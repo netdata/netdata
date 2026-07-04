@@ -41,6 +41,9 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 bytesize = { workspace = true }
+# `test-util` (paused clock: tokio::time::pause/advance + start_paused) for the
+# catalog builder's time-trigger tests; additive over the workspace tokio deps.
+tokio = { workspace = true, features = ["test-util"] }
 # Deliberately NO tls feature here: the TLS backend must arrive via feature
 # unification from opendal's `reqwest-rustls-tls` (see tests/tls_capability.rs).
 reqwest = { version = "0.13", default-features = false }

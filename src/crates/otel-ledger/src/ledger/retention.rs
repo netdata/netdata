@@ -91,10 +91,10 @@ impl Ledger {
             }
         }
 
-        // Catalog retention pass. Day-count derived from the tenant's
-        // SFST `max_age`; see `catalog_retention_days`. A catalog file
-        // is evicted when its date is strictly older than `today -
-        // max_days`.
+        // Catalog retention pass. Day-count driven by the tenant's
+        // remote-archive `horizon` (decoupled from SFST `max_age`); see
+        // `catalog_retention_days`. A catalog file is evicted when its date
+        // is strictly older than `today - max_days`.
         let catalog_reqs: Vec<CleanerRequest> = {
             let mut registries = registries.write().await;
             let registry = match registries.get_mut(tenant_id) {

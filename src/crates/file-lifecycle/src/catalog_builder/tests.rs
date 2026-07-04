@@ -45,12 +45,20 @@ struct Harness {
 }
 
 impl Harness {
+    /// Count-trigger harness: a long `rotation_period` (1h) keeps the 30s time
+    /// ticker from firing during these fast tests, so only the count trigger is
+    /// exercised.
     fn new(rotation_count: usize) -> Self {
+        Self::with_period(rotation_count, std::time::Duration::from_secs(3600))
+    }
+
+    fn with_period(rotation_count: usize, rotation_period: std::time::Duration) -> Self {
         let tmp = tempfile::tempdir().unwrap();
         let base = tmp.path().to_path_buf();
         let args = CatalogBuilderArgs {
             catalog_base_dir: base.clone(),
             rotation_count,
+            rotation_period,
         };
         let cancel = CancellationToken::new();
         let handle = ComponentHandle::spawn::<CatalogBuilder>(args, cancel.child_token());
@@ -64,6 +72,14 @@ impl Harness {
 
     async fn send_recv(&mut self, req: CatalogBuilderRequest) -> CatalogBuilderResponse {
         self.handle.send(req).unwrap();
+        self.handle.recv().await.unwrap()
+    }
+
+    fn send(&mut self, req: CatalogBuilderRequest) {
+        self.handle.send(req).unwrap();
+    }
+
+    async fn recv(&mut self) -> CatalogBuilderResponse {
         self.handle.recv().await.unwrap()
     }
 }
@@ -193,6 +209,7 @@ async fn rotation_failure_preserves_accumulator() {
         CatalogBuilderArgs {
             catalog_base_dir: sentinel,
             rotation_count: 1,
+            rotation_period: std::time::Duration::from_secs(3600),
         },
         cancel.child_token(),
     );
@@ -260,4 +277,137 @@ async fn distinct_scopes_rotate_independently() {
         }
         other => panic!("expected Rotated, got {other:?}"),
     }
+}
+
+#[tokio::test(start_paused = true)]
+async fn time_trigger_rotates_non_empty_after_period() {
+    // A quiet scope well below the count threshold rotates once its age reaches
+    // rotation_period, driven by the 30s check ticker. Paused clock: advancing
+    // past period + one tick fires the time trigger.
+    let mut h = Harness::with_period(100, std::time::Duration::from_secs(60));
+    assert!(matches!(
+        h.send_recv(add_request(1)).await,
+        CatalogBuilderResponse::EntryAccepted { seq: 1 }
+    ));
+
+    // Below period + first tick: nothing rotates yet (30s tick, 60s period).
+    tokio::time::advance(std::time::Duration::from_secs(30)).await;
+
+    // Past the period: the next tick rotates the aged accumulator.
+    tokio::time::advance(std::time::Duration::from_secs(40)).await;
+    match h.recv().await {
+        CatalogBuilderResponse::Rotated { seqs, path, .. } => {
+            assert_eq!(seqs, vec![1]);
+            assert!(path.exists(), "time-rotated catalog file must exist");
+        }
+        other => panic!("expected time-triggered Rotated, got {other:?}"),
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn count_trigger_wins_when_reached_before_period() {
+    // With a real rotation_period set but never advanced past, hitting the count
+    // threshold rotates immediately — the count trigger fires first.
+    let mut h = Harness::with_period(2, std::time::Duration::from_secs(3600));
+    assert!(matches!(
+        h.send_recv(add_request(1)).await,
+        CatalogBuilderResponse::EntryAccepted { .. }
+    ));
+    match h.send_recv(add_request(2)).await {
+        CatalogBuilderResponse::Rotated { max_seq, seqs, .. } => {
+            assert_eq!(max_seq, 2);
+            let mut sorted = seqs.clone();
+            sorted.sort();
+            assert_eq!(sorted, vec![1, 2]);
+        }
+        other => panic!("expected count-triggered Rotated, got {other:?}"),
+    }
+}
+
+#[tokio::test]
+async fn flush_rotates_every_non_empty_scope_then_completes() {
+    // Two distinct scopes, both below the count threshold and the (long) period.
+    // Flush must write a local catalog for each, then reply FlushComplete.
+    let mut h = Harness::new(100);
+    assert!(matches!(
+        h.send_recv(add_request(1)).await,
+        CatalogBuilderResponse::EntryAccepted { .. }
+    ));
+    let other_machine = file_registry::MachineId::new(Uuid::from_u128(0x1111)).unwrap();
+    let other_entry = CatalogEntry {
+        id: FileId::new(file_registry::Identity::new(other_machine, instance()), 0, 7, 0),
+        ..entry_for(7)
+    };
+    assert!(matches!(
+        h.send_recv(CatalogBuilderRequest::AddEntry {
+            tenant_id: TenantId::from("tenant1"),
+            date: date(),
+            entry: other_entry,
+        })
+        .await,
+        CatalogBuilderResponse::EntryAccepted { .. }
+    ));
+
+    h.send(CatalogBuilderRequest::Flush);
+
+    let mut rotated = 0;
+    loop {
+        match h.recv().await {
+            CatalogBuilderResponse::Rotated { path, .. } => {
+                assert!(path.exists(), "flushed catalog file must exist on disk");
+                rotated += 1;
+            }
+            CatalogBuilderResponse::FlushComplete => break,
+            other => panic!("unexpected response during flush: {other:?}"),
+        }
+    }
+    assert_eq!(rotated, 2, "flush must rotate both non-empty scopes");
+}
+
+#[tokio::test]
+async fn flush_with_no_accumulators_just_completes() {
+    // A flush on an idle builder writes nothing and replies FlushComplete.
+    let mut h = Harness::new(100);
+    h.send(CatalogBuilderRequest::Flush);
+    assert!(matches!(
+        h.recv().await,
+        CatalogBuilderResponse::FlushComplete
+    ));
+}
+
+#[tokio::test]
+async fn flush_reports_rotation_failure_then_completes() {
+    // A rotation that fails during Flush emits RotationFailed (not Rotated), and
+    // FlushComplete still follows (it means "done", not "all succeeded").
+    let tmp = tempfile::tempdir().unwrap();
+    let sentinel = tmp.path().join("not_a_dir");
+    std::fs::write(&sentinel, b"").unwrap();
+
+    let cancel = CancellationToken::new();
+    let mut handle = ComponentHandle::spawn::<CatalogBuilder>(
+        CatalogBuilderArgs {
+            catalog_base_dir: sentinel,
+            rotation_count: 100, // never count-rotate; flush is the only trigger
+            rotation_period: std::time::Duration::from_secs(3600),
+        },
+        cancel.child_token(),
+    );
+
+    handle.send(add_request(1)).unwrap();
+    assert!(matches!(
+        handle.recv().await.unwrap(),
+        CatalogBuilderResponse::EntryAccepted { .. }
+    ));
+
+    handle.send(CatalogBuilderRequest::Flush).unwrap();
+    assert!(matches!(
+        handle.recv().await.unwrap(),
+        CatalogBuilderResponse::RotationFailed { .. }
+    ));
+    assert!(matches!(
+        handle.recv().await.unwrap(),
+        CatalogBuilderResponse::FlushComplete
+    ));
+
+    cancel.cancel();
 }

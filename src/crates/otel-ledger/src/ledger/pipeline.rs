@@ -112,6 +112,7 @@ where
         CatalogBuilderArgs {
             catalog_base_dir: catalog_base_dir.clone(),
             rotation_count: config.catalog.rotation_count,
+            rotation_period: config.catalog.rotation_period,
         },
         cancel.child_token(),
     );
@@ -290,14 +291,14 @@ where
         indexer_rx,
         signal,
         pipeline_tx.clone(),
-        "indexer",
+        PipelineResp::INDEXER_KIND,
         PipelineResp::Indexer,
     );
     spawn_forwarder(
         catalog_builder_rx,
         signal,
         pipeline_tx.clone(),
-        "catalog-builder",
+        PipelineResp::CATALOG_BUILDER_KIND,
         PipelineResp::CatalogBuilder,
     );
 

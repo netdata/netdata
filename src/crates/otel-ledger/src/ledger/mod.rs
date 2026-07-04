@@ -409,6 +409,10 @@ impl Ledger {
                         tracing::error!("supervisor request handling failed: {e}")
                     })?;
                     if exit {
+                        // Clean shutdown (the only exit=true path): persist
+                        // in-flight catalog accumulators locally before the
+                        // connection drops and the supervisor reaps workers.
+                        self.flush_catalogs_on_shutdown().await;
                         return Ok(());
                     }
                 }

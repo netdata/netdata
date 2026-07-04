@@ -185,6 +185,14 @@ pub enum CatalogBuilderRequest {
         date: chrono::NaiveDate,
         entry: otel_catalog::CatalogEntry,
     },
+    /// Rotate every non-empty accumulator to a local catalog file NOW,
+    /// regardless of the count/time triggers. Used on clean shutdown to persist
+    /// in-flight accumulators before exit. Each rotated scope emits a
+    /// [`CatalogBuilderResponse::Rotated`] (as usual), followed by a single
+    /// [`CatalogBuilderResponse::FlushComplete`] once all scopes are handled.
+    /// Only the local writes are guaranteed here; the follow-up uploads are best
+    /// effort (the next boot's catalog-upload reconcile finishes them).
+    Flush,
 }
 
 /// Responses sent from the catalog builder back to the ledger.
@@ -220,6 +228,15 @@ pub enum CatalogBuilderResponse {
         max_seq: u64,
         error: String,
     },
+    /// The builder has finished a [`CatalogBuilderRequest::Flush`]: emitted
+    /// exactly once, after every scope's
+    /// [`Rotated`](CatalogBuilderResponse::Rotated) /
+    /// [`RotationFailed`](CatalogBuilderResponse::RotationFailed). It signals
+    /// "done", NOT "all succeeded" — a scope whose rotation failed keeps its
+    /// accumulator (lost on the imminent exit, rebuilt next boot), and
+    /// `FlushComplete` still follows. Lets the shutdown drain know this builder
+    /// is done.
+    FlushComplete,
 }
 
 /// Accept a WAL event connection from the ingestor on the given socket path.

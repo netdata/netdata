@@ -50,3 +50,12 @@ pub enum PipelineResp {
     /// restarts it.
     WorkerGone { kind: &'static str },
 }
+
+impl PipelineResp {
+    /// Worker-kind labels for [`PipelineResp::WorkerGone`], set by the
+    /// per-pipeline forwarders. Shared so a consumer that matches on a kind (the
+    /// shutdown-flush drain checks the catalog-builder kind) can't silently drift
+    /// from the label the forwarder emits.
+    pub const INDEXER_KIND: &'static str = "indexer";
+    pub const CATALOG_BUILDER_KIND: &'static str = "catalog-builder";
+}

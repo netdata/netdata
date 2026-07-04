@@ -326,6 +326,22 @@ fn validate(config: &PluginConfig) -> Result<()> {
         anyhow::bail!("TLS CA certificate requires both TLS certificate and key");
     }
 
+    // Catalog retention (horizon) must outlive SFST retention (max_age) in day
+    // units, or a catalog could be evicted while the SFSTs it gates are still
+    // local — wedging their eviction. Checked per signal, for the default and
+    // every tenant override. Hard error, no clamp (a silent clamp would hide the
+    // misconfiguration).
+    config
+        .logs
+        .retention
+        .validate()
+        .map_err(|e| anyhow::anyhow!("logs.{e}"))?;
+    config
+        .traces
+        .retention
+        .validate()
+        .map_err(|e| anyhow::anyhow!("traces.{e}"))?;
+
     Ok(())
 }
 
@@ -448,8 +464,10 @@ logs:
       max_files: 10
       max_total_size: "1GB"
       max_age: "7 days"
+      horizon: "2 years"
   catalog:
     rotation_count: 10
+    rotation_period: "15 minutes"
 traces:
   rotation:
     default:
@@ -461,8 +479,10 @@ traces:
       max_files: 10
       max_total_size: "1GB"
       max_age: "7 days"
+      horizon: "2 years"
   catalog:
     rotation_count: 10
+    rotation_period: "15 minutes"
 "#;
 
     // Test helpers: exercise config resolution through the public `ConfigResolver`
@@ -1408,7 +1428,80 @@ logs:
             assert_eq!(retention.max_files, 100_000);
             assert_eq!(retention.max_total_size, ByteSize::gb(1));
             assert_eq!(retention.max_age, Duration::from_secs(7 * 24 * 3600));
+            // humantime "2 years" = 2 × 365.25 days; the code default parses the
+            // same literal, so file and default stay in lockstep.
+            assert_eq!(retention.horizon, Duration::from_secs(2 * 31_557_600));
             assert_eq!(signal.catalog.rotation_count, 10);
+            assert_eq!(signal.catalog.rotation_period, Duration::from_secs(15 * 60));
         }
+    }
+
+    #[test]
+    fn horizon_must_exceed_max_age_or_config_is_rejected() {
+        // Equal horizon/max_age is rejected (catalog retention is date-based,
+        // SFST retention age-based; a straddling file would outlive its catalog).
+        let err = resolve_with_user(
+            "logs:\n  retention:\n    default:\n      max_age: \"7 days\"\n      horizon: \"7 days\"\n",
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("horizon"),
+            "expected a horizon-invariant error, got: {err}"
+        );
+
+        // A per-tenant override that undercuts max_age is also rejected.
+        let err = resolve_with_user(
+            "logs:\n  retention:\n    default:\n      max_age: \"7 days\"\n      horizon: \"2 years\"\n    my-tenant:\n      horizon: \"1 days\"\n",
+        )
+        .unwrap_err();
+        assert!(
+            err.to_string().contains("my-tenant"),
+            "expected a per-tenant horizon error, got: {err}"
+        );
+
+        // Comfortably-larger horizon resolves fine.
+        let config = resolve_with_user(
+            "logs:\n  retention:\n    default:\n      max_age: \"7 days\"\n      horizon: \"30 days\"\n",
+        )
+        .unwrap();
+        assert_eq!(
+            config.logs.retention.resolve("default").horizon,
+            Duration::from_secs(30 * 24 * 3600)
+        );
+
+        // Day-unit boundary: the invariant is on ceil-days, so 7d + 1s (→ 8
+        // days) clears 7d (→ 7 days) and is accepted.
+        resolve_with_user(
+            "logs:\n  retention:\n    default:\n      max_age: \"7 days\"\n      horizon: \"7 days 1s\"\n",
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn override_logs_catalog_rotation_period_and_horizon_via_env() {
+        let dir = tempfile::tempdir().unwrap();
+        let stock = write_file(dir.path(), "stock.yaml", STOCK_YAML);
+        let env = ConfigOverride::from_map(&env_map(&[
+            ("NETDATA_OTEL_LOGS_CATALOG_ROTATION_PERIOD", "5 minutes"),
+            ("NETDATA_OTEL_LOGS_RETENTION_HORIZON", "3 years"),
+        ]))
+        .unwrap();
+        let config = ConfigResolver::from_stock(stock)
+            .with_env(env)
+            .resolve()
+            .unwrap();
+        assert_eq!(
+            config.logs.catalog.rotation_period,
+            Duration::from_secs(5 * 60)
+        );
+        assert_eq!(
+            config.logs.retention.resolve("default").horizon,
+            Duration::from_secs(3 * 31_557_600) // humantime "3 years"
+        );
+        // Traces untouched: code defaults.
+        assert_eq!(
+            config.traces.catalog.rotation_period,
+            Duration::from_secs(15 * 60)
+        );
     }
 }

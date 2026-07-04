@@ -100,6 +100,7 @@ impl PluginConfig {
             catalog: CatalogConfig {
                 dir: root.join("catalog"),
                 rotation_count: tuning.catalog.rotation_count,
+                rotation_period: tuning.catalog.rotation_period,
             },
             ingest: tuning.ingest.clone(),
             read_cache_dir: root.join("remote-read"),
@@ -241,12 +242,18 @@ pub struct CatalogTuning {
     /// rotates an in-memory accumulator to an immutable catalog file.
     #[serde(default = "default_catalog_rotation_count")]
     pub rotation_count: usize,
+    /// Age at which a non-empty accumulator rotates even before reaching
+    /// `rotation_count` — the time trigger that bounds how long a quiet host's
+    /// uploaded SFSTs stay uncataloged.
+    #[serde(with = "duration", default = "default_catalog_rotation_period")]
+    pub rotation_period: Duration,
 }
 
 impl Default for CatalogTuning {
     fn default() -> Self {
         Self {
             rotation_count: default_catalog_rotation_count(),
+            rotation_period: default_catalog_rotation_period(),
         }
     }
 }
@@ -373,6 +380,9 @@ pub struct CatalogConfig {
     /// Number of SFST entries accumulated before the catalog builder
     /// rotates an in-memory accumulator to an immutable catalog file.
     pub rotation_count: usize,
+    /// Age at which a non-empty accumulator rotates on the time trigger (see
+    /// [`CatalogTuning::rotation_period`]).
+    pub rotation_period: Duration,
 }
 
 fn default_ingest_max_age() -> Duration {
@@ -385,6 +395,24 @@ fn default_ingest_future_skew() -> Duration {
 
 fn default_catalog_rotation_count() -> usize {
     10
+}
+
+/// Default catalog rotation period: 15 minutes. Aligns the catalog cadence with
+/// the WAL idle-rotation cadence so a quiet host's uploaded SFSTs get cataloged
+/// promptly (a non-empty accumulator rotates at this age even before the count
+/// threshold is reached).
+fn default_catalog_rotation_period() -> Duration {
+    Duration::from_secs(15 * 60)
+}
+
+/// Default catalog retention horizon: 2 years. Catalogs are tiny (~KB) and this
+/// is the queryable-archive depth; it is decoupled from SFST `max_age` and must
+/// stay `>` it in day units (see [`RetentionPolicy::validate`]). Derived by
+/// parsing the same string the stock file ships, so the code default and the
+/// shipped YAML can never drift (humantime counts a year as 365.25 days).
+fn default_retention_horizon() -> Duration {
+    humantime_serde::re::humantime::parse_duration("2 years")
+        .expect("\"2 years\" is a valid humantime duration")
 }
 
 /// WAL file configuration (runtime-only; see [`IndexConfig`]).
@@ -562,6 +590,12 @@ pub struct RetentionEntry {
     pub max_total_size: Option<ByteSize>,
     #[serde(default, with = "opt_duration")]
     pub max_age: Option<Duration>,
+    /// How long catalog (index) files are kept — the remote archive horizon,
+    /// decoupled from SFST `max_age`. Optional in YAML: an absent value inherits
+    /// the code default (see [`default_retention_horizon`]), so existing
+    /// hand-written retention blocks keep parsing after upgrade.
+    #[serde(default, with = "opt_duration")]
+    pub horizon: Option<Duration>,
 }
 
 /// A fully resolved retention policy (all fields present).
@@ -570,6 +604,10 @@ pub struct RetentionConfig {
     pub max_files: usize,
     pub max_total_size: ByteSize,
     pub max_age: Duration,
+    /// Catalog retention horizon (see [`RetentionEntry::horizon`]). Always
+    /// `>` `max_age` in day units by construction — enforced at config load by
+    /// [`RetentionPolicy::validate`].
+    pub horizon: Duration,
 }
 
 /// A validated retention policy: a complete `default` plus partial per-tenant
@@ -598,6 +636,7 @@ impl Default for RetentionPolicy {
                 max_files: 100_000,
                 max_total_size: ByteSize::gb(1),
                 max_age: Duration::from_secs(7 * 24 * 3600),
+                horizon: default_retention_horizon(),
             },
             tenants: HashMap::new(),
         }
@@ -617,7 +656,37 @@ impl RetentionPolicy {
                 .and_then(|e| e.max_total_size)
                 .unwrap_or(self.default.max_total_size),
             max_age: t.and_then(|e| e.max_age).unwrap_or(self.default.max_age),
+            horizon: t.and_then(|e| e.horizon).unwrap_or(self.default.horizon),
         }
+    }
+
+    /// Validate the catalog-horizon invariant for the `default` and every tenant
+    /// override. Catalog retention (`horizon`) must exceed SFST retention
+    /// (`max_age`) in day units: catalog eviction is date-partition based (on a
+    /// file's earliest timestamp) while SFST eviction is age based (on its
+    /// latest timestamp), so a file whose timestamps straddle midnight outlives
+    /// its catalog's date by up to a day. Keeping `horizon` strictly greater in
+    /// day units guarantees the catalog gating an SFST's eviction always
+    /// outlives that SFST. A violation is a hard error at config load (no
+    /// silent clamp — that would quietly wedge local SFSTs).
+    pub fn validate(&self) -> Result<(), String> {
+        let mut names: Vec<&str> = self.tenants.keys().map(String::as_str).collect();
+        names.push("default");
+        for name in names {
+            let r = self.resolve(name);
+            let horizon_days = r.horizon.as_secs().div_ceil(86_400);
+            let max_age_days = r.max_age.as_secs().div_ceil(86_400);
+            if horizon_days <= max_age_days {
+                return Err(format!(
+                    "retention.horizon ({}) must exceed max_age ({}) by more than a day \
+                     for tenant \"{name}\" (catalog retention is date-based, SFST retention is \
+                     age-based, so a catalog must outlive the SFSTs it indexes)",
+                    humantime_serde::re::humantime::format_duration(r.horizon),
+                    humantime_serde::re::humantime::format_duration(r.max_age),
+                ));
+            }
+        }
+        Ok(())
     }
 
     /// Patch this policy from a partial override map: the `"default"` entry's set
@@ -635,6 +704,9 @@ impl RetentionPolicy {
                 if let Some(v) = entry.max_age {
                     self.default.max_age = v;
                 }
+                if let Some(v) = entry.horizon {
+                    self.default.horizon = v;
+                }
             } else {
                 let target = self.tenants.entry(key.clone()).or_default();
                 if let Some(v) = entry.max_files {
@@ -645,6 +717,9 @@ impl RetentionPolicy {
                 }
                 if let Some(v) = entry.max_age {
                     target.max_age = Some(v);
+                }
+                if let Some(v) = entry.horizon {
+                    target.horizon = Some(v);
                 }
             }
         }
@@ -668,6 +743,10 @@ impl TryFrom<HashMap<String, RetentionEntry>> for RetentionPolicy {
             max_age: d
                 .max_age
                 .ok_or_else(|| "default retention must set max_age".to_string())?,
+            // `horizon` is optional in the stock/operator file: an absent value
+            // takes the code default so pre-P5 retention blocks keep parsing.
+            // The catalog >= sfst invariant is enforced separately by `validate`.
+            horizon: d.horizon.unwrap_or_else(default_retention_horizon),
         };
         Ok(Self {
             default,
@@ -685,6 +764,7 @@ impl From<RetentionPolicy> for HashMap<String, RetentionEntry> {
                 max_files: Some(p.default.max_files),
                 max_total_size: Some(p.default.max_total_size),
                 max_age: Some(p.default.max_age),
+                horizon: Some(p.default.horizon),
             },
         );
         map
@@ -919,6 +999,60 @@ traces:
             bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
         assert_eq!(back.max_age, c.max_age);
         assert_eq!(back.future_skew, c.future_skew);
+    }
+
+    #[test]
+    fn retention_horizon_resolves_defaults_overrides_and_validates() {
+        // Absent horizon inherits the code default; the invariant holds (2y > 7d).
+        let policy: RetentionPolicy = serde_yaml::from_str(
+            "default:\n  max_files: 10\n  max_total_size: \"1GB\"\n  max_age: \"7 days\"\n",
+        )
+        .unwrap();
+        assert_eq!(policy.resolve("default").horizon, default_retention_horizon());
+        policy.validate().unwrap();
+
+        // Explicit default + per-tenant override both resolve.
+        let policy: RetentionPolicy = serde_yaml::from_str(
+            "default:\n  max_files: 10\n  max_total_size: \"1GB\"\n  max_age: \"7 days\"\n  horizon: \"30 days\"\ntenant-a:\n  horizon: \"90 days\"\n",
+        )
+        .unwrap();
+        assert_eq!(
+            policy.resolve("default").horizon,
+            Duration::from_secs(30 * 86_400)
+        );
+        assert_eq!(
+            policy.resolve("tenant-a").horizon,
+            Duration::from_secs(90 * 86_400)
+        );
+        policy.validate().unwrap();
+
+        // Equal horizon/max_age is rejected (day-unit strict-greater).
+        let policy: RetentionPolicy = serde_yaml::from_str(
+            "default:\n  max_files: 10\n  max_total_size: \"1GB\"\n  max_age: \"7 days\"\n  horizon: \"7 days\"\n",
+        )
+        .unwrap();
+        assert!(policy.validate().is_err());
+    }
+
+    #[test]
+    fn retention_policy_horizon_survives_bincode_ipc() {
+        // RetentionPolicy travels supervisor→worker as HashMap<_, RetentionEntry>
+        // over bincode; horizon (opt_duration) must round-trip the tuple form.
+        let mut policy = RetentionPolicy::default();
+        policy.apply_overrides(&HashMap::from([(
+            "default".to_string(),
+            RetentionEntry {
+                horizon: Some(Duration::from_secs(1234 * 86_400)),
+                ..Default::default()
+            },
+        )]));
+        let bytes = bincode::serde::encode_to_vec(&policy, bincode::config::standard()).unwrap();
+        let (back, _): (RetentionPolicy, usize) =
+            bincode::serde::decode_from_slice(&bytes, bincode::config::standard()).unwrap();
+        assert_eq!(
+            back.resolve("default").horizon,
+            Duration::from_secs(1234 * 86_400)
+        );
     }
 }
 

@@ -42,6 +42,8 @@ pub(super) struct SignalOverride {
 pub(super) struct CatalogOverride {
     #[serde(default)]
     pub(super) rotation_count: Option<usize>,
+    #[serde(default, deserialize_with = "opt_humantime")]
+    pub(super) rotation_period: Option<Duration>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -109,7 +111,7 @@ impl StorageOverride {
 
 impl CatalogOverride {
     pub(super) fn has_any(&self) -> bool {
-        self.rotation_count.is_some()
+        self.rotation_count.is_some() || self.rotation_period.is_some()
     }
 }
 
@@ -136,6 +138,9 @@ pub(super) fn apply_signal(config: &mut SignalConfig, o: &SignalOverride) {
     if let Some(c) = &o.catalog {
         if let Some(v) = c.rotation_count {
             config.catalog.rotation_count = v;
+        }
+        if let Some(v) = c.rotation_period {
+            config.catalog.rotation_period = v;
         }
     }
     if let Some(i) = &o.ingest {

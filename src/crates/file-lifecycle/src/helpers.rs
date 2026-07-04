@@ -19,13 +19,17 @@ pub fn date_from_summary(summary: &sfst::Summary) -> Option<chrono::NaiveDate> {
     chrono::DateTime::from_timestamp(summary.min_timestamp_s as i64, 0).map(|dt| dt.date_naive())
 }
 
-/// Catalog retention window (whole days) derived from a tenant's SFST
-/// retention policy. Ceiling division so a non-integer `max_age` in days
-/// doesn't trim catalog coverage below SFST coverage. There is no
-/// independent knob — this is the single source of truth.
+/// Catalog retention window (whole days) driven by the remote-archive horizon
+/// (`retention.horizon`), decoupled from SFST `max_age`. Ceiling division so a
+/// non-integer horizon in days doesn't trim catalog coverage. The
+/// `horizon > max_age` (in days) invariant is enforced at config load
+/// ([`bridge::config::RetentionPolicy::validate`]), so a catalog always outlives
+/// the SFSTs it indexes. The startup catalog-upload reconcile does NOT use this
+/// window — it is bounded by the still-local SFST set instead (see
+/// [`crate::recovery::reconcile_local_catalog_uploads`]).
 pub fn catalog_retention_days(retention: &bridge::config::RetentionConfig) -> u32 {
     retention
-        .max_age
+        .horizon
         .as_secs()
         .div_ceil(86_400)
         .try_into()
@@ -105,6 +109,7 @@ mod tests {
             max_files: 7,
             max_total_size: bytesize::ByteSize::gib(10),
             max_age: std::time::Duration::from_secs(86_400),
+            horizon: std::time::Duration::from_secs(2 * 365 * 24 * 3600),
         };
         let policy = sfst_retention_policy(&cfg);
         assert_eq!(policy.max_files, 7);

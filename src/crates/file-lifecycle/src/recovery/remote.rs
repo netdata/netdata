@@ -197,6 +197,23 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
     // means "no cutoff applies" — match retention.rs's own guard.
     let cutoff = today.checked_sub_signed(chrono::Duration::days(max_days as i64));
 
+    // Confirm remote presence only for catalogs that can still gate a
+    // not-yet-evicted (still-local) SFST. `reconcile_local_catalog_uploads` is
+    // the sole restart-time source of `remote_cataloged` (it is not persisted;
+    // `seed_from_catalog_files` sets only uploaded/rotated), and the retention
+    // pass requires `remote_cataloged` before it may evict an SFST. So the
+    // confirm set MUST be bounded by the LOCAL SFSTs (themselves retention-
+    // bounded), NOT by catalog date/horizon: after downtime longer than
+    // `max_age`, a local SFST past `max_age` still needs its now-old catalog
+    // confirmed — a date bound would strand it and wedge eviction for ~horizon.
+    // A catalog can gate a local SFST only if its `max_seq` reaches the oldest
+    // local SFST's seq; catalogs below that cover only already-evicted SFSTs.
+    // With no local SFSTs there is nothing to confirm, and the set is bounded by
+    // the local-SFST tail, never by the (much larger) horizon.
+    let Some(min_local_seq) = registry.sfst.values().map(|f| f.id.seq).min() else {
+        return Ok(());
+    };
+
     // Snapshot the (path, date, remote_key) list so we can mutate the registry
     // (`mark_remote_cataloged`) while processing without holding the iterator's
     // borrow of `registry.catalog_files`.
@@ -204,6 +221,7 @@ pub async fn reconcile_local_catalog_uploads<S: Storage>(
         .catalog_files
         .iter()
         .filter(|(_, file)| !file.is_pending_deletion())
+        .filter(|(_, file)| file.max_seq >= min_local_seq)
         .map(|(local_path, file)| {
             let remote_key = crate::remote_keys::catalog(
                 signal,

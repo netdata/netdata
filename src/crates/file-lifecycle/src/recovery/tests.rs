@@ -123,6 +123,7 @@ fn evict_all_retention() -> bridge::config::RetentionConfig {
         max_files: 0,
         max_total_size: bytesize::ByteSize::b(u64::MAX),
         max_age: std::time::Duration::from_secs(u64::MAX / 2),
+        horizon: std::time::Duration::from_secs(u64::MAX / 2),
     }
 }
 
@@ -235,6 +236,14 @@ async fn reconcile_local_catalog_uploads_re_uploads_missing_files() {
 
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     let local_path = place_local_catalog(&mut reg, date, 10, 100, 200);
+    // The catalog's SFST is still local (a catalog missing from remote implies
+    // its SFSTs were never remote-cataloged, so they can't have been evicted) —
+    // the reconcile only considers catalogs that can gate a local SFST.
+    reg.sfst.track(
+        file_registry::FileId::new(ident(), 0, 10, 0),
+        ByteSize(1),
+        empty_summary(),
+    );
 
     let (op, _op_tmp) = fs_operator();
     let storage = crate::storage::OpendalStorage::from_operator(op.clone());
@@ -292,6 +301,11 @@ async fn reconcile_local_catalog_uploads_skips_existing_files() {
 
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     let _path = place_local_catalog(&mut reg, date, 10, 100, 200);
+    reg.sfst.track(
+        file_registry::FileId::new(ident(), 0, 10, 0),
+        ByteSize(1),
+        empty_summary(),
+    );
 
     let (op, _op_tmp) = fs_operator();
     let storage = crate::storage::OpendalStorage::from_operator(op.clone());
@@ -355,17 +369,23 @@ async fn reconcile_local_catalog_uploads_skips_existing_files() {
 }
 
 #[tokio::test]
-async fn reconcile_local_catalog_uploads_skips_past_retention_files() {
-    // A catalog file past the retention cutoff must not be
-    // re-uploaded: the subsequent retention pass will delete it
-    // locally, and a concurrent upload task would race the cleaner.
+async fn reconcile_local_catalog_uploads_skips_catalogs_of_evicted_sfsts() {
+    // A catalog whose SFSTs are no longer local (already evicted, so the catalog
+    // must already be remote-confirmed) is skipped: the confirm-scan is bounded
+    // by the still-local SFST seq floor, not by date/horizon. Here the only local
+    // SFST is seq=20, so the old seq=5 catalog (max_seq < 20) is not statted.
     let catalog_dir = tempfile::tempdir().unwrap();
     let mut reg = make_registry(catalog_dir.path());
 
-    // Place a catalog dated 30 days ago; retention is 7 days.
     let today = chrono::Utc::now().date_naive();
     let old_date = today - chrono::Duration::days(30);
-    place_local_catalog(&mut reg, old_date, 10, 100, 200);
+    place_local_catalog(&mut reg, old_date, 5, 100, 200);
+    // A newer SFST is still local; its seq is the floor for the confirm-scan.
+    reg.sfst.track(
+        file_registry::FileId::new(ident(), 0, 20, 0),
+        ByteSize(1),
+        empty_summary(),
+    );
 
     let (op, _op_tmp) = fs_operator();
     let storage = crate::storage::OpendalStorage::from_operator(op.clone());
@@ -380,10 +400,81 @@ async fn reconcile_local_catalog_uploads_skips_past_retention_files() {
         cancel.child_token(),
     );
 
+    reconcile_local_catalog_uploads(
+        &mut reg,
+        0,
+        "logs",
+        &mut uploader,
+        &storage,
+        &TenantId::from("tenant1"),
+        &evict_all_retention(),
+    )
+    .await
+    .unwrap();
+
+    // The old catalog (whose SFSTs are gone) was not statted or re-uploaded.
+    assert_eq!(uploader.pending(), 0);
+    assert!(
+        !reg.is_remote_cataloged(5),
+        "a catalog below the local-SFST floor must not be confirmed"
+    );
+
+    cancel.cancel();
+}
+
+#[tokio::test]
+async fn reconcile_confirms_old_catalog_of_still_local_sfst_so_it_can_evict() {
+    // Regression guard for the eviction wedge: after downtime longer than
+    // max_age, an SFST past max_age is still local and its catalog is old. The
+    // confirm-scan MUST still stat that old catalog (it gates a local SFST), or
+    // the SFST can never become remote_cataloged and never evicts. A date-bounded
+    // scan would strand it; the seq-bounded scan confirms it.
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+
+    let today = chrono::Utc::now().date_naive();
+    let old_date = today - chrono::Duration::days(30);
+    let local_path = place_local_catalog(&mut reg, old_date, 10, 100, 200);
+    // The SFST is still local and past max_age (empty summary → max_ts 0).
+    reg.sfst.track(
+        file_registry::FileId::new(ident(), 0, 10, 0),
+        ByteSize(1),
+        empty_summary(),
+    );
+
+    let (op, _op_tmp) = fs_operator();
+    let storage = crate::storage::OpendalStorage::from_operator(op.clone());
+    // The catalog is already on the remote (its upload completed pre-downtime).
+    let remote_key = crate::remote_keys::catalog(
+        "logs",
+        old_date,
+        &TenantId::from("tenant1"),
+        ident(),
+        10,
+        100,
+        200,
+    );
+    op.write(&remote_key, std::fs::read(&local_path).unwrap())
+        .await
+        .unwrap();
+
+    let cancel = tokio_util::sync::CancellationToken::new();
+    let mut uploader = crate::component::ComponentHandle::spawn::<
+        crate::uploader::Uploader<crate::storage::OpendalStorage>,
+    >(
+        crate::uploader::UploaderArgs {
+            storage: storage.clone(),
+            max_concurrent: 4,
+        },
+        cancel.child_token(),
+    );
+
+    // Realistic production shape: horizon (2y) >> max_age (7d).
     let retention = bridge::config::RetentionConfig {
         max_files: 100,
         max_total_size: bytesize::ByteSize::b(u64::MAX),
         max_age: std::time::Duration::from_secs(7 * 86_400),
+        horizon: std::time::Duration::from_secs(2 * 365 * 86_400),
     };
 
     reconcile_local_catalog_uploads(
@@ -398,8 +489,18 @@ async fn reconcile_local_catalog_uploads_skips_past_retention_files() {
     .await
     .unwrap();
 
-    // Past-retention file was skipped: no UploadCatalog enqueued.
-    assert_eq!(uploader.pending(), 0);
+    // The old catalog was confirmed present → its SFST is now remote-cataloged.
+    assert!(
+        reg.is_remote_cataloged(10),
+        "old catalog of a still-local SFST must be confirmed (no wedge)"
+    );
+
+    // And the retention pass now evicts the past-max_age SFST.
+    run_recover_retention(&mut reg, &retention, true).await;
+    assert!(
+        reg.sfst.get(10).is_none(),
+        "a remote-cataloged, past-max_age SFST must be evicted (wedge fixed)"
+    );
 
     cancel.cancel();
 }
@@ -411,6 +512,11 @@ async fn reconcile_local_catalog_uploads_skips_pending_deletion_files() {
 
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     let path = place_local_catalog(&mut reg, date, 10, 100, 200);
+    reg.sfst.track(
+        file_registry::FileId::new(ident(), 0, 10, 0),
+        ByteSize(1),
+        empty_summary(),
+    );
     reg.catalog_files.mark_pending_deletion(&path);
 
     let (op, _op_tmp) = fs_operator();
@@ -469,6 +575,11 @@ async fn reconcile_local_catalog_uploads_skips_on_transient_stat_error() {
 
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     place_local_catalog(&mut reg, date, 10, 100, 200);
+    reg.sfst.track(
+        file_registry::FileId::new(ident(), 0, 10, 0),
+        ByteSize(1),
+        empty_summary(),
+    );
 
     let storage = MockStorage {
         stat: MockStat::Transient,
@@ -518,6 +629,11 @@ async fn reconcile_local_catalog_uploads_confirms_present_via_mock() {
 
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     place_local_catalog(&mut reg, date, 10, 100, 200);
+    reg.sfst.track(
+        file_registry::FileId::new(ident(), 0, 10, 0),
+        ByteSize(1),
+        empty_summary(),
+    );
 
     let storage = MockStorage {
         stat: MockStat::Found,
@@ -562,14 +678,16 @@ async fn reconcile_local_catalog_uploads_confirms_present_via_mock() {
 
 // ── reconcile_remote_uploads tests (mock-driven LIST) ─────────
 
-/// Retention whose `max_age` rounds to a 0-day catalog window, so
+/// Retention whose `horizon` rounds to a 0-day catalog window, so
 /// `reconcile_remote_uploads` issues exactly one LIST (today) — keeps these
-/// single-day tests focused on one prefix.
+/// single-day tests focused on one prefix. (`reconcile_remote_uploads` bounds
+/// its LIST window by `catalog_retention_days`, which is horizon-driven.)
 fn today_window_retention() -> bridge::config::RetentionConfig {
     bridge::config::RetentionConfig {
         max_files: 100,
         max_total_size: bytesize::ByteSize::b(u64::MAX),
         max_age: std::time::Duration::from_secs(0),
+        horizon: std::time::Duration::from_secs(0),
     }
 }
 
@@ -589,6 +707,7 @@ fn spawn_idle_catalog_builder(
         crate::catalog_builder::CatalogBuilderArgs {
             catalog_base_dir: path,
             rotation_count: 100,
+            rotation_period: std::time::Duration::from_secs(3600),
         },
         cancel.child_token(),
     )

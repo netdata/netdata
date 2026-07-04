@@ -235,12 +235,15 @@ impl SignalOverride {
             max_files: parse_env_var(env, &var(prefix, "RETENTION_MAX_FILES"))?,
             max_total_size: parse_env_var(env, &var(prefix, "RETENTION_MAX_TOTAL_SIZE"))?,
             max_age: parse_env_duration(env, &var(prefix, "RETENTION_MAX_AGE"))?,
+            horizon: parse_env_duration(env, &var(prefix, "RETENTION_HORIZON"))?,
         };
         let retention_has_any = retention_default.max_files.is_some()
             || retention_default.max_total_size.is_some()
-            || retention_default.max_age.is_some();
+            || retention_default.max_age.is_some()
+            || retention_default.horizon.is_some();
         let catalog = CatalogOverride {
             rotation_count: parse_env_var(env, &var(prefix, "CATALOG_ROTATION_COUNT"))?,
+            rotation_period: parse_env_duration(env, &var(prefix, "CATALOG_ROTATION_PERIOD"))?,
         };
         let ingest = IngestOverride {
             max_age: parse_env_duration(env, &var(prefix, "INGEST_MAX_AGE"))?,

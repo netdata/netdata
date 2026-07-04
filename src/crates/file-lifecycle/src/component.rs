@@ -66,15 +66,23 @@ impl<Req: Send + 'static, Resp: Send + 'static> ComponentHandle<Req, Resp> {
     }
 
     /// Receive the next response from the component.
+    ///
+    /// The decrement saturates at zero: a component MAY emit unsolicited
+    /// responses with no matching request (the catalog builder's time-trigger
+    /// and `Flush` rotations each emit a `Rotated` with no preceding `AddEntry`),
+    /// so `pending` is a best-effort floor, not a strict send/recv balance. It is
+    /// only consulted by the synchronous recovery drains, which do 1:1 request/
+    /// response; steady-state routing goes through `into_parts` and ignores it.
     pub async fn recv(&mut self) -> Option<Resp> {
         let resp = self.rx.recv().await;
         if resp.is_some() {
-            self.pending -= 1;
+            self.pending = self.pending.saturating_sub(1);
         }
         resp
     }
 
-    /// Number of requests sent but not yet responded to.
+    /// Number of requests sent but not yet responded to (best-effort; see
+    /// [`recv`](Self::recv)).
     pub fn pending(&self) -> usize {
         self.pending
     }

@@ -88,18 +88,29 @@ logs:
   retention:
     # How much log data to keep on local disk; the oldest files are deleted
     # when any of these limits is exceeded.
+    #
+    # `horizon` is separate: it is how long the small catalog (index) files that
+    # map uploaded data are kept — the depth of the queryable remote archive,
+    # independent of local data retention. It MUST exceed max_age (by more than a
+    # day), or the plugin refuses to start: a catalog must outlive the data files
+    # it indexes. Catalogs are tiny (~KB), so a long horizon costs little.
     default:
       max_files: 100000
       max_total_size: "1GB"
       max_age: "7 days"
+      horizon: "2 years"
 
     # Per-tenant overrides (any subset of the fields above):
     # my-tenant:
     #   max_age: "30 days"
 
   catalog:
-    # Number of index files recorded per catalog file.
+    # A catalog (index) file is written when its accumulator reaches
+    # rotation_count entries OR has been open for rotation_period, whichever
+    # comes first (plus a flush on clean shutdown). The time trigger bounds how
+    # long a quiet host's uploaded data stays uncataloged.
     rotation_count: 10
+    rotation_period: "15 minutes"
 
   ingest:
     # Reject log records whose timestamp falls outside this window, checked per
