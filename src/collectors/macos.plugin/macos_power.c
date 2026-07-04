@@ -42,6 +42,40 @@ struct macos_power_source {
 
 static struct macos_power_source *power_sources_root = NULL;
 
+static bool macos_power_source_chart_id_exists(const char *chart_id)
+{
+    for (struct macos_power_source *ps = power_sources_root; ps; ps = ps->next) {
+        if (ps->ps.name && !strcmp(ps->ps.name, chart_id))
+            return true;
+    }
+
+    return false;
+}
+
+static void macos_power_source_unique_chart_id(const char *raw_name, char *dst, size_t dst_size)
+{
+    char base[MACOS_POWER_SOURCE_NAME_MAX + 1];
+    snprintfz(base, sizeof(base), "%s", raw_name);
+    netdata_fix_chart_id(base);
+
+    snprintfz(dst, dst_size, "%s", base);
+    if (!macos_power_source_chart_id_exists(dst))
+        return;
+
+    uint32_t raw_hash = simple_hash(raw_name);
+    char hashed[MACOS_POWER_SOURCE_NAME_MAX + 1];
+    snprintfz(hashed, sizeof(hashed), "%s_%08x", base, raw_hash);
+    snprintfz(dst, dst_size, "%s", hashed);
+    if (!macos_power_source_chart_id_exists(dst))
+        return;
+
+    for (unsigned n = 2; n < 1000; n++) {
+        snprintfz(dst, dst_size, "%s_%u", hashed, n);
+        if (!macos_power_source_chart_id_exists(dst))
+            return;
+    }
+}
+
 static bool cf_dictionary_get_int64(CFDictionaryRef dict, CFStringRef key, int64_t *value)
 {
     if (!dict || !key || !value)
@@ -133,8 +167,7 @@ static struct macos_power_source *macos_power_source_get_or_create(const char *n
     }
 
     char chart_id[MACOS_POWER_SOURCE_NAME_MAX + 1];
-    snprintfz(chart_id, sizeof(chart_id), "%s", name);
-    netdata_fix_chart_id(chart_id);
+    macos_power_source_unique_chart_id(name, chart_id, sizeof(chart_id));
 
     struct macos_power_source *ps = callocz(1, sizeof(*ps));
     ps->raw_name = strdupz(name);
