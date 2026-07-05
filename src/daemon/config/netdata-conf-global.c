@@ -157,6 +157,10 @@ void netdata_conf_section_global(void) {
 }
 
 void netdata_conf_section_global_wmi_timeout(void) {
+    // WMI startup timeout is Windows-only: the env var is consumed exclusively by the
+    // Windows WMI collector. Guard here so the config key is not materialized into the
+    // effective netdata.conf on other OSes, keeping behavior aligned with the docs.
+#if defined(OS_WINDOWS)
     FUNCTION_RUN_ONCE();
 
     long long default_ms = 5000;
@@ -167,6 +171,7 @@ void netdata_conf_section_global_wmi_timeout(void) {
     char buf[32];
     snprintfz(buf, sizeof(buf), "%lld", configured);
     nd_setenv("NETDATA_WMI_STARTUP_TIMEOUT_MS", buf, 1);
+#endif
 }
 
 void netdata_conf_section_global_run_as_user(const char **user) {
