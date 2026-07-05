@@ -57,6 +57,18 @@
   (never `endpoints.0.host`).
 - Projected scalar fields are queryable: `event_name` (now indexed),
   `severity_text`, `severity_number`, `body`.
+- A structured body (kvlist/array) flattens under the `body` root: `body.<key>`,
+  `body.items[].name`, each leaf keeping its own type.
+- **JSON-object string bodies are decomposed at ingest (2026-07):** a body that
+  is a STRING whose trimmed text starts `{` and ends `}` AND parses as a JSON
+  object is rewritten during normalization into the equivalent OTLP kvlist, so
+  it lands as typed `body.*` keys; **the raw string is dropped** (there is no
+  `body` scalar for that record). Any other string body — non-JSON, invalid
+  JSON, or JSON that is not an object (number/bool/array/null/string) — stays
+  the verbatim scalar `body`. String VALUES inside the parsed object are never
+  re-parsed. JSON numbers: integers fitting `i64` → Int; `u64 > i64::MAX` and
+  fractional → Double (precision loss above 2^53 accepted by decision). No
+  depth/field/size caps beyond serde_json's default recursion limit.
 - `trace_id` / `span_id` / `flags` / `dropped_attributes_count` /
   `observed_time` are **per-row columns**, NOT indexed entries — retrieved per
   row, not faceted (`trace_id`/`span_id` are near-unique; faceting them is noise).
@@ -89,18 +101,30 @@
 
 ## Ingest normalization (once, at the observation point)
 
-- `ng_flatten::normalize_timestamps(req, fallback_base_ns)`: per record,
-  `time_unix_nano` if non-zero, else `observed_time_unix_nano`, else
-  `fallback_base_ns + row_offset` (base+offset, computed lock-free), frozen into
-  `Record.ts`. Ordering is preserved; the synthetic fallback is deterministic but
-  not globally unique across frames (it only affects records lacking both event
-  and observed time).
-- `ng_flatten::normalize_ids(req)`: drops malformed trace/span ids (not exactly
-  16/8 bytes, or empty) so the per-row `TRCE`/`SPAN` columns stay clean
-  fixed-stride; returns an aggregate `MalformedIds` count for a single warning
-  per request.
-- Both run once at ingest. Downstream (seal build, tail scan) reads the frozen
-  values; it MUST NOT re-resolve timestamps or ids.
+- One walk: `ng_flatten::normalize_log_request(req, fallback_base_ns, bounds)`
+  performs ALL record normalization in a single in-place pass (the earlier
+  separate `normalize_timestamps`/`normalize_ids` helpers were merged into it):
+  1. **Timestamps**: per record, `time_unix_nano` if non-zero, else
+     `observed_time_unix_nano`, else `fallback_base_ns + k` (deterministic,
+     strictly increasing; not globally unique across frames), frozen into
+     `Record.ts`.
+  2. **Ingest window**: with `TimeBounds` set, records whose resolved
+     client-provided timestamp falls outside `[min_ns, max_ns]` are dropped and
+     counted (`rejected`); synthesized timestamps always pass. Scopes/resources
+     emptied by the filter are dropped so no zero-row attributes get interned.
+  3. **Ids**: malformed trace/span ids (non-empty, wrong length) are cleared so
+     the per-row `TRCE`/`SPAN` columns stay clean fixed-stride; counted in
+     `MalformedIds` for one aggregated warning per request.
+  4. **JSON-object string bodies** (2026-07): rewritten into the equivalent
+     OTLP kvlist (see "Field namespace") so the flattener emits typed `body.*`
+     columns; the raw string is dropped; counted in `parsed_bodies`
+     (normalization-local by design — counts normal behavior, not forwarded or
+     logged by `prepare_log_frame`).
+- Runs once at ingest, before flattening. Downstream (seal build, tail scan)
+  reads the frozen values; it MUST NOT re-resolve timestamps, ids, or bodies.
+- Consequence: the WAL frame is lossless w.r.t. the NORMALIZED request, not the
+  original wire bytes — a decomposed JSON body cannot be re-serialized
+  byte-identically (key order, whitespace, number formatting).
 
 ## Identity authority
 
