@@ -11,13 +11,13 @@ Before configuring either method, understand how Netdata structures its exported
 
 :::note
 
-The metric naming rules below apply to the [remote write exporter](/src/exporting/prometheus/remote_write/README.md) as well as the scraping endpoint — both use the same prefix, context, units, and suffix rules. To preview the exact metric names that remote write will send, query the allmetrics endpoint using the same data source configured in `exporting.conf`:
+The metric naming rules below apply to the [remote write exporter](/src/exporting/prometheus/remote_write/README.md) as well as the scraping endpoint — both use the same prefix, context, units, and suffix rules. To preview the exact metric names that remote write will send, query the `allmetrics` endpoint using the same prefix and data source configured for your remote write exporter in `exporting.conf`:
 
 ```
-http://your.netdata.ip:19999/api/v1/allmetrics?format=prometheus&source=as-collected&help=yes
+http://your.netdata.ip:19999/api/v1/allmetrics?format=prometheus&source=as-collected&prefix=netdata
 ```
 
-Replace `as-collected` with `average` or `sum` to match your exporter's configured data source. The data source controls whether units appear in the metric name and which suffix is appended, exactly as described in [Netdata Data Source](#netdata-data-source).
+Replace `as-collected` with `average` or `sum`, and `netdata` with your configured `prefix`, to match your remote write exporter's settings — the endpoint defaults to the scraping exporter's prefix, which may differ from a remote write instance configured with a custom `prefix`. The data source controls whether units appear in the metric name and which suffix is appended, exactly as described in [Netdata Data Source](#netdata-data-source).
 
 :::
 
@@ -217,7 +217,7 @@ Control the default in `exporting.conf`:
 
 ```text
 [prometheus:exporter]
-	send names instead of ids = yes | no
+ send names instead of ids = yes | no
 ```
 
 Override via URL:
@@ -231,7 +231,7 @@ Filter metrics with this setting:
 
 ```text
 [prometheus:exporter]
-	send charts matching = *
+ send charts matching = *
 ```
 
 This accepts space-separated [simple patterns](/src/libnetdata/simple_pattern/README.md) to match charts. Pattern rules:
@@ -247,7 +247,7 @@ Netdata prefixes all metrics with `netdata_`. Change in `netdata.conf`:
 
 ```text
 [prometheus:exporter]
-	prefix = netdata
+ prefix = netdata
 ```
 
 Or append `&prefix=netdata` to the URL.
@@ -265,10 +265,11 @@ Or append `&prefix=netdata` to the URL.
 When using `average` or `sum` sources, Netdata remembers each client's last access time to calculate values for the period since last access. This prevents data loss regardless of scrape frequency.
 
 Server identification:
-| Scenario | Method |
-|:---------|:-------|
-| Direct connection | Client IP (default) |
-| Behind proxy or NAT | Append `&server=NAME` to URL |
+
+| Scenario                  | Method                          |
+|:--------------------------|:--------------------------------|
+| Direct connection         | Client IP (default)             |
+| Behind proxy or NAT       | Append `&server=NAME` to URL    |
 | Multiple servers, same IP | Each uses unique `&server=NAME` |
 
 ### Host Labels
