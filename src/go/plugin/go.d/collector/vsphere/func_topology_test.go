@@ -105,6 +105,7 @@ func newVSphereTopologyTestCollector() *Collector {
 				OverallStatus:         "green",
 				SnapshotCount:         2,
 				SnapshotMaxChainDepth: 3,
+				Labels:                map[string]string{"vsphere_tag_service": "payments"},
 			},
 		},
 		Datastores: rs.Datastores{
@@ -183,6 +184,9 @@ func TestFuncTopology_HandleWithInventoryCache(t *testing.T) {
 	require.Equal(t, "VM1", vm["name"])
 	require.Equal(t, "network", network["object_type"])
 	require.Equal(t, "VM Network", network["name"])
+	require.Subset(t, data.Types.ActorTypes["vsphere_vm"].Search.Columns, []string{"name", "vsphere_moid", "object_type"})
+	require.Contains(t, data.Types.ActorTypes["vsphere_vm"].Search.LabelKeys, "vsphere_tag_service")
+	require.NotContains(t, data.Types.ActorTypes["vsphere_host"].Search.LabelKeys, "vsphere_tag_service")
 
 	require.NotNil(t, data.Tables)
 	details := topologyTableRows(t, data.Tables.Actor[vsphereTopologyDetailTable].Table, data.Dictionaries)

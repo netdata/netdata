@@ -211,6 +211,9 @@ def assert_whitelist(payload):
     assert all(source == "cgroups" for source in labels["source"])
     assert all(kind == "label" for kind in labels["kind"])
 
+    process_search = payload["data"]["types"]["actor_types"]["process"]["search"]
+    assert {"team", "app"}.issubset(set(process_search["label_keys"]))
+
 
 def assert_mixed(payload):
     assert_contract(payload)
