@@ -60,87 +60,87 @@ func (c *Controller) StepExec(fn dyncfg.Function, run dyncfg.StepRunner) {
 	}
 }
 
-// CommandActs reports whether fn may execute CLAIMLESSLY: false only when
-// execution answers a deterministic rejection BEFORE its first
-// claim-protected access - an unsupported command (the 501 arm above), a
-// missing store, an existing store on add, or a missing/unparsable
-// payload. Claim scheduling consults it so rejection-only store commands
-// claim nothing instead of parking behind held keys with no bounded
-// release; it mirrors the stage gates of the Step functions in this file
-// plus the shared handler's gates (via handler.CommandActs), and the
-// parity test drives StepExec against it. The remove arm consults ONLY the
-// shared pre-claim gate prefix (removeRejection): its affected-jobs check
-// reads the dependency index, which must be excluded by the granted store
-// write claim (no new reference can appear once the claim is held), so
-// EVERY remove gate from that read onward - the 409 and the handler's
-// source/type 405s ordered behind it - answers under the claim, and a
-// remove of any EXISTING store "acts" even when it will answer a rejection
-// inline.
-func (c *Controller) CommandActs(fn dyncfg.Function) bool {
+// CommandPlan reports how fn must be scheduled. Claimless means execution
+// answers a deterministic rejection before its first claim-protected access.
+// The remove arm consults only the pre-claim gate prefix (removeRejection):
+// its affected-jobs check reads the dependency index, so every gate from that
+// read onward answers under the granted store write claim.
+func (c *Controller) CommandPlan(fn dyncfg.Function) dyncfg.CommandPlan {
 	switch fn.Command() {
 	case dyncfg.CommandAdd:
 		if fn.ValidateArgs(3) != nil {
-			return false
+			return dyncfg.CommandPlanClaimless()
 		}
 		key, name, ok := c.cb.ExtractKey(fn)
 		if !ok {
-			return false
+			return dyncfg.CommandPlanClaimless()
 		}
 		if _, exists := c.lookup(key); exists {
-			return false
+			return dyncfg.CommandPlanClaimless()
 		}
 		if fn.ValidateHasPayload() != nil {
-			return false
+			return dyncfg.CommandPlanClaimless()
 		}
 		if dyncfg.JobNameRuleAllowDots(name) != nil {
-			return false
+			return dyncfg.CommandPlanClaimless()
 		}
 		kind, ok := c.dyncfgExtractSecretStoreKindFromTemplateID(fn.ID())
 		if !ok {
-			return false
+			return dyncfg.CommandPlanClaimless()
 		}
 		cfg, err := c.dyncfgSecretStoreConfigFromPayload(fn, name, kind)
-		return err == nil && cfg.Validate() == nil
+		if err == nil && cfg.Validate() == nil {
+			return dyncfg.CommandPlanClaims()
+		}
+		return dyncfg.CommandPlanClaimless()
 	case dyncfg.CommandUpdate:
 		if key, ok := c.dyncfgExtractSecretStoreKey(fn.ID()); ok {
 			if entry, exists := c.lookupInternal(key); exists && entry.Cfg.SourceType() != confgroup.TypeDyncfg {
 				// Conversion path: payload gates at stage, validation in the
 				// effect.
 				if fn.ValidateHasPayload() != nil {
-					return false
+					return dyncfg.CommandPlanClaimless()
 				}
 				_, err := c.dyncfgSecretStoreConfigFromPayload(fn, entry.Cfg.Name(), entry.Cfg.Kind())
-				return err == nil
+				if err == nil {
+					return dyncfg.CommandPlanClaims()
+				}
+				return dyncfg.CommandPlanClaimless()
 			}
 		}
-		return c.handler.CommandActs(fn, c.handlerEntry(fn.ID()))
+		return c.handler.CommandPlan(fn, c.handlerEntry(fn.ID()))
 	case dyncfg.CommandRemove:
 		_, code, _ := c.removeRejection(fn)
-		return code == 0
+		if code == 0 {
+			return dyncfg.CommandPlanClaims()
+		}
+		return dyncfg.CommandPlanClaimless()
 	case dyncfg.CommandTest:
 		storeKey, ok := c.dyncfgExtractSecretStoreKey(fn.ID())
 		if !ok {
-			return false
+			return dyncfg.CommandPlanClaimless()
 		}
 		entry, exists := c.lookupInternal(storeKey)
 		if !exists {
-			return false
+			return dyncfg.CommandPlanClaimless()
 		}
 		if !fn.HasPayload() {
-			return true
+			return dyncfg.CommandPlanClaims()
 		}
 		_, err := c.dyncfgSecretStoreConfigFromPayload(fn, entry.Cfg.Name(), entry.Cfg.Kind())
-		return err == nil
+		if err == nil {
+			return dyncfg.CommandPlanClaims()
+		}
+		return dyncfg.CommandPlanClaimless()
 	default:
 		// schema/get/userconfig answer inline and never claim; everything
 		// else is the 501 arm.
-		return false
+		return dyncfg.CommandPlanClaimless()
 	}
 }
 
 // handlerEntry resolves the shared handler's exposed entry for a command's
-// config ID (nil when the store is not exposed), for handler.CommandActs
-// delegation.
+// config ID (nil when the store is not exposed), for handler command planning.
 func (c *Controller) handlerEntry(id string) *dyncfg.Entry[secretstore.Config] {
 	key, ok := c.dyncfgExtractSecretStoreKey(id)
 	if !ok {
@@ -466,7 +466,7 @@ func (c *Controller) dyncfgCmdRemoveStep(fn dyncfg.Function, run dyncfg.StepRunn
 // removeRejection runs the remove path's PRE-CLAIM gates - the gates that
 // precede its first claim-protected read, the affected-jobs check - and
 // reports the rejection they produce (code 0 = the command must claim). It
-// is the SINGLE SOURCE for dyncfgCmdRemoveStep and CommandActs; add a
+// is the SINGLE SOURCE for dyncfgCmdRemoveStep and CommandPlan; add a
 // pre-claim gate here, never in either caller. Every gate ordered after
 // these - the affected-jobs 409 AND the shared handler's source/type 405s
 // behind it - answers UNDER the granted store write claim.

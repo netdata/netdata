@@ -15,6 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/internal/wiretest"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -218,6 +219,134 @@ func TestExecutor_KeyDerivation(t *testing.T) {
 
 			assert.Equal(t, tc.wantDomain, ev.domain)
 			assert.Equal(t, tc.wantKey, ev.key)
+		})
+	}
+}
+
+func TestExecutor_CommandPlanClaims(t *testing.T) {
+	storeKey := secretstore.StoreKey(secretstore.KindVault, "vault_prod")
+	seedStore := func(t *testing.T, mgr *Manager) {
+		t.Helper()
+		mgr.dyncfgSecretStoreSeqExec(newExecutorTestFn("seed-store",
+			[]string{"test:secretstore:vault", "add", "vault_prod"},
+			mustJSON(t, map[string]any{"value": "secret"})))
+	}
+	claimSet := func(plan eventPlan) []claim {
+		return normalizeClaims(plan.computeClaims())
+	}
+
+	tests := map[string]struct {
+		setup func(t *testing.T, mgr *Manager)
+		event func(t *testing.T, mgr *Manager) event
+		check func(t *testing.T, plan eventPlan, claims []claim)
+	}{
+		"collector update claims old and new refs": {
+			setup: func(t *testing.T, mgr *Manager) {
+				oldCfg := prepareDyncfgCfg("success", "job").
+					Set("password", "${store:vault:vault_old:secret/data/mysql#password}").
+					Set("vnode", "oldvn")
+				mgr.collectorExposed.Add(&dyncfg.Entry[confgroup.Config]{Cfg: oldCfg, Status: dyncfg.StatusRunning})
+			},
+			event: func(t *testing.T, mgr *Manager) event {
+				newCfg := prepareDyncfgCfg("success", "job").
+					Set("password", "${store:vault:vault_new:secret/data/mysql#password}").
+					Set("vnode", "newvn")
+				return mgr.newDyncfgEvent(newExecutorTestFn("collector-update",
+					[]string{"test:collector:success:job", "update"},
+					mustJSON(t, newCfg)))
+			},
+			check: func(t *testing.T, plan eventPlan, claims []claim) {
+				assert.True(t, plan.needsClaims())
+				assert.Equal(t, normalizeClaims([]claim{
+					{key: collectorStateKey("success_job"), mode: claimWrite},
+					{key: secretStoreStateKey("vault:vault_old"), mode: claimRead},
+					{key: secretStoreStateKey("vault:vault_new"), mode: claimRead},
+					{key: vnodeStateKey("oldvn"), mode: claimRead},
+					{key: vnodeStateKey("newvn"), mode: claimRead},
+				}), claims)
+			},
+		},
+		"collector status no-op is hold-aware claimless": {
+			setup: func(t *testing.T, mgr *Manager) {
+				cfg := prepareDyncfgCfg("success", "job")
+				mgr.collectorExposed.Add(&dyncfg.Entry[confgroup.Config]{Cfg: cfg, Status: dyncfg.StatusRunning})
+			},
+			event: func(t *testing.T, mgr *Manager) event {
+				return mgr.newDyncfgEvent(newExecutorTestFn("collector-enable",
+					[]string{"test:collector:success:job", "enable"}, nil))
+			},
+			check: func(t *testing.T, plan eventPlan, claims []claim) {
+				assert.False(t, plan.needsClaims())
+				assert.False(t, plan.bypassesForeignWriteHold())
+				assert.Empty(t, claims)
+			},
+		},
+		"secretstore test claims store read": {
+			setup: seedStore,
+			event: func(t *testing.T, mgr *Manager) event {
+				return mgr.newDyncfgEvent(newExecutorTestFn("store-test",
+					[]string{"test:secretstore:vault:vault_prod", "test"}, nil))
+			},
+			check: func(t *testing.T, plan eventPlan, claims []claim) {
+				assert.True(t, plan.needsClaims())
+				assert.Equal(t, []claim{{key: secretStoreStateKey(storeKey), mode: claimRead}}, claims)
+			},
+		},
+		"secretstore update claims store write and dependent writes": {
+			setup: func(t *testing.T, mgr *Manager) {
+				seedStore(t, mgr)
+				cfg := prepareDyncfgCfg("success", "dep").
+					Set("password", "${store:vault:vault_prod:secret/data/mysql#password}")
+				mgr.collectorExposed.Add(&dyncfg.Entry[confgroup.Config]{Cfg: cfg, Status: dyncfg.StatusRunning})
+				mgr.secretStoreDeps.SetActiveJobStores(cfg.FullName(), cfg.ExposedKey(), []string{storeKey})
+			},
+			event: func(t *testing.T, mgr *Manager) event {
+				return mgr.newDyncfgEvent(newExecutorTestFn("store-update",
+					[]string{"test:secretstore:vault:vault_prod", "update"},
+					mustJSON(t, map[string]any{"value": "rotated"})))
+			},
+			check: func(t *testing.T, plan eventPlan, claims []claim) {
+				assert.True(t, plan.needsClaims())
+				assert.Equal(t, normalizeClaims([]claim{
+					{key: secretStoreStateKey(storeKey), mode: claimWrite},
+					{key: collectorStateKey("success_dep"), mode: claimWrite},
+				}), claims)
+			},
+		},
+		"vnode mutation claims vnode write": {
+			event: func(t *testing.T, mgr *Manager) event {
+				return mgr.newDyncfgEvent(newExecutorTestFn("vnode-add",
+					[]string{"test:vnode", "add", "db"},
+					mustJSON(t, map[string]any{"guid": "b0b0b0b0-0000-4000-8000-0000000000aa", "hostname": "db"})))
+			},
+			check: func(t *testing.T, plan eventPlan, claims []claim) {
+				assert.True(t, plan.needsClaims())
+				assert.Equal(t, []claim{{key: vnodeStateKey("db"), mode: claimWrite}}, claims)
+			},
+		},
+		"underivable command is claimless": {
+			event: func(t *testing.T, mgr *Manager) event {
+				return mgr.newDyncfgEvent(newExecutorTestFn("bad",
+					[]string{"test:collector:success", "add"}, nil))
+			},
+			check: func(t *testing.T, plan eventPlan, claims []claim) {
+				assert.False(t, plan.needsClaims())
+				assert.True(t, plan.bypassesForeignWriteHold())
+				assert.Empty(t, claims)
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr, _ := newExecutorTestManager()
+			if tc.setup != nil {
+				tc.setup(t, mgr)
+			}
+
+			ev := tc.event(t, mgr)
+			plan := mgr.executor.planEvent(ev)
+			tc.check(t, plan, claimSet(plan))
 		})
 	}
 }

@@ -29,21 +29,20 @@
 //     rejection or no-op BEFORE its first claim-protected access (identity,
 //     existence, state, source/type, payload-presence, and command-support
 //     gates) executes claimless-inline instead of parking behind held keys
-//     with no bounded release. Each DOMAIN owns its acts-predicate,
-//     colocated with the gates it mirrors and enforced by that domain's
-//     parity test: dyncfg.Handler.CommandActs (collector), secretsctl and
-//     vnodectl Controller.CommandActs. Execution order is the criterion,
-//     not the eventual outcome: gates that need the claim's exclusion - and
-//     every gate execution orders BEHIND them - answer inline under the
-//     granted claim (the store remove's affected-jobs 409 plus its trailing
-//     source/type 405s; the vnode remove's referenced-by-configs 409). The
-//     STATUS axis is HOLD-AWARE: enable/restart/disable rejections and
-//     no-ops derive from entry.Status, the one input a foreign write-claim
-//     holder (a store command's dependent-restart plan) mutates - while
-//     the command's key is foreign-write-held they are treated as ACTING,
-//     park, and answer truthfully after the hold resolves. Same-key order
-//     is preserved: the route bypass fires only on an unoccupied lane with
-//     an empty FIFO.
+//     with no bounded release. Each DOMAIN owns its CommandPlan, colocated
+//     with the command gates and pinned by parity tests; the executor wraps it
+//     in a jobmgr-local event plan that attaches claim computation. Execution
+//     order is the criterion, not the eventual outcome: gates that need the
+//     claim's exclusion - and every gate execution orders BEHIND them - answer
+//     inline under the granted claim (the store remove's affected-jobs 409
+//     plus its trailing source/type 405s; the vnode remove's
+//     referenced-by-configs 409). The STATUS axis is HOLD-AWARE:
+//     enable/restart/disable rejections and no-ops derive from entry.Status,
+//     the one input a foreign write-claim holder (a store command's
+//     dependent-restart plan) mutates - while the command's key is
+//     foreign-write-held they park and answer truthfully after the hold
+//     resolves. Same-key order is preserved: the route bypass fires only on
+//     an unoccupied lane with an empty FIFO.
 //
 //   - Blocking module work (validation, job creation, detection, stop waits,
 //     secretstore backend I/O, dependent-job restarts) runs on the effect

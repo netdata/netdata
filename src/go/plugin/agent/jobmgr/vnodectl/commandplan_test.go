@@ -13,19 +13,16 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// TestControllerCommandActsParity drives SeqExec across the deterministic
-// stage-gate matrix and asserts CommandActs agrees: a command mutates the
-// vnode store (or reaches its claim-protected gates) exactly when
-// CommandActs reports true, and every wantActs=false cell answers its
-// rejection without touching the store. Claim scheduling relies on this
-// predicate to skip the vnode write claim for rejection-only commands - a
-// stage-gate change without a matching CommandActs update fails here as the
-// starvation bug it would be. Two documented acts-but-rejects cells answer
-// inline UNDER the claim by design: payload parse/GUID/uniqueness rejections
-// (bounded by one effect window) and the remove path's referenced-by-configs
-// 409 (a stopping dependent's read claim must be waited out, not answered
-// around).
-func TestControllerCommandActsParity(t *testing.T) {
+// TestControllerCommandPlanParity drives SeqExec across the deterministic
+// stage-gate matrix and asserts CommandPlan agrees: a command mutates the vnode
+// store (or reaches its claim-protected gates) exactly when the plan reports
+// claims, and every claimless cell answers its rejection without touching the
+// store. Two documented acts-but-rejects cells answer inline UNDER the claim by
+// design:
+// payload parse/GUID/uniqueness rejections (bounded by one effect window) and
+// the remove path's referenced-by-configs 409 (a stopping dependent's read
+// claim must be waited out, not answered around).
+func TestControllerCommandPlanParity(t *testing.T) {
 	const guid = "b0b0b0b0-0000-4000-8000-0000000000aa"
 
 	tests := map[string]struct {
@@ -224,10 +221,12 @@ func TestControllerCommandActsParity(t *testing.T) {
 
 			fn := tc.fn(ctl)
 
-			// Capture the predicate BEFORE running: execution mutates the
-			// store, and the executor consults the predicate pre-execution.
-			acts := ctl.CommandActs(fn)
-			assert.Equal(t, tc.wantActs, acts, "CommandActs")
+			// Capture the plan BEFORE running: execution mutates the store, and
+			// the executor consults the plan pre-execution.
+			plan := ctl.CommandPlan(fn)
+			assert.Equal(t, tc.wantActs, plan.NeedsClaims(false), "CommandPlan")
+			assert.Equal(t, tc.wantActs, plan.NeedsClaims(true),
+				"vnode commands have no status-hold-aware axis")
 
 			ctl.SeqExec(fn)
 			assert.Contains(t, out.String(), fmt.Sprintf("FUNCTION_RESULT_BEGIN parity %d", tc.wantCode),

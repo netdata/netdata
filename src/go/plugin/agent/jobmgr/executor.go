@@ -183,7 +183,7 @@ func (e *executor) dispatch(ev event) {
 func (e *executor) route(sk string, ks *keyState, ev event) {
 	if ks.occupied() || e.claims.heldForWrite(sk) {
 		if !ks.occupied() && len(ks.fifo) == 0 &&
-			ev.kind == eventDyncfgCommand && !e.dyncfgCommandActs(ev) {
+			ev.kind == eventDyncfgCommand && e.planEvent(ev).bypassesForeignWriteHold() {
 			// A deterministic rejection/no-op arriving under a FOREIGN write
 			// hold (a store command's claim on this dependent job key):
 			// answer it claimless-inline instead of parking it behind a hold
@@ -253,7 +253,8 @@ func (e *executor) execute(sk string, ks *keyState, ev event) {
 		e.refuseAtShutdown(ev)
 		return
 	}
-	if !e.eventNeedsClaims(ev) {
+	plan := e.planEvent(ev)
+	if !plan.needsClaims() {
 		e.executeEvent(sk, ks, ev)
 		return
 	}
@@ -262,7 +263,7 @@ func (e *executor) execute(sk string, ks *keyState, ev event) {
 	// occupied through the acquisition so same-key events keep their order.
 	req := &claimRequest{
 		label:   claimLabel(ev),
-		compute: func() []claim { return e.collectorEventClaims(ev) },
+		compute: func() []claim { return e.planEvent(ev).computeClaims() },
 	}
 	req.granted = func(g *claimGrant) {
 		delete(e.claimWork, req)
@@ -352,76 +353,6 @@ func (e *executor) finishIfSettled(sk string, ks *keyState) {
 	e.claims.release(g)
 }
 
-// eventNeedsClaims reports whether the event reaches a phase that mutates
-// state or runs blocking work: those events reserve claims. Discovery
-// events always act; dyncfg commands consult their domain's acts predicate
-// - rejection-only commands (and cheap read commands: get, schema,
-// userconfig) run claimless-inline against loop-owned state.
-func (e *executor) eventNeedsClaims(ev event) bool {
-	switch ev.kind {
-	case eventDiscoveryAdd, eventDiscoveryRemove:
-		return true
-	case eventDyncfgCommand:
-		return e.dyncfgCommandActs(ev)
-	}
-	return false
-}
-
-// dyncfgCommandActs reports whether a dyncfg command reaches a phase that
-// mutates state or runs blocking work, per its DOMAIN's own predicate -
-// each colocated with the gates it mirrors and enforced by that domain's
-// parity test (Handler.CommandActs for collector commands incl. the
-// payload axis; the secretsctl and vnodectl Controller.CommandActs for
-// their stage gates and 501 arms). Rejection-only commands claim NOTHING
-// and bypass foreign-hold lane parking: a rejection execution reaches
-// BEFORE its first claim-protected access (identity/underivable,
-// existence, payload, command-support, and most source/type gates) answers
-// immediately instead of parking behind held dependencies, where a wedged
-// store's write claim has no bounded release. STATUS-derived
-// rejections/no-ops are immediate only when this key is not foreign
-// write-held; under a foreign write hold the status is being mutated, so
-// the command parks and answers after the hold resolves. Gates execution
-// orders BEHIND a claim-protected read answer under the granted claim
-// instead - the store remove's source/type 405s sit behind its
-// affected-jobs read. Evaluated on the loop and re-evaluated at every
-// (re-)stage attempt.
-func (e *executor) dyncfgCommandActs(ev event) bool {
-	if ev.underivable {
-		// Rejection-only by construction: the handler answers 400/404/405
-		// without touching state.
-		return false
-	}
-	m := e.mgr
-	switch ev.domain {
-	case domainSecretStore:
-		return m.secretsCtl.CommandActs(ev.fn)
-	case domainVnode:
-		return m.vnodesCtl.CommandActs(ev.fn)
-	default:
-		// Collector test never reaches the lanes (keyless, diverted at
-		// dispatch); get/schema report false from the handler predicate.
-		entry, ok := m.collectorExposed.LookupByKey(ev.key)
-		if !ok {
-			entry = nil
-		}
-		if m.collectorHandler.CommandActs(ev.fn, entry) {
-			return true
-		}
-		// HOLD-AWARE STATUS GATES: a STATUS-derived rejection/no-op is
-		// deterministic only while no foreign write claim holds this key -
-		// the only cross-key write claimer (a store command's
-		// dependent-restart plan) mutates exactly entry.Status, so an
-		// answer minted from it mid-hold can be falsified by the holder's
-		// outcome (a false-success enable during a failing restart). Such
-		// commands are treated as ACTING while held: they park and answer
-		// truthfully after the hold resolves - under a wedged holder that
-		// is the late return, per key-held-until-return. Every immutable
-		// rejection axis keeps the bypass.
-		return m.collectorHandler.RejectionDependsOnStatus(ev.fn, entry) &&
-			e.claims.heldForWrite(ev.stateKey())
-	}
-}
-
 func claimLabel(ev event) string {
 	if ev.kind == eventDyncfgCommand {
 		return string(ev.fn.Command()) + " " + ev.key
@@ -429,7 +360,7 @@ func claimLabel(ev event) string {
 	return "discovery " + ev.key
 }
 
-// collectorEventClaims computes an event's reservation set.
+// eventClaims computes an event's reservation set.
 //
 // Collector events: a write claim on their own lane key plus read claims on
 // every referenced secret store and the referenced vnode. Update-shaped
@@ -447,15 +378,8 @@ func claimLabel(ev event) string {
 // rejection-only while parked (its entry removed, its store deleted)
 // recomputes to the EMPTY set, which grants immediately and lets it answer
 // its rejection inline.
-func (e *executor) collectorEventClaims(ev event) []claim {
+func (e *executor) eventClaims(ev event) []claim {
 	m := e.mgr
-
-	if ev.kind == eventDyncfgCommand && !e.dyncfgCommandActs(ev) {
-		// Rejection-only commands claim NOTHING - not even their lane key
-		// (see dyncfgCommandActs; arrival-time rejections never reach this
-		// compute, eventNeedsClaims filters them to claimless-inline).
-		return nil
-	}
 
 	if ev.kind == eventDyncfgCommand && ev.domain == domainSecretStore {
 		if ev.fn.Command() == dyncfg.CommandTest {
@@ -514,10 +438,9 @@ func (e *executor) collectorEventClaims(ev event) []claim {
 		// must wait the stop out instead of racing it.
 		addExposedRefs()
 	case eventDyncfgCommand:
-		// Only ACTING commands reach here (the rejection-only guard above,
-		// backed by the per-domain CommandActs predicates and their parity
-		// tests, filtered the rest): every acting mutation claims its
-		// config's references - old and new where both exist.
+		// Only claim-bearing commands reach here (the event plan filtered the
+		// rest): every acting collector mutation claims its config's
+		// references - old and new where both exist.
 		switch ev.fn.Command() {
 		case dyncfg.CommandAdd, dyncfg.CommandUpdate:
 			addPayloadRefs()

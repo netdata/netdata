@@ -479,6 +479,35 @@ func (h *Handler[C]) configSupportedCommands(cfg C, isDyncfg bool) string {
 // another blocking phase of the same command.
 type StepRunner func(effect func(context.Context) error, commit func(error))
 
+// CommandPlan describes the scheduling shape of one command at the point where
+// a caller is deciding whether dependency claims are needed. It is deliberately
+// narrower than command execution: handlers still own responses and mutations.
+type CommandPlan struct {
+	needsClaims     bool
+	statusHoldAware bool
+}
+
+// CommandPlanClaimless is for commands that answer before any claim-protected
+// access and therefore must not park behind dependency claims.
+func CommandPlanClaimless() CommandPlan { return CommandPlan{} }
+
+// CommandPlanClaims is for commands that reach claim-protected state or
+// blocking work.
+func CommandPlanClaims() CommandPlan { return CommandPlan{needsClaims: true} }
+
+// CommandPlanStatusGate is for collector status-derived rejections/no-ops:
+// claimless normally, but held behind a foreign write claim because that holder
+// is mutating the status the response would be derived from.
+func CommandPlanStatusGate() CommandPlan { return CommandPlan{statusHoldAware: true} }
+
+// NeedsClaims reports whether the command should reserve dependencies or wait
+// under a current write hold. Callers use writeHeld=false for the intrinsic
+// claim decision, and writeHeld=true when checking whether a claimless command
+// can bypass a foreign write hold.
+func (p CommandPlan) NeedsClaims(writeHeld bool) bool {
+	return p.needsClaims || (p.statusHoldAware && writeHeld)
+}
+
 // StagedStop is a stop split in two: the routing removal already happened on
 // the goroutine that called StageStop (the command-staging goroutine), and
 // Wait performs the blocking half inside the effect. Undo restores routing
@@ -520,10 +549,9 @@ type UpdateStager[C Config] interface {
 // left nil - kills the plugin) and returns the same error
 // ParseAndValidate's parse step would return for the same input.
 // When implemented, add and update answer a malformed payload's 400 at
-// STAGE - before any claim or effect - and the acts predicate classifies
-// the command as rejection-only instead of letting it park behind held
-// dependency claims. Components without it keep the parse-in-effect
-// semantics.
+// STAGE - before any claim or effect - and the command plan classifies the
+// command as rejection-only instead of letting it park behind held dependency
+// claims. Components without it keep the parse-in-effect semantics.
 type PayloadParser interface {
 	ParsePayload(fn Function, name string) error
 }
@@ -807,85 +835,63 @@ func (h *Handler[C]) CmdRemove(fn Function) {
 	h.cmdRemove(fn, RunStepSync)
 }
 
-// CommandActs reports whether fn against entry reaches a phase that stops
-// or starts work - where dependency reservations are load-bearing - as
-// opposed to answering a deterministic rejection or no-op. Claim scheduling
-// uses it so "rejection-only commands claim nothing" cannot drift from the
-// Cmd* gates in this file. The criterion is EXECUTION ORDER, not the
-// eventual outcome: false is returned only when the command's execution
-// answers BEFORE its first claim-protected access - a rejection that
-// execution reaches only after such an access (a domain gate ordered
-// behind a dependency-index read) must claim first and answer under the
-// claim.
+// CommandPlan reports how fn against entry must be scheduled. The criterion is
+// EXECUTION ORDER, not the eventual outcome: a command is claimless only when
+// execution answers BEFORE its first claim-protected access. A rejection reached
+// after such an access must claim first and answer under the claim.
 //
-// Add and update do not mirror their gates AT ALL: the predicate runs the
-// SAME addRejection/updateRejection functions their Cmd* bodies answer
-// from, so a gate added there - including callback gates like
-// ValidateConfigName, which a mirror in this file cannot see - is
-// automatically rejection-only (eight starvation findings proved that
-// mirroring the parse-shaped gate chains does not converge). The
-// stop/start-shaped commands keep the explicit state predicate below
-// (enable no-ops on Running; restart rejects Accepted/Disabled; disable
-// no-ops on Disabled; remove rejects non-dyncfg sources and non-job types;
-// a nil entry never acts); their pre-effect sections mutate caches, so
-// they cannot share a rejection function, and the parity test drives every
-// command against every gate combination to hold them to this predicate.
-// Identity gates (argument count, config ID format) are also the caller's
-// underivable axis.
-func (h *Handler[C]) CommandActs(fn Function, entry *Entry[C]) bool {
+// Add and update do not mirror their gates: this runs the SAME
+// addRejection/updateRejection helpers their Cmd* bodies answer from, so a gate
+// added there remains single-source. Stop/start-shaped commands keep the
+// explicit state predicate below because their pre-effect sections mutate
+// caches. Identity gates (argument count, config ID format) are still the
+// caller's underivable axis.
+func (h *Handler[C]) CommandPlan(fn Function, entry *Entry[C]) CommandPlan {
 	switch cmd := fn.Command(); cmd {
 	case CommandAdd:
 		_, _, code, _ := h.addRejection(fn)
-		return code == 0
+		if code == 0 {
+			return CommandPlanClaims()
+		}
+		return CommandPlanClaimless()
 	case CommandUpdate:
 		_, _, code, _ := h.updateRejection(fn)
-		return code == 0
+		if code == 0 {
+			return CommandPlanClaims()
+		}
+		return CommandPlanClaimless()
 	default:
 		if entry == nil {
-			return false
+			return CommandPlanClaimless()
 		}
 		switch cmd {
 		case CommandEnable:
-			return entry.Status == StatusAccepted || entry.Status == StatusDisabled || entry.Status == StatusFailed
+			if entry.Status == StatusAccepted || entry.Status == StatusDisabled || entry.Status == StatusFailed {
+				return CommandPlanClaims()
+			}
+			return CommandPlanStatusGate()
 		case CommandRestart:
-			return entry.Status == StatusRunning || entry.Status == StatusFailed
+			if entry.Status == StatusRunning || entry.Status == StatusFailed {
+				return CommandPlanClaims()
+			}
+			return CommandPlanStatusGate()
 		case CommandDisable:
-			return entry.Status != StatusDisabled
+			if entry.Status != StatusDisabled {
+				return CommandPlanClaims()
+			}
+			return CommandPlanStatusGate()
 		case CommandRemove:
-			return entry.Cfg.SourceType() == "dyncfg" && h.cb.ConfigType(entry.Cfg) == ConfigTypeJob
+			if entry.Cfg.SourceType() == "dyncfg" && h.cb.ConfigType(entry.Cfg) == ConfigTypeJob {
+				return CommandPlanClaims()
+			}
 		}
-		return false
+		return CommandPlanClaimless()
 	}
-}
-
-// RejectionDependsOnStatus reports whether fn's rejection-only
-// classification against entry is derived from entry.Status - the one
-// input a FOREIGN write-claim holder (a store command's dependent-restart
-// plan) mutates from another key. A status-derived rejection is
-// deterministic only while no foreign write claim holds the command's key:
-// under a hold the status is mid-mutation, and an answer minted from it
-// can be falsified by the holder's outcome (an enable answering the
-// Running no-op 200 while the dependent restart it cannot see is stopping
-// - and may fail - that very job). Claim scheduling treats such commands
-// as ACTING while their key is write-held, so they park and answer
-// truthfully after the hold resolves. Meaningful only when CommandActs
-// reported false; every other rejection axis (identity, existence,
-// source/type, payload, command support) depends on state no foreign
-// holder mutates.
-func (h *Handler[C]) RejectionDependsOnStatus(fn Function, entry *Entry[C]) bool {
-	if entry == nil {
-		return false
-	}
-	switch fn.Command() {
-	case CommandEnable, CommandRestart, CommandDisable:
-		return true
-	}
-	return false
 }
 
 // addRejection runs cmdAdd's deterministic pre-effect gates and reports the
 // rejection they produce (code 0 = the command acts). It is the SINGLE
-// SOURCE for both cmdAdd and CommandActs; add a gate here, never in either
+// SOURCE for both cmdAdd and CommandPlan; add a gate here, never in either
 // caller.
 func (h *Handler[C]) addRejection(fn Function) (key, name string, code int, msg string) {
 	if err := fn.ValidateArgs(3); err != nil {
@@ -910,7 +916,7 @@ func (h *Handler[C]) addRejection(fn Function) (key, name string, code int, msg 
 // updateRejection runs cmdUpdate's deterministic pre-effect gates and
 // reports the rejection they produce (code 0 = the command acts, and the
 // exposed entry is returned). It is the SINGLE SOURCE for both cmdUpdate
-// and CommandActs; add a gate here, never in either caller.
+// and CommandPlan; add a gate here, never in either caller.
 func (h *Handler[C]) updateRejection(fn Function) (name string, entry *Entry[C], code int, msg string) {
 	key, name, ok := h.cb.ExtractKey(fn)
 	if !ok {
