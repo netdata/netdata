@@ -185,6 +185,12 @@ void os_dmi_info_get(DMI_INFO *dmi) {
 #include <sys/sysctl.h>
 #include <unistd.h>
 
+#if defined(MAC_OS_VERSION_12_0) && MAC_OS_X_VERSION_MAX_ALLOWED >= MAC_OS_VERSION_12_0
+#define NETDATA_IOKIT_MAIN_PORT kIOMainPortDefault
+#else
+#define NETDATA_IOKIT_MAIN_PORT kIOMasterPortDefault
+#endif
+
 struct macos_model_name {
     const char *id;
     const char *name;
@@ -434,24 +440,21 @@ static bool macos_copy_plist_marketing_model(const char *model_id, char *dst, si
 }
 
 static bool macos_system_profiler_copy_value(const char *output, const char *key, char *dst, size_t dst_size) {
-    const char *line = output;
-    size_t key_len = strlen(key);
+    const char *line = strstr(output, key);
+    if (!line)
+        return false;
 
-    while ((line = strstr(line, key)) != NULL) {
-        const char *value = line + key_len;
-        while (*value == ' ' || *value == '\t')
-            value++;
+    const char *value = line + strlen(key);
+    while (*value == ' ' || *value == '\t')
+        value++;
 
-        const char *end = value;
-        while (*end && *end != '\n' && *end != '\r')
-            end++;
+    const char *end = value;
+    while (*end && *end != '\n' && *end != '\r')
+        end++;
 
-        snprintfz(dst, dst_size, "%.*s", (int)(end - value), value);
-        dmi_clean_field(dst, dst_size);
-        return dst[0] != '\0';
-    }
-
-    return false;
+    snprintfz(dst, dst_size, "%.*s", (int)(end - value), value);
+    dmi_clean_field(dst, dst_size);
+    return dst[0] != '\0';
 }
 
 static bool macos_copy_system_profiler_model_name(const char *model_id, char *dst, size_t dst_size) {
@@ -633,7 +636,7 @@ static void get_devicetree_info(DMI_INFO *dmi) {
     if (!dmi)
         return;
 
-    io_registry_entry_t device_tree = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/");
+    io_registry_entry_t device_tree = IORegistryEntryFromPath(NETDATA_IOKIT_MAIN_PORT, "IODeviceTree:/");
     if (!device_tree)
         return;
 
@@ -650,7 +653,7 @@ static void get_devicetree_info(DMI_INFO *dmi) {
     if (!dmi->board.name[0])
         get_iokit_string_property(device_tree, CFSTR("board-id"), dmi->board.name, sizeof(dmi->board.name));
 
-    io_registry_entry_t platform = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/platform");
+    io_registry_entry_t platform = IORegistryEntryFromPath(NETDATA_IOKIT_MAIN_PORT, "IODeviceTree:/platform");
     if (platform) {
         if (!dmi->sys.vendor[0])
             get_iokit_string_property(platform, CFSTR("manufacturer"), dmi->sys.vendor, sizeof(dmi->sys.vendor));
@@ -667,7 +670,7 @@ static void get_platform_expert_info(DMI_INFO *dmi) {
         return;
 
     io_registry_entry_t platform_expert = IORegistryEntryFromPath(
-        kIOMainPortDefault, "IOService:/IOResources/IOPlatformExpertDevice");
+        NETDATA_IOKIT_MAIN_PORT, "IOService:/IOResources/IOPlatformExpertDevice");
 
     if (!platform_expert)
         return;
@@ -755,7 +758,7 @@ static void get_firmware_info(DMI_INFO *dmi) {
         return;
 
     io_registry_entry_t smc = IOServiceGetMatchingService(
-        kIOMainPortDefault, IOServiceMatching("AppleSMC"));
+        NETDATA_IOKIT_MAIN_PORT, IOServiceMatching("AppleSMC"));
 
     if (smc) {
         // SMC revision - can be useful for firmware info
@@ -771,7 +774,7 @@ static void get_firmware_info(DMI_INFO *dmi) {
     }
 
     // Check for BIOS information in IODeviceTree:/rom
-    io_registry_entry_t rom = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/rom");
+    io_registry_entry_t rom = IORegistryEntryFromPath(NETDATA_IOKIT_MAIN_PORT, "IODeviceTree:/rom");
     if (rom) {
         // "version" contains firmware version
         get_iokit_string_property(rom, CFSTR("version"), dmi->bios.version, sizeof(dmi->bios.version));
@@ -872,8 +875,9 @@ static void freebsd_get_sysctl_str(const char *name, char *dst, size_t dst_size)
 }
 
 static void freebsd_get_kenv_str(const char *name, char *dst, size_t dst_size) {
-    CLEAN_CHAR_P tmp = mallocz(dst_size);
+    CLEAN_CHAR_P *tmp = mallocz(dst_size);
 
+    // Preserve any sysctl fallback already collected when the optional kenv value is missing.
     if (kenv(KENV_GET, name, tmp, dst_size - 1) == -1)
         return;
 

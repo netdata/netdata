@@ -216,6 +216,13 @@ static bool dmi_field_contains_any(const char *value, const char *const *needles
     return false;
 }
 
+static bool dmi_field_starts_with(const char *value, const char *prefix) {
+    if (!value || !*value || !prefix || !*prefix)
+        return false;
+
+    return strncasecmp(value, prefix, strlen(prefix)) == 0;
+}
+
 static bool dmi_any_field_contains_any(const DMI_INFO *dmi, const char *const *needles, size_t needles_count) {
     if (!dmi)
         return false;
@@ -243,8 +250,8 @@ static bool dmi_is_apple_product(const DAEMON_STATUS_FILE *ds) {
     return strcasestr(ds->product.vendor, "Apple") != NULL ||
            strcasestr(ds->hw.sys.vendor, "Apple") != NULL ||
            strcasestr(ds->hw.board.vendor, "Apple") != NULL ||
-           strcasestr(ds->hw.product.id, "Mac") == ds->hw.product.id ||
-           strcasestr(ds->hw.product.name, "Mac") == ds->hw.product.name;
+           dmi_field_starts_with(ds->hw.product.id, "Mac") ||
+           dmi_field_starts_with(ds->hw.product.name, "Mac");
 }
 
 static bool dmi_is_server_product_line(const DMI_INFO *dmi) {
