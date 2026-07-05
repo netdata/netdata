@@ -140,10 +140,12 @@ The directories below contain your historical monitoring data and your custom co
 
 :::
 
-To delete the data the MSI uninstall leaves behind, run the following commands in an elevated (Administrator) PowerShell session **after** uninstalling Netdata through the MSI:
+To delete the data the MSI uninstall leaves behind, run the following commands in an elevated (Administrator) PowerShell session **after** uninstalling Netdata through the MSI. The paths below assume Netdata is installed in the default location; if you chose a different install directory, adjust the path accordingly.
 
 ```powershell
-# Remove the auto-updater scheduled task, if you set one up
+# Remove the auto-updater scheduled task, if you set one up. The task name is whatever
+# you chose when creating it in Task Scheduler - adjust the pattern below if it doesn't
+# contain "Netdata".
 Get-ScheduledTask -TaskName *Netdata* -ErrorAction SilentlyContinue | Unregister-ScheduledTask -Confirm:$false
 
 # Remove the install directory, including the metric database, cache, and edited configuration
