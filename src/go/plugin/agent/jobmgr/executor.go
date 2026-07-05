@@ -533,7 +533,7 @@ func (e *executor) snapshotWedgedDeps(g *claimGrant) []wedgedDep {
 	return deps
 }
 
-// staleWarmDep reports why a warm continuation's store dependencies are no
+// staleWarmDepStatus reports why a warm continuation's store dependencies are no
 // longer trustworthy: a store the warm job resolved its secrets from whose
 // committed identity changed since the abandon (a rotation committed while
 // the key was wedged - that rotation reported this dependent as skipped, so
@@ -542,7 +542,8 @@ func (e *executor) snapshotWedgedDeps(g *claimGrant) []wedgedDep {
 // have activated a new value off-loop; dropping is the safe direction - if
 // that mutation ultimately fails, only this warm start is lost, never
 // credential freshness). Union-claimed dependencies the warm config no
-// longer references are ignored. Empty means the continuation is safe.
+// longer references are ignored. staleWarmDepNone means the continuation is
+// safe; the accompanying message is empty in that case.
 func (e *executor) staleWarmDepStatus(deps []wedgedDep, cfg confgroup.Config) (staleWarmDepKind, string) {
 	if len(deps) == 0 {
 		return staleWarmDepNone, ""
