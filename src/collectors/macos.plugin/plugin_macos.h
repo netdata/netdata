@@ -14,8 +14,14 @@ int do_macos_sensors(int update_every, usec_t dt);
 int do_macos_powermetrics(int update_every, usec_t dt);
 int do_macos_nvme_smart(int update_every, usec_t dt);
 
-bool macos_gpu_ioreport_available(void);
+bool macos_gpu_power_available(void);
+bool macos_gpu_power_source_available(void);
 bool macos_gpu_temperature_available(void);
+bool macos_gpu_is_hid_temperature_sensor_name(const char *name);
+bool macos_sensors_gpu_temperature_available(void);
+bool macos_sensors_fan_available(void);
+void macos_powermetrics_release_gpu_power_fallback(void);
+void macos_powermetrics_release_gpu_temperature_fallback(void);
 void macos_gpu_cleanup(void);
 void macos_sensors_cleanup(void);
 void macos_powermetrics_cleanup(void);

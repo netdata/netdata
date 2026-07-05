@@ -31,7 +31,7 @@ The plugin uses eight different methods to collect data:
 - The function `IOPSCopyPowerSourcesInfo` is called to collect battery and UPS power source data.
 - The private Apple IOReport framework is loaded at runtime to collect Apple Silicon GPU utilization, performance-state residency, clock frequency, and power draw without root privileges when macOS exposes the required channels.
 - AppleSMC and IOHID are sampled directly to collect hardware temperature, fan, voltage, current, and power sensors without requiring `powermetrics`.
-- The native Apple `powermetrics` command is sampled in continuous loop mode to collect thermal pressure, plus SMC temperatures, fan speed, and fallback GPU power when the macOS sampler is available.
+- The native Apple `powermetrics` command is sampled in continuous loop mode to collect thermal pressure, plus fallback SMC temperatures, fan speed, and fallback GPU power when the macOS sampler is available.
 - The native IOKit NVMe SMART user client is sampled to collect NVMe health data when macOS exposes readable SMART-capable NVMe services.
 
 
@@ -55,7 +55,7 @@ Power-source, AppleSMC, IOHID, and NVMe SMART enumeration are capped internally 
 
 #### Performance Impact
 
-Power-source, direct hardware sensor, and IOReport GPU collection are lightweight. AppleSMC sensor key discovery is rate-limited and sensor values are read directly from the discovered key list. Native NVMe SMART reads default to the same ten-second cadence as the existing NVMe collector, while device discovery is rate-limited. Thermal pressure collection keeps one `powermetrics` process running in loop mode at a configurable output interval, defaulting to once per minute.
+Power-source, direct IOHID sensor, and IOReport GPU collection are lightweight. AppleSMC sensor key discovery is rate-limited, and AppleSMC sensor values default to a ten-second cadence because AppleSMC reads can generate macOS CoreAnalytics log traffic. Native NVMe SMART reads default to the same ten-second cadence as the existing NVMe collector, while device discovery is rate-limited. Thermal pressure collection keeps one `powermetrics` process running in loop mode at a configurable output interval, defaulting to once per second.
 
 ## Setup
 
@@ -130,11 +130,13 @@ There are eight sections in the file which you can configure:
 | battery temperature | Enable or disable monitoring of battery temperature metrics when exposed by macOS. | yes | no |
 | battery cycle count | Enable or disable monitoring of battery cycle count metrics when exposed by macOS. | yes | no |
 | enabled | Enable or disable Apple Silicon GPU monitoring through IOReport. The module creates charts only when macOS exposes the required IOReport GPU channels. | yes | no |
+| SMC temperature sample every | How often to read AppleSMC GPU temperature keys when IOHID GPU temperature is unavailable and AppleSMC is used as the fallback source. | 10s | no |
 | enabled | Enable or disable direct AppleSMC and IOHID hardware sensor monitoring. | yes | no |
 | SMC sensors | Enable or disable direct AppleSMC hardware temperature, fan, voltage, current, and power sensor monitoring. | yes | no |
-| IOHID sensors | Enable or disable direct IOHID temperature sensor monitoring. | yes | no |
+| IOHID sensors | Enable or disable direct IOHID temperature, current, and voltage sensor monitoring. | yes | no |
 | discovery every | How often to rescan AppleSMC for available hardware sensor keys. | 300s | no |
-| sample every | Output interval passed to the long-running native `powermetrics` loop sampler. | 60s | no |
+| SMC sample every | How often to read values from discovered AppleSMC hardware sensor keys. | 10s | no |
+| sample every | Output interval passed to the long-running native `powermetrics` loop sampler. | 1s | no |
 | sample window | One-shot sampling window used while probing which `powermetrics` sampler set is available. | 1000ms | no |
 | command timeout | Maximum extra time to wait for one `powermetrics` probe or loop sample before restarting the sampler. | 5000ms | no |
 | use ndsudo | Run the native Apple `powermetrics` sampler through Netdata's setuid `ndsudo` helper. | yes | no |

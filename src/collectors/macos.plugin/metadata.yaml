@@ -30,7 +30,7 @@ modules:
           - The function `IOPSCopyPowerSourcesInfo` is called to collect battery and UPS power source data.
           - The private Apple IOReport framework is loaded at runtime to collect Apple Silicon GPU utilization, performance-state residency, clock frequency, and power draw without root privileges when macOS exposes the required channels.
           - AppleSMC and IOHID are sampled directly to collect hardware temperature, fan, voltage, current, and power sensors without requiring `powermetrics`.
-          - The native Apple `powermetrics` command is sampled in continuous loop mode to collect thermal pressure, plus SMC temperatures, fan speed, and fallback GPU power when the macOS sampler is available.
+          - The native Apple `powermetrics` command is sampled in continuous loop mode to collect thermal pressure, plus fallback SMC temperatures, fan speed, and fallback GPU power when the macOS sampler is available.
           - The native IOKit NVMe SMART user client is sampled to collect NVMe health data when macOS exposes readable SMART-capable NVMe services.
       supported_platforms:
         include:
@@ -45,7 +45,7 @@ modules:
         limits:
           description: "Power-source, AppleSMC, IOHID, and NVMe SMART enumeration are capped internally to avoid unexpected chart cardinality. IOReport GPU sampling is in-process and single-device. The `powermetrics` sampler runs as one long-lived loop process and only publishes newly received samples."
         performance_impact:
-          description: "Power-source, direct hardware sensor, and IOReport GPU collection are lightweight. AppleSMC sensor key discovery is rate-limited and sensor values are read directly from the discovered key list. Native NVMe SMART reads default to the same ten-second cadence as the existing NVMe collector, while device discovery is rate-limited. Thermal pressure collection keeps one `powermetrics` process running in loop mode at a configurable output interval, defaulting to once per minute."
+          description: "Power-source, direct IOHID sensor, and IOReport GPU collection are lightweight. AppleSMC sensor key discovery is rate-limited, and AppleSMC sensor values default to a ten-second cadence because AppleSMC reads can generate macOS CoreAnalytics log traffic. Native NVMe SMART reads default to the same ten-second cadence as the existing NVMe collector, while device discovery is rate-limited. Thermal pressure collection keeps one `powermetrics` process running in loop mode at a configurable output interval, defaulting to once per second."
     setup:
       prerequisites:
         list: []
@@ -289,6 +289,11 @@ modules:
               description: Enable or disable Apple Silicon GPU monitoring through IOReport. The module creates charts only when macOS exposes the required IOReport GPU channels.
               default_value: yes
               required: false
+            - name: SMC temperature sample every
+              section_name: plugin:macos:gpu
+              description: How often to read AppleSMC GPU temperature keys when IOHID GPU temperature is unavailable and AppleSMC is used as the fallback source.
+              default_value: 10s
+              required: false
             - name: enabled
               section_name: plugin:macos:sensors
               description: Enable or disable direct AppleSMC and IOHID hardware sensor monitoring.
@@ -301,7 +306,7 @@ modules:
               required: false
             - name: IOHID sensors
               section_name: plugin:macos:sensors
-              description: Enable or disable direct IOHID temperature sensor monitoring.
+              description: Enable or disable direct IOHID temperature, current, and voltage sensor monitoring.
               default_value: yes
               required: false
             - name: discovery every
@@ -309,10 +314,15 @@ modules:
               description: How often to rescan AppleSMC for available hardware sensor keys.
               default_value: 300s
               required: false
+            - name: SMC sample every
+              section_name: plugin:macos:sensors
+              description: How often to read values from discovered AppleSMC hardware sensor keys.
+              default_value: 10s
+              required: false
             - name: sample every
               section_name: plugin:macos:powermetrics
               description: Output interval passed to the long-running native `powermetrics` loop sampler.
-              default_value: 60s
+              default_value: 1s
               required: false
             - name: sample window
               section_name: plugin:macos:powermetrics

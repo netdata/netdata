@@ -10,8 +10,10 @@
 #include <math.h>
 #include <stdint.h>
 #include <string.h>
+#include <strings.h>
 
 #define MACOS_SENSORS_DEFAULT_DISCOVERY_EVERY 300
+#define MACOS_SENSORS_DEFAULT_SMC_COLLECTION_EVERY 10
 #define MACOS_SENSORS_MAX_SMC_KEYS 8192
 #define MACOS_SENSORS_MISSING_CYCLES_BEFORE_OBSOLETE 3
 
@@ -19,6 +21,10 @@ enum {
     MACOS_SENSORS_HID_PAGE_APPLE_VENDOR = 0xff00,
     MACOS_SENSORS_HID_USAGE_TEMPERATURE_SENSOR = 0x0005,
     MACOS_SENSORS_HID_EVENT_TYPE_TEMPERATURE = 15,
+    MACOS_SENSORS_HID_PAGE_APPLE_VENDOR_POWER = 0xff08,
+    MACOS_SENSORS_HID_USAGE_CURRENT_SENSOR = 0x0002,
+    MACOS_SENSORS_HID_USAGE_VOLTAGE_SENSOR = 0x0003,
+    MACOS_SENSORS_HID_EVENT_TYPE_POWER = 25,
 };
 
 enum macos_sensor_kind {
@@ -63,9 +69,25 @@ struct macos_smc_sensor_candidate {
     enum macos_sensor_kind kind;
     char label[128];
     char subsystem[64];
+    struct macos_smc_key_info info;
+    bool has_info;
     bool discovered;
+    bool quarantined;
+    unsigned consecutive_failures;
 
     struct macos_smc_sensor_candidate *next;
+};
+
+struct macos_hid_sensor_source {
+    enum macos_sensor_kind kind;
+    int primary_usage_page;
+    int primary_usage;
+    int64_t event_type;
+    int32_t event_field;
+    NETDATA_DOUBLE divisor;
+    const char *subsystem;
+    const char *default_label;
+    const char *feature_prefix;
 };
 
 static const struct macos_sensor_kind_def macos_sensor_defs[MACOS_SENSOR_KIND_COUNT] = {
@@ -114,13 +136,56 @@ static const struct macos_sensor_kind_def macos_sensor_defs[MACOS_SENSOR_KIND_CO
 static struct macos_sensor_chart *sensor_charts_root = NULL;
 static struct macos_smc_sensor_candidate *smc_candidates_root = NULL;
 static io_connect_t smc_connection = IO_OBJECT_NULL;
-static struct macos_iohid_client hid_client = {0};
+static struct macos_iohid_client hid_clients[MACOS_SENSOR_KIND_COUNT] = {0};
 
 static bool initialized = false;
 static bool do_smc = true;
 static bool do_hid = true;
 static int discovery_every_s = MACOS_SENSORS_DEFAULT_DISCOVERY_EVERY;
+static int smc_collection_every_s = MACOS_SENSORS_DEFAULT_SMC_COLLECTION_EVERY;
 static usec_t last_smc_discovery_ut = 0;
+static usec_t last_smc_collection_ut = 0;
+static bool smc_gpu_temperature_available = false;
+static bool hid_gpu_temperature_available = false;
+static bool smc_fan_available = false;
+static bool last_gpu_temperature_available = false;
+static bool last_gpu_power_available = false;
+
+static const struct macos_hid_sensor_source macos_hid_sensor_sources[] = {
+    {
+        .kind = MACOS_SENSOR_TEMPERATURE,
+        .primary_usage_page = MACOS_SENSORS_HID_PAGE_APPLE_VENDOR,
+        .primary_usage = MACOS_SENSORS_HID_USAGE_TEMPERATURE_SENSOR,
+        .event_type = MACOS_SENSORS_HID_EVENT_TYPE_TEMPERATURE,
+        .event_field = MACOS_SENSORS_HID_EVENT_TYPE_TEMPERATURE << 16,
+        .divisor = 1.0,
+        .subsystem = "thermal",
+        .default_label = "IOHID Temperature Sensor",
+        .feature_prefix = "temperature",
+    },
+    {
+        .kind = MACOS_SENSOR_CURRENT,
+        .primary_usage_page = MACOS_SENSORS_HID_PAGE_APPLE_VENDOR_POWER,
+        .primary_usage = MACOS_SENSORS_HID_USAGE_CURRENT_SENSOR,
+        .event_type = MACOS_SENSORS_HID_EVENT_TYPE_POWER,
+        .event_field = MACOS_SENSORS_HID_EVENT_TYPE_POWER << 16,
+        .divisor = 1000.0,
+        .subsystem = "pmu",
+        .default_label = "IOHID Current Sensor",
+        .feature_prefix = "current",
+    },
+    {
+        .kind = MACOS_SENSOR_VOLTAGE,
+        .primary_usage_page = MACOS_SENSORS_HID_PAGE_APPLE_VENDOR_POWER,
+        .primary_usage = MACOS_SENSORS_HID_USAGE_VOLTAGE_SENSOR,
+        .event_type = MACOS_SENSORS_HID_EVENT_TYPE_POWER,
+        .event_field = MACOS_SENSORS_HID_EVENT_TYPE_POWER << 16,
+        .divisor = 1000.0,
+        .subsystem = "pmu",
+        .default_label = "IOHID Voltage Sensor",
+        .feature_prefix = "voltage",
+    },
+};
 
 static bool macos_sensors_cfstring_to_cstr(CFStringRef str, char *dst, size_t dst_size)
 {
@@ -136,19 +201,9 @@ static bool macos_sensors_cfstring_to_cstr(CFStringRef str, char *dst, size_t ds
     return dst[0] != '\0';
 }
 
-static bool macos_sensors_smc_key_is_printable(const char key[MACOS_SMC_KEY_LEN + 1])
-{
-    for (size_t i = 0; i < MACOS_SMC_KEY_LEN; i++) {
-        if (!isprint((unsigned char)key[i]))
-            return false;
-    }
-
-    return key[MACOS_SMC_KEY_LEN] == '\0';
-}
-
 static bool macos_sensors_smc_kind_for_key(const char key[MACOS_SMC_KEY_LEN + 1], enum macos_sensor_kind *kind)
 {
-    if (!macos_sensors_smc_key_is_printable(key) || !kind)
+    if (!macos_smc_key_is_valid(key) || !kind)
         return false;
 
     if (key[0] == 'T') {
@@ -179,6 +234,118 @@ static bool macos_sensors_smc_kind_for_key(const char key[MACOS_SMC_KEY_LEN + 1]
     return false;
 }
 
+static bool macos_sensors_smc_key_is_gpu_temperature(const char key[MACOS_SMC_KEY_LEN + 1])
+{
+    return key[0] == 'T' && (key[1] == 'g' || key[1] == 'G');
+}
+
+static bool macos_sensors_smc_key_is_gpu_power(const char key[MACOS_SMC_KEY_LEN + 1])
+{
+    return key[0] == 'P' && (key[1] == 'g' || key[1] == 'G');
+}
+
+static bool macos_sensors_smc_key_suppressed_by_better_source(const char key[MACOS_SMC_KEY_LEN + 1])
+{
+    if (macos_sensors_smc_key_is_gpu_temperature(key) && macos_gpu_temperature_available())
+        return true;
+
+    if (macos_sensors_smc_key_is_gpu_power(key) && macos_gpu_power_source_available())
+        return true;
+
+    return false;
+}
+
+static bool macos_sensors_starts_with_ci(const char *value, const char *prefix)
+{
+    return value && prefix && strncasecmp(value, prefix, strlen(prefix)) == 0;
+}
+
+static bool macos_sensors_contains_ci(const char *value, const char *needle)
+{
+    if (!value || !needle || !*needle)
+        return false;
+
+    size_t needle_len = strlen(needle);
+    for (const char *p = value; *p; p++) {
+        if (strncasecmp(p, needle, needle_len) == 0)
+            return true;
+    }
+
+    return false;
+}
+
+static bool macos_sensors_token_matches_ci(const char *value, const char *token)
+{
+    if (!value || !token || !*token)
+        return false;
+
+    size_t token_len = strlen(token);
+    for (const char *p = value; *p;) {
+        while (*p && !isalnum((unsigned char)*p))
+            p++;
+
+        const char *start = p;
+        while (*p && isalnum((unsigned char)*p))
+            p++;
+
+        size_t len = (size_t)(p - start);
+        if (len == token_len && strncasecmp(start, token, token_len) == 0)
+            return true;
+    }
+
+    return false;
+}
+
+static const char *macos_sensors_hid_subsystem_for_product(
+    const struct macos_hid_sensor_source *source,
+    const char *label)
+{
+    if (source->kind != MACOS_SENSOR_TEMPERATURE || !label || !*label)
+        return source->subsystem;
+
+    if (macos_gpu_is_hid_temperature_sensor_name(label) ||
+        macos_sensors_token_matches_ci(label, "gpu"))
+        return "gpu";
+
+    if (macos_sensors_starts_with_ci(label, "NAND") ||
+        macos_sensors_token_matches_ci(label, "SSD") ||
+        macos_sensors_token_matches_ci(label, "NVMe"))
+        return "storage";
+
+    if (macos_sensors_starts_with_ci(label, "PMU") ||
+        macos_sensors_starts_with_ci(label, "sACC") ||
+        macos_sensors_token_matches_ci(label, "SoC") ||
+        macos_sensors_token_matches_ci(label, "PMGR"))
+        return "soc";
+
+    if (macos_sensors_token_matches_ci(label, "CPU") ||
+        macos_sensors_starts_with_ci(label, "eACC") ||
+        macos_sensors_starts_with_ci(label, "pACC"))
+        return "cpu";
+
+    if (macos_sensors_starts_with_ci(label, "mACC") ||
+        macos_sensors_token_matches_ci(label, "DRAM") ||
+        macos_sensors_token_matches_ci(label, "memory"))
+        return "memory";
+
+    if (macos_sensors_token_matches_ci(label, "ambient"))
+        return "ambient";
+
+    if (macos_sensors_token_matches_ci(label, "battery"))
+        return "battery";
+
+    if (macos_sensors_token_matches_ci(label, "airport") ||
+        macos_sensors_token_matches_ci(label, "wireless") ||
+        macos_sensors_token_matches_ci(label, "RF"))
+        return "wireless";
+
+    if (macos_sensors_contains_ci(label, "power delivery") ||
+        macos_sensors_starts_with_ci(label, "PD "))
+        return "power";
+
+    return source->subsystem;
+}
+
 static void macos_sensors_smc_subsystem_for_key(const char key[MACOS_SMC_KEY_LEN + 1], char *dst, size_t dst_size)
 {
     const char *subsystem = "hardware";
@@ -188,45 +355,77 @@ static void macos_sensors_smc_subsystem_for_key(const char key[MACOS_SMC_KEY_LEN
         return;
     }
 
-    switch (tolower((unsigned char)key[1])) {
-        case 'a':
-            subsystem = "ambient";
-            break;
-        case 'b':
-            subsystem = "battery";
-            break;
-        case 'c':
-            subsystem = "cpu";
-            break;
-        case 'd':
-        case 'h':
-        case 'n':
-            subsystem = "storage";
-            break;
-        case 'f':
-            subsystem = "fan";
-            break;
-        case 'g':
-            subsystem = "gpu";
-            break;
-        case 'm':
-            subsystem = "memory";
-            break;
-        case 'p':
-        case 's':
-            subsystem = "soc";
-            break;
-        case 'w':
-            subsystem = "wireless";
-            break;
-        case 'z':
-            subsystem = "power";
-            break;
-        default:
-            break;
+    char kind = (char)tolower((unsigned char)key[0]);
+    char component = (char)tolower((unsigned char)key[1]);
+
+    if (kind == 't') {
+        switch (component) {
+            case 'a':
+                subsystem = "ambient";
+                break;
+            case 'b':
+                subsystem = "battery";
+                break;
+            case 'c':
+            case 'p':
+                subsystem = "cpu";
+                break;
+            case 'd':
+            case 'n':
+                subsystem = "soc";
+                break;
+            case 'h':
+                subsystem = "storage";
+                break;
+            case 'g':
+                subsystem = "gpu";
+                break;
+            case 'm':
+                subsystem = "memory";
+                break;
+            case 's':
+                subsystem = "soc";
+                break;
+            case 'w':
+                subsystem = "wireless";
+                break;
+            case 'z':
+                subsystem = "power";
+                break;
+            default:
+                break;
+        }
+
+        snprintfz(dst, dst_size, "%s", subsystem);
+        return;
+    }
+
+    if (kind == 'p') {
+        switch (component) {
+            case 'c':
+            case 'p':
+                subsystem = "cpu";
+                break;
+            case 'g':
+                subsystem = "gpu";
+                break;
+            case 'm':
+                subsystem = "memory";
+                break;
+            case 's':
+                subsystem = "soc";
+                break;
+            case 'z':
+                subsystem = "power";
+                break;
+            default:
+                subsystem = "power";
+                break;
+        }
     }
 
     snprintfz(dst, dst_size, "%s", subsystem);
+    return;
 }
 
 static void macos_sensors_smc_label_for_key(
@@ -282,7 +481,7 @@ static bool macos_sensors_validate_value(enum macos_sensor_kind kind, NETDATA_DO
 
     switch (kind) {
         case MACOS_SENSOR_TEMPERATURE:
-            return value > 0.0 && value <= 150.0;
+            return value >= -40.0 && value <= 150.0;
         case MACOS_SENSOR_FAN:
             return value >= 0.0 && value <= 30000.0;
         case MACOS_SENSOR_VOLTAGE:
@@ -374,16 +573,40 @@ static void macos_sensors_begin_cycle(void)
         s->seen = false;
 }
 
-static void macos_sensors_finish_cycle(void)
+static void macos_sensors_finish_cycle(bool smc_attempted, bool hid_attempted)
 {
     struct macos_sensor_chart **pp = &sensor_charts_root;
     while (*pp) {
         struct macos_sensor_chart *s = *pp;
+        bool source_attempted = true;
+
+        if (!strcmp(s->source, "smc"))
+            source_attempted = smc_attempted;
+        else if (!strcmp(s->source, "iohid"))
+            source_attempted = hid_attempted;
+
+        if (!source_attempted) {
+            pp = &s->next;
+            continue;
+        }
+
         if (!s->seen && ++s->missing_cycles >= MACOS_SENSORS_MISSING_CYCLES_BEFORE_OBSOLETE) {
             *pp = s->next;
             macos_sensors_free_chart(s);
         } else
             pp = &s->next;
+    }
+
+    smc_gpu_temperature_available = false;
+    smc_fan_available = false;
+    for (struct macos_sensor_chart *s = sensor_charts_root; s; s = s->next) {
+        if (strcmp(s->source, "smc") != 0)
+            continue;
+
+        if (s->kind == MACOS_SENSOR_FAN)
+            smc_fan_available = true;
+        else if (s->kind == MACOS_SENSOR_TEMPERATURE && strcmp(s->subsystem, "gpu") == 0)
+            smc_gpu_temperature_available = true;
     }
 }
 
@@ -425,6 +648,7 @@ static void macos_sensors_update_chart(
         rrdlabels_add(s->st->rrdlabels, "driver", s->driver, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "subsystem", s->subsystem, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "chip_id", s->chip_id, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(s->st->rrdlabels, "device", s->chip_id, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "feature", s->feature, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "label", s->label, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "path", s->path, RRDLABEL_SRC_AUTO);
@@ -451,11 +675,19 @@ static struct macos_smc_sensor_candidate *macos_sensors_find_smc_candidate(const
 
 static struct macos_smc_sensor_candidate *macos_sensors_get_or_create_smc_candidate(
     const char key[MACOS_SMC_KEY_LEN + 1],
-    enum macos_sensor_kind kind)
+    enum macos_sensor_kind kind,
+    const struct macos_smc_key_info *info)
 {
     struct macos_smc_sensor_candidate *c = macos_sensors_find_smc_candidate(key);
     if (c) {
         c->discovered = true;
+        c->kind = kind;
+        if (info) {
+            c->info = *info;
+            c->has_info = true;
+        }
+        c->quarantined = false;
+        c->consecutive_failures = 0;
         return c;
     }
 
@@ -463,6 +695,10 @@ static struct macos_smc_sensor_candidate *macos_sensors_get_or_create_smc_candid
     snprintfz(c->key, sizeof(c->key), "%s", key);
     c->kind = kind;
     c->discovered = true;
+    if (info) {
+        c->info = *info;
+        c->has_info = true;
+    }
     macos_sensors_smc_label_for_key(key, kind, c->label, sizeof(c->label));
     macos_sensors_smc_subsystem_for_key(key, c->subsystem, sizeof(c->subsystem));
 
@@ -515,40 +751,97 @@ static bool macos_sensors_discover_smc(void)
         if (!macos_smc_key_by_index(smc_connection, i, key) || !macos_sensors_smc_kind_for_key(key, &kind))
             continue;
 
+        if (macos_sensors_smc_key_suppressed_by_better_source(key))
+            continue;
+
+        struct macos_smc_key_info info;
+        if (!macos_smc_read_key_info(smc_connection, key, &info))
+            continue;
+
         struct macos_smc_value value;
         NETDATA_DOUBLE decoded;
-        if (!macos_smc_read_key(smc_connection, key, &value) ||
-            !macos_sensors_decode_smc_value(kind, &value, &decoded)) {
-            struct macos_smc_sensor_candidate *c = macos_sensors_find_smc_candidate(key);
-            if (c)
-                c->discovered = true;
+        if (!macos_smc_read_key_with_info(smc_connection, key, &info, &value) ||
+            !macos_sensors_decode_smc_value(kind, &value, &decoded))
             continue;
-        }
 
-        macos_sensors_get_or_create_smc_candidate(key, kind);
+        macos_sensors_get_or_create_smc_candidate(key, kind, &info);
     }
 
     macos_sensors_prune_smc_candidates();
     return true;
 }
 
-static void macos_sensors_collect_smc(int update_every)
+static int macos_sensors_smc_chart_update_every(int plugin_update_every)
+{
+    if (smc_collection_every_s > plugin_update_every)
+        return smc_collection_every_s;
+
+    return plugin_update_every > 0 ? plugin_update_every : 1;
+}
+
+static bool macos_sensors_read_smc_candidate(
+    struct macos_smc_sensor_candidate *c,
+    struct macos_smc_value *value)
+{
+    if (!c->has_info) {
+        if (!macos_smc_read_key_info(smc_connection, c->key, &c->info))
+            return false;
+
+        c->has_info = true;
+    }
+
+    return macos_smc_read_key_with_info(smc_connection, c->key, &c->info, value);
+}
+
+static bool macos_sensors_collect_smc(int update_every)
 {
     usec_t now_ut = now_monotonic_usec();
+    bool gpu_temperature_available = macos_gpu_temperature_available();
+    bool gpu_power_available = macos_gpu_power_source_available();
+    bool collection_due = !last_smc_collection_ut ||
+                          now_ut - last_smc_collection_ut >= (usec_t)smc_collection_every_s * USEC_PER_SEC;
+    if (gpu_temperature_available != last_gpu_temperature_available ||
+        gpu_power_available != last_gpu_power_available) {
+        last_smc_discovery_ut = 0;
+        last_gpu_temperature_available = gpu_temperature_available;
+        last_gpu_power_available = gpu_power_available;
+    }
+
     if (!last_smc_discovery_ut || now_ut - last_smc_discovery_ut >= (usec_t)discovery_every_s * USEC_PER_SEC) {
         if (macos_sensors_discover_smc())
             last_smc_discovery_ut = now_ut;
     }
 
+    if (!collection_due)
+        return false;
+
+    last_smc_collection_ut = now_ut;
+    smc_gpu_temperature_available = false;
+    smc_fan_available = false;
+
     if (smc_connection == IO_OBJECT_NULL || !smc_candidates_root)
-        return;
+        return true;
+
+    int chart_update_every = macos_sensors_smc_chart_update_every(update_every);
 
     for (struct macos_smc_sensor_candidate *c = smc_candidates_root; c; c = c->next) {
+        if (c->quarantined || macos_sensors_smc_key_suppressed_by_better_source(c->key))
+            continue;
+
         struct macos_smc_value value;
         NETDATA_DOUBLE decoded;
-        if (!macos_smc_read_key(smc_connection, c->key, &value) ||
-            !macos_sensors_decode_smc_value(c->kind, &value, &decoded))
+        if (!macos_sensors_read_smc_candidate(c, &value) ||
+            !macos_sensors_decode_smc_value(c->kind, &value, &decoded)) {
+            if (++c->consecutive_failures >= MACOS_SENSORS_MISSING_CYCLES_BEFORE_OBSOLETE)
+                c->quarantined = true;
             continue;
+        }
+
+        c->consecutive_failures = 0;
+        if (c->kind == MACOS_SENSOR_FAN)
+            smc_fan_available = true;
+        else if (c->kind == MACOS_SENSOR_TEMPERATURE && macos_sensors_smc_key_is_gpu_temperature(c->key))
+            smc_gpu_temperature_available = true;
 
         char chart_id[RRD_ID_LENGTH_MAX + 1];
         snprintfz(chart_id, sizeof(chart_id), "macos_smc_%s_%s", macos_sensor_defs[c->kind].name, c->key);
@@ -568,8 +861,10 @@ static void macos_sensors_collect_smc(int update_every)
             "AppleSMC",
             "smc",
             decoded,
-            update_every);
+            chart_update_every);
     }
+
+    return true;
 }
 
 static bool macos_sensors_hid_product_name(IOHIDServiceClientRef service, char *name, size_t name_size)
@@ -641,17 +936,18 @@ static bool macos_sensors_hid_service_identifier(IOHIDServiceClientRef service, 
     return true;
 }
 
-static void macos_sensors_collect_hid(int update_every)
+static bool macos_sensors_collect_hid_source(const struct macos_hid_sensor_source *source, int update_every)
 {
+    struct macos_iohid_client *client = &hid_clients[source->kind];
     if (!macos_iohid_client_set_matching(
-            &hid_client,
-            MACOS_SENSORS_HID_PAGE_APPLE_VENDOR,
-            MACOS_SENSORS_HID_USAGE_TEMPERATURE_SENSOR))
-        return;
+            client,
+            source->primary_usage_page,
+            source->primary_usage))
+        return true;
 
-    CFArrayRef services = macos_iohid_client_copy_services(&hid_client);
+    CFArrayRef services = macos_iohid_client_copy_services(client);
     if (!services)
-        return;
+        return true;
 
     CFIndex count = CFArrayGetCount(services);
     for (CFIndex i = 0; i < count; i++) {
@@ -659,21 +955,28 @@ static void macos_sensors_collect_hid(int update_every)
         if (!service)
             continue;
 
-        NETDATA_DOUBLE temp;
-        if (!macos_iohid_service_copy_event_float(
-                service,
-                MACOS_SENSORS_HID_EVENT_TYPE_TEMPERATURE,
-                MACOS_SENSORS_HID_EVENT_TYPE_TEMPERATURE << 16,
-                &temp))
-            continue;
-
-        if (!macos_sensors_validate_value(MACOS_SENSOR_TEMPERATURE, temp))
-            continue;
-
         char label[128];
         bool has_product = macos_sensors_hid_product_name(service, label, sizeof(label));
+        bool is_gpu_temperature_sensor = has_product &&
+                                         source->kind == MACOS_SENSOR_TEMPERATURE &&
+                                         macos_gpu_is_hid_temperature_sensor_name(label);
+        if (is_gpu_temperature_sensor && macos_gpu_temperature_available())
+            continue;
         if (!has_product)
-            snprintfz(label, sizeof(label), "IOHID Temperature Sensor");
+            snprintfz(label, sizeof(label), "%s", source->default_label);
+
+        NETDATA_DOUBLE value;
+        if (!macos_iohid_service_copy_event_float(
+                service,
+                source->event_type,
+                source->event_field,
+                &value))
+            continue;
+
+        value /= source->divisor;
+
+        if (!macos_sensors_validate_value(source->kind, value))
+            continue;
 
         char feature[128];
         char base_feature[128] = "";
@@ -688,38 +991,51 @@ static void macos_sensors_collect_hid(int update_every)
 
         if (base_feature[0] && has_service_identifier)
             snprintfz(feature, sizeof(feature), "%s_%s", base_feature, service_identifier);
-        else if (base_feature[0]) {
-            // Last-resort suffix when IOHID exposes no stable service identity.
-            snprintfz(feature, sizeof(feature), "%s_%ld", base_feature, (long)i);
-        } else if (has_service_identifier)
-            snprintfz(feature, sizeof(feature), "temperature_%s", service_identifier);
+        else if (has_service_identifier)
+            snprintfz(feature, sizeof(feature), "%s_%s", source->feature_prefix, service_identifier);
         else
-            snprintfz(feature, sizeof(feature), "temperature_%ld", (long)i);
+            continue;
 
         netdata_fix_chart_id(feature);
 
         char chart_id[RRD_ID_LENGTH_MAX + 1];
-        snprintfz(chart_id, sizeof(chart_id), "macos_iohid_temperature_%s", feature);
+        snprintfz(chart_id, sizeof(chart_id), "macos_iohid_%s_%s", macos_sensor_defs[source->kind].name, feature);
         netdata_fix_chart_id(chart_id);
 
         char path[192];
-        snprintfz(path, sizeof(path), "IOHID/%s", feature);
+        snprintfz(path, sizeof(path), "IOHID/%s/%s", macos_sensor_defs[source->kind].name, feature);
+        const char *subsystem = macos_sensors_hid_subsystem_for_product(source, label);
 
         macos_sensors_update_chart(
             chart_id,
-            MACOS_SENSOR_TEMPERATURE,
+            source->kind,
             label,
             feature,
             path,
             "IOHID",
-            "thermal",
+            subsystem,
             "IOHIDEventSystemClient",
             "iohid",
-            temp,
+            value,
             update_every);
+
+        if (is_gpu_temperature_sensor)
+            hid_gpu_temperature_available = true;
     }
 
     CFRelease(services);
+    return true;
+}
+
+static bool macos_sensors_collect_hid(int update_every)
+{
+    bool attempted = false;
+    hid_gpu_temperature_available = false;
+
+    for (size_t i = 0; i < _countof(macos_hid_sensor_sources); i++)
+        attempted |= macos_sensors_collect_hid_source(&macos_hid_sensor_sources[i], update_every);
+
+    return attempted;
 }
 
 static void macos_sensors_init(void)
@@ -737,6 +1053,14 @@ static void macos_sensors_init(void)
     if (discovery_every_s < 10)
         discovery_every_s = 10;
 
+    smc_collection_every_s = (int)inicfg_get_duration_seconds(
+        &netdata_config,
+        "plugin:macos:sensors",
+        "SMC sample every",
+        MACOS_SENSORS_DEFAULT_SMC_COLLECTION_EVERY);
+    if (smc_collection_every_s < 1)
+        smc_collection_every_s = 1;
+
     initialized = true;
 }
 
@@ -752,13 +1076,25 @@ int do_macos_sensors(int update_every, usec_t dt __maybe_unused)
     macos_sensors_init();
 
     macos_sensors_begin_cycle();
+    bool smc_attempted = false;
+    bool hid_attempted = false;
     if (do_smc)
-        macos_sensors_collect_smc(update_every);
+        smc_attempted = macos_sensors_collect_smc(update_every);
     if (do_hid)
-        macos_sensors_collect_hid(update_every);
-    macos_sensors_finish_cycle();
+        hid_attempted = macos_sensors_collect_hid(update_every);
+    macos_sensors_finish_cycle(smc_attempted, hid_attempted);
 
     return 0;
+}
+
+bool macos_sensors_gpu_temperature_available(void)
+{
+    return smc_gpu_temperature_available || hid_gpu_temperature_available;
+}
+
+bool macos_sensors_fan_available(void)
+{
+    return smc_fan_available;
 }
 
 void macos_sensors_cleanup(void)
@@ -777,8 +1113,13 @@ void macos_sensors_cleanup(void)
 
     macos_smc_close(&smc_connection);
 
-    macos_iohid_client_cleanup(&hid_client);
+    for (size_t i = 0; i < _countof(hid_clients); i++)
+        macos_iohid_client_cleanup(&hid_clients[i]);
 
     initialized = false;
     last_smc_discovery_ut = 0;
+    last_smc_collection_ut = 0;
+    smc_gpu_temperature_available = false;
+    hid_gpu_temperature_available = false;
+    smc_fan_available = false;
 }
