@@ -21,12 +21,18 @@ Module: mach_smi
 
 ## Overview
 
-Monitor macOS metrics for efficient operating system performance.
+Monitor macOS metrics for efficient operating system performance, power sources, thermal pressure, sensors, fans, storage, and networking.
 
-The plugin uses three different methods to collect data:
-  - The function `sysctlbyname` is called to collect network, swap, loadavg, and boot time.
-  - The functtion `host_statistic` is called to collect CPU and Virtual memory data;
-  - The function `IOServiceGetMatchingServices` to collect storage information.
+The plugin uses eight different methods to collect data:
+
+- The function `sysctlbyname` is called to collect network, swap, loadavg, and boot time.
+- The function `host_statistics` is called to collect CPU and virtual memory data.
+- The function `IOServiceGetMatchingServices` is called to collect storage information.
+- The function `IOPSCopyPowerSourcesInfo` is called to collect battery and UPS power source data.
+- The private Apple IOReport framework is loaded at runtime to collect Apple Silicon GPU utilization, performance-state residency, clock frequency, and power draw without root privileges when macOS exposes the required channels.
+- AppleSMC and IOHID are sampled directly to collect hardware temperature, fan, voltage, current, and power sensors without requiring `powermetrics`.
+- The native Apple `powermetrics` command is sampled in continuous loop mode to collect thermal pressure, plus fallback SMC temperatures, fan speed, and fallback GPU power when the macOS sampler is available.
+- The native IOKit NVMe SMART user client is sampled to collect NVMe health data when macOS exposes readable SMART-capable NVMe services.
 
 
 This collector is only supported on the following platforms:
@@ -35,20 +41,21 @@ This collector is only supported on the following platforms:
 
 This collector only supports collecting metrics from a single instance of this integration.
 
+Battery, UPS power-source, native Apple Silicon GPU, direct AppleSMC/IOHID hardware sensors, and native NVMe SMART metrics do not require external tools. Apple Silicon GPU metrics use the private IOReport framework loaded at runtime and gracefully disappear when unavailable. Exact thermal pressure and fallback GPU-power readings use the native Apple `powermetrics` command, which requires `netdata` to run with sufficient macOS privileges. The default sampler falls back through available sampler sets; without required privileges, the thermal sampler disables itself after repeated startup probe failures.
 
 ### Default Behavior
 
 #### Auto-Detection
 
-This integration doesn't support auto-detection.
+The collector auto-detects macOS power sources, Apple Silicon IOReport GPU channels, AppleSMC/IOHID hardware sensors, and readable NVMe SMART-capable services, and only creates charts for values exposed by the hardware and operating system.
 
 #### Limits
 
-The default configuration for this integration does not impose any limits on data collection.
+Power-source, AppleSMC, IOHID, and NVMe SMART enumeration are capped internally to avoid unexpected chart cardinality. IOReport GPU sampling is in-process and single-device. The `powermetrics` sampler runs as one long-lived loop process and only publishes newly received samples.
 
 #### Performance Impact
 
-The default configuration for this integration is not expected to impose a significant performance impact on the system.
+Power-source, direct IOHID sensor, and IOReport GPU collection are lightweight. AppleSMC sensor key discovery is rate-limited, and AppleSMC sensor values default to a ten-second cadence because AppleSMC reads can generate macOS CoreAnalytics log traffic. Native NVMe SMART reads default to the same ten-second cadence as the existing NVMe collector, while device discovery is rate-limited. Thermal pressure collection keeps one `powermetrics` process running in loop mode at a configurable output interval, defaulting to once per second.
 
 ## Setup
 
@@ -61,11 +68,16 @@ No action required.
 
 #### Options
 
-There are three sections in the file which you can configure:
+There are eight sections in the file which you can configure:
 
 - `[plugin:macos:sysctl]` - Enable or disable monitoring for network, swap, loadavg, and boot time.
 - `[plugin:macos:mach_smi]` - Enable or disable monitoring for CPU and Virtual memory.
 - `[plugin:macos:iokit]` - Enable or disable monitoring for storage device.
+- `[plugin:macos:power_sources]` - Enable or disable battery and UPS power-source metrics.
+- `[plugin:macos:gpu]` - Enable or disable Apple Silicon IOReport GPU monitoring.
+- `[plugin:macos:sensors]` - Configure direct AppleSMC and IOHID hardware sensor monitoring.
+- `[plugin:macos:powermetrics]` - Configure thermal and fan sampling through native Apple `powermetrics`.
+- `[plugin:macos:nvme_smart]` - Configure native IOKit NVMe SMART sampling.
 
 
 <details open><summary>Config options</summary>
@@ -112,6 +124,31 @@ There are three sections in the file which you can configure:
 | swap i/o | Enable or disable monitoring of SWAP I/O metrics (I/O Swap). | yes | no |
 | memory page faults | Enable or disable monitoring of memory page faults metrics (memory, cow, I/O page, compress, decompress, zero fill, reactivate, purge). | yes | no |
 | disk i/o | Enable or disable monitoring of disk I/O metrics (In, Out). | yes | no |
+| battery capacity | Enable or disable monitoring of battery capacity metrics. | yes | no |
+| power supply voltage | Enable or disable monitoring of battery and UPS voltage metrics. | yes | no |
+| power supply current | Enable or disable monitoring of battery and UPS current metrics. | yes | no |
+| battery temperature | Enable or disable monitoring of battery temperature metrics when exposed by macOS. | yes | no |
+| battery cycle count | Enable or disable monitoring of battery cycle count metrics when exposed by macOS. | yes | no |
+| enabled | Enable or disable Apple Silicon GPU monitoring through IOReport. The module creates charts only when macOS exposes the required IOReport GPU channels. | yes | no |
+| SMC temperature sample every | How often to read AppleSMC GPU temperature keys when IOHID GPU temperature is unavailable and AppleSMC is used as the fallback source. | 10s | no |
+| enabled | Enable or disable direct AppleSMC and IOHID hardware sensor monitoring. | yes | no |
+| SMC sensors | Enable or disable direct AppleSMC hardware temperature, fan, voltage, current, and power sensor monitoring. | yes | no |
+| IOHID sensors | Enable or disable direct IOHID temperature, current, and voltage sensor monitoring. | yes | no |
+| discovery every | How often to rescan AppleSMC for available hardware sensor keys. | 300s | no |
+| SMC sample every | How often to read values from discovered AppleSMC hardware sensor keys. | 10s | no |
+| sample every | Output interval passed to the long-running native `powermetrics` loop sampler. | 1s | no |
+| sample window | One-shot sampling window used while probing which `powermetrics` sampler set is available. | 1000ms | no |
+| command timeout | Maximum extra time to wait for one `powermetrics` probe or loop sample before restarting the sampler. | 5000ms | no |
+| use ndsudo | Run the native Apple `powermetrics` sampler through Netdata's setuid `ndsudo` helper. | yes | no |
+| command path | Path to the native Apple `powermetrics` command when `use ndsudo` is disabled. | /usr/bin/powermetrics | no |
+| thermal pressure | Enable or disable monitoring of macOS thermal pressure state. | yes | no |
+| SMC fan speed | Enable or disable monitoring of SMC fan speed when available. | yes | no |
+| SMC temperatures | Enable or disable monitoring of SMC CPU and GPU die temperatures when available. | yes | no |
+| SMC thermal levels | Enable or disable monitoring of SMC thermal levels when available. | yes | no |
+| SMC prochot | Enable or disable monitoring of SMC processor-hot assertion flags when available. | yes | no |
+| GPU power | Enable or disable fallback GPU power monitoring from `powermetrics` when IOReport GPU power is unavailable and the `gpu_power` sampler exposes a value. | yes | no |
+| sample every | How often to read native NVMe SMART data through IOKit. | 10s | no |
+| discovery every | How often to rescan IORegistry for NVMe SMART-capable services. | 300s | no |
 
 
 </details>
@@ -142,7 +179,7 @@ sudo ./edit-config netdata.conf
 
 ##### Examples
 
-###### Disable swap monitoring.
+###### Disable swap monitoring
 
 A basic example that discards swap monitoring
 
@@ -157,7 +194,7 @@ A basic example that discards swap monitoring
 ```
 </details>
 
-###### Disable complete Machine SMI section.
+###### Disable complete Machine SMI section
 
 A basic example that discards swap monitoring
 
@@ -170,6 +207,58 @@ A basic example that discards swap monitoring
   swap i/o = no
   memory page faults = no
   disk i/o = no
+
+```
+</details>
+
+###### Disable thermal and fan sampling
+
+Disable the privileged `powermetrics` sampler while keeping the rest of `macos.plugin` enabled.
+
+<details open><summary>Config</summary>
+
+```yaml
+[plugin:macos]
+  powermetrics = no
+
+```
+</details>
+
+###### Disable Apple Silicon GPU monitoring
+
+Disable IOReport GPU monitoring while keeping other macOS metrics enabled.
+
+<details open><summary>Config</summary>
+
+```yaml
+[plugin:macos]
+  gpu = no
+
+```
+</details>
+
+###### Disable direct hardware sensor monitoring
+
+Disable direct AppleSMC and IOHID hardware sensor monitoring while keeping the rest of `macos.plugin` enabled.
+
+<details open><summary>Config</summary>
+
+```yaml
+[plugin:macos]
+  sensors = no
+
+```
+</details>
+
+###### Disable native NVMe SMART sampling
+
+Disable native IOKit NVMe SMART health monitoring while keeping generic disk I/O monitoring enabled.
+
+<details open><summary>Config</summary>
+
+```yaml
+[plugin:macos]
+  nvme smart = no
 
 ```
 </details>
@@ -241,6 +330,108 @@ Metrics:
 | ipv6.icmptypes | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |
 | system.uptime | uptime | seconds |
 | system.io | in, out | KiB/s |
+| macos.smc_thermal_level | cpu, gpu, io | level |
+| macos.smc_prochot | cpu, smc | status |
+
+### Per gpu
+
+These metrics refer to macOS GPU monitoring.
+
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| source | Data source |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| macos.gpu_utilization | utilization | percentage |
+| macos.gpu_performance_state_residency | pstate_&lt;index&gt;_&lt;mhz&gt;mhz | percentage |
+| macos.gpu_clock_freq | frequency | MHz |
+| macos.gpu_power_draw | power_draw | W |
+| macos.gpu_temperature | temperature | degrees Celsius |
+
+### Per power source
+
+These metrics refer to macOS battery and UPS power sources.
+
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| device | Sanitized power-source name |
+| source | Data source |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| powersupply.capacity | capacity | percentage |
+| powersupply.voltage | voltage | V |
+| powersupply.current | current | A |
+| powersupply.cycles | cycles | cycles |
+
+### Per sensor
+
+These metrics refer to macOS battery, CPU, GPU, fan, voltage, current, power, and thermal sensors.
+
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| driver | Sensor driver or macOS API source compatible with Linux hardware sensor grouping |
+| subsystem | Hardware subsystem inferred from the sensor source, used with driver for Linux-compatible hardware sensor grouping |
+| chip_id | Sensor chip or macOS service identifier |
+| feature | Stable sensor feature identifier |
+| name | Human-readable sensor name |
+| path | Stable source path for the sensor |
+| source | Data source |
+| sensor | Sensor name |
+| device | Sanitized device name when available |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| system.hw.sensor.temperature.input | input | degrees Celsius |
+| system.hw.sensor.fan.input | input | rotations per minute |
+| system.hw.sensor.voltage.input | input | V |
+| system.hw.sensor.current.input | input | A |
+| system.hw.sensor.power.input | input | W |
+| system.hw.sensor.state.input | nominal, moderate, heavy, sleeping, trapping, undefined | status |
+
+### Per nvme device
+
+These metrics refer to native macOS NVMe SMART-capable devices.
+
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| device | Sanitized NVMe device name |
+| model_number | NVMe model number |
+| source | Data source |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| nvme.device_estimated_endurance_perc | used | percentage |
+| nvme.device_available_spare_perc | spare | percentage |
+| nvme.device_composite_temperature | temperature | celsius |
+| nvme.device_io_transferred_count | read, written | bytes |
+| nvme.device_power_cycles_count | power | cycles |
+| nvme.device_power_on_time | power-on | seconds |
+| nvme.device_unsafe_shutdowns_count | unsafe | shutdowns |
+| nvme.device_critical_warnings_state | available_spare, temp_threshold, nvm_subsystem_reliability, read_only, volatile_mem_backup_failed, persistent_memory_read_only | state |
+| nvme.device_media_errors_rate | media | errors/s |
+| nvme.device_error_log_entries_rate | error_log | entries/s |
 
 ### Per disk
 
@@ -290,3 +481,27 @@ Metrics:
 | net.events | frames, collisions, carrier | events/s |
 
 
+
+## Troubleshooting
+
+### GPU charts are missing
+
+Apple Silicon GPU utilization, performance-state residency, clock frequency, and power draw charts require IOReport GPU channels. These channels are exposed by Apple Silicon GPU drivers and are not available on Intel Macs. The collector loads IOReport at runtime and disables the GPU module cleanly when the framework, DVFS table, or GPU channels are unavailable.
+
+GPU power may still appear from `powermetrics` on systems where the `gpu_power` sampler exposes a plist `gpu_power` value and IOReport GPU power is unavailable. GPU temperature uses direct SMC/IOHID reads from the GPU module when available; otherwise, the `powermetrics` SMC path can still provide the same GPU temperature metric.
+
+
+### Thermal and fan charts are missing
+
+Direct AppleSMC and IOHID hardware sensor charts do not depend on `powermetrics`. If temperature, fan, voltage, current, or power sensor charts are missing, the hardware or macOS driver may not expose readable AppleSMC or IOHID sensor values, or the `[plugin:macos:sensors]` module may be disabled.
+
+The thermal pressure state chart depends on the native Apple `powermetrics` command. On macOS, `powermetrics` requires superuser privileges, so the default installation runs it through Netdata's setuid `ndsudo` helper with hard-coded allow-list entries for the probed sampler sets. Some Macs expose hardware sensors through AppleSMC while refusing `powermetrics`; in that case, hardware sensor charts can still appear while thermal pressure remains absent. If `ndsudo` is missing, not setuid root, or the allow-list rejects all startup probe commands, the sampler disables itself after repeated startup failures to avoid log noise. If the running loop exits later, Netdata probes again and restarts loop mode.
+
+Battery, UPS power-source, and IOReport GPU charts do not depend on `powermetrics` and should still appear when macOS exposes their data.
+
+
+### NVMe health charts are missing
+
+Native NVMe health charts appear only when macOS exposes NVMe SMART-capable services through IOKit and allows the native SMART user client to open them. The collector does not use `nvme-cli` or any external NVMe tool on macOS.
+
+If generic disk I/O charts are present but NVMe health charts are absent, the device, controller, or macOS driver may not expose a readable native NVMe SMART user client. Some Apple internal Apple Fabric SSDs expose disk I/O and filesystem metrics but not detailed public NVMe health fields.

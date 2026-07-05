@@ -19,6 +19,7 @@ modules:
         - udp
         - ports
         - freebsd
+        - macos
       related_resources:
         integrations:
           list: []
@@ -34,14 +35,26 @@ modules:
           On Linux it consumes `NETLINK_INET_DIAG` and the `/proc` socket tables;
           on FreeBSD it walks `KERN_PROC_FILEDESC` and consults `net.inet.tcp.pcblist`
           to attribute sockets to processes.
+          On macOS it walks process file descriptors with `libproc` and reads socket
+          metadata with `PROC_PIDFDSOCKETINFO`. A non-privileged or TCC-restricted
+          macOS run can omit protected processes; the plugin logs a warning when
+          permission-denied socket data or truncated process/socket list reads make
+          results incomplete.
       supported_platforms:
         include:
           - Linux
           - FreeBSD
+          - macOS
         exclude: []
       multi_instance: false
       additional_permissions:
-        description: ""
+        description: |
+          The plugin needs privileged access to enumerate all process sockets. On macOS,
+          non-privileged or TCC-restricted runs can omit protected processes; the plugin
+          logs a warning when permission-denied socket data or truncated process/socket
+          list reads make results incomplete.
+          Grant the Netdata plugin its normal privileged permissions and Full Disk Access
+          when local policy requires it.
       default_behavior:
         auto_detection:
           description: |
@@ -49,7 +62,13 @@ modules:
         limits:
           description: ""
         performance_impact:
-          description: ""
+          description: |
+            On macOS, the current established TCP count for `network-protocols` comes
+            from a cached live socket inventory because macOS does not expose a cheap
+            per-state TCP counter equivalent to FreeBSD's `net.inet.tcp.states`.
+            The cache is held for the Function response update window. Busy hosts
+            with many processes and file descriptors can make that path heavier than
+            the FreeBSD and Linux implementations.
     setup:
       prerequisites:
         list: []
@@ -153,7 +172,7 @@ modules:
     functions:
       description: |
         This plugin exposes real-time functions for viewing active network connections and,
-        on FreeBSD, system-wide TCP and UDP stack statistics.
+        on FreeBSD and macOS, system-wide TCP and UDP stack statistics.
       list:
         - id: network-connections
           name: Network Connections
@@ -162,10 +181,16 @@ modules:
 
             Provides both aggregated and detailed views of TCP and UDP connections for IPv4 and IPv6,
             including connection direction (listen, inbound, outbound), process information,
-            cgroup/container/service enrichment when available, and TCP performance metrics (RTT, retransmissions).
+            cgroup/container/service enrichment when available, and TCP performance metrics (RTT, retransmissions)
+            on platforms that expose those TCP details.
 
             On Linux, connections are classified as system or container based on network namespace.
             On FreeBSD, namespaces are not exposed to userspace and the classification is omitted.
+            On macOS, Linux-style namespaces and cgroups are not exposed by the host APIs; sockets
+            are host/system scoped and container/service identity falls back to process identity.
+            Non-privileged macOS runs may omit protected processes and log a warning when
+            permission-denied socket data or truncated process/socket list reads make results
+            incomplete.
           parameters: []
           returns:
             description: ""
@@ -176,23 +201,27 @@ modules:
         - id: network-protocols
           name: Network Protocols
           description: |
-            Shows FreeBSD TCP and UDP stack statistics grouped by transport protocol.
+            Shows FreeBSD and macOS TCP and UDP stack statistics grouped by transport protocol.
 
             Each row covers one transport (TCP or UDP) and reports IPv4+IPv6 combined
             traffic counters (received, sent, errors), TCP-specific connection counters
             (active opens, currently established, passive opens, resets, total segments,
             retransmitted segments), and the UDP-specific datagrams-with-no-port counter.
 
-            Values are per-second deltas sampled from `net.inet.tcp.stats`,
-            `net.inet.tcp.states`, and `net.inet.udp.stats`. The first call after the
-            plugin starts returns zeros because there is no previous sample to diff against.
+            Values are per-second deltas sampled from `net.inet.tcp.stats` and
+            `net.inet.udp.stats`. The current established TCP count comes from
+            `net.inet.tcp.states` on FreeBSD and from cached live socket inventory on macOS.
+            Busy macOS hosts with many processes and file descriptors can make that inventory
+            path heavier than the FreeBSD counter path.
+            The first call after the plugin starts returns zeros for delta counters because
+            there is no previous sample to diff against.
           parameters: []
           returns:
             description: ""
             columns: []
           performance: ""
           security: ""
-          availability: "FreeBSD only."
+          availability: "FreeBSD and macOS."
         - id: topology:network-connections
           name: Network Connections Topology
           description: |

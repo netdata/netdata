@@ -35,7 +35,7 @@ You can start exploring `systemd` journal logs on the "Logs" tab of the Netdata 
 - Supports `system`, `user`, `namespaces` and `remote` journals.
 - Allows filtering on **any journal field** or **field value**, for any time-frame.
 - Allows **full text search** (`grep`) on all journal fields, for any time-frame.
-- Provides a **histogram** for log entries over time, with a break down per field-value, for any field and any time-frame.
+- Provides a **histogram** for log entries over time, with a breakdown per field-value, for any field and any time-frame.
 - Works directly on journal files, without any other third-party components.
 - Supports coloring log entries, the same way `journalctl` does.
 - In PLAY mode provides the same experience as `journalctl -f`, showing new log entries immediately after they are received.

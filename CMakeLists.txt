@@ -92,6 +92,13 @@ set(NETDATA_RUNTIME_PREFIX "${CMAKE_INSTALL_PREFIX}")
 include(NetdataPlatform)
 include(NetdataCompilerFlags)
 
+if(OS_MACOS)
+  enable_language(OBJC)
+  if(OSLOG AND FOUNDATION)
+    add_compile_definitions(HAVE_OSLOG)
+  endif()
+endif()
+
 set(CONFIG_H_DIR ${CMAKE_BINARY_DIR})
 set(CONFIG_H ${CONFIG_H_DIR}/config.h)
 
@@ -203,7 +210,7 @@ cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" 
 cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True "ENABLE_PLUGIN_EBPF" False)
 mark_as_advanced(ENABLE_LEGACY_EBPF_PROGRAMS)
 cmake_dependent_option(ENABLE_PLUGIN_LOCAL_LISTENERS "Enable local listening socket tracking (including service auto-discovery support)" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
-cmake_dependent_option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer functionality" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_WINDOWS OR OS_FREEBSD" False)
+cmake_dependent_option(ENABLE_PLUGIN_NETWORK_VIEWER "Enable network viewer functionality" ${DEFAULT_FEATURE_STATE} "OS_LINUX OR OS_WINDOWS OR OS_FREEBSD OR OS_MACOS" False)
 cmake_dependent_option(ENABLE_PLUGIN_NFACCT "Enable Linux NFACCT metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_PERF "Enable Linux performance counter monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_SLABINFO "Enable Linux kernel SLAB allocator monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
@@ -2095,6 +2102,21 @@ set(MACOS_PLUGIN_FILES
         src/collectors/macos.plugin/macos_sysctl.c
         src/collectors/macos.plugin/macos_mach_smi.c
         src/collectors/macos.plugin/macos_fw.c
+        src/collectors/macos.plugin/macos_power.c
+        src/collectors/macos.plugin/macos_iohid.c
+        src/collectors/macos.plugin/macos_iohid.h
+        src/collectors/macos.plugin/macos_smc.c
+        src/collectors/macos.plugin/macos_smc.h
+        src/collectors/macos.plugin/macos_gpu.c
+        src/collectors/macos.plugin/macos_sensors.c
+        src/collectors/macos.plugin/macos_powermetrics.c
+        src/collectors/macos.plugin/macos_nvme.c
+)
+
+set(MACOS_LOGS_PLUGIN_FILES
+        src/collectors/macos-logs.plugin/macos-logs.c
+        src/collectors/macos-logs.plugin/macos-logs.h
+        src/collectors/macos-logs.plugin/macos-logs-oslog.m
 )
 
 set(FREEBSD_PLUGIN_FILES
@@ -3170,6 +3192,16 @@ if(OS_WINDOWS)
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
+if(OS_MACOS AND OSLOG AND FOUNDATION)
+        add_executable(macos-logs.plugin ${MACOS_LOGS_PLUGIN_FILES})
+        target_compile_options(macos-logs.plugin PRIVATE "$<$<COMPILE_LANGUAGE:OBJC>:-fobjc-arc>")
+        target_link_libraries(macos-logs.plugin libnetdata ${FOUNDATION} ${OSLOG})
+
+        install(TARGETS macos-logs.plugin
+                COMPONENT plugin-macos-logs
+                DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
 if(ENABLE_PLUGIN_EBPF)
     set(EBPF_PLUGIN_FILES
             src/collectors/ebpf.plugin/ebpf.c
@@ -3367,19 +3399,23 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                 endforeach()
         endif()
 
+        set(NETWORK_VIEWER_COMMON_FILES
+                src/collectors/common-cgroups/cgroup-path.c
+                src/collectors/common-cgroups/cgroup-path.h
+                src/collectors/common-cgroups/cgroup-topology-rules.c
+                src/collectors/common-cgroups/cgroup-topology-rules.h
+                src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
+                src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
+                src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
+                src/collectors/network-viewer.plugin/network-viewer.c
+        )
+
         set(NETWORK_VIEWER_FILES)
         if(OS_LINUX)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets.h
-                        src/collectors/common-cgroups/cgroup-path.c
-                        src/collectors/common-cgroups/cgroup-path.h
-                        src/collectors/common-cgroups/cgroup-topology-rules.c
-                        src/collectors/common-cgroups/cgroup-topology-rules.h
                         src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.c
-                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
-                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
-                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
-                        src/collectors/network-viewer.plugin/network-viewer.c
+                        ${NETWORK_VIEWER_COMMON_FILES}
                 )
         endif()
         if(OS_WINDOWS)
@@ -3390,14 +3426,13 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         if(OS_FREEBSD)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets-freebsd.h
-                        src/collectors/common-cgroups/cgroup-path.c
-                        src/collectors/common-cgroups/cgroup-path.h
-                        src/collectors/common-cgroups/cgroup-topology-rules.c
-                        src/collectors/common-cgroups/cgroup-topology-rules.h
-                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
-                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
-                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
-                        src/collectors/network-viewer.plugin/network-viewer.c
+                        ${NETWORK_VIEWER_COMMON_FILES}
+                )
+        endif()
+        if(OS_MACOS)
+                list(APPEND NETWORK_VIEWER_FILES
+                        src/libnetdata/local-sockets/local-sockets-macos.h
+                        ${NETWORK_VIEWER_COMMON_FILES}
                 )
         endif()
 

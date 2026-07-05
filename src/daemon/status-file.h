@@ -11,7 +11,7 @@
 #include "machine-guid.h"
 #include "status-file-dmi.h"
 
-#define STATUS_FILE_VERSION 28
+#define STATUS_FILE_VERSION 29
 
 typedef enum {
     DAEMON_STATUS_NONE,
@@ -107,6 +107,7 @@ typedef struct daemon_status_file {
     struct {
         // normalized information from cloud provider and h/w information
         char vendor[64];
+        char id[64];
         char name[96];
         char type[16];
     } product;
@@ -174,6 +175,7 @@ const char *daemon_status_file_get_fatal_stack_trace(void);
 const char *daemon_status_file_get_fatal_thread(void);
 const char *daemon_status_file_get_stack_trace_backend(void);
 const char *daemon_status_file_get_sys_vendor(void);
+const char *daemon_status_file_get_product_id(void);
 const char *daemon_status_file_get_product_name(void);
 const char *daemon_status_file_get_product_type(void);
 

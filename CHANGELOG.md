@@ -1,5 +1,7 @@
 ## [unreleased]
 
+- Fix hardware host labels to expose product identifiers, improve macOS model names, and add workstation product type classification.
+
 ### Merged Pull Requests:
 
 - Stabilize runtime metrics shutdown test ([#22169](https://github.com/netdata/netdata/issues/22169))
@@ -3576,4 +3578,3 @@
 
 - WIP - Netdata v2 ([#18125](https://github.com/netdata/netdata/issues/18125))
 - Bump version to v1.99.0 for v2.0 prerelease nightlies.
-
