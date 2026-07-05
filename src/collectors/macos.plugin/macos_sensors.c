@@ -499,7 +499,7 @@ static bool macos_sensors_validate_value(enum macos_sensor_kind kind, NETDATA_DO
         case MACOS_SENSOR_FAN:
             return value >= 0.0 && value <= 30000.0;
         case MACOS_SENSOR_VOLTAGE:
-            return value > 0.0 && value <= 1000.0;
+            return value >= 0.0 && value <= 1000.0;
         case MACOS_SENSOR_CURRENT:
             return value >= -10000.0 && value <= 10000.0;
         case MACOS_SENSOR_POWER:
@@ -604,11 +604,16 @@ static void macos_sensors_finish_cycle(bool smc_attempted, bool hid_attempted)
             continue;
         }
 
-        if (!s->seen && ++s->missing_cycles >= MACOS_SENSORS_MISSING_CYCLES_BEFORE_OBSOLETE) {
-            *pp = s->next;
-            macos_sensors_free_chart(s);
-        } else
+        if (!s->seen) {
+            if (s->missing_cycles < MACOS_SENSORS_MISSING_CYCLES_BEFORE_OBSOLETE &&
+                ++s->missing_cycles == MACOS_SENSORS_MISSING_CYCLES_BEFORE_OBSOLETE)
+                macos_sensors_obsolete_chart(s);
+
             pp = &s->next;
+            continue;
+        }
+
+        pp = &s->next;
     }
 
     smc_gpu_temperature_available = false;
@@ -637,9 +642,17 @@ static void macos_sensors_update_chart(
     NETDATA_DOUBLE value,
     int update_every)
 {
-    struct macos_sensor_chart *s = macos_sensors_get_or_create_chart(
-        id, kind, label, feature, path, driver, subsystem, chip_id, source);
     const struct macos_sensor_kind_def *def = &macos_sensor_defs[kind];
+    collected_number collected_value = (collected_number)llround(value * (NETDATA_DOUBLE)def->divisor);
+    struct macos_sensor_chart *s = macos_sensors_find_chart(id);
+    if (!s && kind == MACOS_SENSOR_VOLTAGE && collected_value == 0)
+        return;
+
+    if (!s)
+        s = macos_sensors_get_or_create_chart(id, kind, label, feature, path, driver, subsystem, chip_id, source);
+
+    if (s->st && s->missing_cycles >= MACOS_SENSORS_MISSING_CYCLES_BEFORE_OBSOLETE)
+        rrdset_isnot_obsolete___safe_from_collector_thread(s->st);
 
     s->seen = true;
     s->missing_cycles = 0;
@@ -673,7 +686,7 @@ static void macos_sensors_update_chart(
     if (!s->rd)
         s->rd = rrddim_add(s->st, "input", NULL, 1, def->divisor, RRD_ALGORITHM_ABSOLUTE);
 
-    rrddim_set_by_pointer(s->st, s->rd, (collected_number)llround(value * (NETDATA_DOUBLE)def->divisor));
+    rrddim_set_by_pointer(s->st, s->rd, collected_value);
     rrdset_done(s->st);
 }
 
