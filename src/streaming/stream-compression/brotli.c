@@ -19,6 +19,7 @@ void stream_compressor_init_brotli(struct compressor_state *state) {
         }
 
         if (!BrotliEncoderSetParameter(state->stream, BROTLI_PARAM_QUALITY, state->level)) {
+            netdata_log_error("STREAM_COMPRESS: BrotliEncoderSetParameter() failed to set quality to %d", state->level);
             BrotliEncoderDestroyInstance(state->stream);
             state->stream = NULL;
             return;
