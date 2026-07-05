@@ -10,13 +10,25 @@ config (`config/signal.rs`, `config/env.rs`), `netdata-plugin/bridge` config
 
 - Remote storage is **global** (one switch + one backend for the whole plugin),
   not per signal. `StorageConfig` (`netdata-plugin/bridge/src/config.rs`) is a
-  top-level `otel.yaml` section with three fields: `enabled: bool`, `uri: String`,
-  and `read_cache_max_size: ByteSize` (default `1 GB`, decimal like every
-  other configured size). All three are
-  env-overridable: `NETDATA_OTEL_STORAGE_ENABLED`, `_URI`, and
-  `_READ_CACHE_MAX_SIZE` (parsed as `ByteSize`). Env overrides apply on top of
+  top-level `otel.yaml` section with four fields: `enabled: bool`, `uri: String`,
+  `read_cache_max_size: ByteSize` (default `1 GB`, decimal like every other
+  configured size), and `startup_op_timeout: humantime` (default **5 min**;
+  see the startup-sync note below). All four are
+  env-overridable: `NETDATA_OTEL_STORAGE_ENABLED`, `_URI`,
+  `_READ_CACHE_MAX_SIZE` (parsed as `ByteSize`), and `_STARTUP_OP_TIMEOUT`
+  (parsed as a humantime duration). Env overrides apply on top of
   `otel.yaml` (env wins), via the shared `StorageOverride` path in
   `config/{signal,env}.rs`.
+- **`startup_op_timeout`** bounds **each** remote operation of the fail-closed
+  startup catalog diff-sync — the single recursive LIST and every catalog GET —
+  not the whole restore, so recovering a large archive stays work-proportional.
+  It also bounds that one recursive LIST, whose cost scales with the **whole
+  bucket's** catalog cardinality (shared buckets list every machine's objects),
+  so very large fleets may need a higher value. It SHOULD exceed the backend's own
+  retry window (~3 min) so transient blips still retry internally; a lower value
+  cuts those retries short and can crash-loop the plugin under a flaky remote. The
+  startup diff-sync behavior it governs is specified in
+  [otel-file-lifecycle.md](otel-file-lifecycle.md).
 - There is **no** `read_cache_dir` config knob. The read-cache directory is
   **derived per signal** as `{base_dir}/{signal}/remote-read` and surfaced on the
   runtime `LifecycleConfig::read_cache_dir` by `PluginConfig::lifecycle_for`. See
@@ -173,6 +185,33 @@ with no shim:
   second parse under the read lock. The shared time-only mask is correct because one
   seq maps to exactly one file and one stream (`build_catalog_entry` copies both the
   id and the stream from the same SFST).
+
+## Lifecycle & ingest tuning knobs (logs)
+
+Per-signal `logs.*` tuning in `otel.yaml` (defaults from
+`netdata-plugin/bridge/src/config.rs`). These govern the on-disk/upload lifecycle
+whose behavior is specified in [otel-file-lifecycle.md](otel-file-lifecycle.md);
+this table is the **config surface** (names, defaults, override scope).
+
+| Knob | Default | Override scope | Note |
+|---|---|---|---|
+| `logs.rotation.default.max_file_size` | `25MB` | per-tenant | WAL seal trigger (size). |
+| `logs.rotation.default.max_log_entries` | `50000` | per-tenant | WAL seal trigger (count). |
+| `logs.rotation.default.max_file_duration` | `15 min` | per-tenant | WAL seal trigger (age); also sealed by a fixed 30 s idle sweep. |
+| `logs.retention.default.max_files` | `100000` | per-tenant | Local SFST retention (count). |
+| `logs.retention.default.max_total_size` | `1GB` | per-tenant | Local SFST retention (bytes). |
+| `logs.retention.default.max_age` | `7 days` | per-tenant | Local SFST retention (age) — **distinct from `ingest.max_age`**. |
+| `logs.retention.default.horizon` | `2 years` | per-tenant | Catalog (archive-index) retention = queryable remote depth. **MUST exceed `retention.max_age` by more than a day (in day units) or the plugin refuses to start** — a catalog must outlive the data it indexes. |
+| `logs.catalog.rotation_count` | `10` | global (logs) | Catalog seal trigger (entries). |
+| `logs.catalog.rotation_period` | `15 min` | global (logs) | Catalog seal trigger (age); bounds how long uploaded data stays uncataloged. Plus a Flush on clean shutdown. |
+| `logs.ingest.max_age` | `24 hours` | global (logs) | Reject records older than this (inclusive), per record; reported via OTLP `partial_success`. |
+| `logs.ingest.future_skew` | `10 minutes` | global (logs) | Reject records more than this far ahead (inclusive). `0` warns at startup. |
+
+- Per-tenant `rotation:`/`retention:` maps stay open (tenant names are data);
+  typos inside a tenant entry are still caught by the strict
+  `RotationEntry`/`RetentionEntry` structs.
+- The `horizon > max_age` invariant is validated in **day units** at config load;
+  the violation is a hard startup error, not a warning.
 
 ## Non-goals
 
