@@ -316,6 +316,10 @@ connectionLoop:
 				// Already connecting or connected
 				continue
 			}
+			// Disconnected: fall through to the backoff block below. We
+			// intentionally do NOT reset attempt here -- reconnect
+			// notifications are wakeups only, so stdin activity cannot bypass
+			// exponential backoff and cause a reconnect storm.
 		default:
 		}
 

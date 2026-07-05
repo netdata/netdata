@@ -419,6 +419,12 @@ static int uuidmap_locked_lookup_delete_interleaving_unittest(void) {
         NETDATA_THREAD_OPTION_DONT_LOG,
         uuidmap_deferred_free_thread,
         &gate);
+    if(!thread) {
+        fprintf(stderr, "ERROR: Cannot create delete helper thread in locked lookup/delete interleaving test\n");
+        rw_spinlock_read_unlock(&uuid_map.p[partition].spinlock);
+        uuidmap_free(id);
+        return errors + 1;
+    }
 
     usec_t deadline = now_monotonic_usec() + 5 * USEC_PER_SEC;
     while(!__atomic_load_n(&gate.writer_blocked, __ATOMIC_ACQUIRE) &&
