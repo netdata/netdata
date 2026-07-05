@@ -219,12 +219,27 @@ disable can answer from `Entry.Status`, and that status is mutated by
 secretstore dependent restart plans. When the collector key is
 foreign-write-held, these commands park and answer after the hold resolves.
 
-The predicates that decide this are colocated with the command gates:
+Command planning rules:
 
-- collector: `dyncfg.Handler.CommandActs` and
-  `RejectionDependsOnStatus`;
-- secretstore: `secretsctl.Controller.CommandActs`;
-- vnode: `vnodectl.Controller.CommandActs`.
+- Domain ownership:
+  - collector commands use `dyncfg.Handler.CommandPlan`;
+  - secretstore commands use `secretsctl.Controller.CommandPlan`;
+  - vnode commands use `vnodectl.Controller.CommandPlan`.
+- Plan classes:
+  - claimless commands answer without claim-table serialization;
+  - hold-aware claimless commands normally answer without claims, but park
+    behind a foreign write hold;
+  - claimed commands acquire their claim set before the first claim-protected
+    access.
+- Executor ownership:
+  - wraps the domain command plan in a jobmgr-local event plan;
+  - owns event-level routing and claim-key computation;
+  - uses `CommandPlan.NeedsClaims(false)` for intrinsic claim acquisition;
+  - uses `CommandPlan.NeedsClaims(true)` to decide foreign write-hold bypass;
+  - re-runs claim computation at every claim-table restage.
+
+Because claim computation is dynamic, a parked command can become claimless or
+change dependencies before it acts.
 
 ## Domain Flows
 
@@ -447,8 +462,7 @@ The test suite should be read as a set of matrices, not as isolated tests.
 
 Do not try to test the full Cartesian product. The useful target is
 equivalence-class coverage: one test per behavior boundary, plus parity
-tests that fail when a command gate moves without updating the scheduler
-predicate.
+tests that fail when a command gate moves without updating the command plan.
 
 ### Existing Coverage Anchors
 
@@ -464,7 +478,7 @@ predicate.
 | Vnode and cross-domain claim interactions | `vnode_claims_test.go`, `dyncfg_vnode_test.go` |
 | Deadline, wedge, shutdown one-rule | `effect_deadline_test.go`, `effect_test.go`, `executor_test.go` |
 | Function publication timing | `manager_process_test.go`, `funcdispatch_test.go`, `funcctl/*_test.go` |
-| CommandActs parity | `handler_test.go`, `secretsctl/commandacts_test.go`, `vnodectl/commandacts_test.go` |
+| Command-plan parity | `handler_test.go`, `secretsctl/commandplan_test.go`, `vnodectl/commandplan_test.go`, `executor_test.go` |
 
 ### Known Test-Gap Classes
 
@@ -474,14 +488,13 @@ hardening should focus.
 | Gap class | Current state | Suggested next test shape |
 | --- | --- | --- |
 | Human-readable matrix | Coverage exists but is spread across many files. | Keep this section current when adding a command or state. |
-| Integrated hold-aware status commands | End-to-end pin covers enable during a dependent restart; handler unit tests classify enable/restart/disable. | Add table-driven end-to-end rows for restart and disable under a foreign dependent write hold if more pre-PR hardening is requested. |
 | Unsupported/inline command parity | End-to-end rejection pins exist for representative unsupported store/vnode commands; per-domain parity tables are not a full unsupported-command census. | Extend parity tables when command support changes, especially for unsupported commands that should remain claimless. |
 | Pairwise cross-domain interleavings | Representative read/write conflicts are pinned; every command pair is not enumerated. | Add pairwise tests only when a new claim mode or new cross-key writer is introduced. |
 | Shutdown matrix by every command | Shutdown one-rule is pinned at the main chokepoints and representative commands. | Add command-specific shutdown rows only when a command adds a new effect phase or publication path. |
 
 When adding tests, prefer:
 
-- table-driven gate parity tests for deterministic command predicates;
+- table-driven gate parity tests for deterministic command plans;
 - property tests for claim-table ordering rules;
 - end-to-end choreography only for cross-domain ordering or publication
-  outcomes that cannot be proven at the predicate/unit layer.
+  outcomes that cannot be proven at the plan/unit layer.

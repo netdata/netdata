@@ -15,18 +15,15 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestControllerCommandActsParity drives StepExec across the deterministic
-// stage-gate matrix and asserts CommandActs agrees: blocking work runs (the
-// step runner is invoked) exactly when CommandActs reports true. Claim
-// scheduling relies on this predicate to skip claims for rejection-only
-// store commands - a stage-gate change without a matching CommandActs update
-// fails here as the starvation bug it would be. The deliberate exception
-// class: remove of any EXISTING store "acts" even when it will reject -
-// its affected-jobs check reads the dependency index, which must be
-// excluded by the granted store write claim, so that 409 AND the handler's
-// source/type 405s ordered behind it answer under the claim without
-// blocking work - those cells assert the exception explicitly via wantRan.
-func TestControllerCommandActsParity(t *testing.T) {
+// TestControllerCommandPlanParity drives StepExec across the deterministic
+// stage-gate matrix and asserts CommandPlan agrees: blocking work runs (the
+// step runner is invoked) exactly when the plan reports intrinsic claims. The
+// deliberate exception class: remove of any EXISTING store "acts" even when it
+// will reject - its affected-jobs check reads the dependency index, which must
+// be excluded by the granted store write claim, so that 409 AND the handler's
+// source/type 405s ordered behind it answer under the claim without blocking
+// work - those cells assert the exception explicitly via wantRan.
+func TestControllerCommandPlanParity(t *testing.T) {
 	const storeName = "vault_prod"
 	storeKey := secretstore.StoreKey(secretstore.KindVault, storeName)
 	garbagePayload := []byte(`{"value": `)
@@ -275,10 +272,12 @@ func TestControllerCommandActsParity(t *testing.T) {
 
 			fn := tc.fn(t, ctl)
 
-			// Capture the predicate BEFORE running: execution mutates the
-			// caches, and the executor consults the predicate pre-execution.
-			acts := ctl.CommandActs(fn)
-			assert.Equal(t, tc.wantActs, acts, "CommandActs")
+			// Capture the plan BEFORE running: execution mutates the caches,
+			// and the executor consults the plan pre-execution.
+			plan := ctl.CommandPlan(fn)
+			assert.Equal(t, tc.wantActs, plan.NeedsClaims(false), "CommandPlan")
+			assert.Equal(t, tc.wantActs, plan.NeedsClaims(true),
+				"store commands have no status-hold-aware axis")
 
 			ran := false
 			ctl.StepExec(fn, func(effect func(context.Context) error, commit func(error)) {
@@ -286,7 +285,7 @@ func TestControllerCommandActsParity(t *testing.T) {
 				dyncfg.RunStepSync(effect, commit)
 			})
 
-			wantRan := acts
+			wantRan := plan.NeedsClaims(false)
 			if tc.wantRan != nil {
 				wantRan = *tc.wantRan
 			}

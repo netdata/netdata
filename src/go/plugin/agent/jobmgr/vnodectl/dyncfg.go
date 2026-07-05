@@ -77,38 +77,36 @@ func (c *Controller) SeqExec(fn dyncfg.Function) {
 	}
 }
 
-// CommandActs reports whether fn may execute CLAIMLESSLY: false only when
-// execution answers a deterministic rejection BEFORE its first
-// claim-protected access - an unsupported command (the 501 arm above), a
-// missing vnode on update/remove, a non-dyncfg vnode on remove, or a
-// missing payload/name on add. The remove SOURCE gate belongs here only
-// because dyncfgCmdRemove orders it BEFORE the referenced-by-configs read
-// (unlike the store domain, whose remove reads its dependency index
-// first). Claim scheduling consults it so rejection-only vnode commands
-// claim nothing instead of parking behind collector read claims held
-// across effects; the parity test drives SeqExec against it. Deliberately
-// NOT mirrored here: payload parse/GUID/uniqueness rejections (answered
-// inline under the claim, bounded by one effect window) and the remove
-// path's referenced-by-configs 409, which must be evaluated under the
-// granted write claim (a stopping dependent's read claim must be waited
-// out, not answered around). schema/get/userconfig/test answer inline and
-// never claim.
-func (c *Controller) CommandActs(fn dyncfg.Function) bool {
+// CommandPlan reports how fn must be scheduled. Claimless means execution
+// answers a deterministic rejection before its first claim-protected access.
+// The remove SOURCE gate belongs here only because dyncfgCmdRemove orders it
+// before the referenced-by-configs read. Payload parse/GUID/uniqueness
+// rejections and referenced-by-configs 409 answer under the vnode write claim.
+func (c *Controller) CommandPlan(fn dyncfg.Function) dyncfg.CommandPlan {
 	switch fn.Command() {
 	case dyncfg.CommandAdd:
 		if fn.ValidateArgs(3) != nil || !fn.HasPayload() {
-			return false
+			return dyncfg.CommandPlanClaimless()
 		}
 		name := fn.JobName()
-		return name != "" && dyncfg.JobNameRuleAllowDots(name) == nil
+		if name != "" && dyncfg.JobNameRuleAllowDots(name) == nil {
+			return dyncfg.CommandPlanClaims()
+		}
+		return dyncfg.CommandPlanClaimless()
 	case dyncfg.CommandUpdate:
 		_, ok := c.Lookup(strings.TrimPrefix(fn.ID(), c.Prefix()+":"))
-		return ok
+		if ok {
+			return dyncfg.CommandPlanClaims()
+		}
+		return dyncfg.CommandPlanClaimless()
 	case dyncfg.CommandRemove:
 		vnode, ok := c.Lookup(strings.TrimPrefix(fn.ID(), c.Prefix()+":"))
-		return ok && vnode.SourceType == confgroup.TypeDyncfg
+		if ok && vnode.SourceType == confgroup.TypeDyncfg {
+			return dyncfg.CommandPlanClaims()
+		}
+		return dyncfg.CommandPlanClaimless()
 	default:
-		return false
+		return dyncfg.CommandPlanClaimless()
 	}
 }
 

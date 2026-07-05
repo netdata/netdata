@@ -1645,38 +1645,63 @@ func TestStopCommitOutcomeMapping(t *testing.T) {
 	}
 }
 
-// TestHandler_RejectionDependsOnStatus pins the status-axis classification
-// consumed by hold-aware claim scheduling: exactly the enable/restart/
-// disable arms against an EXISTING entry are status-derived (their
-// rejection-only outcome can be falsified by a foreign write-claim holder
-// mutating entry.Status); every other command - and every command against
-// a nil entry - rejects on state no foreign holder mutates.
-func TestHandler_RejectionDependsOnStatus(t *testing.T) {
+// TestHandler_CommandPlanForeignHoldStatusGates pins the status-axis scheduling
+// class consumed by foreign-hold claim routing.
+func TestHandler_CommandPlanForeignHoldStatusGates(t *testing.T) {
 	cb := &mockCallbacks{}
 	h := newTestHandler(cb)
-	cfg := testConfig{uid: "uid-j", key: "j", sourceType: "dyncfg", source: "test"}
-	entry := &Entry[testConfig]{Cfg: cfg, Status: StatusRunning}
 
-	commands := []Command{CommandAdd, CommandUpdate, CommandEnable, CommandRestart,
-		CommandDisable, CommandRemove, CommandGet, CommandSchema}
-	for _, cmd := range commands {
-		fn := newTestFn("test:j", string(cmd), "", nil)
-		want := cmd == CommandEnable || cmd == CommandRestart || cmd == CommandDisable
-		assert.Equal(t, want, h.RejectionDependsOnStatus(fn, entry), "command %s with an entry", cmd)
-		assert.False(t, h.RejectionDependsOnStatus(fn, nil), "command %s with a nil entry", cmd)
+	tests := []struct {
+		cmd      Command
+		status   Status
+		wantFree bool
+		wantHeld bool
+	}{
+		{CommandEnable, StatusAccepted, true, true},
+		{CommandEnable, StatusRunning, false, true},
+		{CommandEnable, StatusFailed, true, true},
+		{CommandEnable, StatusDisabled, true, true},
+		{CommandRestart, StatusAccepted, false, true},
+		{CommandRestart, StatusRunning, true, true},
+		{CommandRestart, StatusFailed, true, true},
+		{CommandRestart, StatusDisabled, false, true},
+		{CommandDisable, StatusAccepted, true, true},
+		{CommandDisable, StatusRunning, true, true},
+		{CommandDisable, StatusFailed, true, true},
+		{CommandDisable, StatusDisabled, false, true},
+	}
+
+	for _, tc := range tests {
+		t.Run(fmt.Sprintf("%s %s", tc.cmd, tc.status), func(t *testing.T) {
+			cfg := testConfig{uid: "uid-j", key: "j", sourceType: "dyncfg", source: "test"}
+			entry := &Entry[testConfig]{Cfg: cfg, Status: tc.status}
+			fn := newTestFn("test:j", string(tc.cmd), "", nil)
+
+			plan := h.CommandPlan(fn, entry)
+			assert.Equal(t, tc.wantFree, plan.NeedsClaims(false),
+				"free lane intrinsic claim decision")
+			assert.Equal(t, tc.wantHeld, plan.NeedsClaims(true),
+				"foreign write hold must promote status-derived no-ops")
+		})
+	}
+
+	for _, cmd := range []Command{CommandEnable, CommandRestart, CommandDisable} {
+		t.Run(fmt.Sprintf("%s missing entry", cmd), func(t *testing.T) {
+			fn := newTestFn("test:j", string(cmd), "", nil)
+			plan := h.CommandPlan(fn, nil)
+			assert.False(t, plan.NeedsClaims(false), "missing entry rejects claimless")
+			assert.False(t, plan.NeedsClaims(true), "missing entry bypasses foreign holds")
+		})
 	}
 }
 
-// TestHandler_CommandActsParity drives every state-gated command against
-// every gate combination and asserts CommandActs agrees with the Cmd*
+// TestHandler_CommandPlanParity drives every state-gated command against
+// every gate combination and asserts CommandPlan agrees with the Cmd*
 // implementations: blocking work runs (the step runner is invoked) exactly
-// when CommandActs reports true. Claim scheduling relies on this predicate
-// to skip dependency reservations for rejection-only commands - a gate
-// change in a Cmd* body without a matching CommandActs update fails here
-// as the starvation bug it would be. The payload axis is part of the
-// matrix: add and update answer 400 before any blocking work when the
-// payload is missing.
-func TestHandler_CommandActsParity(t *testing.T) {
+// when the plan reports intrinsic claims. The payload axis is part of the
+// matrix: add and update answer 400 before any blocking work when the payload
+// is missing.
+func TestHandler_CommandPlanParity(t *testing.T) {
 	type gate struct {
 		sourceType string
 		configType ConfigType
@@ -1747,15 +1772,23 @@ func TestHandler_CommandActsParity(t *testing.T) {
 
 						fn := newTestFn("test:j", string(cmd), "", pl.payload)
 
-						// Capture the predicate BEFORE running: the command's
+						// Capture the plan BEFORE running: the command's
 						// commit mutates entry.Status (that is its job), and the
-						// executor consults the predicate pre-execution.
-						acts := h.CommandActs(fn, entry)
+						// executor consults the plan pre-execution.
+						plan := h.CommandPlan(fn, entry)
+						claims := plan.NeedsClaims(false)
+						if !claims && (cmd == CommandEnable || cmd == CommandRestart || cmd == CommandDisable) {
+							assert.True(t, plan.NeedsClaims(true),
+								"claimless status-derived gates must wait under foreign holds")
+						} else {
+							assert.Equal(t, claims, plan.NeedsClaims(true),
+								"non-status gates must not change under foreign holds")
+						}
 
 						ran := driveWithSpy(h, cmd, fn)
 
-						assert.Equal(t, acts, ran,
-							"CommandActs must mirror whether the handler runs blocking work")
+						assert.Equal(t, claims, ran,
+							"CommandPlan must mirror whether the handler runs blocking work")
 					})
 				}
 			}
@@ -1783,12 +1816,15 @@ func TestHandler_CommandActsParity(t *testing.T) {
 
 					fn := newTestFn("test:"+jobName, string(CommandAdd), jobName, pl.payload)
 
-					acts := h.CommandActs(fn, entry)
+					plan := h.CommandPlan(fn, entry)
+					claims := plan.NeedsClaims(false)
+					assert.Equal(t, claims, plan.NeedsClaims(true),
+						"add gates are not status-derived")
 
 					ran := driveWithSpy(h, CommandAdd, fn)
 
-					assert.Equal(t, acts, ran,
-						"CommandActs must mirror whether the handler runs blocking work")
+					assert.Equal(t, claims, ran,
+						"CommandPlan must mirror whether the handler runs blocking work")
 				})
 			}
 		}

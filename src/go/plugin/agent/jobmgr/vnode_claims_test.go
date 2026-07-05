@@ -271,7 +271,7 @@ func TestUnderivableCommand_RejectsWithoutClaiming(t *testing.T) {
 	// The NAME-POLICY axis, a CALLBACK gate (ValidateConfigName /
 	// JobNameRuleStrict): a dotted job name is derivable (non-empty) yet
 	// answers 400 before any blocking work, so its payload refs - which
-	// reference the write-held store - must not be claimed. The predicate
+	// reference the write-held store - must not be claimed. The command plan
 	// runs the handler's own addRejection gates, so callback gates cannot
 	// drift out of it.
 	h.dyncfg("bad-name-add", []string{h.mgr.dyncfgModID("gated"), "add", "bad.name"},
