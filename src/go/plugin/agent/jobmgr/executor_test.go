@@ -383,32 +383,33 @@ func TestExecutor_StaleWarmDep(t *testing.T) {
 		deps      func(*Manager) []wedgedDep
 		cfg       confgroup.Config
 		writeHold bool
-		wantEmpty bool
+		wantKind  staleWarmDepKind
 		wantText  string
 	}{
 		"no deps is fresh": {
-			cfg:       referencingCfg,
-			wantEmpty: true,
+			cfg:      referencingCfg,
+			wantKind: staleWarmDepNone,
 		},
 		"unreferenced dep is ignored": {
 			deps: func(mgr *Manager) []wedgedDep {
 				return []wedgedDep{{stateKey: stateKey, identity: "stale"}}
 			},
-			cfg:       unreferencedCfg,
-			wantEmpty: true,
+			cfg:      unreferencedCfg,
+			wantKind: staleWarmDepNone,
 		},
 		"matching identity is fresh": {
 			deps: func(mgr *Manager) []wedgedDep {
 				return []wedgedDep{{stateKey: stateKey, identity: mgr.secretStoreDepIdentity(storeKey)}}
 			},
-			cfg:       referencingCfg,
-			wantEmpty: true,
+			cfg:      referencingCfg,
+			wantKind: staleWarmDepNone,
 		},
 		"changed identity is stale": {
 			deps: func(mgr *Manager) []wedgedDep {
 				return []wedgedDep{{stateKey: stateKey, identity: "old-identity"}}
 			},
 			cfg:      referencingCfg,
+			wantKind: staleWarmDepChanged,
 			wantText: "changed while the key was wedged",
 		},
 		"write-held dependency is stale": {
@@ -417,6 +418,7 @@ func TestExecutor_StaleWarmDep(t *testing.T) {
 			},
 			cfg:       referencingCfg,
 			writeHold: true,
+			wantKind:  staleWarmDepWriteHeld,
 			wantText:  "is in flight",
 		},
 	}
@@ -436,11 +438,12 @@ func TestExecutor_StaleWarmDep(t *testing.T) {
 				deps = tc.deps(mgr)
 			}
 
-			got := e.staleWarmDep(deps, tc.cfg)
-			if tc.wantEmpty {
-				assert.Empty(t, got)
+			gotKind, gotText := e.staleWarmDepStatus(deps, tc.cfg)
+			assert.Equal(t, tc.wantKind, gotKind)
+			if tc.wantKind == staleWarmDepNone {
+				assert.Empty(t, gotText)
 			} else {
-				assert.Contains(t, got, tc.wantText)
+				assert.Contains(t, gotText, tc.wantText)
 			}
 		})
 	}
@@ -530,6 +533,73 @@ func TestExecutor_ShutdownAbandonKeepsWedgeUntilLateReturn(t *testing.T) {
 		assert.False(t, ks.busy)
 		assert.Nil(t, ks.wedge)
 	}
+}
+
+func TestExecutor_CompletedTransitionChainedCommitKeepsLaneOccupied(t *testing.T) {
+	mgr, _ := newExecutorTestManager()
+	e := newExecutor(mgr)
+	const key = "completed-chain"
+
+	holder := &claimProbe{label: "running-command"}
+	e.claims.acquire(holder.request(staticClaims(claim{key: key, mode: claimWrite})))
+	require.True(t, holder.granted())
+
+	var committed error
+	hookRan := false
+	ks := &keyState{
+		busy:  true,
+		grant: holder.grant,
+		pendingCommit: func(err error) {
+			committed = err
+			ks := e.keys[key]
+			ks.busy = true
+		},
+	}
+	e.keys[key] = ks
+	e.inflight = 1
+	e.afterIdleHook(ks, func() { hookRan = true })
+
+	e.onEffectDone(effectResult{key: key, outcome: effectOutcomeCompleted})
+
+	require.NoError(t, committed)
+	assert.True(t, ks.busy, "the chained phase keeps the lane occupied")
+	assert.False(t, hookRan, "after-idle hooks wait for the chained phase's final commit")
+	assert.True(t, e.claims.heldForWrite(key), "the grant stays held while the chained phase is busy")
+	assert.Equal(t, 0, e.inflight)
+}
+
+func TestExecutor_AbandonTransitionRefusesChainedPhaseAfterEnterWedge(t *testing.T) {
+	mgr, _ := newExecutorTestManager()
+	e := newExecutor(mgr)
+	const key = "abandon-chain"
+
+	deadlineErr := errors.New("deadline")
+	var committed error
+	var chainedErr error
+	chainedRan := false
+	ks := &keyState{
+		busy: true,
+		pendingCommit: func(err error) {
+			committed = err
+			e.runnerFor(key)(func(context.Context) error {
+				chainedRan = true
+				return nil
+			}, func(err error) {
+				chainedErr = err
+			})
+		},
+	}
+	e.keys[key] = ks
+	e.inflight = 1
+
+	e.onEffectDone(effectResult{key: key, outcome: effectOutcomeAbandoned, err: deadlineErr})
+
+	require.ErrorIs(t, committed, deadlineErr)
+	require.ErrorIs(t, chainedErr, dyncfg.ErrPhaseNeverRan)
+	assert.False(t, chainedRan, "the chained effect must not dispatch once the key is wedged")
+	require.NotNil(t, ks.wedge)
+	assert.True(t, ks.busy)
+	assert.Equal(t, 0, e.inflight)
 }
 
 // Per-key FIFO pin: events for ONE key execute and emit in arrival order
