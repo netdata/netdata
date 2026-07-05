@@ -136,7 +136,7 @@ The standard MSI uninstall removes the Netdata binaries and stops and removes th
 
 :::note
 
-The directories below contain your historical monitoring data and your custom configuration. Back them up first if you want to preserve them.
+The directories below contain your historical monitoring data and your custom configuration.
 
 :::
 
