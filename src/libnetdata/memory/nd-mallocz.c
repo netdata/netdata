@@ -223,11 +223,22 @@ static void link_system_library_function(libc_function_t *func_pptr, const char 
     libc_function_t func = dlsym(RTLD_NEXT, name);
     dlsym_bootstrap_depth--;
 
-    *func_pptr = func;
-    if(!*func_pptr && required) {
-        fprintf(stderr, "FATAL: Cannot find system's %s() function.\n", name);
+    if(!func && required) {
+        // Report without allocating, then abort. fprintf() may call malloc(),
+        // which at this point (bootstrap inactive, libc allocator still
+        // unresolved and *func_pptr about to be NULL) would recurse into the
+        // first-run resolver or dereference a NULL libc function pointer.
+        // Mirror dlsym_bootstrap_abort() and use write(2). name is always a
+        // string literal, so strlen() is safe and allocation-free here.
+        static const char pre[] = "FATAL: Cannot find system's ";
+        static const char post[] = "() function.\n";
+        if(write(STDERR_FILENO, pre, sizeof(pre) - 1) < 0) { /* best effort */ }
+        if(write(STDERR_FILENO, name, strlen(name)) < 0) { /* best effort */ }
+        if(write(STDERR_FILENO, post, sizeof(post) - 1) < 0) { /* best effort */ }
         abort();
     }
+
+    *func_pptr = func;
 }
 
 static void *malloc_first_run(size_t size) {
