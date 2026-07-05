@@ -13,8 +13,10 @@
 #define TASK_COMM_LEN 16
 #endif
 
-#define NETDATA_EBPFGO_INTEGRATION_NAME "/netdata_shm_integration_ebpfgo"
-#define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo"
+/* v2: ebpfgo_shm_header grew from 8 to 16 bytes; version suffix ensures old
+ * consumers never map the new layout at the wrong offset. */
+#define NETDATA_EBPFGO_INTEGRATION_NAME "/netdata_shm_integration_ebpfgo_v2"
+#define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo_v2"
 
 /* SHM header written at byte-offset 0; the ebpf_pid_stat[] array follows
  * immediately.  sizeof == 16 so entries start on an 8-byte boundary, which
