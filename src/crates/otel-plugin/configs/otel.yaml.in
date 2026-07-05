@@ -57,6 +57,10 @@ storage:
   #   fs:///var/lib/netdata/otel/remote
   #   s3://bucket/prefix?region=us-east-1
   #   s3://bucket/prefix?region=us-east-1&endpoint=https://minio.example:9000
+  # fs:// caveat: the path must be READABLE by the netdata user. An existing but
+  # unreadable fs root lists as EMPTY (not an error), so the plugin would boot
+  # with an empty archive view instead of fail-closing. S3-class backends surface
+  # permission errors and fail closed correctly.
   uri: "fs://@logdir_POST@/otel/v2/remote"
 
   # Data deleted from local disk by retention but still in remote storage is
