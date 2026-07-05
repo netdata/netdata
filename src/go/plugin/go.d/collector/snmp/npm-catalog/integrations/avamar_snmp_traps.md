@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Avamar across **1 MIB** into structu
 - `AVAMAR-MCS-MIB::eventTrap`
 - `AVAMAR-MCS-MIB::testEventTrap`
 - `AVAMAR-MCS-MIB::burmActivityTrap`
-

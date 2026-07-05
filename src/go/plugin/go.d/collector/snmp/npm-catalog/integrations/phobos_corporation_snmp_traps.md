@@ -143,4 +143,3 @@ Netdata decodes **7 trap definitions** from Phobos Corporation across **1 MIB** 
 - `SONICWALL-SSL-MIB::sslTpsChangeHi`
 - `SONICWALL-SSL-MIB::sslTpsChangeLo`
 - `SONICWALL-SSL-MIB::sslTotalConnectsChangeHi`
-

@@ -144,4 +144,3 @@ Netdata decodes **498 trap definitions** from Marc Hirsch across **2 MIBs** into
 - `CPS6000-MIB::cps6000TrapDc1Faj`
 - `CPS6000-MIB::cps6000TrapDc1Fan`
 - `CPS6000-MIB::cps6000TrapDc1Vsf`
-

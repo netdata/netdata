@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Plaintree Systems Inc across **1 MIB*
 ### Sample decoded traps
 
 - `PLAINTREE-SWITCH-MIB::switchTouched`
-

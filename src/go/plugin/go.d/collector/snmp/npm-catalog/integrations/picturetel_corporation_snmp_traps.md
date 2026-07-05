@@ -143,4 +143,3 @@ Netdata decodes **32 trap definitions** from Picturetel Corporation across **1 M
 - `PICTURETEL-VCS-MIB::pictureTelTrapAgentStarted`
 - `PICTURETEL-VCS-MIB::pictureTelTrapAgentShutdown`
 - `PICTURETEL-VCS-MIB::pictureTelTrapH320IncomingCall`
-

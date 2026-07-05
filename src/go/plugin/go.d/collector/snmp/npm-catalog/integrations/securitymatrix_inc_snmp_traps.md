@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Securitymatrix Inc across **1 MIB** i
 ### Sample decoded traps
 
 - `AirDefense-airCommand-MIB::airCommandAlarm`
-

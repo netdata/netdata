@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Actidata Company across **1 MIB** in
 
 - `ACTIDATA-MIB::enteralarm`
 - `ACTIDATA-MIB::exitalarm`
-

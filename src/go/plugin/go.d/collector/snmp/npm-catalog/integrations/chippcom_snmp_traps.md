@@ -145,4 +145,3 @@ Netdata decodes **20 trap definitions** from Chippcom across **3 MIBs** into str
 - `CHIPCOM-MIB::chipSlotUp`
 - `CHIPCOM-MIB::chipEnvironment`
 - `CHIPCOM-MIB::chipHardware`
-

@@ -144,4 +144,3 @@ Netdata decodes **8 trap definitions** from Atto Technology Inc across **2 MIBs*
 - `ATTOBRIDGE-MIB::bridgeDeviceTransition`
 - `ATTOBRIDGE-MIB::bridgeDeviceError`
 - `ATTO6500N-MIB::bridgeTemperatureWarning`
-

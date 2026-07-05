@@ -143,4 +143,3 @@ Netdata decodes **44 trap definitions** from Deltanet AG across **1 MIB** into s
 - `Lambdatrail2s-MIB::lt2sTemperatureHigh`
 - `Lambdatrail2s-MIB::lt2sTemperatureNormal`
 - `Lambdatrail2s-MIB::lt2sPowerSupplyPluggedIn`
-

@@ -143,4 +143,3 @@ Netdata decodes **39 trap definitions** from Sangoma Technologies across **1 MIB
 - `Vega-MIB::fileServerUnknownError`
 - `Vega-MIB::fileDoesNotExist`
 - `Vega-MIB::recurFileServerGetError`
-

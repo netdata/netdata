@@ -121,5 +121,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | mem.pgfaults | memory, io_requiring, cow, cow_optimized, in_transit | page faults/s |
-
-

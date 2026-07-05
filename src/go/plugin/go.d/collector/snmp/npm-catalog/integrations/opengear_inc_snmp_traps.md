@@ -155,4 +155,3 @@ Netdata decodes **101 trap definitions** from Opengear Inc across **13 MIBs** in
 - `OGTRAPv2-MIB::ogSerialUserNotification`
 - `OGTRAPv2-MIB::ogHostPingNotification`
 - `OGTRAPv2-MIB::ogHostServiceNotification`
-

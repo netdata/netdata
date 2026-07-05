@@ -143,4 +143,3 @@ Netdata decodes **11 trap definitions** from Mcafee Formerly Secure Computing Co
 - `SCC-SW-MIB::swNetTrafficThresholds`
 - `SCC-SW-MIB::swAttackAttempt`
 - `SCC-SW-MIB::swTeViolation`
-

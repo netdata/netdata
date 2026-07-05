@@ -143,4 +143,3 @@ Netdata decodes **14 trap definitions** from Exanet across **1 MIB** into struct
 - `CentricStorFS-MIB::centricStorFSCluFailed`
 - `CentricStorFS-MIB::centricStorFSCluNodeOK`
 - `CentricStorFS-MIB::centricStorFSCluNodeDegraded`
-

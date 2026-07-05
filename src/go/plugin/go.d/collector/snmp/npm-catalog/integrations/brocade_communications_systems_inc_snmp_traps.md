@@ -150,4 +150,3 @@ Netdata decodes **28 trap definitions** from Brocade Communications Systems Inc 
 - `SW-MIB::swFCPortScn`
 - `SW-MIB::swEventTrap`
 - `SW-MIB::swFabricWatchTrap`
-

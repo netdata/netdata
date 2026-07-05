@@ -138,5 +138,3 @@ Metrics:
 | disk.avgsz | reads, writes | KiB/operation |
 | disk_ext.avgsz | discards | KiB/operation |
 | disk.svctm | svctm | milliseconds/operation |
-
-

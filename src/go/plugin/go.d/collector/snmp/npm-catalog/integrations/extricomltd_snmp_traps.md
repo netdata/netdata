@@ -143,4 +143,3 @@ Netdata decodes **80 trap definitions** from Extricomltd across **1 MIB** into s
 - `EXTRICOM-SNMP-MIB::unknownAP`
 - `EXTRICOM-SNMP-MIB::keyError`
 - `EXTRICOM-SNMP-MIB::downlinkRetry`
-

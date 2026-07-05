@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Watchguard Technologies Inc across *
 - `WATCHGUARD-SYSTEM-CONFIG-MIB::wgAlarmTrap`
 - `WATCHGUARD-SYSTEM-CONFIG-MIB::wgSnmpShutdown`
 - `WATCHGUARD-SYSTEM-CONFIG-MIB::wgSnmpStart`
-

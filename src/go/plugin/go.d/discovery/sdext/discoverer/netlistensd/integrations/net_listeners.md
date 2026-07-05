@@ -288,6 +288,3 @@ The stock `exporter` catch-all rule (last in the file) is greedy by design — a
 ### Generated jobs fail to start
 
 The discoverer creates jobs but does not run them. Common causes: the rendered template assumes credentials the local service rejects (e.g. RabbitMQ default `guest:guest`); `0.0.0.0` listeners produce `0.0.0.0:port` addresses that the collector cannot connect to (use `127.0.0.1` in the template if appropriate); the service has TLS but the template uses HTTP.
-
-
-

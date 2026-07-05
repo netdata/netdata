@@ -143,5 +143,3 @@ See Setting Up Membership Rules section above for setup instructions.
 
 ### Reference
 [SCIM Specification](https://scim.org)
-
-

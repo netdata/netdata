@@ -143,4 +143,3 @@ Netdata decodes **24 trap definitions** from Compellent Technologies across **1 
 - `COMPELLENT-MIB::trapStatusDown`
 - `COMPELLENT-MIB::trapStatusInform`
 - `COMPELLENT-MIB::trapStatusCritical`
-

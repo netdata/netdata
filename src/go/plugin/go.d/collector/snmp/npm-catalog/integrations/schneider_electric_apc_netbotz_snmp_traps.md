@@ -143,4 +143,3 @@ Netdata decodes **172 trap definitions** from Schneider Electric Apc Netbotz acr
 - `NetBotz50-MIB::netBotzTempTooLow`
 - `NetBotz50-MIB::netBotzTempUnplugged`
 - `NetBotz50-MIB::netBotzTempErrorRTN`
-

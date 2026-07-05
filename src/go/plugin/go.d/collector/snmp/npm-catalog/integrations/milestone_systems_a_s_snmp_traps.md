@@ -143,4 +143,3 @@ Netdata decodes **64 trap definitions** from Milestone Systems A S across **1 MI
 - `MILESTONESYS-RECORDER-MIB::motionStopped`
 - `MILESTONESYS-RECORDER-MIB::inputActivated`
 - `MILESTONESYS-RECORDER-MIB::inputChanged`
-

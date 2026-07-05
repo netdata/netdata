@@ -144,4 +144,3 @@ Netdata decodes **1812 trap definitions** from Cerent Corporation across **2 MIB
 - `CERENT-GENERIC-MIB::gfailureDetectedExternalToTheNE`
 - `CERENT-GENERIC-MIB::gexternalError`
 - `CERENT-GENERIC-MIB::gexcessiveSwitching`
-

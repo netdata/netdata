@@ -145,4 +145,3 @@ Netdata decodes **14 trap definitions** from Cray Communications A S across **3 
 - `SCA-BOX-MIB::boxTempFailureEvent`
 - `SCA-BOX-MIB::boxModuleInsertedEvent`
 - `SCA-BOX-MIB::boxModuleRemovedEvent`
-

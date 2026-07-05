@@ -143,4 +143,3 @@ Netdata decodes **11 trap definitions** from Pacific Broadband Communications ac
 - `PBC-CMTS-MIB::pbcCmtsChassisNotification`
 - `PBC-CMTS-MIB::pbcCmtsSoftwareNotification`
 - `PBC-CMTS-MIB::pbcCmtsAccessNotification`
-

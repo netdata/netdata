@@ -144,4 +144,3 @@ Netdata decodes **5 trap definitions** from Spidcom Technologies S.A. across **2
 - `SPIDCOM-TRAPS::deviceUp`
 - `SPIDCOM-TRAPS::maxAttenuation`
 - `SPIDCOM-TRAPS::maxNoise`
-

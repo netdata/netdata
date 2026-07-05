@@ -122,5 +122,3 @@ Metrics:
 |:------|:----------|:----|
 | system.ctxt | switches | context switches/s |
 | system.forks | started | processes/s |
-
-

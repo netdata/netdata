@@ -335,6 +335,3 @@ routing tables, expect divergence. This is normal in BGP, not a bug.
 BioRIS-derived enrichment depends on the bio-rd version, upstream BGP source,
 route visibility, and refresh cadence. Validate against your bio-rd setup
 before relying on this for capacity or security decisions.
-
-
-

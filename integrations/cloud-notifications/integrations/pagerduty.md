@@ -44,5 +44,3 @@ endmeta-->
     - **Integration configuration**
       - Integration Key: A 32 character key provided by PagerDuty to receive events on your service.
       - Integration URL (Alert Events): The URL provided by PagerDuty where Netdata Cloud will send notifications.
-
-

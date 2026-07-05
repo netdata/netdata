@@ -143,4 +143,3 @@ Netdata decodes **28 trap definitions** from Powershield Ltd across **1 MIB** in
 - `PS-POWERSHIELD-MIB::psAlarmMonoblockVoltageVariation`
 - `PS-POWERSHIELD-MIB::psAlarmMonoblockVoltageIdle`
 - `PS-POWERSHIELD-MIB::psAlarmStringVoltageChargeDischarge`
-

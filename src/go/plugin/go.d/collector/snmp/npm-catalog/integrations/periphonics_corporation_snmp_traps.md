@@ -143,4 +143,3 @@ Netdata decodes **10 trap definitions** from Periphonics Corporation across **1 
 - `PERIPHONICS-VRU-NETWORK-MIB::notifyLineAppStateChg`
 - `PERIPHONICS-VRU-NETWORK-MIB::notifySpanStateChg`
 - `PERIPHONICS-VRU-NETWORK-MIB::notifyHostStateChg`
-

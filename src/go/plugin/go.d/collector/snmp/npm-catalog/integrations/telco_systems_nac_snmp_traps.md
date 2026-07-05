@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Telco Systems Nac across **1 MIB** in
 ### Sample decoded traps
 
 - `EDGELINK-MIB::edgeLinkEvent`
-

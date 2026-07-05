@@ -144,4 +144,3 @@ Netdata decodes **53 trap definitions** from Unisys Corp across **2 MIBs** into 
 - `VISINET2-MIB::uemTrapSensorWarning`
 - `VISINET2-MIB::uemTrapSensorNormal`
 - `VISINET2-MIB::uemTrapSwitchAlert`
-

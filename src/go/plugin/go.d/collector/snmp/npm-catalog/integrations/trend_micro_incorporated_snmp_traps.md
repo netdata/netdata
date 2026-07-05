@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from Trend Micro Incorporated across **1 
 - `TRENDMICRO-NVW-MIB::bootFactory`
 - `TRENDMICRO-NVW-MIB::bootPrevious`
 - `TRENDMICRO-NVW-MIB::haFailover`
-

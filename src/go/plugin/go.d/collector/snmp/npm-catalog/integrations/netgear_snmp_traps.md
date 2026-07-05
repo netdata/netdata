@@ -183,4 +183,3 @@ Netdata decodes **338 trap definitions** from Netgear across **36 MIBs** into st
 - `GSM7312-SWITCHING-MIB::broadcastStormEndTrap`
 - `GSM7312-SWITCHING-MIB::linkFailureTrap`
 - `GSM7312-SWITCHING-MIB::vlanRequestFailureTrap`
-

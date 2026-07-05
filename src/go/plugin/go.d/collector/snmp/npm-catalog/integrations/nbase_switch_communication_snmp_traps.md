@@ -168,4 +168,3 @@ Netdata decodes **216 trap definitions** from Nbase Switch Communication across 
 - `OA-PORT-LIN-MIB::oaPortLinStateDown`
 - `DEV-CFG-MIB::invalidPassword`
 - `DEV-CFG-MIB::wrongAccess`
-

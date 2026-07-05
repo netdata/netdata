@@ -145,4 +145,3 @@ Netdata decodes **16 trap definitions** from Asante Technology across **3 MIBs**
 - `ASANTE-SWITCH-MIB::eSWFanFail`
 - `ASANTE-SWITCH-MIB::eSWExpPortConnectStateChange`
 - `ASANTE-SWITCH-MIB::eSWIPSpoofing`
-

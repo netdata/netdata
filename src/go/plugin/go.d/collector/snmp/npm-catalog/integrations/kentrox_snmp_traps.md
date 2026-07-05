@@ -143,4 +143,3 @@ Netdata decodes **8 trap definitions** from Kentrox across **1 MIB** into struct
 - `DATASMART-MIB::dsFmcSetNiRcvUpperBwThresh`
 - `DATASMART-MIB::dsFmcClrNiRcvUpperBwThresh`
 - `DATASMART-MIB::dsFmcSetNiXmtUpperBwThresh`
-

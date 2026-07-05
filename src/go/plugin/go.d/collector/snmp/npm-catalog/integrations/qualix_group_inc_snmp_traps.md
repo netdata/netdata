@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Qualix Group Inc across **1 MIB** int
 ### Sample decoded traps
 
 - `LEGATO-CLUSTER-MIB::legatoClusterUserTrap`
-

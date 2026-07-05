@@ -155,4 +155,3 @@ Netdata decodes **52 trap definitions** from Nokia Formerly Lumentis AB across *
 - `LUM-ALARM-MIB::alarmNotificationIndeterminate`
 - `LUM-ALARM-MIB::alarmNotificationWarning`
 - `LUM-ALARM-MIB::alarmNotificationMinor`
-

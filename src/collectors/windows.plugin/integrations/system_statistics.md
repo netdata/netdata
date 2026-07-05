@@ -126,5 +126,3 @@ Metrics:
 | system.threads | threads | threads |
 | system.ctxt | switches | context switches/s |
 | system.processor_queue_length | threads | threads |
-
-

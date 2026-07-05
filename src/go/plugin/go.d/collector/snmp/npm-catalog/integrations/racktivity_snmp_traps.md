@@ -143,4 +143,3 @@ Netdata decodes **25 trap definitions** from Racktivity across **1 MIB** into st
 - `ES-RACKTIVITY-MIB::errorRaised`
 - `ES-RACKTIVITY-MIB::errorValueTooHighCleared`
 - `ES-RACKTIVITY-MIB::errorValueTooLowCleared`
-

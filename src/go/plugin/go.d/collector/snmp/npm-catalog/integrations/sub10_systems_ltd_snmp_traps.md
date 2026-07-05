@@ -144,4 +144,3 @@ Netdata decodes **7 trap definitions** from Sub10 Systems Ltd across **2 MIBs** 
 - `SUB10SYSTEMS-MIB::sub10RadioAlarm`
 - `V320-MIB::terminalLinkQualityImprovedTrap`
 - `V320-MIB::terminalLinkQualityReducedTrap`
-

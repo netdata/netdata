@@ -146,4 +146,3 @@ Netdata decodes **14 trap definitions** from Salix Technologies Inc across **4 M
 - `SALIX-SYSTEM-MIB::salixSysSyncClockModeAlarm`
 - `SALIX-SYSTEM-MIB::salixSysSyncClockModeStateChange`
 - `SALIX-SYSTEM-MIB::salixSysFileSystemUnavailable`
-

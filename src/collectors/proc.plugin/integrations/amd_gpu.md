@@ -109,5 +109,3 @@ Metrics:
 | amdgpu.gpu_mem_vis_vram_usage | free, used | bytes |
 | amdgpu.gpu_mem_gtt_usage_perc | usage | percentage |
 | amdgpu.gpu_mem_gtt_usage | free, used | bytes |
-
-

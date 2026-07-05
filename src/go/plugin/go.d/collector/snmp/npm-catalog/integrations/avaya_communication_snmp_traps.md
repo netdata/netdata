@@ -164,4 +164,3 @@ Netdata decodes **503 trap definitions** from Avaya Communication across **22 MI
 - `G3-AVAYA-TRAP::alarmMajor`
 - `G3-AVAYA-TRAP::alarmMinor`
 - `G3-AVAYA-TRAP::alarmWarning`
-

@@ -173,5 +173,3 @@ Define whether plugin will monitor the call (`entry`) for the functions or it wi
 ### lifetime
 
 Set default lifetime for thread when enabled by cloud.
-
-

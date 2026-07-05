@@ -164,4 +164,3 @@ Netdata decodes **37 trap definitions** from Shanghai Meridian Technologies Co L
 - `QTECH-NMS-REMOTE-PING-MIB::rPingNotification`
 - `QTECH-NMS-FILTER-TRAP::nmsFilterNotification`
 - `QTECH-NMS-ETHERRING::nmsEtherRingNotification`
-

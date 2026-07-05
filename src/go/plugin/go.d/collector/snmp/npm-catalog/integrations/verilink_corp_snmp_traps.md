@@ -146,4 +146,3 @@ Netdata decodes **599 trap definitions** from Verilink Corp across **4 MIBs** in
 - `VERILINK-ENTERPRISE-NCMALARM-MIB::ncmncmfarCSUPowrUP`
 - `VERILINK-ENTERPRISE-NCMALARM-MIB::ncmnearBERexceeded`
 - `VERILINK-ENTERPRISE-NCMALARM-MIB::ncmnearBERexceededCleared`
-

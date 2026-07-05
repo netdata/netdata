@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Bke A S across **1 MIB** into struct
 
 - `PNETMOD-MIB::tsTrapAlarmStart`
 - `PNETMOD-MIB::tsTrapAlarmEnd`
-

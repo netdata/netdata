@@ -152,4 +152,3 @@ Netdata decodes **310 trap definitions** from Broadsoft Inc across **10 MIBs** i
 - `BroadworksFault::softwareError`
 - `BroadworksFault::bwGeneralSoftwareError`
 - `BroadworksFault::bwPMtomcatLaunched`
-

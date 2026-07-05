@@ -144,4 +144,3 @@ Netdata decodes **35 trap definitions** from Sigma Network Systems Inc across **
 - `CT-ELS10-MIB::els10-27PortFunctionsTrap`
 - `CT-ELS10-MIB::els10-27RxQueuesTrap`
 - `CT-ELS10-MIB::els10-27RxStormFlagTrap`
-

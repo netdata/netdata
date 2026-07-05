@@ -143,4 +143,3 @@ Netdata decodes **22 trap definitions** from Lefthand Networks across **1 MIB** 
 - `LEFTHAND-NETWORKS-NSM-NOTIFICATION-MIB::lhnNsmNotificationController`
 - `LEFTHAND-NETWORKS-NSM-NOTIFICATION-MIB::lhnNsmNotificationRAID`
 - `LEFTHAND-NETWORKS-NSM-NOTIFICATION-MIB::lhnNsmNotificationDisk`
-

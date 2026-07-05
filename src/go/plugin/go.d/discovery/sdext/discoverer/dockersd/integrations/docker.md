@@ -315,6 +315,3 @@ Stock rules match on `.Image` patterns. Custom forks or in-house image names won
 ### Generated jobs fail to start
 
 Common causes: the rendered URL is not reachable from the agent (different network, firewall); credentials baked into the template are wrong; the module's port is not the one Docker reported. Check the rendered job YAML in the agent's debug output.
-
-
-

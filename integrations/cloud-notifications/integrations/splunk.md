@@ -38,5 +38,3 @@ endmeta-->
     - **Integration configuration**
       - HTTP Event Collector URI: The URI of your HTTP event collector in Splunk
       - HTTP Event Collector Token: The token that Splunk provided to you when you created the HTTP Event Collector
-
-

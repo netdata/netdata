@@ -143,4 +143,3 @@ Netdata decodes **6 trap definitions** from Television Systems Ltd across **1 MI
 - `TSL-MIB::alarmEqptTempOkTrap`
 - `TSL-MIB::mduPowerStatusTrap`
 - `TSL-MIB::mduVoltageStatusTrap`
-

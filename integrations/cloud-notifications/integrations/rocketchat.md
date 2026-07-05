@@ -48,5 +48,3 @@ For more details please check [Incoming webhooks for RocketChat](https://docs.ro
       - Notifications: The notification types you want to receive
     - **Integration configuration**
       - Webhook URL: URL provided on RocketChat for the channel you want to receive your notifications
-
-

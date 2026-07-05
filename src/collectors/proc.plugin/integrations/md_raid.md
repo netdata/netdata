@@ -124,5 +124,3 @@ Metrics:
 | md.expected_time_until_operation_finish | finish_in | seconds |
 | md.operation_speed | speed | KiB/s |
 | md.nonredundant | available | boolean |
-
-

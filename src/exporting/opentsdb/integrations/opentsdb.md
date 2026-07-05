@@ -185,4 +185,3 @@ For example: `opentsdb:http:my_opentsdb_instance`, `opentsdb:https:my_opentsdb_i
     send charts matching = *
 
 ```
-

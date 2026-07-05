@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Schmid Telecom AG across **1 MIB** in
 ### Sample decoded traps
 
 - `PEGASUS-LEAN-TRAP-MIB::pegasusAlarm`
-

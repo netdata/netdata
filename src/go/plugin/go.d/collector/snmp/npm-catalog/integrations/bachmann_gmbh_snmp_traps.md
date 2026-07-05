@@ -144,4 +144,3 @@ Netdata decodes **60 trap definitions** from Bachmann GmbH across **2 MIBs** int
 - `BLUENET-IRS::birsTrOidCAN`
 - `BLUENET-IRS::birsTrOidNeCuLowerWSet`
 - `BLUENET-IRS::birsTrOidNeCuLowerWRst`
-

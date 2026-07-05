@@ -143,4 +143,3 @@ Netdata decodes **28 trap definitions** from Starline Holdings across **1 MIB** 
 - `UEC-STARLINE-MIB::cpmAcInfUnCurrAssertEv`
 - `UEC-STARLINE-MIB::cpmAcInfUnCurrDeassertEv`
 - `UEC-STARLINE-MIB::cpmAcInfOvVoltAssertEv`
-

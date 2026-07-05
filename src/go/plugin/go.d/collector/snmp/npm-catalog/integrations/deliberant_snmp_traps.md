@@ -145,4 +145,3 @@ Netdata decodes **9 trap definitions** from Deliberant across **3 MIBs** into st
 - `DLB-802DOT11-EXT-MIB::dlbFrequencyChange`
 - `DLB-802DOT11-EXT-MIB::dlbNoiseThresholdReached`
 - `DLB-802DOT11-EXT-MIB::dlbRemoteNodeConnected`
-

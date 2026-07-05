@@ -141,4 +141,3 @@ Netdata decodes **2 trap definitions** from Papouch Elektronika across **2 MIBs*
 
 - `QUIDOS-MIB::temp-msg`
 - `Th2e-v01-MIB::temp-msg`
-

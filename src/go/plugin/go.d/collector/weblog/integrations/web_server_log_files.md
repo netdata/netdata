@@ -520,6 +520,3 @@ The web_log_1m_unmatched alert fires continuously but the unmatched lines are in
 
 **Resolution:**
 Customize the alert threshold in `health.d/web_log.conf` by copying the web_log_1m_unmatched template and adjusting the warn condition, or silence notifications via Netdata Cloud alert configuration.
-
-
-

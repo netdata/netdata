@@ -143,4 +143,3 @@ Netdata decodes **69 trap definitions** from Eltek Valere Inc Formerly Valere Po
 - `ELTEK-BC2000-DC-POWER-MIB::vpwrTrapACFAlarm`
 - `ELTEK-BC2000-DC-POWER-MIB::vpwrTrapHVAlarm`
 - `ELTEK-BC2000-DC-POWER-MIB::vpwrTrapHVSDAlarm`
-

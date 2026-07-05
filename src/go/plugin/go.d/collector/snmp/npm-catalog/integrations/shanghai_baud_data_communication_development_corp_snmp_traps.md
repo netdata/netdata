@@ -181,4 +181,3 @@ Netdata decodes **65 trap definitions** from Shanghai Baud Data Communication De
 - `BDCOM-REMOTE-PING-MIB::rPingNotification`
 - `BDCOM-FILTER-TRAP::bdFilterNotification`
 - `BDCOM-ETHERRING::bdEtherRingNotification`
-

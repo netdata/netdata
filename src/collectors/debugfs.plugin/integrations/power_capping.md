@@ -134,5 +134,3 @@ Metrics:
 |:------|:----------|:----|
 | cpu.powercap_intel_rapl_zone | Power | Watts |
 | cpu.powercap_intel_rapl_subzones | dram, core, uncore | Watts |
-
-

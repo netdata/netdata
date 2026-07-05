@@ -149,4 +149,3 @@ Netdata decodes **83 trap definitions** from Dec across **7 MIBs** into structur
 - `DECHUB90-MIB::configurationExceeded`
 - `DECHUB90-MIB::populationChange`
 - `DECHUB90-MIB::moduleStatusChange`
-

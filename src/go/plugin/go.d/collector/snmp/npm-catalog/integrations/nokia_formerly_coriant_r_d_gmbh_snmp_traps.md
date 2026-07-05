@@ -144,4 +144,3 @@ Netdata decodes **46 trap definitions** from Nokia Formerly Coriant R D GmbH acr
 - `TNMS-NBI-MIB::enmsProxyStateChangeTrap`
 - `TNMS-NBI-MIB::enmsNEObjectCreationTrap`
 - `TNMS-NBI-MIB::enmsNEObjectDeletionTrap`
-

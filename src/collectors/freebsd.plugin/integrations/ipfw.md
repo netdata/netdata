@@ -127,5 +127,3 @@ Metrics:
 | ipfw.bytes | a dimension per static rule | bytes/s |
 | ipfw.active | a dimension per dynamic rule | rules |
 | ipfw.expired | a dimension per dynamic rule | rules |
-
-

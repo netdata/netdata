@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Codima Technologies Ltd across **1 MI
 ### Sample decoded traps
 
 - `CODIMA-EXPRESS-MIB::expressAlarm`
-

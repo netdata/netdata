@@ -143,4 +143,3 @@ Netdata decodes **13 trap definitions** from Katron Technologies Inc across **1 
 - `SWITCH_MIB::switch_Port_Enabled`
 - `SWITCH_MIB::switch_Port_Disabled`
 - `SWITCH_MIB::switch_Port_Speed_Duplex_Change`
-

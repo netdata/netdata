@@ -143,4 +143,3 @@ Netdata decodes **159 trap definitions** from Astaro AG across **1 MIB** into st
 - `ASTARO-MIB::INFO-006`
 - `ASTARO-MIB::INFO-010`
 - `ASTARO-MIB::INFO-011`
-

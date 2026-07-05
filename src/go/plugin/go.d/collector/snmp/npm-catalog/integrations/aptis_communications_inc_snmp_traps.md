@@ -143,4 +143,3 @@ Netdata decodes **85 trap definitions** from Aptis Communications Inc across **1
 - `APTIS-V2TRAPS-MIB::aptis-dc2down`
 - `APTIS-V2TRAPS-MIB::aptis-ac1down`
 - `APTIS-V2TRAPS-MIB::aptis-ac2down`
-

@@ -143,4 +143,3 @@ Netdata decodes **25 trap definitions** from Timesten Performance Software acros
 - `TimesTen::ttPartitionSpaceStateTrap`
 - `TimesTen::ttPartitionSpaceExhaustedTrap`
 - `TimesTen::ttDSDataCorruptionTrap`
-

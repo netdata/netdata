@@ -143,4 +143,3 @@ Netdata decodes **7 trap definitions** from Better Networks across **1 MIB** int
 - `BETTER-NETWORKS-ETHERNETBOX-MIB::sensorstatusChangeToHigh`
 - `BETTER-NETWORKS-ETHERNETBOX-MIB::ethernetboxNotificationInputLineChangeToLow`
 - `BETTER-NETWORKS-ETHERNETBOX-MIB::ethernetboxNotificationInputLineChangeToHigh`
-

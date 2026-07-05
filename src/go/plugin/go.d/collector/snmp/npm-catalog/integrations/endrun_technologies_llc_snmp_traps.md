@@ -146,4 +146,3 @@ Netdata decodes **29 trap definitions** from Endrun Technologies LLC across **4 
 - `ENDRUNTECHNOLOGIES-MIB::cdmaTrapFaultStatusChange`
 - `ENDRUNTECHNOLOGIES-MIB::gntpTrapLeapIndBitsChange`
 - `ENDRUNTECHNOLOGIES-MIB::gntpTrapStratumChange`
-

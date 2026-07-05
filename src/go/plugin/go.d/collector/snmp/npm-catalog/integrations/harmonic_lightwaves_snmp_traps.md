@@ -143,4 +143,3 @@ Netdata decodes **27 trap definitions** from Harmonic Lightwaves across **1 MIB*
 - `HARMONIC-INC-NSG9000-MIB::hPlatformFan1FailTrap`
 - `HARMONIC-INC-NSG9000-MIB::hPlatformFan2FailTrap`
 - `HARMONIC-INC-NSG9000-MIB::hPlatformFan3FailTrap`
-

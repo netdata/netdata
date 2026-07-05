@@ -154,4 +154,3 @@ Netdata decodes **363 trap definitions** from Rbb Rundfunk Berlin Brandenburg ac
 - `IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTTransmitterOpModeEvent`
 - `IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTRFPresentEvent`
 - `IRT-DVBT-SINGLETRANSMITTER-MIB::dvbSTResetFaultEvent`
-

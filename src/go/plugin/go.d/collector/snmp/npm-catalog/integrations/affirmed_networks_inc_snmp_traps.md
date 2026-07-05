@@ -148,4 +148,3 @@ Netdata decodes **575 trap definitions** from Affirmed Networks Inc across **6 M
 - `AFFIRMED-SNMP-AN3000-TRAPS-MIB::fmNmAn3000Test`
 - `AFFIRMED-SNMP-AN3000-TRAPS-MIB::fmNmAn3000Commit`
 - `AFFIRMED-SNMP-AN3000-TRAPS-MIB::fmHmCacheOperStateDown`
-

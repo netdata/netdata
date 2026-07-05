@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Rtbrick Inc across **1 MIB** into str
 ### Sample decoded traps
 
 - `RTBRICK-SYSLOG-MIB::rtbrickSyslogTrap`
-

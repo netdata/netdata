@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Nagios across **1 MIB** into structu
 - `NAGIOS-NOTIFY-MIB::nHostNotify`
 - `NAGIOS-NOTIFY-MIB::nSvcEvent`
 - `NAGIOS-NOTIFY-MIB::nSvcNotify`
-

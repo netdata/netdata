@@ -144,4 +144,3 @@ Netdata decodes **21 trap definitions** from Pan Dacom Telekommunikations across
 - `PANDATEL-MODEM-MIB::modemAdded`
 - `PANDATEL-MODEM-MIB::modemRemoved`
 - `PANDATEL-MODEM-MIB::portLoopEnabled`
-

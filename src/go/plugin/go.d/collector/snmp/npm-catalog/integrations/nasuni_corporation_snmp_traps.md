@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Nasuni Corporation across **1 MIB** i
 ### Sample decoded traps
 
 - `NASUNI-FILER-MIB::filerTrap`
-

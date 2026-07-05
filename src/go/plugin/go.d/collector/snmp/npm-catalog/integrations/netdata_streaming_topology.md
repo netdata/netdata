@@ -88,6 +88,3 @@ There are no alerts configured by default for this integration.
 
 
 ## Metrics
-
-
-

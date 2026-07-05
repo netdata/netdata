@@ -176,5 +176,3 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | `snmp.device_prof_ucd_memoryTotal` | `By` | device | The total amount of real/physical memory installed on this host |
 | `snmp.device_prof_ucd_ssRawSwapIn` | `By/s` | device | Amount of memory swapped in from disk |
 | `snmp.device_prof_ucd_ssRawSwapOut` | `By/s` | device | Amount of memory swapped out to disk |
-
-

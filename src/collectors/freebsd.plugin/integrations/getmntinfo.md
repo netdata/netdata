@@ -132,5 +132,3 @@ Metrics:
 |:------|:----------|:----|
 | disk.space | avail, used, reserved_for_root | GiB |
 | disk.inodes | avail, used, reserved_for_root | inodes |
-
-

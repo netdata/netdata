@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Moca Multimedia Over Coax Alliance a
 - `MOCA11-MIB::mocaTrapAbovePhyThreshold`
 - `MOCA11-MIB::mocaTrapIfStatusChange`
 - `MOCA11-MIB::mocaTrapIfNumNodesChange`
-

@@ -143,4 +143,3 @@ Netdata decodes **9 trap definitions** from Zoho Corporation Formerly Advent Net
 - `AdventNet-WebNMS-MIB::moAttrChangeNotification`
 - `AdventNet-WebNMS-MIB::alertClearNotification`
 - `AdventNet-WebNMS-MIB::alertWarningNotification`
-

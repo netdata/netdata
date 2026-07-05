@@ -105,5 +105,3 @@ Metrics:
 | mem.zram_savings | savings, original | MiB |
 | mem.zram_ratio | ratio | ratio |
 | mem.zram_efficiency | percent | percentage |
-
-

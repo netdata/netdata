@@ -161,4 +161,3 @@ Netdata decodes **85 trap definitions** from Transition Engineering Inc across *
 - `TNI-MIB::sfbrm100VTUMemberViolation`
 - `TNI-MIB::sfbrm100VTUMissViolation`
 - `TNI-MIB::sfbrm100ATUMemberViolation`
-

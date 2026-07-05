@@ -143,4 +143,3 @@ Netdata decodes **35 trap definitions** from Veritas Technologies LLC across **1
 - `VERITAS-APPLIANCE-MONITORING-MIB::vrtsfibrechannelTrap`
 - `VERITAS-APPLIANCE-MONITORING-MIB::vrtstemperatureTrap`
 - `VERITAS-APPLIANCE-MONITORING-MIB::vrtscpuTrap`
-

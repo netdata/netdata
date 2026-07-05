@@ -143,4 +143,3 @@ Netdata decodes **17 trap definitions** from Last Mile Gear across **1 MIB** int
 - `CTMMIB::masterSecondaryPowerLost`
 - `CTMMIB::gpsSignalLost`
 - `CTMMIB::masterTempatureError`
-

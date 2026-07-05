@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Aviat Networks across **1 MIB** into
 - `AVIAT-ALARM-REPORTING-MIB::aviatAlarmClearedInstanceNotification`
 - `AVIAT-ALARM-REPORTING-MIB::aviatAlarmUnstableInstanceNotification`
 - `AVIAT-ALARM-REPORTING-MIB::aviatAlarmStabilizedInstanceNotification`
-

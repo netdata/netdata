@@ -179,4 +179,3 @@ Netdata decodes **287 trap definitions** from Synoptics across **32 MIBs** into 
 - `SYNOPTICS-BASIC-ETHTOK-MIB::portAutoPartition`
 - `SYNOPTICS-BASIC-ETHTOK-MIB::portDTEJabbering`
 - `SYNOPTICS-BASIC-ETHTOK-MIB::localBridgeDiagnostic`
-

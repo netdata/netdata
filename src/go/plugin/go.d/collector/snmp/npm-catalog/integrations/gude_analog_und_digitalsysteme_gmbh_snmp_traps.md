@@ -167,4 +167,3 @@ Netdata decodes **186 trap definitions** from Gude Analog Und Digitalsysteme Gmb
 - `GUDEADS-EPC2X6-MIB::epc2x6witchEvt3`
 - `GUDEADS-EPC2X6-MIB::epc2x6witchEvt4`
 - `GUDEADS-EPC2X6-MIB::epc2x6witchEvt5`
-

@@ -154,4 +154,3 @@ Netdata decodes **35 trap definitions** from Tp Link Systems Inc across **12 MIB
 - `TPLINK-SYSTOOL-MIB::fan`
 - `TPLINK-SYSTOOL-MIB::temperature`
 - `TPLINK-SYSTOOL-MIB::mCard`
-

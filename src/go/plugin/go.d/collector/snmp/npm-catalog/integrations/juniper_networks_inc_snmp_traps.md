@@ -193,4 +193,3 @@ Netdata decodes **229 trap definitions** from Juniper Networks Inc across **46 M
 - `JUNIPER-V1-TRAPS-CHAS::jnxOverTemperatureV1`
 - `MPLS-MIB::mplsLspInfoUp`
 - `MPLS-MIB::mplsLspInfoDown`
-

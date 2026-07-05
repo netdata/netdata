@@ -143,4 +143,3 @@ Netdata decodes **44 trap definitions** from C C Power Inc across **1 MIB** into
 - `CCPOWER-MIB::batteryDisconnectTrap`
 - `CCPOWER-MIB::programmableTrap`
 - `CCPOWER-MIB::highVoltageTrap`
-

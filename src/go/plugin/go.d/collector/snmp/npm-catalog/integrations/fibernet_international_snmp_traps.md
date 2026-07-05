@@ -143,4 +143,3 @@ Netdata decodes **7 trap definitions** from Fibernet International across **1 MI
 - `XMUX4-PLUS::alarmaStatusChange`
 - `XMUX4-PLUS::channelActivoChange`
 - `XMUX4-PLUS::powerLeftChange`
-

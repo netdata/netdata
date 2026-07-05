@@ -160,4 +160,3 @@ Netdata decodes **338 trap definitions** from Fortinet Inc across **18 MIBs** in
 - `FORTINET-TRAP-MIB::fnTrapAgentDown`
 - `FORTINET-TRAP-MIB::fnTrapAgentUp`
 - `FORTINET-TRAP-MIB::fnTrapInfChg`
-

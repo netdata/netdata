@@ -144,4 +144,3 @@ Netdata decodes **10 trap definitions** from Smartoptics AS across **2 MIBs** in
 - `MSERIES-ALARM-MIB::alarmNotificationMinor`
 - `MSERIES-ALARM-MIB::alarmNotificationMajor`
 - `MSERIES-ALARM-MIB::alarmNotificationCritical`
-

@@ -143,4 +143,3 @@ Netdata decodes **12 trap definitions** from Padtec Optical Components And Syste
 - `METROPAD3::alarmAckNotification`
 - `METROPAD3::eventNotification`
 - `METROPAD3::isAliveNotification`
-

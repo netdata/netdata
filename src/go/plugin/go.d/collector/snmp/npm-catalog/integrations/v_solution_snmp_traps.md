@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from V Solution across **1 MIB** into stru
 ### Sample decoded traps
 
 - `V1600D::dataAlarmTrap`
-

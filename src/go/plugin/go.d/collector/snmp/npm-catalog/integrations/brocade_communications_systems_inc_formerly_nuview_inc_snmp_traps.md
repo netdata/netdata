@@ -143,4 +143,3 @@ Netdata decodes **10 trap definitions** from Brocade Communications Systems Inc 
 - `NuView-MIB::ClusterXTrapNodeFail`
 - `NuView-MIB::ClusterXTrapClusterFail`
 - `NuView-MIB::ClusterXTrapResourceFail`
-

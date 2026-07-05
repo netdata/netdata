@@ -143,4 +143,3 @@ Netdata decodes **15 trap definitions** from An D Cz across **1 MIB** into struc
 - `IMCO-LS110-MIB::opto3-trap`
 - `IMCO-LS110-MIB::sdsRE1state-trap`
 - `IMCO-LS110-MIB::sdsRE2state-trap`
-

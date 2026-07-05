@@ -327,4 +327,3 @@ Netdata decodes **3024 trap definitions** from Hewlett Packard across **180 MIBs
 - `HP-SN-ROUTER-TRAP-MIB::snTrapOspfIfStateChange`
 - `HP-SN-ROUTER-TRAP-MIB::snTrapOspfVirtIfStateChange`
 - `HP-SN-ROUTER-TRAP-MIB::snOspfNbrStateChange`
-

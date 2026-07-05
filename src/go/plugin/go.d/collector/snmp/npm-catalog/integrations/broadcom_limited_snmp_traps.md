@@ -154,4 +154,3 @@ Netdata decodes **54 trap definitions** from Broadcom Limited across **12 MIBs**
 - `EdgeSwitch-SWITCHING-MIB::broadcastStormEndTrap`
 - `EdgeSwitch-SWITCHING-MIB::linkFailureTrap`
 - `EdgeSwitch-SWITCHING-MIB::vlanRequestFailureTrap`
-

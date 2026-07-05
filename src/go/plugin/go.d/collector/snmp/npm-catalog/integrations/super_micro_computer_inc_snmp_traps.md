@@ -208,4 +208,3 @@ Netdata decodes **331 trap definitions** from Super Micro Computer Inc across **
 - `SUPERMICRO-SD5-MIB::trapFanCritical`
 - `SUPERMICRO-SD5-MIB::trapVoltageNormal`
 - `SUPERMICRO-SD5-MIB::trapVoltageWarning`
-

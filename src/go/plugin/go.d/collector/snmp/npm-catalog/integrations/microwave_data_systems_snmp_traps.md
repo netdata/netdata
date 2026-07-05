@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Microwave Data Systems across **1 MIB
 ### Sample decoded traps
 
 - `MDS-EVENT-MIB::mdsEvent`
-

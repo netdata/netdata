@@ -143,4 +143,3 @@ Netdata decodes **40 trap definitions** from Nsi Software across **1 MIB** into 
 - `DTMIB::dttrapLicenseViolationStartingSource`
 - `DTMIB::dttrapLicenseViolationOnNetwork`
 - `DTMIB::dttrapSourceStarted`
-

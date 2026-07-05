@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Barracuda Networks AG Previous Was Ph
 ### Sample decoded traps
 
 - `PHION-MIB::eventTrap`
-

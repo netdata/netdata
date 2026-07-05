@@ -121,5 +121,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | system.soft_intr | interrupts | interrupts/s |
-
-

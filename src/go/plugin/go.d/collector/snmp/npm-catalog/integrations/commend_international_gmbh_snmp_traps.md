@@ -143,4 +143,3 @@ Netdata decodes **15 trap definitions** from Commend International GmbH across *
 - `COMMEND-SIP-MIB::commendStationAudioMonitoringAlarmNotification`
 - `COMMEND-SIP-MIB::commendStationInputNotifications`
 - `COMMEND-SIP-MIB::commendStationInputButtonStuckNotification`
-

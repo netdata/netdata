@@ -147,4 +147,3 @@ Netdata decodes **58 trap definitions** from Trango Networks LLC across **5 MIBs
 - `TRANGOM5800S-MIB::apOpModeFailure`
 - `TRANGOM5830S-MIB::suLinkUp`
 - `TRANGOM5830S-MIB::suLinkDown`
-

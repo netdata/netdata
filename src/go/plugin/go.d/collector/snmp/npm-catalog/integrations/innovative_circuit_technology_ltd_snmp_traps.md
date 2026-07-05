@@ -148,4 +148,3 @@ Netdata decodes **64 trap definitions** from Innovative Circuit Technology Ltd a
 - `ICT-DISTRIBUTION-PANEL-MIB::sysOvercurrentAlarmTrap`
 - `ICT-DISTRIBUTION-PANEL-MIB::fuseAlarmTrap`
 - `ICT-DISTRIBUTION-PANEL-MIB::undercurrentAlarmTrap`
-

@@ -172,4 +172,3 @@ Netdata decodes **571 trap definitions** from Sonus Networks Inc across **30 MIB
 - `FRX-MIB::configChangedTrap`
 - `FRX-MIB::nodeCongestedTrap`
 - `FRX-MIB::portInstalledTrap`
-

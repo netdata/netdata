@@ -250,4 +250,3 @@ Netdata decodes **817 trap definitions** from 3Com across **103 MIBs** into stru
 - `LBHUB-BOOM-MIB::deprRptrResetEvent`
 - `LBHUB-BOOM-MIB::heartbeatEvent`
 - `LBHUB-BOOM-MIB::localManagementUpdate`
-

@@ -145,4 +145,3 @@ Netdata decodes **8 trap definitions** from Monnit Corporation across **3 MIBs**
 - `MONNIT-EGW-MIB::WD-report-alarm`
 - `MONNIT-EGW-MIB::WD-report-normal`
 - `EGW4MIB::EGW4NewSensorTraffic`
-

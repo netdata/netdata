@@ -43,5 +43,3 @@ endmeta-->
     - **Integration configuration**
       - Webhook URL: The URL you copied from the previous section
       - Channel Parameters: Select the channel type which the notifications will be sent to, if it is a Forum channel, you need to specify a thread name
-
-

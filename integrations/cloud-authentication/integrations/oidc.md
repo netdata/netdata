@@ -58,5 +58,3 @@ If you start your authentication flow from Netdata sign-in page please check [th
 
 ### Reference
 https://openid.net/developers/how-connect-works/
-
-

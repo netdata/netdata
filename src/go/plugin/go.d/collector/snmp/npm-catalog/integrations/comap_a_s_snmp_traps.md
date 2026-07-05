@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Comap A S across **1 MIB** into struc
 ### Sample decoded traps
 
 - `COMAP-IL-NT-1601217B::alarm`
-

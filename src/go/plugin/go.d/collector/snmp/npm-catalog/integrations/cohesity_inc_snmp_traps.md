@@ -143,4 +143,3 @@ Netdata decodes **418 trap definitions** from Cohesity Inc across **1 MIB** into
 - `COHESITY-APPLIANCE-MIB::markDiskForRemovalNotif`
 - `COHESITY-APPLIANCE-MIB::upgradeFailedNotif`
 - `COHESITY-APPLIANCE-MIB::newDiskFoundNotif`
-

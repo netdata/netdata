@@ -147,4 +147,3 @@ Netdata decodes **9 trap definitions** from Shiva Corporation across **5 MIBs** 
 - `SHIVA-ACCT-MIB::acctMemoryAvailableTrap`
 - `SHIVA-ACCT-MIB::acctVolatileTrap`
 - `SHIVA-DMC-MIB::dmcModemDownTrap`
-

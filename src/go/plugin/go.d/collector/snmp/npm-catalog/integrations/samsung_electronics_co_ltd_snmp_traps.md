@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Samsung Electronics Co Ltd across **1
 ### Sample decoded traps
 
 - `SAMSUNG-CLONING-MIB::scmCloningTrapResult`
-

@@ -143,4 +143,3 @@ Netdata decodes **10 trap definitions** from Forcepoint LLC across **1 MIB** int
 - `FORCEPOINT-NGFW-ENGINE-MIB::nodeOffline`
 - `FORCEPOINT-NGFW-ENGINE-MIB::nodeBoot`
 - `FORCEPOINT-NGFW-ENGINE-MIB::nodeShutdown`
-

@@ -520,5 +520,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | as400.temp_storage_bucket | current, peak | bytes |
-
-

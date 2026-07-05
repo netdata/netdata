@@ -143,4 +143,3 @@ Netdata decodes **8 trap definitions** from Auspex Systems Inc across **1 MIB** 
 - `NETSERVER-MIB::diskStackUpdationTrap`
 - `NETSERVER-MIB::fcLinkFailureTrap`
 - `NETSERVER-MIB::fcLinkUpTrap`
-

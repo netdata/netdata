@@ -156,4 +156,3 @@ Netdata decodes **289 trap definitions** from Rohde Schwarz GmbH Co KG across **
 - `RS-XX8000-COMMON-MIB::ntpSyncFailed`
 - `RS-XX8000-DVB-TX-MIB::txSummaryFault`
 - `RS-XX8000-DVB-TX-MIB::txSummaryWarning`
-

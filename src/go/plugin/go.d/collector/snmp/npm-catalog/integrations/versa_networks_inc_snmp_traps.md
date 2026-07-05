@@ -165,4 +165,3 @@ Netdata decodes **71 trap definitions** from Versa Networks Inc across **23 MIBs
 - `HA-TRAP::haStateChange`
 - `HA-TRAP::haSyncStatus`
 - `IF-TRAP::interfaceUp`
-

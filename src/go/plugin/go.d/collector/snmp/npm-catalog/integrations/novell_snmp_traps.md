@@ -158,4 +158,3 @@ Netdata decodes **676 trap definitions** from Novell across **16 MIBs** into str
 - `LANtern-MIB::duplicateIPAddr`
 - `LANtern-MIB::utilizationAlarm`
 - `LANtern-MIB::errorsAlarm`
-

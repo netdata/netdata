@@ -148,5 +148,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | system.hardirq_latency | hardirq names | milliseconds |
-
-

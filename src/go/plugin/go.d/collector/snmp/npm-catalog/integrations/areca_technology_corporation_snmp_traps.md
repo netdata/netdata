@@ -151,4 +151,3 @@ Netdata decodes **860 trap definitions** from Areca Technology Corporation acros
 - `ARECA-SATA-CARD1-MIB::rsExpand`
 - `ARECA-SATA-CARD1-MIB::rsRebuild`
 - `ARECA-SATA-CARD1-MIB::rsDegraded`
-

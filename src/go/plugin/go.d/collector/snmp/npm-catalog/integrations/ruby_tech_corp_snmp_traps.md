@@ -157,4 +157,3 @@ Netdata decodes **232 trap definitions** from Ruby Tech Corp across **15 MIBs** 
 - `PRIVATETECH-GEPoEL2ESW12-MIB::gepoel2esw12Critical`
 - `PRIVATETECH-GEPoEL2ESW12-MIB::gepoel2esw12Error`
 - `PRIVATETECH-GEPoEL2ESW12-MIB::gepoel2esw12Warning`
-

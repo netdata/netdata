@@ -146,4 +146,3 @@ Netdata decodes **28 trap definitions** from Netscreen Technologies Inc across *
 - `NETSCREEN-TRAP-MIB::netscreenTrapSw`
 - `NETSCREEN-TRAP-MIB::netscreenTrapTrf`
 - `NETSCREEN-TRAP-MIB::netscreenTrapVpn`
-

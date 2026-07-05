@@ -193,5 +193,3 @@ Metrics:
 | app.ebpf_file_open_error | calls | calls/s |
 | app.ebpf_file_closed | calls | calls/s |
 | app.ebpf_file_close_error | calls | calls/s |
-
-

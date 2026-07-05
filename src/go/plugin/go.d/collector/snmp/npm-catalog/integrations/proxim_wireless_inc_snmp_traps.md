@@ -143,4 +143,3 @@ Netdata decodes **57 trap definitions** from Proxim Wireless Inc across **1 MIB*
 - `PROXIM-MIB::wirelessInterfaceInvalidRegDomain`
 - `PROXIM-MIB::wirelessInterfaceWorldModeCCNotSet`
 - `PROXIM-MIB::wirelessInterfaceChannelChanged`
-

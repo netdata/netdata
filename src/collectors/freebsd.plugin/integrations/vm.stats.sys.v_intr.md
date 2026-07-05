@@ -121,5 +121,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | system.dev_intr | interrupts | interrupts/s |
-
-

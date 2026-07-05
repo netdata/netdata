@@ -143,4 +143,3 @@ Netdata decodes **40 trap definitions** from Equipe Communications Corporation a
 - `EQUIPE-TRAP-MIB::eqFanUnitFailed`
 - `EQUIPE-TRAP-MIB::eqFanUnitFaulty`
 - `EQUIPE-TRAP-MIB::eqAcctDataWriteToDiskFailed`
-

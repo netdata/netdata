@@ -152,4 +152,3 @@ Netdata decodes **540 trap definitions** from Dragonwave across **10 MIBs** into
 - `AirPair-MIB::modemLossOfSignalLockFromDemodulatorV1Trap`
 - `AirPair-MIB::modemUncorrectedBerThresholdExceededV1Trap`
 - `AirPair-MIB::modemModulatorPllLockFailureV1Trap`
-

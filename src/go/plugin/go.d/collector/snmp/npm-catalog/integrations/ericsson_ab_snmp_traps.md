@@ -190,4 +190,3 @@ Netdata decodes **393 trap definitions** from Ericsson AB across **43 MIBs** int
 - `ANS-TRAPS-MIB::lof`
 - `ANS-TRAPS-MIB::lop`
 - `ANS-TRAPS-MIB::ais`
-

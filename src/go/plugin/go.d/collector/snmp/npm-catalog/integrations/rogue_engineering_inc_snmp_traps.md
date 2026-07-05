@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Rogue Engineering Inc across **1 MIB
 
 - `Rogue-Engineering-Inc-Sentinel-Remote-IO-with-SNMP::trapInputLevel`
 - `Rogue-Engineering-Inc-Sentinel-Remote-IO-with-SNMP::trapSequenceInputLevel`
-

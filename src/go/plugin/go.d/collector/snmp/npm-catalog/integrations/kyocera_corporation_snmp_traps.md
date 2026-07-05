@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Kyocera Corporation across **1 MIB**
 
 - `KMTRAP::kmEventGenerateTrap`
 - `KMTRAP::kmEventReleaseTrap`
-

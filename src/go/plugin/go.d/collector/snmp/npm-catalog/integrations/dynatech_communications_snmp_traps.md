@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Dynatech Communications across **1 MI
 ### Sample decoded traps
 
 - `DNMSALARM-MIB::dnmsAlarmTrap`
-

@@ -146,4 +146,3 @@ Netdata decodes **801 trap definitions** from American Power Conversion Corp acr
 - `PowerNet-MIB::upsDiagnosticsFailed`
 - `PowerNet-MIB::upsDischarged`
 - `PowerNet-MIB::upsOnBattery`
-

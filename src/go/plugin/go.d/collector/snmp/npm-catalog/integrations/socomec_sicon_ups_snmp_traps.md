@@ -148,4 +148,3 @@ Netdata decodes **383 trap definitions** from Socomec Sicon Ups across **6 MIBs*
 - `SOCOMECUPS-ADICOM-MIB::adicomUpsTrapBatteryLow`
 - `SOCOMECUPS-ADICOM-MIB::adicomUpsTrapPowerRestored`
 - `SOCOMECUPS-ADICOM-MIB::adicomUpsTrapImminentStop`
-

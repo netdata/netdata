@@ -143,4 +143,3 @@ Netdata decodes **13 trap definitions** from Storage Networking Industry Associa
 - `SNIA-SML-MIB::libraryAddedTrap`
 - `SNIA-SML-MIB::libraryDeletedTrap`
 - `SNIA-SML-MIB::libraryOpStatusChangedTrap`
-

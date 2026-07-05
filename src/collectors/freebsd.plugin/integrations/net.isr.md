@@ -141,5 +141,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | cpu.softnet_stat | dispatched, hybrid_dispatched, qdrops, queued | events/s |
-
-

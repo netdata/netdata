@@ -143,4 +143,3 @@ Netdata decodes **26 trap definitions** from Phoenix Contact GmbH Co KG across *
 - `FL-MGD-INFRASTRUCT-MIB::trapFWConf`
 - `FL-MGD-INFRASTRUCT-MIB::trapPowerSupply`
 - `FL-MGD-INFRASTRUCT-MIB::trapSecurityPort`
-

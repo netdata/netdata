@@ -143,4 +143,3 @@ Netdata decodes **4 trap definitions** from Cumulus Networks Inc across **2 MIBs
 - `CUMULUS-BGPUN-MIB::bgpBackwardTransition`
 - `CUMULUS-BGPVRF-MIB::bgpEstablished`
 - `CUMULUS-BGPVRF-MIB::bgpBackwardTransition`
-

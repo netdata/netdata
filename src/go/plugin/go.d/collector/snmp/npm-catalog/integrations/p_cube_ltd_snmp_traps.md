@@ -143,4 +143,3 @@ Netdata decodes **45 trap definitions** from P Cube Ltd across **1 MIB** into st
 - `PCUBE-SE-MIB::operationalStatusFailureTrap`
 - `PCUBE-SE-MIB::systemResetTrap`
 - `PCUBE-SE-MIB::chassisTempAlarmOnTrap`
-

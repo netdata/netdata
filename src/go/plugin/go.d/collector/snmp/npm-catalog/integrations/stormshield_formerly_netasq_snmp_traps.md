@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Stormshield Formerly Netasq across **
 ### Sample decoded traps
 
 - `STORMSHIELD-ALARM-MIB::snsNotification`
-

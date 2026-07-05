@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Garderos GmbH across **1 MIB** into s
 ### Sample decoded traps
 
 - `GARDEROS-ROUTER-MIB::routerNotification`
-

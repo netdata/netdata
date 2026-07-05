@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Melco Inc across **1 MIB** into stru
 
 - `BUFFALO-NAS-MIB::nasErrorOccur`
 - `BUFFALO-NAS-MIB::nasInformationOccur`
-

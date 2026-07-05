@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Del Mar Solutions Inc across **1 MIB
 - `SWATCH-MIB::serverUp`
 - `SWATCH-MIB::dmsStart`
 - `SWATCH-MIB::dmsShutdown`
-

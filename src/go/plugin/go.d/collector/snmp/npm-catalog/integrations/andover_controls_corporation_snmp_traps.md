@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Andover Controls Corporation across *
 ### Sample decoded traps
 
 - `ACC-NC-ALARM-MIB::alarmTransitionEvent`
-

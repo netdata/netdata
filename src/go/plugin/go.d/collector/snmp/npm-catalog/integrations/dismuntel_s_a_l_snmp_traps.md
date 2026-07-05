@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Dismuntel S A L across **1 MIB** into
 ### Sample decoded traps
 
 - `DISMUNTELv00-MIB::alarmMsg`
-

@@ -143,4 +143,3 @@ Netdata decodes **16 trap definitions** from Janitza Electronics GmbH across **1
 - `JANITZA-MIB-UMG96::userTrap3`
 - `JANITZA-MIB-UMG96::userTrap4`
 - `JANITZA-MIB-UMG96::userTrap5`
-

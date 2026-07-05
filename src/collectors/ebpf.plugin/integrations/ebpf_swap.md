@@ -186,5 +186,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | mem.swapcalls | write, read | calls/s |
-
-

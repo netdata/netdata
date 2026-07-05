@@ -146,4 +146,3 @@ Netdata decodes **38 trap definitions** from Quanta Computer Inc across **4 MIBs
 - `SWITCHING-MIB::broadcastStormEndTrap`
 - `SWITCHING-MIB::linkFailureTrap`
 - `SWITCHING-MIB::vlanRequestFailureTrap`
-

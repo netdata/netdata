@@ -143,4 +143,3 @@ Netdata decodes **86 trap definitions** from Carel across **1 MIB** into structu
 - `KELVIN-pCOWeb-Chiller-MIB::low-pressure-switch-1-alarm`
 - `KELVIN-pCOWeb-Chiller-MIB::low-pressure-switch-2-alarm`
 - `KELVIN-pCOWeb-Chiller-MIB::water-level-alarm`
-

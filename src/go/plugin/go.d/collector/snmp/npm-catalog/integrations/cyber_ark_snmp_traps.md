@@ -143,4 +143,3 @@ Netdata decodes **16 trap definitions** from Cyber Ark across **1 MIB** into str
 - `CYBER-ARK-MIB::osMemoryUsageNotification`
 - `CYBER-ARK-MIB::osDiskFreeSpaceNotification`
 - `CYBER-ARK-MIB::osServiceNameNotification`
-

@@ -143,4 +143,3 @@ Netdata decodes **46 trap definitions** from Websense Inc across **1 MIB** into 
 - `WBSN-APPLIANCE-MIB::memMaxUsageExceed`
 - `WBSN-APPLIANCE-MIB::networkMaxBandwidthExceed`
 - `WBSN-APPLIANCE-MIB::diskFreeMinSizeExceed`
-

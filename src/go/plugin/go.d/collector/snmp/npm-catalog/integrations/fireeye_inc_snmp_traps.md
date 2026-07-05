@@ -143,4 +143,3 @@ Netdata decodes **32 trap definitions** from Fireeye Inc across **1 MIB** into s
 - `FE-FIREEYE-MIB::networkAnomaly`
 - `FE-FIREEYE-MIB::signatureMatch`
 - `FE-FIREEYE-MIB::ccConnect`
-

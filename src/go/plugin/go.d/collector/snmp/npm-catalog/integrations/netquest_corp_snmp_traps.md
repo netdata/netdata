@@ -143,4 +143,3 @@ Netdata decodes **33 trap definitions** from Netquest Corp across **1 MIB** into
 - `LINK-PROBE-MIB::pvcRTD`
 - `LINK-PROBE-MIB::frChanUtilizeToDTE`
 - `LINK-PROBE-MIB::frChanUtilizeToDCE`
-

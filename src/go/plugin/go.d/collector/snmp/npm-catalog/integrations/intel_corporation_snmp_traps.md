@@ -169,4 +169,3 @@ Netdata decodes **290 trap definitions** from Intel Corporation across **27 MIBs
 - `INTEL-ES480-TRAP-MIB::fanOK`
 - `INTEL-ES480-TRAP-MIB::invalidLoginAttempt`
 - `INTEL-ES480-TRAP-MIB::powerSupplyFail`
-

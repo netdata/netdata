@@ -132,5 +132,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | system.entropy | entropy | entropy |
-
-

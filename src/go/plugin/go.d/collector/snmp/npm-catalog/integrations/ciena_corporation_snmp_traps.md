@@ -181,4 +181,3 @@ Netdata decodes **229 trap definitions** from Ciena Corporation across **34 MIBs
 - `CIENA-CES-LOOP-DETECTION-MIB::cienaCesLoopDetectionLoopClear`
 - `CIENA-CES-LOOP-DETECTION-MIB::cienaCesLoopDetectionPortOperActionSet`
 - `CIENA-CES-LOOP-DETECTION-MIB::cienaCesLoopDetectionPortOperActionClear`
-

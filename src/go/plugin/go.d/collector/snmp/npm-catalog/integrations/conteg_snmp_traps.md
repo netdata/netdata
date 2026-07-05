@@ -143,4 +143,3 @@ Netdata decodes **15 trap definitions** from Conteg across **1 MIB** into struct
 - `CONTEG-DATABUS-MIB::sdbDevSsInputCurrentAlertDetected`
 - `CONTEG-DATABUS-MIB::sdbDevSsOutletCurrentAlertDetected`
 - `CONTEG-DATABUS-MIB::sdbDevSsInputVoltageAlertDetected`
-

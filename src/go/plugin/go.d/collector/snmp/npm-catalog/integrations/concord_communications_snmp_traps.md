@@ -143,4 +143,3 @@ Netdata decodes **11 trap definitions** from Concord Communications across **1 M
 - `DiagnosticsMonitor::netHealthReset`
 - `DiagnosticsMonitor::netHealthUrgent`
 - `DiagnosticsMonitor::netHealthException`
-

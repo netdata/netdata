@@ -143,4 +143,3 @@ Netdata decodes **26 trap definitions** from Kaspersky Lab Zao across **1 MIB** 
 - `EVENTS-MIB::avBasesAttachedEvent`
 - `EVENTS-MIB::avBasesAreOutOfDateEvent`
 - `EVENTS-MIB::avBasesAreTotallyOutOfDateEvent`
-

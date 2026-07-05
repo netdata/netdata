@@ -143,4 +143,3 @@ Netdata decodes **38 trap definitions** from Invidi Technologies across **1 MIB*
 - `INVIDI-MIB::bdmsInterfaceError`
 - `INVIDI-MIB::adInserterErrors`
 - `INVIDI-MIB::cueProcessingErrors`
-

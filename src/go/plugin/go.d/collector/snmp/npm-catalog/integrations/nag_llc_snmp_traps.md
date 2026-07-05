@@ -151,4 +151,3 @@ Netdata decodes **348 trap definitions** from Nag LLC across **9 MIBs** into str
 - `SNR-ERD-2::signalContact3Alarm`
 - `SNR-ERD-2::signalContact3Ok`
 - `SNR-ERD-2::voltageSignalAlarm`
-

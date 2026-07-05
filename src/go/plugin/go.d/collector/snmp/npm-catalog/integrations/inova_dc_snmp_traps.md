@@ -143,4 +143,3 @@ Netdata decodes **6 trap definitions** from Inova Dc across **1 MIB** into struc
 - `PowerNet-Inova::rpduWarningCondition`
 - `PowerNet-Inova::rpduWarningConditionCleared`
 - `PowerNet-Inova::rpduInformationalCondition`
-

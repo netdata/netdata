@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Nomadix across **1 MIB** into struct
 - `NOMADIX-MIB::subCapacityReached`
 - `NOMADIX-MIB::nseReboot`
 - `NOMADIX-MIB::nseRadCapacityReached`
-

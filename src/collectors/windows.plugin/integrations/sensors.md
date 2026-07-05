@@ -159,5 +159,3 @@ Metrics:
 | system.hw.sensor.acceleration.input | inputX, inputY, inputZ | g |
 | system.hw.sensor.state.input | ready, not_available, no_data, initializing, access_denied, error | status |
 | system.hw.sensor.custom | inputN | nd |
-
-

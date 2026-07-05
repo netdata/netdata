@@ -117,5 +117,3 @@ Metrics:
 | systemd.service.cachestat_dirties | dirty | page/s |
 | systemd.service.cachestat_hits | hit | hits/s |
 | systemd.service.cachestat_misses | miss | misses/s |
-
-

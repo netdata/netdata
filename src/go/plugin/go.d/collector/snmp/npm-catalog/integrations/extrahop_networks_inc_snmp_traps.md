@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Extrahop Networks Inc across **1 MIB
 
 - `EXTRAHOP-MIB::extrahopAlertTrap`
 - `EXTRAHOP-MIB::extrahopStorageAlertTrap`
-

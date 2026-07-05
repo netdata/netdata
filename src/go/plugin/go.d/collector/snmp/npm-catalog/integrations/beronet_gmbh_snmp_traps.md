@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Beronet GmbH across **1 MIB** into s
 - `BEROFIX-MIB::isdn-L2Port`
 - `BEROFIX-MIB::isdn-L2Up`
 - `BEROFIX-MIB::isdn-L2Down`
-

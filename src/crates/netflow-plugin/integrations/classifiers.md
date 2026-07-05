@@ -419,6 +419,3 @@ Field resolution does not error when the wrong context is missing -- it
 returns the type's zero value. So `Interface.Speed >= 1` written in an `exporter_classifiers` rule
 resolves to `0 >= 1` (false) on every call. Use
 `interface_classifiers` for any rule that needs an interface field.
-
-
-

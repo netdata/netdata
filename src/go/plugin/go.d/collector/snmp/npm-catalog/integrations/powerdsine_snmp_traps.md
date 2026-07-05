@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Powerdsine across **1 MIB** into str
 - `MICROSEMI-PDSINE-MIB::powerBackupStatusNotification`
 - `MICROSEMI-PDSINE-MIB::internalPowerSourceStatusNotification`
 - `MICROSEMI-PDSINE-MIB::externalPowerSourceStatusNotification`
-

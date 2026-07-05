@@ -49,5 +49,3 @@ endmeta-->
       - Notifications: The notification types you want to receive
     - **Integration configuration**
       - Alert Source API key: The key you copied in the ilert configuration step.
-
-

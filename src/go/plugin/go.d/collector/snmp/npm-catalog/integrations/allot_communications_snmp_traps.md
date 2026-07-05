@@ -144,4 +144,3 @@ Netdata decodes **7 trap definitions** from Allot Communications across **2 MIBs
 - `ALLOT-MIB::neSecondaryActive`
 - `ALLOT-MIB::neSecondaryStandBy`
 - `ALLOT-MIB::neSecondaryBypass`
-

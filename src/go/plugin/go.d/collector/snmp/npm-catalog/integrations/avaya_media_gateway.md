@@ -223,5 +223,3 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | `snmp.device_prof_avaya_cmgVoipDspStatus` | `{status}` | per avaya_cmg_voip_current_ip_address | Status of the DSP complex |
 | `snmp.device_prof_avaya_cmgVoipHyperactivity` | `{status}` | per avaya_cmg_voip_current_ip_address | Indicates whether hyperactivity has been detected |
 | `snmp.device_prof_avaya_cmgVoipTotalChannels` | `{channel}` | per avaya_cmg_voip_current_ip_address | Total number of channels available to the VoIP engine |
-
-

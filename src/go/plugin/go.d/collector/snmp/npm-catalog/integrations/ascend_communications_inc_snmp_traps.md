@@ -143,4 +143,3 @@ Netdata decodes **45 trap definitions** from Ascend Communications Inc across **
 - `ASCEND-TRAP::portWaitSerial`
 - `ASCEND-TRAP::portHaveSerial`
 - `ASCEND-TRAP::portRinging`
-

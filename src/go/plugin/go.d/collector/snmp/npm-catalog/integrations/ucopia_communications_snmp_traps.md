@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Ucopia Communications across **1 MIB*
 ### Sample decoded traps
 
 - `CONTROLLER-MIB::ucpServiceFaultStateNotification`
-

@@ -143,4 +143,3 @@ Netdata decodes **54 trap definitions** from Clarent Corporation across **1 MIB*
 - `CLARENT-MIB::restartGWFailed`
 - `CLARENT-MIB::ccIsDown`
 - `CLARENT-MIB::restartCCSuccess`
-

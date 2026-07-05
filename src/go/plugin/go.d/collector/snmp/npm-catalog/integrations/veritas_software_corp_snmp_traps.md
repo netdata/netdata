@@ -146,4 +146,3 @@ Netdata decodes **107 trap definitions** from Veritas Software Corp across **4 M
 - `Backup-Exec-MIB::blockingmessage`
 - `Backup-Exec-MIB::warningmessage`
 - `Backup-Exec-MIB::informationmessage`
-

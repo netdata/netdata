@@ -145,4 +145,3 @@ Netdata decodes **93 trap definitions** from Digital Link across **3 MIBs** into
 - `DL5400-MIB::dl5400SelfTestFail`
 - `DL5400-MIB::dl5400RamTestFail`
 - `DL5400-MIB::dl5400RomChecksumFail`
-

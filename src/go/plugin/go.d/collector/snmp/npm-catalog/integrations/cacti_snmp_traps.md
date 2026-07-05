@@ -145,4 +145,3 @@ Netdata decodes **7 trap definitions** from Cacti across **3 MIBs** into structu
 - `CACTI-MIB::cactiNotifyDeviceRecovering`
 - `CACTI-MIB::cactiNotifyPollerRuntimeExceeding`
 - `CACTI-MIB::cactiNotifyDeviceFailedPoll`
-

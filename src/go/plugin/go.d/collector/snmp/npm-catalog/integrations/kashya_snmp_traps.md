@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Kashya across **1 MIB** into structu
 - `KASHYA-MIB::info`
 - `KASHYA-MIB::warning`
 - `KASHYA-MIB::error`
-

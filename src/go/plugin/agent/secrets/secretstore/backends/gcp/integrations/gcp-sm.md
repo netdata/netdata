@@ -216,6 +216,3 @@ Check the file path, the JSON contents, and that the `netdata` user can read the
 ### Permission denied or secret not found
 
 Make sure the Google identity used by Netdata can access the referenced secret, and confirm that the operand uses the correct `project/secret` or `project/secret/version` format.
-
-
-

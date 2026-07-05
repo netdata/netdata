@@ -143,4 +143,3 @@ Netdata decodes **4 trap definitions** from Brocade Communications Systems Inc F
 - `ED-1032-MIB::ed1032FruScn`
 - `EF-6000-MIB::ef6000PortBindingViolation`
 - `EF-6000-MIB::ef6000ThresholdAlert`
-

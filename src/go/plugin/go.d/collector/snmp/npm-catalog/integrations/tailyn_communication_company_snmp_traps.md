@@ -143,4 +143,3 @@ Netdata decodes **65 trap definitions** from Tailyn Communication Company across
 - `IMP-HF528-MIB::iswTrapEvtSysDownloadSuccess`
 - `IMP-HF528-MIB::iswTrapEvtSysDownloadFail`
 - `IMP-HF528-MIB::iswTrapEvtSysProvisiondataExport`
-

@@ -126,5 +126,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | mem.swap | free, used | MiB |
-
-

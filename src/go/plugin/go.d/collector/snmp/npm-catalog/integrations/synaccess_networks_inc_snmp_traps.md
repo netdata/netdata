@@ -144,4 +144,3 @@ Netdata decodes **55 trap definitions** from Synaccess Networks Inc across **2 M
 - `SYNSYS-MIB::autoPingRebootEvent`
 - `SYNSYS-MIB::temperatureAlarmEvent`
 - `SYNSYS-MIB::temperatureControlledOutletEvent`
-

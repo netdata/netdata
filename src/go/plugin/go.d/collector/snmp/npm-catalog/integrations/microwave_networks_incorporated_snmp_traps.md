@@ -143,4 +143,3 @@ Netdata decodes **8 trap definitions** from Microwave Networks Incorporated acro
 - `MNI-PROTEUS-AMT-MIB::mnPrNotificationMinorAlarmSet`
 - `MNI-PROTEUS-AMT-MIB::mnPrNotificationInfoAlarmSet`
 - `MNI-PROTEUS-AMT-MIB::mnPrFNotificationMajorAlarmSet`
-

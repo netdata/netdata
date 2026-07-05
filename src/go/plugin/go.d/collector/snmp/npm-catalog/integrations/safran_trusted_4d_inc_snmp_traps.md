@@ -143,4 +143,3 @@ Netdata decodes **24 trap definitions** from Safran Trusted 4D Inc across **1 MI
 - `SPECTRACOM-XSYNC-MIB::ssEvtV2FrequencyError`
 - `SPECTRACOM-XSYNC-MIB::ssEvtV2FrequencyOK`
 - `SPECTRACOM-XSYNC-MIB::ssEvtV2UserMinorAlarm`
-

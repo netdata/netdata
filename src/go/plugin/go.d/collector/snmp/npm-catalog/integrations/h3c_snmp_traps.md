@@ -339,4 +339,3 @@ Netdata decodes **1306 trap definitions** from H3C across **192 MIBs** into stru
 - `HH3C-UI-MAN-MIB::hh3cLogIn`
 - `HH3C-UI-MAN-MIB::hh3cLogOut`
 - `HH3C-UI-MAN-MIB::hh3cLogInAuthenFailure`
-

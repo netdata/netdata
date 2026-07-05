@@ -143,4 +143,3 @@ Netdata decodes **10 trap definitions** from Acksys across **1 MIB** into struct
 - `ACKSYS-MIB::digitalInputAlarm`
 - `ACKSYS-MIB::tempExceededAlarm`
 - `ACKSYS-MIB::clientLinkAlarm`
-

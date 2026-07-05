@@ -138,5 +138,3 @@ Metrics:
 | mem.fragmentation_index_dma | order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10 | index |
 | mem.fragmentation_index_dma32 | order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10 | index |
 | mem.fragmentation_index_normal | order0, order1, order2, order3, order4, order5, order6, order7, order8, order9, order10 | index |
-
-

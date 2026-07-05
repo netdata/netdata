@@ -143,4 +143,3 @@ Netdata decodes **14 trap definitions** from Fujitsu Access Limited across **1 M
 - `OASW-MIB::swFanFailureTrap`
 - `OASW-MIB::swFanRecoverTrap`
 - `OASW-MIB::swUmcLipFailureTrap`
-

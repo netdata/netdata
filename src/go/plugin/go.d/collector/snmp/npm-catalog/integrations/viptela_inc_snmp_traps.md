@@ -143,4 +143,3 @@ Netdata decodes **110 trap definitions** from Viptela Inc across **1 MIB** into 
 - `VIPTELA-TRAPS::viptelaActionsSystemRebootComplete`
 - `VIPTELA-TRAPS::viptelaBfdBfdStateChange`
 - `VIPTELA-TRAPS::viptelaHardwareFlashFault`
-

@@ -149,4 +149,3 @@ Netdata decodes **240 trap definitions** from Blade Network Technologies Inc acr
 - `IBM-GbTOR-10G-L2L3-MIB::swDefGwDown`
 - `IBM-GbTOR-10G-L2L3-MIB::swDefGwInService`
 - `IBM-GbTOR-10G-L2L3-MIB::swDefGwNotInService`
-

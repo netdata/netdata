@@ -148,4 +148,3 @@ Netdata decodes **35 trap definitions** from Bintec Communications GmbH across *
 - `BIANCA-BRICK-MIB::biboAdmTrapACrdDown`
 - `BIANCA-BRICK-MIB::biboAdmTrapACrdRunning`
 - `BIANCA-BRICK-MIB::biboAdmTrapACrdFailed`
-

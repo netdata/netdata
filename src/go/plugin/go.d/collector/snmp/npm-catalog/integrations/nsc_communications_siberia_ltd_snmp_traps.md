@@ -144,4 +144,3 @@ Netdata decodes **8 trap definitions** from Nsc Communications Siberia Ltd acros
 - `EMUX-TRAPS-V1-MIB::tdmLinkUpV1`
 - `EMUX-TRAPS-V1-MIB::trapDyingGasp`
 - `EMUX-MIB::e1LinkChange`
-

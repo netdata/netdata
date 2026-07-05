@@ -145,5 +145,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | mem.edac_mc_errors | correctable, uncorrectable | errors |
-
-

@@ -143,4 +143,3 @@ Netdata decodes **775 trap definitions** from Infortrend Technology Inc across *
 - `IFT-SNMP-MIB::inconsistent-board-ID-between-the-controllers-has-been-found`
 - `IFT-SNMP-MIB::inconsistent-board-rev-number-between-the-controllers`
 - `IFT-SNMP-MIB::invalid-hardware-settings-have-been-detected`
-

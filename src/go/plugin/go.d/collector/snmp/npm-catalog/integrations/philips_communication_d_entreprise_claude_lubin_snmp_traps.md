@@ -143,4 +143,3 @@ Netdata decodes **9 trap definitions** from Philips Communication D Entreprise C
 - `PCE-MIB::frxStateChange`
 - `PCE-MIB::frxNodeStateChange`
 - `PCE-MIB::frxLineStateChange`
-

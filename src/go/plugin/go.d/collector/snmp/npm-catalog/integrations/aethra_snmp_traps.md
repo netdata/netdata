@@ -143,4 +143,3 @@ Netdata decodes **8 trap definitions** from Aethra across **1 MIB** into structu
 - `AETHRA-MIB::interfaceDown`
 - `AETHRA-MIB::trunkRegistered`
 - `AETHRA-MIB::trunkUnregistered`
-

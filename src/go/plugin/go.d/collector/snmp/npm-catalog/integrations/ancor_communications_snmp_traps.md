@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Ancor Communications across **1 MIB*
 
 - `QLOGIC-MIB::qlSB2PortLinkDown`
 - `QLOGIC-MIB::qlSB2PortLinkUp`
-

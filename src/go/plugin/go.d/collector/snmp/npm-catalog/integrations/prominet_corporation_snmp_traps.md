@@ -143,4 +143,3 @@ Netdata decodes **6 trap definitions** from Prominet Corporation across **1 MIB*
 - `PROMINET-MIB::promTemperatureTrap`
 - `PROMINET-MIB::promResourceTrap`
 - `PROMINET-MIB::promFanTrap`
-

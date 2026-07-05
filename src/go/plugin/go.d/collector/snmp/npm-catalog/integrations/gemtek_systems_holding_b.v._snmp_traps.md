@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from Gemtek Systems Holding B.V. across *
 - `Motorola-Cpe-PRIVATE-MIB::fatalErrorRestart`
 - `Motorola-Cpe-PRIVATE-MIB::linkUp`
 - `Motorola-Cpe-PRIVATE-MIB::notTheHightestPriorityAP`
-

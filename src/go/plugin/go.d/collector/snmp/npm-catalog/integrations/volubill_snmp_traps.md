@@ -143,4 +143,3 @@ Netdata decodes **42 trap definitions** from Volubill across **1 MIB** into stru
 - `KENYA-COMPONENT-TRAPS::snmpUnreachableHost`
 - `KENYA-COMPONENT-TRAPS::dataCollectorThresholdExceeded`
 - `KENYA-COMPONENT-TRAPS::dataCollectorSystemRequirement`
-

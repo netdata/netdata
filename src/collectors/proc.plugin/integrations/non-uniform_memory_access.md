@@ -110,5 +110,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | mem.numa_nodes | hit, miss, local, foreign, interleave, other | events/s |
-
-

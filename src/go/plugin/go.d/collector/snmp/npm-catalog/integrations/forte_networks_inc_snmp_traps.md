@@ -144,4 +144,3 @@ Netdata decodes **41 trap definitions** from Forte Networks Inc across **2 MIBs*
 - `FNET-OPTIVIEW-GENERIC-MIB::ovProbBadDefRouter`
 - `FNET-OPTIVIEW-GENERIC-MIB::probLoneIp`
 - `FNET-OPTIVIEW-GENERIC-MIB::probLoneNbDomain`
-
