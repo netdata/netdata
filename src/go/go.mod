@@ -2,7 +2,7 @@ module github.com/netdata/netdata/go/plugins
 
 go 1.26.0
 
-replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.302.0
+replace github.com/prometheus/prometheus => github.com/prometheus/prometheus v0.305.2
 
 replace github.com/gosnmp/gosnmp => github.com/ilyam8/gosnmp v0.0.0-20250912202722-388b2cb5192e
 
@@ -43,7 +43,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/prometheus-community/pro-bing v0.9.0
 	github.com/prometheus/common v0.69.0
-	github.com/prometheus/prometheus v2.55.1+incompatible
+	github.com/prometheus/prometheus v0.305.2
 	github.com/redis/go-redis/v9 v9.21.0
 	github.com/sijms/go-ora/v2 v2.9.0
 	github.com/sourcegraph/conc v0.3.0
@@ -193,7 +193,7 @@ require (
 	github.com/xdg-go/stringprep v1.0.4 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
-	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.60.0 // indirect
+	go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp v0.61.0 // indirect
 	go.opentelemetry.io/otel v1.43.0 // indirect
 	go.opentelemetry.io/otel/metric v1.43.0 // indirect
 	go.opentelemetry.io/otel/trace v1.43.0 // indirect
