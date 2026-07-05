@@ -776,7 +776,7 @@ func (e *executor) onEffectDoneShutdown(res effectResult) {
 	// parked events) must already see the shutdown mode, or a woken command
 	// would execute - and publish - through the normal path.
 	e.draining = true
-	if !res.late {
+	if res.outcome != effectOutcomeLateReturn {
 		res.err = fmt.Errorf("interrupted by shutdown: %w", dyncfg.ErrPhaseNeverRan)
 	}
 	e.onEffectDone(res)
@@ -785,7 +785,7 @@ func (e *executor) onEffectDoneShutdown(res effectResult) {
 // onEffectDone resumes a completed blocking phase's commit on the run loop.
 func (e *executor) onEffectDone(res effectResult) {
 	ks := e.keys[res.key]
-	if res.late {
+	if res.outcome == effectOutcomeLateReturn {
 		e.onLateReturn(res, ks)
 		return
 	}
@@ -799,7 +799,7 @@ func (e *executor) onEffectDone(res effectResult) {
 	if mx := e.mgr.executorMetrics; mx != nil && res.busyFor > 0 {
 		mx.effectBusySeconds.Add(res.busyFor.Seconds())
 	}
-	if res.abandoned {
+	if res.outcome == effectOutcomeAbandoned {
 		// The deadline outcome commits now, but the key stays busy (wedged)
 		// until the leaked module call returns; no retry and no follow-up
 		// work is scheduled here - the late outcome decides. The whole

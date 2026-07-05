@@ -351,6 +351,187 @@ func TestExecutor_CommandPlanClaims(t *testing.T) {
 	}
 }
 
+func TestExecutor_SnapshotWedgedDepsCapturesReadStoreClaims(t *testing.T) {
+	mgr, _ := newExecutorTestManager()
+	storeA := secretstore.StoreKey(secretstore.KindVault, "vault_a")
+	storeB := secretstore.StoreKey(secretstore.KindVault, "vault_b")
+	seedSecretStore(t, mgr, secretstore.KindVault, "vault_a", map[string]any{"value": "a"}, dyncfg.StatusAccepted)
+	seedSecretStore(t, mgr, secretstore.KindVault, "vault_b", map[string]any{"value": "b"}, dyncfg.StatusAccepted)
+
+	got := mgr.executor.snapshotWedgedDeps(&claimGrant{held: []claim{
+		{key: secretStoreStateKey(storeA), mode: claimRead},
+		{key: vnodeStateKey("vnode"), mode: claimRead},
+		{key: secretStoreStateKey("vault:write"), mode: claimWrite},
+		{key: collectorStateKey("success_job"), mode: claimRead},
+		{key: secretStoreStateKey(storeB), mode: claimRead},
+	}})
+
+	assert.Equal(t, []wedgedDep{
+		{stateKey: secretStoreStateKey(storeA), identity: mgr.secretStoreDepIdentity(storeA)},
+		{stateKey: secretStoreStateKey(storeB), identity: mgr.secretStoreDepIdentity(storeB)},
+	}, got)
+}
+
+func TestExecutor_StaleWarmDep(t *testing.T) {
+	storeKey := secretstore.StoreKey(secretstore.KindVault, "vault_prod")
+	stateKey := secretStoreStateKey(storeKey)
+	referencingCfg := prepareDyncfgCfg("success", "job").
+		Set("password", "${store:vault:vault_prod:secret/data/mysql#password}")
+	unreferencedCfg := prepareDyncfgCfg("success", "job")
+
+	tests := map[string]struct {
+		deps      func(*Manager) []wedgedDep
+		cfg       confgroup.Config
+		writeHold bool
+		wantEmpty bool
+		wantText  string
+	}{
+		"no deps is fresh": {
+			cfg:       referencingCfg,
+			wantEmpty: true,
+		},
+		"unreferenced dep is ignored": {
+			deps: func(mgr *Manager) []wedgedDep {
+				return []wedgedDep{{stateKey: stateKey, identity: "stale"}}
+			},
+			cfg:       unreferencedCfg,
+			wantEmpty: true,
+		},
+		"matching identity is fresh": {
+			deps: func(mgr *Manager) []wedgedDep {
+				return []wedgedDep{{stateKey: stateKey, identity: mgr.secretStoreDepIdentity(storeKey)}}
+			},
+			cfg:       referencingCfg,
+			wantEmpty: true,
+		},
+		"changed identity is stale": {
+			deps: func(mgr *Manager) []wedgedDep {
+				return []wedgedDep{{stateKey: stateKey, identity: "old-identity"}}
+			},
+			cfg:      referencingCfg,
+			wantText: "changed while the key was wedged",
+		},
+		"write-held dependency is stale": {
+			deps: func(mgr *Manager) []wedgedDep {
+				return []wedgedDep{{stateKey: stateKey, identity: mgr.secretStoreDepIdentity(storeKey)}}
+			},
+			cfg:       referencingCfg,
+			writeHold: true,
+			wantText:  "is in flight",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr, _ := newExecutorTestManager()
+			seedSecretStore(t, mgr, secretstore.KindVault, "vault_prod", map[string]any{"value": "secret"}, dyncfg.StatusAccepted)
+			e := newExecutor(mgr)
+			if tc.writeHold {
+				holder := &claimProbe{label: "store-mutation"}
+				e.claims.acquire(holder.request(staticClaims(claim{stateKey, claimWrite})))
+				require.True(t, holder.granted())
+			}
+			var deps []wedgedDep
+			if tc.deps != nil {
+				deps = tc.deps(mgr)
+			}
+
+			got := e.staleWarmDep(deps, tc.cfg)
+			if tc.wantEmpty {
+				assert.Empty(t, got)
+			} else {
+				assert.Contains(t, got, tc.wantText)
+			}
+		})
+	}
+}
+
+func TestKeyFIFOHasStopIntent(t *testing.T) {
+	fn := func(cmd dyncfg.Command) dyncfg.Function {
+		return newExecutorTestFn("uid-"+string(cmd), []string{"test:collector:success:job", string(cmd)}, nil)
+	}
+
+	tests := map[string]struct {
+		fifo []event
+		want bool
+	}{
+		"empty fifo": {},
+		"discovery add is not stop intent": {
+			fifo: []event{{kind: eventDiscoveryAdd}},
+		},
+		"discovery remove is stop intent": {
+			fifo: []event{{kind: eventDiscoveryRemove}},
+			want: true,
+		},
+		"dyncfg disable is stop intent": {
+			fifo: []event{{kind: eventDyncfgCommand, fn: fn(dyncfg.CommandDisable)}},
+			want: true,
+		},
+		"dyncfg remove is stop intent": {
+			fifo: []event{{kind: eventDyncfgCommand, fn: fn(dyncfg.CommandRemove)}},
+			want: true,
+		},
+		"dyncfg restart is not stop intent": {
+			fifo: []event{{kind: eventDyncfgCommand, fn: fn(dyncfg.CommandRestart)}},
+		},
+		"later stop intent is detected": {
+			fifo: []event{
+				{kind: eventDyncfgCommand, fn: fn(dyncfg.CommandGet)},
+				{kind: eventDyncfgCommand, fn: fn(dyncfg.CommandDisable)},
+			},
+			want: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, keyFIFOHasStopIntent(&keyState{fifo: tc.fifo}))
+		})
+	}
+}
+
+func TestExecutor_ShutdownAbandonKeepsWedgeUntilLateReturn(t *testing.T) {
+	mgr, _ := newExecutorTestManager()
+	e := newExecutor(mgr)
+	const key = "shutdown-abandon"
+
+	holder := &claimProbe{label: "running-command"}
+	e.claims.acquire(holder.request(staticClaims(claim{key: key, mode: claimWrite})))
+	require.True(t, holder.granted())
+
+	var committed error
+	ks := &keyState{
+		busy:  true,
+		grant: holder.grant,
+		pendingCommit: func(err error) {
+			committed = err
+		},
+	}
+	e.keys[key] = ks
+	e.inflight = 1
+
+	e.onEffectDoneShutdown(effectResult{
+		key:     key,
+		outcome: effectOutcomeAbandoned,
+		err:     errors.New("deadline"),
+	})
+
+	require.True(t, e.draining)
+	require.ErrorIs(t, committed, dyncfg.ErrPhaseNeverRan)
+	require.NotNil(t, ks.wedge, "shutdown rewrites the committed error, not the abandon lifecycle outcome")
+	assert.True(t, ks.busy, "the lane stays wedged until the leaked child returns")
+	assert.True(t, e.claims.heldForWrite(key), "write claims stay held while wedged")
+	assert.Equal(t, 0, e.inflight)
+
+	e.onEffectDone(effectResult{key: key, outcome: effectOutcomeLateReturn})
+
+	assert.False(t, e.claims.heldForWrite(key), "late return releases the retained write claim")
+	if ks := e.keys[key]; ks != nil {
+		assert.False(t, ks.busy)
+		assert.Nil(t, ks.wedge)
+	}
+}
+
 // Per-key FIFO pin: events for ONE key execute and emit in arrival order
 // through the running manager (cross-key order is unconstrained by design).
 func TestExecutor_DispatchOrder(t *testing.T) {
@@ -535,7 +716,7 @@ func TestSuperviseEffect_AbandonFenceClassification(t *testing.T) {
 		}})
 		defer drainAbandonedEffect(mgr, res, block)
 
-		require.True(t, res.abandoned)
+		require.Equal(t, effectOutcomeAbandoned, res.outcome)
 		assert.False(t, errors.Is(res.err, dyncfg.ErrPhaseAbandoned),
 			"an abandon with no fence installed must not claim the fenced outcome")
 	})
@@ -552,7 +733,7 @@ func TestSuperviseEffect_AbandonFenceClassification(t *testing.T) {
 		}})
 		defer drainAbandonedEffect(mgr, res, block)
 
-		require.True(t, res.abandoned)
+		require.Equal(t, effectOutcomeAbandoned, res.outcome)
 		assert.True(t, fenceRan.Load(), "the worker must run the fence before reporting the abandon")
 		assert.True(t, errors.Is(res.err, dyncfg.ErrPhaseAbandoned))
 	})
@@ -570,7 +751,7 @@ func TestSuperviseEffect_AbandonFenceClassification(t *testing.T) {
 		}})
 		defer drainAbandonedEffect(mgr, res, block)
 
-		require.True(t, res.abandoned)
+		require.Equal(t, effectOutcomeAbandoned, res.outcome)
 		assert.True(t, errors.Is(res.err, dyncfg.ErrPhaseNeverRan),
 			"a shutdown interruption must answer retryably no matter which side wins the claim")
 	})
@@ -601,7 +782,7 @@ func TestSuperviseEffect_AbandonFenceClassification(t *testing.T) {
 		}})
 		defer drainAbandonedEffect(mgr, res, block)
 
-		require.True(t, res.abandoned)
+		require.Equal(t, effectOutcomeAbandoned, res.outcome)
 		assert.True(t, errors.Is(res.err, dyncfg.ErrPhaseNeverRan),
 			"a shutdown interruption answers retryably even when the stop's fence ran")
 		assert.False(t, errors.Is(res.err, dyncfg.ErrPhaseAbandoned),
@@ -818,7 +999,7 @@ func TestSuperviseEffect_LateCompletionWaitsForAbandonDelivery(t *testing.T) {
 		<-ctx.Done() // returns the instant the deadline fires
 		return ctx.Err()
 	}})
-	require.True(t, res.abandoned)
+	require.Equal(t, effectOutcomeAbandoned, res.outcome)
 	require.NotNil(t, res.delivered, "abandoned results carry the delivery gate")
 
 	// The leaked child has already returned, but its late result must wait
@@ -830,7 +1011,7 @@ func TestSuperviseEffect_LateCompletionWaitsForAbandonDelivery(t *testing.T) {
 	require.Eventually(t, func() bool { return len(mgr.effectDoneCh) == 1 }, charWait, charTick,
 		"the late completion must flow once the abandon was delivered")
 	late := <-mgr.effectDoneCh
-	assert.True(t, late.late)
+	assert.Equal(t, effectOutcomeLateReturn, late.outcome)
 }
 
 // TestResumeWarmJob_IneligibleDropDisposesGate pins that a warm job dropped
