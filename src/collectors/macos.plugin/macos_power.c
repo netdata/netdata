@@ -199,7 +199,7 @@ static void macos_power_source_temperature_labels(RRDSET *st, const struct macos
     rrdlabels_add(st->rrdlabels, "subsystem", "battery", RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "chip_id", ps->ps.name, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "feature", "battery_temperature", RRDLABEL_SRC_AUTO);
-    rrdlabels_add(st->rrdlabels, "label", "Battery Temperature", RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "name", "Battery Temperature", RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "path", path, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "sensor", "battery_temperature", RRDLABEL_SRC_AUTO);
 }

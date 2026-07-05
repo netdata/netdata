@@ -388,7 +388,7 @@ Labels:
 | subsystem | Hardware subsystem inferred from the sensor source, used with driver for Linux-compatible hardware sensor grouping |
 | chip_id | Sensor chip or macOS service identifier |
 | feature | Stable sensor feature identifier |
-| label | Human-readable sensor label |
+| name | Human-readable sensor name |
 | path | Stable source path for the sensor |
 | source | Data source |
 | sensor | Sensor name |

@@ -915,7 +915,7 @@ static void macos_powermetrics_add_sensor_labels(
     rrdlabels_add(st->rrdlabels, "chip_id", "powermetrics", RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "device", "powermetrics", RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "feature", feature, RRDLABEL_SRC_AUTO);
-    rrdlabels_add(st->rrdlabels, "label", label, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "name", label, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "path", path, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "sensor", feature, RRDLABEL_SRC_AUTO);
 }

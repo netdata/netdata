@@ -650,7 +650,7 @@ static void macos_sensors_update_chart(
         rrdlabels_add(s->st->rrdlabels, "chip_id", s->chip_id, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "device", s->chip_id, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "feature", s->feature, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(s->st->rrdlabels, "label", s->label, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(s->st->rrdlabels, "name", s->label, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "path", s->path, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "source", s->source, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "sensor", s->feature, RRDLABEL_SRC_AUTO);

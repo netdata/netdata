@@ -890,8 +890,8 @@ modules:
               description: Sensor chip or macOS service identifier
             - name: feature
               description: Stable sensor feature identifier
-            - name: label
-              description: Human-readable sensor label
+            - name: name
+              description: Human-readable sensor name
             - name: path
               description: Stable source path for the sensor
             - name: source
