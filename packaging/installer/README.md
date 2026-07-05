@@ -68,7 +68,7 @@ If the installation completed but nothing appears in your dashboard, work throug
 
 2. **Open the right dashboard for your setup.** For claimed nodes, view your nodes and charts in [Netdata Cloud](https://app.netdata.cloud/). For an unclaimed node or local-only access, open the local Agent dashboard at `http://NODE:19999`.
 
-3. **If the node is missing from Netdata Cloud, verify it was claimed.** Claiming links the Agent to your Netdata Cloud Space. See [Connect Agent to Cloud](/src/claim/README.md#connect-agent-to-cloud) for the claiming steps. If claiming already ran but the node still does not appear, check the Cloud connection with `sudo netdatacli aclk-state` — see [Connection Troubleshooting](/src/claim/README.md#troubleshooting).
+3. **If the node is missing from Netdata Cloud, verify it was claimed.** Claiming links the Agent to your Netdata Cloud Space. See [Connect Agent to Cloud](/src/claim/README.md#connect-agent-to-cloud) for the claiming steps. If claiming already ran but the node still does not appear, check the Cloud connection with `sudo netdatacli aclk-state` — see [Troubleshooting](/src/claim/README.md#troubleshooting).
 
 4. **Allow inbound TCP port 19999 for local dashboard access from another machine.** The host firewall on the node must permit connections to the Agent's port. If the local dashboard does not load from a remote browser, confirm port 19999 is open on the node.
 
