@@ -397,6 +397,12 @@ impl NetdataLogsService {
         self.ingest_bounds.future_skew
     }
 
+    /// The resolved ingestion `max_age`. Used at startup to warn when it is zero,
+    /// which rejects every record older than the moment of arrival.
+    pub fn ingest_max_age(&self) -> std::time::Duration {
+        self.ingest_bounds.max_age
+    }
+
     /// Rotate any per-tenant WAL stream whose active file has passed a rotation
     /// threshold as of now, without a new frame (the idle-rotation sweep, I2/P4).
     /// Called periodically off the write path so a quiet stream still seals,

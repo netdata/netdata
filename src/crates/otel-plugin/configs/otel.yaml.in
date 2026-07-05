@@ -135,7 +135,10 @@ logs:
     # in-window records in the same request are still stored. This guards
     # against clock-skewed or bulk-backfilled data that would otherwise distort
     # retention and pin local disk.
-    # Reject records older than this (measured from the record's resolved timestamp):
+    # Reject records older than this (measured from the record's resolved timestamp).
+    # A value of "0s" rejects every record older than the moment it arrives —
+    # effectively all real history, and ordinary delivery latency causes routine
+    # rejections — so keep a realistic window unless that is specifically intended:
     max_age: "24 hours"
     # Reject records dated more than this far in the future (clock-skew tolerance).
     # A very small value (e.g. "0s") rejects any record even a nanosecond ahead

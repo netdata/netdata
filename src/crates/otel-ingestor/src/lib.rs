@@ -207,6 +207,16 @@ async fn run_ingestor(
              server clock will be rejected (ordinary sender/server clock skew will cause rejections)"
         );
     }
+    // A zero max_age collapses the ingestion window to [now, now + future_skew]:
+    // every record older than the moment of arrival is rejected — effectively all
+    // real (non-synthesized) history. Ordinary delivery latency then causes
+    // routine rejections. Warn once so that is a choice, not a surprise.
+    if logs_service.ingest_max_age().is_zero() {
+        tracing::warn!(
+            "logs ingest max_age is 0; every record older than the moment of arrival is \
+             rejected (effectively all real history; ordinary delivery latency will cause rejections)"
+        );
+    }
     let sweep_service = Arc::clone(&logs_service);
     let sweep_handle = tokio::spawn(async move {
         let mut interval = tokio::time::interval(WAL_SWEEP_INTERVAL);
