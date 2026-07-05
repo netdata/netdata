@@ -860,6 +860,137 @@ func TestSuperviseEffect_AbandonFenceClassification(t *testing.T) {
 	})
 }
 
+func TestSuperviseEffect_PanicCompletionReleasesLane(t *testing.T) {
+	mgr, _ := newExecutorTestManager()
+	e := newExecutor(mgr)
+	sk := "panic-key"
+	e.keys[sk] = &keyState{}
+
+	var committed error
+	e.runnerFor(sk)(func(context.Context) error {
+		panic("boom")
+	}, func(err error) {
+		committed = err
+	})
+
+	var task effectTask
+	select {
+	case task = <-mgr.effectCh:
+	case <-time.After(charWait):
+		t.Fatal("effect was not dispatched")
+	}
+
+	res := mgr.superviseEffect(task)
+	e.onEffectDone(res)
+
+	require.Error(t, committed)
+	assert.Contains(t, committed.Error(), "effect panic: boom")
+	assert.Equal(t, 0, e.inflight)
+	_, exists := e.keys[sk]
+	assert.False(t, exists, "a contained panic must still release the key")
+	assert.Equal(t, int64(0), mgr.leakedNow.Load())
+}
+
+func TestSuperviseEffect_LatePanicWaitsForAbandonDelivery(t *testing.T) {
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
+	mgr := New(Config{PluginName: testPluginName})
+	mgr.ctx = context.Background()
+	mgr.effectDeadline = 30 * time.Millisecond
+	release := make(chan struct{})
+
+	res := mgr.superviseEffect(effectTask{key: "late-panic-key", effect: func(ctx context.Context) error {
+		<-ctx.Done()
+		<-release
+		panic("late boom")
+	}})
+	require.Equal(t, effectOutcomeAbandoned, res.outcome)
+	require.NotNil(t, res.delivered, "abandoned results carry the delivery gate")
+
+	close(release)
+	require.Never(t, func() bool { return len(mgr.effectDoneCh) > 0 }, charNeverWait, charTick,
+		"the late panic completion must not overtake the undelivered abandon")
+
+	close(res.delivered)
+	require.Eventually(t, func() bool { return len(mgr.effectDoneCh) == 1 }, charWait, charTick,
+		"the late panic completion must flow once the abandon was delivered")
+	late := <-mgr.effectDoneCh
+	assert.Equal(t, effectOutcomeLateReturn, late.outcome)
+	require.Error(t, late.err)
+	assert.Contains(t, late.err.Error(), "effect panic: late boom")
+	require.Never(t, func() bool { return len(mgr.effectDoneCh) > 0 }, charNeverWait, charTick,
+		"one abandoned effect must produce exactly one late completion")
+	mgr.leakedChildren.Wait()
+	assert.Equal(t, int64(0), mgr.leakedNow.Load())
+}
+
+func TestRunEffectWorker_DropsCompletionWhenLateDropWins(t *testing.T) {
+	mgr := New(Config{PluginName: testPluginName})
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	mgr.ctx = ctx
+
+	for i := 0; i < cap(mgr.effectDoneCh); i++ {
+		mgr.effectDoneCh <- effectResult{key: fmt.Sprintf("fill-%d", i)}
+	}
+	close(mgr.lateDrop)
+
+	ran := make(chan struct{})
+	workerDone := make(chan struct{})
+	go func() {
+		defer close(workerDone)
+		mgr.runEffectWorker()
+	}()
+
+	mgr.effectCh <- effectTask{key: "drop-key", effect: func(context.Context) error {
+		close(ran)
+		return nil
+	}}
+	select {
+	case <-ran:
+	case <-time.After(charWait):
+		t.Fatal("effect did not run")
+	}
+
+	cancel()
+	select {
+	case <-workerDone:
+	case <-time.After(charWait):
+		t.Fatal("worker did not stop")
+	}
+	assert.Len(t, mgr.effectDoneCh, cap(mgr.effectDoneCh),
+		"the completion must be dropped rather than blocking or overfilling effectDoneCh")
+}
+
+func TestExecutor_ClaimlessRunnerGuard(t *testing.T) {
+	mgr, _ := newExecutorTestManager()
+	e := newExecutor(mgr)
+	sk := "claimless-key"
+	e.keys[sk] = &keyState{claimlessExec: true}
+
+	var ran atomic.Bool
+	var committed error
+	e.runnerFor(sk)(func(context.Context) error {
+		ran.Store(true)
+		return nil
+	}, func(err error) {
+		committed = err
+	})
+
+	require.Error(t, committed)
+	assert.Contains(t, committed.Error(), "claimless command")
+	assert.False(t, ran.Load(), "the blocking phase must not start")
+	assert.False(t, e.keys[sk].busy)
+	assert.Nil(t, e.keys[sk].pendingCommit)
+	assert.Equal(t, 0, e.inflight)
+	assert.Empty(t, e.pending)
+	select {
+	case <-mgr.effectCh:
+		t.Fatal("claimless runner guard dispatched an effect")
+	default:
+	}
+}
+
 // The fence disarm after a completed stop is gated on WINNING the effect's
 // completion claim: a worker that abandoned during the stop - or wins the
 // CAS between Stop returning and the claim - must find the fence STILL
