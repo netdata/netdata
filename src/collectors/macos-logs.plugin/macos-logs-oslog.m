@@ -3,6 +3,7 @@
 #include "macos-logs.h"
 
 #include <errno.h>
+#include <string.h>
 
 #import <Foundation/Foundation.h>
 #import <OSLog/OSLog.h>
@@ -401,7 +402,7 @@ typedef struct {
 #define MACOS_LOGS_PREDICATE_FIELD_ENTRY(facet, oslog, type) \
     { facet, MACOS_LOGS_FIELD_LENGTH(facet), oslog, type, MACOS_LOGS_PREDICATE_UNKNOWN }
 
-static MACOS_LOGS_PREDICATE_FIELD macos_logs_predicate_fields[] = {
+static const MACOS_LOGS_PREDICATE_FIELD macos_logs_predicate_field_templates[] = {
     MACOS_LOGS_PREDICATE_FIELD_ENTRY(MACOS_LOGS_FIELD_SUBSYSTEM, "subsystem", MACOS_LOGS_PREDICATE_VALUE_STRING),
     MACOS_LOGS_PREDICATE_FIELD_ENTRY(MACOS_LOGS_FIELD_CATEGORY, "category", MACOS_LOGS_PREDICATE_VALUE_STRING),
     MACOS_LOGS_PREDICATE_FIELD_ENTRY(MACOS_LOGS_FIELD_PROCESS, "process", MACOS_LOGS_PREDICATE_VALUE_STRING),
@@ -795,12 +796,16 @@ static NSPredicate *macos_logs_build_predicate(
     if(!lqs->rq.slice || !lqs->rq.filters)
         return nil;
 
+    MACOS_LOGS_PREDICATE_FIELD predicate_fields[
+        sizeof(macos_logs_predicate_field_templates) / sizeof(macos_logs_predicate_field_templates[0])];
+    memcpy(predicate_fields, macos_logs_predicate_field_templates, sizeof(predicate_fields));
+
     NSMutableArray *field_predicates = [NSMutableArray array];
-    size_t fields = sizeof(macos_logs_predicate_fields) / sizeof(macos_logs_predicate_fields[0]);
+    size_t fields = sizeof(predicate_fields) / sizeof(predicate_fields[0]);
     for(size_t i = 0; i < fields; i++) {
         NSPredicate *predicate = macos_logs_predicate_for_field(
             lqs, lqs->rq.direction == FACETS_ANCHOR_DIRECTION_FORWARD, store, options, position,
-            &macos_logs_predicate_fields[i]);
+            &predicate_fields[i]);
         if(predicate)
             [field_predicates addObject:predicate];
     }

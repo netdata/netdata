@@ -9,6 +9,7 @@
 #define MAX_PARAMETERS 128
 #define ERROR_BUFFER_SIZE 1024
 #define FAIL2BAN_SOCKET_PATH_IN_DOCKER "/host/var/run/fail2ban/fail2ban.sock"
+#define NDSUDO_MACOS_POWERMETRICS_PATH "/usr/bin/powermetrics"
 
 struct command {
     const char *name;
@@ -225,7 +226,7 @@ struct command {
         .name = "powermetrics-thermal-smc-gpu",
         .params = "-n 1 -i {{sampleWindowMs}} -s thermal,smc,gpu_power -f plist",
         .search = {
-            [0] = "powermetrics",
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
             [1] = NULL,
         },
     },
@@ -233,7 +234,7 @@ struct command {
         .name = "powermetrics-thermal-gpu",
         .params = "-n 1 -i {{sampleWindowMs}} -s thermal,gpu_power -f plist",
         .search = {
-            [0] = "powermetrics",
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
             [1] = NULL,
         },
     },
@@ -241,7 +242,7 @@ struct command {
         .name = "powermetrics-thermal-smc",
         .params = "-n 1 -i {{sampleWindowMs}} -s thermal,smc -f plist",
         .search = {
-            [0] = "powermetrics",
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
             [1] = NULL,
         },
     },
@@ -249,7 +250,7 @@ struct command {
         .name = "powermetrics-thermal",
         .params = "-n 1 -i {{sampleWindowMs}} -s thermal -f plist",
         .search = {
-            [0] = "powermetrics",
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
             [1] = NULL,
         },
     },
@@ -257,7 +258,7 @@ struct command {
         .name = "powermetrics-thermal-smc-gpu-loop",
         .params = "-n 0 -b 0 -i {{sampleIntervalMs}} -s thermal,smc,gpu_power -f plist",
         .search = {
-            [0] = "powermetrics",
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
             [1] = NULL,
         },
     },
@@ -265,7 +266,7 @@ struct command {
         .name = "powermetrics-thermal-gpu-loop",
         .params = "-n 0 -b 0 -i {{sampleIntervalMs}} -s thermal,gpu_power -f plist",
         .search = {
-            [0] = "powermetrics",
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
             [1] = NULL,
         },
     },
@@ -273,7 +274,7 @@ struct command {
         .name = "powermetrics-thermal-smc-loop",
         .params = "-n 0 -b 0 -i {{sampleIntervalMs}} -s thermal,smc -f plist",
         .search = {
-            [0] = "powermetrics",
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
             [1] = NULL,
         },
     },
@@ -281,7 +282,7 @@ struct command {
         .name = "powermetrics-thermal-loop",
         .params = "-n 0 -b 0 -i {{sampleIntervalMs}} -s thermal -f plist",
         .search = {
-            [0] = "powermetrics",
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
             [1] = NULL,
         },
     },
@@ -326,9 +327,24 @@ bool command_exists_in_dir(const char *dir, const char *cmd, char *dst, size_t d
     return access(dst, X_OK) == 0;
 }
 
+bool command_exists_absolute(const char *cmd, char *dst, size_t dst_size) {
+    if(!cmd || cmd[0] != '/' || !dst || !dst_size)
+        return false;
+
+    size_t len = strlen(cmd);
+    if(len >= dst_size)
+        return false;
+
+    memcpy(dst, cmd, len + 1);
+    return access(dst, X_OK) == 0;
+}
+
 bool command_exists_in_PATH(const char *cmd, char *dst, size_t dst_size) {
     if(!dst || !dst_size)
         return false;
+
+    if(cmd && cmd[0] == '/')
+        return command_exists_absolute(cmd, dst, dst_size);
 
     char *path = getenv("PATH");
     if(!path)

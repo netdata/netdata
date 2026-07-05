@@ -14,8 +14,6 @@ typedef struct __IOHIDServiceClient *IOHIDServiceClientRef;
 struct macos_iohid_client {
     IOHIDEventSystemClientRef client;
     CFDictionaryRef matching;
-    CFArrayRef services;
-    usec_t services_collected_ut;
     int primary_usage_page;
     int primary_usage;
     bool matching_configured;

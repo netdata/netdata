@@ -16,26 +16,11 @@ extern IOHIDEventRef IOHIDServiceClientCopyEvent(
     int64_t timestamp);
 extern double IOHIDEventGetFloatValue(IOHIDEventRef event, int32_t field);
 
-#define MACOS_IOHID_SERVICES_CACHE_TTL_SEC 300
-
-static void macos_iohid_services_invalidate(struct macos_iohid_client *hid)
-{
-    if (!hid)
-        return;
-
-    if (hid->services) {
-        CFRelease(hid->services);
-        hid->services = NULL;
-    }
-    hid->services_collected_ut = 0;
-}
-
 static void macos_iohid_client_invalidate(struct macos_iohid_client *hid)
 {
     if (!hid)
         return;
 
-    macos_iohid_services_invalidate(hid);
     if (!hid->client)
         return;
 
@@ -98,7 +83,6 @@ bool macos_iohid_client_set_matching(
         return true;
 
     macos_iohid_client_invalidate(hid);
-    macos_iohid_services_invalidate(hid);
 
     if (hid->matching) {
         CFRelease(hid->matching);
@@ -113,15 +97,6 @@ CFArrayRef macos_iohid_client_copy_services(struct macos_iohid_client *hid)
 {
     if (!hid || !hid->matching_configured || !hid->matching)
         return NULL;
-
-    usec_t now_ut = now_monotonic_usec();
-    if (hid->services &&
-        now_ut - hid->services_collected_ut < (usec_t)MACOS_IOHID_SERVICES_CACHE_TTL_SEC * USEC_PER_SEC) {
-        CFRetain(hid->services);
-        return hid->services;
-    }
-
-    macos_iohid_services_invalidate(hid);
 
     if (!hid->client) {
         hid->client = IOHIDEventSystemClientCreate(kCFAllocatorDefault);
@@ -138,10 +113,6 @@ CFArrayRef macos_iohid_client_copy_services(struct macos_iohid_client *hid)
         return NULL;
     }
 
-    hid->services = services;
-    hid->services_collected_ut = now_ut;
-    CFRetain(hid->services);
-
     return services;
 }
 
@@ -151,7 +122,6 @@ void macos_iohid_client_cleanup(struct macos_iohid_client *hid)
         return;
 
     macos_iohid_client_invalidate(hid);
-    macos_iohid_services_invalidate(hid);
 
     if (hid->matching) {
         CFRelease(hid->matching);

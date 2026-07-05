@@ -75,9 +75,6 @@ static void __attribute__((constructor)) macos_logs_facet_value_cache_init(void)
 }
 
 static void macos_logs_facet_value_cache_ensure_initialized(void) {
-    if(macos_logs_facet_value_cache_initialized)
-        return;
-
     netdata_mutex_lock(&macos_logs_facet_value_cache_mutex);
     if(macos_logs_facet_value_cache_initialized) {
         netdata_mutex_unlock(&macos_logs_facet_value_cache_mutex);
@@ -99,10 +96,12 @@ static void __attribute__((destructor)) macos_logs_facet_value_cache_destroy_mut
 }
 
 static void macos_logs_facet_value_cache_cleanup(void) {
-    if(!macos_logs_facet_value_cache_initialized)
-        return;
-
     netdata_mutex_lock(&macos_logs_facet_value_cache_mutex);
+    if(!macos_logs_facet_value_cache_initialized) {
+        netdata_mutex_unlock(&macos_logs_facet_value_cache_mutex);
+        return;
+    }
+
     for(size_t i = 0; i < sizeof(macos_logs_facet_value_caches) / sizeof(macos_logs_facet_value_caches[0]); i++) {
         dictionary_destroy(macos_logs_facet_value_caches[i].values);
         macos_logs_facet_value_caches[i].values = NULL;
