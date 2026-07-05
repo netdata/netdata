@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "windows-wmi.h"
 #include "windows-wmi-GetDiskDriveInfo.h"
 
 #if defined(OS_WINDOWS)

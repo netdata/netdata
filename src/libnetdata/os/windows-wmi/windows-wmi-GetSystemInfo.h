@@ -3,7 +3,7 @@
 #ifndef NETDATA_WINDOWS_WMI_GETSYSTEMINFO_H
 #define NETDATA_WINDOWS_WMI_GETSYSTEMINFO_H
 
-#include "windows-wmi.h"
+#include "../../libnetdata.h"
 
 #if defined(OS_WINDOWS)
 
