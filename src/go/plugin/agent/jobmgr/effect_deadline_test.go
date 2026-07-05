@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -18,6 +19,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -388,14 +390,17 @@ func TestEffect_StopDeadline(t *testing.T) {
 	}
 }
 
-// Bridge pin: secretstore dependent restarts run loop-synchronously and
-// SKIP-AND-REPORT dependents whose collector key has work in flight; idle
-// dependents restart inline exactly as before.
-func TestSecretstoreBridge_SkipsBusyDependents(t *testing.T) {
+// Secretstore dependent restarts run as ONE claimed multi-key effect: a
+// dependent with work in flight PARKS the store command (write claim on the
+// dependent's key) until that work commits, and the recomputed plan then
+// restarts it against the new store. Only a WEDGED dependent - held by an
+// abandoned effect with no bounded release - is skipped and reported in the
+// terminal message's existing per-job format.
+func TestSecretstoreDependentClaims(t *testing.T) {
 	tests := map[string]struct {
 		run func(t *testing.T)
 	}{
-		"busy-key dependent is skipped and reported in the terminal message": {
+		"a busy dependent parks the store update until its work commits, then restarts": {
 			run: func(t *testing.T) {
 				release := make(chan struct{})
 				var inits atomic.Int32
@@ -406,8 +411,8 @@ func TestSecretstoreBridge_SkipsBusyDependents(t *testing.T) {
 					Create: func() collectorapi.CollectorV1 {
 						return &collectorapi.MockCollectorV1{
 							InitFunc: func(context.Context) error {
-								if inits.Add(1) > 1 {
-									<-release // the update's detection blocks: key busy
+								if inits.Add(1) == 2 {
+									<-release // the restart's detection blocks: key busy
 								}
 								return nil
 							},
@@ -436,6 +441,11 @@ func TestSecretstoreBridge_SkipsBusyDependents(t *testing.T) {
 				defer waitCancel()
 				require.True(t, mgr.WaitStarted(waitCtx))
 				t.Cleanup(func() {
+					select {
+					case <-release:
+					default:
+						close(release)
+					}
 					cancel()
 					select {
 					case <-done:
@@ -455,34 +465,40 @@ func TestSecretstoreBridge_SkipsBusyDependents(t *testing.T) {
 				cfg := prepareDyncfgCfg("gated", "mysql")
 				h.dyncfg("2-enable", []string{mgr.dyncfgJobID(cfg), "enable"}, nil)
 				require.Eventually(t, h.outputContains("CONFIG test:collector:gated:mysql status running"), charWait, charTick)
-				require.Eventually(t, func() bool {
-					return len(mgr.restartableAffectedJobs("vault:vault_prod")) == 1
-				}, charWait, charTick, "the job must be registered as a restartable store dependent")
 
-				// Make the dependent's key busy without leaving Running state
-				// (which would drop it from the restartable set): a restart
-				// whose detection blocks.
+				// The dependent's key goes busy: a restart whose detection
+				// blocks.
 				h.dyncfg("3-restart", []string{mgr.dyncfgJobID(cfg), "restart"}, nil)
 				require.Eventually(t, func() bool { return inits.Load() >= 2 }, charWait, charTick,
 					"the restart's detection did not start")
 
-				// The store update must NOT wait on the busy dependent.
+				// The store update write-claims the busy dependent's key: it
+				// must PARK until the restart commits, never skip it.
 				h.dyncfg("ss-update", []string{mgr.dyncfgSecretStorePrefixValue() + "vault:vault_prod", "update"},
 					mustJSON(t, map[string]any{"value": "rotated"}))
-				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN ss-update 200"), charWait, charTick,
-					"the store update must complete while its dependent is busy")
-
-				var resp map[string]any
-				mustDecodeFunctionPayload(t, h.out.String(), "ss-update", &resp)
-				assert.Contains(t, resp["message"], "dependent collector restarts failed")
-				assert.Contains(t, resp["message"], "skipped: operation in progress")
+				require.Never(t, h.outputContains("FUNCTION_RESULT_BEGIN ss-update"), charNeverWait, charTick,
+					"the store update must wait for the busy dependent, not complete around it")
 
 				close(release)
 				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN 3-restart 200"), charWait, charTick,
 					"the blocked restart must complete after release")
+				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN ss-update 200"), charWait, charTick,
+					"the parked store update must proceed once the dependent frees")
+
+				var resp map[string]any
+				mustDecodeFunctionPayload(t, h.out.String(), "ss-update", &resp)
+				msg, _ := resp["message"].(string)
+				assert.Empty(t, msg, "the unparked update restarts the dependent cleanly - nothing to report")
+				assert.GreaterOrEqual(t, inits.Load(), int32(3),
+					"the dependent must be restarted against the rotated store")
+
+				wiretest.RequireSubsequence(t, h.out.String(), []wiretest.RecordWant{
+					{Name: "restart terminal", Contains: []string{"FUNCTION_RESULT_BEGIN 3-restart 200"}},
+					{Name: "store update terminal", Contains: []string{"FUNCTION_RESULT_BEGIN ss-update 200"}},
+				})
 			},
 		},
-		"a dependent with an enable in flight is reported, never silently missed": {
+		"an in-flight enable parks the rotation via its store read claim, then the recomputed plan restarts the job": {
 			run: func(t *testing.T) {
 				gate := make(chan struct{})
 				var inits atomic.Int32
@@ -493,8 +509,9 @@ func TestSecretstoreBridge_SkipsBusyDependents(t *testing.T) {
 					Create: func() collectorapi.CollectorV1 {
 						return &collectorapi.MockCollectorV1{
 							InitFunc: func(context.Context) error {
-								inits.Add(1)
-								<-gate // the enable's detection holds the key busy
+								if inits.Add(1) == 1 {
+									<-gate // the enable's detection holds the key busy
+								}
 								return nil
 							},
 							ChartsFunc: func() *collectorapi.Charts {
@@ -522,6 +539,11 @@ func TestSecretstoreBridge_SkipsBusyDependents(t *testing.T) {
 				defer waitCancel()
 				require.True(t, mgr.WaitStarted(waitCtx))
 				t.Cleanup(func() {
+					select {
+					case <-gate:
+					default:
+						close(gate)
+					}
 					cancel()
 					select {
 					case <-done:
@@ -537,32 +559,116 @@ func TestSecretstoreBridge_SkipsBusyDependents(t *testing.T) {
 				h.dyncfg("1-add", []string{mgr.dyncfgModID("gated"), "add", "mysql"},
 					mustJSON(t, map[string]any{"option_str": "${store:vault:vault_prod:value}"}))
 				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN 1-add"), charWait, charTick)
-				require.Eventually(t, func() bool {
-					return len(mgr.affectedJobs("vault:vault_prod")) == 1
-				}, charWait, charTick, "the job must be registered as a store dependent")
 
-				// The enable's effect starts (it resolved the OLD secret) but
-				// its commit is pending: the exposed status still reads
-				// accepted while the key is busy.
+				// The enable's effect starts against the OLD secret and holds
+				// a READ claim on the store while its detection runs.
 				cfg := prepareDyncfgCfg("gated", "mysql")
 				h.dyncfg("2-enable", []string{mgr.dyncfgJobID(cfg), "enable"}, nil)
 				require.Eventually(t, func() bool { return inits.Load() >= 1 }, charWait, charTick,
 					"the enable's detection did not start")
 
-				// The store update must not silently miss the in-flight
-				// dependent: it is selected and reported as skipped.
+				// The store rotation's WRITE claim conflicts with the enable's
+				// READ claim: it parks instead of racing the in-flight
+				// detection (the stale-credential window is structurally
+				// closed).
 				h.dyncfg("ss-update", []string{mgr.dyncfgSecretStorePrefixValue() + "vault:vault_prod", "update"},
 					mustJSON(t, map[string]any{"value": "rotated"}))
-				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN ss-update 200"), charWait, charTick)
+				require.Never(t, h.outputContains("FUNCTION_RESULT_BEGIN ss-update"), charNeverWait, charTick,
+					"the rotation must wait out the in-flight enable's store read claim")
+
+				close(gate)
+				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN ss-update 200"), charWait, charTick,
+					"the parked rotation must proceed once the enable commits")
 
 				var resp map[string]any
 				mustDecodeFunctionPayload(t, h.out.String(), "ss-update", &resp)
-				assert.Contains(t, resp["message"], "skipped: operation in progress",
-					"an in-flight dependent must be reported, not silently missed")
+				msg, _ := resp["message"].(string)
+				assert.Empty(t, msg,
+					"the recomputed plan restarts the now-running dependent cleanly")
+				assert.GreaterOrEqual(t, inits.Load(), int32(2),
+					"the dependent that went running during the park must be restarted with the new secret")
+			},
+		},
+		"a wedged dependent is skipped and reported in the terminal message": {
+			run: func(t *testing.T) {
+				release := make(chan struct{})
+				var inits atomic.Int32
 
-				close(gate)
-				require.Eventually(t, h.outputContains("CONFIG test:collector:gated:mysql status running"), charWait, charTick,
-					"the enable must complete after release")
+				reg := collectorapi.Registry{}
+				reg.Register("gated", collectorapi.Creator{
+					JobConfigSchema: collectorapi.MockConfigSchema,
+					Create: func() collectorapi.CollectorV1 {
+						return &collectorapi.MockCollectorV1{
+							InitFunc: func(context.Context) error {
+								inits.Add(1)
+								<-release // ignores the deadline: the key wedges
+								return nil
+							},
+						}
+					},
+				})
+
+				var out simOutput
+				mgr := New(Config{PluginName: testPluginName, SecretStoreService: newTestSecretStoreService()})
+				mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&out))))
+				mgr.modules = reg
+				mgr.effectDeadline = testEffectDeadline
+
+				ctx, cancel := context.WithCancel(context.Background())
+				in := make(chan []*confgroup.Group)
+				done := make(chan struct{})
+				go func() {
+					defer close(done)
+					defer close(in)
+					mgr.Run(ctx, in)
+				}()
+				waitCtx, waitCancel := context.WithTimeout(context.Background(), charWait)
+				defer waitCancel()
+				require.True(t, mgr.WaitStarted(waitCtx))
+				t.Cleanup(func() {
+					select {
+					case <-release:
+					default:
+						close(release)
+					}
+					cancel()
+					select {
+					case <-done:
+					case <-time.After(charWait):
+						t.Errorf("manager did not stop after cancel")
+					}
+				})
+				h := &charHarness{mgr: mgr, out: &out, in: in}
+
+				h.dyncfg("ss-add", []string{mgr.dyncfgSecretStorePrefixValue() + "vault", "add", "vault_prod"},
+					mustJSON(t, map[string]any{"value": "good"}))
+				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN ss-add 200"), charWait, charTick)
+				h.dyncfg("1-add", []string{mgr.dyncfgModID("gated"), "add", "mysql"},
+					mustJSON(t, map[string]any{"option_str": "${store:vault:vault_prod:value}"}))
+				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN 1-add"), charWait, charTick)
+
+				// The enable's detection ignores its deadline: the command
+				// commits failed and the key WEDGES until the leaked call
+				// returns.
+				cfg := prepareDyncfgCfg("gated", "mysql")
+				h.dyncfg("2-enable", []string{mgr.dyncfgJobID(cfg), "enable"}, nil)
+				require.Eventually(t, h.outputContains("CONFIG test:collector:gated:mysql status failed"), charWait, charTick,
+					"the enable must commit its deadline failure")
+
+				// A wedged key has no bounded release: the rotation must NOT
+				// wait for it - it completes and reports the skip in the
+				// existing per-job failure format.
+				h.dyncfg("ss-update", []string{mgr.dyncfgSecretStorePrefixValue() + "vault:vault_prod", "update"},
+					mustJSON(t, map[string]any{"value": "rotated"}))
+				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN ss-update 200"), charWait, charTick,
+					"the store update must complete while its dependent is wedged")
+
+				var resp map[string]any
+				mustDecodeFunctionPayload(t, h.out.String(), "ss-update", &resp)
+				assert.Contains(t, resp["message"], "dependent collector restarts failed")
+				assert.Contains(t, resp["message"], "skipped: operation in progress")
+				assert.Equal(t, int32(1), inits.Load(),
+					"a wedged dependent is never restarted")
 			},
 		},
 		"a wait-parked accepted dependent stays ignored": {
@@ -1137,6 +1243,190 @@ func TestEffect_Shutdown(t *testing.T) {
 					"no disabled status may be published for a stop that never ran")
 			},
 		},
+		"in-flight stop at shutdown answers 503 and publishes nothing": {
+			// ONE RULE at shutdown: every non-terminal command answers 503,
+			// publishes nothing, and disposes everything. This is a deliberate
+			// wire contract: a stop that in fact completes during the drain
+			// still answers 503 instead of 200 - no matter which side wins the
+			// completion claim, the outcome is identical.
+			run: func(t *testing.T) {
+				defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
+				entered := make(chan struct{}, 1)
+				release := make(chan struct{})
+
+				reg := collectorapi.Registry{}
+				reg.Register("stuck", collectorapi.Creator{
+					JobConfigSchema: collectorapi.MockConfigSchema,
+					// Declared functions let the registry track the job, so the
+					// test can observe that the stop effect is in its blocking
+					// wait (routing already withdrawn) before shutdown begins.
+					InstanceFunctions: func(collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+						return []funcapi.FunctionConfig{{ID: "details"}}
+					},
+					Create: func() collectorapi.CollectorV1 {
+						return &collectorapi.MockCollectorV1{
+							ChartsFunc: func() *collectorapi.Charts {
+								return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "t", Units: "u", Dims: collectorapi.Dims{{ID: "d1"}}}}
+							},
+							CollectFunc: func(context.Context) map[string]int64 {
+								select {
+								case entered <- struct{}{}:
+								default:
+								}
+								<-release
+								return map[string]int64{"d1": 1}
+							},
+						}
+					},
+				})
+
+				var out simOutput
+				mgr := New(Config{PluginName: testPluginName})
+				mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&out))))
+				mgr.modules = reg
+				mgr.drainWait = time.Second
+				mgr.effectDeadline = time.Hour // nothing may abandon before shutdown
+
+				ctx, cancel := context.WithCancel(context.Background())
+				in := make(chan []*confgroup.Group)
+				done := make(chan struct{})
+				go func() {
+					defer close(done)
+					defer close(in)
+					mgr.Run(ctx, in)
+				}()
+				waitCtx, waitCancel := context.WithTimeout(context.Background(), charWait)
+				defer waitCancel()
+				require.True(t, mgr.WaitStarted(waitCtx))
+				h := &charHarness{mgr: mgr, out: &out, in: in}
+
+				cfg := prepareDyncfgCfg("stuck", "s")
+				h.dyncfg("1-add", []string{h.mgr.dyncfgModID("stuck"), "add", "s"}, []byte("{}"))
+				h.dyncfg("2-enable", []string{h.mgr.dyncfgJobID(cfg), "enable"}, nil)
+				require.Eventually(t, h.outputContains("CONFIG test:collector:stuck:s status running"), charWait, charTick)
+				select {
+				case <-entered:
+				case <-time.After(charWait):
+					t.Fatal("no collection started")
+				}
+
+				// The stop effect must be in its blocking wait before shutdown:
+				// routing withdrawal happens just ahead of it.
+				h.dyncfg("3-disable", []string{h.mgr.dyncfgJobID(cfg), "disable"}, nil)
+				require.Eventually(t, func() bool {
+					return !slices.Contains(h.mgr.GetJobNames("stuck"), "s")
+				}, charWait, charTick, "the stop effect did not start")
+
+				cancel()
+				// The stop completes during the drain window.
+				close(release)
+				select {
+				case <-done:
+				case <-time.After(charWait):
+					t.Fatal("shutdown did not complete")
+				}
+
+				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN 3-disable 503"), charWait, charTick,
+					"an in-flight stop at shutdown must answer 503, even if it completes during the drain")
+				assert.False(t, h.outputContains("CONFIG test:collector:stuck:s status disabled")(),
+					"no disabled status may be published at shutdown")
+			},
+		},
+		"a stop in flight at shutdown never re-registers its job and never hangs cleanup": {
+			// The abandoned stop commits never-ran (one rule), but its
+			// blocking wait STARTED: the undo must not fire - re-adding the
+			// still-stopping job would hand cleanup a second unbounded
+			// job.Stop on the same instance, hanging shutdown until the
+			// wedged collector unblocks.
+			run: func(t *testing.T) {
+				entered := make(chan struct{}, 1)
+				release := make(chan struct{})
+
+				reg := collectorapi.Registry{}
+				reg.Register("stuck", collectorapi.Creator{
+					JobConfigSchema: collectorapi.MockConfigSchema,
+					Create: func() collectorapi.CollectorV1 {
+						return &collectorapi.MockCollectorV1{
+							ChartsFunc: func() *collectorapi.Charts {
+								return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "t", Units: "u", Dims: collectorapi.Dims{{ID: "d1"}}}}
+							},
+							CollectFunc: func(context.Context) map[string]int64 {
+								select {
+								case entered <- struct{}{}:
+								default:
+								}
+								<-release
+								return map[string]int64{"d1": 1}
+							},
+						}
+					},
+				})
+
+				var out simOutput
+				mgr := New(Config{PluginName: testPluginName})
+				mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&out))))
+				mgr.modules = reg
+				mgr.drainWait = 300 * time.Millisecond
+				mgr.effectDeadline = time.Hour // only shutdown may abandon
+
+				ctx, cancel := context.WithCancel(context.Background())
+				in := make(chan []*confgroup.Group)
+				done := make(chan struct{})
+				go func() {
+					defer close(done)
+					defer close(in)
+					mgr.Run(ctx, in)
+				}()
+				waitCtx, waitCancel := context.WithTimeout(context.Background(), charWait)
+				defer waitCancel()
+				require.True(t, mgr.WaitStarted(waitCtx))
+				t.Cleanup(func() {
+					select {
+					case <-release:
+					default:
+						close(release)
+					}
+					cancel()
+				})
+				h := &charHarness{mgr: mgr, out: &out, in: in}
+
+				cfg := prepareDyncfgCfg("stuck", "s")
+				h.dyncfg("1-add", []string{h.mgr.dyncfgModID("stuck"), "add", "s"}, []byte("{}"))
+				h.dyncfg("2-enable", []string{h.mgr.dyncfgJobID(cfg), "enable"}, nil)
+				require.Eventually(t, h.outputContains("CONFIG test:collector:stuck:s status running"), charWait, charTick)
+				select {
+				case <-entered:
+				case <-time.After(charWait):
+					t.Fatal("no collection started")
+				}
+
+				// The stop blocks in the wedged collection.
+				h.dyncfg("3-disable", []string{h.mgr.dyncfgJobID(cfg), "disable"}, nil)
+				require.Never(t, h.outputContains("FUNCTION_RESULT_BEGIN 3-disable"), charNeverWait, charTick,
+					"the stop must be blocked in its final collection")
+
+				// Shutdown WITHOUT unblocking the collector: the manager must
+				// still stop (the wedged job is owned by the leaked stop, not
+				// re-registered for cleanup to block on).
+				cancel()
+				select {
+				case <-done:
+				case <-time.After(charWait):
+					t.Fatal("shutdown hung: the still-stopping job must not be re-registered for cleanup")
+				}
+
+				require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN 3-disable 503"), charWait, charTick,
+					"the abandoned stop answers 503 at shutdown")
+				assert.False(t, h.outputContains("CONFIG test:collector:stuck:s status disabled")(),
+					"nothing publishes at shutdown")
+				mgr.runningJobs.lock()
+				_, running := mgr.runningJobs.lookup(cfg.FullName())
+				mgr.runningJobs.unlock()
+				assert.False(t, running,
+					"a job whose stop wait started must never be re-registered by the never-ran undo")
+			},
+		},
 		"late detection success during the drain is dropped, never started": {
 			run: func(t *testing.T) {
 				defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
@@ -1410,7 +1700,8 @@ func TestEffect_Shutdown(t *testing.T) {
 // TestCallbacks_NoFreshWorkAfterShutdown pins the success-tail shutdown
 // guard: a detection that finishes normally against a shutdown-cancelled
 // context must not start the job - the enable answers retryably (never-ran)
-// and an update fails disruptively, and neither leaves a gate registered.
+// and updates answer retryably under the shutdown one-rule, and neither
+// leaves a gate registered.
 func TestCallbacks_NoFreshWorkAfterShutdown(t *testing.T) {
 	newMgr := func(cleanups *atomic.Int32, initFn func(context.Context) error) *Manager {
 		reg := collectorapi.Registry{}
@@ -1498,7 +1789,11 @@ func TestCallbacks_NoFreshWorkAfterShutdown(t *testing.T) {
 		assert.False(t, running)
 	})
 
-	t.Run("update fails disruptively and starts nothing", func(t *testing.T) {
+	t.Run("update of a running config answers never-ran and starts nothing", func(t *testing.T) {
+		// ONE RULE at shutdown: even though the old instance was already
+		// stopped (half the update happened), the command answers 503 and
+		// publishes nothing - the daemon retries after restart against a
+		// freshly rebuilt state.
 		mgr := newMgr(nil, nil)
 		oldCfg := prepareDyncfgCfg("quick", "q")
 		require.NoError(t, mgr.collectorCallbacks.Start(context.Background(), oldCfg))
@@ -1507,9 +1802,8 @@ func TestCallbacks_NoFreshWorkAfterShutdown(t *testing.T) {
 		err := mgr.collectorCallbacks.Update(cancelled(), oldCfg, newCfg)
 
 		require.Error(t, err)
-		assert.False(t, errors.Is(err, dyncfg.ErrPhaseNeverRan),
-			"half the update happened (the old instance stopped) - it must fail, not roll back")
-		assert.Contains(t, err.Error(), "shutting down")
+		assert.True(t, errors.Is(err, dyncfg.ErrPhaseNeverRan),
+			"a shutdown-interrupted update answers retryably regardless of how far it got")
 		mgr.runningJobs.lock()
 		_, running := mgr.runningJobs.lookup(newCfg.FullName())
 		mgr.runningJobs.unlock()
@@ -1609,4 +1903,124 @@ func TestWaitUnparkReplayOrder(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return strings.Count(h.out.String(), "CONFIG test:collector:gated:g create accepted") >= 2
 	}, charWait, charTick, "discovery events must not reorder across the wait-unpark replay")
+}
+
+// A discovery removal whose stop ABANDONS at the deadline publishes the
+// removal (fenced-abandon success) while the leaked stop still runs; the
+// store-dependency index must be cleaned at that commit - not at the leaked
+// stop's eventual return - or a store remove granted after the abandon's
+// claim release answers a false 409 naming a config whose delete is already
+// on the wire.
+func TestDiscoveryRemove_CleansDepsIndexAtAbandonCommit(t *testing.T) {
+	release := make(chan struct{})
+	collecting := make(chan struct{}, 1)
+
+	reg := collectorapi.Registry{}
+	reg.Register("gated", collectorapi.Creator{
+		JobConfigSchema: collectorapi.MockConfigSchema,
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				ChartsFunc: func() *collectorapi.Charts {
+					return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "t", Units: "u", Dims: collectorapi.Dims{{ID: "d1"}}}}
+				},
+				CollectFunc: func(context.Context) map[string]int64 {
+					select {
+					case collecting <- struct{}{}:
+					default:
+					}
+					<-release // the removal's stop blocks on this collection
+					return map[string]int64{"d1": 1}
+				},
+			}
+		},
+	})
+
+	h := startSecretStoreEffectHarness(t, reg, func(m *Manager) { m.effectDeadline = testEffectDeadline })
+	t.Cleanup(func() {
+		select {
+		case <-release:
+		default:
+			close(release)
+		}
+	})
+
+	h.dyncfg("ss-add", []string{h.mgr.dyncfgSecretStorePrefixValue() + "vault", "add", "vault_prod"},
+		mustJSON(t, map[string]any{"value": "good"}))
+	require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN ss-add 200"), charWait, charTick)
+
+	cfg := prepareUserCfg("gated", "legacy").Set("option_str", "${store:vault:vault_prod:value}")
+	h.in <- prepareCfgGroups(cfg.Source(), cfg)
+	require.Eventually(t, h.outputContains("CONFIG test:collector:gated:legacy create accepted"), charWait, charTick)
+	h.dyncfg("leg-enable", []string{h.mgr.dyncfgJobID(cfg), "enable"}, nil)
+	require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN leg-enable 200"), charWait, charTick)
+	select {
+	case <-collecting:
+	case <-time.After(charWait):
+		t.Fatal("no collection started")
+	}
+
+	// Discovery removes the config; its stop blocks in the in-flight
+	// collection past the deadline and ABANDONS - the removal publishes.
+	h.in <- prepareCfgGroups(cfg.Source())
+	require.Eventually(t, h.outputContains("CONFIG test:collector:gated:legacy delete"), charWait, charTick,
+		"the abandoned removal must still publish the config delete")
+
+	// The store remove is granted once the abandon commit released the
+	// removal's read claim; the dependency index must no longer list the
+	// removed config.
+	h.dyncfg("ss-remove", []string{h.mgr.dyncfgSecretStorePrefixValue() + "vault:vault_prod", "remove"}, nil)
+	require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN ss-remove 200"), charWait, charTick,
+		"the store remove must not answer a false 409 from the stale dependency index")
+
+	close(release)
+}
+
+// A YAML "null" payload document (the default content type) unmarshals to
+// a NIL confgroup.Config with no error, and the parse prefix then writes
+// config metadata into that map. The stage parse gate (PayloadParser) runs
+// the prefix ON THE MANAGER LOOP, which has no recover - an unguarded nil
+// map is a plugin-killing panic, not a recovered effect failure. YAML null
+// documents must reject as 400 at the parse layer. (JSON null never yields
+// nil: Clone's yaml round-trip materializes it as an empty object -
+// pre-existing behavior, deliberately unchanged; the pin holds it to a
+// non-panic terminal.)
+func TestDyncfgNullPayload_Answers400(t *testing.T) {
+	reg := collectorapi.Registry{}
+	reg.Register("gated", collectorapi.Creator{
+		JobConfigSchema: collectorapi.MockConfigSchema,
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				ChartsFunc: func() *collectorapi.Charts {
+					return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "t", Units: "u", Dims: collectorapi.Dims{{ID: "d1"}}}}
+				},
+				CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"d1": 1} },
+			}
+		},
+	})
+
+	h := startSecretStoreEffectHarness(t, reg, nil)
+
+	// An exposed config for the update path.
+	cfg := prepareDyncfgCfg("gated", "mysql")
+	h.dyncfg("1-add", []string{h.mgr.dyncfgModID("gated"), "add", "mysql"}, mustJSON(t, map[string]any{}))
+	require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN 1-add 202"), charWait, charTick)
+
+	// YAML path: no content type set.
+	h.mgr.dyncfgConfig(dyncfg.NewFunction(functions.Function{
+		UID:     "add-null-yaml",
+		Args:    []string{h.mgr.dyncfgModID("gated"), "add", "pg"},
+		Payload: []byte("null"),
+	}))
+	require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN add-null-yaml 400"), charWait, charTick,
+		"a YAML null payload must answer 400, not panic the manager loop")
+
+	// JSON path: materialized as an empty object, answers its normal
+	// terminal without panicking.
+	h.dyncfg("update-null-json", []string{h.mgr.dyncfgJobID(cfg), "update"}, []byte("null"))
+	require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN update-null-json"), charWait, charTick,
+		"a JSON null payload must reach a terminal, not panic the manager loop")
+
+	// The loop survived: a later command still answers.
+	h.dyncfg("2-get", []string{h.mgr.dyncfgJobID(cfg), "get"}, nil)
+	require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN 2-get"), charWait, charTick)
 }

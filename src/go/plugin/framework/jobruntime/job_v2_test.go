@@ -244,6 +244,29 @@ groups:
 `
 }
 
+// Same contract as the V1 variant: the pre-Start baseline commits into the
+// job without draining the live update queue, so a concurrently queued
+// newer update still applies at collection.
+func TestJobV2_SetVnodeBaselineDoesNotDrainQueuedUpdate(t *testing.T) {
+	mod := &mockModuleV2{store: metrix.NewCollectorStore(), template: chartTemplateV2()}
+	job := newTestJobV2(mod, &bytes.Buffer{})
+	queued := &vnodes.VirtualNode{Name: "v", Hostname: "queued", GUID: "guid-q"}
+	baseline := &vnodes.VirtualNode{Name: "v", Hostname: "baseline", GUID: "guid-b"}
+
+	job.UpdateVnode(queued)
+	job.SetVnodeBaseline(baseline)
+
+	assert.Equal(t, "baseline", job.Vnode().Hostname,
+		"the baseline must be committed into the job, visible without a collection")
+	select {
+	case v := <-job.updVnode:
+		assert.Equal(t, "queued", v.Hostname,
+			"the queued live update must survive the baseline and still apply at collection")
+	default:
+		t.Fatal("the baseline must not drain the queued live update")
+	}
+}
+
 func TestJobV2RunnerDoesNotRunDuringAutoDetection(t *testing.T) {
 	started := make(chan struct{})
 	mod := &mockRunnerModuleV2{

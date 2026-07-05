@@ -61,19 +61,12 @@ type effectControl struct {
 	// BEFORE the deadline outcome commits.
 	quarantine atomic.Pointer[func()]
 
-	// disruptive, set by a multi-phase closure once it has irreversibly
-	// mutated state (an update's old instance is stopped): a shutdown
-	// interruption after this point must commit as a failure, never as
-	// never-ran - a never-ran outcome would roll caches back to a state
-	// that no longer exists.
-	disruptive atomic.Bool
-}
-
-// markDisruptive records the point of no return for the running phase.
-func (c *effectControl) markDisruptive() {
-	if c != nil {
-		c.disruptive.Store(true)
-	}
+	// lateWork, set by a closure with loop-side work that must still run
+	// when the effect is abandoned (a store command's dependent-restart
+	// replay for restarts that complete only after the deadline), is
+	// delivered on the late completion and executed by the loop while the
+	// command's write claims are still held.
+	lateWork atomic.Pointer[func()]
 }
 
 // warmResume is a late-detection success: the already-detected job, started
@@ -108,7 +101,27 @@ func (c *effectControl) claimAbandon() bool {
 
 func (c *effectControl) setResume(r *warmResume) { c.resume.Store(r) }
 
-func (c *effectControl) setQuarantine(fn func()) { c.quarantine.Store(&fn) }
+func (c *effectControl) setLateWork(fn func()) {
+	if c != nil {
+		c.lateWork.Store(&fn)
+	}
+}
+
+func (c *effectControl) takeLateWork() func() {
+	if c == nil {
+		return nil
+	}
+	if p := c.lateWork.Load(); p != nil {
+		return *p
+	}
+	return nil
+}
+
+func (c *effectControl) setQuarantine(fn func()) {
+	if c != nil {
+		c.quarantine.Store(&fn)
+	}
+}
 
 // clearQuarantine disarms the fence once the guarded blocking wait finished
 // normally, so a deadline in a LATER phase of the same effect cannot fence a
@@ -146,9 +159,20 @@ type effectResult struct {
 	abandoned bool
 	// late: the leaked child returned; the key unwedges and resume (if any
 	// and still valid) starts the warm job.
-	late    bool
-	resume  *warmResume
-	busyFor time.Duration
+	late   bool
+	resume *warmResume
+	// lateWork is loop-side work delivered with a late completion (replay
+	// of dependent restarts that completed after the abandon); it runs
+	// before the command's remaining claims release.
+	lateWork func()
+	// delivered, set on abandoned results, is closed by the worker AFTER
+	// the result reaches the loop (or is dropped): the leaked child's late
+	// completion gates on it, so a call that returns instantly at
+	// cancellation can never overtake the abandon - an overtaken late
+	// result would be dropped as not-wedged and the key would wedge with
+	// nothing left to release it.
+	delivered chan struct{}
+	busyFor   time.Duration
 }
 
 func (m *Manager) runEffectWorker() {
@@ -173,6 +197,9 @@ func (m *Manager) runEffectWorker() {
 				// The drain window expired with the results channel full; the
 				// force pass already committed this command's terminal.
 				m.Warningf("dropping effect completion for key '%s' after shutdown (err: %v)", t.key, res.err)
+			}
+			if res.delivered != nil {
+				close(res.delivered)
 			}
 		}
 	}
@@ -238,20 +265,33 @@ func (m *Manager) superviseEffect(t effectTask) effectResult {
 
 		m.leakedChildren.Add(1)
 		m.leakedNow.Add(1)
+		abandonDelivered := make(chan struct{})
 		go func() {
 			defer m.leakedChildren.Done()
 			err := <-done
 			cancel()
 			m.leakedNow.Add(-1)
-			res := effectResult{key: t.key, err: err, late: true, resume: ctl.resume.Load()}
+			// The abandoned result must reach the loop first: an instantly
+			// returning leaked call would otherwise race its late completion
+			// ahead of the abandon.
+			select {
+			case <-abandonDelivered:
+			case <-m.lateDrop:
+			}
+			res := effectResult{key: t.key, err: err, late: true, resume: ctl.resume.Load(), lateWork: ctl.takeLateWork()}
 			if r := res.resume; r != nil && m.ctx.Err() != nil {
 				// Shutdown is in effect: no warm job will ever start, and a
 				// buffered send can win the race against the closed lateDrop
-				// and strand the result unread - dispose here, deliver a
-				// resume-less completion (a consumer just unwedges the key).
-				r.job.Cleanup()
-				m.emissionGates.removeMatching(r.cfg.FullName(), r.gate)
+				// and strand the result unread - dispose here (silently, one
+				// rule), deliver a resume-less completion (a consumer just
+				// unwedges the key).
+				m.disposeWarmResume(r)
 				res.resume = nil
+			}
+			if res.lateWork != nil && m.ctx.Err() != nil {
+				// One rule at shutdown: nothing publishes after the drain -
+				// the late replay is dropped, not run.
+				res.lateWork = nil
 			}
 			select {
 			case m.effectDoneCh <- res:
@@ -260,31 +300,20 @@ func (m *Manager) superviseEffect(t effectTask) effectResult {
 				if r := res.resume; r != nil {
 					// Unreachable once the pre-send disposal ran (shutdown
 					// precedes lateDrop's close); kept as a safety net.
-					r.job.Cleanup()
-					m.emissionGates.removeMatching(r.cfg.FullName(), r.gate)
+					m.disposeWarmResume(r)
 				}
 			}
 		}()
 		var abandonErr error
-		shutdown := errors.Is(context.Cause(ctx), context.Canceled)
 		switch {
-		case shutdown && fenced:
-			// Shutdown cancelled the effect context; same abandon mechanics
-			// (the worker must never block at shutdown), different cause.
-			abandonErr = fmt.Errorf("%w: job manager is shutting down", dyncfg.ErrPhaseAbandoned)
-		case shutdown && ctl.disruptive.Load():
-			// Shutdown after the phase's point of no return (the update's
-			// old instance is already stopped): a never-ran rollback would
-			// resurrect caches for a state that no longer exists - commit
-			// as a plain disruptive failure instead.
-			abandonErr = fmt.Errorf("interrupted by shutdown after the operation began: the previous state was already torn down")
-		case shutdown:
-			// Unfenced shutdown interruption: no matter which side wins the
-			// completion claim, the command's outcome is "interrupted, retry
-			// after restart" - the never-ran shape (503, nothing published,
-			// caches untouched/restored). This is the single choke point:
-			// callback-side conversions cover the child winning the claim,
-			// this branch covers the worker winning it.
+		case errors.Is(context.Cause(ctx), context.Canceled):
+			// Shutdown cancelled the effect context (dyncfg deadlines carry a
+			// timeout cause; commands are never cancelled individually). ONE
+			// RULE: every non-terminal command at shutdown answers 503,
+			// publishes nothing, and disposes everything - regardless of
+			// which phase was running, how far it got, or whether a fence
+			// ran. This is the worker-side choke point; the callback-side
+			// conversions cover the child winning the completion claim.
 			abandonErr = fmt.Errorf("interrupted by shutdown: %w", dyncfg.ErrPhaseNeverRan)
 		case fenced:
 			abandonErr = fmt.Errorf("%w: timed out after %s (the collector call is still running)", dyncfg.ErrPhaseAbandoned, m.effectDeadline)
@@ -295,6 +324,7 @@ func (m *Manager) superviseEffect(t effectTask) effectResult {
 			key:       t.key,
 			err:       abandonErr,
 			abandoned: true,
+			delivered: abandonDelivered,
 			busyFor:   time.Since(started),
 		}
 	}

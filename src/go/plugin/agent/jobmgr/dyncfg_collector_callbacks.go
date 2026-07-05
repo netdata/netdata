@@ -26,17 +26,61 @@ func (m *Manager) scheduleRetryTask(cfg confgroup.Config, job runtimeJob) {
 	go runRetryTask(ctx, m.addCh, cfg)
 }
 
+// disposeWarmResume disposes a warm job that will never start, SILENTLY:
+// its emission gate is closed first (by captured handle), because V1
+// Cleanup emits HOST/HOSTINFO lines even for a never-started job, and a
+// dropped continuation must publish nothing - at shutdown that is the one
+// rule, and on stale drops the identity of a job whose start was suppressed
+// must not reach the wire. The gate is then deregistered matched by handle
+// (a same-name replacement's gate must survive).
+func (m *Manager) disposeWarmResume(r *warmResume) {
+	if r.gate != nil {
+		r.gate.Close()
+	}
+	r.job.Cleanup()
+	m.emissionGates.removeMatching(r.cfg.FullName(), r.gate)
+}
+
+// disposeUnstartedJob cleans up a job that never started. When silent (the
+// command's outcome publishes nothing - the shutdown paths), the job's
+// emission gate closes first: V1 Cleanup emits HOST/HOSTINFO lines even for
+// a never-started job, and identity output for a suppressed start must not
+// reach the wire after a 503. The looked-up gate is this job's own - the
+// key stays busy (or wedged) for the whole effect and its late window, so
+// no same-name replacement can interleave.
+func (m *Manager) disposeUnstartedJob(name string, job runtimeJob, silent bool) {
+	if silent {
+		if gate, ok := m.emissionGates.lookup(name); ok {
+			gate.Close()
+		}
+	}
+	job.Cleanup()
+	m.emissionGates.remove(name)
+}
+
+// shutdownDisposal reports whether a never-started job's disposal must be
+// silent because its command's outcome publishes nothing at shutdown:
+// either shutdown cancelled the effect context, or the manager is shutting
+// down (the manager check covers control-free restarts whose context cause
+// stays pinned to the deadline). Outside shutdown, failure disposals keep
+// today's cleanup emission - they accompany a published failure terminal.
+func shutdownDisposal(ctx context.Context, m *Manager) bool {
+	return errors.Is(context.Cause(ctx), context.Canceled) || m.baseContext().Err() != nil
+}
+
 // resumeWarmJob starts an already-detected job whose detection was abandoned
 // at its deadline but succeeded late. The caller (run loop) has already
-// validated the continuation (no commits on the key since the abandon); here
-// the exposed entry must still be this config in its abandoned-failed state,
-// else the warm job is disposed (module cleanup + gate deregistration).
+// validated the continuation (no commits on the key since the abandon and
+// store dependencies unchanged); here the exposed entry must still be this
+// config in its abandoned-failed state, else the warm job is disposed
+// silently. The vnode config the job snapshotted at creation is reconciled
+// at registration (startRunningJob), covering updates that committed while
+// the key was wedged.
 func (m *Manager) resumeWarmJob(r *warmResume) {
 	entry, ok := m.collectorExposed.LookupByKey(r.cfg.ExposedKey())
 	if !ok || entry.Cfg.UID() != r.cfg.UID() || entry.Status != dyncfg.StatusFailed {
 		m.Infof("dropping late detection success for '%s': config no longer eligible", r.cfg.FullName())
-		r.job.Cleanup()
-		m.emissionGates.removeMatching(r.cfg.FullName(), r.gate)
+		m.disposeWarmResume(r)
 		return
 	}
 	m.retryingTasks.remove(r.cfg)
@@ -116,7 +160,11 @@ func (cb *collectorCallbacks) ValidateConfigName(name string) error {
 	return dyncfg.JobNameRuleStrict(name)
 }
 
-func (cb *collectorCallbacks) ParseAndValidate(ctx context.Context, fn dyncfg.Function, name string) (confgroup.Config, error) {
+// parseCollectorPayload is the CHEAP, deterministic parse prefix of
+// ParseAndValidate (no I/O, no module instantiation), shared with
+// ParsePayload so the stage gate and the effect produce identical outcomes
+// for identical inputs.
+func (cb *collectorCallbacks) parseCollectorPayload(fn dyncfg.Function, name string) (confgroup.Config, error) {
 	mn, ok := cb.mgr.extractModuleName(fn.ID())
 	if !ok {
 		return nil, fmt.Errorf("could not extract module name from ID: %s", fn.ID())
@@ -128,6 +176,21 @@ func (cb *collectorCallbacks) ParseAndValidate(ctx context.Context, fn dyncfg.Fu
 	}
 
 	cb.mgr.dyncfgSetConfigMeta(cfg, mn, name, fn)
+	return cfg, nil
+}
+
+// ParsePayload implements dyncfg.PayloadParser: malformed payloads answer
+// their 400 at stage, before any claim or effect.
+func (cb *collectorCallbacks) ParsePayload(fn dyncfg.Function, name string) error {
+	_, err := cb.parseCollectorPayload(fn, name)
+	return err
+}
+
+func (cb *collectorCallbacks) ParseAndValidate(ctx context.Context, fn dyncfg.Function, name string) (confgroup.Config, error) {
+	cfg, err := cb.parseCollectorPayload(fn, name)
+	if err != nil {
+		return nil, err
+	}
 
 	if err := cb.mgr.validateCollectorJob(ctx, cfg); err != nil {
 		if errors.Is(context.Cause(ctx), context.Canceled) {
@@ -174,8 +237,10 @@ func (cb *collectorCallbacks) Start(ctx context.Context, cfg confgroup.Config) e
 			effectControlFrom(ctx).setResume(&warmResume{cfg: cfg, job: job, gate: gate})
 			return nil
 		}
-		job.Cleanup()
-		cb.mgr.emissionGates.remove(cfg.FullName())
+		// A late failure after a shutdown-finalized 503 must dispose
+		// silently; outside shutdown the cleanup emission accompanies the
+		// published timeout terminal, as today.
+		cb.mgr.disposeUnstartedJob(cfg.FullName(), job, shutdownDisposal(ctx, cb.mgr))
 		if _, ok := errors.AsType[dyncfg.CodedError](detErr); ok {
 			if dyncfg.IsRetryableError(detErr) {
 				cb.mgr.scheduleRetryTask(cfg, job)
@@ -187,11 +252,10 @@ func (cb *collectorCallbacks) Start(ctx context.Context, cfg confgroup.Config) e
 	}
 
 	if detErr != nil {
-		job.Cleanup()
-		// Tracking removal only. The gate itself stays open by contract -
-		// closing is reserved for abandoning a wedged stop - and no writer
-		// survives here anyway: the job never started.
-		cb.mgr.emissionGates.remove(cfg.FullName())
+		// Silent when shutdown owns the outcome (503-publish-nothing);
+		// otherwise the cleanup emission accompanies the published failure
+		// terminal, as today.
+		cb.mgr.disposeUnstartedJob(cfg.FullName(), job, shutdownDisposal(ctx, cb.mgr))
 		if errors.Is(context.Cause(ctx), context.Canceled) {
 			// Shutdown interrupted the detection (a ctx-honoring module
 			// returned early): not a detection failure - answer retryably,
@@ -208,12 +272,19 @@ func (cb *collectorCallbacks) Start(ctx context.Context, cfg confgroup.Config) e
 		return fmt.Errorf("job enable failed: %w", detErr)
 	}
 
-	if errors.Is(context.Cause(ctx), context.Canceled) {
-		// Shutdown began while the detection was finishing (the child won
-		// the completion claim against the cancelled context): never start
-		// fresh collector work - the enable answers retryably instead.
-		job.Cleanup()
-		cb.mgr.emissionGates.remove(cfg.FullName())
+	if errors.Is(context.Cause(ctx), context.Canceled) || cb.mgr.baseContext().Err() != nil {
+		// Shutdown began while the detection was finishing: never start
+		// fresh collector work. The manager-context check matters for
+		// restarts running inside another command's effect (a store
+		// command's dependent restart runs control-free, and its context
+		// cause stays DeadlineExceeded once that effect's deadline fired -
+		// it can never read Canceled, yet its late success must not start a
+		// job after cleanup snapshotted the running set). The command
+		// answers 503-publish-nothing, so the never-started job disposes
+		// silently: the gate closes (this job's own - the key stays busy
+		// for the whole effect, no same-name replacement can interleave)
+		// before Cleanup can emit HOST/HOSTINFO lines.
+		cb.mgr.disposeUnstartedJob(cfg.FullName(), job, true)
 		return fmt.Errorf("job not started: %w", dyncfg.ErrPhaseNeverRan)
 	}
 
@@ -221,19 +292,31 @@ func (cb *collectorCallbacks) Start(ctx context.Context, cfg confgroup.Config) e
 	return nil
 }
 
-func (cb *collectorCallbacks) Update(ctx context.Context, oldCfg, newCfg confgroup.Config) error {
+// StageUpdate splits the update at the stop seam: the old instance's routing
+// removal happens on the staging goroutine (function routing to the job
+// being replaced ends immediately), the blocking wait plus the replacement's
+// creation/detection/start run in the effect. Undo reverts the routing
+// removal when the effect never ran.
+func (cb *collectorCallbacks) StageUpdate(oldCfg, newCfg confgroup.Config) dyncfg.StagedUpdate {
+	staged := cb.mgr.newStagedJobStop(oldCfg.FullName())
 	cb.mgr.retryingTasks.remove(oldCfg)
-	cb.mgr.fileStatus.remove(oldCfg)
-	stopped := cb.mgr.stopRunningJob(ctx, oldCfg.FullName())
-	if stopped {
-		// Point of no return: the old instance is stopped. A shutdown
-		// interruption from here on must commit as a disruptive failure - a
-		// never-ran rollback would resurrect a state that no longer exists.
-		// A no-op stop (the old config was not running) tears nothing down,
-		// so never-ran (and its rollback) stays the truthful outcome.
-		effectControlFrom(ctx).markDisruptive()
+	return dyncfg.StagedUpdate{
+		Run: func(ctx context.Context) error {
+			cb.mgr.fileStatus.remove(oldCfg)
+			staged.wait(ctx)
+			return cb.startUpdatedJob(ctx, newCfg)
+		},
+		Undo: staged.undo,
 	}
+}
 
+func (cb *collectorCallbacks) Update(ctx context.Context, oldCfg, newCfg confgroup.Config) error {
+	return cb.StageUpdate(oldCfg, newCfg).Run(ctx)
+}
+
+// startUpdatedJob is the update effect's post-stop half: creation, detection
+// and start of the replacement instance.
+func (cb *collectorCallbacks) startUpdatedJob(ctx context.Context, newCfg confgroup.Config) error {
 	// A stop phase that exceeded its deadline fails the update here: the
 	// replacement's start phase never begins (no second instance).
 	if effectControlFrom(ctx).abandonedNow() {
@@ -244,14 +327,10 @@ func (cb *collectorCallbacks) Update(ctx context.Context, oldCfg, newCfg confgro
 	if err != nil {
 		effectControlFrom(ctx).claimCompletion()
 		if errors.Is(context.Cause(ctx), context.Canceled) {
-			if !stopped {
-				// Nothing was torn down: answer retryably with rollback.
-				return fmt.Errorf("job not created: %w", dyncfg.ErrPhaseNeverRan)
-			}
-			// Shutdown interrupted the replacement's creation. The old
-			// instance is already stopped: a disruptive failure, not a
-			// rollback.
-			return fmt.Errorf("job update failed: the manager is shutting down; the replacement was not created")
+			// Shutdown interrupted the update: one rule - answer 503 and
+			// publish nothing, whether or not the old instance was already
+			// torn down.
+			return fmt.Errorf("job not created: %w", dyncfg.ErrPhaseNeverRan)
 		}
 		var ce dyncfg.CodedError
 		if errors.As(err, &ce) {
@@ -268,8 +347,8 @@ func (cb *collectorCallbacks) Update(ctx context.Context, oldCfg, newCfg confgro
 			effectControlFrom(ctx).setResume(&warmResume{cfg: newCfg, job: job, gate: gate})
 			return nil
 		}
-		job.Cleanup()
-		cb.mgr.emissionGates.remove(newCfg.FullName())
+		// Same silence rule as Start's late-failure arm.
+		cb.mgr.disposeUnstartedJob(newCfg.FullName(), job, shutdownDisposal(ctx, cb.mgr))
 		if _, ok := errors.AsType[dyncfg.CodedError](detErr); ok {
 			if dyncfg.IsRetryableError(detErr) {
 				cb.mgr.scheduleRetryTask(newCfg, job)
@@ -281,16 +360,12 @@ func (cb *collectorCallbacks) Update(ctx context.Context, oldCfg, newCfg confgro
 	}
 
 	if detErr != nil {
-		job.Cleanup()
-		// Tracking removal only; see the identical note in Start.
-		cb.mgr.emissionGates.remove(newCfg.FullName())
+		// Same silence rule as Start's claimed-failure arm.
+		cb.mgr.disposeUnstartedJob(newCfg.FullName(), job, shutdownDisposal(ctx, cb.mgr))
 		if errors.Is(context.Cause(ctx), context.Canceled) {
-			if !stopped {
-				return fmt.Errorf("job not started: %w", dyncfg.ErrPhaseNeverRan)
-			}
-			// Shutdown interrupted the replacement's detection: disruptive
-			// failure (the old instance is already stopped), no retry.
-			return fmt.Errorf("job update failed: the manager is shutting down; the replacement was not started")
+			// Shutdown interrupted the replacement's detection: one rule -
+			// answer 503, publish nothing, schedule nothing.
+			return fmt.Errorf("detection interrupted: %w", dyncfg.ErrPhaseNeverRan)
 		}
 		var ce dyncfg.CodedError
 		if errors.As(detErr, &ce) {
@@ -303,37 +378,54 @@ func (cb *collectorCallbacks) Update(ctx context.Context, oldCfg, newCfg confgro
 		return fmt.Errorf("job update failed: %w", detErr)
 	}
 
-	if errors.Is(context.Cause(ctx), context.Canceled) {
+	if errors.Is(context.Cause(ctx), context.Canceled) || cb.mgr.baseContext().Err() != nil {
 		// Shutdown began while the replacement's detection was finishing:
-		// never start fresh collector work.
-		job.Cleanup()
-		cb.mgr.emissionGates.remove(newCfg.FullName())
-		if !stopped {
-			// Nothing was torn down: answer retryably with rollback.
-			return fmt.Errorf("job not started: %w", dyncfg.ErrPhaseNeverRan)
-		}
-		// The old instance is already stopped, so this is a disruptive
-		// failure (status failed), not a rollback - unlike the never-ran
-		// phase, half the update happened.
-		return fmt.Errorf("job update failed: the manager is shutting down; the replacement was not started")
+		// never start fresh collector work - one rule, answer 503. (The
+		// manager-context check covers control-free restarts whose context
+		// cause is pinned to DeadlineExceeded; see Start.) Publish-nothing
+		// extends to the never-started replacement's disposal: close its
+		// gate (its own - the key is busy for the whole effect) before
+		// Cleanup can emit HOST/HOSTINFO lines.
+		cb.mgr.disposeUnstartedJob(newCfg.FullName(), job, true)
+		return fmt.Errorf("job not started: %w", dyncfg.ErrPhaseNeverRan)
 	}
 
 	cb.mgr.startRunningJob(job)
 	return nil
 }
 
-func (cb *collectorCallbacks) Stop(ctx context.Context, cfg confgroup.Config) {
+// StageStop splits the stop at its blocking wait: routing removal happens on
+// the staging goroutine, the wait runs in the effect. Undo reverts the
+// routing removal when the wait never ran.
+func (cb *collectorCallbacks) StageStop(cfg confgroup.Config) dyncfg.StagedStop {
+	staged := cb.mgr.newFinalPhaseStagedJobStop(cfg.FullName())
 	cb.mgr.retryingTasks.remove(cfg)
-	// Persisted-status removal precedes the blocking wait so the deadline
-	// path (which commits disable/remove while the stop is still wedged)
-	// observes it done.
-	cb.mgr.fileStatus.remove(cfg)
-	cb.mgr.stopRunningJob(ctx, cfg.FullName())
-	effectControlFrom(ctx).claimCompletion()
+	return dyncfg.StagedStop{
+		Wait: func(ctx context.Context) {
+			// Persisted-status removal precedes the blocking wait so the
+			// deadline path (which commits disable/remove while the stop is
+			// still wedged) observes it done.
+			cb.mgr.fileStatus.remove(cfg)
+			staged.wait(ctx)
+		},
+		Undo: staged.undo,
+	}
+}
+
+func (cb *collectorCallbacks) Stop(ctx context.Context, cfg confgroup.Config) {
+	cb.StageStop(cfg).Wait(ctx)
 }
 
 func (cb *collectorCallbacks) OnStatusChange(entry *dyncfg.Entry[confgroup.Config], _ dyncfg.Status, _ dyncfg.Function) {
-	if entry.Status == dyncfg.StatusRunning && isDyncfg(entry.Cfg) {
+	if entry.Status != dyncfg.StatusRunning {
+		return
+	}
+	// Function publication follows COMMITTED state: the effect started the
+	// job and registered it in the running set; the commit that publishes
+	// the running status publishes its functions (warm-start continuations
+	// and dependent restarts commit through here too).
+	cb.mgr.publishRunningJobFunctions(entry.Cfg.FullName())
+	if isDyncfg(entry.Cfg) {
 		cb.mgr.fileStatus.add(entry.Cfg, entry.Status.String())
 	}
 }

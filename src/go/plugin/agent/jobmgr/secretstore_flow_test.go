@@ -6,11 +6,13 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/internal/wiretest"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -82,6 +84,15 @@ func newTestSecretStoreService() secretstore.Service {
 			return &testStore{}
 		},
 	})
+}
+
+type updateFailingSecretStoreService struct {
+	secretstore.Service
+	err error
+}
+
+func (s *updateFailingSecretStoreService) Update(context.Context, string, secretstore.Config) error {
+	return s.err
 }
 
 func TestApplyConfig_ResolvesStoreReferenceWithKindAndName(t *testing.T) {
@@ -289,6 +300,143 @@ func TestDyncfgSecretStoreUpdate_DependentRestartBehavior(t *testing.T) {
 			tc.run(t, mgr, out)
 		})
 	}
+}
+
+// MUST-NOT-FLIP: the file/user -> dyncfg conversion of a LIVE secretstore
+// activates the override IN PLACE - the old live store is never torn down,
+// so a running dependent is restarted exactly ONCE against the new store and
+// never passes through a failed round. (The generic conversion ordering used
+// to stop the old store first; the dependent visibly failed against the
+// missing store and recovered only after the new store started.)
+func TestDyncfgSecretStoreConversion_FileToDyncfgUpdate(t *testing.T) {
+	initial := newSecretStoreConfigWithSource(t, secretstore.KindVault, "vault_prod",
+		map[string]any{"value": "good"}, "file=/etc/netdata/go.d/ss/vault.conf", confgroup.TypeUser)
+
+	var out bytes.Buffer
+	mgr := New(Config{
+		PluginName:         testPluginName,
+		SecretStores:       []secretstore.Config{initial},
+		SecretStoreService: newTestSecretStoreService(),
+	})
+	mgr.ctx = context.Background()
+	mgr.modules = prepareMockRegistry()
+	mgr.fileStatus = newFileStatus()
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&out))))
+	mgr.modules["gated"] = collectorapi.Creator{
+		Create: func() collectorapi.CollectorV1 { return &secretAwareCollector{} },
+	}
+	mgr.secretsCtl.PublishExisting()
+
+	key := secretstore.StoreKey(secretstore.KindVault, "vault_prod")
+	entry, ok := mgr.lookupSecretStoreEntry(key)
+	require.True(t, ok)
+	require.Equal(t, dyncfg.StatusRunning, entry.Status)
+	require.Equal(t, confgroup.TypeUser, entry.Cfg.SourceType())
+
+	cfg := prepareDyncfgCfg("gated", "mysql").
+		Set("option_str", "${store:vault:vault_prod:value}").
+		Set("option_int", 1)
+	mgr.collectorExposed.Add(&dyncfg.Entry[confgroup.Config]{Cfg: cfg, Status: dyncfg.StatusRunning})
+	mgr.syncSecretStoreDepsForConfig(cfg)
+	require.NoError(t, mgr.collectorCallbacks.Start(context.Background(), cfg))
+
+	convertFn := dyncfg.NewFunction(functions.Function{
+		UID:         "ss-convert",
+		ContentType: "application/json",
+		Payload:     mustJSON(t, map[string]any{"value": "good"}),
+		Args:        []string{mgr.dyncfgSecretStoreID(key), string(dyncfg.CommandUpdate)},
+	})
+	mgr.dyncfgSecretStoreSeqExec(convertFn)
+
+	output := out.String()
+	wiretest.RequireSubsequence(t, output, []wiretest.RecordWant{
+		{
+			Name:     "dependent restarted once against the new store",
+			Contains: []string{"CONFIG test:collector:gated:mysql status running"},
+		},
+		{
+			Name:     "converted store create",
+			Contains: []string{"CONFIG " + mgr.dyncfgSecretStoreID(key) + " create", "dyncfg"},
+		},
+		{
+			Name:     "conversion terminal",
+			Contains: []string{"FUNCTION_RESULT_BEGIN ss-convert 200"},
+		},
+		{
+			Name:     "converted store status",
+			Contains: []string{"CONFIG " + mgr.dyncfgSecretStoreID(key) + " status running"},
+		},
+	})
+	assert.NotContains(t, output, "CONFIG test:collector:gated:mysql status failed",
+		"the in-place conversion must never tear the dependent down against a missing store")
+	assert.Equal(t, 1, strings.Count(output, "CONFIG test:collector:gated:mysql status running"),
+		"the dependent restarts exactly once")
+
+	var resp map[string]any
+	mustDecodeFunctionPayload(t, output, "ss-convert", &resp)
+	assert.Equal(t, float64(200), resp["status"])
+	assert.Equal(t, "", resp["message"], "a clean single-round restart reports no failures")
+
+	entry, ok = mgr.lookupSecretStoreEntry(key)
+	require.True(t, ok)
+	assert.Equal(t, dyncfg.StatusRunning, entry.Status)
+	assert.Equal(t, confgroup.TypeDyncfg, entry.Cfg.SourceType())
+
+	depEntry, ok := mgr.lookupExposedByFullName(cfg.FullName())
+	require.True(t, ok)
+	assert.Equal(t, dyncfg.StatusRunning, depEntry.Status)
+}
+
+func TestDyncfgSecretStoreConversion_PreActivationFailureKeepsExistingEntry(t *testing.T) {
+	initial := newSecretStoreConfigWithSource(t, secretstore.KindVault, "vault_prod",
+		map[string]any{"value": "good"}, "file=/etc/netdata/go.d/ss/vault.conf", confgroup.TypeUser)
+	svc := &updateFailingSecretStoreService{
+		Service: newTestSecretStoreService(),
+		err:     fmt.Errorf("backend refused update"),
+	}
+
+	var out bytes.Buffer
+	mgr := New(Config{
+		PluginName:         testPluginName,
+		SecretStores:       []secretstore.Config{initial},
+		SecretStoreService: svc,
+	})
+	mgr.ctx = context.Background()
+	mgr.modules = prepareMockRegistry()
+	mgr.fileStatus = newFileStatus()
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&out))))
+	mgr.secretsCtl.PublishExisting()
+
+	key := secretstore.StoreKey(secretstore.KindVault, "vault_prod")
+	storeID := mgr.dyncfgSecretStoreID(key)
+	entry, ok := mgr.lookupSecretStoreEntry(key)
+	require.True(t, ok)
+	require.Equal(t, dyncfg.StatusRunning, entry.Status)
+	require.Equal(t, confgroup.TypeUser, entry.Cfg.SourceType())
+
+	convertFn := dyncfg.NewFunction(functions.Function{
+		UID:         "ss-convert-fails",
+		ContentType: "application/json",
+		Payload:     mustJSON(t, map[string]any{"value": "rotated"}),
+		Args:        []string{storeID, string(dyncfg.CommandUpdate)},
+	})
+	mgr.dyncfgSecretStoreSeqExec(convertFn)
+
+	output := out.String()
+	require.Contains(t, output, "FUNCTION_RESULT_BEGIN ss-convert-fails 400")
+	assert.Contains(t, output, "backend refused update")
+	assert.NotContains(t, output, "CONFIG "+storeID+" status failed",
+		"a pre-activation conversion failure must not expose a failed replacement")
+
+	entry, ok = mgr.lookupSecretStoreEntry(key)
+	require.True(t, ok)
+	assert.Equal(t, dyncfg.StatusRunning, entry.Status)
+	assert.Equal(t, confgroup.TypeUser, entry.Cfg.SourceType())
+	assert.Equal(t, "good", entry.Cfg["value"])
+
+	value, err := svc.Resolve(context.Background(), svc.Capture(), key+":value", "${store:"+key+":value}")
+	require.NoError(t, err)
+	assert.Equal(t, "good", value)
 }
 
 func TestDyncfgSecretStoreGet_CanonicalJSONDoesNotExposeUnknownFields(t *testing.T) {

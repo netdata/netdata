@@ -5,6 +5,8 @@ package dyncfg
 import (
 	"context"
 	"errors"
+	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -70,10 +72,42 @@ func IsRetryableError(err error) bool {
 	return errors.As(err, &re) && re.DyncfgRetryable()
 }
 
-// CommandMessageSource optionally provides a success/warning message
-// for the command that just completed.
-type CommandMessageSource interface {
-	TakeCommandMessage() string
+// commandMessageBox carries a command's success/warning message from its
+// effect to its commit. One box exists per command invocation and rides the
+// effect contexts, so concurrent commands can never cross-attribute
+// messages; the mutex covers the effect-goroutine write vs the commit read.
+type commandMessageBox struct {
+	mu  sync.Mutex
+	msg string
+}
+
+func (b *commandMessageBox) set(msg string) {
+	b.mu.Lock()
+	b.msg = msg
+	b.mu.Unlock()
+}
+
+func (b *commandMessageBox) take() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	msg := strings.TrimSpace(b.msg)
+	b.msg = ""
+	return msg
+}
+
+type commandMessageKey struct{}
+
+func withCommandMessage(ctx context.Context, box *commandMessageBox) context.Context {
+	return context.WithValue(ctx, commandMessageKey{}, box)
+}
+
+// SetCommandMessage records a success/warning message for the running
+// command; the commit emits it in the terminal response. No-op outside a
+// command effect.
+func SetCommandMessage(ctx context.Context, msg string) {
+	if box, ok := ctx.Value(commandMessageKey{}).(*commandMessageBox); ok {
+		box.set(msg)
+	}
 }
 
 // HandlerOpts configures the handler with component-specific settings.
@@ -106,14 +140,6 @@ type Handler[C Config] struct {
 	removeStockOnEnableFail bool
 	configCommands          []Command
 	waitGate                *waitGate[C]
-}
-
-func takeCommandMessage[C Config](cb Callbacks[C]) string {
-	msgSrc, ok := any(cb).(CommandMessageSource)
-	if !ok {
-		return ""
-	}
-	return msgSrc.TakeCommandMessage()
 }
 
 // WaitTimeoutEvent describes a wait gate timeout transition.
@@ -453,6 +479,81 @@ func (h *Handler[C]) configSupportedCommands(cfg C, isDyncfg bool) string {
 // another blocking phase of the same command.
 type StepRunner func(effect func(context.Context) error, commit func(error))
 
+// StagedStop is a stop split in two: the routing removal already happened on
+// the goroutine that called StageStop (the command-staging goroutine), and
+// Wait performs the blocking half inside the effect. Undo restores routing
+// when the wait NEVER RAN (the commit received ErrPhaseNeverRan): nothing
+// was stopped, so the stage-time removal would otherwise leave live work
+// invisible to routing and cleanup.
+type StagedStop struct {
+	Wait func(ctx context.Context)
+	Undo func()
+}
+
+// StagedUpdate is the update-shaped counterpart: Run embeds an
+// already-staged stop of the old config's work followed by the replacement's
+// start. Undo reverts the staged routing removal when Run never executed, or
+// when it reports a non-disruptive failure (the old work was not touched).
+type StagedUpdate struct {
+	Run  func(ctx context.Context) error
+	Undo func()
+}
+
+// StopStager is an optional Callbacks extension: components whose Stop has a
+// blocking wait implement it so routing removal happens when the command
+// stages instead of when the effect reaches a pool worker. Components
+// without it keep the single-phase Stop/Update semantics.
+type StopStager[C Config] interface {
+	StageStop(cfg C) StagedStop
+}
+
+// UpdateStager is the Update-shaped staging extension; see StopStager.
+type UpdateStager[C Config] interface {
+	StageUpdate(oldCfg, newCfg C) StagedUpdate
+}
+
+// PayloadParser is an optional Callbacks extension: ParsePayload runs the
+// CHEAP, deterministic parse prefix of ParseAndValidate (no I/O, no module
+// instantiation, no store access - it MUST stay pure in fn AND total on
+// arbitrary payloads: it runs on the caller's dispatch loop, which has no
+// recover, so a panic here - e.g. writing into a map a "null" document
+// left nil - kills the plugin) and returns the same error
+// ParseAndValidate's parse step would return for the same input.
+// When implemented, add and update answer a malformed payload's 400 at
+// STAGE - before any claim or effect - and the acts predicate classifies
+// the command as rejection-only instead of letting it park behind held
+// dependency claims. Components without it keep the parse-in-effect
+// semantics.
+type PayloadParser interface {
+	ParsePayload(fn Function, name string) error
+}
+
+// stagedStopFor stages the config's stop through the callbacks' StopStager
+// when implemented; otherwise it degrades to the single-phase cb.Stop with a
+// no-op Undo.
+func (h *Handler[C]) stagedStopFor(cfg C) StagedStop {
+	if ss, ok := any(h.cb).(StopStager[C]); ok {
+		return ss.StageStop(cfg)
+	}
+	return StagedStop{
+		Wait: func(ctx context.Context) { h.cb.Stop(ctx, cfg) },
+		Undo: func() {},
+	}
+}
+
+// stagedUpdateFor stages the update through the callbacks' UpdateStager when
+// implemented; otherwise it degrades to the single-phase cb.Update with a
+// no-op Undo.
+func (h *Handler[C]) stagedUpdateFor(oldCfg, newCfg C) StagedUpdate {
+	if us, ok := any(h.cb).(UpdateStager[C]); ok {
+		return us.StageUpdate(oldCfg, newCfg)
+	}
+	return StagedUpdate{
+		Run:  func(ctx context.Context) error { return h.cb.Update(ctx, oldCfg, newCfg) },
+		Undo: func() {},
+	}
+}
+
 // RunStepSync is the synchronous StepRunner used by the legacy Cmd* methods.
 func RunStepSync(effect func(context.Context) error, commit func(error)) {
 	commit(effect(context.Background()))
@@ -465,11 +566,12 @@ func RunStepSync(effect func(context.Context) error, commit func(error)) {
 var ErrPhaseNeverRan = errors.New("the operation did not run: shutting down")
 
 // ErrPhaseAbandoned is committed for a blocking phase that ran past its
-// deadline (or into shutdown) and was abandoned with the job's output
-// fenced. Stop-shaped commits publish success on it by contract - the
-// stop is guaranteed to be effective even though the call has not
-// returned. Any other stop error (e.g. a recovered panic) proves nothing
-// about the job's state and MUST commit as failed.
+// DEADLINE and was abandoned with the job's output fenced. Stop-shaped
+// commits publish success on it by contract - the stop is guaranteed to be
+// effective even though the call has not returned. Shutdown interruptions
+// never carry it (they map to ErrPhaseNeverRan: 503, publish nothing). Any
+// other stop error (e.g. a recovered panic) proves nothing about the job's
+// state and MUST commit as failed.
 var ErrPhaseAbandoned = errors.New("the operation was abandoned")
 
 // CmdAddStep is CmdAdd with a caller-supplied StepRunner.
@@ -496,24 +598,9 @@ func (h *Handler[C]) CmdAdd(fn Function) {
 }
 
 func (h *Handler[C]) cmdAdd(fn Function, run StepRunner) {
-	if err := fn.ValidateArgs(3); err != nil {
-		h.api.SendCodef(fn, 400, "%v", err)
-		return
-	}
-
-	key, name, ok := h.cb.ExtractKey(fn)
-	if !ok {
-		h.api.SendCodef(fn, 400, "invalid config ID format.")
-		return
-	}
-
-	if err := fn.ValidateHasPayload(); err != nil {
-		h.api.SendCodef(fn, 400, "%v", err)
-		return
-	}
-
-	if err := h.cb.ValidateConfigName(name); err != nil {
-		h.api.SendCodef(fn, 400, "invalid config name '%s': %v.", name, err)
+	key, name, code, msg := h.addRejection(fn)
+	if code != 0 {
+		h.api.SendCodef(fn, code, "%s", msg)
 		return
 	}
 
@@ -555,11 +642,13 @@ func (h *Handler[C]) cmdAdd(fn Function, run StepRunner) {
 			}
 			existingEntry := existing
 			h.exposed.Remove(existing.Cfg)
+			staged := h.stagedStopFor(existing.Cfg)
 			run(func(ctx context.Context) error {
-				h.cb.Stop(ctx, existing.Cfg)
+				staged.Wait(ctx)
 				return nil
 			}, func(stopErr error) {
 				if errors.Is(stopErr, ErrPhaseNeverRan) {
+					staged.Undo()
 					if wasSeen {
 						h.seen.Add(existingEntry.Cfg)
 					}
@@ -618,8 +707,9 @@ func (h *Handler[C]) cmdEnable(fn Function, run StepRunner) {
 		return
 	}
 
+	box := &commandMessageBox{}
 	run(func(ctx context.Context) error {
-		return h.cb.Start(ctx, entry.Cfg)
+		return h.cb.Start(withCommandMessage(ctx, box), entry.Cfg)
 	}, func(err error) {
 		if errors.Is(err, ErrPhaseNeverRan) {
 			// The start never executed (shutdown): the config is untouched -
@@ -652,7 +742,7 @@ func (h *Handler[C]) cmdEnable(fn Function, run StepRunner) {
 		}
 
 		entry.Status = StatusRunning
-		h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
+		h.api.SendCodef(fn, 200, "%s", box.take())
 		h.NotifyConfigStatus(entry.Cfg, StatusRunning)
 		h.cb.OnStatusChange(entry, oldStatus, fn)
 	})
@@ -685,11 +775,14 @@ func (h *Handler[C]) cmdDisable(fn Function, run StepRunner) {
 	}
 
 	// Unconditional for all non-Disabled statuses.
+	box := &commandMessageBox{}
+	staged := h.stagedStopFor(entry.Cfg)
 	run(func(ctx context.Context) error {
-		h.cb.Stop(ctx, entry.Cfg)
+		staged.Wait(withCommandMessage(ctx, box))
 		return nil
 	}, func(stopErr error) {
 		if errors.Is(stopErr, ErrPhaseNeverRan) {
+			staged.Undo()
 			h.api.SendCodef(fn, 503, "%v", stopErr)
 			return
 		}
@@ -703,7 +796,7 @@ func (h *Handler[C]) cmdDisable(fn Function, run StepRunner) {
 			return
 		}
 		entry.Status = StatusDisabled
-		h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
+		h.api.SendCodef(fn, 200, "%s", box.take())
 		h.NotifyConfigStatus(entry.Cfg, StatusDisabled)
 		h.cb.OnStatusChange(entry, oldStatus, fn)
 	})
@@ -712,6 +805,138 @@ func (h *Handler[C]) cmdDisable(fn Function, run StepRunner) {
 // CmdRemove handles the "remove" command.
 func (h *Handler[C]) CmdRemove(fn Function) {
 	h.cmdRemove(fn, RunStepSync)
+}
+
+// CommandActs reports whether fn against entry reaches a phase that stops
+// or starts work - where dependency reservations are load-bearing - as
+// opposed to answering a deterministic rejection or no-op. Claim scheduling
+// uses it so "rejection-only commands claim nothing" cannot drift from the
+// Cmd* gates in this file. The criterion is EXECUTION ORDER, not the
+// eventual outcome: false is returned only when the command's execution
+// answers BEFORE its first claim-protected access - a rejection that
+// execution reaches only after such an access (a domain gate ordered
+// behind a dependency-index read) must claim first and answer under the
+// claim.
+//
+// Add and update do not mirror their gates AT ALL: the predicate runs the
+// SAME addRejection/updateRejection functions their Cmd* bodies answer
+// from, so a gate added there - including callback gates like
+// ValidateConfigName, which a mirror in this file cannot see - is
+// automatically rejection-only (eight starvation findings proved that
+// mirroring the parse-shaped gate chains does not converge). The
+// stop/start-shaped commands keep the explicit state predicate below
+// (enable no-ops on Running; restart rejects Accepted/Disabled; disable
+// no-ops on Disabled; remove rejects non-dyncfg sources and non-job types;
+// a nil entry never acts); their pre-effect sections mutate caches, so
+// they cannot share a rejection function, and the parity test drives every
+// command against every gate combination to hold them to this predicate.
+// Identity gates (argument count, config ID format) are also the caller's
+// underivable axis.
+func (h *Handler[C]) CommandActs(fn Function, entry *Entry[C]) bool {
+	switch cmd := fn.Command(); cmd {
+	case CommandAdd:
+		_, _, code, _ := h.addRejection(fn)
+		return code == 0
+	case CommandUpdate:
+		_, _, code, _ := h.updateRejection(fn)
+		return code == 0
+	default:
+		if entry == nil {
+			return false
+		}
+		switch cmd {
+		case CommandEnable:
+			return entry.Status == StatusAccepted || entry.Status == StatusDisabled || entry.Status == StatusFailed
+		case CommandRestart:
+			return entry.Status == StatusRunning || entry.Status == StatusFailed
+		case CommandDisable:
+			return entry.Status != StatusDisabled
+		case CommandRemove:
+			return entry.Cfg.SourceType() == "dyncfg" && h.cb.ConfigType(entry.Cfg) == ConfigTypeJob
+		}
+		return false
+	}
+}
+
+// RejectionDependsOnStatus reports whether fn's rejection-only
+// classification against entry is derived from entry.Status - the one
+// input a FOREIGN write-claim holder (a store command's dependent-restart
+// plan) mutates from another key. A status-derived rejection is
+// deterministic only while no foreign write claim holds the command's key:
+// under a hold the status is mid-mutation, and an answer minted from it
+// can be falsified by the holder's outcome (an enable answering the
+// Running no-op 200 while the dependent restart it cannot see is stopping
+// - and may fail - that very job). Claim scheduling treats such commands
+// as ACTING while their key is write-held, so they park and answer
+// truthfully after the hold resolves. Meaningful only when CommandActs
+// reported false; every other rejection axis (identity, existence,
+// source/type, payload, command support) depends on state no foreign
+// holder mutates.
+func (h *Handler[C]) RejectionDependsOnStatus(fn Function, entry *Entry[C]) bool {
+	if entry == nil {
+		return false
+	}
+	switch fn.Command() {
+	case CommandEnable, CommandRestart, CommandDisable:
+		return true
+	}
+	return false
+}
+
+// addRejection runs cmdAdd's deterministic pre-effect gates and reports the
+// rejection they produce (code 0 = the command acts). It is the SINGLE
+// SOURCE for both cmdAdd and CommandActs; add a gate here, never in either
+// caller.
+func (h *Handler[C]) addRejection(fn Function) (key, name string, code int, msg string) {
+	if err := fn.ValidateArgs(3); err != nil {
+		return "", "", 400, fmt.Sprintf("%v", err)
+	}
+	key, name, ok := h.cb.ExtractKey(fn)
+	if !ok {
+		return "", "", 400, "invalid config ID format."
+	}
+	if err := fn.ValidateHasPayload(); err != nil {
+		return "", "", 400, fmt.Sprintf("%v", err)
+	}
+	if err := h.cb.ValidateConfigName(name); err != nil {
+		return "", "", 400, fmt.Sprintf("invalid config name '%s': %v.", name, err)
+	}
+	if err := h.parsePayload(fn, name); err != nil {
+		return "", "", 400, fmt.Sprintf("%v", err)
+	}
+	return key, name, 0, ""
+}
+
+// updateRejection runs cmdUpdate's deterministic pre-effect gates and
+// reports the rejection they produce (code 0 = the command acts, and the
+// exposed entry is returned). It is the SINGLE SOURCE for both cmdUpdate
+// and CommandActs; add a gate here, never in either caller.
+func (h *Handler[C]) updateRejection(fn Function) (name string, entry *Entry[C], code int, msg string) {
+	key, name, ok := h.cb.ExtractKey(fn)
+	if !ok {
+		return "", nil, 400, "invalid config ID format."
+	}
+	entry, ok = h.exposed.LookupByKey(key)
+	if !ok {
+		return "", nil, 404, "config not found."
+	}
+	if err := fn.ValidateHasPayload(); err != nil {
+		return "", nil, 400, fmt.Sprintf("%v", err)
+	}
+	if err := h.parsePayload(fn, name); err != nil {
+		return "", nil, 400, fmt.Sprintf("%v", err)
+	}
+	return name, entry, 0, ""
+}
+
+// parsePayload runs the callbacks' cheap parse prefix when they implement
+// PayloadParser; components without it defer payload-format rejection to
+// ParseAndValidate in the effect.
+func (h *Handler[C]) parsePayload(fn Function, name string) error {
+	if p, ok := any(h.cb).(PayloadParser); ok {
+		return p.ParsePayload(fn, name)
+	}
+	return nil
 }
 
 func (h *Handler[C]) cmdRemove(fn Function, run StepRunner) {
@@ -739,13 +964,16 @@ func (h *Handler[C]) cmdRemove(fn Function, run StepRunner) {
 	// Cache removal precedes the blocking stop (remove-before-block).
 	h.seen.Remove(entry.Cfg)
 	h.exposed.Remove(entry.Cfg)
+	box := &commandMessageBox{}
+	staged := h.stagedStopFor(entry.Cfg)
 	run(func(ctx context.Context) error {
-		h.cb.Stop(ctx, entry.Cfg)
+		staged.Wait(withCommandMessage(ctx, box))
 		return nil
 	}, func(stopErr error) {
 		if errors.Is(stopErr, ErrPhaseNeverRan) {
 			// Nothing was stopped: restore the stage-time cache removals and
 			// answer retryably instead of publishing a delete that is a lie.
+			staged.Undo()
 			h.seen.Add(entry.Cfg)
 			h.exposed.Add(entry)
 			h.api.SendCodef(fn, 503, "%v", stopErr)
@@ -764,7 +992,7 @@ func (h *Handler[C]) cmdRemove(fn Function, run StepRunner) {
 			h.cb.OnStatusChange(entry, oldStatus, fn)
 			return
 		}
-		h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
+		h.api.SendCodef(fn, 200, "%s", box.take())
 		h.NotifyConfigRemove(entry.Cfg)
 	})
 }
@@ -775,27 +1003,17 @@ func (h *Handler[C]) CmdUpdate(fn Function) {
 }
 
 func (h *Handler[C]) cmdUpdate(fn Function, run StepRunner) {
-	key, name, ok := h.cb.ExtractKey(fn)
-	if !ok {
-		h.api.SendCodef(fn, 400, "invalid config ID format.")
+	name, entry, code, msg := h.updateRejection(fn)
+	if code != 0 {
+		h.api.SendCodef(fn, code, "%s", msg)
 		return
 	}
 
-	entry, ok := h.exposed.LookupByKey(key)
-	if !ok {
-		h.api.SendCodef(fn, 404, "config not found.")
-		return
-	}
-
-	if err := fn.ValidateHasPayload(); err != nil {
-		h.api.SendCodef(fn, 400, "%v", err)
-		return
-	}
-
+	box := &commandMessageBox{}
 	var newCfg C
 	run(func(ctx context.Context) error {
 		var err error
-		newCfg, err = h.cb.ParseAndValidate(ctx, fn, name)
+		newCfg, err = h.cb.ParseAndValidate(withCommandMessage(ctx, box), fn, name)
 		return err
 	}, func(err error) {
 		if errors.Is(err, ErrPhaseNeverRan) {
@@ -843,33 +1061,43 @@ func (h *Handler[C]) cmdUpdate(fn Function, run StepRunner) {
 				if isConversion {
 					h.NotifyConfigCreate(newCfg, StatusDisabled)
 				}
-				h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
+				h.api.SendCodef(fn, 200, "%s", box.take())
 				h.NotifyConfigStatus(newCfg, StatusDisabled)
 				h.cb.OnStatusChange(newEntry, oldStatus, fn)
 				return
 			}
 
-			// Start or update.
+			// Start or update. The non-conversion update stages its old
+			// instance's stop NOW (on the staging goroutine): routing to the
+			// job being replaced ends immediately, the blocking wait runs in
+			// the effect.
+			effect := func(ctx context.Context) error { return h.cb.Start(ctx, newCfg) }
+			undo := func() {}
+			if !isConversion {
+				upd := h.stagedUpdateFor(oldCfg, newCfg)
+				effect, undo = upd.Run, upd.Undo
+			}
 			run(func(ctx context.Context) error {
-				if isConversion {
-					return h.cb.Start(ctx, newCfg)
-				}
-				return h.cb.Update(ctx, oldCfg, newCfg)
+				return effect(withCommandMessage(ctx, box))
 			}, func(err error) {
-				if !isConversion && errors.Is(err, ErrPhaseNeverRan) {
-					// The update phase never executed (shutdown): the old
-					// instance is untouched - roll back to the old cache state
-					// and answer retryably instead of publishing failed.
+				if errors.Is(err, ErrPhaseNeverRan) {
+					// The update was interrupted by shutdown: roll back to the
+					// old cache state and answer retryably, publishing nothing
+					// (at shutdown every non-terminal command answers 503 and
+					// emits no CONFIG lines).
+					undo()
 					h.seen.Remove(newCfg)
-					h.seen.Add(oldCfg)
+					if !isConversion {
+						h.seen.Add(oldCfg)
+					}
 					h.exposed.Add(entry)
 					h.api.SendCodef(fn, 503, "%v", err)
-					h.NotifyConfigStatus(oldCfg, oldStatus)
 					return
 				}
 				if err != nil {
 					if !isConversion && errors.Is(err, ErrNonDisruptiveUpdate) {
 						// Update failed before runtime disruption; rollback to old cache state.
+						undo()
 						h.seen.Remove(newCfg)
 						h.seen.Add(oldCfg)
 						h.exposed.Add(entry)
@@ -898,7 +1126,7 @@ func (h *Handler[C]) cmdUpdate(fn Function, run StepRunner) {
 				if isConversion {
 					h.NotifyConfigCreate(newCfg, StatusRunning)
 				}
-				h.api.SendCodef(fn, 200, "%s", takeCommandMessage(h.cb))
+				h.api.SendCodef(fn, 200, "%s", box.take())
 				h.NotifyConfigStatus(newCfg, StatusRunning)
 				h.cb.OnStatusChange(newEntry, oldStatus, fn)
 			})
@@ -906,14 +1134,16 @@ func (h *Handler[C]) cmdUpdate(fn Function, run StepRunner) {
 
 		// For conversion, stop the old work before publishing replacement config state.
 		if isConversion {
+			staged := h.stagedStopFor(oldCfg)
 			run(func(ctx context.Context) error {
-				h.cb.Stop(ctx, oldCfg)
+				staged.Wait(withCommandMessage(ctx, box))
 				return nil
 			}, func(stopErr error) {
 				if errors.Is(stopErr, ErrPhaseNeverRan) {
 					// Nothing happened at all: the old job is untouched and
 					// the caches were not swapped yet - answer retryably
 					// without marking anything failed.
+					staged.Undo()
 					h.api.SendCodef(fn, 503, "%v", stopErr)
 					return
 				}
@@ -974,13 +1204,15 @@ func (h *Handler[C]) cmdRestart(fn Function, run StepRunner) {
 
 	oldStatus := entry.Status
 
+	staged := h.stagedStopFor(entry.Cfg)
 	run(func(ctx context.Context) error {
-		h.cb.Stop(ctx, entry.Cfg)
+		staged.Wait(ctx)
 		return nil
 	}, func(stopErr error) {
 		if errors.Is(stopErr, ErrPhaseNeverRan) {
 			// Nothing happened at all: answer retryably without publishing a
 			// failed status for a job that is in fact untouched.
+			staged.Undo()
 			h.api.SendCodef(fn, 503, "%v", stopErr)
 			return
 		}
@@ -1000,6 +1232,13 @@ func (h *Handler[C]) cmdRestart(fn Function, run StepRunner) {
 		run(func(ctx context.Context) error {
 			return h.cb.Start(ctx, entry.Cfg)
 		}, func(err error) {
+			if errors.Is(err, ErrPhaseNeverRan) {
+				// The start phase was interrupted by shutdown: answer 503 and
+				// publish nothing (at shutdown every non-terminal command
+				// answers retryably and emits no CONFIG lines).
+				h.api.SendCodef(fn, 503, "%v", err)
+				return
+			}
 			if err != nil {
 				entry.Status = StatusFailed
 				code := 422

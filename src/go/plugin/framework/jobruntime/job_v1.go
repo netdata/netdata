@@ -154,8 +154,12 @@ type Job struct {
 	api                  *netdataapi.API
 
 	vnodeCreated bool
-	vnode        vnodes.VirtualNode
-	updVnode     chan *vnodes.VirtualNode
+	// vnodeMu covers j.vnode against off-goroutine readers (Vnode is
+	// called from the manager loop on registered jobs) racing the job
+	// goroutine's writes and the pre-Start baseline write.
+	vnodeMu  sync.RWMutex
+	vnode    vnodes.VirtualNode
+	updVnode chan *vnodes.VirtualNode
 
 	retries atomic.Int64
 	prevRun time.Time
@@ -224,7 +228,9 @@ func (j *Job) Configuration() any {
 }
 
 func (j *Job) Vnode() vnodes.VirtualNode {
-	return j.vnode
+	j.vnodeMu.RLock()
+	defer j.vnodeMu.RUnlock()
+	return *j.vnode.Copy()
 }
 
 // AutoDetection invokes init, check and postCheck. It handles panic.
@@ -291,6 +297,22 @@ func (j *Job) UpdateVnode(vnode *vnodes.VirtualNode) {
 	default:
 	}
 	j.updVnode <- vnode
+}
+
+// SetVnodeBaseline commits the vnode config directly into the job BEFORE
+// Start: registration-time freshness must be visible to Cleanup even when
+// the job never collects, and it must NOT drain a concurrently queued live
+// update - UpdateVnode's slot keeps the newest committed value, which still
+// applies at collection. Pre-Start only: the job goroutine does not exist
+// yet, and the write is published to it by the Start goroutine launch.
+// Module-owned vnode state is never overridden.
+func (j *Job) SetVnodeBaseline(vnode *vnodes.VirtualNode) {
+	if vnode == nil || (j.module != nil && j.module.VirtualNode() != nil) {
+		return
+	}
+	j.vnodeMu.Lock()
+	j.vnode = *vnode.Copy()
+	j.vnodeMu.Unlock()
 }
 
 // Tick Tick.
@@ -506,7 +528,9 @@ func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLast
 		case vnode := <-j.updVnode:
 			j.vnodeCreated = false
 			createChart = j.vnode.GUID != vnode.GUID
+			j.vnodeMu.Lock()
 			j.vnode = *vnode.Copy()
+			j.vnodeMu.Unlock()
 		default:
 		}
 	}
@@ -514,7 +538,9 @@ func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLast
 	if !j.vnodeCreated {
 		if j.vnode.GUID == "" {
 			if v := j.module.VirtualNode(); v != nil && v.GUID != "" && v.Hostname != "" {
+				j.vnodeMu.Lock()
 				j.vnode = *v
+				j.vnodeMu.Unlock()
 			}
 		}
 		if j.vnode.GUID != "" {
@@ -599,8 +625,10 @@ func (j *Job) sendVnodeHostInfo() {
 		return
 	}
 
+	j.vnodeMu.Lock()
 	j.vnode.Hostname = info.Hostname
 	j.vnode.Labels = info.Labels
+	j.vnodeMu.Unlock()
 	j.api.HOSTINFO(info)
 }
 

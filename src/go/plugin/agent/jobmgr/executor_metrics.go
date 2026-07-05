@@ -25,11 +25,13 @@ type executorRuntimeMetrics struct {
 	busyKeys       metrix.StatefulGauge
 	waitParkedKeys metrix.StatefulGauge
 	parkedEvents   metrix.StatefulGauge
+	claimParked    metrix.StatefulGauge
 	poolInflight   metrix.StatefulGauge
 	poolQueued     metrix.StatefulGauge
 
-	oldestParkedAge metrix.StatefulGauge
-	oldestWaitAge   metrix.StatefulGauge
+	oldestParkedAge      metrix.StatefulGauge
+	oldestWaitAge        metrix.StatefulGauge
+	oldestClaimParkedAge metrix.StatefulGauge
 
 	effectsStarted       metrix.StatefulCounter
 	effectPanics         metrix.StatefulCounter
@@ -42,10 +44,12 @@ type executorRuntimeMetrics struct {
 	suppressedLateOutput metrix.StatefulCounter
 	barrierWaitSeconds   metrix.StatefulCounter
 
-	// Unix nanos of the oldest currently parked event / wait-parked key;
-	// 0 when none. Written on the run loop, read by the producer tick.
-	oldestParkedSince atomic.Int64
-	oldestWaitSince   atomic.Int64
+	// Unix nanos of the oldest currently parked event / wait-parked key /
+	// claim-parked acquisition; 0 when none. Written on the run loop, read
+	// by the producer tick.
+	oldestParkedSince      atomic.Int64
+	oldestWaitSince        atomic.Int64
+	oldestClaimParkedSince atomic.Int64
 }
 
 func newExecutorRuntimeMetrics(store metrix.RuntimeStore) *executorRuntimeMetrics {
@@ -70,6 +74,11 @@ func newExecutorRuntimeMetrics(store metrix.RuntimeStore) *executorRuntimeMetric
 			metrix.WithChartFamily("Agent/JobMgr/Executor"),
 			metrix.WithUnit("events"),
 		),
+		claimParked: metrix.SeededGauge(meter, "claim_parked",
+			metrix.WithDescription("Commands parked in the claim table awaiting conflicting keys"),
+			metrix.WithChartFamily("Agent/JobMgr/Executor"),
+			metrix.WithUnit("commands"),
+		),
 		poolInflight: metrix.SeededGauge(meter, "pool_inflight",
 			metrix.WithDescription("Blocking phases in flight: executing on the effect pool or awaiting a slot"),
 			metrix.WithChartFamily("Agent/JobMgr/Executor"),
@@ -87,6 +96,11 @@ func newExecutorRuntimeMetrics(store metrix.RuntimeStore) *executorRuntimeMetric
 		),
 		oldestWaitAge: metrix.SeededGauge(meter, "oldest_wait_age",
 			metrix.WithDescription("Age of the oldest wait-parked key"),
+			metrix.WithChartFamily("Agent/JobMgr/Executor"),
+			metrix.WithUnit("seconds"),
+		),
+		oldestClaimParkedAge: metrix.SeededGauge(meter, "oldest_claim_parked_age",
+			metrix.WithDescription("Age of the oldest claim-parked command"),
 			metrix.WithChartFamily("Agent/JobMgr/Executor"),
 			metrix.WithUnit("seconds"),
 		),
@@ -150,6 +164,7 @@ func (m *executorRuntimeMetrics) refreshAges() error {
 	}
 	m.oldestParkedAge.Set(ageSeconds(m.oldestParkedSince.Load()))
 	m.oldestWaitAge.Set(ageSeconds(m.oldestWaitSince.Load()))
+	m.oldestClaimParkedAge.Set(ageSeconds(m.oldestClaimParkedSince.Load()))
 	return nil
 }
 

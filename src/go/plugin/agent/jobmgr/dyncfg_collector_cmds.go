@@ -228,7 +228,7 @@ func (m *Manager) runDyncfgCmdTest(task dyncfgCmdTestTask) {
 	job, err := newConfigModule(task.creator)
 	if err != nil {
 		m.Warningf("dyncfg: test: module %s: failed to create module: %v", task.moduleName, err)
-		m.dyncfgResponder.SendCodef(task.fn, 500, "Module %s instantiation failed: %v.", task.moduleName, err)
+		m.sendDyncfgCmdTestResult(task.fn, 500, "Module %s instantiation failed: %v.", task.moduleName, err)
 		return
 	}
 	if named, ok := job.(jobNameSetter); ok {
@@ -247,7 +247,7 @@ func (m *Manager) runDyncfgCmdTest(task dyncfgCmdTestTask) {
 	resolveCtx := collectorSecretResolveContext(ctx, m.Logger, task.cfg)
 	if err := applyConfig(resolveCtx, task.cfg, job, m.secretResolver, secretStoreSvc, storeSnapshot); err != nil {
 		m.Warningf("dyncfg: test: module %s job %s: failed to apply config: %v", task.moduleName, task.cfg.Name(), err)
-		m.dyncfgResponder.SendCodef(task.fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
+		m.sendDyncfgCmdTestResult(task.fn, 400, "Invalid configuration. Failed to apply configuration: %v.", err)
 		return
 	}
 
@@ -265,7 +265,7 @@ func (m *Manager) runDyncfgCmdTest(task dyncfgCmdTestTask) {
 		return
 	}
 
-	m.dyncfgResponder.SendCodef(task.fn, 200, "")
+	m.sendDyncfgCmdTestResult(task.fn, 200, "")
 }
 
 func (m *Manager) sendDyncfgCmdTestError(fn dyncfg.Function, defaultCode int, format string, err error) {
@@ -274,7 +274,22 @@ func (m *Manager) sendDyncfgCmdTestError(fn dyncfg.Function, defaultCode int, fo
 	if errors.As(err, &coded) {
 		code = coded.DyncfgCode()
 	}
-	m.dyncfgResponder.SendCodef(fn, code, format, err)
+	m.sendDyncfgCmdTestResult(fn, code, format, err)
+}
+
+// sendDyncfgCmdTestResult delivers a test worker's terminal, overridden with
+// 503 once shutdown began: the keyless test path bypasses the executor's
+// receive-time one-rule choke points (it responds directly from its own
+// worker goroutine), so the boundary lives at its own send seam. A
+// shutdown-canceled Init/Check must not classify as a 422 module failure,
+// and even a test completing during the drain answers 503 - matching the
+// stop-completing-during-drain contract.
+func (m *Manager) sendDyncfgCmdTestResult(fn dyncfg.Function, code int, format string, args ...any) {
+	if m.baseContext().Err() != nil {
+		m.dyncfgResponder.SendCodef(fn, 503, "Job manager is shutting down.")
+		return
+	}
+	m.dyncfgResponder.SendCodef(fn, code, format, args...)
 }
 
 func (m *Manager) dyncfgCmdTestTimeout(fn dyncfg.Function) time.Duration {

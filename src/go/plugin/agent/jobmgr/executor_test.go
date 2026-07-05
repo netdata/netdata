@@ -16,11 +16,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/internal/wiretest"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
 
 func newExecutorTestManager() (*Manager, *bytes.Buffer) {
@@ -386,6 +388,8 @@ func TestDyncfgLaneDerivers_TestIsKeyless(t *testing.T) {
 // that sentinel, so an abandon that wins before the stop registered its
 // quarantine must classify as a plain failure instead.
 func TestSuperviseEffect_AbandonFenceClassification(t *testing.T) {
+	defer goleak.VerifyNone(t, goleak.IgnoreCurrent())
+
 	newMgr := func() *Manager {
 		mgr := New(Config{PluginName: testPluginName})
 		mgr.effectDeadline = 50 * time.Millisecond
@@ -395,12 +399,12 @@ func TestSuperviseEffect_AbandonFenceClassification(t *testing.T) {
 	t.Run("unfenced abandon is a plain failure", func(t *testing.T) {
 		mgr := newMgr()
 		block := make(chan struct{})
-		defer close(block)
 
 		res := mgr.superviseEffect(effectTask{key: "k", effect: func(context.Context) error {
 			<-block
 			return nil
 		}})
+		defer drainAbandonedEffect(mgr, res, block)
 
 		require.True(t, res.abandoned)
 		assert.False(t, errors.Is(res.err, dyncfg.ErrPhaseAbandoned),
@@ -410,7 +414,6 @@ func TestSuperviseEffect_AbandonFenceClassification(t *testing.T) {
 	t.Run("fenced abandon carries ErrPhaseAbandoned", func(t *testing.T) {
 		mgr := newMgr()
 		block := make(chan struct{})
-		defer close(block)
 		var fenceRan atomic.Bool
 
 		res := mgr.superviseEffect(effectTask{key: "k", effect: func(ctx context.Context) error {
@@ -418,6 +421,7 @@ func TestSuperviseEffect_AbandonFenceClassification(t *testing.T) {
 			<-block
 			return nil
 		}})
+		defer drainAbandonedEffect(mgr, res, block)
 
 		require.True(t, res.abandoned)
 		assert.True(t, fenceRan.Load(), "the worker must run the fence before reporting the abandon")
@@ -430,55 +434,29 @@ func TestSuperviseEffect_AbandonFenceClassification(t *testing.T) {
 		cancel()
 		mgr.ctx = ctx // shutdown already began
 		block := make(chan struct{})
-		defer close(block)
 
 		res := mgr.superviseEffect(effectTask{key: "k", effect: func(context.Context) error {
 			<-block
 			return nil
 		}})
+		defer drainAbandonedEffect(mgr, res, block)
 
 		require.True(t, res.abandoned)
 		assert.True(t, errors.Is(res.err, dyncfg.ErrPhaseNeverRan),
 			"a shutdown interruption must answer retryably no matter which side wins the claim")
 	})
 
-	t.Run("disruptive shutdown abandon is a plain failure, never never-ran", func(t *testing.T) {
+	t.Run("fenced shutdown abandon is never-ran too", func(t *testing.T) {
+		// ONE RULE at shutdown: every non-terminal command answers 503 and
+		// publishes nothing - a fence changes nothing about the outcome (it
+		// still runs mechanically to suppress late output). Only a
+		// DEADLINE-caused fenced abandon may publish success.
 		mgr := newMgr()
 		mgr.effectDeadline = time.Hour // only the cancellation may abandon
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
 		mgr.ctx = ctx
 		block := make(chan struct{})
-		defer close(block)
-		marked := make(chan struct{})
-		go func() {
-			// Shutdown lands strictly AFTER the point of no return.
-			<-marked
-			cancel()
-		}()
-
-		res := mgr.superviseEffect(effectTask{key: "k", effect: func(ctx context.Context) error {
-			effectControlFrom(ctx).markDisruptive()
-			close(marked)
-			<-block
-			return nil
-		}})
-
-		require.True(t, res.abandoned)
-		assert.False(t, errors.Is(res.err, dyncfg.ErrPhaseNeverRan),
-			"a never-ran outcome would roll back caches for a state that no longer exists")
-		assert.False(t, errors.Is(res.err, dyncfg.ErrPhaseAbandoned),
-			"no fence ran - success must not be published")
-	})
-
-	t.Run("fenced shutdown abandon carries ErrPhaseAbandoned", func(t *testing.T) {
-		mgr := newMgr()
-		mgr.effectDeadline = time.Hour // only the cancellation may abandon
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
-		mgr.ctx = ctx
-		block := make(chan struct{})
-		defer close(block)
 		fenceSet := make(chan struct{})
 		go func() {
 			// Shutdown lands strictly AFTER the stop registered its fence.
@@ -492,11 +470,238 @@ func TestSuperviseEffect_AbandonFenceClassification(t *testing.T) {
 			<-block
 			return nil
 		}})
+		defer drainAbandonedEffect(mgr, res, block)
 
 		require.True(t, res.abandoned)
-		assert.True(t, errors.Is(res.err, dyncfg.ErrPhaseAbandoned),
-			"a fenced stop may publish success even when shutdown is the cause")
+		assert.True(t, errors.Is(res.err, dyncfg.ErrPhaseNeverRan),
+			"a shutdown interruption answers retryably even when the stop's fence ran")
+		assert.False(t, errors.Is(res.err, dyncfg.ErrPhaseAbandoned),
+			"no stop-shaped success may be published at shutdown")
 	})
+}
+
+// The fence disarm after a completed stop is gated on WINNING the effect's
+// completion claim: a worker that abandoned during the stop - or wins the
+// CAS between Stop returning and the claim - must find the fence STILL
+// ARMED, so its abandon classifies as the fenced stop success
+// (ErrPhaseAbandoned) instead of an unfenced plain timeout that would take
+// the broken-stop 500 + cache-restore branch for a cleanly completed stop.
+func TestWaitStoppedJob_ClaimGatesTheFenceDisarm(t *testing.T) {
+	newCase := func() (*Manager, *effectControl, context.Context, runtimeJob) {
+		mgr := New(Config{PluginName: testPluginName})
+		ctl := &effectControl{}
+		ctx := context.WithValue(context.Background(), effectControlKey{}, ctl)
+		return mgr, ctl, ctx, &tickProbeJob{}
+	}
+
+	t.Run("winning the claim disarms the fence", func(t *testing.T) {
+		mgr, ctl, ctx, job := newCase()
+		mgr.waitStoppedJob(ctx, "j", job, true)
+		assert.False(t, ctl.claimCompletion(), "the wait must have claimed the completion itself")
+		assert.Nil(t, ctl.takeQuarantine(), "a won claim disarms the fence")
+	})
+
+	t.Run("losing the claim leaves the fence armed for the worker", func(t *testing.T) {
+		mgr, ctl, ctx, job := newCase()
+		require.True(t, ctl.claimAbandon(), "the worker wins the race in this scenario")
+		mgr.waitStoppedJob(ctx, "j", job, true)
+		assert.NotNil(t, ctl.takeQuarantine(),
+			"a lost claim must leave the fence for the abandoning worker - its abandon then publishes the fenced stop success")
+	})
+
+	t.Run("an inner-phase stop never claims and always disarms", func(t *testing.T) {
+		mgr, ctl, ctx, job := newCase()
+		mgr.waitStoppedJob(ctx, "j", job, false)
+		assert.True(t, ctl.claimCompletion(), "the outermost closure still owns the completion")
+		assert.Nil(t, ctl.takeQuarantine(), "the inner-phase disarm keeps today's semantics")
+	})
+}
+
+func TestDiscoveryStagedStopsAreFinalPhase(t *testing.T) {
+	runWithAbandonedStop := func(t *testing.T, action func(*Manager, dyncfg.StepRunner)) {
+		t.Helper()
+		mgr, _ := newExecutorTestManager()
+		cfg := prepareDiscoveredCfg("success", "disc")
+		mgr.collectorHandler.AddDiscoveredConfig(cfg, dyncfg.StatusRunning)
+		mgr.runningJobs.lock()
+		mgr.runningJobs.add(cfg.FullName(), &tickProbeJob{
+			fullName:   cfg.FullName(),
+			moduleName: cfg.Module(),
+			name:       cfg.Name(),
+		})
+		mgr.runningJobs.unlock()
+
+		var ran bool
+		run := func(effect func(context.Context) error, commit func(error)) {
+			ran = true
+			ctl := &effectControl{}
+			require.True(t, ctl.claimAbandon(), "the worker wins the deadline race")
+			ctx := context.WithValue(context.Background(), effectControlKey{}, ctl)
+			require.NoError(t, effect(ctx))
+			assert.NotNil(t, ctl.takeQuarantine(),
+				"discovery one-phase stops must leave the fence armed when the worker won the race")
+			commit(dyncfg.ErrPhaseAbandoned)
+		}
+
+		action(mgr, run)
+		require.True(t, ran)
+	}
+
+	t.Run("replace", func(t *testing.T) {
+		runWithAbandonedStop(t, func(mgr *Manager, run dyncfg.StepRunner) {
+			replacement := prepareUserCfg("success", "disc")
+			mgr.stagedAddConfig(replacement, run, func() {}, func(dyncfg.Function) {})
+		})
+	})
+
+	t.Run("remove", func(t *testing.T) {
+		runWithAbandonedStop(t, func(mgr *Manager, run dyncfg.StepRunner) {
+			cfg := prepareDiscoveredCfg("success", "disc")
+			mgr.stagedRemoveConfig(cfg, run)
+		})
+	})
+}
+
+// A collector test completing DURING the shutdown drain answers 503, never
+// its natural 200/422: the keyless test path bypasses the executor's
+// receive-time one-rule choke points (its worker responds directly), so the
+// boundary lives at the worker's send seam - and the drain WAITS for test
+// workers, making this window deterministic, not a race.
+func TestCollectorTest_AnswersShutdown503(t *testing.T) {
+	gate := make(chan struct{})
+
+	reg := collectorapi.Registry{}
+	reg.Register("gated", collectorapi.Creator{
+		JobConfigSchema: collectorapi.MockConfigSchema,
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				InitFunc: func(context.Context) error {
+					<-gate // the test's Init outlives the shutdown start
+					return nil
+				},
+			}
+		},
+	})
+
+	var out simOutput
+	mgr := New(Config{PluginName: testPluginName})
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&out))))
+	mgr.modules = reg
+
+	ctx, cancel := context.WithCancel(context.Background())
+	in := make(chan []*confgroup.Group)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer close(in)
+		mgr.Run(ctx, in)
+	}()
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), charWait)
+	defer waitCancel()
+	require.True(t, mgr.WaitStarted(waitCtx))
+	h := &charHarness{mgr: mgr, out: &out, in: in}
+
+	h.dyncfg("t1", []string{mgr.dyncfgModID("gated"), "test", "probe"}, []byte("{}"))
+	require.Never(t, h.outputContains("FUNCTION_RESULT_BEGIN t1"), charNeverWait, charTick,
+		"the test worker must be in flight")
+
+	// Shutdown begins while the test's Init is blocked; the drain waits for
+	// test workers, so the worker completes DURING shutdown - with a module
+	// SUCCESS that must still answer 503.
+	cancel()
+	close(gate)
+	select {
+	case <-done:
+	case <-time.After(2 * cmdTestWorkerDrainWait):
+		t.Fatal("shutdown did not complete")
+	}
+
+	require.True(t, h.outputContains("FUNCTION_RESULT_BEGIN t1 503")(),
+		"a test completing during the drain must answer 503")
+	assert.NotContains(t, out.String(), "FUNCTION_RESULT_BEGIN t1 200",
+		"the module's success must not reach the wire after shutdown began")
+}
+
+// Once shutdown begins EVERY non-terminal command answers 503 - malformed
+// ones included: the shutdown check precedes even argument validation, so a
+// too-few-args request cannot answer 400 after the one-rule boundary.
+func TestDyncfgConfig_MalformedAnswers503AtShutdown(t *testing.T) {
+	var out simOutput
+	mgr := New(Config{PluginName: testPluginName})
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&out))))
+	mgr.modules = collectorapi.Registry{}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	in := make(chan []*confgroup.Group)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer close(in)
+		mgr.Run(ctx, in)
+	}()
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), charWait)
+	defer waitCancel()
+	require.True(t, mgr.WaitStarted(waitCtx))
+
+	cancel()
+	select {
+	case <-done:
+	case <-time.After(charWait):
+		t.Fatal("shutdown did not complete")
+	}
+
+	h := &charHarness{mgr: mgr, out: &out, in: in}
+	h.dyncfg("bad-args", []string{"test:collector:success"}, nil) // one arg only: malformed
+	require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN bad-args 503"), charWait, charTick,
+		"a malformed command after shutdown must answer 503, not 400")
+	assert.NotContains(t, out.String(), "FUNCTION_RESULT_BEGIN bad-args 400")
+}
+
+// drainAbandonedEffect releases a directly-supervised abandoned effect the
+// way the production worker and loop would: unblock the leaked module call,
+// acknowledge the delivery gate (the worker closes it after its send
+// reaches the loop), and wait the leaked child out - its late completion
+// lands in the buffered effectDoneCh. Without this, the child parks at the
+// delivery gate forever and the goroutine leaks into later tests.
+func drainAbandonedEffect(mgr *Manager, res effectResult, release chan struct{}) {
+	select {
+	case <-release:
+	default:
+		close(release)
+	}
+	if res.delivered != nil {
+		close(res.delivered)
+	}
+	mgr.leakedChildren.Wait()
+}
+
+// TestSuperviseEffect_LateCompletionWaitsForAbandonDelivery pins the late
+// protocol's delivery order: a leaked call that returns INSTANTLY at
+// cancellation (a ctx-honoring backend) must not push its late completion
+// into effectDoneCh before the abandoned result reaches the loop - an
+// overtaken late result would be dropped as not-wedged and the key would
+// wedge with nothing left to release it.
+func TestSuperviseEffect_LateCompletionWaitsForAbandonDelivery(t *testing.T) {
+	mgr := New(Config{PluginName: testPluginName})
+	mgr.effectDeadline = 30 * time.Millisecond
+
+	res := mgr.superviseEffect(effectTask{key: "k", effect: func(ctx context.Context) error {
+		<-ctx.Done() // returns the instant the deadline fires
+		return ctx.Err()
+	}})
+	require.True(t, res.abandoned)
+	require.NotNil(t, res.delivered, "abandoned results carry the delivery gate")
+
+	// The leaked child has already returned, but its late result must wait
+	// for the abandon's delivery.
+	require.Never(t, func() bool { return len(mgr.effectDoneCh) > 0 }, charNeverWait, charTick,
+		"the late completion must not overtake the undelivered abandon")
+
+	close(res.delivered) // what the worker does after its send reaches the loop
+	require.Eventually(t, func() bool { return len(mgr.effectDoneCh) == 1 }, charWait, charTick,
+		"the late completion must flow once the abandon was delivered")
+	late := <-mgr.effectDoneCh
+	assert.True(t, late.late)
 }
 
 // TestResumeWarmJob_IneligibleDropDisposesGate pins that a warm job dropped
