@@ -22,8 +22,9 @@ import (
 )
 
 type functionSet struct {
-	direct   Handler            // for globally-unique names
-	prefixes map[string]Handler // for prefix-multiplexed names
+	direct         Handler                   // for globally-unique names
+	prefixes       map[string]Handler        // for prefix-multiplexed names
+	prefixDerivers map[string]LaneKeyDeriver // optional per-prefix lane-key derivation
 }
 
 const (
@@ -34,17 +35,16 @@ const (
 	// TODO: establish and document a MethodHandler goroutine-safety contract
 	// before increasing this default.
 	defaultWorkerCount = 1
-	// defaultQueueSize is intentionally 1 (not removed: the keyed scheduler is
-	// still the dispatch primitive, we just don't want it to absorb bursts).
-	// Rationale: every downstream stage is single-threaded today (1 worker, 1
-	// jobmgr loop, serial Check()), so admitting more than 1 extra request
-	// only buys wedge surface (a queued request that is later cancelled by
-	// netdata cannot reach jobmgr, so the dyncfg wait gate stays in
-	// 'accepted' forever). With queue=1 the stdin reader back-pressures
-	// earlier through the OS pipe instead of
-	// piling up admitted-but-unprocessed work in stateQueued. If/when we add
-	// real downstream concurrency, raise this again.
-	defaultQueueSize            = 1
+	// defaultQueueSize caps the scheduler BACKLOG only (ready-not-picked plus
+	// lane-queued; decremented when a worker picks a request) - it does not
+	// bound dispatched commands awaiting results. The real in-flight bound for
+	// dyncfg is lane ownership: at most one dispatched command per config lane
+	// until terminal finalize, so total in-flight work is O(active lanes) plus
+	// this backlog, mirroring the daemon's own per-config echo bound. Queued
+	// cancels are ignored (see requestCancellation), so a queued dyncfg
+	// command always reaches its handler and its lane always completes -
+	// backlog depth adds latency, never wedges.
+	defaultQueueSize            = 256
 	defaultCancelFallbackDelay  = 5 * time.Second
 	defaultShutdownDrainTimeout = 8 * time.Second
 	defaultTombstoneTTL         = 60 * time.Second
@@ -73,6 +73,7 @@ type invocationRequest struct {
 	handler     Handler
 	ctx         context.Context
 	scheduleKey string
+	laneMeta    any
 }
 
 type invocationRecord struct {
@@ -286,7 +287,7 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function) {
 		return
 	}
 
-	handler, scheduleKey, ok := m.lookupFunctionRoute(*fn)
+	handler, scheduleKey, laneMeta, ok := m.lookupFunctionRoute(*fn)
 	if !ok {
 		m.Infof("skipping execution of '%s': unregistered function", fn.Name)
 		m.respf(fn, 501, "unregistered function: %s", fn.Name)
@@ -329,6 +330,7 @@ func (m *Manager) dispatchInvocation(parentCtx context.Context, fn *Function) {
 		handler:     handler,
 		ctx:         reqCtx,
 		scheduleKey: scheduleKey,
+		laneMeta:    laneMeta,
 	}
 
 	if m.scheduler == nil {
@@ -692,8 +694,9 @@ func (m *Manager) stopTimersLocked(rec *invocationRecord) {
 }
 
 type functionSnapshot struct {
-	direct   Handler
-	prefixes map[string]Handler
+	direct         Handler
+	prefixes       map[string]Handler
+	prefixDerivers map[string]LaneKeyDeriver
 }
 
 func (m *Manager) snapshotFunction(name string) (functionSnapshot, bool) {
@@ -705,6 +708,10 @@ func (m *Manager) snapshotFunction(name string) (functionSnapshot, bool) {
 		if len(fs.prefixes) > 0 {
 			snap.prefixes = make(map[string]Handler, len(fs.prefixes))
 			maps.Copy(snap.prefixes, fs.prefixes)
+		}
+		if len(fs.prefixDerivers) > 0 {
+			snap.prefixDerivers = make(map[string]LaneKeyDeriver, len(fs.prefixDerivers))
+			maps.Copy(snap.prefixDerivers, fs.prefixDerivers)
 		}
 	}
 	m.mux.Unlock()
@@ -729,10 +736,10 @@ func matchPrefix(prefixes map[string]Handler, id string) (string, Handler, bool)
 	return "", nil, false
 }
 
-func (m *Manager) lookupFunctionRoute(fn Function) (handler Handler, scheduleKey string, ok bool) {
+func (m *Manager) lookupFunctionRoute(fn Function) (handler Handler, scheduleKey string, laneMeta any, ok bool) {
 	snap, ok := m.snapshotFunction(fn.Name)
 	if !ok {
-		return nil, "", false
+		return nil, "", nil, false
 	}
 	unknownHandler := m.unknownFunctionHandler()
 
@@ -740,18 +747,30 @@ func (m *Manager) lookupFunctionRoute(fn Function) (handler Handler, scheduleKey
 		if len(fn.Args) > 0 {
 			id := fn.Args[0]
 			if prefix, routeHandler, matched := matchPrefix(snap.prefixes, id); matched && routeHandler != nil {
-				return routeHandler, routeScheduleKey(fn.Name, prefix), true
+				key := routeScheduleKey(fn.Name, prefix)
+				if derive := snap.prefixDerivers[prefix]; derive != nil {
+					if laneKey, meta := m.deriveLaneKey(derive, fn); laneKey != "" {
+						// Narrow the registration lane to the derived identity;
+						// underivable requests keep the registration-wide lane.
+						// A NUL byte joins the parts: it cannot appear in the
+						// line-based plugins.d protocol, so two different
+						// (route, lane) pairs can never concatenate into the
+						// same schedule key.
+						return routeHandler, key + "\x00" + laneKey, meta, true
+					}
+				}
+				return routeHandler, key, nil, true
 			}
 		}
 
-		return unknownHandler, routeScheduleKey(fn.Name, scheduleKeyUnmatched), true
+		return unknownHandler, routeScheduleKey(fn.Name, scheduleKeyUnmatched), nil, true
 	}
 
 	if snap.direct != nil {
-		return snap.direct, routeScheduleKey(fn.Name, ""), true
+		return snap.direct, routeScheduleKey(fn.Name, ""), nil, true
 	}
 
-	return unknownHandler, routeScheduleKey(fn.Name, scheduleKeyDirectMissing), true
+	return unknownHandler, routeScheduleKey(fn.Name, scheduleKeyDirectMissing), nil, true
 }
 
 // lookupFunction returns a snapshot handler used by existing tests to verify

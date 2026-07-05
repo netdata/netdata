@@ -130,6 +130,8 @@ If the script is valid, this command will return `OK, VALID`. We recommend verif
 
 If `curl` fails to download the install script with `curl: (60) SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)`, this is an OS-level certificate-trust issue: the host's CA certificate store is missing or outdated. Update your system CA certificates using your package manager (for example `sudo apt-get install --reinstall ca-certificates` on Debian/Ubuntu or `sudo dnf reinstall ca-certificates` on RHEL/Fedora), then re-run the install command.
 
+If you see a message like `File not found when checking for remote file at https://repository.netdata.cloud/repos/repoconfig` while running `kickstart.sh`, it is an informational notice. It means a remote file check during installation did not succeed, but this does not stop or break the installation — the installer continues automatically to the next step. The message is not specific to any particular Linux distribution and can appear on any supported system.
+
 ## Related Docs
 
 - [Connect to Netdata Cloud](/src/claim/README.md)

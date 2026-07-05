@@ -3,6 +3,7 @@
 package secretsctl
 
 import (
+	"context"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
@@ -16,14 +17,15 @@ func (c *Controller) publishInitialConfig(rawCfg secretstore.Config) {
 			return
 		}
 		if existing.Status == dyncfg.StatusRunning || existing.Status == dyncfg.StatusFailed {
-			c.cb.Stop(existing.Cfg)
-			c.cb.TakeCommandMessage()
+			// Boot publishing carries no command run: no restart stage, no
+			// terminal message.
+			c.cb.Stop(context.Background(), existing.Cfg)
 		}
 	}
 
 	entry := &dyncfg.Entry[secretstore.Config]{Cfg: cfg, Status: dyncfg.StatusFailed}
 	if prepErr == nil {
-		if err := c.cb.Start(cfg); err == nil {
+		if err := c.cb.Start(context.Background(), cfg); err == nil {
 			entry.Status = dyncfg.StatusRunning
 		}
 	}
@@ -33,7 +35,7 @@ func (c *Controller) publishInitialConfig(rawCfg secretstore.Config) {
 }
 
 func (c *Controller) prepareConfigCandidate(cfg secretstore.Config) (secretstore.Config, error) {
-	return cfg, c.validateConfig(cfg)
+	return cfg, c.validateConfig(context.Background(), cfg)
 }
 
 func shouldKeepExisting(cfg secretstore.Config, existing *dyncfg.Entry[secretstore.Config]) bool {

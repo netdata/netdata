@@ -86,6 +86,16 @@ func TestTopologyFunctionAdapter_HandleDefaultStrictL2(t *testing.T) {
 	assert.Equal(t, "detailed", data.View.Mode)
 	assert.Greater(t, data.Actors.Rows, 0)
 	assert.Greater(t, data.Links.Rows, 0)
+
+	deviceSearch := data.Types.ActorTypes["device"].Search
+	require.NotNil(t, deviceSearch)
+	require.Subset(t, deviceSearch.Columns, []string{"sys_descr", "sys_location", "sys_contact", "netdata_host_id"})
+	require.Subset(t, deviceSearch.LabelKeys, []string{"mac_address", "ip_address", "hostname", "dns_name", topologymodel.LabelOSPFRouterID})
+
+	endpointSearch := data.Types.ActorTypes["endpoint"].Search
+	require.NotNil(t, endpointSearch)
+	require.Subset(t, endpointSearch.Columns, []string{"id", "vendor", "model"})
+	require.Subset(t, endpointSearch.LabelKeys, []string{"mac_address", "ip_address", "hostname", "dns_name", "learned_sources"})
 }
 
 func TestTopologyFunctionAdapter_HandleSelectorParams(t *testing.T) {

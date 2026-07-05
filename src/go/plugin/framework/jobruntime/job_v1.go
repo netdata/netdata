@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -56,22 +57,26 @@ func newCollectDurationChart(pluginName string) *collectorapi.Chart {
 }
 
 type JobConfig struct {
-	PluginName      string
-	Name            string
-	ModuleName      string
-	FullName        string
-	Source          string
-	Module          collectorapi.CollectorV1
-	Labels          map[string]string
-	Out             io.Writer
-	UpdateEvery     int
-	AutoDetectEvery int
-	Priority        int
-	IsStock         bool
-	Vnode           vnodes.VirtualNode
-	AuditMode       bool
-	AuditAnalyzer   metricsaudit.Analyzer
-	FunctionOnly    bool
+	PluginName            string
+	Name                  string
+	ModuleName            string
+	FullName              string
+	Source                string
+	Module                collectorapi.CollectorV1
+	Labels                map[string]string
+	Out                   io.Writer
+	UpdateEvery           int
+	AutoDetectEvery       int
+	Priority              int
+	IsStock               bool
+	Vnode                 vnodes.VirtualNode
+	VnodeName             string
+	VnodeRevision         uint64
+	VnodeMetadataRevision uint64
+	VnodeLookup           VnodeLookup
+	AuditMode             bool
+	AuditAnalyzer         metricsaudit.Analyzer
+	FunctionOnly          bool
 }
 
 func NewJob(cfg JobConfig) *Job {
@@ -85,27 +90,30 @@ func NewJob(cfg JobConfig) *Job {
 		AutoDetectEvery: cfg.AutoDetectEvery,
 		AutoDetectTries: infTries,
 
-		pluginName:           cfg.PluginName,
-		name:                 cfg.Name,
-		moduleName:           cfg.ModuleName,
-		fullName:             cfg.FullName,
-		updateEvery:          cfg.UpdateEvery,
-		priority:             cfg.Priority,
-		isStock:              cfg.IsStock,
-		functionOnly:         cfg.FunctionOnly,
-		module:               cfg.Module,
-		labels:               cfg.Labels,
-		out:                  cfg.Out,
-		collectStatusChart:   newCollectStatusChart(cfg.PluginName),
-		collectDurationChart: newCollectDurationChart(cfg.PluginName),
-		stopCtrl:             newStopController(),
-		tick:                 make(chan int),
-		buf:                  &buf,
-		api:                  netdataapi.New(&buf),
-		vnode:                cfg.Vnode,
-		updVnode:             make(chan *vnodes.VirtualNode, 1),
-		auditMode:            cfg.AuditMode,
-		auditAnalyzer:        cfg.AuditAnalyzer,
+		pluginName:            cfg.PluginName,
+		name:                  cfg.Name,
+		moduleName:            cfg.ModuleName,
+		fullName:              cfg.FullName,
+		updateEvery:           cfg.UpdateEvery,
+		priority:              cfg.Priority,
+		isStock:               cfg.IsStock,
+		functionOnly:          cfg.FunctionOnly,
+		module:                cfg.Module,
+		labels:                cfg.Labels,
+		out:                   cfg.Out,
+		collectStatusChart:    newCollectStatusChart(cfg.PluginName),
+		collectDurationChart:  newCollectDurationChart(cfg.PluginName),
+		stopCtrl:              newStopController(),
+		tick:                  make(chan int),
+		buf:                   &buf,
+		api:                   netdataapi.New(&buf),
+		vnode:                 cfg.Vnode,
+		vnodeName:             cfg.VnodeName,
+		vnodeRevision:         cfg.VnodeRevision,
+		vnodeMetadataRevision: cfg.VnodeMetadataRevision,
+		vnodeLookup:           cfg.VnodeLookup,
+		auditMode:             cfg.AuditMode,
+		auditAnalyzer:         cfg.AuditAnalyzer,
 	}
 
 	log := logger.New().With(jobLoggerAttrs(j.ModuleName(), j.Name(), cfg.Source)...)
@@ -153,13 +161,25 @@ type Job struct {
 	api                  *netdataapi.API
 
 	vnodeCreated bool
-	vnode        vnodes.VirtualNode
-	updVnode     chan *vnodes.VirtualNode
+	// vnodeMu covers j.vnode against off-goroutine readers (Vnode is
+	// called from the manager loop on registered jobs) racing the job
+	// goroutine's writes and the pre-Start baseline write.
+	vnodeMu               sync.RWMutex
+	vnode                 vnodes.VirtualNode
+	vnodeName             string
+	vnodeRevision         uint64
+	vnodeMetadataRevision uint64
+	vnodeLookup           VnodeLookup
 
 	retries atomic.Int64
 	prevRun time.Time
 
 	stopCtrl stopController
+
+	// moduleCleanup guards the module's Cleanup to exactly once: it is
+	// reachable from the detection-failure defer, the main loop's tail, and
+	// Cleanup() (detected-but-never-started jobs are disposed through it).
+	moduleCleanup sync.Once
 
 	// Metrics-audit mode support.
 	auditMode     bool
@@ -218,11 +238,14 @@ func (j *Job) Configuration() any {
 }
 
 func (j *Job) Vnode() vnodes.VirtualNode {
-	return j.vnode
+	j.vnodeMu.RLock()
+	defer j.vnodeMu.RUnlock()
+	return *j.vnode.Copy()
 }
 
 // AutoDetection invokes init, check and postCheck. It handles panic.
-func (j *Job) AutoDetection() (err error) {
+// ctx flows into the module's Init/Check calls and must be non-nil.
+func (j *Job) AutoDetection(ctx context.Context) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic %v", r)
@@ -235,7 +258,7 @@ func (j *Job) AutoDetection() (err error) {
 			}
 		}
 		if err != nil {
-			j.module.Cleanup(context.TODO())
+			j.cleanupModule()
 		}
 	}()
 
@@ -243,7 +266,7 @@ func (j *Job) AutoDetection() (err error) {
 		j.Mute()
 	}
 
-	if err = j.init(); err != nil {
+	if err = j.init(ctx); err != nil {
 		j.Errorf("init failed: %v", err)
 		j.Unmute()
 		if !isRetryableError(err) {
@@ -252,7 +275,7 @@ func (j *Job) AutoDetection() (err error) {
 		return err
 	}
 
-	if err = j.check(); err != nil {
+	if err = j.check(ctx); err != nil {
 		j.Errorf("check failed: %v", err)
 		j.Unmute()
 		return err
@@ -275,15 +298,64 @@ func (j *Job) AutoDetection() (err error) {
 	return nil
 }
 
-func (j *Job) UpdateVnode(vnode *vnodes.VirtualNode) {
-	if vnode == nil {
+// SetVnodeSnapshot commits the vnode config directly into the job BEFORE Start:
+// registration-time freshness must be visible to Cleanup even when the job
+// never collects. Pre-Start only: the job goroutine does not exist yet, and the
+// write is published to it by the Start goroutine launch. Module-owned vnode
+// state is never overridden.
+func (j *Job) SetVnodeSnapshot(snapshot VnodeSnapshot) {
+	if snapshot.Vnode == nil || (j.module != nil && j.module.VirtualNode() != nil) {
 		return
 	}
-	select {
-	case <-j.updVnode:
-	default:
+	next := snapshot.Vnode.Copy()
+	j.vnodeMu.Lock()
+	j.vnode = *next
+	if snapshot.Revision != 0 {
+		j.vnodeRevision = snapshot.Revision
 	}
-	j.updVnode <- vnode
+	if snapshot.MetadataRevision != 0 {
+		j.vnodeMetadataRevision = snapshot.MetadataRevision
+	}
+	j.vnodeMu.Unlock()
+}
+
+func (j *Job) refreshVnodeSnapshot() bool {
+	if j.vnodeName == "" || j.vnodeLookup == nil {
+		return false
+	}
+	snapshot, ok := j.vnodeLookup(j.vnodeName)
+	if !ok {
+		return false
+	}
+	return j.applyVnodeSnapshot(snapshot)
+}
+
+func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) bool {
+	if snapshot.Vnode == nil {
+		return false
+	}
+	next := snapshot.Vnode.Copy()
+
+	j.vnodeMu.Lock()
+	defer j.vnodeMu.Unlock()
+
+	if snapshot.Revision != 0 && snapshot.Revision <= j.vnodeRevision {
+		return false
+	}
+	metadataChanged := snapshot.MetadataRevision == 0 || snapshot.MetadataRevision != j.vnodeMetadataRevision
+	createChart := false
+	if metadataChanged {
+		j.vnodeCreated = false
+		createChart = j.vnode.GUID != next.GUID
+	}
+	j.vnode = *next
+	if snapshot.Revision != 0 {
+		j.vnodeRevision = snapshot.Revision
+	}
+	if snapshot.MetadataRevision != 0 {
+		j.vnodeMetadataRevision = snapshot.MetadataRevision
+	}
+	return createChart
 }
 
 // Tick Tick.
@@ -343,7 +415,6 @@ LOOP:
 			}
 		}
 	}
-	j.module.Cleanup(context.TODO())
 	j.Cleanup()
 }
 
@@ -360,7 +431,12 @@ func (j *Job) disableAutoDetection() {
 	disableAutoDetection(&j.AutoDetectEvery)
 }
 
+func (j *Job) cleanupModule() {
+	j.moduleCleanup.Do(func() { j.module.Cleanup(context.TODO()) })
+}
+
 func (j *Job) Cleanup() {
+	j.cleanupModule()
 	j.buf.Reset()
 	if !collectorapi.ShouldObsoleteCharts() {
 		return
@@ -404,12 +480,12 @@ func (j *Job) Cleanup() {
 	}
 }
 
-func (j *Job) init() error {
+func (j *Job) init(ctx context.Context) error {
 	if j.initialized {
 		return nil
 	}
 
-	if err := j.module.Init(context.TODO()); err != nil {
+	if err := j.module.Init(ctx); err != nil {
 		return err
 	}
 
@@ -418,8 +494,8 @@ func (j *Job) init() error {
 	return nil
 }
 
-func (j *Job) check() error {
-	if err := j.module.Check(context.TODO()); err != nil {
+func (j *Job) check(ctx context.Context) error {
+	if err := j.module.Check(ctx); err != nil {
 		consumeAutoDetectTry(&j.AutoDetectTries)
 		return err
 	}
@@ -491,19 +567,15 @@ func (j *Job) collect() collectedMetrics {
 func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLastRun int) bool {
 	var createChart bool
 	if j.module.VirtualNode() == nil {
-		select {
-		case vnode := <-j.updVnode:
-			j.vnodeCreated = false
-			createChart = j.vnode.GUID != vnode.GUID
-			j.vnode = *vnode.Copy()
-		default:
-		}
+		createChart = j.refreshVnodeSnapshot()
 	}
 
 	if !j.vnodeCreated {
 		if j.vnode.GUID == "" {
 			if v := j.module.VirtualNode(); v != nil && v.GUID != "" && v.Hostname != "" {
+				j.vnodeMu.Lock()
 				j.vnode = *v
+				j.vnodeMu.Unlock()
 			}
 		}
 		if j.vnode.GUID != "" {
@@ -588,8 +660,10 @@ func (j *Job) sendVnodeHostInfo() {
 		return
 	}
 
+	j.vnodeMu.Lock()
 	j.vnode.Hostname = info.Hostname
 	j.vnode.Labels = info.Labels
+	j.vnodeMu.Unlock()
 	j.api.HOSTINFO(info)
 }
 

@@ -101,6 +101,28 @@ func (s *Service) Start(pluginName string, out io.Writer) {
 	go s.runTicker(interval, stopCh, doneCh)
 }
 
+// QuarantineComponent implements the runtimecomp.Service emission barrier:
+// it snapshots the job pointer under s.mu, releases s.mu, and only then
+// waits on the job's tick mutex (lock order: never wait on the tick mutex
+// while holding s.mu).
+func (s *Service) QuarantineComponent(name string) {
+	if s == nil {
+		return
+	}
+	name = strings.TrimSpace(name)
+
+	s.mu.Lock()
+	job := s.job
+	s.mu.Unlock()
+
+	if job != nil {
+		job.quarantineComponent(name)
+		return
+	}
+	// No emitter running: removing the registration is the whole barrier.
+	s.registry.remove(name)
+}
+
 // Stop terminates the runtime emitter job. Calling Stop multiple times is safe.
 func (s *Service) Stop() {
 	if s == nil {
@@ -115,7 +137,9 @@ func (s *Service) Stop() {
 	job := s.job
 	stopCh := s.tkStop
 	doneCh := s.tkDone
-	s.job = nil
+	// s.job stays set until the emitter has fully stopped: a concurrent
+	// QuarantineComponent must keep finding the job so its barrier waits out
+	// the final in-progress tick instead of degrading to a registry remove.
 	s.tkStop = nil
 	s.tkDone = nil
 	s.started = false
@@ -130,6 +154,12 @@ func (s *Service) Stop() {
 	if job != nil {
 		job.Stop()
 	}
+
+	s.mu.Lock()
+	if s.job == job {
+		s.job = nil
+	}
+	s.mu.Unlock()
 }
 
 // Tick advances runtime producers and runtime emitter job on scheduler cadence.

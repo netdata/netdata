@@ -27,7 +27,9 @@ type Options struct {
 
 	AffectedJobs            func(string) []secretstore.JobRef
 	RestartableAffectedJobs func(string) []secretstore.JobRef
-	RestartDependentJobs    func(string) string
+	// StageDependentRestarts snapshots the store's dependent-restart plan on
+	// the caller's goroutine (the run loop).
+	StageDependentRestarts func(storeKey string) *StagedRestarts
 }
 
 type Entry struct {
@@ -47,7 +49,7 @@ type Controller struct {
 
 	affectedJobs            func(string) []secretstore.JobRef
 	restartableAffectedJobs func(string) []secretstore.JobRef
-	restartDependentJobs    func(string) string
+	stageDependentRestarts  func(string) *StagedRestarts
 
 	handler *dyncfg.Handler[secretstore.Config]
 	cb      *secretStoreCallbacks
@@ -73,13 +75,12 @@ func New(opts Options) *Controller {
 		initial:                 append([]secretstore.Config(nil), opts.Initial...),
 		affectedJobs:            opts.AffectedJobs,
 		restartableAffectedJobs: opts.RestartableAffectedJobs,
-		restartDependentJobs:    opts.RestartDependentJobs,
+		stageDependentRestarts:  opts.StageDependentRestarts,
 	}
 	c.cb = newSecretStoreCallbacks(secretStoreCallbackDeps{
-		pluginName:           c.pluginName,
-		log:                  c.Logger,
-		service:              c.service,
-		restartDependentJobs: c.restartDependentJobs,
+		pluginName: c.pluginName,
+		log:        c.Logger,
+		service:    c.service,
 	})
 	c.handler = dyncfg.NewHandler(dyncfg.HandlerOpts[secretstore.Config]{
 		Logger:    c.Logger,

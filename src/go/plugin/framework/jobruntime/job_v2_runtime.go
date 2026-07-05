@@ -66,6 +66,13 @@ func (j *JobV2) runtimeComponentLabels() map[string]string {
 	return labels
 }
 
+// RuntimeComponentName is the runtime-chart component this job registers;
+// the runtime owner uses it to fence the component's emission when the job's
+// stop is abandoned at its deadline.
+func (j *JobV2) RuntimeComponentName() string {
+	return j.buildRuntimeComponentName()
+}
+
 func (j *JobV2) buildRuntimeComponentName() string {
 	plugin := sanitizeRuntimeComponentPart(firstNonEmpty(j.pluginName, "go.d"))
 	fullName := sanitizeRuntimeComponentPart(firstNonEmpty(j.fullName, j.name, "job"))

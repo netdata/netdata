@@ -23,8 +23,7 @@ type Options struct {
 	Plugin  string
 	Initial map[string]*vnodes.VirtualNode
 
-	AffectedJobs     func(string) []string
-	ApplyVnodeUpdate func(string, *vnodes.VirtualNode)
+	AffectedJobs func(string) []string
 }
 
 type Controller struct {
@@ -34,8 +33,7 @@ type Controller struct {
 	pluginName string
 	store      *vnodeStore
 
-	affectedJobs     func(string) []string
-	applyVnodeUpdate func(string, *vnodes.VirtualNode)
+	affectedJobs func(string) []string
 }
 
 func New(opts Options) *Controller {
@@ -45,12 +43,11 @@ func New(opts Options) *Controller {
 	}
 
 	return &Controller{
-		Logger:           log,
-		api:              opts.API,
-		pluginName:       opts.Plugin,
-		store:            newVnodeStore(opts.Initial),
-		affectedJobs:     opts.AffectedJobs,
-		applyVnodeUpdate: opts.ApplyVnodeUpdate,
+		Logger:       log,
+		api:          opts.API,
+		pluginName:   opts.Plugin,
+		store:        newVnodeStore(opts.Initial),
+		affectedJobs: opts.AffectedJobs,
 	}
 }
 
@@ -71,6 +68,13 @@ func (c *Controller) Lookup(name string) (*vnodes.VirtualNode, bool) {
 		return nil, false
 	}
 	return c.store.Lookup(name)
+}
+
+func (c *Controller) LookupSnapshot(name string) (Snapshot, bool) {
+	if c.store == nil {
+		return Snapshot{}, false
+	}
+	return c.store.LookupSnapshot(name)
 }
 
 func (c *Controller) CreateTemplates() {

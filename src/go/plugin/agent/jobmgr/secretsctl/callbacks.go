@@ -4,7 +4,6 @@ package secretsctl
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 
@@ -16,17 +15,12 @@ import (
 
 type secretStoreCallbacks struct {
 	deps secretStoreCallbackDeps
-	// commandMessage is written by Start/Update/Stop and consumed by
-	// TakeCommandMessage. Safety relies on callbacks remaining serialized by
-	// the jobmgr dyncfg command flow.
-	commandMessage string
 }
 
 type secretStoreCallbackDeps struct {
-	pluginName           string
-	log                  *logger.Logger
-	service              secretstore.Service
-	restartDependentJobs func(string) string
+	pluginName string
+	log        *logger.Logger
+	service    secretstore.Service
 }
 
 type codedError struct {
@@ -42,11 +36,30 @@ func newSecretStoreCallbacks(deps secretStoreCallbackDeps) *secretStoreCallbacks
 	return &secretStoreCallbacks{deps: deps}
 }
 
-func (d secretStoreCallbackDeps) restartDependentJobsMessage(storeKey string) string {
-	if d.restartDependentJobs == nil {
-		return ""
+// runStagedRestarts executes the command's staged dependent-restart plan (if
+// any rides the effect context): the message goes to the command's terminal,
+// the buffered per-job state/status commits replay on the loop before it.
+// The returned error is non-nil when the deadline cut the sequence short -
+// mutating callbacks MUST return it, so the command classifies as the
+// timeout failure regardless of whether the effect's return or the worker's
+// abandon wins their select race. That guarantee is enforced HERE as a
+// TOTAL post-condition, not only by the plan's own checkpoints: a sequence
+// returning success while the command's window has already expired (the
+// deadline fired DURING a restart, or after the last one - a per-checkpoint
+// cut check cannot see either) is reclassified as the timeout failure, so
+// no restart pipeline can under-report deadline degradation.
+func runStagedRestarts(ctx context.Context) error {
+	r := storeCommandRunFrom(ctx)
+	if r == nil || r.staged == nil {
+		return nil
 	}
-	return d.restartDependentJobs(storeKey)
+	msg, err := r.staged.Run(ctx)
+	r.setMessage(msg)
+	dyncfg.SetCommandMessage(ctx, msg)
+	if err == nil && ctx.Err() != nil {
+		err = fmt.Errorf("the store operation timed out during the dependent restarts")
+	}
+	return err
 }
 
 func (d secretStoreCallbackDeps) extractSecretStoreKindFromTemplateID(id string) (secretstore.StoreKind, bool) {
@@ -93,18 +106,21 @@ func (d secretStoreCallbackDeps) secretStoreConfigFromPayload(fn dyncfg.Function
 	return payload, nil
 }
 
-func (d secretStoreCallbackDeps) validateSecretStoreConfig(cfg secretstore.Config) error {
+func (d secretStoreCallbackDeps) validateSecretStoreConfig(ctx context.Context, cfg secretstore.Config) error {
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
 	if d.service == nil {
 		return fmt.Errorf("secretstore service is not available")
 	}
-	return d.service.Validate(d.resolveContext(cfg), cfg)
+	return d.service.Validate(d.resolveContext(ctx, cfg), cfg)
 }
 
-func (d secretStoreCallbackDeps) resolveContext(cfg secretstore.Config) context.Context {
-	return secretStoreResolveContext(d.log, cfg)
+// resolveContext derives the service-call context from the caller's: the
+// domain runs loop-synchronously today (ctx is Background), but callers'
+// cancellation propagates once the domain moves onto the executor.
+func (d secretStoreCallbackDeps) resolveContext(ctx context.Context, cfg secretstore.Config) context.Context {
+	return secretStoreResolveContext(ctx, d.log, cfg)
 }
 
 func (d secretStoreCallbackDeps) dyncfgSecretStoreID(id string) string {
@@ -136,7 +152,10 @@ func (cb *secretStoreCallbacks) ValidateConfigName(name string) error {
 	return dyncfg.JobNameRuleAllowDots(name)
 }
 
-func (cb *secretStoreCallbacks) ParseAndValidate(fn dyncfg.Function, name string) (secretstore.Config, error) {
+// parseStorePayload is the CHEAP, deterministic parse prefix of
+// ParseAndValidate (no backend I/O), shared with ParsePayload so the stage
+// gate and the effect produce identical outcomes for identical inputs.
+func (cb *secretStoreCallbacks) parseStorePayload(fn dyncfg.Function, name string) (secretstore.Config, error) {
 	var kind secretstore.StoreKind
 	if fn.Command() == dyncfg.CommandAdd {
 		var ok bool
@@ -156,77 +175,87 @@ func (cb *secretStoreCallbacks) ParseAndValidate(fn dyncfg.Function, name string
 		}
 	}
 
-	cfg, err := cb.deps.secretStoreConfigFromPayload(fn, name, kind)
+	return cb.deps.secretStoreConfigFromPayload(fn, name, kind)
+}
+
+// ParsePayload implements dyncfg.PayloadParser: malformed payloads answer
+// their 400 at stage, before any claim or effect.
+func (cb *secretStoreCallbacks) ParsePayload(fn dyncfg.Function, name string) error {
+	_, err := cb.parseStorePayload(fn, name)
+	return err
+}
+
+func (cb *secretStoreCallbacks) ParseAndValidate(ctx context.Context, fn dyncfg.Function, name string) (secretstore.Config, error) {
+	cfg, err := cb.parseStorePayload(fn, name)
 	if err != nil {
 		return nil, err
 	}
-	if err := cb.deps.validateSecretStoreConfig(cfg); err != nil {
+	if err := cb.deps.validateSecretStoreConfig(ctx, cfg); err != nil {
 		return nil, err
 	}
 	return cfg, nil
 }
 
-func (cb *secretStoreCallbacks) Start(cfg secretstore.Config) error {
-	cb.commandMessage = ""
+func (cb *secretStoreCallbacks) Start(ctx context.Context, cfg secretstore.Config) error {
 	key := cfg.ExposedKey()
 	if cb.deps.service == nil {
 		return &codedError{err: fmt.Errorf("secretstore service is not available"), code: 400}
 	}
 
 	if _, ok := cb.deps.service.GetStatus(key); ok {
-		if err := cb.deps.service.Update(cb.deps.resolveContext(cfg), key, cfg); err != nil {
+		if err := cb.deps.service.Update(cb.deps.resolveContext(ctx, cfg), key, cfg); err != nil {
 			return &codedError{err: err, code: secretStoreErrorCode(err)}
 		}
-	} else if err := cb.deps.service.Add(cb.deps.resolveContext(cfg), cfg); err != nil {
+	} else if err := cb.deps.service.Add(cb.deps.resolveContext(ctx, cfg), cfg); err != nil {
 		return &codedError{err: err, code: secretStoreErrorCode(err)}
 	}
+	markCommandActivated(ctx)
 
-	cb.commandMessage = cb.deps.restartDependentJobsMessage(key)
-	return nil
+	return runStagedRestarts(ctx)
 }
 
-func (cb *secretStoreCallbacks) Update(oldCfg, newCfg secretstore.Config) error {
-	cb.commandMessage = ""
+// markCommandActivated flips the command run's activation marker (when one
+// rides the context): failures from here on are applied-but-degraded, not
+// validation-class.
+func markCommandActivated(ctx context.Context) {
+	if r := storeCommandRunFrom(ctx); r != nil {
+		r.markActivated()
+	}
+}
+
+func (cb *secretStoreCallbacks) Update(ctx context.Context, oldCfg, newCfg secretstore.Config) error {
 	key := oldCfg.ExposedKey()
 	if cb.deps.service == nil {
 		return &codedError{err: fmt.Errorf("secretstore service is not available"), code: 400}
 	}
 
 	if _, ok := cb.deps.service.GetStatus(key); ok {
-		if err := cb.deps.service.Update(cb.deps.resolveContext(newCfg), key, newCfg); err != nil {
+		if err := cb.deps.service.Update(cb.deps.resolveContext(ctx, newCfg), key, newCfg); err != nil {
 			return &codedError{err: err, code: secretStoreErrorCode(err)}
 		}
-	} else if err := cb.deps.service.Add(cb.deps.resolveContext(newCfg), newCfg); err != nil {
+	} else if err := cb.deps.service.Add(cb.deps.resolveContext(ctx, newCfg), newCfg); err != nil {
 		return &codedError{err: err, code: secretStoreErrorCode(err)}
 	}
+	markCommandActivated(ctx)
 
-	cb.commandMessage = cb.deps.restartDependentJobsMessage(key)
-	return nil
+	return runStagedRestarts(ctx)
 }
 
-func (cb *secretStoreCallbacks) Stop(cfg secretstore.Config) {
-	cb.commandMessage = ""
+func (cb *secretStoreCallbacks) Stop(ctx context.Context, cfg secretstore.Config) {
 	key := cfg.ExposedKey()
 	if cb.deps.service == nil {
 		return
 	}
 
 	if err := cb.deps.service.Remove(key); err != nil {
-		if errors.Is(err, secretstore.ErrStoreNotFound) {
-			return
-		}
 		return
 	}
-	cb.commandMessage = cb.deps.restartDependentJobsMessage(key)
+	// Stop has no error return by the handler contract: a deadline-cut
+	// sequence still reports the skipped dependents through the message.
+	_ = runStagedRestarts(ctx)
 }
 
 func (*secretStoreCallbacks) OnStatusChange(*dyncfg.Entry[secretstore.Config], dyncfg.Status, dyncfg.Function) {
-}
-
-func (cb *secretStoreCallbacks) TakeCommandMessage() string {
-	msg := strings.TrimSpace(cb.commandMessage)
-	cb.commandMessage = ""
-	return msg
 }
 
 func (cb *secretStoreCallbacks) ConfigID(cfg secretstore.Config) string {

@@ -34,6 +34,8 @@ func (m *runtimeServiceMock) UnregisterComponent(name string) {
 	m.unregistered = append(m.unregistered, name)
 }
 
+func (m *runtimeServiceMock) QuarantineComponent(string) {}
+
 func (m *runtimeServiceMock) RegisterProducer(string, func() error) error { return nil }
 func (m *runtimeServiceMock) UnregisterProducer(string)                   {}
 

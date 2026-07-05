@@ -4171,8 +4171,104 @@ static void topology_v1_emit_modal_label_identification(
     buffer_json_object_close(wb);
 }
 
-static void topology_v1_emit_actor_search_label_keys(BUFFER *wb, const char *actor_type)
+static int topology_v1_string_ptr_cmp(const void *left, const void *right) {
+    const char *left_string = *(const char * const *)left;
+    const char *right_string = *(const char * const *)right;
+    return strcmp(left_string ? left_string : "", right_string ? right_string : "");
+}
+
+static bool topology_v1_actor_search_label_key_is_builtin(const char *key) {
+    static const char *const keys[] = {
+        "pid",
+        "ppid",
+        "uid",
+        "net_ns_inode",
+        "username",
+        "cmdline",
+        "namespace_type",
+        "local_ip",
+        "local_address_space",
+        "process",
+        "container_name",
+        "cgroup_status",
+        "orchestrator",
+        "cgroup_name",
+        "cgroup_path",
+        "k8s_pod_name",
+        "k8s_namespace",
+        "k8s_workload",
+        "docker_container_name",
+        "docker_image",
+        "systemd_unit_name",
+        "systemd_unit_kind",
+        "actor_kind",
+    };
+
+    if(!key || !*key)
+        return true;
+
+    for(size_t i = 0; i < _countof(keys); i++) {
+        if(strcmp(keys[i], key) == 0)
+            return true;
+    }
+
+    return false;
+}
+
+static bool topology_v1_label_matches_actor_type(
+    const NV_TOPOLOGY_V1_PAYLOAD *payload,
+    const NV_TOPOLOGY_V1_ACTOR_LABEL *label,
+    const char *actor_type) {
+    if(!payload || !label || !actor_type || label->actor >= payload->actors_used)
+        return false;
+
+    return strcmp(payload->actors[label->actor].type, actor_type) == 0;
+}
+
+static bool topology_v1_search_label_key_exists(const char **keys, size_t keys_used, const char *key) {
+    if(topology_v1_actor_search_label_key_is_builtin(key))
+        return true;
+
+    for(size_t i = 0; i < keys_used; i++) {
+        if(strcmp(keys[i], key) == 0)
+            return true;
+    }
+
+    return false;
+}
+
+static void topology_v1_emit_actor_search_label_keys(
+    BUFFER *wb,
+    const NV_TOPOLOGY_V1_PAYLOAD *payload,
+    const char *actor_type)
 {
+    const char **dynamic_keys = NULL;
+    size_t dynamic_keys_used = 0;
+    size_t dynamic_keys_size = 0;
+
+    if(topology_v1_actor_type_has_process_enrichment(actor_type) && payload) {
+        for(size_t i = 0; i < payload->labels_used; i++) {
+            const NV_TOPOLOGY_V1_ACTOR_LABEL *label = &payload->labels[i];
+            if(strcmp(label->source, "cgroups") != 0 || strcmp(label->kind, "label") != 0)
+                continue;
+
+            if(!topology_v1_label_matches_actor_type(payload, label, actor_type))
+                continue;
+
+            if(topology_v1_search_label_key_exists(dynamic_keys, dynamic_keys_used, label->key))
+                continue;
+
+            if(dynamic_keys_used == dynamic_keys_size) {
+                dynamic_keys_size = dynamic_keys_size ? dynamic_keys_size * 2 : 16;
+                dynamic_keys = reallocz(dynamic_keys, dynamic_keys_size * sizeof(*dynamic_keys));
+            }
+            dynamic_keys[dynamic_keys_used++] = label->key;
+        }
+    }
+
+    if(dynamic_keys_used > 1)
+        qsort(dynamic_keys, dynamic_keys_used, sizeof(*dynamic_keys), topology_v1_string_ptr_cmp);
+
     buffer_json_member_add_array(wb, "label_keys");
     if(topology_v1_actor_type_has_process_enrichment(actor_type)) {
         buffer_json_add_array_item_string(wb, "pid");
@@ -4199,11 +4295,16 @@ static void topology_v1_emit_actor_search_label_keys(BUFFER *wb, const char *act
         buffer_json_add_array_item_string(wb, "systemd_unit_kind");
         buffer_json_add_array_item_string(wb, "actor_kind");
     }
+    for(size_t i = 0; i < dynamic_keys_used; i++)
+        buffer_json_add_array_item_string(wb, dynamic_keys[i]);
     buffer_json_array_close(wb);
+
+    freez(dynamic_keys);
 }
 
 static void topology_v1_emit_actor_type(
     BUFFER *wb,
+    const NV_TOPOLOGY_V1_PAYLOAD *payload,
     const char *id,
     const char *merge_a,
     const char *merge_b,
@@ -4248,9 +4349,12 @@ static void topology_v1_emit_actor_type(
             if(strcmp(id, "self") == 0) {
                 buffer_json_add_array_item_string(wb, "display_name");
                 buffer_json_add_array_item_string(wb, "hostname");
+                buffer_json_add_array_item_string(wb, "machine_guid");
             }
             else if(strcmp(id, "process") == 0) {
                 buffer_json_add_array_item_string(wb, "display_name");
+                buffer_json_add_array_item_string(wb, "machine_guid");
+                buffer_json_add_array_item_string(wb, "hostname");
                 buffer_json_add_array_item_string(wb, "process");
                 buffer_json_add_array_item_string(wb, "username");
                 buffer_json_add_array_item_string(wb, "cmdline");
@@ -4271,6 +4375,8 @@ static void topology_v1_emit_actor_type(
             }
             else if(topology_v1_actor_type_is_grouped_runtime(id)) {
                 buffer_json_add_array_item_string(wb, "display_name");
+                buffer_json_add_array_item_string(wb, "machine_guid");
+                buffer_json_add_array_item_string(wb, "hostname");
                 buffer_json_add_array_item_string(wb, "container_name");
                 buffer_json_add_array_item_string(wb, "process");
                 buffer_json_add_array_item_string(wb, "cgroup_status");
@@ -4287,9 +4393,10 @@ static void topology_v1_emit_actor_type(
             else if(strcmp(id, "endpoint") == 0) {
                 buffer_json_add_array_item_string(wb, "display_name");
                 buffer_json_add_array_item_string(wb, "ip");
+                buffer_json_add_array_item_string(wb, "address_space");
             }
             buffer_json_array_close(wb);
-            topology_v1_emit_actor_search_label_keys(wb, id);
+            topology_v1_emit_actor_search_label_keys(wb, payload, id);
         }
         buffer_json_object_close(wb);
         buffer_json_member_add_object(wb, "presentation");
@@ -4484,6 +4591,7 @@ static const NV_TOPOLOGY_RUNTIME_ACTOR_TYPE topology_runtime_actor_types[] = {
 
 static void topology_v1_emit_runtime_actor_type(
     BUFFER *wb,
+    const NV_TOPOLOGY_V1_PAYLOAD *payload,
     const NV_TOPOLOGY_RUNTIME_ACTOR_TYPE *type,
     const char *const *container_scopes,
     size_t container_scopes_count,
@@ -4491,7 +4599,7 @@ static void topology_v1_emit_runtime_actor_type(
     bool detailed)
 {
     topology_v1_emit_actor_type(
-        wb, type->id, "container_name", NULL, container_scopes, container_scopes_count,
+        wb, payload, type->id, "container_name", NULL, container_scopes, container_scopes_count,
         type->label, "primary", type->icon, "actor", true, "metric", "socket_count", "normal", "normal", true,
         "socket_ports", group_by, detailed, "display_name", "container_name");
 }
@@ -4581,6 +4689,7 @@ static void topology_v1_emit_link_type(
 
 static void topology_v1_emit_type_registry(
     BUFFER *wb,
+    const NV_TOPOLOGY_V1_PAYLOAD *payload,
     NV_TOPOLOGY_GROUP_BY group_by,
     bool detailed __maybe_unused) {
     static const char *const self_scopes[] = { "node" };
@@ -4600,22 +4709,22 @@ static void topology_v1_emit_type_registry(
         buffer_json_member_add_object(wb, "actor_types");
         {
             topology_v1_emit_actor_type(
-                wb, "self", "machine_guid", "hostname", self_scopes, _countof(self_scopes),
+                wb, payload, "self", "machine_guid", "hostname", self_scopes, _countof(self_scopes),
                 "This host", "self", "self", "actor", true, "fixed", NULL, "emphasized", "strongest", false, NULL,
                 group_by,
                 detailed,
                 "display_name", "hostname");
             topology_v1_emit_actor_type(
-                wb, "process", process_merge_a, process_merge_b, process_scopes, _countof(process_scopes),
+                wb, payload, "process", process_merge_a, process_merge_b, process_scopes, _countof(process_scopes),
                 "Process", "primary", "process", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
                 group_by,
                 detailed,
                 "display_name", "process");
             for(size_t i = 0; i < _countof(topology_runtime_actor_types); i++)
                 topology_v1_emit_runtime_actor_type(
-                    wb, &topology_runtime_actor_types[i], container_scopes, _countof(container_scopes), group_by, detailed);
+                    wb, payload, &topology_runtime_actor_types[i], container_scopes, _countof(container_scopes), group_by, detailed);
             topology_v1_emit_actor_type(
-                wb, "endpoint", "ip", "address_space", endpoint_scopes, _countof(endpoint_scopes),
+                wb, payload, "endpoint", "ip", "address_space", endpoint_scopes, _countof(endpoint_scopes),
                 "Correlation endpoint", "derived", "remote-endpoint", "endpoint", true, "fixed", NULL, "compact", "weaker", false, NULL,
                 group_by,
                 detailed,
@@ -5795,7 +5904,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_write_data(BUFFER *wb, NV_TOPOLOGY_CONT
         if((abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
             goto cleanup;
 
-        topology_v1_emit_type_registry(wb, ctx->options.group_by, ctx->options.detailed);
+        topology_v1_emit_type_registry(wb, &topology, ctx->options.group_by, ctx->options.detailed);
         if((abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
             goto cleanup;
 

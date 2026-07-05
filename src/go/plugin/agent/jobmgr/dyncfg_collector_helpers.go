@@ -4,6 +4,7 @@ package jobmgr
 
 import (
 	"encoding/json"
+	"errors"
 	"slices"
 	"strings"
 
@@ -57,11 +58,25 @@ func configFromPayload(fn dyncfg.Function) (confgroup.Config, error) {
 			return nil, err
 		}
 
-		return cfg.Clone()
+		cloned, err := cfg.Clone()
+		if err != nil {
+			return nil, err
+		}
+		cfg = cloned
+	} else if err := yaml.Unmarshal(fn.Payload(), &cfg); err != nil {
+		return nil, err
 	}
 
-	if err := yaml.Unmarshal(fn.Payload(), &cfg); err != nil {
-		return nil, err
+	if cfg == nil {
+		// Only the YAML path can get here: a "null" (or whitespace-only)
+		// document unmarshals to a nil map with no error. The JSON path
+		// never yields nil - Clone's yaml round-trip marshals a nil map as
+		// {} and materializes an empty config (pre-existing behavior,
+		// deliberately preserved). Callers write config metadata into the
+		// map, and the stage parse gate runs on the manager loop, which has
+		// no recover: an unguarded nil map is a plugin-killing panic, not a
+		// malformed config error.
+		return nil, errors.New("payload contains no configuration object")
 	}
 
 	return cfg, nil

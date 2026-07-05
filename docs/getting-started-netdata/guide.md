@@ -124,7 +124,7 @@ Within seconds of connection, you'll experience the power of real-time observabi
 
 - **Your node appears live in your Space**
 - **Charts immediately start streaming real-time data**
-- **System Overview dashboard populates automatically**
+- **Overview charts populate automatically for every section**
 - **All metrics update with 1-second granularity**
 - **Zero additional configuration required**
 
@@ -132,7 +132,7 @@ Within seconds of connection, you'll experience the power of real-time observabi
 
 **Automatic Dashboards:**
 
-- **System Overview** - Fully automated dashboard showing all your nodes
+- **[Overview charts](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md#how-the-dashboard-is-organized)** - Automatically arranged at the start of every dashboard section to summarize its metrics
 - **Nodes Tab** - Unified view of all infrastructure with key metrics
 - **Composite Charts** - Data from multiple nodes combined intelligently
 - **Real-Time Updates** - Every metric updates with 1-second granularity
