@@ -233,6 +233,23 @@ mod tests {
     }
 
     #[test]
+    fn fold_returns_max_seq_and_min_max_ts() {
+        let mut c = test_catalog();
+        c.add(entry_at(3, 150, 400, "", ""));
+        c.add(entry_at(7, 100, 250, "", ""));
+        c.add(entry_at(5, 200, 300, "", ""));
+        // max seq = 7; min of mins = 100; max of maxes = 400.
+        assert_eq!(c.fold(), (7, 100, 400));
+    }
+
+    #[test]
+    fn fold_empty_is_zero_triple() {
+        // Structurally not produced (accumulators are non-empty by construction),
+        // but the `unwrap_or(0)` fallbacks must yield (0, 0, 0), never panic.
+        assert_eq!(test_catalog().fold(), (0, 0, 0));
+    }
+
+    #[test]
     fn roundtrip_container_preserves_entries_and_metadata() {
         let mut c = test_catalog();
         c.add(entry_at(1, 100, 200, "prod", "api"));

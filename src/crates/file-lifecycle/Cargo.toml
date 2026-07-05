@@ -41,6 +41,10 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 bytesize = { workspace = true }
+# Test-only: synthesize a catalog container with an arbitrary envelope version
+# (the future/unsupported-version heal test); production code reaches chunk-file
+# transitively through otel-catalog.
+chunk-file = { workspace = true }
 # `test-util` (paused clock: tokio::time::pause/advance + start_paused) for the
 # catalog builder's time-trigger tests; additive over the workspace tokio deps.
 tokio = { workspace = true, features = ["test-util"] }

@@ -36,9 +36,13 @@ pub(crate) const DOWNLOAD_CONCURRENCY: usize = 8;
 /// a hung connection cannot stall startup; there is deliberately no phase-total
 /// cap, so a large restore stays work-proportional (D-P7.1).
 ///
-/// Memory: the listed keys plus the `kept`/`missing` sets are materialized in
-/// memory, bounded by this machine's own catalog cardinality (~100 MB at 10^6
-/// catalogs — fine at expected scale).
+/// Memory: the LIST result is the WHOLE prefix — every catalog key under
+/// `v2/{signal}/catalog/`, including other machines sharing the bucket, since the
+/// D6 own-machine filter runs AFTER materialization. That `Vec<String>` is
+/// bounded by the whole bucket's catalog cardinality; the derived `kept`/`missing`
+/// sets are own-machine only. ~100 MB at 10^6 keys — fine at expected scale; the
+/// shared-bucket LIST cost is the recorded D6 trade-off (streaming the LIST is a
+/// deferred perf option, not done here).
 pub async fn startup_catalog_sync<S: Storage>(
     storage: &S,
     signal: &str,
@@ -96,6 +100,10 @@ pub async fn startup_catalog_sync<S: Storage>(
     //    Design note: a catalog LIST can miss the uploaded-but-uncataloged SFST
     //    crash-window tail — accepted, because post-P6 under-seeding cannot
     //    corrupt (fresh instance_id + identity-keyed state; DESIGN §7-D5).
+    //    This highwater read/write — like all startup LOCAL I/O (catalog reads,
+    //    atomic installs) — is deliberately NOT wrapped in `op_timeout`, which
+    //    bounds only REMOTE ops; a hung local filesystem is bounded by the agent's
+    //    plugin-restart loop, the same outer bound the whole configure path uses.
     if remote_max > 0 {
         let current = wal::read_seq_highwater(seq_highwater_path).unwrap_or(0);
         if remote_max > current {
@@ -147,6 +155,106 @@ pub async fn startup_catalog_sync<S: Storage>(
         tracing::debug!("startup sync ({signal}): skipped {dir_skipped} directory placeholder(s)");
     }
     Ok(remote_tenants)
+}
+
+/// Heal one corrupt-present local catalog (D-P8.1): its body failed to parse at
+/// seeding time. Quarantine it, then re-fetch + validate + atomically install
+/// the single remote object via the diff-sync helper, and return the re-parsed
+/// [`Catalog`](otel_catalog::Catalog) so the caller can seed it.
+///
+/// Returns `None` — and boot continues — when storage is disabled, quarantine
+/// fails, or the re-fetch/validation fails (a bad archive object must not brick
+/// startup, same policy as the diff-sync). The ERROR-level logs here are loud by
+/// design even when the heal succeeds: corruption of an atomically-written,
+/// immutable file signals disk damage and must never be masked.
+///
+/// `parsed` is rebuilt by the caller from the catalog registry's filename-derived
+/// [`File`](otel_catalog::registry::File) fields plus its tenant, so no remote
+/// key is trusted from the corrupt body.
+pub(crate) async fn heal_corrupt_catalog<S: Storage>(
+    storage: Option<&S>,
+    path: &Path,
+    parsed: &ParsedCatalogKey,
+    own_machine: MachineId,
+    signal: &str,
+    catalog_base_dir: &Path,
+    op_timeout: Duration,
+) -> Option<otel_catalog::Catalog> {
+    let Some(storage) = storage else {
+        // Nothing can restore it; the corrupt file in place is the operator's
+        // evidence, so it is deliberately NOT renamed.
+        tracing::error!(path = %path.display(),
+            "corrupt catalog and remote storage disabled: left in place for inspection");
+        return None;
+    };
+
+    // Quarantine: `{path}` → `{path}.corrupt.{unix-ns}`. Recovery/scan sweeps
+    // match only the `.catalog` suffix, so the quarantine file is ignored by them
+    // while kept for forensics; the freed path lets the re-fetch install cleanly.
+    // The `{unix-ns}` uniqueness suffix keeps a second corruption of the same
+    // scope from overwriting the first forensic file (Unix `rename` replaces the
+    // destination) or hard-failing the rename (Windows `rename` onto an existing
+    // path errors).
+    let mut corrupt = path.as_os_str().to_owned();
+    corrupt.push(format!(".corrupt.{}", super::now_ns()));
+    let corrupt_path = PathBuf::from(corrupt);
+    if let Err(e) = std::fs::rename(path, &corrupt_path) {
+        tracing::error!(path = %path.display(),
+            "failed to quarantine corrupt catalog: {e}; left in place, boot continues");
+        return None;
+    }
+    tracing::error!(quarantined = %corrupt_path.display(),
+        "quarantined corrupt catalog, re-fetching from remote (this .corrupt file may be deleted after inspection)");
+
+    // Rebuild the remote key from the trusted (filename-derived) fields and
+    // re-fetch that ONE object. A transport error/timeout returns Err (boot
+    // continues); a 404 or validation failure is a skip → the file stays absent
+    // and the re-read below fails.
+    let key = crate::remote_keys::catalog(
+        signal,
+        parsed.date,
+        &parsed.tenant_id,
+        parsed.identity,
+        parsed.max_seq,
+        parsed.min_timestamp_s,
+        parsed.max_timestamp_s,
+    );
+    let installed = AtomicUsize::new(0);
+    if let Err(e) = download_and_install(
+        storage,
+        &key,
+        parsed,
+        own_machine,
+        signal,
+        catalog_base_dir,
+        op_timeout,
+        &installed,
+        1,
+    )
+    .await
+    {
+        tracing::error!(key = %key,
+            "re-fetch of corrupt catalog failed: {e:#}; quarantine stands, boot continues");
+        return None;
+    }
+
+    // Re-read the freshly installed object (absent if the re-fetch skipped) and
+    // parse it for the caller to seed.
+    let dest = local_catalog_path(catalog_base_dir, parsed);
+    match std::fs::read(&dest)
+        .ok()
+        .and_then(|b| otel_catalog::Catalog::from_container_bytes(&b).ok())
+    {
+        Some(catalog) => {
+            tracing::info!(path = %dest.display(), "healed corrupt catalog from remote");
+            Some(catalog)
+        }
+        None => {
+            tracing::error!(key = %key,
+                "corrupt catalog could not be restored from remote (absent or invalid); quarantine stands, boot continues");
+            None
+        }
+    }
 }
 
 /// The canonical local path for a catalog: `{base}/{date}/{tenant}/{filename}`.
@@ -218,7 +326,8 @@ async fn download_and_install<S: Storage>(
 /// equal the key's segments + filename fields; the entries fold (max seq,
 /// min/max ts) equals the filename fields; and every entry's `remote_key` is a
 /// well-formed SFST key on this machine AND this tenant AND this signal, whose
-/// embedded `FileId` matches the entry's own `id`.
+/// embedded `FileId` matches the entry's own `id` AND whose date matches the
+/// catalog's date.
 pub(crate) fn validate_catalog(
     bytes: &[u8],
     parsed: &ParsedCatalogKey,
@@ -245,20 +354,25 @@ pub(crate) fn validate_catalog(
         return Err("entries fold != filename fields".into());
     }
 
-    // Every entry must reference a well-formed SFST key on THIS signal, machine
-    // and tenant, whose `FileId` is the entry's own — a CRC-valid tampered body
-    // must not redirect a fetch into another signal's/tenant's/machine's object,
-    // nor to a different file than the entry claims to describe.
+    // Every entry must reference a well-formed SFST key on THIS signal, machine,
+    // tenant, and date, whose `FileId` is the entry's own — a CRC-valid tampered
+    // body must not redirect a fetch into another signal's/tenant's/machine's/
+    // day's object, nor to a different file than the entry claims to describe.
+    // Match arms ordered by diagnostic priority: foreign-machine > wrong-tenant >
+    // FileId-mismatch > wrong-date > malformed.
     for (id, entry) in &catalog.entries {
         match crate::remote_keys::parse_sfst_key(&entry.remote_key, signal) {
-            Some((key_id, _)) if key_id.machine_id != own_machine => {
+            Some((key_id, _, _)) if key_id.machine_id != own_machine => {
                 return Err("entry remote_key is a foreign-machine SFST key".into());
             }
-            Some((_, tenant)) if tenant != catalog.tenant_id => {
+            Some((_, tenant, _)) if tenant != catalog.tenant_id => {
                 return Err("entry remote_key tenant != catalog tenant".into());
             }
-            Some((key_id, _)) if key_id != *id => {
+            Some((key_id, _, _)) if key_id != *id => {
                 return Err("entry remote_key FileId != entry id".into());
+            }
+            Some((_, _, key_date)) if key_date != catalog.date => {
+                return Err("entry remote_key date != catalog date".into());
             }
             Some(_) => {}
             None => return Err("entry remote_key is not a well-formed SFST key".into()),

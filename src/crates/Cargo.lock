@@ -1195,6 +1195,7 @@ dependencies = [
  "bridge",
  "bytesize",
  "chrono",
+ "chunk-file",
  "ferryboat",
  "file-registry",
  "futures",

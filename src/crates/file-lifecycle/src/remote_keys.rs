@@ -147,14 +147,15 @@ pub fn parse_catalog_key(key: &str, expected_signal: &str) -> Option<ParsedCatal
     })
 }
 
-/// Parse an SFST remote key into its [`FileId`] and tenant. Used to validate a
-/// catalog entry's `remote_key`: the caller checks the `FileId.machine_id`
-/// belongs to this machine and the returned tenant matches the catalog's tenant.
-/// The `{signal}` segment must equal `expected_signal` (mirroring
+/// Parse an SFST remote key into its [`FileId`], tenant, and date. Used to
+/// validate a catalog entry's `remote_key`: the caller checks the
+/// `FileId.machine_id` belongs to this machine, the returned tenant matches the
+/// catalog's tenant, and the returned date matches the catalog's date. The
+/// `{signal}` segment must equal `expected_signal` (mirroring
 /// [`parse_catalog_key`]), so a tampered catalog body can't redirect a fetch
 /// into another signal's object path. Returns `None` for any shape other than
 /// `v2/{expected_signal}/tenants/{tenant}/sfst/{YYYY-MM-DD}/{file_id}.sfst`.
-pub fn parse_sfst_key(key: &str, expected_signal: &str) -> Option<(FileId, TenantId)> {
+pub fn parse_sfst_key(key: &str, expected_signal: &str) -> Option<(FileId, TenantId, NaiveDate)> {
     let parts: Vec<&str> = key.split('/').collect();
     if parts.len() != 7
         || parts[0] != SCHEMA_VERSION
@@ -165,14 +166,14 @@ pub fn parse_sfst_key(key: &str, expected_signal: &str) -> Option<(FileId, Tenan
         return None;
     }
     let tenant_id = TenantId::validate_path_segment(parts[3]).ok()?;
-    NaiveDate::parse_from_str(parts[5], "%Y-%m-%d").ok()?;
+    let date = NaiveDate::parse_from_str(parts[5], "%Y-%m-%d").ok()?;
     // Require the SFST extension (`FileId::parse` would otherwise strip any).
     let filename = std::path::Path::new(parts[6]);
     if filename.extension()?.to_str()? != SFST_EXT {
         return None;
     }
     let id = FileId::parse(filename)?;
-    Some((id, tenant_id))
+    Some((id, tenant_id, date))
 }
 
 /// Extract the date from an SFST remote key.

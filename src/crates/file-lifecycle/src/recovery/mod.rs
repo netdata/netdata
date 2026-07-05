@@ -3,7 +3,8 @@
 //! path via [`batch_recover`], so recovery and steady-state use the same code.
 //!
 //! Split into [`local`] (WAL indexing, orphan cleanup, retention, local-catalog
-//! seeding — no remote I/O) and [`remote`] (object-storage reconciliation).
+//! seeding — local-only except the corrupt-catalog startup-heal, which re-fetches
+//! from remote via [`startup`]) and [`remote`] (object-storage reconciliation).
 
 use std::time::{SystemTime, UNIX_EPOCH};
 

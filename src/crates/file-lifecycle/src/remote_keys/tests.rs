@@ -176,8 +176,8 @@ fn parse_sfst_key_shape_table() {
             "parse_sfst_key({desc}): {key}"
         );
     }
-    let (parsed_id, parsed_tenant) = parse_sfst_key(&valid, "logs").unwrap();
-    assert_eq!((parsed_id, parsed_tenant), (id, tenant()));
+    let (parsed_id, parsed_tenant, parsed_date) = parse_sfst_key(&valid, "logs").unwrap();
+    assert_eq!((parsed_id, parsed_tenant, parsed_date), (id, tenant(), sample_date()));
     // Nil-identity filenames are rejected by otel_catalog::parse_stem /
     // FileId::parse (covered by those crates' own tests), so a nil-UUID key
     // fails here too — not re-tested in this shape table.

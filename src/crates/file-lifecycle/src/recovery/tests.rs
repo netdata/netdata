@@ -62,8 +62,8 @@ fn write_catalog_file(
     path
 }
 
-#[test]
-fn seed_from_catalog_files_populates_both_sets() {
+#[tokio::test]
+async fn seed_from_catalog_files_populates_both_sets() {
     let catalog_dir = tempfile::tempdir().unwrap();
     let mut reg = make_registry(catalog_dir.path());
 
@@ -75,7 +75,15 @@ fn seed_from_catalog_files_populates_both_sets() {
     );
     reg.catalog_files.recover();
 
-    seed_from_catalog_files(&mut reg);
+    // Storage disabled + all catalogs valid: pure local seed, no heal.
+    seed_from_catalog_files(
+        &mut reg,
+        None::<&crate::storage::MockStorage>,
+        machine(),
+        "logs",
+        long_timeout(),
+    )
+    .await;
 
     for seq in [1u64, 2, 3] {
         assert!(reg.is_uploaded(sk(seq)));
@@ -83,24 +91,340 @@ fn seed_from_catalog_files_populates_both_sets() {
     }
 }
 
-#[test]
-fn seed_from_catalog_files_skips_corrupt_files() {
+/// D-P8.1 test 3 — storage disabled: a corrupt catalog is logged and skipped,
+/// left in place (NOT renamed) as the operator's evidence, and not seeded.
+#[tokio::test]
+async fn seed_storage_disabled_skips_corrupt_without_rename() {
     let catalog_dir = tempfile::tempdir().unwrap();
     let mut reg = make_registry(catalog_dir.path());
 
     let date = NaiveDate::from_ymd_opt(2026, 4, 17).unwrap();
     let dir = file_registry::layout::date_tenant_dir(catalog_dir.path(), date, "tenant1");
     std::fs::create_dir_all(&dir).unwrap();
-    std::fs::write(
-        dir.join(otel_catalog::filename(ident(), 1, 0, 0)),
-        b"not valid json",
-    )
-    .unwrap();
+    let corrupt = dir.join(otel_catalog::filename(ident(), 1, 0, 0));
+    std::fs::write(&corrupt, b"not valid json").unwrap();
     reg.catalog_files.recover();
 
-    seed_from_catalog_files(&mut reg);
+    seed_from_catalog_files(
+        &mut reg,
+        None::<&crate::storage::MockStorage>,
+        machine(),
+        "logs",
+        long_timeout(),
+    )
+    .await;
+
+    assert!(corrupt.exists(), "corrupt file left in place when storage disabled");
+    assert!(!quarantine_exists(&corrupt), "must NOT quarantine when storage disabled");
     assert!(!reg.is_uploaded(sk(1)));
     assert!(!reg.is_rotated(sk(1)));
+}
+
+/// True iff a `{name}.corrupt.<unix-ns>` quarantine of `original` exists in its
+/// directory (the heal path suffixes the quarantine name with a ns timestamp).
+fn quarantine_exists(original: &std::path::Path) -> bool {
+    let prefix = format!("{}.corrupt.", original.file_name().unwrap().to_str().unwrap());
+    std::fs::read_dir(original.parent().unwrap())
+        .unwrap()
+        .flatten()
+        .any(|e| {
+            e.file_name()
+                .to_str()
+                .is_some_and(|n| n.starts_with(&prefix))
+        })
+}
+
+/// D-P8.1 test 1 — corrupt local + good remote: the file is quarantined to
+/// `.corrupt`, the remote replacement is installed byte-identical, and its
+/// entries are seeded.
+#[tokio::test]
+async fn seed_heals_corrupt_catalog_from_remote() {
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+    let tenant = TenantId::from("tenant1");
+    let date = d(17);
+
+    // Good remote object for seqs [1, 2] (fold → max_seq=2, min=100, max=200).
+    let (key, good_bytes) = catalog_object(&tenant, date, ident(), &[1, 2]);
+
+    // Corrupt local catalog at the canonical path: valid NAME (so recover()
+    // tracks it), garbage BODY.
+    let dir = file_registry::layout::date_tenant_dir(catalog_dir.path(), date, "tenant1");
+    std::fs::create_dir_all(&dir).unwrap();
+    let local = dir.join(otel_catalog::filename(ident(), 2, 100, 200));
+    std::fs::write(&local, b"not valid json").unwrap();
+    reg.catalog_files.recover();
+
+    let mut read_bodies = std::collections::HashMap::new();
+    read_bodies.insert(key, good_bytes.clone());
+    let storage = crate::storage::MockStorage {
+        read_bodies,
+        ..Default::default()
+    };
+
+    seed_from_catalog_files(&mut reg, Some(&storage), machine(), "logs", long_timeout()).await;
+
+    assert!(quarantine_exists(&local), "corrupt body quarantined to .corrupt.<ns>");
+    assert_eq!(
+        std::fs::read(&local).unwrap(),
+        good_bytes,
+        "remote replacement installed byte-identical at the original path"
+    );
+    for seq in [1u64, 2] {
+        assert!(reg.is_uploaded(sk(seq)) && reg.is_rotated(sk(seq)));
+    }
+}
+
+/// D-P8.1 test 2 — corrupt local + remote unreachable: the quarantine stands,
+/// boot continues, and other good catalogs still seed.
+#[tokio::test]
+async fn seed_heal_failure_quarantines_and_continues() {
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+    let date = d(17);
+
+    // A good local catalog (seq 5) that must still seed despite the neighbor.
+    write_catalog_file(catalog_dir.path(), date, &[make_entry(5)]);
+
+    // A corrupt local catalog (seq 2).
+    let dir = file_registry::layout::date_tenant_dir(catalog_dir.path(), date, "tenant1");
+    std::fs::create_dir_all(&dir).unwrap();
+    let corrupt = dir.join(otel_catalog::filename(ident(), 2, 100, 200));
+    std::fs::write(&corrupt, b"not valid json").unwrap();
+    reg.catalog_files.recover();
+
+    // Every remote read fails → the heal cannot complete.
+    let storage = crate::storage::MockStorage {
+        read_error: Some("remote down".to_owned()),
+        ..Default::default()
+    };
+
+    seed_from_catalog_files(&mut reg, Some(&storage), machine(), "logs", long_timeout()).await;
+
+    assert!(quarantine_exists(&corrupt), "quarantine stands on heal failure");
+    assert!(!corrupt.exists(), "corrupt file renamed away, not reinstalled");
+    assert!(reg.is_uploaded(sk(5)) && reg.is_rotated(sk(5)), "good catalog still seeded");
+    assert!(!reg.is_uploaded(sk(2)), "unhealed catalog not seeded");
+}
+
+/// D-P8.1 test 4 — a healed file passes a subsequent boot with ZERO downloads:
+/// the reinstalled catalog parses, so no re-fetch is attempted.
+#[tokio::test]
+async fn seed_after_heal_reboots_with_zero_downloads() {
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let tenant = TenantId::from("tenant1");
+    let date = d(17);
+    let (key, good_bytes) = catalog_object(&tenant, date, ident(), &[1, 2]);
+
+    let dir = file_registry::layout::date_tenant_dir(catalog_dir.path(), date, "tenant1");
+    std::fs::create_dir_all(&dir).unwrap();
+    let local = dir.join(otel_catalog::filename(ident(), 2, 100, 200));
+    std::fs::write(&local, b"not valid json").unwrap();
+
+    let mut read_bodies = std::collections::HashMap::new();
+    read_bodies.insert(key, good_bytes);
+    let storage = crate::storage::MockStorage {
+        read_bodies,
+        ..Default::default()
+    };
+
+    // First boot heals (one download).
+    let mut reg = make_registry(catalog_dir.path());
+    reg.catalog_files.recover();
+    seed_from_catalog_files(&mut reg, Some(&storage), machine(), "logs", long_timeout()).await;
+    let after_heal = storage.read_calls.load(std::sync::atomic::Ordering::Relaxed);
+    assert!(after_heal >= 1, "heal performed a download");
+
+    // Second boot over the same dir: the healed file parses, so no download.
+    let mut reg2 = make_registry(catalog_dir.path());
+    reg2.catalog_files.recover();
+    seed_from_catalog_files(&mut reg2, Some(&storage), machine(), "logs", long_timeout()).await;
+    assert_eq!(
+        storage.read_calls.load(std::sync::atomic::Ordering::Relaxed),
+        after_heal,
+        "healthy reboot does zero downloads"
+    );
+    for seq in [1u64, 2] {
+        assert!(reg2.is_uploaded(sk(seq)) && reg2.is_rotated(sk(seq)));
+    }
+}
+
+/// Catalog container bytes whose JSON envelope declares an arbitrary format
+/// `version` — valid container framing, only the envelope version is off, so
+/// `from_container_bytes` rejects it with `UnsupportedVersion`. The version peek
+/// fires before the full envelope parse, so the other fields need only be
+/// well-typed JSON.
+fn future_version_catalog_bytes(version: u32) -> Vec<u8> {
+    // Raw JSON (no serde_json dep): the version peek fires before the full parse,
+    // so the remaining fields only need to be well-typed.
+    let json = format!(
+        r#"{{"version":{version},"tenant_id":"tenant1","date":"2026-04-17","machine_id":"{m}","instance_id":"{i}","entries":[]}}"#,
+        m = machine().as_uuid(),
+        i = instance().as_uuid(),
+    );
+    let mut builder = chunk_file::container::ContainerBuilder::new(
+        otel_catalog::CONTAINER_MAGIC,
+        otel_catalog::CONTAINER_VERSION,
+    );
+    builder.add_chunk(*b"JSON", json.as_bytes());
+    let mut out = Vec::new();
+    builder.write_to(&mut out).unwrap();
+    out
+}
+
+/// D-P8.1 (#2) — a newer, unsupported FORMAT version is NOT corruption: the file
+/// stays in place (no quarantine, no re-fetch) so a re-upgrade can read it, and
+/// boot continues seeding the rest.
+#[tokio::test]
+async fn seed_future_version_left_in_place_not_healed() {
+    let catalog_dir = tempfile::tempdir().unwrap();
+    let mut reg = make_registry(catalog_dir.path());
+    let date = d(17);
+
+    // A good local catalog (seq 5) that must still seed.
+    write_catalog_file(catalog_dir.path(), date, &[make_entry(5)]);
+
+    // A version-7 catalog at a canonical path (valid name → tracked by recover()).
+    let dir = file_registry::layout::date_tenant_dir(catalog_dir.path(), date, "tenant1");
+    std::fs::create_dir_all(&dir).unwrap();
+    let future = dir.join(otel_catalog::filename(ident(), 2, 100, 200));
+    std::fs::write(&future, future_version_catalog_bytes(7)).unwrap();
+    reg.catalog_files.recover();
+
+    // Storage counts reads: the version mismatch must NOT trigger a re-fetch.
+    let storage = crate::storage::MockStorage::default();
+    seed_from_catalog_files(&mut reg, Some(&storage), machine(), "logs", long_timeout()).await;
+
+    assert!(future.exists(), "future-version catalog left in place (not quarantined)");
+    assert!(!quarantine_exists(&future), "no quarantine for a version mismatch");
+    assert_eq!(
+        storage.read_calls.load(std::sync::atomic::Ordering::Relaxed),
+        0,
+        "no re-fetch attempted for a version mismatch"
+    );
+    assert!(reg.is_uploaded(sk(5)) && reg.is_rotated(sk(5)), "good catalog still seeded");
+    assert!(!reg.is_uploaded(sk(2)), "future-version catalog not seeded");
+}
+
+/// D-P8.1 (#4) — validate_catalog rejects an entry whose `remote_key` points at a
+/// DIFFERENT date than the catalog envelope (a tampered body must not redirect a
+/// fetch into another day's SFST directory).
+#[test]
+fn validate_catalog_rejects_cross_date_entry() {
+    let tenant = TenantId::from("tenant1");
+    let cat_date = d(17);
+
+    // Entry whose remote_key is well-formed on the right machine/tenant/signal
+    // and FileId, but on a DIFFERENT date (d18 != the catalog's d17).
+    let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+    let id = file_registry::FileId::new(ident(), 0, 5, part_key);
+    let mut catalog = Catalog::new(tenant.clone(), cat_date, ident());
+    catalog.add(otel_catalog::CatalogEntry {
+        id,
+        remote_key: crate::remote_keys::sfst("logs", &tenant, d(18), id),
+        min_timestamp_s: 100,
+        max_timestamp_s: 200,
+        record_count: 1,
+        content_meta,
+        size: ByteSize(1),
+        uploaded_at_ns: file_registry::TimestampNs(0),
+        remote_etag: None,
+    });
+    let bytes = catalog.to_container_bytes().unwrap();
+    let parsed = crate::remote_keys::ParsedCatalogKey {
+        date: cat_date,
+        tenant_id: tenant,
+        identity: ident(),
+        max_seq: 5,
+        min_timestamp_s: 100,
+        max_timestamp_s: 200,
+    };
+    let err = super::startup::validate_catalog(&bytes, &parsed, machine(), "logs")
+        .expect_err("cross-date entry must be rejected");
+    assert!(err.contains("date"), "rejection reason mentions date: {err}");
+}
+
+/// Run `validate_catalog` over a single-entry catalog (envelope valid: own
+/// identity, tenant `tenant1`, date d17, seq 5, ts 100/200) whose sole entry
+/// carries `remote_key`. Only the per-entry `remote_key` varies, so the result
+/// isolates which per-entry rejection arm fires.
+fn validate_one_entry_key(remote_key: String) -> Result<(), String> {
+    let tenant = TenantId::from("tenant1");
+    let date = d(17);
+    let (part_key, content_meta) = crate::test_helpers::identity_for("prod", "api");
+    let id = file_registry::FileId::new(ident(), 0, 5, part_key);
+    let mut catalog = Catalog::new(tenant.clone(), date, ident());
+    catalog.add(otel_catalog::CatalogEntry {
+        id,
+        remote_key,
+        min_timestamp_s: 100,
+        max_timestamp_s: 200,
+        record_count: 1,
+        content_meta,
+        size: ByteSize(1),
+        uploaded_at_ns: file_registry::TimestampNs(0),
+        remote_etag: None,
+    });
+    let bytes = catalog.to_container_bytes().unwrap();
+    let parsed = crate::remote_keys::ParsedCatalogKey {
+        date,
+        tenant_id: tenant,
+        identity: ident(),
+        max_seq: 5,
+        min_timestamp_s: 100,
+        max_timestamp_s: 200,
+    };
+    super::startup::validate_catalog(&bytes, &parsed, machine(), "logs")
+}
+
+/// Each per-entry rejection arm fires, AND the documented diagnostic priority
+/// (foreign-machine > wrong-tenant > FileId-mismatch > wrong-date > malformed)
+/// holds: every crafted key ALSO trips a lower-priority arm, so the asserted
+/// reason proves the higher-priority arm won.
+#[test]
+fn validate_catalog_rejection_arm_priority() {
+    use crate::remote_keys::sfst;
+    let tenant = TenantId::from("tenant1");
+    let other = TenantId::from("other");
+    let date = d(17);
+    let other_date = d(18);
+    let pk = crate::test_helpers::identity_for("prod", "api").0;
+    let own_id = file_registry::FileId::new(ident(), 0, 5, pk); // the entry's own id
+    let foreign = file_registry::Identity::new(machine2(), instance());
+
+    // (name, remote_key, expected-substring). Each key is crafted to also match a
+    // LOWER-priority arm, so the asserted substring proves the priority order.
+    let cases: Vec<(&str, String, &str)> = vec![
+        // foreign machine + wrong FileId (seq 6) → arm 1 must win over arm 3.
+        (
+            "foreign machine",
+            sfst("logs", &tenant, date, file_registry::FileId::new(foreign, 0, 6, pk)),
+            "foreign-machine",
+        ),
+        // wrong tenant + wrong FileId → arm 2 wins over arm 3.
+        (
+            "wrong tenant",
+            sfst("logs", &other, date, file_registry::FileId::new(ident(), 0, 6, pk)),
+            "tenant",
+        ),
+        // own machine/tenant, wrong FileId + wrong date → arm 3 wins over arm 4.
+        (
+            "FileId mismatch",
+            sfst("logs", &tenant, other_date, file_registry::FileId::new(ident(), 0, 6, pk)),
+            "FileId",
+        ),
+        // own machine/tenant/FileId, wrong date only → arm 4.
+        ("wrong date", sfst("logs", &tenant, other_date, own_id), "date"),
+        // structurally malformed key → the `None` arm.
+        ("malformed key", "not/a/valid/sfst/key".to_owned(), "well-formed"),
+    ];
+    for (name, remote_key, expected) in cases {
+        let err = validate_one_entry_key(remote_key).expect_err(name);
+        assert!(
+            err.contains(expected),
+            "{name}: got {err:?}, expected substring {expected:?}"
+        );
+    }
 }
 
 async fn run_recover_retention(
@@ -1565,7 +1889,7 @@ async fn startup_sync_restores_after_wipe() {
     );
     let reg = regs.get_or_create(&t1);
     reg.recover();
-    seed_from_catalog_files(reg);
+    seed_from_catalog_files(reg, Some(&storage), machine(), "logs", long_timeout()).await;
     let q = file_registry::Query {
         time_range: 0..u32::MAX,
         partition_keys: Vec::new(),
@@ -1791,7 +2115,7 @@ async fn startup_sync_sanitizer_skips_hostile_keys() {
 
 /// A [`Storage`] for the short-circuit test only: one key's `read` errors
 /// instantly, every other `read` hangs (`pending()`). With `buffer_unordered`
-/// + `try_collect`, the instant error must abort the phase before the hung
+/// plus `try_collect`, the instant error must abort the phase before the hung
 /// downloads (or any later ones) complete.
 #[derive(Clone)]
 struct PartialFailStorage {

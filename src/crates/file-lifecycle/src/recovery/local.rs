@@ -1,6 +1,8 @@
 //! Local-disk recovery: WAL indexing, orphan cleanup, retention, and
-//! seeding in-memory upload state from local catalog files. None of these
-//! touch remote storage.
+//! seeding in-memory upload state from local catalog files. These are
+//! local-only, with one exception: `seed_from_catalog_files` heals a
+//! corrupt-present catalog by re-fetching it from remote (D-P8.1), delegating
+//! the remote I/O to `super::startup::heal_corrupt_catalog`.
 
 use file_registry::{ByteSize, SeqKey};
 use otel_catalog::Catalog;
@@ -317,40 +319,96 @@ pub async fn recover_retention(
 /// eviction is gated on remote-confirmed catalogs (`is_remote_cataloged`),
 /// seeded separately by `reconcile_local_catalog_uploads` once the catalog's
 /// remote presence is confirmed.
-pub fn seed_from_catalog_files(registry: &mut Registry) {
-    let paths: Vec<std::path::PathBuf> = registry
+/// `storage`/`own_machine`/`signal`/`op_timeout` support the corrupt-catalog
+/// startup-heal (D-P8.1): on a body-parse failure with storage enabled, the file
+/// is quarantined and re-fetched from remote (see
+/// [`super::startup::heal_corrupt_catalog`]); with storage disabled it is logged
+/// and skipped. A plain read error (not corruption) is always warn-and-skip.
+pub async fn seed_from_catalog_files<S: crate::storage::Storage>(
+    registry: &mut Registry,
+    storage: Option<&S>,
+    own_machine: file_registry::MachineId,
+    signal: &str,
+    op_timeout: std::time::Duration,
+) {
+    // Snapshot (path, key) pairs so the immutable borrow of `catalog_files` is
+    // released before the loop mutates `registry`. Each `ParsedCatalogKey` is
+    // built from the registry's filename-derived fields (+ its tenant), so the
+    // heal path never trusts a remote key drawn from a possibly-corrupt body.
+    let tenant = registry.catalog_files.tenant_id().clone();
+    let catalog_base = registry.catalog_files.base_dir().to_path_buf();
+    let items: Vec<(std::path::PathBuf, crate::remote_keys::ParsedCatalogKey)> = registry
         .catalog_files
         .iter()
-        .map(|(p, _)| p.clone())
+        .map(|(p, f)| {
+            (
+                p.clone(),
+                crate::remote_keys::ParsedCatalogKey {
+                    date: f.date,
+                    tenant_id: tenant.clone(),
+                    identity: file_registry::Identity::new(f.machine_id, f.instance_id),
+                    max_seq: f.max_seq,
+                    min_timestamp_s: f.min_timestamp_s,
+                    max_timestamp_s: f.max_timestamp_s,
+                },
+            )
+        })
         .collect();
-    if paths.is_empty() {
+    if items.is_empty() {
         return;
     }
-    let file_count = paths.len();
+    let file_count = items.len();
 
     let mut seeded = 0usize;
-    for path in paths {
-        let bytes = match std::fs::read(&path) {
-            Ok(b) => b,
+    for (path, parsed) in items {
+        let catalog = match std::fs::read(&path) {
+            Ok(bytes) => match Catalog::from_container_bytes(&bytes) {
+                Ok(c) => Some(c),
+                // A newer, unsupported FORMAT version is NOT corruption (e.g. a
+                // downgrade reading a catalog a newer build wrote). Re-fetching
+                // would return the same future-version bytes AND destroy the local
+                // copy a re-upgrade could read — so leave it in place, untouched.
+                Err(otel_catalog::Error::UnsupportedVersion(v)) => {
+                    tracing::error!(
+                        path = %path.display(),
+                        version = v,
+                        "catalog is a newer unsupported format version; left in place (re-upgrade to read it)"
+                    );
+                    None
+                }
+                Err(e) => {
+                    // A body-parse failure on an immutable, atomically-written
+                    // file signals corruption — ERROR (loud by design) and heal
+                    // from remote (D-P8.1).
+                    tracing::error!(path = %path.display(), "corrupt catalog body: {e}");
+                    super::startup::heal_corrupt_catalog(
+                        storage,
+                        &path,
+                        &parsed,
+                        own_machine,
+                        signal,
+                        &catalog_base,
+                        op_timeout,
+                    )
+                    .await
+                }
+            },
             Err(e) => {
+                // A read error is not corruption (transient FS / permissions);
+                // re-fetching can't fix it and a rename would also fail. Skip.
                 tracing::warn!(path = %path.display(), "failed to read catalog: {e}");
-                continue;
+                None
             }
         };
-        let catalog = match Catalog::from_container_bytes(&bytes) {
-            Ok(c) => c,
-            Err(e) => {
-                tracing::warn!(path = %path.display(), "failed to parse catalog: {e}");
-                continue;
+        if let Some(catalog) = catalog {
+            for entry in catalog.entries.values() {
+                // Each entry carries its own full identity (a local catalog may
+                // hold a prior instance's entries); key the marks by it.
+                let key = SeqKey::from(&entry.id);
+                registry.mark_uploaded(key);
+                registry.mark_rotated(key);
+                seeded += 1;
             }
-        };
-        for entry in catalog.entries.values() {
-            // Each entry carries its own full identity (a local catalog may hold
-            // a prior instance's entries); key the marks by it.
-            let key = SeqKey::from(&entry.id);
-            registry.mark_uploaded(key);
-            registry.mark_rotated(key);
-            seeded += 1;
         }
     }
 

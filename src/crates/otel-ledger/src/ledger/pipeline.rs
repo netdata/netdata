@@ -170,7 +170,14 @@ where
         recover_unindexed(registry, &mut indexer, cleaner).await?;
         drain_wal_deletes(registry, cleaner).await?;
 
-        file_lifecycle::recovery::seed_from_catalog_files(registry);
+        file_lifecycle::recovery::seed_from_catalog_files(
+            registry,
+            storage,
+            own_machine,
+            segment,
+            startup_op_timeout,
+        )
+        .await;
 
         // Remote-storage recovery runs only when storage is enabled (the
         // storage client + uploader exist). The remote LIST reconcile can fail if
