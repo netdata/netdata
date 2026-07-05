@@ -23,6 +23,7 @@
 #define MACOS_GPU_IOREPORT_RETRY_EVERY_SEC 10
 #define MACOS_GPU_MISSING_CYCLES_BEFORE_OBSOLETE 3
 #define MACOS_GPU_HID_TEMPERATURE_SENSOR_PREFIX "GPU MTR Temp Sensor"
+#define MACOS_GPU_MATCH_STRING_MAX 256
 
 typedef const void *IOReportSubscriptionRef;
 
@@ -138,7 +139,7 @@ bool macos_gpu_is_hid_temperature_sensor_name(const char *name)
            strncmp(
                name,
                MACOS_GPU_HID_TEMPERATURE_SENSOR_PREFIX,
-               strlen(MACOS_GPU_HID_TEMPERATURE_SENSOR_PREFIX)) == 0;
+               sizeof(MACOS_GPU_HID_TEMPERATURE_SENSOR_PREFIX) - 1) == 0;
 }
 
 static const char *macos_gpu_temperature_source_label(enum macos_gpu_temperature_source source)
@@ -198,7 +199,10 @@ static bool macos_gpu_token_matches_ci(const char *value, const char *needle)
     if (!value || !needle || !*needle)
         return false;
 
-    size_t needle_len = strlen(needle);
+    size_t needle_len = strnlen(needle, MACOS_GPU_MATCH_STRING_MAX);
+    if (needle_len == MACOS_GPU_MATCH_STRING_MAX)
+        return false;
+
     const char *p = value;
     while (*p) {
         while (*p && !isalnum((unsigned char)*p))
@@ -1134,16 +1138,17 @@ int do_macos_gpu(int update_every, usec_t dt __maybe_unused)
     static int enabled = -1;
     if (unlikely(enabled == -1)) {
         enabled = inicfg_get_boolean(&netdata_config, "plugin:macos:gpu", "enabled", 1);
-        gpu.smc_temperature_sample_every_s = (int)inicfg_get_duration_seconds(
-            &netdata_config,
-            "plugin:macos:gpu",
-            "SMC temperature sample every",
-            MACOS_GPU_DEFAULT_SMC_TEMPERATURE_SAMPLE_EVERY);
-        if (gpu.smc_temperature_sample_every_s < 1)
-            gpu.smc_temperature_sample_every_s = 1;
         if (!enabled)
             return 1;
     }
+
+    gpu.smc_temperature_sample_every_s = (int)inicfg_get_duration_seconds(
+        &netdata_config,
+        "plugin:macos:gpu",
+        "SMC temperature sample every",
+        MACOS_GPU_DEFAULT_SMC_TEMPERATURE_SAMPLE_EVERY);
+    if (gpu.smc_temperature_sample_every_s < 1)
+        gpu.smc_temperature_sample_every_s = 1;
 
     if (!macos_gpu_init())
         return gpu.permanent_failure ? 1 : 0;

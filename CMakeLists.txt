@@ -3400,19 +3400,23 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                 endforeach()
         endif()
 
+        set(NETWORK_VIEWER_COMMON_FILES
+                src/collectors/common-cgroups/cgroup-path.c
+                src/collectors/common-cgroups/cgroup-path.h
+                src/collectors/common-cgroups/cgroup-topology-rules.c
+                src/collectors/common-cgroups/cgroup-topology-rules.h
+                src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
+                src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
+                src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
+                src/collectors/network-viewer.plugin/network-viewer.c
+        )
+
         set(NETWORK_VIEWER_FILES)
         if(OS_LINUX)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets.h
-                        src/collectors/common-cgroups/cgroup-path.c
-                        src/collectors/common-cgroups/cgroup-path.h
-                        src/collectors/common-cgroups/cgroup-topology-rules.c
-                        src/collectors/common-cgroups/cgroup-topology-rules.h
                         src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.c
-                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
-                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
-                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
-                        src/collectors/network-viewer.plugin/network-viewer.c
+                        ${NETWORK_VIEWER_COMMON_FILES}
                 )
         endif()
         if(OS_WINDOWS)
@@ -3423,27 +3427,13 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
         if(OS_FREEBSD)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets-freebsd.h
-                        src/collectors/common-cgroups/cgroup-path.c
-                        src/collectors/common-cgroups/cgroup-path.h
-                        src/collectors/common-cgroups/cgroup-topology-rules.c
-                        src/collectors/common-cgroups/cgroup-topology-rules.h
-                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
-                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
-                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
-                        src/collectors/network-viewer.plugin/network-viewer.c
+                        ${NETWORK_VIEWER_COMMON_FILES}
                 )
         endif()
         if(OS_MACOS)
                 list(APPEND NETWORK_VIEWER_FILES
                         src/libnetdata/local-sockets/local-sockets-macos.h
-                        src/collectors/common-cgroups/cgroup-path.c
-                        src/collectors/common-cgroups/cgroup-path.h
-                        src/collectors/common-cgroups/cgroup-topology-rules.c
-                        src/collectors/common-cgroups/cgroup-topology-rules.h
-                        src/collectors/network-viewer.plugin/network-viewer-apps-lookup-client.h
-                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.c
-                        src/collectors/network-viewer.plugin/network-viewer-topology-containers.h
-                        src/collectors/network-viewer.plugin/network-viewer.c
+                        ${NETWORK_VIEWER_COMMON_FILES}
                 )
         endif()
 

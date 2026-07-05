@@ -16,6 +16,7 @@
 #define MACOS_SENSORS_DEFAULT_SMC_COLLECTION_EVERY 10
 #define MACOS_SENSORS_MAX_SMC_KEYS 8192
 #define MACOS_SENSORS_MISSING_CYCLES_BEFORE_OBSOLETE 3
+#define MACOS_SENSORS_MATCH_STRING_MAX 256
 
 enum {
     MACOS_SENSORS_HID_PAGE_APPLE_VENDOR = 0xff00,
@@ -257,7 +258,14 @@ static bool macos_sensors_smc_key_suppressed_by_better_source(const char key[MAC
 
 static bool macos_sensors_starts_with_ci(const char *value, const char *prefix)
 {
-    return value && prefix && strncasecmp(value, prefix, strlen(prefix)) == 0;
+    if (!value || !prefix || !*prefix)
+        return false;
+
+    size_t prefix_len = strnlen(prefix, MACOS_SENSORS_MATCH_STRING_MAX);
+    if (prefix_len == MACOS_SENSORS_MATCH_STRING_MAX)
+        return false;
+
+    return strncasecmp(value, prefix, prefix_len) == 0;
 }
 
 static bool macos_sensors_contains_ci(const char *value, const char *needle)
@@ -265,7 +273,10 @@ static bool macos_sensors_contains_ci(const char *value, const char *needle)
     if (!value || !needle || !*needle)
         return false;
 
-    size_t needle_len = strlen(needle);
+    size_t needle_len = strnlen(needle, MACOS_SENSORS_MATCH_STRING_MAX);
+    if (needle_len == MACOS_SENSORS_MATCH_STRING_MAX)
+        return false;
+
     for (const char *p = value; *p; p++) {
         if (strncasecmp(p, needle, needle_len) == 0)
             return true;
@@ -279,7 +290,10 @@ static bool macos_sensors_token_matches_ci(const char *value, const char *token)
     if (!value || !token || !*token)
         return false;
 
-    size_t token_len = strlen(token);
+    size_t token_len = strnlen(token, MACOS_SENSORS_MATCH_STRING_MAX);
+    if (token_len == MACOS_SENSORS_MATCH_STRING_MAX)
+        return false;
+
     for (const char *p = value; *p;) {
         while (*p && !isalnum((unsigned char)*p))
             p++;
