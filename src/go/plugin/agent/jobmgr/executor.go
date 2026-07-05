@@ -453,92 +453,46 @@ func (e *executor) eventClaims(ev event) []claim {
 	return set
 }
 
-// THE WEDGE LIFECYCLE CONTRACT. A wedged key (deadline-abandoned effect,
-// leaked module call still running) is the one state where the normal
-// invariants are asymmetric; every site touching it MUST preserve all of
-// the following, and a change to any point updates this block. Structural
-// owners: points 2-5 are the ordered abandon transition actions (the only
-// place a wedge is created); points 8-10 and 13 are the ordered late-return
-// transition actions (the only place one is resolved); point 6 the effect
-// worker; point 7 the restart buffer plus lateWork; points 11-12 the
-// registration reconcile and the late retry evaluation; point 14 the effect
-// closures' obligation:
+// WEDGE LIFECYCLE NOTES. A wedged key (deadline-abandoned effect, leaked
+// module call still running) is the one state where normal settle rules are
+// asymmetric. Loop-side abandon and late-return ordering is owned by
+// planLaneEffectTransition and pinned by executor_transition_test.go:
+// writes stay held until late return, reads release at abandon, read-claimed
+// store identities are snapshotted before release, late replay runs before
+// final release, and shutdown late returns only dispose/drop and release.
 //
-// While wedged (from the abandon commit to the late return):
+// Cross-file invariants still live with their mechanism owners:
 //
-//  1. The lane stays busy: all its events park in the lane FIFO, so no
-//     command for the key can run or commit (generation mismatch at the
-//     late return is an assert, not a working path).
-//  2. The command's WRITE claims - its own key plus any keys the leaked
-//     work may still MUTATE (a store command's dependent job keys) - stay
-//     held until the late return; its READ claims release at the abandon
-//     commit. Dependency mutations CAN therefore commit during the wedge.
-//  3. Because reads release, the abandon commit snapshots the read-claimed
-//     store identities (wedgedDeps) - the last moment mutations were still
-//     excluded, hence exactly what the leaked work resolved.
-//  4. Store-dependency index maintenance happens at the abandon commit
-//     BEFORE any claim release, so commands woken by the release never
-//     read a stale index: the after-idle hooks (the dyncfg-command deps
-//     sync) and the discovery-removal path's commit-side RemoveActiveJob
-//     (stagedRemoveConfig) - cleanup MUST NOT sit in an effect closure
-//     after the blocking wait, where an abandon defers it to the leaked
-//     stop's return while the removal publish already happened.
-//  5. Claim waiters parked at the wedged key are re-attempted at the wedge
-//     (claims.wake): recompute excludes wedged keys, so store mutations
-//     skip-and-report the dependent instead of waiting out the leaked
-//     call; a waiter whose set still needs the key re-parks at the front.
-//  6. The abandoned result reaches the loop before the child's late
-//     completion (the delivered gate): an instantly-returning leaked call
-//     must not wedge the key with nothing left to release it.
-//  7. Store commands buffer completed dependent restarts as they finish:
-//     the buffer flushes at the abandon commit AND is registered as
-//     lateWork for restarts completing after it.
-//
-// At the late return:
-//
-//  8. lateWork runs BEFORE the remaining claims release (the replay is
-//     truthful while the write claims still exclude newer commands) -
-//     unless draining, where it is dropped (one rule).
-//  9. A warm resume starts ONLY if: not draining; the generation matches;
-//     no stop intent is queued in the lane FIFO; every store dependency
-//     the warm config references has an unchanged committed identity and
-//     no in-flight write hold (staleWarmDep); and the exposed entry is
-//     still this config in its abandoned-failed state (resumeWarmJob).
-// 10. Every DROPPED resume disposes silently: disposeWarmResume closes the
-//     job's emission gate by captured handle before Cleanup (V1 Cleanup
-//     emits HOST/HOSTINFO lines even for a never-started job).
-// 11. A STARTED warm job receives the current vnode config at registration
-//     (startRunningJob's reconcile), like every other start path - as a
-//     COMMITTED baseline: it must be visible to cleanup even if the job never
-//     collects; later running updates are pulled at the job's runtime-defined
-//     collection boundary.
-// 12. A late FAILURE evaluates retry eligibility under today's rules at
-//     the return; nothing was scheduled at the abandon (a provisional
-//     retry could race the continuation).
-// 13. Shutdown: late results consumed while draining only release keys -
-//     the resume is disposed, lateWork dropped; the child gates its send
-//     on lateDrop so it never blocks after the drain.
-//
-// Entering the wedge (the deadline race):
-//
-// 14. Classification is race-independent: an effect that DEGRADED its work
-//     because the deadline fired (a store command's restart sequence cut
-//     mid-way) returns a non-nil error, so the command reaches its timeout
-//     outcome whether the closure's return or the worker's abandon wins
-//     their select race - message text alone cannot carry the degradation.
-//     ENFORCED AS A SEAM POST-CONDITION, not per-checkpoint discipline:
-//     runStagedRestarts reclassifies any nil-error restart sequence whose
-//     command window has expired (a deadline firing DURING a restart or
-//     after the last one is invisible to in-loop checkpoints), so the
-//     pipeline cannot under-report degradation. Skip-and-report on WEDGED
-//     dependents is not degradation; it is the command's successful outcome
-//     for wedged keys.
+// - The lane remains occupied while wedged; route/settle must park same-key
+//   events until the late return.
+// - Commit-side dependency cleanup must happen before claim release wakes
+//   waiters. Do not move discovery removal or dependency-index cleanup into
+//   an effect closure after the blocking wait; abandon would defer cleanup
+//   until the leaked call returns while publication already happened.
+// - Claim wake at the wedge lets commands whose recomputed claim set
+//   excludes wedged keys proceed. Store mutations skip-and-report wedged
+//   dependents instead of waiting for an unbounded leaked call.
+// - The effect worker's delivered gate must deliver abandon before the
+//   child's late result, even when the leaked call returns immediately.
+// - Store commands buffer completed dependent restarts as they finish; the
+//   buffer flushes at normal/abandon commit and is also registered as
+//   lateWork for restarts completing after abandon.
+// - resumeWarmJob still verifies the exposed entry before a warm start.
+//   disposeWarmResume closes the captured emission gate before Cleanup, and
+//   startRunningJob reconciles the current vnode baseline at registration.
+// - Late failures evaluate retry eligibility at late return; no provisional
+//   retry is scheduled at abandon.
+// - Late children gate their sends on lateDrop so shutdown drain cannot
+//   block after the bounded wait.
+// - Deadline classification is race-independent: runStagedRestarts
+//   reclassifies an expired restart sequence as a timeout even if the
+//   closure returns after the deadline checkpoint.
 
 // wedge is the loop-owned record of one abandoned command, from its abandon
 // commit to its late return. keyState.wedge != nil IS the wedged state:
 // the enter-wedged transition action is the only constructor and the
 // leave-wedged transition action is the only consumer, so the wedged window's
-// distributed invariants live in the transition table instead of scattered
+// loop-side ordering lives in the transition table instead of scattered
 // sites.
 type wedge struct {
 	// gen is the key's generation at the abandon commit: a mismatch at the
@@ -546,7 +500,7 @@ type wedge struct {
 	// the lane parks everything while wedged).
 	gen uint64
 	// deps are the read-claimed store dependencies' identities at the
-	// abandon commit (contract point 3).
+	// abandon commit.
 	deps []wedgedDep
 }
 

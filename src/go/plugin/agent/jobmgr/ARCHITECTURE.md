@@ -152,6 +152,10 @@ Wait-park is special: it applies to discovery events for a config awaiting
 the user's enable/disable decision. DynCfg commands against the same key do
 not wait-park; they execute and answer the state machine's current outcome.
 
+Effect completion, deadline abandon, and late-return ordering are planned in
+`executor_transition.go` and pinned by `executor_transition_test.go`. The
+diagram below is the conceptual lane shape, not the policy table.
+
 ```mermaid
 stateDiagram-v2
     [*] --> Idle
@@ -378,6 +382,11 @@ loop. If the deadline fires first, the worker commits the deadline outcome
 and the leaked call keeps running in the background. The key is then wedged
 until the leaked call returns.
 
+`executor_transition.go` is the loop-side owner for completion, abandon, late
+return, warm continuation, late replay, and shutdown-late ordering. The prose
+below records the cross-file invariants that stay with the manager, effect
+worker, claim table, and domain controllers.
+
 While wedged:
 
 - the lane remains busy;
@@ -410,10 +419,10 @@ sequenceDiagram
         L->>L: commit, release claims, settle lane
     else deadline fires first
         E-->>L: abandoned result
-        L->>L: commit deadline outcome, wedge key
+        L->>L: abandon transition, wedge key
         M-->>E: late result
         E-->>L: late completion
-        L->>L: resolve wedge, release writes, settle lane
+        L->>L: late-return transition, release writes, settle lane
     end
 ```
 
@@ -499,7 +508,7 @@ tests that fail when a command gate moves without updating the command plan.
 | Secretstore flow and conversion | `secretstore_flow_test.go` |
 | Secretstore effects and dependent restart edge cases | `secretstore_effect_test.go`, `effect_deadline_test.go` |
 | Vnode and cross-domain claim interactions | `vnode_claims_test.go`, `dyncfg_vnode_test.go` |
-| Deadline, wedge, shutdown one-rule | `effect_deadline_test.go`, `effect_test.go`, `executor_test.go` |
+| Deadline, wedge, shutdown one-rule | `effect_deadline_test.go`, `effect_test.go`, `executor_test.go`, `executor_transition_test.go` |
 | Function publication timing | `manager_process_test.go`, `funcdispatch_test.go`, `funcctl/*_test.go` |
 | Command-plan parity | `handler_test.go`, `secretsctl/commandplan_test.go`, `vnodectl/commandplan_test.go`, `executor_test.go` |
 
