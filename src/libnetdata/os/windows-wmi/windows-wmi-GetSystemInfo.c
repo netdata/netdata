@@ -30,13 +30,16 @@ static bool wmi_get_string_property(IWbemClassObject *pclsObj, const wchar_t *pr
         return false;
     }
 
-    if(wcstombs(out, vtProp.bstrVal, out_size - 1) == (size_t)-1) {
+    // WMI returns UTF-16 BSTRs. Convert with a fixed UTF-8 code page rather than the
+    // locale-dependent wcstombs(), which can fail or produce lossy output for non-ASCII
+    // strings (e.g. localized Win32_OperatingSystem.Caption). utf16_to_utf8() uses
+    // WideCharToMultiByte(CP_UTF8, ...) and always null-terminates.
+    if(utf16_to_utf8(out, out_size, vtProp.bstrVal, -1, NULL) == 0) {
         out[0] = '\0';
         VariantClear(&vtProp);
         return false;
     }
 
-    out[out_size - 1] = '\0';
     VariantClear(&vtProp);
     return true;
 }
