@@ -25,6 +25,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
@@ -1892,13 +1893,12 @@ func (*blockingSecretStoreService) Update(context.Context, string, secretstore.C
 	return nil
 }
 
-func (*blockingSecretStoreService) Remove(string) error           { return nil }
-func (j *collectorProbeJob) Cleanup()                             {}
-func (j *collectorProbeJob) IsRunning() bool                      { return true }
-func (j *collectorProbeJob) Panicked() bool                       { return false }
-func (j *collectorProbeJob) Vnode() vnodes.VirtualNode            { return vnodes.VirtualNode{} }
-func (j *collectorProbeJob) UpdateVnode(*vnodes.VirtualNode)      {}
-func (j *collectorProbeJob) SetVnodeBaseline(*vnodes.VirtualNode) {}
+func (*blockingSecretStoreService) Remove(string) error                { return nil }
+func (j *collectorProbeJob) Cleanup()                                  {}
+func (j *collectorProbeJob) IsRunning() bool                           { return true }
+func (j *collectorProbeJob) Panicked() bool                            { return false }
+func (j *collectorProbeJob) Vnode() vnodes.VirtualNode                 { return vnodes.VirtualNode{} }
+func (j *collectorProbeJob) SetVnodeSnapshot(jobruntime.VnodeSnapshot) {}
 
 type auditAnalyzerSpy struct {
 	registered []string

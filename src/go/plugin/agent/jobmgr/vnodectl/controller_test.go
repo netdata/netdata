@@ -35,7 +35,6 @@ func TestControllerSeqExec(t *testing.T) {
 
 				assert.Contains(t, out.String(), "FUNCTION_RESULT_BEGIN vn-schema 200 application/json")
 				assert.Empty(t, seams.affectedJobsCalls)
-				assert.Empty(t, seams.applyCalls)
 			},
 		},
 		"userconfig generation": {
@@ -56,7 +55,6 @@ func TestControllerSeqExec(t *testing.T) {
 				assert.Contains(t, body, "name: db")
 				assert.Contains(t, body, "hostname: db")
 				assert.Empty(t, seams.affectedJobsCalls)
-				assert.Empty(t, seams.applyCalls)
 			},
 		},
 		"get returns stored config": {
@@ -72,10 +70,9 @@ func TestControllerSeqExec(t *testing.T) {
 				assert.Equal(t, "db", payload["name"])
 				assert.Equal(t, "11111111-1111-1111-1111-111111111111", payload["guid"])
 				assert.Empty(t, seams.affectedJobsCalls)
-				assert.Empty(t, seams.applyCalls)
 			},
 		},
-		"add applies vnode update seam": {
+		"add stores versioned vnode snapshot": {
 			run: func(t *testing.T, ctl *Controller, out *bytes.Buffer, seams *controllerSeams) {
 				fn := dyncfg.NewFunction(functions.Function{
 					UID:         "vn-add",
@@ -91,13 +88,14 @@ func TestControllerSeqExec(t *testing.T) {
 				var payload map[string]any
 				mustDecodeFunctionPayload(t, out.String(), "vn-add", &payload)
 				assert.Equal(t, float64(202), payload["status"])
-				assert.Equal(t, []string{"db"}, seams.applyCalls)
-				cfg, ok := ctl.Lookup("db")
+				snapshot, ok := ctl.LookupSnapshot("db")
 				require.True(t, ok)
-				assert.Equal(t, confgroup.TypeDyncfg, cfg.SourceType)
+				assert.Equal(t, confgroup.TypeDyncfg, snapshot.Vnode.SourceType)
+				assert.NotZero(t, snapshot.Revision)
+				assert.Equal(t, snapshot.Revision, snapshot.MetadataRevision)
 			},
 		},
-		"add no-op keeps apply seam unused": {
+		"add no-op leaves store unchanged": {
 			initial: map[string]*vnodes.VirtualNode{
 				"db": testVnode("db", "db", "11111111-1111-1111-1111-111111111111", confgroup.TypeDyncfg),
 			},
@@ -113,7 +111,6 @@ func TestControllerSeqExec(t *testing.T) {
 				var payload map[string]any
 				mustDecodeFunctionPayload(t, out.String(), "vn-add-noop", &payload)
 				assert.Equal(t, float64(202), payload["status"])
-				assert.Empty(t, seams.applyCalls)
 			},
 		},
 		"add equal user vnode rewrites stored source metadata to dyncfg": {
@@ -133,12 +130,11 @@ func TestControllerSeqExec(t *testing.T) {
 				var payload map[string]any
 				mustDecodeFunctionPayload(t, out.String(), "vn-add-promote-user", &payload)
 				assert.Equal(t, float64(202), payload["status"])
-				assert.Equal(t, []string{"db"}, seams.applyCalls)
 
-				cfg, ok := ctl.Lookup("db")
+				snapshot, ok := ctl.LookupSnapshot("db")
 				require.True(t, ok)
-				assert.Equal(t, confgroup.TypeDyncfg, cfg.SourceType)
-				assert.Equal(t, "user=alice", cfg.Source)
+				assert.Equal(t, confgroup.TypeDyncfg, snapshot.Vnode.SourceType)
+				assert.Equal(t, "user=alice", snapshot.Vnode.Source)
 			},
 		},
 		"duplicate hostname is rejected": {
@@ -161,10 +157,9 @@ func TestControllerSeqExec(t *testing.T) {
 				mustDecodeFunctionPayload(t, out.String(), "vn-add-dup-host", &payload)
 				assert.Equal(t, float64(400), payload["status"])
 				assert.Contains(t, fmt.Sprint(payload["errorMessage"]), "duplicate virtual node hostname")
-				assert.Empty(t, seams.applyCalls)
 			},
 		},
-		"update applies vnode update seam": {
+		"update stores versioned vnode snapshot": {
 			initial: map[string]*vnodes.VirtualNode{
 				"db": testVnode("db", "db", "11111111-1111-1111-1111-111111111111", confgroup.TypeDyncfg),
 			},
@@ -183,10 +178,13 @@ func TestControllerSeqExec(t *testing.T) {
 				var payload map[string]any
 				mustDecodeFunctionPayload(t, out.String(), "vn-update", &payload)
 				assert.Equal(t, float64(202), payload["status"])
-				assert.Equal(t, []string{"db"}, seams.applyCalls)
+				snapshot, ok := ctl.LookupSnapshot("db")
+				require.True(t, ok)
+				assert.Equal(t, map[string]string{"team": "db"}, snapshot.Vnode.Labels)
+				assert.Greater(t, snapshot.Revision, uint64(0))
 			},
 		},
-		"update no-op keeps apply seam unused": {
+		"update no-op leaves store unchanged": {
 			initial: map[string]*vnodes.VirtualNode{
 				"db": testVnode("db", "db", "11111111-1111-1111-1111-111111111111", confgroup.TypeDyncfg),
 			},
@@ -202,7 +200,6 @@ func TestControllerSeqExec(t *testing.T) {
 				var payload map[string]any
 				mustDecodeFunctionPayload(t, out.String(), "vn-update-noop", &payload)
 				assert.Equal(t, float64(202), payload["status"])
-				assert.Empty(t, seams.applyCalls)
 			},
 		},
 		"update equal user vnode rewrites stored source metadata to dyncfg": {
@@ -222,12 +219,11 @@ func TestControllerSeqExec(t *testing.T) {
 				var payload map[string]any
 				mustDecodeFunctionPayload(t, out.String(), "vn-update-promote-user", &payload)
 				assert.Equal(t, float64(202), payload["status"])
-				assert.Equal(t, []string{"db"}, seams.applyCalls)
 
-				cfg, ok := ctl.Lookup("db")
+				snapshot, ok := ctl.LookupSnapshot("db")
 				require.True(t, ok)
-				assert.Equal(t, confgroup.TypeDyncfg, cfg.SourceType)
-				assert.Equal(t, "user=alice", cfg.Source)
+				assert.Equal(t, confgroup.TypeDyncfg, snapshot.Vnode.SourceType)
+				assert.Equal(t, "user=alice", snapshot.Vnode.Source)
 			},
 		},
 		"update rejects duplicate hostname": {
@@ -251,7 +247,6 @@ func TestControllerSeqExec(t *testing.T) {
 				mustDecodeFunctionPayload(t, out.String(), "vn-update-dup-host", &payload)
 				assert.Equal(t, float64(400), payload["status"])
 				assert.Contains(t, fmt.Sprint(payload["errorMessage"]), "duplicate virtual node hostname")
-				assert.Empty(t, seams.applyCalls)
 			},
 		},
 		"update rejects duplicate guid": {
@@ -274,7 +269,6 @@ func TestControllerSeqExec(t *testing.T) {
 				mustDecodeFunctionPayload(t, out.String(), "vn-update-dup-guid", &payload)
 				assert.Equal(t, float64(400), payload["status"])
 				assert.Contains(t, fmt.Sprint(payload["errorMessage"]), "duplicate virtual node guid")
-				assert.Empty(t, seams.applyCalls)
 			},
 		},
 		"invalid guid is rejected": {
@@ -290,7 +284,6 @@ func TestControllerSeqExec(t *testing.T) {
 				var payload map[string]any
 				mustDecodeFunctionPayload(t, out.String(), "vn-invalid-guid", &payload)
 				assert.Equal(t, float64(400), payload["status"])
-				assert.Empty(t, seams.applyCalls)
 			},
 		},
 		"empty vnode name is rejected": {
@@ -307,7 +300,6 @@ func TestControllerSeqExec(t *testing.T) {
 				mustDecodeFunctionPayload(t, out.String(), "vn-empty-name", &payload)
 				assert.Equal(t, float64(400), payload["status"])
 				assert.Contains(t, fmt.Sprint(payload["errorMessage"]), "Missing vnode name")
-				assert.Empty(t, seams.applyCalls)
 			},
 		},
 		"remove rejects non dyncfg source": {
@@ -383,7 +375,6 @@ func TestControllerSeqExec(t *testing.T) {
 				assert.Equal(t, float64(202), payload["status"])
 				assert.Equal(t, "Updated configuration will affect configs: mysql:prod.", payload["message"])
 				assert.Equal(t, []string{"db"}, seams.affectedJobsCalls)
-				assert.Empty(t, seams.applyCalls)
 			},
 		},
 	}
@@ -450,10 +441,72 @@ func TestControllerSetAPI_NilPreservesResponder(t *testing.T) {
 	}
 }
 
+func TestControllerLookupSnapshot_ReturnsImmutableVersionedCopies(t *testing.T) {
+	initial := map[string]*vnodes.VirtualNode{
+		"db": {
+			Name:       "db",
+			Hostname:   "db",
+			GUID:       "11111111-1111-1111-1111-111111111111",
+			SourceType: confgroup.TypeUser,
+			Source:     "file",
+			Labels:     map[string]string{"env": "prod"},
+		},
+	}
+	ctl, _, _ := newControllerTestSubject(initial)
+
+	initial["db"].Hostname = "mutated-original"
+	initial["db"].Labels["env"] = "mutated-original"
+
+	snap, ok := ctl.LookupSnapshot("db")
+	require.True(t, ok)
+	assert.Equal(t, "db", snap.Vnode.Hostname)
+	assert.Equal(t, "prod", snap.Vnode.Labels["env"])
+	assert.NotZero(t, snap.Revision)
+	assert.Equal(t, snap.Revision, snap.MetadataRevision)
+
+	snap.Vnode.Hostname = "mutated-lookup"
+	snap.Vnode.Labels["env"] = "mutated-lookup"
+
+	next, ok := ctl.LookupSnapshot("db")
+	require.True(t, ok)
+	assert.Equal(t, "db", next.Vnode.Hostname)
+	assert.Equal(t, "prod", next.Vnode.Labels["env"])
+
+	changed, err := ctl.store.Upsert(&vnodes.VirtualNode{
+		Name:       "db",
+		Hostname:   "db",
+		GUID:       "11111111-1111-1111-1111-111111111111",
+		SourceType: confgroup.TypeDyncfg,
+		Source:     "dyncfg",
+		Labels:     map[string]string{"env": "prod"},
+	})
+	require.NoError(t, err)
+	require.True(t, changed)
+	sourceOnly, ok := ctl.LookupSnapshot("db")
+	require.True(t, ok)
+	assert.Greater(t, sourceOnly.Revision, next.Revision)
+	assert.Equal(t, next.MetadataRevision, sourceOnly.MetadataRevision,
+		"source-only commits are consumed without marking runtime-visible metadata dirty")
+
+	changed, err = ctl.store.Upsert(&vnodes.VirtualNode{
+		Name:       "db",
+		Hostname:   "db-new",
+		GUID:       "11111111-1111-1111-1111-111111111111",
+		SourceType: confgroup.TypeDyncfg,
+		Source:     "dyncfg",
+		Labels:     map[string]string{"env": "prod"},
+	})
+	require.NoError(t, err)
+	require.True(t, changed)
+	metadataChanged, ok := ctl.LookupSnapshot("db")
+	require.True(t, ok)
+	assert.Greater(t, metadataChanged.Revision, sourceOnly.Revision)
+	assert.Greater(t, metadataChanged.MetadataRevision, sourceOnly.MetadataRevision)
+}
+
 type controllerSeams struct {
 	affectedJobs      map[string][]string
 	affectedJobsCalls []string
-	applyCalls        []string
 }
 
 func newControllerTestSubject(initial map[string]*vnodes.VirtualNode) (*Controller, *bytes.Buffer, *controllerSeams) {
@@ -467,9 +520,6 @@ func newControllerTestSubject(initial map[string]*vnodes.VirtualNode) (*Controll
 		AffectedJobs: func(vnode string) []string {
 			seams.affectedJobsCalls = append(seams.affectedJobsCalls, vnode)
 			return seams.affectedJobs[vnode]
-		},
-		ApplyVnodeUpdate: func(name string, _ *vnodes.VirtualNode) {
-			seams.applyCalls = append(seams.applyCalls, name)
 		},
 	})
 	return ctl, &out, seams

@@ -28,21 +28,25 @@ import (
 )
 
 type JobV2Config struct {
-	PluginName      string
-	Name            string
-	ModuleName      string
-	FullName        string
-	Source          string
-	Module          collectorapi.CollectorV2
-	Labels          map[string]string
-	Out             io.Writer
-	UpdateEvery     int
-	AutoDetectEvery int
-	IsStock         bool
-	Vnode           vnodes.VirtualNode
-	VnodeRegistry   *vnoderegistry.Registry
-	FunctionOnly    bool
-	RuntimeService  runtimecomp.Service
+	PluginName            string
+	Name                  string
+	ModuleName            string
+	FullName              string
+	Source                string
+	Module                collectorapi.CollectorV2
+	Labels                map[string]string
+	Out                   io.Writer
+	UpdateEvery           int
+	AutoDetectEvery       int
+	IsStock               bool
+	Vnode                 vnodes.VirtualNode
+	VnodeName             string
+	VnodeRevision         uint64
+	VnodeMetadataRevision uint64
+	VnodeLookup           VnodeLookup
+	VnodeRegistry         *vnoderegistry.Registry
+	FunctionOnly          bool
+	RuntimeService        runtimecomp.Service
 }
 
 func NewJobV2(cfg JobV2Config) *JobV2 {
@@ -56,26 +60,29 @@ func NewJobV2(cfg JobV2Config) *JobV2 {
 	}
 
 	j := &JobV2{
-		pluginName:      cfg.PluginName,
-		name:            cfg.Name,
-		moduleName:      cfg.ModuleName,
-		fullName:        cfg.FullName,
-		updateEvery:     cfg.UpdateEvery,
-		autoDetectEvery: cfg.AutoDetectEvery,
-		autoDetectTries: infTries,
-		isStock:         cfg.IsStock,
-		functionOnly:    cfg.FunctionOnly,
-		module:          cfg.Module,
-		labels:          cloneLabels(cfg.Labels),
-		out:             cfg.Out,
-		stopCtrl:        newStopController(),
-		tick:            make(chan int),
-		updVnode:        make(chan *vnodes.VirtualNode, 1),
-		buf:             &buf,
-		api:             netdataapi.New(&buf),
-		vnode:           cfg.Vnode,
-		vnodeRegistry:   registry,
-		runtimeService:  cfg.RuntimeService,
+		pluginName:            cfg.PluginName,
+		name:                  cfg.Name,
+		moduleName:            cfg.ModuleName,
+		fullName:              cfg.FullName,
+		updateEvery:           cfg.UpdateEvery,
+		autoDetectEvery:       cfg.AutoDetectEvery,
+		autoDetectTries:       infTries,
+		isStock:               cfg.IsStock,
+		functionOnly:          cfg.FunctionOnly,
+		module:                cfg.Module,
+		labels:                cloneLabels(cfg.Labels),
+		out:                   cfg.Out,
+		stopCtrl:              newStopController(),
+		tick:                  make(chan int),
+		buf:                   &buf,
+		api:                   netdataapi.New(&buf),
+		vnode:                 cfg.Vnode,
+		vnodeName:             cfg.VnodeName,
+		vnodeRevision:         cfg.VnodeRevision,
+		vnodeMetadataRevision: cfg.VnodeMetadataRevision,
+		vnodeLookup:           cfg.VnodeLookup,
+		vnodeRegistry:         registry,
+		runtimeService:        cfg.RuntimeService,
 	}
 	if j.out == nil {
 		j.out = io.Discard
@@ -126,9 +133,12 @@ type JobV2 struct {
 	prevRun time.Time
 	retries atomic.Int64
 
-	vnodeMu  sync.RWMutex
-	vnode    vnodes.VirtualNode
-	updVnode chan *vnodes.VirtualNode
+	vnodeMu               sync.RWMutex
+	vnode                 vnodes.VirtualNode
+	vnodeName             string
+	vnodeRevision         uint64
+	vnodeMetadataRevision uint64
+	vnodeLookup           VnodeLookup
 
 	vnodeRegistry *vnoderegistry.Registry
 
@@ -196,36 +206,96 @@ func (j *JobV2) Vnode() vnodes.VirtualNode {
 	defer j.vnodeMu.RUnlock()
 	return *j.vnode.Copy()
 }
-func (j *JobV2) UpdateVnode(vnode *vnodes.VirtualNode) {
-	if vnode == nil {
-		return
-	}
-	select {
-	case <-j.updVnode:
-	default:
-	}
-	j.updVnode <- vnode
-}
 
-// SetVnodeBaseline commits the vnode config into the job BEFORE Start -
-// same contract as the V1 method: visible to cleanup without a collection,
-// never drains a concurrently queued live update, never overrides
-// module-owned vnode state, pre-Start callers only.
-func (j *JobV2) SetVnodeBaseline(vnode *vnodes.VirtualNode) {
-	if vnode == nil {
+// SetVnodeSnapshot commits the vnode config directly into the job BEFORE Start:
+// registration-time freshness must be visible to Cleanup even when the job
+// never collects. Pre-Start only: the job goroutine does not exist yet, and the
+// write is published to it by the Start goroutine launch. Module-owned vnode
+// state is never overridden.
+func (j *JobV2) SetVnodeSnapshot(snapshot VnodeSnapshot) {
+	if snapshot.Vnode == nil {
 		return
 	}
 	if j.module != nil && j.module.VirtualNode() != nil {
 		return
 	}
-	next := vnode.Copy()
+	next := snapshot.Vnode.Copy()
+	var metadataChanged bool
 	j.vnodeMu.Lock()
 	j.vnode = *next
+	if snapshot.Revision != 0 {
+		j.vnodeRevision = snapshot.Revision
+	}
+	metadataChanged = snapshot.MetadataRevision == 0 || snapshot.MetadataRevision != j.vnodeMetadataRevision
+	if snapshot.MetadataRevision != 0 {
+		j.vnodeMetadataRevision = snapshot.MetadataRevision
+	}
 	j.vnodeMu.Unlock()
-	if state := j.scopeStates[defaultHostScopeKey]; state != nil {
-		state.host.invalidateDefine()
+	if metadataChanged {
+		if state := j.scopeStates[defaultHostScopeKey]; state != nil {
+			state.host.invalidateDefine()
+		}
 	}
 }
+
+func (j *JobV2) refreshVnodeSnapshot() {
+	if j.vnodeName == "" || j.vnodeLookup == nil {
+		return
+	}
+	snapshot, ok := j.vnodeLookup(j.vnodeName)
+	if !ok {
+		return
+	}
+	j.applyVnodeSnapshot(snapshot)
+}
+
+func (j *JobV2) applyVnodeSnapshot(snapshot VnodeSnapshot) {
+	if snapshot.Vnode == nil {
+		return
+	}
+	if j.module != nil && j.module.VirtualNode() != nil {
+		advanced := false
+		j.vnodeMu.Lock()
+		if snapshot.Revision != 0 && snapshot.Revision > j.vnodeRevision {
+			j.vnodeRevision = snapshot.Revision
+			if snapshot.MetadataRevision != 0 {
+				j.vnodeMetadataRevision = snapshot.MetadataRevision
+			}
+			advanced = true
+		}
+		j.vnodeMu.Unlock()
+		if advanced {
+			j.Debugf("ignoring vnode update for module-owned vnode")
+		}
+		return
+	}
+
+	next := snapshot.Vnode.Copy()
+
+	var metadataChanged bool
+	j.vnodeMu.Lock()
+	if snapshot.Revision != 0 && snapshot.Revision <= j.vnodeRevision {
+		j.vnodeMu.Unlock()
+		return
+	}
+	j.vnode = *next
+	if snapshot.Revision != 0 {
+		j.vnodeRevision = snapshot.Revision
+	}
+	metadataChanged = snapshot.MetadataRevision == 0 || snapshot.MetadataRevision != j.vnodeMetadataRevision
+	if snapshot.MetadataRevision != 0 {
+		j.vnodeMetadataRevision = snapshot.MetadataRevision
+	}
+	j.vnodeMu.Unlock()
+	if metadataChanged {
+		// Registry owner release is intentionally tied to the next successful
+		// emission or cleanup, so obsolete emission can still select the old host.
+		if state := j.scopeStates[defaultHostScopeKey]; state != nil {
+			state.host.invalidateDefine()
+		}
+	}
+}
+
 func (j *JobV2) Cleanup() {
 	j.buf.Reset()
 	snapshots := j.captureScopeCleanupSnapshots()
@@ -493,7 +563,7 @@ func (j *JobV2) runOnce() {
 	defer j.ResetAllOnce()
 	defer j.flushRuntimeAggregator()
 
-	j.applyPendingVnodeUpdate()
+	j.refreshVnodeSnapshot()
 
 	curTime := time.Now()
 	sinceLastRun := calcSinceLastRun(curTime, j.prevRun)
@@ -517,32 +587,6 @@ func (j *JobV2) runOnce() {
 func (j *JobV2) flushRuntimeAggregator() {
 	if j != nil && j.runtimeAggregator != nil {
 		j.runtimeAggregator.Flush()
-	}
-}
-
-func (j *JobV2) applyPendingVnodeUpdate() {
-	select {
-	case vnode := <-j.updVnode:
-		if vnode == nil {
-			return
-		}
-		if j.module != nil && j.module.VirtualNode() != nil {
-			// Match v1 ownership model: do not override module-owned vnode state.
-			j.Debugf("ignoring vnode update for module-owned vnode")
-			return
-		}
-
-		next := vnode.Copy()
-
-		j.vnodeMu.Lock()
-		j.vnode = *next
-		j.vnodeMu.Unlock()
-		// Registry owner release is intentionally tied to the next successful
-		// emission or cleanup, so obsolete emission can still select the old host.
-		if state := j.scopeStates[defaultHostScopeKey]; state != nil {
-			state.host.invalidateDefine()
-		}
-	default:
 	}
 }
 
