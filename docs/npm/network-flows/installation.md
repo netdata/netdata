@@ -30,6 +30,12 @@ sudo apt install netdata-plugin-netflow
 sudo systemctl restart netdata
 ```
 
+:::note
+
+`netdata-plugin-netflow` ships only in Netdata's own package repository — it is not in the Debian, Ubuntu, or Mint default repositories. If `apt` reports `Unable to locate package`, the Netdata repository is not configured on this host, which is expected when Netdata was installed with the kickstart `--static-only` option or built from source. A static install already bundles the plugin at `/opt/netdata/usr/libexec/netdata/plugins.d/netflow-plugin` (see [Static install](#static-install-kickstart) below); to install the package on a native system instead, re-run the [kickstart installer](/packaging/installer/methods/kickstart.md) without `--static-only` to configure the Netdata repository, then retry `apt install netdata-plugin-netflow`.
+
+:::
+
 ## Install on RHEL / Fedora / CentOS / Rocky / Alma
 
 ```bash
