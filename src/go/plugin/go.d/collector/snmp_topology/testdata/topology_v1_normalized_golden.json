@@ -3001,13 +3001,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -4113,13 +4129,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -4269,7 +4301,8 @@
         },
         "search": {
           "columns": [
-            "display_name"
+            "display_name",
+            "id"
           ]
         }
       },
@@ -5375,13 +5408,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -5543,7 +5592,18 @@
         },
         "search": {
           "columns": [
-            "display_name"
+            "display_name",
+            "id",
+            "vendor",
+            "model"
+          ],
+          "label_keys": [
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "learned_sources",
+            "protocols"
           ]
         }
       },
@@ -6649,13 +6709,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -7922,13 +7998,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -9034,13 +9126,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -10146,13 +10254,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -11258,13 +11382,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -12529,13 +12669,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -13641,13 +13797,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -14753,13 +14925,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -15865,13 +16053,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       }

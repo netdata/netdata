@@ -61,6 +61,7 @@ type vsphereTopologyBuilder struct {
 	collectJob       string
 	actorIndexes     map[string]int
 	actorObjectTypes map[string]string
+	searchLabelKeys  map[string]map[string]struct{}
 	actors           *topologyv1.TableBuilder
 	links            *topologyv1.TableBuilder
 	evidence         map[string]*topologyv1.TableBuilder
@@ -76,6 +77,7 @@ func newVSphereTopologyBuilder(jobName string) *vsphereTopologyBuilder {
 		collectJob:       sanitizeTopologyLabelValue(cleanTopologyString(jobName)),
 		actorIndexes:     make(map[string]int),
 		actorObjectTypes: make(map[string]string),
+		searchLabelKeys:  make(map[string]map[string]struct{}),
 		actors:           topologyv1.NewTableBuilder(vsphereTopologyActorColumns()...),
 		links:            topologyv1.NewTableBuilder(vsphereTopologyLinkColumns()...),
 		evidence: map[string]*topologyv1.TableBuilder{
@@ -135,7 +137,7 @@ func (b *vsphereTopologyBuilder) addActor(actorType, moid, name, parentID string
 	detail.moid = moid
 	detail.name = name
 	b.addActorDetail(row, detail)
-	b.addActorLabels(row, detail, labels)
+	b.addActorLabels(row, actorType, detail, labels)
 
 	return row
 }
@@ -246,7 +248,7 @@ func (b *vsphereTopologyBuilder) data(agentID string, collectedAt time.Time, res
 		Dictionaries: topologyv1.Dictionaries{
 			"strings": b.strings.Values(),
 		},
-		Types:        vsphereTopologyTypes(),
+		Types:        vsphereTopologyTypes(b.searchLabelKeys),
 		Presentation: vsphereTopologyPresentation(),
 		Actors:       actorTable,
 		Links:        linkTable,
@@ -332,7 +334,7 @@ func (b *vsphereTopologyBuilder) addActorDetail(actor int, detail vsphereActorDe
 	)
 }
 
-func (b *vsphereTopologyBuilder) addActorLabels(actor int, detail vsphereActorDetail, labels map[string]string) {
+func (b *vsphereTopologyBuilder) addActorLabels(actor int, actorType string, detail vsphereActorDetail, labels map[string]string) {
 	b.addActorLabel(actor, "name", detail.name, "vsphere", "identity", nil)
 	b.addActorLabel(actor, "object_type", detail.objectType, "vsphere", "identity", nil)
 	b.addActorLabel(actor, "vsphere_moid", detail.moid, "vsphere", "identity", nil)
@@ -350,8 +352,26 @@ func (b *vsphereTopologyBuilder) addActorLabels(actor int, detail vsphereActorDe
 	}
 	sort.Strings(keys)
 	for _, key := range keys {
+		if cleanTopologyString(labels[key]) == "" {
+			continue
+		}
 		b.addActorLabel(actor, key, labels[key], "vsphere", "label", nil)
+		b.addSearchLabelKey(actorType, key)
 	}
+}
+
+func (b *vsphereTopologyBuilder) addSearchLabelKey(actorType, key string) {
+	actorType = cleanTopologyString(actorType)
+	key = cleanTopologyString(key)
+	if actorType == "" || key == "" {
+		return
+	}
+	keys := b.searchLabelKeys[actorType]
+	if keys == nil {
+		keys = make(map[string]struct{})
+		b.searchLabelKeys[actorType] = keys
+	}
+	keys[key] = struct{}{}
 }
 
 func (b *vsphereTopologyBuilder) addActorLabel(actor int, key, value, source, kind string, valueIndex any) {
@@ -482,17 +502,17 @@ func vsphereTopologyLabelColumns() []topologyv1.Column {
 	}
 }
 
-func vsphereTopologyTypes() topologyv1.TypeRegistry {
+func vsphereTopologyTypes(searchLabelKeys map[string]map[string]struct{}) topologyv1.TypeRegistry {
 	return topologyv1.TypeRegistry{
 		ActorTypes: map[string]topologyv1.ActorType{
-			"vsphere_datacenter":        vsphereActorType("Datacenter", "datacenter", "blue"),
-			"vsphere_cluster":           vsphereActorType("Cluster", "cluster", "green"),
-			"vsphere_host":              vsphereActorType("ESXi Host", "host", "orange"),
-			"vsphere_vm":                vsphereActorType("VM", "vm", "purple"),
-			"vsphere_datastore":         vsphereActorType("Datastore", "datastore", "cyan"),
-			"vsphere_network":           vsphereActorType("Network", "network", "yellow"),
-			"vsphere_datastore_cluster": vsphereActorType("Datastore Cluster", "datastore_cluster", "teal"),
-			"vsphere_resource_pool":     vsphereActorType("Resource Pool", "resource_pool", "gray"),
+			"vsphere_datacenter":        vsphereActorType("Datacenter", "datacenter", "blue", searchLabelKeys["vsphere_datacenter"]),
+			"vsphere_cluster":           vsphereActorType("Cluster", "cluster", "green", searchLabelKeys["vsphere_cluster"]),
+			"vsphere_host":              vsphereActorType("ESXi Host", "host", "orange", searchLabelKeys["vsphere_host"]),
+			"vsphere_vm":                vsphereActorType("VM", "vm", "purple", searchLabelKeys["vsphere_vm"]),
+			"vsphere_datastore":         vsphereActorType("Datastore", "datastore", "cyan", searchLabelKeys["vsphere_datastore"]),
+			"vsphere_network":           vsphereActorType("Network", "network", "yellow", searchLabelKeys["vsphere_network"]),
+			"vsphere_datastore_cluster": vsphereActorType("Datastore Cluster", "datastore_cluster", "teal", searchLabelKeys["vsphere_datastore_cluster"]),
+			"vsphere_resource_pool":     vsphereActorType("Resource Pool", "resource_pool", "gray", searchLabelKeys["vsphere_resource_pool"]),
 		},
 		LinkTypes: map[string]topologyv1.LinkType{
 			vsphereTopologyOwnershipLink: vsphereLinkType(
@@ -541,18 +561,40 @@ func vsphereTopologyTypes() topologyv1.TypeRegistry {
 	}
 }
 
-func vsphereActorType(label, icon, colorSlot string) topologyv1.ActorType {
+func vsphereActorType(label, icon, colorSlot string, dynamicLabelKeys map[string]struct{}) topologyv1.ActorType {
 	return topologyv1.ActorType{
 		Layer:          vsphereTopologyLayer,
 		Identity:       []string{"object_type", "vsphere_moid"},
 		MergeIdentity:  []string{"object_type", "vsphere_moid"},
 		ParentIdentity: []string{"parent_object_type", "parent_moid"},
 		Search: &topologyv1.ActorSearchPolicy{
-			Columns:   []string{"name", "vsphere_moid"},
-			LabelKeys: []string{"datacenter", "cluster", "host", "resource_pool"},
+			Columns:   []string{"name", "vsphere_moid", "object_type"},
+			LabelKeys: vsphereSearchLabelKeys(dynamicLabelKeys),
 		},
 		Presentation: vsphereActorPresentation(label, icon, colorSlot),
 	}
+}
+
+func vsphereSearchLabelKeys(dynamicLabelKeys map[string]struct{}) []string {
+	keys := []string{"datacenter", "cluster", "host", "resource_pool"}
+	if len(dynamicLabelKeys) == 0 {
+		return keys
+	}
+
+	seen := make(map[string]struct{}, len(keys)+len(dynamicLabelKeys))
+	for _, key := range keys {
+		seen[key] = struct{}{}
+	}
+
+	extra := make([]string, 0, len(dynamicLabelKeys))
+	for key := range dynamicLabelKeys {
+		if _, ok := seen[key]; ok {
+			continue
+		}
+		extra = append(extra, key)
+	}
+	sort.Strings(extra)
+	return append(keys, extra...)
 }
 
 func vsphereLinkType(orientation, directionRole, semanticRole, aggregationDirection, evidenceType string, presentation *topologyv1.LinkPresentation) topologyv1.LinkType {

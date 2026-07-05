@@ -75,7 +75,9 @@
               "k8s_workload",
               "docker_container_name",
               "docker_image",
-              "systemd_unit_name"
+              "systemd_unit_name",
+              "app",
+              "team"
             ]
           }
         },
