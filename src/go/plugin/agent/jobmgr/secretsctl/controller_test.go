@@ -171,7 +171,11 @@ func TestControllerSeqExec_TestStoredWithoutService_Returns400(t *testing.T) {
 	}
 }
 
-func TestRememberDiscoveredConfig_DrainsRestartFailureMessageFromNonHandlerStop(t *testing.T) {
+// A non-command stop (discovered-config replacement, boot publishing) carries
+// no command run: it must not execute dependent restarts and cannot leave a
+// message behind - restart execution and terminal messages exist only inside
+// a dyncfg command's effect.
+func TestRememberDiscoveredConfig_ReplacementStopRunsNoRestarts(t *testing.T) {
 	ctl, _, seams := newControllerTestSubject()
 	existing := newSecretStoreConfigWithSource(t, secretstore.KindVault, "vault_prod", map[string]any{"value": "one"}, "/etc/netdata/secretstores.yaml", confgroup.TypeUser)
 	require.NoError(t, ctl.Service().Add(context.Background(), existing))
@@ -189,10 +193,10 @@ func TestRememberDiscoveredConfig_DrainsRestartFailureMessageFromNonHandlerStop(
 	require.NoError(t, err)
 	require.True(t, changed)
 	assert.Equal(t, dyncfg.StatusAccepted, entry.Status)
-	assert.Equal(t, []string{key}, seams.restartCalls)
+	assert.Empty(t, seams.restartCalls,
+		"a replacement stop outside a dyncfg command must not restart dependents")
 	_, ok := ctl.Service().GetStatus(key)
 	assert.False(t, ok)
-	assert.Equal(t, "", ctl.cb.TakeCommandMessage())
 }
 
 func TestControllerPublishExisting(t *testing.T) {
@@ -321,11 +325,16 @@ func newControllerTestSubjectWithOptions(opts Options) (*Controller, *bytes.Buff
 			return seams.restartableJobs[storeKey]
 		}
 	}
-	restartDependentJobs := opts.RestartDependentJobs
-	if restartDependentJobs == nil {
-		restartDependentJobs = func(storeKey string) string {
-			seams.restartCalls = append(seams.restartCalls, storeKey)
-			return seams.restartMessages[storeKey]
+	stageRestarts := opts.StageDependentRestarts
+	if stageRestarts == nil {
+		stageRestarts = func(storeKey string) *StagedRestarts {
+			return &StagedRestarts{
+				Run: func(context.Context) (string, error) {
+					seams.restartCalls = append(seams.restartCalls, storeKey)
+					return seams.restartMessages[storeKey], nil
+				},
+				Flush: func() {},
+			}
 		}
 	}
 	ctl := New(Options{
@@ -335,7 +344,7 @@ func newControllerTestSubjectWithOptions(opts Options) (*Controller, *bytes.Buff
 		Service:                 svc,
 		AffectedJobs:            affectedJobs,
 		RestartableAffectedJobs: restartableJobs,
-		RestartDependentJobs:    restartDependentJobs,
+		StageDependentRestarts:  stageRestarts,
 		Initial:                 opts.Initial,
 		Seen:                    opts.Seen,
 		Exposed:                 opts.Exposed,

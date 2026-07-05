@@ -3,16 +3,19 @@
 package jobruntime
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -79,6 +82,45 @@ func TestJob_Panicked(t *testing.T) {
 	assert.Equal(t, job.Panicked(), job.panicked.Load())
 }
 
+// Vnode() is read off-goroutine (the manager loop reads registered jobs'
+// vnodes) while the pre-Start snapshot write may still be in flight on the
+// starting goroutine: the accesses must be synchronized. This test fails
+// under -race without vnodeMu.
+func TestJob_VnodeAccessIsSynchronized(t *testing.T) {
+	job := newTestJob()
+	baseline := &vnodes.VirtualNode{Name: "v", Hostname: "baseline", GUID: "guid-b"}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for range 200 {
+			_ = job.Vnode()
+		}
+	}()
+	for range 200 {
+		job.SetVnodeSnapshot(VnodeSnapshot{Vnode: baseline})
+	}
+	<-done
+}
+
+// The pre-Start snapshot commit is visible without a collection: a job stopped
+// before its first tick must clean up on the reconciled vnode, not the stale
+// creation-time vnode.
+func TestJob_SetVnodeSnapshotCommitsRevisionBeforeStart(t *testing.T) {
+	job := newTestJob()
+	snapshot := VnodeSnapshot{
+		Vnode:            &vnodes.VirtualNode{Name: "v", Hostname: "baseline", GUID: "guid-b"},
+		Revision:         7,
+		MetadataRevision: 5,
+	}
+
+	job.SetVnodeSnapshot(snapshot)
+	assert.Equal(t, "baseline", job.vnode.Hostname,
+		"the snapshot must be committed into the job, visible without a collection")
+	assert.Equal(t, uint64(7), job.vnodeRevision)
+	assert.Equal(t, uint64(5), job.vnodeMetadataRevision)
+}
+
 func TestJob_AutoDetectionEvery(t *testing.T) {
 	job := newTestJob()
 
@@ -102,14 +144,14 @@ func TestJob_RetryAutoDetection(t *testing.T) {
 	assert.True(t, job.RetryAutoDetection())
 	assert.Equal(t, infTries, job.AutoDetectTries)
 	for range 1000 {
-		_ = job.check()
+		_ = job.check(context.Background())
 	}
 	assert.True(t, job.RetryAutoDetection())
 	assert.Equal(t, infTries, job.AutoDetectTries)
 
 	job.AutoDetectTries = 10
 	for range 10 {
-		_ = job.check()
+		_ = job.check(context.Background())
 	}
 	assert.False(t, job.RetryAutoDetection())
 	assert.Equal(t, 0, job.AutoDetectTries)
@@ -134,7 +176,7 @@ func TestJob_AutoDetection(t *testing.T) {
 	}
 	job.module = m
 
-	assert.NoError(t, job.AutoDetection())
+	assert.NoError(t, job.AutoDetection(context.Background()))
 	assert.Equal(t, 3, v)
 }
 
@@ -148,7 +190,7 @@ func TestJob_AutoDetection_FailInit(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.False(t, job.RetryAutoDetection())
 	assert.True(t, m.CleanupDone)
 }
@@ -163,7 +205,7 @@ func TestJob_AutoDetection_RetryableFailInitKeepsRetry(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.True(t, job.RetryAutoDetection())
 	assert.True(t, m.CleanupDone)
 }
@@ -178,7 +220,7 @@ func TestJob_AutoDetection_ForeignRetryableFailInitDisablesRetry(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.False(t, job.RetryAutoDetection())
 	assert.True(t, m.CleanupDone)
 }
@@ -195,7 +237,7 @@ func TestJob_AutoDetection_FailCheck(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.True(t, m.CleanupDone)
 }
 
@@ -214,7 +256,7 @@ func TestJob_AutoDetection_FailPostCheck(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.True(t, m.CleanupDone)
 }
 
@@ -227,7 +269,7 @@ func TestJob_AutoDetection_PanicInit(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.True(t, m.CleanupDone)
 }
 
@@ -243,7 +285,7 @@ func TestJob_AutoDetection_PanicCheck(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.True(t, m.CleanupDone)
 }
 
@@ -262,7 +304,7 @@ func TestJob_AutoDetection_PanicPostCheck(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.True(t, m.CleanupDone)
 }
 
@@ -353,35 +395,169 @@ func TestJob_Tick(t *testing.T) {
 	}
 }
 
-func TestJob_UpdateVnode_NilIgnored(t *testing.T) {
-	tests := map[string]struct {
-		update *vnodes.VirtualNode
-	}{
-		"nil vnode update is ignored": {
-			update: nil,
+func TestJob_PullVnodeUpdateDuringCollectAppliesBeforeSameCycleEmission(t *testing.T) {
+	var out bytes.Buffer
+	current := newSnapshotHolder(VnodeSnapshot{
+		Vnode:            &vnodes.VirtualNode{Name: "db", Hostname: "host-one", GUID: "node-guid"},
+		Revision:         1,
+		MetadataRevision: 1,
+	})
+	collectStarted := make(chan struct{})
+	collectRelease := make(chan struct{})
+
+	mod := &collectorapi.MockCollectorV1{
+		ChartsFunc: func() *collectorapi.Charts {
+			return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "t", Units: "u", Dims: collectorapi.Dims{{ID: "d1"}}}}
+		},
+		CollectFunc: func(context.Context) map[string]int64 {
+			close(collectStarted)
+			<-collectRelease
+			return map[string]int64{"d1": 1}
 		},
 	}
+	job := NewJob(JobConfig{
+		PluginName:            pluginName,
+		Name:                  jobName,
+		ModuleName:            modName,
+		FullName:              modName + "_" + jobName,
+		Module:                mod,
+		Out:                   &out,
+		Vnode:                 *current.snapshot().Vnode.Copy(),
+		VnodeName:             "db",
+		VnodeRevision:         1,
+		VnodeMetadataRevision: 1,
+		VnodeLookup:           current.lookup,
+	})
+	require.NoError(t, job.AutoDetection(context.Background()))
 
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			job := newTestJob()
-			job.module = &collectorapi.MockCollectorV1{}
-			job.charts = &collectorapi.Charts{}
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		job.runOnce()
+	}()
+	<-collectStarted
+	current.set(VnodeSnapshot{
+		Vnode:            &vnodes.VirtualNode{Name: "db", Hostname: "host-two", GUID: "node-guid"},
+		Revision:         2,
+		MetadataRevision: 2,
+	})
+	close(collectRelease)
+	<-done
 
-			job.UpdateVnode(tc.update)
+	assert.Contains(t, out.String(), "HOST_DEFINE 'node-guid' 'host-two'")
+	assert.NotContains(t, out.String(), "HOST_DEFINE 'node-guid' 'host-one'")
+}
 
-			assert.NotPanics(t, func() {
-				_ = job.processMetrics(
-					collectedMetrics{
-						intMetrics:   map[string]int64{},
-						floatMetrics: map[string]float64{},
-					},
-					time.Now(),
-					1,
-				)
-			})
-		})
+func TestJob_PullSourceOnlyUpdateDoesNotResendHostInfo(t *testing.T) {
+	var out bytes.Buffer
+	current := newSnapshotHolder(VnodeSnapshot{
+		Vnode:            &vnodes.VirtualNode{Name: "db", Hostname: "host-one", GUID: "node-guid", SourceType: "user"},
+		Revision:         1,
+		MetadataRevision: 1,
+	})
+	mod := &collectorapi.MockCollectorV1{
+		ChartsFunc: func() *collectorapi.Charts {
+			return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "t", Units: "u", Dims: collectorapi.Dims{{ID: "d1"}}}}
+		},
+		CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"d1": 1} },
 	}
+	job := NewJob(JobConfig{
+		PluginName:            pluginName,
+		Name:                  jobName,
+		ModuleName:            modName,
+		FullName:              modName + "_" + jobName,
+		Module:                mod,
+		Out:                   &out,
+		Vnode:                 *current.snapshot().Vnode.Copy(),
+		VnodeName:             "db",
+		VnodeRevision:         1,
+		VnodeMetadataRevision: 1,
+		VnodeLookup:           current.lookup,
+	})
+	require.NoError(t, job.AutoDetection(context.Background()))
+	job.runOnce()
+
+	out.Reset()
+	current.set(VnodeSnapshot{
+		Vnode:            &vnodes.VirtualNode{Name: "db", Hostname: "host-one", GUID: "node-guid", SourceType: "dyncfg"},
+		Revision:         2,
+		MetadataRevision: 1,
+	})
+	job.runOnce()
+
+	assert.NotContains(t, out.String(), "HOST_DEFINE 'node-guid' 'host-one'")
+}
+
+func TestJob_ModuleOwnedVnodeDoesNotOverrideConfiguredJobVnode(t *testing.T) {
+	var out bytes.Buffer
+	mod := &v1ModuleOwnedVnodeCollector{
+		MockCollectorV1: collectorapi.MockCollectorV1{
+			ChartsFunc: func() *collectorapi.Charts {
+				return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "t", Units: "u", Dims: collectorapi.Dims{{ID: "d1"}}}}
+			},
+			CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"d1": 1} },
+		},
+		vnode: &vnodes.VirtualNode{Name: "module", Hostname: "module-host", GUID: "module-guid"},
+	}
+	current := newSnapshotHolder(VnodeSnapshot{
+		Vnode:            &vnodes.VirtualNode{Name: "db", Hostname: "pulled-host", GUID: "pulled-guid"},
+		Revision:         2,
+		MetadataRevision: 2,
+	})
+	job := NewJob(JobConfig{
+		PluginName:            pluginName,
+		Name:                  jobName,
+		ModuleName:            modName,
+		FullName:              modName + "_" + jobName,
+		Module:                mod,
+		Out:                   &out,
+		Vnode:                 vnodes.VirtualNode{Name: "db", Hostname: "job-host", GUID: "job-guid"},
+		VnodeName:             "db",
+		VnodeRevision:         1,
+		VnodeMetadataRevision: 1,
+		VnodeLookup:           current.lookup,
+	})
+	require.NoError(t, job.AutoDetection(context.Background()))
+
+	job.runOnce()
+
+	assert.Contains(t, out.String(), "HOST_DEFINE 'job-guid' 'job-host'")
+	assert.NotContains(t, out.String(), "module-host")
+	assert.NotContains(t, out.String(), "pulled-host")
+}
+
+type v1ModuleOwnedVnodeCollector struct {
+	collectorapi.MockCollectorV1
+	vnode *vnodes.VirtualNode
+}
+
+func (c *v1ModuleOwnedVnodeCollector) VirtualNode() *vnodes.VirtualNode {
+	return c.vnode
+}
+
+type vnodeSnapshotHolder struct {
+	mu      sync.Mutex
+	current VnodeSnapshot
+}
+
+func newSnapshotHolder(snapshot VnodeSnapshot) *vnodeSnapshotHolder {
+	return &vnodeSnapshotHolder{current: snapshot.Copy()}
+}
+
+func (h *vnodeSnapshotHolder) set(snapshot VnodeSnapshot) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.current = snapshot.Copy()
+}
+
+func (h *vnodeSnapshotHolder) snapshot() VnodeSnapshot {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	return h.current.Copy()
+}
+
+func (h *vnodeSnapshotHolder) lookup(string) (VnodeSnapshot, bool) {
+	return h.snapshot(), true
 }
 
 func newTestFunctionOnlyJob() *Job {
@@ -424,7 +600,7 @@ func TestJob_AutoDetection_FunctionOnly_NilCharts(t *testing.T) {
 	}
 	job.module = m
 
-	assert.NoError(t, job.AutoDetection())
+	assert.NoError(t, job.AutoDetection(context.Background()))
 }
 
 func TestJob_AutoDetection_FunctionOnlyFailCheckCleansUp(t *testing.T) {
@@ -443,7 +619,7 @@ func TestJob_AutoDetection_FunctionOnlyFailCheckCleansUp(t *testing.T) {
 	}
 	job.module = m
 
-	assert.Error(t, job.AutoDetection())
+	assert.Error(t, job.AutoDetection(context.Background()))
 	assert.True(t, m.CleanupDone)
 	assert.Equal(t, 1, cleanupCalls)
 }

@@ -37,6 +37,24 @@ func dyncfgVnodeJobCmds(isDyncfgJob bool) string {
 	return dyncfg.JoinCommands(cmds...)
 }
 
+// DeriveKey returns the vnode name a dyncfg command addresses. Job-scope
+// commands carry it in the config ID (`<prefix>:<name>`, the same extraction
+// the command handlers use); template-scope add/test carry it in Args[2].
+// Template-scope commands without a name (schema, userconfig) are not
+// addressable to a vnode and report !ok. It never logs and has no side
+// effects, so callers can derive keys before execution.
+func (c *Controller) DeriveKey(fn dyncfg.Function) (string, bool) {
+	if name, ok := strings.CutPrefix(fn.ID(), c.Prefix()+":"); ok && name != "" {
+		return name, true
+	}
+	if fn.ID() == c.Prefix() {
+		if name := fn.JobName(); name != "" {
+			return name, true
+		}
+	}
+	return "", false
+}
+
 func (c *Controller) SeqExec(fn dyncfg.Function) {
 	switch fn.Command() {
 	case dyncfg.CommandSchema:
@@ -56,6 +74,39 @@ func (c *Controller) SeqExec(fn dyncfg.Function) {
 	default:
 		c.Warningf("dyncfg: function '%s' command '%s' not implemented", fn.Fn().Name, fn.Command())
 		c.api.SendCodef(fn, 501, "Function '%s' command '%s' is not implemented.", fn.Fn().Name, fn.Command())
+	}
+}
+
+// CommandPlan reports how fn must be scheduled. Claimless means execution
+// answers a deterministic rejection before its first claim-protected access.
+// The remove SOURCE gate belongs here only because dyncfgCmdRemove orders it
+// before the referenced-by-configs read. Payload parse/GUID/uniqueness
+// rejections and referenced-by-configs 409 answer under the vnode write claim.
+func (c *Controller) CommandPlan(fn dyncfg.Function) dyncfg.CommandPlan {
+	switch fn.Command() {
+	case dyncfg.CommandAdd:
+		if fn.ValidateArgs(3) != nil || !fn.HasPayload() {
+			return dyncfg.CommandPlanClaimless()
+		}
+		name := fn.JobName()
+		if name != "" && dyncfg.JobNameRuleAllowDots(name) == nil {
+			return dyncfg.CommandPlanClaims()
+		}
+		return dyncfg.CommandPlanClaimless()
+	case dyncfg.CommandUpdate:
+		_, ok := c.Lookup(strings.TrimPrefix(fn.ID(), c.Prefix()+":"))
+		if ok {
+			return dyncfg.CommandPlanClaims()
+		}
+		return dyncfg.CommandPlanClaimless()
+	case dyncfg.CommandRemove:
+		vnode, ok := c.Lookup(strings.TrimPrefix(fn.ID(), c.Prefix()+":"))
+		if ok && vnode.SourceType == confgroup.TypeDyncfg {
+			return dyncfg.CommandPlanClaims()
+		}
+		return dyncfg.CommandPlanClaimless()
+	default:
+		return dyncfg.CommandPlanClaimless()
 	}
 }
 
@@ -147,7 +198,6 @@ func (c *Controller) dyncfgCmdAdd(fn dyncfg.Function) {
 		return
 	}
 
-	c.applyUpdate(name, cfg)
 	c.api.SendCodef(fn, 202, "")
 	c.createJob(cfg, dyncfg.StatusRunning)
 }
@@ -190,7 +240,6 @@ func (c *Controller) dyncfgCmdUpdate(fn dyncfg.Function) {
 		return
 	}
 
-	c.applyUpdate(name, cfg)
 	c.api.SendCodef(fn, 202, "")
 	c.createJob(cfg, dyncfg.StatusRunning)
 }
@@ -259,12 +308,6 @@ func (c *Controller) affectedJobsFor(vnode string) string {
 		return ""
 	}
 	return strings.Join(c.affectedJobs(vnode), ", ")
-}
-
-func (c *Controller) applyUpdate(name string, cfg *vnodes.VirtualNode) {
-	if c.applyVnodeUpdate != nil {
-		c.applyVnodeUpdate(name, cfg)
-	}
 }
 
 func (c *Controller) verifyVnodeUnique(newCfg *vnodes.VirtualNode) error {

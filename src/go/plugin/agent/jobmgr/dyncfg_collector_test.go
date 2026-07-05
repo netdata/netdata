@@ -25,6 +25,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
@@ -751,7 +752,7 @@ func TestDyncfgCmdUpdate_SingleInstancePolicyReplacesRunningLowerPriority(t *tes
 	mgr.runningJobs.lock()
 	mgr.runningJobs.add(oldJob.FullName(), oldJob)
 	mgr.runningJobs.unlock()
-	t.Cleanup(func() { mgr.stopRunningJob("singleupdate") })
+	t.Cleanup(func() { mgr.stopRunningJob(context.Background(), "singleupdate") })
 
 	newCfg := prepareDyncfgCfg("singleupdate", "singleupdate")
 	fn := dyncfg.NewFunction(functions.Function{
@@ -891,7 +892,7 @@ func TestCollectorCallbacks_ParseAndValidate(t *testing.T) {
 				Args:        collectorTestArgs(mgr, tc.args...),
 			})
 
-			cfg, err := cb.ParseAndValidate(fn, "validated")
+			cfg, err := cb.ParseAndValidate(context.Background(), fn, "validated")
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)
@@ -965,7 +966,7 @@ func TestCollectorCallbacks_ParseAndValidate_SuppressesAuditSideEffects(t *testi
 		Args:        collectorTestArgs(mgr, "success", string(dyncfg.CommandAdd), "validated"),
 	})
 
-	_, err := cb.ParseAndValidate(fn, "validated")
+	_, err := cb.ParseAndValidate(context.Background(), fn, "validated")
 	require.NoError(t, err)
 
 	entries, err := os.ReadDir(tempDir)
@@ -990,7 +991,7 @@ func TestCollectorCallbacks_ApplyConfigLoggingHonorsValidationMode(t *testing.T)
 					Args:        collectorTestArgs(mgr, "success", string(dyncfg.CommandAdd), "validated"),
 				})
 
-				_, err := cb.ParseAndValidate(fn, "validated")
+				_, err := cb.ParseAndValidate(context.Background(), fn, "validated")
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "failed to apply configuration")
 			},
@@ -999,7 +1000,7 @@ func TestCollectorCallbacks_ApplyConfigLoggingHonorsValidationMode(t *testing.T)
 			run: func(t *testing.T, mgr *Manager, _ *bytes.Buffer) {
 				cfg := prepareDyncfgCfg("success", "runtime-job").Set("option_str", "one").Set("option_int", "bad")
 
-				_, err := mgr.createCollectorJob(cfg)
+				_, err := mgr.createCollectorJob(context.Background(), cfg)
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), "cannot unmarshal")
 			},
@@ -1054,7 +1055,7 @@ func TestCollectorCallbacks_Start(t *testing.T) {
 			mgr := newCollectorTestManager()
 			cb := &collectorCallbacks{mgr: mgr}
 
-			err := cb.Start(tc.cfg)
+			err := cb.Start(context.Background(), tc.cfg)
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)
@@ -1074,7 +1075,7 @@ func TestCollectorCallbacks_Start(t *testing.T) {
 			assert.Equal(t, tc.wantRetryPending, retryPending)
 
 			if tc.wantRunning {
-				mgr.stopRunningJob(tc.cfg.FullName())
+				mgr.stopRunningJob(context.Background(), tc.cfg.FullName())
 			}
 			if tc.wantRetryPending {
 				mgr.retryingTasks.remove(tc.cfg)
@@ -1097,7 +1098,7 @@ func TestCollectorCallbacks_Start_AutodetectionCodedError_PreservedNoRetry(t *te
 	cb := &collectorCallbacks{mgr: mgr}
 
 	cfg := prepareDyncfgCfg("codedcheck", "job")
-	err := cb.Start(cfg)
+	err := cb.Start(context.Background(), cfg)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bind failed")
@@ -1124,7 +1125,7 @@ func TestCollectorCallbacks_Start_InitCodedError_PreservedNoRetry(t *testing.T) 
 	cb := &collectorCallbacks{mgr: mgr}
 
 	cfg := prepareDyncfgCfg("codedinit", "job")
-	err := cb.Start(cfg)
+	err := cb.Start(context.Background(), cfg)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bind failed")
@@ -1151,7 +1152,7 @@ func TestCollectorCallbacks_Start_RetryableInitCodedError_PreservedSchedulesRetr
 	cb := &collectorCallbacks{mgr: mgr}
 
 	cfg := prepareDyncfgCfg("retryableinit", "job").Set("autodetection_retry", 1)
-	err := cb.Start(cfg)
+	err := cb.Start(context.Background(), cfg)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bind failed")
@@ -1179,7 +1180,7 @@ func TestCollectorCallbacks_Start_ForeignCodeRetryableErrorDoesNotSatisfyDyncfgC
 	cb := &collectorCallbacks{mgr: mgr}
 
 	cfg := prepareDyncfgCfg("foreignretryable", "job").Set("autodetection_retry", 1)
-	err := cb.Start(cfg)
+	err := cb.Start(context.Background(), cfg)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "foreign retryable")
@@ -1221,7 +1222,7 @@ func TestCollectorCallbacks_Update_CreateCollectorJobPlainErrorPreserved(t *test
 			mgr.runningJobs.unlock()
 			mgr.fileStatus.add(tc.oldCfg, dyncfg.StatusRunning.String())
 
-			err := cb.Update(tc.oldCfg, tc.newCfg)
+			err := cb.Update(context.Background(), tc.oldCfg, tc.newCfg)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), tc.wantErr)
 			if tc.wantCode != 0 {
@@ -1268,7 +1269,7 @@ func TestCollectorCallbacks_Update_AutodetectionCodedError_PreservedNoRetry(t *t
 	mgr.runningJobs.unlock()
 	mgr.fileStatus.add(oldCfg, dyncfg.StatusRunning.String())
 
-	err := cb.Update(oldCfg, newCfg)
+	err := cb.Update(context.Background(), oldCfg, newCfg)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bind failed")
@@ -1308,7 +1309,7 @@ func TestCollectorCallbacks_Update_InitCodedError_PreservedNoRetry(t *testing.T)
 	mgr.runningJobs.unlock()
 	mgr.fileStatus.add(oldCfg, dyncfg.StatusRunning.String())
 
-	err := cb.Update(oldCfg, newCfg)
+	err := cb.Update(context.Background(), oldCfg, newCfg)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bind failed")
@@ -1348,7 +1349,7 @@ func TestCollectorCallbacks_Update_RetryableInitCodedError_PreservedSchedulesRet
 	mgr.runningJobs.unlock()
 	mgr.fileStatus.add(oldCfg, dyncfg.StatusRunning.String())
 
-	err := cb.Update(oldCfg, newCfg)
+	err := cb.Update(context.Background(), oldCfg, newCfg)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "bind failed")
@@ -1403,7 +1404,7 @@ func TestCollectorCallbacks_Update(t *testing.T) {
 			defer cancel()
 			mgr.retryingTasks.add(tc.oldCfg, &retryTask{cancel: cancel})
 
-			err := cb.Update(tc.oldCfg, tc.newCfg)
+			err := cb.Update(context.Background(), tc.oldCfg, tc.newCfg)
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)
@@ -1426,7 +1427,7 @@ func TestCollectorCallbacks_Update(t *testing.T) {
 			assert.Equal(t, tc.wantRetryPending, retryPending)
 
 			if tc.wantRunning {
-				mgr.stopRunningJob(tc.newCfg.FullName())
+				mgr.stopRunningJob(context.Background(), tc.newCfg.FullName())
 			}
 			if tc.wantRetryPending {
 				mgr.retryingTasks.remove(tc.newCfg)
@@ -1460,7 +1461,7 @@ func TestCollectorCallbacks_Stop(t *testing.T) {
 			defer cancel()
 			mgr.retryingTasks.add(cfg, &retryTask{cancel: cancel})
 
-			cb.Stop(cfg)
+			cb.Stop(context.Background(), cfg)
 
 			assert.True(t, job.stopped)
 			_, running := mgr.runningJobs.lookup(cfg.FullName())
@@ -1469,6 +1470,41 @@ func TestCollectorCallbacks_Stop(t *testing.T) {
 			assert.False(t, retryPending)
 			_, fileStatus := mgr.fileStatus.lookup(cfg)
 			assert.False(t, fileStatus)
+		})
+	}
+}
+
+func TestCollectorCallbacks_StagedStopCancelsRetryBeforeWait(t *testing.T) {
+	tests := map[string]struct {
+		stage func(*collectorCallbacks, confgroup.Config, confgroup.Config)
+	}{
+		"stop": {
+			stage: func(cb *collectorCallbacks, cfg, _ confgroup.Config) {
+				cb.StageStop(cfg)
+			},
+		},
+		"update": {
+			stage: func(cb *collectorCallbacks, cfg, newCfg confgroup.Config) {
+				cb.StageUpdate(cfg, newCfg)
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			mgr := newCollectorTestManager()
+			cb := &collectorCallbacks{mgr: mgr}
+			cfg := prepareDyncfgCfg("success", "job").Set("autodetection_retry", 1)
+			newCfg := prepareDyncfgCfg("success", "job").Set("autodetection_retry", 1).Set("option_str", "changed")
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			mgr.retryingTasks.add(cfg, &retryTask{cancel: cancel})
+
+			tc.stage(cb, cfg, newCfg)
+
+			_, retryPending := mgr.retryingTasks.lookup(cfg)
+			assert.False(t, retryPending, "retry must be canceled at stage time, before the stop effect can wait in the pool")
+			assert.ErrorIs(t, ctx.Err(), context.Canceled)
 		})
 	}
 }
@@ -1767,7 +1803,7 @@ func (cb *collectorSeqTestCallbacks) ValidateConfigName(name string) error {
 	return dyncfg.JobNameRuleStrict(name)
 }
 
-func (cb *collectorSeqTestCallbacks) ParseAndValidate(fn dyncfg.Function, _ string) (confgroup.Config, error) {
+func (cb *collectorSeqTestCallbacks) ParseAndValidate(_ context.Context, fn dyncfg.Function, _ string) (confgroup.Config, error) {
 	cfg, ok := cb.parsed[fn.Command()]
 	if !ok {
 		return nil, errors.New("unexpected parse request")
@@ -1775,11 +1811,13 @@ func (cb *collectorSeqTestCallbacks) ParseAndValidate(fn dyncfg.Function, _ stri
 	return cfg, nil
 }
 
-func (cb *collectorSeqTestCallbacks) Start(confgroup.Config) error { return nil }
+func (cb *collectorSeqTestCallbacks) Start(context.Context, confgroup.Config) error { return nil }
 
-func (cb *collectorSeqTestCallbacks) Update(_, _ confgroup.Config) error { return nil }
+func (cb *collectorSeqTestCallbacks) Update(_ context.Context, _, _ confgroup.Config) error {
+	return nil
+}
 
-func (cb *collectorSeqTestCallbacks) Stop(confgroup.Config) {}
+func (cb *collectorSeqTestCallbacks) Stop(context.Context, confgroup.Config) {}
 
 func (cb *collectorSeqTestCallbacks) OnStatusChange(*dyncfg.Entry[confgroup.Config], dyncfg.Status, dyncfg.Function) {
 }
@@ -1806,7 +1844,7 @@ func (j *collectorProbeJob) Collector() any     { return nil }
 func (j *collectorProbeJob) Start()             {}
 func (j *collectorProbeJob) Stop()              { j.stopped = true }
 func (j *collectorProbeJob) Tick(int)           {}
-func (j *collectorProbeJob) AutoDetection() error {
+func (j *collectorProbeJob) AutoDetection(context.Context) error {
 	return nil
 }
 func (j *collectorProbeJob) AutoDetectionEvery() int { return 0 }
@@ -1855,12 +1893,12 @@ func (*blockingSecretStoreService) Update(context.Context, string, secretstore.C
 	return nil
 }
 
-func (*blockingSecretStoreService) Remove(string) error      { return nil }
-func (j *collectorProbeJob) Cleanup()                        {}
-func (j *collectorProbeJob) IsRunning() bool                 { return true }
-func (j *collectorProbeJob) Panicked() bool                  { return false }
-func (j *collectorProbeJob) Vnode() vnodes.VirtualNode       { return vnodes.VirtualNode{} }
-func (j *collectorProbeJob) UpdateVnode(*vnodes.VirtualNode) {}
+func (*blockingSecretStoreService) Remove(string) error                { return nil }
+func (j *collectorProbeJob) Cleanup()                                  {}
+func (j *collectorProbeJob) IsRunning() bool                           { return true }
+func (j *collectorProbeJob) Panicked() bool                            { return false }
+func (j *collectorProbeJob) Vnode() vnodes.VirtualNode                 { return vnodes.VirtualNode{} }
+func (j *collectorProbeJob) SetVnodeSnapshot(jobruntime.VnodeSnapshot) {}
 
 type auditAnalyzerSpy struct {
 	registered []string

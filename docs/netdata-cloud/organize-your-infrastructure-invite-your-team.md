@@ -27,18 +27,22 @@ You can create multiple Spaces, but we recommend using a single Space for most u
 
 ### Set Up Team Access
 
-1. Click "Invite Users" in the Space's sidebar
-2. Assign a role to each invited user. Space-level roles determine what someone can do across the Space:
+You control what each team member can do in a Space by assigning them a **role**. The **Admin** role has full control over the Space, including users, nodes, rooms, and billing. To make someone an Admin, you must already be an Admin yourself — only current Admins can assign the Admin role to others. For the full list of roles and what each one permits, see the [role-based access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
 
-    - **Admin** — full control of the Space, including managing users, Rooms, nodes, notifications, and billing, plus access to every Room. Assign **Admin** to give the invited user the same level of control over the Space that you have.
-    - **Manager** — manage users, Rooms, and most configuration, but cannot manage billing or assign the Admin role.
-    - **Troubleshooter** — investigate issues and build dashboards in the Rooms they are assigned to, without managing the Space.
-    - **Observer** — view-only access to specific Rooms.
-    - **Billing** — manage invoices and payments, without access to monitoring management.
+#### Invite a new user and make them an Admin
 
-   Which roles you can assign depends on your plan. Only an existing Admin can grant the Admin role, so you must already be an Admin to assign it to someone else. Role assignments take effect immediately.
+1. In the Space's sidebar, click **Invite Users**.
+2. Enter the invitee's email address.
+3. Select **Admin** as the role for the invitation.
+4. Send the invitation. The invitee becomes an Admin when they accept and join the Space.
 
-   For the full permission matrix and role availability by plan, see the [role-based access model](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
+#### Change an existing member's role to Admin
+
+1. Click **Space Settings** (⚙️) on the left sidebar below the spaces list.
+2. Open the **User Management** tab.
+3. Find the member and change their role to **Admin**.
+
+Role changes take effect immediately — the member gains the new permissions right away, with no reload or restart needed.
 
 :::tip
 

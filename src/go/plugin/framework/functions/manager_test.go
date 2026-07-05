@@ -96,7 +96,7 @@ func TestManager_RegisterWithContext(t *testing.T) {
 		gotFn = fn
 	})
 
-	handler, scheduleKey, ok := mgr.lookupFunctionRoute(Function{Name: "fn"})
+	handler, scheduleKey, _, ok := mgr.lookupFunctionRoute(Function{Name: "fn"})
 	if !ok {
 		t.Fatal("expected function route")
 	}
@@ -204,7 +204,7 @@ func TestManager_RegisterPrefixWithContext(t *testing.T) {
 		gotFn = fn
 	})
 
-	handler, scheduleKey, ok := mgr.lookupFunctionRoute(Function{Name: "config", Args: []string{"collector:job"}})
+	handler, scheduleKey, _, ok := mgr.lookupFunctionRoute(Function{Name: "config", Args: []string{"collector:job"}})
 	if !ok {
 		t.Fatal("expected prefix function route")
 	}

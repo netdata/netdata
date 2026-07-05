@@ -80,10 +80,10 @@ Once connected, the child maintains a persistent connection:
 Netdata automatically replicates missing historical data when reconnection occurs. Data is only lost if:
 
 - Child restarts during disconnection AND
-- Child uses `memory mode = ram` (metrics stored in memory) AND
+- Child uses `[db].db = ram` (metrics stored in memory) AND
 - Disconnection exceeds retention period (default: 1 hour for RAM mode)
 
-For persistent data, use `memory mode = dbengine`.
+For persistent data, use `[db].db = dbengine`.
 
 :::
 
@@ -191,8 +191,8 @@ The **Netdata Streaming** function (under the "Functions" tab) provides:
 - Comprehensive overview of all streaming connections
 - Status, replication completion time, and connection details
 - Works on both parent and child nodes:
-    - **On child**: Shows outgoing connections
-    - **On parent**: Shows incoming connections (InHops = 1 for direct children, >1 for proxied connections)
+  - **On child**: Shows outgoing connections
+  - **On parent**: Shows incoming connections (InHops = 1 for direct children, >1 for proxied connections)
 
 #### Viewing Logs
 
