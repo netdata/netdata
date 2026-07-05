@@ -36,6 +36,13 @@ void netdata_windows_get_system_info(struct rrdhost_system_info *system_info);
 
 const char *netdata_windows_normalize_virt_string(const char *raw);
 const char *netdata_windows_resolve_virt_detection(const char *wmi, const char *smbios, const char *registry);
+
+// Kubernetes env-var container probe: returns NETDATA_WIN_CONTAINER_KUBERNETES when both
+// values are set and non-empty, otherwise NULL (caller should fall back to WMI detection).
+const char *netdata_windows_container_from_env(const char *k_host, const char *k_port);
+
+// Maps a container classification to its detection-method string.
+const char *netdata_windows_container_detection_method(const char *container);
 #endif
 
 #endif // _NETDATA_WIN_SYSTEM_INFO_H_

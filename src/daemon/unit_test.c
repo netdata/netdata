@@ -1890,4 +1890,74 @@ int unit_test_windows_virt_resolution(void) {
             sizeof(cases) / sizeof(cases[0]));
     return 0;
 }
+
+int unit_test_windows_container(void) {
+    int failures = 0;
+
+    // Kubernetes env-var probe. NULL expected means "not detected via env, fall back to WMI".
+    static const struct {
+        const char *host;
+        const char *port;
+        const char *expected;
+    } env_cases[] = {
+        {"10.0.0.1", "443",  NETDATA_WIN_CONTAINER_KUBERNETES},
+        {"10.0.0.1", "6443", NETDATA_WIN_CONTAINER_KUBERNETES},
+        {"10.0.0.1", "",     NULL},
+        {"",         "443",  NULL},
+        {"",         "",     NULL},
+        {NULL,       "443",  NULL},
+        {"10.0.0.1", NULL,   NULL},
+        {NULL,       NULL,   NULL},
+    };
+
+    for(size_t i = 0; i < sizeof(env_cases) / sizeof(env_cases[0]); i++) {
+        const char *got = netdata_windows_container_from_env(env_cases[i].host, env_cases[i].port);
+        bool ok = (got == NULL && env_cases[i].expected == NULL) ||
+                  (got != NULL && env_cases[i].expected != NULL && strcmp(got, env_cases[i].expected) == 0);
+        if(!ok) {
+            fprintf(stderr,
+                    "unit_test_windows_container: env case %zu (host='%s' port='%s') expected '%s' got '%s'\n",
+                    i,
+                    env_cases[i].host ? env_cases[i].host : "(NULL)",
+                    env_cases[i].port ? env_cases[i].port : "(NULL)",
+                    env_cases[i].expected ? env_cases[i].expected : "(NULL)",
+                    got ? got : "(NULL)");
+            failures++;
+        }
+    }
+
+    // Container classification -> detection-method mapping.
+    static const struct {
+        const char *container;
+        const char *expected;
+    } map_cases[] = {
+        {NETDATA_WIN_CONTAINER_KUBERNETES, NETDATA_WIN_CONTAINER_KUBERNETES_DETECT},
+        {NETDATA_WIN_CONTAINER_WINDOWS,    NETDATA_WIN_CONTAINER_WINDOWS_DETECT},
+        {NETDATA_WIN_CONTAINER_NONE,       NETDATA_WIN_CONTAINER_NONE},
+        {"unexpected-value",               NETDATA_WIN_CONTAINER_NONE},
+        {NULL,                             NETDATA_WIN_CONTAINER_NONE},
+    };
+
+    for(size_t i = 0; i < sizeof(map_cases) / sizeof(map_cases[0]); i++) {
+        const char *got = netdata_windows_container_detection_method(map_cases[i].container);
+        if(strcmp(got, map_cases[i].expected) != 0) {
+            fprintf(stderr,
+                    "unit_test_windows_container: map case '%s' expected '%s' got '%s'\n",
+                    map_cases[i].container ? map_cases[i].container : "(NULL)",
+                    map_cases[i].expected,
+                    got);
+            failures++;
+        }
+    }
+
+    if(failures) {
+        fprintf(stderr, "unit_test_windows_container: %d failure(s)\n", failures);
+        return 1;
+    }
+
+    fprintf(stderr, "unit_test_windows_container: OK (%zu env + %zu map cases)\n",
+            sizeof(env_cases) / sizeof(env_cases[0]),
+            sizeof(map_cases) / sizeof(map_cases[0]));
+    return 0;
+}
 #endif

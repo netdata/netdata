@@ -617,11 +617,28 @@ static void netdata_windows_detect_virtualization(struct rrdhost_system_info *sy
     nd_setenv("NETDATA_SYSTEM_VIRT_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
 }
 
-static const char *netdata_windows_detect_container(void) {
-    char *k_host = getenv("KUBERNETES_SERVICE_HOST");
-    char *k_port = getenv("KUBERNETES_SERVICE_PORT");
+const char *netdata_windows_container_from_env(const char *k_host, const char *k_port) {
     if(k_host && *k_host && k_port && *k_port)
         return NETDATA_WIN_CONTAINER_KUBERNETES;
+
+    return NULL;
+}
+
+const char *netdata_windows_container_detection_method(const char *container) {
+    if(container && strcmp(container, NETDATA_WIN_CONTAINER_KUBERNETES) == 0)
+        return NETDATA_WIN_CONTAINER_KUBERNETES_DETECT;
+
+    if(container && strcmp(container, NETDATA_WIN_CONTAINER_WINDOWS) == 0)
+        return NETDATA_WIN_CONTAINER_WINDOWS_DETECT;
+
+    return NETDATA_WIN_CONTAINER_NONE;
+}
+
+static const char *netdata_windows_detect_container(void) {
+    const char *from_env = netdata_windows_container_from_env(
+        getenv("KUBERNETES_SERVICE_HOST"), getenv("KUBERNETES_SERVICE_PORT"));
+    if(from_env)
+        return from_env;
 
     Win32OperatingSystemInfo os;
     if(GetWin32OperatingSystemInfo(&os) && os.Populated && os.Caption[0]) {
@@ -634,14 +651,7 @@ static const char *netdata_windows_detect_container(void) {
 
 static const char *netdata_windows_detect_container_state(struct rrdhost_system_info *systemInfo) {
     const char *container = netdata_windows_detect_container();
-
-    const char *container_detection;
-    if(strcmp(container, NETDATA_WIN_CONTAINER_KUBERNETES) == 0)
-        container_detection = NETDATA_WIN_CONTAINER_KUBERNETES_DETECT;
-    else if(strcmp(container, NETDATA_WIN_CONTAINER_WINDOWS) == 0)
-        container_detection = NETDATA_WIN_CONTAINER_WINDOWS_DETECT;
-    else
-        container_detection = NETDATA_WIN_CONTAINER_NONE;
+    const char *container_detection = netdata_windows_container_detection_method(container);
 
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CONTAINER", container);
     nd_setenv("NETDATA_SYSTEM_CONTAINER", container, 1);
