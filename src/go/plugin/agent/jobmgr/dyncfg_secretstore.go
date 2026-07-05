@@ -205,7 +205,7 @@ func (m *Manager) lookupExposedByFullName(fullName string) (*dyncfg.Entry[confgr
 // observed on the loop: exposed status plus config content hash, "" when the
 // store is not exposed. Captured at a collector command's deadline abandon
 // and compared at its late return - any store mutation committed in between
-// changes it and invalidates the warm continuation (executor.staleWarmDep).
+// changes it and invalidates the warm continuation (executor.staleWarmDepStatus).
 // A re-apply of identical content (the handler's no-op path) leaves it
 // unchanged by design.
 func (m *Manager) secretStoreDepIdentity(storeKey string) string {

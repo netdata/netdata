@@ -290,6 +290,43 @@ func TestClaimTable_ReleasedHookWaitsForGrantedReaders(t *testing.T) {
 	assert.Equal(t, []string{"store"}, released)
 }
 
+// TestClaimTable_WakeReattemptsWaitersWithoutRelease pins the wedge wake
+// seam: waiters parked at a wedged key must recompute without a holder change.
+// A waiter whose recomputed set drops the wedged key proceeds; one that still
+// needs it re-parks at the FIFO front.
+func TestClaimTable_WakeReattemptsWaitersWithoutRelease(t *testing.T) {
+	ct := newClaimTable()
+
+	holder := &claimProbe{label: "wedged-holder"}
+	ct.acquire(holder.request(staticClaims(claim{"wedged", claimWrite})))
+	require.True(t, holder.granted())
+
+	waiterSet := []claim{{"wedged", claimWrite}}
+	waiter := &claimProbe{label: "store-update"}
+	ct.acquire(waiter.request(func() []claim { return waiterSet }))
+	require.False(t, waiter.granted(), "the waiter starts parked at the wedged key")
+
+	stillNeedsWedged := &claimProbe{label: "still-needs-wedged"}
+	ct.acquire(stillNeedsWedged.request(staticClaims(claim{"wedged", claimWrite})))
+	require.False(t, stillNeedsWedged.granted(), "a later waiter parks behind the first")
+	require.Equal(t, 2, ct.parkedCount())
+
+	waiterSet = []claim{{"other", claimWrite}}
+	ct.wake("wedged")
+
+	require.True(t, waiter.granted(), "wake must reattempt the head and grant after recompute drops the wedged key")
+	assert.Equal(t, []string{"other"}, heldKeys(waiter.grant))
+	require.False(t, stillNeedsWedged.granted(), "the next waiter still needs the wedged key and must re-park")
+	assert.Equal(t, 1, ct.parkedCount())
+
+	ct.release(holder.grant)
+	require.True(t, stillNeedsWedged.granted(), "the re-parked waiter must keep FIFO position when the key releases")
+
+	ct.release(waiter.grant)
+	ct.release(stillNeedsWedged.grant)
+	assert.Equal(t, 0, ct.parkedCount())
+}
+
 // TestClaimTable_RecomputeAtRestage pins the stale-set rule: a parked
 // acquisition recomputes its claim set when it wakes; a changed set releases
 // EVERYTHING held and reacquires under the new set, so keys dropped from the
