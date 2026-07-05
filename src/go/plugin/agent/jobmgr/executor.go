@@ -71,8 +71,13 @@ const effectPoolSize = 4
 
 // keyState is the loop-owned lane state of one key.
 type keyState struct {
-	busy          bool
-	waiting       bool
+	busy    bool
+	waiting bool
+	// claimlessExec is set only while running a command whose plan said it must
+	// complete inline. runnerFor uses it as a runtime invariant check: claimless
+	// commands must not start blocking phases because they hold no claims. A
+	// claimless command does not re-enter claimless execution for the same key.
+	claimlessExec bool
 	generation    uint64
 	fifo          []event
 	waitFIFO      []event
@@ -255,7 +260,7 @@ func (e *executor) execute(sk string, ks *keyState, ev event) {
 	}
 	plan := e.planEvent(ev)
 	if !plan.needsClaims() {
-		e.executeEvent(sk, ks, ev)
+		e.executeClaimlessEvent(sk, ks, ev)
 		return
 	}
 	// Mutating events reserve their full claim set - the lane key plus the
@@ -275,6 +280,12 @@ func (e *executor) execute(sk string, ks *keyState, ev event) {
 	ks.acquiring = req
 	e.claimWork[req] = ev
 	e.claims.acquire(req)
+}
+
+func (e *executor) executeClaimlessEvent(sk string, ks *keyState, ev event) {
+	ks.claimlessExec = true
+	defer func() { ks.claimlessExec = false }()
+	e.executeEvent(sk, ks, ev)
 }
 
 // refuseAtShutdown resolves an event under the one rule: dyncfg commands
@@ -639,6 +650,12 @@ func (e *executor) runnerFor(sk string) dyncfg.StepRunner {
 			return
 		}
 		ks := e.keys[sk]
+		if ks.claimlessExec {
+			err := fmt.Errorf("internal scheduler error: claimless command for key '%s' attempted to run a blocking phase", sk)
+			e.mgr.Errorf("BUG: %v", err)
+			commit(err)
+			return
+		}
 		if ks.wedge != nil {
 			// Reachable when a commit chains a phase after its own stop was
 			// abandoned: the key is held by the leaked call, so the chained

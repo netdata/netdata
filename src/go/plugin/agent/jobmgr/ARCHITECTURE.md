@@ -5,7 +5,11 @@ It is intentionally human-oriented: it explains the moving parts, command
 flows, state ownership, and test model without requiring the reader to
 reconstruct the system from individual review notes.
 
-## Mental Model
+Read it top to bottom as a journey: the plain-language model first, then the
+building blocks (loop, lanes, claims, effects), then how real commands flow,
+and finally the precise contracts and the test model.
+
+## What jobmgr Does
 
 `jobmgr` owns collector jobs at runtime. It accepts configuration changes
 from discovery and Dynamic Configuration (DynCfg), starts and stops jobs,
@@ -16,7 +20,71 @@ The central rule is simple:
 > The manager loop owns orchestration state. Blocking module work runs
 > outside the loop, then returns to the loop to commit.
 
-The architecture has four layers:
+## Job Concurrency In Plain Words
+
+`jobmgr` is not one goroutine doing all job work, and it is not many
+goroutines freely mutating job state. It is a small concurrency model. The
+table below introduces the vocabulary used throughout the rest of this
+document; later sections make each part precise.
+
+| Part | Plain meaning | What it means for jobs |
+| --- | --- | --- |
+| Inputs | Concurrent inputs enter manager channels:<br/>• discovery configs appeared/disappeared<br/>• DynCfg user actions<br/>• effect completions<br/>• shutdown | Inputs do not freely mutate job state. The manager loop consumes them first. |
+| Manager loop | One goroutine makes one orchestration decision at a time. | It chooses:<br/>• domain/key<br/>• inline vs wait vs effect<br/>• visible state commit |
+| Per-key lane | One lane serializes one object. | For the same collector config:<br/>• actions do not overtake<br/>• discovery and DynCfg meet in the same lane |
+| Claims | Shared dependencies are reserved before work runs. | Jobs can block across different collector keys when they share:<br/>• secret stores<br/>• vnodes<br/>Unrelated jobs can proceed concurrently. |
+| Effect pool | Blocking work runs outside the manager loop. | The lane stays occupied while effects run:<br/>• validation<br/>• detection/start<br/>• stop waits<br/>• backend work |
+| Running job | A committed job runs separately from command orchestration. | The collector can collect/emit independently. `jobmgr` still owns:<br/>• lifecycle<br/>• routing<br/>• dependencies<br/>• cleanup |
+| Shutdown | Shutdown switches to the one-rule path. | During shutdown:<br/>• new non-terminal work does not start<br/>• unfinished DynCfg commands answer 503<br/>• unfinished work publishes no CONFIG state |
+
+```mermaid
+flowchart LR
+    discovery("Discovery<br/>config appeared/disappeared") --> input("Manager input channels")
+    dyncfg("DynCfg<br/>user action") --> input
+    finished("Effect completion") --> input
+    shutdown("Shutdown") --> input
+
+    input --> loop("Manager loop<br/>one decision at a time")
+    loop --> lane("Per-key lane<br/>same object order")
+    lane --> claims("Dependency claims<br/>stores/vnodes/jobs")
+    claims --> inline("Inline answer<br/>cheap or rejection-only")
+    claims --> effect("Effect pool<br/>blocking work")
+    effect --> loop
+
+    loop --> commit("Commit visible state")
+    commit --> running("Running job<br/>collects independently")
+    commit --> output("DynCfg terminal<br/>CONFIG records")
+
+    classDef loop fill:#cfe4ff,stroke:#1f6feb,stroke-width:3px,color:#0b2948;
+    classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
+    classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
+    classDef effect fill:#ffe6cc,stroke:#e36209,color:#5a2a00;
+    classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
+    classDef hard fill:#ffdcdc,stroke:#cf222e,color:#5a0b0b;
+
+    class loop loop;
+    class discovery,dyncfg,input input;
+    class shutdown hard;
+    class finished,effect effect;
+    class lane,claims sched;
+    class inline,commit,running,output commit;
+```
+
+Typical job lifecycle:
+
+| Step | What happens | Concurrency rule |
+| --- | --- | --- |
+| 1 | Discovery or DynCfg introduces a config. | The input enters the manager loop through a channel. |
+| 2 | The loop records the config and chooses:<br/>• start<br/>• wait<br/>• rejection | The decision is serialized by the config's lane. |
+| 3 | Starting a job runs validation/detection in an effect worker. | Blocking work leaves the loop, but the lane stays occupied. |
+| 4 | The effect result returns to the loop. | Only the loop commits the result. |
+| 5 | The loop publishes one terminal state:<br/>• running<br/>• failed<br/>• disabled<br/>• deleted<br/>• rejected | Visible state changes happen at commit. |
+| 6 | A running collector works until another lifecycle event arrives:<br/>• stop/restart/update/remove<br/>• dependency restart<br/>• shutdown | Collection is independent; lifecycle remains controlled by `jobmgr`. |
+
+## Architecture Layers
+
+With the plain-language model in mind, the same system in structural terms
+has four layers:
 
 1. Inputs:
    discovery add/remove, DynCfg functions, effect completions, shutdown.
@@ -53,9 +121,26 @@ flowchart TD
     vnodes --> commit
     commit --> wire("DynCfg output and CONFIG records")
     commit --> jobs("runningJobs / deps / funcctl / fileStatus")
+
+    classDef loop fill:#cfe4ff,stroke:#1f6feb,stroke-width:3px,color:#0b2948;
+    classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
+    classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
+    classDef effect fill:#ffe6cc,stroke:#e36209,color:#5a2a00;
+    classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
+    classDef hard fill:#ffdcdc,stroke:#cf222e,color:#5a0b0b;
+
+    class loop loop;
+    class discovery,dyncfg input;
+    class stop hard;
+    class done,effects effect;
+    class exec,lanes,claims,domains,collector,stores,vnodes sched;
+    class commit,wire,jobs commit;
 ```
 
 ## Main Objects
+
+This is the cast of characters: the plain concepts above mapped to the code
+types that implement them.
 
 | Object | Owner | Purpose |
 | --- | --- | --- |
@@ -128,6 +213,20 @@ flowchart TD
     activeCheck -->|no| reject("drop discovery or answer DynCfg 503")
     resultCheck -->|yes| commit("executor.onEffectDone")
     resultCheck -->|no| shutdownResult("executor.onEffectDoneShutdown")
+
+    classDef loop fill:#cfe4ff,stroke:#1f6feb,stroke-width:3px,color:#0b2948;
+    classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
+    classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
+    classDef effect fill:#ffe6cc,stroke:#e36209,color:#5a2a00;
+    classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
+    classDef hard fill:#ffdcdc,stroke:#cf222e,color:#5a0b0b;
+
+    class start,pre,receive,activeCheck,resultCheck loop;
+    class add,remove,fn input;
+    class result effect;
+    class dispatch sched;
+    class commit commit;
+    class drain,reject,shutdownResult hard;
 ```
 
 The loop must not block on module code, external I/O, or unbounded channel
@@ -170,6 +269,18 @@ stateDiagram-v2
     Wedged --> Commit: late return
     InlineCommit --> Idle
     Commit --> Idle
+
+    classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
+    classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
+    classDef effect fill:#ffe6cc,stroke:#e36209,color:#5a2a00;
+    classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
+    classDef hard fill:#ffdcdc,stroke:#cf222e,color:#5a0b0b;
+
+    class Idle input
+    class AcquiringClaims,WaitParked sched
+    class BusyEffect effect
+    class Wedged hard
+    class InlineCommit,Commit commit
 ```
 
 ## Claim Table
@@ -202,48 +313,68 @@ Claim rules:
 This is the deadlock-avoidance core: no command waits for a later key while
 holding keys in an order that another command can invert.
 
-## Rejection-Only Commands
+## Effects, Deadlines, And Wedges
 
-A rejection-only command is one that answers before its first
-claim-protected access. It should not claim anything and should not park
-behind a foreign write hold.
+Blocking work runs as an effect with the manager context plus a flat
+deadline. Blocking work includes:
 
-Examples:
+- collector validation and detection;
+- job stop waits;
+- secretstore backend validation and activation;
+- dependent restarts.
 
-- invalid identity;
-- unknown command;
-- missing object;
-- missing payload;
-- unsupported command;
-- most source/type gates;
-- parse gates that happen before state access.
+If an effect returns before the deadline, the result is committed on the
+loop. If the deadline fires first, the worker commits the deadline outcome
+and the leaked call keeps running in the background. The key is then wedged
+until the leaked call returns.
 
-Status-derived collector gates are the exception. Enable, restart, and
-disable can answer from `Entry.Status`, and that status is mutated by
-secretstore dependent restart plans. When the collector key is
-foreign-write-held, these commands park and answer after the hold resolves.
+`executor_transition.go` is the loop-side owner for completion, abandon, late
+return, warm continuation, late replay, and shutdown-late ordering. The prose
+below records the cross-file invariants that stay with the manager, effect
+worker, claim table, and domain controllers.
 
-Command planning rules:
+While wedged:
 
-- Domain ownership:
-  - collector commands use `dyncfg.Handler.CommandPlan`;
-  - secretstore commands use `secretsctl.Controller.CommandPlan`;
-  - vnode commands use `vnodectl.Controller.CommandPlan`.
-- Plan classes:
-  - claimless commands answer without claim-table serialization;
-  - hold-aware claimless commands normally answer without claims, but park
-    behind a foreign write hold;
-  - claimed commands acquire their claim set before the first claim-protected
-    access.
-- Executor ownership:
-  - wraps the domain command plan in a jobmgr-local event plan;
-  - owns event-level routing and claim-key computation;
-  - uses `CommandPlan.NeedsClaims(false)` for intrinsic claim acquisition;
-  - uses `CommandPlan.NeedsClaims(true)` to decide foreign write-hold bypass;
-  - re-runs claim computation at every claim-table restage.
+- the lane remains busy;
+- same-key events park;
+- read claims release at the abandon commit;
+- write claims remain held until late return;
+- claim waiters at the wedged key are re-attempted so commands that can
+  skip wedged keys do not wait for an unbounded leaked call.
 
-Because claim computation is dynamic, a parked command can become claimless or
-change dependencies before it acts.
+At late return:
+
+- late replay work runs before remaining write claims release;
+- a warm start resumes only if the config is still current, no stop intent
+  is queued, the manager is not shutting down, and referenced stores are
+  unchanged/not write-held;
+- dropped warm starts dispose silently behind a closed emission gate;
+- shutdown late returns only release state and publish nothing.
+
+```mermaid
+sequenceDiagram
+    participant L as Manager loop
+    participant E as Effect worker
+    participant M as Module call
+
+    L->>E: dispatch effect
+    E->>M: run blocking work
+    alt returns before deadline
+        rect rgba(46, 160, 67, 0.15)
+        M-->>E: result
+        E-->>L: normal completion
+        L->>L: commit, release claims, settle lane
+        end
+    else deadline fires first
+        rect rgba(248, 81, 73, 0.15)
+        E-->>L: abandoned result
+        L->>L: abandon transition, wedge key
+        M-->>E: late result
+        E-->>L: late completion
+        L->>L: late-return transition, release writes, settle lane
+        end
+    end
+```
 
 ## Domain Flows
 
@@ -367,64 +498,38 @@ Every job registration reconciles the job's vnode baseline before `Start`.
 This covers dependent restarts and warm resumes that were created before a
 vnode update but registered after it.
 
-## Effects, Deadlines, And Wedges
+## Command Planning And Rejection-Only Commands
 
-Blocking work runs as an effect with the manager context plus a flat
-deadline. Blocking work includes:
+Every command is planned before it runs; the plan decides whether it reserves
+claims. There are three plan classes:
 
-- collector validation and detection;
-- job stop waits;
-- secretstore backend validation and activation;
-- dependent restarts.
+| Plan class | Claims | Behavior |
+| --- | --- | --- |
+| Claimless | none | Answers inline, no claim-table serialization (rejection-only and read-only). |
+| Hold-aware claimless | none, normally | Answers inline, but parks behind a foreign write hold on its key. |
+| Claimed | full set | Acquires its claims before the first claim-protected access. |
 
-If an effect returns before the deadline, the result is committed on the
-loop. If the deadline fires first, the worker commits the deadline outcome
-and the leaked call keeps running in the background. The key is then wedged
-until the leaked call returns.
+**Rejection-only** is the common claimless case — a command that answers before
+its first claim-protected access, so it claims nothing and never parks behind a
+foreign write hold. Examples: invalid identity; unknown or unsupported command;
+missing object or payload; most source/type gates; parse gates before state
+access.
 
-`executor_transition.go` is the loop-side owner for completion, abandon, late
-return, warm continuation, late replay, and shutdown-late ordering. The prose
-below records the cross-file invariants that stay with the manager, effect
-worker, claim table, and domain controllers.
+**The one exception is status-derived collector gates.** Enable, restart, and
+disable can answer from `Entry.Status`, which secretstore dependent-restart
+plans mutate — so they are *hold-aware*: while the collector key is
+foreign-write-held they park and answer after the hold resolves.
 
-While wedged:
+Ownership:
 
-- the lane remains busy;
-- same-key events park;
-- read claims release at the abandon commit;
-- write claims remain held until late return;
-- claim waiters at the wedged key are re-attempted so commands that can
-  skip wedged keys do not wait for an unbounded leaked call.
+- each domain owns its plan — `dyncfg.Handler`, `secretsctl.Controller`, and
+  `vnodectl.Controller` each expose `CommandPlan`;
+- the executor wraps that plan in an event plan and owns claim-key computation:
+  `NeedsClaims(false)` drives intrinsic acquisition, `NeedsClaims(true)` drives
+  the foreign-write-hold bypass, and computation re-runs at every restage.
 
-At late return:
-
-- late replay work runs before remaining write claims release;
-- a warm start resumes only if the config is still current, no stop intent
-  is queued, the manager is not shutting down, and referenced stores are
-  unchanged/not write-held;
-- dropped warm starts dispose silently behind a closed emission gate;
-- shutdown late returns only release state and publish nothing.
-
-```mermaid
-sequenceDiagram
-    participant L as Manager loop
-    participant E as Effect worker
-    participant M as Module call
-
-    L->>E: dispatch effect
-    E->>M: run blocking work
-    alt returns before deadline
-        M-->>E: result
-        E-->>L: normal completion
-        L->>L: commit, release claims, settle lane
-    else deadline fires first
-        E-->>L: abandoned result
-        L->>L: abandon transition, wedge key
-        M-->>E: late result
-        E-->>L: late completion
-        L->>L: late-return transition, release writes, settle lane
-    end
-```
+Claim computation is dynamic: a parked command can become claimless or change
+its dependencies before it acts.
 
 ## Shutdown
 
@@ -448,16 +553,16 @@ They must not publish state.
 
 ## Function Publication
 
-Function publication is separate from job start/stop mechanics.
+Function routing follows committed state, asynchronously — separate from job
+start/stop mechanics:
 
-- Stop withdrawal happens when a stop stages.
-- Start publication happens when a running status commits.
-- A reconciler goroutine performs publication work outside the manager loop.
-- The manager loop may request reconciliation, but it must not publish
-  directly.
+- stop withdrawal happens when a stop stages;
+- start publication happens when a running status commits;
+- a reconciler goroutine performs the actual publish outside the manager loop;
+- the manager loop may request reconciliation, but must not publish directly.
 
-This keeps Function routing aligned to committed state while preventing the
-manager loop from blocking on publication work.
+This keeps routing aligned to committed state without blocking the loop on
+publication work.
 
 ## Output Ordering Rules
 
