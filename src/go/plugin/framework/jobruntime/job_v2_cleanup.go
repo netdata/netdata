@@ -52,18 +52,20 @@ func (j *JobV2) cleanupHostInfo(state *jobV2ScopeState) netdataapi.HostInfo {
 	if state == nil {
 		return netdataapi.HostInfo{}
 	}
+	// The returned HostInfo is consumed immediately for read-only
+	// stale-suppression checks; callers must not mutate Labels.
 	if state.scopeKey == defaultHostScopeKey && j.module != nil && j.module.VirtualNode() != nil {
 		vnode := j.currentVnode()
 		return netdataapi.HostInfo{
 			GUID:     vnode.GUID,
 			Hostname: vnode.Hostname,
-			Labels:   maps.Clone(vnode.Labels),
+			Labels:   vnode.Labels,
 		}
 	}
 	return netdataapi.HostInfo{
 		GUID:     state.host.cleanupInfo.GUID,
 		Hostname: state.host.cleanupInfo.Hostname,
-		Labels:   maps.Clone(state.host.cleanupInfo.Labels),
+		Labels:   state.host.cleanupInfo.Labels,
 	}
 }
 

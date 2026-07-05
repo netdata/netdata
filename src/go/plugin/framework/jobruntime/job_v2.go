@@ -220,16 +220,17 @@ func (j *JobV2) SetVnodeSnapshot(snapshot VnodeSnapshot) {
 		return
 	}
 	next := snapshot.Vnode.Copy()
+	var metadataChanged bool
 	j.vnodeMu.Lock()
 	j.vnode = *next
-	j.vnodeMu.Unlock()
 	if snapshot.Revision != 0 {
 		j.vnodeRevision = snapshot.Revision
 	}
-	metadataChanged := snapshot.MetadataRevision == 0 || snapshot.MetadataRevision != j.vnodeMetadataRevision
+	metadataChanged = snapshot.MetadataRevision == 0 || snapshot.MetadataRevision != j.vnodeMetadataRevision
 	if snapshot.MetadataRevision != 0 {
 		j.vnodeMetadataRevision = snapshot.MetadataRevision
 	}
+	j.vnodeMu.Unlock()
 	if metadataChanged {
 		if state := j.scopeStates[defaultHostScopeKey]; state != nil {
 			state.host.invalidateDefine()
@@ -253,31 +254,39 @@ func (j *JobV2) applyVnodeSnapshot(snapshot VnodeSnapshot) {
 		return
 	}
 	if j.module != nil && j.module.VirtualNode() != nil {
+		advanced := false
+		j.vnodeMu.Lock()
 		if snapshot.Revision != 0 && snapshot.Revision > j.vnodeRevision {
 			j.vnodeRevision = snapshot.Revision
 			if snapshot.MetadataRevision != 0 {
 				j.vnodeMetadataRevision = snapshot.MetadataRevision
 			}
+			advanced = true
+		}
+		j.vnodeMu.Unlock()
+		if advanced {
 			j.Debugf("ignoring vnode update for module-owned vnode")
 		}
-		return
-	}
-	if snapshot.Revision != 0 && snapshot.Revision <= j.vnodeRevision {
 		return
 	}
 
 	next := snapshot.Vnode.Copy()
 
+	var metadataChanged bool
 	j.vnodeMu.Lock()
+	if snapshot.Revision != 0 && snapshot.Revision <= j.vnodeRevision {
+		j.vnodeMu.Unlock()
+		return
+	}
 	j.vnode = *next
-	j.vnodeMu.Unlock()
 	if snapshot.Revision != 0 {
 		j.vnodeRevision = snapshot.Revision
 	}
-	metadataChanged := snapshot.MetadataRevision == 0 || snapshot.MetadataRevision != j.vnodeMetadataRevision
+	metadataChanged = snapshot.MetadataRevision == 0 || snapshot.MetadataRevision != j.vnodeMetadataRevision
 	if snapshot.MetadataRevision != 0 {
 		j.vnodeMetadataRevision = snapshot.MetadataRevision
 	}
+	j.vnodeMu.Unlock()
 	if metadataChanged {
 		// Registry owner release is intentionally tied to the next successful
 		// emission or cleanup, so obsolete emission can still select the old host.

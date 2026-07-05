@@ -28,7 +28,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
@@ -705,11 +704,7 @@ func (m *Manager) reconcileJobVnode(job runtimeJob) {
 }
 
 func commitJobVnodeSnapshot(job runtimeJob, snapshot vnodectl.Snapshot) {
-	job.SetVnodeSnapshot(jobruntime.VnodeSnapshot{
-		Vnode:            snapshot.Vnode,
-		Revision:         snapshot.Revision,
-		MetadataRevision: snapshot.MetadataRevision,
-	})
+	job.SetVnodeSnapshot(toRuntimeVnodeSnapshot(snapshot))
 }
 
 // publishRunningJobFunctions registers a committed-live job with the

@@ -307,15 +307,16 @@ func (j *Job) SetVnodeSnapshot(snapshot VnodeSnapshot) {
 	if snapshot.Vnode == nil || (j.module != nil && j.module.VirtualNode() != nil) {
 		return
 	}
+	next := snapshot.Vnode.Copy()
 	j.vnodeMu.Lock()
-	j.vnode = *snapshot.Vnode.Copy()
-	j.vnodeMu.Unlock()
+	j.vnode = *next
 	if snapshot.Revision != 0 {
 		j.vnodeRevision = snapshot.Revision
 	}
 	if snapshot.MetadataRevision != 0 {
 		j.vnodeMetadataRevision = snapshot.MetadataRevision
 	}
+	j.vnodeMu.Unlock()
 }
 
 func (j *Job) refreshVnodeSnapshot() bool {
@@ -333,6 +334,11 @@ func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) bool {
 	if snapshot.Vnode == nil {
 		return false
 	}
+	next := snapshot.Vnode.Copy()
+
+	j.vnodeMu.Lock()
+	defer j.vnodeMu.Unlock()
+
 	if snapshot.Revision != 0 && snapshot.Revision <= j.vnodeRevision {
 		return false
 	}
@@ -340,11 +346,9 @@ func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) bool {
 	createChart := false
 	if metadataChanged {
 		j.vnodeCreated = false
-		createChart = j.vnode.GUID != snapshot.Vnode.GUID
+		createChart = j.vnode.GUID != next.GUID
 	}
-	j.vnodeMu.Lock()
-	j.vnode = *snapshot.Vnode.Copy()
-	j.vnodeMu.Unlock()
+	j.vnode = *next
 	if snapshot.Revision != 0 {
 		j.vnodeRevision = snapshot.Revision
 	}

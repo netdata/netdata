@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/vnodectl"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
@@ -73,11 +74,7 @@ func newJobFactory(m *Manager) *jobFactory {
 			if !ok {
 				return jobruntime.VnodeSnapshot{}, false
 			}
-			return jobruntime.VnodeSnapshot{
-				Vnode:            snapshot.Vnode,
-				Revision:         snapshot.Revision,
-				MetadataRevision: snapshot.MetadataRevision,
-			}, true
+			return toRuntimeVnodeSnapshot(snapshot), true
 		},
 		out:               m.out,
 		gates:             m.emissionGates,
@@ -92,6 +89,14 @@ func newJobFactory(m *Manager) *jobFactory {
 		secretResolver: m.secretResolver,
 		secretStoreSvc: m.secretsCtl.Service(),
 		ctx:            m.baseContext(),
+	}
+}
+
+func toRuntimeVnodeSnapshot(snapshot vnodectl.Snapshot) jobruntime.VnodeSnapshot {
+	return jobruntime.VnodeSnapshot{
+		Vnode:            snapshot.Vnode,
+		Revision:         snapshot.Revision,
+		MetadataRevision: snapshot.MetadataRevision,
 	}
 }
 
