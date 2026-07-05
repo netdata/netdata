@@ -62,8 +62,17 @@ Getting started is as simple as visiting [app.netdata.cloud](https://app.netdata
 
 ## [2. Connect a Node & See Instant Results](/src/claim/README.md)
 
-**Connect Your First Agent**
-Once logged into Netdata Cloud, you'll see connection instructions. There are three easy ways to connect:
+**Connect Your Agent**
+
+How you connect depends on whether Netdata is already running on your node.
+
+:::tip
+
+**Already have the Netdata Agent installed?** You do **not** need to reinstall it. Open the Agent's local dashboard at `http://NODE:19999` (replace `NODE` with your server's IP address or hostname), sign in to your Netdata Cloud account, and click **Connect** to claim the existing Agent to your Space. See [Connect Existing Agent](/src/claim/README.md#connect-existing-agent) for the full procedure and troubleshooting (including `netdatacli aclk-state` and the `cloud` section of `http://NODE:19999/api/v3/info`).
+
+:::
+
+**New installation?** Once logged into Netdata Cloud, you'll see connection instructions. There are three easy ways to install and connect:
 
 <details>
 <summary><strong>Method 1: Through the Cloud Interface</strong></summary><br/>
