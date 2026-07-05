@@ -230,15 +230,31 @@ Contracts:
   correct seeding makes `seq` unique among local files, and a mis-routed foreign key
   lands as inert `SeqState`, never a false mark.
 - **D6 own-machine LIST filter:** the remote-key layout keeps every machine's objects
-  under one prefix, so each LIST consumer (reconcile, and later the startup diff-sync)
-  MUST drop keys whose `machine_id` ≠ this node's — foreign objects never mutate local
-  state. Keys of a prior process instance on THIS machine are ours and are marked under
-  their own full identity.
+  under one prefix, so each LIST consumer (the reconcile passes and the startup catalog
+  diff-sync) MUST drop keys whose `machine_id` ≠ this node's — foreign objects never
+  mutate local state. Keys of a prior process instance on THIS machine are ours and are
+  marked under their own full identity.
 - **Per-identity reconcile floor:** the startup catalog-confirm pass bounds its stat set
   by the minimum local SFST seq **per `(machine, instance)`**; a catalog of an identity
   with no local SFSTs is skipped, so a high seq under one instance cannot strand a
   low-seq catalog of another. The reconcile splice guard treats a same-`seq` local file
   as the copy of a listed remote object only when the full identity matches.
+- **Startup catalog diff-sync (fail-closed restore):** when storage is enabled, the
+  ledger's configuration phase — per signal, before per-tenant recovery — recursively
+  LISTs the signal's whole `catalog/` prefix, keeps own-machine keys (D6), raises the
+  shared seq highwater to the max listed seq, and downloads every catalog body missing
+  locally, validating each before an atomic install (container magic/CRC + framing
+  version 1, then the JSON envelope's format version 6; envelope tenant/date/identity
+  vs the key; entries fold vs the filename; every entry's `remote_key` a well-formed
+  SFST key on this machine AND tenant AND signal, with its embedded FileId equal to
+  the entry's own id and its date equal to the catalog date). It is fail-closed: a
+  LIST error, a download transport error, or a per-operation timeout
+  (`storage.startup_op_timeout`, default 5 min; no phase-total cap) aborts configuration
+  so the plugin exits and the agent restarts it; a 404 or a validation failure on one
+  object is logged and skipped. Downloads run `DOWNLOAD_CONCURRENCY` (8) at a time and
+  short-circuit on the first hard error. Remote-only tenants are discovered from the LIST
+  and instantiated explicitly. This makes the local catalog set complete (I4) so the
+  existing query path serves the full pre-wipe window with no query-path change.
 - **Eviction gate:** with storage enabled, a local SFST is evicted only once its
   `SeqKey` reaches `CatalogStage::Remote` (`is_remote_cataloged`), so a local file is
   never deleted before its catalog is durably remote (else the remote SFST is orphaned).
