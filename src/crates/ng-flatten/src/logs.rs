@@ -14,6 +14,9 @@
 use serde::{Deserialize, Serialize};
 
 use opentelemetry_proto::tonic::collector::logs::v1::ExportLogsServiceRequest;
+use opentelemetry_proto::tonic::common::v1::{
+    AnyValue, ArrayValue, KeyValue, KeyValueList, any_value::Value as Av,
+};
 
 use crate::common::*;
 
@@ -49,9 +52,14 @@ pub struct LogScopeGroup {
 }
 
 /// One log record: its per-row scalar fields plus its flattened entries. The frame
-/// is **lossless** — every `LogRecord` field is carried here, either as a per-row
-/// column (the scalars below) or as flattened `entries`. What the SFST actually
-/// stores is decided later at index time (`build_sfst`), not at flatten time.
+/// is **lossless w.r.t. the normalized request** — every `LogRecord` field is
+/// carried here, either as a per-row column (the scalars below) or as flattened
+/// `entries`. "Normalized" is the key qualifier: [`normalize_log_request`] runs
+/// first and rewrites some fields (resolves timestamps, clears malformed ids,
+/// and replaces a JSON-object string body with its parsed structure, dropping
+/// the raw string); the frame preserves that post-normalization record, not the
+/// original bytes on the wire. What the SFST actually stores is decided later at
+/// index time (`build_sfst`), not at flatten time.
 ///
 /// Per-row columns (identifiers/scalars, NOT FST facets):
 /// - `ts`: the resolved `time_unix_nano`. The caller MUST normalize timestamps before
@@ -149,6 +157,15 @@ pub struct LogNormalization {
     /// Records dropped because their resolved timestamp fell outside the
     /// ingestion [`TimeBounds`] (0 when no bounds were applied).
     pub rejected: usize,
+    /// String bodies that were a JSON object and got rewritten in place into
+    /// an OTLP kvlist (their raw string dropped) so the flattener emits typed
+    /// `body.*` columns. See [`try_parse_json_body`].
+    ///
+    /// Normalization-local by design: unlike [`Self::bad_ids`] /
+    /// `sanitized_keys`, it counts normal, desired behavior (not malformed
+    /// input), so [`prepare_log_frame`] deliberately does NOT forward it into
+    /// [`PreparedLogFrame`] or log it.
+    pub parsed_bodies: usize,
 }
 
 /// Normalize a logs request in place before flattening — ONE walk over every
@@ -164,11 +181,18 @@ pub struct LogNormalization {
 /// 2. **Clears malformed trace/span ids**: a non-empty id whose length is not
 ///    the spec width becomes absent (the SFST id columns later store it as the
 ///    all-zero "unset" sentinel); conformant and absent ids pass untouched.
+/// 3. **Rewrites JSON-object string bodies**: a body that is a string holding a
+///    JSON object is parsed and replaced in place by the equivalent OTLP kvlist
+///    (see [`try_parse_json_body`]), so the flattener explodes it into typed
+///    `body.*` columns instead of one opaque string. The raw string is dropped
+///    on success; any other body (non-JSON, or JSON that is not an object) is
+///    left verbatim.
 ///
 /// Returns [`LogNormalization`]: the cleared-id counts (for one aggregated
-/// warning per request), the record count, and the `(min, max)` of the
-/// resolved timestamps — computed here, from the same resolution the rows
-/// store, so the frame's time range can never drift from the rows' `ts`.
+/// warning per request), the record count, the `(min, max)` of the resolved
+/// timestamps — computed here, from the same resolution the rows store, so the
+/// frame's time range can never drift from the rows' `ts` — and the count of
+/// rewritten JSON bodies.
 ///
 /// The caller MUST run this before [`flatten_log_request`]. Shared by
 /// `ng-ingest` and the production OTel-logs ingestor.
@@ -220,6 +244,21 @@ pub fn normalize_log_request(
                     r.span_id.clear();
                     out.bad_ids.span += 1;
                 }
+                // A string body that is a JSON object is rewritten into the
+                // equivalent OTLP kvlist so the flattener emits typed `body.*`
+                // columns; the raw string is dropped (decision 1B). Computed in
+                // its own step so the immutable body borrow ends before we
+                // reassign. Any other body is left verbatim.
+                let parsed_body = match &r.body {
+                    Some(AnyValue {
+                        value: Some(Av::StringValue(s)),
+                    }) => try_parse_json_body(s),
+                    _ => None,
+                };
+                if let Some(parsed) = parsed_body {
+                    r.body = Some(parsed);
+                    out.parsed_bodies += 1;
+                }
                 out.records += 1;
                 min = min.min(r.time_unix_nano);
                 max = max.max(r.time_unix_nano);
@@ -237,6 +276,83 @@ pub fn normalize_log_request(
         out.ts_range = Some((min, max));
     }
     out
+}
+
+/// Try to interpret a log body STRING as a JSON object, returning the
+/// equivalent OTLP [`AnyValue`] (always a `KvlistValue`) so the flattener can
+/// explode it into typed `body.*` columns. Returns `None` — leaving the body a
+/// verbatim string — in every case that is not a JSON object:
+///
+/// - the trimmed text does not start with `{` and end with `}`: a cheap
+///   pre-check that skips the parse for the common non-JSON body (guard
+///   decision 3A; `serde_json`'s default recursion limit still bounds nesting);
+/// - `serde_json` fails to parse it; or
+/// - it parses to a non-object (a number, bool, array, null, or bare string
+///   stays verbatim — object-only gate, decision 2A).
+///
+/// Only the top level is gated on being an object; nested values convert by
+/// their own JSON type via [`json_to_any_value`]. A string VALUE inside the
+/// object is NOT re-parsed — one that itself looks like JSON stays a
+/// `StringValue` leaf (decision 2A: no recursive re-parse).
+fn try_parse_json_body(s: &str) -> Option<AnyValue> {
+    let trimmed = s.trim();
+    if !(trimmed.starts_with('{') && trimmed.ends_with('}')) {
+        return None;
+    }
+    let value: serde_json::Value = serde_json::from_str(trimmed).ok()?;
+    if !value.is_object() {
+        return None;
+    }
+    Some(json_to_any_value(value))
+}
+
+/// Convert a [`serde_json::Value`] into the OTLP [`AnyValue`] the flattener
+/// consumes — one-to-one by JSON type. Recurses through arrays and objects; a
+/// string value is carried verbatim (never re-parsed as JSON).
+///
+/// Object key emission order follows `serde_json`'s feature-unified `Map`:
+/// insertion order when any crate in the build graph enables `preserve_order`
+/// (`otel-ingestor`, `otel-ledger`, `journal-function` do), else BTreeMap-sorted
+/// (e.g. `cargo test -p ng-flatten` in isolation). So key order MUST NOT be
+/// relied on for frame byte-stability; column identity is unaffected either way
+/// (nodes intern by path + kind, independent of entry order).
+fn json_to_any_value(value: serde_json::Value) -> AnyValue {
+    let v = match value {
+        serde_json::Value::Null => None,
+        serde_json::Value::Bool(b) => Some(Av::BoolValue(b)),
+        serde_json::Value::Number(n) => Some(json_number_to_value(n)),
+        serde_json::Value::String(s) => Some(Av::StringValue(s)),
+        serde_json::Value::Array(arr) => Some(Av::ArrayValue(ArrayValue {
+            values: arr.into_iter().map(json_to_any_value).collect(),
+        })),
+        serde_json::Value::Object(map) => Some(Av::KvlistValue(KeyValueList {
+            values: map
+                .into_iter()
+                .map(|(key, val)| KeyValue {
+                    key,
+                    value: Some(json_to_any_value(val)),
+                })
+                .collect(),
+        })),
+    };
+    AnyValue { value: v }
+}
+
+/// Map a JSON number onto an OTLP scalar. Integers that fit `i64` stay an
+/// `IntValue`; a `u64` past `i64::MAX` becomes a `DoubleValue` (decision 4B —
+/// stays numeric, accepting precision loss above 2^53); a fractional number is
+/// a `DoubleValue`.
+fn json_number_to_value(n: serde_json::Number) -> Av {
+    if let Some(i) = n.as_i64() {
+        Av::IntValue(i)
+    } else if let Some(u) = n.as_u64() {
+        Av::DoubleValue(u as f64)
+    } else {
+        // Neither `as_i64` nor `as_u64` matched, so this is a fractional
+        // number — its only remaining `serde_json::Number` shape. `as_f64` is
+        // infallible for it (no `arbitrary_precision` feature in this workspace).
+        Av::DoubleValue(n.as_f64().expect("fractional JSON number is always f64"))
+    }
 }
 
 /// Flatten a request into its own per-frame tree (convenience over [`flatten_log_into`])

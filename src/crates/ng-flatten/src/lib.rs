@@ -1095,4 +1095,178 @@ mod tests {
             .hash;
         assert_ne!(name_hash, method_hash(&spans[0]));
     }
+
+    // ---- JSON-object string body rewrite (normalize_log_request) ----
+
+    /// Normalize (so the JSON-object-string body rewrite runs) then flatten a
+    /// single record with the given string body; return the normalization stats
+    /// and the record's resolved leaves.
+    fn flatten_string_body(body: &str) -> (LogNormalization, Vec<Leaf>) {
+        let mut req = req_of(vec![LogRecord {
+            body: Some(av(Av::StringValue(body.into()))),
+            ..Default::default()
+        }]);
+        let norm = normalize_log_request(&mut req, 1000, None);
+        let (flat, _) = flatten_log_request(req);
+        let leaves = flat
+            .tree
+            .resolve(&flat.resources[0].scopes[0].records[0].entries);
+        (norm, leaves)
+    }
+
+    #[test]
+    fn json_object_string_body_flattens_to_typed_columns() {
+        // A body string holding a JSON object explodes into typed `body.*`
+        // leaves; every JSON type maps to the matching `Value`, and the raw
+        // string is dropped (decision 1B).
+        let body = r#"{
+            "int": 7,
+            "double": 3.5,
+            "bool": true,
+            "null": null,
+            "str": "hi",
+            "nested": {"inner": 1},
+            "arr": [1, 2],
+            "empty_obj": {},
+            "empty_arr": []
+        }"#;
+        let (norm, leaves) = flatten_string_body(body);
+        assert_eq!(norm.parsed_bodies, 1);
+        // The raw string is gone — no bare `body` Str leaf survives.
+        assert!(
+            at(&leaves, "body").is_empty(),
+            "raw string body must be dropped on successful parse"
+        );
+        assert_eq!(at(&leaves, "body.int"), [&Value::Int(7)]);
+        assert_eq!(at(&leaves, "body.double"), [&Value::Double(3.5)]);
+        assert_eq!(at(&leaves, "body.bool"), [&Value::Bool(true)]);
+        assert_eq!(at(&leaves, "body.null"), [&Value::Null]);
+        assert_eq!(at(&leaves, "body.str"), [&Value::Str("hi".into())]);
+        assert_eq!(at(&leaves, "body.nested.inner"), [&Value::Int(1)]);
+        // Array indices collapse to one `[]` element path, values in order.
+        assert_eq!(at(&leaves, "body.arr[]"), [&Value::Int(1), &Value::Int(2)]);
+        assert_eq!(at(&leaves, "body.empty_obj"), [&Value::EmptyKvlist]);
+        assert_eq!(at(&leaves, "body.empty_arr"), [&Value::EmptyArray]);
+    }
+
+    #[test]
+    fn empty_object_string_body_is_an_empty_kvlist_leaf() {
+        // `{}` qualifies (it IS an object) and rewrites to a single empty-kvlist
+        // leaf at `body`; no raw string remains.
+        let (norm, leaves) = flatten_string_body("{}");
+        assert_eq!(norm.parsed_bodies, 1);
+        assert_eq!(at(&leaves, "body"), [&Value::EmptyKvlist]);
+    }
+
+    #[test]
+    fn non_object_and_non_json_string_bodies_stay_verbatim() {
+        // Every case that is not a JSON object stays a single verbatim `body`
+        // Str leaf and is not counted. Numbers/bools/arrays/null fail the brace
+        // pre-check; `{not json}` passes the pre-check but fails to parse; a
+        // string with leading text before `{` fails the pre-check.
+        for body in [
+            "hello world", // plain non-JSON
+            "42",          // parses to a number
+            "true",        // parses to a bool
+            "[1, 2]",      // parses to an array
+            "null",        // parses to null
+            "\"quoted\"",  // parses to a bare string
+            "{not json}",  // passes brace pre-check, fails to parse
+            "log: {\"a\": 1}", // leading text — fails the pre-check
+        ] {
+            let (norm, leaves) = flatten_string_body(body);
+            assert_eq!(norm.parsed_bodies, 0, "body {body:?} must not be parsed");
+            assert_eq!(
+                at(&leaves, "body"),
+                [&Value::Str(body.to_string())],
+                "body {body:?} must stay a verbatim Str leaf"
+            );
+        }
+    }
+
+    #[test]
+    fn whitespace_padded_json_object_body_is_parsed() {
+        // The guard trims before the brace pre-check, so padding does not block
+        // the rewrite; the padded raw string is dropped.
+        let (norm, leaves) = flatten_string_body("  \n {\"a\": 1} \t ");
+        assert_eq!(norm.parsed_bodies, 1);
+        assert!(at(&leaves, "body").is_empty(), "padded raw string dropped");
+        assert_eq!(at(&leaves, "body.a"), [&Value::Int(1)]);
+    }
+
+    #[test]
+    fn no_recursive_reparse_of_string_values_inside_the_object() {
+        // A string VALUE that itself looks like JSON stays a StringValue leaf —
+        // only the top-level body string is parsed (decision 2A).
+        let (norm, leaves) = flatten_string_body(r#"{"nested": "{\"x\": 1}"}"#);
+        assert_eq!(norm.parsed_bodies, 1);
+        assert_eq!(
+            at(&leaves, "body.nested"),
+            [&Value::Str("{\"x\": 1}".into())],
+            "inner JSON-looking string must NOT be re-parsed"
+        );
+        // The inner string was not exploded into columns.
+        assert!(at(&leaves, "body.nested.x").is_empty());
+    }
+
+    #[test]
+    fn number_edges_map_to_int_or_double() {
+        // i64 range stays Int (including i64::MAX and negatives); a u64 past
+        // i64::MAX becomes a Double (decision 4B).
+        let body = format!(
+            r#"{{"max_i64": {}, "neg": -5, "over_i64": {}}}"#,
+            i64::MAX,
+            u64::MAX
+        );
+        let (norm, leaves) = flatten_string_body(&body);
+        assert_eq!(norm.parsed_bodies, 1);
+        assert_eq!(at(&leaves, "body.max_i64"), [&Value::Int(i64::MAX)]);
+        assert_eq!(at(&leaves, "body.neg"), [&Value::Int(-5)]);
+        assert_eq!(
+            at(&leaves, "body.over_i64"),
+            [&Value::Double(u64::MAX as f64)],
+            "u64 > i64::MAX maps to Double"
+        );
+    }
+
+    #[test]
+    fn parsed_bodies_counts_only_rewritten_object_bodies() {
+        // Across a request, only string bodies that are JSON objects are
+        // rewritten and counted; other bodies (non-object strings, non-string
+        // AnyValues, absent) are left untouched.
+        let mut req = req_of(vec![
+            LogRecord {
+                body: Some(av(Av::StringValue(r#"{"a": 1}"#.into()))),
+                ..Default::default()
+            },
+            LogRecord {
+                body: Some(av(Av::StringValue(r#"{"b": 2}"#.into()))),
+                ..Default::default()
+            },
+            LogRecord {
+                body: Some(av(Av::StringValue("plain".into()))),
+                ..Default::default()
+            },
+            LogRecord {
+                body: Some(av(Av::StringValue("[1, 2]".into()))),
+                ..Default::default()
+            },
+            // Non-string body (already structured) is never touched.
+            LogRecord {
+                body: Some(av(Av::IntValue(5))),
+                ..Default::default()
+            },
+            // Absent body.
+            LogRecord::default(),
+        ]);
+        let norm = normalize_log_request(&mut req, 1000, None);
+        assert_eq!(norm.records, 6);
+        assert_eq!(norm.parsed_bodies, 2);
+        // Spot-check that a rewritten body flattened to a typed column.
+        let (flat, _) = flatten_log_request(req);
+        let leaves = flat
+            .tree
+            .resolve(&flat.resources[0].scopes[0].records[0].entries);
+        assert_eq!(at(&leaves, "body.a"), [&Value::Int(1)]);
+    }
 }

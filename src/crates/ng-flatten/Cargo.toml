@@ -12,6 +12,7 @@ bincode = { workspace = true }
 hashbrown = { workspace = true }
 opentelemetry-proto = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 tracing = { workspace = true }
 twox-hash = { workspace = true, features = ["xxhash64"] }
 

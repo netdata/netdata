@@ -3077,6 +3077,7 @@ dependencies = [
  "opentelemetry-proto",
  "prost",
  "serde",
+ "serde_json",
  "tracing",
  "twox-hash",
 ]
