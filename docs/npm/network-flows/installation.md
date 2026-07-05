@@ -20,7 +20,7 @@ The static install (the kickstart `--static-only` path) bundles the plugin autom
 
 - A working Netdata Agent on the host that will receive flow data.
 - That host must be reachable on UDP from your routers and switches. The stock plugin listens on UDP `2055` for NetFlow/IPFIX and UDP `6343` for sFlow.
-- A Netdata installation that includes `netdata-plugin-netflow`. Native Linux packages install it as a separate package; static installs bundle it automatically (except the ARMv6 build — Raspberry Pi 1 / Zero); source builds need a Rust toolchain.
+- A Netdata installation that includes `netdata-plugin-netflow`. Native Linux packages install it as a separate package; static installs bundle it automatically (except the ARMv6 build — Raspberry Pi 1 / Zero); source builds need a Rust toolchain and the `--enable-plugin-netflow` installer flag, since the plugin is disabled by default.
 
 ## Install on Debian / Ubuntu / Mint
 
@@ -85,23 +85,23 @@ This populates `/var/cache/netdata/topology-ip-intel/` with the DB-IP-based MMDB
 
 ## IP intelligence defaults
 
-| Item | Behaviour |
-|---|---|
-| Native packages | Ship stock DB-IP ASN and Geo MMDB files under `/usr/share/netdata/topology-ip-intel/`. |
-| Source builds | Do not include stock MMDB files; run the downloader once if you want GeoIP / ASN enrichment. |
-| Fresh copies | The downloader writes to `/var/cache/netdata/topology-ip-intel/`, which takes precedence over the stock files. |
-| Refresh schedule | Netdata does not install a timer or cron job for the downloader. Schedule it yourself if freshness matters. |
+| Item             | Behaviour                                                                                                      |
+|------------------|----------------------------------------------------------------------------------------------------------------|
+| Native packages  | Ship stock DB-IP ASN and Geo MMDB files under `/usr/share/netdata/topology-ip-intel/`.                         |
+| Source builds    | Do not include stock MMDB files; run the downloader once if you want GeoIP / ASN enrichment.                   |
+| Fresh copies     | The downloader writes to `/var/cache/netdata/topology-ip-intel/`, which takes precedence over the stock files. |
+| Refresh schedule | Netdata does not install a timer or cron job for the downloader. Schedule it yourself if freshness matters.    |
 
 ## What gets installed
 
-| Path | Purpose |
-|---|---|
-| `/usr/libexec/netdata/plugins.d/netflow-plugin` | The plugin binary (mode 0750, root:netdata) |
-| `/usr/sbin/topology-ip-intel-downloader` | Helper for refreshing the GeoIP / IP-intel MMDBs; not included in packaged 32-bit installs |
-| `/usr/lib/netdata/conf.d/netflow.yaml` | Stock configuration (read-only reference; copy to `/etc/netdata/netflow.yaml` to customise) |
-| `/usr/lib/netdata/conf.d/topology-ip-intel.yaml` | IP-intel downloader configuration |
-| `/usr/share/netdata/topology-ip-intel/topology-ip-asn.mmdb` | Stock ASN database (DB-IP) |
-| `/usr/share/netdata/topology-ip-intel/topology-ip-geo.mmdb` | Stock geographic database (DB-IP) |
+| Path                                                        | Purpose                                                                                     |
+|-------------------------------------------------------------|---------------------------------------------------------------------------------------------|
+| `/usr/libexec/netdata/plugins.d/netflow-plugin`             | The plugin binary (mode 0750, root:netdata)                                                 |
+| `/usr/sbin/topology-ip-intel-downloader`                    | Helper for refreshing the GeoIP / IP-intel MMDBs; not included in packaged 32-bit installs  |
+| `/usr/lib/netdata/conf.d/netflow.yaml`                      | Stock configuration (read-only reference; copy to `/etc/netdata/netflow.yaml` to customise) |
+| `/usr/lib/netdata/conf.d/topology-ip-intel.yaml`            | IP-intel downloader configuration                                                           |
+| `/usr/share/netdata/topology-ip-intel/topology-ip-asn.mmdb` | Stock ASN database (DB-IP)                                                                  |
+| `/usr/share/netdata/topology-ip-intel/topology-ip-geo.mmdb` | Stock geographic database (DB-IP)                                                           |
 
 (Paths assume native packages. Static installs put everything under `/opt/netdata/`.)
 
