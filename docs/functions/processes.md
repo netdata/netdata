@@ -122,6 +122,10 @@ The typical workflow for drilling down to individual processes looks like this:
 5. **Analyze Process Tree**: Use PPID relationships to understand process spawning patterns
 6. **Group Analysis**: Group by User, Command, or other fields to understand patterns
 
+## Viewing All Processes
+
+The table lists every running process, but only a portion of the rows is visible at once — the rest are reached by scrolling down through the list. If you see only a handful of processes, the others are simply below the visible area, not missing from the data. Use the sort, filter, and group controls (for example, sort by `CPU` or `Memory` descending, or filter by `Category`) to locate specific processes quickly.
+
 ## Use Cases
 
 ### 1. Break Down System Resources into Processes
