@@ -69,7 +69,7 @@ agent currently accepts.
 
 ---
 
-## Body keys (current as of `STATUS_FILE_VERSION = 28`)
+## Body keys (current as of `STATUS_FILE_VERSION = 29`)
 
 | Key | Type | Purpose |
 |---|---|---|

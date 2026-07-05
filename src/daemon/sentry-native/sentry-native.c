@@ -163,6 +163,7 @@ void nd_sentry_init(void) {
     nd_sentry_set_tag("timezone", daemon_status_file_get_timezone());
     
     nd_sentry_set_tag("hw_sys_vendor", daemon_status_file_get_sys_vendor());
+    nd_sentry_set_tag("hw_product_id", daemon_status_file_get_product_id());
     nd_sentry_set_tag("hw_product_name", daemon_status_file_get_product_name());
     nd_sentry_set_tag("hw_product_type", daemon_status_file_get_product_type());
 

@@ -200,6 +200,7 @@ struct rrdhost_system_info *rrdhost_system_info_from_host_labels(RRDLABELS *labe
     rrdlabels_get_value_strdup_or_null(labels, &info->network_default_iface, "_net_default_iface");
     rrdlabels_get_value_strdup_or_null(labels, &info->network_default_iface_ip, "_net_default_iface_ip");
     rrdlabels_get_value_strdup_or_null(labels, &info->network_default_iface_detection, "_net_default_iface_detection");
+    rrdlabels_get_value_strdup_or_null(labels, &info->hw_product_id, "_hw_product_id");
     rrdlabels_get_value_strdup_or_null(labels, &info->hw_product_name, "_hw_product_name");
     rrdlabels_get_value_strdup_or_null(labels, &info->hw_sys_vendor, "_hw_sys_vendor");
     rrdlabels_get_value_strdup_or_null(labels, &info->hw_product_type, "_hw_product_type");
@@ -276,6 +277,9 @@ void rrdhost_system_info_to_rrdlabels(struct rrdhost_system_info *system_info, R
     if (system_info->network_default_iface_detection)
         rrdlabels_add(labels, "_net_default_iface_detection", system_info->network_default_iface_detection, RRDLABEL_SRC_AUTO);
 
+    if (system_info->hw_product_id)
+        rrdlabels_add(labels, "_hw_product_id", system_info->hw_product_id, RRDLABEL_SRC_AUTO);
+
     if (system_info->hw_product_name)
         rrdlabels_add(labels, "_hw_product_name", system_info->hw_product_name, RRDLABEL_SRC_AUTO);
 
@@ -294,6 +298,12 @@ int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
 
     // Populate hardware product fields from the daemon status file when it is available/initialized.
     {
+        const char *product_id = daemon_status_file_get_product_id();
+        if (product_id && *product_id) {
+            freez(system_info->hw_product_id);
+            system_info->hw_product_id = strdupz(product_id);
+        }
+
         const char *product_name = daemon_status_file_get_product_name();
         if (product_name && *product_name) {
             freez(system_info->hw_product_name);
@@ -444,6 +454,7 @@ void rrdhost_system_info_free(struct rrdhost_system_info *system_info) {
         freez(system_info->network_default_iface);
         freez(system_info->network_default_iface_ip);
         freez(system_info->network_default_iface_detection);
+        freez(system_info->hw_product_id);
         freez(system_info->hw_product_name);
         freez(system_info->hw_sys_vendor);
         freez(system_info->hw_product_type);

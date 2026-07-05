@@ -149,7 +149,9 @@ void os_dmi_info_get(DMI_INFO *dmi) {
     linux_get_dmi_field("product_uuid", NULL, dmi->sys.uuid, sizeof(dmi->sys.uuid));
     linux_get_dmi_field("chassis_asset_tag", NULL, dmi->sys.asset_tag, sizeof(dmi->sys.asset_tag));
 
-    linux_get_dmi_field("product_name", "/proc/device-tree/model", dmi->product.name, sizeof(dmi->product.name));
+    linux_get_dmi_field("product_name", "/proc/device-tree/model", dmi->product.id, sizeof(dmi->product.id));
+    if (dmi->product.id[0])
+        safecpy(dmi->product.name, dmi->product.id);
     linux_get_dmi_field("product_version", NULL, dmi->product.version, sizeof(dmi->product.version));
     linux_get_dmi_field("product_sku", NULL, dmi->product.sku, sizeof(dmi->product.sku));
     linux_get_dmi_field("product_family", NULL, dmi->product.family, sizeof(dmi->product.family));
@@ -177,7 +179,70 @@ void os_dmi_info_get(DMI_INFO *dmi) {
 
 #include <IOKit/IOKitLib.h>
 #include <CoreFoundation/CoreFoundation.h>
+#include <fcntl.h>
+#include <poll.h>
+#include <sys/stat.h>
 #include <sys/sysctl.h>
+#include <unistd.h>
+
+struct macos_model_name {
+    const char *id;
+    const char *name;
+};
+
+/*
+ * Mac model names from MacAdmins SOFA v2 macOS data feed.
+ * Feed version: 2.0; LastCheck: 2026-07-05T07:39:47.975742456+00:00.
+ * Source: https://sofafeed.macadmins.io/v2/macos_data_feed.json
+ */
+static const struct macos_model_name macos_known_models[] = {
+    {"Mac13,1", "Mac Studio (M1 Max)"},
+    {"Mac13,2", "Mac Studio (M1 Ultra)"},
+    {"Mac14,2", "MacBook Air (M2, 2022)"},
+    {"Mac14,3", "Mac mini (M2, 2023)"},
+    {"Mac14,5", "MacBook Pro (14-inch, M2 Max, 2023)"},
+    {"Mac14,6", "MacBook Pro (16-inch, M2 Max, 2023)"},
+    {"Mac14,7", "MacBook Pro (13-inch, M2, 2022)"},
+    {"Mac14,8", "Mac Pro (Rack, 2023)"},
+    {"Mac14,9", "MacBook Pro (14-inch, M2 Pro, 2023)"},
+    {"Mac14,10", "MacBook Pro (16-inch, M2 Pro, 2023)"},
+    {"Mac14,12", "Mac mini (M2 Pro, 2023)"},
+    {"Mac14,13", "Mac Studio (M2 Max, 2023)"},
+    {"Mac14,14", "Mac Studio (M2 Ultra, 2023)"},
+    {"Mac14,15", "MacBook Air (15-inch, M2, 2023)"},
+    {"Mac15,3", "MacBook Pro (14-inch, M3, Nov 2023)"},
+    {"Mac15,4", "iMac (24-inch, M3, 2023, Two Ports)"},
+    {"Mac15,5", "iMac (24-inch, M3, 2023, Four Ports)"},
+    {"Mac15,6", "MacBook Pro (14-inch, M3 Pro, Nov 2023)"},
+    {"Mac15,7", "MacBook Pro (16-inch, M3 Pro, Nov 2023)"},
+    {"Mac15,8", "MacBook Pro (14-inch, 16-core M3 Max, Nov 2023)"},
+    {"Mac15,9", "MacBook Pro (16-inch, 16-core M3 Max, Nov 2023)"},
+    {"Mac15,10", "MacBook Pro (14-inch, 14-core M3 Max, Nov 2023)"},
+    {"Mac15,11", "MacBook Pro (16-inch, 14-core M3 Max, Nov 2023)"},
+    {"Mac15,12", "MacBook Air (13-inch, M3, 2024)"},
+    {"Mac15,13", "MacBook Air (15-inch, M3, 2024)"},
+    {"Mac15,14", "Mac Studio (M3 Ultra, 2025)"},
+    {"Mac16,1", "MacBook Pro (14-inch, M4, Nov 2024)"},
+    {"Mac16,2", "iMac (24-inch, M4, 2024, Two Ports)"},
+    {"Mac16,3", "iMac (24-inch, M4, 2024, Four Ports)"},
+    {"Mac16,5", "MacBook Pro (16-inch, M4 Max, Nov 2024)"},
+    {"Mac16,6", "MacBook Pro (14-inch, M4 Max, Nov 2024)"},
+    {"Mac16,7", "MacBook Pro (16-inch, M4 Pro, Nov 2024)"},
+    {"Mac16,8", "MacBook Pro (14-inch, M4 Pro, Nov 2024)"},
+    {"Mac16,9", "Mac Studio (M4 Max, 2025)"},
+    {"Mac16,10", "Mac mini (M4, 2024)"},
+    {"Mac16,11", "Mac mini (M4 Pro, 2024)"},
+    {"Mac16,12", "MacBook Air (13-inch, M4, 2025)"},
+    {"Mac16,13", "MacBook Air (15-inch, M4, 2025)"},
+    {"Mac17,2", "MacBook Pro 14-inch (M5)"},
+    {"Mac17,3", "MacBook Air (13-inch, M5)"},
+    {"Mac17,4", "MacBook Air (15-inch, M5)"},
+    {"Mac17,5", "MacBook Neo"},
+    {"Mac17,6", "MacBook Pro (16-inch, M5 Max)"},
+    {"Mac17,7", "MacBook Pro (14-inch, M5 Max)"},
+    {"Mac17,8", "MacBook Pro (16-inch, M5 Pro)"},
+    {"Mac17,9", "MacBook Pro (14-inch, M5 Pro)"},
+};
 
 // Helper function to safely convert CF types to C strings
 static void cf_string_to_cstr(CFTypeRef cf_val, char *buffer, size_t buffer_size) {
@@ -256,47 +321,339 @@ static void get_parent_iokit_string_property(io_registry_entry_t entry, CFString
     }
 }
 
-// Get hardware info from IODeviceTree
-static void get_devicetree_info(DMI_INFO *dmi) {
-    // Initialize all relevant fields to empty
+static bool macos_copy_known_model_name(const char *model_id, char *dst, size_t dst_size) {
+    if (!model_id || !*model_id || !dst || !dst_size)
+        return false;
+
+    for (size_t i = 0; i < _countof(macos_known_models); i++) {
+        if (strcmp(model_id, macos_known_models[i].id) == 0) {
+            strcatz(dst, 0, macos_known_models[i].name, dst_size);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static CFPropertyListRef macos_copy_plist(const char *filename) {
+    int fd = open(filename, O_RDONLY);
+    if (fd == -1)
+        return NULL;
+
+    struct stat st;
+    if (fstat(fd, &st) == -1 || st.st_size <= 0 || st.st_size > 2 * 1024 * 1024) {
+        close(fd);
+        return NULL;
+    }
+
+    size_t size = (size_t)st.st_size;
+    CLEAN_CHAR_P *data = mallocz(size);
+    size_t used = 0;
+
+    while (used < size) {
+        ssize_t bytes = read(fd, data + used, size - used);
+        if (bytes < 0) {
+            if (errno == EINTR)
+                continue;
+
+            close(fd);
+            return NULL;
+        }
+
+        if (bytes == 0)
+            break;
+
+        used += (size_t)bytes;
+    }
+
+    close(fd);
+
+    if (used != size)
+        return NULL;
+
+    CFDataRef cf_data = CFDataCreate(kCFAllocatorDefault, (const UInt8 *)data, (CFIndex)size);
+    if (!cf_data)
+        return NULL;
+
+    CFErrorRef error = NULL;
+    CFPropertyListRef plist =
+        CFPropertyListCreateWithData(kCFAllocatorDefault, cf_data, kCFPropertyListImmutable, NULL, &error);
+    CFRelease(cf_data);
+
+    if (error)
+        CFRelease(error);
+
+    return plist;
+}
+
+static bool macos_copy_plist_marketing_model(const char *model_id, char *dst, size_t dst_size) {
+    if (!model_id || !*model_id || !dst || !dst_size)
+        return false;
+
+    static const char *const plist_paths[] = {
+        "/System/Library/PrivateFrameworks/ServerInformation.framework/Versions/A/Resources/en.lproj/SIMachineAttributes.plist",
+        "/System/Library/PrivateFrameworks/ServerInformation.framework/Versions/A/Resources/Base.lproj/SIMachineAttributes.plist",
+    };
+
+    for (size_t i = 0; i < _countof(plist_paths); i++) {
+        CFPropertyListRef plist = macos_copy_plist(plist_paths[i]);
+        if (!plist)
+            continue;
+
+        bool found = false;
+
+        if (CFGetTypeID(plist) == CFDictionaryGetTypeID()) {
+            CFStringRef model_key = CFStringCreateWithCString(kCFAllocatorDefault, model_id, kCFStringEncodingUTF8);
+            if (model_key) {
+                CFTypeRef model = CFDictionaryGetValue((CFDictionaryRef)plist, model_key);
+                if (model && CFGetTypeID(model) == CFDictionaryGetTypeID()) {
+                    CFDictionaryRef model_dict = (CFDictionaryRef)model;
+                    CFTypeRef localized = CFDictionaryGetValue(model_dict, CFSTR("_LOCALIZABLE_"));
+                    CFDictionaryRef strings =
+                        (localized && CFGetTypeID(localized) == CFDictionaryGetTypeID()) ?
+                            (CFDictionaryRef)localized : model_dict;
+
+                    CFTypeRef marketing_model = CFDictionaryGetValue(strings, CFSTR("marketingModel"));
+                    if (marketing_model && CFGetTypeID(marketing_model) == CFStringGetTypeID()) {
+                        cf_string_to_cstr(marketing_model, dst, dst_size);
+                        found = dst[0] != '\0';
+                    }
+                }
+
+                CFRelease(model_key);
+            }
+        }
+
+        CFRelease(plist);
+
+        if (found)
+            return true;
+    }
+
+    return false;
+}
+
+static bool macos_system_profiler_copy_value(const char *output, const char *key, char *dst, size_t dst_size) {
+    const char *line = output;
+    size_t key_len = strlen(key);
+
+    while ((line = strstr(line, key)) != NULL) {
+        const char *value = line + key_len;
+        while (*value == ' ' || *value == '\t')
+            value++;
+
+        const char *end = value;
+        while (*end && *end != '\n' && *end != '\r')
+            end++;
+
+        snprintfz(dst, dst_size, "%.*s", (int)(end - value), value);
+        dmi_clean_field(dst, dst_size);
+        return dst[0] != '\0';
+    }
+
+    return false;
+}
+
+static bool macos_copy_system_profiler_model_name(const char *model_id, char *dst, size_t dst_size) {
+    static const int timeout_ms = 3000;
+    static const size_t max_output = 64 * 1024;
+
+    const char *argv[] = {"/usr/sbin/system_profiler", "SPHardwareDataType", NULL};
+    POPEN_INSTANCE *pi = spawn_popen_run_argv(argv);
+    if (!pi)
+        return false;
+
+    int fd = spawn_popen_read_fd(pi);
+    if (fd < 0) {
+        spawn_popen_kill(pi, 1000);
+        return false;
+    }
+
+    CLEAN_CHAR_P *output = mallocz(max_output + 1);
+    size_t used = 0;
+    bool ok = true;
+    usec_t stop_ut = now_monotonic_usec() + (usec_t)timeout_ms * USEC_PER_MS;
+
+    while (used < max_output) {
+        usec_t now_ut = now_monotonic_usec();
+        if (now_ut >= stop_ut) {
+            ok = false;
+            break;
+        }
+
+        int remaining_ms = (int)((stop_ut - now_ut) / USEC_PER_MS);
+        if (remaining_ms < 1)
+            remaining_ms = 1;
+        if (remaining_ms > 250)
+            remaining_ms = 250;
+
+        struct pollfd pfd = {
+            .fd = fd,
+            .events = POLLIN | POLLHUP,
+        };
+
+        int rc = poll(&pfd, 1, remaining_ms);
+        if (rc < 0) {
+            if (errno == EINTR)
+                continue;
+
+            ok = false;
+            break;
+        }
+
+        if (rc == 0)
+            continue;
+
+        if (pfd.revents & POLLIN) {
+            ssize_t bytes = read(fd, output + used, max_output - used);
+            if (bytes < 0) {
+                if (errno == EINTR)
+                    continue;
+
+                ok = false;
+                break;
+            }
+
+            if (bytes == 0)
+                break;
+
+            used += (size_t)bytes;
+            output[used] = '\0';
+        }
+
+        if (pfd.revents & POLLHUP)
+            break;
+    }
+
+    int code = 0;
+    SPAWN_TIMEDWAIT_RESULT wait_rc = spawn_popen_timedwait(pi, 250, &code);
+    if (wait_rc == SPAWN_TIMEDWAIT_RUNNING || wait_rc == SPAWN_TIMEDWAIT_ERROR) {
+        spawn_popen_kill(pi, 1000);
+        ok = false;
+    }
+    else if (code != 0)
+        ok = false;
+
+    if (!ok || !used)
+        return false;
+
+    char profiler_model_id[64] = "";
+    if (macos_system_profiler_copy_value(output, "Model Identifier:", profiler_model_id, sizeof(profiler_model_id)) &&
+        model_id && *model_id && strcmp(model_id, profiler_model_id) != 0)
+        return false;
+
+    char model_name[64] = "";
+    if (!macos_system_profiler_copy_value(output, "Model Name:", model_name, sizeof(model_name)))
+        return false;
+
+    if (model_id && *model_id)
+        snprintfz(dst, dst_size, "%s (%s)", model_name, model_id);
+    else
+        strcatz(dst, 0, model_name, dst_size);
+
+    dmi_clean_field(dst, dst_size);
+    return dst[0] != '\0';
+}
+
+static const char *macos_model_family_from_id(const char *model_id) {
+    if (!model_id || !*model_id)
+        return "Mac";
+
+    if (strncasecmp(model_id, "MacBookAir", 10) == 0)
+        return "MacBook Air";
+
+    if (strncasecmp(model_id, "MacBookPro", 10) == 0)
+        return "MacBook Pro";
+
+    if (strncasecmp(model_id, "MacBook", 7) == 0)
+        return "MacBook";
+
+    if (strncasecmp(model_id, "Macmini", 7) == 0)
+        return "Mac mini";
+
+    if (strncasecmp(model_id, "MacPro", 6) == 0)
+        return "Mac Pro";
+
+    if (strncasecmp(model_id, "iMacPro", 7) == 0)
+        return "iMac Pro";
+
+    if (strncasecmp(model_id, "iMac", 4) == 0)
+        return "iMac";
+
+    if (strncasecmp(model_id, "VirtualMac", 10) == 0)
+        return "VirtualMac";
+
+    return "Mac";
+}
+
+static void macos_enrich_product_name(DMI_INFO *dmi) {
+    if (!dmi || !dmi->product.id[0])
+        return;
+
+    if (macos_copy_known_model_name(dmi->product.id, dmi->product.name, sizeof(dmi->product.name)))
+        return;
+
+    if (macos_copy_plist_marketing_model(dmi->product.id, dmi->product.name, sizeof(dmi->product.name)))
+        return;
+
+    if (macos_copy_system_profiler_model_name(dmi->product.id, dmi->product.name, sizeof(dmi->product.name)))
+        return;
+
+    snprintfz(
+        dmi->product.name, sizeof(dmi->product.name),
+        "%s (%s)", macos_model_family_from_id(dmi->product.id), dmi->product.id);
+    dmi_clean_field(dmi->product.name, sizeof(dmi->product.name));
+}
+
+static void macos_set_chassis_type(DMI_INFO *dmi) {
     if (!dmi)
         return;
 
-    dmi->product.name[0] = '\0';
-    dmi->board.name[0] = '\0';
-    dmi->sys.vendor[0] = '\0';
-    dmi->product.family[0] = '\0';
+    const char *model_id = dmi->product.id;
+    const char *name = dmi->product.name;
 
-    // Get the device tree
-    io_registry_entry_t device_tree = IORegistryEntryFromPath(kIOMasterPortDefault, "IODeviceTree:/");
+    if ((model_id && strncasecmp(model_id, "MacBook", 7) == 0) ||
+        (name && strcasestr(name, "MacBook") != NULL))
+        safecpy(dmi->chassis.type, "9");
+    else if ((model_id && strncasecmp(model_id, "Macmini", 7) == 0) ||
+             (name && strcasestr(name, "Mac mini") != NULL))
+        safecpy(dmi->chassis.type, "35");
+    else if ((model_id && strncasecmp(model_id, "iMac", 4) == 0) ||
+             (name && strcasestr(name, "iMac") != NULL))
+        safecpy(dmi->chassis.type, "13");
+    else if ((model_id && strncasecmp(model_id, "Mac", 3) == 0) ||
+             (name && strcasestr(name, "Mac") != NULL)) {
+        if (!dmi->chassis.type[0])
+            safecpy(dmi->chassis.type, "3");
+    }
+}
+
+// Get hardware info from IODeviceTree
+static void get_devicetree_info(DMI_INFO *dmi) {
+    if (!dmi)
+        return;
+
+    io_registry_entry_t device_tree = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/");
     if (!device_tree)
         return;
 
-    // Get model information - only operate if device_tree is valid
-    get_iokit_string_property(device_tree, CFSTR("model"), dmi->product.name, sizeof(dmi->product.name));
+    char model[sizeof(dmi->product.id)] = "";
+    get_iokit_string_property(device_tree, CFSTR("model"), model, sizeof(model));
+    if (model[0]) {
+        if (!dmi->product.id[0])
+            safecpy(dmi->product.id, model);
 
-    // Get board ID if available
-    get_iokit_string_property(device_tree, CFSTR("board-id"), dmi->board.name, sizeof(dmi->board.name));
+        if (!dmi->product.name[0])
+            safecpy(dmi->product.name, model);
+    }
 
-    // Look for platform information
-    io_registry_entry_t platform = IORegistryEntryFromPath(kIOMasterPortDefault, "IODeviceTree:/platform");
+    if (!dmi->board.name[0])
+        get_iokit_string_property(device_tree, CFSTR("board-id"), dmi->board.name, sizeof(dmi->board.name));
+
+    io_registry_entry_t platform = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/platform");
     if (platform) {
-        // Platform information can sometimes have manufacturer info
-        get_iokit_string_property(platform, CFSTR("manufacturer"), dmi->sys.vendor, sizeof(dmi->sys.vendor));
-
-        // Check compatible property for additional info
-        char compatible[256] = {0};
-        get_iokit_string_property(platform, CFSTR("compatible"), compatible, sizeof(compatible));
-
-        // Parse for product family
-        if (compatible[0]) {
-            char *family = strstr(compatible, ",");
-            if (family && family < compatible + sizeof(compatible) - 1) {
-                family++; // Skip the comma
-                safecpy(dmi->product.family, family);
-                dmi_clean_field(dmi->product.family, sizeof(dmi->product.family));
-            }
-        }
+        if (!dmi->sys.vendor[0])
+            get_iokit_string_property(platform, CFSTR("manufacturer"), dmi->sys.vendor, sizeof(dmi->sys.vendor));
 
         IOObjectRelease(platform);
     }
@@ -310,7 +667,7 @@ static void get_platform_expert_info(DMI_INFO *dmi) {
         return;
 
     io_registry_entry_t platform_expert = IORegistryEntryFromPath(
-        kIOMasterPortDefault, "IOService:/IOResources/IOPlatformExpertDevice");
+        kIOMainPortDefault, "IOService:/IOResources/IOPlatformExpertDevice");
 
     if (!platform_expert)
         return;
@@ -319,9 +676,13 @@ static void get_platform_expert_info(DMI_INFO *dmi) {
     get_iokit_string_property(platform_expert, CFSTR("manufacturer"),
                               dmi->sys.vendor, sizeof(dmi->sys.vendor));
 
-    // Product name
-    get_iokit_string_property(platform_expert, CFSTR("model"),
-                              dmi->product.name, sizeof(dmi->product.name));
+    char model[sizeof(dmi->product.id)] = "";
+    get_iokit_string_property(platform_expert, CFSTR("model"), model, sizeof(model));
+    if (model[0]) {
+        safecpy(dmi->product.id, model);
+        if (!dmi->product.name[0])
+            safecpy(dmi->product.name, model);
+    }
 
     // Model number - can be used as product version
     get_iokit_string_property(platform_expert, CFSTR("model-number"),
@@ -394,7 +755,7 @@ static void get_firmware_info(DMI_INFO *dmi) {
         return;
 
     io_registry_entry_t smc = IOServiceGetMatchingService(
-        kIOMasterPortDefault, IOServiceMatching("AppleSMC"));
+        kIOMainPortDefault, IOServiceMatching("AppleSMC"));
 
     if (smc) {
         // SMC revision - can be useful for firmware info
@@ -410,7 +771,7 @@ static void get_firmware_info(DMI_INFO *dmi) {
     }
 
     // Check for BIOS information in IODeviceTree:/rom
-    io_registry_entry_t rom = IORegistryEntryFromPath(kIOMasterPortDefault, "IODeviceTree:/rom");
+    io_registry_entry_t rom = IORegistryEntryFromPath(kIOMainPortDefault, "IODeviceTree:/rom");
     if (rom) {
         // "version" contains firmware version
         get_iokit_string_property(rom, CFSTR("version"), dmi->bios.version, sizeof(dmi->bios.version));
@@ -424,22 +785,6 @@ static void get_firmware_info(DMI_INFO *dmi) {
         IOObjectRelease(rom);
     }
 
-    // If we still don't have BIOS version, check system version from sysctl
-    if (!dmi->bios.version[0]) {
-        char firmware_version[256] = {0};
-        size_t len = sizeof(firmware_version) - 1;
-
-        if (sysctlbyname("machdep.cpu.brand_string", firmware_version, &len, NULL, 0) == 0) {
-            firmware_version[len] = '\0'; // Ensure null termination
-
-            // Extract firmware info if present
-            char *firmware_info = strstr(firmware_version, "SMC:");
-            if (firmware_info && firmware_info < firmware_version + sizeof(firmware_version) - 1) {
-                safecpy(dmi->bios.version, firmware_info);
-                dmi_clean_field(dmi->bios.version, sizeof(dmi->bios.version));
-            }
-        }
-    }
 }
 
 // Get system hardware information using sysctl
@@ -447,44 +792,19 @@ static void get_sysctl_info(DMI_INFO *dmi) {
     if (!dmi)
         return;
 
-    // Get model identifier using sysctl if not already set
-    if (!dmi->product.name[0]) {
+    if (!dmi->product.id[0]) {
         char model[256] = { 0 };
         size_t len = sizeof(model) - 1;
 
         if (sysctlbyname("hw.model", model, &len, NULL, 0) == 0) {
             model[len] = '\0';
-            safecpy(dmi->product.name, model);
-            dmi_clean_field(dmi->product.name, sizeof(dmi->product.name));
-
-            // If chassis type is still not set, guess from model
-            if (!dmi->chassis.type[0]) {
-                if (strncasecmp(model, "MacBook", 7) == 0)
-                    safecpy(dmi->chassis.type, "9");
-                else if (strncasecmp(model, "iMac", 4) == 0)
-                    safecpy(dmi->chassis.type, "13");
-                else if (strncasecmp(model, "Mac", 3) == 0 && strcasestr(model, "Pro") != NULL)
-                    safecpy(dmi->chassis.type, "3");
-                else if (strncasecmp(model, "Mac", 3) == 0 && strcasestr(model, "mini") != NULL)
-                    safecpy(dmi->chassis.type, "35");
-                else
-                    safecpy(dmi->chassis.type, "3"); // Default to desktop
-            }
+            safecpy(dmi->product.id, model);
+            dmi_clean_field(dmi->product.id, sizeof(dmi->product.id));
         }
     }
 
-    // Get CPU information if board name not set
-    if (!dmi->board.name[0]) {
-        char cpu_brand[256] = {0};
-        size_t len = sizeof(cpu_brand) - 1;
-
-        if (sysctlbyname("machdep.cpu.brand_string", cpu_brand, &len, NULL, 0) == 0) {
-            cpu_brand[len] = '\0'; // Ensure null termination
-            // Use CPU information as part of board info if not available
-            safecpy(dmi->board.name, cpu_brand);
-            dmi_clean_field(dmi->board.name, sizeof(dmi->board.name));
-        }
-    }
+    if (!dmi->product.name[0] && dmi->product.id[0])
+        safecpy(dmi->product.name, dmi->product.id);
 }
 
 // Main function to get hardware info
@@ -506,6 +826,11 @@ void os_dmi_info_get(DMI_INFO *dmi) {
     // Get additional info from sysctl
     get_sysctl_info(dmi);
 
+    // Convert the raw model identifier into a human-readable Mac model name when possible.
+    macos_enrich_product_name(dmi);
+
+    macos_set_chassis_type(dmi);
+
     // Set board vendor to match system vendor if not set
     if (!dmi->board.vendor[0] && dmi->sys.vendor[0])
         safecpy(dmi->board.vendor, dmi->sys.vendor);
@@ -519,7 +844,9 @@ void os_dmi_info_get(DMI_INFO *dmi) {
         safecpy(dmi->bios.vendor, dmi->sys.vendor);
 
     // Default product name if all methods failed
-    if (!dmi->product.name[0])
+    if (!dmi->product.name[0] && dmi->product.id[0])
+        safecpy(dmi->product.name, dmi->product.id);
+    else if (!dmi->product.name[0])
         safecpy(dmi->product.name, "Mac");
 
     // Default chassis type if we couldn't determine it
@@ -545,13 +872,14 @@ static void freebsd_get_sysctl_str(const char *name, char *dst, size_t dst_size)
 }
 
 static void freebsd_get_kenv_str(const char *name, char *dst, size_t dst_size) {
-    dst[0] = '\0';
-    if (kenv(KENV_GET, name, dst, dst_size - 1) == -1)
-        dst[0] = '\0';
-    else {
-        dst[dst_size - 1] = '\0';
-        dmi_clean_field(dst, dst_size);
-    }
+    CLEAN_CHAR_P tmp = mallocz(dst_size);
+
+    if (kenv(KENV_GET, name, tmp, dst_size - 1) == -1)
+        return;
+
+    tmp[dst_size - 1] = '\0';
+    dmi_clean_field(tmp, dst_size);
+    strcatz(dst, 0, tmp, dst_size);
 }
 
 void os_dmi_info_get(DMI_INFO *dmi) {
@@ -594,6 +922,9 @@ void os_dmi_info_get(DMI_INFO *dmi) {
     // If we couldn't get system information from SMBIOS, try to use model
     if (!dmi->product.name[0])
         freebsd_get_sysctl_str("hw.model", dmi->product.name, sizeof(dmi->product.name));
+
+    if (dmi->product.name[0])
+        safecpy(dmi->product.id, dmi->product.name);
     
     // Try to get asset tags
     freebsd_get_kenv_str("smbios.system.asset_tag", dmi->sys.asset_tag, sizeof(dmi->sys.asset_tag));
@@ -795,6 +1126,7 @@ static void process_smbios_system_info(const smbios_header_t *header,
     // Product Name (string index at offset 5)
     if (data[5] > 0 && get_smbios_string(smbios_data, smbios_size, string_table,
                                      data[5], temp_str, sizeof(temp_str))) {
+        safecpy(dmi->product.id, temp_str);
         safecpy(dmi->product.name, temp_str);
     }
     
@@ -1087,13 +1419,23 @@ static void windows_get_registry_info(DMI_INFO *dmi) {
         sizeof(dmi->sys.vendor)
     );
 
-    windows_read_registry_string(
-        HKEY_LOCAL_MACHINE,
-        "HARDWARE\\DESCRIPTION\\System\\BIOS",
-        "SystemProductName",
-        dmi->product.name,
-        sizeof(dmi->product.name)
-    );
+    {
+        char product_name[sizeof(dmi->product.name)] = "";
+        windows_read_registry_string(
+            HKEY_LOCAL_MACHINE,
+            "HARDWARE\\DESCRIPTION\\System\\BIOS",
+            "SystemProductName",
+            product_name,
+            sizeof(product_name)
+        );
+
+        if (product_name[0]) {
+            if (!dmi->product.id[0])
+                safecpy(dmi->product.id, product_name);
+
+            safecpy(dmi->product.name, product_name);
+        }
+    }
     
     // System Serial Number
     windows_read_registry_string(
@@ -1254,6 +1596,7 @@ void dmi_info_init(DMI_INFO *dmi) {
     dmi->sys.asset_tag[0] = '\0';
     
     // Product information
+    dmi->product.id[0] = '\0';
     dmi->product.name[0] = '\0';
     dmi->product.version[0] = '\0';
     dmi->product.sku[0] = '\0';
