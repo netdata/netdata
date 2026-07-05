@@ -47,6 +47,15 @@ static IWbemClassObject *wmi_exec_single_row_query(const wchar_t *query_text, co
 
     BSTR query = SysAllocString(query_text);
     BSTR wql = SysAllocString(L"WQL");
+    if(!query || !wql) {
+        // SysAllocString() returns NULL only on allocation failure here; do not
+        // hand a NULL BSTR to ExecQuery(). SysFreeString(NULL) is a safe no-op.
+        nd_log(NDLS_DAEMON, NDLP_DEBUG,
+               "%s WMI query aborted: SysAllocString() failed (out of memory)", caller);
+        SysFreeString(query);
+        SysFreeString(wql);
+        return NULL;
+    }
 
     IEnumWbemClassObject *pEnumerator = NULL;
     HRESULT hr = nd_wmi.pSvc->lpVtbl->ExecQuery(
