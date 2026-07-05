@@ -4,13 +4,13 @@ This guide explains how to customize Netdata's stock alerts. User configurations
 
 ## Quick Reference
 
-| Goal                                | Method                               |
-|-------------------------------------|--------------------------------------|
-| Change thresholds for ALL instances | Create a template with the same name |
-| Change thresholds for ONE instance  | Create an alarm with the same name   |
-| Disable an alert completely         | Use `enabled alarms` in netdata.conf |
-| Enable only specific alerts         | Use `enabled alarms` without `*`     |
-| Silence notifications only          | Set `to: silent`                     |
+| Goal                                | Method                                                                                             |
+|-------------------------------------|----------------------------------------------------------------------------------------------------|
+| Change thresholds for ALL instances | Create a template with the same name                                                               |
+| Change thresholds for ONE instance  | Create an alarm with the same name                                                                 |
+| Disable an alert completely         | Use `enabled alarms` in netdata.conf                                                               |
+| Enable only specific alerts         | Use [`enabled alarms` without `*`](/src/health/REFERENCE.md#enable-only-specific-alerts-whitelist) |
+| Silence notifications only          | Set `to: silent`                                                                                   |
 
 ## Understanding Overrides
 
@@ -165,6 +165,8 @@ In your `netdata.conf` (edit it with `sudo ./edit-config netdata.conf`):
 ```
 
 This disables `20min_steal_cpu` and `disk_space_usage` while keeping all other alerts (`*`).
+
+This is a `netdata.conf` change, so restart your Netdata Agent to apply it — `netdatacli reload-health` (see [Applying Changes](#applying-changes) below) only reloads `health.d/*.conf` files, not `netdata.conf`.
 
 ### Option B: Per-Alert Disable
 
