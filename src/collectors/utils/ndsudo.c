@@ -331,7 +331,7 @@ bool command_exists_absolute(const char *cmd, char *dst, size_t dst_size) {
     if(!cmd || cmd[0] != '/' || !dst || !dst_size)
         return false;
 
-    size_t len = strlen(cmd);
+    size_t len = strnlen(cmd, dst_size);
     if(len >= dst_size)
         return false;
 
