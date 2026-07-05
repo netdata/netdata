@@ -386,12 +386,14 @@ prepare_cmake_options() {
   [ "$(uname -s)" = "Linux" ] && IS_LINUX=1
   IS_LINUX_OR_FREEBSD="${IS_LINUX}"
   [ "$(uname -s)" = "FreeBSD" ] && IS_LINUX_OR_FREEBSD=1
+  IS_LINUX_OR_FREEBSD_OR_DARWIN="${IS_LINUX_OR_FREEBSD}"
+  [ "$(uname -s)" = "Darwin" ] && IS_LINUX_OR_FREEBSD_OR_DARWIN=1
   enable_feature PLUGIN_DEBUGFS "${IS_LINUX}"
   enable_feature PLUGIN_PERF "${IS_LINUX}"
   enable_feature PLUGIN_SLABINFO "${IS_LINUX}"
   enable_feature PLUGIN_CGROUP_NETWORK "${IS_LINUX}"
   enable_feature PLUGIN_LOCAL_LISTENERS "${IS_LINUX}"
-  enable_feature PLUGIN_NETWORK_VIEWER "${IS_LINUX_OR_FREEBSD}"
+  enable_feature PLUGIN_NETWORK_VIEWER "${IS_LINUX_OR_FREEBSD_OR_DARWIN}"
   enable_feature PLUGIN_EBPF "${ENABLE_EBPF:-0}"
 
   enable_feature BUNDLED_JSONC "${NETDATA_BUILD_JSON_C:-0}"
