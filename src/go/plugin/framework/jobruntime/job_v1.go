@@ -57,22 +57,26 @@ func newCollectDurationChart(pluginName string) *collectorapi.Chart {
 }
 
 type JobConfig struct {
-	PluginName      string
-	Name            string
-	ModuleName      string
-	FullName        string
-	Source          string
-	Module          collectorapi.CollectorV1
-	Labels          map[string]string
-	Out             io.Writer
-	UpdateEvery     int
-	AutoDetectEvery int
-	Priority        int
-	IsStock         bool
-	Vnode           vnodes.VirtualNode
-	AuditMode       bool
-	AuditAnalyzer   metricsaudit.Analyzer
-	FunctionOnly    bool
+	PluginName            string
+	Name                  string
+	ModuleName            string
+	FullName              string
+	Source                string
+	Module                collectorapi.CollectorV1
+	Labels                map[string]string
+	Out                   io.Writer
+	UpdateEvery           int
+	AutoDetectEvery       int
+	Priority              int
+	IsStock               bool
+	Vnode                 vnodes.VirtualNode
+	VnodeName             string
+	VnodeRevision         uint64
+	VnodeMetadataRevision uint64
+	VnodeLookup           VnodeLookup
+	AuditMode             bool
+	AuditAnalyzer         metricsaudit.Analyzer
+	FunctionOnly          bool
 }
 
 func NewJob(cfg JobConfig) *Job {
@@ -86,27 +90,30 @@ func NewJob(cfg JobConfig) *Job {
 		AutoDetectEvery: cfg.AutoDetectEvery,
 		AutoDetectTries: infTries,
 
-		pluginName:           cfg.PluginName,
-		name:                 cfg.Name,
-		moduleName:           cfg.ModuleName,
-		fullName:             cfg.FullName,
-		updateEvery:          cfg.UpdateEvery,
-		priority:             cfg.Priority,
-		isStock:              cfg.IsStock,
-		functionOnly:         cfg.FunctionOnly,
-		module:               cfg.Module,
-		labels:               cfg.Labels,
-		out:                  cfg.Out,
-		collectStatusChart:   newCollectStatusChart(cfg.PluginName),
-		collectDurationChart: newCollectDurationChart(cfg.PluginName),
-		stopCtrl:             newStopController(),
-		tick:                 make(chan int),
-		buf:                  &buf,
-		api:                  netdataapi.New(&buf),
-		vnode:                cfg.Vnode,
-		updVnode:             make(chan *vnodes.VirtualNode, 1),
-		auditMode:            cfg.AuditMode,
-		auditAnalyzer:        cfg.AuditAnalyzer,
+		pluginName:            cfg.PluginName,
+		name:                  cfg.Name,
+		moduleName:            cfg.ModuleName,
+		fullName:              cfg.FullName,
+		updateEvery:           cfg.UpdateEvery,
+		priority:              cfg.Priority,
+		isStock:               cfg.IsStock,
+		functionOnly:          cfg.FunctionOnly,
+		module:                cfg.Module,
+		labels:                cfg.Labels,
+		out:                   cfg.Out,
+		collectStatusChart:    newCollectStatusChart(cfg.PluginName),
+		collectDurationChart:  newCollectDurationChart(cfg.PluginName),
+		stopCtrl:              newStopController(),
+		tick:                  make(chan int),
+		buf:                   &buf,
+		api:                   netdataapi.New(&buf),
+		vnode:                 cfg.Vnode,
+		vnodeName:             cfg.VnodeName,
+		vnodeRevision:         cfg.VnodeRevision,
+		vnodeMetadataRevision: cfg.VnodeMetadataRevision,
+		vnodeLookup:           cfg.VnodeLookup,
+		auditMode:             cfg.AuditMode,
+		auditAnalyzer:         cfg.AuditAnalyzer,
 	}
 
 	log := logger.New().With(jobLoggerAttrs(j.ModuleName(), j.Name(), cfg.Source)...)
@@ -157,9 +164,12 @@ type Job struct {
 	// vnodeMu covers j.vnode against off-goroutine readers (Vnode is
 	// called from the manager loop on registered jobs) racing the job
 	// goroutine's writes and the pre-Start baseline write.
-	vnodeMu  sync.RWMutex
-	vnode    vnodes.VirtualNode
-	updVnode chan *vnodes.VirtualNode
+	vnodeMu               sync.RWMutex
+	vnode                 vnodes.VirtualNode
+	vnodeName             string
+	vnodeRevision         uint64
+	vnodeMetadataRevision uint64
+	vnodeLookup           VnodeLookup
 
 	retries atomic.Int64
 	prevRun time.Time
@@ -288,31 +298,60 @@ func (j *Job) AutoDetection(ctx context.Context) (err error) {
 	return nil
 }
 
-func (j *Job) UpdateVnode(vnode *vnodes.VirtualNode) {
-	if vnode == nil {
-		return
-	}
-	select {
-	case <-j.updVnode:
-	default:
-	}
-	j.updVnode <- vnode
-}
-
-// SetVnodeBaseline commits the vnode config directly into the job BEFORE
-// Start: registration-time freshness must be visible to Cleanup even when
-// the job never collects, and it must NOT drain a concurrently queued live
-// update - UpdateVnode's slot keeps the newest committed value, which still
-// applies at collection. Pre-Start only: the job goroutine does not exist
-// yet, and the write is published to it by the Start goroutine launch.
-// Module-owned vnode state is never overridden.
-func (j *Job) SetVnodeBaseline(vnode *vnodes.VirtualNode) {
-	if vnode == nil || (j.module != nil && j.module.VirtualNode() != nil) {
+// SetVnodeSnapshot commits the vnode config directly into the job BEFORE Start:
+// registration-time freshness must be visible to Cleanup even when the job
+// never collects. Pre-Start only: the job goroutine does not exist yet, and the
+// write is published to it by the Start goroutine launch. Module-owned vnode
+// state is never overridden.
+func (j *Job) SetVnodeSnapshot(snapshot VnodeSnapshot) {
+	if snapshot.Vnode == nil || (j.module != nil && j.module.VirtualNode() != nil) {
 		return
 	}
 	j.vnodeMu.Lock()
-	j.vnode = *vnode.Copy()
+	j.vnode = *snapshot.Vnode.Copy()
 	j.vnodeMu.Unlock()
+	if snapshot.Revision != 0 {
+		j.vnodeRevision = snapshot.Revision
+	}
+	if snapshot.MetadataRevision != 0 {
+		j.vnodeMetadataRevision = snapshot.MetadataRevision
+	}
+}
+
+func (j *Job) refreshVnodeSnapshot() bool {
+	if j.vnodeName == "" || j.vnodeLookup == nil {
+		return false
+	}
+	snapshot, ok := j.vnodeLookup(j.vnodeName)
+	if !ok {
+		return false
+	}
+	return j.applyVnodeSnapshot(snapshot)
+}
+
+func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) bool {
+	if snapshot.Vnode == nil {
+		return false
+	}
+	if snapshot.Revision != 0 && snapshot.Revision <= j.vnodeRevision {
+		return false
+	}
+	metadataChanged := snapshot.MetadataRevision == 0 || snapshot.MetadataRevision != j.vnodeMetadataRevision
+	createChart := false
+	if metadataChanged {
+		j.vnodeCreated = false
+		createChart = j.vnode.GUID != snapshot.Vnode.GUID
+	}
+	j.vnodeMu.Lock()
+	j.vnode = *snapshot.Vnode.Copy()
+	j.vnodeMu.Unlock()
+	if snapshot.Revision != 0 {
+		j.vnodeRevision = snapshot.Revision
+	}
+	if snapshot.MetadataRevision != 0 {
+		j.vnodeMetadataRevision = snapshot.MetadataRevision
+	}
+	return createChart
 }
 
 // Tick Tick.
@@ -524,15 +563,7 @@ func (j *Job) collect() collectedMetrics {
 func (j *Job) processMetrics(mx collectedMetrics, startTime time.Time, sinceLastRun int) bool {
 	var createChart bool
 	if j.module.VirtualNode() == nil {
-		select {
-		case vnode := <-j.updVnode:
-			j.vnodeCreated = false
-			createChart = j.vnode.GUID != vnode.GUID
-			j.vnodeMu.Lock()
-			j.vnode = *vnode.Copy()
-			j.vnodeMu.Unlock()
-		default:
-		}
+		createChart = j.refreshVnodeSnapshot()
 	}
 
 	if !j.vnodeCreated {

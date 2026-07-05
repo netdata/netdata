@@ -7,7 +7,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
 func (m *Manager) dyncfgVnodePrefixValue() string {
@@ -36,12 +35,4 @@ func (m *Manager) affectedVnodeJobs(vnode string) []string {
 		return true
 	})
 	return jobs
-}
-
-func (m *Manager) applyVnodeUpdate(name string, cfg *vnodes.VirtualNode) {
-	for _, job := range m.runningJobs.snapshot() {
-		if job.Vnode().Name == name {
-			job.UpdateVnode(cfg)
-		}
-	}
 }

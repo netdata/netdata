@@ -198,7 +198,6 @@ func (c *Controller) dyncfgCmdAdd(fn dyncfg.Function) {
 		return
 	}
 
-	c.applyUpdate(name, cfg)
 	c.api.SendCodef(fn, 202, "")
 	c.createJob(cfg, dyncfg.StatusRunning)
 }
@@ -241,7 +240,6 @@ func (c *Controller) dyncfgCmdUpdate(fn dyncfg.Function) {
 		return
 	}
 
-	c.applyUpdate(name, cfg)
 	c.api.SendCodef(fn, 202, "")
 	c.createJob(cfg, dyncfg.StatusRunning)
 }
@@ -310,12 +308,6 @@ func (c *Controller) affectedJobsFor(vnode string) string {
 		return ""
 	}
 	return strings.Join(c.affectedJobs(vnode), ", ")
-}
-
-func (c *Controller) applyUpdate(name string, cfg *vnodes.VirtualNode) {
-	if c.applyVnodeUpdate != nil {
-		c.applyVnodeUpdate(name, cfg)
-	}
 }
 
 func (c *Controller) verifyVnodeUnique(newCfg *vnodes.VirtualNode) error {

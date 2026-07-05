@@ -327,11 +327,34 @@ write claim.
 
 | Command | Main flow |
 | --- | --- |
-| `add` | Validate name, payload, GUID, and uniqueness; add vnode. |
-| `update` | Validate payload/GUID/uniqueness; update vnode and notify running jobs. |
+| `add` | Validate name, payload, GUID, and uniqueness; commit a versioned vnode snapshot. |
+| `update` | Validate payload/GUID/uniqueness; commit a new versioned vnode snapshot. |
 | `remove` | Reject if missing, non-dyncfg, or referenced; otherwise remove and publish delete. |
 | `test` | Validate candidate inline, no claim. |
 | `get` / `schema` / `userconfig` | Cheap response paths. |
+
+The vnode store is the authoritative config source. Lookups return cloned
+snapshots with:
+
+- a store revision that advances on every committed vnode config write;
+- a metadata revision that advances only when runtime-visible vnode metadata
+  changes.
+
+Jobs bind to an explicit vnode name and consume snapshots from the store:
+
+- job creation gets the current snapshot from the factory;
+- job registration reconciles the current snapshot before `Start`;
+- V1 jobs refresh after collection and before emission;
+- V2 jobs refresh before collection and emission;
+- cleanup never re-reads the live vnode store:
+  - V1 cleanup uses the job's committed local snapshot;
+  - V2 module-owned cleanup samples `VirtualNode()` before module cleanup;
+  - V2 jobmgr-owned cleanup uses the last successfully emitted HOST_DEFINE
+    cleanup info for owner and stale-suppression metadata.
+
+Runtime-equivalent vnode commits are still consumed by revision, but do not
+force redundant HOSTINFO/HOST_DEFINE output. Module-owned vnodes keep their
+runtime-specific precedence and are not overwritten by jobmgr snapshots.
 
 Collector commands that reference a vnode hold a read claim on the vnode.
 That prevents vnode removal/update from racing a collector stop/start window.

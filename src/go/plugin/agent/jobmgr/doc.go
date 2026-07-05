@@ -91,15 +91,14 @@
 //     a job that never started.
 //
 //   - Every job registration (startRunningJob) reconciles the job's vnode
-//     against the store before Start: vnode updates propagate to registered
-//     jobs only, so a job created before an update but registered after it
-//     (a dependent restart's stop/start gap, a warm continuation) receives
-//     the current config at registration instead of running on its stale
-//     creation-time snapshot. The reconcile COMMITS a baseline into the job
-//     (SetVnodeBaseline) rather than queueing a delivery: the baseline is
-//     visible to cleanup even when the job never collects, and a
-//     concurrently queued live update stays queued and still wins at
-//     collection.
+//     against the store before Start: a job created before a vnode update but
+//     registered after it (a dependent restart's stop/start gap, a warm
+//     continuation) receives the current config at registration instead of
+//     running on its stale creation-time snapshot. The reconcile commits a
+//     versioned snapshot into the job (SetVnodeSnapshot) so cleanup can use the
+//     committed vnode even when the job never collects;
+//     later running jobs refresh from the versioned vnode lookup at their
+//     runtime-defined collection boundary.
 //
 //   - Discovery ingestion (runProcessConfGroups) does not mutate manager
 //     state directly. It publishes add/remove intents through channels

@@ -28,6 +28,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
@@ -164,12 +165,11 @@ func New(cfg Config) *Manager {
 		ConfigCommands:          dyncfgCollectorConfigCmds(),
 	})
 	mgr.vnodesCtl = vnodectl.New(vnodectl.Options{
-		Logger:           mgr.Logger,
-		API:              api,
-		Plugin:           cfg.PluginName,
-		Initial:          vnodesReg,
-		AffectedJobs:     mgr.affectedVnodeJobs,
-		ApplyVnodeUpdate: mgr.applyVnodeUpdate,
+		Logger:       mgr.Logger,
+		API:          api,
+		Plugin:       cfg.PluginName,
+		Initial:      vnodesReg,
+		AffectedJobs: mgr.affectedVnodeJobs,
 	})
 	mgr.secretsCtl = secretsctl.New(secretsctl.Options{
 		Logger:                  mgr.Logger,
@@ -660,15 +660,14 @@ func (m *Manager) startRunningJob(job runtimeJob) {
 	}
 
 	// Registration precedes the vnode reconcile, which precedes Start: a
-	// vnode update committing concurrently either sees the registered job
-	// (applyVnodeUpdate queues it live) or committed before the reconcile's
-	// lookup (the baseline carries it). The baseline is COMMITTED into the
-	// job, not queued: a queued delivery could evict a newer live update
-	// from the one-slot channel, and V1 applies queued updates only during
-	// collection - a job stopped before its first tick would clean up with
-	// the stale creation-time vnode. Ticks to a registered but
-	// not-yet-started job are non-blocking sends; a stop racing this window
-	// unblocks because Start launches unconditionally below.
+	// vnode update committing concurrently either is pulled at the job's
+	// next collection boundary or committed before the reconcile's lookup
+	// (the baseline carries it). The baseline is COMMITTED into the job:
+	// V1 refreshes only during collection, so a job stopped before its first
+	// tick would otherwise clean up with the stale creation-time vnode.
+	// Ticks to a registered but not-yet-started job are non-blocking sends;
+	// a stop racing this window unblocks because Start launches
+	// unconditionally below.
 	m.runningJobs.lock()
 	m.runningJobs.add(job.FullName(), job)
 	m.runningJobs.unlock()
@@ -680,25 +679,37 @@ func (m *Manager) startRunningJob(job runtimeJob) {
 	// the job's functions (collectorCallbacks.OnStatusChange).
 }
 
-// reconcileJobVnode delivers the current vnode config to a job being
-// registered. Vnode updates propagate to REGISTERED jobs only
-// (applyVnodeUpdate): a job created before an update committed but
-// registered after it would run on its stale creation-time snapshot - the
-// stop/start gap of a store command's dependent restart, or a warm
-// continuation resumed after a wedge. Vnode removal cannot leave a dangling
-// reference here: it is 409-refused while the job's exposed entry
-// references the vnode.
+// reconcileJobVnode commits the current vnode snapshot to a job being
+// registered. A job created before an update committed but registered after it
+// must not clean up on its stale creation-time snapshot - the stop/start gap of
+// a store command's dependent restart, or a warm continuation resumed after a
+// wedge. Runtime-equivalent store commits are still consumed here so jobs start
+// with the current store revision even when HOSTINFO/HOST_DEFINE metadata did
+// not change. Vnode removal cannot leave a dangling reference here: it is
+// 409-refused while the job's exposed entry references the vnode.
 func (m *Manager) reconcileJobVnode(job runtimeJob) {
 	cur := job.Vnode()
 	if cur.Name == "" {
 		return
 	}
-	vn, ok := m.vnodesCtl.Lookup(cur.Name)
-	if !ok || cur.Equal(vn) {
+	snapshot, ok := m.vnodesCtl.LookupSnapshot(cur.Name)
+	if !ok || snapshot.Vnode == nil {
+		return
+	}
+	if cur.Equal(snapshot.Vnode) {
+		commitJobVnodeSnapshot(job, snapshot)
 		return
 	}
 	m.Infof("delivering updated vnode '%s' config to job '%s' at registration", cur.Name, job.FullName())
-	job.SetVnodeBaseline(vn)
+	commitJobVnodeSnapshot(job, snapshot)
+}
+
+func commitJobVnodeSnapshot(job runtimeJob, snapshot vnodectl.Snapshot) {
+	job.SetVnodeSnapshot(jobruntime.VnodeSnapshot{
+		Vnode:            snapshot.Vnode,
+		Revision:         snapshot.Revision,
+		MetadataRevision: snapshot.MetadataRevision,
+	})
 }
 
 // publishRunningJobFunctions registers a committed-live job with the

@@ -508,9 +508,9 @@ func (e *executor) eventClaims(ev event) []claim {
 //     emits HOST/HOSTINFO lines even for a never-started job).
 // 11. A STARTED warm job receives the current vnode config at registration
 //     (startRunningJob's reconcile), like every other start path - as a
-//     COMMITTED baseline, not a queued delivery: it must be visible to
-//     cleanup even if the job never collects, and it must not evict a
-//     newer live update from the one-slot queue.
+//     COMMITTED baseline: it must be visible to cleanup even if the job never
+//     collects; later running updates are pulled at the job's runtime-defined
+//     collection boundary.
 // 12. A late FAILURE evaluates retry eligibility under today's rules at
 //     the return; nothing was scheduled at the abandon (a provisional
 //     retry could race the continuation).

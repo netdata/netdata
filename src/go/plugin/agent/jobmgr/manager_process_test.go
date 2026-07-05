@@ -22,6 +22,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
@@ -1057,6 +1058,39 @@ func TestRun_DoesNotPublishCollectorTemplateForSingleInstanceModules(t *testing.
 	assert.NotContains(t, output, "CONFIG "+mgr.dyncfgModID("single")+" create accepted template /collectors/"+testPluginName+"/Jobs")
 }
 
+func TestReconcileJobVnodeCommitsRuntimeEquivalentSnapshotRevision(t *testing.T) {
+	mgr := New(Config{
+		PluginName: testPluginName,
+		Vnodes: map[string]*vnodes.VirtualNode{
+			"db": {
+				Name:       "db",
+				Hostname:   "db-host",
+				GUID:       "db-guid",
+				SourceType: confgroup.TypeDyncfg,
+				Source:     "dyncfg",
+			},
+		},
+	})
+	job := &vnodeReconcileProbeJob{
+		tickProbeJob: tickProbeJob{fullName: "module_job", moduleName: "module", name: "job"},
+		vnode: vnodes.VirtualNode{
+			Name:       "db",
+			Hostname:   "db-host",
+			GUID:       "db-guid",
+			SourceType: confgroup.TypeUser,
+			Source:     "file",
+		},
+	}
+
+	mgr.reconcileJobVnode(job)
+
+	require.Equal(t, 1, job.snapshotCalls)
+	require.NotNil(t, job.snapshot.Vnode)
+	assert.Equal(t, confgroup.TypeDyncfg, job.snapshot.Vnode.SourceType)
+	assert.Equal(t, uint64(1), job.snapshot.Revision)
+	assert.Equal(t, uint64(1), job.snapshot.MetadataRevision)
+}
+
 type lockProbeJob struct {
 	fullName   string
 	moduleName string
@@ -1081,15 +1115,14 @@ func (j *lockProbeJob) Tick(_ int) {
 		<-j.tickRelease
 	})
 }
-func (j *lockProbeJob) AutoDetection(context.Context) error    { return nil }
-func (j *lockProbeJob) AutoDetectionEvery() int                { return 0 }
-func (j *lockProbeJob) RetryAutoDetection() bool               { return false }
-func (j *lockProbeJob) Cleanup()                               {}
-func (j *lockProbeJob) IsRunning() bool                        { return true }
-func (j *lockProbeJob) Panicked() bool                         { return false }
-func (j *lockProbeJob) Vnode() vnodes.VirtualNode              { return vnodes.VirtualNode{} }
-func (j *lockProbeJob) UpdateVnode(_ *vnodes.VirtualNode)      {}
-func (j *lockProbeJob) SetVnodeBaseline(_ *vnodes.VirtualNode) {}
+func (j *lockProbeJob) AutoDetection(context.Context) error       { return nil }
+func (j *lockProbeJob) AutoDetectionEvery() int                   { return 0 }
+func (j *lockProbeJob) RetryAutoDetection() bool                  { return false }
+func (j *lockProbeJob) Cleanup()                                  {}
+func (j *lockProbeJob) IsRunning() bool                           { return true }
+func (j *lockProbeJob) Panicked() bool                            { return false }
+func (j *lockProbeJob) Vnode() vnodes.VirtualNode                 { return vnodes.VirtualNode{} }
+func (j *lockProbeJob) SetVnodeSnapshot(jobruntime.VnodeSnapshot) {}
 
 type tickProbeJob struct {
 	fullName   string
@@ -1098,22 +1131,37 @@ type tickProbeJob struct {
 	collector  any
 }
 
-func (j *tickProbeJob) FullName() string                       { return j.fullName }
-func (j *tickProbeJob) ModuleName() string                     { return j.moduleName }
-func (j *tickProbeJob) Name() string                           { return j.name }
-func (j *tickProbeJob) Collector() any                         { return j.collector }
-func (j *tickProbeJob) Start()                                 {}
-func (j *tickProbeJob) Stop()                                  {}
-func (j *tickProbeJob) Tick(int)                               {}
-func (j *tickProbeJob) AutoDetection(context.Context) error    { return nil }
-func (j *tickProbeJob) AutoDetectionEvery() int                { return 0 }
-func (j *tickProbeJob) RetryAutoDetection() bool               { return false }
-func (j *tickProbeJob) Cleanup()                               {}
-func (j *tickProbeJob) IsRunning() bool                        { return true }
-func (j *tickProbeJob) Panicked() bool                         { return false }
-func (j *tickProbeJob) Vnode() vnodes.VirtualNode              { return vnodes.VirtualNode{} }
-func (j *tickProbeJob) UpdateVnode(_ *vnodes.VirtualNode)      {}
-func (j *tickProbeJob) SetVnodeBaseline(_ *vnodes.VirtualNode) {}
+func (j *tickProbeJob) FullName() string                          { return j.fullName }
+func (j *tickProbeJob) ModuleName() string                        { return j.moduleName }
+func (j *tickProbeJob) Name() string                              { return j.name }
+func (j *tickProbeJob) Collector() any                            { return j.collector }
+func (j *tickProbeJob) Start()                                    {}
+func (j *tickProbeJob) Stop()                                     {}
+func (j *tickProbeJob) Tick(int)                                  {}
+func (j *tickProbeJob) AutoDetection(context.Context) error       { return nil }
+func (j *tickProbeJob) AutoDetectionEvery() int                   { return 0 }
+func (j *tickProbeJob) RetryAutoDetection() bool                  { return false }
+func (j *tickProbeJob) Cleanup()                                  {}
+func (j *tickProbeJob) IsRunning() bool                           { return true }
+func (j *tickProbeJob) Panicked() bool                            { return false }
+func (j *tickProbeJob) Vnode() vnodes.VirtualNode                 { return vnodes.VirtualNode{} }
+func (j *tickProbeJob) SetVnodeSnapshot(jobruntime.VnodeSnapshot) {}
+
+type vnodeReconcileProbeJob struct {
+	tickProbeJob
+	vnode         vnodes.VirtualNode
+	snapshot      jobruntime.VnodeSnapshot
+	snapshotCalls int
+}
+
+func (j *vnodeReconcileProbeJob) Vnode() vnodes.VirtualNode { return *j.vnode.Copy() }
+func (j *vnodeReconcileProbeJob) SetVnodeSnapshot(snapshot jobruntime.VnodeSnapshot) {
+	j.snapshotCalls++
+	j.snapshot = snapshot.Copy()
+	if snapshot.Vnode != nil {
+		j.vnode = *snapshot.Vnode.Copy()
+	}
+}
 
 type managerFunctionAvailability struct {
 	fn func(string) bool

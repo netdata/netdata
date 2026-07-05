@@ -6,6 +6,7 @@ import (
 	"context"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
@@ -30,11 +31,10 @@ type runtimeJob interface {
 	Panicked() bool
 
 	Vnode() vnodes.VirtualNode
-	UpdateVnode(vnode *vnodes.VirtualNode)
-	// SetVnodeBaseline commits a vnode config into the job pre-Start
-	// (visible to cleanup without a collection; never drains a queued
-	// live update). Callers must not use it on a started job.
-	SetVnodeBaseline(vnode *vnodes.VirtualNode)
+	// SetVnodeSnapshot commits a versioned vnode config into the job pre-Start
+	// (visible to cleanup without a collection). Callers must not use it on a
+	// started job.
+	SetVnodeSnapshot(snapshot jobruntime.VnodeSnapshot)
 }
 
 // configModule is the shared Init/Check/config contract for dyncfg config test/get

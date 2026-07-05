@@ -577,11 +577,10 @@ func TestStoreRemove_AffectedGateWaitsForStoreClaim(t *testing.T) {
 		"the remove answers its 409 under the granted claim once the reference settles")
 }
 
-// The registration-time vnode reconcile is COMMITTED into the job, not
-// queued: V1 applies queued updates only during collection, so a job
-// stopped before its first tick would otherwise clean up with the stale
-// creation-time vnode - HOST/HOSTINFO lines for a hostname the store no
-// longer holds.
+// The registration-time vnode reconcile is COMMITTED into the job: V1 pulls
+// later vnode changes only during collection, so a job stopped before its
+// first tick would otherwise clean up with the stale creation-time vnode -
+// HOST/HOSTINFO lines for a hostname the store no longer holds.
 func TestWarmResume_CleanupEmitsReconciledVnodeBeforeFirstCollection(t *testing.T) {
 	gate := make(chan struct{})
 	var inits atomic.Int32
@@ -927,7 +926,7 @@ func TestDependentRestart_ReceivesVnodeUpdatedDuringRestartGap(t *testing.T) {
 	}
 
 	// Mid-gap vnode update: the store command holds no vnode claim, and
-	// applyVnodeUpdate reaches no job (the dependent is between instances).
+	// No running job exists to refresh yet (the dependent is between instances).
 	h.dyncfg("vn-update", []string{h.mgr.dyncfgVnodePrefixValue() + ":v5", "update"},
 		mustJSON(t, map[string]any{"guid": guid, "hostname": "host-two"}))
 	require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN vn-update 202"), charWait, charTick,
@@ -941,10 +940,10 @@ func TestDependentRestart_ReceivesVnodeUpdatedDuringRestartGap(t *testing.T) {
 		"the restarted dependent's vnode host info must carry the config updated during the restart gap")
 }
 
-// A vnode update that commits while a dependent's key is wedged reaches only
-// RUNNING jobs (applyVnodeUpdate): the dependent's late detection success
-// must still start with the CURRENT vnode config - the resume re-delivers
-// the update the warm job missed, exactly as the live update would have.
+// A vnode update that commits while a dependent's key is wedged reaches no
+// running instance of that dependent: the dependent's late detection success
+// must still start with the CURRENT vnode config - the resume commits the
+// update the warm job missed.
 func TestWarmResume_RefreshesVnodeUpdatedWhileWedged(t *testing.T) {
 	gate := make(chan struct{})
 	var inits atomic.Int32
