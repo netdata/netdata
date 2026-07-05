@@ -1015,6 +1015,29 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 - **Raw suffix:** `$dimension_raw` - Last collected value
 - **Timestamp suffix:** `$dimension_last_collected_t` - Unix timestamp when dimension was last collected
 
+:::note
+
+**Dimension names with spaces**
+
+Use the `${...}` brace form when a dimension name contains spaces. A dimension named `Has Number` must be referenced as `${Has Number}` in `calc`, `warn`, and `crit` expressions — the unbraced form `$Has Number` does not resolve correctly because the name is split at the space.
+
+```text
+   alarm: my_dimension_alert
+      on: mychart
+   lookup: max -1m unaligned match-names of Has Number
+     calc: ${Has Number} * 100
+     warn: $this > 80
+     crit: $this > 95
+   units: %
+    every: 1m
+     info: percentage of the Has Number dimension
+       to: sysadmin
+```
+
+The same `${...}` rule applies to any variable name containing characters the unbraced form cannot capture — for example, the hyphens in [Prometheus chart IDs](#prometheus-collector-variables).
+
+:::
+
 #### Host Variables
 
 **What's Available:** All dimensions of all charts, including all alerts, in fullname format.
