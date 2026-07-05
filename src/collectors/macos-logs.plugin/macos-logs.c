@@ -290,13 +290,13 @@ static int macos_logs_response(BUFFER *wb, LOGS_QUERY_STATUS *lqs, MACOS_LOGS_QU
             buffer_strcat(msg_description, "QUERY TIMEOUT: The query timed out and may not include all data in the selected window. ");
             msg_priority = NDLP_WARNING;
         }
-        buffer_json_member_add_object(wb, "message");
-        if(buffer_tostring(msg)) {
+        if(buffer_strlen(msg)) {
+            buffer_json_member_add_object(wb, "message");
             buffer_json_member_add_string(wb, "title", buffer_tostring(msg));
             buffer_json_member_add_string(wb, "description", buffer_tostring(msg_description));
             buffer_json_member_add_string(wb, "status", nd_log_id2priority(msg_priority));
+            buffer_json_object_close(wb);
         }
-        buffer_json_object_close(wb);
     }
 
     buffer_json_member_add_array(wb, "_sources");

@@ -291,7 +291,7 @@ void rrdhost_system_info_to_rrdlabels(struct rrdhost_system_info *system_info, R
 }
 
 int rrdhost_system_info_detect(struct rrdhost_system_info *system_info) {
-    if (unlikely(!system_info)) {
+    if (!system_info) {
         netdata_log_error("SYSTEM INFO: System info structure is NULL.");
         return 1;
     }
