@@ -53,6 +53,10 @@ void out_of_memory(const char *call, size_t size, const char *details) {
 #if defined(HAVE_DLSYM) && defined(ENABLE_DLSYM)
 #include <dlfcn.h>
 
+#ifndef MALLOC_ALIGNMENT
+#define MALLOC_ALIGNMENT (sizeof(uintptr_t) * 2)
+#endif
+
 typedef void (*libc_function_t)(void);
 
 static void *malloc_first_run(size_t size);
@@ -80,12 +84,161 @@ static size_t (*libc_malloc_usable_size)(void *) = malloc_usable_size_first_run;
 static size_t (*libc_malloc_usable_size)(void *) = NULL;
 #endif
 
+#define DLSYM_BOOTSTRAP_BUFFER_SIZE (1024 * 1024)
+#define DLSYM_BOOTSTRAP_MAGIC 0xD157B007U
+
+struct dlsym_bootstrap_header {
+    size_t size;
+    uint32_t magic;
+};
+
+#define DLSYM_BOOTSTRAP_HEADER_SIZE \
+    (((sizeof(struct dlsym_bootstrap_header) + MALLOC_ALIGNMENT - 1) / MALLOC_ALIGNMENT) * MALLOC_ALIGNMENT)
+
+static uint8_t dlsym_bootstrap_buffer[DLSYM_BOOTSTRAP_BUFFER_SIZE]
+    __attribute__((aligned(sizeof(uintptr_t) * 2)));
+static size_t dlsym_bootstrap_used = 0;
+static __thread size_t dlsym_bootstrap_depth = 0;
+
+static size_t dlsym_bootstrap_align_size(size_t size) {
+    size_t rem = size % MALLOC_ALIGNMENT;
+    return rem ? size + MALLOC_ALIGNMENT - rem : size;
+}
+
+static bool dlsym_bootstrap_active(void) {
+    return dlsym_bootstrap_depth != 0;
+}
+
+static void dlsym_bootstrap_abort(void) {
+    static const char msg[] = "FATAL: dlsym() bootstrap allocator exhausted.\n";
+    if(write(STDERR_FILENO, msg, sizeof(msg) - 1) < 0) {
+        // best effort
+    }
+    abort();
+}
+
+static bool dlsym_bootstrap_contains(const void *ptr) {
+    uintptr_t addr = (uintptr_t)ptr;
+    uintptr_t base = (uintptr_t)dlsym_bootstrap_buffer;
+    return addr >= base + DLSYM_BOOTSTRAP_HEADER_SIZE && addr < base + sizeof(dlsym_bootstrap_buffer);
+}
+
+static struct dlsym_bootstrap_header *dlsym_bootstrap_header(void *ptr) {
+    if(!dlsym_bootstrap_contains(ptr))
+        return NULL;
+
+    struct dlsym_bootstrap_header *hdr =
+        (struct dlsym_bootstrap_header *)((uint8_t *)ptr - DLSYM_BOOTSTRAP_HEADER_SIZE);
+
+    return hdr->magic == DLSYM_BOOTSTRAP_MAGIC ? hdr : NULL;
+}
+
+static void *dlsym_bootstrap_malloc(size_t size) {
+    if(!size)
+        size = 1;
+
+    if(size > SIZE_MAX - DLSYM_BOOTSTRAP_HEADER_SIZE)
+        dlsym_bootstrap_abort();
+
+    size_t requested = DLSYM_BOOTSTRAP_HEADER_SIZE + size;
+    if(requested > SIZE_MAX - MALLOC_ALIGNMENT)
+        dlsym_bootstrap_abort();
+
+    size_t total = dlsym_bootstrap_align_size(requested);
+
+    while(true) {
+        size_t used = __atomic_load_n(&dlsym_bootstrap_used, __ATOMIC_RELAXED);
+        size_t aligned_used = dlsym_bootstrap_align_size(used);
+
+        if(aligned_used > DLSYM_BOOTSTRAP_BUFFER_SIZE || total > DLSYM_BOOTSTRAP_BUFFER_SIZE - aligned_used)
+            dlsym_bootstrap_abort();
+
+        size_t next = aligned_used + total;
+        if(__atomic_compare_exchange_n(&dlsym_bootstrap_used, &used, next, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED)) {
+            struct dlsym_bootstrap_header *hdr =
+                (struct dlsym_bootstrap_header *)&dlsym_bootstrap_buffer[aligned_used];
+            hdr->size = size;
+            hdr->magic = DLSYM_BOOTSTRAP_MAGIC;
+            return &dlsym_bootstrap_buffer[aligned_used + DLSYM_BOOTSTRAP_HEADER_SIZE];
+        }
+    }
+}
+
+static void *dlsym_bootstrap_calloc(size_t n, size_t size) {
+    if(size && n > SIZE_MAX / size)
+        dlsym_bootstrap_abort();
+
+    size_t bytes = n * size;
+    void *ptr = dlsym_bootstrap_malloc(bytes);
+    memset(ptr, 0, bytes);
+    return ptr;
+}
+
+static void *dlsym_bootstrap_realloc(void *ptr, size_t size) {
+    if(!ptr)
+        return dlsym_bootstrap_malloc(size);
+
+    struct dlsym_bootstrap_header *hdr = dlsym_bootstrap_header(ptr);
+    if(!hdr)
+        dlsym_bootstrap_abort();
+
+    void *new_ptr = dlsym_bootstrap_malloc(size);
+    memcpy(new_ptr, ptr, MIN(hdr->size, size));
+    return new_ptr;
+}
+
+static char *dlsym_bootstrap_strdup(const char *s) {
+    size_t len = strnlen(s, SIZE_MAX - 1);
+    if(unlikely(len == SIZE_MAX - 1))
+        dlsym_bootstrap_abort();
+
+    size_t size = len + 1;
+    char *ptr = dlsym_bootstrap_malloc(size);
+    memcpy(ptr, s, size);
+    return ptr;
+}
+
+static char *dlsym_bootstrap_strndup(const char *s, size_t len) {
+    size_t bytes = strnlen(s, len);
+    if(unlikely(bytes == SIZE_MAX))
+        dlsym_bootstrap_abort();
+
+    char *ptr = dlsym_bootstrap_malloc(bytes + 1);
+    memcpy(ptr, s, bytes);
+    ptr[bytes] = '\0';
+    return ptr;
+}
+
+static bool dlsym_bootstrap_free(void *ptr) {
+    return dlsym_bootstrap_header(ptr) != NULL;
+}
+
+static size_t dlsym_bootstrap_usable_size(void *ptr) {
+    struct dlsym_bootstrap_header *hdr = dlsym_bootstrap_header(ptr);
+    return hdr ? hdr->size : 0;
+}
+
 static void link_system_library_function(libc_function_t *func_pptr, const char *name, bool required) {
-    *func_pptr = dlsym(RTLD_NEXT, name);
-    if(!*func_pptr && required) {
-        fprintf(stderr, "FATAL: Cannot find system's %s() function.\n", name);
+    dlsym_bootstrap_depth++;
+    libc_function_t func = dlsym(RTLD_NEXT, name);
+    dlsym_bootstrap_depth--;
+
+    if(!func && required) {
+        // Report without allocating, then abort. fprintf() may call malloc(),
+        // which at this point (bootstrap inactive, libc allocator still
+        // unresolved and *func_pptr about to be NULL) would recurse into the
+        // first-run resolver or dereference a NULL libc function pointer.
+        // Mirror dlsym_bootstrap_abort() and use write(2). name is always a
+        // string literal, so strlen() is safe and allocation-free here.
+        static const char pre[] = "FATAL: Cannot find system's ";
+        static const char post[] = "() function.\n";
+        if(write(STDERR_FILENO, pre, sizeof(pre) - 1) < 0) { /* best effort */ }
+        if(write(STDERR_FILENO, name, strlen(name)) < 0) { /* best effort */ }
+        if(write(STDERR_FILENO, post, sizeof(post) - 1) < 0) { /* best effort */ }
         abort();
     }
+
+    *func_pptr = func;
 }
 
 static void *malloc_first_run(size_t size) {
@@ -128,37 +281,97 @@ static size_t malloc_usable_size_first_run(void *ptr) {
 }
 
 void *malloc(size_t size) {
+    if(unlikely(dlsym_bootstrap_active()))
+        return dlsym_bootstrap_malloc(size);
+
     return mallocz(size);
 }
 
 void *calloc(size_t n, size_t size) {
+    if(unlikely(dlsym_bootstrap_active()))
+        return dlsym_bootstrap_calloc(n, size);
+
     return callocz(n, size);
 }
 
 void *realloc(void *ptr, size_t size) {
+    if(unlikely(dlsym_bootstrap_contains(ptr)))
+        return dlsym_bootstrap_realloc(ptr, size);
+
+    if(unlikely(dlsym_bootstrap_active())) {
+        if(!ptr)
+            return dlsym_bootstrap_realloc(ptr, size);
+
+        if(libc_realloc != realloc_first_run)
+            return libc_realloc(ptr, size);
+
+        dlsym_bootstrap_abort();
+    }
+
     return reallocz(ptr, size);
 }
 
 void *reallocarray(void *ptr, size_t n, size_t size) {
-    if(unlikely(size && n > SIZE_MAX / size))
-        fatal("reallocarray() cannot allocate %zu members of %zu bytes.", n, size);
+    if(unlikely(size && n > SIZE_MAX / size)) {
+        if(unlikely(dlsym_bootstrap_active()))
+            dlsym_bootstrap_abort();
 
-    return reallocz(ptr, n * size);
+        fatal("reallocarray() cannot allocate %zu members of %zu bytes.", n, size);
+    }
+
+    size_t bytes = n * size;
+
+    if(unlikely(dlsym_bootstrap_contains(ptr)))
+        return dlsym_bootstrap_realloc(ptr, bytes);
+
+    if(unlikely(dlsym_bootstrap_active())) {
+        if(!ptr)
+            return dlsym_bootstrap_realloc(ptr, bytes);
+
+        if(libc_realloc != realloc_first_run)
+            return libc_realloc(ptr, bytes);
+
+        dlsym_bootstrap_abort();
+    }
+
+    return reallocz(ptr, bytes);
 }
 
 void free(void *ptr) {
+    if(unlikely(dlsym_bootstrap_free(ptr)))
+        return;
+
+    if(unlikely(dlsym_bootstrap_active())) {
+        if(libc_free != free_first_run)
+            libc_free(ptr);
+
+        return;
+    }
+
     freez(ptr);
 }
 
 char *strdup(const char *s) {
+    if(unlikely(dlsym_bootstrap_active()))
+        return dlsym_bootstrap_strdup(s);
+
     return strdupz(s);
 }
 
 char *strndup(const char *s, size_t len) {
+    if(unlikely(dlsym_bootstrap_active()))
+        return dlsym_bootstrap_strndup(s, len);
+
     return strndupz(s, len);
 }
 
 size_t malloc_usable_size(void *ptr) {
+    if(unlikely(dlsym_bootstrap_contains(ptr)))
+        return dlsym_bootstrap_usable_size(ptr);
+
+    if(unlikely(dlsym_bootstrap_active()))
+        return 0;
+
     return mallocz_usable_size(ptr);
 }
 #else // !HAVE_DLSYM
@@ -192,6 +405,20 @@ struct malloc_header {
     uint8_t padding[(sizeof(struct malloc_header_signature) % MALLOC_ALIGNMENT) ? MALLOC_ALIGNMENT - (sizeof(struct malloc_header_signature) % MALLOC_ALIGNMENT) : 0];
     uint8_t data[];
 };
+
+#define MALLOC_HEADER_MAGIC 0x0BADCAFEU
+
+static const uint8_t malloc_header_magic_salt;
+
+static uint32_t malloc_header_magic(const struct malloc_header *t) {
+    uintptr_t value = (uintptr_t)t ^ (uintptr_t)&malloc_header_magic_salt;
+
+#if UINTPTR_MAX > UINT32_MAX
+    value ^= value >> 32;
+#endif
+
+    return (uint32_t)value ^ MALLOC_HEADER_MAGIC;
+}
 
 static size_t malloc_header_size = sizeof(struct malloc_header);
 
@@ -267,9 +494,9 @@ void *mallocz_int(size_t size, const char *file, const char *function, size_t li
 
     struct malloc_header *t = (struct malloc_header *)libc_malloc(malloc_header_size + size);
     if (unlikely(!t)) fatal("mallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
-    t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
     t->signature.size = size;
+    t->signature.magic = malloc_header_magic(t);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
@@ -292,9 +519,9 @@ void *callocz_int(size_t nmemb, size_t size, const char *file, const char *funct
 
     struct malloc_header *t = (struct malloc_header *)libc_calloc(1, malloc_header_size + size);
     if (unlikely(!t)) fatal("mallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
-    t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
     t->signature.size = size;
+    t->signature.magic = malloc_header_magic(t);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
@@ -316,9 +543,9 @@ char *strdupz_int(const char *s, const char *file, const char *function, size_t 
 
     struct malloc_header *t = (struct malloc_header *)libc_malloc(malloc_header_size + size);
     if (unlikely(!t)) fatal("strdupz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
-    t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
     t->signature.size = size;
+    t->signature.magic = malloc_header_magic(t);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
@@ -339,9 +566,9 @@ char *strndupz_int(const char *s, size_t len, const char *file, const char *func
 
     struct malloc_header *t = (struct malloc_header *)libc_malloc(malloc_header_size + size);
     if (unlikely(!t)) fatal("strndupz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
-    t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
     t->signature.size = size;
+    t->signature.magic = malloc_header_magic(t);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
@@ -354,10 +581,13 @@ char *strndupz_int(const char *s, size_t len, const char *file, const char *func
 }
 
 static struct malloc_header *malloc_get_header(void *ptr, const char *caller, const char *file, const char *function, size_t line) {
+    if(!ptr)
+        return NULL;
+
     uint8_t *ret = (uint8_t *)ptr - malloc_header_size;
     struct malloc_header *t = (struct malloc_header *)ret;
 
-    if(t->signature.magic != 0x0BADCAFE) {
+    if(t->signature.magic != malloc_header_magic(t)) {
         netdata_log_error("pointer %p is not our pointer (called %s() from %zu@%s, %s()).", ptr, caller, line, file, function);
         return NULL;
     }
@@ -387,9 +617,9 @@ void *reallocz_int(void *ptr, size_t size, const char *file, const char *functio
 
     t = (struct malloc_header *)libc_realloc(t, malloc_header_size + size);
     if (unlikely(!t)) fatal("reallocz() cannot allocate %zu bytes of memory (%zu with header).", size, malloc_header_size + size);
-    t->signature.magic = 0x0BADCAFE;
     t->signature.trace = p;
     t->signature.size = size;
+    t->signature.magic = malloc_header_magic(t);
 
 #ifdef NETDATA_INTERNAL_CHECKS
     for(ssize_t i = 0; i < (ssize_t)sizeof(t->padding) ;i++) // signed to avoid compiler warning when zero-padded
