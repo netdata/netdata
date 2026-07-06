@@ -159,7 +159,17 @@ static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider,
         return false;
     }
 
-    if(wel_replace_program_with_wevt_netdata_dll(modulePath, _countof(modulePath))) {
+    // Find wevt_netdata.dll: prefer the copy next to netdata.exe (dev/portable), then
+    // fall back to System32 (MSI install or placed there by wel_ensure_manifest_installed).
+    bool dllFound = wel_replace_program_with_wevt_netdata_dll(modulePath, _countof(modulePath));
+    if (!dllFound) {
+        wchar_t sys32[MAX_PATH];
+        if (GetSystemDirectoryW(sys32, _countof(sys32))) {
+            swprintf(modulePath, _countof(modulePath), L"%ls\\wevt_netdata.dll", sys32);
+            dllFound = (GetFileAttributesW(modulePath) != INVALID_FILE_ATTRIBUTES);
+        }
+    }
+    if (dllFound) {
         RegSetValueExW(hRegKey, L"EventMessageFile", 0, REG_EXPAND_SZ,
                        (LPBYTE)modulePath, (wcslen(modulePath) + 1) * sizeof(wchar_t));
 
