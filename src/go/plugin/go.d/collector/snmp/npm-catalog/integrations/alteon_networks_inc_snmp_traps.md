@@ -146,4 +146,3 @@ Netdata decodes **69 trap definitions** from Alteon Networks Inc across **4 MIBs
 - `ALTEON-TRAP-MIB::altSwDefGwUp`
 - `ALTEON-TRAP-MIB::altSwDefGwDown`
 - `ALTEON-TRAP-MIB::altSwDefGwInService`
-

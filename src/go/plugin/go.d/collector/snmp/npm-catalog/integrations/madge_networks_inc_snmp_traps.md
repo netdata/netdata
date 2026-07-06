@@ -144,4 +144,3 @@ Netdata decodes **14 trap definitions** from Madge Networks Inc across **2 MIBs*
 - `MADGECAU-MIB::wrapStateChange`
 - `MADGECAU-MIB::lamPortDisabled`
 - `MADGECAU-MIB::mCaufanSpeedFailed`
-

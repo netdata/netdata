@@ -155,4 +155,3 @@ Netdata decodes **209 trap definitions** from Micom Communication Corporation ac
 - `MICOM-NODE-MIB::mcmEventQueueEntry`
 - `MICOM-NODE-MIB::mcmEventCallFail`
 - `MICOM-NODE-MIB::mcmEventDDSInService`
-

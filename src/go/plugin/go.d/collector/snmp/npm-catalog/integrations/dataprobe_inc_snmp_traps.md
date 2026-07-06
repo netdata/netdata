@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Dataprobe Inc across **1 MIB** into s
 ### Sample decoded traps
 
 - `IBOOTPDU-MIB::outletChange`
-

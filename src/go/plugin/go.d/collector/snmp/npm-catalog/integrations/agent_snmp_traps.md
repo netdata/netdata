@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Agent across **1 MIB** into structure
 ### Sample decoded traps
 
 - `AGENTPP-NOTIFYTEST-MIB::agentppNotifyTestAllTypes`
-

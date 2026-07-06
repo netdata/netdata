@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Cooler Master Co Ltd across **1 MIB*
 
 - `RC-MPLS-TE-MIB::rcMplsLspUp`
 - `RC-MPLS-TE-MIB::rcMplsLspDown`
-

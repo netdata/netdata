@@ -198,4 +198,3 @@ Netdata decodes **2659 trap definitions** from Compaq across **51 MIBs** into st
 - `CPQSTDEQ-MIB::cpqSePCCardThermalFailure`
 - `CPQSTDEQ-MIB::cpqSePCCardThermalSafe`
 - `CPQSTDEQ-MIB::cpqSe2CpuThresholdPassed`
-

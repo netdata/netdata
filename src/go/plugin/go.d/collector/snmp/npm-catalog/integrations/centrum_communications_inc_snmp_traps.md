@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Centrum Communications Inc across **
 - `Centrum-MIB::userLogInTrap`
 - `Centrum-MIB::userLogOutTrap`
 - `Centrum-MIB::userSessionTimeOutTrap`
-

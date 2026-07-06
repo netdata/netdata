@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Dialogic Corporation across **1 MIB*
 
 - `DLGHWINF-MIB::dlgHiServiceChanged`
 - `DLGHWINF-MIB::dlgHiCardStatusChanged`
-

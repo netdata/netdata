@@ -146,4 +146,3 @@ Netdata decodes **535 trap definitions** from Riverbed Technology Inc across **4
 - `STEELHEAD-MIB::cpuUtil`
 - `STEELHEAD-MIB::pagingActivity`
 - `STEELHEAD-MIB::smartError`
-

@@ -143,4 +143,3 @@ Netdata decodes **137 trap definitions** from Fiberhome Telecommunication Techno
 - `FIBERHOME-DATACOMM-MIB::fhBoardFault`
 - `FIBERHOME-DATACOMM-MIB::fhBoardNormal`
 - `FIBERHOME-DATACOMM-MIB::fhIntfPktLossExceed`
-

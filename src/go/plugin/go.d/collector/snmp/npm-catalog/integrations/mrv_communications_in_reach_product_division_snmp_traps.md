@@ -150,4 +150,3 @@ Netdata decodes **993 trap definitions** from Mrv Communications In Reach Produc
 - `ITOUCH-CHARACTER-MIB::contactClosureChanged`
 - `ITOUCH-CHARACTER-MIB::powerAlarmFuseBankA`
 - `ITOUCH-CHARACTER-MIB::powerAlarmFuseBankB`
-

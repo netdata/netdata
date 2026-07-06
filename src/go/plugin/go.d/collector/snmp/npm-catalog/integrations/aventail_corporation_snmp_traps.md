@@ -147,4 +147,3 @@ Netdata decodes **14 trap definitions** from Aventail Corporation across **5 MIB
 - `AVENTAIL-SYSTEM-HEALTH-MIB::cpuCapacityWarning`
 - `AVENTAIL-SYSTEM-HEALTH-MIB::memoryCapacityWarning`
 - `AVENTAIL-SYSTEM-HEALTH-MIB::userLimitWarning`
-

@@ -143,4 +143,3 @@ Netdata decodes **40 trap definitions** from Xylogics Inc across **1 MIB** into 
 - `XYLOGICS-TRAP-MIB::wanAlarmTrap`
 - `XYLOGICS-TRAP-MIB::wanAlarmClearTrap`
 - `XYLOGICS-TRAP-MIB::wanBpvThreshTrap`
-

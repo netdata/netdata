@@ -143,4 +143,3 @@ Netdata decodes **19 trap definitions** from Utstarcom Inc across **1 MIB** into
 - `UTEPON4000FAULT-MIB::utsChassisInvalidCardPlugout`
 - `UTEPON4000FAULT-MIB::utsChassisInvalidCardInsert`
 - `UTEPON4000FAULT-MIB::utsTemperatureNormal`
-

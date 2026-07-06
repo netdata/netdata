@@ -142,4 +142,3 @@ Netdata decodes **3 trap definitions** from Accedian Inc across **2 MIBs** into 
 - `ACD-DESC-MIB::acdPowerLost`
 - `ACD-ALARM-MIB::acdAlarmActiveState`
 - `ACD-ALARM-MIB::acdAlarmClearState`
-

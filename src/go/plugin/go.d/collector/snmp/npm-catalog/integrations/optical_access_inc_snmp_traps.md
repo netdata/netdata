@@ -159,4 +159,3 @@ Netdata decodes **193 trap definitions** from Optical Access Inc across **17 MIB
 - `OA-EFRM-CPE-MIB::oaEfmCpeEventLinkFault`
 - `OA-EFRM-CPE-MIB::oaEfmCpeEventErrSymbolPeriod`
 - `OA-EFRM-CPE-MIB::oaEfmCpeEventErrFrame`
-

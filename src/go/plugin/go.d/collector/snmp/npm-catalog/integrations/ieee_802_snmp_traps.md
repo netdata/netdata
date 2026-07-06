@@ -149,4 +149,3 @@ Netdata decodes **9 trap definitions** from Ieee 802 across **7 MIBs** into stru
 - `IEEE8021-CFM-MIB::dot1agCfmFaultAlarm`
 - `IEEE8021-PBBTE-MIB::ieee8021PbbTeProtectionGroupAdminFailure`
 - `LLDP-V2-MIB::lldpV2RemTablesChange`
-

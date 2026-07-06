@@ -144,4 +144,3 @@ Netdata decodes **116 trap definitions** from Microsens GmbH Co KG across **2 MI
 - `MS-SWITCH30-MIB::temperatureLevelChangeNotification`
 - `MS-SWITCH30-MIB::errorcountNotification`
 - `MS-SWITCH30-MIB::underOverVoltageNotification`
-

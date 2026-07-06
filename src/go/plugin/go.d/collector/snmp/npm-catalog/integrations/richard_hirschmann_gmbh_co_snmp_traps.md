@@ -202,4 +202,3 @@ Netdata decodes **897 trap definitions** from Richard Hirschmann GmbH Co across 
 - `HM2-LICENSE-MGMT-MIB::hm2LMFeatureChangeTrap`
 - `HM2-DEVMGMT-MIB::hm2SfpChangeTrap`
 - `HM2-DEVMGMT-MIB::hm2AutoDisablePortTrap`
-

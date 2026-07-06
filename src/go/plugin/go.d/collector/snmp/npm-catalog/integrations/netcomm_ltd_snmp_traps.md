@@ -143,4 +143,3 @@ Netdata decodes **99 trap definitions** from Netcomm Ltd across **1 MIB** into s
 - `DV2-MIB::linkChanged`
 - `DV2-MIB::psuChanged`
 - `DV2-MIB::configChanged`
-

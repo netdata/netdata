@@ -143,4 +143,3 @@ Netdata decodes **19 trap definitions** from Fusionio across **1 MIB** into stru
 - `FUSIONIO-IODIMM-MIB::fusionIoDimmFlashbackTrap`
 - `FUSIONIO-IODIMM-MIB::fusionIoDimmTempHighTrap`
 - `FUSIONIO-IODIMM-MIB::fusionIoDimmTempOkTrap`
-

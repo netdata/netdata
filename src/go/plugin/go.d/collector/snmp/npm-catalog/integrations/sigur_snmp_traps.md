@@ -143,4 +143,3 @@ Netdata decodes **6 trap definitions** from Sigur across **1 MIB** into structur
 - `SIGUR-MIB::tamperStateInform`
 - `SIGUR-MIB::batteryStateInform`
 - `SIGUR-MIB::breakInInform`
-

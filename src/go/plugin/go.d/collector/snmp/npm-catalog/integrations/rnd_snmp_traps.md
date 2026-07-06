@@ -161,4 +161,3 @@ Netdata decodes **217 trap definitions** from Rnd across **19 MIBs** into struct
 - `Dell-TRAPS-MIB::txOverflowHWFault`
 - `Dell-TRAPS-MIB::routeTableOverflow`
 - `RADWARE-MIB::fanNotWorking`
-

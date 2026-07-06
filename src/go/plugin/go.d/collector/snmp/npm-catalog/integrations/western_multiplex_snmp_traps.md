@@ -144,4 +144,3 @@ Netdata decodes **13 trap definitions** from Western Multiplex across **2 MIBs**
 - `WESTERN-MULTIPLEX-RAD10006-MIB::nmuLinkTrap`
 - `WESTERN-MULTIPLEX-RAD10006-MIB::t1InTrap`
 - `WESTERN-MULTIPLEX-RAD10006-MIB::t1CvTrap`
-

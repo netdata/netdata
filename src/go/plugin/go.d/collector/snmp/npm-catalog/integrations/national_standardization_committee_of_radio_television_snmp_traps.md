@@ -147,4 +147,3 @@ Netdata decodes **8 trap definitions** from National Standardization Committee O
 - `NSCRTV-HFCEMS-COMMON-MIB::hfcWarmStart`
 - `NSCRTV-HFCEMS-OPTICALSWITCH-MIB::osSwitchEvent`
 - `NSCRTV-EPON-ALARM-MGM-MIB::eponAlarmNotification`
-

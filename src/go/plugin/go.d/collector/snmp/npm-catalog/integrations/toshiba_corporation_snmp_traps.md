@@ -143,4 +143,3 @@ Netdata decodes **44 trap definitions** from Toshiba Corporation across **1 MIB*
 - `TIC-RMTI4-G9000-G2020-MIB::upsTrapOnBattery`
 - `TIC-RMTI4-G9000-G2020-MIB::upsTrapOnBatteryClear`
 - `TIC-RMTI4-G9000-G2020-MIB::upsTrapBatteryLow`
-

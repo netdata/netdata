@@ -145,4 +145,3 @@ Netdata decodes **34 trap definitions** from Check Point Software Technologies L
 - `CHECKPOINT-TRAP-MIB::chkpntTrapNetIfUnplugged`
 - `CHECKPOINT-TRAP-MIB::chkpntTrapNewConnRate`
 - `CHECKPOINT-TRAP-MIB::chkpntTrapConcurrentConnRate`
-

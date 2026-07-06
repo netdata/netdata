@@ -155,4 +155,3 @@ Netdata decodes **75 trap definitions** from Gcom Technologies Co Ltd Formerly G
 - `GBNPlatformOAM-MIB::dramBusyTrap`
 - `GBNPlatformOAM-MIB::snmpNotifyTypeSaveConfiguration`
 - `GBNPlatformOAMSyslog-MIB::syslogTrap`
-

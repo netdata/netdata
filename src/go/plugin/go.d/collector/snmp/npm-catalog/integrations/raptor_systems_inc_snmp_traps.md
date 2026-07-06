@@ -141,4 +141,3 @@ Netdata decodes **2 trap definitions** from Raptor Systems Inc across **2 MIBs**
 
 - `RAPTOR-SNMPv1-MIB::raptorNotifyTrap`
 - `RAPTOR-SNMPv2-MIB::raptorNotifyTrap`
-

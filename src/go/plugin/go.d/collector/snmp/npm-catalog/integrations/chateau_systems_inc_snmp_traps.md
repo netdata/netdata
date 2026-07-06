@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Chateau Systems Inc across **1 MIB**
 - `CHATEAU-CD-PRODUCT-MIB::cdChassisTempAlarmEv`
 - `CHATEAU-CD-PRODUCT-MIB::cdChassisTempOkayEv`
 - `CHATEAU-CD-PRODUCT-MIB::cdPowerSupplyEv`
-

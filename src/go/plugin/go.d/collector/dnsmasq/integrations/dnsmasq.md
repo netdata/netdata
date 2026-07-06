@@ -274,5 +274,3 @@ If your Netdata runs in a Docker container named "netdata" (replace if different
 ```bash
 docker logs netdata 2>&1 | grep dnsmasq
 ```
-
-

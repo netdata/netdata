@@ -143,4 +143,3 @@ Netdata decodes **15 trap definitions** from Stratus Computer across **1 MIB** i
 - `STRATUS-MIB::ftsmTrapEnterOnlineState`
 - `STRATUS-MIB::ftsmTrapLeaveOnlineState`
 - `STRATUS-MIB::ftsmTrapEnterOutOfServiceState`
-

@@ -143,4 +143,3 @@ Netdata decodes **18 trap definitions** from Asetek across **1 MIB** into struct
 - `ASETEK-RACKCDU-SMI-V1-MIB-V16::facilitySupplyWarning`
 - `ASETEK-RACKCDU-SMI-V1-MIB-V16::facilityReturnWarning`
 - `ASETEK-RACKCDU-SMI-V1-MIB-V16::serverSupplyWarning`
-

@@ -146,4 +146,3 @@ Netdata decodes **31 trap definitions** from Avici Systems Inc across **4 MIBs**
 - `AVICI-SONET-MIB::aviciSonetFarEndLineEvent`
 - `AVICI-SONET-MIB::aviciSonetPathEvent`
 - `AVICI-SONET-MIB::aviciSonetFarEndPathEvent`
-

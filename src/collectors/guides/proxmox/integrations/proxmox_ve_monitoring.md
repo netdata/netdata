@@ -145,6 +145,3 @@ If ZFS pool metrics are not showing, ensure the `zfspool` collector is enabled a
 ### Missing Ceph metrics
 
 Ceph metrics require the Ceph collector to be configured with the Ceph REST API endpoint. See the Ceph integration page for details.
-
-
-

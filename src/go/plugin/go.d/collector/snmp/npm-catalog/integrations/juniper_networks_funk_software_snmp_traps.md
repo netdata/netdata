@@ -144,4 +144,3 @@ Netdata decodes **117 trap definitions** from Juniper Networks Funk Software acr
 - `FNKSBRTR-MIB::funkSbrTrapThreadsNormal`
 - `FNKSBRTR-MIB::funkSbrTrapFSNormal`
 - `FNKSBRTR-MIB::funkSbrTrapConcurrencyReconnect`
-

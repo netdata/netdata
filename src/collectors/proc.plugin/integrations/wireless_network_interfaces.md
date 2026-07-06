@@ -99,5 +99,3 @@ Metrics:
 | wireless.noise_level | noise_level | dBm |
 | wireless.discarded_packets | nwid, crypt, frag, retry, misc | packets/s |
 | wireless.missed_beacons | missed_beacons | frames/s |
-
-

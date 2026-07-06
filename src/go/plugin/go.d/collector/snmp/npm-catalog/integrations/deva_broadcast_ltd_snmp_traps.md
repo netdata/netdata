@@ -143,4 +143,3 @@ Netdata decodes **33 trap definitions** from Deva Broadcast Ltd across **1 MIB**
 - `DB7001-MIB::notifRflvlLow`
 - `DB7001-MIB::notifRflvlHigh`
 - `DB7001-MIB::notifMpxtOk`
-

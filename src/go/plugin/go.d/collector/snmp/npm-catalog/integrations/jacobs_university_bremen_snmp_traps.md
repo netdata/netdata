@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Jacobs University Bremen across **1 M
 ### Sample decoded traps
 
 - `JACOBS-FS20-MIB::fs20Notification`
-

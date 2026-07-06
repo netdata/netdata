@@ -144,4 +144,3 @@ Netdata decodes **203 trap definitions** from Isilon Ststems across **2 MIBs** i
 - `ISILON-TRAP-MIB::nodeExpStatusCrit`
 - `ISILON-TRAP-MIB::nodeShutdownInfo`
 - `ISILON-TRAP-MIB::nodeShutdownFailCrit`
-

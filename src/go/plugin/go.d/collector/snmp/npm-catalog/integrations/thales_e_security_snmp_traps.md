@@ -143,4 +143,3 @@ Netdata decodes **15 trap definitions** from Thales E Security across **1 MIB** 
 - `THALES-ESECURITY-PAYSHIELD-MIB::payShieldEraseAlarm`
 - `THALES-ESECURITY-PAYSHIELD-MIB::payShieldNewLicenseAlarm`
 - `THALES-ESECURITY-PAYSHIELD-MIB::payShieldNewSoftwareAlarm`
-

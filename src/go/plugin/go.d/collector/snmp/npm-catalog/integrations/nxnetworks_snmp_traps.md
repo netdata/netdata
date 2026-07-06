@@ -144,4 +144,3 @@ Netdata decodes **4 trap definitions** from Nxnetworks across **3 MIBs** into st
 - `PROTEON-MIB::proElsTrapV2`
 - `CHANNEL-CHANGE-MIB::channelChangeCAFailed`
 - `DECserver-Accounting-MIB::acctThresholdExceeded`
-

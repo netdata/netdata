@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Nextnet across **1 MIB** into structu
 ### Sample decoded traps
 
 - `NEXTNET-MIB::nextnetTraps`
-

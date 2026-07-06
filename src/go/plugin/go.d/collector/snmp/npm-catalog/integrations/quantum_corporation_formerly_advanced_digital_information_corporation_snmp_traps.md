@@ -146,4 +146,3 @@ Netdata decodes **158 trap definitions** from Quantum Corporation Formerly Advan
 - `ADIC-INTELLIGENT-STORAGE-MIB::componentAdded`
 - `ADIC-INTELLIGENT-STORAGE-MIB::componentRemoved`
 - `ADIC-INTELLIGENT-STORAGE-MIB::productLibraryClassChange`
-

@@ -144,4 +144,3 @@ Netdata decodes **69 trap definitions** from 4Rf Communications Ltd across **2 M
 - `COMMON-4RF::fouRFUploadStatusEvent`
 - `APRISAXE-EVENTS-4RF::aprisaXEThresholdAlarmEvent`
 - `APRISAXE-EVENTS-4RF::aprisaXERxSynthOutOfLockAlarmEvent`
-

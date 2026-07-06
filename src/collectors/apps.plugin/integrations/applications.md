@@ -136,5 +136,3 @@ Metrics:
 | netdata.collector.ipc.cgroups_lookup.client.queue_depth | queue_depth | paths |
 | netdata.collector.ipc.apps_lookup.server.requests | requests_responded, requests_error | requests/s |
 | netdata.collector.ipc.apps_lookup.server.request_duration_ms | le_1ms, le_5ms, le_10ms, le_50ms, le_100ms, le_500ms, le_1000ms, gt_1000ms | requests/s |
-
-

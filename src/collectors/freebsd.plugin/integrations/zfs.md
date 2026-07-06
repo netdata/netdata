@@ -153,5 +153,3 @@ Metrics:
 | zfs.hash_chains | current, max | chains |
 | zfs.trim_bytes | TRIMmed | bytes |
 | zfs.trim_requests | successful, failed, unsupported | requests |
-
-

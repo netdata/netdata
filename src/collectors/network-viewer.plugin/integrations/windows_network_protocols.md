@@ -166,5 +166,3 @@ This function has no parameters.
 
 | Column | Type | Unit | Visibility | Description |
 |:-------|:-----|:-----|:-----------|:------------|
-
-

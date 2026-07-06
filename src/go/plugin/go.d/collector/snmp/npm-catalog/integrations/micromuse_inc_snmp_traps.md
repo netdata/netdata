@@ -143,4 +143,3 @@ Netdata decodes **9 trap definitions** from Micromuse Inc across **1 MIB** into 
 - `OMNI-MIB::omniOK`
 - `OMNI-MIB::omniNotResponding`
 - `OMNI-MIB::omniResponding`
-

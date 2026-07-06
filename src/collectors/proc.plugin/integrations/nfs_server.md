@@ -103,5 +103,3 @@ Metrics:
 | nfsd.proc3 | a dimension per proc3 call | calls/s |
 | nfsd.proc4 | a dimension per proc4 call | calls/s |
 | nfsd.proc4ops | a dimension per proc4 operation | operations/s |
-
-

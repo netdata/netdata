@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Ce T across **1 MIB** into structure
 - `CET-TSI-MIB::tsiTrapMajorAlarmRemoved`
 - `CET-TSI-MIB::tsiTrapMinorAlarmAdded`
 - `CET-TSI-MIB::tsiTrapMinorAlarmRemoved`
-

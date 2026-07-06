@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Fraunhofer Fokus across **1 MIB** in
 
 - `BEGEMOT-BRIDGE-MIB::begemotBridgeNewRoot`
 - `BEGEMOT-BRIDGE-MIB::begemotBridgeTopologyChange`
-

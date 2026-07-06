@@ -125,5 +125,3 @@ Metrics:
 | ipv4.icmp | received, sent | packets/s |
 | ipv4.icmp_errors | InErrors, OutErrors, InCsumErrors | packets/s |
 | ipv4.icmpmsg | InEchoReps, OutEchoReps, InEchos, OutEchos | packets/s |
-
-

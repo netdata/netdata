@@ -143,4 +143,3 @@ Netdata decodes **8 trap definitions** from Oki Data Corporation across **1 MIB*
 - `OKIDATA-MIB::trapNoPrinterAttached`
 - `OKIDATA-MIB::trapPrinterTonerLow`
 - `OKIDATA-MIB::trapPrinterPaperOut`
-

@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from System Engineering International acr
 
 - `SEI-SMI::juiceBoxAllocatedPowerThresholdReached`
 - `SEI-SMI::juiceBoxPortStatusChange`
-

@@ -144,4 +144,3 @@ Netdata decodes **148 trap definitions** from Enlogic Systems LLC across **2 MIB
 - `ENLOGIC-PDU2-MIB::userLogin`
 - `ENLOGIC-PDU2-MIB::userLogoff`
 - `ENLOGIC-PDU2-MIB::userAuthenticationFailed`
-

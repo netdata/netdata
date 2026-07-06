@@ -145,4 +145,3 @@ Netdata decodes **19 trap definitions** from Senao International Co Ltd across *
 - `ENGENIUS-MESH-MIB::userTrapsUserLogin`
 - `ENGENIUS-MESH-MIB::userTrapsUserLogout`
 - `ENGENIUS-MESH-MIB::systemTrapsSystemReboot`
-

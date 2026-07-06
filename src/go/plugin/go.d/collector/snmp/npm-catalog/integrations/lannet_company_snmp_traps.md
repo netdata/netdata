@@ -143,4 +143,3 @@ Netdata decodes **69 trap definitions** from Lannet Company across **1 MIB** int
 - `Lannet-Trapsv2-MIB::lntSoftRedDelEvent`
 - `Lannet-Trapsv2-MIB::lntSoftRedNewEvent`
 - `Lannet-Trapsv2-MIB::lntTempratureWarning`
-

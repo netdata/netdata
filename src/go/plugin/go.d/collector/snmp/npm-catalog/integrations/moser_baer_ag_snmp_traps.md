@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Moser Baer AG across **1 MIB** into 
 
 - `MOBANetClocksV2-MIB::mbnscTrapsAlarm`
 - `MOBANetClocksV2-MIB::mbnscTrapsAlive`
-

@@ -209,4 +209,3 @@ Netdata decodes **726 trap definitions** from Ekinops Sas across **62 MIBs** int
 - `EKINOPS-Pm1008-MIB::pm1008LineTrapUrgentGoesOn`
 - `EKINOPS-Pm1008-MIB::pm1008LineTrapUrgentGoesOff`
 - `EKINOPS-Pm1008-MIB::pm1008LineTrapCritGoesOn`
-

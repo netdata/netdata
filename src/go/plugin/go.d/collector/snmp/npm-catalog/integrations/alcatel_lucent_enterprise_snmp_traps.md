@@ -205,4 +205,3 @@ Netdata decodes **289 trap definitions** from Alcatel Lucent Enterprise across *
 - `OXO-CALL-HANDLING-MIB::ochmCabinetUnplugged`
 - `OXO-CALL-HANDLING-MIB::ochmCabinetOperational`
 - `OXO-CALL-HANDLING-MIB::ochmBoardFailure`
-

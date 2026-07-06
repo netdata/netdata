@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Telefonaktiebolaget Lm Ericsson acro
 - `ERICSSON-ALARM-IRP-MIB::alarmNew`
 - `ERICSSON-ALARM-IRP-MIB::alarmChanged`
 - `ERICSSON-ALARM-IRP-MIB::alarmCleared`
-

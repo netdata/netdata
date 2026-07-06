@@ -143,4 +143,3 @@ Netdata decodes **18 trap definitions** from Bharti Telesoft International Pvt L
 - `PRETUPS-MIB-new::databasedown`
 - `PRETUPS-MIB-new::databaseup`
 - `PRETUPS-MIB-new::systemerrorerrordown`
-

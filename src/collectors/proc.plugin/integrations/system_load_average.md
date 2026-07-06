@@ -127,5 +127,3 @@ Metrics:
 |:------|:----------|:----|
 | system.load | load1, load5, load15 | load |
 | system.active_processes | active | processes |
-
-

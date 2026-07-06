@@ -146,4 +146,3 @@ Netdata decodes **94 trap definitions** from Tripp Lite across **4 MIBs** into s
 - `TRIPPUPS1-MIB::lowBattery`
 - `TRIPPUPS1-MIB::returnFromLowBattery`
 - `TRIPPUPS1-MIB::communicationEstablished`
-

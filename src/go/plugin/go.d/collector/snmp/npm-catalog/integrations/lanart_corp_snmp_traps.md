@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Lanart Corp across **1 MIB** into str
 ### Sample decoded traps
 
 - `LANART-MIB::laPortStatus`
-

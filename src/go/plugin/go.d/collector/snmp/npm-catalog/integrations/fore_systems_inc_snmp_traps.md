@@ -161,4 +161,3 @@ Netdata decodes **288 trap definitions** from Fore Systems Inc across **19 MIBs*
 - `Fore-Switch-MIB::asxHostLinkDown`
 - `Fore-Switch-MIB::asxHostLinkUp`
 - `Fore-Switch-MIB::asxNetModuleDown`
-

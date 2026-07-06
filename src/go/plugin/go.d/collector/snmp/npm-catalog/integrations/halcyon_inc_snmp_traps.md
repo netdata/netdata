@@ -143,4 +143,3 @@ Netdata decodes **7 trap definitions** from Halcyon Inc across **1 MIB** into st
 - `HALCYON-PRIMEALERT-MIB::eventLogTrap`
 - `HALCYON-PRIMEALERT-MIB::eventColdstartTrap`
 - `HALCYON-PRIMEALERT-MIB::eventAcknowledgeTrap`
-

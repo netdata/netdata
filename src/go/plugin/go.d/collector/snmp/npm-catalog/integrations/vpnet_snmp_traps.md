@@ -143,4 +143,3 @@ Netdata decodes **7 trap definitions** from Vpnet across **1 MIB** into structur
 - `VPN-MIB::skipAlgMismatch`
 - `VPN-MIB::authFailure`
 - `VPN-MIB::authHdrErr`
-

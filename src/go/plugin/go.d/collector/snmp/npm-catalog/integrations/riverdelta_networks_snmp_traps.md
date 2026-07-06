@@ -151,4 +151,3 @@ Netdata decodes **102 trap definitions** from Riverdelta Networks across **9 MIB
 - `RDN-EVT-NOTIFICATIONS::rdnEvtMacrtrUnknownCase`
 - `RDN-EVT-NOTIFICATIONS::rdnEvtMacrtrMsgQReceiveFailure`
 - `RDN-EVT-NOTIFICATIONS::rdnEvtMacrtrRdbDefineTableFailure`
-

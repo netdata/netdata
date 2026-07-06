@@ -143,4 +143,3 @@ Netdata decodes **44 trap definitions** from Ablerex Electronic Co Ltd across **
 - `ATS-MIB::atsSourceBvoltageAbnormal`
 - `ATS-MIB::atsSourceAfrequencyAbnormal`
 - `ATS-MIB::atsSourceBfrequencyAbnormal`
-

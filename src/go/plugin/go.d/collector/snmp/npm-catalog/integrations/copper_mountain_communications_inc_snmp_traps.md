@@ -143,4 +143,3 @@ Netdata decodes **35 trap definitions** from Copper Mountain Communications Inc 
 - `COPPER-MOUNTAIN-NETWORKS-DSL-MIB::cmLogout`
 - `COPPER-MOUNTAIN-NETWORKS-DSL-MIB::cmLoginsSaturated`
 - `COPPER-MOUNTAIN-NETWORKS-DSL-MIB::cmLoginsAvailable`
-

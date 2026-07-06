@@ -146,4 +146,3 @@ Netdata decodes **31 trap definitions** from Cadant Inc across **4 MIBs** into s
 - `CADANT-CMTS-NOTIFICATION-MIB::aaaServerUnreachableTrap`
 - `CADANT-CMTS-NOTIFICATION-MIB::aaaServerGroupUnreachableTrap`
 - `CADANT-CMTS-NOTIFICATION-MIB::aaaServerAuthFailTrap`
-

@@ -129,5 +129,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | system.load | load1, load5, load15 | load |
-
-

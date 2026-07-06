@@ -142,4 +142,3 @@ Netdata decodes **3 trap definitions** from Sagemcom Sas across **2 MIBs** into 
 - `PERFORMANCE-MIB::qualityTrap`
 - `LOG-MIB::logTrap`
 - `LOG-MIB::thresholdTrap`
-

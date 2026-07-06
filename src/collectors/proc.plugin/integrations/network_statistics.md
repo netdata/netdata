@@ -159,5 +159,3 @@ Metrics:
 | ipv6.ect | InNoECTPkts, InECT1Pkts, InECT0Pkts, InCEPkts | packets/s |
 | ipv6.fragsin | ok, failed, timeout, all | packets/s |
 | ipv6.fragsout | ok, failed, all | packets/s |
-
-

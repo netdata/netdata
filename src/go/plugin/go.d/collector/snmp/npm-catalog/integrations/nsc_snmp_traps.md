@@ -145,4 +145,3 @@ Netdata decodes **23 trap definitions** from Nsc across **3 MIBs** into structur
 - `NSC-BORDERGUARD-TRAP::nscBorderGuardBadFileSystem`
 - `NSC-BORDERGUARD-TRAP::nscBorderGuardSoftFault`
 - `NSCTRAP::protocolBound`
-

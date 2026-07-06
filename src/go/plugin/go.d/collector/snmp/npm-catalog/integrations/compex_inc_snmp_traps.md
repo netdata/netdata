@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Compex Inc across **1 MIB** into str
 
 - `COMPEX-IN3000::partState`
 - `COMPEX-IN3000::notPartState`
-

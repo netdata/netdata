@@ -150,4 +150,3 @@ Netdata decodes **26 trap definitions** from Xerox across **8 MIBs** into struct
 - `XEROX-HOST-RESOURCES-EXT-MIB::xcmHrDevDetailV2Event`
 - `XEROX-HOST-RESOURCES-EXT-MIB::xcmHrDevAlertV2Event`
 - `XEROX-PRINTER-EXT-MIB::xcmPrtGeneralConsoleLocalizationV2Event`
-

@@ -96,5 +96,3 @@ Metrics:
 | ipvs.sockets | connections | connections/s |
 | ipvs.packets | received, sent | packets/s |
 | ipvs.net | received, sent | kilobits/s |
-
-

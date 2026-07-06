@@ -145,4 +145,3 @@ Netdata decodes **21 trap definitions** from Quantum Bridge across **3 MIBs** in
 - `QBSYS-SYSTEM-MIB::qbSysModuleDown`
 - `QBSYS-SYSTEM-MIB::qbSysModuleInserted`
 - `QBSYS-SYSTEM-MIB::qbSysModuleRemoved`
-

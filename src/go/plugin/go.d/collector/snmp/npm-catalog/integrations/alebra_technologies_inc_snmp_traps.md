@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Alebra Technologies Inc across **1 M
 - `APERTUS-TNSERVER-MIB::aperTnServTrapsRtmCounterOverflow`
 - `APERTUS-TNSERVER-MIB::aperTnServTrapsRtmSessionUnbound`
 - `APERTUS-TNSERVER-MIB::aperTnServTrapsUserDisabled`
-

@@ -144,4 +144,3 @@ Netdata decodes **26 trap definitions** from Bluesocket Inc across **2 MIBs** in
 - `BLUESERVER-MIB::cctExternalServConfChange`
 - `BLUESERVER-MIB::cctRoleConfChange`
 - `BLUESERVER-MIB::cctDestinationConfChange`
-

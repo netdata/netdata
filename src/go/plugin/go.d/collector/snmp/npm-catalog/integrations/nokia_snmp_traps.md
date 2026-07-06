@@ -148,4 +148,3 @@ Netdata decodes **42 trap definitions** from Nokia across **6 MIBs** into struct
 - `NOKIA-IPSO-SYSTEM-MIB::systemTrapConfigurationSaveChange`
 - `NOKIA-IPSO-SYSTEM-MIB::systemTrapLowDiskSpace`
 - `NOKIA-IPSO-SYSTEM-MIB::systemTrapNoDiskSpace`
-

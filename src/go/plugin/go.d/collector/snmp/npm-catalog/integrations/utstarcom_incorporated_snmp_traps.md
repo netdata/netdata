@@ -143,4 +143,3 @@ Netdata decodes **61 trap definitions** from Utstarcom Incorporated across **1 M
 - `USR-TRAP-MIB::psuWarning`
 - `USR-TRAP-MIB::psuFailure`
 - `USR-TRAP-MIB::tempWarning`
-

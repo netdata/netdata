@@ -147,4 +147,3 @@ Netdata decodes **57 trap definitions** from Coriolis Networks across **5 MIBs**
 - `CARD-MIB::moduleStatusChange`
 - `RING-MIB::ringOperStatusChange`
 - `RING-MIB::neReachabilityChange`
-

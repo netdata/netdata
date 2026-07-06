@@ -143,4 +143,3 @@ Netdata decodes **122 trap definitions** from Armillaire Technologies across **1
 - `ARMILLAIRE2000-MIB::genConsoleLogoutNotify`
 - `ARMILLAIRE2000-MIB::genProcessBufOverflowNotify`
 - `ARMILLAIRE2000-MIB::genProcessBufOverflowRecoverNotify`
-

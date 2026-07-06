@@ -144,4 +144,3 @@ Netdata decodes **71 trap definitions** from Epicenter Inc across **2 MIBs** int
 - `CPI-UNITY-MIB::maxCurrentzx1`
 - `CPI-UNITY-MIB::maxCurrentxy2`
 - `CPI-UNITY-MIB::maxCurrentyz2`
-

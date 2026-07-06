@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Seh Computertechnik GmbH across **1 M
 ### Sample decoded traps
 
 - `SEH-PSRV-MIB::prtFault`
-

@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Jacques Technologies across **1 MIB*
 - `JACQUES-650-MIB::jacquesEndpointOnlineNotify`
 - `JACQUES-650-MIB::jacquesEndpointModeNotify`
 - `JACQUES-650-MIB::jacquesEndpointAlarmNotify`
-

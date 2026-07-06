@@ -143,4 +143,3 @@ Netdata decodes **15 trap definitions** from Empire Technologies Inc across **1 
 - `EMPIRE::monitorEntryNotReadyTrap`
 - `EMPIRE::logMonMatchTrap`
 - `EMPIRE::logMonNotReadyTrap`
-

@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Ibrix Corp across **1 MIB** into stru
 ### Sample decoded traps
 
 - `IBRIX-MIB::ibrixGenericEvent`
-

@@ -147,4 +147,3 @@ Netdata decodes **346 trap definitions** from Sync Research Inc across **5 MIBs*
 - `SYNC-RESEARCH-MIB::dumpExists`
 - `SYNC-RESEARCH-MIB::dumpArchived`
 - `SYNC-RESEARCH-MIB::lineStatusChanged`
-

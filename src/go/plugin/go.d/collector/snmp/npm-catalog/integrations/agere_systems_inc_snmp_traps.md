@@ -143,4 +143,3 @@ Netdata decodes **50 trap definitions** from Agere Systems Inc across **1 MIB** 
 - `ORiNOCO-MIB::oriTrapDNSIPNotConfigured`
 - `ORiNOCO-MIB::oriTrapWINSIPNotConfigured`
 - `ORiNOCO-MIB::oriTrapRADIUSAuthenticationNotConfigured`
-

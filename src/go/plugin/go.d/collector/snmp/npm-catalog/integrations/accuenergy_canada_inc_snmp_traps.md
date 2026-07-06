@@ -143,4 +143,3 @@ Netdata decodes **14 trap definitions** from Accuenergy Canada Inc across **1 MI
 - `ACCUENERGY-MIB::io11DI3StatusChanged`
 - `ACCUENERGY-MIB::io11DI4StatusChanged`
 - `ACCUENERGY-MIB::io11DI5StatusChanged`
-

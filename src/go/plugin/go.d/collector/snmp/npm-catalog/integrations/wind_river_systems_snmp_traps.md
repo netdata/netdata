@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Wind River Systems across **1 MIB** i
 ### Sample decoded traps
 
 - `TMS-COMMON-MIB::tmsCommonSnmpV2TestTrap`
-

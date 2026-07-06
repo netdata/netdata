@@ -143,4 +143,3 @@ Netdata decodes **11 trap definitions** from Shasta Networks across **1 MIB** in
 - `SSG-5000-CHASSIS-MIB::ssg5000CardAlarmNotification`
 - `SSG-5000-CHASSIS-MIB::ssg5000PortAlarmNotification`
 - `SSG-5000-CHASSIS-MIB::ssg5000SSMAlarmNotification`
-

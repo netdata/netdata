@@ -144,4 +144,3 @@ Netdata decodes **29 trap definitions** from At T across **2 MIBs** into structu
 - `ATT-NETGATE-MIB::ngevExcessiveDial`
 - `ATT-NETGATE-MIB::ngevActiveWanIpChanged`
 - `ATT-NETGATE-MIB::ngevRogueMacDetected`
-

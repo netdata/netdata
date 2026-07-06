@@ -143,4 +143,3 @@ Netdata decodes **1990 trap definitions** from Codex across **1 MIB** into struc
 - `ISG-NSD-COMMON-TRAPS::code-fan-failed`
 - `ISG-NSD-COMMON-TRAPS::code-flash-checksum-error`
 - `ISG-NSD-COMMON-TRAPS::code-flash-checksum-ok`
-

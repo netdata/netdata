@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Eurologic Systems Ltd across **1 MIB*
 ### Sample decoded traps
 
 - `EUROLOGIC-SSM-TRAP-MIB::elSSMEventTrap`
-

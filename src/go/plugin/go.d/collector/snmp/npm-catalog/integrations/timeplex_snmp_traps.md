@@ -143,4 +143,3 @@ Netdata decodes **22 trap definitions** from Timeplex across **1 MIB** into stru
 - `HPNSATRAP-MIB::rtLogicalDriveStateChange`
 - `HPNSATRAP-MIB::rtInitializeStarted`
 - `HPNSATRAP-MIB::rtInitializeCompleted`
-

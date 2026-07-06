@@ -147,4 +147,3 @@ Netdata decodes **25 trap definitions** from Hw Group S R O across **5 MIBs** in
 - `POSEIDON-MIB::tsTrapAlarmStart`
 - `POSEIDON-MIB::tsTrapAlarmEnd`
 - `DAMOCLES-MIB::inpChange`
-

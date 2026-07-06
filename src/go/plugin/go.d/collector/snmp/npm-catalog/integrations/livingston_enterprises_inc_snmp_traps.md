@@ -144,4 +144,3 @@ Netdata decodes **26 trap definitions** from Livingston Enterprises Inc across *
 - `LIVINGSTON-SNMP::livingstonFanFailTrap`
 - `LIVINGSTON-SNMP::livingstonFanRestoredTrap`
 - `LIVINGSTON-SNMP::livingstonBoardTempWarnTrap`
-

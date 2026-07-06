@@ -153,4 +153,3 @@ Netdata decodes **62 trap definitions** from Benu Networks Inc across **11 MIBs*
 - `BENU-CHASSIS-MIB::benuLinkUpTrap`
 - `BENU-CHASSIS-MIB::benuLinkDownTrap`
 - `BENU-CHASSIS-MIB::benuSensorCritical`
-

@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Cube Optics AG across **1 MIB** into 
 ### Sample decoded traps
 
 - `CUBO-MINI-MIB::cubominiNotification`
-

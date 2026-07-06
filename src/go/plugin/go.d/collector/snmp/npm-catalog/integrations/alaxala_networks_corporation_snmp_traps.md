@@ -186,4 +186,3 @@ Netdata decodes **803 trap definitions** from Alaxala Networks Corporation acros
 - `AX7800R-TRAP::ax7800rStandbySystemDownTrap`
 - `AX7800R-TRAP::ax7800rTemperatureTrap`
 - `AX7800R-TRAP::ax7800rAirFanStopTrap`
-

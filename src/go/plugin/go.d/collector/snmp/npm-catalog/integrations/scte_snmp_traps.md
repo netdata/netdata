@@ -146,4 +146,3 @@ Netdata decodes **5 trap definitions** from Scte across **4 MIBs** into structur
 - `SCTE-HMS-COMMON-MIB::hmsWarmStart`
 - `SCTE-HMS-HE-COMMON-MIB::heCommonAlarmEvent`
 - `SCTE-HMS-HMTS-MIB::hmtsRegistrationFailedEvent`
-

@@ -143,4 +143,3 @@ Netdata decodes **23 trap definitions** from Exinda Networks Pty Ltd across **1 
 - `EXINDA-MIB::memoryPaging`
 - `EXINDA-MIB::nicCollisions`
 - `EXINDA-MIB::nicNegotiation`
-

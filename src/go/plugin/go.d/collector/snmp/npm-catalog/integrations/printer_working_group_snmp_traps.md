@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Printer Working Group across **1 MIB*
 ### Sample decoded traps
 
 - `PWG-IMAGING-COUNTER-MIB::icAlertV2Trap`
-

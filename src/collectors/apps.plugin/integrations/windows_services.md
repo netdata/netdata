@@ -108,5 +108,3 @@ Metrics:
 | service.threads | threads | threads | • |
 | service.uptime | uptime | seconds | • |
 | service.uptime_summary | min, avg, max | seconds | • |
-
-

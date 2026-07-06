@@ -123,5 +123,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | system.thermalzone_temperature | temperature | celsius |
-
-

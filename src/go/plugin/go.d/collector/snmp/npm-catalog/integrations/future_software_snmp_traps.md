@@ -189,4 +189,3 @@ Netdata decodes **209 trap definitions** from Future Software across **42 MIBs**
 - `FUTURESOFT-OSPF-MIB::futOspfVirtNbrRestartHelperStatusChange`
 - `FUTURESOFT-OSPF-MIB::futOspfHotStandbyEventTrap`
 - `Aricent-MPLS-MIB::fsMplsVplsFdbFullAlarm`
-

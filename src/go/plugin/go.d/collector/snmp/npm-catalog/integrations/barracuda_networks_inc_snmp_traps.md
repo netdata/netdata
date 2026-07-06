@@ -145,4 +145,3 @@ Netdata decodes **46 trap definitions** from Barracuda Networks Inc across **3 M
 - `Barracuda-SPAM::cpuTempHigh`
 - `Barracuda-SPAM::firmwareStorageHigh`
 - `Barracuda-SPAM::mailStorageHigh`
-

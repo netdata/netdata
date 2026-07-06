@@ -143,4 +143,3 @@ Netdata decodes **16 trap definitions** from E T A Elektrotechnische Apparate Gm
 - `ETA-RCI10-MIB::fuseNew`
 - `ETA-RCI10-MIB::fuseGone`
 - `ETA-RCI10-MIB::fuseWrong`
-

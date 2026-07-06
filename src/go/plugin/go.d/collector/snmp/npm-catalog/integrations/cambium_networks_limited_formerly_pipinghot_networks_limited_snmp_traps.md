@@ -153,4 +153,3 @@ Netdata decodes **168 trap definitions** from Cambium Networks Limited Formerly 
 - `CAMBIUM-PTP500-MIB::channelChangeTrap`
 - `CAMBIUM-PTP500-MIB::dfsImpulsiveInterferenceTrap`
 - `CAMBIUM-PTP500-MIB::dataPortStatusTrap`
-

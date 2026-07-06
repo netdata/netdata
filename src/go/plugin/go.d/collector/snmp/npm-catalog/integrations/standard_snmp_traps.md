@@ -314,4 +314,3 @@ Netdata decodes **864 trap definitions** from Standard across **167 MIBs** into 
 - `T11-ZONE-SERVER-MIB::t11ZsMergeSuccessNotify`
 - `T11-ZONE-SERVER-MIB::t11ZsDefZoneChangeNotify`
 - `T11-ZONE-SERVER-MIB::t11ZsActivateNotify`
-

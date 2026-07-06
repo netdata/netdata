@@ -159,4 +159,3 @@ Netdata decodes **40 trap definitions** from Hewlett Packard Enterprise across *
 - `ARUBAWIRED-MGMD-RMON-TRAP-MIB::arubaWiredMgmdRmonTrapEvent`
 - `ARUBAWIRED-RPVST-MIB::arubaWiredRpvstErrantBpduReceived`
 - `ARUBAWIRED-RPVST-MIB::arubaWiredRpvstNewRoot`
-

@@ -145,4 +145,3 @@ Netdata decodes **75 trap definitions** from Promise Technology Inc across **3 M
 - `FASTTRAK-MIB::trpDiskDown`
 - `FASTTRAK-MIB::trpDiskOffline`
 - `FASTTRAK-MIB::trpDiskPlugin`
-

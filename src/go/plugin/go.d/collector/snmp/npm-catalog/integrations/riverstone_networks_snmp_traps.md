@@ -146,4 +146,3 @@ Netdata decodes **23 trap definitions** from Riverstone Networks across **4 MIBs
 - `RIVERSTONE-LFAP-MIB::rsLfapQueueFull`
 - `RIVERSTONE-CONFIG-MIB::rsCfgActiveConfigChange`
 - `RIVERSTONE-CONFIG-MIB::rsCfgStartupConfigChange`
-

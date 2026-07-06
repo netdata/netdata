@@ -146,4 +146,3 @@ Netdata decodes **34 trap definitions** from Connection Technology Systems acros
 - `IES-3110-MIB::swhBroadcastStorm`
 - `IES-3110-MIB::swhBroadcastNormal`
 - `IES-3110-MIB::swhSFPAbnormality`
-

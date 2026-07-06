@@ -144,4 +144,3 @@ Netdata decodes **43 trap definitions** from Zenitel Norway AS across **2 MIBs**
 - `ALPHACOM-MIB::systemLogEvent`
 - `ALPHACOM-MIB::callLogEvent`
 - `VS-DEVICE-MIB::ipsStarted`
-

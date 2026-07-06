@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from Bmc Software across **1 MIB** into s
 - `PATROL-MIB::patrolWarning`
 - `PATROL-MIB::patrolAlarm`
 - `PATROL-MIB::patrolTrapV1StateChanged`
-

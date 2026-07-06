@@ -140,5 +140,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | cpu.interrupts | a dimension per device | interrupts/s |
-
-

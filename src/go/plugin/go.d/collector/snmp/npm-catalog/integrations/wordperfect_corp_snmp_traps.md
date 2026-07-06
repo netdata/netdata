@@ -147,4 +147,3 @@ Netdata decodes **23 trap definitions** from Wordperfect Corp across **5 MIBs** 
 - `NGWASYNC::ngwasyncRestartTrap`
 - `NGWASYNC::ngwasyncGroupWiseLinkTrap`
 - `GWOVVMMIB::ngwovvmStartTrap`
-

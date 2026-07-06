@@ -136,5 +136,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | btrfs.device_errors | write_errs, read_errs, flush_errs, corruption_errs, generation_errs | errors |
-
-

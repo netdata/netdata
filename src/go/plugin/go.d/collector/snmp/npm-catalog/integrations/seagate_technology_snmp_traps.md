@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from Seagate Technology across **1 MIB** 
 - `SEAGATESYSTEMTRAP-MIB::seagateEventErrorTrap`
 - `SEAGATESYSTEMTRAP-MIB::seagateEventCriticalTrap`
 - `SEAGATESYSTEMTRAP-MIB::seagateEventResolvedTrap`
-

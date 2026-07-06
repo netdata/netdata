@@ -143,4 +143,3 @@ Netdata decodes **6 trap definitions** from Tail F Systems AB across **1 MIB** i
 - `TAILF-ALARM-MIB::tfAlarmMinor`
 - `TAILF-ALARM-MIB::tfAlarmMajor`
 - `TAILF-ALARM-MIB::tfAlarmCritical`
-

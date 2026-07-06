@@ -143,4 +143,3 @@ Netdata decodes **84 trap definitions** from Cyan across **1 MIB** into structur
 - `CYAN-MIB::cyanAlarmEqptRestart`
 - `CYAN-MIB::cyanAlarmEqptFail`
 - `CYAN-MIB::cyanAlarmEqptDgrade`
-

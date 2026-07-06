@@ -143,4 +143,3 @@ Netdata decodes **55 trap definitions** from Codan Limited across **1 MIB** into
 - `CODAN-MIB::wvIduInternalFaultStart`
 - `CODAN-MIB::wvIduInternalFaultStop`
 - `CODAN-MIB::wvOduInternalFaultStart`
-

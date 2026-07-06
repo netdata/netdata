@@ -149,4 +149,3 @@ Netdata decodes **364 trap definitions** from Ibm Eserver X across **7 MIBs** in
 - `IBM-GbTOR-G8264T-MIB::swDefGwDown`
 - `IBM-GbTOR-G8264T-MIB::swDefGwInService`
 - `IBM-GbTOR-G8264T-MIB::swDefGwNotInService`
-

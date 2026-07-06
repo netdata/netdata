@@ -144,4 +144,3 @@ Netdata decodes **10 trap definitions** from Panduit Corp across **2 MIBs** into
 - `PANDUIT-OLD-MIB::trapInformation`
 - `PANDUIT-OLD-MIB::trapCleared`
 - `PANDUIT-OLD-MIB::trapTest`
-

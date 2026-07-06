@@ -181,4 +181,3 @@ Netdata decodes **183 trap definitions** from World Wide Packets across **34 MIB
 - `WWP-ENVIRON-MIB::wwpEnvPowerSupplyStatusNotification`
 - `WWP-ENVIRON-MIB::wwpEnvFanModuleNotification`
 - `WWP-ENVIRON-MIB::wwpEnvTempNotification`
-

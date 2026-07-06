@@ -143,4 +143,3 @@ Netdata decodes **442 trap definitions** from Tecnair S P A across **1 MIB** int
 - `SNMPSERVER-MIB::criticalAlTrap_1`
 - `SNMPSERVER-MIB::fansAlTrap_1`
 - `SNMPSERVER-MIB::compAlTrap_1`
-

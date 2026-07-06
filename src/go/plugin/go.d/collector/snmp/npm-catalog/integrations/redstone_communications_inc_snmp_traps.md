@@ -144,4 +144,3 @@ Netdata decodes **5 trap definitions** from Redstone Communications Inc across *
 - `REDSTONE-RXSYS-MIB::rsRXSysTempFanStatusChange`
 - `REDSTONE-RXSYS-MIB::rsRXSysTempStatusChange`
 - `REDSTONE-FILE-XFER-MIB::rsFileXferTrap`
-

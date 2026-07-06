@@ -143,4 +143,3 @@ Netdata decodes **8 trap definitions** from Phihong USA across **1 MIB** into st
 - `PHIHONG-PoE-MIB::poePortOverloadTrap`
 - `PHIHONG-PoE-MIB::poePortDiscoveryFailTrap`
 - `PHIHONG-PoE-MIB::poePortClassificationFailTrap`
-

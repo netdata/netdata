@@ -151,4 +151,3 @@ Netdata decodes **18 trap definitions** from Bluecat Networks across **9 MIBs** 
 - `BCN-DHCPV4-MIB::bcnDhcpv4SubnetLowNotif`
 - `BCN-DHCPV4-MIB::bcnDhcpv4SubnetHighNotif`
 - `BCN-DNS-MIB::bcnDnsAlarmNotif`
-

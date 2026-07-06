@@ -144,4 +144,3 @@ Netdata decodes **40 trap definitions** from Peribit Networks across **2 MIBs** 
 - `JUNIPER-WX-COMMON-MIB::jnxWxCommonEventPowerSupplyOk`
 - `JUNIPER-WX-COMMON-MIB::jnxWxCommonEventLicenseExpired`
 - `JUNIPER-WX-COMMON-MIB::jnxWxCommonEventThruputLimitExceeded`
-

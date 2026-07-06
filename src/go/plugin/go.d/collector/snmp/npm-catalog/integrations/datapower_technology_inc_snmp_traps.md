@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Datapower Technology Inc across **1 
 
 - `DATAPOWER-NOTIFICATION-MIB::dpLogNotification`
 - `DATAPOWER-NOTIFICATION-MIB::dpLogInternalNotification`
-

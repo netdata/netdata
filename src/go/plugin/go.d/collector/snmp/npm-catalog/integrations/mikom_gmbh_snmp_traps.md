@@ -143,4 +143,3 @@ Netdata decodes **7 trap definitions** from Mikom GmbH across **1 MIB** into str
 - `AIMOS::aimosAlarmChanged`
 - `AIMOS::aimosAlarmCleared`
 - `AIMOS::aimosAlarmListRebuildInitiated`
-

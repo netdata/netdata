@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from Net To Net Technologies across **1 M
 - `NTNTECH-NMS-TRAPS-V1-MIB::envTempExceeded-v1`
 - `NTNTECH-NMS-TRAPS-V1-MIB::invIfModPresentTrap-v1`
 - `NTNTECH-NMS-TRAPS-V1-MIB::invIfModRemovedTrap-v1`
-

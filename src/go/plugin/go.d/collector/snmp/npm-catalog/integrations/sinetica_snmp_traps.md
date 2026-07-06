@@ -149,4 +149,3 @@ Netdata decodes **72 trap definitions** from Sinetica across **7 MIBs** into str
 - `NETCOM-MIB::netcomHumidityReturnToNormal`
 - `NETCOM-MIB::netcomLowTemperature`
 - `NETCOM-MIB::netcomHighTemperature`
-

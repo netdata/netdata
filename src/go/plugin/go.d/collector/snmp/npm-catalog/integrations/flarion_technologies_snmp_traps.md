@@ -145,4 +145,3 @@ Netdata decodes **172 trap definitions** from Flarion Technologies across **3 MI
 - `FLARION-TRAP-MIB::bootStatusDown`
 - `FLARION-RR-TRAP-MIB::rectifierFanStatus`
 - `FLARION-RR-TRAP-MIB::acRectifierStatus`
-

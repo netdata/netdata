@@ -150,4 +150,3 @@ Netdata decodes **14 trap definitions** from Siae Microelettronica S P A across 
 - `SIAE-EQUIP-MIB::equipLOMDisconnected`
 - `SIAE-EQUIP-MIB::equipConfigChangeStatus`
 - `SIAE-EQUIP-MIB::equipManagerWakeUpNotify`
-

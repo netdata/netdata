@@ -96,5 +96,3 @@ Metrics:
 | netfilter.synproxy_syn_received | received | packets/s |
 | netfilter.synproxy_conn_reopened | reopened | connections/s |
 | netfilter.synproxy_cookies | valid, invalid, retransmits | cookies/s |
-
-

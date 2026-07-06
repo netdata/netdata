@@ -174,5 +174,3 @@ Metrics:
 | cgroup.net_operstate | up, down, notpresent, lowerlayerdown, testing, dormant, unknown | state |
 | cgroup.net_carrier | up, down | state |
 | cgroup.net_mtu | mtu | octets |
-
-

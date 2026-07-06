@@ -145,4 +145,3 @@ Netdata decodes **78 trap definitions** from Western Telematic Inc across **3 MI
 - `WTI-CONSOLE-MIB::bufferThresholdCrossedClearTrap`
 - `WTI-CONSOLE-MIB::overCurrentInitialSetTrap`
 - `WTI-CONSOLE-MIB::overCurrentInitialClearTrap`
-

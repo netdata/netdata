@@ -193,5 +193,3 @@ Metrics:
 | services.dc_reference | a dimension per systemd service | files |
 | services.dc_not_cache | a dimension per systemd service | files |
 | services.dc_not_found | a dimension per systemd service | files |
-
-

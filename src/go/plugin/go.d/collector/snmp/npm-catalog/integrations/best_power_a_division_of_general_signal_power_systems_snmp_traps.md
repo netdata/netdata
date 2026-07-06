@@ -143,4 +143,3 @@ Netdata decodes **54 trap definitions** from Best Power A Division Of General Si
 - `BESTPOWER-MIB::upsTrapUPSOnBattery`
 - `BESTPOWER-MIB::upsTrapUPSNotOnBattery`
 - `BESTPOWER-MIB::upsTrapLowRuntime`
-

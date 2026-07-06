@@ -143,4 +143,3 @@ Netdata decodes **189 trap definitions** from Cyber Power System Inc across **1 
 - `CPS-MIB::upsDiagnosticsFailed`
 - `CPS-MIB::upsDischarged`
 - `CPS-MIB::upsOnBattery`
-

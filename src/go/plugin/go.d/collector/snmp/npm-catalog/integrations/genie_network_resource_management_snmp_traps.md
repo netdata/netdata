@@ -143,4 +143,3 @@ Netdata decodes **59 trap definitions** from Genie Network Resource Management a
 - `GENIE-ATM-SYSTEM-MIB::geAtmBgpHijackAlert`
 - `GENIE-ATM-SYSTEM-MIB::geAtmBgpMsgUpdateAlert`
 - `GENIE-ATM-SYSTEM-MIB::geAtmConfigUpdateAlert`
-

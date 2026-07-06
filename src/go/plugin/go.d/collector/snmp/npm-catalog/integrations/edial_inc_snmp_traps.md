@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Edial Inc across **1 MIB** into struc
 ### Sample decoded traps
 
 - `EDIAL-MIB::notification`
-

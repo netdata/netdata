@@ -155,4 +155,3 @@ The timeout is 500 ms shorter than the interval (but not less than 1000 ms). You
     collection = your_collection_name
 
 ```
-

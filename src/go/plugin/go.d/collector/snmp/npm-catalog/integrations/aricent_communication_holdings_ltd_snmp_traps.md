@@ -166,4 +166,3 @@ Netdata decodes **86 trap definitions** from Aricent Communication Holdings Ltd 
 - `ARICENT-ECFM-Y1731-MI-MIB::fsMIY1731TstRecivedWithErrorTrap`
 - `ARICENT-ECFM-Y1731-MI-MIB::fsMIY1731FrameDelayTrap`
 - `ARICENT-ECFM-Y1731-MI-MIB::fsMIY1731TxFailTrap`
-

@@ -143,4 +143,3 @@ Netdata decodes **11 trap definitions** from Spectra Logic across **1 MIB** into
 - `SPECTRA-LOGIC-STRATA-MIB::nDataDriveStatus`
 - `SPECTRA-LOGIC-STRATA-MIB::nFanStatus`
 - `SPECTRA-LOGIC-STRATA-MIB::nPoolStatus`
-

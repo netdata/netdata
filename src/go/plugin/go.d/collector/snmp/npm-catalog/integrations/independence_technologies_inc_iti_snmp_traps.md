@@ -143,4 +143,3 @@ Netdata decodes **7 trap definitions** from Independence Technologies Inc Iti ac
 - `BEA-WEBLOGIC-MIB::wlsServerShutDown`
 - `BEA-WEBLOGIC-MIB::wlsMonitorNotification`
 - `BEA-WEBLOGIC-MIB::wlsAttributeChange`
-

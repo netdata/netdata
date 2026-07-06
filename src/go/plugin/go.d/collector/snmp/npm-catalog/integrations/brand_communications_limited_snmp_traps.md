@@ -143,4 +143,3 @@ Netdata decodes **84 trap definitions** from Brand Communications Limited across
 - `APSNMP-MIB::trapsPortsInUseIncoming`
 - `APSNMP-MIB::trapsPortsInUseOutgoing`
 - `APSNMP-MIB::trapsOverrallCompressionRatioOfAllPorts`
-

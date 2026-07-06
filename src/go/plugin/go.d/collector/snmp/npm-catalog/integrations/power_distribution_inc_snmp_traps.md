@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Power Distribution Inc across **1 MI
 
 - `DIRISBCMS::pb1AlarmSummary`
 - `DIRISBCMS::pb2AlarmSummary`
-

@@ -179,4 +179,3 @@ Netdata decodes **203 trap definitions** from Zhone Technologies Inc across **32
 - `ZHONE-SECHTOR100-MIB::sechtor100FanStatusChange`
 - `ZHONE-SECHTOR100-MIB::sechtor100ThermoStatusChange`
 - `ZHNSYSMON::zhnSysMonAlarmSetEvent`
-

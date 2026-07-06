@@ -141,4 +141,3 @@ Netdata decodes **2 trap definitions** from Sensu Enterprise across **2 MIBs** i
 
 - `SENSU-ENTERPRISE-V1-MIB::sensuEnterpriseEventTrap`
 - `SENSU-ENTERPRISE-NOTIFY-MIB::sensuEnterpriseEventTrap`
-

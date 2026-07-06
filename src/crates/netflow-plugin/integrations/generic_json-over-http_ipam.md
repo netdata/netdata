@@ -357,6 +357,3 @@ URLs with embedded credentials (`https://user:pass@host`) are converted to
 HTTP Basic authentication by the HTTP client. Prefer `headers:` for clarity
 and to avoid storing credentials in URLs -- e.g.
 `headers: { Authorization: "Basic dXNlcjpwYXNz" }` for HTTP basic-auth.
-
-
-

@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Bancomm across **1 MIB** into structu
 ### Sample decoded traps
 
 - `SSU2000-MIB::ssuEvent`
-

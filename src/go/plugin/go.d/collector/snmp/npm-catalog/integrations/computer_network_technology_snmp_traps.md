@@ -144,4 +144,3 @@ Netdata decodes **19 trap definitions** from Computer Network Technology across 
 - `CNTAU-MIB::cntSevereErrMsg`
 - `CNTAU-MIB::cntCriticalErrMsg`
 - `CNT241-MIB::cnt2smEmergencyMsg`
-

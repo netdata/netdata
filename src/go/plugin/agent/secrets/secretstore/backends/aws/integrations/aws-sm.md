@@ -228,6 +228,3 @@ Confirm the configured `region` and make sure the AWS identity used by Netdata c
 ### JSON key lookup fails
 
 If you use `secret-name#key`, the secret must be stored as a JSON `SecretString`, and the requested key must exist as a top-level field in that JSON object.
-
-
-

@@ -163,5 +163,3 @@ export NETDATA_ALARM_NOTIFY_DEBUG=1
 ```
 
 Note that this will test _all_ alert mechanisms for the selected role.
-
-

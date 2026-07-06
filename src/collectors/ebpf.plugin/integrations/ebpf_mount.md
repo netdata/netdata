@@ -151,5 +151,3 @@ Metrics:
 |:------|:----------|:----|
 | mount_points.call | mount, umount | calls/s |
 | mount_points.error | mount, umount | calls/s |
-
-

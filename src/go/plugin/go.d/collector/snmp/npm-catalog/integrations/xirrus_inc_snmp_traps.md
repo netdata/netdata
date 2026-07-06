@@ -143,4 +143,3 @@ Netdata decodes **26 trap definitions** from Xirrus Inc across **1 MIB** into st
 - `XIRRUS-MIB::stationACLFailure`
 - `XIRRUS-MIB::stationRadiusAuthFailure`
 - `XIRRUS-MIB::resetArray`
-

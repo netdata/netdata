@@ -504,6 +504,3 @@ Verify the account permissions and platform support for the metricset, or provid
 
 The collector reports missing or invalid integer, decimal, duration, status, license expiration, and IPsec tunnel-count values with the metricset, field, entity name, and raw value when present.
 It does not silently convert missing or malformed values to zero, report fake valid status, or treat unrecognized license dates as never-expiring licenses.
-
-
-

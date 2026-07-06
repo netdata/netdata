@@ -515,6 +515,3 @@ CloudWatch publishes metrics with a delay.
 - Verify the credentials selected by `auth.mode` are valid and not expired.
 - For `assume_role`, confirm the base identity is allowed to `sts:AssumeRole` the target role and that the role's trust policy permits it.
 - For AWS GovCloud or China partitions, ensure every region in `regions` belongs to the same partition.
-
-
-

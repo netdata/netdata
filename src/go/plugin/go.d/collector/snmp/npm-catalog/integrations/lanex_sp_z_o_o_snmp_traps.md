@@ -144,4 +144,3 @@ Netdata decodes **14 trap definitions** from Lanex Sp Z O O across **2 MIBs** in
 - `TM62-MIB::trapOptiLine4LogIdn`
 - `TM62-MIB::trapOptiLine4Es`
 - `TM62-MIB::trapOptiLine4confn`
-

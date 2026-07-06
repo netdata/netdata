@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Metaswitch Networks Ltd Formerly Dat
 
 - `METASWITCH-MIB::alarmTrap`
 - `METASWITCH-MIB::alarmShortTrap`
-

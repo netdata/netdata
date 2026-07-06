@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Newtec Cy across **1 MIB** into struc
 ### Sample decoded traps
 
 - `NEWTEC-NOTIFICATION-MIB::ntcNotifAlReport`
-

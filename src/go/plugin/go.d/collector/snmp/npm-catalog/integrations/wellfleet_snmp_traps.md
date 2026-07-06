@@ -141,4 +141,3 @@ Netdata decodes **2 trap definitions** from Wellfleet across **2 MIBs** into str
 
 - `Wellfleet-ACCT-MIB::wfAcctBufferFull`
 - `Wellfleet-DSUCSU-MIB::wfDsuCsuIfTrap`
-

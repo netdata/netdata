@@ -143,4 +143,3 @@ Netdata decodes **45 trap definitions** from Bay Technical Associates across **1
 - `Baytech-MIB-401-4::outletOn`
 - `Baytech-MIB-401-4::outletOff`
 - `Baytech-MIB-401-4::outletReboot`
-

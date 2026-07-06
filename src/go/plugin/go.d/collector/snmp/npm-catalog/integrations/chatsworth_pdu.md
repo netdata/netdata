@@ -306,5 +306,3 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
 | `snmp.device_prof_cpiPduSensorValue` | â€” | per sensor_index, sensor_name, rm:sensor_type |  |
-
-

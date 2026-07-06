@@ -1104,6 +1104,3 @@ Ensure SQL Server is configured for mixed mode authentication if using SQL login
 
 The monitoring user needs VIEW SERVER STATE permission.
 Grant it with: `GRANT VIEW SERVER STATE TO netdata_user;`
-
-
-

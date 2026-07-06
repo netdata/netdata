@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Advantech Co Ltd across **1 MIB** in
 - `ADVANTECH-EKI-PRONEER-MIB::ddmiAlarmWarning`
 - `ADVANTECH-EKI-PRONEER-MIB::xRingProMasterChange`
 - `ADVANTECH-EKI-PRONEER-MIB::stpStateChange`
-

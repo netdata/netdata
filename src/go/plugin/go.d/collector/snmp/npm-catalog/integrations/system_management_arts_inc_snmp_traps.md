@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from System Management Arts Inc across **
 - `DFM-MIB::smTrapSeverityChange`
 - `DFM-MIB::smTrapNotification`
 - `DFM-MIB::smTrapNotificationClear`
-

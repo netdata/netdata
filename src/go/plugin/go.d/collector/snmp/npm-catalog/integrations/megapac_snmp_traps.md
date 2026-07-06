@@ -143,4 +143,3 @@ Netdata decodes **28 trap definitions** from Megapac across **1 MIB** into struc
 - `SATELCOM-MIB::configChange`
 - `SATELCOM-MIB::vcpConnect`
 - `SATELCOM-MIB::vcpDisconnect`
-

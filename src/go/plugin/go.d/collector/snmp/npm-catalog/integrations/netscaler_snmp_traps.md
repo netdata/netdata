@@ -145,4 +145,3 @@ Netdata decodes **288 trap definitions** from Netscaler across **3 MIBs** into s
 - `NS-ROOT-MIB::cpuUtilization`
 - `NS-ROOT-MIB::linkUp`
 - `NS-ROOT-MIB::linkDown`
-

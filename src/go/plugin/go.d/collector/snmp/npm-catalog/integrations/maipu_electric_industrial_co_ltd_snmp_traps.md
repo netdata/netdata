@@ -148,4 +148,3 @@ Netdata decodes **51 trap definitions** from Maipu Electric Industrial Co Ltd ac
 - `MAIPU-TRAPS::mpSysDown`
 - `MAIPU-TRAPS::mpTaskError`
 - `MAIPU-TRAPS::mpConfig`
-

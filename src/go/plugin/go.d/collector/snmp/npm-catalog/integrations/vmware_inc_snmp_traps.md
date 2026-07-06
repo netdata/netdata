@@ -156,4 +156,3 @@ Netdata decodes **1445 trap definitions** from Vmware Inc across **14 MIBs** int
 - `VMWARE-OBSOLETE-MIB::vmHBLost`
 - `VMWARE-OBSOLETE-MIB::vmHBDetected`
 - `VMWARE-OBSOLETE-MIB::vmSuspended`
-

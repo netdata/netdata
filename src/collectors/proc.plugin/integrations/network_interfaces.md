@@ -136,5 +136,3 @@ Metrics:
 | net.fifo | receive, transmit | errors |
 | net.compressed | received, sent | packets/s |
 | net.events | frames, collisions, carrier | events/s |
-
-

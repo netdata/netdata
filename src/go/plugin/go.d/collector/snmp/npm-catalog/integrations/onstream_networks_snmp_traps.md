@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Onstream Networks across **1 MIB** i
 
 - `LX-10-MIB::alarmOnReport`
 - `LX-10-MIB::alarmOffReport`
-

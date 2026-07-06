@@ -143,4 +143,3 @@ Netdata decodes **13 trap definitions** from Altergy Systems across **1 MIB** in
 - `ALT-DEV-MIB::altergyTrapStartDR`
 - `ALT-DEV-MIB::altergyTrapStopDR`
 - `ALT-DEV-MIB::altergyTrapHold`
-

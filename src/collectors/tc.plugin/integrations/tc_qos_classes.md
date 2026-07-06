@@ -172,5 +172,3 @@ Metrics:
 | tc.qos_dropped | a dimension per class | packets/s |
 | tc.qos_tokens | a dimension per class | tokens |
 | tc.qos_ctokens | a dimension per class | ctokens |
-
-

@@ -143,4 +143,3 @@ Netdata decodes **350 trap definitions** from Nice Systems Ltd across **1 MIB** 
 - `Nice-MIB-II::clsRecordIsInsertedToDB`
 - `Nice-MIB-II::clsCommunicationProblemWithLogger`
 - `Nice-MIB-II::clsCommunicationToLoggerIsOK`
-

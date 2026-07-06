@@ -37,5 +37,3 @@ endmeta-->
       - Notifications: The notification types you want to receive
     - **Integration configuration**
       - Destination URL - The URL provided by VictorOps of your REST endpoint.
-
-

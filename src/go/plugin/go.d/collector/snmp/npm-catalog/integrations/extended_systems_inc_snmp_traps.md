@@ -143,4 +143,3 @@ Netdata decodes **8 trap definitions** from Extended Systems Inc across **1 MIB*
 - `ESI-MIB::trapNoPrinterAttached`
 - `ESI-MIB::trapPrinterTonerLow`
 - `ESI-MIB::trapPrinterPaperOut`
-

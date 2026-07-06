@@ -143,4 +143,3 @@ Netdata decodes **14 trap definitions** from Ascom Sweden AB across **1 MIB** in
 - `ASCOM-IPDECT-MIB::ascomLinkDown`
 - `ASCOM-IPDECT-MIB::ascomLinkUp`
 - `ASCOM-IPDECT-MIB::ascomAuthenticationFailure`
-

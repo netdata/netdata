@@ -212,6 +212,3 @@ You can run `perf.plugin` with the debug option enabled to troubleshoot issues w
   ```bash
   ./perf.plugin 1 all debug
   ```
-
-
-

@@ -145,4 +145,3 @@ Netdata decodes **9 trap definitions** from Media5 Corporation M5 Technologies a
 - `MX-MS-MIB::msTrapStatusInformation`
 - `MX-MS-MIB::msTrapStatusConfigFile`
 - `MX-CORNET-SYSTEM-MIB::corNetFaultManagementRebootTrap`
-

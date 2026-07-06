@@ -143,4 +143,3 @@ Netdata decodes **6 trap definitions** from Loop Telecommunication International
 - `L-AM3440-A-Private::localTrap`
 - `L-AM3440-A-Private::remoteTrap`
 - `L-AM3440-A-Private::remove2Trap`
-

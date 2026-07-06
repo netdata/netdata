@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Sophos PLC across **1 MIB** into stru
 ### Sample decoded traps
 
 - `SFOS-FIREWALL-MIB::sfosNotification`
-

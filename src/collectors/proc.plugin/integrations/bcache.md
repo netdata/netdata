@@ -135,5 +135,3 @@ Metrics:
 | disk.bcache_cache_read_races | races, errors | operations/s |
 | disk.bcache | hits, misses, collisions, readaheads | operations/s |
 | disk.bcache_bypass | hits, misses | operations/s |
-
-

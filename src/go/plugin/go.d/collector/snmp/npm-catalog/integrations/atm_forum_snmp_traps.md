@@ -151,4 +151,3 @@ Netdata decodes **115 trap definitions** from Atm Forum across **9 MIBs** into s
 - `ATM-FORUM-AUTO-CONFIG::atmfAtmServiceConfFail`
 - `ATM-FORUM-SNMP-M4-MIB::atmfM4IfAisAlarm`
 - `ATM-FORUM-SNMP-M4-MIB::atmfM4IfLcdAlarm`
-

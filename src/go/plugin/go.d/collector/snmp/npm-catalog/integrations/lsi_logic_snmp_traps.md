@@ -145,4 +145,3 @@ Netdata decodes **271 trap definitions** from Lsi Logic across **3 MIBs** into s
 - `Adapter-1030-MIB::rtLogicalDriveStateChange`
 - `Adapter-1030-MIB::rtResyncStarted`
 - `Adapter-1030-MIB::rtResyncCompleted`
-

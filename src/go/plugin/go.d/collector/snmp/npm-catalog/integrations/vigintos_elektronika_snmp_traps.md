@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Vigintos Elektronika across **1 MIB*
 - `VEL-HOST2-MIB::host2DevConnectionTrap`
 - `VEL-HOST2-MIB::host2DevEvtStateTrap`
 - `VEL-HOST2-MIB::host2DevParStateTrap`
-

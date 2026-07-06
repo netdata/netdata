@@ -415,6 +415,3 @@ the `bmp` alias) -- if `routing` is removed from both `asn_providers` and
 BGP-derived enrichment depends on router export policy, peer state, and
 route visibility. Validate against your specific router firmware before
 depending on this for capacity or security decisions.
-
-
-

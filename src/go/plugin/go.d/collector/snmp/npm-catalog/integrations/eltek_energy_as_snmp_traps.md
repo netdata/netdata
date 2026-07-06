@@ -147,4 +147,3 @@ Netdata decodes **151 trap definitions** from Eltek Energy AS across **5 MIBs** 
 - `ELTEK-GENERIC-MIB::alarmMajorLowBattVoltTrap`
 - `ELTEK-GENERIC-MIB::alarmMinorLowBattVoltTrap`
 - `ELTEK-GENERIC-MIB::alarmMajorBatteryHighTempTrap`
-

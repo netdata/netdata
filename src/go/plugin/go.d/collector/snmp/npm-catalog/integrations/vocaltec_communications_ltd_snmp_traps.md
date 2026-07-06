@@ -145,4 +145,3 @@ Netdata decodes **23 trap definitions** from Vocaltec Communications Ltd across 
 - `VTCOMMON-MIB::serverShuttingDown`
 - `VTCOMMON-MIB::serverMaintenance`
 - `VTCOMMON-MIB::serverConfigurationFault`
-

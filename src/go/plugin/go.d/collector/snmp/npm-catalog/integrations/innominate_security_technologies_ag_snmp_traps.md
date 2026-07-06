@@ -143,4 +143,3 @@ Netdata decodes **22 trap definitions** from Innominate Security Technologies AG
 - `MGUARDB-MIB::mGuardDHCPNewClientTrap`
 - `MGUARDB-MIB::mGuardTrapDiscFull`
 - `MGUARDB-MIB::mGuardTrapCpuLoadHigh`
-

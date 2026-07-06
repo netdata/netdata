@@ -143,4 +143,3 @@ Netdata decodes **23 trap definitions** from Meraki Networks Inc across **1 MIB*
 - `MERAKI-CLOUD-CONTROLLER-MIB::deviceComesOnline`
 - `MERAKI-CLOUD-CONTROLLER-MIB::foreignAPDetected`
 - `MERAKI-CLOUD-CONTROLLER-MIB::cellularNetworkUp`
-

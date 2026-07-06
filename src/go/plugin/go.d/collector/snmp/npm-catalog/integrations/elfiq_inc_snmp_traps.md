@@ -145,4 +145,3 @@ Netdata decodes **10 trap definitions** from Elfiq Inc across **3 MIBs** into st
 - `ELFIQ-MODULE-COMMON-MIB::systCPUUsage`
 - `ELFIQ-MODULE-COMMON-MIB::systCPUFan`
 - `ELFIQ-MODULE-FOVE-MIB::foveStatusChanged`
-

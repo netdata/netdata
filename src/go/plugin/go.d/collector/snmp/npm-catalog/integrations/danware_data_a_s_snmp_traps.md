@@ -143,4 +143,3 @@ Netdata decodes **166 trap definitions** from Danware Data A S across **1 MIB** 
 - `DANWARE-MIB::netopStartHelp`
 - `DANWARE-MIB::netopStopHelp`
 - `DANWARE-MIB::netopHelpDefined`
-

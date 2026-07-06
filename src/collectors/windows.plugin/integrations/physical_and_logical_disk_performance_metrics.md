@@ -170,5 +170,3 @@ Metrics:
 | disk.busy | busy | milliseconds |
 | disk.iotime | reads, writes | milliseconds/s |
 | disk.qops | operations | operations |
-
-

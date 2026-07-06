@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Egnite GmbH across **1 MIB** into st
 
 - `EGNITEPHYSENSOR-MIB::querxPhySensorNormal`
 - `EGNITEPHYSENSOR-MIB::querxPhySensorAlert`
-

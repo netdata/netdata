@@ -144,4 +144,3 @@ Netdata decodes **96 trap definitions** from Gw Technologies Co Ltd across **2 M
 - `GW-EPON-MIB::onuNotPresent`
 - `GW-EPON-MIB::devPowerOff`
 - `GW-EPON-MIB::devPowerOn`
-

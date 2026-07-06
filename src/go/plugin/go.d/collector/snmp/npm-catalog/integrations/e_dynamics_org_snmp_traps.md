@@ -143,4 +143,3 @@ Netdata decodes **55 trap definitions** from E Dynamics Org across **1 MIB** int
 - `ASCO-QEM-72EE2::transferred_from_normal_to_emergency_SNMPSend`
 - `ASCO-QEM-72EE2::transferred_from_emergency_to_normal_SNMPSend`
 - `ASCO-QEM-72EE2::emergency_accepted_SNMPSend`
-

@@ -143,4 +143,3 @@ Netdata decodes **23 trap definitions** from Acer across **1 MIB** into structur
 - `ASM-PRIVATE-COMMIB::trapECC1BitError`
 - `ASM-PRIVATE-COMMIB::trapECCMBitError`
 - `ASM-PRIVATE-COMMIB::trapFanStop`
-

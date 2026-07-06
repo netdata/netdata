@@ -146,4 +146,3 @@ Netdata decodes **1057 trap definitions** from It Watchdogs Inc across **4 MIBs*
 - `EATON-GENESIS-II-MIB::intDeciAmpsCT3TRAP`
 - `EATON-GENESIS-II-MIB::intDeciAmpsCT4TRAP`
 - `EATON-GENESIS-II-MIB::intDeciAmpsCT5TRAP`
-

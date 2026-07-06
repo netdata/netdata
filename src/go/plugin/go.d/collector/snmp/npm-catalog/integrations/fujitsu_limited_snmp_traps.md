@@ -199,4 +199,3 @@ Netdata decodes **1726 trap definitions** from Fujitsu Limited across **52 MIBs*
 - `PRIMEPOWER-XSCF-MIB::scfHardwareErrorSet`
 - `PRIMEPOWER-XSCF-MIB::scfHardwareErrorUnset`
 - `PRIMEPOWER-XSCF-MIB::scfAgentStart`
-

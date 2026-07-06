@@ -143,4 +143,3 @@ Netdata decodes **14 trap definitions** from Newbridge Networks Corporation acro
 - `NNC-NOTIFICATION-MIB::nncExtNotifSoftwareTT`
 - `NNC-NOTIFICATION-MIB::nncExtNotifCommTT`
 - `NNC-NOTIFICATION-MIB::nncExtNotifUserTT`
-

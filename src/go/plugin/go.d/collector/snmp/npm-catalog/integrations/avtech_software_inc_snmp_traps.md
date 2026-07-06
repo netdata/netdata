@@ -152,4 +152,3 @@ Netdata decodes **157 trap definitions** from Avtech Software Inc across **10 MI
 - `TEMPAGER-MIB::alarmstart2-t4`
 - `TEMPAGER-MIB::alarmclear2-t4`
 - `TEMPAGER-MIB::alarmstart3-t4`
-

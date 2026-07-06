@@ -144,4 +144,3 @@ Netdata decodes **33 trap definitions** from K2Net across **2 MIBs** into struct
 - `CFG-PLCY-MIB::sitaraCfgPlcyNotifnsFailToReStart`
 - `CFG-PLCY-MIB::sitaraCfgPlcyNotifnsFailToUpdatePolicy`
 - `CFG-PLCY-MIB::sitaraCfgPlcyNotifnsFailToXlatePolicy`
-

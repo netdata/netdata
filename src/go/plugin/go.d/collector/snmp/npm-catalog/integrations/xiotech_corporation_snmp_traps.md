@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from Xiotech Corporation across **1 MIB**
 - `XIO-HUB-MIB::xioHubWarningEvent`
 - `XIO-HUB-MIB::xioHubSeriousEvent`
 - `XIO-HUB-MIB::xioHubFatalEvent`
-

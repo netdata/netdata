@@ -143,4 +143,3 @@ Netdata decodes **67 trap definitions** from Centec Networks Inc across **1 MIB*
 - `SWITCH::rebootSendTrap`
 - `SWITCH::memUsageHigher`
 - `SWITCH::memUsageFormHigherToNormal`
-

@@ -217,4 +217,3 @@ Netdata decodes **360 trap definitions** from Qtech LLC across **70 MIBs** into 
 - `QTECH-GBNPlatformOAM-MIB::snmpNotifyTypeSaveConfiguration`
 - `QTECH-GBNPlatformOAMSyslog-MIB::syslogTrap`
 - `QTECH-GBNPlatformGNLink-MIB::ggmpClientPortLoop`
-

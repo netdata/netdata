@@ -144,4 +144,3 @@ Netdata decodes **19 trap definitions** from Intersystems across **2 MIBs** into
 - `ISC-CACHE::cacheDBExpand`
 - `ISC-CACHE::cacheDBOutOfSpace`
 - `ISC-CACHE::cacheDBStatusChange`
-

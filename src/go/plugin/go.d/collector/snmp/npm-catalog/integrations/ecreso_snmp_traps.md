@@ -143,4 +143,3 @@ Netdata decodes **59 trap definitions** from Ecreso across **1 MIB** into struct
 - `ECRESO-FM-TRANS-MIB::eventTxAlFault`
 - `ECRESO-FM-TRANS-MIB::eventTxAlWarning`
 - `ECRESO-FM-TRANS-MIB::eventTxAlVSWR`
-

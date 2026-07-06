@@ -143,4 +143,3 @@ Netdata decodes **11 trap definitions** from Exalt Communications across **1 MIB
 - `ExaltComm-TRAPS-MIB::loc-radio-stat-notif`
 - `ExaltComm-TRAPS-MIB::rem-radio-stat-notif`
 - `ExaltComm-TRAPS-MIB::loc-rsl-stat-horiz-notif`
-

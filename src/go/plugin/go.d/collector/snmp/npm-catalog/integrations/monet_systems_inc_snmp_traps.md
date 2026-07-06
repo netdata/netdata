@@ -143,4 +143,3 @@ Netdata decodes **30 trap definitions** from Monet Systems Inc across **1 MIB** 
 - `TWTRAP-MIB::rptr-Port-Enabled`
 - `TWTRAP-MIB::rptr-Port-Disabled`
 - `TWTRAP-MIB::rptr-Port-Link-Up`
-

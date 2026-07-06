@@ -273,6 +273,3 @@ filter at query time using the tunnel-endpoint pair before decap.
 The plugin cannot decode VXLAN and SRv6 in the same instance. If exporter A
 ships VXLAN tenant traffic and exporter B ships SRv6 transit traffic, you
 must choose the mode that matches the traffic this Netdata Agent receives.
-
-
-

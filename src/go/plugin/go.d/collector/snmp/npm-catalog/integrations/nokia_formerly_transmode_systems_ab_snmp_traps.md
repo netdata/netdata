@@ -143,4 +143,3 @@ Netdata decodes **93 trap definitions** from Nokia Formerly Transmode Systems AB
 - `TRANSMODE1100::trm6001TrapExternal3`
 - `TRANSMODE1100::trm6001CascadeFailure`
 - `TRANSMODE1100::trm9xxxTrapFailure`
-
