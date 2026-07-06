@@ -227,6 +227,64 @@ def test_generate_runtime_otel_honors_explicit_global_storage_uri(tmp_path, monk
     assert "logs" not in doc
 
 
+def test_generate_runtime_otel_extra_yaml_deep_merges_and_wins(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    # A first-class knob (max_file_size) plus a passthrough that (a) reaches
+    # knobs with no first-class param and (b) conflicts on max_log_entries.
+    cfg = runtime.OtelConfig(
+        logs_rotation_max_file_size="1MB",
+        logs_rotation_max_log_entries=50,
+        extra_yaml=(
+            "auth:\n  enabled: true\n"
+            "logs:\n"
+            '  ingest:\n    max_age: "30 days"\n'
+            "  rotation:\n    default:\n      max_log_entries: 7\n"
+        ),
+    )
+    rd, _conf, _otlp = runtime.generate_runtime("agent-x", otel=cfg)
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    # New sections merge in whole...
+    assert doc["auth"] == {"enabled": True}
+    assert doc["logs"]["ingest"] == {"max_age": "30 days"}
+    # ...nested mappings merge (the sibling knob survives), and on a conflict
+    # the passthrough wins.
+    assert doc["logs"]["rotation"]["default"] == {"max_file_size": "1MB", "max_log_entries": 7}
+
+
+def test_generate_runtime_otel_extra_yaml_cannot_override_pins(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    # base_dir and endpoint.path are harness isolation invariants: the
+    # passthrough must not escape the per-agent run dir or lie about the
+    # reported OTLP endpoint.
+    cfg = runtime.OtelConfig(
+        extra_yaml='base_dir: /tmp/escape\nendpoint:\n  path: "1.2.3.4:1"\n  tls_cert_path: /x.pem\n'
+    )
+    rd, _conf, otlp = runtime.generate_runtime("agent-pin", otel=cfg)
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    assert doc["base_dir"] == str(rd / "lib" / "otel")
+    assert doc["endpoint"]["path"] == otlp
+    # Non-pinned endpoint siblings still pass through.
+    assert doc["endpoint"]["tls_cert_path"] == "/x.pem"
+
+
+def test_generate_runtime_otel_extra_yaml_passes_unknown_keys(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    # Unknown keys pass through untouched — feeding the plugin's strict-config
+    # refuse-to-start path is a supported test.
+    cfg = runtime.OtelConfig(extra_yaml="some_future_option: true\n")
+    rd, _conf, _otlp = runtime.generate_runtime("agent-unk", otel=cfg)
+    doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+    assert doc["some_future_option"] is True
+
+
+def test_generate_runtime_otel_extra_yaml_rejects_non_mapping(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    # The tool layer validates first; this is the runtime backstop.
+    cfg = runtime.OtelConfig(extra_yaml="- just\n- a list\n")
+    with pytest.raises(ValueError, match="mapping"):
+        runtime.generate_runtime("agent-bad", otel=cfg)
+
+
 def test_claim_env_empty_without_token():
     assert runtime.claim_env({}) == {}
     assert runtime.claim_env({"NETDATA_CLAIM_TOKEN": "   "}) == {}  # blank = unclaimed

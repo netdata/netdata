@@ -12,6 +12,8 @@ from __future__ import annotations
 import re
 from typing import Annotated
 
+import yaml
+
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import Field
 
@@ -63,6 +65,41 @@ _JournalDir = Annotated[
     str | None,
     Field(description="Read-only legacy viewer: directory of journal files written by the FORMER otel plugin, exposed via the 'legacy-otel-logs' function. The plugin only reads it (never writes/prunes). Unlike base_dir, it is NOT pinned under the run dir."),
 ]
+_ExtraYaml = Annotated[
+    str | None,
+    Field(
+        description=(
+            "Raw-YAML escape hatch: a YAML MAPPING deep-merged over the generated "
+            "otel.yaml (this passthrough wins on conflicts; nested mappings merge, "
+            "other values replace). Reaches every knob without a first-class param — "
+            "auth.enabled, logs.ingest.{max_age,future_skew}, "
+            "logs.retention.default.{max_age,horizon}, logs.catalog.rotation_period, "
+            "per-tenant rotation/retention override blocks, storage.startup_op_timeout — "
+            "and deliberately-unknown keys for strict-config refuse-to-start tests. "
+            "base_dir and endpoint.path stay pinned for per-agent isolation and "
+            "cannot be overridden. SHARP TOOL: a semantically invalid config keeps "
+            "the otel plugin down until reconfigured (check netdata_agent_logs "
+            "component='supervisor'/'ledger' for the refusal) — that failure mode is "
+            "itself the point of the refusal tests."
+        )
+    ),
+]
+
+
+def _extra_yaml_error(agent_id: str, value: str) -> RunInfo | None:
+    """Return an error RunInfo if ``value`` is not parseable YAML with a mapping
+    (or empty) at the top level, else None. Semantic validity is deliberately
+    NOT checked — feeding the plugin a config it refuses is a supported test."""
+    try:
+        parsed = yaml.safe_load(value)
+    except yaml.YAMLError as exc:
+        return agent_error(agent_id, f"extra_yaml is not valid YAML: {exc}")
+    if parsed is not None and not isinstance(parsed, dict):
+        return agent_error(
+            agent_id,
+            f"extra_yaml must be a YAML mapping at the top level, got {type(parsed).__name__}",
+        )
+    return None
 
 
 def register(mcp: FastMCP) -> None:
@@ -83,7 +120,11 @@ def register(mcp: FastMCP) -> None:
             "storage_uri defaults to an isolated per-agent fs:// dir. Use the small "
             "rotation/retention knobs to force multi-file / eviction edge cases over a "
             "known corpus — set traces_* (e.g. traces_rotation_max_log_entries=10) so a "
-            "small trace corpus seals without a restart."
+            "small trace corpus seals without a restart. For knobs without a "
+            "first-class param (auth, ingest windows, retention max_age/horizon, "
+            "per-tenant overrides) or for strict-config refusal tests, pass a raw "
+            "YAML mapping via extra_yaml — it deep-merges over the generated file "
+            "and wins on conflicts (base_dir/endpoint.path stay pinned)."
         ),
     )
     async def netdata_agent_otel_config(
@@ -109,6 +150,7 @@ def register(mcp: FastMCP) -> None:
         storage_enabled: _StorageEnabled = None,
         storage_uri: _StorageUri = None,
         journal_dir: _JournalDir = None,
+        extra_yaml: _ExtraYaml = None,
     ) -> RunInfo:
         if get_agents(ctx).get(agent_id) is None:
             return unknown_agent(agent_id)
@@ -121,6 +163,10 @@ def register(mcp: FastMCP) -> None:
                 agent_id,
                 f"storage_uri must be an opendal URI like 'fs:///path' or 's3://bucket', got {storage_uri!r}",
             )
+        if extra_yaml is not None:
+            err = _extra_yaml_error(agent_id, extra_yaml)
+            if err is not None:
+                return err
         cfg = OtelConfig(
             otlp_endpoint=otlp_endpoint,
             logs_rotation_max_file_size=logs_rotation_max_file_size,
@@ -142,6 +188,7 @@ def register(mcp: FastMCP) -> None:
             storage_enabled=storage_enabled,
             storage_uri=storage_uri,
             journal_dir=journal_dir,
+            extra_yaml=extra_yaml,
         )
         spec = get_agents(ctx).set_otel(agent_id, cfg)
         live = get_runs(ctx).get(agent_id)

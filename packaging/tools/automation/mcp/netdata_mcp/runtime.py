@@ -155,6 +155,29 @@ class OtelConfig:
     storage_enabled: bool | None = None        # storage.enabled (GLOBAL); remote object-storage upload of SFST + catalog files
     storage_uri: str | None = None             # storage.uri (GLOBAL); opendal URI (default: per-agent fs:// dir under the run dir)
     journal_dir: str | None = None             # logs.journal_dir; former-plugin journal files for the read-only legacy-otel-logs viewer
+    # Raw-YAML escape hatch: a YAML MAPPING deep-merged over the generated
+    # document (passthrough wins on conflicts; nested mappings merge, any other
+    # value replaces). Reaches knobs without first-class fields (auth, ingest
+    # windows, retention max_age/horizon, catalog rotation_period, per-tenant
+    # override blocks, startup_op_timeout) and deliberately-invalid keys for
+    # strict-config refusal tests. base_dir and endpoint.path stay pinned (the
+    # harness' per-agent isolation invariants) — see _otel_doc. Validated as
+    # parseable YAML at the tool boundary; a semantically bad config surfaces
+    # as the plugin's own refuse-to-start (that IS the test).
+    extra_yaml: str | None = None
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    """Return ``base`` with ``override`` merged in: nested mappings merge
+    recursively, any other value (scalars, lists) is replaced by the override.
+    Neither input is mutated."""
+    out = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(out.get(key), dict):
+            out[key] = _deep_merge(out[key], value)
+        else:
+            out[key] = value
+    return out
 
 
 def _signal_tuning(
@@ -267,6 +290,26 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
         doc["logs"] = logs
     if traces:
         doc["traces"] = traces
+
+    # Raw-YAML escape hatch (see OtelConfig.extra_yaml): deep-merge the caller's
+    # mapping over the generated doc — passthrough wins — then RE-PIN base_dir
+    # and endpoint.path. Those two are harness invariants (per-agent isolation;
+    # the reported OTLP endpoint), not plugin knobs to reach; everything else,
+    # including keys the plugin will refuse, passes through untouched.
+    if cfg.extra_yaml:
+        extra = yaml.safe_load(cfg.extra_yaml)
+        if extra is not None:
+            if not isinstance(extra, dict):
+                raise ValueError(
+                    f"extra_yaml must be a YAML mapping, got {type(extra).__name__}"
+                )
+            doc = _deep_merge(doc, extra)
+            doc["base_dir"] = base_dir
+            doc.setdefault("endpoint", {})
+            if isinstance(doc["endpoint"], dict):
+                doc["endpoint"]["path"] = otlp_endpoint
+            else:
+                doc["endpoint"] = {"path": otlp_endpoint}
     return doc
 
 
