@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -71,9 +72,22 @@ type dimensionState struct {
 	float      bool
 	static     bool
 	order      int
+	sortKey    dimensionSortKey
 	algorithm  program.Algorithm
 	multiplier int
 	divisor    int
+}
+
+type dimensionSortKind uint8
+
+const (
+	dimensionSortDefault dimensionSortKind = iota
+	dimensionSortHistogramBucket
+)
+
+type dimensionSortKey struct {
+	kind       dimensionSortKind
+	upperBound float64
 }
 
 type dimBuildEntry struct {
@@ -120,13 +134,6 @@ type flattenedReadChecker interface {
 func isHistogramBucketSeries(meta metrix.SeriesMeta) bool {
 	return meta.SourceKind == metrix.MetricKindHistogram &&
 		meta.FlattenRole == metrix.FlattenRoleHistogramBucket
-}
-
-func forceHistogramBucketChartType(meta program.ChartMeta, seriesMeta metrix.SeriesMeta) program.ChartMeta {
-	if isHistogramBucketSeries(seriesMeta) {
-		meta.Type = program.ChartTypeHeatmap
-	}
-	return meta
 }
 
 func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uint64, uint64, uint64, bool, error) {
@@ -446,8 +453,6 @@ func (ctx *planBuildContext) accumulateRoute(
 	labels metrix.LabelView,
 	value metrix.SampleValue,
 ) error {
-	route.Meta = forceHistogramBucketChartType(route.Meta, seriesMeta)
-
 	cs, exists := ctx.chartsByID[route.ChartID]
 	if exists && cs.templateID != route.ChartTemplateID {
 		if !route.Autogen && isAutogenTemplateID(cs.templateID) {
@@ -511,6 +516,7 @@ func (ctx *planBuildContext) accumulateRoute(
 	if isHistogramBucketSeries(seriesMeta) {
 		cs.meta.Type = program.ChartTypeHeatmap
 	}
+	sortKey := histogramBucketDimensionSortKey(route, seriesMeta, labels)
 
 	entry, exists := cs.entries[route.DimensionName]
 	if !exists {
@@ -525,6 +531,7 @@ func (ctx *planBuildContext) accumulateRoute(
 			float:      route.Float,
 			static:     route.Static,
 			order:      route.DimensionIndex,
+			sortKey:    sortKey,
 			algorithm:  route.Algorithm,
 			multiplier: route.Multiplier,
 			divisor:    route.Divisor,
@@ -667,14 +674,49 @@ func observedDimensionNames(cs *chartState, matChart *materializedChartState) []
 			return orderedObservedDimensionNames(cs.entries, cs.currentBuildSeq)
 		}
 		existing := matChart.dimensions[name]
-		if existing == nil || existing.static != entry.static || existing.order != entry.order {
+		if existing == nil || existing.static != entry.static || existing.order != entry.order || existing.sortKey != entry.sortKey {
 			return orderedObservedDimensionNames(cs.entries, cs.currentBuildSeq)
 		}
 	}
 	return prev
 }
 
+func histogramBucketDimensionSortKey(route routeBinding, meta metrix.SeriesMeta, labels metrix.LabelView) dimensionSortKey {
+	if !isHistogramBucketSeries(meta) || route.DimensionKeyLabel != metrix.HistogramBucketLabel || labels == nil {
+		return dimensionSortKey{}
+	}
+	upperBound, ok := labels.Get(metrix.HistogramBucketLabel)
+	if !ok {
+		return dimensionSortKey{}
+	}
+	return histogramBucketSortKey(upperBound)
+}
+
+func histogramBucketSortKey(upperBound string) dimensionSortKey {
+	value, ok := parseHistogramBucketUpperBound(upperBound)
+	if !ok {
+		return dimensionSortKey{}
+	}
+	return dimensionSortKey{
+		kind:       dimensionSortHistogramBucket,
+		upperBound: value,
+	}
+}
+
+func parseHistogramBucketUpperBound(upperBound string) (float64, bool) {
+	upperBound = strings.TrimSpace(upperBound)
+	if upperBound == "" {
+		return 0, false
+	}
+	value, err := strconv.ParseFloat(upperBound, 64)
+	if err != nil || math.IsNaN(value) || math.IsInf(value, -1) {
+		return 0, false
+	}
+	return value, true
+}
+
 func sortInferredDimensions(in []InferredDimension) {
+	histogramGroups := inferredHistogramBucketGroups(in)
 	sort.Slice(in, func(i, j int) bool {
 		lhs := in[i]
 		rhs := in[j]
@@ -684,8 +726,49 @@ func sortInferredDimensions(in []InferredDimension) {
 		if lhs.DimensionIndex != rhs.DimensionIndex {
 			return lhs.DimensionIndex < rhs.DimensionIndex
 		}
+		if histogramGroups[inferredDimensionGroup{chartTemplateID: lhs.ChartTemplateID, dimensionIndex: lhs.DimensionIndex}] {
+			lhsBound, lhsOK := parseHistogramBucketUpperBound(lhs.Name)
+			rhsBound, rhsOK := parseHistogramBucketUpperBound(rhs.Name)
+			if lhsOK && rhsOK && lhsBound != rhsBound {
+				return lhsBound < rhsBound
+			}
+		}
 		return lhs.Name < rhs.Name
 	})
+}
+
+type inferredDimensionGroup struct {
+	chartTemplateID string
+	dimensionIndex  int
+}
+
+type inferredHistogramGroupStats struct {
+	total     int
+	parseable int
+	hasInf    bool
+}
+
+func inferredHistogramBucketGroups(in []InferredDimension) map[inferredDimensionGroup]bool {
+	stats := make(map[inferredDimensionGroup]inferredHistogramGroupStats)
+	for _, dim := range in {
+		group := inferredDimensionGroup{
+			chartTemplateID: dim.ChartTemplateID,
+			dimensionIndex:  dim.DimensionIndex,
+		}
+		item := stats[group]
+		item.total++
+		if upperBound, ok := parseHistogramBucketUpperBound(dim.Name); ok {
+			item.parseable++
+			item.hasInf = item.hasInf || math.IsInf(upperBound, 1)
+		}
+		stats[group] = item
+	}
+
+	out := make(map[inferredDimensionGroup]bool, len(stats))
+	for group, item := range stats {
+		out[group] = item.total > 0 && item.parseable == item.total && item.hasInf
+	}
+	return out
 }
 
 func isAutogenTemplateID(templateID string) bool {

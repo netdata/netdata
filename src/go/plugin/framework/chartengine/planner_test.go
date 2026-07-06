@@ -98,20 +98,21 @@ groups:
 			setup: func(t *testing.T, s metrix.CollectorStore) {
 				t.Helper()
 				cc := mustCycleController(t, s)
-				h := s.Write().SnapshotMeter("svc").Histogram("latency_seconds", metrix.WithHistogramBounds(1, 2))
+				h := s.Write().SnapshotMeter("svc").Histogram("latency_seconds", metrix.WithHistogramBounds(1, 2, 10))
 				cc.BeginCycle()
 				h.ObservePoint(metrix.HistogramPoint{
-					Count: 2,
-					Sum:   3,
+					Count: 4,
+					Sum:   13,
 					Buckets: []metrix.BucketPoint{
 						{UpperBound: 1, CumulativeCount: 1},
 						{UpperBound: 2, CumulativeCount: 2},
+						{UpperBound: 10, CumulativeCount: 3},
 					},
 				})
 				cc.CommitCycleSuccess()
 			},
-			wantNames:      []string{"+Inf", "1", "2"},
-			wantKinds:      []ActionKind{ActionCreateChart, ActionCreateDimension, ActionCreateDimension, ActionCreateDimension, ActionUpdateChart},
+			wantNames:      []string{"1", "2", "10", "+Inf"},
+			wantKinds:      []ActionKind{ActionCreateChart, ActionCreateDimension, ActionCreateDimension, ActionCreateDimension, ActionCreateDimension, ActionUpdateChart},
 			wantCreateType: program.ChartTypeHeatmap,
 		},
 		"summary quantile inference resolves quantile labels": {
@@ -1505,16 +1506,17 @@ groups:
 	store := metrix.NewCollectorStore()
 	cc := mustCycleController(t, store)
 	sm := store.Write().SnapshotMeter("svc")
-	h := sm.Histogram("latency_seconds", metrix.WithHistogramBounds(1, 2))
+	h := sm.Histogram("latency_seconds", metrix.WithHistogramBounds(1, 2, 10))
 	method := sm.LabelSet(metrix.Label{Key: "method", Value: "GET"})
 
 	cc.BeginCycle()
 	h.ObservePoint(metrix.HistogramPoint{
-		Count: 3,
-		Sum:   4,
+		Count: 4,
+		Sum:   13,
 		Buckets: []metrix.BucketPoint{
 			{UpperBound: 1, CumulativeCount: 1},
-			{UpperBound: 2, CumulativeCount: 3},
+			{UpperBound: 2, CumulativeCount: 2},
+			{UpperBound: 10, CumulativeCount: 3},
 		},
 	}, method)
 	cc.CommitCycleSuccess()
@@ -1539,17 +1541,26 @@ groups:
 	_, hasLE := bucketChart.Labels["le"]
 	assert.False(t, hasLE)
 
-	dims := map[string]struct{}{}
+	var dims []string
+	var updateDims []string
 	for _, action := range plan.Actions {
-		create, ok := action.(CreateDimensionAction)
-		if !ok || create.ChartID != "svc.latency_seconds-method=GET" {
-			continue
+		switch action := action.(type) {
+		case CreateDimensionAction:
+			if action.ChartID != "svc.latency_seconds-method=GET" {
+				continue
+			}
+			dims = append(dims, action.Name)
+		case UpdateChartAction:
+			if action.ChartID != "svc.latency_seconds-method=GET" {
+				continue
+			}
+			for _, value := range action.Values {
+				updateDims = append(updateDims, value.Name)
+			}
 		}
-		dims[create.Name] = struct{}{}
 	}
-	assert.Contains(t, dims, "bucket_1")
-	assert.Contains(t, dims, "bucket_2")
-	assert.Contains(t, dims, "bucket_+Inf")
+	assert.Equal(t, []string{"bucket_1", "bucket_2", "bucket_10", "bucket_+Inf"}, dims)
+	assert.Equal(t, []string{"bucket_1", "bucket_2", "bucket_10", "bucket_+Inf"}, updateDims)
 }
 
 func runTestBuildPlanAutogenCreatesChartForUnmatchedGauge(t *testing.T) {

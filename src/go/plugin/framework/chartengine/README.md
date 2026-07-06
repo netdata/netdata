@@ -177,7 +177,8 @@ Default lifecycle policy when template omits lifecycle:
 Histogram bucket charts use non-overlapping range bucket totals from
 `metrix.ReadFlatten()` and are emitted as `heatmap` charts in both autogen and
 template-driven paths. The `le` label remains the upper-bound identity for the
-bucket dimension.
+bucket dimension. Bucket dimensions are ordered by numeric upper bound with
+`+Inf` last, not by lexical dimension name.
 
 `MeasureSet` autogen specifics:
 

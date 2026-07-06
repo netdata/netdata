@@ -198,6 +198,9 @@ func TestHistogramStoreScenarios(t *testing.T) {
 						{UpperBound: 2, CumulativeCount: 1},
 					},
 				})
+				mustValue(t, s.Read(ReadFlatten()), "svc.latency_bucket", Labels{HistogramBucketLabel: "1"}, 0)
+				mustValue(t, s.Read(ReadFlatten()), "svc.latency_bucket", Labels{HistogramBucketLabel: "2"}, 1)
+				mustValue(t, s.Read(ReadFlatten()), "svc.latency_bucket", Labels{HistogramBucketLabel: "+Inf"}, 0)
 
 				cc.BeginCycle()
 				cc.CommitCycleSuccess()
@@ -205,6 +208,8 @@ func TestHistogramStoreScenarios(t *testing.T) {
 				require.False(t, ok, "expected stale cycle-window histogram hidden from Read")
 				_, ok = s.Read(ReadRaw()).Histogram("svc.latency", nil)
 				require.True(t, ok, "expected raw histogram to remain visible")
+				_, ok = s.Read(ReadFlatten()).Value("svc.latency_bucket", Labels{HistogramBucketLabel: "1"})
+				require.False(t, ok, "expected stale cycle-window flattened histogram hidden from Read(ReadFlatten())")
 			},
 		},
 		"window option on snapshot histogram panics": {

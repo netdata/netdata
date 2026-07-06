@@ -9,35 +9,61 @@ import (
 )
 
 func orderedMaterializedDimensionNames(dimensions map[string]*materializedDimensionState) []string {
-	type staticEntry struct {
-		name  string
-		order int
-	}
-	staticEntries := make([]staticEntry, 0, len(dimensions))
-	dynamicNames := make([]string, 0, len(dimensions))
+	staticEntries := make([]staticDimensionOrderEntry, 0, len(dimensions))
+	dynamicEntries := make([]dynamicDimensionOrderEntry, 0, len(dimensions))
 	for name, dim := range dimensions {
 		if dim.static {
-			staticEntries = append(staticEntries, staticEntry{
+			staticEntries = append(staticEntries, staticDimensionOrderEntry{
 				name:  name,
 				order: dim.order,
 			})
 			continue
 		}
-		dynamicNames = append(dynamicNames, name)
+		dynamicEntries = append(dynamicEntries, dynamicDimensionOrderEntry{
+			name:    name,
+			sortKey: dim.sortKey,
+		})
 	}
+	return orderedDimensionNames(staticEntries, dynamicEntries)
+}
+
+type staticDimensionOrderEntry struct {
+	name  string
+	order int
+}
+
+type dynamicDimensionOrderEntry struct {
+	name    string
+	sortKey dimensionSortKey
+}
+
+func orderedDimensionNames(staticEntries []staticDimensionOrderEntry, dynamicEntries []dynamicDimensionOrderEntry) []string {
 	sort.Slice(staticEntries, func(i, j int) bool {
 		if staticEntries[i].order != staticEntries[j].order {
 			return staticEntries[i].order < staticEntries[j].order
 		}
 		return staticEntries[i].name < staticEntries[j].name
 	})
-	sort.Strings(dynamicNames)
-	out := make([]string, 0, len(staticEntries)+len(dynamicNames))
+	sort.Slice(dynamicEntries, func(i, j int) bool {
+		return lessDynamicDimension(dynamicEntries[i], dynamicEntries[j])
+	})
+	out := make([]string, 0, len(staticEntries)+len(dynamicEntries))
 	for _, item := range staticEntries {
 		out = append(out, item.name)
 	}
-	out = append(out, dynamicNames...)
+	for _, item := range dynamicEntries {
+		out = append(out, item.name)
+	}
 	return out
+}
+
+func lessDynamicDimension(lhs, rhs dynamicDimensionOrderEntry) bool {
+	if lhs.sortKey.kind == dimensionSortHistogramBucket && rhs.sortKey.kind == dimensionSortHistogramBucket {
+		if lhs.sortKey.upperBound != rhs.sortKey.upperBound {
+			return lhs.sortKey.upperBound < rhs.sortKey.upperBound
+		}
+	}
+	return lhs.name < rhs.name
 }
 
 func enforceLifecycleCaps(
@@ -348,36 +374,23 @@ func collectExpiryRemovals(
 }
 
 func orderedObservedDimensionNames(entries map[string]*dimBuildEntry, seenSeq uint64) []string {
-	type staticEntry struct {
-		name  string
-		order int
-	}
-	staticEntries := make([]staticEntry, 0, len(entries))
-	dynamicNames := make([]string, 0, len(entries))
+	staticEntries := make([]staticDimensionOrderEntry, 0, len(entries))
+	dynamicEntries := make([]dynamicDimensionOrderEntry, 0, len(entries))
 	for name, entry := range entries {
 		if entry == nil || entry.seenSeq != seenSeq {
 			continue
 		}
 		if entry.static {
-			staticEntries = append(staticEntries, staticEntry{
+			staticEntries = append(staticEntries, staticDimensionOrderEntry{
 				name:  name,
 				order: entry.order,
 			})
 			continue
 		}
-		dynamicNames = append(dynamicNames, name)
+		dynamicEntries = append(dynamicEntries, dynamicDimensionOrderEntry{
+			name:    name,
+			sortKey: entry.sortKey,
+		})
 	}
-	sort.Slice(staticEntries, func(i, j int) bool {
-		if staticEntries[i].order != staticEntries[j].order {
-			return staticEntries[i].order < staticEntries[j].order
-		}
-		return staticEntries[i].name < staticEntries[j].name
-	})
-	sort.Strings(dynamicNames)
-	out := make([]string, 0, len(staticEntries)+len(dynamicNames))
-	for _, entry := range staticEntries {
-		out = append(out, entry.name)
-	}
-	out = append(out, dynamicNames...)
-	return out
+	return orderedDimensionNames(staticEntries, dynamicEntries)
 }

@@ -531,7 +531,8 @@ charts:
 
 Histogram `_bucket` dimensions receive non-overlapping range bucket totals from
 `metrix.ReadFlatten()`. The `le` label remains the bucket upper bound, but the
-value is no longer cumulative with earlier buckets.
+value is no longer cumulative with earlier buckets. Histogram bucket dimensions
+are ordered by numeric `le` value with `+Inf` last.
 
 > [!WARNING]
 > If a chart's dimensions mix counter-like metrics (e.g., `requests_total`) with gauge-like metrics (e.g., `temperature`) and `algorithm` is omitted, the engine fails with a compile error: _"algorithm inference is ambiguous for mixed metric kinds; set algorithm explicitly"_. Set `algorithm` on the chart to resolve this.
