@@ -20,9 +20,9 @@ func newTestFuncInterfaces(cache *ifaceCache) *funcInterfaces {
 func TestSnmpMethods(t *testing.T) {
 	methods := snmpMethods()
 
-	var ifacesMethod *funcapi.MethodConfig
-	var licensesMethod *funcapi.MethodConfig
-	var bgpMethod *funcapi.MethodConfig
+	var ifacesMethod *funcapi.FunctionConfig
+	var licensesMethod *funcapi.FunctionConfig
+	var bgpMethod *funcapi.FunctionConfig
 	methodIDs := make(map[string]bool, len(methods))
 	for i := range methods {
 		methodIDs[methods[i].ID] = true

@@ -1,0 +1,5 @@
+taxonomy_version: 1
+plugin_name: go.d.plugin
+module_name: cloudwatch
+taxonomy_optout:
+  reason: CloudWatch chart contexts are generated at runtime from the active service profiles under the cloudwatch namespace and vary per AWS account and per loaded profile, so the collector does not expose stable collector-level metric scopes for dashboard taxonomy placement.

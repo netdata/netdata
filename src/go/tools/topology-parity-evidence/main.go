@@ -1026,7 +1026,7 @@ func runPhase2(opts options) error {
 	}
 
 	reversePairQuality, err := runSelectionGroup("reverse_pair_quality", []testSelection{{
-		packagePath: "./plugin/go.d/collector/snmp",
+		packagePath: "./plugin/go.d/collector/snmp_topology",
 		tests: []string{
 			"TestTopologyCache_LldpSnapshot",
 			"TestTopologyCache_CdpSnapshot",
@@ -1043,7 +1043,7 @@ func runPhase2(opts options) error {
 	}
 
 	identityMergeQuality, err := runSelectionGroup("identity_merge_quality", []testSelection{{
-		packagePath: "./plugin/go.d/collector/snmp",
+		packagePath: "./plugin/go.d/collector/snmp_topology",
 		tests: []string{
 			"TestTopologyCache_SnapshotMergesRemoteIdentityAcrossProtocols",
 		},
@@ -1553,8 +1553,8 @@ func runRequiredGoTests() []goTestSummary {
 			args:         []string{"test", "./tools/topology-parity-evidence"},
 		},
 		{
-			packageLabel: "./plugin/go.d/collector/snmp -run ^TestTopology",
-			args:         []string{"test", "./plugin/go.d/collector/snmp", "-run", "^TestTopology"},
+			packageLabel: "./plugin/go.d/collector/snmp_topology -run ^TestTopology",
+			args:         []string{"test", "./plugin/go.d/collector/snmp_topology", "-run", "^TestTopology"},
 		},
 	}
 

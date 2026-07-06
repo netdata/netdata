@@ -9,38 +9,33 @@ Use this skill before editing files under:
 
 - `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/`
 - `src/go/cmd/snmptrapprofilegen/` (shipped helper source)
-- `.agents/sow/specs/snmp-traps/netdata.md` (when the change touches profile schema or trap subsystem decisions that the profiles encode)
+- `.agents/skills/project-snmp-trap-profiles-authoring/netdata.md` (when the change touches profile schema or trap subsystem decisions that the profiles encode)
 
 The authoritative schema reference is
 `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md`. The
 authoritative subsystem design is
-`.agents/sow/specs/snmp-traps/netdata.md`. This skill is the working checklist
+`.agents/skills/project-snmp-trap-profiles-authoring/netdata.md`. This skill is the working checklist
 that keeps repository edits aligned with both.
 
-## SNMP Trap SOW Spec Organization
+## SNMP Trap Design Docs
 
-The SNMP trap SOW spec directory intentionally separates Netdata product
-contracts from research evidence.
+The Netdata-owned trap design docs are committed in this skill folder:
 
-- Netdata-owned specs and decisions live directly under
-  `.agents/sow/specs/snmp-traps/`:
-  - `netdata.md`
-  - `trap-metrics-profiles.md`
-  - `netdata-snmp-hub-architecture.md`
-  - `decisions/`
-- Research evidence lives under `.agents/sow/specs/snmp-traps/research/`:
-  - `domain/` for general SNMP trap observability research;
-  - `playbooks/` for operational playbooks and skill-distillation source
-    material;
-  - `netdata-existing/` for inventories of existing Netdata subsystems used as
-    design inputs;
-  - `external-systems/` for per-product studies of other trap implementations;
-  - `comparison/` for cross-system matrices, stress tests, and synthesis.
+- `netdata.md` — authoritative subsystem design
+- `trap-metrics-profiles.md` — trap metric rules
+- `netdata-snmp-hub-architecture.md` — hub architecture
+- `pipeline-internals.md` — pipeline internals
+- `decisions/` — accepted design decisions (ADRs)
 
-Do not put new research files beside the Netdata specs. Research can inform
-specs, but it is not itself a Netdata product contract. When a research finding
-becomes a product rule, copy the accepted rule into a top-level spec or
-`decisions/` entry and cite the research path as evidence.
+Research evidence is local-only working memory (not committed) under
+`.agents/sow/specs/snmp-traps/research/` (`domain/`, `playbooks/`,
+`netdata-existing/`, `external-systems/`, `comparison/`). It informs the design
+docs but is not itself a Netdata product contract.
+
+When a research finding becomes a product rule, copy the accepted rule into one
+of the committed design docs above (or a `decisions/` entry) and cite the
+research path as evidence. Do not put research files beside the committed design
+docs.
 
 ## Trap OID `.0.` tolerance
 
@@ -269,7 +264,7 @@ These are closed sets enforced in three places that must stay in sync:
    `validSeverities`, `severityPriority`, JSON Schema, and classifier prompt text.
 2. `src/go/plugin/go.d/config/go.d/snmp.trap-profiles/profile-format.md`
    — the operator-facing category and severity tables.
-3. `.agents/sow/specs/snmp-traps/netdata.md` — §3 (category taxonomy) and
+3. `.agents/skills/project-snmp-trap-profiles-authoring/netdata.md` — §3 (category taxonomy) and
    §11 (PRIORITY mapping).
 
 A taxonomy change without all three updates is incomplete and will be

@@ -14,22 +14,24 @@ const (
 	snmpTopologyV1ProducerSource = "snmp-l2"
 	snmpTopologyV1Instance       = "local"
 
-	snmpTopologyV1ActorDevice   = "device"
-	snmpTopologyV1ActorEndpoint = "endpoint"
-	snmpTopologyV1ActorSegment  = "segment"
+	snmpTopologyV1ActorDevice          = "device"
+	snmpTopologyV1ActorEndpoint        = "endpoint"
+	snmpTopologyV1ActorSegment         = "segment"
+	snmpTopologyV1ActorL3SubnetSegment = topologymodel.L3SubnetSegmentActorType
 
-	snmpTopologyV1LinkObservation = "l2_observation"
-	snmpTopologyV1LinkLLDP        = "lldp"
-	snmpTopologyV1LinkCDP         = "cdp"
-	snmpTopologyV1LinkBridge      = "bridge"
-	snmpTopologyV1LinkFDB         = "fdb"
-	snmpTopologyV1LinkSTP         = "stp"
-	snmpTopologyV1LinkARP         = "arp"
-	snmpTopologyV1LinkSNMP        = "snmp"
-	snmpTopologyV1LinkProbable    = "probable"
-	snmpTopologyV1LinkL3Subnet    = topologymodel.L3SubnetLinkType
-	snmpTopologyV1LinkOSPF        = topologymodel.OSPFAdjacencyLinkType
-	snmpTopologyV1LinkBGP         = topologymodel.BGPAdjacencyLinkType
+	snmpTopologyV1LinkObservation        = "l2_observation"
+	snmpTopologyV1LinkLLDP               = "lldp"
+	snmpTopologyV1LinkCDP                = "cdp"
+	snmpTopologyV1LinkBridge             = "bridge"
+	snmpTopologyV1LinkFDB                = "fdb"
+	snmpTopologyV1LinkSTP                = "stp"
+	snmpTopologyV1LinkARP                = "arp"
+	snmpTopologyV1LinkSNMP               = "snmp"
+	snmpTopologyV1LinkProbable           = "probable"
+	snmpTopologyV1LinkL3Subnet           = topologymodel.L3SubnetLinkType
+	snmpTopologyV1LinkL3SubnetMembership = topologymodel.L3SubnetMembershipLinkType
+	snmpTopologyV1LinkOSPF               = topologymodel.OSPFAdjacencyLinkType
+	snmpTopologyV1LinkBGP                = topologymodel.BGPAdjacencyLinkType
 )
 
 func Render(data topologymodel.Data) (topologyapi.Data, error) {
@@ -118,6 +120,7 @@ func Render(data topologymodel.Data) (topologyapi.Data, error) {
 				"fdb",
 				"stp",
 				"l3_subnet",
+				"l3_subnet_membership",
 				"ospf",
 				"bgp",
 			},

@@ -81,7 +81,7 @@ static inline void MRG_STATS_DELETED_METRIC(MRG *mrg, size_t partition, Word_t s
     mrg->index[partition].stats.size -= sizeof(METRIC);
     mrg->index[partition].stats.deletions++;
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
-    __atomic_sub_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
+    rrdeng_atomic_uint64_sub_saturating(ctx, &ctx->atomic.metrics, 1, "metrics", "deleting an MRG metric");
 }
 
 static inline void MRG_STATS_SEARCH_HIT(MRG *mrg, size_t partition) {

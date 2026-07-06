@@ -12,17 +12,17 @@ _Atomic int send_cgroup_chart = 0;
 #ifdef OS_LINUX
 #define EBPF_CGROUP_NETIPC_CALL_TIMEOUT_MS 5000u
 
-static nipc_cgroups_cache_t ebpf_cgroup_cache;
-static bool ebpf_cgroup_cache_initialized = false;
+static nipc_client_ctx_t ebpf_cgroup_client;
+static bool ebpf_cgroup_client_initialized = false;
 
 static bool ebpf_cgroup_cache_is_initialized(void)
 {
-    return __atomic_load_n(&ebpf_cgroup_cache_initialized, __ATOMIC_ACQUIRE);
+    return __atomic_load_n(&ebpf_cgroup_client_initialized, __ATOMIC_ACQUIRE);
 }
 
 static void ebpf_cgroup_cache_set_initialized(bool initialized)
 {
-    __atomic_store_n(&ebpf_cgroup_cache_initialized, initialized, __ATOMIC_RELEASE);
+    __atomic_store_n(&ebpf_cgroup_client_initialized, initialized, __ATOMIC_RELEASE);
 }
 
 static const char *ebpf_netipc_client_state_name(nipc_client_state_t state)
@@ -69,11 +69,11 @@ static void ebpf_log_cgroup_transport_state(uint64_t generation, uint32_t count,
     static bool previous_using_shm = false;
     static uint64_t previous_session_id = 0;
 
-    nipc_client_state_t state = ebpf_cgroup_cache.client.state;
-    bool session_valid = ebpf_cgroup_cache.client.session_valid;
-    uint32_t profile = session_valid ? ebpf_cgroup_cache.client.session.selected_profile : 0;
-    bool using_shm = session_valid && ebpf_cgroup_cache.client.shm != NULL;
-    uint64_t session_id = session_valid ? ebpf_cgroup_cache.client.session.session_id : 0;
+    nipc_client_state_t state = ebpf_cgroup_client.state;
+    bool session_valid = ebpf_cgroup_client.session_valid;
+    uint32_t profile = session_valid ? ebpf_cgroup_client.session.selected_profile : 0;
+    bool using_shm = session_valid && ebpf_cgroup_client.shm != NULL;
+    uint64_t session_id = session_valid ? ebpf_cgroup_client.session.session_id : 0;
 
     if (previous_state == state &&
         previous_session_valid == session_valid &&
@@ -179,17 +179,38 @@ static size_t ebpf_count_cgroup_pids_unsafe(void)
 /**
  * Set Target Data
  *
- * Set local variable values from a netipc cache item.
+ * Set local variable values from a netipc cgroups-snapshot item.
  *
  * @param out  local output variable.
- * @param item netipc cache item.
+ * @param item netipc cgroups-snapshot item.
  */
-static inline void ebpf_cgroup_set_target_data(ebpf_cgroup_target_t *out, const nipc_cgroups_cache_item_t *item)
+static inline void ebpf_cgroup_set_target_data(ebpf_cgroup_target_t *out, const nipc_cgroups_item_view_t *item)
 {
+    size_t name_len = item->name.len;
+    if (name_len >= sizeof(out->name))
+        name_len = sizeof(out->name) - 1;
+
     out->hash = item->hash;
-    snprintfz(out->name, 255, "%s", item->name);
+    memcpy(out->name, item->name.ptr, name_len);
+    out->name[name_len] = '\0';
     out->systemd = item->options & CGROUP_OPTIONS_SYSTEM_SLICE_SERVICE;
     out->updated = 1;
+}
+
+static inline bool ebpf_cgroup_target_matches_item(const ebpf_cgroup_target_t *target, const nipc_cgroups_item_view_t *item)
+{
+    size_t name_len = item->name.len;
+
+    if (name_len >= sizeof(target->name) || target->name[name_len] != '\0')
+        return false;
+
+    if (name_len == 0)
+        return true;
+
+    if (!item->name.ptr)
+        return false;
+
+    return memcmp(target->name, item->name.ptr, name_len) == 0;
 }
 
 /**
@@ -197,14 +218,14 @@ static inline void ebpf_cgroup_set_target_data(ebpf_cgroup_target_t *out, const 
  *
  * Find the structure inside the link list or allocate and link when it is not present.
  *
- * @param item netipc cache item.
+ * @param item netipc cgroups-snapshot item.
  *
  * @return It returns a pointer for the structure associated with the input.
  */
-static ebpf_cgroup_target_t *ebpf_cgroup_find_or_create(const nipc_cgroups_cache_item_t *item)
+static ebpf_cgroup_target_t *ebpf_cgroup_find_or_create(const nipc_cgroups_item_view_t *item)
 {
     for (ebpf_cgroup_target_t *ect = ebpf_cgroup_pids; ect; ect = ect->next) {
-        if (ect->hash == item->hash && !strcmp(ect->name, item->name)) {
+        if (ect->hash == item->hash && ebpf_cgroup_target_matches_item(ect, item)) {
             ect->updated = 1;
             return ect;
         }
@@ -288,7 +309,7 @@ void ebpf_reset_updated_var()
 }
 
 /**
- * Initialize netipc cgroup cache
+ * Initialize netipc cgroups-snapshot client
  *
  * Connect to the cgroups-snapshot service via netipc.
  */
@@ -307,10 +328,10 @@ static void ebpf_cgroup_cache_init(void)
         .call_timeout_ms = EBPF_CGROUP_NETIPC_CALL_TIMEOUT_MS,
     };
 
-    nipc_cgroups_cache_init(&ebpf_cgroup_cache,
-                             os_run_dir(false),
-                             "cgroups-snapshot",
-                             &config);
+    nipc_client_init(&ebpf_cgroup_client,
+                     os_run_dir(false),
+                     "cgroups-snapshot",
+                     &config);
 
     ebpf_cgroup_cache_set_initialized(true);
 #endif
@@ -320,26 +341,26 @@ void ebpf_cgroup_cache_abort(void)
 {
 #ifdef OS_LINUX
     if (ebpf_cgroup_cache_is_initialized())
-        nipc_client_abort(&ebpf_cgroup_cache.client);
+        nipc_client_abort(&ebpf_cgroup_client);
 #endif
 }
 
 /**
- * Close the netipc cgroup cache and release resources.
+ * Close the netipc cgroups-snapshot client and release resources.
  */
 void ebpf_cgroup_cache_cleanup(void)
 {
 #ifdef OS_LINUX
     if (ebpf_cgroup_cache_is_initialized()) {
-        nipc_client_abort(&ebpf_cgroup_cache.client);
-        nipc_cgroups_cache_close(&ebpf_cgroup_cache);
+        nipc_client_abort(&ebpf_cgroup_client);
+        nipc_client_close(&ebpf_cgroup_client);
         ebpf_cgroup_cache_set_initialized(false);
     }
 #endif
 }
 
 /**
- * Refresh cgroup data from netipc cache
+ * Refresh cgroup data from netipc cgroups-snapshot
  *
  * Replaces the legacy SHM parse function.
  */
@@ -357,26 +378,48 @@ static void ebpf_parse_cgroup_netipc_data(void)
         return;
 
     static int refresh_fail_count = 0;
-    if (!nipc_cgroups_cache_refresh(&ebpf_cgroup_cache)) {
+    nipc_client_refresh(&ebpf_cgroup_client);
+
+    nipc_cgroups_resp_view_t view;
+    nipc_error_t err = nipc_client_call_cgroups_snapshot_timeout(
+        &ebpf_cgroup_client,
+        &view,
+        EBPF_CGROUP_NETIPC_CALL_TIMEOUT_MS);
+    if (err != NIPC_OK) {
         if (++refresh_fail_count % 10 == 1)
-            collector_error("EBPF CGROUP: netipc refresh failed (%d consecutive failures)", refresh_fail_count);
+            collector_error(
+                "EBPF CGROUP: netipc cgroups-snapshot call failed err=%d (%d consecutive failures)",
+                err,
+                refresh_fail_count);
         return;
     }
-    refresh_fail_count = 0;
 
     uint32_t last_count = previous_count;
-    uint32_t count = ebpf_cgroup_cache.item_count;
-    uint64_t generation = ebpf_cgroup_cache.generation;
+    uint32_t count = view.item_count;
+    uint64_t generation = view.generation;
     uint32_t enabled_count = 0;
 
-    int systemd_enabled = (int)ebpf_cgroup_cache.systemd_enabled;
+    int systemd_enabled = (int)view.systemd_enabled;
     int integration_active = (count > 0) ? 1 : 0;
 
     for (uint32_t i = 0; i < count; i++) {
-        const nipc_cgroups_cache_item_t *item = &ebpf_cgroup_cache.items[i];
-        if (item->enabled)
+        nipc_cgroups_item_view_t item;
+        err = nipc_cgroups_resp_item(&view, i, &item);
+        if (err != NIPC_OK) {
+            if (++refresh_fail_count % 10 == 1)
+                collector_error(
+                    "EBPF CGROUP: netipc cgroups-snapshot item decode failed index=%u err=%d "
+                    "(%d consecutive failures)",
+                    i,
+                    err,
+                    refresh_fail_count);
+            return;
+        }
+
+        if (item.enabled)
             enabled_count++;
     }
+    refresh_fail_count = 0;
 
     ebpf_log_cgroup_transport_state(generation, count, enabled_count);
 
@@ -425,11 +468,12 @@ static void ebpf_parse_cgroup_netipc_data(void)
     ebpf_remove_cgroup_target_update_list();
     ebpf_reset_updated_var();
 
+    // The validation pass above already decoded every item in this immutable response buffer.
     for (uint32_t i = 0; i < count; i++) {
-        const nipc_cgroups_cache_item_t *item = &ebpf_cgroup_cache.items[i];
-        if (item->enabled) {
-            ebpf_cgroup_target_t *ect = ebpf_cgroup_find_or_create(item);
-            ebpf_update_pid_link_list(ect, item->path);
+        nipc_cgroups_item_view_t item;
+        if (nipc_cgroups_resp_item(&view, i, &item) == NIPC_OK && item.enabled) {
+            ebpf_cgroup_target_t *ect = ebpf_cgroup_find_or_create(&item);
+            ebpf_update_pid_link_list(ect, item.path.ptr);
         }
     }
 

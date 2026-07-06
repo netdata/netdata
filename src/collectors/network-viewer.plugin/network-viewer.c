@@ -33,7 +33,7 @@ static SPAWN_SERVER *spawn_srv = NULL;
 #define NETWORK_TOPOLOGY_VIEWER_HELP "Shows live network-connections topology with self/process/endpoint actors and ownership/socket links."
 #define NETWORK_VIEWER_RESPONSE_UPDATE_EVERY 5
 #define NETWORK_PROTOCOLS_FUNCTION      "network-protocols"
-#define NETWORK_PROTOCOLS_FUNCTION_HELP "FreeBSD TCP and UDP statistics (IPv4 and IPv6 combined)"
+#define NETWORK_PROTOCOLS_FUNCTION_HELP "TCP and UDP statistics (IPv4 and IPv6 combined)"
 // Keep in sync with the topology schema contract used across topology producers.
 #define NETWORK_TOPOLOGY_SCHEMA_VERSION "netdata.topology.v1"
 #define NETWORK_TOPOLOGY_SOURCE "network-connections"
@@ -265,18 +265,21 @@ static const char *topology_abort_message(NV_TOPOLOGY_ABORT_STATUS status)
 #include "libnetdata/simple_hashtable/simple_hashtable.h"
 
 netdata_mutex_t stdout_mutex;
-#if defined(OS_FREEBSD)
+#if defined(OS_FREEBSD) || defined(OS_MACOS)
 static netdata_mutex_t nv_proto_mutex;
 #endif
 
 static void __attribute__((constructor)) init_mutex(void) {
     netdata_mutex_init(&stdout_mutex);
-#if defined(OS_FREEBSD)
+#if defined(OS_FREEBSD) || defined(OS_MACOS)
     netdata_mutex_init(&nv_proto_mutex);
 #endif
 }
 
 static void __attribute__((destructor)) destroy_mutex(void) {
+#if defined(OS_FREEBSD) || defined(OS_MACOS)
+    netdata_mutex_destroy(&nv_proto_mutex);
+#endif
     netdata_mutex_destroy(&stdout_mutex);
 }
 static bool plugin_should_exit = false;
@@ -842,6 +845,7 @@ static bool topology_read_proc_starttime(uint64_t pid, uint64_t *starttime) {
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #include <sys/user.h>
+#include <netinet/tcp_var.h>
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
 static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
@@ -869,7 +873,53 @@ static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *
 
     return false;
 }
+#elif defined(OS_MACOS)
+#include <libproc.h>
+#include <netinet/tcp_var.h>
+#include <netinet/udp_var.h>
+#include <sys/proc_info.h>
+#include <sys/sysctl.h>
+
+static bool topology_read_proc_ppid(uint64_t pid, uint64_t *ppid) {
+    if(!pid || !ppid || pid > (uint64_t)INT_MAX)
+        return false;
+
+    struct proc_bsdinfo bsd;
+    int rc = proc_pidinfo((pid_t)pid, PROC_PIDTBSDINFO, 0, &bsd, sizeof(bsd));
+    if(rc != (int)sizeof(bsd))
+        return false;
+
+    uint64_t parent = (uint64_t)bsd.pbi_ppid;
+    if(parent == pid)
+        parent = 0;
+
+    *ppid = parent;
+    return true;
+}
+
+static bool topology_read_proc_starttime(uint64_t pid, uint64_t *starttime) {
+    if(!pid || !starttime || pid > (uint64_t)INT_MAX)
+        return false;
+
+    struct proc_bsdinfo bsd;
+    int rc = proc_pidinfo((pid_t)pid, PROC_PIDTBSDINFO, 0, &bsd, sizeof(bsd));
+    if(rc != (int)sizeof(bsd))
+        return false;
+
+    if(!bsd.pbi_start_tvsec && !bsd.pbi_start_tvusec)
+        return false;
+
+    *starttime = bsd.pbi_start_tvsec * USEC_PER_SEC + bsd.pbi_start_tvusec;
+    return true;
+}
 #else
+static bool topology_read_proc_ppid(uint64_t pid __maybe_unused, uint64_t *ppid) {
+    if(ppid)
+        *ppid = 0;
+
+    return false;
+}
+
 static bool topology_read_proc_starttime(uint64_t pid __maybe_unused, uint64_t *starttime) {
     if(starttime)
         *starttime = 0;
@@ -1550,6 +1600,7 @@ static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOC
         // buffer_json_add_array_item_uint64(wb, n->inode);
         // buffer_json_add_array_item_uint64(wb, n->net_ns_inode);
 
+#if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
         // RTT
         buffer_json_add_array_item_double(wb, (double)n->info.tcp.tcpi_rtt / (double)USEC_PER_MS);
         if(st->max.tcpi_rtt < n->info.tcp.tcpi_rtt)
@@ -1571,6 +1622,7 @@ static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOC
             st->max.tcpi_total_retrans = n->info.tcp.tcpi_total_retrans;
 #else
         buffer_json_add_array_item_uint64(wb, 0);
+#endif
 #endif
 
         // count
@@ -1637,6 +1689,7 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
         KEEP_THE_BIGGER(t->rqueue, n->rqueue);
         KEEP_THE_BIGGER(t->wqueue, n->wqueue);
 
+#if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
         // The current number of consecutive retransmissions that have occurred for the most recently transmitted segment.
 #if defined(OS_LINUX)
         SUM_THEM_ALL(t->info.tcp.tcpi_retransmits, n->info.tcp.tcpi_retransmits);
@@ -1764,6 +1817,7 @@ static void local_sockets_cb_to_aggregation(LS_STATE *ls __maybe_unused, const L
 
         // The available space in the receive buffer.
         KEEP_THE_SMALLER(t->info.tcp.tcpi_rcv_space, n->info.tcp.tcpi_rcv_space);
+#endif
     }
     else {
         t = mallocz(sizeof(*t));
@@ -2009,14 +2063,16 @@ static void local_sockets_cb_to_topology(LS_STATE *ls, const LOCAL_SOCKET *n, vo
     if(!link->starttime && starttime)
         link->starttime = starttime;
     link->sockets++;
-#if defined(OS_LINUX)
+#if defined(LOCAL_SOCKETS_HAVE_TCP_INFO) && defined(OS_LINUX)
     link->retransmissions += n->info.tcp.tcpi_total_retrans;
 #endif
+#if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
     if(link->max_rtt_usec < n->info.tcp.tcpi_rtt)
         link->max_rtt_usec = n->info.tcp.tcpi_rtt;
 #if defined(OS_LINUX)
     if(link->max_rcv_rtt_usec < n->info.tcp.tcpi_rcv_rtt)
         link->max_rcv_rtt_usec = n->info.tcp.tcpi_rcv_rtt;
+#endif
 #endif
 }
 
@@ -3785,9 +3841,11 @@ static void topology_v1_emit_link_columns(BUFFER *wb) {
     topology_v1_emit_column(wb, "state", "string", "group_key", true, NULL);
     topology_v1_emit_column(wb, "evidence_count", "uint", "metric", false, "sum");
     topology_v1_emit_column(wb, "socket_count", "uint", "metric", false, "sum");
+#if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
     topology_v1_emit_column(wb, "retransmissions", "uint", "metric", false, "sum");
     topology_v1_emit_column(wb, "rtt_ms_max", "float", "metric", false, "max");
     topology_v1_emit_column(wb, "recv_rtt_ms_max", "float", "metric", false, "max");
+#endif
 }
 
 static void topology_v1_emit_socket_evidence_columns(BUFFER *wb) {
@@ -3809,9 +3867,11 @@ static void topology_v1_emit_socket_evidence_columns(BUFFER *wb) {
     topology_v1_emit_column(wb, "net_ns_inode", "uint", "attribute", true, NULL);
     topology_v1_emit_column(wb, "process", "string", "attribute", true, NULL);
     topology_v1_emit_column(wb, "socket_count", "uint", "metric", false, "sum");
+#if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
     topology_v1_emit_column(wb, "retransmissions", "uint", "metric", false, "sum");
     topology_v1_emit_column(wb, "rtt_ms_max", "float", "metric", false, "max");
     topology_v1_emit_column(wb, "recv_rtt_ms_max", "float", "metric", false, "max");
+#endif
 }
 
 static void topology_v1_emit_connection_columns(BUFFER *wb) {
@@ -3822,9 +3882,11 @@ static void topology_v1_emit_connection_columns(BUFFER *wb) {
     topology_v1_emit_column(wb, "protocol", "string", "group_key", false, NULL);
     topology_v1_emit_column(wb, "state", "string", "group_key", false, NULL);
     topology_v1_emit_column(wb, "socket_count", "uint", "metric", false, "sum");
+#if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
     topology_v1_emit_column(wb, "retransmissions", "uint", "metric", false, "sum");
     topology_v1_emit_column(wb, "rtt_ms_max", "float", "metric", false, "max");
     topology_v1_emit_column(wb, "recv_rtt_ms_max", "float", "metric", false, "max");
+#endif
 }
 
 static void topology_v1_emit_socket_port_columns(BUFFER *wb) {
@@ -4064,11 +4126,13 @@ static void topology_v1_emit_network_connection_modal_section(
             topology_v1_emit_modal_direct_column(wb, "protocol", "Protocol", "protocol", "badge");
             topology_v1_emit_modal_direct_column(wb, "state", "State", "state", "badge");
             topology_v1_emit_modal_direct_column(wb, "sockets", "Sockets", "socket_count", "number");
+#if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
             topology_v1_emit_modal_direct_column_with_visibility(
                 wb, "retransmissions", "Retransmissions", "retransmissions", "number", "expanded");
             topology_v1_emit_modal_direct_column(wb, "rtt", "RTT max", "rtt_ms_max", "number");
             topology_v1_emit_modal_direct_column_with_visibility(
                 wb, "recv_rtt", "Receiver RTT max", "recv_rtt_ms_max", "number", "expanded");
+#endif
         }
         buffer_json_array_close(wb);
     }
@@ -4171,8 +4235,104 @@ static void topology_v1_emit_modal_label_identification(
     buffer_json_object_close(wb);
 }
 
-static void topology_v1_emit_actor_search_label_keys(BUFFER *wb, const char *actor_type)
+static int topology_v1_string_ptr_cmp(const void *left, const void *right) {
+    const char *left_string = *(const char * const *)left;
+    const char *right_string = *(const char * const *)right;
+    return strcmp(left_string ? left_string : "", right_string ? right_string : "");
+}
+
+static bool topology_v1_actor_search_label_key_is_builtin(const char *key) {
+    static const char *const keys[] = {
+        "pid",
+        "ppid",
+        "uid",
+        "net_ns_inode",
+        "username",
+        "cmdline",
+        "namespace_type",
+        "local_ip",
+        "local_address_space",
+        "process",
+        "container_name",
+        "cgroup_status",
+        "orchestrator",
+        "cgroup_name",
+        "cgroup_path",
+        "k8s_pod_name",
+        "k8s_namespace",
+        "k8s_workload",
+        "docker_container_name",
+        "docker_image",
+        "systemd_unit_name",
+        "systemd_unit_kind",
+        "actor_kind",
+    };
+
+    if(!key || !*key)
+        return true;
+
+    for(size_t i = 0; i < _countof(keys); i++) {
+        if(strcmp(keys[i], key) == 0)
+            return true;
+    }
+
+    return false;
+}
+
+static bool topology_v1_label_matches_actor_type(
+    const NV_TOPOLOGY_V1_PAYLOAD *payload,
+    const NV_TOPOLOGY_V1_ACTOR_LABEL *label,
+    const char *actor_type) {
+    if(!payload || !label || !actor_type || label->actor >= payload->actors_used)
+        return false;
+
+    return strcmp(payload->actors[label->actor].type, actor_type) == 0;
+}
+
+static bool topology_v1_search_label_key_exists(const char **keys, size_t keys_used, const char *key) {
+    if(topology_v1_actor_search_label_key_is_builtin(key))
+        return true;
+
+    for(size_t i = 0; i < keys_used; i++) {
+        if(strcmp(keys[i], key) == 0)
+            return true;
+    }
+
+    return false;
+}
+
+static void topology_v1_emit_actor_search_label_keys(
+    BUFFER *wb,
+    const NV_TOPOLOGY_V1_PAYLOAD *payload,
+    const char *actor_type)
 {
+    const char **dynamic_keys = NULL;
+    size_t dynamic_keys_used = 0;
+    size_t dynamic_keys_size = 0;
+
+    if(topology_v1_actor_type_has_process_enrichment(actor_type) && payload) {
+        for(size_t i = 0; i < payload->labels_used; i++) {
+            const NV_TOPOLOGY_V1_ACTOR_LABEL *label = &payload->labels[i];
+            if(strcmp(label->source, "cgroups") != 0 || strcmp(label->kind, "label") != 0)
+                continue;
+
+            if(!topology_v1_label_matches_actor_type(payload, label, actor_type))
+                continue;
+
+            if(topology_v1_search_label_key_exists(dynamic_keys, dynamic_keys_used, label->key))
+                continue;
+
+            if(dynamic_keys_used == dynamic_keys_size) {
+                dynamic_keys_size = dynamic_keys_size ? dynamic_keys_size * 2 : 16;
+                dynamic_keys = reallocz(dynamic_keys, dynamic_keys_size * sizeof(*dynamic_keys));
+            }
+            dynamic_keys[dynamic_keys_used++] = label->key;
+        }
+    }
+
+    if(dynamic_keys_used > 1)
+        qsort(dynamic_keys, dynamic_keys_used, sizeof(*dynamic_keys), topology_v1_string_ptr_cmp);
+
     buffer_json_member_add_array(wb, "label_keys");
     if(topology_v1_actor_type_has_process_enrichment(actor_type)) {
         buffer_json_add_array_item_string(wb, "pid");
@@ -4199,11 +4359,16 @@ static void topology_v1_emit_actor_search_label_keys(BUFFER *wb, const char *act
         buffer_json_add_array_item_string(wb, "systemd_unit_kind");
         buffer_json_add_array_item_string(wb, "actor_kind");
     }
+    for(size_t i = 0; i < dynamic_keys_used; i++)
+        buffer_json_add_array_item_string(wb, dynamic_keys[i]);
     buffer_json_array_close(wb);
+
+    freez(dynamic_keys);
 }
 
 static void topology_v1_emit_actor_type(
     BUFFER *wb,
+    const NV_TOPOLOGY_V1_PAYLOAD *payload,
     const char *id,
     const char *merge_a,
     const char *merge_b,
@@ -4248,9 +4413,12 @@ static void topology_v1_emit_actor_type(
             if(strcmp(id, "self") == 0) {
                 buffer_json_add_array_item_string(wb, "display_name");
                 buffer_json_add_array_item_string(wb, "hostname");
+                buffer_json_add_array_item_string(wb, "machine_guid");
             }
             else if(strcmp(id, "process") == 0) {
                 buffer_json_add_array_item_string(wb, "display_name");
+                buffer_json_add_array_item_string(wb, "machine_guid");
+                buffer_json_add_array_item_string(wb, "hostname");
                 buffer_json_add_array_item_string(wb, "process");
                 buffer_json_add_array_item_string(wb, "username");
                 buffer_json_add_array_item_string(wb, "cmdline");
@@ -4271,6 +4439,8 @@ static void topology_v1_emit_actor_type(
             }
             else if(topology_v1_actor_type_is_grouped_runtime(id)) {
                 buffer_json_add_array_item_string(wb, "display_name");
+                buffer_json_add_array_item_string(wb, "machine_guid");
+                buffer_json_add_array_item_string(wb, "hostname");
                 buffer_json_add_array_item_string(wb, "container_name");
                 buffer_json_add_array_item_string(wb, "process");
                 buffer_json_add_array_item_string(wb, "cgroup_status");
@@ -4287,9 +4457,10 @@ static void topology_v1_emit_actor_type(
             else if(strcmp(id, "endpoint") == 0) {
                 buffer_json_add_array_item_string(wb, "display_name");
                 buffer_json_add_array_item_string(wb, "ip");
+                buffer_json_add_array_item_string(wb, "address_space");
             }
             buffer_json_array_close(wb);
-            topology_v1_emit_actor_search_label_keys(wb, id);
+            topology_v1_emit_actor_search_label_keys(wb, payload, id);
         }
         buffer_json_object_close(wb);
         buffer_json_member_add_object(wb, "presentation");
@@ -4484,6 +4655,7 @@ static const NV_TOPOLOGY_RUNTIME_ACTOR_TYPE topology_runtime_actor_types[] = {
 
 static void topology_v1_emit_runtime_actor_type(
     BUFFER *wb,
+    const NV_TOPOLOGY_V1_PAYLOAD *payload,
     const NV_TOPOLOGY_RUNTIME_ACTOR_TYPE *type,
     const char *const *container_scopes,
     size_t container_scopes_count,
@@ -4491,7 +4663,7 @@ static void topology_v1_emit_runtime_actor_type(
     bool detailed)
 {
     topology_v1_emit_actor_type(
-        wb, type->id, "container_name", NULL, container_scopes, container_scopes_count,
+        wb, payload, type->id, "container_name", NULL, container_scopes, container_scopes_count,
         type->label, "primary", type->icon, "actor", true, "metric", "socket_count", "normal", "normal", true,
         "socket_ports", group_by, detailed, "display_name", "container_name");
 }
@@ -4527,11 +4699,13 @@ static void topology_v1_emit_link_type(
             {
                 buffer_json_member_add_string(wb, "evidence_count", "sum");
                 buffer_json_member_add_string(wb, "socket_count", "sum");
+#if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
                 if(evidence_type) {
                     buffer_json_member_add_string(wb, "retransmissions", "sum");
                     buffer_json_member_add_string(wb, "rtt_ms_max", "max");
                     buffer_json_member_add_string(wb, "recv_rtt_ms_max", "max");
                 }
+#endif
             }
             buffer_json_object_close(wb);
         }
@@ -4581,6 +4755,7 @@ static void topology_v1_emit_link_type(
 
 static void topology_v1_emit_type_registry(
     BUFFER *wb,
+    const NV_TOPOLOGY_V1_PAYLOAD *payload,
     NV_TOPOLOGY_GROUP_BY group_by,
     bool detailed __maybe_unused) {
     static const char *const self_scopes[] = { "node" };
@@ -4600,22 +4775,22 @@ static void topology_v1_emit_type_registry(
         buffer_json_member_add_object(wb, "actor_types");
         {
             topology_v1_emit_actor_type(
-                wb, "self", "machine_guid", "hostname", self_scopes, _countof(self_scopes),
+                wb, payload, "self", "machine_guid", "hostname", self_scopes, _countof(self_scopes),
                 "This host", "self", "self", "actor", true, "fixed", NULL, "emphasized", "strongest", false, NULL,
                 group_by,
                 detailed,
                 "display_name", "hostname");
             topology_v1_emit_actor_type(
-                wb, "process", process_merge_a, process_merge_b, process_scopes, _countof(process_scopes),
+                wb, payload, "process", process_merge_a, process_merge_b, process_scopes, _countof(process_scopes),
                 "Process", "primary", "process", "actor", true, "metric", "socket_count", "normal", "normal", true, "socket_ports",
                 group_by,
                 detailed,
                 "display_name", "process");
             for(size_t i = 0; i < _countof(topology_runtime_actor_types); i++)
                 topology_v1_emit_runtime_actor_type(
-                    wb, &topology_runtime_actor_types[i], container_scopes, _countof(container_scopes), group_by, detailed);
+                    wb, payload, &topology_runtime_actor_types[i], container_scopes, _countof(container_scopes), group_by, detailed);
             topology_v1_emit_actor_type(
-                wb, "endpoint", "ip", "address_space", endpoint_scopes, _countof(endpoint_scopes),
+                wb, payload, "endpoint", "ip", "address_space", endpoint_scopes, _countof(endpoint_scopes),
                 "Correlation endpoint", "derived", "remote-endpoint", "endpoint", true, "fixed", NULL, "compact", "weaker", false, NULL,
                 group_by,
                 detailed,
@@ -5080,6 +5255,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_link_table(
         NV_TOPOLOGY_V1_LINK_STRING_VALUES(state);
         NV_TOPOLOGY_V1_LINK_UINT_VALUES(evidence_count);
         NV_TOPOLOGY_V1_LINK_UINT_VALUES(socket_count);
+#if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
         NV_TOPOLOGY_V1_LINK_UINT_VALUES(retransmissions);
 
         topology_v1_values_start(wb);
@@ -5099,6 +5275,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_link_table(
             buffer_json_add_array_item_double(wb, (double)payload->links[i].max_rcv_rtt_usec / (double)USEC_PER_MS);
         }
         topology_v1_values_end(wb);
+#endif
 
 #undef NV_TOPOLOGY_V1_LINK_UINT_VALUES
 #undef NV_TOPOLOGY_V1_LINK_STRING_VALUES
@@ -5402,6 +5579,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_port_table(
                         NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES(protocol);
                         NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES(state);
                         NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES(socket_count);
+#if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
                         NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES(retransmissions);
 
                         topology_v1_values_start(wb);
@@ -5421,6 +5599,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_port_table(
                             buffer_json_add_array_item_double(wb, (double)payload->connections[i].max_rcv_rtt_usec / (double)USEC_PER_MS);
                         }
                         topology_v1_values_end(wb);
+#endif
 
 #undef NV_TOPOLOGY_V1_CONNECTION_UINT_VALUES
 #undef NV_TOPOLOGY_V1_CONNECTION_STRING_VALUES
@@ -5513,6 +5692,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_evidence_table(
                 NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(net_ns_inode);
                 NV_TOPOLOGY_V1_EVIDENCE_SOURCE_STRING_VALUES(process);
                 NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(sockets);
+#if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
                 NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES(retransmissions);
 
                 topology_v1_values_start(wb);
@@ -5532,6 +5712,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_v1_emit_socket_evidence_table(
                     buffer_json_add_array_item_double(wb, (double)payload->evidence[i].source->max_rcv_rtt_usec / (double)USEC_PER_MS);
                 }
                 topology_v1_values_end(wb);
+#endif
 
 #undef NV_TOPOLOGY_V1_EVIDENCE_UINT_VALUES
 #undef NV_TOPOLOGY_V1_EVIDENCE_SOURCE_UINT_VALUES
@@ -5795,7 +5976,7 @@ static NV_TOPOLOGY_ABORT_STATUS topology_write_data(BUFFER *wb, NV_TOPOLOGY_CONT
         if((abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
             goto cleanup;
 
-        topology_v1_emit_type_registry(wb, ctx->options.group_by, ctx->options.detailed);
+        topology_v1_emit_type_registry(wb, &topology, ctx->options.group_by, ctx->options.detailed);
         if((abort_status = topology_response_check(wb, ctx)) != NV_TOPOLOGY_ABORT_NONE)
             goto cleanup;
 
@@ -6309,7 +6490,7 @@ static BUFFER *network_viewer_result(char *function) {
 //                                        RRDF_FIELD_OPTS_NONE,
 //                                        NULL);
 
-
+#if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
             // RTT
             buffer_rrdf_table_add_field(wb, field_id++, "RTT", aggregated ? "Max Smoothed Round Trip Time" : "Smoothed Round Trip Time",
                                         RRDF_FIELD_TYPE_DURATION, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_DURATION_S,
@@ -6333,6 +6514,7 @@ static BUFFER *network_viewer_result(char *function) {
                                         RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_RANGE,
                                         RRDF_FIELD_OPTS_VISIBLE,
                                         NULL);
+#endif
 
             // Count
             buffer_rrdf_table_add_field(wb, field_id++, "Count", "Number of sockets like this",
@@ -6523,9 +6705,9 @@ void network_viewer_function(
 }
 
 // ----------------------------------------------------------------------------------------------------------------
-// FreeBSD: network-protocols function
+// FreeBSD/macOS: network-protocols function
 
-#if defined(OS_FREEBSD)
+#if defined(OS_FREEBSD) || defined(OS_MACOS)
 
 typedef struct {
     struct tcpstat tcp;
@@ -6542,12 +6724,78 @@ static uint64_t nv_proto_delta(uint64_t cur, uint64_t prev, double elapsed_s) {
     return (uint64_t)((double)(cur - prev) / elapsed_s + 0.5);
 }
 
-void function_network_protocols(
-    const char *transaction, char *function __maybe_unused,
-    usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
-    BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
-    const char *source __maybe_unused, void *data __maybe_unused)
-{
+#if defined(OS_FREEBSD)
+static uint64_t nv_proto_count_established(void) {
+    uint64_t tcp_states[TCP_NSTATES] = { 0 };
+    size_t len = sizeof(tcp_states);
+    if(sysctlbyname("net.inet.tcp.states", tcp_states, &len, NULL, 0) == 0)
+        return tcp_states[TCPS_ESTABLISHED];
+
+    return 0;
+}
+#elif defined(OS_MACOS)
+struct nv_proto_established_count {
+    uint64_t established;
+};
+
+static void nv_proto_established_count_cb(LS_STATE *ls __maybe_unused, const LOCAL_SOCKET *n, void *data) {
+    struct nv_proto_established_count *count = data;
+
+    if(n && n->local.protocol == IPPROTO_TCP && n->state == TCP_ESTABLISHED)
+        count->established++;
+}
+
+static uint64_t nv_proto_count_established(void) {
+    struct nv_proto_established_count count = { 0 };
+    LS_STATE ls = {
+        .config = {
+            .listening = true,
+            .inbound = true,
+            .outbound = true,
+            .local = true,
+            .tcp4 = true,
+            .tcp6 = true,
+            .udp4 = false,
+            .udp6 = false,
+            .pid = false,
+            .uid = false,
+            .cmdline = false,
+            .comm = false,
+            .namespaces = false,
+            .tcp_info = false,
+            .max_errors = 0,
+            .max_concurrent_namespaces = 0,
+            .cb = nv_proto_established_count_cb,
+            .data = &count,
+        },
+    };
+
+    local_sockets_process(&ls);
+    return count.established;
+}
+
+typedef struct {
+    uint64_t established;
+    usec_t last_ut;
+} NV_PROTO_ESTABLISHED_CACHE;
+
+static NV_PROTO_ESTABLISHED_CACHE nv_proto_established_cache = { 0 };
+
+// Called with nv_proto_mutex held; the cache shares nv_proto_prev's sampling window.
+static uint64_t nv_proto_count_established_cached(usec_t now_ut) {
+    const usec_t cache_ttl_ut = (usec_t)NETWORK_VIEWER_RESPONSE_UPDATE_EVERY * USEC_PER_SEC;
+
+    if(nv_proto_established_cache.last_ut && now_ut - nv_proto_established_cache.last_ut < cache_ttl_ut)
+        return nv_proto_established_cache.established;
+
+    // macOS has no cheap net.inet.tcp.states equivalent; avoid repeated full FD walks in one response window.
+    nv_proto_established_cache.established = nv_proto_count_established();
+    nv_proto_established_cache.last_ut = now_ut;
+    return nv_proto_established_cache.established;
+}
+#endif
+
+static BUFFER *network_protocols_result(void) {
     // Sampling and delta computation must be atomic: acquiring the mutex first
     // prevents two concurrent requests from each sampling stale counters and
     // then computing deltas against the same nv_proto_prev with a near-zero
@@ -6556,32 +6804,18 @@ void function_network_protocols(
 
     struct tcpstat tcp_cur = { 0 };
     struct udpstat udp_cur = { 0 };
-    uint64_t established = 0;
     size_t len;
 
     len = sizeof(tcp_cur);
     if (sysctlbyname("net.inet.tcp.stats", &tcp_cur, &len, NULL, 0) < 0) {
         netdata_mutex_unlock(&nv_proto_mutex);
-        netdata_mutex_lock(&stdout_mutex);
-        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR,
-                                               "failed to read net.inet.tcp.stats");
-        netdata_mutex_unlock(&stdout_mutex);
-        return;
+        return network_viewer_json_error_response(HTTP_RESP_INTERNAL_SERVER_ERROR, "failed to read net.inet.tcp.stats");
     }
-
-    uint64_t tcp_states[TCP_NSTATES] = { 0 };
-    len = sizeof(tcp_states);
-    if (sysctlbyname("net.inet.tcp.states", tcp_states, &len, NULL, 0) == 0)
-        established = tcp_states[TCPS_ESTABLISHED];
 
     len = sizeof(udp_cur);
     if (sysctlbyname("net.inet.udp.stats", &udp_cur, &len, NULL, 0) < 0) {
         netdata_mutex_unlock(&nv_proto_mutex);
-        netdata_mutex_lock(&stdout_mutex);
-        pluginsd_function_json_error_to_stdout(transaction, HTTP_RESP_INTERNAL_SERVER_ERROR,
-                                               "failed to read net.inet.udp.stats");
-        netdata_mutex_unlock(&stdout_mutex);
-        return;
+        return network_viewer_json_error_response(HTTP_RESP_INTERNAL_SERVER_ERROR, "failed to read net.inet.udp.stats");
     }
 
     usec_t now_ut = now_monotonic_usec();
@@ -6618,11 +6852,16 @@ void function_network_protocols(
     nv_proto_prev.last_ut     = now_ut;
     nv_proto_prev.initialized = true;
 
+#if defined(OS_MACOS)
+    uint64_t established = nv_proto_count_established_cached(now_ut);
+#else
+    uint64_t established = nv_proto_count_established();
+#endif
+
     netdata_mutex_unlock(&nv_proto_mutex);
 
     time_t now_s = now_realtime_sec();
-    CLEAN_BUFFER *wb = buffer_create(0, NULL);
-    wb->content_type = CT_APPLICATION_JSON;
+    BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
 
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
@@ -6633,7 +6872,7 @@ void function_network_protocols(
 
     buffer_json_member_add_array(wb, "data");
     {
-        // TCP row — FreeBSD stats cover both IPv4 and IPv6 in a single counter set
+        // TCP row: OS counters cover both IPv4 and IPv6 in a single counter set.
         buffer_json_add_array_item_array(wb);
         {
             buffer_json_add_array_item_string(wb, "TCP");
@@ -6748,17 +6987,22 @@ void function_network_protocols(
     }
     buffer_json_object_close(wb); // group_by
 
-    buffer_json_member_add_time_t(wb, "expires", now_s + NETWORK_VIEWER_RESPONSE_UPDATE_EVERY);
-    buffer_json_finalize(wb);
-
-    netdata_mutex_lock(&stdout_mutex);
-    wb->response_code = HTTP_RESP_OK;
-    wb->expires = now_s + NETWORK_VIEWER_RESPONSE_UPDATE_EVERY;
-    pluginsd_function_result_to_stdout(transaction, wb);
-    netdata_mutex_unlock(&stdout_mutex);
+    network_viewer_finalize_response_buffer(wb, now_s);
+    return wb;
 }
 
-#endif // OS_FREEBSD
+void function_network_protocols(
+    const char *transaction, char *function __maybe_unused,
+    usec_t *stop_monotonic_ut __maybe_unused, bool *cancelled __maybe_unused,
+    BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
+    const char *source __maybe_unused, void *data __maybe_unused)
+{
+    BUFFER *wb = network_protocols_result();
+    network_viewer_emit_response(transaction, wb);
+    buffer_free(wb);
+}
+
+#endif // OS_FREEBSD || OS_MACOS
 
 // ----------------------------------------------------------------------------------------------------------------
 // test CLI
@@ -6774,7 +7018,8 @@ static void network_viewer_test_usage(FILE *stream)
 {
     fprintf(
         stream,
-        "usage: network-viewer.plugin --test <network-connections|topology:network-connections> [--timeout <seconds>] < payload.json\n");
+        "usage: network-viewer.plugin --test <network-connections|topology:network-connections|network-protocols> [--timeout <seconds>] < payload.json\n"
+        "       network-protocols does not read a payload from stdin\n");
 }
 
 static bool network_viewer_test_option_present(int argc, char **argv)
@@ -6931,7 +7176,12 @@ static bool network_viewer_test_function_supported(const char *function)
     return network_viewer_test_function_matches(
                function, NETWORK_CONNECTIONS_VIEWER_FUNCTION, sizeof(NETWORK_CONNECTIONS_VIEWER_FUNCTION) - 1) ||
            network_viewer_test_function_matches(
-               function, NETWORK_TOPOLOGY_VIEWER_FUNCTION, sizeof(NETWORK_TOPOLOGY_VIEWER_FUNCTION) - 1);
+               function, NETWORK_TOPOLOGY_VIEWER_FUNCTION, sizeof(NETWORK_TOPOLOGY_VIEWER_FUNCTION) - 1)
+#if defined(OS_FREEBSD) || defined(OS_MACOS)
+           || network_viewer_test_function_matches(
+               function, NETWORK_PROTOCOLS_FUNCTION, sizeof(NETWORK_PROTOCOLS_FUNCTION) - 1)
+#endif
+           ;
 }
 
 static uint64_t network_viewer_effective_test_timeout_seconds(uint64_t timeout_seconds)
@@ -7014,32 +7264,50 @@ static int run_network_viewer_test_command(const struct network_viewer_test_comm
     if(!network_viewer_test_function_supported(cmd->function_name)) {
         fprintf(
             stderr,
-            "unsupported network-viewer test function '%s' (expected '%s' or '%s')\n",
+            "unsupported network-viewer test function '%s' (expected '%s', '%s'"
+#if defined(OS_FREEBSD) || defined(OS_MACOS)
+            ", or '%s'"
+#endif
+            ")\n",
             cmd->function_name,
             NETWORK_CONNECTIONS_VIEWER_FUNCTION,
-            NETWORK_TOPOLOGY_VIEWER_FUNCTION);
+            NETWORK_TOPOLOGY_VIEWER_FUNCTION
+#if defined(OS_FREEBSD) || defined(OS_MACOS)
+            , NETWORK_PROTOCOLS_FUNCTION
+#endif
+            );
         return 2;
     }
-
-    BUFFER *payload = network_viewer_read_request_payload_from_stdin();
-    if(!payload)
-        return 1;
 
     bool cancelled = false;
     usec_t stop_monotonic_ut = network_viewer_test_stop_monotonic_usec(cmd->timeout_seconds);
     char *function = strdupz(cmd->function_name);
 
     BUFFER *result;
+#if defined(OS_FREEBSD) || defined(OS_MACOS)
+    if(network_viewer_test_function_matches(
+           function,
+           NETWORK_PROTOCOLS_FUNCTION,
+           sizeof(NETWORK_PROTOCOLS_FUNCTION) - 1))
+        result = network_protocols_result();
+    else
+#endif
     if(network_viewer_test_function_matches(
            function,
            NETWORK_TOPOLOGY_VIEWER_FUNCTION,
-           sizeof(NETWORK_TOPOLOGY_VIEWER_FUNCTION) - 1))
+           sizeof(NETWORK_TOPOLOGY_VIEWER_FUNCTION) - 1)) {
+        BUFFER *payload = network_viewer_read_request_payload_from_stdin();
+        if(!payload) {
+            freez(function);
+            return 1;
+        }
         result = network_viewer_topology_result(function, &stop_monotonic_ut, &cancelled, payload);
+        buffer_free(payload);
+    }
     else
         result = network_viewer_result(function);
 
     freez(function);
-    buffer_free(payload);
 
     int rc = network_viewer_write_test_result(result);
     buffer_free(result);
@@ -7130,7 +7398,7 @@ int main(int argc, char **argv) {
             (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_SIGNED_ID | HTTP_ACCESS_SAME_SPACE | HTTP_ACCESS_SENSITIVE_DATA),
             RRDFUNCTIONS_PRIORITY_DEFAULT);
 
-#if defined(OS_FREEBSD)
+#if defined(OS_FREEBSD) || defined(OS_MACOS)
     fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"%s\" %d \"%s\" \"top\" "HTTP_ACCESS_FORMAT" %d\n",
             NETWORK_PROTOCOLS_FUNCTION, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,
             NETWORK_PROTOCOLS_FUNCTION_HELP,
@@ -7153,7 +7421,7 @@ int main(int argc, char **argv) {
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,
                                   NULL);
 
-#if defined(OS_FREEBSD)
+#if defined(OS_FREEBSD) || defined(OS_MACOS)
     functions_evloop_add_function(wg, NETWORK_PROTOCOLS_FUNCTION,
                                   function_network_protocols,
                                   PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT,

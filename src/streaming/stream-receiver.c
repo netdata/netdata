@@ -325,7 +325,7 @@ void stream_receiver_handle_op(struct stream_thread *sth, struct receiver_state 
         STREAM_CIRCULAR_BUFFER_STATS stats = *stream_circular_buffer_stats_unsafe(rpt->thread.send_to_child.scb);
         spinlock_unlock(&rpt->thread.send_to_child.spinlock);
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM RCV[%zu] '%s' [from [%s]:%s]: send buffer is full (buffer size %u, max %u, used %u, available %u). "
+               "STREAM RCV[%zu] '%s' [from [%s]:%s]: send buffer is full (buffer size %zu, max %zu, used %zu, available %zu). "
                "Restarting connection.",
                sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
                stats.bytes_size, stats.bytes_max_size, stats.bytes_outstanding, stats.bytes_available);
@@ -511,8 +511,11 @@ static void stream_receiver_remove_internal(struct stream_thread *sth, struct re
 
     receiver_set_exit_reason(rpt, reason, false);
 
+    // rpt->host may be NULL here (e.g. removal on an early handshake failure,
+    // before the host is attached) -- this path null-checks it below at the
+    // iface/replication reads, so guard the log field too.
     ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host->hostname),
+        ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host ? rpt->host->hostname : NULL),
         ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->remote_ip),
         ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->remote_port),
         ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),

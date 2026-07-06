@@ -42,7 +42,6 @@ This guide will show you how simple it is to get started with Netdata and experi
   />
 </div>
 
-
 unhideme-->
 
 ## [1. Sign in & Access Your Space](/src/claim/README.md)
@@ -125,7 +124,7 @@ Within seconds of connection, you'll experience the power of real-time observabi
 
 - **Your node appears live in your Space**
 - **Charts immediately start streaming real-time data**
-- **System Overview dashboard populates automatically**
+- **Overview charts populate automatically for every section**
 - **All metrics update with 1-second granularity**
 - **Zero additional configuration required**
 
@@ -133,7 +132,7 @@ Within seconds of connection, you'll experience the power of real-time observabi
 
 **Automatic Dashboards:**
 
-- **System Overview** - Fully automated dashboard showing all your nodes
+- **[Overview charts](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md#how-the-dashboard-is-organized)** - Automatically arranged at the start of every dashboard section to summarize its metrics
 - **Nodes Tab** - Unified view of all infrastructure with key metrics
 - **Composite Charts** - Data from multiple nodes combined intelligently
 - **Real-Time Updates** - Every metric updates with 1-second granularity
@@ -212,12 +211,7 @@ Configure alerts to reach you through:
 - **Example**: Create rooms for "Production", "Development", "Database Servers"
 
 **Team Collaboration:**
-Click "Invite Users" in your Space sidebar to add team members. Set appropriate access levels:
-
-- **Admins** - Full control over Spaces, Rooms, and billing
-- **Managers** - Room and user management
-- **Troubleshooters** - Monitoring and analysis access
-- **Observers** - View-only access to specific rooms
+Click "Invite Users" in your Space sidebar to add team members and assign each one a role (Admin, Manager, Troubleshooter, Observer, or Billing). See [Set Up Team Access](/docs/netdata-cloud/organize-your-infrastructure-invite-your-team.md#set-up-team-access) for what each role can do.
 
 :::tip
 
@@ -228,7 +222,7 @@ Click "Invite Users" in your Space sidebar to add team members. Set appropriate 
 **Organize by Your Needs:**
 
 | **Category**       | **Examples**                         |
-| ------------------ | ------------------------------------ |
+|--------------------|--------------------------------------|
 | **By Service**     | Web servers, databases, applications |
 | **By Location**    | Data centers, cloud regions          |
 | **By Team**        | DevOps, SRE, development teams       |
@@ -248,7 +242,7 @@ Click "Invite Users" in your Space sidebar to add team members. Set appropriate 
 ### Traditional Monitoring vs Netdata
 
 | **Traditional Monitoring**                       |        | **Netdata**                                        |
-| ------------------------------------------------ | :----: | -------------------------------------------------- |
+|--------------------------------------------------|:------:|----------------------------------------------------|
 | **Navigate complex interfaces** during incidents |        | **Get instant analysis** with natural language     |
 | **Build dashboards** during incidents            | **VS** | **Automatic dashboards** with zero configuration   |
 | **Manually correlate data** across systems       |        | **AI-powered correlation** and root cause analysis |
@@ -261,13 +255,13 @@ Experience the future of infrastructure monitoring with AI that actually works. 
 
 **AI Features Overview:**
 
-| **Capability**           | **What It Does**                    | **Access**                           |
-| ------------------------ | ----------------------------------- | ------------------------------------ |
-| **AI Chat with Netdata** | Ask questions in natural language   | Available now for all deployments    |
-| **AI DevOps Copilot**    | CLI-based AI automation             | Available now with MCP tools         |
-| **AI Insights**          | Professional reports in 2-3 minutes | Paid plans get unlimited reports |
-| **Anomaly Advisor**      | Find root causes in minutes         | Available to all users               |
-| **ML Anomaly Detection** | Continuous anomaly detection        | Free for everyone                    |
+| **Capability**           | **What It Does**                    | **Access**                        |
+|--------------------------|-------------------------------------|-----------------------------------|
+| **AI Chat with Netdata** | Ask questions in natural language   | Available now for all deployments |
+| **AI DevOps Copilot**    | CLI-based AI automation             | Available now with MCP tools      |
+| **AI Insights**          | Professional reports in 2-3 minutes | Paid plans get unlimited reports  |
+| **Anomaly Advisor**      | Find root causes in minutes         | Available to all users            |
+| **ML Anomaly Detection** | Continuous anomaly detection        | Free for everyone                 |
 
 #### Ask Questions & Get Answers
 

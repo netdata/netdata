@@ -174,7 +174,10 @@ static inline void simple_hashtable_del_value_sorted_named(SIMPLE_HASHTABLE_NAME
     size_t index = simple_hashtable_sorted_binary_search_named(ht, value);
 
     // Check if the value exists at the found index
-    assert(index < ht->sorted.used && ht->sorted.array[index] == value);
+    bool found = index < ht->sorted.used && ht->sorted.array[index] == value;
+    assert(found);
+    if(unlikely(!found))
+        return;
 
     // Use memmove to shift elements and close the gap
     memmove(&ht->sorted.array[index], &ht->sorted.array[index + 1], (ht->sorted.used - index - 1) * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE));
@@ -186,7 +189,10 @@ static inline void simple_hashtable_replace_value_sorted_named(SIMPLE_HASHTABLE_
         return;
 
     size_t old_value_index = simple_hashtable_sorted_binary_search_named(ht, old_value);
-    assert(old_value_index < ht->sorted.used && ht->sorted.array[old_value_index] == old_value);
+    bool old_value_found = old_value_index < ht->sorted.used && ht->sorted.array[old_value_index] == old_value;
+    assert(old_value_found);
+    if(unlikely(!old_value_found))
+        return;
 
     int r = SIMPLE_HASHTABLE_SORT_FUNCTION(old_value, new_value);
     if(r == 0) {
@@ -377,7 +383,7 @@ static inline SIMPLE_HASHTABLE_SLOT_NAMED *simple_hashtable_get_slot_named(
             else {
                 // the hashtable is full, but resize is false.
                 // this should never happen.
-                assert(sl != sl_started);
+                fatal("SIMPLE_HASHTABLE: lookup without resize reached a full table");
             }
         }
     }
@@ -485,7 +491,14 @@ static inline void simple_hashtable_resize_named(SIMPLE_HASHTABLE_NAMED *ht) {
         used++;
     }
 
-    assert(used == ht->used - ht->deleted);
+    if(unlikely(ht->deleted > ht->used))
+        fatal("SIMPLE_HASHTABLE: resize accounting invalid, deleted slots %zu exceed used slots %zu",
+              ht->deleted, ht->used);
+
+    size_t expected_used = ht->used - ht->deleted;
+    if(unlikely(used != expected_used))
+        fatal("SIMPLE_HASHTABLE: resize accounting mismatch, rehashed %zu slots, expected %zu slots (used %zu, deleted %zu)",
+              used, expected_used, ht->used, ht->deleted);
 
     ht->used = used;
     ht->deleted = 0;

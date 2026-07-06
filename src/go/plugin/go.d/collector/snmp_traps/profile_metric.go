@@ -16,7 +16,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
-	"gopkg.in/yaml.v2"
 )
 
 const (
@@ -2112,14 +2111,11 @@ func buildProfileMetricChartTemplateYAML(rules []*compiledProfileMetricRule, cha
 		}
 		group.Charts = append(group.Charts, profileMetricChartToTemplate(chart, ruleByChart[id]))
 	}
-	if err := spec.Validate(); err != nil {
+	raw, err := spec.MarshalTemplate()
+	if err != nil {
 		return "", fmt.Errorf("invalid chart template: %w", err)
 	}
-	raw, err := yaml.Marshal(spec)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal chart template: %w", err)
-	}
-	return string(raw), nil
+	return raw, nil
 }
 
 func validateSelectedProfileMetricChartDimensions(ruleByChart map[string][]*compiledProfileMetricRule) error {

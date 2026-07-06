@@ -138,35 +138,13 @@ char *filename_from_path_entry_strdupz(const char *path, const char *entry) {
 }
 
 bool filename_is_dir(const char *filename, bool create_it) {
-    CLEAN_CHAR_P *buffer = NULL;
-
-    size_t max_links = 100;
-
     bool is_dir = false;
     struct stat st;
-    while(max_links && stat(filename, &st) == 0) {
-        if ((st.st_mode & S_IFMT) == S_IFDIR)
-            is_dir = true;
-        else if ((st.st_mode & S_IFMT) == S_IFLNK) {
-            max_links--;
 
-            if(!buffer)
-                buffer = mallocz(FILENAME_MAX);
+    if(stat(filename, &st) == 0 && (st.st_mode & S_IFMT) == S_IFDIR)
+        is_dir = true;
 
-            char link_dst[FILENAME_MAX];
-            ssize_t l = readlink(filename, link_dst, FILENAME_MAX - 1);
-            if (l > 0) {
-                link_dst[l] = '\0';
-                strncpyz(buffer, link_dst, FILENAME_MAX - 1);
-                filename = buffer;
-                continue;
-            }
-        }
-
-        break;
-    }
-
-    if(!is_dir && create_it && max_links == 100 && mkdir(filename, 0750) == 0)
+    if(!is_dir && create_it && mkdir(filename, 0750) == 0)
         is_dir = true;
 
     return is_dir;
@@ -179,33 +157,11 @@ bool path_entry_is_dir(const char *path, const char *entry, bool create_it) {
 }
 
 bool filename_is_file(const char *filename) {
-    CLEAN_CHAR_P *buffer = NULL;
-
-    size_t max_links = 100;
-
     bool is_file = false;
     struct stat st;
-    while(max_links && stat(filename, &st) == 0) {
-        if((st.st_mode & S_IFMT) == S_IFREG)
-            is_file = true;
-        else if((st.st_mode & S_IFMT) == S_IFLNK) {
-            max_links--;
 
-            if(!buffer)
-                buffer = mallocz(FILENAME_MAX);
-
-            char link_dst[FILENAME_MAX];
-            ssize_t l = readlink(filename, link_dst, FILENAME_MAX - 1);
-            if(l > 0) {
-                link_dst[l] = '\0';
-                strncpyz(buffer, link_dst, FILENAME_MAX - 1);
-                filename = buffer;
-                continue;
-            }
-        }
-
-        break;
-    }
+    if(stat(filename, &st) == 0 && (st.st_mode & S_IFMT) == S_IFREG)
+        is_file = true;
 
     return is_file;
 }

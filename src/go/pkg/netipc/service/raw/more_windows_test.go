@@ -883,7 +883,7 @@ func TestWinCacheLookupBeforeRefresh(t *testing.T) {
 	if cache.Ready() {
 		t.Fatal("cache should not be ready")
 	}
-	if _, found := cache.Lookup(123, "anything"); found {
+	if cacheHasForTest(cache, 123, "anything") {
 		t.Fatal("lookup before refresh should miss")
 	}
 }
@@ -916,7 +916,7 @@ func TestWinCacheFullRoundTrip(t *testing.T) {
 		t.Fatal("cache should be ready after refresh")
 	}
 
-	item, found := cache.Lookup(1001, "docker-abc123")
+	item, found := cacheDupForTest(cache, 1001, "docker-abc123")
 	if !found {
 		t.Fatal("expected cached item")
 	}
@@ -959,7 +959,7 @@ func TestWinCacheRefreshFailurePreserves(t *testing.T) {
 	if !cache.Ready() {
 		t.Fatal("cache should be ready")
 	}
-	if _, found := cache.Lookup(1001, "docker-abc123"); !found {
+	if !cacheHasForTest(cache, 1001, "docker-abc123") {
 		t.Fatal("expected first cached item")
 	}
 
@@ -972,7 +972,7 @@ func TestWinCacheRefreshFailurePreserves(t *testing.T) {
 	if !cache.Ready() {
 		t.Fatal("cache should preserve readiness")
 	}
-	if _, found := cache.Lookup(1001, "docker-abc123"); !found {
+	if !cacheHasForTest(cache, 1001, "docker-abc123") {
 		t.Fatal("old cache data should be preserved")
 	}
 
@@ -1018,13 +1018,13 @@ func TestWinCacheLookupHashNameMismatch(t *testing.T) {
 		t.Fatal("refresh should succeed")
 	}
 
-	if _, found := cache.Lookup(1001, "wrong-name"); found {
+	if cacheHasForTest(cache, 1001, "wrong-name") {
 		t.Fatal("lookup with wrong name should miss")
 	}
-	if _, found := cache.Lookup(9999, "docker-abc123"); found {
+	if cacheHasForTest(cache, 9999, "docker-abc123") {
 		t.Fatal("lookup with wrong hash should miss")
 	}
-	if item, found := cache.Lookup(1001, "docker-abc123"); !found || item.Hash != 1001 {
+	if item, found := cacheDupForTest(cache, 1001, "docker-abc123"); !found || item.Hash != 1001 {
 		t.Fatalf("expected exact hash+name match, got found=%v item=%+v", found, item)
 	}
 }
@@ -1042,7 +1042,7 @@ func TestWinCacheCloseResetsState(t *testing.T) {
 	if cache.Ready() {
 		t.Fatal("cache should not be ready after close")
 	}
-	if _, found := cache.Lookup(1001, "docker-abc123"); found {
+	if cacheHasForTest(cache, 1001, "docker-abc123") {
 		t.Fatal("lookup after close should miss")
 	}
 
@@ -1111,7 +1111,7 @@ func TestWinCacheLargeDataset(t *testing.T) {
 
 	for i := uint32(0); i < itemCount; i++ {
 		name := fmt.Sprintf("cgroup-%d", i)
-		item, found := cache.Lookup(i+1000, name)
+		item, found := cacheDupForTest(cache, i+1000, name)
 		if !found {
 			t.Fatalf("item %d not found", i)
 		}

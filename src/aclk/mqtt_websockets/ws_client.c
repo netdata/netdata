@@ -18,6 +18,7 @@ const char *websocket_upgrage_hdr = "GET /mqtt HTTP/1.1\x0D\x0A"
 const char *mqtt_protoid = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11";
 
 #define DEFAULT_RINGBUFFER_SIZE (1024*128)
+#define MAX_MQTT_INPUT_BUFFER_SIZE (16*1024*1024)
 
 ws_client *ws_client_new(size_t buf_size, char **host)
 {
@@ -26,9 +27,15 @@ ws_client *ws_client_new(size_t buf_size, char **host)
 
     ws_client *client = callocz(1, sizeof(ws_client));
     client->host = host;
-    client->buf_read = rbuf_create(buf_size ? buf_size : DEFAULT_RINGBUFFER_SIZE);
-    client->buf_write = rbuf_create(buf_size ? buf_size : DEFAULT_RINGBUFFER_SIZE);
-    client->buf_to_mqtt = rbuf_create(buf_size ? buf_size : DEFAULT_RINGBUFFER_SIZE);
+
+    size_t size = buf_size ? buf_size : DEFAULT_RINGBUFFER_SIZE;
+    size_t mqtt_input_size = (size > MAX_MQTT_INPUT_BUFFER_SIZE) ? MAX_MQTT_INPUT_BUFFER_SIZE : size;
+
+    // Fixed: raw WebSocket read staging; dynamic growth is only needed after payload decoding.
+    client->buf_read = rbuf_create(size, size);
+    // Fixed: the send path masks buffered bytes in-place after rbuf_bump_head().
+    client->buf_write = rbuf_create(size, size);
+    client->buf_to_mqtt = rbuf_create(mqtt_input_size, MAX_MQTT_INPUT_BUFFER_SIZE);
 
     return client;
 }
@@ -48,9 +55,26 @@ void ws_client_free_headers(ws_client *client)
     client->hs.hdr_count = 0;
 }
 
+static void ws_client_rx_free_specific_data(ws_client *client)
+{
+    switch (client->rx.opcode) {
+        case WS_OP_CONNECTION_CLOSE:
+            freez(client->rx.specific_data.op_close.reason);
+            client->rx.specific_data.op_close.reason = NULL;
+            break;
+        case WS_OP_PING:
+            freez(client->rx.specific_data.ping_msg);
+            client->rx.specific_data.ping_msg = NULL;
+            break;
+        default:
+            break;
+    }
+}
+
 void ws_client_destroy(ws_client *client)
 {
     ws_client_free_headers(client);
+    ws_client_rx_free_specific_data(client);
     freez(client->hs.nonce_reply);
     freez(client->hs.http_reply_msg);
     rbuf_free(client->buf_read);
@@ -62,6 +86,7 @@ void ws_client_destroy(ws_client *client)
 void ws_client_reset(ws_client *client)
 {
     ws_client_free_headers(client);
+    ws_client_rx_free_specific_data(client);
     freez(client->hs.nonce_reply);
     client->hs.nonce_reply = NULL;
 
@@ -74,8 +99,12 @@ void ws_client_reset(ws_client *client)
 
     client->state = WS_RAW;
     client->hs.hdr_state = WS_HDR_HTTP;
+    // Reconnect can happen mid-frame, so clear partial RX frame state too.
     client->rx.parse_state = WS_FIRST_2BYTES;
+    client->rx.opcode = 0;
     client->rx.remote_closed = false;
+    client->rx.payload_length = 0;
+    client->rx.payload_processed = 0;
 }
 
 #define MAX_HTTP_HDR_COUNT 128
@@ -510,13 +539,17 @@ int ws_client_process_rx_ws(ws_client *client)
         case WS_PAYLOAD_EXTENDED_16:
             BUF_READ_CHECK_AT_LEAST(2);
             rbuf_pop(client->buf_read, buf, 2);
-            client->rx.payload_length = be16toh(*((uint16_t *)buf));
+            uint16_t payload_length16;
+            memcpy(&payload_length16, buf, sizeof(payload_length16));
+            client->rx.payload_length = be16toh(payload_length16);
             ws_client_rx_post_hdr_state(client);
             break;
         case WS_PAYLOAD_EXTENDED_64:
             BUF_READ_CHECK_AT_LEAST(LONGEST_POSSIBLE_HDR_PART);
             rbuf_pop(client->buf_read, buf, LONGEST_POSSIBLE_HDR_PART);
-            client->rx.payload_length = be64toh(*((uint64_t *)buf));
+            uint64_t payload_length64;
+            memcpy(&payload_length64, buf, sizeof(payload_length64));
+            client->rx.payload_length = be64toh(payload_length64);
             ws_client_rx_post_hdr_state(client);
             break;
         case WS_PAYLOAD_DATA:
@@ -527,8 +560,11 @@ int ws_client_process_rx_ws(ws_client *client)
                     return WS_CLIENT_NEED_MORE_BYTES;
                 char *insert = rbuf_get_linear_insert_range(client->buf_to_mqtt, &size);
                 if (!insert) {
-                    nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebSocket buffer full! Cannot process payload of %"PRIu64" bytes (processed %"PRIu64"/%"PRIu64"). Buffer capacity: %zu bytes",
-                           remaining, client->rx.payload_processed, client->rx.payload_length, rbuf_get_capacity(client->buf_to_mqtt));
+                    nd_log(NDLS_DAEMON, NDLP_ERR,
+                           "ACLK: inbound WebSocket MQTT buffer full! Cannot process payload of %"PRIu64" bytes "
+                           "(processed %"PRIu64"/%"PRIu64"). Buffer capacity: %zu bytes, max capacity: %zu bytes",
+                           remaining, client->rx.payload_processed, client->rx.payload_length,
+                           rbuf_get_capacity(client->buf_to_mqtt), rbuf_get_max_capacity(client->buf_to_mqtt));
                     return WS_CLIENT_BUFFER_FULL;
                 }
                 size = (size > remaining) ? remaining : size;
@@ -559,7 +595,9 @@ int ws_client_process_rx_ws(ws_client *client)
             BUF_READ_CHECK_AT_LEAST(sizeof(uint16_t));
 
             rbuf_pop(client->buf_read, buf, sizeof(uint16_t));
-            client->rx.specific_data.op_close.ec = be16toh(*((uint16_t *)buf));
+            uint16_t close_code;
+            memcpy(&close_code, buf, sizeof(close_code));
+            client->rx.specific_data.op_close.ec = be16toh(close_code);
             client->rx.payload_processed += sizeof(uint16_t);
 
             client->rx.remote_closed = true;
@@ -610,6 +648,7 @@ int ws_client_process_rx_ws(ws_client *client)
             // TODO schedule this instead of sending right away
             // then attempt to send as soon as buffer space clears up
             size = ws_client_send(client, WS_OP_PONG, client->rx.specific_data.ping_msg, client->rx.payload_length);
+            ws_client_rx_free_specific_data(client);
             if (size != client->rx.payload_length) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Unable to send the PONG as one packet back. Closing connection.");
                 return WS_CLIENT_PROTOCOL_ERROR;

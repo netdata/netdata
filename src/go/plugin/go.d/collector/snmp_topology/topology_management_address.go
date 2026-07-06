@@ -3,10 +3,15 @@
 package snmptopology
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
+	"encoding/hex"
+	"fmt"
 	"net"
 	"sort"
+	"strconv"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 func normalizeAddressType(rawType, addr string) string {
@@ -37,7 +42,7 @@ func managementAddressTypeFromIP(ip string) string {
 	return "ipv6"
 }
 
-func appendManagementAddress(addrs []topologyManagementAddress, addr topologyManagementAddress) []topologyManagementAddress {
+func appendManagementAddress(addrs []topologymodel.ManagementAddress, addr topologymodel.ManagementAddress) []topologymodel.ManagementAddress {
 	if addr.Address == "" {
 		return addrs
 	}
@@ -49,12 +54,12 @@ func appendManagementAddress(addrs []topologyManagementAddress, addr topologyMan
 	return append(addrs, addr)
 }
 
-func appendCdpManagementAddresses(entry *cdpRemote, current []topologyManagementAddress) []topologyManagementAddress {
+func appendCdpManagementAddresses(entry *cdpRemote, current []topologymodel.ManagementAddress) []topologymodel.ManagementAddress {
 	addrs := current
 	if entry.primaryMgmtAddr != "" {
 		addr, addrType := normalizeManagementAddress(entry.primaryMgmtAddr, entry.primaryMgmtAddrType)
 		if addr != "" {
-			addrs = appendManagementAddress(addrs, topologyManagementAddress{
+			addrs = appendManagementAddress(addrs, topologymodel.ManagementAddress{
 				Address:     addr,
 				AddressType: addrType,
 				Source:      "cdp_primary_mgmt",
@@ -64,7 +69,7 @@ func appendCdpManagementAddresses(entry *cdpRemote, current []topologyManagement
 	if entry.secondaryMgmtAddr != "" {
 		addr, addrType := normalizeManagementAddress(entry.secondaryMgmtAddr, entry.secondaryMgmtAddrType)
 		if addr != "" {
-			addrs = appendManagementAddress(addrs, topologyManagementAddress{
+			addrs = appendManagementAddress(addrs, topologymodel.ManagementAddress{
 				Address:     addr,
 				AddressType: addrType,
 				Source:      "cdp_secondary_mgmt",
@@ -74,7 +79,7 @@ func appendCdpManagementAddresses(entry *cdpRemote, current []topologyManagement
 	if entry.address != "" {
 		addr, addrType := normalizeManagementAddress(entry.address, entry.addressType)
 		if addr != "" {
-			addrs = appendManagementAddress(addrs, topologyManagementAddress{
+			addrs = appendManagementAddress(addrs, topologymodel.ManagementAddress{
 				Address:     addr,
 				AddressType: addrType,
 				Source:      "cdp_cache_address",
@@ -84,7 +89,7 @@ func appendCdpManagementAddresses(entry *cdpRemote, current []topologyManagement
 	return addrs
 }
 
-func pickManagementIP(addrs []topologyManagementAddress) string {
+func pickManagementIP(addrs []topologymodel.ManagementAddress) string {
 	if len(addrs) == 0 {
 		return ""
 	}
@@ -123,4 +128,41 @@ func pickManagementIP(addrs []topologyManagementAddress) string {
 		return rawValues[0]
 	}
 	return ""
+}
+
+func reconstructLldpRemMgmtAddrHex(tags map[string]string) string {
+	lengthStr := strings.TrimSpace(tags[tagLldpRemMgmtAddrLen])
+	length, err := strconv.Atoi(lengthStr)
+	if err != nil || length <= 0 || length > net.IPv6len {
+		return ""
+	}
+
+	addr := make([]byte, 0, length)
+	for i := 1; i <= length; i++ {
+		tag := fmt.Sprintf("%s%d", tagLldpRemMgmtAddrOctetPref, i)
+		v := strings.TrimSpace(tags[tag])
+		if v == "" {
+			return ""
+		}
+		octet, err := strconv.Atoi(v)
+		if err != nil || octet < 0 || octet > 255 {
+			return ""
+		}
+		addr = append(addr, byte(octet))
+	}
+
+	return hex.EncodeToString(addr)
+}
+
+func normalizeManagementAddress(rawAddr, rawType string) (string, string) {
+	rawAddr = strings.TrimSpace(rawAddr)
+	if rawAddr == "" {
+		return "", normalizeAddressType(rawType, "")
+	}
+
+	if ip := topologyutil.NormalizeIPAddress(rawAddr); ip != "" {
+		return ip, normalizeAddressType(rawType, ip)
+	}
+
+	return rawAddr, normalizeAddressType(rawType, rawAddr)
 }

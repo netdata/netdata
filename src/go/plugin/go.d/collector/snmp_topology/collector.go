@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"runtime/debug"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gosnmp/gosnmp"
@@ -41,16 +42,20 @@ func newCreator(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentH
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: 60,
 		},
-		CreateV2:       func() collectorapi.CollectorV2 { return New(deviceStore, trapEnrichment) },
-		Config:         func() any { return &Config{} },
-		InstancePolicy: collectorapi.InstancePolicySingle,
-		Methods:        topologyMethods,
-		MethodHandler:  topologyFunctionHandler,
+		CreateV2:        func() collectorapi.CollectorV2 { return newCollector(deviceStore, trapEnrichment) },
+		Config:          func() any { return &Config{} },
+		InstancePolicy:  collectorapi.InstancePolicySingle,
+		SharedFunctions: topologyMethods,
+		MethodHandler:   topologyFunctionHandler,
 	}
 }
 
 // New returns an SNMP topology collector using the provided SNMP-family state.
 func New(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle) *Collector {
+	return newCollector(deviceStore, trapEnrichment)
+}
+
+func newCollector(deviceStore *ddsnmp.DeviceStore, trapEnrichment *TrapEnrichmentHandle) *Collector {
 	if deviceStore == nil {
 		panic("snmp_topology New requires a non-nil device store")
 	}
@@ -78,11 +83,12 @@ type (
 		collectorapi.Base `yaml:",inline"`
 		Config            `yaml:",inline"`
 
-		deviceCaches        map[string]*topologyCache // one cache per SNMP device
-		deviceLastCollected map[string]time.Time      // last collection time per device
-		topologyRegistry    *topologyRegistry
-		deviceSource        deviceSource
-		trapEnrichment      *TrapEnrichmentHandle
+		deviceCaches         map[string]*topologyCache // one cache per SNMP device
+		deviceLastCollected  map[string]time.Time      // last collection time per device
+		topologyRegistry     *topologyRegistry
+		functionAvailability atomic.Bool
+		deviceSource         deviceSource
+		trapEnrichment       *TrapEnrichmentHandle
 
 		refreshMu sync.Mutex
 		statsMu   sync.RWMutex
@@ -126,10 +132,14 @@ func (c *Collector) Run(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return nil
 	}
+	c.functionAvailability.Store(false)
 	c.publishTrapTopologyEnrichment()
 	defer c.unpublishTrapTopologyEnrichment()
+	c.topologyRegistry.setReverseDNSWarmContext(ctx)
+	defer c.topologyRegistry.setReverseDNSWarmContext(nil)
 
 	c.refreshTopologyRecovering(ctx)
+	c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
 
 	ticker := time.NewTicker(c.deviceCheckEvery())
 	defer ticker.Stop()
@@ -140,6 +150,7 @@ func (c *Collector) Run(ctx context.Context) error {
 			return nil
 		case <-ticker.C:
 			c.refreshTopologyRecovering(ctx)
+			c.topologyRegistry.enqueueReverseDNSWarmFromDefaultSnapshot()
 		}
 	}
 }
@@ -247,6 +258,16 @@ func (c *Collector) refreshTopologyRecovering(ctx context.Context) {
 	}()
 
 	c.recordRefreshStats(c.refreshTopology(ctx))
+	c.updateFunctionAvailability()
+}
+
+func (c *Collector) updateFunctionAvailability() {
+	if c.functionAvailability.Load() {
+		return
+	}
+	if c.topologyRegistry.hasRenderableObservations() {
+		c.functionAvailability.Store(true)
+	}
 }
 
 // refreshDeviceTopology collects topology data for a single device into its own cache.

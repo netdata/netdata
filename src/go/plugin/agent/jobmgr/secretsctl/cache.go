@@ -3,6 +3,7 @@
 package secretsctl
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -42,7 +43,7 @@ func (c *Controller) RememberDiscoveredConfig(cfg secretstore.Config) (Entry, bo
 }
 
 func (c *Controller) rememberDiscoveredConfig(cfg secretstore.Config) (*dyncfg.Entry[secretstore.Config], bool, error) {
-	if err := c.validateConfig(cfg); err != nil {
+	if err := c.validateConfig(context.Background(), cfg); err != nil {
 		return nil, false, err
 	}
 
@@ -61,8 +62,7 @@ func (c *Controller) rememberDiscoveredConfig(cfg secretstore.Config) (*dyncfg.E
 	}
 
 	if entry.Status == dyncfg.StatusRunning || entry.Status == dyncfg.StatusFailed {
-		c.cb.Stop(entry.Cfg)
-		c.cb.TakeCommandMessage()
+		c.cb.Stop(context.Background(), entry.Cfg)
 	}
 
 	entry = c.handler.AddDiscoveredConfig(cfg, dyncfg.StatusAccepted)
@@ -84,23 +84,25 @@ func (c *Controller) removeDiscoveredConfig(cfg secretstore.Config) (*dyncfg.Ent
 		return nil, false
 	}
 
-	c.cb.Stop(entry.Cfg)
-	c.cb.TakeCommandMessage()
+	c.cb.Stop(context.Background(), entry.Cfg)
 	c.handler.NotifyConfigRemove(entry.Cfg)
 	return entry, true
 }
 
-func (c *Controller) validateConfig(cfg secretstore.Config) error {
+// validateConfig validates against the backend under the caller's context:
+// effect callers thread the executor's deadline/cancellation so backend I/O
+// never outlives its command.
+func (c *Controller) validateConfig(ctx context.Context, cfg secretstore.Config) error {
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
 	if c.service == nil {
 		return fmt.Errorf("secretstore service is not available")
 	}
-	return c.service.Validate(secretStoreResolveContext(c.Logger, cfg), cfg)
+	return c.service.Validate(secretStoreResolveContext(ctx, c.Logger, cfg), cfg)
 }
 
-func (c *Controller) validateStored(key string) error {
+func (c *Controller) validateStored(ctx context.Context, key string) error {
 	entry, ok := c.lookupInternal(key)
 	if !ok {
 		return secretstore.ErrStoreNotFound
@@ -110,10 +112,10 @@ func (c *Controller) validateStored(key string) error {
 	}
 
 	if _, ok := c.service.GetStatus(key); ok {
-		return c.service.ValidateStored(secretStoreResolveContextForKey(c.Logger, key, entry.Cfg.Kind(), entry.Cfg.Name()), key)
+		return c.service.ValidateStored(secretStoreResolveContextForKey(ctx, c.Logger, key, entry.Cfg.Kind(), entry.Cfg.Name()), key)
 	}
 
-	return c.validateConfig(entry.Cfg)
+	return c.validateConfig(ctx, entry.Cfg)
 }
 
 func (c *Controller) affectedJobsFor(storeKey string) []secretstore.JobRef {

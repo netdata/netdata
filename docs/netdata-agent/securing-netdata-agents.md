@@ -185,3 +185,11 @@ We provide detailed configuration guides for popular web servers:
 - [H2O](/docs/netdata-agent/configuration/running-the-netdata-agent-behind-a-reverse-proxy/Running-behind-h2o.md)
 
 </details>
+
+## Firewall and Egress Requirements
+
+The security measures above concern **inbound** access to your Agent's local dashboard (port `19999`). Connected nodes also require outbound access for the Agent-Cloud Link, anonymous telemetry, and automatic updates.
+
+For the complete reference of all default outbound connections — including which are active by default, what each connects to, and how to disable each one — see [Outbound Network Communication](/docs/security-and-privacy-design/netdata-agent-security.md#outbound-network-communication).
+
+For the domain allowlist and port table required for firewall configuration, see [Configure Netdata for cybersecurity platforms](/docs/netdata-agent/configure-netdata-for-cybersecurity-platforms.md#required-endpoints-and-ports).

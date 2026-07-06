@@ -9,6 +9,7 @@ The Logs tab displays log entries from the following sources:
 - **systemd-journal** — reads logs from `systemd` journald on Linux Nodes. See the [Systemd Journal Plugin Reference](/src/collectors/systemd-journal.plugin/README.md) for details on journal sources, fields, and query performance.
 - **otel-logs** — displays logs ingested via OpenTelemetry (OTLP/gRPC) by the [OpenTelemetry plugin](/src/crates/otel-plugin/README.md), which indexes them for fast querying in this tab.
 - **Windows Event Logs** — reads Windows event logs on Windows Nodes. See the [Windows Events Plugin Reference](/src/collectors/windows-events.plugin/README.md) for supported event channels and configuration.
+- **macOS Unified Logs** — reads native macOS unified logs through Apple's OSLog framework. See the [macOS Logs Plugin Reference](/src/collectors/macos-logs.plugin/README.md) for supported fields and query behavior.
 
 :::note
 

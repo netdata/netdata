@@ -93,7 +93,7 @@ agents_audit_dir() {
 # (paths like /var/lib/netdata, /etc/netdata) or e.g. "/opt/netdata" for
 # bundled installs (paths under /opt/netdata/var/lib/netdata).
 #
-# Rule (per .agents/sow/specs/sensitive-data-discipline.md): probe
+# Rule (per .agents/sensitive-data-discipline.md): probe
 # candidates and pick the first whose <prefix>/var/lib/netdata or
 # <prefix>/etc/netdata exists. NOT a config knob.
 agents_netdata_prefix() {

@@ -128,7 +128,7 @@ limits can fail before `jq` starts.
 
 ## Path discipline
 
-This skill follows `<repo>/.agents/sow/specs/sensitive-data-discipline.md`:
+This skill follows `<repo>/.agents/sensitive-data-discipline.md`:
 
 - Repo files: repo-relative (`<repo>/src/...`).
 - Codacy account / org / repo identifiers: env-keyed.

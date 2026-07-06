@@ -7,6 +7,57 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
+var (
+	snmpTopologyV1DeviceSearchColumns = []string{
+		"display_name",
+		"id",
+		"sys_name",
+		"sys_object_id",
+		"management_ip",
+		"vendor",
+		"model",
+		"sys_descr",
+		"sys_location",
+		"sys_contact",
+		"netdata_host_id",
+	}
+
+	snmpTopologyV1DeviceSearchLabelKeys = []string{
+		"chassis_id",
+		"mac_address",
+		"ip_address",
+		"hostname",
+		"dns_name",
+		topologymodel.LabelOSPFRouterID,
+		"capabilities",
+		"capabilities_supported",
+		"capabilities_enabled",
+		"protocols",
+		"protocols_collected",
+	}
+
+	snmpTopologyV1EndpointSearchColumns = []string{
+		"display_name",
+		"id",
+		"vendor",
+		"model",
+	}
+
+	snmpTopologyV1EndpointSearchLabelKeys = []string{
+		"mac_address",
+		"ip_address",
+		"hostname",
+		"dns_name",
+		"learned_sources",
+		"protocols",
+	}
+
+	snmpTopologyV1CustomSearchColumns = []string{
+		"display_name",
+		"id",
+	}
+)
+
 func snmpTopologyV1ActorTypes() map[string]topologyapi.ActorType {
 	types := make(map[string]topologyapi.ActorType)
 	addDevice := func(id, label, colorSlot, icon string) {
@@ -16,8 +67,8 @@ func snmpTopologyV1ActorTypes() map[string]topologyapi.ActorType {
 			MergeIdentity:     []string{"chassis_ids", "mac_addresses", "ip_addresses", "sys_name"},
 			AggregationScopes: []string{"device", "network"},
 			Search: &topologyapi.ActorSearchPolicy{
-				Columns:   []string{"display_name", "sys_name", "management_ip", "vendor", "model"},
-				LabelKeys: []string{topologymodel.LabelOSPFRouterID},
+				Columns:   snmpTopologyV1DeviceSearchColumns,
+				LabelKeys: snmpTopologyV1DeviceSearchLabelKeys,
 			},
 			Presentation: &topologyapi.ActorPresentation{
 				Label:     label,
@@ -72,7 +123,10 @@ func snmpTopologyV1ActorTypes() map[string]topologyapi.ActorType {
 		Identity:          []string{"id"},
 		MergeIdentity:     []string{"mac_addresses", "ip_addresses"},
 		AggregationScopes: []string{"endpoint", "network"},
-		Search:            &topologyapi.ActorSearchPolicy{Columns: []string{"display_name"}},
+		Search: &topologyapi.ActorSearchPolicy{
+			Columns:   snmpTopologyV1EndpointSearchColumns,
+			LabelKeys: snmpTopologyV1EndpointSearchLabelKeys,
+		},
 		Presentation: &topologyapi.ActorPresentation{
 			Label:     "Inferred endpoint",
 			Role:      "endpoint",
@@ -113,12 +167,34 @@ func snmpTopologyV1ActorTypes() map[string]topologyapi.ActorType {
 			Modal: snmpTopologyV1EndpointModal(),
 		},
 	}
+	types[snmpTopologyV1ActorL3SubnetSegment] = topologyapi.ActorType{
+		Layer:             "network",
+		Identity:          []string{"id"},
+		MergeIdentity:     []string{"id"},
+		AggregationScopes: []string{"segment", "network"},
+		Search:            &topologyapi.ActorSearchPolicy{Enabled: new(false)},
+		Presentation: &topologyapi.ActorPresentation{
+			Label:     "L3 subnet",
+			Role:      "group",
+			Icon:      "segment",
+			ColorSlot: "info",
+			Size:      &topologyapi.ActorSizePresentation{Mode: "fixed", Scale: "compact"},
+			Layout:    &topologyapi.ActorLayoutPresentation{Repulsion: "weakest"},
+			LabelPolicy: &topologyapi.LabelPolicy{
+				Columns:   []string{"display_name"},
+				Fallback:  "type_label",
+				MaxLength: 80,
+				Array:     "reject",
+			},
+			Modal: snmpTopologyV1L3SubnetSegmentModal(),
+		},
+	}
 	types["custom"] = topologyapi.ActorType{
 		Layer:             "custom",
 		Identity:          []string{"id"},
 		MergeIdentity:     []string{"id"},
 		AggregationScopes: []string{"network"},
-		Search:            &topologyapi.ActorSearchPolicy{Columns: []string{"display_name"}},
+		Search:            &topologyapi.ActorSearchPolicy{Columns: snmpTopologyV1CustomSearchColumns},
 		Presentation: &topologyapi.ActorPresentation{
 			Label:     "Custom",
 			Role:      "actor",
@@ -158,8 +234,9 @@ func snmpTopologyV1DeviceModal() *topologyapi.ModalPresentation {
 			},
 			snmpTopologyV1PortLinksSection(2),
 			snmpTopologyV1L3SubnetSection(3),
-			snmpTopologyV1OSPFNeighborsSection(4),
-			snmpTopologyV1BGPPeersSection(5),
+			snmpTopologyV1L3SubnetMembershipSection(4),
+			snmpTopologyV1OSPFNeighborsSection(5),
+			snmpTopologyV1BGPPeersSection(6),
 		},
 	}
 }
@@ -169,6 +246,15 @@ func snmpTopologyV1EndpointModal() *topologyapi.ModalPresentation {
 		Labels:       snmpTopologyV1EndpointModalLabels(),
 		MiniTopology: &topologyapi.ModalMiniTopologyPresentation{Depth: 1},
 		Sections:     []topologyapi.ModalSection{snmpTopologyV1LinksSection(1)},
+	}
+}
+
+func snmpTopologyV1L3SubnetSegmentModal() *topologyapi.ModalPresentation {
+	return &topologyapi.ModalPresentation{
+		MiniTopology: &topologyapi.ModalMiniTopologyPresentation{Depth: 1},
+		Sections: []topologyapi.ModalSection{
+			snmpTopologyV1L3SubnetSegmentMembersSection(1),
+		},
 	}
 }
 
@@ -295,6 +381,79 @@ func snmpTopologyV1L3SubnetSection(order int) topologyapi.ModalSection {
 		},
 		Sort:       &topologyapi.ModalSort{Column: "subnet", Direction: "asc"},
 		EmptyLabel: "No L3 adjacencies",
+	}
+}
+
+func snmpTopologyV1L3SubnetMembershipSection(order int) topologyapi.ModalSection {
+	return topologyapi.ModalSection{
+		ID:    "l3_subnet_memberships",
+		Label: "L3 Subnet Memberships",
+		Order: order,
+		Source: topologyapi.ModalSource{
+			Kind:     "evidence",
+			Evidence: snmpTopologyV1LinkL3SubnetMembership,
+		},
+		OwnerFilter: &topologyapi.ModalOwnerFilter{
+			Mode:           "incident_evidence",
+			LinkColumn:     "link",
+			SrcActorColumn: "src_actor",
+			DstActorColumn: "dst_actor",
+		},
+		Columns: []topologyapi.ModalColumn{
+			{
+				ID:    "subnet_actor",
+				Label: "Subnet",
+				Projection: topologyapi.ModalProjection{
+					Kind:           "opposite_actor",
+					SrcActorColumn: "src_actor",
+					DstActorColumn: "dst_actor",
+				},
+				Cell: "actor_link",
+			},
+			modalDirectColumn("member_ip", "Local IP", "member_ip", "text"),
+			modalDirectColumn("member_if_name", "Interface", "member_if_name", "text"),
+			modalDirectColumn("subnet", "Subnet", "subnet", "text"),
+			modalDirectColumn("prefix", "Prefix", "prefix", "number"),
+			modalDirectColumnWithVisibility("member_if_index", "IfIndex", "member_if_index", "number", "expanded"),
+			modalDirectColumnWithVisibility("member_if_descr", "IfDescr", "member_if_descr", "text", "expanded"),
+			modalDirectColumnWithVisibility("network", "Network", "network", "text", "expanded"),
+			modalDirectColumnWithVisibility("netmask", "Netmask", "netmask", "text", "expanded"),
+			modalDirectColumnWithVisibility("source", "Source", "source", "badge", "expanded"),
+		},
+		Sort:       &topologyapi.ModalSort{Column: "subnet", Direction: "asc"},
+		EmptyLabel: "No L3 subnet memberships",
+	}
+}
+
+func snmpTopologyV1L3SubnetSegmentMembersSection(order int) topologyapi.ModalSection {
+	return topologyapi.ModalSection{
+		ID:    "l3_subnet_members",
+		Label: "Members",
+		Order: order,
+		Source: topologyapi.ModalSource{
+			Kind:     "evidence",
+			Evidence: snmpTopologyV1LinkL3SubnetMembership,
+		},
+		OwnerFilter: &topologyapi.ModalOwnerFilter{
+			Mode:           "incident_evidence",
+			LinkColumn:     "link",
+			SrcActorColumn: "src_actor",
+			DstActorColumn: "dst_actor",
+		},
+		Columns: []topologyapi.ModalColumn{
+			modalActorRefColumn("member", "Member", "member_actor"),
+			modalDirectColumn("member_ip", "Member IP", "member_ip", "text"),
+			modalDirectColumn("member_if_name", "Interface", "member_if_name", "text"),
+			modalDirectColumn("subnet", "Subnet", "subnet", "text"),
+			modalDirectColumn("prefix", "Prefix", "prefix", "number"),
+			modalDirectColumnWithVisibility("member_if_index", "IfIndex", "member_if_index", "number", "expanded"),
+			modalDirectColumnWithVisibility("member_if_descr", "IfDescr", "member_if_descr", "text", "expanded"),
+			modalDirectColumnWithVisibility("network", "Network", "network", "text", "expanded"),
+			modalDirectColumnWithVisibility("netmask", "Netmask", "netmask", "text", "expanded"),
+			modalDirectColumnWithVisibility("source", "Source", "source", "badge", "expanded"),
+		},
+		Sort:       &topologyapi.ModalSort{Column: "member_ip", Direction: "asc"},
+		EmptyLabel: "No subnet members",
 	}
 }
 
@@ -433,6 +592,7 @@ func snmpTopologyV1LinkTypeSpecs() []snmpTopologyV1LinkTypeSpec {
 		{id: snmpTopologyV1LinkSTP, label: "STP", colorSlot: "muted", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkARP, label: "ARP", colorSlot: "muted", lineStyle: "solid", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkL3Subnet, label: "L3 subnet", colorSlot: "info", lineStyle: "dashed", width: "normal", semanticRole: "normal"},
+		{id: snmpTopologyV1LinkL3SubnetMembership, label: "L3 subnet membership", colorSlot: "info", lineStyle: "dashed", width: "normal", semanticRole: "normal"},
 		{id: snmpTopologyV1LinkOSPF, label: "OSPF adjacency", colorSlot: "purple", lineStyle: "dashed", width: "normal", semanticRole: "control"},
 		{id: snmpTopologyV1LinkBGP, label: "BGP adjacency", colorSlot: "accent", lineStyle: "dashed", width: "normal", semanticRole: "control"},
 		{id: snmpTopologyV1LinkSNMP, label: "SNMP", colorSlot: "primary", lineStyle: "solid", width: "normal", semanticRole: "normal"},
@@ -494,6 +654,14 @@ func snmpTopologyV1EvidenceMatchColumnsForType(linkType string) []string {
 			"dst_ip",
 		}
 	}
+	if linkType == snmpTopologyV1LinkL3SubnetMembership {
+		return []string{
+			"member_actor",
+			"segment_actor",
+			"member_ip",
+			"subnet",
+		}
+	}
 	if linkType == snmpTopologyV1LinkOSPF {
 		return []string{
 			"src_actor",
@@ -547,6 +715,7 @@ func snmpTopologyV1Presentation() *topologyapi.Presentation {
 				{Type: "custom", Label: "Other"},
 				{Type: "endpoint", Label: "Inferred endpoint"},
 				{Type: "segment", Label: "Network segment"},
+				{Type: snmpTopologyV1ActorL3SubnetSegment, Label: "L3 subnet"},
 			},
 			Links: []topologyapi.LegendEntry{
 				{Type: snmpTopologyV1LinkLLDP, Label: "LLDP"},
@@ -554,6 +723,7 @@ func snmpTopologyV1Presentation() *topologyapi.Presentation {
 				{Type: snmpTopologyV1LinkSNMP, Label: "SNMP"},
 				{Type: snmpTopologyV1LinkBridge, Label: "Bridge"},
 				{Type: snmpTopologyV1LinkL3Subnet, Label: "L3 subnet"},
+				{Type: snmpTopologyV1LinkL3SubnetMembership, Label: "L3 subnet membership"},
 				{Type: snmpTopologyV1LinkOSPF, Label: "OSPF adjacency"},
 				{Type: snmpTopologyV1LinkBGP, Label: "BGP adjacency"},
 				{Type: snmpTopologyV1LinkProbable, Label: "Probable"},

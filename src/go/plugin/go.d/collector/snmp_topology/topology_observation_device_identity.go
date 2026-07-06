@@ -3,11 +3,13 @@
 package snmptopology
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func ensureTopologyObservationDeviceID(device topologyDevice, baseBridgeAddress string) string {
+func ensureTopologyObservationDeviceID(device topologymodel.Device, baseBridgeAddress string) string {
 	if mac := topologyPrimaryIdentityMAC(device.ChassisID, baseBridgeAddress); mac != "" {
 		return "macAddress:" + mac
 	}

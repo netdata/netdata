@@ -23,14 +23,15 @@ type ObservationSnapshot struct {
 }
 
 type ObservationAggregate struct {
-	Snapshots      []ObservationSnapshot
-	L2Observations []topologyengine.L2Observation
-	L3Interfaces   []L3Interface
-	OSPFNeighbors  []OSPFNeighbor
-	BGPPeers       []BGPPeer
-	LocalDeviceID  string
-	AgentID        string
-	CollectedAt    time.Time
+	Snapshots       []ObservationSnapshot
+	L2Observations  []topologyengine.L2Observation
+	L3Interfaces    []L3Interface
+	OSPFNeighbors   []OSPFNeighbor
+	BGPPeers        []BGPPeer
+	LocalDeviceID   string
+	AgentID         string
+	ProducerScopeID string
+	CollectedAt     time.Time
 }
 
 type L3Interface struct {

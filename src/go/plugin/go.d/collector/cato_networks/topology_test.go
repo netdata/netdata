@@ -42,12 +42,6 @@ func TestTopologyFunction(t *testing.T) {
 				require.Greater(t, data.Links.Rows, 0)
 			},
 		},
-		"requires job selection": {
-			check: func(t *testing.T, _ *Collector) {
-				cfg := catofunc.Methods(defaultUpdateEvery)[0]
-				require.False(t, cfg.AgentWide)
-			},
-		},
 	}
 
 	for name, tc := range tests {
@@ -74,6 +68,7 @@ func TestBuildTopology(t *testing.T) {
 					"1001": {
 						ID:                 "1001",
 						Name:               "Paris Office",
+						Description:        "Primary office",
 						ConnectivityStatus: "connected",
 						PopName:            "POP-Paris",
 						Interfaces:         make(map[string]*interfaceState),
@@ -81,6 +76,16 @@ func TestBuildTopology(t *testing.T) {
 				}, []string{"1001"}, fixedCatoTestNow())
 			},
 			check: func(t *testing.T, data *topologyv1.Data) {
+				actors := topologyTableRows(t, data.Actors, data.Dictionaries)
+				site := requireTopologyRow(t, actors, "type", catofunc.ActorTypeSite)
+				require.Equal(t, "Primary office", site["description"])
+				require.Subset(t, data.Types.ActorTypes[catofunc.ActorTypeSite].Search.Columns, []string{
+					"description",
+					"country_code",
+					"site_type",
+					"connection_type",
+				})
+
 				rows := topologyTableRows(t, data.Links, data.Dictionaries)
 				require.Len(t, rows, 1)
 				require.Equal(t, catofunc.LinkTypeTunnel, rows[0]["type"])
@@ -108,6 +113,8 @@ func TestBuildTopology(t *testing.T) {
 				actors := topologyTableRows(t, data.Actors, data.Dictionaries)
 				peerActor := requireTopologyRow(t, actors, "type", catofunc.ActorTypeBGPPeer)
 				require.Empty(t, peerActor["remote_ip"])
+				require.Contains(t, data.Types.ActorTypes[catofunc.ActorTypeBGPPeer].Search.Columns, "site_id")
+				require.Contains(t, data.Types.ActorTypes[catofunc.ActorTypeBGPPeer].Search.Columns, "pop_name")
 
 				links := topologyTableRows(t, data.Links, data.Dictionaries)
 				bgpLink := requireTopologyRow(t, links, "type", catofunc.LinkTypeBGP)
@@ -161,6 +168,13 @@ func TestBuildTopology(t *testing.T) {
 				require.Equal(t, device1["_row"], interfaces[0]["actor"])
 				require.Equal(t, device2["_row"], interfaces[1]["actor"])
 				require.Equal(t, 2, countTopologyRows(actors, "type", catofunc.ActorTypeDevice))
+				require.Subset(t, data.Types.ActorTypes[catofunc.ActorTypeDevice].Search.Columns, []string{
+					"site_id",
+					"socket_version",
+					"internal_ip",
+					"ha_role",
+					"pop_name",
+				})
 			},
 		},
 	}

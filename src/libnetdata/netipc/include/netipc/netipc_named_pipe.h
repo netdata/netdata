@@ -40,8 +40,8 @@ extern "C" {
 #define NIPC_NP_MAX_INSTANCES PIPE_UNLIMITED_INSTANCES
 
 /* FNV-1a 64-bit constants */
-#define NIPC_FNV1A_OFFSET_BASIS 0xcbf29ce484222325ull
-#define NIPC_FNV1A_PRIME        0x00000100000001B3ull
+#define NIPC_FNV1A_OFFSET_BASIS 0xcbf29ce484222325ULL
+#define NIPC_FNV1A_PRIME        0x00000100000001B3ULL
 
 /* ------------------------------------------------------------------ */
 /*  Error codes (transport-level)                                      */

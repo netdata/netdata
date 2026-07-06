@@ -46,9 +46,9 @@ func (r *router) Cleanup(ctx context.Context) {
 	}
 }
 
-func Methods(updateEvery int) []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		topologyMethodConfig(updateEvery),
+func Methods(updateEvery int) []funcapi.FunctionConfig {
+	return []funcapi.FunctionConfig{
+		topologyFunctionConfig(updateEvery),
 	}
 }
 

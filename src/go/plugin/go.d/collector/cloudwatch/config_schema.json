@@ -1,0 +1,385 @@
+{
+  "jsonSchema": {
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "AWS CloudWatch collector",
+    "type": "object",
+    "properties": {
+      "update_every": {
+        "title": "Update every",
+        "description": "Data collection interval, measured in seconds. CloudWatch's minimum period is 60s.",
+        "type": "integer",
+        "minimum": 60,
+        "default": 60
+      },
+      "autodetection_retry": {
+        "title": "Detection retry",
+        "description": "Recheck interval in seconds. Zero means no recheck.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 0
+      },
+      "vnode": {
+        "title": "Vnode",
+        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "type": "string"
+      },
+      "regions": {
+        "title": "Regions",
+        "description": "AWS regions to collect from. At least one region is required (AWS is region-scoped), and all regions must belong to the same AWS partition.",
+        "type": "array",
+        "items": {
+          "title": "Region",
+          "type": "string"
+        },
+        "minItems": 1
+      },
+      "auth": {
+        "title": "Authentication",
+        "type": "object",
+        "properties": {
+          "mode": {
+            "title": "Mode",
+            "description": "How Netdata obtains AWS credentials: `default` uses the AWS SDK credential chain (environment, shared config, EC2 instance profile, EKS IRSA); `access_key` uses static keys; `assume_role` assumes an IAM role.",
+            "type": "string",
+            "enum": [
+              "default",
+              "access_key",
+              "assume_role"
+            ],
+            "default": "default"
+          }
+        },
+        "dependencies": {
+          "mode": {
+            "oneOf": [
+              {
+                "properties": {
+                  "mode": {
+                    "const": "default"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "access_key"
+                  },
+                  "mode_access_key": {
+                    "title": "Access key",
+                    "type": "object",
+                    "properties": {
+                      "access_key_id": {
+                        "title": "Access key ID",
+                        "type": "string"
+                      },
+                      "secret_access_key": {
+                        "title": "Secret access key",
+                        "type": "string",
+                        "sensitive": true
+                      },
+                      "session_token": {
+                        "title": "Session token",
+                        "type": "string",
+                        "sensitive": true
+                      }
+                    },
+                    "required": [
+                      "access_key_id",
+                      "secret_access_key"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_access_key"
+                ]
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "assume_role"
+                  },
+                  "mode_assume_role": {
+                    "title": "Assume role",
+                    "type": "object",
+                    "properties": {
+                      "roles": {
+                        "title": "Roles",
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "role_arn": {
+                              "title": "Role ARN",
+                              "type": "string"
+                            },
+                            "external_id": {
+                              "title": "External ID",
+                              "type": "string",
+                              "sensitive": true
+                            }
+                          },
+                          "required": [
+                            "role_arn"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "roles"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_assume_role"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      },
+      "profiles": {
+        "title": "Profiles",
+        "type": "object",
+        "properties": {
+          "mode": {
+            "title": "Mode",
+            "description": "Which service profiles to collect: `auto` uses the default-enabled profiles; `exact` uses only the profiles you list (by basename); `combined` adds the deep-grain (per-target-group, per-operation, per-request-filter) profiles to the default set.",
+            "type": "string",
+            "enum": [
+              "auto",
+              "exact",
+              "combined"
+            ],
+            "default": "auto"
+          }
+        },
+        "dependencies": {
+          "mode": {
+            "oneOf": [
+              {
+                "properties": {
+                  "mode": {
+                    "const": "auto"
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "exact"
+                  },
+                  "mode_exact": {
+                    "title": "Exact profiles",
+                    "type": "object",
+                    "properties": {
+                      "entries": {
+                        "title": "Entries",
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "title": "Profile",
+                              "description": "Profile basename to collect (e.g. `ec2`, `alb_target`).",
+                              "type": "string",
+                              "pattern": "^[a-z][a-z0-9_]*$"
+                            }
+                          },
+                          "required": [
+                            "name"
+                          ]
+                        }
+                      }
+                    },
+                    "required": [
+                      "entries"
+                    ]
+                  }
+                },
+                "required": [
+                  "mode_exact"
+                ]
+              },
+              {
+                "properties": {
+                  "mode": {
+                    "const": "combined"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      },
+      "discovery": {
+        "title": "Discovery",
+        "type": "object",
+        "properties": {
+          "refresh_every": {
+            "title": "Refresh every",
+            "description": "How often to re-discover metrics, in seconds.",
+            "type": "integer",
+            "minimum": 60,
+            "default": 300
+          },
+          "recently_active_only": {
+            "title": "Recently active only",
+            "description": "List only metrics active in the last 3h (auto-disabled for metrics whose period exceeds 3h, e.g. daily S3 storage metrics).",
+            "type": "boolean",
+            "default": true
+          }
+        }
+      },
+      "query_offset": {
+        "title": "Query offset",
+        "description": "Seconds subtracted from now when querying, to account for CloudWatch publish latency.",
+        "type": "integer",
+        "minimum": 0,
+        "default": 600
+      },
+      "timeout": {
+        "title": "Timeout",
+        "description": "AWS API call timeout, in seconds.",
+        "type": "number",
+        "minimum": 0,
+        "default": 30
+      }
+    },
+    "required": [
+      "regions",
+      "auth"
+    ]
+  },
+  "uiSchema": {
+    "uiOptions": {
+      "fullPage": true
+    },
+    "regions": {
+      "ui:listFlavour": "list",
+      "ui:help": "AWS regions to collect from. Add one region per row. At least one is required, and all regions must belong to the same AWS partition (standard, GovCloud, or China). Global services report to a single region -- e.g. Amazon CloudFront publishes only in us-east-1 -- so include that region to collect them.",
+      "items": {
+        "ui:placeholder": "us-east-1"
+      }
+    },
+    "auth": {
+      "mode": {
+        "ui:help": "How Netdata obtains AWS credentials: `default` uses the AWS SDK credential chain, `access_key` uses static keys, and `assume_role` assumes an IAM role.",
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "mode_access_key": {
+        "access_key_id": {
+          "ui:help": "AWS access key ID.",
+          "ui:placeholder": "AKIA..."
+        },
+        "secret_access_key": {
+          "ui:help": "AWS secret access key.",
+          "ui:widget": "password"
+        },
+        "session_token": {
+          "ui:help": "Optional session token, required only for temporary credentials.",
+          "ui:widget": "password"
+        }
+      },
+      "mode_assume_role": {
+        "roles": {
+          "ui:listFlavour": "list",
+          "ui:help": "The IAM role to assume. Exactly one role is supported.",
+          "items": {
+            "role_arn": {
+              "ui:help": "ARN of the IAM role to assume.",
+              "ui:placeholder": "arn:aws:iam::123456789012:role/NetdataCloudWatch"
+            },
+            "external_id": {
+              "ui:help": "Optional external ID required by the role's trust policy.",
+              "ui:widget": "password"
+            }
+          }
+        }
+      }
+    },
+    "profiles": {
+      "mode": {
+        "ui:help": "Which service profiles to collect: `auto` uses the default-enabled profiles, `exact` uses only the profiles you list (by basename), and `combined` adds the deep-grain profiles to the default set.",
+        "ui:widget": "radio",
+        "ui:options": {
+          "inline": true
+        }
+      },
+      "mode_exact": {
+        "entries": {
+          "ui:listFlavour": "list",
+          "ui:help": "Profiles to collect, one basename per row.",
+          "items": {
+            "name": {
+              "ui:help": "Profile basename (e.g. ec2, alb_target).",
+              "ui:placeholder": "ec2"
+            }
+          }
+        }
+      }
+    },
+    "discovery": {
+      "refresh_every": {
+        "ui:help": "How often to re-run metric discovery (ListMetrics). Discovery is cheap; raise this only to cut API load on very large accounts."
+      },
+      "recently_active_only": {
+        "ui:help": "List only metrics active in the last 3h. Automatically disabled for profiles with a longer period (e.g. daily S3 storage) so those are not hidden."
+      }
+    },
+    "query_offset": {
+      "ui:help": "Seconds subtracted from now when querying, to account for CloudWatch publish latency. Increase it if you see gaps at the leading edge of charts."
+    },
+    "timeout": {
+      "ui:help": "AWS API call timeout, in seconds. Accepts decimals for sub-second granularity (for example, `0.5` for 500ms)."
+    },
+    "vnode": {
+      "ui:help": "Optional virtual node name used to group this job's charts under a specific Netdata virtual node.",
+      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
+    },
+    "ui:flavour": "tabs",
+    "ui:options": {
+      "tabs": [
+        {
+          "title": "Base",
+          "fields": [
+            "regions",
+            "update_every",
+            "autodetection_retry",
+            "query_offset",
+            "timeout"
+          ]
+        },
+        {
+          "title": "Auth",
+          "fields": [
+            "auth"
+          ]
+        },
+        {
+          "title": "Profiles",
+          "fields": [
+            "profiles"
+          ]
+        },
+        {
+          "title": "Discovery",
+          "fields": [
+            "discovery"
+          ]
+        },
+        {
+          "title": "Virtual Node",
+          "fields": [
+            "vnode"
+          ]
+        }
+      ]
+    }
+  }
+}

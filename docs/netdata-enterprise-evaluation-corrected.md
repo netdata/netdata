@@ -35,7 +35,7 @@ Typically, organizations use the mixed approach, where they install a number of 
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-For more information see [Deployment Strategies](https://github.com/netdata/netdata/blob/master/docs/deployment-guides/deployment-with-centralization-points.md).
+For more information see [Deployment Strategies](/docs/deployment-guides/deployment-with-centralization-points.md).
 
 ## Infrastructure Requirements
 
@@ -43,40 +43,40 @@ Netdata has been architected to minimize resource consumption while maximizing o
 
 - **Storage Optimization**: Industry-leading compression achieving ~0.6 bytes per sample on disk for high-resolution data
 - **Edge Computing**: Distributed architecture keeps data processing close to its source, reducing bandwidth and central processing requirements - Netdata distributes the code instead of centralizing the data
-- **Intelligent ML**: Machine learning runs as low-priority background tasks, automatically yielding resources when needed for data collection. See [AI & ML Features](https://github.com/netdata/netdata/blob/master/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md)
-- **Built-in Scalability**: Native clustering and high-availability features enable organizations to scale horizontally without architectural changes. See [Observability Centralization Points](https://github.com/netdata/netdata/blob/master/docs/deployment-guides/deployment-with-centralization-points.md).
+- **Intelligent ML**: Machine learning runs as low-priority background tasks, automatically yielding resources when needed for data collection. See [AI & ML Features](/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md)
+- **Built-in Scalability**: Native clustering and high-availability features enable organizations to scale horizontally without architectural changes. See [Observability Centralization Points](/docs/deployment-guides/deployment-with-centralization-points.md).
 - **Stable and Predictable Resource Usage**: Agents are optimized to spread work over time and avoid sudden changes in resource consumption
 
 This design philosophy enables Netdata to monitor infrastructure at unprecedented scale with minimal overhead, making it suitable for everything from IoT devices to high-performance computing clusters.
 
 ### Agent Requirements (Per Node)
 
-Netdata Agent is designed to be lightweight, making it suitable for deployment across entire infrastructures. Even with Machine Learning enabled, Netdata Agents typically consume less than 5% CPU of a single core. The exact figures depend on the number of metrics collected per server.
+Netdata Agent is designed to be lightweight, making it suitable for deployment across entire infrastructures. Even with Machine Learning enabled, Netdata Agents typically consume less than 5% CPU of a single core (see [CPU Requirements](/docs/netdata-agent/sizing-netdata-agents/cpu-requirements.md) for default-settings sizing guidance). The exact figures depend on the number of metrics collected per server.
 
 When connected to a Netdata Parent (the agent is in `child` mode), these requirements can be significantly reduced and, in the case of storage, even eliminated (no data on local disk).
 
-| Type       | Metric/s | CPU | Memory | Network | Storage |
-|------------|---------------|-----------|---------|---------|---------|
-| standalone | 3k - 10k | 4% - 20% of single core | 150 - 500 MiB | none | varies based on retention |
-| child      | 3k - 10k | 2% - 10% of single core | 100 - 300 MiB | \<1 Mbps | none |
+| Type       | Metric/s | CPU                     | Memory        | Network  | Storage                   |
+|------------|----------|-------------------------|---------------|----------|---------------------------|
+| standalone | 3k - 10k | 4% - 20% of single core | 150 - 500 MiB | none     | varies based on retention |
+| child      | 3k - 10k | 2% - 10% of single core | 100 - 300 MiB | \<1 Mbps | none                      |
 
-For more information and ways to further reduce Agent resource utilization, see [Agent Resource Utilization](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/README.md).
+For more information and ways to further reduce Agent resource utilization, see [Agent Resource Utilization](/docs/netdata-agent/sizing-netdata-agents/README.md).
 
 ### Parent Node Requirements (Centralization Points)
 
 Parent nodes aggregate data from multiple child agents and require resources that scale with the volume of metrics collected and other deployment decisions (clustered parents, centralized machine learning, etc).
 
-The best practice is to have a cluster of Netdata Parents for every approximately 500 monitored nodes (2M metrics/second), like this:
+The best practice is to have a cluster of Netdata Parents for every approximately 500 monitored nodes (2M metrics/second, see [Parent Sizing Guidelines](/docs/scalability.md#parent-sizing-guidelines) for the full 100/250/500-node breakdown), like this:
 
-| Monitored Nodes | Metric/s | CPU Cores | Memory | Network | Storage |
-|-----------------|----------|-----------|---------|---------|---------|
-| 500 nodes       | 2 million | 20 cores  | 80 GB | 200 Mbps | varies based on retention |
+| Monitored Nodes | Metric/s  | CPU Cores | Memory | Network  | Storage                   |
+|-----------------|-----------|-----------|--------|----------|---------------------------|
+| 500 nodes       | 2 million | 20 cores  | 80 GB  | 200 Mbps | varies based on retention |
 
 These figures include ingestion and query resources.
 
-For more information see [Agent Resource Utilization](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/README.md).
+For more information see [Agent Resource Utilization](/docs/netdata-agent/sizing-netdata-agents/README.md).
 
-For high availability configurations, see [Clustering and High Availability of Netdata Parents](https://github.com/netdata/netdata/blob/master/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md).
+For high availability configurations, see [Clustering and High Availability of Netdata Parents](/docs/observability-centralization-points/metrics-centralization-points/clustering-and-high-availability-of-netdata-parents.md).
 
 ### Netdata Cloud On-Prem
 
@@ -84,10 +84,10 @@ For organizations requiring complete control over their monitoring infrastructur
 
 Netdata Cloud is a Kubernetes cluster (Kubernetes 1.23+):
 
-| Monitored Nodes | CPU Cores | Memory | Storage | Notes |
-|-----------------|-----------|---------|---------|--------|
-| 2,000 nodes     | 20 cores  | 45 GB   | 500 GB  | Minimal K8s cluster |
-| 10,000 nodes    | 100 cores | 200 GB  | 2 TB    | Multi-node K8s cluster |
+| Monitored Nodes | CPU Cores | Memory | Storage | Notes                  |
+|-----------------|-----------|--------|---------|------------------------|
+| 2,000 nodes     | 20 cores  | 45 GB  | 500 GB  | Minimal K8s cluster    |
+| 10,000 nodes    | 100 cores | 200 GB | 2 TB    | Multi-node K8s cluster |
 
 For more information see [Netdata Cloud On-Prem](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/README.md) and [Installation Guide](https://github.com/netdata/netdata-cloud-onprem/blob/master/docs/learn.netdata.cloud/installation.md).
 
@@ -104,7 +104,7 @@ Netdata users have multiple options to deploy Netdata on their systems. Netdata 
 
 **Note**: Netdata Parents use the same software as Agents with different configuration. All deployment methods apply to both.
 
-For more information about Netdata Agents & Parents installation methods see [Netdata Agent Installation](https://github.com/netdata/netdata/blob/master/packaging/installer/README.md).
+For more information about Netdata Agents & Parents installation methods see [Netdata Agent Installation](/packaging/installer/README.md).
 
 ### Netdata Cloud On-Prem Installation & Updates
 
@@ -115,6 +115,7 @@ For more information see [Netdata Cloud On-Prem Installation](https://github.com
 ### Updates and Backwards Compatibility
 
 Netdata maintains strong backward compatibility:
+
 - Newer Parents accept streams from older Agents
 - Configuration files remain compatible across versions
 - Breaking changes are rare and well-documented
@@ -122,13 +123,13 @@ Netdata maintains strong backward compatibility:
 
 ## Authentication, Authorization, and Accounting (AAA)
 
-Netdata Agents and Parents are authorized to connect to Netdata Cloud via a process called [claiming](https://github.com/netdata/netdata/blob/master/src/claim/README.md). This process uses cryptographic certificates to authorize the agents to connect to Netdata Cloud and can be controlled via configuration management/provisioning tools, or manually.
+Netdata Agents and Parents are authorized to connect to Netdata Cloud via a process called [claiming](/src/claim/README.md). This process uses cryptographic certificates to authorize the agents to connect to Netdata Cloud and can be controlled via configuration management/provisioning tools, or manually.
 
-To authorize users, Netdata Cloud supports email authentication, Google OAuth, GitHub OAuth, Okta SSO, OpenID Connect (OIDC). For more information see [Enterprise SSO Authentication](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md).
+To authorize users, Netdata Cloud supports email authentication, Google OAuth, GitHub OAuth, Okta SSO, OpenID Connect (OIDC). For more information see [Enterprise SSO Authentication](/docs/netdata-cloud/authentication-and-authorization/enterprise-sso-authentication.md).
 
-Netdata supports automatic mapping of LDAP/AD groups into Netdata roles, using the System for Cross-domain Identity Management (SCIM) v2. For more information see [SCIM Integration](https://github.com/netdata/netdata/blob/master/integrations/cloud-authentication/metadata.yaml).
+Netdata supports automatic mapping of LDAP/AD groups into Netdata roles, using the System for Cross-domain Identity Management (SCIM) v2. For more information see [SCIM Integration](/integrations/cloud-authentication/metadata.yaml).
 
-To control access to observability data, Netdata Cloud uses spaces and rooms to segment the infrastructure (by geography, type, or any grouping the organization decides). Users gain access to spaces and rooms and, depending on their role, they may have different access to different types of observability data. For more information see [Role-Based Access model (RBAC)](https://github.com/netdata/netdata/blob/master/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
+To control access to observability data, Netdata Cloud uses spaces and rooms to segment the infrastructure (by geography, type, or any grouping the organization decides). Users gain access to spaces and rooms and, depending on their role, they may have different access to different types of observability data. For more information see [Role-Based Access model (RBAC)](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md).
 
 ## Scalability
 
@@ -145,6 +146,7 @@ Due to the distributed nature of the architecture (parallel independent executio
 Netdata takes the impact on monitored infrastructure extremely seriously. Netdata is committed to being a friendly and polite citizen alongside other applications and services running on the monitored systems. This philosophy drives every architectural decision.
 
 **Netdata's Commitment:**
+
 - Any negative impact on monitored applications is considered a severe bug that must be fixed
 - Continuous optimization to minimize resource consumption while maximizing observability value
 - The solution is battle-tested by a large community across diverse environments
@@ -163,7 +165,7 @@ According to the [University of Amsterdam study](https://www.ivanomalavolta.com/
 
 For metrics, Netdata maintains ingested samples as close to the edge as possible. Netdata Parents receive these data and each parent in a cluster maintains its own copy of them. All metrics are stored in write-once files which are rotated according to configuration (size and/or time based). Each Netdata Agent or Parent maintains by default 3 storage tiers of the same data (high resolution - per second, medium resolution - per minute, low resolution - per hour). All tiers are updated in parallel during ingestion. Users can configure size and time retention per tier. High availability of the data is achieved via streaming (parent-child relationships) and parents clustering.
 
-For detailed information see [Disk Requirements and Retention](https://github.com/netdata/netdata/blob/master/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md).
+For detailed information see [Disk Requirements and Retention](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md).
 
 For logs, Netdata uses standard systemd-journal files (readable with journalctl). Standard systemd-journald practices apply (archiving, backup, centralization, exporting, etc) and Forward Secure Sealing (FSS) is supported.
 
@@ -197,7 +199,7 @@ Comprehensive SSO integration supports LDAP/AD group mapping through SCIM 2.0, e
 **Security Operations:**
 Regular third-party security audits, penetration testing, and an active bug bounty program ensure continuous security improvement. The platform supports configurable data anonymization and network segmentation for sensitive environments.
 
-For comprehensive security information see [Security and Privacy Design](https://github.com/netdata/netdata/blob/master/docs/security-and-privacy-design/README.md).
+For comprehensive security information see [Security and Privacy Design](/docs/security-and-privacy-design/README.md).
 
 ## Support and Maintenance
 
@@ -243,7 +245,7 @@ Organizations typically realize immediate benefits through instant visibility, z
 Netdata provides comprehensive training and documentation resources designed to support successful deployment and ongoing operations across enterprise environments.
 
 **Documentation Resources:**
-Extensive documentation is available at [learn.netdata.cloud](https://learn.netdata.cloud), including a comprehensive [Getting Started Guide](https://github.com/netdata/netdata/blob/master/docs/deployment-guides/README.md), step-by-step tutorials, video walkthroughs, and architecture deep-dives. Reference materials include API documentation, configuration guides, troubleshooting resources, and best practices.
+Extensive documentation is available at [learn.netdata.cloud](https://learn.netdata.cloud), including a comprehensive [Getting Started Guide](/docs/deployment-guides/README.md), step-by-step tutorials, video walkthroughs, and architecture deep-dives. Reference materials include API documentation, configuration guides, troubleshooting resources, and best practices.
 
 **Training Programs:**
 Self-service learning options include interactive tutorials, hands-on labs, video courses, and certification paths. Instructor-led training provides virtual workshops, on-site training, custom curriculum development, and train-the-trainer programs.

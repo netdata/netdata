@@ -37,6 +37,12 @@ Without authentication, anyone who can reach the Netdata dashboard could access 
 | Multi-node views                   |   5 nodes   |  5 nodes   | Unlimited |
 | Custom dashboards                  | 1 per agent | 1 per room | Unlimited |
 
+:::note
+
+**Windows standalone Agents:** On Windows, standalone Agents on the free Community tier collect metrics but the local dashboard at `http://localhost:19999` is locked. To view monitoring data, connect the node to [Netdata Cloud](https://app.netdata.cloud) (free Community tier). Paid plans unlock the local dashboard. Air-gapped free standalone Windows installations cannot reach Netdata Cloud, so monitoring data cannot be viewed in that setup. When a Windows Child Agent streams to a Linux-based Netdata parent, the parent dashboard shows the Windows child's metrics normally — the Windows standalone local-dashboard lock does not apply, because the dashboard is served by the Linux parent rather than the Windows Agent. Sensitive functions on the Windows child still follow the standard access-control rules described in this document. For Windows installation details, see [Install Netdata on Windows](/packaging/windows/WINDOWS_INSTALLER.md).
+
+:::
+
 ### Functions (Live Tab)
 
 Functions provide on-demand, detailed information beyond standard metrics.

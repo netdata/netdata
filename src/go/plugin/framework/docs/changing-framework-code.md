@@ -215,7 +215,7 @@ Use this checklist when the changed package is involved.
 
 ### host scopes and vnodes
 
-See `.agents/sow/specs/go-v2-host-scope.md`.
+See `.agents/skills/project-writing-go-modules-framework-v2/go-v2-host-scope.md`.
 
 - Scope identity MUST use deterministic stable IDs.
 - Framework changes MUST preserve collector-provided `_vnode_type` labels. The
@@ -236,7 +236,7 @@ See `.agents/sow/specs/go-v2-host-scope.md`.
 ### topology
 
 See `.agents/skills/project-create-topology/SKILL.md` and
-`.agents/sow/specs/topology-function-schema.md`.
+`.agents/skills/project-create-topology/topology-function-schema.md`.
 
 - New topology producers MUST use `src/go/pkg/topology/v1`.
 - Payload changes MUST validate against

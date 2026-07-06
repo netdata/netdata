@@ -401,27 +401,13 @@ func (c *Collector) populateBGPRow(row *ddsnmp.BGPRow, cfg ddprofiledefinition.B
 	if row.Identity.SubsequentAddressFamily, err = c.bgpSubsequentAddressFamilyValue(cfg.Identity.SubsequentAddressFamily.BGPValueConfig, ctx); err != nil {
 		return fmt.Errorf("identity.subsequent_address_family: %w", err)
 	}
-	if row.Descriptors.LocalAddress, err = c.bgpTextValue(cfg.Descriptors.LocalAddress, ctx); err != nil {
-		return fmt.Errorf("descriptors.local_address: %w", err)
-	}
-	if row.Descriptors.LocalAS, err = c.bgpTextValue(cfg.Descriptors.LocalAS, ctx); err != nil {
-		return fmt.Errorf("descriptors.local_as: %w", err)
-	}
-	if row.Descriptors.LocalIdentifier, err = c.bgpTextValue(cfg.Descriptors.LocalIdentifier, ctx); err != nil {
-		return fmt.Errorf("descriptors.local_identifier: %w", err)
-	}
-	if row.Descriptors.PeerIdentifier, err = c.bgpTextValue(cfg.Descriptors.PeerIdentifier, ctx); err != nil {
-		return fmt.Errorf("descriptors.peer_identifier: %w", err)
-	}
-	if row.Descriptors.PeerType, err = c.bgpTextValue(cfg.Descriptors.PeerType, ctx); err != nil {
-		return fmt.Errorf("descriptors.peer_type: %w", err)
-	}
-	if row.Descriptors.BGPVersion, err = c.bgpTextValue(cfg.Descriptors.BGPVersion, ctx); err != nil {
-		return fmt.Errorf("descriptors.bgp_version: %w", err)
-	}
-	if row.Descriptors.Description, err = c.bgpTextValue(cfg.Descriptors.Description, ctx); err != nil {
-		return fmt.Errorf("descriptors.description: %w", err)
-	}
+	row.Descriptors.LocalAddress = c.bgpOptionalTextValue(cfg.Descriptors.LocalAddress, ctx)
+	row.Descriptors.LocalAS = c.bgpOptionalTextValue(cfg.Descriptors.LocalAS, ctx)
+	row.Descriptors.LocalIdentifier = c.bgpOptionalTextValue(cfg.Descriptors.LocalIdentifier, ctx)
+	row.Descriptors.PeerIdentifier = c.bgpOptionalTextValue(cfg.Descriptors.PeerIdentifier, ctx)
+	row.Descriptors.PeerType = c.bgpOptionalTextValue(cfg.Descriptors.PeerType, ctx)
+	row.Descriptors.BGPVersion = c.bgpOptionalTextValue(cfg.Descriptors.BGPVersion, ctx)
+	row.Descriptors.Description = c.bgpOptionalTextValue(cfg.Descriptors.Description, ctx)
 
 	if err := c.populateBGPStateValue(&row.State, cfg.State, ctx); err != nil {
 		return fmt.Errorf("state: %w", err)
@@ -825,6 +811,19 @@ func (c *Collector) bgpTextValue(cfg ddprofiledefinition.BGPValueConfig, ctx bgp
 		value = mapped
 	}
 	return value, nil
+}
+
+func (c *Collector) bgpOptionalTextValue(cfg ddprofiledefinition.BGPValueConfig, ctx bgpValueContext) string {
+	value, err := c.bgpTextValue(cfg, ctx)
+	if err != nil {
+		sym := bgpValueSymbol(cfg)
+		c.log.Debugf("BGP optional descriptor %q on table %q row %q is unavailable: %v", sym.Name, ctx.tableName, ctx.rowIndex, err)
+		// Descriptors enrich the row, but identity and signals already decide
+		// whether the row is usable. Some devices publish malformed descriptor
+		// placeholders, so keep the row and omit the descriptor.
+		return ""
+	}
+	return value
 }
 
 func (c *Collector) bgpAddressFamilyValue(cfg ddprofiledefinition.BGPValueConfig, ctx bgpValueContext) (ddprofiledefinition.BGPAddressFamily, error) {

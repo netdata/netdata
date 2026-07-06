@@ -13,9 +13,9 @@ const (
 	snmpTrapsFunctionName = snmptrapsfunc.FunctionName
 )
 
-func snmpTrapsMethods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		snmptrapsfunc.LogsMethodConfig(directJournalLogsAvailable),
+func snmpTrapsMethods() []funcapi.FunctionConfig {
+	return []funcapi.FunctionConfig{
+		snmptrapsfunc.LogsFunctionConfig(directJournalLogsAvailable),
 	}
 }
 

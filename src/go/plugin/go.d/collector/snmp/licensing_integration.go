@@ -24,9 +24,9 @@ func (li *licensingIntegration) registerFunction(r *funcRouter) {
 	r.registerHandler(licensesMethodID, newFuncLicenses(li.cache))
 }
 
-func snmpMethods() []funcapi.MethodConfig {
+func snmpMethods() []funcapi.FunctionConfig {
 	methods := snmpBaseMethods()
-	return append(methods, licensesMethodConfig())
+	return append(methods, licensesFunctionConfig())
 }
 
 func (c *Collector) collectLicensing(mx map[string]int64, pms []*ddsnmp.ProfileMetrics) {

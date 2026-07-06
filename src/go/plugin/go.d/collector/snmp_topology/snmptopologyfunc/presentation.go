@@ -7,14 +7,14 @@ import (
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 )
 
-func Methods() []funcapi.MethodConfig {
-	return []funcapi.MethodConfig{
-		methodConfig(),
+func Methods() []funcapi.FunctionConfig {
+	return []funcapi.FunctionConfig{
+		functionConfig(),
 	}
 }
 
-func methodConfig() funcapi.MethodConfig {
-	return funcapi.MethodConfig{
+func functionConfig() funcapi.FunctionConfig {
+	return funcapi.FunctionConfig{
 		ID:           MethodID,
 		FunctionName: FunctionName,
 		Aliases:      []string{MethodID},
@@ -23,7 +23,6 @@ func methodConfig() funcapi.MethodConfig {
 		Help:         "SNMP Layer-2 topology and neighbor discovery data",
 		RequireCloud: true,
 		ResponseType: topologyv1.ResponseType,
-		AgentWide:    true,
 		RequiredParams: []funcapi.ParamConfig{
 			nodesIdentityParamConfig(),
 			mapTypeParamConfig(),

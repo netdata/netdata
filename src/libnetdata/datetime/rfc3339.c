@@ -74,7 +74,7 @@ static inline size_t print_fraction(char *buffer, size_t size, usec_t fraction, 
 }
 
 size_t rfc3339_datetime_ut(char *buffer, size_t len, usec_t now_ut, size_t fractional_digits, bool utc) {
-    if (!buffer || len < 20) // Minimum size for YYYY-MM-DDThh:mm:ssZ
+    if (!buffer || len < 20) // Minimum size for YYYY-MM-DDThh:mm:ss plus terminator
         return 0;
 
     time_t t = (time_t)(now_ut / USEC_PER_SEC);
@@ -93,47 +93,47 @@ size_t rfc3339_datetime_ut(char *buffer, size_t len, usec_t now_ut, size_t fract
     size_t pos = 0;
 
     // Year (4 digits)
-    if (len - pos < 4) goto finish;
+    if (len - pos <= 4) goto finish;
     pos += print_4digit_year(&buffer[pos], len - pos, tmp->tm_year + 1900);
 
     // Month separator
-    if (len - pos < 1) goto finish;
+    if (len - pos <= 1) goto finish;
     buffer[pos++] = '-';
 
     // Month (2 digits)
-    if (len - pos < 2) goto finish;
+    if (len - pos <= 2) goto finish;
     pos += print_2digit(&buffer[pos], len - pos, tmp->tm_mon + 1);
 
     // Day separator
-    if (len - pos < 1) goto finish;
+    if (len - pos <= 1) goto finish;
     buffer[pos++] = '-';
 
     // Day (2 digits)
-    if (len - pos < 2) goto finish;
+    if (len - pos <= 2) goto finish;
     pos += print_2digit(&buffer[pos], len - pos, tmp->tm_mday);
 
     // T separator
-    if (len - pos < 1) goto finish;
+    if (len - pos <= 1) goto finish;
     buffer[pos++] = 'T';
 
     // Hour (2 digits)
-    if (len - pos < 2) goto finish;
+    if (len - pos <= 2) goto finish;
     pos += print_2digit(&buffer[pos], len - pos, tmp->tm_hour);
 
     // Minute separator
-    if (len - pos < 1) goto finish;
+    if (len - pos <= 1) goto finish;
     buffer[pos++] = ':';
 
     // Minute (2 digits)
-    if (len - pos < 2) goto finish;
+    if (len - pos <= 2) goto finish;
     pos += print_2digit(&buffer[pos], len - pos, tmp->tm_min);
 
     // Second separator
-    if (len - pos < 1) goto finish;
+    if (len - pos <= 1) goto finish;
     buffer[pos++] = ':';
 
     // Second (2 digits)
-    if (len - pos < 2) goto finish;
+    if (len - pos <= 2) goto finish;
     pos += print_2digit(&buffer[pos], len - pos, tmp->tm_sec);
 
     // Add fractional part if requested
@@ -143,7 +143,7 @@ size_t rfc3339_datetime_ut(char *buffer, size_t len, usec_t now_ut, size_t fract
 
         if (fractional_part > 0) {
             // Need space for decimal point and digits
-            if (len - pos < fractional_digits + 1) goto finish;
+            if (len - pos <= fractional_digits + 1) goto finish;
 
             buffer[pos++] = '.';
             pos += print_fraction(&buffer[pos], len - pos, fractional_part, fractional_digits);
@@ -152,7 +152,7 @@ size_t rfc3339_datetime_ut(char *buffer, size_t len, usec_t now_ut, size_t fract
 
     // Add timezone information
     if (utc) {
-        if (len - pos < 1) goto finish;
+        if (len - pos <= 1) goto finish;
         buffer[pos++] = 'Z';
     }
     else {
@@ -162,12 +162,12 @@ size_t rfc3339_datetime_ut(char *buffer, size_t len, usec_t now_ut, size_t fract
 
         // Check if timezone is UTC
         if (hours == 0 && minutes == 0) {
-            if (len - pos < 1) goto finish;
+            if (len - pos <= 1) goto finish;
             buffer[pos++] = 'Z';
         }
         else {
             // Need space for sign, hours, colon, minutes (6 chars total)
-            if (len - pos < 6) goto finish;
+            if (len - pos <= 6) goto finish;
 
             // Add timezone offset
             buffer[pos++] = (hours >= 0) ? '+' : '-';
@@ -185,11 +185,7 @@ size_t rfc3339_datetime_ut(char *buffer, size_t len, usec_t now_ut, size_t fract
     }
 
 finish:
-    // Ensure null termination
-    if (pos < len)
-        buffer[pos] = '\0';
-    else
-        buffer[len - 1] = '\0';
+    buffer[pos] = '\0';
 
     return pos;
 }
@@ -280,13 +276,25 @@ usec_t rfc3339_parse_ut(const char *rfc3339, char **endptr) {
         localtime_r(&epoch_s, &local_tm);
         gmtime_r(&epoch_s, &utc_tm);
 #else
-        // If thread-safe functions are not available, use localtime() and gmtime()
+        // localtime() and gmtime() may share static storage; serialize and copy immediately.
+        static SPINLOCK time_static_buffer_spinlock = SPINLOCK_INITIALIZER;
+        spinlock_lock(&time_static_buffer_spinlock);
+
         struct tm *lt = localtime(&epoch_s);
-        struct tm *gt = gmtime(&epoch_s);
-        if (!lt || !gt)
+        if (!lt) {
+            spinlock_unlock(&time_static_buffer_spinlock);
             return 0;
+        }
         local_tm = *lt;
+
+        struct tm *gt = gmtime(&epoch_s);
+        if (!gt) {
+            spinlock_unlock(&time_static_buffer_spinlock);
+            return 0;
+        }
         utc_tm   = *gt;
+
+        spinlock_unlock(&time_static_buffer_spinlock);
 #endif
         int local_offset = (local_tm.tm_hour - utc_tm.tm_hour) * 3600 +
                            (local_tm.tm_min  - utc_tm.tm_min)  * 60;

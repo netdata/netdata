@@ -3,13 +3,15 @@
 package snmptopology
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"slices"
 	"sort"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 
 	topologyengine "github.com/netdata/netdata/go/plugins/pkg/l2topology"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
@@ -116,7 +118,7 @@ func TestTopologyCache_CdpSnapshot(t *testing.T) {
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		ManagementIP:  "10.0.0.1",
@@ -159,7 +161,7 @@ func TestTopologyCache_UpdateTopologyProfileTags_STPBridgeAddressSetsSNMPIdentit
 
 func TestTopologyCache_UpdateFdbEntry_STPBridgeAddressTagSetsSNMPIdentity(t *testing.T) {
 	cache := newTopologyCache()
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "10.20.4.2",
 		ChassisIDType: "management_ip",
 	}
@@ -181,7 +183,7 @@ func TestTopologyCache_BuildEngineObservation_DerivesBaseBridgeMACFromInterfaceP
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "10.20.4.2",
 		ChassisIDType: "management_ip",
 		ManagementIP:  "10.20.4.2",
@@ -232,12 +234,12 @@ func TestTopologyCache_UpdateIfIndexByIP_CollectsAllSNMPDeviceIPs(t *testing.T) 
 	require.Equal(t, "255.255.255.0", cache.ifNetmaskByIP["10.20.4.1"])
 	require.Equal(t, "255.255.255.0", cache.ifNetmaskByIP["10.20.4.2"])
 	require.Empty(t, cache.ifNetmaskByIP["2001:db8::1"])
-	require.Equal(t, topologyL3Interface{
+	require.Equal(t, topologymodel.L3Interface{
 		IP:      "10.20.4.1",
 		Netmask: "255.255.255.0",
 		IfIndex: "1",
 	}, cache.l3InterfacesByIP["10.20.4.1"])
-	require.Equal(t, topologyL3Interface{
+	require.Equal(t, topologymodel.L3Interface{
 		IP:      "10.20.4.2",
 		Netmask: "255.255.255.0",
 		IfIndex: "2",
@@ -246,17 +248,17 @@ func TestTopologyCache_UpdateIfIndexByIP_CollectsAllSNMPDeviceIPs(t *testing.T) 
 
 	addrs := cache.localDevice.ManagementAddresses
 	require.Len(t, addrs, 3)
-	require.Contains(t, addrs, topologyManagementAddress{
+	require.Contains(t, addrs, topologymodel.ManagementAddress{
 		Address:     "10.20.4.1",
 		AddressType: "ipv4",
 		Source:      "ip_mib",
 	})
-	require.Contains(t, addrs, topologyManagementAddress{
+	require.Contains(t, addrs, topologymodel.ManagementAddress{
 		Address:     "10.20.4.2",
 		AddressType: "ipv4",
 		Source:      "ip_mib",
 	})
-	require.Contains(t, addrs, topologyManagementAddress{
+	require.Contains(t, addrs, topologymodel.ManagementAddress{
 		Address:     "2001:db8::1",
 		AddressType: "ipv6",
 		Source:      "ip_mib",
@@ -287,7 +289,7 @@ func TestTopologyCache_CdpSnapshotHexAddress(t *testing.T) {
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		SysName:       "sw1",
@@ -332,7 +334,7 @@ func TestTopologyCache_CdpSnapshotRawAddressWithoutIP(t *testing.T) {
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		SysName:       "sw1",
@@ -364,7 +366,7 @@ func TestTopologyCache_SnapshotBidirectionalPairMetadata(t *testing.T) {
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		SysName:       "sw1",
@@ -392,7 +394,7 @@ func TestTopologyCache_SnapshotBidirectionalPairMetadata(t *testing.T) {
 	remoteCache.updateTime = cache.updateTime
 	remoteCache.lastUpdate = cache.lastUpdate
 	remoteCache.agentID = "agent2"
-	remoteCache.localDevice = topologyDevice{
+	remoteCache.localDevice = topologymodel.Device{
 		ChassisID:     "aa:bb:cc:dd:ee:ff",
 		ChassisIDType: "macAddress",
 		SysName:       "sw2",
@@ -437,7 +439,7 @@ func TestTopologyCache_SnapshotMergesRemoteIdentityAcrossProtocols(t *testing.T)
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		SysName:       "sw1",
@@ -577,12 +579,52 @@ func TestTopologyCache_LLDPManagementAddressesAndCaps(t *testing.T) {
 	}))
 }
 
+func TestTopologyCache_LLDPCapabilitiesDriveLocalActorType(t *testing.T) {
+	tests := map[string]struct {
+		sysName      string
+		capabilities string
+		wantType     string
+	}{
+		"bridge":        {sysName: "switch-a", capabilities: "20", wantType: "switch"},
+		"bridge-router": {sysName: "l3-switch-a", capabilities: "28", wantType: "router"},
+		"none":          {sysName: "device-a", capabilities: "", wantType: "device"},
+		"router":        {sysName: "router-a", capabilities: "08", wantType: "router"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cache := newTestTopologyCache(ddsnmp.DeviceConnectionInfo{
+				Hostname: tc.sysName + ".example.test",
+				SysName:  tc.sysName,
+			})
+			if tc.capabilities != "" {
+				cache.updateTopologyProfileTags([]*ddsnmp.ProfileMetrics{{
+					DeviceMetadata: map[string]ddsnmp.MetaTag{
+						tagLldpLocChassisID:        {Value: "00:11:22:33:44:55"},
+						tagLldpLocChassisIDSubtype: {Value: "4"},
+						tagLldpLocSysCapEnabled:    {Value: tc.capabilities},
+						tagLldpLocSysCapSupported:  {Value: tc.capabilities},
+					},
+				}})
+			}
+			cache.finalizeTopologyCache()
+
+			data, ok := snapshotTopologyCacheForTest(cache)
+			require.True(t, ok)
+
+			actor := findManagedDeviceActorBySysName(data, tc.sysName)
+			require.NotNil(t, actor)
+			require.Equal(t, tc.wantType, actor.ActorType)
+		})
+	}
+}
+
 func TestTopologyCache_CDPManagementAddresses(t *testing.T) {
 	cache := newTopologyCache()
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		ManagementIP:  "10.0.0.1",
@@ -609,7 +651,7 @@ func TestTopologyCache_FDBAndARPEnrichment(t *testing.T) {
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		ManagementIP:  "10.0.0.1",
@@ -637,7 +679,7 @@ func TestTopologyCache_FDBAndARPEnrichment(t *testing.T) {
 	})
 
 	options := defaultTopologyQueryOptionsForTest()
-	options.MapType = topologyMapTypeAllDevicesLowConfidence
+	options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
 	data, ok := snapshotTopologyCacheForTestWithOptions(cache, options)
 
 	require.True(t, ok)
@@ -661,7 +703,7 @@ func TestTopologyCache_Dot1qVLANEnrichment(t *testing.T) {
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		ManagementIP:  "10.0.0.1",
@@ -693,7 +735,7 @@ func TestTopologyCache_Dot1qVLANFallbackUsesFDBIDWhenMapMissing(t *testing.T) {
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		ManagementIP:  "10.0.0.1",
@@ -747,7 +789,7 @@ func TestTopologyCache_VTPVLANNameEnrichment(t *testing.T) {
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		ManagementIP:  "10.0.0.1",
@@ -785,7 +827,7 @@ func TestTopologyCache_STPObservation(t *testing.T) {
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		ManagementIP:  "10.0.0.1",
@@ -822,7 +864,7 @@ func TestTopologyCache_BuildEngineObservation_DerivesBaseBridgeMACFromFDBSelfEnt
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "10.20.4.2",
 		ChassisIDType: "management_ip",
 		ManagementIP:  "10.20.4.2",
@@ -844,7 +886,7 @@ func TestTopologyCache_InterfaceStatusObservation(t *testing.T) {
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		ManagementIP:  "10.0.0.1",
@@ -869,7 +911,7 @@ func TestTopologyCache_InterfaceStatusObservation_FallsBackToIfIndexWhenIfNameMi
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		ManagementIP:  "10.0.0.1",
@@ -995,11 +1037,11 @@ func TestTopologyCache_VLANContextFDBEntriesRemainDistinct(t *testing.T) {
 }
 
 func TestPickManagementIP_DeterministicAcrossInputOrder(t *testing.T) {
-	addrsA := []topologyManagementAddress{
+	addrsA := []topologymodel.ManagementAddress{
 		{Address: "10.20.4.60", Source: "src-a"},
 		{Address: "10.20.4.205", Source: "src-b"},
 	}
-	addrsB := []topologyManagementAddress{
+	addrsB := []topologymodel.ManagementAddress{
 		{Address: "10.20.4.205", Source: "src-b"},
 		{Address: "10.20.4.60", Source: "src-a"},
 	}
@@ -1007,11 +1049,11 @@ func TestPickManagementIP_DeterministicAcrossInputOrder(t *testing.T) {
 	require.Equal(t, "10.20.4.205", pickManagementIP(addrsA))
 	require.Equal(t, pickManagementIP(addrsA), pickManagementIP(addrsB))
 
-	rawA := []topologyManagementAddress{
+	rawA := []topologymodel.ManagementAddress{
 		{Address: "zeta"},
 		{Address: "alpha"},
 	}
-	rawB := []topologyManagementAddress{
+	rawB := []topologymodel.ManagementAddress{
 		{Address: "alpha"},
 		{Address: "zeta"},
 	}
@@ -1024,7 +1066,7 @@ func TestTopologyCache_SnapshotDeterministicEndpointIPSelection(t *testing.T) {
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		ManagementIP:  "10.0.0.1",
@@ -1061,7 +1103,7 @@ func TestTopologyCache_SnapshotDeterministicEndpointIPSelection(t *testing.T) {
 	expectedIPs := []string{"10.20.4.205", "10.20.4.60"}
 	for range 25 {
 		options := defaultTopologyQueryOptionsForTest()
-		options.MapType = topologyMapTypeAllDevicesLowConfidence
+		options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
 		data, ok := snapshotTopologyCacheForTestWithOptions(cache, options)
 
 		require.True(t, ok)
@@ -1076,7 +1118,7 @@ func TestTopologyCache_SnapshotDeterministicOrdering(t *testing.T) {
 	cache.updateTime = time.Now()
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		ManagementIP:  "10.0.0.1",
@@ -1305,7 +1347,7 @@ func TestBuildLocalTopologyDevice_IncludesSysContactVendorAndModel(t *testing.T)
 
 func TestTopologyCache_UpdateTopologySysUptime_StoresSysUptime(t *testing.T) {
 	cache := newTopologyCache()
-	cache.localDevice = topologyDevice{}
+	cache.localDevice = topologymodel.Device{}
 
 	cache.updateTopologySysUptime(4321)
 
@@ -1435,16 +1477,16 @@ func TestBuildLocalTopologyDevice_MapsVersionToSoftwareOnly(t *testing.T) {
 }
 
 func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
-	data := topologyData{
-		Actors: []topologyActor{
+	data := topologymodel.Data{
+		Actors: []topologymodel.Actor{
 			{
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					SysName:     "sw1",
 					ChassisIDs:  []string{"00:11:22:33:44:55"},
 					IPAddresses: []string{"10.0.0.1"},
 				},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						Device: topologyengine.ProjectionDeviceActorDetail{
 							VendorDerived:            "Acme Derived",
@@ -1464,7 +1506,7 @@ func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
 		},
 	}
 
-	local := topologyDevice{
+	local := topologymodel.Device{
 		ChassisID:          "00:11:22:33:44:55",
 		SysName:            "sw1",
 		SysDescr:           "Switch 1",
@@ -1483,7 +1525,7 @@ func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
 		DeviceCharts: map[string]string{
 			"ping_rtt": "ping_rtt",
 		},
-		InterfaceCharts: map[string]topologyInterfaceChartRef{
+		InterfaceCharts: map[string]topologymodel.InterfaceChartRef{
 			"swp07": {
 				ChartIDSuffix:    "swp07",
 				AvailableMetrics: []string{"ifErrors", "ifTraffic"},
@@ -1520,7 +1562,7 @@ func TestAugmentLocalActorFromCache_InjectsIdentityFields(t *testing.T) {
 	require.Equal(t, []string{"ifErrors", "ifTraffic"}, actor.Detail.L2.Device.Ports[0].AvailableMetrics)
 }
 
-func actorHasManagementAddresses(snapshot topologyData) bool {
+func actorHasManagementAddresses(snapshot topologymodel.Data) bool {
 	for _, actor := range snapshot.Actors {
 		if len(actor.Detail.SNMP.ManagementAddresses) > 0 {
 			return true
@@ -1532,7 +1574,7 @@ func actorHasManagementAddresses(snapshot topologyData) bool {
 	return false
 }
 
-func actorHasCapabilitiesEnabled(snapshot topologyData) bool {
+func actorHasCapabilitiesEnabled(snapshot topologymodel.Data) bool {
 	for _, actor := range snapshot.Actors {
 		if len(actor.Detail.SNMP.CapabilitiesEnabled) > 0 {
 			return true
@@ -1544,7 +1586,7 @@ func actorHasCapabilitiesEnabled(snapshot topologyData) bool {
 	return false
 }
 
-func findLinkByProtocol(snapshot topologyData, protocol string) *topologyLink {
+func findLinkByProtocol(snapshot topologymodel.Data, protocol string) *topologymodel.Link {
 	for i := range snapshot.Links {
 		if snapshot.Links[i].Protocol == protocol {
 			return &snapshot.Links[i]
@@ -1553,7 +1595,7 @@ func findLinkByProtocol(snapshot topologyData, protocol string) *topologyLink {
 	return nil
 }
 
-func findActorByMAC(snapshot topologyData, mac string) *topologyActor {
+func findActorByMAC(snapshot topologymodel.Data, mac string) *topologymodel.Actor {
 	for i := range snapshot.Actors {
 		if slices.Contains(snapshot.Actors[i].Match.MacAddresses, mac) {
 			return &snapshot.Actors[i]
@@ -1562,7 +1604,7 @@ func findActorByMAC(snapshot topologyData, mac string) *topologyActor {
 	return nil
 }
 
-func countDeviceActors(snapshot topologyData) int {
+func countDeviceActors(snapshot topologymodel.Data) int {
 	total := 0
 	for _, actor := range snapshot.Actors {
 		if actor.ActorType == "device" {
@@ -1576,7 +1618,7 @@ func containsString(values []string, target string) bool {
 	return slices.Contains(values, target)
 }
 
-func linkHasRawAddressHint(link topologyLink, raw string) bool {
+func linkHasRawAddressHint(link topologymodel.Link, raw string) bool {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return false
@@ -1584,10 +1626,14 @@ func linkHasRawAddressHint(link topologyLink, raw string) bool {
 	return containsString(link.Src.Match.IPAddresses, raw) || containsString(link.Dst.Match.IPAddresses, raw)
 }
 
-func findDeviceActorBySysName(snapshot topologyData, sysName string) *topologyActor {
+func findDeviceActorBySysName(snapshot topologymodel.Data, sysName string) *topologymodel.Actor {
+	return findManagedDeviceActorBySysName(snapshot, sysName)
+}
+
+func findManagedDeviceActorBySysName(snapshot topologymodel.Data, sysName string) *topologymodel.Actor {
 	for i := range snapshot.Actors {
 		actor := &snapshot.Actors[i]
-		if actor.ActorType != "device" {
+		if !topologyengine.IsDeviceActorType(actor.ActorType) {
 			continue
 		}
 		if actor.Match.SysName == sysName {

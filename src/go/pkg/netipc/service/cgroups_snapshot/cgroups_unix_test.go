@@ -182,10 +182,14 @@ func TestCacheRoundTripUnix(t *testing.T) {
 		t.Fatal("cache not ready after refresh")
 	}
 
-	item, ok := cache.Lookup(1001, "docker-abc123")
-	if !ok {
+	guard := cache.ReadLock()
+	itemView := guard.Get(1001, "docker-abc123")
+	if itemView == nil {
+		guard.Unlock()
 		t.Fatal("lookup failed")
 	}
+	item := guard.Dup(itemView)
+	guard.Unlock()
 	if item.Path != "/sys/fs/cgroup/docker/abc123" {
 		t.Fatalf("unexpected path: %q", item.Path)
 	}

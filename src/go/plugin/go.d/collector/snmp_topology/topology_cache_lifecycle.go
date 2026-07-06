@@ -3,9 +3,11 @@
 package snmptopology
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"strings"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
 func newTopologyCache() *topologyCache {
@@ -17,15 +19,15 @@ func newTopologyCache() *topologyCache {
 		ifStatusByIndex:    make(map[string]ifStatus),
 		ifIndexByIP:        make(map[string]string),
 		ifNetmaskByIP:      make(map[string]string),
-		l3InterfacesByIP:   make(map[string]topologyL3Interface),
+		l3InterfacesByIP:   make(map[string]topologymodel.L3Interface),
 		bridgePortToIf:     make(map[string]string),
 		fdbEntries:         make(map[string]*fdbEntry),
 		fdbIDToVlanID:      make(map[string]string),
 		vlanIDToName:       make(map[string]string),
 		stpPorts:           make(map[string]*stpPortEntry),
 		arpEntries:         make(map[string]*arpEntry),
-		ospfNeighborsByKey: make(map[string]topologyOSPFNeighbor),
-		bgpPeersByKey:      make(map[string]topologyBGPPeer),
+		ospfNeighborsByKey: make(map[string]topologymodel.OSPFNeighbor),
+		bgpPeersByKey:      make(map[string]topologymodel.BGPPeer),
 	}
 }
 
@@ -70,6 +72,27 @@ func (c *topologyCache) hasFreshSnapshotAt(now time.Time) bool {
 		return false
 	}
 	return true
+}
+
+func (c *topologyCache) hasRenderableObservationAt(now time.Time) bool {
+	if c == nil {
+		return false
+	}
+
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if !c.hasFreshSnapshotAt(now) {
+		return false
+	}
+
+	local := normalizeTopologyDevice(c.localDevice)
+	localManagementIP := topologyutil.NormalizeIPAddress(local.ManagementIP)
+	if localManagementIP == "" {
+		localManagementIP = pickManagementIP(local.ManagementAddresses)
+	}
+	baseBridgeAddress := c.resolveLocalBaseBridgeAddress(localManagementIP)
+	return strings.TrimSpace(ensureTopologyObservationDeviceID(local, baseBridgeAddress)) != ""
 }
 
 func (c *Collector) finalizeTopologyCache(cache *topologyCache) {

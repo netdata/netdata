@@ -6,11 +6,13 @@ package snmptopology
 
 import (
 	"bufio"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/stretchr/testify/require"
@@ -631,7 +633,7 @@ func parseOIDSuffix(oid, prefix string) (string, bool) {
 	return strings.TrimPrefix(oid, prefix+"."), true
 }
 
-func hasProtocolLink(snapshot topologyData, protocol string) bool {
+func hasProtocolLink(snapshot topologymodel.Data, protocol string) bool {
 	for _, link := range snapshot.Links {
 		if link.Protocol == protocol {
 			return true
@@ -640,7 +642,7 @@ func hasProtocolLink(snapshot topologyData, protocol string) bool {
 	return false
 }
 
-func containsSysName(snapshot topologyData, names map[string]struct{}) bool {
+func containsSysName(snapshot topologymodel.Data, names map[string]struct{}) bool {
 	for _, link := range snapshot.Links {
 		sysName := strings.TrimSpace(link.Dst.SysName)
 		if sysName == "" {
@@ -684,7 +686,7 @@ func hasLinkableCDP(data snmprecTopology) bool {
 	return false
 }
 
-func containsIdentifier(snapshot topologyData, ids map[string]struct{}) bool {
+func containsIdentifier(snapshot topologymodel.Data, ids map[string]struct{}) bool {
 	exact := make(map[string]struct{}, len(ids))
 	macs := make(map[string]struct{}, len(ids))
 	ips := make(map[string]struct{}, len(ids))

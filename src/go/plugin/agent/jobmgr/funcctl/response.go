@@ -13,7 +13,7 @@ import (
 
 type methodResponseWriter func(dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int)
 
-func (c *Controller) respondWithParams(fn functions.Function, moduleName string, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int, methodType string, includeJobParam bool) {
+func (c *Controller) respondWithParams(fn functions.Function, moduleName, methodID string, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int, methodType string, includeJobParam bool) {
 	c.respondMethodDataWithParams(
 		fn,
 		dataResp,
@@ -24,20 +24,20 @@ func (c *Controller) respondWithParams(fn functions.Function, moduleName string,
 			return buildAcceptedParams(params, includeJobParam)
 		},
 		func(params []funcapi.ParamConfig) []map[string]any {
-			return c.buildRequiredParams(moduleName, params, includeJobParam)
+			return c.buildRequiredParams(moduleName, methodID, params, includeJobParam)
 		},
 	)
 }
 
-func (c *Controller) respondJobMethodWithParams(fn functions.Function, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int, methodType string) {
+func (c *Controller) respondInstanceFunctionWithParams(fn functions.Function, dataResp *funcapi.FunctionResponse, methodParams []funcapi.ParamConfig, updateEvery int, methodType string) {
 	c.respondMethodDataWithParams(
 		fn,
 		dataResp,
 		methodParams,
 		updateEvery,
 		methodType,
-		buildJobMethodAcceptedParams,
-		buildJobMethodRequiredParams,
+		buildInstanceFunctionAcceptedParams,
+		buildInstanceFunctionRequiredParams,
 	)
 }
 

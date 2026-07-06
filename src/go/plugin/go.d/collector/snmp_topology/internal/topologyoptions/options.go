@@ -4,27 +4,27 @@ package topologyoptions
 
 import (
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/snmptopologyfunc"
 )
 
 const (
-	MapTypeLLDPCDPManaged                = snmptopologyfunc.MapTypeLLDPCDPManaged
-	MapTypeHighConfidenceInferred        = snmptopologyfunc.MapTypeHighConfidenceInferred
-	MapTypeAllDevicesLowConfidence       = snmptopologyfunc.MapTypeAllDevicesLowConfidence
-	InferenceStrategyFDBMinimumKnowledge = snmptopologyfunc.InferenceStrategyFDBMinimumKnowledge
-	InferenceStrategySTPParentTree       = snmptopologyfunc.InferenceStrategySTPParentTree
-	InferenceStrategyFDBPairwise         = snmptopologyfunc.InferenceStrategyFDBPairwise
-	InferenceStrategySTPFDBCorrelated    = snmptopologyfunc.InferenceStrategySTPFDBCorrelated
-	InferenceStrategyCDPFDBHybrid        = snmptopologyfunc.InferenceStrategyCDPFDBHybrid
-	ManagedFocusAllDevices               = snmptopologyfunc.ManagedFocusAllDevices
-	ManagedFocusIPPrefix                 = snmptopologyfunc.ManagedFocusIPPrefix
-	DepthAll                             = snmptopologyfunc.DepthAll
-	DepthMin                             = snmptopologyfunc.DepthMin
-	DepthMax                             = snmptopologyfunc.DepthMax
-	DepthAllInternal                     = snmptopologyfunc.DepthAllInternal
+	MapTypeLLDPCDPManaged                = "lldp_cdp_managed"
+	MapTypeHighConfidenceInferred        = "high_confidence_inferred"
+	MapTypeAllDevicesLowConfidence       = "all_devices_low_confidence"
+	InferenceStrategyFDBMinimumKnowledge = "fdb_minimum_knowledge"
+	InferenceStrategySTPParentTree       = "stp_parent_tree"
+	InferenceStrategyFDBPairwise         = "fdb_pairwise_minimum_knowledge"
+	InferenceStrategySTPFDBCorrelated    = "stp_fdb_correlated"
+	InferenceStrategyCDPFDBHybrid        = "cdp_fdb_hybrid"
+	ManagedFocusAllDevices               = "all_devices"
+	ManagedFocusIPPrefix                 = "ip:"
+	DepthAll                             = "all"
+	DepthMin                             = 0
+	DepthMax                             = 10
+	DepthAllInternal                     = -1
 )
 
 type QueryOptions struct {
@@ -42,6 +42,17 @@ type ManagedFocusTarget struct {
 	Name  string
 }
 
+func DefaultQueryOptions() QueryOptions {
+	return QueryOptions{
+		CollapseActorsByIP:     true,
+		EliminateNonIPInferred: true,
+		MapType:                MapTypeLLDPCDPManaged,
+		InferenceStrategy:      InferenceStrategyFDBMinimumKnowledge,
+		ManagedDeviceFocus:     ManagedFocusAllDevices,
+		Depth:                  DepthAllInternal,
+	}
+}
+
 func NormalizeQueryOptions(options QueryOptions) QueryOptions {
 	options.MapType = NormalizeMapType(options.MapType)
 	if options.MapType == "" {
@@ -52,13 +63,7 @@ func NormalizeQueryOptions(options QueryOptions) QueryOptions {
 		options.InferenceStrategy = InferenceStrategyFDBMinimumKnowledge
 	}
 	options.ManagedDeviceFocus = FormatManagedFocuses(ParseManagedFocuses(options.ManagedDeviceFocus))
-	if options.Depth != DepthAllInternal {
-		if options.Depth < DepthMin {
-			options.Depth = DepthMin
-		} else if options.Depth > DepthMax {
-			options.Depth = DepthMax
-		}
-	}
+	options.Depth = NormalizeDepth(options.Depth)
 	return options
 }
 
@@ -90,6 +95,31 @@ func NormalizeInferenceStrategy(v string) string {
 	default:
 		return ""
 	}
+}
+
+func NormalizeDepth(depth int) int {
+	if depth == DepthAllInternal {
+		return DepthAllInternal
+	}
+	if depth < DepthMin {
+		return DepthMin
+	}
+	if depth > DepthMax {
+		return DepthMax
+	}
+	return depth
+}
+
+func ParseDepth(v string) int {
+	value := strings.ToLower(strings.TrimSpace(v))
+	if value == "" || value == DepthAll {
+		return DepthAllInternal
+	}
+	depth, err := strconv.Atoi(value)
+	if err != nil {
+		return DepthAllInternal
+	}
+	return NormalizeDepth(depth)
 }
 
 func IsMapTypeProbable(v string) bool {

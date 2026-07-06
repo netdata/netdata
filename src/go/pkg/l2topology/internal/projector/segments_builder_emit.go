@@ -1,0 +1,284 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package projector
+
+import (
+	"sort"
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/pkg/topology/graph"
+)
+
+func (b *segmentProjectionBuilder) emitLinks() {
+	sort.Strings(b.segmentIDs)
+	probableOnlyAnchorPortIDBySegment := b.buildProbableOnlyAnchorPortIDBySegment()
+	segmentsWithAnyLinks := make(map[string]struct{})
+
+	for _, segmentID := range b.segmentIDs {
+		segment := b.segmentByID[segmentID]
+		if segment == nil {
+			continue
+		}
+		segmentEndpoint := graph.LinkEndpoint{
+			Match: b.segmentMatchByID[segmentID],
+		}
+
+		portIDs := make([]string, 0, len(segment.ports))
+		for portID := range segment.ports {
+			portIDs = append(portIDs, portID)
+		}
+		sort.Strings(portIDs)
+		probableOnlyAnchorPortID := probableOnlyAnchorPortIDBySegment[segmentID]
+		for _, portID := range portIDs {
+			if probableOnlyAnchorPortID != "" && portID != probableOnlyAnchorPortID {
+				continue
+			}
+			port := segment.ports[portID]
+			device, ok := b.deviceByID[port.deviceID]
+			if !ok {
+				continue
+			}
+			localPort := bridgePortDisplay(port)
+			if localPort == "" {
+				continue
+			}
+			edgeKey := segmentID + keySep + portID
+			if _, seen := b.deviceSegmentEdgeSeen[edgeKey]; seen {
+				continue
+			}
+			b.deviceSegmentEdgeSeen[edgeKey] = struct{}{}
+
+			l2 := &graph.LinkL2{BridgeDomain: segmentID}
+			if segment.portIdentityKey(port) == segment.portIdentityKey(segment.designatedPort) {
+				l2.Designated = true
+			}
+			b.out.links = append(b.out.links, graph.Link{
+				Layer:        b.layer,
+				Protocol:     "bridge",
+				LinkType:     "bridge",
+				Direction:    "bidirectional",
+				Src:          adjacencySideToEndpoint(device, localPort, b.ifIndexByDeviceName, b.ifaceByDeviceIndex),
+				Dst:          segmentEndpoint,
+				DiscoveredAt: topologyTimePtr(b.collectedAt),
+				LastSeen:     topologyTimePtr(b.collectedAt),
+				L2:           l2,
+			})
+			b.out.linksFdb++
+			b.out.bidirectionalCount++
+			segmentsWithAnyLinks[segmentID] = struct{}{}
+		}
+
+		allowedEndpoints := b.allowedEndpointBySegment[segmentID]
+		if len(allowedEndpoints) == 0 {
+			continue
+		}
+		endpointSet := make(map[string]struct{}, len(segment.endpointIDs)+len(allowedEndpoints))
+		for endpointID := range segment.endpointIDs {
+			endpointSet[endpointID] = struct{}{}
+		}
+		for endpointID := range allowedEndpoints {
+			endpointSet[endpointID] = struct{}{}
+		}
+		endpointIDs := sortedTopologySet(endpointSet)
+		for _, endpointID := range endpointIDs {
+			if _, ok := allowedEndpoints[endpointID]; !ok {
+				continue
+			}
+
+			endpointMatch, ok := b.endpointMatchByID[endpointID]
+			if !ok {
+				endpointMatch = endpointMatchFromID(endpointID)
+				if len(topologyMatchIdentityKeys(endpointMatch)) == 0 {
+					continue
+				}
+			}
+			overlappingDeviceIDs := endpointMatchOverlappingKnownDeviceIDs(endpointMatch, b.deviceIdentityByID)
+			if len(overlappingDeviceIDs) > 0 {
+				matchedManagedDeviceIDs := make([]string, 0, len(overlappingDeviceIDs))
+				for _, overlapID := range overlappingDeviceIDs {
+					if _, ok := b.deviceByID[overlapID]; ok {
+						matchedManagedDeviceIDs = append(matchedManagedDeviceIDs, overlapID)
+					}
+				}
+				if len(matchedManagedDeviceIDs) > 0 {
+					if len(matchedManagedDeviceIDs) == 1 {
+						matchedDeviceID := matchedManagedDeviceIDs[0]
+						if segmentContainsDevice(segment, matchedDeviceID) {
+							if b.out.suppressedManagedOverlapIDs == nil {
+								b.out.suppressedManagedOverlapIDs = make(map[string]struct{})
+							}
+							b.out.suppressedManagedOverlapIDs[normalizeFDBEndpointID(endpointID)] = struct{}{}
+							b.out.endpointLinksSuppressed++
+							continue
+						}
+						if matchedDevice, ok := b.deviceByID[matchedDeviceID]; ok {
+							edgeKey := segmentID + "|managed-device|" + matchedDeviceID
+							if _, seen := b.endpointSegmentEdgeSeen[edgeKey]; !seen {
+								b.endpointSegmentEdgeSeen[edgeKey] = struct{}{}
+								b.out.links = append(b.out.links, graph.Link{
+									Layer:        b.layer,
+									Protocol:     "fdb",
+									LinkType:     "fdb",
+									Direction:    "bidirectional",
+									Src:          segmentEndpoint,
+									Dst:          adjacencySideToEndpoint(matchedDevice, "", b.ifIndexByDeviceName, b.ifaceByDeviceIndex),
+									DiscoveredAt: topologyTimePtr(b.collectedAt),
+									LastSeen:     topologyTimePtr(b.collectedAt),
+									L2:           &graph.LinkL2{BridgeDomain: segmentID},
+									Inference:    &graph.LinkInference{AttachmentMode: "managed_device_overlap"},
+								})
+								b.out.linksFdb++
+								b.out.bidirectionalCount++
+								b.out.endpointLinksEmitted++
+								segmentsWithAnyLinks[segmentID] = struct{}{}
+							}
+							if b.out.suppressedManagedOverlapIDs == nil {
+								b.out.suppressedManagedOverlapIDs = make(map[string]struct{})
+							}
+							b.out.suppressedManagedOverlapIDs[normalizeFDBEndpointID(endpointID)] = struct{}{}
+							continue
+						}
+					}
+					if b.out.suppressedManagedOverlapIDs == nil {
+						b.out.suppressedManagedOverlapIDs = make(map[string]struct{})
+					}
+					b.out.suppressedManagedOverlapIDs[normalizeFDBEndpointID(endpointID)] = struct{}{}
+					b.out.endpointLinksSuppressed++
+					continue
+				}
+				if !b.probabilisticConnectivity {
+					b.out.endpointLinksSuppressed++
+					continue
+				}
+				b.allowEndpoint(segmentID, endpointID, true, "probable_segment")
+			}
+
+			if owner, hasOwner := b.out.endpointDirectOwners[endpointID]; hasOwner &&
+				strings.EqualFold(strings.TrimSpace(owner.source), "single_port_mac") {
+				device, ok := b.deviceByID[owner.port.deviceID]
+				if ok {
+					localPort := bridgePortDisplay(owner.port)
+					if localPort != "" {
+						edgeKey := "direct" + keySep + bridgePortObservationVLANKey(owner.port) + keySep + endpointID
+						if _, seen := b.endpointSegmentEdgeSeen[edgeKey]; !seen {
+							b.endpointSegmentEdgeSeen[edgeKey] = struct{}{}
+							inference := &graph.LinkInference{AttachmentMode: "direct"}
+							linkState := ""
+							if probableSet := b.probableEndpointBySegment[segmentID]; len(probableSet) > 0 {
+								if _, isProbable := probableSet[endpointID]; isProbable {
+									inference.AttachmentMode = "probable_direct"
+									inference.Inference = "probable"
+									inference.Confidence = "low"
+									linkState = "probable"
+								}
+							}
+							b.out.links = append(b.out.links, graph.Link{
+								Layer:        b.layer,
+								Protocol:     "fdb",
+								LinkType:     "fdb",
+								Direction:    "bidirectional",
+								Src:          adjacencySideToEndpoint(device, localPort, b.ifIndexByDeviceName, b.ifaceByDeviceIndex),
+								Dst:          graph.LinkEndpoint{Match: endpointMatch},
+								DiscoveredAt: topologyTimePtr(b.collectedAt),
+								LastSeen:     topologyTimePtr(b.collectedAt),
+								State:        linkState,
+								Inference:    inference,
+							})
+							b.out.linksFdb++
+							b.out.bidirectionalCount++
+							b.out.endpointLinksEmitted++
+							continue
+						}
+					}
+				}
+			}
+
+			edgeKey := segmentID + keySep + endpointID
+			if _, seen := b.endpointSegmentEdgeSeen[edgeKey]; seen {
+				continue
+			}
+			b.endpointSegmentEdgeSeen[edgeKey] = struct{}{}
+
+			l2 := &graph.LinkL2{BridgeDomain: segmentID}
+			var inference *graph.LinkInference
+			linkState := ""
+			if probableSet := b.probableEndpointBySegment[segmentID]; len(probableSet) > 0 {
+				if _, isProbable := probableSet[endpointID]; isProbable {
+					probableMode := ""
+					if modes := b.probableAttachmentModes[segmentID]; len(modes) > 0 {
+						probableMode = strings.TrimSpace(modes[endpointID])
+					}
+					if probableMode == "" {
+						probableMode = "probable_segment"
+					}
+					inference = &graph.LinkInference{
+						AttachmentMode: probableMode,
+						Inference:      "probable",
+						Confidence:     "low",
+					}
+					linkState = "probable"
+				}
+			}
+
+			b.out.links = append(b.out.links, graph.Link{
+				Layer:        b.layer,
+				Protocol:     "fdb",
+				LinkType:     "fdb",
+				Direction:    "bidirectional",
+				Src:          segmentEndpoint,
+				Dst:          graph.LinkEndpoint{Match: endpointMatch},
+				DiscoveredAt: topologyTimePtr(b.collectedAt),
+				LastSeen:     topologyTimePtr(b.collectedAt),
+				State:        linkState,
+				L2:           l2,
+				Inference:    inference,
+			})
+			b.out.linksFdb++
+			b.out.bidirectionalCount++
+			b.out.endpointLinksEmitted++
+			segmentsWithAnyLinks[segmentID] = struct{}{}
+		}
+	}
+
+	b.pruneSegmentsWithoutLinks(segmentsWithAnyLinks)
+}
+
+func (b *segmentProjectionBuilder) pruneSegmentsWithoutLinks(segmentsWithAnyLinks map[string]struct{}) {
+	if len(segmentsWithAnyLinks) >= len(b.segmentIDs) {
+		return
+	}
+
+	filteredActors := make([]projectedActor, 0, len(b.out.actors))
+	for _, actor := range b.out.actors {
+		segmentID := strings.TrimSpace(actor.Detail.Segment.SegmentID)
+		if segmentID == "" {
+			continue
+		}
+		if _, ok := segmentsWithAnyLinks[segmentID]; ok {
+			filteredActors = append(filteredActors, actor)
+		}
+	}
+	b.out.actors = filteredActors
+
+	filteredLinks := make([]graph.Link, 0, len(b.out.links))
+	b.out.linksFdb = 0
+	b.out.bidirectionalCount = 0
+	b.out.endpointLinksEmitted = 0
+	for _, link := range b.out.links {
+		segmentID := topologyLinkBridgeDomain(link)
+		if segmentID != "" {
+			if _, ok := segmentsWithAnyLinks[segmentID]; !ok {
+				continue
+			}
+		}
+		filteredLinks = append(filteredLinks, link)
+		b.out.linksFdb++
+		if strings.EqualFold(strings.TrimSpace(link.Direction), "bidirectional") {
+			b.out.bidirectionalCount++
+		}
+		if strings.EqualFold(strings.TrimSpace(link.Protocol), "fdb") {
+			b.out.endpointLinksEmitted++
+		}
+	}
+	b.out.links = filteredLinks
+}

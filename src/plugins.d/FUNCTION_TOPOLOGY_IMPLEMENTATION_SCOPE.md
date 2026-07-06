@@ -124,11 +124,13 @@ Likely homes:
   `src/go/pkg/l2topology/`;
 - the L2 engine builds an internal, non-payload `l2topology.Graph` projection
   from `l2topology.Result`;
-- the Function handler adapts the current SNMP topology snapshot to
-  `netdata.topology.v1` through
-  `src/go/plugin/go.d/collector/snmp_topology/func_topology_v1.go`;
+- the Function handler snapshots cached SNMP topology state, applies SNMP-owned
+  shape/enrichment passes, and renders `netdata.topology.v1` through
+  `src/go/plugin/go.d/collector/snmp_topology/internal/topologyv1`;
 - the old method-level Go presentation adapter has been retired; presentation
   metadata is emitted in the v1 payload type registry and `data.presentation`;
+- SNMP-owned logical enrichment now adds L3 subnet, OSPF adjacency, and BGP
+  adjacency links after the L2 projection and before v1 rendering;
 - current L2 emission uses directions such as `bidirectional` and
   `unidirectional` at `src/go/pkg/l2topology/topology_adapter_segments_builder_emit.go:60`
   and `src/go/pkg/l2topology/topology_adapter_projection_pairs.go:230`;
@@ -282,13 +284,19 @@ Validation:
 
 Current state:
 
-- initial Function payload migration is implemented through a v1 adapter in
-  `src/go/plugin/go.d/collector/snmp_topology/func_topology_v1.go`;
+- Function payload rendering is implemented in
+  `src/go/plugin/go.d/collector/snmp_topology/internal/topologyv1`;
 - L2 graph synthesis is internal to `src/go/pkg/l2topology` and uses
   `l2topology.Graph`, not the legacy Go topology payload package;
-- the adapter emits compact actor, link, evidence, actor metadata, and
-  actor-detail tables and preserves nested custom actor cells with `json`
-  columns where needed;
+- the renderer emits compact actor, link, evidence, actor-label, actor-detail,
+  and relationship-evidence tables and preserves nested custom actor cells with
+  `json` columns where needed;
+- SNMP topology is internally split into collector/cache/registry code plus
+  `internal/topologymodel`, `internal/topologyoptions`,
+  `internal/topologyshape`, `internal/topologyenrich`, and
+  `internal/topologyv1`; see
+  `src/go/plugin/go.d/collector/snmp_topology/ARCHITECTURE.md` for the current
+  maintainer map;
 - modal-composition producer work now emits `actor_labels`, promoted
   scalar/count actor fields, stable `actor_ports` rows, structured endpoint
   evidence, modal recipes, and payload-level presentation metadata. Remaining

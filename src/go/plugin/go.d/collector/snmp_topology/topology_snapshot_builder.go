@@ -4,11 +4,12 @@ package snmptopology
 
 import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 )
 
-func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologyDevice {
-	device := topologyDevice{
+func buildLocalTopologyDevice(dev ddsnmp.DeviceConnectionInfo) topologymodel.Device {
+	device := topologymodel.Device{
 		ManagementIP:       dev.Hostname,
 		ChartIDPrefix:      topologyProfileChartIDPrefix,
 		ChartContextPrefix: topologyProfileChartContextPrefix,

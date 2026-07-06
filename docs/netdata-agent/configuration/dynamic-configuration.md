@@ -279,7 +279,7 @@ In Netdata, HTTP 412 is used to indicate that an authorization bearer token was 
 
 **Common causes:**
 
-1. **Bearer token protection enabled** - Your agent requires Cloud authentication for API access
+1. **Bearer token protection enabled** - Your Agent requires Cloud authentication for API access
 2. **Cloud connection lost** - Agent disconnected from Netdata Cloud
 3. **Session expired** - Bearer token has expired (tokens expire after 24 hours)
 4. **Missing browser authentication state** - Your browser is no longer sending a valid Cloud bearer token with the request
@@ -288,8 +288,8 @@ In Netdata, HTTP 412 is used to indicate that an authorization bearer token was 
 
 1. **Verify claim and Cloud connection**: Check `http://IP:19999/api/v3/info` and inspect the `cloud` section. Use `cloud.status` to verify whether the Agent is connected to Netdata Cloud, and if it is not `online`, inspect `cloud.reason` for the failure details.
 2. **Re-authenticate**: Log out and log back into Netdata Cloud to refresh your bearer token.
-3. **Verify bearer token protection setting**: If enabled in `netdata.conf`, ensure you're accessing the agent through a Cloud-authenticated session.
-4. **Check permissions only if you get HTTP 403**: If the request changes from HTTP 412 to HTTP 403 after re-authenticating, ensure you have Admin or Manager role in the space containing the agent.
+3. **Verify bearer token protection setting**: If enabled in `netdata.conf`, ensure you're accessing the Agent through a Cloud-authenticated session.
+4. **Check permissions only if you get HTTP 403**: If the request changes from HTTP 412 to HTTP 403 after re-authenticating, ensure you have Admin or Manager role in the space containing the Agent.
 
 For more information, see [Secure Your Netdata Agent with Bearer Token Protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).
 
@@ -313,8 +313,48 @@ Only users with an **Admin** or **Manager** role on a **paid plan** can perform 
 1. **Check your assigned role**: Go to **Space Settings → Users** and verify your role. If you are not an Admin or Manager, ask a Space Admin to upgrade your role. See the [Role-Based Access Model documentation](/docs/netdata-cloud/authentication-and-authorization/role-based-access-model.md) for the full permissions table.
 2. **Verify your subscription plan**: If you are on the Community plan, [upgrade to a paid plan](https://www.netdata.cloud/pricing/) or ask a Space Admin to do so. A paid plan is required for all Dynamic Configuration actions except **List All**.
 
----
+### Disabled Alert Template Still Appears on Nodes
 
-Experience the efficiency and power of the Dynamic Configuration Manager in Netdata today. Whether you're managing a handful of nodes or a vast infrastructure, this feature will make your monitoring and alerting tasks smoother and more intuitive.
+The Dynamic Configuration Manager has a function to bulk-apply configurations to multiple nodes. Without it, any change you do is for the specific node you have selected. So, if you want to disable an alert template (for example `10min_cpu_usage`) for X desired nodes, you need to target all of them.
+
+**Solution:**
+
+Apply the disable to each node that is actually raising the alert. The recommended approach is to use the [Multi-Node Deployment](#multi-node-deployment) feature to select every node still raising the alert and push the disabled configuration to all of them at once.
+
+<details>
+<summary>Alternative: configure each node manually (optional)</summary>
+
+If you prefer not to use Multi-Node Deployment, disable the alert directly in each desired node's local health configuration:
+
+- In `netdata.conf`, under the `[health]` section, exclude the alert name and restart the Agent:
+  ```conf
+  [health]
+      enabled alarms = !10min_cpu_usage *
+  ```
+  [Restarting the Agent](/docs/netdata-agent/start-stop-restart.md) is required because `netdatacli reload-health` reloads health configuration files but does not reload `netdata.conf`.
+- Alternatively, edit the corresponding `health.d/*.conf` file (for example `health.d/cpu.conf`), comment out the alert definition, and run `netdatacli reload-health`.
+
+For the full manual configuration syntax, see [How to Disable or Silence Alerts](/src/health/REFERENCE.md#how-to-disable-or-silence-alerts).
+
+</details>
+
+### "No items to enable" when enabling a single alert
+
+Alerts in Netdata have two separate on/off controls:
+
+1. **Alert level** — Each alert has its own on/off switch, controlled from the **Alerts tab** or **Space Settings → Configurations → Health**.
+2. **Rule level** — Each alert contains one or more **rules**. Each rule has its own enable/disable control, visible only after clicking **Edit** on the alert.
+
+When an alert is switched off, its rules cannot run. If you try to enable its rules while the alert itself is off, Netdata shows **"No items to enable"** — turn the alert on first.
+
+**To enable only specific rules within an alert:**
+
+1. Open the alert from the **Alerts tab** or **Space Settings → Configurations → Health**.
+2. Click **Edit**.
+3. Enable the rules you want to run, and disable every other rule. Leave at least one rule enabled — if all rules are disabled, enabling the alert has no effect.
+4. Click **Submit**.
+5. **Enable** the alert. Only the rules you left enabled will run — depending on how broadly the alert applies, this can activate a large number of alerts at once. This is normal.
+
+If you would rather keep the alert fully enabled, disable the specific alerts you don't want using [Multi-Node Deployment](#multi-node-deployment) to push the change across all affected nodes at once. For the manual, file-based alternative, see [Disabled Alert Template Still Appears on Nodes](#disabled-alert-template-still-appears-on-nodes).
 
 [Read more](/docs/developer-and-contributor-corner/dyncfg.md) on developing with dynamic configuration.

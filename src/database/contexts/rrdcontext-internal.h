@@ -132,7 +132,7 @@ rrd_flag_add_remove_atomic(RRD_FLAGS *flags, RRD_FLAGS check, RRD_FLAGS conditio
     RRD_FLAGS expected, desired;
 
     do {
-        expected = *flags;
+        expected = __atomic_load_n(flags, __ATOMIC_SEQ_CST);
 
         desired = expected;
         desired &= ~(always_remove);
@@ -150,7 +150,7 @@ rrd_flags_replace_atomic(RRD_FLAGS *flags, RRD_FLAGS desired) {
     RRD_FLAGS expected;
     
     do {
-        expected = *flags;
+        expected = __atomic_load_n(flags, __ATOMIC_SEQ_CST);
     } while(!__atomic_compare_exchange_n(flags, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
 
     return expected;

@@ -3,16 +3,17 @@
 #include "../libnetdata.h"
 #include "ringbuffer_internal.h"
 
-rbuf_t rbuf_create(size_t size)
+rbuf_t rbuf_create(size_t size, size_t max_size)
 {
-    rbuf_t buffer = mallocz(sizeof(struct rbuf) + size);
+    rbuf_t buffer = mallocz(sizeof(struct rbuf));
     memset(buffer, 0, sizeof(struct rbuf));
 
-    buffer->data = ((char*)buffer) + sizeof(struct rbuf);
+    buffer->data = mallocz(size);
 
     buffer->head = buffer->data;
     buffer->tail = buffer->data;
     buffer->size = size;
+    buffer->max_size = (max_size > size) ? max_size : size;
     buffer->end = buffer->data + size;
 
     return buffer;
@@ -20,6 +21,10 @@ rbuf_t rbuf_create(size_t size)
 
 void rbuf_free(rbuf_t buffer)
 {
+    if (!buffer)
+        return;
+
+    freez(buffer->data);
     freez(buffer);
 }
 
@@ -30,11 +35,58 @@ void rbuf_flush(rbuf_t buffer)
     buffer->size_data = 0;
 }
 
+static bool rbuf_grow(rbuf_t buffer)
+{
+    if (buffer->size >= buffer->max_size)
+        return false;
+
+    size_t new_size = buffer->size * 2;
+    if (new_size < buffer->size || new_size > buffer->max_size)
+        new_size = buffer->max_size;
+
+    if (new_size <= buffer->size)
+        return false;
+
+    char *new_data = mallocz(new_size);
+    size_t copied = 0;
+
+    if (buffer->size_data) {
+        if (buffer->tail < buffer->head) {
+            memcpy(new_data, buffer->tail, buffer->size_data);
+            copied = buffer->size_data;
+        }
+        else {
+            size_t top = buffer->end - buffer->tail;
+            memcpy(new_data, buffer->tail, top);
+            copied = top;
+
+            if (buffer->head > buffer->data) {
+                size_t bottom = buffer->head - buffer->data;
+                memcpy(new_data + copied, buffer->data, bottom);
+                copied += bottom;
+            }
+        }
+    }
+
+    assert(copied == buffer->size_data);
+
+    freez(buffer->data);
+    buffer->data = new_data;
+    buffer->size = new_size;
+    buffer->end = buffer->data + buffer->size;
+    buffer->tail = buffer->data;
+    buffer->head = buffer->data + buffer->size_data;
+
+    return true;
+}
+
 char *rbuf_get_linear_insert_range(rbuf_t buffer, size_t *bytes)
 {
     *bytes = 0;
-    if (buffer->head == buffer->tail && buffer->size_data)
-        return NULL;
+    if (buffer->head == buffer->tail && buffer->size_data) {
+        if (!rbuf_grow(buffer))
+            return NULL;
+    }
 
     *bytes = ((buffer->head >= buffer->tail) ? buffer->end : buffer->tail) - buffer->head;
     return buffer->head;
@@ -56,7 +108,7 @@ int rbuf_bump_head(rbuf_t buffer, size_t bytes)
     size_t free_bytes = rbuf_bytes_free(buffer);
     if (bytes > free_bytes)
         return 0;
-    int i = buffer->head - buffer->data;
+    size_t i = buffer->head - buffer->data;
     buffer->head = &buffer->data[(i + bytes) % buffer->size];
     buffer->size_data += bytes;
     return 1;
@@ -66,7 +118,7 @@ int rbuf_bump_tail_noopt(rbuf_t buffer, size_t bytes)
 {
     if (bytes > buffer->size_data)
         return 0;
-    int i = buffer->tail - buffer->data;
+    size_t i = buffer->tail - buffer->data;
     buffer->tail = &buffer->data[(i + bytes) % buffer->size];
     buffer->size_data -= bytes;
 
@@ -94,6 +146,11 @@ int rbuf_bump_tail(rbuf_t buffer, size_t bytes)
 size_t rbuf_get_capacity(rbuf_t buffer)
 {
     return buffer->size;
+}
+
+size_t rbuf_get_max_capacity(rbuf_t buffer)
+{
+    return buffer->max_size;
 }
 
 size_t rbuf_bytes_available(rbuf_t buffer)

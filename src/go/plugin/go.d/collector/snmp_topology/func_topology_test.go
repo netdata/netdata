@@ -4,9 +4,6 @@ package snmptopology
 
 import (
 	"context"
-	"encoding/json"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -17,8 +14,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 	topologyv1renderer "github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyv1test"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/snmptopologyfunc"
-	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -49,7 +46,7 @@ func TestTopologyFunctionAdapter_MethodParamsUsesRegistryFocusTargets(t *testing
 	assert.Equal(t, snmptopologyfunc.ParamManagedDeviceFocus, params[3].ID)
 	assert.Equal(t, snmptopologyfunc.ParamDepth, params[4].ID)
 	require.GreaterOrEqual(t, len(params[3].Options), 2)
-	assert.Equal(t, snmptopologyfunc.ManagedFocusAllDevices, params[3].Options[0].ID)
+	assert.Equal(t, topologyoptions.ManagedFocusAllDevices, params[3].Options[0].ID)
 	assert.Equal(t, "ip:10.0.0.1", params[3].Options[1].ID)
 
 	params, err = handler.MethodParams(context.Background(), "unknown")
@@ -80,7 +77,7 @@ func TestTopologyFunctionAdapter_HandleDefaultStrictL2(t *testing.T) {
 
 	data, ok := resp.Data.(topologyv1.Data)
 	require.True(t, ok)
-	require.NoError(t, validateTopologyV1Data(data))
+	require.NoError(t, topologyv1test.ValidateData(data))
 	assert.Equal(t, topologyv1.SchemaVersion, data.SchemaVersion)
 	assert.Equal(t, "snmp-l2", data.Producer.Source)
 	require.NotNil(t, data.View)
@@ -89,6 +86,16 @@ func TestTopologyFunctionAdapter_HandleDefaultStrictL2(t *testing.T) {
 	assert.Equal(t, "detailed", data.View.Mode)
 	assert.Greater(t, data.Actors.Rows, 0)
 	assert.Greater(t, data.Links.Rows, 0)
+
+	deviceSearch := data.Types.ActorTypes["device"].Search
+	require.NotNil(t, deviceSearch)
+	require.Subset(t, deviceSearch.Columns, []string{"sys_descr", "sys_location", "sys_contact", "netdata_host_id"})
+	require.Subset(t, deviceSearch.LabelKeys, []string{"mac_address", "ip_address", "hostname", "dns_name", topologymodel.LabelOSPFRouterID})
+
+	endpointSearch := data.Types.ActorTypes["endpoint"].Search
+	require.NotNil(t, endpointSearch)
+	require.Subset(t, endpointSearch.Columns, []string{"id", "vendor", "model"})
+	require.Subset(t, endpointSearch.LabelKeys, []string{"mac_address", "ip_address", "hostname", "dns_name", "learned_sources"})
 }
 
 func TestTopologyFunctionAdapter_HandleSelectorParams(t *testing.T) {
@@ -111,8 +118,8 @@ func TestTopologyFunctionAdapter_HandleSelectorParams(t *testing.T) {
 
 	params := funcapi.ResolveParams(cfg, map[string][]string{
 		snmptopologyfunc.ParamNodesIdentity:      {snmptopologyfunc.NodesIdentityMAC},
-		snmptopologyfunc.ParamMapType:            {snmptopologyfunc.MapTypeHighConfidenceInferred},
-		snmptopologyfunc.ParamInferenceStrategy:  {snmptopologyfunc.InferenceStrategySTPFDBCorrelated},
+		snmptopologyfunc.ParamMapType:            {topologyoptions.MapTypeHighConfidenceInferred},
+		snmptopologyfunc.ParamInferenceStrategy:  {topologyoptions.InferenceStrategySTPFDBCorrelated},
 		snmptopologyfunc.ParamManagedDeviceFocus: {"ip:10.0.0.1"},
 		snmptopologyfunc.ParamDepth:              {"2"},
 	})
@@ -121,7 +128,7 @@ func TestTopologyFunctionAdapter_HandleSelectorParams(t *testing.T) {
 	assert.Equal(t, 200, resp.Status)
 	data, ok := resp.Data.(topologyv1.Data)
 	require.True(t, ok)
-	require.NoError(t, validateTopologyV1Data(data))
+	require.NoError(t, topologyv1test.ValidateData(data))
 	require.NotNil(t, data.View)
 	assert.Equal(t, "network", data.View.Scope)
 }
@@ -163,7 +170,7 @@ func TestTopologyFunctionAdapter_HandleUnknownSelectorsFallbackToDefaults(t *tes
 	invalidData, ok := invalidResp.Data.(topologyv1.Data)
 	require.True(t, ok)
 
-	require.NoError(t, validateTopologyV1Data(invalidData))
+	require.NoError(t, topologyv1test.ValidateData(invalidData))
 	require.NotNil(t, defaultData.View)
 	require.NotNil(t, invalidData.View)
 	assert.Equal(t, defaultData.View.Scope, invalidData.View.Scope)
@@ -172,21 +179,21 @@ func TestTopologyFunctionAdapter_HandleUnknownSelectorsFallbackToDefaults(t *tes
 
 func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 	ts := time.Date(2026, 5, 9, 12, 0, 0, 0, time.UTC)
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID:     "agent-test",
 		CollectedAt: ts,
 		View:        "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					ChassisIDs:   []string{"00:11:22:33:44:55"},
 					MacAddresses: []string{"00:11:22:33:44:55"},
 					SysName:      "sw-a",
 				},
 				Labels: map[string]string{"site": "lab"},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						Device: topologyengine.ProjectionDeviceActorDetail{
 							PortsTotal: topologyengine.OptionalValue[int]{Value: 0, Has: true},
@@ -229,12 +236,12 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 			{
 				ActorID:   "device-b",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					ChassisIDs:   []string{"aa:bb:cc:dd:ee:ff"},
 					MacAddresses: []string{"aa:bb:cc:dd:ee:ff"},
 					SysName:      "sw-b",
 				},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						Device: topologyengine.ProjectionDeviceActorDetail{
 							CapabilitiesSupported: []string{"router"},
@@ -247,19 +254,19 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "lldp",
 				LinkType:   "lldp",
 				Direction:  "bidirectional",
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex: 1,
 					IfName:  "Gi0/1",
 					PortID:  "1",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					IfIndex: 2,
 					IfName:  "Gi0/2",
 					PortID:  "2",
@@ -275,7 +282,7 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 	require.NotNil(t, payload.Tables)
 	require.Contains(t, payload.Tables.Actor, "actor_ports")
 	require.Contains(t, payload.Tables.Actor, "actor_port_links")
@@ -378,7 +385,7 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 	require.NotNil(t, deviceType.Presentation.Modal.Labels)
 	require.NotNil(t, deviceType.Presentation.Modal.Labels.Identification)
 	assert.Equal(t, "management_ip", deviceType.Presentation.Modal.Labels.Identification.Fields[1].Key)
-	require.Len(t, deviceType.Presentation.Modal.Sections, 5)
+	require.Len(t, deviceType.Presentation.Modal.Sections, 6)
 	assert.Equal(t, "ports", deviceType.Presentation.Modal.Sections[0].ID)
 	assert.Equal(t, "if_index", deviceType.Presentation.Modal.Sections[0].Columns[0].ID)
 	assert.Equal(t, "Port ID", deviceType.Presentation.Modal.Sections[0].Columns[0].Label)
@@ -391,12 +398,15 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 	assert.Equal(t, "l3_adjacencies", deviceType.Presentation.Modal.Sections[2].ID)
 	assert.Equal(t, "evidence", deviceType.Presentation.Modal.Sections[2].Source.Kind)
 	assert.Equal(t, topologymodel.L3SubnetLinkType, deviceType.Presentation.Modal.Sections[2].Source.Evidence)
-	assert.Equal(t, "ospf_neighbors", deviceType.Presentation.Modal.Sections[3].ID)
-	assert.Equal(t, "actor_table", deviceType.Presentation.Modal.Sections[3].Source.Kind)
-	assert.Equal(t, "actor_ospf_neighbors", deviceType.Presentation.Modal.Sections[3].Source.Table)
-	assert.Equal(t, "bgp_peers", deviceType.Presentation.Modal.Sections[4].ID)
+	assert.Equal(t, "l3_subnet_memberships", deviceType.Presentation.Modal.Sections[3].ID)
+	assert.Equal(t, "evidence", deviceType.Presentation.Modal.Sections[3].Source.Kind)
+	assert.Equal(t, topologymodel.L3SubnetMembershipLinkType, deviceType.Presentation.Modal.Sections[3].Source.Evidence)
+	assert.Equal(t, "ospf_neighbors", deviceType.Presentation.Modal.Sections[4].ID)
 	assert.Equal(t, "actor_table", deviceType.Presentation.Modal.Sections[4].Source.Kind)
-	assert.Equal(t, "actor_bgp_peers", deviceType.Presentation.Modal.Sections[4].Source.Table)
+	assert.Equal(t, "actor_ospf_neighbors", deviceType.Presentation.Modal.Sections[4].Source.Table)
+	assert.Equal(t, "bgp_peers", deviceType.Presentation.Modal.Sections[5].ID)
+	assert.Equal(t, "actor_table", deviceType.Presentation.Modal.Sections[5].Source.Kind)
+	assert.Equal(t, "actor_bgp_peers", deviceType.Presentation.Modal.Sections[5].Source.Table)
 
 	endpointType := payload.Types.ActorTypes["endpoint"]
 	require.NotNil(t, endpointType.Presentation)
@@ -407,18 +417,18 @@ func TestSNMPTopologyToV1_BuildsTypedActorDetailTables(t *testing.T) {
 }
 
 func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID: "agent-test",
 		View:    "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					ChassisIDs: []string{"00:11:22:33:44:55"},
 					SysName:    "sw-a",
 				},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						Device: topologyengine.ProjectionDeviceActorDetail{
 							ManagementIP: "10.0.0.1",
@@ -427,7 +437,7 @@ func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
 							PortsTotal:   topologyengine.OptionalValue[int]{Value: 24, Has: true},
 						},
 					},
-					SNMP: topologySNMPActorDetail{
+					SNMP: topologymodel.SNMPActorDetail{
 						ManagementIP: "10.0.0.2",
 						Vendor:       "SNMP Vendor",
 						Capabilities: []string{"router"},
@@ -437,12 +447,12 @@ func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
 			{
 				ActorID:   "device-b",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					ChassisIDs: []string{"aa:bb:cc:dd:ee:ff"},
 					SysName:    "sw-b",
 				},
-				Detail: topologyActorDetail{
-					SNMP: topologySNMPActorDetail{
+				Detail: topologymodel.ActorDetail{
+					SNMP: topologymodel.SNMPActorDetail{
 						ManagementIP: "10.0.0.3",
 						Vendor:       "Peer Vendor",
 						Capabilities: []string{"bridge"},
@@ -450,7 +460,7 @@ func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "lldp",
 				LinkType:   "lldp",
@@ -462,7 +472,7 @@ func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 
 	assert.Equal(t, "SNMP Vendor", topologyV1StringColumnValues(t, payload, payload.Actors, "vendor")[0])
 	assert.Equal(t, "10.0.0.2", topologyV1StringColumnValues(t, payload, payload.Actors, "management_ip")[0])
@@ -471,17 +481,17 @@ func TestSNMPTopologyToV1_PrefersSNMPActorDetailOverL2(t *testing.T) {
 }
 
 func TestSNMPTopologyToV1_OmitsNeighborCountForEmptyNeighborList(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID: "agent-test",
 		View:    "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					SysName: "sw-a",
 				},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						Device: topologyengine.ProjectionDeviceActorDetail{
 							Ports: []topologyengine.ProjectionPortDetail{
@@ -498,22 +508,22 @@ func TestSNMPTopologyToV1_OmitsNeighborCountForEmptyNeighborList(t *testing.T) {
 			{
 				ActorID:   "device-b",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					SysName: "sw-b",
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "lldp",
 				LinkType:   "lldp",
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex: 42,
 					IfName:  "Gi0/42",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					IfName: "Gi0/1",
 				},
 			},
@@ -522,7 +532,7 @@ func TestSNMPTopologyToV1_OmitsNeighborCountForEmptyNeighborList(t *testing.T) {
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 	require.NotNil(t, payload.Tables)
 
 	portTable := payload.Tables.Actor["actor_ports"].Table
@@ -531,17 +541,17 @@ func TestSNMPTopologyToV1_OmitsNeighborCountForEmptyNeighborList(t *testing.T) {
 }
 
 func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID: "agent-test",
 		View:    "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					SysName: "sw-a",
 				},
-				Detail: topologyActorDetail{
+				Detail: topologymodel.ActorDetail{
 					L2: topologyengine.ProjectionActorDetail{
 						Device: topologyengine.ProjectionDeviceActorDetail{
 							Ports: []topologyengine.ProjectionPortDetail{
@@ -557,22 +567,22 @@ func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 			{
 				ActorID:   "device-b",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					SysName: "sw-b",
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "lldp",
 				LinkType:   "lldp",
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex: 42,
 					IfName:  "Gi0/42",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					IfName: "Gi0/1",
 				},
 			},
@@ -581,7 +591,7 @@ func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 	require.NotNil(t, payload.Tables)
 
 	portTable := payload.Tables.Actor["actor_ports"].Table
@@ -597,35 +607,35 @@ func TestSNMPTopologyToV1_UsesIfIndexAsVisiblePortID(t *testing.T) {
 }
 
 func TestSNMPTopologyToV1_PortNamesOnlyUsePortFields(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID: "agent-test",
 		View:    "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					SysName: "sw-a",
 				},
 			},
 			{
 				ActorID:   "device-b",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					SysName: "sw-b",
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "lldp",
 				LinkType:   "lldp",
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					DisplayName: "10.0.0.10",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					SysName: "sw-b",
 				},
 			},
@@ -634,7 +644,7 @@ func TestSNMPTopologyToV1_PortNamesOnlyUsePortFields(t *testing.T) {
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 
 	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, payload.Links, "src_port_name"))
 	assert.Equal(t, []any{nil}, topologyV1ColumnValues(t, payload.Links, "dst_port_name"))
@@ -646,14 +656,14 @@ func TestSNMPTopologyToV1_PortNamesOnlyUsePortFields(t *testing.T) {
 }
 
 func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID: "agent-test",
 		View:    "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "router-a",
 				ActorType: "router",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					IPAddresses: []string{"192.0.2.1"},
 					SysName:     "router-a",
 				},
@@ -661,24 +671,24 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 			{
 				ActorID:   "router-b",
 				ActorType: "router",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					IPAddresses: []string{"192.0.2.2"},
 					SysName:     "router-b",
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
-				Protocol:   topologyL3SubnetLinkType,
-				LinkType:   topologyL3SubnetLinkType,
+				Protocol:   topologymodel.L3SubnetLinkType,
+				LinkType:   topologymodel.L3SubnetLinkType,
 				Direction:  "observed",
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex: 10,
 					IfName:  "xe-0/0/0",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					IfIndex: 20,
 					IfName:  "xe-0/0/1",
 				},
@@ -686,8 +696,8 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 					Inference:      "shared_subnet",
 					AttachmentMode: "logical_l3_subnet",
 				},
-				Detail: topologyLinkDetail{
-					L3Subnet: &topologyL3SubnetLinkDetail{
+				Detail: topologymodel.LinkDetail{
+					L3Subnet: &topologymodel.L3SubnetLinkDetail{
 						Source:  "ip_mib",
 						SrcIP:   "192.0.2.1",
 						DstIP:   "192.0.2.2",
@@ -703,7 +713,7 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 
 	assert.Contains(t, payload.Producer.Capabilities, "l3_subnet")
 	require.NotNil(t, payload.Presentation)
@@ -764,17 +774,140 @@ func TestSNMPTopologyToV1_PreservesL3SubnetPresentationAndEvidence(t *testing.T)
 	}
 }
 
-func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborRows(t *testing.T) {
-	data := topologyData{
+func TestSNMPTopologyToV1_PreservesL3SubnetMembershipPresentationAndEvidence(t *testing.T) {
+	data := topologymodel.Data{
 		AgentID: "agent-test",
 		View:    "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
+			{
+				ActorID:   "router-a",
+				ActorType: "router",
+				Match: topologymodel.Match{
+					IPAddresses: []string{"192.0.2.10"},
+					SysName:     "router-a",
+				},
+			},
+			{
+				ActorID:     "subnet-a",
+				ActorType:   topologymodel.L3SubnetSegmentActorType,
+				SegmentKind: topologymodel.SegmentKindL3Subnet,
+				Detail: topologymodel.ActorDetail{
+					L2: topologyengine.ProjectionActorDetail{
+						DisplayName: "192.0.2.0/24",
+					},
+				},
+			},
+		},
+		Links: []topologymodel.Link{
+			{
+				Protocol:   topologymodel.L3SubnetMembershipLinkType,
+				LinkType:   topologymodel.L3SubnetMembershipLinkType,
+				Direction:  "observed",
+				SrcActorID: "router-a",
+				DstActorID: "subnet-a",
+				Src: topologymodel.LinkEndpoint{
+					IfIndex: 10,
+					IfName:  "xe-0/0/0",
+				},
+				Inference: &graph.LinkInference{
+					Inference:      "shared_subnet_membership",
+					AttachmentMode: "logical_l3_subnet_membership",
+				},
+				Detail: topologymodel.LinkDetail{
+					L3SubnetMembership: &topologymodel.L3SubnetMembershipLinkDetail{
+						Source:  "ip_mib",
+						Subnet:  "192.0.2.0/24",
+						Network: "192.0.2.0",
+						Netmask: "255.255.255.0",
+						Prefix:  24,
+						Interfaces: []topologymodel.L3SubnetMembershipInterface{
+							{MemberIP: "192.0.2.10", IfIndex: 10, IfName: "xe-0/0/0", IfDescr: "primary"},
+							{MemberIP: "192.0.2.11", IfIndex: 11, IfName: "xe-0/0/1", IfDescr: "secondary"},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	payload, err := topologyv1renderer.Render(data)
+	require.NoError(t, err)
+	require.NoError(t, topologyv1test.ValidateData(payload))
+
+	assert.Contains(t, payload.Producer.Capabilities, "l3_subnet_membership")
+	assert.Contains(t, topologyV1LegendActorTypes(payload), topologymodel.L3SubnetSegmentActorType)
+	assert.Contains(t, topologyV1LegendLinkTypes(payload), topologymodel.L3SubnetMembershipLinkType)
+
+	require.Contains(t, payload.Types.ActorTypes, topologymodel.L3SubnetSegmentActorType)
+	segmentType := payload.Types.ActorTypes[topologymodel.L3SubnetSegmentActorType]
+	assert.Equal(t, []string{"id"}, segmentType.Identity)
+	assert.Equal(t, []string{"id"}, segmentType.MergeIdentity)
+	assert.Empty(t, segmentType.ParentIdentity)
+	require.NotNil(t, segmentType.Presentation)
+	assert.Equal(t, "L3 subnet", segmentType.Presentation.Label)
+	require.NotNil(t, segmentType.Presentation.Modal)
+	segmentMembers := requireTopologyV1ModalSection(t, segmentType.Presentation.Modal.Sections, "l3_subnet_members")
+	assert.Equal(t, topologymodel.L3SubnetMembershipLinkType, segmentMembers.Source.Evidence)
+	assert.Equal(t, "member", segmentMembers.Columns[0].ID)
+
+	require.Contains(t, payload.Types.LinkTypes, topologymodel.L3SubnetMembershipLinkType)
+	linkType := payload.Types.LinkTypes[topologymodel.L3SubnetMembershipLinkType]
+	assert.Equal(t, "observed_bidirectional", linkType.Orientation)
+	assert.Equal(t, "observation", linkType.DirectionRole)
+	assert.Equal(t, "normal", linkType.SemanticRole)
+	require.NotNil(t, linkType.Presentation)
+	assert.Equal(t, "L3 subnet membership", linkType.Presentation.Label)
+	assert.Equal(t, "dashed", linkType.Presentation.LineStyle)
+
+	require.Contains(t, payload.Types.EvidenceTypes, topologymodel.L3SubnetMembershipLinkType)
+	evidenceType := payload.Types.EvidenceTypes[topologymodel.L3SubnetMembershipLinkType]
+	assert.Equal(t, topologymodel.L3SubnetMembershipLinkType, evidenceType.LinkType)
+	assert.Equal(t, []string{"member_actor", "segment_actor", "member_ip", "subnet"}, evidenceType.MatchColumns)
+
+	require.Contains(t, payload.Evidence, topologymodel.L3SubnetMembershipLinkType)
+	evidenceTable := payload.Evidence[topologymodel.L3SubnetMembershipLinkType].Table
+	require.Equal(t, 2, evidenceTable.Rows)
+	assert.Equal(t, "actor_ref", topologyV1ColumnType(evidenceTable, "member_actor"))
+	assert.Equal(t, "actor_ref", topologyV1ColumnType(evidenceTable, "segment_actor"))
+	assert.Equal(t, "string_ref", topologyV1ColumnType(evidenceTable, "member_ip"))
+	assert.Equal(t, "uint", topologyV1ColumnType(evidenceTable, "member_if_index"))
+	assert.Equal(t, []any{0, 0}, topologyV1ColumnValues(t, evidenceTable, "link"))
+	assert.Equal(t, []any{0, 0}, topologyV1ColumnValues(t, evidenceTable, "member_actor"))
+	assert.Equal(t, []any{1, 1}, topologyV1ColumnValues(t, evidenceTable, "segment_actor"))
+	assert.Equal(t, []string{"192.0.2.10", "192.0.2.11"}, topologyV1StringColumnValues(t, payload, evidenceTable, "member_ip"))
+	assert.Equal(t, []any{uint64(10), uint64(11)}, topologyV1ColumnValues(t, evidenceTable, "member_if_index"))
+	assert.Equal(t, []string{"xe-0/0/0", "xe-0/0/1"}, topologyV1StringColumnValues(t, payload, evidenceTable, "member_if_name"))
+	assert.Equal(t, []string{"192.0.2.0/24", "192.0.2.0/24"}, topologyV1StringColumnValues(t, payload, evidenceTable, "subnet"))
+	assert.Equal(t, []any{uint64(24), uint64(24)}, topologyV1ColumnValues(t, evidenceTable, "prefix"))
+
+	assert.Equal(t, []string{topologymodel.L3SubnetMembershipLinkType}, topologyV1StringColumnValues(t, payload, payload.Links, "type"))
+	assert.Equal(t, []any{2}, topologyV1ColumnValues(t, payload.Links, "evidence_count"))
+
+	routerType := payload.Types.ActorTypes["router"]
+	require.NotNil(t, routerType.Presentation)
+	require.NotNil(t, routerType.Presentation.Modal)
+	membershipSection := requireTopologyV1ModalSection(t, routerType.Presentation.Modal.Sections, "l3_subnet_memberships")
+	assert.Equal(t, "evidence", membershipSection.Source.Kind)
+	assert.Equal(t, topologymodel.L3SubnetMembershipLinkType, membershipSection.Source.Evidence)
+	require.NotNil(t, membershipSection.OwnerFilter)
+	assert.Equal(t, "incident_evidence", membershipSection.OwnerFilter.Mode)
+
+	if payload.Tables != nil {
+		assert.NotContains(t, payload.Tables.Actor, "actor_port_links")
+	}
+}
+
+func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborRows(t *testing.T) {
+	data := topologymodel.Data{
+		AgentID: "agent-test",
+		View:    "summary",
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "router-a",
 				ActorType: "router",
 				Source:    "snmp",
-				Detail: topologyActorDetail{
-					OSPF: []topologyOSPFNeighborDetailRow{
+				Detail: topologymodel.ActorDetail{
+					OSPF: []topologymodel.OSPFNeighborDetailRow{
 						{
 							LocalRouterID:    "1.1.1.1",
 							NeighborRouterID: "2.2.2.2",
@@ -793,22 +926,22 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 				Source:    "snmp",
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
-				Protocol:   topologyOSPFAdjacencyLinkType,
-				LinkType:   topologyOSPFAdjacencyLinkType,
+				Protocol:   topologymodel.OSPFAdjacencyLinkType,
+				LinkType:   topologymodel.OSPFAdjacencyLinkType,
 				Direction:  "observed",
 				State:      "full",
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Src:        topologyLinkEndpoint{},
-				Dst:        topologyLinkEndpoint{},
+				Src:        topologymodel.LinkEndpoint{},
+				Dst:        topologymodel.LinkEndpoint{},
 				Inference: &graph.LinkInference{
 					Inference:      "ospf_full_adjacency",
 					AttachmentMode: "logical_l3_ospf",
 				},
-				Detail: topologyLinkDetail{
-					OSPF: &topologyOSPFAdjacencyLinkDetail{
+				Detail: topologymodel.LinkDetail{
+					OSPF: &topologymodel.OSPFAdjacencyLinkDetail{
 						Source:           "ospf_mib",
 						LocalRouterID:    "1.1.1.1",
 						NeighborRouterID: "2.2.2.2",
@@ -826,7 +959,7 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 
 	assert.Contains(t, payload.Producer.Capabilities, "ospf")
 	require.Contains(t, payload.Types.LinkTypes, topologymodel.OSPFAdjacencyLinkType)
@@ -884,16 +1017,16 @@ func TestSNMPTopologyToV1_PreservesOSPFAdjacencyPresentationEvidenceAndNeighborR
 }
 
 func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID: "agent-test",
 		View:    "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "router-a",
 				ActorType: "router",
 				Source:    "snmp",
-				Detail: topologyActorDetail{
-					BGP: []topologyBGPPeerDetailRow{
+				Detail: topologymodel.ActorDetail{
+					BGP: []topologymodel.BGPPeerDetailRow{
 						{
 							RoutingInstance:       "default",
 							NeighborIP:            "192.0.2.2",
@@ -920,22 +1053,22 @@ func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t
 				Source:    "snmp",
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
-				Protocol:   topologyBGPAdjacencyLinkType,
-				LinkType:   topologyBGPAdjacencyLinkType,
+				Protocol:   topologymodel.BGPAdjacencyLinkType,
+				LinkType:   topologymodel.BGPAdjacencyLinkType,
 				Direction:  "observed",
 				State:      "established",
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Src:        topologyLinkEndpoint{},
-				Dst:        topologyLinkEndpoint{},
+				Src:        topologymodel.LinkEndpoint{},
+				Dst:        topologymodel.LinkEndpoint{},
 				Inference: &graph.LinkInference{
 					Inference:      "bgp_established_adjacency",
 					AttachmentMode: "logical_l3_bgp",
 				},
-				Detail: topologyLinkDetail{
-					BGP: &topologyBGPAdjacencyLinkDetail{
+				Detail: topologymodel.LinkDetail{
+					BGP: &topologymodel.BGPAdjacencyLinkDetail{
 						Source:          "bgp_mib",
 						RoutingInstance: "default",
 						LocalIdentifier: "1.1.1.1",
@@ -952,7 +1085,7 @@ func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 
 	assert.Contains(t, payload.Producer.Capabilities, "bgp")
 	require.Contains(t, payload.Types.LinkTypes, topologymodel.BGPAdjacencyLinkType)
@@ -1016,20 +1149,20 @@ func TestSNMPTopologyToV1_PreservesBGPAdjacencyPresentationEvidenceAndPeerRows(t
 }
 
 func TestSNMPTopologyToV1_ReturnsErrorForL3SubnetWithoutSubnet(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID: "agent-test",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{ActorID: "router-a", ActorType: "router"},
 			{ActorID: "router-b", ActorType: "router"},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
-				Protocol:   topologyL3SubnetLinkType,
-				LinkType:   topologyL3SubnetLinkType,
+				Protocol:   topologymodel.L3SubnetLinkType,
+				LinkType:   topologymodel.L3SubnetLinkType,
 				SrcActorID: "router-a",
 				DstActorID: "router-b",
-				Detail: topologyLinkDetail{
-					L3Subnet: &topologyL3SubnetLinkDetail{
+				Detail: topologymodel.LinkDetail{
+					L3Subnet: &topologymodel.L3SubnetLinkDetail{
 						Prefix: 30,
 					},
 				},
@@ -1045,15 +1178,15 @@ func TestSNMPTopologyToV1_ReturnsErrorForL3SubnetWithoutSubnet(t *testing.T) {
 
 func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
 	ts := time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC)
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID:     "agent-test",
 		CollectedAt: ts,
 		View:        "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					ChassisIDs:   []string{"00:11:22:33:44:55"},
 					MacAddresses: []string{"00:11:22:33:44:55"},
 					SysName:      "sw-a",
@@ -1062,14 +1195,14 @@ func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
 			{
 				ActorID:   "device-b",
 				ActorType: "device",
-				Match: topologyMatch{
+				Match: topologymodel.Match{
 					ChassisIDs:   []string{"aa:bb:cc:dd:ee:ff"},
 					MacAddresses: []string{"aa:bb:cc:dd:ee:ff"},
 					SysName:      "sw-b",
 				},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "lldp",
 				LinkType:   "lldp",
@@ -1094,7 +1227,7 @@ func TestSNMPTopologyToV1_PreservesLinkPresentationTypes(t *testing.T) {
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 
 	assert.Equal(t, []string{"lldp", "probable"}, topologyV1StringColumnValues(t, payload, payload.Links, "type"))
 
@@ -1143,7 +1276,7 @@ func TestSNMPTopologyV1EvidenceMatchColumnsUseTypedL2EndpointFields(t *testing.T
 		"snmp":     "snmp",
 		"probable": "probable",
 	}
-	payload, err := topologyv1renderer.Render(topologyData{})
+	payload, err := topologyv1renderer.Render(topologymodel.Data{})
 	require.NoError(t, err)
 
 	for name, linkType := range tests {
@@ -1161,25 +1294,25 @@ func TestSNMPTopologyV1EvidenceMatchColumnsUseTypedL2EndpointFields(t *testing.T
 }
 
 func TestSNMPTopologyToV1_PortlessFDBEvidenceUsesLinkRef(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID:     "agent-test",
 		CollectedAt: time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC),
 		View:        "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
 				Source:    "snmp",
-				Match:     topologyMatch{SysName: "switch-a"},
+				Match:     topologymodel.Match{SysName: "switch-a"},
 			},
 			{
 				ActorID:   "endpoint-a",
 				ActorType: "endpoint",
 				Source:    "fdb",
-				Match:     topologyMatch{MacAddresses: []string{"00:11:22:33:44:55"}},
+				Match:     topologymodel.Match{MacAddresses: []string{"00:11:22:33:44:55"}},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "fdb",
 				LinkType:   "fdb",
@@ -1192,7 +1325,7 @@ func TestSNMPTopologyToV1_PortlessFDBEvidenceUsesLinkRef(t *testing.T) {
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 	require.Contains(t, payload.Evidence, "fdb")
 
 	evidenceTable := payload.Evidence["fdb"].Table
@@ -1207,38 +1340,38 @@ func TestSNMPTopologyToV1_PortlessFDBEvidenceUsesLinkRef(t *testing.T) {
 }
 
 func TestSNMPTopologyToV1_L2EvidenceDistinguishesParallelLinksByTypedEndpoints(t *testing.T) {
-	data := topologyData{
+	data := topologymodel.Data{
 		AgentID:     "agent-test",
 		CollectedAt: time.Date(2026, 5, 10, 12, 0, 0, 0, time.UTC),
 		View:        "summary",
-		Actors: []topologyActor{
+		Actors: []topologymodel.Actor{
 			{
 				ActorID:   "device-a",
 				ActorType: "device",
 				Source:    "snmp",
-				Match:     topologyMatch{SysName: "switch-a"},
+				Match:     topologymodel.Match{SysName: "switch-a"},
 			},
 			{
 				ActorID:   "device-b",
 				ActorType: "device",
 				Source:    "snmp",
-				Match:     topologyMatch{SysName: "switch-b"},
+				Match:     topologymodel.Match{SysName: "switch-b"},
 			},
 		},
-		Links: []topologyLink{
+		Links: []topologymodel.Link{
 			{
 				Protocol:   "lldp",
 				LinkType:   "lldp",
 				Direction:  "bidirectional",
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex:  1,
 					IfName:   "Gi0/1",
 					PortID:   "1",
 					PortName: "Gi0/1",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					IfIndex:  11,
 					IfName:   "Eth1",
 					PortID:   "11",
@@ -1251,13 +1384,13 @@ func TestSNMPTopologyToV1_L2EvidenceDistinguishesParallelLinksByTypedEndpoints(t
 				Direction:  "bidirectional",
 				SrcActorID: "device-a",
 				DstActorID: "device-b",
-				Src: topologyLinkEndpoint{
+				Src: topologymodel.LinkEndpoint{
 					IfIndex:  2,
 					IfName:   "Gi0/2",
 					PortID:   "2",
 					PortName: "Gi0/2",
 				},
-				Dst: topologyLinkEndpoint{
+				Dst: topologymodel.LinkEndpoint{
 					IfIndex:  12,
 					IfName:   "Eth2",
 					PortID:   "12",
@@ -1269,7 +1402,7 @@ func TestSNMPTopologyToV1_L2EvidenceDistinguishesParallelLinksByTypedEndpoints(t
 
 	payload, err := topologyv1renderer.Render(data)
 	require.NoError(t, err)
-	require.NoError(t, validateTopologyV1Data(payload))
+	require.NoError(t, topologyv1test.ValidateData(payload))
 	require.Contains(t, payload.Evidence, "lldp")
 
 	evidenceTable := payload.Evidence["lldp"].Table
@@ -1288,12 +1421,12 @@ func TestNormalizeTopologyInferenceStrategy(t *testing.T) {
 		in   string
 		want string
 	}{
-		"default-empty":         {in: "", want: topologyInferenceStrategyFDBMinimumKnowledge},
-		"fdb-minimum-knowledge": {in: topologyInferenceStrategyFDBMinimumKnowledge, want: topologyInferenceStrategyFDBMinimumKnowledge},
-		"stp-parent-tree":       {in: topologyInferenceStrategySTPParentTree, want: topologyInferenceStrategySTPParentTree},
-		"fdb-pairwise":          {in: topologyInferenceStrategyFDBPairwise, want: topologyInferenceStrategyFDBPairwise},
-		"stp-fdb-correlated":    {in: topologyInferenceStrategySTPFDBCorrelated, want: topologyInferenceStrategySTPFDBCorrelated},
-		"cdp-fdb-hybrid":        {in: topologyInferenceStrategyCDPFDBHybrid, want: topologyInferenceStrategyCDPFDBHybrid},
+		"default-empty":         {in: "", want: topologyoptions.InferenceStrategyFDBMinimumKnowledge},
+		"fdb-minimum-knowledge": {in: topologyoptions.InferenceStrategyFDBMinimumKnowledge, want: topologyoptions.InferenceStrategyFDBMinimumKnowledge},
+		"stp-parent-tree":       {in: topologyoptions.InferenceStrategySTPParentTree, want: topologyoptions.InferenceStrategySTPParentTree},
+		"fdb-pairwise":          {in: topologyoptions.InferenceStrategyFDBPairwise, want: topologyoptions.InferenceStrategyFDBPairwise},
+		"stp-fdb-correlated":    {in: topologyoptions.InferenceStrategySTPFDBCorrelated, want: topologyoptions.InferenceStrategySTPFDBCorrelated},
+		"cdp-fdb-hybrid":        {in: topologyoptions.InferenceStrategyCDPFDBHybrid, want: topologyoptions.InferenceStrategyCDPFDBHybrid},
 		"invalid":               {in: "invalid", want: ""},
 	}
 
@@ -1309,15 +1442,15 @@ func TestNormalizeTopologyManagedFocuses(t *testing.T) {
 		in   []string
 		want []string
 	}{
-		"nil":                 {in: nil, want: []string{topologyManagedFocusAllDevices}},
-		"empty":               {in: []string{}, want: []string{topologyManagedFocusAllDevices}},
-		"blank":               {in: []string{""}, want: []string{topologyManagedFocusAllDevices}},
-		"comma-blanks":        {in: []string{" , , "}, want: []string{topologyManagedFocusAllDevices}},
-		"invalid":             {in: []string{"invalid"}, want: []string{topologyManagedFocusAllDevices}},
+		"nil":                 {in: nil, want: []string{topologyoptions.ManagedFocusAllDevices}},
+		"empty":               {in: []string{}, want: []string{topologyoptions.ManagedFocusAllDevices}},
+		"blank":               {in: []string{""}, want: []string{topologyoptions.ManagedFocusAllDevices}},
+		"comma-blanks":        {in: []string{" , , "}, want: []string{topologyoptions.ManagedFocusAllDevices}},
+		"invalid":             {in: []string{"invalid"}, want: []string{topologyoptions.ManagedFocusAllDevices}},
 		"deduplicated-ips":    {in: []string{"ip:10.0.0.2", "ip:10.0.0.1", "ip:10.0.0.2"}, want: []string{"ip:10.0.0.1", "ip:10.0.0.2"}},
 		"comma-separated-ips": {in: []string{" ip:10.0.0.2 , ip:10.0.0.1 "}, want: []string{"ip:10.0.0.1", "ip:10.0.0.2"}},
-		"all-devices-token":   {in: []string{"ip:10.0.0.1", topologyManagedFocusAllDevices}, want: []string{topologyManagedFocusAllDevices}},
-		"all-devices-comma":   {in: []string{"ip:10.0.0.1,all_devices"}, want: []string{topologyManagedFocusAllDevices}},
+		"all-devices-token":   {in: []string{"ip:10.0.0.1", topologyoptions.ManagedFocusAllDevices}, want: []string{topologyoptions.ManagedFocusAllDevices}},
+		"all-devices-comma":   {in: []string{"ip:10.0.0.1,all_devices"}, want: []string{topologyoptions.ManagedFocusAllDevices}},
 	}
 
 	for name, tc := range tests {
@@ -1331,9 +1464,9 @@ func TestNormalizeTopologyManagedFocuses(t *testing.T) {
 		"ip:10.0.0.1,ip:10.0.0.2",
 		topologyoptions.FormatManagedFocuses([]string{"ip:10.0.0.2", "ip:10.0.0.1"}),
 	)
-	assert.Equal(t, []string{topologyManagedFocusAllDevices}, topologyoptions.ParseManagedFocuses(""))
+	assert.Equal(t, []string{topologyoptions.ManagedFocusAllDevices}, topologyoptions.ParseManagedFocuses(""))
 	assert.Equal(t, []string{"10.0.0.1", "10.0.0.2"}, topologyoptions.ManagedFocusSelectedIPs("ip:10.0.0.2,ip:10.0.0.1"))
-	assert.True(t, topologyoptions.IsManagedFocusAllDevices(topologyManagedFocusAllDevices))
+	assert.True(t, topologyoptions.IsManagedFocusAllDevices(topologyoptions.ManagedFocusAllDevices))
 	assert.False(t, topologyoptions.IsManagedFocusAllDevices("ip:10.0.0.1"))
 }
 
@@ -1347,7 +1480,7 @@ func newTestTopologyCacheLLDP(
 	cache.updateTime = ts
 	cache.lastUpdate = ts
 	cache.agentID = agentID
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     localChassis,
 		ChassisIDType: "macAddress",
 		SysName:       localSysName,
@@ -1369,43 +1502,6 @@ func newTestTopologyCacheLLDP(
 		managementAddr:   remoteMgmtIP,
 	}
 	return cache
-}
-
-func validateTopologyV1Data(data topologyv1.Data) error {
-	bs, err := json.Marshal(data)
-	if err != nil {
-		return err
-	}
-	var decoded map[string]any
-	if err := json.Unmarshal(bs, &decoded); err != nil {
-		return err
-	}
-	if err := topologyv1.ValidateDecodedData(decoded); err != nil {
-		return err
-	}
-
-	schemaPath := filepath.Clean(filepath.Join("..", "..", "..", "..", "..", "plugins.d", "FUNCTION_TOPOLOGY_SCHEMA.json"))
-	schemaBytes, err := os.ReadFile(schemaPath)
-	if err != nil {
-		return err
-	}
-	var schemaDoc any
-	if err := json.Unmarshal(schemaBytes, &schemaDoc); err != nil {
-		return err
-	}
-	compiler := jsonschema.NewCompiler()
-	if err := compiler.AddResource("schema.json", schemaDoc); err != nil {
-		return err
-	}
-	schema, err := compiler.Compile("schema.json")
-	if err != nil {
-		return err
-	}
-	var response any
-	if err := json.Unmarshal([]byte(`{"status":200,"type":"topology","data":`+string(bs)+`}`), &response); err != nil {
-		return err
-	}
-	return schema.Validate(response)
 }
 
 func topologyV1ColumnType(table topologyv1.Table, columnID string) string {
@@ -1431,7 +1527,7 @@ func topologyV1ColumnValues(t *testing.T, table topologyv1.Table, columnID strin
 
 	for columnIndex, column := range table.Columns {
 		if column.ID == columnID {
-			return topologyV1DecodeColumnValues(t, table, columnIndex)
+			return topologyv1test.DecodeColumnValues(t, table, columnIndex)
 		}
 	}
 
@@ -1451,7 +1547,7 @@ func topologyV1StringColumnValues(t *testing.T, data topologyv1.Data, table topo
 		dict := data.Dictionaries[column.Dictionary]
 		require.NotNil(t, dict)
 
-		values := topologyV1DecodeColumnValues(t, table, columnIndex)
+		values := topologyv1test.DecodeColumnValues(t, table, columnIndex)
 		out := make([]string, 0, len(values))
 		for _, value := range values {
 			ref, ok := value.(int)
@@ -1469,57 +1565,23 @@ func topologyV1StringColumnValues(t *testing.T, data topologyv1.Data, table topo
 	return nil
 }
 
-func topologyV1DecodeColumnValues(t *testing.T, table topologyv1.Table, columnIndex int) []any {
-	t.Helper()
-
-	switch encoding := table.Values[columnIndex].(type) {
-	case topologyv1.ValuesEncoding:
-		return encoding.Values
-	case *topologyv1.ValuesEncoding:
-		require.NotNil(t, encoding)
-		return encoding.Values
-	case topologyv1.ConstEncoding:
-		values := make([]any, table.Rows)
-		for i := range values {
-			values[i] = encoding.Value
-		}
-		return values
-	case *topologyv1.ConstEncoding:
-		require.NotNil(t, encoding)
-		values := make([]any, table.Rows)
-		for i := range values {
-			values[i] = encoding.Value
-		}
-		return values
-	case topologyv1.DictEncoding:
-		values := make([]any, 0, len(encoding.Indexes))
-		for _, index := range encoding.Indexes {
-			require.GreaterOrEqual(t, index, 0)
-			require.Less(t, index, len(encoding.Values))
-			values = append(values, encoding.Values[index])
-		}
-		return values
-	case *topologyv1.DictEncoding:
-		require.NotNil(t, encoding)
-		values := make([]any, 0, len(encoding.Indexes))
-		for _, index := range encoding.Indexes {
-			require.GreaterOrEqual(t, index, 0)
-			require.Less(t, index, len(encoding.Values))
-			values = append(values, encoding.Values[index])
-		}
-		return values
-	default:
-		require.Failf(t, "unsupported encoding", "column %d has unsupported encoding %T", columnIndex, encoding)
-		return nil
-	}
-}
-
 func topologyV1LegendLinkTypes(data topologyv1.Data) []string {
 	if data.Presentation == nil || data.Presentation.Legend == nil {
 		return nil
 	}
 	out := make([]string, 0, len(data.Presentation.Legend.Links))
 	for _, entry := range data.Presentation.Legend.Links {
+		out = append(out, entry.Type)
+	}
+	return out
+}
+
+func topologyV1LegendActorTypes(data topologyv1.Data) []string {
+	if data.Presentation == nil || data.Presentation.Legend == nil {
+		return nil
+	}
+	out := make([]string, 0, len(data.Presentation.Legend.Actors))
+	for _, entry := range data.Presentation.Legend.Actors {
 		out = append(out, entry.Type)
 	}
 	return out

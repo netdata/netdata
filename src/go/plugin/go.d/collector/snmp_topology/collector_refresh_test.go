@@ -9,6 +9,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+
 	"github.com/golang/mock/gomock"
 	"github.com/gosnmp/gosnmp"
 	snmpmock "github.com/gosnmp/gosnmp/mocks"
@@ -444,7 +446,7 @@ func seedPublishedEndpointSnapshot(cache *topologyCache) {
 	cache.lastUpdate = now
 	cache.staleAfter = time.Hour
 	cache.agentID = "agent-1"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ManagementIP:  "10.0.0.10",
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",

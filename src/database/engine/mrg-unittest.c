@@ -51,9 +51,152 @@ static void mrg_stress(void *ptr) {
     }
 }
 
+static int mrg_unittest_expect_samples_delta(
+    struct rrdengine_instance *ctx,
+    time_t first_time_s,
+    time_t last_time_s,
+    uint32_t update_every_s,
+    bool expected_rc,
+    uint64_t expected_samples,
+    const char *name)
+{
+    uint64_t samples = UINT64_MAX;
+    bool rc = rrdeng_retention_samples_delta(ctx, first_time_s, last_time_s, update_every_s, name, &samples);
+
+    if(rc == expected_rc && samples == expected_samples)
+        return 0;
+
+    fprintf(stderr,
+            "DBENGINE METRIC: samples delta test '%s' failed, expected rc=%s samples=%"PRIu64
+            ", got rc=%s samples=%"PRIu64"\n",
+            name,
+            expected_rc ? "true" : "false",
+            expected_samples,
+            rc ? "true" : "false",
+            samples);
+    return 1;
+}
+
+static int mrg_unittest_expect_counter_sub(
+    struct rrdengine_instance *ctx,
+    uint64_t initial,
+    uint64_t decrement,
+    bool expected_rc,
+    uint64_t expected_value,
+    const char *name)
+{
+    uint64_t counter = initial;
+    bool rc = rrdeng_atomic_uint64_sub_saturating(ctx, &counter, decrement, "unittest", name);
+
+    if(rc == expected_rc && counter == expected_value)
+        return 0;
+
+    fprintf(stderr,
+            "DBENGINE METRIC: counter subtraction test '%s' failed, expected rc=%s value=%"PRIu64
+            ", got rc=%s value=%"PRIu64"\n",
+            name,
+            expected_rc ? "true" : "false",
+            expected_value,
+            rc ? "true" : "false",
+            counter);
+    return 1;
+}
+
+static int dbengine_accounting_helpers_unittest(void) {
+    int errors = 0;
+    struct rrdengine_instance ctx = {0};
+    ctx.config.tier = 1;
+
+    errors += mrg_unittest_expect_samples_delta(&ctx, 10, 70, 10, true, 6, "normal positive interval");
+    errors += mrg_unittest_expect_samples_delta(&ctx, 10, 10, 10, false, 0, "equal timestamps");
+    errors += mrg_unittest_expect_samples_delta(&ctx, 0, 10, 10, false, 0, "missing first timestamp");
+    errors += mrg_unittest_expect_samples_delta(&ctx, 10, 70, 0, false, 0, "missing update every");
+
+#ifndef NETDATA_INTERNAL_CHECKS
+    errors += mrg_unittest_expect_samples_delta(&ctx, 70, 10, 10, false, 0, "reversed interval");
+#endif
+
+    errors += mrg_unittest_expect_counter_sub(&ctx, 9, 4, true, 5, "normal decrement");
+    errors += mrg_unittest_expect_counter_sub(&ctx, 9, 0, true, 9, "zero decrement");
+
+#ifndef NETDATA_INTERNAL_CHECKS
+    errors += mrg_unittest_expect_counter_sub(&ctx, 3, 9, false, 0, "underflow saturation");
+#endif
+
+    ctx.atomic.metrics = 11;
+    ctx.atomic.samples = 22;
+    rrdeng_reset_accounting_if_fresh(&ctx, false);
+    if(ctx.atomic.metrics != 11 || ctx.atomic.samples != 22) {
+        fprintf(stderr,
+                "DBENGINE METRIC: global-context accounting reset policy failed, expected 11/22 got %"PRIu64"/%"PRIu64"\n",
+                ctx.atomic.metrics,
+                ctx.atomic.samples);
+        errors++;
+    }
+
+    rrdeng_reset_accounting_if_fresh(&ctx, true);
+    if(ctx.atomic.metrics != 0 || ctx.atomic.samples != 0) {
+        fprintf(stderr,
+                "DBENGINE METRIC: fresh-context accounting reset policy failed, expected 0/0 got %"PRIu64"/%"PRIu64"\n",
+                ctx.atomic.metrics,
+                ctx.atomic.samples);
+        errors++;
+    }
+
+    return errors;
+}
+
+#ifndef NETDATA_INTERNAL_CHECKS
+static int mrg_metrics_delete_underflow_unittest(MRG *mrg) {
+    nd_uuid_t uuid;
+    uuid_generate(uuid);
+
+    MRG_ENTRY entry = {
+        .uuid = &uuid,
+        .section = (Word_t)&test_ctx_0,
+        .first_time_s = 0,
+        .last_time_s = 0,
+        .latest_update_every_s = 1,
+    };
+
+    bool added = false;
+    METRIC *metric = mrg_metric_add_and_acquire(mrg, entry, &added);
+    if(!metric || !added) {
+        fprintf(stderr, "DBENGINE METRIC: failed to add no-retention metric for delete-underflow test\n");
+        return 1;
+    }
+
+    __atomic_store_n(&test_ctx_0.atomic.metrics, 0, __ATOMIC_RELAXED);
+
+    bool deleted = mrg_metric_release_and_delete(mrg, metric);
+    uint64_t metrics = __atomic_load_n(&test_ctx_0.atomic.metrics, __ATOMIC_RELAXED);
+
+    if(!deleted || metrics != 0) {
+        fprintf(stderr,
+                "DBENGINE METRIC: delete-underflow test failed, expected deleted=true metrics=0, got deleted=%s metrics=%"PRIu64"\n",
+                deleted ? "true" : "false",
+                metrics);
+        return 1;
+    }
+
+    return 0;
+}
+#endif
+
 int mrg_unittest(void) {
     // Use mrg_create_for_unittest to avoid pre-loaded metrics that block deletion
     MRG *mrg = mrg_create_for_unittest();
+    int errors = dbengine_accounting_helpers_unittest();
+
+#ifndef NETDATA_INTERNAL_CHECKS
+    errors += mrg_metrics_delete_underflow_unittest(mrg);
+#endif
+
+    if(errors) {
+        mrg_destroy(mrg);
+        return errors;
+    }
+
     METRIC *m1_t0, *m2_t0, *m3_t0, *m4_t0;
     METRIC *m1_t1, *m2_t1, *m3_t1, *m4_t1;
     bool ret;

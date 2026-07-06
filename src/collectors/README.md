@@ -26,7 +26,7 @@ This section outlines the required privileges and how they are configured in dif
 | Plugin/Binary          | Privileges (Linux)                              | Privileges (Non-Linux or Containerized Environment) |   
 |------------------------|-------------------------------------------------|-----------------------------------------------------|
 | apps.plugin            | CAP_DAC_READ_SEARCH, CAP_SYS_PTRACE             | setuid root                                         |
-| debugfs.plugin         | CAP_DAC_READ_SEARCH                             | setuid root                                         |
+| debugfs.plugin         | CAP_DAC_READ_SEARCH, CAP_AUDIT_CONTROL          | setuid root                                         |
 | systemd-journal.plugin | CAP_DAC_READ_SEARCH                             | setuid root                                         |
 | perf.plugin            | CAP_PERFMON                                     | setuid root                                         |
 | slabinfo.plugin        | CAP_DAC_READ_SEARCH                             | setuid root                                         |

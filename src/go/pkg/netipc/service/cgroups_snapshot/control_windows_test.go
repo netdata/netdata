@@ -41,9 +41,12 @@ func TestClientAndCacheControlMethodsWindows(t *testing.T) {
 	if cache.Ready() {
 		t.Fatal("cache unexpectedly ready without a successful refresh")
 	}
-	if item, ok := cache.Lookup(123, "missing"); ok || item.Name != "" {
-		t.Fatalf("cache lookup without refresh = %+v/%v, want empty/false", item, ok)
+	guard := cache.ReadLock()
+	if item := guard.Get(123, "missing"); item != nil {
+		guard.Unlock()
+		t.Fatalf("cache lookup without refresh = %+v, want nil", item)
 	}
+	guard.Unlock()
 	cacheStatus := cache.Status()
 	if cacheStatus.Populated || cacheStatus.RefreshFailureCount != 1 ||
 		cacheStatus.ConnectionState != StateNotFound {

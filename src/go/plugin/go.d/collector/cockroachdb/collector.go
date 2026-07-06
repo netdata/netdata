@@ -28,10 +28,10 @@ func init() {
 		Defaults: collectorapi.Defaults{
 			UpdateEvery: dbSamplingInterval,
 		},
-		Methods:       cockroachMethods,
-		MethodHandler: cockroachFunctionHandler,
-		Create:        func() collectorapi.CollectorV1 { return New() },
-		Config:        func() any { return &Config{} },
+		SharedFunctions: cockroachMethods,
+		MethodHandler:   cockroachFunctionHandler,
+		Create:          func() collectorapi.CollectorV1 { return New() },
+		Config:          func() any { return &Config{} },
 	})
 }
 

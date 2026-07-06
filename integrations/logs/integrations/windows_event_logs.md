@@ -35,7 +35,7 @@ You can start exploring Windows event logs on the "Logs" tab of the Netdata UI.
 - Supports **Event Tracing for Windows (ETW)** and **TraceLogging (TL)**, when events are routed to Event Log.
 - Allows filtering on all System Events fields.
 - Allows **full text search** (`grep`) on all System and User fields.
-- Provides a **histogram** for log entries over time, with a break down per field-value, for any System Event field and any
+- Provides a **histogram** for log entries over time, with a breakdown per field-value, for any System Event field and any
   time-frame.
 - Supports coloring log entries based on severity.
 - In PLAY mode it "tails" all the Events, showing new log entries immediately after they are received.

@@ -28,9 +28,9 @@
 // atomic load): for them there IS a concurrent writer.
 //
 // MUST NOT be used when more than one thread writes the same counter. For
-// genuinely multi-writer counters use __atomic_fetch_add(). On 32-bit platforms
-// a 64-bit relaxed store is not a single instruction; this is the same trade-off
-// Netdata's other 64-bit atomics already make.
+// genuinely multi-writer counters use __atomic_fetch_add(). 64-bit counters
+// using this helper MUST be 8-byte aligned; some 32-bit compilers inline
+// relaxed 64-bit access when they can prove the target is lock-free.
 
 // add n to a single-writer counter (writer thread only)
 #define single_writer_atomic_add(ptr, n) do {                           \

@@ -45,7 +45,7 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 
 	ipOwner := make(map[string]int)
 	for idx, actor := range data.Actors {
-		if strings.EqualFold(strings.TrimSpace(actor.ActorType), "segment") {
+		if topologymodel.ActorIsSegment(actor) {
 			continue
 		}
 		ips := topologymodel.NormalizedMatchIPs(actor.Match)
@@ -96,6 +96,7 @@ func collapseActorsByIP(data *topologymodel.Data) int {
 			replaceActorID[data.Actors[idx].ActorID] = repActor.ActorID
 			repActor.Match = mergeTopologyMatch(repActor.Match, data.Actors[idx].Match)
 			repActor.Labels = mergeTopologyStringMap(repActor.Labels, data.Actors[idx].Labels)
+			repActor.SegmentKind = topologyutil.FirstNonEmptyString(repActor.SegmentKind, data.Actors[idx].SegmentKind)
 			repActor.Detail = mergeTopologyActorDetail(repActor.Detail, data.Actors[idx].Detail)
 			keep[idx] = false
 		}

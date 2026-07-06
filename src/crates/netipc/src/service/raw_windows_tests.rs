@@ -3021,7 +3021,7 @@ fn test_cache_full_round_trip_windows() {
     let svc = "rs_win_cache_roundtrip";
     let mut server = TestServer::start(svc, METHOD_CGROUPS_SNAPSHOT, test_cgroups_dispatch());
 
-    let mut cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
+    let cache = CgroupsCache::new(TEST_RUN_DIR, svc, client_config());
     assert!(!cache.ready());
 
     thread::sleep(Duration::from_millis(2));
@@ -3030,7 +3030,10 @@ fn test_cache_full_round_trip_windows() {
     assert!(updated);
     assert!(cache.ready());
 
-    let item = cache.lookup(1001, "docker-abc123").expect("lookup");
+    let item = {
+        let guard = cache.read_lock();
+        guard.get(1001, "docker-abc123").expect("lookup").dup()
+    };
     assert_eq!(item.hash, 1001);
     assert_eq!(item.path, "/sys/fs/cgroup/docker/abc123");
 

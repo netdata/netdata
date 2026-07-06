@@ -87,6 +87,12 @@ Use these flags to customize your installation.
 | **Reinstall/Uninstall** | `--reinstall`          | Reinstall existing Netdata          |
 |                         | `--uninstall`          | Uninstall Netdata completely        |
 
+:::note
+
+**Managing auto-updates after installation:** `kickstart.sh` enables daily auto-updates by default. To disable, check, or re-enable auto-updates — including why `netdata-updater.conf` cannot disable them — see [Managing Automatic Updates](/packaging/installer/UPDATE.md#managing-automatic-updates) in the Update guide.
+
+:::
+
 ## Environment Variables
 
 These environment variables provide additional customization options (most users won't need these):
@@ -119,6 +125,12 @@ If the script is valid, this command will return `OK, VALID`. We recommend verif
 - Customize install location or behavior with flags
 - Always verify the downloaded script for security
 - Use the `--non-interactive` flag in CI/CD pipelines
+
+## Troubleshooting
+
+If `curl` fails to download the install script with `curl: (60) SSL certificate OpenSSL verify result: unable to get local issuer certificate (20)`, this is an OS-level certificate-trust issue: the host's CA certificate store is missing or outdated. Update your system CA certificates using your package manager (for example `sudo apt-get install --reinstall ca-certificates` on Debian/Ubuntu or `sudo dnf reinstall ca-certificates` on RHEL/Fedora), then re-run the install command.
+
+If you see a message like `File not found when checking for remote file at https://repository.netdata.cloud/repos/repoconfig` while running `kickstart.sh`, it is an informational notice. It means a remote file check during installation did not succeed, but this does not stop or break the installation — the installer continues automatically to the next step. The message is not specific to any particular Linux distribution and can appear on any supported system.
 
 ## Related Docs
 

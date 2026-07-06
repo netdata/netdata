@@ -150,6 +150,23 @@
       },
       {
         "chassis_ids": [],
+        "display_name": "203.0.113.0/24",
+        "dns_names": [],
+        "endpoints_total": 2,
+        "hostnames": [],
+        "id": "l3-subnet-segment-203-0-113-0-24",
+        "ip_addresses": [],
+        "layer": "network",
+        "mac_addresses": [],
+        "parent_devices": [],
+        "ports_total": 2,
+        "source": "ip_mib",
+        "sys_name": "",
+        "sys_object_id": "",
+        "type": "l3_subnet_segment"
+      },
+      {
+        "chassis_ids": [],
         "display_name": "Server A",
         "dns_names": [],
         "hostnames": [
@@ -281,6 +298,87 @@
         ]
       },
       "type": "l3_subnet"
+    },
+    "l3_subnet_membership": {
+      "table": {
+        "columns": [
+          "link:link_ref:role=reference",
+          "src_actor:actor_ref:role=reference",
+          "dst_actor:actor_ref:role=reference",
+          "protocol:string_ref:dict=strings:role=group_key",
+          "direction:string_ref:dict=strings:role=group_key",
+          "state:string_ref:dict=strings:nullable",
+          "src_port_name:string_ref:dict=strings:nullable",
+          "dst_port_name:string_ref:dict=strings:nullable",
+          "src_if_index:uint:nullable",
+          "dst_if_index:uint:nullable",
+          "src_port_id:string_ref:dict=strings:nullable",
+          "dst_port_id:string_ref:dict=strings:nullable",
+          "src_management_ip:string_ref:dict=strings:nullable",
+          "dst_management_ip:string_ref:dict=strings:nullable",
+          "confidence:string_ref:dict=strings:nullable",
+          "inference:string_ref:dict=strings:nullable",
+          "attachment_mode:string_ref:dict=strings:nullable",
+          "member_actor:actor_ref:role=reference",
+          "segment_actor:actor_ref:role=reference",
+          "member_ip:string_ref:dict=strings:nullable",
+          "member_if_index:uint:nullable",
+          "member_if_name:string_ref:dict=strings:nullable",
+          "member_if_descr:string_ref:dict=strings:nullable",
+          "subnet:string_ref:dict=strings:role=group_key",
+          "network:string_ref:dict=strings:nullable",
+          "netmask:string_ref:dict=strings:nullable",
+          "prefix:uint:nullable",
+          "source:string_ref:dict=strings:nullable"
+        ],
+        "rows": [
+          {
+            "attachment_mode": "logical_l3_subnet_membership",
+            "direction": "observed",
+            "dst_actor": "l3-subnet-segment-203-0-113-0-24",
+            "inference": "shared_subnet_membership",
+            "link": "router-a -\u003e l3-subnet-segment-203-0-113-0-24 | l3_subnet_membership | l3_subnet_membership | \u003cnil\u003e | xe-0/0/2 | \u003cnil\u003e",
+            "member_actor": "router-a",
+            "member_if_descr": "Transit VLAN",
+            "member_if_index": 302,
+            "member_if_name": "xe-0/0/2",
+            "member_ip": "203.0.113.1",
+            "netmask": "255.255.255.0",
+            "network": "203.0.113.0",
+            "prefix": 24,
+            "protocol": "l3_subnet_membership",
+            "segment_actor": "l3-subnet-segment-203-0-113-0-24",
+            "source": "ip_mib",
+            "src_actor": "router-a",
+            "src_if_index": 302,
+            "src_port_name": "xe-0/0/2",
+            "subnet": "203.0.113.0/24"
+          },
+          {
+            "attachment_mode": "logical_l3_subnet_membership",
+            "direction": "observed",
+            "dst_actor": "l3-subnet-segment-203-0-113-0-24",
+            "inference": "shared_subnet_membership",
+            "link": "router-b -\u003e l3-subnet-segment-203-0-113-0-24 | l3_subnet_membership | l3_subnet_membership | \u003cnil\u003e | xe-0/0/2 | \u003cnil\u003e",
+            "member_actor": "router-b",
+            "member_if_descr": "Transit VLAN",
+            "member_if_index": 402,
+            "member_if_name": "xe-0/0/2",
+            "member_ip": "203.0.113.2",
+            "netmask": "255.255.255.0",
+            "network": "203.0.113.0",
+            "prefix": 24,
+            "protocol": "l3_subnet_membership",
+            "segment_actor": "l3-subnet-segment-203-0-113-0-24",
+            "source": "ip_mib",
+            "src_actor": "router-b",
+            "src_if_index": 402,
+            "src_port_name": "xe-0/0/2",
+            "subnet": "203.0.113.0/24"
+          }
+        ]
+      },
+      "type": "l3_subnet_membership"
     },
     "lldp": {
       "table": {
@@ -452,6 +550,24 @@
       },
       {
         "direction": "observed",
+        "dst_actor": "l3-subnet-segment-203-0-113-0-24",
+        "evidence_count": 1,
+        "protocol": "l3_subnet_membership",
+        "src_actor": "router-a",
+        "src_port_name": "xe-0/0/2",
+        "type": "l3_subnet_membership"
+      },
+      {
+        "direction": "observed",
+        "dst_actor": "l3-subnet-segment-203-0-113-0-24",
+        "evidence_count": 1,
+        "protocol": "l3_subnet_membership",
+        "src_actor": "router-b",
+        "src_port_name": "xe-0/0/2",
+        "type": "l3_subnet_membership"
+      },
+      {
+        "direction": "observed",
         "dst_actor": "router-b",
         "dst_port_name": "xe-0/0/1",
         "evidence_count": 1,
@@ -552,6 +668,10 @@
         {
           "label": "Network segment",
           "type": "segment"
+        },
+        {
+          "label": "L3 subnet",
+          "type": "l3_subnet_segment"
         }
       ],
       "links": [
@@ -574,6 +694,10 @@
         {
           "label": "L3 subnet",
           "type": "l3_subnet"
+        },
+        {
+          "label": "L3 subnet membership",
+          "type": "l3_subnet_membership"
         },
         {
           "label": "OSPF adjacency",
@@ -663,6 +787,7 @@
       "fdb",
       "stp",
       "l3_subnet",
+      "l3_subnet_membership",
       "ospf",
       "bgp"
     ],
@@ -676,7 +801,7 @@
     "actors_focus_depth_filtered": 0,
     "actors_map_type_suppressed": 2,
     "actors_non_ip_inferred_suppressed": 0,
-    "actors_total": 5,
+    "actors_total": 6,
     "bgp_adjacency_emitted_links": 1,
     "bgp_adjacency_suppressed_duplicate_link": 0,
     "bgp_adjacency_suppressed_non_established_state": 0,
@@ -687,9 +812,19 @@
     "bgp_peer_detail_rows": 0,
     "bgp_peer_rows": 0,
     "depth": "all",
-    "l3_subnet_candidate_links": 0,
+    "l3_subnet_candidate_links": 1,
     "l3_subnet_candidate_subnets": 0,
     "l3_subnet_emitted_links": 1,
+    "l3_subnet_membership_candidate_links": 2,
+    "l3_subnet_membership_emitted_links": 2,
+    "l3_subnet_membership_suppressed_duplicate_ip": 0,
+    "l3_subnet_membership_suppressed_duplicate_link": 0,
+    "l3_subnet_membership_suppressed_unmatched": 0,
+    "l3_subnet_membership_suppressed_unresolved_actor": 0,
+    "l3_subnet_membership_visible_links": 2,
+    "l3_subnet_segment_candidate_segments": 1,
+    "l3_subnet_segment_emitted_segments": 1,
+    "l3_subnet_segment_suppressed_no_producer_scope": 0,
     "l3_subnet_suppressed_duplicate_ip": 0,
     "l3_subnet_suppressed_duplicate_link": 0,
     "l3_subnet_suppressed_invalid": 0,
@@ -702,7 +837,7 @@
     "l3_subnet_visible_links": 1,
     "links_focus_depth_filtered": 0,
     "links_probable": 1,
-    "links_total": 5,
+    "links_total": 7,
     "managed_snmp_device_focus": "all_devices",
     "map_type": "high_confidence_inferred",
     "ospf_adjacency_emitted_links": 1,
@@ -794,6 +929,55 @@
             "value_index:uint:nullable:role=attribute"
           ],
           "rows": [
+            {
+              "actor": "l3-subnet-segment-203-0-113-0-24",
+              "key": "actor_type",
+              "kind": "identity",
+              "source": "snmp-l2",
+              "value": "l3_subnet_segment"
+            },
+            {
+              "actor": "l3-subnet-segment-203-0-113-0-24",
+              "key": "display_name",
+              "kind": "attribute",
+              "source": "snmp-l2",
+              "value": "203.0.113.0/24"
+            },
+            {
+              "actor": "l3-subnet-segment-203-0-113-0-24",
+              "key": "display_name",
+              "kind": "attribute",
+              "source": "snmp-l2",
+              "value": "203.0.113.0/24"
+            },
+            {
+              "actor": "l3-subnet-segment-203-0-113-0-24",
+              "key": "endpoints_total",
+              "kind": "attribute",
+              "source": "snmp-l2",
+              "value": "2"
+            },
+            {
+              "actor": "l3-subnet-segment-203-0-113-0-24",
+              "key": "layer",
+              "kind": "identity",
+              "source": "snmp-l2",
+              "value": "network"
+            },
+            {
+              "actor": "l3-subnet-segment-203-0-113-0-24",
+              "key": "ports_total",
+              "kind": "attribute",
+              "source": "snmp-l2",
+              "value": "2"
+            },
+            {
+              "actor": "l3-subnet-segment-203-0-113-0-24",
+              "key": "source",
+              "kind": "identity",
+              "source": "snmp-l2",
+              "value": "ip_mib"
+            },
             {
               "actor": "router-a",
               "key": "actor_type",
@@ -2393,6 +2577,124 @@
               {
                 "columns": [
                   {
+                    "cell": "actor_link",
+                    "id": "subnet_actor",
+                    "label": "Subnet",
+                    "projection": {
+                      "dst_actor_column": "dst_actor",
+                      "kind": "opposite_actor",
+                      "src_actor_column": "src_actor"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_ip",
+                    "label": "Local IP",
+                    "projection": {
+                      "column": "member_ip",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_name",
+                    "label": "Interface",
+                    "projection": {
+                      "column": "member_if_name",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "subnet",
+                    "label": "Subnet",
+                    "projection": {
+                      "column": "subnet",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "prefix",
+                    "label": "Prefix",
+                    "projection": {
+                      "column": "prefix",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "member_if_index",
+                    "label": "IfIndex",
+                    "projection": {
+                      "column": "member_if_index",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_descr",
+                    "label": "IfDescr",
+                    "projection": {
+                      "column": "member_if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "network",
+                    "label": "Network",
+                    "projection": {
+                      "column": "network",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "netmask",
+                    "label": "Netmask",
+                    "projection": {
+                      "column": "netmask",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "source",
+                    "label": "Source",
+                    "projection": {
+                      "column": "source",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  }
+                ],
+                "empty_label": "No L3 subnet memberships",
+                "id": "l3_subnet_memberships",
+                "label": "L3 Subnet Memberships",
+                "order": 4,
+                "owner_filter": {
+                  "dst_actor_column": "dst_actor",
+                  "link_column": "link",
+                  "mode": "incident_evidence",
+                  "src_actor_column": "src_actor"
+                },
+                "sort": {
+                  "column": "subnet",
+                  "direction": "asc"
+                },
+                "source": {
+                  "evidence": "l3_subnet_membership",
+                  "kind": "evidence"
+                }
+              },
+              {
+                "columns": [
+                  {
                     "cell": "text",
                     "id": "neighbor_router_id",
                     "label": "Neighbor Router ID",
@@ -2482,7 +2784,7 @@
                 "empty_label": "No OSPF neighbors",
                 "id": "ospf_neighbors",
                 "label": "OSPF Neighbors",
-                "order": 4,
+                "order": 5,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -2658,7 +2960,7 @@
                 "empty_label": "No BGP peers",
                 "id": "bgp_peers",
                 "label": "BGP Peers",
-                "order": 5,
+                "order": 6,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -2699,13 +3001,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -3387,6 +3705,124 @@
               {
                 "columns": [
                   {
+                    "cell": "actor_link",
+                    "id": "subnet_actor",
+                    "label": "Subnet",
+                    "projection": {
+                      "dst_actor_column": "dst_actor",
+                      "kind": "opposite_actor",
+                      "src_actor_column": "src_actor"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_ip",
+                    "label": "Local IP",
+                    "projection": {
+                      "column": "member_ip",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_name",
+                    "label": "Interface",
+                    "projection": {
+                      "column": "member_if_name",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "subnet",
+                    "label": "Subnet",
+                    "projection": {
+                      "column": "subnet",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "prefix",
+                    "label": "Prefix",
+                    "projection": {
+                      "column": "prefix",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "member_if_index",
+                    "label": "IfIndex",
+                    "projection": {
+                      "column": "member_if_index",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_descr",
+                    "label": "IfDescr",
+                    "projection": {
+                      "column": "member_if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "network",
+                    "label": "Network",
+                    "projection": {
+                      "column": "network",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "netmask",
+                    "label": "Netmask",
+                    "projection": {
+                      "column": "netmask",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "source",
+                    "label": "Source",
+                    "projection": {
+                      "column": "source",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  }
+                ],
+                "empty_label": "No L3 subnet memberships",
+                "id": "l3_subnet_memberships",
+                "label": "L3 Subnet Memberships",
+                "order": 4,
+                "owner_filter": {
+                  "dst_actor_column": "dst_actor",
+                  "link_column": "link",
+                  "mode": "incident_evidence",
+                  "src_actor_column": "src_actor"
+                },
+                "sort": {
+                  "column": "subnet",
+                  "direction": "asc"
+                },
+                "source": {
+                  "evidence": "l3_subnet_membership",
+                  "kind": "evidence"
+                }
+              },
+              {
+                "columns": [
+                  {
                     "cell": "text",
                     "id": "neighbor_router_id",
                     "label": "Neighbor Router ID",
@@ -3476,7 +3912,7 @@
                 "empty_label": "No OSPF neighbors",
                 "id": "ospf_neighbors",
                 "label": "OSPF Neighbors",
-                "order": 4,
+                "order": 5,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -3652,7 +4088,7 @@
                 "empty_label": "No BGP peers",
                 "id": "bgp_peers",
                 "label": "BGP Peers",
-                "order": 5,
+                "order": 6,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -3693,13 +4129,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -3849,7 +4301,8 @@
         },
         "search": {
           "columns": [
-            "display_name"
+            "display_name",
+            "id"
           ]
         }
       },
@@ -4531,6 +4984,124 @@
               {
                 "columns": [
                   {
+                    "cell": "actor_link",
+                    "id": "subnet_actor",
+                    "label": "Subnet",
+                    "projection": {
+                      "dst_actor_column": "dst_actor",
+                      "kind": "opposite_actor",
+                      "src_actor_column": "src_actor"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_ip",
+                    "label": "Local IP",
+                    "projection": {
+                      "column": "member_ip",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_name",
+                    "label": "Interface",
+                    "projection": {
+                      "column": "member_if_name",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "subnet",
+                    "label": "Subnet",
+                    "projection": {
+                      "column": "subnet",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "prefix",
+                    "label": "Prefix",
+                    "projection": {
+                      "column": "prefix",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "member_if_index",
+                    "label": "IfIndex",
+                    "projection": {
+                      "column": "member_if_index",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_descr",
+                    "label": "IfDescr",
+                    "projection": {
+                      "column": "member_if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "network",
+                    "label": "Network",
+                    "projection": {
+                      "column": "network",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "netmask",
+                    "label": "Netmask",
+                    "projection": {
+                      "column": "netmask",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "source",
+                    "label": "Source",
+                    "projection": {
+                      "column": "source",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  }
+                ],
+                "empty_label": "No L3 subnet memberships",
+                "id": "l3_subnet_memberships",
+                "label": "L3 Subnet Memberships",
+                "order": 4,
+                "owner_filter": {
+                  "dst_actor_column": "dst_actor",
+                  "link_column": "link",
+                  "mode": "incident_evidence",
+                  "src_actor_column": "src_actor"
+                },
+                "sort": {
+                  "column": "subnet",
+                  "direction": "asc"
+                },
+                "source": {
+                  "evidence": "l3_subnet_membership",
+                  "kind": "evidence"
+                }
+              },
+              {
+                "columns": [
+                  {
                     "cell": "text",
                     "id": "neighbor_router_id",
                     "label": "Neighbor Router ID",
@@ -4620,7 +5191,7 @@
                 "empty_label": "No OSPF neighbors",
                 "id": "ospf_neighbors",
                 "label": "OSPF Neighbors",
-                "order": 4,
+                "order": 5,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -4796,7 +5367,7 @@
                 "empty_label": "No BGP peers",
                 "id": "bgp_peers",
                 "label": "BGP Peers",
-                "order": 5,
+                "order": 6,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -4837,13 +5408,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -5005,7 +5592,18 @@
         },
         "search": {
           "columns": [
-            "display_name"
+            "display_name",
+            "id",
+            "vendor",
+            "model"
+          ],
+          "label_keys": [
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "learned_sources",
+            "protocols"
           ]
         }
       },
@@ -5687,6 +6285,124 @@
               {
                 "columns": [
                   {
+                    "cell": "actor_link",
+                    "id": "subnet_actor",
+                    "label": "Subnet",
+                    "projection": {
+                      "dst_actor_column": "dst_actor",
+                      "kind": "opposite_actor",
+                      "src_actor_column": "src_actor"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_ip",
+                    "label": "Local IP",
+                    "projection": {
+                      "column": "member_ip",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_name",
+                    "label": "Interface",
+                    "projection": {
+                      "column": "member_if_name",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "subnet",
+                    "label": "Subnet",
+                    "projection": {
+                      "column": "subnet",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "prefix",
+                    "label": "Prefix",
+                    "projection": {
+                      "column": "prefix",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "member_if_index",
+                    "label": "IfIndex",
+                    "projection": {
+                      "column": "member_if_index",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_descr",
+                    "label": "IfDescr",
+                    "projection": {
+                      "column": "member_if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "network",
+                    "label": "Network",
+                    "projection": {
+                      "column": "network",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "netmask",
+                    "label": "Netmask",
+                    "projection": {
+                      "column": "netmask",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "source",
+                    "label": "Source",
+                    "projection": {
+                      "column": "source",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  }
+                ],
+                "empty_label": "No L3 subnet memberships",
+                "id": "l3_subnet_memberships",
+                "label": "L3 Subnet Memberships",
+                "order": 4,
+                "owner_filter": {
+                  "dst_actor_column": "dst_actor",
+                  "link_column": "link",
+                  "mode": "incident_evidence",
+                  "src_actor_column": "src_actor"
+                },
+                "sort": {
+                  "column": "subnet",
+                  "direction": "asc"
+                },
+                "source": {
+                  "evidence": "l3_subnet_membership",
+                  "kind": "evidence"
+                }
+              },
+              {
+                "columns": [
+                  {
                     "cell": "text",
                     "id": "neighbor_router_id",
                     "label": "Neighbor Router ID",
@@ -5776,7 +6492,7 @@
                 "empty_label": "No OSPF neighbors",
                 "id": "ospf_neighbors",
                 "label": "OSPF Neighbors",
-                "order": 4,
+                "order": 5,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -5952,7 +6668,7 @@
                 "empty_label": "No BGP peers",
                 "id": "bgp_peers",
                 "label": "BGP Peers",
-                "order": 5,
+                "order": 6,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -5993,14 +6709,191 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
+        }
+      },
+      "l3_subnet_segment": {
+        "aggregation_scopes": [
+          "segment",
+          "network"
+        ],
+        "identity": [
+          "id"
+        ],
+        "layer": "network",
+        "merge_identity": [
+          "id"
+        ],
+        "presentation": {
+          "color_slot": "info",
+          "icon": "segment",
+          "label": "L3 subnet",
+          "label_policy": {
+            "array": "reject",
+            "columns": [
+              "display_name"
+            ],
+            "fallback": "type_label",
+            "max_length": 80
+          },
+          "layout": {
+            "repulsion": "weakest"
+          },
+          "modal": {
+            "mini_topology": {
+              "depth": 1
+            },
+            "sections": [
+              {
+                "columns": [
+                  {
+                    "cell": "actor_link",
+                    "id": "member",
+                    "label": "Member",
+                    "projection": {
+                      "actor_column": "member_actor",
+                      "kind": "actor_ref_label"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_ip",
+                    "label": "Member IP",
+                    "projection": {
+                      "column": "member_ip",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_name",
+                    "label": "Interface",
+                    "projection": {
+                      "column": "member_if_name",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "subnet",
+                    "label": "Subnet",
+                    "projection": {
+                      "column": "subnet",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "prefix",
+                    "label": "Prefix",
+                    "projection": {
+                      "column": "prefix",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "member_if_index",
+                    "label": "IfIndex",
+                    "projection": {
+                      "column": "member_if_index",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_descr",
+                    "label": "IfDescr",
+                    "projection": {
+                      "column": "member_if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "network",
+                    "label": "Network",
+                    "projection": {
+                      "column": "network",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "netmask",
+                    "label": "Netmask",
+                    "projection": {
+                      "column": "netmask",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "source",
+                    "label": "Source",
+                    "projection": {
+                      "column": "source",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  }
+                ],
+                "empty_label": "No subnet members",
+                "id": "l3_subnet_members",
+                "label": "Members",
+                "order": 1,
+                "owner_filter": {
+                  "dst_actor_column": "dst_actor",
+                  "link_column": "link",
+                  "mode": "incident_evidence",
+                  "src_actor_column": "src_actor"
+                },
+                "sort": {
+                  "column": "member_ip",
+                  "direction": "asc"
+                },
+                "source": {
+                  "evidence": "l3_subnet_membership",
+                  "kind": "evidence"
+                }
+              }
+            ]
+          },
+          "role": "group",
+          "size": {
+            "mode": "fixed",
+            "scale": "compact"
+          }
+        },
+        "search": {
+          "enabled": false
         }
       },
       "load_balancer": {
@@ -6681,6 +7574,124 @@
               {
                 "columns": [
                   {
+                    "cell": "actor_link",
+                    "id": "subnet_actor",
+                    "label": "Subnet",
+                    "projection": {
+                      "dst_actor_column": "dst_actor",
+                      "kind": "opposite_actor",
+                      "src_actor_column": "src_actor"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_ip",
+                    "label": "Local IP",
+                    "projection": {
+                      "column": "member_ip",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_name",
+                    "label": "Interface",
+                    "projection": {
+                      "column": "member_if_name",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "subnet",
+                    "label": "Subnet",
+                    "projection": {
+                      "column": "subnet",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "prefix",
+                    "label": "Prefix",
+                    "projection": {
+                      "column": "prefix",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "member_if_index",
+                    "label": "IfIndex",
+                    "projection": {
+                      "column": "member_if_index",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_descr",
+                    "label": "IfDescr",
+                    "projection": {
+                      "column": "member_if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "network",
+                    "label": "Network",
+                    "projection": {
+                      "column": "network",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "netmask",
+                    "label": "Netmask",
+                    "projection": {
+                      "column": "netmask",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "source",
+                    "label": "Source",
+                    "projection": {
+                      "column": "source",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  }
+                ],
+                "empty_label": "No L3 subnet memberships",
+                "id": "l3_subnet_memberships",
+                "label": "L3 Subnet Memberships",
+                "order": 4,
+                "owner_filter": {
+                  "dst_actor_column": "dst_actor",
+                  "link_column": "link",
+                  "mode": "incident_evidence",
+                  "src_actor_column": "src_actor"
+                },
+                "sort": {
+                  "column": "subnet",
+                  "direction": "asc"
+                },
+                "source": {
+                  "evidence": "l3_subnet_membership",
+                  "kind": "evidence"
+                }
+              },
+              {
+                "columns": [
+                  {
                     "cell": "text",
                     "id": "neighbor_router_id",
                     "label": "Neighbor Router ID",
@@ -6770,7 +7781,7 @@
                 "empty_label": "No OSPF neighbors",
                 "id": "ospf_neighbors",
                 "label": "OSPF Neighbors",
-                "order": 4,
+                "order": 5,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -6946,7 +7957,7 @@
                 "empty_label": "No BGP peers",
                 "id": "bgp_peers",
                 "label": "BGP Peers",
-                "order": 5,
+                "order": 6,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -6987,13 +7998,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -7675,6 +8702,124 @@
               {
                 "columns": [
                   {
+                    "cell": "actor_link",
+                    "id": "subnet_actor",
+                    "label": "Subnet",
+                    "projection": {
+                      "dst_actor_column": "dst_actor",
+                      "kind": "opposite_actor",
+                      "src_actor_column": "src_actor"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_ip",
+                    "label": "Local IP",
+                    "projection": {
+                      "column": "member_ip",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_name",
+                    "label": "Interface",
+                    "projection": {
+                      "column": "member_if_name",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "subnet",
+                    "label": "Subnet",
+                    "projection": {
+                      "column": "subnet",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "prefix",
+                    "label": "Prefix",
+                    "projection": {
+                      "column": "prefix",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "member_if_index",
+                    "label": "IfIndex",
+                    "projection": {
+                      "column": "member_if_index",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_descr",
+                    "label": "IfDescr",
+                    "projection": {
+                      "column": "member_if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "network",
+                    "label": "Network",
+                    "projection": {
+                      "column": "network",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "netmask",
+                    "label": "Netmask",
+                    "projection": {
+                      "column": "netmask",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "source",
+                    "label": "Source",
+                    "projection": {
+                      "column": "source",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  }
+                ],
+                "empty_label": "No L3 subnet memberships",
+                "id": "l3_subnet_memberships",
+                "label": "L3 Subnet Memberships",
+                "order": 4,
+                "owner_filter": {
+                  "dst_actor_column": "dst_actor",
+                  "link_column": "link",
+                  "mode": "incident_evidence",
+                  "src_actor_column": "src_actor"
+                },
+                "sort": {
+                  "column": "subnet",
+                  "direction": "asc"
+                },
+                "source": {
+                  "evidence": "l3_subnet_membership",
+                  "kind": "evidence"
+                }
+              },
+              {
+                "columns": [
+                  {
                     "cell": "text",
                     "id": "neighbor_router_id",
                     "label": "Neighbor Router ID",
@@ -7764,7 +8909,7 @@
                 "empty_label": "No OSPF neighbors",
                 "id": "ospf_neighbors",
                 "label": "OSPF Neighbors",
-                "order": 4,
+                "order": 5,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -7940,7 +9085,7 @@
                 "empty_label": "No BGP peers",
                 "id": "bgp_peers",
                 "label": "BGP Peers",
-                "order": 5,
+                "order": 6,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -7981,13 +9126,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -8669,6 +9830,124 @@
               {
                 "columns": [
                   {
+                    "cell": "actor_link",
+                    "id": "subnet_actor",
+                    "label": "Subnet",
+                    "projection": {
+                      "dst_actor_column": "dst_actor",
+                      "kind": "opposite_actor",
+                      "src_actor_column": "src_actor"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_ip",
+                    "label": "Local IP",
+                    "projection": {
+                      "column": "member_ip",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_name",
+                    "label": "Interface",
+                    "projection": {
+                      "column": "member_if_name",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "subnet",
+                    "label": "Subnet",
+                    "projection": {
+                      "column": "subnet",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "prefix",
+                    "label": "Prefix",
+                    "projection": {
+                      "column": "prefix",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "member_if_index",
+                    "label": "IfIndex",
+                    "projection": {
+                      "column": "member_if_index",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_descr",
+                    "label": "IfDescr",
+                    "projection": {
+                      "column": "member_if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "network",
+                    "label": "Network",
+                    "projection": {
+                      "column": "network",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "netmask",
+                    "label": "Netmask",
+                    "projection": {
+                      "column": "netmask",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "source",
+                    "label": "Source",
+                    "projection": {
+                      "column": "source",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  }
+                ],
+                "empty_label": "No L3 subnet memberships",
+                "id": "l3_subnet_memberships",
+                "label": "L3 Subnet Memberships",
+                "order": 4,
+                "owner_filter": {
+                  "dst_actor_column": "dst_actor",
+                  "link_column": "link",
+                  "mode": "incident_evidence",
+                  "src_actor_column": "src_actor"
+                },
+                "sort": {
+                  "column": "subnet",
+                  "direction": "asc"
+                },
+                "source": {
+                  "evidence": "l3_subnet_membership",
+                  "kind": "evidence"
+                }
+              },
+              {
+                "columns": [
+                  {
                     "cell": "text",
                     "id": "neighbor_router_id",
                     "label": "Neighbor Router ID",
@@ -8758,7 +10037,7 @@
                 "empty_label": "No OSPF neighbors",
                 "id": "ospf_neighbors",
                 "label": "OSPF Neighbors",
-                "order": 4,
+                "order": 5,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -8934,7 +10213,7 @@
                 "empty_label": "No BGP peers",
                 "id": "bgp_peers",
                 "label": "BGP Peers",
-                "order": 5,
+                "order": 6,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -8975,13 +10254,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -9663,6 +10958,124 @@
               {
                 "columns": [
                   {
+                    "cell": "actor_link",
+                    "id": "subnet_actor",
+                    "label": "Subnet",
+                    "projection": {
+                      "dst_actor_column": "dst_actor",
+                      "kind": "opposite_actor",
+                      "src_actor_column": "src_actor"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_ip",
+                    "label": "Local IP",
+                    "projection": {
+                      "column": "member_ip",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_name",
+                    "label": "Interface",
+                    "projection": {
+                      "column": "member_if_name",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "subnet",
+                    "label": "Subnet",
+                    "projection": {
+                      "column": "subnet",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "prefix",
+                    "label": "Prefix",
+                    "projection": {
+                      "column": "prefix",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "member_if_index",
+                    "label": "IfIndex",
+                    "projection": {
+                      "column": "member_if_index",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_descr",
+                    "label": "IfDescr",
+                    "projection": {
+                      "column": "member_if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "network",
+                    "label": "Network",
+                    "projection": {
+                      "column": "network",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "netmask",
+                    "label": "Netmask",
+                    "projection": {
+                      "column": "netmask",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "source",
+                    "label": "Source",
+                    "projection": {
+                      "column": "source",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  }
+                ],
+                "empty_label": "No L3 subnet memberships",
+                "id": "l3_subnet_memberships",
+                "label": "L3 Subnet Memberships",
+                "order": 4,
+                "owner_filter": {
+                  "dst_actor_column": "dst_actor",
+                  "link_column": "link",
+                  "mode": "incident_evidence",
+                  "src_actor_column": "src_actor"
+                },
+                "sort": {
+                  "column": "subnet",
+                  "direction": "asc"
+                },
+                "source": {
+                  "evidence": "l3_subnet_membership",
+                  "kind": "evidence"
+                }
+              },
+              {
+                "columns": [
+                  {
                     "cell": "text",
                     "id": "neighbor_router_id",
                     "label": "Neighbor Router ID",
@@ -9752,7 +11165,7 @@
                 "empty_label": "No OSPF neighbors",
                 "id": "ospf_neighbors",
                 "label": "OSPF Neighbors",
-                "order": 4,
+                "order": 5,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -9928,7 +11341,7 @@
                 "empty_label": "No BGP peers",
                 "id": "bgp_peers",
                 "label": "BGP Peers",
-                "order": 5,
+                "order": 6,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -9969,13 +11382,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -10816,6 +12245,124 @@
               {
                 "columns": [
                   {
+                    "cell": "actor_link",
+                    "id": "subnet_actor",
+                    "label": "Subnet",
+                    "projection": {
+                      "dst_actor_column": "dst_actor",
+                      "kind": "opposite_actor",
+                      "src_actor_column": "src_actor"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_ip",
+                    "label": "Local IP",
+                    "projection": {
+                      "column": "member_ip",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_name",
+                    "label": "Interface",
+                    "projection": {
+                      "column": "member_if_name",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "subnet",
+                    "label": "Subnet",
+                    "projection": {
+                      "column": "subnet",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "prefix",
+                    "label": "Prefix",
+                    "projection": {
+                      "column": "prefix",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "member_if_index",
+                    "label": "IfIndex",
+                    "projection": {
+                      "column": "member_if_index",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_descr",
+                    "label": "IfDescr",
+                    "projection": {
+                      "column": "member_if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "network",
+                    "label": "Network",
+                    "projection": {
+                      "column": "network",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "netmask",
+                    "label": "Netmask",
+                    "projection": {
+                      "column": "netmask",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "source",
+                    "label": "Source",
+                    "projection": {
+                      "column": "source",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  }
+                ],
+                "empty_label": "No L3 subnet memberships",
+                "id": "l3_subnet_memberships",
+                "label": "L3 Subnet Memberships",
+                "order": 4,
+                "owner_filter": {
+                  "dst_actor_column": "dst_actor",
+                  "link_column": "link",
+                  "mode": "incident_evidence",
+                  "src_actor_column": "src_actor"
+                },
+                "sort": {
+                  "column": "subnet",
+                  "direction": "asc"
+                },
+                "source": {
+                  "evidence": "l3_subnet_membership",
+                  "kind": "evidence"
+                }
+              },
+              {
+                "columns": [
+                  {
                     "cell": "text",
                     "id": "neighbor_router_id",
                     "label": "Neighbor Router ID",
@@ -10905,7 +12452,7 @@
                 "empty_label": "No OSPF neighbors",
                 "id": "ospf_neighbors",
                 "label": "OSPF Neighbors",
-                "order": 4,
+                "order": 5,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -11081,7 +12628,7 @@
                 "empty_label": "No BGP peers",
                 "id": "bgp_peers",
                 "label": "BGP Peers",
-                "order": 5,
+                "order": 6,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -11122,13 +12669,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -11810,6 +13373,124 @@
               {
                 "columns": [
                   {
+                    "cell": "actor_link",
+                    "id": "subnet_actor",
+                    "label": "Subnet",
+                    "projection": {
+                      "dst_actor_column": "dst_actor",
+                      "kind": "opposite_actor",
+                      "src_actor_column": "src_actor"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_ip",
+                    "label": "Local IP",
+                    "projection": {
+                      "column": "member_ip",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_name",
+                    "label": "Interface",
+                    "projection": {
+                      "column": "member_if_name",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "subnet",
+                    "label": "Subnet",
+                    "projection": {
+                      "column": "subnet",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "prefix",
+                    "label": "Prefix",
+                    "projection": {
+                      "column": "prefix",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "member_if_index",
+                    "label": "IfIndex",
+                    "projection": {
+                      "column": "member_if_index",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_descr",
+                    "label": "IfDescr",
+                    "projection": {
+                      "column": "member_if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "network",
+                    "label": "Network",
+                    "projection": {
+                      "column": "network",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "netmask",
+                    "label": "Netmask",
+                    "projection": {
+                      "column": "netmask",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "source",
+                    "label": "Source",
+                    "projection": {
+                      "column": "source",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  }
+                ],
+                "empty_label": "No L3 subnet memberships",
+                "id": "l3_subnet_memberships",
+                "label": "L3 Subnet Memberships",
+                "order": 4,
+                "owner_filter": {
+                  "dst_actor_column": "dst_actor",
+                  "link_column": "link",
+                  "mode": "incident_evidence",
+                  "src_actor_column": "src_actor"
+                },
+                "sort": {
+                  "column": "subnet",
+                  "direction": "asc"
+                },
+                "source": {
+                  "evidence": "l3_subnet_membership",
+                  "kind": "evidence"
+                }
+              },
+              {
+                "columns": [
+                  {
                     "cell": "text",
                     "id": "neighbor_router_id",
                     "label": "Neighbor Router ID",
@@ -11899,7 +13580,7 @@
                 "empty_label": "No OSPF neighbors",
                 "id": "ospf_neighbors",
                 "label": "OSPF Neighbors",
-                "order": 4,
+                "order": 5,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -12075,7 +13756,7 @@
                 "empty_label": "No BGP peers",
                 "id": "bgp_peers",
                 "label": "BGP Peers",
-                "order": 5,
+                "order": 6,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -12116,13 +13797,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -12804,6 +14501,124 @@
               {
                 "columns": [
                   {
+                    "cell": "actor_link",
+                    "id": "subnet_actor",
+                    "label": "Subnet",
+                    "projection": {
+                      "dst_actor_column": "dst_actor",
+                      "kind": "opposite_actor",
+                      "src_actor_column": "src_actor"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_ip",
+                    "label": "Local IP",
+                    "projection": {
+                      "column": "member_ip",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_name",
+                    "label": "Interface",
+                    "projection": {
+                      "column": "member_if_name",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "subnet",
+                    "label": "Subnet",
+                    "projection": {
+                      "column": "subnet",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "prefix",
+                    "label": "Prefix",
+                    "projection": {
+                      "column": "prefix",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "member_if_index",
+                    "label": "IfIndex",
+                    "projection": {
+                      "column": "member_if_index",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_descr",
+                    "label": "IfDescr",
+                    "projection": {
+                      "column": "member_if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "network",
+                    "label": "Network",
+                    "projection": {
+                      "column": "network",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "netmask",
+                    "label": "Netmask",
+                    "projection": {
+                      "column": "netmask",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "source",
+                    "label": "Source",
+                    "projection": {
+                      "column": "source",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  }
+                ],
+                "empty_label": "No L3 subnet memberships",
+                "id": "l3_subnet_memberships",
+                "label": "L3 Subnet Memberships",
+                "order": 4,
+                "owner_filter": {
+                  "dst_actor_column": "dst_actor",
+                  "link_column": "link",
+                  "mode": "incident_evidence",
+                  "src_actor_column": "src_actor"
+                },
+                "sort": {
+                  "column": "subnet",
+                  "direction": "asc"
+                },
+                "source": {
+                  "evidence": "l3_subnet_membership",
+                  "kind": "evidence"
+                }
+              },
+              {
+                "columns": [
+                  {
                     "cell": "text",
                     "id": "neighbor_router_id",
                     "label": "Neighbor Router ID",
@@ -12893,7 +14708,7 @@
                 "empty_label": "No OSPF neighbors",
                 "id": "ospf_neighbors",
                 "label": "OSPF Neighbors",
-                "order": 4,
+                "order": 5,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -13069,7 +14884,7 @@
                 "empty_label": "No BGP peers",
                 "id": "bgp_peers",
                 "label": "BGP Peers",
-                "order": 5,
+                "order": 6,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -13110,13 +14925,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       },
@@ -13798,6 +15629,124 @@
               {
                 "columns": [
                   {
+                    "cell": "actor_link",
+                    "id": "subnet_actor",
+                    "label": "Subnet",
+                    "projection": {
+                      "dst_actor_column": "dst_actor",
+                      "kind": "opposite_actor",
+                      "src_actor_column": "src_actor"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_ip",
+                    "label": "Local IP",
+                    "projection": {
+                      "column": "member_ip",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_name",
+                    "label": "Interface",
+                    "projection": {
+                      "column": "member_if_name",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "text",
+                    "id": "subnet",
+                    "label": "Subnet",
+                    "projection": {
+                      "column": "subnet",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "prefix",
+                    "label": "Prefix",
+                    "projection": {
+                      "column": "prefix",
+                      "kind": "direct"
+                    }
+                  },
+                  {
+                    "cell": "number",
+                    "id": "member_if_index",
+                    "label": "IfIndex",
+                    "projection": {
+                      "column": "member_if_index",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "member_if_descr",
+                    "label": "IfDescr",
+                    "projection": {
+                      "column": "member_if_descr",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "network",
+                    "label": "Network",
+                    "projection": {
+                      "column": "network",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "text",
+                    "id": "netmask",
+                    "label": "Netmask",
+                    "projection": {
+                      "column": "netmask",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  },
+                  {
+                    "cell": "badge",
+                    "id": "source",
+                    "label": "Source",
+                    "projection": {
+                      "column": "source",
+                      "kind": "direct"
+                    },
+                    "visibility": "expanded"
+                  }
+                ],
+                "empty_label": "No L3 subnet memberships",
+                "id": "l3_subnet_memberships",
+                "label": "L3 Subnet Memberships",
+                "order": 4,
+                "owner_filter": {
+                  "dst_actor_column": "dst_actor",
+                  "link_column": "link",
+                  "mode": "incident_evidence",
+                  "src_actor_column": "src_actor"
+                },
+                "sort": {
+                  "column": "subnet",
+                  "direction": "asc"
+                },
+                "source": {
+                  "evidence": "l3_subnet_membership",
+                  "kind": "evidence"
+                }
+              },
+              {
+                "columns": [
+                  {
                     "cell": "text",
                     "id": "neighbor_router_id",
                     "label": "Neighbor Router ID",
@@ -13887,7 +15836,7 @@
                 "empty_label": "No OSPF neighbors",
                 "id": "ospf_neighbors",
                 "label": "OSPF Neighbors",
-                "order": 4,
+                "order": 5,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -14063,7 +16012,7 @@
                 "empty_label": "No BGP peers",
                 "id": "bgp_peers",
                 "label": "BGP Peers",
-                "order": 5,
+                "order": 6,
                 "owner_filter": {
                   "actor_column": "actor",
                   "mode": "actor_column"
@@ -14104,13 +16053,29 @@
         "search": {
           "columns": [
             "display_name",
+            "id",
             "sys_name",
+            "sys_object_id",
             "management_ip",
             "vendor",
-            "model"
+            "model",
+            "sys_descr",
+            "sys_location",
+            "sys_contact",
+            "netdata_host_id"
           ],
           "label_keys": [
-            "ospf_router_id"
+            "chassis_id",
+            "mac_address",
+            "ip_address",
+            "hostname",
+            "dns_name",
+            "ospf_router_id",
+            "capabilities",
+            "capabilities_supported",
+            "capabilities_enabled",
+            "protocols",
+            "protocols_collected"
           ]
         }
       }
@@ -15019,6 +16984,177 @@
         ],
         "role": "observation_evidence"
       },
+      "l3_subnet_membership": {
+        "columns": [
+          {
+            "id": "link",
+            "role": "reference",
+            "type": "link_ref"
+          },
+          {
+            "id": "src_actor",
+            "role": "reference",
+            "type": "actor_ref"
+          },
+          {
+            "id": "dst_actor",
+            "role": "reference",
+            "type": "actor_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "protocol",
+            "role": "group_key",
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "direction",
+            "role": "group_key",
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "state",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "src_port_name",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "dst_port_name",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "id": "src_if_index",
+            "nullable": true,
+            "type": "uint"
+          },
+          {
+            "id": "dst_if_index",
+            "nullable": true,
+            "type": "uint"
+          },
+          {
+            "dictionary": "strings",
+            "id": "src_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "dst_port_id",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "src_management_ip",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "dst_management_ip",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "confidence",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "inference",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "attachment_mode",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "id": "member_actor",
+            "role": "reference",
+            "type": "actor_ref"
+          },
+          {
+            "id": "segment_actor",
+            "role": "reference",
+            "type": "actor_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "member_ip",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "id": "member_if_index",
+            "nullable": true,
+            "type": "uint"
+          },
+          {
+            "dictionary": "strings",
+            "id": "member_if_name",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "member_if_descr",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "subnet",
+            "role": "group_key",
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "network",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "dictionary": "strings",
+            "id": "netmask",
+            "nullable": true,
+            "type": "string_ref"
+          },
+          {
+            "id": "prefix",
+            "nullable": true,
+            "type": "uint"
+          },
+          {
+            "dictionary": "strings",
+            "id": "source",
+            "nullable": true,
+            "type": "string_ref"
+          }
+        ],
+        "link_type": "l3_subnet_membership",
+        "match_columns": [
+          "member_actor",
+          "segment_actor",
+          "member_ip",
+          "subnet"
+        ],
+        "role": "observation_evidence"
+      },
       "lldp": {
         "columns": [
           {
@@ -15797,6 +17933,29 @@
           "color_slot": "info",
           "curve": "straight",
           "label": "L3 subnet",
+          "line_style": "dashed",
+          "width": "normal"
+        },
+        "semantic_role": "normal"
+      },
+      "l3_subnet_membership": {
+        "aggregation": {
+          "direction": "canonicalize_unordered",
+          "evidence": "append",
+          "metrics": {
+            "evidence_count": "sum"
+          }
+        },
+        "direction_role": "observation",
+        "evidence_types": [
+          "l3_subnet_membership"
+        ],
+        "orientation": "observed_bidirectional",
+        "presentation": {
+          "arrow": "none",
+          "color_slot": "info",
+          "curve": "straight",
+          "label": "L3 subnet membership",
           "line_style": "dashed",
           "width": "normal"
         },

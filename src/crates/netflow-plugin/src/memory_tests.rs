@@ -238,7 +238,7 @@ fn start_ingest_fixture() -> anyhow::Result<(
     let tmp = tempfile::tempdir()?;
     let mut cfg = plugin_config::PluginConfig::default();
     cfg.journal.journal_dir = tmp.path().join("flows").to_string_lossy().to_string();
-    cfg.listener.listen = "127.0.0.1:0".to_string();
+    cfg.listener.listen = vec!["127.0.0.1:0".to_string()];
     cfg.listener.sync_interval = Duration::from_millis(50);
     cfg.listener.sync_every_entries = 256;
     let small_tier = plugin_config::JournalTierRetentionConfig {

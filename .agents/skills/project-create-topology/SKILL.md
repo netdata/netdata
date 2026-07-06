@@ -22,8 +22,8 @@ Read these before designing or changing topology payloads:
 | `src/plugins.d/FUNCTION_TOPOLOGY_SCHEMA.json` | JSON Schema for production topology payloads |
 | `src/plugins.d/FUNCTION_TOPOLOGY_DEVELOPER_GUIDE.md` | Human-readable topology schema contract and producer guidance |
 | `src/plugins.d/FUNCTION_TOPOLOGY_IMPLEMENTATION_SCOPE.md` | Backend/frontend/aggregator migration scope |
-| `.agents/sow/specs/topology-function-schema.md` | Durable project spec for topology semantics |
-| `.agents/sow/specs/topology-modes-correlation-aggregation.md` | Mode, correlation, aggregation, and actor modal identification contract |
+| `.agents/skills/project-create-topology/topology-function-schema.md` | Durable project spec for topology semantics |
+| `.agents/skills/project-create-topology/topology-modes-correlation-aggregation.md` | Mode, correlation, aggregation, and actor modal identification contract |
 | `src/go/pkg/topology/v1` | Go production topology payload builders and compact-table helpers |
 | `.agents/skills/project-writing-collectors/SKILL.md` | Collector quality, Function, validation, and cardinality rules |
 
@@ -450,6 +450,15 @@ For SNMP managed device actor modals:
 - Build link endpoint port labels only from real port fields: `port_name`,
   `if_name`, `if_descr`, or source `port_id`. Never use actor labels such as
   `display_name` or `sys_name` as port-name fallbacks.
+- For SNMP topology changes, update and run the scenario-golden suite in
+  `src/go/plugin/go.d/collector/snmp_topology`. The suite starts from synthetic
+  SNMP-shaped `ddsnmp` inputs, runs the real cache, registry, and Function
+  rendering path, validates the final `topology.v1` payload, and checks semantic
+  product expectations.
+- Store the bulky SNMP topology full-payload JSON oracle in the external
+  `netdata/testdata` fixture repository under `snmp/topology-scenarios/`.
+  Local regeneration may point the test at that checkout with
+  `NETDATA_SNMP_TOPOLOGY_SCENARIO_GOLDEN_DIR`.
 
 ## Validation Checklist
 

@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
 )
 
 const (
@@ -17,21 +18,6 @@ const (
 
 	NodesIdentityIP  = "ip"
 	NodesIdentityMAC = "mac"
-
-	MapTypeLLDPCDPManaged                = "lldp_cdp_managed"
-	MapTypeHighConfidenceInferred        = "high_confidence_inferred"
-	MapTypeAllDevicesLowConfidence       = "all_devices_low_confidence"
-	InferenceStrategyFDBMinimumKnowledge = "fdb_minimum_knowledge"
-	InferenceStrategySTPParentTree       = "stp_parent_tree"
-	InferenceStrategyFDBPairwise         = "fdb_pairwise_minimum_knowledge"
-	InferenceStrategySTPFDBCorrelated    = "stp_fdb_correlated"
-	InferenceStrategyCDPFDBHybrid        = "cdp_fdb_hybrid"
-	ManagedFocusAllDevices               = "all_devices"
-	ManagedFocusIPPrefix                 = "ip:"
-	DepthAll                             = "all"
-	DepthMin                             = 0
-	DepthMax                             = 10
-	DepthAllInternal                     = -1
 )
 
 func nodesIdentityParamConfig() funcapi.ParamConfig {
@@ -55,13 +41,13 @@ func mapTypeParamConfig() funcapi.ParamConfig {
 		Selection: funcapi.ParamSelect,
 		Options: []funcapi.ParamOption{
 			{
-				ID:      MapTypeLLDPCDPManaged,
+				ID:      topologyoptions.MapTypeLLDPCDPManaged,
 				Name:    "LLDP/CDP/Managed Devices Map",
 				Default: true,
 			},
-			{ID: MapTypeHighConfidenceInferred, Name: "High Confidence Inferred Map"},
+			{ID: topologyoptions.MapTypeHighConfidenceInferred, Name: "High Confidence Inferred Map"},
 			{
-				ID:   MapTypeAllDevicesLowConfidence,
+				ID:   topologyoptions.MapTypeAllDevicesLowConfidence,
 				Name: "All Devices (Low Confidence)",
 			},
 		},
@@ -76,24 +62,24 @@ func inferenceStrategyParamConfig() funcapi.ParamConfig {
 		Selection: funcapi.ParamSelect,
 		Options: []funcapi.ParamOption{
 			{
-				ID:      InferenceStrategyFDBMinimumKnowledge,
+				ID:      topologyoptions.InferenceStrategyFDBMinimumKnowledge,
 				Name:    "FDB Minimum-Knowledge (Baseline)",
 				Default: true,
 			},
 			{
-				ID:   InferenceStrategySTPParentTree,
+				ID:   topologyoptions.InferenceStrategySTPParentTree,
 				Name: "STP Parent Tree",
 			},
 			{
-				ID:   InferenceStrategyFDBPairwise,
+				ID:   topologyoptions.InferenceStrategyFDBPairwise,
 				Name: "FDB Pairwise Minimum-Knowledge",
 			},
 			{
-				ID:   InferenceStrategySTPFDBCorrelated,
+				ID:   topologyoptions.InferenceStrategySTPFDBCorrelated,
 				Name: "STP + FDB Correlated",
 			},
 			{
-				ID:   InferenceStrategyCDPFDBHybrid,
+				ID:   topologyoptions.InferenceStrategyCDPFDBHybrid,
 				Name: "CDP + FDB Hybrid",
 			},
 		},
@@ -103,7 +89,7 @@ func inferenceStrategyParamConfig() funcapi.ParamConfig {
 func managedFocusParamConfig(extraOptions []funcapi.ParamOption) funcapi.ParamConfig {
 	options := make([]funcapi.ParamOption, 0, 1+len(extraOptions))
 	options = append(options, funcapi.ParamOption{
-		ID:      ManagedFocusAllDevices,
+		ID:      topologyoptions.ManagedFocusAllDevices,
 		Name:    "All Devices",
 		Default: true,
 	})
@@ -119,13 +105,13 @@ func managedFocusParamConfig(extraOptions []funcapi.ParamOption) funcapi.ParamCo
 }
 
 func depthParamConfig() funcapi.ParamConfig {
-	options := make([]funcapi.ParamOption, 0, 1+(DepthMax-DepthMin+1))
+	options := make([]funcapi.ParamOption, 0, 1+(topologyoptions.DepthMax-topologyoptions.DepthMin+1))
 	options = append(options, funcapi.ParamOption{
-		ID:      DepthAll,
+		ID:      topologyoptions.DepthAll,
 		Name:    "All",
 		Default: true,
 	})
-	for depth := DepthMin; depth <= DepthMax; depth++ {
+	for depth := topologyoptions.DepthMin; depth <= topologyoptions.DepthMax; depth++ {
 		value := strconv.Itoa(depth)
 		options = append(options, funcapi.ParamOption{
 			ID:   value,

@@ -6,7 +6,7 @@
 
 typedef struct rbuf *rbuf_t;
 
-rbuf_t rbuf_create(size_t size);
+rbuf_t rbuf_create(size_t size, size_t max_size);
 void rbuf_free(rbuf_t buffer);
 void rbuf_flush(rbuf_t buffer);
 
@@ -23,6 +23,7 @@ int rbuf_bump_tail(rbuf_t buffer, size_t bytes);
  * @returns total capacity of buffer in bytes (not free/used)
  */
 size_t rbuf_get_capacity(rbuf_t buffer);
+size_t rbuf_get_max_capacity(rbuf_t buffer);
 
 /* @param buffer related buffer instance
  * @returns count of bytes stored in the buffer
@@ -42,5 +43,7 @@ size_t rbuf_pop(rbuf_t buffer, char *data, size_t len);
 
 char *rbuf_find_bytes(rbuf_t buffer, const char *needle, size_t needle_bytes, int *found_idx);
 int rbuf_memcmp_n(rbuf_t buffer, const char *to_cmp, size_t to_cmp_bytes);
+
+int ringbuffer_unittest(void);
 
 #endif

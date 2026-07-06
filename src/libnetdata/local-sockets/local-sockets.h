@@ -15,7 +15,7 @@
 #define USE_LIBMNL_AFTER_SETNS
 #endif
 
-#if defined(HAVE_LIBMNL)
+#if defined(OS_LINUX) && defined(HAVE_LIBMNL)
 #include <linux/rtnetlink.h>
 #include <linux/inet_diag.h>
 #include <linux/sock_diag.h>
@@ -26,12 +26,12 @@
 
 #define UID_UNSET (uid_t)(UINT32_MAX)
 
-// FreeBSD uses TCPS_* values from tcp_fsm.h (different numbering from Linux).
+// FreeBSD and macOS use platform TCP state values with different numbering from Linux.
 // Define Linux-compatible TCP_* constants here so the rest of the code —
-// direction detection (TCP_LISTEN check) and TCP_STATE_2str display — works
-// unchanged on FreeBSD.  The FreeBSD backend converts TCPS_* → TCP_* before
+// direction detection (TCP_LISTEN check) and TCP_STATE_2str display — works.
+// Platform backends convert native states to these TCP_* values before
 // storing the state in LOCAL_SOCKET.state.
-#if defined(OS_FREEBSD)
+#if defined(OS_FREEBSD) || defined(OS_MACOS)
 #define TCP_ESTABLISHED  1
 #define TCP_SYN_SENT     2
 #define TCP_SYN_RECV     3
@@ -43,6 +43,10 @@
 #define TCP_LAST_ACK     9
 #define TCP_LISTEN       10
 #define TCP_CLOSING      11
+#endif
+
+#if !defined(OS_MACOS)
+#define LOCAL_SOCKETS_HAVE_TCP_INFO 1
 #endif
 
 // max cmdline bytes read from /proc/<pid>/cmdline — reader-side guard must match
@@ -162,6 +166,14 @@ typedef struct local_socket_state {
         size_t namespaces_found;
         size_t namespaces_absent;
         size_t namespaces_invalid;
+#if defined(OS_MACOS)
+        size_t macos_pids_seen;
+        size_t macos_socket_fds_seen;
+        size_t macos_pid_fds_permission_denied;
+        size_t macos_socket_fds_permission_denied;
+        size_t macos_pid_lists_maybe_truncated;
+        size_t macos_pid_fd_lists_maybe_truncated;
+#endif
 #if defined(LOCAL_SOCKETS_USE_SETNS)
         size_t namespaces_forks_attempted;
         size_t namespaces_forks_failed;
@@ -181,7 +193,7 @@ typedef struct local_socket_state {
     SPAWN_SERVER *spawn_server;
 #endif
 
-#if defined(HAVE_LIBMNL)
+#if defined(OS_LINUX) && defined(HAVE_LIBMNL)
     uint16_t tmp_protocol;
 #endif
 
@@ -250,7 +262,8 @@ static inline void ipv6_to_in6_addr(const char *ipv6_str, struct in6_addr *d) {
     for (size_t k = 0; k < 4; ++k) {
         memcpy(buf, ipv6_str + (k * 8), 8);
         buf[sizeof(buf) - 1] = '\0';
-        d->s6_addr32[k] = str2uint32_hex(buf, NULL);
+        uint32_t word = str2uint32_hex(buf, NULL);
+        memcpy(&d->s6_addr[k * sizeof(word)], &word, sizeof(word));
     }
 }
 
@@ -278,9 +291,11 @@ typedef struct local_socket {
         bool ipv46;
     } ipv6ony;
 
+#if defined(LOCAL_SOCKETS_HAVE_TCP_INFO)
     union {
         struct tcp_info tcp;
     } info;
+#endif
 
     char comm[TASK_COMM_LEN];
     STRING *cmdline;
@@ -592,7 +607,7 @@ local_sockets_read_proc_inode_link(LS_STATE *ls, const char *filename, uint64_t 
     }
 }
 
-#if !defined(OS_FREEBSD) // /proc-based PID + FD walking is Linux-only
+#if defined(OS_LINUX) // /proc-based PID + FD walking is Linux-only
 
 static inline bool local_sockets_is_path_a_pid(const char *s) {
     if(!s || !*s) return false;
@@ -712,7 +727,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
                         local_sockets_log(ls, "cannot open file: %s\n", filename);
                     else {
                         size_t clen = strlen(comm);
-                        if(comm[clen - 1] == '\n')
+                        if(clen > 0 && comm[clen - 1] == '\n')
                             comm[clen - 1] = '\0';
                     }
                 }
@@ -760,7 +775,7 @@ static inline bool local_sockets_find_all_sockets_in_proc(LS_STATE *ls, const ch
     return true;
 }
 
-#endif // !OS_FREEBSD
+#endif // OS_LINUX
 
 // --------------------------------------------------------------------------------------------------------------------
 
@@ -864,7 +879,7 @@ static inline bool local_sockets_add_socket(LS_STATE *ls, LOCAL_SOCKET *tmp) {
     return true;
 }
 
-#if defined(HAVE_LIBMNL)
+#if defined(OS_LINUX) && defined(HAVE_LIBMNL)
 
 static inline int local_sockets_libmnl_cb_data(const struct nlmsghdr *nlh, void *data) {
     LS_STATE *ls = data;
@@ -1004,9 +1019,9 @@ static inline bool local_sockets_libmnl_get_sockets(LS_STATE *ls, uint16_t famil
 
     return rc;
 }
-#endif // HAVE_LIBMNL
+#endif // OS_LINUX && HAVE_LIBMNL
 
-#if !defined(OS_FREEBSD) // /proc-based socket tables and pcblist reading is Linux-only
+#if defined(OS_LINUX) // /proc-based socket tables and pcblist reading is Linux-only
 
 static inline bool local_sockets_process_proc_line(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol, size_t line, char **words, size_t num_words) {
     // char *sl_txt = get_word(words, num_words, 0);
@@ -1171,7 +1186,14 @@ static inline bool local_sockets_read_proc_net_x_procfile(LS_STATE *ls, const ch
     return true;
 }
 
-#endif // !OS_FREEBSD
+static inline bool local_sockets_read_proc_net_x(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol) {
+    if(ls->config.procfile)
+        return local_sockets_read_proc_net_x_procfile(ls, filename, family, protocol);
+
+    return local_sockets_read_proc_net_x_getline(ls, filename, family, protocol);
+}
+
+#endif // OS_LINUX
 
 // --------------------------------------------------------------------------------------------------------------------
 // Generic helpers – compiled on all platforms.
@@ -1265,7 +1287,7 @@ static inline void local_sockets_init(LS_STATE *ls) {
 
     memset(&ls->stats, 0, sizeof(ls->stats));
 
-#if defined(HAVE_LIBMNL)
+#if defined(OS_LINUX) && defined(HAVE_LIBMNL)
     ls->tmp_protocol = 0;
 #endif
 
@@ -1386,10 +1408,10 @@ static void local_sockets_track_time_by_protocol(LS_STATE *ls, bool mnl, uint16_
     }
 }
 
-#if !defined(OS_FREEBSD) // /proc-based socket reading is Linux-only
+#if defined(OS_LINUX) // /proc-based socket reading is Linux-only
 
 static inline void local_sockets_do_family_protocol(LS_STATE *ls, const char *filename, uint16_t family, uint16_t protocol) {
-#if defined(HAVE_LIBMNL)
+#if defined(OS_LINUX) && defined(HAVE_LIBMNL)
     if(!ls->config.no_mnl) {
         local_sockets_track_time_by_protocol(ls, true, family, protocol);
         if(local_sockets_libmnl_get_sockets(ls, family, protocol))
@@ -1401,10 +1423,7 @@ static inline void local_sockets_do_family_protocol(LS_STATE *ls, const char *fi
 
     local_sockets_track_time_by_protocol(ls, false, family, protocol);
 
-    if(ls->config.procfile)
-        local_sockets_read_proc_net_x_procfile(ls, filename, family, protocol);
-    else
-        local_sockets_read_proc_net_x_getline(ls, filename, family, protocol);
+    local_sockets_read_proc_net_x(ls, filename, family, protocol);
 }
 
 static inline void local_sockets_read_all_system_sockets(LS_STATE *ls) {
@@ -1446,7 +1465,10 @@ static inline void local_sockets_read_all_system_sockets(LS_STATE *ls) {
 #elif defined(OS_FREEBSD)
 // FreeBSD: local_sockets_read_all_system_sockets() is provided by the FreeBSD backend.
 #include "local-sockets-freebsd.h"
-#endif // !OS_FREEBSD
+#elif defined(OS_MACOS)
+// macOS: local_sockets_read_all_system_sockets() is provided by the Darwin backend.
+#include "local-sockets-macos.h"
+#endif // platform backend
 
 // --------------------------------------------------------------------------------------------------------------------
 // switch namespaces to read namespace sockets (Linux/setns only)
@@ -1764,9 +1786,9 @@ static inline void local_sockets_namespaces(LS_STATE *ls) {
 #endif // LOCAL_SOCKETS_USE_SETNS
 
 // --------------------------------------------------------------------------------------------------------------------
-// read namespace sockets from the host's /proc (Linux without setns only)
+// read namespace sockets from the host's /proc if a Linux build disables setns
 
-#if !defined(LOCAL_SOCKETS_USE_SETNS) && !defined(OS_FREEBSD)
+#if defined(OS_LINUX) && !defined(LOCAL_SOCKETS_USE_SETNS)
 
 static inline bool local_sockets_namespaces_from_proc_with_pid(LS_STATE *ls, struct pid_socket *ps) {
     char filename[1024];
@@ -1866,7 +1888,7 @@ static inline void local_sockets_process(LS_STATE *ls) {
 
     local_sockets_track_time(ls, "all_sockets");
 
-    // read all sockets from /proc
+    // read all sockets using the active platform backend
     local_sockets_read_all_system_sockets(ls);
 
     // check all socket namespaces
@@ -1874,7 +1896,7 @@ static inline void local_sockets_process(LS_STATE *ls) {
         local_sockets_track_time(ls, "switch_namespaces");
 #if defined(LOCAL_SOCKETS_USE_SETNS)
         local_sockets_namespaces(ls);
-#elif !defined(OS_FREEBSD)
+#elif defined(OS_LINUX)
         local_sockets_namespaces_from_proc(ls);
 #endif
         // FreeBSD: jails are a different isolation model; namespace switching not supported.

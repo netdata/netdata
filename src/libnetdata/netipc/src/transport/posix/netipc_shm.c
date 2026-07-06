@@ -766,9 +766,9 @@ nipc_shm_error_t nipc_shm_receive(nipc_shm_ctx_t *ctx,
         if (timeout_ms > 0) {
             struct timespec now_ts;
             clock_gettime(CLOCK_MONOTONIC, &now_ts);
-            deadline_ns = (uint64_t)now_ts.tv_sec * 1000000000ull
+            deadline_ns = (uint64_t)now_ts.tv_sec * 1000000000ULL
                         + (uint64_t)now_ts.tv_nsec
-                        + (uint64_t)timeout_ms * 1000000ull;
+                        + (uint64_t)timeout_ms * 1000000ULL;
         }
 
         for (;;) {
@@ -784,14 +784,14 @@ nipc_shm_error_t nipc_shm_receive(nipc_shm_ctx_t *ctx,
             if (deadline_ns > 0) {
                 struct timespec now_ts;
                 clock_gettime(CLOCK_MONOTONIC, &now_ts);
-                uint64_t now_val = (uint64_t)now_ts.tv_sec * 1000000000ull
+                uint64_t now_val = (uint64_t)now_ts.tv_sec * 1000000000ULL
                                  + (uint64_t)now_ts.tv_nsec;
                 if (now_val >= deadline_ns)
                     return NIPC_SHM_ERR_TIMEOUT;
 
                 uint64_t remain = deadline_ns - now_val;
-                ts.tv_sec  = (time_t)(remain / 1000000000ull);
-                ts.tv_nsec = (long)(remain % 1000000000ull);
+                ts.tv_sec  = (time_t)(remain / 1000000000ULL);
+                ts.tv_nsec = (long)(remain % 1000000000ULL);
                 tsp = &ts;
             }
 

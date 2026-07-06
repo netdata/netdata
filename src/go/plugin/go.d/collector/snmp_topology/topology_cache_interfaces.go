@@ -3,9 +3,11 @@
 package snmptopology
 
 import (
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 	"math"
 	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyutil"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 )
@@ -88,14 +90,14 @@ func (c *topologyCache) updateIfIndexByIP(tags map[string]string) {
 	}
 
 	c.ifIndexByIP[ip] = ifIndex
-	c.localDevice.ManagementAddresses = appendManagementAddress(c.localDevice.ManagementAddresses, topologyManagementAddress{
+	c.localDevice.ManagementAddresses = appendManagementAddress(c.localDevice.ManagementAddresses, topologymodel.ManagementAddress{
 		Address:     ip,
 		AddressType: managementAddressTypeFromIP(ip),
 		Source:      "ip_mib",
 	})
 	if mask := topologyutil.NormalizeIPAddress(tags[tagTopoIPMask]); mask != "" {
 		c.ifNetmaskByIP[ip] = mask
-		c.l3InterfacesByIP[ip] = topologyL3Interface{
+		c.l3InterfacesByIP[ip] = topologymodel.L3Interface{
 			IP:      ip,
 			Netmask: mask,
 			IfIndex: ifIndex,

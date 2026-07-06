@@ -38,6 +38,7 @@ RUN chmod +x netdata-installer.sh && \
    --use-system-protobuf \
    --disable-ebpf \
    --enable-plugin-otel \
+   --enable-plugin-netflow \
    --internal-systemd-journal \
    ${EXTRA_INSTALL_OPTS} \
    --install-no-prefix / \

@@ -243,7 +243,7 @@ Both clients (consume) and servers (offer) exist in all three languages. Real ex
 
 Set `Vnode` in job config when the collector has one remote target. For Go V2
 collectors that emit multiple remote nodes from one job, use
-`metrix.HostScope`; see `.agents/sow/specs/go-v2-host-scope.md` and
+`metrix.HostScope`; see `.agents/skills/project-writing-go-modules-framework-v2/go-v2-host-scope.md` and
 `src/go/plugin/go.d/docs/how-to-write-a-collector.md`. Past pain: an older
 refactor had to retroactively split job-name validation per vnode/domain because
 earlier collectors had not accounted for it.

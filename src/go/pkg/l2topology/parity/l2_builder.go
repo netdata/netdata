@@ -14,7 +14,7 @@ import (
 )
 
 // BuildOptions configures protocol extraction when converting walk fixtures
-// into an engine result.
+// into an L2 topology result.
 type BuildOptions struct {
 	EnableLLDP   bool
 	EnableCDP    bool

@@ -483,6 +483,106 @@ static inline void ctx_fs_error(struct rrdengine_instance *ctx) {
     rrd_stat_atomic_add(&global_stats.global_fs_errors, 1);
 }
 
+static inline bool rrdeng_retention_samples_delta(
+    struct rrdengine_instance *ctx,
+    time_t first_time_s,
+    time_t last_time_s,
+    uint32_t update_every_s,
+    const char *reason,
+    uint64_t *samples)
+{
+    *samples = 0;
+
+    if(!update_every_s || !first_time_s || !last_time_s || first_time_s == last_time_s)
+        return false;
+
+    if(unlikely(first_time_s > last_time_s)) {
+        int tier = ctx ? ctx->config.tier : -1;
+
+        internal_fatal(
+            true,
+            "DBENGINE: tier %d: invalid retention interval while %s (first=%ld, last=%ld, update_every=%u)",
+            tier,
+            reason,
+            (long)first_time_s,
+            (long)last_time_s,
+            update_every_s);
+
+        nd_log_limit_static_global_var(erl, 60, 0);
+        nd_log_limit(
+            &erl,
+            NDLS_DAEMON,
+            NDLP_ERR,
+            "DBENGINE: tier %d: invalid retention interval while %s (first=%ld, last=%ld, update_every=%u); not updating sample counter",
+            tier,
+            reason,
+            (long)first_time_s,
+            (long)last_time_s,
+            update_every_s);
+
+        return false;
+    }
+
+    *samples = (last_time_s - first_time_s) / update_every_s;
+    return *samples > 0;
+}
+
+static inline bool rrdeng_atomic_uint64_sub_saturating(
+    struct rrdengine_instance *ctx,
+    uint64_t *counter,
+    uint64_t value,
+    const char *counter_name,
+    const char *reason)
+{
+    if(!value)
+        return true;
+
+    uint64_t old = __atomic_load_n(counter, __ATOMIC_RELAXED);
+    while(true) {
+        if(unlikely(old < value)) {
+            int tier = ctx ? ctx->config.tier : -1;
+
+            internal_fatal(
+                true,
+                "DBENGINE: tier %d: %s counter underflow while %s (current=%" PRIu64 ", subtract=%" PRIu64 ")",
+                tier,
+                counter_name,
+                reason,
+                old,
+                value);
+
+            nd_log_limit_static_global_var(erl, 60, 0);
+            nd_log_limit(
+                &erl,
+                NDLS_DAEMON,
+                NDLP_ERR,
+                "DBENGINE: tier %d: %s counter underflow while %s (current=%" PRIu64 ", subtract=%" PRIu64 "); saturating to zero",
+                tier,
+                counter_name,
+                reason,
+                old,
+                value);
+
+            if(__atomic_compare_exchange_n(counter, &old, 0, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+                return false;
+
+            continue;
+        }
+
+        uint64_t wanted = old - value;
+        if(__atomic_compare_exchange_n(counter, &old, wanted, false, __ATOMIC_RELAXED, __ATOMIC_RELAXED))
+            return true;
+    }
+}
+
+static inline void rrdeng_reset_accounting_if_fresh(struct rrdengine_instance *ctx, bool freshly_initialized_ctx) {
+    if(!freshly_initialized_ctx)
+        return;
+
+    ctx->atomic.metrics = 0;
+    ctx->atomic.samples = 0;
+}
+
 #define ctx_last_fileno_get(ctx) __atomic_load_n(&(ctx)->atomic.last_fileno, __ATOMIC_RELAXED)
 #define ctx_last_fileno_increment(ctx) __atomic_add_fetch(&(ctx)->atomic.last_fileno, 1, __ATOMIC_RELAXED)
 

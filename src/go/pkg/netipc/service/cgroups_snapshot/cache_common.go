@@ -19,9 +19,9 @@ func (c *Cache) Ready() bool {
 	return c.inner.Ready()
 }
 
-// Lookup finds a cached item by hash + name. O(1), no I/O.
-func (c *Cache) Lookup(hash uint32, name string) (CacheItem, bool) {
-	return c.inner.Lookup(hash, name)
+// ReadLock acquires a read guard for borrowed cache access.
+func (c *Cache) ReadLock() CacheReadGuard {
+	return c.inner.ReadLock()
 }
 
 // Status returns a diagnostic snapshot for the L3 cache.

@@ -34,10 +34,10 @@ func TestRegister(t *testing.T) {
 
 }
 
-func TestRegister_FunctionOnlyWithoutMethods(t *testing.T) {
+func TestRegister_FunctionOnlyWithoutFunctions(t *testing.T) {
 	registry := make(Registry)
 
-	// Panic case: FunctionOnly without Methods
+	// Panic case: FunctionOnly without Functions
 	assert.Panics(
 		t,
 		func() {
@@ -45,18 +45,18 @@ func TestRegister_FunctionOnlyWithoutMethods(t *testing.T) {
 		})
 }
 
-func TestRegisterPanicOnMethodsAndJobMethodsConflict(t *testing.T) {
+func TestRegisterPanicOnStaticFunctionsAndInstanceFunctionsConflict(t *testing.T) {
 	tests := map[string]struct {
 		name    string
 		creator Creator
 	}{
-		"panic when both methods and job methods are set": {
+		"panic when both static functions and instance functions are set": {
 			name: "conflict",
 			creator: Creator{
-				Methods: func() []funcapi.MethodConfig {
+				SharedFunctions: func() []funcapi.FunctionConfig {
 					return nil
 				},
-				JobMethods: func(RuntimeJob) []funcapi.MethodConfig {
+				InstanceFunctions: func(RuntimeJob) []funcapi.FunctionConfig {
 					return nil
 				},
 			},
@@ -69,11 +69,75 @@ func TestRegisterPanicOnMethodsAndJobMethodsConflict(t *testing.T) {
 
 			assert.PanicsWithValue(
 				t,
-				"conflict has both Methods and JobMethods defined (mutually exclusive)",
+				"conflict has both static Functions and InstanceFunctions defined (mutually exclusive)",
 				func() { registry.Register(tc.name, tc.creator) },
 			)
 		})
 	}
+}
+
+func TestRegisterPanicOnDuplicateStaticFunctionID(t *testing.T) {
+	tests := map[string]struct {
+		creator Creator
+	}{
+		"duplicate shared function IDs": {
+			creator: Creator{
+				SharedFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{
+						{ID: "logs"},
+						{ID: "logs"},
+					}
+				},
+			},
+		},
+		"duplicate agent function IDs": {
+			creator: Creator{
+				AgentFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{
+						{ID: "logs"},
+						{ID: "logs"},
+					}
+				},
+			},
+		},
+		"duplicate shared and agent function IDs": {
+			creator: Creator{
+				SharedFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{ID: "logs"}}
+				},
+				AgentFunctions: func() []funcapi.FunctionConfig {
+					return []funcapi.FunctionConfig{{ID: "logs"}}
+				},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			registry := make(Registry)
+
+			assert.PanicsWithValue(
+				t,
+				`mod has duplicate static Function ID "logs"`,
+				func() { registry.Register("mod", tc.creator) },
+			)
+		})
+	}
+}
+
+func TestRegisterAllowsEmptyStaticFunctionID(t *testing.T) {
+	registry := make(Registry)
+
+	assert.NotPanics(t, func() {
+		registry.Register("mod", Creator{
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: ""}, {ID: ""}}
+			},
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: ""}}
+			},
+		})
+	})
 }
 
 func TestRegister_InstancePolicy(t *testing.T) {

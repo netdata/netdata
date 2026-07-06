@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologyoptions"
+
 	topologyv1 "github.com/netdata/netdata/go/plugins/pkg/topology/v1"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp/ddsnmp"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
@@ -28,7 +30,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 			tagOSPFNeighborState:            "full",
 		},
 	})
-	cacheA.bgpPeersByKey["peer-router-b"] = topologyBGPPeer{
+	cacheA.bgpPeersByKey["peer-router-b"] = topologymodel.BGPPeer{
 		RoutingInstance: "default",
 		NeighborIP:      "198.51.100.2",
 		RemoteAS:        "65002",
@@ -40,7 +42,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 	}
 
 	cacheB := newTopologyStatsCensusRouterCache(t, "router-b", "aa:bb:cc:dd:ee:ff", "10.0.0.2", "2.2.2.2", "198.51.100.2", "7")
-	cacheB.bgpPeersByKey["peer-router-a"] = topologyBGPPeer{
+	cacheB.bgpPeersByKey["peer-router-a"] = topologymodel.BGPPeer{
 		RoutingInstance: "default",
 		NeighborIP:      "198.51.100.1",
 		RemoteAS:        "65001",
@@ -55,7 +57,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 	registry.register(cacheB)
 
 	options := defaultTopologyQueryOptionsForTest()
-	options.MapType = topologyMapTypeAllDevicesLowConfidence
+	options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
 	data, ok := snapshotTopologyRegistryForTestWithOptions(registry, options)
 	require.True(t, ok)
 
@@ -105,9 +107,18 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 		"l3_subnet_candidate_subnets",
 		"l3_subnet_candidate_links",
 		"l3_subnet_emitted_links",
+		"l3_subnet_segment_candidate_segments",
+		"l3_subnet_segment_emitted_segments",
+		"l3_subnet_membership_candidate_links",
+		"l3_subnet_membership_emitted_links",
 		"l3_subnet_suppressed_invalid",
 		"l3_subnet_suppressed_unsupported_prefix",
 		"l3_subnet_suppressed_duplicate_ip",
+		"l3_subnet_segment_suppressed_no_producer_scope",
+		"l3_subnet_membership_suppressed_duplicate_ip",
+		"l3_subnet_membership_suppressed_unmatched",
+		"l3_subnet_membership_suppressed_unresolved_actor",
+		"l3_subnet_membership_suppressed_duplicate_link",
 		"l3_subnet_suppressed_self_link",
 		"l3_subnet_suppressed_unmatched",
 		"l3_subnet_suppressed_multi_access",
@@ -115,6 +126,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 		"l3_subnet_suppressed_self_actor",
 		"l3_subnet_suppressed_duplicate_link",
 		"l3_subnet_visible_links",
+		"l3_subnet_membership_visible_links",
 		"ospf_neighbor_rows",
 		"ospf_neighbor_detail_rows",
 		"ospf_adjacency_emitted_links",
@@ -135,12 +147,15 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensus(t *testing.T) {
 		"bgp_adjacency_visible_links",
 	}, topologyStatsKeysForTest(payload.Stats))
 
-	require.Equal(t, topologyMapTypeAllDevicesLowConfidence, payload.Stats["map_type"])
-	require.Equal(t, topologyInferenceStrategyFDBMinimumKnowledge, payload.Stats["inference_strategy"])
-	require.Equal(t, topologyManagedFocusAllDevices, payload.Stats["managed_snmp_device_focus"])
-	require.Equal(t, topologyDepthAll, payload.Stats["depth"])
+	require.Equal(t, topologyoptions.MapTypeAllDevicesLowConfidence, payload.Stats["map_type"])
+	require.Equal(t, topologyoptions.InferenceStrategyFDBMinimumKnowledge, payload.Stats["inference_strategy"])
+	require.Equal(t, topologyoptions.ManagedFocusAllDevices, payload.Stats["managed_snmp_device_focus"])
+	require.Equal(t, topologyoptions.DepthAll, payload.Stats["depth"])
 	require.Equal(t, 1, payload.Stats["l3_subnet_emitted_links"])
 	require.Equal(t, 1, payload.Stats["l3_subnet_visible_links"])
+	require.Equal(t, 0, payload.Stats["l3_subnet_segment_emitted_segments"])
+	require.Equal(t, 0, payload.Stats["l3_subnet_membership_emitted_links"])
+	require.Equal(t, 0, payload.Stats["l3_subnet_membership_visible_links"])
 	require.Equal(t, 1, payload.Stats["ospf_adjacency_emitted_links"])
 	require.Equal(t, 1, payload.Stats["ospf_adjacency_visible_links"])
 	require.Equal(t, 1, payload.Stats["bgp_adjacency_emitted_links"])
@@ -168,7 +183,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensusNoProtocolDataEmitsZeroProtocol
 	cache.updateTime = time.Date(2026, time.June, 20, 12, 0, 0, 0, time.UTC)
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent-test"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     "00:11:22:33:44:55",
 		ChassisIDType: "macAddress",
 		SysName:       "switch-a",
@@ -177,7 +192,7 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensusNoProtocolDataEmitsZeroProtocol
 	registry.register(cache)
 
 	options := defaultTopologyQueryOptionsForTest()
-	options.MapType = topologyMapTypeAllDevicesLowConfidence
+	options.MapType = topologyoptions.MapTypeAllDevicesLowConfidence
 	data, ok := snapshotTopologyRegistryForTestWithOptions(registry, options)
 	require.True(t, ok)
 
@@ -186,6 +201,11 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensusNoProtocolDataEmitsZeroProtocol
 	require.Equal(t, 0, payload.Stats["l3_subnet_candidate_links"])
 	require.Equal(t, 0, payload.Stats["l3_subnet_emitted_links"])
 	require.Equal(t, 0, payload.Stats["l3_subnet_visible_links"])
+	require.Equal(t, 0, payload.Stats["l3_subnet_segment_candidate_segments"])
+	require.Equal(t, 0, payload.Stats["l3_subnet_segment_emitted_segments"])
+	require.Equal(t, 0, payload.Stats["l3_subnet_membership_candidate_links"])
+	require.Equal(t, 0, payload.Stats["l3_subnet_membership_emitted_links"])
+	require.Equal(t, 0, payload.Stats["l3_subnet_membership_visible_links"])
 	require.Equal(t, 0, payload.Stats["ospf_neighbor_rows"])
 	require.Equal(t, 0, payload.Stats["ospf_adjacency_emitted_links"])
 	require.Equal(t, 0, payload.Stats["ospf_adjacency_visible_links"])
@@ -195,13 +215,18 @@ func TestSNMPTopologyToV1_RealPipelineStatsCensusNoProtocolDataEmitsZeroProtocol
 }
 
 func TestTopologyStatsToV1_OmitsFocusKeysWhenFocusFilterReturnsEarly(t *testing.T) {
-	data := &topologyData{
-		Actors: []topologyActor{
-			{ActorID: "segment-a", ActorType: "segment", Match: topologyMatch{IPAddresses: []string{"10.0.0.1"}}},
+	data := &topologymodel.Data{
+		Actors: []topologymodel.Actor{
+			{
+				ActorID:     "segment-a",
+				ActorType:   "segment",
+				SegmentKind: topologymodel.SegmentKindBroadcastDomain,
+				Match:       topologymodel.Match{IPAddresses: []string{"10.0.0.1"}},
+			},
 		},
 	}
 
-	topologyshape.ApplyDepthFocusFilter(data, topologyQueryOptions{
+	topologyshape.ApplyDepthFocusFilter(data, topologyoptions.QueryOptions{
 		ManagedDeviceFocus: "ip:10.0.0.1",
 		Depth:              1,
 	})
@@ -222,7 +247,7 @@ func newTopologyStatsCensusRouterCache(t *testing.T, sysName, chassisID, managem
 	cache.updateTime = time.Date(2026, time.June, 20, 12, 0, 0, 0, time.UTC)
 	cache.lastUpdate = cache.updateTime
 	cache.agentID = "agent-test"
-	cache.localDevice = topologyDevice{
+	cache.localDevice = topologymodel.Device{
 		ChassisID:     chassisID,
 		ChassisIDType: "macAddress",
 		SysName:       sysName,

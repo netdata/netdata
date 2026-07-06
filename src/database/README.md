@@ -7,7 +7,7 @@ Netdata stores detailed metrics at one-second granularity using its Database eng
 | Mode       | Description                                                                                                                                                                                                                                                                                                                                                             |
 |------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `dbengine` | The high performance multi-tiered time-series database of Netdata, providing superior storage efficiency (~0.5 bytes per sample on disk for high resolution per-second data), and fast long term data queries (typically 20+ times faster) by transparently utilizing all available database tiers. For details, see [Database Engine](/src/database/engine/README.md). |
-| `ram`      | Stores data entirely in memory without disk persistence. This is typically used in IoT devices or children that stream their metrics to Netdata parents, to avoid having any disk dependency on Netdata |
+| `ram`      | Stores data entirely in memory without disk persistence. This is typically used in IoT devices or children that stream their metrics to Netdata parents, to avoid having any disk dependency on Netdata                                                                                                                                                                 |
 | `none`     | Operates without storage (metrics can only be streamed to a Netdata parent).                                                                                                                                                                                                                                                                                            |
 
 ## Tiers
@@ -26,13 +26,7 @@ Netdata offers a granular approach to data retention, allowing you to manage sto
 >
 > If a user sets a disk space size less than 256 MB for a tier, Netdata will automatically adjust it to 256 MB.
 
-Netdata Agent metrics storage is limited to 3 GiB by default (configurable), using 1 GiB per tier × 3 tiers. Data is deleted when it reaches **either** the size limit or the time limit, whichever comes first. The number of metrics collected determines how far back in time retention extends within the size limit.
-
-In total, with SQLite databases, alert transitions, and other metadata, expect about 4 GiB of disk usage under normal conditions.
-
-In practice, with default settings and an ingestion rate of about 4,000 metrics per second, Netdata provides about 14 days of high resolution (per-second) data, 3 months of medium resolution (per-minute) data, and more than 1 year of low resolution (per-hour) data.
-
-These limits are fully configurable. See [Changing how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
+The number of metrics collected determines how far back in time retention extends within the size limit. For expected default disk usage, per-tier size/time limits, and a practical retention example, see [Disk Requirements & Retention](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md#default-disk-footprint). For how retention limits are actually enforced, see [Retention Size Enforcement](#retention-size-enforcement) below.
 
 ### Monitoring Retention Utilization
 

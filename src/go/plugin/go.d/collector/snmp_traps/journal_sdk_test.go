@@ -57,6 +57,9 @@ func TestNewJournalWriterCreatesCompactUnsealedUncompressedJournal(t *testing.T)
 	assert.NotZero(t, header.IncompatibleFlags()&testJournalIncompatibleCompact)
 	assert.Zero(t, header.IncompatibleFlags()&testJournalIncompatibleCompressed)
 	assert.Zero(t, header.CompatibleFlags()&testJournalCompatibleSealed)
+	assert.Equal(t, w.host.MachineID(), header.MachineID())
+	assert.Equal(t, w.host.BootID(), header.TailEntryBootID())
+	assert.Equal(t, uint64(1), header.NEntries())
 }
 
 func TestJournalWriterWriteAndQueryWithJournalctl(t *testing.T) {

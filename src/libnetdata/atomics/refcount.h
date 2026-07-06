@@ -130,7 +130,7 @@ static bool refcount_release_and_acquire_for_deletion_with_trace(REFCOUNT *refco
     return refcount_release_and_acquire_for_deletion_advanced_with_trace(refcount, func) == REFCOUNT_DELETED;
 }
 
-// this sleeps for 1 nanosecond (posix systems), or Sleep(0) on Windows
+// this sleeps for 1 nanosecond (POSIX systems), or 1 millisecond on Windows
 void tinysleep(void);
 
 ALWAYS_INLINE

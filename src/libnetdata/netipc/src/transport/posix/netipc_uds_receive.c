@@ -107,9 +107,13 @@ static nipc_uds_error_t validate_batch(const nipc_header_t *hdr,
     if (!(hdr->flags & NIPC_FLAG_BATCH) || hdr->item_count <= 1)
         return NIPC_UDS_OK;
 
-    uint32_t dir_bytes = hdr->item_count * 8;
-    uint32_t dir_aligned = (uint32_t)nipc_align8(dir_bytes);
-    if (payload_len < dir_aligned)
+    if (hdr->item_count > UINT32_MAX / NIPC_LOOKUP_DIR_ENTRY_SIZE)
+        return NIPC_UDS_ERR_PROTOCOL;
+    uint32_t dir_bytes = hdr->item_count * NIPC_LOOKUP_DIR_ENTRY_SIZE;
+    size_t dir_aligned = nipc_align8((size_t)dir_bytes);
+    if (dir_aligned < (size_t)dir_bytes || dir_aligned > UINT32_MAX)
+        return NIPC_UDS_ERR_PROTOCOL;
+    if (payload_len < dir_aligned || payload_len - dir_aligned > UINT32_MAX)
         return NIPC_UDS_ERR_PROTOCOL;
 
     uint32_t packed_area_len = (uint32_t)(payload_len - dir_aligned);

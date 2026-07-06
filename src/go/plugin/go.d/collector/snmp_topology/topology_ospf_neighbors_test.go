@@ -5,6 +5,8 @@ package snmptopology
 import (
 	"testing"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
+
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,7 +24,7 @@ func TestTopologyCache_OSPFNeighborDropsUnspecifiedOnlyNeighborIdentity(t *testi
 
 func TestTopologyCache_MatchOSPFNeighborLocalInterfaceUsesLongestPrefix(t *testing.T) {
 	cache := newTopologyCache()
-	cache.l3InterfacesByIP = map[string]topologyL3Interface{
+	cache.l3InterfacesByIP = map[string]topologymodel.L3Interface{
 		"10.0.0.1": {
 			IP:      "10.0.0.1",
 			Netmask: "255.255.0.0",

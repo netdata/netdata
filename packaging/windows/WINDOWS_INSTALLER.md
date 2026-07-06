@@ -2,14 +2,27 @@
 
 Netdata provides a simple Windows installer for quick setup.
 
+## Supported Windows Versions and Requirements
+
+The Netdata Windows Agent is a **64-bit (x64)** application. We recommend **Windows 10 / 11 or Windows Server 2019 or newer** as the supported baseline.
+
+The installer is built to run on older 64-bit Windows editions as far back as Windows Vista and Windows Server 2008, but those versions are not tested or officially supported, and several have reached end-of-life.
+
+:::note
+
+Older Windows and Windows Server releases are end-of-life and are more likely to encounter the download/TLS limitations described below. For the oldest versions, see [Will it run on Windows Server 2008?](#will-it-run-on-windows-server-2008).
+
+:::
+
+### Requirements
+
+- **64-bit (x64) Windows.** The installer ships only as `netdata-x64.msi`.
+- **Administrator rights.** Installation and the running service require elevated (Administrator) privileges.
+- **Network access for download.**
+
 ## Access and Limitations
 
-How you view monitoring data depends on your subscription and deployment mode:
-
-- Paid/enterprise standalone Windows Agents can use the local dashboard at <http://localhost:19999>.
-- Free standalone Windows Agents collect metrics, but the local dashboard is locked. Use [Netdata Cloud](https://app.netdata.cloud) to view monitoring data.
-- Air-gapped free standalone installations cannot use Netdata Cloud, so monitoring data cannot be viewed in that setup.
-- Child Agents streaming to a Linux-based Netdata parent do not show monitoring data in the parent dashboard for free users.
+On Windows, whether you can view monitoring data on the local dashboard at <http://localhost:19999> depends on your Netdata Cloud plan and deployment mode. On the free Community tier, standalone Agents collect metrics but the local dashboard is locked — view your data in [Netdata Cloud](https://app.netdata.cloud) instead. For the full details by plan and deployment mode (including air-gapped and streaming setups), see [Access Control and Feature Availability](/docs/netdata-oss-limitations.md).
 
 ## Download the Windows Installer (MSI)
 
@@ -90,7 +103,7 @@ msiexec /qn /i netdata-x64.msi
 
 :::note
 
-This offline method uses `msiexec /qn` with a locally available MSI. Netdata Cloud is unavailable in air-gapped environments, so standalone Agents run in local mode only. On Windows Server versions earlier than 2019, the *automated download* commands in this document may fail due to TLS compatibility issues, so download the MSI on another machine first or use the [GUI installer](#graphical-installation-gui).
+This offline method uses `msiexec /qn` with a locally available MSI. On Windows Server versions earlier than 2019, the *automated download* commands in this document may fail due to TLS compatibility issues, so download the MSI on another machine first or use the [GUI installer](#graphical-installation-gui).
 
 :::
 
@@ -102,7 +115,7 @@ After installation, verify that the Netdata service is running:
 Get-Service netdata
 ```
 
-If your subscription and installation mode allow local monitoring, open <http://localhost:19999> to access the Netdata Dashboard.
+Open <http://localhost:19999> to access the Netdata Dashboard. See [Access and Limitations](#access-and-limitations) for when the local dashboard is available.
 
 ## License Information
 
@@ -235,7 +248,23 @@ On Windows, `edit-config` opens files with the `nano` editor.
 | Exit                  | `Ctrl + X`                                     |
 | Exit with save prompt | `Ctrl + X`, then `Y` to save or `N` to discard |
 
+## Uninstalling Netdata on Windows
+
+The MSI uninstall removes the Netdata binaries and the Windows service, but it does **not** remove your metric database, cache, or edited configuration files. To uninstall the Agent and completely delete the data it leaves behind, see [Uninstall Netdata](/packaging/installer/UNINSTALL.md).
+
 ## Related Windows documentation
 
 - [Service Control](/docs/netdata-agent/start-stop-restart.md#windows) — Start, stop, restart, and check status of the Netdata Agent
 - [Switching Install Types and Release Channels on Windows](/docs/install/windows-release-channels.md)
+- [Uninstall Netdata](/packaging/installer/UNINSTALL.md) — Remove Netdata from Windows, including the metric database and configuration the MSI uninstall leaves behind
+
+## FAQ
+
+### Will it run on Windows Server 2008?
+
+Windows Server 2008 (pre-R2) is the oldest Windows generation the installer targets, so the Agent **may run** on it. It is **not a tested or supported target**:
+
+- Microsoft ended extended support for Windows Server 2008 and 2008 R2 on January 14, 2020; Extended Security Updates (ESU) ended January 2023 for on-premises deployments (extended through January 9, 2024 only for Azure-hosted instances).
+- On Windows Server versions earlier than 2019, the automated MSI-download commands in this guide can fail due to TLS compatibility — use the [Graphical Installation (GUI)](#graphical-installation-gui) or a [pre-downloaded MSI](#offline-air-gapped-installation) instead (see also [Silent Installation](#silent-installation-command-line)).
+
+For the best experience, use **Windows Server 2019 or newer**.

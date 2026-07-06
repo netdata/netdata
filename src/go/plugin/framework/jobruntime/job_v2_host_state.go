@@ -53,6 +53,7 @@ type jobV2HostState struct {
 	definedInfo   netdataapi.HostInfo
 	engineHost    jobV2HostRef
 	cleanupOwner  jobV2HostRef
+	cleanupInfo   netdataapi.HostInfo
 	cleanupCharts map[string]chartengine.ChartMeta
 	// registryOwners tracks successfully emitted vnode owners so cleanup can
 	// release them after obsolete-chart emission.
@@ -150,6 +151,11 @@ func (s *jobV2HostState) commitSuccessfulEmission(plan chartengine.Plan, decisio
 	}
 
 	s.cleanupOwner = decision.targetHost
+	s.cleanupInfo = netdataapi.HostInfo{
+		GUID:     decision.defineInfo.GUID,
+		Hostname: decision.defineInfo.Hostname,
+		Labels:   maps.Clone(decision.defineInfo.Labels),
+	}
 }
 
 func (s *jobV2HostState) releaseRegistryOwners(registry *vnoderegistry.Registry) {

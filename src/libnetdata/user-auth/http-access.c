@@ -118,6 +118,8 @@ void http_access2buffer_json_array(BUFFER *wb, const char *key, HTTP_ACCESS acce
 }
 
 void http_access2txt(char *buf, size_t size, const char *separator, HTTP_ACCESS access) {
+    if(unlikely(!buf || !size)) return;
+
     char *write = buf;
     char *end = &buf[size - 1];
 
