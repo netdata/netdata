@@ -555,69 +555,113 @@ placements:
             self.assertEqual(placements[0]['items'][0]['unresolved_references'], unresolved)
 
 
+DEMO_META = """  - meta:
+      plugin_name: go.d.plugin
+      module_name: demo
+"""
+
+
+def fake_run_git(old_text, diff_text='@@ -1,1 +1,1 @@\n-old\n+new\n'):
+    def _run_git(*args):
+        if args[0] == 'diff' and '--name-status' not in args:
+            return diff_text
+        if args[0] == 'merge-base':
+            return 'base-sha\n'
+        if args[0] == 'show':
+            return old_text
+        raise AssertionError(f'unexpected git invocation: {args}')
+    return _run_git
+
+
 class TouchedCollectorGateTest(unittest.TestCase):
-    def test_metadata_metrics_spans_ignore_overview_blocks(self):
-        text = """plugin_name: go.d.plugin
+    def test_diff_range_base_resolves_merge_base_for_three_dot_ranges(self):
+        with patch.object(check_collector_taxonomy, 'run_git', return_value='merged-sha\n') as run_git:
+            base = check_collector_taxonomy.diff_range_base('origin/master...HEAD')
+            run_git.assert_called_once_with('merge-base', 'origin/master', 'HEAD')
+        self.assertEqual(base, 'merged-sha')
+
+    def test_diff_range_base_uses_left_side_for_two_dot_ranges(self):
+        self.assertEqual(check_collector_taxonomy.diff_range_base('origin/master..HEAD'), 'origin/master')
+
+    def test_label_description_only_change_is_not_touched(self):
+        old_text = f"""plugin_name: go.d.plugin
 modules:
-  - meta:
-      module_name: demo
-    overview:
-      data_collection:
-        metrics_description: demo
-    metrics:
-      folding:
-        title: Metrics
-      scopes: []
-    setup:
-      configuration: {}
+{DEMO_META}    metrics:
+      scopes:
+        - name: demo
+          labels:
+            - name: device
+              description: TBD
+          metrics:
+            - name: demo.metric
+"""
+        new_text = old_text.replace('description: TBD', 'description: "Real description."')
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'metadata.yaml'
+            path.write_text(new_text)
+            with patch.object(check_collector_taxonomy, 'run_git', fake_run_git(old_text)):
+                self.assertFalse(check_collector_taxonomy.metadata_metrics_touched('base...head', path))
+
+    def test_context_name_change_is_touched(self):
+        old_text = f"""plugin_name: go.d.plugin
+modules:
+{DEMO_META}    metrics:
+      scopes:
+        - name: demo
+          metrics:
+            - name: demo.metric
+"""
+        new_text = old_text.replace('demo.metric', 'demo.renamed_metric')
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'metadata.yaml'
+            path.write_text(new_text)
+            with patch.object(check_collector_taxonomy, 'run_git', fake_run_git(old_text)):
+                self.assertTrue(check_collector_taxonomy.metadata_metrics_touched('base...head', path))
+
+    def test_dynamic_context_prefix_change_is_touched(self):
+        old_text = f"""plugin_name: go.d.plugin
+modules:
+{DEMO_META}    metrics:
+      scopes:
+        - name: demo
+          metrics:
+            - name: demo.metric
+"""
+        new_text = old_text.replace(
+            '    metrics:\n',
+            '    metrics:\n      dynamic_context_prefixes:\n        - prefix: demo.dynamic_\n          reason: test\n',
+            1,
+        )
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / 'metadata.yaml'
+            path.write_text(new_text)
+            with patch.object(check_collector_taxonomy, 'run_git', fake_run_git(old_text)):
+                self.assertTrue(check_collector_taxonomy.metadata_metrics_touched('base...head', path))
+
+    def test_removing_the_metrics_block_is_touched(self):
+        old_text = f"""plugin_name: go.d.plugin
+modules:
+{DEMO_META}    metrics:
+      scopes:
+        - name: demo
+          metrics:
+            - name: demo.metric
+"""
+        new_text = f"""plugin_name: go.d.plugin
+modules:
+{DEMO_META}    setup:
+      configuration: {{}}
 """
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'metadata.yaml'
-            path.write_text(text)
-            self.assertEqual(check_collector_taxonomy.metadata_metrics_spans(path), [(8, 11)])
-
-    def test_metadata_metrics_spans_do_not_depend_on_four_space_indent(self):
-        text = """plugin_name: go.d.plugin
-modules:
-- meta:
-    module_name: demo
-  metrics:
-    folding:
-      title: Metrics
-    scopes: []
-  setup:
-    configuration: {}
-"""
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / 'metadata.yaml'
-            path.write_text(text)
-            self.assertEqual(check_collector_taxonomy.metadata_metrics_spans(path), [(5, 8)])
-
-    def test_range_intersection(self):
-        spans = [(7, 10)]
-        self.assertFalse(check_collector_taxonomy.range_intersects_spans(3, 1, spans))
-        self.assertTrue(check_collector_taxonomy.range_intersects_spans(8, 1, spans))
-
-    def test_missing_metrics_block_with_diff_is_touched(self):
-        text = """plugin_name: go.d.plugin
-modules:
-  - meta:
-      module_name: demo
-    setup:
-      configuration: {}
-"""
-        with tempfile.TemporaryDirectory() as tmp:
-            path = Path(tmp) / 'metadata.yaml'
-            path.write_text(text)
-            with patch.object(check_collector_taxonomy, 'run_git', return_value='@@ -8,4 +0,0 @@\n-    metrics:\n'):
+            path.write_text(new_text)
+            with patch.object(check_collector_taxonomy, 'run_git', fake_run_git(old_text)):
                 self.assertTrue(check_collector_taxonomy.metadata_metrics_touched('base...head', path))
 
     def test_missing_metrics_block_without_diff_is_not_touched(self):
-        text = """plugin_name: go.d.plugin
+        text = f"""plugin_name: go.d.plugin
 modules:
-  - meta:
-      module_name: demo
-"""
+{DEMO_META}"""
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / 'metadata.yaml'
             path.write_text(text)
