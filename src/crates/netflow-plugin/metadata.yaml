@@ -67,32 +67,19 @@ modules:
               The netflow plugin ships as a **separate package** called `netdata-plugin-netflow`.
               It is not part of the standard `netdata` package, so the plugin binary will not
               appear at `/usr/libexec/netdata/plugins.d/netflow-plugin` until you install it
-              explicitly on native-package systems.
+              explicitly on native-package systems. If the Netdata repository is not yet
+              registered on this host, register it first with the kickstart script's
+              `--repositories-only` flag (not `--install-repo-only`), then install the
+              `netdata-plugin-netflow` package for your distribution and restart Netdata.
 
-              1. If the Netdata repository is not yet registered on this host, run the kickstart
-                 script with `--repositories-only` (not `--install-repo-only`):
+              Static installs (kickstart `--static-only`) bundle the plugin automatically on
+              x86_64, ARMv7, and ARM64 — but **not** on the ARMv6 static build (Raspberry Pi 1 /
+              Zero).
 
-                 ```bash
-                 wget -O /tmp/netdata-kickstart.sh https://get.netdata.cloud/kickstart.sh && \
-                   sh /tmp/netdata-kickstart.sh --repositories-only
-                 ```
-
-              2. Install the plugin package and restart Netdata:
-
-                 ```bash
-                 # Debian / Ubuntu / Mint
-                 sudo apt update && sudo apt install netdata-plugin-netflow
-
-                 # RHEL / Fedora / CentOS / Rocky / Alma
-                 sudo dnf install netdata-plugin-netflow
-
-                 sudo systemctl restart netdata
-                 ```
-
-              Static installs (kickstart `--static-only`) already include the plugin on supported
-              architectures. See the
+              See the
               [Network Flows Installation](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/installation)
-              guide for all platforms and verification steps.
+              guide for per-distribution install commands (including openSUSE), the fallback if
+              your distribution doesn't have the package published yet, and verification steps.
       configuration:
         file:
           name: netflow.yaml
