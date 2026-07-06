@@ -104,6 +104,7 @@
                     "properties": {
                       "roles": {
                         "title": "Roles",
+                        "description": "IAM roles to assume -- one per AWS account to monitor. Each metric series is labeled with the account id the role resolves to (via sts:GetCallerIdentity).",
                         "type": "array",
                         "items": {
                           "type": "object",
@@ -121,7 +122,14 @@
                           "required": [
                             "role_arn"
                           ]
-                        }
+                        },
+                        "minItems": 1
+                      },
+                      "include_base_account": {
+                        "title": "Include base account",
+                        "description": "Also monitor the base identity's own account (the identity used to assume the roles). Off by default: with roles set, only the assumed-role accounts are monitored.",
+                        "type": "boolean",
+                        "default": false
                       }
                     },
                     "required": [
@@ -289,7 +297,7 @@
       "mode_assume_role": {
         "roles": {
           "ui:listFlavour": "list",
-          "ui:help": "The IAM role to assume. Exactly one role is supported.",
+          "ui:help": "IAM roles to assume -- add one row per AWS account to monitor. Each metric is labeled with the account the role resolves to.",
           "items": {
             "role_arn": {
               "ui:help": "ARN of the IAM role to assume.",
@@ -300,6 +308,9 @@
               "ui:widget": "password"
             }
           }
+        },
+        "include_base_account": {
+          "ui:help": "Also monitor the base identity's own account (the identity used to assume the roles). Leave off if the base identity is a dedicated monitoring account with no workloads of its own."
         }
       }
     },

@@ -16,11 +16,11 @@ template.
 
 Each collection cycle it:
 
-1. resolves the AWS account id once via STS (`identity.go`);
-2. discovers live resource instances per (profile, region) with `ListMetrics`
-   (`discover.go`);
-3. plans and executes `GetMetricData` in batches grouped by (region, period)
-   (`query_plan.go`, `query_executor.go`);
+1. resolves one AWS account id per configured identity via STS (`identity.go`);
+2. discovers live resource instances per (account, profile, region) with
+   `ListMetrics` (`discover.go`);
+3. plans and executes `GetMetricData` in batches grouped by (account, region,
+   period) (`query_plan.go`, `query_executor.go`);
 4. writes each `instance × metric × statistic` value as a float gauge into the
    `metrix` store, stamped with `{account_id, region, <dimension labels>}`
    (`observe.go`);
@@ -39,25 +39,25 @@ owns the `Collector` struct and lifecycle.
 flowchart TD
     Init["Init: applyDefaults + validate (no AWS calls)"]
     Check["Check"]
-    STS["ensureAccountIdentity: STS GetCallerIdentity, once"]
+    Accounts["ensureAccounts: STS GetCallerIdentity per identity (fail-soft, deduped)"]
     Profiles["ensureProfiles: load catalog, select profiles, build + cache chart template"]
     Post["framework postCheck: validate ChartTemplateYAML via chartengine"]
     Collect["Collect (every update_every)"]
     Cycle["collect(ctx): discovery -> plan -> schedule -> execute -> observe"]
 
     Init --> Check
-    Check --> STS --> Profiles --> Post
+    Check --> Accounts --> Profiles --> Post
     Post --> Collect --> Cycle --> Collect
 ```
 
 - **Init** does config only (`applyDefaults`, `validate`) — no network.
-- **Check** resolves the account id (STS) and builds the chart template. The
+- **Check** resolves each identity's account id (STS) and builds the chart template. The
   template is built here, not lazily, because the framework's `postCheck`
   validates `ChartTemplateYAML()` through `chartengine.LoadYAML` before the
   first `Collect`; an unbuilt template would fail the job.
-- **Collect** runs the whole cycle (below). `ensureAccountIdentity` and
+- **Collect** runs the whole cycle (below). `ensureAccounts` and
   `ensureProfiles` are called again but short-circuit once populated.
-- **Cleanup** resets runtime state (account id, profiles, cached template,
+- **Cleanup** resets runtime state (accounts, profiles, cached template,
   discovery snapshot, client cache, observation schedule) so a framework
   re-Init after failed autodetection starts clean. The `metrix` store is created
   once in `New` and persists — it is not recreated.
@@ -83,13 +83,14 @@ flowchart TD
 
 *Which* profiles to query is decided by config, not by discovery (see Profiles):
 the selected profiles are the CloudWatch namespaces `ListMetrics` runs against.
-Discovery then finds which *instances* of those profiles exist per region.
+Discovery then finds which *instances* of those profiles exist per account and region.
 
 `discover.go`. `refreshDiscovery` re-runs only when the snapshot TTL
 (`discovery.refresh_every`, default 300s) has expired.
 
-- `discoverAll` fans out over every (profile × region) target concurrently
-  (bounded by `apiConcurrency`), one CloudWatch client per region.
+- `discoverAll` fans out over every (account × profile × region) target
+  concurrently (bounded by `apiConcurrency`), one CloudWatch client per
+  (account, region).
 - `discoverInstances` pages `ListMetrics` for the profile's namespace.
   `matchInstanceDimensions` keeps a returned metric only if its dimension-**name**
   set exactly equals the profile's set — same names, same cardinality. This
@@ -119,9 +120,9 @@ Discovery then finds which *instances* of those profiles exist per region.
   Identity labels are `{account_id, region}` plus one label per identifying
   instance dimension (a `constant` dimension is sent in the query but not
   labeled). The exported series name is `<profile>.<metric_id>_<statistic>`.
-- Queries are grouped by `queryGroupKey{region, period}` — the batch unit
+- Queries are grouped by `queryGroupKey{account, region, period}` — the batch unit
   (shared client and time window) and the scheduling unit.
-- The `observationStore` keeps a per-(region, period) `nextQueryAt`. `dueGroups`
+- The `observationStore` keeps a per-(account, region, period) `nextQueryAt`. `dueGroups`
   returns groups whose next time has arrived (or the first cycle);
   `filterDueQueries` drops the rest. So a period-86400 (S3 daily) group is
   queried far less often than the 60s collect cycle, while a 300s group runs
@@ -134,8 +135,8 @@ Discovery then finds which *instances* of those profiles exist per region.
 
 `query_executor.go`. `executeQueries`:
 
-- `indexPlan` groups the plan by (region, period); `resolveRegionClients` builds
-  one client per region up front (region errors recorded once per pass).
+- `indexPlan` groups the plan by (account, region, period); `resolveGroupClients`
+  builds one client per (account, region) up front (errors recorded once per pass).
 - `buildChunkJobs` computes the time window and splits each group into chunks of
   `metricsPerQuery` (500, the `GetMetricData` per-call hard maximum), one job
   per chunk. The chunk size is an explicit argument so tests can exercise the
@@ -187,7 +188,7 @@ Discovery then finds which *instances* of those profiles exist per region.
   `nil_as_zero` defaults to the metric's `rate` flag (rate/sum counts → 0, gauges
   → gap) and is overridable per metric. The cache otherwise persists until the
   instance leaves discovery and `pruneObserved` drops it.
-- `pruneObserved` drops both cached series and per-(region, period) schedule entries
+- `pruneObserved` drops both cached series and per-(account, region, period) schedule entries
   absent from the current plan (a resource or metric went away), so removed resources
   stop being re-emitted and a group that later reappears is queried on its first cycle
   back rather than waiting for a stale schedule entry to expire.
@@ -269,15 +270,25 @@ Profile validation invariants (`profile.go`) — these are load-bearing:
 
 ## Auth And Account Identity
 
-`pkg/cloudauth` (`AWSAuthConfig`). Modes: `default` (SDK credential chain — env,
-shared config, EC2 instance profile, EKS IRSA), `access_key` (static keys), and
-`assume_role` (one role, optional external id). The collector builds an
-`aws.Config` per region through it.
+`internal/awsauth` (`awsauth.Config`), collector-local. Modes: `default` (SDK
+credential chain — env, shared config, EC2 instance profile, EKS IRSA),
+`access_key` (static keys), and `assume_role` (one or more roles, each with an
+optional external id). `Config.Identities()` expands the config into the set of
+credential sources to monitor: one per assume-role, plus the base identity when
+`include_base_account` is set; `default`/`access_key` yield a single identity.
+The collector builds an `aws.Config` per (identity, region).
 
-The AWS account id is resolved **once** via `sts:GetCallerIdentity` (from the
-first region) and stamped on every series. Because the account id and STS
-endpoint are partition-scoped, **all regions in a job must share one AWS
-partition** (aws / aws-us-gov / aws-cn / aws-iso / aws-iso-b / aws-iso-e / aws-iso-f / aws-eusc) — validated in
+Each identity's AWS account id is resolved via `sts:GetCallerIdentity`
+(`identity.go`, `ensureAccounts`) and stamped on that identity's series, so one
+job can monitor several accounts. Resolution is **fail-soft**: an identity that
+cannot be assumed or whose STS call fails is skipped with a warning and the rest
+proceed; only when no account resolves does Check fail. Two identities that
+resolve to the **same** account id are de-duplicated (first kept) — with a shared
+region list they would otherwise collide on the `{account_id, region,
+dimensions}` series identity.
+
+Because the account id and STS endpoint are partition-scoped, **all regions in a
+job must share one AWS partition** (aws / aws-us-gov / aws-cn / aws-iso / aws-iso-b / aws-iso-e / aws-iso-f / aws-eusc) — validated in
 `config.go`. A mixed-partition job would mislabel metrics.
 
 ## Concurrency
@@ -285,8 +296,9 @@ partition** (aws / aws-us-gov / aws-cn / aws-iso / aws-iso-b / aws-iso-e / aws-i
 - `apiConcurrency` (5) bounds both the discovery fan-out and the GetMetricData
   chunk execution, via `conc/pool`. `metricsPerQuery` (500) is the GetMetricData
   batch size. Both are internal constants, not config.
-- `clientCache` builds at most one CloudWatch client per region, under a mutex,
-  caching only successes (a transient credential error is retried next call).
+- `clientCache` builds at most one CloudWatch client per (account, region), under
+  a mutex, caching only successes (a transient credential error is retried next
+  call).
 - The top-level `collect` stages run sequentially, and the per-cycle `store`
   write is single-threaded. Only discovery and query execution fan out.
 
@@ -301,7 +313,7 @@ The two CloudWatch APIs bill differently, and the design leans on that:
   result pages. Raise it only to cut API load on very large accounts.
 - **`GetMetricData` (query) is the cost driver** — it is always billed (~$0.01
   per 1,000 metrics requested) and scales with metric count × query frequency.
-- **Per-`(region, period)` scheduling is the governor** — a metric is queried
+- **Per-`(account, region, period)` scheduling is the governor** — a metric is queried
   once per its own period (a 300s metric every 300s, a daily metric every ~24h),
   not every collect cycle, so cost tracks profile periods rather than
   `update_every`. Between queries, values are re-emitted from cache at zero AWS
@@ -321,7 +333,7 @@ verify current per-region prices on the CloudWatch pricing page.)
   0 (`nil_as_zero`, the default for `rate`/sum counts) or gaps (the default for
   gauges); not-due / failed series re-emit their last value so long-period metrics
   stay visible.
-- **Schedule advances only on success**, per (region, period).
+- **Schedule advances only on success**, per (account, region, period).
 - **Fail-soft discovery** — carry forward on error; only a first-ever total
   failure is fatal.
 - **Single node** — AWS resources are chart instances via `by_labels`, not
@@ -347,7 +359,7 @@ verify current per-region prices on the CloudWatch pricing page.)
 - **Change how samples become metrics** (labels, float hint, gauge): `observe.go`.
 - **Change chart generation** (rate divisor, namespace, template assembly):
   `chart.go`, plus the profile `template`.
-- **Change auth**: `pkg/cloudauth` (shared, multi-collector) — framework-gated.
+- **Change auth**: `internal/awsauth` (collector-local; extract to a shared package only when a second AWS consumer appears).
 - **Add or change a config option**: `config.go` + `config_schema.json` +
   `metadata.yaml` + stock `cloudwatch.conf` + regenerated `integrations/` docs
   (collector consistency). Prefer internal constants over new options unless the
