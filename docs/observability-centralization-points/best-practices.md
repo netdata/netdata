@@ -117,7 +117,9 @@ Retention size limits are soft targets, not hard caps. Actual disk usage can exc
 
 Parent disk usage scales with the total number of metrics streamed from all Child nodes and the retention tiers you configure. The disk you need depends on how many Children you stream from, how many metrics each collects, and how long you retain each tier.
 
-For estimating disk requirements and planning Parent storage, see the [Resource utilization](/docs/netdata-agent/sizing-netdata-agents/README.md) guide.
+For example, a Parent configured with 30 days of Tier 0, 6 months of Tier 1, and 5 years of Tier 2 retention uses approximately **3.7 MB per metric** across all tiers. For **1,000,000 metrics streamed to the Parent**, that's **≈ 3.7 TB**. Add 5-15% overhead for replication buffers, indexes, and metadata, so plan for **≈ 4 TB per million metrics** under this retention policy.
+
+Your own numbers will differ based on your retention settings. See [Disk Requirements & Retention](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md) for the per-tier sample sizes this example is based on, and the [Resource utilization](/docs/netdata-agent/sizing-netdata-agents/README.md) guide for the full sizing picture.
 
 ## Cost Optimization Strategies
 
