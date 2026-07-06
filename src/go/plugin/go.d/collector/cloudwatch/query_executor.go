@@ -44,11 +44,11 @@ func withTimeout(ctx context.Context, d time.Duration) (context.Context, context
 	return context.WithTimeout(ctx, d)
 }
 
-// executeQueries runs the planned queries grouped by (region, period) — each
+// executeQueries runs the planned queries grouped by (account, region, period) — each
 // group shares a CloudWatch client and a time window — chunked to the
 // GetMetricData ≤500-query limit, and runs the chunks concurrently bounded by
 // apiConcurrency, each bounded by the configured timeout. It returns the
-// collected samples and the set of (region, period) groups that did NOT fully
+// collected samples and the set of (account, region, period) groups that did NOT fully
 // succeed (a region client failed, or a chunk errored), so the caller advances
 // the query schedule only for groups that succeeded. An all-failed pass returns
 // an error.
@@ -79,7 +79,7 @@ func (c *Collector) executeQueries(ctx context.Context, plan []plannedQuery, now
 }
 
 // indexPlan indexes the plan by query Id and groups the queries by
-// (region, period) for batched execution.
+// (account, region, period) for batched execution.
 func indexPlan(plan []plannedQuery) (map[string]plannedQuery, map[queryGroupKey][]cwtypes.MetricDataQuery) {
 	byID := make(map[string]plannedQuery, len(plan))
 	groups := make(map[queryGroupKey][]cwtypes.MetricDataQuery)

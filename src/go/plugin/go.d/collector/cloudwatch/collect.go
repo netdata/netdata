@@ -33,7 +33,7 @@ func (c *Collector) collect(ctx context.Context) error {
 		return err
 	}
 
-	// A (region, period) group is "queried" only if it was due AND nothing failed
+	// A (account, region, period) group is "queried" only if it was due AND nothing failed
 	// for it. Advance the schedule only for those; the rest (not due, or
 	// due-but-failed) re-emit their cached values and remain due for retry.
 	queried := make(map[queryGroupKey]bool, len(due))

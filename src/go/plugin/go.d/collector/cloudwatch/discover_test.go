@@ -554,6 +554,36 @@ func TestCollector_refreshDiscovery_EmptySuccessPlusFailureNotFatalOnFirstPass(t
 	assert.False(t, c.discovery.FetchedAt.IsZero(), "snapshot is committed despite the empty+error mix")
 }
 
+func TestCollector_collect_LateResolvedAccountDiscoveredSameCycle(t *testing.T) {
+	// Role A resolves first and populates a fresh discovery snapshot; role B fails
+	// once. When B resolves on a later cycle — still within discovery.refresh_every —
+	// it must be discovered that same cycle, not after the TTL expires.
+	c := assumeRoleCollector(t, twoRoles(), false, &seqSTS{
+		accounts: []string{"111111111111", "", "222222222222"},
+		failAt:   map[int]bool{1: true},
+	})
+	c.profiles = []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))}
+	c.newCloudWatchClient = func(aws.Config) cloudwatchClient {
+		return &nsCloudWatch{byNS: map[string][]cwtypes.Metric{
+			"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")},
+		}}
+	}
+	base := time.Unix(1000, 0)
+	c.now = func() time.Time { return base }
+
+	require.NoError(t, c.collect(context.Background()))
+	require.Equal(t, []string{"111111111111"}, c.accountIDs())
+	assert.Contains(t, c.discovery.Instances, discoveryKey{Account: "111111111111", Profile: "ec2", Region: "us-east-1"})
+	assert.NotContains(t, c.discovery.Instances, discoveryKey{Account: "222222222222", Profile: "ec2", Region: "us-east-1"})
+
+	// Next cycle, still inside the 300s TTL: role B resolves and is discovered now.
+	c.now = func() time.Time { return base.Add(60 * time.Second) }
+	require.NoError(t, c.collect(context.Background()))
+	require.Equal(t, []string{"111111111111", "222222222222"}, c.accountIDs())
+	assert.Contains(t, c.discovery.Instances, discoveryKey{Account: "222222222222", Profile: "ec2", Region: "us-east-1"},
+		"a late-resolved account is discovered the same cycle, not after refresh_every")
+}
+
 func TestCollector_collect_runsDiscovery(t *testing.T) {
 	c, _ := newDiscoveryTestCollector(map[string]map[string][]cwtypes.Metric{
 		"us-east-1": {"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},

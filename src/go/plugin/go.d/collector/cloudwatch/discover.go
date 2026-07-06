@@ -356,6 +356,15 @@ func enabledProfiles(in []cwprofiles.ResolvedProfile) []cwprofiles.ResolvedProfi
 	return out
 }
 
+// markDiscoveryStale forces the next refreshDiscovery to re-run (without treating it
+// as a first pass), so an account resolved after the current snapshot was already
+// fetched is discovered on the very next cycle instead of waiting out
+// discovery.refresh_every. ensureAccounts runs before refreshDiscovery in collect(),
+// so a same-cycle resolution is picked up the same cycle.
+func (c *Collector) markDiscoveryStale() {
+	c.discovery.ExpiresAt = time.Time{}
+}
+
 // refreshDiscovery refreshes the discovery snapshot when its TTL has expired.
 // Per-target failures are logged and tolerated; a total failure keeps the
 // previous snapshot, or errors on the very first pass when there is none.
@@ -411,7 +420,7 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 
 // logDiscovery reports the discovered-resources summary: at Info when it changes
 // (first discovery, or a per-service count change) so operators can see what the
-// collector found, and the full per-(profile,region) breakdown at Debug every refresh.
+// collector found, and the full per-(account, profile, region) breakdown at Debug every refresh.
 func (c *Collector) logDiscovery(snap discoverySnapshot) {
 	byProfile := make(map[string]int)
 	for k, insts := range snap.Instances {
@@ -432,7 +441,7 @@ func (c *Collector) logDiscovery(snap discoverySnapshot) {
 	}
 	summary := b.String()
 
-	c.Debugf("CloudWatch discovery: %d instance(s) across %d (profile,region) target(s): %s",
+	c.Debugf("CloudWatch discovery: %d instance(s) across %d (account, profile, region) target(s): %s",
 		snap.totalInstances(), len(snap.Instances), summary)
 
 	if sig := fmt.Sprintf("%d|%s", snap.totalInstances(), summary); sig != c.discoverySig {

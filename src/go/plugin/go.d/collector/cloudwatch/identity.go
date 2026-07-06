@@ -75,6 +75,7 @@ func (c *Collector) ensureAccounts(ctx context.Context) error {
 		}
 		c.seenAccountID[acctID] = id.Ref
 		c.accounts = append(c.accounts, cwAccount{identity: id, accountID: acctID})
+		c.markDiscoveryStale() // discover the newly-resolved account this cycle, not after refresh_every
 		c.Infof("CloudWatch: monitoring %d AWS account(s): %s", len(c.accounts), strings.Join(c.accountIDs(), ", "))
 	}
 

@@ -527,7 +527,7 @@ func TestPruneObserved(t *testing.T) {
 }
 
 func TestPruneObserved_DropsStaleScheduleForVanishedGroup(t *testing.T) {
-	// A (region, period) group that leaves the plan must lose its schedule entry, so
+	// A (account, region, period) group that leaves the plan must lose its schedule entry, so
 	// a later reappearance is unscheduled (immediately due) rather than blocked until
 	// a stale nextQueryAt expires.
 	c := New()
