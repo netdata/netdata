@@ -356,12 +356,14 @@
                 <Custom Action="UninstallManifest" Before="RemoveFiles" Condition="REMOVE=&quot;ALL&quot;" />
             </InstallExecuteSequence>
 
-            <!-- Unregister the manifest on upgrade. With Schedule="afterInstallValidate",
-                 RemoveExistingProducts runs first and deletes the old manifest, so we must
-                 fire After="InstallFiles" when the new manifest is already in System32.
+            <!-- Unregister the manifest on upgrade before re-registering with the new one.
+                 Must run after InstallFiles (new manifest is on disk) but Before="DllPermission"
+                 so the sequence is: UninstallManifestUpgrade (um) → DllPermission (icacls) →
+                 InstallManifest (im). Without this ordering, InstallManifest would register
+                 the publisher first and UninstallManifestUpgrade would immediately unregister it,
+                 leaving no WINEVT channel registration and breaking the Event Viewer folder hierarchy.
                  Provider names and GUIDs are unchanged across versions so wevtutil um with
-                 the new manifest correctly unregisters the old publisher before wevtutil im
-                 re-registers it via InstallManifest.
+                 the new manifest correctly unregisters the old publisher.
                  WiX requires a separate action identifier — a single action cannot be
                  scheduled at two positions in the same InstallExecuteSequence. -->
             <SetProperty
@@ -379,7 +381,7 @@
                 Impersonate="no"
             />
             <InstallExecuteSequence>
-                <Custom Action="UninstallManifestUpgrade" After="InstallFiles" Condition="WIX_UPGRADE_DETECTED" />
+                <Custom Action="UninstallManifestUpgrade" Before="DllPermission" Condition="WIX_UPGRADE_DETECTED" />
             </InstallExecuteSequence>
 
             <Component Id="NetdataService" Directory="USRBINDIR">
