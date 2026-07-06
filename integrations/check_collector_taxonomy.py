@@ -1,76 +1,56 @@
 #!/usr/bin/env python3
 
 import argparse
-import re
 import subprocess
 import sys
-from pathlib import Path
 
 from ruamel.yaml import YAML, YAMLError
 
-from gen_taxonomy import FATAL, Finding, build_taxonomy, relpath
+from gen_taxonomy import FATAL, Finding, build_taxonomy, dynamic_declarations, module_contexts, relpath
 from _common import REPO_PATH, get_collector_metadata_entries
-
-HUNK_RE = re.compile(r'^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@')
 
 
 def run_git(*args):
     return subprocess.check_output(['git', '-C', str(REPO_PATH), *args], text=True)
 
 
-def metadata_metrics_spans(path):
-    text = path.read_text()
-    lines = text.splitlines()
-    yaml = YAML(typ='rt')
+def diff_range_base(diff_range):
+    if '...' in diff_range:
+        left, right = diff_range.split('...', 1)
+        return run_git('merge-base', left, right).strip()
+    if '..' in diff_range:
+        left, _right = diff_range.split('..', 1)
+        return left
+    return diff_range
+
+
+def module_key(module):
+    meta = module.get('meta', {}) if isinstance(module, dict) else {}
+    return (meta.get('plugin_name'), meta.get('module_name'))
+
+
+def module_taxonomy_signature(module):
+    prefixes, plugins = dynamic_declarations(module)
+    return (
+        tuple(sorted(module_contexts(module))),
+        tuple(sorted(prefixes)),
+        tuple(sorted(plugins)),
+    )
+
+
+def metadata_taxonomy_signatures(text):
+    yaml = YAML(typ='safe')
     try:
         data = yaml.load(text)
     except YAMLError:
-        return []
+        return None
 
-    spans = []
     modules = data.get('modules', []) if isinstance(data, dict) else []
-    for module_index, module in enumerate(modules):
-        if not isinstance(module, dict) or 'metrics' not in module:
-            continue
-        try:
-            start = module.lc.key('metrics')[0] + 1
-        except (AttributeError, KeyError, TypeError):
-            continue
-
-        next_lines = []
-        for key in module:
-            if key == 'metrics':
-                continue
-            try:
-                key_line = module.lc.key(key)[0] + 1
-            except (AttributeError, KeyError, TypeError):
-                continue
-            if key_line > start:
-                next_lines.append(key_line)
-
-        if next_lines:
-            end = min(next_lines) - 1
-        else:
-            next_module_line = None
-            try:
-                if module_index + 1 < len(modules):
-                    next_module_line = modules.lc.item(module_index + 1)[0] + 1
-            except (AttributeError, KeyError, TypeError):
-                next_module_line = None
-            end = (next_module_line - 1) if next_module_line else len(lines)
-
-        spans.append((start, end))
-    return spans
-
-
-def range_intersects_spans(start, length, spans):
-    if length == 0:
-        changed_start = start
-        changed_end = start
-    else:
-        changed_start = start
-        changed_end = start + length - 1
-    return any(changed_start <= span_end and changed_end >= span_start for span_start, span_end in spans)
+    return {
+        module_key(module): module_taxonomy_signature(module)
+        for module in modules
+        if isinstance(module, dict)
+    }
 
 
 def metadata_metrics_touched(diff_range, path):
@@ -81,19 +61,20 @@ def metadata_metrics_touched(diff_range, path):
     if not diff.strip():
         return False
 
-    spans = metadata_metrics_spans(path)
-    if not spans:
+    try:
+        old_text = run_git('show', f'{diff_range_base(diff_range)}:{relpath(path)}')
+    except subprocess.CalledProcessError:
         return True
 
-    for line in diff.splitlines():
-        match = HUNK_RE.match(line)
-        if not match:
-            continue
-        start = int(match.group(1))
-        length = int(match.group(2) or '1')
-        if range_intersects_spans(start, length, spans):
-            return True
-    return False
+    old_signatures = metadata_taxonomy_signatures(old_text)
+    new_signatures = metadata_taxonomy_signatures(path.read_text())
+
+    # Unparseable YAML on either side is a structural change we cannot rule
+    # out safely -- treat as touched rather than silently passing it through.
+    if old_signatures is None or new_signatures is None:
+        return True
+
+    return old_signatures != new_signatures
 
 
 def collector_metadata_paths():
