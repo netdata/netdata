@@ -398,6 +398,10 @@ func fileReadable(path string) bool {
 	return err == nil && !st.IsDir()
 }
 
+// firstConfigValue replicates the shell's `grep -e '^<prefix>' | head -1 |
+// sed -rn 's|\s*<key>\s*:\s*(.*)?$|\1|p'` pipeline. The prefix pre-filter is
+// intentionally stricter than the regex (a `name:vm` line without the space
+// is skipped), exactly like the shell's grep gate.
 func firstConfigValue(path string, sedRE *regexp.Regexp, grepPrefix string) string {
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -458,7 +462,7 @@ func (r *resolver) parseDockerLikeInspectOutput(output string) {
 	}
 }
 
-func (r *resolver) dockerLikeGetNameCommand(ctx context.Context, command, id string) bool {
+func (r *resolver) dockerLikeGetNameCommand(ctx context.Context, command, id string) {
 	format := `{{range .Config.Env}}{{println .}}{{end}}{{range $key, $value := .Config.Labels}}LABEL_{{$key}}={{printf "%q" $value}}{{println}}{{end}}IMAGE_NAME={{.Config.Image}}{{println}}CONT_NAME={{.Name}}`
 	defer r.track(command+"-inspect", time.Now())
 	cmd := exec.CommandContext(ctx, command, "inspect", "--format="+format, id)
@@ -467,7 +471,6 @@ func (r *resolver) dockerLikeGetNameCommand(ctx context.Context, command, id str
 	if err == nil && len(out) > 0 {
 		r.parseDockerLikeInspectOutput(string(out))
 	}
-	return true
 }
 
 func (r *resolver) dockerLikeGetNameAPI(ctx context.Context, hostVar, containerID string) {
