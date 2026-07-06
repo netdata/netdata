@@ -177,6 +177,16 @@ Learn more about this access method: [From Space Settings](#quick-access-methods
 <br/>
 </details>
 
+:::note
+
+**How UI changes take effect, and what they change on disk**
+
+When you submit an alert or collector change from the UI, it is applied on the node **immediately** — there is no scheduled synchronization to wait for. Your edit is saved as a dynamic configuration that **overrides** the node's built-in alert definitions; it does **not** modify or rewrite the stock files in Netdata's stock configuration directory (the `health.d/*.conf` files, for example `C:\Program Files\Netdata\usr\lib\netdata\conf.d\health.d\` on Windows). Those stock files stay untouched and are simply superseded by your UI edit.
+
+To manage alerts from files instead, or to restore file-based behavior after a UI edit, see [Overriding Stock Alerts](/src/health/overriding-stock-alerts.md).
+
+:::
+
 ## Collectors
 
 :::tip
