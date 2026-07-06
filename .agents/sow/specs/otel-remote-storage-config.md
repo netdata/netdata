@@ -13,7 +13,8 @@ config (`config/signal.rs`, `config/env.rs`), `netdata-plugin/bridge` config
   top-level `otel.yaml` section with four fields: `enabled: bool`, `uri: String`,
   `read_cache_max_size: ByteSize` (default `1 GB`, decimal like every other
   configured size), and `startup_op_timeout: humantime` (default **5 min**;
-  see the startup-sync note below). All four are
+  hidden from the stock file — see "Hidden knobs" below; see also the
+  startup-sync note). All four are
   env-overridable: `NETDATA_OTEL_STORAGE_ENABLED`, `_URI`,
   `_READ_CACHE_MAX_SIZE` (parsed as `ByteSize`), and `_STARTUP_OP_TIMEOUT`
   (parsed as a humantime duration). Env overrides apply on top of
@@ -197,16 +198,25 @@ this table is the **config surface** (names, defaults, override scope).
 |---|---|---|---|
 | `logs.rotation.default.max_file_size` | `25MB` | per-tenant | WAL seal trigger (size). |
 | `logs.rotation.default.max_log_entries` | `50000` | per-tenant | WAL seal trigger (count). |
-| `logs.rotation.default.max_file_duration` | `15 min` | per-tenant | WAL seal trigger (age); also sealed by a fixed 30 s idle sweep. |
+| `logs.rotation.default.max_file_duration` | `15 min` | per-tenant | **Hidden.** WAL seal trigger (age); also sealed by a fixed 30 s idle sweep. Optional in the `default` entry (falls back to the code default). |
 | `logs.retention.default.max_files` | `100000` | per-tenant | Local SFST retention (count). |
 | `logs.retention.default.max_total_size` | `1GB` | per-tenant | Local SFST retention (bytes). |
 | `logs.retention.default.max_age` | `7 days` | per-tenant | Local SFST retention (age) — **distinct from `ingest.max_age`**. |
-| `logs.retention.default.horizon` | `2 years` | per-tenant | Catalog (archive-index) retention = queryable remote depth. **MUST exceed `retention.max_age` by more than a day (in day units) or the plugin refuses to start** — a catalog must outlive the data it indexes. |
-| `logs.catalog.rotation_count` | `10` | global (logs) | Catalog seal trigger (entries). |
-| `logs.catalog.rotation_period` | `15 min` | global (logs) | Catalog seal trigger (age); bounds how long uploaded data stays uncataloged. Plus a Flush on clean shutdown. |
-| `logs.ingest.max_age` | `24 hours` | global (logs) | Reject records older than this (inclusive), per record; reported via OTLP `partial_success`. |
-| `logs.ingest.future_skew` | `10 minutes` | global (logs) | Reject records more than this far ahead (inclusive). `0` warns at startup. |
+| `logs.retention.default.horizon` | `10 years` | per-tenant | **Hidden.** Catalog (archive-index) retention = queryable remote depth. **MUST exceed `retention.max_age` by more than a day (in day units) or the plugin refuses to start** — a catalog must outlive the data it indexes. The default is deliberately far above any realistic `max_age` because the knob is hidden. |
+| `logs.catalog.rotation_count` | `10` | global (logs) | **Hidden.** Catalog seal trigger (entries). |
+| `logs.catalog.rotation_period` | `15 min` | global (logs) | **Hidden.** Catalog seal trigger (age); bounds how long uploaded data stays uncataloged. Plus a Flush on clean shutdown. |
+| `logs.ingest.max_age` | `24 hours` | global (logs) | **Hidden.** Reject records older than this (inclusive), per record; reported via OTLP `partial_success`. |
+| `logs.ingest.future_skew` | `10 minutes` | global (logs) | **Hidden.** Reject records more than this far ahead (inclusive). `0` warns at startup. |
 
+- **Hidden knobs** (first-release contract minimization): knobs marked
+  **Hidden** — plus `storage.startup_op_timeout` above — are deliberately NOT
+  listed in the shipped stock `otel.yaml.in`. They remain in the schema and are
+  accepted from the user `otel.yaml` and their env vars; absent, they resolve to
+  the code defaults in this table. The stock-file drift test
+  (`otel-plugin/src/config/mod.rs`, `shipped_stock_file_resolves_with_shipped_values`)
+  asserts both the absence of hidden keys from the shipped file and the values
+  their code defaults resolve to. Re-exposing (possibly renamed/moved) is an
+  expected follow-up; renames land on the strict-config migration-guide path.
 - Per-tenant `rotation:`/`retention:` maps stay open (tenant names are data);
   typos inside a tenant entry are still caught by the strict
   `RotationEntry`/`RetentionEntry` structs.

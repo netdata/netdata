@@ -19,8 +19,8 @@ The remote bucket is an **archive the plugin can restore from**. Local disk is
 the **working set** plus a small **table of contents** — the *catalog* (index)
 files that record which sealed log files (SFSTs) were uploaded and where. Local
 data files age out under your retention limits; the catalogs are kept much longer
-(the `horizon`), so the queryable history in the bucket outlives the data on
-local disk. A query for evicted-but-archived data fetches the sealed files back
+(the `horizon`, 10 years by default), so the queryable history in the bucket
+outlives the data on local disk. A query for evicted-but-archived data fetches the sealed files back
 into a bounded local read cache on demand.
 
 ## Fail-closed startup (the one behavior to know first)
@@ -54,8 +54,8 @@ When the remote returns, the backlog drains and retention resumes.
 The plugin only ever **writes** to the bucket. It never deletes archived objects.
 Remote retention is **your** lever: configure the object store's own lifecycle
 rules. Those rules **MUST NOT** expire objects younger than the `horizon`
-setting, or a query within the horizon will find a catalog entry pointing at an
-object you deleted.
+setting (10 years unless overridden), or a query within the horizon will find a
+catalog entry pointing at an object you deleted.
 
 ## Migrating a node to new hardware
 
@@ -77,7 +77,8 @@ Multiple nodes may share one bucket. Each node touches only **its own** data
 (everything is keyed by machine GUID; every node filters the listing to its own
 objects). The cost: startup listing time grows with **fleet size × history** —
 a shared bucket lists every node's objects, and each node filters. Very large
-fleets may need a higher `storage.startup_op_timeout`.
+fleets may need a higher `storage.startup_op_timeout` (default 5 minutes; an
+advanced option not listed in the stock file — set it in your user `otel.yaml`).
 
 ## Loss windows (crash vs clean shutdown)
 
@@ -139,8 +140,17 @@ made complete.
 
 ## Related configuration
 
-All knobs live in `otel.yaml` (`storage:`, `logs.rotation:`, `logs.retention:`
-incl. `horizon`, `logs.catalog:`, `logs.ingest:`). The stock file
-(`configs/otel.yaml.in`) documents each with defaults. The developer-facing
-contracts are in `.agents/sow/specs/otel-file-lifecycle.md` and
+All knobs live in `otel.yaml`. The stock file (`configs/otel.yaml.in`)
+documents the public surface with defaults: `storage:` (enable, URI, read
+cache), `logs.rotation:` (file size/entry limits), `logs.retention:` (local
+disk limits).
+
+A few advanced knobs are deliberately **not listed in the stock file** but are
+accepted in the user `otel.yaml` (and as environment variables), resolving to
+hard-coded defaults otherwise: `storage.startup_op_timeout` (5 minutes),
+`logs.rotation.<tenant>.max_file_duration` (15 minutes),
+`logs.retention.<tenant>.horizon` (10 years), `logs.catalog:` (rotation count
+10 / period 15 minutes), and `logs.ingest:` (max age 24 hours / future skew
+10 minutes). The developer-facing contracts are in
+`.agents/sow/specs/otel-file-lifecycle.md` and
 `.agents/sow/specs/otel-remote-storage-config.md`.

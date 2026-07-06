@@ -57,29 +57,12 @@ storage:
   #   fs:///var/lib/netdata/otel/remote
   #   s3://bucket/prefix?region=us-east-1
   #   s3://bucket/prefix?region=us-east-1&endpoint=https://minio.example:9000
-  # fs:// caveat: the path must be READABLE by the netdata user. An existing but
-  # unreadable fs root lists as EMPTY (not an error), so the plugin would boot
-  # with an empty archive view instead of fail-closing. S3-class backends surface
-  # permission errors and fail closed correctly.
   uri: "fs://@logdir_POST@/otel/v2/remote"
 
   # Data deleted from local disk by retention but still in remote storage is
   # fetched back into a bounded local cache when a query needs it. Cap for
   # that cache:
   read_cache_max_size: "1GB"
-
-  # Per-operation timeout for the startup catalog sync (each remote LIST and
-  # each catalog download). This phase runs before the plugin serves data and
-  # must reach the remote, so it fails startup rather than hanging if the
-  # backend is unreachable; the agent then retries by restarting the plugin.
-  # Bounds each operation, not the whole restore, so recovering a large archive
-  # stays proportional to its size. It also bounds the single recursive LIST,
-  # which scales with the whole bucket's catalog count (shared buckets list every
-  # machine's objects), so very large fleets may need a higher value. Should
-  # exceed the backend's own retry window (~3 min) so transient blips still retry
-  # internally; a lower value cuts those retries short and can crash-loop the
-  # plugin under a flaky remote:
-  startup_op_timeout: "5 minutes"
 
 auth:
   # Require senders to identify a tenant via the X-Scope-OrgID gRPC header.
@@ -90,13 +73,10 @@ auth:
 logs:
   rotation:
     # Incoming logs are appended to a current file; a new file starts when
-    # any of these limits is reached. Size/entry limits are checked as requests
-    # arrive; max_file_duration also seals an idle file with no new requests
-    # (checked by a background sweep, so a quiet stream still rotates on time).
+    # any of these limits is reached.
     default:
       max_file_size: "25MB"
       max_log_entries: 50000
-      max_file_duration: "15 minutes"
 
     # Per-tenant overrides (any subset of the fields above):
     # my-tenant:
@@ -105,43 +85,11 @@ logs:
   retention:
     # How much log data to keep on local disk; the oldest files are deleted
     # when any of these limits is exceeded.
-    #
-    # `horizon` is separate: it is how long the small catalog (index) files that
-    # map uploaded data are kept — the depth of the queryable remote archive,
-    # independent of local data retention. It MUST exceed max_age (by more than a
-    # day), or the plugin refuses to start: a catalog must outlive the data files
-    # it indexes. Catalogs are tiny (~KB), so a long horizon costs little.
     default:
       max_files: 100000
       max_total_size: "1GB"
       max_age: "7 days"
-      horizon: "2 years"
 
     # Per-tenant overrides (any subset of the fields above):
     # my-tenant:
     #   max_age: "30 days"
-
-  catalog:
-    # A catalog (index) file is written when its accumulator reaches
-    # rotation_count entries OR has been open for rotation_period, whichever
-    # comes first (plus a flush on clean shutdown). The time trigger bounds how
-    # long a quiet host's uploaded data stays uncataloged.
-    rotation_count: 10
-    rotation_period: "15 minutes"
-
-  ingest:
-    # Reject log records whose timestamp falls outside this window, checked per
-    # record. Rejections are reported to the sender via OTLP partial_success;
-    # in-window records in the same request are still stored. This guards
-    # against clock-skewed or bulk-backfilled data that would otherwise distort
-    # retention and pin local disk.
-    # Reject records older than this (measured from the record's resolved timestamp).
-    # A value of "0s" rejects every record older than the moment it arrives —
-    # effectively all real history, and ordinary delivery latency causes routine
-    # rejections — so keep a realistic window unless that is specifically intended:
-    max_age: "24 hours"
-    # Reject records dated more than this far in the future (clock-skew tolerance).
-    # A very small value (e.g. "0s") rejects any record even a nanosecond ahead
-    # of this agent's clock — including ordinary sender clock skew — so keep some
-    # tolerance unless that is specifically what you want.
-    future_skew: "10 minutes"

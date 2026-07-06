@@ -1403,6 +1403,11 @@ logs:
         assert!(!config.storage.enabled);
         assert_eq!(config.storage.uri, "fs:///var/log/netdata/otel/v2/remote");
         assert_eq!(config.storage.read_cache_max_size, ByteSize::gb(1));
+        // Hidden knob: resolved from the code default.
+        assert_eq!(
+            config.storage.startup_op_timeout,
+            Duration::from_secs(5 * 60)
+        );
         assert!(!config.auth.enabled);
 
         // The shipped file intentionally has NO traces section (feature under
@@ -1414,6 +1419,15 @@ logs:
         // (rotation/retention/catalog directly under the signal).
         assert!(!substituted.contains("wal:"));
         assert!(!substituted.contains("index:"));
+        // Advanced knobs are hidden from the first release's stock file —
+        // accepted by the schema (user otel.yaml / env vars) but resolved from
+        // code defaults, which the assertions below pin. Keep them out of the
+        // shipped file until they are deliberately re-exposed.
+        assert!(!substituted.contains("startup_op_timeout"));
+        assert!(!substituted.contains("max_file_duration"));
+        assert!(!substituted.contains("horizon"));
+        assert!(!substituted.contains("catalog:"));
+        assert!(!substituted.contains("ingest:"));
 
         for signal in [&config.logs, &config.traces] {
             // crc/compression are intentionally NOT in the shipped file; the
@@ -1428,11 +1442,14 @@ logs:
             assert_eq!(retention.max_files, 100_000);
             assert_eq!(retention.max_total_size, ByteSize::gb(1));
             assert_eq!(retention.max_age, Duration::from_secs(7 * 24 * 3600));
-            // humantime "2 years" = 2 × 365.25 days; the code default parses the
-            // same literal, so file and default stay in lockstep.
-            assert_eq!(retention.horizon, Duration::from_secs(2 * 31_557_600));
+            // Hidden knob: humantime "10 years" = 10 × 365.25 days, from the
+            // code default (the stock file no longer sets horizon).
+            assert_eq!(retention.horizon, Duration::from_secs(10 * 31_557_600));
             assert_eq!(signal.catalog.rotation_count, 10);
             assert_eq!(signal.catalog.rotation_period, Duration::from_secs(15 * 60));
+            // Hidden knobs: resolved from the code defaults.
+            assert_eq!(signal.ingest.max_age, Duration::from_secs(24 * 3600));
+            assert_eq!(signal.ingest.future_skew, Duration::from_secs(10 * 60));
         }
     }
 

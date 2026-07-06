@@ -423,14 +423,16 @@ fn default_catalog_rotation_period() -> Duration {
     Duration::from_secs(15 * 60)
 }
 
-/// Default catalog retention horizon: 2 years. Catalogs are tiny (~KB) and this
+/// Default catalog retention horizon: 10 years. Catalogs are tiny (~KB) and this
 /// is the queryable-archive depth; it is decoupled from SFST `max_age` and must
-/// stay `>` it in day units (see [`RetentionPolicy::validate`]). Derived by
-/// parsing the same string the stock file ships, so the code default and the
-/// shipped YAML can never drift (humantime counts a year as 365.25 days).
+/// stay `>` it in day units (see [`RetentionPolicy::validate`]). Deliberately
+/// generous: `horizon` is hidden from the stock file, so the default must sit
+/// far above any realistic `max_age` — otherwise raising `max_age` would trip
+/// the horizon invariant on a knob the stock file never shows. Parsed from the
+/// humantime literal for documentation lockstep (a year is 365.25 days).
 fn default_retention_horizon() -> Duration {
-    humantime_serde::re::humantime::parse_duration("2 years")
-        .expect("\"2 years\" is a valid humantime duration")
+    humantime_serde::re::humantime::parse_duration("10 years")
+        .expect("\"10 years\" is a valid humantime duration")
 }
 
 /// WAL file configuration (runtime-only; see [`IndexConfig`]).
@@ -456,6 +458,11 @@ pub struct RotationEntry {
     pub max_file_size: Option<ByteSize>,
     #[serde(default)]
     pub max_log_entries: Option<usize>,
+    /// Optional even in the `default` entry (unlike the two fields above,
+    /// which the default must set): the knob is hidden from the stock file,
+    /// so an absent value inherits the code default (see
+    /// [`default_rotation_max_file_duration`]) — same pattern as
+    /// [`RetentionEntry::horizon`].
     #[serde(default, with = "opt_duration")]
     pub max_file_duration: Option<Duration>,
 }
@@ -536,20 +543,26 @@ impl RotationPolicy {
     }
 }
 
-/// Code default mirroring the shipped stock logs rotation, used when a signal
-/// section is absent from YAML (traces, while under active development). The
-/// otel-plugin stock-file test pins these against the shipped values.
+/// Default rotation `max_file_duration`: 15 minutes, so idle logs streams seal
+/// promptly (the logs ingestor's idle-rotation sweep enforces this even with no
+/// new frames). Also backs the traces signal, which has no sweep yet, so an
+/// idle traces file rotates only on its next write. Hidden from the stock file;
+/// a rotation `default` entry that omits it inherits this value.
+fn default_rotation_max_file_duration() -> Duration {
+    Duration::from_secs(15 * 60)
+}
+
+/// Code default mirroring the shipped stock logs rotation (plus the hidden
+/// `max_file_duration`), used when a signal section is absent from YAML
+/// (traces, while under active development). The otel-plugin stock-file test
+/// pins these against the shipped values.
 impl Default for RotationPolicy {
     fn default() -> Self {
         Self {
             default: RotationConfig {
                 max_file_size: ByteSize::mb(25),
                 max_log_entries: 50_000,
-                // 15 min so idle logs streams seal promptly (the logs ingestor's
-                // idle-rotation sweep enforces this even with no new frames). This
-                // default also backs the traces signal, which has no sweep yet, so
-                // an idle traces file rotates only on its next write.
-                max_file_duration: Duration::from_secs(15 * 60),
+                max_file_duration: default_rotation_max_file_duration(),
             },
             tenants: HashMap::new(),
         }
@@ -570,9 +583,12 @@ impl TryFrom<HashMap<String, RotationEntry>> for RotationPolicy {
             max_log_entries: d
                 .max_log_entries
                 .ok_or_else(|| "default rotation must set max_log_entries".to_string())?,
+            // Optional with a code-default fallback (like `RetentionEntry::horizon`):
+            // the knob is hidden from the stock file, so a hand-written rotation
+            // block must parse without it.
             max_file_duration: d
                 .max_file_duration
-                .ok_or_else(|| "default rotation must set max_file_duration".to_string())?,
+                .unwrap_or_else(default_rotation_max_file_duration),
         };
         Ok(Self {
             default,
@@ -1032,7 +1048,7 @@ traces:
 
     #[test]
     fn retention_horizon_resolves_defaults_overrides_and_validates() {
-        // Absent horizon inherits the code default; the invariant holds (2y > 7d).
+        // Absent horizon inherits the code default; the invariant holds (10y > 7d).
         let policy: RetentionPolicy = serde_yaml::from_str(
             "default:\n  max_files: 10\n  max_total_size: \"1GB\"\n  max_age: \"7 days\"\n",
         )
