@@ -579,6 +579,11 @@ int ws_client_process_rx_ws(ws_client *client)
             // a) empty payload
             // b) 2byte reason code
             // c) 2byte reason code followed by message
+            if (client->rx.payload_length > 125) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebSocket CONNECTION_CLOSE payload too big! Received %"PRIu64" bytes, maximum allowed 125 bytes",
+                       client->rx.payload_length);
+                return WS_CLIENT_PROTOCOL_ERROR;
+            }
             if (client->rx.payload_length == 1) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebScoket CONNECTION_CLOSE can't have payload of size 1");
                 return WS_CLIENT_PROTOCOL_ERROR;
@@ -637,6 +642,11 @@ int ws_client_process_rx_ws(ws_client *client)
             client->rx.parse_state = WS_PACKET_DONE;
             return WS_CLIENT_PARSING_DONE;
         case WS_PAYLOAD_PING_REQ_PAYLOAD:
+            if (client->rx.payload_length > 125) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebSocket PING payload too big! Received %"PRIu64" bytes, maximum allowed 125 bytes",
+                       client->rx.payload_length);
+                return WS_CLIENT_PROTOCOL_ERROR;
+            }
             if (client->rx.payload_length > rbuf_get_capacity(client->buf_read) / 2) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Ping payload too big! Received %"PRIu64" bytes, maximum allowed %zu bytes (buffer capacity: %zu bytes)",
                        client->rx.payload_length, rbuf_get_capacity(client->buf_read) / 2, rbuf_get_capacity(client->buf_read));
