@@ -38,14 +38,14 @@ func (f *seqSTS) GetCallerIdentity(context.Context, *sts.GetCallerIdentityInput,
 	return &sts.GetCallerIdentityOutput{Account: aws.String(acct)}, nil
 }
 
-func assumeRoleCollector(t *testing.T, roles []awsauth.AWSAssumeRole, includeBase bool, sts stsClient) *Collector {
+func assumeRoleCollector(t *testing.T, roles []awsauth.AssumeRole, includeBase bool, sts stsClient) *Collector {
 	t.Helper()
 	c := New()
 	c.Config = Config{
 		Regions: []string{"us-east-1"},
-		Auth: awsauth.AWSAuthConfig{
-			Mode:           awsauth.AWSAuthModeAssumeRole,
-			ModeAssumeRole: &awsauth.AWSModeAssumeRoleConfig{Roles: roles, IncludeBaseAccount: includeBase},
+		Auth: awsauth.Config{
+			Mode:           awsauth.ModeAssumeRole,
+			ModeAssumeRole: &awsauth.ModeAssumeRoleConfig{Roles: roles, IncludeBaseAccount: includeBase},
 		},
 	}
 	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
@@ -54,8 +54,8 @@ func assumeRoleCollector(t *testing.T, roles []awsauth.AWSAssumeRole, includeBas
 	return c
 }
 
-func twoRoles() []awsauth.AWSAssumeRole {
-	return []awsauth.AWSAssumeRole{
+func twoRoles() []awsauth.AssumeRole {
+	return []awsauth.AssumeRole{
 		{RoleARN: "arn:aws:iam::111111111111:role/netdata"},
 		{RoleARN: "arn:aws:iam::222222222222:role/netdata"},
 	}

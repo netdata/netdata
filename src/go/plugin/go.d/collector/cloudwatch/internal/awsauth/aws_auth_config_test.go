@@ -14,88 +14,88 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func TestAWSAuthConfig_ValidateWithPath(t *testing.T) {
+func TestConfig_ValidateWithPath(t *testing.T) {
 	tests := map[string]struct {
-		cfg     AWSAuthConfig
+		cfg     Config
 		wantErr bool
 	}{
 		"default mode": {
-			cfg: AWSAuthConfig{Mode: AWSAuthModeDefault},
+			cfg: Config{Mode: ModeDefault},
 		},
 		"default mode case-insensitive": {
-			cfg: AWSAuthConfig{Mode: "DEFAULT"},
+			cfg: Config{Mode: "DEFAULT"},
 		},
 		"empty mode": {
-			cfg:     AWSAuthConfig{},
+			cfg:     Config{},
 			wantErr: true,
 		},
 		"invalid mode": {
-			cfg:     AWSAuthConfig{Mode: "bogus"},
+			cfg:     Config{Mode: "bogus"},
 			wantErr: true,
 		},
 		"access_key valid": {
-			cfg: AWSAuthConfig{Mode: AWSAuthModeAccessKey, ModeAccessKey: &AWSModeAccessKeyConfig{
+			cfg: Config{Mode: ModeAccessKey, ModeAccessKey: &ModeAccessKeyConfig{
 				AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret",
 			}},
 		},
 		"access_key with session token": {
-			cfg: AWSAuthConfig{Mode: AWSAuthModeAccessKey, ModeAccessKey: &AWSModeAccessKeyConfig{
+			cfg: Config{Mode: ModeAccessKey, ModeAccessKey: &ModeAccessKeyConfig{
 				AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "token",
 			}},
 		},
 		"access_key missing struct": {
-			cfg:     AWSAuthConfig{Mode: AWSAuthModeAccessKey},
+			cfg:     Config{Mode: ModeAccessKey},
 			wantErr: true,
 		},
 		"access_key missing id": {
-			cfg:     AWSAuthConfig{Mode: AWSAuthModeAccessKey, ModeAccessKey: &AWSModeAccessKeyConfig{SecretAccessKey: "secret"}},
+			cfg:     Config{Mode: ModeAccessKey, ModeAccessKey: &ModeAccessKeyConfig{SecretAccessKey: "secret"}},
 			wantErr: true,
 		},
 		"access_key missing secret": {
-			cfg:     AWSAuthConfig{Mode: AWSAuthModeAccessKey, ModeAccessKey: &AWSModeAccessKeyConfig{AccessKeyID: "AKIAEXAMPLE"}},
+			cfg:     Config{Mode: ModeAccessKey, ModeAccessKey: &ModeAccessKeyConfig{AccessKeyID: "AKIAEXAMPLE"}},
 			wantErr: true,
 		},
 		"assume_role valid single role": {
-			cfg: AWSAuthConfig{Mode: AWSAuthModeAssumeRole, ModeAssumeRole: &AWSModeAssumeRoleConfig{
-				Roles: []AWSAssumeRole{{RoleARN: "arn:aws:iam::000000000000:role/example"}},
+			cfg: Config{Mode: ModeAssumeRole, ModeAssumeRole: &ModeAssumeRoleConfig{
+				Roles: []AssumeRole{{RoleARN: "arn:aws:iam::000000000000:role/example"}},
 			}},
 		},
 		"assume_role valid with external id": {
-			cfg: AWSAuthConfig{Mode: AWSAuthModeAssumeRole, ModeAssumeRole: &AWSModeAssumeRoleConfig{
-				Roles: []AWSAssumeRole{{RoleARN: "arn:aws:iam::000000000000:role/example", ExternalID: "ext"}},
+			cfg: Config{Mode: ModeAssumeRole, ModeAssumeRole: &ModeAssumeRoleConfig{
+				Roles: []AssumeRole{{RoleARN: "arn:aws:iam::000000000000:role/example", ExternalID: "ext"}},
 			}},
 		},
 		"assume_role valid multiple roles": {
-			cfg: AWSAuthConfig{Mode: AWSAuthModeAssumeRole, ModeAssumeRole: &AWSModeAssumeRoleConfig{
-				Roles: []AWSAssumeRole{
+			cfg: Config{Mode: ModeAssumeRole, ModeAssumeRole: &ModeAssumeRoleConfig{
+				Roles: []AssumeRole{
 					{RoleARN: "arn:aws:iam::111111111111:role/a"},
 					{RoleARN: "arn:aws:iam::222222222222:role/b"},
 				},
 			}},
 		},
 		"assume_role valid with include_base_account": {
-			cfg: AWSAuthConfig{Mode: AWSAuthModeAssumeRole, ModeAssumeRole: &AWSModeAssumeRoleConfig{
-				Roles:              []AWSAssumeRole{{RoleARN: "arn:aws:iam::111111111111:role/a"}},
+			cfg: Config{Mode: ModeAssumeRole, ModeAssumeRole: &ModeAssumeRoleConfig{
+				Roles:              []AssumeRole{{RoleARN: "arn:aws:iam::111111111111:role/a"}},
 				IncludeBaseAccount: true,
 			}},
 		},
 		"assume_role nil struct": {
-			cfg:     AWSAuthConfig{Mode: AWSAuthModeAssumeRole},
+			cfg:     Config{Mode: ModeAssumeRole},
 			wantErr: true,
 		},
 		"assume_role no roles": {
-			cfg:     AWSAuthConfig{Mode: AWSAuthModeAssumeRole, ModeAssumeRole: &AWSModeAssumeRoleConfig{}},
+			cfg:     Config{Mode: ModeAssumeRole, ModeAssumeRole: &ModeAssumeRoleConfig{}},
 			wantErr: true,
 		},
 		"assume_role missing role_arn": {
-			cfg: AWSAuthConfig{Mode: AWSAuthModeAssumeRole, ModeAssumeRole: &AWSModeAssumeRoleConfig{
-				Roles: []AWSAssumeRole{{ExternalID: "ext"}},
+			cfg: Config{Mode: ModeAssumeRole, ModeAssumeRole: &ModeAssumeRoleConfig{
+				Roles: []AssumeRole{{ExternalID: "ext"}},
 			}},
 			wantErr: true,
 		},
 		"assume_role one of several roles missing role_arn": {
-			cfg: AWSAuthConfig{Mode: AWSAuthModeAssumeRole, ModeAssumeRole: &AWSModeAssumeRoleConfig{
-				Roles: []AWSAssumeRole{{RoleARN: "arn:aws:iam::111111111111:role/a"}, {ExternalID: "ext"}},
+			cfg: Config{Mode: ModeAssumeRole, ModeAssumeRole: &ModeAssumeRoleConfig{
+				Roles: []AssumeRole{{RoleARN: "arn:aws:iam::111111111111:role/a"}, {ExternalID: "ext"}},
 			}},
 			wantErr: true,
 		},
@@ -113,36 +113,36 @@ func TestAWSAuthConfig_ValidateWithPath(t *testing.T) {
 	}
 }
 
-func TestAWSAuthConfig_Identities(t *testing.T) {
+func TestConfig_Identities(t *testing.T) {
 	tests := map[string]struct {
-		cfg      AWSAuthConfig
+		cfg      Config
 		wantRefs []string
 	}{
 		"default is one base identity": {
-			cfg:      AWSAuthConfig{Mode: AWSAuthModeDefault},
+			cfg:      Config{Mode: ModeDefault},
 			wantRefs: []string{"default"},
 		},
 		"access_key is one base identity": {
-			cfg: AWSAuthConfig{Mode: AWSAuthModeAccessKey, ModeAccessKey: &AWSModeAccessKeyConfig{
+			cfg: Config{Mode: ModeAccessKey, ModeAccessKey: &ModeAccessKeyConfig{
 				AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret",
 			}},
 			wantRefs: []string{"access_key"},
 		},
 		"assume_role single role": {
-			cfg: AWSAuthConfig{Mode: AWSAuthModeAssumeRole, ModeAssumeRole: &AWSModeAssumeRoleConfig{
-				Roles: []AWSAssumeRole{{RoleARN: "arn:a"}},
+			cfg: Config{Mode: ModeAssumeRole, ModeAssumeRole: &ModeAssumeRoleConfig{
+				Roles: []AssumeRole{{RoleARN: "arn:a"}},
 			}},
 			wantRefs: []string{"arn:a"},
 		},
 		"assume_role multiple roles keep config order": {
-			cfg: AWSAuthConfig{Mode: AWSAuthModeAssumeRole, ModeAssumeRole: &AWSModeAssumeRoleConfig{
-				Roles: []AWSAssumeRole{{RoleARN: "arn:a"}, {RoleARN: "arn:b"}, {RoleARN: "arn:c"}},
+			cfg: Config{Mode: ModeAssumeRole, ModeAssumeRole: &ModeAssumeRoleConfig{
+				Roles: []AssumeRole{{RoleARN: "arn:a"}, {RoleARN: "arn:b"}, {RoleARN: "arn:c"}},
 			}},
 			wantRefs: []string{"arn:a", "arn:b", "arn:c"},
 		},
 		"assume_role with include_base_account appends base last": {
-			cfg: AWSAuthConfig{Mode: AWSAuthModeAssumeRole, ModeAssumeRole: &AWSModeAssumeRoleConfig{
-				Roles:              []AWSAssumeRole{{RoleARN: "arn:a"}, {RoleARN: "arn:b"}},
+			cfg: Config{Mode: ModeAssumeRole, ModeAssumeRole: &ModeAssumeRoleConfig{
+				Roles:              []AssumeRole{{RoleARN: "arn:a"}, {RoleARN: "arn:b"}},
 				IncludeBaseAccount: true,
 			}},
 			wantRefs: []string{"arn:a", "arn:b", "base"},
@@ -164,15 +164,15 @@ func TestIdentity_NewConfig(t *testing.T) {
 	ctx := context.Background()
 
 	t.Run("invalid config returns error", func(t *testing.T) {
-		_, err := AWSAuthConfig{}.Identities()[0].NewConfig(ctx, AWSConfigOptions{Region: "us-east-1"})
+		_, err := Config{}.Identities()[0].NewConfig(ctx, ConfigOptions{Region: "us-east-1"})
 		assert.Error(t, err)
 	})
 
 	t.Run("access_key sets region and static credentials", func(t *testing.T) {
-		cfg := AWSAuthConfig{Mode: AWSAuthModeAccessKey, ModeAccessKey: &AWSModeAccessKeyConfig{
+		cfg := Config{Mode: ModeAccessKey, ModeAccessKey: &ModeAccessKeyConfig{
 			AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret",
 		}}
-		awsCfg, err := cfg.Identities()[0].NewConfig(ctx, AWSConfigOptions{Region: "eu-west-1"})
+		awsCfg, err := cfg.Identities()[0].NewConfig(ctx, ConfigOptions{Region: "eu-west-1"})
 		require.NoError(t, err)
 		assert.Equal(t, "eu-west-1", awsCfg.Region)
 
@@ -183,10 +183,10 @@ func TestIdentity_NewConfig(t *testing.T) {
 	})
 
 	t.Run("access_key propagates the session token", func(t *testing.T) {
-		cfg := AWSAuthConfig{Mode: AWSAuthModeAccessKey, ModeAccessKey: &AWSModeAccessKeyConfig{
+		cfg := Config{Mode: ModeAccessKey, ModeAccessKey: &ModeAccessKeyConfig{
 			AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "session-token-value",
 		}}
-		awsCfg, err := cfg.Identities()[0].NewConfig(ctx, AWSConfigOptions{Region: "eu-west-1"})
+		awsCfg, err := cfg.Identities()[0].NewConfig(ctx, ConfigOptions{Region: "eu-west-1"})
 		require.NoError(t, err)
 
 		creds, err := awsCfg.Credentials.Retrieve(ctx)
@@ -195,24 +195,24 @@ func TestIdentity_NewConfig(t *testing.T) {
 	})
 
 	t.Run("default mode builds a config with the region", func(t *testing.T) {
-		awsCfg, err := AWSAuthConfig{Mode: AWSAuthModeDefault}.Identities()[0].NewConfig(ctx, AWSConfigOptions{Region: "us-east-1"})
+		awsCfg, err := Config{Mode: ModeDefault}.Identities()[0].NewConfig(ctx, ConfigOptions{Region: "us-east-1"})
 		require.NoError(t, err)
 		assert.Equal(t, "us-east-1", awsCfg.Region)
 	})
 
 	t.Run("assume_role builds a config without resolving credentials eagerly", func(t *testing.T) {
-		cfg := AWSAuthConfig{Mode: AWSAuthModeAssumeRole, ModeAssumeRole: &AWSModeAssumeRoleConfig{
-			Roles: []AWSAssumeRole{{RoleARN: "arn:aws:iam::000000000000:role/example"}},
+		cfg := Config{Mode: ModeAssumeRole, ModeAssumeRole: &ModeAssumeRoleConfig{
+			Roles: []AssumeRole{{RoleARN: "arn:aws:iam::000000000000:role/example"}},
 		}}
-		awsCfg, err := cfg.Identities()[0].NewConfig(ctx, AWSConfigOptions{Region: "us-east-1"})
+		awsCfg, err := cfg.Identities()[0].NewConfig(ctx, ConfigOptions{Region: "us-east-1"})
 		require.NoError(t, err)
 		assert.Equal(t, "us-east-1", awsCfg.Region)
 		assert.NotNil(t, awsCfg.Credentials)
 	})
 
 	t.Run("assume_role multiple roles each build a config", func(t *testing.T) {
-		cfg := AWSAuthConfig{Mode: AWSAuthModeAssumeRole, ModeAssumeRole: &AWSModeAssumeRoleConfig{
-			Roles: []AWSAssumeRole{
+		cfg := Config{Mode: ModeAssumeRole, ModeAssumeRole: &ModeAssumeRoleConfig{
+			Roles: []AssumeRole{
 				{RoleARN: "arn:aws:iam::111111111111:role/a"},
 				{RoleARN: "arn:aws:iam::222222222222:role/b"},
 			},
@@ -220,7 +220,7 @@ func TestIdentity_NewConfig(t *testing.T) {
 		ids := cfg.Identities()
 		require.Len(t, ids, 2)
 		for _, id := range ids {
-			awsCfg, err := id.NewConfig(ctx, AWSConfigOptions{Region: "us-east-1"})
+			awsCfg, err := id.NewConfig(ctx, ConfigOptions{Region: "us-east-1"})
 			require.NoError(t, err)
 			assert.Equal(t, "us-east-1", awsCfg.Region)
 			assert.NotNil(t, awsCfg.Credentials)
@@ -228,15 +228,15 @@ func TestIdentity_NewConfig(t *testing.T) {
 	})
 
 	t.Run("included base identity builds a base config without assuming a role", func(t *testing.T) {
-		cfg := AWSAuthConfig{Mode: AWSAuthModeAssumeRole, ModeAssumeRole: &AWSModeAssumeRoleConfig{
-			Roles:              []AWSAssumeRole{{RoleARN: "arn:aws:iam::111111111111:role/a"}},
+		cfg := Config{Mode: ModeAssumeRole, ModeAssumeRole: &ModeAssumeRoleConfig{
+			Roles:              []AssumeRole{{RoleARN: "arn:aws:iam::111111111111:role/a"}},
 			IncludeBaseAccount: true,
 		}}
 		ids := cfg.Identities()
 		require.Len(t, ids, 2)
 		base := ids[len(ids)-1]
 		require.Equal(t, "base", base.Ref)
-		awsCfg, err := base.NewConfig(ctx, AWSConfigOptions{Region: "us-east-1"})
+		awsCfg, err := base.NewConfig(ctx, ConfigOptions{Region: "us-east-1"})
 		require.NoError(t, err)
 		assert.Equal(t, "us-east-1", awsCfg.Region)
 	})
@@ -288,10 +288,10 @@ func TestIdentity_AssumeRoleRequest(t *testing.T) {
 	t.Setenv("AWS_SECRET_ACCESS_KEY", "base-secret")
 	t.Setenv("AWS_ENDPOINT_URL_STS", srv.URL)
 
-	cfg := AWSAuthConfig{Mode: AWSAuthModeAssumeRole, ModeAssumeRole: &AWSModeAssumeRoleConfig{
-		Roles: []AWSAssumeRole{{RoleARN: "arn:aws:iam::000000000000:role/example", ExternalID: "ext-123"}},
+	cfg := Config{Mode: ModeAssumeRole, ModeAssumeRole: &ModeAssumeRoleConfig{
+		Roles: []AssumeRole{{RoleARN: "arn:aws:iam::000000000000:role/example", ExternalID: "ext-123"}},
 	}}
-	awsCfg, err := cfg.Identities()[0].NewConfig(ctx, AWSConfigOptions{Region: "us-west-2"})
+	awsCfg, err := cfg.Identities()[0].NewConfig(ctx, ConfigOptions{Region: "us-west-2"})
 	require.NoError(t, err)
 
 	creds, err := awsCfg.Credentials.Retrieve(ctx)
@@ -308,22 +308,22 @@ func TestIdentity_AssumeRoleRequest(t *testing.T) {
 	assert.Equal(t, "temp-session-token", creds.SessionToken)
 }
 
-func TestAWSAuthConfig_YAMLRoundTrip(t *testing.T) {
-	tests := map[string]AWSAuthConfig{
+func TestConfig_YAMLRoundTrip(t *testing.T) {
+	tests := map[string]Config{
 		"access_key with session token": {
-			Mode:          AWSAuthModeAccessKey,
-			ModeAccessKey: &AWSModeAccessKeyConfig{AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "token"},
+			Mode:          ModeAccessKey,
+			ModeAccessKey: &ModeAccessKeyConfig{AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "token"},
 		},
 		"assume_role with external id": {
-			Mode: AWSAuthModeAssumeRole,
-			ModeAssumeRole: &AWSModeAssumeRoleConfig{
-				Roles: []AWSAssumeRole{{RoleARN: "arn:aws:iam::000000000000:role/example", ExternalID: "ext"}},
+			Mode: ModeAssumeRole,
+			ModeAssumeRole: &ModeAssumeRoleConfig{
+				Roles: []AssumeRole{{RoleARN: "arn:aws:iam::000000000000:role/example", ExternalID: "ext"}},
 			},
 		},
 		"assume_role multiple roles with include_base_account": {
-			Mode: AWSAuthModeAssumeRole,
-			ModeAssumeRole: &AWSModeAssumeRoleConfig{
-				Roles: []AWSAssumeRole{
+			Mode: ModeAssumeRole,
+			ModeAssumeRole: &ModeAssumeRoleConfig{
+				Roles: []AssumeRole{
 					{RoleARN: "arn:aws:iam::111111111111:role/a"},
 					{RoleARN: "arn:aws:iam::222222222222:role/b", ExternalID: "ext"},
 				},
@@ -336,7 +336,7 @@ func TestAWSAuthConfig_YAMLRoundTrip(t *testing.T) {
 			data, err := yaml.Marshal(orig)
 			require.NoError(t, err)
 
-			var got AWSAuthConfig
+			var got Config
 			require.NoError(t, yaml.Unmarshal(data, &got))
 			assert.Equal(t, orig, got)
 		})

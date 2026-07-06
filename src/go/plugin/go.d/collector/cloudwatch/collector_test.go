@@ -53,7 +53,7 @@ func (f *fakeSTS) GetCallerIdentity(context.Context, *sts.GetCallerIdentityInput
 func validConfig() Config {
 	return Config{
 		Regions: []string{"us-east-1"},
-		Auth:    awsauth.AWSAuthConfig{Mode: awsauth.AWSAuthModeDefault},
+		Auth:    awsauth.Config{Mode: awsauth.ModeDefault},
 	}
 }
 
@@ -86,17 +86,17 @@ func TestCollector_Init(t *testing.T) {
 			cfg: validConfig(),
 		},
 		"missing regions": {
-			cfg:     Config{Auth: awsauth.AWSAuthConfig{Mode: awsauth.AWSAuthModeDefault}},
+			cfg:     Config{Auth: awsauth.Config{Mode: awsauth.ModeDefault}},
 			wantErr: true,
 		},
 		"invalid auth mode": {
-			cfg:     Config{Regions: []string{"us-east-1"}, Auth: awsauth.AWSAuthConfig{Mode: "bogus"}},
+			cfg:     Config{Regions: []string{"us-east-1"}, Auth: awsauth.Config{Mode: "bogus"}},
 			wantErr: true,
 		},
 		"profiles exact without entries": {
 			cfg: Config{
 				Regions:  []string{"us-east-1"},
-				Auth:     awsauth.AWSAuthConfig{Mode: awsauth.AWSAuthModeDefault},
+				Auth:     awsauth.Config{Mode: awsauth.ModeDefault},
 				Profiles: ProfilesConfig{Mode: profilesModeExact},
 			},
 			wantErr: true,

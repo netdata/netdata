@@ -35,7 +35,7 @@ func defaultNewSTSClient(cfg aws.Config) stsClient {
 }
 
 func defaultNewAWSConfig(ctx context.Context, id awsauth.Identity, region string) (aws.Config, error) {
-	return id.NewConfig(ctx, awsauth.AWSConfigOptions{Region: region})
+	return id.NewConfig(ctx, awsauth.ConfigOptions{Region: region})
 }
 
 // clientKey identifies a CloudWatch client by the account it authenticates as and

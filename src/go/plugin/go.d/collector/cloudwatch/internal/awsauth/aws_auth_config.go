@@ -18,46 +18,46 @@ import (
 )
 
 const (
-	AWSAuthModeDefault    = "default"
-	AWSAuthModeAccessKey  = "access_key"
-	AWSAuthModeAssumeRole = "assume_role"
+	ModeDefault    = "default"
+	ModeAccessKey  = "access_key"
+	ModeAssumeRole = "assume_role"
 
-	awsAuthConfigPath = "cloud_auth.aws"
+	defaultConfigPath = "cloud_auth.aws"
 
 	// baseIdentityRef is Identity.Ref for the base credential source when it is
 	// monitored alongside assumed roles (include_base_account).
 	baseIdentityRef = "base"
 )
 
-type AWSModeAccessKeyConfig struct {
+type ModeAccessKeyConfig struct {
 	AccessKeyID     string `yaml:"access_key_id,omitempty" json:"access_key_id,omitempty"`
 	SecretAccessKey string `yaml:"secret_access_key,omitempty" json:"secret_access_key,omitempty"`
 	SessionToken    string `yaml:"session_token,omitempty" json:"session_token,omitempty"`
 }
 
-type AWSAssumeRole struct {
+type AssumeRole struct {
 	RoleARN    string `yaml:"role_arn,omitempty" json:"role_arn,omitempty"`
 	ExternalID string `yaml:"external_id,omitempty" json:"external_id,omitempty"`
 }
 
-type AWSModeAssumeRoleConfig struct {
+type ModeAssumeRoleConfig struct {
 	// Roles are assumed one per monitored account; account_id is resolved per role
 	// via sts:GetCallerIdentity.
-	Roles []AWSAssumeRole `yaml:"roles,omitempty" json:"roles,omitempty"`
+	Roles []AssumeRole `yaml:"roles,omitempty" json:"roles,omitempty"`
 	// IncludeBaseAccount also monitors the base identity's own account (the identity
 	// used to assume the roles). Off by default: with roles set, only the assumed-role
 	// accounts are monitored.
 	IncludeBaseAccount bool `yaml:"include_base_account,omitempty" json:"include_base_account,omitempty"`
 }
 
-type AWSAuthConfig struct {
-	Mode           string                   `yaml:"mode,omitempty" json:"mode,omitempty"`
-	ModeAccessKey  *AWSModeAccessKeyConfig  `yaml:"mode_access_key,omitempty" json:"mode_access_key,omitempty"`
-	ModeAssumeRole *AWSModeAssumeRoleConfig `yaml:"mode_assume_role,omitempty" json:"mode_assume_role,omitempty"`
+type Config struct {
+	Mode           string                `yaml:"mode,omitempty" json:"mode,omitempty"`
+	ModeAccessKey  *ModeAccessKeyConfig  `yaml:"mode_access_key,omitempty" json:"mode_access_key,omitempty"`
+	ModeAssumeRole *ModeAssumeRoleConfig `yaml:"mode_assume_role,omitempty" json:"mode_assume_role,omitempty"`
 }
 
-// AWSConfigOptions controls how the regional aws.Config is built.
-type AWSConfigOptions struct {
+// ConfigOptions controls how the regional aws.Config is built.
+type ConfigOptions struct {
 	// Region is the AWS region the resulting config targets.
 	Region string
 	// STSRegion overrides the STS endpoint region for assume_role mode.
@@ -66,15 +66,15 @@ type AWSConfigOptions struct {
 	STSRegion string
 }
 
-func (c AWSAuthConfig) NormalizedMode() string {
+func (c Config) NormalizedMode() string {
 	return strings.ToLower(strings.TrimSpace(c.Mode))
 }
 
-func (c AWSAuthConfig) Validate() error {
-	return c.ValidateWithPath(awsAuthConfigPath)
+func (c Config) Validate() error {
+	return c.ValidateWithPath(defaultConfigPath)
 }
 
-func (c AWSAuthConfig) ValidateWithPath(path string) error {
+func (c Config) ValidateWithPath(path string) error {
 	modeField := fieldPath(path, "mode")
 	mode := c.NormalizedMode()
 
@@ -83,11 +83,11 @@ func (c AWSAuthConfig) ValidateWithPath(path string) error {
 	}
 
 	switch mode {
-	case AWSAuthModeDefault:
+	case ModeDefault:
 		return nil
-	case AWSAuthModeAccessKey:
+	case ModeAccessKey:
 		if c.ModeAccessKey == nil {
-			return fmt.Errorf("%s is required when %s is %q", fieldPath(path, "mode_access_key"), modeField, AWSAuthModeAccessKey)
+			return fmt.Errorf("%s is required when %s is %q", fieldPath(path, "mode_access_key"), modeField, ModeAccessKey)
 		}
 		var errs []error
 		if strings.TrimSpace(c.ModeAccessKey.AccessKeyID) == "" {
@@ -97,10 +97,10 @@ func (c AWSAuthConfig) ValidateWithPath(path string) error {
 			errs = append(errs, errors.New(fieldPath(path, "mode_access_key.secret_access_key")+" is required"))
 		}
 		return errors.Join(errs...)
-	case AWSAuthModeAssumeRole:
+	case ModeAssumeRole:
 		rolesField := fieldPath(path, "mode_assume_role.roles")
 		if c.ModeAssumeRole == nil || len(c.ModeAssumeRole.Roles) == 0 {
-			return fmt.Errorf("%s must contain at least one role when %s is %q", rolesField, modeField, AWSAuthModeAssumeRole)
+			return fmt.Errorf("%s must contain at least one role when %s is %q", rolesField, modeField, ModeAssumeRole)
 		}
 		// One role per monitored account; each needs a role_arn.
 		var errs []error
@@ -112,7 +112,7 @@ func (c AWSAuthConfig) ValidateWithPath(path string) error {
 		return errors.Join(errs...)
 	default:
 		return fmt.Errorf("%s %q is invalid: expected one of %q, %q, %q",
-			modeField, c.Mode, AWSAuthModeDefault, AWSAuthModeAccessKey, AWSAuthModeAssumeRole)
+			modeField, c.Mode, ModeDefault, ModeAccessKey, ModeAssumeRole)
 	}
 }
 
@@ -123,16 +123,16 @@ type Identity struct {
 	// cache key: the role ARN for an assumed-role identity, or the mode name
 	// (default/access_key) or "base" for a base identity.
 	Ref  string
-	auth AWSAuthConfig
-	role *AWSAssumeRole // non-nil => assume this role; nil => base identity (no assumption)
+	auth Config
+	role *AssumeRole // non-nil => assume this role; nil => base identity (no assumption)
 }
 
 // Identities returns the distinct credential sources this config monitors: exactly
 // one for default/access_key; one per role for assume_role, plus the base identity
 // when include_base_account is set. The order is stable (roles as configured, base
 // last).
-func (c AWSAuthConfig) Identities() []Identity {
-	if c.NormalizedMode() == AWSAuthModeAssumeRole && c.ModeAssumeRole != nil {
+func (c Config) Identities() []Identity {
+	if c.NormalizedMode() == ModeAssumeRole && c.ModeAssumeRole != nil {
 		ids := make([]Identity, 0, len(c.ModeAssumeRole.Roles)+1)
 		for i := range c.ModeAssumeRole.Roles {
 			ids = append(ids, Identity{
@@ -156,7 +156,7 @@ func (c AWSAuthConfig) Identities() []Identity {
 //	  or static access keys.
 //	assumed-role identity -> the base identity assumes the role via a regional STS
 //	  endpoint, cached.
-func (id Identity) NewConfig(ctx context.Context, opts AWSConfigOptions) (aws.Config, error) {
+func (id Identity) NewConfig(ctx context.Context, opts ConfigOptions) (aws.Config, error) {
 	if err := id.auth.Validate(); err != nil {
 		return aws.Config{}, err
 	}
@@ -176,7 +176,7 @@ func (id Identity) NewConfig(ctx context.Context, opts AWSConfigOptions) (aws.Co
 	if region != "" {
 		loadOpts = append(loadOpts, awsconfig.WithRegion(region))
 	}
-	if id.auth.NormalizedMode() == AWSAuthModeAccessKey {
+	if id.auth.NormalizedMode() == ModeAccessKey {
 		ak := id.auth.ModeAccessKey
 		loadOpts = append(loadOpts, awsconfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(

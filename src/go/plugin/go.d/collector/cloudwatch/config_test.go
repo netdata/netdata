@@ -20,7 +20,7 @@ func validBaseConfig() Config {
 	return Config{
 		UpdateEvery: 60,
 		Regions:     []string{"us-east-1"},
-		Auth:        awsauth.AWSAuthConfig{Mode: awsauth.AWSAuthModeDefault},
+		Auth:        awsauth.Config{Mode: awsauth.ModeDefault},
 		Profiles:    ProfilesConfig{Mode: profilesModeAuto},
 		Discovery:   DiscoveryConfig{RefreshEvery: 300},
 		QueryOffset: 600,
