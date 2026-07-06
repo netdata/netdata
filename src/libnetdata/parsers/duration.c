@@ -116,6 +116,21 @@ inline int64_t duration_round_to_resolution(int64_t value, int64_t resolution) {
     return 0;
 }
 
+#if defined(__SIZEOF_INT128__)
+typedef unsigned __int128 duration_snprintf_uint_t;
+#else
+typedef uint64_t duration_snprintf_uint_t;
+#endif
+
+static inline duration_snprintf_uint_t duration_round_to_resolution_u(
+    duration_snprintf_uint_t value,
+    duration_snprintf_uint_t resolution) {
+    duration_snprintf_uint_t quotient = value / resolution;
+    duration_snprintf_uint_t remainder = value % resolution;
+
+    return quotient + (remainder > resolution / 2);
+}
+
 // -------------------------------------------------------------------------------------------------------------------
 // parse a duration string
 
@@ -317,15 +332,21 @@ ssize_t duration_snprintf(char *dst, size_t dst_size, int64_t value, const char 
         return snprintfz(dst, dst_size, "off");
 
     const char *sign = "";
+    uint64_t magnitude = (uint64_t)value;
     if(value < 0) {
         sign = "-";
-        value = -value;
+        magnitude = (uint64_t)(-(value + 1)) + 1;
     }
 
     const struct duration_unit *du_min = duration_find_unit(unit);
     size_t offset = 0;
 
-    int64_t nsec = value * du_min->multiplier;
+#if !defined(__SIZEOF_INT128__)
+    if(unlikely(magnitude > UINT64_MAX / (uint64_t)du_min->multiplier))
+        return -3;
+#endif
+
+    duration_snprintf_uint_t nsec = (duration_snprintf_uint_t)magnitude * (duration_snprintf_uint_t)du_min->multiplier;
 
     // Iterate through units from largest to smallest
     for (ssize_t i = (ssize_t)(sizeof(units) / sizeof(units[0])) - 1; i >= 0 && nsec > 0; i--) {
@@ -339,14 +360,20 @@ ssize_t duration_snprintf(char *dst, size_t dst_size, int64_t value, const char 
         // we have to round the value per unit (inside this loop), not globally.
         // Otherwise, we have to make sure that all larger units are integer multiples of the smaller ones.
 
-        int64_t multiplier = units[i].multiplier;
-        int64_t rounded = (du == du_min) ? (duration_round_to_resolution(nsec, multiplier) * multiplier) : nsec;
+        duration_snprintf_uint_t multiplier = (duration_snprintf_uint_t)units[i].multiplier;
+        duration_snprintf_uint_t rounded =
+            (du == du_min) ? (duration_round_to_resolution_u(nsec, multiplier) * multiplier) : nsec;
 
-        int64_t unit_count = rounded / multiplier;
+        duration_snprintf_uint_t unit_count = rounded / multiplier;
         if (unit_count > 0) {
+#if defined(__SIZEOF_INT128__)
+            if(unlikely(unit_count > UINT64_MAX))
+                return -3;
+#endif
+
             const char *space = (add_spaces && offset) ? " " : "";
             int written = snprintfz(dst + offset, dst_size - offset,
-                                    "%s%s%" PRIi64 "%s", space, sign, unit_count, units[i].unit);
+                                    "%s%s%" PRIu64 "%s", space, sign, (uint64_t)unit_count, units[i].unit);
 
             if (written < 0)
                 return -3;
@@ -359,10 +386,11 @@ ssize_t duration_snprintf(char *dst, size_t dst_size, int64_t value, const char 
                 return (ssize_t)offset;
             }
 
-            if(unit_count * multiplier >= nsec)
+            duration_snprintf_uint_t unit_nsec = unit_count * multiplier;
+            if(unit_nsec >= nsec)
                 break;
             else
-                nsec -= unit_count * multiplier;
+                nsec -= unit_nsec;
         }
 
         if(du == du_min)
