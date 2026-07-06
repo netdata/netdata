@@ -12,7 +12,7 @@ The static install (the kickstart `--static-only` path) bundles the plugin autom
 
 - A working Netdata Agent on the host that will receive flow data.
 - That host must be reachable on UDP from your routers and switches. The stock plugin listens on UDP `2055` for NetFlow/IPFIX and UDP `6343` for sFlow.
-- A Netdata installation that includes `netdata-plugin-netflow`. Native Linux packages install it as a separate package; static installs bundle it automatically (except the ARMv6 build — Raspberry Pi 1 / Zero); source builds need a Rust toolchain.
+- A Netdata installation that includes `netdata-plugin-netflow`. Native Linux packages install it as a separate package; static installs bundle it automatically (except the ARMv6 build — Raspberry Pi 1 / Zero); source builds need a Rust toolchain **and** `--enable-plugin-netflow` (disabled by default).
 
 ## Install on Debian / Ubuntu / Mint
 
@@ -57,12 +57,14 @@ ls /opt/netdata/usr/libexec/netdata/plugins.d/netflow-plugin
 
 ## Source build
 
-Building from source requires a Rust toolchain (rustc + cargo, version 1.83 or later). When CMake detects Rust, the plugin is built and installed alongside the rest of Netdata.
+Building from source requires a Rust toolchain (rustc + cargo, version 1.83 or later) **and**
+passing `--enable-plugin-netflow` to `netdata-installer.sh` -- the plugin is disabled by default
+in source builds regardless of whether a Rust toolchain is present.
 
 ```bash
 git clone https://github.com/netdata/netdata.git
 cd netdata
-sudo ./netdata-installer.sh
+sudo ./netdata-installer.sh --enable-plugin-netflow
 ```
 
 **Caveat:** source builds do **not** include the stock GeoIP / IP-intelligence database files. Packaged 32-bit installs ship the stock MMDB payload but do not include `topology-ip-intel-downloader`. The plugin starts fine without cache files, but country, city, and AS-name fields will be empty until you run the downloader once on an install that includes it:
