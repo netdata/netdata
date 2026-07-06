@@ -65,7 +65,7 @@ func (c *Collector) ensureAccounts(ctx context.Context) error {
 			// Keep the identity pending and retry next cycle; throttle the warning so a
 			// persistently unreachable role does not warn every cycle.
 			c.Limit(logKeyAccountResolveFailed+":"+id.Ref, 1, recurringLogEvery).
-				Warningf("CloudWatch: could not resolve account for identity %q (will retry): %v", id.Ref, err)
+				Warningf("CloudWatch: %v (will retry next cycle)", err)
 			continue
 		}
 		c.resolvedRefs[id.Ref] = struct{}{}
@@ -95,15 +95,15 @@ func (c *Collector) resolveAccountID(ctx context.Context, id awsauth.Identity, r
 
 	cfg, err := c.newAWSConfig(cctx, id, region)
 	if err != nil {
-		return "", fmt.Errorf("building AWS config: %w", err)
+		return "", fmt.Errorf("identity %q (region %q): building AWS config: %w", id.Ref, region, err)
 	}
 
 	out, err := c.newSTSClient(cfg).GetCallerIdentity(cctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
-		return "", fmt.Errorf("sts:GetCallerIdentity: %w", err)
+		return "", fmt.Errorf("identity %q (region %q): sts:GetCallerIdentity: %w", id.Ref, region, err)
 	}
 	if out.Account == nil || *out.Account == "" {
-		return "", errors.New("sts:GetCallerIdentity returned no account id")
+		return "", fmt.Errorf("identity %q (region %q): sts:GetCallerIdentity returned no account id", id.Ref, region)
 	}
 	return *out.Account, nil
 }

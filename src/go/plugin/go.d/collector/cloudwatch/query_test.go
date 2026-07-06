@@ -276,7 +276,7 @@ func TestExecuteQueries(t *testing.T) {
 }
 
 // TestBuildChunkJobs verifies query batching into GetMetricData-sized chunks (one
-// job per chunk) and that a group whose region client failed is skipped and
+// job per chunk) and that a group whose (account, region) client failed is skipped and
 // marked failed. chunkSize is an explicit argument, so production passes the fixed
 // metricsPerQuery (the AWS 500/call maximum) while tests exercise the multi-chunk
 // split without constructing 500+ queries.
@@ -401,7 +401,7 @@ func TestExecuteQueries_RegionClientFailures(t *testing.T) {
 		wantSamples int
 		wantRegion  string
 	}{
-		"all region clients fail errors": {
+		"all clients fail errors": {
 			regions:    []string{"us-east-1"},
 			instances:  map[string][][]string{"us-east-1": {{"i-1"}}},
 			failRegion: func(string) bool { return true },

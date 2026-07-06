@@ -17,7 +17,7 @@ import (
 )
 
 // chunkJob is one GetMetricData call: a chunk of a group's queries together with
-// the region client and time window they share.
+// the (account, region) client and time window they share.
 type chunkJob struct {
 	key    queryGroupKey
 	client cloudwatchClient
@@ -49,7 +49,7 @@ func withTimeout(ctx context.Context, d time.Duration) (context.Context, context
 // GetMetricData ≤500-query limit, and runs the chunks concurrently bounded by
 // apiConcurrency, each bounded by the configured timeout. It returns the
 // collected samples and the set of (account, region, period) groups that did NOT fully
-// succeed (a region client failed, or a chunk errored), so the caller advances
+// succeed (an (account, region) client failed, or a chunk errored), so the caller advances
 // the query schedule only for groups that succeeded. An all-failed pass returns
 // an error.
 func (c *Collector) executeQueries(ctx context.Context, plan []plannedQuery, now time.Time) ([]querySample, map[string]bool, map[queryGroupKey]bool, error) {
@@ -117,8 +117,8 @@ func (c *Collector) resolveGroupClients(ctx context.Context, groups map[queryGro
 }
 
 // buildChunkJobs splits each group's queries into GetMetricData-sized chunks
-// paired with the group's region client and time window. A group whose region
-// client failed is marked failed and skipped.
+// paired with the group's (account, region) client and time window. A group whose
+// (account, region) client failed is marked failed and skipped.
 func (c *Collector) buildChunkJobs(groups map[queryGroupKey][]cwtypes.MetricDataQuery, groupClients map[clientKey]cloudwatchClient, groupErrs map[clientKey]error, now time.Time, chunkSize int) ([]chunkJob, map[queryGroupKey]bool) {
 	failedGroups := make(map[queryGroupKey]bool)
 	var jobs []chunkJob

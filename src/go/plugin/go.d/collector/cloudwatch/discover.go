@@ -405,7 +405,7 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	// with shared regions across many accounts, empty successes are expected — and
 	// any carried-forward snapshot keeps the collector running.
 	if c.discovery.FetchedAt.IsZero() && len(results) > 0 && len(errs) == len(results) {
-		return fmt.Errorf("CloudWatch discovery failed for all %d (account, namespace, region) targets", len(results))
+		return fmt.Errorf("CloudWatch discovery failed for all %d (account, profile, region) targets", len(results))
 	}
 
 	c.discovery = snap

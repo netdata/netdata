@@ -16,7 +16,7 @@ type observedSeries struct {
 	seriesName string
 	labels     []metrix.Label
 	value      float64
-	groupKey   queryGroupKey // (region, effective period) — the scheduling unit
+	groupKey   queryGroupKey // (account, region, effective period) — the scheduling unit
 }
 
 // observationStore owns the metric write path together with the per-series
@@ -27,7 +27,7 @@ type observedSeries struct {
 type observationStore struct {
 	store        metrix.CollectorStore
 	lastObserved map[string]observedSeries   // last value per series, for retention re-emit
-	nextQueryAt  map[queryGroupKey]time.Time // next due time per (region, effective period)
+	nextQueryAt  map[queryGroupKey]time.Time // next due time per (account, region, effective period)
 }
 
 func newObservationStore(store metrix.CollectorStore) *observationStore {
