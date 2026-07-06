@@ -186,14 +186,26 @@ static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider,
 #define WINEVT_PUBLISHERS_KEY L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Publishers\\"
 
 static bool wel_manifest_is_current(void) {
-    wchar_t key[MAX_PATH];
-    swprintf(key, _countof(key), L"%ls%ls", WINEVT_PUBLISHERS_KEY, NETDATA_WEL_PROVIDER_DAEMON_GUID_STR_W);
-    HKEY hKey;
-    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, key, 0, KEY_READ, &hKey) == ERROR_SUCCESS) {
+    // All five importChannel provider GUIDs must be present; a partial registration
+    // (e.g. only Daemon from an older version) must also trigger re-installation.
+    static const wchar_t *const provider_guids[] = {
+        NETDATA_WEL_PROVIDER_DAEMON_GUID_STR_W,
+        NETDATA_WEL_PROVIDER_COLLECTORS_GUID_STR_W,
+        NETDATA_WEL_PROVIDER_ACCESS_GUID_STR_W,
+        NETDATA_WEL_PROVIDER_HEALTH_GUID_STR_W,
+        NETDATA_WEL_PROVIDER_ACLK_GUID_STR_W,
+    };
+
+    for (size_t i = 0; i < _countof(provider_guids); i++) {
+        wchar_t key[MAX_PATH];
+        swprintf(key, _countof(key), L"%ls%ls", WINEVT_PUBLISHERS_KEY, provider_guids[i]);
+        HKEY hKey;
+        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, key, 0, KEY_READ, &hKey) != ERROR_SUCCESS)
+            return false;
         RegCloseKey(hKey);
-        return true;
     }
-    return false;
+
+    return true;
 }
 
 static bool wel_run_silent(const wchar_t *exe, const wchar_t *params) {
