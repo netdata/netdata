@@ -48,7 +48,7 @@ void nd_env_normalize_dir_path(const char *src, char *dst, size_t dst_size) {
 // Walk every '/' separator and create each prefix, ignoring failures
 // (the parent may already exist).  The drive root "X:" is skipped
 // because mkdir on a bare drive letter always fails.
-static void mkdir_recursive(const char *native_path, int perms) {
+void mkdir_recursive(const char *native_path, int perms) {
     char tmp[FILENAME_MAX + 1];
     strncpyz(tmp, native_path, FILENAME_MAX);
 

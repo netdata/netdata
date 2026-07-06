@@ -13,5 +13,8 @@ extern char *pidfile;
 
 void nd_env_normalize_dir_path(const char *src, char *dst, size_t dst_size);
 void verify_required_directory(const char *env, const char *dir, bool create_it, int perms);
+#if defined(OS_WINDOWS)
+void mkdir_recursive(const char *native_path, int perms);
+#endif
 
 #endif /* NETDATA_DAEMON_H */
