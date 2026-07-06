@@ -127,7 +127,7 @@ func TestCheck_PopulatesChartTemplateBeforeCollect(t *testing.T) {
 	c.Profiles = ProfilesConfig{Mode: profilesModeAuto}
 	c.applyDefaults()
 	c.newCatalog = cwprofiles.LoadFromDefaultDirs
-	c.newAWSConfig = func(_ context.Context, _ awsauth.AWSAuthConfig, region string) (aws.Config, error) {
+	c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
 		return aws.Config{Region: region}, nil
 	}
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
@@ -221,7 +221,7 @@ func TestObserve_PerRegionScheduleIsolation(t *testing.T) {
 	c.applyDefaults()
 	c.profiles = []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2}}
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
-	c.newAWSConfig = func(_ context.Context, _ awsauth.AWSAuthConfig, region string) (aws.Config, error) {
+	c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
 		return aws.Config{Region: region}, nil
 	}
 	c.newCloudWatchClient = func(cfg aws.Config) cloudwatchClient {
@@ -487,13 +487,13 @@ func TestCleanup_ResetsRuntimeState(t *testing.T) {
 
 	_, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	require.NotEmpty(t, c.accountID)
+	require.NotEmpty(t, c.accounts)
 	require.NotEmpty(t, c.observations.lastObserved)
 	require.NotEmpty(t, c.observations.nextQueryAt)
 
 	c.Cleanup(context.Background())
 
-	assert.Empty(t, c.accountID)
+	assert.Empty(t, c.accounts)
 	assert.Nil(t, c.profiles)
 	assert.Empty(t, c.observations.lastObserved)
 	assert.Empty(t, c.observations.nextQueryAt)

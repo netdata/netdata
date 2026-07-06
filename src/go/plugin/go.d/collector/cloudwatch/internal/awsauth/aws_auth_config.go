@@ -23,6 +23,10 @@ const (
 	AWSAuthModeAssumeRole = "assume_role"
 
 	awsAuthConfigPath = "cloud_auth.aws"
+
+	// baseIdentityRef is Identity.Ref for the base credential source when it is
+	// monitored alongside assumed roles (include_base_account).
+	baseIdentityRef = "base"
 )
 
 type AWSModeAccessKeyConfig struct {
@@ -37,7 +41,13 @@ type AWSAssumeRole struct {
 }
 
 type AWSModeAssumeRoleConfig struct {
+	// Roles are assumed one per monitored account; account_id is resolved per role
+	// via sts:GetCallerIdentity.
 	Roles []AWSAssumeRole `yaml:"roles,omitempty" json:"roles,omitempty"`
+	// IncludeBaseAccount also monitors the base identity's own account (the identity
+	// used to assume the roles). Off by default: with roles set, only the assumed-role
+	// accounts are monitored.
+	IncludeBaseAccount bool `yaml:"include_base_account,omitempty" json:"include_base_account,omitempty"`
 }
 
 type AWSAuthConfig struct {
@@ -92,33 +102,62 @@ func (c AWSAuthConfig) ValidateWithPath(path string) error {
 		if c.ModeAssumeRole == nil || len(c.ModeAssumeRole.Roles) == 0 {
 			return fmt.Errorf("%s must contain at least one role when %s is %q", rolesField, modeField, AWSAuthModeAssumeRole)
 		}
-		// MVP supports a single role; the schema is a list from day one so
-		// multi-account fan-out can be enabled later without a breaking change.
-		if len(c.ModeAssumeRole.Roles) != 1 {
-			return fmt.Errorf("%s currently supports exactly one role", rolesField)
+		// One role per monitored account; each needs a role_arn.
+		var errs []error
+		for i, r := range c.ModeAssumeRole.Roles {
+			if strings.TrimSpace(r.RoleARN) == "" {
+				errs = append(errs, errors.New(fieldPath(path, fmt.Sprintf("mode_assume_role.roles[%d].role_arn", i))+" is required"))
+			}
 		}
-		if strings.TrimSpace(c.ModeAssumeRole.Roles[0].RoleARN) == "" {
-			return errors.New(fieldPath(path, "mode_assume_role.roles[0].role_arn") + " is required")
-		}
-		return nil
+		return errors.Join(errs...)
 	default:
 		return fmt.Errorf("%s %q is invalid: expected one of %q, %q, %q",
 			modeField, c.Mode, AWSAuthModeDefault, AWSAuthModeAccessKey, AWSAuthModeAssumeRole)
 	}
 }
 
-// NewConfig builds a regional aws.Config for the configured auth mode.
+// Identity is one AWS credential source the collector treats as a distinct account.
+// Build a regional aws.Config for it with NewConfig.
+type Identity struct {
+	// Ref is a stable, config-derived reference used for logging and as a pre-STS
+	// cache key: the role ARN for an assumed-role identity, or the mode name
+	// (default/access_key) or "base" for a base identity.
+	Ref  string
+	auth AWSAuthConfig
+	role *AWSAssumeRole // non-nil => assume this role; nil => base identity (no assumption)
+}
+
+// Identities returns the distinct credential sources this config monitors: exactly
+// one for default/access_key; one per role for assume_role, plus the base identity
+// when include_base_account is set. The order is stable (roles as configured, base
+// last).
+func (c AWSAuthConfig) Identities() []Identity {
+	if c.NormalizedMode() == AWSAuthModeAssumeRole && c.ModeAssumeRole != nil {
+		ids := make([]Identity, 0, len(c.ModeAssumeRole.Roles)+1)
+		for i := range c.ModeAssumeRole.Roles {
+			ids = append(ids, Identity{
+				Ref:  strings.TrimSpace(c.ModeAssumeRole.Roles[i].RoleARN),
+				auth: c,
+				role: &c.ModeAssumeRole.Roles[i],
+			})
+		}
+		if c.ModeAssumeRole.IncludeBaseAccount {
+			ids = append(ids, Identity{Ref: baseIdentityRef, auth: c})
+		}
+		return ids
+	}
+	return []Identity{{Ref: c.NormalizedMode(), auth: c}}
+}
+
+// NewConfig builds a regional aws.Config for this identity.
 //
-// default     -> SDK default credential chain (env, shared config, instance
-//
-//	profile, IRSA/web-identity).
-//
-// access_key  -> static credentials.
-// assume_role -> base identity assumes the configured role via a regional STS
-//
-//	endpoint, cached.
-func (c AWSAuthConfig) NewConfig(ctx context.Context, opts AWSConfigOptions) (aws.Config, error) {
-	if err := c.Validate(); err != nil {
+//	base identity (default / access_key / the included base) -> SDK default
+//	  credential chain (env, shared config, instance profile, IRSA/web-identity),
+//	  or static access keys.
+//	assumed-role identity -> the base identity assumes the role via a regional STS
+//	  endpoint, cached.
+func (id Identity) NewConfig(ctx context.Context, opts AWSConfigOptions) (aws.Config, error) {
+	if err := id.auth.Validate(); err != nil {
 		return aws.Config{}, err
 	}
 
@@ -137,10 +176,8 @@ func (c AWSAuthConfig) NewConfig(ctx context.Context, opts AWSConfigOptions) (aw
 	if region != "" {
 		loadOpts = append(loadOpts, awsconfig.WithRegion(region))
 	}
-
-	switch c.NormalizedMode() {
-	case AWSAuthModeAccessKey:
-		ak := c.ModeAccessKey
+	if id.auth.NormalizedMode() == AWSAuthModeAccessKey {
+		ak := id.auth.ModeAccessKey
 		loadOpts = append(loadOpts, awsconfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(
 				strings.TrimSpace(ak.AccessKeyID),
@@ -148,31 +185,31 @@ func (c AWSAuthConfig) NewConfig(ctx context.Context, opts AWSConfigOptions) (aw
 				strings.TrimSpace(ak.SessionToken),
 			),
 		))
-		return awsconfig.LoadDefaultConfig(ctx, loadOpts...)
-	case AWSAuthModeAssumeRole:
-		base, err := awsconfig.LoadDefaultConfig(ctx, loadOpts...)
-		if err != nil {
-			return aws.Config{}, err
-		}
-		role := c.ModeAssumeRole.Roles[0]
-		stsRegion := strings.TrimSpace(opts.STSRegion)
-		if stsRegion == "" {
-			stsRegion = region
-		}
-		stsClient := sts.NewFromConfig(base, func(o *sts.Options) {
-			if stsRegion != "" {
-				o.Region = stsRegion
-			}
-		})
-		provider := stscreds.NewAssumeRoleProvider(stsClient, strings.TrimSpace(role.RoleARN), func(o *stscreds.AssumeRoleOptions) {
-			o.RoleSessionName = "netdata" // stable session name for legible CloudTrail entries
-			if v := strings.TrimSpace(role.ExternalID); v != "" {
-				o.ExternalID = aws.String(v)
-			}
-		})
-		base.Credentials = aws.NewCredentialsCache(provider)
-		return base, nil
-	default: // AWSAuthModeDefault
-		return awsconfig.LoadDefaultConfig(ctx, loadOpts...)
 	}
+
+	base, err := awsconfig.LoadDefaultConfig(ctx, loadOpts...)
+	if err != nil {
+		return aws.Config{}, err
+	}
+	if id.role == nil {
+		return base, nil // base identity — no role assumption
+	}
+
+	stsRegion := strings.TrimSpace(opts.STSRegion)
+	if stsRegion == "" {
+		stsRegion = region
+	}
+	stsClient := sts.NewFromConfig(base, func(o *sts.Options) {
+		if stsRegion != "" {
+			o.Region = stsRegion
+		}
+	})
+	provider := stscreds.NewAssumeRoleProvider(stsClient, strings.TrimSpace(id.role.RoleARN), func(o *stscreds.AssumeRoleOptions) {
+		o.RoleSessionName = "netdata" // stable session name for legible CloudTrail entries
+		if v := strings.TrimSpace(id.role.ExternalID); v != "" {
+			o.ExternalID = aws.String(v)
+		}
+	})
+	base.Credentials = aws.NewCredentialsCache(provider)
+	return base, nil
 }

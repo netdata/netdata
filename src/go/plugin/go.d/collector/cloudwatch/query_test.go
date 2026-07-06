@@ -64,7 +64,7 @@ func ec2QueryCollector(regions []string, instancesByRegion map[string][][]string
 	c := New()
 	c.Config.Regions = regions
 	c.applyDefaults()
-	c.accountID = "123456789012"
+	c.accounts = []cwAccount{{accountID: "123456789012"}}
 	c.profiles = []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}}
 
 	insts := make(map[discoveryKey][]discoveredInstance)
@@ -73,7 +73,7 @@ func ec2QueryCollector(regions []string, instancesByRegion map[string][][]string
 		for _, vals := range list {
 			di = append(di, discoveredInstance{DimensionValues: vals})
 		}
-		insts[discoveryKey{Profile: "ec2", Region: region}] = di
+		insts[discoveryKey{Account: "123456789012", Profile: "ec2", Region: region}] = di
 	}
 	c.discovery = discoverySnapshot{Instances: insts}
 	return c
@@ -137,7 +137,7 @@ func TestBuildQueryPlan_ConstantDimension(t *testing.T) {
 	c := New()
 	c.Config.Regions = []string{"us-east-1"}
 	c.applyDefaults()
-	c.accountID = "123456789012"
+	c.accounts = []cwAccount{{accountID: "123456789012"}}
 	c.profiles = []cwprofiles.ResolvedProfile{{Name: "cloudfront", Config: cwprofiles.Profile{
 		Namespace: "AWS/CloudFront",
 		Period:    300,
@@ -150,7 +150,7 @@ func TestBuildQueryPlan_ConstantDimension(t *testing.T) {
 		},
 	}}}
 	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
-		{Profile: "cloudfront", Region: "us-east-1"}: {{DimensionValues: []string{"E1", "Global"}}},
+		{Account: "123456789012", Profile: "cloudfront", Region: "us-east-1"}: {{DimensionValues: []string{"E1", "Global"}}},
 	}}
 
 	plan := c.buildQueryPlan()
@@ -289,28 +289,28 @@ func TestBuildChunkJobs(t *testing.T) {
 		}
 		return map[queryGroupKey][]cwtypes.MetricDataQuery{key: qs}
 	}
-	ok := map[string]cloudwatchClient{"us-east-1": &gmdCloudWatch{}}
+	ok := map[clientKey]cloudwatchClient{{region: "us-east-1"}: &gmdCloudWatch{}}
 
 	tests := map[string]struct {
-		groups        map[queryGroupKey][]cwtypes.MetricDataQuery
-		regionClients map[string]cloudwatchClient
-		regionErrs    map[string]error
-		chunkSize     int
-		wantJobs      int
-		wantQueries   int
-		wantFailed    bool
+		groups       map[queryGroupKey][]cwtypes.MetricDataQuery
+		groupClients map[clientKey]cloudwatchClient
+		groupErrs    map[clientKey]error
+		chunkSize    int
+		wantJobs     int
+		wantQueries  int
+		wantFailed   bool
 	}{
-		"all queries fit one chunk":           {groups: groupOf(6), regionClients: ok, chunkSize: 500, wantJobs: 1, wantQueries: 6},
-		"split into even chunks":              {groups: groupOf(6), regionClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 6},
-		"uneven last chunk":                   {groups: groupOf(5), regionClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 5},
-		"group without a region client fails": {groups: groupOf(6), regionClients: map[string]cloudwatchClient{}, regionErrs: map[string]error{"us-east-1": errors.New("no client")}, chunkSize: 2, wantJobs: 0, wantFailed: true},
+		"all queries fit one chunk":             {groups: groupOf(6), groupClients: ok, chunkSize: 500, wantJobs: 1, wantQueries: 6},
+		"split into even chunks":                {groups: groupOf(6), groupClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 6},
+		"uneven last chunk":                     {groups: groupOf(5), groupClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 5},
+		"group without an account client fails": {groups: groupOf(6), groupClients: map[clientKey]cloudwatchClient{}, groupErrs: map[clientKey]error{{region: "us-east-1"}: errors.New("no client")}, chunkSize: 2, wantJobs: 0, wantFailed: true},
 	}
 
 	c := New()
 	c.applyDefaults()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			jobs, failed := c.buildChunkJobs(tc.groups, tc.regionClients, tc.regionErrs, time.Unix(1_000_000_000, 0), tc.chunkSize)
+			jobs, failed := c.buildChunkJobs(tc.groups, tc.groupClients, tc.groupErrs, time.Unix(1_000_000_000, 0), tc.chunkSize)
 			require.Len(t, jobs, tc.wantJobs)
 			total := 0
 			for _, j := range jobs {
@@ -420,7 +420,7 @@ func TestExecuteQueries_RegionClientFailures(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c := ec2QueryCollector(tc.regions, tc.instances)
 			fake := &gmdCloudWatch{value: 7}
-			c.newAWSConfig = func(_ context.Context, _ awsauth.AWSAuthConfig, region string) (aws.Config, error) {
+			c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
 				if tc.failRegion(region) {
 					return aws.Config{}, errors.New("no credentials for region")
 				}

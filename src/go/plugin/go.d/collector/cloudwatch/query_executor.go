@@ -58,14 +58,14 @@ func (c *Collector) executeQueries(ctx context.Context, plan []plannedQuery, now
 	}
 
 	byID, groups := indexPlan(plan)
-	regionClients, regionErrs := c.resolveRegionClients(ctx, groups)
-	c.Debugf("CloudWatch query: %d planned quer(y/ies) in %d (region,period) group(s); %d region client(s) ready, %d failed",
-		len(plan), len(groups), len(regionClients), len(regionErrs))
+	groupClients, groupErrs := c.resolveGroupClients(ctx, groups)
+	c.Debugf("CloudWatch query: %d planned quer(y/ies) in %d (account,region,period) group(s); %d client(s) ready, %d failed",
+		len(plan), len(groups), len(groupClients), len(groupErrs))
 
-	jobs, failedGroups := c.buildChunkJobs(groups, regionClients, regionErrs, now, metricsPerQuery)
+	jobs, failedGroups := c.buildChunkJobs(groups, groupClients, groupErrs, now, metricsPerQuery)
 	if len(jobs) == 0 {
-		if len(regionErrs) > 0 {
-			return nil, nil, nil, fmt.Errorf("CloudWatch query: no usable region clients (%d region(s) failed)", len(regionErrs))
+		if len(groupErrs) > 0 {
+			return nil, nil, nil, fmt.Errorf("CloudWatch query: no usable clients (%d account/region pair(s) failed)", len(groupErrs))
 		}
 		return nil, nil, nil, nil
 	}
@@ -91,42 +91,44 @@ func indexPlan(plan []plannedQuery) (map[string]plannedQuery, map[queryGroupKey]
 	return byID, groups
 }
 
-// resolveRegionClients builds one client per region once per pass, recording
-// per-region build errors so a failed region is attempted only once this pass.
-// forRegion is concurrency-safe; resolving up front keeps client building off
+// resolveGroupClients builds one client per (account, region) once per pass,
+// recording per-pair build errors so a failed pair is attempted only once this pass.
+// forAccountRegion is concurrency-safe; resolving up front keeps client building off
 // the fan-out below.
-func (c *Collector) resolveRegionClients(ctx context.Context, groups map[queryGroupKey][]cwtypes.MetricDataQuery) (map[string]cloudwatchClient, map[string]error) {
-	regionClients := make(map[string]cloudwatchClient)
-	regionErrs := make(map[string]error)
+func (c *Collector) resolveGroupClients(ctx context.Context, groups map[queryGroupKey][]cwtypes.MetricDataQuery) (map[clientKey]cloudwatchClient, map[clientKey]error) {
+	clients := make(map[clientKey]cloudwatchClient)
+	errs := make(map[clientKey]error)
 	for key := range groups {
-		if _, ok := regionClients[key.region]; ok {
+		ck := clientKey{account: key.account, region: key.region}
+		if _, ok := clients[ck]; ok {
 			continue
 		}
-		if _, bad := regionErrs[key.region]; bad {
+		if _, bad := errs[ck]; bad {
 			continue
 		}
-		client, err := c.clients.forRegion(ctx, key.region)
+		client, err := c.clients.forAccountRegion(ctx, key.account, key.region)
 		if err != nil {
-			regionErrs[key.region] = err
+			errs[ck] = err
 			continue
 		}
-		regionClients[key.region] = client
+		clients[ck] = client
 	}
-	return regionClients, regionErrs
+	return clients, errs
 }
 
 // buildChunkJobs splits each group's queries into GetMetricData-sized chunks
 // paired with the group's region client and time window. A group whose region
 // client failed is marked failed and skipped.
-func (c *Collector) buildChunkJobs(groups map[queryGroupKey][]cwtypes.MetricDataQuery, regionClients map[string]cloudwatchClient, regionErrs map[string]error, now time.Time, chunkSize int) ([]chunkJob, map[queryGroupKey]bool) {
+func (c *Collector) buildChunkJobs(groups map[queryGroupKey][]cwtypes.MetricDataQuery, groupClients map[clientKey]cloudwatchClient, groupErrs map[clientKey]error, now time.Time, chunkSize int) ([]chunkJob, map[queryGroupKey]bool) {
 	failedGroups := make(map[queryGroupKey]bool)
 	var jobs []chunkJob
 	for key, queries := range groups {
-		client, ok := regionClients[key.region]
+		ck := clientKey{account: key.account, region: key.region}
+		client, ok := groupClients[ck]
 		if !ok {
 			failedGroups[key] = true
-			c.Limit(logKeyQueryClientFailed+":"+key.region, 1, recurringLogEvery).
-				Warningf("CloudWatch query: build client for region %q: %v", key.region, regionErrs[key.region])
+			c.Limit(logKeyQueryClientFailed+":"+key.account+"/"+key.region, 1, recurringLogEvery).
+				Warningf("CloudWatch query: build client for account %q region %q: %v", key.account, key.region, groupErrs[ck])
 			continue
 		}
 		start, end := queryWindow(now, key.period, c.QueryOffset)
@@ -161,8 +163,8 @@ func (c *Collector) collectChunkResults(results []chunkResult, failedGroups map[
 		if r.err != nil {
 			failures++
 			failedGroups[r.key] = true
-			c.Limit(logKeyGetMetricDataFailed+":"+r.key.region, 1, recurringLogEvery).
-				Warningf("CloudWatch GetMetricData (region %q, period %ds): %v", r.key.region, r.key.period, r.err)
+			c.Limit(logKeyGetMetricDataFailed+":"+r.key.account+"/"+r.key.region, 1, recurringLogEvery).
+				Warningf("CloudWatch GetMetricData (account %q, region %q, period %ds): %v", r.key.account, r.key.region, r.key.period, r.err)
 			continue
 		}
 		samples = append(samples, r.samples...)
@@ -236,7 +238,7 @@ func (c *Collector) runGetMetricData(ctx context.Context, client cloudwatchClien
 		id := aws.ToString(q.Id)
 		if value, ok := valueByID[id]; ok {
 			pq := byID[id]
-			samples = append(samples, querySample{seriesName: pq.seriesName, labels: pq.labels, value: value, region: pq.region, period: pq.period})
+			samples = append(samples, querySample{seriesName: pq.seriesName, labels: pq.labels, value: value, account: pq.account, region: pq.region, period: pq.period})
 			continue
 		}
 		if usableByID[id] {

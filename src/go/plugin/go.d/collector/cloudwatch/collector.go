@@ -59,7 +59,7 @@ func New() *Collector {
 		newSTSClient:        defaultNewSTSClient,
 	}
 	c.observations = newObservationStore(c.store)
-	c.clients = newClientCache(c.buildRegionClient)
+	c.clients = newClientCache(c.buildAccountRegionClient)
 	return c
 }
 
@@ -71,21 +71,21 @@ type Collector struct {
 	now   func() time.Time
 
 	// client seams (overridden in tests)
-	newAWSConfig        func(ctx context.Context, auth awsauth.AWSAuthConfig, region string) (aws.Config, error)
+	newAWSConfig        func(ctx context.Context, id awsauth.Identity, region string) (aws.Config, error)
 	newCloudWatchClient func(cfg aws.Config) cloudwatchClient
 	newSTSClient        func(cfg aws.Config) stsClient
 	newCatalog          func() (cwprofiles.Catalog, error) // nil => cwprofiles.DefaultCatalog
 
-	accountID         string
+	accounts          []cwAccount // resolved AWS accounts (one per auth identity, deduped by account id)
 	chartTemplateYAML string
 
 	profiles  []cwprofiles.ResolvedProfile // candidate profiles selected per profiles.mode
-	clients   *clientCache                 // CloudWatch client cache, one per region
+	clients   *clientCache                 // CloudWatch client cache, one per (account, region)
 	discovery discoverySnapshot
 
 	discoverySig string // last-logged discovered-resources summary; Info re-logs only when it changes
 
-	observations *observationStore // retention cache + per-(region, period) query schedule
+	observations *observationStore // retention cache + per-(account, region, period) query schedule
 }
 
 func (c *Collector) Init(context.Context) error {
@@ -94,7 +94,7 @@ func (c *Collector) Init(context.Context) error {
 }
 
 func (c *Collector) Check(ctx context.Context) error {
-	if err := c.ensureAccountIdentity(ctx); err != nil {
+	if err := c.ensureAccounts(ctx); err != nil {
 		return err
 	}
 	// Resolve profiles and build the chart template here too: the framework
@@ -111,7 +111,7 @@ func (c *Collector) Cleanup(context.Context) {
 	// Reset runtime state so a framework re-Init (e.g. after a failed
 	// autodetection retry on the same instance) starts clean, mirroring
 	// azure_monitor. All ensure*/refresh paths rebuild lazily.
-	c.accountID = ""
+	c.accounts = nil
 	c.profiles = nil
 	c.chartTemplateYAML = ""
 	c.discovery = discoverySnapshot{}

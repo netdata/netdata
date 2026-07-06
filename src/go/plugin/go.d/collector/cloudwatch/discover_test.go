@@ -316,22 +316,22 @@ func TestDiscoverAll(t *testing.T) {
 		},
 	}
 
-	newClient := func(region string) (cloudwatchClient, error) {
+	newClient := func(_, region string) (cloudwatchClient, error) {
 		return &nsCloudWatch{byNS: regionData[region]}, nil
 	}
 
 	results := discoverAll(context.Background(), newClient,
-		[]cwprofiles.ResolvedProfile{ec2, s3}, []string{"us-east-1", "us-west-2"}, true, 5, 0)
+		[]string{"000000000000"}, []cwprofiles.ResolvedProfile{ec2, s3}, []string{"us-east-1", "us-west-2"}, true, 5, 0)
 	require.Len(t, results, 4)
 
 	snap, errs := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
 	require.Empty(t, errs)
 
 	assert.Equal(t, 4, snap.totalInstances())
-	assert.Equal(t, [][]string{{"i-1"}}, dimValues(snap.Instances[discoveryKey{"ec2", "us-east-1"}]))
-	assert.Equal(t, [][]string{{"i-2"}, {"i-3"}}, dimValues(snap.Instances[discoveryKey{"ec2", "us-west-2"}]))
-	assert.Equal(t, [][]string{{"b1", "StandardStorage"}}, dimValues(snap.Instances[discoveryKey{"s3", "us-east-1"}]))
-	assert.NotContains(t, snap.Instances, discoveryKey{"s3", "us-west-2"}, "empty target must be omitted")
+	assert.Equal(t, [][]string{{"i-1"}}, dimValues(snap.Instances[discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-east-1"}]))
+	assert.Equal(t, [][]string{{"i-2"}, {"i-3"}}, dimValues(snap.Instances[discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-west-2"}]))
+	assert.Equal(t, [][]string{{"b1", "StandardStorage"}}, dimValues(snap.Instances[discoveryKey{Account: "000000000000", Profile: "s3", Region: "us-east-1"}]))
+	assert.NotContains(t, snap.Instances, discoveryKey{Account: "000000000000", Profile: "s3", Region: "us-west-2"}, "empty target must be omitted")
 
 	assert.Equal(t, time.Unix(1000, 0), snap.FetchedAt)
 	assert.Equal(t, time.Unix(1300, 0), snap.ExpiresAt)
@@ -340,7 +340,7 @@ func TestDiscoverAll(t *testing.T) {
 func TestDiscoverAll_ClientBuildErrorIsPerTarget(t *testing.T) {
 	ec2 := resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))
 
-	newClient := func(region string) (cloudwatchClient, error) {
+	newClient := func(_, region string) (cloudwatchClient, error) {
 		if region == "bad-region" {
 			return nil, errors.New("no credentials for region")
 		}
@@ -350,29 +350,29 @@ func TestDiscoverAll_ClientBuildErrorIsPerTarget(t *testing.T) {
 	}
 
 	results := discoverAll(context.Background(), newClient,
-		[]cwprofiles.ResolvedProfile{ec2}, []string{"us-east-1", "bad-region"}, true, 5, 0)
+		[]string{"000000000000"}, []cwprofiles.ResolvedProfile{ec2}, []string{"us-east-1", "bad-region"}, true, 5, 0)
 
 	snap, errs := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
 	require.Len(t, errs, 1)
 	assert.Contains(t, errs[0].Error(), "bad-region")
 	assert.Equal(t, 1, snap.totalInstances())
-	assert.Contains(t, snap.Instances, discoveryKey{"ec2", "us-east-1"})
+	assert.Contains(t, snap.Instances, discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-east-1"})
 }
 
 func TestBuildDiscoverySnapshot_FailSoftCarriesForward(t *testing.T) {
 	prev := map[discoveryKey][]discoveredInstance{
-		{Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
-		{Profile: "ec2", Region: "us-west-2"}: {{DimensionValues: []string{"i-9"}}},
+		{Account: "000000000000", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
+		{Account: "000000000000", Profile: "ec2", Region: "us-west-2"}: {{DimensionValues: []string{"i-9"}}},
 	}
 	results := []discoveryResult{
-		{Key: discoveryKey{"ec2", "us-east-1"}, Instances: []discoveredInstance{{DimensionValues: []string{"i-2"}}}}, // refreshed
-		{Key: discoveryKey{"ec2", "us-west-2"}, Err: errors.New("throttled")},                                        // failed
+		{Key: discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-east-1"}, Instances: []discoveredInstance{{DimensionValues: []string{"i-2"}}}}, // refreshed
+		{Key: discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-west-2"}, Err: errors.New("throttled")},                                        // failed
 	}
 
 	snap, errs := buildDiscoverySnapshot(results, prev, time.Unix(1000, 0), 300)
 	require.Len(t, errs, 1)
-	assert.Equal(t, [][]string{{"i-2"}}, dimValues(snap.Instances[discoveryKey{"ec2", "us-east-1"}]), "succeeded target is refreshed")
-	assert.Equal(t, [][]string{{"i-9"}}, dimValues(snap.Instances[discoveryKey{"ec2", "us-west-2"}]), "failed target carries forward last-known instances")
+	assert.Equal(t, [][]string{{"i-2"}}, dimValues(snap.Instances[discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-east-1"}]), "succeeded target is refreshed")
+	assert.Equal(t, [][]string{{"i-9"}}, dimValues(snap.Instances[discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-west-2"}]), "failed target carries forward last-known instances")
 }
 
 func TestDiscoverySnapshot_Expired(t *testing.T) {
@@ -468,7 +468,7 @@ func newDiscoveryTestCollector(regionMetrics map[string]map[string][]cwtypes.Met
 		fakes[region] = &nsCloudWatch{byNS: byNS}
 	}
 
-	c.newAWSConfig = func(_ context.Context, _ awsauth.AWSAuthConfig, region string) (aws.Config, error) {
+	c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
 		return aws.Config{Region: region}, nil
 	}
 	c.newCloudWatchClient = func(cfg aws.Config) cloudwatchClient { return fakes[cfg.Region] }
@@ -482,6 +482,7 @@ func TestCollector_refreshDiscovery_TTLCaching(t *testing.T) {
 		"us-west-2": {"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-2")}},
 	})
 	c.profiles = []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))}
+	c.accounts = []cwAccount{{accountID: "000000000000"}}
 
 	base := time.Unix(1000, 0)
 	c.now = func() time.Time { return base }
@@ -506,8 +507,9 @@ func TestCollector_refreshDiscovery_TotalFailureFirstPassErrors(t *testing.T) {
 	c.Config.Regions = []string{"us-east-1"}
 	c.applyDefaults()
 	c.profiles = []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))}
+	c.accounts = []cwAccount{{accountID: "000000000000"}}
 	c.now = func() time.Time { return time.Unix(1000, 0) }
-	c.newAWSConfig = func(context.Context, awsauth.AWSAuthConfig, string) (aws.Config, error) {
+	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) {
 		return aws.Config{}, errors.New("no credentials")
 	}
 
@@ -525,7 +527,7 @@ func TestCollector_collect_runsDiscovery(t *testing.T) {
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
 
 	require.NoError(t, c.collect(context.Background()))
-	assert.Equal(t, "000000000000", c.accountID)
+	assert.Equal(t, []string{"000000000000"}, c.accountIDs())
 	assert.Equal(t, 1, c.discovery.totalInstances())
 }
 

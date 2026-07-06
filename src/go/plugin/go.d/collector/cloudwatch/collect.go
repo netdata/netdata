@@ -5,7 +5,7 @@ package cloudwatch
 import "context"
 
 func (c *Collector) collect(ctx context.Context) error {
-	if err := c.ensureAccountIdentity(ctx); err != nil {
+	if err := c.ensureAccounts(ctx); err != nil {
 		return err
 	}
 	if err := c.ensureProfiles(); err != nil {

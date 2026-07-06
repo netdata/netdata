@@ -134,8 +134,9 @@ func constantDimensionsHold(dims []cwprofiles.InstanceDimension, values []string
 	return true
 }
 
-// discoveryKey identifies a discovered instance set by profile and region.
+// discoveryKey identifies a discovered instance set by account, profile, and region.
 type discoveryKey struct {
+	Account string
 	Profile string
 	Region  string
 }
@@ -154,7 +155,7 @@ func (s discoverySnapshot) expired(now time.Time) bool {
 	return s.FetchedAt.IsZero() || !now.Before(s.ExpiresAt)
 }
 
-// totalInstances is the instance count across all (profile, region) keys.
+// totalInstances is the instance count across all (account, profile, region) keys.
 func (s discoverySnapshot) totalInstances() int {
 	n := 0
 	for _, insts := range s.Instances {
@@ -163,46 +164,53 @@ func (s discoverySnapshot) totalInstances() int {
 	return n
 }
 
-// discoveryResult is the outcome of discovering one (profile, region) target.
+// discoveryResult is the outcome of discovering one (account, profile, region) target.
 type discoveryResult struct {
 	Key       discoveryKey
 	Instances []discoveredInstance
 	Err       error
 }
 
-// discoverAll runs ListMetrics-based discovery for every (profile, region)
-// target concurrently (bounded by maxConcurrency) and returns one result per
-// target. Failures are per-target (carried in result.Err); the caller decides
-// fail-soft handling. One CloudWatch client is built per region and shared
-// across that region's profiles.
+// discoverAll runs ListMetrics-based discovery for every (account, profile, region)
+// target concurrently (bounded by maxConcurrency) and returns one result per target.
+// Failures are per-target (carried in result.Err); the caller decides fail-soft
+// handling. One CloudWatch client is built per (account, region) and shared across
+// that pair's profiles.
 func discoverAll(
 	ctx context.Context,
-	newClient func(region string) (cloudwatchClient, error),
+	newClient func(account, region string) (cloudwatchClient, error),
+	accounts []string,
 	profiles []cwprofiles.ResolvedProfile,
 	regions []string,
 	recentlyActiveOnly bool,
 	maxConcurrency int,
 	timeout time.Duration,
 ) []discoveryResult {
-	clients := make(map[string]cloudwatchClient, len(regions))
-	clientErrs := make(map[string]error, len(regions))
-	for _, region := range regions {
-		c, err := newClient(region)
-		if err != nil {
-			clientErrs[region] = err
-			continue
+	clients := make(map[clientKey]cloudwatchClient, len(accounts)*len(regions))
+	clientErrs := make(map[clientKey]error, len(accounts)*len(regions))
+	for _, account := range accounts {
+		for _, region := range regions {
+			ck := clientKey{account: account, region: region}
+			c, err := newClient(account, region)
+			if err != nil {
+				clientErrs[ck] = err
+				continue
+			}
+			clients[ck] = c
 		}
-		clients[region] = c
 	}
 
 	type target struct {
+		account string
 		profile cwprofiles.ResolvedProfile
 		region  string
 	}
 	var targets []target
-	for _, p := range profiles {
-		for _, r := range regions {
-			targets = append(targets, target{profile: p, region: r})
+	for _, account := range accounts {
+		for _, p := range profiles {
+			for _, r := range regions {
+				targets = append(targets, target{account: account, profile: p, region: r})
+			}
 		}
 	}
 
@@ -210,14 +218,15 @@ func discoverAll(
 	p := pool.New().WithMaxGoroutines(max(1, maxConcurrency))
 
 	for i, t := range targets {
-		key := discoveryKey{Profile: t.profile.Name, Region: t.region}
-		if err := clientErrs[t.region]; err != nil {
-			results[i] = discoveryResult{Key: key, Err: fmt.Errorf("build client for region %q: %w", t.region, err)}
+		key := discoveryKey{Account: t.account, Profile: t.profile.Name, Region: t.region}
+		ck := clientKey{account: t.account, region: t.region}
+		if err := clientErrs[ck]; err != nil {
+			results[i] = discoveryResult{Key: key, Err: fmt.Errorf("build client for account %q region %q: %w", t.account, t.region, err)}
 			continue
 		}
 
 		prof := t.profile.Config
-		client := clients[t.region]
+		client := clients[ck]
 		p.Go(func() {
 			cctx, cancel := withTimeout(ctx, timeout)
 			defer cancel()
@@ -246,7 +255,7 @@ func buildDiscoverySnapshot(results []discoveryResult, prev map[discoveryKey][]d
 	var errs []error
 	for _, r := range results {
 		if r.Err != nil {
-			errs = append(errs, fmt.Errorf("discovery %s/%s: %w", r.Key.Profile, r.Key.Region, r.Err))
+			errs = append(errs, fmt.Errorf("discovery %s/%s/%s: %w", r.Key.Account, r.Key.Profile, r.Key.Region, r.Err))
 			if insts, ok := prev[r.Key]; ok && len(insts) > 0 {
 				snap.Instances[r.Key] = insts // fail-soft: keep this target's last-known instances
 			}
@@ -356,10 +365,10 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 		return nil
 	}
 
-	newClient := func(region string) (cloudwatchClient, error) {
-		return c.clients.forRegion(ctx, region)
+	newClient := func(account, region string) (cloudwatchClient, error) {
+		return c.clients.forAccountRegion(ctx, account, region)
 	}
-	results := discoverAll(ctx, newClient, c.profiles, c.regions(), c.recentlyActiveOnly(), apiConcurrency, c.Timeout.Duration())
+	results := discoverAll(ctx, newClient, c.accountIDs(), c.profiles, c.regions(), c.recentlyActiveOnly(), apiConcurrency, c.Timeout.Duration())
 	// If the parent context was canceled or timed out during the fan-out, abort before
 	// committing: buildDiscoverySnapshot would otherwise carry forward instances (or
 	// accept a partial first snapshot) and advance the TTL, so the next cycle would skip
@@ -377,8 +386,8 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	// warn every cycle.
 	for _, r := range results {
 		if r.Err != nil {
-			c.Limit(logKeyDiscoveryTargetFailed+":"+r.Key.Profile+"/"+r.Key.Region, 1, recurringLogEvery).
-				Warningf("CloudWatch discovery %s/%s failed (using last-known instances): %v", r.Key.Profile, r.Key.Region, r.Err)
+			c.Limit(logKeyDiscoveryTargetFailed+":"+r.Key.Account+"/"+r.Key.Profile+"/"+r.Key.Region, 1, recurringLogEvery).
+				Warningf("CloudWatch discovery %s/%s/%s failed (using last-known instances): %v", r.Key.Account, r.Key.Profile, r.Key.Region, r.Err)
 		}
 	}
 

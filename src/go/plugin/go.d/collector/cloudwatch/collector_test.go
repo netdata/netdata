@@ -61,7 +61,7 @@ func newTestCollector(t *testing.T, cfg Config, f *fakeSTS) *Collector {
 	t.Helper()
 	c := New()
 	c.Config = cfg
-	c.newAWSConfig = func(context.Context, awsauth.AWSAuthConfig, string) (aws.Config, error) {
+	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) {
 		return aws.Config{}, nil
 	}
 	c.newSTSClient = func(aws.Config) stsClient { return f }
@@ -71,7 +71,7 @@ func newTestCollector(t *testing.T, cfg Config, f *fakeSTS) *Collector {
 // useFakeClient wires the AWS-config and CloudWatch-client seams so every region
 // resolves to the given fake — the common per-test CloudWatch client setup.
 func useFakeClient(c *Collector, fake cloudwatchClient) {
-	c.newAWSConfig = func(_ context.Context, _ awsauth.AWSAuthConfig, region string) (aws.Config, error) {
+	c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
 		return aws.Config{Region: region}, nil
 	}
 	c.newCloudWatchClient = func(aws.Config) cloudwatchClient { return fake }
@@ -136,7 +136,7 @@ func TestCollector_Check(t *testing.T) {
 		require.NoError(t, c.Init(context.Background()))
 
 		require.NoError(t, c.Check(context.Background()))
-		assert.Equal(t, "000000000000", c.accountID)
+		assert.Equal(t, []string{"000000000000"}, c.accountIDs())
 		assert.Equal(t, 1, f.calls)
 
 		require.NoError(t, c.Check(context.Background()))
