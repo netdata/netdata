@@ -156,8 +156,8 @@ static bool netdata_ebpfgo_shared_pid_memory_copy_snapshot(netdata_ebpfgo_shared
     /* Capture the per-module validity flags from the header before copying
      * entries, both under the same semaphore hold as the caller. */
     const struct ebpfgo_shm_header *hdr = (const struct ebpfgo_shm_header *)ctx->mapping;
-    ctx->shm_flags = hdr->flags;
-    ctx->last_publish_ut = hdr->last_publish_ut;
+    ctx->shm_flags = __atomic_load_n(&hdr->flags, __ATOMIC_ACQUIRE);
+    ctx->last_publish_ut = __atomic_load_n(&hdr->last_publish_ut, __ATOMIC_ACQUIRE);
 
     memcpy(ctx->snapshot, ctx->shm, ebpfgo_shm_entries_nbytes(ctx->shm_total));
     qsort(ctx->snapshot, ctx->shm_total, sizeof(*ctx->snapshot), netdata_ebpfgo_shared_pid_memory_compare_pid);
