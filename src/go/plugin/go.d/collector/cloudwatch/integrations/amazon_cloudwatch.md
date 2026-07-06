@@ -69,7 +69,7 @@ Replace `AWS/<Service>` with the service namespace (for example `AWS/AmazonMQ`) 
 :::
 
 
-The collector discovers available metrics with the CloudWatch `ListMetrics` API (one paginated call per selected service profile and region; the collector then keeps only the metrics whose dimension set matches each profile's instance dimensions) and queries them in batches with the `GetMetricData` API. Account identity is resolved once at startup via `sts:GetCallerIdentity`. Authentication uses the AWS SDK default credential chain, static access keys, or an assumed IAM role.
+The collector discovers available metrics with the CloudWatch `ListMetrics` API (one paginated call per account, selected service profile, and region; the collector then keeps only the metrics whose dimension set matches each profile's instance dimensions) and queries them in batches with the `GetMetricData` API. Each configured identity's AWS account id is resolved via `sts:GetCallerIdentity` (one per assumed role, so a single job can monitor several accounts). Note that both discovery and query volume scale with accounts × regions × profiles, so adding many roles multiplies API calls (and `GetMetricData` cost) accordingly. Authentication uses the AWS SDK default credential chain, static access keys, or one or more assumed IAM roles.
 
 
 This collector is supported on all platforms.
@@ -182,7 +182,8 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | auth.mode_access_key.access_key_id | AWS access key ID (used in `access_key` mode). |  | no |
 |  | auth.mode_access_key.secret_access_key | AWS secret access key (used in `access_key` mode). |  | no |
 |  | auth.mode_access_key.session_token | Optional AWS session token for temporary credentials (used in `access_key` mode). |  | no |
-|  | auth.mode_assume_role.roles | A single-element list with the IAM role to assume (used in `assume_role` mode); each entry has `role_arn` and an optional `external_id`. Exactly one role is supported per job -- to monitor multiple accounts, run one job per account/role. |  | no |
+|  | auth.mode_assume_role.roles | IAM roles to assume (used in `assume_role` mode) -- one per AWS account to monitor. Each entry has `role_arn` and an optional `external_id`, and each metric series is labeled with the account id its role resolves to. A role that cannot be assumed is skipped with a warning while the rest keep collecting; two roles resolving to the same account are de-duplicated. |  | no |
+|  | auth.mode_assume_role.include_base_account | When `true`, also monitor the base identity's own account (the identity used to assume the roles) alongside the assumed-role accounts. Defaults to `false` -- with roles set, only the assumed-role accounts are monitored; to also cover the base account, enable this or run a separate `default`-mode job. | no | no |
 | **Profiles** | profiles.mode | Profile selection: `auto` (default service profiles), `exact` (only the profiles you list, by basename), or `combined` (default profiles plus deep-grain per-target-group / per-operation / per-request-filter profiles). | auto | no |
 |  | profiles.mode_exact.entries | List of profiles to collect by basename (required when `profiles.mode` is `exact`). Each entry has a `name`, e.g. `ec2` or `alb_target`. |  | no |
 | **Discovery** | discovery.refresh_every | How often (seconds) to re-discover metrics. Minimum 60. | 300 | no |
@@ -297,6 +298,28 @@ jobs:
         roles:
           - role_arn: "arn:aws:iam::123456789012:role/netdata-cloudwatch"
             # external_id: "your-external-id"   # add if the role's trust policy requires it
+
+```
+</details>
+
+###### Multiple accounts (assume several roles)
+
+Monitor several AWS accounts from one job by assuming a role in each. Every metric is labeled with the account id its role resolves to. Enable `include_base_account` to also monitor the account the base identity itself belongs to.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: multi_account
+    regions:
+      - us-east-1
+    auth:
+      mode: assume_role
+      mode_assume_role:
+        include_base_account: false
+        roles:
+          - role_arn: "arn:aws:iam::111111111111:role/netdata-cloudwatch"
+          - role_arn: "arn:aws:iam::222222222222:role/netdata-cloudwatch"
 
 ```
 </details>

@@ -13,8 +13,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/cwprofiles"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -316,22 +316,22 @@ func TestDiscoverAll(t *testing.T) {
 		},
 	}
 
-	newClient := func(region string) (cloudwatchClient, error) {
+	newClient := func(_, region string) (cloudwatchClient, error) {
 		return &nsCloudWatch{byNS: regionData[region]}, nil
 	}
 
 	results := discoverAll(context.Background(), newClient,
-		[]cwprofiles.ResolvedProfile{ec2, s3}, []string{"us-east-1", "us-west-2"}, true, 5, 0)
+		[]string{"000000000000"}, []cwprofiles.ResolvedProfile{ec2, s3}, []string{"us-east-1", "us-west-2"}, true, 5, 0)
 	require.Len(t, results, 4)
 
 	snap, errs := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
 	require.Empty(t, errs)
 
 	assert.Equal(t, 4, snap.totalInstances())
-	assert.Equal(t, [][]string{{"i-1"}}, dimValues(snap.Instances[discoveryKey{"ec2", "us-east-1"}]))
-	assert.Equal(t, [][]string{{"i-2"}, {"i-3"}}, dimValues(snap.Instances[discoveryKey{"ec2", "us-west-2"}]))
-	assert.Equal(t, [][]string{{"b1", "StandardStorage"}}, dimValues(snap.Instances[discoveryKey{"s3", "us-east-1"}]))
-	assert.NotContains(t, snap.Instances, discoveryKey{"s3", "us-west-2"}, "empty target must be omitted")
+	assert.Equal(t, [][]string{{"i-1"}}, dimValues(snap.Instances[discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-east-1"}]))
+	assert.Equal(t, [][]string{{"i-2"}, {"i-3"}}, dimValues(snap.Instances[discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-west-2"}]))
+	assert.Equal(t, [][]string{{"b1", "StandardStorage"}}, dimValues(snap.Instances[discoveryKey{Account: "000000000000", Profile: "s3", Region: "us-east-1"}]))
+	assert.NotContains(t, snap.Instances, discoveryKey{Account: "000000000000", Profile: "s3", Region: "us-west-2"}, "empty target must be omitted")
 
 	assert.Equal(t, time.Unix(1000, 0), snap.FetchedAt)
 	assert.Equal(t, time.Unix(1300, 0), snap.ExpiresAt)
@@ -340,7 +340,7 @@ func TestDiscoverAll(t *testing.T) {
 func TestDiscoverAll_ClientBuildErrorIsPerTarget(t *testing.T) {
 	ec2 := resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))
 
-	newClient := func(region string) (cloudwatchClient, error) {
+	newClient := func(_, region string) (cloudwatchClient, error) {
 		if region == "bad-region" {
 			return nil, errors.New("no credentials for region")
 		}
@@ -350,29 +350,29 @@ func TestDiscoverAll_ClientBuildErrorIsPerTarget(t *testing.T) {
 	}
 
 	results := discoverAll(context.Background(), newClient,
-		[]cwprofiles.ResolvedProfile{ec2}, []string{"us-east-1", "bad-region"}, true, 5, 0)
+		[]string{"000000000000"}, []cwprofiles.ResolvedProfile{ec2}, []string{"us-east-1", "bad-region"}, true, 5, 0)
 
 	snap, errs := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
 	require.Len(t, errs, 1)
 	assert.Contains(t, errs[0].Error(), "bad-region")
 	assert.Equal(t, 1, snap.totalInstances())
-	assert.Contains(t, snap.Instances, discoveryKey{"ec2", "us-east-1"})
+	assert.Contains(t, snap.Instances, discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-east-1"})
 }
 
 func TestBuildDiscoverySnapshot_FailSoftCarriesForward(t *testing.T) {
 	prev := map[discoveryKey][]discoveredInstance{
-		{Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
-		{Profile: "ec2", Region: "us-west-2"}: {{DimensionValues: []string{"i-9"}}},
+		{Account: "000000000000", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
+		{Account: "000000000000", Profile: "ec2", Region: "us-west-2"}: {{DimensionValues: []string{"i-9"}}},
 	}
 	results := []discoveryResult{
-		{Key: discoveryKey{"ec2", "us-east-1"}, Instances: []discoveredInstance{{DimensionValues: []string{"i-2"}}}}, // refreshed
-		{Key: discoveryKey{"ec2", "us-west-2"}, Err: errors.New("throttled")},                                        // failed
+		{Key: discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-east-1"}, Instances: []discoveredInstance{{DimensionValues: []string{"i-2"}}}}, // refreshed
+		{Key: discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-west-2"}, Err: errors.New("throttled")},                                        // failed
 	}
 
 	snap, errs := buildDiscoverySnapshot(results, prev, time.Unix(1000, 0), 300)
 	require.Len(t, errs, 1)
-	assert.Equal(t, [][]string{{"i-2"}}, dimValues(snap.Instances[discoveryKey{"ec2", "us-east-1"}]), "succeeded target is refreshed")
-	assert.Equal(t, [][]string{{"i-9"}}, dimValues(snap.Instances[discoveryKey{"ec2", "us-west-2"}]), "failed target carries forward last-known instances")
+	assert.Equal(t, [][]string{{"i-2"}}, dimValues(snap.Instances[discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-east-1"}]), "succeeded target is refreshed")
+	assert.Equal(t, [][]string{{"i-9"}}, dimValues(snap.Instances[discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-west-2"}]), "failed target carries forward last-known instances")
 }
 
 func TestDiscoverySnapshot_Expired(t *testing.T) {
@@ -468,7 +468,7 @@ func newDiscoveryTestCollector(regionMetrics map[string]map[string][]cwtypes.Met
 		fakes[region] = &nsCloudWatch{byNS: byNS}
 	}
 
-	c.newAWSConfig = func(_ context.Context, _ cloudauth.AWSAuthConfig, region string) (aws.Config, error) {
+	c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
 		return aws.Config{Region: region}, nil
 	}
 	c.newCloudWatchClient = func(cfg aws.Config) cloudwatchClient { return fakes[cfg.Region] }
@@ -482,6 +482,7 @@ func TestCollector_refreshDiscovery_TTLCaching(t *testing.T) {
 		"us-west-2": {"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-2")}},
 	})
 	c.profiles = []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))}
+	c.accounts = []cwAccount{{accountID: "000000000000"}}
 
 	base := time.Unix(1000, 0)
 	c.now = func() time.Time { return base }
@@ -506,14 +507,81 @@ func TestCollector_refreshDiscovery_TotalFailureFirstPassErrors(t *testing.T) {
 	c.Config.Regions = []string{"us-east-1"}
 	c.applyDefaults()
 	c.profiles = []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))}
+	c.accounts = []cwAccount{{accountID: "000000000000"}}
 	c.now = func() time.Time { return time.Unix(1000, 0) }
-	c.newAWSConfig = func(context.Context, cloudauth.AWSAuthConfig, string) (aws.Config, error) {
+	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) {
 		return aws.Config{}, errors.New("no credentials")
 	}
 
 	err := c.refreshDiscovery(context.Background())
 	assert.Error(t, err, "all-target failure on the first pass must surface")
 	assert.True(t, c.discovery.FetchedAt.IsZero())
+}
+
+// errListMetrics is a CloudWatch client whose ListMetrics always errors — used to
+// make one discovery target fail while others succeed.
+type errListMetrics struct{}
+
+func (errListMetrics) ListMetrics(context.Context, *cloudwatch.ListMetricsInput, ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
+	return nil, errors.New("throttled")
+}
+
+func (errListMetrics) GetMetricData(context.Context, *cloudwatch.GetMetricDataInput, ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+	return &cloudwatch.GetMetricDataOutput{}, nil
+}
+
+func TestCollector_refreshDiscovery_EmptySuccessPlusFailureNotFatalOnFirstPass(t *testing.T) {
+	// One target succeeds with zero instances (a resource-free region) while another
+	// errors. On the first pass this must NOT be fatal — not every target failed.
+	c := New()
+	c.Config.Regions = []string{"us-east-1", "us-west-2"}
+	c.applyDefaults()
+	c.accounts = []cwAccount{{accountID: "000000000000"}}
+	c.profiles = []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))}
+	c.now = func() time.Time { return time.Unix(1000, 0) }
+	c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
+		return aws.Config{Region: region}, nil
+	}
+	c.newCloudWatchClient = func(cfg aws.Config) cloudwatchClient {
+		if cfg.Region == "us-west-2" {
+			return errListMetrics{} // this target errors
+		}
+		return &nsCloudWatch{byNS: map[string][]cwtypes.Metric{}} // empty but successful
+	}
+
+	require.NoError(t, c.refreshDiscovery(context.Background()), "empty success + one error must not be fatal")
+	assert.Zero(t, c.discovery.totalInstances())
+	assert.False(t, c.discovery.FetchedAt.IsZero(), "snapshot is committed despite the empty+error mix")
+}
+
+func TestCollector_collect_LateResolvedAccountDiscoveredSameCycle(t *testing.T) {
+	// Role A resolves first and populates a fresh discovery snapshot; role B fails
+	// once. When B resolves on a later cycle — still within discovery.refresh_every —
+	// it must be discovered that same cycle, not after the TTL expires.
+	c := assumeRoleCollector(t, twoRoles(), false, &seqSTS{
+		accounts: []string{"111111111111", "", "222222222222"},
+		failAt:   map[int]bool{1: true},
+	})
+	c.profiles = []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))}
+	c.newCloudWatchClient = func(aws.Config) cloudwatchClient {
+		return &nsCloudWatch{byNS: map[string][]cwtypes.Metric{
+			"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")},
+		}}
+	}
+	base := time.Unix(1000, 0)
+	c.now = func() time.Time { return base }
+
+	require.NoError(t, c.collect(context.Background()))
+	require.Equal(t, []string{"111111111111"}, c.accountIDs())
+	assert.Contains(t, c.discovery.Instances, discoveryKey{Account: "111111111111", Profile: "ec2", Region: "us-east-1"})
+	assert.NotContains(t, c.discovery.Instances, discoveryKey{Account: "222222222222", Profile: "ec2", Region: "us-east-1"})
+
+	// Next cycle, still inside the 300s TTL: role B resolves and is discovered now.
+	c.now = func() time.Time { return base.Add(60 * time.Second) }
+	require.NoError(t, c.collect(context.Background()))
+	require.Equal(t, []string{"111111111111", "222222222222"}, c.accountIDs())
+	assert.Contains(t, c.discovery.Instances, discoveryKey{Account: "222222222222", Profile: "ec2", Region: "us-east-1"},
+		"a late-resolved account is discovered the same cycle, not after refresh_every")
 }
 
 func TestCollector_collect_runsDiscovery(t *testing.T) {
@@ -525,7 +593,7 @@ func TestCollector_collect_runsDiscovery(t *testing.T) {
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
 
 	require.NoError(t, c.collect(context.Background()))
-	assert.Equal(t, "000000000000", c.accountID)
+	assert.Equal(t, []string{"000000000000"}, c.accountIDs())
 	assert.Equal(t, 1, c.discovery.totalInstances())
 }
 

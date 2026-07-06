@@ -313,7 +313,9 @@ func cwProfilesDirFromThisFile() string {
 	}
 
 	base := filepath.Dir(thisFile)
-	candidate := filepath.Join(base, "..", "..", "..", "config", "go.d", profilesDirName, "default")
+	// base is .../collector/cloudwatch/internal/cwprofiles → climb 4 levels to plugin/go.d,
+	// then into config/go.d/<profiles>/default. Update the count if this file moves.
+	candidate := filepath.Join(base, "..", "..", "..", "..", "config", "go.d", profilesDirName, "default")
 	if !isDirExists(candidate) {
 		return ""
 	}

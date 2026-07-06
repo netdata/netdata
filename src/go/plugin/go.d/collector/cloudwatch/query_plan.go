@@ -10,23 +10,25 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 )
 
 // querySample is one observed value for a series identity in a collect cycle.
-// region+period are its scheduling group (drives retention re-emit scheduling).
+// account+region+period is its scheduling group (drives retention re-emit scheduling).
 type querySample struct {
 	seriesName string
 	labels     []metrix.Label
 	value      float64
+	account    string
 	region     string
 	period     int
 }
 
 // plannedQuery ties a synthetic GetMetricData query Id back to the series it
-// populates and the region/period that determine its client and window.
+// populates and the account/region/period that determine its client and window.
 type plannedQuery struct {
 	id         string
+	account    string
 	region     string
 	period     int
 	seriesName string
@@ -35,19 +37,22 @@ type plannedQuery struct {
 	query      cwtypes.MetricDataQuery
 }
 
-// queryGroupKey groups queries that share a CloudWatch client and time window;
-// it is also the per-(region, period) scheduling unit.
+// queryGroupKey groups queries that share a CloudWatch client and time window; it is
+// also the per-(account, region, period) scheduling unit. account is part of the key
+// because the same region is queried under each account's own credentials (a distinct
+// client), so accounts must batch and schedule independently.
 type queryGroupKey struct {
-	region string
-	period int
+	account string
+	region  string
+	period  int
 }
 
 func (q plannedQuery) groupKey() queryGroupKey {
-	return queryGroupKey{region: q.region, period: q.period}
+	return queryGroupKey{account: q.account, region: q.region, period: q.period}
 }
 
 func (s querySample) groupKey() queryGroupKey {
-	return queryGroupKey{region: s.region, period: s.period}
+	return queryGroupKey{account: s.account, region: s.region, period: s.period}
 }
 
 // queryWindow computes the GetMetricData time window for a metric of the given
@@ -65,22 +70,24 @@ func queryWindow(now time.Time, period, queryOffset int) (start, end time.Time) 
 	return time.Unix(endSec-periodSec, 0).UTC(), time.Unix(endSec, 0).UTC()
 }
 
-// buildQueryPlan builds one GetMetricData query per (instance × metric ×
-// statistic) across the discovery snapshot. Query Ids are q0..qN; each maps back
-// to its series name and instance labels via the returned plannedQuery.
+// buildQueryPlan builds one GetMetricData query per (account × instance × metric ×
+// statistic) across the discovery snapshot. Query Ids are q0..qN; each maps back to
+// its series name and instance labels via the returned plannedQuery.
 func (c *Collector) buildQueryPlan() []plannedQuery {
 	var plan []plannedQuery
 	idx := 0
-	for _, prof := range c.profiles {
-		nDims := len(prof.Config.Instance.Dimensions)
-		for _, region := range c.regions() {
-			instances := c.discovery.Instances[discoveryKey{Profile: prof.Name, Region: region}]
-			for _, inst := range instances {
-				if len(inst.DimensionValues) != nDims {
-					continue // defensive: snapshot/profile mismatch
+	for _, acct := range c.accounts {
+		for _, prof := range c.profiles {
+			nDims := len(prof.Config.Instance.Dimensions)
+			for _, region := range c.regions() {
+				instances := c.discovery.Instances[discoveryKey{Account: acct.accountID, Profile: prof.Name, Region: region}]
+				for _, inst := range instances {
+					if len(inst.DimensionValues) != nDims {
+						continue // defensive: snapshot/profile mismatch
+					}
+					labels, dims := c.instanceLabelsAndDims(acct.accountID, prof, region, inst)
+					plan = append(plan, c.metricQueries(acct.accountID, prof, region, labels, dims, &idx)...)
 				}
-				labels, dims := c.instanceLabelsAndDims(prof, region, inst)
-				plan = append(plan, c.metricQueries(prof, region, labels, dims, &idx)...)
 			}
 		}
 	}
@@ -93,12 +100,12 @@ func (c *Collector) buildQueryPlan() []plannedQuery {
 // dimensions are included in the query dimensions but omitted from the labels. The
 // returned label slice is shared read-only by all of the instance's planned
 // queries, so callers must not append to it.
-func (c *Collector) instanceLabelsAndDims(prof cwprofiles.ResolvedProfile, region string, inst discoveredInstance) ([]metrix.Label, []cwtypes.Dimension) {
+func (c *Collector) instanceLabelsAndDims(accountID string, prof cwprofiles.ResolvedProfile, region string, inst discoveredInstance) ([]metrix.Label, []cwtypes.Dimension) {
 	pdims := prof.Config.Instance.Dimensions
 	dims := make([]cwtypes.Dimension, len(pdims))
 	labels := make([]metrix.Label, 0, len(pdims)+2)
 	labels = append(labels,
-		metrix.Label{Key: "account_id", Value: c.accountID},
+		metrix.Label{Key: "account_id", Value: accountID},
 		metrix.Label{Key: "region", Value: region},
 	)
 	for i, d := range pdims {
@@ -113,7 +120,7 @@ func (c *Collector) instanceLabelsAndDims(prof cwprofiles.ResolvedProfile, regio
 
 // metricQueries builds the planned queries for one instance: one per
 // (metric × statistic), allocating sequential q<idx> ids through idx.
-func (c *Collector) metricQueries(prof cwprofiles.ResolvedProfile, region string, labels []metrix.Label, dims []cwtypes.Dimension, idx *int) []plannedQuery {
+func (c *Collector) metricQueries(accountID string, prof cwprofiles.ResolvedProfile, region string, labels []metrix.Label, dims []cwtypes.Dimension, idx *int) []plannedQuery {
 	var out []plannedQuery
 	for _, m := range prof.Config.Metrics {
 		period := prof.Config.EffectivePeriod(m)
@@ -123,6 +130,7 @@ func (c *Collector) metricQueries(prof cwprofiles.ResolvedProfile, region string
 			*idx++
 			out = append(out, plannedQuery{
 				id:         id,
+				account:    accountID,
 				region:     region,
 				period:     period,
 				seriesName: cwprofiles.ExportedSeriesName(prof.Name, m.ID, token),

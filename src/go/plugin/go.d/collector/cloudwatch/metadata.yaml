@@ -107,7 +107,7 @@ modules:
 
           :::
         method_description: |
-          The collector discovers available metrics with the CloudWatch `ListMetrics` API (one paginated call per selected service profile and region; the collector then keeps only the metrics whose dimension set matches each profile's instance dimensions) and queries them in batches with the `GetMetricData` API. Account identity is resolved once at startup via `sts:GetCallerIdentity`. Authentication uses the AWS SDK default credential chain, static access keys, or an assumed IAM role.
+          The collector discovers available metrics with the CloudWatch `ListMetrics` API (one paginated call per account, selected service profile, and region; the collector then keeps only the metrics whose dimension set matches each profile's instance dimensions) and queries them in batches with the `GetMetricData` API. Each configured identity's AWS account id is resolved via `sts:GetCallerIdentity` (one per assumed role, so a single job can monitor several accounts). Note that both discovery and query volume scale with accounts × regions × profiles, so adding many roles multiplies API calls (and `GetMetricData` cost) accordingly. Authentication uses the AWS SDK default credential chain, static access keys, or one or more assumed IAM roles.
       supported_platforms:
         include: []
         exclude: []
@@ -234,8 +234,13 @@ modules:
               required: false
               group: Authentication
             - name: auth.mode_assume_role.roles
-              description: A single-element list with the IAM role to assume (used in `assume_role` mode); each entry has `role_arn` and an optional `external_id`. Exactly one role is supported per job -- to monitor multiple accounts, run one job per account/role.
+              description: IAM roles to assume (used in `assume_role` mode) -- one per AWS account to monitor. Each entry has `role_arn` and an optional `external_id`, and each metric series is labeled with the account id its role resolves to. A role that cannot be assumed is skipped with a warning while the rest keep collecting; two roles resolving to the same account are de-duplicated.
               default_value: ""
+              required: false
+              group: Authentication
+            - name: auth.mode_assume_role.include_base_account
+              description: When `true`, also monitor the base identity's own account (the identity used to assume the roles) alongside the assumed-role accounts. Defaults to `false` -- with roles set, only the assumed-role accounts are monitored; to also cover the base account, enable this or run a separate `default`-mode job.
+              default_value: false
               required: false
               group: Authentication
             - name: profiles.mode
@@ -303,6 +308,20 @@ modules:
                         roles:
                           - role_arn: "arn:aws:iam::123456789012:role/netdata-cloudwatch"
                             # external_id: "your-external-id"   # add if the role's trust policy requires it
+            - name: Multiple accounts (assume several roles)
+              description: Monitor several AWS accounts from one job by assuming a role in each. Every metric is labeled with the account id its role resolves to. Enable `include_base_account` to also monitor the account the base identity itself belongs to.
+              config: |
+                jobs:
+                  - name: multi_account
+                    regions:
+                      - us-east-1
+                    auth:
+                      mode: assume_role
+                      mode_assume_role:
+                        include_base_account: false
+                        roles:
+                          - role_arn: "arn:aws:iam::111111111111:role/netdata-cloudwatch"
+                          - role_arn: "arn:aws:iam::222222222222:role/netdata-cloudwatch"
             - name: Specific services only
               description: Collect only EC2 and RDS instead of auto-discovering all built-in services.
               config: |

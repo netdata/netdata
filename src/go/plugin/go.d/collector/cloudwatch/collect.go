@@ -5,7 +5,7 @@ package cloudwatch
 import "context"
 
 func (c *Collector) collect(ctx context.Context) error {
-	if err := c.ensureAccountIdentity(ctx); err != nil {
+	if err := c.ensureAccounts(ctx); err != nil {
 		return err
 	}
 	if err := c.ensureProfiles(); err != nil {
@@ -33,7 +33,7 @@ func (c *Collector) collect(ctx context.Context) error {
 		return err
 	}
 
-	// A (region, period) group is "queried" only if it was due AND nothing failed
+	// A (account, region, period) group is "queried" only if it was due AND nothing failed
 	// for it. Advance the schedule only for those; the rest (not due, or
 	// due-but-failed) re-emit their cached values and remain due for retry.
 	queried := make(map[queryGroupKey]bool, len(due))

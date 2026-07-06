@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 )
 
 const (
@@ -35,15 +35,15 @@ const (
 )
 
 type Config struct {
-	UpdateEvery        int                     `yaml:"update_every,omitempty" json:"update_every,omitempty"`
-	AutoDetectionRetry int                     `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
-	Vnode              string                  `yaml:"vnode,omitempty" json:"vnode"`
-	Regions            []string                `yaml:"regions" json:"regions"`
-	Auth               cloudauth.AWSAuthConfig `yaml:"auth" json:"auth"`
-	Profiles           ProfilesConfig          `yaml:"profiles" json:"profiles"`
-	Discovery          DiscoveryConfig         `yaml:"discovery" json:"discovery"`
-	QueryOffset        int                     `yaml:"query_offset,omitempty" json:"query_offset"`
-	Timeout            confopt.Duration        `yaml:"timeout,omitempty" json:"timeout"`
+	UpdateEvery        int              `yaml:"update_every,omitempty" json:"update_every,omitempty"`
+	AutoDetectionRetry int              `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
+	Vnode              string           `yaml:"vnode,omitempty" json:"vnode"`
+	Regions            []string         `yaml:"regions" json:"regions"`
+	Auth               awsauth.Config   `yaml:"auth" json:"auth"`
+	Profiles           ProfilesConfig   `yaml:"profiles" json:"profiles"`
+	Discovery          DiscoveryConfig  `yaml:"discovery" json:"discovery"`
+	QueryOffset        int              `yaml:"query_offset,omitempty" json:"query_offset"`
+	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
 
 type ProfilesConfig struct {
