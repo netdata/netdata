@@ -156,7 +156,7 @@ func run(args []string, stdout io.Writer) int {
 
 // setupEnvironment mirrors the long-standing shell helper: it appends the
 // standard system directories to the inherited PATH (rather than locking PATH
-// down), so docker/kubectl/podman/jq/ps are found wherever the host installed
+// down), so docker/kubectl/snap/ps are found wherever the host installed
 // them. The helper runs unprivileged (as the netdata user), like the shell
 // helper it replaces.
 func setupEnvironment() {
@@ -470,13 +470,13 @@ func (r *resolver) dockerLikeGetNameCommand(ctx context.Context, command, id str
 	return true
 }
 
-func (r *resolver) dockerLikeGetNameAPI(ctx context.Context, hostVar, containerID string) bool {
+func (r *resolver) dockerLikeGetNameAPI(ctx context.Context, hostVar, containerID string) {
 	host := os.Getenv(hostVar)
 	path := "/containers/" + containerID + "/json"
 
 	if host == "" {
 		r.warning(fmt.Sprintf("No %s is set", hostVar))
-		return false
+		return
 	}
 
 	address := host
@@ -495,13 +495,12 @@ func (r *resolver) dockerLikeGetNameAPI(ctx context.Context, hostVar, containerI
 		body, err = httpGetWithContext(ctx, defaultHTTPURL(address+path), httpGetOptions{})
 	}
 	if err != nil || len(body) == 0 {
-		return true
+		return
 	}
 
 	if output, ok := dockerJSONToInspectOutput(body); ok && output != "" {
 		r.parseDockerLikeInspectOutput(output)
 	}
-	return true
 }
 
 func isSocket(path string) bool {
@@ -781,8 +780,12 @@ func (r *resolver) dockerGetName(ctx context.Context, id string) {
 		r.dockerLikeGetNameAPI(ctx, "DOCKER_HOST", id)
 	} else if commandAvailable("docker") {
 		r.dockerLikeGetNameCommand(ctx, "docker", id)
-	} else if !r.dockerLikeGetNameAPI(ctx, "DOCKER_HOST", id) {
-		r.dockerLikeGetNameCommand(ctx, "podman", id)
+	} else {
+		// the shell chained `api || podman CLI inspect` here, but the CLI leg
+		// ran only when jq was missing (DOCKER_HOST is always defaulted, and a
+		// failed curl still returned success); with native JSON parsing the
+		// API path always handles this branch, so the dead leg is gone
+		r.dockerLikeGetNameAPI(ctx, "DOCKER_HOST", id)
 	}
 
 	if r.name == "" {
@@ -803,9 +806,10 @@ func (r *resolver) dockerValidateID(ctx context.Context, id string) {
 }
 
 func (r *resolver) podmanGetName(ctx context.Context, id string) {
-	if !r.dockerLikeGetNameAPI(ctx, "PODMAN_HOST", id) {
-		r.dockerLikeGetNameCommand(ctx, "podman", id)
-	}
+	// API only, like the shell in practice: its `|| podman CLI inspect` leg
+	// ran only when jq was missing (PODMAN_HOST is always defaulted, and a
+	// failed curl still returned success)
+	r.dockerLikeGetNameAPI(ctx, "PODMAN_HOST", id)
 
 	if r.name == "" {
 		r.warning(fmt.Sprintf("cannot find the name of podman container '%s'", id))

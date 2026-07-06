@@ -98,13 +98,14 @@ shell. The Go helper only parses the output text; this is an intentional fix.
 
 ## Docker/Podman API Branch
 
-`docker_like_get_name_api(host_var, id)` returns failure only when the selected
-host variable is empty. (The shell helper also failed when `jq` was missing
-from `PATH`; the Go helper parses JSON natively and needs no external tools.)
-
-Every other outcome returns success, even when curl/HTTP/JSON parsing fails and
-no name is found. This is required because the shell function ends with
-unconditional `return 0`.
+`docker_like_get_name_api(host_var, id)` treats every outcome as handled: an
+empty host variable only logs a warning, and curl/HTTP/JSON failures leave the
+name empty so the caller emits the `id[:12]` fallback with the retry exit code.
+This mirrors the shell function, which ended with an unconditional `return 0`
+whenever `jq` was available. The shell's only real failure mode was a missing
+`jq`, which chained to a `podman inspect` CLI fallback; the Go helper parses
+JSON natively, so that fallback leg does not exist and the podman flow is
+API-only.
 
 Host parsing preserves the shell regex `^([a-z]+)://(.*)`: lowercase schemes
 are stripped before constructing the request target. Unix-socket paths are
