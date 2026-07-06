@@ -123,8 +123,13 @@ def check_touched_coverage(diff_range):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Validate collector taxonomy coverage and taxonomy artifact generation.')
-    parser.add_argument('--pr-diff', help='Git diff range for touched-collector coverage, for example origin/master...HEAD.')
+    parser = argparse.ArgumentParser(
+        description='Validate collector taxonomy coverage and taxonomy artifact generation.',
+    )
+    parser.add_argument(
+        '--pr-diff',
+        help='Git diff range for touched-collector coverage, for example origin/master...HEAD.',
+    )
     args = parser.parse_args()
 
     findings = []
