@@ -118,9 +118,9 @@ journal:
   query_max_groups: 50000
   tiers:
     raw:      { size_of_journal_files: 50GB, duration_of_journal_files: 24h }
-    minute_1: { size_of_journal_files: 5GB,  duration_of_journal_files: 14d }
-    minute_5: { size_of_journal_files: 5GB,  duration_of_journal_files: 30d }
-    hour_1:   { size_of_journal_files: 5GB,  duration_of_journal_files: 365d }
+    minute_1: { size_of_journal_files: 10GB, duration_of_journal_files: 14d }
+    minute_5: { size_of_journal_files: 10GB, duration_of_journal_files: 30d }
+    hour_1:   { size_of_journal_files: 10GB, duration_of_journal_files: 365d }
 ```
 
 ### Journal directory
@@ -139,13 +139,13 @@ tiers:
     size_of_journal_files: 50GB
     duration_of_journal_files: 24h
   minute_1:
-    size_of_journal_files: 5GB
+    size_of_journal_files: 10GB
     duration_of_journal_files: 14d
   minute_5:
-    size_of_journal_files: 5GB
+    size_of_journal_files: 10GB
     duration_of_journal_files: 30d
   hour_1:
-    size_of_journal_files: 5GB
+    size_of_journal_files: 10GB
     duration_of_journal_files: 365d
 ```
 
