@@ -267,6 +267,27 @@ def test_generate_runtime_otel_extra_yaml_cannot_override_pins(tmp_path, monkeyp
     assert doc["endpoint"]["tls_cert_path"] == "/x.pem"
 
 
+def test_generate_runtime_otel_extra_yaml_pins_survive_non_mapping_endpoint(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    # The re-pin must hold even when the passthrough replaces `endpoint` with
+    # something that is not a mapping (the isinstance fallback branch).
+    for evil in ("endpoint: null\n", "endpoint: 42\n", "endpoint: [1, 2]\n", "base_dir: null\nendpoint: null\n"):
+        cfg = runtime.OtelConfig(extra_yaml=evil)
+        rd, _conf, otlp = runtime.generate_runtime("agent-nd", otel=cfg)
+        doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
+        assert doc["base_dir"] == str(rd / "lib" / "otel"), evil
+        assert doc["endpoint"] == {"path": otlp}, evil
+
+
+def test_generate_runtime_otel_extra_yaml_rejects_invalid_yaml(tmp_path, monkeypatch):
+    monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
+    # Unparseable YAML (as opposed to a non-mapping) also surfaces as the same
+    # ValueError contract from the runtime backstop, not a raw yaml.YAMLError.
+    cfg = runtime.OtelConfig(extra_yaml="auth: [unclosed\n")
+    with pytest.raises(ValueError, match="not valid YAML"):
+        runtime.generate_runtime("agent-badyaml", otel=cfg)
+
+
 def test_generate_runtime_otel_extra_yaml_passes_unknown_keys(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     # Unknown keys pass through untouched — feeding the plugin's strict-config

@@ -123,13 +123,15 @@ class OtelConfig:
 
     Every field is optional: ``None`` means "leave the plugin default" and the
     key is omitted from the generated otel.yaml (which the plugin partial-merges
-    over its own stock defaults). The directory layout is not exposed — the
-    plugin derives every per-signal dir from a single ``base_dir`` that is always
-    pinned under the run dir for per-agent isolation. The rotation/retention
-    knobs are the edge-case drivers (tiny thresholds force multi-file splits and
-    evictions over small, deterministic corpora). ``journal_dir`` is the one
-    exception: a caller-supplied, *not* run-dir-pinned path the plugin only reads
-    (the read-only legacy viewer's fixture).
+    over its own stock defaults). The local storage layout is derived from a
+    single ``base_dir`` that is always pinned under the run dir for per-agent
+    isolation (re-pinned after the ``extra_yaml`` merge, alongside
+    ``endpoint.path``). Caller-supplied paths do exist beyond the pin:
+    ``storage_uri``, ``journal_dir``, and whatever ``extra_yaml`` reaches — the
+    server is a localhost-only developer tool, so the caller is trusted. The
+    rotation/retention knobs are the edge-case drivers (tiny thresholds force
+    multi-file splits and evictions over small, deterministic corpora).
+    ``journal_dir`` is a read-only path (the legacy viewer's fixture).
     """
 
     otlp_endpoint: str | None = None          # endpoint.path; None → auto free loopback port
@@ -297,7 +299,10 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
     # the reported OTLP endpoint), not plugin knobs to reach; everything else,
     # including keys the plugin will refuse, passes through untouched.
     if cfg.extra_yaml:
-        extra = yaml.safe_load(cfg.extra_yaml)
+        try:
+            extra = yaml.safe_load(cfg.extra_yaml)
+        except yaml.YAMLError as exc:
+            raise ValueError(f"extra_yaml is not valid YAML: {exc}") from exc
         if extra is not None:
             if not isinstance(extra, dict):
                 raise ValueError(
