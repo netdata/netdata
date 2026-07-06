@@ -79,6 +79,13 @@ type loadedEntry[P any] struct {
 	path string
 }
 
+// stockRef records the first stock profile seen for a key, so a second stock
+// profile with the same key is rejected even when a user profile shadows both.
+type stockRef struct {
+	baseName string
+	path     string
+}
+
 // Load builds a Catalog from the given directories. A profile's identity is its
 // file basename. Files that are not `.yaml`/`.yml`, or whose basename starts
 // with `_`, are ignored. A user profile overrides a stock profile with the same
@@ -105,6 +112,7 @@ func Load[P any](specs []DirSpec, opts Options[P]) (Catalog[P], error) {
 
 	cat := newCatalog[P](normalize)
 	seen := make(map[string]loadedEntry[P])
+	stockSeen := make(map[string]stockRef)
 
 	for _, spec := range specs {
 		if strings.TrimSpace(spec.Path) == "" {
@@ -150,8 +158,15 @@ func Load[P any](specs []DirSpec, opts Options[P]) (Catalog[P], error) {
 			}
 
 			key := normalize(baseName)
+
+			// A second stock profile with the same key is fatal, tracked
+			// independently of the effective winner so a user override cannot hide
+			// a duplicate stock profile.
 			if spec.IsStock {
-				cat.hadStock[key] = struct{}{}
+				if prevStock, dup := stockSeen[key]; dup {
+					return fmt.Errorf("duplicate stock profile name %q in %q and %q", prevStock.baseName, prevStock.path, path)
+				}
+				stockSeen[key] = stockRef{baseName: baseName, path: path}
 			}
 
 			prev, exists := seen[key]
@@ -164,21 +179,20 @@ func Load[P any](specs []DirSpec, opts Options[P]) (Catalog[P], error) {
 				return nil
 			}
 
+			// A duplicate stock profile was already rejected above, so at most one
+			// of prev/current is stock here.
 			switch {
-			case prev.e.isStock == spec.IsStock:
-				if !spec.IsStock {
-					log.Warningf("ignoring duplicate user profile %q in %q; already loaded from %q", baseName, path, prev.path)
-					return nil
-				}
-				return fmt.Errorf("duplicate stock profile name %q in %q and %q", baseName, prev.path, path)
-			case prev.e.isStock && !spec.IsStock:
+			case !spec.IsStock && !prev.e.isStock:
+				// Both user: keep the first.
+				log.Warningf("ignoring duplicate user profile %q in %q; already loaded from %q", baseName, path, prev.path)
+			case !spec.IsStock && prev.e.isStock:
 				// User profile overrides the stock one.
 				seen[key] = loadedEntry[P]{
 					e:    entry[P]{profile: prof, baseName: baseName, isStock: false},
 					path: path,
 				}
-			case !prev.e.isStock && spec.IsStock:
-				// User profile already loaded; stock does not override it.
+			case spec.IsStock && !prev.e.isStock:
+				// A user profile already won; stock does not override it.
 			}
 
 			return nil
@@ -190,6 +204,9 @@ func Load[P any](specs []DirSpec, opts Options[P]) (Catalog[P], error) {
 
 	for key, le := range seen {
 		cat.byKey[key] = le.e
+	}
+	for key, sr := range stockSeen {
+		cat.stockBase[key] = sr.baseName
 	}
 
 	return cat, nil

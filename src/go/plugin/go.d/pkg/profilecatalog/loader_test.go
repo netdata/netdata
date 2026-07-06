@@ -146,6 +146,22 @@ func TestLoad(t *testing.T) {
 			}}},
 			wantErr: true,
 		},
+		"duplicate stock is fatal even when a user profile shadows it (user first)": {
+			dirs: []dirFiles{
+				{isStock: false, files: map[string]string{"app.yaml": "user"}},
+				{isStock: true, files: map[string]string{"app.yaml": "stockA"}},
+				{isStock: true, files: map[string]string{"app.yaml": "stockB"}},
+			},
+			wantErr: true,
+		},
+		"duplicate stock is fatal even with a user override between them": {
+			dirs: []dirFiles{
+				{isStock: true, files: map[string]string{"app.yaml": "stockA"}},
+				{isStock: false, files: map[string]string{"app.yaml": "user"}},
+				{isStock: true, files: map[string]string{"app.yaml": "stockB"}},
+			},
+			wantErr: true,
+		},
 		"duplicate user across dirs keeps first": {
 			dirs: []dirFiles{
 				{isStock: false, files: map[string]string{"app.yaml": "first"}},
@@ -223,6 +239,30 @@ func TestLoad_caseInsensitiveNormalization(t *testing.T) {
 	require.True(t, ok, "case-insensitive lookup must resolve")
 	assert.Equal(t, "app", got.Name)
 	assert.True(t, cat.Has("App"))
+}
+
+// TestLoad_stockNamesUsesStockBasename verifies that StockNames/HasStock report
+// the stock profile's own basename even when a user profile with a differently
+// cased basename overrides it (custom case-insensitive normalization).
+func TestLoad_stockNamesUsesStockBasename(t *testing.T) {
+	norm := func(s string) string { return strings.ToLower(s) }
+	anyName := func(string) bool { return true }
+	specs := buildSpecs(t, []dirFiles{
+		{isStock: true, files: map[string]string{"app.yaml": "stock"}},
+		{isStock: false, files: map[string]string{"App.yaml": "user"}},
+	})
+
+	cat, err := Load(specs, Options[tProfile]{Decode: decodeTest, NormalizeKey: norm, ValidName: anyName})
+	require.NoError(t, err)
+
+	// The user profile ("App") wins the lookup.
+	got, ok := cat.Get("app")
+	require.True(t, ok)
+	assert.Equal(t, "user", got.Content)
+
+	// StockNames reports the STOCK basename ("app"), not the winner's ("App").
+	assert.Equal(t, []string{"app"}, cat.StockNames())
+	assert.True(t, cat.HasStock("APP"))
 }
 
 func TestLoad_customValidName(t *testing.T) {

@@ -27,15 +27,15 @@ type entry[P any] struct {
 // "haproxy" transparently.
 type Catalog[P any] struct {
 	byKey       map[string]entry[P]
-	orderedKeys []string            // normalized keys, in discovery order
-	hadStock    map[string]struct{} // normalized keys that had a stock profile (even if later overridden by a user profile)
+	orderedKeys []string          // normalized keys, in discovery order
+	stockBase   map[string]string // normalized key -> stock profile's basename (even if later overridden by a user profile)
 	normalize   func(string) string
 }
 
 func newCatalog[P any](normalize func(string) string) Catalog[P] {
 	return Catalog[P]{
 		byKey:     make(map[string]entry[P]),
-		hadStock:  make(map[string]struct{}),
+		stockBase: make(map[string]string),
 		normalize: normalize,
 	}
 }
@@ -88,19 +88,20 @@ func (c Catalog[P]) Sorted() []Named[P] {
 // HasStock reports whether a stock profile with the given name was found during
 // loading, even if a user profile later overrode it.
 func (c Catalog[P]) HasStock(name string) bool {
-	_, ok := c.hadStock[c.key(name)]
+	_, ok := c.stockBase[c.key(name)]
 	return ok
 }
 
-// StockNames returns, sorted, the basenames that had a stock profile (even if a
-// user profile overrode them).
+// StockNames returns, sorted, the stock profile basenames (even where a user
+// profile overrode them). The basename is the stock profile's own, independent
+// of the effective winner.
 func (c Catalog[P]) StockNames() []string {
-	if len(c.hadStock) == 0 {
+	if len(c.stockBase) == 0 {
 		return nil
 	}
-	out := make([]string, 0, len(c.hadStock))
-	for k := range c.hadStock {
-		out = append(out, c.byKey[k].baseName)
+	out := make([]string, 0, len(c.stockBase))
+	for _, baseName := range c.stockBase {
+		out = append(out, baseName)
 	}
 	sort.Strings(out)
 	return out

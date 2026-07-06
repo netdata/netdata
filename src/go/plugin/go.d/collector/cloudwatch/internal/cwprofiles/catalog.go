@@ -66,6 +66,9 @@ func loadFromDirs(specs []profilecatalog.DirSpec) (Catalog, error) {
 	}
 
 	cat := Catalog{Catalog: core}
+	if cat.Empty() {
+		return Catalog{}, errors.New("no CloudWatch profiles were loaded")
+	}
 	if err := validateUniqueChartIDs(cat.Sorted(), cat.EffectiveIsStock); err != nil {
 		return Catalog{}, err
 	}

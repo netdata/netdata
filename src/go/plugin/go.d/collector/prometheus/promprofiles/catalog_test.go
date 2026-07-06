@@ -165,6 +165,27 @@ func TestProfile_TemplateConcurrent(t *testing.T) {
 	wg.Wait()
 }
 
+// TestProfile_TemplateReturnsIndependentCopies verifies Template() hands out an
+// independent deep copy each call, so a caller mutating the result cannot corrupt
+// the process-wide catalog (a shared, cached template).
+func TestProfile_TemplateReturnsIndependentCopies(t *testing.T) {
+	cat, err := loadCatalog(t, fileSpec{stock: true, name: "app.yaml", content: profileYAML("app_*")})
+	require.NoError(t, err)
+	got, err := cat.Resolve([]string{"app"})
+	require.NoError(t, err)
+	p := got[0]
+
+	t1, err := p.Template()
+	require.NoError(t, err)
+	require.NotEmpty(t, t1.Charts)
+	t1.Charts[0].Title = "MUTATED"
+
+	t2, err := p.Template()
+	require.NoError(t, err)
+	require.NotEmpty(t, t2.Charts)
+	assert.NotEqual(t, "MUTATED", t2.Charts[0].Title, "Template() must return independent copies")
+}
+
 func TestCatalog_Resolve(t *testing.T) {
 	cat, err := loadCatalog(t, fileSpec{stock: true, name: "app.yaml", content: profileYAML("a_*")})
 	require.NoError(t, err)

@@ -52,8 +52,9 @@ type lazyTemplate struct {
 }
 
 // Template parses and validates the chart template on first call and memoizes
-// the result. The returned group is shared and read-only; callers MUST Clone it
-// before mutating. Safe for concurrent use.
+// the result. It returns an independent deep copy each call, so callers may
+// freely mutate it without corrupting the process-wide catalog. Safe for
+// concurrent use.
 func (p Profile) Template() (charttpl.Group, error) {
 	if p.lazy == nil {
 		return charttpl.Group{}, fmt.Errorf("profile %q: no template loaded", p.Name)
@@ -61,7 +62,10 @@ func (p Profile) Template() (charttpl.Group, error) {
 	p.lazy.once.Do(func() {
 		p.lazy.tmpl, p.lazy.err = parseTemplate(p.Name, p.lazy.raw)
 	})
-	return p.lazy.tmpl, p.lazy.err
+	if p.lazy.err != nil {
+		return charttpl.Group{}, p.lazy.err
+	}
+	return p.lazy.tmpl.Clone(), nil
 }
 
 // validateHeader validates the always-loaded fields (match + app). Template

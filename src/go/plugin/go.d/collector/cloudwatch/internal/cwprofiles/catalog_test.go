@@ -223,6 +223,12 @@ func TestLoadFromDirs_InvalidStockProfileFatal(t *testing.T) {
 	assert.Error(t, err)
 }
 
+func TestLoadFromDirs_EmptyCatalogIsError(t *testing.T) {
+	emptyDir := t.TempDir()
+	_, err := loadFromDirs([]profilecatalog.DirSpec{{Path: emptyDir, IsStock: true}})
+	assert.Error(t, err, "an empty catalog must be rejected")
+}
+
 func TestCatalog_AllProfiles(t *testing.T) {
 	catalog, err := LoadFromDefaultDirs()
 	require.NoError(t, err)
