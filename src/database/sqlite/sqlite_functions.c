@@ -174,7 +174,7 @@ static void finalize_and_free_stmt_list(struct stmt_pool_s *stmt_list)
     if (!stmt_list)
         return;
 
-    int max_keys = stmt_list->count;
+    int max_keys = MIN(stmt_list->count, MAX_PREPARED_THREAD_STATEMENTS);
     for (int i = 0; i < max_keys; i++) {
         if (!stmt_list->stmt[i])
             continue;
