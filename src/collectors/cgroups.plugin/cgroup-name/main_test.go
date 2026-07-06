@@ -540,10 +540,24 @@ func TestMirroredK8sPodListFixtureViaAPIServer(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// The token file carries a trailing newline on purpose: the shell helper
+	// read it with $(<file), which strips it, and net/http rejects header
+	// values containing a newline, so the helper must trim before use.
+	tokenFile := filepath.Join(tmp, "serviceaccount-token")
+	if err := os.WriteFile(tokenFile, []byte("fixture-token\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	savedTokenFile := k8sServiceAccountTokenFile
+	k8sServiceAccountTokenFile = tokenFile
+	t.Cleanup(func() { k8sServiceAccountTokenFile = savedTokenFile })
+
 	containerdID, dockerID, crioID, pods := k8sPodFixture()
 	kubeSystemNS := `{"metadata":{"name":"kube-system","uid":"fixture-system-uid"}}`
 
 	ts := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if got := r.Header.Get("Authorization"); got != "Bearer fixture-token" {
+			t.Errorf("Authorization header = %q, want %q", got, "Bearer fixture-token")
+		}
 		switch r.URL.Path {
 		case "/api/v1/namespaces/kube-system":
 			_, _ = w.Write([]byte(kubeSystemNS))

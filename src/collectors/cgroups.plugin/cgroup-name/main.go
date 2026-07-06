@@ -37,6 +37,9 @@ const (
 
 const k8sServiceAccountCAFile = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 
+// package-level var so tests can point it at a fixture file
+var k8sServiceAccountTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+
 var (
 	sbindirPost string
 
@@ -886,10 +889,13 @@ func (r *resolver) k8sGCPGetClusterName(ctx context.Context) (string, bool) {
 		go func(i int, url string) {
 			defer wg.Done()
 			body, err := httpGetWithContext(ctx, url, httpGetOptions{headers: headers, noProxy: true, fail: true, timeout: 3 * time.Second})
-			if err != nil || len(body) == 0 {
+			// the shell captured these with $(curl ...), which strips trailing
+			// newlines, and tested the stripped value for emptiness
+			value := strings.TrimSpace(string(body))
+			if err != nil || value == "" {
 				cancel()
 			}
-			ch <- result{idx: i, value: string(body), err: err}
+			ch <- result{idx: i, value: value, err: err}
 		}(i, url)
 	}
 	wg.Wait()
@@ -1181,8 +1187,10 @@ func kubeletPodsURL() string {
 
 func (r *resolver) k8sFetchPods(ctx context.Context, fn, kubeSystemUID string) (string, string, int) {
 	if os.Getenv("KUBERNETES_SERVICE_HOST") != "" && os.Getenv("KUBERNETES_PORT_443_TCP_PORT") != "" {
-		tokenBytes, _ := os.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/token")
-		header := map[string]string{"Authorization": "Bearer " + string(tokenBytes)}
+		tokenBytes, _ := os.ReadFile(k8sServiceAccountTokenFile)
+		// the shell read the token with $(<file), which strips trailing newlines;
+		// net/http rejects header values containing a newline outright
+		header := map[string]string{"Authorization": "Bearer " + strings.TrimSpace(string(tokenBytes))}
 		host := os.Getenv("KUBERNETES_SERVICE_HOST") + ":" + os.Getenv("KUBERNETES_PORT_443_TCP_PORT")
 		var kubeSystemNS string
 		if kubeSystemUID == "" {
