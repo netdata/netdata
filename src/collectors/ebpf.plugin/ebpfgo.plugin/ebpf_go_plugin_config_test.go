@@ -32,14 +32,16 @@ func parseTempConfig(t *testing.T, filename, content string) pluginConfigFile {
 	return cfg
 }
 
-// checkBoolPtr asserts that got matches want: both nil, or both non-nil and equal.
-func checkBoolPtr(t *testing.T, name string, got, want *bool) {
+// checkPtr asserts that got matches want: both nil, or both non-nil and equal.
+func checkPtr[T comparable](t *testing.T, name string, got, want *T) {
 	t.Helper()
 	if want == nil {
 		if got != nil {
 			t.Fatalf("%s should be nil, got %v", name, *got)
 		}
-	} else if got == nil || *got != *want {
+		return
+	}
+	if got == nil || *got != *want {
 		t.Fatalf("%s = %v, want %v", name, got, *want)
 	}
 }
@@ -49,85 +51,57 @@ func TestParsePluginConfigFileLegacyKeys(t *testing.T) {
 	// recognised and mapped to Go-plugin equivalents.
 	tests := map[string]struct {
 		content      string
-		wantFlavor   string // "" means "don't care / unchanged"
-		wantPidLevel int    // -1 means "not set"
+		wantFlavor   *string
+		wantPidLevel *int
 	}{
 		"ebpf type format legacy forces tracing flavor": {
-			content:      "[global]\nebpf type format = legacy\n",
-			wantFlavor:   "tracing",
-			wantPidLevel: -1,
+			content:    "[global]\nebpf type format = legacy\n",
+			wantFlavor: stringPtr("tracing"),
 		},
 		"ebpf type format auto leaves flavor unchanged": {
-			content:      "[global]\nebpf type format = auto\n",
-			wantFlavor:   "",
-			wantPidLevel: -1,
+			content: "[global]\nebpf type format = auto\n",
 		},
 		"ebpf type format co-re leaves flavor unchanged": {
-			content:      "[global]\nebpf type format = co-re\n",
-			wantFlavor:   "",
-			wantPidLevel: -1,
+			content: "[global]\nebpf type format = co-re\n",
 		},
 		"ebpf co-re tracing probe forces tracing flavor": {
-			content:      "[global]\nebpf co-re tracing = probe\n",
-			wantFlavor:   "tracing",
-			wantPidLevel: -1,
+			content:    "[global]\nebpf co-re tracing = probe\n",
+			wantFlavor: stringPtr("tracing"),
 		},
 		"ebpf co-re tracing trampoline leaves flavor unchanged": {
-			content:      "[global]\nebpf co-re tracing = trampoline\n",
-			wantFlavor:   "",
-			wantPidLevel: -1,
+			content: "[global]\nebpf co-re tracing = trampoline\n",
 		},
 		"ebpf object flavor legacy maps to tracing flavor": {
-			content:      "[global]\nebpf object flavor = legacy\n",
-			wantFlavor:   "tracing",
-			wantPidLevel: -1,
+			content:    "[global]\nebpf object flavor = legacy\n",
+			wantFlavor: stringPtr("tracing"),
 		},
 		"ebpf object flavor buffer ring maps to buffer flavor": {
-			content:      "[global]\nebpf object flavor = buffer ring\n",
-			wantFlavor:   "buffer",
-			wantPidLevel: -1,
+			content:    "[global]\nebpf object flavor = buffer ring\n",
+			wantFlavor: stringPtr("buffer"),
 		},
 		"ebpf object flavor ring buffer maps to buffer flavor": {
-			content:      "[global]\nebpf object flavor = ring-buffer\n",
-			wantFlavor:   "buffer",
-			wantPidLevel: -1,
+			content:    "[global]\nebpf object flavor = ring-buffer\n",
+			wantFlavor: stringPtr("buffer"),
 		},
 		"collect pid real parent sets level 0": {
 			content:      "[global]\ncollect pid = real parent\n",
-			wantFlavor:   "",
-			wantPidLevel: 0,
+			wantPidLevel: intPtr(0),
 		},
 		"collect pid parent sets level 1": {
 			content:      "[global]\ncollect pid = parent\n",
-			wantFlavor:   "",
-			wantPidLevel: 1,
+			wantPidLevel: intPtr(1),
 		},
 		"collect pid all sets level 2": {
 			content:      "[global]\ncollect pid = all\n",
-			wantFlavor:   "",
-			wantPidLevel: 2,
+			wantPidLevel: intPtr(2),
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			cfg := parseTempConfig(t, "cachestat.conf", tc.content)
-
-			if tc.wantFlavor != "" {
-				if cfg.ObjectFlavor == nil || *cfg.ObjectFlavor != tc.wantFlavor {
-					t.Fatalf("ObjectFlavor = %v, want %q", cfg.ObjectFlavor, tc.wantFlavor)
-				}
-			} else if cfg.ObjectFlavor != nil {
-				t.Fatalf("ObjectFlavor should be nil, got %q", *cfg.ObjectFlavor)
-			}
-
-			if tc.wantPidLevel >= 0 {
-				if cfg.CollectPidLevel == nil || *cfg.CollectPidLevel != tc.wantPidLevel {
-					t.Fatalf("CollectPidLevel = %v, want %d", cfg.CollectPidLevel, tc.wantPidLevel)
-				}
-			} else if cfg.CollectPidLevel != nil {
-				t.Fatalf("CollectPidLevel should be nil, got %d", *cfg.CollectPidLevel)
-			}
+			checkPtr(t, "ObjectFlavor", cfg.ObjectFlavor, tc.wantFlavor)
+			checkPtr(t, "CollectPidLevel", cfg.CollectPidLevel, tc.wantPidLevel)
 		})
 	}
 }
@@ -143,24 +117,12 @@ func TestParsePluginConfigFile(t *testing.T) {
     ebpf object flavor = arena
 `)
 
-	if cfg.UpdateEvery == nil || *cfg.UpdateEvery != 17 {
-		t.Fatalf("unexpected update every: %#v", cfg.UpdateEvery)
-	}
-	if cfg.PidTable == nil || *cfg.PidTable != 4096 {
-		t.Fatalf("unexpected pid table size: %#v", cfg.PidTable)
-	}
-	if cfg.MapsPerCore == nil || *cfg.MapsPerCore {
-		t.Fatalf("unexpected maps per core: %#v", cfg.MapsPerCore)
-	}
-	if cfg.BTFPath == nil || *cfg.BTFPath != "/tmp/btf" {
-		t.Fatalf("unexpected btf path: %#v", cfg.BTFPath)
-	}
-	if cfg.Lifetime == nil || *cfg.Lifetime != 123 {
-		t.Fatalf("unexpected lifetime: %#v", cfg.Lifetime)
-	}
-	if cfg.ObjectFlavor == nil || *cfg.ObjectFlavor != "arena" {
-		t.Fatalf("unexpected object flavor: %#v", cfg.ObjectFlavor)
-	}
+	checkPtr(t, "UpdateEvery", cfg.UpdateEvery, intPtr(17))
+	checkPtr(t, "PidTable", cfg.PidTable, uint32Ptr(4096))
+	checkPtr(t, "MapsPerCore", cfg.MapsPerCore, boolPtr(false))
+	checkPtr(t, "BTFPath", cfg.BTFPath, stringPtr("/tmp/btf"))
+	checkPtr(t, "Lifetime", cfg.Lifetime, intPtr(123))
+	checkPtr(t, "ObjectFlavor", cfg.ObjectFlavor, stringPtr("arena"))
 }
 
 func TestParsePluginConfigFileCollectPidInvalid(t *testing.T) {
@@ -205,8 +167,8 @@ func TestParsePluginConfigFileEbpfPrograms(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
 			cfg := parseTempConfig(t, "ebpf.d.conf", tc.content)
-			checkBoolPtr(t, "Socket", cfg.Socket, tc.wantSocket)
-			checkBoolPtr(t, "Cachestat", cfg.Cachestat, tc.wantCachestat)
+			checkPtr(t, "Socket", cfg.Socket, tc.wantSocket)
+			checkPtr(t, "Cachestat", cfg.Cachestat, tc.wantCachestat)
 		})
 	}
 }

@@ -49,7 +49,7 @@ func TestParseMinimalFunctionLine(t *testing.T) {
 			line: `FUNCTION 99 10 "network-protocols"`,
 		},
 		"empty line": {line: ""},
-		"not a FUNCTION line": {line: `CHART '' '' 'cpu' 'percentage' 'cpu' 'cpu.cpu0' 'line' 100 1 '' 'netdata' 'cpu'"},
+		"not a FUNCTION line": {line: `CHART '' '' 'cpu' 'percentage' 'cpu' 'cpu.cpu0' 'line' 100 1 '' 'netdata' 'cpu'`},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -403,10 +403,10 @@ func TestNetworkProtocolsFunctionTableResponseShape(t *testing.T) {
 	if len(resp.Data) != 2 {
 		t.Fatalf("Data len = %d, want 2", len(resp.Data))
 	}
-	if got, _ := resp.Data[0].([]interface{})[0].(string); got != "TCP" {
+	if got, _ := resp.Data[0][0].(string); got != "TCP" {
 		t.Errorf("Data[0][0] = %q, want \"TCP\"", got)
 	}
-	if got, _ := resp.Data[1].([]interface{})[0].(string); got != "UDP" {
+	if got, _ := resp.Data[1][0].(string); got != "UDP" {
 		t.Errorf("Data[1][0] = %q, want \"UDP\"", got)
 	}
 	if _, ok := resp.Columns["Transport"]; !ok {

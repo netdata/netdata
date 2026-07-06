@@ -94,7 +94,7 @@ func parseMinimalFunctionLine(line string) (uid, name string) {
 	r.Comma = ' '
 	r.LazyQuotes = true
 	parts, err := r.Read()
-	if err != nil || len(parts) < 4 {
+	if err != nil || len(parts) < 5 || parts[0] != "FUNCTION" {
 		return "", ""
 	}
 	uid = parts[1]

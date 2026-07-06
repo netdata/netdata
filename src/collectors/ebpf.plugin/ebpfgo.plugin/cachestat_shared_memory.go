@@ -73,15 +73,15 @@ const (
 // data race where socket's goroutine could mutate the entries slice while
 // publisher.Publish is still reading it.
 func (s *cachestatSharedMemoryStore) Publish(publisher *SharedPidMemoryPublisher) error {
-	if publisher == nil {
-		return nil
-	}
-
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	flags := s.activeModules
 	s.activeModules = 0
+
+	if publisher == nil {
+		return nil
+	}
 	return publisher.Publish(s.entries, flags)
 }
 

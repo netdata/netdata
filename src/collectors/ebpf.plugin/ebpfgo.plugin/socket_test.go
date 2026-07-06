@@ -14,7 +14,10 @@ func TestSocketDelta(t *testing.T) {
 		"no change":           {current: 50, prev: 50, want: 0},
 		"counter reset":       {current: 10, prev: 500, want: 0}, // must not return 490
 		"counter wrap":        {current: 1, prev: ^uint64(0), want: 0},
-		"first read (prev=0)": {current: 1000, prev: 0, want: 0}, // suppress accumulated history spike
+		// prev=0 means the counter genuinely started at zero (eBPF maps clear
+		// on load); spike suppression is handled by socketGlobalState.Update's
+		// !initialized gate, not here.
+		"first read (prev=0)": {current: 1000, prev: 0, want: 1000},
 		"both zero":           {current: 0, prev: 0, want: 0},
 	}
 	for name, tc := range tests {

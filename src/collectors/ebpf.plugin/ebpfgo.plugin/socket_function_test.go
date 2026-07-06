@@ -56,8 +56,8 @@ func TestBuildNetworkProtocolsJSON_BPFMapping(t *testing.T) {
 		t.Fatalf("Data len = %d, want 2 (TCP + UDP)", len(resp.Data))
 	}
 
-	tcpRow, ok := resp.Data[0].([]interface{})
-	if !ok || len(tcpRow) < 11 {
+	tcpRow := resp.Data[0]
+	if len(tcpRow) < 11 {
 		t.Fatalf("TCP row malformed: %+v", resp.Data[0])
 	}
 
@@ -92,8 +92,8 @@ func TestBuildNetworkProtocolsJSON_BPFMapping(t *testing.T) {
 		t.Errorf("TCP SegsRetransmitted = %d, want %d (tcpRetransmit)", got, p.tcpRetransmit)
 	}
 
-	udpRow, ok := resp.Data[1].([]interface{})
-	if !ok || len(udpRow) < 8 {
+	udpRow := resp.Data[1]
+	if len(udpRow) < 8 {
 		t.Fatalf("UDP row malformed: %+v", resp.Data[1])
 	}
 	if got := mustUint64(udpRow[2]); got != p.udpRecvCalls {

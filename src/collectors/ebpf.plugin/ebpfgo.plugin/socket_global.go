@@ -48,7 +48,7 @@ type socketGlobalState struct {
 // Returns 0 when prev is zero (first read — avoids a spike from accumulated
 // counter history) or when current is not greater than prev (counter reset or wrap).
 func socketDelta(current, prev uint64) uint64 {
-	if prev == 0 || current <= prev {
+	if current <= prev {
 		return 0
 	}
 	return current - prev
