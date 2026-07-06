@@ -549,6 +549,22 @@
 - Docs: Correct database config key from mode to db in docs ([#22864](https://github.com/netdata/netdata/issues/22864))
 - Docs: Add default database storage path to disk requirements doc ([#22865](https://github.com/netdata/netdata/issues/22865))
 - Feat(go.d): run collector dyncfg commands concurrently on per-key lanes ([#22964](https://github.com/netdata/netdata/issues/22964))
+- Feat(go.d): move jobmgr dyncfg domains onto claimed executor ([#22966](https://github.com/netdata/netdata/issues/22966))
+- Refactor(go.d): route jobmgr scheduling through command plans ([#22979](https://github.com/netdata/netdata/issues/22979))
+- Refactor(go.d/jobmgr): pull vnode snapshots at runtime boundaries ([#22986](https://github.com/netdata/netdata/issues/22986))
+- Docs: Document enabled alarms whitelist for specific alert filtering ([#22894](https://github.com/netdata/netdata/issues/22894))
+- Docs: Document Windows uninstall data retention and full cleanup ([#22897](https://github.com/netdata/netdata/issues/22897))
+- Docs: Add System Overview section to single-node dashboard docs ([#22924](https://github.com/netdata/netdata/issues/22924))
+- Docs: Note metric naming applies to remote write in prometheus README ([#22928](https://github.com/netdata/netdata/issues/22928))
+- Docs: Explain benign repoconfig warning in kickstart troubleshooting ([#22941](https://github.com/netdata/netdata/issues/22941))
+- Refactor(go.d/jobmgr): move effect lifecycle routing into transition kernel ([#22990](https://github.com/netdata/netdata/issues/22990))
+- Improve topology search policies ([#22988](https://github.com/netdata/netdata/issues/22988))
+- Netdata fixes part 25 ([#22958](https://github.com/netdata/netdata/issues/22958))
+- Netdata fixes part 24 ([#22956](https://github.com/netdata/netdata/issues/22956))
+- Expose raw partial trimming metadata ([#22953](https://github.com/netdata/netdata/issues/22953))
+- Test(go.d/jobmgr): harden effect lifecycle invariants ([#22991](https://github.com/netdata/netdata/issues/22991))
+- Add macOS logs, battery, thermal, storage, smart collectors ([#22475](https://github.com/netdata/netdata/issues/22475))
+- Update netflow-plugin to systemd-journal-sdk 0.7.6 ([#22993](https://github.com/netdata/netdata/issues/22993))
 
 ## [2.10.0] - 2026-04-09
 

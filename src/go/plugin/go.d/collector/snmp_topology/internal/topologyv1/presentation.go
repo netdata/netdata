@@ -7,6 +7,57 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/snmp_topology/internal/topologymodel"
 )
 
+var (
+	snmpTopologyV1DeviceSearchColumns = []string{
+		"display_name",
+		"id",
+		"sys_name",
+		"sys_object_id",
+		"management_ip",
+		"vendor",
+		"model",
+		"sys_descr",
+		"sys_location",
+		"sys_contact",
+		"netdata_host_id",
+	}
+
+	snmpTopologyV1DeviceSearchLabelKeys = []string{
+		"chassis_id",
+		"mac_address",
+		"ip_address",
+		"hostname",
+		"dns_name",
+		topologymodel.LabelOSPFRouterID,
+		"capabilities",
+		"capabilities_supported",
+		"capabilities_enabled",
+		"protocols",
+		"protocols_collected",
+	}
+
+	snmpTopologyV1EndpointSearchColumns = []string{
+		"display_name",
+		"id",
+		"vendor",
+		"model",
+	}
+
+	snmpTopologyV1EndpointSearchLabelKeys = []string{
+		"mac_address",
+		"ip_address",
+		"hostname",
+		"dns_name",
+		"learned_sources",
+		"protocols",
+	}
+
+	snmpTopologyV1CustomSearchColumns = []string{
+		"display_name",
+		"id",
+	}
+)
+
 func snmpTopologyV1ActorTypes() map[string]topologyapi.ActorType {
 	types := make(map[string]topologyapi.ActorType)
 	addDevice := func(id, label, colorSlot, icon string) {
@@ -16,8 +67,8 @@ func snmpTopologyV1ActorTypes() map[string]topologyapi.ActorType {
 			MergeIdentity:     []string{"chassis_ids", "mac_addresses", "ip_addresses", "sys_name"},
 			AggregationScopes: []string{"device", "network"},
 			Search: &topologyapi.ActorSearchPolicy{
-				Columns:   []string{"display_name", "sys_name", "management_ip", "vendor", "model"},
-				LabelKeys: []string{topologymodel.LabelOSPFRouterID},
+				Columns:   snmpTopologyV1DeviceSearchColumns,
+				LabelKeys: snmpTopologyV1DeviceSearchLabelKeys,
 			},
 			Presentation: &topologyapi.ActorPresentation{
 				Label:     label,
@@ -72,7 +123,10 @@ func snmpTopologyV1ActorTypes() map[string]topologyapi.ActorType {
 		Identity:          []string{"id"},
 		MergeIdentity:     []string{"mac_addresses", "ip_addresses"},
 		AggregationScopes: []string{"endpoint", "network"},
-		Search:            &topologyapi.ActorSearchPolicy{Columns: []string{"display_name"}},
+		Search: &topologyapi.ActorSearchPolicy{
+			Columns:   snmpTopologyV1EndpointSearchColumns,
+			LabelKeys: snmpTopologyV1EndpointSearchLabelKeys,
+		},
 		Presentation: &topologyapi.ActorPresentation{
 			Label:     "Inferred endpoint",
 			Role:      "endpoint",
@@ -140,7 +194,7 @@ func snmpTopologyV1ActorTypes() map[string]topologyapi.ActorType {
 		Identity:          []string{"id"},
 		MergeIdentity:     []string{"id"},
 		AggregationScopes: []string{"network"},
-		Search:            &topologyapi.ActorSearchPolicy{Columns: []string{"display_name"}},
+		Search:            &topologyapi.ActorSearchPolicy{Columns: snmpTopologyV1CustomSearchColumns},
 		Presentation: &topologyapi.ActorPresentation{
 			Label:     "Custom",
 			Role:      "actor",

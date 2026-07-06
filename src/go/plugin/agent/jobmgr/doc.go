@@ -77,18 +77,18 @@
 //
 //   - An abandoned effect (deadline exceeded) frees its pool slot and commits
 //     its deadline outcome, but the key stays busy until the leaked module
-//     call returns; the late outcome (warm start, retry eligibility, plain
-//     release) is decided then, on the loop. The wedge re-attempts claim
-//     waiters parked at the key, so commands that exclude wedged keys on
-//     recompute (store mutations skip-and-report wedged dependents) proceed
-//     instead of waiting out the leaked call. A late warm start additionally
-//     requires the job's store dependencies unchanged since the abandon
-//     (their identities are captured when the read claims release; a store
-//     mutation committed or in flight at the late return drops the warm job,
-//     matching the mutation's skip-and-report of the wedged dependent).
-//     Dropped continuations dispose SILENTLY: the job's emission gate closes
-//     before its cleanup, which would otherwise emit HOST/HOSTINFO lines for
-//     a job that never started.
+//     call returns. Loop-side abandon and late-return ordering is planned by
+//     executor_transition.go and pinned by executor_transition_test.go. The
+//     wedge re-attempts claim waiters parked at the key, so commands that
+//     exclude wedged keys on recompute (store mutations skip-and-report wedged
+//     dependents) proceed instead of waiting out the leaked call. A late warm
+//     start additionally requires the job's store dependencies unchanged since
+//     the abandon (their identities are captured when the read claims release;
+//     a store mutation committed or in flight at the late return drops the
+//     warm job, matching the mutation's skip-and-report of the wedged
+//     dependent). Dropped continuations dispose SILENTLY: the job's emission
+//     gate closes before its cleanup, which would otherwise emit HOST/HOSTINFO
+//     lines for a job that never started.
 //
 //   - Every job registration (startRunningJob) reconciles the job's vnode
 //     against the store before Start: a job created before a vnode update but

@@ -16,6 +16,10 @@ id_to_path = {}
 # -----------------------------
 # FS utilities
 # -----------------------------
+def with_single_final_newline(md: str) -> str:
+    return md.rstrip("\r\n") + "\n"
+
+
 def cleanup(only_base_paths=None):
     """
     Clean generated /integrations folders.
@@ -51,7 +55,7 @@ def clean_and_write(md: str, path: Path):
     md = re.sub(r'\{% details open=true summary="(.*?)" %\}', r'<details open><summary>\1</summary>\n', md)
     md = re.sub(r'\{% details summary="(.*?)" %\}', r'<details><summary>\1</summary>\n', md)
     md = md.replace("{% /details %}", "</details>\n")
-    path.write_text(md, encoding="utf-8")
+    path.write_text(with_single_final_newline(md), encoding="utf-8")
 
 
 def resolve_related_links():
@@ -76,7 +80,7 @@ def resolve_related_links():
             return name
 
         md = re.sub(r'\{% relatedResource id="([^"]*)" %\}(.*?)\{% /relatedResource %\}', _resolve, md)
-        p.write_text(md, encoding="utf-8")
+        p.write_text(with_single_final_newline(md), encoding="utf-8")
 
 
 def build_path(meta_yaml_link: str) -> str:
@@ -111,6 +115,13 @@ def add_custom_edit_url(markdown_string: str, meta_yaml_link: str, sidebar_label
     else:
         # safe fallback
         path_to_md_file = f"{meta_yaml_link.replace('/metadata.yaml', '')}/integrations/{slug}"
+
+    if mode == "logs":
+        markdown_string = markdown_string.replace(
+            "endmeta-->\n",
+            "endmeta-->\n\n<!-- markdownlint-disable MD012 MD033 MD043 MD045 -->\n",
+            1,
+        )
 
     return markdown_string.replace(
         "<!--startmeta", f"<!--startmeta\ncustom_edit_url: \"{path_to_md_file}.md\""

@@ -279,6 +279,7 @@ static void dsf_json_hw(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
 
         buffer_json_member_add_object(wb, "product");
         {
+            buffer_json_member_add_string(wb, "id", ds->hw.product.id);
             buffer_json_member_add_string(wb, "name", ds->hw.product.name);
             buffer_json_member_add_string(wb, "version", ds->hw.product.version);
             buffer_json_member_add_string(wb, "sku", ds->hw.product.sku);
@@ -322,6 +323,7 @@ static void dsf_json_product(BUFFER *wb, DAEMON_STATUS_FILE *ds) {
     buffer_json_member_add_object(wb, "product");
     {
         buffer_json_member_add_string(wb, "vendor", ds->product.vendor);
+        buffer_json_member_add_string(wb, "id", ds->product.id);
         buffer_json_member_add_string(wb, "name", ds->product.name);
         buffer_json_member_add_string(wb, "type", ds->product.type);
     }
@@ -417,6 +419,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     unsigned required_v25 = version >= 25 ? strict : JSONC_OPTIONAL;
     unsigned required_v26 = version >= 26 ? strict : JSONC_OPTIONAL;
     unsigned required_v27 = version >= 27 ? strict : JSONC_OPTIONAL;
+    unsigned required_v29 = version >= 29 ? strict : JSONC_OPTIONAL;
 
     // Parse timestamp
     JSONC_PARSE_TXT2RFC3339_USEC_OR_ERROR_AND_RETURN(jobj, path, "@timestamp", ds->timestamp_ut, error, required_v1);
@@ -591,6 +594,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
         });
 
         JSONC_PARSE_SUBOBJECT(jobj, path, "product", error, required_v25, {
+            JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "id", ds->hw.product.id, error, required_v29);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "name", ds->hw.product.name, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "version", ds->hw.product.version, error, required_v25);
             JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "sku", ds->hw.product.sku, error, required_v25);
@@ -624,6 +628,7 @@ static bool daemon_status_file_from_json(json_object *jobj, void *data, BUFFER *
     // Parse product object
     JSONC_PARSE_SUBOBJECT(jobj, path, "product", error, required_v26, {
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "vendor", ds->product.vendor, error, required_v26);
+        JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "id", ds->product.id, error, required_v29);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "name", ds->product.name, error, required_v26);
         JSONC_PARSE_TXT2CHAR_OR_ERROR_AND_RETURN(jobj, path, "type", ds->product.type, error, required_v26);
     });
@@ -1699,6 +1704,10 @@ const char *daemon_status_file_get_fatal_thread(void) {
 
 const char *daemon_status_file_get_sys_vendor(void) {
     return session_status.product.vendor;
+}
+
+const char *daemon_status_file_get_product_id(void) {
+    return session_status.product.id;
 }
 
 const char *daemon_status_file_get_product_name(void) {

@@ -71,8 +71,13 @@ const effectPoolSize = 4
 
 // keyState is the loop-owned lane state of one key.
 type keyState struct {
-	busy          bool
-	waiting       bool
+	busy    bool
+	waiting bool
+	// claimlessExec is set only while running a command whose plan said it must
+	// complete inline. runnerFor uses it as a runtime invariant check: claimless
+	// commands must not start blocking phases because they hold no claims. A
+	// claimless command does not re-enter claimless execution for the same key.
+	claimlessExec bool
 	generation    uint64
 	fifo          []event
 	waitFIFO      []event
@@ -88,8 +93,8 @@ type keyState struct {
 	grant     *claimGrant
 	// wedge, when non-nil, IS the wedged state: the lane's command was
 	// abandoned at its deadline and the leaked call has not returned (busy
-	// stays true for the whole window). Constructed only by wedgeKey at the
-	// abandon commit; consumed only by the late return.
+	// stays true for the whole window). Constructed only by the enter-wedged
+	// transition action; consumed only by the late return.
 	wedge *wedge
 }
 
@@ -255,7 +260,7 @@ func (e *executor) execute(sk string, ks *keyState, ev event) {
 	}
 	plan := e.planEvent(ev)
 	if !plan.needsClaims() {
-		e.executeEvent(sk, ks, ev)
+		e.executeClaimlessEvent(sk, ks, ev)
 		return
 	}
 	// Mutating events reserve their full claim set - the lane key plus the
@@ -275,6 +280,12 @@ func (e *executor) execute(sk string, ks *keyState, ev event) {
 	ks.acquiring = req
 	e.claimWork[req] = ev
 	e.claims.acquire(req)
+}
+
+func (e *executor) executeClaimlessEvent(sk string, ks *keyState, ev event) {
+	ks.claimlessExec = true
+	defer func() { ks.claimlessExec = false }()
+	e.executeEvent(sk, ks, ev)
 }
 
 // refuseAtShutdown resolves an event under the one rule: dyncfg commands
@@ -453,98 +464,54 @@ func (e *executor) eventClaims(ev event) []claim {
 	return set
 }
 
-// THE WEDGE LIFECYCLE CONTRACT. A wedged key (deadline-abandoned effect,
-// leaked module call still running) is the one state where the normal
-// invariants are asymmetric; every site touching it MUST preserve all of
-// the following, and a change to any point updates this block. Structural
-// owners: points 2-5 are the ordered body of wedgeKey (the only place a
-// wedge is created); points 8-10 and 13 the ordered body of resolveWedge
-// (the only place one is resolved); point 6 the effect worker; point 7 the
-// restart buffer plus lateWork; points 11-12 the registration reconcile and
-// the late retry evaluation; point 14 the effect closures' obligation:
+// WEDGE LIFECYCLE NOTES. A wedged key (deadline-abandoned effect, leaked
+// module call still running) is the one state where normal settle rules are
+// asymmetric. Loop-side abandon and late-return ordering is owned by
+// planLaneEffectTransition and pinned by executor_transition_test.go:
+// writes stay held until late return, reads release at abandon, read-claimed
+// store identities are snapshotted before release, late replay runs before
+// final release, and shutdown late returns only dispose/drop and release.
 //
-// While wedged (from the abandon commit to the late return):
+// Cross-file invariants still live with their mechanism owners:
 //
-//  1. The lane stays busy: all its events park in the lane FIFO, so no
-//     command for the key can run or commit (generation mismatch at the
-//     late return is an assert, not a working path).
-//  2. The command's WRITE claims - its own key plus any keys the leaked
-//     work may still MUTATE (a store command's dependent job keys) - stay
-//     held until the late return; its READ claims release at the abandon
-//     commit. Dependency mutations CAN therefore commit during the wedge.
-//  3. Because reads release, the abandon commit snapshots the read-claimed
-//     store identities (wedgedDeps) - the last moment mutations were still
-//     excluded, hence exactly what the leaked work resolved.
-//  4. Store-dependency index maintenance happens at the abandon commit
-//     BEFORE any claim release, so commands woken by the release never
-//     read a stale index: the after-idle hooks (the dyncfg-command deps
-//     sync) and the discovery-removal path's commit-side RemoveActiveJob
-//     (stagedRemoveConfig) - cleanup MUST NOT sit in an effect closure
-//     after the blocking wait, where an abandon defers it to the leaked
-//     stop's return while the removal publish already happened.
-//  5. Claim waiters parked at the wedged key are re-attempted at the wedge
-//     (claims.wake): recompute excludes wedged keys, so store mutations
-//     skip-and-report the dependent instead of waiting out the leaked
-//     call; a waiter whose set still needs the key re-parks at the front.
-//  6. The abandoned result reaches the loop before the child's late
-//     completion (the delivered gate): an instantly-returning leaked call
-//     must not wedge the key with nothing left to release it.
-//  7. Store commands buffer completed dependent restarts as they finish:
-//     the buffer flushes at the abandon commit AND is registered as
-//     lateWork for restarts completing after it.
-//
-// At the late return:
-//
-//  8. lateWork runs BEFORE the remaining claims release (the replay is
-//     truthful while the write claims still exclude newer commands) -
-//     unless draining, where it is dropped (one rule).
-//  9. A warm resume starts ONLY if: not draining; the generation matches;
-//     no stop intent is queued in the lane FIFO; every store dependency
-//     the warm config references has an unchanged committed identity and
-//     no in-flight write hold (staleWarmDep); and the exposed entry is
-//     still this config in its abandoned-failed state (resumeWarmJob).
-// 10. Every DROPPED resume disposes silently: disposeWarmResume closes the
-//     job's emission gate by captured handle before Cleanup (V1 Cleanup
-//     emits HOST/HOSTINFO lines even for a never-started job).
-// 11. A STARTED warm job receives the current vnode config at registration
-//     (startRunningJob's reconcile), like every other start path - as a
-//     COMMITTED baseline: it must be visible to cleanup even if the job never
-//     collects; later running updates are pulled at the job's runtime-defined
-//     collection boundary.
-// 12. A late FAILURE evaluates retry eligibility under today's rules at
-//     the return; nothing was scheduled at the abandon (a provisional
-//     retry could race the continuation).
-// 13. Shutdown: late results consumed while draining only release keys -
-//     the resume is disposed, lateWork dropped; the child gates its send
-//     on lateDrop so it never blocks after the drain.
-//
-// Entering the wedge (the deadline race):
-//
-// 14. Classification is race-independent: an effect that DEGRADED its work
-//     because the deadline fired (a store command's restart sequence cut
-//     mid-way) returns a non-nil error, so the command reaches its timeout
-//     outcome whether the closure's return or the worker's abandon wins
-//     their select race - message text alone cannot carry the degradation.
-//     ENFORCED AS A SEAM POST-CONDITION, not per-checkpoint discipline:
-//     runStagedRestarts reclassifies any nil-error restart sequence whose
-//     command window has expired (a deadline firing DURING a restart or
-//     after the last one is invisible to in-loop checkpoints), so the
-//     pipeline cannot under-report degradation. Skip-and-report on WEDGED
-//     dependents is not degradation; it is the command's successful outcome
-//     for wedged keys.
+// - The lane remains occupied while wedged; route/settle must park same-key
+//   events until the late return.
+// - Commit-side dependency cleanup must happen before claim release wakes
+//   waiters. Do not move discovery removal or dependency-index cleanup into
+//   an effect closure after the blocking wait; abandon would defer cleanup
+//   until the leaked call returns while publication already happened.
+// - Claim wake at the wedge lets commands whose recomputed claim set
+//   excludes wedged keys proceed. Store mutations skip-and-report wedged
+//   dependents instead of waiting for an unbounded leaked call.
+// - The effect worker's delivered gate must deliver abandon before the
+//   child's late result, even when the leaked call returns immediately.
+// - Store commands buffer completed dependent restarts as they finish; the
+//   buffer flushes at normal/abandon commit and is also registered as
+//   lateWork for restarts completing after abandon.
+// - resumeWarmJob still verifies the exposed entry before a warm start.
+//   disposeWarmResume closes the captured emission gate before Cleanup, and
+//   startRunningJob reconciles the current vnode baseline at registration.
+// - Late failures evaluate retry eligibility at late return; no provisional
+//   retry is scheduled at abandon.
+// - Late children gate their sends on lateDrop so shutdown drain cannot
+//   block after the bounded wait.
+// - Deadline classification is race-independent: runStagedRestarts
+//   reclassifies an expired restart sequence as a timeout even if the
+//   closure returns after the deadline checkpoint.
 
 // wedge is the loop-owned record of one abandoned command, from its abandon
 // commit to its late return. keyState.wedge != nil IS the wedged state:
-// wedgeKey (the abandon commit) is the only constructor and resolveWedge
-// (the late return) the only consumer, so the wedged window's distributed
-// invariants live in two ordered bodies instead of scattered sites.
+// the enter-wedged transition action is the only constructor and the
+// leave-wedged transition action is the only consumer, so the wedged window's
+// loop-side ordering lives in the transition table instead of scattered
+// sites.
 type wedge struct {
 	// gen is the key's generation at the abandon commit: a mismatch at the
 	// late return means a newer command committed on the key (assert-only -
 	// the lane parks everything while wedged).
 	gen uint64
 	// deps are the read-claimed store dependencies' identities at the
-	// abandon commit (contract point 3).
+	// abandon commit.
 	deps []wedgedDep
 }
 
@@ -555,34 +522,6 @@ type wedge struct {
 type wedgedDep struct {
 	stateKey string
 	identity string
-}
-
-// wedgeKey performs the abandon-commit half of the wedge lifecycle, in
-// order: mark the key wedged FIRST (the commit's chained phases must refuse
-// and claim recomputes must already exclude this key), commit the deadline
-// outcome and advance the generation, run the command's after-idle hooks
-// (loop-owned side effects such as the store-dependency sync finalize
-// BEFORE any claim release - contract point 4), capture the read-claimed
-// store dependency identities (the last moment the read claims still
-// exclude mutations - point 3), release those read claims (they must not
-// outlive the commit, or a wedged dependent's store read would block every
-// rotation of that store - point 2), and re-attempt the claim waiters
-// parked at the key (the retained write claim has no bounded release;
-// recompute lets store mutations skip-and-report this key instead of
-// waiting out the leaked call - point 5). The command's WRITE claims - this
-// key and any keys the leaked work may still mutate - stay held on ks.grant
-// until the late return settles the lane (point 2).
-func (e *executor) wedgeKey(sk string, ks *keyState, commit func(error), err error) {
-	ks.wedge = &wedge{}
-	commit(err)
-	ks.generation++
-	ks.wedge.gen = ks.generation
-	e.runAfterIdleHooks(ks)
-	if ks.grant != nil {
-		ks.wedge.deps = e.snapshotWedgedDeps(ks.grant)
-		e.claims.releaseReadClaims(ks.grant)
-	}
-	e.claims.wake(sk)
 }
 
 // snapshotWedgedDeps captures the wedging command's store dependencies from
@@ -605,7 +544,7 @@ func (e *executor) snapshotWedgedDeps(g *claimGrant) []wedgedDep {
 	return deps
 }
 
-// staleWarmDep reports why a warm continuation's store dependencies are no
+// staleWarmDepStatus reports why a warm continuation's store dependencies are no
 // longer trustworthy: a store the warm job resolved its secrets from whose
 // committed identity changed since the abandon (a rotation committed while
 // the key was wedged - that rotation reported this dependent as skipped, so
@@ -614,10 +553,11 @@ func (e *executor) snapshotWedgedDeps(g *claimGrant) []wedgedDep {
 // have activated a new value off-loop; dropping is the safe direction - if
 // that mutation ultimately fails, only this warm start is lost, never
 // credential freshness). Union-claimed dependencies the warm config no
-// longer references are ignored. Empty means the continuation is safe.
-func (e *executor) staleWarmDep(deps []wedgedDep, cfg confgroup.Config) string {
+// longer references are ignored. staleWarmDepNone means the continuation is
+// safe; the accompanying message is empty in that case.
+func (e *executor) staleWarmDepStatus(deps []wedgedDep, cfg confgroup.Config) (staleWarmDepKind, string) {
 	if len(deps) == 0 {
-		return ""
+		return staleWarmDepNone, ""
 	}
 	referenced := make(map[string]bool, len(deps))
 	for _, key := range extractSecretStoreKeys(cfg) {
@@ -628,14 +568,14 @@ func (e *executor) staleWarmDep(deps []wedgedDep, cfg confgroup.Config) string {
 			continue
 		}
 		if e.claims.heldForWrite(dep.stateKey) {
-			return fmt.Sprintf("a mutation of store dependency '%s' is in flight", dep.stateKey)
+			return staleWarmDepWriteHeld, fmt.Sprintf("a mutation of store dependency '%s' is in flight", dep.stateKey)
 		}
 		key, _ := strings.CutPrefix(dep.stateKey, secretStoreStateKey(""))
 		if e.mgr.secretStoreDepIdentity(key) != dep.identity {
-			return fmt.Sprintf("store dependency '%s' changed while the key was wedged", dep.stateKey)
+			return staleWarmDepChanged, fmt.Sprintf("store dependency '%s' changed while the key was wedged", dep.stateKey)
 		}
 	}
-	return ""
+	return staleWarmDepNone, ""
 }
 
 func (e *executor) executeCollectorCommand(sk string, ks *keyState, fn dyncfg.Function) {
@@ -710,6 +650,12 @@ func (e *executor) runnerFor(sk string) dyncfg.StepRunner {
 			return
 		}
 		ks := e.keys[sk]
+		if ks.claimlessExec {
+			err := fmt.Errorf("internal scheduler error: claimless command for key '%s' attempted to run a blocking phase", sk)
+			e.mgr.Errorf("BUG: %v", err)
+			commit(err)
+			return
+		}
 		if ks.wedge != nil {
 			// Reachable when a commit chains a phase after its own stop was
 			// abandoned: the key is held by the leaked call, so the chained
@@ -776,139 +722,13 @@ func (e *executor) onEffectDoneShutdown(res effectResult) {
 	// parked events) must already see the shutdown mode, or a woken command
 	// would execute - and publish - through the normal path.
 	e.draining = true
-	if !res.late {
-		res.err = fmt.Errorf("interrupted by shutdown: %w", dyncfg.ErrPhaseNeverRan)
-	}
 	e.onEffectDone(res)
 }
 
 // onEffectDone resumes a completed blocking phase's commit on the run loop.
 func (e *executor) onEffectDone(res effectResult) {
 	ks := e.keys[res.key]
-	if res.late {
-		e.onLateReturn(res, ks)
-		return
-	}
-	if ks == nil || !ks.busy || ks.pendingCommit == nil {
-		e.mgr.Errorf("BUG: stray effect completion for key '%s' (err: %v)", res.key, res.err)
-		return
-	}
-	commit := ks.pendingCommit
-	ks.pendingCommit = nil
-	e.inflight--
-	if mx := e.mgr.executorMetrics; mx != nil && res.busyFor > 0 {
-		mx.effectBusySeconds.Add(res.busyFor.Seconds())
-	}
-	if res.abandoned {
-		// The deadline outcome commits now, but the key stays busy (wedged)
-		// until the leaked module call returns; no retry and no follow-up
-		// work is scheduled here - the late outcome decides. The whole
-		// transition, including the commit, is wedgeKey's ordered body.
-		e.wedgeKey(res.key, ks, commit, res.err)
-		e.flushPendingEffects()
-		e.observeState()
-		return
-	}
-	ks.busy = false
-	commit(res.err) // may chain the next phase, re-marking the key busy
-	ks.generation++
-	if !ks.busy {
-		// The command's final commit ran: finalize its loop-owned side
-		// effects BEFORE the claim release wakes commands that read them.
-		e.runAfterIdleHooks(ks)
-	}
-	e.finishIfSettled(res.key, ks)
-	e.settle(res.key, ks)
-	e.maybeDelete(res.key, ks)
-	e.flushPendingEffects()
-	e.observeState()
-}
-
-// onLateReturn unwedges a key whose abandoned effect finally returned:
-// resolveWedge decides the late outcome, then the lane settles.
-func (e *executor) onLateReturn(res effectResult, ks *keyState) {
-	if ks == nil || ks.wedge == nil {
-		e.mgr.Errorf("BUG: late completion for a key that is not wedged ('%s')", res.key)
-		if res.resume != nil {
-			e.mgr.disposeWarmResume(res.resume)
-		}
-		return
-	}
-	w := ks.wedge
-	ks.wedge = nil
-	ks.busy = false
-	e.mgr.Infof("abandoned operation for key '%s' returned (err: %v)", res.key, res.err)
-	e.resolveWedge(w, res, ks)
-	e.finishIfSettled(res.key, ks)
-	e.settle(res.key, ks)
-	e.maybeDelete(res.key, ks)
-	e.observeState()
-}
-
-// resolveWedge is the late-return half of the wedge lifecycle, in order:
-// replay the late work while the command's write claims still hold (dropped
-// when draining - one rule; contract points 8 and 13), then start the warm
-// continuation ONLY while every validity condition holds - not draining,
-// generation unchanged (assert - the lane parks everything while wedged),
-// no stop intent queued, and the warm config's store dependencies unchanged
-// since the abandon and not currently write-held (their read claims were
-// released with the abandon commit, so a rotation may have committed - or
-// be in flight - underneath the wedge; point 9). Every dropped continuation
-// disposes silently (point 10).
-func (e *executor) resolveWedge(w *wedge, res effectResult, ks *keyState) {
-	if res.lateWork != nil {
-		if e.draining {
-			// A late result queued just before cancellation can carry replay
-			// work: one rule - nothing publishes at shutdown; state
-			// reconverges on restart.
-			e.mgr.Infof("dropping late replay for key '%s': shutting down", res.key)
-		} else {
-			// Replay loop-side work for pieces that completed only after the
-			// abandon (dependent restarts): the command's write claims are
-			// still held, so no newer command has touched the affected keys
-			// and the replay is truthful.
-			res.lateWork()
-		}
-	}
-
-	if res.resume == nil {
-		return
-	}
-	staleDep := e.staleWarmDep(w.deps, res.resume.cfg)
-	switch {
-	case e.draining:
-		// Shutdown never starts fresh collector work: a warm job that
-		// arrives during the drain is dropped, not resumed (no late
-		// re-enables and no running publish after shutdown began).
-		e.mgr.Infof("dropping late detection success for key '%s': shutting down", res.key)
-		e.mgr.disposeWarmResume(res.resume)
-	case ks.generation != w.gen:
-		if mx := e.mgr.executorMetrics; mx != nil {
-			mx.staleCommits.Add(1)
-		}
-		e.mgr.Warningf("dropping late detection success for key '%s': config changed during operation", res.key)
-		e.mgr.disposeWarmResume(res.resume)
-	case keyFIFOHasStopIntent(ks):
-		// A disable/remove is already queued behind the wedge: the user's
-		// intent wins over the continuation - the warm job is dropped and
-		// the queued command executes against the failed entry.
-		e.mgr.Infof("dropping late detection success for key '%s': a stop command is queued", res.key)
-		e.mgr.disposeWarmResume(res.resume)
-	case staleDep != "":
-		// The warm job resolved its secrets from a store that changed (or
-		// is being changed) while the key was wedged: starting it would
-		// resurrect pre-rotation credentials that the store command
-		// deliberately skipped restarting (skip-and-report on wedged
-		// dependents), with nothing left to ever refresh them.
-		if mx := e.mgr.executorMetrics; mx != nil {
-			mx.staleCommits.Add(1)
-		}
-		e.mgr.Warningf("dropping late detection success for key '%s': %s", res.key, staleDep)
-		e.mgr.disposeWarmResume(res.resume)
-	default:
-		e.mgr.resumeWarmJob(res.resume)
-		ks.generation++
-	}
+	e.executeEffectTransition(res, ks)
 }
 
 // settle drains a key's after-idle hooks and parked events until the key

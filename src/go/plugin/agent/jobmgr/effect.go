@@ -151,16 +151,20 @@ func effectControlFrom(ctx context.Context) *effectControl {
 	return ctl
 }
 
+type effectOutcome uint8
+
+const (
+	effectOutcomeCompleted effectOutcome = iota
+	effectOutcomeAbandoned
+	effectOutcomeLateReturn
+	effectOutcomeShutdownNeverRan
+)
+
 type effectResult struct {
-	key string
-	err error
-	// abandoned: the deadline fired; the key must stay busy (wedged) until
-	// the late completion arrives.
-	abandoned bool
-	// late: the leaked child returned; the key unwedges and resume (if any
-	// and still valid) starts the warm job.
-	late   bool
-	resume *warmResume
+	key     string
+	outcome effectOutcome
+	err     error
+	resume  *warmResume
 	// lateWork is loop-side work delivered with a late completion (replay
 	// of dependent restarts that completed after the abandon); it runs
 	// before the command's remaining claims release.
@@ -187,7 +191,7 @@ func (m *Manager) runEffectWorker() {
 				// must NOT start (no new module calls at shutdown) - it
 				// resolves never-ran, same as the drain resolves the rest of
 				// the queue.
-				res = effectResult{key: t.key, err: dyncfg.ErrPhaseNeverRan}
+				res = effectResult{key: t.key, outcome: effectOutcomeShutdownNeverRan, err: dyncfg.ErrPhaseNeverRan}
 			} else {
 				res = m.superviseEffect(t)
 			}
@@ -236,14 +240,14 @@ func (m *Manager) superviseEffect(t effectTask) effectResult {
 	select {
 	case err := <-done:
 		cancel()
-		return effectResult{key: t.key, err: err, busyFor: time.Since(started)}
+		return effectResult{key: t.key, outcome: effectOutcomeCompleted, err: err, busyFor: time.Since(started)}
 	case <-ctx.Done():
 		if !ctl.claimAbandon() {
 			// The closure claimed completion first: its in-process post-work
 			// is finishing - wait it out and report a normal completion.
 			err := <-done
 			cancel()
-			return effectResult{key: t.key, err: err}
+			return effectResult{key: t.key, outcome: effectOutcomeCompleted, err: err}
 		}
 		// Quarantine the stopping job's output BEFORE the deadline outcome
 		// commits (the commit happens after this result reaches the loop).
@@ -278,7 +282,13 @@ func (m *Manager) superviseEffect(t effectTask) effectResult {
 			case <-abandonDelivered:
 			case <-m.lateDrop:
 			}
-			res := effectResult{key: t.key, err: err, late: true, resume: ctl.resume.Load(), lateWork: ctl.takeLateWork()}
+			res := effectResult{
+				key:      t.key,
+				outcome:  effectOutcomeLateReturn,
+				err:      err,
+				resume:   ctl.resume.Load(),
+				lateWork: ctl.takeLateWork(),
+			}
 			if r := res.resume; r != nil && m.ctx.Err() != nil {
 				// Shutdown is in effect: no warm job will ever start, and a
 				// buffered send can win the race against the closed lateDrop
@@ -322,8 +332,8 @@ func (m *Manager) superviseEffect(t effectTask) effectResult {
 		}
 		return effectResult{
 			key:       t.key,
+			outcome:   effectOutcomeAbandoned,
 			err:       abandonErr,
-			abandoned: true,
 			delivered: abandonDelivered,
 			busyFor:   time.Since(started),
 		}

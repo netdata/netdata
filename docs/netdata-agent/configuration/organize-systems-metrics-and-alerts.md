@@ -82,11 +82,13 @@ Netdata automatically generates host labels when it starts, capturing:
 | Label Category | Information Captured                                |
 |----------------|-----------------------------------------------------|
 | System Info    | Kernel version, OS name and version                 |
-| Hardware       | CPU architecture, cores, frequency, RAM, disk space |
+| Hardware       | CPU architecture, cores, frequency, RAM, disk space, product ID, product name, product type |
 | Environment    | Container details, Kubernetes node status           |
 | Infrastructure | Virtualization layer, Parent-child streaming status |
 
 View your automatic labels at `http://HOST-IP:19999/api/v1/info`:
+
+Host-label values use Netdata's label sanitizer. For example, commas in hardware model identifiers are exposed as dots in host labels.
 
 ```json
 {

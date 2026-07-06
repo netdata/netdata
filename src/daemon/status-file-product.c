@@ -184,6 +184,7 @@ static bool dmi_is_virtual_machine(const DMI_INFO *dmi) {
     };
 
     const char *strs_to_check[] = {
+        dmi->product.id,
         dmi->product.name,
         dmi->product.family,
         dmi->sys.vendor,
@@ -201,6 +202,95 @@ static bool dmi_is_virtual_machine(const DMI_INFO *dmi) {
     }
 
     return false;
+}
+
+static bool dmi_field_contains_any(const char *value, const char *const *needles, size_t needles_count) {
+    if (!value || !*value)
+        return false;
+
+    for (size_t i = 0; i < needles_count; i++) {
+        if (strcasestr(value, needles[i]) != NULL)
+            return true;
+    }
+
+    return false;
+}
+
+static bool dmi_field_starts_with_mac(const char *value) {
+    static const char prefix[] = "Mac";
+
+    if (!value || !*value)
+        return false;
+
+    return strncasecmp(value, prefix, sizeof(prefix) - 1) == 0;
+}
+
+static bool dmi_any_field_contains_any(const DMI_INFO *dmi, const char *const *needles, size_t needles_count) {
+    if (!dmi)
+        return false;
+
+    const char *values[] = {
+        dmi->product.id,
+        dmi->product.name,
+        dmi->product.family,
+        dmi->board.name,
+        dmi->sys.vendor,
+    };
+
+    for (size_t i = 0; i < _countof(values); i++) {
+        if (dmi_field_contains_any(values[i], needles, needles_count))
+            return true;
+    }
+
+    return false;
+}
+
+static bool dmi_is_apple_product(const DAEMON_STATUS_FILE *ds) {
+    if (!ds)
+        return false;
+
+    return strcasestr(ds->product.vendor, "Apple") != NULL ||
+           strcasestr(ds->hw.sys.vendor, "Apple") != NULL ||
+           strcasestr(ds->hw.board.vendor, "Apple") != NULL ||
+           dmi_field_starts_with_mac(ds->hw.product.id) ||
+           dmi_field_starts_with_mac(ds->hw.product.name);
+}
+
+static bool dmi_is_server_product_line(const DMI_INFO *dmi) {
+    static const char *const server_indicators[] = {
+        "Server", "PowerEdge", "ProLiant", "ThinkSystem", "PRIMERGY", "System x",
+        "BladeCenter", "RackStation",
+    };
+
+    return dmi_any_field_contains_any(dmi, server_indicators, _countof(server_indicators));
+}
+
+static bool dmi_is_workstation_product_line(const DAEMON_STATUS_FILE *ds) {
+    static const char *const workstation_indicators[] = {
+        "workstation", "ThinkStation", "Precision Workstation", "Z Workstation", "Pro Workstation",
+    };
+
+    if (!ds)
+        return false;
+
+    if (dmi_is_apple_product(ds)) {
+        return strcasestr(ds->hw.product.name, "Mac Studio") != NULL ||
+               strcasestr(ds->hw.product.name, "Mac Pro") != NULL ||
+               strcasestr(ds->hw.product.name, "iMac Pro") != NULL;
+    }
+
+    return dmi_any_field_contains_any(&ds->hw, workstation_indicators, _countof(workstation_indicators));
+}
+
+static bool dmi_is_laptop_product_line(const DAEMON_STATUS_FILE *ds) {
+    if (!ds)
+        return false;
+
+    static const char *const laptop_indicators[] = {
+        "MacBook", "notebook", "laptop",
+    };
+
+    return dmi_any_field_contains_any(&ds->hw, laptop_indicators, _countof(laptop_indicators));
 }
 
 static const char *dmi_chassis_type_to_string(int chassis_type) {
@@ -371,6 +461,13 @@ static bool is_server_hardware(void) {
 void product_name_vendor_type(DAEMON_STATUS_FILE *ds) {
     char *force_type = NULL;
 
+    if (ds->hw.product.id[0])
+        safecpy(ds->product.id, ds->hw.product.id);
+    else if (ds->hw.product.name[0])
+        safecpy(ds->product.id, ds->hw.product.name);
+    else
+        ds->product.id[0] = '\0';
+
     if(ds->cloud_provider_type[0] && strcasecmp(ds->cloud_provider_type, "unknown") != 0)
         safecpy(ds->product.vendor, ds->cloud_provider_type);
     else {
@@ -386,7 +483,8 @@ void product_name_vendor_type(DAEMON_STATUS_FILE *ds) {
 
         // derive the vendor from other DMI fields
         if(!ds->product.vendor[0]) {
-            if(strcasestr(ds->hw.product.name, "VirtualMac") != NULL ||
+            if(strcasestr(ds->hw.product.id, "VirtualMac") != NULL ||
+                strcasestr(ds->hw.product.name, "VirtualMac") != NULL ||
                 (strcasestr(ds->hw.board.name, "Apple") != NULL &&
                  strcasestr(ds->hw.board.name, "Virtual") != NULL)) {
                 safecpy(ds->product.vendor, "Apple");
@@ -436,11 +534,14 @@ void product_name_vendor_type(DAEMON_STATUS_FILE *ds) {
     else {
         // copy the product family
         size_t len = strcatz(ds->product.name, 0, ds->hw.product.family, sizeof(ds->product.name));
+        bool product_name_is_enriched =
+            ds->hw.product.id[0] && ds->hw.product.name[0] && strcmp(ds->hw.product.id, ds->hw.product.name) != 0;
 
         // append the product name, if it is not included already
         if(ds->hw.product.name[0] && !strcasestr(ds->product.name, ds->hw.product.name)) {
             if(ds->product.name[0]) {
-                bool includes_family = strcasestr(ds->hw.product.name, ds->hw.product.family) != NULL;
+                bool includes_family =
+                    !ds->hw.product.family[0] || strcasestr(ds->hw.product.name, ds->hw.product.family) != NULL;
 
                 if(includes_family) {
                     // the product name includes the product family we have in buf
@@ -458,7 +559,7 @@ void product_name_vendor_type(DAEMON_STATUS_FILE *ds) {
         }
 
         // append the board name, if it is not included already
-        if(ds->hw.board.name[0] && !strcasestr(ds->product.name, ds->hw.board.name)) {
+        if(!product_name_is_enriched && ds->hw.board.name[0] && !strcasestr(ds->product.name, ds->hw.board.name)) {
             if(ds->product.name[0]) {
                 bool includes_family = !ds->hw.product.family[0] || strcasestr(ds->hw.board.name, ds->hw.product.family) != NULL;
                 bool includes_product = !ds->hw.product.name[0] || strcasestr(ds->hw.board.name, ds->hw.product.name) != NULL;
@@ -482,20 +583,23 @@ void product_name_vendor_type(DAEMON_STATUS_FILE *ds) {
             safecpy(ds->product.name, "unknown");
     }
 
+    char *end = NULL;
+    int type = (int)strtol(ds->hw.chassis.type, &end, 10);
+    const char *chassis_type = (type && (!end || !*end)) ? dmi_chassis_type_to_string(type) : "unknown";
+
     if(ds->virtualization[0] && strcasecmp(ds->virtualization, "none") != 0 && strcasecmp(ds->virtualization, "unknown") != 0)
         safecpy(ds->product.type, "vm");
     else if(force_type)
         safecpy(ds->product.type, force_type);
     else if(dmi_is_virtual_machine(&ds->hw))
         safecpy(ds->product.type, "vm");
+    else if(strcmp(chassis_type, "server") == 0 || dmi_is_server_product_line(&ds->hw))
+        safecpy(ds->product.type, "server");
+    else if(dmi_is_workstation_product_line(ds) && strcmp(chassis_type, "laptop") != 0 && !dmi_is_laptop_product_line(ds))
+        safecpy(ds->product.type, "workstation");
     else if(is_server_hardware())
         safecpy(ds->product.type, "server");
     else {
-        char *end = NULL;
-        int type = (int)strtol(ds->hw.chassis.type, &end, 10);
-        if(type && (!end || !*end))
-            safecpy(ds->product.type, dmi_chassis_type_to_string(type));
-        else
-            safecpy(ds->product.type, "unknown");
+        safecpy(ds->product.type, chassis_type);
     }
 }

@@ -9,6 +9,7 @@
 #define MAX_PARAMETERS 128
 #define ERROR_BUFFER_SIZE 1024
 #define FAIL2BAN_SOCKET_PATH_IN_DOCKER "/host/var/run/fail2ban/fail2ban.sock"
+#define NDSUDO_MACOS_POWERMETRICS_PATH "/usr/bin/powermetrics"
 
 struct command {
     const char *name;
@@ -222,6 +223,70 @@ struct command {
         },
     },
     {
+        .name = "powermetrics-thermal-smc-gpu",
+        .params = "-n 1 -i {{sampleWindowMs}} -s thermal,smc,gpu_power -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-gpu",
+        .params = "-n 1 -i {{sampleWindowMs}} -s thermal,gpu_power -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-smc",
+        .params = "-n 1 -i {{sampleWindowMs}} -s thermal,smc -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal",
+        .params = "-n 1 -i {{sampleWindowMs}} -s thermal -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-smc-gpu-loop",
+        .params = "-n 0 -b 0 -i {{sampleIntervalMs}} -s thermal,smc,gpu_power -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-gpu-loop",
+        .params = "-n 0 -b 0 -i {{sampleIntervalMs}} -s thermal,gpu_power -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-smc-loop",
+        .params = "-n 0 -b 0 -i {{sampleIntervalMs}} -s thermal,smc -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
+        .name = "powermetrics-thermal-loop",
+        .params = "-n 0 -b 0 -i {{sampleIntervalMs}} -s thermal -f plist",
+        .search = {
+            [0] = NDSUDO_MACOS_POWERMETRICS_PATH,
+            [1] = NULL,
+        },
+    },
+    {
         .name = "megacli-disk-info",
         .params = "-LDPDInfo -aAll -NoLog",
         .search = {
@@ -262,9 +327,24 @@ bool command_exists_in_dir(const char *dir, const char *cmd, char *dst, size_t d
     return access(dst, X_OK) == 0;
 }
 
+bool command_exists_absolute(const char *cmd, char *dst, size_t dst_size) {
+    if(!cmd || cmd[0] != '/' || !dst || !dst_size)
+        return false;
+
+    size_t len = strnlen(cmd, dst_size);
+    if(len >= dst_size)
+        return false;
+
+    memcpy(dst, cmd, len + 1);
+    return access(dst, X_OK) == 0;
+}
+
 bool command_exists_in_PATH(const char *cmd, char *dst, size_t dst_size) {
     if(!dst || !dst_size)
         return false;
+
+    if(cmd && cmd[0] == '/')
+        return command_exists_absolute(cmd, dst, dst_size);
 
     char *path = getenv("PATH");
     if(!path)
@@ -317,6 +397,74 @@ bool check_params(int argc, char **argv, char *err, size_t err_size) {
     for(int i = 0 ; i < argc ;i++)
         if(!check_string(argv[i], i, err, err_size))
             return false;
+
+    return true;
+}
+
+bool check_positive_integer_argument(const char *cmd, int argc, char **argv, const char *name, unsigned long max, char *err, size_t err_size) {
+    for (int i = 2; i < argc - 1; i++) {
+        if (strcmp(argv[i], name) != 0)
+            continue;
+
+        const char *value = argv[i + 1];
+        if (!value || !*value) {
+            snprintf(err, err_size, "%s: %s requires a positive integer value", cmd, name);
+            return false;
+        }
+
+        for (const char *s = value; *s; s++) {
+            if (*s < '0' || *s > '9') {
+                snprintf(err, err_size, "%s: %s must be a positive integer", cmd, name);
+                return false;
+            }
+        }
+
+        bool all_zero = true;
+        for (const char *s = value; *s; s++) {
+            if (*s != '0') {
+                all_zero = false;
+                break;
+            }
+        }
+        if (all_zero) {
+            snprintf(err, err_size, "%s: %s must be greater than zero", cmd, name);
+            return false;
+        }
+
+        // Bound privileged-helper inputs: ndsudo is setuid-root, so an unbounded
+        // value here could keep a root powermetrics process running for a long time.
+        if (max) {
+            errno = 0;
+            unsigned long v = strtoul(value, NULL, 10);
+            if (errno == ERANGE || v > max) {
+                snprintf(err, err_size, "%s: %s must be at most %lu ms", cmd, name, max);
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    snprintf(err, err_size, "%s: required argument %s is missing", cmd, name);
+    return false;
+}
+
+// Upper bound for powermetrics sample intervals accepted by the setuid helper,
+// to keep privileged powermetrics invocations bounded when ndsudo is invoked directly.
+#define NDSUDO_POWERMETRICS_INTERVAL_MS_MAX 60000UL
+
+bool check_command_specific_params(const char *cmd, int argc, char **argv, char *err, size_t err_size) {
+    if (strcmp(cmd, "powermetrics-thermal-smc-gpu") == 0 ||
+        strcmp(cmd, "powermetrics-thermal-gpu") == 0 ||
+        strcmp(cmd, "powermetrics-thermal-smc") == 0 ||
+        strcmp(cmd, "powermetrics-thermal") == 0)
+        return check_positive_integer_argument(cmd, argc, argv, "--sampleWindowMs", NDSUDO_POWERMETRICS_INTERVAL_MS_MAX, err, err_size);
+
+    if (strcmp(cmd, "powermetrics-thermal-smc-gpu-loop") == 0 ||
+        strcmp(cmd, "powermetrics-thermal-gpu-loop") == 0 ||
+        strcmp(cmd, "powermetrics-thermal-smc-loop") == 0 ||
+        strcmp(cmd, "powermetrics-thermal-loop") == 0)
+        return check_positive_integer_argument(cmd, argc, argv, "--sampleIntervalMs", NDSUDO_POWERMETRICS_INTERVAL_MS_MAX, err, err_size);
 
     return true;
 }
@@ -455,7 +603,17 @@ int main(int argc, char *argv[]) {
         return 3;
     }
 
-    char new_path[] = "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
+    if(!check_command_specific_params(cmd, argc, argv, error_buffer, sizeof(error_buffer))) {
+        fprintf(stderr, "invalid command parameters: %s\n", error_buffer);
+        return 2;
+    }
+
+    char new_path[] =
+#ifdef __APPLE__
+        "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/opt/homebrew/bin:/opt/homebrew/sbin";
+#else
+        "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin";
+#endif
     putenv(new_path);
 
     // Escalate to root before searching PATH and running the whitelisted

@@ -101,37 +101,6 @@ void parse_command_line(int argc, char **argv) {
     }
 }
 
-/*
- * 'cupsGetIntegerOption()' - Get an integer option value.
- *
- * INT_MIN is returned when the option does not exist, is not an integer, or
- * exceeds the range of values for the "int" type.
- *
- * @since CUPS 2.2.4/macOS 10.13@
- */
-
-int					/* O - Option value or @code INT_MIN@ */
-getIntegerOption(
-    const char    *name,		/* I - Name of option */
-    int           num_options,		/* I - Number of options */
-    cups_option_t *options)		/* I - Options */
-{
-  const char	*value = cupsGetOption(name, num_options, options);
-					/* String value of option */
-  char		*ptr;			/* Pointer into string value */
-  long		intvalue;		/* Integer value */
-
-
-  if (!value || !*value)
-    return (INT_MIN);
-
-  intvalue = strtol(value, &ptr, 10);
-  if (intvalue < INT_MIN || intvalue > INT_MAX || *ptr)
-    return (INT_MIN);
-
-  return ((int)intvalue);
-}
-
 static int reset_job_metrics(const DICTIONARY_ITEM *item __maybe_unused, void *entry, void *data __maybe_unused) {
     struct job_metrics *jm = (struct job_metrics *)entry;
 
@@ -160,7 +129,7 @@ void send_job_charts_definitions_to_netdata(const char *name, uint32_t job_id, b
     printf("DIMENSION processing '' absolute 1 1\n");
 }
 
-struct job_metrics *get_job_metrics(char *dest) {
+struct job_metrics *get_job_metrics(const char *dest) {
     struct job_metrics *jm = dictionary_get(dict_dest_job_metrics, dest);
 
     if (unlikely(!jm)) {
@@ -205,6 +174,132 @@ int send_job_metrics_to_netdata(const DICTIONARY_ITEM *item, void *entry, void *
     return 0;
 }
 
+struct destination_metrics {
+    const char *name;
+    bool has_uri;
+    bool is_accepting_jobs;
+    bool is_shared;
+    int state;
+};
+
+static void reset_destination_metrics(struct destination_metrics *dest) {
+    *dest = (struct destination_metrics) {
+        .state = INT_MIN,
+    };
+}
+
+static void collect_destination_metrics(struct destination_metrics *dest) {
+    // Keep the former cupsGetDests2() configured-queue guard without invoking Bonjour discovery.
+    if (!dest->name || !dest->has_uri)
+        return;
+
+    num_dest_total++;
+
+    if (dest->is_accepting_jobs)
+        num_dest_accepting_jobs++;
+
+    if (dest->is_shared)
+        num_dest_shared++;
+
+    switch (dest->state) {
+        case 3:
+            num_dest_idle++;
+            break;
+        case 4:
+            num_dest_printing++;
+            break;
+        case 5:
+            num_dest_stopped++;
+            break;
+        case INT_MIN:
+            if (debug)
+                fprintf(stderr, "printer state is missing for destination %s\n", dest->name);
+            break;
+        default:
+            netdata_log_error("Unknown printer state (%d) found.", dest->state);
+            break;
+    }
+
+    /*
+     * Flag job metrics to print values. This reports destinations with zero
+     * active jobs without invoking libcups destination discovery.
+     */
+    struct job_metrics *jm = get_job_metrics(dest->name);
+    jm->is_collected = true;
+}
+
+static bool collect_scheduler_destinations(void) {
+    static const char * const requested_attributes[] = {
+        "printer-name",
+        "printer-uri-supported",
+        "printer-is-accepting-jobs",
+        "printer-is-shared",
+        "printer-state",
+    };
+
+    ipp_t *request = ippNewRequest(IPP_OP_CUPS_GET_PRINTERS);
+    if (unlikely(!request))
+        return false;
+
+    ippAddStrings(
+        request,
+        IPP_TAG_OPERATION,
+        IPP_TAG_KEYWORD,
+        "requested-attributes",
+        sizeof(requested_attributes) / sizeof(requested_attributes[0]),
+        NULL,
+        requested_attributes);
+    ippAddString(request, IPP_TAG_OPERATION, IPP_TAG_NAME, "requesting-user-name", NULL, cupsUser());
+
+    ipp_t *response = cupsDoRequest(http, request, "/");
+    if (unlikely(!response))
+        return false;
+
+    ipp_status_t status = ippGetStatusCode(response);
+    if (unlikely(status >= IPP_STATUS_REDIRECTION_OTHER_SITE)) {
+        ippDelete(response);
+        return false;
+    }
+
+    ipp_attribute_t *attr = ippFirstAttribute(response);
+    while (attr) {
+        while (attr && ippGetGroupTag(attr) != IPP_TAG_PRINTER)
+            attr = ippNextAttribute(response);
+
+        if (!attr)
+            break;
+
+        struct destination_metrics dest;
+        reset_destination_metrics(&dest);
+
+        for (; attr && ippGetGroupTag(attr) == IPP_TAG_PRINTER; attr = ippNextAttribute(response)) {
+            const char *name = ippGetName(attr);
+            if (!name)
+                continue;
+
+            ipp_tag_t value_tag = ippGetValueTag(attr);
+
+            if (!strcmp(name, "printer-name") && value_tag == IPP_TAG_NAME)
+                dest.name = ippGetString(attr, 0, NULL);
+            else if (!strcmp(name, "printer-uri-supported") && value_tag == IPP_TAG_URI) {
+                const char *uri = ippGetString(attr, 0, NULL);
+                dest.has_uri = uri && *uri;
+            }
+            else if (!strcmp(name, "printer-is-accepting-jobs") && value_tag == IPP_TAG_BOOLEAN)
+                dest.is_accepting_jobs = ippGetBoolean(attr, 0);
+            else if (!strcmp(name, "printer-is-shared") && value_tag == IPP_TAG_BOOLEAN)
+                dest.is_shared = ippGetBoolean(attr, 0);
+            else if (!strcmp(name, "printer-state") && value_tag == IPP_TAG_ENUM)
+                dest.state = ippGetInteger(attr, 0);
+        }
+
+        collect_destination_metrics(&dest);
+    }
+
+    ippDelete(response);
+    return true;
+}
+
 void reset_metrics() {
     num_dest_total = 0;
     num_dest_accepting_jobs = 0;
@@ -247,72 +342,16 @@ int main(int argc, char **argv) {
 
         reset_metrics();
 
-        cups_dest_t *dests;
-        num_dest_total = cupsGetDests2(http, &dests);
-
-        if(unlikely(num_dest_total == 0)) {
+        if (unlikely(!collect_scheduler_destinations())) {
             // reconnect to cups to check if the server is down.
-            httpClose(http);
+            if (http)
+                httpClose(http);
             http = httpConnect2(cupsServer(), ippPort(), NULL, AF_UNSPEC, cupsEncryption(), 0, netdata_update_every * 1000, NULL);
             if(http == NULL) {
                 netdata_log_error("cups daemon is not running. Exiting!");
                 exit(1);
             }
         }
-
-        cups_dest_t *curr_dest = dests;
-        int counter = 0;
-        while (counter < num_dest_total) {
-            if (counter != 0) {
-                curr_dest++;
-            }
-            counter++;
-
-            const char *printer_uri_supported = cupsGetOption("printer-uri-supported", curr_dest->num_options, curr_dest->options);
-            if (!printer_uri_supported) {
-                if(debug)
-                    fprintf(stderr, "destination %s discovered, but not yet setup as a local printer", curr_dest->name);
-                continue;
-            }
-
-            const char *printer_is_accepting_jobs = cupsGetOption("printer-is-accepting-jobs", curr_dest->num_options, curr_dest->options);
-            if (printer_is_accepting_jobs && !strcmp(printer_is_accepting_jobs, "true")) {
-                num_dest_accepting_jobs++;
-            }
-
-            const char *printer_is_shared = cupsGetOption("printer-is-shared", curr_dest->num_options, curr_dest->options);
-            if (printer_is_shared && !strcmp(printer_is_shared, "true")) {
-                num_dest_shared++;
-            }
-
-            int printer_state = getIntegerOption("printer-state", curr_dest->num_options, curr_dest->options);
-            switch (printer_state) {
-                case 3:
-                    num_dest_idle++;
-                    break;
-                case 4:
-                    num_dest_printing++;
-                    break;
-                case 5:
-                    num_dest_stopped++;
-                    break;
-                case INT_MIN:
-                    if(debug)
-                        fprintf(stderr, "printer state is missing for destination %s", curr_dest->name);
-                    break;
-                default:
-                    netdata_log_error("Unknown printer state (%d) found.", printer_state);
-                    break;
-            }
-
-            /*
-             * flag job metrics to print values.
-             * This is needed to report also destinations with zero active jobs.
-             */
-            struct job_metrics *jm = get_job_metrics(curr_dest->name);
-            jm->is_collected = true;
-        }
-        cupsFreeDests(num_dest_total, dests);
 
         if (unlikely(exit_initiated_get()))
             break;
