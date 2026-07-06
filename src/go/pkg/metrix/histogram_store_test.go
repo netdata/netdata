@@ -44,11 +44,36 @@ func TestHistogramStoreScenarios(t *testing.T) {
 
 				fr := s.Read(ReadFlatten())
 				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "0.1"}, 1)
-				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "0.5"}, 2)
-				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "1"}, 3)
-				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "+Inf"}, 3)
+				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "0.5"}, 1)
+				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "1"}, 1)
+				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "+Inf"}, 0)
 				mustValue(t, fr, "svc.request_duration_seconds_count", nil, 3)
 				mustValue(t, fr, "svc.request_duration_seconds_sum", nil, 1.2)
+			},
+		},
+		"snapshot histogram without finite bounds flattens count into +Inf range bucket": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				h := s.Write().SnapshotMeter("svc").Histogram("latency")
+
+				cc.BeginCycle()
+				h.ObservePoint(HistogramPoint{
+					Count: 4,
+					Sum:   12,
+				})
+				cc.CommitCycleSuccess()
+
+				mustHistogram(t, s.Read(), "svc.latency", nil, HistogramPoint{
+					Count:   4,
+					Sum:     12,
+					Buckets: []BucketPoint{},
+				})
+
+				fr := s.Read(ReadFlatten())
+				mustValue(t, fr, "svc.latency_bucket", Labels{"le": "+Inf"}, 4)
+				mustValue(t, fr, "svc.latency_count", nil, 4)
+				mustValue(t, fr, "svc.latency_sum", nil, 12)
 			},
 		},
 		"snapshot histogram without bounds captures schema after successful cycle": {

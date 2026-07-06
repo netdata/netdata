@@ -117,6 +117,18 @@ type flattenedReadChecker interface {
 	FlattenedRead() bool
 }
 
+func isHistogramBucketSeries(meta metrix.SeriesMeta) bool {
+	return meta.SourceKind == metrix.MetricKindHistogram &&
+		meta.FlattenRole == metrix.FlattenRoleHistogramBucket
+}
+
+func forceHistogramBucketChartType(meta program.ChartMeta, seriesMeta metrix.SeriesMeta) program.ChartMeta {
+	if isHistogramBucketSeries(seriesMeta) {
+		meta.Type = program.ChartTypeHeatmap
+	}
+	return meta
+}
+
 func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uint64, uint64, uint64, bool, error) {
 	if e == nil {
 		return Plan{}, materializedState{}, 0, 0, 0, false, fmt.Errorf("chartengine: nil engine")
@@ -405,7 +417,7 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 		}
 
 		for _, route := range routes {
-			if err := ctx.accumulateRoute(ctx.index, route, labels, v); err != nil {
+			if err := ctx.accumulateRoute(ctx.index, route, meta, labels, v); err != nil {
 				firstErr = err
 				return
 			}
@@ -430,9 +442,12 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 func (ctx *planBuildContext) accumulateRoute(
 	index matchIndex,
 	route routeBinding,
+	seriesMeta metrix.SeriesMeta,
 	labels metrix.LabelView,
 	value metrix.SampleValue,
 ) error {
+	route.Meta = forceHistogramBucketChartType(route.Meta, seriesMeta)
+
 	cs, exists := ctx.chartsByID[route.ChartID]
 	if exists && cs.templateID != route.ChartTemplateID {
 		if !route.Autogen && isAutogenTemplateID(cs.templateID) {
@@ -492,6 +507,9 @@ func (ctx *planBuildContext) accumulateRoute(
 			currentBuildSeq: ctx.buildCycle,
 		}
 		ctx.chartsByID[route.ChartID] = cs
+	}
+	if isHistogramBucketSeries(seriesMeta) {
+		cs.meta.Type = program.ChartTypeHeatmap
 	}
 
 	entry, exists := cs.entries[route.DimensionName]

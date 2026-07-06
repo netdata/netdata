@@ -174,6 +174,11 @@ Default lifecycle policy when template omits lifecycle:
 | Type ID budget        | Enforced via `AutogenPolicy.MaxTypeIDLen` + effective emit type-id prefix (`WithEmitTypeIDBudgetPrefix(...)`)                                  |
 | Lifecycle             | Autogen applies `ExpireAfterSuccessCycles` to **both** chart and dimension expiry (unlike template lifecycle where they default independently) |
 
+Histogram bucket charts use non-overlapping range bucket totals from
+`metrix.ReadFlatten()` and are emitted as `heatmap` charts in both autogen and
+template-driven paths. The `le` label remains the upper-bound identity for the
+bucket dimension.
+
 `MeasureSet` autogen specifics:
 
 - chartengine treats `MeasureSet` as a structured family, similar to `StateSet`, not as grouped scalar coincidence
@@ -191,7 +196,7 @@ These label keys are treated specially by chartengine when consuming flattened s
 
 | Key / Pattern   | Meaning                                                                                                                |
 |-----------------|------------------------------------------------------------------------------------------------------------------------|
-| `le`            | Histogram bucket bound label                                                                                           |
+| `le`            | Histogram range bucket upper-bound label                                                                               |
 | `quantile`      | Summary quantile label                                                                                                 |
 | `measure_field` | `MeasureSet` field identity label                                                                                      |
 | `<metric-name>` | `StateSet` special case: the flattened state name is carried under a synthetic label whose key is the base metric name |

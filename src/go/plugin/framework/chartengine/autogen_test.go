@@ -129,6 +129,7 @@ func runTestBuildHistogramBucketAutogenRoute(t *testing.T) {
 			assert.Equal(t, tc.wantDim, route.dimensionName)
 			assert.Equal(t, metrix.HistogramBucketLabel, route.dimensionKeyLabel)
 			assert.Equal(t, program.AlgorithmIncremental, route.algorithm)
+			assert.Equal(t, program.ChartTypeHeatmap, route.chartType)
 			assert.False(t, route.staticDimension)
 		})
 	}

@@ -74,10 +74,11 @@ func TestInferDimensionLabelKeyScenarios(t *testing.T) {
 
 func TestBuildPlanResolvesInferDimensionNames(t *testing.T) {
 	tests := map[string]struct {
-		yaml      string
-		setup     func(t *testing.T, s metrix.CollectorStore)
-		wantNames []string
-		wantKinds []ActionKind
+		yaml           string
+		setup          func(t *testing.T, s metrix.CollectorStore)
+		wantNames      []string
+		wantKinds      []ActionKind
+		wantCreateType program.ChartType
 	}{
 		"histogram bucket inference resolves bucket names from le": {
 			yaml: `
@@ -89,6 +90,7 @@ groups:
     charts:
       - title: Latency buckets
         context: latency_bucket
+        type: stacked
         units: observations
         dimensions:
           - selector: svc.latency_seconds_bucket
@@ -108,8 +110,9 @@ groups:
 				})
 				cc.CommitCycleSuccess()
 			},
-			wantNames: []string{"+Inf", "1", "2"},
-			wantKinds: []ActionKind{ActionCreateChart, ActionCreateDimension, ActionCreateDimension, ActionCreateDimension, ActionUpdateChart},
+			wantNames:      []string{"+Inf", "1", "2"},
+			wantKinds:      []ActionKind{ActionCreateChart, ActionCreateDimension, ActionCreateDimension, ActionCreateDimension, ActionUpdateChart},
+			wantCreateType: program.ChartTypeHeatmap,
 		},
 		"summary quantile inference resolves quantile labels": {
 			yaml: `
@@ -194,6 +197,11 @@ groups:
 			}
 			assert.Equal(t, tc.wantNames, got)
 			assert.Equal(t, tc.wantKinds, actionKinds(plan.Actions))
+			if tc.wantCreateType != "" {
+				create := findCreateChartAction(plan)
+				require.NotNil(t, create)
+				assert.Equal(t, tc.wantCreateType, create.Meta.Type)
+			}
 		})
 	}
 }
@@ -1213,6 +1221,7 @@ groups:
 	assert.Equal(t, "Request duration", buckets.Meta.Title)
 	assert.Equal(t, "Latency", buckets.Meta.Family)
 	assert.Equal(t, "observations/s", buckets.Meta.Units)
+	assert.Equal(t, program.ChartTypeHeatmap, buckets.Meta.Type)
 
 	sum := findCreateChartActionByID(plan, "svc.request_duration_ms_sum")
 	require.NotNil(t, sum)
@@ -1525,6 +1534,7 @@ groups:
 		}
 	}
 	require.NotNil(t, bucketChart)
+	assert.Equal(t, program.ChartTypeHeatmap, bucketChart.Meta.Type)
 	assert.Equal(t, "GET", bucketChart.Labels["method"])
 	_, hasLE := bucketChart.Labels["le"]
 	assert.False(t, hasLE)

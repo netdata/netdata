@@ -292,7 +292,7 @@ func buildHistogramBucketAutogenRoute(
 		dimensionKeyLabel: metrix.HistogramBucketLabel,
 		algorithm:         program.AlgorithmIncremental,
 		units:             "observations/s",
-		chartType:         program.ChartTypeLine,
+		chartType:         program.ChartTypeHeatmap,
 		family:            getAutogenChartFamily(baseName),
 		contextName:       baseName,
 		staticDimension:   false,
