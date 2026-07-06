@@ -860,6 +860,9 @@ func (r *resolver) k8sIsPauseContainer(cgroupPath string) bool {
 	if len(procs) != 1 {
 		return false
 	}
+	// /proc is intentionally NOT prefixed with NETDATA_HOST_PREFIX, matching
+	// the shell helper: containerized deployments run the plugin in the host
+	// PID namespace, where the local /proc resolves host PIDs.
 	comm, err := os.ReadFile(filepath.Join("/proc", procs[0], "comm"))
 	if err != nil {
 		return false
@@ -1228,6 +1231,11 @@ func (r *resolver) k8sFetchPods(ctx context.Context, fn, kubeSystemUID string) (
 
 	if r.kubeletProcessRunning(ctx) {
 		if commandAvailable("kubectl") {
+			// Quirk kept from the shell helper: when KUBE_CONFIG is unset, the
+			// namespace query below runs with --kubeconfig="" (kubectl default
+			// loading rules) and only the pods query gets the admin.conf
+			// fallback, because the shell applied its default between the two
+			// calls.
 			kubeConfig := os.Getenv("KUBE_CONFIG")
 			var kubeSystemNS string
 			if kubeSystemUID == "" {

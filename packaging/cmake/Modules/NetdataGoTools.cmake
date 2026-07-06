@@ -58,6 +58,12 @@ macro(add_go_target target output build_src build_dir)
         ${target} ALL
         DEPENDS ${output}
     )
+
+    # macro() shares the caller's scope - drop our parse/scratch variables
+    unset(ARG_EXTRA_LDFLAGS)
+    unset(ARG_UNPARSED_ARGUMENTS)
+    unset(ARG_KEYWORDS_MISSING_VALUES)
+    unset(${target}_GO_LDFLAGS)
 endmacro()
 
 # find_min_go_version: Determine the minimum Go version based on go.mod files
