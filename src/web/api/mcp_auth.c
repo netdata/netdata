@@ -14,13 +14,20 @@ static char mcp_dev_preview_api_key[MCP_DEV_PREVIEW_API_KEY_LENGTH + 1] = "";
 static bool mcp_api_key_generate_and_save(void) {
     nd_uuid_t uuid;
     uuid_generate_random(uuid);
-    
+
     // Unparse directly to the destination buffer
     uuid_unparse_lower(uuid, mcp_dev_preview_api_key);
-    
+
     // Construct full path
     char path[PATH_MAX];
     snprintf(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, MCP_DEV_PREVIEW_API_KEY_FILENAME);
+#if defined(OS_WINDOWS)
+    {
+        char tmp[PATH_MAX];
+        nd_env_normalize_dir_path(path, tmp, sizeof(tmp));
+        strncpyz(path, tmp, sizeof(path));
+    }
+#endif
     
     // Open file with O_CREAT | O_EXCL to ensure we don't overwrite
     int fd = open(path, O_WRONLY | O_CREAT | O_TRUNC, 0600);
@@ -59,6 +66,13 @@ static bool mcp_api_key_load(void) {
     // Construct full path
     char path[PATH_MAX];
     snprintf(path, sizeof(path), "%s/%s", netdata_configured_varlib_dir, MCP_DEV_PREVIEW_API_KEY_FILENAME);
+#if defined(OS_WINDOWS)
+    {
+        char tmp[PATH_MAX];
+        nd_env_normalize_dir_path(path, tmp, sizeof(tmp));
+        strncpyz(path, tmp, sizeof(path));
+    }
+#endif
     
     int fd = open(path, O_RDONLY);
     if (fd == -1) {
