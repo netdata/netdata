@@ -14,6 +14,7 @@ func (c *Collector) collect(ctx context.Context) error {
 	if err := c.refreshDiscovery(ctx); err != nil {
 		return err
 	}
+	c.refreshTags(ctx) // best-effort tag enrichment; never gates collection (INV.2)
 
 	plan := c.buildQueryPlan()
 	c.observations.pruneObserved(plan)

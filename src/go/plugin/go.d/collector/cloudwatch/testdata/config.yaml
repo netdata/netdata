@@ -21,5 +21,8 @@ profiles:
 discovery:
   refresh_every: 123
   recently_active_only: true
+tags:
+  - name: "ok"
+    rename: "ok"
 query_offset: 123
 timeout: 123.123

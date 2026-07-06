@@ -250,6 +250,48 @@ Discovery then finds which *instances* of those profiles exist per account and r
   stop being re-emitted and a group that later reappears is queried on its first cycle
   back rather than waiting for a stale schedule entry to expire.
 
+## Tag Enrichment (`tags.go`, `tagjoin.go`, `tagresolve.go`)
+
+Opt-in (`tags` config, empty by default). When set, the collector attaches selected
+AWS resource tags as **non-identity** chart labels, so `i-0abc123` also carries
+`owner`/`project`/`name`/… without changing series identity. It slots into the cycle
+between discovery and query planning:
+
+```text
+refreshDiscovery → refreshTags → buildQueryPlan → … → observe
+```
+
+- **Client + cache.** A Resource Groups Tagging API (RGTA) client is built per
+  `{account, region}` (the same generic `clientCache[T]` as the CloudWatch client).
+  `refreshTags` runs on the discovery TTL and is best-effort: a per-`{account, region}`
+  failure keeps that scope's **last-known** tags (a first-run failure yields none) and
+  never fails the cycle. With no tags configured, no RGTA client is ever built.
+- **Resolution (`tagresolve.go`).** `resolveTagPlan` turns the allowlist into a
+  per-profile `awsKey → label` plan, once. It is **non-fatal**: an entry whose label is
+  empty/invalid, collides with a reserved (`account_id`/`region`) or dimension label, or
+  duplicates another tag is **skipped with a warning** — never a config error, never an
+  emitted duplicate key (which would panic `metrix`). `rename` resolves collisions; the
+  default label is the sanitized key (`Name` → `name`).
+- **ARN↔dimension join (`tagjoin.go`).** RGTA returns ARN + tags; the cache is keyed by
+  the profile's ARN-projectable `joinKey`. A per-profile mapper (a default
+  last-resource-segment extractor plus overrides for ALB/NLB/target-group/ECS/OpenSearch/
+  Step-Functions) derives the `joinKey` from the ARN, and the instance side projects its
+  dimension values onto the same key. **Safe failure mode:** a wrong ARN assumption is a
+  cache *miss* (no tags), never *wrong* tags, because the instance side uses real
+  dimension values. Parent-resource profiles (S3, DynamoDB-operation, ALB-target) key on
+  the parent dimension so children inherit its tags. Unregistered profiles
+  (auto_scaling, bedrock, and the ambiguous cloudfront/api_gateway/msk/elasticache) carry
+  no tags.
+- **Emission split.** Identity `labels` (`{account_id, region, <dims>}`) and `tagLabels`
+  travel separately through `plannedQuery`/`querySample`/`observedSeries`. `writeSample`
+  emits `labels + tagLabels` in a fresh slice; `observedKey` (the retention/scheduling
+  identity) uses **identity labels only**, so a tag change never churns scheduling, and
+  retention re-emit carries the last-known `tagLabels`. `chartengine` `auto_intersection`
+  then promotes the tag labels as non-identity chart labels — no template change.
+- **INV.2.** Tags only ADD labels; they never gate series existence. A custom profile
+  that names a tag in `instances.by_labels` (or uses `["*"]`) is out of scope — that is
+  the operator's own chart-identity choice.
+
 ## Dynamic Charts
 
 `chart.go`, built once by `ensureProfiles` and cached in `chartTemplateYAML`.
@@ -395,9 +437,13 @@ verify current per-region prices on the CloudWatch pricing page.)
   failure is fatal.
 - **Single node** — AWS resources are chart instances via `by_labels`, not
   vnodes.
+- **Tags are additive** — the opt-in `tags` allowlist adds non-identity labels
+  only; it never gates series existence and never overwrites an identity label
+  (a colliding tag is skipped with a warning).
 - **Config minimalism** — only `regions`, `auth`, `profiles`, `discovery`
-  (`refresh_every`, `recently_active_only`), `query_offset`, and `timeout` (plus
-  the framework's `update_every` / `autodetection_retry`) are operator-facing.
+  (`refresh_every`, `recently_active_only`), `query_offset`, `timeout`, and the
+  opt-in `tags` allowlist (plus the framework's `update_every` /
+  `autodetection_retry`) are operator-facing.
   Concurrency, batch size, and the recently-active period bound are internal
   constants.
 

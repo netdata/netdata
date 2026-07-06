@@ -238,7 +238,7 @@ func (c *Collector) runGetMetricData(ctx context.Context, client cloudwatchClien
 		id := aws.ToString(q.Id)
 		if value, ok := valueByID[id]; ok {
 			pq := byID[id]
-			samples = append(samples, querySample{seriesName: pq.seriesName, labels: pq.labels, value: value, account: pq.account, region: pq.region, period: pq.period})
+			samples = append(samples, querySample{seriesName: pq.seriesName, labels: pq.labels, tagLabels: pq.tagLabels, value: value, account: pq.account, region: pq.region, period: pq.period})
 			continue
 		}
 		if usableByID[id] {
