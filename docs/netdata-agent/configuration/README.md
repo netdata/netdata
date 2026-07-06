@@ -37,6 +37,26 @@ All of Netdata's documentation **assumes your config directory is at** `/etc/net
 
 :::
 
+### On Windows
+
+On Windows, the **Netdata config directory** is located at `C:\Program Files\Netdata\etc\netdata`.
+
+The default alert templates — Netdata's built-in health configuration files (`.conf`) that define the stock alerts — ship in the stock configuration directory at `C:\Program Files\Netdata\usr\lib\netdata\conf.d\health.d\`. Browse the files there to see which alerts ship with Netdata.
+
+To customize an alert, edit the corresponding `.conf` file in your config directory's `health.d` subdirectory instead: `C:\Program Files\Netdata\etc\netdata\health.d\`. Editing your copy here — rather than in the stock directory — ensures your changes survive Agent updates.
+
+:::note
+
+The `edit-config` helper script referenced in the Linux steps above is Linux-only. On Windows, edit these files directly in a text editor run as Administrator. After saving, reload your alert configuration without restarting the Agent:
+
+```powershell
+& "C:\Program Files\Netdata\usr\bin\netdatacli.exe" reload-health
+```
+
+:::
+
+For the full alert configuration syntax, see the [health configuration reference](/src/health/REFERENCE.md).
+
 ## Edit Configuration Files
 
 <details>
