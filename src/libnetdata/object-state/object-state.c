@@ -61,8 +61,15 @@ void object_state_deactivate(OBJECT_STATE *os) {
         &os->state_refcount, &expected, desired, false, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED));
 
     // Now wait for all holders to release
-    while(__atomic_load_n(&os->state_refcount, __ATOMIC_ACQUIRE) != OBJECT_STATE_DEACTIVATED)
+    REFCOUNT refcount;
+    while((refcount = __atomic_load_n(&os->state_refcount, __ATOMIC_ACQUIRE)) != OBJECT_STATE_DEACTIVATED) {
+        if(refcount < OBJECT_STATE_DEACTIVATED) {
+            fatal("OBJECT_STATE: object state refcount underflowed while deactivating (state refcount %d)", refcount);
+            return;
+        }
+
         tinysleep();   // Busy wait until all holders are gone
+    }
 }
 
 bool object_state_acquire(OBJECT_STATE *os, OBJECT_STATE_ID wanted_state_id) {
@@ -88,5 +95,17 @@ bool object_state_acquire(OBJECT_STATE *os, OBJECT_STATE_ID wanted_state_id) {
 }
 
 void object_state_release(OBJECT_STATE *os) {
-    __atomic_sub_fetch(&os->state_refcount, 1, __ATOMIC_RELEASE);
+    REFCOUNT expected = __atomic_load_n(&os->state_refcount, __ATOMIC_RELAXED);
+    REFCOUNT desired;
+
+    do {
+        if(expected <= OBJECT_STATE_DEACTIVATED) {
+            fatal("OBJECT_STATE: attempt to release object with no holders (state refcount %d)", expected);
+            return;
+        }
+
+        desired = expected - 1;
+
+    } while(!__atomic_compare_exchange_n(
+        &os->state_refcount, &expected, desired, false, __ATOMIC_RELEASE, __ATOMIC_RELAXED));
 }

@@ -135,6 +135,25 @@ static int ringbuffer_flush_keeps_capacity_unittest(void)
     return errors;
 }
 
+static int ringbuffer_find_bytes_unittest(void)
+{
+    int errors = 0;
+    rbuf_t buffer = rbuf_create(8, 8);
+    size_t idx = (size_t)-1;
+    char *found;
+
+    RB_TEST(rbuf_push(buffer, "abcdefgh", 8) == 8, "find setup fill");
+    found = rbuf_find_bytes(buffer, "ef", 2, &idx);
+    RB_TEST(found && !memcmp(found, "ef", 2), "find bytes returns matching pointer");
+    RB_TEST(idx == 4, "find bytes reports size_t offset");
+
+    RB_TEST(rbuf_find_bytes(buffer, "zz", 2, &idx) == NULL, "find bytes reports no match");
+    RB_TEST(idx == 8, "find bytes reports scanned size on no match");
+
+    rbuf_free(buffer);
+    return errors;
+}
+
 int ringbuffer_unittest(void)
 {
     int errors = 0;
@@ -147,6 +166,7 @@ int ringbuffer_unittest(void)
     errors += ringbuffer_wrapped_growth_unittest();
     errors += ringbuffer_cap_unittest();
     errors += ringbuffer_flush_keeps_capacity_unittest();
+    errors += ringbuffer_find_bytes_unittest();
 
     if (errors)
         fprintf(stderr, "ringbuffer unittest: %d ERROR(S)\n", errors);

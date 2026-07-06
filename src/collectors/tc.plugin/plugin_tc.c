@@ -800,6 +800,9 @@ static inline int tc_space(char c) {
 }
 
 static inline void tc_split_words(char *str, char **words, int max_words) {
+    if(unlikely(max_words <= 0))
+        return;
+
     char *s = str;
     int i = 0;
 

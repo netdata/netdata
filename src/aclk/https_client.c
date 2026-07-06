@@ -241,7 +241,7 @@ const char *get_http_header_by_name(http_parse_ctx *ctx, const char *name)
 
 static int parse_http_hdr(rbuf_t buf, http_parse_ctx *parse_ctx)
 {
-    int idx, idx_end;
+    size_t idx, idx_end;
     char buf_key[HTTP_HDR_BUFFER_SIZE];
     char buf_val[HTTP_HDR_BUFFER_SIZE];
     char *ptr;
@@ -296,7 +296,7 @@ static inline void chunked_response_buffer_grow_by(http_parse_ctx *parse_ctx, si
 
 static int process_chunked_content(rbuf_t buf, http_parse_ctx *parse_ctx)
 {
-    int idx;
+    size_t idx;
     size_t bytes_to_copy;
 
     do {
@@ -378,7 +378,7 @@ static int process_chunked_content(rbuf_t buf, http_parse_ctx *parse_ctx)
 
 http_parse_rc parse_http_response(rbuf_t buf, http_parse_ctx *parse_ctx)
 {
-    int idx;
+    size_t idx;
     char rc[4];
 
     do {
