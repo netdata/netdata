@@ -58,7 +58,10 @@ func orderedDimensionNames(staticEntries []staticDimensionOrderEntry, dynamicEnt
 }
 
 func lessDynamicDimension(lhs, rhs dynamicDimensionOrderEntry) bool {
-	if lhs.sortKey.kind == dimensionSortHistogramBucket && rhs.sortKey.kind == dimensionSortHistogramBucket {
+	if lhs.sortKey.kind != rhs.sortKey.kind {
+		return lhs.sortKey.kind < rhs.sortKey.kind
+	}
+	if lhs.sortKey.kind == dimensionSortHistogramBucket {
 		if lhs.sortKey.upperBound != rhs.sortKey.upperBound {
 			return lhs.sortKey.upperBound < rhs.sortKey.upperBound
 		}

@@ -234,6 +234,7 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 		"BuildPlanTemplatePrecedenceOverAutogen":                       {run: runTestBuildPlanTemplatePrecedenceOverAutogen},
 		"BuildPlanAutogenStrictOverflowDrop":                           {run: runTestBuildPlanAutogenStrictOverflowDrop},
 		"BuildPlanAutogenUsesFlattenMetadataForHistogramBuckets":       {run: runTestBuildPlanAutogenUsesFlattenMetadataForHistogramBuckets},
+		"BuildPlanOrdersMixedHistogramAndDefaultDynamicDimensions":     {run: runTestBuildPlanOrdersMixedHistogramAndDefaultDynamicDimensions},
 		"BuildPlanAutogenCreatesChartForUnmatchedGauge":                {run: runTestBuildPlanAutogenCreatesChartForUnmatchedGauge},
 		"BuildPlanAutogenCreatesChartForUnmatchedStateSet":             {run: runTestBuildPlanAutogenCreatesChartForUnmatchedStateSet},
 		"BuildPlanAutogenKeepsStateSetUnitsWhenMetricMetaUnitIsSet":    {run: runTestBuildPlanAutogenKeepsStateSetUnitsWhenMetricMetaUnitIsSet},
@@ -252,6 +253,70 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, tc.run)
 	}
+}
+
+func runTestBuildPlanOrdersMixedHistogramAndDefaultDynamicDimensions(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Mixed
+    metrics:
+      - svc.latency_seconds_bucket
+      - svc.status
+    charts:
+      - title: Mixed Dynamic Dimensions
+        context: mixed_dynamic_dimensions
+        units: values
+        algorithm: incremental
+        dimensions:
+          - selector: svc.latency_seconds_bucket
+          - selector: svc.status
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	h := sm.Histogram("latency_seconds", metrix.WithHistogramBounds(2, 10))
+	ss := sm.StateSet("status", metrix.WithStateSetStates("15", "3"), metrix.WithStateSetMode(metrix.ModeEnum))
+
+	cc.BeginCycle()
+	h.ObservePoint(metrix.HistogramPoint{
+		Count: 3,
+		Sum:   13,
+		Buckets: []metrix.BucketPoint{
+			{UpperBound: 2, CumulativeCount: 1},
+			{UpperBound: 10, CumulativeCount: 2},
+		},
+	})
+	ss.Enable("3")
+	cc.CommitCycleSuccess()
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, program.ChartTypeHeatmap, create.Meta.Type)
+
+	var createDims []string
+	var updateDims []string
+	for _, action := range plan.Actions {
+		switch action := action.(type) {
+		case CreateDimensionAction:
+			createDims = append(createDims, action.Name)
+		case UpdateChartAction:
+			for _, value := range action.Values {
+				updateDims = append(updateDims, value.Name)
+			}
+		}
+	}
+	want := []string{"15", "3", "2", "10", "+Inf"}
+	assert.Equal(t, want, createDims)
+	assert.Equal(t, want, updateDims)
 }
 
 func runTestBuildPlanRequiresFlattenedReaderForInference(t *testing.T) {
