@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 )
 
 // TestStockProfiles_OptionalBlocksUncommentValid guards the commented "optional
@@ -45,7 +46,7 @@ func TestStockProfiles_OptionalBlocksUncommentValid(t *testing.T) {
 	require.NotZero(t, want)
 
 	// Loading as stock validates every uncommented profile fatally.
-	catalog, err := LoadFromDirs([]DirSpec{{Path: tmp, IsStock: true}})
+	catalog, err := loadFromDirs([]profilecatalog.DirSpec{{Path: tmp, IsStock: true}})
 	require.NoError(t, err, "a stock profile is invalid once its optional blocks are uncommented")
 	require.Len(t, catalog.AllProfiles(), want)
 

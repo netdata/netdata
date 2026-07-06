@@ -6,11 +6,19 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// Generic loader mechanics (directory walk, .yaml/.yml filter, _-prefix skip,
+// basename validation, stock/user override precedence, duplicate handling,
+// missing-directory handling, empty catalogs) are owned and tested by
+// pkg/profilecatalog. This file covers only Prometheus-specific behavior: strict
+// header decoding, header validation, lazy template hydration, and
+// case-insensitive resolution.
 
 type fileSpec struct {
 	stock   bool
@@ -36,6 +44,15 @@ template:
 `, match)
 }
 
+// profileYAMLNoChart has a valid header but a structurally invalid template (a
+// group with no chart), so it decodes fine but fails template hydration.
+func profileYAMLNoChart(match string) string {
+	return fmt.Sprintf(`match: "%s"
+template:
+  family: test
+`, match)
+}
+
 func loadCatalog(t *testing.T, files ...fileSpec) (Catalog, error) {
 	t.Helper()
 
@@ -52,139 +69,100 @@ func loadCatalog(t *testing.T, files ...fileSpec) (Catalog, error) {
 	return LoadFromDirs([]DirSpec{{Path: userDir, IsStock: false}, {Path: stockDir, IsStock: true}})
 }
 
-func TestLoadFromDirs(t *testing.T) {
+// TestLoadFromDirs_headerDecodeAndValidation covers the strict header decode and
+// header-level validation that Prometheus applies at load time (the lazy design
+// keeps these eager while deferring only the chart template).
+func TestLoadFromDirs_headerDecodeAndValidation(t *testing.T) {
 	tests := map[string]struct {
-		files     []fileSpec
-		wantErr   bool
-		wantNames []string
+		content string
+		wantErr bool
 	}{
-		"single stock profile": {
-			files:     []fileSpec{{stock: true, name: "app.yaml", content: profileYAML("app_*")}},
-			wantNames: []string{"app"},
+		"valid stock profile": {
+			content: profileYAML("app_*"),
 		},
-		"ignores non-yaml and underscore-prefixed files": {
-			files: []fileSpec{
-				{stock: true, name: "app.yaml", content: profileYAML("app_*")},
-				{stock: true, name: "_partial.yaml", content: profileYAML("p_*")},
-				{stock: true, name: "notes.txt", content: "ignored"},
-			},
-			wantNames: []string{"app"},
-		},
-		"strict yaml rejects unknown field in stock profile": {
-			files:   []fileSpec{{stock: true, name: "app.yaml", content: profileYAML("app_*") + "bogus: 1\n"}},
+		"strict yaml rejects unknown top-level field": {
+			content: profileYAML("app_*") + "bogus: 1\n",
 			wantErr: true,
 		},
-		"stray name field is rejected in stock profile": {
-			files:   []fileSpec{{stock: true, name: "app.yaml", content: "name: app\n" + profileYAML("app_*")}},
+		"stray name field is rejected": {
+			content: "name: app\n" + profileYAML("app_*"),
 			wantErr: true,
 		},
-		"empty match in stock profile is fatal": {
-			files:   []fileSpec{{stock: true, name: "app.yaml", content: profileYAML("")}},
+		"empty match is fatal": {
+			content: profileYAML(""),
 			wantErr: true,
-		},
-		"invalid basename in stock profile is fatal": {
-			files:   []fileSpec{{stock: true, name: "App.yaml", content: profileYAML("app_*")}},
-			wantErr: true,
-		},
-		"invalid profile in user dir is skipped": {
-			files: []fileSpec{
-				{stock: true, name: "good.yaml", content: profileYAML("g_*")},
-				{stock: false, name: "bad.yaml", content: profileYAML("")},
-			},
-			wantNames: []string{"good"},
-		},
-		"invalid basename in user dir is skipped": {
-			files: []fileSpec{
-				{stock: true, name: "good.yaml", content: profileYAML("g_*")},
-				{stock: false, name: "Bad.yaml", content: profileYAML("b_*")},
-			},
-			wantNames: []string{"good"},
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			cat, err := loadCatalog(t, tc.files...)
+			_, err := loadCatalog(t, fileSpec{stock: true, name: "app.yaml", content: tc.content})
 			if tc.wantErr {
 				assert.Error(t, err)
-				return
+			} else {
+				assert.NoError(t, err)
 			}
-			require.NoError(t, err)
-
-			var got []string
-			for _, p := range cat.OrderedProfiles() {
-				got = append(got, p.Name)
-			}
-			assert.ElementsMatch(t, tc.wantNames, got)
 		})
 	}
 }
 
-func TestLoadFromDirs_userOverridesStock(t *testing.T) {
+// TestLoadFromDirs_stockTemplateHydratesLazily verifies a stock profile with a
+// valid header but a structurally invalid template LOADS successfully (matching
+// only needs the header) and errors only when its template is hydrated.
+func TestLoadFromDirs_stockTemplateHydratesLazily(t *testing.T) {
+	cat, err := loadCatalog(t, fileSpec{stock: true, name: "app.yaml", content: profileYAMLNoChart("app_*")})
+	require.NoError(t, err, "a stock profile with a bad template must still load")
+
+	got, err := cat.Resolve([]string{"app"})
+	require.NoError(t, err)
+	require.Len(t, got, 1)
+
+	_, err1 := got[0].Template()
+	assert.Error(t, err1, "template hydration must surface the invalid template")
+
+	// The memoized error is returned again (hydration runs once).
+	_, err2 := got[0].Template()
+	assert.Equal(t, err1, err2)
+}
+
+// TestLoadFromDirs_userBadTemplateSkippedStockSurvives verifies O3: a user
+// profile validates its template at load, so a broken user override is skipped
+// and the stock profile of the same name survives.
+func TestLoadFromDirs_userBadTemplateSkippedStockSurvives(t *testing.T) {
 	cat, err := loadCatalog(t,
 		fileSpec{stock: true, name: "app.yaml", content: profileYAML("stock_*")},
-		fileSpec{stock: false, name: "app.yaml", content: profileYAML("user_*")},
+		fileSpec{stock: false, name: "app.yaml", content: profileYAMLNoChart("user_*")},
 	)
 	require.NoError(t, err)
 
 	got, err := cat.Resolve([]string{"app"})
 	require.NoError(t, err)
 	require.Len(t, got, 1)
-	assert.Equal(t, "user_*", got[0].Match)
+	assert.Equal(t, "stock_*", got[0].Match, "the valid stock profile must survive the broken user override")
+
+	tmpl, err := got[0].Template()
+	require.NoError(t, err, "the surviving stock template must hydrate")
+	assert.NotEmpty(t, tmpl.Charts)
 }
 
-func TestLoadFromDirs_userOverridesStockWhenStockSeenFirst(t *testing.T) {
-	userDir := t.TempDir()
-	stockDir := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(stockDir, "app.yaml"), []byte(profileYAML("stock_*")), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(userDir, "app.yaml"), []byte(profileYAML("user_*")), 0o600))
-
-	cat, err := LoadFromDirs([]DirSpec{{Path: stockDir, IsStock: true}, {Path: userDir, IsStock: false}})
+// TestProfile_TemplateConcurrent exercises concurrent hydration of a shared
+// catalog profile (run with -race).
+func TestProfile_TemplateConcurrent(t *testing.T) {
+	cat, err := loadCatalog(t, fileSpec{stock: true, name: "app.yaml", content: profileYAML("app_*")})
 	require.NoError(t, err)
-
 	got, err := cat.Resolve([]string{"app"})
 	require.NoError(t, err)
-	require.Len(t, got, 1)
-	assert.Equal(t, "user_*", got[0].Match)
-}
+	p := got[0]
 
-func TestLoadFromDirs_duplicateStockAcrossDirsIsFatal(t *testing.T) {
-	d1 := t.TempDir()
-	d2 := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(d1, "app.yaml"), []byte(profileYAML("a_*")), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(d2, "app.yaml"), []byte(profileYAML("b_*")), 0o600))
-
-	_, err := LoadFromDirs([]DirSpec{{Path: d1, IsStock: true}, {Path: d2, IsStock: true}})
-	assert.Error(t, err)
-}
-
-func TestLoadFromDirs_duplicateUserAcrossDirsKeepsFirst(t *testing.T) {
-	d1 := t.TempDir()
-	d2 := t.TempDir()
-	require.NoError(t, os.WriteFile(filepath.Join(d1, "app.yaml"), []byte(profileYAML("first_*")), 0o600))
-	require.NoError(t, os.WriteFile(filepath.Join(d2, "app.yaml"), []byte(profileYAML("second_*")), 0o600))
-
-	cat, err := LoadFromDirs([]DirSpec{{Path: d1, IsStock: false}, {Path: d2, IsStock: false}})
-	require.NoError(t, err)
-	require.Len(t, cat.OrderedProfiles(), 1)
-	assert.Equal(t, "first_*", cat.OrderedProfiles()[0].Match)
-}
-
-func TestLoadFromDirs_missingStockDirIsFatal(t *testing.T) {
-	_, err := LoadFromDirs([]DirSpec{{Path: filepath.Join(t.TempDir(), "nope"), IsStock: true}})
-	assert.Error(t, err)
-}
-
-func TestLoadFromDirs_missingUserDirIsSkipped(t *testing.T) {
-	cat, err := LoadFromDirs([]DirSpec{{Path: filepath.Join(t.TempDir(), "nope"), IsStock: false}})
-	require.NoError(t, err)
-	assert.True(t, cat.Empty())
-}
-
-func TestLoadFromDirs_emptySpecs(t *testing.T) {
-	cat, err := LoadFromDirs(nil)
-	require.NoError(t, err)
-	assert.True(t, cat.Empty())
+	var wg sync.WaitGroup
+	for range 16 {
+		wg.Go(func() {
+			tmpl, err := p.Template()
+			assert.NoError(t, err)
+			assert.NotEmpty(t, tmpl.Charts)
+		})
+	}
+	wg.Wait()
 }
 
 func TestCatalog_Resolve(t *testing.T) {

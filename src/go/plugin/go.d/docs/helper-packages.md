@@ -34,6 +34,7 @@ these roots for an existing package that already owns the behavior.
 | IP range parsing | `src/go/plugin/go.d/pkg/iprange` |
 | SQL query/scan helpers | `src/go/plugin/go.d/pkg/sqlquery` |
 | Cloud auth config/credentials | `src/go/plugin/go.d/pkg/cloudauth` |
+| Profile-catalog loading (YAML profiles, stock/user dirs) | `src/go/plugin/go.d/pkg/profilecatalog` |
 | Ping probing | `src/go/plugin/go.d/pkg/pinger` |
 | SNMP utilities | `src/go/plugin/go.d/pkg/snmputils` |
 | Kubernetes client helpers | `src/go/plugin/go.d/pkg/k8sclient` |
@@ -306,6 +307,36 @@ Why:
 
 - probe config validation and derived metrics are shared;
 - collectors avoid reimplementing packet sampling and jitter math.
+
+## Profile Catalog Helpers
+
+Use `src/go/plugin/go.d/pkg/profilecatalog` when a collector ships curated
+per-target "profiles" as YAML files (a profile's identity is its file basename)
+and loads them from stock plus user directories. Used by the `prometheus`,
+`azure_monitor`, and `cloudwatch` collectors.
+
+When:
+
+- the collector reads profiles from `config/go.d/<name>.profiles/` (stock) and
+  the user config dirs;
+- it needs stock/user override precedence (user overrides stock by basename),
+  the stock-fatal / user-skip error policy, and a process-wide cached catalog.
+
+Why:
+
+- one shared `Load[P]` + `Catalog[P]` + `Cached[T]` replaces per-collector copies
+  of the directory walk, override precedence, and singleton caching;
+- it is generic over the collector's profile type `P` and oblivious to matching
+  (matching stays in the collector);
+- decode depth is the collector's choice via `Options.Decode`: parse everything
+  eagerly, or parse a lightweight header now and hydrate the heavy part later
+  (as `prometheus` does for its chart templates).
+
+Do NOT put matching logic in this package; it is a catalog + loader, not a
+matcher. Keep the profile schema, its decode/validate, the `defaultDirSpecs`
+directory resolution (location-specific), and specialized queries in the
+collector's own `*profiles` package, wrapping `profilecatalog.Catalog[P]` by
+struct embedding.
 
 ## Legacy V1 Helpers
 

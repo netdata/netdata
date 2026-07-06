@@ -6,8 +6,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/fs"
-	"os"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -18,6 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 )
 
 const (
@@ -26,26 +25,19 @@ const (
 
 var log = logger.New().With("component", "azure_monitor/azureprofiles")
 
+// DirSpec is one profile search directory (re-exported so this package's API is
+// self-contained for callers of LoadFromDirs).
+type DirSpec = profilecatalog.DirSpec
+
+// Catalog wraps the shared profile catalog with Azure-specific queries
+// (resolution by basename and by resource type).
 type Catalog struct {
-	byBaseName            map[string]Profile
-	stockProfileBaseNames map[string]struct{}
+	profilecatalog.Catalog[Profile]
 }
 
 type ResolvedProfile struct {
 	Name   string
 	Config Profile
-}
-
-type catalogEntry struct {
-	Config   Profile
-	Path     string
-	BaseName string
-	IsStock  bool
-}
-
-type DirSpec struct {
-	Path    string
-	IsStock bool
 }
 
 func LoadFromDefaultDirs() (Catalog, error) {
@@ -58,126 +50,48 @@ func LoadFromDefaultDirs() (Catalog, error) {
 	if err != nil {
 		return Catalog{}, err
 	}
-	if len(catalog.stockProfileBaseNames) == 0 {
+	if len(catalog.StockNames()) == 0 {
 		return Catalog{}, fmt.Errorf("no stock profiles found under %q", filepath.Join(pluginconfig.CollectorsStockDir(), profilesDirName, "default"))
 	}
 	return catalog, nil
 }
 
 func LoadFromDirs(specs []DirSpec) (Catalog, error) {
-	catalog := Catalog{
-		byBaseName:            make(map[string]Profile),
-		stockProfileBaseNames: make(map[string]struct{}),
-	}
-	seen := make(map[string]catalogEntry)
-
-	for _, spec := range specs {
-		if strings.TrimSpace(spec.Path) == "" {
-			continue
-		}
-		if !isDirExists(spec.Path) {
-			if spec.IsStock {
-				return Catalog{}, fmt.Errorf("stock profiles directory does not exist: %s", spec.Path)
-			}
-			continue
-		}
-
-		err := filepath.WalkDir(spec.Path, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return handleProfileLoadError(spec, path, err)
-			}
-			if d.IsDir() {
-				return nil
-			}
-
-			name := d.Name()
-			ext := strings.ToLower(filepath.Ext(name))
-			if ext != ".yaml" && ext != ".yml" {
-				return nil
-			}
-			if strings.HasPrefix(name, "_") {
-				return nil
-			}
-
-			baseName := strings.TrimSpace(profileBaseName(path))
-			if !IsValidProfileName(baseName) {
-				return handleProfileLoadError(spec, path, fmt.Errorf("profile %q: basename must match %q", path, reIdentityID.String()))
-			}
-
-			cfg, err := loadProfileFile(path, baseName)
-			if err != nil {
-				return handleProfileLoadError(spec, path, err)
-			}
-			if spec.IsStock {
-				catalog.stockProfileBaseNames[baseName] = struct{}{}
-			}
-
-			prev, exists := seen[baseName]
-			if !exists {
-				seen[baseName] = catalogEntry{Config: cfg, Path: path, BaseName: baseName, IsStock: spec.IsStock}
-				return nil
-			}
-
-			switch {
-			case prev.IsStock == spec.IsStock:
-				if !spec.IsStock {
-					log.Warningf("ignoring duplicate user profile basename %q in %q; already loaded from %q", baseName, path, prev.Path)
-					return nil
-				}
-				return fmt.Errorf("duplicate stock profile basename %q in %q and %q", baseName, prev.Path, path)
-			case prev.IsStock && !spec.IsStock:
-				seen[baseName] = catalogEntry{Config: cfg, Path: path, BaseName: baseName, IsStock: false}
-			case !prev.IsStock && spec.IsStock:
-				// User overrides stock. Keep the existing user profile.
-			}
-
-			return nil
-		})
-		if err != nil {
-			return Catalog{}, err
-		}
+	core, err := profilecatalog.Load(specs, profilecatalog.Options[Profile]{
+		Decode: func(ctx profilecatalog.FileContext, data []byte) (Profile, error) {
+			return decodeProfile(data, ctx.BaseName)
+		},
+		Log: log,
+	})
+	if err != nil {
+		return Catalog{}, err
 	}
 
-	if len(seen) == 0 {
+	catalog := Catalog{Catalog: core}
+	if catalog.Empty() {
 		return Catalog{}, errors.New("no Azure Monitor profiles were loaded")
 	}
-
-	for baseName, entry := range seen {
-		catalog.byBaseName[baseName] = entry.Config
-	}
-
 	return catalog, nil
 }
 
-func loadProfileFile(path, baseName string) (Profile, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return Profile{}, err
-	}
-
+// decodeProfile decodes, normalizes, and validates one profile. The decoder is
+// non-strict (unknown keys are ignored), so an older collector tolerates
+// profiles that carry newer optional fields.
+func decodeProfile(data []byte, baseName string) (Profile, error) {
 	var cfg Profile
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	if err := dec.Decode(&cfg); err != nil {
-		return Profile{}, fmt.Errorf("unmarshal profile %q: %w", path, err)
+		return Profile{}, fmt.Errorf("unmarshal profile %q: %w", baseName, err)
 	}
 
 	if err := cfg.Normalize(baseName); err != nil {
-		return Profile{}, fmt.Errorf("normalize profile %q: %w", path, err)
+		return Profile{}, fmt.Errorf("normalize profile %q: %w", baseName, err)
 	}
 	if err := cfg.Validate(fmt.Sprintf("profile %q", baseName), baseName); err != nil {
-		return Profile{}, fmt.Errorf("validate profile %q: %w", path, err)
+		return Profile{}, fmt.Errorf("validate profile %q: %w", baseName, err)
 	}
 
 	return cfg, nil
-}
-
-func handleProfileLoadError(spec DirSpec, path string, err error) error {
-	if spec.IsStock {
-		return err
-	}
-
-	log.Warningf("ignoring invalid user profile %q: %v", path, err)
-	return nil
 }
 
 func (c Catalog) Resolve(profileNames []string) ([]ResolvedProfile, error) {
@@ -188,7 +102,7 @@ func (c Catalog) Resolve(profileNames []string) ([]ResolvedProfile, error) {
 	profiles := make([]ResolvedProfile, 0, len(profileNames))
 	for _, name := range profileNames {
 		profileName := strings.TrimSpace(name)
-		prof, ok := c.byBaseName[profileName]
+		prof, ok := c.Get(profileName)
 		if !ok {
 			return nil, fmt.Errorf("unknown profile %q", name)
 		}
@@ -216,16 +130,15 @@ func (c Catalog) ProfilesForResourceTypes(types map[string]struct{}) []string {
 	}
 
 	var names []string
-	for name, prof := range c.byBaseName {
-		rt := normalizeKey(prof.ResourceType)
+	for _, n := range c.Sorted() {
+		rt := normalizeKey(n.Profile.ResourceType)
 		if rt == "" {
 			continue
 		}
 		if _, ok := types[rt]; ok {
-			names = append(names, name)
+			names = append(names, n.Name)
 		}
 	}
-	sort.Strings(names)
 	return names
 }
 
@@ -254,34 +167,15 @@ func (c Catalog) ResourceTypesForProfileBaseNames(profileBaseNames []string) ([]
 	return types, nil
 }
 
-func (c Catalog) defaultProfileBaseNames() []string {
-	if len(c.stockProfileBaseNames) == 0 {
-		return nil
-	}
-
-	names := make([]string, 0, len(c.stockProfileBaseNames))
-	for name := range c.stockProfileBaseNames {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
-}
-
-func profileBaseName(path string) string {
-	name := filepath.Base(path)
-	ext := filepath.Ext(name)
-	return strings.TrimSuffix(name, ext)
-}
-
 func (c Catalog) ResourceTypes() []string {
-	if len(c.byBaseName) == 0 {
+	if c.Empty() {
 		return nil
 	}
 
-	seen := make(map[string]struct{}, len(c.byBaseName))
-	types := make([]string, 0, len(c.byBaseName))
-	for _, prof := range c.byBaseName {
-		rt := strings.TrimSpace(prof.ResourceType)
+	seen := make(map[string]struct{}, c.Len())
+	types := make([]string, 0, c.Len())
+	for _, n := range c.Sorted() {
+		rt := strings.TrimSpace(n.Profile.ResourceType)
 		key := normalizeKey(rt)
 		if key == "" {
 			continue
@@ -308,7 +202,7 @@ func defaultDirSpecs() []DirSpec {
 	// Keep the adjacent stock-dir fast path for local development runs where the
 	// built binary lives under src/go/plugin/go.d/bin and should use the source-tree
 	// stock profiles without depending on installed pluginconfig paths.
-	if dir := filepath.Join(executable.Directory, "../config/go.d", profilesDirName, "default"); isDirExists(dir) {
+	if dir := filepath.Join(executable.Directory, "../config/go.d", profilesDirName, "default"); profilecatalog.DirExists(dir) {
 		return []DirSpec{{Path: dir, IsStock: true}}
 	}
 
@@ -334,26 +228,12 @@ func azureProfilesDirFromThisFile() string {
 	}
 
 	base := filepath.Dir(thisFile)
-	candidates := []string{
-		filepath.Join(base, "..", "..", "..", "config", "go.d", profilesDirName, "default"),
+	candidate := filepath.Join(base, "..", "..", "..", "config", "go.d", profilesDirName, "default")
+	if !profilecatalog.DirExists(candidate) {
+		return ""
 	}
-
-	for _, candidate := range candidates {
-		if !isDirExists(candidate) {
-			continue
-		}
-		abs, _ := filepath.Abs(candidate)
-		return abs
-	}
-	return ""
-}
-
-func isDirExists(dir string) bool {
-	fi, err := os.Stat(dir)
-	if err != nil {
-		return false
-	}
-	return fi.Mode().IsDir()
+	abs, _ := filepath.Abs(candidate)
+	return abs
 }
 
 func normalizeKey(v string) string {
