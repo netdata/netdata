@@ -83,6 +83,26 @@ jobs:
 
 Restart Netdata with `sudo systemctl restart netdata`, or the [appropriate method](/docs/netdata-agent/start-stop-restart.md) for your system. Netdata should pick up your web server's access log and begin showing real-time charts!
 
+### Monitor multiple log files
+
+Each `web_log` job follows a **single** log file. If you set `path` to a wildcard (glob) pattern, the collector still only follows one of the matched files — it does not combine data from every match into one stream. To monitor several log files, add a separate job for each one.
+
+A common case is per-account or per-domain access logs. For example, cPanel/WHM writes a separate Apache access log for each user at `/var/lib/apache2/domlogs/<user>-ssl_log`. To collect every user's log, define one job per file:
+
+```yaml
+jobs:
+  - name: user1_ssl_log
+    path: /var/lib/apache2/domlogs/user1-ssl_log
+  - name: user2_ssl_log
+    path: /var/lib/apache2/domlogs/user2-ssl_log
+```
+
+Edit the collector configuration with `./edit-config go.d/web_log.conf`.
+
+Each job produces its own set of charts, so you can tell traffic apart per user or domain by the job name.
+
+A wildcard such as `/var/lib/apache2/domlogs/*-ssl_log` will **not** collect from every matching log. The collector follows only one of the matched files (the last in name order), so the remaining users' traffic is silently absent — no error is raised. Use one job per file, as shown above, to cover every log you want to monitor.
+
 ### Custom log formats and fields
 
 The web log collector is capable of parsing custom Nginx and Apache log formats and presenting them as charts, but we'll leave that topic for a separate guide.
