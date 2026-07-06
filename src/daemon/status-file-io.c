@@ -182,6 +182,11 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     }
 
     /* Rename temp file to target file */
+#if defined(OS_WINDOWS)
+    // POSIX rename() atomically replaces an existing destination; Windows rename()
+    // fails with EEXIST instead.  Unlink first to get the same replace semantics.
+    unlink(final);
+#endif
     if (rename(temp, final) != 0) {
         unlink(temp);
         return false;
