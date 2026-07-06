@@ -110,6 +110,16 @@ Add your own labels to categorize systems by any criteria you need.
     sudo ./edit-config netdata.conf
     ```
 
+    :::note Windows
+    On Windows there is no `sudo`. Open the bundled MSYS2 environment as Administrator and run `cd /etc/netdata && ./edit-config netdata.conf` to edit `netdata.conf`. After adding your `[host labels]` section, reload labels from an elevated PowerShell:
+
+    ```powershell
+    & "C:\Program Files\Netdata\usr\bin\netdatacli.exe" reload-labels
+    ```
+
+    See [editing configuration files on Windows](/packaging/windows/WINDOWS_INSTALLER.md#editing-configuration-files) for the MSYS2 environment details.
+    :::
+
 2. Add a `[host labels]` section:
 
     ```text
