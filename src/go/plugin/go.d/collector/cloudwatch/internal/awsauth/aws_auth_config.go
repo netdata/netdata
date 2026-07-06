@@ -22,7 +22,10 @@ const (
 	ModeAccessKey  = "access_key"
 	ModeAssumeRole = "assume_role"
 
-	defaultConfigPath = "cloud_auth.aws"
+	// defaultConfigPath is the error-message prefix Validate() uses when no explicit
+	// path is given. cloudwatch (the sole consumer) embeds this config under the
+	// "auth" key, so validation errors read as "auth.*".
+	defaultConfigPath = "auth"
 
 	// baseIdentityRef is Identity.Ref for the base credential source when it is
 	// monitored alongside assumed roles (include_base_account).
