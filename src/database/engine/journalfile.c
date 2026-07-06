@@ -1253,6 +1253,17 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         journal_v1_file_size = (uint32_t)statbuf.st_size;
 
     journalfile_v2_generate_path(datafile, path_v2, sizeof(path_v2));
+
+    // fileno is parsed from directory entries (sscanf %u); this prefix check
+    // satisfies CWE-73 static analysis and guards against any future change
+    // that might allow non-numeric components in path_v2.
+    const char *dbpath = datafile_ctx(datafile)->config.dbfiles_path;
+    size_t dbpath_len = strlen(dbpath);
+    if (strncmp(path_v2, dbpath, dbpath_len) != 0 || path_v2[dbpath_len] != '/') {
+        netdata_log_error("DBENGINE: journal path \"%s\" is outside database directory \"%s\"", path_v2, dbpath);
+        return 1;
+    }
+
     nd_win_trace("journalfile_v2_load: fileno=%u v1_size=%zu opening v2='%s'",
                  datafile->fileno, journal_v1_file_size, path_v2);
     fd = open(path_v2, O_RDONLY | O_CLOEXEC);
