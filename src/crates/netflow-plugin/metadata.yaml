@@ -52,7 +52,7 @@ modules:
         auto_detection:
           description: "The stock configuration enables the plugin and listens on the configured UDP ports."
         limits:
-          description: "Operational limits are driven by sustained flow records/s, exporter batching, cardinality, retention, storage speed, and enrichment. See [Sizing and Capacity Planning](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/sizing-and-capacity-planning) for the per-agent throughput envelope, disk sizing, and distributed-deployment guidance."
+          description: "Operational limits are driven by sustained flow records/s, exporter batching, cardinality, retention, storage speed, and enrichment. See [Sizing and Capacity Planning](/docs/npm/network-flows/sizing-capacity.md) for the per-agent throughput envelope, disk sizing, and distributed-deployment guidance."
         performance_impact:
           description: "Disabled until exporters send traffic. Once active, CPU and disk I/O scale with flow-record rate and cardinality; size retention and storage from observed flow records/s."
     setup:
@@ -77,7 +77,7 @@ modules:
               Zero).
 
               See the
-              [Network Flows Installation](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/installation)
+              [Network Flows Installation](/docs/npm/network-flows/installation.md)
               guide for per-distribution install commands (including openSUSE), the fallback if
               your distribution doesn't have the package published yet, and verification steps.
       configuration:
@@ -231,7 +231,7 @@ modules:
         auto_detection:
           description: "The stock configuration enables the plugin and listens on the configured UDP ports."
         limits:
-          description: "Operational limits are driven by sustained flow records/s, exporter batching, template churn, cardinality, retention, storage speed, and enrichment. See [Sizing and Capacity Planning](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/sizing-and-capacity-planning) for the per-agent throughput envelope, disk sizing, and distributed-deployment guidance."
+          description: "Operational limits are driven by sustained flow records/s, exporter batching, template churn, cardinality, retention, storage speed, and enrichment. See [Sizing and Capacity Planning](/docs/npm/network-flows/sizing-capacity.md) for the per-agent throughput envelope, disk sizing, and distributed-deployment guidance."
         performance_impact:
           description: "Disabled until exporters send traffic. Once active, CPU and disk I/O scale with flow-record rate, template volume, and cardinality; size retention and storage from observed flow records/s."
     setup:
@@ -256,7 +256,7 @@ modules:
               Zero).
 
               See the
-              [Network Flows Installation](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/installation)
+              [Network Flows Installation](/docs/npm/network-flows/installation.md)
               guide for per-distribution install commands (including openSUSE), the fallback if
               your distribution doesn't have the package published yet, and verification steps.
       configuration:
@@ -410,7 +410,7 @@ modules:
               Zero).
 
               See the
-              [Network Flows Installation](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/installation)
+              [Network Flows Installation](/docs/npm/network-flows/installation.md)
               guide for per-distribution install commands (including openSUSE), the fallback if
               your distribution doesn't have the package published yet, and verification steps.
       configuration:
