@@ -76,7 +76,7 @@ This collector is supported on all platforms.
 
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
-The configured IAM identity requires `cloudwatch:ListMetrics`, `cloudwatch:GetMetricData`, and `sts:GetCallerIdentity`. When `auth.mode` is `assume_role`, it also requires `sts:AssumeRole`.
+The configured IAM identity requires `cloudwatch:ListMetrics`, `cloudwatch:GetMetricData`, and `sts:GetCallerIdentity`. When `auth.mode` is `assume_role`, it also requires `sts:AssumeRole`. Resource tag enrichment (the optional `tags` option) additionally requires `tag:GetResources`.
 
 
 ### Default Behavior
@@ -91,7 +91,7 @@ With `profiles.mode: auto` (default), the collector discovers metrics for all bu
 - Minimum collection interval is 60 seconds (CloudWatch's minimum metric period).
 - CloudWatch publishes metrics with a delay; the effective query offset is `max(query_offset, period)`, so long-period metrics (such as the daily S3 storage metrics) are inherently about one period behind.
 - There is no cap on discovered resources; a warning is logged at 1000 or more discovered instances (collection is never truncated).
-- Resources are labeled by their identifying CloudWatch dimensions (for example EC2 `instance_id`), not by their `Name` tag or other resource tags; tag-based naming and filtering are not currently supported. (A dimension that is constant across resources, such as CloudFront's `Region=Global`, is used to match and query metrics but is not turned into a label.)
+- Resources are labeled by their identifying CloudWatch dimensions (for example EC2 `instance_id`). Selected resource tags can additionally be attached as labels via the opt-in `tags` option (using the Resource Groups Tagging API); tags are enrichment only and never change a resource's identity. (A dimension that is constant across resources, such as CloudFront's `Region=Global`, is used to match and query metrics but is not turned into a label.)
 
 
 #### Performance Impact
@@ -141,7 +141,7 @@ Attach a policy such as:
 }
 ```
 
-`cloudwatch:ListMetrics`, `cloudwatch:GetMetricData`, and `sts:GetCallerIdentity` do not support resource-level permissions, so `"Resource": "*"` is required -- this is already least-privilege for these read actions. In `assume_role` mode, scope `sts:AssumeRole` to the specific role ARN(s) rather than `*`.
+`cloudwatch:ListMetrics`, `cloudwatch:GetMetricData`, and `sts:GetCallerIdentity` do not support resource-level permissions, so `"Resource": "*"` is required -- this is already least-privilege for these read actions. In `assume_role` mode, scope `sts:AssumeRole` to the specific role ARN(s) rather than `*`. To enable resource tag enrichment (the optional `tags` option), also grant `tag:GetResources` (it likewise requires `"Resource": "*"`).
 
 Then provide credentials with one of the `auth.mode` options:
 
@@ -188,6 +188,7 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | profiles.mode_exact.entries | List of profiles to collect by basename (required when `profiles.mode` is `exact`). Each entry has a `name`, e.g. `ec2` or `alb_target`. |  | no |
 | **Discovery** | discovery.refresh_every | How often (seconds) to re-discover metrics. Minimum 60. | 300 | no |
 |  | discovery.recently_active_only | List only metrics active in the last 3 hours. Automatically disabled for metrics whose period exceeds 3 hours (such as the daily S3 storage metrics). | yes | no |
+| **Tags** | tags | Optional allowlist of AWS resource tags to attach as extra labels on collected metrics, looked up via the Resource Groups Tagging API. Empty by default -- with no tags listed, no tag lookup runs and no extra IAM is needed. Each entry has a `name` (the AWS tag key, case-sensitive) and an optional `rename` (the Netdata label name; the default is the sanitized key, so `Name` becomes `name`). Use `rename` when the key is not a valid label (for example an `aws:`-prefixed key) or collides with a built-in label such as `region`. Enabling tags requires the `tag:GetResources` IAM permission. Note: tag values become label values and may contain personal data (such as owner emails), so list only tags you want exposed as labels. Tags apply only to profiles with a supported resource-ARN join; some services are not tag-enriched: Auto Scaling and Bedrock (not taggable via the Resource Groups Tagging API), and -- pending a reliable ARN join -- API Gateway, CloudFront, MSK, and ElastiCache. Tags behave as create-time chart labels: a tag that first appears or changes value after a chart already exists is reflected only when that chart is next recreated. |  | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 <a id="option-authentication-auth-mode"></a>

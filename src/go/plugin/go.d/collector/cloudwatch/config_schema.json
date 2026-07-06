@@ -241,6 +241,30 @@
           }
         }
       },
+      "tags": {
+        "title": "Resource tags",
+        "description": "AWS resource tags to attach as labels on collected metrics, looked up via the Resource Groups Tagging API. Empty by default; listing any tag enables tag lookup and requires the tag:GetResources IAM permission. Tag values may contain personal data (e.g. owner emails) -- only list tags you want exposed as labels.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Tag key",
+              "description": "AWS tag key to collect (case-sensitive), e.g. owner. Becomes the sanitized label (e.g. owner) unless renamed.",
+              "type": "string"
+            },
+            "rename": {
+              "title": "Label name",
+              "description": "Optional Netdata label name to use instead of the sanitized tag key. Use it when the sanitized key would be invalid (for example an aws:-prefixed key) or collides with a built-in label such as region.",
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      },
       "query_offset": {
         "title": "Query offset",
         "description": "Seconds subtracted from now when querying, to account for CloudWatch publish latency.",
@@ -335,6 +359,20 @@
         }
       }
     },
+    "tags": {
+      "ui:listFlavour": "list",
+      "ui:help": "AWS resource tags to attach as labels. Add one row per tag. Leave empty to disable tag enrichment (no extra IAM or API calls). Tag values may contain personal data (e.g. owner emails) -- only list tags you want exposed.",
+      "items": {
+        "name": {
+          "ui:help": "AWS tag key (case-sensitive).",
+          "ui:placeholder": "owner"
+        },
+        "rename": {
+          "ui:help": "Optional label name; defaults to the sanitized tag key. Use it to rename or to resolve a collision (e.g. the tag 'region' -> 'aws_region').",
+          "ui:placeholder": "aws_region"
+        }
+      }
+    },
     "discovery": {
       "refresh_every": {
         "ui:help": "How often to re-run metric discovery (ListMetrics). Discovery is cheap; raise this only to cut API load on very large accounts."
@@ -382,6 +420,12 @@
           "title": "Discovery",
           "fields": [
             "discovery"
+          ]
+        },
+        {
+          "title": "Tags",
+          "fields": [
+            "tags"
           ]
         },
         {

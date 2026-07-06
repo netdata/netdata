@@ -15,6 +15,7 @@ import (
 type observedSeries struct {
 	seriesName string
 	labels     []metrix.Label
+	tagLabels  []metrix.Label // non-identity enrichment; re-emitted with the series, not in observedKey
 	value      float64
 	groupKey   queryGroupKey // (account, region, effective period) — the scheduling unit
 }
@@ -103,10 +104,11 @@ func (o *observationStore) observe(dueQueries []plannedQuery, samples []querySam
 	observedThisCycle := make(map[string]bool, len(samples))
 	for _, s := range samples {
 		key := observedKey(s.seriesName, s.labels)
-		writeSample(meter, s.seriesName, s.labels, s.value)
+		writeSample(meter, s.seriesName, s.labels, s.tagLabels, s.value)
 		o.lastObserved[key] = observedSeries{
 			seriesName: s.seriesName,
 			labels:     s.labels,
+			tagLabels:  s.tagLabels,
 			value:      s.value,
 			groupKey:   s.groupKey(),
 		}
@@ -126,10 +128,11 @@ func (o *observationStore) observe(dueQueries []plannedQuery, samples []querySam
 			continue // had a datapoint
 		}
 		if pq.nilAsZero && noData[pq.id] {
-			writeSample(meter, pq.seriesName, pq.labels, 0)
+			writeSample(meter, pq.seriesName, pq.labels, pq.tagLabels, 0)
 			o.lastObserved[key] = observedSeries{
 				seriesName: pq.seriesName,
 				labels:     pq.labels,
+				tagLabels:  pq.tagLabels,
 				value:      0,
 				groupKey:   pq.groupKey(),
 			}
@@ -143,15 +146,25 @@ func (o *observationStore) observe(dueQueries []plannedQuery, samples []querySam
 		if observedThisCycle[key] || queried[obs.groupKey] {
 			continue
 		}
-		writeSample(meter, obs.seriesName, obs.labels, obs.value)
+		writeSample(meter, obs.seriesName, obs.labels, obs.tagLabels, obs.value)
 	}
 }
 
-func writeSample(meter metrix.SnapshotMeter, seriesName string, labels []metrix.Label, value float64) {
+func writeSample(meter metrix.SnapshotMeter, seriesName string, labels, tagLabels []metrix.Label, value float64) {
+	// Identity labels are shared read-only across an instance's queries, so tag
+	// enrichment is concatenated into a FRESH slice, never appended onto labels.
+	// tagLabels are non-identity (not part of observedKey), so a tag change never
+	// churns retention/scheduling.
+	all := labels
+	if len(tagLabels) > 0 {
+		all = make([]metrix.Label, 0, len(labels)+len(tagLabels))
+		all = append(all, labels...)
+		all = append(all, tagLabels...)
+	}
 	// WithFloat marks the metric float-native; chartengine inherits that onto the
 	// chart dimension, so CloudWatch's fractional values render at full precision
 	// without injecting options.float per dimension.
-	meter.WithLabels(labels...).Gauge(seriesName, metrix.WithFloat(true)).Observe(value)
+	meter.WithLabels(all...).Gauge(seriesName, metrix.WithFloat(true)).Observe(value)
 }
 
 // pruneObserved drops both the retention-cache entries and the per-(account, region,

@@ -18,6 +18,7 @@ import (
 type querySample struct {
 	seriesName string
 	labels     []metrix.Label
+	tagLabels  []metrix.Label // non-identity enrichment labels; emitted but not in observedKey
 	value      float64
 	account    string
 	region     string
@@ -33,7 +34,8 @@ type plannedQuery struct {
 	period     int
 	seriesName string
 	labels     []metrix.Label
-	nilAsZero  bool // record 0 (vs a gap) when the query returns no datapoint
+	tagLabels  []metrix.Label // non-identity enrichment labels; emitted but not in observedKey
+	nilAsZero  bool           // record 0 (vs a gap) when the query returns no datapoint
 	query      cwtypes.MetricDataQuery
 }
 
@@ -86,7 +88,8 @@ func (c *Collector) buildQueryPlan() []plannedQuery {
 						continue // defensive: snapshot/profile mismatch
 					}
 					labels, dims := c.instanceLabelsAndDims(acct.accountID, prof, region, inst)
-					plan = append(plan, c.metricQueries(acct.accountID, prof, region, labels, dims, &idx)...)
+					tagLabels := c.tagLabelsFor(acct.accountID, region, prof, inst.DimensionValues)
+					plan = append(plan, c.metricQueries(acct.accountID, prof, region, labels, tagLabels, dims, &idx)...)
 				}
 			}
 		}
@@ -120,7 +123,7 @@ func (c *Collector) instanceLabelsAndDims(accountID string, prof cwprofiles.Reso
 
 // metricQueries builds the planned queries for one instance: one per
 // (metric × statistic), allocating sequential q<idx> ids through idx.
-func (c *Collector) metricQueries(accountID string, prof cwprofiles.ResolvedProfile, region string, labels []metrix.Label, dims []cwtypes.Dimension, idx *int) []plannedQuery {
+func (c *Collector) metricQueries(accountID string, prof cwprofiles.ResolvedProfile, region string, labels, tagLabels []metrix.Label, dims []cwtypes.Dimension, idx *int) []plannedQuery {
 	var out []plannedQuery
 	for _, m := range prof.Config.Metrics {
 		period := prof.Config.EffectivePeriod(m)
@@ -135,6 +138,7 @@ func (c *Collector) metricQueries(accountID string, prof cwprofiles.ResolvedProf
 				period:     period,
 				seriesName: cwprofiles.ExportedSeriesName(prof.Name, m.ID, token),
 				labels:     labels,
+				tagLabels:  tagLabels,
 				nilAsZero:  m.EmitZeroOnNoData(token),
 				query: cwtypes.MetricDataQuery{
 					Id: aws.String(id),

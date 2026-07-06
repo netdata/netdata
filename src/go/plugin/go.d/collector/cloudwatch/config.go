@@ -42,6 +42,7 @@ type Config struct {
 	Auth               awsauth.Config   `yaml:"auth" json:"auth"`
 	Profiles           ProfilesConfig   `yaml:"profiles" json:"profiles"`
 	Discovery          DiscoveryConfig  `yaml:"discovery" json:"discovery"`
+	Tags               []TagConfig      `yaml:"tags,omitempty" json:"tags,omitempty"`
 	QueryOffset        int              `yaml:"query_offset,omitempty" json:"query_offset"`
 	Timeout            confopt.Duration `yaml:"timeout,omitempty" json:"timeout"`
 }
@@ -58,6 +59,17 @@ type ProfilesExactConfig struct {
 // ProfileEntry names one profile (by basename) to collect in exact mode.
 type ProfileEntry struct {
 	Name string `yaml:"name" json:"name"`
+}
+
+// TagConfig selects one AWS resource tag to emit as an additional label. Name is
+// the AWS tag key (case-sensitive). Rename optionally sets the Netdata label name;
+// without it the label is the sanitized tag key. An empty allowlist disables tag
+// enrichment entirely (no RGTA calls, no extra IAM). Tag resolution -- sanitize,
+// collision skip-and-warn, per-service ARN join -- is non-fatal and runs after
+// profile selection, never in config validation.
+type TagConfig struct {
+	Name   string `yaml:"name" json:"name"`
+	Rename string `yaml:"rename,omitempty" json:"rename,omitempty"`
 }
 
 type DiscoveryConfig struct {

@@ -14,6 +14,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func validBaseConfig() Config {
@@ -86,13 +87,39 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 	// Every public Config key must have a schema property (drift guard).
 	for _, key := range []string{
 		"update_every", "autodetection_retry", "vnode", "regions", "auth", "profiles",
-		"discovery", "query_offset", "timeout",
+		"discovery", "tags", "query_offset", "timeout",
 	} {
 		assert.Contains(t, doc.JSONSchema.Properties, key, "schema property for %q", key)
 	}
 
 	// Credential fields must be marked sensitive (secret_access_key, session_token, external_id).
 	assert.Equal(t, 3, strings.Count(string(data), `"sensitive": true`), "credential fields marked sensitive")
+}
+
+func TestConfig_TagsDecode(t *testing.T) {
+	// Structural decode only: tag semantics (sanitize, collision skip-and-warn, rename
+	// validation) are resolved non-fatally after profile selection, not in config
+	// decoding or validation. An empty allowlist disables tag enrichment (opt-in).
+	tests := map[string]struct {
+		yaml string
+		want []TagConfig
+	}{
+		"a list of tag specs decodes (optional rename)": {
+			yaml: "regions: [us-east-1]\ntags:\n  - name: owner\n  - name: Name\n    rename: instance_name\n",
+			want: []TagConfig{{Name: "owner"}, {Name: "Name", Rename: "instance_name"}},
+		},
+		"absent tags decodes to nil (opt-in disabled)": {
+			yaml: "regions: [us-east-1]\n",
+			want: nil,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			var c Config
+			require.NoError(t, yaml.Unmarshal([]byte(tc.yaml), &c))
+			assert.Equal(t, tc.want, c.Tags)
+		})
+	}
 }
 
 func TestRegionPartition(t *testing.T) {

@@ -26,6 +26,8 @@ const (
 	logKeyGetMetricDataFailed    = "getmetricdata_failed"
 	logKeyGetMetricDataForbidden = "getmetricdata_forbidden"
 	logKeyAccountResolveFailed   = "account_resolve_failed"
+	logKeyTagPlanWarn            = "tag_plan_warn"
+	logKeyTagRefreshFailed       = "tag_refresh_failed"
 )
 
 //go:embed "config_schema.json"
@@ -58,9 +60,11 @@ func New() *Collector {
 		newAWSConfig:        defaultNewAWSConfig,
 		newCloudWatchClient: defaultNewCloudWatchClient,
 		newSTSClient:        defaultNewSTSClient,
+		newRGTAClient:       defaultNewRGTAClient,
 	}
 	c.observations = newObservationStore(c.store)
 	c.clients = newClientCache(c.buildAccountRegionClient)
+	c.rgtaClients = newClientCache(c.buildAccountRegionRGTAClient)
 	return c
 }
 
@@ -75,6 +79,7 @@ type Collector struct {
 	newAWSConfig        func(ctx context.Context, id awsauth.Identity, region string) (aws.Config, error)
 	newCloudWatchClient func(cfg aws.Config) cloudwatchClient
 	newSTSClient        func(cfg aws.Config) stsClient
+	newRGTAClient       func(cfg aws.Config) rgtaClient
 	newCatalog          func() (cwprofiles.Catalog, error) // nil => cwprofiles.DefaultCatalog
 
 	accounts          []cwAccount         // resolved AWS accounts (one per auth identity, deduped by account id)
@@ -82,13 +87,17 @@ type Collector struct {
 	seenAccountID     map[string]string   // account id -> first identity Ref, for cross-cycle dedup
 	chartTemplateYAML string
 
-	profiles  []cwprofiles.ResolvedProfile // candidate profiles selected per profiles.mode
-	clients   *clientCache                 // CloudWatch client cache, one per (account, region)
-	discovery discoverySnapshot
+	profiles    []cwprofiles.ResolvedProfile   // candidate profiles selected per profiles.mode
+	clients     *clientCache[cloudwatchClient] // CloudWatch client cache, one per (account, region)
+	rgtaClients *clientCache[rgtaClient]       // RGTA (tag) client cache, one per (account, region)
+	discovery   discoverySnapshot
 
 	discoverySig string // last-logged discovered-resources summary; Info re-logs only when it changes
 
 	observations *observationStore // retention cache + per-(account, region, period) query schedule
+
+	tags     tagSnapshot              // resource tag cache, refreshed with discovery (empty when tags unconfigured)
+	tagPlans map[string][]resolvedTag // per-profile resolved tag->label plans (nil when tags unconfigured)
 }
 
 func (c *Collector) Init(context.Context) error {
@@ -122,7 +131,10 @@ func (c *Collector) Cleanup(context.Context) {
 	c.discovery = discoverySnapshot{}
 	c.discoverySig = ""
 	c.clients.reset()
+	c.rgtaClients.reset()
 	c.observations.reset()
+	c.tags = tagSnapshot{}
+	c.tagPlans = nil
 }
 
 func (c *Collector) Configuration() any { return c.Config }
