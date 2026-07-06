@@ -1,33 +1,70 @@
 # AWS CloudWatch Collector Architecture
 
-Maintainer-oriented map of `cloudwatch`. It explains the runtime path, the
-profile-driven model, and the package boundaries. Per-service metric and chart
-details live in the profile YAMLs (`config/go.d/cloudwatch.profiles/`) and the
-focused tests, not here.
+Maintainer-oriented map of `cloudwatch`, written to be read top to bottom as a
+journey: the plain model and the big picture first, then the lifecycle and the
+collection cycle, then each stage in detail, and finally the profile schema,
+invariants, and where to change things. Per-service metric and chart details live
+in the profile YAMLs (`config/go.d/cloudwatch.profiles/`) and the focused tests,
+not here.
 
-## Short Version
+The one rule that shapes most of what follows:
+
+> `GetMetricData` is billed per query, so the collector queries each metric only
+> as often as its period and re-emits cached values in between — cost tracks the
+> profiles you run, not how often Netdata collects.
+
+## What It Does
 
 `cloudwatch` is a framework-V2 go.d collector that pulls AWS CloudWatch metrics
-for a curated set of AWS services (each defined by a profile — see Profiles)
-and renders them as dynamic Netdata charts. It is **profile-driven**: each
-service is a YAML profile declaring its CloudWatch namespace, the dimension set
-that identifies one instance, the metrics/statistics to query, and a chart
-template.
+for a curated set of AWS services and renders them as dynamic Netdata charts. It
+is **profile-driven**: each service is a YAML profile (see Profiles) declaring its
+CloudWatch namespace, the dimension set that identifies one instance, the
+metrics/statistics to query, and a chart template — so adding or adjusting a
+service is usually a YAML edit, not Go.
 
-Each collection cycle it:
+It runs as a **single Netdata node**: AWS resources are chart *instances* (keyed
+by `by_labels`), not separate nodes — there are no vnodes/host scopes.
 
-1. resolves one AWS account id per configured identity via STS (`identity.go`);
-2. discovers live resource instances per (account, profile, region) with
-   `ListMetrics` (`discover.go`);
-3. plans and executes `GetMetricData` in batches grouped by (account, region,
-   period) (`query_plan.go`, `query_executor.go`);
-4. writes each `instance × metric × statistic` value as a float gauge into the
-   `metrix` store, stamped with `{account_id, region, <dimension labels>}`
-   (`observe.go`);
-5. serves a chart template built once from the selected profiles (`chart.go`).
+## Big Picture
 
-It runs as a **single Netdata node**. AWS resources are chart *instances*
-(keyed by `by_labels`), not separate nodes; there are no vnodes/host scopes.
+Config picks the services; the collector discovers what actually exists, queries
+it on a per-period schedule to keep the bill down, and renders the results as
+charts under the `cloudwatch.` namespace.
+
+```mermaid
+flowchart LR
+    cfg("Config<br/>regions · auth · profiles")
+    disc("Discover<br/>ListMetrics<br/>cheap / free tier")
+    plan("Plan + schedule<br/>per account/region/period")
+    query("Query<br/>GetMetricData<br/>billed — the cost driver")
+    store("metrix store<br/>gauges + labels")
+    charts("Dynamic charts<br/>cloudwatch.*")
+
+    cfg --> disc --> plan --> query --> store --> charts
+
+    classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
+    classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
+    classDef effect fill:#ffe6cc,stroke:#e36209,color:#5a2a00;
+    classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
+
+    class cfg input
+    class disc,plan sched
+    class query effect
+    class store,charts commit
+```
+
+Each collection cycle (`collect.go`), in order:
+
+1. resolve one AWS account id per configured identity via STS (`identity.go`);
+2. discover live instances per (account, profile, region) with `ListMetrics`
+   (`discover.go`);
+3. plan and schedule `GetMetricData`, grouped by (account, region, period)
+   (`query_plan.go`);
+4. execute the due queries in concurrent batches (`query_executor.go`);
+5. write each value as a float gauge into `metrix`, stamped with
+   `{account_id, region, <dimension labels>}`, and re-emit cached values for
+   not-due series (`observe.go`);
+6. serve a chart template built once from the selected profiles (`chart.go`).
 
 ## Lifecycle
 
@@ -37,17 +74,27 @@ owns the `Collector` struct and lifecycle.
 
 ```mermaid
 flowchart TD
-    Init["Init: applyDefaults + validate (no AWS calls)"]
-    Check["Check"]
-    Accounts["ensureAccounts: STS GetCallerIdentity per identity (fail-soft, deduped)"]
-    Profiles["ensureProfiles: load catalog, select profiles, build + cache chart template"]
-    Post["framework postCheck: validate ChartTemplateYAML via chartengine"]
-    Collect["Collect (every update_every)"]
-    Cycle["collect(ctx): discovery -> plan -> schedule -> execute -> observe"]
+    Init("Init<br/>applyDefaults + validate<br/>no AWS calls")
+    Check("Check")
+    Accounts("ensureAccounts<br/>STS GetCallerIdentity per identity<br/>fail-soft · deduped")
+    Profiles("ensureProfiles<br/>load catalog · select profiles<br/>build + cache chart template")
+    Post("framework postCheck<br/>validate ChartTemplateYAML via chartengine")
+    Collect("Collect<br/>every update_every")
+    Cycle("collect cycle<br/>discover → plan → schedule → execute → observe")
 
     Init --> Check
     Check --> Accounts --> Profiles --> Post
     Post --> Collect --> Cycle --> Collect
+
+    classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
+    classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
+    classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
+    classDef core fill:#cfe4ff,stroke:#1f6feb,stroke-width:3px,color:#0b2948;
+
+    class Init,Check input
+    class Accounts,Profiles sched
+    class Post commit
+    class Collect,Cycle core
 ```
 
 - **Init** does config only (`applyDefaults`, `validate`) — no network.
@@ -69,14 +116,24 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A["ensure account id + profiles (cached after first run)"]
-    B["refreshDiscovery: ListMetrics per (profile,region) when TTL expired"]
-    C["buildQueryPlan: one query per instance x metric x statistic"]
-    D["dueGroups + filterDueQueries: keep only (region,period) groups due now"]
-    E["executeQueries: batched, concurrent GetMetricData"]
-    F["advanceSchedule(succeeded) + observe: write gauges, re-emit retained"]
+    A("ensure account ids + profiles<br/>cached after first run")
+    B("refreshDiscovery<br/>ListMetrics per account/profile/region<br/>when TTL expired")
+    C("buildQueryPlan<br/>one query per account × instance × metric × statistic")
+    D("dueGroups + filterDueQueries<br/>keep only (account, region, period) groups due now")
+    E("executeQueries<br/>batched · concurrent GetMetricData")
+    F("advanceSchedule + observe<br/>write gauges · re-emit retained")
 
     A --> B --> C --> D --> E --> F
+
+    classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
+    classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
+    classDef effect fill:#ffe6cc,stroke:#e36209,color:#5a2a00;
+    classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
+
+    class A input
+    class B,C,D sched
+    class E effect
+    class F commit
 ```
 
 ## Discovery
