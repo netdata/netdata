@@ -91,12 +91,16 @@ image="<image>"
 Every line beginning `LABEL_netdata.cloud/` appends a label. The line is split
 only at the first `=`, so additional `=` characters remain part of the value.
 
+The shell helper `eval`ed the inspect output, so exported `NOMAD_*`,
+`CONT_NAME`, or `IMAGE_NAME` variables from the helper's own environment could
+leak into the result, and container-controlled values were executed by the
+shell. The Go helper only parses the output text; this is an intentional fix.
+
 ## Docker/Podman API Branch
 
-`docker_like_get_name_api(host_var, id)` returns failure only when:
-
-- the selected host variable is empty; or
-- `jq` is not found on `PATH`.
+`docker_like_get_name_api(host_var, id)` returns failure only when the selected
+host variable is empty. (The shell helper also failed when `jq` was missing
+from `PATH`; the Go helper parses JSON natively and needs no external tools.)
 
 Every other outcome returns success, even when curl/HTTP/JSON parsing fails and
 no name is found. This is required because the shell function ends with
@@ -140,7 +144,8 @@ file from the host cgroup tree, splits all whitespace, requires exactly one
 process, then reads `/proc/<pid>/comm` from the running namespace. A single
 process named `pause` returns `3`.
 
-`jq` must be present on `PATH`; absence warns and returns `1`.
+The shell helper required `jq` on `PATH` here (absence warned and returned
+`1`); the Go helper parses all JSON natively and has no such gate.
 
 The Kubernetes cache files are:
 
@@ -150,8 +155,11 @@ The Kubernetes cache files are:
 
 For container ids, all three files must exist and the containers file must have
 a grep match for the container id to use the cache. Otherwise the binary reads
-any existing cluster/system uid cache, discovers missing values, then overwrites
-the cache files with non-atomic writes equivalent to `echo > file 2>/dev/null`.
+any existing cluster/system uid cache, discovers missing values, then rewrites
+the cache files atomically: each is written to an unguessable `0600` temp file
+in the same directory and renamed over the destination, so a symlink planted at
+the predictable path is replaced, not followed. (The shell helper used plain
+`echo > file 2>/dev/null` writes.)
 
 Kubernetes data source selection is a switch:
 

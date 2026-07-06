@@ -220,10 +220,6 @@ func TestPodsToContainerLines(t *testing.T) {
 func TestK8sContainerCachePath(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("PATH", tmp)
-	if err := os.WriteFile(filepath.Join(tmp, "jq"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("PATH", tmp)
 	t.Setenv("TMPDIR", tmp)
 	t.Setenv("NETDATA_LOG_LEVEL", "emerg")
 
@@ -258,10 +254,6 @@ func TestMirroredK8sContainerPathFixturesFromCache(t *testing.T) {
 	// sustainable-computing-io/kepler. They intentionally avoid copying upstream
 	// pod/container names while preserving the cgroup path shapes.
 	tmp := t.TempDir()
-	t.Setenv("PATH", tmp)
-	if err := os.WriteFile(filepath.Join(tmp, "jq"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	t.Setenv("PATH", tmp)
 	t.Setenv("TMPDIR", tmp)
 	t.Setenv("NETDATA_LOG_LEVEL", "emerg")
@@ -479,9 +471,6 @@ func TestMirroredK8sPodListFixtureViaKubelet(t *testing.T) {
 	// Docker IDs, containerd IDs, and CRI-O IDs.
 	tmp := t.TempDir()
 	t.Setenv("PATH", tmp)
-	if err := os.WriteFile(filepath.Join(tmp, "jq"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	t.Setenv("TMPDIR", tmp)
 	t.Setenv("NETDATA_LOG_LEVEL", "emerg")
 	t.Setenv("NETDATA_HOST_PREFIX", tmp)
@@ -518,9 +507,6 @@ func TestMirroredK8sPodListFixtureViaAPIServer(t *testing.T) {
 	// object (its metadata.uid becomes the cluster id) and then /api/v1/pods.
 	// The API-server and kubelet paths must resolve to identical names/labels.
 	tmp := t.TempDir()
-	if err := os.WriteFile(filepath.Join(tmp, "jq"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	t.Setenv("PATH", tmp)
 	t.Setenv("TMPDIR", tmp)
 	t.Setenv("NETDATA_LOG_LEVEL", "emerg")
@@ -594,9 +580,6 @@ func TestMirroredK8sPodListFixtureViaAPIServer(t *testing.T) {
 func TestMirroredDockerAndPodmanAPIFixtures(t *testing.T) {
 	tmp := t.TempDir()
 	t.Setenv("PATH", tmp)
-	if err := os.WriteFile(filepath.Join(tmp, "jq"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
-		t.Fatal(err)
-	}
 	if err := os.WriteFile(filepath.Join(tmp, "snap"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}

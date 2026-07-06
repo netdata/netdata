@@ -213,11 +213,11 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     char buffer[8192]; // we need some size for labels
     char *new_name = NULL;
 
-    // Bound the helper independently of whether it honors its own timeout: a
-    // custom rename script (or a wedged helper) must not stall discovery. Wait
-    // up to the operator timeout plus a grace period for the helper to produce
-    // its line, then reclaim it. cgroup_name_timeout_ms == 0 keeps the legacy
-    // unbounded behavior.
+    // Bound the wait for the helper's reply independently of whether the
+    // helper honors its own timeout: a wedged helper must not stall discovery.
+    // Wait up to the operator timeout plus a grace period for the helper to
+    // start producing its line, then reclaim it. cgroup_name_timeout_ms == 0
+    // keeps the legacy unbounded behavior.
     int wait_ms = -1;
     if (cgroup_name_timeout_ms > 0)
         wait_ms = cgroup_name_timeout_ms > INT_MAX - CGROUP_NAME_GRACE_MS ?
