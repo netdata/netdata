@@ -25,6 +25,7 @@ const (
 	logKeyQueryClientFailed      = "query_client_failed"
 	logKeyGetMetricDataFailed    = "getmetricdata_failed"
 	logKeyGetMetricDataForbidden = "getmetricdata_forbidden"
+	logKeyAccountResolveFailed   = "account_resolve_failed"
 )
 
 //go:embed "config_schema.json"
@@ -76,7 +77,9 @@ type Collector struct {
 	newSTSClient        func(cfg aws.Config) stsClient
 	newCatalog          func() (cwprofiles.Catalog, error) // nil => cwprofiles.DefaultCatalog
 
-	accounts          []cwAccount // resolved AWS accounts (one per auth identity, deduped by account id)
+	accounts          []cwAccount         // resolved AWS accounts (one per auth identity, deduped by account id)
+	resolvedRefs      map[string]struct{} // identity Refs already resolved (kept or deduped); the rest are retried each cycle
+	seenAccountID     map[string]string   // account id -> first identity Ref, for cross-cycle dedup
 	chartTemplateYAML string
 
 	profiles  []cwprofiles.ResolvedProfile // candidate profiles selected per profiles.mode
@@ -112,6 +115,8 @@ func (c *Collector) Cleanup(context.Context) {
 	// autodetection retry on the same instance) starts clean, mirroring
 	// azure_monitor. All ensure*/refresh paths rebuild lazily.
 	c.accounts = nil
+	c.resolvedRefs = nil
+	c.seenAccountID = nil
 	c.profiles = nil
 	c.chartTemplateYAML = ""
 	c.discovery = discoverySnapshot{}

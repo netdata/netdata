@@ -106,6 +106,22 @@ func TestEnsureAccounts_IncludeBaseAccount(t *testing.T) {
 		"the base identity's account is monitored alongside the roles")
 }
 
+func TestEnsureAccounts_RetriesPendingIdentity(t *testing.T) {
+	// Role A resolves on the first cycle; role B fails once (transient) and must be
+	// retried on a later cycle rather than being dropped for the job's lifetime.
+	c := assumeRoleCollector(t, twoRoles(), false, &seqSTS{
+		accounts: []string{"111111111111", "", "222222222222"},
+		failAt:   map[int]bool{1: true}, // second STS call (role B, first attempt) fails
+	})
+
+	require.NoError(t, c.ensureAccounts(context.Background()))
+	assert.Equal(t, []string{"111111111111"}, c.accountIDs(), "role A resolves; role B is pending, not fatal")
+
+	require.NoError(t, c.ensureAccounts(context.Background()))
+	assert.Equal(t, []string{"111111111111", "222222222222"}, c.accountIDs(),
+		"the transiently-failed role is retried and eventually starts collecting")
+}
+
 // TestBuildQueryPlan_MultiAccount is the INV.2 analog for the account dimension:
 // adding accounts only ADDS series (each stamped with its account_id); it never drops
 // an instance. Each account's discovery is queried under its own account_id.

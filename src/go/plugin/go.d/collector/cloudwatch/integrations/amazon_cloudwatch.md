@@ -69,7 +69,7 @@ Replace `AWS/<Service>` with the service namespace (for example `AWS/AmazonMQ`) 
 :::
 
 
-The collector discovers available metrics with the CloudWatch `ListMetrics` API (one paginated call per selected service profile and region; the collector then keeps only the metrics whose dimension set matches each profile's instance dimensions) and queries them in batches with the `GetMetricData` API. Each configured identity's AWS account id is resolved via `sts:GetCallerIdentity` (one per assumed role, so a single job can monitor several accounts). Authentication uses the AWS SDK default credential chain, static access keys, or one or more assumed IAM roles.
+The collector discovers available metrics with the CloudWatch `ListMetrics` API (one paginated call per account, selected service profile, and region; the collector then keeps only the metrics whose dimension set matches each profile's instance dimensions) and queries them in batches with the `GetMetricData` API. Each configured identity's AWS account id is resolved via `sts:GetCallerIdentity` (one per assumed role, so a single job can monitor several accounts). Note that both discovery and query volume scale with accounts × regions × profiles, so adding many roles multiplies API calls (and `GetMetricData` cost) accordingly. Authentication uses the AWS SDK default credential chain, static access keys, or one or more assumed IAM roles.
 
 
 This collector is supported on all platforms.

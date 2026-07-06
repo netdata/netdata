@@ -21,52 +21,69 @@ type cwAccount struct {
 }
 
 // ensureAccounts resolves the AWS account id for every configured identity via
-// sts:GetCallerIdentity, once. account_id is part of every series' identity, so at
-// least one account MUST resolve. Individual identities that fail are skipped with a
-// warning (fail-soft, mirroring per-region discovery); only when none resolve does
-// Check fail. Two identities that resolve to the same account id are de-duplicated
-// (first kept) — with a shared region list they would otherwise collide on the
-// {account_id, region, dimensions} series identity.
+// sts:GetCallerIdentity. account_id is part of every series' identity, so at least
+// one account MUST resolve; if none do, Check fails. Resolution is fail-soft AND
+// retried: an identity whose config-build or STS/AssumeRole call fails stays pending
+// and is retried on the next cycle (rate-limited warning), so a transient failure
+// does not silently drop an account for the lifetime of the job. Two identities that
+// resolve to the same account id are de-duplicated (first kept) — with a shared
+// region list they would otherwise collide on the {account_id, region, dimensions}
+// series identity.
 func (c *Collector) ensureAccounts(ctx context.Context) error {
-	if len(c.accounts) > 0 {
+	identities := c.Auth.Identities()
+	if c.resolvedRefs == nil {
+		c.resolvedRefs = make(map[string]struct{}, len(identities))
+		c.seenAccountID = make(map[string]string, len(identities))
+	}
+
+	// Short-circuit once every configured identity has resolved (to a kept account
+	// or an intentionally-skipped duplicate). Until then, retry the pending ones.
+	allResolved := true
+	for _, id := range identities {
+		if _, ok := c.resolvedRefs[id.Ref]; !ok {
+			allResolved = false
+			break
+		}
+	}
+	if allResolved {
+		if len(c.accounts) == 0 {
+			return errors.New("no AWS accounts resolved")
+		}
 		return nil
 	}
 
 	region := c.regions()[0] // validated non-empty in Init
-	identities := c.Auth.Identities()
-
-	seenAccount := make(map[string]string, len(identities)) // account id -> first identity ref
-	var accounts []cwAccount
 	var lastErr error
 
 	for _, id := range identities {
+		if _, ok := c.resolvedRefs[id.Ref]; ok {
+			continue // already resolved (kept or deduped)
+		}
 		acctID, err := c.resolveAccountID(ctx, id, region)
 		if err != nil {
 			lastErr = err
-			// A single-identity failure is reported once via the returned error below;
-			// only warn per-identity when there is more than one to disambiguate.
-			if len(identities) > 1 {
-				c.Warningf("CloudWatch: skipping identity %q: %v", id.Ref, err)
-			}
+			// Keep the identity pending and retry next cycle; throttle the warning so a
+			// persistently unreachable role does not warn every cycle.
+			c.Limit(logKeyAccountResolveFailed+":"+id.Ref, 1, recurringLogEvery).
+				Warningf("CloudWatch: could not resolve account for identity %q (will retry): %v", id.Ref, err)
 			continue
 		}
-		if firstRef, dup := seenAccount[acctID]; dup {
+		c.resolvedRefs[id.Ref] = struct{}{}
+		if firstRef, dup := c.seenAccountID[acctID]; dup {
 			c.Warningf("CloudWatch: identity %q resolves to account %s already monitored via %q; skipping the duplicate", id.Ref, acctID, firstRef)
 			continue
 		}
-		seenAccount[acctID] = id.Ref
-		accounts = append(accounts, cwAccount{identity: id, accountID: acctID})
+		c.seenAccountID[acctID] = id.Ref
+		c.accounts = append(c.accounts, cwAccount{identity: id, accountID: acctID})
+		c.Infof("CloudWatch: monitoring %d AWS account(s): %s", len(c.accounts), strings.Join(c.accountIDs(), ", "))
 	}
 
-	if len(accounts) == 0 {
+	if len(c.accounts) == 0 {
 		if lastErr != nil {
 			return fmt.Errorf("no AWS account could be resolved (the 'sts:GetCallerIdentity' permission is required): %w", lastErr)
 		}
 		return errors.New("no AWS accounts resolved")
 	}
-
-	c.accounts = accounts
-	c.Infof("CloudWatch: monitoring %d AWS account(s): %s", len(accounts), strings.Join(c.accountIDs(), ", "))
 	return nil
 }
 

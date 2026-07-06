@@ -391,10 +391,12 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 		}
 	}
 
-	// Only a first-ever pass with nothing discovered and errors is fatal; otherwise
-	// the carried-forward snapshot keeps the collector running.
-	if c.discovery.FetchedAt.IsZero() && snap.totalInstances() == 0 && len(errs) > 0 {
-		return fmt.Errorf("CloudWatch discovery failed for all %d (namespace, region) targets", len(results))
+	// Only a first-ever pass where EVERY target errored is fatal. An empty but
+	// successful target (a resource-free account/region/profile) is not a failure —
+	// with shared regions across many accounts, empty successes are expected — and
+	// any carried-forward snapshot keeps the collector running.
+	if c.discovery.FetchedAt.IsZero() && len(results) > 0 && len(errs) == len(results) {
+		return fmt.Errorf("CloudWatch discovery failed for all %d (account, namespace, region) targets", len(results))
 	}
 
 	c.discovery = snap

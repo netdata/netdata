@@ -518,6 +518,42 @@ func TestCollector_refreshDiscovery_TotalFailureFirstPassErrors(t *testing.T) {
 	assert.True(t, c.discovery.FetchedAt.IsZero())
 }
 
+// errListMetrics is a CloudWatch client whose ListMetrics always errors — used to
+// make one discovery target fail while others succeed.
+type errListMetrics struct{}
+
+func (errListMetrics) ListMetrics(context.Context, *cloudwatch.ListMetricsInput, ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
+	return nil, errors.New("throttled")
+}
+
+func (errListMetrics) GetMetricData(context.Context, *cloudwatch.GetMetricDataInput, ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+	return &cloudwatch.GetMetricDataOutput{}, nil
+}
+
+func TestCollector_refreshDiscovery_EmptySuccessPlusFailureNotFatalOnFirstPass(t *testing.T) {
+	// One target succeeds with zero instances (a resource-free region) while another
+	// errors. On the first pass this must NOT be fatal — not every target failed.
+	c := New()
+	c.Config.Regions = []string{"us-east-1", "us-west-2"}
+	c.applyDefaults()
+	c.accounts = []cwAccount{{accountID: "000000000000"}}
+	c.profiles = []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))}
+	c.now = func() time.Time { return time.Unix(1000, 0) }
+	c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
+		return aws.Config{Region: region}, nil
+	}
+	c.newCloudWatchClient = func(cfg aws.Config) cloudwatchClient {
+		if cfg.Region == "us-west-2" {
+			return errListMetrics{} // this target errors
+		}
+		return &nsCloudWatch{byNS: map[string][]cwtypes.Metric{}} // empty but successful
+	}
+
+	require.NoError(t, c.refreshDiscovery(context.Background()), "empty success + one error must not be fatal")
+	assert.Zero(t, c.discovery.totalInstances())
+	assert.False(t, c.discovery.FetchedAt.IsZero(), "snapshot is committed despite the empty+error mix")
+}
+
 func TestCollector_collect_runsDiscovery(t *testing.T) {
 	c, _ := newDiscoveryTestCollector(map[string]map[string][]cwtypes.Metric{
 		"us-east-1": {"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
