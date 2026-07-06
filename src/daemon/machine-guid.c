@@ -186,18 +186,6 @@ static ND_MACHINE_GUID machine_guid_get_or_create(void) {
     snprintfz(pathname, sizeof(pathname), "%s/registry", netdata_configured_varlib_dir);
     snprintfz(filename, sizeof(filename), "%s/%s", pathname, "netdata.public.unique.id");
 
-#if defined(OS_WINDOWS)
-    // UCRT64 does not translate MSYS2 POSIX paths (/c/...); normalize to native form (C:/)
-    // before any C-runtime file operations (open, mkdir, rename, stat).
-    {
-        char tmp[FILENAME_MAX];
-        nd_env_normalize_dir_path(pathname, tmp, sizeof(tmp));
-        strncpyz(pathname, tmp, sizeof(pathname));
-        nd_env_normalize_dir_path(filename, tmp, sizeof(tmp));
-        strncpyz(filename, tmp, sizeof(filename));
-    }
-#endif
-
     // Attempt to read the GUID from the file.
     if (machine_guid_read_from_file(filename, &h))
         return h;

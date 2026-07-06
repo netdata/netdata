@@ -42,16 +42,10 @@ void nd_windows_detect_prefix_and_override_paths(void) {
     if (attrs == INVALID_FILE_ATTRIBUTES || !(attrs & FILE_ATTRIBUTE_DIRECTORY))
         return;
 
-    // Convert the Windows prefix (C:/...) to POSIX/MSYS2 form (/c/...).
-    // The runtime-paths globals must be in POSIX form because the config
-    // system's reformat_path() passes them through os_translate_windows_to_msys_path(),
-    // which leaves paths already starting with '/' unchanged.  Using /c/...
-    // here means the globals survive reformat_path() intact and are correctly
-    // converted to Windows form (C:\...) by os_translate_msys_to_windows_path()
-    // at actual file-system call sites (e.g. chdir in daemon/main.c).
-    CLEAN_CHAR_P *posix_prefix = os_translate_windows_to_msys_path(exe_path);
-
-    // Override all runtime path globals.
+    // Override all runtime path globals with Windows-native form (C:/...).
+    // reformat_path() in inicfg_api.c normalizes paths to this same form on every
+    // inicfg_get_path() call, so the globals remain C:/... throughout the lifetime
+    // of the process regardless of how the config file was authored.
     //
     // Small one-time startup leak: these strdupz() allocations are later
     // overwritten by nd_runtime_paths_load_directories_from_inicfg() which
@@ -62,7 +56,7 @@ void nd_windows_detect_prefix_and_override_paths(void) {
 #define SET_PATH(var, suffix) \
     do { \
         char _buf[FILENAME_MAX + 1]; \
-        snprintfz(_buf, FILENAME_MAX, "%s" suffix, posix_prefix); \
+        snprintfz(_buf, FILENAME_MAX, "%s" suffix, exe_path); \
         (var) = strdupz(_buf); \
     } while(0)
 
