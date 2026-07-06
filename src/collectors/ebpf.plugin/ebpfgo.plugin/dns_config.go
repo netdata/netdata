@@ -1,7 +1,7 @@
 package main
 
-const dnslLegacyConfigFile = "ebpf.d/dns.conf"
+const dnsLegacyConfigFile = "ebpf.d/dns.conf"
 
 func loadDNSConfigFiles() (pluginConfigFile, bool, error) {
-	return loadCollectorConfigFiles(dnslLegacyConfigFile)
+	return loadCollectorConfigFiles(dnsLegacyConfigFile)
 }
