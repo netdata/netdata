@@ -15,7 +15,7 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/sourcegraph/conc/pool"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 )
 
 // recentlyActiveMaxPeriod is the upper bound (seconds) for using ListMetrics

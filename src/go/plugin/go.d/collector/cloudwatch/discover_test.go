@@ -13,8 +13,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/cwprofiles"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -468,7 +468,7 @@ func newDiscoveryTestCollector(regionMetrics map[string]map[string][]cwtypes.Met
 		fakes[region] = &nsCloudWatch{byNS: byNS}
 	}
 
-	c.newAWSConfig = func(_ context.Context, _ cloudauth.AWSAuthConfig, region string) (aws.Config, error) {
+	c.newAWSConfig = func(_ context.Context, _ awsauth.AWSAuthConfig, region string) (aws.Config, error) {
 		return aws.Config{Region: region}, nil
 	}
 	c.newCloudWatchClient = func(cfg aws.Config) cloudwatchClient { return fakes[cfg.Region] }
@@ -507,7 +507,7 @@ func TestCollector_refreshDiscovery_TotalFailureFirstPassErrors(t *testing.T) {
 	c.applyDefaults()
 	c.profiles = []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))}
 	c.now = func() time.Time { return time.Unix(1000, 0) }
-	c.newAWSConfig = func(context.Context, cloudauth.AWSAuthConfig, string) (aws.Config, error) {
+	c.newAWSConfig = func(context.Context, awsauth.AWSAuthConfig, string) (aws.Config, error) {
 		return aws.Config{}, errors.New("no credentials")
 	}
 

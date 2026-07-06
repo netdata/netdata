@@ -15,8 +15,8 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/cwprofiles"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -127,7 +127,7 @@ func TestCheck_PopulatesChartTemplateBeforeCollect(t *testing.T) {
 	c.Profiles = ProfilesConfig{Mode: profilesModeAuto}
 	c.applyDefaults()
 	c.newCatalog = cwprofiles.LoadFromDefaultDirs
-	c.newAWSConfig = func(_ context.Context, _ cloudauth.AWSAuthConfig, region string) (aws.Config, error) {
+	c.newAWSConfig = func(_ context.Context, _ awsauth.AWSAuthConfig, region string) (aws.Config, error) {
 		return aws.Config{Region: region}, nil
 	}
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
@@ -221,7 +221,7 @@ func TestObserve_PerRegionScheduleIsolation(t *testing.T) {
 	c.applyDefaults()
 	c.profiles = []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2}}
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
-	c.newAWSConfig = func(_ context.Context, _ cloudauth.AWSAuthConfig, region string) (aws.Config, error) {
+	c.newAWSConfig = func(_ context.Context, _ awsauth.AWSAuthConfig, region string) (aws.Config, error) {
 		return aws.Config{Region: region}, nil
 	}
 	c.newCloudWatchClient = func(cfg aws.Config) cloudwatchClient {

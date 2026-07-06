@@ -16,8 +16,8 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/cwprofiles"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -420,7 +420,7 @@ func TestExecuteQueries_RegionClientFailures(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			c := ec2QueryCollector(tc.regions, tc.instances)
 			fake := &gmdCloudWatch{value: 7}
-			c.newAWSConfig = func(_ context.Context, _ cloudauth.AWSAuthConfig, region string) (aws.Config, error) {
+			c.newAWSConfig = func(_ context.Context, _ awsauth.AWSAuthConfig, region string) (aws.Config, error) {
 				if tc.failRegion(region) {
 					return aws.Config{}, errors.New("no credentials for region")
 				}

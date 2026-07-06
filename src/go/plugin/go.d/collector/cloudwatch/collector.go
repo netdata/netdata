@@ -11,8 +11,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/cwprofiles"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 )
 
 // recurringLogEvery throttles warnings for conditions that recur every collect
@@ -71,7 +71,7 @@ type Collector struct {
 	now   func() time.Time
 
 	// client seams (overridden in tests)
-	newAWSConfig        func(ctx context.Context, auth cloudauth.AWSAuthConfig, region string) (aws.Config, error)
+	newAWSConfig        func(ctx context.Context, auth awsauth.AWSAuthConfig, region string) (aws.Config, error)
 	newCloudWatchClient func(cfg aws.Config) cloudwatchClient
 	newSTSClient        func(cfg aws.Config) stsClient
 	newCatalog          func() (cwprofiles.Catalog, error) // nil => cwprofiles.DefaultCatalog

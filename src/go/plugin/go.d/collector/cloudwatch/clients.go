@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 )
 
 // cloudwatchClient is the narrow CloudWatch API surface the collector uses.
@@ -33,8 +33,8 @@ func defaultNewSTSClient(cfg aws.Config) stsClient {
 	return sts.NewFromConfig(cfg)
 }
 
-func defaultNewAWSConfig(ctx context.Context, auth cloudauth.AWSAuthConfig, region string) (aws.Config, error) {
-	return auth.NewConfig(ctx, cloudauth.AWSConfigOptions{Region: region})
+func defaultNewAWSConfig(ctx context.Context, auth awsauth.AWSAuthConfig, region string) (aws.Config, error) {
+	return auth.NewConfig(ctx, awsauth.AWSConfigOptions{Region: region})
 }
 
 // clientCache builds and caches one CloudWatch client per region. forRegion is

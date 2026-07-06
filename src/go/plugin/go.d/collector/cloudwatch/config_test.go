@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -20,7 +20,7 @@ func validBaseConfig() Config {
 	return Config{
 		UpdateEvery: 60,
 		Regions:     []string{"us-east-1"},
-		Auth:        cloudauth.AWSAuthConfig{Mode: cloudauth.AWSAuthModeDefault},
+		Auth:        awsauth.AWSAuthConfig{Mode: awsauth.AWSAuthModeDefault},
 		Profiles:    ProfilesConfig{Mode: profilesModeAuto},
 		Discovery:   DiscoveryConfig{RefreshEvery: 300},
 		QueryOffset: 600,
