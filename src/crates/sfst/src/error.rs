@@ -125,9 +125,9 @@ pub enum Error {
     CorruptIndex(String),
 }
 
-/// Map the shared container helper's errors onto the historical SFST
-/// error shapes so callers' matching keeps working across the v5
-/// migration. A crc32 mismatch is a corrupt file, so it lands on
+/// Map the shared container helper's errors onto SFST's own error
+/// shapes so callers match one error type at this crate's boundary.
+/// A crc32 mismatch is a corrupt file, so it lands on
 /// [`Error::CorruptIndex`] and flows through the query layer's existing
 /// skip-the-file degrade path.
 impl From<chunk_file::container::Error> for Error {

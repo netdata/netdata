@@ -77,13 +77,13 @@ fn serde_bytes_is_wire_compatible_with_plain_vec_u8() {
     // Identical on disk — the whole point.
     assert_eq!(plain, bytes, "serde_bytes changed the on-disk encoding");
 
-    // And bytes written the *old* way decode through the *new* (annotated)
-    // struct — i.e. a pre-change v4 file is still readable.
+    // And bytes written the plain way decode through the annotated
+    // struct — adding `serde_bytes` never changes what is readable.
     let (decoded, _): (WithBytes, _) = bincode::serde::decode_from_slice(&plain, cfg).unwrap();
     assert_eq!(decoded.blob, data);
 }
 
-// ── Typed schema tree (v9 field descriptor) ──────────────────────
+// ── Typed schema tree (the on-disk field descriptor) ─────────────
 
 use crate::{
     FieldEntry, FieldTable, FieldTier, LeafStats, SchemaEdge, SchemaNode, SchemaTree, Step,

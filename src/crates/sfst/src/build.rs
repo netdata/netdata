@@ -379,11 +379,11 @@ pub(crate) fn build_into<W: Write + Seek>(
             ty: s.column_type,
         })
         .collect();
-    // The v9 field descriptor is the typed schema tree. A producer with typed
-    // flattening (`ng-index`) supplies the structural tree; we fill its leaf
-    // stats from `fields` (matched by path). A producer with no tree (raw
+    // The on-disk field descriptor is the typed schema tree. A producer with
+    // typed flattening (`ng-index`) supplies the structural tree; we fill its
+    // leaf stats from `fields` (matched by path). A producer with no tree (raw
     // `(ts, key=value)` rows) gets a flat `Str`-typed tree derived from `fields`,
-    // so every v9 file carries a valid descriptor. Either way the derived field
+    // so every file carries a valid descriptor. Either way the derived field
     // table (`tree.derive_field_table()`) reproduces `fields` exactly.
     let tree = match &row_index.tree {
         Some(t) => {

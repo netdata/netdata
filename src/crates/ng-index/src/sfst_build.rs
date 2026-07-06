@@ -130,7 +130,7 @@ fn populate_row_index(
     let mut stats = SfstStats::default();
     let mut kv = String::new();
     // Accumulates the global typed schema tree by interning every frame's
-    // per-frame tree. Persisted as the v9 field descriptor (`Metadata.tree`).
+    // per-frame tree. Persisted as the on-disk field descriptor (`Metadata.tree`).
     // The interner feed still renders `key=value` via the per-frame paths (the
     // rendered string is identical), so this is build-only — the returned
     // local→global map is unused.
@@ -226,7 +226,7 @@ fn populate_row_index(
         metrics.add_records(records);
     }
 
-    // Persist the global typed schema tree as the v9 field descriptor. The
+    // Persist the global typed schema tree as the on-disk field descriptor. The
     // builder fills each leaf's cardinality/tier from the per-field stats.
     row_index.tree = Some(to_sfst_tree(&flattener.into_tree()));
 

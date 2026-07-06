@@ -21,29 +21,11 @@ pub use registry::{File, Registry, filename, parse_stem, scan_max_sequence};
 /// JSON payload). Distinct from [`CONTAINER_VERSION`], which versions
 /// the on-disk framing around it.
 ///
-/// v3 drops the top-level `part_key` from `CatalogEntry` — the partition key
-/// lives only in `entry.id` (the `FileId`), the single source of truth.
-///
-/// v4: each entry's `remote_key` now embeds the per-signal path segment
-/// (`v2/{signal}/...`). A pre-v4 catalog references the old segment-less layout
-/// (`v1/tenants/...`), so it is rejected on recovery rather than reused — this
-/// prevents a stale catalog from republishing remote keys that point at the
-/// now-orphaned old layout. There is no migration (experimental feature).
-///
-/// v5: the `FileId` and `Catalog` envelope field `boot_id` is renamed to
-/// `invocation_id` — the value was the Netdata agent invocation id
-/// (`NETDATA_INVOCATION_ID`), not the OS boot id, and the JSON wire key follows
-/// the Rust field name (both derive serde with named fields). Pre-GA break;
-/// v4 catalogs are rejected on recovery.
-///
-/// v6: `invocation_id` is renamed to `instance_id` and its meaning changes — the
-/// plugin now self-generates a fresh v4 UUID per process at startup instead of
-/// carrying the agent invocation id (which a crashed-and-respawned plugin would
-/// inherit unchanged, colliding provenance across distinct processes). The JSON
-/// wire key follows the field name; pre-GA break, v5 catalogs are rejected on
-/// recovery. The WAL header and SFST formats are unchanged (identity lives in
-/// filenames only, never inside those bytes).
-pub const FORMAT_VERSION: u32 = 6;
+/// Readers accept exactly this version: a catalog carrying any other value
+/// is rejected on recovery (never reused, never migrated) — the version peek
+/// happens before the full serde parse, so an unknown schema surfaces as
+/// [`Error::UnsupportedVersion`] rather than a serde field error.
+pub const FORMAT_VERSION: u32 = 1;
 
 /// Magic bytes of the on-disk catalog container.
 pub const CONTAINER_MAGIC: [u8; 4] = *b"NCAT";

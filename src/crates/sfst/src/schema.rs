@@ -43,8 +43,8 @@ pub use file_registry::FileSummary as Summary;
 pub struct Metadata {
     pub histogram: Histogram,
     pub id_ranges: IdRanges,
-    /// The typed, array-collapsed schema tree — the on-disk field descriptor
-    /// (replaces the flat `FieldTable` as of v9). Carries structure (parent/
+    /// The typed, array-collapsed schema tree — the on-disk field descriptor.
+    /// Carries structure (parent/
     /// child, `[]` collapse) + per-leaf [`ValueKind`], and per-leaf storage
     /// stats ([`LeafStats`]: cardinality + tier). The flat [`FieldTable`] the
     /// tier machinery and legacy consumers use is **derived** from this tree
@@ -89,7 +89,7 @@ pub struct IdRanges {
 
 /// One entry in the **derived** flat field table — the read-time view
 /// produced by [`SchemaTree::derive_field_table`] from [`Metadata::tree`]
-/// (the on-disk [`SchemaTree`], as of v9). Not stored directly anymore.
+/// (the on-disk [`SchemaTree`]). The table itself is never stored.
 ///
 /// The table is ordered low → mid → high, with each tier internally
 /// sorted by field name. Readers walk it to count mid-card and
@@ -264,8 +264,8 @@ pub struct SchemaEdge {
 
 /// The typed, array-collapsed schema tree carried in [`Metadata::tree`] — an
 /// arena of [`SchemaNode`]s sized by structural variety, not data volume. Node
-/// `0` is the root. Replaces the flat `FieldTable` as the on-disk field
-/// descriptor (v9); the `FieldTable` is *derived* from it on demand.
+/// `0` is the root. This is the on-disk field descriptor; the flat
+/// `FieldTable` is *derived* from it on demand.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SchemaTree {
     nodes: Vec<SchemaNode>,
@@ -346,10 +346,10 @@ impl SchemaTree {
     /// Build a **flat** tree from a [`FieldTable`]: one `Str`-typed leaf per
     /// field directly under the root, each a single `Field(name)` step carrying
     /// the field's `(cardinality, tier)`. This is the descriptor a producer
-    /// with no typed tree emits (raw `(ts, key=value)` rows) so every v9
+    /// with no typed tree emits (raw `(ts, key=value)` rows) so every
     /// file has a valid descriptor; `derive_field_table` round-trips it back to
     /// the same `FieldTable`. It is structurally flat and `Str`-typed (no worse
-    /// than the pre-v9 untyped `FieldTable`).
+    /// than the untyped `FieldTable` it derives from).
     pub fn flat(fields: &FieldTable) -> Self {
         let mut nodes = Vec::with_capacity(fields.len() + 1);
         // Root.
@@ -480,8 +480,8 @@ impl SchemaTree {
 
     /// Derive the flat [`FieldTable`] this tree describes: one [`FieldEntry`]
     /// per distinct **leaf path** with its `(cardinality, tier)`, ordered
-    /// low → mid → high then by name — byte-identical to the table a pre-v9
-    /// producer stored. A polymorphic path (multiple leaf kinds) collapses to a
+    /// low → mid → high then by name — deterministic, so [`Self::flat`]
+    /// round-trips exactly. A polymorphic path (multiple leaf kinds) collapses to a
     /// single entry (its sibling leaves share path-level stats). Leaf nodes
     /// missing `LeafStats` are skipped defensively (a well-formed tree has
     /// stats on every leaf).

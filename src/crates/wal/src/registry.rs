@@ -405,7 +405,7 @@ mod tests {
         assert_eq!(seqs, vec![1, 2]);
 
         // Recovery reads the partition key from the filename (FileId), not the
-        // header — since v4 the header no longer stores part_key.
+        // header — the header stores no part_key.
         assert!(
             registry
                 .archived_files()

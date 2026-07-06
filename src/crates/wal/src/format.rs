@@ -7,12 +7,11 @@ use file_registry::{ByteSize, FileId, TenantId, TimestampNs};
 /// Magic bytes at the start of every WAL file.
 pub const MAGIC: [u8; 4] = *b"NWAL";
 
-/// Current format version. v5 adds the opaque `payload_format` tag, rejects
-/// unknown flag bits, and CRC-protects the header page. (v4 dropped the
-/// header's `part_key` — the filename `FileId` owns it; v3 stored it in the
-/// header; v2 stored a typed `ServiceStream`.) No back-compat: an older file
-/// is rejected and skipped as an orphan at recovery.
-pub const FORMAT_VERSION: u16 = 5;
+/// Current format version. v1 carries an opaque `payload_format` tag,
+/// strict flag bits (unknown bits reject), and a CRC32-protected header
+/// page. Readers accept exactly this version: any other value is rejected
+/// and the file is skipped as an orphan at recovery.
+pub const FORMAT_VERSION: u16 = 1;
 
 /// Total size of the file header in bytes (one 4 KiB page).
 pub const HEADER_SIZE: usize = 4096;
@@ -339,39 +338,31 @@ mod tests {
     }
 
     #[test]
-    fn header_rejects_v4() {
-        // The immediately-prior version is hard-rejected like any other —
-        // never misread.
-        let mut buf = header(Vec::new()).to_bytes();
-        buf[4..6].copy_from_slice(&4u16.to_le_bytes());
-        let err = FileHeader::from_bytes(&buf).unwrap_err();
-        assert!(matches!(err, crate::Error::UnsupportedVersion(4)));
+    fn header_rejects_other_versions() {
+        // Exactly one version is accepted; anything else — zero, the next
+        // version up, or far future — is hard-rejected, never misread. The
+        // version check precedes the CRC gate, so no reseal is needed.
+        for v in [0u16, 2, 999] {
+            let mut buf = header(Vec::new()).to_bytes();
+            buf[4..6].copy_from_slice(&v.to_le_bytes());
+            let err = FileHeader::from_bytes(&buf).unwrap_err();
+            assert!(matches!(err, crate::Error::UnsupportedVersion(x) if x == v));
+        }
     }
 
     #[test]
-    fn header_rejects_older_version() {
-        // An older-version header is hard-rejected — no back-compat.
+    fn header_rejects_unknown_version_before_misreading_offset() {
+        // A different format version may place other fields where this
+        // layout reads `content_meta_len`. Rejection must happen at the
+        // version check *before* any layout-dependent field is read. Forge
+        // a version-2 header with a huge value at the current length offset
+        // and confirm the failure is the version rejection — not oversize
+        // content-meta, and not the (absent) CRC.
         let mut buf = [0u8; HEADER_SIZE];
         buf[0..4].copy_from_slice(&MAGIC);
-        buf[4..6].copy_from_slice(&1u16.to_le_bytes());
-        let err = FileHeader::from_bytes(&buf).unwrap_err();
-        assert!(matches!(err, crate::Error::UnsupportedVersion(1)));
-    }
-
-    #[test]
-    fn header_rejects_old_version_before_misreading_offset() {
-        // Older layouts place different fields where the current version
-        // reads `content_meta_len` (v3 had `part_key` bytes there; v4 had
-        // the length two bytes earlier). An old header must reject at the
-        // version check *before* any layout-dependent field is read. Forge a
-        // v3 header with a huge value at the current length offset and
-        // confirm the failure is the version rejection — not oversize
-        // content-meta, and not the (absent) v5 CRC.
-        let mut buf = [0u8; HEADER_SIZE];
-        buf[0..4].copy_from_slice(&MAGIC);
-        buf[4..6].copy_from_slice(&3u16.to_le_bytes());
+        buf[4..6].copy_from_slice(&2u16.to_le_bytes());
         buf[CONTENT_META_OFFSET - 2..CONTENT_META_OFFSET].copy_from_slice(&u16::MAX.to_le_bytes());
         let err = FileHeader::from_bytes(&buf).unwrap_err();
-        assert!(matches!(err, crate::Error::UnsupportedVersion(3)));
+        assert!(matches!(err, crate::Error::UnsupportedVersion(2)));
     }
 }

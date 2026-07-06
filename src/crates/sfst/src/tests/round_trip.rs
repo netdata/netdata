@@ -426,7 +426,7 @@ fn round_trip_multi_batch_stream() {
     assert_eq!(all[record_count as usize - 1], vec![KvId(record_count - 1)]);
 }
 
-// ── v7 container integrity ───────────────────────────────────────
+// ── Container integrity ──────────────────────────────────────────
 
 /// Minimal valid file: primary + timestamps + one stream batch.
 fn minimal_file() -> Vec<u8> {
@@ -440,40 +440,18 @@ fn minimal_file() -> Vec<u8> {
 }
 
 #[test]
-fn v4_file_is_rejected_on_open() {
-    let mut buf = minimal_file();
-    // Patch the header's version field back to 4 — the clean break: no
-    // v4 read path exists.
-    buf[4..8].copy_from_slice(&4u32.to_le_bytes());
-    assert!(matches!(
-        ChunkReader::open(&buf),
-        Err(Error::UnsupportedVersion(4))
-    ));
-}
-
-#[test]
-fn v5_file_is_rejected_on_open() {
-    let mut buf = minimal_file();
-    // The v5→v6 break (content-agnostic SUMR schema): a v5 file must reject
-    // at the version check, not surface a later bincode decode error.
-    buf[4..8].copy_from_slice(&5u32.to_le_bytes());
-    assert!(matches!(
-        ChunkReader::open(&buf),
-        Err(Error::UnsupportedVersion(5))
-    ));
-}
-
-#[test]
-fn v6_file_is_rejected_on_open() {
-    let mut buf = minimal_file();
-    // The v6→v7 break (SUMR drops `part_key`; it now lives only in the
-    // `FileId`): a v6 file must reject at the version check, not surface a
-    // later bincode decode error.
-    buf[4..8].copy_from_slice(&6u32.to_le_bytes());
-    assert!(matches!(
-        ChunkReader::open(&buf),
-        Err(Error::UnsupportedVersion(6))
-    ));
+fn other_version_file_is_rejected_on_open() {
+    // Exactly one version is readable. Any other value — zero, the next
+    // version up, or far future — must reject at the version check, not
+    // surface a later bincode decode error against a mismatched layout.
+    for v in [0u32, 2, 999] {
+        let mut buf = minimal_file();
+        buf[4..8].copy_from_slice(&v.to_le_bytes());
+        assert!(matches!(
+            ChunkReader::open(&buf),
+            Err(Error::UnsupportedVersion(x)) if x == v
+        ));
+    }
 }
 
 #[test]

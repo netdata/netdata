@@ -31,7 +31,7 @@ The TOC immediately follows the header. Chunk bodies follow the TOC in
 the same order their entries appear in it. Readers look chunks up by
 id through the TOC and must not assume a positional layout.
 
-Since v5 every chunk body carries a trailing crc32 (`crc32fast`,
+Every chunk body carries a trailing crc32 (`crc32fast`,
 i.e. IEEE) computed over the payload bytes — the stored (compressed)
 form, excluding the 4-byte CRC itself. The TOC's per-chunk span covers
 `payload_len + 4`. Readers verify the CRC on every chunk access and
@@ -93,14 +93,14 @@ within its tier in the trailing bytes.
     "META"      Metadata                                      No (always emitted)
     "TIMS"      Vec<i64>  (per-log nanosecond timestamps)     Yes
     "PRIM"      PrefixMap<BitmapValue>                        Yes
-    "OBTS"      Vec<i64>  (per-row observed timestamps)       No (per-row column, v8)
-    "TRCE"      16-byte arena (per-row trace ids)             No (per-row column, v8)
-    "SPAN"      8-byte arena (per-row span ids)               No (per-row column, v8)
-    "FLAG"      Vec<u32>  (per-row LogRecord.flags)           No (per-row column, v8)
-    "DRAC"      Vec<u32>  (per-row dropped_attributes_count)  No (per-row column, v8)
-    "PSPN"      8-byte arena (per-row parent_span_id)         No (per-row column, additive v9)
-    "DURN"      Vec<i64>  (per-row span duration, ns)         No (per-row column, additive v9)
-    "TIDX"      TraceIdIndex  (trace_id fanout + sort permutation)  No (optional, additive v9)
+    "OBTS"      Vec<i64>  (per-row observed timestamps)       No (per-row column)
+    "TRCE"      16-byte arena (per-row trace ids)             No (per-row column)
+    "SPAN"      8-byte arena (per-row span ids)               No (per-row column)
+    "FLAG"      Vec<u32>  (per-row LogRecord.flags)           No (per-row column)
+    "DRAC"      Vec<u32>  (per-row dropped_attributes_count)  No (per-row column)
+    "PSPN"      8-byte arena (per-row parent_span_id)         No (per-row column)
+    "DURN"      Vec<i64>  (per-row span duration, ns)         No (per-row column)
+    "TIDX"      TraceIdIndex  (trace_id fanout + sort permutation)  No (optional)
     "MF{hi}{lo}" PrefixMap<BitmapValue>  (mid-card field)     No (one per mid field)
     "HF{hi}{lo}" HighField  (high-card field, columnar SoA)   No (one per high field)
     "SB0{N}"    StreamBatch  (stream-batch N, fixed-width arena)  Yes (at least 1)
@@ -251,8 +251,8 @@ Heavy query-time metadata:
     pub struct Metadata {
         pub histogram: Histogram,
         pub id_ranges: IdRanges,
-        pub tree:      SchemaTree,         // typed field descriptor (v9; replaces `fields`)
-        pub columns:   Vec<ColumnEntry>,   // per-row columns manifest (v8)
+        pub tree:      SchemaTree,         // typed field descriptor
+        pub columns:   Vec<ColumnEntry>,   // per-row columns manifest
     }
 
     // The per-row columns manifest: one entry per present column (membership =
@@ -275,9 +275,9 @@ Heavy query-time metadata:
         pub high_end: KvId,
     }
 
-    // The typed, array-collapsed schema tree — the on-disk field descriptor
-    // (v9; replaces the flat `Vec<FieldEntry>`). An arena of nodes; node 0 is the
-    // root. A non-root node always has a smaller id than its children.
+    // The typed, array-collapsed schema tree — the on-disk field descriptor.
+    // An arena of nodes; node 0 is the root. A non-root node always has a
+    // smaller id than its children.
     pub struct SchemaTree { nodes: Vec<SchemaNode> }
 
     pub struct SchemaNode {
@@ -305,15 +305,14 @@ column (a path collapses array indices to `[]`); interior `Kvlist`/`Array` nodes
 give structure; leaf nodes carry the path's `cardinality` + `tier`. The flat
 **`FieldTable`** the tier machinery and legacy consumers use is **derived** from
 the tree at read time (`SchemaTree::derive_field_table`): one `FieldEntry` per
-distinct leaf path, ordered low → mid → high then by name (byte-identical to the
-`Vec<FieldEntry>` a pre-v9 file stored), which yields the count of mid-card and
+distinct leaf path, ordered low → mid → high then by name, which yields the count of mid-card and
 high-card fields and thus how many `MF{i}`/`HF{i}` chunks are present. A
 polymorphic path (multiple leaf kinds) collapses to one `FieldEntry`; its single
 coalesced **scalar** type (for typed/UI display) comes from
 `SchemaTree::derive_scalar_kinds` (drop `Null`; empty containers contribute no
 scalar; `Int ⊔ Double = Double`; any other scalar mix → `Str`). A producer with
 no typed tree (raw `(ts, key=value)` rows) emits a flat `Str`-typed tree
-(`SchemaTree::flat`) so every v9 file has a valid descriptor. Per-occurrence type
+(`SchemaTree::flat`) so every file has a valid descriptor. Per-occurrence type
 is not stored anywhere — the tree records the *set* of kinds per path, not which
 kind each stored value was.
 
@@ -476,155 +475,22 @@ CRC then fails to match.
 
 ## Format Version
 
-The current version is **9**.
+The current version is **1**.
 
-### Additive within v9: the `TIDX` trace_id index
+Readers accept exactly the current version: any other value in the
+header's version field is rejected on open with
+`Error::UnsupportedVersion`. There is no migration tooling and no
+multi-version read path — the first post-release format change must
+introduce one.
 
-The optional `TIDX` chunk (see [§ Chunk Ids](#chunk-ids)) is **additive and
-TOC-indexed**: it changes no existing chunk's bincode layout, a file without it
-simply omits it, and a reader that does not know it reads the rest unchanged.
-Its presence therefore needs **no version bump** — the same treatment the v8
-per-row column chunks received. A `TIDX` produced by this build pairs with the
-`TRCE` column in the same file.
+### Additive changes need no bump
 
-### v9 changelog (from v8)
-
-- **`META` replaces the flat field table with a typed schema tree.** `Metadata`
-  swaps `fields: Vec<FieldEntry>` for `tree: SchemaTree` — the typed,
-  array-collapsed schema tree is now the on-disk field descriptor (per-leaf
-  `ValueKind` + parent/child structure + per-leaf `cardinality`/`tier`). The flat
-  `FieldTable` is *derived* from the tree at read time
-  (`SchemaTree::derive_field_table`), byte-identical to what a v8 file stored, so
-  the tier machinery and legacy consumers are unchanged. Coalesced scalar field
-  types come from `SchemaTree::derive_scalar_kinds`.
-- **Storage chunks are unchanged from v8.** `PRIM`/`MF{i}`/`HF{i}`/`SB{i}`/`TIMS`
-  and the per-row column chunks keep their v8 encoding — only the `META` payload
-  changed. A v9 SFST built from a given WAL has byte-identical non-`META` chunks
-  to the v8 SFST from the same WAL.
-- Incompatible `META` bincode layout, so older files are rejected on open
-  (`Container::open` version check).
-
-### v8 changelog (from v7)
-
-- **`META` gains a per-row columns manifest.** `Metadata` adds
-  `columns: Vec<ColumnEntry>` — the authoritative list of which per-row column
-  chunks the file carries and their types. Empty for files with no per-row
-  columns. Incompatible `META` bincode layout, so older files are rejected on
-  open (`Container::open` version check).
-- **New optional per-row column chunks** `OBTS`/`TRCE`/`SPAN`/`FLAG`/`DRAC`,
-  in the **cold region after `PRIM`**. Each is independently optional, holds one
-  value per row in chronological order, and is stored — not FST-indexed — so
-  near-unique identifiers don't explode the facet index. Producers that write no
-  per-row columns (the production logs indexer) emit none of these chunks and an
-  empty manifest.
-
-### v7 changelog (from v6)
-
-- **`SUMR` drops `part_key`.** The partition key is no longer stored in the
-  summary — it is the single source of truth in the filename (`FileId`),
-  propagated from the WAL file the SFST is built from. `FileSummary` is now
-  `{ min_timestamp_s, max_timestamp_s, record_count, content_meta }`. Candidate
-  filtering reads `id.part_key` (from the filename) instead of `summary.part_key`.
-  The bincode layout is incompatible, so a v6 file is rejected at the version
-  check (`Error::UnsupportedVersion`).
-
-v6 files cannot be read by a v7 reader and vice versa
-(`Error::UnsupportedVersion`). No migration tool exists.
-
-### v6 changelog (from v5)
-
-- **Content-agnostic `SUMR`.** The summary payload changed from the typed
-  `Summary { total_logs: u32, stream: ServiceStream }` to
-  `file_registry::FileSummary { record_count: u32, part_key: u64,
-  content_meta: Vec<u8> }`. The SFST layer no longer knows about
-  `(service.namespace, service.name)`: it stores an opaque `part_key`
-  (compared for candidate selection) and an opaque `content_meta` blob
-  (stored verbatim; decoded only by the content plane). The bincode byte
-  layouts are incompatible, so a v5 file is rejected at the version check
-  (`Error::UnsupportedVersion`) rather than failing later inside the bincode
-  decode. No other chunk changed.
-
-v5 files cannot be read by a v6 reader and vice versa
-(`Error::UnsupportedVersion` on the version field). No migration tool
-exists.
-
-### v5 changelog (from v4)
-
-- **Per-chunk crc32 trailers.** Every chunk body is now
-  `<payload> <crc32 u32 LE>`, with the CRC computed over the stored
-  (compressed) payload bytes via `crc32fast`. The TOC accounts for the
-  4 extra bytes per chunk. Readers verify the CRC on every chunk
-  access; a mismatch surfaces as `Error::CorruptIndex` and the query
-  layer degrades that file to an empty shard instead of serving
-  corrupted rows. SFSTs are uploaded to remote storage that is never
-  garbage-collected, so files must be integrity-checked before any
-  permanent objects accumulate. The framing is now produced/parsed by
-  the shared `chunk_file::container` helper, whose TOC stores offsets
-  little-endian as this document specifies. (The earlier in-branch v5
-  draft framed the file through the external `gix-chunk` crate, which
-  writes offsets big-endian — contradicting this spec; no such file was
-  ever shipped.)
-
-v4 files cannot be read by a v5 reader and vice versa
-(`Error::UnsupportedVersion` on the version field). No migration tool
-exists.
-
-### v4 changelog (from v3)
-
-- **`SB{i}` payload reshape — `Vec<Vec<KvId>>` → fixed-width arena.** v3
-  stored each stream batch as `Vec<Vec<KvId>>` (varint `KvId`s, one inner
-  `Vec` per row); decoding it deserialized every `KvId` one at a time —
-  the dominant *cycle* cost on a full high-card scan. v4 stores a
-  `StreamBatch { kv_bytes: Vec<u8>, row_lens: Vec<u32> }` arena where each
-  `KvId` is 4 little-endian bytes, so the scan reads ids straight from
-  `kv_bytes` with no per-id deserialization — see
-  [§ `SB{i}`](#sbi--stream-batch-n). Fixed-width is also ~10% *smaller* on
-  disk than varint here (high-card `KvId`s already cost ~4 bytes as
-  varints, and the regular stride compresses tighter).
-
-v3 files cannot be read by a v4 reader and vice versa
-(`Error::UnsupportedVersion` on the version field). No migration tool
-exists.
-
-### v3 changelog (from v2)
-
-- **`HF{i}` payload reshape — `Vec<String>` keys → string arena.** v2
-  stored a high-card field's keys as `HighField { keys: Vec<String>,
-  masks: Vec<u8> }`; deserializing it allocated one heap `String` per
-  key, which dominated allocation on a full high-card scan. v3 replaces
-  the keys column with a string arena (`keys_blob: Vec<u8>` +
-  `key_lens: Vec<u32>`) — see [§ `HF{i}`](#hfi--high-card-field-columnar-string-arena).
-  On disk this is size-neutral (slightly smaller; lengths are stored,
-  not offsets); on decode it collapses N allocations to ~2. The write
-  side now packs an owned `HighField` (`for_write`) directly, so the v2
-  `HighFieldRef<'a>` borrowed view is gone.
-
-v2 files cannot be read by a v3 reader and vice versa
-(`Error::UnsupportedVersion` on the version field). No migration tool
-exists.
-
-### v2 changelog (from v1)
-
-- **`STRM` → `SB{i}` stream-batch chunks.** v1 stored every log's
-  attribute list in a single `STRM` chunk; v2 partitions logs
-  chronologically into 1–8 `SB{i}` chunks (`SB00`..`SB07`), one per
-  partition. Partition count and size are derived from
-  `Summary::record_count` via `num_stream_batches` /
-  `stream_batch_size` — see
-  [§ Stream-batch partitioning](#stream-batch-partitioning).
-  This enables a high-card filter to materialise only the batches
-  its values appear in, rather than scanning the whole stream.
-- **`HF{i}` payload reshape.** v1 stored each high-card field as
-  `Vec<(String, BitmapValue)>`. v2 replaces it with a columnar
-  `HighField { keys: Vec<String>, masks: Vec<u8> }`. `BitmapValue`
-  is gone from the high-card path; `masks` is a per-value batch-
-  membership bitmask that tells a reader which `SB{i}` chunk(s)
-  contain the value. The change requires the batching above to
-  exist, so the two are bumped together.
-
-v1 files cannot be read by a v2 reader and vice versa
-(`Error::UnsupportedVersion` on the version field). No migration tool
-exists — v1 files were never deployed beyond development.
+A new **optional, TOC-indexed** chunk id is additive: it changes no
+existing chunk's bincode layout, a file without it simply omits it,
+and a reader that does not know it reads the rest unchanged. Adding
+one therefore needs **no version bump**. The optional per-row columns
+and the `TIDX` trace_id index (see [§ Chunk Ids](#chunk-ids)) follow
+exactly this rule.
 
 ### When to bump the version
 
@@ -632,11 +498,11 @@ A bump is required for any change that breaks the on-disk contract:
 
 - adding a required chunk id,
 - removing an existing chunk id,
-- changing any chunk's payload schema in a non-backwards-compatible way,
+- changing any chunk's payload schema (bincode is **positional**:
+  appending a field to a persisted struct — even one with a serde
+  default — changes where the decoder expects bytes, so it is a
+  breaking change; only `#[serde(skip)]` in-memory-only fields are
+  layout-neutral),
 - changing the stream-batch partitioning rule (which would change
   every reader's view of which `SB{i}` chunk a position lives in),
 - changing how the TOC is laid out.
-
-Adding a new optional chunk id, or extending an existing payload with
-a field whose default decodes from absent bytes, does not require a
-bump.

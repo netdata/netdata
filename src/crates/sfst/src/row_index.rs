@@ -56,13 +56,13 @@ pub struct RowIndex<'a> {
     /// only be set together with `trace_ids`. The logs path leaves it `false` (its
     /// `trace_ids` are near-unique-free log correlation ids, not a trace key).
     pub build_trace_id_index: bool,
-    /// The typed schema tree to persist as the v9 field descriptor
+    /// The typed schema tree to persist as the on-disk field descriptor
     /// (`Metadata.tree`). `Some` when a producer with typed flattening supplies
     /// it (the `ng-index` path) — structure + per-leaf `ValueKind`, leaf stats
     /// filled at build from the per-field cardinality/tier. `None` for a producer
     /// that feeds only raw `(ts, key=value)` rows and supplies no typed tree; the
     /// builder then synthesizes a flat `Str`-typed tree from the derived field
-    /// table so every v9 file carries a valid descriptor.
+    /// table so every file carries a valid descriptor.
     pub tree: Option<crate::SchemaTree>,
 }
 

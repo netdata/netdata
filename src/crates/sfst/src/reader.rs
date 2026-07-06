@@ -58,7 +58,7 @@ pub struct ChunkReader<'a> {
     metadata: OnceCell<Metadata>,
     /// Flat [`FieldTable`] **derived** from the META schema tree
     /// (`metadata().tree`), cached on first access. The on-disk descriptor is
-    /// the tree (v9); the tier machinery and legacy consumers read this derived
+    /// the tree; the tier machinery and legacy consumers read this derived
     /// view. Same lazy-decode rationale as `metadata`.
     fields: OnceCell<FieldTable>,
 }
@@ -135,7 +135,7 @@ impl<'a> ChunkReader<'a> {
 
     /// Field table — the flat view **derived** from the schema tree
     /// (`metadata().tree`), cached on first access. Ordered low → mid → high
-    /// then by name, identical to the table a pre-v9 file stored directly.
+    /// then by name.
     pub fn fields(&self) -> Result<&FieldTable, Error> {
         if let Some(f) = self.fields.get() {
             return Ok(f);

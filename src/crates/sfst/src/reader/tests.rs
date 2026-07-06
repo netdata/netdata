@@ -16,10 +16,9 @@ fn error_on_short_file() {
 }
 
 #[test]
-fn error_on_older_format_version() {
-    // A valid current-version file whose version field is rewound to v8 is
-    // rejected on open — the v9 META layout (typed `tree` replacing `fields`) is
-    // incompatible with v8.
+fn error_on_other_format_version() {
+    // A valid file whose version field is patched to any other version is
+    // rejected on open — readers accept exactly the current version.
     let summary = crate::Summary {
         min_timestamp_s: 0,
         max_timestamp_s: 0,
@@ -29,11 +28,11 @@ fn error_on_older_format_version() {
     let mut buf = crate::writer::write_summary_only(std::io::Cursor::new(Vec::new()), &summary)
         .unwrap()
         .into_inner();
-    // Header layout: magic(4) | version(4, LE) | num_chunks(4). Overwrite v9 -> v8.
-    buf[4..8].copy_from_slice(&8u32.to_le_bytes());
+    // Header layout: magic(4) | version(4, LE) | num_chunks(4).
+    buf[4..8].copy_from_slice(&2u32.to_le_bytes());
     assert!(matches!(
         ChunkReader::open(&buf),
-        Err(Error::UnsupportedVersion(8))
+        Err(Error::UnsupportedVersion(2))
     ));
 }
 

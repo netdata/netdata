@@ -122,9 +122,9 @@ pub use writer::{ChunkCounts, ChunkWriter, ColumnsPresent};
 
 const MAGIC: &[u8; 4] = b"SFST";
 
-// Current on-disk version. The v3→v9 evolution history — what each bump changed
-// and why older files are rejected on open — lives in FORMAT.md.
-const VERSION: u32 = 9;
+// Current on-disk version. Readers accept exactly this version; any other
+// is rejected on open. FORMAT.md documents the format and the bump policy.
+const VERSION: u32 = 1;
 
 const CHUNK_SUMMARY: chunk_file::ChunkId = *b"SUMR";
 const CHUNK_META: chunk_file::ChunkId = *b"META";
@@ -133,7 +133,7 @@ const CHUNK_TIMS: chunk_file::ChunkId = *b"TIMS";
 // Optional per-row column chunks (one per column), written in the COLD region
 // (after PRIM) so a query decodes a column only on demand. Each present column is
 // listed in the META `ColumnsTable`; a file with no per-row columns carries none of
-// these. Their presence is part of the v8 format (see VERSION below and FORMAT.md).
+// these.
 const CHUNK_OBSERVED_TS: chunk_file::ChunkId = *b"OBTS";
 const CHUNK_TRACE_IDS: chunk_file::ChunkId = *b"TRCE";
 const CHUNK_SPAN_IDS: chunk_file::ChunkId = *b"SPAN";
