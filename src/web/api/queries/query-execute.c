@@ -16,12 +16,12 @@ static NETDATA_DOUBLE *UNUSED_FUNCTION(rrdr_line_values)(RRDR *r, long rrdr_line
 }
 
 ALWAYS_INLINE
-static long rrdr_line_next(RRDR *r __maybe_unused, long rrdr_line) {
+static long rrdr_line_next(RRDR *r, long rrdr_line) {
     rrdr_line++;
 
-    internal_fatal(rrdr_line >= (long)r->n,
-                   "QUERY: requested to step above RRDR size for query '%s'",
-                   r->internal.qt->id);
+    if(unlikely(rrdr_line < 0 || (size_t)rrdr_line >= r->n))
+        fatal("QUERY: requested to step above RRDR size for query '%s'",
+              r->internal.qt->id);
 
     return rrdr_line;
 }

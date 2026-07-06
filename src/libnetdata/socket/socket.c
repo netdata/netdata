@@ -14,8 +14,8 @@ bool ip_to_hostname(const char *ip, char *dst, size_t dst_len) {
     if(!dst || !dst_len)
         return false;
 
-    struct sockaddr_in sa;
-    struct sockaddr_in6 sa6;
+    struct sockaddr_in sa = { 0 };
+    struct sockaddr_in6 sa6 = { 0 };
     struct sockaddr *sa_ptr;
     int sa_len;
 
@@ -655,17 +655,17 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "LISTENER: cannot getnameinfo() on received client connection.");
 
-            strncpyz(client_ip, "UNKNOWN", ipsize);
-            strncpyz(client_port, "UNKNOWN", portsize);
+            strncpyz(client_ip, "UNKNOWN", ipsize - 1);
+            strncpyz(client_port, "UNKNOWN", portsize - 1);
         }
         if (!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
-            strncpyz(client_ip, "localhost", ipsize);
+            strncpyz(client_ip, "localhost", ipsize - 1);
         }
         sock_setcloexec(nfd, true);
 
 #ifdef __FreeBSD__
         if(((struct sockaddr *)&sadr)->sa_family == AF_LOCAL)
-            strncpyz(client_ip, "localhost", ipsize);
+            strncpyz(client_ip, "localhost", ipsize - 1);
 #endif
 
         client_ip[ipsize - 1] = '\0';
@@ -675,7 +675,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             case AF_UNIX:
                 // netdata_log_debug(D_LISTENER, "New UNIX domain web client from %s on socket %d.", client_ip, fd);
                 // set the port - certain versions of libc return garbage on unix sockets
-                strncpyz(client_port, "UNIX", portsize);
+                strncpyz(client_port, "UNIX", portsize - 1);
                 break;
 
             case AF_INET:

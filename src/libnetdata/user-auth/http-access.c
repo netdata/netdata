@@ -48,25 +48,24 @@ const char *http_id2user_role(HTTP_USER_ROLE role) {
 
 // --------------------------------------------------------------------------------------------------------------------
 
-static struct {
+static const struct {
     const char *name;
-    uint32_t hash;
     HTTP_ACCESS value;
 } http_accesses[] = {
-      {"none"                       , 0    , HTTP_ACCESS_NONE}
-    , {"signed-in"                  , 0    , HTTP_ACCESS_SIGNED_ID}
-    , {"same-space"                 , 0    , HTTP_ACCESS_SAME_SPACE}
-    , {"commercial"                 , 0    , HTTP_ACCESS_COMMERCIAL_SPACE}
-    , {"anonymous-data"             , 0    , HTTP_ACCESS_ANONYMOUS_DATA}
-    , {"sensitive-data"             , 0    , HTTP_ACCESS_SENSITIVE_DATA}
-    , {"view-config"                , 0    , HTTP_ACCESS_VIEW_AGENT_CONFIG}
-    , {"edit-config"                , 0    , HTTP_ACCESS_EDIT_AGENT_CONFIG}
-    , {"view-notifications-config"  , 0    , HTTP_ACCESS_VIEW_NOTIFICATIONS_CONFIG}
-    , {"edit-notifications-config"  , 0    , HTTP_ACCESS_EDIT_NOTIFICATIONS_CONFIG}
-    , {"view-alerts-silencing"      , 0    , HTTP_ACCESS_VIEW_ALERTS_SILENCING}
-    , {"edit-alerts-silencing"     , 0    , HTTP_ACCESS_EDIT_ALERTS_SILENCING}
+      {"none"                       , HTTP_ACCESS_NONE}
+    , {"signed-in"                  , HTTP_ACCESS_SIGNED_ID}
+    , {"same-space"                 , HTTP_ACCESS_SAME_SPACE}
+    , {"commercial"                 , HTTP_ACCESS_COMMERCIAL_SPACE}
+    , {"anonymous-data"             , HTTP_ACCESS_ANONYMOUS_DATA}
+    , {"sensitive-data"             , HTTP_ACCESS_SENSITIVE_DATA}
+    , {"view-config"                , HTTP_ACCESS_VIEW_AGENT_CONFIG}
+    , {"edit-config"                , HTTP_ACCESS_EDIT_AGENT_CONFIG}
+    , {"view-notifications-config"  , HTTP_ACCESS_VIEW_NOTIFICATIONS_CONFIG}
+    , {"edit-notifications-config"  , HTTP_ACCESS_EDIT_NOTIFICATIONS_CONFIG}
+    , {"view-alerts-silencing"      , HTTP_ACCESS_VIEW_ALERTS_SILENCING}
+    , {"edit-alerts-silencing"      , HTTP_ACCESS_EDIT_ALERTS_SILENCING}
 
-    , {NULL                , 0    , 0}
+    , {NULL                         , 0}
 };
 
 inline HTTP_ACCESS http_access2id_one(const char *str) {
@@ -77,10 +76,9 @@ inline HTTP_ACCESS http_access2id_one(const char *str) {
     uint32_t hash = simple_hash(str);
     int i;
     for(i = 0; http_accesses[i].name ; i++) {
-        if(unlikely(!http_accesses[i].hash))
-            http_accesses[i].hash = simple_hash(http_accesses[i].name);
+        uint32_t candidate_hash = simple_hash(http_accesses[i].name);
 
-        if (unlikely(hash == http_accesses[i].hash && !strcmp(str, http_accesses[i].name))) {
+        if (unlikely(hash == candidate_hash && !strcmp(str, http_accesses[i].name))) {
             ret |= http_accesses[i].value;
             break;
         }
