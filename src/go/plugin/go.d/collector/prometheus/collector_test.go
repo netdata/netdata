@@ -387,7 +387,7 @@ test_dur_count 6
 `,
 			want: func(t *testing.T, fr metrix.Reader) {
 				assert.InDelta(t, 4, value(t, fr, "test_dur_bucket", metrix.Labels{"le": "0.1"}), 1e-9)
-				assert.InDelta(t, 6, value(t, fr, "test_dur_bucket", metrix.Labels{"le": "+Inf"}), 1e-9)
+				assert.InDelta(t, 2, value(t, fr, "test_dur_bucket", metrix.Labels{"le": "+Inf"}), 1e-9)
 				assert.InDelta(t, 2.5, value(t, fr, "test_dur_sum", nil), 1e-9)
 				assert.InDelta(t, 6, value(t, fr, "test_dur_count", nil), 1e-9)
 			},

@@ -192,6 +192,12 @@ metrix.MeasureSetPoint{Values: []metrix.SampleValue{15, 23}}
 | StateSet    | `<name>{<name>=state}` with scalar 0/1 values                                                                    |
 | MeasureSet  | `<name>_<field>{measure_field=field}`; flattened kind follows family semantics (`Gauge` or `Counter`)            |
 
+Histogram bucket flattening emits non-overlapping range bucket totals while
+keeping the `le` label as the bucket upper bound. The first finite bucket is
+`<= le[0]`; each later finite bucket is `(previous le, current le]`; `+Inf` is
+`count - last finite cumulative bucket`. Typed `Histogram()` reads remain
+canonical cumulative histogram points.
+
 Flatten metadata is exposed via `SeriesMeta.Kind`, `SeriesMeta.SourceKind`, and `SeriesMeta.FlattenRole`.
 
 `MeasureSet` flattening keeps per-field metric names for `MetricMeta(name)` compatibility and also adds a synthetic `measure_field=<field>` label. This gives chartengine explicit field identity without widening the reader metadata API.
