@@ -37,15 +37,25 @@ Additionally, the following build time features require additional dependencies:
 
 :::note
 
-When protobuf is not installed on the system, the build downloads Abseil and
-Protobuf source code from GitHub and compiles them locally. This requires an
-internet connection and can take several minutes on slower connections, during
-which the build may appear to hang at messages like `Preparing bundled Abseil`
-or `Preparing bundled Protobuf`. To avoid this download step, install system
-protobuf packages before building:
+The build only downloads and compiles Abseil and Protobuf from GitHub when bundling is
+explicitly requested — either by passing `-DENABLE_BUNDLED_PROTOBUF=True` to `cmake` when
+configuring the build (see [Building Netdata](#building-netdata) below), or by using
+[`netdata-installer.sh`](/packaging/installer/methods/manual.md) or `kickstart.sh`, which
+enable it by default unless you pass `--use-system-protobuf`. This happens regardless of
+whether protobuf is already installed on the system, requires an internet connection, and
+can take several minutes on slower connections, during which the build may appear to hang
+at messages such as `Preparing bundled Abseil (required by bundled Protobuf)` or `Preparing
+bundled Protobuf`.
 
-- Debian/Ubuntu: `libprotobuf-dev protobuf-compiler`
-- Fedora/RHEL: `protobuf-devel protobuf-compiler`
+Without bundling requested, CMake uses the system protobuf directly, or fails immediately
+with a clear error if it can't find one — it does not download anything on its own.
+
+To avoid the bundled download:
+
+- Install a system protobuf package: Debian/Ubuntu `libprotobuf-dev protobuf-compiler`,
+  Fedora/RHEL `protobuf-devel protobuf-compiler`.
+- Do not pass `-DENABLE_BUNDLED_PROTOBUF=True` when configuring with `cmake`, or, if you are
+  using `netdata-installer.sh`/`kickstart.sh` instead, pass `--use-system-protobuf`.
 
 :::
 
