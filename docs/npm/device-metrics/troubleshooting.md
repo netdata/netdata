@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/troubleshooting.md"
-sidebar_label: "Troubleshooting"
-learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring/Device Metrics"
-keywords: ['snmp', 'troubleshooting', 'timeout', 'snmpv3', 'profile', 'gaps', 'mtu']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Troubleshooting

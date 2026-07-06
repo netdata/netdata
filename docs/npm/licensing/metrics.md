@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/licensing/metrics.md"
-sidebar_label: "Metrics and Functions"
-learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring/Licensing Monitoring"
-keywords: ['license', 'licensing', 'metrics', 'charts', 'snmp:licenses', 'function', 'alerts']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Metrics and the Licenses Function

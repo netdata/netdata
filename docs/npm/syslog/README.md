@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/syslog/README.md"
-sidebar_label: "Overview"
-learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring/Syslog from Network Devices"
-keywords: ['syslog', 'opentelemetry', 'otel', 'otlp', 'network devices', 'logs', 'overview']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Syslog from Network Devices

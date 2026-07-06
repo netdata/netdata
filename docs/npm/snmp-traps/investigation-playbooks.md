@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/investigation-playbooks.md"
-sidebar_label: "Investigation Playbooks"
-learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'investigation', 'playbooks', 'incident response', 'deduplication', 'siem']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Investigation Playbooks

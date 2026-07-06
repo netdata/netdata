@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/trap-profiles.md"
-sidebar_label: "Trap Profiles"
-learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'trap profiles', 'mib conversion', 'trap oid', 'trap metrics', 'netops', 'noc', 'sre']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Trap Profiles

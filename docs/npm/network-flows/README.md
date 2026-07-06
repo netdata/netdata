@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/README.md"
-sidebar_label: "Overview"
-learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['netflow', 'sflow', 'ipfix', 'network flows', 'traffic analysis', 'overview']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Network Flows

@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/retention-querying.md"
-sidebar_label: "Retention and Tiers"
-learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['retention', 'tiers', 'rollup', 'tier selection']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Retention and Tiers

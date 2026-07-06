@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/validation.md"
-sidebar_label: "Validation and Data Quality"
-learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['validation', 'snmp cross-check', 'data quality', 'sanity check']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Validation and Data Quality

@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/visualization/maps-globe.md"
-sidebar_label: "Maps and Globe"
-learn_status: "Published"
-learn_rel_path: "Network Flows/Visualization"
-keywords: ['country map', 'state map', 'city map', 'globe', 'visualization']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Maps and Globe

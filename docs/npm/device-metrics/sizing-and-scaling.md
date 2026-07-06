@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/sizing-and-scaling.md"
-sidebar_label: "Sizing and Scaling"
-learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring/Device Metrics"
-keywords: ['snmp', 'sizing', 'scaling', 'capacity', 'hub', 'parents', 'distributed', 'per-site']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Sizing and Scaling

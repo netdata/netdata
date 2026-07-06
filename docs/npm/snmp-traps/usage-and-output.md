@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/usage-and-output.md"
-sidebar_label: "Usage and Output"
-learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'usage', 'output', 'trap rows', 'varbinds', 'deduplication', 'decode errors']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Usage and Output

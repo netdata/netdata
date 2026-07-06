@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/validation.md"
-sidebar_label: "Validation"
-learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring/Device Metrics"
-keywords: ['snmp', 'validation', 'data quality', 'profile match', 'counters', 'trust']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Validation and Data Quality

@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/README.md"
-sidebar_label: "Overview"
-learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'snmp', 'trap', 'inform', 'network events', 'logs', 'netops', 'secops', 'snmpv3', 'otlp', 'siem']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # SNMP Traps

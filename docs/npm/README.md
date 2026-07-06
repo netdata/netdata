@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/README.md"
-sidebar_label: "Overview"
-learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring"
-keywords: ['network performance monitoring', 'npm', 'snmp', 'network', 'topology', 'flows', 'traps', 'overview']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Network Performance Monitoring

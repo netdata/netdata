@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/configuration.md"
-sidebar_label: "Configuration"
-learn_status: "Published"
-learn_rel_path: "Network Flows"
-keywords: ['configuration', 'netflow.yaml', 'tuning', 'retention', 'listener']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Configuration

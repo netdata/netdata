@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/device-metrics/README.md"
-sidebar_label: "Overview"
-learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring/Device Metrics"
-keywords: ['snmp', 'network devices', 'router', 'switch', 'firewall', 'discovery', 'interface', 'overview']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Device Metrics

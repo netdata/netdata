@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/topology/discovery-methods.md"
-sidebar_label: "Discovery Methods"
-learn_status: "Published"
-learn_rel_path: "Network Performance Monitoring/Topologies"
-keywords: ['topology', 'lldp', 'cdp', 'fdb', 'arp', 'stp', 'bgp', 'ospf', 'discovery']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Discovery Methods

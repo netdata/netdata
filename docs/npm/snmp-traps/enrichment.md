@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/enrichment.md"
-sidebar_label: "Enrichment"
-learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'enrichment', 'source identity', 'trusted relays', 'reverse dns', 'topology']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Enrichment

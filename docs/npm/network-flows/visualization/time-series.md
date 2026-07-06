@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/network-flows/visualization/time-series.md"
-sidebar_label: "Time-Series"
-learn_status: "Published"
-learn_rel_path: "Network Flows/Visualization"
-keywords: ['time series', 'top-n over time', 'trends', 'visualization']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Time-Series

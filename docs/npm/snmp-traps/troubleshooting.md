@@ -1,11 +1,3 @@
-<!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/docs/npm/snmp-traps/troubleshooting.md"
-sidebar_label: "Troubleshooting"
-learn_status: "Published"
-learn_rel_path: "SNMP Traps"
-keywords: ['snmp traps', 'troubleshooting', 'receiver pipeline', 'decode errors', 'snmpv3', 'journal', 'otlp']
-endmeta-->
-
 <!-- markdownlint-disable-file -->
 
 # Troubleshooting
