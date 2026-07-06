@@ -241,6 +241,24 @@ modules:
             description: |
               A router, switch, or firewall configured to export IPFIX datagrams to the
               Netdata agent's UDP listener.
+          - title: Netflow plugin package
+            description: |
+              IPFIX decoding is provided by the same **separate package** as NetFlow and sFlow:
+              `netdata-plugin-netflow`. It is not part of the standard `netdata` package, so the
+              plugin binary will not appear at `/usr/libexec/netdata/plugins.d/netflow-plugin`
+              until you install it explicitly on native-package systems. If the Netdata repository
+              is not yet registered on this host, register it first with the kickstart script's
+              `--repositories-only` flag (not `--install-repo-only`), then install the
+              `netdata-plugin-netflow` package for your distribution and restart Netdata.
+
+              Static installs (kickstart `--static-only`) bundle the plugin automatically on
+              x86_64, ARMv7, and ARM64 — but **not** on the ARMv6 static build (Raspberry Pi 1 /
+              Zero).
+
+              See the
+              [Network Flows Installation](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/installation)
+              guide for per-distribution install commands (including openSUSE), the fallback if
+              your distribution doesn't have the package published yet, and verification steps.
       configuration:
         file:
           name: netflow.yaml
@@ -377,6 +395,24 @@ modules:
             description: |
               A switch, router, or host-based sFlow agent (such as Host sFlow) configured to send
               sFlow v5 datagrams to the Netdata agent's UDP listener.
+          - title: Netflow plugin package
+            description: |
+              sFlow decoding is provided by the same **separate package** as NetFlow and IPFIX:
+              `netdata-plugin-netflow`. It is not part of the standard `netdata` package, so the
+              plugin binary will not appear at `/usr/libexec/netdata/plugins.d/netflow-plugin`
+              until you install it explicitly on native-package systems. If the Netdata repository
+              is not yet registered on this host, register it first with the kickstart script's
+              `--repositories-only` flag (not `--install-repo-only`), then install the
+              `netdata-plugin-netflow` package for your distribution and restart Netdata.
+
+              Static installs (kickstart `--static-only`) bundle the plugin automatically on
+              x86_64, ARMv7, and ARM64 — but **not** on the ARMv6 static build (Raspberry Pi 1 /
+              Zero).
+
+              See the
+              [Network Flows Installation](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/installation)
+              guide for per-distribution install commands (including openSUSE), the fallback if
+              your distribution doesn't have the package published yet, and verification steps.
       configuration:
         file:
           name: netflow.yaml
