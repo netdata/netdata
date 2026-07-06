@@ -270,7 +270,7 @@ This isn't just optimization. It's a fundamentally different architecture that r
 <details>
 <summary><strong>How many nodes can a single Netdata Parent handle?</strong></summary><br/>
 
-We recommend running Parents with up to 500 Agents (1.5M metrics/s). We have customers running larger Parents, but resources increase and performance decreases non-linearly.
+We recommend running Parents with up to 500 Agents — see [Parent Sizing Guidelines](#parent-sizing-guidelines) above for the metrics/s and resource breakdown by scale. We have customers running larger Parents, but resources increase and performance decreases non-linearly.
 
 </details>
 

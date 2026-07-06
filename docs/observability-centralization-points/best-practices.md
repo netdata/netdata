@@ -113,49 +113,13 @@ Retention size limits are soft targets, not hard caps. Actual disk usage can exc
 
 :::
 
-## Estimating Disk Retention by Metric Volume on Parent Nodes
+## Planning Parent Disk Space
 
-Parent nodes are the central long-term storage layer in a Netdata infrastructure. They receive all metrics streamed from children and store them according to tiered retention settings.
+Parent disk usage scales with the total number of metrics streamed from all Child nodes and the retention tiers you configure. The disk you need depends on how many Children you stream from, how many metrics each collects, and how long you retain each tier.
 
-| Tier   | Sample Resolution                  | Typical Compressed Size per Sample |
-|--------|------------------------------------|------------------------------------|
-| Tier 0 | per second (native)                | ~0.6 B / sample                    |
-| Tier 1 | per minute (60× aggregate)         | ~6 B / sample                      |
-| Tier 2 | per hour (60× aggregate of Tier 1) | ~18 B / sample                     |
+For example, a Parent configured with 30 days of Tier 0, 6 months of Tier 1, and 5 years of Tier 2 retention uses approximately **3.7 MB per metric** across all tiers. For **1,000,000 metrics streamed to the Parent**, that's **≈ 3.7 TB**. Add 5-15% overhead for replication buffers, indexes, and metadata, so plan for **≈ 4 TB per million metrics** under this retention policy.
 
-### Example Calculation
-
-Assume a Parent configured with:
-
-- **Tier 0:** 30 days retention (per-second resolution)
-- **Tier 1:** 6 months retention (per-minute resolution)
-- **Tier 2:** 5 years retention (per-hour resolution)
-
-One metric would consume approximately **3.7 MB** across tiers.
-For **1,000,000 metrics streamed to the Parent**, this equals **≈ 3.7 TB**.
-
-Adding 5–15% overhead for replication buffers, indexes, and metadata, plan for **≈ 4 TB per million metrics** under this retention policy.
-
-### Configuration Example for Production Deployments
-
-```ini
-[db]
-    db = dbengine
-    update every = 1
-    storage tiers = 3
-
-    # Tier 0: per-second data for 30 days
-    dbengine tier 0 retention time = 30d
-    # No size limit - let time control retention
-
-    # Tier 1: per-minute data for 6 months  
-    dbengine tier 1 update every iterations = 60
-    dbengine tier 1 retention time = 6mo
-
-    # Tier 2: per-hour data for 5 years
-    dbengine tier 2 update every iterations = 60
-    dbengine tier 2 retention time = 5y
-```
+Your own numbers will differ based on your retention settings. See [Disk Requirements & Retention](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md) for the per-tier sample sizes this example is based on, and the [Resource utilization](/docs/netdata-agent/sizing-netdata-agents/README.md) guide for the full sizing picture.
 
 ## Cost Optimization Strategies
 
