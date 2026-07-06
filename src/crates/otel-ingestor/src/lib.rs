@@ -470,10 +470,14 @@ impl DirScan {
 /// WAL but SFSTs at higher seqs still sit on disk; starting low would make new
 /// files appear "older" than retained ones and trigger immediate eviction by the
 /// seq-ordered retention loop. Catalogs outlive the SFSTs they describe, so they
-/// bound the seed when the data files are gone. None of the scans is a safe upper
-/// bound on its own (age-based eviction is keyed on data timestamps, not seq), so
-/// the caller also folds in the persisted high-water mark — the highest seq ever
-/// reserved — which is the load-bearing input. A missing dir scans as 0.
+/// bound the seed when the data files are gone. Together the scans guarantee what
+/// correctness needs: no new seq collides with a surviving local file (the
+/// invariant of the bare-seq-keyed registries). The caller additionally folds in
+/// the persisted high-water mark, which extends monotonicity across seqs whose
+/// files are gone entirely (age-evicted, or wiped with a remote archive) — reuse
+/// there cannot corrupt (identities are per-process and cross-identity state is
+/// identity-keyed), it only degrades seq as a creation-order proxy. A missing dir
+/// scans as 0.
 fn scan_seq_dirs(
     wal_dir: &std::path::Path,
     index_dir: &std::path::Path,

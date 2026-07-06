@@ -3,17 +3,24 @@
 //! `seq` is one component of the durable global identity
 //! `FileId { machine_id, instance_id, pipeline_id, seq, part_key }`, embedded in every
 //! local filename, every remote object key, and every catalog entry.
-//! A seq value, once issued, must never be reissued while any artifact
-//! bearing its FileId still exists — locally or in remote storage
-//! (which is never garbage-collected).
+//! The instance id is freshly generated per process, so a seq reused
+//! after a restart can never reproduce an existing FileId, and callers
+//! key all cross-identity state by the full identity — seq reuse
+//! cannot corrupt.
 //!
-//! Scanning surviving local files at boot is not a safe upper bound:
-//! age-based eviction is keyed on each file's data timestamp, not its
-//! seq, so a high-seq file holding old data can be evicted while
-//! lower-seq files survive. [`SeqAllocator`] therefore persists a
-//! monotonic **high-water mark** — the highest seq ever *reserved* (a
-//! ceiling) — and never issues a seq above it without first durably
-//! raising it.
+//! What reuse would cost is monotonicity: callers key and age-order
+//! *local* files by bare seq, and the never-GC'd archive reads best
+//! when seq tracks creation order per machine. Boot scans of the
+//! surviving local files already guarantee the correctness part
+//! (no new seq collides with a live local file), but not monotonicity
+//! against seqs whose files are gone — age-based eviction is keyed on
+//! each file's data timestamp, not its seq, so a high-seq file holding
+//! old data can be evicted while lower-seq files survive.
+//! [`SeqAllocator`] therefore persists a monotonic **high-water
+//! mark** — the highest seq ever *reserved* (a ceiling) — and never
+//! issues a seq above it without first durably raising it: ordering
+//! hygiene plus a safety margin for the bare-seq convention, not a
+//! correctness requirement.
 //!
 //! Reservations are batched: raising the ceiling by
 //! [`DEFAULT_RESERVE_BATCH`] costs one durable write per batch, and
@@ -117,8 +124,8 @@ fn encode_envelope(reserved: u64) -> [u8; ENVELOPE_LEN] {
 /// Durably persist `reserved` to `path` via the shared atomic-write
 /// sequence (tmp → fsync(file) → rename → fsync(parent dir)). The
 /// parent-dir fsync is non-negotiable here — a high-water file lost on
-/// power loss would reintroduce the seq-reuse regression it exists to
-/// prevent.
+/// power loss would silently drop the monotonicity guarantee it exists
+/// to provide.
 ///
 /// Public counterpart of [`read_seq_highwater`] for tooling and tests;
 /// normal allocation goes through [`SeqAllocator`].
