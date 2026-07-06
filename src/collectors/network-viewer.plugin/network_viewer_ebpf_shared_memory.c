@@ -19,6 +19,9 @@ bool network_viewer_ebpf_shared_memory_refresh(void)
 
 const struct ebpf_pid_stat *network_viewer_ebpf_shared_memory_lookup(pid_t pid)
 {
+    if (!(netdata_ebpfgo_shared_pid_memory_flags(&nv_ebpfgo_shared_memory_ctx) & EBPFGO_SHM_FLAG_SOCKET))
+        return NULL;
+
     return netdata_ebpfgo_shared_pid_memory_lookup(&nv_ebpfgo_shared_memory_ctx, pid);
 }
 
