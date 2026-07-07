@@ -15,12 +15,17 @@ use tracing::{error, info, warn};
 /// `ControlFlow::Break(())` to stop the loop (typically because the downstream
 /// channel is closed).
 ///
+/// If `subscribe` is `Some`, the text frame is sent once immediately after the
+/// connection opens — required by sources that only start streaming after an
+/// application-level subscribe message (e.g. RIS Live). Sources that stream on
+/// connect (jetstream, certstream) pass `None`.
+///
 /// If `ping` is `Some`, sends WebSocket pings at that interval to keep the
-/// connection alive. When `ping` is `None`, the write half of the connection
-/// is dropped immediately.
+/// connection alive.
 pub async fn run<H, F>(
     name: &str,
     url: &str,
+    subscribe: Option<String>,
     ping: Option<Duration>,
     mut handler: H,
 ) -> anyhow::Result<()>
@@ -34,6 +39,11 @@ where
     info!("Connected to {name}");
 
     let (mut write, mut read) = ws_stream.split();
+
+    if let Some(subscribe) = subscribe {
+        info!("{name} sending subscribe frame");
+        write.send(WsMessage::Text(subscribe.into())).await?;
+    }
 
     let mut ping_timer: Option<tokio::time::Interval> = match ping {
         Some(d) => {

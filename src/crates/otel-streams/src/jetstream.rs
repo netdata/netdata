@@ -127,7 +127,7 @@ pub async fn connect(
     url: &str,
     tx: mpsc::Sender<(Event, serde_json::Value)>,
 ) -> anyhow::Result<()> {
-    crate::ws::run("Jetstream", url, None, move |raw_json| {
+    crate::ws::run("Jetstream", url, None, None, move |raw_json| {
         let tx = tx.clone();
         async move {
             let event: Event = match serde_json::from_value(raw_json.clone()) {

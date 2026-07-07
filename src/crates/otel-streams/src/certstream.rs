@@ -78,7 +78,7 @@ pub async fn connect(
     url: &str,
     tx: mpsc::Sender<(CertData, serde_json::Value)>,
 ) -> anyhow::Result<()> {
-    crate::ws::run("CertStream", url, Some(PING_INTERVAL), move |raw_json| {
+    crate::ws::run("CertStream", url, None, Some(PING_INTERVAL), move |raw_json| {
         let tx = tx.clone();
         async move {
             let message: Message = match serde_json::from_value(raw_json.clone()) {

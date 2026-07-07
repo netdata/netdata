@@ -6,6 +6,7 @@ pub mod certstream;
 pub mod github;
 pub mod jetstream;
 pub mod otel;
+pub mod ris;
 pub mod runner;
 pub mod sender;
 pub mod synth;
