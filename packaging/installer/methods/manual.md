@@ -20,18 +20,18 @@ should be installed on your system to build and run Netdata. It supports a large
 and other operating systems and is regularly tested. You can find this tool [here](https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh) or run it directly with `bash <(curl -sSL https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/install-required-packages.sh)`. Otherwise read on for how to get requires packages manually:
 
 - **Alpine** Linux and its derivatives
-    - You have to install `bash` yourself, before using the installer.
+  - You have to install `bash` yourself, before using the installer.
 
 - **Gentoo** Linux and its derivatives
 
 - **Debian** Linux and its derivatives (including **Ubuntu**, **Mint**)
 
 - **Red Hat Enterprise Linux** and its derivatives (including **Fedora**, **CentOS**, **Amazon Machine Image**)
-    - Please note that for RHEL/CentOS you need
+  - Please note that for RHEL/CentOS you need
       [EPEL](http://www.tecmint.com/how-to-enable-epel-repository-for-rhel-centos-6-5/).
       In addition, RHEL/CentOS version 6 also need
       [OKay](https://okay.com.mx) for package libuv version 1.
-    - CentOS 8 / RHEL 8 requires a bit of extra work. See the dedicated section below.
+  - CentOS 8 / RHEL 8 requires a bit of extra work. See the dedicated section below.
 
 - **SUSE** Linux and its derivatives (including **openSUSE**)
 
@@ -202,8 +202,7 @@ cd netdata
   cannot be used to change installation types.
 - `--use-system-protobuf`: Use a system-installed copy of `libprotobuf` instead of the bundled copy. Requires the
   system `protobuf` and `protobuf-compiler` development packages to be installed beforehand.
-- `--disable-exporting-prometheus-remote-write`: Disable the Prometheus remote write exporting connector. Use this if
-  you do not need Prometheus remote write — it removes the need to build Protobuf entirely.
+- `--disable-exporting-prometheus-remote-write`: Disable the Prometheus remote write exporting connector.
 - `--local-files`: Used for [offline installations](/packaging/installer/methods/offline.md). Pass four file paths: the Netdata
   tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
   process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
@@ -226,18 +225,9 @@ In most cases, you can do this by running `CC=gcc ./netdata-installer.sh`.
 
 ### Build appears to hang at "Preparing bundled Protobuf"
 
-During a source build, Netdata downloads Protobuf (and, on newer toolchains, its Abseil dependency) from GitHub and
-compiles it locally. On a slow or restricted network this step can appear to hang for a long time, or fail outright.
+During a source build, Netdata downloads Protobuf (and, on newer toolchains, its Abseil dependency) from GitHub and compiles it locally. Protobuf is required for Netdata Cloud connectivity, which is always built. On a slow or restricted network this step can appear to hang for a long time, or fail outright.
 
-If you do not need the Prometheus remote write exporter, build with `--disable-exporting-prometheus-remote-write` to
-skip the Protobuf build entirely:
-
-```sh
-./netdata-installer.sh --disable-exporting-prometheus-remote-write
-```
-
-If you have the system `protobuf` and `protobuf-compiler` development packages installed, build with
-`--use-system-protobuf` to avoid the download and use your system's copy instead:
+If you have the system `protobuf` and `protobuf-compiler` development packages installed, build with `--use-system-protobuf` to avoid the download and use your system's copy instead:
 
 ```sh
 ./netdata-installer.sh --use-system-protobuf
