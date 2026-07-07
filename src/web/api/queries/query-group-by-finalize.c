@@ -135,8 +135,11 @@ void rrdr2rrdr_group_by_calculate_percentage_of_group(RRDR *r) {
             else if(isnan(h))
                 cn[d] = 100.0;
 
-            else
-                cn[d] = n * 100.0 / (n + h);
+            else {
+                // all series collected zeros (or cancel out): report 0%, not a gap
+                NETDATA_DOUBLE t = n + h;
+                cn[d] = (t != 0.0) ? (n * 100.0 / t) : 0.0;
+            }
         }
     }
 }
@@ -322,7 +325,10 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
                 NETDATA_DOUBLE n;
 
                 sum += *cn;
-                ars += *ar;
+
+                // when the sts pair is per-row (percentage), the anomaly rate must
+                // also be accumulated per-row (the row mean), not per-contribution
+                ars += percentage_stats_by_rows ? (*ar / (NETDATA_DOUBLE)gbc) : *ar;
 
                 if(aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE && !query_target_aggregatable(qt))
                     n = (*cn /= gbc);
