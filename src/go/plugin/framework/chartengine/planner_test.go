@@ -1624,8 +1624,8 @@ groups:
 			}
 		}
 	}
-	assert.Equal(t, []string{"bucket_1", "bucket_2", "bucket_10", "bucket_+Inf"}, dims)
-	assert.Equal(t, []string{"bucket_1", "bucket_2", "bucket_10", "bucket_+Inf"}, updateDims)
+	assert.Equal(t, []string{"1", "2", "10", "+Inf"}, dims)
+	assert.Equal(t, []string{"1", "2", "10", "+Inf"}, updateDims)
 }
 
 func runTestBuildPlanAutogenCreatesChartForUnmatchedGauge(t *testing.T) {
