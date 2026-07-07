@@ -52,6 +52,50 @@ Netdata provides three data export modes:
 | [Prometheus Remote Write](/src/exporting/prometheus/remote_write/README.md) | Snappy-compressed protobuf | Binary over HTTP                   |
 | [TimescaleDB](/src/exporting/TIMESCALE.md)                                  | JSON streams               | Time-series tables                 |
 
+## How Metric Names Are Constructed
+
+The connector type determines how Netdata metric names appear in your external database. Connectors fall into two naming families.
+
+### Flat-name connectors: OpenTSDB and Graphite
+
+These connectors join the prefix, chart, and dimension with dots, so the chart and dimension are visible directly in the metric name:
+
+```text
+prefix.chart.dimension
+```
+
+- **OpenTSDB** sends the host as a separate tag (`host=...`).
+- **Graphite** embeds the host in the dotted path: `prefix.hostname.chart.dimension`.
+
+Example (OpenTSDB): `netdata.system.cpu.user` with a `host=myhost` tag.
+
+### Prometheus-based connectors: scrape and remote write
+
+These connectors join the prefix and the chart **context** with underscores, and carry the chart, family, and dimension as labels:
+
+```text
+prefix_context{chart="...", family="...", dimension="..."}
+```
+
+- The chart **context** — the template shared by all charts of the same kind — is part of the metric name, not the individual chart ID or name.
+- For `average` and `sum` data sources, the chart **units** and a `_average`/`_sum` suffix are appended to the name; counters get a `_total` suffix.
+
+Example (remote write): `netdata_system_cpu_percentage_average{chart="system.cpu", family="cpu", dimension="user"}`.
+
+For the complete naming rules — contexts, units, suffixes, and how to preview the exact metric names via the `allmetrics` endpoint — see the [Prometheus reference](/src/exporting/prometheus/README.md).
+
+### Quick comparison
+
+| Aspect                       | OpenTSDB / Graphite            | Prometheus scrape / remote write      |
+|:-----------------------------|:-------------------------------|:--------------------------------------|
+| Separator                    | Dots (`.`)                     | Underscores (`_`)                     |
+| In the metric name           | Prefix, chart, dimension       | Prefix, chart **context** (+ units/suffix for stored data) |
+| Chart & dimension            | Part of the name               | Provided as labels                    |
+| Host                         | Tag (OpenTSDB) or in path (Graphite) | Label                          |
+| Default prefix               | `netdata`                      | `netdata`                             |
+
+Both families respect the `send names instead of ids` setting: when enabled, Netdata uses human-friendly chart and dimension names; when disabled, it uses the raw system IDs. See the [OpenTSDB connector options](/src/exporting/opentsdb/README.md) for the prefix and name settings.
+
 ## Configuration Structure
 
 Your `exporting.conf` file contains these configuration blocks:
