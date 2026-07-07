@@ -19,10 +19,11 @@ void web_client_ensure_proper_authorization(struct web_client *w) {
     web_client_set_permissions(w, HTTP_ACCESS_ALL, HTTP_USER_ROLE_ADMIN, USER_AUTH_METHOD_GOD);
 #else
     if(w->user_auth.method == USER_AUTH_METHOD_NONE) {
+        bool bearer_protected = netdata_bearer_protection_is_enabled();
         web_client_set_permissions(
             w,
-            (netdata_is_protected_by_bearer) ? HTTP_ACCESS_NONE : HTTP_ACCESS_ANONYMOUS_DATA,
-            (netdata_is_protected_by_bearer) ? HTTP_USER_ROLE_NONE : HTTP_USER_ROLE_ANY,
+            bearer_protected ? HTTP_ACCESS_NONE : HTTP_ACCESS_ANONYMOUS_DATA,
+            bearer_protected ? HTTP_USER_ROLE_NONE : HTTP_USER_ROLE_ANY,
             USER_AUTH_METHOD_NONE);
     }
 #endif

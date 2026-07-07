@@ -415,7 +415,7 @@ short int websocket_handle_handshake(struct web_client *w) {
             return web_client_permission_denied_acl(w);
         }
 
-        if (netdata_is_protected_by_bearer && !mcp_api_key_verified) {
+        if (netdata_bearer_protection_is_enabled() && !mcp_api_key_verified) {
             w->response.data->content_type = CT_TEXT_PLAIN;
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data,
