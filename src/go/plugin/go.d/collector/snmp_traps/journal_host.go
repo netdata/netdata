@@ -18,7 +18,6 @@ import (
 
 const (
 	netdataLibDirEnv        = "NETDATA_LIB_DIR"
-	netdataHostPrefixEnv    = "NETDATA_HOST_PREFIX"
 	journalHostStateDirName = "systemd-journal-sdk"
 )
 
@@ -62,7 +61,7 @@ func netdataJournalHostStateDir() string {
 }
 
 func netdataHostFilesystemPrefix() string {
-	if dir := strings.TrimSpace(os.Getenv(netdataHostPrefixEnv)); dir != "" {
+	if dir := strings.TrimSpace(pluginconfig.HostPrefix()); dir != "" {
 		return filepath.Clean(dir)
 	}
 	return ""

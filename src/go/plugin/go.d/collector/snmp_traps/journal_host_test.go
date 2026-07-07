@@ -94,16 +94,16 @@ func TestNetdataJournalHostStateDirUsesBuildinfoVarLibDir(t *testing.T) {
 
 func TestNetdataHostFilesystemPrefixUsesNetdataHostPrefix(t *testing.T) {
 	prefix := filepath.Join(t.TempDir(), "host", "..", "host")
-	t.Setenv(netdataHostPrefixEnv, prefix)
+	t.Setenv("NETDATA_HOST_PREFIX", prefix)
 
-	want := filepath.Clean(os.Getenv(netdataHostPrefixEnv))
+	want := filepath.Clean(os.Getenv("NETDATA_HOST_PREFIX"))
 	if got := netdataHostFilesystemPrefix(); got != want {
 		t.Fatalf("netdataHostFilesystemPrefix() = %q, want %q", got, want)
 	}
 }
 
 func TestNetdataHostFilesystemPrefixIgnoresEmptyNetdataHostPrefix(t *testing.T) {
-	t.Setenv(netdataHostPrefixEnv, "  ")
+	t.Setenv("NETDATA_HOST_PREFIX", "  ")
 
 	if got := netdataHostFilesystemPrefix(); got != "" {
 		t.Fatalf("netdataHostFilesystemPrefix() = %q, want empty", got)
@@ -115,7 +115,7 @@ func TestJournalHostLoadOptionsIncludesHostFilesystemPrefix(t *testing.T) {
 		t.Skip("pluginconfig VarLibDir is already initialized")
 	}
 
-	t.Setenv(netdataHostPrefixEnv, "/host")
+	t.Setenv("NETDATA_HOST_PREFIX", "/host")
 	t.Setenv(netdataLibDirEnv, "")
 	libDir := filepath.Join(t.TempDir(), "opt", "netdata", "var", "lib", "netdata")
 	withTestBuildinfoVarLibDir(t, libDir)

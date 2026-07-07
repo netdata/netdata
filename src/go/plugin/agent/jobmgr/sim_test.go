@@ -130,7 +130,8 @@ func (s *runSim) run(t *testing.T) {
 			mgr.collectorSeen.Count() == len(s.wantSeen) &&
 			mgr.collectorExposed.Count() == len(s.wantExposed) &&
 			runningSetMatches(mgr.runningJobs.snapshot(), s.wantRunning) &&
-			out.FuncResultCount() >= expectedResults
+			out.FuncResultCount() >= expectedResults &&
+			s.dyncfgTranscriptSettled(out.String())
 	}, timeout, 10*time.Millisecond, "manager state did not settle before shutdown")
 	if t.Failed() {
 		t.Logf("settle state: discovered %d/%d seen %d/%d exposed %d/%d results %d/%d",
@@ -151,29 +152,7 @@ func (s *runSim) run(t *testing.T) {
 		t.Errorf("failed to finish work in %s", timeout)
 	}
 
-	var lines []string
-	skipNextEmpty := false
-	for s := range strings.SplitSeq(out.String(), "\n") {
-		if strings.HasPrefix(s, "CONFIG") && strings.Contains(s, " template ") {
-			skipNextEmpty = false
-			continue
-		}
-		if strings.HasPrefix(s, "FUNCTION GLOBAL") || strings.HasPrefix(s, "FUNCTION_DEL") {
-			skipNextEmpty = true
-			continue
-		}
-		if skipNextEmpty && s == "" {
-			skipNextEmpty = false
-			continue
-		}
-		skipNextEmpty = false
-		if strings.HasPrefix(s, "FUNCTION_RESULT_BEGIN") {
-			parts := strings.Fields(s)
-			s = strings.Join(parts[:len(parts)-1], " ") // remove timestamp
-		}
-		lines = append(lines, s)
-	}
-	wantDyncfg, gotDyncfg := strings.TrimSpace(s.wantDyncfg), strings.TrimSpace(strings.Join(lines, "\n"))
+	wantDyncfg, gotDyncfg := strings.TrimSpace(s.wantDyncfg), normalizeDyncfgTranscript(out.String())
 
 	//fmt.Println(gotDyncfg)
 
@@ -228,6 +207,44 @@ func (s *runSim) run(t *testing.T) {
 		_, ok := runningBeforeShutdown[name]
 		require.Truef(t, ok, "runningJobs: job '%s' is not found", name)
 	}
+}
+
+func normalizeDyncfgTranscript(output string) string {
+	var lines []string
+	skipNextEmpty := false
+	for s := range strings.SplitSeq(output, "\n") {
+		if strings.HasPrefix(s, "CONFIG") && strings.Contains(s, " template ") {
+			skipNextEmpty = false
+			continue
+		}
+		if strings.HasPrefix(s, "FUNCTION GLOBAL") || strings.HasPrefix(s, "FUNCTION_DEL") {
+			skipNextEmpty = true
+			continue
+		}
+		if skipNextEmpty && s == "" {
+			skipNextEmpty = false
+			continue
+		}
+		skipNextEmpty = false
+		if strings.HasPrefix(s, "FUNCTION_RESULT_BEGIN") {
+			parts := strings.Fields(s)
+			s = strings.Join(parts[:len(parts)-1], " ") // remove timestamp
+		}
+		lines = append(lines, s)
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func (s *runSim) dyncfgTranscriptSettled(output string) bool {
+	got := normalizeDyncfgTranscript(output)
+	if len(s.wantDyncfgRecords) > 0 {
+		total := 0
+		for _, wants := range s.wantDyncfgRecords {
+			total += len(wants)
+		}
+		return len(wiretest.AtomicRecords(got)) >= total
+	}
+	return got == strings.TrimSpace(s.wantDyncfg)
 }
 
 func prepareMockRegistry() collectorapi.Registry {
