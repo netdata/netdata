@@ -60,9 +60,11 @@ static int cbuffer_realloc_unsafe(struct circular_buffer *buf) {
         return 1;
 
     size_t old_size = buf->size;
-    size_t new_size = buf->size * 2;
-    if (new_size > buf->max_size)
+    size_t new_size = buf->size;
+    if (new_size > buf->max_size / 2)
         new_size = buf->max_size;
+    else
+        new_size = new_size ? new_size * 2 : 1;
 
     // We know that: size < new_size <= max_size
     // For simplicity align the current data at the bottom of the new buffer
@@ -103,13 +105,16 @@ size_t cbuffer_available_size_unsafe(struct circular_buffer *buf) {
 
 int cbuffer_add_unsafe(struct circular_buffer *buf, const char *d, size_t d_len) {
     size_t len = cbuffer_used_size_unsafe(buf);
-    while (d_len + len >= buf->size) {
+    if (unlikely(len >= buf->max_size || d_len >= buf->max_size - len))
+        return 1;
+
+    while (len >= buf->size || d_len >= buf->size - len) {
         if (cbuffer_realloc_unsafe(buf)) {
             return 1;
         }
     }
     // Guarantee: write + d_len cannot hit read
-    if (buf->write + d_len < buf->size) {
+    if (d_len < buf->size - buf->write) {
         memcpy(buf->data + buf->write, d, d_len);
         buf->write += d_len;
     }
@@ -190,18 +195,21 @@ char *cbuffer_reserve_unsafe(struct circular_buffer *buf, size_t size) {
 
     // First, make sure we have enough space in the buffer
     size_t len = cbuffer_used_size_unsafe(buf);
-    while (size + len >= buf->size) {
+    if (unlikely(len >= buf->max_size || size >= buf->max_size - len))
+        return NULL;
+
+    while (len >= buf->size || size >= buf->size - len) {
         if (cbuffer_realloc_unsafe(buf)) {
             // Can't grow buffer anymore
             return NULL;
         }
     }
 
-    if(buf->write + size > buf->size) {
+    if(size > buf->size - buf->write) {
         if (!cbuffer_ensure_unwrapped_size(buf, len))
             return NULL;
 
-        if(buf->read != 0 && buf->write + size > buf->size) {
+        if(buf->read != 0 && size > buf->size - buf->write) {
             // It is a contiguous buffer, but we need to move the data
             // Move the data to the beginning of the buffer
             memmove(buf->data, buf->data + buf->read, buf->write - buf->read);
@@ -211,7 +219,7 @@ char *cbuffer_reserve_unsafe(struct circular_buffer *buf, size_t size) {
     }
 
     // Check if we can write contiguously from the current write position
-    if (buf->write + size <= buf->size) {
+    if (size <= buf->size - buf->write) {
         // Simple case - we have enough space at the current write position
         return buf->data + buf->write;
     }
@@ -224,13 +232,23 @@ char *cbuffer_reserve_unsafe(struct circular_buffer *buf, size_t size) {
 // Commit the reserved space after writing to it
 // Size should be less than or equal to the size passed to cbuffer_reserve_unsafe
 void cbuffer_commit_reserved_unsafe(struct circular_buffer *buf, size_t size) {
-    if (unlikely(!buf || !buf->data || size == 0))
+    if (!buf)
         return;
 
-    // Update the write pointer
-    buf->write += size;
+    if (!buf->data || size == 0)
+        return;
 
-    // Handle wrap-around if we've gone past the buffer boundary
-    if (buf->write >= buf->size)
-        buf->write -= buf->size;
+    size_t buffer_size = buf->size;
+    if (buffer_size == 0)
+        return;
+
+    size_t used = cbuffer_used_size_unsafe(buf);
+    if (unlikely(used >= buffer_size || size >= buffer_size - used))
+        return;
+
+    size_t available = buffer_size - buf->write;
+    if (size >= available)
+        buf->write = size - available;
+    else
+        buf->write += size;
 }
