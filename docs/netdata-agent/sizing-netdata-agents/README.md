@@ -4,16 +4,14 @@ Netdata is designed to automatically adjust its resource consumption based on th
 
 ## Minimum system requirements
 
-A standalone Netdata Agent runs comfortably on a minimal system. The figures below are conservative guidance derived from Netdata's measured footprint, not hard minimums — actual usage is lower on an idle or lightly-loaded host.
+A standalone Netdata Agent has a small footprint and runs comfortably on a minimal system. The table below shows Netdata's measured resource usage — follow the links for how each figure is derived.
 
-| Resource    | What you need                                          | Netdata's measured footprint                                                                                           |
-|:------------|:-------------------------------------------------------|:-----------------------------------------------------------------------------------------------------------------------|
-| **CPU**     | A single core is more than enough.                     | Typically 1%-5% of a single core with default settings; up to 5%-20% in production.                                   |
-| **RAM**     | Around 512 MB of free RAM.                             | About 100-200 MB of RAM on an empty system; 250-350 MB in typical production.                                          |
-| **Disk**    | A few GB of free disk.                                 | About 4 GiB by default (3 GiB metrics plus metadata), configurable per tier.                                           |
-| **Privileges** | Root on Linux, or Administrator on Windows, for installation. | Elevated privileges are required to install the Agent.                                                            |
-
-For the detailed footprint and default-settings sizing, see [CPU Utilization](/docs/netdata-agent/sizing-netdata-agents/cpu-requirements.md), [RAM Utilization](/docs/netdata-agent/sizing-netdata-agents/ram-requirements.md), [Disk Requirements & Retention](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md), and [Netdata's impact on resources](/docs/impact-on-resources.md).
+| Resource       | Netdata's footprint                                                                                                                                                                                                             |
+|:---------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **CPU**        | [1%-5% of a single core](/docs/netdata-agent/sizing-netdata-agents/cpu-requirements.md) with default settings; up to [5%-20% in production](/docs/impact-on-resources.md#typical-netdata-resources-usage-on-production-systems) |
+| **RAM**        | [100-200 MB](/docs/netdata-agent/sizing-netdata-agents/ram-requirements.md) on an empty system; [250-350 MB in typical production](/docs/impact-on-resources.md#typical-netdata-resources-usage-on-production-systems)          |
+| **Disk**       | [~4 GiB by default](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md#default-disk-footprint) (3 GiB metrics plus metadata), configurable per tier                                                   |
+| **Privileges** | Root on Linux, or Administrator on Windows, required for installation                                                                                                                                                           |
 
 For multi-node setups that centralize metrics on a Netdata Parent, resource needs scale with the number of Children and retention — see [Parent Configuration Best Practices](/docs/observability-centralization-points/best-practices.md).
 
