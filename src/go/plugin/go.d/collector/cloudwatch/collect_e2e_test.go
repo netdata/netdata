@@ -305,7 +305,7 @@ func seriesName(key string) string {
 }
 
 // TestAllStockProfiles_PipelineChartComplete is the full-catalog sweep: for EVERY
-// stock profile (combined mode includes the disabled deep-grain ones), it feeds a
+// stock profile (combined mode includes disabled opt-in profiles), it feeds a
 // synthetic instance with a datapoint for every (metric, statistic), runs the real
 // collect, and asserts (a) every profile's every active series is produced and
 // (b) every produced series flows into a chart (AssertChartCoverage). Profiles that
@@ -356,7 +356,7 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 
 	c := New()
 	c.Config.Regions = []string{region}
-	c.Profiles = ProfilesConfig{Mode: profilesModeCombined} // include disabled deep-grain profiles
+	c.Profiles = ProfilesConfig{Mode: profilesModeCombined} // include disabled opt-in profiles
 	c.applyDefaults()
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 	useFakeClient(c, &e2eCloudWatch{list: list, values: values, ts: time.Unix(1, 0)})

@@ -110,7 +110,7 @@ func (c Catalog) AllProfiles() []ResolvedProfile {
 // ProfilesByBaseNames returns the loaded profiles whose basename matches any of
 // the given basenames, sorted by basename. It is the candidate set for
 // profiles.mode=exact and returns matching profiles regardless of their
-// default-enabled/disabled flag, so a deep-grain profile can be selected by name.
+// default-enabled/disabled flag, so an opt-in profile can be selected by name.
 func (c Catalog) ProfilesByBaseNames(names []string) []ResolvedProfile {
 	want := make(map[string]struct{}, len(names))
 	for _, n := range names {

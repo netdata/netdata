@@ -54,7 +54,8 @@ metrics:
   #   rate: true
   # Nitro-only per-volume metrics (VolumeAvgIOPS, VolumeAvgReadLatency, VolumeIOPSExceededCheck, ...)
   # and instance-aggregate EBS (AWS/EC2 + InstanceId: EBSReadBytes/EBSWriteBytes/... -- see the ec2
-  # profile) are separate. See:
+  # profile) are separate. VolumeStalledIOCheck is available through the disabled ebs_stalled_io
+  # profile. See:
   # https://docs.aws.amazon.com/ebs/latest/userguide/using_cloudwatch_ebs.html
   # BurstBalance is emitted only for gp2/st1/sc1 volumes.
 template:
