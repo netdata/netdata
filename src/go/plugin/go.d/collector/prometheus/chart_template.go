@@ -51,14 +51,17 @@ func buildChartTemplate(app string) (string, error) {
 func buildMergedChartTemplate(app string, profiles []promprofiles.Profile) (string, error) {
 	spec := newAutogenSpec(app)
 	for _, p := range profiles {
-		g := p.Template.Clone()
+		// Template() returns an independent deep copy, so mutating g below cannot
+		// corrupt the shared process-wide catalog.
+		g, err := p.Template()
+		if err != nil {
+			return "", err
+		}
 		// The profile's root context_namespace is the exporter-type segment
 		// (prometheus.<app>.<ns>.<context>). When the resolved app equals that namespace —
 		// e.g. app fell back to the profile's own app: because the job has no app set
 		// (by the user or service discovery) — drop the redundant segment so the
-		// context is prometheus.<app>.<context>, not prometheus.<app>.<app>.<context>. g is
-		// a deep clone of the catalog profile, so clearing its ContextNamespace cannot
-		// mutate the shared catalog.
+		// context is prometheus.<app>.<context>, not prometheus.<app>.<app>.<context>.
 		if g.ContextNamespace == app {
 			g.ContextNamespace = ""
 		}

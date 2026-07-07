@@ -3,71 +3,102 @@
 package promprofiles
 
 import (
-	"fmt"
 	"testing"
 
-	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-// chartGroup builds a minimal valid charttpl group with an explicit metrics:
-// visibility list (declared as a real v2 template would), matching the
-// dimension selectors.
-func chartGroup(family, context string, selectors ...string) charttpl.Group {
-	dims := make([]charttpl.Dimension, len(selectors))
-	for i, sel := range selectors {
-		dims[i] = charttpl.Dimension{Selector: sel, Name: fmt.Sprintf("dim%d", i)}
-	}
-	return charttpl.Group{
-		Family:  family,
-		Metrics: append([]string(nil), selectors...),
-		Charts:  []charttpl.Chart{{Title: "Title", Context: context, Units: "count", Dimensions: dims}},
-	}
-}
-
-func TestProfile_validate(t *testing.T) {
+// TestDecodeProfile_validation checks header and template validation through the
+// real decode path. A user profile (isStock=false) validates its template at
+// load, so every rule — header (app format) and template (no chart, undeclared
+// dimension) — surfaces from decodeProfile.
+func TestDecodeProfile_validation(t *testing.T) {
 	tests := map[string]struct {
-		profile Profile
+		yaml    string
 		wantErr bool
 	}{
 		"valid": {
-			profile: Profile{Match: "a_*", Template: chartGroup("fam", "ctx", "a_total", "a_count")},
+			yaml: `match: "a_*"
+template:
+  family: fam
+  metrics:
+    - a_total
+  charts:
+    - title: Title
+      context: ctx
+      units: count
+      dimensions:
+        - selector: a_total
+          name: d0
+`,
 		},
 		"valid with app": {
-			profile: Profile{Match: "a_*", App: "my_app", Template: chartGroup("fam", "ctx", "a_total")},
+			yaml: `match: "a_*"
+app: my_app
+template:
+  family: fam
+  metrics:
+    - a_total
+  charts:
+    - title: Title
+      context: ctx
+      units: count
+      dimensions:
+        - selector: a_total
+          name: d0
+`,
 		},
 		"invalid app format": {
-			profile: Profile{Match: "a_*", App: "Bad App!", Template: chartGroup("fam", "ctx", "a_total")},
-			wantErr: true,
-		},
-		"empty match": {
-			profile: Profile{Match: "", Template: chartGroup("fam", "ctx", "a_total")},
+			yaml: `match: "a_*"
+app: "Bad App!"
+template:
+  family: fam
+  metrics:
+    - a_total
+  charts:
+    - title: Title
+      context: ctx
+      units: count
+      dimensions:
+        - selector: a_total
+          name: d0
+`,
 			wantErr: true,
 		},
 		"template with no chart": {
-			profile: Profile{Match: "a_*", Template: charttpl.Group{Family: "fam"}},
+			yaml: `match: "a_*"
+template:
+  family: fam
+`,
 			wantErr: true,
 		},
 		"dimension metric not declared in metrics": {
-			profile: Profile{Match: "a_*", Template: charttpl.Group{
-				Family:  "fam",
-				Metrics: []string{"declared_total"},
-				Charts: []charttpl.Chart{{Title: "T", Context: "ctx", Units: "count",
-					Dimensions: []charttpl.Dimension{{Selector: "undeclared_total", Name: "d"}}}},
-			}},
+			yaml: `match: "a_*"
+template:
+  family: fam
+  metrics:
+    - declared_total
+  charts:
+    - title: T
+      context: ctx
+      units: count
+      dimensions:
+        - selector: undeclared_total
+          name: d
+`,
 			wantErr: true,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			p := tc.profile
-			err := p.validate("test")
+			_, err := decodeProfile([]byte(tc.yaml), "test", false)
 			if tc.wantErr {
 				assert.Error(t, err)
-				return
+			} else {
+				require.NoError(t, err)
 			}
-			assert.NoError(t, err)
 		})
 	}
 }
