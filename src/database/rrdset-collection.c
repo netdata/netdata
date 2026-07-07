@@ -4,6 +4,14 @@
 #include "rrddim-collection.h"
 
 time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
+    if(unlikely(update_every_s <= 0 || update_every_s > INT32_MAX)) {
+        internal_error(
+            true,
+            "RRDSET '%s' ignoring invalid update every %lld; keeping %d",
+            rrdset_id(st), (long long)update_every_s, (int)st->update_every);
+        return st->update_every;
+    }
+
     if(unlikely(update_every_s == st->update_every))
         return st->update_every;
 

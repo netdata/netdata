@@ -1615,6 +1615,59 @@ static int test_rrdmetric_algorithm_follows_rrddim(void) {
     return rc;
 }
 
+static int test_rrdset_rejects_invalid_update_every(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    time_t old_update_every = nd_profile.update_every;
+    const time_t original_update_every = 5;
+
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+    nd_profile.update_every = original_update_every;
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-update-every-guard", "unittest-update-every-guard", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        original_update_every, RRDSET_TYPE_LINE);
+
+    int rc = 0;
+    time_t previous = rrdset_set_update_every_s(st, 0);
+    if(previous != original_update_every || st->update_every != original_update_every) {
+        fprintf(stderr, "%s: zero update every changed chart from %ld to %d\n",
+                __FUNCTION__, (long)previous, st->update_every);
+        rc = 1;
+    }
+
+    previous = rrdset_set_update_every_s(st, -1);
+    if(previous != original_update_every || st->update_every != original_update_every) {
+        fprintf(stderr, "%s: negative update every changed chart from %ld to %d\n",
+                __FUNCTION__, (long)previous, st->update_every);
+        rc = 1;
+    }
+
+    previous = rrdset_set_update_every_s(st, (time_t)((intmax_t)INT32_MAX + 1));
+    if(previous != original_update_every || st->update_every != original_update_every) {
+        fprintf(stderr, "%s: out-of-range update every changed chart from %ld to %d\n",
+                __FUNCTION__, (long)previous, st->update_every);
+        rc = 1;
+    }
+
+    const time_t valid_update_every = 7;
+    previous = rrdset_set_update_every_s(st, valid_update_every);
+    if(previous != original_update_every || st->update_every != valid_update_every) {
+        fprintf(stderr, "%s: valid update every did not change chart from %ld to %ld; current %d\n",
+                __FUNCTION__, (long)previous, (long)valid_update_every, st->update_every);
+        rc = 1;
+    }
+
+    if(st->update_every != original_update_every)
+        rrdset_set_update_every_s(st, original_update_every);
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    nd_profile.update_every = old_update_every;
+    return rc;
+}
+
 int run_all_mockup_tests(void)
 {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
@@ -1638,6 +1691,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_rrdmetric_algorithm_follows_rrddim())
+        return 1;
+
+    if(test_rrdset_rejects_invalid_update_every())
         return 1;
 
     if(!test_variable_renames())
