@@ -2,6 +2,21 @@
 
 Netdata is designed to automatically adjust its resource consumption based on the specific workload.
 
+## Minimum system requirements
+
+A standalone Netdata Agent has a small footprint and runs comfortably on a minimal system. The table below shows Netdata's measured resource usage — follow the links for how each figure is derived.
+
+| Resource       | Netdata's footprint                                                                                                                                                                                                             |
+|:---------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **CPU**        | [1%-5% of a single core](/docs/netdata-agent/sizing-netdata-agents/cpu-requirements.md) with default settings; up to [5%-20% in production](/docs/impact-on-resources.md#typical-netdata-resources-usage-on-production-systems) |
+| **RAM**        | [100-200 MB](/docs/netdata-agent/sizing-netdata-agents/ram-requirements.md) on an empty system; [250-350 MB in typical production](/docs/impact-on-resources.md#typical-netdata-resources-usage-on-production-systems)          |
+| **Disk**       | [~4 GiB by default](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md#default-disk-footprint) (3 GiB metrics plus metadata), configurable per tier                                                   |
+| **Privileges** | Root on Linux, or Administrator on Windows, required for installation                                                                                                                                                           |
+
+For multi-node setups that centralize metrics on a Netdata Parent, resource needs scale with the number of Children and retention — see [Parent Configuration Best Practices](/docs/observability-centralization-points/best-practices.md).
+
+## What affects resource usage
+
 This table shows the specific system resources affected by different Netdata features:
 
 |                 Feature | CPU | RAM | Disk I/O | Disk Space | Network Traffic |

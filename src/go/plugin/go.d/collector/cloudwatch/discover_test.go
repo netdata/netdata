@@ -440,7 +440,7 @@ func TestCollector_selectProfiles(t *testing.T) {
 		assert.Error(t, err)
 	})
 
-	t.Run("exact selects a default-disabled deep-grain profile by name", func(t *testing.T) {
+	t.Run("exact selects a default-disabled opt-in profile by name", func(t *testing.T) {
 		c := &Collector{Config: Config{Profiles: ProfilesConfig{
 			Mode:      profilesModeExact,
 			ModeExact: &ProfilesExactConfig{Entries: []ProfileEntry{{Name: "alb_target"}}},

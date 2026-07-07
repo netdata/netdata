@@ -5218,9 +5218,9 @@ dependencies = [
 
 [[package]]
 name = "systemd-journal-sdk-common"
-version = "0.7.6"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6d1e8982e662302ab942d72c86cada4a01a069012a1b6aea3802fc83619041c"
+checksum = "26dffb78c54dd0878c122705a5e285cac0b45f4d449a2345fe339994fa3d6dec"
 dependencies = [
  "libc",
  "rustc-hash",
@@ -5231,9 +5231,9 @@ dependencies = [
 
 [[package]]
 name = "systemd-journal-sdk-core"
-version = "0.7.6"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bf7ebd119a8c9e30b33faba9acbb84dbe3d1b0d601d497aebca48b399955dbb8"
+checksum = "cb19cb9e5b94468937d7a3558f795f33913d190517d217313d493f827a37e5e9"
 dependencies = [
  "anyhow",
  "chrono",
@@ -5272,9 +5272,9 @@ dependencies = [
 
 [[package]]
 name = "systemd-journal-sdk-engine"
-version = "0.7.6"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96b521b001ca842805380a07db7c8b64924b4bfbe83ccb1cfa8c181e2c33b9e5"
+checksum = "2737251973f2264ed314d349a4978b9d86ebafca785a170b0733852073478524"
 dependencies = [
  "async-stream",
  "async-trait",
@@ -5298,9 +5298,9 @@ dependencies = [
 
 [[package]]
 name = "systemd-journal-sdk-host"
-version = "0.7.6"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e47facaccf9fcaf588c3ed2cc189427728935560fe1b5139a3609a59033c9af8"
+checksum = "f0b8f13e0d446f8f8aea1184bef404d93d4de5e5c98db15f95a4d2b8204cb105"
 dependencies = [
  "libc",
  "systemd-journal-sdk-common",
@@ -5310,9 +5310,9 @@ dependencies = [
 
 [[package]]
 name = "systemd-journal-sdk-index"
-version = "0.7.6"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c52f574dd822d3663dd0dea8ac63d7f7fb63269c571ff155b68586e679207a81"
+checksum = "eaf050f2b2d60f7659a51cf2f31f9d2213b7932c5492675f1bce71974ec6568c"
 dependencies = [
  "regex",
  "roaring 0.11.4",
@@ -5327,9 +5327,9 @@ dependencies = [
 
 [[package]]
 name = "systemd-journal-sdk-log-writer"
-version = "0.7.6"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8a3cc1fa4f01832641f30d80a5669749f46c9ae2601514d1aed90137bd112357"
+checksum = "91abdafd3a2616fd61118a4136c8f087562ebb2242fea8a0f54e458c71bcfbff"
 dependencies = [
  "itoa",
  "systemd-journal-sdk-common",
@@ -5342,9 +5342,9 @@ dependencies = [
 
 [[package]]
 name = "systemd-journal-sdk-registry"
-version = "0.7.6"
+version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "41f2739f7d0d149aa01129077496f1941d10d1ee3e3737b542123ffde03de47e"
+checksum = "440268acc39fb032477bbb714a80a7e2b16ae226a81c6222332406e16c5144a5"
 dependencies = [
  "notify",
  "parking_lot",

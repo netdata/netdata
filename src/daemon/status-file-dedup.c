@@ -84,7 +84,7 @@ uint64_t daemon_status_file_hash(DAEMON_STATUS_FILE *ds, const char *msg, const 
 
     safecpy(to_hash.version, ds->version);
     safecpy(to_hash.filename, ds->fatal.filename);
-    safecpy(to_hash.filename, ds->fatal.function);
+    safecpy(to_hash.function, ds->fatal.function);
     safecpy(to_hash.stack_trace, ds->fatal.stack_trace);
     safecpy(to_hash.thread, ds->fatal.thread);
 

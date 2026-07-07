@@ -322,7 +322,7 @@ func (c *Collector) selectProfiles(catalog cwprofiles.Catalog) ([]cwprofiles.Res
 	case profilesModeAuto:
 		return enabledProfiles(catalog.AllProfiles()), nil
 	case profilesModeCombined:
-		// auto plus the default-disabled (deep-grain) profiles.
+		// auto plus the default-disabled opt-in profiles.
 		return catalog.AllProfiles(), nil
 	case profilesModeExact:
 		var names []string
@@ -332,7 +332,7 @@ func (c *Collector) selectProfiles(catalog cwprofiles.Catalog) ([]cwprofiles.Res
 			}
 		}
 		// Exact mode selects the named profiles by basename regardless of their
-		// default-enabled/disabled flag, so a deep-grain profile can be picked by name.
+		// default-enabled/disabled flag, so an opt-in profile can be picked by name.
 		profiles := catalog.ProfilesByBaseNames(names)
 		if len(profiles) == 0 {
 			return nil, fmt.Errorf("no CloudWatch profiles match the configured names: %v", names)

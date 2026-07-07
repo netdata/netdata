@@ -29,6 +29,7 @@ var (
 
 type envData struct {
 	cygwinBase string
+	hostPrefix string
 	userDir    string
 	stockDir   string
 	varLibDir  string
@@ -84,6 +85,7 @@ func MustInit(input InitInput) {
 }
 
 func EnvLogLevel() string      { return env.logLevel }
+func HostPrefix() string       { return hostPrefix() }
 func RegistryUniqueID() string { return readRegistryUniqueID(registryUniqueIDVarLibDir()) }
 
 func UserConfigDirs() multipath.MultiPath { return dirs.userConfigDirsClone() }
@@ -274,12 +276,14 @@ var isTerm = terminal.IsTerminal()
 func readEnvFromOS(execDir string) envData {
 	e := envData{
 		cygwinBase: os.Getenv("NETDATA_CYGWIN_BASE_PATH"),
+		hostPrefix: os.Getenv("NETDATA_HOST_PREFIX"),
 		userDir:    os.Getenv("NETDATA_USER_CONFIG_DIR"),
 		stockDir:   os.Getenv("NETDATA_STOCK_CONFIG_DIR"),
 		watchPath:  os.Getenv("NETDATA_PLUGINS_GOD_WATCH_PATH"),
 		varLibDir:  os.Getenv("NETDATA_LIB_DIR"),
 		logLevel:   os.Getenv("NETDATA_LOG_LEVEL"),
 	}
+	e.hostPrefix = handleDirOnWin(e.cygwinBase, safePathClean(e.hostPrefix), execDir)
 	e.userDir = handleDirOnWin(e.cygwinBase, safePathClean(e.userDir), execDir)
 	e.stockDir = handleDirOnWin(e.cygwinBase, safePathClean(e.stockDir), execDir)
 	e.varLibDir = handleDirOnWin(e.cygwinBase, safePathClean(e.varLibDir), execDir)
@@ -292,6 +296,13 @@ func readEnvFromOS(execDir string) envData {
 	}
 
 	return e
+}
+
+func hostPrefix() string {
+	if env.hostPrefix != "" {
+		return env.hostPrefix
+	}
+	return safePathClean(os.Getenv("NETDATA_HOST_PREFIX"))
 }
 
 // Convert a POSIX absolute (/foo) to Windows under base (e.g., C:\msys64\foo).
