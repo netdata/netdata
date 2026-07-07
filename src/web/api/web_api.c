@@ -29,6 +29,22 @@ void web_client_ensure_proper_authorization(struct web_client *w) {
 #endif
 }
 
+void web_api_command_hashes_init(struct web_api_command *api_commands, SPINLOCK *spinlock, bool *initialized) {
+    if(likely(__atomic_load_n(initialized, __ATOMIC_ACQUIRE)))
+        return;
+
+    spinlock_lock(spinlock);
+
+    if(unlikely(!__atomic_load_n(initialized, __ATOMIC_ACQUIRE))) {
+        for(int i = 0; api_commands[i].api ; i++)
+            api_commands[i].hash = simple_hash(api_commands[i].api);
+
+        __atomic_store_n(initialized, true, __ATOMIC_RELEASE);
+    }
+
+    spinlock_unlock(spinlock);
+}
+
 int web_client_api_request_vX(RRDHOST *host, struct web_client *w, char *url_path_endpoint, struct web_api_command *api_commands) {
     buffer_no_cacheable(w->response.data);
 
