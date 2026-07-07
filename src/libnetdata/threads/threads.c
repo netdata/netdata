@@ -522,10 +522,10 @@ int nd_thread_join(ND_THREAD *nti) {
                "cannot join thread. uv_thread_join() failed with code %d. (tag=%s)",
                ret, nti->tag);
 
-        // On Windows/MSYS2, if the thread exited very quickly, uv_thread_join() can fail with EINVAL (-22)
+        // On Windows/MSYS2, if the thread exited very quickly, uv_thread_join() can fail with UV_EINVAL
         // because the thread handle becomes invalid before the join executes. However, the thread may
         // still be finishing its cleanup. Wait for it to reach FINISHED state before cleaning up.
-        if(ret == -22) { // UV_EINVAL
+        if(ret == UV_EINVAL) {
             nd_log(NDLS_DAEMON, NDLP_INFO,
                    "thread '%s' join returned EINVAL, waiting for thread to finish...", nti->tag);
 
@@ -545,9 +545,12 @@ int nd_thread_join(ND_THREAD *nti) {
         }
     }
 
-    // Always clean up the thread structure - if uv_thread_join() failed,
-    // retrying won't help (thread doesn't exist, not joinable, or logic error)
-    // JOINED flag was already set atomically at the start of this function
+    // Only release the wrapper once the OS join succeeded, or Netdata's thread
+    // exit path has finished and can no longer use the thread-local pointer.
+    if(ret != 0 && !nd_thread_status_check(nti, NETDATA_THREAD_STATUS_FINISHED)) {
+        nd_thread_status_clear(nti, NETDATA_THREAD_STATUS_JOINED);
+        return ret;
+    }
 
     spinlock_lock(&threads_globals.running.spinlock);
     if(nti->list == ND_THREAD_LIST_RUNNING) {
