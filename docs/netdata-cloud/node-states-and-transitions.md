@@ -6,11 +6,11 @@ Netdata provides dashboards at multiple levels of your infrastructure. Each leve
 
 Netdata's distributed architecture provides three observation points:
 
-| Dashboard | What You See | How to Access |
-|-----------|--------------|---------------|
-| **Agent** | Local node only | `http://node-ip:19999` |
-| **Parent** | All nodes streaming to this Parent | `http://parent-ip:19999` |
-| **Netdata Cloud** | All nodes claimed to your Space | `https://app.netdata.cloud` |
+| Dashboard         | What You See                       | How to Access               |
+|-------------------|------------------------------------|-----------------------------|
+| **Agent**         | Local node only                    | `http://node-ip:19999`      |
+| **Parent**        | All nodes streaming to this Parent | `http://parent-ip:19999`    |
+| **Netdata Cloud** | All nodes claimed to your Space    | `https://app.netdata.cloud` |
 
 **How data flows:**
 
@@ -23,22 +23,22 @@ Node states reflect this flow: if a link breaks, states change based on where da
 
 ## States on Netdata Cloud
 
-| State | Meaning |
-|-------|---------|
-| **Live** | Node is connected to Netdata Cloud (directly or via Parents) and providing live metrics |
-| **Stale** | Node disconnected, but a Parent connected to Netdata Cloud has its historical data |
-| **Offline** | Node is disconnected and no data is available |
-| **Unseen** | Node was claimed but has never connected |
+| State       | Meaning                                                                                 |
+|-------------|-----------------------------------------------------------------------------------------|
+| **Live**    | Node is connected to Netdata Cloud (directly or via Parents) and providing live metrics |
+| **Stale**   | Node disconnected, but a Parent connected to Netdata Cloud has its historical data      |
+| **Offline** | Node is disconnected and no data is available                                           |
+| **Unseen**  | Node was claimed but has never connected                                                |
 
 ### Stale vs Offline
 
 The difference is **data availability**:
 
-| Scenario | State | Can Query Data? |
-|----------|-------|-----------------|
-| Child disconnected, Parent connected to Cloud | **Stale** | Yes, via Parent |
-| Standalone Agent disconnected | **Offline** | No |
-| Child disconnected, all Parents disconnected from Cloud | **Offline** | No |
+| Scenario                                                | State       | Can Query Data? |
+|---------------------------------------------------------|-------------|-----------------|
+| Child disconnected, Parent connected to Cloud           | **Stale**   | Yes, via Parent |
+| Standalone Agent disconnected                           | **Offline** | No              |
+| Child disconnected, all Parents disconnected from Cloud | **Offline** | No              |
 
 Stale nodes remain queryable because the Parent serves as a data cache. This is why you cannot delete Stale nodes from the UI—they still have accessible data.
 
@@ -46,9 +46,9 @@ Stale nodes remain queryable because the Parent serves as a data cache. This is 
 
 Parents display nodes that stream (or have streamed) to them:
 
-| State | Meaning |
-|-------|---------|
-| **Live** | Node is actively streaming metrics |
+| State     | Meaning                                          |
+|-----------|--------------------------------------------------|
+| **Live**  | Node is actively streaming metrics               |
 | **Stale** | Node stopped streaming, historical data retained |
 
 Parents don't show Offline or Unseen states. When a node's retention expires or cleanup runs, it disappears from the Parent's view entirely.
@@ -57,24 +57,24 @@ Parents don't show Offline or Unseen states. When a node's retention expires or 
 
 When a Parent connects to Netdata Cloud, it reports the state of all its children:
 
-| Parent Sees | Cloud Shows | Why |
-|-------------|-------------|-----|
-| Live | **Live** | Data flowing through Parent |
-| Stale | **Stale** | Parent connected to Cloud has historical data |
-| (removed) | **Offline** | No data source available |
+| Parent Sees | Cloud Shows | Why                                           |
+|-------------|-------------|-----------------------------------------------|
+| Live        | **Live**    | Data flowing through Parent                   |
+| Stale       | **Stale**   | Parent connected to Cloud has historical data |
+| (removed)   | **Offline** | No data source available                      |
 
 **High-availability setups (recommended):**
 With two Parents (Child → P1 → P2), children stream to one Parent, which replicates to the other. Both Parents connect to Cloud.
 
 If the child connects to Cloud only via Parents:
 
-| Event | Result | Why |
-|-------|--------|-----|
-| P1 disconnects from Cloud | No change (Live) | P1 still runs, replicates to P2, P2 reports to Cloud |
-| P1 stops | Brief Stale, then Live | Child fails over to P2 |
-| P2 disconnects from Cloud | No change (Live) | P1 still connected to Cloud |
-| P2 stops | No change (Live) | Child still streams to P1, P1 reports to Cloud |
-| Both disconnect from Cloud | **Offline** | No Parent can report to Cloud |
+| Event                      | Result                 | Why                                                  |
+|----------------------------|------------------------|------------------------------------------------------|
+| P1 disconnects from Cloud  | No change (Live)       | P1 still runs, replicates to P2, P2 reports to Cloud |
+| P1 stops                   | Brief Stale, then Live | Child fails over to P2                               |
+| P2 disconnects from Cloud  | No change (Live)       | P1 still connected to Cloud                          |
+| P2 stops                   | No change (Live)       | Child still streams to P1, P1 reports to Cloud       |
+| Both disconnect from Cloud | **Offline**            | No Parent can report to Cloud                        |
 
 If the child also connects directly to Cloud, it remains Live regardless of Parent status.
 
@@ -90,18 +90,18 @@ Children with retained data appear as **Stale** (or **Live** if actively streami
 
 **Netdata Cloud detects agent/parent disconnection:**
 
-| Event | Detection Time | Mechanism |
-|-------|----------------|-----------|
+| Event                                  | Detection Time  | Mechanism                     |
+|----------------------------------------|-----------------|-------------------------------|
 | Agent or Parent loses Cloud connection | **~60 seconds** | MQTT keepalive (60s interval) |
-| UI reflects state change | **1-2 minutes** | Cloud processing + UI refresh |
+| UI reflects state change               | **1-2 minutes** | Cloud processing + UI refresh |
 
 **Parent detects child disconnection:**
 
-| Event | Detection Time | Mechanism |
-|-------|----------------|-----------|
-| Child shuts down gracefully | **Immediate** | Socket close detected |
-| Child crashes or network drops | **~60 seconds** | TCP keepalive probes (30s idle + 3×10s probes) |
-| Child silently stops sending data | **10 minutes** | Idle activity timeout |
+| Event                             | Detection Time  | Mechanism                                      |
+|-----------------------------------|-----------------|------------------------------------------------|
+| Child shuts down gracefully       | **Immediate**   | Socket close detected                          |
+| Child crashes or network drops    | **~60 seconds** | TCP keepalive probes (30s idle + 3×10s probes) |
+| Child silently stops sending data | **10 minutes**  | Idle activity timeout                          |
 
 These timings are hardcoded and not user-configurable.
 
@@ -109,11 +109,11 @@ These timings are hardcoded and not user-configurable.
 
 A standalone Agent connects directly to Cloud without a Parent.
 
-| Event | From | To | Timing |
-|-------|------|-----|--------|
-| Agent starts, connects to Cloud | Unseen/Offline | **Live** | Immediate on connection |
-| Agent stops or loses network | Live | **Offline** | Immediate to ~60 seconds |
-| Agent restarts | Offline | **Live** | Immediate on reconnection |
+| Event                           | From           | To          | Timing                    |
+|---------------------------------|----------------|-------------|---------------------------|
+| Agent starts, connects to Cloud | Unseen/Offline | **Live**    | Immediate on connection   |
+| Agent stops or loses network    | Live           | **Offline** | Immediate to ~60 seconds  |
+| Agent restarts                  | Offline        | **Live**    | Immediate on reconnection |
 
 **No Stale state**: Standalone agents go directly to Offline because there's no Parent holding their data.
 
@@ -121,20 +121,20 @@ A standalone Agent connects directly to Cloud without a Parent.
 
 A child streams metrics to a Parent, which connects to Cloud.
 
-| Event | From | To | Timing |
-|-------|------|-----|--------|
-| Child connects to Parent | Unseen/Offline | **Live** | Immediate |
-| Child stops streaming | Live | **Stale** | Immediate to ~60 seconds (see Detection Speed) |
-| Child restarts streaming | Stale | **Live** | Immediate |
-| All Parents go offline | Live/Stale | **Offline** | Immediate to ~60 seconds |
-| Parent reconnects (child still down) | Offline | **Stale** | Immediate (if data retained) |
+| Event                                | From           | To          | Timing                                         |
+|--------------------------------------|----------------|-------------|------------------------------------------------|
+| Child connects to Parent             | Unseen/Offline | **Live**    | Immediate                                      |
+| Child stops streaming                | Live           | **Stale**   | Immediate to ~60 seconds (see Detection Speed) |
+| Child restarts streaming             | Stale          | **Live**    | Immediate                                      |
+| All Parents go offline               | Live/Stale     | **Offline** | Immediate to ~60 seconds                       |
+| Parent reconnects (child still down) | Offline        | **Stale**   | Immediate (if data retained)                   |
 
 ### First Connection
 
-| Event | From | To | Timing |
-|-------|------|-----|--------|
-| Node claimed to Space | - | **Unseen** | Immediate |
-| Node connects for first time | Unseen | **Live** | Immediate on connection |
+| Event                        | From   | To         | Timing                  |
+|------------------------------|--------|------------|-------------------------|
+| Node claimed to Space        | -      | **Unseen** | Immediate               |
+| Node connects for first time | Unseen | **Live**   | Immediate on connection |
 
 ## Automatic Cleanup
 
@@ -142,11 +142,11 @@ A child streams metrics to a Parent, which connects to Cloud.
 
 Cloud automatically removes nodes that remain Offline or Unseen:
 
-| Node Type | Cleanup After | Notes |
-|-----------|---------------|-------|
-| Standalone agents (0 hops) | **7 days** | Direct Cloud connection |
-| Child nodes (1+ hops) | **48 hours** | Connected via Parent |
-| Unseen nodes | **48 hours** | Claimed but never connected |
+| Node Type                  | Cleanup After | Notes                       |
+|----------------------------|---------------|-----------------------------|
+| Standalone agents (0 hops) | **7 days**    | Direct Cloud connection     |
+| Child nodes (1+ hops)      | **48 hours**  | Connected via Parent        |
+| Unseen nodes               | **48 hours**  | Claimed but never connected |
 
 **Stale nodes are never automatically removed.** They have queryable data via their Parent.
 
@@ -165,6 +165,7 @@ For dynamic infrastructure (auto-scaling groups, containers, spot instances), ma
 ```
 
 **Effects:**
+
 - No disconnection alerts for this node
 - Node label `_is_ephemeral=true` propagates to Parents and Cloud
 
@@ -184,7 +185,7 @@ To force-remove a Stale node:
 netdatacli remove-stale-node <node-id | hostname | ALL_NODES>
 ```
 
-This marks the node as ephemeral and removes it from queries on both this Agent dashboard and Netdata Cloud — it does not transition to Offline status. The node typically disappears from the Cloud dashboard within 1-2 minutes as Cloud processes the update and the UI refreshes.
+This marks the node as ephemeral and disconnects it, which transitions the node to Offline on Netdata Cloud. Because the node is ephemeral, Cloud deletes it immediately instead of waiting for the standard Offline cleanup window described above — the node typically disappears from the Cloud dashboard within 1-2 minutes as Cloud processes the update and the UI refreshes. On this Agent's dashboard, the node is removed from queries immediately.
 
 See [Remove Node](/docs/learn/remove-node.md) for detailed instructions.
 
@@ -192,11 +193,11 @@ See [Remove Node](/docs/learn/remove-node.md) for detailed instructions.
 
 Check how a node connects to Cloud:
 
-| Hops | Meaning |
-|------|---------|
-| 0 | Direct Cloud connection (standalone) |
-| 1 | Connected via one Parent |
-| 2+ | Connected via chained Parents |
+| Hops | Meaning                              |
+|------|--------------------------------------|
+| 0    | Direct Cloud connection (standalone) |
+| 1    | Connected via one Parent             |
+| 2+   | Connected via chained Parents        |
 
 View hops in Netdata Cloud by clicking the node info button.
 
@@ -224,6 +225,7 @@ journalctl -u netdata MESSAGE_ID=6e2e3839-0676-4896-8b64-6045dbf28d66
 **Cause:** Node stopped streaming to its Parent.
 
 **Check:**
+
 1. Is the node's Netdata Agent running? `systemctl status netdata`
 2. Can the node reach the Parent? Check network/firewall
 3. Check streaming config: `cat /etc/netdata/stream.conf`
@@ -234,6 +236,7 @@ journalctl -u netdata MESSAGE_ID=6e2e3839-0676-4896-8b64-6045dbf28d66
 **Cause:** Either it's a standalone Agent, or all its Parents are disconnected from Cloud.
 
 **Check:**
+
 1. Is this a standalone Agent or does it stream to a Parent?
 2. If streaming: Is the Parent online and connected to Cloud?
 3. Check Parent's dashboard—does it show the child?
@@ -243,6 +246,7 @@ journalctl -u netdata MESSAGE_ID=6e2e3839-0676-4896-8b64-6045dbf28d66
 **Cause:** Node was claimed but never successfully connected to Cloud.
 
 **Check:**
+
 1. Is the Netdata Agent running?
 2. Can the agent reach `app.netdata.cloud`? Check firewall/proxy
 3. Is the claiming token correct?
@@ -253,6 +257,7 @@ journalctl -u netdata MESSAGE_ID=6e2e3839-0676-4896-8b64-6045dbf28d66
 **Cause:** All Parents lost their Cloud connection. With HA setups (two Parents), this only happens if both disconnect.
 
 **Check:**
+
 1. Are the Parents online? `systemctl status netdata`
 2. Can they reach Cloud? Check network
 3. Check Parent logs: `journalctl -u netdata | grep -i aclk`
@@ -262,6 +267,7 @@ journalctl -u netdata MESSAGE_ID=6e2e3839-0676-4896-8b64-6045dbf28d66
 **Cause:** Node is Stale (has data via Parent). UI prevents deletion to protect queryable data.
 
 **Solution:** Use CLI to remove:
+
 ```bash
 netdatacli remove-stale-node <node-id>
 ```
@@ -271,6 +277,7 @@ netdatacli remove-stale-node <node-id>
 **Cause:** The `streaming_disconnected` and `streaming_never_connected` alerts are configured with `to: silent` by default. They trigger on the Parent dashboard but do not send notifications unless you override the delivery setting.
 
 **Check:**
+
 1. Is the node marked as **permanent**? Ephemeral nodes are excluded from these alerts. Check `netdata.conf` for `is ephemeral node = yes`.
 2. On the Parent dashboard, can you see the alert raised? If the alert is visible but no notification arrived, the `to: silent` default is in effect.
 3. Has a Space administrator [enabled Alert notifications](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/manage-notification-methods.md#manage-space-notification-settings) for your Space?
@@ -282,6 +289,7 @@ netdatacli remove-stale-node <node-id>
 **Cause:** Agent is still running and configured to reconnect.
 
 **Solution:**
+
 1. Stop the agent: `systemctl stop netdata`
 2. Remove claim: `rm /var/lib/netdata/cloud.d/claimed_id`
 3. Clear environment variables if set
