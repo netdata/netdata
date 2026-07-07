@@ -3,6 +3,7 @@
 package snmp_traps
 
 import (
+	"os"
 	"path/filepath"
 	"sync/atomic"
 	"testing"
@@ -88,6 +89,44 @@ func TestNetdataJournalHostStateDirUsesBuildinfoVarLibDir(t *testing.T) {
 	want := filepath.Join(libDir, journalHostStateDirName)
 	if got := netdataJournalHostStateDir(); got != want {
 		t.Fatalf("netdataJournalHostStateDir() = %q, want %q", got, want)
+	}
+}
+
+func TestNetdataHostFilesystemPrefixUsesNetdataHostPrefix(t *testing.T) {
+	prefix := filepath.Join(t.TempDir(), "host", "..", "host")
+	t.Setenv(netdataHostPrefixEnv, prefix)
+
+	want := filepath.Clean(os.Getenv(netdataHostPrefixEnv))
+	if got := netdataHostFilesystemPrefix(); got != want {
+		t.Fatalf("netdataHostFilesystemPrefix() = %q, want %q", got, want)
+	}
+}
+
+func TestNetdataHostFilesystemPrefixIgnoresEmptyNetdataHostPrefix(t *testing.T) {
+	t.Setenv(netdataHostPrefixEnv, "  ")
+
+	if got := netdataHostFilesystemPrefix(); got != "" {
+		t.Fatalf("netdataHostFilesystemPrefix() = %q, want empty", got)
+	}
+}
+
+func TestJournalHostLoadOptionsIncludesHostFilesystemPrefix(t *testing.T) {
+	if pluginconfig.VarLibDir() != "" {
+		t.Skip("pluginconfig VarLibDir is already initialized")
+	}
+
+	t.Setenv(netdataHostPrefixEnv, "/host")
+	t.Setenv(netdataLibDirEnv, "")
+	libDir := filepath.Join(t.TempDir(), "opt", "netdata", "var", "lib", "netdata")
+	withTestBuildinfoVarLibDir(t, libDir)
+
+	opts := journalHostLoadOptions()
+
+	if got, want := opts.StateDir, filepath.Join(libDir, journalHostStateDirName); got != want {
+		t.Fatalf("StateDir = %q, want %q", got, want)
+	}
+	if got, want := opts.HostFilesystemPrefix, "/host"; got != want {
+		t.Fatalf("HostFilesystemPrefix = %q, want %q", got, want)
 	}
 }
 

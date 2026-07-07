@@ -18,6 +18,7 @@ import (
 
 const (
 	netdataLibDirEnv        = "NETDATA_LIB_DIR"
+	netdataHostPrefixEnv    = "NETDATA_HOST_PREFIX"
 	journalHostStateDirName = "systemd-journal-sdk"
 )
 
@@ -34,25 +35,37 @@ var defaultJournalHost struct {
 }
 
 func loadJournalHostProvider() (journalHostProvider, error) {
-	stateDir := netdataJournalHostStateDir()
-	provider, err := journalhost.Load(journalhost.LoadOptions{StateDir: stateDir})
+	opts := journalHostLoadOptions()
+	provider, err := journalhost.Load(opts)
 	if err != nil {
-		return nil, fmt.Errorf("load local journal host identity using state directory %s: %w", stateDir, err)
+		return nil, fmt.Errorf("load local journal host identity using state directory %s: %w", opts.StateDir, err)
 	}
 	return provider, nil
 }
 
 func defaultJournalHostProvider() (journalHostProvider, error) {
 	defaultJournalHost.once.Do(func() {
-		defaultJournalHost.provider, defaultJournalHost.err = journalhost.Load(journalhost.LoadOptions{
-			StateDir: netdataJournalHostStateDir(),
-		})
+		defaultJournalHost.provider, defaultJournalHost.err = journalhost.Load(journalHostLoadOptions())
 	})
 	return defaultJournalHost.provider, defaultJournalHost.err
 }
 
+func journalHostLoadOptions() journalhost.LoadOptions {
+	return journalhost.LoadOptions{
+		StateDir:             netdataJournalHostStateDir(),
+		HostFilesystemPrefix: netdataHostFilesystemPrefix(),
+	}
+}
+
 func netdataJournalHostStateDir() string {
 	return filepath.Join(netdataLibDir(), journalHostStateDirName)
+}
+
+func netdataHostFilesystemPrefix() string {
+	if dir := strings.TrimSpace(os.Getenv(netdataHostPrefixEnv)); dir != "" {
+		return filepath.Clean(dir)
+	}
+	return ""
 }
 
 func netdataLibDir() string {

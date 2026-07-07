@@ -108,6 +108,15 @@ impl PluginConfig {
             .join("systemd-journal-sdk")
     }
 
+    pub(crate) fn journal_host_filesystem_prefix(&self) -> Option<&Path> {
+        self._netdata_env
+            .host_prefix
+            .as_deref()
+            .map(str::trim)
+            .filter(|path| !path.is_empty())
+            .map(Path::new)
+    }
+
     fn load_from_netdata_config(netdata_env: &NetdataEnv) -> Result<Self> {
         let candidates = [
             netdata_env
