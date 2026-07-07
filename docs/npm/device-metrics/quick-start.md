@@ -59,7 +59,7 @@ Check two things:
 
 ## 3. Read the interfaces
 
-Run the **`snmp:interfaces`** Function (Functions tab, pick the device) for a live, sortable table of every interface — traffic, status, errors, and discards — served from data already collected, with no extra requests to the device. If the device runs BGP or exposes licenses, `snmp:bgp-peers` and `snmp:licenses` are there too.
+On the **[Live tab](/docs/dashboards-and-charts/live-tab.md)** in the top navigation, select `SNMP -> Interfaces` from the Functions list (and pick the device) for a live, sortable table of every interface — traffic, status, errors, and discards — served from data already collected, with no extra requests to the device. If the device runs BGP or exposes licenses, `snmp:bgp-peers` and `snmp:licenses` are there too.
 
 ## Next steps
 
