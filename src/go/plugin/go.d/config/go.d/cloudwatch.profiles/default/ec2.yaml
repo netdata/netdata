@@ -30,6 +30,9 @@ metrics:
   - id: status_check_failed
     metric_name: StatusCheckFailed
     statistics: [maximum]
+  - id: status_check_failed_attached_ebs
+    metric_name: StatusCheckFailed_AttachedEBS
+    statistics: [maximum]
   # ----------------------------------------------------------------------------------------
   # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
   # matching chart in the charts: section below, then restart the go.d process. All are
@@ -129,6 +132,8 @@ template:
       dimensions:
         - selector: status_check_failed_maximum
           name: failed
+        - selector: status_check_failed_attached_ebs_maximum
+          name: attached_ebs
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------

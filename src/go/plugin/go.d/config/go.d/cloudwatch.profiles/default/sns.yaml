@@ -24,23 +24,30 @@ metrics:
     metric_name: NumberOfNotificationsFilteredOut
     statistics: [sum]
     rate: true
+  - id: number_of_notifications_filtered_out_invalid_attributes
+    metric_name: NumberOfNotificationsFilteredOut-InvalidAttributes
+    statistics: [sum]
+    rate: true
+  - id: number_of_notifications_filtered_out_invalid_message_body
+    metric_name: NumberOfNotificationsFilteredOut-InvalidMessageBody
+    statistics: [sum]
+    rate: true
+  - id: number_of_notifications_redriven_to_dlq
+    metric_name: NumberOfNotificationsRedrivenToDlq
+    statistics: [sum]
+    rate: true
+  - id: number_of_notifications_failed_to_redrive_to_dlq
+    metric_name: NumberOfNotificationsFailedToRedriveToDlq
+    statistics: [sum]
+    rate: true
   - id: publish_size
     metric_name: PublishSize
     statistics: [average]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. All are published at the {TopicName} grain.
+  # Additional filtered-out breakdown metrics at the {TopicName} grain can be added the same way.
   # ----------------------------------------------------------------------------------------
-  # - id: number_of_notifications_redriven_to_dlq
-  #   metric_name: NumberOfNotificationsRedrivenToDlq
-  #   statistics: [sum]
-  #   rate: true
-  # - id: number_of_notifications_failed_to_redrive_to_dlq
-  #   metric_name: NumberOfNotificationsFailedToRedriveToDlq
-  #   statistics: [sum]
-  #   rate: true
   # Filtered-out breakdowns (NumberOfNotificationsFilteredOut-MessageAttributes / -MessageBody /
-  # -InvalidAttributes / -NoMessageAttributes) are also at {TopicName}. SMS (PhoneNumber grain),
+  # -NoMessageAttributes) are also at {TopicName}. SMS (PhoneNumber grain),
   # mobile-push (Application/Platform grains), and account-level SMS spend need their own profiles.
   # See: https://docs.aws.amazon.com/sns/latest/dg/sns-monitoring-using-cloudwatch.html
 template:
@@ -81,17 +88,25 @@ template:
       dimensions:
         - selector: publish_size_average
           name: size
-    # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
-    # ----------------------------------------------------------------------------------------
-    # - id: cw_sns_dlq
-    #   context: dlq_redrive
-    #   title: SNS Dead-Letter Queue Redrive
-    #   family: Notifications
-    #   units: notifications/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: number_of_notifications_redriven_to_dlq_sum
-    #       name: redriven
-    #     - selector: number_of_notifications_failed_to_redrive_to_dlq_sum
-    #       name: failed_redrive
+    - id: cw_sns_invalid_notifications
+      context: invalid_notifications
+      title: SNS Invalid Notifications
+      family: Notifications
+      units: notifications/s
+      algorithm: absolute
+      dimensions:
+        - selector: number_of_notifications_filtered_out_invalid_attributes_sum
+          name: invalid_attributes
+        - selector: number_of_notifications_filtered_out_invalid_message_body_sum
+          name: invalid_message_body
+    - id: cw_sns_dlq
+      context: dlq_redrive
+      title: SNS Dead-Letter Queue Redrive
+      family: Notifications
+      units: notifications/s
+      algorithm: absolute
+      dimensions:
+        - selector: number_of_notifications_redriven_to_dlq_sum
+          name: redriven
+        - selector: number_of_notifications_failed_to_redrive_to_dlq_sum
+          name: failed_redrive
