@@ -285,6 +285,14 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
     if(!query_target_aggregatable(qt) && r->partial_data_trimming.expected_after < qt->window.before)
         rrdr2rrdr_group_by_partial_trimming(r);
 
+    // percentage points are already normalized (0-100), so their sts pair must
+    // average over the view rows to stay consistent with min/max (row extremes),
+    // not over the per-point source contributions (gbc); in aggregatable (raw)
+    // mode the values are not percentaged and the cloud derives the statistics,
+    // so the (sum, gbc) pair is kept as-is
+    bool percentage_stats_by_rows =
+        aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE && !query_target_aggregatable(qt);
+
     // apply averaging, remove RRDR_VALUE_EMPTY, find the non-zero dimensions, min and max
     size_t global_min_max_values = 0;
     size_t dimensions_nonzero = 0;
@@ -347,7 +355,7 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
                         global_max = n;
                 }
 
-                count += gbc;
+                count += percentage_stats_by_rows ? 1 : gbc;
             }
         }
 
