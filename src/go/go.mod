@@ -90,7 +90,7 @@ require (
 	github.com/microsoft/go-mssqldb v1.10.0
 	github.com/moby/moby/api v1.55.0
 	github.com/moby/moby/client v0.5.0
-	github.com/netdata/systemd-journal-sdk/go v0.7.7
+	github.com/netdata/systemd-journal-sdk/go v0.7.8
 	github.com/oschwald/maxminddb-golang v1.13.1
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2
 	go.mongodb.org/mongo-driver/v2 v2.7.0
