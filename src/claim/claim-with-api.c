@@ -488,7 +488,7 @@ bool claim_agent_from_environment(void) {
 
     bool insecure = CONFIG_BOOLEAN_NO;
     const char *from_env = getenv("NETDATA_EXTRA_CLAIM_OPTS");
-    if(from_env && *from_env && strstr(from_env, "-insecure") == 0)
+    if(from_env && *from_env && strstr(from_env, "-insecure") != NULL)
         insecure = CONFIG_BOOLEAN_YES;
 
     return claim_agent(url, token, rooms, proxy, insecure);
