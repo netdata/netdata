@@ -7,6 +7,7 @@
 struct {
     aclk_query_t query_workers[MAX_QUERY_ENTRIES];
     int free_stack[MAX_QUERY_ENTRIES];
+    bool in_free_stack[MAX_QUERY_ENTRIES];
     int top;
     SPINLOCK spinlock;
 } queryPool;
@@ -17,6 +18,7 @@ __attribute__((constructor)) void init_query_pool()
     spinlock_init(&queryPool.spinlock);
     for (int i = 0; i < MAX_QUERY_ENTRIES; i++) {
         queryPool.free_stack[i] = i;
+        queryPool.in_free_stack[i] = true;
         queryPool.query_workers[i].allocated = false;
     }
     queryPool.top = MAX_QUERY_ENTRIES;
@@ -32,6 +34,7 @@ static aclk_query_t *get_query()
         return query;
     }
     int index = queryPool.free_stack[--queryPool.top];
+    queryPool.in_free_stack[index] = false;
     memset(&queryPool.query_workers[index], 0, sizeof(aclk_query_t));
     spinlock_unlock(&queryPool.spinlock);
     return &queryPool.query_workers[index];
@@ -49,6 +52,11 @@ static void return_query(aclk_query_t *query)
         spinlock_unlock(&queryPool.spinlock);
         return;  // Invalid (should not happen)
     }
+    if (unlikely(queryPool.in_free_stack[index] || queryPool.top < 0 || queryPool.top >= MAX_QUERY_ENTRIES)) {
+        spinlock_unlock(&queryPool.spinlock);
+        return;
+    }
+    queryPool.in_free_stack[index] = true;
     queryPool.free_stack[queryPool.top++] = index;
     memset(query, 0, sizeof(aclk_query_t));
     spinlock_unlock(&queryPool.spinlock);
