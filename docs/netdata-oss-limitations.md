@@ -6,11 +6,11 @@ This document explains the access control policies that govern feature availabil
 
 Netdata implements a layered access control system to protect sensitive information while keeping core monitoring capabilities freely available. The system distinguishes between three access levels:
 
-| Access Level                  | Description                                                              |
-|-------------------------------|--------------------------------------------------------------------------|
-| **Anonymous**                 | Using the Netdata dashboard without signing in                           |
-| **Netdata Cloud Community**   | Signed in to Netdata Cloud (free tier)                                   |
-| **Netdata Cloud paid plan**   | Signed in with a paid plan (Homelab, Business, or Enterprise On-Premise) |
+| Access Level                | Description                                                              |
+|-----------------------------|--------------------------------------------------------------------------|
+| **Anonymous**               | Using the Netdata dashboard without signing in                           |
+| **Netdata Cloud Community** | Signed in to Netdata Cloud (free tier)                                   |
+| **Netdata Cloud paid plan** | Signed in with a paid plan (Homelab, Business, or Enterprise On-Premise) |
 
 ## Why Access Controls Exist
 
@@ -34,7 +34,7 @@ Without authentication, anyone who can reach the Netdata dashboard could access 
 | Charts and dashboards              |      ✓      |     ✓      |     ✓     |
 | Anomaly detection (ML)             |      ✓      |     ✓      |     ✓     |
 | Alert notifications                |      ✓      |     ✓      |     ✓     |
-| Multi-node views                   |   5 nodes   |  5 nodes   | Unlimited |
+| Node dashboard access              |   5 nodes   |  5 nodes   | Unlimited |
 | Custom dashboards                  | 1 per agent | 1 per room | Unlimited |
 
 :::note
@@ -126,12 +126,12 @@ Dynamic Configuration requires a paid plan:
 
 ### Increase Node Limits
 
-The 5-node limit on multi-node dashboards applies to both **Anonymous** and **Community** users. You can:
+The 5-node limit on Netdata Cloud dashboards applies to both **Anonymous** and **Community** users. You can:
 
-1. **Upgrade to a paid plan** for unlimited nodes in multi-node dashboards
-2. **Select preferred nodes** in **Space Settings > Nodes** to choose which 5 nodes appear in multi-node dashboards
+1. **Upgrade to a paid plan** for unlimited nodes on Netdata Cloud dashboards
+2. **Select preferred nodes** in **Space Settings > Nodes** to choose which 5 nodes you can access on Netdata Cloud
 
-This limit is a **display limit for the multi-node dashboard**, not a streaming or connection limit. You can stream any number of nodes to a parent and chain parents across multiple levels — both are fully supported. Every node continues collecting and storing its data, and each remains individually viewable on its own single-node dashboard. The limit only controls how many nodes appear together in the combined Metrics tab.
+This limit is a **Netdata Cloud plan entitlement**, not a streaming or connection limit. You can stream any number of nodes to a parent and chain parents across multiple levels — both are fully supported, and every node continues collecting and storing its data regardless of this limit. On Netdata Cloud, however, a node outside your 5-node quota shows as **Locked**: every per-node feature — its single-node dashboard, Functions, Configuration, silencing rules, Anomaly Advisor, and alert details — becomes inaccessible, and it is excluded from the combined Metrics tab, until you either select it as one of your preferred nodes or upgrade to a paid plan.
 
 ```mermaid
 flowchart LR
@@ -139,12 +139,16 @@ flowchart LR
         C1["Child 1"] --> P["Parent"]
         CN["Child 2..N"] --> P
     end
-    P --> M["Multi-node dashboard<br/>(Metrics tab)"]
-    M --> V["Up to 5 nodes<br/>shown together"]
+    P --> D["Netdata Cloud dashboards<br/>(single-node & Metrics tab)"]
+    D --> Q{"Node in your<br/>5-node quota?"}
+    Q -->|Yes| V["Dashboard & per-node<br/>features accessible"]
+    Q -->|No| L["Locked — select as preferred<br/>node or upgrade plan"]
     classDef parent fill:#f3e8ff,stroke:#9b59b6,stroke-width:2px
     classDef dash fill:#e8f4f8,stroke:#2196F3,stroke-width:2px
+    classDef locked fill:#fdecea,stroke:#e74c3c,stroke-width:2px
     class P parent
-    class M,V dash
+    class D,V dash
+    class L locked
 ```
 
 :::note
@@ -152,7 +156,6 @@ flowchart LR
 Preferred node selection only affects Netdata Cloud dashboards. On the local Agent dashboard (accessed directly at `http://<agent-ip>:19999`), the nodes shown in multi-node views are determined by the Agent's streaming configuration and cannot be changed via preferred node settings.
 
 :::
-
 
 ## Summary
 
@@ -165,7 +168,7 @@ Preferred node selection only affects Netdata Cloud dashboards. On the local Age
 | **Sensitive Functions**   | Blocked     | Full access   | Full access |
 | **AI Features**           | Blocked     | Full access   | Full access |
 | **Dynamic Configuration** | Blocked     | Blocked       | Full access |
-| **Multi-node Limit**      | 5 nodes     | 5 nodes       | Unlimited   |
+| **Node Dashboard Access** | 5 nodes     | 5 nodes       | Unlimited   |
 | **Custom Dashboards**     | 1 per agent | 1 per room    | Unlimited   |
 | **RBAC & SSO**            | N/A         | Not available | Full access |
 
