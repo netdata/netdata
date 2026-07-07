@@ -1,7 +1,7 @@
 //! Configuration loading for the otel-plugin.
 //!
 //! Resolution order (highest priority first):
-//! 1. Environment variables (`NETDATA_OTEL_*`)
+//! 1. Environment variables (`NETDATA_OTEL_CFG_*`)
 //! 2. User config file (`$NETDATA_USER_CONFIG_DIR/otel.yaml`)
 //! 3. Stock config file (`$NETDATA_STOCK_CONFIG_DIR/otel.yaml`)
 
@@ -228,7 +228,7 @@ impl ConfigResolver {
 /// Load and resolve the plugin configuration, layering the stock file, the user
 /// file, then env vars (see the module-level resolution order).
 ///
-/// Thin I/O shell: it resolves the config dirs and `NETDATA_OTEL_*` environment,
+/// Thin I/O shell: it resolves the config dirs and `NETDATA_OTEL_CFG_*` environment,
 /// then delegates the read/parse/merge/validate to [`ConfigResolver`].
 pub fn load_config() -> Result<PluginConfig> {
     const CONFIG_FILENAME: &str = "otel.yaml";
@@ -985,33 +985,76 @@ logs:
 
     #[test]
     fn env_unrecognized_variable_rejected() {
-        // Same strictness as YAML keys: a typo'd NETDATA_OTEL_* name is fatal,
+        // Same strictness as YAML keys: a typo'd NETDATA_OTEL_CFG_* name is fatal,
         // not silently ignored. The error names every offender.
         let err = ConfigOverride::from_map(&env_map(&[
-            ("NETDATA_OTEL_LOGS_RETENSION_MAX_FILES", "5"),
-            ("NETDATA_OTEL_ENDPOINT_PATH", "0.0.0.0:9999"),
+            ("NETDATA_OTEL_CFG_LOGS_RETENSION_MAX_FILES", "5"),
+            ("NETDATA_OTEL_CFG_ENDPOINT_PATH", "0.0.0.0:9999"),
         ]))
         .unwrap_err();
         let msg = format!("{err:#}");
         assert!(msg.contains("unrecognized environment variable"), "{msg}");
         assert!(
-            msg.contains("NETDATA_OTEL_LOGS_RETENSION_MAX_FILES"),
+            msg.contains("NETDATA_OTEL_CFG_LOGS_RETENSION_MAX_FILES"),
             "{msg}"
         );
         // Old (pre-rework) storage/auth names are typos now too.
         let err =
-            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_LOGS_STORAGE_ENABLED", "true")]))
+            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_LOGS_STORAGE_ENABLED", "true")]))
                 .unwrap_err();
         assert!(
-            format!("{err:#}").contains("NETDATA_OTEL_LOGS_STORAGE_ENABLED"),
+            format!("{err:#}").contains("NETDATA_OTEL_CFG_LOGS_STORAGE_ENABLED"),
             "{err:#}"
         );
     }
 
     #[test]
+    fn env_snapshot_ignores_k8s_service_link_variables() {
+        // A k8s Service named `netdata-otel` injects these service-link
+        // variables into every pod that can see it (enableServiceLinks
+        // defaults to true). They live outside the NETDATA_OTEL_CFG_ prefix,
+        // so the snapshot never collects them and the strict unknown-name
+        // check never sees them.
+        let vars = [
+            ("NETDATA_OTEL_PORT", "tcp://10.96.0.10:4317"),
+            ("NETDATA_OTEL_PORT_4317_TCP", "tcp://10.96.0.10:4317"),
+            ("NETDATA_OTEL_PORT_4317_TCP_ADDR", "10.96.0.10"),
+            ("NETDATA_OTEL_PORT_4317_TCP_PORT", "4317"),
+            ("NETDATA_OTEL_PORT_4317_TCP_PROTO", "tcp"),
+            ("NETDATA_OTEL_SERVICE_HOST", "10.96.0.10"),
+            ("NETDATA_OTEL_SERVICE_PORT", "4317"),
+            ("NETDATA_OTEL_SERVICE_PORT_OTEL", "4317"),
+            ("NETDATA_OTEL_CFG_ENDPOINT_PATH", "0.0.0.0:9999"),
+        ];
+        let map = env::otel_env_from_iter(vars.iter().map(|(k, v)| {
+            (
+                std::ffi::OsString::from(*k),
+                std::ffi::OsString::from(*v),
+            )
+        }));
+        let o = ConfigOverride::from_map(&map).unwrap();
+        assert_eq!(
+            o.endpoint.as_ref().unwrap().path.as_deref(),
+            Some("0.0.0.0:9999")
+        );
+    }
+
+    #[test]
+    fn env_old_prefix_config_names_are_invisible() {
+        // Former NETDATA_OTEL_* config names fall outside the CFG prefix and
+        // are silently ignored — the same mechanism that shields the k8s
+        // service-link names above.
+        let map = env::otel_env_from_iter([(
+            std::ffi::OsString::from("NETDATA_OTEL_STORAGE_URI"),
+            std::ffi::OsString::from("s3://bucket/prefix"),
+        )]);
+        assert!(!ConfigOverride::from_map(&map).unwrap().has_any());
+    }
+
+    #[test]
     fn env_override_endpoint_path() {
         let o =
-            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_ENDPOINT_PATH", "0.0.0.0:9999")]))
+            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_ENDPOINT_PATH", "0.0.0.0:9999")]))
                 .unwrap();
         assert_eq!(
             o.endpoint.as_ref().unwrap().path.as_deref(),
@@ -1021,7 +1064,7 @@ logs:
 
     #[test]
     fn env_override_metrics_interval() {
-        let o = ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_METRICS_INTERVAL_SECS", "30")]))
+        let o = ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_METRICS_INTERVAL_SECS", "30")]))
             .unwrap();
         assert_eq!(o.metrics.as_ref().unwrap().interval_secs, Some(30));
     }
@@ -1029,7 +1072,7 @@ logs:
     #[test]
     fn env_override_logs_bytesize() {
         let o = ConfigOverride::from_map(&env_map(&[(
-            "NETDATA_OTEL_LOGS_ROTATION_MAX_FILE_SIZE",
+            "NETDATA_OTEL_CFG_LOGS_ROTATION_MAX_FILE_SIZE",
             "200MB",
         )]))
         .unwrap();
@@ -1041,7 +1084,7 @@ logs:
     #[test]
     fn env_override_logs_duration() {
         let o = ConfigOverride::from_map(&env_map(&[(
-            "NETDATA_OTEL_LOGS_RETENTION_MAX_AGE",
+            "NETDATA_OTEL_CFG_LOGS_RETENTION_MAX_AGE",
             "14 days",
         )]))
         .unwrap();
@@ -1053,8 +1096,8 @@ logs:
     #[test]
     fn env_override_logs_ingest() {
         let o = ConfigOverride::from_map(&env_map(&[
-            ("NETDATA_OTEL_LOGS_INGEST_MAX_AGE", "36 hours"),
-            ("NETDATA_OTEL_LOGS_INGEST_FUTURE_SKEW", "30 seconds"),
+            ("NETDATA_OTEL_CFG_LOGS_INGEST_MAX_AGE", "36 hours"),
+            ("NETDATA_OTEL_CFG_LOGS_INGEST_FUTURE_SKEW", "30 seconds"),
         ]))
         .unwrap();
         let ingest = o.logs.as_ref().unwrap().ingest.as_ref().unwrap();
@@ -1064,7 +1107,7 @@ logs:
 
     #[test]
     fn env_override_logs_bool() {
-        let o = ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_LOGS_CRC_ENABLED", "yes")]))
+        let o = ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_LOGS_CRC_ENABLED", "yes")]))
             .unwrap();
         assert_eq!(o.logs.as_ref().unwrap().crc_enabled, Some(true));
     }
@@ -1072,9 +1115,9 @@ logs:
     #[test]
     fn env_override_global_storage() {
         let o = ConfigOverride::from_map(&env_map(&[
-            ("NETDATA_OTEL_STORAGE_ENABLED", "yes"),
-            ("NETDATA_OTEL_STORAGE_URI", "fs:///data/remote"),
-            ("NETDATA_OTEL_STORAGE_READ_CACHE_MAX_SIZE", "2GiB"),
+            ("NETDATA_OTEL_CFG_STORAGE_ENABLED", "yes"),
+            ("NETDATA_OTEL_CFG_STORAGE_URI", "fs:///data/remote"),
+            ("NETDATA_OTEL_CFG_STORAGE_READ_CACHE_MAX_SIZE", "2GiB"),
         ]))
         .unwrap();
         // Guard against a future refactor dropping a field from
@@ -1090,8 +1133,8 @@ logs:
     #[test]
     fn env_override_base_dir_and_auth() {
         let o = ConfigOverride::from_map(&env_map(&[
-            ("NETDATA_OTEL_BASE_DIR", "/data/otel"),
-            ("NETDATA_OTEL_AUTH_ENABLED", "true"),
+            ("NETDATA_OTEL_CFG_BASE_DIR", "/data/otel"),
+            ("NETDATA_OTEL_CFG_AUTH_ENABLED", "true"),
         ]))
         .unwrap();
         assert!(o.has_any());
@@ -1105,7 +1148,7 @@ logs:
     #[test]
     fn env_override_traces_tuning_separate_from_logs() {
         let o = ConfigOverride::from_map(&env_map(&[(
-            "NETDATA_OTEL_TRACES_ROTATION_MAX_LOG_ENTRIES",
+            "NETDATA_OTEL_CFG_TRACES_ROTATION_MAX_LOG_ENTRIES",
             "777",
         )]))
         .unwrap();
@@ -1121,7 +1164,7 @@ logs:
     fn env_override_invalid_number_rejected() {
         assert!(
             ConfigOverride::from_map(&env_map(&[(
-                "NETDATA_OTEL_METRICS_INTERVAL_SECS",
+                "NETDATA_OTEL_CFG_METRICS_INTERVAL_SECS",
                 "not_a_number"
             )]))
             .is_err()
@@ -1131,7 +1174,7 @@ logs:
     #[test]
     fn env_override_invalid_bool_rejected() {
         assert!(
-            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_LOGS_CRC_ENABLED", "maybe")]))
+            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_LOGS_CRC_ENABLED", "maybe")]))
                 .is_err()
         );
     }
@@ -1140,7 +1183,7 @@ logs:
     fn env_override_invalid_bytesize_rejected() {
         assert!(
             ConfigOverride::from_map(&env_map(&[(
-                "NETDATA_OTEL_STORAGE_READ_CACHE_MAX_SIZE",
+                "NETDATA_OTEL_CFG_STORAGE_READ_CACHE_MAX_SIZE",
                 "not-a-size"
             )]))
             .is_err()
@@ -1165,7 +1208,7 @@ logs:
         // error is the unrecognized-name one, not a UTF-8 one.
         let mut env: std::collections::HashMap<String, OsString> = std::collections::HashMap::new();
         env.insert(
-            "NETDATA_OTEL_UNKNOWN_FUTURE".to_string(),
+            "NETDATA_OTEL_CFG_UNKNOWN_FUTURE".to_string(),
             OsString::from_vec(vec![0xff, 0xfe]),
         );
         let err = ConfigOverride::from_map(&env).unwrap_err();
@@ -1183,7 +1226,7 @@ logs:
         // A consumed var whose value is not UTF-8 must surface an error at load.
         let mut env: std::collections::HashMap<String, OsString> = std::collections::HashMap::new();
         env.insert(
-            "NETDATA_OTEL_ENDPOINT_PATH".to_string(),
+            "NETDATA_OTEL_CFG_ENDPOINT_PATH".to_string(),
             OsString::from_vec(vec![0xff, 0xfe]),
         );
         assert!(ConfigOverride::from_map(&env).is_err());
@@ -1229,7 +1272,7 @@ logs:
             "endpoint:\n  path: '192.168.1.1:4317'\n",
         );
         let env =
-            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_ENDPOINT_PATH", "0.0.0.0:9999")]))
+            ConfigOverride::from_map(&env_map(&[("NETDATA_OTEL_CFG_ENDPOINT_PATH", "0.0.0.0:9999")]))
                 .unwrap();
         let config = ConfigResolver::from_stock(stock)
             .with_user(user)
@@ -1246,7 +1289,7 @@ logs:
         let dir = tempfile::tempdir().unwrap();
         let stock = write_file(dir.path(), "stock.yaml", STOCK_YAML);
         let env = ConfigOverride::from_map(&env_map(&[(
-            "NETDATA_OTEL_LOGS_ROTATION_MAX_LOG_ENTRIES",
+            "NETDATA_OTEL_CFG_LOGS_ROTATION_MAX_LOG_ENTRIES",
             "12345",
         )]))
         .unwrap();
@@ -1499,8 +1542,8 @@ logs:
         let dir = tempfile::tempdir().unwrap();
         let stock = write_file(dir.path(), "stock.yaml", STOCK_YAML);
         let env = ConfigOverride::from_map(&env_map(&[
-            ("NETDATA_OTEL_LOGS_CATALOG_ROTATION_PERIOD", "5 minutes"),
-            ("NETDATA_OTEL_LOGS_RETENTION_HORIZON", "3 years"),
+            ("NETDATA_OTEL_CFG_LOGS_CATALOG_ROTATION_PERIOD", "5 minutes"),
+            ("NETDATA_OTEL_CFG_LOGS_RETENTION_HORIZON", "3 years"),
         ]))
         .unwrap();
         let config = ConfigResolver::from_stock(stock)

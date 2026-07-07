@@ -11,22 +11,35 @@ use super::endpoint::EndpointOverride;
 use super::metrics::MetricsOverride;
 use super::signal::{AuthOverride, CatalogOverride, IngestOverride, SignalOverride, StorageOverride};
 
-/// A snapshot of `NETDATA_OTEL_*` (name → raw value), so config resolution reads
+/// A snapshot of `NETDATA_OTEL_CFG_*` (name → raw value), so config resolution reads
 /// from an injected map rather than `std::env` and stays unit-testable. Values
 /// stay `OsString`; a value's UTF-8 is checked only when read ([`get_env`]).
 /// Every name in the snapshot must be recognized ([`EnvReader`]) — an unknown
 /// name is fatal before its value matters.
 pub(super) type EnvMap = HashMap<String, OsString>;
 
-/// Collect the `NETDATA_OTEL_*` environment into an [`EnvMap`] — the only reader
-/// of the process environment. A non-UTF-8 key cannot match the ASCII prefix and
-/// is skipped; values are kept verbatim and validated lazily on read.
+/// Collect the `NETDATA_OTEL_CFG_*` environment into an [`EnvMap`] — the only
+/// reader of the process environment.
 pub(super) fn otel_env_from_process() -> EnvMap {
+    otel_env_from_iter(std::env::vars_os())
+}
+
+/// Filter an environment snapshot down to `NETDATA_OTEL_CFG_*` entries.
+/// A non-UTF-8 key cannot match the ASCII prefix and is skipped; values are
+/// kept verbatim and validated lazily on read.
+///
+/// The prefix deliberately does not own the plugin-wide `NETDATA_OTEL_`
+/// namespace: Kubernetes injects service-link variables such as
+/// `NETDATA_OTEL_SERVICE_HOST` and `NETDATA_OTEL_PORT_4317_TCP` into every pod
+/// that can see a Service named `netdata-otel`, and those must never reach the
+/// strict unknown-name check below.
+pub(super) fn otel_env_from_iter(
+    vars: impl IntoIterator<Item = (OsString, OsString)>,
+) -> EnvMap {
     let mut env = EnvMap::new();
-    for (key, value) in std::env::vars_os() {
-        // A non-UTF-8 key cannot match the ASCII NETDATA_OTEL_* prefix.
+    for (key, value) in vars {
         let Some(key) = key.to_str() else { continue };
-        if key.starts_with("NETDATA_OTEL_") {
+        if key.starts_with("NETDATA_OTEL_CFG_") {
             env.insert(key.to_string(), value);
         }
     }
@@ -34,7 +47,7 @@ pub(super) fn otel_env_from_process() -> EnvMap {
 }
 
 /// An [`EnvMap`] that records every name looked up, so that after resolution
-/// the leftovers — `NETDATA_OTEL_*` names no consumer recognizes, i.e. typos —
+/// the leftovers — `NETDATA_OTEL_CFG_*` names no consumer recognizes, i.e. typos —
 /// can be rejected. The consumers query their full fixed vocabulary
 /// unconditionally, so "read" equals "recognized" by construction; there is no
 /// hand-maintained list of accepted names to drift out of sync.
@@ -71,7 +84,7 @@ impl<'a> EnvReader<'a> {
         }
         unknown.sort_unstable();
         anyhow::bail!(
-            "unrecognized environment variable{}: {} — NETDATA_OTEL_* names are \
+            "unrecognized environment variable{}: {} — NETDATA_OTEL_CFG_* names are \
              checked strictly so a typo cannot be silently ignored",
             if unknown.len() == 1 { "" } else { "s" },
             unknown.join(", ")
@@ -115,7 +128,7 @@ fn parse_env_duration(env: &EnvReader<'_>, name: &str) -> Result<Option<Duration
 
 /// Parse a boolean env var. Accepted values are case-insensitive: `true`/`1`/`yes`
 /// and `false`/`0`/`no`; anything else is an error (this is the user-facing
-/// vocabulary for `NETDATA_OTEL_*_ENABLED` flags).
+/// vocabulary for `NETDATA_OTEL_CFG_*_ENABLED` flags).
 fn parse_env_bool(env: &EnvReader<'_>, name: &str) -> Result<Option<bool>> {
     match get_env(env, name)? {
         Some(val) => match val.to_lowercase().as_str() {
@@ -132,7 +145,7 @@ fn parse_env_bool(env: &EnvReader<'_>, name: &str) -> Result<Option<bool>> {
 }
 
 impl ConfigOverride {
-    /// Build the config overrides from an [`EnvMap`] snapshot of `NETDATA_OTEL_*`
+    /// Build the config overrides from an [`EnvMap`] snapshot of `NETDATA_OTEL_CFG_*`
     /// variables. Pure: reads only the provided map, never the process env.
     /// A name in the snapshot that no consumer recognizes is an error — the
     /// consumers below query their full vocabulary unconditionally, so after
@@ -141,7 +154,7 @@ impl ConfigOverride {
         let env = &EnvReader::new(env);
         let endpoint = EndpointOverride::from_map(env)?;
         let metrics = MetricsOverride::from_map(env)?;
-        let base_dir = get_env(env, "NETDATA_OTEL_BASE_DIR")?.map(PathBuf::from);
+        let base_dir = get_env(env, "NETDATA_OTEL_CFG_BASE_DIR")?.map(PathBuf::from);
         let storage = StorageOverride::from_map(env)?;
         let auth = AuthOverride::from_map(env)?;
         let logs = SignalOverride::from_map(env, "LOGS")?;
@@ -175,10 +188,10 @@ impl ConfigOverride {
 impl EndpointOverride {
     fn from_map(env: &EnvReader<'_>) -> Result<Self> {
         Ok(Self {
-            path: get_env(env, "NETDATA_OTEL_ENDPOINT_PATH")?.map(str::to_string),
-            tls_cert_path: get_env(env, "NETDATA_OTEL_ENDPOINT_TLS_CERT_PATH")?.map(str::to_string),
-            tls_key_path: get_env(env, "NETDATA_OTEL_ENDPOINT_TLS_KEY_PATH")?.map(str::to_string),
-            tls_ca_cert_path: get_env(env, "NETDATA_OTEL_ENDPOINT_TLS_CA_CERT_PATH")?
+            path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_PATH")?.map(str::to_string),
+            tls_cert_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_TLS_CERT_PATH")?.map(str::to_string),
+            tls_key_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_TLS_KEY_PATH")?.map(str::to_string),
+            tls_ca_cert_path: get_env(env, "NETDATA_OTEL_CFG_ENDPOINT_TLS_CA_CERT_PATH")?
                 .map(str::to_string),
         })
     }
@@ -187,14 +200,14 @@ impl EndpointOverride {
 impl MetricsOverride {
     fn from_map(env: &EnvReader<'_>) -> Result<Self> {
         Ok(Self {
-            chart_configs_dir: get_env(env, "NETDATA_OTEL_METRICS_CHART_CONFIGS_DIR")?
+            chart_configs_dir: get_env(env, "NETDATA_OTEL_CFG_METRICS_CHART_CONFIGS_DIR")?
                 .map(str::to_string),
-            interval_secs: parse_env_var(env, "NETDATA_OTEL_METRICS_INTERVAL_SECS")?,
-            grace_period_secs: parse_env_var(env, "NETDATA_OTEL_METRICS_GRACE_PERIOD_SECS")?,
-            expiry_duration_secs: parse_env_var(env, "NETDATA_OTEL_METRICS_EXPIRY_DURATION_SECS")?,
+            interval_secs: parse_env_var(env, "NETDATA_OTEL_CFG_METRICS_INTERVAL_SECS")?,
+            grace_period_secs: parse_env_var(env, "NETDATA_OTEL_CFG_METRICS_GRACE_PERIOD_SECS")?,
+            expiry_duration_secs: parse_env_var(env, "NETDATA_OTEL_CFG_METRICS_EXPIRY_DURATION_SECS")?,
             max_new_charts_per_request: parse_env_var(
                 env,
-                "NETDATA_OTEL_METRICS_MAX_NEW_CHARTS_PER_REQUEST",
+                "NETDATA_OTEL_CFG_METRICS_MAX_NEW_CHARTS_PER_REQUEST",
             )?,
         })
     }
@@ -203,12 +216,12 @@ impl MetricsOverride {
 impl StorageOverride {
     fn from_map(env: &EnvReader<'_>) -> Result<Self> {
         Ok(Self {
-            enabled: parse_env_bool(env, "NETDATA_OTEL_STORAGE_ENABLED")?,
-            uri: get_env(env, "NETDATA_OTEL_STORAGE_URI")?.map(str::to_string),
-            read_cache_max_size: parse_env_var(env, "NETDATA_OTEL_STORAGE_READ_CACHE_MAX_SIZE")?,
+            enabled: parse_env_bool(env, "NETDATA_OTEL_CFG_STORAGE_ENABLED")?,
+            uri: get_env(env, "NETDATA_OTEL_CFG_STORAGE_URI")?.map(str::to_string),
+            read_cache_max_size: parse_env_var(env, "NETDATA_OTEL_CFG_STORAGE_READ_CACHE_MAX_SIZE")?,
             startup_op_timeout: parse_env_duration(
                 env,
-                "NETDATA_OTEL_STORAGE_STARTUP_OP_TIMEOUT",
+                "NETDATA_OTEL_CFG_STORAGE_STARTUP_OP_TIMEOUT",
             )?,
         })
     }
@@ -217,13 +230,13 @@ impl StorageOverride {
 impl AuthOverride {
     fn from_map(env: &EnvReader<'_>) -> Result<Self> {
         Ok(Self {
-            enabled: parse_env_bool(env, "NETDATA_OTEL_AUTH_ENABLED")?,
+            enabled: parse_env_bool(env, "NETDATA_OTEL_CFG_AUTH_ENABLED")?,
         })
     }
 }
 
 impl SignalOverride {
-    /// Build a per-signal tuning override from `NETDATA_OTEL_{PREFIX}_*` entries
+    /// Build a per-signal tuning override from `NETDATA_OTEL_CFG_{PREFIX}_*` entries
     /// in the map (`PREFIX` is `LOGS` or `TRACES`). Dirs and storage are not
     /// per-signal and so have no per-signal env vars.
     fn from_map(env: &EnvReader<'_>, prefix: &str) -> Result<Self> {
@@ -286,7 +299,7 @@ impl SignalOverride {
     }
 }
 
-/// Build a per-signal env-var name: `NETDATA_OTEL_{PREFIX}_{SUFFIX}`.
+/// Build a per-signal env-var name: `NETDATA_OTEL_CFG_{PREFIX}_{SUFFIX}`.
 fn var(prefix: &str, suffix: &str) -> String {
-    format!("NETDATA_OTEL_{prefix}_{suffix}")
+    format!("NETDATA_OTEL_CFG_{prefix}_{suffix}")
 }
