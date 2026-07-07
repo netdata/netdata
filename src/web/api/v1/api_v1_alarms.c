@@ -138,7 +138,7 @@ int api_v1_variable(RRDHOST *host, struct web_client *w, char *url) {
     }
 
     w->response.data->content_type = CT_APPLICATION_JSON;
-    st->last_accessed_time_s = now_realtime_sec();
+    rrdset_touch_last_accessed_time_s(st);
     alert_variable_lookup_trace(host, st, variable, w->response.data);
 
     return HTTP_RESP_OK;

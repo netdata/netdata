@@ -36,9 +36,13 @@ struct variable_lookup_job {
 };
 
 static void variable_lookup_add_result_with_score(struct variable_lookup_job *vbd, NETDATA_DOUBLE n, RRDSET *st, const char *source __maybe_unused) {
-    if(vbd->score.last_rrdset != st && vbd->rc->rrdset) {
-        vbd->score.last_rrdset = st;
-        vbd->score.last_score = rrdlabels_common_count(vbd->rc->rrdset->rrdlabels, st->rrdlabels);
+    if(vbd->score.last_rrdset != st) {
+        RRDSET *alert_st = rrdcalc_rrdset_read_lock(vbd->rc);
+        if(alert_st) {
+            vbd->score.last_rrdset = st;
+            vbd->score.last_score = rrdlabels_common_count(alert_st->rrdlabels, st->rrdlabels);
+            rrdcalc_rrdset_read_unlock(alert_st);
+        }
     }
 
     if(vbd->result.used >= vbd->result.size) {

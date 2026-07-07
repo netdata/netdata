@@ -258,6 +258,18 @@ static inline uint32_t rrdset_metadata_version(RRDSET *st) {
     return __atomic_load_n(&st->version, __ATOMIC_RELAXED);
 }
 
+static inline time_t rrdset_last_accessed_time_s(RRDSET *st) {
+    return __atomic_load_n(&st->last_accessed_time_s, __ATOMIC_RELAXED);
+}
+
+static inline void rrdset_set_last_accessed_time_s(RRDSET *st, time_t last_accessed_time_s) {
+    __atomic_store_n(&st->last_accessed_time_s, last_accessed_time_s, __ATOMIC_RELAXED);
+}
+
+static inline void rrdset_touch_last_accessed_time_s(RRDSET *st) {
+    rrdset_set_last_accessed_time_s(st, now_realtime_sec());
+}
+
 static inline uint32_t rrdset_metadata_upstream_version(RRDSET *st) {
     return __atomic_load_n(&st->stream.snd.sent_version, __ATOMIC_RELAXED);
 }

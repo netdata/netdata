@@ -3,6 +3,7 @@
 #include "rrd.h"
 #include "storage-engine.h"
 #include "rrddim-collection.h"
+#include "ram/rrddim_mem.h"
 
 void rrddim_metadata_updated(RRDDIM *rd) {
     rrdcontext_updated_rrddim(rd);
@@ -214,17 +215,22 @@ static void rrddim_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, v
         metaqueue_delete_dimension_uuid(uuidmap_uuid_ptr(rd->uuid));
     }
 
+    bool db_data_lifetime_transferred = false;
+
     for(size_t tier = 0; tier < nd_profile.storage_tiers;tier++) {
         spinlock_lock(&rd->tiers[tier].spinlock);
         if(rd->tiers[tier].smh) {
             STORAGE_ENGINE *eng = host->db[tier].eng;
-            eng->api.metric_release(rd->tiers[tier].smh);
+            if(rd->tiers[tier].seb == STORAGE_ENGINE_BACKEND_RRDDIM)
+                db_data_lifetime_transferred |= rrddim_metric_release_from_rrddim(rd->tiers[tier].smh, rd);
+            else
+                eng->api.metric_release(rd->tiers[tier].smh);
             rd->tiers[tier].smh = NULL;
         }
         spinlock_unlock(&rd->tiers[tier].spinlock);
     }
 
-    if(rd->db.data) {
+    if(rd->db.data && !db_data_lifetime_transferred) {
         pulse_db_rrd_memory_sub(rd->db.memsize);
 
         if(rd->rrd_memory_mode == RRD_DB_MODE_RAM)
@@ -338,8 +344,8 @@ void rrddim_index_destroy(RRDSET *st) {
     st->rrddim_root_index = NULL;
 }
 
-static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
-    return dictionary_get(st->rrddim_root_index, id);
+static inline const DICTIONARY_ITEM *rrddim_index_find_and_acquire(RRDSET *st, const char *id) {
+    return dictionary_get_and_acquire_item(st->rrddim_root_index, id);
 }
 
 // ----------------------------------------------------------------------------
@@ -348,13 +354,16 @@ static inline RRDDIM *rrddim_index_find(RRDSET *st, const char *id) {
 inline RRDDIM *rrddim_find(RRDSET *st, const char *id, bool include_obsolete) {
     netdata_log_debug(D_RRD_CALLS, "rrddim_find() for chart %s, dimension %s", rrdset_name(st), id);
 
-    RRDDIM *rd = rrddim_index_find(st, id);
+    const DICTIONARY_ITEM *rd_item = rrddim_index_find_and_acquire(st, id);
+    RRDDIM *rd = dictionary_acquired_item_value(rd_item);
     if(rd) {
         if(!include_obsolete && rrddim_flag_check(rd, RRDDIM_FLAG_OBSOLETE) && !rrdset_is_discoverable(st))
-            return NULL;
-
-        rd->rrdset->last_accessed_time_s = now_realtime_sec();
+            rd = NULL;
+        else
+            rrdset_touch_last_accessed_time_s(rd->rrdset);
     }
+
+    dictionary_acquired_item_release(st->rrddim_root_index, rd_item);
 
     return rd;
 }
@@ -370,7 +379,7 @@ inline RRDDIM_ACQUIRED *rrddim_find_and_acquire(RRDSET *st, const char *id, bool
             return NULL;
         }
 
-        rd->rrdset->last_accessed_time_s = now_realtime_sec();
+        rrdset_touch_last_accessed_time_s(rd->rrdset);
     }
 
     return rda;
@@ -514,17 +523,20 @@ RRDDIM *rrddim_add_custom(RRDSET *st
 
     RRDDIM *rd = NULL;
     while(!rd) {
-        rd = rrddim_index_find(st, id);
-        if(rd) {
-            if(spinlock_trylock(&rd->destroy_lock)) {
-                rrddim_isnot_obsolete___safe_from_collector_thread(st, rd);
-                spinlock_unlock(&rd->destroy_lock);
+        const DICTIONARY_ITEM *item = dictionary_get_and_acquire_item(st->rrddim_root_index, id);
+        if(item) {
+            RRDDIM *existing_rd = dictionary_acquired_item_value(item);
+            if(spinlock_trylock(&existing_rd->destroy_lock)) {
+                rrddim_isnot_obsolete___safe_from_collector_thread(st, existing_rd);
+                spinlock_unlock(&existing_rd->destroy_lock);
             }
             else {
-                rd = NULL;
+                dictionary_acquired_item_release(st->rrddim_root_index, item);
                 microsleep(1 * USEC_PER_MS);
                 continue;
             }
+
+            dictionary_acquired_item_release(st->rrddim_root_index, item);
         }
 
         struct rrddim_constructor tmp = {
