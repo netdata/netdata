@@ -139,7 +139,7 @@ class OtelConfig:
     # signal has an independent set; an omitted knob keeps the plugin's stock
     # default for that signal. logs.* and traces.* are symmetric.
     logs_rotation_max_file_size: str | None = None      # logs.rotation.default.max_file_size
-    logs_rotation_max_log_entries: int | None = None    # logs.rotation.default.max_log_entries
+    logs_rotation_max_entries: int | None = None    # logs.rotation.default.max_entries
     logs_rotation_max_file_duration: str | None = None  # logs.rotation.default.max_file_duration
     logs_crc_enabled: bool | None = None                # logs.crc_enabled
     logs_compression_enabled: bool | None = None        # logs.compression_enabled
@@ -147,7 +147,7 @@ class OtelConfig:
     logs_retention_max_total_size: str | None = None    # logs.retention.default.max_total_size
     logs_catalog_rotation_count: int | None = None  # logs.catalog.rotation_count; entries per catalog before it rotates+uploads
     traces_rotation_max_file_size: str | None = None      # traces.rotation.default.max_file_size
-    traces_rotation_max_log_entries: int | None = None    # traces.rotation.default.max_log_entries
+    traces_rotation_max_entries: int | None = None    # traces.rotation.default.max_entries
     traces_rotation_max_file_duration: str | None = None  # traces.rotation.default.max_file_duration
     traces_crc_enabled: bool | None = None                # traces.crc_enabled
     traces_compression_enabled: bool | None = None        # traces.compression_enabled
@@ -187,7 +187,7 @@ def _signal_tuning(
     crc_enabled: bool | None,
     compression_enabled: bool | None,
     rotation_max_file_size: str | None,
-    rotation_max_log_entries: int | None,
+    rotation_max_entries: int | None,
     rotation_max_file_duration: str | None,
     retention_max_files: int | None,
     retention_max_total_size: str | None,
@@ -208,7 +208,7 @@ def _signal_tuning(
         k: v
         for k, v in (
             ("max_file_size", rotation_max_file_size),
-            ("max_log_entries", rotation_max_log_entries),
+            ("max_entries", rotation_max_entries),
             ("max_file_duration", rotation_max_file_duration),
         )
         if v is not None
@@ -248,7 +248,7 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
         crc_enabled=cfg.logs_crc_enabled,
         compression_enabled=cfg.logs_compression_enabled,
         rotation_max_file_size=cfg.logs_rotation_max_file_size,
-        rotation_max_log_entries=cfg.logs_rotation_max_log_entries,
+        rotation_max_entries=cfg.logs_rotation_max_entries,
         rotation_max_file_duration=cfg.logs_rotation_max_file_duration,
         retention_max_files=cfg.logs_retention_max_files,
         retention_max_total_size=cfg.logs_retention_max_total_size,
@@ -258,7 +258,7 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
         crc_enabled=cfg.traces_crc_enabled,
         compression_enabled=cfg.traces_compression_enabled,
         rotation_max_file_size=cfg.traces_rotation_max_file_size,
-        rotation_max_log_entries=cfg.traces_rotation_max_log_entries,
+        rotation_max_entries=cfg.traces_rotation_max_entries,
         rotation_max_file_duration=cfg.traces_rotation_max_file_duration,
         retention_max_files=cfg.traces_retention_max_files,
         retention_max_total_size=cfg.traces_retention_max_total_size,

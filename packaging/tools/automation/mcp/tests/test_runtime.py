@@ -134,7 +134,7 @@ def test_generate_runtime_otel_emits_only_set_knobs(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     cfg = runtime.OtelConfig(
         otlp_endpoint="127.0.0.1:4317",
-        logs_rotation_max_log_entries=10,
+        logs_rotation_max_entries=10,
         logs_retention_max_files=2,
         logs_crc_enabled=False,
     )
@@ -144,7 +144,7 @@ def test_generate_runtime_otel_emits_only_set_knobs(tmp_path, monkeypatch):
     assert doc["endpoint"]["path"] == "127.0.0.1:4317"
     # tuning lands flat under logs.* — the plugin's public schema (no dirs,
     # no wal/index nesting)
-    assert doc["logs"]["rotation"]["default"] == {"max_log_entries": 10}
+    assert doc["logs"]["rotation"]["default"] == {"max_entries": 10}
     assert doc["logs"]["retention"]["default"] == {"max_files": 2}
     assert doc["logs"]["crc_enabled"] is False
     assert "wal" not in doc["logs"]
@@ -160,10 +160,10 @@ def test_generate_runtime_otel_tunes_traces_only(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     # Mirror of the logs-only test: tuning only traces emits a traces section and
     # NO logs section (no logs knobs, no journal_dir) — proves the symmetry.
-    cfg = runtime.OtelConfig(traces_rotation_max_log_entries=5, traces_retention_max_files=1)
+    cfg = runtime.OtelConfig(traces_rotation_max_entries=5, traces_retention_max_files=1)
     rd, _conf, _otlp = runtime.generate_runtime("agent-traces-only", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
-    assert doc["traces"]["rotation"]["default"] == {"max_log_entries": 5}
+    assert doc["traces"]["rotation"]["default"] == {"max_entries": 5}
     assert doc["traces"]["retention"]["default"] == {"max_files": 1}
     assert "logs" not in doc
 
@@ -173,15 +173,15 @@ def test_generate_runtime_otel_tunes_signals_independently(tmp_path, monkeypatch
     # logs and traces tuned independently in one config; each lands in its own
     # section, neither leaks into the other.
     cfg = runtime.OtelConfig(
-        logs_rotation_max_log_entries=20,
-        traces_rotation_max_log_entries=10,
+        logs_rotation_max_entries=20,
+        traces_rotation_max_entries=10,
         traces_catalog_rotation_count=3,
     )
     rd, _conf, _otlp = runtime.generate_runtime("agent-sig", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
-    assert doc["logs"]["rotation"]["default"] == {"max_log_entries": 20}
+    assert doc["logs"]["rotation"]["default"] == {"max_entries": 20}
     assert "catalog" not in doc["logs"]
-    assert doc["traces"]["rotation"]["default"] == {"max_log_entries": 10}
+    assert doc["traces"]["rotation"]["default"] == {"max_entries": 10}
     assert doc["traces"]["catalog"] == {"rotation_count": 3}
     # storage/auth are global, not per-signal — neither section carries them
     assert "storage" not in doc["logs"] and "storage" not in doc["traces"]
@@ -230,15 +230,15 @@ def test_generate_runtime_otel_honors_explicit_global_storage_uri(tmp_path, monk
 def test_generate_runtime_otel_extra_yaml_deep_merges_and_wins(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
     # A first-class knob (max_file_size) plus a passthrough that (a) reaches
-    # knobs with no first-class param and (b) conflicts on max_log_entries.
+    # knobs with no first-class param and (b) conflicts on max_entries.
     cfg = runtime.OtelConfig(
         logs_rotation_max_file_size="1MB",
-        logs_rotation_max_log_entries=50,
+        logs_rotation_max_entries=50,
         extra_yaml=(
             "auth:\n  enabled: true\n"
             "logs:\n"
             '  ingest:\n    max_age: "30 days"\n'
-            "  rotation:\n    default:\n      max_log_entries: 7\n"
+            "  rotation:\n    default:\n      max_entries: 7\n"
         ),
     )
     rd, _conf, _otlp = runtime.generate_runtime("agent-x", otel=cfg)
@@ -248,7 +248,7 @@ def test_generate_runtime_otel_extra_yaml_deep_merges_and_wins(tmp_path, monkeyp
     assert doc["logs"]["ingest"] == {"max_age": "30 days"}
     # ...nested mappings merge (the sibling knob survives), and on a conflict
     # the passthrough wins.
-    assert doc["logs"]["rotation"]["default"] == {"max_file_size": "1MB", "max_log_entries": 7}
+    assert doc["logs"]["rotation"]["default"] == {"max_file_size": "1MB", "max_entries": 7}
 
 
 def test_generate_runtime_otel_extra_yaml_cannot_override_pins(tmp_path, monkeypatch):
