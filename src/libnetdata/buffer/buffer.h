@@ -158,10 +158,13 @@ static const char *buffer_tostring(BUFFER *wb)
 
 ALWAYS_INLINE
 static void _buffer_json_depth_push(BUFFER *wb, BUFFER_JSON_NODE_TYPE type) {
-#ifdef NETDATA_INTERNAL_CHECKS
-    assert(wb->json.depth <= BUFFER_JSON_MAX_DEPTH && "BUFFER JSON: max nesting reached");
-#endif
-    wb->json.depth++;
+    int next_depth = wb->json.depth + 1;
+
+    if(unlikely(next_depth < 0 || next_depth >= BUFFER_JSON_MAX_DEPTH))
+        fatal("BUFFER JSON: invalid nesting depth %d (next %d, max %d)",
+              wb->json.depth, next_depth, BUFFER_JSON_MAX_DEPTH - 1);
+
+    wb->json.depth = (int8_t)next_depth;
 #ifdef NETDATA_INTERNAL_CHECKS
     assert(wb->json.depth >= 0 && "Depth wrapped around and is negative");
 #endif
