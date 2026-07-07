@@ -7,6 +7,7 @@
 #define PFWORDS_INCREASE_STEP 2000
 #define PFLINES_INCREASE_STEP 200
 #define PROCFILE_INCREMENT_BUFFER 4096
+#define PROCFILE_MAX_SOURCE_SIZE ((size_t)128 * 1024 * 1024)
 
 int procfile_open_flags = O_RDONLY | O_CLOEXEC;
 
@@ -176,6 +177,19 @@ static inline void procfile_lines_free(pflines *fl) {
     freez(fl);
 }
 
+static procfile *procfile_readall_file_too_large(procfile *ff) {
+    if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO)))
+        collector_error(PF_PREFIX ": Refusing to read more than %zu bytes from file '%s' on fd %d.",
+                        (size_t)PROCFILE_MAX_SOURCE_SIZE, procfile_filename(ff), ff->fd);
+    else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
+        netdata_log_error(PF_PREFIX ": Refusing to read more than %zu bytes from file '%s' on fd %d.",
+                          (size_t)PROCFILE_MAX_SOURCE_SIZE, procfile_filename(ff), ff->fd);
+
+    procfile_close(ff);
+    errno = EFBIG;
+    return NULL;
+}
+
 
 // ----------------------------------------------------------------------------
 // The procfile
@@ -325,24 +339,39 @@ procfile *procfile_readall(procfile *ff) {
     ff->len = 0;    // zero the used size
     ssize_t r = 1;  // read at least once
     while(r > 0) {
-        ssize_t s = ff->len;
-        ssize_t x = ff->size - s;
+        size_t s = ff->len;
+        size_t x = ff->size - s;
+
+        if(unlikely(s >= PROCFILE_MAX_SOURCE_SIZE))
+            return procfile_readall_file_too_large(ff);
 
         if(unlikely(!x)) {
+            if(unlikely(ff->size >= PROCFILE_MAX_SOURCE_SIZE))
+                return procfile_readall_file_too_large(ff);
+
             size_t minimum = PROCFILE_INCREMENT_BUFFER;
             size_t optimal = ff->size / 2;
             size_t wanted = (optimal > minimum)?optimal:minimum;
+            size_t available = PROCFILE_MAX_SOURCE_SIZE - ff->size;
+            if(unlikely(wanted > available))
+                wanted = available;
 
             netdata_log_debug(D_PROCFILE, PF_PREFIX ": Expanding data buffer for file '%s' by %zu bytes.", procfile_filename(ff), wanted);
             ff = reallocz(ff, sizeof(procfile) + ff->size + wanted);
             ff->size += wanted;
             ff->stats.memory += wanted;
             ff->stats.resizes++;
+
+            x = ff->size - s;
         }
+
+        size_t remaining = PROCFILE_MAX_SOURCE_SIZE - s;
+        if(unlikely(x > remaining))
+            x = remaining;
 
         // netdata_log_info("Reading file '%s', from position %zd with length %zd", procfile_filename(ff), s, (ssize_t)(ff->size - s));
         ff->stats.reads++;
-        r = read(ff->fd, &ff->data[s], ff->size - s);
+        r = read(ff->fd, &ff->data[s], x);
         if(unlikely(r == -1)) {
             if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
             else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
