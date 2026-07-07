@@ -38,8 +38,6 @@ typedef struct {
 typedef struct {
     RRDHOST *rh;
 
-    std::atomic<bool> ml_running;
-
     // Incremented at the END of every ml_host_stop, after all chart/dim resets
     // have committed. ml_host_detect_once samples this before and after its
     // unlocked chart walk; a change means a stop completed during the walk
@@ -103,5 +101,81 @@ typedef struct {
 
     bool reset_pointers;
 } ml_host_t;
+
+static ALWAYS_INLINE bool ml_running_load(const RRDHOST *rh)
+{
+    return __atomic_load_n(&rh->ml_running, __ATOMIC_RELAXED);
+}
+
+static ALWAYS_INLINE void ml_running_store(RRDHOST *rh, bool running)
+{
+    __atomic_store_n(&rh->ml_running, running, __ATOMIC_RELAXED);
+}
+
+#ifdef __cplusplus
+class AcquiredMLHost {
+public:
+    explicit AcquiredMLHost(RRDHOST *rh) : RH(rh), Host(nullptr)
+    {
+        if (!RH)
+            return;
+
+        rw_spinlock_read_lock(&RH->ml_host_rwlock);
+        Host = reinterpret_cast<ml_host_t *>(__atomic_load_n(&RH->ml_host, __ATOMIC_ACQUIRE));
+        if (!Host)
+            release();
+    }
+
+    AcquiredMLHost(const AcquiredMLHost &) = delete;
+    AcquiredMLHost &operator=(const AcquiredMLHost &) = delete;
+
+    AcquiredMLHost(AcquiredMLHost &&other) noexcept : RH(other.RH), Host(other.Host)
+    {
+        other.RH = nullptr;
+        other.Host = nullptr;
+    }
+
+    AcquiredMLHost &operator=(AcquiredMLHost &&other) noexcept
+    {
+        if (this != &other) {
+            release();
+            RH = other.RH;
+            Host = other.Host;
+            other.RH = nullptr;
+            other.Host = nullptr;
+        }
+
+        return *this;
+    }
+
+    ~AcquiredMLHost()
+    {
+        release();
+    }
+
+    ml_host_t *get() const
+    {
+        return Host;
+    }
+
+    explicit operator bool() const
+    {
+        return Host != nullptr;
+    }
+
+    void release()
+    {
+        if (RH) {
+            rw_spinlock_read_unlock(&RH->ml_host_rwlock);
+            RH = nullptr;
+            Host = nullptr;
+        }
+    }
+
+private:
+    RRDHOST *RH;
+    ml_host_t *Host;
+};
+#endif
 
 #endif /* NETDATA_ML_HOST_H */
