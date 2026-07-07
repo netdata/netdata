@@ -440,6 +440,50 @@ Per interface configuration:
   # events = auto
 ```
 
+## Monitoring Network Statistics
+
+These metrics describe the host's overall IPv4 and IPv6 protocol activity (as opposed to per-interface traffic, covered in [Monitoring Network Interfaces](#monitoring-network-interfaces)). They are collected from `/proc/net/netstat`, `/proc/net/snmp`, and `/proc/net/snmp6`, and cover packet errors, TCP, UDP, broadcast, multicast, and ECN.
+
+### Monitored network statistics metrics
+
+- **IPv4/IPv6 Packet Errors (packets/s)**
+    IP packets that were discarded or could not be processed, split by inbound and outbound and by cause (no route, header error, address error, unknown protocol, checksum error, truncated packet). Sustained non-zero values point to a network path problem such as bad cabling, a misconfigured router, or packet corruption.
+
+- **TCP Connections (active connections)**
+    The number of TCP connections currently established on this host. Use it for capacity planning and to spot unexpected connection growth.
+
+- **TCP Opens (connections/s)**
+    New TCP connections initiated by this host (active) and accepted from remote peers (passive). A spike in active opens indicates a new outbound workload; a spike in passive opens indicates an incoming surge or a possible scan.
+
+- **TCP Handshake Issues (events/s)**
+    TCP connections that were reset or failed during the handshake, including refused/failed connection attempts and SYN retransmissions. Spikes here usually mean a service is refusing, crashing, or unreachable, or that SYNs are being lost on the path.
+
+- **TCP Connection Aborts (connections/s)**
+    Established TCP connections that were aborted, broken down by cause (bad data received, closed by the application, out of memory, timeout, linger, failed abort). Useful when investigating unexpected disconnects reported by users or applications.
+
+- **TCP Errors (packets/s)**
+    TCP segments received with errors (including checksum errors) and segments that had to be retransmitted. High retransmissions indicate packet loss or congestion on the path between peers.
+
+- **TCP Out-of-Order Queue and Reorders (packets/s)**
+    Packets that arrived out of order (queued, dropped, merged, pruned) and reordered segments grouped by detection method. Helpful when diagnosing slow transfers over paths that reorder packets.
+
+- **UDP Packets (packets/s)**
+    UDP datagrams received and sent by this host.
+
+- **UDP Errors (events/s)**
+    UDP datagrams that could not be delivered or processed, including receive/send buffer errors, "no port" errors, and checksum errors. Sustained receive-buffer errors usually mean an application is not draining its socket fast enough.
+
+- **Broadcast Bandwidth and Packets (kilobits/s, packets/s)**
+    The amount of data and the number of packets received and sent as IPv4 broadcast (and IPv6 broadcast where available). Useful for spotting misconfigured services flooding the local subnet.
+
+- **Multicast Bandwidth and Packets (kilobits/s, packets/s)**
+    The amount of data and the number of packets received and sent as IPv4/IPv6 multicast, reflecting multicast-based services such as discovery protocols, routing, or media streaming.
+
+- **ECN — Explicit Congestion Notification (packets/s)**
+    Packets marked with ECN codepoints, split by Congestion Experienced (CEP), Not-ECT (NoECTP), ECT(0) and ECT(1). A rising CEP count means routers along the path are signaling congestion without dropping packets, which is the earliest visibility into network congestion before losses appear.
+
+By default Netdata will enable monitoring metrics only when they are not zero. If they are constantly zero they are ignored. Metrics that start having values, after Netdata is started, will be detected and charts will be automatically added to the dashboard (a refresh of the dashboard is needed for them to appear though).
+
 ## Linux Anti-DDoS
 
 ![image6](https://cloud.githubusercontent.com/assets/2662304/14253733/53550b16-fa95-11e5-8d9d-4ed171df4735.gif)
