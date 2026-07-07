@@ -16,13 +16,14 @@ const char *daemon_pipename(void) {
         return pipename;
     }
 
-//#if defined(OS_WINDOWS)
-//    cached_pipename = strdupz("\\\\?\\pipe\\netdata-cli");
-//    return cached_pipename;
-//#else
+#if defined(OS_WINDOWS)
+    // Windows named pipes require the \\.\pipe\ prefix; filesystem paths are invalid.
+    cached_pipename = strdupz("\\\\.\\pipe\\netdata-daemon");
+    return cached_pipename;
+#else
     char filename[FILENAME_MAX + 1];
     snprintfz(filename, FILENAME_MAX, "%s/netdata.pipe", os_run_dir(false));
     cached_pipename = strdupz(filename);
     return cached_pipename;
-//#endif
+#endif
 }
