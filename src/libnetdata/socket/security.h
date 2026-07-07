@@ -55,4 +55,11 @@ bool netdata_ssl_has_pending(NETDATA_SSL *ssl);
 
 void netdata_ssl_log_verify_error(X509_STORE_CTX *ctx);
 
+#if defined(OS_WINDOWS)
+// Load CA certificates from the Windows system certificate store.
+// Replaces SSL_CTX_set_default_verify_paths(), which fails on deployed Windows
+// systems because OpenSSL's compiled-in OPENSSLDIR does not exist there.
+bool netdata_ssl_load_windows_ca_certs(SSL_CTX *ctx);
+#endif
+
 #endif //NETDATA_SECURITY_H

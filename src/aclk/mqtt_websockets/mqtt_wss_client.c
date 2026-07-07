@@ -242,7 +242,7 @@ void mqtt_wss_destroy(mqtt_wss_client client)
         SSL_CTX_free(client->ssl_ctx);
 
     if (client->sockfd > 0)
-        close(client->sockfd);
+        sock_close(client->sockfd);
 
     freez(client);
 }
@@ -352,7 +352,7 @@ int mqtt_wss_connect(
     client->ssl_flags = ssl_flags;
 
     if (client->sockfd > 0)
-        close(client->sockfd);
+        sock_close(client->sockfd);
 
     char port_str[16];
     snprintf(port_str, sizeof(port_str) -1, "%d", client->port);
@@ -426,7 +426,13 @@ int mqtt_wss_connect(
 
     client->ssl_ctx = SSL_CTX_new(SSLv23_client_method());
     if (!(client->ssl_flags & MQTT_WSS_SSL_DONT_CHECK_CERTS)) {
+#if defined(OS_WINDOWS)
+        if (!netdata_ssl_load_windows_ca_certs(client->ssl_ctx))
+            nd_log(NDLS_DAEMON, NDLP_WARNING,
+                   "ACLK: failed to load CA certs from Windows Certificate Store; SSL verify will fail");
+#else
         SSL_CTX_set_default_verify_paths(client->ssl_ctx);
+#endif
         SSL_CTX_set_verify(client->ssl_ctx, SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE, cert_verify_callback);
     } else
         nd_log(NDLS_DAEMON, NDLP_ERR, "SSL Certificate checking completely disabled!!!");
@@ -593,7 +599,7 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
     // or timeout happens (unusual) in which case we close
     mqtt_wss_service_all(client, timeout_ms / 4);
 
-    close(client->sockfd);
+    sock_close(client->sockfd);
     client->sockfd = -1;
 }
 
