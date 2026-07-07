@@ -5,7 +5,7 @@ use file_registry::ByteSize;
 /// When to rotate a WAL file and start a new one.
 #[derive(Debug, Clone)]
 pub struct RotationConfig {
-    pub max_log_entries: usize,
+    pub max_entries: usize,
     pub max_file_size: ByteSize,
     pub max_duration: Option<Duration>,
 }
@@ -13,7 +13,7 @@ pub struct RotationConfig {
 impl Default for RotationConfig {
     fn default() -> Self {
         Self {
-            max_log_entries: 100_000,
+            max_entries: 100_000,
             max_file_size: ByteSize(256 * 1024 * 1024),
             max_duration: Some(Duration::from_secs(3600)),
         }

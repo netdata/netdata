@@ -77,7 +77,7 @@ fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
     let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
     let config = wal::Config {
         rotation: wal::RotationConfig {
-            max_log_entries: usize::MAX,
+            max_entries: usize::MAX,
             max_file_size: ByteSize(u64::MAX),
             max_duration: None,
         },

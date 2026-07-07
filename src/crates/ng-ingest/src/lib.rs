@@ -34,7 +34,7 @@ pub fn count_log_records(req: &ExportLogsServiceRequest) -> usize {
 pub fn one_file_config() -> wal::Config {
     wal::Config {
         rotation: wal::RotationConfig {
-            max_log_entries: usize::MAX,
+            max_entries: usize::MAX,
             max_file_size: ByteSize(u64::MAX),
             max_duration: None,
         },

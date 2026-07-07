@@ -22,7 +22,7 @@ const FORMER_LOGS_KEYS: [(&str, &str); 7] = [
     ),
     (
         "entries_of_journal_file",
-        "logs.rotation.default.max_log_entries",
+        "logs.rotation.default.max_entries",
     ),
     (
         "duration_of_journal_file",

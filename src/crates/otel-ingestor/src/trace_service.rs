@@ -92,7 +92,7 @@ impl NetdataTracesService {
         let rotation = self.wal_config.rotation.resolve(tenant_id);
         wal::Config {
             rotation: wal::RotationConfig {
-                max_log_entries: rotation.max_log_entries,
+                max_entries: rotation.max_entries,
                 max_file_size: file_registry::ByteSize(rotation.max_file_size.as_u64()),
                 max_duration: Some(rotation.max_file_duration),
             },

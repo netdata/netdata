@@ -326,7 +326,7 @@ impl Stream {
         let Some(active) = &self.active else {
             return false;
         };
-        if active.log_entry_count + incoming_entries > self.config.rotation.max_log_entries as u64 {
+        if active.log_entry_count + incoming_entries > self.config.rotation.max_entries as u64 {
             return true;
         }
         if active.bytes_written >= self.config.rotation.max_file_size {

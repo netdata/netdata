@@ -457,7 +457,7 @@ pub struct RotationEntry {
     #[serde(default, with = "opt_bytesize")]
     pub max_file_size: Option<ByteSize>,
     #[serde(default)]
-    pub max_log_entries: Option<usize>,
+    pub max_entries: Option<usize>,
     /// Optional even in the `default` entry (unlike the two fields above,
     /// which the default must set): the knob is hidden from the stock file,
     /// so an absent value inherits the code default (see
@@ -471,7 +471,7 @@ pub struct RotationEntry {
 #[derive(Debug, Clone)]
 pub struct RotationConfig {
     pub max_file_size: ByteSize,
-    pub max_log_entries: usize,
+    pub max_entries: usize,
     pub max_file_duration: Duration,
 }
 
@@ -502,9 +502,9 @@ impl RotationPolicy {
             max_file_size: t
                 .and_then(|e| e.max_file_size)
                 .unwrap_or(self.default.max_file_size),
-            max_log_entries: t
-                .and_then(|e| e.max_log_entries)
-                .unwrap_or(self.default.max_log_entries),
+            max_entries: t
+                .and_then(|e| e.max_entries)
+                .unwrap_or(self.default.max_entries),
             max_file_duration: t
                 .and_then(|e| e.max_file_duration)
                 .unwrap_or(self.default.max_file_duration),
@@ -521,8 +521,8 @@ impl RotationPolicy {
                 if let Some(v) = entry.max_file_size {
                     self.default.max_file_size = v;
                 }
-                if let Some(v) = entry.max_log_entries {
-                    self.default.max_log_entries = v;
+                if let Some(v) = entry.max_entries {
+                    self.default.max_entries = v;
                 }
                 if let Some(v) = entry.max_file_duration {
                     self.default.max_file_duration = v;
@@ -532,8 +532,8 @@ impl RotationPolicy {
                 if let Some(v) = entry.max_file_size {
                     target.max_file_size = Some(v);
                 }
-                if let Some(v) = entry.max_log_entries {
-                    target.max_log_entries = Some(v);
+                if let Some(v) = entry.max_entries {
+                    target.max_entries = Some(v);
                 }
                 if let Some(v) = entry.max_file_duration {
                     target.max_file_duration = Some(v);
@@ -561,7 +561,7 @@ impl Default for RotationPolicy {
         Self {
             default: RotationConfig {
                 max_file_size: ByteSize::mb(25),
-                max_log_entries: 50_000,
+                max_entries: 50_000,
                 max_file_duration: default_rotation_max_file_duration(),
             },
             tenants: HashMap::new(),
@@ -580,9 +580,9 @@ impl TryFrom<HashMap<String, RotationEntry>> for RotationPolicy {
             max_file_size: d
                 .max_file_size
                 .ok_or_else(|| "default rotation must set max_file_size".to_string())?,
-            max_log_entries: d
-                .max_log_entries
-                .ok_or_else(|| "default rotation must set max_log_entries".to_string())?,
+            max_entries: d
+                .max_entries
+                .ok_or_else(|| "default rotation must set max_entries".to_string())?,
             // Optional with a code-default fallback (like `RetentionEntry::horizon`):
             // the knob is hidden from the stock file, so a hand-written rotation
             // block must parse without it.
@@ -604,7 +604,7 @@ impl From<RotationPolicy> for HashMap<String, RotationEntry> {
             "default".to_string(),
             RotationEntry {
                 max_file_size: Some(p.default.max_file_size),
-                max_log_entries: Some(p.default.max_log_entries),
+                max_entries: Some(p.default.max_entries),
                 max_file_duration: Some(p.default.max_file_duration),
             },
         );
@@ -874,7 +874,7 @@ logs:
   rotation:
     default:
       max_file_size: "100MB"
-      max_log_entries: 50000
+      max_entries: 50000
       max_file_duration: "2 hours"
   retention:
     default:
@@ -887,7 +887,7 @@ traces:
   rotation:
     default:
       max_file_size: "10MB"
-      max_log_entries: 1000
+      max_entries: 1000
       max_file_duration: "30 minutes"
   retention:
     default:
@@ -910,7 +910,7 @@ traces:
         assert!(config.traces.compression_enabled);
         let rotation = config.traces.rotation.resolve("default");
         assert_eq!(rotation.max_file_size, ByteSize::mb(25));
-        assert_eq!(rotation.max_log_entries, 50_000);
+        assert_eq!(rotation.max_entries, 50_000);
         assert_eq!(rotation.max_file_duration, Duration::from_secs(15 * 60));
         let retention = config.traces.retention.resolve("default");
         assert_eq!(retention.max_files, 100_000);
@@ -978,7 +978,7 @@ traces:
         );
         // Per-signal tuning is the traces section, not logs'.
         let traces_rot = traces.wal.rotation.resolve("default");
-        assert_eq!(traces_rot.max_log_entries, 1000);
+        assert_eq!(traces_rot.max_entries, 1000);
     }
 
     #[test]

@@ -76,7 +76,7 @@ logs:
     # any of these limits is reached.
     default:
       max_file_size: "25MB"
-      max_log_entries: 50000
+      max_entries: 50000
 
     # Per-tenant overrides (any subset of the fields above):
     # my-tenant:

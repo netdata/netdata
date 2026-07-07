@@ -326,7 +326,7 @@ mod tests {
         let entries_per_file: usize = *entry_counts.iter().max().unwrap_or(&10);
         let config = Config {
             rotation: RotationConfig {
-                max_log_entries: entries_per_file,
+                max_entries: entries_per_file,
                 max_file_size: ByteSize(u64::MAX),
                 max_duration: None,
             },

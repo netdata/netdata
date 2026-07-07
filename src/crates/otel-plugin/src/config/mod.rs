@@ -457,7 +457,7 @@ logs:
   rotation:
     default:
       max_file_size: "100MB"
-      max_log_entries: 50000
+      max_entries: 50000
       max_file_duration: "2 hours"
   retention:
     default:
@@ -472,7 +472,7 @@ traces:
   rotation:
     default:
       max_file_size: "100MB"
-      max_log_entries: 50000
+      max_entries: 50000
       max_file_duration: "2 hours"
   retention:
     default:
@@ -567,7 +567,7 @@ traces:
         );
         let rotation = config.logs.rotation.resolve("default");
         assert_eq!(rotation.max_file_size, ByteSize::mb(100));
-        assert_eq!(rotation.max_log_entries, 50000);
+        assert_eq!(rotation.max_entries, 50000);
         assert_eq!(rotation.max_file_duration, Duration::from_secs(2 * 3600));
         assert!(config.logs.crc_enabled);
         assert!(config.logs.compression_enabled);
@@ -586,7 +586,7 @@ traces:
             std::path::Path::new("/var/log/netdata/otel/v2/traces/wal")
         );
         let rotation = config.traces.rotation.resolve("default");
-        assert_eq!(rotation.max_log_entries, 50000);
+        assert_eq!(rotation.max_entries, 50000);
     }
 
     // -- Overrides (applied through the resolver's user layer) --
@@ -630,12 +630,12 @@ traces:
 logs:
   rotation:
     default:
-      max_log_entries: 100000
+      max_entries: 100000
 "#,
         )
         .unwrap();
         let rotation = config.logs.rotation.resolve("default");
-        assert_eq!(rotation.max_log_entries, 100000);
+        assert_eq!(rotation.max_entries, 100000);
         // Untouched stock fields survive the partial override.
         assert_eq!(rotation.max_file_size, ByteSize::mb(100));
     }
@@ -670,15 +670,15 @@ logs:
 traces:
   rotation:
     default:
-      max_log_entries: 999
+      max_entries: 999
 "#,
         )
         .unwrap();
         let traces_rot = config.traces.rotation.resolve("default");
-        assert_eq!(traces_rot.max_log_entries, 999);
+        assert_eq!(traces_rot.max_entries, 999);
         // Logs is untouched.
         let logs_rot = config.logs.rotation.resolve("default");
-        assert_eq!(logs_rot.max_log_entries, 50000);
+        assert_eq!(logs_rot.max_entries, 50000);
     }
 
     #[test]
@@ -1148,7 +1148,7 @@ logs:
     #[test]
     fn env_override_traces_tuning_separate_from_logs() {
         let o = ConfigOverride::from_map(&env_map(&[(
-            "NETDATA_OTEL_CFG_TRACES_ROTATION_MAX_LOG_ENTRIES",
+            "NETDATA_OTEL_CFG_TRACES_ROTATION_MAX_ENTRIES",
             "777",
         )]))
         .unwrap();
@@ -1157,7 +1157,7 @@ logs:
         assert!(o.logs.is_none());
         let rotation = o.traces.as_ref().unwrap().rotation.as_ref().unwrap();
         let entry = rotation.get("default").unwrap();
-        assert_eq!(entry.max_log_entries, Some(777));
+        assert_eq!(entry.max_entries, Some(777));
     }
 
     #[test]
@@ -1289,7 +1289,7 @@ logs:
         let dir = tempfile::tempdir().unwrap();
         let stock = write_file(dir.path(), "stock.yaml", STOCK_YAML);
         let env = ConfigOverride::from_map(&env_map(&[(
-            "NETDATA_OTEL_CFG_LOGS_ROTATION_MAX_LOG_ENTRIES",
+            "NETDATA_OTEL_CFG_LOGS_ROTATION_MAX_ENTRIES",
             "12345",
         )]))
         .unwrap();
@@ -1298,7 +1298,7 @@ logs:
             .resolve()
             .unwrap();
         assert_eq!(
-            config.logs.rotation.resolve("default").max_log_entries,
+            config.logs.rotation.resolve("default").max_entries,
             12345
         );
         // Untouched stock field survives the env override.
@@ -1479,7 +1479,7 @@ logs:
             assert!(signal.compression_enabled);
             let rotation = signal.rotation.resolve("default");
             assert_eq!(rotation.max_file_size, ByteSize::mb(25));
-            assert_eq!(rotation.max_log_entries, 50000);
+            assert_eq!(rotation.max_entries, 50000);
             assert_eq!(rotation.max_file_duration, Duration::from_secs(15 * 60));
             let retention = signal.retention.resolve("default");
             assert_eq!(retention.max_files, 100_000);

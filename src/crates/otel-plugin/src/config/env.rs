@@ -242,11 +242,11 @@ impl SignalOverride {
     fn from_map(env: &EnvReader<'_>, prefix: &str) -> Result<Self> {
         let rotation_default = bridge::config::RotationEntry {
             max_file_size: parse_env_var(env, &var(prefix, "ROTATION_MAX_FILE_SIZE"))?,
-            max_log_entries: parse_env_var(env, &var(prefix, "ROTATION_MAX_LOG_ENTRIES"))?,
+            max_entries: parse_env_var(env, &var(prefix, "ROTATION_MAX_ENTRIES"))?,
             max_file_duration: parse_env_duration(env, &var(prefix, "ROTATION_MAX_FILE_DURATION"))?,
         };
         let rotation_has_any = rotation_default.max_file_size.is_some()
-            || rotation_default.max_log_entries.is_some()
+            || rotation_default.max_entries.is_some()
             || rotation_default.max_file_duration.is_some();
         let retention_default = bridge::config::RetentionEntry {
             max_files: parse_env_var(env, &var(prefix, "RETENTION_MAX_FILES"))?,

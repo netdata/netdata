@@ -375,7 +375,7 @@ impl NetdataLogsService {
         let rotation = self.wal_config.rotation.resolve(tenant_id);
         wal::Config {
             rotation: wal::RotationConfig {
-                max_log_entries: rotation.max_log_entries,
+                max_entries: rotation.max_entries,
                 max_file_size: file_registry::ByteSize(rotation.max_file_size.as_u64()),
                 max_duration: Some(rotation.max_file_duration),
             },
@@ -984,7 +984,7 @@ mod tests {
             "default".to_string(),
             bridge::config::RotationEntry {
                 max_file_size: Some(bytesize::ByteSize::mb(64)),
-                max_log_entries: Some(100_000),
+                max_entries: Some(100_000),
                 max_file_duration: Some(std::time::Duration::from_secs(3600)),
             },
         );
@@ -1076,7 +1076,7 @@ mod tests {
             "default".to_string(),
             bridge::config::RotationEntry {
                 max_file_size: Some(bytesize::ByteSize::mb(64)),
-                max_log_entries: Some(100_000),
+                max_entries: Some(100_000),
                 max_file_duration: Some(std::time::Duration::ZERO),
             },
         );
