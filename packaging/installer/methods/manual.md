@@ -197,16 +197,9 @@ cd netdata
 - `--nightly-channel`: Automatically update on every new nightly build.
 - `--disable-telemetry`: Opt-out of [anonymous statistics](/docs/netdata-agent/configuration/anonymous-telemetry-events.md) we use to make
   Netdata better.
-- `--no-updates`: Prevent automatic updates of any kind.
-- `--reinstall`: If an existing install is detected, reinstall instead of trying to update it. Note that this
-  cannot be used to change installation types.
 - `--use-system-protobuf`: Use a system-installed copy of `libprotobuf` instead of the bundled copy. Requires the
   system `protobuf` and `protobuf-compiler` development packages to be installed beforehand.
 - `--disable-exporting-prometheus-remote-write`: Disable the Prometheus remote write exporting connector.
-- `--local-files`: Used for [offline installations](/packaging/installer/methods/offline.md). Pass four file paths: the Netdata
-  tarball, the checksum file, the go.d plugin tarball, and the go.d plugin config tarball, to force kickstart run the
-  process using those files. This option conflicts with the `--stable-channel` option. If you set this _and_
-  `--stable-channel`, Netdata will use the local files.
 
 ### Connect node to Netdata Cloud during installation
 
