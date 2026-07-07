@@ -79,7 +79,7 @@ A few common chart types you will see on a node:
 | `netdata`| The Netdata Agent’s own runtime and self-monitoring         | `netdata.memory`, `netdata.clients`, `netdata.aclk_status` |
 | `apps`   | Per-application resource usage                              | `apps.cpu`, `apps.mem`                  |
 | `disk`   | Physical and logical disks                                  | `disk.io`, `disk.util`                  |
-| `net`    | Per-network-interface traffic                               | `net.eth0`, `net_packets.eth0`          |
+| `net`    | Per-network-interface traffic                               | `net.eth0`                              |
 
 :::note
 
