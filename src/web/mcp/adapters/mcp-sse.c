@@ -152,11 +152,12 @@ int mcp_sse_handle_request(struct rrdhost *host __maybe_unused, struct web_clien
         return w->response.code;
     }
 
-    bool mcp_api_key_verified = false;
 #ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
-    mcp_api_key_verified = mcp_sse_apply_api_key(w);
-#endif
+    bool mcp_api_key_verified = mcp_sse_apply_api_key(w);
     if (netdata_bearer_protection_is_enabled() && !mcp_api_key_verified) {
+#else
+    if (netdata_bearer_protection_is_enabled()) {
+#endif
         buffer_flush(w->response.data);
         w->response.data->content_type = CT_TEXT_EVENT_STREAM;
         mcp_http_disable_compression(w);

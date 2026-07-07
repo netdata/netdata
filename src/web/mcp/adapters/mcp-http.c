@@ -115,11 +115,12 @@ int mcp_http_handle_request(struct rrdhost *host __maybe_unused, struct web_clie
         return w->response.code;
     }
 
-    bool mcp_api_key_verified = false;
 #ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
-    mcp_api_key_verified = mcp_http_apply_api_key(w);
-#endif
+    bool mcp_api_key_verified = mcp_http_apply_api_key(w);
     if (netdata_bearer_protection_is_enabled() && !mcp_api_key_verified) {
+#else
+    if (netdata_bearer_protection_is_enabled()) {
+#endif
         BUFFER *payload = mcp_jsonrpc_build_error_payload(
             NULL, -32600,
             "MCP API key is required when bearer token protection is enabled",
