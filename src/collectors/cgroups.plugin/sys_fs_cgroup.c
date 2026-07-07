@@ -785,6 +785,8 @@ static inline void cgroup2_read_pressure(struct pressure *res) {
 
 static inline void cgroup_read_memory(struct memory *mem, char parent_cg_is_unified) {
     static procfile *ff = NULL;
+    static procfile *ff_events = NULL;
+    static procfile *ff_swap_events = NULL;
 
     if(likely(mem->filename_detailed)) {
         ff = procfile_reopen(ff, mem->filename_detailed, NULL, CGROUP_PROCFILE_FLAG);
@@ -877,6 +879,80 @@ memory_next:
 
     if (likely(mem->filename_failcnt)) {
         mem->updated_failcnt = !read_single_number_file(mem->filename_failcnt, &mem->failcnt);
+    }
+
+    // memory.events and memory.swap.events are discovered only on cgroup v2
+    if (likely(mem->filename_events)) {
+        mem->updated_events = 0;
+
+        ff_events = procfile_reopen(ff_events, mem->filename_events, NULL, CGROUP_PROCFILE_FLAG);
+        if (likely(ff_events && (ff_events = procfile_readall(ff_events)))) {
+            if (unlikely(!mem->arl_events)) {
+                mem->arl_events = arl_create("cgroup/memory.events", NULL, 60);
+
+                arl_expect(mem->arl_events, "low", &mem->events_low);
+                arl_expect(mem->arl_events, "high", &mem->events_high);
+                arl_expect(mem->arl_events, "max", &mem->events_max);
+                arl_expect(mem->arl_events, "oom", &mem->events_oom);
+                arl_expect(mem->arl_events, "oom_kill", &mem->events_oom_kill);
+                mem->arl_events_oom_group_kill =
+                    arl_expect(mem->arl_events, "oom_group_kill", &mem->events_oom_group_kill);
+                mem->arl_events_sock_throttled =
+                    arl_expect(mem->arl_events, "sock_throttled", &mem->events_sock_throttled);
+            }
+
+            arl_begin(mem->arl_events);
+
+            unsigned long i, lines = procfile_lines(ff_events);
+            for (i = 0; i < lines; i++) {
+                if (arl_check(mem->arl_events, procfile_lineword(ff_events, i, 0), procfile_lineword(ff_events, i, 1)))
+                    break;
+            }
+
+            if (unlikely(!mem->events_has_oom_group_kill &&
+                         (mem->arl_events_oom_group_kill->flags & ARL_ENTRY_FLAG_FOUND)))
+                mem->events_has_oom_group_kill = 1;
+
+            if (unlikely(!mem->events_has_sock_throttled &&
+                         (mem->arl_events_sock_throttled->flags & ARL_ENTRY_FLAG_FOUND)))
+                mem->events_has_sock_throttled = 1;
+
+            mem->updated_events = 1;
+        }
+        else
+            cgroups_check = 1;
+    }
+
+    if (likely(mem->filename_swap_events)) {
+        mem->updated_swap_events = 0;
+
+        ff_swap_events = procfile_reopen(ff_swap_events, mem->filename_swap_events, NULL, CGROUP_PROCFILE_FLAG);
+        if (likely(ff_swap_events && (ff_swap_events = procfile_readall(ff_swap_events)))) {
+            if (unlikely(!mem->arl_swap_events)) {
+                mem->arl_swap_events = arl_create("cgroup/memory.swap.events", NULL, 60);
+
+                mem->arl_swap_events_high = arl_expect(mem->arl_swap_events, "high", &mem->swap_events_high);
+                arl_expect(mem->arl_swap_events, "max", &mem->swap_events_max);
+                arl_expect(mem->arl_swap_events, "fail", &mem->swap_events_fail);
+            }
+
+            arl_begin(mem->arl_swap_events);
+
+            unsigned long i, lines = procfile_lines(ff_swap_events);
+            for (i = 0; i < lines; i++) {
+                if (arl_check(
+                        mem->arl_swap_events, procfile_lineword(ff_swap_events, i, 0),
+                        procfile_lineword(ff_swap_events, i, 1)))
+                    break;
+            }
+
+            if (unlikely(!mem->swap_events_has_high && (mem->arl_swap_events_high->flags & ARL_ENTRY_FLAG_FOUND)))
+                mem->swap_events_has_high = 1;
+
+            mem->updated_swap_events = 1;
+        }
+        else
+            cgroups_check = 1;
     }
 }
 
@@ -1081,6 +1157,13 @@ void update_cgroup_systemd_services_charts() {
         if (likely(cg->memory.updated_failcnt)) {
             update_mem_failcnt_chart(cg);
         }
+        if (likely(cg->memory.updated_events)) {
+            update_mem_events_chart(cg);
+            update_mem_events_oom_chart(cg);
+        }
+        if (likely(cg->memory.updated_swap_events)) {
+            update_mem_events_swap_chart(cg);
+        }
         if (likely(cg->memory.updated_detailed)) {
             update_mem_usage_detailed_chart(cg);
             update_mem_writeback_chart(cg);
@@ -1210,6 +1293,15 @@ void update_cgroup_charts() {
 
         if (likely(cg->memory.updated_failcnt)) {
             update_mem_failcnt_chart(cg);
+        }
+
+        if (likely(cg->memory.updated_events)) {
+            update_mem_events_chart(cg);
+            update_mem_events_oom_chart(cg);
+        }
+
+        if (likely(cg->memory.updated_swap_events)) {
+            update_mem_events_swap_chart(cg);
         }
 
         cgroup_update_io_pids_charts(cg);
