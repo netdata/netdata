@@ -699,6 +699,25 @@ fn journal_host_state_dir_falls_back_to_build_default() {
 }
 
 #[test]
+fn journal_host_filesystem_prefix_uses_configured_host_prefix() {
+    let mut cfg = PluginConfig::default();
+    cfg._netdata_env.host_prefix = Some("/host".to_string());
+
+    assert_eq!(
+        cfg.journal_host_filesystem_prefix(),
+        Some(std::path::Path::new("/host"))
+    );
+}
+
+#[test]
+fn journal_host_filesystem_prefix_ignores_empty_host_prefix() {
+    let mut cfg = PluginConfig::default();
+    cfg._netdata_env.host_prefix = Some("  ".to_string());
+
+    assert_eq!(cfg.journal_host_filesystem_prefix(), None);
+}
+
+#[test]
 fn auto_detect_geoip_databases_uses_absolute_journal_parent() {
     let dir = tempdir().expect("create tempdir");
     let cache_dir = dir.path();
