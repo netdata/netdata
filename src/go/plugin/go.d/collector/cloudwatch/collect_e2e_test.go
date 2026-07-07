@@ -114,6 +114,23 @@ func TestCollect_E2E(t *testing.T) {
 				`lambda.duration_p90{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:     200,
 			},
 		},
+		"msk broker partition health metrics": {
+			profiles: []string{"msk"},
+			listMetrics: map[string][]cwtypes.Metric{
+				"AWS/Kafka": {
+					mkMetric("UnderReplicatedPartitions", "Cluster Name", "cluster-a", "Broker ID", "1"),
+					mkMetric("UnderMinIsrPartitionCount", "Cluster Name", "cluster-a", "Broker ID", "1"),
+				},
+			},
+			gmd: map[string]float64{
+				e2eKey("AWS/Kafka", "UnderReplicatedPartitions", "Maximum", "Cluster Name", "cluster-a", "Broker ID", "1"): 2,
+				e2eKey("AWS/Kafka", "UnderMinIsrPartitionCount", "Maximum", "Cluster Name", "cluster-a", "Broker ID", "1"): 1,
+			},
+			wantSeries: map[string]metrix.SampleValue{
+				`msk.under_replicated_partitions_maximum{account_id="000000000000",broker_id="1",cluster_name="cluster-a",region="us-east-1"}`:   2,
+				`msk.under_min_isr_partition_count_maximum{account_id="000000000000",broker_id="1",cluster_name="cluster-a",region="us-east-1"}`: 1,
+			},
+		},
 		"alb multi-granularity dimension filter keeps only {LoadBalancer}": {
 			profiles: []string{"alb"},
 			listMetrics: map[string][]cwtypes.Metric{

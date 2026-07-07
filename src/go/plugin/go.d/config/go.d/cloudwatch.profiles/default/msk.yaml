@@ -49,6 +49,9 @@ metrics:
   - id: under_replicated_partitions
     metric_name: UnderReplicatedPartitions
     statistics: [maximum]
+  - id: under_min_isr_partition_count
+    metric_name: UnderMinIsrPartitionCount
+    statistics: [maximum]
   - id: partition_count
     metric_name: PartitionCount
     statistics: [maximum]
@@ -66,9 +69,6 @@ metrics:
   # - id: cpu_io_wait
   #   metric_name: CpuIoWait
   #   statistics: [average]
-  # - id: under_min_isr_partition_count
-  #   metric_name: UnderMinIsrPartitionCount
-  #   statistics: [maximum]
   # ClientConnectionCount is DEFAULT-level but AWS publishes it at {Cluster Name, Broker ID, Client
   # Authentication} -- a third dimension -- so it does not match this {Cluster Name, Broker ID} grain
   # and needs its own profile.
@@ -159,6 +159,15 @@ template:
           name: leaders
         - selector: under_replicated_partitions_maximum
           name: under_replicated
+    - id: cw_msk_isr
+      context: under_min_isr
+      title: MSK Under-Min-ISR Partitions
+      family: Partitions
+      units: partitions
+      algorithm: absolute
+      dimensions:
+        - selector: under_min_isr_partition_count_maximum
+          name: under_min_isr
     - id: cw_msk_connections
       context: connections
       title: MSK Broker Connections
@@ -171,15 +180,6 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_msk_isr
-    #   context: under_min_isr
-    #   title: MSK Under-Min-ISR Partitions
-    #   family: Partitions
-    #   units: partitions
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: under_min_isr_partition_count_maximum
-    #       name: under_min_isr
     # - id: cw_msk_cpu_io_wait
     #   context: cpu_io_wait
     #   title: MSK Broker CPU I/O Wait

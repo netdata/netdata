@@ -466,6 +466,14 @@ modules:
         metric: cloudwatch.msk.heap_memory_after_gc
         info: "MSK broker heap memory after GC high on ${label:cluster_name}/${label:broker_id}"
         link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_msk_under_replicated_partitions
+        metric: cloudwatch.msk.partitions
+        info: "MSK broker has sustained under-replicated partitions on ${label:cluster_name}/${label:broker_id}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_msk_under_min_isr_partitions
+        metric: cloudwatch.msk.under_min_isr
+        info: "MSK broker has partitions below minimum ISR on ${label:cluster_name}/${label:broker_id}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
       - name: cw_rds_replica_lag
         metric: cloudwatch.rds.replica_lag
         info: "RDS replica lag high on ${label:db_instance_identifier}"
@@ -543,7 +551,7 @@ modules:
         | [Amazon OpenSearch Service](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/opensearch.yaml) | `cloudwatch.opensearch.*` | cluster status, index writes blocked, automated snapshot failures, nodes, CPU utilization, JVM memory pressure, old-gen JVM memory pressure, free storage space, search and indexing rate, search and indexing latency |
         | [Amazon DocumentDB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/docdb.yaml) | `cloudwatch.docdb.*` | CPU utilization, freeable memory, connections, buffer cache hit ratio, disk IOPS, latency, throughput, replica lag, cursors timed out |
         | [Amazon Redshift](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/redshift.yaml) | `cloudwatch.redshift.*` | health, CPU utilization, disk space used, database connections, disk IOPS, throughput, network throughput |
-        | [Amazon MSK](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/msk.yaml) | `cloudwatch.msk.*` | broker throughput, messages in, CPU, disk used, memory, heap memory after GC, partitions, connections |
+        | [Amazon MSK](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/msk.yaml) | `cloudwatch.msk.*` | broker throughput, messages in, CPU, disk used, memory, heap memory after GC, partitions, under-min-ISR partitions, connections |
         | [Amazon CloudFront](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/cloudfront.yaml) | `cloudwatch.cloudfront.*` | requests, downloaded and uploaded traffic, total/4xx/5xx error rates |
         | [AWS Auto Scaling](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/auto_scaling.yaml) | `cloudwatch.auto_scaling.*` | group sizing (min/max/desired/total) and instances by state (in-service, pending, standby, terminating) |
         | [Amazon Bedrock](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/bedrock.yaml) | `cloudwatch.bedrock.*` | invocations, invocation errors, token throughput, invocation and time-to-first-token latency |
