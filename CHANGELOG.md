@@ -565,6 +565,23 @@
 - Test(go.d/jobmgr): harden effect lifecycle invariants ([#22991](https://github.com/netdata/netdata/issues/22991))
 - Add macOS logs, battery, thermal, storage, smart collectors ([#22475](https://github.com/netdata/netdata/issues/22475))
 - Update netflow-plugin to systemd-journal-sdk 0.7.6 ([#22993](https://github.com/netdata/netdata/issues/22993))
+- Netdata fixes part 26 ([#22959](https://github.com/netdata/netdata/issues/22959))
+- Docs: Fix Windows child streaming note, Parent scaling figure, and disk-sizing guidance ([#22943](https://github.com/netdata/netdata/issues/22943))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/service/cloudwatch from 1.59.0 to 1.61.1 in /src/go ([#22996](https://github.com/netdata/netdata/issues/22996))
+- Build(deps): bump github.com/aws/aws-sdk-go-v2/config from 1.32.25 to 1.32.27 in /src/go ([#22997](https://github.com/netdata/netdata/issues/22997))
+- Docs: Rename enterprise evaluation guide to remove AI-artifact suffix ([#22954](https://github.com/netdata/netdata/issues/22954))
+- Regenerate integrations docs ([#22992](https://github.com/netdata/netdata/issues/22992))
+- Docs: Define TBD disk labels in proc.plugin metadata.yaml ([#22929](https://github.com/netdata/netdata/issues/22929))
+- Docs: Add bundled protobuf fetch troubleshooting to source build guide ([#22939](https://github.com/netdata/netdata/issues/22939))
+- Feat(go.d/cloudwatch): add multi-account support ([#23004](https://github.com/netdata/netdata/issues/23004))
+- Netdata fixes part 23 ([#22955](https://github.com/netdata/netdata/issues/22955))
+- Feat(go.d/cloudwatch): add opt-in resource tag labels ([#23011](https://github.com/netdata/netdata/issues/23011))
+- Regenerate integrations docs ([#23005](https://github.com/netdata/netdata/issues/23005))
+- Netdata fixes part 27 ([#22967](https://github.com/netdata/netdata/issues/22967))
+- Netdata fixes part 28 ([#22968](https://github.com/netdata/netdata/issues/22968))
+- Netdata fixes part 29 ([#22969](https://github.com/netdata/netdata/issues/22969))
+- Netdata fixes part 30 ([#22970](https://github.com/netdata/netdata/issues/22970))
+- Feat(go.d): chart histogram buckets as range heatmaps ([#23013](https://github.com/netdata/netdata/issues/23013))
 
 ## [2.10.0] - 2026-04-09
 
