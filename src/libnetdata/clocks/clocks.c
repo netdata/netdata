@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "../libnetdata.h"
+#include "clocks-internals.h"
 
 // defaults are for compatibility
 // call clocks_init() once, to optimize these default settings
@@ -259,7 +260,7 @@ void sleep_to_absolute_time(usec_t usec) {
                                       req.tv_nsec);
                 }
             }
-            sleep_usec(usec);
+            break;
         }
     }
 }
@@ -284,7 +285,9 @@ void heartbeat_statistics(usec_t *min_ptr, usec_t *max_ptr, usec_t *average_ptr,
     struct heartbeat_thread_statistics current[HEARTBEAT_ALIGNMENT_STATISTICS_SIZE];
     static struct heartbeat_thread_statistics old[HEARTBEAT_ALIGNMENT_STATISTICS_SIZE] = { 0 };
 
+    spinlock_lock(&heartbeat_alignment_spinlock);
     memcpy(current, heartbeat_alignment_values, sizeof(struct heartbeat_thread_statistics) * HEARTBEAT_ALIGNMENT_STATISTICS_SIZE);
+    spinlock_unlock(&heartbeat_alignment_spinlock);
 
     usec_t min = 0, max = 0, total = 0, average = 0;
     size_t i, count = 0;
@@ -367,10 +370,12 @@ inline void heartbeat_init(heartbeat_t *hb, usec_t step) {
     hb->randomness = heartbeat_randomness(hb->hash);
 
     if(hb->statistics_id < HEARTBEAT_ALIGNMENT_STATISTICS_SIZE) {
+        spinlock_lock(&heartbeat_alignment_spinlock);
         heartbeat_alignment_values[hb->statistics_id].dt = 0;
         heartbeat_alignment_values[hb->statistics_id].sequence = 0;
         heartbeat_alignment_values[hb->statistics_id].randomness = hb->randomness;
         heartbeat_alignment_values[hb->statistics_id].tid = os_gettid();
+        spinlock_unlock(&heartbeat_alignment_spinlock);
     }
 }
 
@@ -395,7 +400,6 @@ usec_t heartbeat_next(heartbeat_t *hb) {
     sleep_usec_with_now(next - now, now);
     spinlock_lock(&heartbeat_alignment_spinlock);
     now = now_realtime_usec();
-    spinlock_unlock(&heartbeat_alignment_spinlock);
 
     dt = now - hb->realtime;
 
@@ -403,6 +407,7 @@ usec_t heartbeat_next(heartbeat_t *hb) {
         heartbeat_alignment_values[hb->statistics_id].dt += now - next;
         heartbeat_alignment_values[hb->statistics_id].sequence++;
     }
+    spinlock_unlock(&heartbeat_alignment_spinlock);
 
     if(unlikely(now < next)) {
         errno_clear();
@@ -451,7 +456,7 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut __maybe_unused) {
     Sleep(sleep_ms);
 }
 #else
-void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
+void sleep_usec_with_now(usec_t usec, usec_t started_ut __maybe_unused) {
     // we expect microseconds (1.000.000 per second)
     // but timespec is nanoseconds (1.000.000.000 per second)
     struct timespec rem = { 0, 0 }, req = {
@@ -462,10 +467,7 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
     // make sure errno is not EINTR
     errno_clear();
 
-    if(!started_ut)
-        started_ut = now_realtime_usec();
-
-    usec_t end_ut = started_ut + usec;
+    usec_t started_monotonic_ut = now_monotonic_usec();
 
     while (nanosleep(&req, &rem) != 0) {
         if (likely(errno == EINTR && (rem.tv_sec || rem.tv_nsec))) {
@@ -475,18 +477,9 @@ void sleep_usec_with_now(usec_t usec, usec_t started_ut) {
             // break an infinite loop
             errno_clear();
 
-            usec_t now_ut = now_realtime_usec();
-            if(now_ut >= end_ut)
+            usec_t now_ut = now_monotonic_usec();
+            if(!sleep_usec_prepare_retry_after_eintr(usec, started_monotonic_ut, now_ut, &req))
                 break;
-
-            usec_t remaining_ut = (usec_t)req.tv_sec * USEC_PER_SEC + (usec_t)req.tv_nsec * NSEC_PER_USEC > usec;
-            usec_t check_ut = now_ut - started_ut;
-            if(remaining_ut > check_ut) {
-                req = (struct timespec){
-                    .tv_sec = (time_t) ( check_ut / USEC_PER_SEC),
-                    .tv_nsec = (suseconds_t) ((check_ut % USEC_PER_SEC) * NSEC_PER_USEC)
-                };
-            }
         }
         else {
             netdata_log_error("Cannot nanosleep() for %"PRIu64" microseconds.", usec);
