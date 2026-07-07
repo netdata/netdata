@@ -144,4 +144,3 @@ Netdata decodes **10 trap definitions** from Nokia Formerly Infinera Corp across
 - `INFINERA-NOTIFICATION-MIB::infnAdminEventNotification`
 - `INFINERA-NOTIFICATION-MIB::infnAuditEventNotification`
 - `INFINERA-NOTIFICATION-MIB::infnSecurityEventNotification`
-

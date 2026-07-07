@@ -147,4 +147,3 @@ Netdata decodes **11 trap definitions** from Infinet LLC Formerly Aqua Project G
 - `AQUAMINT-MIB::mintTopologyNotification`
 - `AQUAMINT-MIB::mintNewNeighborNotification`
 - `AQUAMINT-MIB::mintNeighborLostNotification`
-

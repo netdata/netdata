@@ -154,4 +154,3 @@ Netdata decodes **109 trap definitions** from Kevin Ether Boulain across **12 MI
 - `SUNMANAGEMENTCENTER-TRAP-MIB::statusChange`
 - `SUNMANAGEMENTCENTER-TRAP-MIB::valueRefresh`
 - `TRAPS-SUNMANAGEMENTCENTER-MIB::event`
-

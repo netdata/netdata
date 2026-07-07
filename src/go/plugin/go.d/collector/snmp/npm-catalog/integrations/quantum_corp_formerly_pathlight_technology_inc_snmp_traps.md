@@ -144,4 +144,3 @@ Netdata decodes **87 trap definitions** from Quantum Corp Formerly Pathlight Tec
 - `SANMgrV1-MIB::ssaUidAddedEvent`
 - `SANMgrV1-MIB::ssaUidRemovedEvent`
 - `SANMgrV1-MIB::ssaWebReconfiguredEvent`
-

@@ -143,4 +143,3 @@ Netdata decodes **821 trap definitions** from Starent Networks across **1 MIB** 
 - `STARENT-MIB::starCardReset`
 - `STARENT-MIB::starCardRebootRequest`
 - `STARENT-MIB::starCardUp`
-

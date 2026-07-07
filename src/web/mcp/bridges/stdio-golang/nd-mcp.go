@@ -15,6 +15,7 @@ import (
 	"os/signal"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
@@ -127,7 +128,8 @@ func main() {
 	var stateMu sync.Mutex
 	var messageQueueMu sync.Mutex
 	messageQueue := []string{}
-	stdinActive := true
+	var stdinActive atomic.Bool
+	stdinActive.Store(true)
 
 	// Pending requests that are waiting for connection to be established
 	var pendingMu sync.Mutex
@@ -281,7 +283,7 @@ func main() {
 		}
 
 		// Signal that stdin is closed
-		stdinActive = false
+		stdinActive.Store(false)
 		close(stdinClosedCh)
 	}()
 
@@ -290,11 +292,10 @@ func main() {
 	maxDelay := 60 * time.Second
 	attempt := 0
 
-	// Timer for reconnection backoff
-	var timer *time.Timer
 	stdinClosedNotify := (<-chan struct{})(stdinClosedCh)
 
 	// Main connection loop
+connectionLoop:
 	for {
 		select {
 		case <-doneCh:
@@ -305,49 +306,47 @@ func main() {
 			// and then exit on the next reconnection attempt
 			stdinClosedNotify = nil // Prevent duplicate handling
 		case <-reconnectCh:
-			// Immediate reconnection requested (e.g. from stdin activity)
-			if timer != nil {
-				timer.Stop()
-			}
-
+			// Stdin activity may wake an idle disconnected bridge.
 			// Only proceed with immediate reconnection if we're not already connecting/connected
 			stateMu.Lock()
 			currentState := state
 			stateMu.Unlock()
 
-			if currentState == stateDisconnected {
-				// Reset the reconnection timer
-				attempt = 0
-				// Fall through to connection attempt
-			} else {
+			if currentState != stateDisconnected {
 				// Already connecting or connected
 				continue
 			}
+			// Disconnected: fall through to the backoff block below. We
+			// intentionally do NOT reset attempt here -- reconnect
+			// notifications are wakeups only, so stdin activity cannot bypass
+			// exponential backoff and cause a reconnect storm.
 		default:
-			// Calculate backoff delay with jitter
-			if attempt > 0 {
-				// Check if stdin is closed and we're disconnected - if so, exit
-				if !stdinActive {
-					fmt.Fprintf(os.Stderr, "%s: Stdin closed and disconnected, exiting\n", programName)
-					return
-				}
+		}
 
-				delaySeconds := math.Min(float64(maxDelay.Seconds()),
-					float64(baseDelay.Seconds())*math.Pow(2, float64(attempt-1))*(0.5+jitter()))
-				delay := time.Duration(delaySeconds * float64(time.Second))
+		// Calculate backoff delay with jitter
+		if attempt > 0 {
+			// Check if stdin is closed and we're disconnected - if so, exit
+			if !stdinActive.Load() {
+				fmt.Fprintf(os.Stderr, "%s: Stdin closed and disconnected, exiting\n", programName)
+				return
+			}
 
-				fmt.Fprintf(os.Stderr, "%s: Reconnecting in %.1f seconds (attempt %d)...\n",
-					programName, delaySeconds, attempt)
+			delaySeconds := math.Min(float64(maxDelay.Seconds()),
+				float64(baseDelay.Seconds())*math.Pow(2, float64(attempt-1))*(0.5+jitter()))
+			delay := time.Duration(delaySeconds * float64(time.Second))
 
-				// Create timer and wait for it to expire, or for signals
-				timer = time.NewTimer(delay)
+			fmt.Fprintf(os.Stderr, "%s: Reconnecting in %.1f seconds (attempt %d)...\n",
+				programName, delaySeconds, attempt)
 
+			// Create timer and wait for it to expire, or for shutdown signals.
+			timer := time.NewTimer(delay)
+
+		backoffWait:
+			for {
 				select {
 				case <-timer.C:
 					// Timer expired, continue to connection attempt
-				case <-reconnectCh:
-					// Immediate reconnection requested
-					timer.Stop()
+					break backoffWait
 				case <-doneCh:
 					// Program termination requested
 					timer.Stop()
@@ -356,7 +355,7 @@ func main() {
 					// Stdin closed
 					timer.Stop()
 					stdinClosedNotify = nil
-					continue
+					continue connectionLoop
 				}
 			}
 		}
@@ -371,7 +370,6 @@ func main() {
 
 		// Set up connection timeout
 		connectionCtx, connectionCancel := context.WithTimeout(ctx, 15*time.Second)
-		defer connectionCancel()
 
 		fmt.Fprintf(os.Stderr, "%s: Connecting to %s...\n", programName, targetURL)
 
@@ -388,6 +386,7 @@ func main() {
 			CompressionMode: websocket.CompressionContextTakeover,
 			HTTPHeader:      header,
 		})
+		connectionCancel()
 
 		// Connection failed
 		if err != nil {
@@ -469,9 +468,6 @@ func main() {
 				// Clean up the connection
 				conn.Close(websocket.StatusNormalClosure, "Shutdown requested")
 				cancel()
-				return
-			case <-stdinClosedCh:
-				// Stdin closed, but keep connection active
 				return
 			}
 		}()
@@ -636,7 +632,7 @@ func main() {
 		hasMessages := len(messageQueue) > 0
 		messageQueueMu.Unlock()
 
-		if !stdinActive && !hasMessages {
+		if !stdinActive.Load() && !hasMessages {
 			fmt.Fprintf(os.Stderr, "%s: Stdin closed and no pending messages, exiting\n", programName)
 			return
 		}

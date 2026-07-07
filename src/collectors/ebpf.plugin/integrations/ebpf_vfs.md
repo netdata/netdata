@@ -228,5 +228,3 @@ Metrics:
 | app.ebpf_call_vfs_open_error | calls | calls/s |
 | app.ebpf_call_vfs_create | calls | calls/s |
 | app.ebpf_call_vfs_create_error | calls | calls/s |
-
-

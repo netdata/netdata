@@ -12,12 +12,27 @@
 #endif
 
 typedef uint32_t stream_compression_signature_t;
+#define STREAM_COMPRESSION_SIGNATURE_LENGTH_BITS 14U
+#define STREAM_COMPRESSION_SIGNATURE_MAX_PAYLOAD_SIZE ((1U << STREAM_COMPRESSION_SIGNATURE_LENGTH_BITS) - 1U)
+#define STREAM_COMPRESSION_SIGNATURE_7BIT_MASK ((stream_compression_signature_t)0x7fU)
+#define STREAM_COMPRESSION_SIGNATURE_HIGH_BITS_MASK (STREAM_COMPRESSION_SIGNATURE_7BIT_MASK << 7)
+
+#if COMPRESSION_MAX_CHUNK > (STREAM_COMPRESSION_SIGNATURE_MAX_PAYLOAD_SIZE + 1U)
+#error "COMPRESSION_MAX_CHUNK exceeds stream compression signature length capacity"
+#endif
+
 #define STREAM_COMPRESSION_SIGNATURE ((stream_compression_signature_t)('z' | 0x80) | (0x80 << 8) | (0x80 << 16) | ('\n' << 24))
 #define STREAM_COMPRESSION_SIGNATURE_MASK ((stream_compression_signature_t) 0xffU | (0x80U << 8) | (0x80U << 16) | (0xffU << 24))
 #define STREAM_COMPRESSION_SIGNATURE_SIZE sizeof(stream_compression_signature_t)
 
 static inline stream_compression_signature_t stream_compress_encode_signature(size_t compressed_data_size) {
-    stream_compression_signature_t len = ((compressed_data_size & 0x7f) | 0x80 | (((compressed_data_size & (0x7f << 7)) << 1) | 0x8000)) << 8;
+    if(unlikely(compressed_data_size > STREAM_COMPRESSION_SIGNATURE_MAX_PAYLOAD_SIZE))
+        fatal("STREAM_COMPRESS: compressed data size %zu exceeds stream compression signature capacity %u",
+              compressed_data_size, STREAM_COMPRESSION_SIGNATURE_MAX_PAYLOAD_SIZE);
+
+    stream_compression_signature_t len =
+        ((((stream_compression_signature_t)compressed_data_size & STREAM_COMPRESSION_SIGNATURE_7BIT_MASK) | 0x80U |
+          ((((stream_compression_signature_t)compressed_data_size & STREAM_COMPRESSION_SIGNATURE_HIGH_BITS_MASK) << 1) | 0x8000U)) << 8);
     return len | STREAM_COMPRESSION_SIGNATURE;
 }
 
@@ -49,14 +64,34 @@ static inline void simple_ring_buffer_reset(SIMPLE_RING_BUFFER *b) {
 }
 
 static inline void simple_ring_buffer_make_room(SIMPLE_RING_BUFFER *b, size_t size) {
-    if(b->write_pos + size > b->size) {
-        if(!b->size)
-            b->size = COMPRESSION_MAX_CHUNK;
-        else
-            b->size *= 2;
+    if(unlikely(!b))
+        fatal("STREAM_COMPRESSION: NULL simple ring buffer");
 
-        if(b->write_pos + size > b->size)
-            b->size += size;
+    size_t needed_size;
+    if(unlikely(__builtin_add_overflow(b->write_pos, size, &needed_size)))
+        fatal("STREAM_COMPRESSION: simple ring buffer size overflow (write_pos=%zu, size=%zu)",
+              b->write_pos, size);
+
+    if(needed_size > b->size) {
+        size_t new_size;
+        if(!b->size)
+            new_size = COMPRESSION_MAX_CHUNK;
+        else if(b->size > SIZE_MAX / 2)
+            new_size = needed_size;
+        else
+            new_size = b->size * 2;
+
+        if(needed_size > new_size) {
+            if(size > SIZE_MAX - new_size)
+                new_size = needed_size;
+            else
+                new_size += size;
+
+            if(new_size < needed_size)
+                new_size = needed_size;
+        }
+
+        b->size = new_size;
 
         b->data = (const char *)reallocz((void *)b->data, b->size);
     }
@@ -131,7 +166,8 @@ static inline size_t stream_decompress_decode_signature(const char *data, size_t
     if (unlikely((sign & STREAM_COMPRESSION_SIGNATURE_MASK) != STREAM_COMPRESSION_SIGNATURE))
         return 0;
 
-    size_t length = ((sign >> 8) & 0x7f) | ((sign >> 9) & (0x7f << 7));
+    size_t length = ((sign >> 8) & STREAM_COMPRESSION_SIGNATURE_7BIT_MASK) |
+                    ((sign >> 9) & STREAM_COMPRESSION_SIGNATURE_HIGH_BITS_MASK);
     return length;
 }
 
@@ -145,6 +181,10 @@ static inline size_t stream_decompressor_start(struct decompressor_state *state,
 static inline size_t stream_decompressed_bytes_in_buffer(struct decompressor_state *state) {
     if(unlikely(state->output.read_pos > state->output.write_pos))
         fatal("STREAM_DECOMPRESS: invalid read/write stream positions");
+    if(unlikely(state->output.write_pos > state->output.size))
+        fatal("STREAM_DECOMPRESS: invalid output buffer size");
+    if(unlikely(state->output.write_pos && !state->output.data))
+        fatal("STREAM_DECOMPRESS: missing output buffer data");
 
     return state->output.write_pos - state->output.read_pos;
 }
@@ -161,6 +201,8 @@ static inline size_t stream_decompressor_get(struct decompressor_state *state, c
     size_t bytes_to_return = size;
     if(bytes_to_return > remaining)
         bytes_to_return = remaining;
+    if(unlikely(bytes_to_return > state->output.size - state->output.read_pos))
+        fatal("STREAM_DECOMPRESS: invalid output buffer read");
 
     memcpy(dst, state->output.data + state->output.read_pos, bytes_to_return);
     state->output.read_pos += bytes_to_return;

@@ -143,4 +143,3 @@ Netdata decodes **23 trap definitions** from Aginode Germany GmbH across **1 MIB
 - `NEXANS-BM-MIB::portNewMacAddress`
 - `NEXANS-BM-MIB::portSecurityFailure`
 - `NEXANS-BM-MIB::portErrorCountFailure`
-

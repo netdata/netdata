@@ -151,4 +151,3 @@ Netdata decodes **16 trap definitions** from Teracom Ltd across **9 MIBs** into 
 - `TERACOM-TCW111-MIB::trcVoltagex10Int`
 - `TERACOM-TCW111-MIB::trcTempx10Int`
 - `TERACOM-TCW111-MIB::trcHumix10Int`
-

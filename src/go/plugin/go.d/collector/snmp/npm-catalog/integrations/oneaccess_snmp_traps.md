@@ -153,4 +153,3 @@ Netdata decodes **38 trap definitions** from Oneaccess across **11 MIBs** into s
 - `ONEACCESS-NAT-MIB::oacNatNotificationWarningSessionReachingLimit`
 - `ONEACCESS-ACL-MIB::oacAclNotificationMaximumSessionReached`
 - `ONEACCESS-ACL-MIB::oacAclNotificationWarningSessionReachingLimit`
-

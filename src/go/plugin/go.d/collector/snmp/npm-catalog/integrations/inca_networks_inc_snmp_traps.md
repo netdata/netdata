@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from Inca Networks Inc across **1 MIB** i
 - `INCA-TS-ALARM-MIB::tsStreamAlarmNotif`
 - `INCA-TS-ALARM-MIB::tsProgStartNotif`
 - `INCA-TS-ALARM-MIB::tsProgEndNotif`
-

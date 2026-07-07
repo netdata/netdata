@@ -157,4 +157,3 @@ Netdata decodes **514 trap definitions** from Lucent Technologies across **15 MI
 - `DHCP-SERVER-MIB::dhcpServerReload`
 - `DHCP-SERVER-MIB::dhcpServerSubnetDepleted`
 - `DHCP-SERVER-MIB::dhcpServerBadPacket`
-

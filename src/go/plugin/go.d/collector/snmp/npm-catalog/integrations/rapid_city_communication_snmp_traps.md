@@ -153,4 +153,3 @@ Netdata decodes **305 trap definitions** from Rapid City Communication across **
 - `RAPID-CITY::rcIpBgpTmpAfEstablishedNotification`
 - `RAPID-CITY::rcIpBgpTmpAfBackwardTransitionNotification`
 - `RAPID-CITY::rcnFdbProtectViolation`
-

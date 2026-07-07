@@ -181,4 +181,3 @@ Netdata decodes **152 trap definitions** from Ross Video Limited across **34 MIB
 - `OPEN-GEAR-FRAME-MIB::openGearFrameAVRStateEvent`
 - `OPEN-GEAR-FRAME-MIB::openGearDataSafeStateEvent`
 - `OPEN-GEAR-FRAME-MIB::openGearPSU1StatusEvent`
-

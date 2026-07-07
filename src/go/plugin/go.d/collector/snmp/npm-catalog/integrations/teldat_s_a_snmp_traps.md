@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Teldat S A across **1 MIB** into str
 - `TELDAT-MIB::telTECircuitTrapUp`
 - `TELDAT-MIB::telTECircuitTrapBackup`
 - `TELDAT-MIB::telTECircuitTrapDown`
-

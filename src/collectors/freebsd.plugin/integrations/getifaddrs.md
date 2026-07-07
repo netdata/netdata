@@ -162,5 +162,3 @@ Metrics:
 | net.errors | inbound, outbound | errors/s |
 | net.drops | inbound, outbound | drops/s |
 | net.events | collisions | events/s |
-
-

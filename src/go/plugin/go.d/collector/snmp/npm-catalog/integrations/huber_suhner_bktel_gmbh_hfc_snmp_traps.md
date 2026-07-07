@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Huber Suhner Bktel GmbH Hfc across **
 ### Sample decoded traps
 
 - `BKTEL-HFC862-HMSNE-MIB::neSynchronizeEvent`
-

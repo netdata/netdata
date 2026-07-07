@@ -505,7 +505,7 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     if (!is_empty)
         return 0;
 
-    std::vector<ml_kmeans_t> V;
+    std::vector<ml_kmeans_inlined_t> loaded_km_contexts;
 
     sqlite3_stmt *res = active_stmt ? *active_stmt : NULL;
     int rc = 0;
@@ -547,12 +547,8 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     if (unlikely(rc != SQLITE_OK))
         goto bind_fail;
 
-    spinlock_lock(&dim->slock);
-
-    dim->km_contexts.reserve(Cfg.num_models_to_use);
+    loaded_km_contexts.reserve(Cfg.num_models_to_use);
     while ((rc = sqlite3_step_monitored(res)) == SQLITE_ROW) {
-        ml_kmeans_t km;
-
         sqlite3_int64 raw_after  = sqlite3_column_int64(res, 0);
         sqlite3_int64 raw_before = sqlite3_column_int64(res, 1);
         // Protect against silent truncation when time_t is narrower than int64_t
@@ -564,13 +560,14 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
             continue;
         }
 
+        loaded_km_contexts.emplace_back();
+        ml_kmeans_inlined_t &km = loaded_km_contexts.back();
+
         km.after  = (time_t) raw_after;
         km.before = (time_t) raw_before;
 
         km.min_dist = sqlite3_column_double(res, 2);
         km.max_dist = sqlite3_column_double(res, 3);
-
-        km.cluster_centers.resize(2);
 
         km.cluster_centers[0].set_size(Cfg.lag_n + 1);
         km.cluster_centers[0](0) = sqlite3_column_double(res, 4);
@@ -587,15 +584,16 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
         km.cluster_centers[1](3) = sqlite3_column_double(res, 13);
         km.cluster_centers[1](4) = sqlite3_column_double(res, 14);
         km.cluster_centers[1](5) = sqlite3_column_double(res, 15);
-
-        dim->km_contexts.emplace_back(km);
     }
 
-    if (!dim->km_contexts.empty()) {
-        dim->ts = TRAINING_STATUS_TRAINED;
+    if (rc == SQLITE_DONE && !loaded_km_contexts.empty()) {
+        spinlock_lock(&dim->slock);
+        if (dim->km_contexts.empty()) {
+            dim->km_contexts.swap(loaded_km_contexts);
+            dim->ts = TRAINING_STATUS_TRAINED;
+        }
+        spinlock_unlock(&dim->slock);
     }
-
-    spinlock_unlock(&dim->slock);
 
     step_rc = rc;
     if (unlikely(step_rc != SQLITE_DONE))
@@ -617,20 +615,13 @@ int ml_dimension_load_models(RRDDIM *rd, sqlite3_stmt **active_stmt) {
     step_corrupt    = ml_db_mark_if_corrupt(step_rc);
     cleanup_corrupt = ml_db_mark_if_corrupt(rc);
 
-    // Partial step results may be polluting dim state -- roll back whenever
-    // step did NOT cleanly return SQLITE_DONE, not only on CORRUPT/NOTADB.
-    // SQLITE_BUSY-after-retries, SQLITE_IOERR, SQLITE_INTERRUPT etc. all
-    // leave a partial km_contexts behind, and the training-enqueue gate in
-    // ml_public.cc only requeues UNTRAINED dims -- so leaving ts=TRAINED
-    // with a truncated context locks the dim onto stale models until the
-    // next agent restart. Cleanup-only corruption (step=DONE, reset/
-    // finalize=CORRUPT) does NOT trigger this: step returned DONE so the
-    // rows already loaded are structurally valid; only the DB-level flag
-    // needs setting for future calls.
+    // Partial step results stay local. On failure, only repair an otherwise
+    // empty dimension's state; do not clear a model installed concurrently
+    // while SQLite was stepping.
     if (step_rc != SQLITE_DONE) {
         spinlock_lock(&dim->slock);
-        dim->km_contexts.clear();
-        dim->ts = TRAINING_STATUS_UNTRAINED;
+        if (dim->km_contexts.empty())
+            dim->ts = TRAINING_STATUS_UNTRAINED;
         spinlock_unlock(&dim->slock);
     }
 
@@ -1185,14 +1176,20 @@ ml_chart_is_available_for_ml(ml_chart_t *chart)
 void
 ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomalous)
 {
-    switch (dim->mls) {
+    spinlock_lock(&dim->slock);
+    enum ml_machine_learning_status mls = dim->mls;
+    enum ml_metric_type mt = dim->mt;
+    enum ml_training_status ts = dim->ts;
+    spinlock_unlock(&dim->slock);
+
+    switch (mls) {
         case MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART:
             chart->mls.num_machine_learning_status_disabled_sp++;
             return;
         case MACHINE_LEARNING_STATUS_ENABLED: {
             chart->mls.num_machine_learning_status_enabled++;
 
-            switch (dim->mt) {
+            switch (mt) {
                 case METRIC_TYPE_CONSTANT:
                     chart->mls.num_metric_type_constant++;
                     chart->mls.num_training_status_trained++;
@@ -1203,7 +1200,7 @@ ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomal
                     break;
             }
 
-            switch (dim->ts) {
+            switch (ts) {
                 case TRAINING_STATUS_UNTRAINED:
                     chart->mls.num_training_status_untrained++;
                     return;

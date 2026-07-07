@@ -143,4 +143,3 @@ Netdata decodes **10 trap definitions** from Schleifenbauer Products B.V. across
 - `SCHLEIFENBAUER-DATABUS-MIB::sdbDevSsInputCurrentAlertDetected`
 - `SCHLEIFENBAUER-DATABUS-MIB::sdbDevSsOutletCurrentAlertDetected`
 - `SCHLEIFENBAUER-DATABUS-MIB::sdbDevSsInputVoltageAlertDetected`
-

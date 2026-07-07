@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Skyhigh Security LLC across **1 MIB*
 - `SKYHIGHSECURITY-SWG-MIB::trSystem`
 - `SKYHIGHSECURITY-SWG-MIB::trApplication`
 - `SKYHIGHSECURITY-SWG-MIB::trUser`
-

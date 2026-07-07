@@ -151,4 +151,3 @@ Netdata decodes **569 trap definitions** from Enterasys Networks Inc across **9 
 - `CABLETRON-TRAPS::portSegmenting`
 - `CABLETRON-TRAPS::portUnsegementing`
 - `CABLETRON-TRAPS::portLinkUp`
-

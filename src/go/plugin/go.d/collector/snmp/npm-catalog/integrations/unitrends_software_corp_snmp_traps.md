@@ -143,4 +143,3 @@ Netdata decodes **16 trap definitions** from Unitrends Software Corp across **1 
 - `UNITRENDS-SNMP::trapGroupPCI`
 - `UNITRENDS-SNMP::trapGroupProcess`
 - `UNITRENDS-SNMP::trapGroupDisk`
-

@@ -148,4 +148,3 @@ Netdata decodes **129 trap definitions** from Fibrolan across **6 MIBs** into st
 - `FIBROLAN-MIB-MS-TRAPS::psuInstalled`
 - `FIBROLAN-MIB-MS-TRAPS::psuRemoved`
 - `FIBROLAN-MIB-MS-TRAPS::psuUp`
-

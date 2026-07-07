@@ -143,4 +143,3 @@ Netdata decodes **359 trap definitions** from Egenera Inc across **1 MIB** into 
 - `EGENERA-MIB::bladeFrameDeviceIdMismatchTrap`
 - `EGENERA-MIB::bladeFramePowerOverCommitTrap`
 - `EGENERA-MIB::bladeFramePowerOverDrawTrap`
-

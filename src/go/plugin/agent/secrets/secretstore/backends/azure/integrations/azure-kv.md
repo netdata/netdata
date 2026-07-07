@@ -244,6 +244,3 @@ Check the operand format. It must be `vault-name/secret-name`, and both names mu
 ### Access denied
 
 Make sure the Azure identity used by Netdata can read secret values from the target vault.
-
-
-

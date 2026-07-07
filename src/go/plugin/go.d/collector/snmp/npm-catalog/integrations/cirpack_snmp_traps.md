@@ -143,4 +143,3 @@ Netdata decodes **9 trap definitions** from Cirpack across **1 MIB** into struct
 - `KMIB::cirpackabort`
 - `KMIB::cirpackmisbehave`
 - `KMIB::cirpackdown`
-

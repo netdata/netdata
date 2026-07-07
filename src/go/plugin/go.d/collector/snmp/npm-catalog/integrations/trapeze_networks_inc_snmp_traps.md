@@ -143,4 +143,3 @@ Netdata decodes **88 trap definitions** from Trapeze Networks Inc across **1 MIB
 - `TRAPEZE-NETWORKS-TRAP-MIB::trpzPoEFailTrap`
 - `TRAPEZE-NETWORKS-TRAP-MIB::trpzApTimeoutTrap`
 - `TRAPEZE-NETWORKS-TRAP-MIB::trpzAPBootTrap`
-

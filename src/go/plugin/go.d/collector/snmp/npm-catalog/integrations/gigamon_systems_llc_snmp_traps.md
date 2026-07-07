@@ -143,4 +143,3 @@ Netdata decodes **20 trap definitions** from Gigamon Systems LLC across **1 MIB*
 - `GIGAMON-SNMP-MIB::gigamonSnmpFirmwareChangeNotification`
 - `GIGAMON-SNMP-MIB::gigamonSnmpConfigSaveNotification`
 - `GIGAMON-SNMP-MIB::gigamonSnmpModuleChangeNotification`
-

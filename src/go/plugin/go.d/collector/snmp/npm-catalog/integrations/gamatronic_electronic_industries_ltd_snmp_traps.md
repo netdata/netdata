@@ -143,4 +143,3 @@ Netdata decodes **41 trap definitions** from Gamatronic Electronic Industries Lt
 - `GAMATRONIC-MIB::psTrap1006Battery1TestFault`
 - `GAMATRONIC-MIB::psTrap1006LVD2Open`
 - `GAMATRONIC-MIB::psTrap1006LVD1Open`
-

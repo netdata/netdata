@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Cherokee International Corporation a
 - `SITE-MONITORING-MIB::siteV1NotificationOfEvent`
 - `SITE-MONITORING-MIB::es1NotificationOfEvent`
 - `SITE-MONITORING-MIB::es1dc1NotificationOfEvent`
-

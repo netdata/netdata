@@ -143,4 +143,3 @@ Netdata decodes **9 trap definitions** from Image Project Inc across **1 MIB** i
 - `WEBSITEPULSE-NOTIFY-MIB::webSitePulseTimeoutFailure`
 - `WEBSITEPULSE-NOTIFY-MIB::webSitePulseFailureRepeated`
 - `WEBSITEPULSE-NOTIFY-MIB::webSitePulseRecovery`
-

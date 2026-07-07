@@ -153,4 +153,3 @@ Netdata decodes **3510 trap definitions** from Network Technologies Inc across *
 - `NETWORK-TECHNOLOGIES-GLOBAL-REG::humiditySensor1Trap`
 - `NETWORK-TECHNOLOGIES-GLOBAL-REG::humiditySensor2Trap`
 - `NETWORK-TECHNOLOGIES-GLOBAL-REG::dryContactSensor1Trap`
-

@@ -194,4 +194,3 @@ Netdata decodes **318 trap definitions** from Allied Telesis Inc across **47 MIB
 - `AtiL2-MIB::atiL2FanStopTrap`
 - `AtiL2-MIB::atiL2TemperatureAbnormalTrap`
 - `AtiL2-MIB::atiL2PowerSupplyOutage`
-

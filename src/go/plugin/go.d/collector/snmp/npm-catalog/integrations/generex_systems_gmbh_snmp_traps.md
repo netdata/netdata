@@ -143,4 +143,3 @@ Netdata decodes **17 trap definitions** from Generex Systems GmbH across **1 MIB
 - `UPSMAN::upsTurnedOff`
 - `UPSMAN::communicationEstablished`
 - `UPSMAN::powerRestored`
-

@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from Ap Nederland B.V. across **1 MIB** i
 - `APNL-MODULAR-PDU-MIB::pduPowerAlarm`
 - `APNL-MODULAR-PDU-MIB::sensorAlarm`
 - `APNL-MODULAR-PDU-MIB::pduSwitchAlarm`
-

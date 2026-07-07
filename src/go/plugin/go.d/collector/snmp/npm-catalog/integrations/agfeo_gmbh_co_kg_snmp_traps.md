@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Agfeo GmbH Co KG across **1 MIB** int
 ### Sample decoded traps
 
 - `AGFEO-PBX-MIB::agfeoEventGeneric`
-

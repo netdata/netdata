@@ -143,4 +143,3 @@ Netdata decodes **70 trap definitions** from Aperto Networks across **1 MIB** in
 - `DEVTRAPS-MIB::aniDevTrapBsuSuDown`
 - `DEVTRAPS-MIB::aniDevTrapSuBsuUp`
 - `DEVTRAPS-MIB::aniDevTrapSuBsuDown`
-

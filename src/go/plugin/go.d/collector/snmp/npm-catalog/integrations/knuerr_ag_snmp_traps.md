@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Knuerr AG across **1 MIB** into stru
 
 - `RMS-MIB::rmsFilterTrap`
 - `RMS-MIB::rmsChipcardTrap`
-

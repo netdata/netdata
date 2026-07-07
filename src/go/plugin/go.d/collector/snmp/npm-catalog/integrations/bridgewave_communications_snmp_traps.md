@@ -143,4 +143,3 @@ Netdata decodes **15 trap definitions** from Bridgewave Communications across **
 - `BRWAVE-RADIO-MIB::brwaveUnitTemperatureAbnormal`
 - `BRWAVE-RADIO-MIB::brwaveUnitTemperatureNormal`
 - `BRWAVE-RADIO-MIB::brwaveTxTemperatureAbnormal`
-

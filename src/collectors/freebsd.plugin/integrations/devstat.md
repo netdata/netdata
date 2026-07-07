@@ -156,5 +156,3 @@ Metrics:
 | disk.await | reads, writes, other, frees | milliseconds/operation |
 | disk.avgsz | reads, writes, frees | KiB/operation |
 | disk.svctm | svctm | milliseconds/operation |
-
-

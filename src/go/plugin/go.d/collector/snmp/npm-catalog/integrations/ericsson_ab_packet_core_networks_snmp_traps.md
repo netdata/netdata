@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Ericsson AB Packet Core Networks acr
 - `GGSN-MIB::ggsnTrapNew`
 - `GGSN-MIB::ggsnTrapChanged`
 - `GGSN-MIB::ggsnTrapCleared`
-

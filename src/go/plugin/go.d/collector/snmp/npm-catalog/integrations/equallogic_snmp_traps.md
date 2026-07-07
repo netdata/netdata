@@ -144,4 +144,3 @@ Netdata decodes **26 trap definitions** from Equallogic across **2 MIBs** into s
 - `EQLMEMBER-MIB::eqlMemberHealthFanSpeedHighThreshold`
 - `EQLMEMBER-MIB::eqlMemberHealthFanSpeedLowThreshold`
 - `EQLMEMBER-MIB::eqlMemberHealthPowerSupplyFanFailure`
-

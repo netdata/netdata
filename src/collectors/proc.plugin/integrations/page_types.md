@@ -112,5 +112,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | mem.pagetype | a dimension per pagesize | B |
-
-

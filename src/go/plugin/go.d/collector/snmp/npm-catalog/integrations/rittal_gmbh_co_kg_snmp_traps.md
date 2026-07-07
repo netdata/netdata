@@ -147,4 +147,3 @@ Netdata decodes **151 trap definitions** from Rittal GmbH Co KG across **5 MIBs*
 - `CMC-MIB::alarmFan1`
 - `CMC-MIB::alarmFan2`
 - `CMC-MIB::alarmVoltage`
-

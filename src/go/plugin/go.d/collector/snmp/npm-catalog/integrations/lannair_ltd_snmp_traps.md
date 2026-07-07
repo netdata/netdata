@@ -143,4 +143,3 @@ Netdata decodes **17 trap definitions** from Lannair Ltd across **1 MIB** into s
 - `BREEZECOM-MIB::brzAPdisassociated`
 - `BREEZECOM-MIB::brzAPaging`
 - `BREEZECOM-MIB::brzAProamedOut`
-

@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from Atlas Computer Equipment Inc across 
 - `ACOS-MIB::acosTftpInitiatedTrap`
 - `ACOS-MIB::acosTftpFailedTrap`
 - `ACOS-MIB::acosTftpSucceededTrap`
-

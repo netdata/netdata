@@ -148,4 +148,3 @@ Netdata decodes **324 trap definitions** from Computer Associates International 
 - `CAIMIB::caiUniSecuT3`
 - `CAIMIB::caiUniSecuT4`
 - `CAIMIB::caiUniSecuT5`
-

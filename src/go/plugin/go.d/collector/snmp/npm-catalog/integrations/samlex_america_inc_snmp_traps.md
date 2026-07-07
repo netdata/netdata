@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Samlex America Inc across **1 MIB** i
 ### Sample decoded traps
 
 - `SAMLEXAMERICA-MIB::snmpTrap`
-

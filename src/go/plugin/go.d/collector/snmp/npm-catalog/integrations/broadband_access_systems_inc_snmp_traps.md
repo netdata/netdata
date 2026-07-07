@@ -143,4 +143,3 @@ Netdata decodes **11 trap definitions** from Broadband Access Systems Inc across
 - `BAS-TRAPS-MIB::basTraceLogTrap`
 - `BAS-TRAPS-MIB::basCmtsCmUp`
 - `BAS-TRAPS-MIB::basCmtsCmDown`
-

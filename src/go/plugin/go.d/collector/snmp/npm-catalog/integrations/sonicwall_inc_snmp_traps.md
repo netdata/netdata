@@ -144,4 +144,3 @@ Netdata decodes **12 trap definitions** from Sonicwall Inc across **2 MIBs** int
 - `SONICWALL-FIREWALL-TRAP-MIB::swFwTrapBlkWebSite`
 - `SONICWALL-FIREWALL-TRAP-MIB::swFwTrapIpsecTunnel`
 - `SONICWALL-FIREWALL-TRAP-MIB::swFwTrapWlanIDS`
-

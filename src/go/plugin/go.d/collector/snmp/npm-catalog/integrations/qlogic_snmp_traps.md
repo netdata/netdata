@@ -141,4 +141,3 @@ Netdata decodes **2 trap definitions** from Qlogic across **2 MIBs** into struct
 
 - `QLGC-QLASPTrap-MIB::failoverEvent`
 - `QLGC-MP-MIB::qlgcMPStatusChange`
-

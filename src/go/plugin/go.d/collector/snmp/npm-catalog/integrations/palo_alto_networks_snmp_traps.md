@@ -144,4 +144,3 @@ Netdata decodes **665 trap definitions** from Palo Alto Networks across **2 MIBs
 - `PAN-TRAPS::panTrafficTrap`
 - `PAN-TRAPS::panThreatTrap`
 - `PAN-TRAPS::panHipMatchTrap`
-

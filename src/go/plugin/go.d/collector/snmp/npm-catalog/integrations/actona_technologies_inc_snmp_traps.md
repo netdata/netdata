@@ -143,4 +143,3 @@ Netdata decodes **6 trap definitions** from Actona Technologies Inc across **1 M
 - `ACTONA-ACTASTOR-MIB::acEsLogsTrap`
 - `ACTONA-ACTASTOR-MIB::mgrLogsTrap`
 - `ACTONA-ACTASTOR-MIB::csLogsTrap`
-

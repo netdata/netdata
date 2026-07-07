@@ -146,8 +146,8 @@ groups:
         title: Request Duration Buckets
         context: request_duration_buckets
         units: observations/s
-        type: stacked
-        algorithm: incremental        # histogram buckets are counters
+        type: heatmap                 # histogram bucket charts are forced to heatmap
+        algorithm: incremental        # histogram range buckets are counter-like totals
         instances:
           by_labels: [host]
         dimensions:
@@ -207,7 +207,7 @@ groups:
             # service_status="ready" → dim "ready", service_status="degraded" → dim "degraded", etc.
 ```
 
-**What this template produces** — if the collector reports metrics for 2 hosts (`host="web-1"`, `host="web-2"`), the engine creates **2 instances of every chart** (one per host). The histogram bucket chart gets one dimension per `le` boundary, the summary chart gets one per quantile, and the stateset chart gets one per state — all named automatically by the engine.
+**What this template produces** — if the collector reports metrics for 2 hosts (`host="web-1"`, `host="web-2"`), the engine creates **2 instances of every chart** (one per host). The histogram bucket chart is a heatmap with one non-overlapping range dimension per `le` boundary, the summary chart gets one per quantile, and the stateset chart gets one per state — all named automatically by the engine.
 
 ## Template Structure
 
@@ -514,7 +514,7 @@ charts:
 | `context`         | string        | **yes**  |                        | Chart context leaf. Combined with context namespaces.                        |
 | `units`           | string        | **yes**  |                        | Chart units (e.g., `queries/s`, `bytes`, `percentage`).                      |
 | `algorithm`       | string        | no       | inferred from metrics  | `absolute` or `incremental`. If omitted, inferred from metric suffixes.      |
-| `type`            | string        | no       | `line`                 | `line`, `area`, `stacked`, or `heatmap`.                                     |
+| `type`            | string        | no       | `line`                 | `line`, `area`, `stacked`, or `heatmap`. Histogram bucket charts are forced to `heatmap`. |
 | `priority`        | int           | no       | `70000`                | Chart ordering priority in the dashboard (`0` = use engine default `70000`). |
 | `label_promotion` | array[string] | no       | from `chart_defaults`  | Labels to promote as chart labels (for filtering/grouping in UI). Entries must be non-empty label keys. |
 | `instances`       | object        | no       | from `chart_defaults`  | Instance identity policy (see [instances](#instances)).                      |
@@ -528,6 +528,11 @@ charts:
 |-------------------------------------------|--------------------|
 | `*_total`, `*_count`, `*_sum`, `*_bucket` | `incremental`      |
 | Everything else                           | `absolute`         |
+
+Histogram `_bucket` dimensions receive non-overlapping range bucket totals from
+`metrix.ReadFlatten()`. The `le` label remains the bucket upper bound, but the
+value is no longer cumulative with earlier buckets. Histogram bucket dimensions
+are ordered by numeric `le` value with `+Inf` last.
 
 > [!WARNING]
 > If a chart's dimensions mix counter-like metrics (e.g., `requests_total`) with gauge-like metrics (e.g., `temperature`) and `algorithm` is omitted, the engine fails with a compile error: _"algorithm inference is ambiguous for mixed metric kinds; set algorithm explicitly"_. Set `algorithm` on the chart to resolve this.

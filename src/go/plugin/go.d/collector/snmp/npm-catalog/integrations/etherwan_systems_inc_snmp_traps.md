@@ -143,4 +143,3 @@ Netdata decodes **24 trap definitions** from Etherwan Systems Inc across **1 MIB
 - `EtherWAN-ewnSwitchM::ewnTrapsRringTopologyChange`
 - `EtherWAN-ewnSwitchM::ewnTrapsDigitalIOInput1`
 - `EtherWAN-ewnSwitchM::ewnTrapsDigitalIOInput2`
-

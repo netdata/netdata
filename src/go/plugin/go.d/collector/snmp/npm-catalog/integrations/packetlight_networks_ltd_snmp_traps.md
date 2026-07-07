@@ -164,4 +164,3 @@ Netdata decodes **42 trap definitions** from Packetlight Networks Ltd across **2
 - `SL-TRAP-MIB::edfaStatusChangeV1`
 - `SL-TRAP-MIB::edfaControlModeChangeV1`
 - `SL-TRAP-MIB::optApsTrapSwitchoverV1`
-

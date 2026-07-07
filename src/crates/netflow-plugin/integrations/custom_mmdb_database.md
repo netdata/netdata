@@ -226,6 +226,3 @@ and its 30-second cadence are documented in
 Operational practice: have your build pipeline write the new MMDB to a
 temp file in the same directory and `rename(2)` it over the live path so
 the swap is atomic.
-
-
-

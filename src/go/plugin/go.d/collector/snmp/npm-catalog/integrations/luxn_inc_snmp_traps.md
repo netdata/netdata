@@ -143,4 +143,3 @@ Netdata decodes **285 trap definitions** from Luxn Inc across **1 MIB** into str
 - `LUXN-MIB::luxNVoadmDetectorFailureResolvedTrap`
 - `LUXN-MIB::luxNVoadmOutofRangeTrap`
 - `LUXN-MIB::luxNVoadmOutofRangeResolvedTrap`
-

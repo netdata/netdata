@@ -220,4 +220,3 @@ Netdata decodes **1128 trap definitions** from Zyxel Communications Corp across 
 - `ZyXEL-COE-MIB::overheat`
 - `ZyXEL-COE-MIB::overheatOver`
 - `ZYXEL-PRESTIGE-MIB::reboot`
-

@@ -142,5 +142,3 @@ Metrics:
 | adcs.cert_signed_certificate_timestamp_lists | lists | lists/s |
 | adcs.cert_signed_certificate_timestamp_list_processing_time | processing_time | seconds |
 | adcs.cert_retrieval_processing_time | processing_time | seconds |
-
-

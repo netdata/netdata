@@ -145,4 +145,3 @@ Netdata decodes **59 trap definitions** from Gandalf across **3 MIBs** into stru
 - `GANDALF-ENTERPRISE-MIB::gCardMismatch`
 - `GANDALF-ENTERPRISE-MIB::gCardMismatchCleared`
 - `GANDALF-ENTERPRISE-MIB::gPortThresholdExceeded`
-

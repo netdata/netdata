@@ -158,4 +158,3 @@ Netdata decodes **69 trap definitions** from Trend Micro Inc Formerly Tippingpoi
 - `TPT-MISC-NOTIFY-MIB::tptManagedNotify`
 - `TPT-MISC-NOTIFY-MIB::tptUnmanagedNotify`
 - `TPT-MISC-NOTIFY-MIB::tptRolloverNotify`
-

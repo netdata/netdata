@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Fial Computer Inc across **1 MIB** i
 - `FIAL-ENC-MIB::encShutdown`
 - `FIAL-ENC-MIB::encStartup`
 - `FIAL-ENC-MIB::encEventLog`
-

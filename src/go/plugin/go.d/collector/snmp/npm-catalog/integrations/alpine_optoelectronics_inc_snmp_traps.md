@@ -144,4 +144,3 @@ Netdata decodes **5 trap definitions** from Alpine Optoelectronics Inc across **
 - `ALPINE-GEN-CARD-EDFA-MIB::alpineGenEdfaBiasAlarm`
 - `ALPINE-GEN-CARD-EDFA-MIB::alpineGenEdfaLossAlarm`
 - `ALPINE-TDCM-EDFA-MIB::alpineTEAlarmTemperature`
-

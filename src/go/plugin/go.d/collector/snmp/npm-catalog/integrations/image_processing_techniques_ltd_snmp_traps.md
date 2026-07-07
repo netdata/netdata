@@ -143,4 +143,3 @@ Netdata decodes **26 trap definitions** from Image Processing Techniques Ltd acr
 - `OMNITEK-MIB::videoStandardChangedTRAP`
 - `OMNITEK-MIB::digitalInputTRAP`
 - `OMNITEK-MIB::digitalInputBTRAP`
-

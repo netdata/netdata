@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Dantherm Cooling A S across **1 MIB**
 ### Sample decoded traps
 
 - `DANTHERM-COOLING-MIB::cc3000Trap`
-

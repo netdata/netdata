@@ -145,4 +145,3 @@ Netdata decodes **45 trap definitions** from Terra across **3 MIBs** into struct
 - `TERRA-sdi410C-MIB::notifyInpsig`
 - `TERRA-sdi410C-MIB::notifyBitovf`
 - `TERRA-sdi410C-MIB::notifyLinks`
-

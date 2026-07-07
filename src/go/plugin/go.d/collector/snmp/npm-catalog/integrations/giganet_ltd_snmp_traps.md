@@ -144,4 +144,3 @@ Netdata decodes **251 trap definitions** from Giganet Ltd across **2 MIBs** into
 - `CERAGON-MIB::gnSDHTrap`
 - `CERAGON-MIB::gnACCESSTrap`
 - `CERAGON-MIB::gnODUTrapCleared`
-

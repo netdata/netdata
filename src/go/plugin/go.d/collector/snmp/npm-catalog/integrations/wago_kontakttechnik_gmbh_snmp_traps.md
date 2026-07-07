@@ -143,4 +143,3 @@ Netdata decodes **10 trap definitions** from Wago Kontakttechnik GmbH across **1
 - `WAGO-MIB::wioPlcStop`
 - `WAGO-MIB::wioPlcReset`
 - `WAGO-MIB::wioPlcSoftwareWatchdog`
-

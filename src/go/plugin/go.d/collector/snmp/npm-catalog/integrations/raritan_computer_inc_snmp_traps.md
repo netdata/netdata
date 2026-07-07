@@ -151,4 +151,3 @@ Netdata decodes **389 trap definitions** from Raritan Computer Inc across **9 MI
 - `RARITANCC-MIB::ccUserLogin`
 - `RARITANCC-MIB::ccUserLogout`
 - `RARITANCC-MIB::ccSPortConnectionStarted`
-

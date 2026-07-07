@@ -148,4 +148,3 @@ Netdata decodes **46 trap definitions** from Nec Corporation across **6 MIBs** i
 - `MMPF-MIB::supervisorLoginFailure`
 - `MMPF-MIB::supervisorExit`
 - `PICO-SMI::picoTemperatureFault`
-

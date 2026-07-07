@@ -144,5 +144,3 @@ Metrics:
 | system.clock_sync_state | state | state |
 | system.clock_status | unsync, clockerr | status |
 | system.clock_sync_offset | offset | milliseconds |
-
-

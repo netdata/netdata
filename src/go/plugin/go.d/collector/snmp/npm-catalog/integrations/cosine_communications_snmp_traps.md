@@ -144,4 +144,3 @@ Netdata decodes **61 trap definitions** from Cosine Communications across **2 MI
 - `COSINE-ORION-MIB::csOrionBladeStateChange`
 - `COSINE-ORION-MIB::csOrionFanStatusChange`
 - `COSINE-ORION-MIB::csOrionConfigChange`
-

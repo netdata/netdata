@@ -144,4 +144,3 @@ Netdata decodes **90 trap definitions** from Reltec Corporation across **2 MIBs*
 - `VEC-MIBv5-9::psAlarmLowVoltage`
 - `VEC-MIBv5-9::psAlarmSystemHighVoltage1`
 - `VEC-MIBv5-9::psAlarmSystemHighVoltage2`
-

@@ -133,5 +133,3 @@ Metrics:
 | netfilter.netlink_expect | created, deleted, new | expectations/s |
 | netfilter.nfacct_packets | a dimension per nfacct object | packets/s |
 | netfilter.nfacct_bytes | a dimension per nfacct object | kilobytes/s |
-
-

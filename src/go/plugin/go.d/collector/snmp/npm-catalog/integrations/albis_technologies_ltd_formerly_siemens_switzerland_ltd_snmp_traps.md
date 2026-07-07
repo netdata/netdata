@@ -143,4 +143,3 @@ Netdata decodes **16 trap definitions** from Albis Technologies Ltd Formerly Sie
 - `TRAP-MIB::deviceLinkUp`
 - `TRAP-MIB::lineLinkDown`
 - `TRAP-MIB::lineLinkUp`
-

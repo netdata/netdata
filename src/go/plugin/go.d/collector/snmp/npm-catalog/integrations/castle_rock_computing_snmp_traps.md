@@ -143,4 +143,3 @@ Netdata decodes **26 trap definitions** from Castle Rock Computing across **1 MI
 - `CASTLEROCK-MIB::pollNoResponse`
 - `CASTLEROCK-MIB::pollStatusTestPass`
 - `CASTLEROCK-MIB::pollStatusTestFail`
-

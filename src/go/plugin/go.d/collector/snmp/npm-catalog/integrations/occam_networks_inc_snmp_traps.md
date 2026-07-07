@@ -145,4 +145,3 @@ Netdata decodes **11 trap definitions** from Occam Networks Inc across **3 MIBs*
 - `OCCAM-SENSOR-MIB::occamExtAlarmRaised`
 - `OCCAM-SENSOR-MIB::occamExtAlarmCleared`
 - `OCCAM-SHELF-MIB::cardPresenceNotification`
-

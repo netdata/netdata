@@ -146,4 +146,3 @@ Netdata decodes **6 trap definitions** from Net Snmp across **4 MIBs** into stru
 - `NET-SNMP-AGENT-MIB::nsNotifyStart`
 - `NET-SNMP-AGENT-MIB::nsNotifyShutdown`
 - `NET-SNMP-AGENT-MIB::nsNotifyRestart`
-

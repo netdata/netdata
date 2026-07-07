@@ -147,4 +147,3 @@ Netdata decodes **9 trap definitions** from Arrowpoint Communications Inc across
 - `SVCEXT-MIB::apSvcTransitionTrap`
 - `SNMPEXT-MIB::apSnmpExtReloadTrap`
 - `FLOWMGREXT-MIB::apFlowMgrExtDosSynTrap`
-

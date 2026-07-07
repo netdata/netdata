@@ -143,4 +143,3 @@ Netdata decodes **8 trap definitions** from Snarlsnmp Dynamic Web Application Mo
 - `SNARLSNMP-MIB::snarlsnmpWarning`
 - `SNARLSNMP-MIB::snarlsnmpCritical`
 - `SNARLSNMP-MIB::snarlsnmpSuspended`
-

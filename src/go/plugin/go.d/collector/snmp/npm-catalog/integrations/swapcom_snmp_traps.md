@@ -144,4 +144,3 @@ Netdata decodes **15 trap definitions** from Swapcom across **2 MIBs** into stru
 - `SWAPCOM-SNMP::platformStop`
 - `SWAPCOM-SNMP::unknownLog`
 - `SWAPCOM-SNMP::infoLog`
-

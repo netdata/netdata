@@ -172,5 +172,3 @@ Metrics:
 | net.rsc_exceptions | exceptions | exceptions/s |
 | net.rsc_average_packet_size | average | bytes |
 | net.chimney_connections | connections | connections |
-
-

@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Octel Communications Corp across **1 
 ### Sample decoded traps
 
 - `VMX-DIAL::hwerrTrap`
-

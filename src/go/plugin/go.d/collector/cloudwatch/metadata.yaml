@@ -107,14 +107,14 @@ modules:
 
           :::
         method_description: |
-          The collector discovers available metrics with the CloudWatch `ListMetrics` API (one paginated call per selected service profile and region; the collector then keeps only the metrics whose dimension set matches each profile's instance dimensions) and queries them in batches with the `GetMetricData` API. Account identity is resolved once at startup via `sts:GetCallerIdentity`. Authentication uses the AWS SDK default credential chain, static access keys, or an assumed IAM role.
+          The collector discovers available metrics with the CloudWatch `ListMetrics` API (one paginated call per account, selected service profile, and region; the collector then keeps only the metrics whose dimension set matches each profile's instance dimensions) and queries them in batches with the `GetMetricData` API. Each configured identity's AWS account id is resolved via `sts:GetCallerIdentity` (one per assumed role, so a single job can monitor several accounts). Note that both discovery and query volume scale with accounts × regions × profiles, so adding many roles multiplies API calls (and `GetMetricData` cost) accordingly. Authentication uses the AWS SDK default credential chain, static access keys, or one or more assumed IAM roles.
       supported_platforms:
         include: []
         exclude: []
       multi_instance: true
       additional_permissions:
         description: |
-          The configured IAM identity requires `cloudwatch:ListMetrics`, `cloudwatch:GetMetricData`, and `sts:GetCallerIdentity`. When `auth.mode` is `assume_role`, it also requires `sts:AssumeRole`.
+          The configured IAM identity requires `cloudwatch:ListMetrics`, `cloudwatch:GetMetricData`, and `sts:GetCallerIdentity`. When `auth.mode` is `assume_role`, it also requires `sts:AssumeRole`. Resource tag enrichment (the optional `tags` option) additionally requires `tag:GetResources`.
       default_behavior:
         auto_detection:
           description: |
@@ -124,7 +124,7 @@ modules:
             - Minimum collection interval is 60 seconds (CloudWatch's minimum metric period).
             - CloudWatch publishes metrics with a delay; the effective query offset is `max(query_offset, period)`, so long-period metrics (such as the daily S3 storage metrics) are inherently about one period behind.
             - There is no cap on discovered resources; a warning is logged at 1000 or more discovered instances (collection is never truncated).
-            - Resources are labeled by their identifying CloudWatch dimensions (for example EC2 `instance_id`), not by their `Name` tag or other resource tags; tag-based naming and filtering are not currently supported. (A dimension that is constant across resources, such as CloudFront's `Region=Global`, is used to match and query metrics but is not turned into a label.)
+            - Resources are labeled by their identifying CloudWatch dimensions (for example EC2 `instance_id`). Selected resource tags can additionally be attached as labels via the opt-in `tags` option (using the Resource Groups Tagging API); tags are enrichment only and never change a resource's identity. (A dimension that is constant across resources, such as CloudFront's `Region=Global`, is used to match and query metrics but is not turned into a label.)
         performance_impact:
           description: |
             AWS bills CloudWatch API usage. `GetMetricData` (the metric queries) is the cost driver, billed per metric requested; `ListMetrics` discovery falls under the free tier and then costs a fraction as much. As a rough anchor, `GetMetricData` is billed at roughly $0.01 per 1,000 metrics requested -- confirm current [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) for your region. Each combination of instance, metric, and statistic is one billed query, run once per its own period (not once per collection cycle), so cost scales with discovered instances, metrics, statistics, and their periods -- not with `update_every`. The collector already minimizes it with curated per-service profiles, single-statistic defaults, exact dimension filtering, cached discovery, and `recently_active_only`. To reduce it further, restrict services with `profiles.mode: exact` or narrow `regions`.
@@ -154,7 +154,7 @@ modules:
               }
               ```
 
-              `cloudwatch:ListMetrics`, `cloudwatch:GetMetricData`, and `sts:GetCallerIdentity` do not support resource-level permissions, so `"Resource": "*"` is required -- this is already least-privilege for these read actions. In `assume_role` mode, scope `sts:AssumeRole` to the specific role ARN(s) rather than `*`.
+              `cloudwatch:ListMetrics`, `cloudwatch:GetMetricData`, and `sts:GetCallerIdentity` do not support resource-level permissions, so `"Resource": "*"` is required -- this is already least-privilege for these read actions. In `assume_role` mode, scope `sts:AssumeRole` to the specific role ARN(s) rather than `*`. To enable resource tag enrichment (the optional `tags` option), also grant `tag:GetResources` (it likewise requires `"Resource": "*"`).
 
               Then provide credentials with one of the `auth.mode` options:
 
@@ -234,8 +234,13 @@ modules:
               required: false
               group: Authentication
             - name: auth.mode_assume_role.roles
-              description: A single-element list with the IAM role to assume (used in `assume_role` mode); each entry has `role_arn` and an optional `external_id`. Exactly one role is supported per job -- to monitor multiple accounts, run one job per account/role.
+              description: IAM roles to assume (used in `assume_role` mode) -- one per AWS account to monitor. Each entry has `role_arn` and an optional `external_id`, and each metric series is labeled with the account id its role resolves to. A role that cannot be assumed is skipped with a warning while the rest keep collecting; two roles resolving to the same account are de-duplicated.
               default_value: ""
+              required: false
+              group: Authentication
+            - name: auth.mode_assume_role.include_base_account
+              description: When `true`, also monitor the base identity's own account (the identity used to assume the roles) alongside the assumed-role accounts. Defaults to `false` -- with roles set, only the assumed-role accounts are monitored; to also cover the base account, enable this or run a separate `default`-mode job.
+              default_value: false
               required: false
               group: Authentication
             - name: profiles.mode
@@ -258,6 +263,12 @@ modules:
               default_value: true
               required: false
               group: Discovery
+            - name: tags
+              description: |
+                Optional allowlist of AWS resource tags to attach as extra labels on collected metrics, looked up via the Resource Groups Tagging API. Empty by default -- with no tags listed, no tag lookup runs and no extra IAM is needed. Each entry has a `name` (the AWS tag key, case-sensitive) and an optional `rename` (the Netdata label name; the default is the sanitized key, so `Name` becomes `name`). Use `rename` when the key is not a valid label (for example an `aws:`-prefixed key) or collides with a built-in label such as `region`. Enabling tags requires the `tag:GetResources` IAM permission. Note: tag values become label values and may contain personal data (such as owner emails), so list only tags you want exposed as labels. Tags apply only to profiles with a supported resource-ARN join; some services are not tag-enriched: Auto Scaling and Bedrock (not taggable via the Resource Groups Tagging API), and -- pending a reliable ARN join -- API Gateway, CloudFront, MSK, and ElastiCache. Tags behave as create-time chart labels: a tag that first appears or changes value after a chart already exists is reflected only when that chart is next recreated.
+              default_value: ""
+              required: false
+              group: Tags
             - name: vnode
               description: Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).
               default_value: ""
@@ -303,6 +314,20 @@ modules:
                         roles:
                           - role_arn: "arn:aws:iam::123456789012:role/netdata-cloudwatch"
                             # external_id: "your-external-id"   # add if the role's trust policy requires it
+            - name: Multiple accounts (assume several roles)
+              description: Monitor several AWS accounts from one job by assuming a role in each. Every metric is labeled with the account id its role resolves to. Enable `include_base_account` to also monitor the account the base identity itself belongs to.
+              config: |
+                jobs:
+                  - name: multi_account
+                    regions:
+                      - us-east-1
+                    auth:
+                      mode: assume_role
+                      mode_assume_role:
+                        include_base_account: false
+                        roles:
+                          - role_arn: "arn:aws:iam::111111111111:role/netdata-cloudwatch"
+                          - role_arn: "arn:aws:iam::222222222222:role/netdata-cloudwatch"
             - name: Specific services only
               description: Collect only EC2 and RDS instead of auto-discovering all built-in services.
               config: |

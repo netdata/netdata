@@ -143,4 +143,3 @@ Netdata decodes **9 trap definitions** from Avista Labs Inc across **1 MIB** int
 - `PLUG-POWER-ESERIES-MIB::fcsETrapMNAlarmEntryAdded`
 - `PLUG-POWER-ESERIES-MIB::fcsETrapMNAlarmEntryRemoved`
 - `PLUG-POWER-ESERIES-MIB::fcsETrapRunning`
-

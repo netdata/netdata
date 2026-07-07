@@ -148,4 +148,3 @@ Netdata decodes **14 trap definitions** from Comtech Efdata Corporation across *
 - `CDM-570Traps::cdm570LRxTrafficAlarm`
 - `CDM-570LTraps::cdm570LODUAlarm`
 - `CDM-570::cdm570UnitAlarm`
-

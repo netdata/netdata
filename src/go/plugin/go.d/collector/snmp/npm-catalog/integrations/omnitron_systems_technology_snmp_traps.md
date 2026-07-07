@@ -144,4 +144,3 @@ Netdata decodes **201 trap definitions** from Omnitron Systems Technology across
 - `OMNITRON-TRAP-MIB::icModlinkdown`
 - `OMNITRON-TRAP-MIB::icModlinkup`
 - `OMNITRON-TRAP-MIB::icModdipsw`
-

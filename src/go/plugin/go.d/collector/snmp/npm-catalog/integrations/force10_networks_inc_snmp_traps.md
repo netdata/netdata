@@ -161,4 +161,3 @@ Netdata decodes **160 trap definitions** from Force10 Networks Inc across **19 M
 - `F10-CHASSIS-MIB::chAlarmCardReset`
 - `F10-CHASSIS-MIB::chAlarmCardOffline`
 - `F10-CHASSIS-MIB::chAlarmCardMismatch`
-

@@ -146,4 +146,3 @@ Netdata decodes **372 trap definitions** from Powertek Limited across **4 MIBs**
 - `SPS2v1-MIB::pduSystemRestart`
 - `SPS2v1-MIB::pduResetToDefault`
 - `SPS2v1-MIB::pduSystemLogClear`
-

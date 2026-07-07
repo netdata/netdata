@@ -46,5 +46,3 @@ endmeta-->
       - Notifications: The notification types you want to receive
     - **Integration configuration**
       - Topic ARN: The topic provided on AWS SNS (with region) for where to publish your notifications.
-
-

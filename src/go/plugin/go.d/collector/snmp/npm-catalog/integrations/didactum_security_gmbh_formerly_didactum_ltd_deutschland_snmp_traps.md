@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Didactum Security GmbH Formerly Didac
 ### Sample decoded traps
 
 - `DIDACTUM-SYSTEM-MIB::ctlUnitTrapNotification`
-

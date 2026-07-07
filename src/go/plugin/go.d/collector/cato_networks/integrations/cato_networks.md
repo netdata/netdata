@@ -351,6 +351,3 @@ Increase `update_every` or narrow `site_selector` if the Cato API reports rate l
 ### Connection, TLS, or proxy failures
 
 Check DNS, firewall egress, TLS inspection, proxy settings, endpoint region, and the collector logs.
-
-
-

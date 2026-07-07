@@ -355,6 +355,3 @@ Use `tls_skip_verify: yes` to bypass for testing, then mount the issuing CA and 
 ### Bearer token file not found
 
 When Netdata runs **outside** Kubernetes and the configured `bearer_token_file` points under `/var/run/secrets/`, missing tokens are silently ignored — this is intentional so the same config works in dev and in Helm. If you are inside k8s, the file must exist.
-
-
-

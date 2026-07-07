@@ -154,5 +154,3 @@ Metrics:
 | adfs.windows_integrated_authentications | authentications | authentications/s |
 | adfs.wsfed_token_requests_success | success | requests/s |
 | adfs.wstrust_token_requests_success | success | requests/s |
-
-

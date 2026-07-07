@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from Gadzoox Microsystems Inc across **1 
 - `Gadz-1-MIB::trapEnvironment`
 - `Gadz-1-MIB::trapPortStatus`
 - `Gadz-1-MIB::trapConfigurationStatus`
-

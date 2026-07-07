@@ -147,4 +147,3 @@ Netdata decodes **26 trap definitions** from Redline Communications Inc across *
 - `REDLINE-AN50-MIB::an50PswdChangeFailTrap`
 - `REDLINE-AN50-MIB::an50FirmwareConfigFailTrap`
 - `REDLINE-AN50-MIB::an50EepromCorruptedTrap`
-

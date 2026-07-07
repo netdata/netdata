@@ -103,7 +103,8 @@ app_dur_count 4
 			assert: func(t *testing.T, fr metrix.Reader, written int) {
 				assert.Equal(t, 1, written)
 				assert.InDelta(t, 1, value(t, fr, "app_dur_bucket", metrix.Labels{"le": "0.1"}), 1e-9)
-				assert.InDelta(t, 3, value(t, fr, "app_dur_bucket", metrix.Labels{"le": "0.5"}), 1e-9)
+				assert.InDelta(t, 2, value(t, fr, "app_dur_bucket", metrix.Labels{"le": "0.5"}), 1e-9)
+				assert.InDelta(t, 1, value(t, fr, "app_dur_bucket", metrix.Labels{"le": "+Inf"}), 1e-9)
 				assert.InDelta(t, 4, value(t, fr, "app_dur_count", nil), 1e-9)
 				assert.InDelta(t, 0.9, value(t, fr, "app_dur_sum", nil), 1e-9)
 			},
@@ -119,6 +120,7 @@ app_hist_count 5
 			assert: func(t *testing.T, fr metrix.Reader, written int) {
 				assert.Equal(t, 1, written, "a malformed +Inf count must not skip the whole histogram (Count supersedes +Inf)")
 				assert.InDelta(t, 5, value(t, fr, "app_hist_bucket", metrix.Labels{"le": "1"}), 1e-9)
+				assert.InDelta(t, 0, value(t, fr, "app_hist_bucket", metrix.Labels{"le": "+Inf"}), 1e-9)
 				assert.InDelta(t, 5, value(t, fr, "app_hist_count", nil), 1e-9)
 			},
 		},

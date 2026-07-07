@@ -148,4 +148,3 @@ Netdata decodes **57 trap definitions** from Fibronics across **6 MIBs** into st
 - `EDB-snmp::fmPrimaryPowerSupplyOK`
 - `EDB-snmp::fmSecondPowerSupplyOK`
 - `EDB-snmp::fmPowerSupplyChangeConfig`
-

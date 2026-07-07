@@ -128,5 +128,3 @@ Metrics:
 |:------|:----------|:----|
 | system.ipc_semaphores | semaphores | semaphores |
 | system.ipc_semaphore_arrays | arrays | arrays |
-
-

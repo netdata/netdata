@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from The Advantage Group across **1 MIB**
 - `MITSUBISHI-UPS-MIB::alarmInformation`
 - `MITSUBISHI-UPS-MIB::upsAlarmCleared`
 - `MITSUBISHI-UPS-MIB::upsTrapInitialization`
-

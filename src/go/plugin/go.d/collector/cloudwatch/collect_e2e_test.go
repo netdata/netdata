@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 

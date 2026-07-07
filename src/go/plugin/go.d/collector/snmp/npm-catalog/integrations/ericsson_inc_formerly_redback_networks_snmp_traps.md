@@ -169,4 +169,3 @@ Netdata decodes **95 trap definitions** from Ericsson Inc Formerly Redback Netwo
 - `RBN-ENVMON-MIB::rbnFanFailChange`
 - `RBN-ENVMON-MIB::rbnPowerFailChange`
 - `RBN-ENVMON-MIB::rbnFanStatusChange`
-

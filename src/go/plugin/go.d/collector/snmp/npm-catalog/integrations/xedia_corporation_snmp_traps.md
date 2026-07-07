@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Xedia Corporation across **1 MIB** in
 ### Sample decoded traps
 
 - `XEDIA-SYSTEM-MIB::xsysSystemEvent`
-

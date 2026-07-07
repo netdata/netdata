@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Fujitsu Network Communications Inc a
 - `FNCNMS::nmsNEEvent`
 - `FNCNMS::nmsNEStateChangeEvent`
 - `FNCNMS::nmsNEOperationEvent`
-

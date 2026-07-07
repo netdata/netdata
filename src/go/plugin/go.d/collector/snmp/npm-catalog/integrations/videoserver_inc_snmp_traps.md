@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Videoserver Inc across **1 MIB** into
 ### Sample decoded traps
 
 - `MC-MIB::conferenceTermination`
-

@@ -143,4 +143,3 @@ Netdata decodes **138 trap definitions** from Pacific Broadbank Networks across 
 - `PBN-MIB::module17`
 - `PBN-MIB::module18`
 - `PBN-MIB::module19`
-

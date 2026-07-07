@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Sensoria Corporation across **1 MIB*
 
 - `TRANZEO-ENROUTE-MUNIWIFI-MIB::enRouteConfigChange`
 - `TRANZEO-ENROUTE-MUNIWIFI-MIB::enRouteConfigReset`
-

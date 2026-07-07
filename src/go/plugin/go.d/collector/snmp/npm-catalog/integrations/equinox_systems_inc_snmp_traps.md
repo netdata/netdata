@@ -143,4 +143,3 @@ Netdata decodes **40 trap definitions** from Equinox Systems Inc across **1 MIB*
 - `FSCSERIAL-TRAP-MIB::fscSerialUserLogoutTrap`
 - `FSCSERIAL-TRAP-MIB::fscSerialSerialSessionStartedTrap`
 - `FSCSERIAL-TRAP-MIB::fscSerialSerialSessionStoppedTrap`
-

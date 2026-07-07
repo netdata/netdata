@@ -143,4 +143,3 @@ Netdata decodes **68 trap definitions** from Merlin Gerin across **1 MIB** into 
 - `MG-SNMP-UPS-MIB::upsmgBatteryReplacementIndicated`
 - `MG-SNMP-UPS-MIB::upsmgBatteryReplaceNotIndicated`
 - `MG-SNMP-UPS-MIB::upsmgAtLowBattery`
-

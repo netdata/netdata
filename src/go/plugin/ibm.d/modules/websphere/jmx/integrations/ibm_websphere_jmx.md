@@ -240,5 +240,3 @@ Metrics:
 |:------|:----------|:----|
 | websphere_jmx.threadpool_size | size, max | threads |
 | websphere_jmx.threadpool_active | active | threads |
-
-

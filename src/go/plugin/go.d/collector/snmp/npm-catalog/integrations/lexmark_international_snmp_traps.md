@@ -144,4 +144,3 @@ Netdata decodes **13 trap definitions** from Lexmark International across **2 MI
 - `LEXMARK-PVT-MIB::irOutputFull`
 - `LEXMARK-PVT-MIB::irLoadPaper`
 - `LEXMARK-PVT-MIB::irPaperJam`
-

@@ -15,8 +15,8 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/cwprofiles"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/cloudauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -127,7 +127,7 @@ func TestCheck_PopulatesChartTemplateBeforeCollect(t *testing.T) {
 	c.Profiles = ProfilesConfig{Mode: profilesModeAuto}
 	c.applyDefaults()
 	c.newCatalog = cwprofiles.LoadFromDefaultDirs
-	c.newAWSConfig = func(_ context.Context, _ cloudauth.AWSAuthConfig, region string) (aws.Config, error) {
+	c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
 		return aws.Config{Region: region}, nil
 	}
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
@@ -221,7 +221,7 @@ func TestObserve_PerRegionScheduleIsolation(t *testing.T) {
 	c.applyDefaults()
 	c.profiles = []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2}}
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
-	c.newAWSConfig = func(_ context.Context, _ cloudauth.AWSAuthConfig, region string) (aws.Config, error) {
+	c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
 		return aws.Config{Region: region}, nil
 	}
 	c.newCloudWatchClient = func(cfg aws.Config) cloudwatchClient {
@@ -487,13 +487,13 @@ func TestCleanup_ResetsRuntimeState(t *testing.T) {
 
 	_, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	require.NotEmpty(t, c.accountID)
+	require.NotEmpty(t, c.accounts)
 	require.NotEmpty(t, c.observations.lastObserved)
 	require.NotEmpty(t, c.observations.nextQueryAt)
 
 	c.Cleanup(context.Background())
 
-	assert.Empty(t, c.accountID)
+	assert.Empty(t, c.accounts)
 	assert.Nil(t, c.profiles)
 	assert.Empty(t, c.observations.lastObserved)
 	assert.Empty(t, c.observations.nextQueryAt)
@@ -527,27 +527,29 @@ func TestPruneObserved(t *testing.T) {
 }
 
 func TestPruneObserved_DropsStaleScheduleForVanishedGroup(t *testing.T) {
-	// A (region, period) group that leaves the plan must lose its schedule entry, so
-	// a later reappearance is unscheduled (immediately due) rather than blocked until
-	// a stale nextQueryAt expires.
+	// A group that leaves the plan must lose its schedule entry, so a later
+	// reappearance is unscheduled (immediately due) rather than blocked until a stale
+	// nextQueryAt expires. The two groups here differ ONLY by account, which pins that
+	// account is part of the (account, region, period) schedule key — a regression that
+	// dropped account from the key would keep the vanished group.
 	c := New()
-	inPlan := queryGroupKey{region: "us-east-1", period: 300}
-	vanished := queryGroupKey{region: "us-east-1", period: 86400}
+	inPlan := queryGroupKey{account: "111111111111", region: "us-east-1", period: 300}
+	vanished := queryGroupKey{account: "222222222222", region: "us-east-1", period: 300}
 	c.observations.nextQueryAt = map[queryGroupKey]time.Time{
 		inPlan:   time.Unix(1_000_000_300, 0),
-		vanished: time.Unix(1_000_086_400, 0),
+		vanished: time.Unix(1_000_000_300, 0),
 	}
 	labels := []metrix.Label{
-		{Key: "account_id", Value: "000000000000"},
+		{Key: "account_id", Value: "111111111111"},
 		{Key: "region", Value: "us-east-1"},
 		{Key: "instance_id", Value: "i-1"},
 	}
 
-	// Plan retains only the 300s group; the daily group's instances are gone.
+	// Plan retains only account 111111111111's group; account 222222222222 is gone.
 	c.observations.pruneObserved([]plannedQuery{
-		{seriesName: "ec2.cpu_utilization_average", labels: labels, region: "us-east-1", period: 300},
+		{seriesName: "ec2.cpu_utilization_average", labels: labels, account: "111111111111", region: "us-east-1", period: 300},
 	})
 
 	assert.Contains(t, c.observations.nextQueryAt, inPlan, "a group still in the plan keeps its schedule")
-	assert.NotContains(t, c.observations.nextQueryAt, vanished, "a group no longer in the plan loses its schedule")
+	assert.NotContains(t, c.observations.nextQueryAt, vanished, "a group that left the plan (differing only by account) loses its schedule")
 }

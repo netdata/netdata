@@ -47,5 +47,3 @@ For more details please check [Incoming webhooks for Mattermost](https://develop
       - Notifications: The notification types you want to receive
     - **Integration configuration**
       - Webhook URL: URL provided on Mattermost for the channel you want to receive your notifications
-
-

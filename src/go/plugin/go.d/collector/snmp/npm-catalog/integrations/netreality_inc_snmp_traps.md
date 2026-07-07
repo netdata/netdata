@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Netreality Inc across **1 MIB** into
 - `NETREALITY-MIB::nrShortResources`
 - `NETREALITY-MIB::nrDiagnosticFailure`
 - `NETREALITY-MIB::nrDLCIRemove`
-

@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Lenovoemc Ltd Formerly Iomega across
 - `IOMEGANAS-MIB::iomegaNASNotificationError`
 - `IOMEGANAS-MIB::iomegaNASNotificationWarn`
 - `IOMEGANAS-MIB::iomegaNASNotificationInfo`
-

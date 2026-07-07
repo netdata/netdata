@@ -143,4 +143,3 @@ Netdata decodes **180 trap definitions** from Lancity Corporation across **1 MIB
 - `LANCITY-MCNS-MIB::lcErrUnknown`
 - `LANCITY-MCNS-MIB::lcErrSystemError`
 - `LANCITY-MCNS-MIB::lcErrTest`
-

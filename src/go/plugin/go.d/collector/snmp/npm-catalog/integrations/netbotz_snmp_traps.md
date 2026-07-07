@@ -144,4 +144,3 @@ Netdata decodes **449 trap definitions** from Netbotz across **2 MIBs** into str
 - `NETBOTZ-MIB::netBotz-prd-bot-trap-clear`
 - `NETBOTZ-MIB::netBotz-prd-bot-offline-trap`
 - `NETBOTZ-MIB::netBotz-prd-bot-online-trap`
-

@@ -144,4 +144,3 @@ Netdata decodes **5 trap definitions** from Telstrat International Ltd across **
 - `ISHELF-SYS-MIB::iShelfSysDbChangeTrap`
 - `ISHELF-CARD-MIB::iShelfPanicDumpAvailableTrap`
 - `ISHELF-SYS-MIB::iShelfSysDbDeleteTrap`
-

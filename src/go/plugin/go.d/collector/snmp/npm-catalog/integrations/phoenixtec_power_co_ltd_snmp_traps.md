@@ -145,4 +145,3 @@ Netdata decodes **263 trap definitions** from Phoenixtec Power Co Ltd across **3
 - `XPPC-MIB::upsDiagnosticsFailed`
 - `XPPC-MIB::upsDischarged`
 - `XPPC-MIB::upsOnBattery`
-

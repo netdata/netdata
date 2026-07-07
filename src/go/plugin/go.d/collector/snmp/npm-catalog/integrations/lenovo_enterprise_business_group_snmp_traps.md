@@ -147,4 +147,3 @@ Netdata decodes **351 trap definitions** from Lenovo Enterprise Business Group a
 - `LENOVO-ENV-MIB::lenovoEnvMibFanFailure`
 - `LENOVO-ENV-MIB::lenovoEnvMibFanFixed`
 - `LENOVO-ENV-MIB::lenovoEnvMibTempSensorFailure`
-

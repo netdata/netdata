@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Bird Technologies across **1 MIB** i
 - `BPMEMIB::highPwrAlarmTrap`
 - `BPMEMIB::lowPwrAlarmTrap`
 - `BPMEMIB::vswrPwrAlarmTrap`
-

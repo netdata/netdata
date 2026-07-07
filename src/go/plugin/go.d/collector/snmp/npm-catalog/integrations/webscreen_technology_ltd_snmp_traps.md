@@ -143,4 +143,3 @@ Netdata decodes **291 trap definitions** from Webscreen Technology Ltd across **
 - `DDOSSECURE4-MIB::apOutputErrorMIEvent`
 - `DDOSSECURE4-MIB::apNewConfigEvent`
 - `DDOSSECURE4-MIB::apNotLicensedEvent`
-

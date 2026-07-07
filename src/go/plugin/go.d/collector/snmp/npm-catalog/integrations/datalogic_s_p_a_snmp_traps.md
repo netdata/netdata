@@ -143,4 +143,3 @@ Netdata decodes **214 trap definitions** from Datalogic S P A across **1 MIB** i
 - `NextUPSSystems::cmpUPSFailure`
 - `NextUPSSystems::cmpChargerFailure`
 - `NextUPSSystems::cmpOverloadFailure`
-

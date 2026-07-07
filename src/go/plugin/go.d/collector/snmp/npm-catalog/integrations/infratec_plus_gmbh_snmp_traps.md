@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Infratec Plus GmbH across **1 MIB** 
 
 - `INFRATEC-RMS-MIB::rmsFilterTrap`
 - `INFRATEC-RMS-MIB::rmsChipcardTrap`
-

@@ -133,5 +133,3 @@ Metrics:
 |:------|:----------|:----|
 | powersupply.capacity | capacity | percentage |
 | powersupply.voltage | now | V |
-
-

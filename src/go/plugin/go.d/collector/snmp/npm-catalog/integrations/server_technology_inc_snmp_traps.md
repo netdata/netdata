@@ -144,4 +144,3 @@ Netdata decodes **40 trap definitions** from Server Technology Inc across **2 MI
 - `Sentry3-MIB::infeedLoadEvent`
 - `Sentry3-MIB::outletStatusEvent`
 - `Sentry3-MIB::outletLoadEvent`
-

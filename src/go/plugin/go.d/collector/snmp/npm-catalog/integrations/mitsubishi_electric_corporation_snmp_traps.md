@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Mitsubishi Electric Corporation acros
 ### Sample decoded traps
 
 - `R2000-MIB::fddiAlarm`
-

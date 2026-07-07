@@ -146,4 +146,3 @@ Netdata decodes **151 trap definitions** from A10 Networks Previously Raksha Net
 - `A10-AX-NOTIFICATIONS::axSystemShutdown`
 - `A10-AX-NOTIFICATIONS::axSystemTempHigh`
 - `A10-AX-NOTIFICATIONS::axFan1Failure`
-

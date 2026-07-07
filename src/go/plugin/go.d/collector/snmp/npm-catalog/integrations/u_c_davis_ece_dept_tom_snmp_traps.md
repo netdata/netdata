@@ -144,4 +144,3 @@ Netdata decodes **4 trap definitions** from U C Davis Ece Dept Tom across **3 MI
 - `UCD-SNMP-MIB::ucdStart`
 - `UCD-SNMP-MIB::ucdShutdown`
 - `NOTIFICATION-TEST-MIB::demo-notif`
-

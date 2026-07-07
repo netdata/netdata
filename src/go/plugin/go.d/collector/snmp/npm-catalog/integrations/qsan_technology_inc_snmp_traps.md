@@ -143,4 +143,3 @@ Netdata decodes **292 trap definitions** from Qsan Technology Inc across **1 MIB
 - `QSAN-SNMP-MIB::evtid-hdd-jbod-readerr`
 - `QSAN-SNMP-MIB::evtid-hdd-writeerr`
 - `QSAN-SNMP-MIB::evtid-hdd-jbod-writeerr`
-

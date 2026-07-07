@@ -143,4 +143,3 @@ Netdata decodes **8 trap definitions** from Exabyte Corporation across **1 MIB**
 - `EXABYTE-MIB::cfgEEPPortOpenTrap`
 - `EXABYTE-MIB::cfgErrorStateTrap`
 - `EXABYTE-MIB::cfgMagRemovedTrap`
-

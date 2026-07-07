@@ -149,4 +149,3 @@ Netdata decodes **13 trap definitions** from General Datacomm Inc across **7 MIB
 - `GDCSCM-MIB::scmExpressPollTrap`
 - `GDCSCM-MIB::scmPowerSupplyTrap`
 - `GDCSCM-MIB::scmAliveTrap`
-

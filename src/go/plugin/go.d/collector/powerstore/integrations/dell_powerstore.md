@@ -567,6 +567,3 @@ If the collector reports that a vnode does not exist:
    in vnodes.conf — the match is case-sensitive.
 3. Confirm the vnodes.conf file uses valid YAML format with correct `guid` values
    (a valid UUID string).
-
-
-

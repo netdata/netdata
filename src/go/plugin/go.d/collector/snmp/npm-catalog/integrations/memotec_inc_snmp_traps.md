@@ -143,4 +143,3 @@ Netdata decodes **37 trap definitions** from Memotec Inc across **1 MIB** into s
 - `CLEARTRAC7-MIB::pvcDown`
 - `CLEARTRAC7-MIB::cardDown`
 - `CLEARTRAC7-MIB::connectionUp`
-

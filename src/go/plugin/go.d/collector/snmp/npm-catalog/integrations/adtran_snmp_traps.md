@@ -234,4 +234,3 @@ Netdata decodes **1372 trap definitions** from Adtran across **87 MIBs** into st
 - `ADTRAN-DSUDPP-MIB::adDSUDPSelfTestPass`
 - `ADTRAN-DSUDPP-MIB::adDSUDPSelfTestFail`
 - `ADTRAN-DSUDPP-MIB::adDSUDPNetworkINS`
-

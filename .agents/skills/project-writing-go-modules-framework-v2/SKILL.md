@@ -115,6 +115,10 @@ source files for evidence.
 - Do NOT rely on chartengine's metric-name suffix inference for generated
   Netdata metrics. Suffix inference is only a fallback and MUST NOT be used as
   the correctness mechanism for V2 collector charts.
+- Histogram bucket charts use range bucket values from `metrix.ReadFlatten()`
+  and chartengine forces them to `heatmap`. Bucket dimensions are ordered by
+  numeric upper bound with `+Inf` last. Do NOT add collector-local
+  cumulative-bucket workaround metrics or a bucket-mode option for V2 charts.
 - Put multipliers, divisors, hidden flags, and float formatting in the chart
   template, not ad hoc chart-emission code.
 - `metrix` registers a descriptor per metric NAME permanently (no unregister), so

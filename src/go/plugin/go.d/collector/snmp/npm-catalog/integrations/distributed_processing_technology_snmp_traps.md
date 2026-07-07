@@ -143,4 +143,3 @@ Netdata decodes **24 trap definitions** from Distributed Processing Technology a
 - `DPT-SCSI-MIB::dptHbaTemperatureNormalTrap`
 - `DPT-SCSI-MIB::dptHbaEccRAMErrorNotFoundTrap`
 - `DPT-SCSI-MIB::dptDevStatusChangedTrap`
-

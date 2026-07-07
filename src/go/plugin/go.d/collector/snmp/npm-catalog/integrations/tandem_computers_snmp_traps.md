@@ -147,4 +147,3 @@ Netdata decodes **21 trap definitions** from Tandem Computers across **5 MIBs** 
 - `SNMP-HMSA-MIB::zhrmRAMThreshold`
 - `SNMP-HMSA-MIB::zhrmDiskThreshold`
 - `EthernetSubagentPvt-MIB::zesalinkUp`
-

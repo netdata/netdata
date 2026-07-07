@@ -203,5 +203,3 @@ Metrics:
 | services.task_close | a dimension per systemd service | calls/s |
 | services.task_exit | a dimension per systemd service | calls/s |
 | services.task_error | a dimension per systemd service | calls/s |
-
-

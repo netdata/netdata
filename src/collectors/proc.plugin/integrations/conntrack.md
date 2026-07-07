@@ -104,5 +104,3 @@ Metrics:
 | netfilter.conntrack_expect | created, deleted, new | expectations/s |
 | netfilter.conntrack_search | searched, restarted, found | searches/s |
 | netfilter.conntrack_errors | icmp_error, error_failed, drop, early_drop | events/s |
-
-

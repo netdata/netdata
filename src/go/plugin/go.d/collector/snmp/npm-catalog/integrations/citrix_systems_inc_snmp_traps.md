@@ -145,4 +145,3 @@ Netdata decodes **22 trap definitions** from Citrix Systems Inc across **3 MIBs*
 - `MFAGENT-MIB::trapSessionDisc`
 - `MFAGENT-MIB::trapSessionLimitThreshold`
 - `MFAGENT-MIB::trapLicLowThreshold`
-

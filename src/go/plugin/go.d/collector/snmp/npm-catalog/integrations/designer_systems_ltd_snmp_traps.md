@@ -143,4 +143,3 @@ Netdata decodes **138 trap definitions** from Designer Systems Ltd across **1 MI
 - `PDUSNMP::slave-Set-meter1-IRMSLow`
 - `PDUSNMP::slave-Set-meter1-IRMSHigh`
 - `PDUSNMP::slave-Set-meter1-KWSLow`
-

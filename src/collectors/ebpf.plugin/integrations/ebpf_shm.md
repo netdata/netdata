@@ -201,5 +201,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | system.shared_memory_calls | get, at, dt, ctl | calls/s |
-
-

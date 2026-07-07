@@ -145,4 +145,3 @@ Netdata decodes **53 trap definitions** from Digipower Manufacturing Inc across 
 - `DGPUPS-MIB::upsDiagnosticsFailed`
 - `DGPUPS-MIB::upsDischarged`
 - `DGPUPS-MIB::upsOnBattery`
-

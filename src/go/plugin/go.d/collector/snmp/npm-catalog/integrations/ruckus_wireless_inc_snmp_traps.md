@@ -147,4 +147,3 @@ Netdata decodes **483 trap definitions** from Ruckus Wireless Inc across **5 MIB
 - `RUCKUS-EVENT-MIB::ruckusEventSetErrorTrap`
 - `RUCKUS-EVENT-MIB::ruckusEventConnectTrap`
 - `RUCKUS-EVENT-MIB::ruckusEventDisconnectTrap`
-

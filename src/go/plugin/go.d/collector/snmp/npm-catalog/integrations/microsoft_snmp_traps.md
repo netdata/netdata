@@ -144,4 +144,3 @@ Netdata decodes **15 trap definitions** from Microsoft across **2 MIBs** into st
 - `EVNTAGENT-MIB::w32NtpInaccessible`
 - `EVNTAGENT-MIB::w32SystemStartup`
 - `EVNTAGENT-MIB::w32SystemShutdown`
-

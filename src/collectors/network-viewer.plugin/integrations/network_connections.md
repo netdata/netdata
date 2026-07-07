@@ -1,5 +1,5 @@
 <!--startmeta
-custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/network-viewer.plugin/README.md"
+custom_edit_url: "https://github.com/netdata/netdata/edit/master/src/collectors/network-viewer.plugin/integrations/network_connections.md"
 meta_yaml: "https://github.com/netdata/netdata/edit/master/src/collectors/network-viewer.plugin/metadata.yaml"
 sidebar_label: "Network Connections"
 learn_status: "Published"

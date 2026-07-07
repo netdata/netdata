@@ -153,4 +153,3 @@ Netdata decodes **19 trap definitions** from Mitel Corp across **11 MIBs** into 
 - `MITEL-IperaVoiceLAN-MIB::mitelIpera3000ShutdownAlarm`
 - `MITEL-IperaVoiceLAN-MIB::mitelIpera3000RestartCompleteAlarm`
 - `MITEL-IperaVoiceLAN-MIB::mitelIpera3000NotifResiltFirstSetFailover`
-

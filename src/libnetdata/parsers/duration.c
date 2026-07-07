@@ -339,6 +339,8 @@ ssize_t duration_snprintf(char *dst, size_t dst_size, int64_t value, const char 
     }
 
     const struct duration_unit *du_min = duration_find_unit(unit);
+    if(!du_min) return -3;
+
     size_t offset = 0;
 
 #if !defined(__SIZEOF_INT128__)

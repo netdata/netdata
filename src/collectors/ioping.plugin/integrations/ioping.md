@@ -139,5 +139,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | ioping.latency | latency | microseconds |
-
-

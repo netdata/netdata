@@ -29,6 +29,7 @@ type materializedDimensionState struct {
 	float              bool
 	static             bool
 	order              int
+	sortKey            dimensionSortKey
 	algorithm          program.Algorithm
 	multiplier         int
 	divisor            int
@@ -128,13 +129,14 @@ func (s *materializedState) ensureChart(
 func (c *materializedChartState) ensureDimension(name string, state dimensionState) (*materializedDimensionState, bool) {
 	dim, ok := c.dimensions[name]
 	if ok {
-		if dim.static != state.static || dim.order != state.order {
+		if dim.static != state.static || dim.order != state.order || dim.sortKey != state.sortKey {
 			c.orderedDimsDirty = true
 		}
 		dim.hidden = state.hidden
 		dim.float = state.float
 		dim.static = state.static
 		dim.order = state.order
+		dim.sortKey = state.sortKey
 		dim.algorithm = state.algorithm
 		dim.multiplier = state.multiplier
 		dim.divisor = state.divisor
@@ -145,6 +147,7 @@ func (c *materializedChartState) ensureDimension(name string, state dimensionSta
 		float:      state.float,
 		static:     state.static,
 		order:      state.order,
+		sortKey:    state.sortKey,
 		algorithm:  state.algorithm,
 		multiplier: state.multiplier,
 		divisor:    state.divisor,

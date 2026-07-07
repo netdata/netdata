@@ -143,4 +143,3 @@ Netdata decodes **16 trap definitions** from Mission Critical Software Inc acros
 - `MISSION-CRITICAL-MIB::gathererServiceGoingDown`
 - `MISSION-CRITICAL-MIB::gathererServiceComingUp`
 - `MISSION-CRITICAL-MIB::eemRedAlert`
-

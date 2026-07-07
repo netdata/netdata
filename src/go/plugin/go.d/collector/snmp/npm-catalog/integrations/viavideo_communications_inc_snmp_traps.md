@@ -143,4 +143,3 @@ Netdata decodes **35 trap definitions** from Viavideo Communications Inc across 
 - `POLYCOM-VIDEO-MIB::lowBattery`
 - `POLYCOM-VIDEO-MIB::callUp`
 - `POLYCOM-VIDEO-MIB::callDown`
-

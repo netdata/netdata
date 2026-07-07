@@ -131,5 +131,3 @@ Metrics:
 | smb.server_shares_read_requests | reads | requests/s |
 | smb.server_shares_metadata_requests | metadata | requests/s |
 | smb.server_shares_files_opened | opened | files/s |
-
-

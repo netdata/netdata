@@ -8,7 +8,7 @@
       {
         "name": "bucket_+Inf",
         "algo": "incremental",
-        "value": 6
+        "value": 2
       },
       {
         "name": "bucket_0.1",
@@ -19,7 +19,7 @@
     "soft": {
       "units": "observations/s",
       "family": "test_histogram",
-      "type": ""
+      "type": "heatmap"
     }
   },
   {

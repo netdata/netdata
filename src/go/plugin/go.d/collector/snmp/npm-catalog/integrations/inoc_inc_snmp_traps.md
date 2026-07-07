@@ -144,4 +144,3 @@ Netdata decodes **7 trap definitions** from Inoc Inc across **2 MIBs** into stru
 - `SONICWALL-SSL-DEV-MIB::configChange`
 - `SONICWALL-SSL-TRAN-MIB::sslTpsChangeHi`
 - `SONICWALL-SSL-TRAN-MIB::sslTpsChangeLo`
-

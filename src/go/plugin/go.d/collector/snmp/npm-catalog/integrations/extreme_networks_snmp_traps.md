@@ -168,4 +168,3 @@ Netdata decodes **127 trap definitions** from Extreme Networks across **26 MIBs*
 - `A3COM51-SS9000SX::fanOK`
 - `A3COM51-SS9000SX::invalidLoginAttempt`
 - `EXTREME-TRAP-MIB::extremeOverheat`
-

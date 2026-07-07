@@ -143,4 +143,3 @@ Netdata decodes **6 trap definitions** from Latitude Communications across **1 M
 - `CISCO-LATITUDE-MIB::mpMajHwAlarm`
 - `CISCO-LATITUDE-MIB::mpMinHwAlarm`
 - `CISCO-LATITUDE-MIB::mpMajSwAlarm`
-

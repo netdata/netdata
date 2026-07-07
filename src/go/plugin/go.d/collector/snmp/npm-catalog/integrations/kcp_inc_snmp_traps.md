@@ -144,4 +144,3 @@ Netdata decodes **291 trap definitions** from Kcp Inc across **2 MIBs** into str
 - `HHMSAGENT-MIB::hhmsWarningStatus`
 - `HHMSAGENT-MIB::hhmsCriticalStatus`
 - `HHMSAGENT-MIB::hhmsDownStatus`
-

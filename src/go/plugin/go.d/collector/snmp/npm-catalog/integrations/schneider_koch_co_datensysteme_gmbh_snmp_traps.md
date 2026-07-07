@@ -144,4 +144,3 @@ Netdata decodes **13 trap definitions** from Schneider Koch Co Datensysteme GmbH
 - `SK-CONC-MIB::skfddiPortDisconnect`
 - `SK-CONC-MIB::skfddiPortReconnect`
 - `SK-GE-MIB::skGeSensorWarningLower`
-

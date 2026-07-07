@@ -144,4 +144,3 @@ Netdata decodes **55 trap definitions** from Swichtec Power Systems across **2 M
 - `RPS-SC200-MIB::major-AI-Low-Active`
 - `RPS-SC200-MIB::major-DI-Active`
 - `RPS-SC200-MIB::major-Smart-Active`
-

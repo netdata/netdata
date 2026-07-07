@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Aware Inc across **1 MIB** into struc
 ### Sample decoded traps
 
 - `SFOS-FIREWALL-OLD-MIB::sfosNotification`
-

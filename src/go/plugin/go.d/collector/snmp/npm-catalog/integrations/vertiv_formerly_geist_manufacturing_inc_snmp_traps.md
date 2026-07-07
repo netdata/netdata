@@ -149,4 +149,3 @@ Netdata decodes **1318 trap definitions** from Vertiv Formerly Geist Manufacturi
 - `GEIST-MIB::gstClimateHumidityTRAP`
 - `GEIST-MIB::gstClimateAirflowTRAP`
 - `GEIST-MIB::gstClimateLightTRAP`
-

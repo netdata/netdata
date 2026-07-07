@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from Telesend Inc across **1 MIB** into s
 - `Cisco90Series-MIB::frxInsertChUTrap`
 - `Cisco90Series-MIB::frxRemoveChUTrap`
 - `Cisco90Series-MIB::frxDConfigFailed`
-

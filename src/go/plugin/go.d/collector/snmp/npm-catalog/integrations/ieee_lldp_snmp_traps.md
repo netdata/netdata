@@ -146,4 +146,3 @@ Netdata decodes **13 trap definitions** from Ieee Lldp across **4 MIBs** into st
 - `LLDP-EXT-DCBX-MIB::lldpXdcbxMiscControlError`
 - `LLDP-EXT-DCBX-MIB::lldpXdcbxMiscFeatureError`
 - `LLDP-EXT-DCBX-MIB::lldpXdcbxMultiplePeers`
-

@@ -144,4 +144,3 @@ Netdata decodes **32 trap definitions** from Netrake Corporation across **2 MIBs
 - `Netrake-MIB::chasBrdStateChangeTrap`
 - `Netrake-MIB::systemOperStateChangeTrap`
 - `Netrake-MIB::postAlarm`
-

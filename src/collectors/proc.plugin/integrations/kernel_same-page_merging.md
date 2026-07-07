@@ -102,5 +102,3 @@ Metrics:
 | mem.ksm | shared, unshared, sharing, volatile | MiB |
 | mem.ksm_savings | savings, offered | MiB |
 | mem.ksm_ratios | savings | percentage |
-
-

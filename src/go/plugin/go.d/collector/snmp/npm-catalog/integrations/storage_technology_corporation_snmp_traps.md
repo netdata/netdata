@@ -144,4 +144,3 @@ Netdata decodes **25 trap definitions** from Storage Technology Corporation acro
 - `HORIZON-LIBRARY-MONITOR-MIB::hlmTrpInfo`
 - `HORIZON-LIBRARY-MONITOR-MIB::hlmTrpUncl`
 - `HORIZON-LIBRARY-MONITOR-MIB::hlmTrpNorStatus`
-

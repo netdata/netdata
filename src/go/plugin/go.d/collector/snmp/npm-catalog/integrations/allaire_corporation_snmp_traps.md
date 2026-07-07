@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Allaire Corporation across **1 MIB**
 - `Macromedia-MIB::serverAbnormalState`
 - `Macromedia-MIB::jrunServerAbnormalState`
 - `Macromedia-MIB::jrunJDBCFailure`
-

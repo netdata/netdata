@@ -147,4 +147,3 @@ Netdata decodes **20 trap definitions** from Linksys across **5 MIBs** into stru
 - `LINKSYS-COPY-MIB::rlCopyFailed`
 - `LINKSYS-Physicaldescription-MIB::rlStackUnitRemoved`
 - `LINKSYS-Physicaldescription-MIB::rlStackConfigChangedRingChain`
-

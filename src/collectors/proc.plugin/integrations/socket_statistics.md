@@ -108,5 +108,3 @@ Metrics:
 | ipv4.sockstat_raw_sockets | inuse | sockets |
 | ipv4.sockstat_frag_sockets | inuse | fragments |
 | ipv4.sockstat_frag_mem | mem | KiB |
-
-

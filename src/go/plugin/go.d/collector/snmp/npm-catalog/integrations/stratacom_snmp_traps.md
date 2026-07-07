@@ -144,4 +144,3 @@ Netdata decodes **365 trap definitions** from Stratacom across **2 MIBs** into s
 - `CISCO-MGX82XX-TRAPS-MIB::functionModuleRemovedTrap`
 - `CISCO-MGX82XX-TRAPS-MIB::functionModuleInsertedTrap`
 - `CISCO-MGX82XX-TRAPS-MIB::functionModuleSwitchoverTrap`
-

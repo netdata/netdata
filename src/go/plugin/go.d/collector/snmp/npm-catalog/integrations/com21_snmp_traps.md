@@ -151,4 +151,3 @@ Netdata decodes **129 trap definitions** from Com21 across **9 MIBs** into struc
 - `COM21-HCXCC-MIB::hcxCcDiagTestComplete`
 - `COM21-HCXCC-MIB::hcxCcTestStatusLedChange`
 - `COM21-HCXCC-MIB::hcxCcFaultStatusLedChange`
-

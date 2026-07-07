@@ -203,4 +203,3 @@ Netdata decodes **2629 trap definitions** from Fujitsu Germany GmbH across **56 
 - `SNI-TRAP-MIB::sniNWVolumeMounted`
 - `SNI-TRAP-MIB::sniNWVolumeDismounted`
 - `SNI-TRAP-MIB::sniNWDownServer`
-

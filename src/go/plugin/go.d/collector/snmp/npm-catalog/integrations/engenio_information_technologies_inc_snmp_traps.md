@@ -149,4 +149,3 @@ Netdata decodes **41 trap definitions** from Engenio Information Technologies In
 - `SYMTRAP-MIB::symSCSI2`
 - `SYMTRAP-MIB::symSCSI3`
 - `SYMTRAP-MIB::symSCSI4`
-

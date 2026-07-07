@@ -143,4 +143,3 @@ Netdata decodes **50 trap definitions** from Telematics International Inc across
 - `Telematics-Nevada-MIB::nvTrapDuiportavail`
 - `Telematics-Nevada-MIB::nvTrapNoIdlePorts`
 - `Telematics-Nevada-MIB::nvTrapDatatimerexpird`
-

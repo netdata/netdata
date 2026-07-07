@@ -155,4 +155,3 @@ sudo ./edit-config exporting.conf
     topic id = my_topic
 
 ```
-

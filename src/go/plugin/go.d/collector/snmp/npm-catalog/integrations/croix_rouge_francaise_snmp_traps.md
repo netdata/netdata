@@ -143,4 +143,3 @@ Netdata decodes **74 trap definitions** from Croix Rouge Francaise across **1 MI
 - `ELTEX-SMI::mc240ss7LinkAlarmTrap`
 - `ELTEX-SMI::mc240ss7LinksetAlarmTrap`
 - `ELTEX-SMI::mc240FileAlarmTrap`
-

@@ -143,4 +143,3 @@ Netdata decodes **71 trap definitions** from New Oak Communications Inc across *
 - `CONTIVITY-TRAPS-V1-MIB::hardDisk1StatusTrap`
 - `CONTIVITY-TRAPS-V1-MIB::hardDisk0StatusTrap`
 - `CONTIVITY-TRAPS-V1-MIB::memoryUsageTrap`
-

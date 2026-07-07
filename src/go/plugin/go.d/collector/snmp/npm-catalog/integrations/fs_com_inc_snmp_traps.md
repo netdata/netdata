@@ -229,4 +229,3 @@ Netdata decodes **503 trap definitions** from Fs Com Inc across **82 MIBs** into
 - `FS-V1-TRAP::sysHardChangeDetected`
 - `FS-V1-TRAP::portSecurityViolate`
 - `FS-V1-TRAP::stormViolationAlarm`
-

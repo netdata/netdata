@@ -174,5 +174,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | filesystem.attributte_latency | latency period | calls/s |
-
-

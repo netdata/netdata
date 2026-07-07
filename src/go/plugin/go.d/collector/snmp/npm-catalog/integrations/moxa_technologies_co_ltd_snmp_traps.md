@@ -170,4 +170,3 @@ Netdata decodes **354 trap definitions** from Moxa Technologies Co Ltd across **
 - `MOXA-EDS508-MIB::powerOff2OnTrap`
 - `MOXA-EDS508-MIB::trafficOverloadTrap`
 - `MOXA-EDS508-MIB::redundancyTopologyChangedTrap`
-

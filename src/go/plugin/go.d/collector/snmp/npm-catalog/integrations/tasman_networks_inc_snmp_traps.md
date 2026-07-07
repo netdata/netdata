@@ -149,4 +149,3 @@ Netdata decodes **22 trap definitions** from Tasman Networks Inc across **7 MIBs
 - `TIARA-NETWORKS-SYSTEM-MIB::userLogOffNotification`
 - `TIARA-NETWORKS-SYSTEM-MIB::userLoginFailNotification`
 - `TIARA-NETWORKS-SYSTEM-MIB::failOverNotification`
-

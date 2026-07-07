@@ -143,4 +143,3 @@ Netdata decodes **9 trap definitions** from Artel Video Systems Inc across **1 M
 - `CROSSSTREAM-MIB::cstrmPowerMonitor`
 - `CROSSSTREAM-MIB::cstrmATMPhyTrap`
 - `CROSSSTREAM-MIB::cstrmOAMVPTrap`
-

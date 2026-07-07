@@ -143,4 +143,3 @@ Netdata decodes **11 trap definitions** from Expand Networks Inc across **1 MIB*
 - `EXPAND-TRAP-MIB::connectionInboundUp`
 - `EXPAND-TRAP-MIB::connectionInboundDown`
 - `EXPAND-TRAP-MIB::connectionOutboundUp`
-

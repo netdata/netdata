@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Mcafee Associates Inc across **1 MIB
 - `MCAFEE-MWG-MIB::trSystem`
 - `MCAFEE-MWG-MIB::trApplication`
 - `MCAFEE-MWG-MIB::trUser`
-

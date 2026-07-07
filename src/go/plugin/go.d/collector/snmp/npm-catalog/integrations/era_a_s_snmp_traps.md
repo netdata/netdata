@@ -143,4 +143,3 @@ Netdata decodes **12 trap definitions** from Era A S across **1 MIB** into struc
 - `ERA-MIB::mssTrapStatusSystemWarning`
 - `ERA-MIB::mssTrapStatusSystemOK`
 - `ERA-MIB::mssTrapStatusSystemUnknown`
-

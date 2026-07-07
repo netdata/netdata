@@ -127,5 +127,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | windows.service_state | running, stopped, start_pending, stop_pending, continue_pending, pause_pending, paused, unknown | state |
-
-

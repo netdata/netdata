@@ -240,5 +240,3 @@ There are no alerts configured by default for this integration.
 
 Metrics are dynamically created based on the OpenTelemetry data received.
 The specific metrics depend on the OTLP sources sending data to the plugin.
-
-

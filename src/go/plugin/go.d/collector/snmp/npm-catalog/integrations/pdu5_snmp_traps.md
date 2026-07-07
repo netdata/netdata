@@ -143,4 +143,3 @@ Netdata decodes **17 trap definitions** from Pdu5 across **1 MIB** into structur
 - `SCHLEIFENBAUER-GENERIC-MIB::restarted`
 - `SCHLEIFENBAUER-GENERIC-MIB::userLogin`
 - `SCHLEIFENBAUER-GENERIC-MIB::userLogout`
-

@@ -25,6 +25,8 @@ struct netdata_string {
     const char str[];   // the string itself, is appended to this structure
 };
 
+#define STRING_MAX_LENGTH (MIN((size_t)UINT32_MAX, (size_t)LONG_MAX - sizeof(STRING)) - 1)
+
 static struct string_partition {
     RW_SPINLOCK spinlock;       // the R/W spinlock to protect the Judy array
 
@@ -306,6 +308,9 @@ STRING *string_strdupz(const char *str) {
 
     if(unlikely(!length)) return NULL;
 
+    if(unlikely(length > STRING_MAX_LENGTH))
+        fatal("STRING: cannot index string length %zu, maximum is %zu", length, STRING_MAX_LENGTH);
+
     length++;
     uint8_t partition = string_partition_str(str);
     STRING *string = string_index_search(str, length, partition);
@@ -332,6 +337,9 @@ STRING *string_strdupz(const char *str) {
 ALWAYS_INLINE
 STRING *string_strndupz(const char *str, size_t len) {
     if(unlikely(!str || !*str || !len)) return NULL;
+
+    if(unlikely(len > STRING_MAX_LENGTH))
+        fatal("STRING: cannot index string length %zu, maximum is %zu", len, STRING_MAX_LENGTH);
 
     uint8_t partition = string_partition_str(str);
 
@@ -429,9 +437,6 @@ bool string_equals_string_nocase(const STRING *a, const STRING *b) {
 static STRING *string_2way_merge_X = NULL;
 
 STRING *string_2way_merge(STRING *a, STRING *b) {
-    if(unlikely(!string_2way_merge_X))
-        string_2way_merge_X = string_strdupz("[x]");
-
     if(unlikely(a == b)) return string_dup(a);
     if(unlikely(a == string_2way_merge_X)) return string_dup(a);
     if(unlikely(b == string_2way_merge_X)) return string_dup(b);
@@ -453,18 +458,19 @@ STRING *string_2way_merge(STRING *a, STRING *b) {
         *dst1++ = *s1;
 
     *dst1 = '\0';
+    const char *prefix_end1 = s1, *prefix_end2 = s2;
 
     if(*s1 != '\0' || *s2 != '\0') {
         *dst1++ = '[';
         *dst1++ = 'x';
         *dst1++ = ']';
 
-        s1 = &(string2str(a))[alen - 1];
-        s2 = &(string2str(b))[blen - 1];
+        s1 = string2str(a) + alen;
+        s2 = string2str(b) + blen;
         char *dst2 = &buf2[length];
         *dst2 = '\0';
-        for (; *s1 && *s2 && *s1 == *s2; s1--, s2--)
-            *(--dst2) = *s1;
+        for (; s1 > prefix_end1 && s2 > prefix_end2 && s1[-1] == s2[-1]; s1--, s2--)
+            *(--dst2) = s1[-1];
 
         strcpy(dst1, dst2);
     }
@@ -969,4 +975,6 @@ void string_init(void) {
         string_base[i].JudyLPointers = NULL;
 #endif
     }
+
+    string_2way_merge_X = string_strdupz("[x]");
 }

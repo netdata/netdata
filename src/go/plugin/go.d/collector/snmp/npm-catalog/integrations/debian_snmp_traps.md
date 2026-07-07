@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Debian across **1 MIB** into structu
 - `KEEPALIVED-MIB::vrrpInstanceStateChange`
 - `KEEPALIVED-MIB::realServerStateChange`
 - `KEEPALIVED-MIB::virtualServerQuorumStateChange`
-

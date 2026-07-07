@@ -143,4 +143,3 @@ Netdata decodes **93 trap definitions** from Johnson Controls Inc across **1 MIB
 - `JCImSeries-MIB::n1HvacConditionalEventAcknowledged`
 - `JCImSeries-MIB::n1FireActiveConditionalEvent`
 - `JCImSeries-MIB::n1FireInactiveConditionalEvent`
-

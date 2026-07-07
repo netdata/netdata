@@ -32,6 +32,9 @@ extern bool isspace_map_group_by_label[256];
 extern bool isspace_dyncfg_id_map[256];
 
 static ALWAYS_INLINE size_t quoted_strings_splitter(char *str, char **words, size_t max_words, bool *isspace_map) {
+    if (unlikely(!max_words))
+        return 0;
+
     if (unlikely(!str)) {
         if (likely(max_words))
             words[0] = NULL;

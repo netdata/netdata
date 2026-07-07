@@ -189,5 +189,3 @@ Metrics:
 | iis.w3svc_w3wp_output_cache_active_flushed_items | used | items |
 | iis.w3svc_w3wp_output_cache_memory_usage | used | bytes |
 | iis.w3svc_w3wp_output_cache_flushed_total | output_cache_entries | flushes |
-
-

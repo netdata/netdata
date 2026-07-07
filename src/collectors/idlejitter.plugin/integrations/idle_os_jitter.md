@@ -120,5 +120,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | system.idlejitter | min, max, average | microseconds lost/s |
-
-

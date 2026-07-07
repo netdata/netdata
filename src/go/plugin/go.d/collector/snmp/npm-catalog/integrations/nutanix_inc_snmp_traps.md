@@ -143,4 +143,3 @@ Netdata decodes **860 trap definitions** from Nutanix Inc across **1 MIB** into 
 - `NUTANIX-MIB::ntxTrapClusterRunningOutOfStorageCapacitylowRunway`
 - `NUTANIX-MIB::ntxTrapClusterRunningOutOfCPUCapacitylowRunway`
 - `NUTANIX-MIB::ntxTrapNodeRunningOutOfCPUCapacitylowRunway`
-

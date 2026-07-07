@@ -129,5 +129,3 @@ Metrics:
 |:------|:----------|:----|
 | ipv4.udppackets | received, sent | packets/s |
 | ipv4.udperrors | InErrors, NoPorts, RcvbufErrors, InCsumErrors, IgnoredMulti | events/s |
-
-

@@ -150,4 +150,3 @@ Netdata decodes **34 trap definitions** from Cable Television Laboratories Inc a
 - `DSG-IF-STD-MIB::dsgIfStdTdsg2TimeoutNotify`
 - `DOCS-DIAG-MIB::docsDiagLogSizeHighThrshldReached`
 - `DOCS-DIAG-MIB::docsDiagLogSizeLowThrshldReached`
-

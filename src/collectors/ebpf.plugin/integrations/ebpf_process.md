@@ -108,5 +108,3 @@ Metrics:
 | netdata.ebpf_hash_tables_insert_pid_elements | thread | rows |
 | netdata.ebpf_hash_tables_remove_pid_elements | thread | rows |
 | netdata.ebpf_ipc_usage | positions | % |
-
-

@@ -148,4 +148,3 @@ Netdata decodes **1100 trap definitions** from Wired For Management across **6 M
 - `INTEL-WFM-MIB::wfmTempOKLNCGH`
 - `DELL-ASF-MIB::asfTrapUnderTemperature`
 - `INTEL-WFM-MIB::wfmTempLowWarningCritWarnLCGH`
-

@@ -327,4 +327,3 @@ Netdata decodes **1105 trap definitions** from D Link Systems Inc across **180 M
 - `DES3225G-MIB::portPartition`
 - `DES3225G-MIB::linkChangeEvent`
 - `DES3225G-MIB::broadcastRisingStorm`
-

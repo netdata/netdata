@@ -144,4 +144,3 @@ Netdata decodes **5 trap definitions** from Metro Ethernet Forum across **2 MIBs
 - `MEF-SOAM-PM-MIB::mefSoamDmSessionStartStopAlarm`
 - `MEF-SOAM-PM-MIB::mefSoamPmThresholdCrossingAlarm`
 - `MEF-UNI-EVC-MIB::mefServiceConfigurationAlarm`
-

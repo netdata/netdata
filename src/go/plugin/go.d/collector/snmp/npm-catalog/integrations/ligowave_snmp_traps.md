@@ -147,4 +147,3 @@ Netdata decodes **23 trap definitions** from Ligowave across **5 MIBs** into str
 - `LIGO-GENERIC-MIB::ligoHeartbeat`
 - `LIGO-GENERIC-MIB::ligoHighPing`
 - `LIGO-802DOT11-EXT-MIB::ligoFrequencyChange`
-

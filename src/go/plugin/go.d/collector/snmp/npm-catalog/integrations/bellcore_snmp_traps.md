@@ -144,4 +144,3 @@ Netdata decodes **9 trap definitions** from Bellcore across **2 MIBs** into stru
 - `SMDS-Subscription-MIB::individualAddressScreenEntryChange`
 - `SMDS-Subscription-MIB::groupAddressScreenEntryChange`
 - `SMDS-Subscription-MIB::groupAddressChange`
-

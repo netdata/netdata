@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Plexcom Inc across **1 MIB** into st
 - `PLEXCOM-MIB::plxPanicMesgTrap`
 - `PLEXCOM-MIB::plxGenericHubTrap`
 - `PLEXCOM-MIB::plxSecurityViolationTrap`
-

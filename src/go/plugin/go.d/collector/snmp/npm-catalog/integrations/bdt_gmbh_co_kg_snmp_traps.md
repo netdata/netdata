@@ -143,4 +143,3 @@ Netdata decodes **12 trap definitions** from Bdt GmbH Co KG across **1 MIB** int
 - `BDTMIB::bDTShutdown`
 - `BDTMIB::bDTError`
 - `BDTMIB::bDTInformational`
-

@@ -140,5 +140,3 @@ Metrics:
 | system.zswap_written_back_raw_bytes | written_back | bytes/s |
 | system.zswap_same_filled_raw_size | same_filled | bytes |
 | system.zswap_duplicate_entry | duplicate | entries/s |
-
-

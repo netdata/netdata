@@ -106,7 +106,7 @@ bool stream_compression_initialize(struct sender_state *s) {
     if(s->thread.compressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
         s->thread.compressor.level = stream_send.compression.levels[s->thread.compressor.algorithm];
         stream_compressor_init(&s->thread.compressor);
-        return true;
+        return s->thread.compressor.initialized;
     }
 
     return false;
@@ -131,7 +131,7 @@ bool stream_decompression_initialize(struct receiver_state *rpt) {
 
     if(rpt->thread.compressed.decompressor.algorithm != COMPRESSION_ALGORITHM_NONE) {
         stream_decompressor_init(&rpt->thread.compressed.decompressor);
-        return true;
+        return rpt->thread.compressed.decompressor.initialized;
     }
 
     return false;
@@ -269,9 +269,9 @@ size_t stream_compress(struct compressor_state *state, const char *data, size_t 
             break;
     }
 
-    if(unlikely(ret >= COMPRESSION_MAX_CHUNK)) {
-        netdata_log_error("STREAM_COMPRESS: compressed data is %zu bytes, which is >= than the max chunk size %d",
-                ret, COMPRESSION_MAX_CHUNK);
+    if(unlikely(ret >= COMPRESSION_MAX_CHUNK || ret > STREAM_COMPRESSION_SIGNATURE_MAX_PAYLOAD_SIZE)) {
+        netdata_log_error("STREAM_COMPRESS: compressed data is %zu bytes, exceeding max chunk size %d or signature capacity %u",
+                ret, COMPRESSION_MAX_CHUNK, STREAM_COMPRESSION_SIGNATURE_MAX_PAYLOAD_SIZE);
         return 0;
     }
 
@@ -389,6 +389,48 @@ size_t stream_decompress(struct decompressor_state *state, const char *compresse
 
 // ----------------------------------------------------------------------------
 // unit test
+
+static int unittest_stream_compression_signature(void) {
+    fprintf(stderr, "\nTesting streaming compression signature\n");
+
+    static const size_t lengths[] = {
+        1,
+        STREAM_COMPRESSION_SIGNATURE_7BIT_MASK,
+        STREAM_COMPRESSION_SIGNATURE_7BIT_MASK + 1,
+        STREAM_COMPRESSION_SIGNATURE_HIGH_BITS_MASK,
+        STREAM_COMPRESSION_SIGNATURE_MAX_PAYLOAD_SIZE,
+    };
+
+    int errors = 0;
+
+    for(size_t i = 0; i < sizeof(lengths) / sizeof(lengths[0]); i++) {
+        stream_compression_signature_t signature = stream_compress_encode_signature(lengths[i]);
+        size_t decoded = stream_decompress_decode_signature((const char *)&signature, sizeof(signature));
+
+        if(decoded != lengths[i]) {
+            fprintf(stderr,
+                    "  FAILED: signature length round trip for %zu bytes decoded as %zu bytes\n",
+                    lengths[i], decoded);
+            errors++;
+        }
+    }
+
+    stream_compression_signature_t signature =
+        stream_compress_encode_signature(STREAM_COMPRESSION_SIGNATURE_MAX_PAYLOAD_SIZE);
+    if(stream_decompress_decode_signature((const char *)&signature, sizeof(signature) - 1) != 0) {
+        fprintf(stderr, "  FAILED: truncated signature decoded as valid\n");
+        errors++;
+    }
+
+    char invalid_signature[STREAM_COMPRESSION_SIGNATURE_SIZE] = { 0 };
+    if(stream_decompress_decode_signature(invalid_signature, sizeof(invalid_signature)) != 0) {
+        fprintf(stderr, "  FAILED: invalid signature decoded as valid\n");
+        errors++;
+    }
+
+    fprintf(stderr, "Streaming compression signature: %s\n", errors ? "FAILED" : "OK");
+    return errors;
+}
 
 void unittest_generate_random_name(char *dst, size_t size) {
     if(size < 7)
@@ -525,7 +567,7 @@ int unittest_stream_compression_speed(compression_algorithm_t algorithm, const c
             errors++;
             goto cleanup;
         }
-        else if(size >= COMPRESSION_MAX_CHUNK) {
+        else if(size >= COMPRESSION_MAX_CHUNK || size > STREAM_COMPRESSION_SIGNATURE_MAX_PAYLOAD_SIZE) {
             fprintf(stderr, "iteration %d: compressed size %zu exceeds max allowed size\n",
                     i, size);
             errors++;
@@ -618,7 +660,7 @@ int unittest_stream_compression(compression_algorithm_t algorithm, const char *n
             errors++;
             goto cleanup;
         }
-        else if(size >= COMPRESSION_MAX_CHUNK) {
+        else if(size >= COMPRESSION_MAX_CHUNK || size > STREAM_COMPRESSION_SIGNATURE_MAX_PAYLOAD_SIZE) {
             fprintf(stderr, "iteration %d: compressed size %zu exceeds max allowed size\n",
                     i, size);
             errors++;
@@ -687,6 +729,8 @@ int unittest_stream_decompress_bomb_zstd(void);
 
 int unittest_stream_compressions(void) {
     int ret = 0;
+
+    ret += unittest_stream_compression_signature();
 
 #ifdef ENABLE_ZSTD
     ret += unittest_stream_decompress_bomb_zstd();

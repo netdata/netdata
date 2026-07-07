@@ -183,4 +183,3 @@ Netdata decodes **2452 trap definitions** from Dell Inc across **36 MIBs** into 
 - `DELLTRAPS-MIB::dellEventWarningTrap`
 - `DELLTRAPS-MIB::dellEventErrorTrap`
 - `DELLTRAPS-MIB::dellEventCriticalTrap`
-

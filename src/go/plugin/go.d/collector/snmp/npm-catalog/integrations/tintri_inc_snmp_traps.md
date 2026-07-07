@@ -143,4 +143,3 @@ Netdata decodes **156 trap definitions** from Tintri Inc across **1 MIB** into s
 - `VMSTORE-MIB::systemFailure`
 - `VMSTORE-MIB::maxFileLimitReached`
 - `VMSTORE-MIB::maxSnapshotFileLimitReached`
-

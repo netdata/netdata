@@ -178,5 +178,3 @@ Metrics:
 |:------|:----------|:----|
 | cpu.cpu | guest_nice, guest, steal, softirq, irq, user, system, nice, iowait, idle | percentage |
 | cpuidle.cpu_cstate_residency_time | a dimension per c-state | percentage |
-
-

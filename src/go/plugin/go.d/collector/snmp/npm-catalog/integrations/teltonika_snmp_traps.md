@@ -146,4 +146,3 @@ Netdata decodes **19 trap definitions** from Teltonika across **4 MIBs** into st
 - `TELTONIKA-RUTX-MIB::connectionTypeNotification`
 - `TELTONIKA-MIB::trapConnectionType`
 - `TELTONIKA-RUTX-MIB::digitalInputNotification`
-

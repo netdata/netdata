@@ -144,4 +144,3 @@ Netdata decodes **32 trap definitions** from Lantronix across **2 MIBs** into st
 - `LANTRONIX-SLC-MIB::slcEventSLCShutdown`
 - `LANTRONIX-SLC-MIB::slcEventDevicePortData`
 - `LANTRONIX-SLC-MIB::slcEventDevicePortSLMData`
-

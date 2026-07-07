@@ -144,7 +144,9 @@ void sender_buffer_commit(struct sender_state *s, BUFFER *wb, struct sender_buff
                     "STREAM SND '%s' [to %s]: COMPRESSION failed. Resetting compressor and re-trying",
                     rrdhost_hostname(s->host), s->remote_ip);
 
-                stream_compression_initialize(s);
+                if (!stream_compression_initialize(s))
+                    goto compression_failed_with_lock;
+
                 dst_len = stream_compress(&s->thread.compressor, src, size_to_compress, &dst);
                 if (!dst_len)
                     goto compression_failed_with_lock;

@@ -145,4 +145,3 @@ Netdata decodes **39 trap definitions** from Comet System S R O across **3 MIBs*
 - `T3610-MIB::trapEmailErrLogin`
 - `T3610-MIB::trapEmailErrAuth`
 - `T3610-MIB::trapEmailErrSome`
-
