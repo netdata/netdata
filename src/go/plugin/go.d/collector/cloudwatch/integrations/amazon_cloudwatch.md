@@ -96,7 +96,7 @@ With `profiles.mode: auto` (default), the collector discovers metrics for all bu
 
 #### Performance Impact
 
-AWS bills CloudWatch API usage. `GetMetricData` (the metric queries) is the cost driver, billed per metric requested; `ListMetrics` discovery falls under the free tier and then costs a fraction as much. As a rough anchor, `GetMetricData` is billed at roughly $0.01 per 1,000 metrics requested -- confirm current [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) for your region. Each combination of instance, metric, and statistic is one billed query, run once per its own period (not once per collection cycle), so cost scales with discovered instances, metrics, statistics, and their periods -- not with `update_every`. The collector already minimizes it with curated per-service profiles, single-statistic defaults, exact dimension filtering, cached discovery, and `recently_active_only`. To reduce it further, restrict services with `profiles.mode: exact` or narrow `regions`.
+AWS bills CloudWatch API usage. `GetMetricData` (the metric queries) is the cost driver, billed per metric requested; `ListMetrics` discovery falls under the free tier and then costs a fraction as much. As a rough anchor, `GetMetricData` is billed at roughly $0.01 per 1,000 metrics requested -- confirm current [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) for your region. Each combination of instance, metric, and statistic is one billed query, run once per its own period (not once per collection cycle), so cost scales with discovered instances, metrics, statistics, and their periods -- not with `update_every`. The collector already minimizes it with curated per-service profiles, single-statistic defaults, exact dimension filtering, cached discovery, and `recently_active_only`. The default profile set includes narrow ALB/NLB target-health profiles; these add one health metric/statistic query per discovered target group and intentionally avoid the broader target-group metric packs. To reduce cost further, restrict services with `profiles.mode: exact` or narrow `regions`.
 
 
 ## Setup
@@ -184,7 +184,7 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | auth.mode_access_key.session_token | Optional AWS session token for temporary credentials (used in `access_key` mode). |  | no |
 |  | auth.mode_assume_role.roles | IAM roles to assume (used in `assume_role` mode) -- one per AWS account to monitor. Each entry has `role_arn` and an optional `external_id`, and each metric series is labeled with the account id its role resolves to. A role that cannot be assumed is skipped with a warning while the rest keep collecting; two roles resolving to the same account are de-duplicated. |  | no |
 |  | auth.mode_assume_role.include_base_account | When `true`, also monitor the base identity's own account (the identity used to assume the roles) alongside the assumed-role accounts. Defaults to `false` -- with roles set, only the assumed-role accounts are monitored; to also cover the base account, enable this or run a separate `default`-mode job. | no | no |
-| **Profiles** | profiles.mode | Profile selection: `auto` (default service profiles), `exact` (only the profiles you list, by basename), or `combined` (default profiles plus deep-grain per-target-group / per-operation / per-request-filter profiles). | auto | no |
+| **Profiles** | profiles.mode | Profile selection: `auto` (default service profiles, including narrow ALB/NLB target health), `exact` (only the profiles you list, by basename), or `combined` (default profiles plus disabled opt-in profiles such as broad target-group, per-operation, per-request-filter, and EBS stalled-I/O profiles). | auto | no |
 |  | profiles.mode_exact.entries | List of profiles to collect by basename (required when `profiles.mode` is `exact`). Each entry has a `name`, e.g. `ec2` or `alb_target`. |  | no |
 | **Discovery** | discovery.refresh_every | How often (seconds) to re-discover metrics. Minimum 60. | 300 | no |
 |  | discovery.recently_active_only | List only metrics active in the last 3 hours. Automatically disabled for metrics whose period exceeds 3 hours (such as the daily S3 storage metrics). | yes | no |
@@ -348,9 +348,9 @@ jobs:
 ```
 </details>
 
-###### All services including deep-grain profiles
+###### All services including opt-in profiles
 
-Use `combined` mode to also collect the opt-in deep-grain profiles (ALB target groups, DynamoDB operations, S3 request metrics).
+Use `combined` mode to also collect disabled opt-in profiles (broad ALB target groups, DynamoDB operations, S3 request metrics, EBS stalled I/O).
 
 <details open><summary>Config</summary>
 
@@ -378,6 +378,9 @@ The following alerts are available:
 |:------------|:----------|:------------|
 | [ cw_ec2_status_check_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.ec2.status_check_failed | EC2 status check failed on ${label:instance_id} |
 | [ cw_ec2_attached_ebs_status_check_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.ec2.status_check_failed | EC2 attached EBS status check failed on ${label:instance_id} |
+| [ cw_alb_target_group_unhealthy_hosts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.alb_target_health.unhealthy_hosts | ALB target group has unhealthy targets on ${label:load_balancer}/${label:target_group} |
+| [ cw_nlb_target_group_unhealthy_hosts ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.nlb_target_health.unhealthy_hosts | NLB target group has unhealthy targets on ${label:load_balancer}/${label:target_group} |
+| [ cw_ebs_stalled_io_check_failed ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.ebs_stalled_io.stalled_io_check | EBS volume stalled I/O check failed on ${label:volume_id}; requires the opt-in ebs_stalled_io profile |
 | [ cw_nat_gateway_port_allocation_errors ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.nat_gateway.errors | NAT Gateway port allocation errors on ${label:nat_gateway_id} |
 | [ cw_efs_io_limit_reached ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.efs.io_limit | EFS I/O limit reached on ${label:file_system_id} |
 | [ cw_efs_burst_credits_exhausted ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.efs.burst_credit | EFS burst credits exhausted on ${label:file_system_id} |
@@ -392,6 +395,9 @@ The following alerts are available:
 | [ cw_opensearch_automated_snapshot_failure ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.opensearch.automated_snapshot_failure | OpenSearch automated snapshot failed on ${label:domain_name} |
 | [ cw_opensearch_old_gen_jvm_memory_pressure ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.opensearch.old_gen_jvm_memory_pressure | OpenSearch old-gen JVM memory pressure high on ${label:domain_name} |
 | [ cw_elasticache_engine_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.elasticache.cpu | ElastiCache engine CPU utilization high on ${label:cache_cluster_id}/${label:cache_node_id} |
+| [ cw_msk_active_controller_missing ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.msk_cluster.active_controllers | MSK cluster has no active controller on ${label:cluster_name} |
+| [ cw_msk_multiple_active_controllers ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.msk_cluster.active_controllers | MSK cluster has multiple active controllers on ${label:cluster_name} |
+| [ cw_msk_offline_partitions ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.msk_cluster.offline_partitions | MSK cluster has offline partitions on ${label:cluster_name} |
 | [ cw_msk_cpu_utilization ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.msk.cpu | MSK broker CPU utilization high on ${label:cluster_name}/${label:broker_id} |
 | [ cw_msk_data_logs_disk_used ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.msk.disk_used | MSK broker data-log disk utilization high on ${label:cluster_name}/${label:broker_id} |
 | [ cw_msk_heap_memory_after_gc ](https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf) | cloudwatch.msk.heap_memory_after_gc | MSK broker heap memory after GC high on ${label:cluster_name}/${label:broker_id} |
@@ -428,7 +434,9 @@ The built-in profiles ship the following charts by default. Each service links t
 | [Amazon RDS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/rds.yaml) | `cloudwatch.rds.*` | CPU utilization, database connections, freeable memory, free storage space, disk throughput, IOPS, latency, replica lag, PostgreSQL transaction ID usage, EBS credit balance |
 | [Classic Load Balancer (ELB)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/elb.yaml) | `cloudwatch.elb.*` | request count, backend and load-balancer response codes, backend connection errors, latency, host count, spillover count |
 | [Application Load Balancer (ALB)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/alb.yaml) | `cloudwatch.alb.*` | request count, target and load-balancer response codes, connection rate, active connections, processed traffic, target response time, consumed LCUs |
+| [ALB Target Health](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/alb_target_health.yaml) | `cloudwatch.alb_target_health.*` | per-target-group unhealthy host count |
 | [Network Load Balancer (NLB)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/nlb.yaml) | `cloudwatch.nlb.*` | active and new flow counts, processed bytes and packets, consumed LCUs, TCP resets |
+| [NLB Target Health](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/nlb_target_health.yaml) | `cloudwatch.nlb_target_health.*` | per-target-group unhealthy host count |
 | [Amazon S3](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/s3.yaml) | `cloudwatch.s3.*` | bucket size, number of objects (daily storage metrics) |
 | [AWS Lambda](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/lambda.yaml) | `cloudwatch.lambda.*` | invocations, errors and throttles, duration |
 | [Amazon SQS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/sqs.yaml) | `cloudwatch.sqs.*` | message throughput, empty receives, queue depth, age of oldest message, sent message size |
@@ -447,6 +455,7 @@ The built-in profiles ship the following charts by default. Each service links t
 | [Amazon DocumentDB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/docdb.yaml) | `cloudwatch.docdb.*` | CPU utilization, freeable memory, connections, buffer cache hit ratio, disk IOPS, latency, throughput, replica lag, cursors timed out |
 | [Amazon Redshift](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/redshift.yaml) | `cloudwatch.redshift.*` | health, CPU utilization, disk space used, database connections, disk IOPS, throughput, network throughput |
 | [Amazon MSK](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/msk.yaml) | `cloudwatch.msk.*` | broker throughput, messages in, CPU, disk used, memory, heap memory after GC, partitions, under-min-ISR partitions, connections |
+| [Amazon MSK Cluster](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/msk_cluster.yaml) | `cloudwatch.msk_cluster.*` | active controllers and offline partitions |
 | [Amazon CloudFront](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/cloudfront.yaml) | `cloudwatch.cloudfront.*` | requests, downloaded and uploaded traffic, total/4xx/5xx error rates |
 | [AWS Auto Scaling](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/auto_scaling.yaml) | `cloudwatch.auto_scaling.*` | group sizing (min/max/desired/total) and instances by state (in-service, pending, standby, terminating) |
 | [Amazon Bedrock](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/bedrock.yaml) | `cloudwatch.bedrock.*` | invocations, invocation errors, token throughput, invocation and time-to-first-token latency |
@@ -456,15 +465,16 @@ The built-in profiles ship the following charts by default. Each service links t
 
 Each profile also carries **optional metrics** that are commented out to keep cost and cardinality low; uncomment a metric and its matching chart, then **restart the Netdata Agent** (profiles are loaded once per go.d process and cached). Stock profiles are shipped at `/usr/lib/netdata/conf.d/go.d/cloudwatch.profiles/default/`. To customize a service, copy its profile into `/etc/netdata/go.d/cloudwatch.profiles/` (keep the same filename) and edit it -- a user profile fully replaces the stock one of the same name -- then restart the Agent.
 
-With `profiles.mode: combined`, these deep-grain profiles are collected in addition to the defaults:
+With `profiles.mode: combined`, these disabled opt-in profiles are collected in addition to the defaults:
 
 | Profile | Metric prefix | Description |
 |:--------|:--------------|:------------|
 | [ALB Target Groups](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/alb_target.yaml) | `cloudwatch.alb_target.*` | per-target-group host count, requests per target, response time, response codes, connection errors |
 | [DynamoDB Operations](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/dynamodb_operation.yaml) | `cloudwatch.dynamodb_operation.*` | per-operation successful request latency, system errors, throttled requests, returned items |
+| [EBS Stalled I/O](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/ebs_stalled_io.yaml) | `cloudwatch.ebs_stalled_io.*` | per-volume stalled I/O health check |
 | [S3 Request Metrics](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/s3_requests.yaml) | `cloudwatch.s3_requests.*` | requests, request errors, request latency, request data transfer |
 
-These deep-grain profiles are the highest-cardinality data the collector emits. **S3 Request Metrics** additionally require per-bucket request-metrics configuration in AWS and are billed at CloudWatch custom-metric rates; they collect nothing until enabled on the bucket.
+These opt-in profiles include the highest-cardinality data the collector emits. **S3 Request Metrics** additionally require per-bucket request-metrics configuration in AWS and are billed at CloudWatch custom-metric rates; they collect nothing until enabled on the bucket.
 
 
 

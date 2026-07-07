@@ -342,10 +342,10 @@ Load and resolution (`catalog.go`):
   requires).
 - **Profile selection is config-driven** (`selectProfiles`), not discovery-driven.
   `profiles.mode: auto` (default) selects every default-enabled profile in the
-  catalog; `combined` adds the default-disabled deep-grain profiles; `exact` selects
+  catalog; `combined` adds the default-disabled opt-in profiles; `exact` selects
   only the profiles named by basename in `profiles.mode_exact.entries` (e.g. `ec2`,
   `alb_target`). Unlike `auto`, an `exact` entry selects a profile regardless of its
-  default-disabled flag, so a deep-grain profile can be picked by name. The selected
+  default-disabled flag, so an opt-in profile can be picked by name. The selected
   set is the *candidate* set — the namespaces of those profiles are what discovery
   `ListMetrics` runs against; a selected profile with no live instances simply
   produces no charts. `auto` is zero-config but lists every supported service each

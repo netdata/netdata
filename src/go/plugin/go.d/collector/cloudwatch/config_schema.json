@@ -154,7 +154,7 @@
         "properties": {
           "mode": {
             "title": "Mode",
-            "description": "Which service profiles to collect: `auto` uses the default-enabled profiles; `exact` uses only the profiles you list (by basename); `combined` adds the deep-grain (per-target-group, per-operation, per-request-filter) profiles to the default set.",
+            "description": "Which service profiles to collect: `auto` uses the default-enabled profiles, including narrow ALB/NLB target health; `exact` uses only the profiles you list by basename; `combined` adds disabled opt-in profiles to the default set.",
             "type": "string",
             "enum": [
               "auto",
@@ -340,7 +340,7 @@
     },
     "profiles": {
       "mode": {
-        "ui:help": "Which service profiles to collect: `auto` uses the default-enabled profiles, `exact` uses only the profiles you list (by basename), and `combined` adds the deep-grain profiles to the default set.",
+        "ui:help": "Which service profiles to collect: `auto` uses the default-enabled profiles, including narrow ALB/NLB target health; `exact` uses only the profiles you list by basename; `combined` adds disabled opt-in profiles to the default set.",
         "ui:widget": "radio",
         "ui:options": {
           "inline": true

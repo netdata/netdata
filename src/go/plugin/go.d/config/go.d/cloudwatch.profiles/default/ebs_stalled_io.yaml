@@ -1,0 +1,33 @@
+---
+version: v1
+display_name: Amazon EBS Stalled I/O
+namespace: AWS/EBS
+disabled: true   # opt-in only; 60s per-volume health metric
+period: 60
+# AWS documents VolumeStalledIOCheck at VolumeId | InstanceId. This disabled profile uses the
+# same {VolumeId} grain as ebs.yaml for normal per-volume monitoring; Multi-Attach users who need
+# attachment-level views can override this profile.
+instance:
+  dimensions:
+    - name: VolumeId
+      label: volume_id
+metrics:
+  - id: volume_stalled_io_check
+    metric_name: VolumeStalledIOCheck
+    statistics: [maximum]
+template:
+  family: EBS
+  context_namespace: ebs_stalled_io
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, volume_id]
+  charts:
+    - id: cw_ebs_stalled_io_check
+      context: stalled_io_check
+      title: EBS Volume Stalled I/O Check
+      family: Health
+      units: status
+      algorithm: absolute
+      dimensions:
+        - selector: volume_stalled_io_check_maximum
+          name: stalled

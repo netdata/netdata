@@ -52,9 +52,9 @@ metrics:
   #   statistics: [sum]
   #   rate: true
   # Also published at {LoadBalancer}: per-protocol variants (ActiveFlowCount_TCP/_UDP/_TLS,
-  # NewFlowCount_*, ProcessedBytes_*, ConsumedLCUs_*) and TargetTLSNegotiationErrorCount. Per-target
-  # metrics (HealthyHostCount, UnHealthyHostCount, UnhealthyRoutingFlowCount) use the
-  # {LoadBalancer, TargetGroup} grain and need their own profile. See:
+  # NewFlowCount_*, ProcessedBytes_*, ConsumedLCUs_*) and TargetTLSNegotiationErrorCount. Narrow
+  # target health at {LoadBalancer, TargetGroup} is collected by the default nlb_target_health
+  # profile; broader per-target metrics need their own opt-in profile. See:
   # https://docs.aws.amazon.com/elasticloadbalancing/latest/network/load-balancer-cloudwatch-metrics.html
 template:
   family: NLB
