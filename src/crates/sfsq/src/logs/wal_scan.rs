@@ -334,7 +334,7 @@ impl WalScan {
             if in_window {
                 facets.accumulate(&compiled, &conjuncts, &scratch, self);
             }
-            timeline.accumulate(row.ts_ns, &compiled, &conjuncts, &scratch);
+            timeline.accumulate(row.ts_ns, &conjuncts, &scratch);
         }
 
         LogsShard {
@@ -610,8 +610,9 @@ impl CompiledFilter {
 
     /// Whether the row satisfies every conjunct *except* `field`'s own
     /// selection (plus the query) — the row-scan analogue of
-    /// `BitmapFilter::without`, used to scope a facet or histogram so a
-    /// field's own selection doesn't collapse its breakdown.
+    /// `BitmapFilter::without`, used to scope a facet so a field's own
+    /// selection doesn't collapse its breakdown. The timeline uses
+    /// [`RowMatch::full`] instead (the full filter applies to the chart).
     fn matches_without(&self, m: &RowMatch, field: &str) -> bool {
         m.query
             && self
@@ -694,15 +695,14 @@ impl<'q> FacetAcc<'q> {
 
 /// The histogram accumulator over the row loop — the row-scan analogue
 /// of `IndexReader::timeline`, including its exact-`unset` rule.
-struct TimelineAcc<'q> {
+struct TimelineAcc {
     /// `None` when the field is high-card here or the grid is invalid —
     /// the cases where the SFST path errors and `evaluate` degrades the
     /// shard's timeline to `None`.
-    state: Option<TimelineState<'q>>,
+    state: Option<TimelineState>,
 }
 
-struct TimelineState<'q> {
-    field: &'q str,
+struct TimelineState {
     grid: Grid,
     /// Dimension labels: every distinct value of the field in the file
     /// (not just matching rows), lexicographic — FST enumeration order.
@@ -711,14 +711,14 @@ struct TimelineState<'q> {
     dim_of: HashMap<u32, usize>,
     /// `counts[dim][bucket]`, transposed at finish.
     dim_counts: Vec<Vec<u64>>,
-    /// Rows satisfying the scope (filter minus own selection), per bucket.
+    /// Rows matching the full filter, per bucket.
     bucket_total: Vec<u64>,
     /// Of those, rows carrying at least one value of the field.
     with_field: Vec<u64>,
 }
 
-impl<'q> TimelineAcc<'q> {
-    fn new(field: &'q str, grid: Grid, fields: &FieldTable, scan: &WalScan) -> Self {
+impl TimelineAcc {
+    fn new(field: &str, grid: Grid, fields: &FieldTable, scan: &WalScan) -> Self {
         // Mirror the SFST error paths that `evaluate` turns into a
         // `None` timeline: an invalid bucket width, or a field that is
         // high-cardinality in this file.
@@ -748,7 +748,6 @@ impl<'q> TimelineAcc<'q> {
 
         Self {
             state: Some(TimelineState {
-                field,
                 grid,
                 dim_counts: vec![vec![0; grid.num_buckets]; dimensions.len()],
                 bucket_total: vec![0; grid.num_buckets],
@@ -759,21 +758,16 @@ impl<'q> TimelineAcc<'q> {
         }
     }
 
-    fn accumulate(
-        &mut self,
-        ts_ns: i64,
-        compiled: &CompiledFilter,
-        conjuncts: &RowMatch,
-        distinct_tokens: &[u32],
-    ) {
+    fn accumulate(&mut self, ts_ns: i64, conjuncts: &RowMatch, distinct_tokens: &[u32]) {
         let Some(state) = &mut self.state else { return };
-        // Range check first: it's a pair of comparisons, while the scope
-        // check iterates the filter's conjuncts.
         let grid = state.grid;
         if !grid.range_ns().contains(&ts_ns) {
             return;
         }
-        if !compiled.matches_without(conjuncts, state.field) {
+        // The full filter applies — including the histogram field's own
+        // selection (unlike facets): the chart shows exactly the matched
+        // rows, mirroring `IndexReader::timeline`.
+        if !conjuncts.full {
             return;
         }
         let bucket = ((ts_ns - grid.bucket_start_ns) / grid.bucket_width_ns) as usize;
@@ -796,7 +790,7 @@ impl<'q> TimelineAcc<'q> {
         let buckets = (0..state.grid.num_buckets)
             .map(|b| sfst::Bucket {
                 counts: state.dim_counts.iter().map(|dc| dc[b]).collect(),
-                unset: state.bucket_total[b] - state.with_field[b],
+                unset: state.bucket_total[b].saturating_sub(state.with_field[b]),
             })
             .collect();
         Some(Timeline {

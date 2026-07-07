@@ -334,11 +334,13 @@ fn timeline_unset_counts_match_logs_missing_the_field() {
 }
 
 #[test]
-fn timeline_excludes_own_field_from_filter() {
+fn timeline_applies_the_full_filter_including_its_own_field() {
     let data = build_query_fixture();
     let reader = IndexReader::open(&data).unwrap();
-    // Selecting `level=info` shouldn't collapse the `level` timeline
-    // to a single dimension.
+    // Unlike facets, the timeline honors the histogram field's own
+    // selection: the chart shows exactly the matched logs (the legacy
+    // facets.c contract). Selecting `level=info` zeroes the `error`
+    // dimension instead of showing the unfiltered breakdown.
     let filter = bf(&reader, Filter::new().select("level", "info"));
     let timeline = reader
         .timeline(
@@ -349,10 +351,11 @@ fn timeline_excludes_own_field_from_filter() {
         .unwrap();
     // One bucket covering everything.
     assert_eq!(timeline.buckets.len(), 1);
-    // Both dimensions visible.
+    // Dimensions still enumerate every value in the file...
     assert_eq!(timeline.dimensions, vec!["error", "info"]);
-    // Counts reflect the full bitmap (filter excluded its own field).
-    assert_eq!(timeline.buckets[0].counts, vec![3, 3]);
+    // ...but only the matched logs are counted.
+    assert_eq!(timeline.buckets[0].counts, vec![0, 3]);
+    assert_eq!(timeline.buckets[0].unset, 0);
 }
 
 #[test]

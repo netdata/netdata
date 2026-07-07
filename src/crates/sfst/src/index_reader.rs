@@ -949,9 +949,11 @@ impl<'a> IndexReader<'a> {
     ///
     /// `grid` is caller-supplied. A grid that extends past the file's
     /// actual log range produces zero counts in the outer buckets
-    /// (handled naturally by `partition_point`). `field`'s own
-    /// selections are excluded from the filter (same reason as in
-    /// [`facets`](Self::facets)).
+    /// (handled naturally by `partition_point`). The **full** filter
+    /// applies — including `field`'s own selection, unlike
+    /// [`facets`](Self::facets): the chart must show exactly the matched
+    /// logs (the legacy `facets.c` contract), while the facet sidebar
+    /// keeps every value visible for further selection.
     ///
     /// A field that isn't present in this file is treated as "every
     /// matching log lacks it": the result has no dimensions and all
@@ -972,16 +974,12 @@ impl<'a> IndexReader<'a> {
             return Err(crate::Error::InvalidBucketWidth(grid.bucket_width_ns));
         }
 
-        // The field's own selection is excluded from its histogram (same
-        // reason as in `facets`). When nothing *else* constrains it
-        // (`fast`), each value's per-bucket count is read directly from the
-        // on-disk bitmap via `range_cardinality` — no per-value scope op.
-        let fast = filter.is_unconstrained(field);
-        let filter_set = if filter.contains_field(field) {
-            filter.without(field)
-        } else {
-            filter.full().clone()
-        };
+        // The full filter applies, including the field's own selection.
+        // When the filter carries no constraint at all (`fast`), each
+        // value's per-bucket count is read directly from the on-disk
+        // bitmap via `range_cardinality` — no per-value scope op.
+        let fast = filter.is_empty();
+        let filter_set = filter.full();
 
         // Per-bucket position ranges `[pos_lo, pos_hi)`, clamped naturally:
         // a grid extending past the file's range yields empty outer buckets.
@@ -1004,7 +1002,7 @@ impl<'a> IndexReader<'a> {
             Some(FieldLocation::Low) => {
                 for (kv_bytes, bv) in self.primary.prefix_pairs(prefix.as_bytes()) {
                     dimensions.push(String::from_utf8_lossy(&kv_bytes[prefix_len..]).into_owned());
-                    dim_counts.push(bucket_counts(bv, fast, &filter_set, &bucket_ranges));
+                    dim_counts.push(bucket_counts(bv, fast, filter_set, &bucket_ranges));
                     has_field.or_assign(&PosSet::from_value(bv));
                 }
             }
@@ -1012,7 +1010,7 @@ impl<'a> IndexReader<'a> {
                 let chunk = self.sfst.mid_field(idx)?;
                 chunk.for_each(|kv_bytes, bv| {
                     dimensions.push(String::from_utf8_lossy(&kv_bytes[prefix_len..]).into_owned());
-                    dim_counts.push(bucket_counts(bv, fast, &filter_set, &bucket_ranges));
+                    dim_counts.push(bucket_counts(bv, fast, filter_set, &bucket_ranges));
                     has_field.or_assign(&PosSet::from_value(bv));
                 });
             }
@@ -1021,7 +1019,7 @@ impl<'a> IndexReader<'a> {
             }
         }
         if !fast {
-            has_field.and_assign(&filter_set);
+            has_field.and_assign(filter_set);
         }
 
         // Transpose dimension-major counts into bucket-major and derive
@@ -1482,8 +1480,15 @@ impl BitmapFilter {
         self.per_field.iter().any(|(name, _)| name == field)
     }
 
+    /// Whether the filter carries no constraint at all — no field
+    /// selections and no full-text query — so [`full`](Self::full) is the
+    /// entire range. The timeline's fast-path condition.
+    fn is_empty(&self) -> bool {
+        self.query.is_none() && self.per_field.is_empty()
+    }
+
     /// Whether no constraint *other than* `field`'s own selection applies —
-    /// then `field`'s own facet/histogram can count directly over the window
+    /// then `field`'s own facet can count directly over the window
     /// (the fast path), with no scope to intersect. A full-text query is a
     /// global constraint, so its presence rules the fast path out. Purely
     /// structural; builds no bitmap.
@@ -1492,7 +1497,7 @@ impl BitmapFilter {
     }
 
     /// The filter scope with `field`'s own selection excluded — the AND of
-    /// the *other* fields and the query. For a facet/histogram on a field
+    /// the *other* fields and the query. For a facet on a field
     /// that is itself filtered and has siblings (otherwise it's
     /// [`is_unconstrained`]).
     ///

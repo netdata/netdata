@@ -16,9 +16,12 @@
 //! allowed values — disjunction within a field, conjunction across fields.
 //! An empty filter matches every log.
 //!
-//! When computing a facet or timeline *for* a field, that field's own
-//! selection is excluded from the filter, so selecting `level=error`
-//! doesn't collapse the `level` facet to a single value.
+//! When computing a facet *for* a field, that field's own selection is
+//! excluded from the filter, so selecting `level=error` doesn't collapse
+//! the `level` facet to a single value. A [`Timeline`] is different: the
+//! full filter applies — including the histogram field's own selection —
+//! so the chart shows exactly the matched logs (the legacy `facets.c`
+//! contract the consuming UI renders against).
 
 use std::collections::{BTreeMap, HashMap};
 use std::ops::Range;

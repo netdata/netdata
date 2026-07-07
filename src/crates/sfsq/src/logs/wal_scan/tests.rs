@@ -293,7 +293,7 @@ fn timeline_buckets_by_timestamp() {
 }
 
 #[test]
-fn timeline_excludes_own_selection_and_keeps_zero_count_dimensions() {
+fn timeline_applies_full_filter_and_keeps_zero_count_dimensions() {
     let scan = scan_from(&[
         (1, &["level=info", "host=a"]),
         (2, &["level=error", "host=a"]),
@@ -308,10 +308,11 @@ fn timeline_excludes_own_selection_and_keeps_zero_count_dimensions() {
             .build(),
     );
     let timeline = shard.timeline.expect("timeline");
-    // Dimensions enumerate every value of `level` in the file — `debug`
-    // stays as a zero-count dimension (its rows fail host=a).
+    // Dimensions enumerate every value of `level` in the file, but the
+    // counts honor the FULL filter — including the histogram field's own
+    // selection (unlike facets): only the level=error ∧ host=a row counts.
     assert_eq!(timeline.dimensions, vec!["debug", "error", "info"]);
-    assert_eq!(timeline.buckets[0].counts, vec![0, 1, 1]);
+    assert_eq!(timeline.buckets[0].counts, vec![0, 1, 0]);
     assert_eq!(timeline.buckets[0].unset, 0);
 }
 
