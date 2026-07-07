@@ -16,6 +16,10 @@ known-exact fixtures.
 - **ris** — real, live. The RIPE RIS Live BGP firehose (routing updates from
   the global RRC route collectors, ~4k messages/second), optionally filtered by
   collector (`--host`) or BGP message type (`--type`) to throttle volume.
+- **wikimedia** — real, live. The Wikimedia EventStreams `recentchange` feed
+  (edits, page creations, and log actions across all wikis) over SSE, with
+  several low/mid-cardinality categorical fields (change type, wiki, namespace,
+  bot/minor flags, log type/action) promoted to attributes.
 - **github** — real, historical replay. Hourly GH Archive event archives,
   downloaded and replayed at a configurable rate.
 - **synth** — synthetic. A deterministic, reproducible generator whose

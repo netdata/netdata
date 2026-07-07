@@ -9,9 +9,11 @@ pub mod otel;
 pub mod ris;
 pub mod runner;
 pub mod sender;
+pub mod sse;
 pub mod synth;
 // PROOF SCAFFOLD (otel traces-proof SOW; revert with the skeleton).
 pub mod synth_traces;
+pub mod wikimedia;
 pub mod ws;
 
 pub trait Source: Send + 'static {
