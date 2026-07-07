@@ -53,4 +53,24 @@ impl LogsData {
     pub fn facetable(&self) -> BTreeSet<&str> {
         self.available_fields.names().collect()
     }
+
+    /// The empty result for `grid` — what [`run`](super::run) produces for
+    /// an empty source set: zero counts, no facets or fields, and a
+    /// grid-aligned all-zero histogram ([`sfst::Timeline::empty`]). For
+    /// consumers that must emit a well-formed envelope without running a
+    /// query (a cancelled or failed call): the chart contract still gets
+    /// its full grid of zero counts rather than a shapeless blank.
+    pub fn empty(histogram_field: impl Into<String>, grid: sfst::Grid) -> Self {
+        Self {
+            matched: 0,
+            facets: Vec::new(),
+            histogram_field: histogram_field.into(),
+            histogram: sfst::Timeline::empty(grid),
+            available_fields: sfst::FieldTable::default(),
+            columns: Vec::new(),
+            rows: Vec::new(),
+            has_newer: false,
+            has_older: false,
+        }
+    }
 }

@@ -283,6 +283,28 @@ pub struct Timeline {
     pub buckets: Vec<Bucket>,
 }
 
+impl Timeline {
+    /// An empty timeline aligned to `grid`: no dimensions, one all-zero
+    /// bucket per grid bucket. The well-formed zero-count timeline a query
+    /// over no sources falls back to (a merge over no per-file timelines
+    /// yields `None`, not this) — the chart contract still gets a full
+    /// grid of zero counts rather than a shapeless blank. A zero-bucket
+    /// grid is allowed and yields an empty bucket list.
+    pub fn empty(grid: Grid) -> Self {
+        Self {
+            grid,
+            dimensions: Vec::new(),
+            buckets: vec![
+                Bucket {
+                    counts: Vec::new(),
+                    unset: 0,
+                };
+                grid.num_buckets
+            ],
+        }
+    }
+}
+
 /// Counts for one time bucket of a [`Timeline`].
 ///
 /// `counts[j]` is the number of matched logs in this bucket carrying value

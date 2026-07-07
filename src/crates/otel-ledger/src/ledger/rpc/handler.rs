@@ -27,11 +27,11 @@ use tokio::sync::RwLock;
 use tokio_util::sync::CancellationToken;
 
 use file_lifecycle::storage::{Storage, StorageError};
-use sfsq::logs::{LogSource, SfstCandidate, Source, WalTail, run};
+use sfsq::logs::{LogSource, LogsData, SfstCandidate, Source, WalTail, run};
 
 use super::adapter::{stream_required_params, to_result, window_secs};
 use super::wire::{
-    CatalogFileEntry, FilesResponse, InfoResponse, LogsResult, OtelLogsRequest, OtelLogsResponse,
+    CatalogFileEntry, FilesResponse, InfoResponse, OtelLogsRequest, OtelLogsResponse,
     SfstFileEntry, StreamId, TenantFiles, WalFileEntry,
 };
 use file_lifecycle::chunk::ChunkCache;
@@ -535,10 +535,16 @@ impl FunctionHandler for OtelLogsHandler {
                     guards
                 }
                 Err(file_cache::CacheError::Cancelled) => {
-                    // Match the other empty-return paths: keep the stream selector.
-                    let mut stub = LogsResult::empty_stub(time_range.start, time_range.end, last);
-                    stub.required_params = required_params;
-                    return Ok(OtelLogsResponse::Logs(stub));
+                    // The bridge usually discards a cancelled call's
+                    // response, but the cancel `select!` can race and
+                    // deliver it — so it must be the same well-formed
+                    // empty envelope as every other path, selector included.
+                    let mut result = to_result(
+                        LogsData::empty(query.histogram_field(), query.grid()),
+                        last,
+                    );
+                    result.required_params = required_params;
+                    return Ok(OtelLogsResponse::Logs(result));
                 }
                 Err(file_cache::CacheError::TooLarge {
                     footprint,
@@ -573,15 +579,13 @@ impl FunctionHandler for OtelLogsHandler {
             .chain(wal_tails.into_iter().map(LogSource::Tail))
             .collect();
 
-        let (after, before) = (time_range.start, time_range.end);
-        if sources.is_empty() {
-            // Still advertise the selector so the user can change the
-            // stream/time selection from an empty window.
-            let mut stub = LogsResult::empty_stub(after, before, last);
-            stub.required_params = required_params;
-            return Ok(OtelLogsResponse::Logs(stub));
-        }
-
+        // No `sources.is_empty()` special case: the engine's run over an
+        // empty source set is I/O-free and yields the grid-aligned empty
+        // `LogsData`, which `to_result` shapes into the same well-formed
+        // envelope as a zero-match query — a full grid of zero-count
+        // histogram buckets and the fixed table columns, which is what
+        // the consuming UI needs to render an empty window sanely.
+        //
         // The query is synchronous and CPU/IO-bound (opens + decompresses
         // SFSTs, row-scans the tails); run it and shape the neutral
         // result into the wire envelope off the runtime thread.
@@ -594,6 +598,11 @@ impl FunctionHandler for OtelLogsHandler {
         // early; the bridge's cancel `select!` already returns the 499 to the
         // caller and discards this partial result.
         let cancel = ctx.cancellation.clone();
+        // The failure fallback needs the grid and histogram field, but
+        // `query` moves into the closure — hoist them out first (`Grid`
+        // is `Copy`).
+        let grid = query.grid();
+        let histogram_field = query.histogram_field().to_owned();
         let mut result = match tokio::task::spawn_blocking(move || {
             to_result(run(sources, query, cancel, done), last)
         })
@@ -602,7 +611,7 @@ impl FunctionHandler for OtelLogsHandler {
             Ok(result) => result,
             Err(e) => {
                 tracing::warn!("otel-logs blocking task failed: {e}");
-                LogsResult::empty_stub(after, before, last)
+                to_result(LogsData::empty(histogram_field, grid), last)
             }
         };
         // Advertise the stream selector on every data response.

@@ -265,7 +265,7 @@ pub fn run(
         .cloned()
         .collect();
     let columns: Vec<String> = stats.fields.names().map(str::to_owned).collect();
-    let histogram = stats.timeline.unwrap_or_else(|| empty_timeline(grid));
+    let histogram = stats.timeline.unwrap_or_else(|| sfst::Timeline::empty(grid));
 
     // Step 2: paginate across every source under the unified cursor
     // order — on-disk SFSTs and in-memory chunks (`Part::Indexed`), and
@@ -282,21 +282,6 @@ pub fn run(
         rows: page.rows,
         has_newer: page.has_newer,
         has_older: page.has_older,
-    }
-}
-
-/// An empty timeline aligned to `grid`: no dimensions, all-zero buckets.
-fn empty_timeline(grid: sfst::Grid) -> sfst::Timeline {
-    sfst::Timeline {
-        grid,
-        dimensions: Vec::new(),
-        buckets: vec![
-            sfst::Bucket {
-                counts: Vec::new(),
-                unset: 0,
-            };
-            grid.num_buckets
-        ],
     }
 }
 

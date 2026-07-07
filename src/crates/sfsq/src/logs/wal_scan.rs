@@ -26,9 +26,10 @@
 //! What this module re-implements — and what the equivalence tests must
 //! hold against the SFST engine — is the *evaluation*: OR-within-field /
 //! AND-across-fields matching, the own-selection exclusion for facets
-//! and the histogram, per-row value dedup (a row carrying one pair twice
-//! counts once; a row carrying two values of a field counts in both),
-//! the histogram's exact `unset`, and lexicographic value ordering.
+//! (the histogram applies the full filter, own selection included),
+//! per-row value dedup (a row carrying one pair twice counts once; a row
+//! carrying two values of a field counts in both), the histogram's exact
+//! `unset`, and lexicographic value ordering.
 //!
 //! [`LogsShard::evaluate`]: super::aggregate::LogsShard::evaluate
 

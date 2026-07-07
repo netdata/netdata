@@ -35,22 +35,3 @@ fn data_point_round_trip() {
     assert_eq!(back.timestamp_ms, 42);
     assert_eq!(back.items, vec![[1, 2, 3], [4, 5, 6]]);
 }
-
-#[test]
-fn empty_stub_has_expected_shape() {
-    let r = LogsResult::empty_stub(100, 200, 200);
-    let v = serde_json::to_value(&r).unwrap();
-    assert_eq!(v["status"], 200);
-    assert_eq!(v["progress"], 100);
-    assert_eq!(v["v"], 3);
-    assert_eq!(v["type"], "table");
-    assert!(v["facets"].as_array().unwrap().is_empty());
-    assert!(v["available_histograms"].as_array().unwrap().is_empty());
-    assert!(v["data"].as_array().unwrap().is_empty());
-    assert!(v["columns"].is_object());
-    assert_eq!(v["items"]["max_to_return"], 200);
-    assert_eq!(v["items"]["matched"], 0);
-    assert_eq!(v["histogram"]["chart"]["view"]["after"], 100);
-    assert_eq!(v["histogram"]["chart"]["view"]["before"], 200);
-    assert_eq!(v["pagination"]["key"], "anchor");
-}

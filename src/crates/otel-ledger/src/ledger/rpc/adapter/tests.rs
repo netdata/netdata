@@ -184,6 +184,48 @@ fn histogram_with_zero_buckets_still_well_formed() {
 }
 
 #[test]
+fn empty_logs_data_shapes_a_full_zero_count_envelope() {
+    // The empty envelope every degenerate handler path returns (empty
+    // window, cancelled remote fetch, failed blocking task) — shaped by
+    // `to_result` over `LogsData::empty`, never hand-rolled. The chart
+    // contract must hold: real id/title, grid-derived bounds and
+    // update_every, the "(unset)" label invariant, one zero DataPoint
+    // per bucket, and the three fixed table columns.
+    let grid = sfst::Grid::new(1_700_000_000 * NS_PER_S, 15 * NS_PER_S, 4);
+    let r = to_result(sfsq::logs::LogsData::empty("severity_text", grid), 200);
+
+    assert_eq!(r.histogram.id, "severity_text");
+    assert_eq!(r.histogram.name, "severity_text");
+    let view = &r.histogram.chart.view;
+    assert_eq!(view.title, "Events distribution by severity_text");
+    assert_eq!(view.after, 1_700_000_000);
+    assert_eq!(view.before, 1_700_000_000 + 60);
+    assert_eq!(view.update_every, 15);
+    assert_eq!(view.dimensions.ids, vec!["(unset)"]);
+    assert_eq!(r.histogram.chart.result.labels, vec!["time", "(unset)"]);
+    let dps = &r.histogram.chart.result.data;
+    assert_eq!(dps.len(), 4);
+    assert!(dps.iter().all(|dp| dp.items == vec![[0, 0, 0]]));
+
+    let v = serde_json::to_value(&r).unwrap();
+    let mut column_keys: Vec<&str> = v["columns"].as_object().unwrap().keys().map(String::as_str).collect();
+    column_keys.sort_unstable();
+    assert_eq!(column_keys, vec!["cursor", "severity", "timestamp"]);
+    assert!(v["facets"].as_array().unwrap().is_empty());
+    assert!(v["data"].as_array().unwrap().is_empty());
+    assert_eq!(v["items"]["matched"], 0);
+    assert_eq!(v["items"]["max_to_return"], 200);
+    // Envelope-wide constants, pinned here so the empty envelope stays
+    // fully asserted in one place.
+    assert_eq!(v["status"], 200);
+    assert_eq!(v["progress"], 100);
+    assert_eq!(v["v"], 3);
+    assert_eq!(v["type"], "table");
+    assert_eq!(v["pagination"]["key"], "anchor");
+    assert_eq!(v["pagination"]["column"], "cursor");
+}
+
+#[test]
 fn available_histograms_enumerates_fields_in_order() {
     // The engine already excludes high-card fields, so the converter is
     // a straight enumeration in field order.
