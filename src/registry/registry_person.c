@@ -208,6 +208,7 @@ REGISTRY_PERSON_URL *registry_person_link_to_url(REGISTRY_PERSON *p, REGISTRY_MA
 
             pu->machine->links--;
             pu->machine = m;
+            m->links++;
         }
 
         if(strcmp(string2str(pu->machine_name), machine_name) != 0) {

@@ -1437,7 +1437,7 @@ static void populate_system_info(void) {
     build_info_set_value_strdupz(BIB_OS_ID, system_info->host_os_id);
     build_info_set_value_strdupz(BIB_OS_ID_LIKE, system_info->host_os_id_like);
     build_info_set_value_strdupz(BIB_OS_VERSION, system_info->host_os_version);
-    build_info_set_value_strdupz(BIB_OS_VERSION_ID, system_info->container_os_version_id);
+    build_info_set_value_strdupz(BIB_OS_VERSION_ID, system_info->host_os_version_id);
     build_info_set_value_strdupz(BIB_OS_DETECTION, system_info->host_os_detection);
     build_info_set_value_strdupz(BIB_HW_CPU_CORES, system_info->host_cores);
     build_info_set_value_strdupz(BIB_HW_CPU_FREQUENCY, system_info->host_cpu_freq);
