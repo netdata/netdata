@@ -323,6 +323,7 @@ static int append_slash_to_url_and_redirect(struct web_client *w) {
 
     buffer_strcat(w->response.header, "Location: ");
     const char *b = buffer_tostring(w->url_as_received);
+    size_t url_len = buffer_strlen(w->url_as_received);
     const char *q = strchr(b, '?');
     if(q && q > b) {
         const char *e = q - 1;
@@ -335,7 +336,8 @@ static int append_slash_to_url_and_redirect(struct web_client *w) {
         buffer_strcat(w->response.header, q);
     }
     else {
-        const char *e = &b[buffer_strlen(w->url_as_received) - 1];
+        const char *e = b + url_len;
+        if(e > b) e--;
         while(e > b && *e != '/') e--;
         if(*e == '/') e++;
 
