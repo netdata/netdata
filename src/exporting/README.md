@@ -119,7 +119,7 @@ Your `exporting.conf` file contains these configuration blocks:
     enabled = yes
     destination = localhost:2003
     data source = average
-    prefix = Netdata
+    prefix = netdata
     hostname = my-name
     update every = 10
     buffer on failures = 10
