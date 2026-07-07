@@ -192,14 +192,21 @@ static char *cgroup_parse_resolved_name_and_labels(struct cgroup *cg, char *data
     while(data) {
         char *pair = strsep_skip_consecutive_separators(&data, ",");
 
-        if(strncmp(pair, CGROUP_NETDATA_CLOUD_LABEL_PREFIX, sizeof(CGROUP_NETDATA_CLOUD_LABEL_PREFIX) - 1) == 0) {
+        // the kubernetes resolver prefixes every label with "k8s_", including
+        // the netdata.cloud/* pod annotations, so accept the directives with
+        // and without that prefix
+        char *directive = pair;
+        if(strncmp(directive, "k8s_", sizeof("k8s_") - 1) == 0)
+            directive = &directive[sizeof("k8s_") - 1];
+
+        if(strncmp(directive, CGROUP_NETDATA_CLOUD_LABEL_PREFIX, sizeof(CGROUP_NETDATA_CLOUD_LABEL_PREFIX) - 1) == 0) {
             // a netdata.cloud label
-            char *key = &pair[sizeof(CGROUP_NETDATA_CLOUD_LABEL_PREFIX) - 1];
+            char *key = &directive[sizeof(CGROUP_NETDATA_CLOUD_LABEL_PREFIX) - 1];
 
             if(strncmp(key, CGROUP_RENAME_LABEL, sizeof(CGROUP_RENAME_LABEL) - 1) == 0) {
                 char *n = &key[sizeof(CGROUP_RENAME_LABEL) - 1];
                 size_t len = strlen(n);
-                if(n[0] == '"' && n[len - 1] == '"') {
+                if(len > 0 && n[0] == '"' && n[len - 1] == '"') {
                     n[len - 1] = '\0';
                     n++;
                 }
