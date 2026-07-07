@@ -211,7 +211,7 @@ void ml_host_stop(RRDHOST *rh) {
             continue;
 
         // reset chart
-        chart->mls = ml_machine_learning_stats_t();
+        ml_chart_reset_stats(chart);
 
         void *rdp = NULL;
         rrddim_foreach_read(rdp, rs) {
@@ -244,9 +244,8 @@ void ml_host_stop(RRDHOST *rh) {
 
     // Publish the stop only after every chart->mls / dim reset is committed.
     // ml_host_detect_once treats a generation change as "discard the snapshot",
-    // so bumping here guarantees that if detect saw stale chart->mls it will
-    // either also observe the new generation or have already published before
-    // any of our resets started.
+    // so bumping here guarantees that a detector spanning the reset cannot
+    // publish the mixed pre/post-stop snapshot.
     host->ml_stop_generation.fetch_add(1);
 
     netdata_mutex_unlock(&host->start_stop_mutex);
@@ -353,6 +352,7 @@ void ml_chart_new(RRDSET *rs)
 
     chart->rs = rs;
     chart->mls = ml_machine_learning_stats_t();
+    spinlock_init(&chart->mls_spinlock);
 
     // Publish with release semantics so readers that load rs->ml_chart with
     // acquire semantics observe the chart's `rs` and `mls` fields as fully
@@ -388,7 +388,7 @@ ALWAYS_INLINE_ONLY bool ml_chart_update_begin(RRDSET *rs)
     if (!chart)
         return false;
 
-    chart->mls = {};
+    ml_chart_reset_stats(chart);
     return true;
 }
 

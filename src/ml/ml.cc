@@ -1180,6 +1180,40 @@ ml_chart_is_available_for_ml(ml_chart_t *chart)
     return rrdset_is_available_for_exporting_and_alarms(chart->rs);
 }
 
+static void ml_chart_stats_add(ml_machine_learning_stats_t *dst, const ml_machine_learning_stats_t &src)
+{
+    dst->num_machine_learning_status_enabled += src.num_machine_learning_status_enabled;
+    dst->num_machine_learning_status_disabled_sp += src.num_machine_learning_status_disabled_sp;
+
+    dst->num_metric_type_constant += src.num_metric_type_constant;
+    dst->num_metric_type_variable += src.num_metric_type_variable;
+
+    dst->num_training_status_untrained += src.num_training_status_untrained;
+    dst->num_training_status_pending_without_model += src.num_training_status_pending_without_model;
+    dst->num_training_status_trained += src.num_training_status_trained;
+    dst->num_training_status_pending_with_model += src.num_training_status_pending_with_model;
+    dst->num_training_status_silenced += src.num_training_status_silenced;
+
+    dst->num_anomalous_dimensions += src.num_anomalous_dimensions;
+    dst->num_normal_dimensions += src.num_normal_dimensions;
+}
+
+void ml_chart_reset_stats(ml_chart_t *chart)
+{
+    spinlock_lock(&chart->mls_spinlock);
+    chart->mls = {};
+    spinlock_unlock(&chart->mls_spinlock);
+}
+
+ml_machine_learning_stats_t ml_chart_get_stats(ml_chart_t *chart)
+{
+    spinlock_lock(&chart->mls_spinlock);
+    ml_machine_learning_stats_t mls = chart->mls;
+    spinlock_unlock(&chart->mls_spinlock);
+
+    return mls;
+}
+
 void
 ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomalous)
 {
@@ -1189,46 +1223,52 @@ ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomal
     enum ml_training_status ts = dim->ts;
     spinlock_unlock(&dim->slock);
 
+    ml_machine_learning_stats_t delta = {};
+
     switch (mls) {
         case MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART:
-            chart->mls.num_machine_learning_status_disabled_sp++;
-            return;
+            delta.num_machine_learning_status_disabled_sp++;
+            break;
         case MACHINE_LEARNING_STATUS_ENABLED: {
-            chart->mls.num_machine_learning_status_enabled++;
+            delta.num_machine_learning_status_enabled++;
 
             switch (mt) {
                 case METRIC_TYPE_CONSTANT:
-                    chart->mls.num_metric_type_constant++;
-                    chart->mls.num_training_status_trained++;
-                    chart->mls.num_normal_dimensions++;
-                    return;
+                    delta.num_metric_type_constant++;
+                    delta.num_training_status_trained++;
+                    delta.num_normal_dimensions++;
+                    break;
                 case METRIC_TYPE_VARIABLE:
-                    chart->mls.num_metric_type_variable++;
+                    delta.num_metric_type_variable++;
+
+                    switch (ts) {
+                        case TRAINING_STATUS_UNTRAINED:
+                            delta.num_training_status_untrained++;
+                            break;
+                        case TRAINING_STATUS_TRAINED:
+                            delta.num_training_status_trained++;
+
+                            delta.num_anomalous_dimensions += is_anomalous;
+                            delta.num_normal_dimensions += !is_anomalous;
+                            break;
+                        case TRAINING_STATUS_SILENCED:
+                            delta.num_training_status_silenced++;
+                            delta.num_training_status_trained++;
+
+                            delta.num_anomalous_dimensions += is_anomalous;
+                            delta.num_normal_dimensions += !is_anomalous;
+                            break;
+                    }
                     break;
             }
 
-            switch (ts) {
-                case TRAINING_STATUS_UNTRAINED:
-                    chart->mls.num_training_status_untrained++;
-                    return;
-                case TRAINING_STATUS_TRAINED:
-                    chart->mls.num_training_status_trained++;
-
-                    chart->mls.num_anomalous_dimensions += is_anomalous;
-                    chart->mls.num_normal_dimensions += !is_anomalous;
-                    return;
-                case TRAINING_STATUS_SILENCED:
-                    chart->mls.num_training_status_silenced++;
-                    chart->mls.num_training_status_trained++;
-
-                    chart->mls.num_anomalous_dimensions += is_anomalous;
-                    chart->mls.num_normal_dimensions += !is_anomalous;
-                    return;
-            }
-
-            return;
+            break;
         }
     }
+
+    spinlock_lock(&chart->mls_spinlock);
+    ml_chart_stats_add(&chart->mls, delta);
+    spinlock_unlock(&chart->mls_spinlock);
 }
 
 /*
@@ -1269,7 +1309,7 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
             if (!ml_chart_is_available_for_ml(chart))
                 continue;
 
-            ml_machine_learning_stats_t chart_mls = chart->mls;
+            ml_machine_learning_stats_t chart_mls = ml_chart_get_stats(chart);
 
             host_mls.num_machine_learning_status_enabled += chart_mls.num_machine_learning_status_enabled;
             host_mls.num_machine_learning_status_disabled_sp += chart_mls.num_machine_learning_status_disabled_sp;

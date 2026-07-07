@@ -40,10 +40,10 @@ typedef struct {
 
     // Incremented at the END of every ml_host_stop, after all chart/dim resets
     // have committed. ml_host_detect_once samples this before and after its
-    // unlocked chart walk; a change means a stop completed during the walk
-    // (so detect raced with stop's chart->mls writes) or a stop+start cycle
-    // happened around the walk. In either case the accumulated snapshot must
-    // be discarded even if ml_running is back to true at the re-check.
+    // chart walk; a change means a stop completed during the walk or a
+    // stop+start cycle happened around the walk. In either case the
+    // accumulated snapshot must be discarded even if ml_running is back to true
+    // at the re-check.
     std::atomic<uint64_t> ml_stop_generation;
 
     ml_machine_learning_stats_t mls;
@@ -57,7 +57,7 @@ typedef struct {
     // cannot carry host->mutex into that walk), so a racing start cannot
     // re-enable ml_running while stop is mid-reset. Without it, a detect walk
     // could observe ml_running==true with an unchanged stop generation and
-    // publish a snapshot torn by stop's in-flight chart->mls resets.
+    // publish a snapshot spanning stop's in-flight resets.
     netdata_mutex_t start_stop_mutex;
 
     ml_queue_t *queue;
