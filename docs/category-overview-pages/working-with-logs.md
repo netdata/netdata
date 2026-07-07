@@ -6,6 +6,16 @@ The [systemd journal plugin](/src/collectors/systemd-journal.plugin) is the core
 
 For structured logs, Netdata provides tools like [log2journal](/src/collectors/log2journal/README.md) and [systemd-cat-native](/src/libnetdata/log/systemd-cat-native.md) to convert them into compatible systemd journal entries.
 
+## Keeping logs local with journal namespaces
+
+When collected logs are sent to the default systemd journal, they intermix with kernel, service, and audit messages — the same stream you see in `journalctl` with no filter or in `/var/log/messages`. systemd journal namespaces let you store collected logs in a separate, dedicated journal on the same server, keeping them out of the system log without forwarding them to a remote host. Pipe parsed logs through [`systemd-cat-native`](/src/libnetdata/log/systemd-cat-native.md) with the `--namespace` option to write them to a namespace journal instead of the default one:
+
+```bash
+tail -F /var/log/nginx/*.log | log2journal 'PATTERN' | systemd-cat-native --namespace=netdata_logs
+```
+
+The namespace must already be configured and running on the system. The [systemd journal plugin](/src/collectors/systemd-journal.plugin) automatically discovers namespace journals, so the collected logs appear in the Logs tab without additional collector configuration.
+
 ## Non-systemd Linux systems
 
 Linux distributions without systemd, such as Alpine Linux, cannot use the [systemd journal plugin](/src/collectors/systemd-journal.plugin) locally because it requires a local `systemd-journald` installation. Note that [log2journal](/src/collectors/log2journal/README.md) itself does not require systemd — it is a standalone text processor that can run on any Linux system to convert log files to Journal Export Format. The converted output can then be piped to `systemd-cat-native --url` for remote forwarding (see option 1 below).
