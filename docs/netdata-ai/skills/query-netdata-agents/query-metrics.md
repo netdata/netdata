@@ -83,8 +83,7 @@ seconds.**
 **Common mistake**: `after: -600, points: 30` is NOT per-second
 data over 10 minutes -- it is 20-seconds-per-point heavily
 aggregated data. Per-second resolution over 10 minutes requires
-`points: 600` (at the 500-point server cap; reduce duration or
-accept coarser resolution).
+`points: 600`.
 
 **Per-second data also requires dbengine tier 0** (per-second
 storage) covers the requested time range. If tier 0 retention is
@@ -92,9 +91,11 @@ shorter than `abs(after)`, the engine auto-selects a coarser
 tier silently. Force tier 0 with `"tier": 0` in the window to
 fail loudly rather than silently downsample.
 
-**`points: 0` is NOT "per-second"** -- it means "all available
-points within the 500 cap", which the engine still aggregates
-when the duration exceeds 500 seconds.
+**`points: 0` is NOT "per-second"** -- it means "return all the
+natural points the database holds for the requested window", one
+point per collection interval at the relevant storage tier, up to
+the 86,400-point per-query maximum. It is only per-second if that
+storage tier collects every second.
 
 ## Limits and gotchas
 
@@ -102,7 +103,11 @@ when the duration exceeds 500 seconds.
   contains metadata for every context on the agent.
 - **`unaligned`**: include in `options` for API queries to avoid
   wall-clock alignment of the time window.
-- **Max points ≈ 500** per query (server-side cap).
+- **Max points: 86,400 per query** (the agent's absolute maximum).
+  The separate ~500-point limit (`ScopeDataRequestMaxPoints`) is
+  enforced by Netdata Cloud only -- the agent REST API does not
+  apply it. See
+  [../query-netdata-cloud/query-metrics.md](../query-netdata-cloud/query-metrics.md).
 - **Single host.** For multi-node aggregation, use the Cloud
   `/data` path documented in
   [../query-netdata-cloud/query-metrics.md](../query-netdata-cloud/query-metrics.md).
