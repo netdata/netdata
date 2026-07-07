@@ -389,7 +389,119 @@ modules:
               - Verify the credentials selected by `auth.mode` are valid and not expired.
               - For `assume_role`, confirm the base identity is allowed to `sts:AssumeRole` the target role and that the role's trust policy permits it.
               - For AWS GovCloud or China partitions, ensure every region in `regions` belongs to the same partition.
-    alerts: []
+    alerts:
+      - name: cw_ec2_status_check_failed
+        metric: cloudwatch.ec2.status_check_failed
+        info: "EC2 status check failed on ${label:instance_id}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_ec2_attached_ebs_status_check_failed
+        metric: cloudwatch.ec2.status_check_failed
+        info: "EC2 attached EBS status check failed on ${label:instance_id}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_nat_gateway_port_allocation_errors
+        metric: cloudwatch.nat_gateway.errors
+        info: "NAT Gateway port allocation errors on ${label:nat_gateway_id}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_efs_io_limit_reached
+        metric: cloudwatch.efs.io_limit
+        info: "EFS I/O limit reached on ${label:file_system_id}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_efs_burst_credits_exhausted
+        metric: cloudwatch.efs.burst_credit
+        info: "EFS burst credits exhausted on ${label:file_system_id}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_ecs_cpu_utilization
+        metric: cloudwatch.ecs.utilization
+        info: "ECS service CPU utilization high on ${label:cluster_name}/${label:service_name}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_ecs_memory_utilization
+        metric: cloudwatch.ecs.utilization
+        info: "ECS service memory utilization high on ${label:cluster_name}/${label:service_name}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_ecs_ebs_filesystem_utilization
+        metric: cloudwatch.ecs.ebs_filesystem_utilization
+        info: "ECS EBS filesystem utilization high on ${label:cluster_name}/${label:service_name}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_opensearch_cluster_status_red
+        metric: cloudwatch.opensearch.cluster_status
+        info: "OpenSearch cluster red on ${label:domain_name}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_opensearch_cluster_status_yellow
+        metric: cloudwatch.opensearch.cluster_status
+        info: "OpenSearch cluster yellow on ${label:domain_name}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_opensearch_index_writes_blocked
+        metric: cloudwatch.opensearch.index_writes_blocked
+        info: "OpenSearch index writes blocked on ${label:domain_name}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_opensearch_jvm_memory_pressure
+        metric: cloudwatch.opensearch.jvm_memory_pressure
+        info: "OpenSearch JVM memory pressure high on ${label:domain_name}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_opensearch_cpu_utilization
+        metric: cloudwatch.opensearch.cpu
+        info: "OpenSearch CPU utilization high on ${label:domain_name}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_opensearch_automated_snapshot_failure
+        metric: cloudwatch.opensearch.automated_snapshot_failure
+        info: "OpenSearch automated snapshot failed on ${label:domain_name}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_opensearch_old_gen_jvm_memory_pressure
+        metric: cloudwatch.opensearch.old_gen_jvm_memory_pressure
+        info: "OpenSearch old-gen JVM memory pressure high on ${label:domain_name}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_elasticache_engine_cpu_utilization
+        metric: cloudwatch.elasticache.cpu
+        info: "ElastiCache engine CPU utilization high on ${label:cache_cluster_id}/${label:cache_node_id}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_msk_cpu_utilization
+        metric: cloudwatch.msk.cpu
+        info: "MSK broker CPU utilization high on ${label:cluster_name}/${label:broker_id}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_msk_data_logs_disk_used
+        metric: cloudwatch.msk.disk_used
+        info: "MSK broker data-log disk utilization high on ${label:cluster_name}/${label:broker_id}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_msk_heap_memory_after_gc
+        metric: cloudwatch.msk.heap_memory_after_gc
+        info: "MSK broker heap memory after GC high on ${label:cluster_name}/${label:broker_id}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_rds_replica_lag
+        metric: cloudwatch.rds.replica_lag
+        info: "RDS replica lag high on ${label:db_instance_identifier}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_rds_maximum_used_transaction_ids
+        metric: cloudwatch.rds.maximum_used_transaction_ids
+        info: "RDS transaction ID usage high on ${label:db_instance_identifier}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_rds_ebs_byte_balance
+        metric: cloudwatch.rds.ebs_balance
+        info: "RDS EBS byte balance low on ${label:db_instance_identifier}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_rds_ebs_io_balance
+        metric: cloudwatch.rds.ebs_balance
+        info: "RDS EBS I/O balance low on ${label:db_instance_identifier}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_vpn_tunnel_down
+        metric: cloudwatch.vpn.tunnel_state
+        info: "VPN tunnel down on ${label:vpn_id}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_sns_invalid_notification_attributes
+        metric: cloudwatch.sns.invalid_notifications
+        info: "SNS invalid notification attributes on ${label:topic_name}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_sns_invalid_notification_body
+        metric: cloudwatch.sns.invalid_notifications
+        info: "SNS invalid notification message body on ${label:topic_name}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_sns_notifications_redriven_to_dlq
+        metric: cloudwatch.sns.dlq_redrive
+        info: "SNS notifications redriven to DLQ on ${label:topic_name}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
+      - name: cw_sns_notifications_failed_to_redrive_to_dlq
+        metric: cloudwatch.sns.dlq_redrive
+        info: "SNS notifications failed to redrive to DLQ on ${label:topic_name}"
+        link: https://github.com/netdata/netdata/blob/master/src/health/health.d/cloudwatch.conf
     metrics:
       folding:
         title: Metrics
@@ -409,8 +521,8 @@ modules:
 
         | Profile | Metric prefix | Description |
         |:--------|:--------------|:------------|
-        | [Amazon EC2](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/ec2.yaml) | `cloudwatch.ec2.*` | CPU utilization, network traffic, disk operations, status-check failures |
-        | [Amazon RDS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/rds.yaml) | `cloudwatch.rds.*` | CPU utilization, database connections, freeable memory, free storage space, disk throughput, IOPS, latency |
+        | [Amazon EC2](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/ec2.yaml) | `cloudwatch.ec2.*` | CPU utilization, network traffic, disk operations, status-check failures, attached-EBS status-check failures |
+        | [Amazon RDS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/rds.yaml) | `cloudwatch.rds.*` | CPU utilization, database connections, freeable memory, free storage space, disk throughput, IOPS, latency, replica lag, PostgreSQL transaction ID usage, EBS credit balance |
         | [Classic Load Balancer (ELB)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/elb.yaml) | `cloudwatch.elb.*` | request count, backend and load-balancer response codes, backend connection errors, latency, host count, spillover count |
         | [Application Load Balancer (ALB)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/alb.yaml) | `cloudwatch.alb.*` | request count, target and load-balancer response codes, connection rate, active connections, processed traffic, target response time, consumed LCUs |
         | [Network Load Balancer (NLB)](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/nlb.yaml) | `cloudwatch.nlb.*` | active and new flow counts, processed bytes and packets, consumed LCUs, TCP resets |
@@ -423,15 +535,15 @@ modules:
         | [NAT Gateway](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/nat_gateway.yaml) | `cloudwatch.nat_gateway.*` | traffic, active connections, connection rate, errors, idle timeouts |
         | [Amazon Kinesis Data Streams](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/kinesis.yaml) | `cloudwatch.kinesis.*` | data throughput, records, GetRecords iterator age, operation latency, throughput exceeded, PutRecords rejected |
         | [Amazon Data Firehose](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/firehose.yaml) | `cloudwatch.firehose.*` | records, throughput, put requests, throttled records, S3 delivery freshness and success |
-        | [Amazon SNS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/sns.yaml) | `cloudwatch.sns.*` | messages published, notifications, published message size |
+        | [Amazon SNS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/sns.yaml) | `cloudwatch.sns.*` | messages published, notifications, invalid notification filters, DLQ redrive, published message size |
         | [Amazon EBS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/ebs.yaml) | `cloudwatch.ebs.*` | volume throughput, IOPS, queue length, idle time, burst balance |
         | [Amazon EFS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/efs.yaml) | `cloudwatch.efs.*` | I/O throughput, metered vs permitted throughput, percent I/O limit, burst credit balance, client connections |
         | [Amazon ECS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/ecs.yaml) | `cloudwatch.ecs.*` | service utilization, EBS filesystem utilization, live task count |
         | [Amazon ElastiCache](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/elasticache.yaml) | `cloudwatch.elasticache.*` | CPU utilization, memory, database memory usage, current and new connections, cache hits and misses, evictions, network traffic |
-        | [Amazon OpenSearch Service](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/opensearch.yaml) | `cloudwatch.opensearch.*` | cluster status, index writes blocked, nodes, CPU utilization, JVM memory pressure, free storage space, search and indexing rate, search and indexing latency |
+        | [Amazon OpenSearch Service](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/opensearch.yaml) | `cloudwatch.opensearch.*` | cluster status, index writes blocked, automated snapshot failures, nodes, CPU utilization, JVM memory pressure, old-gen JVM memory pressure, free storage space, search and indexing rate, search and indexing latency |
         | [Amazon DocumentDB](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/docdb.yaml) | `cloudwatch.docdb.*` | CPU utilization, freeable memory, connections, buffer cache hit ratio, disk IOPS, latency, throughput, replica lag, cursors timed out |
         | [Amazon Redshift](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/redshift.yaml) | `cloudwatch.redshift.*` | health, CPU utilization, disk space used, database connections, disk IOPS, throughput, network throughput |
-        | [Amazon MSK](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/msk.yaml) | `cloudwatch.msk.*` | broker throughput, messages in, CPU, disk used, memory, partitions, connections |
+        | [Amazon MSK](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/msk.yaml) | `cloudwatch.msk.*` | broker throughput, messages in, CPU, disk used, memory, heap memory after GC, partitions, connections |
         | [Amazon CloudFront](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/cloudfront.yaml) | `cloudwatch.cloudfront.*` | requests, downloaded and uploaded traffic, total/4xx/5xx error rates |
         | [AWS Auto Scaling](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/auto_scaling.yaml) | `cloudwatch.auto_scaling.*` | group sizing (min/max/desired/total) and instances by state (in-service, pending, standby, terminating) |
         | [Amazon Bedrock](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/bedrock.yaml) | `cloudwatch.bedrock.*` | invocations, invocation errors, token throughput, invocation and time-to-first-token latency |
