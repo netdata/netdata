@@ -184,7 +184,7 @@ To force-remove a Stale node:
 netdatacli remove-stale-node <node-id | hostname | ALL_NODES>
 ```
 
-This sends an offline signal to Cloud. The node transitions to Offline and becomes eligible for cleanup (or immediate UI deletion).
+This marks the node as ephemeral and removes it from queries on both this Agent dashboard and Netdata Cloud — it does not transition to Offline status. The node typically disappears from the Cloud dashboard within 1-2 minutes as Cloud processes the update and the UI refreshes.
 
 See [Remove Node](/docs/learn/remove-node.md) for detailed instructions.
 

@@ -113,7 +113,7 @@ If a node is represented by multiple Parent Agents in an HA setup, this command 
 
 :::
 
-**What happens next**: On the **Parent Agent**, the node is removed immediately and disappears from the Parent dashboard. On **Netdata Cloud**, the node transitions to **Offline** within 1-2 minutes. Once Offline, the node is no longer queryable and becomes eligible for cleanup — child nodes are removed automatically after 48 hours, or you can delete them immediately from **Space Settings > Nodes**. See [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md) for details on cleanup timing.
+**What happens next**: The node is marked as ephemeral and fully removed — it is no longer available for queries on either the **Parent Agent** dashboard or **Netdata Cloud**, and it does **not** transition to Offline status. On the Parent Agent, the node disappears immediately. On Netdata Cloud, the node typically disappears within 1-2 minutes as Cloud processes the update and the UI refreshes. See [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md) for details on node states.
 
 </details>
 
