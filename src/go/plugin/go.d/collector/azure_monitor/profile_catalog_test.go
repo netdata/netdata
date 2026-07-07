@@ -419,6 +419,7 @@ template:
 		{Path: stockDir, IsStock: true},
 	})
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), filepath.Join(stockDir, "sql_database.yaml"))
 	assert.Contains(t, err.Error(), "template")
 	assert.Contains(t, err.Error(), "missing_average")
 }

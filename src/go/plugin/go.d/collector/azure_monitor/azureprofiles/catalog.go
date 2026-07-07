@@ -59,7 +59,7 @@ func LoadFromDefaultDirs() (Catalog, error) {
 func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 	core, err := profilecatalog.Load(specs, profilecatalog.Options[Profile]{
 		Decode: func(ctx profilecatalog.FileContext, data []byte) (Profile, error) {
-			return decodeProfile(data, ctx.BaseName)
+			return decodeProfile(ctx, data)
 		},
 		Log: log,
 	})
@@ -77,18 +77,24 @@ func LoadFromDirs(specs []DirSpec) (Catalog, error) {
 // decodeProfile decodes, normalizes, and validates one profile. The decoder is
 // non-strict (unknown keys are ignored), so an older collector tolerates
 // profiles that carry newer optional fields.
-func decodeProfile(data []byte, baseName string) (Profile, error) {
+func decodeProfile(ctx profilecatalog.FileContext, data []byte) (Profile, error) {
+	baseName := ctx.BaseName
+	path := strings.TrimSpace(ctx.Path)
+	if path == "" {
+		path = baseName
+	}
+
 	var cfg Profile
 	dec := yaml.NewDecoder(bytes.NewReader(data))
 	if err := dec.Decode(&cfg); err != nil {
-		return Profile{}, fmt.Errorf("unmarshal profile %q: %w", baseName, err)
+		return Profile{}, fmt.Errorf("unmarshal profile %q: %w", path, err)
 	}
 
 	if err := cfg.Normalize(baseName); err != nil {
-		return Profile{}, fmt.Errorf("normalize profile %q: %w", baseName, err)
+		return Profile{}, fmt.Errorf("normalize profile %q: %w", path, err)
 	}
 	if err := cfg.Validate(fmt.Sprintf("profile %q", baseName), baseName); err != nil {
-		return Profile{}, fmt.Errorf("validate profile %q: %w", baseName, err)
+		return Profile{}, fmt.Errorf("validate profile %q: %w", path, err)
 	}
 
 	return cfg, nil

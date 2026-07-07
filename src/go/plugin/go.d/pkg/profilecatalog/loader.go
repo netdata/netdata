@@ -102,6 +102,7 @@ func Load[P any](specs []DirSpec, opts Options[P]) (Catalog[P], error) {
 		normalize = func(s string) string { return s }
 	}
 	validName := opts.ValidName
+	usesDefaultValidName := validName == nil
 	if validName == nil {
 		validName = DefaultValidName
 	}
@@ -144,7 +145,11 @@ func Load[P any](specs []DirSpec, opts Options[P]) (Catalog[P], error) {
 
 			baseName := strings.TrimSuffix(name, filepath.Ext(name))
 			if !validName(baseName) {
-				return handleLoadError(spec, log, path, fmt.Errorf("profile %q: basename %q must match %s", path, baseName, reValidName.String()))
+				err := fmt.Errorf("profile %q: invalid basename %q", path, baseName)
+				if usesDefaultValidName {
+					err = fmt.Errorf("profile %q: basename %q must match %s", path, baseName, reValidName.String())
+				}
+				return handleLoadError(spec, log, path, err)
 			}
 
 			data, err := os.ReadFile(path)

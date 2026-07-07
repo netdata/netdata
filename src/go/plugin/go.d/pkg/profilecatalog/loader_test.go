@@ -203,7 +203,9 @@ func TestLoad(t *testing.T) {
 			}
 			require.NoError(t, err)
 
-			assert.ElementsMatch(t, tc.wantInOrder, names(cat.InOrder()))
+			if tc.wantInOrder != nil {
+				assert.Equal(t, tc.wantInOrder, names(cat.InOrder()))
+			}
 
 			for base, want := range tc.wantContent {
 				got, ok := cat.Get(base)
@@ -272,7 +274,9 @@ func TestLoad_customValidName(t *testing.T) {
 		Decode:    decodeTest,
 		ValidName: func(string) bool { return false },
 	})
-	assert.Error(t, err)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), `invalid basename "app"`)
+	assert.NotContains(t, err.Error(), reValidName.String())
 }
 
 func TestDefaultValidName(t *testing.T) {
