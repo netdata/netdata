@@ -5,7 +5,7 @@
 #if defined(OS_WINDOWS)
 long netdata_registry_get_dword_from_open_key(unsigned int *out, void *lKey, char *name)
 {
-    DWORD length = 260;
+    DWORD length = sizeof(*out);
     return RegQueryValueEx(lKey, name, NULL, NULL, (LPBYTE) out, &length);
 }
 

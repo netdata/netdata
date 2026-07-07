@@ -130,6 +130,9 @@ size_t os_read_cpuset_cpus(const char *filename, size_t system_cpus) {
             if(*s == '-') {
                 s++;
                 unsigned long m = cpuset_str2ul(&s);
+                if(unlikely(m < n))
+                    return 0;
+
                 ncpus += m - n; // calculate the number of cpus in the region
             }
             s++;
