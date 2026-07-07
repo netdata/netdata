@@ -948,7 +948,7 @@ mqtt_msg_data mqtt_ng_generate_connect(
     ret = frag;
 
     // MQTT Fixed Header
-    size_t needed_bytes = 1 /* Packet type */ + MQTT_VARSIZE_INT_BYTES(size) + sizeof(mqtt_protocol_name_frag) + 1 /* CONNECT FLAGS */ + 2 /* keepalive */ + 1 /* Properties TODO now fixed 0*/;
+    size_t needed_bytes = 1 /* Packet type */ + MQTT_VARSIZE_INT_BYTES(size) + sizeof(mqtt_protocol_name_frag) + 1 /* CONNECT FLAGS */ + 2 /* keepalive */ + 4 /* Properties TODO now fixed to Topic Alias Maximum */;
     CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, needed_bytes, goto fail_rollback)
 
     *WRITE_POS(frag) = MQTT_CPT_CONNECT << 4;
