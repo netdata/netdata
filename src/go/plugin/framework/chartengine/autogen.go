@@ -288,7 +288,7 @@ func buildHistogramBucketAutogenRoute(
 	return autogenRoute{
 		chartID:           chartID,
 		chartName:         baseName,
-		dimensionName:     "bucket_" + upperBound,
+		dimensionName:     upperBound,
 		dimensionKeyLabel: metrix.HistogramBucketLabel,
 		algorithm:         program.AlgorithmIncremental,
 		units:             "observations/s",
