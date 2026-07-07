@@ -76,7 +76,6 @@ static BUFFER *argv_to_windows(const char **argv) {
         return NULL;
 #else
     CLEAN_CHAR_P *translated_argv0 = os_translate_msys_to_windows_path(argv[0]);
-    size_t b_size = strlen(translated_argv0) + 1;
     CLEAN_CHAR_P *b = strdupz(translated_argv0);
 #endif
 

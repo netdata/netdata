@@ -584,6 +584,8 @@ bool nd_log_init_windows(void) {
     nd_win_trace("nd_log_init_windows: done initialized=true etw=%d; "
                  "events go to Netdata/{Daemon,Collectors,Access,Health,Aclk}",
                  (int)nd_log.eventlog.etw);
+
+    wel_queue_init();
     return true;
 }
 
@@ -616,12 +618,6 @@ static struct {
     wchar_t *buf;
 } fields_buffers[_NDF_MAX] = { 0 };
 
-#if defined(HAVE_ETW)
-static EVENT_DATA_DESCRIPTOR etw_eventData[_NDF_MAX - 1];
-#endif
-
-static LPCWSTR wel_messages[_NDF_MAX - 1];
-
 __attribute__((constructor)) void wevents_initialize_buffers(void) {
     for(size_t i = 0; i < _NDF_MAX ;i++) {
         fields_buffers[i].buf = small_wide_buffers[i];
@@ -635,9 +631,172 @@ __attribute__((constructor)) void wevents_initialize_buffers(void) {
     fields_buffers[NDF_REQUEST].size = BIG_WIDE_BUFFERS_SIZE;
     fields_buffers[NDF_MESSAGE].buf = big_wide_buffers[1];
     fields_buffers[NDF_MESSAGE].size = BIG_WIDE_BUFFERS_SIZE;
+}
 
-    for(size_t i = 1; i < _NDF_MAX ;i++)
-        wel_messages[i - 1] = fields_buffers[i].buf;
+// ----------------------------------------------------------------------------
+// Async WEL/ETW writer — decouples producers from ReportEventW/EventWrite
+//
+// The global wchar buffers (small/medium/big) are shared state. The old design held a
+// single spinlock across BOTH field generation AND ReportEventW; if ReportEventW blocked
+// (e.g. a crashed prior run left the WEL channel in bad state) every logging thread spun
+// indefinitely, blocking the main thread and the shutdown cleanup thread.
+//
+// New design:
+//   - wel_queue.mutex replaces the spinlock and covers only field generation + enqueue.
+//   - A single background thread (wel_async_writer) dequeues entries and calls ReportEventW.
+//   - If ReportEventW blocks, only the background thread stalls; producers enqueue and return.
+//   - When the queue is full the entry is dropped and the caller falls back to stderr.
+
+#define WEL_QUEUE_DEPTH 8
+
+struct wel_queue_entry {
+    HANDLE          hEventLog;
+    WORD            wType;
+    DWORD           eventID;
+    ND_LOG_SOURCES  source_id;
+    bool            is_etw;
+#if defined(HAVE_ETW)
+    USHORT          channelID;
+    UCHAR           level;
+    UCHAR           opcode;
+    USHORT          task;
+    ULONGLONG       keyword;
+#endif
+    // Snapshots of the three global wchar buffer pools (copied under wel_queue.mutex)
+    wchar_t small[_NDF_MAX][SMALL_WIDE_BUFFERS_SIZE];
+    wchar_t medium[2][MEDIUM_WIDE_BUFFERS_SIZE];
+    wchar_t big[2][BIG_WIDE_BUFFERS_SIZE];
+};
+
+static struct {
+    struct wel_queue_entry  slots[WEL_QUEUE_DEPTH];
+    size_t                  head, tail, count;
+    bool                    stopped;
+    uint64_t                dropped;
+    netdata_mutex_t         mutex;
+    netdata_cond_t          not_empty;
+    HANDLE                  drain_ack;  // auto-reset; consumer sets it on exit
+    ND_THREAD              *thread;
+    bool                    initialized;
+} wel_queue;
+
+// Mirror the fields_buffers[] layout: return the right buffer from a queue entry.
+static inline const wchar_t *wel_entry_field(const struct wel_queue_entry *e, size_t i) {
+    if(i == NDF_NIDL_INSTANCE) return e->medium[0];
+    if(i == NDF_REQUEST)       return e->big[0];
+    if(i == NDF_MESSAGE)       return e->big[1];
+    return e->small[i];
+}
+
+static void wel_entry_process(struct wel_queue_entry *e) {
+    BOOL rc;
+
+#if defined(HAVE_ETW)
+    if(e->is_etw) {
+        EVENT_DATA_DESCRIPTOR desc[_NDF_MAX - 1];
+        for(size_t i = 1; i < _NDF_MAX; i++) {
+            const wchar_t *buf = wel_entry_field(e, i);
+            EventDataDescCreate(&desc[i - 1], buf, (wcslen(buf) + 1) * sizeof(WCHAR));
+        }
+        EVENT_DESCRIPTOR ed = {
+            .Id      = e->eventID & EVENT_ID_CODE_MASK,
+            .Version = 0,
+            .Channel = (UCHAR)e->channelID,
+            .Level   = e->level,
+            .Opcode  = e->opcode,
+            .Task    = e->task,
+            .Keyword = e->keyword,
+        };
+        rc = ERROR_SUCCESS == EventWrite(regHandle, &ed, _NDF_MAX - 1, desc);
+    }
+    else
+#endif
+    {
+        LPCWSTR msgs[_NDF_MAX - 1];
+        for(size_t i = 1; i < _NDF_MAX; i++)
+            msgs[i - 1] = wel_entry_field(e, i);
+        rc = ReportEventW(e->hEventLog, e->wType, 0, e->eventID, NULL, _NDF_MAX - 1, 0, msgs, NULL);
+    }
+
+    if(!rc) {
+        static bool first_failure[_NDLS_MAX];
+        if(e->source_id < _NDLS_MAX &&
+           !__atomic_exchange_n(&first_failure[e->source_id], true, __ATOMIC_RELAXED)) {
+            DWORD err = GetLastError();
+            nd_win_trace("wel_async[%s]: write FAILED err=%lu eventID=0x%lx",
+                         nd_log_id2source(e->source_id),
+                         (unsigned long)err, (unsigned long)e->eventID);
+        }
+    } else {
+        static bool first_success[_NDLS_MAX];
+        if(e->source_id < _NDLS_MAX &&
+           !__atomic_exchange_n(&first_success[e->source_id], true, __ATOMIC_RELAXED)) {
+            nd_win_trace("wel_async[%s]: write ok eventID=0x%lx",
+                         nd_log_id2source(e->source_id), (unsigned long)e->eventID);
+        }
+    }
+}
+
+static void wel_async_writer(void *arg __maybe_unused) {
+    nd_win_trace("wel_async_writer: started depth=%d", WEL_QUEUE_DEPTH);
+
+    for(;;) {
+        netdata_mutex_lock(&wel_queue.mutex);
+
+        while(wel_queue.count == 0 && !wel_queue.stopped)
+            netdata_cond_wait(&wel_queue.not_empty, &wel_queue.mutex);
+
+        if(wel_queue.count == 0) {
+            // stopped and queue drained
+            netdata_mutex_unlock(&wel_queue.mutex);
+            break;
+        }
+
+        // Snapshot head without advancing. count stays > 0, so producers cannot
+        // wrap tail back to this slot while we process it outside the mutex.
+        size_t idx = wel_queue.head;
+        netdata_mutex_unlock(&wel_queue.mutex);
+
+        // ReportEventW/EventWrite may block here — no lock held, producers unaffected
+        wel_entry_process(&wel_queue.slots[idx]);
+
+        // Release the slot
+        netdata_mutex_lock(&wel_queue.mutex);
+        wel_queue.head = (wel_queue.head + 1) % WEL_QUEUE_DEPTH;
+        wel_queue.count--;
+        netdata_mutex_unlock(&wel_queue.mutex);
+    }
+
+    nd_win_trace("wel_async_writer: exiting (dropped total=%" PRIu64 ")", wel_queue.dropped);
+    if(wel_queue.drain_ack)
+        SetEvent(wel_queue.drain_ack);
+}
+
+static void wel_queue_init(void) {
+    netdata_mutex_init(&wel_queue.mutex);
+    netdata_cond_init(&wel_queue.not_empty);
+    wel_queue.drain_ack = CreateEvent(NULL, FALSE, FALSE, NULL);
+    wel_queue.thread = nd_thread_create("WEL-ASYNC", NETDATA_THREAD_OPTION_DEFAULT,
+                                        wel_async_writer, NULL);
+    wel_queue.initialized = true;
+    nd_win_trace("wel_queue_init: async writer thread created");
+}
+
+void nd_log_stop_windows_async(void) {
+    if(!wel_queue.initialized)
+        return;
+
+    netdata_mutex_lock(&wel_queue.mutex);
+    wel_queue.stopped = true;
+    netdata_cond_signal(&wel_queue.not_empty);
+    netdata_mutex_unlock(&wel_queue.mutex);
+
+    // Wait up to 2 s for the async writer to drain remaining entries.
+    // If WEL is still blocked we time out and let the process terminate normally.
+    if(wel_queue.drain_ack)
+        WaitForSingleObject(wel_queue.drain_ack, 2000);
+
+    nd_win_trace("nd_log_stop_windows_async: done (dropped total=%" PRIu64 ")", wel_queue.dropped);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -753,12 +912,13 @@ static bool has_user_role_permissions(struct log_field *fields, size_t fields_ma
 }
 
 static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fields, size_t fields_max) {
-    if (!nd_log.eventlog.initialized)
+    if (!nd_log.eventlog.initialized || !wel_queue.initialized)
         return false;
 
-    // trace the first call from each source independently so all sources are confirmed in the log
+    // Trace first call per source before enqueue — confirms the logging path is exercised.
     static bool first_call[_NDLS_MAX];
-    if(source->source < _NDLS_MAX && !__atomic_exchange_n(&first_call[source->source], true, __ATOMIC_RELAXED))
+    if(source->source < _NDLS_MAX &&
+       !__atomic_exchange_n(&first_call[source->source], true, __ATOMIC_RELAXED))
         nd_win_trace("nd_logger_windows: first call source=%s", nd_log_id2source(source->source));
 
     ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
@@ -766,12 +926,14 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
         priority = (ND_LOG_FIELD_PRIORITY) fields[NDF_PRIORITY].entry.u64;
 
     DWORD wType = get_event_type_from_priority(priority);
-    (void) wType;
-
     CLEAN_BUFFER *tmp = NULL;
 
-    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
-    spinlock_lock(&spinlock);
+    // wel_queue.mutex replaces the old spinlock:
+    //   - protects field generation into the shared global wchar buffers
+    //   - protects queue head/tail/count while we claim a slot
+    //   - does NOT cover ReportEventW (that runs in the async writer thread)
+    netdata_mutex_lock(&wel_queue.mutex);
+
     wevt_generate_all_fields_unsafe(fields, fields_max, &tmp);
 
     MESSAGE_ID messageID;
@@ -824,70 +986,47 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
 
     DWORD eventID = construct_event_id(source->source, priority, messageID);
 
-    // wType
-    //
-    // without a manifest => this determines the Level of the event
-    // with a manifest    => Level from the manifest is used (wType ignored)
-    //                       [however it is good to have, in case the manifest is not accessible somehow]
-    //
+    bool enqueued = false;
+    if(wel_queue.count < WEL_QUEUE_DEPTH) {
+        struct wel_queue_entry *e = &wel_queue.slots[wel_queue.tail];
+        wel_queue.tail = (wel_queue.tail + 1) % WEL_QUEUE_DEPTH;
+        wel_queue.count++;
+        enqueued = true;
 
-    // wCategory
-    //
-    // without a manifest => numeric Task values appear
-    // with a manifest    => Task from the manifest is used (wCategory ignored)
-
-    BOOL rc;
+        e->hEventLog  = source->hEventLog;
+        e->wType      = wType;
+        e->eventID    = eventID;
+        e->source_id  = source->source;
+        e->is_etw     = nd_log.eventlog.etw;
 #if defined(HAVE_ETW)
-    if (nd_log.eventlog.etw) {
-        // metadata based logging - ETW
-
-        for (size_t i = 1; i < _NDF_MAX; i++)
-            EventDataDescCreate(&etw_eventData[i - 1], fields_buffers[i].buf,
-                                (wcslen(fields_buffers[i].buf) + 1) * sizeof(WCHAR));
-
-        EVENT_DESCRIPTOR EventDesc = {
-                .Id = eventID & EVENT_ID_CODE_MASK, // ETW needs the raw event id
-                .Version = 0,
-                .Channel = source->channelID,
-                .Level = get_level_from_priority(priority),
-                .Opcode = source->Opcode,
-                .Task = source->Task,
-                .Keyword = source->Keyword,
-        };
-
-        rc = ERROR_SUCCESS == EventWrite(regHandle, &EventDesc, _NDF_MAX - 1, etw_eventData);
-
-    }
-    else
+        e->channelID  = source->channelID;
+        e->level      = get_level_from_priority(priority);
+        e->opcode     = source->Opcode;
+        e->task       = source->Task;
+        e->keyword    = source->Keyword;
 #endif
-    {
-        // eventID based logging - WEL
-        rc = ReportEventW(source->hEventLog, wType, 0, eventID, NULL, _NDF_MAX - 1, 0, wel_messages, NULL);
-        if(!rc) {
-            // trace only the first failure per source — persistent failure would otherwise
-            // emit a trace line on every log call, causing unbounded trace-file growth
-            static bool first_failure[_NDLS_MAX];
-            if(source->source < _NDLS_MAX && !__atomic_exchange_n(&first_failure[source->source], true, __ATOMIC_RELAXED)) {
-                DWORD err = GetLastError();
-                nd_win_trace("nd_logger_windows[%s]: ReportEventW FAILED err=%lu eventID=0x%lx",
-                             nd_log_id2source(source->source), (unsigned long)err, (unsigned long)eventID);
-            }
-        }
-        else {
-            // trace the first successful write per source so the log confirms events reach WEL
-            static bool first_success[_NDLS_MAX];
-            if(source->source < _NDLS_MAX && !__atomic_exchange_n(&first_success[source->source], true, __ATOMIC_RELAXED)) {
-                const wchar_t *wch = wel_channel_per_source[source->source];
-                nd_win_trace("nd_logger_windows[%s]: ReportEventW ok eventID=0x%lx -> channel=%ls",
-                             nd_log_id2source(source->source), (unsigned long)eventID,
-                             wch ? wch : NETDATA_WEL_CHANNEL_DAEMON_W);
-            }
-        }
+        // Snapshot the global buffers into the queue slot before releasing the mutex.
+        memcpy(e->small,  small_wide_buffers,  sizeof(small_wide_buffers));
+        memcpy(e->medium, medium_wide_buffers, sizeof(medium_wide_buffers));
+        memcpy(e->big,    big_wide_buffers,    sizeof(big_wide_buffers));
+
+        netdata_cond_signal(&wel_queue.not_empty);
+    } else {
+        wel_queue.dropped++;
     }
 
-    spinlock_unlock(&spinlock);
+    netdata_mutex_unlock(&wel_queue.mutex);
 
-    return rc == TRUE;
+    if(!enqueued) {
+        // Only trace the first drop — the caller falls back to stderr for this entry.
+        static bool first_drop = false;
+        if(!__atomic_exchange_n(&first_drop, true, __ATOMIC_RELAXED))
+            nd_win_trace("nd_logger_windows: WEL queue full (depth=%d), dropping entries; "
+                         "async writer may be blocked in ReportEventW",
+                         WEL_QUEUE_DEPTH);
+    }
+
+    return enqueued;
 }
 
 #if defined(HAVE_ETW)
