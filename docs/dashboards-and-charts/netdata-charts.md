@@ -69,7 +69,23 @@ A **context** groups charts by metric type and displayed dimensions. Contexts de
 - `apps.cpu` for **Apps CPU Time**
 - `apps.mem` for **Apps Real Memory**
 
-The part before the dot (`.`) is the **type**, while the part after is defined by the chart’s developer or its family.
+The part before the dot (`.`) is the **type**, while the part after is defined by the chart’s developer or its family. The **type** identifies which category of metrics a chart belongs to.
+
+A few common chart types you will see on a node:
+
+| Type     | What it covers                                              | Examples                                |
+|----------|-------------------------------------------------------------|-----------------------------------------|
+| `system` | Host system resources of the node                           | `system.cpu`, `system.ram`, `system.net`|
+| `netdata`| The Netdata Agent’s own runtime and self-monitoring         | `netdata.memory`, `netdata.clients`, `netdata.aclk_status` |
+| `apps`   | Per-application resource usage                              | `apps.cpu`, `apps.mem`                  |
+| `disk`   | Physical and logical disks                                  | `disk.io`, `disk.util`                  |
+| `net`    | Per-network-interface traffic                               | `net.eth0`, `net_packets.eth0`          |
+
+:::note
+
+`netdata.*` charts monitor the Netdata Agent **itself** — the CPU, memory, DB engine, API/web clients, and Cloud connectivity the Agent uses while collecting, storing, and serving metrics. They are **not** network traffic. Actual traffic flowing through the node’s network interfaces appears under `system.net` (aggregated bandwidth across all interfaces) and the per-interface `net` and `net_packets` charts.
+
+:::
 
 Contexts are also used for alert configurations.
 
