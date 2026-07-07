@@ -6,12 +6,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io/fs"
-	"maps"
-	"os"
 	"path/filepath"
 	"runtime"
-	"slices"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -19,37 +15,23 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/executable"
 	"github.com/netdata/netdata/go/plugins/pkg/pluginconfig"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
 )
 
 const profilesDirName = "cloudwatch.profiles"
 
 var log = logger.New().With("component", "cloudwatch/cwprofiles")
 
-// Catalog holds the loaded profiles keyed by basename. Stock profiles are
-// tracked separately so auto-mode can default to the stock set.
+// Catalog wraps the shared profile catalog with CloudWatch-specific queries.
+// Stock/user tracking and lookups come from the embedded shared catalog.
 type Catalog struct {
-	byBaseName            map[string]Profile
-	stockProfileBaseNames map[string]struct{}
-	entryIsStock          map[string]bool // effective origin per basename (a user override of a stock profile is NOT stock)
+	profilecatalog.Catalog[Profile]
 }
 
 // ResolvedProfile pairs a profile with its basename (the series-name prefix).
 type ResolvedProfile struct {
 	Name   string
 	Config Profile
-}
-
-type catalogEntry struct {
-	Config   Profile
-	Path     string
-	BaseName string
-	IsStock  bool
-}
-
-// DirSpec is one profile search directory.
-type DirSpec struct {
-	Path    string
-	IsStock bool
 }
 
 // LoadFromDefaultDirs loads stock profiles plus any user overrides from the
@@ -60,116 +42,37 @@ func LoadFromDefaultDirs() (Catalog, error) {
 		return Catalog{}, errors.New("no profile search directories configured")
 	}
 
-	catalog, err := LoadFromDirs(specs)
+	cat, err := loadFromDirs(specs)
 	if err != nil {
 		return Catalog{}, err
 	}
-	if len(catalog.stockProfileBaseNames) == 0 {
+	if len(cat.StockNames()) == 0 {
 		return Catalog{}, fmt.Errorf("no stock profiles found under %q", filepath.Join(pluginconfig.CollectorsStockDir(), profilesDirName, "default"))
 	}
-	return catalog, nil
+	return cat, nil
 }
 
-// LoadFromDirs loads profiles from the given directories. A user profile
-// overrides a stock profile with the same basename. Invalid stock profiles are
-// fatal; invalid user profiles are logged and skipped.
-func LoadFromDirs(specs []DirSpec) (Catalog, error) {
-	catalog := Catalog{
-		byBaseName:            make(map[string]Profile),
-		stockProfileBaseNames: make(map[string]struct{}),
-		entryIsStock:          make(map[string]bool),
-	}
-	seen := make(map[string]catalogEntry)
-
-	for _, spec := range specs {
-		if strings.TrimSpace(spec.Path) == "" {
-			continue
-		}
-		if !isDirExists(spec.Path) {
-			if spec.IsStock {
-				return Catalog{}, fmt.Errorf("stock profiles directory does not exist: %s", spec.Path)
-			}
-			continue
-		}
-
-		err := filepath.WalkDir(spec.Path, func(path string, d fs.DirEntry, err error) error {
-			if err != nil {
-				return handleProfileLoadError(spec, path, err)
-			}
-			if d.IsDir() {
-				return nil
-			}
-
-			name := d.Name()
-			ext := strings.ToLower(filepath.Ext(name))
-			if ext != ".yaml" && ext != ".yml" {
-				return nil
-			}
-			if strings.HasPrefix(name, "_") {
-				return nil
-			}
-
-			baseName := strings.TrimSpace(profileBaseName(path))
-			if !IsValidProfileName(baseName) {
-				return handleProfileLoadError(spec, path, fmt.Errorf("profile %q: basename must match %q", path, reIdentityID.String()))
-			}
-
-			cfg, err := loadProfileFile(path, baseName)
-			if err != nil {
-				return handleProfileLoadError(spec, path, err)
-			}
-			if spec.IsStock {
-				catalog.stockProfileBaseNames[baseName] = struct{}{}
-			}
-
-			prev, exists := seen[baseName]
-			if !exists {
-				seen[baseName] = catalogEntry{Config: cfg, Path: path, BaseName: baseName, IsStock: spec.IsStock}
-				return nil
-			}
-
-			switch {
-			case prev.IsStock == spec.IsStock:
-				if !spec.IsStock {
-					log.Warningf("ignoring duplicate user profile basename %q in %q; already loaded from %q", baseName, path, prev.Path)
-					return nil
-				}
-				return fmt.Errorf("duplicate stock profile basename %q in %q and %q", baseName, prev.Path, path)
-			case prev.IsStock && !spec.IsStock:
-				seen[baseName] = catalogEntry{Config: cfg, Path: path, BaseName: baseName, IsStock: false}
-			case !prev.IsStock && spec.IsStock:
-				// User overrides stock. Keep the existing user profile.
-			}
-
-			return nil
-		})
-		if err != nil {
-			return Catalog{}, err
-		}
-	}
-
-	if len(seen) == 0 {
-		return Catalog{}, errors.New("no CloudWatch profiles were loaded")
-	}
-
-	for baseName, entry := range seen {
-		catalog.byBaseName[baseName] = entry.Config
-		catalog.entryIsStock[baseName] = entry.IsStock
-	}
-
-	if err := catalog.validateUniqueChartIDs(); err != nil {
+// loadFromDirs loads profiles from the given directories via the shared loader,
+// then enforces the CloudWatch-specific cross-profile chart-id uniqueness rule.
+func loadFromDirs(specs []profilecatalog.DirSpec) (Catalog, error) {
+	core, err := profilecatalog.Load(specs, profilecatalog.Options[Profile]{
+		Decode: func(ctx profilecatalog.FileContext, data []byte) (Profile, error) {
+			return decodeProfileBytes(data, ctx.BaseName)
+		},
+		Log: log,
+	})
+	if err != nil {
 		return Catalog{}, err
 	}
 
-	return catalog, nil
-}
-
-func loadProfileFile(path, baseName string) (Profile, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return Profile{}, err
+	cat := Catalog{Catalog: core}
+	if cat.Empty() {
+		return Catalog{}, errors.New("no CloudWatch profiles were loaded")
 	}
-	return decodeProfileBytes(data, baseName)
+	if err := validateUniqueChartIDs(cat.Sorted(), cat.EffectiveIsStock); err != nil {
+		return Catalog{}, err
+	}
+	return cat, nil
 }
 
 // decodeProfileBytes decodes, normalizes, and validates one profile. It is the
@@ -193,26 +96,19 @@ func decodeProfileBytes(data []byte, baseName string) (Profile, error) {
 	return cfg, nil
 }
 
-func handleProfileLoadError(spec DirSpec, path string, err error) error {
-	if spec.IsStock {
-		return err
-	}
-	log.Warningf("ignoring invalid user profile %q: %v", path, err)
-	return nil
-}
-
 // AllProfiles returns every loaded profile (stock + user), sorted by basename.
 // This is the candidate set for profiles.mode=auto.
 func (c Catalog) AllProfiles() []ResolvedProfile {
-	out := make([]ResolvedProfile, 0, len(c.byBaseName))
-	for _, name := range c.sortedBaseNames() {
-		out = append(out, ResolvedProfile{Name: name, Config: c.byBaseName[name]})
+	named := c.Sorted()
+	out := make([]ResolvedProfile, 0, len(named))
+	for _, n := range named {
+		out = append(out, ResolvedProfile{Name: n.Name, Config: n.Profile})
 	}
 	return out
 }
 
-// ProfilesByBaseNames returns the loaded profiles whose basename matches any of the
-// given basenames, sorted by basename. It is the candidate set for
+// ProfilesByBaseNames returns the loaded profiles whose basename matches any of
+// the given basenames, sorted by basename. It is the candidate set for
 // profiles.mode=exact and returns matching profiles regardless of their
 // default-enabled/disabled flag, so a deep-grain profile can be selected by name.
 func (c Catalog) ProfilesByBaseNames(names []string) []ResolvedProfile {
@@ -227,16 +123,12 @@ func (c Catalog) ProfilesByBaseNames(names []string) []ResolvedProfile {
 	}
 
 	var out []ResolvedProfile
-	for _, name := range c.sortedBaseNames() {
-		if _, ok := want[name]; ok {
-			out = append(out, ResolvedProfile{Name: name, Config: c.byBaseName[name]})
+	for _, n := range c.Sorted() {
+		if _, ok := want[n.Name]; ok {
+			out = append(out, ResolvedProfile{Name: n.Name, Config: n.Profile})
 		}
 	}
 	return out
-}
-
-func (c Catalog) sortedBaseNames() []string {
-	return slices.Sorted(maps.Keys(c.byBaseName))
 }
 
 // validateUniqueChartIDs ensures no two loaded profiles render a chart with the
@@ -245,41 +137,37 @@ func (c Catalog) sortedBaseNames() []string {
 // vanish (e.g. in profiles.mode combined, where every profile is active). A
 // collision between two stock profiles is a packaging bug and is fatal; a
 // collision involving a user profile is logged (its colliding chart is dropped).
-func (c Catalog) validateUniqueChartIDs() error {
+// isStock reports the effective origin of a profile by basename (a user override
+// of a stock profile is NOT stock).
+func validateUniqueChartIDs(profiles []profilecatalog.Named[Profile], isStock func(string) bool) error {
 	type owner struct {
 		base  string
 		stock bool
 	}
 	seen := make(map[string]owner)
 	var errs []error
-	for _, base := range c.sortedBaseNames() {
-		isStock := c.entryIsStock[base]
-		for _, id := range chartIDs(c.byBaseName[base].Template) {
+	for _, p := range profiles {
+		stock := isStock(p.Name)
+		for _, id := range chartIDs(p.Profile.Template) {
 			prev, ok := seen[id]
 			if !ok {
-				seen[id] = owner{base: base, stock: isStock}
+				seen[id] = owner{base: p.Name, stock: stock}
 				continue
 			}
-			if prev.stock && isStock {
-				errs = append(errs, fmt.Errorf("duplicate chart id %q in stock profiles %q and %q", id, prev.base, base))
+			if prev.stock && stock {
+				errs = append(errs, fmt.Errorf("duplicate chart id %q in stock profiles %q and %q", id, prev.base, p.Name))
 			} else {
-				log.Warningf("chart id %q in profile %q collides with profile %q; chartengine will render only one", id, base, prev.base)
+				log.Warningf("chart id %q in profile %q collides with profile %q; chartengine will render only one", id, p.Name, prev.base)
 			}
 		}
 	}
 	return errors.Join(errs...)
 }
 
-func profileBaseName(path string) string {
-	name := filepath.Base(path)
-	ext := filepath.Ext(name)
-	return strings.TrimSuffix(name, ext)
-}
-
-func defaultDirSpecs() []DirSpec {
+func defaultDirSpecs() []profilecatalog.DirSpec {
 	if executable.Name == "test" {
 		if dir := cwProfilesDirFromThisFile(); dir != "" {
-			return []DirSpec{{Path: dir, IsStock: true}}
+			return []profilecatalog.DirSpec{{Path: dir, IsStock: true}}
 		}
 		return nil
 	}
@@ -287,18 +175,18 @@ func defaultDirSpecs() []DirSpec {
 	// Keep the adjacent stock-dir fast path for local development runs where the
 	// built binary lives under src/go/plugin/go.d/bin and should use the source-tree
 	// stock profiles without depending on installed pluginconfig paths.
-	if dir := filepath.Join(executable.Directory, "../config/go.d", profilesDirName, "default"); isDirExists(dir) {
-		return []DirSpec{{Path: dir, IsStock: true}}
+	if dir := filepath.Join(executable.Directory, "../config/go.d", profilesDirName, "default"); profilecatalog.DirExists(dir) {
+		return []profilecatalog.DirSpec{{Path: dir, IsStock: true}}
 	}
 
-	specs := make([]DirSpec, 0, len(pluginconfig.CollectorsUserDirs())+1)
+	specs := make([]profilecatalog.DirSpec, 0, len(pluginconfig.CollectorsUserDirs())+1)
 	for _, dir := range pluginconfig.CollectorsUserDirs() {
-		specs = append(specs, DirSpec{
+		specs = append(specs, profilecatalog.DirSpec{
 			Path:    filepath.Join(dir, profilesDirName),
 			IsStock: false,
 		})
 	}
-	specs = append(specs, DirSpec{
+	specs = append(specs, profilecatalog.DirSpec{
 		Path:    filepath.Join(pluginconfig.CollectorsStockDir(), profilesDirName, "default"),
 		IsStock: true,
 	})
@@ -316,17 +204,9 @@ func cwProfilesDirFromThisFile() string {
 	// base is .../collector/cloudwatch/internal/cwprofiles → climb 4 levels to plugin/go.d,
 	// then into config/go.d/<profiles>/default. Update the count if this file moves.
 	candidate := filepath.Join(base, "..", "..", "..", "..", "config", "go.d", profilesDirName, "default")
-	if !isDirExists(candidate) {
+	if !profilecatalog.DirExists(candidate) {
 		return ""
 	}
 	abs, _ := filepath.Abs(candidate)
 	return abs
-}
-
-func isDirExists(dir string) bool {
-	fi, err := os.Stat(dir)
-	if err != nil {
-		return false
-	}
-	return fi.Mode().IsDir()
 }
