@@ -85,12 +85,12 @@ $ProgressPreference = 'SilentlyContinue'; Invoke-WebRequest https://github.com/n
 
 During the wizard you'll see a **Connect to the Cloud** dialog. These fields register the Windows Agent with your Netdata Cloud Space — they are the GUI equivalent of the silent-install `TOKEN`, `ROOMS`, `PROXY`, and `INSECURE` options.
 
-| Field       | What it's for                                                                                  |
-|-------------|------------------------------------------------------------------------------------------------|
-| Claim Token | The claim token from your Netdata Cloud Space.                                                 |
-| Rooms ID(s) | The Room(s) you want to add this Agent to.                                                     |
-| Proxy URL   | (Optional) A proxy address, if your network requires one to reach Netdata Cloud.               |
-| Cloud URL   | The Netdata Cloud endpoint. Defaults to `https://app.netdata.cloud`.                           |
+| Field       | What it's for                                                                                     |
+|-------------|---------------------------------------------------------------------------------------------------|
+| Claim Token | The claim token from your Netdata Cloud Space.                                                    |
+| Rooms ID(s) | The Room(s) you want to add this Agent to.                                                        |
+| Proxy URL   | (Optional) A proxy address, if your network requires one to reach Netdata Cloud.                  |
+| Cloud URL   | The Netdata Cloud endpoint. Defaults to `https://app.netdata.cloud`.                              |
 | Insecure    | (Optional) Disables TLS hostname verification when the Agent contacts the Netdata Cloud endpoint. |
 
 :::warning The Claim dialog connects to Netdata Cloud only
