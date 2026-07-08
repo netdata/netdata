@@ -250,25 +250,30 @@ void simple_connector_worker(void *instance_p)
         // detach buffer
 
         size_t buffered_metrics;
+        struct simple_connector_buffer *detached_buffer = NULL;
+        int detached_buffer_used = 0;
 
         if (!connector_specific_data->previous_buffer ||
             (connector_specific_data->previous_buffer == connector_specific_data->first_buffer &&
              connector_specific_data->first_buffer->used == 1)) {
             BUFFER *header, *buffer;
 
-            header = connector_specific_data->first_buffer->header;
-            buffer = connector_specific_data->first_buffer->buffer;
-            connector_specific_data->buffered_metrics = connector_specific_data->first_buffer->buffered_metrics;
-            connector_specific_data->buffered_bytes = connector_specific_data->first_buffer->buffered_bytes;
+            detached_buffer = connector_specific_data->first_buffer;
+            detached_buffer_used = detached_buffer->used;
+
+            header = detached_buffer->header;
+            buffer = detached_buffer->buffer;
+            connector_specific_data->buffered_metrics = detached_buffer->buffered_metrics;
+            connector_specific_data->buffered_bytes = detached_buffer->buffered_bytes;
 
             buffered_metrics = connector_specific_data->buffered_metrics;
 
             buffer_flush(connector_specific_data->header);
-            connector_specific_data->first_buffer->header = connector_specific_data->header;
+            detached_buffer->header = connector_specific_data->header;
             connector_specific_data->header = header;
 
             buffer_flush(connector_specific_data->buffer);
-            connector_specific_data->first_buffer->buffer = connector_specific_data->buffer;
+            detached_buffer->buffer = connector_specific_data->buffer;
             connector_specific_data->buffer = buffer;
         } else {
             buffered_metrics = connector_specific_data->buffered_metrics;
@@ -346,10 +351,15 @@ void simple_connector_worker(void *instance_p)
             failures++;
         }
 
-        if (!failures) {
-            connector_specific_data->first_buffer->buffered_metrics =
-                connector_specific_data->first_buffer->buffered_bytes = connector_specific_data->first_buffer->used = 0;
-            connector_specific_data->first_buffer = connector_specific_data->first_buffer->next;
+        if (!failures && detached_buffer) {
+            netdata_mutex_lock(&instance->mutex);
+
+            if (connector_specific_data->first_buffer == detached_buffer && detached_buffer->used == detached_buffer_used) {
+                detached_buffer->buffered_metrics = detached_buffer->buffered_bytes = detached_buffer->used = 0;
+                connector_specific_data->first_buffer = detached_buffer->next;
+            }
+
+            netdata_mutex_unlock(&instance->mutex);
         }
 
         if (unlikely(instance->engine->exit))

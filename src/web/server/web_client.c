@@ -1075,13 +1075,59 @@ static inline void web_client_send_http_header(struct web_client *w) {
         w->statistics.sent_bytes += bytes;
 }
 
-static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, char *url, bool nodeid, int (*func)(RRDHOST *, struct web_client *, char *)) {
-    static uint32_t hash_localhost = 0;
+struct web_client_url_hashes {
+    uint32_t api;
+    uint32_t host;
+    uint32_t node;
+    uint32_t netdata_conf;
+    uint32_t v0;
+    uint32_t v1;
+    uint32_t v2;
+    uint32_t v3;
+    uint32_t mcp;
+    uint32_t sse;
+#ifdef NETDATA_INTERNAL_CHECKS
+    uint32_t exit;
+    uint32_t debug;
+    uint32_t mirror;
+#endif
+};
 
-    if(unlikely(!hash_localhost)) {
-        hash_localhost = simple_hash("localhost");
+static struct web_client_url_hashes web_client_url_hashes = { 0 };
+static SPINLOCK web_client_url_hashes_spinlock = SPINLOCK_INITIALIZER;
+static bool web_client_url_hashes_initialized = false;
+
+static inline const struct web_client_url_hashes *web_client_url_hashes_get(void) {
+    if(likely(__atomic_load_n(&web_client_url_hashes_initialized, __ATOMIC_ACQUIRE)))
+        return &web_client_url_hashes;
+
+    spinlock_lock(&web_client_url_hashes_spinlock);
+
+    if(unlikely(!__atomic_load_n(&web_client_url_hashes_initialized, __ATOMIC_ACQUIRE))) {
+        web_client_url_hashes.api = simple_hash("api");
+        web_client_url_hashes.host = simple_hash("host");
+        web_client_url_hashes.node = simple_hash("node");
+        web_client_url_hashes.netdata_conf = simple_hash("netdata.conf");
+        web_client_url_hashes.v0 = simple_hash("v0");
+        web_client_url_hashes.v1 = simple_hash("v1");
+        web_client_url_hashes.v2 = simple_hash("v2");
+        web_client_url_hashes.v3 = simple_hash("v3");
+        web_client_url_hashes.mcp = simple_hash("mcp");
+        web_client_url_hashes.sse = simple_hash("sse");
+#ifdef NETDATA_INTERNAL_CHECKS
+        web_client_url_hashes.exit = simple_hash("exit");
+        web_client_url_hashes.debug = simple_hash("debug");
+        web_client_url_hashes.mirror = simple_hash("mirror");
+#endif
+        __atomic_store_n(&web_client_url_hashes_initialized, true, __ATOMIC_RELEASE);
     }
 
+    spinlock_unlock(&web_client_url_hashes_spinlock);
+
+    return &web_client_url_hashes;
+}
+
+static inline int web_client_switch_host(RRDHOST *host, struct web_client *w, char *url, bool nodeid, int (*func)(RRDHOST *, struct web_client *, char *)) {
     if(host != localhost) {
         buffer_flush(w->response.data);
         buffer_strcat(w->response.data, "Nesting of hosts is not allowed.");
@@ -1162,30 +1208,21 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
     if(uuid_is_null(w->transaction))
         uuid_generate_random(w->transaction);
 
-    static uint32_t
-            hash_api = 0,
-            hash_host = 0,
-            hash_node = 0;
-
-    if(unlikely(!hash_api)) {
-        hash_api = simple_hash("api");
-        hash_host = simple_hash("host");
-        hash_node = simple_hash("node");
-    }
+    const struct web_client_url_hashes *url_hashes = web_client_url_hashes_get();
 
     char *tok = strsep_skip_consecutive_separators(&decoded_url_path, "/?");
     if(likely(tok && *tok)) {
         uint32_t hash = simple_hash(tok);
 
-        if(unlikely(hash == hash_api && strcmp(tok, "api") == 0)) {
+        if(unlikely(hash == url_hashes->api && strcmp(tok, "api") == 0)) {
             // current API
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
             return check_host_and_call(host, w, decoded_url_path, web_client_api_request);
         }
-        else if(unlikely((hash == hash_host && strcmp(tok, "host") == 0) || (hash == hash_node && strcmp(tok, "node") == 0))) {
+        else if(unlikely((hash == url_hashes->host && strcmp(tok, "host") == 0) || (hash == url_hashes->node && strcmp(tok, "node") == 0))) {
             // host switching
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
-            return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_api_request_with_node_selection);
+            return web_client_switch_host(host, w, decoded_url_path, hash == url_hashes->node, web_client_api_request_with_node_selection);
         }
     }
 
@@ -1199,39 +1236,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
     if(unlikely(!service_running(ABILITY_WEB_REQUESTS)))
         return web_client_service_unavailable(w);
 
-    static uint32_t
-            hash_api = 0,
-            hash_netdata_conf = 0,
-            hash_host = 0,
-            hash_node = 0,
-            hash_v0 = 0,
-            hash_v1 = 0,
-            hash_v2 = 0,
-            hash_v3 = 0,
-            hash_mcp = 0,
-            hash_sse = 0;
-
-#ifdef NETDATA_INTERNAL_CHECKS
-    static uint32_t hash_exit = 0, hash_debug = 0, hash_mirror = 0;
-#endif
-
-    if(unlikely(!hash_api)) {
-        hash_api = simple_hash("api");
-        hash_netdata_conf = simple_hash("netdata.conf");
-        hash_host = simple_hash("host");
-        hash_node = simple_hash("node");
-        hash_v0 = simple_hash("v0");
-        hash_v1 = simple_hash("v1");
-        hash_v2 = simple_hash("v2");
-        hash_v3 = simple_hash("v3");
-        hash_mcp = simple_hash("mcp");
-        hash_sse = simple_hash("sse");
-#ifdef NETDATA_INTERNAL_CHECKS
-        hash_exit = simple_hash("exit");
-        hash_debug = simple_hash("debug");
-        hash_mirror = simple_hash("mirror");
-#endif
-    }
+    const struct web_client_url_hashes *url_hashes = web_client_url_hashes_get();
 
     // keep a copy of the decoded path, in case we need to serve it as a filename
     char filename[FILENAME_MAX + 1];
@@ -1242,49 +1247,49 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
         uint32_t hash = simple_hash(tok);
         netdata_log_debug(D_WEB_CLIENT, "%llu: Processing command '%s'.", w->id, tok);
 
-        if(likely(hash == hash_api && strcmp(tok, "api") == 0)) {                           // current API
+        if(likely(hash == url_hashes->api && strcmp(tok, "api") == 0)) {                           // current API
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: API request ...", w->id);
             return check_host_and_call(host, w, decoded_url_path, web_client_api_request);
         }
-        else if(likely(hash == hash_mcp && strcmp(tok, "mcp") == 0)) {
+        else if(likely(hash == url_hashes->mcp && strcmp(tok, "mcp") == 0)) {
             if(unlikely(!http_can_access_mcp(w)))
                 return web_client_permission_denied_acl(w);
             return mcp_http_handle_request(host, w);
         }
-        else if(likely(hash == hash_sse && strcmp(tok, "sse") == 0)) {
+        else if(likely(hash == url_hashes->sse && strcmp(tok, "sse") == 0)) {
             if(unlikely(!http_can_access_mcp(w)))
                 return web_client_permission_denied_acl(w);
             return mcp_sse_handle_request(host, w);
         }
-        else if(unlikely((hash == hash_host && strcmp(tok, "host") == 0) || (hash == hash_node && strcmp(tok, "node") == 0))) { // host switching
+        else if(unlikely((hash == url_hashes->host && strcmp(tok, "host") == 0) || (hash == url_hashes->node && strcmp(tok, "node") == 0))) { // host switching
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: host switch request ...", w->id);
-            return web_client_switch_host(host, w, decoded_url_path, hash == hash_node, web_client_process_url);
+            return web_client_switch_host(host, w, decoded_url_path, hash == url_hashes->node, web_client_process_url);
         }
-        else if(unlikely(hash == hash_v3 && strcmp(tok, "v3") == 0)) {
+        else if(unlikely(hash == url_hashes->v3 && strcmp(tok, "v3") == 0)) {
             if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
                 return bad_request_multiple_dashboard_versions(w);
             web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_V3);
             return web_client_process_url(host, w, decoded_url_path);
         }
-        else if(unlikely(hash == hash_v2 && strcmp(tok, "v2") == 0)) {
+        else if(unlikely(hash == url_hashes->v2 && strcmp(tok, "v2") == 0)) {
             if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
                 return bad_request_multiple_dashboard_versions(w);
             web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_V2);
             return web_client_process_url(host, w, decoded_url_path);
         }
-        else if(unlikely(hash == hash_v1 && strcmp(tok, "v1") == 0)) {
+        else if(unlikely(hash == url_hashes->v1 && strcmp(tok, "v1") == 0)) {
             if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
                 return bad_request_multiple_dashboard_versions(w);
             web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_V1);
             return web_client_process_url(host, w, decoded_url_path);
         }
-        else if(unlikely(hash == hash_v0 && strcmp(tok, "v0") == 0)) {
+        else if(unlikely(hash == url_hashes->v0 && strcmp(tok, "v0") == 0)) {
             if(web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_WITH_VERSION))
                 return bad_request_multiple_dashboard_versions(w);
             web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_V0);
             return web_client_process_url(host, w, decoded_url_path);
         }
-        else if(unlikely(hash == hash_netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
+        else if(unlikely(hash == url_hashes->netdata_conf && strcmp(tok, "netdata.conf") == 0)) {    // netdata.conf
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);
 
@@ -1296,7 +1301,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             return HTTP_RESP_OK;
         }
 #ifdef NETDATA_INTERNAL_CHECKS
-        else if(unlikely(hash == hash_exit && strcmp(tok, "exit") == 0)) {
+        else if(unlikely(hash == url_hashes->exit && strcmp(tok, "exit") == 0)) {
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);
 
@@ -1312,7 +1317,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             netdata_exit_gracefully(EXIT_REASON_API_QUIT, true);
             return HTTP_RESP_OK;
         }
-        else if(unlikely(hash == hash_debug && strcmp(tok, "debug") == 0)) {
+        else if(unlikely(hash == url_hashes->debug && strcmp(tok, "debug") == 0)) {
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);
 
@@ -1350,7 +1355,7 @@ static inline int web_client_process_url(RRDHOST *host, struct web_client *w, ch
             buffer_strcat(w->response.data, "debug which chart?\r\n");
             return HTTP_RESP_BAD_REQUEST;
         }
-        else if(unlikely(hash == hash_mirror && strcmp(tok, "mirror") == 0)) {
+        else if(unlikely(hash == url_hashes->mirror && strcmp(tok, "mirror") == 0)) {
             if(unlikely(!http_can_access_netdataconf(w)))
                 return web_client_permission_denied_acl(w);
 
