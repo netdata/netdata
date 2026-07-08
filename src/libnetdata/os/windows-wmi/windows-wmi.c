@@ -53,7 +53,12 @@ HRESULT InitializeWMI(void) {
         return hr;
     }
 
-    // Connect to WMI
+    // Connect to WMI.
+    // These probes run synchronously on the daemon startup path (before rrd_init()), so a
+    // hung/unhealthy WMI service would otherwise block agent startup indefinitely. The query
+    // iteration is already time-bounded (Next() in the GetSystemInfo helper), but ConnectServer()
+    // has no custom-timeout knob; WBEM_FLAG_CONNECT_USE_MAX_WAIT is the only mechanism and caps
+    // the connect at ~2 minutes, turning an indefinite hang into a bounded delay.
     BSTR namespacePath = SysAllocString(L"ROOT\\CIMV2");
     hr = (*pLoc)->lpVtbl->ConnectServer(
             *pLoc,
@@ -61,7 +66,7 @@ HRESULT InitializeWMI(void) {
             NULL,
             NULL,
             0,
-            0,
+            WBEM_FLAG_CONNECT_USE_MAX_WAIT,
             0,
             0,
             pSvc
