@@ -439,9 +439,9 @@ static inline char *netdata_pvar_to_char(const PROPERTYKEY *key, ISensor *pSenso
     HRESULT hr = pSensor->lpVtbl->GetProperty(pSensor, key, &pv);
     if (SUCCEEDED(hr) && pv.vt == VT_LPWSTR) {
         char value[8192];
-        int len = wcslen(pv.pwszVal);
-        len = wcstombs(value, pv.pwszVal, len);
-        if (len < 0) {
+        size_t len = wcstombs(value, pv.pwszVal, sizeof(value) - 1);
+        if (len == (size_t)-1) {
+            PropVariantClear(&pv);
             return NULL;
         }
         value[len] = '\0';
