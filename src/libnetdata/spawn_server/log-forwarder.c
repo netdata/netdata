@@ -5,6 +5,7 @@
 
 typedef struct LOG_FORWARDER_ENTRY {
     int fd;
+    LOG_FORWARDER_TOKEN token;
     char *cmd;
     pid_t pid;
     BUFFER *wb;
@@ -20,6 +21,7 @@ typedef struct LOG_FORWARDER {
     ND_THREAD *thread;
     SPINLOCK spinlock;
     int pipe_fds[2]; // Pipe for notifications
+    LOG_FORWARDER_TOKEN next_token;
     bool running;
     volatile bool initialized; // Thread has fully initialized (atomic)
 } LOG_FORWARDER;
@@ -39,13 +41,21 @@ static inline size_t log_forwarder_max_pfds(void) {
 // --------------------------------------------------------------------------------------------------------------------
 // helper functions
 
-static inline LOG_FORWARDER_ENTRY *log_forwarder_find_entry_unsafe(LOG_FORWARDER *lf, int fd) {
+static inline LOG_FORWARDER_ENTRY *log_forwarder_find_entry_unsafe(LOG_FORWARDER *lf, LOG_FORWARDER_TOKEN token) {
     for (LOG_FORWARDER_ENTRY *entry = lf->entries; entry; entry = entry->next) {
-        if (entry->fd == fd)
+        if (entry->token == token)
             return entry;
     }
 
     return NULL;
+}
+
+static inline LOG_FORWARDER_TOKEN log_forwarder_next_token_unsafe(LOG_FORWARDER *lf) {
+    LOG_FORWARDER_TOKEN token = lf->next_token++;
+    if(unlikely(token == LOG_FORWARDER_TOKEN_NONE))
+        token = lf->next_token++;
+
+    return token;
 }
 
 static inline void log_forwarder_del_entry_unsafe(LOG_FORWARDER *lf, LOG_FORWARDER_ENTRY *entry) {
@@ -82,6 +92,7 @@ LOG_FORWARDER *log_forwarder_start(void) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: Failed to set non-blocking mode");
 
     lf->running = true;
+    lf->next_token = LOG_FORWARDER_TOKEN_NONE + 1;
     __atomic_store_n(&lf->initialized, false, __ATOMIC_RELEASE);
 
     lf->thread = nd_thread_create("log-fw", NETDATA_THREAD_OPTION_DEFAULT, log_forwarder_thread_func, lf);
@@ -151,8 +162,8 @@ void log_forwarder_stop(LOG_FORWARDER *lf) {
 // --------------------------------------------------------------------------------------------------------------------
 // managing entries
 
-void log_forwarder_add_fd(LOG_FORWARDER *lf, int fd) {
-    if(!lf || !lf->running || fd < 0) return;
+LOG_FORWARDER_TOKEN log_forwarder_add_fd(LOG_FORWARDER *lf, int fd) {
+    if(!lf || fd < 0) return LOG_FORWARDER_TOKEN_NONE;
 
     LOG_FORWARDER_ENTRY *entry = callocz(1, sizeof(LOG_FORWARDER_ENTRY));
     entry->fd = fd;
@@ -164,6 +175,16 @@ void log_forwarder_add_fd(LOG_FORWARDER *lf, int fd) {
 
     spinlock_lock(&lf->spinlock);
 
+    if(!lf->running) {
+        spinlock_unlock(&lf->spinlock);
+        buffer_free(entry->wb);
+        freez(entry);
+        return LOG_FORWARDER_TOKEN_NONE;
+    }
+
+    LOG_FORWARDER_TOKEN token = log_forwarder_next_token_unsafe(lf);
+    entry->token = token;
+
     // Append to the entries list
     DOUBLE_LINKED_LIST_PREPEND_ITEM_UNSAFE(lf->entries, entry, prev, next);
 
@@ -171,16 +192,18 @@ void log_forwarder_add_fd(LOG_FORWARDER *lf, int fd) {
     log_forwarder_wake_up_worker(lf);
 
     spinlock_unlock(&lf->spinlock);
+
+    return token;
 }
 
-bool log_forwarder_del_and_close_fd(LOG_FORWARDER *lf, int fd) {
-    if(!lf || !lf->running || fd < 0) return false;
+bool log_forwarder_del_and_close_token(LOG_FORWARDER *lf, LOG_FORWARDER_TOKEN token) {
+    if(!lf || !lf->running || token == LOG_FORWARDER_TOKEN_NONE) return false;
 
     bool ret = false;
 
     spinlock_lock(&lf->spinlock);
 
-    LOG_FORWARDER_ENTRY *entry = log_forwarder_find_entry_unsafe(lf, fd);
+    LOG_FORWARDER_ENTRY *entry = log_forwarder_find_entry_unsafe(lf, token);
     if(entry) {
         entry->delete = true;
 
@@ -195,12 +218,12 @@ bool log_forwarder_del_and_close_fd(LOG_FORWARDER *lf, int fd) {
     return ret;
 }
 
-void log_forwarder_annotate_fd_name(LOG_FORWARDER *lf, int fd, const char *cmd) {
-    if(!lf || !lf->running || fd < 0 || !cmd || !*cmd) return;
+void log_forwarder_annotate_token_name(LOG_FORWARDER *lf, LOG_FORWARDER_TOKEN token, const char *cmd) {
+    if(!lf || !lf->running || token == LOG_FORWARDER_TOKEN_NONE || !cmd || !*cmd) return;
 
     spinlock_lock(&lf->spinlock);
 
-    LOG_FORWARDER_ENTRY *entry = log_forwarder_find_entry_unsafe(lf, fd);
+    LOG_FORWARDER_ENTRY *entry = log_forwarder_find_entry_unsafe(lf, token);
     if (entry) {
         freez(entry->cmd);
         entry->cmd = strdupz(cmd);
@@ -209,12 +232,12 @@ void log_forwarder_annotate_fd_name(LOG_FORWARDER *lf, int fd, const char *cmd) 
     spinlock_unlock(&lf->spinlock);
 }
 
-void log_forwarder_annotate_fd_pid(LOG_FORWARDER *lf, int fd, pid_t pid) {
-    if(!lf || !lf->running || fd < 0) return;
+void log_forwarder_annotate_token_pid(LOG_FORWARDER *lf, LOG_FORWARDER_TOKEN token, pid_t pid) {
+    if(!lf || !lf->running || token == LOG_FORWARDER_TOKEN_NONE) return;
 
     spinlock_lock(&lf->spinlock);
 
-    LOG_FORWARDER_ENTRY *entry = log_forwarder_find_entry_unsafe(lf, fd);
+    LOG_FORWARDER_ENTRY *entry = log_forwarder_find_entry_unsafe(lf, token);
     if (entry)
         entry->pid = pid;
 
