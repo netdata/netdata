@@ -361,6 +361,7 @@ RRDHOST *rrdhost_create(
 
     spinlock_init(&host->receiver_lock);
     spinlock_init(&host->rrdhost_update_lock);
+    spinlock_init(&host->aclk.spinlock);
 
     if (likely(!archived)) {
         rrd_functions_host_init(host);

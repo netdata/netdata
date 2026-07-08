@@ -10,6 +10,63 @@ static struct {
     .spinlock = SPINLOCK_INITIALIZER,
 };
 
+static ND_UUID rrdhost_claim_id_field_get(RRDHOST *host, bool parent) {
+    ND_UUID uuid = UUID_ZERO;
+
+    if(unlikely(!host))
+        return uuid;
+
+    spinlock_lock(&host->aclk.spinlock);
+    uuid = parent ? host->aclk.claim_id_of_parent : host->aclk.claim_id_of_origin;
+    spinlock_unlock(&host->aclk.spinlock);
+
+    return uuid;
+}
+
+static void rrdhost_claim_id_field_set(RRDHOST *host, ND_UUID claim_id, bool parent) {
+    if(unlikely(!host))
+        return;
+
+    spinlock_lock(&host->aclk.spinlock);
+    if(parent)
+        host->aclk.claim_id_of_parent = claim_id;
+    else
+        host->aclk.claim_id_of_origin = claim_id;
+    spinlock_unlock(&host->aclk.spinlock);
+}
+
+ND_UUID rrdhost_claim_id_of_origin_get(RRDHOST *host) {
+    return rrdhost_claim_id_field_get(host, false);
+}
+
+void rrdhost_claim_id_of_origin_set(RRDHOST *host, ND_UUID claim_id) {
+    rrdhost_claim_id_field_set(host, claim_id, false);
+}
+
+ND_UUID rrdhost_claim_id_of_parent_get(RRDHOST *host) {
+    return rrdhost_claim_id_field_get(host, true);
+}
+
+bool rrdhost_claim_id_of_parent_update(RRDHOST *host, ND_UUID claim_id, ND_UUID *previous_claim_id) {
+    ND_UUID previous = UUID_ZERO;
+    bool changed = false;
+
+    if(likely(host)) {
+        spinlock_lock(&host->aclk.spinlock);
+        previous = host->aclk.claim_id_of_parent;
+        if(!UUIDeq(previous, claim_id)) {
+            host->aclk.claim_id_of_parent = claim_id;
+            changed = true;
+        }
+        spinlock_unlock(&host->aclk.spinlock);
+    }
+
+    if(previous_claim_id)
+        *previous_claim_id = previous;
+
+    return changed;
+}
+
 void claim_id_clear_previous_working(void) {
     spinlock_lock(&claim.spinlock);
     claim.claim_uuid_saved = UUID_ZERO;
@@ -27,7 +84,7 @@ void claim_id_set(ND_UUID new_claim_id) {
 
     claim.claim_uuid = new_claim_id;
     if(localhost)
-        localhost->aclk.claim_id_of_origin = claim.claim_uuid;
+        rrdhost_claim_id_of_origin_set(localhost, claim.claim_uuid);
 
     spinlock_unlock(&claim.spinlock);
 }
@@ -106,14 +163,16 @@ CLAIM_ID rrdhost_claim_id_get(RRDHOST *host) {
 
     if(host == localhost) {
         ret.uuid = claim_id_get_uuid();
-        if(UUIDiszero(ret.uuid) || (!aclk_online() && !UUIDiszero(host->aclk.claim_id_of_parent)))
-            ret.uuid = host->aclk.claim_id_of_parent;
+        ND_UUID parent_claim_id = rrdhost_claim_id_of_parent_get(host);
+        if(UUIDiszero(ret.uuid) || (!aclk_online() && !UUIDiszero(parent_claim_id)))
+            ret.uuid = parent_claim_id;
     }
     else {
-        if (!UUIDiszero(host->aclk.claim_id_of_origin))
-            ret.uuid = host->aclk.claim_id_of_origin;
+        ND_UUID origin_claim_id = rrdhost_claim_id_of_origin_get(host);
+        if (!UUIDiszero(origin_claim_id))
+            ret.uuid = origin_claim_id;
         else
-            ret.uuid = host->aclk.claim_id_of_parent;
+            ret.uuid = rrdhost_claim_id_of_parent_get(host);
     }
 
     if(claim_id_is_set(ret))

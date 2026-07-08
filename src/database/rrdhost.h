@@ -374,6 +374,7 @@ struct rrdhost {
     ND_UUID node_id;                                // Cloud node_id
 
     struct {
+        SPINLOCK spinlock;
         ND_UUID claim_id_of_origin;
         ND_UUID claim_id_of_parent;
     } aclk;
