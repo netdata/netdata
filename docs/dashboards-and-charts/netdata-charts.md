@@ -68,10 +68,13 @@ A **context** groups charts by metric type and displayed dimensions. Contexts de
 
 - `apps.cpu` for **Apps CPU Time**
 - `apps.mem` for **Apps Real Memory**
+- `net.net` for network **Bandwidth**
 
-The part before the dot (`.`) is the **type**, while the part after is defined by the chart’s developer or its family.
+The part before the dot (`.`) is the **type**, while the part after is defined by the chart's developer or its family.
 
 Contexts are also used for alert configurations.
+
+The contexts available on any given node depend on which collectors are enabled and what hardware and software Netdata detects, so there is no fixed universal list. To discover the contexts on your own system, browse the [Metrics tab](/docs/dashboards-and-charts/metrics-tab-and-single-node-tabs.md) — charts there are grouped into sections by context — open the **Chart info** dialog on any chart to see its context value, or query the `/api/v3/contexts` endpoint programmatically. Each collector documents the metrics and contexts it produces on its integration page, which you can browse through the **Integrations tab** in the dashboard.
 
 ### Families
 
