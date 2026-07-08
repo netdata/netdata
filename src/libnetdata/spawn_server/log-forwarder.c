@@ -136,13 +136,14 @@ void log_forwarder_stop(LOG_FORWARDER *lf) {
     // Wait for the thread to finish
     // Note: nd_thread_join() handles the Windows/MSYS2 EINVAL case internally
     int join_result = nd_thread_join(lf->thread);
+    lf->thread = NULL;
     if(join_result != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "Log forwarder: nd_thread_join() failed with error %d", join_result);
+               "Log forwarder: nd_thread_join() failed with error %d; leaking state to avoid racing a live worker",
+               join_result);
+        return;
     }
 
-    // Always clean up - if join failed, the thread has still exited
-    lf->thread = NULL;
     close(lf->pipe_fds[PIPE_WRITE]);
     freez(lf);
 }
