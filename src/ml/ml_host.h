@@ -35,7 +35,7 @@ typedef struct {
     uint32_t anomalous_dimensions;
 } ml_context_anomaly_rate_t;
 
-typedef struct {
+typedef struct ml_host {
     RRDHOST *rh;
 
     // Incremented at the END of every ml_host_stop, after all chart/dim resets
@@ -115,13 +115,13 @@ static ALWAYS_INLINE void ml_running_store(RRDHOST *rh, bool running)
 #ifdef __cplusplus
 class AcquiredMLHost {
 public:
-    explicit AcquiredMLHost(RRDHOST *rh) : RH(rh), Host(nullptr)
+    explicit AcquiredMLHost(RRDHOST *rh) : RH(rh)
     {
         if (!RH)
             return;
 
         rw_spinlock_read_lock(&RH->ml_host_rwlock);
-        Host = reinterpret_cast<ml_host_t *>(__atomic_load_n(&RH->ml_host, __ATOMIC_ACQUIRE));
+        Host = __atomic_load_n(&RH->ml_host, __ATOMIC_ACQUIRE);
         if (!Host)
             release();
     }
@@ -174,7 +174,7 @@ public:
 
 private:
     RRDHOST *RH;
-    ml_host_t *Host;
+    ml_host_t *Host = nullptr;
 };
 #endif
 

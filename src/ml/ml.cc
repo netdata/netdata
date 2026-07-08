@@ -1248,15 +1248,15 @@ ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomal
                         case TRAINING_STATUS_TRAINED:
                             delta.num_training_status_trained++;
 
-                            delta.num_anomalous_dimensions += is_anomalous;
-                            delta.num_normal_dimensions += !is_anomalous;
+                            delta.num_anomalous_dimensions += is_anomalous ? 1 : 0;
+                            delta.num_normal_dimensions += is_anomalous ? 0 : 1;
                             break;
                         case TRAINING_STATUS_SILENCED:
                             delta.num_training_status_silenced++;
                             delta.num_training_status_trained++;
 
-                            delta.num_anomalous_dimensions += is_anomalous;
-                            delta.num_normal_dimensions += !is_anomalous;
+                            delta.num_anomalous_dimensions += is_anomalous ? 1 : 0;
+                            delta.num_normal_dimensions += is_anomalous ? 0 : 1;
                             break;
                     }
                     break;
