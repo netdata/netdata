@@ -59,8 +59,8 @@ _TracesCompressionEnabled = Annotated[bool | None, Field(description="traces: co
 _TracesRetentionMaxFiles = Annotated[int | None, Field(description="traces retention: max number of index files to keep. Small values force eviction.")]
 _TracesRetentionMaxTotalSize = Annotated[str | None, Field(description="traces retention: max total size of all index files (e.g. '1GB', '500MB').")]
 _TracesCatalogRotationCount = Annotated[int | None, Field(description="traces catalog rotation: number of index files recorded before a catalog file rotates and uploads. Small values (e.g. 2) force catalog rotation + upload over a small corpus.")]
-_StorageEnabled = Annotated[bool | None, Field(description="Remote object-storage upload of SFST + catalog files (default off). Enable to exercise the upload path and remote-confirmed eviction. With it off, the uploader is not even constructed.")]
-_StorageUri = Annotated[str | None, Field(description="opendal storage URI (e.g. 'fs:///abs/path', 's3://bucket/prefix'). Omit while storage is enabled to default to an isolated per-agent 'fs://' directory under the run dir.")]
+_RemoteStorageEnabled = Annotated[bool | None, Field(description="Remote object-storage upload of SFST + catalog files (default off). Enable to exercise the upload path and remote-confirmed eviction. With it off, the uploader is not even constructed.")]
+_RemoteStorageUri = Annotated[str | None, Field(description="opendal storage URI (e.g. 'fs:///abs/path', 's3://bucket/prefix'). Omit while remote storage is enabled to default to an isolated per-agent 'fs://' directory under the run dir.")]
 _JournalDir = Annotated[
     str | None,
     Field(description="Read-only legacy viewer: directory of journal files written by the FORMER otel plugin, exposed via the 'legacy-otel-logs' function. The plugin only reads it (never writes/prunes). Unlike base_dir, it is NOT pinned under the run dir."),
@@ -74,7 +74,7 @@ _ExtraYaml = Annotated[
             "other values replace). Reaches every knob without a first-class param — "
             "auth.enabled, logs.ingest.{max_age,future_skew}, "
             "logs.retention.default.{max_age,horizon}, logs.catalog.rotation_period, "
-            "per-tenant rotation/retention override blocks, storage.startup_op_timeout — "
+            "per-tenant rotation/retention override blocks, remote_storage.startup_op_timeout — "
             "and deliberately-unknown keys for strict-config refuse-to-start tests. "
             "base_dir and endpoint.path stay pinned for per-agent isolation and "
             "cannot be overridden. SHARP TOOL: a semantically invalid config keeps "
@@ -115,9 +115,9 @@ def register(mcp: FastMCP) -> None:
             "traces_* knobs tune the traces pipeline independently (one call sets "
             "both). Storage is GLOBAL (not signal-prefixed; auth has no "
             "first-class param — reach it via extra_yaml): set "
-            "storage_enabled=true (optionally storage_uri) to exercise the remote "
+            "remote_storage_enabled=true (optionally remote_storage_uri) to exercise the remote "
             "upload + remote-confirmed eviction path for both signals; an omitted "
-            "storage_uri defaults to an isolated per-agent fs:// dir. Use the small "
+            "remote_storage_uri defaults to an isolated per-agent fs:// dir. Use the small "
             "rotation/retention knobs to force multi-file / eviction edge cases over a "
             "known corpus — set traces_* (e.g. traces_rotation_max_entries=10) so a "
             "small trace corpus seals without a restart. For knobs without a "
@@ -147,8 +147,8 @@ def register(mcp: FastMCP) -> None:
         traces_retention_max_files: _TracesRetentionMaxFiles = None,
         traces_retention_max_total_size: _TracesRetentionMaxTotalSize = None,
         traces_catalog_rotation_count: _TracesCatalogRotationCount = None,
-        storage_enabled: _StorageEnabled = None,
-        storage_uri: _StorageUri = None,
+        remote_storage_enabled: _RemoteStorageEnabled = None,
+        remote_storage_uri: _RemoteStorageUri = None,
         journal_dir: _JournalDir = None,
         extra_yaml: _ExtraYaml = None,
     ) -> RunInfo:
@@ -158,10 +158,10 @@ def register(mcp: FastMCP) -> None:
             err = _endpoint_error(agent_id, otlp_endpoint)
             if err is not None:
                 return err
-        if storage_uri is not None and "://" not in storage_uri:
+        if remote_storage_uri is not None and "://" not in remote_storage_uri:
             return agent_error(
                 agent_id,
-                f"storage_uri must be an opendal URI like 'fs:///path' or 's3://bucket', got {storage_uri!r}",
+                f"remote_storage_uri must be an opendal URI like 'fs:///path' or 's3://bucket', got {remote_storage_uri!r}",
             )
         if extra_yaml is not None:
             err = _extra_yaml_error(agent_id, extra_yaml)
@@ -185,8 +185,8 @@ def register(mcp: FastMCP) -> None:
             traces_retention_max_files=traces_retention_max_files,
             traces_retention_max_total_size=traces_retention_max_total_size,
             traces_catalog_rotation_count=traces_catalog_rotation_count,
-            storage_enabled=storage_enabled,
-            storage_uri=storage_uri,
+            remote_storage_enabled=remote_storage_enabled,
+            remote_storage_uri=remote_storage_uri,
             journal_dir=journal_dir,
             extra_yaml=extra_yaml,
         )

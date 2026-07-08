@@ -105,7 +105,7 @@ def test_generate_runtime_writes_otel_yaml_with_isolated_base_dir_and_endpoint(t
     # no per-signal dirs are emitted (derived), and no tuning knobs were set
     assert "logs" not in doc
     # global storage omitted (disabled) unless configured
-    assert "storage" not in doc
+    assert "remote_storage" not in doc
 
 
 def test_generate_runtime_otel_emits_journal_dir_when_set(tmp_path, monkeypatch):
@@ -184,7 +184,7 @@ def test_generate_runtime_otel_tunes_signals_independently(tmp_path, monkeypatch
     assert doc["traces"]["rotation"]["default"] == {"max_entries": 10}
     assert doc["traces"]["catalog"] == {"rotation_count": 3}
     # storage/auth are global, not per-signal — neither section carries them
-    assert "storage" not in doc["logs"] and "storage" not in doc["traces"]
+    assert "remote_storage" not in doc["logs"] and "remote_storage" not in doc["traces"]
 
 
 def test_generate_runtime_otel_omits_dirs_and_storage_by_default(tmp_path, monkeypatch):
@@ -195,7 +195,7 @@ def test_generate_runtime_otel_omits_dirs_and_storage_by_default(tmp_path, monke
     assert doc["base_dir"] == str(rd / "lib" / "otel")
     assert "logs" not in doc
     # remote storage is omitted (disabled) unless explicitly configured
-    assert "storage" not in doc
+    assert "remote_storage" not in doc
 
 
 def test_generate_runtime_otel_emits_catalog_tuning_without_dir(tmp_path, monkeypatch):
@@ -205,25 +205,25 @@ def test_generate_runtime_otel_emits_catalog_tuning_without_dir(tmp_path, monkey
     assert doc["logs"]["catalog"] == {"rotation_count": 2}
 
 
-def test_generate_runtime_otel_enables_global_storage_with_default_fs_uri(tmp_path, monkeypatch):
+def test_generate_runtime_otel_enables_global_remote_storage_with_default_fs_uri(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    cfg = runtime.OtelConfig(storage_enabled=True, logs_catalog_rotation_count=2)
+    cfg = runtime.OtelConfig(remote_storage_enabled=True, logs_catalog_rotation_count=2)
     rd, _conf, _otlp = runtime.generate_runtime("agent-store", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
-    # storage is GLOBAL (top-level), not nested under logs
-    assert doc["storage"]["enabled"] is True
+    # remote_storage is GLOBAL (top-level), not nested under logs
+    assert doc["remote_storage"]["enabled"] is True
     # an omitted uri defaults to an isolated per-agent fs:// dir under the run dir
-    assert doc["storage"]["uri"] == f"fs://{rd / 'lib' / 'otel' / 'remote'}"
-    assert "storage" not in doc["logs"]
+    assert doc["remote_storage"]["uri"] == f"fs://{rd / 'lib' / 'otel' / 'remote'}"
+    assert "remote_storage" not in doc["logs"]
     assert doc["logs"]["catalog"]["rotation_count"] == 2
 
 
-def test_generate_runtime_otel_honors_explicit_global_storage_uri(tmp_path, monkeypatch):
+def test_generate_runtime_otel_honors_explicit_global_remote_storage_uri(tmp_path, monkeypatch):
     monkeypatch.setattr(runtime.Path, "home", classmethod(lambda cls: tmp_path))
-    cfg = runtime.OtelConfig(storage_enabled=True, storage_uri="s3://bucket/prefix")
+    cfg = runtime.OtelConfig(remote_storage_enabled=True, remote_storage_uri="s3://bucket/prefix")
     rd, _conf, _otlp = runtime.generate_runtime("agent-s3", otel=cfg)
     doc = yaml.safe_load((rd / "etc" / "otel.yaml").read_text())
-    assert doc["storage"] == {"enabled": True, "uri": "s3://bucket/prefix"}
+    assert doc["remote_storage"] == {"enabled": True, "uri": "s3://bucket/prefix"}
     assert "logs" not in doc
 
 

@@ -127,7 +127,7 @@ class OtelConfig:
     single ``base_dir`` that is always pinned under the run dir for per-agent
     isolation (re-pinned after the ``extra_yaml`` merge, alongside
     ``endpoint.path``). Caller-supplied paths do exist beyond the pin:
-    ``storage_uri``, ``journal_dir``, and whatever ``extra_yaml`` reaches — the
+    ``remote_storage_uri``, ``journal_dir``, and whatever ``extra_yaml`` reaches — the
     server is a localhost-only developer tool, so the caller is trusted. The
     rotation/retention knobs are the edge-case drivers (tiny thresholds force
     multi-file splits and evictions over small, deterministic corpora).
@@ -154,8 +154,8 @@ class OtelConfig:
     traces_retention_max_files: int | None = None         # traces.retention.default.max_files
     traces_retention_max_total_size: str | None = None    # traces.retention.default.max_total_size
     traces_catalog_rotation_count: int | None = None  # traces.catalog.rotation_count; entries per catalog before it rotates+uploads
-    storage_enabled: bool | None = None        # storage.enabled (GLOBAL); remote object-storage upload of SFST + catalog files
-    storage_uri: str | None = None             # storage.uri (GLOBAL); opendal URI (default: per-agent fs:// dir under the run dir)
+    remote_storage_enabled: bool | None = None # remote_storage.enabled (GLOBAL); remote object-storage upload of SFST + catalog files
+    remote_storage_uri: str | None = None      # remote_storage.uri (GLOBAL); opendal URI (default: per-agent fs:// dir under the run dir)
     journal_dir: str | None = None             # logs.journal_dir; former-plugin journal files for the read-only legacy-otel-logs viewer
     # Raw-YAML escape hatch: a YAML MAPPING deep-merged over the generated
     # document (passthrough wins on conflicts; nested mappings merge, any other
@@ -270,13 +270,13 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
     # fs:// directory under the run dir (opendal fs = `fs://` + absolute path),
     # isolated like the local dirs, so the upload path can be exercised
     # end-to-end without external storage.
-    storage: dict = {}
-    if cfg.storage_enabled is not None:
-        storage["enabled"] = cfg.storage_enabled
-    if cfg.storage_uri is not None:
-        storage["uri"] = cfg.storage_uri
-    elif cfg.storage_enabled:
-        storage["uri"] = f"fs://{rd / 'lib' / 'otel' / 'remote'}"
+    remote_storage: dict = {}
+    if cfg.remote_storage_enabled is not None:
+        remote_storage["enabled"] = cfg.remote_storage_enabled
+    if cfg.remote_storage_uri is not None:
+        remote_storage["uri"] = cfg.remote_storage_uri
+    elif cfg.remote_storage_enabled:
+        remote_storage["uri"] = f"fs://{rd / 'lib' / 'otel' / 'remote'}"
 
     # Read-only legacy viewer: point it at the former plugin's journal files.
     # This is the FORMER schema's `logs.journal_dir`, read by a separate tolerant
@@ -286,8 +286,8 @@ def _otel_doc(cfg: OtelConfig, rd: Path, otlp_endpoint: str) -> dict:
         logs["journal_dir"] = cfg.journal_dir
 
     doc: dict = {"endpoint": {"path": otlp_endpoint}, "base_dir": base_dir}
-    if storage:
-        doc["storage"] = storage
+    if remote_storage:
+        doc["remote_storage"] = remote_storage
     if logs:
         doc["logs"] = logs
     if traces:
