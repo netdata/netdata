@@ -21,7 +21,12 @@ const char *daemon_pipename(void) {
             cached_pipename = strdupz(env_pipename);
         else {
 #if defined(OS_WINDOWS)
-            // Windows named pipes require the \\.\pipe\ prefix; filesystem paths are invalid.
+            // Windows named pipes require the \\.\pipe\ prefix; filesystem paths are invalid,
+            // so we cannot scope the name under os_run_dir() as the Unix path does.
+            // The name is machine-wide and predictable; use NETDATA_PIPENAME to override when
+            // running multiple instances or to avoid the global name entirely.
+            // TODO: scope via the machine GUID (HKLM\SOFTWARE\Microsoft\Cryptography\MachineGuid)
+            // to avoid collisions and squatting without requiring explicit operator configuration.
             cached_pipename = strdupz("\\\\.\\pipe\\netdata-daemon");
 #else
             char filename[FILENAME_MAX + 1];
