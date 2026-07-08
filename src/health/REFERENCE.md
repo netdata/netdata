@@ -943,6 +943,10 @@ How to write calculations and use variables in your alert definitions. Essential
 | `nan` | Not a number (database lookup failed) | `$this != nan` |
 | `inf` | Infinite (division by zero)           | `$this != inf` |
 
+**Referencing Variables:**
+
+Reference a variable as `$name`. The unbraced form stops at the first character that isn't part of a plain identifier — a space, or any operator/punctuation character the expression syntax itself uses (`+`, `-`, `*`, `/`, comparisons, `(`, `)`, etc.) — so it only works for names built entirely from safe characters. A variable name containing an unsafe character — for example a dimension name with spaces (`Has Number`), or a Prometheus chart ID with hyphens (see [Prometheus Collector Variables](#prometheus-collector-variables)) — must be wrapped in braces instead: `${name}` captures everything up to the closing `}`, including spaces and hyphens. Using the unbraced form on such a name causes the whole `calc`, `warn`, or `crit` expression to fail to parse.
+
 ### Conditional Operator for Hysteresis
 
 **Why This Matters:** The conditional operator (`? :`) can create "sticky" alert thresholds that prevent alert spam when values fluctuate around a threshold. This is called [hysteresis](https://en.wikipedia.org/wiki/Hysteresis).
@@ -1019,7 +1023,7 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 
 **Dimension names with spaces**
 
-Use the `${...}` brace form when a dimension name contains spaces. A dimension named `Has Number` must be referenced as `${Has Number}` in `calc`, `warn`, and `crit` expressions — the unbraced form `$Has Number` fails to parse: the expression lexer reads `$Has` as the variable name, then hits the standalone word `Number`, which is not valid syntax, so the whole expression fails to compile.
+A dimension name containing spaces needs the `${...}` brace form — see [Referencing Variables](#expressions-overview). A dimension named `Has Number` must be referenced as `${Has Number}`:
 
 ```text
     alarm: my_dimension_alert
@@ -1035,8 +1039,6 @@ Use the `${...}` brace form when a dimension name contains spaces. A dimension n
 
 This uses `calc` directly on the chart-local dimension, without a `lookup` — see [Alert Examples](#alert-examples) for when to pair `calc` with `lookup` for time-window aggregation instead of the current value.
 
-The same `${...}` rule applies to any variable name containing characters the unbraced form cannot capture — for example, the hyphens in [Prometheus chart IDs](#prometheus-collector-variables).
-
 :::
 
 #### Host Variables
@@ -1047,6 +1049,7 @@ The same `${...}` rule applies to any variable name containing characters the un
 
 - `CHART` can be either chart ID or chart name
 - Both formats are supported
+- If `CHART` or `VARIABLE` contains a space, hyphen, or other character the unbraced `$name` form can't capture, wrap the whole reference in braces instead (e.g. `${mychart.Has Number}`) — see [Referencing Variables](#expressions-overview)
 
 **Examples:**
 
@@ -1070,7 +1073,7 @@ Several stock health configurations use host variables to reference dimensions f
 
 For metrics collected by the go.d `prometheus` collector, each unique Prometheus label set usually produces a separate chart. The chart ID is built from the metric name followed by `-label=value` pairs for every label (e.g. `kubelet_volume_stats_used_bytes-persistentvolumeclaim=my-pvc`); characters in a label value that are not chart-ID-safe, such as `.`, are replaced with `_` in the chart ID, while the chart's label keeps the original value (so `addr="10.0.0.1"` yields `…-addr=10_0_0_1`). In the Netdata chart registry, the prefix comes from the go.d job `FullName`: it is `prometheus.<metric_name>-<label_set>` only when the job name is literally `prometheus`; otherwise it is `prometheus_<job_name>.<metric_name>-<label_set>` (for example, `prometheus_local.<metric_name>-<label_set>` or `prometheus_kubelet.<metric_name>-<label_set>`). Summary and histogram families also emit separate `_sum` and `_count` charts; the suffix is part of the metric name, so the IDs are `<metric_name>_sum-<label_set>` and `<metric_name>_count-<label_set>` (just `<metric_name>_sum` / `<metric_name>_count` when the series has no labels), while histogram buckets are dimensions of the base `<metric_name>` chart. Verify the exact chart ID you want to reference.
 
-Because Prometheus chart IDs typically contain hyphens and `=` characters, use the `${...}` brace form to reference them in `calc`/`warn`/`crit` expressions — the unbraced `$var` form stops parsing at `-`. Apply the same rule for both the common `prometheus_<job_name>` prefix and the special-case plain `prometheus` prefix, including any `_sum` or `_count` chart variants.
+Prometheus chart IDs typically contain hyphens and `=` characters, so reference them with the `${...}` brace form — see [Referencing Variables](#expressions-overview). This applies to both the common `prometheus_<job_name>` prefix and the special-case plain `prometheus` prefix, including any `_sum` or `_count` chart variants.
 
 **Example — PVC volume usage alert using kubelet metrics from a named Prometheus job (`name: kubelet`):**
 
