@@ -6,34 +6,46 @@
 
 const char* get_release_channel() {
     static int use_stable = -1;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
-    if (use_stable == -1) {
-        char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/.environment", netdata_configured_user_config_dir);
-        procfile *ff = procfile_open(filename, "=", PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
-        if (ff) {
-            procfile_set_quotes(ff, "'\"");
-            ff = procfile_readall(ff);
+    int stable = __atomic_load_n(&use_stable, __ATOMIC_ACQUIRE);
+
+    if (unlikely(stable == -1)) {
+        spinlock_lock(&spinlock);
+
+        stable = __atomic_load_n(&use_stable, __ATOMIC_RELAXED);
+        if (stable == -1) {
+            char filename[FILENAME_MAX + 1];
+            snprintfz(filename, FILENAME_MAX, "%s/.environment", netdata_configured_user_config_dir);
+            procfile *ff = procfile_open(filename, "=", PROCFILE_FLAG_NO_ERROR_ON_FILE_IO);
             if (ff) {
-                unsigned int i;
-                for (i = 0; i < procfile_lines(ff); i++) {
-                    if (!procfile_linewords(ff, i))
-                        continue;
-                    if (!strcmp(procfile_lineword(ff, i, 0), "RELEASE_CHANNEL")) {
-                        if (!strcmp(procfile_lineword(ff, i, 1), "stable"))
-                            use_stable = 1;
-                        else if (!strcmp(procfile_lineword(ff, i, 1), "nightly"))
-                            use_stable = 0;
-                        break;
+                procfile_set_quotes(ff, "'\"");
+                ff = procfile_readall(ff);
+                if (ff) {
+                    unsigned int i;
+                    for (i = 0; i < procfile_lines(ff); i++) {
+                        if (!procfile_linewords(ff, i))
+                            continue;
+                        if (!strcmp(procfile_lineword(ff, i, 0), "RELEASE_CHANNEL")) {
+                            if (!strcmp(procfile_lineword(ff, i, 1), "stable"))
+                                stable = 1;
+                            else if (!strcmp(procfile_lineword(ff, i, 1), "nightly"))
+                                stable = 0;
+                            break;
+                        }
                     }
+                    procfile_close(ff);
                 }
-                procfile_close(ff);
             }
+            if (stable == -1)
+                stable = strchr(NETDATA_VERSION, '-') ? 0 : 1;
+
+            __atomic_store_n(&use_stable, stable, __ATOMIC_RELEASE);
         }
-        if (use_stable == -1)
-            use_stable = strchr(NETDATA_VERSION, '-') ? 0 : 1;
+
+        spinlock_unlock(&spinlock);
     }
-    return (use_stable)?"stable":"nightly";
+    return stable ? "stable" : "nightly";
 }
 
 void charts2json(RRDHOST *host, BUFFER *wb) {
