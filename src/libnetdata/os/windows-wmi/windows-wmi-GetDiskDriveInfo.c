@@ -5,22 +5,6 @@
 
 #if defined(OS_WINDOWS)
 
-static void wmi_bstr_to_multibyte(char *dst, size_t dst_size, BSTR src)
-{
-    if (!dst_size)
-        return;
-
-    dst[0] = '\0';
-
-    if (!src)
-        return;
-
-    if (!utf16_to_utf8(dst, dst_size, src, -1, NULL)) {
-        dst[0] = '\0';
-        return;
-    }
-}
-
 size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
     HRESULT init_hr = InitializeWMI();
     if (FAILED(init_hr) || !nd_wmi.pSvc) return 0;

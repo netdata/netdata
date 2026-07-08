@@ -6,6 +6,22 @@
 
 __thread ND_WMI nd_wmi = { 0 };
 
+void wmi_bstr_to_multibyte(char *dst, size_t dst_size, BSTR src)
+{
+    if (!dst_size)
+        return;
+
+    dst[0] = '\0';
+
+    if (!src)
+        return;
+
+    if (!utf16_to_utf8(dst, dst_size, src, -1, NULL)) {
+        dst[0] = '\0';
+        return;
+    }
+}
+
 HRESULT InitializeWMI(void) {
     if(nd_wmi.pLoc && nd_wmi.pSvc) return S_OK;
     CleanupWMI();
