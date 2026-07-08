@@ -390,15 +390,13 @@ size_t uuidmap_destroy(void) {
         uuid_map.p[partition].entries = 0;
     }
 
-    uuidmap_unlock_all_partitions();
-
     // Destroy ARAL
     if (uuid_map.ar) {
         aral_destroy(uuid_map.ar);
         uuid_map.ar = NULL;
     }
 
-    memset(&uuid_map, 0, sizeof(uuid_map));
+    uuidmap_unlock_all_partitions();
     return referenced;
 }
 
