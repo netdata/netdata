@@ -12,9 +12,12 @@
 // and the RegQueryValueEx will set your size variable to the required buffer size. However,
 // if the source is "Global" or one or more object index values, you will need to increment
 // the buffer size in a loop until RegQueryValueEx does not return ERROR_MORE_DATA.
-static LPBYTE getPerformanceData(const char *pwszSource) {
+static LPBYTE getPerformanceData(const char *pwszSource, DWORD *bytes_used) {
     static __thread DWORD size = 0;
     static __thread LPBYTE buffer = NULL;
+
+    if(bytes_used)
+        *bytes_used = 0;
 
     if(pwszSource == (const char *)0x01) {
         freez(buffer);
@@ -40,11 +43,14 @@ static LPBYTE getPerformanceData(const char *pwszSource) {
         return NULL;
     }
 
+    if(bytes_used)
+        *bytes_used = size;
+
     return buffer;
 }
 
 void perflibFreePerformanceData(void) {
-    getPerformanceData((const char *)0x01);
+    getPerformanceData((const char *)0x01, NULL);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -449,6 +455,10 @@ static BOOL isValidInstanceDefinition(
     if(unlikely(pObjectType && !isObjectSpanValid(pObjectType, pInstance, byte_length)))
         return FALSE;
 
+    if(unlikely(pInstance->NameLength > byte_length ||
+                pInstance->NameOffset > byte_length - pInstance->NameLength))
+        return FALSE;
+
     return TRUE;
 }
 
@@ -486,10 +496,25 @@ static BOOL isValidCounterDefinition(
     return TRUE;
 }
 
-static inline PERF_DATA_BLOCK *getDataBlock(BYTE *pBuffer) {
+static inline PERF_DATA_BLOCK *getDataBlock(BYTE *pBuffer, DWORD bytes_used) {
+    if(unlikely(!pBuffer || bytes_used < sizeof(PERF_DATA_BLOCK))) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "WINDOWS: PERFLIB: Performance data block is too small.");
+        return NULL;
+    }
+
     PERF_DATA_BLOCK *pDataBlock = (PERF_DATA_BLOCK *)pBuffer;
 
     static WCHAR signature[] = { 'P', 'E', 'R', 'F' };
+
+    if(unlikely(pDataBlock->TotalByteLength > bytes_used))
+        pDataBlock->TotalByteLength = bytes_used;
+
+    if(unlikely(pDataBlock->TotalByteLength < sizeof(*pDataBlock))) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "WINDOWS: PERFLIB: Invalid data block length.");
+        return NULL;
+    }
 
     if(memcmp(pDataBlock->Signature, signature, sizeof(signature)) != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
@@ -637,6 +662,9 @@ static BOOL getEncodedStringToUTF8(char *dst, size_t dst_len, DWORD CodePage, ch
     WCHAR *tempBuffer;  // Temporary buffer for Unicode data
     DWORD charsCopied = 0;
 
+    if(unlikely(!dst || !dst_len || dst_len > INT_MAX || length > INT_MAX))
+        return FALSE;
+
     if (CodePage == 0) {
         // Input is already Unicode (UTF-16)
         tempBuffer = (WCHAR *)start;
@@ -649,6 +677,9 @@ static BOOL getEncodedStringToUTF8(char *dst, size_t dst_len, DWORD CodePage, ch
     }
 
     // Now convert from Unicode (UTF-16) to UTF-8
+    if(unlikely(charsCopied > INT_MAX))
+        return FALSE;
+
     int bytesCopied = WideCharToMultiByte(CP_UTF8, 0, tempBuffer, (int)charsCopied, dst, (int)dst_len, NULL, NULL);
     if (bytesCopied == 0) {
         dst[0] = '\0'; // Ensure the buffer is null-terminated even on failure
@@ -662,8 +693,10 @@ static BOOL getEncodedStringToUTF8(char *dst, size_t dst_len, DWORD CodePage, ch
 ALWAYS_INLINE
 BOOL getInstanceName(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, PERF_INSTANCE_DEFINITION *pInstance,
                      char *buffer, size_t bufferLen) {
-    (void)pDataBlock;
     if (!pObjectType || !pInstance || !buffer || !bufferLen)
+        return FALSE;
+
+    if(!isValidInstanceDefinition(pDataBlock, pObjectType, pInstance))
         return FALSE;
 
     return getEncodedStringToUTF8(buffer, bufferLen, pObjectType->CodePage,
@@ -811,10 +844,11 @@ PERF_DATA_BLOCK *perflibGetPerformanceData(DWORD id) {
     char source[24];
     snprintfz(source, sizeof(source), "%u", id);
 
-    LPBYTE pData = (LPBYTE)getPerformanceData((id > 0) ? source : NULL);
+    DWORD bytes_used = 0;
+    LPBYTE pData = (LPBYTE)getPerformanceData((id > 0) ? source : NULL, &bytes_used);
     if (!pData) return NULL;
 
-    PERF_DATA_BLOCK *pDataBlock = getDataBlock(pData);
+    PERF_DATA_BLOCK *pDataBlock = getDataBlock(pData, bytes_used);
     if(!pDataBlock) return NULL;
 
     return pDataBlock;
