@@ -1019,20 +1019,21 @@ Although the `alarm_variables` link shows variables for a particular chart, the 
 
 **Dimension names with spaces**
 
-Use the `${...}` brace form when a dimension name contains spaces. A dimension named `Has Number` must be referenced as `${Has Number}` in `calc`, `warn`, and `crit` expressions — the unbraced form `$Has Number` does not resolve correctly because the name is split at the space.
+Use the `${...}` brace form when a dimension name contains spaces. A dimension named `Has Number` must be referenced as `${Has Number}` in `calc`, `warn`, and `crit` expressions — the unbraced form `$Has Number` fails to parse: the expression lexer reads `$Has` as the variable name, then hits the standalone word `Number`, which is not valid syntax, so the whole expression fails to compile.
 
 ```text
-   alarm: my_dimension_alert
-      on: mychart
-   lookup: max -1m unaligned match-names of Has Number
+    alarm: my_dimension_alert
+       on: mychart
      calc: ${Has Number} * 100
      warn: $this > 80
      crit: $this > 95
-   units: %
+    units: %
     every: 1m
      info: percentage of the Has Number dimension
        to: sysadmin
 ```
+
+This uses `calc` directly on the chart-local dimension, without a `lookup` — see [Alert Examples](#alert-examples) for when to pair `calc` with `lookup` for time-window aggregation instead of the current value.
 
 The same `${...}` rule applies to any variable name containing characters the unbraced form cannot capture — for example, the hyphens in [Prometheus chart IDs](#prometheus-collector-variables).
 
