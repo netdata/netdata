@@ -118,8 +118,12 @@ func TestHistogramStoreScenarios(t *testing.T) {
 					},
 				})
 
+				// A nil-bounds histogram observing bounds different from the captured
+				// schema must NOT panic (client-driven bounds must be crash-safe). The
+				// mismatch is resolved at commit: the captured schema was not observed
+				// this cycle, so the new bounds supersede it.
 				cc.BeginCycle()
-				expectPanic(t, func() {
+				require.NotPanics(t, func() {
 					h.ObservePoint(HistogramPoint{
 						Count: 2, Sum: 0.8,
 						Buckets: []BucketPoint{
@@ -128,7 +132,14 @@ func TestHistogramStoreScenarios(t *testing.T) {
 						},
 					})
 				})
-				cc.AbortCycle()
+				require.NoError(t, cc.CommitCycleSuccess())
+				mustHistogram(t, s.Read(), "svc.latency", nil, HistogramPoint{
+					Count: 2, Sum: 0.8,
+					Buckets: []BucketPoint{
+						{UpperBound: 0.5, CumulativeCount: 2},
+						{UpperBound: 1, CumulativeCount: 2},
+					},
+				})
 			},
 		},
 		"stateful histogram requires bounds": {

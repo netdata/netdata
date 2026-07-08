@@ -16,6 +16,24 @@ type RuntimeStore interface {
 	Write() RuntimeWriter
 }
 
+// DescriptorRetention is an OPTIONAL interface a CollectorStore may implement to expose how
+// long it keeps a descriptor and the clock that lifetime is measured in. A consumer that
+// caches per-name state keyed off metrix descriptors (e.g. the prometheus writer) obtains it
+// via a type assertion and keeps its state alive at least DescriptorRetentionWindow successful
+// commits, so it never re-registers a name while metrix still holds the descriptor. It is
+// deliberately NOT part of CollectorStore so existing implementations and test fakes keep
+// compiling.
+type DescriptorRetention interface {
+	// DescriptorRetentionWindow is the number of successful commits a descriptor can outlive
+	// its last series: expireAfterSuccessCycles + descriptorGraceCycles. It is
+	// DescriptorRetentionUnbounded when series age-expiry is disabled (the descriptor can then
+	// live indefinitely); a consumer MUST treat that as "never age out my cached state".
+	DescriptorRetentionWindow() uint64
+	// SuccessfulCommits is the number of successful commits so far - the clock the retention
+	// window is measured against.
+	SuccessfulCommits() uint64
+}
+
 // CycleController owns collect-cycle transitions for a cycle-managed store.
 // Collector code does not call these methods directly.
 type CycleController interface {
