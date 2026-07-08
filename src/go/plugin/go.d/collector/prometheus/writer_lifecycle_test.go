@@ -218,10 +218,15 @@ func TestMetricFamilyWriterHandleLifecycle(t *testing.T) {
 	})
 
 	t.Run("with no descriptor-retention accessor, family handles are kept (fallback)", func(t *testing.T) {
-		store := metrix.NewCollectorStore()
+		// A CollectorStore that genuinely does not expose DescriptorRetention, so this exercises
+		// newMetricFamilyWriter's real constructor fallback rather than mutating the writer after.
+		real := metrix.NewCollectorStore()
+		store := &noRetentionStore{CollectorStore: real}
 		w := newMetricFamilyWriter(store, metricFamilyWriterPolicy{}, logger.New())
-		w.retention = nil // simulate a store that does not expose the optional accessor
-		cc := cycle(t, store)
+		require.Nil(t, w.retention, "constructor must not resolve the optional accessor")
+		require.Equal(t, metrix.DescriptorRetentionUnbounded, w.window, "fallback window must be unbounded")
+
+		cc := cycle(t, real) // controls the same core the wrapper's Write() delegates to
 
 		cc.BeginCycle()
 		require.Equal(t, 1, w.writeMetricFamilies(scrape(t, "# TYPE foo gauge\nfoo 1\n")))
@@ -234,4 +239,11 @@ func TestMetricFamilyWriterHandleLifecycle(t *testing.T) {
 		}
 		require.Contains(t, w.handles, "foo", "with no accessor, reconcile must keep handles")
 	})
+}
+
+// noRetentionStore is a metrix.CollectorStore that deliberately does NOT expose the optional
+// DescriptorRetention accessor: embedding the interface promotes only Read/Write, so a type
+// assertion to DescriptorRetention fails. It exercises the writer's no-accessor fallback path.
+type noRetentionStore struct {
+	metrix.CollectorStore
 }
