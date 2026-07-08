@@ -549,7 +549,9 @@ NETDATA_SSL_HANDSHAKE_RESULT netdata_ssl_accept_nonblocking(NETDATA_SSL *ssl) {
         return NETDATA_SSL_HANDSHAKE_PENDING;
     }
 
+    int saved_errno = errno;
     netdata_ssl_log_error_queue("SSL_accept", ssl, err);
+    errno = saved_errno;
     ssl->state = NETDATA_SSL_STATE_FAILED;
     return NETDATA_SSL_HANDSHAKE_FAILED;
 }
