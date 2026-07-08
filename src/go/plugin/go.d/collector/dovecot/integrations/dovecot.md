@@ -24,7 +24,7 @@ Module: dovecot
 This collector monitors Dovecot metrics about sessions, logins, commands, page faults and more.
 
 
-It reads the server's response to the `EXPORT\tglobal\n` command.
+It reads the server's response to the `EXPORT\tglobal\n` command from Dovecot's `old_stats` interface.
 
 
 This collector is supported on all platforms.
@@ -69,9 +69,31 @@ UI configuration requires paid Netdata Cloud plan.
 
 ### Prerequisites
 
-#### Enable old_stats plugin
+#### Enable old_stats-compatible statistics
 
-To enable `old_stats` plugin, see [Old Statistics](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics).
+This collector uses Dovecot's `old_stats` interface. On Dovecot 2.3 and newer, enable the
+`old_stats` plugin and expose an `old-stats` socket that matches the collector `address`.
+
+Example Dovecot 2.3+ configuration:
+
+```text
+mail_plugins = $mail_plugins old_stats
+
+service old-stats {
+  unix_listener old-stats {
+    user = netdata
+    group = netdata
+    mode = 0660
+  }
+}
+```
+
+With the socket above, set `address` to `unix:///var/run/dovecot/old-stats`.
+
+The newer Dovecot statistics/OpenMetrics interface is not collected by this integration.
+If you expose Dovecot metrics through OpenMetrics instead, configure Netdata's
+Prometheus/OpenMetrics collector for that endpoint.
+
 
 
 
@@ -90,7 +112,7 @@ The following options can be defined globally: update_every, autodetection_retry
 |:------|:-----|:------------|:--------|:---------:|
 | **Collection** | update_every | Data collection interval (seconds). | 1 | no |
 |  | autodetection_retry | Autodetection retry interval (seconds). Set 0 to disable. | 0 | no |
-| **Target** | address | Dovecot socket address (Unix or TCP). Used by the [old_stats](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics) plugin. | 127.0.0.1:24242 | yes |
+| **Target** | address | Dovecot socket address (Unix or TCP). This collector expects the `old_stats` interface; on Dovecot 2.3+, expose it through `service old-stats`. | 127.0.0.1:24242 | yes |
 |  | timeout | Connection, read, write, and name resolution timeout (seconds). | 1 | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 

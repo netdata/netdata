@@ -20,7 +20,7 @@
       },
       "address": {
         "title": "Address",
-        "description": "The Unix or TCP socket address where the Dovecot [old_stats](https://doc.dovecot.org/configuration_manual/stats/old_statistics/#old-statistics) plugin listens for connections.",
+        "description": "The Unix or TCP socket address where the Dovecot old_stats interface listens for connections. On Dovecot 2.3 and newer, expose this through service old-stats.",
         "type": "string",
         "default": "127.0.0.1:24242"
       },
@@ -56,7 +56,7 @@
       "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
     },
     "address": {
-      "ui:help": "Use `unix://{path_to_socket}` for Unix socket or `{ip}:{port}` for TCP socket."
+      "ui:help": "Use `unix://{path_to_socket}` for a Unix socket or `{ip}:{port}` for TCP. For Dovecot 2.3+, this should point to the old-stats socket."
     },
     "timeout": {
       "ui:help": "Accepts decimals for precise control (e.g., type 1.5 for 1.5 seconds)."
