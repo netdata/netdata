@@ -902,6 +902,7 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
 
     const RRDCALC_ACQUIRED *rca = NULL;
     RRDCALC *rc = NULL;
+    RRDSET_ACQUIRED *rsa = NULL;
     RRDSET *st = NULL;
 
     while(url) {
@@ -968,8 +969,10 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
 
     int scale = (scale_str && *scale_str)?str2i(scale_str):100;
 
-    st = rrdset_find(host, chart, false);
-    if(!st) st = rrdset_find_byname(host, chart);
+    rsa = rrdset_find_and_acquire(host, chart, false);
+    if(!rsa) rsa = rrdset_find_byname_and_acquire(host, chart);
+
+    st = rrdset_acquired_to_rrdset(rsa);
     if(!st) {
         buffer_no_cacheable(w->response.data);
         buffer_svg(w->response.data, "chart not found", NAN, "", NULL, NULL, -1, scale, 0, -1, -1, NULL, NULL);
@@ -1161,6 +1164,7 @@ int api_v1_badge(RRDHOST *host, struct web_client *w, char *url) {
 
 cleanup:
     rrdcalc_from_rrdset_release(st, rca);
+    rrdset_acquired_release(rsa);
     buffer_free(dimensions);
     return ret;
 }
