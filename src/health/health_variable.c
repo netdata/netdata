@@ -148,8 +148,14 @@ bool alert_variable_from_running_alerts(struct variable_lookup_job *vbd) {
     bool found = false;
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(vbd->host, rc) {
-        if(rc->config.name == vbd->variable && rc->rrdset) {
-            variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rc->value, rc->rrdset, "alarm value");
+        if(rc->config.name == vbd->variable) {
+            RRDSET *st = NULL;
+            RRDSET_ACQUIRED *rsa = rrdcalc_rrdset_acquire_linked(vbd->host, rc, &st);
+            if(!rsa)
+                continue;
+
+            variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rc->value, st, "alarm value");
+            rrdset_acquired_release(rsa);
             found = true;
         }
     }
@@ -214,9 +220,16 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
     RRDSET *source_st = NULL;
 
     RRDCALC *rc = data;
-    RRDSET *st = rc->rrdset;
+    RRDSET *linked_st = rrdcalc_rrdset_read_lock(rc);
+    if(!linked_st)
+        return false;
 
-    if(!st)
+    RRDHOST *host = linked_st->rrdhost;
+    rrdcalc_rrdset_read_unlock(linked_st);
+
+    RRDSET *st = NULL;
+    RRDSET_ACQUIRED *rsa = rrdcalc_rrdset_acquire_linked(host, rc, &st);
+    if(!rsa)
         return false;
 
     if(unlikely(!last_collected_t_string)) {
@@ -430,9 +443,9 @@ log:
                "resolved with %s of chart '%s' and context '%s'",
                string2str(variable),
                string2str(rc->config.name),
-               string2str(rc->rrdset->id),
-               string2str(rc->rrdset->context),
-               string2str(rc->rrdset->rrdhost->hostname),
+               string2str(st->id),
+               string2str(st->context),
+               string2str(st->rrdhost->hostname),
                source,
                string2str(source_st->id),
                string2str(source_st->context)
@@ -444,9 +457,9 @@ log:
                "could not be resolved",
                string2str(variable),
                string2str(rc->config.name),
-               string2str(rc->rrdset->id),
-               string2str(rc->rrdset->context),
-               string2str(rc->rrdset->rrdhost->hostname)
+               string2str(st->id),
+               string2str(st->context),
+               string2str(st->rrdhost->hostname)
         );
     }
 #endif
@@ -471,6 +484,7 @@ log:
     }
 
     string_freez(vbd.dim);
+    rrdset_acquired_release(rsa);
 
     return found;
 }
@@ -487,6 +501,7 @@ int alert_variable_lookup_trace(RRDHOST *host __maybe_unused, RRDSET *st, const 
 
     STRING *v = string_strdupz(variable);
     RRDCALC rc = {
+        .chart = st->id,
         .rrdset = st,
     };
 
