@@ -62,14 +62,6 @@ Stale status does not apply to standalone nodes — stale specifically means a c
 **Steps**:
 
 1. Stop the Netdata Agent on the node you want to remove.
-
-   **On Windows**, stop the Netdata service, then uninstall the Agent so the node does not reconnect to Netdata Cloud:
-
-   - **Stop the service**: Follow [Service Control](/docs/netdata-agent/start-stop-restart.md) to stop the Netdata service on Windows.
-   - **Uninstall the Agent**: Open **Windows Settings → Apps → Installed apps** (or search "Add or remove programs"), select **Netdata**, and choose **Uninstall**. Alternatively, run `msiexec /x netdata-x64.msi` from an elevated PowerShell session in the folder containing the installer.
-
-   Uninstalling the Agent takes effect immediately and prevents the node from reconnecting. For full details on the Windows MSI installer, see [Switching Netdata Install Types and Release Channels on Windows](/docs/install/windows-release-channels.md).
-
 2. In Netdata Cloud, go to **Space Settings > Nodes** (click the ⚙️ cog icon below the spaces list).
 3. Locate the offline node in the list
 4. Select the trash icon to remove it
@@ -167,8 +159,11 @@ For nodes that are part of streaming configurations, see [Nodes Ephemerality](/d
 
 To prevent removed nodes from reappearing:
 
+* [Stop the Netdata Agent](/docs/netdata-agent/start-stop-restart.md) on the node
 * Remove or clear any existing `claim.conf` file
 * Clear related environment variables on the node
+
+To remove Netdata from the node entirely instead, see [Uninstall Netdata](/packaging/installer/UNINSTALL.md).
 
 ## Troubleshooting
 
