@@ -342,8 +342,26 @@ procfile *procfile_readall(procfile *ff) {
         size_t s = ff->len;
         size_t x = ff->size - s;
 
-        if(unlikely(s >= PROCFILE_MAX_SOURCE_SIZE))
+        if(unlikely(s > PROCFILE_MAX_SOURCE_SIZE))
             return procfile_readall_file_too_large(ff);
+
+        if(unlikely(s == PROCFILE_MAX_SOURCE_SIZE)) {
+            char extra;
+            ff->stats.reads++;
+            r = read(ff->fd, &extra, 1);
+            if(unlikely(r == -1)) {
+                if(unlikely(!(ff->flags & PROCFILE_FLAG_NO_ERROR_ON_FILE_IO))) collector_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
+                else if(unlikely(ff->flags & PROCFILE_FLAG_ERROR_ON_ERROR_LOG))
+                    netdata_log_error(PF_PREFIX ": Cannot read from file '%s' on fd %d", procfile_filename(ff), ff->fd);
+                procfile_close(ff);
+                return NULL;
+            }
+
+            if(likely(!r))
+                break;
+
+            return procfile_readall_file_too_large(ff);
+        }
 
         if(unlikely(!x)) {
             if(unlikely(ff->size >= PROCFILE_MAX_SOURCE_SIZE))
