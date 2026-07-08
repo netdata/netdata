@@ -64,6 +64,26 @@ Getting started is as simple as visiting [app.netdata.cloud](https://app.netdata
 
 Connect your Agent to your Space to start streaming live metrics within seconds. Whether you're installing Netdata for the first time or connecting an Agent that's already running, the [connect documentation](/src/claim/README.md) covers every method — from the one-command installer for new nodes to the [UI, configuration file, and environment variable options for existing Agents](/src/claim/README.md#connect-existing-agent).
 
+:::tip
+
+**For new installations**, Netdata Cloud generates a personalized version of this command for you:
+
+```bash
+bash <(curl -Ss https://get.netdata.cloud/kickstart.sh) --claim-token YOUR_TOKEN --claim-rooms YOUR_ROOMS --claim-url https://app.netdata.cloud
+```
+
+<details>
+<summary><strong>What this single command does</strong></summary><br/>
+
+- Automatically detects your operating system
+- Installs the latest Netdata Agent
+- Connects to your Cloud Space
+- Starts monitoring immediately
+
+</details>
+
+:::
+
 **What You'll See When Connected:**
 
 Within seconds of connection, you'll experience the power of real-time observability:
