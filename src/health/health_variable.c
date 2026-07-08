@@ -5,6 +5,7 @@
 
 struct variable_lookup_score {
     RRDSET *st;
+    RRDSET_ACQUIRED *rsa;
     const char *source;
     NETDATA_DOUBLE value;
     size_t score;
@@ -36,6 +37,12 @@ struct variable_lookup_job {
 };
 
 static void variable_lookup_add_result_with_score(struct variable_lookup_job *vbd, NETDATA_DOUBLE n, RRDSET *st, const char *source __maybe_unused) {
+    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(st->rrdhost, rrdset_id(st), true);
+    if(!rsa)
+        return;
+
+    st = rrdset_acquired_to_rrdset(rsa);
+
     if(vbd->score.last_rrdset != st) {
         RRDSET *alert_st = rrdcalc_rrdset_read_lock(vbd->rc);
         if(alert_st) {
@@ -57,8 +64,19 @@ static void variable_lookup_add_result_with_score(struct variable_lookup_job *vb
         .value = n,
         .score = vbd->score.last_score,
         .st = st,
+        .rsa = rsa,
         .source = source,
     };
+}
+
+static void variable_lookup_results_free(struct variable_lookup_job *vbd) {
+    for(size_t i = 0; i < vbd->result.used; i++)
+        rrdset_acquired_release(vbd->result.array[i].rsa);
+
+    freez(vbd->result.array);
+    vbd->result.array = NULL;
+    vbd->result.used = 0;
+    vbd->result.size = 0;
 }
 
 static bool variable_lookup_in_chart(struct variable_lookup_job *vbd, RRDSET *st, bool stop_on_match) {
@@ -428,7 +446,6 @@ find_best_scored:
         source = best->source;
         source_st = best->st;
         *result = best->value;
-        freez(vbd.result.array);
     }
     else {
         found = false;
@@ -483,6 +500,7 @@ log:
         }
     }
 
+    variable_lookup_results_free(&vbd);
     string_freez(vbd.dim);
     rrdset_acquired_release(rsa);
 
