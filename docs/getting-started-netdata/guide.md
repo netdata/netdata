@@ -62,70 +62,7 @@ Getting started is as simple as visiting [app.netdata.cloud](https://app.netdata
 
 ## [2. Connect a Node & See Instant Results](/src/claim/README.md)
 
-**Connect Your Agent**
-
-How you connect depends on whether Netdata is already running on your node.
-
-:::tip
-
-**Already have the Netdata Agent installed?** You do **not** need to reinstall it. Open the Agent's local dashboard at `http://NODE:19999` (replace `NODE` with your server's IP address or hostname), sign in to your Netdata Cloud account, and click **Connect** to claim the existing Agent to your Space. See [Connect Existing Agent](/src/claim/README.md#connect-existing-agent) for the full procedure and troubleshooting (including `netdatacli aclk-state` and the `cloud` section of `http://NODE:19999/api/v3/info`).
-
-:::
-
-**New installation?** Once logged into Netdata Cloud, you'll see connection instructions. There are three easy ways to install and connect:
-
-<details>
-<summary><strong>Method 1: Through the Cloud Interface</strong></summary><br/>
-
-1. Navigate to **Space Settings** (⚙️) on the left sidebar below the spaces list
-2. Select **Nodes** tab
-3. Click the **"+"** button to add a new node
-4. Copy and run the generated connection command
-
-</details>
-
-<details>
-<summary><strong>Method 2: From the Nodes Tab</strong></summary><br/>
-
-1. Go to the **Nodes** tab in your Room
-2. Click **Add nodes** button
-3. Follow the step-by-step instructions
-
-</details>
-
-<details>
-<summary><strong>Method 3: Via Integrations Page</strong></summary><br/>
-
-1. Visit the **Integrations** page
-2. Select your OS or container environment
-3. Execute the provided connection command
-
-</details>
-
-:::tip
-
-**The One-Command Solution:**
-All methods will show you a command like this:
-
-```bash
-bash <(curl -Ss https://get.netdata.cloud/kickstart.sh) --claim-token YOUR_TOKEN --claim-rooms YOUR_ROOMS --claim-url https://app.netdata.cloud
-```
-
-:::
-
-:::info
-
-<details>
-<summary><strong>What this single command does:</strong></summary><br/>
-
-- Automatically detects your operating system
-- Installs the latest Netdata Agent
-- Connects to your Cloud Space
-- Starts monitoring immediately
-
-</details>
-
-:::
+Connect your Agent to your Space to start streaming live metrics within seconds. Whether you're installing Netdata for the first time or connecting an Agent that's already running, the [connect documentation](/src/claim/README.md) covers every method — from the one-command installer for new nodes to the UI, configuration file, and environment variable options for existing Agents.
 
 **What You'll See When Connected:**
 
