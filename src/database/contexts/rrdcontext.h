@@ -46,7 +46,7 @@ STRING *rrdinstance_acquired_units_dup(RRDINSTANCE_ACQUIRED *ria);
 RRDLABELS *rrdinstance_acquired_labels(RRDINSTANCE_ACQUIRED *ria);
 DICTIONARY *rrdinstance_acquired_functions(RRDINSTANCE_ACQUIRED *ria);
 RRDHOST *rrdinstance_acquired_rrdhost(RRDINSTANCE_ACQUIRED *ria);
-RRDSET *rrdinstance_acquired_rrdset(RRDINSTANCE_ACQUIRED *ria);
+RRDSET_ACQUIRED *rrdinstance_acquired_rrdset_acquire(RRDINSTANCE_ACQUIRED *ria);
 
 bool rrdinstance_acquired_belongs_to_context(RRDINSTANCE_ACQUIRED *ria, RRDCONTEXT_ACQUIRED *rca);
 time_t rrdinstance_acquired_update_every(RRDINSTANCE_ACQUIRED *ria);

@@ -405,6 +405,8 @@ extern RRDHOST *localhost;
 #define rrdhost_os(host) string2str((host)->os)
 // Timezone fields are mutable at runtime (DST refresh); use rrdhost_tz_get() for thread-safe access.
 // Do NOT access host->timezone or host->abbrev_timezone directly outside of rrdhost_update_lock.
+// Host identity fields are mutable at runtime; use rrdhost_identity_acquire()
+// when their STRING references must survive concurrent host metadata updates.
 #define rrdhost_program_name(host) string2str((host)->program_name)
 #define rrdhost_program_version(host) string2str((host)->program_version)
 
@@ -525,6 +527,15 @@ void set_host_properties(
     const char *prog_name, const char *prog_version);
 
 bool rrdhost_update_timezone(RRDHOST *host, const char *timezone, const char *abbrev_timezone, int32_t utc_offset);
+
+typedef struct {
+    STRING *hostname;
+    STRING *prog_name;
+    STRING *prog_version;
+} RRDHOST_IDENTITY;
+
+RRDHOST_IDENTITY rrdhost_identity_acquire(RRDHOST *host);
+void rrdhost_identity_release(RRDHOST_IDENTITY *identity);
 
 // Thread-safe timezone snapshot from an RRDHOST.
 // The returned struct owns strdup'd copies; release with rrdhost_tz_free().

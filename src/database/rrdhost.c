@@ -212,6 +212,27 @@ void rrdhost_tz_free(RRDHOST_TZ *tz) {
     tz->utc_offset = 0;
 }
 
+RRDHOST_IDENTITY rrdhost_identity_acquire(RRDHOST *host) {
+    RRDHOST_IDENTITY identity;
+
+    spinlock_lock(&host->rrdhost_update_lock);
+    identity.hostname = string_dup(host->hostname);
+    identity.prog_name = string_dup(host->program_name);
+    identity.prog_version = string_dup(host->program_version);
+    spinlock_unlock(&host->rrdhost_update_lock);
+
+    return identity;
+}
+
+void rrdhost_identity_release(RRDHOST_IDENTITY *identity) {
+    string_freez(identity->hostname);
+    string_freez(identity->prog_name);
+    string_freez(identity->prog_version);
+    identity->hostname = NULL;
+    identity->prog_name = NULL;
+    identity->prog_version = NULL;
+}
+
 // ----------------------------------------------------------------------------
 // RRDHOST - add a host
 
