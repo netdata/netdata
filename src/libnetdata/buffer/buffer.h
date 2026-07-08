@@ -160,9 +160,11 @@ ALWAYS_INLINE
 static void _buffer_json_depth_push(BUFFER *wb, BUFFER_JSON_NODE_TYPE type) {
     int next_depth = wb->json.depth + 1;
 
-    if(unlikely(next_depth < 0 || next_depth >= BUFFER_JSON_MAX_DEPTH))
+    if(next_depth < 0 || next_depth >= BUFFER_JSON_MAX_DEPTH) {
         fatal("BUFFER JSON: invalid nesting depth %d (next %d, max %d)",
               wb->json.depth, next_depth, BUFFER_JSON_MAX_DEPTH - 1);
+        return;
+    }
 
     wb->json.depth = (int8_t)next_depth;
 #ifdef NETDATA_INTERNAL_CHECKS
