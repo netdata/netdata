@@ -136,7 +136,7 @@ fn build_files_response(tr: &TenantRegistries) -> FilesResponse {
 
 /// The query path's handle to remote storage: a fetcher ([`OpendalStorage`]) and
 /// the local read-through [`FileCache`] that materializes evicted SFSTs back to
-/// disk. Present only when `storage.enabled`.
+/// disk. Present only when `remote_storage.enabled`.
 #[derive(Clone)]
 pub(crate) struct RemoteRead {
     storage: file_lifecycle::storage::OpendalStorage,

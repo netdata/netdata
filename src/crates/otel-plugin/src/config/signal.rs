@@ -1,16 +1,16 @@
 //! Override types for the per-signal tuning sections (`logs`, `traces`) and the
-//! global `storage`/`auth` sections.
+//! global `remote_storage`/`auth` sections.
 //!
 //! Per-signal sections carry tuning only — no dirs (derived from `base_dir`) and
 //! no storage (global). The same [`SignalOverride`] shape applies to every
 //! signal; [`apply_signal`] merges it onto a [`SignalConfig`]. Storage and auth
-//! are global, merged by [`apply_storage`] / [`apply_auth`].
+//! are global, merged by [`apply_remote_storage`] / [`apply_auth`].
 
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;
 
-use bridge::config::{AuthConfig, RetentionEntry, SignalConfig, StorageConfig};
+use bridge::config::{AuthConfig, RemoteStorageConfig, RetentionEntry, SignalConfig};
 use bytesize::ByteSize;
 use serde::Deserialize;
 
@@ -69,7 +69,7 @@ fn opt_humantime<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<Durati
 
 #[derive(Debug, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub(super) struct StorageOverride {
+pub(super) struct RemoteStorageOverride {
     #[serde(default)]
     pub(super) enabled: Option<bool>,
     #[serde(default)]
@@ -105,7 +105,7 @@ impl SignalOverride {
     }
 }
 
-impl StorageOverride {
+impl RemoteStorageOverride {
     pub(super) fn has_any(&self) -> bool {
         self.enabled.is_some()
             || self.uri.is_some()
@@ -158,8 +158,8 @@ pub(super) fn apply_signal(config: &mut SignalConfig, o: &SignalOverride) {
     }
 }
 
-/// Merge the global storage override onto [`StorageConfig`].
-pub(super) fn apply_storage(config: &mut StorageConfig, o: &StorageOverride) {
+/// Merge the global remote-storage override onto [`RemoteStorageConfig`].
+pub(super) fn apply_remote_storage(config: &mut RemoteStorageConfig, o: &RemoteStorageOverride) {
     if let Some(v) = o.enabled {
         config.enabled = v;
     }

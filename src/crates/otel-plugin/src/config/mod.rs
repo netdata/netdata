@@ -19,7 +19,7 @@ use serde::Deserialize;
 
 use endpoint::EndpointOverride;
 use metrics::MetricsOverride;
-use signal::{AuthOverride, SignalOverride, StorageOverride};
+use signal::{AuthOverride, RemoteStorageOverride, SignalOverride};
 
 /// Standard-install fallback when the agent's log directory is unknown.
 const LEGACY_DEFAULT_JOURNAL_DIR: &str = "/var/log/netdata/otel/v1";
@@ -247,13 +247,13 @@ pub fn load_config() -> Result<PluginConfig> {
 }
 
 fn log_config(source: &str, config: &PluginConfig) {
-    // The whole config is logged at startup for supportability, but `storage.uri`
+    // The whole config is logged at startup for supportability, but `remote_storage.uri`
     // is redacted to its scheme first: operators are told (otel.yaml.in + the
     // remote-storage spec) the URI is not logged, so a misplaced secret in its
     // host/path/query cannot leak to the journal. Redaction is logging-only — the
     // real config sent to the workers over IPC keeps the verbatim URI.
     let mut redacted = config.clone();
-    redacted.storage.uri = redact_uri(&config.storage.uri);
+    redacted.remote_storage.uri = redact_uri(&config.remote_storage.uri);
     match serde_json::to_string(&redacted) {
         Ok(json) => tracing::info!("{source} config: {json}"),
         Err(e) => tracing::warn!("failed to serialize {source} config: {e}"),
@@ -288,8 +288,8 @@ fn validate(config: &PluginConfig) -> Result<()> {
     }
     // When storage is on, the URI is consumed by OpenDAL; an empty URI would
     // only fail later at backend construction. Surface it at config load.
-    if config.storage.enabled && config.storage.uri.is_empty() {
-        anyhow::bail!("storage.uri must be set when storage.enabled is true");
+    if config.remote_storage.enabled && config.remote_storage.uri.is_empty() {
+        anyhow::bail!("remote_storage.uri must be set when remote_storage.enabled is true");
     }
 
     if !config.endpoint.path.contains(':') {
@@ -359,7 +359,7 @@ pub(crate) struct ConfigOverride {
     #[serde(default)]
     base_dir: Option<PathBuf>,
     #[serde(default)]
-    storage: Option<StorageOverride>,
+    remote_storage: Option<RemoteStorageOverride>,
     #[serde(default)]
     auth: Option<AuthOverride>,
     #[serde(default)]
@@ -390,7 +390,7 @@ impl ConfigOverride {
         self.endpoint.is_some()
             || self.metrics.is_some()
             || self.base_dir.is_some()
-            || self.storage.is_some()
+            || self.remote_storage.is_some()
             || self.auth.is_some()
             || self.logs.is_some()
             || self.traces.is_some()
@@ -407,8 +407,8 @@ fn apply_overrides(config: &mut PluginConfig, o: &ConfigOverride) {
     if let Some(b) = &o.base_dir {
         config.base_dir = b.clone();
     }
-    if let Some(s) = &o.storage {
-        signal::apply_storage(&mut config.storage, s);
+    if let Some(s) = &o.remote_storage {
+        signal::apply_remote_storage(&mut config.remote_storage, s);
     }
     if let Some(a) = &o.auth {
         signal::apply_auth(&mut config.auth, a);
@@ -446,7 +446,7 @@ metrics:
   expiry_duration_secs: 900
   max_new_charts_per_request: 100
 base_dir: /var/log/netdata/otel/v2
-storage:
+remote_storage:
   enabled: false
   uri: "fs:///var/log/netdata/otel/v2/remote"
 auth:
@@ -541,10 +541,10 @@ traces:
             std::path::Path::new("/var/log/netdata/otel/v2")
         );
         // Storage + auth are global.
-        assert!(!config.storage.enabled);
-        assert_eq!(config.storage.uri, "fs:///var/log/netdata/otel/v2/remote");
+        assert!(!config.remote_storage.enabled);
+        assert_eq!(config.remote_storage.uri, "fs:///var/log/netdata/otel/v2/remote");
         // The fixture omits read_cache_max_size → the code default (1 GB).
-        assert_eq!(config.storage.read_cache_max_size, ByteSize::gb(1));
+        assert_eq!(config.remote_storage.read_cache_max_size, ByteSize::gb(1));
         assert!(!config.auth.enabled);
     }
 
@@ -722,19 +722,19 @@ logs:
     }
 
     #[test]
-    fn override_global_storage() {
+    fn override_global_remote_storage() {
         let config = resolve_with_user(
             r#"
-storage:
+remote_storage:
   enabled: true
   uri: "fs:///data/remote"
   read_cache_max_size: "2GiB"
 "#,
         )
         .unwrap();
-        assert!(config.storage.enabled);
-        assert_eq!(config.storage.uri, "fs:///data/remote");
-        assert_eq!(config.storage.read_cache_max_size, ByteSize::gib(2));
+        assert!(config.remote_storage.enabled);
+        assert_eq!(config.remote_storage.uri, "fs:///data/remote");
+        assert_eq!(config.remote_storage.read_cache_max_size, ByteSize::gib(2));
         // Read-cache dir is derived per signal from base_dir (stock's default 4 GB
         // size is asserted in stock_yaml_base_dir_and_globals_parsed).
         let logs = config.lifecycle_for(bridge::signals::Signal::Logs);
@@ -792,7 +792,7 @@ logs:
             "some_future_option: true\n",
             "endpoint:\n  unknown: x\n",
             "metrics:\n  unknown: x\n",
-            "storage:\n  unknown: x\n",
+            "remote_storage:\n  unknown: x\n",
             "auth:\n  unknown: x\n",
             "logs:\n  unknown: x\n",
             "traces:\n  unknown: x\n",
@@ -920,10 +920,10 @@ logs:
     }
 
     #[test]
-    fn validation_rejects_enabled_storage_without_uri() {
-        assert!(resolve_with_user("storage:\n  enabled: true\n  uri: ''\n").is_err());
+    fn validation_rejects_enabled_remote_storage_without_uri() {
+        assert!(resolve_with_user("remote_storage:\n  enabled: true\n  uri: ''\n").is_err());
         // Disabled storage with an empty uri is fine (uri unused).
-        assert!(resolve_with_user("storage:\n  enabled: false\n  uri: ''\n").is_ok());
+        assert!(resolve_with_user("remote_storage:\n  enabled: false\n  uri: ''\n").is_ok());
     }
 
     #[test]
@@ -1113,21 +1113,21 @@ logs:
     }
 
     #[test]
-    fn env_override_global_storage() {
+    fn env_override_global_remote_storage() {
         let o = ConfigOverride::from_map(&env_map(&[
-            ("NETDATA_OTEL_CFG_STORAGE_ENABLED", "yes"),
-            ("NETDATA_OTEL_CFG_STORAGE_URI", "fs:///data/remote"),
-            ("NETDATA_OTEL_CFG_STORAGE_READ_CACHE_MAX_SIZE", "2GiB"),
+            ("NETDATA_OTEL_CFG_REMOTE_STORAGE_ENABLED", "yes"),
+            ("NETDATA_OTEL_CFG_REMOTE_STORAGE_URI", "fs:///data/remote"),
+            ("NETDATA_OTEL_CFG_REMOTE_STORAGE_READ_CACHE_MAX_SIZE", "2GiB"),
         ]))
         .unwrap();
         // Guard against a future refactor dropping a field from
-        // `StorageOverride::has_any()` — that would silently discard the
+        // `RemoteStorageOverride::has_any()` — that would silently discard the
         // override (a set-but-not-applied footgun) while still parsing.
         assert!(o.has_any());
-        let storage = o.storage.as_ref().unwrap();
-        assert_eq!(storage.enabled, Some(true));
-        assert_eq!(storage.uri.as_deref(), Some("fs:///data/remote"));
-        assert_eq!(storage.read_cache_max_size, Some(ByteSize::gib(2)));
+        let remote_storage = o.remote_storage.as_ref().unwrap();
+        assert_eq!(remote_storage.enabled, Some(true));
+        assert_eq!(remote_storage.uri.as_deref(), Some("fs:///data/remote"));
+        assert_eq!(remote_storage.read_cache_max_size, Some(ByteSize::gib(2)));
     }
 
     #[test]
@@ -1183,7 +1183,7 @@ logs:
     fn env_override_invalid_bytesize_rejected() {
         assert!(
             ConfigOverride::from_map(&env_map(&[(
-                "NETDATA_OTEL_CFG_STORAGE_READ_CACHE_MAX_SIZE",
+                "NETDATA_OTEL_CFG_REMOTE_STORAGE_READ_CACHE_MAX_SIZE",
                 "not-a-size"
             )]))
             .is_err()
@@ -1443,12 +1443,12 @@ logs:
 
         assert_eq!(config.base_dir, Path::new("/var/log/netdata/otel/v2"));
 
-        assert!(!config.storage.enabled);
-        assert_eq!(config.storage.uri, "fs:///var/log/netdata/otel/v2/remote");
-        assert_eq!(config.storage.read_cache_max_size, ByteSize::gb(1));
+        assert!(!config.remote_storage.enabled);
+        assert_eq!(config.remote_storage.uri, "fs:///var/log/netdata/otel/v2/remote");
+        assert_eq!(config.remote_storage.read_cache_max_size, ByteSize::gb(1));
         // Hidden knob: resolved from the code default.
         assert_eq!(
-            config.storage.startup_op_timeout,
+            config.remote_storage.startup_op_timeout,
             Duration::from_secs(5 * 60)
         );
         assert!(!config.auth.enabled);

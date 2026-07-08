@@ -36,7 +36,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Context;
-use bridge::config::{LifecycleConfig, StorageConfig};
+use bridge::config::{LifecycleConfig, RemoteStorageConfig};
 use bridge::signals::Signal;
 use bridge::{LedgerRequest, LedgerResponse};
 use ferryboat::Connection;
@@ -100,9 +100,9 @@ pub struct Ledger {
     /// carry the owning `pipeline_id`.
     cleaner: ComponentHandle<CleanerRequest, CleanerResponse>,
     /// Shared uploader (one global upload-concurrency budget + shared storage
-    /// handle). `None` when remote storage is disabled (`storage.enabled =
+    /// handle). `None` when remote storage is disabled (`remote_storage.enabled =
     /// false`): the storage client and uploader are not constructed, so a
-    /// malformed `storage.uri` cannot abort startup for a local-only deployment.
+    /// malformed `remote_storage.uri` cannot abort startup for a local-only deployment.
     /// Every send site is gated on storage being enabled, so a `None` uploader
     /// is never asked to upload. Its responses carry the owning `pipeline_id`.
     uploader: Option<ComponentHandle<UploaderRequest, UploaderResponse>>,
@@ -183,7 +183,7 @@ impl Ledger {
         // Process-global remote storage (one backend for every signal). The shell
         // owns it: it builds the storage handle / uploader / read cache from this
         // and decides upload+retention gating from whether that handle exists.
-        storage_config: &StorageConfig,
+        remote_storage_config: &RemoteStorageConfig,
     ) -> anyhow::Result<Self> {
         let cancel = CancellationToken::new();
 
@@ -191,11 +191,11 @@ impl Ledger {
         tracing::info!("cleaner spawned");
 
         // Build the shared remote-storage client and uploader ONLY when storage
-        // is enabled. `OpendalStorage::new` parses `storage.uri` (and applies the
+        // is enabled. `OpendalStorage::new` parses `remote_storage.uri` (and applies the
         // retry layer); deferring it behind the flag means a malformed URI cannot
-        // abort startup for a local-only (storage.enabled = false) deployment.
-        let (storage, mut uploader, read_cache) = if storage_config.enabled {
-            let storage = OpendalStorage::new(storage_config.uri.as_str())?;
+        // abort startup for a local-only (remote_storage.enabled = false) deployment.
+        let (storage, mut uploader, read_cache) = if remote_storage_config.enabled {
+            let storage = OpendalStorage::new(remote_storage_config.uri.as_str())?;
 
             // Non-blocking startup reachability probe: confirm the backend is
             // reachable and the credentials are accepted, logging a clear error
@@ -240,11 +240,11 @@ impl Ledger {
             let cache_dir = lifecycle.read_cache_dir.clone();
             let read_cache = file_cache::FileCache::open(
                 &cache_dir,
-                storage_config.read_cache_max_size.as_u64(),
+                remote_storage_config.read_cache_max_size.as_u64(),
             )?;
             tracing::info!(
                 dir = %cache_dir.display(),
-                capacity = storage_config.read_cache_max_size.as_u64(),
+                capacity = remote_storage_config.read_cache_max_size.as_u64(),
                 "remote-read cache opened"
             );
 
@@ -271,7 +271,7 @@ impl Ledger {
             lifecycle,
             own_machine,
             seq_highwater_path,
-            storage_config.startup_op_timeout,
+            remote_storage_config.startup_op_timeout,
             &cancel,
             &mut cleaner,
             uploader.as_mut(),
@@ -292,7 +292,7 @@ impl Ledger {
             traces_lifecycle,
             own_machine,
             seq_highwater_path,
-            storage_config.startup_op_timeout,
+            remote_storage_config.startup_op_timeout,
             &cancel,
             &mut cleaner,
             uploader.as_mut(),

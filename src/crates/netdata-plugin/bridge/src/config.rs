@@ -37,7 +37,7 @@ pub struct PluginConfig {
     pub base_dir: PathBuf,
     /// Remote object storage — global across signals (one on/off + one
     /// backend). Each signal uploads under its own `v2/{signal}/...` prefix.
-    pub storage: StorageConfig,
+    pub remote_storage: RemoteStorageConfig,
     /// Tenant authentication — global across signals (one gRPC tenant policy
     /// for the process).
     #[serde(default)]
@@ -73,7 +73,7 @@ impl PluginConfig {
     /// The signal-neutral file-lifecycle view for one signal: the WAL, index, and
     /// catalog settings (with derived dirs) the content-agnostic ledger substrate
     /// consumes. The derived directory layout (`{base_dir}/{signal}/...`) is
-    /// combined with the per-signal tuning. `storage` and `auth` are excluded —
+    /// combined with the per-signal tuning. `remote_storage` and `auth` are excluded —
     /// both are global to the process (the coordinator shell owns remote storage;
     /// auth is tenant-scoped), not per-signal file-lifecycle concerns.
     ///
@@ -345,7 +345,7 @@ pub struct LifecycleConfig {
 /// (see [`LifecycleConfig::read_cache_dir`]).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct StorageConfig {
+pub struct RemoteStorageConfig {
     /// Whether remote storage is enabled.
     #[serde(default)]
     pub enabled: bool,
@@ -862,7 +862,7 @@ endpoint:
 metrics:
   max_new_charts_per_request: 100
 base_dir: /var/lib/netdata/otel
-storage:
+remote_storage:
   enabled: true
   uri: "fs:///var/lib/netdata/otel/remote"
   read_cache_max_size: "2GiB"
@@ -924,9 +924,9 @@ traces:
         let c = full_config();
         assert_eq!(c.base_dir, PathBuf::from("/var/lib/netdata/otel"));
         // Global storage + auth.
-        assert!(c.storage.enabled);
-        assert_eq!(c.storage.uri, "fs:///var/lib/netdata/otel/remote");
-        assert_eq!(c.storage.read_cache_max_size, ByteSize::gib(2));
+        assert!(c.remote_storage.enabled);
+        assert_eq!(c.remote_storage.uri, "fs:///var/lib/netdata/otel/remote");
+        assert_eq!(c.remote_storage.read_cache_max_size, ByteSize::gib(2));
         assert!(c.auth.enabled);
         // Per-signal tuning differs between logs and traces.
         assert!(c.logs.crc_enabled);
@@ -1013,12 +1013,12 @@ traces:
     }
 
     #[test]
-    fn storage_startup_op_timeout_default_and_roundtrip() {
+    fn remote_storage_startup_op_timeout_default_and_roundtrip() {
         // Absent → 5 min default.
-        let c: StorageConfig = serde_yaml::from_str("uri: \"fs:///x\"\n").unwrap();
+        let c: RemoteStorageConfig = serde_yaml::from_str("uri: \"fs:///x\"\n").unwrap();
         assert_eq!(c.startup_op_timeout, Duration::from_secs(5 * 60));
         // Present humantime string round-trips.
-        let c: StorageConfig =
+        let c: RemoteStorageConfig =
             serde_yaml::from_str("uri: \"fs:///x\"\nstartup_op_timeout: \"5 minutes\"\n").unwrap();
         assert_eq!(c.startup_op_timeout, Duration::from_secs(5 * 60));
     }

@@ -115,7 +115,7 @@ pub struct OpendalStorage {
 impl OpendalStorage {
     /// Build from a storage URI, applying the standard retry layer. Parsing the
     /// URI here (not at `Ledger::new`) keeps opendal out of the ledger; the
-    /// caller still gates construction on `storage.enabled` so a malformed URI
+    /// caller still gates construction on `remote_storage.enabled` so a malformed URI
     /// can't abort a local-only deployment.
     pub fn new(uri: &str) -> std::io::Result<Self> {
         let retry_layer = opendal::layers::RetryLayer::new()

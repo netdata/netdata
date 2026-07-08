@@ -40,7 +40,7 @@ metrics:
 # Must be an absolute path.
 base_dir: @logdir_POST@/otel/v2
 
-storage:
+remote_storage:
   # Upload data to remote object storage, in addition to keeping it on local
   # disk. One backend is shared by logs and traces.
   enabled: false

@@ -9,7 +9,9 @@ use anyhow::Result;
 use super::ConfigOverride;
 use super::endpoint::EndpointOverride;
 use super::metrics::MetricsOverride;
-use super::signal::{AuthOverride, CatalogOverride, IngestOverride, SignalOverride, StorageOverride};
+use super::signal::{
+    AuthOverride, CatalogOverride, IngestOverride, RemoteStorageOverride, SignalOverride,
+};
 
 /// A snapshot of `NETDATA_OTEL_CFG_*` (name → raw value), so config resolution reads
 /// from an injected map rather than `std::env` and stays unit-testable. Values
@@ -155,7 +157,7 @@ impl ConfigOverride {
         let endpoint = EndpointOverride::from_map(env)?;
         let metrics = MetricsOverride::from_map(env)?;
         let base_dir = get_env(env, "NETDATA_OTEL_CFG_BASE_DIR")?.map(PathBuf::from);
-        let storage = StorageOverride::from_map(env)?;
+        let remote_storage = RemoteStorageOverride::from_map(env)?;
         let auth = AuthOverride::from_map(env)?;
         let logs = SignalOverride::from_map(env, "LOGS")?;
         let traces = SignalOverride::from_map(env, "TRACES")?;
@@ -173,8 +175,8 @@ impl ConfigOverride {
                 None
             },
             base_dir,
-            storage: if storage.has_any() {
-                Some(storage)
+            remote_storage: if remote_storage.has_any() {
+                Some(remote_storage)
             } else {
                 None
             },
@@ -213,15 +215,18 @@ impl MetricsOverride {
     }
 }
 
-impl StorageOverride {
+impl RemoteStorageOverride {
     fn from_map(env: &EnvReader<'_>) -> Result<Self> {
         Ok(Self {
-            enabled: parse_env_bool(env, "NETDATA_OTEL_CFG_STORAGE_ENABLED")?,
-            uri: get_env(env, "NETDATA_OTEL_CFG_STORAGE_URI")?.map(str::to_string),
-            read_cache_max_size: parse_env_var(env, "NETDATA_OTEL_CFG_STORAGE_READ_CACHE_MAX_SIZE")?,
+            enabled: parse_env_bool(env, "NETDATA_OTEL_CFG_REMOTE_STORAGE_ENABLED")?,
+            uri: get_env(env, "NETDATA_OTEL_CFG_REMOTE_STORAGE_URI")?.map(str::to_string),
+            read_cache_max_size: parse_env_var(
+                env,
+                "NETDATA_OTEL_CFG_REMOTE_STORAGE_READ_CACHE_MAX_SIZE",
+            )?,
             startup_op_timeout: parse_env_duration(
                 env,
-                "NETDATA_OTEL_CFG_STORAGE_STARTUP_OP_TIMEOUT",
+                "NETDATA_OTEL_CFG_REMOTE_STORAGE_STARTUP_OP_TIMEOUT",
             )?,
         })
     }

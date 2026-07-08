@@ -57,7 +57,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     // → `{base}/{signal}/...` dirs + per-signal tuning). The ingestor's per-signal
     // WAL writers derive their dirs the same way, so the two processes agree on
     // where each signal's files live. Remote storage is process-global, so it is
-    // passed once (`config.storage`), not per signal.
+    // passed once (`config.remote_storage`), not per signal.
     let mut ledger = Ledger::new(
         supervisor,
         &config.writer_socket_path,
@@ -65,7 +65,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
         &config.seq_highwater_path(),
         &config.lifecycle_for(Signal::Logs),
         &config.lifecycle_for(Signal::Traces),
-        &config.storage,
+        &config.remote_storage,
     )
     .await
     .context("failed to initialize ledger")?;
