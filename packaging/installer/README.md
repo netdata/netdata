@@ -64,11 +64,11 @@ You can also install Netdata directly without connecting to Netdata Cloud. Choos
 
 If the installation completed but nothing appears in your dashboard, work through this checklist:
 
-1. **Confirm the Agent service is running.** Check the service status for your platform (`sudo systemctl status netdata` on systemd, or `sudo service netdata status` otherwise) and confirm the Agent is reachable at `http://NODE:19999`. See [Check status](/docs/netdata-agent/start-stop-restart.md#check-status) for the full command list and the `netdatacli ping` readiness check.
+1. **Confirm the Agent service is running.** [Check the service status](/docs/netdata-agent/start-stop-restart.md#check-status) for your platform and confirm the Agent is reachable at `http://NODE:19999`.
 
-2. **Open the right dashboard for your setup.** For claimed nodes, view your nodes and charts in [Netdata Cloud](https://app.netdata.cloud/). For an unclaimed node or local-only access, open the local Agent dashboard at `http://NODE:19999`.
+2. **Open the right dashboard for your setup.** For connected nodes, check [Netdata Cloud](https://app.netdata.cloud/). For a node that is not connected to Netdata Cloud, or for local-only access, open the local Agent dashboard at `http://NODE:19999`.
 
-3. **If the node is missing from Netdata Cloud, verify it was claimed.** Claiming links the Agent to your Netdata Cloud Space. See [Connect Agent to Cloud](/src/claim/README.md#connect-agent-to-cloud) for the claiming steps. If claiming already ran but the node still does not appear, check the Cloud connection with `sudo netdatacli aclk-state` — see [Troubleshooting](/src/claim/README.md#troubleshooting).
+3. **If the node is missing from Netdata Cloud, verify it was connected.** Connecting links the Agent to your Netdata Cloud Space. See [Connect Agent to Cloud](/src/claim/README.md#connect-agent-to-cloud) for the steps. If the Agent was already connected but the node still does not appear, see [Troubleshooting](/src/claim/README.md#troubleshooting) to check the Cloud connection status.
 
 4. **Allow inbound TCP port 19999 for local dashboard access from another machine.** The host firewall on the node must permit connections to the Agent's port. If the local dashboard does not load from a remote browser, confirm port 19999 is open on the node.
 
