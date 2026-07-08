@@ -171,6 +171,27 @@ Add your own labels to categorize systems by any criteria you need.
 
 Use custom host labels such as `environment` with [Node Rule-Based Room Assignment](/docs/netdata-cloud/node-rule-based-room-assignment.md) to route Kubernetes Nodes into separate Rooms.
 
+### Remove custom labels
+
+Remove a custom label you no longer need.
+
+1. Edit your Netdata configuration:
+
+    ```bash
+    cd /etc/netdata   # Replace with your Netdata config directory
+    sudo ./edit-config netdata.conf
+    ```
+
+2. In the `[host labels]` section, delete the line for the label you want to remove.
+3. Save the file.
+4. Apply the change without restarting Netdata:
+
+    ```bash
+    netdatacli reload-labels
+    ```
+
+5. Confirm the label is gone at `http://HOST-IP:19999/api/v1/info`
+
 ### Stream labels from Child to Parent
 
 In Parent-Child setups, host labels automatically stream from children to the parent node. Access any child's labels through the parent at:
