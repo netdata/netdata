@@ -9,9 +9,12 @@
 
 #include "../collectors-ipc/ebpfgo_dns_shared_memory.h"
 
-bool network_viewer_dns_shared_memory_refresh(void);
-const struct ebpfgo_dns_aggregate    *network_viewer_dns_shared_memory_get(void);
-const struct ebpfgo_dns_flow_record  *network_viewer_dns_shared_memory_get_flows(uint32_t *count_out);
+/* Atomically refreshes the DNS SHM and copies the full snapshot into *out.
+ * *out must point to caller-allocated storage (use mallocz(sizeof(*out))).
+ * The caller owns *out and may read it without holding any lock.
+ * Returns false when no live data is available (producer not running or data
+ * too stale). */
+bool network_viewer_dns_shared_memory_snapshot(struct ebpfgo_dns_shared *out);
 void network_viewer_dns_shared_memory_close(void);
 
 #endif /* OS_LINUX */

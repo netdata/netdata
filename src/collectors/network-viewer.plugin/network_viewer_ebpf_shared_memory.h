@@ -10,7 +10,12 @@
 #include "../collectors-ipc/ebpfgo_shared_memory.h"
 
 bool network_viewer_ebpf_shared_memory_refresh(void);
-const struct ebpf_pid_stat *network_viewer_ebpf_shared_memory_lookup(pid_t pid);
+
+/* Looks up pid and copies the matching stat into *out under a mutex.
+ * Returns true if pid was found, false otherwise.
+ * The caller owns *out and may read it without holding any lock. */
+bool network_viewer_ebpf_shared_memory_lookup(pid_t pid, struct ebpf_pid_stat *out);
+
 void network_viewer_ebpf_shared_memory_close(void);
 
 #endif

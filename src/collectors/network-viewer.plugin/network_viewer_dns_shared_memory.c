@@ -12,42 +12,41 @@ static netdata_ebpfgo_dns_shared_memory_t nv_ebpfgo_dns_memory_ctx = {
     .sem = SEM_FAILED,
 };
 
-bool network_viewer_dns_shared_memory_refresh(void)
+/* Serializes refresh (which overwrites ctx->data via 312 KB memcpy) against
+ * snapshot (which copies ctx->data to the caller's buffer).  Without this
+ * lock two concurrent DNS-query handlers can overlap a refresh write with a
+ * snapshot read, producing torn data. */
+static netdata_mutex_t nv_dns_shm_mutex;
+
+static void __attribute__((constructor)) nv_dns_shm_mutex_ctor(void) {
+    netdata_mutex_init(&nv_dns_shm_mutex);
+}
+
+static void __attribute__((destructor)) nv_dns_shm_mutex_dtor(void) {
+    netdata_mutex_destroy(&nv_dns_shm_mutex);
+}
+
+bool network_viewer_dns_shared_memory_snapshot(struct ebpfgo_dns_shared *out)
 {
-    return netdata_ebpfgo_dns_shared_memory_refresh(
+    netdata_mutex_lock(&nv_dns_shm_mutex);
+
+    bool ok = netdata_ebpfgo_dns_shared_memory_refresh(
         &nv_ebpfgo_dns_memory_ctx,
         NETDATA_EBPFGO_DNS_SHM_NAME,
         NETDATA_EBPFGO_DNS_SEM_NAME);
-}
 
-const struct ebpfgo_dns_aggregate *network_viewer_dns_shared_memory_get(void)
-{
-    if (!nv_ebpfgo_dns_memory_ctx.has_data)
-        return NULL;
-    return &nv_ebpfgo_dns_memory_ctx.data.agg;
-}
+    if (ok)
+        *out = nv_ebpfgo_dns_memory_ctx.data;  /* copy under lock; caller owns the snapshot */
 
-const struct ebpfgo_dns_flow_record *network_viewer_dns_shared_memory_get_flows(uint32_t *count_out)
-{
-    if (!nv_ebpfgo_dns_memory_ctx.has_data) {
-        if (count_out)
-            *count_out = 0;
-        return NULL;
-    }
-
-    uint32_t n = nv_ebpfgo_dns_memory_ctx.data.ring_count;
-    if (n > NETDATA_EBPFGO_DNS_FLOW_RING_CAP)
-        n = NETDATA_EBPFGO_DNS_FLOW_RING_CAP;
-
-    if (count_out)
-        *count_out = n;
-
-    return nv_ebpfgo_dns_memory_ctx.data.ring;
+    netdata_mutex_unlock(&nv_dns_shm_mutex);
+    return ok;
 }
 
 void network_viewer_dns_shared_memory_close(void)
 {
+    netdata_mutex_lock(&nv_dns_shm_mutex);
     netdata_ebpfgo_dns_shared_memory_close(&nv_ebpfgo_dns_memory_ctx);
+    netdata_mutex_unlock(&nv_dns_shm_mutex);
 }
 
 #endif /* OS_LINUX */

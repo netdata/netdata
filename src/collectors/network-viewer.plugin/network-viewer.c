@@ -1644,17 +1644,18 @@ static void local_socket_to_json_array(struct sockets_stats *st, const LOCAL_SOC
         // eBPF per-PID socket counters from ebpfgo.plugin shared memory
 #if defined(OS_LINUX)
         {
-            const struct ebpf_pid_stat *es = network_viewer_ebpf_shared_memory_lookup((pid_t)n->pid);
-            buffer_json_add_array_item_uint64(wb, es ? es->socket.bytes_sent         : 0);
-            buffer_json_add_array_item_uint64(wb, es ? es->socket.bytes_received      : 0);
-            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_tcp_sent       : 0);
-            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_tcp_received   : 0);
-            buffer_json_add_array_item_uint64(wb, es ? es->socket.retransmit          : 0);
-            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_udp_sent       : 0);
-            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_udp_received   : 0);
-            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_close          : 0);
-            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_tcp_v4_connection : 0);
-            buffer_json_add_array_item_uint64(wb, es ? es->socket.call_tcp_v6_connection : 0);
+            struct ebpf_pid_stat es;
+            bool have_es = network_viewer_ebpf_shared_memory_lookup((pid_t)n->pid, &es);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.bytes_sent         : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.bytes_received      : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_tcp_sent       : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_tcp_received   : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.retransmit          : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_udp_sent       : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_udp_received   : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_close          : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_tcp_v4_connection : 0);
+            buffer_json_add_array_item_uint64(wb, have_es ? es.socket.call_tcp_v6_connection : 0);
         }
 #else
         buffer_json_add_array_item_uint64(wb, 0);
@@ -6502,17 +6503,17 @@ static const char *nv_dns_rcode_name(uint16_t rcode)
 
 static BUFFER *network_viewer_dns_result(void)
 {
-    network_viewer_dns_shared_memory_refresh();
-
-    const struct ebpfgo_dns_aggregate *agg = network_viewer_dns_shared_memory_get();
-    if (!agg)
+    struct ebpfgo_dns_shared *dns = mallocz(sizeof(*dns));
+    if (!network_viewer_dns_shared_memory_snapshot(dns)) {
+        freez(dns);
         return network_viewer_json_error_response(
             HTTP_RESP_SERVICE_UNAVAILABLE,
             "dns-queries: data not yet available (enable dns = yes in ebpf.d.conf)");
+    }
 
-    uint32_t flow_count = 0;
-    const struct ebpfgo_dns_flow_record *flows =
-        network_viewer_dns_shared_memory_get_flows(&flow_count);
+    uint32_t flow_count = dns->ring_count;
+    if (flow_count > NETDATA_EBPFGO_DNS_FLOW_RING_CAP)
+        flow_count = NETDATA_EBPFGO_DNS_FLOW_RING_CAP;
 
     time_t now_s = now_realtime_sec();
     BUFFER *wb = nv_response_preamble();
@@ -6529,7 +6530,7 @@ static BUFFER *network_viewer_dns_result(void)
         char num_buf[32];
 
         for (uint32_t i = 0; i < flow_count; i++) {
-            const struct ebpfgo_dns_flow_record *r = &flows[i];
+            const struct ebpfgo_dns_flow_record *r = &dns->ring[i];
 
             /* Format server IP.  inet_ntop returns NULL on malformed input
              * (e.g. ip_version lies about the family); fall back to a safe
@@ -6700,6 +6701,7 @@ static BUFFER *network_viewer_dns_result(void)
     buffer_json_object_close(wb); // group_by
 
     network_viewer_finalize_response_buffer(wb, now_s);
+    freez(dns);
     return wb;
 }
 
