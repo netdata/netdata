@@ -127,9 +127,11 @@ int registry_db_save(void) {
 
     char tmp_filename[FILENAME_MAX + 1];
     char old_filename[FILENAME_MAX + 1];
+    char old_tmp_filename[FILENAME_MAX + 1];
 
     snprintfz(old_filename, FILENAME_MAX, "%s.old", registry.db_filename);
     snprintfz(tmp_filename, FILENAME_MAX, "%s.tmp", registry.db_filename);
+    snprintfz(old_tmp_filename, FILENAME_MAX, "%s.old.tmp", registry.db_filename);
 
     netdata_log_debug(D_REGISTRY, "REGISTRY: Creating file '%s'", tmp_filename);
     FILE *fp = fopen(tmp_filename, "w");
@@ -181,48 +183,67 @@ int registry_db_save(void) {
 
     errno_clear();
 
-    // remove the .old db
-    netdata_log_debug(D_REGISTRY, "REGISTRY: Removing old db '%s'", old_filename);
-    if(unlink(old_filename) == -1 && errno != ENOENT)
-        netdata_log_error("REGISTRY: cannot remove old registry file '%s'", old_filename);
+    netdata_log_debug(D_REGISTRY, "REGISTRY: Removing stale old tmp db '%s'", old_tmp_filename);
+    if(unlink(old_tmp_filename) == -1 && errno != ENOENT) {
+        netdata_log_error("REGISTRY: cannot remove stale temporary old registry file '%s'", old_tmp_filename);
+        unlink(tmp_filename);
+        nd_log_limits_reset();
+        registry.consecutive_save_failures++;
+        registry.last_save_failure = now_realtime_sec();
+        return -1;
+    }
 
-    // rename the db to .old
-    netdata_log_debug(D_REGISTRY, "REGISTRY: Link current db '%s' to .old: '%s'", registry.db_filename, old_filename);
-    if(link(registry.db_filename, old_filename) == -1 && errno != ENOENT)
-        netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Saving registry DB failed!", registry.db_filename, old_filename);
-
-    else {
-        // remove the database (it is saved in .old)
-        netdata_log_debug(D_REGISTRY, "REGISTRY: removing db '%s'", registry.db_filename);
-        if (unlink(registry.db_filename) == -1 && errno != ENOENT)
-            netdata_log_error("REGISTRY: cannot remove old registry file '%s'", registry.db_filename);
-
-        // move the .tmp to make it active
-        netdata_log_debug(D_REGISTRY, "REGISTRY: linking tmp db '%s' to active db '%s'", tmp_filename, registry.db_filename);
-        if (link(tmp_filename, registry.db_filename) == -1) {
-            netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Saving registry DB failed!", tmp_filename,
-                    registry.db_filename);
-
-            // move the .old back
-            netdata_log_debug(D_REGISTRY, "REGISTRY: linking old db '%s' to active db '%s'", old_filename, registry.db_filename);
-            if(link(old_filename, registry.db_filename) == -1)
-                netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Recovering the old registry DB failed!", old_filename, registry.db_filename);
-        }
-        else {
-            netdata_log_debug(D_REGISTRY, "REGISTRY: removing tmp db '%s'", tmp_filename);
-            if(unlink(tmp_filename) == -1)
-                netdata_log_error("REGISTRY: cannot remove tmp registry file '%s'", tmp_filename);
-
-            // it has been moved successfully
-            // discard the current registry log
-            registry_log_recreate();
-            registry.log_count = 0;
-            
-            // Reset failure tracking on success
-            registry.consecutive_save_failures = 0;
-            registry.last_save_failure = 0;
+    // Keep a backup of the current DB, but do not remove the active DB before publishing the new one.
+    netdata_log_debug(D_REGISTRY, "REGISTRY: Link current db '%s' to temporary old db '%s'", registry.db_filename, old_tmp_filename);
+    if(link(registry.db_filename, old_tmp_filename) == -1) {
+        if(errno != ENOENT) {
+            netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Saving registry DB failed!", registry.db_filename,
+                              old_tmp_filename);
+            unlink(tmp_filename);
+            nd_log_limits_reset();
+            registry.consecutive_save_failures++;
+            registry.last_save_failure = now_realtime_sec();
+            return -1;
         }
     }
+    else {
+        netdata_log_debug(D_REGISTRY, "REGISTRY: renaming temporary old db '%s' to old db '%s'", old_tmp_filename,
+                          old_filename);
+        if(rename(old_tmp_filename, old_filename) == -1) {
+            netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Saving registry DB failed!", old_tmp_filename,
+                              old_filename);
+            unlink(old_tmp_filename);
+            unlink(tmp_filename);
+            nd_log_limits_reset();
+            registry.consecutive_save_failures++;
+            registry.last_save_failure = now_realtime_sec();
+            return -1;
+        }
+
+        if(unlink(old_tmp_filename) == -1 && errno != ENOENT)
+            netdata_log_error("REGISTRY: cannot remove temporary old registry file '%s'", old_tmp_filename);
+    }
+
+    // Publish the new DB atomically. If rename fails, the active DB remains untouched.
+    netdata_log_debug(D_REGISTRY, "REGISTRY: renaming tmp db '%s' to active db '%s'", tmp_filename, registry.db_filename);
+    if(rename(tmp_filename, registry.db_filename) == -1) {
+        netdata_log_error("REGISTRY: cannot move file '%s' to '%s'. Saving registry DB failed!", tmp_filename,
+                          registry.db_filename);
+        unlink(tmp_filename);
+        nd_log_limits_reset();
+        registry.consecutive_save_failures++;
+        registry.last_save_failure = now_realtime_sec();
+        return -1;
+    }
+
+    // it has been moved successfully
+    // discard the current registry log
+    registry_log_recreate();
+    registry.log_count = 0;
+
+    // Reset failure tracking on success
+    registry.consecutive_save_failures = 0;
+    registry.last_save_failure = 0;
 
     // continue operations
     nd_log_limits_reset();

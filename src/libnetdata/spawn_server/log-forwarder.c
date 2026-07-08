@@ -359,8 +359,16 @@ static void log_forwarder_thread_func(void *arg) {
 
             // read or mark them for deletion
             for(LOG_FORWARDER_ENTRY *entry = lf->entries; entry ; entry = entry->next) {
-                if (entry->pfds_idx < 1 || entry->pfds_idx >= nfds || !(pfds[entry->pfds_idx].revents & POLLIN) || entry->delete || !entry->wb)
+                if (entry->pfds_idx < 1 || entry->pfds_idx >= nfds || entry->delete || !entry->wb)
                     continue;
+
+                short revents = pfds[entry->pfds_idx].revents;
+                if (!(revents & POLLIN)) {
+                    if (revents & (POLLERR | POLLHUP | POLLNVAL))
+                        entry->delete = true;
+
+                    continue;
+                }
 
                 BUFFER *wb = entry->wb;
                 buffer_need_bytes(wb, 1024);
