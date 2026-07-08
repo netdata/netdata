@@ -62,7 +62,7 @@ Getting started is as simple as visiting [app.netdata.cloud](https://app.netdata
 
 ## [2. Connect a Node & See Instant Results](/src/claim/README.md)
 
-Connect your Agent to your Space to start streaming live metrics within seconds. Whether you're installing Netdata for the first time or connecting an Agent that's already running, the [connect documentation](/src/claim/README.md) covers every method — from the one-command installer for new nodes to the UI, configuration file, and environment variable options for existing Agents.
+Connect your Agent to your Space to start streaming live metrics within seconds. Whether you're installing Netdata for the first time or connecting an Agent that's already running, the [connect documentation](/src/claim/README.md) covers every method — from the one-command installer for new nodes to the [UI, configuration file, and environment variable options for existing Agents](/src/claim/README.md#connect-existing-agent).
 
 **What You'll See When Connected:**
 
