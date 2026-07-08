@@ -309,7 +309,8 @@ NETDATA_DOUBLE single_exponential_smoothing_reverse(const NETDATA_DOUBLE *series
     const NETDATA_DOUBLE *value = &series[entries -1];
     NETDATA_DOUBLE level = (1.0 - alpha) * (*value);
 
-    for(value++ ; value >= series; value--) {
+    while(value > series) {
+        value--;
         if(likely(netdata_double_isnumber(*value)))
             level = alpha * (*value) + (1.0 - alpha) * level;
     }
@@ -342,8 +343,8 @@ NETDATA_DOUBLE double_exponential_smoothing(const NETDATA_DOUBLE *series, size_t
     else
         trend = 0;
 
-    const NETDATA_DOUBLE *value = series;
-    for(value++ ; value >= series; value--) {
+    const NETDATA_DOUBLE *value = series, *end = &series[entries];
+    for(value++ ; value < end; value++) {
         if(likely(netdata_double_isnumber(*value))) {
             NETDATA_DOUBLE last_level = level;
             level = alpha * *value + (1.0 - alpha) * (level + trend);

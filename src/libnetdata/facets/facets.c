@@ -2,13 +2,14 @@
 #include "facets.h"
 
 #define FACETS_HISTOGRAM_COLUMNS 150        // the target number of points in a histogram
-#define FACETS_KEYS_WITH_VALUES_MAX 200     // the max number of keys that can be facets
+#define FACETS_KEYS_WITH_VALUES_INITIAL 200 // embedded capacity for keys that can be facets
 #define FACETS_KEYS_IN_ROW_MAX 500          // the max number of keys in a row
 
 #define FACETS_KEYS_HASHTABLE_ENTRIES 15
 #define FACETS_VALUES_HASHTABLE_ENTRIES 15
 
 static inline void facets_reset_key(FACET_KEY *k);
+static inline void facets_track_key_in_current_row(FACETS *facets, FACET_KEY *k);
 
 // ----------------------------------------------------------------------------
 
@@ -257,12 +258,15 @@ struct facets {
     struct {
         // this is like a stack, of the keys that are used as facets
         size_t used;
-        FACET_KEY *array[FACETS_KEYS_WITH_VALUES_MAX];
+        size_t size;
+        FACET_KEY **array;
+        FACET_KEY *initial_array[FACETS_KEYS_WITH_VALUES_INITIAL];
     } keys_with_values;
 
     struct {
         // this is like a stack, of the keys that need to clean up between each row
         size_t used;
+        bool overflowed;
         FACET_KEY *array[FACETS_KEYS_IN_ROW_MAX];
     } keys_in_row;
 
@@ -633,8 +637,32 @@ static inline void facet_key_late_init(FACETS *facets, FACET_KEY *k) {
     if(facets_key_is_facet(facets, k)) {
         FACETS_VALUES_INDEX_CREATE(k);
         k->values.enabled = true;
-        if(facets->keys_with_values.used < FACETS_KEYS_WITH_VALUES_MAX)
-            facets->keys_with_values.array[facets->keys_with_values.used++] = k;
+
+        if(unlikely(facets->keys_with_values.used == facets->keys_with_values.size)) {
+            size_t new_size = facets->keys_with_values.size ?
+                              facets->keys_with_values.size * 2 :
+                              FACETS_KEYS_WITH_VALUES_INITIAL;
+
+            if(unlikely(new_size < facets->keys_with_values.size ||
+                        new_size > SIZE_MAX / sizeof(*facets->keys_with_values.array)))
+                fatal("Cannot grow facets keys_with_values array beyond %zu entries",
+                      facets->keys_with_values.size);
+
+            FACET_KEY **new_array;
+            if(facets->keys_with_values.array == facets->keys_with_values.initial_array) {
+                new_array = mallocz(new_size * sizeof(*new_array));
+                memcpy(new_array,
+                       facets->keys_with_values.initial_array,
+                       facets->keys_with_values.used * sizeof(*new_array));
+            }
+            else
+                new_array = reallocz(facets->keys_with_values.array, new_size * sizeof(*new_array));
+
+            facets->keys_with_values.array = new_array;
+            facets->keys_with_values.size = new_size;
+        }
+
+        facets->keys_with_values.array[facets->keys_with_values.used++] = k;
     }
 }
 
@@ -642,6 +670,8 @@ static inline void FACETS_KEYS_INDEX_CREATE(FACETS *facets) {
     facets->keys.ll = NULL;
     facets->keys.count = 0;
     facets->keys_with_values.used = 0;
+    facets->keys_with_values.size = FACETS_KEYS_WITH_VALUES_INITIAL;
+    facets->keys_with_values.array = facets->keys_with_values.initial_array;
 
     simple_hashtable_init_KEY(&facets->keys.ht, FACETS_KEYS_HASHTABLE_ENTRIES);
 }
@@ -661,6 +691,10 @@ static inline void FACETS_KEYS_INDEX_DESTROY(FACETS *facets) {
     facets->keys.ll = NULL;
     facets->keys.count = 0;
     facets->keys_with_values.used = 0;
+    facets->keys_with_values.size = 0;
+    if(facets->keys_with_values.array != facets->keys_with_values.initial_array)
+        freez(facets->keys_with_values.array);
+    facets->keys_with_values.array = NULL;
 
     simple_hashtable_destroy_KEY(&facets->keys.ht);
 }
@@ -1905,8 +1939,7 @@ void facets_set_additional_options(FACETS *facets, FACETS_OPTIONS options) {
 // ----------------------------------------------------------------------------
 
 static inline void facets_key_set_unsampled_value(FACETS *facets, FACET_KEY *k) {
-    if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
-        facets->keys_in_row.array[facets->keys_in_row.used++] = k;
+    facets_track_key_in_current_row(facets, k);
 
     k->current_value.flags |= FACET_KEY_VALUE_UPDATED | FACET_KEY_VALUE_UNSAMPLED;
 
@@ -1929,8 +1962,7 @@ static inline void facets_key_set_unsampled_value(FACETS *facets, FACET_KEY *k) 
 }
 
 static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
-    if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
-        facets->keys_in_row.array[facets->keys_in_row.used++] = k;
+    facets_track_key_in_current_row(facets, k);
 
     k->current_value.flags |= FACET_KEY_VALUE_UPDATED | FACET_KEY_VALUE_EMPTY;
 
@@ -1953,8 +1985,7 @@ static inline void facets_key_set_empty_value(FACETS *facets, FACET_KEY *k) {
 }
 
 static inline void facets_key_check_value(FACETS *facets, FACET_KEY *k) {
-    if(likely(!facet_key_value_updated(k) && facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
-        facets->keys_in_row.array[facets->keys_in_row.used++] = k;
+    facets_track_key_in_current_row(facets, k);
 
     k->current_value.flags |= FACET_KEY_VALUE_UPDATED;
     k->current_value.flags &= ~(FACET_KEY_VALUE_EMPTY|FACET_KEY_VALUE_UNSAMPLED|FACET_KEY_VALUE_ESTIMATED);
@@ -2258,18 +2289,38 @@ static inline void facets_reset_key(FACET_KEY *k) {
     k->current_value.v = NULL;
 }
 
-static void facets_reset_keys_with_value_and_row(FACETS *facets) {
-    size_t entries = facets->keys_in_row.used;
+static inline void facets_track_key_in_current_row(FACETS *facets, FACET_KEY *k) {
+    if(unlikely(facet_key_value_updated(k)))
+        return;
 
-    for(size_t p = 0; p < entries ;p++) {
-        FACET_KEY *k = facets->keys_in_row.array[p];
-        facets_reset_key(k);
+    if(likely(facets->keys_in_row.used < FACETS_KEYS_IN_ROW_MAX))
+        facets->keys_in_row.array[facets->keys_in_row.used++] = k;
+    else
+        facets->keys_in_row.overflowed = true;
+}
+
+static void facets_reset_keys_with_value_and_row(FACETS *facets) {
+    if(unlikely(facets->keys_in_row.overflowed)) {
+        FACET_KEY *k;
+        foreach_key_in_facets(facets, k) {
+            facets_reset_key(k);
+        }
+        foreach_key_in_facets_done(k);
+    }
+    else {
+        size_t entries = facets->keys_in_row.used;
+
+        for(size_t p = 0; p < entries ;p++) {
+            FACET_KEY *k = facets->keys_in_row.array[p];
+            facets_reset_key(k);
+        }
     }
 
     facets->current_row.severity = FACET_ROW_SEVERITY_NORMAL;
     facets->current_row.keys_matched_by_query_positive = 0;
     facets->current_row.keys_matched_by_query_negative = 0;
     facets->keys_in_row.used = 0;
+    facets->keys_in_row.overflowed = false;
 
     facets_row_bin_data_cleanup(facets, &facets->bin_data);
 }
@@ -2282,6 +2333,7 @@ void facets_rows_begin(FACETS *facets) {
     foreach_key_in_facets_done(k);
 
     facets->keys_in_row.used = 0;
+    facets->keys_in_row.overflowed = false;
     facets_reset_keys_with_value_and_row(facets);
 }
 

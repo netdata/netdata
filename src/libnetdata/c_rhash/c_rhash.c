@@ -115,7 +115,7 @@ int c_rhash_get_uint8_by_str(c_rhash hash, const char *key, uint8_t *ret_val) {
     struct bin_item *bin = hash->bins[nhash];
 
     while (bin) {
-        if (bin->key_type == ITEMTYPE_STRING) {
+        if (bin->key_type == ITEMTYPE_STRING && bin->value_type == ITEMTYPE_UINT8) {
             if (!strcmp(bin->key, key)) {
                 *ret_val = *(uint8_t*)bin->value;
                 return 0;
@@ -123,6 +123,7 @@ int c_rhash_get_uint8_by_str(c_rhash hash, const char *key, uint8_t *ret_val) {
         }
         bin = bin->next;
     }
+    *ret_val = 0;
     return 1;
 }
 

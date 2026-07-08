@@ -5,15 +5,17 @@
 
 size_t netdata_conf_cpus(void) {
     static size_t processors = 0;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
-    if(processors)
-        return processors;
+    size_t cached_processors = __atomic_load_n(&processors, __ATOMIC_ACQUIRE);
+    if(cached_processors)
+        return cached_processors;
 
-    SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     spinlock_lock(&spinlock);
     size_t p = 0;
 
-    if(processors)
+    cached_processors = __atomic_load_n(&processors, __ATOMIC_ACQUIRE);
+    if(cached_processors)
         goto skip;
 
 #if defined(OS_LINUX)
@@ -29,15 +31,16 @@ size_t netdata_conf_cpus(void) {
     if(p < 1)
         p = 1;
 
-    processors = p;
+    cached_processors = p;
 
     char buf[24];
-    snprintfz(buf, sizeof(buf), "%zu", processors);
+    snprintfz(buf, sizeof(buf), "%zu", cached_processors);
     nd_setenv("NETDATA_CONF_CPUS", buf, 1);
+    __atomic_store_n(&processors, cached_processors, __ATOMIC_RELEASE);
 
 skip:
     spinlock_unlock(&spinlock);
-    return processors;
+    return cached_processors;
 }
 
 void netdata_conf_glibc_malloc_initialize(size_t wanted_arenas, size_t trim_threshold __maybe_unused) {

@@ -8,6 +8,8 @@
 #define REGISTRY_STATUS_FAILED "failed"
 #define REGISTRY_STATUS_DISABLED "disabled"
 
+static SPINLOCK registry_cloud_base_url_spinlock = SPINLOCK_INITIALIZER;
+
 bool registry_is_valid_url(const char *url) {
     return url && (*url == 'h' || *url == '*');
 }
@@ -150,12 +152,23 @@ static inline int registry_person_url_callback_verify_machine_exists(REGISTRY_PE
 
 // ----------------------------------------------------------------------------
 // dynamic update of the configuration
-// The registry does not seem to be designed to support this and I cannot see any concurrency protection
-// that could make this safe, so try to be as atomic as possible.
+// This may run before registry.lock is initialized, so protect the owned snapshot with a dedicated lock.
 
 void registry_update_cloud_base_url() {
-    registry.cloud_base_url = cloud_config_url_get();
+    char *cloud_base_url = strdupz(cloud_config_url_get());
+
+    spinlock_lock(&registry_cloud_base_url_spinlock);
+    freez(registry.cloud_base_url);
+    registry.cloud_base_url = cloud_base_url;
     nd_setenv("NETDATA_REGISTRY_CLOUD_BASE_URL", registry.cloud_base_url, 1);
+    spinlock_unlock(&registry_cloud_base_url_spinlock);
+}
+
+void registry_cloud_base_url_free(void) {
+    spinlock_lock(&registry_cloud_base_url_spinlock);
+    freez(registry.cloud_base_url);
+    registry.cloud_base_url = NULL;
+    spinlock_unlock(&registry_cloud_base_url_spinlock);
 }
 
 // ----------------------------------------------------------------------------
@@ -184,7 +197,9 @@ int registry_request_hello_json(RRDHOST *host, struct web_client *w, bool do_not
 
     CLOUD_STATUS status = cloud_status();
     buffer_json_member_add_string(w->response.data, "cloud_status", CLOUD_STATUS_2str(status));
+    spinlock_lock(&registry_cloud_base_url_spinlock);
     buffer_json_member_add_string(w->response.data, "cloud_base_url", registry.cloud_base_url);
+    spinlock_unlock(&registry_cloud_base_url_spinlock);
 
     buffer_json_member_add_string(w->response.data, "registry", registry.registry_to_announce);
     buffer_json_member_add_boolean(w->response.data, "anonymous_statistics", do_not_track ? false : netdata_anonymous_statistics_enabled);
@@ -460,11 +475,6 @@ void registry_statistics(void) {
         rrddim_add(sts, "sessions",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
 
-    rrddim_set(sts, "sessions", (collected_number)registry.usages_count);
-    rrdset_done(sts);
-
-    // ------------------------------------------------------------------------
-
     if(unlikely(!stc)) {
         stc = rrdset_create_localhost(
                 "netdata"
@@ -486,14 +496,6 @@ void registry_statistics(void) {
         rrddim_add(stc, "persons_urls",   NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
         rrddim_add(stc, "machines_urls",  NULL,  1, 1, RRD_ALGORITHM_ABSOLUTE);
     }
-
-    rrddim_set(stc, "persons",       (collected_number)registry.persons_count);
-    rrddim_set(stc, "machines",      (collected_number)registry.machines_count);
-    rrddim_set(stc, "persons_urls",  (collected_number)registry.persons_urls_count);
-    rrddim_set(stc, "machines_urls", (collected_number)registry.machines_urls_count);
-    rrdset_done(stc);
-
-    // ------------------------------------------------------------------------
 
     if(unlikely(!stm)) {
         stm = rrdset_create_localhost(
@@ -517,17 +519,57 @@ void registry_statistics(void) {
         rrddim_add(stm, "machines_urls",  NULL,  1, 1024, RRD_ALGORITHM_ABSOLUTE);
     }
 
+    collected_number usages_count;
+    collected_number persons_count, machines_count, persons_urls_count, machines_urls_count;
+    collected_number persons_memory, machines_memory, persons_urls_memory, machines_urls_memory;
+
+    registry_lock();
+
+    usages_count = (collected_number)registry.usages_count;
+    persons_count = (collected_number)registry.persons_count;
+    machines_count = (collected_number)registry.machines_count;
+    persons_urls_count = (collected_number)registry.persons_urls_count;
+    machines_urls_count = (collected_number)registry.machines_urls_count;
+
     struct aral_statistics *p_aral_stats = aral_get_statistics(registry.persons_aral);
-    rrddim_set(stm, "persons",       (collected_number)p_aral_stats->structures.allocated_bytes + (collected_number)p_aral_stats->malloc.allocated_bytes + (collected_number)p_aral_stats->mmap.allocated_bytes);
+    persons_memory = (collected_number)aral_structures_bytes_from_stats(p_aral_stats) +
+                     (collected_number)aral_used_bytes_from_stats(p_aral_stats) +
+                     (collected_number)aral_free_bytes_from_stats(p_aral_stats);
 
     struct aral_statistics *m_aral_stats = aral_get_statistics(registry.machines_aral);
-    rrddim_set(stm, "machines",      (collected_number)m_aral_stats->structures.allocated_bytes + (collected_number)m_aral_stats->malloc.allocated_bytes + (collected_number)m_aral_stats->mmap.allocated_bytes);
+    machines_memory = (collected_number)aral_structures_bytes_from_stats(m_aral_stats) +
+                      (collected_number)aral_used_bytes_from_stats(m_aral_stats) +
+                      (collected_number)aral_free_bytes_from_stats(m_aral_stats);
 
     struct aral_statistics *pu_aral_stats = aral_get_statistics(registry.person_urls_aral);
-    rrddim_set(stm, "persons_urls",  (collected_number)pu_aral_stats->structures.allocated_bytes + (collected_number)pu_aral_stats->malloc.allocated_bytes + (collected_number)pu_aral_stats->mmap.allocated_bytes);
+    persons_urls_memory = (collected_number)aral_structures_bytes_from_stats(pu_aral_stats) +
+                          (collected_number)aral_used_bytes_from_stats(pu_aral_stats) +
+                          (collected_number)aral_free_bytes_from_stats(pu_aral_stats);
 
     struct aral_statistics *mu_aral_stats = aral_get_statistics(registry.machine_urls_aral);
-    rrddim_set(stm, "machines_urls", (collected_number)mu_aral_stats->structures.allocated_bytes + (collected_number)mu_aral_stats->malloc.allocated_bytes + (collected_number)mu_aral_stats->mmap.allocated_bytes);
+    machines_urls_memory = (collected_number)aral_structures_bytes_from_stats(mu_aral_stats) +
+                           (collected_number)aral_used_bytes_from_stats(mu_aral_stats) +
+                           (collected_number)aral_free_bytes_from_stats(mu_aral_stats);
+
+    registry_unlock();
+
+    rrddim_set(sts, "sessions", usages_count);
+    rrdset_done(sts);
+
+    // ------------------------------------------------------------------------
+
+    rrddim_set(stc, "persons",       persons_count);
+    rrddim_set(stc, "machines",      machines_count);
+    rrddim_set(stc, "persons_urls",  persons_urls_count);
+    rrddim_set(stc, "machines_urls", machines_urls_count);
+    rrdset_done(stc);
+
+    // ------------------------------------------------------------------------
+
+    rrddim_set(stm, "persons",       persons_memory);
+    rrddim_set(stm, "machines",      machines_memory);
+    rrddim_set(stm, "persons_urls",  persons_urls_memory);
+    rrddim_set(stm, "machines_urls", machines_urls_memory);
 
     rrdset_done(stm);
 }

@@ -135,8 +135,11 @@ void rrdr2rrdr_group_by_calculate_percentage_of_group(RRDR *r) {
             else if(isnan(h))
                 cn[d] = 100.0;
 
-            else
-                cn[d] = n * 100.0 / (n + h);
+            else {
+                // all series collected zeros (or cancel out): report 0%, not a gap
+                NETDATA_DOUBLE t = n + h;
+                cn[d] = (t != 0.0) ? (n * 100.0 / t) : 0.0;
+            }
         }
     }
 }
@@ -285,6 +288,14 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
     if(!query_target_aggregatable(qt) && r->partial_data_trimming.expected_after < qt->window.before)
         rrdr2rrdr_group_by_partial_trimming(r);
 
+    // percentage points are already normalized (0-100), so their sts pair must
+    // average over the view rows to stay consistent with min/max (row extremes),
+    // not over the per-point source contributions (gbc); in aggregatable (raw)
+    // mode the values are not percentaged and the cloud derives the statistics,
+    // so the (sum, gbc) pair is kept as-is
+    bool percentage_stats_by_rows =
+        aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE && !query_target_aggregatable(qt);
+
     // apply averaging, remove RRDR_VALUE_EMPTY, find the non-zero dimensions, min and max
     size_t global_min_max_values = 0;
     size_t dimensions_nonzero = 0;
@@ -314,7 +325,10 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
                 NETDATA_DOUBLE n;
 
                 sum += *cn;
-                ars += *ar;
+
+                // when the sts pair is per-row (percentage), the anomaly rate must
+                // also be accumulated per-row (the row mean), not per-contribution
+                ars += percentage_stats_by_rows ? (*ar / (NETDATA_DOUBLE)gbc) : *ar;
 
                 if(aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE && !query_target_aggregatable(qt))
                     n = (*cn /= gbc);
@@ -347,7 +361,7 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
                         global_max = n;
                 }
 
-                count += gbc;
+                count += percentage_stats_by_rows ? 1 : gbc;
             }
         }
 

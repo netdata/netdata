@@ -153,7 +153,13 @@ static inline void simple_hashtable_add_value_sorted_named(SIMPLE_HASHTABLE_NAME
 
     // Ensure there's enough space in the sorted array
     if (ht->sorted.used >= ht->sorted.size) {
+        if(unlikely(ht->sorted.size > SIZE_MAX / 2))
+            fatal("SIMPLE_HASHTABLE: cannot resize sorted array with %zu entries", ht->sorted.size);
+
         size_t size = ht->sorted.size ? ht->sorted.size * 2 : 64;
+        if(unlikely(size > SIZE_MAX / sizeof(SIMPLE_HASHTABLE_VALUE_TYPE)))
+            fatal("SIMPLE_HASHTABLE: cannot allocate sorted array with %zu entries", size);
+
         SIMPLE_HASHTABLE_VALUE_TYPE *array = mallocz(size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE));
         if(ht->sorted.array) {
             memcpy(array, ht->sorted.array, ht->sorted.size * sizeof(SIMPLE_HASHTABLE_VALUE_TYPE));
@@ -311,7 +317,8 @@ static inline bool simple_hashtable_can_use_slot_named(
     return false;
 }
 
-#define SIMPLE_HASHTABLE_NEEDS_RESIZE(ht) ((ht)->size <= ((ht)->used - (ht)->deleted) << 1 || (ht)->used >= (ht)->size)
+#define SIMPLE_HASHTABLE_NEEDS_RESIZE(ht) \
+    ((ht)->used >= (ht)->size || ((ht)->used - (ht)->deleted) >= ((ht)->size / 2 + ((ht)->size & 1)))
 
 // IMPORTANT: the pointer returned by this call is valid up to the next call of this function (or the resize one).
 // If you need to cache something, cache the hash, not the slot pointer.
@@ -467,8 +474,12 @@ static inline void simple_hashtable_resize_named(SIMPLE_HASHTABLE_NAMED *ht) {
 
     size_t new_size = ht->size;
 
-    if(SIMPLE_HASHTABLE_NEEDS_RESIZE(ht))
-        new_size = (ht->size << 1) - ((ht->size > 16) ? 1 : 0);
+    if(SIMPLE_HASHTABLE_NEEDS_RESIZE(ht)) {
+        if(unlikely(ht->size > SIZE_MAX / 2))
+            fatal("SIMPLE_HASHTABLE: cannot resize table with %zu slots", ht->size);
+
+        new_size = (ht->size * 2) - ((ht->size > 16) ? 1 : 0);
+    }
 
     ht->resizes++;
     ht->size = new_size;

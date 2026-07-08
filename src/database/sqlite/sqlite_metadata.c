@@ -2128,7 +2128,7 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
 
     usec_t started_ut = now_monotonic_usec();
     nd_win_trace("populate_metrics_from_database: sqlite3_step loop starting...");
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         nd_uuid_t uuid;
         if (!sqlite3_column_uuid_copy(res, 0, uuid))
             continue;

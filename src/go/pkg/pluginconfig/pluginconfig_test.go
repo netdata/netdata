@@ -27,6 +27,17 @@ func TestReadRegistryUniqueID(t *testing.T) {
 	assert.Empty(t, readRegistryUniqueID(filepath.Join(tmp, "missing")))
 }
 
+func TestHostPrefixReadsNetdataHostPrefix(t *testing.T) {
+	orig := env
+	t.Cleanup(func() { env = orig })
+	env.hostPrefix = ""
+
+	prefix := filepath.Join(t.TempDir(), "host", "..", "host")
+	t.Setenv("NETDATA_HOST_PREFIX", prefix)
+
+	assert.Equal(t, filepath.Clean(prefix), HostPrefix())
+}
+
 func TestDirectoriesBuild(t *testing.T) {
 	tmp := t.TempDir()
 	execDir := filepath.Join(tmp, "root", "opt", "netdata", "bin")

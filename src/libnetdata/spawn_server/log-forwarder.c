@@ -136,13 +136,14 @@ void log_forwarder_stop(LOG_FORWARDER *lf) {
     // Wait for the thread to finish
     // Note: nd_thread_join() handles the Windows/MSYS2 EINVAL case internally
     int join_result = nd_thread_join(lf->thread);
+    lf->thread = NULL;
     if(join_result != 0) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
-               "Log forwarder: nd_thread_join() failed with error %d", join_result);
+               "Log forwarder: nd_thread_join() failed with error %d; leaking state to avoid racing a live worker",
+               join_result);
+        return;
     }
 
-    // Always clean up - if join failed, the thread has still exited
-    lf->thread = NULL;
     close(lf->pipe_fds[PIPE_WRITE]);
     freez(lf);
 }
@@ -415,8 +416,16 @@ static void log_forwarder_thread_func(void *arg) {
 
             // read or mark them for deletion
             for(LOG_FORWARDER_ENTRY *entry = lf->entries; entry ; entry = entry->next) {
-                if (entry->pfds_idx < 1 || entry->pfds_idx >= nfds || !(pfds[entry->pfds_idx].revents & POLLIN) || entry->delete || !entry->wb)
+                if (entry->pfds_idx < 1 || entry->pfds_idx >= nfds || entry->delete || !entry->wb)
                     continue;
+
+                short revents = pfds[entry->pfds_idx].revents;
+                if (!(revents & POLLIN)) {
+                    if (revents & (POLLERR | POLLHUP | POLLNVAL))
+                        entry->delete = true;
+
+                    continue;
+                }
 
                 BUFFER *wb = entry->wb;
                 buffer_need_bytes(wb, 1024);

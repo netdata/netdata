@@ -375,8 +375,6 @@ static void nd_thread_exit(ND_THREAD *nti) {
     thread_cache_destroy();
     worker_unregister();
 
-    nd_thread_status_set(nti, NETDATA_THREAD_STATUS_FINISHED);
-
     spinlock_lock(&threads_globals.running.spinlock);
     if(nti->list == ND_THREAD_LIST_RUNNING) {
         DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(threads_globals.running.list, nti, prev, next);
@@ -388,6 +386,8 @@ static void nd_thread_exit(ND_THREAD *nti) {
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(threads_globals.exited.list, nti, prev, next);
     nti->list = ND_THREAD_LIST_EXITED;
     spinlock_unlock(&threads_globals.exited.spinlock);
+
+    nd_thread_status_set(nti, NETDATA_THREAD_STATUS_FINISHED);
 }
 
 static void nd_thread_starting_point(void *ptr) {

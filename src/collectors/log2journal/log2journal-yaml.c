@@ -197,9 +197,27 @@ bool yaml_parse_file(const char *config_file_path, LOG_JOB *jb) {
 }
 
 bool yaml_parse_config(const char *config_name, LOG_JOB *jb) {
+    if(!config_name || !*config_name) {
+        l2j_log("yaml configuration name cannot be empty.");
+        return false;
+    }
+
     char filename[FILENAME_MAX + 1];
 
-    snprintf(filename, sizeof(filename), "%s/%s.yaml", LOG2JOURNAL_CONFIG_PATH, config_name);
+    int length = snprintf(filename, sizeof(filename), "%s/%s.yaml", LOG2JOURNAL_CONFIG_PATH, config_name);
+    if(length < 0) {
+        l2j_log("failed to generate yaml configuration filename.");
+        return false;
+    }
+
+    if((size_t)length >= sizeof(filename)) {
+        l2j_log(
+            "yaml configuration filename is too long (needed %d bytes plus NUL, buffer is %zu bytes).",
+            length,
+            sizeof(filename));
+        return false;
+    }
+
     return yaml_parse_file(filename, jb);
 }
 
@@ -246,23 +264,43 @@ static bool needs_quotes_in_yaml(const char *str) {
     return false;
 }
 
+static void yaml_print_single_quoted_value(const char *value) {
+    fputc('\'', stderr);
+
+    while(*value) {
+        if(*value == '\'')
+            fputc('\'', stderr);
+
+        fputc(*value, stderr);
+        value++;
+    }
+
+    fputc('\'', stderr);
+}
+
 static void yaml_print_node(const char *key, const char *value, size_t depth, bool dash) {
     if(depth > 10) depth = 10;
-    const char *quote = "'";
+    bool quote = true;
 
     const char *second_line = NULL;
     if(value && strchr(value, '\n')) {
         second_line = value;
         value = "|";
-        quote = "";
+        quote = false;
     }
     else if(!value || !needs_quotes_in_yaml(value))
-        quote = "";
+        quote = false;
 
-    fprintf(stderr, "%.*s%s%s%s%s%s%s\n",
+    fprintf(stderr, "%.*s%s%s%s",
             (int)(depth * 2), "                    ", dash ? "- ": "",
-            key ? key : "", key ? ": " : "",
-            quote, value ? value : "", quote);
+            key ? key : "", key ? ": " : "");
+
+    if(quote)
+        yaml_print_single_quoted_value(value ? value : "");
+    else
+        fputs(value ? value : "", stderr);
+
+    fputc('\n', stderr);
 
     if(second_line) {
         yaml_print_multiline_value(second_line, depth + 1);

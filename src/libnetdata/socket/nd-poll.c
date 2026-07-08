@@ -48,7 +48,7 @@ nd_poll_t *nd_poll_create() {
 }
 
 static inline uint32_t nd_poll_events_to_epoll_events(nd_poll_event_t events) {
-    uint32_t pevents = EPOLLERR | EPOLLHUP;
+    uint32_t pevents = EPOLLERR | EPOLLHUP | EPOLLRDHUP;
     if (events & ND_POLL_READ) pevents |= EPOLLIN;
     if (events & ND_POLL_WRITE) pevents |= EPOLLOUT;
     return pevents;
@@ -238,6 +238,10 @@ int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
             return 1;
 
         internal_fatal(true, "nd_poll_get_next_event() should have 1 event!");
+        errno = EIO;
+        result->events = ND_POLL_POLL_FAILED;
+        result->data = NULL;
+        return -1;
     } while(true);
 }
 
@@ -386,6 +390,8 @@ bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events) {
 static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *result) {
     for (nfds_t i = ndpl->last_pos; i < ndpl->nfds; i++) {
         if (ndpl->fds[i].revents != 0) {
+            short int revents = ndpl->fds[i].revents;
+            ndpl->fds[i].revents = 0;
 
             // Use original_fds for the POINTERS lookup; fds[i].fd may be -1 when disabled.
             result->data = POINTERS_GET(&ndpl->pointers, ndpl->original_fds[i]);
@@ -398,13 +404,11 @@ static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *res
             // in revents regardless and nd_poll_events_to_poll_events() never puts them
             // in pfd->events (WSAPoll rejects them there), so they must always pass through.
             result->events = nd_poll_events_from_poll_revents(
-                ndpl->fds[i].revents &
+                revents &
                 (ndpl->fds[i].events | (short int)(POLLERR | POLLHUP | POLLNVAL | POLLRDHUP)));
             if(!result->events)
                 // nd_poll_upd() may have removed some flags since we got this
                 continue;
-
-            ndpl->fds[i].revents = 0;
 
             ndpl->last_pos = i + 1;
             return true;
@@ -461,6 +465,10 @@ int nd_poll_wait(nd_poll_t *ndpl, int timeout_ms, nd_poll_result_t *result) {
             return 1;
 
         internal_fatal(true, "nd_poll_get_next_event() should have 1 event!");
+        errno = EIO;
+        result->events = ND_POLL_POLL_FAILED;
+        result->data = NULL;
+        return -1;
     } while (true);
 }
 

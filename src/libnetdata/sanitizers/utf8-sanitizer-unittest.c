@@ -1505,6 +1505,20 @@ static void test_regression_fixed_bugs(void) {
         run_sanitize_test(&t);
     }
 
+    // REGRESSION: In-place hex expansion must not overwrite unread source bytes.
+    {
+        const unsigned char input[] = "\xC2" "AB";
+        unsigned char separate[sizeof(input)];
+        unsigned char in_place[] = "\xC2" "AB";
+
+        size_t separate_len = text_sanitize(separate, input, sizeof(separate), identity_char_map, true, "", NULL);
+        size_t in_place_len = text_sanitize(in_place, in_place, sizeof(in_place), identity_char_map, true, "", NULL);
+
+        TEST_ASSERT("regression_in_place_hex_alias",
+            in_place_len == separate_len && strcmp((char *)in_place, (char *)separate) == 0,
+            "In-place result '%s' does not match separate result '%s'", in_place, separate);
+    }
+
     // Test truncated sequence that would overflow if not properly bounded
     {
         sanitize_test_t t = {

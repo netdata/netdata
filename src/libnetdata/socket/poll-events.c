@@ -140,7 +140,9 @@ int poll_default_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
 
                 return -1;
             }
-        } else if (rc) {
+        } else if (!rc) {
+            return -1;
+        } else {
             // data received
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "POLLFD: internal error: poll_default_rcv_callback() is discarding %zd bytes received on socket %d",

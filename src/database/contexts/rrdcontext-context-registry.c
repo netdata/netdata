@@ -22,11 +22,13 @@ void rrdcontext_context_registry_destroy(void) {
     
     // Free the strings we've held references to
     PValue = JudyLFirst(context_registry_judyl, &index, PJE0);
-    while (PValue) {
+    while (PValue && PValue != PJERR) {
         // Each string has been duplicated when added, so free it
         string_freez((STRING *)index);
         PValue = JudyLNext(context_registry_judyl, &index, PJE0);
     }
+    if (unlikely(PValue == PJERR))
+        fatal("RRDCONTEXT: corrupted context registry JudyL array");
     
     // Free the entire Judy array
     JudyLFreeArray(&context_registry_judyl, PJE0);
@@ -45,12 +47,8 @@ bool rrdcontext_context_registry_add(STRING *context) {
     // Get or insert a slot for this context
     Pvoid_t *PValue = JudyLIns(&context_registry_judyl, (Word_t)context, PJE0);
     
-    if (unlikely(PValue == PJERR)) {
-        // Memory allocation error
-        internal_error(true, "RRDCONTEXT: JudyL memory allocation failed in rrdcontext_context_registry_add()");
-        spinlock_unlock(&context_registry_spinlock);
-        return false;
-    }
+    if (unlikely(!PValue || PValue == PJERR))
+        fatal("RRDCONTEXT: corrupted context registry JudyL array");
     
     size_t count = (size_t)(Word_t)*PValue;
     
@@ -80,6 +78,9 @@ bool rrdcontext_context_registry_remove(STRING *context) {
     // Try to get the value for this context
     Pvoid_t *PValue = JudyLGet(context_registry_judyl, (Word_t)context, PJE0);
     
+    if (unlikely(PValue == PJERR))
+        fatal("RRDCONTEXT: corrupted context registry JudyL array");
+
     if (PValue) {
         size_t count = (size_t)(Word_t)*PValue;
         
@@ -113,10 +114,12 @@ size_t rrdcontext_context_registry_unique_count(void) {
     Word_t index = 0;
     Pvoid_t *PValue = JudyLFirst(context_registry_judyl, &index, PJE0);
     
-    while (PValue) {
+    while (PValue && PValue != PJERR) {
         count++;
         PValue = JudyLNext(context_registry_judyl, &index, PJE0);
     }
+    if (unlikely(PValue == PJERR))
+        fatal("RRDCONTEXT: corrupted context registry JudyL array");
     
     spinlock_unlock(&context_registry_spinlock);
     
@@ -146,7 +149,7 @@ void rrdcontext_context_registry_json_mcp_array(BUFFER *wb, SIMPLE_PATTERN *patt
     Word_t index = 0;
     bool first = true;
     Pvoid_t *PValue;
-    while ((PValue = JudyLFirstThenNext(context_registry_judyl, &index, &first))) {
+    while ((PValue = JudyLFirstThenNext(context_registry_judyl, &index, &first)) && PValue != PJERR) {
         if (!index || !*PValue) continue;
 
         const char *context_name = string2str((STRING *)index);
@@ -160,6 +163,8 @@ void rrdcontext_context_registry_json_mcp_array(BUFFER *wb, SIMPLE_PATTERN *patt
         buffer_json_add_array_item_uint64(wb, *(size_t *)PValue);
         buffer_json_array_close(wb);
     }
+    if (unlikely(PValue == PJERR))
+        fatal("RRDCONTEXT: corrupted context registry JudyL array");
 
     buffer_json_array_close(wb);
 
@@ -178,7 +183,7 @@ void rrdcontext_context_registry_json_mcp_categories_array(BUFFER *wb, SIMPLE_PA
     Word_t index = 0;
     bool first = true;
     Pvoid_t *PValue;
-    while ((PValue = JudyLFirstThenNext(context_registry_judyl, &index, &first))) {
+    while ((PValue = JudyLFirstThenNext(context_registry_judyl, &index, &first)) && PValue != PJERR) {
         if (!index || !*PValue) continue;
         
         const char *context_name = string2str((STRING *)index);
@@ -203,20 +208,20 @@ void rrdcontext_context_registry_json_mcp_categories_array(BUFFER *wb, SIMPLE_PA
         // Get or insert a slot for this category
         Pvoid_t *CategoryValue = JudyLIns(&categories_judyl, (Word_t)category_str, PJE0);
         
-        if (CategoryValue) {
-            // Check if this is a new entry
-            size_t count = (size_t)(Word_t)*CategoryValue;
-            if (count > 0) {
-                // Already exists, free our reference (JudyL already has one)
-                string_freez(category_str);
-            }
-            // Increment the count
-            *CategoryValue = (void *)(Word_t)(count + 1);
-        } else {
-            // Failed to insert, free the STRING
+        if (unlikely(!CategoryValue || CategoryValue == PJERR))
+            fatal("RRDCONTEXT: corrupted category JudyL array");
+
+        // Check if this is a new entry
+        size_t count = (size_t)(Word_t)*CategoryValue;
+        if (count > 0) {
+            // Already exists, free our reference (JudyL already has one)
             string_freez(category_str);
         }
+        // Increment the count
+        *CategoryValue = (void *)(Word_t)(count + 1);
     }
+    if (unlikely(PValue == PJERR))
+        fatal("RRDCONTEXT: corrupted context registry JudyL array");
     
     // Second pass: output the unique categories and their counts
 
@@ -243,7 +248,7 @@ void rrdcontext_context_registry_json_mcp_categories_array(BUFFER *wb, SIMPLE_PA
 
     index = 0;
     first = true;
-    while ((PValue = JudyLFirstThenNext(categories_judyl, &index, &first))) {
+    while ((PValue = JudyLFirstThenNext(categories_judyl, &index, &first)) && PValue != PJERR) {
         if (!index) continue;
         
         STRING *category_str = (STRING *)index;
@@ -262,6 +267,8 @@ void rrdcontext_context_registry_json_mcp_categories_array(BUFFER *wb, SIMPLE_PA
         // Free the STRING object as we go
         string_freez(category_str);
     }
+    if (unlikely(PValue == PJERR))
+        fatal("RRDCONTEXT: corrupted category JudyL array");
     
     buffer_json_array_close(wb);
     

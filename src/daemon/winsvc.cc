@@ -185,6 +185,10 @@ static void call_netdata_cleanup(void *arg)
     // Set status to stopped
     netdata_service_log("Reporting the service as stopped...");
     ReportSvcStatus(SERVICE_STOPPED, 0, 0, 0);
+
+    // SERVICE_STOPPED closes the SCM context; terminate instead of returning to
+    // stale service code.
+    exit(0);
 }
 
 static void WINAPI ServiceControlHandler(DWORD controlCode)

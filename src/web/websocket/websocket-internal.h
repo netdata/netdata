@@ -178,6 +178,9 @@ typedef struct websocket_thread {
         int pipe[2];                 // Command pipe [0] = read, [1] = write
         char *buffer;                // Reusable scratch buffer for command payloads
         size_t buffer_size;
+        bool broadcast_pending;
+        uint32_t broadcast_payload_size;
+        uint32_t broadcast_payload_read;
     } cmd;
 
 } WEBSOCKET_THREAD;
