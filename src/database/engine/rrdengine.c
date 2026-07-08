@@ -1616,14 +1616,14 @@ void datafile_delete(
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
-    bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile, false);
+    bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
     size_t attempts = 0;
 
     while (!datafile_got_for_deletion) {
         if(worker)
             worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
-        datafile_got_for_deletion = datafile_acquire_for_deletion(datafile, false);
+        datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
         if (!datafile_got_for_deletion) {
             if(++attempts >= 30) {
