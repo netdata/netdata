@@ -448,8 +448,13 @@ bool dumpInstanceCb(PERF_DATA_BLOCK *pDataBlock, PERF_OBJECT_TYPE *pObjectType, 
         if(pInstance->ParentObjectTitleIndex) {
             PERF_INSTANCE_DEFINITION *pi = pInstance;
             while(pi->ParentObjectTitleIndex) {
-                PERF_OBJECT_TYPE *po = getObjectTypeByIndex(pDataBlock, pInstance->ParentObjectTitleIndex);
+                PERF_OBJECT_TYPE *po = getObjectTypeByIndex(pDataBlock, pi->ParentObjectTitleIndex);
+                if(!po)
+                    break;
+
                 pi = getInstanceByPosition(pDataBlock, po, pi->ParentObjectInstance);
+                if(!pi)
+                    break;
 
                 if(!getInstanceName(pDataBlock, po, pi, name, sizeof(name)))
                     strncpyz(name, "[failed]", sizeof(name) - 1);

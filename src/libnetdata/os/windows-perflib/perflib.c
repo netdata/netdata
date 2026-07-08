@@ -629,7 +629,15 @@ PERF_INSTANCE_DEFINITION *getInstanceByPosition(PERF_DATA_BLOCK *pDataBlock, PER
     PERF_COUNTER_BLOCK *pc = NULL;
     for(DWORD i = 0; i <= instancePosition ;i++) {
         pi = getInstance(pDataBlock, pObjectType, pc);
+        if(!pi)
+            return NULL;
+
+        if(i == instancePosition)
+            return pi;
+
         pc = getInstanceCounterBlock(pDataBlock, pObjectType, pi);
+        if(!pc)
+            return NULL;
     }
     return pi;
 }
