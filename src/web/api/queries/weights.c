@@ -2215,7 +2215,7 @@ static ssize_t weights_count_node_callback(void *data, RRDHOST *host, bool query
 
     struct query_weights_data *qwd = data;
     if (qwd->total_hosts >= qwd->hosts_array_capacity) {
-        qwd->hosts_array_capacity *= 2;
+        qwd->hosts_array_capacity = qwd->hosts_array_capacity ? qwd->hosts_array_capacity * 2 : 1;
         qwd->hosts_array = reallocz(qwd->hosts_array, sizeof(RRDHOST *) * qwd->hosts_array_capacity);
     }
     qwd->hosts_array[qwd->total_hosts++] = host;
@@ -2280,8 +2280,8 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
 
 #else
     size_t host_count = dictionary_entries(rrdhost_root_index);
-    qwd->hosts_array = mallocz(sizeof(RRDHOST *) * host_count);
-    qwd->hosts_array_capacity = host_count;
+    qwd->hosts_array_capacity = host_count ? host_count : 1;
+    qwd->hosts_array = mallocz(sizeof(RRDHOST *) * qwd->hosts_array_capacity);
     qwd->total_hosts = 0;
 
     (void) query_scope_foreach_host(scope_hosts_sp, hosts_sp, weights_count_node_callback, qwd, &qwd->versions, NULL);
