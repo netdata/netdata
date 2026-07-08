@@ -260,7 +260,25 @@ url_is_request_complete_and_extract_payload(const char *begin, const char *end, 
         if(!cl) return false;
         cl = &cl[16];
 
-        size_t content_length = str2ul(cl);
+        while(*cl == ' ' || *cl == '\t')
+            cl++;
+
+        if(!isdigit((uint8_t)*cl))
+            return false;
+
+        char *content_length_end;
+        errno_clear();
+        unsigned long long parsed_content_length = strtoull(cl, &content_length_end, 10);
+        if(errno != 0 || parsed_content_length > SIZE_MAX)
+            return false;
+
+        while(*content_length_end == ' ' || *content_length_end == '\t')
+            content_length_end++;
+
+        if(content_length_end[0] != '\r' || content_length_end[1] != '\n')
+            return false;
+
+        size_t content_length = (size_t)parsed_content_length;
 
         const char *payload = strstr(cl, "\r\n\r\n");
         if(!payload) return false;
