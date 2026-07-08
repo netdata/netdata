@@ -707,6 +707,7 @@ A SOW cannot be completed until Validation records:
 - end-user/operator docs update or evidence-backed reason none were affected;
 - end-user/operator skill update or evidence-backed reason none were affected by docs/spec changes;
 - lessons extracted or specific reason there were none;
+- workflow-friction triage: each recorded `Workflow Friction & Rule Gaps` note resolved to a rule update (`AGENTS.md`, project skill, spec, or SOW template), an evidence-backed rejection, or a tracked follow-up (or an explicit "none arose");
 - follow-up mapping.
 
 Generic "N/A" is invalid.
