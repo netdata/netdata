@@ -61,7 +61,7 @@ Stale status does not apply to standalone nodes — stale specifically means a c
 
 **Steps**:
 
-1. Stop the Netdata Agent on the node you want to remove
+1. Stop the Netdata Agent on the node you want to remove.
 2. In Netdata Cloud, go to **Space Settings > Nodes** (click the ⚙️ cog icon below the spaces list).
 3. Locate the offline node in the list
 4. Select the trash icon to remove it
@@ -159,8 +159,11 @@ For nodes that are part of streaming configurations, see [Nodes Ephemerality](/d
 
 To prevent removed nodes from reappearing:
 
+* [Stop the Netdata Agent](/docs/netdata-agent/start-stop-restart.md) on the node
 * Remove or clear any existing `claim.conf` file
 * Clear related environment variables on the node
+
+To remove Netdata from the node entirely instead, see [Uninstall Netdata](/packaging/installer/UNINSTALL.md).
 
 ## Troubleshooting
 
