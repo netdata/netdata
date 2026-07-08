@@ -197,20 +197,22 @@ LOG_FORWARDER_TOKEN log_forwarder_add_fd(LOG_FORWARDER *lf, int fd) {
 }
 
 bool log_forwarder_del_and_close_token(LOG_FORWARDER *lf, LOG_FORWARDER_TOKEN token) {
-    if(!lf || !lf->running || token == LOG_FORWARDER_TOKEN_NONE) return false;
+    if(!lf || token == LOG_FORWARDER_TOKEN_NONE) return false;
 
     bool ret = false;
 
     spinlock_lock(&lf->spinlock);
 
-    LOG_FORWARDER_ENTRY *entry = log_forwarder_find_entry_unsafe(lf, token);
-    if(entry) {
-        entry->delete = true;
+    if(lf->running) {
+        LOG_FORWARDER_ENTRY *entry = log_forwarder_find_entry_unsafe(lf, token);
+        if(entry) {
+            entry->delete = true;
 
-        // Send a byte to the pipe to wake up the thread
-        log_forwarder_wake_up_worker(lf);
+            // Send a byte to the pipe to wake up the thread
+            log_forwarder_wake_up_worker(lf);
 
-        ret = true;
+            ret = true;
+        }
     }
 
     spinlock_unlock(&lf->spinlock);
