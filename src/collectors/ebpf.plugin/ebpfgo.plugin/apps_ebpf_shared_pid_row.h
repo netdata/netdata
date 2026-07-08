@@ -157,6 +157,19 @@ struct ebpf_pid_stat {
 #include <stdbool.h>
 #include <time.h>
 
+/* Returns the current CLOCK_MONOTONIC timestamp in microseconds.
+ * All SHM writers and readers MUST use this so that last_publish_ut
+ * comparisons stay on the same clock.  Do NOT use now_monotonic_usec()
+ * here: libnetdata resolves that to CLOCK_MONOTONIC_RAW, which drifts
+ * relative to CLOCK_MONOTONIC on NTP-disciplined hosts. */
+static inline uint64_t ebpfgo_shm_now_monotonic_usec(void)
+{
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+        return 0;
+    return (uint64_t)ts.tv_sec * 1000000ULL + (uint64_t)ts.tv_nsec / 1000ULL;
+}
+
 /* Timed semaphore acquire: 200 ms deadline per attempt, retries on EINTR. */
 static inline bool ebpfgo_shm_sem_wait(sem_t *sem)
 {

@@ -121,7 +121,7 @@ bool netdata_ebpfgo_dns_shared_memory_refresh(
     bool locked = false;
     if (ctx->sem != SEM_FAILED) {
         if (!ebpfgo_shm_sem_wait(ctx->sem)) {
-            if (!netdata_ebpfgo_dns_payload_is_live(ctx->last_publish_ut, now_monotonic_usec())) {
+            if (!netdata_ebpfgo_dns_payload_is_live(ctx->last_publish_ut, ebpfgo_shm_now_monotonic_usec())) {
                 netdata_ebpfgo_dns_shm_close_internal(ctx);
                 ctx->has_data = false;
                 return false;
@@ -137,7 +137,7 @@ bool netdata_ebpfgo_dns_shared_memory_refresh(
     if (locked)
         sem_post(ctx->sem);
 
-    if (!netdata_ebpfgo_dns_payload_is_live(ctx->last_publish_ut, now_monotonic_usec())) {
+    if (!netdata_ebpfgo_dns_payload_is_live(ctx->last_publish_ut, ebpfgo_shm_now_monotonic_usec())) {
         netdata_ebpfgo_dns_shm_close_internal(ctx);
         ctx->has_data = false;
         memset(&ctx->data, 0, sizeof(ctx->data));

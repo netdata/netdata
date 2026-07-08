@@ -205,7 +205,7 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
     bool locked = false;
     if (ctx->sem != SEM_FAILED) {
         if (!ebpfgo_shm_sem_wait(ctx->sem)) {
-            if (!netdata_ebpfgo_shared_pid_snapshot_is_live(ctx->last_publish_ut, now_monotonic_usec())) {
+            if (!netdata_ebpfgo_shared_pid_snapshot_is_live(ctx->last_publish_ut, ebpfgo_shm_now_monotonic_usec())) {
                 netdata_ebpfgo_shared_pid_memory_close_internal(ctx);
                 return false;
             }
@@ -222,7 +222,7 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
     if (!ok)
         return false;
 
-    if (!netdata_ebpfgo_shared_pid_snapshot_is_live(ctx->last_publish_ut, now_monotonic_usec())) {
+    if (!netdata_ebpfgo_shared_pid_snapshot_is_live(ctx->last_publish_ut, ebpfgo_shm_now_monotonic_usec())) {
         netdata_ebpfgo_shared_pid_memory_close_internal(ctx);
         return false;
     }
