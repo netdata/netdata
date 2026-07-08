@@ -84,7 +84,9 @@ static __thread struct web_server_static_threaded_worker *worker_private = NULL;
 // ----------------------------------------------------------------------------
 
 static inline int web_server_check_client_status(struct web_client *w) {
-    if(unlikely(web_client_check_dead(w) || (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w))))
+    if(unlikely(web_client_check_dead(w) ||
+                (!web_client_has_wait_receive(w) && !web_client_has_wait_send(w) &&
+                 !web_client_has_ssl_wait_receive(w) && !web_client_has_ssl_wait_send(w))))
         return -1;
 
     return 0;
@@ -92,6 +94,92 @@ static inline int web_server_check_client_status(struct web_client *w) {
 
 // ----------------------------------------------------------------------------
 // web server clients
+
+static void web_server_enable_ssl_wait_from_ssl(struct web_client *w, nd_poll_event_t *events) {
+    if(w->ssl.ssl_errno == SSL_ERROR_WANT_READ) {
+        web_client_disable_ssl_wait_send(w);
+        web_client_enable_ssl_wait_receive(w);
+        *events |= ND_POLL_READ;
+    }
+    else if(w->ssl.ssl_errno == SSL_ERROR_WANT_WRITE) {
+        web_client_disable_ssl_wait_receive(w);
+        web_client_enable_ssl_wait_send(w);
+        *events |= ND_POLL_WRITE;
+    }
+    else {
+        web_client_disable_ssl_wait_receive(w);
+        web_client_disable_ssl_wait_send(w);
+    }
+}
+
+static bool web_server_complete_ssl_handshake(struct web_client *w, nd_poll_event_t *events) {
+    NETDATA_SSL_HANDSHAKE_RESULT rc = netdata_ssl_accept_nonblocking(&w->ssl);
+    if(rc == NETDATA_SSL_HANDSHAKE_COMPLETE) {
+        web_client_disable_ssl_wait_receive(w);
+        web_client_disable_ssl_wait_send(w);
+        return true;
+    }
+
+    if(rc == NETDATA_SSL_HANDSHAKE_PENDING) {
+        web_server_enable_ssl_wait_from_ssl(w, events);
+        return false;
+    }
+
+    WEB_CLIENT_IS_DEAD(w);
+    web_client_disable_ssl_wait_receive(w);
+    web_client_disable_ssl_wait_send(w);
+    return false;
+}
+
+static bool web_server_check_tcp_ssl(struct web_client *w, nd_poll_event_t *events) {
+    if(!web_client_check_conn_tcp(w) || !netdata_ssl_web_server_ctx)
+        return true;
+
+    if(w->ssl.conn) {
+        if(w->ssl.state == NETDATA_SSL_STATE_COMPLETE)
+            return true;
+
+        if(w->ssl.state == NETDATA_SSL_STATE_INIT)
+            return web_server_complete_ssl_handshake(w, events);
+
+        WEB_CLIENT_IS_DEAD(w);
+        return false;
+    }
+
+    if(web_client_has_ssl_checked(w))
+        return true;
+
+    char test;
+    ssize_t bytes = recv(w->fd, &test, 1, MSG_PEEK | MSG_DONTWAIT);
+    if(bytes == 1) {
+        web_client_set_ssl_checked(w);
+
+        if(test > 0x17) {
+            netdata_ssl_close(&w->ssl);
+            return true;
+        }
+
+        if(!netdata_ssl_open(&w->ssl, netdata_ssl_web_server_ctx, w->fd)) {
+            WEB_CLIENT_IS_DEAD(w);
+            return false;
+        }
+
+        return web_server_complete_ssl_handshake(w, events);
+    }
+
+    if(bytes == 0) {
+        WEB_CLIENT_IS_DEAD(w);
+        return false;
+    }
+
+    if(errno == EAGAIN || errno == EWOULDBLOCK || errno == EINTR) {
+        *events |= ND_POLL_READ;
+        return false;
+    }
+
+    WEB_CLIENT_IS_DEAD(w);
+    return false;
+}
 
 static void *web_server_add_callback(POLLINFO *pi, nd_poll_event_t *events, void *data __maybe_unused) {
     worker_is_busy(WORKER_JOB_ADD_CONNECTION);
@@ -110,34 +198,6 @@ static void *web_server_add_callback(POLLINFO *pi, nd_poll_event_t *events, void
         web_client_set_conn_unix(w);
     } else {
         web_client_set_conn_tcp(w);
-    }
-
-    if ((web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx)) {
-        sock_setnonblock(w->fd, false);
-
-        //Read the first 7 bytes from the message, but the message
-        //is not removed from the queue, because we are using MSG_PEEK
-        char test[8];
-        if ( recv(w->fd,test, 7, MSG_PEEK) == 7 ) {
-            test[7] = '\0';
-        }
-        else {
-            // we couldn't read 7 bytes
-            sock_setnonblock(w->fd, true);
-            goto cleanup;
-        }
-
-        if(test[0] > 0x17) {
-            // no SSL
-            netdata_ssl_close(&w->ssl); // free any previous SSL data
-        }
-        else {
-            // SSL
-            if(!netdata_ssl_open(&w->ssl, netdata_ssl_web_server_ctx, w->fd) || !netdata_ssl_accept(&w->ssl))
-                WEB_CLIENT_IS_DEAD(w);
-        }
-
-        sock_setnonblock(w->fd, true);
     }
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);
@@ -182,6 +242,11 @@ static int web_server_rcv_callback(POLLINFO *pi, nd_poll_event_t *events) {
 
     struct web_client *w = (struct web_client *)pi->data;
     int fd = pi->fd;
+
+    if(!web_server_check_tcp_ssl(w, events)) {
+        ret = web_server_check_client_status(w);
+        goto cleanup;
+    }
 
     ssize_t bytes;
     bytes = web_client_receive(w);
@@ -248,6 +313,19 @@ static int web_server_snd_callback(POLLINFO *pi, nd_poll_event_t *events) {
 
     struct web_client *w = (struct web_client *)pi->data;
     int fd = pi->fd;
+
+    bool completing_ssl_handshake = w->ssl.conn && w->ssl.state == NETDATA_SSL_STATE_INIT;
+    if(!web_server_check_tcp_ssl(w, events)) {
+        retval = web_server_check_client_status(w);
+        goto cleanup;
+    }
+
+    if(completing_ssl_handshake && !web_client_has_wait_send(w)) {
+        web_client_enable_wait_receive(w);
+        *events |= ND_POLL_READ;
+        retval = 0;
+        goto cleanup;
+    }
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: sending data on fd %d.", w->id, fd);
 

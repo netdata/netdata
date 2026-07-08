@@ -529,6 +529,31 @@ bool netdata_ssl_accept(NETDATA_SSL *ssl) {
     return true;
 }
 
+NETDATA_SSL_HANDSHAKE_RESULT netdata_ssl_accept_nonblocking(NETDATA_SSL *ssl) {
+    errno = 0;
+    ssl->ssl_errno = 0;
+
+    if(unlikely(!is_handshake_initialized(ssl, "accept")))
+        return NETDATA_SSL_HANDSHAKE_FAILED;
+
+    int ret = SSL_accept(ssl->conn);
+    if(ret == 1) {
+        ssl->state = NETDATA_SSL_STATE_COMPLETE;
+        return NETDATA_SSL_HANDSHAKE_COMPLETE;
+    }
+
+    int err = SSL_get_error(ssl->conn, ret);
+    if(err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+        ssl->ssl_errno = err;
+        errno = EWOULDBLOCK;
+        return NETDATA_SSL_HANDSHAKE_PENDING;
+    }
+
+    netdata_ssl_log_error_queue("SSL_accept", ssl, err);
+    ssl->state = NETDATA_SSL_STATE_FAILED;
+    return NETDATA_SSL_HANDSHAKE_FAILED;
+}
+
 /**
  * Info Callback
  *

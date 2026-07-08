@@ -8,6 +8,12 @@ typedef enum __attribute__((packed)) {
     NETDATA_SSL_STATE_COMPLETE,     // SSL handshake successful
 } NETDATA_SSL_STATE;
 
+typedef enum __attribute__((packed)) {
+    NETDATA_SSL_HANDSHAKE_FAILED = -1,
+    NETDATA_SSL_HANDSHAKE_PENDING = 0,
+    NETDATA_SSL_HANDSHAKE_COMPLETE = 1,
+} NETDATA_SSL_HANDSHAKE_RESULT;
+
 #define NETDATA_SSL_WEB_SERVER_CTX 0
 #define NETDATA_SSL_STREAMING_SENDER_CTX 1
 #define NETDATA_SSL_EXPORTING_CTX 2
@@ -41,6 +47,7 @@ SSL_CTX * netdata_ssl_create_client_ctx(unsigned long mode);
 
 bool netdata_ssl_connect(NETDATA_SSL *ssl);
 bool netdata_ssl_accept(NETDATA_SSL *ssl);
+NETDATA_SSL_HANDSHAKE_RESULT netdata_ssl_accept_nonblocking(NETDATA_SSL *ssl);
 
 bool netdata_ssl_open(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd);
 bool netdata_ssl_open_ext(NETDATA_SSL *ssl, SSL_CTX *ctx, int fd, const unsigned char *alpn_protos, unsigned int alpn_protos_len);
