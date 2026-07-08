@@ -314,10 +314,16 @@ impl Ledger {
             pipelines.logs.function_name(),
         );
 
-        // Signal Ready (with every pipeline's declaration) between pipeline
-        // construction and the ingestor accept; see the method docstring for the
-        // full ordering rationale.
-        let declarations: Vec<_> = pipelines.iter().map(|p| p.declaration().clone()).collect();
+        // Signal Ready between pipeline construction and the ingestor accept;
+        // see the method docstring for the full ordering rationale.
+        //
+        // Only the logs function is advertised to Netdata. The traces pipeline
+        // is a proof scaffold whose query handler is a stub, so we deliberately
+        // do NOT declare `otel_traces` yet — the pipeline is still built and its
+        // ingest/seal/index run normally; it is simply not exposed as a queryable
+        // function. Advertise its declaration here once a real traces query
+        // engine lands.
+        let declarations = vec![pipelines.logs.declaration().clone()];
         supervisor
             .send(LedgerResponse::Ready { declarations })
             .await
