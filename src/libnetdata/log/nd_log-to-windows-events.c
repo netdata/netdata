@@ -474,6 +474,8 @@ static bool etw_register_provider(void) {
 }
 #endif
 
+static void wel_queue_init(void);
+
 bool nd_log_init_windows(void) {
     nd_win_trace("nd_log_init_windows: entered etw=%d initialized=%d",
                  (int)nd_log.eventlog.etw, (int)nd_log.eventlog.initialized);
