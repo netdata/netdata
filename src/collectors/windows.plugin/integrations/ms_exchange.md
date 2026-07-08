@@ -153,5 +153,3 @@ Metrics:
 | exchange.http_proxy_requests | requests | seconds |
 | exchange.autodiscover_requests | processed | requests/s |
 | exchange.avail_service_requests | serviced | requests/s |
-
-

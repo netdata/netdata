@@ -154,4 +154,3 @@ Netdata decodes **258 trap definitions** from Brocade Communication Systems Inc 
 - `FOUNDRY-SN-NOTIFICATION-MIB::snTrapOspfIfStateChange`
 - `FOUNDRY-SN-NOTIFICATION-MIB::snTrapOspfVirtIfStateChange`
 - `FOUNDRY-SN-NOTIFICATION-MIB::snOspfNbrStateChange`
-

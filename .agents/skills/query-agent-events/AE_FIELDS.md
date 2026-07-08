@@ -3,7 +3,7 @@
 Verified field map for the agent-events journal namespace.
 Every claim here is traceable to producer source at
 `<repo>/src/daemon/status-file.c` (the schema is
-`STATUS_FILE_VERSION = 28`, `src/daemon/status-file.h:14`).
+`STATUS_FILE_VERSION = 29`, `src/daemon/status-file.h:14`).
 
 The .local draft `agent-events-journals.md` was found to have
 14 high-severity divergences (wrong enums, missing fields,
@@ -47,7 +47,7 @@ prefix in the journal field name.
 | `exit_cause` | `AE_EXIT_CAUSE` | string | yes | Human-readable label for why this session ended. The first thing to look at. See enum below. |
 | `message` | `AE_MESSAGE` | string | yes | One-line summary; subject of FTS search. |
 | `priority` | `AE_PRIORITY` | int | yes | Syslog priority (lower = more severe). |
-| `version_saved` | `AE_VERSION_SAVED` | uint | yes | The status file's own version (typically 28). |
+| `version_saved` | `AE_VERSION_SAVED` | uint | yes | The status file's own version (typically 29). |
 | `agent_version_now` | `AE_AGENT_VERSION_NOW` | string | yes | Posting agent's version (the agent that did the POST = next session, NOT the one that crashed). |
 | `agent_pid_now` | `AE_AGENT_PID_NOW` | uint | yes | PID of the agent that POSTed. |
 | `host_memory_critical` | `AE_HOST_MEMORY_CRITICAL` | bool | yes | Was the host under memory pressure at POST time? |
@@ -163,7 +163,8 @@ investigation. Privacy-sensitive serials and asset_tags are
 |---|---|---|
 | `hw.sys.vendor` | `AE_HW_SYS_VENDOR` | BIOS / system vendor. |
 | `hw.sys.uuid` | `AE_HW_SYS_UUID` | System UUID. |
-| `hw.product.name` | `AE_HW_PRODUCT_NAME` | Product name (e.g. `MacBookPro18,3`). |
+| `hw.product.id` | `AE_HW_PRODUCT_ID` | Raw platform product/model identifier (e.g. `Mac16,10`). |
+| `hw.product.name` | `AE_HW_PRODUCT_NAME` | Human-friendly product name when available (e.g. `Mac mini (M4, 2024)`). |
 | `hw.product.version` | `AE_HW_PRODUCT_VERSION` | |
 | `hw.product.sku` | `AE_HW_PRODUCT_SKU` | |
 | `hw.product.family` | `AE_HW_PRODUCT_FAMILY` | |
@@ -178,11 +179,12 @@ investigation. Privacy-sensitive serials and asset_tags are
 | `hw.bios.version` | `AE_HW_BIOS_VERSION` | |
 | `hw.bios.vendor` | `AE_HW_BIOS_VENDOR` | |
 
-## `product.*` fields (`dsf_json_product`, `:321-329`)
+## `product.*` fields (`dsf_json_product`, `:321-330`)
 
 | JSON path | Journal field |
 |---|---|
 | `product.vendor` | `AE_PRODUCT_VENDOR` |
+| `product.id` | `AE_PRODUCT_ID` |
 | `product.name` | `AE_PRODUCT_NAME` |
 | `product.type` | `AE_PRODUCT_TYPE` |
 

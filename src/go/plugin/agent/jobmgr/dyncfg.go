@@ -3,18 +3,13 @@
 package jobmgr
 
 import (
-	"strings"
-
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
 func (m *Manager) dyncfgConfig(fn dyncfg.Function) {
-	if err := fn.ValidateArgs(2); err != nil {
-		m.Warningf("dyncfg: %v", err)
-		m.dyncfgResponder.SendCodef(fn, 400, "%v", err)
-		return
-	}
-
+	// The shutdown check precedes even argument validation: once shutdown
+	// begins EVERY non-terminal command answers 503-publish-nothing (one
+	// rule), malformed ones included.
 	select {
 	case <-m.ctx.Done():
 		m.dyncfgResponder.SendCodef(fn, 503, "Job manager is shutting down.")
@@ -22,31 +17,28 @@ func (m *Manager) dyncfgConfig(fn dyncfg.Function) {
 	default:
 	}
 
+	if err := fn.ValidateArgs(2); err != nil {
+		m.Warningf("dyncfg: %v", err)
+		m.dyncfgResponder.SendCodef(fn, 400, "%v", err)
+		return
+	}
+
 	m.dyncfgQueuedExec(fn)
 }
 
 func (m *Manager) dyncfgQueuedExec(fn dyncfg.Function) {
-	switch {
-	case strings.HasPrefix(fn.ID(), m.dyncfgSecretStorePrefixValue()):
+	switch m.dyncfgDomain(fn) {
+	case domainSecretStore:
 		m.dyncfgSecretStoreExec(fn)
-	case strings.HasPrefix(fn.ID(), m.dyncfgCollectorPrefixValue()):
+	case domainCollector:
 		m.dyncfgCollectorExec(fn)
-	case strings.HasPrefix(fn.ID(), m.dyncfgVnodePrefixValue()):
+	case domainVnode:
 		m.dyncfgVnodeExec(fn)
 	default:
-		m.dyncfgResponder.SendCodef(fn, 503, "unknown function '%s' (%s).", fn.Fn().Name, fn.ID())
+		m.dyncfgRespondUnknown(fn)
 	}
 }
 
-func (m *Manager) dyncfgSeqExec(fn dyncfg.Function) {
-	switch {
-	case strings.HasPrefix(fn.ID(), m.dyncfgSecretStorePrefixValue()):
-		m.dyncfgSecretStoreSeqExec(fn)
-	case strings.HasPrefix(fn.ID(), m.dyncfgCollectorPrefixValue()):
-		m.dyncfgCollectorSeqExec(fn)
-	case strings.HasPrefix(fn.ID(), m.dyncfgVnodePrefixValue()):
-		m.dyncfgVnodeSeqExec(fn)
-	default:
-		m.dyncfgResponder.SendCodef(fn, 503, "unknown function '%s' (%s).", fn.Fn().Name, fn.ID())
-	}
+func (m *Manager) dyncfgRespondUnknown(fn dyncfg.Function) {
+	m.dyncfgResponder.SendCodef(fn, 503, "unknown function '%s' (%s).", fn.Fn().Name, fn.ID())
 }

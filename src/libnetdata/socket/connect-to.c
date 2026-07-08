@@ -49,6 +49,31 @@ static inline int connect_to_unix(const char *path, struct timeval *timeout) {
     return fd;
 }
 
+static inline int timeval_to_poll_timeout_ms(const struct timeval *timeout) {
+    if(!timeout)
+        return 1000;
+
+    if(timeout->tv_sec <= 0 && timeout->tv_usec <= 0)
+        return 0;
+
+    uint64_t timeout_ms = 0;
+
+    if(timeout->tv_sec > 0) {
+        if((uint64_t)timeout->tv_sec > (uint64_t)INT_MAX / MSEC_PER_SEC)
+            return INT_MAX;
+
+        timeout_ms = (uint64_t)timeout->tv_sec * MSEC_PER_SEC;
+    }
+
+    if(timeout->tv_usec > 0)
+        timeout_ms += (uint64_t)timeout->tv_usec / USEC_PER_MS;
+
+    if(timeout_ms > INT_MAX)
+        return INT_MAX;
+
+    return (int)timeout_ms;
+}
+
 // connect_to_this_ip46()
 // protocol    IPPROTO_TCP, IPPROTO_UDP
 // socktype    SOCK_STREAM, SOCK_DGRAM
@@ -154,8 +179,7 @@ int connect_to_this_ip46(
                            "Waiting for connection to ip %s port %s to be established",
                            hostBfr, servBfr);
 
-                    // Convert 'struct timeval' to milliseconds for poll():
-                    int timeout_ms = timeout ? (timeout->tv_sec * 1000 + timeout->tv_usec / 1000) : 1000;
+                    int timeout_ms = timeval_to_poll_timeout_ms(timeout);
 
                     switch(wait_on_socket_or_cancel_with_timeout(NULL, fd, timeout_ms, POLLOUT, NULL)) {
                         case  0: // proceed
@@ -424,7 +448,7 @@ static bool connect_to_one_of_callback(char *entry, void *data) {
     struct connect_to_one_of_data *t = data;
 
     if(t->reconnects_counter)
-        t->reconnects_counter++;
+        (*t->reconnects_counter)++;
 
     t->sock = connect_to_this(entry, t->default_port, t->timeout);
     if(t->sock != -1) {

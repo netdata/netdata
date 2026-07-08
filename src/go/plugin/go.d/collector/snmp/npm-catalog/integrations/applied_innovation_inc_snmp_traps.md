@@ -143,4 +143,3 @@ Netdata decodes **28 trap definitions** from Applied Innovation Inc across **1 M
 - `AIBADGER-MIB::notDefinedBistateTrap`
 - `AIBADGER-MIB::infoBistateTrap`
 - `AIBADGER-MIB::normalBistateTrap`
-

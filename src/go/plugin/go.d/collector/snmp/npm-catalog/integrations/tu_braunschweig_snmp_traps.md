@@ -141,4 +141,3 @@ Netdata decodes **2 trap definitions** from Tu Braunschweig across **2 MIBs** in
 
 - `TUBS-IBR-PING-MIB::pingNoResponse`
 - `TUBS-IBR-LINUX-NETFILTER-MIB::lnfRuleMatch`
-

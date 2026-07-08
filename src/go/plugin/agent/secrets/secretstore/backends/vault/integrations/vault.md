@@ -267,6 +267,3 @@ Make sure the Netdata host trusts the CA that signed the Vault certificate. Use 
 ### Token file cannot be read
 
 Check the file path, file contents, and that the `netdata` user can read the file.
-
-
-

@@ -177,5 +177,3 @@ Metrics:
 | xendomain.packets_network | received, sent | packets/s |
 | xendomain.errors_network | received, sent | errors/s |
 | xendomain.drops_network | received, sent | drops/s |
-
-

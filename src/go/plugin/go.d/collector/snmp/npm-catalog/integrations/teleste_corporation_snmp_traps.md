@@ -143,4 +143,3 @@ Netdata decodes **170 trap definitions** from Teleste Corporation across **1 MIB
 - `TELESTE-LUMINATO-MIB2::extendedServiceMissingAlarmEvent`
 - `TELESTE-LUMINATO-MIB2::extendedPidConflictAlarmEvent`
 - `TELESTE-LUMINATO-MIB2::extendedTemperatureTooHighAlarmEvent`
-

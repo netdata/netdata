@@ -163,4 +163,3 @@ Netdata decodes **166 trap definitions** from Enterasys Networks across **21 MIB
 - `ENTERASYS-SYSLOG-CLIENT-MIB::etsysSyslogSecureLogDroppedMsgNotification`
 - `ENTERASYS-MAC-LOCKING-MIB::etsysMACLockingMACViolation`
 - `ENTERASYS-MAC-LOCKING-MIB::etsysMACLockingMACThreshold`
-

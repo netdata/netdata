@@ -147,4 +147,3 @@ Netdata decodes **197 trap definitions** from Delta Electronics Inc across **5 M
 - `UPSD-MIB::dupsPowerFail`
 - `UPSD-MIB::dupsPowerRestored`
 - `UPSD-MIB::dupsLowBattery`
-

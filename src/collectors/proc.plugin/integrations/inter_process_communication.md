@@ -119,5 +119,3 @@ Metrics:
 | system.message_queue_bytes | a dimension per queue | bytes |
 | system.shared_memory_segments | segments | segments |
 | system.shared_memory_bytes | bytes | bytes |
-
-

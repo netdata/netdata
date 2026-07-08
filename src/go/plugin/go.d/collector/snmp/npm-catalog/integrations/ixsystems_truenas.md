@@ -249,5 +249,3 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 |---|---|---|---|
 | `snmp.device_prof_hrStorageSize` | `By` | per storage_index, rm:storage_type, rm:storage_alloc_unit |  |
 | `snmp.device_prof_hrStorageUsed` | `By` | per storage_index, rm:storage_type, rm:storage_alloc_unit |  |
-
-

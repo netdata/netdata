@@ -148,4 +148,3 @@ Netdata decodes **93 trap definitions** from Siemens AG across **6 MIBs** into s
 - `SIEMENS-HP4KHIM-MIB::internalErrorHimSubagent`
 - `SIEMENS-HP4KHIM-MIB::himDiscovSucc`
 - `SIEMENS-HP4KHIM-MIB::himDiscovErr`
-

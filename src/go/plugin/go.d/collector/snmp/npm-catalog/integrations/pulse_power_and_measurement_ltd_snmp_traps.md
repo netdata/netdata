@@ -143,4 +143,3 @@ Netdata decodes **46 trap definitions** from Pulse Power And Measurement Ltd acr
 - `PPM-IGNIS-V1TRAPS-MIB::minorAlarm`
 - `PPM-IGNIS-V1TRAPS-MIB::minorCleared`
 - `PPM-IGNIS-V1TRAPS-MIB::agcAlarm`
-

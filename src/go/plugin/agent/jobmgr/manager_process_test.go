@@ -22,6 +22,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 )
 
@@ -105,7 +106,7 @@ func TestRunNotifyRunningJobs_TickOutsideLock(t *testing.T) {
 
 	stopDone := make(chan struct{})
 	go func() {
-		mgr.stopRunningJob(job.FullName())
+		mgr.stopRunningJob(context.Background(), job.FullName())
 		close(stopDone)
 	}()
 
@@ -361,59 +362,6 @@ func TestRequestFunctionReconcile_CoalescesPendingModules(t *testing.T) {
 	assert.Equal(t, []string{"mod"}, mgr.takePendingFunctionReconcileModules())
 }
 
-func TestRunWaitDecisionStep(t *testing.T) {
-	tests := map[string]struct {
-		run func(t *testing.T)
-	}{
-		"executes dyncfg command while waiting": {
-			run: func(t *testing.T) {
-				var out bytes.Buffer
-				mgr := New(Config{PluginName: testPluginName, Out: &out})
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				mgr.ctx = ctx
-				mgr.collectorHandler.WaitForDecision(prepareUserCfg("mod", "job"))
-				mgr.dyncfgCh <- dyncfg.NewFunction(functions.Function{
-					UID:  "unknown",
-					Name: "config",
-					Args: []string{"unknown", string(dyncfg.CommandSchema)},
-				})
-
-				require.True(t, mgr.runWaitDecisionStep())
-				assert.Contains(t, out.String(), "unknown function")
-			},
-		},
-		"expires wait decision": {
-			run: func(t *testing.T) {
-				mgr := New(Config{PluginName: testPluginName})
-				ctx, cancel := context.WithCancel(context.Background())
-				defer cancel()
-				mgr.ctx = ctx
-				mgr.collectorHandler = newTestCollectorHandlerWithWaitTimeout(mgr, time.Nanosecond)
-				mgr.collectorHandler.WaitForDecision(prepareUserCfg("mod", "job"))
-
-				require.True(t, mgr.runWaitDecisionStep())
-				assert.False(t, mgr.collectorHandler.WaitingForDecision())
-			},
-		},
-		"context cancel returns false": {
-			run: func(t *testing.T) {
-				mgr := New(Config{PluginName: testPluginName})
-				ctx, cancel := context.WithCancel(context.Background())
-				mgr.ctx = ctx
-				mgr.collectorHandler.WaitForDecision(prepareUserCfg("mod", "job"))
-				cancel()
-
-				assert.False(t, mgr.runWaitDecisionStep())
-			},
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, tc.run)
-	}
-}
-
 func TestRunFunctionReconciler_DoesNotBlockManagerControlLoop(t *testing.T) {
 	reg := &recordingFunctionRegistry{}
 	var out simOutput
@@ -521,6 +469,7 @@ func TestFunctionReconcileFunnelConcurrentLifecycle(t *testing.T) {
 
 	stable := &tickProbeJob{fullName: "mod_stable", moduleName: "mod", name: "stable", collector: availability}
 	mgr.startRunningJob(stable)
+	mgr.publishRunningJobFunctions(stable.FullName())
 	available.Store(true)
 
 	var wg sync.WaitGroup
@@ -533,7 +482,8 @@ func TestFunctionReconcileFunnelConcurrentLifecycle(t *testing.T) {
 				fullName := fmt.Sprintf("mod_%s", name)
 				job := &tickProbeJob{fullName: fullName, moduleName: "mod", name: name, collector: availability}
 				mgr.startRunningJob(job)
-				mgr.stopRunningJob(fullName)
+				mgr.publishRunningJobFunctions(fullName)
+				mgr.stopRunningJob(context.Background(), fullName)
 			}
 		}(worker)
 	}
@@ -597,7 +547,7 @@ func TestFunctionReconcileFunnelWithdrawsStoppedInstanceAfterInFlightPublish(t *
 		collector:  availability,
 	}
 	mgr.startRunningJob(job)
-	mgr.requestFunctionReconcile("mod")
+	mgr.publishRunningJobFunctions(job.FullName())
 
 	select {
 	case <-availabilityEntered:
@@ -605,7 +555,7 @@ func TestFunctionReconcileFunnelWithdrawsStoppedInstanceAfterInFlightPublish(t *
 		t.Fatal("reconcile did not check instance Function availability")
 	}
 
-	mgr.stopRunningJob(job.FullName())
+	mgr.stopRunningJob(context.Background(), job.FullName())
 	close(releaseAvailability)
 
 	require.Eventually(t, func() bool {
@@ -621,6 +571,160 @@ func TestFunctionReconcileFunnelWithdrawsStoppedInstanceAfterInFlightPublish(t *
 	case <-time.After(2 * time.Second):
 		t.Fatal("runFunctionReconciler did not stop")
 	}
+}
+
+// MUST-NOT-FLIP: function routing to a stopping job is withdrawn BEFORE the
+// stop's blocking wait completes - the registry removal happens ahead of
+// job.Stop(), so a job wedged in its final collection cannot keep receiving
+// function dispatches while its stop is pending. The withdrawal must never
+// move behind the blocking wait.
+func TestFuncRoutingWithdrawal_PrecedesBlockingStopWait(t *testing.T) {
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+
+	reg := collectorapi.Registry{}
+	reg.Register("stuck", collectorapi.Creator{
+		JobConfigSchema: collectorapi.MockConfigSchema,
+		// The function registry tracks jobs only for modules that declare
+		// functions; routing withdrawal is observable through it.
+		InstanceFunctions: func(collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{ID: "details"}}
+		},
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				ChartsFunc: func() *collectorapi.Charts {
+					return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "t", Units: "u", Dims: collectorapi.Dims{{ID: "d1"}}}}
+				},
+				CollectFunc: func(context.Context) map[string]int64 {
+					select {
+					case entered <- struct{}{}:
+					default:
+					}
+					<-release
+					return map[string]int64{"d1": 1}
+				},
+			}
+		},
+	})
+
+	// The default effect deadline applies: the blocked stop must not abandon
+	// within the test window, so the pin observes a stop that is genuinely in
+	// its blocking wait.
+	h := startCharManager(t, reg)
+	t.Cleanup(func() { close(release) })
+
+	cfg := prepareDyncfgCfg("stuck", "s")
+	h.dyncfg("1-add", []string{h.mgr.dyncfgModID("stuck"), "add", "s"}, []byte("{}"))
+	h.dyncfg("2-enable", []string{h.mgr.dyncfgJobID(cfg), "enable"}, nil)
+	require.Eventually(t, h.outputContains("CONFIG test:collector:stuck:s status running"), charWait, charTick)
+	require.Eventually(t, func() bool {
+		return slices.Contains(h.mgr.GetJobNames("stuck"), "s")
+	}, charWait, charTick, "the running job must be routable")
+
+	select {
+	case <-entered:
+	case <-time.After(charWait):
+		t.Fatal("no collection started")
+	}
+
+	h.dyncfg("3-disable", []string{h.mgr.dyncfgJobID(cfg), "disable"}, nil)
+
+	require.Eventually(t, func() bool {
+		return !slices.Contains(h.mgr.GetJobNames("stuck"), "s")
+	}, charWait, charTick, "routing must be withdrawn while the stop is still blocked")
+	assert.False(t, h.outputContains("FUNCTION_RESULT_BEGIN 3-disable")(),
+		"the withdrawal must precede the stop's completion, not follow its terminal")
+
+	release <- struct{}{}
+	require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN 3-disable 200"), charWait, charTick,
+		"the released stop must complete normally")
+}
+
+// MUST-NOT-FLIP: function-routing withdrawal happens when the stop command
+// STAGES, not when its effect reaches a pool worker - a saturated effect
+// pool must not extend routing to a job the user asked to stop. The blocking
+// wait itself may then run (or wedge) arbitrarily late.
+func TestFuncRoutingWithdrawal_ProceedsWhilePoolSaturated(t *testing.T) {
+	entered := make(chan struct{}, 1)
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	releaseAll := func() { releaseOnce.Do(func() { close(release) }) }
+
+	var detStarted atomic.Int32
+	reg := collectorapi.Registry{}
+	reg.Register("stuck", collectorapi.Creator{
+		JobConfigSchema: collectorapi.MockConfigSchema,
+		InstanceFunctions: func(collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+			return []funcapi.FunctionConfig{{ID: "details"}}
+		},
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				ChartsFunc: func() *collectorapi.Charts {
+					return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "t", Units: "u", Dims: collectorapi.Dims{{ID: "d1"}}}}
+				},
+				CollectFunc: func(context.Context) map[string]int64 {
+					select {
+					case entered <- struct{}{}:
+					default:
+					}
+					<-release
+					return map[string]int64{"d1": 1}
+				},
+			}
+		},
+	})
+	reg.Register("wedge", collectorapi.Creator{
+		JobConfigSchema: collectorapi.MockConfigSchema,
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				InitFunc: func(context.Context) error {
+					detStarted.Add(1)
+					<-release
+					return nil
+				},
+			}
+		},
+	})
+
+	h := startCharManager(t, reg)
+	t.Cleanup(releaseAll)
+
+	cfg := prepareDyncfgCfg("stuck", "s")
+	h.dyncfg("1-add", []string{h.mgr.dyncfgModID("stuck"), "add", "s"}, []byte("{}"))
+	h.dyncfg("2-enable", []string{h.mgr.dyncfgJobID(cfg), "enable"}, nil)
+	require.Eventually(t, h.outputContains("CONFIG test:collector:stuck:s status running"), charWait, charTick)
+	require.Eventually(t, func() bool {
+		return slices.Contains(h.mgr.GetJobNames("stuck"), "s")
+	}, charWait, charTick, "the running job must be routable")
+	select {
+	case <-entered:
+	case <-time.After(charWait):
+		t.Fatal("no collection started")
+	}
+
+	// Pin every pool worker inside a blocked detection: detection i can only
+	// dispatch after validate i completed, so every validate finds a free
+	// slot and the detections then occupy all workers.
+	for i := range effectPoolSize {
+		name := string(rune('a' + i))
+		h.dyncfg("w-add-"+name, []string{h.mgr.dyncfgModID("wedge"), "add", name}, []byte("{}"))
+		h.dyncfg("w-en-"+name, []string{h.mgr.dyncfgJobID(prepareDyncfgCfg("wedge", name)), "enable"}, nil)
+	}
+	require.Eventually(t, func() bool { return detStarted.Load() == int32(effectPoolSize) }, charWait, charTick,
+		"every pool worker must be inside a blocked detection")
+
+	// The disable's stop effect cannot reach a worker; the stage must still
+	// withdraw routing immediately.
+	h.dyncfg("3-disable", []string{h.mgr.dyncfgJobID(cfg), "disable"}, nil)
+	require.Eventually(t, func() bool {
+		return !slices.Contains(h.mgr.GetJobNames("stuck"), "s")
+	}, charWait, charTick, "routing must be withdrawn while the stop effect is starved of a pool slot")
+	assert.False(t, h.outputContains("FUNCTION_RESULT_BEGIN 3-disable")(),
+		"the stop effect must not have run yet - withdrawal happened at stage time")
+
+	releaseAll()
+	require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN 3-disable 200"), charWait, charTick,
+		"the released stop must complete normally")
 }
 
 func TestManagerAddConfigSingleInstancePolicy(t *testing.T) {
@@ -781,7 +885,7 @@ func TestRun_RegistersAgentScopeModuleMethodsBeforeAnyJobStarts(t *testing.T) {
 	assert.Equal(t, []string{"mod:a"}, fnReg.registeredNames())
 }
 
-func TestStartRunningJob_RegistersModuleMethodsAfterReconcile(t *testing.T) {
+func TestPublishRunningJobFunctions_RegistersModuleMethodsAfterReconcile(t *testing.T) {
 	fnReg := &recordingFunctionRegistry{}
 	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
 	creator := collectorapi.Creator{
@@ -794,6 +898,7 @@ func TestStartRunningJob_RegistersModuleMethodsAfterReconcile(t *testing.T) {
 
 	job := &lockProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"}
 	mgr.startRunningJob(job)
+	mgr.publishRunningJobFunctions(job.FullName())
 
 	assert.Empty(t, fnReg.registeredNames())
 
@@ -802,7 +907,7 @@ func TestStartRunningJob_RegistersModuleMethodsAfterReconcile(t *testing.T) {
 	assert.ElementsMatch(t, []string{"mod:a", "mod:b"}, fnReg.registeredNames())
 }
 
-func TestStartRunningJob_ReconcileDoesNotReregisterModuleMethods(t *testing.T) {
+func TestPublishRunningJobFunctions_ReconcileDoesNotReregisterModuleMethods(t *testing.T) {
 	fnReg := &recordingFunctionRegistry{}
 	mgr := New(Config{PluginName: testPluginName, FnReg: fnReg})
 	creator := collectorapi.Creator{
@@ -815,10 +920,12 @@ func TestStartRunningJob_ReconcileDoesNotReregisterModuleMethods(t *testing.T) {
 
 	job1 := &lockProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"}
 	mgr.startRunningJob(job1)
+	mgr.publishRunningJobFunctions(job1.FullName())
 	mgr.funcCtl.ReconcileModuleMethods("mod")
 
 	job2 := &lockProbeJob{fullName: "mod_job2", moduleName: "mod", name: "job2"}
 	mgr.startRunningJob(job2)
+	mgr.publishRunningJobFunctions(job2.FullName())
 	mgr.funcCtl.ReconcileModuleMethods("mod")
 
 	registered := fnReg.registeredNames()
@@ -951,6 +1058,39 @@ func TestRun_DoesNotPublishCollectorTemplateForSingleInstanceModules(t *testing.
 	assert.NotContains(t, output, "CONFIG "+mgr.dyncfgModID("single")+" create accepted template /collectors/"+testPluginName+"/Jobs")
 }
 
+func TestReconcileJobVnodeCommitsRuntimeEquivalentSnapshotRevision(t *testing.T) {
+	mgr := New(Config{
+		PluginName: testPluginName,
+		Vnodes: map[string]*vnodes.VirtualNode{
+			"db": {
+				Name:       "db",
+				Hostname:   "db-host",
+				GUID:       "db-guid",
+				SourceType: confgroup.TypeDyncfg,
+				Source:     "dyncfg",
+			},
+		},
+	})
+	job := &vnodeReconcileProbeJob{
+		tickProbeJob: tickProbeJob{fullName: "module_job", moduleName: "module", name: "job"},
+		vnode: vnodes.VirtualNode{
+			Name:       "db",
+			Hostname:   "db-host",
+			GUID:       "db-guid",
+			SourceType: confgroup.TypeUser,
+			Source:     "file",
+		},
+	}
+
+	mgr.reconcileJobVnode(job)
+
+	require.Equal(t, 1, job.snapshotCalls)
+	require.NotNil(t, job.snapshot.Vnode)
+	assert.Equal(t, confgroup.TypeDyncfg, job.snapshot.Vnode.SourceType)
+	assert.Equal(t, uint64(1), job.snapshot.Revision)
+	assert.Equal(t, uint64(1), job.snapshot.MetadataRevision)
+}
+
 type lockProbeJob struct {
 	fullName   string
 	moduleName string
@@ -975,14 +1115,14 @@ func (j *lockProbeJob) Tick(_ int) {
 		<-j.tickRelease
 	})
 }
-func (j *lockProbeJob) AutoDetection() error              { return nil }
-func (j *lockProbeJob) AutoDetectionEvery() int           { return 0 }
-func (j *lockProbeJob) RetryAutoDetection() bool          { return false }
-func (j *lockProbeJob) Cleanup()                          {}
-func (j *lockProbeJob) IsRunning() bool                   { return true }
-func (j *lockProbeJob) Panicked() bool                    { return false }
-func (j *lockProbeJob) Vnode() vnodes.VirtualNode         { return vnodes.VirtualNode{} }
-func (j *lockProbeJob) UpdateVnode(_ *vnodes.VirtualNode) {}
+func (j *lockProbeJob) AutoDetection(context.Context) error       { return nil }
+func (j *lockProbeJob) AutoDetectionEvery() int                   { return 0 }
+func (j *lockProbeJob) RetryAutoDetection() bool                  { return false }
+func (j *lockProbeJob) Cleanup()                                  {}
+func (j *lockProbeJob) IsRunning() bool                           { return true }
+func (j *lockProbeJob) Panicked() bool                            { return false }
+func (j *lockProbeJob) Vnode() vnodes.VirtualNode                 { return vnodes.VirtualNode{} }
+func (j *lockProbeJob) SetVnodeSnapshot(jobruntime.VnodeSnapshot) {}
 
 type tickProbeJob struct {
 	fullName   string
@@ -991,21 +1131,37 @@ type tickProbeJob struct {
 	collector  any
 }
 
-func (j *tickProbeJob) FullName() string                  { return j.fullName }
-func (j *tickProbeJob) ModuleName() string                { return j.moduleName }
-func (j *tickProbeJob) Name() string                      { return j.name }
-func (j *tickProbeJob) Collector() any                    { return j.collector }
-func (j *tickProbeJob) Start()                            {}
-func (j *tickProbeJob) Stop()                             {}
-func (j *tickProbeJob) Tick(int)                          {}
-func (j *tickProbeJob) AutoDetection() error              { return nil }
-func (j *tickProbeJob) AutoDetectionEvery() int           { return 0 }
-func (j *tickProbeJob) RetryAutoDetection() bool          { return false }
-func (j *tickProbeJob) Cleanup()                          {}
-func (j *tickProbeJob) IsRunning() bool                   { return true }
-func (j *tickProbeJob) Panicked() bool                    { return false }
-func (j *tickProbeJob) Vnode() vnodes.VirtualNode         { return vnodes.VirtualNode{} }
-func (j *tickProbeJob) UpdateVnode(_ *vnodes.VirtualNode) {}
+func (j *tickProbeJob) FullName() string                          { return j.fullName }
+func (j *tickProbeJob) ModuleName() string                        { return j.moduleName }
+func (j *tickProbeJob) Name() string                              { return j.name }
+func (j *tickProbeJob) Collector() any                            { return j.collector }
+func (j *tickProbeJob) Start()                                    {}
+func (j *tickProbeJob) Stop()                                     {}
+func (j *tickProbeJob) Tick(int)                                  {}
+func (j *tickProbeJob) AutoDetection(context.Context) error       { return nil }
+func (j *tickProbeJob) AutoDetectionEvery() int                   { return 0 }
+func (j *tickProbeJob) RetryAutoDetection() bool                  { return false }
+func (j *tickProbeJob) Cleanup()                                  {}
+func (j *tickProbeJob) IsRunning() bool                           { return true }
+func (j *tickProbeJob) Panicked() bool                            { return false }
+func (j *tickProbeJob) Vnode() vnodes.VirtualNode                 { return vnodes.VirtualNode{} }
+func (j *tickProbeJob) SetVnodeSnapshot(jobruntime.VnodeSnapshot) {}
+
+type vnodeReconcileProbeJob struct {
+	tickProbeJob
+	vnode         vnodes.VirtualNode
+	snapshot      jobruntime.VnodeSnapshot
+	snapshotCalls int
+}
+
+func (j *vnodeReconcileProbeJob) Vnode() vnodes.VirtualNode { return *j.vnode.Copy() }
+func (j *vnodeReconcileProbeJob) SetVnodeSnapshot(snapshot jobruntime.VnodeSnapshot) {
+	j.snapshotCalls++
+	j.snapshot = snapshot.Copy()
+	if snapshot.Vnode != nil {
+		j.vnode = *snapshot.Vnode.Copy()
+	}
+}
 
 type managerFunctionAvailability struct {
 	fn func(string) bool
@@ -1016,6 +1172,11 @@ func (a managerFunctionAvailability) FunctionAvailable(functionID string) bool {
 		return true
 	}
 	return a.fn(functionID)
+}
+
+type registeredPrefix struct {
+	name   string
+	prefix string
 }
 
 type recordingFunctionRegistry struct {
@@ -1065,28 +1226,4 @@ func (r *recordingFunctionRegistry) registeredPrefixes() []registeredPrefix {
 	out := make([]registeredPrefix, len(r.prefixes))
 	copy(out, r.prefixes)
 	return out
-}
-
-func newTestCollectorHandlerWithWaitTimeout(mgr *Manager, timeout time.Duration) *dyncfg.Handler[confgroup.Config] {
-	return dyncfg.NewHandler(dyncfg.HandlerOpts[confgroup.Config]{
-		Logger:    mgr.Logger,
-		API:       mgr.dyncfgResponder,
-		Seen:      dyncfg.NewSeenCache[confgroup.Config](),
-		Exposed:   dyncfg.NewExposedCache[confgroup.Config](),
-		Callbacks: mgr.collectorCallbacks,
-		WaitKey: func(cfg confgroup.Config) string {
-			return cfg.FullName()
-		},
-
-		Path:                    fmt.Sprintf(dyncfgCollectorPath, testPluginName),
-		EnableFailCode:          200,
-		RemoveStockOnEnableFail: true,
-		ConfigCommands:          dyncfgCollectorConfigCmds(),
-		WaitTimeout:             timeout,
-	})
-}
-
-type registeredPrefix struct {
-	name   string
-	prefix string
 }

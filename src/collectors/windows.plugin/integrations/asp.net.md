@@ -168,5 +168,3 @@ Metrics:
 | aspnet.form_authentication_success | success | auth |
 | aspnet.form_authentication_success | success | auth |
 | aspnet.form_authentication_failure | failure | auth |
-
-

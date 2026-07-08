@@ -1057,7 +1057,9 @@ static void mcp_process_table_result(MCP_FUNCTION_DATA *data, size_t max_size_th
     struct json_object *columns_obj = NULL;
 
     if (!json_object_object_get_ex(data->input.jobj, "data", &data_obj) ||
-        !json_object_object_get_ex(data->input.jobj, "columns", &columns_obj)) {
+        !json_object_is_type(data_obj, json_type_array) ||
+        !json_object_object_get_ex(data->input.jobj, "columns", &columns_obj) ||
+        !json_object_is_type(columns_obj, json_type_object)) {
         buffer_strcat(data->output.result, json_str); // Missing required elements
         return;
     }
@@ -1193,8 +1195,12 @@ static void mcp_process_table_result(MCP_FUNCTION_DATA *data, size_t max_size_th
     // Copy rows for filtering/sorting, applying filters if specified
     for (size_t i = 0; i < row_count; i++) {
         struct json_object *row = json_object_array_get_idx(data_obj, i);
-        if (!row)
-            continue;
+        if (!json_object_is_type(row, json_type_array)) {
+            data->output.status = MCP_TABLE_NOT_PROCESSABLE;
+            buffer_strcat(data->output.result, json_str);
+            freez((void *)rows);
+            return;
+        }
 
         bool include_row = true;
 
@@ -2286,7 +2292,9 @@ static MCP_RETURN_CODE mcp_functions_process_table(MCP_FUNCTION_DATA *data, MCP_
         struct json_object *columns_obj = NULL;
         
         if (!json_object_object_get_ex(data->input.jobj, "data", &data_obj) ||
-            !json_object_object_get_ex(data->input.jobj, "columns", &columns_obj)) {
+            !json_object_is_type(data_obj, json_type_array) ||
+            !json_object_object_get_ex(data->input.jobj, "columns", &columns_obj) ||
+            !json_object_is_type(columns_obj, json_type_object)) {
             // Missing required fields, treat as not processable
             data->output.status = MCP_TABLE_NOT_PROCESSABLE;
             buffer_strcat(data->output.result, buffer_tostring(data->input.json));

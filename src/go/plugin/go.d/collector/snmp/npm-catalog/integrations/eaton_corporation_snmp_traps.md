@@ -150,4 +150,3 @@ Netdata decodes **175 trap definitions** from Eaton Corporation across **8 MIBs*
 - `XUPS-MIB::xupstdOnBattery`
 - `XUPS-MIB::xupstdLowBattery`
 - `XUPS-MIB::xupstdUtilityPowerRestored`
-

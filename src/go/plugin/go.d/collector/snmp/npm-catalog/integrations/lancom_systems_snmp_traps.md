@@ -185,4 +185,3 @@ Netdata decodes **733 trap definitions** from Lancom Systems across **38 MIBs** 
 - `LCOS-MIB::lcsTrapsUplsucc`
 - `LCOS-MIB::lcsTrapsUplfailto`
 - `LCOS-MIB::lcsTrapsUplfailincl`
-

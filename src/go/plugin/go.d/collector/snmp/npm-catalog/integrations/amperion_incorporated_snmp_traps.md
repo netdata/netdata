@@ -143,4 +143,3 @@ Netdata decodes **25 trap definitions** from Amperion Incorporated across **1 MI
 - `Amperion-MIB::criticalBatteryShutdownWarning`
 - `Amperion-MIB::p12vOutOfRange`
 - `Amperion-MIB::m8point5vOutOfRange`
-

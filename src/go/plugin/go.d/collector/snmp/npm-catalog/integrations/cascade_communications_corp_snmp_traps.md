@@ -143,4 +143,3 @@ Netdata decodes **82 trap definitions** from Cascade Communications Corp across 
 - `CASCADE-MIB::nodeBoardPulled`
 - `CASCADE-MIB::nodeBoardMismatch`
 - `CASCADE-MIB::nodePsAStatusChange`
-

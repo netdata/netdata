@@ -152,4 +152,3 @@ Netdata decodes **18 trap definitions** from Arista Networks Inc Formerly Arastr
 - `ARISTA-BRIDGE-EXT-MIB::aristaMacAge`
 - `ARISTA-TEST-MIB::aristaTestNotification`
 - `ARISTA-REDUNDANCY-MIB::aristaRedundancySwitchOverNotif`
-

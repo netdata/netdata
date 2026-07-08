@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Apple Computer Inc across **1 MIB** i
 ### Sample decoded traps
 
 - `Apple-macintosh-system-mib::userInTrouble`
-

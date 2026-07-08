@@ -123,5 +123,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | cpu.temperature | a dimension per core | Celcius |
-
-

@@ -17,6 +17,14 @@ const dyncfgShuttingDownMsg = "Job manager is shutting down."
 // blocks. This is intentional so awaited state transitions preserve ordering
 // and eventually slow the producer instead of being dropped.
 func (m *Manager) enqueueDyncfgFunction(fn dyncfg.Function) {
+	// Post-shutdown commands are rejected up front: with the run loop gone,
+	// a buffered send would strand the command unread. The executor's
+	// shutdown drain answers what was accepted before cancellation; a send
+	// racing cancellation itself is force-finalized by the functions layer.
+	if m.baseContext().Err() != nil {
+		m.dyncfgResponder.SendCodef(fn, 503, dyncfgShuttingDownMsg)
+		return
+	}
 	select {
 	case m.dyncfgCh <- fn:
 	case <-m.baseContext().Done():

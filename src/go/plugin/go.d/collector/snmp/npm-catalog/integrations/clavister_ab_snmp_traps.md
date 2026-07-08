@@ -144,4 +144,3 @@ Netdata decodes **8 trap definitions** from Clavister AB across **2 MIBs** into 
 - `CLAVISTER-STREAM-TRAPS-MIB::ssmHAActivePeerDead`
 - `CLAVISTER-STREAM-TRAPS-MIB::ssmHAActiveOutrankingPeer`
 - `CLAVISTER-STREAM-TRAPS-MIB::ssmHAActiveUserRequest`
-

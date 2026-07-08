@@ -143,4 +143,3 @@ Netdata decodes **102 trap definitions** from Meru Networks across **1 MIB** int
 - `MERU-WLAN-MIB::mwlTopoStaAtsModify`
 - `MERU-WLAN-MIB::mwlRogueApDetected`
 - `MERU-WLAN-MIB::mwlRogueApRemoved`
-

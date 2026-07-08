@@ -8317,11 +8317,11 @@
                 "type": "integer"
               },
               "partial_data_trimming": {
-                "description": "Information related to trimming of the last few points of the `result`, that was required to remove (increasing) partial data.\nTrimming is disabled when the `raw` option is given to the query.\nThis object is available only when the `debug` flag is set.\n",
+                "description": "Information related to trimming of the last few points of the `result`, that was required to remove (increasing) partial data.\nFinal trimming is disabled when the `raw` option is given to the query, but this metadata is still available for raw responses.\nThis object is available when the `debug` or `raw` flag is set.\n",
                 "type": "object",
                 "properties": {
                   "max_update_every": {
-                    "description": "The maximum `update_every` for all metrics aggregated into the query.\nTrimming is by default enabled at `view.before - max_update_every`, but only when `view.before >= now - max_update_every`.\n",
+                    "description": "The live-tail trimming budget in seconds, computed as two times the maximum `update_every` for all metrics aggregated into the query.\nTrimming is by default enabled at `view.before - max_update_every`, but only when `view.before >= now - max_update_every`.\n",
                     "type": "integer"
                   },
                   "expected_after": {
@@ -8329,7 +8329,8 @@
                     "type": "integer"
                   },
                   "trimmed_after": {
-                    "description": "The timestamp at which trimming has been applied.\nIf this timestamp is greater or equal to `view.before`, there is no trimming.\n"
+                    "description": "The timestamp at which trimming has been applied.\nIf this timestamp is greater or equal to `view.before`, there is no trimming.\n",
+                    "type": "integer"
                   }
                 }
               },

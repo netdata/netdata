@@ -148,4 +148,3 @@ Netdata decodes **48 trap definitions** from Mellanox Technologies Ltd across **
 - `MELLANOX-EFM-MIB::cpuUtilHigh`
 - `MELLANOX-EFM-MIB::procUnexpectedExit`
 - `MELLANOX-EFM-MIB::unexpectedShutdown`
-

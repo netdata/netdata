@@ -143,4 +143,3 @@ Netdata decodes **27 trap definitions** from Protection One Inc across **1 MIB**
 - `RMCU::trap-analog-over2`
 - `RMCU::trap-analog-over3`
 - `RMCU::trap-analog-over4`
-

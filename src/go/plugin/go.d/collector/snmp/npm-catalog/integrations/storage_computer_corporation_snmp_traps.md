@@ -144,4 +144,3 @@ Netdata decodes **5 trap definitions** from Storage Computer Corporation across 
 - `SCC-RAID7-MIB::raid7EnvironmentFailure`
 - `SCCRAID7-PROXY-MIB::raid7LinkUp`
 - `SCCRAID7-PROXY-MIB::raid7LinkDown`
-

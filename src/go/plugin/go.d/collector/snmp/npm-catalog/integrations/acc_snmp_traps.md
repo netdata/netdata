@@ -162,4 +162,3 @@ Netdata decodes **417 trap definitions** from Acc across **20 MIBs** into struct
 - `ACC-SLOT::accRmFeatureTrap`
 - `ACC-SLOT::accRmCardRemovedTrap`
 - `ACC-SLOT::accRmActvComplTrap`
-

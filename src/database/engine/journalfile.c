@@ -170,28 +170,35 @@ static void njfv2idx_add(struct rrdengine_datafile *datafile) {
         fatal("DBENGINE: NJFV2IDX trying to index a journal file with no datafile");
 
     struct rrdengine_instance *ctx = datafile_ctx(datafile);
+    time_t last_time_s = datafile->journalfile->v2.last_time_s;
 
-    internal_fatal(datafile->journalfile->v2.last_time_s <= 0, "DBENGINE: NJFV2IDX trying to index a journal file with invalid first_time_s");
+    if(unlikely(last_time_s <= 0))
+        fatal("DBENGINE: NJFV2IDX trying to index a journal file with invalid last_time_s");
+
+    if(unlikely((uintmax_t)last_time_s > (uintmax_t)(Word_t)~0UL))
+        fatal("DBENGINE: NJFV2IDX trying to index a journal file with last_time_s outside Judy word range");
+
+    Word_t indexed_as = (Word_t)last_time_s;
 
     rw_spinlock_write_lock(&ctx->njfv2idx.spinlock);
-    datafile->journalfile->njfv2idx.indexed_as = datafile->journalfile->v2.last_time_s;
 
-    do {
-        internal_fatal(datafile->journalfile->njfv2idx.indexed_as <= 0, "DBENGINE: NJFV2IDX journalfile is already indexed");
+    // Ask Judy for the empty slot so collision probing is bounded and cannot wrap.
+    int rc = JudyLFirstEmpty(ctx->njfv2idx.JudyL, &indexed_as, PJE0);
+    if(unlikely(rc == JERR))
+        fatal("DBENGINE: NJFV2IDX corrupted judy array");
 
-        Pvoid_t *PValue = JudyLIns(&ctx->njfv2idx.JudyL, datafile->journalfile->njfv2idx.indexed_as, PJE0);
-        if (!PValue || PValue == PJERR)
-            fatal("DBENGINE: NJFV2IDX corrupted judy array");
+    if(unlikely(!rc))
+        fatal("DBENGINE: NJFV2IDX cannot find an empty journal file index slot");
 
-        if (unlikely(*PValue)) {
-            // already there
-            datafile->journalfile->njfv2idx.indexed_as++;
-        }
-        else {
-            *PValue = datafile;
-            break;
-        }
-    } while(1);
+    Pvoid_t *PValue = JudyLIns(&ctx->njfv2idx.JudyL, indexed_as, PJE0);
+    if (!PValue || PValue == PJERR)
+        fatal("DBENGINE: NJFV2IDX corrupted judy array");
+
+    if(unlikely(*PValue))
+        fatal("DBENGINE: NJFV2IDX selected an occupied journal file index slot");
+
+    *PValue = datafile;
+    datafile->journalfile->njfv2idx.indexed_as = indexed_as;
 
     rw_spinlock_write_unlock(&ctx->njfv2idx.spinlock);
 }
@@ -1032,7 +1039,16 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
 
         char uuid_str[UUID_STR_LEN];
         uuid_unparse_lower(metric->uuid, uuid_str);
-        struct journal_page_header *metric_list_header = (void *) (data_start + metric->page_offset);
+        size_t page_offset = (size_t)metric->page_offset;
+        if (page_offset > journal_v2_file_size ||
+            journal_v2_file_size - page_offset < sizeof(struct journal_page_header)) {
+            netdata_log_info(
+                "DBENGINE: verification failed invalid page list header offset -- index %u at offset %u",
+                entries, metric->page_offset);
+            return 1;
+        }
+
+        struct journal_page_header *metric_list_header = (void *) ((uint8_t *) data_start + page_offset);
         struct journal_page_header local_metric_list_header = *metric_list_header;
 
         local_metric_list_header.crc = JOURVAL_V2_MAGIC;
@@ -1042,8 +1058,17 @@ static int journalfile_v2_validate(void *data_start, size_t journal_v2_file_size
         rc = crc32cmp(metric_list_header->checksum, crc);
 
         if (!rc) {
+            size_t page_list_room = journal_v2_file_size - page_offset - sizeof(struct journal_page_header);
+            if (page_list_room < sizeof(struct journal_v2_block_trailer) ||
+                (size_t)metric_list_header->entries > (page_list_room - sizeof(struct journal_v2_block_trailer)) / sizeof(struct journal_page_list)) {
+                netdata_log_info("DBENGINE: verification failed invalid page list entries -- index %u entries %u at offset %u",
+                                 entries, metric_list_header->entries, metric->page_offset);
+                return 1;
+            }
+
             struct journal_v2_block_trailer *journal_trailer =
-                (void *) data_start + metric->page_offset + sizeof(struct journal_page_header) + (metric_list_header->entries * sizeof(struct journal_page_list));
+                (void *) ((uint8_t *) data_start + page_offset + sizeof(struct journal_page_header) +
+                          (metric_list_header->entries * sizeof(struct journal_page_list)));
 
             crc = crc32(0L, Z_NULL, 0);
             crc = crc32(crc, (uint8_t *) metric_list_header + sizeof(struct journal_page_header), metric_list_header->entries * sizeof(struct journal_page_list));

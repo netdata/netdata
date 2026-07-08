@@ -127,5 +127,3 @@ Metrics:
 | ipv4.fragsout | ok, failed, created | packets/s |
 | ipv4.fragsin | ok, failed, all | packets/s |
 | ipv4.errors | InDiscards, OutDiscards, InHdrErrors, OutNoRoutes, InAddrErrors, InUnknownProtos | packets/s |
-
-

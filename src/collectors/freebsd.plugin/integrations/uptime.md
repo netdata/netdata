@@ -121,5 +121,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | system.uptime | uptime | seconds |
-
-

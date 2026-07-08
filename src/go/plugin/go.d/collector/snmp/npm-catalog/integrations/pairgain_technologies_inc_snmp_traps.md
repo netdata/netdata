@@ -148,4 +148,3 @@ Netdata decodes **26 trap definitions** from Pairgain Technologies Inc across **
 - `PAIRGAIN-DSLAM-TRAP-MIB::pgDSLAMchassisConfigChange`
 - `PAIRGAIN-DSLAM-TRAP-MIB::pgDSLAMchassisTemperatureThresholdExceeded`
 - `PAIRGAIN-DSLAM-TRAP-MIB::pgDSLAMHDSLESThresholdExceeded`
-

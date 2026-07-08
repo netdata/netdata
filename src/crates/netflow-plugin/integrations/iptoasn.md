@@ -246,6 +246,3 @@ because BGP-driven prefix re-assignments will land in the dataset
 within hours but not in your cache until the next download. The
 plugin reloads MMDB files in place every 30 seconds when the file
 signature changes, so a fresh file lands without restart.
-
-
-

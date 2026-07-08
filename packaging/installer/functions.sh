@@ -386,12 +386,14 @@ prepare_cmake_options() {
   [ "$(uname -s)" = "Linux" ] && IS_LINUX=1
   IS_LINUX_OR_FREEBSD="${IS_LINUX}"
   [ "$(uname -s)" = "FreeBSD" ] && IS_LINUX_OR_FREEBSD=1
+  IS_LINUX_OR_FREEBSD_OR_DARWIN="${IS_LINUX_OR_FREEBSD}"
+  [ "$(uname -s)" = "Darwin" ] && IS_LINUX_OR_FREEBSD_OR_DARWIN=1
   enable_feature PLUGIN_DEBUGFS "${IS_LINUX}"
   enable_feature PLUGIN_PERF "${IS_LINUX}"
   enable_feature PLUGIN_SLABINFO "${IS_LINUX}"
   enable_feature PLUGIN_CGROUP_NETWORK "${IS_LINUX}"
   enable_feature PLUGIN_LOCAL_LISTENERS "${IS_LINUX}"
-  enable_feature PLUGIN_NETWORK_VIEWER "${IS_LINUX_OR_FREEBSD}"
+  enable_feature PLUGIN_NETWORK_VIEWER "${IS_LINUX_OR_FREEBSD_OR_DARWIN}"
   enable_feature PLUGIN_EBPF "${ENABLE_EBPF:-0}"
 
   enable_feature BUNDLED_JSONC "${NETDATA_BUILD_JSON_C:-0}"
@@ -628,11 +630,38 @@ get_os_key() {
 }
 
 get_group(){
+  group="${1:-}"
+
+  [ -z "${group}" ] && return 1
+
   if command -v getent > /dev/null 2>&1; then
-    getent group "${1:-""}"
-  else
-    grep "^${1}:" /etc/group
+    getent group "${group}" && return 0
   fi
+
+  if command -v dscl > /dev/null 2>&1; then
+    if group_record="$(dscl . read /Groups/"${group}" 2>/dev/null)"; then
+      gid="$(printf "%s\n" "${group_record}" | awk '/^PrimaryGroupID:/{print $2; exit}')"
+      members="$(printf "%s\n" "${group_record}" | awk '
+        /^GroupMembership:/ {
+          for (i = 2; i <= NF; i++) {
+            members = members ? members "," $i : $i
+          }
+        }
+        END {
+          print members
+        }
+      ')"
+      case "${gid}" in
+        ''|*[!0-9]*) ;;
+        *)
+          printf "%s:*:%s:%s\n" "${group}" "${gid}" "${members}"
+          return 0
+          ;;
+      esac
+    fi
+  fi
+
+  awk -F ':' -v group="${group}" '$1 == group { print; found = 1 } END { exit !found }' /etc/group
 }
 
 issystemd() {

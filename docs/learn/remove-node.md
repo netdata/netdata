@@ -22,7 +22,6 @@ You can't delete a Stale node because the Parent is alive/connected to the Cloud
 This is why stale nodes show "Delete is disabled" - the system prevents deletion while the parent node still holds queryable metrics data for that child.<br/>
 </details>
 
-
 ## Quick Decision Guide
 
 **What type of node is it?**
@@ -61,7 +60,8 @@ Stale status does not apply to standalone nodes — stale specifically means a c
 :::
 
 **Steps**:
-1. Stop the Netdata Agent on the node you want to remove
+
+1. Stop the Netdata Agent on the node you want to remove.
 2. In Netdata Cloud, go to **Space Settings > Nodes** (click the ⚙️ cog icon below the spaces list).
 3. Locate the offline node in the list
 4. Select the trash icon to remove it
@@ -84,8 +84,9 @@ These are nodes that stream metrics through a Parent Agent. When a child node st
 **When to use**: Your child node shows as **Stale** status and UI shows "Delete is disabled".
 
 **Step 1: Get the Node Identifier**
+
 1. In Netdata Cloud, navigate to the stale node
-2. Click the **node information (i)** button 
+2. Click the **node information (i)** button
 3. Click **"View node info in JSON"**
 4. Copy the identifier from the JSON data (node_id, machine_guid, or hostname)
 
@@ -97,9 +98,10 @@ netdatacli remove-stale-node <identifier>
 ```
 
 Replace `<identifier>` with one of:
-- `node_id` - The node's unique identifier
-- `machine_guid` - The machine GUID from the node info
-- `hostname` - The node's hostname
+
+* `node_id` - The node's unique identifier
+* `machine_guid` - The machine GUID from the node info
+* `hostname` - The node's hostname
 
 :::important
 
@@ -113,7 +115,7 @@ If a node is represented by multiple Parent Agents in an HA setup, this command 
 
 :::
 
-**What happens next**: The command marks the node as ephemeral and removes it so it is no longer available for queries, from both the Netdata Agent dashboard and Netdata Cloud. The node is fully removed — it does not transition to Offline status.
+**What happens next**: The node is marked as ephemeral and disconnected. On the **Parent Agent**, the node is removed from queries and disappears from the dashboard immediately. On **Netdata Cloud**, the node transitions to Offline — but because it is ephemeral, Cloud deletes it immediately rather than waiting for the standard Offline cleanup window, so it typically disappears from the Cloud dashboard within 1-2 minutes as Cloud processes the update and the UI refreshes. See [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md) for details on node states and cleanup timing.
 
 </details>
 
@@ -138,6 +140,7 @@ This command affects all disconnected child nodes on the Parent Agent where it i
 ## Prevention and Best Practices
 
 ### Auto-scaling/Spot Instances
+
 For environments with auto-scaling cloud instances or spot instances that get terminated frequently, consider configuring nodes as ephemeral:
 
 ```ini
@@ -153,9 +156,14 @@ For nodes that are part of streaming configurations, see [Nodes Ephemerality](/d
 :::
 
 ### Prevent Automatic Reconnection
+
 To prevent removed nodes from reappearing:
-* Remove or clear any existing `claim.conf` file 
+
+* [Stop the Netdata Agent](/docs/netdata-agent/start-stop-restart.md) on the node
+* Remove or clear any existing `claim.conf` file
 * Clear related environment variables on the node
+
+To remove Netdata from the node entirely instead, see [Uninstall Netdata](/packaging/installer/UNINSTALL.md).
 
 ## Troubleshooting
 

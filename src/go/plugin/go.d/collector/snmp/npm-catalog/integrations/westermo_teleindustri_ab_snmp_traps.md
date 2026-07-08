@@ -149,4 +149,3 @@ Netdata decodes **56 trap definitions** from Westermo Teleindustri AB across **7
 - `WESTERMO-LYNX-MIB::linkUpChangeWarning`
 - `WESTERMO-LYNX-MIB::linkDownChangeWarning`
 - `WESTERMO-MRD-300-MIB::wirelessState`
-

@@ -122,5 +122,3 @@ Metrics:
 |:------|:----------|:----|
 | system.intr | interrupts | interrupts/s |
 | system.interrupts | a dimension per interrupt | interrupts/s |
-
-

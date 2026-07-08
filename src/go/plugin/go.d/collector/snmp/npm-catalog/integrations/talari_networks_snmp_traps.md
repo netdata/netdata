@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Talari Networks across **1 MIB** int
 
 - `TALARI-MIB::talariEventNotification`
 - `TALARI-MIB::talariNetworkEventNotification`
-

@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Tridium across **1 MIB** into structu
 ### Sample decoded traps
 
 - `TRIDIUMR3-MIB::stationAlarm`
-

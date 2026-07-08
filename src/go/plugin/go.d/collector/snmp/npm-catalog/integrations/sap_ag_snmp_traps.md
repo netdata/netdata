@@ -143,4 +143,3 @@ Netdata decodes **84 trap definitions** from Sap AG across **1 MIB** into struct
 - `SAP-MIB::r3trapStateChange`
 - `SAP-MIB::r3trapSyslogIdNormal`
 - `SAP-MIB::r3trapSyslogIdWarning`
-

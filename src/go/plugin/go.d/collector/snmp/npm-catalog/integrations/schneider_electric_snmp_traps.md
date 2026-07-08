@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Schneider Electric across **1 MIB** 
 - `PM8ECCMIB::pm8OnBoardAlarmP1`
 - `PM8ECCMIB::pm8OnBoardAlarmP2`
 - `PM8ECCMIB::pm8OnBoardAlarmP3`
-

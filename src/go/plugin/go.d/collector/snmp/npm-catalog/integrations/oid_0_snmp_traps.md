@@ -147,4 +147,3 @@ Netdata decodes **9 trap definitions** from Oid 0 across **5 MIBs** into structu
 - `H323MC-MIB::conferenceTermination`
 - `H323-GATEKEEPER-MIB::h323GatekeeperStart`
 - `H323-GATEKEEPER-MIB::h323GatekeeperGoingDown`
-

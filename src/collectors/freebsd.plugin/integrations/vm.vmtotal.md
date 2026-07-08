@@ -130,5 +130,3 @@ Metrics:
 | system.active_processes | active | processes |
 | system.processes | running, blocked | processes |
 | mem.real | used | MiB |
-
-

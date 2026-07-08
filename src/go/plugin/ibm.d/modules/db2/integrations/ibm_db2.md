@@ -478,5 +478,3 @@ Metrics:
 | db2.tablespace_group_size | used, free | bytes |
 | db2.tablespace_group_usable_size | total, usable | bytes |
 | db2.tablespace_group_state | state | state |
-
-

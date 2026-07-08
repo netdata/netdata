@@ -179,4 +179,3 @@ Netdata decodes **713 trap definitions** from General Instrument across **32 MIB
 - `APEX-MIB::trapConfigurationChangeOID`
 - `APEX-MIB::trapConfigurationChangeIpAddress`
 - `APEX-MIB::trapConditionNotInList`
-

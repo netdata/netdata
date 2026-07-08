@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Electroline Equipment Inc across **1
 
 - `ELECTROLINE-DHT-STATUS-MIB::dhtSleepModeEvent`
 - `ELECTROLINE-DHT-STATUS-MIB::dhtAlarmAssuranceEvent`
-

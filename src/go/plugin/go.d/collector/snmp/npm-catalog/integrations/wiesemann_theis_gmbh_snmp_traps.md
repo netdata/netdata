@@ -162,4 +162,3 @@ Netdata decodes **728 trap definitions** from Wiesemann Theis GmbH across **20 M
 - `Webio-ANx-MIB::wtWebioAn8Alert1`
 - `Webio-ANx-MIB::wtWebioAn8Alert2`
 - `Webio-ANx-MIB::wtWebioAn8Alert3`
-

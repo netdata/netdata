@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Accelerated Concepts Inc across **1 M
 ### Sample decoded traps
 
 - `ACCELERATED-MIB::event`
-

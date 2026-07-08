@@ -137,5 +137,3 @@ Metrics:
 | mem.thp_compact | success, fail, stall | events/s |
 | mem.oom_kill | kills | kills/s |
 | mem.numa | local, foreign, interleave, other, pte_updates, huge_pte_updates, hint_faults, hint_faults_local, pages_migrated | events/s |
-
-

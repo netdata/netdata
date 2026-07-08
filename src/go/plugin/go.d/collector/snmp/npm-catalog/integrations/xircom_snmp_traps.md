@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Xircom across **1 MIB** into structur
 ### Sample decoded traps
 
 - `XIRCOM-MIB::printerTrap`
-

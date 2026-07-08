@@ -453,6 +453,3 @@ The discoverer creates jobs but does not run them — the `snmp` collector does.
 - The rendered `config_template` produces invalid YAML for some discovered field values (for example, unescaped colons in `sysName`). YAML-quote dynamic values when in doubt.
 - Module name mismatch — the rule `id` (or explicit `module:` field) does not match `snmp`.
 - SNMPv3 credentials succeeded for `system` MIB during discovery but the collector cannot read other OIDs (different VACM view); confirm with `snmpwalk` against the device.
-
-
-

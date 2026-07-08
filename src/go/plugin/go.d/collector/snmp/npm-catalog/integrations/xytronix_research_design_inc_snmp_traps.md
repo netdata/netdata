@@ -143,4 +143,3 @@ Netdata decodes **26 trap definitions** from Xytronix Research Design Inc across
 - `XYTRONIX-MIB::digitalInput3Notification`
 - `XYTRONIX-MIB::digitalInput4Notification`
 - `XYTRONIX-MIB::relay1Notification`
-

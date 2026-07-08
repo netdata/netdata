@@ -145,4 +145,3 @@ Netdata decodes **13 trap definitions** from Waystream AB Formerly Packetfront N
 - `WAYSTREAM-MIB::wsIbosVoltLow`
 - `WAYSTREAM-MIB::wsIbosVoltHigh`
 - `WAYSTREAM-MIB::wsIbosFanRPMLow`
-

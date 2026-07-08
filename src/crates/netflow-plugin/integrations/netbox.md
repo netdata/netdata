@@ -338,6 +338,3 @@ An empty `results` array (legitimate state for a freshly-installed NetBox)
 is treated as a fetch failure by the cross-cutting source loop and triggers
 exponential backoff. Add at least one synthetic prefix (e.g. a `RFC1918`
 container) so the response is never empty.
-
-
-

@@ -143,4 +143,3 @@ Netdata decodes **9 trap definitions** from Platform Computing Corporation acros
 - `LSF-SNMP-MIB::lsfSbdDown`
 - `LSF-SNMP-MIB::lsfHostUnlicensed`
 - `LSF-SNMP-MIB::lsfMasterElect`
-

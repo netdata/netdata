@@ -143,4 +143,3 @@ Netdata decodes **16 trap definitions** from Phoenix Technologies Inc across **1
 - `ROMPILOT-MIB::rpDiagResetTrap`
 - `ROMPILOT-MIB::rpIDEResetTrap`
 - `ROMPILOT-MIB::rpBootTrap`
-

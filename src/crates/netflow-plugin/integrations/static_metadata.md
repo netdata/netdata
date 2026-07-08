@@ -377,6 +377,3 @@ carry a rate.
 Static metadata is loaded at plugin startup and there is no file-change
 watcher. Restart the plugin (or the agent) after editing
 `netflow.yaml`.
-
-
-

@@ -14,6 +14,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/internal/wiretest"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -30,13 +31,19 @@ type wantExposedEntry struct {
 }
 
 type runSim struct {
-	do func(mgr *Manager, in chan []*confgroup.Group)
+	do func(t *testing.T, mgr *Manager, in chan []*confgroup.Group)
 
 	wantDiscovered []confgroup.Config
 	wantSeen       []confgroup.Config
 	wantExposed    []wantExposedEntry
 	wantRunning    []string
 	wantDyncfg     string
+	// wantDyncfgRecords is the per-key alternative to wantDyncfg for
+	// multi-key scenarios: each element is one key's expected atomic-record
+	// subsequence, asserted independently against the full transcript, plus
+	// a completeness check (total record count must equal the sum of wants),
+	// so only cross-key interleaving is left unconstrained.
+	wantDyncfgRecords [][]wiretest.RecordWant
 }
 
 const funcResultEndMarker = "FUNCTION_RESULT_END\n\n"
@@ -105,16 +112,32 @@ func (s *runSim) run(t *testing.T) {
 		t.Errorf("failed to start work in %s", timeout)
 	}
 
-	s.do(mgr, grpCh)
+	s.do(t, mgr, grpCh)
 
 	expectedResults := strings.Count(s.wantDyncfg, "FUNCTION_RESULT_END")
+	for _, wants := range s.wantDyncfgRecords {
+		for _, want := range wants {
+			for _, sub := range want.Contains {
+				if strings.HasPrefix(sub, "FUNCTION_RESULT_BEGIN") {
+					expectedResults++
+					break
+				}
+			}
+		}
+	}
 	require.Eventually(t, func() bool {
 		return countDiscovered(mgr) == len(s.wantDiscovered) &&
 			mgr.collectorSeen.Count() == len(s.wantSeen) &&
 			mgr.collectorExposed.Count() == len(s.wantExposed) &&
 			runningSetMatches(mgr.runningJobs.snapshot(), s.wantRunning) &&
-			out.FuncResultCount() >= expectedResults
+			out.FuncResultCount() >= expectedResults &&
+			s.dyncfgTranscriptSettled(out.String())
 	}, timeout, 10*time.Millisecond, "manager state did not settle before shutdown")
+	if t.Failed() {
+		t.Logf("settle state: discovered %d/%d seen %d/%d exposed %d/%d results %d/%d",
+			countDiscovered(mgr), len(s.wantDiscovered), mgr.collectorSeen.Count(), len(s.wantSeen),
+			mgr.collectorExposed.Count(), len(s.wantExposed), out.FuncResultCount(), expectedResults)
+	}
 
 	runningBeforeShutdown := make(map[string]struct{})
 	for _, job := range mgr.runningJobs.snapshot() {
@@ -129,33 +152,22 @@ func (s *runSim) run(t *testing.T) {
 		t.Errorf("failed to finish work in %s", timeout)
 	}
 
-	var lines []string
-	skipNextEmpty := false
-	for s := range strings.SplitSeq(out.String(), "\n") {
-		if strings.HasPrefix(s, "CONFIG") && strings.Contains(s, " template ") {
-			skipNextEmpty = false
-			continue
-		}
-		if strings.HasPrefix(s, "FUNCTION GLOBAL") || strings.HasPrefix(s, "FUNCTION_DEL") {
-			skipNextEmpty = true
-			continue
-		}
-		if skipNextEmpty && s == "" {
-			skipNextEmpty = false
-			continue
-		}
-		skipNextEmpty = false
-		if strings.HasPrefix(s, "FUNCTION_RESULT_BEGIN") {
-			parts := strings.Fields(s)
-			s = strings.Join(parts[:len(parts)-1], " ") // remove timestamp
-		}
-		lines = append(lines, s)
-	}
-	wantDyncfg, gotDyncfg := strings.TrimSpace(s.wantDyncfg), strings.TrimSpace(strings.Join(lines, "\n"))
+	wantDyncfg, gotDyncfg := strings.TrimSpace(s.wantDyncfg), normalizeDyncfgTranscript(out.String())
 
 	//fmt.Println(gotDyncfg)
 
-	assert.Equal(t, wantDyncfg, gotDyncfg, "dyncfg commands")
+	if len(s.wantDyncfgRecords) > 0 {
+		require.Empty(t, s.wantDyncfg, "use either wantDyncfg or wantDyncfgRecords, not both")
+		total := 0
+		for _, wants := range s.wantDyncfgRecords {
+			wiretest.RequireSubsequence(t, gotDyncfg, wants)
+			total += len(wants)
+		}
+		assert.Len(t, wiretest.AtomicRecords(gotDyncfg), total,
+			"transcript must contain exactly the expected records (cross-key order free)")
+	} else {
+		assert.Equal(t, wantDyncfg, gotDyncfg, "dyncfg commands")
+	}
 
 	var n int
 	for _, cfgs := range mgr.discoveredConfigs.items {
@@ -195,6 +207,44 @@ func (s *runSim) run(t *testing.T) {
 		_, ok := runningBeforeShutdown[name]
 		require.Truef(t, ok, "runningJobs: job '%s' is not found", name)
 	}
+}
+
+func normalizeDyncfgTranscript(output string) string {
+	var lines []string
+	skipNextEmpty := false
+	for s := range strings.SplitSeq(output, "\n") {
+		if strings.HasPrefix(s, "CONFIG") && strings.Contains(s, " template ") {
+			skipNextEmpty = false
+			continue
+		}
+		if strings.HasPrefix(s, "FUNCTION GLOBAL") || strings.HasPrefix(s, "FUNCTION_DEL") {
+			skipNextEmpty = true
+			continue
+		}
+		if skipNextEmpty && s == "" {
+			skipNextEmpty = false
+			continue
+		}
+		skipNextEmpty = false
+		if strings.HasPrefix(s, "FUNCTION_RESULT_BEGIN") {
+			parts := strings.Fields(s)
+			s = strings.Join(parts[:len(parts)-1], " ") // remove timestamp
+		}
+		lines = append(lines, s)
+	}
+	return strings.TrimSpace(strings.Join(lines, "\n"))
+}
+
+func (s *runSim) dyncfgTranscriptSettled(output string) bool {
+	got := normalizeDyncfgTranscript(output)
+	if len(s.wantDyncfgRecords) > 0 {
+		total := 0
+		for _, wants := range s.wantDyncfgRecords {
+			total += len(wants)
+		}
+		return len(wiretest.AtomicRecords(got)) >= total
+	}
+	return got == strings.TrimSpace(s.wantDyncfg)
 }
 
 func prepareMockRegistry() collectorapi.Registry {

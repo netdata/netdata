@@ -41,13 +41,13 @@ const char *stacktrace_root_cause_function(void) {
 
 // Initialize the stacktrace cache
 void stacktrace_cache_init(void) {
-    if (cache_initialized)
+    if (likely(__atomic_load_n(&cache_initialized, __ATOMIC_ACQUIRE)))
         return;
 
     spinlock_lock(&stacktrace_lock);
-    if (!cache_initialized) {
+    if (unlikely(!__atomic_load_n(&cache_initialized, __ATOMIC_ACQUIRE))) {
         STACKTRACE_INIT(&stacktrace_cache);
-        cache_initialized = true;
+        __atomic_store_n(&cache_initialized, true, __ATOMIC_RELEASE);
     }
     spinlock_unlock(&stacktrace_lock);
 }
@@ -74,6 +74,87 @@ struct stacktrace *stacktrace_create(int num_frames) {
     struct stacktrace *trace = callocz(1, size);
     trace->frame_count = num_frames;
     return trace;
+}
+
+static bool stacktrace_frames_equal(const struct stacktrace *trace, const void *frames, int num_frames) {
+    return trace && trace->frame_count == num_frames &&
+           memcmp(trace->frames, frames, (size_t)num_frames * sizeof(void *)) == 0;
+}
+
+// The global cache caller holds stacktrace_lock; unit tests use a private cache.
+static struct stacktrace *stacktrace_cache_get_or_create(
+    STACKTRACE_JudyLSet *cache,
+    uint64_t hash,
+    const void *frames,
+    int num_frames)
+{
+    if (unlikely(!cache || !frames || num_frames <= 0))
+        return NULL;
+
+    Word_t key = (Word_t)hash;
+    struct stacktrace *last = NULL;
+
+    for (struct stacktrace *trace = STACKTRACE_GET(cache, key); trace; trace = trace->hash_next) {
+        if (stacktrace_frames_equal(trace, frames, num_frames))
+            return trace;
+
+        last = trace;
+    }
+
+    struct stacktrace *trace = stacktrace_create(num_frames);
+    if (unlikely(!trace))
+        return NULL;
+
+    trace->hash = hash;
+    memcpy(trace->frames, frames, (size_t)num_frames * sizeof(void *));
+
+    if (last)
+        last->hash_next = trace;
+    else if (!STACKTRACE_SET(cache, key, trace)) {
+        freez(trace);
+        return NULL;
+    }
+
+    return trace;
+}
+
+static void stacktrace_free_chain(Word_t index __maybe_unused, struct stacktrace *trace, void *data __maybe_unused) {
+    while (trace) {
+        struct stacktrace *next = trace->hash_next;
+        freez(trace->text);
+        freez(trace);
+        trace = next;
+    }
+}
+
+int stacktrace_cache_unittest(void) {
+    STACKTRACE_JudyLSet cache;
+    STACKTRACE_INIT(&cache);
+
+    int frame_a0, frame_a1, frame_b1;
+    void *frames_a[] = { &frame_a0, &frame_a1 };
+    void *frames_a_again[] = { &frame_a0, &frame_a1 };
+    void *frames_b[] = { &frame_a0, &frame_b1 };
+    uint64_t hash = UINT64_C(0x1122334455667788);
+
+    struct stacktrace *first = stacktrace_cache_get_or_create(&cache, hash, frames_a, _countof(frames_a));
+    struct stacktrace *second = stacktrace_cache_get_or_create(&cache, hash, frames_b, _countof(frames_b));
+    struct stacktrace *first_again = stacktrace_cache_get_or_create(&cache, hash, frames_a_again, _countof(frames_a_again));
+
+    size_t chain_length = 0;
+    for (struct stacktrace *trace = STACKTRACE_GET(&cache, (Word_t)hash); trace; trace = trace->hash_next)
+        chain_length++;
+
+    bool success = first && second &&
+                   first != second &&
+                   first_again == first &&
+                   first->hash == hash &&
+                   second->hash == hash &&
+                   chain_length == 2;
+
+    STACKTRACE_FREE(&cache, stacktrace_free_chain, NULL);
+
+    return success ? 0 : 1;
 }
 
 // Exact match check if a function is in the auxiliary list (strcmp)
@@ -168,43 +249,8 @@ STACKTRACE stacktrace_get(int skip_frames) {
     // Calculate hash
     uint64_t hash = XXH3_64bits(frames, num_frames * sizeof(void *));
     
-    // Look up in cache first
     spinlock_lock(&stacktrace_lock);
-    
-    struct stacktrace *trace = STACKTRACE_GET(&stacktrace_cache, hash);
-    
-    // If existing trace found, verify it's the same frames
-    // This handles hash collisions
-    if (trace) {
-        if (trace->frame_count != num_frames || 
-            memcmp(trace->frames, frames, num_frames * sizeof(void *)) != 0) {
-            // Hash collision - use linear probing
-            int i = 1;
-            uint64_t new_hash = hash;
-            do {
-                new_hash = hash + i;
-                trace = STACKTRACE_GET(&stacktrace_cache, new_hash);
-                
-                if (!trace || 
-                    (trace->frame_count == num_frames && 
-                     memcmp(trace->frames, frames, num_frames * sizeof(void *)) == 0)) {
-                    break; // Either found a match or empty slot
-                }
-                i++;
-            } while (i < 10);  // Limit search to avoid infinite loops
-            
-            hash = new_hash;
-        }
-    }
-    
-    // If not found or hash collision, create new entry
-    if (!trace) {
-        trace = stacktrace_create(num_frames);
-        trace->hash = hash;
-        memcpy(trace->frames, frames, num_frames * sizeof(void *));
-        STACKTRACE_SET(&stacktrace_cache, hash, trace);
-    }
-    
+    struct stacktrace *trace = stacktrace_cache_get_or_create(&stacktrace_cache, hash, frames, num_frames);
     spinlock_unlock(&stacktrace_lock);
     
     return trace;
@@ -219,13 +265,17 @@ void stacktrace_to_buffer(STACKTRACE trace, BUFFER *wb) {
     }
     
     struct stacktrace *st = (struct stacktrace *)trace;
-    
+
     // If we already have cached text representation, use it
-    if (st->text) {
-        buffer_strcat(wb, st->text);
+    spinlock_lock(&stacktrace_lock);
+    const char *text = st->text;
+    spinlock_unlock(&stacktrace_lock);
+
+    if (text) {
+        buffer_strcat(wb, text);
         return;
     }
-    
+
     // Use the implementation-specific function for conversion
     impl_stacktrace_to_buffer(trace, wb);
     

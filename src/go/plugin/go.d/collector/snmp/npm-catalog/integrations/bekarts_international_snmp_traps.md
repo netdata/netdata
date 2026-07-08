@@ -143,4 +143,3 @@ Netdata decodes **9 trap definitions** from Bekarts International across **1 MIB
 - `BEKARTS-v1-MIB::bekarts-mailshappy-active`
 - `BEKARTS-v1-MIB::bekarts-mailshappy-deactive`
 - `BEKARTS-v1-MIB::bekarts-mailshappy-warning`
-

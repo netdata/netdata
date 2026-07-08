@@ -123,5 +123,3 @@ Metrics:
 | system.ipc_msq_queues | queues | queues |
 | system.ipc_msq_messages | messages | messages |
 | system.ipc_msq_size | allocated, used | bytes |
-
-

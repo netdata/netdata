@@ -6,7 +6,7 @@ sidebar:
     items:
       - meta:
           label: Enterprise Evaluation Guide
-          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-enterprise-evaluation-corrected.md
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-enterprise-evaluation.md
           keywords:
             - real-time observability
             - infrastructure monitoring

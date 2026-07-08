@@ -312,6 +312,3 @@ firewall rules it can.
 
 `tls.skip_verify: true` is rejected by validation. Use `tls.ca_file`
 for custom-CA paths (e.g., on an internal mirror with a private CA).
-
-
-

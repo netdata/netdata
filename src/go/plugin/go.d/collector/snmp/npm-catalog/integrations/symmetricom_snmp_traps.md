@@ -144,4 +144,3 @@ Netdata decodes **5 trap definitions** from Symmetricom across **2 MIBs** into s
 - `TP5000E::tp5000eTrapEvent`
 - `TP5000E::tp5000eClientNotification`
 - `TP5000E::tp5000ePtpMgmtEvent`
-

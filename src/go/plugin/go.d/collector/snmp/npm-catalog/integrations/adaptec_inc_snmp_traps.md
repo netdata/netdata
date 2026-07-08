@@ -152,4 +152,3 @@ Netdata decodes **159 trap definitions** from Adaptec Inc across **10 MIBs** int
 - `HPNSATRAP-MIB::cycDuplicateHostAdapter`
 - `HPNSATRAP-MIB::cycHostAdapterDiscovered`
 - `HPNSATRAP-MIB::cycHostAdapterChanged`
-

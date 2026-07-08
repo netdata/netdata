@@ -144,4 +144,3 @@ Netdata decodes **10 trap definitions** from Barix AG across **2 MIBs** into str
 - `BARIX-ABCL-TRAPS-MIB::amplifier1AlarmCleared`
 - `BARIX-ABCL-TRAPS-MIB::amplifier1Alarm`
 - `BARIX-ABCL-TRAPS-MIB::amplifier2AlarmCleared`
-

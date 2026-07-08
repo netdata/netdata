@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Synamedia across **1 MIB** into stru
 
 - `SAEUROPE-TRAPCONTROL-MIB::trapControlMsgTrap`
 - `SAEUROPE-TRAPCONTROL-MIB::trapControlMsgTrap2`
-

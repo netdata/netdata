@@ -161,5 +161,3 @@ Metrics:
 | services.cachestat_dirties | a dimension per systemd service | page/s |
 | services.cachestat_hits | a dimension per systemd service | hits/s |
 | services.cachestat_misses | a dimension per systemd service | misses/s |
-
-

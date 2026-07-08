@@ -150,4 +150,3 @@ Netdata decodes **128 trap definitions** from Meinberg across **8 MIBs** into st
 - `MBG-SNMP-LT-MIB::mbgLtTrapServerBoot`
 - `MBG-SNMP-LT-MIB::mbgLtTrapReceiverNotResponding`
 - `MBG-SNMP-LT-MIB::mbgLtTrapReceiverNotSync`
-

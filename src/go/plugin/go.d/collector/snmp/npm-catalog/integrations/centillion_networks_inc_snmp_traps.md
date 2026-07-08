@@ -141,4 +141,3 @@ Netdata decodes **2 trap definitions** from Centillion Networks Inc across **2 M
 
 - `REDUND-TRAP-MIB::sysMcpRedundDown`
 - `PVC-TRAP-MIB::remotePvcDown`
-

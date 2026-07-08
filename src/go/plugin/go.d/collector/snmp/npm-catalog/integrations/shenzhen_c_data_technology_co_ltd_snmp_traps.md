@@ -145,4 +145,3 @@ Netdata decodes **43 trap definitions** from Shenzhen C Data Technology Co Ltd a
 - `XXX-MIB::shelf-psuA-On`
 - `XXX-MIB::shelf-psuA-Off`
 - `XXX-MIB::shelf-psuB-On`
-

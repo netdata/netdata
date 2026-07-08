@@ -140,5 +140,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | cpu.cpu | nice, system, user, interrupt, idle | percentage |
-
-

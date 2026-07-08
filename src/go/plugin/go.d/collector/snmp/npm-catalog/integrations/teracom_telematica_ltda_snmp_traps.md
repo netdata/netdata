@@ -148,4 +148,3 @@ Netdata decodes **184 trap definitions** from Teracom Telematica Ltda across **6
 - `DATACOM-GENERIC-DEVICE-TRAPS-MIB::mtGenDvStSnmpManagementStatusTrap`
 - `DATACOM-GENERIC-DEVICE-TRAPS-MIB::mtGenDvStLatchedPossibleNewCfgTrap`
 - `DATACOM-GENERIC-DEVICE-TRAPS-MIB::agFwRemDownTempMemTrap`
-

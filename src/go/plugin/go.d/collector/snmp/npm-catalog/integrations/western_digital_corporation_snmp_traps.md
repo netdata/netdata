@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Western Digital Corporation across *
 - `WDMYCLOUDEX4-MIB::notifyFirmwareUpgraded`
 - `WDMYCLOUDEX4-MIB::notifyNetworkChanged`
 - `WDMYCLOUDEX4-MIB::notifyTemperatureExceeded`
-

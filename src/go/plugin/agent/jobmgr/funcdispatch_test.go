@@ -409,7 +409,7 @@ func TestInstanceFunctionRegisteredHandlerPaths(t *testing.T) {
 			if tc.wantDataValue != nil {
 				assert.Equal(t, tc.wantDataValue, jsonNestedArrayValue(t, resp["data"], 0, 0))
 			}
-			mgr.stopRunningJob("mod_job1")
+			mgr.stopRunningJob(context.Background(), "mod_job1")
 		})
 	}
 }
@@ -577,8 +577,10 @@ func TestCleanup_UnregistersStaticFunctionsBeforeStoppingJobs(t *testing.T) {
 	mgr.funcCtl.RegisterModules(mgr.modules)
 
 	mgr.startRunningJob(&lockProbeJob{fullName: "staticmod_job1", moduleName: "staticmod", name: "job1"})
+	mgr.publishRunningJobFunctions("staticmod_job1")
 	mgr.funcCtl.ReconcileModuleMethods("staticmod")
 	mgr.startRunningJob(&lockProbeJob{fullName: "jobmod_job1", moduleName: "jobmod", name: "job1"})
+	mgr.publishRunningJobFunctions("jobmod_job1")
 	mgr.funcCtl.ReconcileModuleMethods("jobmod")
 
 	mgr.cleanup()
@@ -713,6 +715,7 @@ func newInstanceFunctionDispatchTestManager(
 	mgr.modules = collectorapi.Registry{"mod": creator}
 	mgr.funcCtl.RegisterModules(mgr.modules)
 	mgr.startRunningJob(&lockProbeJob{fullName: "mod_job1", moduleName: "mod", name: "job1"})
+	mgr.publishRunningJobFunctions("mod_job1") // publication happens at commit, not inside the start
 	mgr.funcCtl.ReconcileModuleMethods("mod")
 
 	return mgr

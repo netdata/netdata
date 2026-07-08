@@ -161,4 +161,3 @@ Netdata decodes **95 trap definitions** from Juniper Networks Unisphere across *
 - `Juniper-System-MIB::juniSystemModuleOperStatusChange`
 - `Juniper-System-MIB::juniSystemPowerStatusChange`
 - `Juniper-System-MIB::juniSystemFanStatusChange`
-

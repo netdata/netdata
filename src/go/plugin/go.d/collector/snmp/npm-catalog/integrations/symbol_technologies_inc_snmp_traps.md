@@ -149,4 +149,3 @@ Netdata decodes **593 trap definitions** from Symbol Technologies Inc across **7
 - `SYMBOL-ENTERPRISE-PRIVATE-MIB::apAPIdConflictTrap`
 - `SYMBOL-ENTERPRISE-PRIVATE-MIB::apMUAssocTrap`
 - `SYMBOL-ENTERPRISE-PRIVATE-MIB::apMUUnAssocTrap`
-

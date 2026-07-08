@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Networth Inc across **1 MIB** into s
 - `NETWORTH-FASTPIPES-MIB::nwfpPowerSupplyUp`
 - `NETWORTH-FASTPIPES-MIB::nwfpfanDown`
 - `NETWORTH-FASTPIPES-MIB::nwfpfanUp`
-

@@ -9,6 +9,10 @@
 
 #include "rtc/rtc.h"
 
+#if defined(ENABLE_LZ4)
+#include <lz4.h>
+#endif
+
 #define WEBRTC_OUR_MAX_MESSAGE_SIZE (5 * 1024 * 1024)
 #define WEBRTC_DEFAULT_REMOTE_MAX_MESSAGE_SIZE (65536)
 #define WEBRTC_COMPRESSED_HEADER_SIZE 200
@@ -320,7 +324,7 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
     size_t response_size = buffer_strlen(w->response.data);
 
     bool send_plain = true;
-    int max_message_size = (int)chan->conn->max_message_size - WEBRTC_COMPRESSED_HEADER_SIZE;
+    size_t max_message_size = chan->conn->max_message_size - WEBRTC_COMPRESSED_HEADER_SIZE;
 
     if(!webrtc_dc_is_open(chan)) {
         internal_error(true, "WEBRTC[%d],DC[%d]: ignoring API response on closed data channel.", chan->conn->pc, chan->dc);
@@ -332,19 +336,21 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
     }
 
 #if defined(ENABLE_LZ4)
-    int max_compressed_size = LZ4_compressBound((int)response_size);
-    char *compressed = mallocz(max_compressed_size);
+    if(response_size <= LZ4_MAX_INPUT_SIZE) {
+        int max_compressed_size = LZ4_compressBound((int)response_size);
+        char *compressed = mallocz(max_compressed_size);
 
-    int compressed_size = LZ4_compress_default(buffer_tostring(w->response.data), compressed,
-                                               (int)response_size, max_compressed_size);
+        int compressed_size = LZ4_compress_default(buffer_tostring(w->response.data), compressed,
+                                                   (int)response_size, max_compressed_size);
 
-    if(compressed_size > 0) {
-        send_plain = false;
-        sent_bytes = webrtc_send_in_chunks(chan, compressed, compressed_size,
-                                           w->response.code, "LZ4", w->response.data->content_type,
-                                           max_message_size, true);
+        if(compressed_size > 0) {
+            send_plain = false;
+            sent_bytes = webrtc_send_in_chunks(chan, compressed, compressed_size,
+                                               w->response.code, "LZ4", w->response.data->content_type,
+                                               max_message_size, true);
+        }
+        freez(compressed);
     }
-    freez(compressed);
 #endif
 
     if(send_plain)
@@ -370,7 +376,7 @@ static void myOpenCallback(int id __maybe_unused, void *user_ptr) {
 
     nd_log(NDLS_ACCESS, NDLP_DEBUG, "WEBRTC[%d],DC[%d]: %d DATA CHANNEL '%s' OPEN", chan->conn->pc, chan->dc, gettid_cached(), chan->label);
     internal_error(true, "WEBRTC[%d],DC[%d]: data channel opened.", chan->conn->pc, chan->dc);
-    chan->open = true;
+    __atomic_store_n(&chan->open, true, __ATOMIC_RELAXED);
 }
 
 static void myClosedCallback(int id __maybe_unused, void *user_ptr) {
@@ -532,7 +538,7 @@ static void myDescriptionCallback(int pc __maybe_unused, const char *sdp, const 
 
     internal_error(true, "WEBRTC[%d]: local description type '%s': %s", conn->pc, type, sdp);
     spinlock_lock(&conn->response.spinlock);
-    if(!conn->response.candidates) {
+    if(conn->response.wb && !conn->response.candidates) {
         buffer_json_member_add_string(conn->response.wb, "sdp", sdp);
         buffer_json_member_add_string(conn->response.wb, "type", type);
         conn->response.sdp = true;
@@ -549,13 +555,15 @@ static void myCandidateCallback(int pc __maybe_unused, const char *cand, const c
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
     spinlock_lock(&conn->response.spinlock);
-    if(!conn->response.candidates) {
-        buffer_json_member_add_array(conn->response.wb, "candidates");
-        conn->response.candidates = true;
-    }
-
     internal_error(true, "WEBRTC[%d]: local candidate '%s', mid '%s'", conn->pc, cand, mid);
-    buffer_json_add_array_item_string(conn->response.wb, cand);
+    if(conn->response.wb) {
+        if(!conn->response.candidates) {
+            buffer_json_member_add_array(conn->response.wb, "candidates");
+            conn->response.candidates = true;
+        }
+
+        buffer_json_add_array_item_string(conn->response.wb, cand);
+    }
     spinlock_unlock(&conn->response.spinlock);
 }
 
@@ -708,14 +716,16 @@ int webrtc_new_connection(const char *sdp, BUFFER *wb) {
     if(logged)
         internal_error(true, "WEBRTC[%d]: Gathering finished, our answer is ready", conn->pc);
 
+    conn->max_message_size = MIN(conn->local_max_message_size, conn->remote_max_message_size);
+    if(conn->max_message_size <= WEBRTC_COMPRESSED_HEADER_SIZE)
+        conn->max_message_size = WEBRTC_COMPRESSED_HEADER_SIZE + 1;
+
+    spinlock_lock(&conn->response.spinlock);
     internal_fatal(!conn->response.sdp, "WEBRTC[%d]: response does not have an SDP: %s", conn->pc, buffer_tostring(conn->response.wb));
     internal_fatal(!conn->response.candidates, "WEBRTC[%d]: response does not have candidates: %s", conn->pc, buffer_tostring(conn->response.wb));
-
-    conn->max_message_size = MIN(conn->local_max_message_size, conn->remote_max_message_size);
-    if(conn->max_message_size < WEBRTC_COMPRESSED_HEADER_SIZE)
-        conn->max_message_size = WEBRTC_COMPRESSED_HEADER_SIZE;
-
     buffer_json_finalize(wb);
+    conn->response.wb = NULL;
+    spinlock_unlock(&conn->response.spinlock);
 
     return HTTP_RESP_OK;
 }

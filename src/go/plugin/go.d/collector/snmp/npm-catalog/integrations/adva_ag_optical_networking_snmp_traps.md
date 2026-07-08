@@ -166,4 +166,3 @@ Netdata decodes **1510 trap definitions** from Adva AG Optical Networking across
 - `METRO1500-MIB::metro1500PSNotFail`
 - `METRO1500-MIB::metro1500PSFail`
 - `METRO1500-MIB::metro1500FanNotFail`
-

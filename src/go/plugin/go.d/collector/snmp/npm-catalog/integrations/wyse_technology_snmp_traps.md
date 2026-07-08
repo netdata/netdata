@@ -143,4 +143,3 @@ Netdata decodes **7 trap definitions** from Wyse Technology across **1 MIB** int
 - `WYSE-MIB::wbt3TrapDHCPUpdNotComplete`
 - `WYSE-MIB::wbt3TrapSNMPAccptLd`
 - `WYSE-MIB::wbt3TrapSNMPLdDone`
-

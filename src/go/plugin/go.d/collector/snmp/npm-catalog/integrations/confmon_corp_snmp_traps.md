@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Confmon Corp across **1 MIB** into st
 ### Sample decoded traps
 
 - `ZENOSS-MIB::zenGenTrap`
-

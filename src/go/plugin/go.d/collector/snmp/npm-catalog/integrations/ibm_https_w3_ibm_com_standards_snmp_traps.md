@@ -172,4 +172,3 @@ Netdata decodes **1110 trap definitions** from Ibm Https W3 Ibm Com Standards ac
 - `IBM-RXR-MIB::topologyChange`
 - `ATM-SWITCHING-NODE-MIB::hello`
 - `ATM-SWITCHING-NODE-MIB::lock`
-

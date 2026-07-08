@@ -266,6 +266,3 @@ the journal for `network-sources` warnings:
 `tls.skip_verify: true` is rejected by validation. Use `tls.ca_file` for
 custom-CA paths if you front AWS behind an internal TLS-terminating proxy
 with a private CA.
-
-
-

@@ -105,6 +105,32 @@ func (m *Manager) RegisterPrefixWithContext(name, prefix string, fn Handler) {
 	fs.prefixes[prefix] = fn
 }
 
+// RegisterPrefixLaneDeriver attaches a lane-key derivation callback to an
+// existing prefix registration. Registering for an unknown name/prefix is a
+// no-op with a warning; passing nil removes the deriver.
+func (m *Manager) RegisterPrefixLaneDeriver(name, prefix string, derive LaneKeyDeriver) {
+	m.mux.Lock()
+	defer m.mux.Unlock()
+
+	fs, ok := m.functionRegistry[name]
+	if !ok || fs.prefixes == nil {
+		m.Warningf("not attaching lane deriver to '%s' prefix '%s': not registered", name, prefix)
+		return
+	}
+	if _, exists := fs.prefixes[prefix]; !exists {
+		m.Warningf("not attaching lane deriver to '%s' prefix '%s': prefix not registered", name, prefix)
+		return
+	}
+	if derive == nil {
+		delete(fs.prefixDerivers, prefix)
+		return
+	}
+	if fs.prefixDerivers == nil {
+		fs.prefixDerivers = make(map[string]LaneKeyDeriver)
+	}
+	fs.prefixDerivers[prefix] = derive
+}
+
 func prefixesOverlap(a, b string) bool {
 	if a == "" || b == "" {
 		return false
@@ -125,6 +151,9 @@ func (m *Manager) UnregisterPrefix(name, prefix string) {
 	if _, exists := fs.prefixes[prefix]; exists {
 		m.Debugf("unregistering function '%s' with prefix '%s'", name, prefix)
 		delete(fs.prefixes, prefix)
+		// The deriver belongs to the registration: a later re-register of
+		// the same prefix must not inherit a stale deriver.
+		delete(fs.prefixDerivers, prefix)
 	}
 
 	if fs.direct == nil && len(fs.prefixes) == 0 {

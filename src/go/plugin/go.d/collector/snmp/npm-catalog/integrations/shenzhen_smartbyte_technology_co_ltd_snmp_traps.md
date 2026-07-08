@@ -143,4 +143,3 @@ Netdata decodes **6 trap definitions** from Shenzhen Smartbyte Technology Co Ltd
 - `NMS-SYS-MIB::batteryRecover`
 - `NMS-SYS-MIB::fanFailure`
 - `NMS-SYS-MIB::fanNormal`
-

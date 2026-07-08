@@ -141,6 +141,3 @@ from `ExtendedSwitch` records only -- not from 802.1Q tags inside the sampled he
 See also
 [Validation and Data Quality](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/validation-and-data-quality)
 and the sFlow section of [Anti-patterns](https://learn.netdata.cloud/docs/network-performance-monitoring/network-flows/anti-patterns).
-
-
-

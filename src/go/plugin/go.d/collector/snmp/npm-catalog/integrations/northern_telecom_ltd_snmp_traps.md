@@ -165,4 +165,3 @@ Netdata decodes **169 trap definitions** from Northern Telecom Ltd across **23 M
 - `Nortel-Magellan-Passport-AlarmMIB::minorAlarm`
 - `Nortel-Magellan-Passport-AlarmMIB::warningAlarm`
 - `Nortel-Magellan-Passport-AlarmMIB::clearedAlarm`
-

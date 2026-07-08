@@ -143,5 +143,3 @@ Metrics:
 | audit.lost | lost | events/s |
 | audit.enabled | disabled, enabled, immutable | state |
 | audit.failure | silent, printk, panic | state |
-
-

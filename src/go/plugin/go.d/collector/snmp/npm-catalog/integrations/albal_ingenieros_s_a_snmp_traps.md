@@ -143,4 +143,3 @@ Netdata decodes **1962 trap definitions** from Albal Ingenieros S A across **1 M
 - `ALBALA-MIB::vct3000p01v1ModeTrap`
 - `ALBALA-MIB::vct3000p01v1InputTrap`
 - `ALBALA-MIB::vct3000p01v1MainFailTrap`
-

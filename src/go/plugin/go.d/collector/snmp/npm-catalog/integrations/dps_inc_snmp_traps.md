@@ -155,4 +155,3 @@ Netdata decodes **18495 trap definitions** from Dps Inc across **13 MIBs** into 
 - `DPS-MIB-V38-V2EXT::tmonV2MJalarmSet`
 - `DPS-MIB-V38-V2EXT::tmonV2MJalarmClr`
 - `DPS-MIB-V38-V2EXT::tmonV2MNalarmSet`
-

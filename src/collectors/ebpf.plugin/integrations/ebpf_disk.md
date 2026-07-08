@@ -148,5 +148,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | disk.latency_io | latency | calls/s |
-
-

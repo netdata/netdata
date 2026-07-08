@@ -325,7 +325,7 @@ void stream_receiver_handle_op(struct stream_thread *sth, struct receiver_state 
         STREAM_CIRCULAR_BUFFER_STATS stats = *stream_circular_buffer_stats_unsafe(rpt->thread.send_to_child.scb);
         spinlock_unlock(&rpt->thread.send_to_child.spinlock);
         nd_log(NDLS_DAEMON, NDLP_ERR,
-               "STREAM RCV[%zu] '%s' [from [%s]:%s]: send buffer is full (buffer size %u, max %u, used %u, available %u). "
+               "STREAM RCV[%zu] '%s' [from [%s]:%s]: send buffer is full (buffer size %zu, max %zu, used %zu, available %zu). "
                "Restarting connection.",
                sth->id, rrdhost_hostname(rpt->host), rpt->remote_ip, rpt->remote_port,
                stats.bytes_size, stats.bytes_max_size, stats.bytes_outstanding, stats.bytes_available);
@@ -961,7 +961,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_DISCONNECT_SOCKET_CLOSED_BY_REMOTE);
             continue;
         }
-        if (probe_rc < 0 && errno != EAGAIN && errno != EWOULDBLOCK) {
+        if (probe_rc < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR) {
             // Socket error detected (keepalive timeout, etc.)
             // Save errno immediately as subsequent calls may modify it
             int saved_errno = errno;
@@ -985,7 +985,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             continue;
         }
         // probe_rc > 0: data available (normal)
-        // probe_rc < 0 with EAGAIN/EWOULDBLOCK: no data but connection alive
+        // probe_rc < 0 with EAGAIN/EWOULDBLOCK/EINTR: no data but connection alive
 
         spinlock_lock(&rpt->thread.send_to_child.spinlock);
         STREAM_CIRCULAR_BUFFER_STATS stats = *stream_circular_buffer_stats_unsafe(rpt->thread.send_to_child.scb);

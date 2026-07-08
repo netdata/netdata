@@ -195,4 +195,3 @@ Netdata decodes **3538 trap definitions** from Dasan Co Ltd across **48 MIBs** i
 - `DASAN-NOTIFICATION-V1::powerOkTrap`
 - `DASAN-NOTIFICATION-V1::powerFailTrap`
 - `DASAN-NOTIFICATION-V1::fanOkTrap`
-

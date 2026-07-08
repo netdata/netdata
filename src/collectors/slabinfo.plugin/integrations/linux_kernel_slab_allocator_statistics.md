@@ -133,5 +133,3 @@ Metrics:
 | mem.slabmemory | a dimension per cache | B |
 | mem.slabfilling | a dimension per cache | % |
 | mem.slabwaste | a dimension per cache | B |
-
-

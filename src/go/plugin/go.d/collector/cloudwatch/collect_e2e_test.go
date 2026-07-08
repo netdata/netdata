@@ -20,7 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
@@ -112,6 +112,23 @@ func TestCollect_E2E(t *testing.T) {
 				`lambda.duration_average{account_id="000000000000",function_name="fn-1",region="us-east-1"}`: 120.5,
 				`lambda.duration_maximum{account_id="000000000000",function_name="fn-1",region="us-east-1"}`: 350,
 				`lambda.duration_p90{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:     200,
+			},
+		},
+		"msk broker partition health metrics": {
+			profiles: []string{"msk"},
+			listMetrics: map[string][]cwtypes.Metric{
+				"AWS/Kafka": {
+					mkMetric("UnderReplicatedPartitions", "Cluster Name", "cluster-a", "Broker ID", "1"),
+					mkMetric("UnderMinIsrPartitionCount", "Cluster Name", "cluster-a", "Broker ID", "1"),
+				},
+			},
+			gmd: map[string]float64{
+				e2eKey("AWS/Kafka", "UnderReplicatedPartitions", "Maximum", "Cluster Name", "cluster-a", "Broker ID", "1"): 2,
+				e2eKey("AWS/Kafka", "UnderMinIsrPartitionCount", "Maximum", "Cluster Name", "cluster-a", "Broker ID", "1"): 1,
+			},
+			wantSeries: map[string]metrix.SampleValue{
+				`msk.under_replicated_partitions_maximum{account_id="000000000000",broker_id="1",cluster_name="cluster-a",region="us-east-1"}`:   2,
+				`msk.under_min_isr_partition_count_maximum{account_id="000000000000",broker_id="1",cluster_name="cluster-a",region="us-east-1"}`: 1,
 			},
 		},
 		"alb multi-granularity dimension filter keeps only {LoadBalancer}": {
@@ -288,7 +305,7 @@ func seriesName(key string) string {
 }
 
 // TestAllStockProfiles_PipelineChartComplete is the full-catalog sweep: for EVERY
-// stock profile (combined mode includes the disabled deep-grain ones), it feeds a
+// stock profile (combined mode includes disabled opt-in profiles), it feeds a
 // synthetic instance with a datapoint for every (metric, statistic), runs the real
 // collect, and asserts (a) every profile's every active series is produced and
 // (b) every produced series flows into a chart (AssertChartCoverage). Profiles that
@@ -339,7 +356,7 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 
 	c := New()
 	c.Config.Regions = []string{region}
-	c.Profiles = ProfilesConfig{Mode: profilesModeCombined} // include disabled deep-grain profiles
+	c.Profiles = ProfilesConfig{Mode: profilesModeCombined} // include disabled opt-in profiles
 	c.applyDefaults()
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 	useFakeClient(c, &e2eCloudWatch{list: list, values: values, ts: time.Unix(1, 0)})

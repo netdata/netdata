@@ -143,4 +143,3 @@ Netdata decodes **12 trap definitions** from Aerohive Networks Inc across **1 MI
 - `AH-TRAP-MIB::ahStateChangeEvent`
 - `AH-TRAP-MIB::ahConnectionChangeEvent`
 - `AH-TRAP-MIB::ahIDPStationEvent`
-

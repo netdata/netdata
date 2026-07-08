@@ -146,4 +146,3 @@ Netdata decodes **269 trap definitions** from F5 Labs Inc across **4 MIBs** into
 - `LOAD-BAL-SYSTEM-MIB::loadBalTrapServiceUP`
 - `LOAD-BAL-SYSTEM-MIB::loadBalTrapReset`
 - `LOAD-BAL-SYSTEM-MIB::loadBalTrapDenial`
-

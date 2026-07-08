@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Ipf Technology Ltd across **1 MIB** i
 ### Sample decoded traps
 
 - `VOLIUS-OA-MIB::vlsEventTrap`
-

@@ -645,5 +645,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | websphere_pmi.web_services_gateway_requests | synchronous, synchronous_responses, asynchronous, asynchronous_responses | requests/s |
-
-

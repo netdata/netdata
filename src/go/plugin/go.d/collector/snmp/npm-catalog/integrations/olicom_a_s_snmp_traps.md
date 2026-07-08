@@ -144,4 +144,3 @@ Netdata decodes **17 trap definitions** from Olicom A S across **2 MIBs** into s
 - `Olicom-crossfireAtmSwitch-MIB::restart`
 - `Olicom-crossfireAtmSwitch-MIB::globalCongestionTrap`
 - `Olicom-crossfireAtmSwitch-MIB::globalInvalidCellRateTrap`
-

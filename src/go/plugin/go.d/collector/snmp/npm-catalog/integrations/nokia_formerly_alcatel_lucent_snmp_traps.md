@@ -274,4 +274,3 @@ Netdata decodes **5948 trap definitions** from Nokia Formerly Alcatel Lucent acr
 - `TSDIM-SUPPORT-MIB::tsdimAVCNotification`
 - `TSDIM-SUPPORT-MIB::tsdimStateChangeNotification`
 - `TSDIM-SUPPORT-MIB::tsdimAlertNotification`
-

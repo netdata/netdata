@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Schechtertech LLC across **1 MIB** i
 - `TEMPERATUREALERT-MIB::taHighAlarm`
 - `TEMPERATUREALERT-MIB::taLowAlarm`
 - `TEMPERATUREALERT-MIB::taShutdown`
-

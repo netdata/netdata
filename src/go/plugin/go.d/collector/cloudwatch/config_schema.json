@@ -104,6 +104,7 @@
                     "properties": {
                       "roles": {
                         "title": "Roles",
+                        "description": "IAM roles to assume -- one per AWS account to monitor. Each metric series is labeled with the account id the role resolves to (via sts:GetCallerIdentity).",
                         "type": "array",
                         "items": {
                           "type": "object",
@@ -121,7 +122,14 @@
                           "required": [
                             "role_arn"
                           ]
-                        }
+                        },
+                        "minItems": 1
+                      },
+                      "include_base_account": {
+                        "title": "Include base account",
+                        "description": "Also monitor the base identity's own account (the identity used to assume the roles). Off by default: with roles set, only the assumed-role accounts are monitored.",
+                        "type": "boolean",
+                        "default": false
                       }
                     },
                     "required": [
@@ -146,7 +154,7 @@
         "properties": {
           "mode": {
             "title": "Mode",
-            "description": "Which service profiles to collect: `auto` uses the default-enabled profiles; `exact` uses only the profiles you list (by basename); `combined` adds the deep-grain (per-target-group, per-operation, per-request-filter) profiles to the default set.",
+            "description": "Which service profiles to collect: `auto` uses the default-enabled profiles, including narrow ALB/NLB target health; `exact` uses only the profiles you list by basename; `combined` adds disabled opt-in profiles to the default set.",
             "type": "string",
             "enum": [
               "auto",
@@ -233,6 +241,30 @@
           }
         }
       },
+      "tags": {
+        "title": "Resource tags",
+        "description": "AWS resource tags to attach as labels on collected metrics, looked up via the Resource Groups Tagging API. Empty by default; listing any tag enables tag lookup and requires the tag:GetResources IAM permission. Tag values may contain personal data (e.g. owner emails) -- only list tags you want exposed as labels.",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "title": "Tag key",
+              "description": "AWS tag key to collect (case-sensitive), e.g. owner. Becomes the sanitized label (e.g. owner) unless renamed.",
+              "type": "string"
+            },
+            "rename": {
+              "title": "Label name",
+              "description": "Optional Netdata label name to use instead of the sanitized tag key. Use it when the sanitized key would be invalid (for example an aws:-prefixed key) or collides with a built-in label such as region.",
+              "type": "string",
+              "pattern": "^[a-z][a-z0-9_]*$"
+            }
+          },
+          "required": [
+            "name"
+          ]
+        }
+      },
       "query_offset": {
         "title": "Query offset",
         "description": "Seconds subtracted from now when querying, to account for CloudWatch publish latency.",
@@ -289,7 +321,7 @@
       "mode_assume_role": {
         "roles": {
           "ui:listFlavour": "list",
-          "ui:help": "The IAM role to assume. Exactly one role is supported.",
+          "ui:help": "IAM roles to assume -- add one row per AWS account to monitor. Each metric is labeled with the account the role resolves to.",
           "items": {
             "role_arn": {
               "ui:help": "ARN of the IAM role to assume.",
@@ -300,12 +332,15 @@
               "ui:widget": "password"
             }
           }
+        },
+        "include_base_account": {
+          "ui:help": "Also monitor the base identity's own account (the identity used to assume the roles). Leave off if the base identity is a dedicated monitoring account with no workloads of its own."
         }
       }
     },
     "profiles": {
       "mode": {
-        "ui:help": "Which service profiles to collect: `auto` uses the default-enabled profiles, `exact` uses only the profiles you list (by basename), and `combined` adds the deep-grain profiles to the default set.",
+        "ui:help": "Which service profiles to collect: `auto` uses the default-enabled profiles, including narrow ALB/NLB target health; `exact` uses only the profiles you list by basename; `combined` adds disabled opt-in profiles to the default set.",
         "ui:widget": "radio",
         "ui:options": {
           "inline": true
@@ -321,6 +356,20 @@
               "ui:placeholder": "ec2"
             }
           }
+        }
+      }
+    },
+    "tags": {
+      "ui:listFlavour": "list",
+      "ui:help": "AWS resource tags to attach as labels. Add one row per tag. Leave empty to disable tag enrichment (no extra IAM or API calls). Tag values may contain personal data (e.g. owner emails) -- only list tags you want exposed.",
+      "items": {
+        "name": {
+          "ui:help": "AWS tag key (case-sensitive).",
+          "ui:placeholder": "owner"
+        },
+        "rename": {
+          "ui:help": "Optional label name; defaults to the sanitized tag key. Use it to rename or to resolve a collision (e.g. the tag 'region' -> 'aws_region').",
+          "ui:placeholder": "aws_region"
         }
       }
     },
@@ -371,6 +420,12 @@
           "title": "Discovery",
           "fields": [
             "discovery"
+          ]
+        },
+        {
+          "title": "Tags",
+          "fields": [
+            "tags"
           ]
         },
         {

@@ -141,4 +141,3 @@ Netdata decodes **2 trap definitions** from City Com B.V. across **2 MIBs** into
 
 - `ADTX-RAID-AVCL-MIB::daemonEvent`
 - `ADTX-RAID-AVCL-S2-MIB::daemonEvent`
-

@@ -30,6 +30,12 @@ sudo apt install netdata-plugin-netflow
 sudo systemctl restart netdata
 ```
 
+:::note
+
+`netdata-plugin-netflow` ships only in Netdata's own package repository — it is not in the Debian, Ubuntu, or Mint default repositories. If `apt` reports `Unable to locate package`, the Netdata repository is not configured on this host, which is expected when Netdata was installed with the kickstart `--static-only` option or built from source. A static install already bundles the plugin at `/opt/netdata/usr/libexec/netdata/plugins.d/netflow-plugin` (see [Static install](#static-install-kickstart) below); to install the package on a native system instead, re-run the [kickstart installer](/packaging/installer/methods/kickstart.md) with `--reinstall-clean` and without `--static-only` to reconfigure the Netdata repository and switch to a native install, then retry `apt install netdata-plugin-netflow`. A plain re-run of kickstart only updates the existing static install, and `--reinstall` alone reinstalls it but keeps it static — neither one switches the install method or configures the repository.
+
+:::
+
 ## Install on RHEL / Fedora / CentOS / Rocky / Alma
 
 ```bash
@@ -63,6 +69,29 @@ To verify:
 ls /opt/netdata/usr/libexec/netdata/plugins.d/netflow-plugin
 ```
 
+## Docker / OCI image
+
+The netflow plugin is **already bundled in the official `netdata/netdata` Docker image** — there is no separate package to install and no extra build step. The plugin is enabled by default and opens its stock UDP listeners (`2055` for NetFlow/IPFIX, `6343` for sFlow), the same as a native install.
+
+The only Docker-specific detail is the network mode, because it determines whether the flow ports are reachable:
+
+- **Host networking (`--network=host`)** — the recommended run mode for Netdata containers. The container shares the host's network, so the UDP listeners are reachable by your routers and switches with **no extra port flags**. Use the command from the [Docker installation guide](/packaging/docker/README.md#create-a-new-netdata-agent-container) unchanged.
+- **Bridge networking** — if you run without `--network=host`, the container's network is isolated. The image only declares the dashboard port (`19999`) in its `EXPOSE`, so you must publish it and the flow UDP ports yourself, otherwise no flow data arrives. Add these to the [recommended `docker run` command](/packaging/docker/README.md#create-a-new-netdata-agent-container) in place of `--network=host`, keeping its other mounts and privileges:
+
+```bash
+-p 19999:19999 \
+-p 2055:2055/udp \
+-p 6343:6343/udp \
+```
+
+:::warning
+
+Dropping `--network=host` isn't free even beyond netflow — `proc.plugin`, `go.d.plugin`, `local-listeners`, and `network-viewer.plugin` all require host network mode for full functionality (see the [privileges table](/packaging/docker/README.md#create-a-new-netdata-agent-container)). Only switch to bridge networking if you have another reason to avoid host networking.
+
+:::
+
+To listen on different ports (for example, if `2055` or `6343` is in use on the host), edit `netflow.yaml` inside the container — see [Configure Agent Containers](/packaging/docker/README.md#configure-agent-containers) for how to edit a config file in a running container — then publish the matching ports. See [Configuration](/docs/npm/network-flows/configuration.md) for the netflow-specific options.
+
 ## Source build
 
 Building from source requires a Rust toolchain (rustc + cargo, version 1.83 or later). When CMake detects Rust, the plugin is built and installed alongside the rest of Netdata.
@@ -83,23 +112,23 @@ This populates `/var/cache/netdata/topology-ip-intel/` with the DB-IP-based MMDB
 
 ## IP intelligence defaults
 
-| Item | Behaviour |
-|---|---|
-| Native packages | Ship stock DB-IP ASN and Geo MMDB files under `/usr/share/netdata/topology-ip-intel/`. |
-| Source builds | Do not include stock MMDB files; run the downloader once if you want GeoIP / ASN enrichment. |
-| Fresh copies | The downloader writes to `/var/cache/netdata/topology-ip-intel/`, which takes precedence over the stock files. |
-| Refresh schedule | Netdata does not install a timer or cron job for the downloader. Schedule it yourself if freshness matters. |
+| Item             | Behaviour                                                                                                      |
+|------------------|----------------------------------------------------------------------------------------------------------------|
+| Native packages  | Ship stock DB-IP ASN and Geo MMDB files under `/usr/share/netdata/topology-ip-intel/`.                         |
+| Source builds    | Do not include stock MMDB files; run the downloader once if you want GeoIP / ASN enrichment.                   |
+| Fresh copies     | The downloader writes to `/var/cache/netdata/topology-ip-intel/`, which takes precedence over the stock files. |
+| Refresh schedule | Netdata does not install a timer or cron job for the downloader. Schedule it yourself if freshness matters.    |
 
 ## What gets installed
 
-| Path | Purpose |
-|---|---|
-| `/usr/libexec/netdata/plugins.d/netflow-plugin` | The plugin binary (mode 0750, root:netdata) |
-| `/usr/sbin/topology-ip-intel-downloader` | Helper for refreshing the GeoIP / IP-intel MMDBs; not included in packaged 32-bit installs |
-| `/usr/lib/netdata/conf.d/netflow.yaml` | Stock configuration (read-only reference; copy to `/etc/netdata/netflow.yaml` to customise) |
-| `/usr/lib/netdata/conf.d/topology-ip-intel.yaml` | IP-intel downloader configuration |
-| `/usr/share/netdata/topology-ip-intel/topology-ip-asn.mmdb` | Stock ASN database (DB-IP) |
-| `/usr/share/netdata/topology-ip-intel/topology-ip-geo.mmdb` | Stock geographic database (DB-IP) |
+| Path                                                        | Purpose                                                                                     |
+|-------------------------------------------------------------|---------------------------------------------------------------------------------------------|
+| `/usr/libexec/netdata/plugins.d/netflow-plugin`             | The plugin binary (mode 0750, root:netdata)                                                 |
+| `/usr/sbin/topology-ip-intel-downloader`                    | Helper for refreshing the GeoIP / IP-intel MMDBs; not included in packaged 32-bit installs  |
+| `/usr/lib/netdata/conf.d/netflow.yaml`                      | Stock configuration (read-only reference; copy to `/etc/netdata/netflow.yaml` to customise) |
+| `/usr/lib/netdata/conf.d/topology-ip-intel.yaml`            | IP-intel downloader configuration                                                           |
+| `/usr/share/netdata/topology-ip-intel/topology-ip-asn.mmdb` | Stock ASN database (DB-IP)                                                                  |
+| `/usr/share/netdata/topology-ip-intel/topology-ip-geo.mmdb` | Stock geographic database (DB-IP)                                                           |
 
 (Paths assume native packages. Static installs put everything under `/opt/netdata/`.)
 

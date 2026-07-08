@@ -144,4 +144,3 @@ Netdata decodes **10 trap definitions** from Rapidstream Inc across **2 MIBs** i
 - `RAPID-SYSTEM-CONFIG-MIB::rsSnmpShutdown`
 - `RAPID-IPSEC-SA-MON-MIB-EXT::rsEspAuthFailureTrap`
 - `RAPID-IPSEC-SA-MON-MIB-EXT::rsAhAuthFailureTrap`
-

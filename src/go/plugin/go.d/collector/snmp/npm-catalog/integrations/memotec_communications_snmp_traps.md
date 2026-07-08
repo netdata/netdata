@@ -154,4 +154,3 @@ Netdata decodes **23 trap definitions** from Memotec Communications across **12 
 - `CXMCVOX-MIB::cxMcVoxTrapDc`
 - `CXMCVOX-MIB::cxMcVoxHistoryTrap`
 - `CXIoHardware-MIB::cxIoHwCardTypeTrap`
-

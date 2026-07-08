@@ -127,5 +127,3 @@ Metrics:
 | ipv6.fragsout | ok, failed, all | packets/s |
 | ipv6.fragsin | ok, failed, timeout, all | packets/s |
 | ipv6.errors | InDiscards, OutDiscards, InHdrErrors, InAddrErrors, InTruncatedPkts, InNoRoutes, OutNoRoutes | packets/s |
-
-

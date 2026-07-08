@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Chromatis Networks Inc across **1 MIB
 ### Sample decoded traps
 
 - `ChrTrap-MIB::chrComTrapLoggedTrap`
-

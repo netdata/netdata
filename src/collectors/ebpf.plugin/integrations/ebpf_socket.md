@@ -215,5 +215,3 @@ Metrics:
 | services.net_tcp_retransmit | calls | calls/s |
 | services.net_udp_send | calls | calls/s |
 | services.net_udp_recv | calls | calls/s |
-
-

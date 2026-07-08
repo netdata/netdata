@@ -88,6 +88,17 @@ void aclk_proxy_get_display(char *buf, size_t buflen, const char *proxy, ACLK_PR
 }
 
 static const char *proxy_source = NULL;
+static netdata_mutex_t aclk_proxy_mutex;
+
+static void __attribute__((constructor)) aclk_proxy_mutex_init(void)
+{
+    netdata_mutex_init(&aclk_proxy_mutex);
+}
+
+static void __attribute__((destructor)) aclk_proxy_mutex_destroy(void)
+{
+    netdata_mutex_destroy(&aclk_proxy_mutex);
+}
 
 static inline int check_environment_proxy(const char **proxy, ACLK_PROXY_TYPE *type)
 {
@@ -193,6 +204,8 @@ const char *aclk_get_proxy(ACLK_PROXY_TYPE *return_type, bool for_logging)
     static const char *safe_proxy = NULL;
     static ACLK_PROXY_TYPE proxy_type = PROXY_NOT_SET;
 
+    netdata_mutex_lock(&aclk_proxy_mutex);
+
     if (proxy_type == PROXY_NOT_SET) {
         proxy = aclk_lws_wss_get_proxy_setting(&proxy_type);
         char *log = NULL;
@@ -205,7 +218,12 @@ const char *aclk_get_proxy(ACLK_PROXY_TYPE *return_type, bool for_logging)
 
     if (return_type)
         *return_type = proxy_type;
-    return for_logging ? safe_proxy : proxy;
+
+    const char *ret = for_logging ? safe_proxy : proxy;
+
+    netdata_mutex_unlock(&aclk_proxy_mutex);
+
+    return ret;
 }
 
 const char *aclk_get_proxy_source(void) {

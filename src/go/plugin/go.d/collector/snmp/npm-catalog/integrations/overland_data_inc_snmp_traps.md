@@ -143,4 +143,3 @@ Netdata decodes **12 trap definitions** from Overland Data Inc across **1 MIB** 
 - `OVERLAND-NEXTGEN::eventHardFault`
 - `OVERLAND-NEXTGEN::eventSlaveFailed`
 - `OVERLAND-NEXTGEN::eventPowerSupplyFailed`
-

@@ -4,12 +4,19 @@
 
 size_t os_get_system_cpus_cached(bool cache) {
     static size_t processors = 0;
+    static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
-    if(likely(cache && processors > 0))
-        return processors;
+    size_t cached_processors = __atomic_load_n(&processors, __ATOMIC_ACQUIRE);
+    if(likely(cache && cached_processors > 0))
+        return cached_processors;
 
-    SPINLOCK spinlock = SPINLOCK_INITIALIZER;
     spinlock_lock(&spinlock);
+
+    cached_processors = __atomic_load_n(&processors, __ATOMIC_RELAXED);
+    if(likely(cache && cached_processors > 0)) {
+        spinlock_unlock(&spinlock);
+        return cached_processors;
+    }
 
     long p = 0;
 
@@ -71,15 +78,17 @@ size_t os_get_system_cpus_cached(bool cache) {
 #endif
 
 done:
-    processors = (size_t)p;
+    cached_processors = (size_t)p;
+    __atomic_store_n(&processors, cached_processors, __ATOMIC_RELEASE);
     spinlock_unlock(&spinlock);
-    return processors;
+    return cached_processors;
 
 error:
+    cached_processors = 1;
+    __atomic_store_n(&processors, cached_processors, __ATOMIC_RELEASE);
     spinlock_unlock(&spinlock);
-    processors = 1;
-    netdata_log_error("Cannot detect number of CPU cores. Assuming the system has %zu processors.", processors);
-    return processors;
+    netdata_log_error("Cannot detect number of CPU cores. Assuming the system has %zu processors.", cached_processors);
+    return cached_processors;
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -130,6 +139,9 @@ size_t os_read_cpuset_cpus(const char *filename, size_t system_cpus) {
             if(*s == '-') {
                 s++;
                 unsigned long m = cpuset_str2ul(&s);
+                if(unlikely(m < n))
+                    return 0;
+
                 ncpus += m - n; // calculate the number of cpus in the region
             }
             s++;

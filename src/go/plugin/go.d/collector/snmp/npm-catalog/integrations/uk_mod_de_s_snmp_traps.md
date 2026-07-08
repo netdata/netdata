@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from UK Mod De S across **1 MIB** into st
 
 - `VIVOE-MIB::deviceError`
 - `VIVOE-MIB::ipAddressConflict`
-

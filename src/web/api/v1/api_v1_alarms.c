@@ -54,7 +54,7 @@ int api_v1_alarm_count(RRDHOST *host, struct web_client *w, char *url) {
 
         char* p = value;
         if(!strcmp(name, "status")) {
-            while ((*p = toupper(*p))) p++;
+            while ((*p = (char)toupper((uint8_t)*p))) p++;
             if (!strcmp("CRITICAL", value)) status = RRDCALC_STATUS_CRITICAL;
             else if (!strcmp("WARNING", value)) status = RRDCALC_STATUS_WARNING;
             else if (!strcmp("UNINITIALIZED", value)) status = RRDCALC_STATUS_UNINITIALIZED;
@@ -138,7 +138,7 @@ int api_v1_variable(RRDHOST *host, struct web_client *w, char *url) {
     }
 
     w->response.data->content_type = CT_APPLICATION_JSON;
-    st->last_accessed_time_s = now_realtime_sec();
+    rrdset_touch_last_accessed_time_s(st);
     alert_variable_lookup_trace(host, st, variable, w->response.data);
 
     return HTTP_RESP_OK;

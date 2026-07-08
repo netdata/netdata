@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Barco Control Rooms across **1 MIB**
 - `BARCO-CLICKSHARE-MIB::alarmCpuTemperature`
 - `BARCO-CLICKSHARE-MIB::alarmCaseFanSpeed`
 - `BARCO-CLICKSHARE-MIB::alarmProcessNotRunning`
-

@@ -148,4 +148,3 @@ Netdata decodes **23 trap definitions** from Videoframe Systems across **6 MIBs*
 - `VIDEOFRAME-GENERIC-MIB::boxFailoverEvent`
 - `VIDEOFRAME-GENERIC-MIB::boxStateChangeEvent`
 - `VIDEOFRAME-SIGMON-VM0001-MIB::analogAudioAPLHighAlarm`
-

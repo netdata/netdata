@@ -102,7 +102,7 @@ func runTestBuildHistogramBucketAutogenRoute(t *testing.T) {
 		wantID     string
 		wantDim    string
 	}{
-		"histogram bucket excludes le from chart id and uses bucket dimension": {
+		"histogram bucket excludes le from chart id and uses upper-bound dimension": {
 			metricName: "svc.latency_seconds_bucket",
 			labels: map[string]string{
 				"instance": "db1",
@@ -110,7 +110,7 @@ func runTestBuildHistogramBucketAutogenRoute(t *testing.T) {
 				"method":   "GET",
 			},
 			wantID:  "svc.latency_seconds-instance=db1-method=GET",
-			wantDim: "bucket_0.5",
+			wantDim: "0.5",
 		},
 	}
 
@@ -129,6 +129,7 @@ func runTestBuildHistogramBucketAutogenRoute(t *testing.T) {
 			assert.Equal(t, tc.wantDim, route.dimensionName)
 			assert.Equal(t, metrix.HistogramBucketLabel, route.dimensionKeyLabel)
 			assert.Equal(t, program.AlgorithmIncremental, route.algorithm)
+			assert.Equal(t, program.ChartTypeHeatmap, route.chartType)
 			assert.False(t, route.staticDimension)
 		})
 	}

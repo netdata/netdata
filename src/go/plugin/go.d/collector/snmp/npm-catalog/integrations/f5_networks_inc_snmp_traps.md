@@ -143,4 +143,3 @@ Netdata decodes **45 trap definitions** from F5 Networks Inc across **1 MIB** in
 - `F5OS-APPLIANCE-ALERT-NOTIF-MIB::unknown-alarm`
 - `F5OS-APPLIANCE-ALERT-NOTIF-MIB::memory-fault`
 - `F5OS-APPLIANCE-ALERT-NOTIF-MIB::drive-fault`
-

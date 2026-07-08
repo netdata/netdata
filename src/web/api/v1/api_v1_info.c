@@ -21,7 +21,7 @@ static void host_collectors(RRDHOST *host, BUFFER *wb) {
         bool *set = dictionary_set(dict, name, &old, sizeof(bool));
         if(!*set) {
             *set = true;
-            st->last_accessed_time_s = now;
+            rrdset_set_last_accessed_time_s(st, now);
             buffer_json_add_array_item_object(wb);
             buffer_json_member_add_string(wb, "plugin", rrdset_plugin_name(st));
             buffer_json_member_add_string(wb, "module", rrdset_module_name(st));
@@ -81,8 +81,13 @@ static void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host,
     size_t normal = 0, warning = 0, critical = 0;
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        if(unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+        RRDSET *st = rrdcalc_rrdset_read_lock(rc);
+        if(unlikely(!st))
             continue;
+        if(unlikely(!st->last_collected_time.tv_sec)) {
+            rrdcalc_rrdset_read_unlock(st);
+            continue;
+        }
 
         switch(rc->status) {
             case RRDCALC_STATUS_WARNING:
@@ -94,6 +99,7 @@ static void web_client_api_request_v1_info_summary_alarm_statuses(RRDHOST *host,
             default:
                 normal++;
         }
+        rrdcalc_rrdset_read_unlock(st);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
 

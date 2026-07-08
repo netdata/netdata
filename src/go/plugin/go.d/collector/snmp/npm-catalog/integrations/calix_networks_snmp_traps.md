@@ -152,4 +152,3 @@ Netdata decodes **197 trap definitions** from Calix Networks across **10 MIBs** 
 - `E7-Notifications-MIB::e7TrapDbChange`
 - `E7-Notifications-MIB::e7TrapSecurity`
 - `E7-Notifications-MIB::e7TrapTca`
-

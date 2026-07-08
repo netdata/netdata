@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Vutlan Sro Formerly Sky Control Sro a
 ### Sample decoded traps
 
 - `VUTLAN-SYSTEM-MIB::ctlUnitTrapNotification`
-

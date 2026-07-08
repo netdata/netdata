@@ -221,5 +221,3 @@ Metrics:
 | ad.sam_enumerations | enumeration | enumerations/s |
 | ad.sam_membership_changes | change | changes/s |
 | ad.sam_password_changes | change | changes/s |
-
-

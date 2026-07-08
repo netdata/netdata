@@ -215,4 +215,3 @@ Netdata decodes **765 trap definitions** from Zhongxing Telecom Co Ltd Abbr Zte 
 - `ZXR10-MIB::zxr10StatisticsAlarmTrap`
 - `ZXR10-SNMP-SECURITY-MIB::failureTrap`
 - `ZXR10-SNMP-SECURITY-MIB::changestageTrap`
-

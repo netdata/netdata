@@ -148,5 +148,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | system.softirq_latency | soft IRQs | milliseconds |
-
-

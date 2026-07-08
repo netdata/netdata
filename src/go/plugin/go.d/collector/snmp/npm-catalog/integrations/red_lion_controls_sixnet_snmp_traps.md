@@ -143,4 +143,3 @@ Netdata decodes **8 trap definitions** from Red Lion Controls Sixnet across **1 
 - `SIXNET-MIB::swAuthenticationFailure`
 - `SIXNET-MIB::swAuthenticationSuccess`
 - `SIXNET-MIB::swLoopbackDetectionTrap`
-

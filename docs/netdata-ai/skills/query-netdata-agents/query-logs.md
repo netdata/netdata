@@ -16,10 +16,11 @@ which makes index-friendly queries possible on large namespaces.
 See the "Multi-value field selections" section in the Cloud doc
 for the exact shape and the structured-filters-first rule.
 
-The agent ships the same three log Functions:
+The agent ships the same log Functions as the Cloud-proxied path:
 
 - `systemd-journal` (Linux nodes)
 - `windows-events` (Windows nodes)
+- `macos-logs` (macOS nodes)
 - `otel-logs` (when the OTEL log receiver is enabled)
 
 ---

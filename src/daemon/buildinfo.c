@@ -88,6 +88,7 @@ typedef enum __attribute__((packed)) {
     BIB_PLUGIN_LINUX_DISKSPACE,
     BIB_PLUGIN_FREEBSD,
     BIB_PLUGIN_MACOS,
+    BIB_PLUGIN_MACOS_LOGS,
     BIB_PLUGIN_WINDOWS,
     BIB_PLUGIN_STATSD,
     BIB_PLUGIN_TIMEX,
@@ -809,6 +810,14 @@ static struct {
                 .json = "macos",
                 .value = NULL,
         },
+        [BIB_PLUGIN_MACOS_LOGS] = {
+                .category = BIC_PLUGINS,
+                .type = BIT_BOOLEAN,
+                .analytics = "MACOS-LOGS",
+                .print = "macos-logs (monitor macOS unified logs)",
+                .json = "macos-logs",
+                .value = NULL,
+        },
         [BIB_PLUGIN_WINDOWS] = {
             .category = BIC_PLUGINS,
             .type = BIT_BOOLEAN,
@@ -1192,6 +1201,9 @@ __attribute__((constructor)) void initialize_build_info(void) {
     build_info_set_status(BIB_FEATURE_BUILT_FOR, true);
     build_info_set_value(BIB_FEATURE_BUILT_FOR, "MacOS");
     build_info_set_status(BIB_PLUGIN_MACOS, true);
+#ifdef HAVE_OSLOG
+    build_info_set_status(BIB_PLUGIN_MACOS_LOGS, true);
+#endif
 #endif
 #ifdef OS_WINDOWS
     build_info_set_status(BIB_PLUGIN_WINDOWS, true);
@@ -1425,7 +1437,7 @@ static void populate_system_info(void) {
     build_info_set_value_strdupz(BIB_OS_ID, system_info->host_os_id);
     build_info_set_value_strdupz(BIB_OS_ID_LIKE, system_info->host_os_id_like);
     build_info_set_value_strdupz(BIB_OS_VERSION, system_info->host_os_version);
-    build_info_set_value_strdupz(BIB_OS_VERSION_ID, system_info->container_os_version_id);
+    build_info_set_value_strdupz(BIB_OS_VERSION_ID, system_info->host_os_version_id);
     build_info_set_value_strdupz(BIB_OS_DETECTION, system_info->host_os_detection);
     build_info_set_value_strdupz(BIB_HW_CPU_CORES, system_info->host_cores);
     build_info_set_value_strdupz(BIB_HW_CPU_FREQUENCY, system_info->host_cpu_freq);

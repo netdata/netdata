@@ -317,8 +317,13 @@ static void rrdhost_status_health_internal(RRDHOST_STATUS *s, RRDHOST_FLAGS flag
 
         RRDCALC *rc;
         foreach_rrdcalc_in_rrdhost_read(host, rc) {
-            if (unlikely(!rc->rrdset || !rc->rrdset->last_collected_time.tv_sec))
+            RRDSET *st = rrdcalc_rrdset_read_lock(rc);
+            if (unlikely(!st))
                 continue;
+            if (unlikely(!st->last_collected_time.tv_sec)) {
+                rrdcalc_rrdset_read_unlock(st);
+                continue;
+            }
 
             switch (rc->status) {
                 default:
@@ -345,6 +350,7 @@ static void rrdhost_status_health_internal(RRDHOST_STATUS *s, RRDHOST_FLAGS flag
                     s->health.alerts.uninitialized++;
                     break;
             }
+            rrdcalc_rrdset_read_unlock(st);
         }
         foreach_rrdcalc_in_rrdhost_done(rc);
     }

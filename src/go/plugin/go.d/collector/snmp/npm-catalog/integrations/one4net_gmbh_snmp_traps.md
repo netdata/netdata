@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from One4Net GmbH across **1 MIB** into s
 - `B100-MIB::rSstateChange`
 - `B100-MIB::hAstateChange`
 - `B100-MIB::licenseExceeded`
-

@@ -156,4 +156,3 @@ Netdata decodes **149 trap definitions** from Alvarion Ltd across **14 MIBs** in
 - `RAINBOW-NOTIFICATIONS-MIB::rbDiagnosticsHwFaultOff`
 - `RAINBOW-NOTIFICATIONS-MIB::rbMonitorAccessOn`
 - `RAINBOW-NOTIFICATIONS-MIB::rbMonitorAccessOff`
-

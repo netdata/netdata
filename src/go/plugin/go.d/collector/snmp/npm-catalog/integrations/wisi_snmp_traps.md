@@ -146,4 +146,3 @@ Netdata decodes **22 trap definitions** from Wisi across **4 MIBs** into structu
 - `WISI-GTMODULES-MIB::gtModulesNotifyFailure`
 - `WISI-GTMODULES-MIB::gtModulesNotifyRedundancy`
 - `WISI-GTMODULES-MIB::gtModulesNotifyRedundancyClear`
-

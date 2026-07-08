@@ -144,4 +144,3 @@ Netdata decodes **20 trap definitions** from Net Track GmbH across **2 MIBs** in
 - `NETTRACK-E3METER-SNMP-MIB::e3IpmCurrentNormal`
 - `NETTRACK-E3METER-SNMP-MIB::e3IpmCurrentWarnHigh`
 - `NETTRACK-E3METER-SNMP-MIB::e3IpmCurrentCritHigh`
-

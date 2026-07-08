@@ -143,4 +143,3 @@ Netdata decodes **19 trap definitions** from The Freeradius Server Project acros
 - `FREERADIUS-NOTIFICATION-MIB::serverMaxRequests`
 - `FREERADIUS-NOTIFICATION-MIB::signalHup`
 - `FREERADIUS-NOTIFICATION-MIB::signalTerm`
-

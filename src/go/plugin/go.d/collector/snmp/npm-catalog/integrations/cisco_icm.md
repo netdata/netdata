@@ -459,5 +459,3 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | `snmp.device_prof_ccmRegisteredPhones` | `{phone}` | device | Number of phones that are registered and actively in communication with the local call manager. |
 | `snmp.device_prof_ccmRejectedPhones` | `{reject}` | device | Number of phones whose registration requests were rejected by the local call manager. |
 | `snmp.device_prof_ccmUnregisteredPhones` | `{phone}` | device | Number of phone that are unregistered or have lost contact with the local call manager. |
-
-

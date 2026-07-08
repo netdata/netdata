@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Os Nexus Inc across **1 MIB** into st
 ### Sample decoded traps
 
 - `QUANTASTOR-SYS-STATS::quantastor-notif`
-

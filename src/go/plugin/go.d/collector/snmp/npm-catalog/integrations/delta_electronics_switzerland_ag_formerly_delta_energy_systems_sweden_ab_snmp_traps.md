@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Delta Electronics Switzerland AG For
 - `ORION-BASE-MIB::systemNonUrgentAlarm`
 - `ORION-BASE-MIB::systemUrgentAlarm`
 - `ORION-BASE-MIB::systemCriticalAlarm`
-

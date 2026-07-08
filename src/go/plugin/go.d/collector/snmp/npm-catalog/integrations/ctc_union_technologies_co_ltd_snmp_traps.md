@@ -143,4 +143,3 @@ Netdata decodes **53 trap definitions** from Ctc Union Technologies Co Ltd acros
 - `CTC-FRM220-MIB::fanOFF`
 - `CTC-FRM220-MIB::fanON`
 - `CTC-FRM220-MIB::utpLinkDown`
-

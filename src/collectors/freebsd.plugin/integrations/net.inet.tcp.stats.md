@@ -143,5 +143,3 @@ Metrics:
 | ipv4.tcpsyncookies | received, sent, failed | packets/s |
 | ipv4.tcplistenissues | overflows | packets/s |
 | ipv4.ecnpkts | InCEPkts, InECT0Pkts, InECT1Pkts, OutECT0Pkts, OutECT1Pkts | packets/s |
-
-

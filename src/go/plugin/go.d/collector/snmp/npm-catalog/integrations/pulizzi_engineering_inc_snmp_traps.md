@@ -143,4 +143,3 @@ Netdata decodes **10 trap definitions** from Pulizzi Engineering Inc across **1 
 - `EATON-EPDU-PU-SW-MIB::notifyVoltageThreshold`
 - `EATON-EPDU-PU-SW-MIB::notifyTempSensorThreshold`
 - `EATON-EPDU-PU-SW-MIB::notifyHumidSensorThreshold`
-

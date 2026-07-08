@@ -143,4 +143,3 @@ Netdata decodes **45 trap definitions** from Panasas Inc across **1 MIB** into s
 - `PANASAS-NOTIFY-MIB-V1::panNotifyHwCompPS1Incompatible`
 - `PANASAS-NOTIFY-MIB-V1::panNotifyHwCompPS1BadReplacement`
 - `PANASAS-NOTIFY-MIB-V1::panNotifyHwCompPS2BadReplacement`
-

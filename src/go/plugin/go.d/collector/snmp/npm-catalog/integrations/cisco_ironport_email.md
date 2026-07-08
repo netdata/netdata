@@ -316,5 +316,3 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
 | `snmp.device_prof_ironport_cacheThruputNow` | `{request}` | device | Request throughput in the last minute |
-
-

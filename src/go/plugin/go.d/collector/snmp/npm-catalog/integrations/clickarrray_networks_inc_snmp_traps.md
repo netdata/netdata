@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Clickarrray Networks Inc across **1 
 - `CA-SNMP-MIB8::caStart`
 - `CA-SNMP-MIB8::caShutdown`
 - `CA-SNMP-MIB8::licenseRemainingDays`
-

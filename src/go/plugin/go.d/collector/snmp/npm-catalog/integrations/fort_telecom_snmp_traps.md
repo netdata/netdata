@@ -143,4 +143,3 @@ Netdata decodes **88 trap definitions** from Fort Telecom across **1 MIB** into 
 - `FORT-TELECOM-MIB::specialFunctionNoPingResponse`
 - `FORT-TELECOM-MIB::specialFunctionLowSpeed`
 - `FORT-TELECOM-MIB::updateFirmware`
-

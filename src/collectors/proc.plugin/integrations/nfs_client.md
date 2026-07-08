@@ -98,5 +98,3 @@ Metrics:
 | nfs.proc2 | a dimension per proc2 call | calls/s |
 | nfs.proc3 | a dimension per proc3 call | calls/s |
 | nfs.proc4 | a dimension per proc4 call | calls/s |
-
-

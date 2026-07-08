@@ -143,4 +143,3 @@ Netdata decodes **22 trap definitions** from Austin Hughes Electronics Ltd acros
 - `InfraPower-MIB::circuitBreakerTripped`
 - `InfraPower-MIB::circuitBreakerRecovered`
 - `InfraPower-MIB::sensorConnectionLost`
-

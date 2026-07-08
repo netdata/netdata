@@ -149,4 +149,3 @@ Netdata decodes **19 trap definitions** from Wuhan Research Institute Of Posts A
 - `WRI-POWER-MIB::powerFault`
 - `WRI-POWER-MIB::powerOk`
 - `WRI-CPU-MIB::cpuOverThreshold`
-

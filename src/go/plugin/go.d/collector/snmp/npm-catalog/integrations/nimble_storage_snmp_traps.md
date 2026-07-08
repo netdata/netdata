@@ -143,4 +143,3 @@ Netdata decodes **448 trap definitions** from Nimble Storage across **1 MIB** in
 - `NIMBLE-TRAP-MIB::nimbleDsdSpaceCrit0103Deprecated`
 - `NIMBLE-TRAP-MIB::nimbleDsdSpaceUtilizationHigh`
 - `NIMBLE-TRAP-MIB::nimbleDsdSpaceUtilizationOk`
-

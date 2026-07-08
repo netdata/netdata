@@ -133,5 +133,3 @@ Metrics:
 | ipv6.icmprouter | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
 | ipv6.icmpneighbor | InSolicits, OutSolicits, InAdvertisements, OutAdvertisements | messages/s |
 | ipv6.icmptypes | InType1, InType128, InType129, InType136, OutType1, OutType128, OutType129, OutType133, OutType135, OutType143 | messages/s |
-
-

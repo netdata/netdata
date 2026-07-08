@@ -4,6 +4,7 @@
 #include "libnetdata/libnetdata.h"
 
 static char *cached_run_dir = NULL;
+static bool cached_run_dir_available = false;
 static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
 static inline bool is_dir_accessible(const char *dir, bool rw) {
@@ -116,17 +117,23 @@ success:
 
 const char *os_run_dir(bool rw) {
     // Fast path - return cached directory if available
-    if(cached_run_dir)
+    if(__atomic_load_n(&cached_run_dir_available, __ATOMIC_ACQUIRE))
         return cached_run_dir;
 
     spinlock_lock(&spinlock);
 
     // Check again under lock in case another thread set it
-    if(!cached_run_dir)
-        cached_run_dir = detect_run_dir(rw);
+    char *run_dir = cached_run_dir;
+    if(!run_dir) {
+        run_dir = detect_run_dir(rw);
+        cached_run_dir = run_dir;
+
+        if(run_dir)
+            __atomic_store_n(&cached_run_dir_available, true, __ATOMIC_RELEASE);
+    }
 
     spinlock_unlock(&spinlock);
 
     errno_clear();
-    return cached_run_dir;
+    return run_dir;
 }

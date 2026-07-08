@@ -75,7 +75,7 @@ static inline size_t svc_rrdset_archive_obsolete_dimensions(RRDSET *st, bool all
 }
 
 static bool svc_rrdset_lock_for_deletion(RRDSET *st, time_t now) {
-    if(st->last_accessed_time_s + rrdset_free_obsolete_time_s < now &&
+    if(rrdset_last_accessed_time_s(st) + rrdset_free_obsolete_time_s < now &&
         st->last_updated.tv_sec + rrdset_free_obsolete_time_s < now &&
         st->last_collected_time.tv_sec + rrdset_free_obsolete_time_s < now &&
         spinlock_trylock(&st->destroy_lock)) {

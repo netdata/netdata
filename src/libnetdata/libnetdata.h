@@ -45,8 +45,6 @@ char *find_and_replace(const char *src, const char *find, const char *replace, c
 #define BITS_IN_A_KILOBIT     1000
 #define KILOBITS_IN_A_MEGABIT 1000
 
-#include "bitmap/bitmap64.h"
-
 #define COMPRESSION_MAX_CHUNK 0x4000
 #define COMPRESSION_MAX_OVERHEAD 128
 #define COMPRESSION_MAX_MSG_SIZE (COMPRESSION_MAX_CHUNK - COMPRESSION_MAX_OVERHEAD - 1)

@@ -144,4 +144,3 @@ Netdata decodes **4 trap definitions** from Aten International Co Ltd across **3
 - `ATEN-PE-CFG-STR::customTrapMSG`
 - `ATEN-PE2-CFG::trapNotifEvent`
 - `ATEN-IPMI-MIB::guid`
-

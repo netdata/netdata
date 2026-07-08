@@ -143,4 +143,3 @@ Netdata decodes **28 trap definitions** from Oplink Communications Inc across **
 - `OPLINK-BTI-OPS-MIB::oplinkemuFanRemove`
 - `OPLINK-BTI-OPS-MIB::oplinkemuFanInsert`
 - `OPLINK-BTI-OPS-MIB::oplinkemuPowerRemove`
-

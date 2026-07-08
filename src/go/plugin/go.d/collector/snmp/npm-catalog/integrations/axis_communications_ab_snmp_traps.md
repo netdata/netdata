@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Axis Communications AB across **1 MI
 - `AXIS-VIDEO-MIB::alarmNew`
 - `AXIS-VIDEO-MIB::alarmCleared`
 - `AXIS-VIDEO-MIB::alarmSingle`
-

@@ -9,8 +9,10 @@ Use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configurati
 ```text
 [db]
   # dbengine, ram, none
-  mode = dbengine
+  db = dbengine
 ```
+
+`mode` is also accepted for backwards compatibility.
 
 ## Tiers
 
@@ -22,7 +24,7 @@ In a Parent-Child setup, these settings control the Parent's total storage for m
 
 Child and Parent storage are independent:
 
-- A Child can keep local history based on its own `[db].mode`.
+- A Child can keep local history based on its own `[db].db`.
 - Streamed metrics can also be persisted on the Parent, in the Parent's own dbengine files.
 
 Retention size is enforced **per-tier**, not per Child, so all streaming Children share the Parent's tier quota. For Parent sizing guidance, see [Parent Retention Sizing](/docs/netdata-agent/sizing-netdata-agents/disk-requirements-and-retention.md#parent-retention-sizing).
@@ -47,7 +49,7 @@ You can change these limits using [`edit-config`](/docs/netdata-agent/configurat
 
 ```text
 [db]
-    mode = dbengine
+    db = dbengine
     storage tiers = 3
 
     # Tier 0, per second data. Set to 0 for no limit.
@@ -126,3 +128,25 @@ There are two cache sizes that you can configure in `netdata.conf` to better opt
 Both of them are dynamically adjusted to use some of the total memory computed above. The configuration in `netdata.conf` allows providing additional memory to them, increasing their caching efficiency.
 
 :::
+
+### Monitoring Cache Memory Usage
+
+You can check how much memory the dbengine caches are currently consuming directly from the dashboard.
+
+The total memory used by the database always appears as the **dbengine** dimension in the **Netdata Memory** chart (under the **Netdata** section → **Memory Usage** family). This gives a quick view of the database's overall memory footprint without any extra configuration.
+
+For a detailed breakdown into individual caches, the dedicated dbengine cache charts require **extended pulse statistics**, which are disabled by default. To enable them, use [`edit-config`](/docs/netdata-agent/configuration/README.md#edit-configuration-files) to open `netdata.conf` and set:
+
+```text
+[pulse]
+    extended = yes
+```
+
+[Restart the Agent](/docs/netdata-agent/start-stop-restart.md) for the change to take effect. Once enabled, the following charts appear under the **Netdata** section:
+
+- In the **dbengine memory** family, the **Netdata DB Memory** chart breaks total database memory down by component: main cache, open cache, extent cache, metrics registry, buffers, and allocator bookkeeping (aral structures, aral padding, pgd padding).
+- In the **dbengine main cache**, **dbengine open cache**, and **dbengine extent cache** families:
+  - **Netdata main Cache Memory**, **Netdata open Cache Memory**, and **Netdata extent Cache Memory** show how each cache's memory is distributed across its states — hot, dirty, clean, free, index, evicting, and flushing.
+  - **Netdata main Target Cache Memory**, **Netdata open Target Cache Memory**, and **Netdata extent Target Cache Memory** show each cache's current memory size alongside its target (wanted) size.
+
+To check whether your configured cache sizes provide enough headroom, compare the **current** value against the **wanted** value in the Target Cache Memory charts. When a cache consistently operates at its target, increasing `dbengine page cache size` or `dbengine extent cache size` may improve caching efficiency.

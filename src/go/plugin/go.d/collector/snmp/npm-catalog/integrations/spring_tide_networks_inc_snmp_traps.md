@@ -155,4 +155,3 @@ Netdata decodes **79 trap definitions** from Spring Tide Networks Inc across **1
 - `STN-POLICY-MIB::stnPmQosFlowCBRemoved`
 - `STN-POLICY-MIB::stnPmQosShapingPacketDiscard`
 - `STN-POLICY-MIB::stnPmQosThresholdPacketDiscard`
-

@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Loral Wdl across **1 MIB** into stru
 
 - `LUCENT-GENERIC-DLOAD-MIB::luDloadTrapCompleted`
 - `LUCENT-GENERIC-DLOAD-MIB::luUpLoadTrapCompleted`
-

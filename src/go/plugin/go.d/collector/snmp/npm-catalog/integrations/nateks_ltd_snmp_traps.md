@@ -143,4 +143,3 @@ Netdata decodes **6 trap definitions** from Nateks Ltd across **1 MIB** into str
 - `NATEKS-MIB::tftpStatusChange`
 - `NATEKS-MIB::macFilterViolation`
 - `NATEKS-MIB::dInStateChange`
-

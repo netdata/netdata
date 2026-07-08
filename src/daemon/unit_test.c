@@ -534,6 +534,64 @@ int unit_test_buffer() {
     return 0;
 }
 
+static int check_jsonwrap_v2_partial_data_trimming_case(RRDR_OPTIONS options, const char *expected) {
+    RRDR r = {
+        .partial_data_trimming = {
+            .max_update_every = 10,
+            .expected_after = 100,
+            .trimmed_after = 101,
+        },
+    };
+
+    BUFFER *wb = buffer_create(0, NULL);
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
+    rrdr_json_wrapper_partial_data_trimming_v2(wb, &r, options);
+    buffer_json_finalize(wb);
+
+    const char *actual = buffer_tostring(wb);
+    if(strcmp(actual, expected) != 0) {
+        fprintf(stderr, "rrdr_json_wrapper_partial_data_trimming_v2() generated '%s', expected '%s'\n",
+                actual, expected);
+        buffer_free(wb);
+        return 1;
+    }
+
+    buffer_free(wb);
+    return 0;
+}
+
+static int test_jsonwrap_v2_partial_data_trimming_raw_metadata(void) {
+    const char *expected =
+        "{\"partial_data_trimming\":{\"max_update_every\":10,\"expected_after\":100,\"trimmed_after\":101}}";
+
+    if(check_jsonwrap_v2_partial_data_trimming_case(0, "{}"))
+        return 1;
+
+    if(check_jsonwrap_v2_partial_data_trimming_case(RRDR_OPTION_DEBUG, expected))
+        return 1;
+
+    if(check_jsonwrap_v2_partial_data_trimming_case(RRDR_OPTION_RETURN_RAW, expected))
+        return 1;
+
+    if(check_jsonwrap_v2_partial_data_trimming_case(RRDR_OPTION_DEBUG | RRDR_OPTION_RETURN_RAW, expected))
+        return 1;
+
+    QUERY_TARGET qt = { 0 };
+    qt.window.options = RRDR_OPTION_RETURN_RAW;
+    if(!query_target_aggregatable(&qt)) {
+        fprintf(stderr, "RRDR_OPTION_RETURN_RAW must keep query_target_aggregatable() true\n");
+        return 1;
+    }
+
+    qt.window.options = 0;
+    if(query_target_aggregatable(&qt)) {
+        fprintf(stderr, "query_target_aggregatable() unexpectedly true without RRDR_OPTION_RETURN_RAW\n");
+        return 1;
+    }
+
+    return 0;
+}
+
 int unit_test_static_threads() {
     struct netdata_static_thread *static_threads = static_threads_get();
 
@@ -1567,6 +1625,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(check_number_printing())
+        return 1;
+
+    if(test_jsonwrap_v2_partial_data_trimming_raw_metadata())
         return 1;
 
     if(check_rrdcalc_comparisons())

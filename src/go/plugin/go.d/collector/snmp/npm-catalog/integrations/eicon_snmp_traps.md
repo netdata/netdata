@@ -148,4 +148,3 @@ Netdata decodes **10 trap definitions** from Eicon across **6 MIBs** into struct
 - `EICON-MIB-SERVER::srvTrapInternal`
 - `EICON-MIB-CARD::cardTrapHeartbeatLost`
 - `EICON-MIB-CARD::cardTrapStateChange`
-

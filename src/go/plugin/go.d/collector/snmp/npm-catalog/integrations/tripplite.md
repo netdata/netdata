@@ -137,5 +137,3 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | Metric (chart context) | Unit | Scope | Description |
 |---|---|---|---|
 | `snmp.device_prof_systemUptime` | `s` | device | Time since the system was last rebooted or powered on. |
-
-

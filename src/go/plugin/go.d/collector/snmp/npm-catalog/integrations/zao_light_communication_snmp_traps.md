@@ -149,4 +149,3 @@ Netdata decodes **35 trap definitions** from Zao Light Communication across **7 
 - `DKSF-202-9-X-X-1::npBatteryTrap`
 - `DKSF-PWR-MIB::npRelayTrapOff`
 - `DKSF-PWR-MIB::npRelayTrapOn`
-

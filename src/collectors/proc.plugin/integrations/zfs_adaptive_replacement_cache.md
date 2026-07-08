@@ -124,5 +124,3 @@ Metrics:
 | zfs.prefetch_data_hits_rate | hits, misses | events/s |
 | zfs.hash_elements | current, max | elements |
 | zfs.hash_chains | current, max | chains |
-
-

@@ -294,7 +294,7 @@ static bool labels_add_already_sanitized(RRDLABELS *labels, const char *key, con
         changed = true;
     }
 
-    labels->version++;
+    __atomic_add_fetch(&labels->version, 1, __ATOMIC_RELAXED);
 
 //    judy_mem = JudyAllocThreadPulseGetAndReset();
 //    RRDLABELS_MEMORY_DELTA(&dictionary_stats_category_rrdlabels, judy_mem, 0);
@@ -762,7 +762,8 @@ bool rrdlabels_migrate_to_these(RRDLABELS *dst, RRDLABELS *src) {
     lfe_done_nolock();
 
     size_t removed = rrdlabels_remove_all_unmarked_unsafe(dst);
-    dst->version = src->version;
+    uint32_t src_version = __atomic_load_n(&src->version, __ATOMIC_RELAXED);
+    __atomic_store_n(&dst->version, src_version, __ATOMIC_RELAXED);
 
     spinlock_unlock(&src->spinlock);
     spinlock_unlock(&dst->spinlock);
@@ -834,7 +835,7 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
             // is modified. Same ordering as labels_add_already_sanitized().
             *((RRDLABEL_SRC *)PValue) = (ls & ~(RRDLABEL_FLAG_OLD)) | RRDLABEL_FLAG_NEW;
             dup_label(label);
-            dst->version++;
+            __atomic_add_fetch(&dst->version, 1, __ATOMIC_RELAXED);
             update_statistics = true;
         }
         else
@@ -857,7 +858,7 @@ void rrdlabels_copy(RRDLABELS *dst, RRDLABELS *src)
             // Cleanup is itself a state mutation: bump version and request
             // tail-stats accounting so version-based consumers and the
             // memory pulse stay correct even when no new insert happened.
-            dst->version++;
+            __atomic_add_fetch(&dst->version, 1, __ATOMIC_RELAXED);
             update_statistics = true;
         }
     }
@@ -1092,7 +1093,7 @@ uint32_t rrdlabels_version(RRDLABELS *labels __maybe_unused)
     if (unlikely(!labels))
         return 0;
 
-    return labels->version;
+    return __atomic_load_n(&labels->version, __ATOMIC_RELAXED);
 }
 
 void rrdset_update_rrdlabels(RRDSET *st, RRDLABELS *new_rrdlabels) {
@@ -1972,6 +1973,8 @@ static int rrdlabels_unittest_host_chart_labels() {
     errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=*name* _hostname=*", true);
     errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=*name* _os=l*", true);
     errors += rrdlabels_unittest_check_pattern_list(labels, "_os=l* _hostname=*name*", true);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "=_hostname", false);
+    errors += rrdlabels_unittest_check_pattern_list(labels, "_hostname=", true);
 
     rrdlabels_destroy(labels);
 

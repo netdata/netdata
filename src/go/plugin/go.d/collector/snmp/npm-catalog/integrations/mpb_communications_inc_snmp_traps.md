@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Mpb Communications Inc across **1 MI
 - `MPBC-2RU-MIB::mpbc2RUTrapMajor`
 - `MPBC-2RU-MIB::mpbc2RUTrapMinor`
 - `MPBC-2RU-MIB::mpbc2RUTrapInformational`
-

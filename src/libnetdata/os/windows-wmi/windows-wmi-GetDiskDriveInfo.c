@@ -5,6 +5,22 @@
 
 #if defined(OS_WINDOWS)
 
+static void wmi_bstr_to_multibyte(char *dst, size_t dst_size, BSTR src)
+{
+    if (!dst_size)
+        return;
+
+    dst[0] = '\0';
+
+    if (!src)
+        return;
+
+    if (!utf16_to_utf8(dst, dst_size, src, -1, NULL)) {
+        dst[0] = '\0';
+        return;
+    }
+}
+
 size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
     HRESULT init_hr = InitializeWMI();
     if (FAILED(init_hr) || !nd_wmi.pSvc) return 0;
@@ -45,28 +61,40 @@ size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
         // Extract DeviceID
         hr = pclsObj->lpVtbl->Get(pclsObj, L"DeviceID", 0, &vtProp, 0, 0);
         if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wcstombs(diskInfoArray[index].DeviceID, vtProp.bstrVal, sizeof(diskInfoArray[index].DeviceID));
+            wmi_bstr_to_multibyte(
+                diskInfoArray[index].DeviceID,
+                sizeof(diskInfoArray[index].DeviceID),
+                vtProp.bstrVal);
         }
         VariantClear(&vtProp);
 
         // Extract Model
         hr = pclsObj->lpVtbl->Get(pclsObj, L"Model", 0, &vtProp, 0, 0);
         if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wcstombs(diskInfoArray[index].Model, vtProp.bstrVal, sizeof(diskInfoArray[index].Model));
+            wmi_bstr_to_multibyte(
+                diskInfoArray[index].Model,
+                sizeof(diskInfoArray[index].Model),
+                vtProp.bstrVal);
         }
         VariantClear(&vtProp);
 
         // Extract Caption
         hr = pclsObj->lpVtbl->Get(pclsObj, L"Caption", 0, &vtProp, 0, 0);
         if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wcstombs(diskInfoArray[index].Caption, vtProp.bstrVal, sizeof(diskInfoArray[index].Caption));
+            wmi_bstr_to_multibyte(
+                diskInfoArray[index].Caption,
+                sizeof(diskInfoArray[index].Caption),
+                vtProp.bstrVal);
         }
         VariantClear(&vtProp);
 
         // Extract Name
         hr = pclsObj->lpVtbl->Get(pclsObj, L"Name", 0, &vtProp, 0, 0);
         if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wcstombs(diskInfoArray[index].Name, vtProp.bstrVal, sizeof(diskInfoArray[index].Name));
+            wmi_bstr_to_multibyte(
+                diskInfoArray[index].Name,
+                sizeof(diskInfoArray[index].Name),
+                vtProp.bstrVal);
         }
         VariantClear(&vtProp);
 
@@ -81,7 +109,7 @@ size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
         hr = pclsObj->lpVtbl->Get(pclsObj, L"Size", 0, &vtProp, 0, 0);
         if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
             char sizeStr[64];
-            wcstombs(sizeStr, vtProp.bstrVal, sizeof(sizeStr));
+            wmi_bstr_to_multibyte(sizeStr, sizeof(sizeStr), vtProp.bstrVal);
             diskInfoArray[index].Size = strtoull(sizeStr, NULL, 10);
         }
         VariantClear(&vtProp);
@@ -89,7 +117,10 @@ size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
         // Extract Status
         hr = pclsObj->lpVtbl->Get(pclsObj, L"Status", 0, &vtProp, 0, 0);
         if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wcstombs(diskInfoArray[index].Status, vtProp.bstrVal, sizeof(diskInfoArray[index].Status));
+            wmi_bstr_to_multibyte(
+                diskInfoArray[index].Status,
+                sizeof(diskInfoArray[index].Status),
+                vtProp.bstrVal);
         }
         VariantClear(&vtProp);
 
@@ -110,21 +141,30 @@ size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
         // Extract Manufacturer
         hr = pclsObj->lpVtbl->Get(pclsObj, L"Manufacturer", 0, &vtProp, 0, 0);
         if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wcstombs(diskInfoArray[index].Manufacturer, vtProp.bstrVal, sizeof(diskInfoArray[index].Manufacturer));
+            wmi_bstr_to_multibyte(
+                diskInfoArray[index].Manufacturer,
+                sizeof(diskInfoArray[index].Manufacturer),
+                vtProp.bstrVal);
         }
         VariantClear(&vtProp);
 
         // Extract InstallDate
         hr = pclsObj->lpVtbl->Get(pclsObj, L"InstallDate", 0, &vtProp, 0, 0);
         if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wcstombs(diskInfoArray[index].InstallDate, vtProp.bstrVal, sizeof(diskInfoArray[index].InstallDate));
+            wmi_bstr_to_multibyte(
+                diskInfoArray[index].InstallDate,
+                sizeof(diskInfoArray[index].InstallDate),
+                vtProp.bstrVal);
         }
         VariantClear(&vtProp);
 
         // Extract MediaType
         hr = pclsObj->lpVtbl->Get(pclsObj, L"MediaType", 0, &vtProp, 0, 0);
         if (SUCCEEDED(hr) && vtProp.vt == VT_BSTR) {
-            wcstombs(diskInfoArray[index].MediaType, vtProp.bstrVal, sizeof(diskInfoArray[index].MediaType));
+            wmi_bstr_to_multibyte(
+                diskInfoArray[index].MediaType,
+                sizeof(diskInfoArray[index].MediaType),
+                vtProp.bstrVal);
         }
         VariantClear(&vtProp);
 

@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"maps"
 	"sort"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -72,6 +73,12 @@ type runtimeMetricsJob struct {
 
 	out      io.Writer
 	registry *componentRegistry
+
+	// tickMu spans runOnce's entire critical section (registry snapshot ->
+	// chart build -> wire write -> state-commit finalizers -> buffer reset)
+	// so quarantineComponent can wait out an in-progress tick. Lock order:
+	// tickMu -> registry.mu; never wait on tickMu while holding Service.mu.
+	tickMu sync.Mutex
 
 	running atomic.Bool
 	stop    chan struct{}
@@ -161,6 +168,9 @@ func (j *runtimeMetricsJob) Stop() {
 }
 
 func (j *runtimeMetricsJob) runOnce(clock int) {
+	j.tickMu.Lock()
+	defer j.tickMu.Unlock()
+
 	specs := j.registry.snapshot()
 	seen := make(map[string]struct{}, len(specs))
 	now := time.Now()
@@ -205,6 +215,18 @@ func (j *runtimeMetricsJob) runOnce(clock int) {
 		j.Warningf("runtime metrics commit failed: %v", err)
 	}
 	j.buf.Reset()
+}
+
+// quarantineComponent deletes the component's registration and emission
+// state without removal output. Holding tickMu waits out any in-progress
+// tick including its finalizers, so after this returns no already-snapshotted
+// sample and no removal-obsolete output for the component can be emitted; a
+// later re-registration of the same name is a fresh component.
+func (j *runtimeMetricsJob) quarantineComponent(name string) {
+	j.tickMu.Lock()
+	defer j.tickMu.Unlock()
+	j.registry.remove(name)
+	delete(j.components, name)
 }
 
 func (j *runtimeMetricsJob) newComponentState(spec componentSpec) (*runtimeComponentState, error) {

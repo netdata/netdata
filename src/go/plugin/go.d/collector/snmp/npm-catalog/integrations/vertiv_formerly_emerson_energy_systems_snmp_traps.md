@@ -144,4 +144,3 @@ Netdata decodes **6 trap definitions** from Vertiv Formerly Emerson Energy Syste
 - `EES-POWER-MIB::alarmCeaseTrap`
 - `NETSURE-DISTRIB-MIB::alarmTrap`
 - `NETSURE-DISTRIB-MIB::alarmActiveTrap`
-

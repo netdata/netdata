@@ -132,5 +132,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | cpu.softirqs | a dimension per softirq | softirqs/s |
-
-

@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from 3Par Data across **1 MIB** into struc
 ### Sample decoded traps
 
 - `ThreeParMIB::alertNotify`
-

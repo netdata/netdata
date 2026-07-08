@@ -143,4 +143,3 @@ Netdata decodes **26 trap definitions** from Advanced Fibre Communications Afc a
 - `UMC1000TRAPS::umc1TrapTerminalInfoChange`
 - `UMC1000TRAPS::umc1TrapTopologyChange`
 - `UMC1000TRAPS::umc1TrapInventoryShelfTableChange`
-

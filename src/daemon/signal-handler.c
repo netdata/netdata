@@ -56,7 +56,7 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
         if(signals_waiting[i].signo != signo)
             continue;
 
-        signals_waiting[i].count++;
+        __atomic_fetch_add(&signals_waiting[i].count, 1, __ATOMIC_RELAXED);
 
         if(signals_waiting[i].action == NETDATA_SIGNAL_DEADLY) {
             bool chained_handler = original_sigactions[signo] || (original_handlers[signo] && original_handlers[signo] != SIG_IGN && original_handlers[signo] != SIG_DFL);
@@ -91,12 +91,14 @@ void nd_signal_handler(int signo, siginfo_t *info, void *context __maybe_unused)
                 len = strcatz(b, len, ")", sizeof(b));
             }
             len = strcatz(b, len, " in thread ", sizeof(b));
-            len += print_uint64(&b[len], gettid_cached());
+            char tid[UINT64_MAX_LENGTH];
+            print_uint64(tid, gettid_cached());
+            len = strcatz(b, len, tid, sizeof(b));
             len = strcatz(b, len, " ", sizeof(b));
             len = strcatz(b, len, nd_thread_tag_async_safe(), sizeof(b));
             len = strcatz(b, len, "!\n", sizeof(b));
 
-            if(write(STDERR_FILENO, b, strlen(b)) == -1) {
+            if(write(STDERR_FILENO, b, len) == -1) {
                 // nothing to do - we cannot write but there is no way to complain about it
                 ;
             }
@@ -215,11 +217,10 @@ static void process_triggered_signals(void) {
     do {
         found = 0;
         for (size_t i = 0; i < _countof(signals_waiting) ; i++) {
-            if (!signals_waiting[i].count)
+            if (!__atomic_exchange_n(&signals_waiting[i].count, 0, __ATOMIC_RELAXED))
                 continue;
 
             found++;
-            signals_waiting[i].count = 0;
             const char *name = signals_waiting[i].name;
 
             switch (signals_waiting[i].action) {

@@ -194,4 +194,3 @@ Netdata decodes **1114 trap definitions** from Accton Technology across **47 MIB
 - `ES4612-MIB::swFanFailureTrap`
 - `ES4612-MIB::swFanRecoverTrap`
 - `ES4612-MIB::swPortSecurityTrap`
-

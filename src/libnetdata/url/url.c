@@ -22,8 +22,13 @@ char to_hex(char code) {
 /* IMPORTANT: be sure to free() the returned string after use */
 char *url_encode(const char *str) {
     char *buf, *pbuf;
+    size_t max_len = (SIZE_MAX - 1) / 3;
+    size_t len = strnlen(str, max_len + 1);
 
-    pbuf = buf = mallocz(strlen(str) * 3 + 1);
+    if(unlikely(len > (SIZE_MAX - 1) / 3))
+        fatal("url_encode() cannot allocate encoded string for %zu bytes.", len);
+
+    pbuf = buf = mallocz(len * 3 + 1);
 
     while (*str) {
         if (isalnum((uint8_t)*str) || *str == '-' || *str == '_' || *str == '.' || *str == '~')
@@ -311,7 +316,7 @@ inline char *url_find_protocol(char *s) {
         while (*s && *s != ' ') s++;
 
         // is it SPACE + "HTTP/" ?
-        if(*s && !strncmp(s, " HTTP/", 6)) break;
+        if(!*s || !strncmp(s, " HTTP/", 6)) break;
         else s++;
     }
 

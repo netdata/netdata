@@ -144,4 +144,3 @@ Netdata decodes **44 trap definitions** from Lotus Development Corp across **2 M
 - `LMS-TRAP-FORWARDING-MIB::lmsMinor`
 - `LMS-TRAP-FORWARDING-MIB::lmsWarning`
 - `LMS-TRAP-FORWARDING-MIB::lmsCleared`
-

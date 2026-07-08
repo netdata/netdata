@@ -143,4 +143,3 @@ Netdata decodes **8 trap definitions** from Net Insight AB across **1 MIB** into
 - `NETI-EVT-MIB::nevtAlarmMinor`
 - `NETI-EVT-MIB::nevtAlarmWarning`
 - `NETI-EVT-MIB::nevtAlarmIndeterminate`
-

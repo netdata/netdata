@@ -333,6 +333,3 @@ When `pod.local_mode: true` is set but `MY_NODE_NAME` is missing, the discoverer
 ### Generated jobs fail to start
 
 The Address resolves to the pod's CNI IP — the Netdata Agent must be able to reach pod IPs. Most CNIs allow this from a pod running in the same cluster, but flat-network requirements differ. For service-role targets, the cluster-internal DNS name (`<svc>.<ns>.svc`) is used and should always resolve from inside the cluster.
-
-
-

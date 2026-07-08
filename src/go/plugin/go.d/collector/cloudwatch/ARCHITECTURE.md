@@ -1,33 +1,70 @@
 # AWS CloudWatch Collector Architecture
 
-Maintainer-oriented map of `cloudwatch`. It explains the runtime path, the
-profile-driven model, and the package boundaries. Per-service metric and chart
-details live in the profile YAMLs (`config/go.d/cloudwatch.profiles/`) and the
-focused tests, not here.
+Maintainer-oriented map of `cloudwatch`, written to be read top to bottom as a
+journey: the plain model and the big picture first, then the lifecycle and the
+collection cycle, then each stage in detail, and finally the profile schema,
+invariants, and where to change things. Per-service metric and chart details live
+in the profile YAMLs (`config/go.d/cloudwatch.profiles/`) and the focused tests,
+not here.
 
-## Short Version
+The one rule that shapes most of what follows:
+
+> `GetMetricData` is billed per query, so the collector queries each metric only
+> as often as its period and re-emits cached values in between — cost tracks the
+> profiles you run, not how often Netdata collects.
+
+## What It Does
 
 `cloudwatch` is a framework-V2 go.d collector that pulls AWS CloudWatch metrics
-for a curated set of AWS services (each defined by a profile — see Profiles)
-and renders them as dynamic Netdata charts. It is **profile-driven**: each
-service is a YAML profile declaring its CloudWatch namespace, the dimension set
-that identifies one instance, the metrics/statistics to query, and a chart
-template.
+for a curated set of AWS services and renders them as dynamic Netdata charts. It
+is **profile-driven**: each service is a YAML profile (see Profiles) declaring its
+CloudWatch namespace, the dimension set that identifies one instance, the
+metrics/statistics to query, and a chart template — so adding or adjusting a
+service is usually a YAML edit, not Go.
 
-Each collection cycle it:
+It runs as a **single Netdata node**: AWS resources are chart *instances* (keyed
+by `by_labels`), not separate nodes — there are no vnodes/host scopes.
 
-1. resolves the AWS account id once via STS (`identity.go`);
-2. discovers live resource instances per (profile, region) with `ListMetrics`
+## Big Picture
+
+Config picks the services; the collector discovers what actually exists, queries
+it on a per-period schedule to keep the bill down, and renders the results as
+charts under the `cloudwatch.` namespace.
+
+```mermaid
+flowchart LR
+    cfg("Config<br/>regions · auth · profiles")
+    disc("Discover<br/>ListMetrics<br/>cheap / free tier")
+    plan("Plan + schedule<br/>per account/region/period")
+    query("Query<br/>GetMetricData<br/>billed — the cost driver")
+    store("metrix store<br/>gauges + labels")
+    charts("Dynamic charts<br/>cloudwatch.*")
+
+    cfg --> disc --> plan --> query --> store --> charts
+
+    classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
+    classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
+    classDef effect fill:#ffe6cc,stroke:#e36209,color:#5a2a00;
+    classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
+
+    class cfg input
+    class disc,plan sched
+    class query effect
+    class store,charts commit
+```
+
+Each collection cycle (`collect.go`), in order:
+
+1. resolve one AWS account id per configured identity via STS (`identity.go`);
+2. discover live instances per (account, profile, region) with `ListMetrics`
    (`discover.go`);
-3. plans and executes `GetMetricData` in batches grouped by (region, period)
-   (`query_plan.go`, `query_executor.go`);
-4. writes each `instance × metric × statistic` value as a float gauge into the
-   `metrix` store, stamped with `{account_id, region, <dimension labels>}`
-   (`observe.go`);
-5. serves a chart template built once from the selected profiles (`chart.go`).
-
-It runs as a **single Netdata node**. AWS resources are chart *instances*
-(keyed by `by_labels`), not separate nodes; there are no vnodes/host scopes.
+3. plan and schedule `GetMetricData`, grouped by (account, region, period)
+   (`query_plan.go`);
+4. execute the due queries in concurrent batches (`query_executor.go`);
+5. write each value as a float gauge into `metrix`, stamped with
+   `{account_id, region, <dimension labels>}`, and re-emit cached values for
+   not-due series (`observe.go`);
+6. serve a chart template built once from the selected profiles (`chart.go`).
 
 ## Lifecycle
 
@@ -37,27 +74,37 @@ owns the `Collector` struct and lifecycle.
 
 ```mermaid
 flowchart TD
-    Init["Init: applyDefaults + validate (no AWS calls)"]
-    Check["Check"]
-    STS["ensureAccountIdentity: STS GetCallerIdentity, once"]
-    Profiles["ensureProfiles: load catalog, select profiles, build + cache chart template"]
-    Post["framework postCheck: validate ChartTemplateYAML via chartengine"]
-    Collect["Collect (every update_every)"]
-    Cycle["collect(ctx): discovery -> plan -> schedule -> execute -> observe"]
+    Init("Init<br/>applyDefaults + validate<br/>no AWS calls")
+    Check("Check")
+    Accounts("ensureAccounts<br/>STS GetCallerIdentity per identity<br/>fail-soft · deduped")
+    Profiles("ensureProfiles<br/>load catalog · select profiles<br/>build + cache chart template")
+    Post("framework postCheck<br/>validate ChartTemplateYAML via chartengine")
+    Collect("Collect<br/>every update_every")
+    Cycle("collect cycle<br/>discover → plan → schedule → execute → observe")
 
     Init --> Check
-    Check --> STS --> Profiles --> Post
+    Check --> Accounts --> Profiles --> Post
     Post --> Collect --> Cycle --> Collect
+
+    classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
+    classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
+    classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
+    classDef core fill:#cfe4ff,stroke:#1f6feb,stroke-width:3px,color:#0b2948;
+
+    class Init,Check input
+    class Accounts,Profiles sched
+    class Post commit
+    class Collect,Cycle core
 ```
 
 - **Init** does config only (`applyDefaults`, `validate`) — no network.
-- **Check** resolves the account id (STS) and builds the chart template. The
+- **Check** resolves each identity's account id (STS) and builds the chart template. The
   template is built here, not lazily, because the framework's `postCheck`
   validates `ChartTemplateYAML()` through `chartengine.LoadYAML` before the
   first `Collect`; an unbuilt template would fail the job.
-- **Collect** runs the whole cycle (below). `ensureAccountIdentity` and
+- **Collect** runs the whole cycle (below). `ensureAccounts` and
   `ensureProfiles` are called again but short-circuit once populated.
-- **Cleanup** resets runtime state (account id, profiles, cached template,
+- **Cleanup** resets runtime state (accounts, profiles, cached template,
   discovery snapshot, client cache, observation schedule) so a framework
   re-Init after failed autodetection starts clean. The `metrix` store is created
   once in `New` and persists — it is not recreated.
@@ -69,27 +116,38 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A["ensure account id + profiles (cached after first run)"]
-    B["refreshDiscovery: ListMetrics per (profile,region) when TTL expired"]
-    C["buildQueryPlan: one query per instance x metric x statistic"]
-    D["dueGroups + filterDueQueries: keep only (region,period) groups due now"]
-    E["executeQueries: batched, concurrent GetMetricData"]
-    F["advanceSchedule(succeeded) + observe: write gauges, re-emit retained"]
+    A("ensure account ids + profiles<br/>cached after first run")
+    B("refreshDiscovery<br/>ListMetrics per account/profile/region<br/>when TTL expired")
+    C("buildQueryPlan<br/>one query per account × instance × metric × statistic")
+    D("dueGroups + filterDueQueries<br/>keep only (account, region, period) groups due now")
+    E("executeQueries<br/>batched · concurrent GetMetricData")
+    F("advanceSchedule + observe<br/>write gauges · re-emit retained")
 
     A --> B --> C --> D --> E --> F
+
+    classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
+    classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
+    classDef effect fill:#ffe6cc,stroke:#e36209,color:#5a2a00;
+    classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
+
+    class A input
+    class B,C,D sched
+    class E effect
+    class F commit
 ```
 
 ## Discovery
 
 *Which* profiles to query is decided by config, not by discovery (see Profiles):
 the selected profiles are the CloudWatch namespaces `ListMetrics` runs against.
-Discovery then finds which *instances* of those profiles exist per region.
+Discovery then finds which *instances* of those profiles exist per account and region.
 
 `discover.go`. `refreshDiscovery` re-runs only when the snapshot TTL
 (`discovery.refresh_every`, default 300s) has expired.
 
-- `discoverAll` fans out over every (profile × region) target concurrently
-  (bounded by `apiConcurrency`), one CloudWatch client per region.
+- `discoverAll` fans out over every (account × profile × region) target
+  concurrently (bounded by `apiConcurrency`), one CloudWatch client per
+  (account, region).
 - `discoverInstances` pages `ListMetrics` for the profile's namespace.
   `matchInstanceDimensions` keeps a returned metric only if its dimension-**name**
   set exactly equals the profile's set — same names, same cardinality. This
@@ -119,9 +177,9 @@ Discovery then finds which *instances* of those profiles exist per region.
   Identity labels are `{account_id, region}` plus one label per identifying
   instance dimension (a `constant` dimension is sent in the query but not
   labeled). The exported series name is `<profile>.<metric_id>_<statistic>`.
-- Queries are grouped by `queryGroupKey{region, period}` — the batch unit
+- Queries are grouped by `queryGroupKey{account, region, period}` — the batch unit
   (shared client and time window) and the scheduling unit.
-- The `observationStore` keeps a per-(region, period) `nextQueryAt`. `dueGroups`
+- The `observationStore` keeps a per-(account, region, period) `nextQueryAt`. `dueGroups`
   returns groups whose next time has arrived (or the first cycle);
   `filterDueQueries` drops the rest. So a period-86400 (S3 daily) group is
   queried far less often than the 60s collect cycle, while a 300s group runs
@@ -134,8 +192,8 @@ Discovery then finds which *instances* of those profiles exist per region.
 
 `query_executor.go`. `executeQueries`:
 
-- `indexPlan` groups the plan by (region, period); `resolveRegionClients` builds
-  one client per region up front (region errors recorded once per pass).
+- `indexPlan` groups the plan by (account, region, period); `resolveGroupClients`
+  builds one client per (account, region) up front (errors recorded once per pass).
 - `buildChunkJobs` computes the time window and splits each group into chunks of
   `metricsPerQuery` (500, the `GetMetricData` per-call hard maximum), one job
   per chunk. The chunk size is an explicit argument so tests can exercise the
@@ -187,10 +245,52 @@ Discovery then finds which *instances* of those profiles exist per region.
   `nil_as_zero` defaults to the metric's `rate` flag (rate/sum counts → 0, gauges
   → gap) and is overridable per metric. The cache otherwise persists until the
   instance leaves discovery and `pruneObserved` drops it.
-- `pruneObserved` drops both cached series and per-(region, period) schedule entries
+- `pruneObserved` drops both cached series and per-(account, region, period) schedule entries
   absent from the current plan (a resource or metric went away), so removed resources
   stop being re-emitted and a group that later reappears is queried on its first cycle
   back rather than waiting for a stale schedule entry to expire.
+
+## Tag Enrichment (`tags.go`, `tagjoin.go`, `tagresolve.go`)
+
+Opt-in (`tags` config, empty by default). When set, the collector attaches selected
+AWS resource tags as **non-identity** chart labels, so `i-0abc123` also carries
+`owner`/`project`/`name`/… without changing series identity. It slots into the cycle
+between discovery and query planning:
+
+```text
+refreshDiscovery → refreshTags → buildQueryPlan → … → observe
+```
+
+- **Client + cache.** A Resource Groups Tagging API (RGTA) client is built per
+  `{account, region}` (the same generic `clientCache[T]` as the CloudWatch client).
+  `refreshTags` runs on the discovery TTL and is best-effort: a per-`{account, region}`
+  failure keeps that scope's **last-known** tags (a first-run failure yields none) and
+  never fails the cycle. With no tags configured, no RGTA client is ever built.
+- **Resolution (`tagresolve.go`).** `resolveTagPlan` turns the allowlist into a
+  per-profile `awsKey → label` plan, once. It is **non-fatal**: an entry whose label is
+  empty/invalid, collides with a reserved (`account_id`/`region`) or dimension label, or
+  duplicates another tag is **skipped with a warning** — never a config error, never an
+  emitted duplicate key (which would panic `metrix`). `rename` resolves collisions; the
+  default label is the sanitized key (`Name` → `name`).
+- **ARN↔dimension join (`tagjoin.go`).** RGTA returns ARN + tags; the cache is keyed by
+  the profile's ARN-projectable `joinKey`. A per-profile mapper (a default
+  last-resource-segment extractor plus overrides for ALB/NLB/target-group/ECS/OpenSearch/
+  Step-Functions) derives the `joinKey` from the ARN, and the instance side projects its
+  dimension values onto the same key. **Safe failure mode:** a wrong ARN assumption is a
+  cache *miss* (no tags), never *wrong* tags, because the instance side uses real
+  dimension values. Parent-resource profiles (S3, DynamoDB-operation, ALB-target) key on
+  the parent dimension so children inherit its tags. Unregistered profiles
+  (auto_scaling, bedrock, and the ambiguous cloudfront/api_gateway/msk/elasticache) carry
+  no tags.
+- **Emission split.** Identity `labels` (`{account_id, region, <dims>}`) and `tagLabels`
+  travel separately through `plannedQuery`/`querySample`/`observedSeries`. `writeSample`
+  emits `labels + tagLabels` in a fresh slice; `observedKey` (the retention/scheduling
+  identity) uses **identity labels only**, so a tag change never churns scheduling, and
+  retention re-emit carries the last-known `tagLabels`. `chartengine` `auto_intersection`
+  then promotes the tag labels as non-identity chart labels — no template change.
+- **INV.2.** Tags only ADD labels; they never gate series existence. A custom profile
+  that names a tag in `instances.by_labels` (or uses `["*"]`) is out of scope — that is
+  the operator's own chart-identity choice.
 
 ## Dynamic Charts
 
@@ -242,10 +342,10 @@ Load and resolution (`catalog.go`):
   requires).
 - **Profile selection is config-driven** (`selectProfiles`), not discovery-driven.
   `profiles.mode: auto` (default) selects every default-enabled profile in the
-  catalog; `combined` adds the default-disabled deep-grain profiles; `exact` selects
+  catalog; `combined` adds the default-disabled opt-in profiles; `exact` selects
   only the profiles named by basename in `profiles.mode_exact.entries` (e.g. `ec2`,
   `alb_target`). Unlike `auto`, an `exact` entry selects a profile regardless of its
-  default-disabled flag, so a deep-grain profile can be picked by name. The selected
+  default-disabled flag, so an opt-in profile can be picked by name. The selected
   set is the *candidate* set — the namespaces of those profiles are what discovery
   `ListMetrics` runs against; a selected profile with no live instances simply
   produces no charts. `auto` is zero-config but lists every supported service each
@@ -269,15 +369,25 @@ Profile validation invariants (`profile.go`) — these are load-bearing:
 
 ## Auth And Account Identity
 
-`pkg/cloudauth` (`AWSAuthConfig`). Modes: `default` (SDK credential chain — env,
-shared config, EC2 instance profile, EKS IRSA), `access_key` (static keys), and
-`assume_role` (one role, optional external id). The collector builds an
-`aws.Config` per region through it.
+`internal/awsauth` (`awsauth.Config`), collector-local. Modes: `default` (SDK
+credential chain — env, shared config, EC2 instance profile, EKS IRSA),
+`access_key` (static keys), and `assume_role` (one or more roles, each with an
+optional external id). `Config.Identities()` expands the config into the set of
+credential sources to monitor: one per assume-role, plus the base identity when
+`include_base_account` is set; `default`/`access_key` yield a single identity.
+The collector builds an `aws.Config` per (identity, region).
 
-The AWS account id is resolved **once** via `sts:GetCallerIdentity` (from the
-first region) and stamped on every series. Because the account id and STS
-endpoint are partition-scoped, **all regions in a job must share one AWS
-partition** (aws / aws-us-gov / aws-cn / aws-iso / aws-iso-b / aws-iso-e / aws-iso-f / aws-eusc) — validated in
+Each identity's AWS account id is resolved via `sts:GetCallerIdentity`
+(`identity.go`, `ensureAccounts`) and stamped on that identity's series, so one
+job can monitor several accounts. Resolution is **fail-soft**: an identity that
+cannot be assumed or whose STS call fails is skipped with a warning and the rest
+proceed; only when no account resolves does Check fail. Two identities that
+resolve to the **same** account id are de-duplicated (first kept) — with a shared
+region list they would otherwise collide on the `{account_id, region,
+dimensions}` series identity.
+
+Because the account id and STS endpoint are partition-scoped, **all regions in a
+job must share one AWS partition** (aws / aws-us-gov / aws-cn / aws-iso / aws-iso-b / aws-iso-e / aws-iso-f / aws-eusc) — validated in
 `config.go`. A mixed-partition job would mislabel metrics.
 
 ## Concurrency
@@ -285,8 +395,9 @@ partition** (aws / aws-us-gov / aws-cn / aws-iso / aws-iso-b / aws-iso-e / aws-i
 - `apiConcurrency` (5) bounds both the discovery fan-out and the GetMetricData
   chunk execution, via `conc/pool`. `metricsPerQuery` (500) is the GetMetricData
   batch size. Both are internal constants, not config.
-- `clientCache` builds at most one CloudWatch client per region, under a mutex,
-  caching only successes (a transient credential error is retried next call).
+- `clientCache` builds at most one CloudWatch client per (account, region), under
+  a mutex, caching only successes (a transient credential error is retried next
+  call).
 - The top-level `collect` stages run sequentially, and the per-cycle `store`
   write is single-threaded. Only discovery and query execution fan out.
 
@@ -301,7 +412,7 @@ The two CloudWatch APIs bill differently, and the design leans on that:
   result pages. Raise it only to cut API load on very large accounts.
 - **`GetMetricData` (query) is the cost driver** — it is always billed (~$0.01
   per 1,000 metrics requested) and scales with metric count × query frequency.
-- **Per-`(region, period)` scheduling is the governor** — a metric is queried
+- **Per-`(account, region, period)` scheduling is the governor** — a metric is queried
   once per its own period (a 300s metric every 300s, a daily metric every ~24h),
   not every collect cycle, so cost tracks profile periods rather than
   `update_every`. Between queries, values are re-emitted from cache at zero AWS
@@ -321,14 +432,18 @@ verify current per-region prices on the CloudWatch pricing page.)
   0 (`nil_as_zero`, the default for `rate`/sum counts) or gaps (the default for
   gauges); not-due / failed series re-emit their last value so long-period metrics
   stay visible.
-- **Schedule advances only on success**, per (region, period).
+- **Schedule advances only on success**, per (account, region, period).
 - **Fail-soft discovery** — carry forward on error; only a first-ever total
   failure is fatal.
 - **Single node** — AWS resources are chart instances via `by_labels`, not
   vnodes.
+- **Tags are additive** — the opt-in `tags` allowlist adds non-identity labels
+  only; it never gates series existence and never overwrites an identity label
+  (a colliding tag is skipped with a warning).
 - **Config minimalism** — only `regions`, `auth`, `profiles`, `discovery`
-  (`refresh_every`, `recently_active_only`), `query_offset`, and `timeout` (plus
-  the framework's `update_every` / `autodetection_retry`) are operator-facing.
+  (`refresh_every`, `recently_active_only`), `query_offset`, `timeout`, and the
+  opt-in `tags` allowlist (plus the framework's `update_every` /
+  `autodetection_retry`) are operator-facing.
   Concurrency, batch size, and the recently-active period bound are internal
   constants.
 
@@ -347,7 +462,7 @@ verify current per-region prices on the CloudWatch pricing page.)
 - **Change how samples become metrics** (labels, float hint, gauge): `observe.go`.
 - **Change chart generation** (rate divisor, namespace, template assembly):
   `chart.go`, plus the profile `template`.
-- **Change auth**: `pkg/cloudauth` (shared, multi-collector) — framework-gated.
+- **Change auth**: `internal/awsauth` (collector-local; extract to a shared package only when a second AWS consumer appears).
 - **Add or change a config option**: `config.go` + `config_schema.json` +
   `metadata.yaml` + stock `cloudwatch.conf` + regenerated `integrations/` docs
   (collector consistency). Prefer internal constants over new options unless the

@@ -144,4 +144,3 @@ Netdata decodes **101 trap definitions** from Audiocodes Ltd across **2 MIBs** i
 - `AcBoard::acBoardTemperatureAlarm`
 - `AcBoard::acBoardEvBoardStarted`
 - `AcBoard::acBoardEvResettingBoard`
-

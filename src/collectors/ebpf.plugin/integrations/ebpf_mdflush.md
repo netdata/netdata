@@ -143,5 +143,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | mdstat.mdstat_flush | disk | flushes |
-
-

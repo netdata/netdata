@@ -143,4 +143,3 @@ Netdata decodes **7 trap definitions** from Nokia Networks Formerly Nokia Siemen
 - `NETGUARD-STREAM-TRAPS-MIB::ssmHAActiveOutrankingPeer`
 - `NETGUARD-STREAM-TRAPS-MIB::ssmHAActiveUserRequest`
 - `NETGUARD-STREAM-TRAPS-MIB::ssmHAInactiveOutrankedByPeer`
-

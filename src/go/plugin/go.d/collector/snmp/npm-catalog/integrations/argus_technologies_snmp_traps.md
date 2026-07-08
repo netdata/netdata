@@ -145,4 +145,3 @@ Netdata decodes **18 trap definitions** from Argus Technologies across **3 MIBs*
 - `Argus-MIB::dcPwrSysRelayTrap`
 - `Argus-MIB::dcPwrSysComOKTrap`
 - `Argus-MIB::dcPwrSysComErrTrap`
-

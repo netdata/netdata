@@ -10125,13 +10125,13 @@ components:
             partial_data_trimming:
               description: |
                 Information related to trimming of the last few points of the `result`, that was required to remove (increasing) partial data.
-                Trimming is disabled when the `raw` option is given to the query.
-                This object is available only when the `debug` flag is set.
+                Final trimming is disabled when the `raw` option is given to the query, but this metadata is still available for raw responses.
+                This object is available when the `debug` or `raw` flag is set.
               type: object
               properties:
                 max_update_every:
                   description: |
-                    The maximum `update_every` for all metrics aggregated into the query.
+                    The live-tail trimming budget in seconds, computed as two times the maximum `update_every` for all metrics aggregated into the query.
                     Trimming is by default enabled at `view.before - max_update_every`, but only when `view.before >= now - max_update_every`.
                   type: integer
                 expected_after:
@@ -10143,6 +10143,7 @@ components:
                   description: |
                     The timestamp at which trimming has been applied.
                     If this timestamp is greater or equal to `view.before`, there is no trimming.
+                  type: integer
             points:
               description: |
                 The number of points in `result`. Available only when `raw` is given.

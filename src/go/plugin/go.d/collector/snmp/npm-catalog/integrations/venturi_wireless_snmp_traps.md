@@ -144,4 +144,3 @@ Netdata decodes **90 trap definitions** from Venturi Wireless across **2 MIBs** 
 - `FOURELLE-VENTURI2-MIB::venturi2cpuOverload`
 - `FOURELLE-VENTURI2-MIB::venturi2memoryOverload`
 - `FOURELLE-VENTURI2-MIB::venturi2diskOverload`
-

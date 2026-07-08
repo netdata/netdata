@@ -160,4 +160,3 @@ Netdata decodes **3007 trap definitions** from Asentria Corporation across **18 
 - `DATALINK-MIB::datalinkDataAlarmTrap`
 - `DATALINK-MIB::datalinkSensorAlarmTrap`
 - `DATALINK-MIB::datalinkNoDataAlarmTrap`
-

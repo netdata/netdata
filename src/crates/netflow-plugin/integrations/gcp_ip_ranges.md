@@ -307,6 +307,3 @@ Google states the lists are "published and updated frequently" but does
 not guarantee a fixed cadence. The `syncToken` and `creationTime` keys
 at the top of each file let you check when Google last regenerated it.
 Daily polling is a safe default; sub-hourly is unnecessary.
-
-
-

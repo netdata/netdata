@@ -11,6 +11,12 @@ Netdata offers two database modes to suit your needs for performance and data pe
 
 ## `dbengine`
 
+:::note
+
+By default, `dbengine` stores its metrics database files on disk. The exact location depends on your installation method, operating system, and whether you run Netdata in Docker or Kubernetes — see [Backing up a Netdata Agent](/docs/netdata-agent/backup-and-restore-an-agent.md) for the default path and other Netdata data locations.
+
+:::
+
 Netdata's `dbengine` mode efficiently stores data on disk using compression. The actual disk space used depends on how well the data compresses.
 This mode uses a tiered storage approach: data is saved in multiple tiers on disk. Each tier retains data at a different resolution (detail level). Higher tiers store a down-sampled (less detailed) version of the data found in lower tiers.
 
@@ -59,12 +65,12 @@ For details about how dbengine enforces retention size limits, see [Retention Si
 
 Child and Parent storage are independent:
 
-- **On the Child (local):** Controlled by the Child's `[db].mode`.
+- **On the Child (local):** Controlled by the Child's `[db].db`.
 - **On the Parent (received stream):** Controlled by the Parent's settings. Metrics streamed from Children can be persisted on the Parent and count against the Parent's per-tier retention limits.
 
 **Configuring dbengine mode and retention**:
 
-- Enable dbengine mode: The dbengine mode is already the default, so no configuration change is necessary. For reference, the dbengine mode can be configured by setting `[db].mode` to `dbengine` in `netdata.conf`.
+- Enable dbengine mode: The dbengine mode is already the default, so no configuration change is necessary. For reference, the dbengine mode can be configured by setting `[db].db` to `dbengine` in `netdata.conf`.
 - Adjust retention (optional): see [Change how long Netdata stores metrics](/src/database/CONFIGURATION.md#tiers).
 
 ## `ram`
@@ -77,5 +83,5 @@ The memory required per sample in these modes, is four bytes: `ram` mode uses `m
 
 **Configuring ram mode and retention**:
 
-- Enable ram mode: To use in-memory storage, set `[db].mode` to ram in your `netdata.conf` file. Remember, this mode won't retain historical data after restarts.
+- Enable ram mode: To use in-memory storage, set `[db].db` to ram in your `netdata.conf` file. Remember, this mode won't retain historical data after restarts.
 - Adjust retention (optional): While ram mode focuses on real-time data, you can optionally control the number of samples stored in memory. Set `[db].retention` in `netdata.conf` to the desired number in seconds. Note: If the value you choose isn't a multiple of 1024, Netdata will automatically round it up to the nearest multiple.

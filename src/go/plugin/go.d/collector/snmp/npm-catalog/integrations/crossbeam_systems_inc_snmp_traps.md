@@ -146,4 +146,3 @@ Netdata decodes **39 trap definitions** from Crossbeam Systems Inc across **4 MI
 - `CBS-HARDWARE-MIB::cbsHwPowerFeedFailed`
 - `CBS-HARDWARE-MIB::cbsHwPowerFeedRecovered`
 - `CBS-HARDWARE-MIB::cbsHwUpperFanTrayInserted`
-

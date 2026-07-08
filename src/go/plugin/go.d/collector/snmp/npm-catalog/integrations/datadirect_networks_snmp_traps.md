@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Datadirect Networks across **1 MIB** 
 ### Sample decoded traps
 
 - `DDN-WOS-MIB::wosTrapMessage`
-

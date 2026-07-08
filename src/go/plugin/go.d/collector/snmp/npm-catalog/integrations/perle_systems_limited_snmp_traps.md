@@ -144,4 +144,3 @@ Netdata decodes **267 trap definitions** from Perle Systems Limited across **2 M
 - `PERLE-IOLAN-SDS-MIB::sdsMIBIoLineInputDCDAlarm`
 - `PERLE-IOLAN-SDS-MIB::sdsMIBIoLineInputCTSAlarm`
 - `PERLE-IOLAN-SDS-MIB::sdsMIBIoAnalogInputAlarmSeverityLevel1`
-

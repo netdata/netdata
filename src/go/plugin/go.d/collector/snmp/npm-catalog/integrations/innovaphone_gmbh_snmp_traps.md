@@ -143,4 +143,3 @@ Netdata decodes **8 trap definitions** from Innovaphone GmbH across **1 MIB** in
 - `INNO-MIB::innoLinkDown`
 - `INNO-MIB::innoLinkUp`
 - `INNO-MIB::innoAuthenticationFailure`
-

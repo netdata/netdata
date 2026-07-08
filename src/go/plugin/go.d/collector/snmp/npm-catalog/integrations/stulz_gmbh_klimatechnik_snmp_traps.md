@@ -143,4 +143,3 @@ Netdata decodes **258 trap definitions** from Stulz GmbH Klimatechnik across **1
 - `Stulz-WIB8000-MIB::trpairflow3`
 - `Stulz-WIB8000-MIB::trphighpressure1`
 - `Stulz-WIB8000-MIB::trphighpressure2`
-

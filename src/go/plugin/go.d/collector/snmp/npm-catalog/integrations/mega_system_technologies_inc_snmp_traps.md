@@ -143,4 +143,3 @@ Netdata decodes **62 trap definitions** from Mega System Technologies Inc across
 - `PROBE-MIB::probeTemperatureNormal`
 - `PROBE-MIB::probeHumidityOver`
 - `PROBE-MIB::probeHumidityDown`
-

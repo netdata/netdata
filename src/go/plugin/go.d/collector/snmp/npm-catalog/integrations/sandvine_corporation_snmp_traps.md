@@ -143,4 +143,3 @@ Netdata decodes **23 trap definitions** from Sandvine Corporation across **1 MIB
 - `PACKETLOGIC-TRAP-MIB::pl2TrapSystemStatsAlert`
 - `PACKETLOGIC-TRAP-MIB::pl2TrapSystemStatsAlert64`
 - `PACKETLOGIC-TRAP-MIB::pl2TrapSystemStatsAlertClear`
-

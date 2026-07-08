@@ -143,4 +143,3 @@ Netdata decodes **49 trap definitions** from Streamcore across **1 MIB** into st
 - `STREAMCORE-MIB::scHDPartitionNearlyFull`
 - `STREAMCORE-MIB::scFreeMemoryTooLow`
 - `STREAMCORE-MIB::scHDFailure`
-

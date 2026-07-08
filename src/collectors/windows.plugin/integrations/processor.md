@@ -144,5 +144,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | cpu.cpu | interrupts, user, privileged, dpc | percentage |
-
-

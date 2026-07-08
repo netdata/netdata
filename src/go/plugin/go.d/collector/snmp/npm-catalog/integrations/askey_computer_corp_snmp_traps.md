@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Askey Computer Corp across **1 MIB** 
 ### Sample decoded traps
 
 - `ASKEY-ENTITY-ALARM-MIB::askeyEntityAlarmTrap`
-

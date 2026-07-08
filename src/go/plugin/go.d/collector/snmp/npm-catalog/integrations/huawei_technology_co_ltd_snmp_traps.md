@@ -627,4 +627,3 @@ Netdata decodes **13021 trap definitions** from Huawei Technology Co Ltd across 
 - `EXPERTV2-MIB::seekUserTrap`
 - `EXPERTV2-MIB::kickUserTrap`
 - `EXPERTV2-MIB::alarmMML`
-

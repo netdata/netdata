@@ -12,6 +12,8 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/pkg/safewriter"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/vnodectl"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
@@ -213,7 +215,7 @@ func TestCreateCollectorJob_UsesVnodeControllerLookup(t *testing.T) {
 			mgr := New(Config{PluginName: testPluginName, Vnodes: tc.vnodes})
 			mgr.modules = prepareMockRegistry()
 
-			job, err := mgr.createCollectorJob(tc.cfg)
+			job, err := mgr.createCollectorJob(context.Background(), tc.cfg)
 			if tc.wantErr != "" {
 				require.Error(t, err)
 				assert.Contains(t, err.Error(), tc.wantErr)
@@ -265,74 +267,66 @@ func TestDyncfgCmdTest_ValidatesVnodeThroughControllerLookup(t *testing.T) {
 	}
 }
 
-func TestApplyVnodeUpdate_UpdatesMatchingRunningJobs(t *testing.T) {
-	mgr := New(Config{PluginName: testPluginName})
+func TestRunningJobPullsVnodeUpdateFromStore(t *testing.T) {
+	reg := collectorapi.Registry{}
+	reg.Register("gated", collectorapi.Creator{
+		JobConfigSchema: collectorapi.MockConfigSchema,
+		Create: func() collectorapi.CollectorV1 {
+			return &collectorapi.MockCollectorV1{
+				ChartsFunc: func() *collectorapi.Charts {
+					return &collectorapi.Charts{&collectorapi.Chart{ID: "id", Title: "t", Units: "u", Dims: collectorapi.Dims{{ID: "d1"}}}}
+				},
+				CollectFunc: func(context.Context) map[string]int64 { return map[string]int64{"d1": 1} },
+			}
+		},
+	})
 
-	dbJob := &vnodeUpdateProbeJob{
-		fullName: "success_db",
-		module:   "success",
-		name:     "db",
-		vnode:    vnodes.VirtualNode{Name: "db"},
-	}
-	otherJob := &vnodeUpdateProbeJob{
-		fullName: "success_other",
-		module:   "success",
-		name:     "other",
-		vnode:    vnodes.VirtualNode{Name: "other"},
-	}
+	var out, jobOut simOutput
+	mgr := New(Config{PluginName: testPluginName, Out: &jobOut})
+	mgr.SetDyncfgResponder(dyncfg.NewResponder(netdataapi.New(safewriter.New(&out))))
+	mgr.modules = reg
+	mgr.vnodesCtl = vnodectl.New(vnodectl.Options{
+		Logger:       mgr.Logger,
+		API:          mgr.dyncfgResponder,
+		Plugin:       testPluginName,
+		AffectedJobs: mgr.affectedVnodeJobs,
+	})
 
-	mgr.runningJobs.lock()
-	mgr.runningJobs.add(dbJob.FullName(), dbJob)
-	mgr.runningJobs.add(otherJob.FullName(), otherJob)
-	mgr.runningJobs.unlock()
+	ctx, cancel := context.WithCancel(context.Background())
+	in := make(chan []*confgroup.Group)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer close(in)
+		mgr.Run(ctx, in)
+	}()
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), charWait)
+	defer waitCancel()
+	require.True(t, mgr.WaitStarted(waitCtx))
+	t.Cleanup(func() {
+		cancel()
+		select {
+		case <-done:
+		case <-time.After(charWait):
+			t.Errorf("manager did not stop after cancel")
+		}
+	})
+	h := &charHarness{mgr: mgr, out: &out, in: in}
 
-	next := &vnodes.VirtualNode{
-		Name:       "db",
-		Hostname:   "db-new",
-		GUID:       "11111111-1111-1111-1111-111111111111",
-		SourceType: confgroup.TypeDyncfg,
-		Source:     confgroup.TypeDyncfg,
-	}
+	const guid = "b0b0b0b0-0000-4000-8000-000000000055"
+	h.dyncfg("vn-add", []string{h.mgr.dyncfgVnodePrefixValue(), "add", "v-pull"},
+		mustJSON(t, map[string]any{"guid": guid, "hostname": "host-one"}))
+	require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN vn-add 202"), charWait, charTick)
 
-	mgr.applyVnodeUpdate("db", next)
+	cfg := prepareDyncfgCfg("gated", "mysql").Set("vnode", "v-pull")
+	h.dyncfg("1-add", []string{h.mgr.dyncfgModID("gated"), "add", "mysql"},
+		mustJSON(t, map[string]any{"vnode": "v-pull", "update_every": 1}))
+	h.dyncfg("2-enable", []string{h.mgr.dyncfgJobID(cfg), "enable"}, nil)
+	require.Eventually(t, func() bool { return strings.Contains(jobOut.String(), "host-one") }, charWait, charTick)
 
-	require.NotNil(t, dbJob.updated)
-	assert.Equal(t, "db-new", dbJob.updated.Hostname)
-	assert.Nil(t, otherJob.updated)
-}
-
-type vnodeUpdateProbeJob struct {
-	fullName string
-	module   string
-	name     string
-	vnode    vnodes.VirtualNode
-	updated  *vnodes.VirtualNode
-}
-
-func (j *vnodeUpdateProbeJob) FullName() string   { return j.fullName }
-func (j *vnodeUpdateProbeJob) ModuleName() string { return j.module }
-func (j *vnodeUpdateProbeJob) Name() string       { return j.name }
-func (j *vnodeUpdateProbeJob) Collector() any     { return nil }
-func (j *vnodeUpdateProbeJob) Start()             {}
-func (j *vnodeUpdateProbeJob) Stop()              {}
-func (j *vnodeUpdateProbeJob) Tick(int)           {}
-func (j *vnodeUpdateProbeJob) AutoDetection() error {
-	return nil
-}
-func (j *vnodeUpdateProbeJob) AutoDetectionEvery() int { return 0 }
-func (j *vnodeUpdateProbeJob) RetryAutoDetection() bool {
-	return false
-}
-func (j *vnodeUpdateProbeJob) Cleanup()                  {}
-func (j *vnodeUpdateProbeJob) IsRunning() bool           { return true }
-func (j *vnodeUpdateProbeJob) Panicked() bool            { return false }
-func (j *vnodeUpdateProbeJob) Vnode() vnodes.VirtualNode { return j.vnode }
-func (j *vnodeUpdateProbeJob) UpdateVnode(vnode *vnodes.VirtualNode) {
-	if vnode == nil {
-		j.updated = nil
-		return
-	}
-	copy := *vnode
-	j.updated = &copy
-	j.vnode = copy
+	h.dyncfg("vn-update", []string{h.mgr.dyncfgVnodePrefixValue() + ":v-pull", "update"},
+		mustJSON(t, map[string]any{"guid": guid, "hostname": "host-two"}))
+	require.Eventually(t, h.outputContains("FUNCTION_RESULT_BEGIN vn-update 202"), charWait, charTick)
+	require.Eventually(t, func() bool { return strings.Contains(jobOut.String(), "host-two") }, charWait, charTick,
+		"running job must refresh from the vnode store")
 }

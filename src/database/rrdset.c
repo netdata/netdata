@@ -125,7 +125,7 @@ void rrdset_is_obsolete___safe_from_collector_thread(RRDSET *st) {
         rrdset_flag_set(st, RRDSET_FLAG_OBSOLETE);
         rrdhost_flag_set(st->rrdhost, RRDHOST_FLAG_PENDING_OBSOLETE_CHARTS);
 
-        st->last_accessed_time_s = now_realtime_sec();
+        rrdset_touch_last_accessed_time_s(st);
 
         // The parent skips replication for obsolete charts, so the natural
         // "replication finished" decrement at stream-replication-sender.c will
@@ -159,7 +159,7 @@ void rrdset_isnot_obsolete___safe_from_collector_thread(RRDSET *st) {
 //                rrdhost_hostname(st->rrdhost), rrdset_id(st));
 
         rrdset_flag_clear(st, RRDSET_FLAG_OBSOLETE);
-        st->last_accessed_time_s = now_realtime_sec();
+        rrdset_touch_last_accessed_time_s(st);
 
         rrdset_metadata_updated(st);
 

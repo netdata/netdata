@@ -112,5 +112,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | cpu.scaling_cur_freq | frequency | MHz |
-
-

@@ -148,4 +148,3 @@ Netdata decodes **81 trap definitions** from Vertiv Formerly Emerson Computer Po
 - `LIEBERT-MICRO-UPS-MIB::lcUpsOnBatteryTrap`
 - `LIEBERT-MICRO-UPS-MIB::lcUpsLowBatteryWarningTrap`
 - `LIEBERT-UPS-MIB::lcUpsLowBatteryShutdownTrap`
-
