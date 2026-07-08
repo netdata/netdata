@@ -63,9 +63,9 @@ Stale status does not apply to standalone nodes — stale specifically means a c
 
 1. Stop the Netdata Agent on the node you want to remove.
 
-   **On Windows**, stop the Netdata service and uninstall the Agent so the node does not reconnect to Netdata Cloud:
+   **On Windows**, stop the Netdata service, then uninstall the Agent so the node does not reconnect to Netdata Cloud:
 
-   - **Stop the service**: Run `Stop-Service netdata` in an elevated PowerShell session, or stop the **Netdata** service from the Windows Services manager (`services.msc`).
+   - **Stop the service**: Follow [Service Control](/docs/netdata-agent/start-stop-restart.md) to stop the Netdata service on Windows.
    - **Uninstall the Agent**: Open **Windows Settings → Apps → Installed apps** (or search "Add or remove programs"), select **Netdata**, and choose **Uninstall**. Alternatively, run `msiexec /x netdata-x64.msi` from an elevated PowerShell session in the folder containing the installer.
 
    Uninstalling the Agent takes effect immediately and prevents the node from reconnecting. For full details on the Windows MSI installer, see [Switching Netdata Install Types and Release Channels on Windows](/docs/install/windows-release-channels.md).
