@@ -225,9 +225,12 @@ func parseFloat(s string) float64 {
 }
 
 func removeUnits(s string) string {
-	fields := strings.Fields(s)
-	if len(fields) == 0 {
+	s = strings.TrimSpace(s)
+	if s == "" {
 		return ""
 	}
-	return fields[0]
+	if i := strings.IndexAny(s, " \t\r\n"); i != -1 {
+		return s[:i]
+	}
+	return s
 }
