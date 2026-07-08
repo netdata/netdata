@@ -1645,11 +1645,15 @@ static int test_rrdset_rejects_invalid_update_every(void) {
         rc = 1;
     }
 
-    previous = rrdset_set_update_every_s(st, (time_t)((intmax_t)INT32_MAX + 1));
-    if(previous != original_update_every || st->update_every != original_update_every) {
-        fprintf(stderr, "%s: out-of-range update every changed chart from %ld to %d\n",
-                __FUNCTION__, (long)previous, st->update_every);
-        rc = 1;
+    if(sizeof(time_t) > sizeof(int32_t)) {
+        time_t too_large_update_every = (time_t)INT32_MAX;
+        too_large_update_every++;
+        previous = rrdset_set_update_every_s(st, too_large_update_every);
+        if(previous != original_update_every || st->update_every != original_update_every) {
+            fprintf(stderr, "%s: out-of-range update every changed chart from %ld to %d\n",
+                    __FUNCTION__, (long)previous, st->update_every);
+            rc = 1;
+        }
     }
 
     const time_t valid_update_every = 7;
