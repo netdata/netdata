@@ -485,7 +485,7 @@ Here are solutions for common alert notification issues:
 1. Verify your service key:
 
    ```bash
-   grep -E "PAGERDUTY_SERVICE_KEY" /etc/netdata/health_alarm_notify.conf
+   grep -E "DEFAULT_RECIPIENT_PD|SEND_PD" /etc/netdata/health_alarm_notify.conf
    ```
 
 2. Test the PagerDuty API directly:
@@ -498,9 +498,7 @@ Here are solutions for common alert notification issues:
 
 If notifications seem delayed:
 
-1. Check the `delay` parameter in your alarm configuration
-2. Verify your `health.d/*.conf` files for delay settings
-3. Check the `ALARM_NOTIFY_DELAY` setting in health_alarm_notify.conf
+1. Check the `delay` parameter in your alarm definitions in `health.d/*.conf`. Notification delays are controlled exclusively by this parameter — there is no global delay setting in `health_alarm_notify.conf`.
 
 ## Related Docs
 
