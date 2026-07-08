@@ -392,7 +392,14 @@ static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *res
             if(!result->data)
                 continue;
 
-            result->events = nd_poll_events_from_poll_revents(ndpl->fds[i].revents);
+            // Intersect revents with the current subscription mask to suppress
+            // stale POLLIN/POLLOUT that nd_poll_upd() removed after poll() returned.
+            // POLLERR, POLLHUP, POLLNVAL, POLLRDHUP are output-only: poll() sets them
+            // in revents regardless and nd_poll_events_to_poll_events() never puts them
+            // in pfd->events (WSAPoll rejects them there), so they must always pass through.
+            result->events = nd_poll_events_from_poll_revents(
+                ndpl->fds[i].revents &
+                (ndpl->fds[i].events | (short int)(POLLERR | POLLHUP | POLLNVAL | POLLRDHUP)));
             if(!result->events)
                 // nd_poll_upd() may have removed some flags since we got this
                 continue;
