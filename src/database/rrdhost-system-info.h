@@ -61,6 +61,7 @@ struct rrdhost_system_info;
 // allocation and free
 
 struct rrdhost_system_info *rrdhost_system_info_create(void);
+struct rrdhost_system_info *rrdhost_system_info_dup(struct rrdhost_system_info *system_info);
 void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
 
 // --------------------------------------------------------------------------------------------------------------------

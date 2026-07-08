@@ -491,7 +491,11 @@ static void rrdcontext_to_json_v2_rrdhost(BUFFER *wb, RRDHOST *host, struct rrdc
             buffer_json_member_add_string(wb, "v", rrdhost_program_version(host));
 
             host_labels2json(host, wb, "labels");
-            rrdhost_system_info_to_json_v2(wb, host->system_info);
+            spinlock_lock(&host->rrdhost_update_lock);
+            struct rrdhost_system_info *system_info = rrdhost_system_info_dup(host->system_info);
+            spinlock_unlock(&host->rrdhost_update_lock);
+            rrdhost_system_info_to_json_v2(wb, system_info);
+            rrdhost_system_info_free(system_info);
 
             // created      - the node is created but never connected to cloud
             // unreachable  - not currently connected

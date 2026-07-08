@@ -1159,12 +1159,18 @@ bind_fail:
 
 static bool store_host_systeminfo(RRDHOST *host)
 {
-    struct rrdhost_system_info *system_info = host->system_info;
+    spinlock_lock(&host->rrdhost_update_lock);
+    struct rrdhost_system_info *system_info = rrdhost_system_info_dup(host->system_info);
+    spinlock_unlock(&host->rrdhost_update_lock);
 
     if (unlikely(!system_info))
         return false;
 
-    return (RRDHOST_SYSTEM_INFO_KEY_COUNT != rrdhost_system_info_foreach(system_info, add_host_sysinfo_key_value, &host->host_id.uuid));
+    bool ret =
+        (RRDHOST_SYSTEM_INFO_KEY_COUNT != rrdhost_system_info_foreach(system_info, add_host_sysinfo_key_value, &host->host_id.uuid));
+    rrdhost_system_info_free(system_info);
+
+    return ret;
 }
 
 
