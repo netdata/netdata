@@ -6,7 +6,7 @@ static struct engine *engine = NULL;
 
 void analytics_exporting_connectors_ssl(BUFFER *b)
 {
-    if (netdata_ssl_exporting_ctx) {
+    if (netdata_ssl_exporting_ctx && engine) {
         for (struct instance *instance = engine->instance_root; instance; instance = instance->next) {
             struct simple_connector_data *connector_specific_data = instance->connector_specific_data;
             if (SSL_connection(&connector_specific_data->ssl)) {
@@ -111,6 +111,7 @@ static void exporting_clean_engine()
 
     freez((void *)engine->config.hostname);
     freez(engine);
+    engine = NULL;
 }
 
 /**

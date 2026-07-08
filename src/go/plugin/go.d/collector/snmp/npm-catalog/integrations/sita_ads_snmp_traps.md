@@ -147,4 +147,3 @@ Netdata decodes **12 trap definitions** from Sita Ads across **5 MIBs** into str
 - `TIGER::tigIdle`
 - `MATIP-MIB::matipUserStateChange`
 - `MATIP-MIB::matipSessionStateChange`
-

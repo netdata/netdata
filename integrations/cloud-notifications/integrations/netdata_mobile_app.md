@@ -34,5 +34,3 @@ In order to login to the Netdata Mobile App
 ### Netdata Configuration
 
 After linking your device, enable the toggle for **Mobile App Notifications** under the same settings panel.
-
-

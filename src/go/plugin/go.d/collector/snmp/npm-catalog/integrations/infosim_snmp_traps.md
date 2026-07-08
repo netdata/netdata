@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Infosim across **1 MIB** into structu
 ### Sample decoded traps
 
 - `INFOSIM-TRAPMIB::snAgentEvent`
-

@@ -145,4 +145,3 @@ Netdata decodes **21 trap definitions** from Cheyenne Software across **3 MIBs**
 - `ARCserve-Alarm-MIB::arcServetrapLow`
 - `ARCserve-Alarm-MIB::arcServetrap4`
 - `ARCserve-Alarm-MIB::arcServetrap5`
-

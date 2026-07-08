@@ -71,14 +71,17 @@ char *generate_update_node_info_message(size_t *len, struct update_node_info *in
 {
     nodeinstance::info::v1::UpdateNodeInfo msg;
 
-    msg.set_node_id(info->node_id);
-    msg.set_claim_id(info->claim_id);
+    if (info->node_id)
+        msg.set_node_id(info->node_id);
+    if (info->claim_id)
+        msg.set_claim_id(info->claim_id);
 
     if (generate_node_info(msg.mutable_data(), &info->data))
         return NULL;
 
     set_google_timestamp_from_timeval(info->updated_at, msg.mutable_updated_at());
-    msg.set_machine_guid(info->machine_guid);
+    if (info->machine_guid)
+        msg.set_machine_guid(info->machine_guid);
     msg.set_child(info->child);
 
     nodeinstance::info::v1::MachineLearningInfo *ml_info = msg.mutable_ml_info();
@@ -115,15 +118,19 @@ char *generate_update_node_collectors_message(size_t *len, struct update_node_co
 {
     nodeinstance::info::v1::UpdateNodeCollectors msg;
 
-    msg.set_node_id(upd_node_collectors->node_id);
-    msg.set_claim_id(upd_node_collectors->claim_id);
+    if (upd_node_collectors->node_id)
+        msg.set_node_id(upd_node_collectors->node_id);
+    if (upd_node_collectors->claim_id)
+        msg.set_claim_id(upd_node_collectors->claim_id);
 
     void *colls;
     dfe_start_read(upd_node_collectors->node_collectors, colls) {
         struct collector_info *c =(struct collector_info *)colls;
         nodeinstance::info::v1::CollectorInfo *col = msg.add_collectors();
-        col->set_plugin(c->plugin);
-        col->set_module(c->module);
+        if (c->plugin)
+            col->set_plugin(c->plugin);
+        if (c->module)
+            col->set_module(c->module);
     }
     dfe_done(colls);
 

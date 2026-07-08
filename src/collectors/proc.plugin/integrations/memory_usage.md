@@ -134,5 +134,3 @@ Metrics:
 | mem.high_low | high_used, low_used, high_free, low_free | MiB |
 | mem.cma | used, free | MiB |
 | mem.directmaps | 4k, 2m, 4m, 1g | MiB |
-
-

@@ -145,4 +145,3 @@ Netdata decodes **254 trap definitions** from Avocent Corporation across **3 MIB
 - `KVMS3-TRAP-MIB::fscKvmS3UserLogoutTrap`
 - `KVMS3-TRAP-MIB::fscKvmS3VideoSessionStartedTrap`
 - `KVMS3-TRAP-MIB::fscKvmS3VideoSessionStoppedTrap`
-

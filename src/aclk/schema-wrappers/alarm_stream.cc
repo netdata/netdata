@@ -176,6 +176,11 @@ struct send_alarm_snapshot *parse_send_alarm_snapshot(const char *data, size_t l
 
 void destroy_send_alarm_snapshot(struct send_alarm_snapshot *ptr)
 {
+    if (!ptr)
+        return;
+
+    freez(ptr->node_id);
+    freez(ptr->claim_id);
     freez(ptr->snapshot_uuid);
     freez(ptr);
 }
@@ -213,6 +218,7 @@ char *generate_alarm_snapshot_bin(size_t *len, alarm_snapshot_proto_ptr_t snapsh
     *len = PROTO_COMPAT_MSG_SIZE_PTR(alarm_snapshot);
     char *bin = (char*)mallocz(*len);
     if (!alarm_snapshot->SerializeToArray(bin, *len)) {
+        freez(bin);
         delete alarm_snapshot;
         return NULL;
     }

@@ -146,4 +146,3 @@ Netdata decodes **24 trap definitions** from Ups Manufacturing across **4 MIBs**
 - `SENSORTRAP-MIB::sensorAlarmTMin`
 - `SENSORTRAP-MIB::sensorAlarmTMinRemoved`
 - `SENSORTRAP-MIB::sensorIOAlarm`
-

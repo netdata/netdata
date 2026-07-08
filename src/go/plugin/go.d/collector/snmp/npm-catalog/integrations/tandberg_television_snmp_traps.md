@@ -144,4 +144,3 @@ Netdata decodes **9 trap definitions** from Tandberg Television across **2 MIBs*
 - `ETV-AlarmTrap-MIB::alarmIndeterminate`
 - `ETV-AlarmTrap-MIB::alarmWarning`
 - `ETV-AlarmTrap-MIB::alarmMinor`
-

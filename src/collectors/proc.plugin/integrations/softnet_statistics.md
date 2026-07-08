@@ -134,5 +134,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | cpu.softnet_stat | processed, dropped, squeezed, received_rps, flow_limit_count | events/s |
-
-

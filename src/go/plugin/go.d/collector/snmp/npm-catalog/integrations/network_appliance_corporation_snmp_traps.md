@@ -154,4 +154,3 @@ Netdata decodes **1065 trap definitions** from Network Appliance Corporation acr
 - `NETAPP-MIB::dhmNoticePFAEvent`
 - `NETAPP-MIB::emergencyTrap`
 - `NETAPP-MIB::alertTrap`
-

@@ -4,6 +4,7 @@
 #include "libnetdata/libnetdata.h"
 
 static ND_UUID cached_machine_id = { 0 };
+static bool cached_machine_id_available = false;
 static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
 
 #if defined(OS_LINUX)
@@ -171,26 +172,29 @@ static ND_UUID get_machine_id(void) {
 #endif // OS_WINDOWS
 
 ND_UUID os_machine_id(void) {
-    // Fast path - return cached value if available
-    if(!UUIDiszero(cached_machine_id))
+    if(__atomic_load_n(&cached_machine_id_available, __ATOMIC_ACQUIRE))
         return cached_machine_id;
 
     spinlock_lock(&spinlock);
 
-    // Check again under lock in case another thread set it
-    if(UUIDiszero(cached_machine_id)) {
-        cached_machine_id = get_machine_id();
+    ND_UUID machine_id = cached_machine_id;
+    if(UUIDiszero(machine_id)) {
+        machine_id = get_machine_id();
+        cached_machine_id = machine_id;
 
         // Log the result if debugging is enabled
-        if(UUIDeq(cached_machine_id, NO_MACHINE_ID))
+        if(UUIDeq(machine_id, NO_MACHINE_ID))
             nd_log(NDLS_DAEMON, NDLP_WARNING, "OS_MACHINE_ID: Could not detect a reliable machine ID");
         else {
             char buf[UUID_STR_LEN];
-            uuid_unparse_lower(cached_machine_id.uuid, buf);
+            uuid_unparse_lower(machine_id.uuid, buf);
             nd_log(NDLS_DAEMON, NDLP_NOTICE, "OS_MACHINE_ID: machine ID found '%s'", buf);
         }
+
+        if(!UUIDiszero(machine_id))
+            __atomic_store_n(&cached_machine_id_available, true, __ATOMIC_RELEASE);
     }
 
     spinlock_unlock(&spinlock);
-    return cached_machine_id;
+    return machine_id;
 }

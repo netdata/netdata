@@ -144,4 +144,3 @@ Netdata decodes **96 trap definitions** from Mylex Corporation across **2 MIBs**
 - `MYLEXRAID-MIB::fCArrayAssistant3`
 - `MYLEXRAID-MIB::fCArrayAssistant4`
 - `MYLEXRAID-MIB::fCArrayAssistant5`
-

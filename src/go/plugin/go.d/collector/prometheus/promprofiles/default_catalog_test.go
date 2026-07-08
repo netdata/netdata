@@ -3,108 +3,28 @@
 package promprofiles
 
 import (
-	"errors"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-func TestDefaultCatalog_CachesSuccessfulLoads(t *testing.T) {
-	calls := 0
-	restore := stubDefaultCatalog(t, func() bool { return true }, func() (Catalog, error) {
-		calls++
-		return testCatalog("haproxy"), nil
-	})
-	defer restore()
+// Catalog caching (load-once, retry-after-failure, disabled-under-test) is now
+// provided and tested by pkg/profilecatalog (Cached); it is not re-tested here.
 
-	first, err := DefaultCatalog()
+// TestDefaultCatalog_AllStockTemplatesValidate hydrates and validates every stock
+// profile's template. Templates are parsed lazily at runtime (only when a job
+// selects a profile), so this test is what keeps a broken stock template from
+// slipping through CI — it would otherwise surface only when a job happens to
+// select that profile.
+func TestDefaultCatalog_AllStockTemplatesValidate(t *testing.T) {
+	catalog, err := LoadFromDefaultDirs()
 	require.NoError(t, err)
 
-	second, err := DefaultCatalog()
-	require.NoError(t, err)
+	profiles := catalog.OrderedProfiles()
+	require.NotEmpty(t, profiles, "expected at least one stock profile")
 
-	assert.Equal(t, 1, calls)
-	assert.Equal(t, []string{"haproxy"}, profileNames(first.OrderedProfiles()))
-	assert.Equal(t, []string{"haproxy"}, profileNames(second.OrderedProfiles()))
-}
-
-func TestDefaultCatalog_RetriesAfterFailure(t *testing.T) {
-	calls := 0
-	restore := stubDefaultCatalog(t, func() bool { return true }, func() (Catalog, error) {
-		calls++
-		if calls == 1 {
-			return Catalog{}, errors.New("boom")
-		}
-		return testCatalog("nginx"), nil
-	})
-	defer restore()
-
-	_, err := DefaultCatalog()
-	require.Error(t, err)
-
-	catalog, err := DefaultCatalog()
-	require.NoError(t, err)
-
-	assert.Equal(t, 2, calls)
-	assert.Equal(t, []string{"nginx"}, profileNames(catalog.OrderedProfiles()))
-}
-
-func TestDefaultCatalog_DoesNotCacheWhenDisabled(t *testing.T) {
-	calls := 0
-	restore := stubDefaultCatalog(t, func() bool { return false }, func() (Catalog, error) {
-		calls++
-		return testCatalog("haproxy"), nil
-	})
-	defer restore()
-
-	_, err := DefaultCatalog()
-	require.NoError(t, err)
-	_, err = DefaultCatalog()
-	require.NoError(t, err)
-
-	assert.Equal(t, 2, calls)
-}
-
-// stubDefaultCatalog swaps the package-level loader and cache-enabled gate for the
-// duration of a test, restoring them (and the cached state) afterwards.
-func stubDefaultCatalog(t *testing.T, cacheEnabled func() bool, loader func() (Catalog, error)) func() {
-	t.Helper()
-
-	defaultCatalogMu.Lock()
-	prevCatalog := defaultCatalog
-	prevLoaded := defaultCatalogLoaded
-	prevLoader := defaultCatalogLoader
-	prevEnabled := defaultCatalogCacheEnabled
-
-	defaultCatalog = Catalog{}
-	defaultCatalogLoaded = false
-	defaultCatalogLoader = loader
-	defaultCatalogCacheEnabled = cacheEnabled
-	defaultCatalogMu.Unlock()
-
-	return func() {
-		defaultCatalogMu.Lock()
-		defaultCatalog = prevCatalog
-		defaultCatalogLoaded = prevLoaded
-		defaultCatalogLoader = prevLoader
-		defaultCatalogCacheEnabled = prevEnabled
-		defaultCatalogMu.Unlock()
-	}
-}
-
-func testCatalog(name string) Catalog {
-	key := normalizeKey(name)
-	return Catalog{
-		byName:      map[string]Profile{key: {Name: name}},
-		orderedKeys: []string{key},
-	}
-}
-
-func profileNames(profiles []Profile) []string {
-	names := make([]string, 0, len(profiles))
 	for _, p := range profiles {
-		names = append(names, p.Name)
+		_, err := p.Template()
+		require.NoErrorf(t, err, "stock profile %q template must be valid", p.Name)
 	}
-	return names
 }

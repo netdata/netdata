@@ -113,9 +113,9 @@ Labels:
 
 | Label      | Description     |
 |:-----------|:----------------|
-| device | TBD |
-| mount_point | TBD |
-| device_type | TBD |
+| device | Kernel-assigned name of the block device (for example sda, nvme0n1, or fd0). This is a device name, not a mount-point path. |
+| mount_point | Directory where the device's filesystem is mounted (for example /, /run, /dev, or /dev/shm). Shows [none] for devices that are not mounted. |
+| device_type | How Netdata classifies the device: physical (a real disk), partition (a slice of a physical disk), virtual (a logical or software-backed device such as LVM or device-mapper), or unknown. |
 
 Metrics:
 
@@ -138,5 +138,3 @@ Metrics:
 | disk.avgsz | reads, writes | KiB/operation |
 | disk_ext.avgsz | discards | KiB/operation |
 | disk.svctm | svctm | milliseconds/operation |
-
-

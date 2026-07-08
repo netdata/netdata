@@ -149,4 +149,3 @@ Netdata decodes **224 trap definitions** from Opencode Systems Ltd across **7 MI
 - `OPCD-USSDB-MIB-V2::ocussdbrowser-Crash`
 - `OPCD-USSDB-MIB-V2::ocussdbrowser-Crash-Canceled`
 - `OPCD-USSDB-MIB-V2::ocussdbrowser-Smsc-Conn`
-

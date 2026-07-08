@@ -150,4 +150,3 @@ Netdata decodes **95 trap definitions** from Endace Technology across **8 MIBs**
 - `ENDACE-SYSTEM-MIB::procNormal`
 - `ENDACE-SYSTEM-MIB::cpuUtilHigh`
 - `ENDACE-SYSTEM-MIB::cpuUtilNormal`
-

@@ -145,4 +145,3 @@ Netdata decodes **50 trap definitions** from Tylink across **3 MIBs** into struc
 - `TY1250I-MIB::ty1250LineInServiceTrap`
 - `TY1250I-MIB::ty1250ConnectedTrap`
 - `TY1250I-MIB::ty1250ConnectFailureTrap`
-

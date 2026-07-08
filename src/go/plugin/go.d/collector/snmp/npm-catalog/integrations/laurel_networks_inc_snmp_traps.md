@@ -143,4 +143,3 @@ Netdata decodes **783 trap definitions** from Laurel Networks Inc across **1 MIB
 - `ECI-TRAPS::eciOverTemperature`
 - `ECI-TRAPS::eciOverTemperatureCleared`
 - `ECI-TRAPS::eciPhyCardRemoved`
-

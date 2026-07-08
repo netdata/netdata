@@ -42,5 +42,3 @@ endmeta-->
       - Notifications: The notification types you want to receive
     - **Integration configuration**
       - API Key: The key provided on Opsgenie for the channel you want to receive your notifications
-
-

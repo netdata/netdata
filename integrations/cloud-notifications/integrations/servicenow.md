@@ -46,5 +46,3 @@ endmeta-->
       - Instance URL: The base URL of your ServiceNow instance (for example, `https://my-instance.service-now.com/`).
       - Username: The username of the ServiceNow integration user you created.
       - Password: The password of the ServiceNow integration user you created.
-
-

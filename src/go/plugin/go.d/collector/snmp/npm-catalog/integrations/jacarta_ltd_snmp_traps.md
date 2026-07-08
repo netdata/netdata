@@ -143,4 +143,3 @@ Netdata decodes **22 trap definitions** from Jacarta Ltd across **1 MIB** into s
 - `InterSeptor-MIB::inSeptAlarm1Inactive`
 - `InterSeptor-MIB::inSeptAlarm1Active`
 - `InterSeptor-MIB::inSeptAlarm2Inactive`
-

@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -161,7 +161,7 @@ func TestEnsureProfiles_CombinedBuildsValidChartTemplate(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, c.ensureProfiles())
-	assert.Len(t, c.profiles, len(cat.AllProfiles())) // combined = every profile, incl. deep-grain
+	assert.Len(t, c.profiles, len(cat.AllProfiles())) // combined = every profile, including disabled opt-in profiles
 
 	require.NotEmpty(t, c.chartTemplateYAML)
 	collecttest.AssertChartTemplateSchema(t, c.chartTemplateYAML)

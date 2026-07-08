@@ -143,4 +143,3 @@ Netdata decodes **7 trap definitions** from Synso Inc across **1 MIB** into stru
 - `SYNSO-UPSMIB::syupsTrapOverVoltage`
 - `SYNSO-UPSMIB::syupsTrapUnderVoltage`
 - `SYNSO-UPSMIB::syupsOffFrequency`
-

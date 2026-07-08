@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Optical Transmission Labs Inc across 
 ### Sample decoded traps
 
 - `ONS15501-MIB::ons15501GenericNotificationTrap`
-

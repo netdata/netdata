@@ -531,9 +531,17 @@ done:
 
 void sql_check_removed_alerts_state(RRDHOST *host)
 {
-    uint32_t max_unique_id = 0;
     sqlite3_stmt *res = NULL;
     nd_uuid_t transition_id;
+
+    struct removed_alert_candidate {
+        uint32_t unique_id;
+        uint32_t alarm_id;
+        uint32_t alarm_event_id;
+        nd_uuid_t transition_id;
+    } *candidates = NULL;
+    size_t candidates_used = 0;
+    size_t candidates_size = 0;
 
     if (!PREPARE_STATEMENT(db_meta, SQL_SELECT_LAST_STATUSES, &res))
         return;
@@ -559,10 +567,29 @@ void sql_check_removed_alerts_state(RRDHOST *host)
         uuid_copy(transition_id, *transition_uuid);
 
         if (unlikely(status != RRDCALC_STATUS_REMOVED)) {
-           if (unlikely(!max_unique_id))
-               max_unique_id = sql_get_max_unique_id(host);
+            if (unlikely(candidates_used == candidates_size)) {
+                if (unlikely(candidates_size > SIZE_MAX / 2)) {
+                    error_report("HEALTH [%s]: Too many removed alert candidates. Stopping removed alert check.",
+                                 rrdhost_hostname(host));
+                    break;
+                }
 
-           sql_inject_removed_status(host, alarm_id, alarm_event_id, unique_id, ++max_unique_id, &transition_id);
+                size_t new_size = candidates_size ? candidates_size * 2 : 16;
+                if (unlikely(new_size > SIZE_MAX / sizeof(*candidates))) {
+                    error_report("HEALTH [%s]: Too many removed alert candidates. Stopping removed alert check.",
+                                 rrdhost_hostname(host));
+                    break;
+                }
+
+                candidates = reallocz(candidates, new_size * sizeof(*candidates));
+                candidates_size = new_size;
+            }
+
+            candidates[candidates_used].unique_id = unique_id;
+            candidates[candidates_used].alarm_id = alarm_id;
+            candidates[candidates_used].alarm_event_id = alarm_event_id;
+            uuid_copy(candidates[candidates_used].transition_id, transition_id);
+            candidates_used++;
         }
         if (!service_running(SERVICE_HEALTH))
             break;
@@ -570,6 +597,21 @@ void sql_check_removed_alerts_state(RRDHOST *host)
 done:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
+
+    if (candidates_used) {
+        uint32_t max_unique_id = sql_get_max_unique_id(host);
+        for (size_t i = 0; i < candidates_used; i++) {
+            sql_inject_removed_status(
+                host,
+                candidates[i].alarm_id,
+                candidates[i].alarm_event_id,
+                candidates[i].unique_id,
+                ++max_unique_id,
+                &candidates[i].transition_id);
+        }
+    }
+
+    freez(candidates);
 }
 
 #define SQL_DELETE_MISSING_CHART_ALERT                                                                                 \
@@ -1080,7 +1122,7 @@ void sql_health_alarm_log2json(RRDHOST *host, BUFFER *wb, time_t after, const ch
      buffer_json_initialize(wb, "\"", "\"", 0, false, BUFFER_JSON_OPTIONS_DEFAULT);
      buffer_json_member_add_array(wb, NULL);
 
-     while (sqlite3_step(stmt_query) == SQLITE_ROW) {
+     while (sqlite3_step_monitored(stmt_query) == SQLITE_ROW) {
          char old_value_string[100 + 1];
          char new_value_string[100 + 1];
 
@@ -1540,7 +1582,7 @@ run_query:;
     size_t invalid_transition_ids = 0;
 
     param = 0;
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         if (unlikely(!sqlite3_column_uuid_copy(res, 0, host_id))) {
             invalid_host_ids++;
             continue;
@@ -1684,7 +1726,7 @@ int sql_get_alert_configuration(
 
     added = 0;
     int param;
-    while (sqlite3_step(res) == SQLITE_ROW) {
+    while (sqlite3_step_monitored(res) == SQLITE_ROW) {
         param = 0;
         if (unlikely(!sqlite3_column_uuid_copy(res, param++, config_hash_id))) {
             invalid_config_hash_ids++;

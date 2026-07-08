@@ -47,5 +47,3 @@ endmeta-->
       - Notifications: The notification types you want to receive
     - **Integration configuration**
       - Microsoft Teams Incoming Webhook URL: The Incoming Webhook URL that you copied earlier.
-
-

@@ -143,4 +143,3 @@ Netdata decodes **179 trap definitions** from Hypercom Inc across **1 MIB** into
 - `HYPERCOM-MIB::hypTrap09`
 - `HYPERCOM-MIB::hypTrap10`
 - `HYPERCOM-MIB::hypTrap20`
-

@@ -98,5 +98,3 @@ Metrics:
 | sctp.packets | received, sent | packets/s |
 | sctp.packet_errors | invalid, checksum | packets/s |
 | sctp.fragmentation | reassembled, fragmented | packets/s |
-
-

@@ -184,4 +184,3 @@ Netdata decodes **409 trap definitions** from Rad Data Communications Ltd across
 - `RAD-EthIf-MIB::erpPortStateChange`
 - `RAD-EthIf-MIB::oamEfmRemoteLoopback`
 - `RAD-EthIf-MIB::oamEfmRemoteLoopbackOff`
-

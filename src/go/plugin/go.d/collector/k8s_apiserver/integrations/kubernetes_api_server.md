@@ -410,6 +410,3 @@ Authentication failed. Verify:
 TLS verification failed. Options:
 1. Provide the correct CA certificate path in `tls_ca`
 2. Set `tls_skip_verify: yes` (not recommended for production)
-
-
-

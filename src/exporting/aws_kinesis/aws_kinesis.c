@@ -137,18 +137,23 @@ void aws_kinesis_connector_worker(void *instance_p)
             char partition_key[KINESIS_PARTITION_KEY_MAX + 1];
             snprintf(partition_key, KINESIS_PARTITION_KEY_MAX, "netdata_%llu", partition_key_seq++);
             size_t partition_key_len = strnlen(partition_key, KINESIS_PARTITION_KEY_MAX);
+            size_t max_record_len = KINESIS_RECORD_MAX - partition_key_len;
 
             const char *first_char = buffer_tostring(buffer) + sent;
 
             size_t record_len = 0;
 
             // split buffer into chunks of maximum allowed size
-            if (buffer_len - sent < KINESIS_RECORD_MAX - partition_key_len) {
+            if (buffer_len - sent < max_record_len) {
                 record_len = buffer_len - sent;
             } else {
-                record_len = KINESIS_RECORD_MAX - partition_key_len;
+                record_len = max_record_len;
                 while (record_len && *(first_char + record_len - 1) != '\n')
                     record_len--;
+
+                // Oversized single records cannot stay newline-bounded; split at the payload limit.
+                if (unlikely(!record_len))
+                    record_len = max_record_len;
             }
             char error_message[ERROR_LINE_MAX + 1] = "";
 

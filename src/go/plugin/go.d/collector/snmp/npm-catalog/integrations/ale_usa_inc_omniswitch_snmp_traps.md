@@ -150,4 +150,3 @@ Netdata decodes **161 trap definitions** from Ale USA Inc Omniswitch across **8 
 - `XYLAN-SOFT-PVC-MIB::atmxSoftPvcCallFailuresTrap`
 - `XYLAN-OAM-MIB::xylanOamTrapVCAIS`
 - `XYLAN-OAM-MIB::xylanOamTrapVCRDI`
-

@@ -142,5 +142,3 @@ Metrics:
 |:------|:----------|:----|
 | cups.destination_job_num | pending, held, processing | jobs |
 | cups.destination_job_size | pending, held, processing | KB |
-
-

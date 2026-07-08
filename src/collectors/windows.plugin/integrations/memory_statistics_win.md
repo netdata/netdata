@@ -135,5 +135,3 @@ Metrics:
 | mem.system_drivers | resident, total | bytes |
 | mem.page_faults_breakdown | cache, demand_zero, transition, write_copies | faults/s |
 | mem.transition_repurposed | repurposed | pages/s |
-
-

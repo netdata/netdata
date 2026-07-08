@@ -143,4 +143,3 @@ Netdata decodes **19 trap definitions** from Elitecore Technologies Ltd across *
 - `CYBEROAM-MIB::highSigDiskUsage`
 - `CYBEROAM-MIB::highReportDiskUsage`
 - `CYBEROAM-MIB::highPhyMemUsage`
-

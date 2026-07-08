@@ -143,4 +143,3 @@ Netdata decodes **41 trap definitions** from Symantec Corporation across **1 MIB
 - `PCA-Alert-MIB::pcaHostAbnormalEnd`
 - `PCA-Alert-MIB::pcaHostConnFailDeviceError`
 - `PCA-Alert-MIB::pcaHostStopped`
-

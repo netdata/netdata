@@ -143,4 +143,3 @@ Netdata decodes **38 trap definitions** from Neoteris Inc across **1 MIB** into 
 - `PULSESECURE-PSG-MIB::iveMaxConcurrentUsersSignedIn`
 - `PULSESECURE-PSG-MIB::iveTooManyFailedLoginAttempts`
 - `PULSESECURE-PSG-MIB::externalAuthServerUnreachable`
-

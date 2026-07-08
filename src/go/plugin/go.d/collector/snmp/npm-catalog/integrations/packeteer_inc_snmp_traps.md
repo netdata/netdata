@@ -143,4 +143,3 @@ Netdata decodes **13 trap definitions** from Packeteer Inc across **1 MIB** into
 - `PACKETEER-MIB::psAlarmPowerSystemTwo`
 - `PACKETEER-MIB::psAlarmFanOne`
 - `PACKETEER-MIB::psAlarmFanTwo`
-

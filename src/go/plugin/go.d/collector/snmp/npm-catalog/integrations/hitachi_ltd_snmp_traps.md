@@ -147,4 +147,3 @@ Netdata decodes **144 trap definitions** from Hitachi Ltd across **5 MIBs** into
 - `Hitachi-DF-RAID-LAN-MIB::fanFailure`
 - `Hitachi-DF-RAID-LAN-MIB::powerSupplyFailure`
 - `Hitachi-DF-RAID-LAN-MIB::batteryFailure`
-

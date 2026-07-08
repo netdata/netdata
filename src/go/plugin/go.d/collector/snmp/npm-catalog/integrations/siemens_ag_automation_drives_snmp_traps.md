@@ -143,4 +143,3 @@ Netdata decodes **8 trap definitions** from Siemens AG Automation Drives across 
 - `SN-OSM-PRIV-MIB::snOsmStandbyActiveState`
 - `SN-OSM-PRIV-MIB::snOsmStandbyPassiveState`
 - `SN-OSM-PRIV-MIB::snOsmPowerLineDown`
-

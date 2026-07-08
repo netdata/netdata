@@ -143,4 +143,3 @@ Netdata decodes **8 trap definitions** from Timestep Corp across **1 MIB** into 
 - `TIMESTEP-IPSEC-MIB::ipsecTrapInvalidCookie`
 - `TIMESTEP-IPSEC-MIB::ipsecTrapIpsecNegFailure`
 - `TIMESTEP-IPSEC-MIB::ipsecTrapIpsecAuthFailure`
-

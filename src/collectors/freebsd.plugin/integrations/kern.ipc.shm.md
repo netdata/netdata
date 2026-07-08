@@ -122,5 +122,3 @@ Metrics:
 |:------|:----------|:----|
 | system.ipc_shared_mem_segs | segments | segments |
 | system.ipc_shared_mem_size | allocated | KiB |
-
-

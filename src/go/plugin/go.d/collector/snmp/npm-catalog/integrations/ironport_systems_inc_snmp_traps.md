@@ -144,4 +144,3 @@ Netdata decodes **13 trap definitions** from Ironport Systems Inc across **2 MIB
 - `ASYNCOS-MAIL-MIB::highTemperature`
 - `ASYNCOS-MAIL-MIB::fanFailure`
 - `ASYNCOS-MAIL-MIB::keyExpiration`
-

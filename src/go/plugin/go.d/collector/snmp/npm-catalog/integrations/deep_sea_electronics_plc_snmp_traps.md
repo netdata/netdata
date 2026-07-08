@@ -144,4 +144,3 @@ Netdata decodes **422 trap definitions** from Deep Sea Electronics PLC across **
 - `DSE-8610-MIB::namedAlarmHighCoolantTemp`
 - `DSE-8610-MIB::namedAlarmLowCoolantTemp`
 - `DSE-8610-MIB::namedAlarmUnderSpeed`
-

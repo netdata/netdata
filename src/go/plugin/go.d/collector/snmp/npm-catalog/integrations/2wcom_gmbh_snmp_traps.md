@@ -143,4 +143,3 @@ Netdata decodes **19 trap definitions** from 2Wcom GmbH across **1 MIB** into st
 - `FLEXDSR04::tunerBerEvent`
 - `FLEXDSR04::tunerTsSyncEvent`
 - `FLEXDSR04::asiTsSyncEvent`
-

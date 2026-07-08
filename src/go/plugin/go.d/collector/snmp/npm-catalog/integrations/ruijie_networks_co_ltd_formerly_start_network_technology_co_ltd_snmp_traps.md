@@ -221,4 +221,3 @@ Netdata decodes **440 trap definitions** from Ruijie Networks Co Ltd Formerly St
 - `RAISECOM-V1-TRAP::stormViolationAlarm`
 - `RAISECOM-V1-TRAP::macNotification`
 - `RAISECOM-V1-TRAP::powerStateChange`
-

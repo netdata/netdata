@@ -114,7 +114,7 @@ RRDSET *rrdset_find_byname(RRDHOST *host, const char *name) {
         if(!rrdset_is_discoverable(st))
             return NULL;
 
-        st->last_accessed_time_s = now_realtime_sec();
+        rrdset_touch_last_accessed_time_s(st);
     }
 
     return(st);

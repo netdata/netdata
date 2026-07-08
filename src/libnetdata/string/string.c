@@ -25,6 +25,8 @@ struct netdata_string {
     const char str[];   // the string itself, is appended to this structure
 };
 
+#define STRING_MAX_LENGTH (MIN((size_t)UINT32_MAX, (size_t)LONG_MAX - sizeof(STRING)) - 1)
+
 static struct string_partition {
     RW_SPINLOCK spinlock;       // the R/W spinlock to protect the Judy array
 
@@ -81,17 +83,34 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
     if (releases) *releases = 0;
 
     for(size_t i = 0; i < STRING_PARTITIONS ;i++) {
-        if (inserts)        *inserts        += string_base[i].inserts;
-        if (deletes)        *deletes        += string_base[i].deletes;
-        if (entries)        *entries        += (size_t) string_base[i].entries;
-        if (memory)         *memory         += (size_t) string_base[i].memory;
-        if (memory_index)   *memory_index   += (string_base[i].memory_index > 0) ? string_base[i].memory_index : 0;
+        rw_spinlock_read_lock(&string_base[i].spinlock);
+
+        size_t partition_inserts = string_base[i].inserts;
+        size_t partition_deletes = string_base[i].deletes;
+        long int partition_entries = string_base[i].entries;
+        long int partition_memory = string_base[i].memory;
+        long int partition_memory_index = string_base[i].memory_index;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        if (searches)       *searches       += string_base[i].atomic.searches;
-        if (references)     *references     += (size_t) string_base[i].atomic.active_references;
-        if (duplications)   *duplications   += string_base[i].atomic.duplications;
-        if (releases)       *releases       += string_base[i].atomic.releases;
+        size_t partition_searches = __atomic_load_n(&string_base[i].atomic.searches, __ATOMIC_RELAXED);
+        long int partition_references = __atomic_load_n(&string_base[i].atomic.active_references, __ATOMIC_RELAXED);
+        size_t partition_duplications = __atomic_load_n(&string_base[i].atomic.duplications, __ATOMIC_RELAXED);
+        size_t partition_releases = __atomic_load_n(&string_base[i].atomic.releases, __ATOMIC_RELAXED);
+#endif
+
+        rw_spinlock_read_unlock(&string_base[i].spinlock);
+
+        if (inserts)        *inserts        += partition_inserts;
+        if (deletes)        *deletes        += partition_deletes;
+        if (entries)        *entries        += (size_t) partition_entries;
+        if (memory)         *memory         += (size_t) partition_memory;
+        if (memory_index)   *memory_index   += (partition_memory_index > 0) ? (size_t) partition_memory_index : 0;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        if (searches)       *searches       += partition_searches;
+        if (references)     *references     += (size_t) partition_references;
+        if (duplications)   *duplications   += partition_duplications;
+        if (releases)       *releases       += partition_releases;
 #endif
     }
 }
@@ -306,6 +325,9 @@ STRING *string_strdupz(const char *str) {
 
     if(unlikely(!length)) return NULL;
 
+    if(unlikely(length > STRING_MAX_LENGTH))
+        fatal("STRING: cannot index string length %zu, maximum is %zu", length, STRING_MAX_LENGTH);
+
     length++;
     uint8_t partition = string_partition_str(str);
     STRING *string = string_index_search(str, length, partition);
@@ -332,6 +354,9 @@ STRING *string_strdupz(const char *str) {
 ALWAYS_INLINE
 STRING *string_strndupz(const char *str, size_t len) {
     if(unlikely(!str || !*str || !len)) return NULL;
+
+    if(unlikely(len > STRING_MAX_LENGTH))
+        fatal("STRING: cannot index string length %zu, maximum is %zu", len, STRING_MAX_LENGTH);
 
     uint8_t partition = string_partition_str(str);
 
@@ -429,9 +454,6 @@ bool string_equals_string_nocase(const STRING *a, const STRING *b) {
 static STRING *string_2way_merge_X = NULL;
 
 STRING *string_2way_merge(STRING *a, STRING *b) {
-    if(unlikely(!string_2way_merge_X))
-        string_2way_merge_X = string_strdupz("[x]");
-
     if(unlikely(a == b)) return string_dup(a);
     if(unlikely(a == string_2way_merge_X)) return string_dup(a);
     if(unlikely(b == string_2way_merge_X)) return string_dup(b);
@@ -453,18 +475,19 @@ STRING *string_2way_merge(STRING *a, STRING *b) {
         *dst1++ = *s1;
 
     *dst1 = '\0';
+    const char *prefix_end1 = s1, *prefix_end2 = s2;
 
     if(*s1 != '\0' || *s2 != '\0') {
         *dst1++ = '[';
         *dst1++ = 'x';
         *dst1++ = ']';
 
-        s1 = &(string2str(a))[alen - 1];
-        s2 = &(string2str(b))[blen - 1];
+        s1 = string2str(a) + alen;
+        s2 = string2str(b) + blen;
         char *dst2 = &buf2[length];
         *dst2 = '\0';
-        for (; *s1 && *s2 && *s1 == *s2; s1--, s2--)
-            *(--dst2) = *s1;
+        for (; s1 > prefix_end1 && s2 > prefix_end2 && s1[-1] == s2[-1]; s1--, s2--)
+            *(--dst2) = s1[-1];
 
         strcpy(dst1, dst2);
     }
@@ -969,4 +992,6 @@ void string_init(void) {
         string_base[i].JudyLPointers = NULL;
 #endif
     }
+
+    string_2way_merge_X = string_strdupz("[x]");
 }

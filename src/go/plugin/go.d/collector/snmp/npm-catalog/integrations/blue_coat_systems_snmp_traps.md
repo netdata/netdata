@@ -143,4 +143,3 @@ Netdata decodes **24 trap definitions** from Blue Coat Systems across **1 MIB** 
 - `BLUECOAT-CAS-MIB::casVirusDetected`
 - `BLUECOAT-CAS-MIB::casFileServed`
 - `BLUECOAT-CAS-MIB::casFileBlocked`
-

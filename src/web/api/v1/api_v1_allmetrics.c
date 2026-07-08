@@ -35,8 +35,8 @@ static inline size_t shell_name_copy(char *d, const char *s, size_t usable) {
     for(n = 0; *s && n < usable ; d++, s++, n++) {
         register char c = *s;
 
-        if(unlikely(!isalnum(c))) *d = '_';
-        else *d = (char)toupper(c);
+        if(unlikely(!isalnum((uint8_t)c))) *d = '_';
+        else *d = (char)toupper((uint8_t)c);
     }
     *d = '\0';
 
@@ -93,10 +93,17 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
 
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
-        if(!rc->rrdset) continue;
+        RRDSET *alert_st = rc->rrdset;
+        if(!alert_st) continue;
+
+        rw_spinlock_read_lock(&alert_st->alerts.spinlock);
+        if(unlikely(rc->rrdset != alert_st)) {
+            rw_spinlock_read_unlock(&alert_st->alerts.spinlock);
+            continue;
+        }
 
         char chart[SHELL_ELEMENT_MAX + 1];
-        shell_name_copy(chart, rc->rrdset->name?rrdset_name(rc->rrdset):rrdset_id(rc->rrdset), SHELL_ELEMENT_MAX);
+        shell_name_copy(chart, alert_st->name?rrdset_name(alert_st):rrdset_id(alert_st), SHELL_ELEMENT_MAX);
 
         char alarm[SHELL_ELEMENT_MAX + 1];
         shell_name_copy(alarm, rrdcalc_name(rc), SHELL_ELEMENT_MAX);
@@ -111,6 +118,7 @@ void rrd_stats_api_v1_charts_allmetrics_shell(RRDHOST *host, const char *filter_
         }
 
         buffer_sprintf(wb, "NETDATA_ALARM_%s_%s_STATUS=\"%s\"\n", chart, alarm, rrdcalc_status2string(rc->status));
+        rw_spinlock_read_unlock(&alert_st->alerts.spinlock);
     }
     foreach_rrdcalc_in_rrdhost_done(rc);
 

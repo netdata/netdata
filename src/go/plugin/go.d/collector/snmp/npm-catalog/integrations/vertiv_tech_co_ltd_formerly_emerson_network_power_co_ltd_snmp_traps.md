@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Vertiv Tech Co Ltd Formerly Emerson N
 ### Sample decoded traps
 
 - `DCS-MIB::systemAlarmTrapDefine`
-

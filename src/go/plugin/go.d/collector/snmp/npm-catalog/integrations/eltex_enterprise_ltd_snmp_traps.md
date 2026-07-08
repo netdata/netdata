@@ -171,4 +171,3 @@ Netdata decodes **505 trap definitions** from Eltex Enterprise Ltd across **29 M
 - `ELTEX-LTP8X::ltp8xLoadAverageAlarmTrap`
 - `ELTEX-LTP8X::ltp8xRAMAlarmTrap`
 - `ELTEX-LTP8X::ltp8xLoginAlarmTrap`
-

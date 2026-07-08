@@ -143,4 +143,3 @@ Netdata decodes **19 trap definitions** from Cyberguard Corporationdavid Rhein a
 - `MEDIAHAWK-MIB::mhvsVPResourcesVPChangedStatus`
 - `MEDIAHAWK-MIB::mhvsVPResourcesDiskChangedStatus`
 - `MEDIAHAWK-MIB::mhvsVPResourcesDiskAttChangedStatus`
-

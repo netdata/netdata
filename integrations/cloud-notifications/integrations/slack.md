@@ -49,5 +49,3 @@ For more details please check [Incoming webhooks for Slack](https://slack.com/he
       - Notifications: The notification types you want to receive
     - **Integration configuration**
       - Webhook URL: URL provided on Slack for the channel you want to receive your notifications
-
-

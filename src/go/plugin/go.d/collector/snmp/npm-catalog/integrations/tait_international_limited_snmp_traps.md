@@ -143,4 +143,3 @@ Netdata decodes **48 trap definitions** from Tait International Limited across *
 - `TAIT-TN9300-MIB::tn9300SiteOkEvent`
 - `TAIT-TN9300-MIB::tn9300ChannelMinorAlarmEvent`
 - `TAIT-TN9300-MIB::tn9300ChannelMajorAlarmEvent`
-

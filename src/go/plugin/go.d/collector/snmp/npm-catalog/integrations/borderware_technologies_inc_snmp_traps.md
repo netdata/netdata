@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Borderware Technologies Inc across **
 ### Sample decoded traps
 
 - `BORDERWARE-FW-MIB::alAlarm`
-

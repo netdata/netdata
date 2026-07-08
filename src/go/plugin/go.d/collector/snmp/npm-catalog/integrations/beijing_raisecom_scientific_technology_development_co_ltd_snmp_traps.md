@@ -206,4 +206,3 @@ Netdata decodes **826 trap definitions** from Beijing Raisecom Scientific Techno
 - `RAISECOM-SYSTEM-MIB::raisecomMemoryTrap`
 - `RAISECOM-SYSTEM-MIB::raisecomMemoryTrapRecover`
 - `RAISECOM-SYSTEM-MIB::temperatureAbnormalTrap`
-

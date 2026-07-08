@@ -143,4 +143,3 @@ Netdata decodes **20 trap definitions** from Atmel Hellas S A N across **1 MIB**
 - `ATMEL-MIB::trapAssociation`
 - `ATMEL-MIB::trapDisassociation`
 - `ATMEL-MIB::trapAssociationExpire`
-

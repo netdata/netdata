@@ -700,10 +700,10 @@ static ARAL_PAGE *aral_create_page___no_lock_needed(ARAL *ar, size_t size TRACE_
 
     if(ar->config.mmap.enabled) {
         page = callocz(1, sizeof(ARAL_PAGE));
-        ar->aral_lock.file_number++;
+        size_t file_number = __atomic_add_fetch(&ar->aral_lock.file_number, 1, __ATOMIC_RELAXED);
 
         char filename[FILENAME_MAX + 1];
-        snprintfz(filename, FILENAME_MAX, "%s/array_alloc.mmap/%s.%zu", *ar->config.mmap.cache_dir, ar->config.mmap.filename, ar->aral_lock.file_number);
+        snprintfz(filename, FILENAME_MAX, "%s/array_alloc.mmap/%s.%zu", *ar->config.mmap.cache_dir, ar->config.mmap.filename, file_number);
         page->filename = strdupz(filename);
         page->mapped = true;
 
@@ -802,7 +802,7 @@ static void aral_del_page___no_lock_needed(ARAL *ar, ARAL_PAGE *page TRACE_ALLOC
         nd_munmap(page->data, page->size);
 
         if (unlikely(unlink(page->filename) == -1))
-            netdata_log_error("Cannot delete file '%s'", page->filename);
+            netdata_log_error("ARAL: '%s' cannot delete file '%s'", ar->config.name, page->filename);
 
         freez((void *)page->filename);
         freez(page);
@@ -1060,19 +1060,25 @@ static inline void aral_add_free_slot___no_lock_required(ARAL *ar, ARAL_PAGE *pa
     // use the slot id of the item to be freed to determine the partition number
     size_t start = (((uint8_t *)ptr - page->data) / ar->config.element_size) % ARAL_PAGE_INCOMING_PARTITIONS;
 
-    while (true) {
-        for (size_t partition = start; partition < ARAL_PAGE_INCOMING_PARTITIONS; partition++) {
-            if (aral_page_incoming_trylock(ar, page, partition)) {
-                fr->next = page->incoming[partition].list;
-                page->incoming[partition].list = fr;
-                __atomic_fetch_or(&page->incoming_partition_bitmap, 1U << partition, __ATOMIC_RELEASE);
-                aral_page_incoming_unlock(ar, page, partition);
-                return;
-            }
+    size_t partition = start;
+    bool locked = false;
+    for(size_t offset = 0; offset < ARAL_PAGE_INCOMING_PARTITIONS; offset++) {
+        partition = (start + offset) % ARAL_PAGE_INCOMING_PARTITIONS;
+        if(aral_page_incoming_trylock(ar, page, partition)) {
+            locked = true;
+            break;
         }
-
-        start = 0;
     }
+
+    if(!locked) {
+        partition = start;
+        aral_page_incoming_lock(ar, page, partition);
+    }
+
+    fr->next = page->incoming[partition].list;
+    page->incoming[partition].list = fr;
+    __atomic_fetch_or(&page->incoming_partition_bitmap, 1U << partition, __ATOMIC_RELEASE);
+    aral_page_incoming_unlock(ar, page, partition);
 }
 
 ALWAYS_INLINE void *aral_callocz_internal(ARAL *ar, bool marked TRACE_ALLOCATIONS_FUNCTION_DEFINITION_PARAMS) {

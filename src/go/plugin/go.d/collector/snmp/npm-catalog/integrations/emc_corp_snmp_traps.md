@@ -148,4 +148,3 @@ Netdata decodes **33 trap definitions** from Emc Corp across **6 MIBs** into str
 - `EMC-MIB::emcRatiosOutofRangeTrap`
 - `EMC-MIB::discoveryTableChange`
 - `EMC-MIB::emcSymmetrixEventTrap`
-

@@ -144,4 +144,3 @@ Netdata decodes **246 trap definitions** from Ingrasys across **2 MIBs** into st
 - `USHA-MIB::ushaReturnFromLowBattery`
 - `USHA-MIB::ushaLowBattery`
 - `USHA-MIB::ushaUpsOk`
-

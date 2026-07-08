@@ -1304,6 +1304,15 @@ static double ks_2samp(
         DIFFS_NUMBERS highlight_diffs[], int high_size,
         uint32_t base_shifts) {
 
+    // high_idx is bounded by high_size; keep the scaled comparison representable.
+    if(unlikely(base_shifts >= sizeof(int64_t) * CHAR_BIT - 1))
+        return NAN;
+    int64_t high_multiplier = 1;
+    for(uint32_t shift = 0; shift < base_shifts; shift++)
+        high_multiplier *= 2;
+    if(unlikely((int64_t)high_size > INT64_MAX / high_multiplier))
+        return NAN;
+
     qsort(baseline_diffs, base_size, sizeof(DIFFS_NUMBERS), compare_diffs);
     qsort(highlight_diffs, high_size, sizeof(DIFFS_NUMBERS), compare_diffs);
 
@@ -1335,8 +1344,8 @@ static double ks_2samp(
     DIFFS_NUMBERS K = baseline_diffs[0];
     int base_idx = binary_search_bigger_than(baseline_diffs, 1, base_size, K);
     int high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
-    int delta = base_idx - (high_idx << base_shifts);
-    int min = delta, max = delta;
+    int64_t delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
+    int64_t min = delta, max = delta;
     int base_min_idx = base_idx;
     int base_max_idx = base_idx;
     int high_min_idx = high_idx;
@@ -1348,7 +1357,7 @@ static double ks_2samp(
         base_idx = binary_search_bigger_than(baseline_diffs, i + 1, base_size, K); // starting from i, since data1 is sorted
         high_idx = binary_search_bigger_than(highlight_diffs, 0, high_size, K);
 
-        delta = base_idx - (high_idx << base_shifts);
+        delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
         if(delta < min) {
             min = delta;
             base_min_idx = base_idx;
@@ -1367,7 +1376,7 @@ static double ks_2samp(
         base_idx = binary_search_bigger_than(baseline_diffs, 0, base_size, K);
         high_idx = binary_search_bigger_than(highlight_diffs, i + 1, high_size, K); // starting from i, since data2 is sorted
 
-        delta = base_idx - (high_idx << base_shifts);
+        delta = (int64_t)base_idx - (int64_t)high_idx * high_multiplier;
         if(delta < min) {
             min = delta;
             base_min_idx = base_idx;
@@ -2686,7 +2695,15 @@ static int mc_unittest4(void) {
     DIFFS_NUMBERS high[3] = { 365, -123, 0 };
 
     double prob = ks_2samp(base, bs, high, hs, 2);
-    return double_expect(prob, "0.777778", "12x3");
+    int errors = double_expect(prob, "0.777778", "12x3");
+
+    DIFFS_NUMBERS invalid_base[1] = { 1 };
+    DIFFS_NUMBERS invalid_high[1] = { 1 };
+    prob = ks_2samp(invalid_base, 1, invalid_high, 1, (uint32_t)(sizeof(int64_t) * CHAR_BIT));
+    int ret = isnan(prob) ? 0 : 1;
+
+    fprintf(stderr, "%s invalid shift, expected NAN, got %f\n", ret ? "FAILED" : "OK", prob);
+    return errors + ret;
 }
 
 int mc_unittest(void) {

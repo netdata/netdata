@@ -143,4 +143,3 @@ Netdata decodes **170 trap definitions** from Televes S A across **1 MIB** into 
 - `TREDESS-FS-MIB::amplifierSumTrap`
 - `TREDESS-FS-MIB::exceededOutputPowerTrap`
 - `TREDESS-FS-MIB::decreasedOutputPowerTrap`
-

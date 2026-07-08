@@ -157,5 +157,3 @@ Metrics:
 | netframework.clrlocksandthreads_current_physical_threads | physical | threads |
 | netframework.clrlocksandthreads_recognized_threads | threads | threads/s |
 | netframework.clrlocksandthreads_contentions | contentions | contentions/s |
-
-

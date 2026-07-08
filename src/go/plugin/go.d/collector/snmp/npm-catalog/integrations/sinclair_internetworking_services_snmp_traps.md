@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Sinclair Internetworking Services ac
 
 - `OPMANTEK-MIB::omkEvent`
 - `OPMANTEK-MIB::nmisEvent`
-

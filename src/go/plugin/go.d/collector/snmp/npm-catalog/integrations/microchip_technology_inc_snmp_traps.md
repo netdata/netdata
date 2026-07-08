@@ -144,4 +144,3 @@ Netdata decodes **5 trap definitions** from Microchip Technology Inc across **2 
 - `CONTROLBOX-TH332-MIB::temperatureTrap`
 - `CONTROLBOX-TH332-MIB::humidityTrap`
 - `CONTROLBOX-TH332-MIB::dewpointTrap`
-

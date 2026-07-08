@@ -145,4 +145,3 @@ Netdata decodes **287 trap definitions** from Parameter LLC across **3 MIBs** in
 - `RLE-FALCON-MIB::falconAccessGranted`
 - `RLE-FALCON-MIB::falconAccessDenied`
 - `RLE-FALCON-EM-MIB::falconAlarmEntryAdded`
-

@@ -143,4 +143,3 @@ Netdata decodes **15 trap definitions** from Inktomi Corporation across **1 MIB*
 - `INKTOMI-TS-MIB::logSpaceCrisis`
 - `INKTOMI-TS-MIB::cacheError`
 - `INKTOMI-TS-MIB::cacheWarning`
-

@@ -98,5 +98,3 @@ Metrics:
 | ib.errors | Pkts_malformated, Pkts_rcvd_discarded, Pkts_sent_discarded, Tick_Wait_to_send, Pkts_missed_resource, Buffer_overrun, Link_Downed, Link_recovered, Link_integrity_err, Link_minor_errors, Pkts_rcvd_with_EBP, Pkts_rcvd_discarded_by_switch, Pkts_sent_discarded_by_switch | errors/s |
 | ib.hwerrors | Duplicated_packets, Pkt_Seq_Num_gap, Ack_timer_expired, Drop_missing_buffer, Drop_out_of_sequence, NAK_sequence_rcvd, CQE_err_Req, CQE_err_Resp, CQE_Flushed_err_Req, CQE_Flushed_err_Resp, Remote_access_err_Req, Remote_access_err_Resp, Remote_invalid_req, Local_length_err_Resp, RNR_NAK_Packets, CNP_Pkts_ignored, RoCE_ICRC_Errors | errors/s |
 | ib.hwpackets | RoCEv2_Congestion_sent, RoCEv2_Congestion_rcvd, IB_Congestion_handled, ATOMIC_req_rcvd, Connection_req_rcvd, Read_req_rcvd, Write_req_rcvd, RoCE_retrans_adaptive, RoCE_retrans_timeout, RoCE_slow_restart, RoCE_slow_restart_congestion, RoCE_slow_restart_count | packets/s |
-
-

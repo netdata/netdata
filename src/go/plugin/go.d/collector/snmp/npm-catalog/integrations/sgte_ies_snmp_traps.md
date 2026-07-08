@@ -143,4 +143,3 @@ Netdata decodes **31 trap definitions** from Sgte Ies across **1 MIB** into stru
 - `SGTE-MIB::aLiaisonJbus`
 - `SGTE-MIB::aTestEnCours`
 - `SGTE-MIB::aUBMin`
-

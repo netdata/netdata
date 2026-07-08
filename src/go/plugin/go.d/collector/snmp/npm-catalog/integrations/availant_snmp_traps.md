@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Availant across **1 MIB** into struct
 ### Sample decoded traps
 
 - `AVAM-SNMPv1::avEventNotify`
-

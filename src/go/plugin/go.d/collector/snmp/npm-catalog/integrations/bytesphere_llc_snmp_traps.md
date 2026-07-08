@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Bytesphere LLC across **1 MIB** into 
 ### Sample decoded traps
 
 - `BYTESPHERE-EVENTLOG-MIB::eventGenerated`
-

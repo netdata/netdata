@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Emc Data General Division across **1 
 ### Sample decoded traps
 
 - `DGCNAS-MIB::dgTrapNasEventLogNotification`
-

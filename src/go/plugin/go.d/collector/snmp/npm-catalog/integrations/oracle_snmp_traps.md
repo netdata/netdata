@@ -146,4 +146,3 @@ Netdata decodes **7 trap definitions** from Oracle across **4 MIBs** into struct
 - `ORAINTERCHANGE-MIB::oraCmanagerStateChange`
 - `ORACLE-AGENT-MIB::oraAgentEventOcc`
 - `ORACLE-ENTERPRISE-MANAGER-4-MIB::oraEM4Alert`
-

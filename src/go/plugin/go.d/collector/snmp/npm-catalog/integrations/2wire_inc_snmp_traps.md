@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from 2Wire Inc across **1 MIB** into stru
 
 - `RBBPROVISIONING-MIB::rbbSubNotify`
 - `RBBPROVISIONING-MIB::rbbPowerUpNotify`
-

@@ -144,4 +144,3 @@ Netdata decodes **5 trap definitions** from Saf Tehnika across **2 MIBs** into s
 - `SAF-ALARM-MIB::safAlarmActiveState`
 - `SAF-ALARM-MIB::safAlarmActiveTState`
 - `SAF-ALARM-MIB::safAlarmClearState`
-

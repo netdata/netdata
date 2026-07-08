@@ -144,4 +144,3 @@ Netdata decodes **6 trap definitions** from Qnap Systems Inc across **2 MIBs** i
 - `NAS-MIB::eventError`
 - `QTS-MIB::eventInform`
 - `QTS-MIB::eventWarning`
-

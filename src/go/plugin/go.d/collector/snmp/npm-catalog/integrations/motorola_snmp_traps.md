@@ -148,4 +148,3 @@ Netdata decodes **34 trap definitions** from Motorola across **6 MIBs** into str
 - `WHISP-APS-MIB::whispRegFailure`
 - `WHISP-APS-MIB::whispDefKeyUsed`
 - `WHISP-APS-MIB::whispGPSInSync`
-

@@ -27,6 +27,7 @@ static void parse_command_reply(BUFFER *buf)
     unsigned response_string_size = buffer_strlen(buf);
     FILE *stream = NULL;
     char *pos;
+    char *status_end;
     int syntax_error = 0;
 
     for (pos = response_string ;
@@ -40,7 +41,19 @@ static void parse_command_reply(BUFFER *buf)
 
         switch (*pos) {
         case CMD_PREFIX_EXIT_CODE:
-            exit_status = atoi(++pos);
+            pos++;
+            status_end = pos;
+            while (status_end < response_string + response_string_size && isdigit((uint8_t)*status_end))
+                status_end++;
+
+            if (status_end == pos || status_end >= response_string + response_string_size || *status_end != '\0') {
+                syntax_error = 1;
+                fprintf(stderr, "Syntax error, failed to parse command response.\n");
+            }
+            else {
+                exit_status = atoi(pos);
+                pos = status_end;
+            }
             break;
         case CMD_PREFIX_INFO:
             stream = stdout;

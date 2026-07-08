@@ -7,8 +7,9 @@
 
 void stream_compressor_init_zstd(struct compressor_state *state) {
     if(!state->initialized) {
-        state->initialized = true;
         state->stream = ZSTD_createCStream();
+        if(!state->stream)
+            return;
 
         if(state->level < 1)
             state->level = 1;
@@ -17,11 +18,16 @@ void stream_compressor_init_zstd(struct compressor_state *state) {
             state->level = ZSTD_maxCLevel();
 
         size_t ret = ZSTD_initCStream(state->stream, state->level);
-        if(ZSTD_isError(ret))
+        if(ZSTD_isError(ret)) {
             netdata_log_error("STREAM_COMPRESS: ZSTD_initCStream() returned error: %s", ZSTD_getErrorName(ret));
+            ZSTD_freeCStream(state->stream);
+            state->stream = NULL;
+            return;
+        }
 
         // ZSTD_CCtx_setParameter(state->stream, ZSTD_c_compressionLevel, 1);
         // ZSTD_CCtx_setParameter(state->stream, ZSTD_c_strategy, ZSTD_fast);
+        state->initialized = true;
     }
 }
 
@@ -94,14 +100,20 @@ size_t stream_compress_zstd(struct compressor_state *state, const char *data, si
 
 void stream_decompressor_init_zstd(struct decompressor_state *state) {
     if(!state->initialized) {
-        state->initialized = true;
         state->stream = ZSTD_createDStream();
+        if(!state->stream)
+            return;
 
         size_t ret = ZSTD_initDStream(state->stream);
-        if(ZSTD_isError(ret))
+        if(ZSTD_isError(ret)) {
             netdata_log_error("STREAM_DECOMPRESS: ZSTD_initDStream() returned error: %s", ZSTD_getErrorName(ret));
+            ZSTD_freeDStream(state->stream);
+            state->stream = NULL;
+            return;
+        }
 
         simple_ring_buffer_make_room(&state->output, MAX(COMPRESSION_MAX_CHUNK, ZSTD_DStreamOutSize()));
+        state->initialized = true;
     }
 }
 

@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Mimosa Networks Inc across **1 MIB**
 - `MIMOSA-NETWORKS-BASE-MIB::mimosaTempWarning`
 - `MIMOSA-NETWORKS-BASE-MIB::mimosaTempNormal`
 - `MIMOSA-NETWORKS-BASE-MIB::mimosaEthernetSpeedChange`
-

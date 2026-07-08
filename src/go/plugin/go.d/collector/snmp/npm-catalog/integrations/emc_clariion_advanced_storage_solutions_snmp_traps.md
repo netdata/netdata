@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from Emc Clariion Advanced Storage Soluti
 - `CLARIION-MIB::eventMonitorTrapWarn`
 - `CLARIION-MIB::eventMonitorTrapError`
 - `CLARIION-MIB::eventMonitorTrapFault`
-

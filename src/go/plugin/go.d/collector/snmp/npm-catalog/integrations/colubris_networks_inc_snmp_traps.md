@@ -157,4 +157,3 @@ Netdata decodes **56 trap definitions** from Colubris Networks Inc across **15 M
 - `COLUBRIS-PUBLIC-ACCESS-MIB::publicAccessUsersSessionStartTrap`
 - `COLUBRIS-PUBLIC-ACCESS-MIB::publicAccessUsersSessionStopTrap`
 - `COLUBRIS-PUBLIC-ACCESS-MIB::publicAccessUsersSessionFailTrap`
-

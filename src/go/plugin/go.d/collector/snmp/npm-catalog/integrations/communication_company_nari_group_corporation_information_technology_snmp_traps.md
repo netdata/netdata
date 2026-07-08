@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Communication Company Nari Group Cor
 - `StationSW-MIB::ucMacChangeTrap`
 - `StationSW-MIB::userTrap`
 - `StationSW-MIB::userOperTrap`
-

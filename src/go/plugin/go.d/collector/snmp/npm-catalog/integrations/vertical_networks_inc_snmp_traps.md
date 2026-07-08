@@ -149,4 +149,3 @@ Netdata decodes **63 trap definitions** from Vertical Networks Inc across **7 MI
 - `VERTICALT1-E1-MIB::vdsx1TrunkYellowClear`
 - `VERTICALT1-E1-MIB::vdsx1TrunkYellow`
 - `VERTICALT1-E1-MIB::vdsx1TrunkBlueClear`
-

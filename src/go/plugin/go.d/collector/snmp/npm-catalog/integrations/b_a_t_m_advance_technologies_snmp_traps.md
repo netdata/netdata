@@ -180,4 +180,3 @@ Netdata decodes **130 trap definitions** from B A T M Advance Technologies acros
 - `PRVT-SWITCH-MIB::fanStatusChange`
 - `PRVT-SWITCH-MIB::portSecurityViolation`
 - `PRVT-SWITCH-MIB::portRedundantLinkChange`
-

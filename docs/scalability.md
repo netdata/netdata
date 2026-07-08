@@ -270,7 +270,7 @@ This isn't just optimization. It's a fundamentally different architecture that r
 <details>
 <summary><strong>How many nodes can a single Netdata Parent handle?</strong></summary><br/>
 
-We recommend running Parents with up to 500 Agents (1.5M metrics/s). We have customers running larger Parents, but resources increase and performance decreases non-linearly.
+We recommend running Parents with up to 500 Agents — see [Parent Sizing Guidelines](#parent-sizing-guidelines) above for the metrics/s and resource breakdown by scale. We have customers running larger Parents, but resources increase and performance decreases non-linearly.
 
 </details>
 
@@ -355,7 +355,7 @@ There is some extra network latency involved, but this is usually small (a few m
 
 - **[Deploy your first Agent](/docs/deployment-guides/standalone-deployment.md)** - Start monitoring in 60 seconds
 - **[Configure Parents](/docs/deployment-guides/deployment-with-centralization-points.md)** - Scale to hundreds of nodes
-- **[Design for Enterprise](/docs/netdata-enterprise-evaluation-corrected.md)** - Architect for thousands
+- **[Design for Enterprise](/docs/netdata-enterprise-evaluation.md)** - Architect for thousands
 - **[Try Netdata Cloud](/docs/netdata-cloud/README.md)** - Unified visibility across everything
 
 *Based on real production deployments, independent research (University of Amsterdam, ICSOC 2023), and comparative testing (2025). All metrics and resource usage figures represent typical production scenarios.*

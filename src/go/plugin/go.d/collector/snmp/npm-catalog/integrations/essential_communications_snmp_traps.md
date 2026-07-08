@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Essential Communications across **1 M
 ### Sample decoded traps
 
 - `ESSENTIAL-ODS-ESS2000-HIPPI-SWITCH-MIB::switchSensorWarning`
-

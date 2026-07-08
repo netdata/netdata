@@ -143,4 +143,3 @@ Netdata decodes **22 trap definitions** from Netpartner S R O across **1 MIB** i
 - `IMCO-BIG-MIB::imco3TrapNewAlarm`
 - `IMCO-BIG-MIB::imco3TrapAlarmEnd`
 - `IMCO-BIG-MIB::imco3TrapAlarmOut1ON`
-

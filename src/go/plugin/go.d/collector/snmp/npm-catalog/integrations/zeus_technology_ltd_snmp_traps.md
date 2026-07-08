@@ -143,4 +143,3 @@ Netdata decodes **266 trap definitions** from Zeus Technology Ltd across **1 MIB
 - `ZXTM-MIB-SMIv2::fewfreefds`
 - `ZXTM-MIB-SMIv2::restartrequired`
 - `ZXTM-MIB-SMIv2::timemovedback`
-

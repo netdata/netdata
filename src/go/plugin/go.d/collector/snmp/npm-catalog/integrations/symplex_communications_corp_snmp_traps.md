@@ -143,4 +143,3 @@ Netdata decodes **15 trap definitions** from Symplex Communications Corp across 
 - `D5-MIB::stopDisasterRecovery`
 - `D5-MIB::noBChannel`
 - `D5-MIB::dailyConnLimit`
-

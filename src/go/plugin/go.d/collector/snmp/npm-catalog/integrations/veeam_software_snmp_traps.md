@@ -143,4 +143,3 @@ Netdata decodes **16 trap definitions** from Veeam Software across **1 MIB** int
 - `VEEAM-MIB::onLinuxFLRMountStarted`
 - `VEEAM-MIB::onLinuxFLRCopyToStarted`
 - `VEEAM-MIB::onLinuxFLRToOriginalStarted`
-

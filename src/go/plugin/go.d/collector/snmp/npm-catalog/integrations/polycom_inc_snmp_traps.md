@@ -144,4 +144,3 @@ Netdata decodes **339 trap definitions** from Polycom Inc across **2 MIBs** into
 - `POLYCOM-RMX-MIB::rmxNoIpServiceParamsAlarmFault`
 - `POLYCOM-RMX-MIB::rmxTaskTerminatedAlarmFault`
 - `POLYCOM-RMX-MIB::rmxCfgChangedAlarmFault`
-

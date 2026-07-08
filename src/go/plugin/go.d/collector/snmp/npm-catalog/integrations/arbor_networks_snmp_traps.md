@@ -145,4 +145,3 @@ Netdata decodes **123 trap definitions** from Arbor Networks across **3 MIBs** i
 - `PEAKFLOW-DOS-MIB::protocolAnomaly`
 - `PEAKFLOW-DOS-MIB::heartbeatLoss`
 - `PEAKFLOW-DOS-MIB::internalError`
-

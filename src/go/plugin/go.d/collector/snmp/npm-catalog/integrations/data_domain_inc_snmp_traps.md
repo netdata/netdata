@@ -143,4 +143,3 @@ Netdata decodes **247 trap definitions** from Data Domain Inc across **1 MIB** i
 - `DATA-DOMAIN-MIB::systemOverheatAlertAlarm`
 - `DATA-DOMAIN-MIB::systemOverheatShutdownAlarm`
 - `DATA-DOMAIN-MIB::fanModuleFailedAlarm`
-

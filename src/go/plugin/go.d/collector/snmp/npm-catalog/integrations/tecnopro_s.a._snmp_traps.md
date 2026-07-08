@@ -156,4 +156,3 @@ Netdata decodes **377 trap definitions** from Tecnopro S.A. across **14 MIBs** i
 - `APPIAN-CHASSIS-MIB::acChassisFanFailureTrap`
 - `APPIAN-CHASSIS-MIB::acChassisTemperatureClearTrap`
 - `APPIAN-CHASSIS-MIB::acChassisFanFailureClearTrap`
-

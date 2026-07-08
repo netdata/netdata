@@ -44,11 +44,36 @@ func TestHistogramStoreScenarios(t *testing.T) {
 
 				fr := s.Read(ReadFlatten())
 				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "0.1"}, 1)
-				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "0.5"}, 2)
-				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "1"}, 3)
-				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "+Inf"}, 3)
+				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "0.5"}, 1)
+				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "1"}, 1)
+				mustValue(t, fr, "svc.request_duration_seconds_bucket", Labels{"le": "+Inf"}, 0)
 				mustValue(t, fr, "svc.request_duration_seconds_count", nil, 3)
 				mustValue(t, fr, "svc.request_duration_seconds_sum", nil, 1.2)
+			},
+		},
+		"snapshot histogram without finite bounds flattens count into +Inf range bucket": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				h := s.Write().SnapshotMeter("svc").Histogram("latency")
+
+				cc.BeginCycle()
+				h.ObservePoint(HistogramPoint{
+					Count: 4,
+					Sum:   12,
+				})
+				cc.CommitCycleSuccess()
+
+				mustHistogram(t, s.Read(), "svc.latency", nil, HistogramPoint{
+					Count:   4,
+					Sum:     12,
+					Buckets: []BucketPoint{},
+				})
+
+				fr := s.Read(ReadFlatten())
+				mustValue(t, fr, "svc.latency_bucket", Labels{"le": "+Inf"}, 4)
+				mustValue(t, fr, "svc.latency_count", nil, 4)
+				mustValue(t, fr, "svc.latency_sum", nil, 12)
 			},
 		},
 		"snapshot histogram without bounds captures schema after successful cycle": {
@@ -93,8 +118,12 @@ func TestHistogramStoreScenarios(t *testing.T) {
 					},
 				})
 
+				// A nil-bounds histogram observing bounds different from the captured
+				// schema must NOT panic (client-driven bounds must be crash-safe). The
+				// mismatch is resolved at commit: the captured schema was not observed
+				// this cycle, so the new bounds supersede it.
 				cc.BeginCycle()
-				expectPanic(t, func() {
+				require.NotPanics(t, func() {
 					h.ObservePoint(HistogramPoint{
 						Count: 2, Sum: 0.8,
 						Buckets: []BucketPoint{
@@ -103,7 +132,14 @@ func TestHistogramStoreScenarios(t *testing.T) {
 						},
 					})
 				})
-				cc.AbortCycle()
+				require.NoError(t, cc.CommitCycleSuccess())
+				mustHistogram(t, s.Read(), "svc.latency", nil, HistogramPoint{
+					Count: 2, Sum: 0.8,
+					Buckets: []BucketPoint{
+						{UpperBound: 0.5, CumulativeCount: 2},
+						{UpperBound: 1, CumulativeCount: 2},
+					},
+				})
 			},
 		},
 		"stateful histogram requires bounds": {
@@ -173,6 +209,9 @@ func TestHistogramStoreScenarios(t *testing.T) {
 						{UpperBound: 2, CumulativeCount: 1},
 					},
 				})
+				mustValue(t, s.Read(ReadFlatten()), "svc.latency_bucket", Labels{HistogramBucketLabel: "1"}, 0)
+				mustValue(t, s.Read(ReadFlatten()), "svc.latency_bucket", Labels{HistogramBucketLabel: "2"}, 1)
+				mustValue(t, s.Read(ReadFlatten()), "svc.latency_bucket", Labels{HistogramBucketLabel: "+Inf"}, 0)
 
 				cc.BeginCycle()
 				cc.CommitCycleSuccess()
@@ -180,6 +219,8 @@ func TestHistogramStoreScenarios(t *testing.T) {
 				require.False(t, ok, "expected stale cycle-window histogram hidden from Read")
 				_, ok = s.Read(ReadRaw()).Histogram("svc.latency", nil)
 				require.True(t, ok, "expected raw histogram to remain visible")
+				_, ok = s.Read(ReadFlatten()).Value("svc.latency_bucket", Labels{HistogramBucketLabel: "1"})
+				require.False(t, ok, "expected stale cycle-window flattened histogram hidden from Read(ReadFlatten())")
 			},
 		},
 		"window option on snapshot histogram panics": {

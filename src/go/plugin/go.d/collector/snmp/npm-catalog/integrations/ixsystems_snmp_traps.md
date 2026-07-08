@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Ixsystems across **1 MIB** into stru
 
 - `FREENAS-MIB::alert`
 - `FREENAS-MIB::alertCancellation`
-

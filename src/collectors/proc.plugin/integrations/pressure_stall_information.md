@@ -128,5 +128,3 @@ Metrics:
 | system.io_some_pressure_stall_time | time | ms |
 | system.io_full_pressure | some10, some60, some300 | percentage |
 | system.io_full_pressure_stall_time | time | ms |
-
-

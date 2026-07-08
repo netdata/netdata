@@ -143,4 +143,3 @@ Netdata decodes **90 trap definitions** from Tavve Software Co across **1 MIB** 
 - `TAVVE-MIB::tscEwSourceUp`
 - `TAVVE-MIB::tscEwInferredUp`
 - `TAVVE-MIB::tscEwNodeDown`
-

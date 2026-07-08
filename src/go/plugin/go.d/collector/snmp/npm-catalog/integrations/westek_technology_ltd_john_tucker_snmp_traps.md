@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from Westek Technology Ltd John Tucker ac
 - `GUARDIAN-MIB::tempAlert`
 - `GUARDIAN-MIB::isaAlert`
 - `GUARDIAN-MIB::dcAlert`
-

@@ -38,6 +38,18 @@ metrics:
   - id: write_latency
     metric_name: WriteLatency
     statistics: [average]
+  - id: replica_lag               # read replicas only, seconds
+    metric_name: ReplicaLag
+    statistics: [maximum]
+  - id: maximum_used_transaction_ids  # PostgreSQL only
+    metric_name: MaximumUsedTransactionIDs
+    statistics: [average]
+  - id: ebs_byte_balance          # RDS storage throughput credits, percent
+    metric_name: EBSByteBalance%
+    statistics: [average]
+  - id: ebs_io_balance            # RDS storage I/O credits, percent
+    metric_name: EBSIOBalance%
+    statistics: [average]
   # ----------------------------------------------------------------------------------------
   # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
   # matching chart in the charts: section below, then restart the go.d process. All are
@@ -58,9 +70,6 @@ metrics:
   # - id: burst_balance             # gp2 storage burst credits, percent
   #   metric_name: BurstBalance
   #   statistics: [average]
-  # - id: replica_lag               # read replicas only, seconds
-  #   metric_name: ReplicaLag
-  #   statistics: [average]
   # - id: cpu_credit_usage          # burstable (db.t*) instances only
   #   metric_name: CPUCreditUsage
   #   statistics: [average]
@@ -69,8 +78,8 @@ metrics:
   #   statistics: [average]
   # Engine- and storage-specific metrics are also published at {DBInstanceIdentifier} and can be
   # added the same way: BinLogDiskUsage (MySQL/MariaDB); TempDb* and FailedSQLServerAgentJobsCount
-  # (SQL Server); MaximumUsedTransactionIDs, *ReplicationSlot*, TransactionLogs* (PostgreSQL); and
-  # the *LogVolume / *LocalStorage families. See:
+  # (SQL Server); *ReplicationSlot*, TransactionLogs* (PostgreSQL); and the *LogVolume /
+  # *LocalStorage families. See:
   # https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/rds-metrics.html
 template:
   family: RDS
@@ -148,6 +157,35 @@ template:
           name: read
         - selector: write_latency_average
           name: write
+    - id: cw_rds_replica_lag
+      context: replica_lag
+      title: RDS Replica Lag
+      family: Replication
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: replica_lag_maximum
+          name: lag
+    - id: cw_rds_transaction_ids
+      context: maximum_used_transaction_ids
+      title: RDS Maximum Used Transaction IDs
+      family: Transactions
+      units: transactions
+      algorithm: absolute
+      dimensions:
+        - selector: maximum_used_transaction_ids_average
+          name: used
+    - id: cw_rds_ebs_balance
+      context: ebs_balance
+      title: RDS EBS Credit Balance
+      family: Credits
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: ebs_byte_balance_average
+          name: byte
+        - selector: ebs_io_balance_average
+          name: io
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
@@ -189,15 +227,6 @@ template:
     #   dimensions:
     #     - selector: burst_balance_average
     #       name: balance
-    # - id: cw_rds_replica_lag
-    #   context: replica_lag
-    #   title: RDS Replica Lag
-    #   family: Replication
-    #   units: seconds
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: replica_lag_average
-    #       name: lag
     # - id: cw_rds_cpu_credits
     #   context: cpu_credits
     #   title: RDS CPU Credits

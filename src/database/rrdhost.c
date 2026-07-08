@@ -36,6 +36,9 @@ RRDHOST *rrdhost_find_by_node_id(const char *node_id) {
 }
 
 RRDHOST *rrdhost_find_by_hostname(const char *hostname) {
+    if(unlikely(!hostname))
+        return NULL;
+
     if(strcmp(hostname, "localhost") == 0)
         return localhost;
 
@@ -209,6 +212,27 @@ void rrdhost_tz_free(RRDHOST_TZ *tz) {
     tz->utc_offset = 0;
 }
 
+RRDHOST_IDENTITY rrdhost_identity_acquire(RRDHOST *host) {
+    RRDHOST_IDENTITY identity;
+
+    spinlock_lock(&host->rrdhost_update_lock);
+    identity.hostname = string_dup(host->hostname);
+    identity.prog_name = string_dup(host->program_name);
+    identity.prog_version = string_dup(host->program_version);
+    spinlock_unlock(&host->rrdhost_update_lock);
+
+    return identity;
+}
+
+void rrdhost_identity_release(RRDHOST_IDENTITY *identity) {
+    string_freez(identity->hostname);
+    string_freez(identity->prog_name);
+    string_freez(identity->prog_version);
+    identity->hostname = NULL;
+    identity->prog_name = NULL;
+    identity->prog_version = NULL;
+}
+
 // ----------------------------------------------------------------------------
 // RRDHOST - add a host
 
@@ -358,6 +382,7 @@ RRDHOST *rrdhost_create(
 
     spinlock_init(&host->receiver_lock);
     spinlock_init(&host->rrdhost_update_lock);
+    spinlock_init(&host->aclk.spinlock);
 
     if (likely(!archived)) {
         rrd_functions_host_init(host);

@@ -44,15 +44,16 @@ static void bearer_token_delete_from_disk(nd_uuid_t *token) {
 }
 
 static void bearer_token_cleanup(bool force) {
-    static time_t attempts = 0;
+    static uint32_t cleanup_attempts = 0;
 
-    if(++attempts % 1000 != 0 && !force)
+    uint32_t attempts = __atomic_add_fetch(&cleanup_attempts, 1, __ATOMIC_RELAXED);
+    if(attempts % 1000 != 0 && !force)
         return;
 
     time_t now_s = now_realtime_sec();
 
     struct bearer_token *z;
-    dfe_start_read(netdata_authorized_bearers, z) {
+    dfe_start_write(netdata_authorized_bearers, z) {
         if(z->expires_s < now_s) {
             nd_uuid_t uuid;
             if(uuid_parse_flexi(z_dfe.name, uuid) == 0)

@@ -143,4 +143,3 @@ Netdata decodes **153 trap definitions** from Tegile Systems Inc across **1 MIB*
 - `TEGILE-MIB::diskGoneOffline`
 - `TEGILE-MIB::diskError`
 - `TEGILE-MIB::spareDiskReplaced`
-

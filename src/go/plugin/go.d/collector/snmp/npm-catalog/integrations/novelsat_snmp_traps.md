@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Novelsat across **1 MIB** into struct
 ### Sample decoded traps
 
 - `NOVELSAT-COMMON-MIB::nsCommonMonitorEventNotification`
-

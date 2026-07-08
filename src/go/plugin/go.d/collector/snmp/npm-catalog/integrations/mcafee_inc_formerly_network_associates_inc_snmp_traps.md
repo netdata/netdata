@@ -144,4 +144,3 @@ Netdata decodes **93 trap definitions** from Mcafee Inc Formerly Network Associa
 - `TVD-MIB::mcafee-EVENT-FILECLEANED`
 - `TVD-MIB::mcafee-EVENT-FILECLEANERROR`
 - `TVD-MIB::mcafee-EVENT-FILEDELETED`
-

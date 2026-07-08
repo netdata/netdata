@@ -143,4 +143,3 @@ Netdata decodes **9 trap definitions** from Exablaze across **1 MIB** into struc
 - `EXALINK-FUSION-MIB::fusionTempAlert`
 - `EXALINK-FUSION-MIB::fusionPsuAlert`
 - `EXALINK-FUSION-MIB::fusionSystemAlert`
-

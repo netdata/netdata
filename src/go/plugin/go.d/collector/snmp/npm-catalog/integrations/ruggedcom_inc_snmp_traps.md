@@ -151,4 +151,3 @@ Netdata decodes **57 trap definitions** from Ruggedcom Inc across **9 MIBs** int
 - `RUGGEDCOM-TRAPS-MIB::swUpgradeTrap`
 - `RUGGEDCOM-TRAPS-MIB::cfgChangeTrap`
 - `RUGGEDCOM-TRAPS-MIB::cfgChangeNoRevTrap`
-

@@ -386,5 +386,3 @@ Metrics:
 | mq.topic.subscribers | subscribers | subscribers |
 | mq.topic.messages | messages | messages/s |
 | mq.topic.time_since_last_message | time_since_last_msg | seconds |
-
-

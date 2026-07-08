@@ -7,11 +7,18 @@
 
 #ifdef HAVE_LIBDATACHANNEL
 
+#include <limits.h>
+
 #include "rtc/rtc.h"
+
+#if defined(ENABLE_LZ4)
+#include <lz4.h>
+#endif
 
 #define WEBRTC_OUR_MAX_MESSAGE_SIZE (5 * 1024 * 1024)
 #define WEBRTC_DEFAULT_REMOTE_MAX_MESSAGE_SIZE (65536)
 #define WEBRTC_COMPRESSED_HEADER_SIZE 200
+#define WEBRTC_REQUEST_PARSER_PADDING 10
 
 static void webrtc_log(rtcLogLevel level, const char *message) {
     switch(level) {
@@ -123,6 +130,24 @@ static struct {
 static inline bool webrtc_dc_is_open(WEBRTC_DC *chan) {
     return __atomic_load_n(&chan->open, __ATOMIC_RELAXED);
 }
+
+static inline rtcState webrtc_conn_state(WEBRTC_CONN *conn) {
+    return __atomic_load_n(&conn->state, __ATOMIC_RELAXED);
+}
+
+static inline void webrtc_conn_set_state(WEBRTC_CONN *conn, rtcState state) {
+    __atomic_store_n(&conn->state, state, __ATOMIC_RELAXED);
+}
+
+static inline rtcGatheringState webrtc_conn_gathering_state(WEBRTC_CONN *conn) {
+    return __atomic_load_n(&conn->gathering_state, __ATOMIC_RELAXED);
+}
+
+static inline void webrtc_conn_set_gathering_state(WEBRTC_CONN *conn, rtcGatheringState state) {
+    __atomic_store_n(&conn->gathering_state, state, __ATOMIC_RELAXED);
+}
+
+static void cleanupConnections(void);
 
 static void webrtc_config_ice_servers(void) {
     BUFFER *wb = buffer_create(0, NULL);
@@ -280,7 +305,7 @@ static size_t webrtc_send_in_chunks(WEBRTC_DC *chan, const char *data, size_t si
     return sent_bytes;
 }
 
-static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, size_t size __maybe_unused, bool binary __maybe_unused) {
+static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, size_t size, bool binary) {
     ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_SRC_TRANSPORT, "webrtc"),
             ND_LOG_FIELD_END(),
@@ -320,7 +345,7 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
     size_t response_size = buffer_strlen(w->response.data);
 
     bool send_plain = true;
-    int max_message_size = (int)chan->conn->max_message_size - WEBRTC_COMPRESSED_HEADER_SIZE;
+    size_t max_message_size = chan->conn->max_message_size - WEBRTC_COMPRESSED_HEADER_SIZE;
 
     if(!webrtc_dc_is_open(chan)) {
         internal_error(true, "WEBRTC[%d],DC[%d]: ignoring API response on closed data channel.", chan->conn->pc, chan->dc);
@@ -332,19 +357,21 @@ static void webrtc_execute_api_request(WEBRTC_DC *chan, const char *request, siz
     }
 
 #if defined(ENABLE_LZ4)
-    int max_compressed_size = LZ4_compressBound((int)response_size);
-    char *compressed = mallocz(max_compressed_size);
+    if(response_size <= LZ4_MAX_INPUT_SIZE) {
+        int max_compressed_size = LZ4_compressBound((int)response_size);
+        char *compressed = mallocz(max_compressed_size);
 
-    int compressed_size = LZ4_compress_default(buffer_tostring(w->response.data), compressed,
-                                               (int)response_size, max_compressed_size);
+        int compressed_size = LZ4_compress_default(buffer_tostring(w->response.data), compressed,
+                                                   (int)response_size, max_compressed_size);
 
-    if(compressed_size > 0) {
-        send_plain = false;
-        sent_bytes = webrtc_send_in_chunks(chan, compressed, compressed_size,
-                                           w->response.code, "LZ4", w->response.data->content_type,
-                                           max_message_size, true);
+        if(compressed_size > 0) {
+            send_plain = false;
+            sent_bytes = webrtc_send_in_chunks(chan, compressed, compressed_size,
+                                               w->response.code, "LZ4", w->response.data->content_type,
+                                               max_message_size, true);
+        }
+        freez(compressed);
     }
-    freez(compressed);
 #endif
 
     if(send_plain)
@@ -387,6 +414,9 @@ static void myClosedCallback(int id __maybe_unused, void *user_ptr) {
     __atomic_store_n(&chan->open, false, __ATOMIC_RELAXED);
     internal_error(true, "WEBRTC[%d],DC[%d]: data channel closed.", pc, dc);
 
+    if(rtcDeleteDataChannel(dc) != RTC_ERR_SUCCESS)
+        netdata_log_error("WEBRTC[%d],DC[%d]: rtcDeleteDataChannel() failed.", pc, dc);
+
     spinlock_lock(&conn->channels.spinlock);
     DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(conn->channels.head, chan, link.prev, link.next);
     spinlock_unlock(&conn->channels.spinlock);
@@ -395,6 +425,8 @@ static void myClosedCallback(int id __maybe_unused, void *user_ptr) {
 
     freez(chan->label);
     freez(chan);
+
+    cleanupConnections();
 }
 
 static void myErrorCallback(int id __maybe_unused, const char *error, void *user_ptr) {
@@ -414,10 +446,25 @@ static void myMessageCallback(int id __maybe_unused, const char *message, int si
     internal_fatal(!webrtc_dc_is_open(chan), "WEBRTC[%d],DC[%d]: received message on closed channel", chan->conn->pc, chan->dc);
 
     bool binary = (size >= 0);
+    if(size == INT_MIN) {
+        netdata_log_error("WEBRTC[%d],DC[%d]: invalid message size.", chan->conn->pc, chan->dc);
+        return;
+    }
+
     if(size < 0)
         size = -size;
 
-    webrtc_execute_api_request(chan, message, size, binary);
+    if(unlikely(!message)) {
+        netdata_log_error("WEBRTC[%d],DC[%d]: received NULL message.", chan->conn->pc, chan->dc);
+        return;
+    }
+
+    size_t request_size = (size_t)size;
+    CLEAN_CHAR_P *request = mallocz(request_size + 1 + WEBRTC_REQUEST_PARSER_PADDING);
+    memcpy(request, message, request_size);
+    memset(&request[request_size], 0, 1 + WEBRTC_REQUEST_PARSER_PADDING);
+
+    webrtc_execute_api_request(chan, request, request_size, binary);
 }
 
 //#define WEBRTC_MAX_REQUEST_SIZE 65536
@@ -484,32 +531,53 @@ static void myDataChannelCallback(int pc __maybe_unused, int dc, void *user_ptr)
 // ----------------------------------------------------------------------------
 // webrtc connection
 
-static inline void webrtc_destroy_connection_unsafe(WEBRTC_CONN *conn) {
-    if(conn->state == RTC_CLOSED) {
+static WEBRTC_CONN *webrtc_connection_to_destroy_unsafe(void) {
+    WEBRTC_CONN *conn = webrtc_base.unsafe.head;
+
+    while(conn) {
+        WEBRTC_CONN *next = conn->link.next;
+
+        if(webrtc_conn_state(conn) != RTC_CLOSED) {
+            conn = next;
+            continue;
+        }
+
         spinlock_lock(&conn->channels.spinlock);
         WEBRTC_DC *chan = conn->channels.head;
         spinlock_unlock(&conn->channels.spinlock);
 
         if(!chan) {
-            internal_error(true, "WEBRTC[%d]: destroying connection", conn->pc);
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(webrtc_base.unsafe.head, conn, link.prev, link.next);
-            freez(conn);
+            return conn;
         }
-        else {
-            internal_error(true, "WEBRTC[%d]: not destroying closed connection because it has data channels running", conn->pc);
-        }
+
+        internal_error(true, "WEBRTC[%d]: not destroying closed connection because it has data channels running", conn->pc);
+        conn = next;
     }
+
+    return NULL;
 }
 
-static void cleanupConnections() {
-    spinlock_lock(&webrtc_base.unsafe.spinlock);
-    WEBRTC_CONN *conn = webrtc_base.unsafe.head;
-    while(conn) {
-        WEBRTC_CONN *conn_next = conn->link.next;
-        webrtc_destroy_connection_unsafe(conn);
-        conn = conn_next;
+static void webrtc_delete_connection(WEBRTC_CONN *conn) {
+    internal_error(true, "WEBRTC[%d]: destroying connection", conn->pc);
+
+    if(rtcDeletePeerConnection(conn->pc) != RTC_ERR_SUCCESS)
+        netdata_log_error("WEBRTC[%d]: rtcDeletePeerConnection() failed.", conn->pc);
+
+    freez(conn);
+}
+
+static void cleanupConnections(void) {
+    while(true) {
+        spinlock_lock(&webrtc_base.unsafe.spinlock);
+        WEBRTC_CONN *conn = webrtc_connection_to_destroy_unsafe();
+        spinlock_unlock(&webrtc_base.unsafe.spinlock);
+
+        if(!conn)
+            break;
+
+        webrtc_delete_connection(conn);
     }
-    spinlock_unlock(&webrtc_base.unsafe.spinlock);
 }
 
 static WEBRTC_CONN * webrtc_create_connection(void) {
@@ -532,7 +600,7 @@ static void myDescriptionCallback(int pc __maybe_unused, const char *sdp, const 
 
     internal_error(true, "WEBRTC[%d]: local description type '%s': %s", conn->pc, type, sdp);
     spinlock_lock(&conn->response.spinlock);
-    if(!conn->response.candidates) {
+    if(conn->response.wb && !conn->response.candidates) {
         buffer_json_member_add_string(conn->response.wb, "sdp", sdp);
         buffer_json_member_add_string(conn->response.wb, "type", type);
         conn->response.sdp = true;
@@ -549,13 +617,15 @@ static void myCandidateCallback(int pc __maybe_unused, const char *cand, const c
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
     spinlock_lock(&conn->response.spinlock);
-    if(!conn->response.candidates) {
-        buffer_json_member_add_array(conn->response.wb, "candidates");
-        conn->response.candidates = true;
-    }
-
     internal_error(true, "WEBRTC[%d]: local candidate '%s', mid '%s'", conn->pc, cand, mid);
-    buffer_json_add_array_item_string(conn->response.wb, cand);
+    if(conn->response.wb) {
+        if(!conn->response.candidates) {
+            buffer_json_member_add_array(conn->response.wb, "candidates");
+            conn->response.candidates = true;
+        }
+
+        buffer_json_add_array_item_string(conn->response.wb, cand);
+    }
     spinlock_unlock(&conn->response.spinlock);
 }
 
@@ -565,7 +635,7 @@ static void myStateChangeCallback(int pc __maybe_unused, rtcState state, void *u
     WEBRTC_CONN *conn = user_ptr;
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
-    conn->state = state;
+    webrtc_conn_set_state(conn, state);
 
     switch(state) {
         case RTC_NEW:
@@ -595,9 +665,7 @@ static void myStateChangeCallback(int pc __maybe_unused, rtcState state, void *u
         case RTC_CLOSED:
             nd_log(NDLS_ACCESS, NDLP_DEBUG, "WEBRTC[%d]: %d CONNECTION CLOSED", conn->pc, gettid_cached());
             internal_error(true, "WEBRTC[%d]: closed.", conn->pc);
-            spinlock_lock(&webrtc_base.unsafe.spinlock);
-            webrtc_destroy_connection_unsafe(conn);
-            spinlock_unlock(&webrtc_base.unsafe.spinlock);
+            cleanupConnections();
             break;
     }
 }
@@ -608,7 +676,7 @@ static void myGatheringStateCallback(int pc __maybe_unused, rtcGatheringState st
     WEBRTC_CONN *conn = user_ptr;
     internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
 
-    conn->gathering_state = state;
+    webrtc_conn_set_gathering_state(conn, state);
 
     switch(state) {
         case RTC_GATHERING_NEW:
@@ -697,7 +765,7 @@ int webrtc_new_connection(const char *sdp, BUFFER *wb) {
     }
 
     bool logged = false;
-    while(conn->gathering_state != RTC_GATHERING_COMPLETE) {
+    while(webrtc_conn_gathering_state(conn) != RTC_GATHERING_COMPLETE) {
         if(!logged) {
             logged = true;
             internal_error(true, "WEBRTC[%d]: Waiting for gathering to complete", conn->pc);
@@ -708,14 +776,16 @@ int webrtc_new_connection(const char *sdp, BUFFER *wb) {
     if(logged)
         internal_error(true, "WEBRTC[%d]: Gathering finished, our answer is ready", conn->pc);
 
+    conn->max_message_size = MIN(conn->local_max_message_size, conn->remote_max_message_size);
+    if(conn->max_message_size <= WEBRTC_COMPRESSED_HEADER_SIZE)
+        conn->max_message_size = WEBRTC_COMPRESSED_HEADER_SIZE + 1;
+
+    spinlock_lock(&conn->response.spinlock);
     internal_fatal(!conn->response.sdp, "WEBRTC[%d]: response does not have an SDP: %s", conn->pc, buffer_tostring(conn->response.wb));
     internal_fatal(!conn->response.candidates, "WEBRTC[%d]: response does not have candidates: %s", conn->pc, buffer_tostring(conn->response.wb));
-
-    conn->max_message_size = MIN(conn->local_max_message_size, conn->remote_max_message_size);
-    if(conn->max_message_size < WEBRTC_COMPRESSED_HEADER_SIZE)
-        conn->max_message_size = WEBRTC_COMPRESSED_HEADER_SIZE;
-
     buffer_json_finalize(wb);
+    conn->response.wb = NULL;
+    spinlock_unlock(&conn->response.spinlock);
 
     return HTTP_RESP_OK;
 }

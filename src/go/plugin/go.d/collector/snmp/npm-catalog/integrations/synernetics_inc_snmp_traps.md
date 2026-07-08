@@ -146,4 +146,3 @@ Netdata decodes **27 trap definitions** from Synernetics Inc across **4 MIBs** i
 - `LANPLEX-MIB-1-2-9::lpBridgeAddressThresholdEvent`
 - `LANPLEX-MIB-1-2-9::lpSystemOverTemperatureEvent`
 - `LANPLEX-MIB-1-2-9::lpSlotOverTemperatureEvent`
-

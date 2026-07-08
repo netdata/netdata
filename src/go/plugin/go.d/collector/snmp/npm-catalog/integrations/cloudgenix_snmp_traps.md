@@ -143,4 +143,3 @@ Netdata decodes **19 trap definitions** from Cloudgenix across **1 MIB** into st
 - `CGX-EVENTS-MIB::cgxVpnPeerUnreachableClear`
 - `CGX-EVENTS-MIB::cgxVpnPeerUnreachable`
 - `CGX-EVENTS-MIB::cgxVpnBfdUp`
-

@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Dantel Inc across **1 MIB** into str
 - `WEBMON-EDGE-MATRIX-MIB::digitalEventTrap`
 - `WEBMON-EDGE-MATRIX-MIB::remoteDeviceEventTrap`
 - `WEBMON-EDGE-MATRIX-MIB::faultTrap`
-

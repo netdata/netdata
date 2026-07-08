@@ -162,4 +162,3 @@ Netdata decodes **225 trap definitions** from Acme Packet across **20 MIBs** int
 - `APSYSMGMT-MIB::apSysMgmtGroupClearTrap`
 - `APSYSMGMT-MIB::apSysMgmtSingleUnitRedundancyTrap`
 - `APSYSMGMT-MIB::apSysMgmtPowerTrap`
-

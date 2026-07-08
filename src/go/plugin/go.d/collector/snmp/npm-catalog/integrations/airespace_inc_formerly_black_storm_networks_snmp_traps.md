@@ -144,4 +144,3 @@ Netdata decodes **94 trap definitions** from Airespace Inc Formerly Black Storm 
 - `AIRESPACE-SWITCHING-MIB::broadcastStormEndTrap`
 - `AIRESPACE-SWITCHING-MIB::linkFailureTrap`
 - `AIRESPACE-SWITCHING-MIB::vlanRequestFailureTrap`
-

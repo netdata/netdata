@@ -198,5 +198,3 @@ On top of the **generic SNMP baseline** (the *Generic SNMP Device* integration â
 | `snmp.device_prof_netscaler_sdx_nsNsMemoryUsage` | `%` | per netscaler_sdx_ns_uuid, netscaler_sdx_ns_name | Memory usage percentage |
 | `snmp.device_prof_netscaler_sdx_nsNsRx` | `bit/s` | per netscaler_sdx_ns_uuid, netscaler_sdx_ns_name | In throughput of netscaler instance in megabits per second |
 | `snmp.device_prof_netscaler_sdx_nsNsTx` | `bit/s` | per netscaler_sdx_ns_uuid, netscaler_sdx_ns_name | Out throughput of netscaler instance in megabits per second |
-
-

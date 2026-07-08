@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Albentia Systems S A across **1 MIB**
 ### Sample decoded traps
 
 - `ALBENTIA-MIB::albAlarmNotification`
-

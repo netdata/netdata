@@ -143,4 +143,3 @@ Netdata decodes **9 trap definitions** from Sonix Communications Ltd across **1 
 - `REMOTEACCESS-MIB::isdnLinkUpEvent`
 - `REMOTEACCESS-MIB::q931FailCauseEvent`
 - `REMOTEACCESS-MIB::dass2FailCauseEvent`
-

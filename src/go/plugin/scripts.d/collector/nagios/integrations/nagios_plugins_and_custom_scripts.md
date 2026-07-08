@@ -625,6 +625,3 @@ The Netdata Agent runs as the `netdata` user. If a check needs to read protected
 ### Windows script support
 
 On Windows, point `plugin` directly to a `.ps1`, `.bat`, or `.cmd` script. Netdata automatically invokes `.ps1` scripts through `powershell.exe` and `.bat`/`.cmd` scripts through `cmd.exe`. Ensure scripts are stored in directories with appropriate ACLs.
-
-
-

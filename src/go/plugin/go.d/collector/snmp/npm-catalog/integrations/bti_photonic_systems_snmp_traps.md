@@ -146,4 +146,3 @@ Netdata decodes **901 trap definitions** from Bti Photonic Systems across **4 MI
 - `BTI-7000-MIB::slotInvPluginEvt`
 - `BTI-7000-MIB::slotInvUnpluginEvt`
 - `BTI-7000-MIB::slotInvUpgradeStageResultEvt`
-

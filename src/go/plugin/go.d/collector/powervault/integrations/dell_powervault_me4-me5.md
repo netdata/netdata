@@ -507,6 +507,3 @@ PowerVault controllers ship with self-signed certificates. If you see TLS errors
 
 1. Set `tls_skip_verify: yes` in the configuration (most common solution).
 2. Alternatively, export the controller's certificate and provide it via `tls_ca`.
-
-
-

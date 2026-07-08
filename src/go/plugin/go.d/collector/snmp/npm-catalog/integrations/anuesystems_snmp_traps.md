@@ -143,4 +143,3 @@ Netdata decodes **19 trap definitions** from Anuesystems across **1 MIB** into s
 - `ANUE-MIB::anueNtoEventMonStatInvalidCount`
 - `ANUE-MIB::anueNtoEventMonStatDropCount`
 - `ANUE-MIB::anueNtoEventMonStatRxUtilization`
-

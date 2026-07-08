@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Exceliance across **1 MIB** into str
 
 - `EXCELIANCE-MIB::eNotificationMsg`
 - `EXCELIANCE-MIB::alTrap`
-

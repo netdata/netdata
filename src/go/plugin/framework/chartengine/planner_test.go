@@ -74,10 +74,11 @@ func TestInferDimensionLabelKeyScenarios(t *testing.T) {
 
 func TestBuildPlanResolvesInferDimensionNames(t *testing.T) {
 	tests := map[string]struct {
-		yaml      string
-		setup     func(t *testing.T, s metrix.CollectorStore)
-		wantNames []string
-		wantKinds []ActionKind
+		yaml           string
+		setup          func(t *testing.T, s metrix.CollectorStore)
+		wantNames      []string
+		wantKinds      []ActionKind
+		wantCreateType program.ChartType
 	}{
 		"histogram bucket inference resolves bucket names from le": {
 			yaml: `
@@ -89,6 +90,7 @@ groups:
     charts:
       - title: Latency buckets
         context: latency_bucket
+        type: stacked
         units: observations
         dimensions:
           - selector: svc.latency_seconds_bucket
@@ -96,20 +98,22 @@ groups:
 			setup: func(t *testing.T, s metrix.CollectorStore) {
 				t.Helper()
 				cc := mustCycleController(t, s)
-				h := s.Write().SnapshotMeter("svc").Histogram("latency_seconds", metrix.WithHistogramBounds(1, 2))
+				h := s.Write().SnapshotMeter("svc").Histogram("latency_seconds", metrix.WithHistogramBounds(1, 2, 10))
 				cc.BeginCycle()
 				h.ObservePoint(metrix.HistogramPoint{
-					Count: 2,
-					Sum:   3,
+					Count: 4,
+					Sum:   13,
 					Buckets: []metrix.BucketPoint{
 						{UpperBound: 1, CumulativeCount: 1},
 						{UpperBound: 2, CumulativeCount: 2},
+						{UpperBound: 10, CumulativeCount: 3},
 					},
 				})
 				cc.CommitCycleSuccess()
 			},
-			wantNames: []string{"+Inf", "1", "2"},
-			wantKinds: []ActionKind{ActionCreateChart, ActionCreateDimension, ActionCreateDimension, ActionCreateDimension, ActionUpdateChart},
+			wantNames:      []string{"1", "2", "10", "+Inf"},
+			wantKinds:      []ActionKind{ActionCreateChart, ActionCreateDimension, ActionCreateDimension, ActionCreateDimension, ActionCreateDimension, ActionUpdateChart},
+			wantCreateType: program.ChartTypeHeatmap,
 		},
 		"summary quantile inference resolves quantile labels": {
 			yaml: `
@@ -194,6 +198,11 @@ groups:
 			}
 			assert.Equal(t, tc.wantNames, got)
 			assert.Equal(t, tc.wantKinds, actionKinds(plan.Actions))
+			if tc.wantCreateType != "" {
+				create := findCreateChartAction(plan)
+				require.NotNil(t, create)
+				assert.Equal(t, tc.wantCreateType, create.Meta.Type)
+			}
 		})
 	}
 }
@@ -225,6 +234,7 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 		"BuildPlanTemplatePrecedenceOverAutogen":                       {run: runTestBuildPlanTemplatePrecedenceOverAutogen},
 		"BuildPlanAutogenStrictOverflowDrop":                           {run: runTestBuildPlanAutogenStrictOverflowDrop},
 		"BuildPlanAutogenUsesFlattenMetadataForHistogramBuckets":       {run: runTestBuildPlanAutogenUsesFlattenMetadataForHistogramBuckets},
+		"BuildPlanOrdersMixedHistogramAndDefaultDynamicDimensions":     {run: runTestBuildPlanOrdersMixedHistogramAndDefaultDynamicDimensions},
 		"BuildPlanAutogenCreatesChartForUnmatchedGauge":                {run: runTestBuildPlanAutogenCreatesChartForUnmatchedGauge},
 		"BuildPlanAutogenCreatesChartForUnmatchedStateSet":             {run: runTestBuildPlanAutogenCreatesChartForUnmatchedStateSet},
 		"BuildPlanAutogenKeepsStateSetUnitsWhenMetricMetaUnitIsSet":    {run: runTestBuildPlanAutogenKeepsStateSetUnitsWhenMetricMetaUnitIsSet},
@@ -243,6 +253,70 @@ func TestBuildPlanLegacySingleScenarioCases(t *testing.T) {
 	for name, tc := range tests {
 		t.Run(name, tc.run)
 	}
+}
+
+func runTestBuildPlanOrdersMixedHistogramAndDefaultDynamicDimensions(t *testing.T) {
+	e, err := New()
+	require.NoError(t, err)
+
+	yaml := `
+version: v1
+groups:
+  - family: Mixed
+    metrics:
+      - svc.latency_seconds_bucket
+      - svc.status
+    charts:
+      - title: Mixed Dynamic Dimensions
+        context: mixed_dynamic_dimensions
+        units: values
+        algorithm: incremental
+        dimensions:
+          - selector: svc.latency_seconds_bucket
+          - selector: svc.status
+`
+	require.NoError(t, e.LoadYAML([]byte(yaml), 1))
+
+	store := metrix.NewCollectorStore()
+	cc := mustCycleController(t, store)
+	sm := store.Write().SnapshotMeter("svc")
+	h := sm.Histogram("latency_seconds", metrix.WithHistogramBounds(2, 10))
+	ss := sm.StateSet("status", metrix.WithStateSetStates("15", "3"), metrix.WithStateSetMode(metrix.ModeEnum))
+
+	cc.BeginCycle()
+	h.ObservePoint(metrix.HistogramPoint{
+		Count: 3,
+		Sum:   13,
+		Buckets: []metrix.BucketPoint{
+			{UpperBound: 2, CumulativeCount: 1},
+			{UpperBound: 10, CumulativeCount: 2},
+		},
+	})
+	ss.Enable("3")
+	cc.CommitCycleSuccess()
+
+	plan, err := buildPlan(e, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+
+	create := findCreateChartAction(plan)
+	require.NotNil(t, create)
+	assert.Equal(t, program.ChartTypeHeatmap, create.Meta.Type)
+
+	var createDims []string
+	var updateDims []string
+	for _, action := range plan.Actions {
+		switch action := action.(type) {
+		case CreateDimensionAction:
+			createDims = append(createDims, action.Name)
+		case UpdateChartAction:
+			for _, value := range action.Values {
+				updateDims = append(updateDims, value.Name)
+			}
+		}
+	}
+	want := []string{"15", "3", "2", "10", "+Inf"}
+	assert.Equal(t, want, createDims)
+	assert.Equal(t, want, updateDims)
 }
 
 func runTestBuildPlanRequiresFlattenedReaderForInference(t *testing.T) {
@@ -1213,6 +1287,7 @@ groups:
 	assert.Equal(t, "Request duration", buckets.Meta.Title)
 	assert.Equal(t, "Latency", buckets.Meta.Family)
 	assert.Equal(t, "observations/s", buckets.Meta.Units)
+	assert.Equal(t, program.ChartTypeHeatmap, buckets.Meta.Type)
 
 	sum := findCreateChartActionByID(plan, "svc.request_duration_ms_sum")
 	require.NotNil(t, sum)
@@ -1496,16 +1571,17 @@ groups:
 	store := metrix.NewCollectorStore()
 	cc := mustCycleController(t, store)
 	sm := store.Write().SnapshotMeter("svc")
-	h := sm.Histogram("latency_seconds", metrix.WithHistogramBounds(1, 2))
+	h := sm.Histogram("latency_seconds", metrix.WithHistogramBounds(1, 2, 10))
 	method := sm.LabelSet(metrix.Label{Key: "method", Value: "GET"})
 
 	cc.BeginCycle()
 	h.ObservePoint(metrix.HistogramPoint{
-		Count: 3,
-		Sum:   4,
+		Count: 4,
+		Sum:   13,
 		Buckets: []metrix.BucketPoint{
 			{UpperBound: 1, CumulativeCount: 1},
-			{UpperBound: 2, CumulativeCount: 3},
+			{UpperBound: 2, CumulativeCount: 2},
+			{UpperBound: 10, CumulativeCount: 3},
 		},
 	}, method)
 	cc.CommitCycleSuccess()
@@ -1525,21 +1601,31 @@ groups:
 		}
 	}
 	require.NotNil(t, bucketChart)
+	assert.Equal(t, program.ChartTypeHeatmap, bucketChart.Meta.Type)
 	assert.Equal(t, "GET", bucketChart.Labels["method"])
 	_, hasLE := bucketChart.Labels["le"]
 	assert.False(t, hasLE)
 
-	dims := map[string]struct{}{}
+	var dims []string
+	var updateDims []string
 	for _, action := range plan.Actions {
-		create, ok := action.(CreateDimensionAction)
-		if !ok || create.ChartID != "svc.latency_seconds-method=GET" {
-			continue
+		switch action := action.(type) {
+		case CreateDimensionAction:
+			if action.ChartID != "svc.latency_seconds-method=GET" {
+				continue
+			}
+			dims = append(dims, action.Name)
+		case UpdateChartAction:
+			if action.ChartID != "svc.latency_seconds-method=GET" {
+				continue
+			}
+			for _, value := range action.Values {
+				updateDims = append(updateDims, value.Name)
+			}
 		}
-		dims[create.Name] = struct{}{}
 	}
-	assert.Contains(t, dims, "bucket_1")
-	assert.Contains(t, dims, "bucket_2")
-	assert.Contains(t, dims, "bucket_+Inf")
+	assert.Equal(t, []string{"1", "2", "10", "+Inf"}, dims)
+	assert.Equal(t, []string{"1", "2", "10", "+Inf"}, updateDims)
 }
 
 func runTestBuildPlanAutogenCreatesChartForUnmatchedGauge(t *testing.T) {

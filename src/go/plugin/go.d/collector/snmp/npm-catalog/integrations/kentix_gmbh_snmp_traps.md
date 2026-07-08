@@ -144,4 +144,3 @@ Netdata decodes **4 trap definitions** from Kentix GmbH across **3 MIBs** into s
 - `KAM-PRO::login`
 - `KAM-PRO::alarm`
 - `KENTIXDEVICES::event`
-

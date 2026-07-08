@@ -146,4 +146,3 @@ Netdata decodes **11 trap definitions** from Westell Inc Formerly Kentrox across
 - `AISYSCFGPOWER-MIB::aiSCPowerTrapConverterFail`
 - `AISYSCFGPOWER-MIB::aiSCPowerTrapConverterOk`
 - `AISYSCFGFAN-MIB::aiSCFanTrapFail`
-

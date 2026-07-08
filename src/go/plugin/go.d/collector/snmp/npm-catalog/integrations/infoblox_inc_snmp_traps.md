@@ -143,4 +143,3 @@ Netdata decodes **7 trap definitions** from Infoblox Inc across **1 MIB** into s
 - `IB-TRAP-MIB::ibThresholdCrossingEvent`
 - `IB-TRAP-MIB::ibStateChangeEvent`
 - `IB-TRAP-MIB::ibProcStartStopTrap`
-

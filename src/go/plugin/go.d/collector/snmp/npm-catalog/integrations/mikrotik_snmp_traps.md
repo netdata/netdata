@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Mikrotik across **1 MIB** into struc
 
 - `MIKROTIK-MIB::mtxrTrap`
 - `MIKROTIK-MIB::mtxrTemperatureException`
-

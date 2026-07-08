@@ -143,4 +143,3 @@ Netdata decodes **214 trap definitions** from Shenzhen First Mile Communications
 - `OnAccess2200-MIB::mc2200-card-Local-Tx-Up`
 - `OnAccess2200-MIB::mc2200-card-Local-Tx-Down`
 - `OnAccess2200-MIB::mc2200-card-Local-Fx-Up`
-

@@ -98,5 +98,3 @@ Metrics:
 | ipv6.sockstat6_udplite_sockets | inuse | sockets |
 | ipv6.sockstat6_raw_sockets | inuse | sockets |
 | ipv6.sockstat6_frag_sockets | inuse | fragments |
-
-

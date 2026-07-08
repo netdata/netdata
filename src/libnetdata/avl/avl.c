@@ -381,8 +381,7 @@ void avl_init_lock(avl_tree_lock *tree, int (*compar)(void * /*a*/, void * /*b*/
 
 void avl_destroy_lock(avl_tree_lock *tree __maybe_unused) {
 #if defined(AVL_LOCK_WITH_RWLOCK)
-    if(netdata_rwlock_destroy(&tree->rwlock) != 0)
-        fatal("Failed to destroy AVL rwlock");
+    netdata_rwlock_destroy(&tree->rwlock);
 #endif
 }
 

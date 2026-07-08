@@ -41,7 +41,7 @@ size_t rbuf_bytes_free(rbuf_t buffer);
 size_t rbuf_push(rbuf_t buffer, const char *data, size_t len);
 size_t rbuf_pop(rbuf_t buffer, char *data, size_t len);
 
-char *rbuf_find_bytes(rbuf_t buffer, const char *needle, size_t needle_bytes, int *found_idx);
+char *rbuf_find_bytes(rbuf_t buffer, const char *needle, size_t needle_bytes, size_t *found_idx);
 int rbuf_memcmp_n(rbuf_t buffer, const char *to_cmp, size_t to_cmp_bytes);
 
 int ringbuffer_unittest(void);

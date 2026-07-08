@@ -154,4 +154,3 @@ Netdata decodes **544 trap definitions** from Eastern Research Inc across **12 M
 - `ERI-DNX-ALARM-TRAP-MIB::evntDevColdStart`
 - `ERI-DNX-ALARM-TRAP-MIB::evntDevWarmStart`
 - `ERI-DNX-SMC-MIB::connectionEventTrap`
-

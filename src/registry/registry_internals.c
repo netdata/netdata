@@ -47,13 +47,12 @@ static inline char *registry_fix_machine_name(char *name, size_t *len) {
     }
 
     // remove trailing spaces
-    while(--t >= s) {
-        if(*t == ' ')
-            *t = '\0';
+    while(t > s) {
+        if(t[-1] == ' ')
+            *--t = '\0';
         else
             break;
     }
-    t++;
 
     if(likely(len))
         *len = (t - s);

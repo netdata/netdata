@@ -563,4 +563,3 @@ Netdata decodes **1860 trap definitions** from Ciscosystems across **416 MIBs** 
 - `CISCO-FASTHUB-MIB::logonIntruder`
 - `CISCO-FASTHUB-MIB::hubStackDiagnostic`
 - `CISCO-FASTHUB-MIB::rpsFailed`
-

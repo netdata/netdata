@@ -144,4 +144,3 @@ Netdata decodes **5 trap definitions** from Aol Netscape Communications Corp acr
 - `NSMAIL-MIB::nsMailServerNoResponse`
 - `NSLDAP-MIB::nsDirectoryServerDown`
 - `NSLDAP-MIB::nsDirectoryServerStart`
-

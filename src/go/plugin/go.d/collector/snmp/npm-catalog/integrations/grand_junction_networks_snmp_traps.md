@@ -143,4 +143,3 @@ Netdata decodes **6 trap definitions** from Grand Junction Networks across **1 M
 - `STAND-ALONE-ETHERNET-SWITCH-MIB::addressViolation`
 - `STAND-ALONE-ETHERNET-SWITCH-MIB::broadcastStorm`
 - `STAND-ALONE-ETHERNET-SWITCH-MIB::rpsFailed`
-

@@ -143,4 +143,3 @@ Netdata decodes **41 trap definitions** from Idirect across **1 MIB** into struc
 - `IDIRECT-REMOTE-MIB::upstreamSNR`
 - `IDIRECT-REMOTE-MIB::downstreamSNR`
 - `IDIRECT-REMOTE-MIB::tempLimit`
-

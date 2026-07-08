@@ -148,4 +148,3 @@ Netdata decodes **111 trap definitions** from Distributed Management Task Force 
 - `DMTF-DMI-MIB::dmiComponentAddedIndication`
 - `DMTF-DMI-MIB::dmiComponentDeletedIndication`
 - `DMTF-DMI-MIB::dmiLanguageAddedIndication`
-

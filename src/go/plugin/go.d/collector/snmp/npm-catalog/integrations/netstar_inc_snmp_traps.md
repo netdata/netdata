@@ -143,4 +143,3 @@ Netdata decodes **53 trap definitions** from Netstar Inc across **1 MIB** into s
 - `NETSTAR-MIB::grFanFailure`
 - `NETSTAR-MIB::grCardDown`
 - `NETSTAR-MIB::grCardUp`
-

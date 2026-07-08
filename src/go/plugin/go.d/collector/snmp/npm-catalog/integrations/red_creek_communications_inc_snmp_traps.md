@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from Red Creek Communications Inc across 
 - `REDCREEK-TRAP-MIB::rcFirmwareDownloadSucceded`
 - `REDCREEK-TRAP-MIB::rcFirmwareDownloadFailed`
 - `REDCREEK-TRAP-MIB::rcTunnelStatusThreshold`
-

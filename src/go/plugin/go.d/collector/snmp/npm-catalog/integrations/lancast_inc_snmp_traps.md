@@ -144,4 +144,3 @@ Netdata decodes **17 trap definitions** from Lancast Inc across **2 MIBs** into 
 - `LC-PHYSICAL-ENTITIES-MIB::backPlaneFailure`
 - `LC-PHYSICAL-ENTITIES-MIB::powerSupply5vChange`
 - `LC-PHYSICAL-ENTITIES-MIB::powerSupplyStatusChange`
-

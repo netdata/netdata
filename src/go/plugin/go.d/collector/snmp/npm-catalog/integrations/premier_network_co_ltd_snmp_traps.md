@@ -169,4 +169,3 @@ Netdata decodes **202 trap definitions** from Premier Network Co Ltd across **27
 - `UBIQUOSS-INTERFACE-MIB::ubiPortOperStatusChangeNotification`
 - `UBIQUOSS-INTERFACE-MIB::ubiPortAdminStatusChangeNotification`
 - `UBIQUOSS-INTERFACE-MIB::ubiPortBlockStatusChangeNotification`
-

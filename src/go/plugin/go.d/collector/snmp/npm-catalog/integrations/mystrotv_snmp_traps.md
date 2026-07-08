@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Mystrotv across **1 MIB** into struc
 - `MYSTRO-VIDEOPORT-MIB::addService`
 - `MYSTRO-VIDEOPORT-MIB::removeService`
 - `MYSTRO-VIDEOPORT-MIB::updateService`
-

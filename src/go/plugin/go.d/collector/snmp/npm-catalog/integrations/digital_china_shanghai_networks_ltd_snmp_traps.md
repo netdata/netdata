@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Digital China Shanghai Networks Ltd a
 ### Sample decoded traps
 
 - `AMER-MIB::lldpRemTablesChange`
-

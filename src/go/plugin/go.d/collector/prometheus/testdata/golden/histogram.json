@@ -6,12 +6,12 @@
     },
     "dims": [
       {
-        "name": "bucket_+Inf",
+        "name": "+Inf",
         "algo": "incremental",
-        "value": 6
+        "value": 2
       },
       {
-        "name": "bucket_0.1",
+        "name": "0.1",
         "algo": "incremental",
         "value": 4
       }
@@ -19,7 +19,7 @@
     "soft": {
       "units": "observations/s",
       "family": "test_histogram",
-      "type": ""
+      "type": "heatmap"
     }
   },
   {

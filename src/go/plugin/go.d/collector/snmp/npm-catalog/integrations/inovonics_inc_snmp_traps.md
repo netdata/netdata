@@ -144,4 +144,3 @@ Netdata decodes **8 trap definitions** from Inovonics Inc across **2 MIBs** into
 - `INOVONICS-MODEL640-MIB::rdsErrorTrap`
 - `INOVONICS-MODEL640-MIB::pilotLossTrap`
 - `INOVONICS-MODEL650-MIB::audioLossTrap`
-

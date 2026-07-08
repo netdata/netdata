@@ -146,4 +146,3 @@ Netdata decodes **24 trap definitions** from Stonesoft Corp across **4 MIBs** in
 - `STONESOFT-NETNODE-MIB::nodeOnline`
 - `STONESOFT-NETNODE-MIB::nodeOffline`
 - `STONESOFT-NETNODE-MIB::nodeBoot`
-

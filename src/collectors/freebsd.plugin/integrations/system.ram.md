@@ -130,5 +130,3 @@ Metrics:
 |:------|:----------|:----|
 | system.ram | free, active, inactive, wired, cache, laundry, buffers | MiB |
 | mem.available | avail | MiB |
-
-

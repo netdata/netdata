@@ -245,14 +245,14 @@ exit_with_error:
 
 #define HTTP_HDR_LINE_CHECK_LIMIT(x)                                                                                   \
     if ((x) >= MAX_HTTP_LINE_LENGTH) {                                                                                 \
-        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP line received is too long. Maximum is %d", MAX_HTTP_LINE_LENGTH);                                  \
+        nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP line received is too long. Maximum is %zu", (size_t)MAX_HTTP_LINE_LENGTH);                         \
         return WS_CLIENT_PROTOCOL_ERROR;                                                                               \
     }
 
 int ws_client_parse_handshake_resp(ws_client *client)
 {
     char buf[HTTP_SC_LENGTH];
-    int idx_crlf, idx_sep;
+    size_t idx_crlf, idx_sep;
     char *ptr;
     size_t bytes;
 
@@ -316,13 +316,13 @@ int ws_client_parse_handshake_resp(ws_client *client)
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Expected HTTP hdr field key/value separator \": \" before endline in non empty HTTP header line");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
-            if (idx_crlf == idx_sep + (int)strlen(HTTP_HDR_SEPARATOR)) {
+            if (idx_crlf == idx_sep + strlen(HTTP_HDR_SEPARATOR)) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP Header value cannot be empty");
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
             if (idx_sep > HTTP_HEADER_NAME_MAX_LEN) {
-                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP header too long (%d)", idx_sep);
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: HTTP header too long (%zu)", idx_sep);
                 return WS_CLIENT_PROTOCOL_ERROR;
             }
 
@@ -579,6 +579,11 @@ int ws_client_process_rx_ws(ws_client *client)
             // a) empty payload
             // b) 2byte reason code
             // c) 2byte reason code followed by message
+            if (client->rx.payload_length > 125) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebSocket CONNECTION_CLOSE payload too big! Received %"PRIu64" bytes, maximum allowed 125 bytes",
+                       client->rx.payload_length);
+                return WS_CLIENT_PROTOCOL_ERROR;
+            }
             if (client->rx.payload_length == 1) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebScoket CONNECTION_CLOSE can't have payload of size 1");
                 return WS_CLIENT_PROTOCOL_ERROR;
@@ -609,9 +614,10 @@ int ws_client_process_rx_ws(ws_client *client)
             }
             client->rx.parse_state = WS_PAYLOAD_CONNECTION_CLOSE_MSG;
             break;
-        case WS_PAYLOAD_CONNECTION_CLOSE_MSG:
+        case WS_PAYLOAD_CONNECTION_CLOSE_MSG: {
+            size_t close_reason_length = (size_t)(client->rx.payload_length - sizeof(uint16_t));
             if (!client->rx.specific_data.op_close.reason)
-                client->rx.specific_data.op_close.reason = mallocz(client->rx.payload_length + 1);
+                client->rx.specific_data.op_close.reason = mallocz(close_reason_length + 1);
 
             while (client->rx.payload_processed < client->rx.payload_length) {
                 if (!rbuf_bytes_available(client->buf_read))
@@ -620,7 +626,7 @@ int ws_client_process_rx_ws(ws_client *client)
                                                          &client->rx.specific_data.op_close.reason[client->rx.payload_processed - sizeof(uint16_t)],
                                                          client->rx.payload_length - client->rx.payload_processed);
             }
-            client->rx.specific_data.op_close.reason[client->rx.payload_length] = 0;
+            client->rx.specific_data.op_close.reason[close_reason_length] = 0;
             nd_log(NDLS_DAEMON, NDLP_INFO, "ACLK: WebSocket server closed the connection with EC=%d and reason \"%s\"",
                 client->rx.specific_data.op_close.ec,
                 client->rx.specific_data.op_close.reason);
@@ -629,6 +635,7 @@ int ws_client_process_rx_ws(ws_client *client)
             client->rx.specific_data.op_close.reason = NULL;
             client->rx.parse_state = WS_PACKET_DONE;
             break;
+        }
         case WS_PAYLOAD_SKIP_UNKNOWN_PAYLOAD:
             BUF_READ_CHECK_AT_LEAST(client->rx.payload_length);
             nd_log(NDLS_DAEMON, NDLP_WARNING, "ACLK: Skipping Websocket Packet of unsupported/unknown type");
@@ -637,6 +644,11 @@ int ws_client_process_rx_ws(ws_client *client)
             client->rx.parse_state = WS_PACKET_DONE;
             return WS_CLIENT_PARSING_DONE;
         case WS_PAYLOAD_PING_REQ_PAYLOAD:
+            if (client->rx.payload_length > 125) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: WebSocket PING payload too big! Received %"PRIu64" bytes, maximum allowed 125 bytes",
+                       client->rx.payload_length);
+                return WS_CLIENT_PROTOCOL_ERROR;
+            }
             if (client->rx.payload_length > rbuf_get_capacity(client->buf_read) / 2) {
                 nd_log(NDLS_DAEMON, NDLP_ERR, "ACLK: Ping payload too big! Received %"PRIu64" bytes, maximum allowed %zu bytes (buffer capacity: %zu bytes)",
                        client->rx.payload_length, rbuf_get_capacity(client->buf_read) / 2, rbuf_get_capacity(client->buf_read));

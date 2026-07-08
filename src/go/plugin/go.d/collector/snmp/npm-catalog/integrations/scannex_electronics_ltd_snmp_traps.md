@@ -143,4 +143,3 @@ Netdata decodes **45 trap definitions** from Scannex Electronics Ltd across **1 
 - `SCANNEX-MIB::powerfailTrap`
 - `SCANNEX-MIB::ipchangeTrap`
 - `SCANNEX-MIB::heartbeatTrap`
-

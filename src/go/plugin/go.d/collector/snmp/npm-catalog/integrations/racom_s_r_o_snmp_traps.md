@@ -144,4 +144,3 @@ Netdata decodes **37 trap definitions** from Racom S R O across **2 MIBs** into 
 - `RAY-MIB::airWdog`
 - `RAY-MIB::tempAlarm`
 - `RAY-MIB::powerAlarm`
-

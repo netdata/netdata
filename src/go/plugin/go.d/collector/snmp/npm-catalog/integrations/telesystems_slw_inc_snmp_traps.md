@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Telesystems Slw Inc across **1 MIB** 
 ### Sample decoded traps
 
 - `AWCVX-MIB::awcTrapLog`
-

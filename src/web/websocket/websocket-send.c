@@ -146,17 +146,19 @@ static int websocket_protocol_send_frame(
             header_dst[3] = final_payload_len & 0xFF;
             break;
 
-        case 10:
+        case 10: {
+            uint64_t final_payload_len64 = final_payload_len;
             header_dst[1] = 127;
-            header_dst[2] = (final_payload_len >> 56) & 0xFF;
-            header_dst[3] = (final_payload_len >> 48) & 0xFF;
-            header_dst[4] = (final_payload_len >> 40) & 0xFF;
-            header_dst[5] = (final_payload_len >> 32) & 0xFF;
-            header_dst[6] = (final_payload_len >> 24) & 0xFF;
-            header_dst[7] = (final_payload_len >> 16) & 0xFF;
-            header_dst[8] = (final_payload_len >> 8) & 0xFF;
-            header_dst[9] = final_payload_len & 0xFF;
+            header_dst[2] = (final_payload_len64 >> 56) & 0xFF;
+            header_dst[3] = (final_payload_len64 >> 48) & 0xFF;
+            header_dst[4] = (final_payload_len64 >> 40) & 0xFF;
+            header_dst[5] = (final_payload_len64 >> 32) & 0xFF;
+            header_dst[6] = (final_payload_len64 >> 24) & 0xFF;
+            header_dst[7] = (final_payload_len64 >> 16) & 0xFF;
+            header_dst[8] = (final_payload_len64 >> 8) & 0xFF;
+            header_dst[9] = final_payload_len64 & 0xFF;
             break;
+        }
 
         default:
             // impossible case - added to avoid compiler warning

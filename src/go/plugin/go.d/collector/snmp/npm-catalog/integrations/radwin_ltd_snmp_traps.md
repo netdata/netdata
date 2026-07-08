@@ -143,4 +143,3 @@ Netdata decodes **110 trap definitions** from Radwin Ltd across **1 MIB** into s
 - `RADWIN-MIB-WINLINK1000::bitFailedAlarm`
 - `RADWIN-MIB-WINLINK1000::wrongConfigurationLoadedAlarm`
 - `RADWIN-MIB-WINLINK1000::lanPort1DisconnectedAlarm`
-

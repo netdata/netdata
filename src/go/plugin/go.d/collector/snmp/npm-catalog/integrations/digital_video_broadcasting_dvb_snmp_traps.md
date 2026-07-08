@@ -144,4 +144,3 @@ Netdata decodes **5 trap definitions** from Digital Video Broadcasting Dvb acros
 - `DVB-MGTR101290-MIB::measurementUnknownTrap`
 - `DVB-MGSIGNALCHARACTERISTICS-MIB::tsStructureChangeTrap`
 - `DVB-MGSIGNALCHARACTERISTICS-MIB::rfCharacteristicsChangeTrap`
-

@@ -172,4 +172,3 @@ Netdata decodes **410 trap definitions** from Ip Infusion Inc across **30 MIBs**
 - `IPI-VRF-MIB::ipiVrfIfUpNotification`
 - `IPI-VRF-MIB::ipiVrfIfDownNotification`
 - `IPI-ICMP-TRAP-MIB::icmpV4ErrorNotify`
-

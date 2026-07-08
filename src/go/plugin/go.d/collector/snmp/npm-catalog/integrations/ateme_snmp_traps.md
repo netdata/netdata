@@ -144,4 +144,3 @@ Netdata decodes **181 trap definitions** from Ateme across **2 MIBs** into struc
 - `ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorLogSystemStoppedNotification`
 - `ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorLogSystemEthernetIgmpVersionChangedNotification`
 - `ATEME-TITAN-EDGE-MIB::titanEdgeApplianceMonitorLogDvbSsuChannelUpdateNotification`
-

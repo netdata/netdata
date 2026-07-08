@@ -143,4 +143,3 @@ Netdata decodes **124 trap definitions** from Abb Power Protection S.A. across *
 - `ABBMODULARUPS-MIB::upsTrapAlarmEntryAdded`
 - `ABBMODULARUPS-MIB::upsTrapAlarmEntryRemoved`
 - `ABBMODULARUPS-MIB::ups01TrapOnBattery`
-

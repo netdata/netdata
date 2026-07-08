@@ -143,4 +143,3 @@ Netdata decodes **74 trap definitions** from Cray across **1 MIB** into structur
 - `CRI-SERVER-MIB::eddState`
 - `CRI-SERVER-MIB::sysBrdTempNorm`
 - `CRI-SERVER-MIB::sysBrdTempHigh`
-

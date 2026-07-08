@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Silver Peak Systems Inc across **1 MI
 ### Sample decoded traps
 
 - `SILVERPEAK-MGMT-MIB::spsNotifyAlarm`
-

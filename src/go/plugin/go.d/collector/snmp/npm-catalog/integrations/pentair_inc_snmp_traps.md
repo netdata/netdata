@@ -143,4 +143,3 @@ Netdata decodes **10 trap definitions** from Pentair Inc across **1 MIB** into s
 - `COMM-BOARD-MIB::startUpLowTempEV`
 - `COMM-BOARD-MIB::highTempAlarmEV`
 - `COMM-BOARD-MIB::lowTempAlarmEV`
-

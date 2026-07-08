@@ -378,13 +378,27 @@ struct {
     { .hash = 0, .key = NULL, .cb = NULL }
 };
 
-char *http_header_parse_line(struct web_client *w, char *s) {
-    if(unlikely(!supported_headers[0].hash)) {
-        // initialize the hashes, the first time it runs
+static SPINLOCK supported_headers_init_spinlock = SPINLOCK_INITIALIZER;
+static bool supported_headers_initialized = false;
 
+static inline void supported_headers_init(void) {
+    if(likely(__atomic_load_n(&supported_headers_initialized, __ATOMIC_ACQUIRE)))
+        return;
+
+    spinlock_lock(&supported_headers_init_spinlock);
+
+    if(unlikely(!__atomic_load_n(&supported_headers_initialized, __ATOMIC_ACQUIRE))) {
         for(size_t i = 0; supported_headers[i].key ;i++)
             supported_headers[i].hash = simple_uhash(supported_headers[i].key);
+
+        __atomic_store_n(&supported_headers_initialized, true, __ATOMIC_RELEASE);
     }
+
+    spinlock_unlock(&supported_headers_init_spinlock);
+}
+
+char *http_header_parse_line(struct web_client *w, char *s) {
+    supported_headers_init();
 
     char *e = s;
 

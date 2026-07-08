@@ -143,4 +143,3 @@ Netdata decodes **44 trap definitions** from Pan Dacom Direkt GmbH Formerly Pan 
 - `SPEEDCARRIER-MIB::fanError`
 - `SPEEDCARRIER-MIB::fanOK`
 - `SPEEDCARRIER-MIB::powerFailure`
-

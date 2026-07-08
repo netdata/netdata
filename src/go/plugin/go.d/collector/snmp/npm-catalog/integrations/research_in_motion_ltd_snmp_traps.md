@@ -144,4 +144,3 @@ Netdata decodes **37 trap definitions** from Research In Motion Ltd across **2 M
 - `BLACKBERRYSERVER-MIB::besMailServerDownEvent`
 - `BLACKBERRYSERVER-MIB::besMDStoBESConnectionEvent`
 - `BLACKBERRYSERVER-MIB::besMDSStartStopEvent`
-

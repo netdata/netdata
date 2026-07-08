@@ -142,4 +142,3 @@ Netdata decodes **4 trap definitions** from Network Alchemy Inc across **1 MIB**
 - `NETWORK-ALCHEMY-CLUSTER-MIB::clusterMemberJoin`
 - `NETWORK-ALCHEMY-CLUSTER-MIB::clusterMemberLeft`
 - `NETWORK-ALCHEMY-CLUSTER-MIB::clusterMemberBecameMaster`
-

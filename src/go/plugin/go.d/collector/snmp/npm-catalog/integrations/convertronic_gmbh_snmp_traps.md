@@ -143,4 +143,3 @@ Netdata decodes **32 trap definitions** from Convertronic GmbH across **1 MIB** 
 - `STS_SEQUENZ-MIB::syncronisation_error_present`
 - `STS_SEQUENZ-MIB::inverter_failure_present`
 - `STS_SEQUENZ-MIB::no_redundant_inverter_present`
-

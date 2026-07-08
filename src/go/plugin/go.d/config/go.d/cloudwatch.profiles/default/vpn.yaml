@@ -25,7 +25,7 @@ metrics:
     rate: true
   - id: tunnel_state
     metric_name: TunnelState
-    statistics: [average]
+    statistics: [average, minimum]
 template:
   family: VPN
   context_namespace: vpn
@@ -53,3 +53,5 @@ template:
       dimensions:
         - selector: tunnel_state_average
           name: up
+        - selector: tunnel_state_minimum
+          name: minimum

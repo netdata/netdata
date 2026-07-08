@@ -143,4 +143,3 @@ Netdata decodes **5 trap definitions** from Jds Uniphase Corporation across **1 
 - `JDSU-ONMSI-MIB::jdsuOnmsiPonTestResultTrap`
 - `JDSU-ONMSI-MIB::jdsuOnmsiMonitoringTestResultTrap`
 - `JDSU-ONMSI-MIB::jdsuOnmsiAlarmEventTrap`
-

@@ -981,6 +981,3 @@ If the logs show `vsphere:periodic-discovery-error`, check vCenter reachability,
 ### vCenter reboot recovery
 
 The collector cannot always recover an existing session after a vCenter reboot. Restart `go.d.plugin` if collection does not resume after vCenter becomes available again.
-
-
-

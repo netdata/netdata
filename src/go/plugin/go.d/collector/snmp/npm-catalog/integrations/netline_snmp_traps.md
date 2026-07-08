@@ -143,4 +143,3 @@ Netdata decodes **10 trap definitions** from Netline across **1 MIB** into struc
 - `Cxr-connect-MIB::linkUp`
 - `Cxr-connect-MIB::authenticationFailure`
 - `Cxr-connect-MIB::comStart`
-

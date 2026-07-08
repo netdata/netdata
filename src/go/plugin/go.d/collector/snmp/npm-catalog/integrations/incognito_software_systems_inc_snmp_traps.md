@@ -143,4 +143,3 @@ Netdata decodes **39 trap definitions** from Incognito Software Systems Inc acro
 - `INCOGNITO-EXPR-IPCOMMANDER-MIB::incognitoIPCMDServerStart`
 - `INCOGNITO-EXPR-IPCOMMANDER-MIB::incognitoIPCMDServerStop`
 - `INCOGNITO-EXPR-IPCOMMANDER-MIB::incognitoIPCMDServicePaused`
-

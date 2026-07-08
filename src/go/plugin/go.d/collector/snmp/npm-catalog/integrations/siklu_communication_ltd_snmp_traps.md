@@ -143,4 +143,3 @@ Netdata decodes **17 trap definitions** from Siklu Communication Ltd across **1 
 - `RADIO-BRIDGE-MIB::trapTemperatureInRange`
 - `RADIO-BRIDGE-MIB::trapSfpIn`
 - `RADIO-BRIDGE-MIB::trapSfpOut`
-

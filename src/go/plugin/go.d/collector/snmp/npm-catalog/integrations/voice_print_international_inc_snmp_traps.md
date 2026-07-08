@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Voice Print International Inc across 
 ### Sample decoded traps
 
 - `VPIEVENT-MIB::eventNotif`
-

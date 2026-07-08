@@ -168,5 +168,3 @@ Metrics:
 | mem.memory_map | msync | calls/s |
 | mem.sync | sync, syncfs | calls/s |
 | mem.file_segment | sync_file_range | calls/s |
-
-

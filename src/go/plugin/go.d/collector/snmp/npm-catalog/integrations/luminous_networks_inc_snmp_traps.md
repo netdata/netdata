@@ -144,4 +144,3 @@ Netdata decodes **21 trap definitions** from Luminous Networks Inc across **2 MI
 - `LUMINOUS-TRAP-MIB::lumCardStateChange`
 - `LUMINOUS-TRAP-MIB::lumDownloadComplete`
 - `LUMINOUS-TRAP-MIB::lumProvisionAlarm`
-

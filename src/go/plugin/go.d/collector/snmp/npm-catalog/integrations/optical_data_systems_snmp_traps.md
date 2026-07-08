@@ -143,4 +143,3 @@ Netdata decodes **6 trap definitions** from Optical Data Systems across **1 MIB*
 - `ODSLANBlazer7000-MIB::lanBlazer7000TemperatureTrap`
 - `ODSLANBlazer7000-MIB::lanBlazer7000ResourceTrap`
 - `ODSLANBlazer7000-MIB::lanBlazer7000FanTrap`
-

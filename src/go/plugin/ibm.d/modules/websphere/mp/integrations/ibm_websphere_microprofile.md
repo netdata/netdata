@@ -185,5 +185,3 @@ Metrics:
 |:------|:----------|:----|
 | websphere_mp.threadpool_usage | active, idle | threads |
 | websphere_mp.threadpool_size | size | threads |
-
-

@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Red Lion Controls N Tron across **1 M
 ### Sample decoded traps
 
 - `NTRON714FX6-MIB::ntronPowerChange`
-

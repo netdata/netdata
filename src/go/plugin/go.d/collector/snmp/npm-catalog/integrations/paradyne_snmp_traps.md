@@ -165,4 +165,3 @@ Netdata decodes **125 trap definitions** from Paradyne across **23 MIBs** into s
 - `HOTWIRE-XDSL-INTERFACE-MIB::xdslLinkUpDownTransitions`
 - `HOTWIRE-XDSL-INTERFACE-MIB::xdslPortSpeedLow`
 - `HOTWIRE-XDSL-INTERFACE-MIB::xdslMarginLow`
-

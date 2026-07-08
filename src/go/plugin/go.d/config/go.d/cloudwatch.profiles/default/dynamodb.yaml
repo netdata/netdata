@@ -51,7 +51,7 @@ metrics:
   #   rate: true
   # Per-operation metrics {TableName, Operation} (SystemErrors, ThrottledRequests, ReturnedItemCount,
   # SuccessfulRequestLatency) are collected by the dynamodb_operation profile -- enable it with
-  # namespaces.mode: combined. Metrics at still other grains need their own profile:
+  # profiles.mode: combined. Metrics at still other grains need their own profile:
   #   - Global secondary indexes {TableName, GlobalSecondaryIndexName}; global tables
   #     {TableName, ReceivingRegion}; change-data-capture {TableName, DelegatedOperation}.
   # On-demand max capacity (OnDemandMaxRead/WriteRequestUnits) is also published at {TableName}. See:

@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Auditec S.A. across **1 MIB** into s
 
 - `AUDITEC2-MIB::probeAlarmEvent`
 - `AUDITEC2-MIB::probeAlarmEvent2`
-

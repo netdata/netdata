@@ -148,4 +148,3 @@ Netdata decodes **93 trap definitions** from Arris Interactive LLC across **6 MI
 - `ARRIS-C3-FPD-MIB::dcxFPDFan1Fail`
 - `ARRIS-C3-FPD-MIB::dcxFPDFan1FailClr`
 - `ARRIS-C3-FPD-MIB::dcxFPDFan2Fail`
-

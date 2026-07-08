@@ -1,0 +1,33 @@
+---
+version: v1
+display_name: AWS NLB Target Health
+namespace: AWS/NetworkELB
+period: 300
+# Narrow default target-group health profile. NLB target-health metrics are published at
+# {LoadBalancer, TargetGroup}, while the main nlb profile intentionally stays at {LoadBalancer}.
+instance:
+  dimensions:
+    - name: LoadBalancer
+      label: load_balancer
+    - name: TargetGroup
+      label: target_group
+metrics:
+  - id: unhealthy_host_count
+    metric_name: UnHealthyHostCount
+    statistics: [minimum]
+template:
+  family: NLB Targets
+  context_namespace: nlb_target_health
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, load_balancer, target_group]
+  charts:
+    - id: cw_nlb_target_health_unhealthy_hosts
+      context: unhealthy_hosts
+      title: NLB Target Group Unhealthy Hosts
+      family: Hosts
+      units: hosts
+      algorithm: absolute
+      dimensions:
+        - selector: unhealthy_host_count_minimum
+          name: unhealthy

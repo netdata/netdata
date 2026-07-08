@@ -113,8 +113,13 @@ bool stream_circular_buffer_add_unsafe(
     scb->stats.bytes_uncompressed += bytes_uncompressed;
     scb->stats.bytes_sent_by_type[type] += bytes_actual;
 
-    if(unlikely(autoscale && cbuffer_available_size_unsafe(scb->cb) < bytes_actual))
-        stream_circular_buffer_set_max_size_unsafe(scb, scb->cb->max_size * 2, true);
+    if(unlikely(autoscale && cbuffer_available_size_unsafe(scb->cb) < bytes_actual)) {
+        size_t max_size = scb->cb->max_size;
+        max_size = (max_size > SIZE_MAX / 2) ? SIZE_MAX : max_size * 2;
+
+        if(max_size > scb->cb->max_size)
+            stream_circular_buffer_set_max_size_unsafe(scb, max_size, true);
+    }
 
     if(unlikely(cbuffer_add_unsafe(scb->cb, data, bytes_actual) != 0))
         return false;

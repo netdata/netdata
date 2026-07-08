@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Inflection Systems across **1 MIB** i
 ### Sample decoded traps
 
 - `EXAGRID-MIB::egTrap`
-

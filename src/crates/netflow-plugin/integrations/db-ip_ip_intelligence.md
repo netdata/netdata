@@ -211,6 +211,3 @@ tier; the 1-minute, 5-minute, and 1-hour rollups drop them to keep cardinality
 bounded. A query that auto-falls back to a rollup tier therefore renders an empty
 city map. Narrow the time range so the query fits the raw tier, or use the
 country / state map (those survive into rollups).
-
-
-

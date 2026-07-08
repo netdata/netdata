@@ -126,5 +126,3 @@ Metrics:
 | Metric | Dimensions | Unit |
 |:------|:----------|:----|
 | ipv4.tcpsock | connections | active connections |
-
-

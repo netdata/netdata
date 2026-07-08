@@ -114,5 +114,3 @@ Metrics:
 | usergroup.fds_open | files, sockets, pipes, inotifies, event, timer, signal, eventpolls, other | fds |
 | usergroup.uptime | uptime | seconds |
 | usergroup.uptime_summary | min, avg, max | seconds |
-
-

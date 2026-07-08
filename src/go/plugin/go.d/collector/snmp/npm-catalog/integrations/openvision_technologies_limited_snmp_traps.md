@@ -143,4 +143,3 @@ Netdata decodes **26 trap definitions** from Openvision Technologies Limited acr
 - `VRTS-SNMP-MIBv1::nbuExtEvent`
 - `VRTS-SNMP-MIBv1::dbBackupFailed`
 - `VRTS-SNMP-MIBv1::dbBackupIsDisabled`
-

@@ -151,4 +151,3 @@ Netdata decodes **601 trap definitions** from Aruba A Hewlett Packard Enterprise
 - `CPPM-MIB::cppmNodeCertExpiry`
 - `CPPM-MIB::cppmLowDiskSpace`
 - `CPPM-MIB::cppmLowMemory`
-

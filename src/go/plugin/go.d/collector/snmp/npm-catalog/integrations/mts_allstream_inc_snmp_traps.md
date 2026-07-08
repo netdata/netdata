@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Mts Allstream Inc across **1 MIB** in
 ### Sample decoded traps
 
 - `MTSALLSTREAM-MIB::allstreamForwardCICEventTrap`
-

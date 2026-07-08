@@ -242,6 +242,80 @@ static size_t dictionary_unittest_foreach_delete_this(DICTIONARY *dict, char **n
     return entries - count;
 }
 
+static size_t dictionary_unittest_reject_unrepresentable_lengths(void) {
+    size_t errors = 0;
+
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    int value = 1;
+    if(dictionary_set_advanced(dict, "key-too-long", (ssize_t)KEY_LEN_MAX + 1, &value, sizeof(value), NULL)) {
+        fprintf(stderr, ">>> %s() accepted an unrepresentable key length\n", __FUNCTION__);
+        errors++;
+    }
+    if(dictionary_entries(dict) != 0) {
+        fprintf(stderr, ">>> %s() added an item with an unrepresentable key length\n", __FUNCTION__);
+        errors++;
+    }
+    dictionary_destroy(dict);
+
+    DICTIONARY *master = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    DICTIONARY *view = dictionary_create_view(master);
+    DICT_ITEM_CONST DICTIONARY_ITEM *master_item = dictionary_set_and_acquire_item(master, "master", &value, sizeof(value));
+    if(!master_item) {
+        fprintf(stderr, ">>> %s() failed to add the master item\n", __FUNCTION__);
+        errors++;
+    }
+    else {
+        if(dictionary_view_set_advanced(view, "view-key-too-long", (ssize_t)KEY_LEN_MAX + 1, master_item)) {
+            fprintf(stderr, ">>> %s() accepted an unrepresentable view key length\n", __FUNCTION__);
+            errors++;
+        }
+        if(dictionary_entries(view) != 0) {
+            fprintf(stderr, ">>> %s() added a view item with an unrepresentable key length\n", __FUNCTION__);
+            errors++;
+        }
+        dictionary_acquired_item_release(master, master_item);
+    }
+    dictionary_destroy(view);
+    dictionary_destroy(master);
+
+    dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    if(dictionary_set(dict, "value-too-large", NULL, (size_t)VALUE_LEN_MAX + 1)) {
+        fprintf(stderr, ">>> %s() accepted an unrepresentable value length\n", __FUNCTION__);
+        errors++;
+    }
+    if(dictionary_entries(dict) != 0) {
+        fprintf(stderr, ">>> %s() added an item with an unrepresentable value length\n", __FUNCTION__);
+        errors++;
+    }
+    dictionary_destroy(dict);
+
+    dict = dictionary_create(DICT_OPTION_SINGLE_THREADED);
+    int original = 1234;
+    int *stored = dictionary_set(dict, "existing", &original, sizeof(original));
+    if(!stored || *stored != original) {
+        fprintf(stderr, ">>> %s() failed to add the baseline item\n", __FUNCTION__);
+        errors++;
+    }
+
+    if(dictionary_set(dict, "existing", NULL, (size_t)VALUE_LEN_MAX + 1)) {
+        fprintf(stderr, ">>> %s() reset an item with an unrepresentable value length\n", __FUNCTION__);
+        errors++;
+    }
+
+    stored = dictionary_get(dict, "existing");
+    if(!stored || *stored != original) {
+        fprintf(stderr, ">>> %s() changed the baseline item after rejected reset\n", __FUNCTION__);
+        errors++;
+    }
+    if(dictionary_entries(dict) != 1) {
+        fprintf(stderr, ">>> %s() changed dictionary entries after rejected reset\n", __FUNCTION__);
+        errors++;
+    }
+    dictionary_destroy(dict);
+
+    return errors;
+}
+
 static size_t dictionary_unittest_destroy(DICTIONARY *dict, char **names, char **values, size_t entries) {
     (void)names;
     (void)values;
@@ -1891,6 +1965,9 @@ int dictionary_unittest(size_t entries) {
 
     dictionary_unittest_free_char_pp(names, entries);
     dictionary_unittest_free_char_pp(values, entries);
+
+    fprintf(stderr, "\nTesting dictionary packed length bounds\n");
+    errors += dictionary_unittest_reject_unrepresentable_lengths();
 
     errors += dictionary_unittest_views();
     errors += dictionary_unittest_threads();

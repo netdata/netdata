@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Librenms across **1 MIB** into struct
 ### Sample decoded traps
 
 - `LIBRENMS-NOTIFICATIONS-MIB::defaultAlertEvent`
-

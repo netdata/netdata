@@ -143,4 +143,3 @@ Netdata decodes **50 trap definitions** from Planet Technology Corp across **1 M
 - `DIGIPDU-MIB::inFeedHighCurrentTrap`
 - `DIGIPDU-MIB::inFeedLowCurrentTrap`
 - `DIGIPDU-MIB::inFeedBranchOverloadTrap`
-

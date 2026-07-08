@@ -385,6 +385,7 @@ struct nd_log nd_log = {
 
 __thread struct log_stack_entry *thread_log_stack_base[THREAD_LOG_STACK_MAX];
 __thread size_t thread_log_stack_next = 0;
+static __thread size_t thread_log_stack_dropped = 0;
 __thread struct log_field thread_log_fields[_NDF_MAX] = {
     // THE ORDER HERE IS IRRELEVANT (but keep them sorted by their number)
 
@@ -732,6 +733,12 @@ void log_stack_pop(void *ptr) {
 
     struct log_stack_entry *lgs = *(struct log_stack_entry (*)[])ptr;
 
+    // Dropped frames unwind before older pushed frames; consume them before pointer matching.
+    if(unlikely(thread_log_stack_dropped)) {
+        thread_log_stack_dropped--;
+        return;
+    }
+
     if(unlikely(!thread_log_stack_next || lgs != thread_log_stack_base[thread_log_stack_next - 1])) {
         fatal("You cannot pop in the middle of the stack, or an item not in the stack");
         return;
@@ -741,9 +748,104 @@ void log_stack_pop(void *ptr) {
 }
 
 void log_stack_push(struct log_stack_entry *lgs) {
-    if(!lgs || thread_log_stack_next >= THREAD_LOG_STACK_MAX) return;
+    if(!lgs) return;
+
+    if(unlikely(thread_log_stack_next >= THREAD_LOG_STACK_MAX)) {
+        thread_log_stack_dropped++;
+        return;
+    }
+
     thread_log_stack_base[thread_log_stack_next++] = lgs;
 }
+
+#define LOG_STACK_TEST(condition, msg) do {                                      \
+        if(!(condition)) {                                                       \
+            fprintf(stderr, "log stack unittest FAILED: %s (%s:%d)\n",          \
+                    (msg), __FUNCTION__, __LINE__);                              \
+            errors++;                                                            \
+        }                                                                        \
+    } while(0)
+
+int log_stack_unittest(void) {
+    int errors = 0;
+
+    fprintf(stderr, "\nrunning log stack unittest\n");
+
+    struct log_stack_entry lgs[THREAD_LOG_STACK_MAX + 2][2];
+    for(size_t i = 0; i < THREAD_LOG_STACK_MAX + 2; i++) {
+        lgs[i][0] = ND_LOG_FIELD_TXT(NDF_MESSAGE, "log-stack-unittest");
+        lgs[i][1] = ND_LOG_FIELD_END();
+    }
+
+    memset(thread_log_stack_base, 0, sizeof(thread_log_stack_base));
+    thread_log_stack_next = 0;
+    thread_log_stack_dropped = 0;
+
+    for(size_t i = 0; i < THREAD_LOG_STACK_MAX; i++)
+        log_stack_push(lgs[i]);
+
+    LOG_STACK_TEST(thread_log_stack_next == THREAD_LOG_STACK_MAX, "stack fills to maximum depth");
+    LOG_STACK_TEST(thread_log_stack_dropped == 0, "no dropped pushes before overflow");
+
+    log_stack_push(lgs[THREAD_LOG_STACK_MAX]);
+    log_stack_push(lgs[THREAD_LOG_STACK_MAX + 1]);
+
+    LOG_STACK_TEST(thread_log_stack_next == THREAD_LOG_STACK_MAX, "overflow does not grow stack");
+    LOG_STACK_TEST(thread_log_stack_dropped == 2, "overflow records dropped pushes");
+
+    log_stack_pop(&lgs[THREAD_LOG_STACK_MAX + 1]);
+    LOG_STACK_TEST(thread_log_stack_next == THREAD_LOG_STACK_MAX, "dropped cleanup leaves stack depth unchanged");
+    LOG_STACK_TEST(thread_log_stack_dropped == 1, "dropped cleanup consumes one dropped push");
+
+    log_stack_pop(&lgs[THREAD_LOG_STACK_MAX]);
+    LOG_STACK_TEST(thread_log_stack_next == THREAD_LOG_STACK_MAX, "second dropped cleanup leaves stack depth unchanged");
+    LOG_STACK_TEST(thread_log_stack_dropped == 0, "second dropped cleanup consumes final dropped push");
+
+    for(size_t i = THREAD_LOG_STACK_MAX; i > 0; i--)
+        log_stack_pop(&lgs[i - 1]);
+
+    LOG_STACK_TEST(thread_log_stack_next == 0, "successful pushes still pop in LIFO order");
+    LOG_STACK_TEST(thread_log_stack_dropped == 0, "dropped counter is clear after cleanup");
+
+    struct log_stack_entry repeated_lgs[] = {
+        ND_LOG_FIELD_TXT(NDF_MESSAGE, "log-stack-repeated-pointer"),
+        ND_LOG_FIELD_END(),
+    };
+
+    memset(thread_log_stack_base, 0, sizeof(thread_log_stack_base));
+    thread_log_stack_next = 0;
+    thread_log_stack_dropped = 0;
+
+    for(size_t i = 0; i < THREAD_LOG_STACK_MAX; i++)
+        log_stack_push(repeated_lgs);
+
+    log_stack_push(repeated_lgs);
+    LOG_STACK_TEST(thread_log_stack_next == THREAD_LOG_STACK_MAX, "same-pointer overflow leaves previous stack entries");
+    LOG_STACK_TEST(thread_log_stack_dropped == 1, "same-pointer overflow records dropped push");
+
+    log_stack_pop(&repeated_lgs);
+    LOG_STACK_TEST(thread_log_stack_next == THREAD_LOG_STACK_MAX, "same-pointer dropped cleanup does not pop older entry");
+    LOG_STACK_TEST(thread_log_stack_dropped == 0, "same-pointer dropped cleanup consumes dropped push");
+
+    for(size_t i = THREAD_LOG_STACK_MAX; i > 0; i--)
+        log_stack_pop(&repeated_lgs);
+
+    LOG_STACK_TEST(thread_log_stack_next == 0, "same-pointer successful entries still pop");
+    LOG_STACK_TEST(thread_log_stack_dropped == 0, "same-pointer dropped counter is clear after cleanup");
+
+    memset(thread_log_stack_base, 0, sizeof(thread_log_stack_base));
+    thread_log_stack_next = 0;
+    thread_log_stack_dropped = 0;
+
+    if(errors)
+        fprintf(stderr, "log stack unittest: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "log stack unittest: OK\n");
+
+    return errors;
+}
+
+#undef LOG_STACK_TEST
 
 // --------------------------------------------------------------------------------------------------------------------
 

@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Smc across **1 MIB** into structured
 
 - `SMC6152L2-MIB::swPowerStatusChangeTrap`
 - `SMC6152L2-MIB::swPortSecurityTrap`
-

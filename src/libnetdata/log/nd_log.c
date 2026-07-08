@@ -150,7 +150,8 @@ static void nd_log_fatal_hook(struct log_field *fields, size_t fields_max __mayb
 
     nd_log_fatal_event = false;
 
-    if(!nd_log.fatal_hook_cb)
+    log_event_t fatal_hook_cb = __atomic_load_n(&nd_log.fatal_hook_cb, __ATOMIC_ACQUIRE);
+    if(!fatal_hook_cb)
         return;
 
     const char *filename = log_field_strdupz(&fields[NDF_FILE]);
@@ -160,17 +161,17 @@ static void nd_log_fatal_hook(struct log_field *fields, size_t fields_max __mayb
     const char *errno_str = log_field_strdupz(&fields[NDF_ERRNO]);
     long line = log_field_to_int64(&fields[NDF_LINE]);
 
-    nd_log.fatal_hook_cb(filename, function, message, errno_str, stack_trace, line);
+    fatal_hook_cb(filename, function, message, errno_str, stack_trace, line);
 }
 
 void nd_log_register_fatal_hook_cb(log_event_t cb) {
-    nd_log.fatal_hook_cb = cb;
+    __atomic_store_n(&nd_log.fatal_hook_cb, cb, __ATOMIC_RELEASE);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
 
 void nd_log_register_fatal_final_cb(fatal_event_t cb) {
-    nd_log.fatal_final_cb = cb;
+    __atomic_store_n(&nd_log.fatal_final_cb, cb, __ATOMIC_RELEASE);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -585,8 +586,9 @@ void netdata_logger_fatal(const char *file, const char *function, const unsigned
     fatal_abort_internal_checks();
 #endif
 
-    if(nd_log.fatal_final_cb)
-        nd_log.fatal_final_cb();
+    fatal_event_t fatal_final_cb = __atomic_load_n(&nd_log.fatal_final_cb, __ATOMIC_ACQUIRE);
+    if(fatal_final_cb)
+        fatal_final_cb();
 
     exit(1);
 }

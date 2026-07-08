@@ -347,7 +347,7 @@ int send_alarm_configuration(const char *msg, size_t msg_len)
 int send_alarm_snapshot(const char *msg, size_t msg_len)
 {
     struct send_alarm_snapshot *sas = parse_send_alarm_snapshot(msg, msg_len);
-    if (!sas->node_id || !sas->claim_id || !sas->snapshot_uuid) {
+    if (!sas || !sas->node_id || !sas->claim_id || !sas->snapshot_uuid) {
         netdata_log_error("Error parsing SendAlarmSnapshot");
         destroy_send_alarm_snapshot(sas);
         return 1;
@@ -355,6 +355,8 @@ int send_alarm_snapshot(const char *msg, size_t msg_len)
     aclk_query_t *query = aclk_query_new(ALERT_CHECKPOINT);
     query->data.node_id = sas->node_id;     // Will be freed on query free
     query->claim_id = sas->claim_id;        // Will be freed on query free
+    sas->node_id = NULL;
+    sas->claim_id = NULL;
     query->version = 0; // force snapshot
     aclk_add_job(query);
     destroy_send_alarm_snapshot(sas);

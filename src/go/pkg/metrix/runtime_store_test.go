@@ -103,8 +103,8 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 
 				fr := s.Read(ReadFlatten())
 				mustValue(t, fr, "runtime.req_duration_bucket", Labels{"le": "1"}, 1)
-				mustValue(t, fr, "runtime.req_duration_bucket", Labels{"le": "2"}, 1)
-				mustValue(t, fr, "runtime.req_duration_bucket", Labels{"le": "+Inf"}, 2)
+				mustValue(t, fr, "runtime.req_duration_bucket", Labels{"le": "2"}, 0)
+				mustValue(t, fr, "runtime.req_duration_bucket", Labels{"le": "+Inf"}, 1)
 				mustValue(t, fr, "runtime.mode", Labels{"runtime.mode": "maintenance"}, 0)
 				mustValue(t, fr, "runtime.mode", Labels{"runtime.mode": "operational"}, 1)
 			},

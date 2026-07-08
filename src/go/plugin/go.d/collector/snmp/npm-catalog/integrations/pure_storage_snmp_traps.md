@@ -141,4 +141,3 @@ Netdata decodes **3 trap definitions** from Pure Storage across **1 MIB** into s
 - `PURESTORAGE-MIB::pureInfoTrap`
 - `PURESTORAGE-MIB::pureWarningTrap`
 - `PURESTORAGE-MIB::pureCriticalTrap`
-

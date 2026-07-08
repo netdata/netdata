@@ -139,16 +139,30 @@ static inline int health_parse_repeat(
             return 1;
         }
         if(!strcasecmp(key, "warning")) {
-            if (!duration_parse_seconds(value, (int *)warn_repeat_every)) {
+            int repeat_every;
+            if (!duration_parse_seconds(value, &repeat_every)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                                   line, file, value, key);
             }
+            else if (repeat_every < 0) {
+                netdata_log_error("Health configuration at line %zu of file '%s': negative value '%s' for '%s' keyword",
+                                  line, file, value, key);
+            }
+            else
+                *warn_repeat_every = (uint32_t)repeat_every;
         }
         else if(!strcasecmp(key, "critical")) {
-            if (!duration_parse_seconds(value, (int *)crit_repeat_every)) {
+            int repeat_every;
+            if (!duration_parse_seconds(value, &repeat_every)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid value '%s' for '%s' keyword",
                                   line, file, value, key);
             }
+            else if (repeat_every < 0) {
+                netdata_log_error("Health configuration at line %zu of file '%s': negative value '%s' for '%s' keyword",
+                                  line, file, value, key);
+            }
+            else
+                *crit_repeat_every = (uint32_t)repeat_every;
         }
     }
 

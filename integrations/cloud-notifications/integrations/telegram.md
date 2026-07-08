@@ -47,5 +47,3 @@ endmeta-->
       - Bot Token: The token of your bot
       - Chat ID: The chat id where your bot will deliver messages to
       - Topic ID: The identifier of the chat topic to which your bot will send messages. If omitted or 0, messages will be sent to the General topic. If topics are not supported, messages will be sent to the chat.
-
-

@@ -145,4 +145,3 @@ Netdata decodes **12 trap definitions** from Grandstream Networks Inc across **3
 - `GRANDSTREAM-GWN-PRODUCTS-SWITCH-MIB::logMessageGenerated`
 - `GRANDSTREAM-GWN-PRODUCTS-SWITCH-MIB::normalMessageGenerated`
 - `GRANDSTREAM-GWN-PRODUCTS-SWITCH-MIB::alarmMessageGenerated`
-

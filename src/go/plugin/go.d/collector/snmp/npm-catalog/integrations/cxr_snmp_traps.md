@@ -144,4 +144,3 @@ Netdata decodes **73 trap definitions** from Cxr across **2 MIBs** into structur
 - `CXR-CFIP-MIB::failsSelfTest`
 - `CXR-CFIP-MIB::eventOverflow`
 - `CXR-CFIP-MIB::uadbuActive`
-

@@ -516,7 +516,15 @@ ALWAYS_INLINE PGD *pgd_create_from_disk_data(uint8_t type, void *base, uint32_t 
 
             memcpy(pg->raw.data, base, pg->raw.size);
 
-            uint32_t total_entries = gorilla_buffer_patch((void *) pg->raw.data);
+            uint32_t total_entries = 0;
+            if(unlikely(!gorilla_buffer_patch((void *) pg->raw.data,
+                                              size / RRDENG_GORILLA_32BIT_BUFFER_SIZE,
+                                              &total_entries))) {
+                netdata_log_error("DBENGINE: invalid gorilla disk page chain.");
+                pgd_free(pg);
+                pg = PGD_EMPTY;
+                break;
+            }
             pg->used = total_entries;
             pg->slots = pg->used;
             break;

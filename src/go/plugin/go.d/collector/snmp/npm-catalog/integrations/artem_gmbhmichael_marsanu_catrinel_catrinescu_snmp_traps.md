@@ -144,4 +144,3 @@ Netdata decodes **5 trap definitions** from Artem Gmbhmichael Marsanu Catrinel C
 - `ARTEM-COMPOINT-WLAN-MIB::artemBridgePeerConfigSetup`
 - `ARTEM-COMPOINT-WLAN-MIB::artemBridgeLinkLock`
 - `ARTEM-COMPOINT-BLD-MIB::artemBLDConnection`
-

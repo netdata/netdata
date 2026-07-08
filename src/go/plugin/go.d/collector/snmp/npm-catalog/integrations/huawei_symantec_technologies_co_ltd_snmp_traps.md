@@ -139,4 +139,3 @@ Netdata decodes **1 trap definition** from Huawei Symantec Technologies Co Ltd a
 ### Sample decoded traps
 
 - `ISM-TRAP-MIB::eventType`
-

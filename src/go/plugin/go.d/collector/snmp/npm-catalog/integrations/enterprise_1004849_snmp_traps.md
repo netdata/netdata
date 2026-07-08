@@ -143,4 +143,3 @@ Netdata decodes **11 trap definitions** from Enterprise 1004849 across **1 MIB**
 - `DAHUA-SNMP-MIB::videoBlindEvent`
 - `DAHUA-SNMP-MIB::videoLossEvent`
 - `DAHUA-SNMP-MIB::localAlarmEvent`
-

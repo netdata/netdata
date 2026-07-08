@@ -143,4 +143,3 @@ Netdata decodes **124 trap definitions** from Pacific Softworks Inc across **1 M
 - `IBM-TS3500-MIBv1::ibm3584Trap003`
 - `IBM-TS3500-MIBv1::ibm3584Trap004`
 - `IBM-TS3500-MIBv1::ibm3584Trap005`
-

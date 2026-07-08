@@ -241,7 +241,12 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 		return
 	}
 
+	prevCumulative := SampleValue(0)
 	for i, ub := range schema.bounds {
+		cumulative := src.histogramCumulative[i]
+		bucketValue := cumulative - prevCumulative
+		prevCumulative = cumulative
+
 		labelsMap := make(map[string]string, len(src.labels)+1)
 		for _, lbl := range src.labels {
 			labelsMap[lbl.Key] = lbl.Value
@@ -272,7 +277,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 				window:    src.desc.window,
 				meta:      src.desc.meta,
 			},
-			value: src.histogramCumulative[i],
+			value: bucketValue,
 			meta: flattenedSeriesMeta(
 				src.meta,
 				MetricKindCounter,
@@ -308,7 +313,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 				window:    src.desc.window,
 				meta:      src.desc.meta,
 			},
-			value: src.histogramCount,
+			value: src.histogramCount - prevCumulative,
 			meta: flattenedSeriesMeta(
 				src.meta,
 				MetricKindCounter,

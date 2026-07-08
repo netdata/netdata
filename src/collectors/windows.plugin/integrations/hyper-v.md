@@ -222,5 +222,3 @@ Metrics:
 | hyperv.vswitch_packets_flooded | flooded | packets/s |
 | hyperv.vswitch_learned_mac_addresses | learned | mac addresses/s |
 | hyperv.vswitch_purged_mac_addresses | purged | mac addresses/s |
-
-

@@ -143,4 +143,3 @@ Netdata decodes **56 trap definitions** from Verax Systems across **1 MIB** into
 - `VERAX-NMS-AGENT-MIB::psWarningThresholdExceeded`
 - `VERAX-NMS-AGENT-MIB::psCriticalThresholdExceeded`
 - `VERAX-NMS-AGENT-MIB::psTimeoutReached`
-

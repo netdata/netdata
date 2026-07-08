@@ -144,4 +144,3 @@ Netdata decodes **611 trap definitions** from Imv Victron B.V. across **2 MIBs**
 - `GEPARALLELUPS-MIB::upsTrapAlarmOnBattery`
 - `GEPARALLELUPS-MIB::upsTrapAlarmLowBattery`
 - `GEPARALLELUPS-MIB::upsTrapAlarmDepletedBattery`
-

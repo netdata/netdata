@@ -140,4 +140,3 @@ Netdata decodes **2 trap definitions** from Chloride across **1 MIB** into struc
 
 - `CHLORIDE-ENVIRONMENT-SENSOR-MIB::trapEntryAdded`
 - `CHLORIDE-ENVIRONMENT-SENSOR-MIB::trapEntryRemoved`
-

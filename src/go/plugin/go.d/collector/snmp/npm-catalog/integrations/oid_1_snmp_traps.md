@@ -194,4 +194,3 @@ Netdata decodes **216 trap definitions** from Oid 1 across **47 MIBs** into stru
 - `DC-RTM-MIB::rtmPathActivityChange`
 - `DC-ISIS-MIB::isisDatabaseOverload`
 - `DC-ISIS-MIB::isisManualAddressDrops`
-

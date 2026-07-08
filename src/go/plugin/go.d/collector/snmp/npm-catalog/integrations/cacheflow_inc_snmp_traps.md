@@ -155,4 +155,3 @@ Netdata decodes **19 trap definitions** from Cacheflow Inc across **13 MIBs** in
 - `BLUECOAT-SG-ATTACK-MIB::deviceAttackTrap`
 - `BLUECOAT-SG-USAGE-MIB::deviceUsageTrap`
 - `BLUECOAT-SG-POLICY-MIB::devicePolicyTrap`
-
