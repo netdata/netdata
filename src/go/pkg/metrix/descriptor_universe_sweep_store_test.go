@@ -56,7 +56,7 @@ func TestDescriptorUniverseSweep(t *testing.T) {
 				sv.core.retention = collectorRetentionPolicy{expireAfterSuccessCycles: 1, descriptorGraceCycles: 1}
 				cc := cycleController(t, s)
 
-				for i := 0; i < 10; i++ {
+				for i := range 10 {
 					cc.BeginCycle()
 					s.Write().SnapshotMeter("svc").Gauge("g").Observe(SampleValue(i))
 					require.NoError(t, cc.CommitCycleSuccess())

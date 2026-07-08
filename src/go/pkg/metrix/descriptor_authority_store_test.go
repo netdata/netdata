@@ -714,13 +714,13 @@ func TestCommitCostGuards(t *testing.T) {
 		cc.BeginCycle()
 		// Stateful: 1000 Observe on one handle.
 		hs := s.Write().StatefulMeter("svc").Histogram("hs", WithHistogramBounds(1, 2))
-		for i := 0; i < 1000; i++ {
+		for range 1000 {
 			hs.Observe(1)
 		}
 		// Snapshot: 1000 ObservePoint with the same bounds on one handle.
 		hp := s.Write().SnapshotMeter("svc").Histogram("hp")
 		pt := HistogramPoint{Count: 1, Sum: 1, Buckets: []BucketPoint{{UpperBound: 1, CumulativeCount: 1}, {UpperBound: 2, CumulativeCount: 1}}}
-		for i := 0; i < 1000; i++ {
+		for range 1000 {
 			hp.ObservePoint(pt)
 		}
 		require.Empty(t, sv.core.active.conflicts, "same-handle repeats must not append descriptor evidence")
@@ -737,7 +737,7 @@ func TestCommitCostGuards(t *testing.T) {
 		}
 
 		cc.BeginCycle()
-		for i := 0; i < retained; i++ {
+		for i := range retained {
 			s.Write().SnapshotMeter("svc").WithLabels(Label{Key: "id", Value: labels[i]}).Gauge("m").Observe(SampleValue(i))
 		}
 		require.NoError(t, cc.CommitCycleSuccess())
@@ -745,7 +745,7 @@ func TestCommitCostGuards(t *testing.T) {
 		// A cycle touching only 5 of the retained series must not clone all of them.
 		allocs := testing.AllocsPerRun(2, func() {
 			cc.BeginCycle()
-			for i := 0; i < 5; i++ {
+			for i := range 5 {
 				s.Write().SnapshotMeter("svc").WithLabels(Label{Key: "id", Value: labels[i]}).Gauge("m").Observe(SampleValue(i))
 			}
 			_ = cc.CommitCycleSuccess()
@@ -814,7 +814,7 @@ func TestMultiAuthorityCommittedObserved(t *testing.T) {
 				// authority (no cap), so the bytes-vs-seconds declaration conflict is caught
 				// regardless of map-iteration order -> FAIL every time, never an order-dependent DROP.
 				// Repeat to exercise staged-map order.
-				for i := 0; i < 64; i++ {
+				for i := range 64 {
 					s := NewCollectorStore()
 					cc := cycleController(t, s)
 

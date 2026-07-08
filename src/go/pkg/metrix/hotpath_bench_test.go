@@ -152,7 +152,7 @@ func BenchmarkCollectorCommitManySuperseded(b *testing.B) {
 				// Alternate each name's kind every cycle so each name supersedes the other.
 				cc.BeginCycle()
 				meter := s.Write().SnapshotMeter("svc")
-				for i := 0; i < n; i++ {
+				for i := range n {
 					name := fmt.Sprintf("m%d", i)
 					if iter%2 == 0 {
 						meter.Counter(name).ObserveTotal(1)
@@ -181,7 +181,7 @@ func BenchmarkCollectorCommitManyDropped(b *testing.B) {
 			for iter := 0; iter < b.N; iter++ {
 				cc.BeginCycle()
 				meter := s.Write().SnapshotMeter("svc")
-				for i := 0; i < n; i++ {
+				for i := range n {
 					name := fmt.Sprintf("m%d", i)
 					meter.Gauge(name).Observe(1)
 					meter.Counter(name).ObserveTotal(1)
@@ -222,7 +222,7 @@ func BenchmarkCollectorSameKeyRepeatedWrites(b *testing.B) {
 				cc.BeginCycle()
 				h := s.Write().SnapshotMeter("svc").Histogram("h")
 				h.ObservePoint(pt12)
-				for j := 0; j < k; j++ {
+				for range k {
 					h.ObservePoint(pt56) // differs from the staged entry every time
 				}
 				cc.CommitCycleSuccess()
@@ -249,7 +249,7 @@ func BenchmarkCollectorCommitManySchemasPerName(b *testing.B) {
 			for iter := 0; iter < b.N; iter++ {
 				cc.BeginCycle()
 				meter := s.Write().SnapshotMeter("svc")
-				for i := 0; i < n; i++ {
+				for i := range n {
 					pt := HistogramPoint{Count: 1, Sum: 1, Buckets: []BucketPoint{{UpperBound: float64(i + 1), CumulativeCount: 1}}}
 					meter.WithLabels(Label{Key: "id", Value: fmt.Sprintf("s%d", i)}).Histogram("h").ObservePoint(pt)
 				}

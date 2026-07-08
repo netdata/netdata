@@ -163,7 +163,7 @@ func TestDescriptorConflictResolution(t *testing.T) {
 				pt := HistogramPoint{Count: 1, Sum: 1, Buckets: []BucketPoint{{UpperBound: 1, CumulativeCount: 1}, {UpperBound: 2, CumulativeCount: 1}}}
 				// Repeat: staged-map iteration order is nondeterministic, so a directional
 				// wildcard would sometimes wrongly split these into two authorities and drop them.
-				for i := 0; i < 64; i++ {
+				for i := range 64 {
 					s := NewCollectorStore()
 					cc := cycleController(t, s)
 					cc.BeginCycle()
@@ -284,7 +284,7 @@ func TestSameKeyEvidenceRetainsDistinctDescriptors(t *testing.T) {
 				// no-clone identity check (evidence stays O(1)).
 				h := s.Write().SnapshotMeter("svc").Histogram("h")
 				h.ObservePoint(HistogramPoint{Count: 1, Sum: 1, Buckets: []BucketPoint{{UpperBound: 1, CumulativeCount: 1}, {UpperBound: 2, CumulativeCount: 1}}})
-				for i := 0; i < 1000; i++ {
+				for range 1000 {
 					h.ObservePoint(HistogramPoint{Count: 1, Sum: 1, Buckets: []BucketPoint{{UpperBound: 5, CumulativeCount: 1}, {UpperBound: 6, CumulativeCount: 1}}})
 				}
 				require.Len(t, sv.core.active.conflicts, 1, "a repeated same-authority conflict must record once")
@@ -305,7 +305,7 @@ func TestSameKeyEvidenceRetainsDistinctDescriptors(t *testing.T) {
 				// and the rest dedup -> evidence stays O(1), not O(handles).
 				entry := stale(t, s, cc, WithUnit("bytes"))
 				var dups []SnapshotGauge
-				for i := 0; i < 8; i++ {
+				for range 8 {
 					dups = append(dups, stale(t, s, cc, WithUnit("seconds")))
 				}
 				cc.BeginCycle()

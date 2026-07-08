@@ -285,7 +285,7 @@ const (
 )
 
 func hashUint64(h, v uint64) uint64 {
-	for i := 0; i < 8; i++ {
+	for i := range 8 {
 		h ^= (v >> (uint(i) * 8)) & 0xff
 		h *= fnvPrime64
 	}
