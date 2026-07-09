@@ -411,7 +411,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     const DICTIONARY_ITEM *host_function_acquired = NULL;
 
     const char *source_to_sanitize = source ? source : "";
-    size_t sanitized_source_size = strlen(source_to_sanitize) + 1;
+    size_t sanitized_source_size = rrd_functions_strlen_bounded(source_to_sanitize, PLUGINSD_LINE_MAX) + 1;
     CLEAN_CHAR_P *sanitized_source = mallocz(sanitized_source_size);
     rrd_functions_sanitize(sanitized_source, source_to_sanitize, sanitized_source_size);
 

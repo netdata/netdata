@@ -165,7 +165,7 @@ void host_functions_to_dict(RRDHOST *host, DICTIONARY *dst, void *value, size_t 
         if(version)
             *version = t->version;
 
-        size_t function_name_len = strlen(t_dfe.name);
+        size_t function_name_len = rrd_functions_strlen_bounded(t_dfe.name, PLUGINSD_LINE_MAX);
         if(unlikely(function_name_len > SIZE_MAX - UINT64_MAX_LENGTH - sizeof(RRDFUNCTIONS_VERSION_SEPARATOR)))
             fatal("RRDFUNCTIONS: function key is too large.");
 
