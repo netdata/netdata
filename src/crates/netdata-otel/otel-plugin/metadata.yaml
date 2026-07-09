@@ -240,7 +240,59 @@ modules:
                   journal_dir: /var/log/netdata/otel-journals
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: Plugin cannot initialize the otel/v1 journal directory
+            description: |
+              The plugin builds its journal log writer at startup, and if it cannot initialize the
+              configured `logs.journal_dir` it aborts before accepting any log data. The Agent log
+              shows an error of the form `Failed to create journal log for directory:
+              /var/log/netdata/otel/v1`.
+
+              The stock `otel.yaml` sets `logs.journal_dir` to `/var/log/netdata/otel/v1` (the
+              `@logdir_POST@/otel/v1` template resolves to `<netdata log dir>/otel/v1`, i.e.
+              `/var/log/netdata/otel/v1` by default). The option table above lists an empty default
+              and marks the option `required: true` -- the stock configuration is what supplies the
+              real path, so a missing, blank, or mis-set value leaves the writer with no usable
+              directory.
+
+              The writer creates the `journal_dir` (and a machine-id subdirectory beneath it, which is
+              where the journal files actually land) when it does not already exist, so this failure
+              is almost always a permissions problem rather than a missing directory: the `netdata`
+              user cannot create or write under the configured path, or the path is already occupied
+              by a regular file instead of a directory.
+
+              Remediation: make sure the `netdata` user can create and write under the configured
+              `journal_dir`. Either grant write access on the parent directory, or pre-create the
+              directory and assign ownership, e.g.
+              `mkdir -p /var/log/netdata/otel/v1 && chown -R netdata:netdata /var/log/netdata/otel/v1`,
+              then restart the Agent. Also confirm the path is not already a regular file. If you
+              override `logs.journal_dir`, point it at a directory the `netdata` user can create and
+              write to.
+          - name: Remote OTLP senders cannot reach the gRPC endpoint
+            description: |
+              By default the plugin listens on `127.0.0.1:4317` (loopback only). An OpenTelemetry
+              Collector, SDK, or instrumented application running on a different host cannot connect,
+              so no logs or metrics arrive -- with no error reported in the Agent itself.
+
+              Remediation: when the sender is on another host, set `endpoint.path` to a remotely
+              reachable address such as `0.0.0.0:4317` to listen on all interfaces (or a specific
+              interface IP), and make sure the port is reachable by the sender. The "Partial user
+              override" example above shows this change.
+          - name: TLS settings do not match between the plugin and the sender
+            description: |
+              TLS on the plugin is enabled only when both `endpoint.tls_cert_path` and
+              `endpoint.tls_key_path` are provided. Setting only the certificate is rejected at
+              startup with `TLS private key path must be provided when TLS certificate is provided`,
+              and setting `endpoint.tls_ca_cert_path` without both certificate and key is rejected
+              with `TLS CA certificate path requires both TLS certificate and key to be configured`.
+              If the plugin and the sender disagree on TLS (one side uses TLS, the other plaintext),
+              connections fail or are dropped at the gRPC transport layer with no ingested data.
+
+              Remediation: configure TLS on both ends consistently. Provide both `tls_cert_path` and
+              `tls_key_path` (and optionally `tls_ca_cert_path` for client authentication) only when
+              the sender is also configured for TLS; otherwise leave them unset for plaintext. The
+              "TLS-enabled configuration" example above shows the TLS form, and the certificate and
+              key files must be readable by the `netdata` user at startup.
     alerts: []
     metrics:
       folding:
