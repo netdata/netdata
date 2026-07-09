@@ -25,7 +25,11 @@ static void update_cygpath_env(void) {
     char win_path[MAX_PATH];
 
     // Convert Cygwin root path to Windows path
-    cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path));
+    errno_clear();
+    if(cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path)) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot convert Cygwin/MSYS2 base path to Windows path: %s", strerror(errno));
+        return;
+    }
 
     nd_setenv("NETDATA_CYGWIN_BASE_PATH", win_path, 1);
 

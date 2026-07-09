@@ -196,7 +196,7 @@ RW_FLAGS parse_rewrite_flags(const char *options) {
 
     // Tokenize the input options using ","
     char *token;
-    char *optionsCopy = strdup(options); // Make a copy to avoid modifying the original
+    char *optionsCopy = strdupz(options); // Make a copy to avoid modifying the original
     token = strtok(optionsCopy, ",");
 
     while (token != NULL) {
@@ -222,7 +222,7 @@ RW_FLAGS parse_rewrite_flags(const char *options) {
         token = strtok(NULL, ",");
     }
 
-    free(optionsCopy); // Free the copied string
+    freez(optionsCopy); // Free the copied string
 
     return flags;
 }
@@ -270,7 +270,7 @@ static bool parse_rewrite(LOG_JOB *jb, const char *param) {
     // Extract key, search pattern, and replacement pattern
     char *key = strndupz(param, equal_sign - param);
     char *search_pattern = strndupz(equal_sign + 2, second_separator - (equal_sign + 2));
-    char *replace_pattern = third_separator ? strndup(second_separator + 1, third_separator - (second_separator + 1)) : strdupz(second_separator + 1);
+    char *replace_pattern = third_separator ? strndupz(second_separator + 1, third_separator - (second_separator + 1)) : strdupz(second_separator + 1);
 
     if(!*search_pattern)
         flags &= ~RW_MATCH_PCRE2;
