@@ -838,45 +838,17 @@ The following `tracing` are used to collect `mount` & `unmount` call counts:
 
 ### Networking Stack
 
-Netdata monitors socket bandwidth attaching `tracing` for internal functions.
+Socket monitoring is provided by `ebpfgo.plugin` and exposed through the on-demand
+**`network-protocols`** function (FUNCTIONGLOBAL) consumed by the network-viewer. The function
+attaches kprobes or fentry/fexit trampolines to `tcp_sendmsg`, `tcp_cleanup_rbuf`,
+`tcp_v4_connect`, `tcp_v6_connect`, `tcp_close`, `udp_sendmsg`, and `udp_recvmsg`.
 
-#### TCP outbound connections
-
-This chart demonstrates calls to `tcp_v4_connection` and `tcp_v6_connection` that start connections for IPV4 and IPV6, respectively.
-
-#### TCP inbound connections
-
-This chart demonstrates TCP and UDP connections that the host receives.
-To collect this information, netdata attaches a tracing to `inet_csk_accept`.
-
-#### TCP bandwidth functions
-
-This chart demonstrates calls to functions `tcp_sendmsg`, `tcp_cleanup_rbuf`, and `tcp_close`; these functions are used
-to send & receive data and to close connections when `TCP` protocol is used.
-
-#### TCP bandwidth
-
-This chart demonstrates calls to functions:
-
-- `tcp_sendmsg`: Function responsible to send data for a specified destination.
-- `tcp_cleanup_rbuf`: We use this function instead of `tcp_recvmsg`, because the last one misses `tcp_read_sock` traffic
-     and we would also need to add more `tracing` to get the socket and package size.
-- `tcp_close`: Function responsible to close connection.
-
-#### TCP retransmit
-
-This chart demonstrates calls to function `tcp_retransmit` that is responsible for executing TCP retransmission when the
-receiver did not return the packet during the expected time.
-
-#### UDP functions
-
-This chart demonstrates calls to functions `udp_sendmsg` and `udp_recvmsg`, which are responsible for sending &
-receiving data for connections when the `UDP` protocol is used.
-
-#### UDP bandwidth
-
-Like the previous chart, this one also monitors `udp_sendmsg` and `udp_recvmsg`, but instead of showing the number of
-calls, it monitors the number of bytes sent and received.
+> **Migration note** — Prior versions of `ebpf.plugin` (the legacy C plugin) published standalone
+> charts for networking data: TCP/UDP connection counts, bandwidth, function call rates,
+> retransmits, and per-app, per-cgroup, and per-service equivalents. These standalone charts are
+> **permanently removed**. The data is now available on demand through the `network-protocols`
+> function in network-viewer. On-demand function output does not support alerting or metric
+> retention.
 
 ### Apps
 
