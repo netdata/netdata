@@ -6,17 +6,9 @@
 
 #include <fcntl.h>
 #include "../ebpf.plugin/ebpfgo.plugin/apps_ebpf_shared_pid_row.h"
+#include "ebpfgo_shm_liveness.h"
 #include <sys/mman.h>
 #include <unistd.h>
-
-/* Dynamic stale timeout: 2× the publisher's update_every + 5 s slack.
- * Falls back to 60 s when update_every_s == 0 (old writer). */
-static inline usec_t ebpfgo_dns_shm_stale_timeout_ut(uint32_t update_every_s)
-{
-    if (update_every_s == 0)
-        return 60ULL * USEC_PER_SEC;
-    return (usec_t)update_every_s * 2ULL * USEC_PER_SEC + 5ULL * USEC_PER_SEC;
-}
 
 static void netdata_ebpfgo_dns_shm_close_internal(netdata_ebpfgo_dns_shared_memory_t *ctx)
 {
@@ -40,14 +32,20 @@ static void netdata_ebpfgo_dns_shm_close_internal(netdata_ebpfgo_dns_shared_memo
 
     ctx->shm_dev = 0;
     ctx->shm_ino = 0;
-    ctx->last_publish_ut = 0;
+
+    /* Zero liveness fields so a stale check after the next successful open
+     * does not pass against a timestamp from a prior session. */
+    ctx->data.hdr.last_publish_ut = 0;
+    ctx->data.hdr.update_every_s  = 0;
 }
 
-static bool netdata_ebpfgo_dns_payload_is_live(uint64_t last_publish_ut, usec_t now_ut, uint32_t update_every_s)
+static bool netdata_ebpfgo_dns_payload_is_live(const netdata_ebpfgo_dns_shared_memory_t *ctx, usec_t now_ut)
 {
-    return last_publish_ut != 0 &&
-           now_ut >= last_publish_ut &&
-           (now_ut - last_publish_ut) <= ebpfgo_dns_shm_stale_timeout_ut(update_every_s);
+    uint64_t ts = ctx->data.hdr.last_publish_ut;
+    uint32_t ue = ctx->data.hdr.update_every_s;
+
+    return ts != 0 && now_ut >= ts &&
+           (now_ut - ts) <= ebpfgo_shm_stale_timeout_ut(ue);
 }
 
 static bool netdata_ebpfgo_dns_shm_open(
@@ -107,9 +105,13 @@ bool netdata_ebpfgo_dns_shared_memory_refresh(
         }
 
         struct stat st;
-        bool changed = (fstat(fd, &st) != 0 ||
-                        st.st_dev != ctx->shm_dev ||
-                        st.st_ino != ctx->shm_ino);
+        if (fstat(fd, &st) != 0) {
+            close(fd);
+            netdata_ebpfgo_dns_shm_close_internal(ctx);
+            return false;
+        }
+
+        bool changed = (st.st_dev != ctx->shm_dev || st.st_ino != ctx->shm_ino);
         close(fd);
 
         if (changed)
@@ -121,14 +123,13 @@ bool netdata_ebpfgo_dns_shared_memory_refresh(
 
     if (ctx->sem == SEM_FAILED && sem_name) {
         ctx->sem = sem_open(sem_name, 0);
-        /* SEM_FAILED is non-fatal: subsequent calls will treat the SHM as
-         * lock-free and rely on mmap visibility for cross-process ordering. */
+        /* SEM_FAILED is non-fatal: subsequent calls treat the SHM as lock-free. */
     }
 
     bool locked = false;
     if (ctx->sem != SEM_FAILED) {
         if (!ebpfgo_shm_sem_wait(ctx->sem)) {
-            if (!netdata_ebpfgo_dns_payload_is_live(ctx->last_publish_ut, ebpfgo_shm_now_monotonic_usec(), ctx->data.update_every_s)) {
+            if (!netdata_ebpfgo_dns_payload_is_live(ctx, ebpfgo_shm_now_monotonic_usec())) {
                 netdata_ebpfgo_dns_shm_close_internal(ctx);
                 ctx->has_data = false;
                 return false;
@@ -138,13 +139,22 @@ bool netdata_ebpfgo_dns_shared_memory_refresh(
         locked = true;
     }
 
-    memcpy(&ctx->data, ctx->shm, sizeof(struct ebpfgo_dns_shared));
-    ctx->last_publish_ut = ctx->data.last_publish_ut;
+    /* Partial copy: header + aggregate + only the live flow records.
+     * Avoids memcpy-ing the full ~312 KB ring when flow_count is small. */
+    uint32_t live = __atomic_load_n(&ctx->shm->hdr.live_count, __ATOMIC_ACQUIRE);
+    if (live > NETDATA_EBPFGO_DNS_FLOW_RING_CAP)
+        live = NETDATA_EBPFGO_DNS_FLOW_RING_CAP;
+
+    memcpy(&ctx->data.hdr, &ctx->shm->hdr, sizeof(ctx->data.hdr));
+    memcpy(&ctx->data.agg, &ctx->shm->agg, sizeof(ctx->data.agg));
+    if (live)
+        memcpy(ctx->data.ring, ctx->shm->ring, live * sizeof(ctx->data.ring[0]));
+    ctx->data.hdr.live_count = live; /* re-apply cap in the local copy */
 
     if (locked)
         sem_post(ctx->sem);
 
-    if (!netdata_ebpfgo_dns_payload_is_live(ctx->last_publish_ut, ebpfgo_shm_now_monotonic_usec(), ctx->data.update_every_s)) {
+    if (!netdata_ebpfgo_dns_payload_is_live(ctx, ebpfgo_shm_now_monotonic_usec())) {
         netdata_ebpfgo_dns_shm_close_internal(ctx);
         ctx->has_data = false;
         memset(&ctx->data, 0, sizeof(ctx->data));

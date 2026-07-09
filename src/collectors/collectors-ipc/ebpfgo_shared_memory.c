@@ -1,23 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "ebpfgo_shared_memory.h"
+#include "ebpfgo_shm_liveness.h"
 
 #if defined(OS_LINUX)
 
 #include <fcntl.h>
 #include <sys/mman.h>
 #include <unistd.h>
-
-/* Dynamic stale timeout: 2× the publisher's update_every + 5 s slack.
- * Falls back to 60 s when update_every_s == 0 (old writer that predates
- * the update_every_s field).  The old 10 s hardcoded value caused data
- * blackouts for any update_every ≥ 10. */
-static inline usec_t ebpfgo_pid_shm_stale_timeout_ut(uint32_t update_every_s)
-{
-    if (update_every_s == 0)
-        return 60ULL * USEC_PER_SEC;
-    return (usec_t)update_every_s * 2ULL * USEC_PER_SEC + 5ULL * USEC_PER_SEC;
-}
 
 /* Bytes occupied by entries[] only (no header). */
 static inline size_t ebpfgo_shm_entries_nbytes(size_t total)
@@ -94,7 +84,7 @@ static bool netdata_ebpfgo_shared_pid_snapshot_is_live(uint64_t last_publish_ut,
 {
     return last_publish_ut != 0 &&
            now_ut >= last_publish_ut &&
-           (now_ut - last_publish_ut) <= ebpfgo_pid_shm_stale_timeout_ut(update_every_s);
+           (now_ut - last_publish_ut) <= ebpfgo_shm_stale_timeout_ut(update_every_s);
 }
 
 static bool netdata_ebpfgo_shared_pid_memory_open(
@@ -192,6 +182,7 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
         struct stat st;
         if (fstat(fd, &st) != 0) {
             close(fd);
+            netdata_ebpfgo_shared_pid_memory_close_internal(ctx);
             return false;
         }
 

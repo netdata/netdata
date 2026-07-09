@@ -3,10 +3,17 @@
 #ifndef NETDATA_APPS_EBPF_SHARED_DNS_ROW_H
 #define NETDATA_APPS_EBPF_SHARED_DNS_ROW_H 1
 
-#include <stdint.h>
+/* struct ebpfgo_shm_header is defined in apps_ebpf_shared_pid_row.h.
+ * Including it here so both PID and DNS SHM share the same out-of-band
+ * header protocol (flags, update_every_s, last_publish_ut, live_count). */
+#include "apps_ebpf_shared_pid_row.h"
 
-#define NETDATA_EBPFGO_DNS_SHM_NAME "/netdata_shm_ebpfgo_dns"
-#define NETDATA_EBPFGO_DNS_SEM_NAME "/netdata_sem_ebpfgo_dns"
+/* v1: initial versioned release; struct ebpfgo_shm_header moved to the
+ * front of ebpfgo_dns_shared, replacing the embedded last_publish_ut /
+ * ring_count / update_every_s fields.  Version suffix prevents old readers
+ * from mapping the new layout at the wrong offset. */
+#define NETDATA_EBPFGO_DNS_SHM_NAME "/netdata_shm_ebpfgo_dns_v1"
+#define NETDATA_EBPFGO_DNS_SEM_NAME "/netdata_sem_ebpfgo_dns_v1"
 
 /* Maximum per-query flow records kept in one SHM publish. */
 #define NETDATA_EBPFGO_DNS_FLOW_RING_CAP 1000
@@ -43,22 +50,21 @@ struct ebpfgo_dns_aggregate {
     uint64_t responses_tcp6;
 };
 
-/* Full SHM region: aggregate counters + flat array of live per-query records.
+/* Full SHM region.  struct ebpfgo_shm_header is at offset 0, matching the PID
+ * SHM layout so both segments share the same liveness protocol.
  *
- * last_publish_ut is a producer liveness marker.  Producers update it after
- * writing the current payload and clear it on close; consumers reject the SHM
- * when it is zero or too old.
+ *   hdr.last_publish_ut  — producer liveness marker; 0 = no live producer
+ *   hdr.live_count       — valid flow records: ring[0..hdr.live_count-1]
+ *   hdr.update_every_s   — publish interval; reader uses it for stale timeout
+ *   hdr.flags            — reserved; 0 for this segment
  *
- * Writer publishes the current 20-second live set as ring[0..ring_count-1].
- * Reader copies all ring_count records under semaphore and scans them.
- * ring_count is always ≤ NETDATA_EBPFGO_DNS_FLOW_RING_CAP. */
+ * Writer publishes the current 20-second live set as ring[0..hdr.live_count-1].
+ * Reader copies hdr + agg + only the live ring entries under semaphore. */
 struct ebpfgo_dns_shared {
-    struct ebpfgo_dns_aggregate agg;                              /* offset   0 size  64 */
-    uint64_t                    last_publish_ut;                  /* offset  64 size   8 */
-    uint32_t                    ring_count;                       /* offset  72 size   4 */
-    uint32_t                    update_every_s;                   /* offset  76 size   4; 0 = unknown (old writer) */
-    struct ebpfgo_dns_flow_record ring[NETDATA_EBPFGO_DNS_FLOW_RING_CAP]; /* offset 80 size 320000 */
+    struct ebpfgo_shm_header hdr;                                    /* offset   0 size  24 */
+    struct ebpfgo_dns_aggregate agg;                                 /* offset  24 size  64 */
+    struct ebpfgo_dns_flow_record ring[NETDATA_EBPFGO_DNS_FLOW_RING_CAP]; /* offset  88 size 320000 */
 };
-/* sizeof(struct ebpfgo_dns_shared) == 320080 (~312 KB) */
+/* sizeof(struct ebpfgo_dns_shared) == 320088 (~312 KB) */
 
 #endif /* NETDATA_APPS_EBPF_SHARED_DNS_ROW_H */

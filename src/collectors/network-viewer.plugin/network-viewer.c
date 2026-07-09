@@ -6511,7 +6511,7 @@ static BUFFER *network_viewer_dns_result(void)
             "dns-queries: data not yet available (enable dns = yes in ebpf.d.conf)");
     }
 
-    uint32_t flow_count = dns->ring_count;
+    uint32_t flow_count = dns->hdr.live_count;
     if (flow_count > NETDATA_EBPFGO_DNS_FLOW_RING_CAP)
         flow_count = NETDATA_EBPFGO_DNS_FLOW_RING_CAP;
 
