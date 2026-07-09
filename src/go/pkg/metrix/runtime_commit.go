@@ -65,6 +65,35 @@ func runtimeEnsureSeriesMutable(old, next *readSnapshot, key, name, hostScopeKey
 	return series
 }
 
+func runtimeEnsureHistogramSeriesMutable(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
+	series := next.series[key]
+	if series != nil {
+		ensureSeriesMeta(series.desc, &series.meta)
+		return series
+	}
+	if existing, ok := lookupSnapshotSeries(old, key); ok {
+		series = cloneCommittedSeriesForHistogramMutation(existing)
+		rememberHistogramPreviousFrom(series, existing, desc)
+		ensureSeriesMeta(series.desc, &series.meta)
+		next.series[key] = series
+		return series
+	}
+	series = &committedSeries{
+		id:           SeriesID(key),
+		hash64:       seriesIDHash(SeriesID(key)),
+		key:          key,
+		name:         name,
+		hostScopeKey: hostScopeKey,
+		hostScope:    cloneHostScope(hostScope),
+		labels:       append([]Label(nil), labels...),
+		labelsKey:    labelsKey,
+		desc:         desc,
+		meta:         baseSeriesMeta(desc),
+	}
+	next.series[key] = series
+	return series
+}
+
 func (r *runtimeStoreBackend) shouldCompactRuntimeSnapshot(next *readSnapshot) bool {
 	if r.compaction.maxOverlayDepth > 0 && next.runtimeDepth >= r.compaction.maxOverlayDepth {
 		return true

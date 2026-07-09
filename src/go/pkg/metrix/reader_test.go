@@ -106,6 +106,62 @@ func TestFlattenSnapshotScenarios(t *testing.T) {
 				mustDelta(t, fr, "svc.duration_sum", nil, 6)
 			},
 		},
+		"flattened histogram and summary sum deltas are unavailable on decrease": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				m := s.Write().StatefulMeter("svc")
+				h := m.Histogram("latency", WithHistogramBounds(0, 10))
+				sum := m.Summary("duration")
+
+				cc.BeginCycle()
+				h.Observe(10)
+				sum.Observe(10)
+				require.NoError(t, cc.CommitCycleSuccess())
+
+				cc.BeginCycle()
+				h.Observe(-5)
+				sum.Observe(-5)
+				require.NoError(t, cc.CommitCycleSuccess())
+
+				fr := s.Read(ReadFlatten())
+				mustValue(t, fr, "svc.latency_sum", nil, 5)
+				mustValue(t, fr, "svc.duration_sum", nil, 5)
+				mustNoDelta(t, fr, "svc.latency_sum", nil)
+				mustNoDelta(t, fr, "svc.duration_sum", nil)
+				mustDelta(t, fr, "svc.latency_count", nil, 1)
+				mustDelta(t, fr, "svc.duration_count", nil, 1)
+			},
+		},
+		"flattened histogram and summary counters require contiguous successful cycles": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				m := s.Write().StatefulMeter("svc")
+				h := m.Histogram("latency", WithHistogramBounds(1, 2))
+				sum := m.Summary("duration")
+
+				cc.BeginCycle()
+				h.Observe(1)
+				sum.Observe(1)
+				require.NoError(t, cc.CommitCycleSuccess())
+
+				cc.BeginCycle()
+				require.NoError(t, cc.CommitCycleSuccess())
+
+				cc.BeginCycle()
+				h.Observe(2)
+				sum.Observe(2)
+				require.NoError(t, cc.CommitCycleSuccess())
+
+				fr := s.Read(ReadFlatten())
+				mustNoDelta(t, fr, "svc.latency_bucket", Labels{HistogramBucketLabel: "2"})
+				mustNoDelta(t, fr, "svc.latency_count", nil)
+				mustNoDelta(t, fr, "svc.latency_sum", nil)
+				mustNoDelta(t, fr, "svc.duration_count", nil)
+				mustNoDelta(t, fr, "svc.duration_sum", nil)
+			},
+		},
 	}
 
 	for name, tc := range tests {

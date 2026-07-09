@@ -164,8 +164,7 @@ func (c *storeCycleController) CommitCycleSuccess() error {
 		// nil-bounds observation to its observed bounds), and the resolver groups a name's
 		// writes by effective bounds, so every staged write of an accepted name shares the
 		// canonical bounds - no per-series schema capture or drift check is needed here.
-		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
-		rememberHistogramPrevious(series, staged.desc)
+		series := getOrCreateCommitHistogramSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
 		series.histogramCount = staged.count
 		series.histogramSum = staged.sum
 		series.histogramCumulative = append(series.histogramCumulative[:0], staged.cumulative...)
@@ -289,15 +288,16 @@ func (c *storeCycleController) CommitCycleSuccess() error {
 	return nil
 }
 
-func rememberHistogramPrevious(series *committedSeries, nextDesc *instrumentDescriptor) {
-	if series.desc != nil &&
-		series.desc.kind == kindHistogram &&
-		series.histogramCurrentSeq > 0 &&
-		seriesAuthoritiesCompatible(series.desc, nextDesc) {
-		series.histogramPreviousCount = series.histogramCount
-		series.histogramPreviousSum = series.histogramSum
-		series.histogramPreviousCumulative = append(series.histogramPreviousCumulative[:0], series.histogramCumulative...)
-		series.histogramPreviousSeq = series.histogramCurrentSeq
+func rememberHistogramPreviousFrom(series, previous *committedSeries, nextDesc *instrumentDescriptor) {
+	if previous != nil &&
+		previous.desc != nil &&
+		previous.desc.kind == kindHistogram &&
+		previous.histogramCurrentSeq > 0 &&
+		seriesAuthoritiesCompatible(previous.desc, nextDesc) {
+		series.histogramPreviousCount = previous.histogramCount
+		series.histogramPreviousSum = previous.histogramSum
+		series.histogramPreviousCumulative = previous.histogramCumulative
+		series.histogramPreviousSeq = previous.histogramCurrentSeq
 		series.histogramHasPrev = true
 		return
 	}

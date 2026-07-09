@@ -198,6 +198,7 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, src *committedSeries, nam
 		value: value,
 		meta:  meta,
 	}
+	series.counterNoResetFallback = flattenedCounterNoResetFallback(meta)
 	setFlattenedCounterState(series, value, previous, hasPrev, flattenedCounterCurrentSeq(src, meta), flattenedCounterPreviousSeq(src, meta))
 	dst.series[key] = series
 }
@@ -313,6 +314,10 @@ func flattenedCounterPreviousSeq(src *committedSeries, meta SeriesMeta) uint64 {
 	default:
 		return 0
 	}
+}
+
+func flattenedCounterNoResetFallback(meta SeriesMeta) bool {
+	return meta.FlattenRole == FlattenRoleHistogramSum || meta.FlattenRole == FlattenRoleSummarySum
 }
 
 func appendFlattenedStateSetSeries(dst *readSnapshot, src *committedSeries) {

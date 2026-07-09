@@ -31,6 +31,10 @@ type committedSeries struct {
 	counterHasPrev     bool
 	counterCurrentSeq  uint64
 	counterPreviousSeq uint64
+	// counterNoResetFallback makes Delta() unavailable on decreases for
+	// counter-shaped series where a decrease can be a valid signed observation,
+	// not necessarily a reset.
+	counterNoResetFallback bool
 
 	// Histogram current sample (used by Histogram()).
 	histogramCount      SampleValue

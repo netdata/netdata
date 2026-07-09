@@ -121,6 +121,27 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				mustValue(t, fr, "runtime.mode", Labels{"runtime.mode": "operational"}, 1)
 			},
 		},
+		"runtime histogram and summary sum deltas are unavailable on decrease": {
+			run: func(t *testing.T) {
+				s := NewRuntimeStore()
+				m := s.Write().StatefulMeter("runtime")
+				h := m.Histogram("req_duration", WithHistogramBounds(0, 10))
+				sum := m.Summary("latency")
+
+				h.Observe(10)
+				sum.Observe(10)
+				h.Observe(-5)
+				sum.Observe(-5)
+
+				fr := s.Read(ReadFlatten())
+				mustValue(t, fr, "runtime.req_duration_sum", nil, 5)
+				mustValue(t, fr, "runtime.latency_sum", nil, 5)
+				mustNoDelta(t, fr, "runtime.req_duration_sum", nil)
+				mustNoDelta(t, fr, "runtime.latency_sum", nil)
+				mustDelta(t, fr, "runtime.req_duration_count", nil, 1)
+				mustDelta(t, fr, "runtime.latency_count", nil, 1)
+			},
+		},
 		"runtime MeasureSet gauge and counter are readable and flattenable": {
 			run: func(t *testing.T) {
 				s := NewRuntimeStore()

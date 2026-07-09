@@ -53,6 +53,9 @@ func (r *storeReader) Delta(name string, labels Labels) (SampleValue, bool) {
 		return 0, false
 	}
 	if s.counterCurrent < s.counterPrevious {
+		if s.counterNoResetFallback {
+			return 0, false
+		}
 		return s.counterCurrent, true
 	}
 	return s.counterCurrent - s.counterPrevious, true

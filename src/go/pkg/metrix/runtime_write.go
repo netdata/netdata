@@ -99,7 +99,7 @@ func (r *runtimeStoreBackend) recordHistogramObserve(desc *instrumentDescriptor,
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
+		series := runtimeEnsureHistogramSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
 
 		if series.desc.histogram == nil || !equalHistogramBounds(series.desc.histogram.bounds, schema.bounds) {
 			panic("metrix: histogram schema drift detected")
@@ -108,7 +108,6 @@ func (r *runtimeStoreBackend) recordHistogramObserve(desc *instrumentDescriptor,
 			series.histogramCumulative = make([]SampleValue, len(schema.bounds))
 		}
 
-		rememberHistogramPrevious(series, desc)
 		idx := findHistogramBucket(schema.bounds, value)
 		if idx < len(series.histogramCumulative) {
 			for i := idx; i < len(series.histogramCumulative); i++ {

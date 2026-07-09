@@ -45,6 +45,23 @@ func getOrCreateCommitSeries(old, next *readSnapshot, key, name, hostScopeKey st
 	return series
 }
 
+func getOrCreateCommitHistogramSeries(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
+	series := next.series[key]
+	if series != nil {
+		if oldSeries, ok := old.series[key]; ok && oldSeries == series {
+			series = cloneCommittedSeriesForHistogramOverwrite(oldSeries)
+			rememberHistogramPreviousFrom(series, oldSeries, desc)
+			next.series[key] = series
+		} else {
+			ensureSeriesMeta(series.desc, &series.meta)
+		}
+		return series
+	}
+	series = newCommittedSeries(key, name, hostScopeKey, hostScope, labels, labelsKey, desc)
+	next.series[key] = series
+	return series
+}
+
 func refreshCommittedHostScopes(old, next *readSnapshot, scopes map[string]HostScope) {
 	if len(scopes) == 0 {
 		return
@@ -102,6 +119,39 @@ func makeSeriesKey(hostScopeKey, name, labelsKey string) string {
 }
 
 func cloneCommittedSeries(s *committedSeries) *committedSeries {
+	cp := cloneCommittedSeriesBase(s)
+	if len(s.histogramCumulative) > 0 {
+		cp.histogramCumulative = append([]SampleValue(nil), s.histogramCumulative...)
+	}
+	if len(s.histogramPreviousCumulative) > 0 {
+		cp.histogramPreviousCumulative = append([]SampleValue(nil), s.histogramPreviousCumulative...)
+	}
+	return &cp
+}
+
+func cloneCommittedSeriesForHistogramOverwrite(s *committedSeries) *committedSeries {
+	if s.desc == nil || s.desc.kind != kindHistogram {
+		return cloneCommittedSeries(s)
+	}
+	cp := cloneCommittedSeriesBase(s)
+	cp.histogramCumulative = nil
+	cp.histogramPreviousCumulative = nil
+	return &cp
+}
+
+func cloneCommittedSeriesForHistogramMutation(s *committedSeries) *committedSeries {
+	if s.desc == nil || s.desc.kind != kindHistogram {
+		return cloneCommittedSeries(s)
+	}
+	cp := cloneCommittedSeriesBase(s)
+	if len(s.histogramCumulative) > 0 {
+		cp.histogramCumulative = append([]SampleValue(nil), s.histogramCumulative...)
+	}
+	cp.histogramPreviousCumulative = nil
+	return &cp
+}
+
+func cloneCommittedSeriesBase(s *committedSeries) committedSeries {
 	cp := *s
 	ensureSeriesMeta(cp.desc, &cp.meta)
 	cp.hostScope = cloneHostScope(s.hostScope)
@@ -116,19 +166,13 @@ func cloneCommittedSeries(s *committedSeries) *committedSeries {
 	if len(s.measureSetPreviousValues) > 0 {
 		cp.measureSetPreviousValues = append([]SampleValue(nil), s.measureSetPreviousValues...)
 	}
-	if len(s.histogramCumulative) > 0 {
-		cp.histogramCumulative = append([]SampleValue(nil), s.histogramCumulative...)
-	}
-	if len(s.histogramPreviousCumulative) > 0 {
-		cp.histogramPreviousCumulative = append([]SampleValue(nil), s.histogramPreviousCumulative...)
-	}
 	if len(s.summaryQuantiles) > 0 {
 		cp.summaryQuantiles = append([]SampleValue(nil), s.summaryQuantiles...)
 	}
 	if s.summarySketch != nil {
 		cp.summarySketch = s.summarySketch.clone()
 	}
-	return &cp
+	return cp
 }
 
 func cloneStateMap(in map[string]bool) map[string]bool {
