@@ -771,3 +771,38 @@ fn dropped_count_alone_preserves_the_chunk() {
     assert!(tr.spans[0].events.is_empty());
     assert_eq!(tr.spans[0].dropped_events_count, 9);
 }
+
+/// Phase-2 bloom: the traces seal writes TBLM; membership answers have no
+/// false negatives, and an absent id resolves to an empty trace via the bloom
+/// pre-check (same observable result as before, cheaper path).
+#[test]
+fn seal_writes_trace_id_bloom() {
+    let traces: Vec<[u8; 16]> = (1..=40u8).map(|i| [i; 16]).collect();
+    let spans: Vec<Span> = traces
+        .iter()
+        .enumerate()
+        .flat_map(|(i, t)| {
+            let base = 1_000 + (i as u64) * 100;
+            vec![
+                span(*t, [1; 8], [0; 8], base, base + 50, "root"),
+                span(*t, [2; 8], [1; 8], base + 10, base + 40, "child"),
+            ]
+        })
+        .collect();
+    let bytes = seal(vec![req(spans)]);
+    let index = IndexReader::open(&bytes).unwrap();
+    assert!(index.has_trace_id_bloom(), "TBLM present after the seal");
+
+    let bloom = index.trace_id_bloom().unwrap();
+    assert_eq!(bloom.distinct_ids(), 40);
+    for t in &traces {
+        assert!(bloom.might_contain(TraceId::from(*t)), "no false negatives");
+        // The exact lookup still resolves the trace (bloom is a pre-check).
+        assert_eq!(index.trace_by_id(TraceId::from(*t)).unwrap().spans.len(), 2);
+    }
+
+    // An absent id returns an empty trace through the bloom short-circuit.
+    let absent = TraceId::from([0xEEu8; 16]);
+    let tr = index.trace_by_id(absent).unwrap();
+    assert!(tr.spans.is_empty() && tr.roots.is_empty());
+}

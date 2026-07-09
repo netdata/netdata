@@ -15,11 +15,11 @@ use serde::Serialize;
 use crate::{
     ALL_COLUMNS, BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_DURATION, CHUNK_EVENTS, CHUNK_FLAGS,
     CHUNK_LINKS, CHUNK_META, CHUNK_OBSERVED_TS, CHUNK_PARENT_SPAN_IDS, CHUNK_PRIMARY,
-    CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS, CHUNK_TRACE_IDS, CHUNK_TRACE_INDEX, ColumnSpec,
-    ColumnsTable, DroppedAttributeCounts, Durations, Error, Flags, HighField, MAGIC,
-    MAX_STREAM_BATCHES, Metadata, ObservedTimestamps, ParentSpanIds, SpanIds, StreamBatch,
-    Summary, TraceIdIndex, TraceIds, VERSION, ZSTD_LEVEL_DEFAULT, ZSTD_LEVEL_FST, high_field_id,
-    mid_field_id, stream_batch_id,
+    CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS, CHUNK_TRACE_BLOOM, CHUNK_TRACE_IDS,
+    CHUNK_TRACE_INDEX, ColumnSpec, ColumnsTable, DroppedAttributeCounts, Durations, Error, Flags,
+    HighField, MAGIC, MAX_STREAM_BATCHES, Metadata, ObservedTimestamps, ParentSpanIds, SpanIds,
+    StreamBatch, Summary, TraceIdIndex, TraceIds, VERSION, ZSTD_LEVEL_DEFAULT, ZSTD_LEVEL_FST,
+    high_field_id, mid_field_id, stream_batch_id,
 };
 
 /// Serialize a value with bincode, then compress with zstd.
@@ -111,8 +111,11 @@ pub struct ChunkCounts {
     /// in the cold region right after the per-row columns. Built from the `TRCE`
     /// column, so a file that sets this must also carry the `trace_id` column.
     pub trace_id_index: bool,
-    /// Whether the file carries the optional span event structure (`EVNB`),
+    /// Whether the file carries the optional per-file trace-id bloom (`TBLM`),
     /// written after the trace_id index (traces seal only).
+    pub trace_id_bloom: bool,
+    /// Whether the file carries the optional span event structure (`EVNB`),
+    /// written after the trace-id bloom (traces seal only).
     pub event_index: bool,
     /// Whether the file carries the optional span link structure (`LNKB`),
     /// written after the event structure (traces seal only).
@@ -141,7 +144,9 @@ enum Stage {
     /// The optional `trace_id` index, after the per-row columns and before the
     /// secondary sections; skipped entirely when not declared.
     TraceIndex,
-    /// The optional span event structure (`EVNB`), after the trace_id index.
+    /// The optional per-file trace-id bloom (`TBLM`), after the trace_id index.
+    TraceBloom,
+    /// The optional span event structure (`EVNB`), after the trace-id bloom.
     EventIndex,
     /// The optional span link structure (`LNKB`), after the event structure.
     LinkIndex,
@@ -157,6 +162,7 @@ impl Stage {
             Stage::Primary => "primary",
             Stage::Columns => "a declared per-row column chunk",
             Stage::TraceIndex => "the declared trace_id index chunk",
+            Stage::TraceBloom => "the declared trace_id bloom chunk",
             Stage::EventIndex => "the declared span event structure chunk",
             Stage::LinkIndex => "the declared span link structure chunk",
             Stage::Secondary => "a mid-field, high-field, or stream-batch chunk",
@@ -216,12 +222,20 @@ impl<W: Write + Seek> ChunkWriter<W> {
                 "trace_id index declared without the trace_id column it indexes".into(),
             ));
         }
+        // The bloom is derived from the index's sorted permutation at build, so
+        // a file cannot carry TBLM without TIDX.
+        if counts.trace_id_bloom && !counts.trace_id_index {
+            return Err(Error::WriterMisuse(
+                "trace_id bloom declared without the trace_id index it derives from".into(),
+            ));
+        }
         // One cold-region chunk per present per-row column (independently
         // optional), plus the optional trace_id index and span event/link
         // structures.
         let num_chunks = 4u32
             + counts.columns.count()
             + u32::from(counts.trace_id_index)
+            + u32::from(counts.trace_id_bloom)
             + u32::from(counts.event_index)
             + u32::from(counts.link_index)
             + u32::from(counts.mid_fields)
@@ -315,9 +329,19 @@ impl<W: Write + Seek> ChunkWriter<W> {
         }
     }
 
-    /// The stage after the `trace_id` index: the span event structure if
-    /// declared, otherwise whatever follows it.
+    /// The stage after the `trace_id` index: the trace-id bloom if declared,
+    /// otherwise whatever follows it.
     fn after_trace_index(&self) -> Stage {
+        if self.counts.trace_id_bloom {
+            Stage::TraceBloom
+        } else {
+            self.after_trace_bloom()
+        }
+    }
+
+    /// The stage after the trace-id bloom: the span event structure if
+    /// declared, otherwise whatever follows it.
+    fn after_trace_bloom(&self) -> Stage {
         if self.counts.event_index {
             Stage::EventIndex
         } else {
@@ -469,8 +493,24 @@ impl<W: Write + Seek> ChunkWriter<W> {
         Ok(())
     }
 
-    /// Write the optional span event structure chunk (`EVNB`), after the
+    /// Write the optional per-file trace-id bloom chunk (`TBLM`), after the
     /// `trace_id` index. Only valid when declared in
+    /// [`ChunkCounts::trace_id_bloom`]; the stage machine rejects it otherwise.
+    pub fn trace_id_bloom(&mut self, bloom: &crate::TraceIdBloom) -> Result<(), Error> {
+        if self.stage != Stage::TraceBloom {
+            return Err(Error::WriterMisuse(format!(
+                "trace_id bloom chunk out of order: the writer expects {} next",
+                self.stage.expects(),
+            )));
+        }
+        let packed = pack(bloom, ZSTD_LEVEL_DEFAULT)?;
+        self.inner.write_chunk(CHUNK_TRACE_BLOOM, &packed)?;
+        self.stage = self.after_trace_bloom();
+        Ok(())
+    }
+
+    /// Write the optional span event structure chunk (`EVNB`), after the
+    /// trace-id bloom. Only valid when declared in
     /// [`ChunkCounts::event_index`]; the stage machine rejects it otherwise.
     pub fn event_index(&mut self, index: &crate::EventIndex) -> Result<(), Error> {
         if self.stage != Stage::EventIndex {

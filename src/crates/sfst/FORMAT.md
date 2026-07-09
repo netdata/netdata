@@ -101,6 +101,7 @@ within its tier in the trailing bytes.
     "PSPN"      8-byte arena (per-row parent_span_id)         No (per-row column)
     "DURN"      Vec<i64>  (per-row span duration, ns)         No (per-row column)
     "TIDX"      TraceIdIndex  (trace_id fanout + sort permutation)  No (optional)
+    "TBLM"      TraceIdBloom  (per-file trace-id bloom filter)  No (optional)
     "EVNB"      EventIndex  (per-row span event structure)    No (optional)
     "LNKB"      LinkIndex  (per-row span link structure)      No (optional)
     "MF{hi}{lo}" PrefixMap<BitmapValue>  (mid-card field)     No (one per mid field)
@@ -127,6 +128,26 @@ contiguous run in `sort_perm`. It lives in the cold region after the per-row
 columns, requires the `TRCE` column it indexes, and is detected via the TOC
 (`IndexReader::has_trace_id_index`), not the `ColumnsTable`. Presence is independent
 of any per-row column except its required `TRCE`.
+
+The optional `TBLM` chunk is the **per-file trace-id bloom**: a serialized
+[`fastbloom`] filter over the file's DISTINCT set trace ids, plus that distinct
+count for validation. It answers "is trace X definitely NOT in this file?" so a
+cross-file trace-by-id skips a file with one small chunk read, never touching
+`TIDX`/`TRCE` (the single-file `trace_by_id` uses it as the same pre-check).
+False negatives are impossible; false positives (~5% build-time target,
+≈6.25 bits per distinct id) merely fall through to the exact `TIDX` lookup.
+The payload is self-describing — the filter's bit length, hash count, and
+seeded hasher state all serialize with it — so readers never depend on the
+build-time constants; the build uses a fixed seed, making identical inputs
+seal to identical bytes. It lives in the cold region after `TIDX` and before
+`EVNB`, so a reader that ignores it skips it like any other optional chunk.
+Written only when the file has at least one set (non-zero) trace id, and only
+together with `TIDX` (the bloom is derived from the index's sorted
+permutation; the writer rejects TBLM-without-TIDX at declaration, and the
+reader symmetrically rejects a bloom in a file without the index). Detected
+via the TOC (`IndexReader::has_trace_id_bloom`).
+
+[`fastbloom`]: https://crates.io/crates/fastbloom
 
 The optional `EVNB` / `LNKB` chunks are the **span event / link structures**
 (traces signal). Rows carry event/link *values* as ordinary interned tokens
@@ -524,8 +545,9 @@ A new **optional, TOC-indexed** chunk id is additive: it changes no
 existing chunk's bincode layout, a file without it simply omits it,
 and a reader that does not know it reads the rest unchanged. Adding
 one therefore needs **no version bump**. The optional per-row columns,
-the `TIDX` trace_id index, and the `EVNB`/`LNKB` span event/link
-structures (see [§ Chunk Ids](#chunk-ids)) follow exactly this rule.
+the `TIDX` trace_id index, the `TBLM` trace-id bloom, and the
+`EVNB`/`LNKB` span event/link structures (see [§ Chunk Ids](#chunk-ids))
+follow exactly this rule.
 
 ### When to bump the version
 

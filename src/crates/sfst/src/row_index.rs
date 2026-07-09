@@ -56,6 +56,12 @@ pub struct RowIndex<'a> {
     /// only be set together with `trace_ids`. The logs path leaves it `false` (its
     /// `trace_ids` are near-unique-free log correlation ids, not a trace key).
     pub build_trace_id_index: bool,
+    /// Producer signal: build the per-file trace-id bloom (`TBLM`) at seal.
+    /// Derived from the trace-id index, so this MUST only be set together with
+    /// [`build_trace_id_index`](Self::build_trace_id_index) (and the chunk is
+    /// skipped when the file has no set trace ids). The logs path leaves it
+    /// `false`.
+    pub build_trace_id_bloom: bool,
     /// Span event structure accumulator (`EVNB` chunk; traces seal only). When
     /// present it MUST have exactly one ended row per [`row`](RowIndex::row)
     /// call ([`crate::Error::ColumnLengthMismatch`] at build). See
@@ -89,6 +95,7 @@ impl<'a> RowIndex<'a> {
             parent_span_ids: None,
             durations: None,
             build_trace_id_index: false,
+            build_trace_id_bloom: false,
             events: None,
             links: None,
             tree: None,

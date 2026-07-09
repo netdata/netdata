@@ -1201,6 +1201,13 @@ macro_rules! id_arena {
                 self.bytes.is_empty()
             }
 
+            /// Whether any id in the arena is set (not the all-zero sentinel).
+            pub fn any_set(&self) -> bool {
+                self.bytes
+                    .chunks_exact(Self::WIDTH)
+                    .any(|c| c.iter().any(|&b| b != 0))
+            }
+
             /// Whether the backing buffer is a whole number of `WIDTH`-byte ids.
             /// A decoded chunk that fails this is malformed (truncated/corrupt) —
             /// the reader rejects it rather than letting `get`/`iter` drop or

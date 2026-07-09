@@ -95,12 +95,7 @@ fn populate(
         // (filename); candidate filtering reads `f.id.part_key`.
         let part_key = crate::opaque_part_key(ns, name);
         reg.track(
-            FileId::new(
-                file_registry::test_identity(),
-                0,
-                seq,
-                part_key,
-            ),
+            FileId::new(file_registry::test_identity(), 0, seq, part_key),
             ByteSize(1),
             Summary {
                 min_timestamp_s: min_s,

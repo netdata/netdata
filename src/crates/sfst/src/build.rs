@@ -408,6 +408,11 @@ pub(crate) fn build_into<W: Write + Seek>(
         // Built from the chronological `trace_id` column when the producer asks
         // (the traces seal). The logs seal leaves `build_trace_id_index` false.
         trace_id_index: row_index.build_trace_id_index,
+        // Bloom presence needs an up-front answer (the TOC is reserved before
+        // any chunk exists): declared when the producer asks AND the file has
+        // at least one set trace id (an empty filter is never written).
+        trace_id_bloom: row_index.build_trace_id_bloom
+            && row_index.trace_ids.as_ref().is_some_and(|t| t.any_set()),
         // Span event/link structures (traces seal only; the logs seal leaves
         // both `None`). Presence driven off the `RowIndex` `Option`s, like the
         // per-row columns.
@@ -489,7 +494,16 @@ pub(crate) fn build_into<W: Write + Seek>(
         let trace_ids = chronological_trace_ids.as_ref().expect(
             "build_trace_id_index requires the trace_id column (ChunkWriter also enforces this)",
         );
-        w.trace_id_index(&TraceIdIndex::build(trace_ids))?;
+        let index = TraceIdIndex::build(trace_ids);
+        w.trace_id_index(&index)?;
+        // The bloom derives from the index's sorted permutation (distinct ids
+        // via adjacent dedup); `counts.trace_id_bloom` already folded in the
+        // any-set check, so a declared bloom always builds non-empty.
+        if counts.trace_id_bloom {
+            let bloom = crate::TraceIdBloom::build(&index, trace_ids)
+                .expect("declared only when a set trace id exists");
+            w.trace_id_bloom(&bloom)?;
+        }
     }
 
     // Optional span event/link structures (EVNB/LNKB), after TIDX: rows remapped

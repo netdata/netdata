@@ -18,6 +18,15 @@ fn sid(b: u8) -> SpanId {
 /// of `(span_id, parent_span_id)` pairs in chronological (row) order. Fields are
 /// empty (the tree logic under test reads ids/timestamps, not attributes).
 fn trace_file(rows: &[(SpanId, SpanId)]) -> Vec<u8> {
+    trace_file_with_bloom(rows, None)
+}
+
+/// Like [`trace_file`], optionally carrying a caller-supplied `TBLM` payload
+/// (which may be deliberately malformed — the writer packs, it does not vet).
+fn trace_file_with_bloom(
+    rows: &[(SpanId, SpanId)],
+    bloom: Option<&crate::TraceIdBloom>,
+) -> Vec<u8> {
     let n = rows.len();
     let mut trace = TraceIds::with_capacity(n);
     let mut span = SpanIds::with_capacity(n);
@@ -44,6 +53,7 @@ fn trace_file(rows: &[(SpanId, SpanId)]) -> Vec<u8> {
     let counts = ChunkCounts {
         columns,
         trace_id_index: true,
+        trace_id_bloom: bloom.is_some(),
         event_index: false,
         link_index: false,
         mid_fields: 0,
@@ -110,9 +120,36 @@ fn trace_file(rows: &[(SpanId, SpanId)]) -> Vec<u8> {
     w.parent_span_ids(&parent).unwrap();
     w.durations(&durations).unwrap();
     w.trace_id_index(&index).unwrap();
+    if let Some(b) = bloom {
+        w.trace_id_bloom(b).unwrap();
+    }
     w.add_stream_batch(&StreamBatch::for_write(&vec![Vec::<KvId>::new(); n]))
         .unwrap();
     w.finish().unwrap().into_inner()
+}
+
+#[test]
+fn corrupt_bloom_degrades_to_the_exact_lookup() {
+    // The bloom is a skip hint: a TBLM that decodes but fails validation
+    // (absurd hash count here) must NOT make a findable trace unfindable —
+    // trace_by_id falls through to TIDX. The accessor itself still errors,
+    // so cross-file callers can observe the corruption.
+    let hostile = crate::TraceIdBloom::raw_for_tests(
+        1,
+        fastbloom::BloomFilter::from_vec(vec![0u64; 4])
+            .seed(&1)
+            .hashes(1_000),
+    );
+    let buf = trace_file_with_bloom(&[(sid(1), SpanId::from([0; 8]))], Some(&hostile));
+    let reader = IndexReader::open(&buf).unwrap();
+
+    assert!(reader.has_trace_id_bloom());
+    assert!(
+        reader.trace_id_bloom().is_err(),
+        "accessor surfaces corruption"
+    );
+    let trace = reader.trace_by_id(TraceId::from(TRACE)).unwrap();
+    assert_eq!(trace.spans.len(), 1, "lookup degraded to TIDX and resolved");
 }
 
 #[test]

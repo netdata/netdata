@@ -418,6 +418,36 @@ impl<'a> ChunkReader<'a> {
         Ok(index)
     }
 
+    // ── TBLM (trace-id bloom) ────────────────────────────────────────
+
+    /// Whether this file carries the optional per-file trace-id bloom (`TBLM`).
+    pub fn has_trace_id_bloom(&self) -> bool {
+        self.container.has_chunk(crate::CHUNK_TRACE_BLOOM)
+    }
+
+    /// Decode and validate the trace-id bloom (`TBLM`). Same trust-boundary
+    /// contract as [`trace_id_index`](Self::trace_id_index); callers gate on
+    /// [`has_trace_id_bloom`](Self::has_trace_id_bloom).
+    pub fn trace_id_bloom(&self) -> Result<crate::TraceIdBloom, Error> {
+        // The bloom derives from TIDX — the writer guarantees TBLM ⟹ TIDX at
+        // seal; this is the symmetric read-side guard for a file produced
+        // out-of-band. Without it, a definite bloom miss on such a file would
+        // silently report "trace absent" instead of surfacing the corruption.
+        if !self.has_trace_id_index() {
+            return Err(Error::CorruptIndex(
+                "trace_id bloom without the trace_id index it derives from".into(),
+            ));
+        }
+        // ...and the full dependency chain TBLM ⟹ TIDX ⟹ TRCE: a crafted file
+        // with the two chunks but no trace_id column would otherwise let a
+        // bloom miss answer "trace absent" where the exact path would have
+        // surfaced the corruption.
+        self.require_column(TraceIds::NAME, TraceIds::COLUMN_TYPE)?;
+        let bloom: crate::TraceIdBloom = unpack(self.chunk_raw_by_id(crate::CHUNK_TRACE_BLOOM)?)?;
+        bloom.validate(self.record_count()?)?;
+        Ok(bloom)
+    }
+
     // ── EVNB / LNKB (span event / link structures) ───────────────────
 
     /// Whether this file carries the optional span event structure (`EVNB`).

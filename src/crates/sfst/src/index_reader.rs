@@ -203,9 +203,10 @@ impl<'a> IndexReader<'a> {
     }
 
     /// Byte span of the cold suffix (optional per-row columns + optional
-    /// `trace_id` index + mid/high field chunks + stream batches) a query
-    /// releases from the page cache once done. See
-    /// the chunk reader's cold-region rule.
+    /// `trace_id` index, trace-id bloom, and span event/link structures +
+    /// mid/high field chunks + stream batches) a query releases from the page
+    /// cache once done — advising it away also evicts the small `TBLM` chunk.
+    /// See the chunk reader's cold-region rule.
     pub fn cold_region(&self) -> Option<(usize, usize)> {
         self.sfst.cold_region()
     }
@@ -325,6 +326,18 @@ impl<'a> IndexReader<'a> {
     /// Whether the file carries the optional `trace_id` index (`TIDX`).
     pub fn has_trace_id_index(&self) -> bool {
         self.sfst.has_trace_id_index()
+    }
+
+    /// Whether the file carries the optional per-file trace-id bloom (`TBLM`).
+    pub fn has_trace_id_bloom(&self) -> bool {
+        self.sfst.has_trace_id_bloom()
+    }
+
+    /// The trace-id bloom. Gate on [`has_trace_id_bloom`](Self::has_trace_id_bloom).
+    /// `might_contain == false` is definitive; cross-file callers use this to
+    /// skip the file without touching `TIDX`/`TRCE`.
+    pub fn trace_id_bloom(&self) -> Result<crate::TraceIdBloom, crate::Error> {
+        self.sfst.trace_id_bloom()
     }
 
     /// Whether the file carries the optional span event structure (`EVNB`).
@@ -616,6 +629,30 @@ impl<'a> IndexReader<'a> {
     /// or absent from this file becomes a root — yielding a forest, never a dropped
     /// span or an unbounded recursion.
     pub fn trace_by_id(&self, trace_id: TraceId) -> Result<Trace, crate::Error> {
+        // Bloom pre-check: one small chunk read answers "definitely absent"
+        // without decoding TIDX or the TRCE column (false positives just fall
+        // through to the exact lookup below). The bloom is a SKIP HINT, not an
+        // authoritative structure: unlike a corrupt TIDX (without which lookup
+        // is impossible) or a corrupt EVNB (whose data would be silently
+        // wrong), a corrupt/unreadable TBLM must not make a findable trace
+        // unfindable — degrade to the exact lookup and log, never fail.
+        if self.sfst.has_trace_id_bloom() {
+            match self.sfst.trace_id_bloom() {
+                Ok(bloom) if !bloom.might_contain(trace_id) => {
+                    return Ok(Trace {
+                        spans: Vec::new(),
+                        roots: Vec::new(),
+                        children: HashMap::new(),
+                    });
+                }
+                Ok(_) => {}
+                Err(e) => {
+                    tracing::warn!(
+                        "trace_id bloom unreadable; falling back to the exact lookup: {e}"
+                    );
+                }
+            }
+        }
         let index = self.sfst.trace_id_index()?;
         let trace_ids = self.sfst.trace_ids()?;
         let positions = index.positions(trace_id, &trace_ids);

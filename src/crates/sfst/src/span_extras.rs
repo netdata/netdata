@@ -120,7 +120,12 @@ impl EventIndex {
             self.times.len(),
             self.attr_refs.len(),
         )?;
-        if self.names.iter().chain(self.attr_refs.iter()).any(|id| id.0 >= kv_total) {
+        if self
+            .names
+            .iter()
+            .chain(self.attr_refs.iter())
+            .any(|id| id.0 >= kv_total)
+        {
             return Err(Error::CorruptIndex(format!(
                 "event index token ref out of range (kv total {kv_total})"
             )));
@@ -268,12 +273,7 @@ fn validate_skeleton(
 }
 
 /// A prefix-sum offsets array over `count` items terminating at `total`.
-fn validate_offsets(
-    what: &str,
-    offsets: &[u32],
-    count: usize,
-    total: usize,
-) -> Result<(), Error> {
+fn validate_offsets(what: &str, offsets: &[u32], count: usize, total: usize) -> Result<(), Error> {
     if offsets.len() != count + 1 {
         return Err(Error::CorruptIndex(format!(
             "{what} has {} offsets, expected {}",
@@ -336,7 +336,13 @@ impl EventRows {
     }
 
     /// Append one event to the current (not yet ended) row.
-    pub fn push_event(&mut self, time_unix_nano: u64, dropped: u32, name: KvSlot, attrs: &[KvSlot]) {
+    pub fn push_event(
+        &mut self,
+        time_unix_nano: u64,
+        dropped: u32,
+        name: KvSlot,
+        attrs: &[KvSlot],
+    ) {
         self.times.push(time_unix_nano);
         self.dropped.push(dropped);
         self.names.push(name);
@@ -499,7 +505,8 @@ impl LinkRows {
                 out.span_ids.push(self.span_ids[l]);
                 out.flags.push(self.flags[l]);
                 out.dropped.push(self.dropped[l]);
-                out.ts_bytes.extend_from_slice(self.trace_states[l].as_bytes());
+                out.ts_bytes
+                    .extend_from_slice(self.trace_states[l].as_bytes());
                 out.ts_offsets.push(out.ts_bytes.len() as u32);
                 let alo = self.attr_offsets[l] as usize;
                 let ahi = self.attr_offsets[l + 1] as usize;
@@ -644,7 +651,10 @@ mod tests {
         rows.end_row(0);
         let mut idx = rows.reordered([0usize].into_iter(), &ident(2));
         idx.attr_offsets = vec![0, 1, 0]; // drops below the prior offset
-        assert!(idx.validate(1, 2).is_err(), "non-monotonic offsets rejected");
+        assert!(
+            idx.validate(1, 2).is_err(),
+            "non-monotonic offsets rejected"
+        );
 
         // A link id arena with trailing bytes: len() floors to the right count,
         // so only the well_formed() check catches it.
@@ -684,6 +694,7 @@ mod tests {
             let counts = ChunkCounts {
                 columns: ColumnsPresent::default(),
                 trace_id_index: false,
+                trace_id_bloom: false,
                 event_index: true,
                 link_index: false,
                 mid_fields: 0,
@@ -735,20 +746,14 @@ mod tests {
         *bad.attr_offsets.last_mut().unwrap() += 1;
         let buf = write_file(&bad);
         let reader = crate::reader::ChunkReader::open(&buf).unwrap();
-        assert!(matches!(
-            reader.event_index(),
-            Err(Error::CorruptIndex(_))
-        ));
+        assert!(matches!(reader.event_index(), Err(Error::CorruptIndex(_))));
 
         // Out-of-range token ref (>= META high_end) is rejected too.
         let mut bad = good.clone();
         bad.names[0] = KvId(99);
         let buf = write_file(&bad);
         let reader = crate::reader::ChunkReader::open(&buf).unwrap();
-        assert!(matches!(
-            reader.event_index(),
-            Err(Error::CorruptIndex(_))
-        ));
+        assert!(matches!(reader.event_index(), Err(Error::CorruptIndex(_))));
     }
 
     #[test]

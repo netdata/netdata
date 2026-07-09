@@ -507,6 +507,9 @@ fn populate_trace_row_index(
     row_index.dropped_attribute_counts = Some(DroppedAttributeCounts(dropped_attrs));
     // Spans turn the index on: the builder builds TIDX from the chronological TRCE.
     row_index.build_trace_id_index = true;
+    // ...and the per-file trace-id bloom derived from it (skipped by the
+    // builder when no set trace id exists).
+    row_index.build_trace_id_bloom = true;
     // Event/link structures only when they carry information (≥1 item or a
     // nonzero span-level dropped count) — an all-empty accumulator writes no chunk.
     row_index.events = events.is_meaningful().then_some(events);

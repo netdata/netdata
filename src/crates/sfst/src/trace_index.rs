@@ -183,6 +183,26 @@ impl TraceIdIndex {
         self.sort_perm.len()
     }
 
+    /// The file's DISTINCT set trace ids, each yielded once, in sorted order —
+    /// adjacent-dedup over the sorted permutation, so no hashing and no
+    /// allocation. `trace_ids` MUST be the `TRCE` column this index was built
+    /// from (same coupling as [`positions`](Self::positions)).
+    pub(crate) fn distinct_ids<'s>(
+        &'s self,
+        trace_ids: &'s TraceIds,
+    ) -> impl Iterator<Item = TraceId> + 's {
+        let mut prev: Option<TraceId> = None;
+        self.sort_perm.iter().filter_map(move |&p| {
+            let id = trace_ids.get(p as usize);
+            if prev == Some(id) {
+                None
+            } else {
+                prev = Some(id);
+                Some(id)
+            }
+        })
+    }
+
     /// Validate a decoded index against the file's `record_count` at the trust
     /// boundary: a malformed (but CRC-valid) chunk must surface as
     /// [`Error::CorruptIndex`] so the query layer skips the file rather than

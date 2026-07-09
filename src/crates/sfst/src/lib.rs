@@ -60,6 +60,7 @@ mod reader;
 mod row_index;
 mod schema;
 mod span_extras;
+mod trace_bloom;
 mod trace_index;
 mod writer;
 
@@ -78,6 +79,7 @@ pub use reader::read_summary;
 pub use registry::{File, Registry, RetentionPolicy};
 pub use row_index::RowIndex;
 pub use span_extras::{EventIndex, EventRef, EventRows, LinkIndex, LinkRef, LinkRows};
+pub use trace_bloom::TraceIdBloom;
 pub use trace_index::TraceIdIndex;
 
 /// Deterministic opaque partition key for tests. SFST treats `part_key` as an
@@ -160,6 +162,11 @@ const CHUNK_TRACE_INDEX: chunk_file::ChunkId = *b"TIDX";
 // `span_extras`).
 const CHUNK_EVENTS: chunk_file::ChunkId = *b"EVNB";
 const CHUNK_LINKS: chunk_file::ChunkId = *b"LNKB";
+// Optional per-file trace-id bloom (cold region, after TIDX): a serialized
+// fastbloom filter over the file's distinct set trace ids — "definitely not in
+// this file" for cross-file trace-by-id, at a 5% build-time FP target. Same
+// additive TOC-indexed contract as TIDX (see `trace_bloom`).
+const CHUNK_TRACE_BLOOM: chunk_file::ChunkId = *b"TBLM";
 
 /// Minimum number of logs in each stream batch. Files with fewer than
 /// `MIN_LOGS_PER_BATCH` total logs use a single batch; otherwise the
