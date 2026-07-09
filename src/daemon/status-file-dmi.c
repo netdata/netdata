@@ -1347,7 +1347,7 @@ static void parse_smbios_structures(const smbios_data_t smbios, DMI_INFO *dmi) {
             
             if (found_terminator) {
                 // Advance to next structure
-                current = (const BYTE *)(str_end + 1);
+                current = (const BYTE *)(str_end + 2);
                 continue;
             } else {
                 break; // Corrupt data
@@ -1388,7 +1388,7 @@ static void parse_smbios_structures(const smbios_data_t smbios, DMI_INFO *dmi) {
         }
         
         // Move to the next structure
-        current = (const BYTE *)(str_end + 1);
+        current = (const BYTE *)(str_end + 2);
         
         // Check for end marker or out of bounds
         if (current >= end || *current == 127)

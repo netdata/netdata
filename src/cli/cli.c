@@ -4,6 +4,7 @@
 #include "daemon/common.h"
 
 static uv_pipe_t client_pipe;
+static bool client_pipe_close_requested;
 static uv_write_t write_req;
 static uv_shutdown_t shutdown_req;
 
@@ -11,6 +12,14 @@ static char command_string[MAX_COMMAND_LENGTH];
 static unsigned command_string_size;
 
 static int exit_status;
+
+static void close_client_pipe(void)
+{
+    if (!client_pipe_close_requested) {
+        client_pipe_close_requested = true;
+        uv_close((uv_handle_t *)&client_pipe, NULL);
+    }
+}
 
 struct command_context {
     uv_work_t work;
@@ -27,6 +36,7 @@ static void parse_command_reply(BUFFER *buf)
     unsigned response_string_size = buffer_strlen(buf);
     FILE *stream = NULL;
     char *pos;
+    char *status_end;
     int syntax_error = 0;
 
     for (pos = response_string ;
@@ -40,7 +50,19 @@ static void parse_command_reply(BUFFER *buf)
 
         switch (*pos) {
         case CMD_PREFIX_EXIT_CODE:
-            exit_status = atoi(++pos);
+            pos++;
+            status_end = pos;
+            while (status_end < response_string + response_string_size && isdigit((uint8_t)*status_end))
+                status_end++;
+
+            if (status_end == pos || status_end >= response_string + response_string_size || *status_end != '\0') {
+                syntax_error = 1;
+                fprintf(stderr, "Syntax error, failed to parse command response.\n");
+            }
+            else {
+                exit_status = atoi(pos);
+                pos = status_end;
+            }
             break;
         case CMD_PREFIX_INFO:
             stream = stdout;
@@ -101,7 +123,7 @@ static void shutdown_cb(uv_shutdown_t* req, int status)
     ret = uv_read_start((uv_stream_t *)&client_pipe, alloc_cb, pipe_read_cb);
     if (ret) {
         fprintf(stderr, "uv_read_start(): %s\n", uv_strerror(ret));
-        uv_close((uv_handle_t *)&client_pipe, NULL);
+        close_client_pipe();
         return;
     }
 }
@@ -118,7 +140,7 @@ static void pipe_write_cb(uv_write_t* req, int status)
     ret = uv_shutdown(&shutdown_req, (uv_stream_t *)&client_pipe, shutdown_cb);
     if (ret) {
         fprintf(stderr, "uv_shutdown(): %s\n", uv_strerror(ret));
-        uv_close((uv_handle_t *)&client_pipe, NULL);
+        close_client_pipe();
         return;
     }
 }
@@ -192,7 +214,7 @@ int main(int argc, char **argv)
 
     uv_run(loop, UV_RUN_DEFAULT);
 
-    uv_close((uv_handle_t *)&client_pipe, NULL);
+    close_client_pipe();
     buffer_free(client_pipe.data);
 
     return exit_status;

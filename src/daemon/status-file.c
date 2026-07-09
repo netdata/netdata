@@ -1078,7 +1078,7 @@ static void post_status_file(struct post_status_file_thread_data *d) {
         session_status.posts++;
         nd_log(NDLS_DAEMON, NDLP_INFO, "Posted last status to agent-events successfully.");
         uint64_t hash = daemon_status_file_hash(d->status, d->msg, d->cause);
-        dedup_keep_hash(&session_status, hash, false);
+        dedup_keep_hash(&session_status, hash, false, DEDUP_RELOAD_FROM_DISK);
         daemon_status_file_save(wb, &session_status, true);
     }
     else
@@ -1134,7 +1134,8 @@ void daemon_status_file_init(void) {
     static_save_buffer_init();
     mallocz_register_out_of_memory_cb(daemon_status_file_out_of_memory);
 
-    status_file_io_load(STATUS_FILENAME, status_file_load_and_parse, &last_session_status);
+    status_file_io_load(STATUS_FILENAME, status_file_load_and_parse, &last_session_status, true);
+    daemon_status_dedup_load(false);
 
     // fill missing information on older versions of the status file
 
@@ -1385,7 +1386,7 @@ void daemon_status_file_check_crash(void) {
         (last_session_status.restarts > 1 || !nd_is_running_under_ci()) &&
 
         // we have not reported this
-        !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause), false)
+        !dedup_already_posted(&session_status, daemon_status_file_hash(&last_session_status, msg, cause), false, DEDUP_RELOAD_FROM_DISK)
 
         ) {
         daemon_status_file_startup_step("startup(crash reports prep)");
@@ -1591,10 +1592,11 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     bool duplicate = false;
     if(chained_handler) {
         uint64_t hash = daemon_status_file_hash(&session_status, NULL, NULL);
-        duplicate = dedup_already_posted(&session_status, hash, true);
+        // Loading from disk is not async-signal-safe; use the table loaded during normal startup.
+        duplicate = dedup_already_posted(&session_status, hash, true, DEDUP_USE_LOADED);
         if (!duplicate) {
             // save this hash, so that we won't post it again to sentry
-            dedup_keep_hash(&session_status, hash, true);
+            dedup_keep_hash(&session_status, hash, true, DEDUP_USE_LOADED);
         }
     }
 
@@ -1604,7 +1606,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     // This can cause a deadlock when a signal is received while the lock is held.
     // The code is commented out to prevent the deadlock, at the cost of not saving the status file on a crash.
 #else
-    bool safe_to_get_stack_trace = reason != EXIT_REASON_SIGABRT || stacktrace_capture_is_async_signal_safe();
+    bool safe_to_get_stack_trace = reason != EXIT_REASON_SIGABRT && stacktrace_capture_is_async_signal_safe();
     bool get_stack_trace = stacktrace_available() && safe_to_get_stack_trace && stack_trace_is_empty(&session_status);
 
     // save it
@@ -1613,6 +1615,8 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
     else {
         if (!stacktrace_available())
             set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "no stack trace backend available");
+        else if(reason == EXIT_REASON_SIGABRT)
+            set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "fatal handler already captured the stack trace");
         else
             set_stack_trace_message_if_empty(&session_status, STACK_TRACE_INFO_PREFIX "not safe to get a stack trace for this signal using this backend");
 

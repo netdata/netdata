@@ -10,7 +10,7 @@ c_rhash c_rhash_new(size_t bin_count) {
     if (unlikely(bin_count > (SIZE_MAX - sizeof(struct c_rhash_s)) / sizeof(c_rhash_bin)))
         fatal("C_RHASH: bin count is too large.");
 
-    c_rhash hash = callocz(1, sizeof(struct c_rhash_s) + (bin_count * sizeof(struct bin_ll*)) );
+    c_rhash hash = callocz(1, sizeof(struct c_rhash_s) + (bin_count * sizeof(c_rhash_bin)) );
     hash->bin_count = bin_count;
     hash->bins = (c_rhash_bin *)((char*)hash + sizeof(struct c_rhash_s));
 
@@ -115,7 +115,7 @@ int c_rhash_get_uint8_by_str(c_rhash hash, const char *key, uint8_t *ret_val) {
     struct bin_item *bin = hash->bins[nhash];
 
     while (bin) {
-        if (bin->key_type == ITEMTYPE_STRING) {
+        if (bin->key_type == ITEMTYPE_STRING && bin->value_type == ITEMTYPE_UINT8) {
             if (!strcmp(bin->key, key)) {
                 *ret_val = *(uint8_t*)bin->value;
                 return 0;

@@ -18,6 +18,16 @@ MCP_CLIENT *mcp_websocket_get_context(struct websocket_server_client *wsc) {
     return (MCP_CLIENT *)wsc->user_data;
 }
 
+static void mcp_websocket_release_context(struct websocket_server_client *wsc) {
+    MCP_CLIENT *ctx = mcp_websocket_get_context(wsc);
+    if (!ctx)
+        return;
+
+    // Detach before freeing so repeated lifecycle callbacks never observe a stale pointer.
+    mcp_websocket_set_context(wsc, NULL);
+    mcp_free_client(ctx);
+}
+
 // Create a response context for a WebSocket client
 static MCP_CLIENT *mcp_websocket_create_context(struct websocket_server_client *wsc) {
     if (!wsc) return NULL;
@@ -163,12 +173,7 @@ void mcp_websocket_on_close(struct websocket_server_client *wsc, WEBSOCKET_CLOSE
     
     websocket_debug(wsc, "MCP client closing (code: %d, reason: %s)", code, reason ? reason : "none");
     
-    // Clean up the MCP context
-    MCP_CLIENT *ctx = mcp_websocket_get_context(wsc);
-    if (ctx) {
-        mcp_free_client(ctx);
-        mcp_websocket_set_context(wsc, NULL);
-    }
+    mcp_websocket_release_context(wsc);
 }
 
 // WebSocket disconnect handler for MCP
@@ -177,12 +182,7 @@ void mcp_websocket_on_disconnect(struct websocket_server_client *wsc) {
     
     websocket_debug(wsc, "MCP client disconnected");
     
-    // Clean up the MCP context
-    MCP_CLIENT *ctx = mcp_websocket_get_context(wsc);
-    if (ctx) {
-        mcp_free_client(ctx);
-        mcp_websocket_set_context(wsc, NULL);
-    }
+    mcp_websocket_release_context(wsc);
 }
 
 // Register WebSocket callbacks for MCP

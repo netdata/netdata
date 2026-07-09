@@ -83,17 +83,34 @@ void string_statistics(size_t *inserts, size_t *deletes, size_t *searches, size_
     if (releases) *releases = 0;
 
     for(size_t i = 0; i < STRING_PARTITIONS ;i++) {
-        if (inserts)        *inserts        += string_base[i].inserts;
-        if (deletes)        *deletes        += string_base[i].deletes;
-        if (entries)        *entries        += (size_t) string_base[i].entries;
-        if (memory)         *memory         += (size_t) string_base[i].memory;
-        if (memory_index)   *memory_index   += (string_base[i].memory_index > 0) ? string_base[i].memory_index : 0;
+        rw_spinlock_read_lock(&string_base[i].spinlock);
+
+        size_t partition_inserts = string_base[i].inserts;
+        size_t partition_deletes = string_base[i].deletes;
+        long int partition_entries = string_base[i].entries;
+        long int partition_memory = string_base[i].memory;
+        long int partition_memory_index = string_base[i].memory_index;
 
 #ifdef NETDATA_INTERNAL_CHECKS
-        if (searches)       *searches       += string_base[i].atomic.searches;
-        if (references)     *references     += (size_t) string_base[i].atomic.active_references;
-        if (duplications)   *duplications   += string_base[i].atomic.duplications;
-        if (releases)       *releases       += string_base[i].atomic.releases;
+        size_t partition_searches = __atomic_load_n(&string_base[i].atomic.searches, __ATOMIC_RELAXED);
+        long int partition_references = __atomic_load_n(&string_base[i].atomic.active_references, __ATOMIC_RELAXED);
+        size_t partition_duplications = __atomic_load_n(&string_base[i].atomic.duplications, __ATOMIC_RELAXED);
+        size_t partition_releases = __atomic_load_n(&string_base[i].atomic.releases, __ATOMIC_RELAXED);
+#endif
+
+        rw_spinlock_read_unlock(&string_base[i].spinlock);
+
+        if (inserts)        *inserts        += partition_inserts;
+        if (deletes)        *deletes        += partition_deletes;
+        if (entries)        *entries        += (size_t) partition_entries;
+        if (memory)         *memory         += (size_t) partition_memory;
+        if (memory_index)   *memory_index   += (partition_memory_index > 0) ? (size_t) partition_memory_index : 0;
+
+#ifdef NETDATA_INTERNAL_CHECKS
+        if (searches)       *searches       += partition_searches;
+        if (references)     *references     += (size_t) partition_references;
+        if (duplications)   *duplications   += partition_duplications;
+        if (releases)       *releases       += partition_releases;
 #endif
     }
 }
@@ -341,11 +358,14 @@ STRING *string_strndupz(const char *str, size_t len) {
     if(unlikely(len > STRING_MAX_LENGTH))
         fatal("STRING: cannot index string length %zu, maximum is %zu", len, STRING_MAX_LENGTH);
 
+    size_t length = strnlen(str, len);
+    if(unlikely(!length)) return NULL;
+
     uint8_t partition = string_partition_str(str);
 
-    STRING *string = string_index_search(str, len + 1, partition);
+    STRING *string = string_index_search(str, length + 1, partition);
     while(!string)
-        string = string_index_insert(str, len + 1, partition);
+        string = string_index_insert(str, length + 1, partition);
 
     string_stats_atomic_increment(partition, active_references);
 
@@ -751,6 +771,25 @@ int string_unittest(size_t entries) {
 
     // check string
     {
+        char short_bound[100] = "short";
+        STRING *s_short_bound = string_strndupz(short_bound, sizeof(short_bound));
+        if(!s_short_bound || string_strlen(s_short_bound) != 5 || strcmp(string2str(s_short_bound), "short") != 0) {
+            errors++;
+            fprintf(stderr, "ERROR: strndup string input should stop at NUL before the bound\n");
+        }
+        else
+            fprintf(stderr, "OK: strndup string input stops at NUL before the bound\n");
+        string_freez(s_short_bound);
+
+        STRING *s_substring = string_strndupz("prefix:suffix", 6);
+        if(!s_substring || string_strlen(s_substring) != 6 || strcmp(string2str(s_substring), "prefix") != 0) {
+            errors++;
+            fprintf(stderr, "ERROR: strndup string input should preserve bounded substrings\n");
+        }
+        else
+            fprintf(stderr, "OK: strndup string input preserves bounded substrings\n");
+        string_freez(s_substring);
+
         long entries_starting = unittest_string_entries();
 
         fprintf(stderr, "\nChecking strings...\n");

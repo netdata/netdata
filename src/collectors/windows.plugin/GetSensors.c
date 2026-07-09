@@ -14,6 +14,8 @@
 static ISensorManager *pSensorManager = NULL;
 static ND_THREAD *sensors_thread_update = NULL;
 static netdata_mutex_t sensors_mutex;
+static volatile LONG sensors_thread_finished = 0;
+static const int SENSORS_THREAD_JOIN_FALLBACK_WAIT_MS = 2000;
 
 #define NETDATA_WIN_SENSOR_STATES (6)
 #define NETDATA_WIN_VECTOR_POS (3)
@@ -695,7 +697,7 @@ static void netdata_sensors_monitor(void *ptr __maybe_unused)
     if (FAILED(hr) && hr != RPC_E_CHANGED_MODE) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Sensor thread: cannot initialize COM interface (error 0x%lX)", (unsigned long)hr);
-        return;
+        goto done;
     }
 
     // Create sensor manager instance for this thread
@@ -704,10 +706,7 @@ static void netdata_sensors_monitor(void *ptr __maybe_unused)
     if (FAILED(hr)) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Sensor thread: cannot create ISensorManager (error 0x%lX)", (unsigned long)hr);
-        // Only uninitialize if we successfully initialized COM ourselves
-        if (com_initialized)
-            CoUninitialize();
-        return;
+        goto done;
     }
 
     heartbeat_t hb;
@@ -722,6 +721,7 @@ static void netdata_sensors_monitor(void *ptr __maybe_unused)
         netdata_get_sensors();
     }
 
+done:
     // Thread cleanup - release sensor manager and uninitialize COM
     if (pSensorManager) {
         pSensorManager->lpVtbl->Release(pSensorManager);
@@ -731,6 +731,8 @@ static void netdata_sensors_monitor(void *ptr __maybe_unused)
     // Only uninitialize if we successfully initialized COM ourselves
     if (com_initialized)
         CoUninitialize();
+
+    InterlockedExchange(&sensors_thread_finished, 1);
 }
 
 void dict_sensor_insert(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
@@ -765,8 +767,11 @@ static int initialize(int update_every)
     dictionary_register_insert_callback(sensors, dict_sensor_insert, NULL);
     dictionary_register_delete_callback(sensors, dict_sensor_delete, NULL);
 
+    InterlockedExchange(&sensors_thread_finished, 0);
     sensors_thread_update =
         nd_thread_create("sensors_upd", NETDATA_THREAD_OPTION_DEFAULT, netdata_sensors_monitor, &update_every);
+    if (!sensors_thread_update)
+        InterlockedExchange(&sensors_thread_finished, 1);
 
     return 0;
 }
@@ -942,11 +947,29 @@ int do_GetSensors(int update_every, usec_t dt __maybe_unused)
 
 void do_Sensors_cleanup()
 {
-    // Wait for sensor thread to finish
-    // The thread handles its own COM cleanup (CoUninitialize) and pSensorManager release
-    if (nd_thread_join(sensors_thread_update))
-        nd_log_daemon(NDLP_ERR, "Failed to join sensors thread update");
-    sensors_thread_update = NULL;
+    if (sensors_thread_update) {
+        int join_result = nd_thread_join(sensors_thread_update);
+        sensors_thread_update = NULL;
+
+        if (join_result) {
+            nd_log_daemon(NDLP_ERR, "Failed to join sensors thread update");
+
+            size_t retries = 0;
+            while (!InterlockedCompareExchange(&sensors_thread_finished, 1, 1) &&
+                   retries < (size_t)SENSORS_THREAD_JOIN_FALLBACK_WAIT_MS) {
+                Sleep(1);
+                retries++;
+            }
+
+            if (!InterlockedCompareExchange(&sensors_thread_finished, 1, 1))
+                return;
+        }
+    } else if (sensors && !InterlockedCompareExchange(&sensors_thread_finished, 1, 1)) {
+        return;
+    }
+
+    if (!sensors)
+        return;
 
     __netdata_mutex_destroy(&sensors_mutex);
     dictionary_destroy(sensors);

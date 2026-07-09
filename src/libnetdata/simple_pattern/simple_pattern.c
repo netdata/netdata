@@ -388,8 +388,8 @@ static void scan_is_potential_name(struct simple_pattern *p, int *alpha, int *co
             }
             if (p->mode != SIMPLE_PATTERN_EXACT)
                 *wildcards = 1;
-            p = p->child;
         }
+        p = p->child;
     }
 }
 

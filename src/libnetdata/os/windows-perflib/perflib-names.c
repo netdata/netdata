@@ -144,22 +144,34 @@ const char *RegistryFindHelpByID(DWORD id) {
 
 // ----------------------------------------------------------
 
+static inline bool registry_multi_sz_strlen(const char *ptr, const char *end, size_t *len) {
+    if(ptr >= end)
+        return false;
+
+    const char *nul = memchr(ptr, '\0', (size_t)(end - ptr));
+    if(!nul)
+        return false;
+
+    *len = (size_t)(nul - ptr);
+    return true;
+}
+
 static inline void readRegistryKeys_unsafe(BOOL helps) {
-    TCHAR *pData = NULL;
+    char *pData = NULL;
 
     HKEY hKey;
     DWORD dwType;
     DWORD dwSize = 0;
     LONG lStatus;
 
-    LPCSTR valueName;
+    const char *valueName;
     if(helps)
-        valueName = TEXT("help");
+        valueName = "help";
     else
-        valueName = TEXT("CounterDefinition");
+        valueName = "CounterDefinition";
 
     // Open the key for the English counters
-    lStatus = RegOpenKeyEx(HKEY_LOCAL_MACHINE, TEXT(REGISTRY_KEY), 0, KEY_READ, &hKey);
+    lStatus = RegOpenKeyExA(HKEY_LOCAL_MACHINE, REGISTRY_KEY, 0, KEY_READ, &hKey);
     if (lStatus != ERROR_SUCCESS) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Failed to open registry key HKEY_LOCAL_MACHINE, subkey '%s', error %ld\n", REGISTRY_KEY, (long)lStatus);
@@ -167,7 +179,7 @@ static inline void readRegistryKeys_unsafe(BOOL helps) {
     }
 
     // Get the size of the 'Counters' data
-    lStatus = RegQueryValueEx(hKey, valueName, NULL, &dwType, NULL, &dwSize);
+    lStatus = RegQueryValueExA(hKey, valueName, NULL, &dwType, NULL, &dwSize);
     if (lStatus != ERROR_SUCCESS) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Failed to get registry key HKEY_LOCAL_MACHINE, subkey '%s', value '%s', size of data, error %ld\n",
@@ -179,7 +191,7 @@ static inline void readRegistryKeys_unsafe(BOOL helps) {
     pData = mallocz(dwSize);
 
     // Read the 'Counters' data
-    lStatus = RegQueryValueEx(hKey, valueName, NULL, &dwType, (LPBYTE)pData, &dwSize);
+    lStatus = RegQueryValueExA(hKey, valueName, NULL, &dwType, (LPBYTE)pData, &dwSize);
     if (lStatus != ERROR_SUCCESS || dwType != REG_MULTI_SZ) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Failed to get registry key HKEY_LOCAL_MACHINE, subkey '%s', value '%s', data, error %ld\n",
@@ -188,11 +200,15 @@ static inline void readRegistryKeys_unsafe(BOOL helps) {
     }
 
     // Process the counter data
-    TCHAR *ptr = pData;
-    TCHAR *end_ptr = pData + dwSize;
-    while (*ptr && ptr < end_ptr - 1) {
-        TCHAR *sid = ptr;  // First string is the ID
-        size_t sid_len = lstrlen(ptr);
+    char *ptr = pData;
+    char *end_ptr = pData + dwSize;
+    while (ptr < end_ptr && *ptr) {
+        char *sid = ptr;  // First string is the ID
+        size_t sid_len;
+        if(!registry_multi_sz_strlen(ptr, end_ptr, &sid_len)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Registry data truncated while reading ID, aborting");
+            break;
+        }
         
         // Check for valid ID string
         if (sid_len == 0) {
@@ -200,16 +216,19 @@ static inline void readRegistryKeys_unsafe(BOOL helps) {
             break;
         }
         
-        // Check for buffer overrun
-        if (ptr + sid_len + 1 >= end_ptr) {
+        ptr += sid_len + 1; // Move to the next string
+
+        if (ptr >= end_ptr) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Registry data truncated after ID, aborting");
             break;
         }
-        
-        ptr += sid_len + 1; // Move to the next string
-        
-        TCHAR *name = ptr;  // Second string is the name
-        size_t name_len = lstrlen(ptr);
+
+        char *name = ptr;  // Second string is the name
+        size_t name_len;
+        if(!registry_multi_sz_strlen(ptr, end_ptr, &name_len)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Registry data truncated while reading name, aborting");
+            break;
+        }
         
         // Check for empty name
         if (name_len == 0) {
@@ -218,13 +237,7 @@ static inline void readRegistryKeys_unsafe(BOOL helps) {
             ptr += 1;
             continue;
         }
-        
-        // Check for buffer overrun
-        if (ptr + name_len + 1 > end_ptr) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Registry data truncated after name, aborting");
-            break;
-        }
-        
+
         ptr += name_len + 1; // Move to the next pair
         
         // Convert ID to number with validation

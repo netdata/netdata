@@ -393,6 +393,72 @@ static int test_parse_and_format_roundtrip(void) {
     return failed;
 }
 
+static int test_duration_parse_seconds_int_range(void) {
+    int failed = 0;
+    char max_int_seconds[64];
+    char min_int_seconds[64];
+    char above_max_int_seconds[64];
+    char below_min_int_seconds[64];
+
+    snprintfz(max_int_seconds, sizeof(max_int_seconds), "%ds", INT_MAX);
+    snprintfz(min_int_seconds, sizeof(min_int_seconds), "%ds", INT_MIN);
+#if INT_MAX < INTMAX_MAX
+    snprintfz(above_max_int_seconds, sizeof(above_max_int_seconds), "%" PRIdMAX "s", (intmax_t)INT_MAX + 1);
+#else
+    snprintfz(above_max_int_seconds, sizeof(above_max_int_seconds), "999999999999999999999999999999s");
+#endif
+#if INT_MIN > INTMAX_MIN
+    snprintfz(below_min_int_seconds, sizeof(below_min_int_seconds), "%" PRIdMAX "s", (intmax_t)INT_MIN - 1);
+#else
+    snprintfz(below_min_int_seconds, sizeof(below_min_int_seconds), "-999999999999999999999999999999s");
+#endif
+
+    struct {
+        const char *input;
+        bool should_succeed;
+        int expected;
+        const char *description;
+    } range_tests[] = {
+        { max_int_seconds, true, INT_MAX, "max int seconds succeeds" },
+        { min_int_seconds, true, INT_MIN, "min int seconds succeeds" },
+        { above_max_int_seconds, false, 0, "above max int seconds fails" },
+        { below_min_int_seconds, false, 0, "below min int seconds fails" },
+        { NULL, false, 0, NULL }
+    };
+
+    for (int i = 0; range_tests[i].input != NULL; i++) {
+        int result = 12345;
+        bool success = duration_parse_seconds(range_tests[i].input, &result);
+
+        if (success != range_tests[i].should_succeed) {
+            fprintf(stderr, "FAILED: %s\n", range_tests[i].description);
+            fprintf(stderr, "  Input: '%s'\n", range_tests[i].input);
+            fprintf(stderr, "  Expected to %s but %s\n",
+                    range_tests[i].should_succeed ? "succeed" : "fail",
+                    success ? "succeeded" : "failed");
+            failed++;
+            continue;
+        }
+
+        if (success && result != range_tests[i].expected) {
+            fprintf(stderr, "FAILED: %s\n", range_tests[i].description);
+            fprintf(stderr, "  Input: '%s'\n", range_tests[i].input);
+            fprintf(stderr, "  Expected: %d seconds\n", range_tests[i].expected);
+            fprintf(stderr, "  Got: %d seconds\n", result);
+            failed++;
+        }
+
+        if (!success && result != 12345) {
+            fprintf(stderr, "FAILED: %s modified result on failure\n", range_tests[i].description);
+            fprintf(stderr, "  Input: '%s'\n", range_tests[i].input);
+            fprintf(stderr, "  Got: %d seconds\n", result);
+            failed++;
+        }
+    }
+
+    return failed;
+}
+
 int duration_unittest(void) {
     int passed = 0;
     int failed = 0;
@@ -425,7 +491,15 @@ int duration_unittest(void) {
     } else {
         failed += roundtrip_failed;
     }
-    
+
+    printf("\nRunning int range tests...\n");
+    int range_failed = test_duration_parse_seconds_int_range();
+    if (range_failed == 0) {
+        printf("All int range tests passed\n");
+    } else {
+        failed += range_failed;
+    }
+
     printf("\n===============================================================\n");
     printf("Duration parser tests completed: %d passed, %d failed\n", passed, failed);
     

@@ -26,7 +26,11 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
     wb->content_type = CT_APPLICATION_JSON;
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
 
-    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(localhost));
+    {
+        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(localhost);
+        buffer_json_member_add_string(wb, "hostname", string2str(identity.hostname));
+        rrdhost_identity_release(&identity);
+    }
     buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
     buffer_json_member_add_string(wb, "type", "table");
     buffer_json_member_add_time_t(wb, "update_every", STREAMING_FUNCTION_UPDATE_EVERY);
@@ -71,6 +75,7 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
         dfe_start_read(rrdhost_root_index, host) {
             RRDHOST_STATUS s;
             rrdhost_status(host, now, &s, RRDHOST_STATUS_ALL);
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
             buffer_json_add_array_item_array(wb);
 
             if(s.db.metrics > max_db_metrics)
@@ -96,7 +101,7 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
             }
 
             // Node
-            buffer_json_add_array_item_string(wb, rrdhost_hostname(s.host));
+            buffer_json_add_array_item_string(wb, string2str(identity.hostname));
 
             // rowOptions
             buffer_json_add_array_item_object(wb);
@@ -136,8 +141,8 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
             buffer_json_add_array_item_string(wb, rrdhost_option_check(s.host, RRDHOST_OPTION_EPHEMERAL_HOST) ? "ephemeral" : "permanent");
 
             // AgentName and AgentVersion
-            buffer_json_add_array_item_string(wb, rrdhost_program_name(host));
-            buffer_json_add_array_item_string(wb, rrdhost_program_version(host));
+            buffer_json_add_array_item_string(wb, string2str(identity.prog_name));
+            buffer_json_add_array_item_string(wb, string2str(identity.prog_version));
 
             // System Info
             rrdhost_system_info_to_streaming_function_array(wb, s.host->system_info);
@@ -169,9 +174,9 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
             // collection
 
             // InConnections
-            buffer_json_add_array_item_uint64(wb, s.host->stream.rcv.status.connections);
-            if(s.host->stream.rcv.status.connections > max_in_connections)
-                max_in_connections = s.host->stream.rcv.status.connections;
+            buffer_json_add_array_item_uint64(wb, s.ingest.id);
+            if(s.ingest.id > max_in_connections)
+                max_in_connections = s.ingest.id;
 
             if(s.ingest.since) {
                 uint64_t in_since = s.ingest.since * MSEC_PER_SEC;
@@ -219,9 +224,9 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
             // streaming
 
             // OutConnections
-            buffer_json_add_array_item_uint64(wb, s.host->stream.snd.status.connections);
-            if(s.host->stream.snd.status.connections > max_out_connections)
-                max_out_connections = s.host->stream.snd.status.connections;
+            buffer_json_add_array_item_uint64(wb, s.stream.id);
+            if(s.stream.id > max_out_connections)
+                max_out_connections = s.stream.id;
 
             if(s.stream.since) {
                 uint64_t out_since = s.stream.since * MSEC_PER_SEC;
@@ -320,6 +325,7 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
                 buffer_json_add_array_item_string(wb, NULL); // NodeID
 
             // close
+            rrdhost_identity_release(&identity);
             buffer_json_array_close(wb);
         }
         dfe_done(host);

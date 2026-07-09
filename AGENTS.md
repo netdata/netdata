@@ -157,6 +157,11 @@ and edge cases):**
      evidence, or a linked GitHub issue) before an earlier stage merges. A
      self-certified "a later stage will finish it" with no tracked item is not
      acceptable.
+   - Re-ground staged designs: a design recorded during planning or an earlier
+     stage MAY have drifted from the code a previous stage produced (a removed
+     structure, an obsoleted mechanism). Before implementing a later stage you
+     MUST re-verify its recorded design against the current code and record the
+     correction in the SOW; never implement against stale assumptions.
    - Deferral check: before recommending deferral, check the issue, SOW,
      acceptance criteria, and affected migration scope. Silence or ambiguity MUST
      NOT be read as permission to defer; if those sources do not clearly place
@@ -702,6 +707,7 @@ A SOW cannot be completed until Validation records:
 - end-user/operator docs update or evidence-backed reason none were affected;
 - end-user/operator skill update or evidence-backed reason none were affected by docs/spec changes;
 - lessons extracted or specific reason there were none;
+- workflow-friction triage: each recorded `Workflow Friction & Rule Gaps` note resolved to a rule update (`AGENTS.md`, project skill, spec, or SOW template), an evidence-backed rejection, or a tracked follow-up (or an explicit "none arose");
 - follow-up mapping.
 
 Generic "N/A" is invalid.

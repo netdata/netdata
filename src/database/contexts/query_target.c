@@ -602,9 +602,20 @@ inline STRING *query_instance_name_fqdn(QUERY_INSTANCE *qi, size_t version) {
     return qi->name_fqdn;
 }
 
-RRDSET *rrdinstance_acquired_rrdset(RRDINSTANCE_ACQUIRED *ria) {
+RRDSET_ACQUIRED *rrdinstance_acquired_rrdset_acquire(RRDINSTANCE_ACQUIRED *ria) {
     RRDINSTANCE *ri = rrdinstance_acquired_value(ria);
-    return ri->rrdset;
+    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(ri->rc->rrdhost, string2str(ri->id), true);
+    if(unlikely(!rsa))
+        return NULL;
+
+    RRDSET *st = rrdset_acquired_to_rrdset(rsa);
+
+    if(unlikely(st->rrdcontexts.rrdinstance != ria)) {
+        rrdset_acquired_release(rsa);
+        return NULL;
+    }
+
+    return rsa;
 }
 
 const char *rrdcontext_acquired_units(RRDCONTEXT_ACQUIRED *rca) {
@@ -624,7 +635,8 @@ const char *rrdcontext_acquired_title(RRDCONTEXT_ACQUIRED *rca) {
 
 static void query_target_eval_instance_rrdcalc(QUERY_TARGET_LOCALS *qtl __maybe_unused,
                                                QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi) {
-    RRDSET *st = rrdinstance_acquired_rrdset(qi->ria);
+    RRDSET_ACQUIRED *rsa = rrdinstance_acquired_rrdset_acquire(qi->ria);
+    RRDSET *st = rrdset_acquired_to_rrdset(rsa);
     if (st) {
         rw_spinlock_read_lock(&st->alerts.spinlock);
         for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
@@ -659,15 +671,19 @@ static void query_target_eval_instance_rrdcalc(QUERY_TARGET_LOCALS *qtl __maybe_
         }
         rw_spinlock_read_unlock(&st->alerts.spinlock);
     }
+    rrdset_acquired_release(rsa);
 }
 
 static bool query_target_match_alert_pattern(RRDINSTANCE_ACQUIRED *ria, SIMPLE_PATTERN *pattern) {
     if(!pattern)
         return true;
 
-    RRDSET *st = rrdinstance_acquired_rrdset(ria);
-    if (!st)
+    RRDSET_ACQUIRED *rsa = rrdinstance_acquired_rrdset_acquire(ria);
+    RRDSET *st = rrdset_acquired_to_rrdset(rsa);
+    if (!st) {
+        rrdset_acquired_release(rsa);
         return false;
+    }
 
     BUFFER *wb = NULL;
     bool matched = false;
@@ -704,6 +720,7 @@ static bool query_target_match_alert_pattern(RRDINSTANCE_ACQUIRED *ria, SIMPLE_P
     }
     rw_spinlock_read_unlock(&st->alerts.spinlock);
 
+    rrdset_acquired_release(rsa);
     buffer_free(wb);
     return matched;
 }

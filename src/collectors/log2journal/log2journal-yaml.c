@@ -197,9 +197,27 @@ bool yaml_parse_file(const char *config_file_path, LOG_JOB *jb) {
 }
 
 bool yaml_parse_config(const char *config_name, LOG_JOB *jb) {
+    if(!config_name || !*config_name) {
+        l2j_log("yaml configuration name cannot be empty.");
+        return false;
+    }
+
     char filename[FILENAME_MAX + 1];
 
-    snprintf(filename, sizeof(filename), "%s/%s.yaml", LOG2JOURNAL_CONFIG_PATH, config_name);
+    int length = snprintf(filename, sizeof(filename), "%s/%s.yaml", LOG2JOURNAL_CONFIG_PATH, config_name);
+    if(length < 0) {
+        l2j_log("failed to generate yaml configuration filename.");
+        return false;
+    }
+
+    if((size_t)length >= sizeof(filename)) {
+        l2j_log(
+            "yaml configuration filename is too long (needed %d bytes plus NUL, buffer is %zu bytes).",
+            length,
+            sizeof(filename));
+        return false;
+    }
+
     return yaml_parse_file(filename, jb);
 }
 

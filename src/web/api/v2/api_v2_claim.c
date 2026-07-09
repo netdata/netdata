@@ -5,9 +5,10 @@
 
 static char *netdata_random_session_id_filename = NULL;
 static nd_uuid_t netdata_random_session_id = { 0 };
+static SPINLOCK netdata_random_session_id_spinlock = SPINLOCK_INITIALIZER;
 
-bool netdata_random_session_id_generate(void) {
-    static char guid[UUID_STR_LEN] = "";
+static bool netdata_random_session_id_generate_unlocked(void) {
+    char guid[UUID_STR_LEN] = "";
 
     uuid_generate_random(netdata_random_session_id);
     uuid_unparse_lower(netdata_random_session_id, guid);
@@ -44,26 +45,38 @@ bool netdata_random_session_id_generate(void) {
     return ret;
 }
 
-static const char *netdata_random_session_id_get_filename(void) {
-    if(!netdata_random_session_id_filename)
-        netdata_random_session_id_generate();
+bool netdata_random_session_id_generate(void) {
+    spinlock_lock(&netdata_random_session_id_spinlock);
+    bool ret = netdata_random_session_id_generate_unlocked();
+    spinlock_unlock(&netdata_random_session_id_spinlock);
 
-    return netdata_random_session_id_filename;
+    return ret;
+}
+
+static const char *netdata_random_session_id_get_filename(void) {
+    spinlock_lock(&netdata_random_session_id_spinlock);
+
+    if(!netdata_random_session_id_filename)
+        netdata_random_session_id_generate_unlocked();
+
+    const char *filename = netdata_random_session_id_filename;
+    spinlock_unlock(&netdata_random_session_id_spinlock);
+
+    return filename;
 }
 
 static bool netdata_random_session_id_matches(const char *guid) {
-    if(uuid_is_null(netdata_random_session_id))
-        return false;
-
     nd_uuid_t uuid;
 
     if(uuid_parse(guid, uuid))
         return false;
 
-    if(uuid_compare(netdata_random_session_id, uuid) == 0)
-        return true;
+    spinlock_lock(&netdata_random_session_id_spinlock);
+    bool ret = !uuid_is_null(netdata_random_session_id) &&
+               uuid_compare(netdata_random_session_id, uuid) == 0;
+    spinlock_unlock(&netdata_random_session_id_spinlock);
 
-    return false;
+    return ret;
 }
 
 static bool check_claim_param(const char *s) {

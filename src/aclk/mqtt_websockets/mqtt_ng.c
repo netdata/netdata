@@ -148,6 +148,7 @@ struct mqtt_properties_parser_ctx {
     struct mqtt_property *tail;
     uint32_t properties_length;
     uint32_t vbi_length;
+    size_t max_bytes;
     struct mqtt_vbi_parser_ctx vbi_parser_ctx;
     size_t bytes_consumed;
     int str_idx;
@@ -1505,6 +1506,28 @@ int mqtt_ng_ping(struct mqtt_ng_client *client)
     if (rbuf_bytes_available(buf) < (x))                                                                               \
         return MQTT_NG_CLIENT_NEED_MORE_BYTES;
 
+static int mqtt_properties_read_check(struct mqtt_properties_parser_ctx *ctx, rbuf_t data, size_t bytes)
+{
+    size_t consumed = ctx->bytes_consumed;
+    if (ctx->state == PROPERTIES_LENGTH || ctx->state == PROPERTY_TYPE_VBI)
+        consumed += ctx->vbi_parser_ctx.bytes;
+
+    if (consumed > ctx->max_bytes || bytes > ctx->max_bytes - consumed) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MQTT properties exceed packet boundary.");
+        return MQTT_NG_CLIENT_PROTOCOL_ERROR;
+    }
+    if (rbuf_bytes_available(data) < bytes)
+        return MQTT_NG_CLIENT_NEED_MORE_BYTES;
+
+    return MQTT_NG_CLIENT_PARSE_DONE;
+}
+
+#define PROPERTIES_READ_CHECK_AT_LEAST(ctx, data, x) do {                                                              \
+        int read_check_rc = mqtt_properties_read_check((ctx), (data), (x));                                            \
+        if (read_check_rc != MQTT_NG_CLIENT_PARSE_DONE)                                                               \
+            return read_check_rc;                                                                                     \
+    } while(0)
+
 #define vbi_parser_reset_ctx(ctx) memset(ctx, 0, sizeof(struct mqtt_vbi_parser_ctx))
 
 static int vbi_parser_parse(struct mqtt_vbi_parser_ctx *ctx, rbuf_t data)
@@ -1546,6 +1569,7 @@ static void mqtt_properties_parser_ctx_reset(struct mqtt_properties_parser_ctx *
     ctx->tail = NULL;
     ctx->properties_length = 0;
     ctx->bytes_consumed = 0;
+    ctx->max_bytes = SIZE_MAX;
     vbi_parser_reset_ctx(&ctx->vbi_parser_ctx);
 }
 
@@ -1637,11 +1661,16 @@ static int parse_properties_array(struct mqtt_properties_parser_ctx *ctx, rbuf_t
     int rc;
     switch (ctx->state) {
         case PROPERTIES_LENGTH:
+            PROPERTIES_READ_CHECK_AT_LEAST(ctx, data, 1);
             rc = vbi_parser_parse(&ctx->vbi_parser_ctx, data);
             if (rc == MQTT_NG_CLIENT_PARSE_DONE) {
                 ctx->properties_length = ctx->vbi_parser_ctx.result;
                 ctx->bytes_consumed += ctx->vbi_parser_ctx.bytes;
                 ctx->vbi_length = ctx->vbi_parser_ctx.bytes;
+                if (ctx->vbi_length > ctx->max_bytes || ctx->properties_length > ctx->max_bytes - ctx->vbi_length) {
+                    nd_log(NDLS_DAEMON, NDLP_ERR, "MQTT properties exceed packet boundary.");
+                    return MQTT_NG_CLIENT_PROTOCOL_ERROR;
+                }
                 if (!ctx->properties_length)
                     return MQTT_NG_CLIENT_PARSE_DONE;
                 ctx->state = PROPERTY_CREATE;
@@ -1649,7 +1678,7 @@ static int parse_properties_array(struct mqtt_properties_parser_ctx *ctx, rbuf_t
             }
             return rc;
         case PROPERTY_CREATE:
-            BUF_READ_CHECK_AT_LEAST(data, 1)
+            PROPERTIES_READ_CHECK_AT_LEAST(ctx, data, 1);
             struct mqtt_property *prop = callocz(1, sizeof(struct mqtt_property));
             if (ctx->head == NULL) {
                 ctx->head = prop;
@@ -1691,7 +1720,7 @@ static int parse_properties_array(struct mqtt_properties_parser_ctx *ctx, rbuf_t
             }
             break;
         case PROPERTY_TYPE_STR_BIN_LEN:
-            BUF_READ_CHECK_AT_LEAST(data, sizeof(uint16_t))
+            PROPERTIES_READ_CHECK_AT_LEAST(ctx, data, sizeof(uint16_t));
             rbuf_pop(data, (char*)&ctx->tail->bindata_len, sizeof(uint16_t));
             ctx->tail->bindata_len = be16toh(ctx->tail->bindata_len);
             ctx->bytes_consumed += 2;
@@ -1709,7 +1738,7 @@ static int parse_properties_array(struct mqtt_properties_parser_ctx *ctx, rbuf_t
             }
             break;
         case PROPERTY_TYPE_STR:
-            BUF_READ_CHECK_AT_LEAST(data, ctx->tail->bindata_len)
+            PROPERTIES_READ_CHECK_AT_LEAST(ctx, data, ctx->tail->bindata_len);
             ctx->tail->data.strings[ctx->str_idx] = mallocz(ctx->tail->bindata_len + 1);
             rbuf_pop(data, ctx->tail->data.strings[ctx->str_idx], ctx->tail->bindata_len);
             ctx->tail->data.strings[ctx->str_idx][ctx->tail->bindata_len] = 0;
@@ -1722,13 +1751,14 @@ static int parse_properties_array(struct mqtt_properties_parser_ctx *ctx, rbuf_t
             ctx->state = PROPERTY_NEXT;
             break;
         case PROPERTY_TYPE_BIN:
-            BUF_READ_CHECK_AT_LEAST(data, ctx->tail->bindata_len)
+            PROPERTIES_READ_CHECK_AT_LEAST(ctx, data, ctx->tail->bindata_len);
             ctx->tail->data.bindata = mallocz(ctx->tail->bindata_len);
             rbuf_pop(data, ctx->tail->data.bindata, ctx->tail->bindata_len);
             ctx->bytes_consumed += ctx->tail->bindata_len;
             ctx->state = PROPERTY_NEXT;
             break;
         case PROPERTY_TYPE_VBI:
+            PROPERTIES_READ_CHECK_AT_LEAST(ctx, data, 1);
             rc = vbi_parser_parse(&ctx->vbi_parser_ctx, data);
             if (rc == MQTT_NG_CLIENT_PARSE_DONE) {
                 ctx->tail->data.uint32 = ctx->vbi_parser_ctx.result;
@@ -1738,20 +1768,20 @@ static int parse_properties_array(struct mqtt_properties_parser_ctx *ctx, rbuf_t
             }
             return rc;
         case PROPERTY_TYPE_UINT8:
-            BUF_READ_CHECK_AT_LEAST(data, sizeof(uint8_t))
+            PROPERTIES_READ_CHECK_AT_LEAST(ctx, data, sizeof(uint8_t));
             rbuf_pop(data, (char*)&ctx->tail->data.uint8, sizeof(uint8_t));
             ctx->bytes_consumed += sizeof(uint8_t);
             ctx->state = PROPERTY_NEXT;
             break;
         case PROPERTY_TYPE_UINT32:
-            BUF_READ_CHECK_AT_LEAST(data, sizeof(uint32_t))
+            PROPERTIES_READ_CHECK_AT_LEAST(ctx, data, sizeof(uint32_t));
             rbuf_pop(data, (char*)&ctx->tail->data.uint32, sizeof(uint32_t));
             ctx->tail->data.uint32 = be32toh(ctx->tail->data.uint32);
             ctx->bytes_consumed += sizeof(uint32_t);
             ctx->state = PROPERTY_NEXT;
             break;
         case PROPERTY_TYPE_UINT16:
-            BUF_READ_CHECK_AT_LEAST(data, sizeof(uint16_t))
+            PROPERTIES_READ_CHECK_AT_LEAST(ctx, data, sizeof(uint16_t));
             rbuf_pop(data, (char*)&ctx->tail->data.uint16, sizeof(uint16_t));
             ctx->tail->data.uint16 = be16toh(ctx->tail->data.uint16);
             ctx->bytes_consumed += sizeof(uint16_t);
@@ -1761,7 +1791,11 @@ static int parse_properties_array(struct mqtt_properties_parser_ctx *ctx, rbuf_t
             if (ctx->properties_length > ctx->bytes_consumed - ctx->vbi_length) {
                 ctx->state = PROPERTY_CREATE;
                 break;
-            } else
+            }
+            if (ctx->properties_length < ctx->bytes_consumed - ctx->vbi_length) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "MQTT property exceeds properties length.");
+                return MQTT_NG_CLIENT_PROTOCOL_ERROR;
+            }
             return MQTT_NG_CLIENT_PARSE_DONE;
     }
     return MQTT_NG_CLIENT_OK_CALL_AGAIN;
@@ -1769,17 +1803,30 @@ static int parse_properties_array(struct mqtt_properties_parser_ctx *ctx, rbuf_t
 
 static int parse_connack_varhdr(struct mqtt_ng_client *client)
 {
+    int rc;
     struct mqtt_ng_parser *parser = &client->parser;
     switch (parser->varhdr_state) {
         case MQTT_PARSE_VARHDR_INITIAL:
+            if (parser->mqtt_fixed_hdr_remaining_length < 3) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Error parsing CONNACK message");
+                return MQTT_NG_CLIENT_PROTOCOL_ERROR;
+            }
             BUF_READ_CHECK_AT_LEAST(parser->received_data, 2)
             rbuf_pop(parser->received_data, (char*)&parser->mqtt_packet.connack.flags, 1);
             rbuf_pop(parser->received_data, (char*)&parser->mqtt_packet.connack.reason_code, 1);
             parser->varhdr_state = MQTT_PARSE_VARHDR_PROPS;
             mqtt_properties_parser_ctx_reset(&parser->properties_parser);
+            parser->properties_parser.max_bytes = parser->mqtt_fixed_hdr_remaining_length - 2;
             break;
         case MQTT_PARSE_VARHDR_PROPS:
-            return parse_properties_array(&parser->properties_parser, parser->received_data);
+            rc = parse_properties_array(&parser->properties_parser, parser->received_data);
+            if (rc != MQTT_NG_CLIENT_PARSE_DONE)
+                return rc;
+            if (parser->properties_parser.bytes_consumed != parser->properties_parser.max_bytes) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Error parsing CONNACK message");
+                return MQTT_NG_CLIENT_PROTOCOL_ERROR;
+            }
+            return MQTT_NG_CLIENT_PARSE_DONE;
         default:
             nd_log(NDLS_DAEMON, NDLP_ERR, "invalid state for connack varhdr parser");
             return MQTT_NG_CLIENT_INTERNAL_ERROR;
@@ -1789,6 +1836,7 @@ static int parse_connack_varhdr(struct mqtt_ng_client *client)
 
 static int parse_disconnect_varhdr(struct mqtt_ng_client *client)
 {
+    int rc;
     struct mqtt_ng_parser *parser = &client->parser;
     switch (parser->varhdr_state) {
         case MQTT_PARSE_VARHDR_INITIAL:
@@ -1803,9 +1851,17 @@ static int parse_disconnect_varhdr(struct mqtt_ng_client *client)
                 return MQTT_NG_CLIENT_PARSE_DONE;
             parser->varhdr_state = MQTT_PARSE_VARHDR_PROPS;
             mqtt_properties_parser_ctx_reset(&parser->properties_parser);
+            parser->properties_parser.max_bytes = parser->mqtt_fixed_hdr_remaining_length - 1;
             break;
         case MQTT_PARSE_VARHDR_PROPS:
-            return parse_properties_array(&parser->properties_parser, parser->received_data);
+            rc = parse_properties_array(&parser->properties_parser, parser->received_data);
+            if (rc != MQTT_NG_CLIENT_PARSE_DONE)
+                return rc;
+            if (parser->properties_parser.bytes_consumed != parser->properties_parser.max_bytes) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Error parsing DISCONNECT message");
+                return MQTT_NG_CLIENT_PROTOCOL_ERROR;
+            }
+            return MQTT_NG_CLIENT_PARSE_DONE;
         default:
             nd_log(NDLS_DAEMON, NDLP_ERR, "invalid state for connack varhdr parser");
             return MQTT_NG_CLIENT_INTERNAL_ERROR;
@@ -1815,9 +1871,14 @@ static int parse_disconnect_varhdr(struct mqtt_ng_client *client)
 
 static int parse_puback_varhdr(struct mqtt_ng_client *client)
 {
+    int rc;
     struct mqtt_ng_parser *parser = &client->parser;
     switch (parser->varhdr_state) {
         case MQTT_PARSE_VARHDR_INITIAL:
+            if (parser->mqtt_fixed_hdr_remaining_length < 2) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Error parsing PUBACK message");
+                return MQTT_NG_CLIENT_PROTOCOL_ERROR;
+            }
             BUF_READ_CHECK_AT_LEAST(parser->received_data, 2)
             rbuf_pop(parser->received_data, (char*)&parser->mqtt_packet.puback.packet_id, 2);
             parser->mqtt_packet.puback.packet_id = be16toh(parser->mqtt_packet.puback.packet_id);
@@ -1841,9 +1902,17 @@ static int parse_puback_varhdr(struct mqtt_ng_client *client)
 
             parser->varhdr_state = MQTT_PARSE_VARHDR_PROPS;
             mqtt_properties_parser_ctx_reset(&parser->properties_parser);
+            parser->properties_parser.max_bytes = parser->mqtt_fixed_hdr_remaining_length - 3;
             /* FALLTHROUGH */
         case MQTT_PARSE_VARHDR_PROPS:
-            return parse_properties_array(&parser->properties_parser, parser->received_data);
+            rc = parse_properties_array(&parser->properties_parser, parser->received_data);
+            if (rc != MQTT_NG_CLIENT_PARSE_DONE)
+                return rc;
+            if (parser->properties_parser.bytes_consumed != parser->properties_parser.max_bytes) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Error parsing PUBACK message");
+                return MQTT_NG_CLIENT_PROTOCOL_ERROR;
+            }
+            return MQTT_NG_CLIENT_PARSE_DONE;
         default:
             nd_log(NDLS_DAEMON, NDLP_ERR, "invalid state for puback varhdr parser");
             return MQTT_NG_CLIENT_INTERNAL_ERROR;
@@ -1854,25 +1923,34 @@ static int parse_puback_varhdr(struct mqtt_ng_client *client)
 static int parse_suback_varhdr(struct mqtt_ng_client *client)
 {
     int rc;
-    size_t avail;
+    size_t avail, stored;
     struct mqtt_ng_parser *parser = &client->parser;
     struct mqtt_suback *suback = &client->parser.mqtt_packet.suback;
     switch (parser->varhdr_state) {
         case MQTT_PARSE_VARHDR_INITIAL:
             suback->reason_codes = NULL;
+            if (parser->mqtt_fixed_hdr_remaining_length < 4) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Error parsing SUBACK message");
+                return MQTT_NG_CLIENT_PROTOCOL_ERROR;
+            }
             BUF_READ_CHECK_AT_LEAST(parser->received_data, 2)
             rbuf_pop(parser->received_data, (char*)&suback->packet_id, 2);
             suback->packet_id = be16toh(suback->packet_id);
             parser->varhdr_state = MQTT_PARSE_VARHDR_PROPS;
             parser->mqtt_parsed_len = 2;
             mqtt_properties_parser_ctx_reset(&parser->properties_parser);
+            parser->properties_parser.max_bytes = parser->mqtt_fixed_hdr_remaining_length - parser->mqtt_parsed_len - 1;
             /* FALLTHROUGH */
         case MQTT_PARSE_VARHDR_PROPS:
-           rc = parse_properties_array(&parser->properties_parser, parser->received_data);
+            rc = parse_properties_array(&parser->properties_parser, parser->received_data);
             if (rc != MQTT_NG_CLIENT_PARSE_DONE) 
                 return rc;
             parser->mqtt_parsed_len += parser->properties_parser.bytes_consumed;
             suback->reason_code_count = parser->mqtt_fixed_hdr_remaining_length - parser->mqtt_parsed_len;
+            if (!suback->reason_code_count) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Error parsing SUBACK message");
+                return MQTT_NG_CLIENT_PROTOCOL_ERROR;
+            }
             suback->reason_codes = callocz(suback->reason_code_count, sizeof(*suback->reason_codes));
             suback->reason_codes_pending = suback->reason_code_count;
             parser->varhdr_state = MQTT_PARSE_REASONCODES;
@@ -1882,7 +1960,11 @@ static int parse_suback_varhdr(struct mqtt_ng_client *client)
             if (avail < 1)
                 return MQTT_NG_CLIENT_NEED_MORE_BYTES;
 
-            suback->reason_codes_pending -= rbuf_pop(parser->received_data, (char*)suback->reason_codes, MIN(suback->reason_codes_pending, avail));
+            stored = suback->reason_code_count - suback->reason_codes_pending;
+            suback->reason_codes_pending -= rbuf_pop(
+                parser->received_data,
+                (char *)&suback->reason_codes[stored],
+                MIN(suback->reason_codes_pending, avail));
 
             if (!suback->reason_codes_pending)
                 return MQTT_NG_CLIENT_PARSE_DONE;
@@ -1909,6 +1991,10 @@ static int parse_publish_varhdr(struct mqtt_ng_client *client)
             rbuf_pop(parser->received_data, (char*)&publish->topic_len, 2);
             publish->topic_len = be16toh(publish->topic_len);
             parser->mqtt_parsed_len = 2;
+            if (parser->mqtt_fixed_hdr_remaining_length < parser->mqtt_parsed_len + publish->topic_len + (publish->qos ? 2 : 0) + 1) {
+                nd_log(NDLS_DAEMON, NDLP_ERR, "Error parsing PUBLISH message");
+                return MQTT_NG_CLIENT_PROTOCOL_ERROR;
+            }
             if (!publish->topic_len) {
                 parser->varhdr_state = MQTT_PARSE_VARHDR_POST_TOPICNAME;
                 break;
@@ -1939,6 +2025,7 @@ static int parse_publish_varhdr(struct mqtt_ng_client *client)
             parser->mqtt_parsed_len += 2;
             /* FALLTHROUGH */
         case MQTT_PARSE_VARHDR_PROPS:
+            parser->properties_parser.max_bytes = parser->mqtt_fixed_hdr_remaining_length - parser->mqtt_parsed_len;
             rc = parse_properties_array(&parser->properties_parser, parser->received_data);
             if (rc != MQTT_NG_CLIENT_PARSE_DONE) 
                 return rc;
@@ -2345,6 +2432,41 @@ static int mqtt_ng_unittest_push_bytes(rbuf_t buffer, const char *data, size_t l
         }                                                                      \
     } while(0)
 
+static int mqtt_ng_unittest_reject_malformed_properties_packet(
+    const char *packet_name,
+    const char *packet,
+    size_t packet_len,
+    size_t expected_unread)
+{
+    int errors = 0;
+    rbuf_t input = rbuf_create(128, 128);
+    struct mqtt_ng_init settings = {
+        .data_in = input,
+        .data_out_fnc = NULL,
+        .user_ctx = NULL,
+        .connack_callback = NULL,
+        .puback_callback = NULL,
+        .msg_callback = NULL,
+    };
+    struct mqtt_ng_client *client = mqtt_ng_init(&settings);
+
+    MQTT_NG_TEST(client != NULL, packet_name);
+    if (!client) {
+        rbuf_free(input);
+        return errors;
+    }
+
+    MQTT_NG_TEST(!mqtt_ng_unittest_push_bytes(input, packet, packet_len), packet_name);
+
+    int rc = handle_incoming_traffic(client);
+    MQTT_NG_TEST(rc == MQTT_NG_CLIENT_PROTOCOL_ERROR, packet_name);
+    MQTT_NG_TEST(rbuf_bytes_available(input) == expected_unread, packet_name);
+
+    mqtt_ng_destroy(client);
+    rbuf_free(input);
+    return errors;
+}
+
 static int mqtt_ng_unittest_reset_after_partial_publish(void)
 {
     int errors = 0;
@@ -2408,6 +2530,156 @@ static int mqtt_ng_unittest_reset_after_partial_publish(void)
     return errors;
 }
 
+static int mqtt_ng_unittest_partial_suback_reason_codes(void)
+{
+    int errors = 0;
+    rbuf_t input = rbuf_create(128, 128);
+    struct mqtt_ng_init settings = {
+        .data_in = input,
+        .data_out_fnc = NULL,
+        .user_ctx = NULL,
+        .connack_callback = NULL,
+        .puback_callback = NULL,
+        .msg_callback = NULL,
+    };
+    struct mqtt_ng_client *client = mqtt_ng_init(&settings);
+
+    const char partial_suback[] = {
+        (char)(MQTT_CPT_SUBACK << 4), 5,
+        0, 1,
+        0,
+        0,
+    };
+    const char remaining_suback[] = {
+        (char)0x80,
+    };
+
+    MQTT_NG_TEST(client != NULL, "mqtt_ng_init succeeds for SUBACK parser test");
+    if (!client) {
+        rbuf_free(input);
+        return errors;
+    }
+
+    MQTT_NG_TEST(!mqtt_ng_unittest_push_bytes(input, partial_suback, sizeof(partial_suback)),
+                 "push partial SUBACK");
+
+    int rc = handle_incoming_traffic(client);
+    MQTT_NG_TEST(rc == MQTT_NG_CLIENT_NEED_MORE_BYTES, "partial SUBACK needs more bytes");
+    MQTT_NG_TEST(client->parser.state == MQTT_PARSE_VARIABLE_HEADER, "partial SUBACK stays in variable-header parser");
+    MQTT_NG_TEST(client->parser.varhdr_state == MQTT_PARSE_REASONCODES, "partial SUBACK waits for reason codes");
+    MQTT_NG_TEST(client->parser.mqtt_packet.suback.reason_code_count == 2, "partial SUBACK reason-code count");
+    MQTT_NG_TEST(client->parser.mqtt_packet.suback.reason_codes_pending == 1, "partial SUBACK pending reason code");
+    uint8_t *reason_codes = client->parser.mqtt_packet.suback.reason_codes;
+    MQTT_NG_TEST(reason_codes != NULL, "partial SUBACK owns reason-code buffer");
+    if (reason_codes)
+        MQTT_NG_TEST(reason_codes[0] == 0, "partial SUBACK stores first reason code");
+
+    MQTT_NG_TEST(!mqtt_ng_unittest_push_bytes(input, remaining_suback, sizeof(remaining_suback)),
+                 "push remaining SUBACK reason code");
+
+    rc = parse_suback_varhdr(client);
+    MQTT_NG_TEST(rc == MQTT_NG_CLIENT_PARSE_DONE, "fragmented SUBACK reason codes parse done");
+    if (reason_codes) {
+        MQTT_NG_TEST(reason_codes[0] == 0, "fragmented SUBACK preserves first reason code");
+        MQTT_NG_TEST(reason_codes[1] == 0x80, "fragmented SUBACK appends second reason code");
+    }
+    MQTT_NG_TEST(client->parser.mqtt_packet.suback.reason_codes_pending == 0, "fragmented SUBACK consumes all reason codes");
+
+    freez(client->parser.mqtt_packet.suback.reason_codes);
+    client->parser.mqtt_packet.suback.reason_codes = NULL;
+    mqtt_ng_destroy(client);
+    rbuf_free(input);
+    return errors;
+}
+
+static int mqtt_ng_unittest_malformed_suback_properties_length(void)
+{
+    int errors = 0;
+    rbuf_t input = rbuf_create(128, 128);
+    struct mqtt_ng_init settings = {
+        .data_in = input,
+        .data_out_fnc = NULL,
+        .user_ctx = NULL,
+        .connack_callback = NULL,
+        .puback_callback = NULL,
+        .msg_callback = NULL,
+    };
+    struct mqtt_ng_client *client = mqtt_ng_init(&settings);
+
+    const char malformed_suback[] = {
+        (char)(MQTT_CPT_SUBACK << 4), 4,
+        0, 1,
+        2,
+        MQTT_PROP_REQ_PROBLEM_INFO,
+        (char)(MQTT_CPT_PINGRESP << 4), 0,
+    };
+
+    MQTT_NG_TEST(client != NULL, "mqtt_ng_init succeeds for malformed SUBACK parser test");
+    if (!client) {
+        rbuf_free(input);
+        return errors;
+    }
+
+    MQTT_NG_TEST(!mqtt_ng_unittest_push_bytes(input, malformed_suback, sizeof(malformed_suback)),
+                 "push malformed SUBACK");
+
+    int rc = handle_incoming_traffic(client);
+    MQTT_NG_TEST(rc == MQTT_NG_CLIENT_PROTOCOL_ERROR, "malformed SUBACK properties length is rejected");
+    MQTT_NG_TEST(client->parser.mqtt_packet.suback.reason_codes == NULL,
+                 "malformed SUBACK does not allocate reason codes");
+    MQTT_NG_TEST(rbuf_bytes_available(input) == 3,
+                 "malformed SUBACK leaves following bytes unread");
+
+    mqtt_ng_destroy(client);
+    rbuf_free(input);
+    return errors;
+}
+
+static int mqtt_ng_unittest_malformed_ack_properties_length(void)
+{
+    int errors = 0;
+    const char malformed_connack[] = {
+        (char)(MQTT_CPT_CONNACK << 4), 4,
+        0, 0,
+        1,
+        MQTT_PROP_REASON_STR,
+        (char)(MQTT_CPT_PINGRESP << 4), 0,
+    };
+    const char malformed_disconnect[] = {
+        (char)(MQTT_CPT_DISCONNECT << 4), 3,
+        0,
+        1,
+        MQTT_PROP_REASON_STR,
+        (char)(MQTT_CPT_PINGRESP << 4), 0,
+    };
+    const char malformed_puback[] = {
+        (char)(MQTT_CPT_PUBACK << 4), 5,
+        0, 1,
+        0,
+        1,
+        MQTT_PROP_REASON_STR,
+        (char)(MQTT_CPT_PINGRESP << 4), 0,
+    };
+
+    errors += mqtt_ng_unittest_reject_malformed_properties_packet(
+        "malformed CONNACK properties do not consume following packet",
+        malformed_connack,
+        sizeof(malformed_connack),
+        2);
+    errors += mqtt_ng_unittest_reject_malformed_properties_packet(
+        "malformed DISCONNECT properties do not consume following packet",
+        malformed_disconnect,
+        sizeof(malformed_disconnect),
+        2);
+    errors += mqtt_ng_unittest_reject_malformed_properties_packet(
+        "malformed PUBACK properties do not consume following packet",
+        malformed_puback,
+        sizeof(malformed_puback),
+        2);
+
+    return errors;
+}
+
 int mqtt_ng_unittest(void)
 {
     int errors = 0;
@@ -2415,6 +2687,9 @@ int mqtt_ng_unittest(void)
     fprintf(stderr, "\nrunning mqtt_ng unittest\n");
 
     errors += mqtt_ng_unittest_reset_after_partial_publish();
+    errors += mqtt_ng_unittest_partial_suback_reason_codes();
+    errors += mqtt_ng_unittest_malformed_suback_properties_length();
+    errors += mqtt_ng_unittest_malformed_ack_properties_length();
 
     if (errors)
         fprintf(stderr, "mqtt_ng unittest: %d ERROR(S)\n", errors);

@@ -21,6 +21,8 @@
 
 SILENCERS *silencers;
 
+static RW_SPINLOCK silencers_rw_spinlock = RW_SPINLOCK_INITIALIZER;
+
 /**
  * Create Silencer
  *
@@ -42,7 +44,7 @@ SILENCER *create_silencer(void) {
  *
  * @param silencer
  */
-void health_silencers_add(SILENCER *silencer) {
+static void health_silencers_add_unsafe(SILENCER *silencer) {
     // Add the created instance to the linked list in silencers
     silencer->next = silencers->silencers;
     silencers->silencers = silencer;
@@ -53,6 +55,12 @@ void health_silencers_add(SILENCER *silencer) {
         silencer->charts,
         silencer->contexts,
         silencer->hosts);
+}
+
+void health_silencers_add(SILENCER *silencer) {
+    rw_spinlock_write_lock(&silencers_rw_spinlock);
+    health_silencers_add_unsafe(silencer);
+    rw_spinlock_write_unlock(&silencers_rw_spinlock);
 }
 
 /**
@@ -67,20 +75,12 @@ void health_silencers_add(SILENCER *silencer) {
  * @return It returns the silencer configured on success and NULL otherwise
  */
 SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) {
-    static uint32_t
-        hash_alarm = 0,
-        hash_template = 0,
-        hash_chart = 0,
-        hash_context = 0,
-        hash_host = 0;
-
-    if (unlikely(!hash_alarm)) {
-        hash_alarm = simple_uhash(HEALTH_ALARM_KEY);
-        hash_template = simple_uhash(HEALTH_TEMPLATE_KEY);
-        hash_chart = simple_uhash(HEALTH_CHART_KEY);
-        hash_context = simple_uhash(HEALTH_CONTEXT_KEY);
+    uint32_t
+        hash_alarm = simple_uhash(HEALTH_ALARM_KEY),
+        hash_template = simple_uhash(HEALTH_TEMPLATE_KEY),
+        hash_chart = simple_uhash(HEALTH_CHART_KEY),
+        hash_context = simple_uhash(HEALTH_CONTEXT_KEY),
         hash_host = simple_uhash(HEALTH_HOST_KEY);
-    }
 
     uint32_t hash = simple_uhash(key);
     if (unlikely(silencer == NULL)) {
@@ -121,7 +121,7 @@ SILENCER *health_silencers_addparam(SILENCER *silencer, char *key, char *value) 
  *
  * @return It always return 0.
  */
-int health_silencers_json_read_callback(JSON_ENTRY *e)
+static int health_silencers_json_read_callback(JSON_ENTRY *e)
 {
     switch(e->type) {
         case JSON_OBJECT:
@@ -133,7 +133,7 @@ int health_silencers_json_read_callback(JSON_ENTRY *e)
 #endif
                 e->callback_data = create_silencer();
                 if(e->callback_data) {
-                    health_silencers_add(e->callback_data);
+                    health_silencers_add_unsafe(e->callback_data);
                 }
 #ifndef ENABLE_JSONC
             }
@@ -177,10 +177,12 @@ int health_silencers_json_read_callback(JSON_ENTRY *e)
  * @return It returns 0 on success and -1 otherwise
  */
 int health_initialize_global_silencers() {
+    rw_spinlock_write_lock(&silencers_rw_spinlock);
     silencers = mallocz(sizeof(SILENCERS));
     silencers->all_alarms = 0;
     silencers->stype = STYPE_NONE;
     silencers->silencers = NULL;
+    rw_spinlock_write_unlock(&silencers_rw_spinlock);
 
     return 0;
 }
@@ -194,7 +196,7 @@ int health_initialize_global_silencers() {
  *
  * @param t is the structure that will be cleaned.
  */
-void free_silencers(SILENCER *t) {
+static void free_silencers_unsafe(SILENCER *t) {
     if (!t) return;
 
     while(t) {
@@ -212,6 +214,12 @@ void free_silencers(SILENCER *t) {
 
         t = next;
     }
+}
+
+void free_silencers(SILENCER *t) {
+    rw_spinlock_write_lock(&silencers_rw_spinlock);
+    free_silencers_unsafe(t);
+    rw_spinlock_write_unlock(&silencers_rw_spinlock);
 }
 
 /**
@@ -242,7 +250,7 @@ int health_silencers2json_entry(BUFFER *wb, char* var, char* val, int hasprev) {
  *
  * @param wb is the buffer to write the silencers.
  */
-void health_silencers2json(BUFFER *wb) {
+static void health_silencers2json_unsafe(BUFFER *wb) {
     buffer_sprintf(wb, "{\n\t\"all\": %s,"
                        "\n\t\"type\": \"%s\","
                        "\n\t\"silencers\": [",
@@ -264,6 +272,12 @@ void health_silencers2json(BUFFER *wb) {
     }
     if(likely(i)) buffer_strcat(wb, "\n\t");
     buffer_strcat(wb, "]\n}\n");
+}
+
+void health_silencers2json(BUFFER *wb) {
+    rw_spinlock_read_lock(&silencers_rw_spinlock);
+    health_silencers2json_unsafe(wb);
+    rw_spinlock_read_unlock(&silencers_rw_spinlock);
 }
 
 
@@ -304,6 +318,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
     (void) host;
 
     BUFFER *wb = w->response.data;
+    BUFFER *jsonb = NULL;
     buffer_flush(wb);
     wb->content_type = CT_TEXT_PLAIN;
 
@@ -322,6 +337,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
             buffer_strcat(wb, HEALTH_CMDAPI_MSG_AUTHERROR);
             ret = HTTP_RESP_FORBIDDEN;
         } else {
+            rw_spinlock_write_lock(&silencers_rw_spinlock);
             while (url) {
                 char *value = strsep_skip_consecutive_separators(&url, "&");
                 if (!value || !*value) continue;
@@ -351,12 +367,12 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                     } else if (!strcmp(value, HEALTH_CMDAPI_CMD_RESET)) {
                         silencers->all_alarms = 0;
                         silencers->stype = STYPE_NONE;
-                        free_silencers(silencers->silencers);
+                        free_silencers_unsafe(silencers->silencers);
                         silencers->silencers = NULL;
                         buffer_strcat(wb, HEALTH_CMDAPI_MSG_RESET);
                     } else if (!strcmp(value, HEALTH_CMDAPI_CMD_LIST)) {
                         w->response.data->content_type = CT_APPLICATION_JSON;
-                        health_silencers2json(wb);
+                        health_silencers2json_unsafe(wb);
                         config_changed=0;
                     }
                 } else {
@@ -365,7 +381,7 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
             }
 
             if (likely(silencer)) {
-                health_silencers_add(silencer);
+                health_silencers_add_unsafe(silencer);
                 buffer_strcat(wb, HEALTH_CMDAPI_MSG_ADDED);
                 if (silencers->stype == STYPE_NONE) {
                     buffer_strcat(wb, HEALTH_CMDAPI_MSG_STYPEWARNING);
@@ -375,13 +391,16 @@ int web_client_api_request_v1_mgmt_health(RRDHOST *host, struct web_client *w, c
                 buffer_strcat(wb, HEALTH_CMDAPI_MSG_NOSELECTORWARNING);
             }
             ret = HTTP_RESP_OK;
+            if (config_changed) {
+                jsonb = buffer_create(200, &netdata_buffers_statistics.buffers_health);
+                health_silencers2json_unsafe(jsonb);
+            }
+            rw_spinlock_write_unlock(&silencers_rw_spinlock);
         }
     }
     w->response.data = wb;
     buffer_no_cacheable(w->response.data);
-    if (ret == HTTP_RESP_OK && config_changed) {
-        BUFFER *jsonb = buffer_create(200, &netdata_buffers_statistics.buffers_health);
-        health_silencers2json(jsonb);
+    if (ret == HTTP_RESP_OK && jsonb) {
         health_silencers2file(jsonb);
         buffer_free(jsonb);
     }
@@ -417,7 +436,9 @@ void health_silencers_init(void) {
                 copied = fread(str, sizeof(char), length, fd);
                 if (copied == (length* sizeof(char))) {
                     str[length] = 0x00;
+                    rw_spinlock_write_lock(&silencers_rw_spinlock);
                     json_parse(str, NULL, health_silencers_json_read_callback);
+                    rw_spinlock_write_unlock(&silencers_rw_spinlock);
                     netdata_log_info("Parsed health silencers file %s", health_silencers_filename());
                 } else {
                     netdata_log_error("Cannot read the data from health silencers file %s", health_silencers_filename());
@@ -437,7 +458,7 @@ void health_silencers_init(void) {
     }
 }
 
-SILENCE_TYPE health_silencers_check_silenced(RRDCALC *rc, const char *host) {
+static SILENCE_TYPE health_silencers_check_silenced_unsafe(RRDCALC *rc, const char *host) {
     SILENCER *s;
 
     for (s = silencers->silencers; s!=NULL; s=s->next){
@@ -465,18 +486,26 @@ SILENCE_TYPE health_silencers_check_silenced(RRDCALC *rc, const char *host) {
     return STYPE_NONE;
 }
 
+SILENCE_TYPE health_silencers_check_silenced(RRDCALC *rc, const char *host) {
+    rw_spinlock_read_lock(&silencers_rw_spinlock);
+    SILENCE_TYPE st = health_silencers_check_silenced_unsafe(rc, host);
+    rw_spinlock_read_unlock(&silencers_rw_spinlock);
+
+    return st;
+}
+
 int health_silencers_update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
     uint32_t rrdcalc_flags_old = rc->run_flags;
     // Clear the flags
     rc->run_flags &= ~(RRDCALC_FLAG_DISABLED | RRDCALC_FLAG_SILENCED);
-    if (unlikely(silencers->all_alarms)) {
-        if (silencers->stype == STYPE_DISABLE_ALARMS) rc->run_flags |= RRDCALC_FLAG_DISABLED;
-        else if (silencers->stype == STYPE_SILENCE_NOTIFICATIONS) rc->run_flags |= RRDCALC_FLAG_SILENCED;
-    } else {
-        SILENCE_TYPE st = health_silencers_check_silenced(rc, rrdhost_hostname(host));
-        if (st == STYPE_DISABLE_ALARMS) rc->run_flags |= RRDCALC_FLAG_DISABLED;
-        else if (st == STYPE_SILENCE_NOTIFICATIONS) rc->run_flags |= RRDCALC_FLAG_SILENCED;
-    }
+
+    rw_spinlock_read_lock(&silencers_rw_spinlock);
+    SILENCE_TYPE st =
+        silencers->all_alarms ? silencers->stype : health_silencers_check_silenced_unsafe(rc, rrdhost_hostname(host));
+    rw_spinlock_read_unlock(&silencers_rw_spinlock);
+
+    if (st == STYPE_DISABLE_ALARMS) rc->run_flags |= RRDCALC_FLAG_DISABLED;
+    else if (st == STYPE_SILENCE_NOTIFICATIONS) rc->run_flags |= RRDCALC_FLAG_SILENCED;
 
     if (rrdcalc_flags_old != rc->run_flags) {
         netdata_log_info(
@@ -492,4 +521,12 @@ int health_silencers_update_disabled_silenced(RRDHOST *host, RRDCALC *rc) {
         return 1;
     else
         return 0;
+}
+
+bool health_silencers_all_alarms_disabled(void) {
+    rw_spinlock_read_lock(&silencers_rw_spinlock);
+    bool ret = silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS;
+    rw_spinlock_read_unlock(&silencers_rw_spinlock);
+
+    return ret;
 }
