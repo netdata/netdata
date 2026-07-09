@@ -289,7 +289,12 @@ static int poll_process_new_tcp_connection(POLLINFO *pi, time_t now) {
                          "POLLFD: LISTENER: too many open files - used by this thread %zu, max for this thread %zu",
                          p->used, p->limit);
         }
-        else if(unlikely(errno != EWOULDBLOCK && errno != EAGAIN))
+        else if(unlikely(errno != EWOULDBLOCK && errno != EAGAIN
+#if defined(OS_WINDOWS)
+            // WinSock sets WSAGetLastError() but not errno for WSAEWOULDBLOCK
+            && WSAGetLastError() != WSAEWOULDBLOCK
+#endif
+        ))
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "POLLFD: LISTENER: accept() failed.");
 

@@ -94,7 +94,12 @@ bool is_socket_closed(int fd) {
         return true;
     }
     else if (result < 0) {
-        if (errno == EAGAIN || errno == EWOULDBLOCK) {
+        if (errno == EAGAIN || errno == EWOULDBLOCK
+#if defined(OS_WINDOWS)
+            // WinSock sets WSAGetLastError() but not errno for WSAEWOULDBLOCK
+            || WSAGetLastError() == WSAEWOULDBLOCK
+#endif
+        ) {
             // No data available, but socket is still open
             return false;
         } else {
