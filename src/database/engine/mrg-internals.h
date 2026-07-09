@@ -14,7 +14,6 @@ struct metric {
 
     REFCOUNT refcount;
     uint8_t partition;
-    bool deleted;
 
     uint32_t latest_update_every_s; // the latest data collection frequency
 
@@ -65,21 +64,21 @@ struct mrg {
 };
 
 static inline void MRG_STATS_DUPLICATE_ADD(MRG *mrg, size_t partition) {
-    mrg->index[partition].stats.additions_duplicate++;
+    __atomic_add_fetch(&mrg->index[partition].stats.additions_duplicate, 1, __ATOMIC_RELAXED);
 }
 
 static inline void MRG_STATS_ADDED_METRIC(MRG *mrg, size_t partition, Word_t section) {
-    mrg->index[partition].stats.entries++;
-    mrg->index[partition].stats.additions++;
-    mrg->index[partition].stats.size += sizeof(METRIC);
+    __atomic_add_fetch(&mrg->index[partition].stats.entries, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->index[partition].stats.additions, 1, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->index[partition].stats.size, (int64_t)sizeof(METRIC), __ATOMIC_RELAXED);
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
     __atomic_add_fetch(&ctx->atomic.metrics, 1, __ATOMIC_RELAXED);
 }
 
 static inline void MRG_STATS_DELETED_METRIC(MRG *mrg, size_t partition, Word_t section) {
-    mrg->index[partition].stats.entries--;
-    mrg->index[partition].stats.size -= sizeof(METRIC);
-    mrg->index[partition].stats.deletions++;
+    __atomic_sub_fetch(&mrg->index[partition].stats.entries, 1, __ATOMIC_RELAXED);
+    __atomic_sub_fetch(&mrg->index[partition].stats.size, (int64_t)sizeof(METRIC), __ATOMIC_RELAXED);
+    __atomic_add_fetch(&mrg->index[partition].stats.deletions, 1, __ATOMIC_RELAXED);
     struct rrdengine_instance *ctx = (struct rrdengine_instance *) section;
     rrdeng_atomic_uint64_sub_saturating(ctx, &ctx->atomic.metrics, 1, "metrics", "deleting an MRG metric");
 }
@@ -93,7 +92,7 @@ static inline void MRG_STATS_SEARCH_MISS(MRG *mrg, size_t partition) {
 }
 
 static inline void MRG_STATS_DELETE_MISS(MRG *mrg, size_t partition) {
-    mrg->index[partition].stats.delete_misses++;
+    __atomic_add_fetch(&mrg->index[partition].stats.delete_misses, 1, __ATOMIC_RELAXED);
 }
 
 #define mrg_index_read_lock(mrg, partition) rw_spinlock_read_lock(&(mrg)->index[partition].rw_spinlock)
@@ -202,8 +201,6 @@ static void acquired_for_deletion_metric_delete(MRG *mrg, METRIC *metric) {
 
     mrg_index_write_unlock(mrg, partition);
 
-    __atomic_store_n(&metric->deleted, true, __ATOMIC_RELEASE);
-
     mrg_stats_judy_mem(mrg, partition, JudyAllocThreadPulseGetAndReset());
 }
 
@@ -212,11 +209,6 @@ static bool metric_acquire(MRG *mrg, METRIC *metric) {
     REFCOUNT rc = refcount_acquire_advanced(&metric->refcount);
     if(!REFCOUNT_ACQUIRED(rc))
         return false;
-
-    if (__atomic_load_n(&metric->deleted, __ATOMIC_ACQUIRE)) {
-        refcount_release(&metric->refcount);
-        return false;
-    }
 
     size_t partition = metric->partition;
 
@@ -232,24 +224,23 @@ ALWAYS_INLINE
 static bool metric_release(MRG *mrg, METRIC *metric) {
     size_t partition = metric->partition;
 
-    if (refcount_release(&metric->refcount) == 0) {
+    if (refcount_release_and_acquire_for_deletion_advanced(&metric->refcount) == REFCOUNT_DELETED) {
         // we are the last user
         if (!acquired_metric_has_retention(mrg, metric)) {
-            // This metric is eligible for deletion.
-            // Atomically check and set the 'deleted' flag.
-            // If __atomic_test_and_set returns 'true', it means the flag was already set.
-            if (!__atomic_test_and_set(&metric->deleted, __ATOMIC_ACQ_REL)) {
-                // We won the race. The flag was 'false' and we set it to 'true'.
-                // We are now responsible for deletion.
-                acquired_for_deletion_metric_delete(mrg, metric);
-                uuidmap_free(metric->uuid);
-                aral_freez(mrg->index[partition].aral, metric);
-                __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
-                __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
-                return true;
-            }
-            // Another thread is already deleting it. nothing to do
+            // We claimed the last reference for deletion, so no new acquire can resurrect it.
+            acquired_for_deletion_metric_delete(mrg, metric);
+            uuidmap_free(metric->uuid);
+            aral_freez(mrg->index[partition].aral, metric);
+            __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
+            __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
+            return true;
         }
+
+        REFCOUNT expected = REFCOUNT_DELETED;
+        bool restored = __atomic_compare_exchange_n(&metric->refcount, &expected, 0,
+                                                    false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
+        internal_fatal(!restored, "DBENGINE METRIC: cannot restore retained metric refcount from deletion state");
+        __atomic_sub_fetch(&mrg->index[partition].stats.entries_acquired, 1, __ATOMIC_RELAXED);
     }
 
     __atomic_sub_fetch(&mrg->index[partition].stats.current_references, 1, __ATOMIC_RELAXED);
@@ -309,7 +300,6 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
     metric->latest_time_s_clean = MAX(0, entry->last_time_s);
     metric->latest_time_s_hot = 0;
     metric->latest_update_every_s = entry->latest_update_every_s;
-    metric->deleted = false;
 #ifdef NETDATA_INTERNAL_CHECKS
     metric->writer = 0;
 #endif
