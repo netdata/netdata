@@ -55,6 +55,15 @@ modules:
 
           Incoming logs are written to journal files with configurable rotation and retention
           policies.
+
+          OTLP log fields are written to the journal as flattened key-value entries. The log body
+          is available under `log.body`, attributes under `log.attributes.*`, the severity under
+          `log.severity_text`, and the event name under `log.event_name`.
+
+          The message title shown for each entry in the Netdata Logs tab reflects the journal
+          `MESSAGE` field. OpenTelemetry logs do not populate this field — their content is stored
+          under the flattened keys above — so the title is displayed as `-`. The full log content
+          is available in the expanded entry details.
       supported_platforms:
         include:
           - Linux
@@ -240,7 +249,17 @@ modules:
                   journal_dir: /var/log/netdata/otel-journals
     troubleshooting:
       problems:
-        list: []
+        list:
+          - name: OTLP logs show dash as message title
+            description: |
+              The Netdata Logs tab uses the journal `MESSAGE` field as the message title for each entry.
+              OpenTelemetry logs do not populate the `MESSAGE` field; instead, their content is stored as
+              flattened key-value entries such as `log.body`, `log.attributes.*`, `log.severity_text`,
+              and `log.event_name`. As a result, the title for OTLP log entries is displayed as `-`.
+
+              The full log content — including the body, attributes, severity, and event name — is visible
+              when you expand the entry. Use the facet columns and filters in the Logs tab to browse these
+              fields directly.
     alerts: []
     metrics:
       folding:
