@@ -246,53 +246,61 @@ OS_PROCESS_MEMORY os_process_memory(pid_t pid) {
             proc_mem.rss = pmc.WorkingSetSize;
             proc_mem.max_rss = pmc.PeakWorkingSetSize;
             proc_mem.virtual_size = pmc.PagefileUsage + pmc.WorkingSetSize;
-            
-            // Get module information to determine text and shared memory
-            // CreateToolhelp32Snapshot is a low-level Windows API call
-            HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, process_id);
-            if (hSnapshot != INVALID_HANDLE_VALUE) {
-                MODULEENTRY32 me;
-                ZeroMemory(&me, sizeof(me));
-                me.dwSize = sizeof(MODULEENTRY32);
-                
-                // Module32First/Next are direct API calls to examine loaded modules
-                if (Module32First(hSnapshot, &me)) {
-                    // The first module is the executable itself
-                    proc_mem.text = me.modBaseSize;
-                    
-                    // Sum all other modules as shared code
-                    while (Module32Next(hSnapshot, &me)) {
-                        proc_mem.shared += me.modBaseSize;
+
+            // CreateToolhelp32Snapshot and VirtualQueryEx both need the Windows
+            // loader lock internally. During shutdown another thread may hold that
+            // lock (e.g. DllMain/DLL_THREAD_ATTACH for a newly created uv thread),
+            // which would cause an indefinite hang. Skip these two sub-queries when
+            // a shutdown is already in progress; the core RSS/max_rss numbers
+            // collected above are all that the status file needs at exit time.
+            if(!exit_initiated_get()) {
+                // Get module information to determine text and shared memory
+                // CreateToolhelp32Snapshot is a low-level Windows API call
+                HANDLE hSnapshot = CreateToolhelp32Snapshot(TH32CS_SNAPMODULE | TH32CS_SNAPMODULE32, process_id);
+                if (hSnapshot != INVALID_HANDLE_VALUE) {
+                    MODULEENTRY32 me;
+                    ZeroMemory(&me, sizeof(me));
+                    me.dwSize = sizeof(MODULEENTRY32);
+
+                    // Module32First/Next are direct API calls to examine loaded modules
+                    if (Module32First(hSnapshot, &me)) {
+                        // The first module is the executable itself
+                        proc_mem.text = me.modBaseSize;
+
+                        // Sum all other modules as shared code
+                        while (Module32Next(hSnapshot, &me)) {
+                            proc_mem.shared += me.modBaseSize;
+                        }
                     }
+                    CloseHandle(hSnapshot);
                 }
-                CloseHandle(hSnapshot);
-            }
-            
-            // Get virtual memory information for more detailed breakdown
-            MEMORY_BASIC_INFORMATION mbi;
-            ZeroMemory(&mbi, sizeof(mbi));
-            SIZE_T address = 0;
-            
-            // VirtualQueryEx is a low-level API to get memory region info
-            while (VirtualQueryEx(hProcess, (LPCVOID)address, &mbi, sizeof(mbi)) == sizeof(mbi)) {
-                if (mbi.State == MEM_COMMIT) {
-                    if (mbi.Type == MEM_PRIVATE && !(mbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))) {
-                        // Private data memory
-                        proc_mem.data += mbi.RegionSize;
+
+                // Get virtual memory information for more detailed breakdown
+                MEMORY_BASIC_INFORMATION mbi;
+                ZeroMemory(&mbi, sizeof(mbi));
+                SIZE_T address = 0;
+
+                // VirtualQueryEx is a low-level API to get memory region info
+                while (VirtualQueryEx(hProcess, (LPCVOID)address, &mbi, sizeof(mbi)) == sizeof(mbi)) {
+                    if (mbi.State == MEM_COMMIT) {
+                        if (mbi.Type == MEM_PRIVATE && !(mbi.Protect & (PAGE_EXECUTE | PAGE_EXECUTE_READ | PAGE_EXECUTE_READWRITE | PAGE_EXECUTE_WRITECOPY))) {
+                            // Private data memory
+                            proc_mem.data += mbi.RegionSize;
+                        }
                     }
+
+                    // Move to the next region
+                    address = (SIZE_T)mbi.BaseAddress + mbi.RegionSize;
+
+                    // Avoid potential infinite loop on 64-bit systems
+                    if (address < (SIZE_T)mbi.BaseAddress)
+                        break;
                 }
-                
-                // Move to the next region
-                address = (SIZE_T)mbi.BaseAddress + mbi.RegionSize;
-                
-                // Avoid potential infinite loop on 64-bit systems
-                if (address < (SIZE_T)mbi.BaseAddress)
-                    break;
+
+                // If data counting failed, fall back to estimation
+                if (proc_mem.data == 0)
+                    proc_mem.data = pmc.PrivateUsage - proc_mem.text;
             }
-            
-            // If data counting failed, fall back to estimation
-            if (proc_mem.data == 0)
-                proc_mem.data = pmc.PrivateUsage - proc_mem.text;
         }
         CloseHandle(hProcess);
     }

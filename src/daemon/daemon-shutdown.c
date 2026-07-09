@@ -185,11 +185,12 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
         exit(1);
     }
     run = true;
+    nd_win_trace("cleanup: daemon_status_file_update_status");
     daemon_status_file_update_status(DAEMON_STATUS_EXITING);
-
+    nd_win_trace("cleanup: nd_log_limits_unlimited");
     nd_log_limits_unlimited();
+    nd_win_trace("cleanup: netdata_log_exit_reason");
     netdata_log_exit_reason();
-
     nd_win_trace("cleanup begin (abnormal=%d)", (int)abnormal);
 
     watcher_thread_start();
