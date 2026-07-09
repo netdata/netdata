@@ -408,6 +408,11 @@ pub(crate) fn build_into<W: Write + Seek>(
         // Built from the chronological `trace_id` column when the producer asks
         // (the traces seal). The logs seal leaves `build_trace_id_index` false.
         trace_id_index: row_index.build_trace_id_index,
+        // Span event/link structures (traces seal only; the logs seal leaves
+        // both `None`). Presence driven off the `RowIndex` `Option`s, like the
+        // per-row columns.
+        event_index: row_index.events.is_some(),
+        link_index: row_index.links.is_some(),
         mid_fields: u16::try_from(row_index.mid_fields().len())
             .expect("mid-card field count exceeds u16::MAX"),
         high_fields: u16::try_from(row_index.high_fields().len())
@@ -485,6 +490,19 @@ pub(crate) fn build_into<W: Write + Seek>(
             "build_trace_id_index requires the trace_id column (ChunkWriter also enforces this)",
         );
         w.trace_id_index(&TraceIdIndex::build(trace_ids))?;
+    }
+
+    // Optional span event/link structures (EVNB/LNKB), after TIDX: rows remapped
+    // through the same time permutation as every column, interner slots
+    // translated to file KvIds through the same table as the stream batches —
+    // so the structure refs and the row entry lists point at identical ids.
+    if let Some(events) = &row_index.events {
+        check_column_len("events", events.num_rows(), n)?;
+        w.event_index(&events.reordered(by_time(), &kv_to_file))?;
+    }
+    if let Some(links) = &row_index.links {
+        check_column_len("links", links.num_rows(), n)?;
+        w.link_index(&links.reordered(by_time(), &kv_to_file))?;
     }
 
     // Low/mid-cardinality FSTs, high-cardinality chunks, then the

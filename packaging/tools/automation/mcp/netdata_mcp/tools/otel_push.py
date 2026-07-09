@@ -34,12 +34,18 @@ _BatchSize = Annotated[int, Field(description="Max records per gRPC export reque
 _FlushMs = Annotated[int, Field(description="Max ms before flushing a partial batch.", ge=1)]
 _ConnectTimeout = Annotated[int, Field(description="Max seconds to wait for the OTLP endpoint to accept a connection.", ge=1)]
 _Timeout = Annotated[int, Field(description="Max seconds to wait for the whole push (the first run also builds the generator).", ge=1, le=1200)]
+_SpansPerTrace = Annotated[int, Field(description="Traces only: spans per trace. 1 = flat (each span its own trace); >1 = a root plus a binary-ish tree of children.", ge=1)]
+_EventsPerSpan = Annotated[int, Field(description="Traces only: events per span (0 = none; the first is exception-shaped with type/message/stacktrace).", ge=0)]
+_LinksEvery = Annotated[int, Field(description="Traces only: every Nth span links to the previous trace's root (0 = never).", ge=0)]
+_OrphanEvery = Annotated[int, Field(description="Traces only: every Nth trace's last span parents a nonexistent id — an orphan (0 = never).", ge=0)]
+_ExtraRootEvery = Annotated[int, Field(description="Traces only: every Nth trace's last span becomes a second root (0 = never).", ge=0)]
+_ResendEvery = Annotated[int, Field(description="Traces only: every Nth span is sent twice — a resend the reader must collapse (0 = never).", ge=0)]
 
 
 class OtelPushResult(BaseModel):
     agent_id: str
     otel_endpoint: str | None = None
-    count: int | None = Field(default=None, description="Records requested (and sent, when success=True).")
+    count: int | None = Field(default=None, description="Records sent (when success=True). For traces with resend_every > 0 this is the EFFECTIVE total including the duplicated spans, which exceeds the requested count.")
     success: bool = False
     returncode: int | None = None
     log_tail: str | None = Field(default=None, description="Last lines of the generator output (build + send).")
@@ -129,7 +135,11 @@ def register(mcp: FastMCP) -> None:
             "restart (the small thresholds, applied at the prior run_start, make rotation "
             "automatic as data arrives). Like "
             "the logs push but with `duration_nanos` (per-span duration) and no "
-            "`field_cardinality`. First call also builds the generator (cargo), so allow time."
+            "`field_cardinality`. Defaults emit the flat corpus; `spans_per_trace > 1` "
+            "emits real trace trees, `events_per_span`/`links_every` add span events and "
+            "cross-trace links, and `orphan_every`/`extra_root_every`/`resend_every` "
+            "inject the reader edge cases. First call also builds the generator (cargo), "
+            "so allow time."
         ),
     )
     async def netdata_agent_otel_push_traces(
@@ -146,17 +156,31 @@ def register(mcp: FastMCP) -> None:
         batch_size: _BatchSize = 100,
         connect_timeout_secs: _ConnectTimeout = 30,
         timeout: _Timeout = 120,
+        spans_per_trace: _SpansPerTrace = 1,
+        events_per_span: _EventsPerSpan = 0,
+        links_every: _LinksEvery = 0,
+        orphan_every: _OrphanEvery = 0,
+        extra_root_every: _ExtraRootEvery = 0,
+        resend_every: _ResendEvery = 0,
     ) -> OtelPushResult:
         # No flush_interval_ms: synth-traces exports synchronously in batch_size
         # chunks (no flush timer), so the logs Sender's flush knob is inert here.
+        #
+        # The known-exact-corpus contract: `resend_every` DUPLICATES every Nth
+        # span, so the effective exported total exceeds `count`. Report the
+        # effective number — callers assert rotation/seal behavior against it.
+        effective_count = count + (count // resend_every if resend_every else 0)
         return await _run_push(
-            ctx, agent_id, count,
+            ctx, agent_id, effective_count,
             lambda ep: streams.synth_traces_cmd(
                 ep, count=count, spacing_nanos=spacing_nanos, duration_nanos=duration_nanos,
                 start_time_nanos=start_time_nanos, seed=seed,
                 tenant_id=tenant_id, batch_size=batch_size,
                 connect_timeout_secs=connect_timeout_secs,
                 service_name=service_name, service_namespace=service_namespace,
+                spans_per_trace=spans_per_trace, events_per_span=events_per_span,
+                links_every=links_every, orphan_every=orphan_every,
+                extra_root_every=extra_root_every, resend_every=resend_every,
             ),
             timeout,
         )

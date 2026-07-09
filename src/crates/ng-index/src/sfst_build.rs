@@ -82,6 +82,53 @@ pub struct SfstStats {
 /// hash collision aliasing distinct strings); a verified hit skips the intern-map
 /// insert. Computed once per resource/scope group and reused across its records, so
 /// shared attrs aren't re-probed per record.
+fn intern_one(
+    row_index: &mut RowIndex<'_>,
+    e: &Entry,
+    paths: &[String],
+    kv: &mut String,
+    stats: &mut SfstStats,
+) -> KvSlot {
+    // Render key=value up front so a hash hit can be *verified* against the
+    // interned string. Without this re-check, two distinct strings sharing a
+    // hash (a genuine xxhash64 collision, or an unfilled hash==0) would alias:
+    // `lookup_hash` returns the first string's slot with no string check, and
+    // the interner's collision overflow — populated only inside `intern` — is
+    // never reached, because a fast-path hit skips `intern` entirely.
+    build_kv(&paths[e.node as usize], &e.value, kv);
+    let hit = row_index.lookup_hash(e.hash);
+    match hit {
+        Some(token) if row_index.resolve(token) == kv.as_str() => {
+            stats.hits += 1;
+            token
+        }
+        // Unknown hash, or a hit whose string differs (a real collision):
+        // `intern` compares strings and records the collision correctly.
+        _ => {
+            stats.misses += 1;
+            row_index.intern(Some(e.hash), kv)
+        }
+    }
+}
+
+/// Intern `entries` APPENDING their slots to `out` — the allocation-free form
+/// for hot loops that reuse a scratch buffer (per-event/per-link attrs) or
+/// intern straight into the row's token list.
+fn intern_entries_into(
+    row_index: &mut RowIndex<'_>,
+    entries: &[Entry],
+    paths: &[String],
+    kv: &mut String,
+    stats: &mut SfstStats,
+    out: &mut Vec<KvSlot>,
+) {
+    out.reserve(entries.len());
+    for e in entries {
+        let slot = intern_one(row_index, e, paths, kv, stats);
+        out.push(slot);
+    }
+}
+
 fn intern_entries(
     row_index: &mut RowIndex<'_>,
     entries: &[Entry],
@@ -89,31 +136,9 @@ fn intern_entries(
     kv: &mut String,
     stats: &mut SfstStats,
 ) -> Vec<KvSlot> {
-    entries
-        .iter()
-        .map(|e| {
-            // Render key=value up front so a hash hit can be *verified* against the
-            // interned string. Without this re-check, two distinct strings sharing a
-            // hash (a genuine xxhash64 collision, or an unfilled hash==0) would alias:
-            // `lookup_hash` returns the first string's slot with no string check, and
-            // the interner's collision overflow — populated only inside `intern` — is
-            // never reached, because a fast-path hit skips `intern` entirely.
-            build_kv(&paths[e.node as usize], &e.value, kv);
-            let hit = row_index.lookup_hash(e.hash);
-            match hit {
-                Some(token) if row_index.resolve(token) == kv.as_str() => {
-                    stats.hits += 1;
-                    token
-                }
-                // Unknown hash, or a hit whose string differs (a real collision):
-                // `intern` compares strings and records the collision correctly.
-                _ => {
-                    stats.misses += 1;
-                    row_index.intern(Some(e.hash), kv)
-                }
-            }
-        })
-        .collect()
+    let mut out = Vec::with_capacity(entries.len());
+    intern_entries_into(row_index, entries, paths, kv, stats, &mut out);
+    out
 }
 
 /// Populate `row_index` from every frame `reader` yields: intern each entry
@@ -339,6 +364,10 @@ fn populate_trace_row_index(
     let mut durations: Vec<i64> = Vec::new();
     let mut flags: Vec<u32> = Vec::new();
     let mut dropped_attrs: Vec<u32> = Vec::new();
+    let mut events = sfst::EventRows::new();
+    let mut links = sfst::LinkRows::new();
+    // Reused per-event/per-link attr slot buffer (see the span loop).
+    let mut attr_scratch: Vec<KvSlot> = Vec::new();
 
     loop {
         let frame = {
@@ -381,13 +410,75 @@ fn populate_trace_row_index(
                 for span in &sg.spans {
                     records += 1;
 
-                    let span_tokens =
-                        intern_entries(row_index, &span.entries, &paths, &mut kv, &mut stats);
+                    // Span entries intern straight into the row token list (no
+                    // per-span Vec); the truncate re-establishes the shared
+                    // resource+scope prefix.
                     tokens.truncate(resource_tokens.len() + scope_tokens.len());
-                    tokens.extend_from_slice(&span_tokens);
+                    intern_entries_into(
+                        row_index,
+                        &span.entries,
+                        &paths,
+                        &mut kv,
+                        &mut stats,
+                        &mut tokens,
+                    );
+
+                    // Events/links: their name/attr entries intern like any row
+                    // token (searchable via the tiers) AND register in the
+                    // structure accumulators, which reference the same slots —
+                    // grouping/order/per-item scalars for the EVNB/LNKB chunks.
+                    // `attr_scratch` is reused per item (no per-event/link Vec).
+                    for ev in &span.events {
+                        let name_slot =
+                            intern_one(row_index, &ev.name, &paths, &mut kv, &mut stats);
+                        attr_scratch.clear();
+                        intern_entries_into(
+                            row_index,
+                            &ev.attributes,
+                            &paths,
+                            &mut kv,
+                            &mut stats,
+                            &mut attr_scratch,
+                        );
+                        tokens.push(name_slot);
+                        tokens.extend_from_slice(&attr_scratch);
+                        events.push_event(
+                            ev.time_unix_nano,
+                            ev.dropped_attributes_count,
+                            name_slot,
+                            &attr_scratch,
+                        );
+                    }
+                    for link in &span.links {
+                        attr_scratch.clear();
+                        intern_entries_into(
+                            row_index,
+                            &link.attributes,
+                            &paths,
+                            &mut kv,
+                            &mut stats,
+                            &mut attr_scratch,
+                        );
+                        tokens.extend_from_slice(&attr_scratch);
+                        links.push_link(
+                            sfst::TraceId::from(*link.trace_id.as_bytes()),
+                            sfst::SpanId::from(*link.span_id.as_bytes()),
+                            link.flags,
+                            link.dropped_attributes_count,
+                            &link.trace_state,
+                            &attr_scratch,
+                        );
+                    }
 
                     // ts = start_time, normalized at ingest (always concrete).
                     row_index.row(span.ts, &tokens);
+
+                    // Per-row pushes AFTER row(): the row and every parallel
+                    // per-row structure advance atomically at the bottom of the
+                    // iteration (same discipline as the column Vecs below), so
+                    // no early exit can leave the accumulators misaligned.
+                    events.end_row(span.dropped_events_count);
+                    links.end_row(span.dropped_links_count);
 
                     // Per-row span columns, one value per row (parallel to the row
                     // just fed) so they stay aligned for the build-time remap. Ids
@@ -416,6 +507,10 @@ fn populate_trace_row_index(
     row_index.dropped_attribute_counts = Some(DroppedAttributeCounts(dropped_attrs));
     // Spans turn the index on: the builder builds TIDX from the chronological TRCE.
     row_index.build_trace_id_index = true;
+    // Event/link structures only when they carry information (≥1 item or a
+    // nonzero span-level dropped count) — an all-empty accumulator writes no chunk.
+    row_index.events = events.is_meaningful().then_some(events);
+    row_index.links = links.is_meaningful().then_some(links);
 
     Ok(stats)
 }

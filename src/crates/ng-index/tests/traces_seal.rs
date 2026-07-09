@@ -16,7 +16,9 @@ use std::sync::Arc;
 use file_registry::{ByteSize, MonotonicClock, TimestampNs};
 use ng_index::{Metrics, build_sfst_traces_file};
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
-use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value as Av};
+use opentelemetry_proto::tonic::common::v1::{
+    AnyValue, ArrayValue, KeyValue, KeyValueList, any_value::Value as Av,
+};
 use opentelemetry_proto::tonic::resource::v1::Resource;
 use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
 use sfst::{IndexReader, SpanId, TraceId};
@@ -27,6 +29,14 @@ fn kv(k: &str, v: &str) -> KeyValue {
         value: Some(AnyValue {
             value: Some(Av::StringValue(v.into())),
         }),
+    }
+}
+
+/// A key with an arbitrary (possibly nested) OTLP value.
+fn kv_any(k: &str, v: Av) -> KeyValue {
+    KeyValue {
+        key: k.into(),
+        value: Some(AnyValue { value: Some(v) }),
     }
 }
 
@@ -531,4 +541,233 @@ fn oracle_real_wal_self_consistency() {
         truth.len(),
         checked,
     );
+}
+
+/// Round-trip oracle for the phase-1 lossless fields (events, links,
+/// trace_state, status_message, dropped counts): OTLP → WAL frame → seal →
+/// `trace_by_id` returns every field, with per-event grouping/order intact,
+/// while the flat `events.`/`links.` search tokens stay out of the span's
+/// facet list (they are represented structurally).
+#[test]
+fn events_links_and_deferred_scalars_round_trip() {
+    use opentelemetry_proto::tonic::trace::v1::Status;
+    use opentelemetry_proto::tonic::trace::v1::span::{Event, Link};
+
+    let trace = [0xE1u8; 16];
+    let mut root = span(trace, [1; 8], [0; 8], 2_000, 2_500, "root");
+    root.trace_state = "ot=th:8".into();
+    root.status = Some(Status {
+        code: 2,
+        message: "disk full".into(),
+    });
+    root.dropped_events_count = 4;
+    root.dropped_links_count = 1;
+    root.events = vec![
+        Event {
+            time_unix_nano: 2_100,
+            name: "exception".into(),
+            attributes: vec![
+                kv("exception.type", "IOError"),
+                kv("exception.stacktrace", "at main()\n  at run()"),
+            ],
+            dropped_attributes_count: 7,
+        },
+        Event {
+            time_unix_nano: 2_200,
+            name: "retry".into(),
+            attributes: vec![
+                kv("policy", "backoff"),
+                // Nested containers: platform fidelity = leaf tokens under the
+                // collapsed paths (kvlist keys dotted, array elems as `[]`).
+                kv_any(
+                    "ctx",
+                    Av::KvlistValue(KeyValueList {
+                        values: vec![
+                            kv("user", "u1"),
+                            kv_any(
+                                "ids",
+                                Av::ArrayValue(ArrayValue {
+                                    values: vec![
+                                        AnyValue {
+                                            value: Some(Av::IntValue(1)),
+                                        },
+                                        AnyValue {
+                                            value: Some(Av::IntValue(2)),
+                                        },
+                                    ],
+                                }),
+                            ),
+                        ],
+                    }),
+                ),
+            ],
+            dropped_attributes_count: 0,
+        },
+    ];
+    root.links = vec![Link {
+        trace_id: vec![0xB2; 16],
+        span_id: vec![0xB3; 8],
+        trace_state: "vendor=x".into(),
+        attributes: vec![
+            kv("messaging.operation", "publish"),
+            kv_any(
+                "route",
+                Av::KvlistValue(KeyValueList {
+                    values: vec![kv("queue", "q1")],
+                }),
+            ),
+        ],
+        dropped_attributes_count: 2,
+        flags: 0x300,
+    }];
+    // A SPAN attribute deliberately named like the reserved event namespace:
+    // it flattens under `attributes.events.name`, so the reader's `events.`
+    // facet filter must NOT drop it.
+    root.attributes.push(kv("events.name", "decoy"));
+    // A second span, chronologically EARLIER but ingested after: the seal's
+    // time remap reorders rows, and each span's events must stay its own.
+    let mut early = span(trace, [2; 8], [1; 8], 1_000, 1_400, "child");
+    early.events = vec![Event {
+        time_unix_nano: 1_100,
+        name: "cache-miss".into(),
+        attributes: vec![],
+        dropped_attributes_count: 0,
+    }];
+
+    let bytes = seal(vec![req(vec![root, early])]);
+    let index = IndexReader::open(&bytes).unwrap();
+    assert!(index.has_event_index(), "EVNB present");
+    assert!(index.has_link_index(), "LNKB present");
+
+    let tr = index.trace_by_id(TraceId::from(trace)).unwrap();
+    assert_eq!(tr.spans.len(), 2);
+    // Spans sort by start_ns: [child(1000), root(2000)].
+    let child = &tr.spans[0];
+    let root = &tr.spans[1];
+    assert_eq!(root.span_id, SpanId::from([1; 8]));
+
+    // Scalars (Decision 2A) are row facets.
+    let field = |s: &sfst::TraceSpan, k: &str| -> Vec<String> {
+        s.fields
+            .iter()
+            .filter(|(key, _)| key == k)
+            .map(|(_, v)| v.clone())
+            .collect()
+    };
+    assert_eq!(field(root, "trace_state"), ["ot=th:8"]);
+    assert_eq!(field(root, "status_message"), ["disk full"]);
+    assert_eq!(field(root, "status_code"), ["ERROR"]);
+
+    // Structured events: grouping, order, per-event scalars, stripped attr keys.
+    assert_eq!(root.dropped_events_count, 4);
+    assert_eq!(root.dropped_links_count, 1);
+    assert_eq!(root.events.len(), 2);
+    let ev = &root.events[0];
+    assert_eq!(
+        (ev.time_unix_nano, ev.name.as_str(), ev.dropped_attributes_count),
+        (2_100, "exception", 7)
+    );
+    assert_eq!(
+        ev.attributes,
+        vec![
+            ("exception.type".to_string(), "IOError".to_string()),
+            (
+                "exception.stacktrace".to_string(),
+                "at main()\n  at run()".to_string()
+            ),
+        ]
+    );
+    assert_eq!(root.events[1].name, "retry");
+    // Nested containers regroup at platform fidelity: kvlist keys dotted,
+    // array elements under the collapsed `[]` path, in original order,
+    // attached to THIS event.
+    assert_eq!(
+        root.events[1].attributes,
+        vec![
+            ("policy".to_string(), "backoff".to_string()),
+            ("ctx.user".to_string(), "u1".to_string()),
+            ("ctx.ids[]".to_string(), "1".to_string()),
+            ("ctx.ids[]".to_string(), "2".to_string()),
+        ]
+    );
+
+    // Structured link: ids, verbatim trace_state, flags, dropped, attrs.
+    assert_eq!(root.links.len(), 1);
+    let link = &root.links[0];
+    assert_eq!(link.trace_id, TraceId::from([0xB2; 16]));
+    assert_eq!(link.span_id, SpanId::from([0xB3; 8]));
+    assert_eq!(link.trace_state, "vendor=x");
+    assert_eq!(link.flags, 0x300);
+    assert_eq!(link.dropped_attributes_count, 2);
+    assert_eq!(
+        link.attributes,
+        vec![
+            ("messaging.operation".to_string(), "publish".to_string()),
+            ("route.queue".to_string(), "q1".to_string()),
+        ]
+    );
+
+    // The remapped earlier span kept ITS event (no cross-row bleed).
+    assert_eq!(child.events.len(), 1);
+    assert_eq!(child.events[0].name, "cache-miss");
+    assert!(child.links.is_empty());
+    assert_eq!((child.dropped_events_count, child.dropped_links_count), (0, 0));
+
+    // Flat search tokens exist in the field table (searchable) but are excluded
+    // from the reconstructed span's facet list (represented structurally).
+    let fields = index.field_table();
+    assert!(fields.iter().any(|f| f.name == "events.name"));
+    assert!(
+        fields
+            .iter()
+            .any(|f| f.name == "events.attributes.exception.stacktrace")
+    );
+    assert!(fields.iter().any(|f| f.name == "links.attributes.messaging.operation"));
+    assert!(
+        root.fields.iter().all(|(k, _)| !k.starts_with("events.")),
+        "flat events.* tokens excluded from the structured span"
+    );
+    assert!(root.fields.iter().all(|(k, _)| !k.starts_with("links.")));
+    // ...but a span ATTRIBUTE named like the reserved namespace lives under
+    // `attributes.events.name` and must survive the filter.
+    assert_eq!(field(root, "attributes.events.name"), ["decoy"]);
+}
+
+/// A corpus with no events/links (and zero dropped counts) writes neither
+/// chunk — the additive-absence contract.
+#[test]
+fn no_events_no_links_no_chunks() {
+    let trace = [0xE2u8; 16];
+    let bytes = seal(vec![req(vec![span(
+        trace,
+        [1; 8],
+        [0; 8],
+        1_000,
+        2_000,
+        "plain",
+    )])]);
+    let index = IndexReader::open(&bytes).unwrap();
+    assert!(!index.has_event_index());
+    assert!(!index.has_link_index());
+    let tr = index.trace_by_id(TraceId::from(trace)).unwrap();
+    assert_eq!(tr.spans.len(), 1);
+    assert!(tr.spans[0].events.is_empty());
+    assert!(tr.spans[0].links.is_empty());
+    assert_eq!(tr.spans[0].dropped_events_count, 0);
+}
+
+/// `Span.dropped_events_count > 0` with zero surviving events still writes the
+/// chunk — the count must not silently vanish.
+#[test]
+fn dropped_count_alone_preserves_the_chunk() {
+    let trace = [0xE3u8; 16];
+    let mut s = span(trace, [1; 8], [0; 8], 1_000, 2_000, "lossy");
+    s.dropped_events_count = 9;
+    let bytes = seal(vec![req(vec![s])]);
+    let index = IndexReader::open(&bytes).unwrap();
+    assert!(index.has_event_index(), "EVNB carries the dropped count");
+    assert!(!index.has_link_index());
+    let tr = index.trace_by_id(TraceId::from(trace)).unwrap();
+    assert!(tr.spans[0].events.is_empty());
+    assert_eq!(tr.spans[0].dropped_events_count, 9);
 }

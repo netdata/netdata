@@ -31,8 +31,10 @@ pub struct IndexReader<'a> {
 }
 
 /// One materialized span of a trace reconstructed by [`IndexReader::trace_by_id`]:
-/// its ids, timing, per-row scalars, and attribute facets (`name`, `kind`,
-/// `status_code`, `attributes.*`) as flat `(key, value)` pairs.
+/// its ids, timing, per-row scalars, attribute facets (`name`, `kind`,
+/// `status_code`, `trace_state`, `status_message`, `attributes.*`) as flat
+/// `(key, value)` pairs, and its structured events/links (from the `EVNB`/`LNKB`
+/// chunks; empty when the file predates them or the span has none).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TraceSpan {
     pub span_id: SpanId,
@@ -42,7 +44,41 @@ pub struct TraceSpan {
     /// W3C trace flags (the low byte carries the sampled bit).
     pub flags: u32,
     pub dropped_attributes_count: u32,
+    /// Zero when the file carries no `EVNB` chunk (no chunk ⇒ no drops to
+    /// preserve, by the producer's `is_meaningful` rule).
+    pub dropped_events_count: u32,
+    /// Zero when the file carries no `LNKB` chunk (same rule).
+    pub dropped_links_count: u32,
+    /// Row facets, `events.`/`links.`-prefixed tokens excluded when the file
+    /// carries the corresponding structure (they appear structured instead).
     pub fields: Vec<(String, String)>,
+    pub events: Vec<TraceEvent>,
+    pub links: Vec<TraceLink>,
+}
+
+/// One span event, resolved to strings (platform fidelity: values are the
+/// rendered token strings; field-level types live in the schema tree).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TraceEvent {
+    /// Raw OTLP `time_unix_nano` (never normalized; zero stays zero).
+    pub time_unix_nano: u64,
+    pub name: String,
+    pub dropped_attributes_count: u32,
+    /// Attribute pairs with the `events.attributes.` path prefix stripped.
+    pub attributes: Vec<(String, String)>,
+}
+
+/// One span link, resolved to strings (see [`TraceEvent`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TraceLink {
+    pub trace_id: TraceId,
+    pub span_id: SpanId,
+    /// Verbatim W3C `trace_state`.
+    pub trace_state: String,
+    pub flags: u32,
+    pub dropped_attributes_count: u32,
+    /// Attribute pairs with the `links.attributes.` path prefix stripped.
+    pub attributes: Vec<(String, String)>,
 }
 
 /// A trace reconstructed by [`IndexReader::trace_by_id`]: the trace's spans plus the
@@ -69,6 +105,30 @@ pub struct Trace {
     pub roots: Vec<usize>,
     /// `span_id` → indices into [`spans`](Self::spans) of its direct children.
     pub children: HashMap<SpanId, Vec<usize>>,
+}
+
+/// The value half of a resolved `key=value` token (split on the FIRST `=`, so
+/// value-embedded `=` bytes are preserved — e.g. `trace_state=ot=th:8` yields
+/// `ot=th:8`), or empty for an unresolvable ref (corrupt file — the row path
+/// renders those empty too rather than failing the trace).
+fn kv_value(strings: &HashMap<u32, String>, id: crate::KvId) -> String {
+    strings
+        .get(&id.0)
+        .and_then(|s| s.split_once('=').map(|(_, v)| v.to_string()))
+        .unwrap_or_default()
+}
+
+/// A resolved attribute token as a `(key, value)` pair with `prefix` stripped
+/// from the key (`events.attributes.` / `links.attributes.`). A key that lacks
+/// the prefix (corrupt file) is kept as-is rather than dropped.
+fn kv_attr(strings: &HashMap<u32, String>, id: crate::KvId, prefix: &str) -> (String, String) {
+    match strings.get(&id.0).and_then(|s| s.split_once('=')) {
+        Some((k, v)) => (
+            k.strip_prefix(prefix).unwrap_or(k).to_string(),
+            v.to_string(),
+        ),
+        None => (String::new(), String::new()),
+    }
 }
 
 impl<'a> IndexReader<'a> {
@@ -265,6 +325,26 @@ impl<'a> IndexReader<'a> {
     /// Whether the file carries the optional `trace_id` index (`TIDX`).
     pub fn has_trace_id_index(&self) -> bool {
         self.sfst.has_trace_id_index()
+    }
+
+    /// Whether the file carries the optional span event structure (`EVNB`).
+    pub fn has_event_index(&self) -> bool {
+        self.sfst.has_event_index()
+    }
+
+    /// Whether the file carries the optional span link structure (`LNKB`).
+    pub fn has_link_index(&self) -> bool {
+        self.sfst.has_link_index()
+    }
+
+    /// The span event structure. Gate on [`has_event_index`](Self::has_event_index).
+    pub fn event_index(&self) -> Result<crate::EventIndex, crate::Error> {
+        self.sfst.event_index()
+    }
+
+    /// The span link structure. Gate on [`has_link_index`](Self::has_link_index).
+    pub fn link_index(&self) -> Result<crate::LinkIndex, crate::Error> {
+        self.sfst.link_index()
     }
 
     /// The `trace_id` index. Positions it yields index the chronological
@@ -557,6 +637,36 @@ impl<'a> IndexReader<'a> {
         // build-time invariant, CRC-guarded), so indexing them at `pos` is in-bounds.
         let rows = self.materialize_rows(positions)?;
 
+        // Span event/link structures (absent in files that predate them or carry
+        // none). Their token refs resolve through the same string path as the
+        // rows — collected across all positions and resolved in one pass.
+        let event_index = if self.sfst.has_event_index() {
+            Some(self.sfst.event_index()?)
+        } else {
+            None
+        };
+        let link_index = if self.sfst.has_link_index() {
+            Some(self.sfst.link_index()?)
+        } else {
+            None
+        };
+        let extra_strings = if event_index.is_some() || link_index.is_some() {
+            let mut ids: Vec<u32> = Vec::new();
+            for &pos in positions {
+                if let Some(ev) = &event_index {
+                    ids.extend(ev.all_refs_for_row(pos).map(|id| id.0));
+                }
+                if let Some(lk) = &link_index {
+                    ids.extend(lk.all_refs_for_row(pos).map(|id| id.0));
+                }
+            }
+            ids.sort_unstable();
+            ids.dedup();
+            self.resolve_kv_strings(&ids)?
+        } else {
+            HashMap::new()
+        };
+
         // Assemble spans, collapsing duplicate span_ids (resends) to the first seen.
         // All positions share `trace_id`, so dedup by span_id == dedup by
         // (trace_id, span_id).
@@ -570,6 +680,53 @@ impl<'a> IndexReader<'a> {
             if !span_id.is_unset() && !seen.insert(span_id) {
                 continue;
             }
+            // Row facets: the `events.`/`links.` tokens exist for search; in the
+            // reconstructed span they appear structured instead, so drop the flat
+            // duplicates (only when the structure is actually present).
+            let fields: Vec<(String, String)> = rows[i]
+                .fields
+                .iter()
+                .filter(|(k, _)| {
+                    let structured_event = event_index.is_some() && k.starts_with("events.");
+                    let structured_link = link_index.is_some() && k.starts_with("links.");
+                    !structured_event && !structured_link
+                })
+                .cloned()
+                .collect();
+            let events = match &event_index {
+                Some(ev) => ev
+                    .events_for_row(pos)
+                    .map(|e| TraceEvent {
+                        time_unix_nano: e.time_unix_nano,
+                        name: kv_value(&extra_strings, e.name),
+                        dropped_attributes_count: e.dropped_attributes_count,
+                        attributes: e
+                            .attr_refs
+                            .iter()
+                            .map(|&id| kv_attr(&extra_strings, id, "events.attributes."))
+                            .collect(),
+                    })
+                    .collect(),
+                None => Vec::new(),
+            };
+            let links = match &link_index {
+                Some(lk) => lk
+                    .links_for_row(pos)
+                    .map(|l| TraceLink {
+                        trace_id: l.trace_id,
+                        span_id: l.span_id,
+                        trace_state: String::from_utf8_lossy(l.trace_state).into_owned(),
+                        flags: l.flags,
+                        dropped_attributes_count: l.dropped_attributes_count,
+                        attributes: l
+                            .attr_refs
+                            .iter()
+                            .map(|&id| kv_attr(&extra_strings, id, "links.attributes."))
+                            .collect(),
+                    })
+                    .collect(),
+                None => Vec::new(),
+            };
             spans.push(TraceSpan {
                 span_id,
                 parent_span_id: parents.get(pos as usize),
@@ -577,7 +734,15 @@ impl<'a> IndexReader<'a> {
                 duration_ns: durations.0[pos as usize],
                 flags: flags.0[pos as usize],
                 dropped_attributes_count: dropped.0[pos as usize],
-                fields: rows[i].fields.clone(),
+                dropped_events_count: event_index
+                    .as_ref()
+                    .map_or(0, |ev| ev.row_dropped_count(pos)),
+                dropped_links_count: link_index
+                    .as_ref()
+                    .map_or(0, |lk| lk.row_dropped_count(pos)),
+                fields,
+                events,
+                links,
             });
         }
 

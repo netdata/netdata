@@ -1,9 +1,9 @@
-//! PROOF SCAFFOLD (otel traces-proof SOW; revert with the skeleton).
-//!
 //! Send a deterministic synthetic batch of OTLP **traces** to an endpoint — the
-//! traces analogue of the `synth` bin, used to drive the skeletal traces
-//! pipeline end-to-end. Self-contained (does not reuse the logs `Sender`, which
-//! is `LogsServiceClient`-typed): it connects a `TraceServiceClient` and exports
+//! traces analogue of the `synth` bin. Generates real trace trees with events,
+//! links, and (behind explicit knobs) the edge cases the read path must survive
+//! (orphans, extra roots, resends) — see [`otel_streams::synth_traces`].
+//! Self-contained (does not reuse the logs `Sender`, which is
+//! `LogsServiceClient`-typed): it connects a `TraceServiceClient` and exports
 //! the spans in `--batch-size` chunks, one export request per chunk.
 
 use std::time::Duration;
@@ -20,9 +20,7 @@ use otel_streams::synth_traces::{SynthTraceParams, build_request, generate};
 
 #[derive(Parser)]
 #[command(name = "synth-traces")]
-#[command(
-    about = "Send a deterministic synthetic batch of OTLP traces to an endpoint (proof scaffold)"
-)]
+#[command(about = "Send a deterministic synthetic batch of OTLP traces to an endpoint")]
 struct Args {
     #[command(flatten)]
     common: CommonArgs,
@@ -46,6 +44,31 @@ struct Args {
     /// Value-selection offset added before deriving span ids/values.
     #[arg(long, default_value_t = 0)]
     seed: u64,
+
+    /// Spans per trace: 1 = flat (each span its own trace); >1 = a root plus a
+    /// binary-ish tree of children.
+    #[arg(long, default_value_t = 1)]
+    spans_per_trace: usize,
+
+    /// Events per span (0 = none; the first is exception-shaped).
+    #[arg(long, default_value_t = 0)]
+    events_per_span: usize,
+
+    /// Every Nth span links to the previous trace's root (0 = never).
+    #[arg(long, default_value_t = 0)]
+    links_every: usize,
+
+    /// Every Nth trace's last span parents a nonexistent id (0 = never).
+    #[arg(long, default_value_t = 0)]
+    orphan_every: usize,
+
+    /// Every Nth trace's last span becomes a second root (0 = never).
+    #[arg(long, default_value_t = 0)]
+    extra_root_every: usize,
+
+    /// Every Nth span is sent twice (0 = never).
+    #[arg(long, default_value_t = 0)]
+    resend_every: usize,
 
     /// Resource `service.name`.
     #[arg(long, default_value = "otel-streams-synth-traces")]
@@ -79,6 +102,12 @@ async fn main() -> anyhow::Result<()> {
         spacing_nanos: args.spacing_nanos,
         duration_nanos: args.duration_nanos,
         seed: args.seed,
+        spans_per_trace: args.spans_per_trace,
+        events_per_span: args.events_per_span,
+        links_every: args.links_every,
+        orphan_every: args.orphan_every,
+        extra_root_every: args.extra_root_every,
+        resend_every: args.resend_every,
     });
     let total = spans.len();
 

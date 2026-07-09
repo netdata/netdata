@@ -418,6 +418,38 @@ impl<'a> ChunkReader<'a> {
         Ok(index)
     }
 
+    // ── EVNB / LNKB (span event / link structures) ───────────────────
+
+    /// Whether this file carries the optional span event structure (`EVNB`).
+    pub fn has_event_index(&self) -> bool {
+        self.container.has_chunk(crate::CHUNK_EVENTS)
+    }
+
+    /// Whether this file carries the optional span link structure (`LNKB`).
+    pub fn has_link_index(&self) -> bool {
+        self.container.has_chunk(crate::CHUNK_LINKS)
+    }
+
+    /// Decode and validate the span event structure (`EVNB`). Same trust-boundary
+    /// contract as [`trace_id_index`](Self::trace_id_index): panic-safety-only
+    /// validation (skeleton consistency + token refs in range); callers gate on
+    /// [`has_event_index`](Self::has_event_index).
+    pub fn event_index(&self) -> Result<crate::EventIndex, Error> {
+        let index: crate::EventIndex = unpack(self.chunk_raw_by_id(crate::CHUNK_EVENTS)?)?;
+        let kv_total = self.metadata()?.id_ranges.high_end.0;
+        index.validate(self.record_count()?, kv_total)?;
+        Ok(index)
+    }
+
+    /// Decode and validate the span link structure (`LNKB`). See
+    /// [`event_index`](Self::event_index).
+    pub fn link_index(&self) -> Result<crate::LinkIndex, Error> {
+        let index: crate::LinkIndex = unpack(self.chunk_raw_by_id(crate::CHUNK_LINKS)?)?;
+        let kv_total = self.metadata()?.id_ranges.high_end.0;
+        index.validate(self.record_count()?, kv_total)?;
+        Ok(index)
+    }
+
     // ── Stream-batch chunks ──────────────────────────────────────────
 
     /// Decompress and deserialize one stream-batch chunk by index.

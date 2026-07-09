@@ -44,6 +44,8 @@ fn trace_file(rows: &[(SpanId, SpanId)]) -> Vec<u8> {
     let counts = ChunkCounts {
         columns,
         trace_id_index: true,
+        event_index: false,
+        link_index: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,

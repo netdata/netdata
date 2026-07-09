@@ -14,6 +14,8 @@ fn counts(mid: u16, high: u16, batches: u8) -> ChunkCounts {
     ChunkCounts {
         columns: ColumnsPresent::default(),
         trace_id_index: false,
+        event_index: false,
+        link_index: false,
         mid_fields: mid,
         high_fields: high,
         stream_batches: batches,
@@ -339,6 +341,8 @@ fn col_counts(columns: ColumnsPresent) -> ChunkCounts {
     ChunkCounts {
         columns,
         trace_id_index: false,
+        event_index: false,
+        link_index: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -549,6 +553,8 @@ fn idx_counts() -> ChunkCounts {
             ..Default::default()
         },
         trace_id_index: true,
+        event_index: false,
+        link_index: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -631,6 +637,8 @@ fn trace_id_index_without_its_column_is_rejected() {
     let bad = ChunkCounts {
         columns: ColumnsPresent::default(),
         trace_id_index: true,
+        event_index: false,
+        link_index: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,

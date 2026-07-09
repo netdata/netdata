@@ -13,13 +13,13 @@ use chunk_file::container::StreamingWriter;
 use serde::Serialize;
 
 use crate::{
-    ALL_COLUMNS, BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_DURATION, CHUNK_FLAGS, CHUNK_META,
-    CHUNK_OBSERVED_TS, CHUNK_PARENT_SPAN_IDS, CHUNK_PRIMARY, CHUNK_SPAN_IDS, CHUNK_SUMMARY,
-    CHUNK_TIMS, CHUNK_TRACE_IDS, CHUNK_TRACE_INDEX, ColumnSpec, ColumnsTable,
-    DroppedAttributeCounts, Durations, Error, Flags, HighField, MAGIC, MAX_STREAM_BATCHES,
-    Metadata, ObservedTimestamps, ParentSpanIds, SpanIds, StreamBatch, Summary, TraceIdIndex,
-    TraceIds, VERSION, ZSTD_LEVEL_DEFAULT, ZSTD_LEVEL_FST, high_field_id, mid_field_id,
-    stream_batch_id,
+    ALL_COLUMNS, BitmapValue, CHUNK_DROPPED_ATTRS, CHUNK_DURATION, CHUNK_EVENTS, CHUNK_FLAGS,
+    CHUNK_LINKS, CHUNK_META, CHUNK_OBSERVED_TS, CHUNK_PARENT_SPAN_IDS, CHUNK_PRIMARY,
+    CHUNK_SPAN_IDS, CHUNK_SUMMARY, CHUNK_TIMS, CHUNK_TRACE_IDS, CHUNK_TRACE_INDEX, ColumnSpec,
+    ColumnsTable, DroppedAttributeCounts, Durations, Error, Flags, HighField, MAGIC,
+    MAX_STREAM_BATCHES, Metadata, ObservedTimestamps, ParentSpanIds, SpanIds, StreamBatch,
+    Summary, TraceIdIndex, TraceIds, VERSION, ZSTD_LEVEL_DEFAULT, ZSTD_LEVEL_FST, high_field_id,
+    mid_field_id, stream_batch_id,
 };
 
 /// Serialize a value with bincode, then compress with zstd.
@@ -111,6 +111,12 @@ pub struct ChunkCounts {
     /// in the cold region right after the per-row columns. Built from the `TRCE`
     /// column, so a file that sets this must also carry the `trace_id` column.
     pub trace_id_index: bool,
+    /// Whether the file carries the optional span event structure (`EVNB`),
+    /// written after the trace_id index (traces seal only).
+    pub event_index: bool,
+    /// Whether the file carries the optional span link structure (`LNKB`),
+    /// written after the event structure (traces seal only).
+    pub link_index: bool,
     /// Mid-cardinality per-field FST chunks (`MF{i}`).
     pub mid_fields: u16,
     /// High-cardinality per-field sorted-list chunks (`HF{i}`).
@@ -135,6 +141,10 @@ enum Stage {
     /// The optional `trace_id` index, after the per-row columns and before the
     /// secondary sections; skipped entirely when not declared.
     TraceIndex,
+    /// The optional span event structure (`EVNB`), after the trace_id index.
+    EventIndex,
+    /// The optional span link structure (`LNKB`), after the event structure.
+    LinkIndex,
     Secondary,
 }
 
@@ -147,6 +157,8 @@ impl Stage {
             Stage::Primary => "primary",
             Stage::Columns => "a declared per-row column chunk",
             Stage::TraceIndex => "the declared trace_id index chunk",
+            Stage::EventIndex => "the declared span event structure chunk",
+            Stage::LinkIndex => "the declared span link structure chunk",
             Stage::Secondary => "a mid-field, high-field, or stream-batch chunk",
         }
     }
@@ -205,10 +217,13 @@ impl<W: Write + Seek> ChunkWriter<W> {
             ));
         }
         // One cold-region chunk per present per-row column (independently
-        // optional), plus the optional trace_id index.
+        // optional), plus the optional trace_id index and span event/link
+        // structures.
         let num_chunks = 4u32
             + counts.columns.count()
             + u32::from(counts.trace_id_index)
+            + u32::from(counts.event_index)
+            + u32::from(counts.link_index)
             + u32::from(counts.mid_fields)
             + u32::from(counts.high_fields)
             + u32::from(counts.stream_batches);
@@ -291,10 +306,30 @@ impl<W: Write + Seek> ChunkWriter<W> {
     }
 
     /// The stage after the per-row columns: the `trace_id` index if declared,
-    /// otherwise straight to the secondary sections.
+    /// otherwise whatever follows it.
     fn after_columns(&self) -> Stage {
         if self.counts.trace_id_index {
             Stage::TraceIndex
+        } else {
+            self.after_trace_index()
+        }
+    }
+
+    /// The stage after the `trace_id` index: the span event structure if
+    /// declared, otherwise whatever follows it.
+    fn after_trace_index(&self) -> Stage {
+        if self.counts.event_index {
+            Stage::EventIndex
+        } else {
+            self.after_event_index()
+        }
+    }
+
+    /// The stage after the span event structure: the span link structure if
+    /// declared, otherwise the secondary sections.
+    fn after_event_index(&self) -> Stage {
+        if self.counts.link_index {
+            Stage::LinkIndex
         } else {
             Stage::Secondary
         }
@@ -430,6 +465,37 @@ impl<W: Write + Seek> ChunkWriter<W> {
         }
         let packed = pack(index, ZSTD_LEVEL_DEFAULT)?;
         self.inner.write_chunk(CHUNK_TRACE_INDEX, &packed)?;
+        self.stage = self.after_trace_index();
+        Ok(())
+    }
+
+    /// Write the optional span event structure chunk (`EVNB`), after the
+    /// `trace_id` index. Only valid when declared in
+    /// [`ChunkCounts::event_index`]; the stage machine rejects it otherwise.
+    pub fn event_index(&mut self, index: &crate::EventIndex) -> Result<(), Error> {
+        if self.stage != Stage::EventIndex {
+            return Err(Error::WriterMisuse(format!(
+                "span event structure chunk out of order: the writer expects {} next",
+                self.stage.expects(),
+            )));
+        }
+        let packed = pack(index, ZSTD_LEVEL_DEFAULT)?;
+        self.inner.write_chunk(CHUNK_EVENTS, &packed)?;
+        self.stage = self.after_event_index();
+        Ok(())
+    }
+
+    /// Write the optional span link structure chunk (`LNKB`), after the span
+    /// event structure. Only valid when declared in [`ChunkCounts::link_index`].
+    pub fn link_index(&mut self, index: &crate::LinkIndex) -> Result<(), Error> {
+        if self.stage != Stage::LinkIndex {
+            return Err(Error::WriterMisuse(format!(
+                "span link structure chunk out of order: the writer expects {} next",
+                self.stage.expects(),
+            )));
+        }
+        let packed = pack(index, ZSTD_LEVEL_DEFAULT)?;
+        self.inner.write_chunk(CHUNK_LINKS, &packed)?;
         self.stage = Stage::Secondary;
         Ok(())
     }

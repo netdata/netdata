@@ -99,6 +99,8 @@ fn write_test_sfst(path: &std::path::Path, min_s: u32) {
     let counts = sfst::ChunkCounts {
         columns: sfst::ColumnsPresent::default(),
         trace_id_index: false,
+        event_index: false,
+        link_index: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -175,6 +177,8 @@ fn write_service_only_sfst(path: &std::path::Path, min_s: u32) {
     let counts = sfst::ChunkCounts {
         columns: sfst::ColumnsPresent::default(),
         trace_id_index: false,
+        event_index: false,
+        link_index: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,
@@ -239,6 +243,8 @@ fn write_same_ts_sfst(path: &std::path::Path, ts_s: u32, n: usize) {
     let counts = sfst::ChunkCounts {
         columns: sfst::ColumnsPresent::default(),
         trace_id_index: false,
+        event_index: false,
+        link_index: false,
         mid_fields: 0,
         high_fields: 0,
         stream_batches: 1,

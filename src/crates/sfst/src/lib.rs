@@ -59,13 +59,14 @@ pub mod query;
 mod reader;
 mod row_index;
 mod schema;
+mod span_extras;
 mod trace_index;
 mod writer;
 
 pub mod registry;
 
 pub use error::Error;
-pub use index_reader::{BitmapFilter, IndexReader, Trace, TraceSpan};
+pub use index_reader::{BitmapFilter, IndexReader, Trace, TraceEvent, TraceLink, TraceSpan};
 pub use index_writer::IndexWriter;
 pub use kv_interner::KvSlot;
 pub(crate) use prefix_map::{BuildError, PrefixMap};
@@ -76,6 +77,7 @@ pub use query::{
 pub use reader::read_summary;
 pub use registry::{File, Registry, RetentionPolicy};
 pub use row_index::RowIndex;
+pub use span_extras::{EventIndex, EventRef, EventRows, LinkIndex, LinkRef, LinkRows};
 pub use trace_index::TraceIdIndex;
 
 /// Deterministic opaque partition key for tests. SFST treats `part_key` as an
@@ -151,6 +153,13 @@ const CHUNK_DURATION: chunk_file::ChunkId = *b"DURN";
 // reader that ignores it reads the rest unchanged, so its presence needs no
 // version bump.
 const CHUNK_TRACE_INDEX: chunk_file::ChunkId = *b"TIDX";
+// Optional span event / link structures (cold region, after TIDX): per-row
+// prefix-sum skeletons whose token refs point at the same interned KvIds the
+// rows carry — grouping/order/per-item scalars for OTLP `Span.events[]` /
+// `Span.links[]`. Same additive TOC-indexed contract as TIDX (see
+// `span_extras`).
+const CHUNK_EVENTS: chunk_file::ChunkId = *b"EVNB";
+const CHUNK_LINKS: chunk_file::ChunkId = *b"LNKB";
 
 /// Minimum number of logs in each stream batch. Files with fewer than
 /// `MIN_LOGS_PER_BATCH` total logs use a single batch; otherwise the

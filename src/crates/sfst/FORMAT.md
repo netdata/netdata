@@ -101,6 +101,8 @@ within its tier in the trailing bytes.
     "PSPN"      8-byte arena (per-row parent_span_id)         No (per-row column)
     "DURN"      Vec<i64>  (per-row span duration, ns)         No (per-row column)
     "TIDX"      TraceIdIndex  (trace_id fanout + sort permutation)  No (optional)
+    "EVNB"      EventIndex  (per-row span event structure)    No (optional)
+    "LNKB"      LinkIndex  (per-row span link structure)      No (optional)
     "MF{hi}{lo}" PrefixMap<BitmapValue>  (mid-card field)     No (one per mid field)
     "HF{hi}{lo}" HighField  (high-card field, columnar SoA)   No (one per high field)
     "SB0{N}"    StreamBatch  (stream-batch N, fixed-width arena)  Yes (at least 1)
@@ -125,6 +127,38 @@ contiguous run in `sort_perm`. It lives in the cold region after the per-row
 columns, requires the `TRCE` column it indexes, and is detected via the TOC
 (`IndexReader::has_trace_id_index`), not the `ColumnsTable`. Presence is independent
 of any per-row column except its required `TRCE`.
+
+The optional `EVNB` / `LNKB` chunks are the **span event / link structures**
+(traces signal). Rows carry event/link *values* as ordinary interned tokens
+(searchable through the field tiers, listed in the row's stream-batch entry
+list, under the reserved `events.` / `links.` path namespaces); these chunks
+store the *structure* the flat token list cannot express — which tokens form
+which event/link, in what order, with what per-item scalars. Layout: per-row
+prefix-sum `row_offsets` (`record_count + 1`) plus a per-row `row_dropped`
+array (the span-level OTLP `dropped_events_count` / `dropped_links_count`),
+then parallel per-item arrays — events: raw `time_unix_nano`,
+`dropped_attributes_count`, a name token ref (`events.name=<name>`; always
+present per event); links: linked `trace_id` (16-byte arena), `span_id`
+(8-byte arena), `flags`, `dropped_attributes_count`, and a verbatim
+`trace_state` byte arena with its own prefix-sum offsets — and finally
+per-item attribute token refs behind a second prefix-sum (`attr_offsets`).
+Token refs are **bare `KvId`s** into the same id space as the stream batches
+(written through the same slot→id translation): values are stored once, and
+value typing is field-level via the schema tree — there is no per-occurrence
+type ref (the platform fidelity bar). Consequence, stated explicitly: the
+`key=value` rendering is not type-unique, so same-rendering values of
+different kinds under one path intern to ONE token — `Int 3` ↔ `Str "3"`,
+`Bool true` ↔ `Str "true"`, `Null` ↔ `Str ""`, `Bytes []` ↔ `Str ""`,
+hex-looking strings ↔ `Bytes`. A mono-kind field recovers its type exactly
+from its schema-tree kind; a poly-kind field coalesces (`Int ⊔ Double =
+Double`; any other mix → `Str`) and its occurrences reconstruct at the
+coalesced kind. This is sufficient for display/search consumers;
+type-faithful OTLP re-export of poly-kind fields is out of scope by design.
+Both chunks live after `TIDX`
+(`EVNB` before `LNKB`), are written only when meaningful (≥1 item, or a
+nonzero dropped count that must survive), and are detected via the TOC
+(`IndexReader::has_event_index` / `has_link_index`). Rows are chronological
+like every per-row column; items within a row keep their original OTLP order.
 
 The rows are listed in the order the canonical producer emits chunk
 bodies. This order is **not** part of the format contract — readers
@@ -260,7 +294,8 @@ Heavy query-time metadata:
     // the file carries no per-row columns.
     pub struct ColumnEntry {
         pub name: String,        // "observed_ts" | "trace_id" | "span_id" | "flags"
-                                 //   | "dropped_attributes_count"
+                                 //   | "dropped_attributes_count" | "parent_span_id"
+                                 //   | "duration"
         pub ty:   ColumnType,    // I64 | U32 | FixedBytes(n)
     }
 
@@ -488,9 +523,9 @@ introduce one.
 A new **optional, TOC-indexed** chunk id is additive: it changes no
 existing chunk's bincode layout, a file without it simply omits it,
 and a reader that does not know it reads the rest unchanged. Adding
-one therefore needs **no version bump**. The optional per-row columns
-and the `TIDX` trace_id index (see [§ Chunk Ids](#chunk-ids)) follow
-exactly this rule.
+one therefore needs **no version bump**. The optional per-row columns,
+the `TIDX` trace_id index, and the `EVNB`/`LNKB` span event/link
+structures (see [§ Chunk Ids](#chunk-ids)) follow exactly this rule.
 
 ### When to bump the version
 

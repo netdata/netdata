@@ -183,7 +183,7 @@ mod tests {
             ..Default::default()
         };
         let mut f = Flattener::new();
-        let entries = f.flatten_span(span);
+        let entries = f.flatten_span(span).entries;
         let tree = f.into_tree();
         let leaves = tree.resolve(&entries);
 
@@ -217,7 +217,7 @@ mod tests {
             }),
             ..Default::default()
         });
-        let l = f.into_tree().resolve(&e);
+        let l = f.into_tree().resolve(&e.entries);
         assert!(at(&l, "kind").is_empty() && at(&l, "_kind").is_empty());
         assert!(at(&l, "status_code").is_empty() && at(&l, "_status_code").is_empty());
 
@@ -231,7 +231,7 @@ mod tests {
             }),
             ..Default::default()
         });
-        let l = f.into_tree().resolve(&e);
+        let l = f.into_tree().resolve(&e.entries);
         assert!(at(&l, "kind").is_empty(), "no label for an unknown kind");
         assert_eq!(at(&l, "_kind"), [&Value::Int(99)]);
         assert!(at(&l, "status_code").is_empty());
@@ -368,13 +368,166 @@ mod tests {
             status: None,
             ..Default::default()
         });
-        let l = f.into_tree().resolve(&e);
+        let l = f.into_tree().resolve(&e.entries);
         assert!(at(&l, "name").is_empty(), "empty name → no facet");
         assert!(
             at(&l, "status_code").is_empty() && at(&l, "_status_code").is_empty(),
             "status None → no facet"
         );
         assert_eq!(at(&l, "kind"), [&Value::Str("SERVER".into())]);
+    }
+
+    #[test]
+    fn span_trace_state_and_status_message_are_facets() {
+        let mut f = Flattener::new();
+        let e = f.flatten_span(Span {
+            trace_state: "ot=th:8".into(),
+            status: Some(Status {
+                code: 0, // UNSET — the message must still round-trip
+                message: "boom".into(),
+            }),
+            ..Default::default()
+        });
+        let l = f.into_tree().resolve(&e.entries);
+        assert_eq!(at(&l, "trace_state"), [&Value::Str("ot=th:8".into())]);
+        assert_eq!(at(&l, "status_message"), [&Value::Str("boom".into())]);
+        assert!(
+            at(&l, "status_code").is_empty(),
+            "UNSET code stays absent even with a message"
+        );
+
+        // Empty trace_state / message → absent (proto3 empty == unset on the wire).
+        let mut f = Flattener::new();
+        let e = f.flatten_span(Span::default());
+        let l = f.into_tree().resolve(&e.entries);
+        assert!(at(&l, "trace_state").is_empty());
+        assert!(at(&l, "status_message").is_empty());
+
+        // OK code + empty message: the code facets emit, the message doesn't —
+        // an empty message must never suppress the status code (or vice versa).
+        let mut f = Flattener::new();
+        let e = f.flatten_span(Span {
+            status: Some(Status {
+                code: 1, // OK
+                message: String::new(),
+            }),
+            ..Default::default()
+        });
+        let l = f.into_tree().resolve(&e.entries);
+        assert_eq!(at(&l, "status_code"), [&Value::Str("OK".into())]);
+        assert_eq!(at(&l, "_status_code"), [&Value::Int(1)]);
+        assert!(at(&l, "status_message").is_empty());
+    }
+
+    #[test]
+    fn span_events_flatten_grouped_and_faceted() {
+        use opentelemetry_proto::tonic::trace::v1::span::Event;
+        let mut f = Flattener::new();
+        let e = f.flatten_span(Span {
+            events: vec![
+                Event {
+                    time_unix_nano: 111,
+                    name: "exception".into(),
+                    attributes: vec![
+                        kv("exception.type", Av::StringValue("IOError".into())),
+                        kv("exception.stacktrace", Av::StringValue("at main()".into())),
+                    ],
+                    dropped_attributes_count: 3,
+                },
+                Event {
+                    time_unix_nano: 222,
+                    name: "retry".into(),
+                    attributes: vec![kv("attempt", Av::IntValue(3))],
+                    dropped_attributes_count: 0,
+                },
+            ],
+            ..Default::default()
+        });
+
+        // Structure: grouping, order, per-event scalars survive.
+        assert_eq!(e.events.len(), 2);
+        assert_eq!(e.events[0].time_unix_nano, 111);
+        assert_eq!(e.events[0].dropped_attributes_count, 3);
+        assert_eq!(e.events[0].attributes.len(), 2);
+        assert_eq!(e.events[1].time_unix_nano, 222);
+        assert_eq!(e.events[1].attributes.len(), 1);
+
+        // Facets: names + attrs resolve under the reserved `events.` namespace.
+        let tree = f.into_tree();
+        let names = tree.resolve(&[e.events[0].name.clone(), e.events[1].name.clone()]);
+        assert_eq!(
+            at(&names, "events.name"),
+            [
+                &Value::Str("exception".into()),
+                &Value::Str("retry".into())
+            ]
+        );
+        let attrs = tree.resolve(&e.events[1].attributes);
+        assert_eq!(at(&attrs, "events.attributes.attempt"), [&Value::Int(3)]);
+
+        // Malformed empty event name still yields a name entry (EVNB needs one).
+        let mut f = Flattener::new();
+        let e = f.flatten_span(Span {
+            events: vec![Event::default()],
+            ..Default::default()
+        });
+        let l = f.into_tree().resolve(&[e.events[0].name.clone()]);
+        assert_eq!(at(&l, "events.name"), [&Value::Str(String::new())]);
+    }
+
+    #[test]
+    fn span_links_flatten_ids_structured_attrs_faceted() {
+        use opentelemetry_proto::tonic::trace::v1::span::Link;
+        let mut f = Flattener::new();
+        let e = f.flatten_span(Span {
+            links: vec![Link {
+                trace_id: vec![0xbb; 16],
+                span_id: vec![0xcc; 8],
+                trace_state: "vendor=1".into(),
+                attributes: vec![kv("messaging.op", Av::StringValue("publish".into()))],
+                dropped_attributes_count: 1,
+                flags: 0x100,
+            }],
+            ..Default::default()
+        });
+
+        assert_eq!(e.links.len(), 1);
+        let link = &e.links[0];
+        assert_eq!(link.trace_id, TraceId::from([0xbb; 16]));
+        assert_eq!(link.span_id, SpanId::from([0xcc; 8]));
+        assert_eq!(link.trace_state, "vendor=1");
+        assert_eq!(link.flags, 0x100);
+        assert_eq!(link.dropped_attributes_count, 1);
+
+        let l = f.into_tree().resolve(&link.attributes);
+        assert_eq!(
+            at(&l, "links.attributes.messaging.op"),
+            [&Value::Str("publish".into())]
+        );
+    }
+
+    #[test]
+    fn normalize_trace_ids_clears_malformed_link_ids() {
+        use opentelemetry_proto::tonic::trace::v1::span::Link;
+        let mut req = trace_req(
+            Span {
+                trace_id: vec![1u8; 16],
+                span_id: vec![2u8; 8],
+                links: vec![Link {
+                    trace_id: vec![9u8; 5], // wrong length → cleared
+                    span_id: vec![8u8; 8],  // conformant → kept
+                    ..Default::default()
+                }],
+                ..Default::default()
+            },
+            None,
+            None,
+        );
+        let bad = normalize_trace_ids(&mut req);
+        assert_eq!((bad.trace, bad.span), (1, 0));
+        let link = &req.resource_spans[0].scope_spans[0].spans[0].links[0];
+        assert!(link.trace_id.is_empty(), "malformed link trace_id cleared");
+        assert_eq!(link.span_id, vec![8u8; 8]);
     }
 
     #[test]

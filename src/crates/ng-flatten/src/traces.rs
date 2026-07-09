@@ -37,11 +37,12 @@ pub struct SpanScopeGroup {
     pub spans: Vec<SpanRecord>,
 }
 
-/// One span: its per-row columns plus its flattened entries (span analog of
-/// [`crate::logs::Record`]). **Not yet lossless** — deferred (not carried):
-/// `events[]`, `links[]`, `trace_state`, `status.message`, and the
-/// `dropped_events_count` / `dropped_links_count` counters (the latter two land
-/// with the events/links bodies, SOW Step 1b).
+/// One span: its per-row columns, its flattened entries, and its structured
+/// sub-objects (span analog of [`crate::logs::Record`]). Carries every OTLP
+/// `Span` field: scalar facets (`name`, `kind`, `status_code`, `trace_state`,
+/// `status_message`) and `attributes.*` live in [`entries`](Self::entries);
+/// events and links are structured lists ([`EventRecord`] / [`LinkRecord`])
+/// whose searchable parts double as entries at seal time.
 ///
 /// Per-row columns (NOT FST facets): `ts` = the resolved `start_time_unix_nano`
 /// (the row-ordering key; callers MUST normalize first, see
@@ -49,7 +50,8 @@ pub struct SpanScopeGroup {
 /// an unset/earlier end (see [`flatten_trace_into`]); `trace_id`/`span_id`/
 /// `parent_span_id` raw OTLP bytes (empty if unset); `flags` /
 /// `dropped_attributes_count` carried verbatim. There is no `observed_ts` (spans
-/// have no observed time).
+/// have no observed time). `dropped_events_count` / `dropped_links_count` are
+/// span-level scalars sealed alongside the event/link structures (`EVNB`/`LNKB`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpanRecord {
     pub ts: i64,
@@ -59,7 +61,52 @@ pub struct SpanRecord {
     pub parent_span_id: SpanId,
     pub flags: u32,
     pub dropped_attributes_count: u32,
+    pub dropped_events_count: u32,
+    pub dropped_links_count: u32,
     pub entries: Vec<Entry>,
+    pub events: Vec<EventRecord>,
+    pub links: Vec<LinkRecord>,
+}
+
+/// One span event (OTLP `Span.Event`), flattened: the per-event scalars plus its
+/// name/attribute [`Entry`]s. The entries share the frame's [`SchemaTree`]
+/// (`events.name`, `events.attributes.*`) so at seal they intern into the same
+/// token space as the row's other facets — searchable via the normal tiers —
+/// while the per-event grouping/order lives in the sealed `EVNB` structure.
+///
+/// `time_unix_nano` is stored **raw** (no normalization — a zero stays zero);
+/// `name` is always present as an entry, even for a (malformed) empty name, so
+/// the sealed structure always has a valid name token.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EventRecord {
+    pub time_unix_nano: u64,
+    pub dropped_attributes_count: u32,
+    pub name: Entry,
+    pub attributes: Vec<Entry>,
+}
+
+/// One span link (OTLP `Span.Link`), flattened: the linked-to ids and per-link
+/// scalars plus its attribute [`Entry`]s (`links.attributes.*`). Link ids are
+/// deliberately NOT entries (near-unique identifiers don't belong in facets —
+/// the same rule that keeps log correlation ids out, see `crate::logs`); they
+/// seal into the `LNKB` structure. `trace_state` is carried verbatim.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LinkRecord {
+    pub trace_id: TraceId,
+    pub span_id: SpanId,
+    pub trace_state: String,
+    pub flags: u32,
+    pub dropped_attributes_count: u32,
+    pub attributes: Vec<Entry>,
+}
+
+/// The three outputs of flattening one span: its own entries plus the
+/// structured event/link lists. See [`Flattener::flatten_span`].
+#[derive(Debug, Clone, Default)]
+pub struct FlattenedSpan {
+    pub entries: Vec<Entry>,
+    pub events: Vec<EventRecord>,
+    pub links: Vec<LinkRecord>,
 }
 
 /// Span duration in nanoseconds (`end - start`), clamped to `0` when the end time
@@ -98,17 +145,34 @@ pub fn flatten_trace_into(
             let spans = ss
                 .spans
                 .into_iter()
-                .map(|sp| SpanRecord {
-                    ts: i64::try_from(sp.start_time_unix_nano).unwrap_or(i64::MAX),
-                    duration: span_duration(&sp),
+                .map(|sp| {
+                    let ts = i64::try_from(sp.start_time_unix_nano).unwrap_or(i64::MAX);
+                    let duration = span_duration(&sp);
                     // Ingest normalization (normalize_trace_ids) already cleared any
                     // wrong-length id to empty → from_bytes(empty) → UNSET.
-                    trace_id: TraceId::from_bytes(&sp.trace_id).unwrap_or_default(),
-                    span_id: SpanId::from_bytes(&sp.span_id).unwrap_or_default(),
-                    parent_span_id: SpanId::from_bytes(&sp.parent_span_id).unwrap_or_default(),
-                    flags: sp.flags,
-                    dropped_attributes_count: sp.dropped_attributes_count,
-                    entries: flattener.flatten_span(sp),
+                    let trace_id = TraceId::from_bytes(&sp.trace_id).unwrap_or_default();
+                    let span_id = SpanId::from_bytes(&sp.span_id).unwrap_or_default();
+                    let parent_span_id =
+                        SpanId::from_bytes(&sp.parent_span_id).unwrap_or_default();
+                    let flags = sp.flags;
+                    let dropped_attributes_count = sp.dropped_attributes_count;
+                    let dropped_events_count = sp.dropped_events_count;
+                    let dropped_links_count = sp.dropped_links_count;
+                    let flat = flattener.flatten_span(sp);
+                    SpanRecord {
+                        ts,
+                        duration,
+                        trace_id,
+                        span_id,
+                        parent_span_id,
+                        flags,
+                        dropped_attributes_count,
+                        dropped_events_count,
+                        dropped_links_count,
+                        entries: flat.entries,
+                        events: flat.events,
+                        links: flat.links,
+                    }
                 })
                 .collect();
             scopes.push(SpanScopeGroup { scope, spans });
@@ -140,10 +204,11 @@ pub fn flatten_trace_request(request: ExportTraceServiceRequest) -> (FlattenedTr
 
 /// Drop malformed span ids at the ingest boundary — the traces analog of
 /// [`crate::logs::normalize_log_request`]. Clears any non-empty
-/// `trace_id`/`span_id`/`parent_span_id` whose length is not the spec width
-/// (16/8/8); the SFST column later stores a cleared id as the all-zero "unset"
-/// sentinel. Malformed `parent_span_id`s are counted under `span` (both are 8-byte
-/// span ids). Callers MUST run this before [`flatten_trace_request`].
+/// `trace_id`/`span_id`/`parent_span_id` — including each link's
+/// `trace_id`/`span_id` — whose length is not the spec width (16/8); the sealed
+/// column/structure later stores a cleared id as the all-zero "unset" sentinel.
+/// Malformed `parent_span_id`s and link span ids are counted under `span` (all
+/// are 8-byte span ids). Callers MUST run this before [`flatten_trace_request`].
 pub fn normalize_trace_ids(req: &mut ExportTraceServiceRequest) -> MalformedIds {
     let mut bad = MalformedIds::default();
     for rs in &mut req.resource_spans {
@@ -160,6 +225,16 @@ pub fn normalize_trace_ids(req: &mut ExportTraceServiceRequest) -> MalformedIds 
                 if !s.parent_span_id.is_empty() && s.parent_span_id.len() != SPAN_ID_LEN {
                     s.parent_span_id.clear();
                     bad.span += 1;
+                }
+                for l in &mut s.links {
+                    if !l.trace_id.is_empty() && l.trace_id.len() != TRACE_ID_LEN {
+                        l.trace_id.clear();
+                        bad.trace += 1;
+                    }
+                    if !l.span_id.is_empty() && l.span_id.len() != SPAN_ID_LEN {
+                        l.span_id.clear();
+                        bad.span += 1;
+                    }
                 }
             }
         }
