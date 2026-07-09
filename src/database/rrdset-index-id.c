@@ -365,6 +365,9 @@ RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id, bool
 RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool include_obsolete) {
     netdata_log_debug(D_RRD_CALLS, "rrdset_find_and_acquire() for host %s, chart %s", rrdhost_hostname(host), id);
 
+    if (unlikely(!host->rrdset_root_index))
+        return NULL;
+
     RRDSET_ACQUIRED *sta = (RRDSET_ACQUIRED *)dictionary_get_and_acquire_item(host->rrdset_root_index, id);
     if(sta) {
         RRDSET *st = dictionary_acquired_item_value((const DICTIONARY_ITEM *)sta);
