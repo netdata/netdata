@@ -205,7 +205,7 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, src *committedSeries, nam
 
 func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 	schema := src.desc.summary
-	if schema != nil && len(schema.quantiles) > 0 && len(src.summaryQuantiles) != len(schema.quantiles) {
+	if !summaryQuantilesMatchSchema(src) {
 		return
 	}
 
@@ -274,6 +274,14 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 			),
 		}
 	}
+}
+
+func summaryQuantilesMatchSchema(src *committedSeries) bool {
+	schema := src.desc.summary
+	if schema == nil {
+		return len(src.summaryQuantiles) == 0
+	}
+	return len(src.summaryQuantiles) == len(schema.quantiles)
 }
 
 func previousHistogramBucketFloor(values []SampleValue, idx int) SampleValue {

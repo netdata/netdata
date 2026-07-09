@@ -142,6 +142,34 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				mustDelta(t, fr, "runtime.latency_count", nil, 1)
 			},
 		},
+		"runtime histogram flattened deltas survive compaction": {
+			run: func(t *testing.T) {
+				s := NewRuntimeStore()
+				view := runtimeStoreViewForTest(t, s)
+				view.backend.compaction = runtimeCompactionPolicy{
+					maxOverlayDepth:  1,
+					maxOverlayWrites: 1,
+				}
+
+				h := s.Write().StatefulMeter("runtime").Histogram("req_duration", WithHistogramBounds(1, 2))
+				h.Observe(0.5)
+				mustNoDelta(t, s.Read(ReadFlatten()), "runtime.req_duration_bucket", Labels{"le": "1"})
+
+				h.Observe(1.5)
+				fr := s.Read(ReadFlatten())
+				mustDelta(t, fr, "runtime.req_duration_bucket", Labels{"le": "1"}, 0)
+				mustDelta(t, fr, "runtime.req_duration_bucket", Labels{"le": "2"}, 1)
+				mustDelta(t, fr, "runtime.req_duration_bucket", Labels{"le": "+Inf"}, 0)
+				mustDelta(t, fr, "runtime.req_duration_count", nil, 1)
+
+				h.Observe(3)
+				fr = s.Read(ReadFlatten())
+				mustDelta(t, fr, "runtime.req_duration_bucket", Labels{"le": "1"}, 0)
+				mustDelta(t, fr, "runtime.req_duration_bucket", Labels{"le": "2"}, 0)
+				mustDelta(t, fr, "runtime.req_duration_bucket", Labels{"le": "+Inf"}, 1)
+				mustDelta(t, fr, "runtime.req_duration_count", nil, 1)
+			},
+		},
 		"runtime MeasureSet gauge and counter are readable and flattenable": {
 			run: func(t *testing.T) {
 				s := NewRuntimeStore()
