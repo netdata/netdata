@@ -90,7 +90,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 			),
 		}
 		previous := SampleValue(0)
-		hasPrev := src.histogramHasPrev && len(src.histogramPreviousCumulative) == len(schema.bounds)
+		hasPrev := flattenedCounterDeltaSupported(src) && src.histogramHasPrev && len(src.histogramPreviousCumulative) == len(schema.bounds)
 		if hasPrev {
 			previous = src.histogramPreviousCumulative[i] - previousHistogramBucketFloor(src.histogramPreviousCumulative, i)
 		}
@@ -133,7 +133,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 			),
 		}
 		previous := SampleValue(0)
-		hasPrev := src.histogramHasPrev && len(src.histogramPreviousCumulative) == len(schema.bounds)
+		hasPrev := flattenedCounterDeltaSupported(src) && src.histogramHasPrev && len(src.histogramPreviousCumulative) == len(schema.bounds)
 		if hasPrev {
 			previous = src.histogramPreviousCount
 			if len(src.histogramPreviousCumulative) > 0 {
@@ -151,7 +151,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 		src.labels,
 		src.histogramCount,
 		src.histogramPreviousCount,
-		src.histogramHasPrev,
+		flattenedCounterDeltaSupported(src) && src.histogramHasPrev,
 		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindHistogram, FlattenRoleHistogramCount),
 		src.desc,
 	)
@@ -162,7 +162,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 		src.labels,
 		src.histogramSum,
 		src.histogramPreviousSum,
-		src.histogramHasPrev,
+		flattenedCounterDeltaSupported(src) && src.histogramHasPrev,
 		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindHistogram, FlattenRoleHistogramSum),
 		src.desc,
 	)
@@ -216,7 +216,7 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 		src.labels,
 		src.summaryCount,
 		src.summaryPreviousCount,
-		src.summaryHasPrev,
+		flattenedCounterDeltaSupported(src) && src.summaryHasPrev,
 		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindSummary, FlattenRoleSummaryCount),
 		src.desc,
 	)
@@ -227,7 +227,7 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 		src.labels,
 		src.summarySum,
 		src.summaryPreviousSum,
-		src.summaryHasPrev,
+		flattenedCounterDeltaSupported(src) && src.summaryHasPrev,
 		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindSummary, FlattenRoleSummarySum),
 		src.desc,
 	)
@@ -289,6 +289,11 @@ func previousHistogramBucketFloor(values []SampleValue, idx int) SampleValue {
 		return 0
 	}
 	return values[idx-1]
+}
+
+func flattenedCounterDeltaSupported(src *committedSeries) bool {
+	// Cycle-window histogram and summary samples are independent per cycle.
+	return src.desc != nil && src.desc.window == WindowCumulative
 }
 
 func setFlattenedCounterState(series *committedSeries, current, previous SampleValue, hasPrev bool, currentSeq, previousSeq uint64) {

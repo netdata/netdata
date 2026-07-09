@@ -135,6 +135,44 @@ func TestFlattenSnapshotScenarios(t *testing.T) {
 				mustDelta(t, fr, "svc.duration_sum", nil, 6)
 			},
 		},
+		"cycle-window flattened histogram and summary counters do not expose delta": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				m := s.Write().StatefulMeter("svc")
+				h := m.Histogram("latency", WithHistogramBounds(1, 2), WithWindow(WindowCycle))
+				sum := m.Summary("duration", WithWindow(WindowCycle))
+
+				cc.BeginCycle()
+				h.Observe(0.5)
+				h.Observe(1.5)
+				sum.Observe(1)
+				sum.Observe(3)
+				require.NoError(t, cc.CommitCycleSuccess())
+
+				cc.BeginCycle()
+				h.Observe(3)
+				sum.Observe(5)
+				require.NoError(t, cc.CommitCycleSuccess())
+
+				fr := s.Read(ReadFlatten())
+				mustValue(t, fr, "svc.latency_bucket", Labels{HistogramBucketLabel: "1"}, 0)
+				mustValue(t, fr, "svc.latency_bucket", Labels{HistogramBucketLabel: "2"}, 0)
+				mustValue(t, fr, "svc.latency_bucket", Labels{HistogramBucketLabel: "+Inf"}, 1)
+				mustValue(t, fr, "svc.latency_count", nil, 1)
+				mustValue(t, fr, "svc.latency_sum", nil, 3)
+				mustValue(t, fr, "svc.duration_count", nil, 1)
+				mustValue(t, fr, "svc.duration_sum", nil, 5)
+
+				mustNoDelta(t, fr, "svc.latency_bucket", Labels{HistogramBucketLabel: "1"})
+				mustNoDelta(t, fr, "svc.latency_bucket", Labels{HistogramBucketLabel: "2"})
+				mustNoDelta(t, fr, "svc.latency_bucket", Labels{HistogramBucketLabel: "+Inf"})
+				mustNoDelta(t, fr, "svc.latency_count", nil)
+				mustNoDelta(t, fr, "svc.latency_sum", nil)
+				mustNoDelta(t, fr, "svc.duration_count", nil)
+				mustNoDelta(t, fr, "svc.duration_sum", nil)
+			},
+		},
 		"flattened histogram and summary sum deltas are unavailable on decrease": {
 			run: func(t *testing.T) {
 				s := NewCollectorStore()
