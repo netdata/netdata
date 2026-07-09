@@ -78,15 +78,19 @@ func BenchmarkRuntimeStoreSingleWriteAtCardinality(b *testing.B) {
 	}
 }
 
-// This guards the ALLOCATION envelope of a sparse commit: only touched/changed series are
-// cloned, so allocs stay ~O(touched) and never O(retained). Commit TIME is intentionally
-// O(live-series + touched + distinct-authorities) - every commit copies the series map and
-// scans live series for retention, host-scope refresh, canonicalization, and the
-// descriptor-universe sweep - so the timings scale with live series (same touched, more
-// retained = slower), which is expected; the invariant this bench pins is that allocs do not.
-// Latest (developer laptop, -benchtime=300x): s100/t5 2.2us/38allocs, s1000/t5 11us/38,
-// s5000/t10 23us/58, s50000/t10 198us/62, s100000/t20 543us/98 (the descriptor-universe sweep
-// added no allocs: it is O(distinct-names) and its live-name set does not escape the commit).
+// This guards the sparse-commit envelope at retained cardinality. Commit time and bytes are
+// intentionally O(live-series + touched + distinct-authorities): every commit copies the
+// series map and scans live series for retention, host-scope refresh, canonicalization, and
+// the descriptor-universe sweep. With the same retained population, refactors must not add
+// extra work or allocation counts.
+// Latest corrected parent/current check (developer laptop, -benchtime=20x):
+// s100/t5 ~24us/40allocs, s1000/t5 ~180us/42allocs, s5000/t10 ~660us/72allocs,
+// s50000/t10 ~6.0ms/184allocs, s100000/t20 ~15.5ms/344allocs.
+// The benchmark sets expiry beyond b.N and asserts retained raw cardinality after the timed
+// loop so calibrated runs cannot silently measure an expired, shrunken store.
+//
+// Earlier benchmark comments using default retention were invalid for calibrated runs because
+// untouched series aged out after the default ten successful commits.
 // Before the canonicalization-clone fix the s100000/t20 case cloned every retained descriptor:
 // 43.7ms / 100340 allocs.
 func BenchmarkCollectorCommitSparseAtCardinality(b *testing.B) {
@@ -103,7 +107,7 @@ func BenchmarkCollectorCommitSparseAtCardinality(b *testing.B) {
 
 	for name, tc := range tests {
 		b.Run(name, func(b *testing.B) {
-			s := NewCollectorStore()
+			s := NewCollectorStore(WithExpireAfterSuccessCycles(uint64(b.N) + 2))
 			cc := benchmarkCycleController(b, s)
 			gv := s.Write().SnapshotMeter("collect.hotpath").Vec("id").Gauge("value")
 
@@ -133,8 +137,22 @@ func BenchmarkCollectorCommitSparseAtCardinality(b *testing.B) {
 				}
 				cc.CommitCycleSuccess()
 			}
+			b.StopTimer()
+
+			got := countRawScalarSeries(s.Read(ReadRaw()))
+			if got != tc.totalSeries {
+				b.Fatalf("retained raw series = %d, want %d", got, tc.totalSeries)
+			}
 		})
 	}
+}
+
+func countRawScalarSeries(r Reader) int {
+	var count int
+	r.ForEachSeries(func(_ string, _ LabelView, _ SampleValue) {
+		count++
+	})
+	return count
 }
 
 // BenchmarkCollectorCommitManySuperseded exercises commit when many distinct names each

@@ -3,10 +3,36 @@
 package metrix_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
+
+const metrixPkgPath = "github.com/netdata/netdata/go/plugins/pkg/metrix"
+
+func TestPublicTypesAreRootDefined(t *testing.T) {
+	tests := []struct {
+		name string
+		typ  reflect.Type
+	}{
+		{name: "Label", typ: reflect.TypeOf(metrix.Label{})},
+		{name: "LabelSet", typ: reflect.TypeOf(metrix.LabelSet{})},
+		{name: "HostScope", typ: reflect.TypeOf(metrix.HostScope{})},
+		{name: "SeriesID", typ: reflect.TypeOf(metrix.SeriesID(""))},
+		{name: "Reader", typ: reflect.TypeOf((*metrix.Reader)(nil)).Elem()},
+		{name: "CollectorStore", typ: reflect.TypeOf((*metrix.CollectorStore)(nil)).Elem()},
+		{name: "RuntimeStore", typ: reflect.TypeOf((*metrix.RuntimeStore)(nil)).Elem()},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.typ.PkgPath(); got != metrixPkgPath {
+				t.Fatalf("%s package path = %q, want %q", tt.name, got, metrixPkgPath)
+			}
+		})
+	}
+}
 
 func TestCollectorStorePublicContract(t *testing.T) {
 	store := metrix.NewCollectorStore(
