@@ -135,7 +135,12 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
 #endif
 
     const char *argv[] = {
+#if defined(OS_WINDOWS)
+        // Windows has no /bin/sh; use sh.exe from PATH (MSYS2, Git Bash, etc.)
+        "sh",
+#else
         "/bin/sh",
+#endif
         "-c",
         cmd,
         NULL
