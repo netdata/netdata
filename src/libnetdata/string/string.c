@@ -358,11 +358,14 @@ STRING *string_strndupz(const char *str, size_t len) {
     if(unlikely(len > STRING_MAX_LENGTH))
         fatal("STRING: cannot index string length %zu, maximum is %zu", len, STRING_MAX_LENGTH);
 
+    size_t length = strnlen(str, len);
+    if(unlikely(!length)) return NULL;
+
     uint8_t partition = string_partition_str(str);
 
-    STRING *string = string_index_search(str, len + 1, partition);
+    STRING *string = string_index_search(str, length + 1, partition);
     while(!string)
-        string = string_index_insert(str, len + 1, partition);
+        string = string_index_insert(str, length + 1, partition);
 
     string_stats_atomic_increment(partition, active_references);
 
@@ -768,6 +771,25 @@ int string_unittest(size_t entries) {
 
     // check string
     {
+        char short_bound[100] = "short";
+        STRING *s_short_bound = string_strndupz(short_bound, sizeof(short_bound));
+        if(!s_short_bound || string_strlen(s_short_bound) != 5 || strcmp(string2str(s_short_bound), "short") != 0) {
+            errors++;
+            fprintf(stderr, "ERROR: strndup string input should stop at NUL before the bound\n");
+        }
+        else
+            fprintf(stderr, "OK: strndup string input stops at NUL before the bound\n");
+        string_freez(s_short_bound);
+
+        STRING *s_substring = string_strndupz("prefix:suffix", 6);
+        if(!s_substring || string_strlen(s_substring) != 6 || strcmp(string2str(s_substring), "prefix") != 0) {
+            errors++;
+            fprintf(stderr, "ERROR: strndup string input should preserve bounded substrings\n");
+        }
+        else
+            fprintf(stderr, "OK: strndup string input preserves bounded substrings\n");
+        string_freez(s_substring);
+
         long entries_starting = unittest_string_entries();
 
         fprintf(stderr, "\nChecking strings...\n");
