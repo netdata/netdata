@@ -125,7 +125,7 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 	// publisher (cachestat is not running or has no apps/cgroups consumers).
 	var shmPublisher *SharedPidMemoryPublisher
 	if shouldPublish && store != nil {
-		p, perr := NewSharedPidMemoryPublisher(socketDefaultPIDTableSize)
+		p, perr := NewSharedPidMemoryPublisher(socketDefaultPIDTableSize, uint32(updateEvery))
 		if perr != nil {
 			logPluginErr("socket.shm_open", "socket", "shared memory open", perr)
 		} else {

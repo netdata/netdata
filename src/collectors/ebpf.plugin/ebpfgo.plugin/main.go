@@ -164,7 +164,7 @@ func main() {
 		} else if handle != nil && handle.Runtime != nil {
 			// dns-queries is served by network-viewer.plugin on Linux via SHM;
 			// ebpf-go.plugin only writes the aggregate counters to shared memory.
-			shmDns, shmErr := NewSharedDnsMemoryPublisher()
+			shmDns, shmErr := NewSharedDnsMemoryPublisher(uint32(ue))
 			if shmErr != nil {
 				fmt.Fprintf(os.Stderr, "ebpf-go.plugin: dns shm open failed: %v\n", shmErr)
 			}

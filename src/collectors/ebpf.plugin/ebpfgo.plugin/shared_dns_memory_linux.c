@@ -17,6 +17,7 @@
 
 struct shared_dns_memory {
     struct ebpfgo_dns_shared *data;
+    uint32_t update_every_s;
     int shm_fd;
     sem_t *sem;
 };
@@ -48,7 +49,7 @@ static void shared_dns_memory_invalidate(struct shared_dns_memory *ctx)
         sem_post(ctx->sem);
 }
 
-struct shared_dns_memory *shared_dns_memory_open(void)
+struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
 {
     struct shared_dns_memory *ctx = calloc(1, sizeof(*ctx));
     if (!ctx)
@@ -56,6 +57,7 @@ struct shared_dns_memory *shared_dns_memory_open(void)
 
     ctx->shm_fd = -1;
     ctx->sem = SEM_FAILED;
+    ctx->update_every_s = update_every_s;
 
     ctx->shm_fd = shm_open(NETDATA_EBPFGO_DNS_SHM_NAME, O_CREAT | O_RDWR, 0660);
     if (ctx->shm_fd < 0)
@@ -115,6 +117,7 @@ void shared_dns_memory_publish(
         memcpy(ctx->data->ring, flows, n * sizeof(struct ebpfgo_dns_flow_record));
 
     ctx->data->ring_count = n;
+    ctx->data->update_every_s = ctx->update_every_s;
     __atomic_store_n(&ctx->data->last_publish_ut, shared_dns_memory_now_monotonic_usec(), __ATOMIC_RELEASE);
 
     if (locked)

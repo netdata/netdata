@@ -8,7 +8,16 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
-#define EBPFGO_PID_SHM_STALE_TIMEOUT_UT (10ULL * USEC_PER_SEC)
+/* Dynamic stale timeout: 2× the publisher's update_every + 5 s slack.
+ * Falls back to 60 s when update_every_s == 0 (old writer that predates
+ * the update_every_s field).  The old 10 s hardcoded value caused data
+ * blackouts for any update_every ≥ 10. */
+static inline usec_t ebpfgo_pid_shm_stale_timeout_ut(uint32_t update_every_s)
+{
+    if (update_every_s == 0)
+        return 60ULL * USEC_PER_SEC;
+    return (usec_t)update_every_s * 2ULL * USEC_PER_SEC + 5ULL * USEC_PER_SEC;
+}
 
 /* Bytes occupied by entries[] only (no header). */
 static inline size_t ebpfgo_shm_entries_nbytes(size_t total)
@@ -88,16 +97,17 @@ static void netdata_ebpfgo_shared_pid_memory_close_internal(netdata_ebpfgo_share
 
     ctx->shm_total = 0;
     ctx->shm_flags = 0;
+    ctx->update_every_s = 0;
     ctx->last_publish_ut = 0;
     ctx->shm_dev = 0;
     ctx->shm_ino = 0;
 }
 
-static bool netdata_ebpfgo_shared_pid_snapshot_is_live(uint64_t last_publish_ut, usec_t now_ut)
+static bool netdata_ebpfgo_shared_pid_snapshot_is_live(uint64_t last_publish_ut, usec_t now_ut, uint32_t update_every_s)
 {
     return last_publish_ut != 0 &&
            now_ut >= last_publish_ut &&
-           (now_ut - last_publish_ut) <= EBPFGO_PID_SHM_STALE_TIMEOUT_UT;
+           (now_ut - last_publish_ut) <= ebpfgo_pid_shm_stale_timeout_ut(update_every_s);
 }
 
 static bool netdata_ebpfgo_shared_pid_memory_open(
@@ -153,10 +163,11 @@ static bool netdata_ebpfgo_shared_pid_memory_copy_snapshot(netdata_ebpfgo_shared
         ctx->snapshot_total = ctx->shm_total;
     }
 
-    /* Capture the per-module validity flags from the header before copying
-     * entries, both under the same semaphore hold as the caller. */
+    /* Capture the per-module validity flags and publish interval from the header
+     * before copying entries, both under the same semaphore hold as the caller. */
     const struct ebpfgo_shm_header *hdr = (const struct ebpfgo_shm_header *)ctx->mapping;
     ctx->shm_flags = __atomic_load_n(&hdr->flags, __ATOMIC_ACQUIRE);
+    ctx->update_every_s = __atomic_load_n(&hdr->update_every_s, __ATOMIC_ACQUIRE);
     ctx->last_publish_ut = __atomic_load_n(&hdr->last_publish_ut, __ATOMIC_ACQUIRE);
 
     memcpy(ctx->snapshot, ctx->shm, ebpfgo_shm_entries_nbytes(ctx->shm_total));
@@ -205,7 +216,7 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
     bool locked = false;
     if (ctx->sem != SEM_FAILED) {
         if (!ebpfgo_shm_sem_wait(ctx->sem)) {
-            if (!netdata_ebpfgo_shared_pid_snapshot_is_live(ctx->last_publish_ut, ebpfgo_shm_now_monotonic_usec())) {
+            if (!netdata_ebpfgo_shared_pid_snapshot_is_live(ctx->last_publish_ut, ebpfgo_shm_now_monotonic_usec(), ctx->update_every_s)) {
                 netdata_ebpfgo_shared_pid_memory_close_internal(ctx);
                 return false;
             }
@@ -222,7 +233,7 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
     if (!ok)
         return false;
 
-    if (!netdata_ebpfgo_shared_pid_snapshot_is_live(ctx->last_publish_ut, ebpfgo_shm_now_monotonic_usec())) {
+    if (!netdata_ebpfgo_shared_pid_snapshot_is_live(ctx->last_publish_ut, ebpfgo_shm_now_monotonic_usec(), ctx->update_every_s)) {
         netdata_ebpfgo_shared_pid_memory_close_internal(ctx);
         return false;
     }

@@ -17,6 +17,7 @@ typedef struct netdata_ebpfgo_shared_pid_memory {
     struct ebpf_pid_stat *shm;      /* = (char*)mapping + sizeof(ebpfgo_shm_header) */
     struct ebpf_pid_stat *snapshot;
     uint32_t shm_flags;             /* EBPFGO_SHM_FLAG_* bits from last refresh */
+    uint32_t update_every_s;        /* publish interval from SHM header; 0 = unknown */
     uint64_t last_publish_ut;       /* monotonic usec of the payload in snapshot */
     size_t shm_total;
     size_t snapshot_total;

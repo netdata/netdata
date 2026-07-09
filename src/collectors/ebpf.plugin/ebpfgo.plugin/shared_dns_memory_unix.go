@@ -68,10 +68,10 @@ type SharedDnsMemoryPublisher struct {
 	ptr *C.struct_shared_dns_memory
 }
 
-func NewSharedDnsMemoryPublisher() (*SharedDnsMemoryPublisher, error) {
+func NewSharedDnsMemoryPublisher(updateEverySec uint32) (*SharedDnsMemoryPublisher, error) {
 	assertSharedDnsMemoryLayout()
 
-	ctx := C.shared_dns_memory_open()
+	ctx := C.shared_dns_memory_open(C.uint32_t(updateEverySec))
 	if ctx == nil {
 		return nil, fmt.Errorf("open shared dns memory failed")
 	}

@@ -277,7 +277,7 @@ func runCachestatGlobalCollector(api *netdataapi.API, handle *CachestatLegacyHan
 				// cost.  The handle is mutated under the loop's single-
 				// goroutine guarantee so no extra lock is needed.
 				if handle.SharedMemory == nil {
-					publisher, perr := NewSharedPidMemoryPublisher(handle.PidTableSize)
+					publisher, perr := NewSharedPidMemoryPublisher(handle.PidTableSize, uint32(updateEvery))
 					if perr != nil {
 						logPluginErr("cachestat.shm_open", "cachestat", "shared memory open", perr)
 					} else {

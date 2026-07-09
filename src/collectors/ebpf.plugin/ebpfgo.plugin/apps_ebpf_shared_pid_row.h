@@ -21,12 +21,12 @@
 /* SHM header written at byte-offset 0; the ebpf_pid_stat[] array follows
  * immediately.  sizeof == 16 so entries start on an 8-byte boundary, which
  * satisfies the alignment of the uint64_t fields inside ebpf_pid_stat.
- * Producers set flags and last_publish_ut before releasing the semaphore;
- * consumers use them to determine which modules contributed data this cycle
- * and whether the payload is still live. */
+ * Producers set flags, update_every_s, and last_publish_ut before releasing
+ * the semaphore; consumers use them to determine which modules contributed
+ * data this cycle, compute the liveness window, and detect stale payloads. */
 struct ebpfgo_shm_header {
-    uint32_t flags; /* EBPFGO_SHM_FLAG_* bits set by the active publisher(s) */
-    uint32_t _pad;  /* pad so last_publish_ut stays 8-byte aligned */
+    uint32_t flags;          /* EBPFGO_SHM_FLAG_* bits set by the active publisher(s) */
+    uint32_t update_every_s; /* publish interval in seconds; 0 = unknown (old writer) */
     uint64_t last_publish_ut; /* CLOCK_MONOTONIC, usec; 0 means no live producer */
 };
 

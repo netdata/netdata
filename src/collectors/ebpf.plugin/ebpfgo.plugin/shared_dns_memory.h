@@ -7,7 +7,9 @@
 
 struct shared_dns_memory;
 
-struct shared_dns_memory *shared_dns_memory_open(void);
+/* update_every_s: the publisher's collection interval in seconds.  Written into
+ * the SHM header so the reader can compute a correct stale-timeout window. */
+struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s);
 
 void shared_dns_memory_publish(
     struct shared_dns_memory *ctx,

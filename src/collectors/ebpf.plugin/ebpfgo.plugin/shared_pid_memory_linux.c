@@ -17,6 +17,7 @@ struct shared_pid_memory {
     struct ebpf_pid_stat *entries;    /* = (char*)mapping + sizeof(*header) */
     size_t total;
     size_t prev_count; /* entries written in the previous publish cycle */
+    uint32_t update_every_s;
     int shm_fd;
     sem_t *sem;
 };
@@ -53,7 +54,7 @@ static void shared_pid_memory_invalidate(struct shared_pid_memory *ctx)
         sem_post(ctx->sem);
 }
 
-struct shared_pid_memory *shared_pid_memory_open(size_t total)
+struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_every_s)
 {
     if (!total)
         return NULL;
@@ -64,6 +65,7 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total)
 
     ctx->shm_fd = -1;
     ctx->sem = SEM_FAILED;
+    ctx->update_every_s = update_every_s;
 
     /* A normal Close() only closes this process' handles; it does not unlink
      * the SHM name.  Keeping the name present avoids a consumer refresh window
@@ -140,9 +142,10 @@ int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_p
         locked = true;
     }
 
-    /* Set per-module validity flags for this publish cycle.
-     * The caller provides the complete EBPFGO_SHM_FLAG_* bitmask that should be
-     * visible to consumers for the data written by this publish. */
+    /* Set per-module validity flags and publish interval for this cycle.
+     * update_every_s lets the reader compute a correctly-sized stale window
+     * instead of using a hardcoded constant that breaks when update_every > 10. */
+    __atomic_store_n(&ctx->header->update_every_s, ctx->update_every_s, __ATOMIC_RELEASE);
     __atomic_store_n(&ctx->header->flags, flags, __ATOMIC_RELEASE);
 
     if (entries && count)

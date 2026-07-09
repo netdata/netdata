@@ -56,7 +56,7 @@ struct ebpfgo_dns_shared {
     struct ebpfgo_dns_aggregate agg;                              /* offset   0 size  64 */
     uint64_t                    last_publish_ut;                  /* offset  64 size   8 */
     uint32_t                    ring_count;                       /* offset  72 size   4 */
-    uint32_t                    _pad;                             /* offset  76 size   4 */
+    uint32_t                    update_every_s;                   /* offset  76 size   4; 0 = unknown (old writer) */
     struct ebpfgo_dns_flow_record ring[NETDATA_EBPFGO_DNS_FLOW_RING_CAP]; /* offset 80 size 320000 */
 };
 /* sizeof(struct ebpfgo_dns_shared) == 320080 (~312 KB) */

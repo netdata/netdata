@@ -9,7 +9,10 @@
 
 struct shared_pid_memory;
 
-struct shared_pid_memory *shared_pid_memory_open(size_t total);
+/* update_every_s: the publisher's collection interval in seconds.  Written into
+ * the SHM header so the reader can scale its stale-timeout window instead of
+ * using a hardcoded constant that breaks when update_every > 10. */
+struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_every_s);
 /* flags: OR of EBPFGO_SHM_FLAG_* bits; written into the SHM header under the
  * semaphore along with last_publish_ut so consumers can tell which modules
  * produced valid data and whether the payload is still live. */
