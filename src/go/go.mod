@@ -41,7 +41,7 @@ require (
 	github.com/mattn/go-xmlrpc v0.0.3
 	github.com/miekg/dns v1.1.72
 	github.com/mitchellh/go-homedir v1.1.0
-	github.com/prometheus-community/pro-bing v0.9.0
+	github.com/prometheus-community/pro-bing v0.9.1
 	github.com/prometheus/common v0.69.0
 	github.com/prometheus/prometheus v2.55.1+incompatible
 	github.com/redis/go-redis/v9 v9.21.0
