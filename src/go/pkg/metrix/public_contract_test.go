@@ -16,13 +16,13 @@ func TestPublicTypesAreRootDefined(t *testing.T) {
 		name string
 		typ  reflect.Type
 	}{
-		{name: "Label", typ: reflect.TypeOf(metrix.Label{})},
-		{name: "LabelSet", typ: reflect.TypeOf(metrix.LabelSet{})},
-		{name: "HostScope", typ: reflect.TypeOf(metrix.HostScope{})},
-		{name: "SeriesID", typ: reflect.TypeOf(metrix.SeriesID(""))},
-		{name: "Reader", typ: reflect.TypeOf((*metrix.Reader)(nil)).Elem()},
-		{name: "CollectorStore", typ: reflect.TypeOf((*metrix.CollectorStore)(nil)).Elem()},
-		{name: "RuntimeStore", typ: reflect.TypeOf((*metrix.RuntimeStore)(nil)).Elem()},
+		{name: "Label", typ: reflect.TypeFor[metrix.Label]()},
+		{name: "LabelSet", typ: reflect.TypeFor[metrix.LabelSet]()},
+		{name: "HostScope", typ: reflect.TypeFor[metrix.HostScope]()},
+		{name: "SeriesID", typ: reflect.TypeFor[metrix.SeriesID]()},
+		{name: "Reader", typ: reflect.TypeFor[metrix.Reader]()},
+		{name: "CollectorStore", typ: reflect.TypeFor[metrix.CollectorStore]()},
+		{name: "RuntimeStore", typ: reflect.TypeFor[metrix.RuntimeStore]()},
 	}
 
 	for _, tt := range tests {

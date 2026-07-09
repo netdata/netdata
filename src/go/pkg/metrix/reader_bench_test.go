@@ -120,7 +120,7 @@ func benchmarkCommittedScalarStore(b *testing.B, totalSeries int) CollectorStore
 	gv := s.Write().SnapshotMeter("reader.scalar").Vec("id").Gauge("value")
 	handles := make([]SnapshotGauge, totalSeries)
 
-	for i := 0; i < totalSeries; i++ {
+	for i := range totalSeries {
 		h, err := gv.GetWithLabelValues(strconv.Itoa(i))
 		if err != nil {
 			b.Fatalf("create gauge handle: %v", err)
@@ -158,7 +158,7 @@ func benchmarkCommittedMixedStore(b *testing.B, totalSeries int) CollectorStore 
 	states := make([]StateSetInstrument, totalSeries)
 	measureSets := make([]SnapshotMeasureSetGauge, totalSeries)
 
-	for i := 0; i < totalSeries; i++ {
+	for i := range totalSeries {
 		id := strconv.Itoa(i)
 
 		h, err := hv.GetWithLabelValues(id)
@@ -187,7 +187,7 @@ func benchmarkCommittedMixedStore(b *testing.B, totalSeries int) CollectorStore 
 	}
 
 	cc.BeginCycle()
-	for i := 0; i < totalSeries; i++ {
+	for i := range totalSeries {
 		v := SampleValue(i + 1)
 		hists[i].ObservePoint(HistogramPoint{
 			Count: v + 3,
@@ -237,7 +237,7 @@ func benchmarkRuntimeOverlayStore(b *testing.B, depth int) RuntimeStore {
 	view.backend.compaction.maxOverlayWrites = 0
 
 	gv := s.Write().StatefulMeter("reader.runtime").Vec("id").Gauge("value")
-	for i := 0; i < depth; i++ {
+	for i := range depth {
 		h, err := gv.GetWithLabelValues(strconv.Itoa(i))
 		if err != nil {
 			b.Fatalf("create runtime gauge handle: %v", err)
