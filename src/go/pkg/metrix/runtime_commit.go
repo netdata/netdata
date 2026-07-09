@@ -37,34 +37,57 @@ func (r *runtimeStoreBackend) commitRuntimeWrite(apply func(old, next *readSnaps
 	r.core.snapshot.Store(next)
 }
 
-func runtimeEnsureSeriesMutable(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
-	series, _ := runtimeEnsureSeriesMutableWithClone(old, next, key, name, hostScopeKey, hostScope, labels, labelsKey, desc, committedSeriesCloneFull)
-	return series
+type runtimeMutableSeriesState struct {
+	series   *committedSeries
+	previous *committedSeries
+	expired  bool
 }
 
-func runtimeEnsureHistogramSeriesMutable(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
-	series, previous := runtimeEnsureSeriesMutableWithClone(old, next, key, name, hostScopeKey, hostScope, labels, labelsKey, desc, committedSeriesCloneHistogramMutation)
-	if previous != nil {
-		rememberHistogramPreviousFrom(series, previous, desc)
+func (r *runtimeStoreBackend) runtimeEnsureSeriesMutable(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor, nowUnixNano int64) *committedSeries {
+	state := r.runtimeEnsureSeriesMutableWithClone(old, next, key, name, hostScopeKey, hostScope, labels, labelsKey, desc, nowUnixNano, committedSeriesCloneFull)
+	return state.series
+}
+
+func (r *runtimeStoreBackend) runtimeEnsureHistogramSeriesMutable(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor, nowUnixNano int64) *committedSeries {
+	state := r.runtimeEnsureSeriesMutableWithClone(old, next, key, name, hostScopeKey, hostScope, labels, labelsKey, desc, nowUnixNano, committedSeriesCloneHistogramMutation)
+	if state.previous != nil {
+		rememberHistogramPreviousFrom(state.series, state.previous, desc)
 	}
-	return series
+	return state.series
 }
 
-func runtimeEnsureSeriesMutableWithClone(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor, cloneKind committedSeriesCloneKind) (*committedSeries, *committedSeries) {
+func (r *runtimeStoreBackend) runtimeEnsureSummarySeriesMutable(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor, nowUnixNano int64) (*committedSeries, bool) {
+	state := r.runtimeEnsureSeriesMutableWithClone(old, next, key, name, hostScopeKey, hostScope, labels, labelsKey, desc, nowUnixNano, committedSeriesCloneFull)
+	return state.series, state.expired
+}
+
+func (r *runtimeStoreBackend) runtimeEnsureSeriesMutableWithClone(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor, nowUnixNano int64, cloneKind committedSeriesCloneKind) runtimeMutableSeriesState {
 	series := next.series[key]
 	if series != nil {
 		ensureSeriesMeta(series.desc, &series.meta)
-		return series, nil
+		return runtimeMutableSeriesState{series: series}
 	}
 	if existing, ok := lookupSnapshotSeries(old, key); ok {
+		if r.runtimeSeriesExpired(existing, nowUnixNano) {
+			series = newCommittedSeries(key, name, hostScopeKey, hostScope, labels, labelsKey, desc)
+			next.series[key] = series
+			return runtimeMutableSeriesState{series: series, expired: true}
+		}
 		series = cloneCommittedSeriesForKind(existing, cloneKind)
 		ensureSeriesMeta(series.desc, &series.meta)
 		next.series[key] = series
-		return series, existing
+		return runtimeMutableSeriesState{series: series, previous: existing}
 	}
 	series = newCommittedSeries(key, name, hostScopeKey, hostScope, labels, labelsKey, desc)
 	next.series[key] = series
-	return series, nil
+	return runtimeMutableSeriesState{series: series}
+}
+
+func (r *runtimeStoreBackend) runtimeSeriesExpired(series *committedSeries, nowUnixNano int64) bool {
+	if r.retention.ttl <= 0 {
+		return false
+	}
+	return series.runtimeLastSeenUnixNano <= nowUnixNano-int64(r.retention.ttl)
 }
 
 func (r *runtimeStoreBackend) shouldCompactRuntimeSnapshot(next *readSnapshot) bool {

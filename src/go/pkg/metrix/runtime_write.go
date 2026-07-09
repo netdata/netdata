@@ -12,7 +12,7 @@ func (r *runtimeStoreBackend) recordGaugeSet(desc *instrumentDescriptor, scope H
 	scope = mustNormalizeHostScope(scope)
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
+		series := r.runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc, nowUnixNano)
 		series.value = value
 		series.meta.LastSeenSuccessSeq = seq
 		series.runtimeLastSeenUnixNano = nowUnixNano
@@ -29,7 +29,7 @@ func (r *runtimeStoreBackend) recordGaugeAdd(desc *instrumentDescriptor, scope H
 	scope = mustNormalizeHostScope(scope)
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
+		series := r.runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc, nowUnixNano)
 		series.value += delta
 		series.meta.LastSeenSuccessSeq = seq
 		series.runtimeLastSeenUnixNano = nowUnixNano
@@ -54,7 +54,7 @@ func (r *runtimeStoreBackend) recordCounterAdd(desc *instrumentDescriptor, scope
 	scope = mustNormalizeHostScope(scope)
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
+		series := r.runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc, nowUnixNano)
 
 		hadCurrent := series.desc != nil && series.desc.kind == kindCounter && series.counterCurrentSeq > 0
 		if hadCurrent {
@@ -99,7 +99,7 @@ func (r *runtimeStoreBackend) recordHistogramObserve(desc *instrumentDescriptor,
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureHistogramSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
+		series := r.runtimeEnsureHistogramSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc, nowUnixNano)
 
 		if series.desc.histogram == nil || !equalHistogramBounds(series.desc.histogram.bounds, schema.bounds) {
 			panic("metrix: histogram schema drift detected")
@@ -140,7 +140,10 @@ func (r *runtimeStoreBackend) recordSummaryObserve(desc *instrumentDescriptor, s
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
+		series, expired := r.runtimeEnsureSummarySeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc, nowUnixNano)
+		if expired {
+			delete(r.summarySketches, key)
+		}
 
 		rememberSummaryPrevious(series, desc)
 		series.summaryCount++
@@ -183,7 +186,7 @@ func (r *runtimeStoreBackend) recordStateSetObserve(desc *instrumentDescriptor, 
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
+		series := r.runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc, nowUnixNano)
 		series.stateSetValues = cloneStateMap(states)
 		series.meta.LastSeenSuccessSeq = seq
 		series.runtimeLastSeenUnixNano = nowUnixNano
@@ -212,7 +215,7 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeSetPoint(desc *instrumentDesc
 	scope = mustNormalizeHostScope(scope)
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
+		series := r.runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc, nowUnixNano)
 		series.measureSetValues = append(series.measureSetValues[:0], values...)
 		series.meta.LastSeenSuccessSeq = seq
 		series.runtimeLastSeenUnixNano = nowUnixNano
@@ -237,7 +240,7 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeAddPoint(desc *instrumentDesc
 	scope = mustNormalizeHostScope(scope)
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
+		series := r.runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc, nowUnixNano)
 		if len(series.measureSetValues) == 0 {
 			series.measureSetValues = make([]SampleValue, len(schema.fields))
 		}
@@ -268,7 +271,7 @@ func (r *runtimeStoreBackend) recordMeasureSetGaugeSetField(desc *instrumentDesc
 	scope = mustNormalizeHostScope(scope)
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
+		series := r.runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc, nowUnixNano)
 		if len(series.measureSetValues) == 0 {
 			series.measureSetValues = make([]SampleValue, len(schema.fields))
 		}
@@ -300,7 +303,7 @@ func (r *runtimeStoreBackend) recordMeasureSetCounterAddPoint(desc *instrumentDe
 	scope = mustNormalizeHostScope(scope)
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
-		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
+		series := r.runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc, nowUnixNano)
 		if len(series.measureSetValues) == 0 {
 			series.measureSetValues = make([]SampleValue, len(schema.fields))
 		}
