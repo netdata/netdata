@@ -514,16 +514,18 @@ static int aclk_get_transport_idx(aclk_env_t *env) {
 ACLK_STATUS aclk_status = ACLK_STATUS_OFFLINE;
 
 const char *aclk_status_to_string(void) {
-    if(aclk_status == ACLK_STATUS_CONNECTED)
+    ACLK_STATUS status = __atomic_load_n(&aclk_status, __ATOMIC_RELAXED);
+
+    if(status == ACLK_STATUS_CONNECTED)
         return "connected";
 
-    if((int)aclk_status < (int)ND_SOCK_ERR_MAX)
-        return ND_SOCK_ERROR_2str((ND_SOCK_ERROR)aclk_status);
+    if((int)status < (int)ND_SOCK_ERR_MAX)
+        return ND_SOCK_ERROR_2str((ND_SOCK_ERROR)status);
 
-    if((int)aclk_status < (int)HTTPS_CLIENT_RESP_MAX)
-        return https_client_resp_t_2str((https_client_resp_t)aclk_status);
+    if((int)status < (int)HTTPS_CLIENT_RESP_MAX)
+        return https_client_resp_t_2str((https_client_resp_t)status);
 
-    switch(aclk_status) {
+    switch(status) {
         case ACLK_STATUS_CONNECTED:
             return "connected";
 
@@ -593,7 +595,7 @@ const char *aclk_status_to_string(void) {
 }
 
 void aclk_status_set(ACLK_STATUS status) {
-    aclk_status = status;
+    __atomic_store_n(&aclk_status, status, __ATOMIC_RELAXED);
 
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_UUID(NDF_MESSAGE_ID, &aclk_connection_msgid),
