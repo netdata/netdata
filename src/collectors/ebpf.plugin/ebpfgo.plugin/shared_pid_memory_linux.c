@@ -159,6 +159,9 @@ int shared_pid_memory_publish(struct shared_pid_memory *ctx, const struct ebpf_p
                (ctx->prev_count - count) * sizeof(struct ebpf_pid_stat));
 
     ctx->prev_count = count;
+    /* live_count is stored after entries are written so a reader that sees the
+     * updated last_publish_ut is guaranteed to also see the correct live_count. */
+    __atomic_store_n(&ctx->header->live_count, (uint32_t)count, __ATOMIC_RELEASE);
     __atomic_store_n(&ctx->header->last_publish_ut, shared_pid_memory_now_monotonic_usec(), __ATOMIC_RELEASE);
 
     if (locked)

@@ -44,9 +44,9 @@ func (s *cachestatSharedMemoryStore) Snapshot() []ebpfPidStat {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	// s.entries is already sorted ascending by pid: the C layer qsorts its
-	// output, SnapshotApps preserves that order, and UpdateApps iterates in
-	// order while only skipping (not reordering) stale entries.
+	// s.entries is always sorted ascending by pid before Publish() is called:
+	// UpdateApps sorts when BPF input is unordered, and applySocketDataLocked /
+	// buildEntriesFromSocketLocked sort after appending socket-only PIDs.
 	copied := make([]ebpfPidStat, len(s.entries))
 	copy(copied, s.entries)
 	return copied

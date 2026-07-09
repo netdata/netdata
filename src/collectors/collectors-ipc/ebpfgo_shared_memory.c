@@ -41,20 +41,6 @@ static inline size_t ebpfgo_shm_stat_entry_count(const struct stat *st)
     return ((size_t)st->st_size - hdr) / sizeof(struct ebpf_pid_stat);
 }
 
-static int netdata_ebpfgo_shared_pid_memory_compare_pid(const void *a, const void *b)
-{
-    const struct ebpf_pid_stat *pa = a;
-    const struct ebpf_pid_stat *pb = b;
-
-    if (pa->pid < pb->pid)
-        return -1;
-    if (pa->pid > pb->pid)
-        return 1;
-
-    return 0;
-}
-
-
 static bool netdata_ebpfgo_shared_pid_memory_open_sem(
     netdata_ebpfgo_shared_pid_memory_t *ctx,
     const char *sem_name)
@@ -94,6 +80,7 @@ static void netdata_ebpfgo_shared_pid_memory_close_internal(netdata_ebpfgo_share
     freez(ctx->snapshot);
     ctx->snapshot = NULL;
     ctx->snapshot_total = 0;
+    ctx->snapshot_cap = 0;
 
     ctx->shm_total = 0;
     ctx->shm_flags = 0;
@@ -158,20 +145,32 @@ static bool netdata_ebpfgo_shared_pid_memory_copy_snapshot(netdata_ebpfgo_shared
     if (!ctx || !ctx->shm || !ctx->shm_total)
         return false;
 
-    if (ctx->snapshot_total != ctx->shm_total) {
+    /* Allocate at full segment capacity; shm_total never changes for a given
+     * mapping, so this realloc fires at most once per segment lifetime. */
+    if (ctx->snapshot_cap < ctx->shm_total) {
         ctx->snapshot = reallocz(ctx->snapshot, ebpfgo_shm_entries_nbytes(ctx->shm_total));
-        ctx->snapshot_total = ctx->shm_total;
+        ctx->snapshot_cap = ctx->shm_total;
     }
 
-    /* Capture the per-module validity flags and publish interval from the header
-     * before copying entries, both under the same semaphore hold as the caller. */
+    /* Capture per-module validity flags, publish interval, and live entry
+     * count from the header under the same semaphore hold as the caller. */
     const struct ebpfgo_shm_header *hdr = (const struct ebpfgo_shm_header *)ctx->mapping;
-    ctx->shm_flags = __atomic_load_n(&hdr->flags, __ATOMIC_ACQUIRE);
-    ctx->update_every_s = __atomic_load_n(&hdr->update_every_s, __ATOMIC_ACQUIRE);
+    ctx->shm_flags      = __atomic_load_n(&hdr->flags,            __ATOMIC_ACQUIRE);
+    ctx->update_every_s = __atomic_load_n(&hdr->update_every_s,   __ATOMIC_ACQUIRE);
     ctx->last_publish_ut = __atomic_load_n(&hdr->last_publish_ut, __ATOMIC_ACQUIRE);
 
-    memcpy(ctx->snapshot, ctx->shm, ebpfgo_shm_entries_nbytes(ctx->shm_total));
-    qsort(ctx->snapshot, ctx->shm_total, sizeof(*ctx->snapshot), netdata_ebpfgo_shared_pid_memory_compare_pid);
+    uint32_t live = __atomic_load_n(&hdr->live_count, __ATOMIC_ACQUIRE);
+    if (live > (uint32_t)ctx->shm_total)
+        live = (uint32_t)ctx->shm_total;
+
+    /* Copy only the live entries.  The Go publisher sorts entries ascending by
+     * pid before writing to SHM, so the previous qsort was redundant.  This
+     * shrinks the per-cycle semaphore hold from a full ~17.5 MiB
+     * memcpy + qsort(32768) to a few-KiB memcpy(live_count). */
+    if (live)
+        memcpy(ctx->snapshot, ctx->shm, live * sizeof(*ctx->snapshot));
+    ctx->snapshot_total = live;
+
     return true;
 }
 
@@ -220,7 +219,9 @@ bool netdata_ebpfgo_shared_pid_memory_refresh(
                 netdata_ebpfgo_shared_pid_memory_close_internal(ctx);
                 return false;
             }
-            return ctx->snapshot && ctx->snapshot_total;
+            /* Return true if we have a prior snapshot, even with zero live entries:
+             * snapshot_total may be 0 when the publisher is alive but tracks no PIDs. */
+            return ctx->snapshot != NULL;
         }
         locked = true;
     }

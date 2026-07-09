@@ -13,21 +13,26 @@
 #define TASK_COMM_LEN 16
 #endif
 
-/* v2: ebpfgo_shm_header grew from 8 to 16 bytes; version suffix ensures old
- * consumers never map the new layout at the wrong offset. */
-#define NETDATA_EBPFGO_INTEGRATION_NAME "/netdata_shm_integration_ebpfgo_v2"
-#define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo_v2"
+/* v3: live_count added at offset 16; header is now 24 bytes; entries start
+ *     at offset 24 (still 8-byte aligned for the uint64_t fields in ebpf_pid_stat).
+ * v2: update_every_s replaced _pad; header grew from 8 to 16 bytes.
+ * Version suffix ensures old consumers never map the new layout at the wrong offset. */
+#define NETDATA_EBPFGO_INTEGRATION_NAME "/netdata_shm_integration_ebpfgo_v3"
+#define NETDATA_EBPFGO_SHM_INTEGRATION_NAME "/netdata_sem_integration_ebpfgo_v3"
 
 /* SHM header written at byte-offset 0; the ebpf_pid_stat[] array follows
- * immediately.  sizeof == 16 so entries start on an 8-byte boundary, which
+ * immediately.  sizeof == 24 so entries start on an 8-byte boundary, which
  * satisfies the alignment of the uint64_t fields inside ebpf_pid_stat.
- * Producers set flags, update_every_s, and last_publish_ut before releasing
- * the semaphore; consumers use them to determine which modules contributed
- * data this cycle, compute the liveness window, and detect stale payloads. */
+ * Producers set flags, update_every_s, live_count, and last_publish_ut before
+ * releasing the semaphore; consumers use them to determine which modules
+ * contributed data this cycle, how many entries to copy (live_count), and
+ * whether the payload is still live. */
 struct ebpfgo_shm_header {
-    uint32_t flags;          /* EBPFGO_SHM_FLAG_* bits set by the active publisher(s) */
-    uint32_t update_every_s; /* publish interval in seconds; 0 = unknown (old writer) */
+    uint32_t flags;           /* EBPFGO_SHM_FLAG_* bits set by the active publisher(s) */
+    uint32_t update_every_s;  /* publish interval in seconds; 0 = unknown (old writer) */
     uint64_t last_publish_ut; /* CLOCK_MONOTONIC, usec; 0 means no live producer */
+    uint32_t live_count;      /* entries written this cycle; reader copies only this many */
+    uint32_t _reserved;       /* reserved for future use */
 };
 
 #define EBPFGO_SHM_FLAG_CACHESTAT 0x01u /* cachestat per-PID fields are valid */
