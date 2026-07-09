@@ -202,7 +202,6 @@ static void *web_server_add_callback(POLLINFO *pi, nd_poll_event_t *events, void
 
     netdata_log_debug(D_WEB_CLIENT, "%llu: ADDED CLIENT FD %d", w->id, pi->fd);
 
-cleanup:
     worker_is_idle();
     return w;
 }
@@ -315,6 +314,14 @@ static int web_server_snd_callback(POLLINFO *pi, nd_poll_event_t *events) {
     int fd = pi->fd;
 
     bool completing_ssl_handshake = w->ssl.conn && w->ssl.state == NETDATA_SSL_STATE_INIT;
+
+    // A writable event consumed for TLS handshake progress is not an
+    // application send. Keep it out of send_count, so the first-request
+    // timeout (which is armed only while send_count == 0) still applies
+    // to clients that stall or trickle mid-handshake.
+    if(completing_ssl_handshake && pi->send_count > 0)
+        pi->send_count--;
+
     if(!web_server_check_tcp_ssl(w, events)) {
         retval = web_server_check_client_status(w);
         goto cleanup;

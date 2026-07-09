@@ -46,7 +46,6 @@ int security_test_certificate(SSL *ssl);
 SSL_CTX * netdata_ssl_create_client_ctx(unsigned long mode);
 
 bool netdata_ssl_connect(NETDATA_SSL *ssl);
-bool netdata_ssl_accept(NETDATA_SSL *ssl);
 // Tri-state result; compare explicitly with NETDATA_SSL_HANDSHAKE_* constants.
 NETDATA_SSL_HANDSHAKE_RESULT netdata_ssl_accept_nonblocking(NETDATA_SSL *ssl);
 
