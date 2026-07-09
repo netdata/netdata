@@ -103,23 +103,24 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_e
     ctx->header  = (struct ebpfgo_shm_header *)ctx->mapping;
     ctx->entries = (struct ebpf_pid_stat *)((char *)ctx->mapping + sizeof(*ctx->header));
 
-    if (reused) {
-        /* Reused SHM: the previous run may have written rows beyond
-         * this run's high-water mark, and those rows would survive
-         * forever (publish's tail-zeroing only operates on prev_count
-         * which starts at 0).  Zero the segment so the consumer's
-         * binary search does not return stale PIDs from the prior
-         * run.  This is a one-time cost on restart, not per cycle. */
-        memset(ctx->mapping, 0, length);
-    }
-
     ctx->sem = sem_open(NETDATA_EBPFGO_SHM_INTEGRATION_NAME, O_CREAT, 0660, 1);
     if (ctx->sem == SEM_FAILED)
         goto fail;
 
-    /* POSIX guarantees a newly-created shm_open segment is zero-filled,
-     * so when !reused we trust the kernel and skip the explicit memset
-     * (this preserves the per-startup 17.5 MB page-fault saving). */
+    if (reused) {
+        /* Zero the segment under the semaphore so a reader that survived the
+         * crash cannot observe a torn copy.  Zeroing last_publish_ut in the
+         * header causes any in-flight reader to reject the data via is_live.
+         * If sem_wait times out (crashed writer held it), zero anyway: the
+         * zeroed last_publish_ut self-heals on the reader's next refresh.
+         * POSIX guarantees a newly-created segment is zero-filled, so the
+         * memset only fires on the reuse path (preserving the per-startup
+         * 17.5 MB page-fault saving on first run). */
+        bool locked = ebpfgo_shm_sem_wait(ctx->sem);
+        memset(ctx->mapping, 0, length);
+        if (locked)
+            sem_post(ctx->sem);
+    }
     return ctx;
 
 fail:

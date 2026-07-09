@@ -69,12 +69,19 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
         goto fail;
     }
 
-    if (reused)
-        memset(ctx->data, 0, sizeof(struct ebpfgo_dns_shared));
-
     ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT, 0660, 1);
     if (ctx->sem == SEM_FAILED)
         goto fail;
+
+    if (reused) {
+        /* Zero the segment under the semaphore so a reader that survived the
+         * crash cannot observe a torn copy.  See shared_pid_memory_linux.c for
+         * the rationale; the same race and fix apply to this DNS segment. */
+        bool locked = ebpfgo_shm_sem_wait(ctx->sem);
+        memset(ctx->data, 0, sizeof(struct ebpfgo_dns_shared));
+        if (locked)
+            sem_post(ctx->sem);
+    }
 
     return ctx;
 
