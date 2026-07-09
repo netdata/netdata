@@ -22,21 +22,36 @@ func newCommittedSeries(key, name, hostScopeKey string, hostScope HostScope, lab
 	}
 }
 
+type committedSeriesCloneKind uint8
+
+const (
+	committedSeriesCloneFull committedSeriesCloneKind = iota
+	committedSeriesCloneHistogramOverwrite
+	committedSeriesCloneHistogramMutation
+)
+
 func ensureCommitSeriesMutable(old, next *readSnapshot, key string) *committedSeries {
-	series := next.series[key]
-	if series == nil {
-		return nil
-	}
-	if oldSeries, ok := old.series[key]; ok && oldSeries == series {
-		series = cloneCommittedSeries(series)
-		next.series[key] = series
-	}
-	ensureSeriesMeta(series.desc, &series.meta)
+	series, _ := ensureCommitSeriesMutableWithClone(old, next, key, committedSeriesCloneFull)
 	return series
 }
 
+func ensureCommitSeriesMutableWithClone(old, next *readSnapshot, key string, cloneKind committedSeriesCloneKind) (*committedSeries, *committedSeries) {
+	series := next.series[key]
+	if series == nil {
+		return nil, nil
+	}
+	if oldSeries, ok := old.series[key]; ok && oldSeries == series {
+		series = cloneCommittedSeriesForKind(oldSeries, cloneKind)
+		next.series[key] = series
+		ensureSeriesMeta(series.desc, &series.meta)
+		return series, oldSeries
+	}
+	ensureSeriesMeta(series.desc, &series.meta)
+	return series, nil
+}
+
 func getOrCreateCommitSeries(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
-	series := ensureCommitSeriesMutable(old, next, key)
+	series, _ := ensureCommitSeriesMutableWithClone(old, next, key, committedSeriesCloneFull)
 	if series != nil {
 		return series
 	}
@@ -46,14 +61,10 @@ func getOrCreateCommitSeries(old, next *readSnapshot, key, name, hostScopeKey st
 }
 
 func getOrCreateCommitHistogramSeries(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
-	series := next.series[key]
+	series, previous := ensureCommitSeriesMutableWithClone(old, next, key, committedSeriesCloneHistogramOverwrite)
 	if series != nil {
-		if oldSeries, ok := old.series[key]; ok && oldSeries == series {
-			series = cloneCommittedSeriesForHistogramOverwrite(oldSeries)
-			rememberHistogramPreviousFrom(series, oldSeries, desc)
-			next.series[key] = series
-		} else {
-			ensureSeriesMeta(series.desc, &series.meta)
+		if previous != nil {
+			rememberHistogramPreviousFrom(series, previous, desc)
 		}
 		return series
 	}
@@ -127,6 +138,17 @@ func cloneCommittedSeries(s *committedSeries) *committedSeries {
 		cp.histogramPreviousCumulative = append([]SampleValue(nil), s.histogramPreviousCumulative...)
 	}
 	return &cp
+}
+
+func cloneCommittedSeriesForKind(s *committedSeries, kind committedSeriesCloneKind) *committedSeries {
+	switch kind {
+	case committedSeriesCloneHistogramOverwrite:
+		return cloneCommittedSeriesForHistogramOverwrite(s)
+	case committedSeriesCloneHistogramMutation:
+		return cloneCommittedSeriesForHistogramMutation(s)
+	default:
+		return cloneCommittedSeries(s)
+	}
 }
 
 func cloneCommittedSeriesForHistogramOverwrite(s *committedSeries) *committedSeries {

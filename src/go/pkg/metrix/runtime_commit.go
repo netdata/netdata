@@ -38,60 +38,33 @@ func (r *runtimeStoreBackend) commitRuntimeWrite(apply func(old, next *readSnaps
 }
 
 func runtimeEnsureSeriesMutable(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
-	series := next.series[key]
-	if series != nil {
-		ensureSeriesMeta(series.desc, &series.meta)
-		return series
-	}
-	if existing, ok := lookupSnapshotSeries(old, key); ok {
-		series = cloneCommittedSeries(existing)
-		ensureSeriesMeta(series.desc, &series.meta)
-		next.series[key] = series
-		return series
-	}
-	series = &committedSeries{
-		id:           SeriesID(key),
-		hash64:       seriesIDHash(SeriesID(key)),
-		key:          key,
-		name:         name,
-		hostScopeKey: hostScopeKey,
-		hostScope:    cloneHostScope(hostScope),
-		labels:       append([]Label(nil), labels...),
-		labelsKey:    labelsKey,
-		desc:         desc,
-		meta:         baseSeriesMeta(desc),
-	}
-	next.series[key] = series
+	series, _ := runtimeEnsureSeriesMutableWithClone(old, next, key, name, hostScopeKey, hostScope, labels, labelsKey, desc, committedSeriesCloneFull)
 	return series
 }
 
 func runtimeEnsureHistogramSeriesMutable(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor) *committedSeries {
+	series, previous := runtimeEnsureSeriesMutableWithClone(old, next, key, name, hostScopeKey, hostScope, labels, labelsKey, desc, committedSeriesCloneHistogramMutation)
+	if previous != nil {
+		rememberHistogramPreviousFrom(series, previous, desc)
+	}
+	return series
+}
+
+func runtimeEnsureSeriesMutableWithClone(old, next *readSnapshot, key, name, hostScopeKey string, hostScope HostScope, labels []Label, labelsKey string, desc *instrumentDescriptor, cloneKind committedSeriesCloneKind) (*committedSeries, *committedSeries) {
 	series := next.series[key]
 	if series != nil {
 		ensureSeriesMeta(series.desc, &series.meta)
-		return series
+		return series, nil
 	}
 	if existing, ok := lookupSnapshotSeries(old, key); ok {
-		series = cloneCommittedSeriesForHistogramMutation(existing)
-		rememberHistogramPreviousFrom(series, existing, desc)
+		series = cloneCommittedSeriesForKind(existing, cloneKind)
 		ensureSeriesMeta(series.desc, &series.meta)
 		next.series[key] = series
-		return series
+		return series, existing
 	}
-	series = &committedSeries{
-		id:           SeriesID(key),
-		hash64:       seriesIDHash(SeriesID(key)),
-		key:          key,
-		name:         name,
-		hostScopeKey: hostScopeKey,
-		hostScope:    cloneHostScope(hostScope),
-		labels:       append([]Label(nil), labels...),
-		labelsKey:    labelsKey,
-		desc:         desc,
-		meta:         baseSeriesMeta(desc),
-	}
+	series = newCommittedSeries(key, name, hostScopeKey, hostScope, labels, labelsKey, desc)
 	next.series[key] = series
-	return series
+	return series, nil
 }
 
 func (r *runtimeStoreBackend) shouldCompactRuntimeSnapshot(next *readSnapshot) bool {
