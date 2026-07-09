@@ -1,0 +1,54 @@
+[package]
+name = "file-lifecycle"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "file_lifecycle"
+path = "src/lib.rs"
+
+# Content-agnostic file-lifecycle substrate (registry, rotation/retention,
+# catalog manifest, remote upload/download, query-time chunk cache, recovery,
+# the per-signal `Pipeline` shell). The remote read-through cache (`RemoteRead` +
+# `file-cache`) is part of the per-signal query path and stays in the content
+# binding (`otel-ledger`) for now; it moves here with the traces work. The crate
+# MUST NOT depend on the log-content
+# crates — `sfsq`, `otel-logs-identity` — so a second signal
+# (traces) can reuse it. The omission below is the hard dependency guard
+# (cargo makes importing an undeclared crate impossible); a manifest assertion
+# in `tests/` backstops it.
+[dependencies]
+anyhow = { workspace = true }
+bridge = { path = "../netdata-plugin/bridge" }
+chrono = { workspace = true }
+ferryboat = { workspace = true }
+file-registry = { workspace = true }
+futures = { workspace = true }
+moka = { workspace = true }
+netdata-plugin-protocol = { path = "../netdata-plugin/protocol" }
+opendal = { workspace = true }
+otel-catalog = { workspace = true }
+sfst = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+uuid = { workspace = true }
+wal = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+bytesize = { workspace = true }
+# Test-only: synthesize a catalog container with an arbitrary envelope version
+# (the future/unsupported-version heal test); production code reaches chunk-file
+# transitively through otel-catalog.
+chunk-file = { workspace = true }
+# `test-util` (paused clock: tokio::time::pause/advance + start_paused) for the
+# catalog builder's time-trigger tests; additive over the workspace tokio deps.
+tokio = { workspace = true, features = ["test-util"] }
+# Deliberately NO tls feature here: the TLS backend must arrive via feature
+# unification from opendal's `reqwest-rustls-tls` (see tests/tls_capability.rs).
+reqwest = { version = "0.13", default-features = false }
+tempfile = { workspace = true }

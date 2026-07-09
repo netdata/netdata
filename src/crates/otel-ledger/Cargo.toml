@@ -1,0 +1,49 @@
+[package]
+name = "otel-ledger"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "otel_ledger"
+path = "src/lib.rs"
+
+[dependencies]
+otel-logs-identity = { workspace = true }
+anyhow = { workspace = true }
+async-trait = { workspace = true }
+bridge = { path = "../netdata-plugin/bridge" }
+chrono = { workspace = true }
+ferryboat = { workspace = true }
+file-cache = { workspace = true }
+file-lifecycle = { workspace = true }
+file-registry = { workspace = true }
+netdata-plugin-error = { path = "../netdata-plugin/error" }
+netdata-plugin-protocol = { path = "../netdata-plugin/protocol" }
+netdata-plugin-types = { path = "../netdata-plugin/types" }
+otel-catalog = { workspace = true }
+sfst = { workspace = true }
+ng-index = { workspace = true }
+sfsq = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+# preserve_order: the log-table `columns` object must serialize in insertion
+# (index) order — the Netdata UI orders columns by their JSON key position.
+# Declared here so otel-ledger is correct on its own, not by relying on a
+# sibling crate enabling the feature and Cargo unifying it into the binary.
+serde_json = { workspace = true, features = ["preserve_order"] }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+uuid = { workspace = true }
+wal = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+bytesize = { workspace = true }
+# test-util exposes the chunk-level writer for the hand-built SFST fixtures in
+# ledger/rpc/handler/tests.rs.
+sfst = { workspace = true, features = ["test-util"] }
+tempfile = { workspace = true }
+treight = { workspace = true }

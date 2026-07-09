@@ -14,6 +14,6 @@ You can still make logs available in Netdata using these alternatives:
 
 1. **Remote journal forwarding with `systemd-cat-native --url`** — Use [`systemd-cat-native --url=URL`](/src/libnetdata/log/systemd-cat-native.md) to send logs directly to a remote `systemd-journal-remote` running on another Linux system with systemd. This mode works even when the local system has no systemd, allowing the remote systemd journal to become the logs database for the local system. The receiving system must have `systemd-journal-remote` configured and accessible at the specified URL.
 
-2. **OpenTelemetry (OTLP) log ingestion** — The [OpenTelemetry Signal Viewer plugin](/src/crates/netdata-log-viewer/otel-signal-viewer-plugin/README.md) receives logs via the OTLP/gRPC protocol and stores them in systemd-compatible journal files, which are then displayed in the Logs tab. This method does not depend on a local systemd installation.
+2. **OpenTelemetry (OTLP) log ingestion** — The [OpenTelemetry plugin](/src/crates/otel-plugin/README.md) receives logs via the OTLP/gRPC protocol and indexes them for fast querying in the Logs tab (the `otel-logs` source). This method does not depend on a local systemd installation.
 
 You can also find useful guides on how to set up log centralization points in the [Observability Centralization Points](/docs/deployment-guides/deployment-with-centralization-points.md) section of our docs.

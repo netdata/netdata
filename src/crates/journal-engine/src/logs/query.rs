@@ -45,8 +45,8 @@ pub struct PaginationState {
 /// # Example
 ///
 /// ```ignore
+/// use journal_engine::logs::LogQuery;
 /// use journal_index::{Anchor, Direction};
-/// use journal_function::logs::LogQuery;
 ///
 /// let entries = LogQuery::new(&file_indexes, Anchor::Head, Direction::Forward)
 ///     .with_limit(100)

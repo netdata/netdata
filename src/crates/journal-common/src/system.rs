@@ -8,6 +8,7 @@ use std::io;
 /// Reads a file from the host filesystem, trying both the normal path and /host/ prefix.
 ///
 /// This is useful when running in containers where the host filesystem may be mounted at /host.
+#[cfg(target_os = "linux")]
 fn read_host_file(filename: &str) -> io::Result<String> {
     match std::fs::read_to_string(filename) {
         Ok(contents) => Ok(contents),
@@ -71,6 +72,27 @@ pub fn load_machine_id() -> io::Result<uuid::Uuid> {
     Err(io::Error::new(
         io::ErrorKind::Unsupported,
         "Machine ID loading not supported on this platform",
+    ))
+}
+
+/// Loads the hostname from the system.
+///
+/// On Linux and macOS, this uses `nix::unistd::gethostname()`.
+/// On other platforms, this returns an error.
+#[cfg(any(target_os = "linux", target_os = "macos"))]
+pub fn load_hostname() -> io::Result<String> {
+    let hostname =
+        nix::unistd::gethostname().map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    hostname
+        .into_string()
+        .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "hostname is not valid UTF-8"))
+}
+
+#[cfg(not(any(target_os = "linux", target_os = "macos")))]
+pub fn load_hostname() -> io::Result<String> {
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "Hostname loading not supported on this platform",
     ))
 }
 
