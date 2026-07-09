@@ -310,6 +310,20 @@ void rrdset_index_init(RRDHOST *host) {
     rrdset_index_byname_init(host);
 }
 
+void rrdset_index_flush(RRDHOST *host) {
+    // empty the indexes but keep them allocated and the host pointers valid,
+    // so that in-flight queries holding acquired charts can still release them
+    // through rrdset_acquired_release() after the host is archived;
+    // the indexes are destroyed only in rrdhost_free_unlinked(), after the
+    // host has been removed from the indexes and cannot be found by new queries
+
+    // flush the name index first (it is a view of the id index)
+    dictionary_flush(host->rrdset_root_index_name);
+
+    // then flush the id index
+    dictionary_flush(host->rrdset_root_index);
+}
+
 void rrdset_index_destroy(RRDHOST *host) {
     // destroy the name index first
     dictionary_destroy(host->rrdset_root_index_name);
@@ -365,6 +379,9 @@ RRDSET *rrdset_find_bytype(RRDHOST *host, const char *type, const char *id, bool
 RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool include_obsolete) {
     netdata_log_debug(D_RRD_CALLS, "rrdset_find_and_acquire() for host %s, chart %s", rrdhost_hostname(host), id);
 
+    // the index stays allocated for the whole life of the host (archiving only
+    // flushes it); this guard is defense-in-depth for callers racing with
+    // rrdhost_free_unlinked()
     if (unlikely(!host->rrdset_root_index))
         return NULL;
 
