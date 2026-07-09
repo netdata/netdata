@@ -131,16 +131,39 @@ func (c *Collector) collectGPUInfo(mx map[string]int64) error {
 }
 
 func addGPUPowerMetricsSwitch(mx map[string]int64, px string, gpu gpuInfo) {
-	switch true {
-	case gpu.PowerReadings != nil && gpu.PowerReadings.PowerDraw != nil:
-		addMetric(mx, px+"power_draw", *gpu.PowerReadings.PowerDraw, 0)
-	case gpu.GPUPowerReadings != nil && gpu.GPUPowerReadings.PowerDraw != nil:
-		addMetric(mx, px+"power_draw", *gpu.GPUPowerReadings.PowerDraw, 0)
-	case gpu.GPUPowerReadings != nil && gpu.GPUPowerReadings.InstantPowerDraw != nil:
-		addMetric(mx, px+"power_draw", *gpu.GPUPowerReadings.InstantPowerDraw, 0)
-	case gpu.GPUPowerReadings != nil && gpu.GPUPowerReadings.AveragePowerDraw != nil:
-		addMetric(mx, px+"power_draw", *gpu.GPUPowerReadings.AveragePowerDraw, 0)
+	for _, value := range []*string{
+		gpuPowerDraw(gpu.PowerReadings),
+		gpuPowerDraw(gpu.GPUPowerReadings),
+		gpuInstantPowerDraw(gpu.GPUPowerReadings),
+		gpuAveragePowerDraw(gpu.GPUPowerReadings),
+	} {
+		if value == nil || !isValidValue(*value) {
+			continue
+		}
+		addMetric(mx, px+"power_draw", *value, 0)
+		return
 	}
+}
+
+func gpuPowerDraw(v *gpuPowerReadings) *string {
+	if v == nil {
+		return nil
+	}
+	return v.PowerDraw
+}
+
+func gpuInstantPowerDraw(v *gpuPowerReadings) *string {
+	if v == nil {
+		return nil
+	}
+	return v.InstantPowerDraw
+}
+
+func gpuAveragePowerDraw(v *gpuPowerReadings) *string {
+	if v == nil {
+		return nil
+	}
+	return v.AveragePowerDraw
 }
 
 func calcMaxPCIEBandwidth(gpu gpuInfo) float64 {
@@ -192,6 +215,7 @@ func addMetric(mx map[string]int64, key, value string, mul int) {
 }
 
 func isValidValue(v string) bool {
+	v = strings.TrimSpace(v)
 	return v != "" && v != "N/A" && v != "[N/A]"
 }
 
@@ -201,8 +225,12 @@ func parseFloat(s string) float64 {
 }
 
 func removeUnits(s string) string {
-	if i := strings.IndexByte(s, ' '); i != -1 {
-		s = s[:i]
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	if i := strings.IndexAny(s, " \t\r\n"); i != -1 {
+		return s[:i]
 	}
 	return s
 }
