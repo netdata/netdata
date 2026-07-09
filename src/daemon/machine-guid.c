@@ -172,6 +172,8 @@ static bool machine_guid_write_to_file(const char *filename, ND_MACHINE_GUID *ho
 }
 
 static ND_MACHINE_GUID nd_machine_guid = { 0 };
+static bool nd_machine_guid_available = false;
+static SPINLOCK nd_machine_guid_spinlock = SPINLOCK_INITIALIZER;
 
 static ND_MACHINE_GUID machine_guid_get_or_create(void) {
     char pathname[FILENAME_MAX];
@@ -235,9 +237,16 @@ static ND_MACHINE_GUID machine_guid_get_or_create(void) {
 }
 
 ND_MACHINE_GUID *machine_guid_get(void) {
-    if(UUIDiszero(nd_machine_guid.uuid)) {
-        nd_machine_guid = machine_guid_get_or_create();
-        nd_setenv("NETDATA_REGISTRY_UNIQUE_ID", nd_machine_guid.txt, 1);
+    if(unlikely(!__atomic_load_n(&nd_machine_guid_available, __ATOMIC_ACQUIRE))) {
+        spinlock_lock(&nd_machine_guid_spinlock);
+
+        if(unlikely(!__atomic_load_n(&nd_machine_guid_available, __ATOMIC_ACQUIRE))) {
+            nd_machine_guid = machine_guid_get_or_create();
+            nd_setenv("NETDATA_REGISTRY_UNIQUE_ID", nd_machine_guid.txt, 1);
+            __atomic_store_n(&nd_machine_guid_available, true, __ATOMIC_RELEASE);
+        }
+
+        spinlock_unlock(&nd_machine_guid_spinlock);
     }
 
     return &nd_machine_guid;
