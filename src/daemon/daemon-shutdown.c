@@ -368,9 +368,14 @@ static void netdata_cleanup_and_exit(EXIT_REASON reason, bool abnormal, bool exi
     // have unlinked the pipe on close. For other exit paths the command
     // thread keeps running and we must clean it up here. ENOENT just means
     // libuv beat us to removing it.
+    // On Windows, the pipe is a Named Pipe (\\.\pipe\...) — a kernel object,
+    // not a filesystem path. Windows cleans it up automatically when the last
+    // handle closes; unlink()/DeleteFile() on a pipe path always fails.
+#if !defined(OS_WINDOWS)
     const char *pipe = daemon_pipename();
     if(pipe && *pipe && unlink(pipe) != 0 && errno != ENOENT)
         netdata_log_error("EXIT: cannot unlink netdatacli socket file '%s'.", pipe);
+#endif
 
     watcher_step_complete(WATCHER_STEP_ID_REMOVE_PID_FILE);
 
