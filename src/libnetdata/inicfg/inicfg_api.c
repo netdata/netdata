@@ -432,7 +432,7 @@ time_t inicfg_get_duration_days_to_seconds(struct config *root, const char *sect
         return default_value_seconds;
     }
 
-    return (unsigned)ABS(result);
+    return ABS(result);
 }
 
 long long inicfg_get_number(struct config *root, const char *section, const char *name, long long value) {
@@ -567,7 +567,7 @@ uint64_t inicfg_get_size_mb(struct config *root, const char *section, const char
         return default_value;
     }
 
-    return (unsigned)result;
+    return result;
 }
 
 uint64_t inicfg_set_size_mb(struct config *root, const char *section, const char *name, uint64_t value) {
