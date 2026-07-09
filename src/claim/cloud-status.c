@@ -36,17 +36,19 @@ CLOUD_STATUS cloud_status(void) {
 }
 
 time_t cloud_last_change(void) {
-    time_t ret = MAX(last_conn_time_mqtt, last_disconnect_time);
+    time_t last_conn = __atomic_load_n(&last_conn_time_mqtt, __ATOMIC_RELAXED);
+    time_t last_disconnect = __atomic_load_n(&last_disconnect_time, __ATOMIC_RELAXED);
+    time_t ret = MAX(last_conn, last_disconnect);
     if(!ret) ret = netdata_start_time;
     return ret;
 }
 
 time_t cloud_next_connection_attempt(void) {
-    return next_connection_attempt;
+    return __atomic_load_n(&next_connection_attempt, __ATOMIC_RELAXED);
 }
 
 size_t cloud_connection_id(void) {
-    return aclk_connection_counter;
+    return (size_t)__atomic_load_n(&aclk_connection_counter, __ATOMIC_RELAXED);
 }
 
 const char *cloud_status_aclk_offline_reason() {
