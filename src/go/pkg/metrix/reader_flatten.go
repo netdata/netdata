@@ -64,7 +64,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 
 		name := src.name + "_bucket"
 		key := makeSeriesKey(src.hostScopeKey, name, labelsKey)
-		dst.series[key] = &committedSeries{
+		series := &committedSeries{
 			id:           SeriesID(key),
 			hash64:       seriesIDHash(SeriesID(key)),
 			key:          key,
@@ -89,6 +89,13 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 				FlattenRoleHistogramBucket,
 			),
 		}
+		previous := SampleValue(0)
+		hasPrev := src.histogramHasPrev && len(src.histogramPreviousCumulative) == len(schema.bounds)
+		if hasPrev {
+			previous = src.histogramPreviousCumulative[i] - previousHistogramBucketFloor(src.histogramPreviousCumulative, i)
+		}
+		setFlattenedCounterState(series, bucketValue, previous, hasPrev, src.histogramCurrentSeq, src.histogramPreviousSeq)
+		dst.series[key] = series
 	}
 
 	infMap := make(map[string]string, len(src.labels)+1)
@@ -100,7 +107,7 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 	if err == nil {
 		infName := src.name + "_bucket"
 		infKey := makeSeriesKey(src.hostScopeKey, infName, infLabelsKey)
-		dst.series[infKey] = &committedSeries{
+		series := &committedSeries{
 			id:           SeriesID(infKey),
 			hash64:       seriesIDHash(SeriesID(infKey)),
 			key:          infKey,
@@ -125,6 +132,16 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 				FlattenRoleHistogramBucket,
 			),
 		}
+		previous := SampleValue(0)
+		hasPrev := src.histogramHasPrev && len(src.histogramPreviousCumulative) == len(schema.bounds)
+		if hasPrev {
+			previous = src.histogramPreviousCount
+			if len(src.histogramPreviousCumulative) > 0 {
+				previous -= src.histogramPreviousCumulative[len(src.histogramPreviousCumulative)-1]
+			}
+		}
+		setFlattenedCounterState(series, src.histogramCount-prevCumulative, previous, hasPrev, src.histogramCurrentSeq, src.histogramPreviousSeq)
+		dst.series[infKey] = series
 	}
 
 	appendFlattenedHistogramScalar(
@@ -133,6 +150,8 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 		src.name+"_count",
 		src.labels,
 		src.histogramCount,
+		src.histogramPreviousCount,
+		src.histogramHasPrev,
 		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindHistogram, FlattenRoleHistogramCount),
 		src.desc,
 	)
@@ -142,12 +161,14 @@ func appendFlattenedHistogramSeries(dst *readSnapshot, src *committedSeries) {
 		src.name+"_sum",
 		src.labels,
 		src.histogramSum,
+		src.histogramPreviousSum,
+		src.histogramHasPrev,
 		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindHistogram, FlattenRoleHistogramSum),
 		src.desc,
 	)
 }
 
-func appendFlattenedHistogramScalar(dst *readSnapshot, src *committedSeries, name string, labels []Label, value SampleValue, meta SeriesMeta, desc *instrumentDescriptor) {
+func appendFlattenedHistogramScalar(dst *readSnapshot, src *committedSeries, name string, labels []Label, value, previous SampleValue, hasPrev bool, meta SeriesMeta, desc *instrumentDescriptor) {
 	labelsMap := make(map[string]string, len(labels))
 	for _, lbl := range labels {
 		labelsMap[lbl.Key] = lbl.Value
@@ -157,7 +178,7 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, src *committedSeries, nam
 		return
 	}
 	key := makeSeriesKey(src.hostScopeKey, name, labelsKey)
-	dst.series[key] = &committedSeries{
+	series := &committedSeries{
 		id:           SeriesID(key),
 		hash64:       seriesIDHash(SeriesID(key)),
 		key:          key,
@@ -177,15 +198,24 @@ func appendFlattenedHistogramScalar(dst *readSnapshot, src *committedSeries, nam
 		value: value,
 		meta:  meta,
 	}
+	setFlattenedCounterState(series, value, previous, hasPrev, flattenedCounterCurrentSeq(src, meta), flattenedCounterPreviousSeq(src, meta))
+	dst.series[key] = series
 }
 
 func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
+	schema := src.desc.summary
+	if schema != nil && len(schema.quantiles) > 0 && len(src.summaryQuantiles) != len(schema.quantiles) {
+		return
+	}
+
 	appendFlattenedHistogramScalar(
 		dst,
 		src,
 		src.name+"_count",
 		src.labels,
 		src.summaryCount,
+		src.summaryPreviousCount,
+		src.summaryHasPrev,
 		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindSummary, FlattenRoleSummaryCount),
 		src.desc,
 	)
@@ -195,15 +225,13 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 		src.name+"_sum",
 		src.labels,
 		src.summarySum,
+		src.summaryPreviousSum,
+		src.summaryHasPrev,
 		flattenedSeriesMeta(src.meta, MetricKindCounter, MetricKindSummary, FlattenRoleSummarySum),
 		src.desc,
 	)
 
-	schema := src.desc.summary
 	if schema == nil {
-		return
-	}
-	if len(src.summaryQuantiles) != len(schema.quantiles) {
 		return
 	}
 
@@ -244,6 +272,46 @@ func appendFlattenedSummarySeries(dst *readSnapshot, src *committedSeries) {
 				FlattenRoleSummaryQuantile,
 			),
 		}
+	}
+}
+
+func previousHistogramBucketFloor(values []SampleValue, idx int) SampleValue {
+	if idx == 0 {
+		return 0
+	}
+	return values[idx-1]
+}
+
+func setFlattenedCounterState(series *committedSeries, current, previous SampleValue, hasPrev bool, currentSeq, previousSeq uint64) {
+	series.counterCurrent = current
+	series.counterCurrentSeq = currentSeq
+	if !hasPrev {
+		return
+	}
+	series.counterPrevious = previous
+	series.counterPreviousSeq = previousSeq
+	series.counterHasPrev = true
+}
+
+func flattenedCounterCurrentSeq(src *committedSeries, meta SeriesMeta) uint64 {
+	switch meta.SourceKind {
+	case MetricKindHistogram:
+		return src.histogramCurrentSeq
+	case MetricKindSummary:
+		return src.summaryCurrentSeq
+	default:
+		return 0
+	}
+}
+
+func flattenedCounterPreviousSeq(src *committedSeries, meta SeriesMeta) uint64 {
+	switch meta.SourceKind {
+	case MetricKindHistogram:
+		return src.histogramPreviousSeq
+	case MetricKindSummary:
+		return src.summaryPreviousSeq
+	default:
+		return 0
 	}
 }
 

@@ -119,6 +119,9 @@ func cloneCommittedSeries(s *committedSeries) *committedSeries {
 	if len(s.histogramCumulative) > 0 {
 		cp.histogramCumulative = append([]SampleValue(nil), s.histogramCumulative...)
 	}
+	if len(s.histogramPreviousCumulative) > 0 {
+		cp.histogramPreviousCumulative = append([]SampleValue(nil), s.histogramPreviousCumulative...)
+	}
 	if len(s.summaryQuantiles) > 0 {
 		cp.summaryQuantiles = append([]SampleValue(nil), s.summaryQuantiles...)
 	}

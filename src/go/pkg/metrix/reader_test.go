@@ -40,7 +40,7 @@ func TestFlattenSnapshotScenarios(t *testing.T) {
 				require.False(t, ok, "expected malformed histogram sum series to be skipped")
 			},
 		},
-		"malformed summary quantile length skips quantile series but keeps count sum": {
+		"malformed summary quantile length skips whole flattened family": {
 			run: func(t *testing.T) {
 				src := &readSnapshot{
 					series: map[string]*committedSeries{
@@ -59,14 +59,51 @@ func TestFlattenSnapshotScenarios(t *testing.T) {
 				}
 
 				flat := flattenSnapshot(src)
-				require.Contains(t, flat.series, "svc.latency_count")
-				require.Contains(t, flat.series, "svc.latency_sum")
 				r := &storeReader{snap: flat, raw: true}
 
-				mustValue(t, r, "svc.latency_count", nil, 2)
-				mustValue(t, r, "svc.latency_sum", nil, 1.2)
-				_, ok := r.Value("svc.latency", Labels{"quantile": "0.5"})
+				_, ok := r.Value("svc.latency_count", nil)
+				require.False(t, ok, "expected malformed summary count series to be skipped")
+				_, ok = r.Value("svc.latency_sum", nil)
+				require.False(t, ok, "expected malformed summary sum series to be skipped")
+				_, ok = r.Value("svc.latency", Labels{"quantile": "0.5"})
 				require.False(t, ok, "expected malformed summary quantile series to be skipped")
+			},
+		},
+		"flattened histogram and summary counters support delta": {
+			run: func(t *testing.T) {
+				s := NewCollectorStore()
+				cc := cycleController(t, s)
+				m := s.Write().StatefulMeter("svc")
+				h := m.Histogram("latency", WithHistogramBounds(1, 2))
+				sum := m.Summary("duration")
+
+				cc.BeginCycle()
+				h.Observe(0.5)
+				h.Observe(1.5)
+				sum.Observe(2)
+				sum.Observe(4)
+				require.NoError(t, cc.CommitCycleSuccess())
+
+				mustNoDelta(t, s.Read(ReadFlatten()), "svc.latency_bucket", Labels{HistogramBucketLabel: "1"})
+				mustNoDelta(t, s.Read(ReadFlatten()), "svc.latency_count", nil)
+				mustNoDelta(t, s.Read(ReadFlatten()), "svc.latency_sum", nil)
+				mustNoDelta(t, s.Read(ReadFlatten()), "svc.duration_count", nil)
+				mustNoDelta(t, s.Read(ReadFlatten()), "svc.duration_sum", nil)
+
+				cc.BeginCycle()
+				h.Observe(0.2)
+				h.Observe(3)
+				sum.Observe(6)
+				require.NoError(t, cc.CommitCycleSuccess())
+
+				fr := s.Read(ReadFlatten())
+				mustDelta(t, fr, "svc.latency_bucket", Labels{HistogramBucketLabel: "1"}, 1)
+				mustDelta(t, fr, "svc.latency_bucket", Labels{HistogramBucketLabel: "2"}, 0)
+				mustDelta(t, fr, "svc.latency_bucket", Labels{HistogramBucketLabel: "+Inf"}, 1)
+				mustDelta(t, fr, "svc.latency_count", nil, 2)
+				mustDelta(t, fr, "svc.latency_sum", nil, 3.2)
+				mustDelta(t, fr, "svc.duration_count", nil, 1)
+				mustDelta(t, fr, "svc.duration_sum", nil, 6)
 			},
 		},
 	}

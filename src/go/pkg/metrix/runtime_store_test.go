@@ -62,6 +62,8 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				sum := s.Write().StatefulMeter("runtime").Summary("latency", WithSummaryQuantiles(0.5, 1.0))
 
 				sum.Observe(1)
+				mustNoDelta(t, s.Read(ReadFlatten()), "runtime.latency_count", nil)
+				mustNoDelta(t, s.Read(ReadFlatten()), "runtime.latency_sum", nil)
 				sum.Observe(3)
 
 				p, ok := s.Read().Summary("runtime.latency", nil)
@@ -74,6 +76,8 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				fr := s.Read(ReadFlatten())
 				mustValue(t, fr, "runtime.latency_count", nil, 2)
 				mustValue(t, fr, "runtime.latency_sum", nil, 4)
+				mustDelta(t, fr, "runtime.latency_count", nil, 1)
+				mustDelta(t, fr, "runtime.latency_sum", nil, 3)
 				_, ok = fr.Summary("runtime.latency", nil)
 				require.False(t, ok, "expected flattened view to hide typed summary getter")
 			},
@@ -86,6 +90,9 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				ss := m.StateSet("mode", WithStateSetStates("maintenance", "operational"), WithStateSetMode(ModeEnum))
 
 				h.Observe(0.5)
+				mustNoDelta(t, s.Read(ReadFlatten()), "runtime.req_duration_bucket", Labels{"le": "1"})
+				mustNoDelta(t, s.Read(ReadFlatten()), "runtime.req_duration_count", nil)
+				mustNoDelta(t, s.Read(ReadFlatten()), "runtime.req_duration_sum", nil)
 				h.Observe(3)
 				ss.Enable("operational")
 
@@ -105,6 +112,11 @@ func TestRuntimeStoreScenarios(t *testing.T) {
 				mustValue(t, fr, "runtime.req_duration_bucket", Labels{"le": "1"}, 1)
 				mustValue(t, fr, "runtime.req_duration_bucket", Labels{"le": "2"}, 0)
 				mustValue(t, fr, "runtime.req_duration_bucket", Labels{"le": "+Inf"}, 1)
+				mustDelta(t, fr, "runtime.req_duration_bucket", Labels{"le": "1"}, 0)
+				mustDelta(t, fr, "runtime.req_duration_bucket", Labels{"le": "2"}, 0)
+				mustDelta(t, fr, "runtime.req_duration_bucket", Labels{"le": "+Inf"}, 1)
+				mustDelta(t, fr, "runtime.req_duration_count", nil, 1)
+				mustDelta(t, fr, "runtime.req_duration_sum", nil, 3)
 				mustValue(t, fr, "runtime.mode", Labels{"runtime.mode": "maintenance"}, 0)
 				mustValue(t, fr, "runtime.mode", Labels{"runtime.mode": "operational"}, 1)
 			},

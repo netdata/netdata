@@ -165,9 +165,11 @@ func (c *storeCycleController) CommitCycleSuccess() error {
 		// writes by effective bounds, so every staged write of an accepted name shares the
 		// canonical bounds - no per-series schema capture or drift check is needed here.
 		series := getOrCreateCommitSeries(oldSnap, next, key, staged.name, staged.hostScopeKey, staged.hostScope, staged.labels, staged.labelsKey, staged.desc)
+		rememberHistogramPrevious(series, staged.desc)
 		series.histogramCount = staged.count
 		series.histogramSum = staged.sum
 		series.histogramCumulative = append(series.histogramCumulative[:0], staged.cumulative...)
+		series.histogramCurrentSeq = c.core.active.seq
 		markSeriesSeen(series, c.core.active.seq, successSeq)
 	}
 
@@ -184,6 +186,7 @@ func (c *storeCycleController) CommitCycleSuccess() error {
 			}
 		}
 
+		rememberSummaryPrevious(series, staged.desc)
 		series.summaryCount = staged.count
 		series.summarySum = staged.sum
 		if len(staged.quantileValues) > 0 {
@@ -191,6 +194,7 @@ func (c *storeCycleController) CommitCycleSuccess() error {
 		} else {
 			series.summaryQuantiles = nil
 		}
+		series.summaryCurrentSeq = c.core.active.seq
 		if staged.sketch != nil && series.desc != nil && series.desc.window == WindowCumulative {
 			series.summarySketch = staged.sketch.clone()
 		} else {
@@ -283,6 +287,44 @@ func (c *storeCycleController) CommitCycleSuccess() error {
 	c.core.successSeq = successSeq
 	c.core.active = nil
 	return nil
+}
+
+func rememberHistogramPrevious(series *committedSeries, nextDesc *instrumentDescriptor) {
+	if series.desc != nil &&
+		series.desc.kind == kindHistogram &&
+		series.histogramCurrentSeq > 0 &&
+		seriesAuthoritiesCompatible(series.desc, nextDesc) {
+		series.histogramPreviousCount = series.histogramCount
+		series.histogramPreviousSum = series.histogramSum
+		series.histogramPreviousCumulative = append(series.histogramPreviousCumulative[:0], series.histogramCumulative...)
+		series.histogramPreviousSeq = series.histogramCurrentSeq
+		series.histogramHasPrev = true
+		return
+	}
+
+	series.histogramPreviousCount = 0
+	series.histogramPreviousSum = 0
+	series.histogramPreviousCumulative = nil
+	series.histogramPreviousSeq = 0
+	series.histogramHasPrev = false
+}
+
+func rememberSummaryPrevious(series *committedSeries, nextDesc *instrumentDescriptor) {
+	if series.desc != nil &&
+		series.desc.kind == kindSummary &&
+		series.summaryCurrentSeq > 0 &&
+		seriesAuthoritiesCompatible(series.desc, nextDesc) {
+		series.summaryPreviousCount = series.summaryCount
+		series.summaryPreviousSum = series.summarySum
+		series.summaryPreviousSeq = series.summaryCurrentSeq
+		series.summaryHasPrev = true
+		return
+	}
+
+	series.summaryPreviousCount = 0
+	series.summaryPreviousSum = 0
+	series.summaryPreviousSeq = 0
+	series.summaryHasPrev = false
 }
 
 // AbortCycle discards staged writes and publishes metadata-only failed-attempt status.

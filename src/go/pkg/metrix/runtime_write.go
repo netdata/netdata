@@ -108,6 +108,7 @@ func (r *runtimeStoreBackend) recordHistogramObserve(desc *instrumentDescriptor,
 			series.histogramCumulative = make([]SampleValue, len(schema.bounds))
 		}
 
+		rememberHistogramPrevious(series, desc)
 		idx := findHistogramBucket(schema.bounds, value)
 		if idx < len(series.histogramCumulative) {
 			for i := idx; i < len(series.histogramCumulative); i++ {
@@ -116,6 +117,7 @@ func (r *runtimeStoreBackend) recordHistogramObserve(desc *instrumentDescriptor,
 		}
 		series.histogramCount++
 		series.histogramSum += value
+		series.histogramCurrentSeq++
 		series.meta.LastSeenSuccessSeq = seq
 		series.runtimeLastSeenUnixNano = nowUnixNano
 	})
@@ -141,8 +143,10 @@ func (r *runtimeStoreBackend) recordSummaryObserve(desc *instrumentDescriptor, s
 	r.commitRuntimeWrite(func(old, next *readSnapshot, seq uint64, nowUnixNano int64) {
 		series := runtimeEnsureSeriesMutable(old, next, key, desc.name, scope.ScopeKey, scope, labels, labelsKey, desc)
 
+		rememberSummaryPrevious(series, desc)
 		series.summaryCount++
 		series.summarySum += value
+		series.summaryCurrentSeq++
 
 		qs := desc.summaryQuantiles()
 		if len(qs) > 0 {

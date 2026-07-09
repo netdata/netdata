@@ -36,12 +36,25 @@ type committedSeries struct {
 	histogramCount      SampleValue
 	histogramSum        SampleValue
 	histogramCumulative []SampleValue
+	// Histogram two-sample state (used by flattened histogram Delta()).
+	histogramPreviousCount      SampleValue
+	histogramPreviousSum        SampleValue
+	histogramPreviousCumulative []SampleValue
+	histogramHasPrev            bool
+	histogramCurrentSeq         uint64
+	histogramPreviousSeq        uint64
 
 	// Summary current sample (used by Summary()).
 	summaryCount     SampleValue
 	summarySum       SampleValue
 	summaryQuantiles []SampleValue
 	summarySketch    *summaryQuantileSketch // cumulative stateful quantile estimator
+	// Summary two-sample state (used by flattened summary Delta()).
+	summaryPreviousCount SampleValue
+	summaryPreviousSum   SampleValue
+	summaryHasPrev       bool
+	summaryCurrentSeq    uint64
+	summaryPreviousSeq   uint64
 
 	// StateSet current sample (used by StateSet()).
 	stateSetValues map[string]bool
