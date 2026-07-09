@@ -25,7 +25,12 @@ static void update_cygpath_env(void) {
     char win_path[MAX_PATH];
 
 #if defined(__CYGWIN__) || defined(__MSYS__)
-    cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path));
+    // Convert Cygwin root path to Windows path
+    errno_clear();
+    if(cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path)) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot convert Cygwin/MSYS2 base path to Windows path: %s", strerror(errno));
+        return;
+    }
 #else
     // On UCRT64 there is no Cygwin layer. NETDATA_WINDOWS_PATH_PREFIX is the
     // Windows installation directory (e.g. "C:\Program Files\Netdata") where

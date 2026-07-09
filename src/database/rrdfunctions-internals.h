@@ -34,6 +34,14 @@ struct rrd_host_function {
     struct rrd_collector *collector;
 };
 
+static inline size_t rrd_functions_strlen_bounded(const char *s, size_t max) {
+    size_t len = strnlen(s, max + 1);
+    if(unlikely(len > max))
+        fatal("RRDFUNCTIONS: string exceeds maximum supported length.");
+
+    return len;
+}
+
 bool rrd_function_is_available(struct rrd_host_function *rdcf, RRDHOST *host);
 int rrd_functions_find_by_name(RRDHOST *host, BUFFER *wb, const char *name, size_t key_length, const DICTIONARY_ITEM **item);
 

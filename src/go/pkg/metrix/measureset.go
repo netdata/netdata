@@ -265,6 +265,13 @@ func (c *storeCore) recordMeasureSetGaugeSetPoint(desc *instrumentDescriptor, sc
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.measureSetGauges[key]
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyDesc(key, entry.desc, desc)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		entry = &stagedMeasureSet{
 			key:          key,
@@ -309,9 +316,16 @@ func (c *storeCore) recordMeasureSetGaugeAddPoint(desc *instrumentDescriptor, sc
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.measureSetGauges[key]
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyDesc(key, entry.desc, desc)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		baseline := make([]SampleValue, len(schema.fields))
-		if existing := c.snapshot.Load().series[key]; existing != nil {
+		if existing := c.baselineSeriesForWrite(key, desc); existing != nil {
 			baseline = append(baseline[:0], existing.measureSetValues...)
 			if len(baseline) != len(schema.fields) {
 				baseline = make([]SampleValue, len(schema.fields))
@@ -364,9 +378,16 @@ func (c *storeCore) recordMeasureSetGaugeSetField(desc *instrumentDescriptor, sc
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.measureSetGauges[key]
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyDesc(key, entry.desc, desc)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		baseline := make([]SampleValue, len(schema.fields))
-		if existing := c.snapshot.Load().series[key]; existing != nil {
+		if existing := c.baselineSeriesForWrite(key, desc); existing != nil {
 			baseline = append(baseline[:0], existing.measureSetValues...)
 			if len(baseline) != len(schema.fields) {
 				baseline = make([]SampleValue, len(schema.fields))
@@ -418,6 +439,13 @@ func (c *storeCore) recordMeasureSetCounterObserveTotalPoint(desc *instrumentDes
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.measureSetCounters[key]
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyDesc(key, entry.desc, desc)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		entry = &stagedMeasureSet{
 			key:          key,
@@ -462,9 +490,16 @@ func (c *storeCore) recordMeasureSetCounterAddPoint(desc *instrumentDescriptor, 
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.measureSetCounters[key]
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyDesc(key, entry.desc, desc)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		baseline := make([]SampleValue, len(schema.fields))
-		if existing := c.snapshot.Load().series[key]; existing != nil {
+		if existing := c.baselineSeriesForWrite(key, desc); existing != nil {
 			baseline = append(baseline[:0], existing.measureSetValues...)
 			if len(baseline) != len(schema.fields) {
 				baseline = make([]SampleValue, len(schema.fields))

@@ -86,6 +86,7 @@ void health_alarm_entry_aral_init(void);
 struct aral_statistics *health_alarm_entry_aral_stats(void);
 ALARM_ENTRY *health_alarm_entry_create(void);
 void health_alarm_entry_destroy(ALARM_ENTRY *ae);
+void health_alarm_entry_assign_unique_id(RRDHOST *host, ALARM_ENTRY *ae);
 
 void *health_cmdapi_thread(void *ptr);
 

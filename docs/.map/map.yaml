@@ -910,7 +910,7 @@ sidebar:
               label: Chat with Netdata
               edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/ai-chat-netdata.md
           - meta:
-              label: MCP Clients
+              label: Supported AI Clients
               edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md
             items:
               - meta:
@@ -940,6 +940,9 @@ sidebar:
               - meta:
                   label: OpenCode
                   edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-clients/opencode.md
+          - meta:
+              label: MCP Connections
+              edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-ai/mcp/mcp-connections.md
   # Dashboards and Charts
   - meta:
       label: Dashboards and Charts

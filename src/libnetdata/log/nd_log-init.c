@@ -325,7 +325,7 @@ void nd_log_reopen_log_files(bool log) {
 }
 
 int nd_log_systemd_journal_fd(void) {
-    return nd_log.journal.fd;
+    return __atomic_load_n(&nd_log.journal.fd, __ATOMIC_ACQUIRE);
 }
 
 void nd_log_reopen_log_files_for_spawn_server(const char *name) {

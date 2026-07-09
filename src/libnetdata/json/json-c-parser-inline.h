@@ -135,7 +135,16 @@
         if (json_object_is_type(_j, json_type_string)) {                                                        \
             char _datetime[RFC3339_MAX_LENGTH]; _datetime[0] = '\0';                                            \
             strncpyz(_datetime, json_object_get_string(_j), sizeof(_datetime) - 1);                             \
-            dst = rfc3339_parse_ut(_datetime, NULL);                                                            \
+            usec_t _timestamp_ut = 0;                                                                           \
+            if (rfc3339_parse_ut(_datetime, &_timestamp_ut, NULL))                                               \
+                dst = _timestamp_ut;                                                                            \
+            else {                                                                                              \
+                dst = 0;                                                                                        \
+                if ((flags) & (JSONC_REQUIRED | JSONC_STRICT)) {                                                \
+                    buffer_sprintf(error, "invalid RFC3339 datetime for '%s.%s'", path, member);                \
+                    return false;                                                                               \
+                }                                                                                               \
+            }                                                                                                   \
         }                                                                                                       \
         else {                                                                                                  \
             dst = 0;                                                                                            \

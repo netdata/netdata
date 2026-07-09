@@ -119,13 +119,16 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt, size_t dimensions, size_t 
     r->view.before = qt->window.before;
     r->view.after = qt->window.after;
     r->time_grouping.points_wanted = points;
-    r->d = (int)dimensions;
-    r->n = (int)points;
+    r->d = dimensions;
+    r->n = points;
 
     if(points && dimensions) {
-        r->v = onewayalloc_mallocz(owa, points * dimensions * sizeof(NETDATA_DOUBLE));
-        r->o = onewayalloc_mallocz(owa, points * dimensions * sizeof(RRDR_VALUE_FLAGS));
-        r->ar = onewayalloc_mallocz(owa, points * dimensions * sizeof(NETDATA_DOUBLE));
+        r->v = onewayalloc_mallocz(
+            owa, onewayalloc_mul3_or_fatal(points, dimensions, sizeof(*r->v), "RRDR values"));
+        r->o = onewayalloc_mallocz(
+            owa, onewayalloc_mul3_or_fatal(points, dimensions, sizeof(*r->o), "RRDR value flags"));
+        r->ar = onewayalloc_mallocz(
+            owa, onewayalloc_mul3_or_fatal(points, dimensions, sizeof(*r->ar), "RRDR anomaly rates"));
     }
 
     if(points) {
@@ -133,7 +136,7 @@ RRDR *rrdr_create(ONEWAYALLOC *owa, QUERY_TARGET *qt, size_t dimensions, size_t 
     }
 
     if(dimensions) {
-        r->od = onewayalloc_mallocz(owa, dimensions * sizeof(RRDR_DIMENSION_FLAGS));
+        r->od = onewayalloc_mallocz(owa, onewayalloc_mul_or_fatal(dimensions, sizeof(*r->od), "RRDR dimension flags"));
         r->di = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
         r->dn = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));
         r->du = onewayalloc_callocz(owa, dimensions, sizeof(STRING *));

@@ -109,6 +109,13 @@ func (c *storeCore) recordSummaryObservePoint(desc *instrumentDescriptor, scope 
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.summaries[key]
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyDesc(key, entry.desc, desc)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		entry = &stagedSummary{
 			key:          key,
@@ -153,6 +160,13 @@ func (c *storeCore) recordSummaryObserve(desc *instrumentDescriptor, scope HostS
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.summaries[key]
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyDesc(key, entry.desc, desc)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		entry = &stagedSummary{
 			key:          key,
@@ -164,7 +178,7 @@ func (c *storeCore) recordSummaryObserve(desc *instrumentDescriptor, scope HostS
 			desc:         desc,
 		}
 		if desc.window == WindowCumulative {
-			if existing := c.snapshot.Load().series[key]; existing != nil && existing.desc != nil && existing.desc.kind == kindSummary {
+			if existing := c.baselineSeriesForWrite(key, desc); existing != nil {
 				entry.count = existing.summaryCount
 				entry.sum = existing.summarySum
 				if len(desc.summaryQuantiles()) > 0 && existing.summarySketch != nil {

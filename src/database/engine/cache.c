@@ -1042,7 +1042,7 @@ static inline void free_this_page(PGC *cache, PGC_PAGE *page, size_t partition _
             .metric_id = page->metric_id,
             .start_time_s = page->start_time_s,
             .end_time_s = __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED),
-            .update_every_s = page->update_every_s,
+            .update_every_s = pgc_page_update_every_s(page),
             .size = size,
             .hot = (is_page_hot(page)) ? true : false,
             .data = page->data,
@@ -1866,7 +1866,7 @@ static bool flush_pages(PGC *cache, size_t max_flushes, Word_t section, bool wai
                             .metric_id = page->metric_id,
                             .start_time_s = page->start_time_s,
                             .end_time_s = __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED),
-                            .update_every_s = page->update_every_s,
+                            .update_every_s = pgc_page_update_every_s(page),
                             .size = page_size_from_assumed_size(cache, page->assumed_size),
                             .data = page->data,
                             .custom_data = (cache->config.additional_bytes_per_page) ? page->custom_data : NULL,
@@ -2314,14 +2314,15 @@ time_t pgc_page_end_time_s(PGC_PAGE *page) {
 }
 
 uint32_t pgc_page_update_every_s(PGC_PAGE *page) {
-    return page->update_every_s;
+    return __atomic_load_n(&page->update_every_s, __ATOMIC_RELAXED);
 }
 
 uint32_t pgc_page_fix_update_every(PGC_PAGE *page, uint32_t update_every_s) {
-    if(page->update_every_s == 0)
-        page->update_every_s = update_every_s;
+    uint32_t expected = 0;
+    __atomic_compare_exchange_n(&page->update_every_s, &expected, update_every_s,
+                                false, __ATOMIC_RELAXED, __ATOMIC_RELAXED);
 
-    return page->update_every_s;
+    return __atomic_load_n(&page->update_every_s, __ATOMIC_RELAXED);
 }
 
 time_t pgc_page_fix_end_time_s(PGC_PAGE *page, time_t end_time_s) {
@@ -2652,7 +2653,7 @@ void pgc_open_cache_to_journal_v2(
             struct jv2_page_info *pi = aral_mallocz(ar_pi);
             pi->start_time_s = page->start_time_s;
             pi->end_time_s = page->end_time_s;
-            pi->update_every_s = page->update_every_s;
+            pi->update_every_s = pgc_page_update_every_s(page);
             pi->page_length = page_size_from_assumed_size(cache, page->assumed_size);
             pi->page = page;
             pi->extent_index = current_extent_index_id;

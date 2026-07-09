@@ -23,6 +23,9 @@ void onewayalloc_destroy(ONEWAYALLOC *owa);
 // freshly-created arena; the reset path does not relax that contract.
 void onewayalloc_reset(ONEWAYALLOC *owa);
 
+size_t onewayalloc_mul_or_fatal(size_t nmemb, size_t size, const char *context);
+size_t onewayalloc_mul3_or_fatal(size_t nmemb1, size_t nmemb2, size_t size, const char *context);
+
 void *onewayalloc_mallocz(ONEWAYALLOC *owa, size_t size);
 void *onewayalloc_callocz(ONEWAYALLOC *owa, size_t nmemb, size_t size);
 char *onewayalloc_strdupz(ONEWAYALLOC *owa, const char *s);

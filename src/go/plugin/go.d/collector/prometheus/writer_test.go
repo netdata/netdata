@@ -419,7 +419,7 @@ app_lat_count{id="b"} 3
 		assert.Len(t, w.handles["app_g"].gauges, 1, "stale series handle must be evicted, leaving only the active one")
 	})
 
-	t.Run("reappearing metric name with a changed type is skipped, never re-registered (no panic)", func(t *testing.T) {
+	t.Run("a reappearing name within the descriptor window with a changed type is drift-skipped (no panic)", func(t *testing.T) {
 		store := metrix.NewCollectorStore()
 		w := newMetricFamilyWriter(store, metricFamilyWriterPolicy{}, logger.New())
 		cc := cycle(t, store)
@@ -428,24 +428,25 @@ app_lat_count{id="b"} 3
 		require.Equal(t, 1, w.writeMetricFamilies(scrape(t, "# TYPE foo gauge\nfoo 1\n")))
 		require.NoError(t, cc.CommitCycleSuccess())
 
-		// foo is absent well beyond the per-series retention window; its series handle is evicted, but
-		// the family handle is kept.
-		for range seriesCacheRetentionCycles + 5 {
+		// foo is absent but the endpoint stays up (a keepalive family keeps the writer reconciling)
+		// for fewer cycles than the descriptor window, so metrix still holds foo's gauge descriptor.
+		for range seriesCacheRetentionCycles {
 			cc.BeginCycle()
+			w.writeMetricFamilies(scrape(t, "# TYPE ka gauge\nka 1\n"))
 			require.NoError(t, cc.CommitCycleSuccess())
 		}
 
-		// foo reappears as a counter. metrix's descriptor for "foo" is a permanent gauge, so
-		// re-registering it as a counter would panic; the kept handle must detect the drift and skip.
+		// foo reappears as a counter while its gauge descriptor is still live: writing a conflicting
+		// kind would fail the metrix commit, so the kept handle must detect the drift and skip.
 		cc.BeginCycle()
 		assert.NotPanics(t, func() {
 			assert.Equal(t, 0, w.writeMetricFamilies(scrape(t, "# TYPE foo counter\nfoo 5\n")),
-				"a reappearing name with a changed type must be skipped")
+				"a reappearing name whose descriptor is still live must be drift-skipped")
 		})
 		require.NoError(t, cc.CommitCycleSuccess())
 	})
 
-	t.Run("reappearing metric name with changed summary quantiles is skipped (no panic)", func(t *testing.T) {
+	t.Run("a reappearing name within the descriptor window with changed summary quantiles is drift-skipped (no panic)", func(t *testing.T) {
 		store := metrix.NewCollectorStore()
 		w := newMetricFamilyWriter(store, metricFamilyWriterPolicy{}, logger.New())
 		cc := cycle(t, store)
@@ -455,19 +456,21 @@ app_lat_count{id="b"} 3
 			"# TYPE app_lat summary\napp_lat{quantile=\"0.5\"} 1\napp_lat_sum 1\napp_lat_count 1\n")))
 		require.NoError(t, cc.CommitCycleSuccess())
 
-		// app_lat absent beyond the per-series retention window (series handle evicted, family handle kept).
-		for range seriesCacheRetentionCycles + 5 {
+		// app_lat absent for fewer cycles than the descriptor window (keepalive keeps the writer
+		// reconciling), so metrix still holds its summary descriptor fixed to {0.5}.
+		for range seriesCacheRetentionCycles {
 			cc.BeginCycle()
+			w.writeMetricFamilies(scrape(t, "# TYPE ka gauge\nka 1\n"))
 			require.NoError(t, cc.CommitCycleSuccess())
 		}
 
-		// app_lat reappears with a different quantile set. metrix's summary descriptor for "app_lat" is
-		// fixed to {0.5}; observing {0.5,0.9} would panic, so the kept handle must skip the drifted series.
+		// app_lat reappears with a different quantile set while its descriptor is still live; the
+		// off-schema series must be drift-skipped rather than fail the commit.
 		cc.BeginCycle()
 		assert.NotPanics(t, func() {
 			assert.Equal(t, 0, w.writeMetricFamilies(scrape(t,
 				"# TYPE app_lat summary\napp_lat{quantile=\"0.5\"} 1\napp_lat{quantile=\"0.9\"} 2\napp_lat_sum 3\napp_lat_count 2\n")),
-				"a reappearing summary with a changed quantile set must be skipped")
+				"a reappearing summary with a changed quantile set must be drift-skipped while live")
 		})
 		require.NoError(t, cc.CommitCycleSuccess())
 	})

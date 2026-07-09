@@ -13,6 +13,7 @@
 struct fd_info {
     uint32_t events;
     uint32_t last_served;
+    uint32_t registration_id;
     const void *data;
 };
 
@@ -32,6 +33,7 @@ struct nd_poll_t {
 
     uint32_t nfds; // the number of sockets we have
     uint32_t iteration_counter;
+    uint32_t registration_counter;
 };
 
 // Initialize the event poll context
@@ -72,6 +74,22 @@ static inline nd_poll_event_t nd_poll_events_from_epoll_events(uint32_t events) 
     return nd_poll_events;
 }
 
+static inline uint64_t nd_poll_epoll_data(int fd, uint32_t registration_id) {
+    return ((uint64_t)registration_id << 32) | (uint32_t)fd;
+}
+
+static inline struct fd_info *nd_poll_fd_info_from_event(nd_poll_t *ndpl, const struct epoll_event *ev) {
+    uint64_t data = ev->data.u64;
+    int fd = (int)(uint32_t)data;
+    uint32_t registration_id = (uint32_t)(data >> 32);
+
+    struct fd_info *fdi = POINTERS_GET(&ndpl->pointers, fd);
+    if(!fdi || fdi->registration_id != registration_id)
+        return NULL;
+
+    return fdi;
+}
+
 // Add a file descriptor to the event poll
 bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, const void *data) {
     internal_fatal(!data, "nd_poll() does not support NULL data pointers");
@@ -80,6 +98,9 @@ bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, const void *da
     fdi->data = data;
     fdi->last_served = 0;
     fdi->events = nd_poll_events_to_epoll_events(events);
+    fdi->registration_id = ++ndpl->registration_counter;
+    if(unlikely(!fdi->registration_id))
+        fdi->registration_id = ++ndpl->registration_counter;
 
     if(POINTERS_GET(&ndpl->pointers, fd) || !POINTERS_SET(&ndpl->pointers, fd, fdi)) {
         freez(fdi);
@@ -88,7 +109,7 @@ bool nd_poll_add(nd_poll_t *ndpl, int fd, nd_poll_event_t events, const void *da
 
     struct epoll_event ev = {
         .events = fdi->events,
-        .data.fd = fd,
+        .data.u64 = nd_poll_epoll_data(fd, fdi->registration_id),
     };
 
     bool rc = epoll_ctl(ndpl->epoll_fd, EPOLL_CTL_ADD, fd, &ev) == 0;
@@ -128,7 +149,7 @@ bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events) {
 
     struct epoll_event ev = {
         .events = fdi->events,
-        .data.fd = fd,
+        .data.u64 = nd_poll_epoll_data(fd, fdi->registration_id),
     };
     bool rc = epoll_ctl(ndpl->epoll_fd, EPOLL_CTL_MOD, fd, &ev) == 0;
     internal_fatal(!rc, "epoll_ctl() failed"); // this may happen if fd is closed
@@ -137,9 +158,9 @@ bool nd_poll_upd(nd_poll_t *ndpl, int fd, nd_poll_event_t events) {
 
 static inline bool nd_poll_get_next_event(nd_poll_t *ndpl, nd_poll_result_t *result) {
     while(ndpl->last_pos < ndpl->used) {
-        struct fd_info *fdi = POINTERS_GET(&ndpl->pointers, ndpl->ev[ndpl->last_pos].data.fd);
+        struct fd_info *fdi = nd_poll_fd_info_from_event(ndpl, &ndpl->ev[ndpl->last_pos]);
 
-        // Skip events that have been invalidated by nd_poll_del()
+        // Skip events invalidated by nd_poll_del() or by fd reuse after deletion.
         if(!fdi || !fdi->data) {
             ndpl->last_pos++;
             continue;
@@ -187,7 +208,7 @@ static void sort_events(nd_poll_t *ndpl) {
 
     sortable_event_t sortable_array[MAX_EVENTS_PER_CALL];
     for (size_t i = 0; i < ndpl->used; ++i) {
-        struct fd_info *fdi = POINTERS_GET(&ndpl->pointers, ndpl->ev[i].data.fd);
+        struct fd_info *fdi = nd_poll_fd_info_from_event(ndpl, &ndpl->ev[i]);
         sortable_array[i] = (sortable_event_t){
             .event = ndpl->ev[i],
             .last_served = fdi ? fdi->last_served : UINT32_MAX,
