@@ -111,7 +111,10 @@ static void netdata_windows_cpu_from_registry(struct rrdhost_system_info *system
 
     netdata_windows_cpu_vendor_model(systemInfo, lKey, "NETDATA_SYSTEM_CPU_VENDOR", "VendorIdentifier");
     netdata_windows_cpu_vendor_model(systemInfo, lKey, "NETDATA_SYSTEM_CPU_MODEL", "ProcessorNameString");
+    // Not stored in the struct; consumed from the environment by anonymous-statistics.sh
+    // (mirrors the Linux system-info.sh dispatch that nd_setenv()s every key).
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD);
+    nd_setenv("NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
 }
 
 static void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
@@ -134,7 +137,9 @@ static void netdata_windows_get_mem(struct rrdhost_system_info *systemInfo)
     (void)rrdhost_system_info_set_by_name(systemInfo,
                                            "NETDATA_SYSTEM_TOTAL_RAM",
                                            (!size) ? NETDATA_DEFAULT_SYSTEM_INFO_VALUE_UNKNOWN : memSize);
+    // Not stored in the struct; consumed from the environment by anonymous-statistics.sh.
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD);
+    nd_setenv("NETDATA_SYSTEM_RAM_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
 }
 
 static ULONGLONG netdata_windows_get_disk_size(char *cVolume)
@@ -180,7 +185,10 @@ static void netdata_windows_get_total_disk_size(struct rrdhost_system_info *syst
     char diskSize[256];
     (void)snprintf(diskSize, 255, "%llu", total);
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_TOTAL_DISK_SIZE", diskSize);
+
+    // Not stored in the struct; consumed from the environment by anonymous-statistics.sh.
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD);
+    nd_setenv("NETDATA_SYSTEM_DISK_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
 }
 
 // Host
@@ -473,8 +481,15 @@ static void netdata_windows_container(struct rrdhost_system_info *systemInfo, co
     netdata_windows_set_local_kernel_info(systemInfo);
     (void)rrdhost_system_info_set_by_name(
         systemInfo, "NETDATA_HOST_IS_K8S_NODE", NETDATA_DEFAULT_SYSTEM_INFO_VALUE_FALSE);
+
+    // rrdhost_system_info_set_by_name() recognizes but does not store this key (it has no
+    // struct field); its only consumer is anonymous-statistics.sh, which reads it from the
+    // environment. On Linux the system-info.sh dispatch loop nd_setenv()s it — mirror that
+    // here so the flag is not silently dropped on Windows.
+    const char *official_image = netdata_windows_container_is_official_image();
     (void)rrdhost_system_info_set_by_name(
-        systemInfo, "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE", netdata_windows_container_is_official_image());
+        systemInfo, "NETDATA_CONTAINER_IS_OFFICIAL_IMAGE", official_image);
+    nd_setenv("NETDATA_CONTAINER_IS_OFFICIAL_IMAGE", official_image, 1);
 }
 
 static void netdata_windows_install_type(struct rrdhost_system_info *systemInfo)
