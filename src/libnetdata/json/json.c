@@ -52,6 +52,11 @@ jsmntok_t *json_tokenise(char *js, size_t len, size_t *count)
 
     int ret = jsmn_parse(&parser, js, len, tokens, n);
     while (ret == JSMN_ERROR_NOMEM) {
+        if(unlikely(n > INT_MAX / 2 || (size_t)n > SIZE_MAX / sizeof(*tokens) / 2)) {
+            freez(tokens);
+            return NULL;
+        }
+
         n *= 2;
         jsmntok_t *new = reallocz(tokens, sizeof(jsmntok_t) * n);
         if(!new) {
