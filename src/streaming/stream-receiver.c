@@ -487,7 +487,7 @@ void stream_receiver_move_to_running_unsafe(struct stream_thread *sth, struct re
     rpt->thread.line_buffer = buffer_create(sizeof(rpt->thread.uncompressed.read_buffer), NULL);
 
     // help preferred_sender_buffer() select the right buffer
-    rpt->host->stream.snd.commit.receiver_tid = gettid_cached();
+    __atomic_store_n(&rpt->host->stream.snd.commit.receiver_tid, gettid_cached(), __ATOMIC_RELAXED);
 
     rpt->replication.last_progress_ut = now_monotonic_usec();
 
@@ -1348,6 +1348,7 @@ void rrdhost_clear_receiver(struct receiver_state *rpt, STREAM_HANDSHAKE reason)
             host->health.enabled = false;
 
             rrdhost_flag_set(host, RRDHOST_FLAG_ORPHAN);
+            __atomic_store_n(&host->stream.snd.commit.receiver_tid, 0, __ATOMIC_RELAXED);
             host->receiver = NULL;
         }
     }
