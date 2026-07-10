@@ -150,29 +150,56 @@ static bool test_cgroup_name_helper_gate(void)
     return ok;
 }
 
-static bool test_cgroup_name_line_framing(void)
+static bool test_cgroup_name_read_protocol(void)
 {
-    struct framing_case {
+    struct read_case {
         const char *name;
-        const char *line;
-        bool expected;
+        const char *payload;
+        bool close_writer;
+        int timeout_ms;
+        CGROUP_NAME_READ_RESULT expected;
     };
-    static const struct framing_case cases[] = {
-        { .name = "complete line", .line = "name label=\"value\"\n", .expected = true },
-        { .name = "missing newline", .line = "name label=\"value\"", .expected = false },
-        { .name = "empty read", .line = "", .expected = false },
+    static const struct read_case cases[] = {
+        { .name = "complete line", .payload = "name label=\"value\"\n", .close_writer = true,
+          .timeout_ms = 100, .expected = CGROUP_NAME_READ_COMPLETE },
+        { .name = "incomplete EOF", .payload = "name label=\"value\"", .close_writer = true,
+          .timeout_ms = 100, .expected = CGROUP_NAME_READ_INVALID },
+        { .name = "empty EOF", .payload = "", .close_writer = true,
+          .timeout_ms = 100, .expected = CGROUP_NAME_READ_EMPTY },
+        { .name = "partial writer hangs", .payload = "x", .close_writer = false,
+          .timeout_ms = 25, .expected = CGROUP_NAME_READ_TIMEOUT },
     };
 
     bool ok = true;
     for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
-        bool actual = cgroup_name_line_is_complete(cases[i].line);
-        if (actual != cases[i].expected) {
-            fprintf(stderr, "%s: expected complete=%s, got %s\n",
-                    cases[i].name,
-                    cases[i].expected ? "true" : "false",
-                    actual ? "true" : "false");
+        int fds[2];
+        if (pipe(fds) != 0) {
+            perror("pipe");
+            return false;
+        }
+
+        size_t length = strlen(cases[i].payload);
+        if (length && write(fds[1], cases[i].payload, length) != (ssize_t)length) {
+            perror("write");
             ok = false;
         }
+        if (cases[i].close_writer) {
+            close(fds[1]);
+            fds[1] = -1;
+        }
+
+        char buffer[CGROUP_NAME_LINE_MAX + 2];
+        CGROUP_NAME_READ_RESULT result =
+            cgroup_name_read_response(fds[0], buffer, sizeof(buffer), cases[i].timeout_ms);
+        if (result != cases[i].expected) {
+            fprintf(stderr, "%s: expected read result %d, got %d\n",
+                    cases[i].name, cases[i].expected, result);
+            ok = false;
+        }
+
+        close(fds[0]);
+        if (fds[1] >= 0)
+            close(fds[1]);
     }
     return ok;
 }
@@ -280,7 +307,7 @@ int main(void)
 
     if (!test_cgroup_name_helper_gate())
         failures++;
-    if (!test_cgroup_name_line_framing())
+    if (!test_cgroup_name_read_protocol())
         failures++;
 
     if (failures) {

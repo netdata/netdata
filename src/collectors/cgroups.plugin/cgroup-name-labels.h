@@ -7,9 +7,17 @@
 
 #define CGROUP_NAME_LINE_MAX 8190
 
-// A helper response is one newline-terminated record. The caller rejects a
-// full buffer without a newline rather than parsing a truncated record.
-bool cgroup_name_line_is_complete(const char *data);
+typedef enum {
+    CGROUP_NAME_READ_ERROR = -1,
+    CGROUP_NAME_READ_TIMEOUT = 0,
+    CGROUP_NAME_READ_COMPLETE = 1,
+    CGROUP_NAME_READ_EMPTY = 2,
+    CGROUP_NAME_READ_INVALID = 3,
+} CGROUP_NAME_READ_RESULT;
+
+// Read one bounded newline-terminated record without letting a partial writer
+// reset or bypass the caller's deadline. A negative timeout is unbounded.
+CGROUP_NAME_READ_RESULT cgroup_name_read_response(int fd, char *buffer, size_t size, int timeout_ms);
 
 // Parse a resolved "<name> key=\"value\",..." line produced by the cgroup-name
 // helper. Adds the label pairs to `labels`, returns the chart name (a pointer

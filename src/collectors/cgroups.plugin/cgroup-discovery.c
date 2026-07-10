@@ -216,7 +216,7 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
     // Bound the wait for the helper's reply independently of whether the
     // helper honors its own timeout: a wedged helper must not stall discovery.
     // Wait up to the operator timeout plus a grace period for the helper to
-    // start producing its line, then reclaim it. cgroup_name_timeout_ms == 0
+    // complete its framed line, then reclaim it. cgroup_name_timeout_ms == 0
     // keeps the legacy unbounded behavior.
     int wait_ms = -1;
     if (cgroup_name_timeout_ms > 0)
@@ -224,46 +224,24 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
                       INT_MAX :
                       cgroup_name_timeout_ms + CGROUP_NAME_GRACE_MS;
 
-    int poll_wait_ms = wait_ms;
-    usec_t poll_deadline_ut = 0;
-    if (wait_ms > 0) {
-        usec_t now_ut = now_monotonic_usec();
-        if (now_ut)
-            poll_deadline_ut = now_ut + (usec_t)wait_ms * USEC_PER_MS;
-    }
-
-    struct pollfd pfd = { .fd = spawn_popen_read_fd(instance), .events = POLLIN };
-    int pr;
-    do {
-        pr = poll(&pfd, 1, poll_wait_ms);
-        // Do not give the helper a fresh full timeout after every signal.
-        if (pr < 0 && errno == EINTR && poll_deadline_ut) {
-            usec_t now_ut = now_monotonic_usec();
-            if (now_ut >= poll_deadline_ut) {
-                pr = 0;
-                break;
-            }
-
-            poll_wait_ms = (int)((poll_deadline_ut - now_ut + USEC_PER_MS - 1) / USEC_PER_MS);
-        }
-    } while (pr < 0 && errno == EINTR);
-
-    if (pr > 0) {
-        new_name = fgets(buffer, sizeof(buffer), spawn_popen_stdout(instance));
-        if (new_name && !cgroup_name_line_is_complete(new_name)) {
-            collector_error("CGROUP: rename helper for '%s' produced an oversized or incomplete record.", cg->id);
-            new_name = NULL;
-        }
-    }
+    CGROUP_NAME_READ_RESULT read_result = cgroup_name_read_response(
+        spawn_popen_read_fd(instance), buffer, sizeof(buffer), wait_ms);
+    if (read_result == CGROUP_NAME_READ_COMPLETE)
+        new_name = buffer;
+    else if (read_result == CGROUP_NAME_READ_INVALID)
+        collector_error("CGROUP: rename helper for '%s' produced an oversized or incomplete record.", cg->id);
 
     int exit_code = -1;
-    if (pr <= 0) {
+    if (read_result == CGROUP_NAME_READ_TIMEOUT || read_result == CGROUP_NAME_READ_ERROR) {
         // timeout or poll error: the helper hung. Kill it, drop any partial
         // output, and stop retrying this cgroup - re-running a helper that
         // already hung would just block discovery again every cycle. The cgroup
         // keeps its raw chart id.
-        collector_error(
-            "CGROUP: rename helper for '%s' did not respond within %d ms; killing it.", cg->id, wait_ms);
+        if (read_result == CGROUP_NAME_READ_TIMEOUT)
+            collector_error(
+                "CGROUP: rename helper for '%s' did not respond within %d ms; killing it.", cg->id, wait_ms);
+        else
+            collector_error("CGROUP: cannot read rename helper response for '%s'; killing it.", cg->id);
         spawn_popen_kill(instance, 0);
         cg->pending_renames = 0;
         new_name = NULL;
@@ -281,11 +259,9 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
                     break;
 
                 default:
-                    // exit 2 (retry): the helper could not fully resolve the name
-                    // yet but printed a fallback (e.g. the short container id or
-                    // 'k8s_<id>'). Keep retrying through the ladder so late K8s API
-                    // metadata can still win; the fallback is applied below once
-                    // the ladder is exhausted (pending_renames reaches 0).
+                    // Exit 2 may carry a fallback while requesting a retry; exit
+                    // 1 carries no usable record. Keep the normal retry ladder,
+                    // then apply any fallback or continue with the raw chart id.
                     break;
             }
         } else {

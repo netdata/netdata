@@ -75,7 +75,7 @@ func TestWriteResolutionIsAtomicAndBounded(t *testing.T) {
 		},
 		"oversized line fails without partial output": {
 			result: resolution{name: strings.Repeat("n", maxCgroupNameLineBytes+1)},
-			code:   exitDisable,
+			code:   exitFatal,
 		},
 		"write failure is fatal": {
 			result: resolution{name: "name"},

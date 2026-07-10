@@ -48,7 +48,7 @@ func (r *resolver) writeResolution(stdout io.Writer, cgroup string, result resol
 	}
 	if len(line) > maxCgroupNameLineBytes {
 		r.errorf("cgroup '%s' resolution is %d bytes, maximum is %d", cgroup, len(line), maxCgroupNameLineBytes)
-		return exitDisable
+		return exitFatal
 	}
 	r.infof("cgroup '%s' is called '%s', labels '%s'", cgroup, result.name, labels)
 	written, err := io.WriteString(stdout, line+"\n")

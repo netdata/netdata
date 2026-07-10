@@ -72,7 +72,9 @@ If the name is still unresolved at the deadline, the helper logs a per-call
 time breakdown at error level and exits with the retry code instead of emitting
 a fallback name, so discovery's retry ladder runs. `cgroups.plugin` waits X plus
 a 2s grace period, then kills the helper; X=0 keeps the legacy unbounded
-behavior on both sides.
+behavior on both sides. The parent incrementally polls and reads until newline,
+EOF, the size bound, or the original absolute deadline; a helper that writes a
+partial record cannot reset or bypass the timeout.
 
 ## Inputs And Exit Codes
 
@@ -327,9 +329,9 @@ or:
 
 The payload before the newline is at most 8190 bytes, so the C consumer's
 8192-byte buffer receives the complete record plus newline and terminator.
-Oversized records produce exit `3` without stdout, so deterministic overflow is
-not retried. Short/failed writes produce fatal exit `1`. The C consumer
-independently rejects records without a newline.
+Oversized records and short/failed writes produce fatal exit `1` without
+partial stdout. The C consumer independently rejects records without a newline;
+after the normal retry ladder, monitoring continues with the raw cgroup name.
 Kubernetes-prefixed `k8s_netdata.cloud/cgroup.name` and
 `k8s_netdata.cloud/ignore` are control annotations at that boundary; other
 `k8s_netdata.cloud/*` annotations remain ordinary labels.

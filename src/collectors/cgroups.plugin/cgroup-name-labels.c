@@ -58,8 +58,58 @@ static char *cgroup_next_label_pair(char **labels) {
     return pair;
 }
 
-bool cgroup_name_line_is_complete(const char *data) {
-    return data && strchr(data, '\n');
+CGROUP_NAME_READ_RESULT cgroup_name_read_response(int fd, char *buffer, size_t size, int timeout_ms) {
+    if (fd < 0 || !buffer || size < 2)
+        return CGROUP_NAME_READ_ERROR;
+
+    usec_t deadline_ut = 0;
+    if (timeout_ms >= 0) {
+        usec_t now_ut = now_monotonic_usec();
+        if (now_ut)
+            deadline_ut = now_ut + (usec_t)timeout_ms * USEC_PER_MS;
+    }
+
+    size_t used = 0;
+    for (;;) {
+        int poll_wait_ms = timeout_ms;
+        if (deadline_ut) {
+            usec_t now_ut = now_monotonic_usec();
+            if (now_ut >= deadline_ut)
+                return CGROUP_NAME_READ_TIMEOUT;
+            poll_wait_ms = (int)((deadline_ut - now_ut + USEC_PER_MS - 1) / USEC_PER_MS);
+        }
+
+        struct pollfd pfd = { .fd = fd, .events = POLLIN };
+        int pr = poll(&pfd, 1, poll_wait_ms);
+        if (pr < 0) {
+            if (errno == EINTR)
+                continue;
+            return CGROUP_NAME_READ_ERROR;
+        }
+        if (pr == 0)
+            return CGROUP_NAME_READ_TIMEOUT;
+        if (pfd.revents & (POLLERR | POLLNVAL))
+            return CGROUP_NAME_READ_ERROR;
+
+        ssize_t bytes = read(fd, buffer + used, size - used - 1);
+        if (bytes < 0) {
+            if (errno == EINTR || errno == EAGAIN)
+                continue;
+            return CGROUP_NAME_READ_ERROR;
+        }
+        if (bytes == 0) {
+            buffer[used] = '\0';
+            return used == 0 ? CGROUP_NAME_READ_EMPTY : CGROUP_NAME_READ_INVALID;
+        }
+
+        used += (size_t)bytes;
+        buffer[used] = '\0';
+        char *newline = memchr(buffer, '\n', used);
+        if (newline)
+            return newline == buffer + used - 1 ? CGROUP_NAME_READ_COMPLETE : CGROUP_NAME_READ_INVALID;
+        if (used == size - 1)
+            return CGROUP_NAME_READ_INVALID;
+    }
 }
 
 char *cgroup_parse_name_and_labels(RRDLABELS *labels, char *data, bool *ignored) {
