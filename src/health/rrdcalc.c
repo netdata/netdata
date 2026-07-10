@@ -136,10 +136,13 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
         }
 
         var[i] = '\0';
-        pos = m - temp + 1;
+        size_t match_pos = m - temp;
+        pos = match_pos + 1;
 
         if (!strcmp(var, RRDCALC_VAR_FAMILY)) {
-            char *buf = find_and_replace(temp, var, (rc->rrdset && rc->rrdset->family) ? rrdset_family(rc->rrdset) : "", m);
+            const char *family = (rc->rrdset && rc->rrdset->family) ? rrdset_family(rc->rrdset) : "";
+            char *buf = find_and_replace(temp, var, family, m);
+            pos = match_pos + strlen(family);
             freez(temp);
             temp = buf;
         }
@@ -154,6 +157,7 @@ static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RR
                 rrdlabels_get_value_strdup_or_null(rc->rrdset->rrdlabels, &lbl_value, label_val);
                 if (lbl_value) {
                     char *buf = find_and_replace(temp, var, lbl_value, m);
+                    pos = match_pos + strlen(lbl_value);
                     freez(temp);
                     temp = buf;
                     freez(lbl_value);
