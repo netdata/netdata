@@ -1658,7 +1658,8 @@ bool journalfile_migrate_to_v2_callback(Word_t section, unsigned datafile_fileno
         return false;
     }
 
-    struct journal_metric_list_to_sort *uuid_list = NULL;
+    // Recovery cleanup reads this after siglongjmp(), including after allocation.
+    struct journal_metric_list_to_sort * volatile uuid_list = NULL;
 
     PROTECTED_ACCESS_SETUP(data_start, total_file_size, path, "migrate");
     if(no_signal_received) {
