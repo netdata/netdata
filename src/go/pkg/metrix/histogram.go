@@ -101,16 +101,27 @@ func (c *storeCore) recordHistogramObservePoint(desc *instrumentDescriptor, scop
 		return
 	}
 
-	schema := desc.histogram
-	if schema == nil {
-		// For snapshot histograms without explicit bounds, validate against
-		// previously captured family schema (if available).
-		schema = c.snapshotHistogramSchema[desc.name]
-	}
-	bounds, count, sum, cumulative := normalizeHistogramPoint(point, schema)
+	// A nil-bounds snapshot histogram adopts the bounds of the observed point; it is
+	// NOT validated against the committed schema here, because client-driven bounds
+	// must never panic the record path. Bounds consistency for nil-bounds histograms
+	// is resolved at commit via the effective-authority path (drop/fail). Explicit-
+	// bounds histograms still validate against their declared schema (fail-loud).
+	bounds, count, sum, cumulative := normalizeHistogramPoint(point, desc.histogram)
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.histograms[key]
+	// Reconcile a same-key write only when it DIFFERS from the staged entry (a different
+	// handle, or the same handle with different observed bounds); a repeated same-handle
+	// write with the same bounds is a canonicalization no-op and must not grow evidence.
+	// A nil-bounds snapshot descriptor is a wildcard, so compare by observed bounds: two
+	// same-key writes with different effective schemas must not silently collapse.
+	if ok && (entry.desc != desc || !equalHistogramBounds(entry.bounds, bounds)) {
+		canonical, proceed := c.reconcileSameKeyHistogram(key, entry, desc, bounds)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		entry = &stagedHistogram{
 			key:          key,
@@ -122,9 +133,6 @@ func (c *storeCore) recordHistogramObservePoint(desc *instrumentDescriptor, scop
 			desc:         desc,
 		}
 		c.active.histograms[key] = entry
-	}
-	if len(entry.bounds) > 0 && !equalHistogramBounds(entry.bounds, bounds) {
-		panic("metrix: histogram point schema mismatch within cycle")
 	}
 	entry.bounds = append(entry.bounds[:0], bounds...)
 	entry.count = count
@@ -162,6 +170,16 @@ func (c *storeCore) recordHistogramObserve(desc *instrumentDescriptor, scope Hos
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.histograms[key]
+	// A stateful histogram's descriptor fully determines its effective authority (bounds
+	// are declared, not per-write), so a repeated same-handle write is a no-op; reconcile
+	// only when the descriptor differs.
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyHistogram(key, entry, desc, desc.histogram.bounds)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		entry = &stagedHistogram{
 			key:          key,
@@ -175,7 +193,7 @@ func (c *storeCore) recordHistogramObserve(desc *instrumentDescriptor, scope Hos
 			cumulative:   make([]SampleValue, len(schema.bounds)),
 		}
 		if desc.window == WindowCumulative {
-			if existing := c.snapshot.Load().series[key]; existing != nil && existing.desc != nil && existing.desc.kind == kindHistogram {
+			if existing := c.baselineSeriesForWrite(key, desc); existing != nil {
 				entry.count = existing.histogramCount
 				entry.sum = existing.histogramSum
 				entry.cumulative = append(entry.cumulative[:0], existing.histogramCumulative...)

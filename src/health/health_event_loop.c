@@ -457,8 +457,8 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                         rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0);
 
                 if (ae) {
-                    health_log_alert(host, ae);
                     health_alarm_log_add_entry(host, ae, false);
+                    health_log_alert(host, ae);
                     health_alert_status_counts_sub(&status_counts, rc->status);
                     rc->old_status = rc->status;
                     rc->status = RRDCALC_STATUS_REMOVED;
@@ -661,11 +661,11 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                             ((rc->config.alert_action_options & ALERT_ACTION_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
                             ((rc->run_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
                             (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
-                                )
+                        )
                     );
 
-                health_log_alert(host, ae);
                 health_alarm_log_add_entry(host, ae, false);
+                health_log_alert(host, ae);
 
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
                        "[%s]: Alert event for [%s.%s], value [%s], status [%s].",
@@ -740,9 +740,10 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                             ((rc->config.alert_action_options & ALERT_ACTION_OPTION_NO_CLEAR_NOTIFICATION)? HEALTH_ENTRY_FLAG_NO_CLEAR_NOTIFICATION : 0) |
                             ((rc->run_flags & RRDCALC_FLAG_SILENCED)? HEALTH_ENTRY_FLAG_SILENCED : 0) |
                             (rrdcalc_isrepeating(rc)?HEALTH_ENTRY_FLAG_IS_REPEATING:0)
-                                )
+                        )
                     );
 
+                health_alarm_entry_assign_unique_id(host, ae);
                 health_log_alert(host, ae);
                 ae->last_repeat = rc->last_repeat;
                 if (!(rc->run_flags & RRDCALC_FLAG_RUN_ONCE) && rc->status == RRDCALC_STATUS_CLEAR) {
@@ -818,7 +819,7 @@ static void health_event_loop(void) {
             schedule_node_state_update(localhost, 10);
         }
 
-        if (unlikely(silencers->all_alarms && silencers->stype == STYPE_DISABLE_ALARMS)) {
+        if (unlikely(health_silencers_all_alarms_disabled())) {
             static int logged=0;
             if (!logged) {
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,

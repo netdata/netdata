@@ -54,7 +54,9 @@ fn log_level_to_filter(level: &LogLevel) -> &'static str {
 /// Initialize tracing with automatic environment detection.
 ///
 /// Uses NETDATA_LOG_LEVEL environment variable if set, otherwise defaults to "info".
-pub fn init_tracing() {
+/// The `syslog_identifier` is used as the SYSLOG_IDENTIFIER for journald logging,
+/// making it easy to distinguish different processes in `journalctl` output.
+pub fn init_tracing_with_identifier(syslog_identifier: &str) {
     // Read Netdata environment configuration
     let netdata_env = NetdataEnv::from_environment();
 
@@ -70,7 +72,7 @@ pub fn init_tracing() {
 
     // Create environment filter: configured level as default, but limit noisy
     // third-party crates to info.
-    let filter = format!("{filter_str},foyer=info,notify=info,h2=info,tower=info,hyper=info");
+    let filter = format!("{filter_str},notify=info,h2=info,tower=info,hyper=info");
     let env_filter = EnvFilter::new(&filter);
 
     // Build the registry with base layers
@@ -79,7 +81,9 @@ pub fn init_tracing() {
     // Add output layer based on log method
     match log_method {
         LogMethod::Journal => {
-            let journald_layer = tracing_journald::layer().expect("failed to connect to journald");
+            let journald_layer = tracing_journald::layer()
+                .expect("failed to connect to journald")
+                .with_syslog_identifier(syslog_identifier.to_string());
             registry.with(journald_layer).init();
         }
         LogMethod::Stderr | LogMethod::Syslog | LogMethod::None => {

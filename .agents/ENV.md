@@ -33,6 +33,19 @@ state if you forget a key.
 | `NETDATA_CLOUD_HOSTNAME` | Cloud REST API host | Almost always `app.netdata.cloud` | `app.netdata.cloud` |
 | `NETDATA_REPOS_DIR` | local Netdata-org repos mirror dir | Pick or create. Will be populated by `mirror-netdata-repos` skill's sync script. | `$HOME/src/netdata` |
 
+### Netdata Cloud claiming (build-MCP auto-claim)
+
+Used by the build/run MCP server under `packaging/tools/automation/mcp`. When
+`NETDATA_CLAIM_TOKEN` is set in that server's environment, every agent it
+launches claims itself to Cloud as an ephemeral node named `mcp-<agent_id>`.
+Leave the token blank to launch unclaimed (local + MCP access still work).
+
+| Key | Role | Where to find it | Sample format |
+|---|---|---|---|
+| `NETDATA_CLAIM_TOKEN` | Space claim token; enables auto-claim when set | app.netdata.cloud -> Space settings -> Connect Nodes -> the `--claim-token` value | long opaque token |
+| `NETDATA_CLAIM_ROOMS` | comma-separated Room id(s) for the node (optional) | same Connect Nodes dialog -> the `--claim-rooms` value | UUID[,UUID...] |
+| `NETDATA_CLAIM_URL` | Cloud base URL (optional) | defaults to `https://app.netdata.cloud` agent-side | URL |
+
 ### agent-events ingestion node
 
 The `agent-events` node is the Netdata-operated ingestion

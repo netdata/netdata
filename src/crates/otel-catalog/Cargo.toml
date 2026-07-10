@@ -1,0 +1,21 @@
+[package]
+name = "otel-catalog"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+uuid = { workspace = true, features = ["serde"] }
+chrono = { workspace = true, features = ["serde"] }
+thiserror = { workspace = true }
+chunk-file = { workspace = true }
+file-registry = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

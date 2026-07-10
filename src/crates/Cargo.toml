@@ -6,10 +6,13 @@ members = [
     "journal-common",
     "journal-core",
     "journal-index",
+    "chunk-file",
+    "treight",
+    "sfst",
     "journal-log-writer",
     "journal-engine",
     "journal-registry",
-    "rdp",
+    "journal-function",
 
     # Netdata plugin workspace members
     "netdata-plugin/error",
@@ -20,13 +23,36 @@ members = [
     "netdata-plugin/bridge",
     "netdata-plugin/charts-derive",
 
-    # Netdata log viewer workspace members
-    "netdata-log-viewer/journal-function",
-    "netdata-log-viewer/otel-signal-viewer-plugin",
-
     # Netdata OTEL workspace members
-    "netdata-otel/otel-plugin",
-    "netdata-otel/flatten_otel",
+    "otel-plugin",
+    "otel-ledger",
+    "file-lifecycle",
+    "otel-catalog",
+    "otel-logs-identity",
+    "file-cache",
+    "flatten-otel",
+
+    # Stress test tools
+    "otel-streams",
+
+    # IPC / RPC
+    "ferryboat",
+
+    "otel-ingestor",
+    "otel-legacy-logs",
+
+    # WAL
+    "file-registry",
+    "wal",
+
+    # SFST build + query
+    "sfsq",
+    "sfsq-cli",
+
+    # OTLP→WAL/indexing experiment (SOW-20260627)
+    "ng-ingest",
+    "ng-index",
+    "ng-flatten",
 
     # Netdata NetFlow workspace members
     "netflow-plugin",
@@ -44,6 +70,27 @@ rust-version = "1.85"
 collapsible_if = "allow"
 
 [workspace.dependencies]
+
+# --- merged from master (deps required by master's journal/netflow/rdp crates) ---
+arbitrary = "1.3"
+async-stream = "0.3"
+bitvec = "1.0.1"
+duct = "0.13"
+foyer = { version = "0.20.0", features = ["serde"] }
+hdrhistogram = { version = "7.5" }
+hyper-util = "0.1"
+indexmap = "2.9"
+journal-log-writer = { path = "journal-log-writer" }
+netdata-plugin-bridge = { path = "netdata-plugin/bridge" }
+netdata-plugin-charts-derive = { path = "netdata-plugin/charts-derive" }
+netdata-plugin-rt = { path = "netdata-plugin/rt" }
+netdata-plugin-types = { path = "netdata-plugin/types" }
+opentelemetry = "0.31.0"
+opentelemetry-otlp = { version = "0.31.0", features = ["grpc-tonic", "logs"] }
+opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio", "logs"] }
+tokio-stream = "0.1"
+tower = "0.5"
+tracing-opentelemetry = "0.32.0"
 static_assertions = "1.1"
 thiserror = "2"
 zerocopy = { version = "0.9.0-alpha.0" }
@@ -61,23 +108,25 @@ rand = "0.9"
 lz4_flex = { version = "0.12", default-features = false, features = ["std", "safe-decode", "checked-decode"] }
 lzma-rust2 = { version = "0.15", default-features = false, features = ["std", "xz"] }
 md5 = "0.7"
+arrayvec = "0.7"
+cardinality-estimator = "1.0"
 
+fst = { git = "https://github.com/vkalintiris/fst.git", branch="bumpalo" }
 roaring = { git = "https://github.com/netdata/roaring-rs.git", branch="allocative" }
-hashbrown = "0.17.0"
 serde = { version = "1.0" }
+serde_bytes = "0.11"
+hashbrown = "0.17"
 rustc-hash = "2.1"
 rmp-serde = "1.3.1"
+bincode = { version = "2.0", features = ["serde"] }
 notify = "8.2"
 
 walkdir = "2.4"
-
-async-stream = "0.3"
 crossbeam-channel = "0.5"
 regex = "1.10"
-bitvec = "1.0.1"
+moka = { version = "0.12", features = ["future"] }
 serde_json = "1.0"
 anyhow = "1.0"
-arbitrary = "1.3"
 chrono = { version = "0.4" }
 
 
@@ -89,15 +138,13 @@ ipnet = "2.11.0"
 ipnet-trie = "0.3.0"
 
 # Tracing
+console-subscriber = "0.5"
 tracing = { version = "0.1" }
 tracing-journald = "0.3"
 tracing-futures = { version = "0.2.5" }
-tracing-opentelemetry = "0.32.0"
 tracing-subscriber = "0.3"
-opentelemetry = "0.31.0"
-opentelemetry_sdk = { version = "0.31.0", features = ["rt-tokio", "logs"] }
-opentelemetry-otlp = { version = "0.31.0", features = ["grpc-tonic", "logs"] }
 opentelemetry-proto = "0.31"
+prost = "0.14"
 
 # Netdata plugin
 schemars = "1.0"
@@ -109,14 +156,12 @@ bytes = "1"
 futures = "0.3"
 phf = { version = "0.12", default-features = false }
 phf_codegen = "0.12"
-tokio-stream = "0.1"
 tokio-util = { version = "0.7", features = ["codec"] }
-foyer = { version = "0.20.0", features = ["serde"] }
 lru = "0.16"
 parking_lot = "0.12"
-allocative = { version = "0.3.4" }
-
-hdrhistogram = { version = "7.5" }
+allocative = "0.3.4"
+bumpalo = { version = "3", features = ["std"] }
+tikv-jemallocator = "0.6"
 rayon = "1.11.0"
 itoa = "1.0"
 
@@ -131,11 +176,8 @@ netflow_parser = "0.9.0"
 netgauze-bgp-pkt = "0.11.0"
 netgauze-bmp-pkt = "0.11.0"
 sflow-parser = "0.6.0"
-reqwest = { version = "0.13.2", default-features = false }
 socket2 = "0.6.3"
 tonic-prost = "0.14"
-prost = "0.14"
-fst = "0.4.7"
 tonic-prost-build = "0.14"
 protoc-bin-vendored = "3"
 etherparse = "0.20.1"
@@ -145,46 +187,79 @@ pcap-file = "2.0.0"
 atty = "0.2"
 bytesize = { version = "2.3.1", features = ["serde"] }
 clap = { version = "4", features = ["derive"] }
-duct = "0.13"
+criterion = { version = "0.5" }
 humantime = "2.2"
 humantime-serde = "1.1"
-hyper-util = "0.1"
-indexmap = "2.9"
 tonic = "0.14"
-tower = "0.5"
 
 flatten-serde-json = { git = "https://github.com/meilisearch/meilisearch", tag = "v1.22.1" }
 
 # Internal workspace crates
 journal-common = { path = "journal-common" }
 journal-core = { path = "journal-core" }
-journal-index = { path = "journal-index" }
-journal-log-writer = { path = "journal-log-writer" }
+journal-index = { path = "journal-index", default-features = false }
+chunk-file = { path = "chunk-file" }
 journal-engine = { path = "journal-engine" }
 journal-registry = { path = "journal-registry" }
+journal-function = { path = "journal-function" }
 rdp = { path = "rdp" }
+treight = { path = "treight" }
+sfst = { path = "sfst" }
+sfsq = { path = "sfsq" }
+sfsq-cli = { path = "sfsq-cli" }
 
 # Netdata plugin crates
 netdata-plugin-error = { path = "netdata-plugin/error" }
 netdata-plugin-protocol = { path = "netdata-plugin/protocol" }
-netdata-plugin-rt = { path = "netdata-plugin/rt" }
 netdata-plugin-schema = { path = "netdata-plugin/schema" }
-netdata-plugin-types = { path = "netdata-plugin/types" }
-netdata-plugin-bridge = { path = "netdata-plugin/bridge" }
-netdata-plugin-charts-derive = { path = "netdata-plugin/charts-derive" }
 rt = { path = "netdata-plugin/rt" }
 
-# Netdata log viewer crates
-journal-function = { path = "netdata-log-viewer/journal-function" }
-otel-signal-viewer-plugin = { path = "netdata-log-viewer/otel-signal-viewer-plugin" }
-
 # Netdata OTEL crates
-otel-plugin = { path = "netdata-otel/otel-plugin" }
-flatten_otel = { path = "netdata-otel/flatten_otel" }
 
+flatten_otel = { path = "flatten-otel" }
+
+# Ledger
+otel-ledger = { path = "otel-ledger" }
+file-lifecycle = { path = "file-lifecycle" }
+otel-ingestor = { path = "otel-ingestor" }
+otel-catalog = { path = "otel-catalog" }
+file-cache = { path = "file-cache" }
+
+# IPC / RPC crates
+ferryboat = { path = "ferryboat" }
+
+file-registry = { path = "file-registry" }
+otel-logs-identity = { path = "otel-logs-identity" }
+wal = { path = "wal" }
+ng-flatten = { path = "ng-flatten" }
+ng-index = { path = "ng-index" }
+
+# reqwest-rustls-tls is load-bearing: without a TLS backend, reqwest rejects
+# every https:// URL in-process (S3/STS never reachable). Guarded by
+# file-lifecycle's TLS-capability test.
+opendal = { version = "0.57", default-features = false, features = [
+  "services-fs",
+  "services-s3",
+  "executors-tokio",
+  "layers-retry",
+  "reqwest-rustls-tls",
+  "auto-register-services",
+] }
+
+rustls = { version = "0.23", default-features = false, features = ["ring"] }
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+url = "2"
+
+crc32fast = "1"
 tempfile = { version = "3" }
 
 proptest = "1.9"
+zstd = "0.13"
+fsst-rs = "0.5"
+futures-util = { version = "0.3", features = ["sink"] }
+flate2 = "1"
+reqwest = { version = "0.13.2", features = ["stream"] }
+
 
 [profile.dev]
 opt-level = 1
@@ -207,5 +282,11 @@ codegen-units = 1
 strip = true
 panic = "abort"
 
-[patch.crates-io]
-fastant = { git = "https://github.com/netdata/fastant.git", branch = "fastant-x86-fix" }
+# Profiling builds (perf / heaptrack): optimized like release, but no LTO so
+# stack backtraces attribute to the real functions instead of being mangled
+# by cross-crate inlining. Build with `cargo build --profile profiling`.
+[profile.profiling]
+inherits = "release"
+lto = false
+codegen-units = 16
+debug = true

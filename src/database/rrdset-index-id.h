@@ -61,6 +61,7 @@ static inline
 }
 
 void rrdset_index_init(RRDHOST *host);
+void rrdset_index_flush(RRDHOST *host);
 void rrdset_index_destroy(RRDHOST *host);
 
 void rrdset_free(RRDSET *st);

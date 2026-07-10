@@ -133,6 +133,13 @@ func (c *storeCore) recordStateSetObserve(desc *instrumentDescriptor, scope Host
 
 	key := makeSeriesKey(scope.ScopeKey, desc.name, labelsKey)
 	entry, ok := c.active.stateSet[key]
+	if ok && entry.desc != desc {
+		canonical, proceed := c.reconcileSameKeyDesc(key, entry.desc, desc)
+		if !proceed {
+			return
+		}
+		entry.desc = canonical
+	}
 	if !ok {
 		entry = &stagedStateSet{
 			key:          key,

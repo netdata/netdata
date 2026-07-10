@@ -91,15 +91,60 @@ topology, tests, specs, or skills.
 
 ## Core Framework Change Gate
 
-Changes to shared Go framework code are high-blast-radius work. Before changing
-these areas, read `src/go/plugin/framework/docs/changing-framework-code.md`.
-That guide is the canonical owner of the framework-change scope list, required
-design note, validation expectations, and artifact checks.
+Changes to shared Go framework code (`metrix`, `chartengine`, `charttpl`, the job
+runtime, `collectorapi`) are high-blast-radius: this code runs in EVERY collector,
+most of it on the per-cycle hot path. Before changing these areas, read
+`src/go/plugin/framework/docs/changing-framework-code.md` — the canonical owner of
+the framework-change scope list, required design note, validation expectations, and
+artifact checks. Implementation MUST NOT begin until that guide's applicable
+approval tier is satisfied.
 
-Framework-change implementation MUST NOT begin until the applicable approval
-tier in that guide is satisfied. You SHOULD prefer a clean framework extension
-over collector-local glue, global variables, or private package coupling when
-the problem is general.
+- Clean extension over glue: prefer a clean framework extension over
+  collector-local globals, singletons, adapters, or private-package coupling when
+  the problem is general.
+- Behavior preservation: when a framework change also touches shipped collectors,
+  preserve their observable behavior (chart IDs, contexts, dimensions, config keys,
+  defaults) and validate representative consumers, not only the framework package
+  (see "Validation For Go Changes").
+- metrix contract: `metrix` keeps one descriptor per metric NAME, resolved
+  atomically at commit and bounded — a name idle past `expireAfterSuccessCycles +
+  descriptorGraceCycles` is evicted, and re-registers cleanly afterward. A consumer
+  that caches per-name state across cycles MUST couple its lifetime to the optional
+  `metrix.DescriptorRetention` accessor. See `src/go/pkg/metrix/README.md`
+  ("Descriptor Lifecycle and Retention").
+
+## Hot-Path And Benchmark Discipline
+
+metrix commit/collect, per-sample/per-write, and per-cycle code are hot paths that
+run for every collector on every cycle.
+
+- Before/after REQUIRED: a hot-path change MUST include before/after
+  `go test -bench` numbers (use `git stash` for the "before" baseline), not just
+  "tests pass".
+- Allocation count is the gate: assert allocs stay within the intended envelope
+  (e.g. a sparse commit stays ~O(touched), never O(retained)). `ns/op` is a
+  dev-machine trend indicator, NOT a CI gate — label it as such inline, and never
+  record a personal name in the file.
+- State the complexity envelope explicitly (e.g. "commit is O(live-series +
+  touched + distinct-names)") and prove the change did not introduce an
+  O(samples)/O(retained)/O(n^2) regression.
+- Keep bench comments in sync with the code they measure, in the same change, with
+  self-contained wording (no round/session references).
+
+## Validation For Go Changes
+
+Run the narrowest command that actually exercises the change; do not claim
+full-project validation from a narrow one.
+
+- Always: `gofmt` clean and `go vet ./<pkg>/` clean.
+- Unit: `go test -count=1 ./<pkg>/...` for every package you touched.
+- Concurrency: add `-race` for concurrency-sensitive packages (`metrix`, the job
+  runtime, `plugin/agent/jobmgr`).
+- Shared framework code: ALSO build and test representative consumers (a couple of
+  real collectors) plus `-race ./plugin/agent/jobmgr/`, so a framework change is
+  proven against real users, not just its own package.
+- Reproduce a reviewer-reported bug as a FAILING test first, then fix to green
+  (repo-wide working-style rule).
 
 ## Batching And Review
 
@@ -111,4 +156,7 @@ the problem is general.
 - Changes MUST NOT mix framework changes, collector migrations, and
   integration-doc regeneration unless they are required for one coherent
   behavior change.
+- Multi-round review: checkpoint-commit each validated change before its review and
+  squash at PR time; if findings keep clustering in one subsystem (~2-3 rounds),
+  stop patching and fix the class (repo-wide review rules).
 - For Go test style, follow the repo-root `AGENTS.md` "Go test style" section.

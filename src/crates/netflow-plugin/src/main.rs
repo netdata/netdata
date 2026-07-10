@@ -76,7 +76,7 @@ fn main() {
     let glibc_arena_max = memory_allocator::limit_glibc_arenas_for_process();
 
     println!("TRUST_DURATIONS 1");
-    rt::init_tracing();
+    rt::init_tracing_with_identifier("netflow-plugin");
 
     #[cfg(all(target_os = "linux", target_env = "gnu"))]
     match glibc_arena_max {

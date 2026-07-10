@@ -274,6 +274,22 @@ static bool is_plugin(char *dst, size_t dst_size, const char *filename) {
     return false;
 }
 
+// Plugins that were removed from the agent but may linger on disk after an
+// upgrade.
+static bool is_obsolete_plugin(const char *pluginname) {
+    static const char *obsolete[] = {
+        "otel-signal-viewer",
+        NULL,
+    };
+
+    for (size_t i = 0; obsolete[i]; i++) {
+        if (strcmp(pluginname, obsolete[i]) == 0)
+            return true;
+    }
+
+    return false;
+}
+
 void *pluginsd_main(void *ptr) {
     CLEANUP_FUNCTION_REGISTER(pluginsd_main_cleanup) cleanup_ptr = ptr;
 
@@ -325,6 +341,20 @@ void *pluginsd_main(void *ptr) {
                 char pluginname[CONFIG_MAX_NAME + 1];
                 if(!is_plugin(pluginname, sizeof(pluginname), file->d_name)) {
                     netdata_log_debug(D_PLUGINSD, "file '%s' does not look like a plugin", file->d_name);
+                    continue;
+                }
+
+                // Skip any obsolete plugins.
+                if(is_obsolete_plugin(pluginname)) {
+                    // log info level first time, debug level afterwards.
+                    static bool logged_obsolete = false;
+                    if(!logged_obsolete) {
+                        logged_obsolete = true;
+                        netdata_log_info("skipping obsolete plugin '%s'; the current agent already provides its function", file->d_name);
+                    }
+                    else {
+                        netdata_log_debug(D_PLUGINSD, "skipping obsolete plugin '%s'", file->d_name);
+                    }
                     continue;
                 }
 

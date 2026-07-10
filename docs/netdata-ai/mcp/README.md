@@ -1,6 +1,13 @@
 # Netdata MCP
 
-Netdata provides [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) servers that enable AI assistants to interact with your infrastructure monitoring data. You can connect via:
+[Model Context Protocol (MCP)](https://modelcontextprotocol.io/) works in **two directions** with Netdata:
+
+- **Netdata as an MCP server** — AI assistants and clients (Claude, Cursor, VS Code, CLIs, and more) connect *to* Netdata to query your infrastructure. **This page** covers server setup; for per-client instructions see [Supported AI Clients](/docs/netdata-ai/mcp/mcp-clients/ai-devops-copilot.md).
+- **Netdata as an MCP client** — Netdata Cloud connects *out* to your own MCP servers (GitHub, PagerDuty, Atlassian, or any custom HTTPS MCP server) so Netdata AI can pull your team's institutional context into troubleshooting. See [MCP Connections](/docs/netdata-ai/mcp/mcp-connections.md).
+
+The rest of this page covers **Netdata as an MCP server**.
+
+Netdata provides MCP servers that enable AI assistants to interact with your infrastructure monitoring data. You can connect via:
 
 - **[Netdata Cloud](#netdata-cloud-mcp)** — A single cloud-hosted endpoint at `https://app.netdata.cloud/api/v1/mcp` with full visibility across all your nodes. No bridges, no firewall changes.
 - **[Local Agent or Parent](#local-agent-or-parent-mcp)** —

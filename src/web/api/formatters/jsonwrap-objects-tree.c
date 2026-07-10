@@ -4,7 +4,8 @@
 #include "jsonwrap-internal.h"
 
 static void rrdset_rrdcalc_entries_v2(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
-    RRDSET *st = rrdinstance_acquired_rrdset(ria);
+    RRDSET_ACQUIRED *rsa = rrdinstance_acquired_rrdset_acquire(ria);
+    RRDSET *st = rrdset_acquired_to_rrdset(rsa);
     if(st) {
         rw_spinlock_read_lock(&st->alerts.spinlock);
         if(st->alerts.base) {
@@ -23,6 +24,7 @@ static void rrdset_rrdcalc_entries_v2(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
         }
         rw_spinlock_read_unlock(&st->alerts.spinlock);
     }
+    rrdset_acquired_release(rsa);
 }
 
 void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS options) {
