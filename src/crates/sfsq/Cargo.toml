@@ -1,0 +1,36 @@
+[package]
+name = "sfsq"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Query layer over SFST log indexes"
+
+[lints]
+workspace = true
+
+[lib]
+name = "sfsq"
+path = "src/lib.rs"
+
+[dependencies]
+sfst = { workspace = true }
+wal = { workspace = true }
+file-registry = { workspace = true }
+# Active-WAL tail scan of ng-flatten frames (`WalScan::scan_flattened`).
+ng-flatten = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+tracing = { workspace = true }
+memmap2 = { workspace = true }
+tokio-util = { workspace = true }
+libc = { workspace = true }
+regex = { workspace = true }
+
+[dev-dependencies]
+clap = { workspace = true }
+opentelemetry-proto = { workspace = true }
+tempfile = { workspace = true }
+uuid = { workspace = true }
+# ng-flatten tail-scan equivalence harness (tests/ng_wal_equivalence.rs): builds
+# the sealed ng SFST via ng-index::build_sfst to compare against scan_flattened.
+ng-index = { workspace = true }

@@ -1,0 +1,62 @@
+[package]
+name = "sfst"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "Container format for split FST indexes with a chunk-file TOC"
+
+[lints]
+workspace = true
+
+[features]
+# Expose the chunk-level reader/writer (`ChunkReader`, `ChunkWriter` + its
+# input-only types) so external tests can hand-build files chunk by chunk and
+# the `inspect` example can dump raw chunks. Test fixtures/introspection only —
+# production goes through `IndexWriter`/`IndexReader`/`read_summary`.
+# Cargo feature unification
+# makes these visible workspace-wide under `cargo test --workspace`; a
+# per-crate test run still needs its own dev-dep enabling the feature.
+test-util = []
+
+[dependencies]
+# Format
+fst = { workspace = true }
+bumpalo = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_bytes = { workspace = true }
+bincode = { workspace = true }
+zstd = { workspace = true }
+chunk-file = { workspace = true }
+thiserror = { workspace = true }
+treight = { workspace = true, features = ["roaring", "serde"] }
+regex = { workspace = true }
+
+# Index build (RowIndex → IndexWriter)
+hashbrown = { workspace = true }
+roaring = { workspace = true }
+twox-hash = { workspace = true, features = ["xxhash64"] }
+
+# Registry
+file-registry = { workspace = true }
+memmap2 = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+tempfile = { workspace = true }
+uuid = { workspace = true }
+clap = { workspace = true }
+chrono = { workspace = true }
+serde_json = { workspace = true }
+
+[[example]]
+name = "inspect"
+path = "examples/inspect.rs"
+# Raw-chunk introspection (byte sizes per chunk) is chunk-level surface.
+required-features = ["test-util"]
+
+[[bench]]
+name = "decode"
+harness = false
+# The zstd-only decode legs read raw chunk bytes via ChunkReader.
+required-features = ["test-util"]
