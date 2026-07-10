@@ -760,7 +760,7 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
     return 0;
 }
 
-// vm.stats.vm.v_syscall
+// vm.stats.sys.v_syscall
 
 int do_vm_stats_sys_v_syscalls(int update_every, usec_t dt) {
     (void)dt;
