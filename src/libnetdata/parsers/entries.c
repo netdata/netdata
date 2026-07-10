@@ -111,7 +111,12 @@ bool entries_parse(const char *entries_str, uint64_t *result, const char *defaul
         }
     }
 
-    uint64_t bytes = (uint64_t)round(value * (NETDATA_DOUBLE)su->multiplier);
+    uint64_t bytes;
+    if(!parser_round_number_to_uint64(value * (NETDATA_DOUBLE)su->multiplier, &bytes)) {
+        *result = 0;
+        return false;
+    }
+
     *result = entries_round_to_resolution_int(bytes, su_def->multiplier);
 
     return true;
