@@ -3,9 +3,9 @@
 # cgroup-name flow
 
 This document is the implementation binding for the Go `cgroup-name` binary.
-It maps the legacy `cgroup-name.sh.in` flow line-by-line by behavior. The
-binary must preserve the script's branch order, exit codes, output format,
-logging payload, environment handling, and known bugs.
+It maps the legacy `cgroup-name.sh.in` flow by behavior. The binary preserves
+branch order, exit codes, and the external output grammar except where this
+document explicitly records a correctness, security, or typed-data fix.
 
 ## Source ownership
 
@@ -29,8 +29,8 @@ external process contract across all internal boundaries.
 
 ## Startup
 
-- Extend `PATH` before every lookup: existing `PATH` plus
-  `/sbin:/usr/sbin:/usr/local/sbin:<sbindir>`.
+- Replace inherited `PATH` before every lookup with the fixed trusted list
+  `/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/snap/bin`.
 - Set `LC_ALL=C` before every lookup and before spawning subprocesses.
 - Build `ND_REQUEST` as `'<argv0>' '<arg1>' '<arg2>' `:
   each argument is wrapped in single quotes, there is a trailing space, and
@@ -56,6 +56,11 @@ block name resolution. `request` and `msg` are Go `%q`-quoted, which escapes
 embedded quotes and newlines, so the line is always single-line and parseable.
 
 ## Timeout And Deadline
+
+`cgroups.plugin` reads `[plugin:cgroups]` `script to get cgroup names`, whose
+default is the installed `cgroup-name` binary. It enables rename matching only
+when that configured path is executable; builds that omit the helper therefore
+retain raw cgroup names without repeated spawn failures.
 
 `NETDATA_CGROUP_NAME_TIMEOUT_MS` carries the operator budget X (from the
 `[plugin:cgroups]` `cgroup-name timeout` option, default 120s). The helper sets
@@ -129,11 +134,11 @@ whenever `jq` was available. The shell's only real failure mode was a missing
 JSON natively, so that fallback leg does not exist and the podman flow is
 API-only.
 
-Host parsing preserves the shell regex `^([a-z]+)://(.*)`: lowercase schemes
-are stripped before constructing the request target. Unix-socket paths are
-detected with a socket stat. Docker/Podman API calls do not use `--fail`, so
-HTTP non-2xx bodies are still parsed and only missing/invalid fields leave the
-name empty.
+Host parsing strips `unix://` for socket access, maps `tcp://` to plain HTTP,
+preserves explicit `http://` and `https://`, and rejects unsupported schemes.
+Unix-socket paths are detected with a socket stat. Docker/Podman API calls do
+not use `--fail`, so HTTP non-2xx bodies are still parsed and only
+missing/invalid fields leave the name empty.
 
 ## Label Helpers
 
@@ -175,23 +180,32 @@ process named `pause` returns `3`.
 The shell helper required `jq` on `PATH` here (absence warned and returned
 `1`); the Go helper parses all JSON natively and has no such gate.
 
-The Kubernetes cache files are:
+The Kubernetes cache lives in a private `0700` state directory:
 
-- `${TMPDIR:-/tmp}/netdata-cgroups-k8s-cluster-name`
-- `${TMPDIR:-/tmp}/netdata-cgroups-kubesystem-uid`
-- `${TMPDIR:-/tmp}/netdata-cgroups-containers`
+- `${NETDATA_LIB_DIR}/cgroup-name` under the daemon.
+- `${TMPDIR:-/tmp}/netdata-cgroup-name-<euid>` only for standalone invocations
+  where `NETDATA_LIB_DIR` is absent.
+
+The files inside it are:
+
+- `netdata-cgroups-k8s-cluster-name`
+- `netdata-cgroups-kubesystem-uid`
+- `netdata-cgroups-containers`
 
 For container ids, all three files must exist and the containers file must have
-a streaming exact match on the typed `container_id` field to use the cache.
-Metadata records are capped at 64 KiB and container records at 16 MiB, so stale or
-hostile predictable files cannot force an allocation proportional to the whole
-cache. Readers reject symlinks and verify that the opened regular file is the
-same file observed at the path before and after open. Otherwise the binary
-reads any existing cluster/system uid cache,
-discovers missing values, then rewrites the cache files atomically: each is
-written to an unguessable `0600` temp file in the same directory and renamed
-over the destination, so a symlink planted at the predictable path is replaced,
-not followed. (The shell helper used plain `echo > file 2>/dev/null` writes.)
+a streaming exact match on the final typed `container_id` field to use the
+cache. Raw delimiter matching rejects collisions without parsing every
+preceding label set; only the matching record is decoded. Metadata records are
+capped at 64 KiB, individual container records at 16 MiB, and the complete
+container cache at 128 MiB. Scans honor the invocation context.
+
+The directory and files must be owned by the current effective user. The
+directory mode is exactly `0700`; files must be single-link `0600` regular files.
+Readers reject unsafe mode, ownership, link count, size, symlinks, and inode
+replacement. Missing values are discovered and files are rewritten atomically
+through an unguessable `0600` same-directory temporary file. Legacy predictable
+files directly under `TMPDIR` are never migrated or trusted. (The shell helper
+used plain `echo > file 2>/dev/null` writes.)
 
 Kubernetes data source selection is a switch:
 
@@ -249,8 +263,10 @@ This typed boundary is an intentional safety exception to the shell's raw
 `,container_` substring truncation: an annotation value containing that text
 does not corrupt the pod label record.
 
-Names containing `_null` followed by `_` or end warn. With
-`USE_KUBELET_FOR_PODS_METADATA` set they return `2`; otherwise they return `1`.
+Required namespace, pod-name, and container-name fields are validated by typed
+presence and non-empty value before constructing the result. Missing/empty
+fields warn and return `2` with `USE_KUBELET_FOR_PODS_METADATA`, otherwise `1`.
+A literal Kubernetes name equal to `null` is a valid value and succeeds.
 
 The function returns the built name and code `0` when the name is non-empty, or
 code `1` when it is empty. `k8s_get_name` prefixes successful output with
@@ -308,3 +324,12 @@ or:
 ```text
 <NAME> <LABELS>
 ```
+
+The payload before the newline is at most 8190 bytes, so the C consumer's
+8192-byte buffer receives the complete record plus newline and terminator.
+Oversized records produce exit `3` without stdout, so deterministic overflow is
+not retried. Short/failed writes produce fatal exit `1`. The C consumer
+independently rejects records without a newline.
+Kubernetes-prefixed `k8s_netdata.cloud/cgroup.name` and
+`k8s_netdata.cloud/ignore` are control annotations at that boundary; other
+`k8s_netdata.cloud/*` annotations remain ordinary labels.

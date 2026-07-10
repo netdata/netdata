@@ -376,10 +376,16 @@ void read_cgroup_plugin_configuration() {
                        " * "
             ), NULL, SIMPLE_PATTERN_EXACT, true);
 
-    // the cgroup-name helper always ships next to the other plugins; its path is
-    // fixed and not operator-overridable.
     snprintfz(filename, FILENAME_MAX, "%s/cgroup-name", netdata_configured_primary_plugins_dir);
-    cgroups_rename_script = strdupz(filename);
+    const char *configured_cgroup_name =
+        inicfg_get(&netdata_config, "plugin:cgroups", "script to get cgroup names", filename);
+    if (configured_cgroup_name && *configured_cgroup_name && access(configured_cgroup_name, X_OK) == 0)
+        cgroups_rename_script = configured_cgroup_name;
+    else {
+        cgroups_rename_script = NULL;
+        collector_error("CGROUP: cgroup-name helper '%s' is not executable; cgroup renaming is disabled.",
+                       configured_cgroup_name ? configured_cgroup_name : "");
+    }
 
     // single operator knob for the whole cgroup-name invocation: the helper
     // receives it and self-terminates by then; discovery waits this long plus a

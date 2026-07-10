@@ -210,7 +210,7 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
         return;
     }
 
-    char buffer[8192]; // we need some size for labels
+    char buffer[CGROUP_NAME_LINE_MAX + 2]; // payload, newline, terminator
     char *new_name = NULL;
 
     // Bound the wait for the helper's reply independently of whether the
@@ -248,8 +248,13 @@ static inline void discovery_rename_cgroup(struct cgroup *cg) {
         }
     } while (pr < 0 && errno == EINTR);
 
-    if (pr > 0)
+    if (pr > 0) {
         new_name = fgets(buffer, sizeof(buffer), spawn_popen_stdout(instance));
+        if (new_name && !cgroup_name_line_is_complete(new_name)) {
+            collector_error("CGROUP: rename helper for '%s' produced an oversized or incomplete record.", cg->id);
+            new_name = NULL;
+        }
+    }
 
     int exit_code = -1;
     if (pr <= 0) {

@@ -18,8 +18,11 @@ type kubernetesMetadata struct {
 }
 
 func (r *resolver) loadKubernetesMetadata(ctx context.Context, functionName, containerID string) (kubernetesMetadata, kubePodOutcome) {
-	cache := newKubernetesCache(r.config.tmpDir)
-	cache.repairModes()
+	cache, err := newKubernetesCache(r.config.kubernetesCacheDir)
+	if err != nil {
+		r.warningf("cannot use Kubernetes metadata cache %q: %v", r.config.kubernetesCacheDir, err)
+		cache = kubernetesCache{}
+	}
 
 	metadata := kubernetesMetadata{
 		systemUID:   cache.systemUID(),
@@ -31,10 +34,12 @@ func (r *resolver) loadKubernetesMetadata(ctx context.Context, functionName, con
 		} else {
 			metadata.clusterName = unknownKubernetesClusterName
 		}
-		cache.writeClusterName(metadata.clusterName)
+		if err := cache.writeClusterName(metadata.clusterName); err != nil {
+			r.warningf("cannot update Kubernetes cluster-name cache: %v", err)
+		}
 	}
 	if containerID != "" && cache.complete() {
-		if labels, ok := cache.lookupContainer(containerID); ok {
+		if labels, ok := cache.lookupContainer(ctx, containerID); ok {
 			metadata.containerLabels = labels
 			metadata.hasContainerLabels = true
 			return metadata, kubePodSuccess
@@ -62,8 +67,12 @@ func (r *resolver) loadKubernetesMetadata(ctx context.Context, functionName, con
 	metadata.containers = containers
 
 	if fetched.kubeSystemNamespace != "" && metadata.systemUID != "" {
-		cache.writeSystemUID(metadata.systemUID)
+		if err := cache.writeSystemUID(metadata.systemUID); err != nil {
+			r.warningf("cannot update Kubernetes system-UID cache: %v", err)
+		}
 	}
-	cache.writeContainers(metadata.containers)
+	if err := cache.writeContainers(metadata.containers); err != nil {
+		r.warningf("cannot update Kubernetes container cache: %v", err)
+	}
 	return metadata, kubePodSuccess
 }

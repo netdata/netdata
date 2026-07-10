@@ -105,6 +105,7 @@ Renaming is configured with the following options:
 ```text
 [plugin:cgroups]
  run script to rename cgroups matching =  !/  !*.mount  !*.socket  !*.partition  /machine.slice/*.service  !*.service  !*.slice  !*.swap  !*.user  !init.scope  !*.scope/vcpu*  !*.scope/emulator  *.scope  *docker*  *lxc*  *qemu*  */kubepods/pod*/*  */kubepods/*/pod*/*  */*-kubepods-pod*/*  */*-kubepods-*-pod*/*  !*kubepods*  !*kubelet*  *.libvirt-qemu  *
+ script to get cgroup names = /usr/libexec/netdata/plugins.d/cgroup-name
  cgroup-name timeout = 120
 ```
 
@@ -119,9 +120,15 @@ API is still populating a new pod's metadata), it is retried on a later
 discovery cycle.
 
 The above pattern list is matched against the path of the cgroup. For matched
-cgroups, Netdata calls the `cgroup-name` helper to get its name. This helper
+cgroups, Netdata calls the configured executable to get its name. If it is
+missing or is not executable, cgroup renaming is disabled without repeated
+spawn attempts. The default `cgroup-name` helper
 queries `docker`, `kubectl`, `podman`, or applies heuristics to find a name for
 the cgroup.
+
+A custom helper must emit one newline-terminated record containing at most 8190
+bytes before the newline. Netdata rejects oversized or incomplete records
+rather than applying a truncated name or label set.
 
 #### Note on Podman container names
 
@@ -143,6 +150,10 @@ should be set to the proxy's URL in this case.
 Inside a Kubernetes cluster, the `cgroup-name` helper resolves pod and container
 names by querying the kubelet and the Kubernetes API server, using the pod's
 mounted service-account token and CA certificate.
+
+Resolved Kubernetes metadata is cached in a private
+`${NETDATA_LIB_DIR}/cgroup-name` directory. The helper rejects cache directories
+or files with unsafe ownership, permissions, links, or sizes.
 
 By default the helper verifies the API server's TLS certificate against the
 mounted cluster CA (`/var/run/secrets/kubernetes.io/serviceaccount/ca.crt`),

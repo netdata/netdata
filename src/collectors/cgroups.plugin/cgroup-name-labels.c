@@ -3,6 +3,7 @@
 #include "cgroup-name-labels.h"
 
 #define CGROUP_NETDATA_CLOUD_LABEL_PREFIX "netdata.cloud/"
+#define CGROUP_K8S_NETDATA_CLOUD_LABEL_PREFIX "k8s_netdata.cloud/"
 #define CGROUP_RENAME_LABEL "cgroup.name="
 #define CGROUP_IGNORE_LABEL "ignore="
 
@@ -57,6 +58,10 @@ static char *cgroup_next_label_pair(char **labels) {
     return pair;
 }
 
+bool cgroup_name_line_is_complete(const char *data) {
+    return data && strchr(data, '\n');
+}
+
 char *cgroup_parse_name_and_labels(RRDLABELS *labels, char *data, bool *ignored) {
     rrdlabels_unmark_all(labels);
 
@@ -69,10 +74,18 @@ char *cgroup_parse_name_and_labels(RRDLABELS *labels, char *data, bool *ignored)
     char *pair;
     while((pair = cgroup_next_label_pair(&data))) {
 
-        if(strncmp(pair, CGROUP_NETDATA_CLOUD_LABEL_PREFIX, sizeof(CGROUP_NETDATA_CLOUD_LABEL_PREFIX) - 1) == 0) {
-            // a netdata.cloud label
-            char *key = &pair[sizeof(CGROUP_NETDATA_CLOUD_LABEL_PREFIX) - 1];
+        bool kubernetes_prefixed = false;
+        char *key = NULL;
+        if(strncmp(pair, CGROUP_NETDATA_CLOUD_LABEL_PREFIX, sizeof(CGROUP_NETDATA_CLOUD_LABEL_PREFIX) - 1) == 0)
+            key = &pair[sizeof(CGROUP_NETDATA_CLOUD_LABEL_PREFIX) - 1];
+        else if(strncmp(pair, CGROUP_K8S_NETDATA_CLOUD_LABEL_PREFIX,
+                        sizeof(CGROUP_K8S_NETDATA_CLOUD_LABEL_PREFIX) - 1) == 0) {
+            key = &pair[sizeof(CGROUP_K8S_NETDATA_CLOUD_LABEL_PREFIX) - 1];
+            kubernetes_prefixed = true;
+        }
 
+        if(key) {
+            // a netdata.cloud label
             if(strncmp(key, CGROUP_RENAME_LABEL, sizeof(CGROUP_RENAME_LABEL) - 1) == 0) {
                 char *n = &key[sizeof(CGROUP_RENAME_LABEL) - 1];
                 size_t len = strlen(n);
@@ -93,6 +106,9 @@ char *cgroup_parse_name_and_labels(RRDLABELS *labels, char *data, bool *ignored)
 
                 // no need to add this label
             }
+            else if(kubernetes_prefixed)
+                // Kubernetes annotations other than controls remain labels.
+                rrdlabels_add_pair(labels, pair, RRDLABEL_SRC_AUTO | RRDLABEL_SRC_K8S);
         }
         else
             // add the label as-is

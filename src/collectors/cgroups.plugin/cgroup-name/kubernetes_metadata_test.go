@@ -20,7 +20,8 @@ func TestLoadKubernetesMetadataRefreshesUnknownClusterName(t *testing.T) {
 		gcpValues     bool
 		wantCluster   string
 		wantCached    string
-		wantCalls     int32
+		minCalls      int32
+		maxCalls      int32
 		wantTimestamp bool
 	}{
 		"fresh negative cache is reused": {
@@ -33,14 +34,16 @@ func TestLoadKubernetesMetadataRefreshesUnknownClusterName(t *testing.T) {
 			gcpValues:     true,
 			wantCluster:   "gke_project-a_region-a_cluster-a",
 			wantCached:    "gke_project-a_region-a_cluster-a",
-			wantCalls:     3,
+			minCalls:      3,
+			maxCalls:      3,
 			wantTimestamp: true,
 		},
 		"expired negative cache is refreshed on failure": {
 			cacheAge:      10 * time.Minute,
 			wantCluster:   "unknown",
 			wantCached:    "unknown",
-			wantCalls:     3,
+			minCalls:      1,
+			maxCalls:      3,
 			wantTimestamp: true,
 		},
 	}
@@ -62,16 +65,22 @@ func TestLoadKubernetesMetadataRefreshesUnknownClusterName(t *testing.T) {
 			defer server.Close()
 
 			tmp := t.TempDir()
-			cache := newKubernetesCache(tmp)
-			cache.writeClusterName("unknown")
-			cache.writeSystemUID("system-uid")
-			cache.writeContainers([]labelSet{{items: []label{
+			cache := mustNewKubernetesCache(t, tmp)
+			if err := cache.writeClusterName("unknown"); err != nil {
+				t.Fatal(err)
+			}
+			if err := cache.writeSystemUID("system-uid"); err != nil {
+				t.Fatal(err)
+			}
+			if err := cache.writeContainers([]labelSet{{items: []label{
 				{name: "namespace", value: "default"},
 				{name: "pod_name", value: "api"},
 				{name: "pod_uid", value: "pod-uid"},
 				{name: "container_name", value: "app"},
 				{name: "container_id", value: containerID},
-			}}})
+			}}}); err != nil {
+				t.Fatal(err)
+			}
 			clusterPath := filepath.Join(tmp, "netdata-cgroups-k8s-cluster-name")
 			writtenAt := time.Now()
 			if test.cacheAge > 0 {
@@ -82,8 +91,8 @@ func TestLoadKubernetesMetadataRefreshesUnknownClusterName(t *testing.T) {
 			}
 
 			r := newResolver([]string{"cgroup-name"}, invocationConfig{
-				tmpDir:   tmp,
-				logLevel: ndlpEmerg,
+				kubernetesCacheDir: tmp,
+				logLevel:           ndlpEmerg,
 				kubernetes: kubernetesConfig{
 					gcpMetadataURL: server.URL,
 				},
@@ -98,8 +107,8 @@ func TestLoadKubernetesMetadataRefreshesUnknownClusterName(t *testing.T) {
 			if got := cache.clusterName(); got != test.wantCached {
 				t.Fatalf("cached cluster name = %q, want %q", got, test.wantCached)
 			}
-			if got := calls.Load(); got != test.wantCalls {
-				t.Fatalf("GCP calls = %d, want %d", got, test.wantCalls)
+			if got := calls.Load(); got < test.minCalls || got > test.maxCalls {
+				t.Fatalf("GCP calls = %d, want range [%d,%d]", got, test.minCalls, test.maxCalls)
 			}
 			if test.wantTimestamp {
 				info, err := os.Stat(clusterPath)

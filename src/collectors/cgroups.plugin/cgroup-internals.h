@@ -412,7 +412,7 @@ static inline int matches_enabled_cgroup_names(char *name) {
 }
 
 static inline int matches_enabled_cgroup_renames(char *id) {
-    return simple_pattern_matches(enabled_cgroup_renames, id);
+    return cgroups_rename_script && simple_pattern_matches(enabled_cgroup_renames, id);
 }
 
 static inline int matches_systemd_services_cgroups(char *id) {

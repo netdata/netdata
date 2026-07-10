@@ -3,7 +3,9 @@
 package main
 
 import (
+	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -21,13 +23,13 @@ const (
 )
 
 type invocationConfig struct {
-	dockerHost string
-	podmanHost string
-	hostPrefix string
-	tmpDir     string
-	logLevel   int
-	timeout    time.Duration
-	kubernetes kubernetesConfig
+	dockerHost         string
+	podmanHost         string
+	hostPrefix         string
+	kubernetesCacheDir string
+	logLevel           int
+	timeout            time.Duration
+	kubernetes         kubernetesConfig
 }
 
 type kubernetesConfig struct {
@@ -52,10 +54,7 @@ func prepareInvocationConfig() invocationConfig {
 }
 
 func loadInvocationConfig() invocationConfig {
-	tmpDir := os.Getenv("TMPDIR")
-	if tmpDir == "" {
-		tmpDir = "/tmp"
-	}
+	kubernetesCacheDir := cgroupNameStateDir(os.Getenv("NETDATA_LIB_DIR"), os.Getenv("TMPDIR"), os.Geteuid())
 
 	ms, _ := strconv.ParseInt(os.Getenv("NETDATA_CGROUP_NAME_TIMEOUT_MS"), 10, 64)
 	var timeout time.Duration
@@ -70,12 +69,12 @@ func loadInvocationConfig() invocationConfig {
 	}
 
 	return invocationConfig{
-		dockerHost: os.Getenv("DOCKER_HOST"),
-		podmanHost: os.Getenv("PODMAN_HOST"),
-		hostPrefix: os.Getenv("NETDATA_HOST_PREFIX"),
-		tmpDir:     tmpDir,
-		logLevel:   parseLogPriority(os.Getenv("NETDATA_LOG_LEVEL")),
-		timeout:    timeout,
+		dockerHost:         os.Getenv("DOCKER_HOST"),
+		podmanHost:         os.Getenv("PODMAN_HOST"),
+		hostPrefix:         os.Getenv("NETDATA_HOST_PREFIX"),
+		kubernetesCacheDir: kubernetesCacheDir,
+		logLevel:           parseLogPriority(os.Getenv("NETDATA_LOG_LEVEL")),
+		timeout:            timeout,
 		kubernetes: kubernetesConfig{
 			serviceHost:             os.Getenv("KUBERNETES_SERVICE_HOST"),
 			servicePort:             os.Getenv("KUBERNETES_PORT_443_TCP_PORT"),
@@ -90,6 +89,16 @@ func loadInvocationConfig() invocationConfig {
 			gcpMetadataURL:          defaultGCPMetadataURL,
 		},
 	}
+}
+
+func cgroupNameStateDir(varLibDir, tmpDir string, euid int) string {
+	if varLibDir = strings.TrimSpace(varLibDir); varLibDir != "" {
+		return filepath.Join(varLibDir, "cgroup-name")
+	}
+	if tmpDir = strings.TrimSpace(tmpDir); tmpDir == "" {
+		tmpDir = os.TempDir()
+	}
+	return filepath.Join(tmpDir, fmt.Sprintf("netdata-cgroup-name-%d", euid))
 }
 
 func setupEnvironment() {

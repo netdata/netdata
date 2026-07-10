@@ -5,11 +5,14 @@
 
 RRDHOST *localhost;
 struct config netdata_config;
+const char *cgroups_rename_script;
+SIMPLE_PATTERN *enabled_cgroup_renames;
 
 struct label_case {
     const char *name;
     const char *data;
     const char *expected_name;
+    bool expected_ignored;
     const char *key[3];
     const char *value[3];
 };
@@ -54,8 +57,24 @@ static bool run_case(const struct label_case *tc)
         ok = false;
     }
 
+    if (ignored != tc->expected_ignored) {
+        fprintf(stderr, "%s: expected ignored=%s, got %s\n",
+                tc->name,
+                tc->expected_ignored ? "true" : "false",
+                ignored ? "true" : "false");
+        ok = false;
+    }
+
     struct collected_labels collected = { 0 };
     rrdlabels_walkthrough_read(labels, read_label_callback, &collected);
+
+    int expected_count = 0;
+    while (expected_count < 3 && tc->key[expected_count] != NULL)
+        expected_count++;
+    if (collected.count != expected_count) {
+        fprintf(stderr, "%s: expected %d ordinary labels, got %d\n", tc->name, expected_count, collected.count);
+        ok = false;
+    }
 
     for (int l = 0; l < 3 && tc->key[l] != NULL; l++) {
         const char *key = tc->key[l];
@@ -105,6 +124,56 @@ static bool run_case(const struct label_case *tc)
     freez(data);
     rrdlabels_destroy(labels);
 
+    return ok;
+}
+
+static bool test_cgroup_name_helper_gate(void)
+{
+    bool ok = true;
+    enabled_cgroup_renames = simple_pattern_create("*", NULL, SIMPLE_PATTERN_EXACT, true);
+
+    cgroups_rename_script = NULL;
+    if (matches_enabled_cgroup_renames("/docker/fixture")) {
+        fprintf(stderr, "missing cgroup-name helper did not disable rename matching\n");
+        ok = false;
+    }
+
+    cgroups_rename_script = "/fixture/cgroup-name";
+    if (!matches_enabled_cgroup_renames("/docker/fixture")) {
+        fprintf(stderr, "available cgroup-name helper disabled rename matching\n");
+        ok = false;
+    }
+
+    simple_pattern_free(enabled_cgroup_renames);
+    enabled_cgroup_renames = NULL;
+    cgroups_rename_script = NULL;
+    return ok;
+}
+
+static bool test_cgroup_name_line_framing(void)
+{
+    struct framing_case {
+        const char *name;
+        const char *line;
+        bool expected;
+    };
+    static const struct framing_case cases[] = {
+        { .name = "complete line", .line = "name label=\"value\"\n", .expected = true },
+        { .name = "missing newline", .line = "name label=\"value\"", .expected = false },
+        { .name = "empty read", .line = "", .expected = false },
+    };
+
+    bool ok = true;
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        bool actual = cgroup_name_line_is_complete(cases[i].line);
+        if (actual != cases[i].expected) {
+            fprintf(stderr, "%s: expected complete=%s, got %s\n",
+                    cases[i].name,
+                    cases[i].expected ? "true" : "false",
+                    actual ? "true" : "false");
+            ok = false;
+        }
+    }
     return ok;
 }
 
@@ -183,6 +252,24 @@ int main(void)
         { .name = "pair of commas",
           .data = "name, ,",
           .expected_name = "name," },
+
+        { .name = "docker name override",
+          .data = "name netdata.cloud/cgroup.name=\"override\"",
+          .expected_name = "override" },
+
+        { .name = "docker ignore control",
+          .data = "name netdata.cloud/ignore=\"true\"",
+          .expected_name = "name",
+          .expected_ignored = true },
+
+        { .name = "kubernetes name override",
+          .data = "name k8s_netdata.cloud/cgroup.name=\"override\"",
+          .expected_name = "override" },
+
+        { .name = "kubernetes ignore control",
+          .data = "name k8s_netdata.cloud/ignore=\"yes\"",
+          .expected_name = "name",
+          .expected_ignored = true },
     };
 
     size_t failures = 0;
@@ -190,6 +277,11 @@ int main(void)
         if (!run_case(&cases[i]))
             failures++;
     }
+
+    if (!test_cgroup_name_helper_gate())
+        failures++;
+    if (!test_cgroup_name_line_framing())
+        failures++;
 
     if (failures) {
         fprintf(stderr, "%zu cgroup label-parser tests failed\n", failures);

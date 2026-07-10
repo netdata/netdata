@@ -4,6 +4,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -106,6 +107,38 @@ func TestPrepareInvocationConfigDefaultsRuntimeHosts(t *testing.T) {
 			}
 			if got := os.Getenv(test.envName); got != test.want {
 				t.Fatalf("exported %s = %q, want %q", test.envName, got, test.want)
+			}
+		})
+	}
+}
+
+func TestCgroupNameStateDir(t *testing.T) {
+	tests := map[string]struct {
+		varLibDir string
+		tmpDir    string
+		euid      int
+		want      string
+	}{
+		"daemon var-lib directory": {
+			varLibDir: "/var/lib/netdata",
+			tmpDir:    "/ignored",
+			euid:      123,
+			want:      "/var/lib/netdata/cgroup-name",
+		},
+		"private standalone fallback": {
+			tmpDir: "/tmp",
+			euid:   123,
+			want:   "/tmp/netdata-cgroup-name-123",
+		},
+		"system temporary fallback": {
+			euid: 123,
+			want: filepath.Join(os.TempDir(), "netdata-cgroup-name-123"),
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := cgroupNameStateDir(test.varLibDir, test.tmpDir, test.euid); got != filepath.Clean(test.want) {
+				t.Fatalf("cgroupNameStateDir() = %q, want %q", got, test.want)
 			}
 		})
 	}

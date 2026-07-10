@@ -18,20 +18,24 @@ import (
 
 func TestK8sContainerCachePath(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("TMPDIR", tmp)
+	cacheDir := filepath.Join(tmp, "cgroup-name")
+	if err := os.Mkdir(cacheDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("NETDATA_LIB_DIR", tmp)
 	t.Setenv("NETDATA_LOG_LEVEL", "emerg")
 
 	id := "abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd"
 	uid := "11111111-2222-3333-4444-555555555555"
-	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-k8s-cluster-name"), []byte("gke_project_region_cluster\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(cacheDir, "netdata-cgroups-k8s-cluster-name"), []byte("gke_project_region_cluster\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-kubesystem-uid"), []byte("system-uid\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(cacheDir, "netdata-cgroups-kubesystem-uid"), []byte("system-uid\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	collision := `namespace="wrong",pod_name="wrong",pod_uid="wrong-uid",netdata.cloud/note="references-` + id + `",node_name="wrong-node",container_name="wrong",container_id="` + strings.Repeat("0", 64) + `"`
 	target := `namespace="default",pod_name="api",pod_uid="` + uid + `",node_name="node-a",container_name="app",container_id="` + id + `"`
-	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-containers"), []byte(collision+"\n"+target+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(cacheDir, "netdata-cgroups-containers"), []byte(collision+"\n"+target+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -52,7 +56,11 @@ func TestMirroredK8sContainerPathFixturesFromCache(t *testing.T) {
 	// DataDog/datadog-agent, google/cadvisor, grafana/beyla, and
 	// sustainable-computing-io/kepler.
 	tmp := t.TempDir()
-	t.Setenv("TMPDIR", tmp)
+	cacheDir := filepath.Join(tmp, "cgroup-name")
+	if err := os.Mkdir(cacheDir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("NETDATA_LIB_DIR", tmp)
 	t.Setenv("NETDATA_LOG_LEVEL", "emerg")
 	t.Setenv("NETDATA_HOST_PREFIX", tmp)
 	t.Setenv("DOCKER_HOST", "")
@@ -61,10 +69,10 @@ func TestMirroredK8sContainerPathFixturesFromCache(t *testing.T) {
 	if err := os.MkdirAll(filepath.Join(tmp, "sys/fs/cgroup"), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-k8s-cluster-name"), []byte("fixture-cluster\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(cacheDir, "netdata-cgroups-k8s-cluster-name"), []byte("fixture-cluster\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-kubesystem-uid"), []byte("fixture-system-uid\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(cacheDir, "netdata-cgroups-kubesystem-uid"), []byte("fixture-system-uid\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -90,7 +98,7 @@ func TestMirroredK8sContainerPathFixturesFromCache(t *testing.T) {
 		containerLine("openshift-monitoring", "api-d", uidD, "node-d", "collector", idD),
 		containerLine("default", "api-e", uidE, "node-e", "inner", idE),
 	}, "\n")
-	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-containers"), []byte(containers+"\n"), 0o600); err != nil {
+	if err := os.WriteFile(filepath.Join(cacheDir, "netdata-cgroups-containers"), []byte(containers+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 
@@ -169,7 +177,7 @@ func k8sPodFixture() (containerdID, dockerID, crioID, pods string) {
 	return
 }
 
-func assertK8sBurstableContainerResolved(t *testing.T, tmp, containerdID, dockerID, crioID string, config invocationConfig) {
+func assertK8sBurstableContainerResolved(t *testing.T, cacheDir, containerdID, dockerID, crioID string, config invocationConfig) {
 	t.Helper()
 	cgroup := "kubepods.slice/kubepods-burstable.slice/kubepods-burstable-podaaaaaaaa_bbbb_cccc_dddd_eeeeeeeeeeee.slice/cri-containerd-" + containerdID + ".scope"
 	var out bytes.Buffer
@@ -196,7 +204,7 @@ func assertK8sBurstableContainerResolved(t *testing.T, tmp, containerdID, docker
 		}
 	}
 
-	cache, err := os.ReadFile(filepath.Join(tmp, "netdata-cgroups-containers"))
+	cache, err := os.ReadFile(filepath.Join(cacheDir, "netdata-cgroups-containers"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +222,7 @@ func assertK8sBurstableContainerResolved(t *testing.T, tmp, containerdID, docker
 		"netdata-cgroups-kubesystem-uid",
 		"netdata-cgroups-containers",
 	} {
-		info, err := os.Stat(filepath.Join(tmp, name))
+		info, err := os.Stat(filepath.Join(cacheDir, name))
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -235,10 +243,14 @@ func TestMirroredK8sPodListFixtures(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			tmp := t.TempDir()
-			t.Setenv("TMPDIR", tmp)
+			cacheDir := filepath.Join(tmp, "cgroup-name")
+			if err := os.Mkdir(cacheDir, 0o700); err != nil {
+				t.Fatal(err)
+			}
+			t.Setenv("NETDATA_LIB_DIR", tmp)
 			t.Setenv("NETDATA_LOG_LEVEL", "emerg")
 			t.Setenv("NETDATA_HOST_PREFIX", tmp)
-			if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-k8s-cluster-name"), []byte("fixture-cluster\n"), 0o644); err != nil {
+			if err := os.WriteFile(filepath.Join(cacheDir, "netdata-cgroups-k8s-cluster-name"), []byte("fixture-cluster\n"), 0o600); err != nil {
 				t.Fatal(err)
 			}
 
@@ -281,7 +293,7 @@ func TestMirroredK8sPodListFixtures(t *testing.T) {
 				config = prepareInvocationConfig()
 				config.kubernetes.serviceAccountTokenFile = tokenFile
 			} else {
-				if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-kubesystem-uid"), []byte("fixture-system-uid\n"), 0o644); err != nil {
+				if err := os.WriteFile(filepath.Join(cacheDir, "netdata-cgroups-kubesystem-uid"), []byte("fixture-system-uid\n"), 0o600); err != nil {
 					t.Fatal(err)
 				}
 				server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
@@ -300,9 +312,9 @@ func TestMirroredK8sPodListFixtures(t *testing.T) {
 				config = prepareInvocationConfig()
 			}
 
-			assertK8sBurstableContainerResolved(t, tmp, containerdID, dockerID, crioID, config)
+			assertK8sBurstableContainerResolved(t, cacheDir, containerdID, dockerID, crioID, config)
 			if test.useAPIServer {
-				uid, err := os.ReadFile(filepath.Join(tmp, "netdata-cgroups-kubesystem-uid"))
+				uid, err := os.ReadFile(filepath.Join(cacheDir, "netdata-cgroups-kubesystem-uid"))
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -342,6 +354,8 @@ func TestKubernetesPodAndContainerOutcomes(t *testing.T) {
 	kubeVirt := base.clone()
 	literalNullNamespace := base.clone()
 	literalNullPodName := base.clone()
+	literalNullContainerName := base.clone()
+	controlAnnotations := base.clone()
 	emptyNamespace := base.clone()
 	for index := range kubeVirt.items {
 		switch kubeVirt.items[index].name {
@@ -361,11 +375,18 @@ func TestKubernetesPodAndContainerOutcomes(t *testing.T) {
 			literalNullPodName.items[index].value = "null"
 		}
 	}
+	for index := range literalNullContainerName.items {
+		if literalNullContainerName.items[index].name == "container_name" {
+			literalNullContainerName.items[index].value = "null"
+		}
+	}
 	for index := range emptyNamespace.items {
 		if emptyNamespace.items[index].name == "namespace" {
 			emptyNamespace.items[index].value = ""
 		}
 	}
+	controlAnnotations.add("netdata.cloud/cgroup.name", "override")
+	controlAnnotations.add("netdata.cloud/ignore", "true")
 	collision := labelSet{items: []label{
 		{name: "namespace", value: "wrong"},
 		{name: "pod_name", value: "wrong"},
@@ -448,6 +469,26 @@ func TestKubernetesPodAndContainerOutcomes(t *testing.T) {
 			want: kubePodResolution{
 				name:    "pod_default_null",
 				labels:  parseLabelSet(`k8s_namespace="default",k8s_pod_name="null",k8s_node_name="node-a",k8s_kind="pod",k8s_qos_class="burstable"`),
+				outcome: kubePodSuccess,
+			},
+		},
+		"literal null container name is valid": {
+			container: true,
+			identity:  kubernetesCgroupIdentity{containerID: "container-id", qosClass: "burstable"},
+			metadata:  kubernetesMetadata{containerLabels: literalNullContainerName, hasContainerLabels: true},
+			want: kubePodResolution{
+				name:    "cntr_default_api_null",
+				labels:  parseLabelSet(`k8s_namespace="default",k8s_pod_name="api",k8s_node_name="node-a",k8s_container_name="null",k8s_kind="container",k8s_qos_class="burstable"`),
+				outcome: kubePodSuccess,
+			},
+		},
+		"Kubernetes control annotations retain their cross-language prefix": {
+			container: true,
+			identity:  kubernetesCgroupIdentity{containerID: "container-id", qosClass: "burstable"},
+			metadata:  kubernetesMetadata{containerLabels: controlAnnotations, hasContainerLabels: true},
+			want: kubePodResolution{
+				name:    "cntr_default_api_app",
+				labels:  parseLabelSet(`k8s_namespace="default",k8s_pod_name="api",k8s_node_name="node-a",k8s_container_name="app",k8s_netdata.cloud/cgroup.name="override",k8s_netdata.cloud/ignore="true",k8s_kind="container",k8s_qos_class="burstable"`),
 				outcome: kubePodSuccess,
 			},
 		},
@@ -603,20 +644,26 @@ func TestKubernetesFallbackExitMapping(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tmp := t.TempDir()
 			if test.seedCache {
-				cache := newKubernetesCache(tmp)
-				cache.writeClusterName("cluster-a")
-				cache.writeSystemUID("system-uid")
-				cache.writeContainers([]labelSet{{items: []label{
+				cache := mustNewKubernetesCache(t, tmp)
+				if err := cache.writeClusterName("cluster-a"); err != nil {
+					t.Fatal(err)
+				}
+				if err := cache.writeSystemUID("system-uid"); err != nil {
+					t.Fatal(err)
+				}
+				if err := cache.writeContainers([]labelSet{{items: []label{
 					{name: "pod_name", value: "api"},
 					{name: "container_name", value: "app"},
 					{name: "container_id", value: id},
-				}}})
+				}}}); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			var out bytes.Buffer
 			code := runWithConfig([]string{"cgroup-name", test.cgroup, test.cgroup}, &out, invocationConfig{
-				tmpDir:   tmp,
-				logLevel: ndlpEmerg,
+				kubernetesCacheDir: tmp,
+				logLevel:           ndlpEmerg,
 				kubernetes: kubernetesConfig{
 					useKubelet: test.useKubelet,
 				},
@@ -677,15 +724,19 @@ func TestKubernetesAPIServerDeadlinePolicy(t *testing.T) {
 				t.Fatal(err)
 			}
 			tmp := t.TempDir()
-			cache := newKubernetesCache(tmp)
-			cache.writeClusterName("cluster-a")
-			cache.writeSystemUID("system-uid")
+			cache := mustNewKubernetesCache(t, tmp)
+			if err := cache.writeClusterName("cluster-a"); err != nil {
+				t.Fatal(err)
+			}
+			if err := cache.writeSystemUID("system-uid"); err != nil {
+				t.Fatal(err)
+			}
 
 			var out bytes.Buffer
 			code := runWithConfig([]string{"cgroup-name", cgroup, cgroup}, &out, invocationConfig{
-				tmpDir:   tmp,
-				logLevel: ndlpEmerg,
-				timeout:  test.timeout,
+				kubernetesCacheDir: tmp,
+				logLevel:           ndlpEmerg,
+				timeout:            test.timeout,
 				kubernetes: kubernetesConfig{
 					serviceHost: host,
 					servicePort: port,
@@ -725,14 +776,18 @@ func TestKubernetesPodEndToEndOutput(t *testing.T) {
 	}
 
 	tmp := t.TempDir()
-	cache := newKubernetesCache(tmp)
-	cache.writeClusterName("cluster-a")
-	cache.writeSystemUID("system-uid")
+	cache := mustNewKubernetesCache(t, tmp)
+	if err := cache.writeClusterName("cluster-a"); err != nil {
+		t.Fatal(err)
+	}
+	if err := cache.writeSystemUID("system-uid"); err != nil {
+		t.Fatal(err)
+	}
 	cgroup := "kubepods-burstable-pod" + strings.ReplaceAll(uid, "-", "_") + ".slice"
 	var out bytes.Buffer
 	code := runWithConfig([]string{"cgroup-name", cgroup, cgroup}, &out, invocationConfig{
-		tmpDir:   tmp,
-		logLevel: ndlpEmerg,
+		kubernetesCacheDir: tmp,
+		logLevel:           ndlpEmerg,
 		kubernetes: kubernetesConfig{
 			serviceHost: host,
 			servicePort: port,
