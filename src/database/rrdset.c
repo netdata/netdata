@@ -44,7 +44,7 @@ time_t rrdset_first_entry_s(RRDSET *st) {
 
     rrddim_foreach_read(rd, st) {
         time_t t = rrddim_first_entry_s(rd);
-        if(t < first_entry_s)
+        if(t && t < first_entry_s)
             first_entry_s = t;
     }
     rrddim_foreach_done(rd);
