@@ -744,13 +744,15 @@ int frag_set_external_data(struct buffer_fragment *frag, void *data, size_t data
 static const char mqtt_protocol_name_frag[] =
     { 0x00, 0x04, 'M', 'Q', 'T', 'T', MQTT_VERSION_5_0 };
 
-#define MQTT_UTF8_STRING_SIZE(string) (2 + strlen(string))
-
 // see 1.5.5
 #define MQTT_VARSIZE_INT_BYTES(value) ( value > 2097152 ? 4 : ( value > 16384 ? 3 : ( value > 128 ? 2 : 1 ) ) )
 
 static size_t mqtt_ng_connect_size(struct mqtt_auth_properties *auth,
-                    struct mqtt_lwt_properties *lwt)
+                    struct mqtt_lwt_properties *lwt,
+                    uint16_t client_id_len,
+                    uint16_t will_topic_len,
+                    uint16_t username_len,
+                    uint16_t password_len)
 {
     // First get the size of payload + variable header
     size_t size =
@@ -761,7 +763,7 @@ static size_t mqtt_ng_connect_size(struct mqtt_auth_properties *auth,
 
     // CONNECT payload. 3.1.3
     if (auth->client_id)
-        size += MQTT_UTF8_STRING_SIZE(auth->client_id);
+        size += 2 + client_id_len;
 
     if (lwt) {
         // 3.1.3.2 will properties TODO TODO
@@ -769,7 +771,7 @@ static size_t mqtt_ng_connect_size(struct mqtt_auth_properties *auth,
 
         // 3.1.3.3
         if (lwt->will_topic)
-            size += MQTT_UTF8_STRING_SIZE(lwt->will_topic);
+            size += 2 + will_topic_len;
 
         // 3.1.3.4 will payload
         if (lwt->will_message) {
@@ -779,11 +781,11 @@ static size_t mqtt_ng_connect_size(struct mqtt_auth_properties *auth,
 
     // 3.1.3.5
     if (auth->username)
-        size += MQTT_UTF8_STRING_SIZE(auth->username);
+        size += 2 + username_len;
 
     // 3.1.3.6
     if (auth->password)
-        size += MQTT_UTF8_STRING_SIZE(auth->password);
+        size += 2 + password_len;
 
     return size;
 }
@@ -812,6 +814,18 @@ static size_t mqtt_ng_connect_size(struct mqtt_auth_properties *auth,
         memcpy(WRITE_POS(frag), &temp, sizeof(uint16_t));                                                              \
         DATA_ADVANCE(buffer, sizeof(uint16_t), frag);                                                                  \
     }
+
+static bool mqtt_ng_get_2byte_field_length(const char *field, const char *value, uint16_t *length)
+{
+    size_t len = strnlen(value, (size_t)UINT16_MAX + 1);
+    if (unlikely(len > UINT16_MAX)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MQTT %s exceeds the 65535-byte protocol limit", field);
+        return false;
+    }
+
+    *length = (uint16_t)len;
+    return true;
+}
 
 static int optimized_add(struct header_buffer *buf, void *data, size_t data_len, free_fnc_t data_free_fnc, struct buffer_fragment **frag)
 {
@@ -906,8 +920,11 @@ mqtt_msg_data mqtt_ng_generate_connect(
         return NULL;
     }
 
-    size_t len = strlen(auth->client_id);
-    if (!len) {
+    uint16_t client_id_len;
+    if (!mqtt_ng_get_2byte_field_length("Client ID", auth->client_id, &client_id_len))
+        return NULL;
+
+    if (!client_id_len) {
         // [MQTT-3.1.3-6] server MAY allow empty client_id and treat it
         // as specific client_id (not same as client_id not given)
         // however server MUST allow ClientIDs between 1-23 bytes [MQTT-3.1.3-5]
@@ -915,6 +932,8 @@ mqtt_msg_data mqtt_ng_generate_connect(
         // at his own risk!
         nd_log(NDLS_DAEMON, NDLP_WARNING, "client_id provided is empty string. This might not be allowed by server [MQTT-3.1.3-6]");
     }
+
+    uint16_t will_topic_len = 0;
 
     if (lwt) {
         if (lwt->will_message && lwt->will_message_size > 65535) {
@@ -927,6 +946,9 @@ mqtt_msg_data mqtt_ng_generate_connect(
             return NULL;
         }
 
+        if (!mqtt_ng_get_2byte_field_length("Will Topic", lwt->will_topic, &will_topic_len))
+            return NULL;
+
         if (lwt->will_qos > MQTT_MAX_QOS) {
             // refer to [MQTT-3-1.2-12]
             nd_log(NDLS_DAEMON, NDLP_ERR, "QOS for LWT message is bigger than max");
@@ -934,11 +956,20 @@ mqtt_msg_data mqtt_ng_generate_connect(
         }
     }
 
+    uint16_t username_len = 0;
+    if (auth->username && !mqtt_ng_get_2byte_field_length("User Name", auth->username, &username_len))
+        return NULL;
+
+    uint16_t password_len = 0;
+    if (auth->password && !mqtt_ng_get_2byte_field_length("Password", auth->password, &password_len))
+        return NULL;
+
     // >> START THE RODEO <<
     transaction_buffer_transaction_start(trx_buf)
 
     // Calculate the resulting message size sans fixed MQTT header
-    size_t size = mqtt_ng_connect_size(auth, lwt);
+    size_t size = mqtt_ng_connect_size(
+        auth, lwt, client_id_len, will_topic_len, username_len, password_len);
 
     // Start generating the message
     struct buffer_fragment *frag = NULL;
@@ -989,8 +1020,8 @@ mqtt_msg_data mqtt_ng_generate_connect(
 
     // [MQTT-3.1.3.1] Client identifier
     CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 2, goto fail_rollback)
-    PACK_2B_INT(&trx_buf->hdr_buffer, strlen(auth->client_id), frag)
-    if (optimized_add(&trx_buf->hdr_buffer, auth->client_id, strlen(auth->client_id), auth->client_id_free, &frag))
+    PACK_2B_INT(&trx_buf->hdr_buffer, client_id_len, frag)
+    if (optimized_add(&trx_buf->hdr_buffer, auth->client_id, client_id_len, auth->client_id_free, &frag))
         goto fail_rollback;
 
     if (lwt != NULL) {
@@ -1003,8 +1034,8 @@ mqtt_msg_data mqtt_ng_generate_connect(
 
         // Will Topic [MQTT-3.1.3.3]
         CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 2, goto fail_rollback)
-        PACK_2B_INT(&trx_buf->hdr_buffer, strlen(lwt->will_topic), frag)
-        if (optimized_add(&trx_buf->hdr_buffer, lwt->will_topic, strlen(lwt->will_topic), lwt->will_topic_free, &frag))
+        PACK_2B_INT(&trx_buf->hdr_buffer, will_topic_len, frag)
+        if (optimized_add(&trx_buf->hdr_buffer, lwt->will_topic, will_topic_len, lwt->will_topic_free, &frag))
             goto fail_rollback;
 
         // Will Payload [MQTT-3.1.3.4]
@@ -1022,8 +1053,8 @@ mqtt_msg_data mqtt_ng_generate_connect(
     if (auth->username) {
         BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback)
         CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 2, goto fail_rollback)
-        PACK_2B_INT(&trx_buf->hdr_buffer, strlen(auth->username), frag)
-        if (optimized_add(&trx_buf->hdr_buffer, auth->username, strlen(auth->username), auth->username_free, &frag))
+        PACK_2B_INT(&trx_buf->hdr_buffer, username_len, frag)
+        if (optimized_add(&trx_buf->hdr_buffer, auth->username, username_len, auth->username_free, &frag))
             goto fail_rollback;
     }
 
@@ -1031,8 +1062,8 @@ mqtt_msg_data mqtt_ng_generate_connect(
     if (auth->password) {
         BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback)
         CHECK_BYTES_AVAILABLE(&trx_buf->hdr_buffer, 2, goto fail_rollback)
-        PACK_2B_INT(&trx_buf->hdr_buffer, strlen(auth->password), frag)
-        if (optimized_add(&trx_buf->hdr_buffer, auth->password, strlen(auth->password), auth->password_free, &frag))
+        PACK_2B_INT(&trx_buf->hdr_buffer, password_len, frag)
+        if (optimized_add(&trx_buf->hdr_buffer, auth->password, password_len, auth->password_free, &frag))
             goto fail_rollback;
     }
     trx_buf->hdr_buffer.tail_frag->flags |= BUFFER_FRAG_MQTT_PACKET_TAIL;
@@ -1090,12 +1121,12 @@ uint16_t get_unused_packet_id() {
 }
 
 static size_t mqtt_ng_publish_size(
-    const char *topic,
+    uint16_t topic_len,
     size_t msg_len,
     uint16_t topic_id)
 {
     size_t retval = 2
-                    + (topic == NULL ? 0 : strlen(topic)) /* Topic Name Length */
+                    + topic_len                           /* Topic Name Length */
                     + 2                                   /* Packet identifier */
                     + 1                                   /* Properties Length for now fixed to 1 property */
                     + msg_len;
@@ -1114,13 +1145,14 @@ int mqtt_ng_generate_publish(struct transaction_buffer *trx_buf,
                              size_t msg_len,
                              uint8_t publish_flags,
                              uint16_t *packet_id,
-                             uint16_t topic_alias)
+                             uint16_t topic_alias,
+                             uint16_t topic_len)
 {
     // >> START THE RODEO <<
     transaction_buffer_transaction_start(trx_buf)
 
     // Calculate the resulting message size sans fixed MQTT header
-    size_t size = mqtt_ng_publish_size(topic, msg_len, topic_alias);
+    size_t size = mqtt_ng_publish_size(topic_len, msg_len, topic_alias);
 
     // Start generating the message
     struct buffer_fragment *frag = NULL;
@@ -1143,9 +1175,9 @@ int mqtt_ng_generate_publish(struct transaction_buffer *trx_buf,
 
     // MQTT Variable Header
     // [MQTT-3.3.2.1]
-    PACK_2B_INT(&trx_buf->hdr_buffer, topic == NULL ? 0 : strlen(topic), frag)
+    PACK_2B_INT(&trx_buf->hdr_buffer, topic_len, frag)
     if (topic != NULL) {
-        if (optimized_add(&trx_buf->hdr_buffer, topic, strlen(topic), topic_free, &frag))
+        if (optimized_add(&trx_buf->hdr_buffer, topic, topic_len, topic_free, &frag))
             goto fail_rollback;
         BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback)
     }
@@ -1301,6 +1333,10 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
                     uint8_t publish_flags,
                     uint16_t *packet_id)
 {
+    uint16_t topic_len;
+    if (!mqtt_ng_get_2byte_field_length("Topic Name", topic, &topic_len))
+        return MQTT_NG_MSGGEN_USER_ERROR;
+
     struct topic_alias_data *alias = NULL;
     spinlock_lock(&client->tx_topic_aliases.spinlock);
     c_rhash_get_ptr_by_str(client->tx_topic_aliases.stoi_dict, topic, (void**)&alias);
@@ -1314,10 +1350,11 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
         if (cnt) {
             topic = NULL;
             topic_free = NULL;
+            topic_len = 0;
         }
     }
 
-    if (client->max_msg_size && PUBLISH_SP_SIZE + mqtt_ng_publish_size(topic, msg_len, topic_id) > client->max_msg_size) {
+    if (client->max_msg_size && PUBLISH_SP_SIZE + mqtt_ng_publish_size(topic_len, msg_len, topic_id) > client->max_msg_size) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Message too big for server: %zu", msg_len);
         return MQTT_NG_MSGGEN_MSG_TOO_BIG;
     }
@@ -1327,30 +1364,47 @@ int mqtt_ng_publish(struct mqtt_ng_client *client,
     // On MQTT_NG_MSGGEN_OK, msg is attached to a buffer fragment and freed by
     // the transaction-buffer GC after ack; *packet_id has been written by the
     // generator. See the long comment in mqtt_wss_publish5 for the invariant.
-    int rc = TRY_GENERATE_MESSAGE(mqtt_ng_generate_publish, topic, topic_free, msg, msg_free, msg_len, publish_flags, packet_id, topic_id);
+    int rc = TRY_GENERATE_MESSAGE(
+        mqtt_ng_generate_publish,
+        topic,
+        topic_free,
+        msg,
+        msg_free,
+        msg_len,
+        publish_flags,
+        packet_id,
+        topic_id,
+        topic_len);
     if (rc == MQTT_NG_MSGGEN_OK && packet_id)
         add_packet_to_timeout_monitor_list(client, *packet_id);
     return rc;
 }
 
-static size_t mqtt_ng_subscribe_size(struct mqtt_sub *subs, size_t sub_count)
+static int mqtt_ng_subscribe_size(struct mqtt_sub *subs, size_t sub_count, size_t *size)
 {
     size_t len = 2 /* Packet Identifier */ + 1 /* Properties Length TODO for now fixed 0 */;
     len += sub_count * (2 /* topic filter string length */ + 1 /* [MQTT-3.8.3.1] Subscription Options Byte */);
 
     for (size_t i = 0; i < sub_count; i++) {
-        len += strlen(subs[i].topic);
+        uint16_t topic_len;
+        if (!mqtt_ng_get_2byte_field_length("Topic Filter", subs[i].topic, &topic_len))
+            return MQTT_NG_MSGGEN_USER_ERROR;
+        len += topic_len;
     }
-    return len;
+
+    *size = len;
+    return MQTT_NG_MSGGEN_OK;
 }
 
 int mqtt_ng_generate_subscribe(struct transaction_buffer *trx_buf, struct mqtt_sub *subs, size_t sub_count)
 {
+    size_t size;
+    int rc = mqtt_ng_subscribe_size(subs, sub_count, &size);
+    if (rc != MQTT_NG_MSGGEN_OK)
+        return rc;
+
     // >> START THE RODEO <<
     transaction_buffer_transaction_start(trx_buf)
-
-    // Calculate the resulting message size sans fixed MQTT header
-    size_t size = mqtt_ng_subscribe_size(subs, sub_count);
 
     // Start generating the message
     struct buffer_fragment *frag = NULL;
@@ -1377,9 +1431,12 @@ int mqtt_ng_generate_subscribe(struct transaction_buffer *trx_buf, struct mqtt_s
     DATA_ADVANCE(&trx_buf->hdr_buffer, 1, frag)
 
     for (size_t i = 0; i < sub_count; i++) {
+        uint16_t topic_len;
+        if (!mqtt_ng_get_2byte_field_length("Topic Filter", subs[i].topic, &topic_len))
+            goto fail_user_rollback;
         BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback)
-        PACK_2B_INT(&trx_buf->hdr_buffer, strlen(subs[i].topic), frag)
-        if (optimized_add(&trx_buf->hdr_buffer, subs[i].topic, strlen(subs[i].topic), subs[i].topic_free, &frag))
+        PACK_2B_INT(&trx_buf->hdr_buffer, topic_len, frag)
+        if (optimized_add(&trx_buf->hdr_buffer, subs[i].topic, topic_len, subs[i].topic_free, &frag))
             goto fail_rollback;
         BUFFER_TRANSACTION_NEW_FRAG(&trx_buf->hdr_buffer, 0, frag, goto fail_rollback)
         *WRITE_POS(frag) = subs[i].options;
@@ -1389,6 +1446,9 @@ int mqtt_ng_generate_subscribe(struct transaction_buffer *trx_buf, struct mqtt_s
     trx_buf->hdr_buffer.tail_frag->flags |= BUFFER_FRAG_MQTT_PACKET_TAIL;
     transaction_buffer_transaction_commit(trx_buf)
     return MQTT_NG_MSGGEN_OK;
+fail_user_rollback:
+    transaction_buffer_transaction_rollback(trx_buf, ret);
+    return MQTT_NG_MSGGEN_USER_ERROR;
 fail_rollback:
     transaction_buffer_transaction_rollback(trx_buf, ret);
     return MQTT_NG_MSGGEN_BUFFER_OOM;
@@ -2489,6 +2549,87 @@ static int mqtt_ng_unittest_reject_malformed_properties_packet(
     return errors;
 }
 
+static int mqtt_ng_unittest_2byte_field_lengths(void)
+{
+    int errors = 0;
+    size_t too_long_len = (size_t)UINT16_MAX + 1;
+    char *field = mallocz(too_long_len + 1);
+    memset(field, 'x', too_long_len);
+    field[too_long_len] = '\0';
+
+    uint16_t encoded_len = 0;
+    field[UINT16_MAX] = '\0';
+    MQTT_NG_TEST(
+        mqtt_ng_get_2byte_field_length("test field", field, &encoded_len) && encoded_len == UINT16_MAX,
+        "two-byte field accepts exactly 65535 bytes");
+    field[UINT16_MAX] = 'x';
+    MQTT_NG_TEST(
+        !mqtt_ng_get_2byte_field_length("test field", field, &encoded_len),
+        "two-byte field rejects 65536 bytes");
+
+    rbuf_t input = rbuf_create(128, 128);
+    struct mqtt_ng_init settings = {
+        .data_in = input,
+        .data_out_fnc = NULL,
+        .user_ctx = NULL,
+        .connack_callback = NULL,
+        .puback_callback = NULL,
+        .msg_callback = NULL,
+    };
+    struct mqtt_ng_client *client = mqtt_ng_init(&settings);
+    MQTT_NG_TEST(client != NULL, "mqtt_ng_init succeeds for two-byte field test");
+    if (!client) {
+        rbuf_free(input);
+        freez(field);
+        return errors;
+    }
+
+    struct mqtt_auth_properties auth = {.client_id = field};
+    MQTT_NG_TEST(
+        mqtt_ng_generate_connect(&client->main_buffer, &auth, NULL, 60) == NULL,
+        "CONNECT rejects oversized Client ID");
+
+    auth.client_id = "client";
+    auth.username = field;
+    MQTT_NG_TEST(
+        mqtt_ng_generate_connect(&client->main_buffer, &auth, NULL, 60) == NULL,
+        "CONNECT rejects oversized User Name");
+
+    auth.username = NULL;
+    auth.password = field;
+    MQTT_NG_TEST(
+        mqtt_ng_generate_connect(&client->main_buffer, &auth, NULL, 60) == NULL,
+        "CONNECT rejects oversized Password");
+
+    auth.password = NULL;
+    struct mqtt_lwt_properties lwt = {.will_topic = field};
+    MQTT_NG_TEST(
+        mqtt_ng_generate_connect(&client->main_buffer, &auth, &lwt, 60) == NULL,
+        "CONNECT rejects oversized Will Topic");
+
+    struct mqtt_sub sub = {.topic = field};
+    MQTT_NG_TEST(
+        mqtt_ng_subscribe(client, &sub, 1) == MQTT_NG_MSGGEN_USER_ERROR,
+        "SUBSCRIBE rejects oversized Topic Filter");
+
+    char payload = 'x';
+    uint16_t packet_id = 0;
+    MQTT_NG_TEST(
+        mqtt_ng_publish(
+            client, field, NULL, &payload, CALLER_RESPONSIBILITY, sizeof(payload), 0, &packet_id) ==
+            MQTT_NG_MSGGEN_USER_ERROR,
+        "PUBLISH rejects oversized Topic Name");
+
+    MQTT_NG_TEST(
+        BUFFER_BYTES_USED(&client->main_buffer.hdr_buffer) == 0,
+        "oversized two-byte fields queue no fragments");
+
+    mqtt_ng_destroy(client);
+    rbuf_free(input);
+    freez(field);
+    return errors;
+}
+
 static int mqtt_ng_unittest_topic_alias_uint16(void)
 {
     int errors = 0;
@@ -2808,6 +2949,7 @@ int mqtt_ng_unittest(void)
 
     fprintf(stderr, "\nrunning mqtt_ng unittest\n");
 
+    errors += mqtt_ng_unittest_2byte_field_lengths();
     errors += mqtt_ng_unittest_reset_after_partial_publish();
     errors += mqtt_ng_unittest_topic_alias_uint16();
     errors += mqtt_ng_unittest_partial_suback_reason_codes();
