@@ -903,11 +903,13 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.var_cache = os_disk_space(netdata_configured_cache_dir);
     session_status.system_cpus = os_get_system_cpus();
 
-    // rrd_rdlock() inside rrdstats_metadata_collect() can block if a collector
-    // thread holds the write lock.  Skip during shutdown to avoid a deadlock
-    // that would outlast the SCM stop timeout (error 1053).
+    // rrd_rdlock() inside rrdstats_metadata_collect() can block while UV threads
+    // hold rrd_wrlock() loading metadata after rrd_init.  Skip during startup
+    // (DAEMON_STATUS_INITIALIZING) so the main thread is not blocked for minutes
+    // before startup completes.  Also skip during shutdown to avoid a deadlock
+    // with active collectors.
     nd_win_trace("daemon_status_file_refresh: rrdstats_metadata_collect");
-    if(!exit_initiated_get())
+    if(status != DAEMON_STATUS_INITIALIZING && !exit_initiated_get())
         session_status.metrics_metadata = rrdstats_metadata_collect();
 
     // Update disk footprint at most once every 10 minutes (600 seconds).
