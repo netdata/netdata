@@ -2658,6 +2658,7 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
 
     size_t entries = k->values.used;
     struct facet_value_restore {
+        FACET_VALUE *v;
         const char *name;
         uint32_t name_len;
     } *values = mallocz(entries * sizeof(*values));
@@ -2668,6 +2669,7 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
         if(used >= entries)
             break;
 
+        values[used].v = v;
         values[used].name = v->name;
         values[used].name_len = v->name_len;
         used++;
@@ -2680,17 +2682,12 @@ static uint32_t facets_sort_and_reorder_values(FACET_KEY *k) {
 
     ret = facets_sort_and_reorder_values_internal(k);
 
-    used = 0;
-    foreach_value_in_key(k, v) {
-        if(used >= entries)
-            break;
-
+    for(uint32_t i = 0; i < used; i++) {
+        v = values[i].v;
         freez((void *)v->name);
-        v->name = values[used].name;
-        v->name_len = values[used].name_len;
-        used++;
+        v->name = values[i].name;
+        v->name_len = values[i].name_len;
     }
-    foreach_value_in_key_done(v);
 
     buffer_free(tb);
     freez(values);
