@@ -52,29 +52,43 @@ func TestCacheReadHelpersRejectSymlinks(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if isPrivateRegularFile(link) {
-		t.Fatal("isPrivateRegularFile must reject a symlink")
+	tests := map[string]struct {
+		path        string
+		wantRegular bool
+		wantFirst   string
+		wantGrep    bool
+		wantOpen    bool
+	}{
+		"regular file": {
+			path:        secret,
+			wantRegular: true,
+			wantFirst:   "leaked-line",
+			wantGrep:    true,
+			wantOpen:    true,
+		},
+		"symlink": {
+			path: link,
+		},
 	}
-	if !isPrivateRegularFile(secret) {
-		t.Fatal("isPrivateRegularFile must accept a regular file")
-	}
-	if got := firstLineFile(link); got != "" {
-		t.Fatalf("firstLineFile followed a symlink: %q", got)
-	}
-	if _, ok := grepFile(link, "leaked", 0); ok {
-		t.Fatal("grepFile followed a symlink")
-	}
-	if got := firstLineFile(secret); got != "leaked-line" {
-		t.Fatalf("firstLineFile on a regular file = %q", got)
-	}
-	file, err := openPrivateRegularFile(secret)
-	if err != nil {
-		t.Fatalf("openPrivateRegularFile on regular file: %v", err)
-	}
-	_ = file.Close()
-	if file, err := openPrivateRegularFile(link); err == nil {
-		_ = file.Close()
-		t.Fatal("openPrivateRegularFile followed a symlink")
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := isPrivateRegularFile(test.path); got != test.wantRegular {
+				t.Fatalf("isPrivateRegularFile = %v, want %v", got, test.wantRegular)
+			}
+			if got := firstLineFile(test.path); got != test.wantFirst {
+				t.Fatalf("firstLineFile = %q, want %q", got, test.wantFirst)
+			}
+			if _, got := grepFile(test.path, "leaked", 0); got != test.wantGrep {
+				t.Fatalf("grepFile matched = %v, want %v", got, test.wantGrep)
+			}
+			file, err := openPrivateRegularFile(test.path)
+			if file != nil {
+				_ = file.Close()
+			}
+			if got := err == nil; got != test.wantOpen {
+				t.Fatalf("openPrivateRegularFile success = %v, want %v (error: %v)", got, test.wantOpen, err)
+			}
+		})
 	}
 }
 

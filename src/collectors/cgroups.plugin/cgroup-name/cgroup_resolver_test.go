@@ -113,19 +113,33 @@ func TestProxmoxBranches(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tests := map[string]string{
-		"qemu.slice_101.scope": "qemu_vm-one\n",
-		"qemu.slice_103.scope": "qemu_\n",
-		"lxc_102":              "ct-one\n",
+	tests := map[string]struct {
+		cgroup string
+		want   string
+	}{
+		"qemu name": {
+			cgroup: "qemu.slice_101.scope",
+			want:   "qemu_vm-one\n",
+		},
+		"qemu missing name": {
+			cgroup: "qemu.slice_103.scope",
+			want:   "qemu_\n",
+		},
+		"lxc hostname": {
+			cgroup: "lxc_102",
+			want:   "ct-one\n",
+		},
 	}
-	for cgroup, want := range tests {
-		var out bytes.Buffer
-		if code := run([]string{"cgroup-name", cgroup, cgroup}, &out); code != exitSuccess {
-			t.Fatalf("%s exit code %d", cgroup, code)
-		}
-		if out.String() != want {
-			t.Fatalf("%s stdout: want %q got %q", cgroup, want, out.String())
-		}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var out bytes.Buffer
+			if code := run([]string{"cgroup-name", test.cgroup, test.cgroup}, &out); code != exitSuccess {
+				t.Fatalf("exit code = %d, want success", code)
+			}
+			if got := out.String(); got != test.want {
+				t.Fatalf("stdout: want %q got %q", test.want, got)
+			}
+		})
 	}
 }
 
@@ -172,11 +186,27 @@ func TestMachineNameMatchesShellSedSemantics(t *testing.T) {
 }
 
 func TestHostPathKeepsAbsolutePathsWithEmptyPrefix(t *testing.T) {
-	if got := hostPath("", "/etc/pve"); got != "/etc/pve" {
-		t.Fatalf("hostPath with empty prefix = %q, want /etc/pve", got)
+	tests := map[string]struct {
+		prefix string
+		path   string
+		want   string
+	}{
+		"empty prefix keeps absolute path": {
+			path: "/etc/pve",
+			want: "/etc/pve",
+		},
+		"host prefix is prepended": {
+			prefix: "/host",
+			path:   "/etc/pve",
+			want:   "/host/etc/pve",
+		},
 	}
-	if got := hostPath("/host", "/etc/pve"); got != "/host/etc/pve" {
-		t.Fatalf("hostPath with /host prefix = %q, want /host/etc/pve", got)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := hostPath(test.prefix, test.path); got != test.want {
+				t.Fatalf("hostPath(%q, %q) = %q, want %q", test.prefix, test.path, got, test.want)
+			}
+		})
 	}
 }
 

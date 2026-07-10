@@ -225,95 +225,94 @@ func assertK8sBurstableContainerResolved(t *testing.T, tmp, containerdID, docker
 	}
 }
 
-func TestMirroredK8sPodListFixtureViaKubelet(t *testing.T) {
-	tmp := t.TempDir()
-	t.Setenv("PATH", tmp)
-	t.Setenv("TMPDIR", tmp)
-	t.Setenv("NETDATA_LOG_LEVEL", "emerg")
-	t.Setenv("NETDATA_HOST_PREFIX", tmp)
-	t.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
-	t.Setenv("KUBERNETES_PORT_443_TCP_PORT", "443")
-	t.Setenv("USE_KUBELET_FOR_PODS_METADATA", "1")
-
-	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-k8s-cluster-name"), []byte("fixture-cluster\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-kubesystem-uid"), []byte("fixture-system-uid\n"), 0o644); err != nil {
-		t.Fatal(err)
-	}
-
+func TestMirroredK8sPodListFixtures(t *testing.T) {
 	containerdID, dockerID, crioID, pods := k8sPodFixture()
-	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != "/pods" {
-			t.Errorf("unexpected kubelet path %s", request.URL.Path)
-			http.Error(w, "unexpected path", http.StatusNotFound)
-			return
-		}
-		_, _ = w.Write([]byte(pods))
-	}))
-	defer server.Close()
-	t.Setenv("KUBELET_URL", server.URL)
-
-	assertK8sBurstableContainerResolved(t, tmp, containerdID, dockerID, crioID, prepareInvocationConfig())
-}
-
-func TestMirroredK8sPodListFixtureViaAPIServer(t *testing.T) {
-	tmp := t.TempDir()
-	t.Setenv("PATH", tmp)
-	t.Setenv("TMPDIR", tmp)
-	t.Setenv("NETDATA_LOG_LEVEL", "emerg")
-	t.Setenv("NETDATA_HOST_PREFIX", tmp)
-	t.Setenv("K8S_TLS_INSECURE", "true")
-	t.Setenv("USE_KUBELET_FOR_PODS_METADATA", "")
-	t.Setenv("MY_NODE_NAME", "")
-
-	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-k8s-cluster-name"), []byte("fixture-cluster\n"), 0o644); err != nil {
-		t.Fatal(err)
+	tests := map[string]struct {
+		useAPIServer bool
+	}{
+		"kubelet":    {},
+		"API server": {useAPIServer: true},
 	}
-	tokenFile := filepath.Join(tmp, "serviceaccount-token")
-	if err := os.WriteFile(tokenFile, []byte("fixture-token\n"), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			tmp := t.TempDir()
+			t.Setenv("PATH", tmp)
+			t.Setenv("TMPDIR", tmp)
+			t.Setenv("NETDATA_LOG_LEVEL", "emerg")
+			t.Setenv("NETDATA_HOST_PREFIX", tmp)
+			if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-k8s-cluster-name"), []byte("fixture-cluster\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
 
-	containerdID, dockerID, crioID, pods := k8sPodFixture()
-	kubeSystemNamespace := `{"metadata":{"name":"kube-system","uid":"fixture-system-uid"}}`
-	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		if got := request.Header.Get("Authorization"); got != "Bearer fixture-token" {
-			t.Errorf("Authorization header = %q, want %q", got, "Bearer fixture-token")
-		}
-		switch request.URL.Path {
-		case "/api/v1/namespaces/kube-system":
-			_, _ = w.Write([]byte(kubeSystemNamespace))
-		case "/api/v1/pods":
-			_, _ = w.Write([]byte(pods))
-		default:
-			t.Errorf("unexpected API-server path %s", request.URL.Path)
-			http.Error(w, "unexpected path", http.StatusNotFound)
-		}
-	}))
-	defer server.Close()
+			var config invocationConfig
+			if test.useAPIServer {
+				tokenFile := filepath.Join(tmp, "serviceaccount-token")
+				if err := os.WriteFile(tokenFile, []byte("fixture-token\n"), 0o600); err != nil {
+					t.Fatal(err)
+				}
+				kubeSystemNamespace := `{"metadata":{"name":"kube-system","uid":"fixture-system-uid"}}`
+				server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+					if got := request.Header.Get("Authorization"); got != "Bearer fixture-token" {
+						t.Errorf("Authorization header = %q, want %q", got, "Bearer fixture-token")
+					}
+					switch request.URL.Path {
+					case "/api/v1/namespaces/kube-system":
+						_, _ = w.Write([]byte(kubeSystemNamespace))
+					case "/api/v1/pods":
+						_, _ = w.Write([]byte(pods))
+					default:
+						t.Errorf("unexpected API-server path %s", request.URL.Path)
+						http.Error(w, "unexpected path", http.StatusNotFound)
+					}
+				}))
+				t.Cleanup(server.Close)
 
-	parsedURL, err := url.Parse(server.URL)
-	if err != nil {
-		t.Fatal(err)
-	}
-	host, port, err := net.SplitHostPort(parsedURL.Host)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Setenv("KUBERNETES_SERVICE_HOST", host)
-	t.Setenv("KUBERNETES_PORT_443_TCP_PORT", port)
+				parsedURL, err := url.Parse(server.URL)
+				if err != nil {
+					t.Fatal(err)
+				}
+				host, port, err := net.SplitHostPort(parsedURL.Host)
+				if err != nil {
+					t.Fatal(err)
+				}
+				t.Setenv("KUBERNETES_SERVICE_HOST", host)
+				t.Setenv("KUBERNETES_PORT_443_TCP_PORT", port)
+				t.Setenv("K8S_TLS_INSECURE", "true")
+				t.Setenv("USE_KUBELET_FOR_PODS_METADATA", "")
+				t.Setenv("MY_NODE_NAME", "")
+				config = prepareInvocationConfig()
+				config.kubernetes.serviceAccountTokenFile = tokenFile
+			} else {
+				if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-kubesystem-uid"), []byte("fixture-system-uid\n"), 0o644); err != nil {
+					t.Fatal(err)
+				}
+				server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+					if request.URL.Path != "/pods" {
+						t.Errorf("unexpected kubelet path %s", request.URL.Path)
+						http.Error(w, "unexpected path", http.StatusNotFound)
+						return
+					}
+					_, _ = w.Write([]byte(pods))
+				}))
+				t.Cleanup(server.Close)
+				t.Setenv("KUBERNETES_SERVICE_HOST", "127.0.0.1")
+				t.Setenv("KUBERNETES_PORT_443_TCP_PORT", "443")
+				t.Setenv("USE_KUBELET_FOR_PODS_METADATA", "1")
+				t.Setenv("KUBELET_URL", server.URL)
+				config = prepareInvocationConfig()
+			}
 
-	config := prepareInvocationConfig()
-	config.kubernetes.serviceAccountTokenFile = tokenFile
-	assertK8sBurstableContainerResolved(t, tmp, containerdID, dockerID, crioID, config)
-
-	uid, err := os.ReadFile(filepath.Join(tmp, "netdata-cgroups-kubesystem-uid"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := strings.TrimSpace(string(uid)); got != "fixture-system-uid" {
-		t.Fatalf("cached kube-system uid = %q, want fixture-system-uid", got)
+			assertK8sBurstableContainerResolved(t, tmp, containerdID, dockerID, crioID, config)
+			if test.useAPIServer {
+				uid, err := os.ReadFile(filepath.Join(tmp, "netdata-cgroups-kubesystem-uid"))
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := strings.TrimSpace(string(uid)); got != "fixture-system-uid" {
+					t.Fatalf("cached kube-system uid = %q, want fixture-system-uid", got)
+				}
+			}
+		})
 	}
 }
 
@@ -342,93 +341,144 @@ func TestKubernetesPodAndContainerOutcomes(t *testing.T) {
 		{name: "container_name", value: "app"},
 		{name: "container_id", value: "container-id"},
 	}}
-	r := newResolver([]string{"cgroup-name"}, invocationConfig{logLevel: ndlpEmerg})
+	kubeVirt := base.clone()
+	for index := range kubeVirt.items {
+		switch kubeVirt.items[index].name {
+		case "pod_name":
+			kubeVirt.items[index].value = "virt-launcher-vm"
+		case "container_name":
+			kubeVirt.items[index].value = "guest-console-log"
+		}
+	}
 
-	t.Run("pod success", func(t *testing.T) {
-		result := r.resolveKubernetesPod("k8s_get_kubepod_name", "pod-cgroup", kubernetesCgroupIdentity{
-			podUID:   "pod-uid",
-			qosClass: "burstable",
-		}, kubernetesMetadata{
-			clusterName: "cluster-a",
-			systemUID:   "system-uid",
-			containers:  []labelSet{base},
-		})
-		if result.outcome != kubePodSuccess || result.name != "pod_default_api" {
-			t.Fatalf("outcome=%d name=%q", result.outcome, result.name)
-		}
-		wantLabels := `k8s_namespace="default",k8s_pod_name="api",k8s_node_name="node-a",k8s_kind="pod",k8s_qos_class="burstable",k8s_cluster_id="system-uid",k8s_cluster_name="cluster-a"`
-		if got := result.labels.String(); got != wantLabels {
-			t.Fatalf("pod labels:\nwant %q\n got %q", wantLabels, got)
-		}
-	})
-
-	t.Run("missing pod retries", func(t *testing.T) {
-		result := r.resolveKubernetesPod("k8s_get_kubepod_name", "pod-cgroup", kubernetesCgroupIdentity{
-			podUID: "missing",
-		}, kubernetesMetadata{containers: []labelSet{base}})
-		if result.outcome != kubePodRetryFallback {
-			t.Fatalf("outcome=%d, want retry", result.outcome)
-		}
-	})
-
-	t.Run("kubevirt helper disables", func(t *testing.T) {
-		labels := base.clone()
-		for index := range labels.items {
-			switch labels.items[index].name {
-			case "pod_name":
-				labels.items[index].value = "virt-launcher-vm"
-			case "container_name":
-				labels.items[index].value = "guest-console-log"
-			}
-		}
-		result := r.resolveKubernetesContainer("k8s_get_kubepod_name", "container-cgroup", kubernetesCgroupIdentity{
-			containerID: "container-id",
-		}, kubernetesMetadata{containerLabels: labels, hasContainerLabels: true})
-		if result.outcome != kubePodDisableFallback {
-			t.Fatalf("outcome=%d, want disable", result.outcome)
-		}
-	})
-
-	t.Run("null name policy", func(t *testing.T) {
-		labels := base.without("namespace")
-		for _, test := range []struct {
-			name       string
-			useKubelet bool
-			want       kubePodOutcome
-		}{
-			{name: "API enables", want: kubePodEnableFallback},
-			{name: "kubelet retries", useKubelet: true, want: kubePodRetryFallback},
-		} {
-			t.Run(test.name, func(t *testing.T) {
-				resolver := newResolver([]string{"cgroup-name"}, invocationConfig{
-					logLevel: ndlpEmerg,
-					kubernetes: kubernetesConfig{
-						useKubelet: test.useKubelet,
-					},
-				})
-				result := resolver.resolveKubernetesContainer("k8s_get_kubepod_name", "container-cgroup", kubernetesCgroupIdentity{
-					containerID: "container-id",
-				}, kubernetesMetadata{containerLabels: labels, hasContainerLabels: true})
-				if result.outcome != test.want {
-					t.Fatalf("outcome=%d, want %d", result.outcome, test.want)
-				}
+	tests := map[string]struct {
+		container  bool
+		identity   kubernetesCgroupIdentity
+		metadata   kubernetesMetadata
+		useKubelet bool
+		want       kubePodResolution
+	}{
+		"pod success": {
+			identity: kubernetesCgroupIdentity{
+				podUID:   "pod-uid",
+				qosClass: "burstable",
+			},
+			metadata: kubernetesMetadata{
+				clusterName: "cluster-a",
+				systemUID:   "system-uid",
+				containers:  []labelSet{base},
+			},
+			want: kubePodResolution{
+				name:    "pod_default_api",
+				labels:  parseLabelSet(`k8s_namespace="default",k8s_pod_name="api",k8s_node_name="node-a",k8s_kind="pod",k8s_qos_class="burstable",k8s_cluster_id="system-uid",k8s_cluster_name="cluster-a"`),
+				outcome: kubePodSuccess,
+			},
+		},
+		"missing pod retries": {
+			identity: kubernetesCgroupIdentity{podUID: "missing"},
+			metadata: kubernetesMetadata{containers: []labelSet{base}},
+			want:     kubePodResolution{outcome: kubePodRetryFallback},
+		},
+		"kubevirt helper disables": {
+			container: true,
+			identity:  kubernetesCgroupIdentity{containerID: "container-id"},
+			metadata:  kubernetesMetadata{containerLabels: kubeVirt, hasContainerLabels: true},
+			want:      kubePodResolution{outcome: kubePodDisableFallback},
+		},
+		"API null name enables": {
+			container: true,
+			identity:  kubernetesCgroupIdentity{containerID: "container-id"},
+			metadata:  kubernetesMetadata{containerLabels: base.without("namespace"), hasContainerLabels: true},
+			want: kubePodResolution{
+				name:    "cntr_null_api_app",
+				labels:  parseLabelSet(`k8s_pod_name="api",k8s_node_name="node-a",k8s_container_name="app",k8s_kind="container",k8s_qos_class=""`),
+				outcome: kubePodEnableFallback,
+			},
+		},
+		"kubelet null name retries": {
+			container:  true,
+			identity:   kubernetesCgroupIdentity{containerID: "container-id"},
+			metadata:   kubernetesMetadata{containerLabels: base.without("namespace"), hasContainerLabels: true},
+			useKubelet: true,
+			want: kubePodResolution{
+				name:    "cntr_null_api_app",
+				labels:  parseLabelSet(`k8s_pod_name="api",k8s_node_name="node-a",k8s_container_name="app",k8s_kind="container",k8s_qos_class=""`),
+				outcome: kubePodRetryFallback,
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			r := newResolver([]string{"cgroup-name"}, invocationConfig{
+				logLevel: ndlpEmerg,
+				kubernetes: kubernetesConfig{
+					useKubelet: test.useKubelet,
+				},
 			})
-		}
-	})
+			var got kubePodResolution
+			if test.container {
+				got = r.resolveKubernetesContainer("k8s_get_kubepod_name", "container-cgroup", test.identity, test.metadata)
+			} else {
+				got = r.resolveKubernetesPod("k8s_get_kubepod_name", "pod-cgroup", test.identity, test.metadata)
+			}
+			if got.outcome != test.want.outcome || got.name != test.want.name || got.labels.String() != test.want.labels.String() {
+				t.Fatalf("resolution = {name:%q labels:%q outcome:%d}, want {name:%q labels:%q outcome:%d}",
+					got.name, got.labels.String(), got.outcome, test.want.name, test.want.labels.String(), test.want.outcome)
+			}
+		})
+	}
 }
 
 func TestSingleCgroupProcessIsPause(t *testing.T) {
-	readPause := func(pid string) ([]byte, error) {
-		if pid != "42" {
-			t.Fatalf("pid = %q, want 42", pid)
-		}
-		return []byte("pause\n"), nil
+	tests := map[string]struct {
+		processes []byte
+		comm      []byte
+		readErr   error
+		want      bool
+		wantRead  bool
+		wantPID   string
+	}{
+		"single pause process": {
+			processes: []byte("42\n"),
+			comm:      []byte("pause\n"),
+			want:      true,
+			wantRead:  true,
+			wantPID:   "42",
+		},
+		"single non-pause process": {
+			processes: []byte("42\n"),
+			comm:      []byte("worker\n"),
+			wantRead:  true,
+			wantPID:   "42",
+		},
+		"multiple processes": {
+			processes: []byte("42 43\n"),
+		},
+		"empty process list": {},
+		"comm read failure": {
+			processes: []byte("42\n"),
+			readErr:   os.ErrNotExist,
+			wantRead:  true,
+			wantPID:   "42",
+		},
 	}
-	if !singleCgroupProcessIsPause([]byte("42\n"), readPause) {
-		t.Fatal("single pause process was not detected")
-	}
-	if singleCgroupProcessIsPause([]byte("42 43\n"), readPause) {
-		t.Fatal("multiple processes must not be classified as a pause container")
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			readCalled := false
+			got := singleCgroupProcessIsPause(test.processes, func(pid string) ([]byte, error) {
+				readCalled = true
+				if pid != test.wantPID {
+					t.Fatalf("pid = %q, want %q", pid, test.wantPID)
+				}
+				return test.comm, test.readErr
+			})
+			if got != test.want {
+				t.Fatalf("pause process = %v, want %v", got, test.want)
+			}
+			if readCalled != test.wantRead {
+				t.Fatalf("read comm called = %v, want %v", readCalled, test.wantRead)
+			}
+		})
 	}
 }
 
@@ -436,27 +486,48 @@ func TestKubernetesFallbackExitMapping(t *testing.T) {
 	id := strings.Repeat("c", 64)
 	cgroup := "kubepods-burstable-pod11111111_2222_3333_4444_555555555555_docker-" + id + ".scope"
 
-	for _, test := range []struct {
-		name       string
+	tests := map[string]struct {
+		cgroup     string
+		seedCache  bool
 		useKubelet bool
 		wantCode   int
+		wantOutput string
 	}{
-		{name: "API null name enables", wantCode: exitSuccess},
-		{name: "kubelet null name retries", useKubelet: true, wantCode: exitRetry},
-	} {
-		t.Run(test.name, func(t *testing.T) {
+		"API null name enables": {
+			cgroup:     cgroup,
+			seedCache:  true,
+			wantCode:   exitSuccess,
+			wantOutput: "k8s_" + cgroup + "\n",
+		},
+		"kubelet null name retries": {
+			cgroup:     cgroup,
+			seedCache:  true,
+			useKubelet: true,
+			wantCode:   exitRetry,
+			wantOutput: "k8s_" + cgroup + "\n",
+		},
+		"unrecognized kubepod disables": {
+			cgroup:     "kubepods-invalid",
+			wantCode:   exitDisable,
+			wantOutput: "k8s_kubepods-invalid\n",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
 			tmp := t.TempDir()
-			cache := newKubernetesCache(tmp)
-			cache.writeClusterName("cluster-a")
-			cache.writeSystemUID("system-uid")
-			cache.writeContainers([]labelSet{{items: []label{
-				{name: "pod_name", value: "api"},
-				{name: "container_name", value: "app"},
-				{name: "container_id", value: id},
-			}}})
+			if test.seedCache {
+				cache := newKubernetesCache(tmp)
+				cache.writeClusterName("cluster-a")
+				cache.writeSystemUID("system-uid")
+				cache.writeContainers([]labelSet{{items: []label{
+					{name: "pod_name", value: "api"},
+					{name: "container_name", value: "app"},
+					{name: "container_id", value: id},
+				}}})
+			}
 
 			var out bytes.Buffer
-			code := runWithConfig([]string{"cgroup-name", cgroup, cgroup}, &out, invocationConfig{
+			code := runWithConfig([]string{"cgroup-name", test.cgroup, test.cgroup}, &out, invocationConfig{
 				tmpDir:   tmp,
 				logLevel: ndlpEmerg,
 				kubernetes: kubernetesConfig{
@@ -466,42 +537,36 @@ func TestKubernetesFallbackExitMapping(t *testing.T) {
 			if code != test.wantCode {
 				t.Fatalf("exit code = %d, want %d", code, test.wantCode)
 			}
-			if got, want := out.String(), "k8s_"+cgroup+"\n"; got != want {
-				t.Fatalf("stdout = %q, want %q", got, want)
+			if got := out.String(); got != test.wantOutput {
+				t.Fatalf("stdout = %q, want %q", got, test.wantOutput)
 			}
 		})
 	}
-
-	t.Run("unrecognized kubepod disables", func(t *testing.T) {
-		var out bytes.Buffer
-		code := runWithConfig([]string{"cgroup-name", "kubepods-invalid", "kubepods-invalid"}, &out, invocationConfig{
-			tmpDir:   t.TempDir(),
-			logLevel: ndlpEmerg,
-		})
-		if code != exitDisable {
-			t.Fatalf("exit code = %d, want disable", code)
-		}
-		if got, want := out.String(), "k8s_kubepods-invalid\n"; got != want {
-			t.Fatalf("stdout = %q, want %q", got, want)
-		}
-	})
 }
 
 func TestKubernetesAPIServerDeadlinePolicy(t *testing.T) {
 	id := strings.Repeat("e", 64)
 	cgroup := "kubepods-burstable-pod11111111_2222_3333_4444_555555555555_docker-" + id + ".scope"
 
-	for _, test := range []struct {
-		name       string
+	tests := map[string]struct {
 		block      bool
 		timeout    time.Duration
 		wantCode   int
 		wantOutput string
 	}{
-		{name: "deadline retries without output", block: true, timeout: 25 * time.Millisecond, wantCode: exitRetry},
-		{name: "fast failure keeps shell enable fallback", timeout: 2 * time.Second, wantCode: exitSuccess, wantOutput: "k8s_" + cgroup + "\n"},
-	} {
-		t.Run(test.name, func(t *testing.T) {
+		"deadline retries without output": {
+			block:    true,
+			timeout:  25 * time.Millisecond,
+			wantCode: exitRetry,
+		},
+		"fast failure keeps shell enable fallback": {
+			timeout:    2 * time.Second,
+			wantCode:   exitSuccess,
+			wantOutput: "k8s_" + cgroup + "\n",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
 			var calls atomic.Int32
 			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
 				calls.Add(1)

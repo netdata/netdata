@@ -23,23 +23,42 @@ func TestHTTPGetOptions(t *testing.T) {
 	}))
 	defer server.Close()
 
-	t.Run("body cap", func(t *testing.T) {
-		_, err := httpGetWithContext(context.Background(), server.URL+"/large", httpGetOptions{maxBody: 4})
-		if err == nil || !strings.Contains(err.Error(), "response exceeds 4 bytes") {
-			t.Fatalf("body cap error = %v", err)
-		}
-	})
-
-	t.Run("non-2xx is optional", func(t *testing.T) {
-		body, err := httpGetWithContext(context.Background(), server.URL+"/failure", httpGetOptions{})
-		if err != nil || !strings.Contains(string(body), "upstream failure") {
-			t.Fatalf("non-failing status: body=%q err=%v", body, err)
-		}
-		body, err = httpGetWithContext(context.Background(), server.URL+"/failure", httpGetOptions{fail: true})
-		if err == nil || !strings.Contains(err.Error(), "http status 503") || !strings.Contains(string(body), "upstream failure") {
-			t.Fatalf("failing status: body=%q err=%v", body, err)
-		}
-	})
+	tests := map[string]struct {
+		path             string
+		options          httpGetOptions
+		wantBodyContains string
+		wantErrContains  string
+	}{
+		"body cap": {
+			path:            "/large",
+			options:         httpGetOptions{maxBody: 4},
+			wantErrContains: "response exceeds 4 bytes",
+		},
+		"non-2xx accepted": {
+			path:             "/failure",
+			wantBodyContains: "upstream failure",
+		},
+		"non-2xx rejected": {
+			path:             "/failure",
+			options:          httpGetOptions{fail: true},
+			wantBodyContains: "upstream failure",
+			wantErrContains:  "http status 503",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			body, err := httpGetWithContext(context.Background(), server.URL+test.path, test.options)
+			if test.wantErrContains == "" && err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if test.wantErrContains != "" && (err == nil || !strings.Contains(err.Error(), test.wantErrContains)) {
+				t.Fatalf("error = %v, want containing %q", err, test.wantErrContains)
+			}
+			if test.wantBodyContains != "" && !strings.Contains(string(body), test.wantBodyContains) {
+				t.Fatalf("body = %q, want containing %q", body, test.wantBodyContains)
+			}
+		})
+	}
 }
 
 func TestParseK8sTLSInsecure(t *testing.T) {
@@ -79,21 +98,6 @@ func TestK8sTLSModesAgainstSelfSignedServer(t *testing.T) {
 			serviceAccountCAFile: k8sServiceAccountCAFile,
 		},
 	})
-	if _, err := httpGetWithContext(context.Background(), server.URL, httpGetOptions{
-		tlsConfig: secure.k8sTLSConfig(tlsModeKubelet),
-		noProxy:   true,
-		fail:      true,
-	}); err != nil {
-		t.Fatalf("kubelet mode must accept a self-signed certificate, got: %v", err)
-	}
-	if _, err := httpGetWithContext(context.Background(), server.URL, httpGetOptions{
-		tlsConfig: secure.k8sTLSConfig(tlsModeAPIServer),
-		noProxy:   true,
-		fail:      true,
-	}); err == nil {
-		t.Fatal("API-server mode must reject a certificate that does not chain to the service-account CA")
-	}
-
 	insecure := newResolver([]string{"cgroup-name"}, invocationConfig{
 		logLevel: ndlpInfo,
 		kubernetes: kubernetesConfig{
@@ -101,12 +105,39 @@ func TestK8sTLSModesAgainstSelfSignedServer(t *testing.T) {
 			tlsInsecure:          true,
 		},
 	})
-	if _, err := httpGetWithContext(context.Background(), server.URL, httpGetOptions{
-		tlsConfig: insecure.k8sTLSConfig(tlsModeAPIServer),
-		noProxy:   true,
-		fail:      true,
-	}); err != nil {
-		t.Fatalf("insecure API-server mode must accept any certificate, got: %v", err)
+	tests := map[string]struct {
+		resolver *resolver
+		mode     k8sTLSMode
+		wantErr  bool
+	}{
+		"kubelet accepts self-signed certificate": {
+			resolver: secure,
+			mode:     tlsModeKubelet,
+		},
+		"secure API server rejects unknown CA": {
+			resolver: secure,
+			mode:     tlsModeAPIServer,
+			wantErr:  true,
+		},
+		"insecure API server accepts self-signed certificate": {
+			resolver: insecure,
+			mode:     tlsModeAPIServer,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := httpGetWithContext(context.Background(), server.URL, httpGetOptions{
+				tlsConfig: test.resolver.k8sTLSConfig(test.mode),
+				noProxy:   true,
+				fail:      true,
+			})
+			if test.wantErr && err == nil {
+				t.Fatal("expected TLS error")
+			}
+			if !test.wantErr && err != nil {
+				t.Fatalf("unexpected TLS error: %v", err)
+			}
+		})
 	}
 }
 
@@ -117,19 +148,40 @@ func TestK8sTLSConfigIsReusedPerInvocation(t *testing.T) {
 			tlsInsecure: true,
 		},
 	})
-	if first, second := r.k8sTLSConfig(tlsModeAPIServer), r.k8sTLSConfig(tlsModeAPIServer); first != second {
-		t.Fatal("API-server TLS roots were rebuilt within one invocation")
+	tests := map[string]struct {
+		mode k8sTLSMode
+	}{
+		"API server": {mode: tlsModeAPIServer},
+		"kubelet":    {mode: tlsModeKubelet},
 	}
-	if first, second := r.k8sTLSConfig(tlsModeKubelet), r.k8sTLSConfig(tlsModeKubelet); first != second {
-		t.Fatal("kubelet TLS configuration was rebuilt within one invocation")
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if first, second := r.k8sTLSConfig(test.mode), r.k8sTLSConfig(test.mode); first != second {
+				t.Fatal("TLS configuration was rebuilt within one invocation")
+			}
+		})
 	}
 }
 
 func TestKubeletPodsURLAppendsPods(t *testing.T) {
-	if got := kubeletPodsURL(defaultKubeletURL); got != "https://localhost:10250/pods" {
-		t.Fatalf("default kubelet url = %q", got)
+	tests := map[string]struct {
+		base string
+		want string
+	}{
+		"default URL": {
+			base: defaultKubeletURL,
+			want: "https://localhost:10250/pods",
+		},
+		"configured URL": {
+			base: "https://node-1:10250",
+			want: "https://node-1:10250/pods",
+		},
 	}
-	if got := kubeletPodsURL("https://node-1:10250"); got != "https://node-1:10250/pods" {
-		t.Fatalf("configured kubelet url = %q", got)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := kubeletPodsURL(test.base); got != test.want {
+				t.Fatalf("kubelet URL = %q, want %q", got, test.want)
+			}
+		})
 	}
 }

@@ -17,16 +17,31 @@ func TestInvocationConfigPreservesKubeConfigPresence(t *testing.T) {
 		}
 	})
 
-	_ = os.Unsetenv("KUBE_CONFIG")
-	if config := loadInvocationConfig(); config.kubernetes.kubeConfigSet {
-		t.Fatal("unset KUBE_CONFIG must remain distinguishable from an empty value")
+	tests := map[string]struct {
+		set       bool
+		value     string
+		wantSet   bool
+		wantValue string
+	}{
+		"unset remains distinguishable": {},
+		"explicitly empty remains set": {
+			set:     true,
+			wantSet: true,
+		},
 	}
-
-	_ = os.Setenv("KUBE_CONFIG", "")
-	config := loadInvocationConfig()
-	if !config.kubernetes.kubeConfigSet || config.kubernetes.kubeConfig != "" {
-		t.Fatalf("explicitly empty KUBE_CONFIG was not preserved: set=%v value=%q",
-			config.kubernetes.kubeConfigSet, config.kubernetes.kubeConfig)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if test.set {
+				_ = os.Setenv("KUBE_CONFIG", test.value)
+			} else {
+				_ = os.Unsetenv("KUBE_CONFIG")
+			}
+			config := loadInvocationConfig()
+			if config.kubernetes.kubeConfigSet != test.wantSet || config.kubernetes.kubeConfig != test.wantValue {
+				t.Fatalf("KUBE_CONFIG: set=%v value=%q, want set=%v value=%q",
+					config.kubernetes.kubeConfigSet, config.kubernetes.kubeConfig, test.wantSet, test.wantValue)
+			}
+		})
 	}
 }
 
@@ -36,39 +51,56 @@ func TestPrepareInvocationConfigDefaultsRuntimeHosts(t *testing.T) {
 	t.Setenv("PODMAN_HOST", "")
 
 	config := prepareInvocationConfig()
-	if config.dockerHost != defaultDockerHost {
-		t.Fatalf("DOCKER_HOST = %q, want %q", config.dockerHost, defaultDockerHost)
+	tests := map[string]struct {
+		envName     string
+		configValue string
+		want        string
+	}{
+		"docker host": {
+			envName:     "DOCKER_HOST",
+			configValue: config.dockerHost,
+			want:        defaultDockerHost,
+		},
+		"podman host": {
+			envName:     "PODMAN_HOST",
+			configValue: config.podmanHost,
+			want:        defaultPodmanHost,
+		},
 	}
-	if config.podmanHost != defaultPodmanHost {
-		t.Fatalf("PODMAN_HOST = %q, want %q", config.podmanHost, defaultPodmanHost)
-	}
-	if got := os.Getenv("DOCKER_HOST"); got != defaultDockerHost {
-		t.Fatalf("DOCKER_HOST was not exported for child commands: %q", got)
-	}
-	if got := os.Getenv("PODMAN_HOST"); got != defaultPodmanHost {
-		t.Fatalf("PODMAN_HOST was not exported for child commands: %q", got)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if test.configValue != test.want {
+				t.Fatalf("config value = %q, want %q", test.configValue, test.want)
+			}
+			if got := os.Getenv(test.envName); got != test.want {
+				t.Fatalf("exported %s = %q, want %q", test.envName, got, test.want)
+			}
+		})
 	}
 }
 
 func TestParseLogPriorityMatchesShellAliases(t *testing.T) {
-	tests := map[string]int{
-		"emerg":     0,
-		"emergency": 0,
-		"alert":     1,
-		"crit":      2,
-		"critical":  2,
-		"err":       3,
-		"error":     3,
-		"warn":      4,
-		"warning":   4,
-		"notice":    5,
-		"info":      6,
-		"debug":     7,
+	tests := map[string]struct {
+		value string
+		want  int
+	}{
+		"emerg":     {value: "emerg", want: 0},
+		"emergency": {value: "emergency", want: 0},
+		"alert":     {value: "alert", want: 1},
+		"crit":      {value: "crit", want: 2},
+		"critical":  {value: "critical", want: 2},
+		"err":       {value: "err", want: 3},
+		"error":     {value: "error", want: 3},
+		"warn":      {value: "warn", want: 4},
+		"warning":   {value: "warning", want: 4},
+		"notice":    {value: "notice", want: 5},
+		"info":      {value: "info", want: 6},
+		"debug":     {value: "debug", want: 7},
 	}
-	for value, want := range tests {
-		t.Run(value, func(t *testing.T) {
-			if got := parseLogPriority(value); got != want {
-				t.Fatalf("parseLogPriority(%q) = %d, want %d", value, got, want)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := parseLogPriority(test.value); got != test.want {
+				t.Fatalf("parseLogPriority(%q) = %d, want %d", test.value, got, test.want)
 			}
 		})
 	}

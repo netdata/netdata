@@ -108,33 +108,30 @@ func TestK8sGCPRequestPolicyAndCancellation(t *testing.T) {
 }
 
 func TestK8sFetchPodsViaKubectlPreservesKubeConfigPresence(t *testing.T) {
-	for _, test := range []struct {
-		name          string
+	tests := map[string]struct {
 		kubeConfig    string
 		kubeConfigSet bool
 		wantNamespace string
 		wantPods      string
 	}{
-		{
-			name:          "unset",
+		"unset": {
 			wantNamespace: "--kubeconfig= get namespaces kube-system -o json",
 			wantPods:      "--kubeconfig=/etc/kubernetes/admin.conf get pods --all-namespaces -o json",
 		},
-		{
-			name:          "explicitly empty",
+		"explicitly empty": {
 			kubeConfigSet: true,
 			wantNamespace: "--kubeconfig= get namespaces kube-system -o json",
 			wantPods:      "--kubeconfig= get pods --all-namespaces -o json",
 		},
-		{
-			name:          "explicit path",
+		"explicit path": {
 			kubeConfig:    "/fixture/config",
 			kubeConfigSet: true,
 			wantNamespace: "--kubeconfig=/fixture/config get namespaces kube-system -o json",
 			wantPods:      "--kubeconfig=/fixture/config get pods --all-namespaces -o json",
 		},
-	} {
-		t.Run(test.name, func(t *testing.T) {
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
 			tmp := t.TempDir()
 			calls := filepath.Join(tmp, "kubectl.calls")
 			if err := os.WriteFile(filepath.Join(tmp, "ps"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {

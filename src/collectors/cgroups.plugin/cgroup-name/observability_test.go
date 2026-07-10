@@ -19,36 +19,40 @@ func TestBuildCmdLinePreservesShellQuotingBug(t *testing.T) {
 }
 
 func TestSetupDeadlineBudget(t *testing.T) {
-	t.Run("unbounded", func(t *testing.T) {
-		r := newResolver([]string{"cgroup-name"}, invocationConfig{logLevel: ndlpInfo})
-		_, cancel := r.setupDeadline()
-		defer cancel()
-		if !r.budget.expiresAt.IsZero() {
-			t.Fatal("expiresAt must be zero when no timeout is configured")
-		}
-		if r.budgetExpired() {
-			t.Fatal("an unbounded budget must never report expired")
-		}
-	})
-
-	t.Run("expires", func(t *testing.T) {
-		r := newResolver([]string{"cgroup-name"}, invocationConfig{logLevel: ndlpInfo, timeout: 10 * time.Millisecond})
-		ctx, cancel := r.setupDeadline()
-		defer cancel()
-		if r.budget.expiresAt.IsZero() {
-			t.Fatal("expiresAt must be set when a timeout is configured")
-		}
-		if r.budgetExpired() {
-			t.Fatal("budget must not be expired immediately")
-		}
-		time.Sleep(20 * time.Millisecond)
-		if !r.budgetExpired() {
-			t.Fatal("budget must report expired after the deadline passes")
-		}
-		if ctx.Err() == nil {
-			t.Fatal("the deadline context must be done after the budget expires")
-		}
-	})
+	tests := map[string]struct {
+		timeout     time.Duration
+		wantExpires bool
+	}{
+		"unbounded": {},
+		"expires": {
+			timeout:     10 * time.Millisecond,
+			wantExpires: true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			r := newResolver([]string{"cgroup-name"}, invocationConfig{logLevel: ndlpInfo, timeout: test.timeout})
+			ctx, cancel := r.setupDeadline()
+			defer cancel()
+			if got := !r.budget.expiresAt.IsZero(); got != test.wantExpires {
+				t.Fatalf("deadline configured = %v, want %v", got, test.wantExpires)
+			}
+			if r.budgetExpired() {
+				t.Fatal("budget must not be expired immediately")
+			}
+			if !test.wantExpires {
+				return
+			}
+			select {
+			case <-ctx.Done():
+			case <-time.After(time.Second):
+				t.Fatal("deadline context did not expire")
+			}
+			if !r.budgetExpired() {
+				t.Fatal("budget must report expired after the deadline passes")
+			}
+		})
+	}
 }
 
 func TestLogfmtIsSingleLineAndQuoted(t *testing.T) {

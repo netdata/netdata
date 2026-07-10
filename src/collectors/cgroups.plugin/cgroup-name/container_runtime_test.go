@@ -16,102 +16,110 @@ import (
 	"time"
 )
 
-func TestDockerInspectParser(t *testing.T) {
-	result := parseDockerLikeInspectOutput(strings.Join([]string{
-		"NOMAD_NAMESPACE=prod",
-		"NOMAD_JOB_NAME=api",
-		"NOMAD_TASK_NAME=worker",
-		"NOMAD_SHORT_ALLOC_ID=abc123",
-		"CONT_NAME=/ignored",
-		"IMAGE_NAME=registry.example.invalid/app:1",
-		"LABEL_netdata.cloud/service=payments",
-		"LABEL_netdata.cloud/url=https://example.invalid/path?k=v",
-		`LABEL_netdata.cloud/escaped="a,b\"c\nline"`,
-	}, "\n"))
-
-	if result.name != "prod-api-worker-abc123" {
-		t.Fatalf("unexpected name %q", result.name)
+func TestDockerInspectParsing(t *testing.T) {
+	tests := map[string]struct {
+		json       bool
+		input      string
+		wantName   string
+		wantLabels string
+	}{
+		"text output": {
+			input: strings.Join([]string{
+				"NOMAD_NAMESPACE=prod",
+				"NOMAD_JOB_NAME=api",
+				"NOMAD_TASK_NAME=worker",
+				"NOMAD_SHORT_ALLOC_ID=abc123",
+				"CONT_NAME=/ignored",
+				"IMAGE_NAME=registry.example.invalid/app:1",
+				"LABEL_netdata.cloud/service=payments",
+				"LABEL_netdata.cloud/url=https://example.invalid/path?k=v",
+				`LABEL_netdata.cloud/escaped="a,b\"c\nline"`,
+			}, "\n"),
+			wantName:   "prod-api-worker-abc123",
+			wantLabels: `image="registry.example.invalid/app:1",netdata.cloud/service="payments",netdata.cloud/url="https://example.invalid/path?k=v",netdata.cloud/escaped="a,b\"c line"`,
+		},
+		"JSON preserves label order": {
+			json:       true,
+			input:      `{"Name":"/web","Config":{"Env":["A=B"],"Image":"img:v1","Labels":{"netdata.cloud/a":"1","netdata.cloud/b":"2"}}}`,
+			wantName:   "web",
+			wantLabels: `image="img:v1",netdata.cloud/a="1",netdata.cloud/b="2"`,
+		},
+		"JSON values stay line oriented": {
+			json:     true,
+			input:    `{"Name":"/ignored","Config":{"Env":["NOMAD_NAMESPACE=prod\ninjected","NOMAD_JOB_NAME=api","NOMAD_TASK_NAME=worker","NOMAD_SHORT_ALLOC_ID=abc123"],"Image":"","Labels":{}}}`,
+			wantName: "prod-api-worker-abc123",
+		},
 	}
-	wantLabels := `image="registry.example.invalid/app:1",netdata.cloud/service="payments",netdata.cloud/url="https://example.invalid/path?k=v",netdata.cloud/escaped="a,b\"c line"`
-	if got := result.labels.String(); got != wantLabels {
-		t.Fatalf("unexpected labels:\nwant %q\n got %q", wantLabels, got)
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var result resolution
+			if test.json {
+				var ok bool
+				result, ok = dockerJSONToResolution([]byte(test.input))
+				if !ok {
+					t.Fatal("docker JSON did not parse")
+				}
+			} else {
+				result = parseDockerLikeInspectOutput(test.input)
+			}
+			if result.name != test.wantName {
+				t.Fatalf("name = %q, want %q", result.name, test.wantName)
+			}
+			if got := result.labels.String(); got != test.wantLabels {
+				t.Fatalf("labels:\nwant %q\n got %q", test.wantLabels, got)
+			}
+		})
 	}
 }
 
-func TestDockerJSONToResolutionPreservesLabelOrder(t *testing.T) {
-	body := []byte(`{"Name":"/web","Config":{"Env":["A=B"],"Image":"img:v1","Labels":{"netdata.cloud/a":"1","netdata.cloud/b":"2"}}}`)
-	result, ok := dockerJSONToResolution(body)
-	if !ok {
-		t.Fatal("docker JSON did not parse")
-	}
-	if result.name != "web" {
-		t.Fatalf("name = %q", result.name)
-	}
-	if got, want := result.labels.String(), `image="img:v1",netdata.cloud/a="1",netdata.cloud/b="2"`; got != want {
-		t.Fatalf("labels:\nwant %q\n got %q", want, got)
-	}
-}
-
-func TestDockerJSONToResolutionKeepsInspectValuesLineOriented(t *testing.T) {
-	body := []byte(`{"Name":"/ignored","Config":{"Env":["NOMAD_NAMESPACE=prod\ninjected","NOMAD_JOB_NAME=api","NOMAD_TASK_NAME=worker","NOMAD_SHORT_ALLOC_ID=abc123"],"Image":"","Labels":{}}}`)
-	result, ok := dockerJSONToResolution(body)
-	if !ok {
-		t.Fatal("docker JSON did not parse")
-	}
-	if got, want := result.name, "prod-api-worker-abc123"; got != want {
-		t.Fatalf("name = %q, want the first physical inspect line %q", got, want)
-	}
-}
-
-func TestDockerRetryFallbackPreservesInspectLabels(t *testing.T) {
+func TestRuntimeRetryFallbackPreservesInspectLabels(t *testing.T) {
 	tmp := t.TempDir()
 	if err := os.WriteFile(filepath.Join(tmp, "snap"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", tmp)
 
-	id := strings.Repeat("7", 64)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		_, _ = w.Write([]byte(`{"Name":"","Config":{"Env":[],"Image":"registry.example.invalid/partial:v1","Labels":{"netdata.cloud/team":"platform"}}}`))
-	}))
-	defer server.Close()
+	tests := map[string]struct {
+		podman bool
+		idByte string
+		image  string
+	}{
+		"docker": {
+			idByte: "7",
+			image:  "registry.example.invalid/partial:v1",
+		},
+		"podman": {
+			podman: true,
+			idByte: "8",
+			image:  "registry.example.invalid/podman-partial:v1",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			id := strings.Repeat(test.idByte, 64)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				_, _ = w.Write([]byte(`{"Name":"","Config":{"Env":[],"Image":"` + test.image + `","Labels":{"netdata.cloud/team":"platform"}}}`))
+			}))
+			defer server.Close()
 
-	r := newResolver([]string{"cgroup-name"}, invocationConfig{
-		dockerHost: server.URL,
-		logLevel:   ndlpEmerg,
-	})
-	result, handled := r.resolveDockerID(context.Background(), id, "docker-"+id+".scope")
-	if !handled {
-		t.Fatal("valid Docker id was not handled")
-	}
-	if got, want := result.name, id[:12]; got != want {
-		t.Fatalf("fallback name = %q, want %q", got, want)
-	}
-	if result.exitCode != exitRetry {
-		t.Fatalf("exit code = %d, want retry", result.exitCode)
-	}
-	if got, want := result.labels.String(), `image="registry.example.invalid/partial:v1",netdata.cloud/team="platform"`; got != want {
-		t.Fatalf("fallback labels:\nwant %q\n got %q", want, got)
-	}
-}
-
-func TestPodmanRetryFallbackPreservesInspectLabels(t *testing.T) {
-	id := strings.Repeat("8", 64)
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-		_, _ = w.Write([]byte(`{"Name":"","Config":{"Env":[],"Image":"registry.example.invalid/podman-partial:v1","Labels":{"netdata.cloud/team":"platform"}}}`))
-	}))
-	defer server.Close()
-
-	r := newResolver([]string{"cgroup-name"}, invocationConfig{
-		podmanHost: server.URL,
-		logLevel:   ndlpEmerg,
-	})
-	result, handled := r.resolvePodmanID(context.Background(), id, "libpod-"+id+".scope")
-	if !handled || result.exitCode != exitRetry || result.name != id[:12] {
-		t.Fatalf("handled=%v exit=%d name=%q", handled, result.exitCode, result.name)
-	}
-	if got, want := result.labels.String(), `image="registry.example.invalid/podman-partial:v1",netdata.cloud/team="platform"`; got != want {
-		t.Fatalf("fallback labels:\nwant %q\n got %q", want, got)
+			config := invocationConfig{logLevel: ndlpEmerg}
+			var result resolution
+			var handled bool
+			if test.podman {
+				config.podmanHost = server.URL
+				result, handled = newResolver([]string{"cgroup-name"}, config).resolvePodmanID(context.Background(), id, "libpod-"+id+".scope")
+			} else {
+				config.dockerHost = server.URL
+				result, handled = newResolver([]string{"cgroup-name"}, config).resolveDockerID(context.Background(), id, "docker-"+id+".scope")
+			}
+			if !handled || result.exitCode != exitRetry || result.name != id[:12] {
+				t.Fatalf("handled=%v exit=%d name=%q", handled, result.exitCode, result.name)
+			}
+			wantLabels := `image="` + test.image + `",netdata.cloud/team="platform"`
+			if got := result.labels.String(); got != wantLabels {
+				t.Fatalf("fallback labels:\nwant %q\n got %q", wantLabels, got)
+			}
+		})
 	}
 }
 
@@ -235,12 +243,19 @@ func TestECSAndContainerdDispatchUseDockerAPI(t *testing.T) {
 		logLevel:   ndlpEmerg,
 	})
 
-	for name, cgroup := range map[string]string{
-		"ecs":        "ecs-a_task_" + id,
-		"containerd": "system.slice_containerd.service_cpuset_" + id,
-	} {
+	tests := map[string]struct {
+		cgroup string
+	}{
+		"ecs": {
+			cgroup: "ecs-a_task_" + id,
+		},
+		"containerd": {
+			cgroup: "system.slice_containerd.service_cpuset_" + id,
+		},
+	}
+	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			result, handled := r.resolveNonKubernetes(context.Background(), cgroup)
+			result, handled := r.resolveNonKubernetes(context.Background(), test.cgroup)
 			if !handled || result.name != "runtime-container" {
 				t.Fatalf("handled=%v name=%q", handled, result.name)
 			}
@@ -263,68 +278,66 @@ func TestMirroredDockerAndPodmanAPIFixtures(t *testing.T) {
 		return `{"Name":"/` + name + `","Config":{"Env":["PATH=/usr/bin"],"Image":"` + image + `","Labels":{"com.docker.compose.service":"ignored","netdata.cloud/service":"payments","netdata.cloud/team":"platform"}}}`
 	}
 
-	t.Run("docker http api", func(t *testing.T) {
-		id := strings.Repeat("4", 64)
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-			if request.URL.Path != "/containers/"+id+"/json" {
-				t.Fatalf("unexpected docker API path %s", request.URL.Path)
-			}
-			_, _ = w.Write([]byte(inspectJSON("api-docker", "registry.example.invalid/api:v1")))
-		}))
-		defer server.Close()
-		t.Setenv("DOCKER_HOST", server.URL)
-		t.Setenv("PODMAN_HOST", "")
+	tests := map[string]struct {
+		podman   bool
+		idByte   string
+		wantName string
+		image    string
+	}{
+		"docker HTTP API": {
+			idByte:   "4",
+			wantName: "api-docker",
+			image:    "registry.example.invalid/api:v1",
+		},
+		"podman HTTP API": {
+			podman:   true,
+			idByte:   "5",
+			wantName: "api-podman",
+			image:    "registry.example.invalid/podman:v1",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			id := strings.Repeat(test.idByte, 64)
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+				if request.URL.Path != "/containers/"+id+"/json" {
+					t.Errorf("unexpected API path %s", request.URL.Path)
+					http.Error(w, "unexpected path", http.StatusNotFound)
+					return
+				}
+				_, _ = w.Write([]byte(inspectJSON(test.wantName, test.image)))
+			}))
+			defer server.Close()
+			t.Setenv("DOCKER_HOST", "")
+			t.Setenv("PODMAN_HOST", "")
 
-		cgroup := "system.slice/docker-" + id + ".scope"
-		var out bytes.Buffer
-		code := run([]string{"cgroup-name", cgroup, cgroup}, &out)
-		if code != exitSuccess {
-			t.Fatalf("exit code: want %d got %d", exitSuccess, code)
-		}
-		got := strings.TrimSpace(out.String())
-		for _, want := range []string{
-			`api-docker `,
-			`image="registry.example.invalid/api:v1"`,
-			`netdata.cloud/service="payments"`,
-			`netdata.cloud/team="platform"`,
-		} {
-			if !strings.Contains(got, want) {
-				t.Fatalf("output missing %q:\n%s", want, got)
+			var cgroup string
+			if test.podman {
+				t.Setenv("PODMAN_HOST", server.URL)
+				cgroup = "user.slice/user-1000.slice/user-1000.service/user.slice/libpod-" + id + ".scope/container"
+			} else {
+				t.Setenv("DOCKER_HOST", server.URL)
+				cgroup = "system.slice/docker-" + id + ".scope"
 			}
-		}
-		if strings.Contains(got, "com.docker.compose.service") {
-			t.Fatalf("non-netdata label leaked into output:\n%s", got)
-		}
-	})
 
-	t.Run("podman http api", func(t *testing.T) {
-		id := strings.Repeat("5", 64)
-		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
-			if request.URL.Path != "/containers/"+id+"/json" {
-				t.Fatalf("unexpected podman API path %s", request.URL.Path)
+			var out bytes.Buffer
+			if code := run([]string{"cgroup-name", cgroup, cgroup}, &out); code != exitSuccess {
+				t.Fatalf("exit code: want %d got %d", exitSuccess, code)
 			}
-			_, _ = w.Write([]byte(inspectJSON("api-podman", "registry.example.invalid/podman:v1")))
-		}))
-		defer server.Close()
-		t.Setenv("DOCKER_HOST", "")
-		t.Setenv("PODMAN_HOST", server.URL)
-
-		cgroup := "user.slice/user-1000.slice/user-1000.service/user.slice/libpod-" + id + ".scope/container"
-		var out bytes.Buffer
-		code := run([]string{"cgroup-name", cgroup, cgroup}, &out)
-		if code != exitSuccess {
-			t.Fatalf("exit code: want %d got %d", exitSuccess, code)
-		}
-		got := strings.TrimSpace(out.String())
-		for _, want := range []string{
-			`api-podman `,
-			`image="registry.example.invalid/podman:v1"`,
-			`netdata.cloud/service="payments"`,
-			`netdata.cloud/team="platform"`,
-		} {
-			if !strings.Contains(got, want) {
-				t.Fatalf("output missing %q:\n%s", want, got)
+			got := strings.TrimSpace(out.String())
+			for _, want := range []string{
+				test.wantName + " ",
+				`image="` + test.image + `"`,
+				`netdata.cloud/service="payments"`,
+				`netdata.cloud/team="platform"`,
+			} {
+				if !strings.Contains(got, want) {
+					t.Fatalf("output missing %q:\n%s", want, got)
+				}
 			}
-		}
-	})
+			if strings.Contains(got, "com.docker.compose.service") {
+				t.Fatalf("non-netdata label leaked into output:\n%s", got)
+			}
+		})
+	}
 }
