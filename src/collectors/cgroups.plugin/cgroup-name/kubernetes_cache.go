@@ -109,10 +109,7 @@ func repairPrivateFileMode(path string) {
 }
 
 func firstLineFile(path string) string {
-	if !isPrivateRegularFile(path) {
-		return ""
-	}
-	file, err := os.Open(path)
+	file, err := openPrivateRegularFile(path)
 	if err != nil {
 		return ""
 	}
@@ -127,10 +124,7 @@ func firstLineFile(path string) string {
 }
 
 func grepFile(path, pattern string, max int) (string, bool) {
-	if !isPrivateRegularFile(path) {
-		return "", false
-	}
-	file, err := os.Open(path)
+	file, err := openPrivateRegularFile(path)
 	if err != nil {
 		return "", false
 	}
@@ -155,4 +149,23 @@ func grepFile(path, pattern string, max int) (string, bool) {
 		return "", false
 	}
 	return strings.Join(matches, "\n"), true
+}
+
+func openPrivateRegularFile(path string) (*os.File, error) {
+	before, err := os.Lstat(path)
+	if err != nil || !before.Mode().IsRegular() {
+		return nil, os.ErrInvalid
+	}
+	file, err := os.Open(path)
+	if err != nil {
+		return nil, err
+	}
+	opened, openErr := file.Stat()
+	after, pathErr := os.Lstat(path)
+	if openErr != nil || pathErr != nil || !opened.Mode().IsRegular() || !after.Mode().IsRegular() ||
+		!os.SameFile(before, opened) || !os.SameFile(opened, after) {
+		_ = file.Close()
+		return nil, os.ErrInvalid
+	}
+	return file, nil
 }

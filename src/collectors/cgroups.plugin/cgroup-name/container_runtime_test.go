@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDockerInspectParser(t *testing.T) {
@@ -114,30 +115,68 @@ func TestPodmanRetryFallbackPreservesInspectLabels(t *testing.T) {
 	}
 }
 
-func TestDockerLikeGetNameCommand(t *testing.T) {
+func TestDockerCLISelectionWithShortID(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skip("shell command fixture is not available on Windows")
 	}
 	tmp := t.TempDir()
-	id := strings.Repeat("9", 64)
+	id := strings.Repeat("9", 12)
 	command := filepath.Join(tmp, "docker")
 	script := `#!/bin/sh
-[ "$1" = "inspect" ] || exit 10
-[ "$3" = "$EXPECTED_CONTAINER_ID" ] || exit 11
+printf '%s\n' "$1" "$2" "$3" > "$DOCKER_CALLS"
 printf '%s\n' 'IMAGE_NAME=registry.example.invalid/cli:v1' 'CONT_NAME=/cli-container' 'LABEL_netdata.cloud/team="platform"'
 `
 	if err := os.WriteFile(command, []byte(script), 0o755); err != nil {
 		t.Fatal(err)
 	}
-	t.Setenv("EXPECTED_CONTAINER_ID", id)
+	t.Setenv("PATH", tmp)
+	calls := filepath.Join(tmp, "docker.calls")
+	t.Setenv("DOCKER_CALLS", calls)
 
-	r := newResolver([]string{"cgroup-name"}, invocationConfig{logLevel: ndlpEmerg})
-	result := r.dockerLikeGetNameCommand(context.Background(), command, id)
-	if got, want := result.name, "cli-container"; got != want {
-		t.Fatalf("name = %q, want %q", got, want)
+	cgroup := "docker-" + id + ".scope"
+	var out bytes.Buffer
+	if code := runWithConfig([]string{"cgroup-name", cgroup, cgroup}, &out, invocationConfig{logLevel: ndlpEmerg}); code != exitSuccess {
+		t.Fatalf("exit code = %d, want success", code)
 	}
-	if got, want := result.labels.String(), `image="registry.example.invalid/cli:v1",netdata.cloud/team="platform"`; got != want {
-		t.Fatalf("labels:\nwant %q\n got %q", want, got)
+	if got, want := out.String(), `cli-container image="registry.example.invalid/cli:v1",netdata.cloud/team="platform"`+"\n"; got != want {
+		t.Fatalf("stdout:\nwant %q\n got %q", want, got)
+	}
+
+	data, err := os.ReadFile(calls)
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantFormat := `--format={{range .Config.Env}}{{println .}}{{end}}{{range $key, $value := .Config.Labels}}LABEL_{{$key}}={{printf "%q" $value}}{{println}}{{end}}IMAGE_NAME={{.Config.Image}}{{println}}CONT_NAME={{.Name}}`
+	wantCalls := "inspect\n" + wantFormat + "\n" + id + "\n"
+	if got := string(data); got != wantCalls {
+		t.Fatalf("docker arguments:\nwant %q\n got %q", wantCalls, got)
+	}
+}
+
+func TestDockerAPIDeadlineRetriesWithoutFallback(t *testing.T) {
+	tmp := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmp, "snap"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", tmp)
+
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, request *http.Request) {
+		<-request.Context().Done()
+	}))
+	defer server.Close()
+	id := strings.Repeat("d", 64)
+	cgroup := "docker-" + id + ".scope"
+	var out bytes.Buffer
+	code := runWithConfig([]string{"cgroup-name", cgroup, cgroup}, &out, invocationConfig{
+		dockerHost: server.URL,
+		logLevel:   ndlpEmerg,
+		timeout:    25 * time.Millisecond,
+	})
+	if code != exitRetry {
+		t.Fatalf("exit code = %d, want retry", code)
+	}
+	if out.Len() != 0 {
+		t.Fatalf("deadline emitted fallback output %q", out.String())
 	}
 }
 

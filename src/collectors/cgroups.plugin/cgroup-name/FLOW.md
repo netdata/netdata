@@ -62,11 +62,12 @@ embedded quotes and newlines, so the line is always single-line and parseable.
 `expires_at = start + X` and shares one deadline `context.Context` across every
 external command and HTTP call, so each call gets the remaining budget and
 calls after expiry are not attempted. HTTP response bodies are capped (16 MiB
-generally, 64 MiB for Kubernetes pod lists). If the name is still unresolved at
-the deadline, the helper logs a per-call time breakdown at error level and
-exits with the retry code instead of emitting a fallback name, so discovery's
-retry ladder runs. `cgroups.plugin` waits X plus a 2s grace period, then kills
-the helper; X=0 keeps the legacy unbounded behavior on both sides.
+generally, 64 MiB for Kubernetes pod lists); kubectl output uses the same caps.
+If the name is still unresolved at the deadline, the helper logs a per-call
+time breakdown at error level and exits with the retry code instead of emitting
+a fallback name, so discovery's retry ladder runs. `cgroups.plugin` waits X plus
+a 2s grace period, then kills the helper; X=0 keeps the legacy unbounded
+behavior on both sides.
 
 ## Inputs And Exit Codes
 
@@ -136,6 +137,11 @@ name empty.
 
 ## Label Helpers
 
+The Go label serializer escapes quotes and backslashes and replaces control
+characters with spaces. This is an intentional safety exception to the shell's
+direct interpolation of label values; field order and the external
+`name="value"` grammar remain stable.
+
 - `get_lbl_val(labels, name)` splits labels on commas, then on the first `=`.
   It returns the value without the surrounding quotes. Missing or empty labels
   return the literal string `null`.
@@ -179,7 +185,9 @@ For container ids, all three files must exist and the containers file must have
 a streaming first-match lookup for the container id to use the cache. Metadata
 records are capped at 64 KiB and container records at 16 MiB, so stale or
 hostile predictable files cannot force an allocation proportional to the whole
-cache. Otherwise the binary reads any existing cluster/system uid cache,
+cache. Readers reject symlinks and verify that the opened regular file is the
+same file observed at the path before and after open. Otherwise the binary
+reads any existing cluster/system uid cache,
 discovers missing values, then rewrites the cache files atomically: each is
 written to an unguessable `0600` temp file in the same directory and renamed
 over the destination, so a symlink planted at the predictable path is replaced,

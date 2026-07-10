@@ -67,6 +67,15 @@ func TestCacheReadHelpersRejectSymlinks(t *testing.T) {
 	if got := firstLineFile(secret); got != "leaked-line" {
 		t.Fatalf("firstLineFile on a regular file = %q", got)
 	}
+	file, err := openPrivateRegularFile(secret)
+	if err != nil {
+		t.Fatalf("openPrivateRegularFile on regular file: %v", err)
+	}
+	_ = file.Close()
+	if file, err := openPrivateRegularFile(link); err == nil {
+		_ = file.Close()
+		t.Fatal("openPrivateRegularFile followed a symlink")
+	}
 }
 
 func TestCacheLookupDoesNotAllocateTheWholeFile(t *testing.T) {

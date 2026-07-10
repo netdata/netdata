@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestK8sGCPGetClusterName(t *testing.T) {
@@ -36,9 +38,6 @@ func TestK8sGCPGetClusterName(t *testing.T) {
 		_, _ = w.Write([]byte(value))
 	}))
 	defer server.Close()
-	t.Setenv("HTTP_PROXY", "http://127.0.0.1:1")
-	t.Setenv("HTTPS_PROXY", "http://127.0.0.1:1")
-
 	r := newResolver([]string{"cgroup-name"}, invocationConfig{
 		logLevel: ndlpEmerg,
 		kubernetes: kubernetesConfig{
@@ -54,6 +53,56 @@ func TestK8sGCPGetClusterName(t *testing.T) {
 	for path := range responses {
 		if seen[path] != 1 {
 			t.Fatalf("request count for %s = %d, want 1", path, seen[path])
+		}
+	}
+}
+
+func TestK8sGCPRequestPolicyAndCancellation(t *testing.T) {
+	r := newResolver([]string{"cgroup-name"}, invocationConfig{
+		logLevel: ndlpEmerg,
+		kubernetes: kubernetesConfig{
+			gcpMetadataURL: "http://metadata.invalid",
+		},
+	})
+	type call struct {
+		url     string
+		options httpGetOptions
+		err     error
+	}
+	var mu sync.Mutex
+	var calls []call
+	get := func(ctx context.Context, url string, options httpGetOptions) ([]byte, error) {
+		if strings.HasSuffix(url, "/project/project-id") {
+			err := errors.New("fixture failure")
+			mu.Lock()
+			calls = append(calls, call{url: url, options: options, err: err})
+			mu.Unlock()
+			return nil, err
+		}
+		<-ctx.Done()
+		mu.Lock()
+		calls = append(calls, call{url: url, options: options, err: ctx.Err()})
+		mu.Unlock()
+		return nil, ctx.Err()
+	}
+	if name, ok := r.k8sGCPGetClusterNameWith(context.Background(), get); ok || name != "" {
+		t.Fatalf("name=%q ok=%v, want failed lookup", name, ok)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	if len(calls) != 3 {
+		t.Fatalf("calls = %d, want 3", len(calls))
+	}
+	for _, call := range calls {
+		if !call.options.noProxy || !call.options.fail || call.options.timeout != 3*time.Second {
+			t.Fatalf("request policy for %s: noProxy=%v fail=%v timeout=%s", call.url, call.options.noProxy, call.options.fail, call.options.timeout)
+		}
+		if got := call.options.headers["Metadata-Flavor"]; got != "Google" {
+			t.Fatalf("Metadata-Flavor for %s = %q", call.url, got)
+		}
+		if call.err == nil {
+			t.Fatalf("call %s unexpectedly succeeded", call.url)
 		}
 	}
 }
@@ -126,5 +175,22 @@ esac
 				t.Fatalf("kubectl calls:\nwant %q\n got %q", want, got)
 			}
 		})
+	}
+}
+
+func TestKubectlOutputIsCapped(t *testing.T) {
+	tmp := t.TempDir()
+	kubectl := filepath.Join(tmp, "kubectl")
+	if err := os.WriteFile(kubectl, []byte("#!/bin/sh\nprintf 12345\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", tmp)
+	r := newResolver([]string{"cgroup-name"}, invocationConfig{logLevel: ndlpEmerg})
+	output, err := r.kubectlOutput(context.Background(), "", 4, "get", "pods")
+	if err == nil || !strings.Contains(err.Error(), "kubectl output exceeds 4 bytes") {
+		t.Fatalf("cap error = %v", err)
+	}
+	if got, want := string(output), "1234"; got != want {
+		t.Fatalf("output = %q, want %q", got, want)
 	}
 }

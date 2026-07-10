@@ -11,7 +11,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestK8sContainerCachePath(t *testing.T) {
@@ -354,8 +356,9 @@ func TestKubernetesPodAndContainerOutcomes(t *testing.T) {
 		if result.outcome != kubePodSuccess || result.name != "pod_default_api" {
 			t.Fatalf("outcome=%d name=%q", result.outcome, result.name)
 		}
-		if got := result.labels.String(); strings.Contains(got, "container_") || !strings.Contains(got, `k8s_kind="pod"`) {
-			t.Fatalf("unexpected pod labels: %q", got)
+		wantLabels := `k8s_namespace="default",k8s_pod_name="api",k8s_node_name="node-a",k8s_kind="pod",k8s_qos_class="burstable",k8s_cluster_id="system-uid",k8s_cluster_name="cluster-a"`
+		if got := result.labels.String(); got != wantLabels {
+			t.Fatalf("pod labels:\nwant %q\n got %q", wantLabels, got)
 		}
 	})
 
@@ -482,4 +485,113 @@ func TestKubernetesFallbackExitMapping(t *testing.T) {
 			t.Fatalf("stdout = %q, want %q", got, want)
 		}
 	})
+}
+
+func TestKubernetesAPIServerDeadlinePolicy(t *testing.T) {
+	id := strings.Repeat("e", 64)
+	cgroup := "kubepods-burstable-pod11111111_2222_3333_4444_555555555555_docker-" + id + ".scope"
+
+	for _, test := range []struct {
+		name       string
+		block      bool
+		timeout    time.Duration
+		wantCode   int
+		wantOutput string
+	}{
+		{name: "deadline retries without output", block: true, timeout: 25 * time.Millisecond, wantCode: exitRetry},
+		{name: "fast failure keeps shell enable fallback", timeout: 2 * time.Second, wantCode: exitSuccess, wantOutput: "k8s_" + cgroup + "\n"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			var calls atomic.Int32
+			server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+				calls.Add(1)
+				if request.URL.Path != "/api/v1/pods" {
+					t.Errorf("path = %q, want /api/v1/pods", request.URL.Path)
+				}
+				if test.block {
+					<-request.Context().Done()
+					return
+				}
+				http.Error(w, "fixture failure", http.StatusServiceUnavailable)
+			}))
+			defer server.Close()
+
+			parsedURL, err := url.Parse(server.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			host, port, err := net.SplitHostPort(parsedURL.Host)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tmp := t.TempDir()
+			cache := newKubernetesCache(tmp)
+			cache.writeClusterName("cluster-a")
+			cache.writeSystemUID("system-uid")
+
+			var out bytes.Buffer
+			code := runWithConfig([]string{"cgroup-name", cgroup, cgroup}, &out, invocationConfig{
+				tmpDir:   tmp,
+				logLevel: ndlpEmerg,
+				timeout:  test.timeout,
+				kubernetes: kubernetesConfig{
+					serviceHost: host,
+					servicePort: port,
+					tlsInsecure: true,
+				},
+			})
+			if code != test.wantCode {
+				t.Fatalf("exit code = %d, want %d", code, test.wantCode)
+			}
+			if got := out.String(); got != test.wantOutput {
+				t.Fatalf("stdout = %q, want %q", got, test.wantOutput)
+			}
+			if got := calls.Load(); got != 1 {
+				t.Fatalf("API calls = %d, want 1", got)
+			}
+		})
+	}
+}
+
+func TestKubernetesPodEndToEndOutput(t *testing.T) {
+	uid := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	pods := `{"items":[{"metadata":{"namespace":"default","name":"api-123","uid":"` + uid + `","annotations":{"netdata.cloud/service":"payments"},"ownerReferences":[{"controller":true,"kind":"ReplicaSet","name":"api-123"}]},"spec":{"nodeName":"node-a"},"status":{"containerStatuses":[{"name":"app","containerID":"containerd://` + strings.Repeat("f", 64) + `"}]}}]}`
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/api/v1/pods" {
+			t.Errorf("path = %q, want /api/v1/pods", request.URL.Path)
+		}
+		_, _ = w.Write([]byte(pods))
+	}))
+	defer server.Close()
+	parsedURL, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	host, port, err := net.SplitHostPort(parsedURL.Host)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tmp := t.TempDir()
+	cache := newKubernetesCache(tmp)
+	cache.writeClusterName("cluster-a")
+	cache.writeSystemUID("system-uid")
+	cgroup := "kubepods-burstable-pod" + strings.ReplaceAll(uid, "-", "_") + ".slice"
+	var out bytes.Buffer
+	code := runWithConfig([]string{"cgroup-name", cgroup, cgroup}, &out, invocationConfig{
+		tmpDir:   tmp,
+		logLevel: ndlpEmerg,
+		kubernetes: kubernetesConfig{
+			serviceHost: host,
+			servicePort: port,
+			tlsInsecure: true,
+		},
+	})
+	if code != exitSuccess {
+		t.Fatalf("exit code = %d, want success", code)
+	}
+	want := `k8s_pod_default_api-123 k8s_namespace="default",k8s_pod_name="api-123",k8s_netdata.cloud/service="payments",k8s_controller_kind="ReplicaSet",k8s_controller_name="api-123",k8s_node_name="node-a",k8s_kind="pod",k8s_qos_class="burstable",k8s_cluster_id="system-uid",k8s_cluster_name="cluster-a"` + "\n"
+	if got := out.String(); got != want {
+		t.Fatalf("stdout:\nwant %q\n got %q", want, got)
+	}
 }

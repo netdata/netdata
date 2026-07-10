@@ -3,7 +3,6 @@
 package main
 
 import (
-	"context"
 	"io"
 	"os"
 	"strings"
@@ -50,25 +49,6 @@ func TestSetupDeadlineBudget(t *testing.T) {
 			t.Fatal("the deadline context must be done after the budget expires")
 		}
 	})
-}
-
-func TestExpiredKubernetesResolutionRetriesWithoutFallback(t *testing.T) {
-	r := newResolver([]string{"cgroup-name"}, invocationConfig{
-		tmpDir:   t.TempDir(),
-		logLevel: ndlpEmerg,
-	})
-	r.budget.expiresAt = time.Now().Add(-time.Second)
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	id := "kubepods-burstable-pod11111111_2222_3333_4444_555555555555_docker-" + strings.Repeat("8", 64) + ".scope"
-	result := r.resolve(ctx, "missing", id)
-	if result.exitCode != exitRetry {
-		t.Fatalf("exit code = %d, want retry", result.exitCode)
-	}
-	if result.name != "" || len(result.labels.items) != 0 {
-		t.Fatalf("expired resolution emitted fallback: name=%q labels=%q", result.name, result.labels.String())
-	}
 }
 
 func TestLogfmtIsSingleLineAndQuoted(t *testing.T) {
