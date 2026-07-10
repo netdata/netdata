@@ -136,18 +136,10 @@ static BUFFER *argv_to_windows(const char **argv) {
 }
 
 int set_fd_blocking(int fd) {
-    int flags = fcntl(fd, F_GETFL, 0);
-    if (flags == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: fcntl(F_GETFL) failed");
-        return -1;
-    }
-
-    flags &= ~O_NONBLOCK;
-    if (fcntl(fd, F_SETFL, flags) == -1) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: fcntl(F_SETFL) failed");
-        return -1;
-    }
-
+    // Windows anonymous pipes are blocking by default.  The fcntl(F_SETFL)
+    // stub in common.h uses ioctlsocket, which only accepts socket handles;
+    // calling it on a pipe handle yields WSAENOTSOCK (10038).  Nothing to do.
+    (void)fd;
     return 0;
 }
 
