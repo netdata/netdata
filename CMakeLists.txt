@@ -4019,10 +4019,6 @@ if(ENABLE_CGROUP_NAME)
             COMPONENT netdata
             DESTINATION usr/libexec/netdata/plugins.d)
 endif()
-if(OS_LINUX)
-    install(CODE "file(REMOVE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh\")"
-            COMPONENT netdata)
-endif()
 
 #
 # otel config
