@@ -313,6 +313,9 @@ size_t registry_db_load(void) {
                 }
                 *url++ = '\0';
 
+                size_t machine_name_len;
+                char *machine_name = registry_fix_machine_name(&s[69], &machine_name_len);
+
                 if(*url != 'h' && *url != '*') {
                     netdata_log_error("REGISTRY: person URL line %zu does not have a valid url: %s", line, url);
                     continue;
@@ -333,7 +336,7 @@ size_t registry_db_load(void) {
 
                 REGISTRY_PERSON_URL *pu = registry_person_url_index_find(p, u);
                 if(!pu)
-                    pu = registry_person_url_allocate(p, m, u, &s[69], strlen(&s[69]), first_t);
+                    pu = registry_person_url_allocate(p, m, u, machine_name, machine_name_len, first_t);
                 else
                     netdata_log_error("REGISTRY: person URL line %zu is duplicate, reusing the old one.", line);
 
