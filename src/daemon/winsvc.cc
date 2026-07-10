@@ -272,6 +272,22 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     netdata_service_log("Running the agent...");
     netdata_main(argc, argv);
     netdata_service_log("Agent has been started...");
+
+    // netdata_main() spawns background threads and returns once the agent is
+    // running.  Without blocking here, ServiceMain would return, which causes
+    // StartServiceCtrlDispatcher (in main()) to return, main() to return 0,
+    // and ExitProcess to silently kill every background thread before any
+    // useful work is done.  Block on the stop event until the SCM sends
+    // SERVICE_CONTROL_STOP or SERVICE_CONTROL_SHUTDOWN.
+    WaitForSingleObject(svc_stop_event_handle, INFINITE);
+
+    // ServiceControlHandler already created the cleanup thread and signalled
+    // the stop event.  The cleanup thread runs netdata_exit_gracefully() and
+    // calls exit(0) when done.  Loop here so that ServiceMain never returns
+    // before that exit(0) fires; returning would let StartServiceCtrlDispatcher
+    // → main() → ExitProcess race the cleanup thread and lose.
+    while(1)
+        Sleep(1000);
 }
 
 static bool update_path() {

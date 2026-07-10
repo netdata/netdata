@@ -866,6 +866,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.oom_protection = 0;
 #endif
     
+    nd_win_trace("daemon_status_file_refresh: os_process_memory");
     OS_PROCESS_MEMORY proc_mem = os_process_memory(0);
     if(OS_PROCESS_MEMORY_OK(proc_mem))
         session_status.netdata_max_rss = proc_mem.max_rss;
@@ -895,51 +896,64 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     if(status != DAEMON_STATUS_NONE)
         session_status.status = status;
 
+    nd_win_trace("daemon_status_file_refresh: os_system_memory");
     session_status.memory = os_system_memory(true);
+
+    nd_win_trace("daemon_status_file_refresh: os_disk_space");
     session_status.var_cache = os_disk_space(netdata_configured_cache_dir);
     session_status.system_cpus = os_get_system_cpus();
-    
-    // Collect metrics metadata statistics
-    session_status.metrics_metadata = rrdstats_metadata_collect();
-    
-    // Update disk footprint at most once every 10 minutes (600 seconds)
-    if ((now_ut - session_status.disk_footprint.last_updated_ut) >= 600 * USEC_PER_SEC ||
-        session_status.disk_footprint.last_updated_ut == 0) {
-        // Calculate disk footprint by categories
-        const char *dirs_to_measure[] = {
-            netdata_configured_varlib_dir,
-            netdata_configured_cache_dir
-        };
-        
-        // Create patterns for different file types
-        SIMPLE_PATTERN *dbengine_pattern = simple_pattern_create("*dbengine*/*.ndf *dbengine*/*.njf*", " ", SIMPLE_PATTERN_EXACT, false);
-        SIMPLE_PATTERN *sqlite_pattern = simple_pattern_create("*.db *.wal *.shm", " ", SIMPLE_PATTERN_EXACT, false);
-        
-        // Get total size first
-        DIR_SIZE total_size = dir_size_multiple(dirs_to_measure, 2, NULL, 0);
-        
-        // Get DBEngine files size
-        DIR_SIZE dbengine_size = dir_size_multiple(dirs_to_measure, 2, dbengine_pattern, 0);
-        session_status.disk_footprint.dbengine = dbengine_size.bytes;
-        
-        // Get SQLite files size
-        DIR_SIZE sqlite_size = dir_size_multiple(dirs_to_measure, 2, sqlite_pattern, 0);
-        session_status.disk_footprint.sqlite = sqlite_size.bytes;
-        
-        // Calculate other files (total - dbengine - sqlite)
-        session_status.disk_footprint.other = total_size.bytes - dbengine_size.bytes - sqlite_size.bytes;
 
-        // Update last updated timestamp
-        session_status.disk_footprint.last_updated_ut = now_ut;
-        rfc3339_datetime_ut(session_status.disk_footprint.last_updated_ut_rfc3339,
-                            sizeof(session_status.disk_footprint.last_updated_ut_rfc3339),
-                            session_status.disk_footprint.last_updated_ut, 2, true);
+    // rrd_rdlock() inside rrdstats_metadata_collect() can block if a collector
+    // thread holds the write lock.  Skip during shutdown to avoid a deadlock
+    // that would outlast the SCM stop timeout (error 1053).
+    nd_win_trace("daemon_status_file_refresh: rrdstats_metadata_collect");
+    if(!exit_initiated_get())
+        session_status.metrics_metadata = rrdstats_metadata_collect();
 
-        // Clean up patterns
-        simple_pattern_free(dbengine_pattern);
-        simple_pattern_free(sqlite_pattern);
+    // Update disk footprint at most once every 10 minutes (600 seconds).
+    // Skip entirely during shutdown — dir_size_multiple walks the filesystem
+    // and can block long enough to trigger error 1053.
+    nd_win_trace("daemon_status_file_refresh: disk_footprint");
+    if (!exit_initiated_get()) {
+        if ((now_ut - session_status.disk_footprint.last_updated_ut) >= 600 * USEC_PER_SEC ||
+            session_status.disk_footprint.last_updated_ut == 0) {
+            // Calculate disk footprint by categories
+            const char *dirs_to_measure[] = {
+                netdata_configured_varlib_dir,
+                netdata_configured_cache_dir
+            };
+
+            // Create patterns for different file types
+            SIMPLE_PATTERN *dbengine_pattern = simple_pattern_create("*dbengine*/*.ndf *dbengine*/*.njf*", " ", SIMPLE_PATTERN_EXACT, false);
+            SIMPLE_PATTERN *sqlite_pattern = simple_pattern_create("*.db *.wal *.shm", " ", SIMPLE_PATTERN_EXACT, false);
+
+            // Get total size first
+            DIR_SIZE total_size = dir_size_multiple(dirs_to_measure, 2, NULL, 0);
+
+            // Get DBEngine files size
+            DIR_SIZE dbengine_size = dir_size_multiple(dirs_to_measure, 2, dbengine_pattern, 0);
+            session_status.disk_footprint.dbengine = dbengine_size.bytes;
+
+            // Get SQLite files size
+            DIR_SIZE sqlite_size = dir_size_multiple(dirs_to_measure, 2, sqlite_pattern, 0);
+            session_status.disk_footprint.sqlite = sqlite_size.bytes;
+
+            // Calculate other files (total - dbengine - sqlite)
+            session_status.disk_footprint.other = total_size.bytes - dbengine_size.bytes - sqlite_size.bytes;
+
+            // Update last updated timestamp
+            session_status.disk_footprint.last_updated_ut = now_ut;
+            rfc3339_datetime_ut(session_status.disk_footprint.last_updated_ut_rfc3339,
+                                sizeof(session_status.disk_footprint.last_updated_ut_rfc3339),
+                                session_status.disk_footprint.last_updated_ut, 2, true);
+
+            // Clean up patterns
+            simple_pattern_free(dbengine_pattern);
+            simple_pattern_free(sqlite_pattern);
+        }
     }
 
+    nd_win_trace("daemon_status_file_refresh: dsf_release");
     dsf_release(session_status);
 }
 
