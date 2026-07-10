@@ -110,15 +110,22 @@ fn seal(reqs: Vec<ExportTraceServiceRequest>) -> Vec<u8> {
             continue;
         }
         let base = clock.now_ns().as_u64();
-        ng_flatten::normalize_span_timestamps(&mut r, base);
-        ng_flatten::normalize_trace_ids(&mut r);
+        ng_flatten::normalize_trace_request(&mut r, base, None);
         let (flat, _) = ng_flatten::flatten_trace_request(r);
         let data = ng_flatten::encode_trace_frame(&flat).unwrap();
         let ingestion_ns = clock.now_ns();
+        // The production content_meta: the version-tagged empty-ServiceStream
+        // blob the unattributed stream carries (not a bare empty slice), so
+        // the seal is exercised against production-shaped WAL headers.
+        let content_meta =
+            otel_logs_identity::encode_content_meta(&otel_logs_identity::ServiceStream::new(
+                "", "",
+            ))
+            .expect("the empty identity always encodes");
         writer
             .write_frame(
                 0,
-                &[],
+                &content_meta,
                 &data,
                 wal::FrameMeta {
                     entry_count: count,

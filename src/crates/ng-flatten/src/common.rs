@@ -741,7 +741,7 @@ macro_rules! id_newtype {
             /// Parse **exactly** `$width` bytes; `None` for any other length. An
             /// empty/wrong-length id is the caller's to map (commonly
             /// `.unwrap_or_default()` → [`UNSET`](Self::UNSET)). Ingest normalization
-            /// (`normalize_log_request`/`normalize_trace_ids`) already clears
+            /// (`normalize_log_request`/`normalize_trace_request`) already clears
             /// wrong-length ids to empty, so a conformant id round-trips.
             pub fn from_bytes(bytes: &[u8]) -> Option<Self> {
                 <[u8; $width]>::try_from(bytes).ok().map(Self)
@@ -802,6 +802,18 @@ impl MalformedIds {
     pub fn any(self) -> bool {
         self.trace > 0 || self.span > 0
     }
+}
+
+/// Inclusive client-timestamp acceptance window `[min_ns, max_ns]` for
+/// ingestion, signal-neutral. Logs judge a record's resolved `time_unix_nano`
+/// against it (`crate::logs::normalize_log_request`); traces judge the span's
+/// whole `[start, effective end]` interval
+/// (`crate::traces::normalize_trace_request`). Out-of-window items are dropped
+/// and counted as `rejected`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TimeBounds {
+    pub min_ns: u64,
+    pub max_ns: u64,
 }
 
 /// Render a typed value into its `key=value` string form, appended to `out`:

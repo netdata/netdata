@@ -26,7 +26,7 @@ use crate::{
 /// Read just the [`Summary`] of an SFST from its bytes.
 ///
 /// Touches only the header, TOC, and `SUMR` chunk, and works on **every**
-/// SFST — including summary-only files (e.g. a content-light traces seal),
+/// SFST — including summary-only files (the format's minimal valid shape),
 /// which [`IndexReader::open`](crate::IndexReader::open) refuses because
 /// they carry no queryable chunks. The cheap path for recovery/registry-style
 /// scans that need identity + time range + record count without a query.

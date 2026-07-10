@@ -37,11 +37,13 @@ pub(crate) fn pack<T: Serialize + ?Sized>(value: &T, zstd_level: i32) -> Result<
 /// Write a minimal, content-light SFST containing only the `SUMR` summary chunk.
 ///
 /// [`ChunkWriter`] mandates the full logs-shaped chunk set (primary FST,
-/// per-log timestamps, ≥1 stream batch) and refuses an underfilled file. A
-/// signal whose content is not logs-shaped (e.g. traces) uses this to produce a
-/// sealed file that carries only its [`Summary`] (`record_count`, timestamps,
-/// opaque `content_meta`) and no queryable content. `summary.record_count` must
-/// be `> 0` to be tracked rather than discarded.
+/// per-log timestamps, ≥1 stream batch) and refuses an underfilled file; this
+/// is the format's floor — the smallest valid SFST a reader must accept.
+/// Test-only: its last production caller (the retired traces proof scaffold's
+/// summary-only seal) is gone, but the reader/writer boundary tests keep
+/// exercising it because summary-only files remain valid on the read side.
+/// `summary.record_count` must be `> 0` to be tracked rather than discarded.
+#[cfg(test)]
 pub fn write_summary_only<W: Write + Seek>(sink: W, summary: &Summary) -> Result<W, Error> {
     let mut inner = StreamingWriter::new(sink, *MAGIC, VERSION, 1)?;
     inner.write_chunk(CHUNK_SUMMARY, &pack(summary, ZSTD_LEVEL_DEFAULT)?)?;

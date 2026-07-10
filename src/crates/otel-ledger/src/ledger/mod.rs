@@ -7,8 +7,8 @@
 //! per-signal state — tenant registries, lifecycle config, the seal/index and
 //! catalog-builder workers, and the query handler — lives in a [`Pipeline`] per
 //! signal, decoded from the wire `pipeline_id` to a `Signal` at the boundary and
-//! held in a `PerSignal` structure (today logs + the skeletal traces proof). A
-//! further signal plugs in by adding a `Pipeline`, not by editing the shell.
+//! held in a `PerSignal` structure (today logs + traces). A further signal
+//! plugs in by adding a `Pipeline`, not by editing the shell.
 //!
 //! Routing:
 //! - writer events → `pipelines[event.file_id.pipeline_id]` (after the global
@@ -174,11 +174,11 @@ impl Ledger {
         // concurrently MUST revisit that (the highwater would then race).
         seq_highwater_path: &std::path::Path,
         lifecycle: &LifecycleConfig,
-        // PROOF SCAFFOLD (traces-proof SOW): the skeletal traces pipeline's
-        // lifecycle config, derived by `PluginConfig::lifecycle_for(Signal::Traces)`
-        // (its own `{base}/traces/...` dirs). The N-signal generalization (a signal
-        // list instead of two explicit args) is a real-traces-SOW finding,
-        // deliberately not done for the proof.
+        // The traces pipeline's lifecycle config, derived by
+        // `PluginConfig::lifecycle_for(Signal::Traces)` (its own
+        // `{base}/traces/...` dirs). The N-signal generalization (a signal
+        // list instead of two explicit args) is deliberately deferred until a
+        // third signal exists.
         traces_lifecycle: &LifecycleConfig,
         // Process-global remote storage (one backend for every signal). The shell
         // owns it: it builds the storage handle / uploader / read cache from this
@@ -282,11 +282,10 @@ impl Ledger {
         )
         .await?;
 
-        // PROOF SCAFFOLD (traces-proof SOW): the skeletal traces pipeline,
-        // sharing the same cleaner/uploader/storage but with its own
-        // `{base}/traces/...` dirs, a content-light seal, and a stub query
-        // handler. This is the whole point of the proof — a second signal plugs
-        // in with another `build_*_pipeline` call, no shell edits.
+        // The traces pipeline: shares the same cleaner/uploader/storage but has
+        // its own `{base}/traces/...` dirs, the traces seal
+        // (`ng_index::build_sfst_traces_file`), and a stub query handler until
+        // the traces query engine lands (plan decision D5).
         let traces = traces_pipeline::build_traces_pipeline(
             Signal::Traces,
             traces_lifecycle,
@@ -317,12 +316,12 @@ impl Ledger {
         // Signal Ready between pipeline construction and the ingestor accept;
         // see the method docstring for the full ordering rationale.
         //
-        // Only the logs function is advertised to Netdata. The traces pipeline
-        // is a proof scaffold whose query handler is a stub, so we deliberately
-        // do NOT declare `otel_traces` yet — the pipeline is still built and its
-        // ingest/seal/index run normally; it is simply not exposed as a queryable
-        // function. Advertise its declaration here once a real traces query
-        // engine lands.
+        // Only the logs function is advertised to Netdata. The traces query
+        // handler is a stub until the traces query engine lands (plan decision
+        // D5), so we deliberately do NOT declare `otel_traces` yet — the
+        // pipeline is still built and its ingest/seal/index run normally; it is
+        // simply not exposed as a queryable function. Advertise its declaration
+        // here once the query engine lands.
         let declarations = vec![pipelines.logs.declaration().clone()];
         supervisor
             .send(LedgerResponse::Ready { declarations })

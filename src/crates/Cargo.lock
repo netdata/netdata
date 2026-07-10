@@ -3106,6 +3106,7 @@ dependencies = [
  "file-registry",
  "ng-flatten",
  "opentelemetry-proto",
+ "otel-logs-identity",
  "sfst",
  "tempfile",
  "thiserror 2.0.18",

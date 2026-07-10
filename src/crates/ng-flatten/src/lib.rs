@@ -331,7 +331,7 @@ mod tests {
     }
 
     #[test]
-    fn normalize_trace_ids_and_span_timestamps() {
+    fn normalize_trace_request_ids_and_timestamps() {
         let mut req = trace_req(
             Span {
                 trace_id: vec![0x01, 0x02], // wrong length → cleared
@@ -343,18 +343,162 @@ mod tests {
             None,
             None,
         );
-        let bad = normalize_trace_ids(&mut req);
-        assert_eq!(bad.trace, 1);
-        assert_eq!(bad.span, 1, "malformed parent_span_id counted under span");
+        let norm = normalize_trace_request(&mut req, 5_000, None);
+        assert_eq!(norm.bad_ids.trace, 1);
+        assert_eq!(
+            norm.bad_ids.span, 1,
+            "malformed parent_span_id counted under span"
+        );
+        assert_eq!(norm.records, 1);
+        assert_eq!(norm.rejected, 0);
         let s = &req.resource_spans[0].scope_spans[0].spans[0];
         assert!(s.trace_id.is_empty() && s.parent_span_id.is_empty());
         assert_eq!(s.span_id.len(), 8, "valid span_id untouched");
-
-        normalize_span_timestamps(&mut req, 5_000);
+        assert_eq!(s.start_time_unix_nano, 5_001, "zero start synthesized");
         assert_eq!(
-            req.resource_spans[0].scope_spans[0].spans[0].start_time_unix_nano,
-            5_001
+            norm.ts_range,
+            Some((5_001, 5_001)),
+            "ts_range folds the RESOLVED start"
         );
+    }
+
+    #[test]
+    fn normalize_trace_request_interval_bounds() {
+        use opentelemetry_proto::tonic::trace::v1::ScopeSpans;
+        let bounds = Some(TimeBounds {
+            min_ns: 1_000,
+            max_ns: 2_000,
+        });
+        let span = |start, end| Span {
+            start_time_unix_nano: start,
+            end_time_unix_nano: end,
+            ..Default::default()
+        };
+        let mut req = trace_req(span(0, 0), None, None);
+        req.resource_spans[0].scope_spans[0].spans = vec![
+            span(500, 1_500),  // start before the window → rejected (past bound)
+            span(1_200, 2_500),// end past the window → rejected (future bound)
+            span(2_500, 2_600),// entirely future: caught via end > max_ns → rejected
+            span(1_200, 1_800),// whole interval inside → kept
+            span(1_300, 0),    // unset end clamps to start (in-window) → kept
+            span(1_400, 700),  // end < start clamps to start (in-window) → kept
+            span(0, 0),        // synthesized start (base 1_500) → kept
+            span(0, 9_999),    // synthesized start BUT absurd client end → rejected
+        ];
+        let norm = normalize_trace_request(&mut req, 1_500, bounds);
+        assert_eq!(norm.rejected, 4);
+        assert_eq!(norm.records, 4);
+        let kept: Vec<u64> = req.resource_spans[0].scope_spans[0].spans
+            .iter()
+            .map(|s| s.start_time_unix_nano)
+            .collect();
+        assert_eq!(kept, vec![1_200, 1_300, 1_400, 1_501]);
+        assert_eq!(
+            norm.ts_range,
+            Some((1_200, 1_501)),
+            "range covers kept spans only"
+        );
+
+        // A request whose every span is out-of-window: the emptied scope AND
+        // resource are dropped (no zero-row attrs), rejected still counted.
+        let mut req = trace_req(span(10, 20), None, None);
+        req.resource_spans[0].scope_spans.push(ScopeSpans {
+            spans: vec![span(1_200, 1_300)],
+            ..Default::default()
+        });
+        let norm = normalize_trace_request(&mut req, 1_500, bounds);
+        assert_eq!((norm.records, norm.rejected), (1, 1));
+        assert_eq!(
+            req.resource_spans[0].scope_spans.len(),
+            1,
+            "emptied scope dropped, surviving scope kept"
+        );
+        let mut req = trace_req(span(10, 20), None, None);
+        let norm = normalize_trace_request(&mut req, 1_500, bounds);
+        assert_eq!((norm.records, norm.rejected), (0, 1));
+        assert!(req.resource_spans.is_empty(), "emptied resource dropped");
+    }
+
+    /// `future_skew = 0` collapses the window's upper edge onto "now"
+    /// (`max_ns == fallback_base`). Synthesized starts land at
+    /// `fallback_base + k` — past that edge — so they MUST NOT face the
+    /// future bound through their own clamp (the value is ours, not the
+    /// client's); only a RAW client end does. Mirrors the logs zero-skew
+    /// exemption; review round 1 finding 2.
+    #[test]
+    fn normalize_trace_request_zero_future_skew_keeps_synthesized_starts() {
+        let base: u64 = 1_000_000;
+        let bounds = Some(TimeBounds {
+            min_ns: base - 1_000,
+            max_ns: base, // future_skew = 0
+        });
+        let span = |start, end| Span {
+            start_time_unix_nano: start,
+            end_time_unix_nano: end,
+            ..Default::default()
+        };
+        let mut req = trace_req(span(0, 0), None, None);
+        req.resource_spans[0].scope_spans[0].spans = vec![
+            span(0, 0),            // synthesized, no client end → kept
+            span(0, base - 500),   // synthesized, client end < synth start (clamp
+                                   // would judge OUR value) → kept
+            span(0, base + 500),   // synthesized, raw client end past the edge → rejected
+            span(base - 100, 0),   // client start in-window, unset end → kept
+            span(base - 100, base + 1), // client end 1ns past the edge → rejected
+        ];
+        let norm = normalize_trace_request(&mut req, base, bounds);
+        assert_eq!((norm.records, norm.rejected), (3, 2));
+    }
+
+    #[test]
+    fn prepare_trace_frame_encodes_and_reports() {
+        // Normal request → encoded payload round-trips through the frame codec.
+        let frame = prepare_trace_frame(
+            trace_req(
+                Span {
+                    start_time_unix_nano: 1_000,
+                    end_time_unix_nano: 1_500,
+                    ..Default::default()
+                },
+                None,
+                None,
+            ),
+            1,
+            None,
+        )
+        .unwrap();
+        assert_eq!((frame.records, frame.rejected), (1, 0));
+        assert_eq!(frame.ts_range, Some((1_000, 1_000)));
+        let decoded = decode_trace_frame(&frame.data).unwrap();
+        assert_eq!(decoded.resources[0].scopes[0].spans[0].ts, 1_000);
+
+        // Zero spans → nothing prepared, nothing to write.
+        let frame =
+            prepare_trace_frame(ExportTraceServiceRequest::default(), 1, None).unwrap();
+        assert_eq!((frame.records, frame.rejected), (0, 0));
+        assert!(frame.data.is_empty() && frame.ts_range.is_none());
+
+        // Every span out-of-window → no frame, but `rejected` is carried so the
+        // caller can report it via partial_success.
+        let frame = prepare_trace_frame(
+            trace_req(
+                Span {
+                    start_time_unix_nano: 10,
+                    end_time_unix_nano: 20,
+                    ..Default::default()
+                },
+                None,
+                None,
+            ),
+            1_500,
+            Some(TimeBounds {
+                min_ns: 1_000,
+                max_ns: 2_000,
+            }),
+        )
+        .unwrap();
+        assert_eq!((frame.records, frame.rejected), (0, 1));
+        assert!(frame.data.is_empty());
     }
 
     #[test]
@@ -507,7 +651,7 @@ mod tests {
     }
 
     #[test]
-    fn normalize_trace_ids_clears_malformed_link_ids() {
+    fn normalize_trace_request_clears_malformed_link_ids() {
         use opentelemetry_proto::tonic::trace::v1::span::Link;
         let mut req = trace_req(
             Span {
@@ -523,15 +667,15 @@ mod tests {
             None,
             None,
         );
-        let bad = normalize_trace_ids(&mut req);
-        assert_eq!((bad.trace, bad.span), (1, 0));
+        let norm = normalize_trace_request(&mut req, 1, None);
+        assert_eq!((norm.bad_ids.trace, norm.bad_ids.span), (1, 0));
         let link = &req.resource_spans[0].scope_spans[0].spans[0].links[0];
         assert!(link.trace_id.is_empty(), "malformed link trace_id cleared");
         assert_eq!(link.span_id, vec![8u8; 8]);
     }
 
     #[test]
-    fn normalize_trace_ids_keeps_conformant() {
+    fn normalize_trace_request_keeps_conformant_ids() {
         let mut req = trace_req(
             Span {
                 trace_id: vec![1u8; 16],
@@ -543,7 +687,7 @@ mod tests {
             None,
         );
         assert_eq!(
-            normalize_trace_ids(&mut req),
+            normalize_trace_request(&mut req, 1, None).bad_ids,
             MalformedIds::default(),
             "conformant ids untouched"
         );

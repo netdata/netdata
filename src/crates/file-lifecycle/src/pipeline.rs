@@ -1,7 +1,7 @@
 //! A single signal's pipeline.
 //!
 //! The substrate's coordinator (the `otel-ledger` `Ledger` shell) owns one
-//! [`Pipeline`] per signal (today logs + the skeletal traces proof) and routes
+//! [`Pipeline`] per signal (today logs + traces) and routes
 //! events to it by `pipeline_id`. A `Pipeline` carries the per-signal state the
 //! shell does not:
 //! its tenant registries, lifecycle config, remote-key segment, the request

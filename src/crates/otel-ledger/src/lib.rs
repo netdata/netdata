@@ -1,16 +1,16 @@
-//! OTel-logs ledger: the logs content binding over the content-agnostic
+//! OTel ledger: the logs + traces content bindings over the content-agnostic
 //! [`file_lifecycle`] substrate. It owns the `Ledger` coordinator (run-loop,
 //! supervisor/writer IPC, shared workers), the logs query handler + engine
-//! adapter (`ledger::rpc`), and the logs seal step (`indexer`, which builds the
-//! SFST via `ng-index`). The reusable machinery (registry, catalog, upload/download,
-//! cache, recovery, the per-signal `Pipeline` shell) lives in `file-lifecycle`.
+//! adapter (`ledger::rpc`), and the shared seal component (`indexer`, spawned
+//! per signal with that signal's `ng-index` builder). The reusable machinery
+//! (registry, catalog, upload/download, cache, recovery, the per-signal
+//! `Pipeline` shell) lives in `file-lifecycle`.
 
 pub mod event;
 pub mod indexer;
 mod ledger;
 #[cfg(test)]
 pub(crate) mod test_helpers;
-pub mod traces_indexer;
 
 pub use ledger::Ledger;
 

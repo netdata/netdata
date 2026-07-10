@@ -21,7 +21,7 @@ use std::fmt;
 pub enum Signal {
     /// Logs.
     Logs,
-    /// Traces. PROOF SCAFFOLD (traces-proof SOW): the skeletal traces signal.
+    /// Traces.
     Traces,
 }
 

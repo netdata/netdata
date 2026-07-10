@@ -370,7 +370,11 @@ pub(crate) async fn build_logs_pipeline(
     chunk_cache: Arc<ChunkCache>,
     pipeline_tx: &mpsc::UnboundedSender<(Signal, PipelineResp)>,
 ) -> anyhow::Result<Pipeline> {
-    let indexer = ComponentHandle::spawn::<Indexer>((), cancel.child_token());
+    // The logs seal: decode ng-flatten log frames into a full split-FST index.
+    let indexer = ComponentHandle::spawn::<Indexer>(
+        ng_index::build_sfst_file as crate::indexer::SealFn,
+        cancel.child_token(),
+    );
 
     // Owned clones for the handler closure: the builder body borrows `storage`
     // for recovery, while the handler needs its own `RemoteRead` (storage +
