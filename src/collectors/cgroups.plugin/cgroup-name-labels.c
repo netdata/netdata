@@ -104,7 +104,7 @@ CGROUP_NAME_READ_RESULT cgroup_name_read_response(int fd, char *buffer, size_t s
 
         used += (size_t)bytes;
         buffer[used] = '\0';
-        char *newline = memchr(buffer, '\n', used);
+        char *newline = memchr(buffer + used - (size_t)bytes, '\n', (size_t)bytes);
         if (newline)
             return newline == buffer + used - 1 ? CGROUP_NAME_READ_COMPLETE : CGROUP_NAME_READ_INVALID;
         if (used == size - 1)

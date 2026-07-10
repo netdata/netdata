@@ -183,6 +183,13 @@ if [ -d /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d ]; then
   run chown -R root:${NETDATA_GROUP} /opt/netdata/usr/libexec/netdata/plugins.d/ebpf.d
 fi
 
+# The Go helper replaces the old Bash artifact. Remove leftovers from an
+# overlay upgrade so persisted defaults cannot keep executing stale code.
+if [ -e "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh" ] ||
+  [ -L "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh" ]; then
+  run rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh"
+fi
+
 # -----------------------------------------------------------------------------
 
 progress "changing plugins ownership and permissions"

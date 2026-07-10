@@ -2075,6 +2075,8 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/sys_fs_cgroup.h
         src/collectors/cgroups.plugin/cgroup-internals.h
         src/collectors/cgroups.plugin/cgroup-discovery.c
+        src/collectors/cgroups.plugin/cgroup-name-config.c
+        src/collectors/cgroups.plugin/cgroup-name-config.h
         src/collectors/cgroups.plugin/cgroup-name-labels.c
         src/collectors/cgroups.plugin/cgroup-orchestrator.c
         src/collectors/common-cgroups/cgroup-path.c
@@ -3081,6 +3083,10 @@ if(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT)
 endif()
 
 if(OS_LINUX)
+    add_executable(cgroup-name-config-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroup_name_config.c
+            src/collectors/cgroups.plugin/cgroup-name-config.c)
+
     add_executable(cgroup-orchestrator-test EXCLUDE_FROM_ALL
             src/collectors/cgroups.plugin/tests/test_cgroup_orchestrator.c
             src/collectors/cgroups.plugin/cgroup-orchestrator.c)

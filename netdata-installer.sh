@@ -837,6 +837,13 @@ install_netdata_dirs
 
 # --- plugins ----
 
+# The Go helper replaces the old Bash artifact. Remove leftovers from an
+# overlay upgrade so persisted defaults cannot keep executing stale code.
+if [ -e "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh" ] ||
+  [ -L "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh" ]; then
+  run rm -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name.sh"
+fi
+
 if [ "$(id -u)" -eq 0 ]; then
   # find the admin group
   admin_group=

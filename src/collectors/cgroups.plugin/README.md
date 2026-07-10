@@ -122,7 +122,9 @@ discovery cycle.
 The above pattern list is matched against the path of the cgroup. For matched
 cgroups, Netdata calls the configured executable to get its name. If it is
 missing or is not executable, cgroup renaming is disabled without repeated
-spawn attempts. The default `cgroup-name` helper
+spawn attempts. On upgrade, a value equal to the installed legacy
+`plugins.d/cgroup-name.sh` path is migrated to the new binary; custom helper
+paths are preserved. The default `cgroup-name` helper
 queries `docker`, `kubectl`, `podman`, or applies heuristics to find a name for
 the cgroup.
 

@@ -1310,6 +1310,7 @@ Control groups (cgroups) monitoring plugin configuration
 | `enable by default cgroups names matching` | string | Pattern matching on cgroup names after renaming. Allows filtering based on human-readable names. Supports wildcards. |
 | `search for cgroups in subpaths matching` | string | Pattern matching for cgroup filesystem paths to search. Limits where the plugin looks for cgroups. Default is "*" (all paths). |
 | `script to get cgroup names` | string | Path to the executable that provides human-readable names for cgroups. Defaults to the installed `cgroup-name` helper. |
+| `cgroup-name timeout` | duration | Resolution budget for the cgroup-name helper. Defaults to 120 seconds; the parent allows a 2-second response grace, and 0 keeps the legacy unbounded response wait. |
 | `script to get cgroup network interfaces` | string | Path to external script that determines network interfaces associated with each cgroup. Enables network metrics per container. |
 | `run script to rename cgroups matching` | string | Pattern matching to determine which cgroups should be processed by the renaming script. Default is "*" (all cgroups). |
 | `cgroups to match as systemd services` | string | Pattern matching to identify cgroups that represent systemd services. Enables special handling for systemd service monitoring. |

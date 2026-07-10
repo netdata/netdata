@@ -3,6 +3,8 @@
 #include "test_cgroups_plugin.h"
 #include "../cgroup-name-labels.h"
 
+#include <sys/wait.h>
+
 RRDHOST *localhost;
 struct config netdata_config;
 const char *cgroups_rename_script;
@@ -152,6 +154,15 @@ static bool test_cgroup_name_helper_gate(void)
 
 static bool test_cgroup_name_read_protocol(void)
 {
+    char maximum_line[CGROUP_NAME_LINE_MAX + 2];
+    memset(maximum_line, 'x', CGROUP_NAME_LINE_MAX);
+    maximum_line[CGROUP_NAME_LINE_MAX] = '\n';
+    maximum_line[CGROUP_NAME_LINE_MAX + 1] = '\0';
+
+    char oversized_record[CGROUP_NAME_LINE_MAX + 2];
+    memset(oversized_record, 'x', CGROUP_NAME_LINE_MAX + 1);
+    oversized_record[CGROUP_NAME_LINE_MAX + 1] = '\0';
+
     struct read_case {
         const char *name;
         const char *payload;
@@ -159,9 +170,13 @@ static bool test_cgroup_name_read_protocol(void)
         int timeout_ms;
         CGROUP_NAME_READ_RESULT expected;
     };
-    static const struct read_case cases[] = {
+    const struct read_case cases[] = {
         { .name = "complete line", .payload = "name label=\"value\"\n", .close_writer = true,
           .timeout_ms = 100, .expected = CGROUP_NAME_READ_COMPLETE },
+        { .name = "maximum line", .payload = maximum_line, .close_writer = true,
+          .timeout_ms = 100, .expected = CGROUP_NAME_READ_COMPLETE },
+        { .name = "oversized record", .payload = oversized_record, .close_writer = true,
+          .timeout_ms = 100, .expected = CGROUP_NAME_READ_INVALID },
         { .name = "incomplete EOF", .payload = "name label=\"value\"", .close_writer = true,
           .timeout_ms = 100, .expected = CGROUP_NAME_READ_INVALID },
         { .name = "empty EOF", .payload = "", .close_writer = true,
@@ -201,6 +216,62 @@ static bool test_cgroup_name_read_protocol(void)
         if (fds[1] >= 0)
             close(fds[1]);
     }
+    return ok;
+}
+
+static bool test_cgroup_name_read_deadline(void)
+{
+    int fds[2];
+    if (pipe(fds) != 0) {
+        perror("pipe");
+        return false;
+    }
+
+    if (write(fds[1], "x", 1) != 1) {
+        perror("write");
+        close(fds[0]);
+        close(fds[1]);
+        return false;
+    }
+
+    pid_t pid = fork();
+    if (pid < 0) {
+        perror("fork");
+        close(fds[0]);
+        close(fds[1]);
+        return false;
+    }
+    if (pid == 0) {
+        close(fds[0]);
+        for (int i = 0; i < 5; i++) {
+            sleep_usec(10 * USEC_PER_MS);
+            if (write(fds[1], "x", 1) != 1)
+                _exit(1);
+        }
+        close(fds[1]);
+        _exit(0);
+    }
+
+    close(fds[1]);
+    char buffer[CGROUP_NAME_LINE_MAX + 2];
+    CGROUP_NAME_READ_RESULT result = cgroup_name_read_response(fds[0], buffer, sizeof(buffer), 25);
+
+    int status = 0;
+    pid_t waited;
+    do
+        waited = waitpid(pid, &status, 0);
+    while (waited < 0 && errno == EINTR);
+
+    bool ok = waited == pid && WIFEXITED(status) && WEXITSTATUS(status) == 0;
+    if (!ok)
+        fprintf(stderr, "slow writer process failed\n");
+    if (result != CGROUP_NAME_READ_TIMEOUT) {
+        fprintf(stderr, "slow writer: expected read result %d, got %d\n",
+                CGROUP_NAME_READ_TIMEOUT, result);
+        ok = false;
+    }
+
+    close(fds[0]);
     return ok;
 }
 
@@ -309,9 +380,11 @@ int main(void)
         failures++;
     if (!test_cgroup_name_read_protocol())
         failures++;
+    if (!test_cgroup_name_read_deadline())
+        failures++;
 
     if (failures) {
-        fprintf(stderr, "%zu cgroup label-parser tests failed\n", failures);
+        fprintf(stderr, "%zu cgroups.plugin tests failed\n", failures);
         return 1;
     }
 

@@ -60,7 +60,9 @@ embedded quotes and newlines, so the line is always single-line and parseable.
 `cgroups.plugin` reads `[plugin:cgroups]` `script to get cgroup names`, whose
 default is the installed `cgroup-name` binary. It enables rename matching only
 when that configured path is executable; builds that omit the helper therefore
-retain raw cgroup names without repeated spawn failures.
+retain raw cgroup names without repeated spawn failures. A persisted value
+equal to the installed legacy `plugins.d/cgroup-name.sh` path is migrated to
+the new binary; all custom helper paths remain unchanged.
 
 `NETDATA_CGROUP_NAME_TIMEOUT_MS` carries the operator budget X (from the
 `[plugin:cgroups]` `cgroup-name timeout` option, default 120s). The helper sets
@@ -71,10 +73,11 @@ generally, 64 MiB for Kubernetes pod lists); kubectl output uses the same caps.
 If the name is still unresolved at the deadline, the helper logs a per-call
 time breakdown at error level and exits with the retry code instead of emitting
 a fallback name, so discovery's retry ladder runs. `cgroups.plugin` waits X plus
-a 2s grace period, then kills the helper; X=0 keeps the legacy unbounded
-behavior on both sides. The parent incrementally polls and reads until newline,
-EOF, the size bound, or the original absolute deadline; a helper that writes a
-partial record cannot reset or bypass the timeout.
+a 2s grace period for a complete response, then kills a silent or partial
+helper. After a complete response it allows up to another 2s for process exit;
+X=0 keeps the legacy unbounded response wait. The parent incrementally polls
+and reads until newline, EOF, the size bound, or the original absolute deadline;
+a helper that writes a partial record cannot reset or bypass the timeout.
 
 ## Inputs And Exit Codes
 
@@ -84,7 +87,7 @@ partial record cannot reset or bypass the timeout.
   and exits `1`.
 - Exit codes are:
   - `0`: success or enabled fallback.
-  - `1`: fatal no-argument path only.
+  - `1`: fatal missing-argument, oversized-output, or stdout-write failure.
   - `2`: retry.
   - `3`: disable.
 

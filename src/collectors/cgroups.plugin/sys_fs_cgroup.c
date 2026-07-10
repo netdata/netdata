@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "cgroup-internals.h"
+#include "cgroup-name-config.h"
 #include "cgroup-netipc.h"
 
 // main cgroups thread worker jobs
@@ -376,9 +377,18 @@ void read_cgroup_plugin_configuration() {
                        " * "
             ), NULL, SIMPLE_PATTERN_EXACT, true);
 
+    char legacy_cgroup_name[FILENAME_MAX];
+    snprintfz(legacy_cgroup_name, sizeof(legacy_cgroup_name),
+              "%s/cgroup-name.sh", netdata_configured_primary_plugins_dir);
     snprintfz(filename, FILENAME_MAX, "%s/cgroup-name", netdata_configured_primary_plugins_dir);
     const char *configured_cgroup_name =
         inicfg_get(&netdata_config, "plugin:cgroups", "script to get cgroup names", filename);
+    if (cgroup_name_is_legacy_default_helper(configured_cgroup_name, legacy_cgroup_name)) {
+        collector_info("CGROUP: migrating legacy cgroup-name helper '%s' to '%s'.",
+                       configured_cgroup_name, filename);
+        configured_cgroup_name =
+            inicfg_set(&netdata_config, "plugin:cgroups", "script to get cgroup names", filename);
+    }
     if (configured_cgroup_name && *configured_cgroup_name && access(configured_cgroup_name, X_OK) == 0)
         cgroups_rename_script = configured_cgroup_name;
     else {
