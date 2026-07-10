@@ -168,8 +168,10 @@ func formatLabelSets(sets []labelSet) string {
 
 func findLabelSet(sets []labelSet, pattern string) (labelSet, bool) {
 	for _, set := range sets {
-		if strings.Contains(set.String(), pattern) {
-			return set.clone(), true
+		for _, item := range set.items {
+			if strings.Contains(item.name, pattern) || strings.Contains(item.value, pattern) {
+				return set.clone(), true
+			}
 		}
 	}
 	return labelSet{}, false

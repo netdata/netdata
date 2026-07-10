@@ -14,6 +14,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -30,6 +31,13 @@ const (
 	tlsModeAPIServer k8sTLSMode = iota
 	tlsModeKubelet
 )
+
+type kubernetesTLSConfigCache struct {
+	apiServerOnce sync.Once
+	apiServer     *tls.Config
+	kubeletOnce   sync.Once
+	kubelet       *tls.Config
+}
 
 type httpGetOptions struct {
 	headers   map[string]string
@@ -122,21 +130,26 @@ func httpGetWithContext(ctx context.Context, url string, options httpGetOptions)
 func (r *resolver) k8sTLSConfig(mode k8sTLSMode) *tls.Config {
 	switch mode {
 	case tlsModeKubelet:
-		return &tls.Config{ // NOSONAR - kubelet serving certificates are commonly self-signed.
-			MinVersion:         tls.VersionTLS12,
-			InsecureSkipVerify: true, // NOSONAR - legacy-compatible kubelet behavior.
-		}
-	case tlsModeAPIServer:
-		if r.config.kubernetes.tlsInsecure {
-			r.tlsWarnOnce.Do(func() {
-				r.warning("K8S_TLS_INSECURE is set: TLS verification of Kubernetes API calls is disabled")
-			})
-			return &tls.Config{ // NOSONAR - explicit operator escape hatch.
+		r.tlsConfigs.kubeletOnce.Do(func() {
+			r.tlsConfigs.kubelet = &tls.Config{ // NOSONAR - kubelet serving certificates are commonly self-signed.
 				MinVersion:         tls.VersionTLS12,
-				InsecureSkipVerify: true, // NOSONAR - explicit operator escape hatch.
+				InsecureSkipVerify: true, // NOSONAR - legacy-compatible kubelet behavior.
 			}
-		}
-		return k8sServiceAccountTLSConfig(r.config.kubernetes.serviceAccountCAFile)
+		})
+		return r.tlsConfigs.kubelet
+	case tlsModeAPIServer:
+		r.tlsConfigs.apiServerOnce.Do(func() {
+			if r.config.kubernetes.tlsInsecure {
+				r.warning("K8S_TLS_INSECURE is set: TLS verification of Kubernetes API calls is disabled")
+				r.tlsConfigs.apiServer = &tls.Config{ // NOSONAR - explicit operator escape hatch.
+					MinVersion:         tls.VersionTLS12,
+					InsecureSkipVerify: true, // NOSONAR - explicit operator escape hatch.
+				}
+				return
+			}
+			r.tlsConfigs.apiServer = k8sServiceAccountTLSConfig(r.config.kubernetes.serviceAccountCAFile)
+		})
+		return r.tlsConfigs.apiServer
 	default:
 		return nil
 	}

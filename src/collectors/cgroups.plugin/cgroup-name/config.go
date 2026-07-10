@@ -13,6 +13,7 @@ const (
 	defaultDockerHost          = "unix:///var/run/docker.sock"
 	defaultPodmanHost          = "unix:///run/podman/podman.sock"
 	defaultKubeletURL          = "https://localhost:10250"
+	defaultGCPMetadataURL      = "http://metadata"
 	k8sServiceAccountCAFile    = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 	k8sServiceAccountTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
 )
@@ -42,6 +43,7 @@ type kubernetesConfig struct {
 	kubeConfig              string
 	kubeConfigSet           bool
 	tlsInsecure             bool
+	gcpMetadataURL          string
 }
 
 func prepareInvocationConfig() invocationConfig {
@@ -87,6 +89,7 @@ func loadInvocationConfig() invocationConfig {
 			kubeConfig:              kubeConfig,
 			kubeConfigSet:           kubeConfigSet,
 			tlsInsecure:             parseK8sTLSInsecure(os.Getenv("K8S_TLS_INSECURE")),
+			gcpMetadataURL:          defaultGCPMetadataURL,
 		},
 	}
 }
@@ -114,10 +117,14 @@ func parseLogPriority(value string) int {
 		return ndlpEmerg
 	case "alert":
 		return ndlpAlert
+	case "crit", "critical":
+		return ndlpCrit
 	case "err", "error":
 		return ndlpErr
 	case "warn", "warning":
 		return ndlpWarn
+	case "notice":
+		return ndlpNotice
 	case "debug":
 		return ndlpDebug
 	default:

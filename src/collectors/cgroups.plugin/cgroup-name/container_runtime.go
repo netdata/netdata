@@ -22,8 +22,22 @@ type dockerInspect struct {
 }
 
 func parseDockerLikeInspectOutput(output string) resolution {
-	values := make(map[string]string)
+	values := parseDockerLikeInspectValues(output)
 	var labels labelSet
+	for line := range strings.SplitSeq(output, "\n") {
+		name, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		if strings.HasPrefix(name, "LABEL_netdata.cloud/") {
+			labels.add(strings.TrimPrefix(name, "LABEL_"), inspectLabelValue(value))
+		}
+	}
+	return containerResolution(values, labels)
+}
+
+func parseDockerLikeInspectValues(output string) map[string]string {
+	values := make(map[string]string)
 	for line := range strings.SplitSeq(output, "\n") {
 		name, value, ok := strings.Cut(line, "=")
 		if !ok {
@@ -32,13 +46,9 @@ func parseDockerLikeInspectOutput(output string) resolution {
 		switch name {
 		case "NOMAD_NAMESPACE", "NOMAD_JOB_NAME", "NOMAD_TASK_NAME", "NOMAD_SHORT_ALLOC_ID", "CONT_NAME", "IMAGE_NAME":
 			values[name] = value
-		default:
-			if strings.HasPrefix(name, "LABEL_netdata.cloud/") {
-				labels.add(strings.TrimPrefix(name, "LABEL_"), inspectLabelValue(value))
-			}
 		}
 	}
-	return containerResolution(values, labels)
+	return values
 }
 
 func dockerJSONToResolution(body []byte) (resolution, bool) {
@@ -47,15 +57,9 @@ func dockerJSONToResolution(body []byte) (resolution, bool) {
 		return resolution{}, false
 	}
 
-	values := make(map[string]string)
-	for _, env := range doc.Config.Env {
-		name, value, ok := strings.Cut(env, "=")
-		if ok {
-			values[name] = value
-		}
-	}
-	values["CONT_NAME"] = doc.Name
-	values["IMAGE_NAME"] = doc.Config.Image
+	inspectLines := append([]string(nil), doc.Config.Env...)
+	inspectLines = append(inspectLines, "CONT_NAME="+doc.Name, "IMAGE_NAME="+doc.Config.Image)
+	values := parseDockerLikeInspectValues(strings.Join(inspectLines, "\n"))
 
 	entries, err := orderedStringEntries(doc.Config.Labels)
 	if err != nil {
@@ -160,7 +164,7 @@ func (r *resolver) resolveDockerID(ctx context.Context, id, cgroup string) (reso
 
 	if result.name == "" {
 		r.warning(fmt.Sprintf("cannot find the name of docker container '%s'", id))
-		return resolution{name: prefixLen(id, 12), exitCode: exitRetry}, true
+		return resolution{name: prefixLen(id, 12), labels: result.labels, exitCode: exitRetry}, true
 	}
 	r.info(fmt.Sprintf("docker container '%s' is named '%s'", id, result.name))
 	return result, true
@@ -177,7 +181,7 @@ func (r *resolver) resolvePodmanID(ctx context.Context, id, cgroup string) (reso
 	result := r.dockerLikeGetNameAPI(ctx, "podman", "PODMAN_HOST", r.config.podmanHost, id)
 	if result.name == "" {
 		r.warning(fmt.Sprintf("cannot find the name of podman container '%s'", id))
-		return resolution{name: prefixLen(id, 12), exitCode: exitRetry}, true
+		return resolution{name: prefixLen(id, 12), labels: result.labels, exitCode: exitRetry}, true
 	}
 	r.info(fmt.Sprintf("podman container '%s' is named '%s'", id, result.name))
 	return result, true

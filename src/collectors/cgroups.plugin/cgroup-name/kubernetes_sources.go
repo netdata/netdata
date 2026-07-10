@@ -24,10 +24,15 @@ func (r *resolver) k8sGCPGetClusterName(ctx context.Context) (string, bool) {
 		value string
 		err   error
 	}
+	baseURL := r.config.kubernetes.gcpMetadataURL
+	if baseURL == "" {
+		baseURL = defaultGCPMetadataURL
+	}
+	baseURL = strings.TrimRight(baseURL, "/") + "/computeMetadata/v1"
 	urls := []string{
-		"http://metadata/computeMetadata/v1/project/project-id",
-		"http://metadata/computeMetadata/v1/instance/attributes/cluster-location",
-		"http://metadata/computeMetadata/v1/instance/attributes/cluster-name",
+		baseURL + "/project/project-id",
+		baseURL + "/instance/attributes/cluster-location",
+		baseURL + "/instance/attributes/cluster-name",
 	}
 	headers := map[string]string{"Metadata-Flavor": "Google"}
 	defer r.track("gcp-metadata", time.Now())

@@ -49,3 +49,27 @@ func TestPrepareInvocationConfigDefaultsRuntimeHosts(t *testing.T) {
 		t.Fatalf("PODMAN_HOST was not exported for child commands: %q", got)
 	}
 }
+
+func TestParseLogPriorityMatchesShellAliases(t *testing.T) {
+	tests := map[string]int{
+		"emerg":     0,
+		"emergency": 0,
+		"alert":     1,
+		"crit":      2,
+		"critical":  2,
+		"err":       3,
+		"error":     3,
+		"warn":      4,
+		"warning":   4,
+		"notice":    5,
+		"info":      6,
+		"debug":     7,
+	}
+	for value, want := range tests {
+		t.Run(value, func(t *testing.T) {
+			if got := parseLogPriority(value); got != want {
+				t.Fatalf("parseLogPriority(%q) = %d, want %d", value, got, want)
+			}
+		})
+	}
+}

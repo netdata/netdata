@@ -2,10 +2,7 @@
 
 package main
 
-import (
-	"context"
-	"sync"
-)
+import "context"
 
 const (
 	exitSuccess = 0
@@ -21,10 +18,10 @@ type resolution struct {
 }
 
 type resolver struct {
-	config      invocationConfig
-	logger      invocationLogger
-	budget      invocationBudget
-	tlsWarnOnce sync.Once
+	config     invocationConfig
+	logger     invocationLogger
+	budget     invocationBudget
+	tlsConfigs kubernetesTLSConfigCache
 }
 
 func newResolver(args []string, config invocationConfig) *resolver {
@@ -36,6 +33,9 @@ func newResolver(args []string, config invocationConfig) *resolver {
 }
 
 func (r *resolver) resolve(ctx context.Context, cgroupPath, cgroup string) resolution {
+	if r.budgetExpired() {
+		return r.deadlineRetry()
+	}
 	if isKubernetesCgroup(cgroup) {
 		return r.resolveKubernetes(ctx, cgroupPath, cgroup)
 	}
@@ -43,13 +43,19 @@ func (r *resolver) resolve(ctx context.Context, cgroupPath, cgroup string) resol
 	result, ok := r.resolveNonKubernetes(ctx, cgroup)
 	if !ok {
 		if r.budgetExpired() {
-			r.logCallBreakdown()
-			return resolution{exitCode: exitRetry}
+			return r.deadlineRetry()
 		}
 		result = resolution{name: cgroup, exitCode: exitSuccess}
+	} else if result.exitCode == exitRetry && r.budgetExpired() {
+		return r.deadlineRetry()
 	}
 	if len(result.name) > 100 {
 		result.name = result.name[:100]
 	}
 	return result
+}
+
+func (r *resolver) deadlineRetry() resolution {
+	r.logCallBreakdown()
+	return resolution{exitCode: exitRetry}
 }

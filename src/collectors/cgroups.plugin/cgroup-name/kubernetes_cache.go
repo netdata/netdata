@@ -3,9 +3,15 @@
 package main
 
 import (
+	"bufio"
 	"os"
 	"path/filepath"
 	"strings"
+)
+
+const (
+	maxKubernetesCacheMetadataLine  = 64 << 10
+	maxKubernetesCacheContainerLine = 16 << 20
 )
 
 type kubernetesCache struct {
@@ -106,40 +112,44 @@ func firstLineFile(path string) string {
 	if !isPrivateRegularFile(path) {
 		return ""
 	}
-	data, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return ""
 	}
-	return firstLine(string(data))
-}
+	defer file.Close()
 
-func firstLine(value string) string {
-	if before, _, ok := strings.Cut(value, "\n"); ok {
-		return before
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 4096), maxKubernetesCacheMetadataLine)
+	if scanner.Scan() {
+		return scanner.Text()
 	}
-	return value
+	return ""
 }
 
 func grepFile(path, pattern string, max int) (string, bool) {
 	if !isPrivateRegularFile(path) {
 		return "", false
 	}
-	data, err := os.ReadFile(path)
+	file, err := os.Open(path)
 	if err != nil {
 		return "", false
 	}
-	return grepString(string(data), pattern, max)
-}
+	defer file.Close()
 
-func grepString(value, pattern string, max int) (string, bool) {
 	var matches []string
-	for line := range strings.SplitSeq(strings.TrimRight(value, "\n"), "\n") {
+	scanner := bufio.NewScanner(file)
+	scanner.Buffer(make([]byte, 64<<10), maxKubernetesCacheContainerLine)
+	for scanner.Scan() {
+		line := scanner.Text()
 		if strings.Contains(line, pattern) {
 			matches = append(matches, line)
 			if max > 0 && len(matches) >= max {
 				break
 			}
 		}
+	}
+	if scanner.Err() != nil {
+		return "", false
 	}
 	if len(matches) == 0 {
 		return "", false

@@ -110,6 +110,21 @@ func TestK8sTLSModesAgainstSelfSignedServer(t *testing.T) {
 	}
 }
 
+func TestK8sTLSConfigIsReusedPerInvocation(t *testing.T) {
+	r := newResolver([]string{"cgroup-name"}, invocationConfig{
+		logLevel: ndlpEmerg,
+		kubernetes: kubernetesConfig{
+			tlsInsecure: true,
+		},
+	})
+	if first, second := r.k8sTLSConfig(tlsModeAPIServer), r.k8sTLSConfig(tlsModeAPIServer); first != second {
+		t.Fatal("API-server TLS roots were rebuilt within one invocation")
+	}
+	if first, second := r.k8sTLSConfig(tlsModeKubelet), r.k8sTLSConfig(tlsModeKubelet); first != second {
+		t.Fatal("kubelet TLS configuration was rebuilt within one invocation")
+	}
+}
+
 func TestKubeletPodsURLAppendsPods(t *testing.T) {
 	if got := kubeletPodsURL(defaultKubeletURL); got != "https://localhost:10250/pods" {
 		t.Fatalf("default kubelet url = %q", got)

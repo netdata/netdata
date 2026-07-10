@@ -120,13 +120,16 @@ func isDir(path string) bool {
 }
 
 func fileReadable(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil || !info.Mode().IsRegular() {
+		return false
+	}
 	file, err := os.Open(path)
 	if err != nil {
 		return false
 	}
 	_ = file.Close()
-	info, err := os.Stat(path)
-	return err == nil && !info.IsDir()
+	return true
 }
 
 // firstConfigValue keeps the legacy grep-before-sed gate: "name:vm" does not

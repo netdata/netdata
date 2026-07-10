@@ -13,21 +13,25 @@ import (
 )
 
 const (
-	ndlpEmerg = 0
-	ndlpAlert = 1
-	ndlpErr   = 3
-	ndlpWarn  = 4
-	ndlpInfo  = 6
-	ndlpDebug = 7
+	ndlpEmerg  = 0
+	ndlpAlert  = 1
+	ndlpCrit   = 2
+	ndlpErr    = 3
+	ndlpWarn   = 4
+	ndlpNotice = 5
+	ndlpInfo   = 6
+	ndlpDebug  = 7
 )
 
 var ndlpNames = map[int]string{
-	ndlpEmerg: "emergency",
-	ndlpAlert: "alert",
-	ndlpErr:   "error",
-	ndlpWarn:  "warning",
-	ndlpInfo:  "info",
-	ndlpDebug: "debug",
+	ndlpEmerg:  "emergency",
+	ndlpAlert:  "alert",
+	ndlpCrit:   "critical",
+	ndlpErr:    "error",
+	ndlpWarn:   "warning",
+	ndlpNotice: "notice",
+	ndlpInfo:   "info",
+	ndlpDebug:  "debug",
 }
 
 type invocationLogger struct {

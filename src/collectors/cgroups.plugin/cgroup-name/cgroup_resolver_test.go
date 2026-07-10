@@ -66,9 +66,9 @@ func TestMainDispatchPureBranches(t *testing.T) {
 			stdout: "lxc.payload.\n",
 			code:   exitSuccess,
 		},
-		"invalid docker id falls through enabled": {
-			cgroup: "docker_xyz",
-			stdout: "docker_xyz\n",
+		"short hexadecimal docker id falls through enabled": {
+			cgroup: "docker_abcdef",
+			stdout: "docker_abcdef\n",
 			code:   exitSuccess,
 		},
 	}
@@ -177,5 +177,11 @@ func TestHostPathKeepsAbsolutePathsWithEmptyPrefix(t *testing.T) {
 	}
 	if got := hostPath("/host", "/etc/pve"); got != "/host/etc/pve" {
 		t.Fatalf("hostPath with /host prefix = %q, want /host/etc/pve", got)
+	}
+}
+
+func TestFileReadableRejectsNonRegularFiles(t *testing.T) {
+	if fileReadable(os.DevNull) {
+		t.Fatalf("fileReadable(%q) accepted a non-regular file", os.DevNull)
 	}
 }

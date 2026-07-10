@@ -37,8 +37,9 @@ external process contract across all internal boundaries.
   embedded single quotes are not escaped.
 - `PROGRAM_NAME` is the executable basename. The installed binary therefore
   logs `cgroup-name`.
-- `NETDATA_LOG_LEVEL` maps to syslog priorities. Unknown values keep the
-  default info threshold.
+- `NETDATA_LOG_LEVEL` maps `emerg|emergency`, `alert`, `crit|critical`,
+  `err|error`, `warn|warning`, `notice`, `info`, and `debug` to the matching
+  syslog priorities. Unknown values keep the default info threshold.
 
 ## Logging
 
@@ -175,12 +176,14 @@ The Kubernetes cache files are:
 - `${TMPDIR:-/tmp}/netdata-cgroups-containers`
 
 For container ids, all three files must exist and the containers file must have
-a grep match for the container id to use the cache. Otherwise the binary reads
-any existing cluster/system uid cache, discovers missing values, then rewrites
-the cache files atomically: each is written to an unguessable `0600` temp file
-in the same directory and renamed over the destination, so a symlink planted at
-the predictable path is replaced, not followed. (The shell helper used plain
-`echo > file 2>/dev/null` writes.)
+a streaming first-match lookup for the container id to use the cache. Metadata
+records are capped at 64 KiB and container records at 16 MiB, so stale or
+hostile predictable files cannot force an allocation proportional to the whole
+cache. Otherwise the binary reads any existing cluster/system uid cache,
+discovers missing values, then rewrites the cache files atomically: each is
+written to an unguessable `0600` temp file in the same directory and renamed
+over the destination, so a symlink planted at the predictable path is replaced,
+not followed. (The shell helper used plain `echo > file 2>/dev/null` writes.)
 
 Kubernetes data source selection is a switch:
 
@@ -225,13 +228,17 @@ For container cgroups, append `kind="container"`, `qos_class`, optional
 cntr_<namespace>_<pod_name>_<container_name> <labels>
 ```
 
-For pod cgroups, take the first matching pod line, strip from
-`,container_` to the end, append pod labels, remove `pod_uid`, prefix labels,
-and build:
+For pod cgroups, take the first matching pod record and retain typed fields up
+to the first actual `container_*` field, then append pod labels, remove
+`pod_uid`, prefix labels, and build:
 
 ```text
 pod_<namespace>_<pod_name> <labels>
 ```
+
+This typed boundary is an intentional safety exception to the shell's raw
+`,container_` substring truncation: an annotation value containing that text
+does not corrupt the pod label record.
 
 Names containing `_null` followed by `_` or end warn. With
 `USE_KUBELET_FOR_PODS_METADATA` set they return `2`; otherwise they return `1`.

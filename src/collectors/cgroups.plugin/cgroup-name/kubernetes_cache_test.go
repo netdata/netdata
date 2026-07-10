@@ -5,6 +5,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -65,5 +66,24 @@ func TestCacheReadHelpersRejectSymlinks(t *testing.T) {
 	}
 	if got := firstLineFile(secret); got != "leaked-line" {
 		t.Fatalf("firstLineFile on a regular file = %q", got)
+	}
+}
+
+func TestCacheLookupDoesNotAllocateTheWholeFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "netdata-cgroups-containers")
+	contents := `container_id="needle",pod_name="first"` + "\n" + strings.Repeat("x", 4<<20)
+	if err := os.WriteFile(path, []byte(contents), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	result := testing.Benchmark(func(b *testing.B) {
+		for range b.N {
+			if _, ok := grepFile(path, "needle", 1); !ok {
+				b.Fatal("cache match not found")
+			}
+		}
+	})
+	if got, max := result.AllocedBytesPerOp(), int64(512<<10); got > max {
+		t.Fatalf("cache lookup allocated %d bytes/op, want at most %d", got, max)
 	}
 }

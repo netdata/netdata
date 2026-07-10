@@ -4,10 +4,13 @@ package main
 
 import (
 	"bytes"
+	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -45,6 +48,167 @@ func TestDockerJSONToResolutionPreservesLabelOrder(t *testing.T) {
 	}
 	if got, want := result.labels.String(), `image="img:v1",netdata.cloud/a="1",netdata.cloud/b="2"`; got != want {
 		t.Fatalf("labels:\nwant %q\n got %q", want, got)
+	}
+}
+
+func TestDockerJSONToResolutionKeepsInspectValuesLineOriented(t *testing.T) {
+	body := []byte(`{"Name":"/ignored","Config":{"Env":["NOMAD_NAMESPACE=prod\ninjected","NOMAD_JOB_NAME=api","NOMAD_TASK_NAME=worker","NOMAD_SHORT_ALLOC_ID=abc123"],"Image":"","Labels":{}}}`)
+	result, ok := dockerJSONToResolution(body)
+	if !ok {
+		t.Fatal("docker JSON did not parse")
+	}
+	if got, want := result.name, "prod-api-worker-abc123"; got != want {
+		t.Fatalf("name = %q, want the first physical inspect line %q", got, want)
+	}
+}
+
+func TestDockerRetryFallbackPreservesInspectLabels(t *testing.T) {
+	tmp := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmp, "snap"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", tmp)
+
+	id := strings.Repeat("7", 64)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		_, _ = w.Write([]byte(`{"Name":"","Config":{"Env":[],"Image":"registry.example.invalid/partial:v1","Labels":{"netdata.cloud/team":"platform"}}}`))
+	}))
+	defer server.Close()
+
+	r := newResolver([]string{"cgroup-name"}, invocationConfig{
+		dockerHost: server.URL,
+		logLevel:   ndlpEmerg,
+	})
+	result, handled := r.resolveDockerID(context.Background(), id, "docker-"+id+".scope")
+	if !handled {
+		t.Fatal("valid Docker id was not handled")
+	}
+	if got, want := result.name, id[:12]; got != want {
+		t.Fatalf("fallback name = %q, want %q", got, want)
+	}
+	if result.exitCode != exitRetry {
+		t.Fatalf("exit code = %d, want retry", result.exitCode)
+	}
+	if got, want := result.labels.String(), `image="registry.example.invalid/partial:v1",netdata.cloud/team="platform"`; got != want {
+		t.Fatalf("fallback labels:\nwant %q\n got %q", want, got)
+	}
+}
+
+func TestPodmanRetryFallbackPreservesInspectLabels(t *testing.T) {
+	id := strings.Repeat("8", 64)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		_, _ = w.Write([]byte(`{"Name":"","Config":{"Env":[],"Image":"registry.example.invalid/podman-partial:v1","Labels":{"netdata.cloud/team":"platform"}}}`))
+	}))
+	defer server.Close()
+
+	r := newResolver([]string{"cgroup-name"}, invocationConfig{
+		podmanHost: server.URL,
+		logLevel:   ndlpEmerg,
+	})
+	result, handled := r.resolvePodmanID(context.Background(), id, "libpod-"+id+".scope")
+	if !handled || result.exitCode != exitRetry || result.name != id[:12] {
+		t.Fatalf("handled=%v exit=%d name=%q", handled, result.exitCode, result.name)
+	}
+	if got, want := result.labels.String(), `image="registry.example.invalid/podman-partial:v1",netdata.cloud/team="platform"`; got != want {
+		t.Fatalf("fallback labels:\nwant %q\n got %q", want, got)
+	}
+}
+
+func TestDockerLikeGetNameCommand(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("shell command fixture is not available on Windows")
+	}
+	tmp := t.TempDir()
+	id := strings.Repeat("9", 64)
+	command := filepath.Join(tmp, "docker")
+	script := `#!/bin/sh
+[ "$1" = "inspect" ] || exit 10
+[ "$3" = "$EXPECTED_CONTAINER_ID" ] || exit 11
+printf '%s\n' 'IMAGE_NAME=registry.example.invalid/cli:v1' 'CONT_NAME=/cli-container' 'LABEL_netdata.cloud/team="platform"'
+`
+	if err := os.WriteFile(command, []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("EXPECTED_CONTAINER_ID", id)
+
+	r := newResolver([]string{"cgroup-name"}, invocationConfig{logLevel: ndlpEmerg})
+	result := r.dockerLikeGetNameCommand(context.Background(), command, id)
+	if got, want := result.name, "cli-container"; got != want {
+		t.Fatalf("name = %q, want %q", got, want)
+	}
+	if got, want := result.labels.String(), `image="registry.example.invalid/cli:v1",netdata.cloud/team="platform"`; got != want {
+		t.Fatalf("labels:\nwant %q\n got %q", want, got)
+	}
+}
+
+func TestDockerLikeGetNameAPIOverUnixSocket(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix sockets are not available on Windows")
+	}
+	id := strings.Repeat("a", 64)
+	temporary, err := os.CreateTemp("/tmp", "cgroup-name-socket-")
+	if err != nil {
+		t.Fatal(err)
+	}
+	socket := temporary.Name() + ".sock"
+	_ = temporary.Close()
+	_ = os.Remove(temporary.Name())
+	t.Cleanup(func() { _ = os.Remove(socket) })
+	listener, err := net.Listen("unix", socket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := &http.Server{Handler: http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		if got, want := request.URL.Path, "/containers/"+id+"/json"; got != want {
+			t.Errorf("path = %q, want %q", got, want)
+		}
+		_, _ = w.Write([]byte(`{"Name":"/socket-container","Config":{"Env":[],"Image":"socket:v1","Labels":{}}}`))
+	})}
+	go func() { _ = server.Serve(listener) }()
+	t.Cleanup(func() { _ = server.Close() })
+
+	r := newResolver([]string{"cgroup-name"}, invocationConfig{logLevel: ndlpEmerg})
+	result := r.dockerLikeGetNameAPI(context.Background(), "docker", "DOCKER_HOST", "unix://"+socket, id)
+	if got, want := result.name, "socket-container"; got != want {
+		t.Fatalf("name = %q, want %q", got, want)
+	}
+	if got, want := result.labels.String(), `image="socket:v1"`; got != want {
+		t.Fatalf("labels = %q, want %q", got, want)
+	}
+}
+
+func TestECSAndContainerdDispatchUseDockerAPI(t *testing.T) {
+	tmp := t.TempDir()
+	if err := os.WriteFile(filepath.Join(tmp, "snap"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", tmp)
+	id := strings.Repeat("b", 64)
+
+	requests := make(chan string, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, request *http.Request) {
+		requests <- request.URL.Path
+		_, _ = w.Write([]byte(`{"Name":"/runtime-container","Config":{"Env":[],"Image":"runtime:v1","Labels":{}}}`))
+	}))
+	defer server.Close()
+	r := newResolver([]string{"cgroup-name"}, invocationConfig{
+		dockerHost: server.URL,
+		logLevel:   ndlpEmerg,
+	})
+
+	for name, cgroup := range map[string]string{
+		"ecs":        "ecs-a_task_" + id,
+		"containerd": "system.slice_containerd.service_cpuset_" + id,
+	} {
+		t.Run(name, func(t *testing.T) {
+			result, handled := r.resolveNonKubernetes(context.Background(), cgroup)
+			if !handled || result.name != "runtime-container" {
+				t.Fatalf("handled=%v name=%q", handled, result.name)
+			}
+			if got, want := <-requests, "/containers/"+id+"/json"; got != want {
+				t.Fatalf("API path = %q, want %q", got, want)
+			}
+		})
 	}
 }
 

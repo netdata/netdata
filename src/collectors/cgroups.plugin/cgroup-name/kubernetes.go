@@ -58,6 +58,9 @@ func (r *resolver) resolveKubernetes(ctx context.Context, cgroupPath, id string)
 		}
 		return resolution{name: name, labels: result.labels, exitCode: exitSuccess}
 	case kubePodRetryFallback:
+		if r.budgetExpired() {
+			return r.deadlineRetry()
+		}
 		name := "k8s_" + id
 		r.warning(fmt.Sprintf("k8s_get_name: cannot find the name of cgroup with id '%s'. Setting name to %s and asking for retry.", id, name))
 		return resolution{name: name, exitCode: exitRetry}
@@ -66,6 +69,9 @@ func (r *resolver) resolveKubernetes(ctx context.Context, cgroupPath, id string)
 		r.warning(fmt.Sprintf("k8s_get_name: cannot find the name of cgroup with id '%s'. Setting name to %s and disabling it.", id, name))
 		return resolution{name: name, exitCode: exitDisable}
 	default:
+		if r.budgetExpired() {
+			return r.deadlineRetry()
+		}
 		name := "k8s_" + id
 		r.warning(fmt.Sprintf("k8s_get_name: cannot find the name of cgroup with id '%s'. Setting name to %s and enabling it.", id, name))
 		return resolution{name: name, exitCode: exitSuccess}
@@ -197,13 +203,19 @@ func (r *resolver) k8sIsPauseContainer(cgroupPath string) bool {
 	if err != nil {
 		return false
 	}
-	processes := strings.Fields(string(data))
-	if len(processes) != 1 {
-		return false
-	}
 	// /proc intentionally uses the running namespace, not NETDATA_HOST_PREFIX:
 	// containerized deployments run the plugin in the host PID namespace.
-	comm, err := os.ReadFile(filepath.Join("/proc", processes[0], "comm"))
+	return singleCgroupProcessIsPause(data, func(pid string) ([]byte, error) {
+		return os.ReadFile(filepath.Join("/proc", pid, "comm"))
+	})
+}
+
+func singleCgroupProcessIsPause(processes []byte, readComm func(string) ([]byte, error)) bool {
+	fields := strings.Fields(string(processes))
+	if len(fields) != 1 {
+		return false
+	}
+	comm, err := readComm(fields[0])
 	return err == nil && strings.TrimRight(string(comm), "\n") == "pause"
 }
 
