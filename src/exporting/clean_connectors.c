@@ -55,6 +55,7 @@ void simple_connector_cleanup(struct instance *instance)
     buffer_free(instance->buffer);
     buffer_free(simple_connector_data->buffer);
     buffer_free(simple_connector_data->header);
+    buffer_free(simple_connector_data->response);
 
     struct simple_connector_buffer *next_buffer = simple_connector_data->first_buffer;
     for (int i = 0; i < instance->config.buffer_on_failures; i++) {

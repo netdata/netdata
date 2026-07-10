@@ -85,7 +85,7 @@ Repo path: `integrations/gen_integrations.py`.
 | `src/go/plugin/scripts.d/collector` | scripts.d (shell) |
 | `src/go/plugin/ibm.d/modules` | ibm.d collectors (db2, mq, etc.) |
 | `src/go/plugin/ibm.d/modules/websphere` | websphere/{jmx,mp,pmi}/ subcollectors -- listed separately because they are 1 level deeper |
-| `src/crates/netdata-otel` | the OTEL Rust crate's collector metadata |
+| `src/crates/otel-plugin/metadata.yaml` | the OTEL plugin's collector metadata (single-file source) |
 
 - **Exporters**: `src/exporting/*/metadata.yaml`
   (`gen_integrations.py:43`).

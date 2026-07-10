@@ -124,7 +124,7 @@ pub use netdata_env::{LogFormat, LogLevel, LogMethod, NetdataEnv, SyslogFacility
 
 // Tracing initialization
 mod tracing_setup;
-pub use tracing_setup::init_tracing;
+pub use tracing_setup::init_tracing_with_identifier;
 
 /// Atomic progress state shared between handlers and the runtime ticker.
 ///
@@ -1163,33 +1163,38 @@ impl<R: AsyncRead + Unpin + Send, W: AsyncWrite + Unpin + Send> PluginRuntime<R,
             return;
         }
 
-        // patch function-call for systemd-journal. will remove this once
-        // we convert the frontend request from a GET to POST.
+        // patch function-call for otel-logs GET requests. will remove this
+        // once we convert the frontend request from a GET to POST.
+        //
+        // Legacy URL form puts args after the function name, space-separated:
+        //   ?function=otel-logs info after:N before:M           → capability discovery
+        //   ?function=otel-logs after:N before:M slice:true     → data request
+        // `info` is true only when the literal token is in the args; without
+        // it the request is a data query and `info:false` must reach the
+        // handler so it runs the query path instead of returning capabilities.
         let mut function_call = function_call;
         {
-            if function_call.name == "otel-logs" {
-                if !function_call.args.is_empty() {
-                    let mut map = serde_json::Map::new();
-                    map.insert("info".to_string(), serde_json::json!(true));
+            if function_call.name == "otel-logs" && !function_call.args.is_empty() {
+                let info = function_call.args.iter().any(|a| a == "info");
+                let mut map = serde_json::Map::new();
+                map.insert("info".to_string(), serde_json::json!(info));
 
-                    for arg in &function_call.args {
-                        if let Some(after_str) = arg.strip_prefix("after:") {
-                            if let Ok(after_val) = after_str.parse::<u64>() {
-                                map.insert("after".to_string(), serde_json::json!(after_val));
-                            }
-                        } else if let Some(before_str) = arg.strip_prefix("before:") {
-                            if let Ok(before_val) = before_str.parse::<u64>() {
-                                map.insert("before".to_string(), serde_json::json!(before_val));
-                            }
+                for arg in &function_call.args {
+                    if let Some(after_str) = arg.strip_prefix("after:") {
+                        if let Ok(after_val) = after_str.parse::<u64>() {
+                            map.insert("after".to_string(), serde_json::json!(after_val));
+                        }
+                    } else if let Some(before_str) = arg.strip_prefix("before:") {
+                        if let Ok(before_val) = before_str.parse::<u64>() {
+                            map.insert("before".to_string(), serde_json::json!(before_val));
                         }
                     }
-
-                    let json = serde_json::Value::Object(map);
-                    let payload = serde_json::to_vec(&json).unwrap();
-                    function_call.payload = Some(payload);
                 }
-            }
 
+                let json = serde_json::Value::Object(map);
+                let payload = serde_json::to_vec(&json).unwrap();
+                function_call.payload = Some(payload);
+            }
         }
 
         // Get handler

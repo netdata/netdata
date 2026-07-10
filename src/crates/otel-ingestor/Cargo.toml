@@ -1,0 +1,44 @@
+[package]
+name = "otel-ingestor"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[lib]
+name = "otel_ingestor"
+path = "src/lib.rs"
+
+[dependencies]
+bridge = { path = "../netdata-plugin/bridge" }
+ferryboat = { workspace = true }
+flatten_otel = { workspace = true }
+ng-flatten = { workspace = true }
+netdata-plugin-types = { path = "../netdata-plugin/types" }
+
+# WAL writing
+file-registry = { workspace = true }
+otel-logs-identity = { workspace = true }
+otel-catalog = { workspace = true }
+prost = { workspace = true }
+serde = { workspace = true, features = ["rc"] }
+sfst = { workspace = true }
+wal = { workspace = true }
+
+anyhow = { workspace = true }
+opentelemetry-proto = { workspace = true }
+regex = { workspace = true }
+serde_json = { workspace = true, features = ["preserve_order"] }
+serde_regex = { workspace = true }
+serde_yaml = { workspace = true }
+tokio = { workspace = true }
+tonic = { workspace = true, features = ["gzip", "tls-ring"] }
+tracing = { workspace = true }
+twox-hash = { workspace = true, features = ["xxhash64"] }
+uuid = { workspace = true }
+
+[dev-dependencies]
+bytesize = { workspace = true }
+tempfile = { workspace = true }

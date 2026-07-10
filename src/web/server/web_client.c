@@ -323,6 +323,7 @@ static int append_slash_to_url_and_redirect(struct web_client *w) {
 
     buffer_strcat(w->response.header, "Location: ");
     const char *b = buffer_tostring(w->url_as_received);
+    size_t url_len = buffer_strlen(w->url_as_received);
     const char *q = strchr(b, '?');
     if(q && q > b) {
         const char *e = q - 1;
@@ -335,7 +336,8 @@ static int append_slash_to_url_and_redirect(struct web_client *w) {
         buffer_strcat(w->response.header, q);
     }
     else {
-        const char *e = &b[buffer_strlen(w->url_as_received) - 1];
+        const char *e = b + url_len;
+        if(e > b) e--;
         while(e > b && *e != '/') e--;
         if(*e == '/') e++;
 
@@ -739,12 +741,13 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
  *          in the enum HTTP_VALIDATION otherwise.
  */
 HTTP_VALIDATION http_request_validate(struct web_client *w) {
-    char *s = (char *)buffer_tostring(w->response.data), *encoded_url = NULL;
+    char *request = (char *)buffer_tostring(w->response.data), *s = request, *encoded_url = NULL;
 
     size_t last_pos = w->header_parse_last_size;
 
     w->header_parse_tries++;
     w->header_parse_last_size = buffer_strlen(w->response.data);
+    char *request_end = request + w->header_parse_last_size;
 
     int is_it_valid;
     if(w->header_parse_tries > 1) {
@@ -792,10 +795,14 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
     encoded_url = s;
 
     //we search for the position where we have " HTTP/", because it finishes the user request
-    s = url_find_protocol(s);
+    char *request_line_end = s;
+    while(request_line_end < request_end && *request_line_end && *request_line_end != '\r')
+        request_line_end++;
+
+    s = url_find_protocol(s, request_line_end);
 
     // incomplete requests
-    if(unlikely(!*s)) {
+    if(unlikely(s >= request_line_end || !*s)) {
         web_client_enable_wait_receive(w);
         return HTTP_VALIDATION_INCOMPLETE;
     }

@@ -1423,8 +1423,10 @@ static double kstwo(
         return NAN;
 
     // -1 in size, since the calculate_pairs_diffs() returns one less point
-    DIFFS_NUMBERS *baseline_diffs = onewayalloc_mallocz(owa, (size_t)(baseline_points - 1) * sizeof(*baseline_diffs));
-    DIFFS_NUMBERS *highlight_diffs = onewayalloc_mallocz(owa, (size_t)(highlight_points - 1) * sizeof(*highlight_diffs));
+    DIFFS_NUMBERS *baseline_diffs = onewayalloc_mallocz(
+        owa, onewayalloc_mul_or_fatal((size_t)(baseline_points - 1), sizeof(*baseline_diffs), "baseline diffs"));
+    DIFFS_NUMBERS *highlight_diffs = onewayalloc_mallocz(
+        owa, onewayalloc_mul_or_fatal((size_t)(highlight_points - 1), sizeof(*highlight_diffs), "highlight diffs"));
 
     int base_size = (int)calculate_pairs_diff(baseline_diffs, baseline, baseline_points);
     int high_size = (int)calculate_pairs_diff(highlight_diffs, highlight, highlight_points);
@@ -1507,7 +1509,8 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
         goto cleanup;
 
     *entries = rrdr_rows(r);
-    ret = onewayalloc_mallocz(owa, sizeof(NETDATA_DOUBLE) * rrdr_rows(r));
+    size_t ret_size = onewayalloc_mul_or_fatal(rrdr_rows(r), sizeof(*ret), "weight values");
+    ret = onewayalloc_mallocz(owa, ret_size);
 
     if(sp)
         *sp = r->internal.qt->query.array[0].query_points;
@@ -1515,7 +1518,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
     // copy the points of the dimension to a contiguous array
     // there is no need to check for empty values, since empty values are already zero
     // https://github.com/netdata/netdata/blob/6e3144683a73a2024d51425b20ecfd569034c858/web/api/queries/average/average.c#L41-L43
-    memcpy(ret, r->v, rrdr_rows(r) * sizeof(NETDATA_DOUBLE));
+    memcpy(ret, r->v, ret_size);
 
 cleanup:
     rrdr_free(owa, r);

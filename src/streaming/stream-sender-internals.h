@@ -130,7 +130,7 @@ struct sender_state {
 void stream_sender_add_to_connector_queue(RRDHOST *host);
 
 void stream_sender_execute_commands_cleanup(struct sender_state *s);
-void stream_sender_execute_commands(struct sender_state *s);
+bool stream_sender_execute_commands(struct sender_state *s);
 
 bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeout);
 

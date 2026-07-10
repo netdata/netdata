@@ -234,7 +234,7 @@ void rrd_function_add(RRDHOST *host, RRDSET *st, const char *name, int timeout, 
     if(st && !st->functions_view)
         st->functions_view = dictionary_create_view(host->functions);
 
-    size_t key_size = strlen(name) + 1;
+    size_t key_size = rrd_functions_strlen_bounded(name, PLUGINSD_LINE_MAX) + 1;
     CLEAN_CHAR_P *key = mallocz(key_size);
     rrd_functions_sanitize(key, name, key_size);
 
@@ -265,7 +265,7 @@ bool rrd_function_del(RRDHOST *host, RRDSET *st, const char *name, bool from_str
     if(unlikely(!name || !*name))
         return false;
 
-    size_t key_size = strlen(name) + 1;
+    size_t key_size = rrd_functions_strlen_bounded(name, PLUGINSD_LINE_MAX) + 1;
     CLEAN_CHAR_P *key = mallocz(key_size);
     rrd_functions_sanitize(key, name, key_size);
 

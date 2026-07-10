@@ -2,7 +2,7 @@
 
 #include "windows_plugin.h"
 
-char windows_shared_buffer[8192];
+__thread char windows_shared_buffer[8192];
 
 static struct proc_module {
     const char *name;

@@ -1,0 +1,442 @@
+use std::collections::BTreeMap;
+use std::ops::Range;
+
+use chrono::NaiveDate;
+use chunk_file::ChunkId;
+use chunk_file::container::{Container, ContainerBuilder};
+use file_registry::{FileId, Identity, InstanceId, MachineId, Query, TenantId};
+use serde::{Deserialize, Serialize};
+
+use crate::entry::CatalogEntry;
+use crate::{CONTAINER_MAGIC, CONTAINER_VERSION, Error, FORMAT_VERSION};
+
+/// Chunk id of the JSON payload inside the catalog container. A future
+/// binary payload is a new chunk id beside (or instead of) this one —
+/// not a new file format.
+const CHUNK_JSON: ChunkId = *b"JSON";
+
+/// Per-tenant, per-date, per-machine, per-instance record of uploaded SFSTs.
+///
+/// The catalog file's identifying metadata (tenant, date, machine, instance)
+/// is encoded in the path; entries carry their own per-SFST timestamps,
+/// and the file's union `[min, max]` time range is encoded in the
+/// filename. No per-catalog "created_at" timestamp is stored — nothing
+/// in the planner reads it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Catalog {
+    pub tenant_id: TenantId,
+    pub date: NaiveDate,
+    pub machine_id: MachineId,
+    pub instance_id: InstanceId,
+    pub entries: BTreeMap<FileId, CatalogEntry>,
+}
+
+impl Catalog {
+    pub fn new(tenant_id: TenantId, date: NaiveDate, identity: Identity) -> Self {
+        Self {
+            tenant_id,
+            date,
+            machine_id: identity.machine_id,
+            instance_id: identity.instance_id,
+            entries: BTreeMap::new(),
+        }
+    }
+
+    pub fn add(&mut self, entry: CatalogEntry) {
+        self.entries.insert(entry.id, entry);
+    }
+
+    pub fn remove(&mut self, id: &FileId) -> Option<CatalogEntry> {
+        self.entries.remove(id)
+    }
+
+    /// Fold the entries down to the filename fields `(max_seq, min_ts, max_ts)`
+    /// in one pass. `(0, 0, 0)` for an empty catalog — structurally not
+    /// produced (an accumulator exists only while non-empty), matched by the
+    /// `unwrap_or(0)` fallbacks. This is the single source of the rotation
+    /// filename fields (`catalog_builder`) and of the download-time filename
+    /// check (`recovery::startup::validate_catalog`), so the two cannot drift.
+    pub fn fold(&self) -> (u64, u32, u32) {
+        let max_seq = self.entries.values().map(|e| e.id.seq).max().unwrap_or(0);
+        let min_ts = self
+            .entries
+            .values()
+            .map(|e| e.min_timestamp_s)
+            .min()
+            .unwrap_or(0);
+        let max_ts = self
+            .entries
+            .values()
+            .map(|e| e.max_timestamp_s)
+            .max()
+            .unwrap_or(0);
+        (max_seq, min_ts, max_ts)
+    }
+
+    // TODO: O(n) scan. The BTreeMap is keyed by FileId, not time, so range
+    // filtering touches every entry. Fine at current scales (~hundreds of
+    // entries per scope); revisit with an interval index or date-bucketed
+    // key if query planner workloads show it matters.
+    /// Iterate entries whose `[min_timestamp_s, max_timestamp_s]` range
+    /// (inclusive on both ends) intersects the query's `[start, end)`
+    /// range (half-open) — matching the convention used by
+    /// `sfst::Registry::candidates` and `wal::Registry::candidates`.
+    pub fn find<'a>(&'a self, q: &Query) -> impl Iterator<Item = &'a CatalogEntry> + 'a {
+        // Extract q's contents upfront so the filter closures don't borrow
+        // q. Decouples the iterator's lifetime from q's, letting callers
+        // pass a temporary `Query`.
+        let q_range = q.time_range.clone();
+        let partition_keys = q.partition_keys.clone();
+        self.entries
+            .values()
+            .filter(move |e| range_overlaps(e, &q_range))
+            .filter(move |e| partition_keys.is_empty() || partition_keys.contains(&e.id.part_key))
+    }
+
+    /// Serialize to the on-disk container: magic `NCAT` + framing
+    /// version + chunk-file TOC + a single `JSON` chunk holding the
+    /// catalog JSON, with a crc32 trailer. All durable catalog bytes go
+    /// through this — never raw JSON.
+    pub fn to_container_bytes(&self) -> Result<Vec<u8>, Error> {
+        let json = self.to_json()?;
+        let mut builder = ContainerBuilder::new(CONTAINER_MAGIC, CONTAINER_VERSION);
+        builder.add_chunk(CHUNK_JSON, &json);
+        let mut out = Vec::new();
+        builder.write_to(&mut out)?;
+        Ok(out)
+    }
+
+    /// Parse the on-disk container produced by
+    /// [`to_container_bytes`](Catalog::to_container_bytes), verifying
+    /// magic, framing version and the `JSON` chunk's crc32 before
+    /// deserializing.
+    pub fn from_container_bytes(bytes: &[u8]) -> Result<Self, Error> {
+        let container = Container::open(bytes, &CONTAINER_MAGIC, CONTAINER_VERSION)?;
+        let json = container.chunk(CHUNK_JSON)?;
+        Self::from_json(json)
+    }
+
+    fn to_json(&self) -> Result<Vec<u8>, Error> {
+        let env = Envelope {
+            version: FORMAT_VERSION,
+            tenant_id: self.tenant_id.clone(),
+            date: self.date,
+            machine_id: self.machine_id,
+            instance_id: self.instance_id,
+            entries: self.entries.values().cloned().collect(),
+        };
+        Ok(serde_json::to_vec(&env)?)
+    }
+
+    fn from_json(bytes: &[u8]) -> Result<Self, Error> {
+        // Peek the version before the full parse. A different-schema catalog
+        // may lack the current required fields, so a direct full deserialize
+        // would fail with a confusing serde "missing field" error instead of a
+        // clean `UnsupportedVersion`. This matches the WAL (header) and SFST
+        // (container) tiers, which both reject on version before touching the
+        // payload.
+        #[derive(serde::Deserialize)]
+        struct VersionOnly {
+            version: u32,
+        }
+        let VersionOnly { version } = serde_json::from_slice(bytes)?;
+        if version != FORMAT_VERSION {
+            return Err(Error::UnsupportedVersion(version));
+        }
+        let env: Envelope = serde_json::from_slice(bytes)?;
+        let mut entries = BTreeMap::new();
+        for entry in env.entries {
+            entries.insert(entry.id, entry);
+        }
+        Ok(Self {
+            tenant_id: env.tenant_id,
+            date: env.date,
+            machine_id: env.machine_id,
+            instance_id: env.instance_id,
+            entries,
+        })
+    }
+}
+
+/// True iff the entry's `[min_timestamp_s, max_timestamp_s]` range
+/// (inclusive on both ends) shares any second with the query's
+/// `[start, end)` range (half-open) — the shared
+/// [`file_registry::range_overlaps`] rule.
+fn range_overlaps(entry: &CatalogEntry, q: &Range<u32>) -> bool {
+    file_registry::range_overlaps(q, entry.min_timestamp_s, entry.max_timestamp_s)
+}
+
+#[derive(Serialize, Deserialize)]
+struct Envelope {
+    version: u32,
+    tenant_id: TenantId,
+    date: NaiveDate,
+    machine_id: MachineId,
+    instance_id: InstanceId,
+    entries: Vec<CatalogEntry>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::entry::opaque_part_key;
+    use file_registry::{ByteSize, TimestampNs};
+    use uuid::Uuid;
+
+    fn ident() -> Identity {
+        // Arbitrary non-nil identities (the newtypes reject the nil UUID).
+        Identity::new(
+            MachineId::new(Uuid::from_u128(0xa1)).unwrap(),
+            InstanceId::new(Uuid::from_u128(1)).unwrap(),
+        )
+    }
+
+    fn test_catalog() -> Catalog {
+        Catalog::new(
+            TenantId::from("tenant1"),
+            NaiveDate::from_ymd_opt(2026, 4, 17).unwrap(),
+            ident(),
+        )
+    }
+
+    fn entry_at(seq: u64, min_s: u32, max_s: u32, ns: &str, name: &str) -> CatalogEntry {
+        let part_key = opaque_part_key(ns, name);
+        CatalogEntry {
+            id: FileId::new(ident(), 0, seq, part_key),
+            remote_key: format!("tenant1/sfst/2026-04-17/{seq}.sfst"),
+            min_timestamp_s: min_s,
+            max_timestamp_s: max_s,
+            record_count: 10,
+            content_meta: Vec::new(),
+            size: ByteSize(1024),
+            uploaded_at_ns: TimestampNs(2_000_000_000),
+            remote_etag: None,
+        }
+    }
+
+    #[test]
+    fn new_has_empty_entries() {
+        let c = test_catalog();
+        assert!(c.entries.is_empty());
+    }
+
+    #[test]
+    fn add_then_remove_returns_to_empty() {
+        let mut c = test_catalog();
+        let e = entry_at(1, 100, 200, "", "");
+        c.add(e.clone());
+        assert_eq!(c.entries.len(), 1);
+
+        let removed = c.remove(&e.id).unwrap();
+        assert_eq!(removed, e);
+        assert!(c.entries.is_empty());
+    }
+
+    #[test]
+    fn fold_returns_max_seq_and_min_max_ts() {
+        let mut c = test_catalog();
+        c.add(entry_at(3, 150, 400, "", ""));
+        c.add(entry_at(7, 100, 250, "", ""));
+        c.add(entry_at(5, 200, 300, "", ""));
+        // max seq = 7; min of mins = 100; max of maxes = 400.
+        assert_eq!(c.fold(), (7, 100, 400));
+    }
+
+    #[test]
+    fn fold_empty_is_zero_triple() {
+        // Structurally not produced (accumulators are non-empty by construction),
+        // but the `unwrap_or(0)` fallbacks must yield (0, 0, 0), never panic.
+        assert_eq!(test_catalog().fold(), (0, 0, 0));
+    }
+
+    #[test]
+    fn roundtrip_container_preserves_entries_and_metadata() {
+        let mut c = test_catalog();
+        c.add(entry_at(1, 100, 200, "prod", "api"));
+        c.add(entry_at(2, 300, 500, "", ""));
+
+        let bytes = c.to_container_bytes().unwrap();
+        assert_eq!(&bytes[0..4], &CONTAINER_MAGIC, "container leads with NCAT");
+
+        // Wire contract: the envelope key is `instance_id`. Pin the JSON wire
+        // so a future serde rename can't silently change it without failing
+        // here (the JSON key follows the Rust field name).
+        let container =
+            chunk_file::container::Container::open(&bytes, &CONTAINER_MAGIC, CONTAINER_VERSION)
+                .unwrap();
+        let json = std::str::from_utf8(container.chunk(CHUNK_JSON).unwrap()).unwrap();
+        assert!(
+            json.contains("\"instance_id\""),
+            "catalog JSON must use the instance_id key"
+        );
+
+        let parsed = Catalog::from_container_bytes(&bytes).unwrap();
+        assert_eq!(parsed, c);
+    }
+
+    #[test]
+    fn from_container_bytes_rejects_corruption_and_foreign_bytes() {
+        let mut c = test_catalog();
+        c.add(entry_at(1, 100, 200, "prod", "api"));
+        let clean = c.to_container_bytes().unwrap();
+
+        // Any flipped payload byte fails the JSON chunk's crc32.
+        let mut corrupt = clean.clone();
+        let last = corrupt.len() - 1;
+        corrupt[last] ^= 0x01;
+        match Catalog::from_container_bytes(&corrupt) {
+            Err(Error::Container(chunk_file::container::Error::CrcMismatch { .. })) => {}
+            other => panic!("expected CrcMismatch, got {other:?}"),
+        }
+
+        // Raw (legacy) JSON is not a container — rejected by magic.
+        match Catalog::from_container_bytes(b"{\"version\":1}") {
+            Err(Error::Container(chunk_file::container::Error::BadMagic)) => {}
+            other => panic!("expected BadMagic, got {other:?}"),
+        }
+
+        // Unknown framing version.
+        let mut wrong_version = clean;
+        wrong_version[4..8].copy_from_slice(&99u32.to_le_bytes());
+        match Catalog::from_container_bytes(&wrong_version) {
+            Err(Error::Container(chunk_file::container::Error::UnsupportedVersion(99))) => {}
+            other => panic!("expected UnsupportedVersion, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn find_range_overlap_semantics() {
+        let mut c = test_catalog();
+        c.add(entry_at(1, 100, 200, "", ""));
+        c.add(entry_at(2, 300, 400, "", ""));
+        c.add(entry_at(3, 150, 350, "", ""));
+
+        // Window [50, 250) — file 1's max=200 is in range, file 3's
+        // min=150 is in range, file 2's min=300 is past the upper bound.
+        let q = Query {
+            time_range: 50..250,
+            partition_keys: Vec::new(),
+        };
+        let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
+        assert_eq!(hits, vec![1, 3]);
+
+        // Inclusive lower / exclusive upper edges. Window [200, 300):
+        //  - file 1: max=200 ≥ 200 ✓ and min=100 < 300 ✓ → in
+        //  - file 2: max=400 ≥ 200 ✓ and min=300 < 300 ✗ → out
+        //  - file 3: max=350 ≥ 200 ✓ and min=150 < 300 ✓ → in
+        let q = Query {
+            time_range: 200..300,
+            partition_keys: Vec::new(),
+        };
+        let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
+        assert_eq!(hits, vec![1, 3]);
+
+        let q = Query {
+            time_range: 500..600,
+            partition_keys: Vec::new(),
+        };
+        assert_eq!(c.find(&q).count(), 0);
+
+        // Single-second range [200, 201) hits file 1 (max=200) and
+        // file 3 (min=150, max=350); file 2's min=300 is out.
+        let q = Query {
+            time_range: 200..201,
+            partition_keys: Vec::new(),
+        };
+        let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
+        assert_eq!(hits, vec![1, 3]);
+    }
+
+    #[test]
+    fn find_with_part_key_filter_matches_only_that_partition() {
+        let mut c = test_catalog();
+        // Two entries on one partition, one on another.
+        c.add(entry_at(1, 100, 200, "prod", "api"));
+        c.add(entry_at(2, 100, 200, "prod", "worker"));
+        c.add(entry_at(3, 100, 200, "prod", "api"));
+
+        let q = Query {
+            time_range: 0..1000,
+            partition_keys: vec![opaque_part_key("prod", "api")],
+        };
+        let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
+        assert_eq!(hits, vec![1, 3]);
+    }
+
+    #[test]
+    fn find_with_part_key_filter_excludes_non_matching_entries() {
+        let mut c = test_catalog();
+        c.add(entry_at(1, 100, 200, "", ""));
+        c.add(entry_at(2, 100, 200, "prod", "api"));
+
+        // The catalog compares `part_key` as an opaque u64: only the entry
+        // whose key equals the query's is kept (entry 2 has a different key).
+        let q = Query {
+            time_range: 0..1000,
+            partition_keys: vec![opaque_part_key("", "")],
+        };
+        let hits: Vec<u64> = c.find(&q).map(|e| e.id.seq).collect();
+        assert_eq!(hits, vec![1]);
+    }
+
+    #[test]
+    fn find_empty_query_matches_nothing() {
+        let mut c = test_catalog();
+        c.add(entry_at(1, 100, 200, "", ""));
+
+        // start == end → empty window.
+        let q = Query {
+            time_range: 200..200,
+            partition_keys: Vec::new(),
+        };
+        assert_eq!(c.find(&q).count(), 0);
+    }
+
+    #[test]
+    fn from_json_rejects_unsupported_version() {
+        let json = br#"{
+            "version": 999,
+            "tenant_id": "t",
+            "date": "2026-04-17",
+            "machine_id": "00000000-0000-0000-0000-000000000000",
+            "instance_id": "00000000-0000-0000-0000-000000000000",
+            "entries": []
+        }"#;
+        match Catalog::from_json(json) {
+            Err(Error::UnsupportedVersion(999)) => {}
+            other => panic!("expected UnsupportedVersion(999), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_json_rejects_other_schema_on_version_not_serde() {
+        // A catalog from a different (hypothetical) schema version may carry
+        // entries whose shape the current parser cannot read. The version peek
+        // must reject it as `UnsupportedVersion(2)` — not a confusing serde
+        // "missing field" error from attempting the full parse, and never a
+        // misread of alien fields into the current schema.
+        let json = br#"{
+            "version": 2,
+            "tenant_id": "t",
+            "date": "2026-04-17",
+            "machine_id": "00000000-0000-0000-0000-000000000000",
+            "instance_id": "00000000-0000-0000-0000-000000000000",
+            "entries": [
+                {"id": "x", "total_logs": 5, "stream": {"namespace": "p", "name": "a"}}
+            ]
+        }"#;
+        match Catalog::from_json(json) {
+            Err(Error::UnsupportedVersion(2)) => {}
+            other => panic!("expected UnsupportedVersion(2), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn from_json_rejects_truncated_json() {
+        let truncated = b"{\"version\": 1, \"tenant_id\": \"t";
+        match Catalog::from_json(truncated) {
+            Err(Error::Json(_)) => {}
+            other => panic!("expected Json error, got {other:?}"),
+        }
+    }
+}

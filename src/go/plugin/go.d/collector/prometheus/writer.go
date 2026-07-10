@@ -3,6 +3,7 @@
 package prometheus
 
 import (
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -32,6 +33,16 @@ type metricFamilyWriter struct {
 	policy  metricFamilyWriterPolicy
 	handles map[string]*metricFamilyHandle
 	cycle   uint64
+
+	// Family-handle lifetime is coupled to the metrix descriptor lifetime (see metricFamilyHandle):
+	// retention is the store's descriptor-retention accessor, nil only if the store does not expose
+	// it (then handles are kept, the pre-coupling behavior); window is the descriptor retention
+	// window (expire+grace), MaxUint64 meaning unbounded; lastReconcileSuccess is the successful-commit
+	// count observed at the previous scrape, used to detect whether the previous cycle committed.
+	retention            metrix.DescriptorRetention
+	window               uint64
+	lastReconcileSuccess uint64
+
 	*logger.Logger
 }
 
@@ -43,25 +54,32 @@ type cachedInstrument[T any] struct {
 }
 
 // metricFamilyHandle caches, per metric name, the canonical distribution schema, instrument options,
-// and the per-series instrument handles. The family handle is created once per name and KEPT for the
-// job's lifetime on purpose: metrix registers an instrument descriptor per name permanently (no
-// unregister API), so if a name reappeared with a changed contract (kind, summary quantiles, or
-// histogram bounds) and the writer re-registered it, metrix would panic on the mismatch. Keeping the
-// handle lets ensureHandle detect that drift and skip it instead of re-registering.
+// and the per-series instrument handles. The handle exists for as long as metrix keeps the name's
+// descriptor: while the descriptor is live, keeping the handle lets ensureHandle detect a changed
+// contract (kind, summary quantiles, or histogram bounds) and skip it rather than write a conflicting
+// kind; once the name is idle past the metrix descriptor window (expire+grace) metrix evicts the
+// descriptor and reconcileHandles evicts this handle in lockstep, so a name that later reappears with
+// a changed contract re-registers cleanly instead of being drift-skipped forever. staged marks the
+// handle as touched this scrape (awaiting the framework commit); accepted/acceptedSuccess record the
+// last successful commit that accepted it, the clock reconcileHandles ages it by.
 //
-// The per-series instrument handles inside ARE evicted: they are reused across cycles (skipping
-// per-series instrument re-resolution) and dropped once a series goes unobserved for
+// The per-series instrument handles inside ARE evicted separately: they are reused across cycles
+// (skipping per-series instrument re-resolution) and dropped once a series goes unobserved for
 // seriesCacheRetentionCycles, so the cache stays bounded under label-value churn — unlike a metrix
 // vec, whose internal handle cache is unbounded. A family may mix label-key sets; each series is
 // cached and written by its own full label tuple. Per-name state (this handle plus the metrix
 // descriptor) is bounded by metric-name cardinality; metric-NAME churn (a Prometheus anti-pattern)
-// grows it — an accepted metrix-store limit.
+// grows it only within the retention window — a now-bounded limit.
 type metricFamilyHandle struct {
 	name             string
 	typ              commonmodel.MetricType
 	summaryQuantiles []float64
 	histogramBounds  []float64
 	opts             []metrix.InstrumentOption
+
+	staged          bool
+	accepted        bool
+	acceptedSuccess uint64
 
 	gauges     map[string]*cachedInstrument[metrix.SnapshotGauge]
 	counters   map[string]*cachedInstrument[metrix.SnapshotCounter]
@@ -78,12 +96,19 @@ func newMetricFamilyWriter(store metrix.CollectorStore, policy metricFamilyWrite
 	if policy.isFallbackTypeCounter == nil {
 		policy.isFallbackTypeCounter = matcher.FALSE()
 	}
-	return &metricFamilyWriter{
+	w := &metricFamilyWriter{
 		store:   store,
 		policy:  policy,
 		handles: make(map[string]*metricFamilyHandle),
+		window:  math.MaxUint64, // no accessor -> keep family handles (pre-coupling behavior)
 		Logger:  log,
 	}
+	// Couple family-handle lifetime to the metrix descriptor window when the store exposes it.
+	if dr, ok := store.(metrix.DescriptorRetention); ok {
+		w.retention = dr
+		w.window = dr.DescriptorRetentionWindow()
+	}
+	return w
 }
 
 // countWritable reports how many series across all families could be written. Used at Check to
@@ -116,6 +141,7 @@ func (w *metricFamilyWriter) countWritable(mfs prompkg.MetricFamilies) int {
 
 func (w *metricFamilyWriter) writeMetricFamilies(mfs prompkg.MetricFamilies) int {
 	w.cycle++
+	w.reconcileHandles()
 
 	written := 0
 	for _, mf := range mfs {
@@ -133,15 +159,61 @@ func (w *metricFamilyWriter) writeMetricFamilies(mfs prompkg.MetricFamilies) int
 			continue
 		}
 
+		// Stage the handle only when at least one compatible series actually writes. A family whose
+		// type matches but whose series all drift (changed summary quantiles / histogram bounds)
+		// writes nothing, so it must NOT refresh its lifetime - otherwise it would never age out to
+		// re-adopt the new schema after metrix evicts the descriptor. Partial drift (some canonical
+		// series still write) does refresh, keeping the live family.
 		for _, metric := range mf.Metrics() {
 			if w.observeMetric(handle, metric) {
 				written++
+				handle.staged = true
 			}
 		}
 	}
 
 	w.evictStaleSeries()
 	return written
+}
+
+// reconcileHandles couples the family-handle cache to the metrix descriptor lifetime. It runs at the
+// start of each scrape, before handles are (re)touched, on the metrix successful-commit clock:
+//   - a handle staged in the previous scrape is PROMOTED to accepted if that scrape's cycle committed;
+//     if it did not commit (aborted) and the handle had never been accepted, it is dropped so a bogus
+//     handle from a failed commit cannot drift-skip this scrape;
+//   - an accepted handle idle for the descriptor window (expire+grace) is evicted, matching metrix's
+//     own descriptor eviction, so a name that reappears with a changed contract re-registers cleanly.
+//
+// Both clocks advance only on successful commits, so writer and store stay in lockstep across endpoint
+// downtime (aborted cycles advance neither). With no accessor (window == MaxUint64) handles are kept,
+// the pre-coupling behavior.
+func (w *metricFamilyWriter) reconcileHandles() {
+	if w.retention == nil {
+		return
+	}
+	success := w.retention.SuccessfulCommits()
+	committed := success > w.lastReconcileSuccess
+	for name, h := range w.handles {
+		if h.staged {
+			h.staged = false
+			switch {
+			case committed:
+				h.accepted = true
+				h.acceptedSuccess = success
+			case !h.accepted:
+				delete(w.handles, name) // never accepted and the staging cycle aborted -> bogus
+				continue
+			}
+		}
+		// Age out an accepted handle once idle for the descriptor window. Skip when the window is
+		// unbounded (series expiry disabled), and guard the subtraction against a non-monotonic
+		// clock so it can never underflow-wrap into a spurious eviction.
+		if h.accepted && w.window != metrix.DescriptorRetentionUnbounded &&
+			success >= h.acceptedSuccess && success-h.acceptedSuccess >= w.window {
+			delete(w.handles, name) // metrix has evicted the descriptor; drop the handle in step
+		}
+	}
+	w.lastReconcileSuccess = success
 }
 
 func (w *metricFamilyWriter) skipMetricFamily(mf *prompkg.MetricFamily) bool {

@@ -135,6 +135,16 @@ Open decisions:
 
 - <files touched, decisions, deviations, reviewers>
 
+## Workflow Friction & Rule Gaps
+
+Running capture of anything that suggests a rule or workflow change: a rule that
+was missing, ambiguous, or slowed the work; a practice worth codifying; a review
+pattern that helped. Jot entries as they happen — do not reconstruct them from
+memory at close. Every entry is triaged before completion (see the Artifact
+Maintenance Gate).
+
+- <observation + which artifact it may touch (AGENTS.md / project skill / spec / SOW template)>
+
 ## Validation
 
 Acceptance criteria evidence:
@@ -169,6 +179,7 @@ Sensitive data gate:
 - End-user/operator docs: <updated docs/runbooks/help paths or evidence-backed reason none were affected>
 - End-user/operator skills: <updated output/reference skill paths or evidence-backed reason none were affected>
 - SOW lifecycle: <durable knowledge transferred to skills/docs/code/tests; follow-ups moved to GitHub issues or rejected; `Status: completed` set; SOW working file is local-only under .agents/sow/q/ and never committed; regression-as-new-SOW handling recorded>
+- Workflow friction triaged: <each `Workflow Friction & Rule Gaps` entry resolved to a rule update (file + change), an evidence-backed rejection, or a tracked follow-up; "no workflow friction arose" if the section is empty>
 
 Specs update:
 

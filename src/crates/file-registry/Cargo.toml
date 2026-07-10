@@ -1,0 +1,17 @@
+[package]
+name = "file-registry"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+chrono = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+uuid = { workspace = true, features = ["serde", "v4"] }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }

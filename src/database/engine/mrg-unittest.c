@@ -183,6 +183,131 @@ static int mrg_metrics_delete_underflow_unittest(MRG *mrg) {
 }
 #endif
 
+static int mrg_entries_acquired_counter_unittest(MRG *mrg) {
+    int errors = 0;
+
+    nd_uuid_t uuid;
+    uuid_generate(uuid);
+
+    struct mrg_statistics baseline;
+    mrg_get_statistics(mrg, &baseline);
+
+    MRG_ENTRY entry = {
+        .uuid = &uuid,
+        .section = (Word_t)&test_ctx_0,
+        .first_time_s = 10,
+        .last_time_s = 20,
+        .latest_update_every_s = 1,
+    };
+
+    bool added = false;
+    METRIC *metric = mrg_metric_add_and_acquire(mrg, entry, &added);
+    if(!metric || !added) {
+        fprintf(stderr, "DBENGINE METRIC: failed to add retained metric for acquired-counter test\n");
+        return 1;
+    }
+
+    struct mrg_statistics stats;
+    mrg_get_statistics(mrg, &stats);
+    if(stats.entries != baseline.entries + 1 ||
+       stats.entries_acquired != baseline.entries_acquired + 1 ||
+       stats.current_references != baseline.current_references + 1) {
+        fprintf(stderr,
+                "DBENGINE METRIC: acquired-counter add failed, expected entries/acquired/references %zu/%zd/%zd, got %zu/%zd/%zd\n",
+                baseline.entries + 1,
+                baseline.entries_acquired + 1,
+                baseline.current_references + 1,
+                stats.entries,
+                stats.entries_acquired,
+                stats.current_references);
+        errors++;
+    }
+
+    bool deleted = mrg_metric_release(mrg, metric);
+    if(deleted) {
+        fprintf(stderr, "DBENGINE METRIC: acquired-counter retained metric was deleted on release\n");
+        errors++;
+    }
+
+    mrg_get_statistics(mrg, &stats);
+    if(stats.entries_acquired != baseline.entries_acquired ||
+       stats.current_references != baseline.current_references) {
+        fprintf(stderr,
+                "DBENGINE METRIC: acquired-counter release failed, expected acquired/references %zd/%zd, got %zd/%zd\n",
+                baseline.entries_acquired,
+                baseline.current_references,
+                stats.entries_acquired,
+                stats.current_references);
+        errors++;
+    }
+
+    metric = mrg_metric_get_and_acquire_by_uuid(mrg, &uuid, entry.section);
+    if(!metric) {
+        fprintf(stderr, "DBENGINE METRIC: acquired-counter retained metric not found after release\n");
+        return errors + 1;
+    }
+
+    mrg_get_statistics(mrg, &stats);
+    if(stats.entries_acquired != baseline.entries_acquired + 1 ||
+       stats.current_references != baseline.current_references + 1) {
+        fprintf(stderr,
+                "DBENGINE METRIC: acquired-counter reacquire failed, expected acquired/references %zd/%zd, got %zd/%zd\n",
+                baseline.entries_acquired + 1,
+                baseline.current_references + 1,
+                stats.entries_acquired,
+                stats.current_references);
+        errors++;
+    }
+
+    deleted = mrg_metric_release(mrg, metric);
+    if(deleted) {
+        fprintf(stderr, "DBENGINE METRIC: acquired-counter reacquired retained metric was deleted on release\n");
+        errors++;
+    }
+
+    mrg_get_statistics(mrg, &stats);
+    if(stats.entries_acquired != baseline.entries_acquired ||
+       stats.current_references != baseline.current_references) {
+        fprintf(stderr,
+                "DBENGINE METRIC: acquired-counter second release failed, expected acquired/references %zd/%zd, got %zd/%zd\n",
+                baseline.entries_acquired,
+                baseline.current_references,
+                stats.entries_acquired,
+                stats.current_references);
+        errors++;
+    }
+
+    metric = mrg_metric_get_and_acquire_by_uuid(mrg, &uuid, entry.section);
+    if(!metric) {
+        fprintf(stderr, "DBENGINE METRIC: acquired-counter retained metric not found for cleanup\n");
+        return errors + 1;
+    }
+
+    mrg_metric_clear_retention(mrg, metric);
+    deleted = mrg_metric_release_and_delete(mrg, metric);
+    if(!deleted) {
+        fprintf(stderr, "DBENGINE METRIC: acquired-counter cleanup did not delete metric\n");
+        errors++;
+    }
+
+    mrg_get_statistics(mrg, &stats);
+    if(stats.entries != baseline.entries ||
+       stats.entries_acquired != baseline.entries_acquired ||
+       stats.current_references != baseline.current_references) {
+        fprintf(stderr,
+                "DBENGINE METRIC: acquired-counter cleanup failed, expected entries/acquired/references %zu/%zd/%zd, got %zu/%zd/%zd\n",
+                baseline.entries,
+                baseline.entries_acquired,
+                baseline.current_references,
+                stats.entries,
+                stats.entries_acquired,
+                stats.current_references);
+        errors++;
+    }
+
+    return errors;
+}
+
 int mrg_unittest(void) {
     // Use mrg_create_for_unittest to avoid pre-loaded metrics that block deletion
     MRG *mrg = mrg_create_for_unittest();
@@ -191,6 +316,7 @@ int mrg_unittest(void) {
 #ifndef NETDATA_INTERNAL_CHECKS
     errors += mrg_metrics_delete_underflow_unittest(mrg);
 #endif
+    errors += mrg_entries_acquired_counter_unittest(mrg);
 
     if(errors) {
         mrg_destroy(mrg);

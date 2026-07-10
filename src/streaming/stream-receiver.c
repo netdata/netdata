@@ -143,16 +143,40 @@ static ssize_t read_stream(struct receiver_state *r, char* buffer, size_t size) 
 
 ALWAYS_INLINE
 static ssize_t receiver_read_uncompressed(struct receiver_state *r) {
-    internal_fatal(r->thread.uncompressed.read_buffer[r->thread.uncompressed.read_len] != '\0',
+    ssize_t read_len = r->thread.uncompressed.read_len;
+    if(unlikely(read_len < 0)) {
+        internal_fatal(true, "The line to read is too big! Already have %zd bytes in read_buffer.", read_len);
+        errno_clear();
+        return -2;
+    }
+
+    size_t read_offset = (size_t)read_len;
+    if(unlikely(read_offset >= sizeof(r->thread.uncompressed.read_buffer) - 1)) {
+        internal_fatal(true, "The line to read is too big! Already have %zd bytes in read_buffer.", read_len);
+        errno_clear();
+        return -2;
+    }
+
+    internal_fatal(r->thread.uncompressed.read_buffer[read_offset] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
 
-    ssize_t bytes = read_stream(r, r->thread.uncompressed.read_buffer + r->thread.uncompressed.read_len, sizeof(r->thread.uncompressed.read_buffer) - r->thread.uncompressed.read_len - 1);
+    size_t available = sizeof(r->thread.uncompressed.read_buffer) - read_offset - 1;
+    char *dst = r->thread.uncompressed.read_buffer + read_offset;
+    ssize_t bytes = read_stream(r, dst, available);
     if(bytes > 0) {
+        size_t bytes_read = (size_t)bytes;
+        if(unlikely(bytes_read > available)) {
+            internal_fatal(true, "read_stream() returned %zd bytes with only %zu bytes available", bytes, available);
+            errno_clear();
+            return -2;
+        }
+
+        size_t new_read_len = read_offset + bytes_read;
         worker_set_metric(WORKER_RECEIVER_JOB_BYTES_READ, (NETDATA_DOUBLE)bytes);
         worker_set_metric(WORKER_RECEIVER_JOB_BYTES_UNCOMPRESSED, (NETDATA_DOUBLE)bytes);
 
-        r->thread.uncompressed.read_len += bytes;
-        r->thread.uncompressed.read_buffer[r->thread.uncompressed.read_len] = '\0';
+        r->thread.uncompressed.read_len = (ssize_t)new_read_len;
+        dst[bytes_read] = '\0';
         r->thread.bytes_received += bytes;
         if(likely(r->host))
             single_writer_atomic_add(&r->host->stream.rcv.status.bytes_in, (uint64_t)bytes);
@@ -243,30 +267,56 @@ static decompressor_status_t receiver_get_decompressed(struct receiver_state *r)
     if (unlikely(!stream_decompressed_bytes_in_buffer(&r->thread.compressed.decompressor)))
         return DECOMPRESS_NEED_MORE_DATA;
 
-    size_t available = sizeof(r->thread.uncompressed.read_buffer) - r->thread.uncompressed.read_len - 1;
-    if (likely(available)) {
-        size_t len = stream_decompressor_get(
-            &r->thread.compressed.decompressor, r->thread.uncompressed.read_buffer + r->thread.uncompressed.read_len, available);
-        if (unlikely(!len)) {
-            internal_error(true, "decompressor returned zero length #1");
-            return DECOMPRESS_FAILED;
-        }
-
-        r->thread.uncompressed.read_len += (int)len;
-        r->thread.uncompressed.read_buffer[r->thread.uncompressed.read_len] = '\0';
-    }
-    else {
-        internal_fatal(true, "The line to read is too big! Already have %zd bytes in read_buffer.", r->thread.uncompressed.read_len);
+    ssize_t read_len = r->thread.uncompressed.read_len;
+    if(unlikely(read_len < 0)) {
+        internal_fatal(true, "The line to read is too big! Already have %zd bytes in read_buffer.", read_len);
         return DECOMPRESS_FAILED;
     }
+
+    size_t read_offset = (size_t)read_len;
+    if(unlikely(read_offset >= sizeof(r->thread.uncompressed.read_buffer) - 1)) {
+        internal_fatal(true, "The line to read is too big! Already have %zd bytes in read_buffer.", read_len);
+        return DECOMPRESS_FAILED;
+    }
+
+    size_t available = sizeof(r->thread.uncompressed.read_buffer) - read_offset - 1;
+    char *dst = r->thread.uncompressed.read_buffer + read_offset;
+    size_t len = stream_decompressor_get(
+        &r->thread.compressed.decompressor, dst, available);
+    if (unlikely(!len)) {
+        internal_error(true, "decompressor returned zero length #1");
+        return DECOMPRESS_FAILED;
+    }
+
+    if(unlikely(len > available)) {
+        internal_fatal(true, "decompressor returned %zu bytes with only %zu bytes available", len, available);
+        return DECOMPRESS_FAILED;
+    }
+
+    size_t new_read_len = read_offset + len;
+    r->thread.uncompressed.read_len = (ssize_t)new_read_len;
+    dst[len] = '\0';
 
     return DECOMPRESS_OK;
 }
 
 ALWAYS_INLINE_HOT_FLATTEN
 static ssize_t receiver_read_compressed(struct receiver_state *r) {
+    ssize_t read_len = r->thread.uncompressed.read_len;
+    if(unlikely(read_len < 0)) {
+        internal_fatal(true, "The line to read is too big! Already have %zd bytes in read_buffer.", read_len);
+        errno_clear();
+        return -2;
+    }
 
-    internal_fatal(r->thread.uncompressed.read_buffer[r->thread.uncompressed.read_len] != '\0',
+    size_t read_offset = (size_t)read_len;
+    if(unlikely(read_offset >= sizeof(r->thread.uncompressed.read_buffer) - 1)) {
+        internal_fatal(true, "The line to read is too big! Already have %zd bytes in read_buffer.", read_len);
+        errno_clear();
+        return -2;
+    }
+
+    internal_fatal(r->thread.uncompressed.read_buffer[read_offset] != '\0',
                    "%s: read_buffer does not start with zero #2", __FUNCTION__ );
 
     ssize_t bytes = read_stream(r, r->thread.compressed.buf + r->thread.compressed.used,
@@ -812,6 +862,11 @@ bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_sta
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
+    if(unlikely(!parser)) {
+        stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
+        return false;
+    }
+
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
         ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
