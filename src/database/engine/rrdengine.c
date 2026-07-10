@@ -985,9 +985,9 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
 
     // compress the payload
     size_t compressed_size =
-        (int)dbengine_compress(xt_io_descr->buf + payload_offset,
-                               uncompressed_payload_length,
-                               compression_algorithm);
+        dbengine_compress(xt_io_descr->buf + payload_offset,
+                          uncompressed_payload_length,
+                          compression_algorithm);
 
     internal_fatal(compressed_size > max_compressed_size, "DBENGINE: compression returned more data than the max allowed");
     internal_fatal(compressed_size > uncompressed_payload_length, "DBENGINE: compression returned more data than the uncompressed extent");
