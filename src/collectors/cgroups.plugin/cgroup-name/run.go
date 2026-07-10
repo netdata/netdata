@@ -26,7 +26,7 @@ func runWithConfig(args []string, stdout io.Writer, config invocationConfig) int
 		cgroup = strings.ReplaceAll(args[2], "/", "_")
 	}
 	if cgroup == "" {
-		r.fatal("called without a cgroup name. Nothing to do.")
+		r.fatalf("called without a cgroup name. Nothing to do.")
 		return exitFatal
 	}
 
@@ -37,7 +37,7 @@ func runWithConfig(args []string, stdout io.Writer, config invocationConfig) int
 
 	result.name = strings.ReplaceAll(result.name, " ", "_")
 	labels := result.labels.String()
-	r.info(fmt.Sprintf("cgroup '%s' is called '%s', labels '%s'", cgroup, result.name, labels))
+	r.infof("cgroup '%s' is called '%s', labels '%s'", cgroup, result.name, labels)
 	if labels == "" {
 		fmt.Fprintf(stdout, "%s\n", result.name)
 	} else {

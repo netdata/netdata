@@ -5,7 +5,6 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -107,7 +106,7 @@ func (r *resolver) dockerLikeGetNameCommand(ctx context.Context, command, id str
 func (r *resolver) dockerLikeGetNameAPI(ctx context.Context, runtimeName, hostVar, host, containerID string) resolution {
 	path := "/containers/" + containerID + "/json"
 	if host == "" {
-		r.warning(fmt.Sprintf("No %s is set", hostVar))
+		r.warningf("No %s is set", hostVar)
 		return resolution{}
 	}
 
@@ -120,10 +119,10 @@ func (r *resolver) dockerLikeGetNameAPI(ctx context.Context, runtimeName, hostVa
 	var body []byte
 	var err error
 	if isSocket(address) {
-		r.info(fmt.Sprintf("Running API command: curl --unix-socket \"%s\" http://localhost%s", address, path))
+		r.infof("Running API command: curl --unix-socket \"%s\" http://localhost%s", address, path)
 		body, err = httpUnixGet(ctx, address, "http://localhost"+path)
 	} else {
-		r.info(fmt.Sprintf("Running API command: curl \"%s%s\"", address, path))
+		r.infof("Running API command: curl \"%s%s\"", address, path)
 		body, err = httpGetWithContext(ctx, defaultHTTPURL(address+path), httpGetOptions{})
 	}
 	if err != nil || len(body) == 0 {
@@ -147,7 +146,7 @@ func (r *resolver) snapHasDocker(ctx context.Context) bool {
 
 func (r *resolver) resolveDockerID(ctx context.Context, id, cgroup string) (resolution, bool) {
 	if id == "" || (len(id) != 64 && len(id) != 12) {
-		r.error(fmt.Sprintf("a docker id cannot be extracted from docker cgroup '%s'.", cgroup))
+		r.errorf("a docker id cannot be extracted from docker cgroup '%s'.", cgroup)
 		return resolution{}, false
 	}
 
@@ -163,16 +162,16 @@ func (r *resolver) resolveDockerID(ctx context.Context, id, cgroup string) (reso
 	}
 
 	if result.name == "" {
-		r.warning(fmt.Sprintf("cannot find the name of docker container '%s'", id))
+		r.warningf("cannot find the name of docker container '%s'", id)
 		return resolution{name: prefixLen(id, 12), labels: result.labels, exitCode: exitRetry}, true
 	}
-	r.info(fmt.Sprintf("docker container '%s' is named '%s'", id, result.name))
+	r.infof("docker container '%s' is named '%s'", id, result.name)
 	return result, true
 }
 
 func (r *resolver) resolvePodmanID(ctx context.Context, id, cgroup string) (resolution, bool) {
 	if id == "" || len(id) != 64 {
-		r.error(fmt.Sprintf("a podman id cannot be extracted from docker cgroup '%s'.", cgroup))
+		r.errorf("a podman id cannot be extracted from docker cgroup '%s'.", cgroup)
 		return resolution{}, false
 	}
 
@@ -180,10 +179,10 @@ func (r *resolver) resolvePodmanID(ctx context.Context, id, cgroup string) (reso
 	// makes the API the complete and only Podman resolution path.
 	result := r.dockerLikeGetNameAPI(ctx, "podman", "PODMAN_HOST", r.config.podmanHost, id)
 	if result.name == "" {
-		r.warning(fmt.Sprintf("cannot find the name of podman container '%s'", id))
+		r.warningf("cannot find the name of podman container '%s'", id)
 		return resolution{name: prefixLen(id, 12), labels: result.labels, exitCode: exitRetry}, true
 	}
-	r.info(fmt.Sprintf("podman container '%s' is named '%s'", id, result.name))
+	r.infof("podman container '%s' is named '%s'", id, result.name)
 	return result, true
 }
 

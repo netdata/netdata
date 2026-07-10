@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"regexp"
 	"strings"
@@ -63,7 +62,7 @@ func (r *resolver) resolveNonKubernetes(ctx context.Context, cgroup string) (res
 			name := "qemu_" + firstConfigValue(filename, reProxmoxConfName, "^name: ")
 			return resolution{name: name}, true
 		}
-		r.error(fmt.Sprintf("proxmox config file missing %s or netdata does not have read access.  Please ensure netdata is a member of www-data group.", filename))
+		r.errorf("proxmox config file missing %s or netdata does not have read access.  Please ensure netdata is a member of www-data group.", filename)
 	case reProxmoxLXC.MatchString(cgroup) && isDir(hostPath(r.config.hostPrefix, "/etc/pve")):
 		match := reProxmoxLXC.FindStringSubmatch(cgroup)
 		filename := hostPath(r.config.hostPrefix, "/etc/pve/lxc/"+match[1]+".conf")
@@ -71,7 +70,7 @@ func (r *resolver) resolveNonKubernetes(ctx context.Context, cgroup string) (res
 			name := firstConfigValue(filename, reProxmoxConfHost, "^hostname: ")
 			return resolution{name: name}, name != ""
 		}
-		r.error(fmt.Sprintf("proxmox config file missing %s or netdata does not have read access.  Please ensure netdata is a member of www-data group.", filename))
+		r.errorf("proxmox config file missing %s or netdata does not have read access.  Please ensure netdata is a member of www-data group.", filename)
 	case strings.Contains(cgroup, "lxc.payload"):
 		name := reLxcPayload.ReplaceAllString(cgroup, "$1")
 		return resolution{name: name}, name != ""

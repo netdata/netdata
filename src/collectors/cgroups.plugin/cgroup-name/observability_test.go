@@ -5,10 +5,20 @@ package main
 import (
 	"io"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
 )
+
+type countingStringer struct {
+	calls int
+}
+
+func (s *countingStringer) String() string {
+	s.calls++
+	return "formatted"
+}
 
 func TestBuildCmdLinePreservesShellQuotingBug(t *testing.T) {
 	got := buildCmdLine([]string{"cgroup-name", "/docker/a'b", "docker_a"})
@@ -55,25 +65,84 @@ func TestSetupDeadlineBudget(t *testing.T) {
 	}
 }
 
-func TestLogfmtIsSingleLineAndQuoted(t *testing.T) {
+func TestLoggerFormatsMessages(t *testing.T) {
 	r := newResolver([]string{"cgroup-name", "weird arg"}, invocationConfig{logLevel: ndlpDebug})
+	tests := map[string]struct {
+		format      string
+		args        []any
+		wantMessage string
+	}{
+		"literal escaping": {
+			format:      "name has a \" quote and a\nnewline",
+			wantMessage: "name has a \" quote and a\nnewline",
+		},
+		"formatted arguments": {
+			format:      "container %q has %d labels",
+			args:        []any{"api", 3},
+			wantMessage: `container "api" has 3 labels`,
+		},
+		"literal percent without arguments": {
+			format:      "progress is 100%",
+			wantMessage: "progress is 100%",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			line := captureStderr(t, func() {
+				r.errorf(test.format, test.args...)
+			})
+			if strings.Count(strings.TrimRight(line, "\n"), "\n") != 0 {
+				t.Fatalf("log line must be single-line, got: %q", line)
+			}
+			if !strings.Contains(line, "level=error") || !strings.Contains(line, "comm=cgroup-name") {
+				t.Fatalf("log line missing expected fields: %q", line)
+			}
+			if want := "msg=" + strconv.Quote(test.wantMessage); !strings.Contains(line, want) {
+				t.Fatalf("log line missing %q: %q", want, line)
+			}
+		})
+	}
+}
+
+func TestLoggerSkipsFormattingBelowConfiguredLevel(t *testing.T) {
+	logger := newInvocationLogger([]string{"cgroup-name"}, ndlpErr)
+	value := &countingStringer{}
+
+	logger.logf(ndlpDebug, "value=%s", value)
+
+	if value.calls != 0 {
+		t.Fatalf("disabled log formatted its arguments %d times", value.calls)
+	}
+}
+
+func captureStderr(t *testing.T, write func()) string {
+	t.Helper()
+
+	readPipe, writePipe, err := os.Pipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer readPipe.Close()
+	writeClosed := false
+	defer func() {
+		if !writeClosed {
+			_ = writePipe.Close()
+		}
+	}()
 
 	old := os.Stderr
-	readPipe, writePipe, _ := os.Pipe()
 	os.Stderr = writePipe
-	r.error("name has a \" quote and a\nnewline")
-	_ = writePipe.Close()
-	os.Stderr = old
+	defer func() { os.Stderr = old }()
 
-	out, _ := io.ReadAll(readPipe)
-	line := string(out)
-	if strings.Count(strings.TrimRight(line, "\n"), "\n") != 0 {
-		t.Fatalf("log line must be single-line, got: %q", line)
+	write()
+	os.Stderr = old
+	if err := writePipe.Close(); err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(line, "level=error") || !strings.Contains(line, "comm=cgroup-name") {
-		t.Fatalf("log line missing expected fields: %q", line)
+	writeClosed = true
+	out, err := io.ReadAll(readPipe)
+	if err != nil {
+		t.Fatal(err)
 	}
-	if !strings.Contains(line, `\"`) || !strings.Contains(line, `\n`) {
-		t.Fatalf("quotes and newlines in the message must be escaped: %q", line)
-	}
+	return string(out)
 }

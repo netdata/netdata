@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 )
 
 type kubernetesMetadata struct {
@@ -47,7 +46,7 @@ func (r *resolver) loadKubernetesMetadata(ctx context.Context, functionName, con
 	if fetched.kubeSystemNamespace != "" {
 		uid, err := jsonMetadataUID(fetched.kubeSystemNamespace)
 		if err != nil {
-			r.warning(fmt.Sprintf("%s: error on 'jq' parse kube_system_ns: %s.", functionName, err.Error()))
+			r.warningf("%s: error on 'jq' parse kube_system_ns: %s.", functionName, err.Error())
 		} else {
 			metadata.systemUID = uid
 		}
@@ -55,7 +54,7 @@ func (r *resolver) loadKubernetesMetadata(ctx context.Context, functionName, con
 
 	containers, err := podsToContainerLabelSets(fetched.pods)
 	if err != nil {
-		r.warning(fmt.Sprintf("%s: error on 'jq' parse pods: %s.", functionName, err.Error()))
+		r.warningf("%s: error on 'jq' parse pods: %s.", functionName, err.Error())
 		return kubernetesMetadata{}, kubePodEnableFallback
 	}
 	metadata.containers = containers

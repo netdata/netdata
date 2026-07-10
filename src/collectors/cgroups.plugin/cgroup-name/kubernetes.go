@@ -4,7 +4,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -52,9 +51,9 @@ func (r *resolver) resolveKubernetes(ctx context.Context, cgroupPath, id string)
 	case kubePodSuccess:
 		name := "k8s_" + result.name
 		if labels := result.labels.String(); labels != "" {
-			r.info(fmt.Sprintf("k8s_get_name: cgroup '%s' has chart name '%s', labels '%s'", id, name, labels))
+			r.infof("k8s_get_name: cgroup '%s' has chart name '%s', labels '%s'", id, name, labels)
 		} else {
-			r.info(fmt.Sprintf("k8s_get_name: cgroup '%s' has chart name '%s'", id, name))
+			r.infof("k8s_get_name: cgroup '%s' has chart name '%s'", id, name)
 		}
 		return resolution{name: name, labels: result.labels, exitCode: exitSuccess}
 	case kubePodRetryFallback:
@@ -62,18 +61,18 @@ func (r *resolver) resolveKubernetes(ctx context.Context, cgroupPath, id string)
 			return r.deadlineRetry()
 		}
 		name := "k8s_" + id
-		r.warning(fmt.Sprintf("k8s_get_name: cannot find the name of cgroup with id '%s'. Setting name to %s and asking for retry.", id, name))
+		r.warningf("k8s_get_name: cannot find the name of cgroup with id '%s'. Setting name to %s and asking for retry.", id, name)
 		return resolution{name: name, exitCode: exitRetry}
 	case kubePodDisableFallback:
 		name := "k8s_" + id
-		r.warning(fmt.Sprintf("k8s_get_name: cannot find the name of cgroup with id '%s'. Setting name to %s and disabling it.", id, name))
+		r.warningf("k8s_get_name: cannot find the name of cgroup with id '%s'. Setting name to %s and disabling it.", id, name)
 		return resolution{name: name, exitCode: exitDisable}
 	default:
 		if r.budgetExpired() {
 			return r.deadlineRetry()
 		}
 		name := "k8s_" + id
-		r.warning(fmt.Sprintf("k8s_get_name: cannot find the name of cgroup with id '%s'. Setting name to %s and enabling it.", id, name))
+		r.warningf("k8s_get_name: cannot find the name of cgroup with id '%s'. Setting name to %s and enabling it.", id, name)
 		return resolution{name: name, exitCode: exitSuccess}
 	}
 }
@@ -81,7 +80,7 @@ func (r *resolver) resolveKubernetes(ctx context.Context, cgroupPath, id string)
 func (r *resolver) resolveKubePod(ctx context.Context, cgroupPath, id string) kubePodResolution {
 	const functionName = "k8s_get_kubepod_name"
 	if !isKubernetesCgroup(id) {
-		r.warning(fmt.Sprintf("%s: '%s' is not kubepod cgroup.", functionName, id))
+		r.warningf("%s: '%s' is not kubepod cgroup.", functionName, id)
 		return kubePodResolution{outcome: kubePodEnableFallback}
 	}
 
@@ -90,14 +89,14 @@ func (r *resolver) resolveKubePod(ctx context.Context, cgroupPath, id string) ku
 		return kubePodResolution{name: identity.baseName, outcome: kubePodSuccess}
 	}
 	if identity.podUID == "" && identity.containerID == "" {
-		r.warning(fmt.Sprintf("%s: can't extract pod_uid or container_id from the cgroup '%s'.", functionName, id))
+		r.warningf("%s: can't extract pod_uid or container_id from the cgroup '%s'.", functionName, id)
 		return kubePodResolution{outcome: kubePodDisableFallback}
 	}
 	if identity.podUID != "" {
-		r.info(fmt.Sprintf("%s: cgroup '%s' is a pod(uid:%s)", functionName, id, identity.podUID))
+		r.infof("%s: cgroup '%s' is a pod(uid:%s)", functionName, id, identity.podUID)
 	}
 	if identity.containerID != "" {
-		r.info(fmt.Sprintf("%s: cgroup '%s' is a container(id:%s)", functionName, id, identity.containerID))
+		r.infof("%s: cgroup '%s' is a container(id:%s)", functionName, id, identity.containerID)
 		if r.k8sIsPauseContainer(cgroupPath) {
 			return kubePodResolution{outcome: kubePodDisableFallback}
 		}
@@ -153,7 +152,7 @@ func (r *resolver) resolveKubernetesContainer(functionName, id string, identity 
 	if strings.HasPrefix(podName, "virt-launcher-") {
 		switch containerName {
 		case "volumerootdisk", "guest-console-log":
-			r.info(fmt.Sprintf("%s: skipping kubevirt helper container '%s' in pod '%s'", functionName, containerName, podName))
+			r.infof("%s: skipping kubevirt helper container '%s' in pod '%s'", functionName, containerName, podName)
 			return kubePodResolution{outcome: kubePodDisableFallback}
 		}
 	}
@@ -181,7 +180,7 @@ func (r *resolver) resolveKubernetesPod(functionName, id string, identity kubern
 
 func (r *resolver) validateKubernetesName(functionName, id, name string, labels labelSet) kubePodResolution {
 	if reNullName.MatchString(name) {
-		r.warning(fmt.Sprintf("%s: invalid name: %s (cgroup '%s')", functionName, name, id))
+		r.warningf("%s: invalid name: %s (cgroup '%s')", functionName, name, id)
 		if r.config.kubernetes.useKubelet {
 			return kubePodResolution{name: name, labels: labels, outcome: kubePodRetryFallback}
 		}

@@ -65,9 +65,13 @@ func buildCmdLine(args []string) string {
 	return b.String()
 }
 
-func (l *invocationLogger) log(level int, message string) {
+func (l *invocationLogger) logf(level int, format string, args ...any) {
 	if level > l.level {
 		return
+	}
+	message := format
+	if len(args) > 0 {
+		message = fmt.Sprintf(format, args...)
 	}
 	fmt.Fprintf(os.Stderr, "time=%s comm=%s level=%s request=%q msg=%q\n",
 		time.Now().Format("2006-01-02T15:04:05.000Z07:00"),
@@ -128,11 +132,13 @@ func (r *resolver) logCallBreakdown() {
 	if breakdown == "" {
 		breakdown = " (no external calls were attempted)"
 	}
-	r.error("name resolution budget expired; time spent per external call:" + breakdown)
+	r.errorf("name resolution budget expired; time spent per external call:%s", breakdown)
 }
 
-func (r *resolver) log(level int, message string) { r.logger.log(level, message) }
-func (r *resolver) info(message string)           { r.log(ndlpInfo, message) }
-func (r *resolver) warning(message string)        { r.log(ndlpWarn, message) }
-func (r *resolver) error(message string)          { r.log(ndlpErr, message) }
-func (r *resolver) fatal(message string)          { r.log(ndlpAlert, message) }
+func (r *resolver) logf(level int, format string, args ...any) {
+	r.logger.logf(level, format, args...)
+}
+func (r *resolver) infof(format string, args ...any)    { r.logf(ndlpInfo, format, args...) }
+func (r *resolver) warningf(format string, args ...any) { r.logf(ndlpWarn, format, args...) }
+func (r *resolver) errorf(format string, args ...any)   { r.logf(ndlpErr, format, args...) }
+func (r *resolver) fatalf(format string, args ...any)   { r.logf(ndlpAlert, format, args...) }

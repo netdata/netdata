@@ -140,7 +140,7 @@ func (r *resolver) k8sTLSConfig(mode k8sTLSMode) *tls.Config {
 	case tlsModeAPIServer:
 		r.tlsConfigs.apiServerOnce.Do(func() {
 			if r.config.kubernetes.tlsInsecure {
-				r.warning("K8S_TLS_INSECURE is set: TLS verification of Kubernetes API calls is disabled")
+				r.warningf("K8S_TLS_INSECURE is set: TLS verification of Kubernetes API calls is disabled")
 				r.tlsConfigs.apiServer = &tls.Config{ // NOSONAR - explicit operator escape hatch.
 					MinVersion:         tls.VersionTLS12,
 					InsecureSkipVerify: true, // NOSONAR - explicit operator escape hatch.

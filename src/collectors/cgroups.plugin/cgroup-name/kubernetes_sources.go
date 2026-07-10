@@ -96,7 +96,7 @@ func (r *resolver) k8sFetchPods(ctx context.Context, functionName, kubeSystemUID
 			})
 			r.track("k8s-api-namespace", started)
 			if err != nil {
-				r.warning(fmt.Sprintf("%s: error on curl '%s': %s.%s", functionName, url, err.Error(), tlsHint(err)))
+				r.warningf("%s: error on curl '%s': %s.%s", functionName, url, err.Error(), tlsHint(err))
 			} else {
 				kubeSystemNamespace = string(body)
 			}
@@ -120,7 +120,7 @@ func (r *resolver) k8sFetchPods(ctx context.Context, functionName, kubeSystemUID
 		})
 		r.track("k8s-pods", started)
 		if err != nil {
-			r.warning(fmt.Sprintf("%s: error on curl '%s': %s.%s", functionName, url, err.Error(), tlsHint(err)))
+			r.warningf("%s: error on curl '%s': %s.%s", functionName, url, err.Error(), tlsHint(err))
 			return podMetadataResult{kubeSystemNamespace: kubeSystemNamespace, outcome: kubePodEnableFallback}
 		}
 		return podMetadataResult{
@@ -139,7 +139,7 @@ func (r *resolver) k8sFetchPods(ctx context.Context, functionName, kubeSystemUID
 		if kubeSystemUID == "" {
 			out, err := r.kubectlOutput(ctx, kubeConfig, defaultBodyCap, "get", "namespaces", "kube-system", "-o", "json")
 			if err != nil {
-				r.warning(fmt.Sprintf("%s: error on 'kubectl': %s.", functionName, strings.TrimRight(string(out), "\n")))
+				r.warningf("%s: error on 'kubectl': %s.", functionName, strings.TrimRight(string(out), "\n"))
 			} else {
 				kubeSystemNamespace = string(out)
 			}
@@ -149,7 +149,7 @@ func (r *resolver) k8sFetchPods(ctx context.Context, functionName, kubeSystemUID
 		}
 		out, err := r.kubectlOutput(ctx, kubeConfig, k8sPodsBodyCap, "get", "pods", "--all-namespaces", "-o", "json")
 		if err != nil {
-			r.warning(fmt.Sprintf("%s: error on 'kubectl': %s.", functionName, strings.TrimRight(string(out), "\n")))
+			r.warningf("%s: error on 'kubectl': %s.", functionName, strings.TrimRight(string(out), "\n"))
 			return podMetadataResult{kubeSystemNamespace: kubeSystemNamespace, outcome: kubePodEnableFallback}
 		}
 		return podMetadataResult{
@@ -159,7 +159,7 @@ func (r *resolver) k8sFetchPods(ctx context.Context, functionName, kubeSystemUID
 		}
 	}
 
-	r.warning(fmt.Sprintf("%s: not inside the k8s cluster and 'kubectl' command not available.", functionName))
+	r.warningf("%s: not inside the k8s cluster and 'kubectl' command not available.", functionName)
 	return podMetadataResult{outcome: kubePodEnableFallback}
 }
 
