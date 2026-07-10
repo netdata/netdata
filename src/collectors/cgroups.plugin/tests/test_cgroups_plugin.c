@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "test_cgroups_plugin.h"
+#include "../cgroup-internals.h"
 #include "../cgroup-name-labels.h"
 
 #include <sys/wait.h>
