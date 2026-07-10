@@ -24,13 +24,20 @@ func (s labelSet) clone() labelSet {
 	return labelSet{items: append([]label(nil), s.items...)}
 }
 
-// valueOrNull preserves the helper's public "null" sentinel for missing
-// Kubernetes metadata while keeping label lookup typed internally.
-func (s labelSet) valueOrNull(name string) string {
+func (s labelSet) value(name string) (string, bool) {
 	for _, item := range s.items {
 		if item.name == name {
-			return item.value
+			return item.value, true
 		}
+	}
+	return "", false
+}
+
+// valueOrNull preserves the helper's diagnostic representation for missing
+// Kubernetes metadata. Resolution validity is determined from value presence.
+func (s labelSet) valueOrNull(name string) string {
+	if value, ok := s.value(name); ok {
+		return value
 	}
 	return "null"
 }
@@ -166,12 +173,13 @@ func formatLabelSets(sets []labelSet) string {
 	return strings.Join(lines, "\n")
 }
 
-func findLabelSet(sets []labelSet, pattern string) (labelSet, bool) {
+func findLabelSetByValue(sets []labelSet, name, value string) (labelSet, bool) {
+	if name == "" || value == "" {
+		return labelSet{}, false
+	}
 	for _, set := range sets {
-		for _, item := range set.items {
-			if strings.Contains(item.name, pattern) || strings.Contains(item.value, pattern) {
-				return set.clone(), true
-			}
+		if candidate, ok := set.value(name); ok && candidate == value {
+			return set.clone(), true
 		}
 	}
 	return labelSet{}, false

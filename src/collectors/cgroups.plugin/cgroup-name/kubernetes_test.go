@@ -29,8 +29,9 @@ func TestK8sContainerCachePath(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-kubesystem-uid"), []byte("system-uid\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	line := `namespace="default",pod_name="api",pod_uid="` + uid + `",node_name="node-a",container_name="app",container_id="` + id + `"`
-	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-containers"), []byte(line+"\n"), 0o644); err != nil {
+	collision := `namespace="wrong",pod_name="wrong",pod_uid="wrong-uid",netdata.cloud/note="references-` + id + `",node_name="wrong-node",container_name="wrong",container_id="` + strings.Repeat("0", 64) + `"`
+	target := `namespace="default",pod_name="api",pod_uid="` + uid + `",node_name="node-a",container_name="app",container_id="` + id + `"`
+	if err := os.WriteFile(filepath.Join(tmp, "netdata-cgroups-containers"), []byte(collision+"\n"+target+"\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -339,6 +340,9 @@ func TestKubernetesPodAndContainerOutcomes(t *testing.T) {
 		{name: "container_id", value: "container-id"},
 	}}
 	kubeVirt := base.clone()
+	literalNullNamespace := base.clone()
+	literalNullPodName := base.clone()
+	emptyNamespace := base.clone()
 	for index := range kubeVirt.items {
 		switch kubeVirt.items[index].name {
 		case "pod_name":
@@ -347,6 +351,30 @@ func TestKubernetesPodAndContainerOutcomes(t *testing.T) {
 			kubeVirt.items[index].value = "guest-console-log"
 		}
 	}
+	for index := range literalNullNamespace.items {
+		if literalNullNamespace.items[index].name == "namespace" {
+			literalNullNamespace.items[index].value = "null"
+		}
+	}
+	for index := range literalNullPodName.items {
+		if literalNullPodName.items[index].name == "pod_name" {
+			literalNullPodName.items[index].value = "null"
+		}
+	}
+	for index := range emptyNamespace.items {
+		if emptyNamespace.items[index].name == "namespace" {
+			emptyNamespace.items[index].value = ""
+		}
+	}
+	collision := labelSet{items: []label{
+		{name: "namespace", value: "wrong"},
+		{name: "pod_name", value: "wrong"},
+		{name: "pod_uid", value: "wrong-uid"},
+		{name: "netdata.cloud/note", value: "references container-id and pod-uid"},
+		{name: "node_name", value: "wrong-node"},
+		{name: "container_name", value: "wrong"},
+		{name: "container_id", value: "wrong-container-id"},
+	}}
 
 	tests := map[string]struct {
 		container  bool
@@ -369,6 +397,68 @@ func TestKubernetesPodAndContainerOutcomes(t *testing.T) {
 				name:    "pod_default_api",
 				labels:  parseLabelSet(`k8s_namespace="default",k8s_pod_name="api",k8s_node_name="node-a",k8s_kind="pod",k8s_qos_class="burstable",k8s_cluster_id="system-uid",k8s_cluster_name="cluster-a"`),
 				outcome: kubePodSuccess,
+			},
+		},
+		"pod selects exact pod uid field": {
+			identity: kubernetesCgroupIdentity{
+				podUID:   "pod-uid",
+				qosClass: "burstable",
+			},
+			metadata: kubernetesMetadata{
+				clusterName: "cluster-a",
+				systemUID:   "system-uid",
+				containers:  []labelSet{collision, base},
+			},
+			want: kubePodResolution{
+				name:    "pod_default_api",
+				labels:  parseLabelSet(`k8s_namespace="default",k8s_pod_name="api",k8s_node_name="node-a",k8s_kind="pod",k8s_qos_class="burstable",k8s_cluster_id="system-uid",k8s_cluster_name="cluster-a"`),
+				outcome: kubePodSuccess,
+			},
+		},
+		"container selects exact container id field": {
+			container: true,
+			identity: kubernetesCgroupIdentity{
+				containerID: "container-id",
+				qosClass:    "burstable",
+			},
+			metadata: kubernetesMetadata{
+				clusterName: "cluster-a",
+				systemUID:   "system-uid",
+				containers:  []labelSet{collision, base},
+			},
+			want: kubePodResolution{
+				name:    "cntr_default_api_app",
+				labels:  parseLabelSet(`k8s_namespace="default",k8s_pod_name="api",k8s_node_name="node-a",k8s_container_name="app",k8s_kind="container",k8s_qos_class="burstable",k8s_cluster_id="system-uid",k8s_cluster_name="cluster-a"`),
+				outcome: kubePodSuccess,
+			},
+		},
+		"literal null namespace is valid": {
+			container: true,
+			identity:  kubernetesCgroupIdentity{containerID: "container-id", qosClass: "burstable"},
+			metadata:  kubernetesMetadata{containerLabels: literalNullNamespace, hasContainerLabels: true},
+			want: kubePodResolution{
+				name:    "cntr_null_api_app",
+				labels:  parseLabelSet(`k8s_namespace="null",k8s_pod_name="api",k8s_node_name="node-a",k8s_container_name="app",k8s_kind="container",k8s_qos_class="burstable"`),
+				outcome: kubePodSuccess,
+			},
+		},
+		"literal null pod name is valid": {
+			identity: kubernetesCgroupIdentity{podUID: "pod-uid", qosClass: "burstable"},
+			metadata: kubernetesMetadata{containers: []labelSet{literalNullPodName}},
+			want: kubePodResolution{
+				name:    "pod_default_null",
+				labels:  parseLabelSet(`k8s_namespace="default",k8s_pod_name="null",k8s_node_name="node-a",k8s_kind="pod",k8s_qos_class="burstable"`),
+				outcome: kubePodSuccess,
+			},
+		},
+		"empty namespace remains invalid": {
+			container: true,
+			identity:  kubernetesCgroupIdentity{containerID: "container-id", qosClass: "burstable"},
+			metadata:  kubernetesMetadata{containerLabels: emptyNamespace, hasContainerLabels: true},
+			want: kubePodResolution{
+				name:    "cntr__api_app",
+				labels:  parseLabelSet(`k8s_namespace="",k8s_pod_name="api",k8s_node_name="node-a",k8s_container_name="app",k8s_kind="container",k8s_qos_class="burstable"`),
+				outcome: kubePodEnableFallback,
 			},
 		},
 		"missing pod retries": {

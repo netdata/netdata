@@ -12,7 +12,6 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -22,8 +21,6 @@ const (
 	defaultBodyCap = 16 << 20
 	k8sPodsBodyCap = 64 << 20
 )
-
-var reHostScheme = regexp.MustCompile(`^([a-z]+)://(.*)`)
 
 type k8sTLSMode int
 
@@ -35,6 +32,7 @@ const (
 type kubernetesTLSConfigCache struct {
 	apiServerOnce sync.Once
 	apiServer     *tls.Config
+	apiServerErr  error
 	kubeletOnce   sync.Once
 	kubelet       *tls.Config
 }
@@ -147,7 +145,10 @@ func (r *resolver) k8sTLSConfig(mode k8sTLSMode) *tls.Config {
 				}
 				return
 			}
-			r.tlsConfigs.apiServer = k8sServiceAccountTLSConfig(r.config.kubernetes.serviceAccountCAFile)
+			r.tlsConfigs.apiServer, r.tlsConfigs.apiServerErr = k8sServiceAccountTLSConfig(r.config.kubernetes.serviceAccountCAFile)
+			if r.tlsConfigs.apiServerErr != nil {
+				r.warningf("cannot load Kubernetes API service-account CA %q: %v", r.config.kubernetes.serviceAccountCAFile, r.tlsConfigs.apiServerErr)
+			}
 		})
 		return r.tlsConfigs.apiServer
 	default:
@@ -155,15 +156,17 @@ func (r *resolver) k8sTLSConfig(mode k8sTLSMode) *tls.Config {
 	}
 }
 
-func k8sServiceAccountTLSConfig(caFile string) *tls.Config {
-	roots, err := x509.SystemCertPool()
-	if err != nil || roots == nil {
-		roots = x509.NewCertPool()
+func k8sServiceAccountTLSConfig(caFile string) (*tls.Config, error) {
+	roots := x509.NewCertPool()
+	config := &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: roots}
+	ca, err := os.ReadFile(caFile)
+	if err != nil {
+		return config, fmt.Errorf("read CA file: %w", err)
 	}
-	if ca, err := os.ReadFile(caFile); err == nil {
-		roots.AppendCertsFromPEM(ca)
+	if !roots.AppendCertsFromPEM(ca) {
+		return config, errors.New("parse CA file: no certificates found")
 	}
-	return &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: roots}
+	return config, nil
 }
 
 func tlsHint(err error) string {

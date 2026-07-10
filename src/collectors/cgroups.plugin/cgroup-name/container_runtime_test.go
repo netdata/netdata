@@ -224,6 +224,56 @@ func TestDockerLikeGetNameAPIOverUnixSocket(t *testing.T) {
 	}
 }
 
+func TestNormalizeRuntimeHost(t *testing.T) {
+	tests := map[string]struct {
+		host    string
+		want    string
+		wantErr bool
+	}{
+		"bare address": {
+			host: "runtime.example.invalid:2375",
+			want: "runtime.example.invalid:2375",
+		},
+		"unix socket": {
+			host: "unix:///run/docker.sock",
+			want: "/run/docker.sock",
+		},
+		"plain TCP": {
+			host: "tcp://runtime.example.invalid:2375",
+			want: "runtime.example.invalid:2375",
+		},
+		"explicit HTTP": {
+			host: "http://runtime.example.invalid:2375",
+			want: "http://runtime.example.invalid:2375",
+		},
+		"explicit HTTPS": {
+			host: "https://runtime.example.invalid:2376",
+			want: "https://runtime.example.invalid:2376",
+		},
+		"unsupported scheme": {
+			host:    "ssh://runtime.example.invalid",
+			wantErr: true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := normalizeRuntimeHost(test.host)
+			if test.wantErr {
+				if err == nil {
+					t.Fatalf("normalizeRuntimeHost(%q) unexpectedly succeeded with %q", test.host, got)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("normalizeRuntimeHost(%q): %v", test.host, err)
+			}
+			if got != test.want {
+				t.Fatalf("normalizeRuntimeHost(%q) = %q, want %q", test.host, got, test.want)
+			}
+		})
+	}
+}
+
 func TestECSAndContainerdDispatchUseDockerAPI(t *testing.T) {
 	tmp := t.TempDir()
 	if err := os.WriteFile(filepath.Join(tmp, "snap"), []byte("#!/bin/sh\nexit 0\n"), 0o755); err != nil {

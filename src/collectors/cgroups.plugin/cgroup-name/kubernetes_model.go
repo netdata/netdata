@@ -49,9 +49,9 @@ func podsToContainerLabelSets(raw string) ([]labelSet, error) {
 	var containers []labelSet
 	for _, item := range document.Items {
 		var base labelSet
-		base.add("namespace", pointerString(item.Metadata.Namespace))
-		base.add("pod_name", pointerString(item.Metadata.Name))
-		base.add("pod_uid", pointerString(item.Metadata.UID))
+		addPresentLabel(&base, "namespace", item.Metadata.Namespace)
+		addPresentLabel(&base, "pod_name", item.Metadata.Name)
+		addPresentLabel(&base, "pod_uid", item.Metadata.UID)
 
 		annotations, err := orderedStringEntries(item.Metadata.Annotations)
 		if err != nil {
@@ -73,12 +73,20 @@ func podsToContainerLabelSets(raw string) ([]labelSet, error) {
 
 		for _, status := range item.Status.ContainerStatuses {
 			labels := labelSet{items: append([]label(nil), base.items...)}
-			labels.add("container_name", pointerString(status.Name))
-			labels.add("container_id", containerRuntimePrefix.Replace(pointerString(status.ContainerID)))
+			addPresentLabel(&labels, "container_name", status.Name)
+			if status.ContainerID != nil {
+				labels.add("container_id", containerRuntimePrefix.Replace(*status.ContainerID))
+			}
 			containers = append(containers, labels)
 		}
 	}
 	return containers, nil
+}
+
+func addPresentLabel(labels *labelSet, name string, value *string) {
+	if value != nil {
+		labels.add(name, *value)
+	}
 }
 
 func jsonMetadataUID(raw string) (string, error) {

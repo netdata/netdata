@@ -4,7 +4,10 @@ package main
 
 import (
 	"context"
+	"time"
 )
+
+const unknownKubernetesClusterName = "unknown"
 
 type kubernetesMetadata struct {
 	clusterName        string
@@ -18,24 +21,23 @@ func (r *resolver) loadKubernetesMetadata(ctx context.Context, functionName, con
 	cache := newKubernetesCache(r.config.tmpDir)
 	cache.repairModes()
 
-	var metadata kubernetesMetadata
-	if containerID != "" && cache.complete() {
-		if labels, ok := cache.lookup(containerID); ok {
-			metadata.containerLabels = labels
-			metadata.hasContainerLabels = true
-			metadata.systemUID = cache.systemUID()
-			metadata.clusterName = cache.clusterName()
-			return metadata, kubePodSuccess
-		}
+	metadata := kubernetesMetadata{
+		systemUID:   cache.systemUID(),
+		clusterName: cache.clusterName(),
 	}
-
-	metadata.systemUID = cache.systemUID()
-	metadata.clusterName = cache.clusterName()
-	if metadata.clusterName == "" {
+	if cache.clusterNameNeedsRefresh(metadata.clusterName, time.Now()) {
 		if value, ok := r.k8sGCPGetClusterName(ctx); ok {
 			metadata.clusterName = value
 		} else {
-			metadata.clusterName = "unknown"
+			metadata.clusterName = unknownKubernetesClusterName
+		}
+		cache.writeClusterName(metadata.clusterName)
+	}
+	if containerID != "" && cache.complete() {
+		if labels, ok := cache.lookupContainer(containerID); ok {
+			metadata.containerLabels = labels
+			metadata.hasContainerLabels = true
+			return metadata, kubePodSuccess
 		}
 	}
 
@@ -59,7 +61,6 @@ func (r *resolver) loadKubernetesMetadata(ctx context.Context, functionName, con
 	}
 	metadata.containers = containers
 
-	cache.writeClusterName(metadata.clusterName)
 	if fetched.kubeSystemNamespace != "" && metadata.systemUID != "" {
 		cache.writeSystemUID(metadata.systemUID)
 	}

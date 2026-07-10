@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"strings"
@@ -110,20 +111,21 @@ func (r *resolver) dockerLikeGetNameAPI(ctx context.Context, runtimeName, hostVa
 		return resolution{}
 	}
 
-	address := host
-	if match := reHostScheme.FindStringSubmatch(host); len(match) > 2 {
-		address = match[2]
+	address, err := normalizeRuntimeHost(host)
+	if err != nil {
+		r.warningf("invalid %s value %q: %v", hostVar, host, err)
+		return resolution{}
 	}
 
 	defer r.track(runtimeName+"-api", time.Now())
 	var body []byte
-	var err error
 	if isSocket(address) {
 		r.infof("Running API command: curl --unix-socket \"%s\" http://localhost%s", address, path)
 		body, err = httpUnixGet(ctx, address, "http://localhost"+path)
 	} else {
-		r.infof("Running API command: curl \"%s%s\"", address, path)
-		body, err = httpGetWithContext(ctx, defaultHTTPURL(address+path), httpGetOptions{})
+		url := defaultHTTPURL(strings.TrimRight(address, "/") + path)
+		r.infof("Running API command: curl \"%s\"", url)
+		body, err = httpGetWithContext(ctx, url, httpGetOptions{})
 	}
 	if err != nil || len(body) == 0 {
 		return resolution{}
@@ -134,6 +136,24 @@ func (r *resolver) dockerLikeGetNameAPI(ctx context.Context, runtimeName, hostVa
 		return resolution{}
 	}
 	return result
+}
+
+func normalizeRuntimeHost(host string) (string, error) {
+	scheme, address, hasScheme := strings.Cut(host, "://")
+	if !hasScheme {
+		return host, nil
+	}
+	if address == "" {
+		return "", fmt.Errorf("%s endpoint is empty", scheme)
+	}
+	switch scheme {
+	case "unix", "tcp":
+		return address, nil
+	case "http", "https":
+		return host, nil
+	default:
+		return "", fmt.Errorf("unsupported scheme %q", scheme)
+	}
 }
 
 func (r *resolver) snapHasDocker(ctx context.Context) bool {

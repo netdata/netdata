@@ -4,8 +4,11 @@ package main
 
 import (
 	"context"
+	"encoding/pem"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -158,6 +161,62 @@ func TestK8sTLSConfigIsReusedPerInvocation(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if first, second := r.k8sTLSConfig(test.mode), r.k8sTLSConfig(test.mode); first != second {
 				t.Fatal("TLS configuration was rebuilt within one invocation")
+			}
+		})
+	}
+}
+
+func TestK8sServiceAccountTLSConfigUsesOnlyMountedCA(t *testing.T) {
+	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = w.Write([]byte("ok"))
+	}))
+	defer server.Close()
+
+	caFile := filepath.Join(t.TempDir(), "service-account-ca.crt")
+	certificate := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: server.Certificate().Raw})
+	if err := os.WriteFile(caFile, certificate, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	config, err := k8sServiceAccountTLSConfig(caFile)
+	if err != nil {
+		t.Fatalf("load mounted cluster CA: %v", err)
+	}
+	if got := len(config.RootCAs.Subjects()); got != 1 {
+		t.Fatalf("trusted CA subjects = %d, want only the mounted cluster CA", got)
+	}
+	if _, err := httpGetWithContext(context.Background(), server.URL, httpGetOptions{
+		tlsConfig: config,
+		noProxy:   true,
+		fail:      true,
+	}); err != nil {
+		t.Fatalf("mounted cluster CA was not trusted: %v", err)
+	}
+}
+
+func TestK8sServiceAccountTLSConfigRejectsInvalidCA(t *testing.T) {
+	tmp := t.TempDir()
+	invalidCA := filepath.Join(tmp, "invalid-ca.crt")
+	if err := os.WriteFile(invalidCA, []byte("not a certificate\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	tests := map[string]struct {
+		caFile string
+	}{
+		"missing CA file": {
+			caFile: filepath.Join(tmp, "missing-ca.crt"),
+		},
+		"invalid CA file": {
+			caFile: invalidCA,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			config, err := k8sServiceAccountTLSConfig(test.caFile)
+			if err == nil {
+				t.Fatalf("CA load unexpectedly succeeded with %d trusted subjects", len(config.RootCAs.Subjects()))
+			}
+			if got := len(config.RootCAs.Subjects()); got != 0 {
+				t.Fatalf("trusted CA subjects = %d after load failure, want 0", got)
 			}
 		})
 	}

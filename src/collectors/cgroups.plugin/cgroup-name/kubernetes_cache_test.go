@@ -44,7 +44,7 @@ func TestWritePrivateFileIsSymlinkSafe(t *testing.T) {
 func TestCacheReadHelpersRejectSymlinks(t *testing.T) {
 	dir := t.TempDir()
 	secret := filepath.Join(dir, "secret")
-	if err := os.WriteFile(secret, []byte("leaked-line\n"), 0o600); err != nil {
+	if err := os.WriteFile(secret, []byte(`container_id="leaked"`+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	link := filepath.Join(dir, "cache-link")
@@ -56,14 +56,14 @@ func TestCacheReadHelpersRejectSymlinks(t *testing.T) {
 		path        string
 		wantRegular bool
 		wantFirst   string
-		wantGrep    bool
+		wantLookup  bool
 		wantOpen    bool
 	}{
 		"regular file": {
 			path:        secret,
 			wantRegular: true,
-			wantFirst:   "leaked-line",
-			wantGrep:    true,
+			wantFirst:   `container_id="leaked"`,
+			wantLookup:  true,
 			wantOpen:    true,
 		},
 		"symlink": {
@@ -78,8 +78,8 @@ func TestCacheReadHelpersRejectSymlinks(t *testing.T) {
 			if got := firstLineFile(test.path); got != test.wantFirst {
 				t.Fatalf("firstLineFile = %q, want %q", got, test.wantFirst)
 			}
-			if _, got := grepFile(test.path, "leaked", 0); got != test.wantGrep {
-				t.Fatalf("grepFile matched = %v, want %v", got, test.wantGrep)
+			if _, got := findLabelSetInFile(test.path, "container_id", "leaked"); got != test.wantLookup {
+				t.Fatalf("field lookup matched = %v, want %v", got, test.wantLookup)
 			}
 			file, err := openPrivateRegularFile(test.path)
 			if file != nil {
@@ -101,7 +101,7 @@ func TestCacheLookupDoesNotAllocateTheWholeFile(t *testing.T) {
 
 	result := testing.Benchmark(func(b *testing.B) {
 		for range b.N {
-			if _, ok := grepFile(path, "needle", 1); !ok {
+			if _, ok := findLabelSetInFile(path, "container_id", "needle"); !ok {
 				b.Fatal("cache match not found")
 			}
 		}

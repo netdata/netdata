@@ -7,11 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const (
 	maxKubernetesCacheMetadataLine  = 64 << 10
 	maxKubernetesCacheContainerLine = 16 << 20
+	gcpClusterNameNegativeTTL       = 5 * time.Minute
 )
 
 type kubernetesCache struct {
@@ -48,12 +50,22 @@ func (c kubernetesCache) systemUID() string {
 	return firstLineFile(c.systemUIDPath)
 }
 
-func (c kubernetesCache) lookup(pattern string) (labelSet, bool) {
-	line, ok := grepFile(c.containersPath, pattern, 1)
-	if !ok {
-		return labelSet{}, false
+func (c kubernetesCache) clusterNameNeedsRefresh(name string, now time.Time) bool {
+	if name == "" {
+		return true
 	}
-	return parseLabelSet(line), true
+	if name != unknownKubernetesClusterName {
+		return false
+	}
+	info, err := os.Lstat(c.clusterNamePath)
+	if err != nil || !info.Mode().IsRegular() {
+		return true
+	}
+	return !info.ModTime().Add(gcpClusterNameNegativeTTL).After(now)
+}
+
+func (c kubernetesCache) lookupContainer(id string) (labelSet, bool) {
+	return findLabelSetInFile(c.containersPath, "container_id", id)
 }
 
 func (c kubernetesCache) writeClusterName(name string) {
@@ -123,32 +135,32 @@ func firstLineFile(path string) string {
 	return ""
 }
 
-func grepFile(path, pattern string, max int) (string, bool) {
+func findLabelSetInFile(path, name, value string) (labelSet, bool) {
+	if name == "" || value == "" {
+		return labelSet{}, false
+	}
 	file, err := openPrivateRegularFile(path)
 	if err != nil {
-		return "", false
+		return labelSet{}, false
 	}
 	defer file.Close()
 
-	var matches []string
 	scanner := bufio.NewScanner(file)
 	scanner.Buffer(make([]byte, 64<<10), maxKubernetesCacheContainerLine)
 	for scanner.Scan() {
 		line := scanner.Text()
-		if strings.Contains(line, pattern) {
-			matches = append(matches, line)
-			if max > 0 && len(matches) >= max {
-				break
-			}
+		if !strings.Contains(line, name+"=") {
+			continue
+		}
+		labels := parseLabelSet(line)
+		if candidate, ok := labels.value(name); ok && candidate == value {
+			return labels, true
 		}
 	}
 	if scanner.Err() != nil {
-		return "", false
+		return labelSet{}, false
 	}
-	if len(matches) == 0 {
-		return "", false
-	}
-	return strings.Join(matches, "\n"), true
+	return labelSet{}, false
 }
 
 func openPrivateRegularFile(path string) (*os.File, error) {

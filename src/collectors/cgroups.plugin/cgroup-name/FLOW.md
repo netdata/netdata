@@ -182,8 +182,8 @@ The Kubernetes cache files are:
 - `${TMPDIR:-/tmp}/netdata-cgroups-containers`
 
 For container ids, all three files must exist and the containers file must have
-a streaming first-match lookup for the container id to use the cache. Metadata
-records are capped at 64 KiB and container records at 16 MiB, so stale or
+a streaming exact match on the typed `container_id` field to use the cache.
+Metadata records are capped at 64 KiB and container records at 16 MiB, so stale or
 hostile predictable files cannot force an allocation proportional to the whole
 cache. Readers reject symlinks and verify that the opened regular file is the
 same file observed at the path before and after open. Otherwise the binary
@@ -200,11 +200,10 @@ Kubernetes data source selection is a switch:
   `/var/run/secrets/kubernetes.io/serviceaccount/token`. Non-2xx responses are
   failures. TLS verification deliberately differs from the shell's
   `curl --fail -sSk`:
-  - API-server calls verify against the system pool plus the mounted
-    service-account CA (the in-cluster default of client-go and of netdata's
-    go.d collectors). Setting `K8S_TLS_INSECURE` to anything but
-    `0`/`false`/`no` disables this verification (escape hatch for custom-PKI
-    clusters) and logs a warning.
+  - API-server calls verify only against the mounted service-account CA. An
+    unreadable or invalid CA fails closed and logs the loading error. Setting
+    `K8S_TLS_INSECURE` to anything but `0`/`false`/`no` disables verification
+    (escape hatch for custom-PKI clusters) and logs a warning.
   - Kubelet calls (`USE_KUBELET_FOR_PODS_METADATA`) never verify: stock
     kubelet serving certificates are self-signed, and even cluster-CA-signed
     ones carry only node-name/IP SANs, so verification of
@@ -220,7 +219,9 @@ Kubernetes data source selection is a switch:
 GCP cluster metadata calls are the only allowed parallel HTTP chain. Each uses
 `Metadata-Flavor: Google`, bypasses proxies, has the existing three-second
 timeout, treats non-2xx as failure, and all three values must be non-empty.
-Failure produces the cluster name `unknown`.
+Failure produces the cluster name `unknown`. That negative result is cached for
+five minutes; after expiry, only the three GCP metadata requests are retried and
+cached pod/container labels remain usable.
 
 Pod JSON is converted to one line per container:
 

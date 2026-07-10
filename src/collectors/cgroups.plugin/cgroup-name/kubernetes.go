@@ -16,7 +16,6 @@ var (
 	reK8sPlainID = regexp.MustCompile(`.+pod[a-f0-9-]+_([a-f0-9]+)$`)
 	reK8sPodUID  = regexp.MustCompile(`.+pod([a-f0-9_-]+)$`)
 	reK8sQOSAny  = regexp.MustCompile(`.+(besteffort|burstable)`)
-	reNullName   = regexp.MustCompile(`_null(_|$)`)
 )
 
 type kubePodOutcome int
@@ -142,13 +141,14 @@ func (r *resolver) resolveKubernetesContainer(functionName, id string, identity 
 	labels := metadata.containerLabels
 	if !metadata.hasContainerLabels {
 		var ok bool
-		labels, ok = findLabelSet(metadata.containers, identity.containerID)
+		labels, ok = findLabelSetByValue(metadata.containers, "container_id", identity.containerID)
 		if !ok {
 			return kubePodResolution{outcome: kubePodRetryFallback}
 		}
 	}
-	containerName := labels.valueOrNull("container_name")
-	podName := labels.valueOrNull("pod_name")
+	namespace, hasNamespace := labels.value("namespace")
+	podName, hasPodName := labels.value("pod_name")
+	containerName, hasContainerName := labels.value("container_name")
 	if strings.HasPrefix(podName, "virt-launcher-") {
 		switch containerName {
 		case "volumerootdisk", "guest-console-log":
@@ -161,25 +161,29 @@ func (r *resolver) resolveKubernetesContainer(functionName, id string, identity 
 	labels = addClusterLabels(labels, metadata.systemUID, metadata.clusterName)
 	name := "cntr_" + labels.valueOrNull("namespace") + "_" + labels.valueOrNull("pod_name") + "_" + labels.valueOrNull("container_name")
 	labels = labels.without("container_id").without("pod_uid").prefixed("k8s_")
-	return r.validateKubernetesName(functionName, id, name, labels)
+	complete := hasNamespace && namespace != "" && hasPodName && podName != "" && hasContainerName && containerName != ""
+	return r.validateKubernetesName(functionName, id, name, labels, complete)
 }
 
 func (r *resolver) resolveKubernetesPod(functionName, id string, identity kubernetesCgroupIdentity, metadata kubernetesMetadata) kubePodResolution {
-	labels, ok := findLabelSet(metadata.containers, identity.podUID)
+	labels, ok := findLabelSetByValue(metadata.containers, "pod_uid", identity.podUID)
 	if !ok {
 		return kubePodResolution{outcome: kubePodRetryFallback}
 	}
+	namespace, hasNamespace := labels.value("namespace")
+	podName, hasPodName := labels.value("pod_name")
 	labels = labelsBeforeContainerFields(labels)
 	labels.add("kind", "pod")
 	labels.add("qos_class", identity.qosClass)
 	labels = addClusterLabels(labels, metadata.systemUID, metadata.clusterName)
 	name := "pod_" + labels.valueOrNull("namespace") + "_" + labels.valueOrNull("pod_name")
 	labels = labels.without("pod_uid").prefixed("k8s_")
-	return r.validateKubernetesName(functionName, id, name, labels)
+	complete := hasNamespace && namespace != "" && hasPodName && podName != ""
+	return r.validateKubernetesName(functionName, id, name, labels, complete)
 }
 
-func (r *resolver) validateKubernetesName(functionName, id, name string, labels labelSet) kubePodResolution {
-	if reNullName.MatchString(name) {
+func (r *resolver) validateKubernetesName(functionName, id, name string, labels labelSet, complete bool) kubePodResolution {
+	if !complete {
 		r.warningf("%s: invalid name: %s (cgroup '%s')", functionName, name, id)
 		if r.config.kubernetes.useKubelet {
 			return kubePodResolution{name: name, labels: labels, outcome: kubePodRetryFallback}
@@ -222,7 +226,7 @@ func addClusterLabels(labels labelSet, systemUID, clusterName string) labelSet {
 	if systemUID != "" && systemUID != "null" {
 		labels.add("cluster_id", systemUID)
 	}
-	if clusterName != "" && clusterName != "unknown" {
+	if clusterName != "" && clusterName != unknownKubernetesClusterName {
 		labels.add("cluster_name", clusterName)
 	}
 	return labels
