@@ -13,6 +13,7 @@ pub mod config;
 pub mod discover;
 pub mod output;
 pub mod query;
+pub mod traces;
 
 use std::io::{self, Write};
 use std::path::PathBuf;

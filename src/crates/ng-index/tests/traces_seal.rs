@@ -215,10 +215,12 @@ fn trace_by_id_builds_linear_tree() {
     assert_eq!(tr.spans[0].span_id, SpanId::from(root));
     assert_eq!(tr.spans[tr.roots[0]].span_id, SpanId::from(root));
     let kids = |sid: [u8; 8]| {
-        tr.children
-            .get(&SpanId::from(sid))
-            .cloned()
-            .unwrap_or_default()
+        let idx = tr
+            .spans
+            .iter()
+            .position(|s| s.span_id == SpanId::from(sid))
+            .expect("span present");
+        tr.children[idx].clone()
     };
     assert_eq!(kids(root).len(), 1);
     assert_eq!(tr.spans[kids(root)[0]].span_id, SpanId::from(child));
@@ -250,7 +252,12 @@ fn trace_by_id_collapses_duplicate_span_ids() {
         .trace_by_id(TraceId::from(t))
         .unwrap();
     assert_eq!(tr.spans.len(), 2, "duplicate (trace_id, span_id) collapsed");
-    assert_eq!(tr.children.get(&SpanId::from(root)).unwrap().len(), 1);
+    let root_idx = tr
+        .spans
+        .iter()
+        .position(|s| s.span_id == SpanId::from(root))
+        .unwrap();
+    assert_eq!(tr.children[root_idx].len(), 1);
 }
 
 #[test]
@@ -274,7 +281,7 @@ fn trace_by_id_forms_a_forest_from_orphans_and_multiple_roots() {
         "two unset-parent roots + one orphan-as-root"
     );
     assert!(
-        tr.children.is_empty(),
+        tr.children.iter().all(|kids| kids.is_empty()),
         "no edges: no in-file parent has children"
     );
 }
@@ -300,7 +307,12 @@ fn trace_by_id_handles_clock_skew() {
     );
     assert_eq!(tr.roots.len(), 1);
     assert_eq!(tr.spans[tr.roots[0]].span_id, SpanId::from(root));
-    let kids = tr.children.get(&SpanId::from(root)).unwrap();
+    let root_idx = tr
+        .spans
+        .iter()
+        .position(|s| s.span_id == SpanId::from(root))
+        .unwrap();
+    let kids = &tr.children[root_idx];
     assert_eq!(tr.spans[kids[0]].span_id, SpanId::from(child));
 }
 
@@ -322,7 +334,12 @@ fn trace_by_id_handles_large_fan_out() {
         .unwrap();
     assert_eq!(tr.spans.len(), 201);
     assert_eq!(tr.roots.len(), 1);
-    assert_eq!(tr.children.get(&SpanId::from(root)).unwrap().len(), 200);
+    let root_idx = tr
+        .spans
+        .iter()
+        .position(|s| s.span_id == SpanId::from(root))
+        .unwrap();
+    assert_eq!(tr.children[root_idx].len(), 200);
 }
 
 #[test]
@@ -406,9 +423,7 @@ fn trace_by_id_reaches_all_spans_despite_a_cyclic_component() {
         if !seen.insert(i) {
             continue;
         }
-        if let Some(kids) = tr.children.get(&tr.spans[i].span_id) {
-            stack.extend(kids.iter().copied());
-        }
+        stack.extend(tr.children[i].iter().copied());
     }
     assert_eq!(seen.len(), 4, "every span reachable from a root");
 }
@@ -426,7 +441,7 @@ fn trace_by_id_self_parent_is_a_root() {
         .unwrap();
     assert_eq!(tr.spans.len(), 1);
     assert_eq!(tr.roots.len(), 1, "self-parent treated as root");
-    assert!(tr.children.is_empty(), "no self-edge");
+    assert!(tr.children.iter().all(|kids| kids.is_empty()), "no self-edge");
 }
 
 #[test]

@@ -34,6 +34,25 @@ pub fn read_summary(data: &[u8]) -> Result<Summary, Error> {
     ChunkReader::open(data)?.summary()
 }
 
+/// Read ONLY the [`Summary`] of a sealed SFST on disk, cheaply: the file
+/// is memory-mapped and just the header + TOC + `SUMR` pages fault in —
+/// never the whole file (`Advice::Random` suppresses readahead). The
+/// pattern the registry's recovery uses, exposed for tools that need a
+/// summary without loading the file (e.g. building query candidates).
+///
+/// Sealed SFSTs are immutable once finalized, so the short-lived read-only
+/// mapping is sound.
+pub fn read_summary_path(path: &std::path::Path) -> Result<Summary, Error> {
+    let file = std::fs::File::open(path)?;
+    // SAFETY: sealed SFSTs are immutable (the ingestor rolls new files
+    // rather than mutating); a read-only map for the duration of this
+    // call cannot observe concurrent modification.
+    let mmap = unsafe { memmap2::Mmap::map(&file) }?;
+    #[cfg(unix)]
+    let _ = mmap.advise(memmap2::Advice::Random);
+    read_summary(&mmap)
+}
+
 /// Decompress zstd, then deserialize with bincode. Crate-internal:
 /// consumers read through [`ChunkReader`]'s typed accessors.
 pub(crate) fn unpack<T: DeserializeOwned>(data: &[u8]) -> Result<T, Error> {

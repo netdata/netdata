@@ -13,6 +13,7 @@ mod sfst_build;
 pub use perf::{Metrics, Rss, read_rss};
 pub use sfst_build::{
     SfstStats, build_sfst, build_sfst_file, build_sfst_range, build_sfst_traces_file,
+    build_sfst_traces_range, to_sfst_tree,
 };
 
 // Re-export the flattening + frame vocabulary so the binary (and any consumer) gets

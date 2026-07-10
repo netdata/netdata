@@ -61,13 +61,16 @@ mod row_index;
 mod schema;
 mod span_extras;
 mod trace_bloom;
+pub mod trace_combine;
 mod trace_index;
 mod writer;
 
 pub mod registry;
 
 pub use error::Error;
-pub use index_reader::{BitmapFilter, IndexReader, Trace, TraceEvent, TraceLink, TraceSpan};
+pub use index_reader::{
+    BitmapFilter, IndexReader, Trace, TraceEvent, TraceFileSession, TraceLink, TraceSpan,
+};
 pub use index_writer::IndexWriter;
 pub use kv_interner::KvSlot;
 pub(crate) use prefix_map::{BuildError, PrefixMap};
@@ -75,11 +78,13 @@ pub use query::{
     Bucket, FacetResult, Filter, Grid, Matcher, MaterializedRow, Timeline, Timestamps,
     compile_pattern, compile_query,
 };
-pub use reader::read_summary;
+pub use reader::{read_summary, read_summary_path};
 pub use registry::{File, Registry, RetentionPolicy};
 pub use row_index::RowIndex;
 pub use span_extras::{EventIndex, EventRef, EventRows, LinkIndex, LinkRef, LinkRows};
+pub use schema::join_value_kinds;
 pub use trace_bloom::TraceIdBloom;
+pub use trace_combine::{CombineOutcome, SpanRef, SpanSource};
 pub use trace_index::TraceIdIndex;
 
 /// Deterministic opaque partition key for tests. SFST treats `part_key` as an

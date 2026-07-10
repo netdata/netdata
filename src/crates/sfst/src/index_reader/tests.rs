@@ -172,7 +172,8 @@ fn duplicate_span_id_is_collapsed_to_first() {
     // The two A rows collapse to one span; B remains → 2 spans, both roots.
     assert_eq!(trace.spans.len(), 2);
     assert_eq!(trace.roots.len(), 2);
-    assert!(trace.children.is_empty());
+    // `children` is parallel to `spans` — no edges means all-empty lists.
+    assert!(trace.children.iter().all(|kids| kids.is_empty()));
 }
 
 #[test]
@@ -197,11 +198,11 @@ fn parent_edges_and_missing_parent_root() {
     assert_eq!(trace.spans.len(), 3);
     // A and C are roots; B is A's child.
     assert_eq!(trace.roots.len(), 2);
-    let a_children = trace.children.get(&sid(1)).expect("A has children");
+    let a_idx = trace.spans.iter().position(|s| s.span_id == sid(1)).unwrap();
+    let a_children = &trace.children[a_idx];
     assert_eq!(a_children.len(), 1);
     // The edge points at B.
-    let child_idx = a_children[0];
-    assert_eq!(trace.spans[child_idx].span_id, sid(2));
+    assert_eq!(trace.spans[a_children[0]].span_id, sid(2));
 }
 
 #[test]
@@ -225,9 +226,7 @@ fn parent_cycle_stays_a_forest_and_terminates() {
             continue;
         }
         seen[i] = true;
-        if let Some(kids) = trace.children.get(&trace.spans[i].span_id) {
-            stack.extend(kids.iter().copied().filter(|&c| !seen[c]));
-        }
+        stack.extend(trace.children[i].iter().copied().filter(|&c| !seen[c]));
     }
     assert!(seen.iter().all(|&s| s), "every span reachable from a root");
 }

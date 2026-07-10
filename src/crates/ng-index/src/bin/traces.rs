@@ -246,10 +246,8 @@ fn reconstruct(sfst_path: &Path, trace_id_hex: &str) -> ExitCode {
                 indent = depth * 2 + 2,
             );
         }
-        if let Some(kids) = trace.children.get(&s.span_id) {
-            for &c in kids.iter().rev() {
-                stack.push((c, depth + 1));
-            }
+        for &c in trace.children[i].iter().rev() {
+            stack.push((c, depth + 1));
         }
     }
     ExitCode::SUCCESS

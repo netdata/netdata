@@ -540,6 +540,27 @@ fn tier_rank(tier: FieldTier) -> u8 {
     }
 }
 
+/// Join two ALREADY-COALESCED scalar kinds across files/sources with the
+/// same lattice [`SchemaTree::derive_scalar_kinds`] applies within one
+/// tree (equal → itself; Int ⊔ Double → Double; any other mix → Str) —
+/// the cross-source half of the field→kind map trace/search results
+/// carry. Inputs come from `derive_scalar_kinds`, so they are always
+/// value-bearing kinds and the join always exists.
+pub fn join_value_kinds(a: ValueKind, b: ValueKind) -> ValueKind {
+    let mut set = ScalarSet::default();
+    set.add(a);
+    set.add(b);
+    // Non-scalar inputs cannot arise from derive_scalar_kinds (asserted in
+    // dev builds); in release, degrade to the universal string fallback
+    // rather than panicking.
+    let joined = set.coalesce();
+    debug_assert!(
+        joined.is_some(),
+        "join_value_kinds called with non-scalar kinds {a:?}/{b:?}"
+    );
+    joined.unwrap_or(ValueKind::Str)
+}
+
 /// Accumulates which scalar kinds a path's leaves carry, for coalescing.
 #[derive(Default)]
 struct ScalarSet {
@@ -1100,12 +1121,12 @@ pub struct ParentSpanIds {
 /// OTLP/W3C "unset/invalid" sentinel ([`TraceId::is_unset`]). `Copy` + `Ord` +
 /// `Hash` so it sorts (the `trace_id` index) and keys maps (the trace tree)
 /// directly; the on-disk [`TraceIds`] column stores these as a packed byte arena.
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize)]
 pub struct TraceId([u8; TraceIds::WIDTH]);
 
 /// A W3C span id: a fixed 8-byte identifier. See [`TraceId`] for the shared
 /// semantics (unset sentinel, ordering, packed [`SpanIds`] storage).
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize)]
 pub struct SpanId([u8; SpanIds::WIDTH]);
 
 /// Generate the shared id-value API (`from_bytes`/`as_bytes`/`is_unset`/`UNSET`,

@@ -10,6 +10,7 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
+use sfsq_cli::traces::{TraceArgs, run_trace};
 use sfsq_cli::{Args, init_tracing, is_broken_pipe, run};
 
 /// Inspect OpenTelemetry logs stored in Netdata WAL/SFST files.
@@ -21,8 +22,17 @@ use sfsq_cli::{Args, init_tracing, is_broken_pipe, run};
 #[derive(Debug, Parser)]
 #[command(version, about, long_about = None)]
 struct Cli {
+    #[command(subcommand)]
+    cmd: Option<Cmd>,
     #[command(flatten)]
     args: Args,
+}
+
+#[derive(Debug, clap::Subcommand)]
+enum Cmd {
+    /// Reconstruct one trace across sealed SFSTs and traces WALs
+    /// (cross-source trace-by-id over `sfsq::traces`).
+    Trace(TraceArgs),
 }
 
 fn main() -> ExitCode {
@@ -30,6 +40,16 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     let stdout = io::stdout();
     let mut out = stdout.lock();
+    if let Some(Cmd::Trace(trace_args)) = &cli.cmd {
+        return match run_trace(trace_args, &mut out) {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(e) if is_broken_pipe(&e) => ExitCode::SUCCESS,
+            Err(e) => {
+                eprintln!("error: {e:#}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     match run(&cli.args, &mut out) {
         Ok(()) => ExitCode::SUCCESS,
         // A downstream pipe closing (e.g. `| head`) is a normal, quiet exit.

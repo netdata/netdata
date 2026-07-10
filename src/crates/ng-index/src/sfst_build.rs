@@ -40,11 +40,13 @@ fn to_value_kind(kind: ng_flatten::Kind) -> sfst::ValueKind {
     }
 }
 
-/// Convert the global flatten [`ng_flatten::SchemaTree`] into the format crate's
+/// Convert a flatten [`ng_flatten::SchemaTree`] into the format crate's
 /// [`sfst::SchemaTree`] node-by-node (ids are preserved, parents precede
 /// children). Leaf stats are left unset here — the SFST build fills them from
-/// the per-field cardinality/tier.
-fn to_sfst_tree(tree: &ng_flatten::SchemaTree) -> sfst::SchemaTree {
+/// the per-field cardinality/tier. Public as the CANONICAL boundary
+/// conversion: the sfsq traces tail scan derives its field→kind map through
+/// this exact converter, so tail and sealed kinds agree by construction.
+pub fn to_sfst_tree(tree: &ng_flatten::SchemaTree) -> sfst::SchemaTree {
     let nodes = (0..tree.len() as NodeId)
         .map(|id| sfst::SchemaNode {
             kind: to_value_kind(tree.node(id).kind),
@@ -335,6 +337,27 @@ pub fn build_sfst_range(
     let arena = Bump::new();
     let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
     populate_row_index(&mut reader, &mut row_index, &Metrics::new())?;
+    let cursor = std::io::Cursor::new(Vec::new());
+    let (cursor, summary, _metadata) = IndexWriter::write_into(&row_index, cursor, content_meta)?;
+    Ok((summary, cursor.into_inner()))
+}
+
+/// The **traces** counterpart of [`build_sfst_range`]: an in-memory SFST over a
+/// frame-aligned `range` of an active flattened-traces WAL — the on-query chunk
+/// build over the durable-unindexed prefix. Same typed tree + span per-row columns
+/// (+ TIDX/TBLM) as [`build_sfst_traces_file`], so the chunks are byte-identical to
+/// a file build over the same frames. The caller cross-checks
+/// `summary.record_count` against the expected count to detect a truncated prefix
+/// (the check `open_range` defers).
+pub fn build_sfst_traces_range(
+    wal_path: &Path,
+    range: wal::FrameRange,
+) -> Result<(sfst::Summary, Vec<u8>), Error> {
+    let mut reader = wal::Reader::open_range(wal_path, range)?;
+    let content_meta = reader.header().content_meta.clone();
+    let arena = Bump::new();
+    let mut row_index = RowIndex::new(&arena, CARDINALITY_THRESHOLD);
+    populate_trace_row_index(&mut reader, &mut row_index, &Metrics::new())?;
     let cursor = std::io::Cursor::new(Vec::new());
     let (cursor, summary, _metadata) = IndexWriter::write_into(&row_index, cursor, content_meta)?;
     Ok((summary, cursor.into_inner()))
