@@ -21,10 +21,17 @@ Module: prometheus
 
 ## Overview
 
-Track AWS EC2 instances key metrics for optimized performance and cost management.
+Monitor Amazon EC2 inventory and capacity information exposed by AWS EC2 Exporter.
+
+This integration complements the
+[Amazon CloudWatch](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/cloudwatch/integrations/amazon_cloudwatch.md) collector,
+which queries runtime metrics from CloudWatch. The integrations use different AWS data sources and do
+not replace one another.
 
 
-Metrics are gathered by periodically sending HTTP requests to [AWS EC2 Exporter](https://github.com/O1ahmad/aws_ec2_exporter).
+Netdata periodically scrapes Prometheus metrics from
+[AWS EC2 Exporter](https://github.com/O1ahmad/aws_ec2_exporter), which obtains inventory and capacity
+information from Amazon EC2 APIs rather than CloudWatch.
 
 
 This collector is supported on all platforms.

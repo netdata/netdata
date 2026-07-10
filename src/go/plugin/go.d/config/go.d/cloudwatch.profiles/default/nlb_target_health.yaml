@@ -22,7 +22,7 @@ template:
     instances:
       by_labels: [account_id, region, load_balancer, target_group]
   charts:
-    - id: cw_nlb_target_health_unhealthy_hosts
+    - id: aws_cloudwatch_nlb_target_health_unhealthy_hosts
       context: unhealthy_hosts
       title: NLB Target Group Unhealthy Hosts
       family: Hosts

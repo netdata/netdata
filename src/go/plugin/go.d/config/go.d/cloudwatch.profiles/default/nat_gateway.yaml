@@ -83,7 +83,7 @@ template:
     instances:
       by_labels: [account_id, region, nat_gateway_id]
   charts:
-    - id: cw_natgw_bytes
+    - id: aws_cloudwatch_natgw_bytes
       context: bytes
       title: NAT Gateway Traffic
       family: Traffic
@@ -98,7 +98,7 @@ template:
           name: in_from_destination
         - selector: bytes_out_to_source_sum
           name: out_to_source
-    - id: cw_natgw_active_connections
+    - id: aws_cloudwatch_natgw_active_connections
       context: active_connections
       title: NAT Gateway Active Connections
       family: Connections
@@ -107,7 +107,7 @@ template:
       dimensions:
         - selector: active_connection_count_maximum
           name: active
-    - id: cw_natgw_connection_rate
+    - id: aws_cloudwatch_natgw_connection_rate
       context: connection_rate
       title: NAT Gateway Connection Rate
       family: Connections
@@ -118,7 +118,7 @@ template:
           name: attempted
         - selector: connection_established_count_sum
           name: established
-    - id: cw_natgw_errors
+    - id: aws_cloudwatch_natgw_errors
       context: errors
       title: NAT Gateway Errors
       family: Errors
@@ -129,7 +129,7 @@ template:
           name: port_allocation
         - selector: packets_drop_count_sum
           name: packets_dropped
-    - id: cw_natgw_idle_timeouts
+    - id: aws_cloudwatch_natgw_idle_timeouts
       context: idle_timeouts
       title: NAT Gateway Idle Timeouts
       family: Connections
@@ -141,7 +141,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_natgw_packets
+    # - id: aws_cloudwatch_natgw_packets
     #   context: packets
     #   title: NAT Gateway Packets
     #   family: Traffic
@@ -156,7 +156,7 @@ template:
     #       name: in_from_destination
     #     - selector: packets_out_to_source_sum
     #       name: out_to_source
-    # - id: cw_natgw_peak_throughput
+    # - id: aws_cloudwatch_natgw_peak_throughput
     #   context: peak_throughput
     #   title: NAT Gateway Peak Throughput
     #   family: Traffic
@@ -165,7 +165,7 @@ template:
     #   dimensions:
     #     - selector: peak_bytes_per_second_maximum
     #       name: peak_bytes
-    # - id: cw_natgw_peak_packets
+    # - id: aws_cloudwatch_natgw_peak_packets
     #   context: peak_packets
     #   title: NAT Gateway Peak Packets
     #   family: Traffic

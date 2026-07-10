@@ -57,7 +57,7 @@ template:
     instances:
       by_labels: [account_id, region, topic_name]
   charts:
-    - id: cw_sns_published
+    - id: aws_cloudwatch_sns_published
       context: messages_published
       title: SNS Messages Published
       family: Messages
@@ -66,7 +66,7 @@ template:
       dimensions:
         - selector: number_of_messages_published_sum
           name: published
-    - id: cw_sns_notifications
+    - id: aws_cloudwatch_sns_notifications
       context: notifications
       title: SNS Notifications
       family: Notifications
@@ -79,7 +79,7 @@ template:
           name: failed
         - selector: number_of_notifications_filtered_out_sum
           name: filtered_out
-    - id: cw_sns_publish_size
+    - id: aws_cloudwatch_sns_publish_size
       context: publish_size
       title: SNS Published Message Size
       family: Messages
@@ -88,7 +88,7 @@ template:
       dimensions:
         - selector: publish_size_average
           name: size
-    - id: cw_sns_invalid_notifications
+    - id: aws_cloudwatch_sns_invalid_notifications
       context: invalid_notifications
       title: SNS Invalid Notifications
       family: Notifications
@@ -99,7 +99,7 @@ template:
           name: invalid_attributes
         - selector: number_of_notifications_filtered_out_invalid_message_body_sum
           name: invalid_message_body
-    - id: cw_sns_dlq
+    - id: aws_cloudwatch_sns_dlq
       context: dlq_redrive
       title: SNS Dead-Letter Queue Redrive
       family: Notifications

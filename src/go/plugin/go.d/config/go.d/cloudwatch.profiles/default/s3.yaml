@@ -33,7 +33,7 @@ template:
     instances:
       by_labels: [account_id, region, bucket_name, storage_type]
   charts:
-    - id: cw_s3_bucket_size
+    - id: aws_cloudwatch_s3_bucket_size
       context: bucket_size
       title: S3 Bucket Size
       family: Storage
@@ -42,7 +42,7 @@ template:
       dimensions:
         - selector: bucket_size_bytes_average
           name: size
-    - id: cw_s3_objects
+    - id: aws_cloudwatch_s3_objects
       context: number_of_objects
       title: S3 Number of Objects
       family: Storage

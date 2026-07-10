@@ -66,7 +66,7 @@ template:
     instances:
       by_labels: [account_id, region, file_system_id]
   charts:
-    - id: cw_efs_io_throughput
+    - id: aws_cloudwatch_efs_io_throughput
       context: io_throughput
       title: EFS I/O Throughput
       family: Throughput
@@ -81,7 +81,7 @@ template:
           name: write
         - selector: metadata_io_bytes_sum
           name: metadata
-    - id: cw_efs_metered_throughput
+    - id: aws_cloudwatch_efs_metered_throughput
       context: metered_throughput
       title: EFS Metered vs Permitted Throughput
       family: Throughput
@@ -92,7 +92,7 @@ template:
           name: metered
         - selector: permitted_throughput_average
           name: permitted
-    - id: cw_efs_io_limit
+    - id: aws_cloudwatch_efs_io_limit
       context: io_limit
       title: EFS Percent I/O Limit
       family: Limits
@@ -101,7 +101,7 @@ template:
       dimensions:
         - selector: percent_io_limit_average
           name: io_limit
-    - id: cw_efs_burst_credit
+    - id: aws_cloudwatch_efs_burst_credit
       context: burst_credit
       title: EFS Burst Credit Balance
       family: Credits
@@ -110,7 +110,7 @@ template:
       dimensions:
         - selector: burst_credit_balance_average
           name: balance
-    - id: cw_efs_client_connections
+    - id: aws_cloudwatch_efs_client_connections
       context: client_connections
       title: EFS Client Connections
       family: Connections
@@ -122,7 +122,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_efs_metadata_io
+    # - id: aws_cloudwatch_efs_metadata_io
     #   context: metadata_io
     #   title: EFS Metadata I/O
     #   family: Throughput

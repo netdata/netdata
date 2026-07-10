@@ -73,7 +73,7 @@ template:
     instances:
       by_labels: [account_id, region, stream_name]
   charts:
-    - id: cw_kinesis_throughput
+    - id: aws_cloudwatch_kinesis_throughput
       context: throughput
       title: Kinesis Data Throughput
       family: Throughput
@@ -84,7 +84,7 @@ template:
           name: incoming
         - selector: get_records_bytes_sum
           name: outgoing
-    - id: cw_kinesis_records
+    - id: aws_cloudwatch_kinesis_records
       context: records
       title: Kinesis Records
       family: Records
@@ -95,7 +95,7 @@ template:
           name: incoming
         - selector: get_records_records_sum
           name: outgoing
-    - id: cw_kinesis_iterator_age
+    - id: aws_cloudwatch_kinesis_iterator_age
       context: iterator_age
       title: Kinesis GetRecords Iterator Age
       family: Consumers
@@ -104,7 +104,7 @@ template:
       dimensions:
         - selector: get_records_iterator_age_maximum
           name: iterator_age
-    - id: cw_kinesis_latency
+    - id: aws_cloudwatch_kinesis_latency
       context: latency
       title: Kinesis Operation Latency
       family: Latency
@@ -117,7 +117,7 @@ template:
           name: put_record
         - selector: put_records_latency_average
           name: put_records
-    - id: cw_kinesis_throttling
+    - id: aws_cloudwatch_kinesis_throttling
       context: throughput_exceeded
       title: Kinesis Throughput Exceeded
       family: Throttling
@@ -128,7 +128,7 @@ template:
           name: read
         - selector: write_throughput_exceeded_average
           name: write
-    - id: cw_kinesis_put_errors
+    - id: aws_cloudwatch_kinesis_put_errors
       context: put_errors
       title: Kinesis PutRecords Rejected
       family: Errors
@@ -142,7 +142,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_kinesis_put_bytes
+    # - id: aws_cloudwatch_kinesis_put_bytes
     #   context: put_bytes
     #   title: Kinesis Put Bytes
     #   family: Throughput

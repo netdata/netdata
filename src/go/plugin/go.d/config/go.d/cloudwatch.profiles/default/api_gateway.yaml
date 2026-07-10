@@ -52,7 +52,7 @@ template:
     instances:
       by_labels: [account_id, region, api_name]
   charts:
-    - id: cw_apigw_requests
+    - id: aws_cloudwatch_apigw_requests
       context: requests
       title: API Gateway Requests
       family: Requests
@@ -61,7 +61,7 @@ template:
       dimensions:
         - selector: count_sum
           name: requests
-    - id: cw_apigw_errors
+    - id: aws_cloudwatch_apigw_errors
       context: errors
       title: API Gateway Errors
       family: Errors
@@ -72,7 +72,7 @@ template:
           name: 4xx
         - selector: error_5xx_sum
           name: 5xx
-    - id: cw_apigw_latency
+    - id: aws_cloudwatch_apigw_latency
       context: latency
       title: API Gateway Latency
       family: Latency
@@ -86,7 +86,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_apigw_cache
+    # - id: aws_cloudwatch_apigw_cache
     #   context: cache
     #   title: API Gateway Cache
     #   family: Cache

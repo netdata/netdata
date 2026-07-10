@@ -70,7 +70,7 @@ template:
     instances:
       by_labels: [account_id, region, cluster_identifier]
   charts:
-    - id: cw_redshift_health
+    - id: aws_cloudwatch_redshift_health
       context: health
       title: Redshift Health
       family: Health
@@ -81,7 +81,7 @@ template:
           name: healthy
         - selector: maintenance_mode_maximum
           name: maintenance
-    - id: cw_redshift_cpu
+    - id: aws_cloudwatch_redshift_cpu
       context: cpu
       title: Redshift CPU Utilization
       family: CPU
@@ -90,7 +90,7 @@ template:
       dimensions:
         - selector: cpu_utilization_average
           name: cpu
-    - id: cw_redshift_disk
+    - id: aws_cloudwatch_redshift_disk
       context: disk_space_used
       title: Redshift Disk Space Used
       family: Storage
@@ -99,7 +99,7 @@ template:
       dimensions:
         - selector: percentage_disk_space_used_average
           name: used
-    - id: cw_redshift_connections
+    - id: aws_cloudwatch_redshift_connections
       context: connections
       title: Redshift Database Connections
       family: Connections
@@ -108,7 +108,7 @@ template:
       dimensions:
         - selector: database_connections_average
           name: connections
-    - id: cw_redshift_iops
+    - id: aws_cloudwatch_redshift_iops
       context: iops
       title: Redshift Disk IOPS
       family: Throughput
@@ -119,7 +119,7 @@ template:
           name: read
         - selector: write_iops_average
           name: write
-    - id: cw_redshift_throughput
+    - id: aws_cloudwatch_redshift_throughput
       context: throughput
       title: Redshift Disk Throughput
       family: Throughput
@@ -130,7 +130,7 @@ template:
           name: read
         - selector: write_throughput_average
           name: write
-    - id: cw_redshift_network
+    - id: aws_cloudwatch_redshift_network
       context: network
       title: Redshift Network Throughput
       family: Network
@@ -144,7 +144,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_redshift_latency
+    # - id: aws_cloudwatch_redshift_latency
     #   context: latency
     #   title: Redshift Disk Latency
     #   family: Latency
@@ -155,7 +155,7 @@ template:
     #       name: read
     #     - selector: write_latency_average
     #       name: write
-    # - id: cw_redshift_tables
+    # - id: aws_cloudwatch_redshift_tables
     #   context: total_table_count
     #   title: Redshift Total Table Count
     #   family: Tables
@@ -164,7 +164,7 @@ template:
     #   dimensions:
     #     - selector: total_table_count_average
     #       name: tables
-    # - id: cw_redshift_concurrency_scaling
+    # - id: aws_cloudwatch_redshift_concurrency_scaling
     #   context: concurrency_scaling
     #   title: Redshift Concurrency Scaling Usage
     #   family: Concurrency Scaling

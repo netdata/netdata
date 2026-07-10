@@ -63,7 +63,7 @@ template:
     instances:
       by_labels: [account_id, region, table_name]
   charts:
-    - id: cw_dynamodb_consumed_capacity
+    - id: aws_cloudwatch_dynamodb_consumed_capacity
       context: consumed_capacity
       title: DynamoDB Consumed Capacity
       family: Capacity
@@ -74,7 +74,7 @@ template:
           name: read
         - selector: consumed_write_capacity_units_sum
           name: write
-    - id: cw_dynamodb_provisioned_capacity
+    - id: aws_cloudwatch_dynamodb_provisioned_capacity
       context: provisioned_capacity
       title: DynamoDB Provisioned Capacity
       family: Capacity
@@ -85,7 +85,7 @@ template:
           name: read
         - selector: provisioned_write_capacity_units_average
           name: write
-    - id: cw_dynamodb_throttle_events
+    - id: aws_cloudwatch_dynamodb_throttle_events
       context: throttle_events
       title: DynamoDB Throttle Events
       family: Throttling
@@ -99,7 +99,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_dynamodb_conditional_check_failed
+    # - id: aws_cloudwatch_dynamodb_conditional_check_failed
     #   context: conditional_check_failed_requests
     #   title: DynamoDB Conditional Check Failures
     #   family: Errors
@@ -108,7 +108,7 @@ template:
     #   dimensions:
     #     - selector: conditional_check_failed_requests_sum
     #       name: failed
-    # - id: cw_dynamodb_transaction_conflicts
+    # - id: aws_cloudwatch_dynamodb_transaction_conflicts
     #   context: transaction_conflict
     #   title: DynamoDB Transaction Conflicts
     #   family: Errors
@@ -117,7 +117,7 @@ template:
     #   dimensions:
     #     - selector: transaction_conflict_sum
     #       name: conflicts
-    # - id: cw_dynamodb_ttl_deleted
+    # - id: aws_cloudwatch_dynamodb_ttl_deleted
     #   context: ttl_deleted_items
     #   title: DynamoDB TTL Deleted Items
     #   family: Items

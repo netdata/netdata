@@ -34,12 +34,12 @@ func validProfile() Profile {
 			},
 			Charts: []charttpl.Chart{
 				{
-					ID: "cw_ec2_cpu", Context: "cpu_utilization", Title: "EC2 CPU Utilization",
+					ID: "aws_cloudwatch_ec2_cpu", Context: "cpu_utilization", Title: "EC2 CPU Utilization",
 					Family: "CPU", Units: "percentage", Algorithm: "absolute",
 					Dimensions: []charttpl.Dimension{{Selector: "cpu_utilization_average", Name: "average"}},
 				},
 				{
-					ID: "cw_ec2_network", Context: "network_traffic", Title: "EC2 Network Traffic",
+					ID: "aws_cloudwatch_ec2_network", Context: "network_traffic", Title: "EC2 Network Traffic",
 					Family: "Network", Units: "bytes/s", Algorithm: "absolute",
 					Dimensions: []charttpl.Dimension{{Selector: "network_in_sum", Name: "in"}},
 				},
