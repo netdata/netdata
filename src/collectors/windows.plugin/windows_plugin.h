@@ -21,7 +21,7 @@
 
 void win_plugin_main(void *ptr);
 
-extern char windows_shared_buffer[8192];
+extern __thread char windows_shared_buffer[8192];
 
 // Windows API
 int do_GetSystemUptime(int update_every, usec_t dt);
