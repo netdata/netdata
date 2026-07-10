@@ -1772,6 +1772,7 @@ void facets_destroy(FACETS *facets) {
     simple_pattern_free(facets->visible_keys);
     simple_pattern_free(facets->included_keys);
     simple_pattern_free(facets->excluded_keys);
+    simple_pattern_free(facets->query);
 
     while(facets->base) {
         FACET_ROW *r = facets->base;
