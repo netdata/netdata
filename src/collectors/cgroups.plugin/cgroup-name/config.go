@@ -16,11 +16,9 @@ const (
 	defaultGCPMetadataURL      = "http://metadata"
 	k8sServiceAccountCAFile    = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 	k8sServiceAccountTokenFile = "/var/run/secrets/kubernetes.io/serviceaccount/token"
+	// Commands are executed by basename, so this list must never inherit caller-controlled entries.
+	trustedExecutablePath = "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/snap/bin"
 )
-
-// sbindirPost is set by CMake through -X main.sbindirPost=... . Keep this
-// symbol in package main: its fully qualified name is part of the build.
-var sbindirPost string
 
 type invocationConfig struct {
 	dockerHost string
@@ -94,14 +92,8 @@ func loadInvocationConfig() invocationConfig {
 	}
 }
 
-// setupEnvironment extends the inherited PATH rather than replacing it so the
-// same host-installed docker, kubectl, snap, and ps commands remain discoverable.
 func setupEnvironment() {
-	path := os.Getenv("PATH") + ":/sbin:/usr/sbin:/usr/local/sbin"
-	if sbindirPost != "" {
-		path += ":" + sbindirPost
-	}
-	_ = os.Setenv("PATH", path)
+	_ = os.Setenv("PATH", trustedExecutablePath)
 	_ = os.Setenv("LC_ALL", "C")
 }
 

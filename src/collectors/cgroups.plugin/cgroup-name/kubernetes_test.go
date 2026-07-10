@@ -18,7 +18,6 @@ import (
 
 func TestK8sContainerCachePath(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("PATH", tmp)
 	t.Setenv("TMPDIR", tmp)
 	t.Setenv("NETDATA_LOG_LEVEL", "emerg")
 
@@ -52,7 +51,6 @@ func TestMirroredK8sContainerPathFixturesFromCache(t *testing.T) {
 	// DataDog/datadog-agent, google/cadvisor, grafana/beyla, and
 	// sustainable-computing-io/kepler.
 	tmp := t.TempDir()
-	t.Setenv("PATH", tmp)
 	t.Setenv("TMPDIR", tmp)
 	t.Setenv("NETDATA_LOG_LEVEL", "emerg")
 	t.Setenv("NETDATA_HOST_PREFIX", tmp)
@@ -236,7 +234,6 @@ func TestMirroredK8sPodListFixtures(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			tmp := t.TempDir()
-			t.Setenv("PATH", tmp)
 			t.Setenv("TMPDIR", tmp)
 			t.Setenv("NETDATA_LOG_LEVEL", "emerg")
 			t.Setenv("NETDATA_HOST_PREFIX", tmp)

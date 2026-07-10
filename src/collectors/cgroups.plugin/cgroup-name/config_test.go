@@ -4,8 +4,41 @@ package main
 
 import (
 	"os"
+	"strings"
 	"testing"
 )
+
+func TestSetupEnvironmentUsesTrustedValues(t *testing.T) {
+	const untrustedPath = "/tmp/user-writable"
+	t.Setenv("PATH", untrustedPath)
+	t.Setenv("LC_ALL", "inherited-locale")
+
+	setupEnvironment()
+
+	tests := map[string]struct {
+		envName string
+		want    string
+	}{
+		"fixed command path": {
+			envName: "PATH",
+			want:    "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin:/snap/bin",
+		},
+		"fixed locale": {
+			envName: "LC_ALL",
+			want:    "C",
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if got := os.Getenv(test.envName); got != test.want {
+				t.Fatalf("%s = %q, want %q", test.envName, got, test.want)
+			}
+		})
+	}
+	if got := os.Getenv("PATH"); strings.Contains(got, untrustedPath) {
+		t.Fatalf("PATH retained inherited writable directory %q: %q", untrustedPath, got)
+	}
+}
 
 func TestInvocationConfigPreservesKubeConfigPresence(t *testing.T) {
 	original, wasSet := os.LookupEnv("KUBE_CONFIG")
@@ -46,7 +79,6 @@ func TestInvocationConfigPreservesKubeConfigPresence(t *testing.T) {
 }
 
 func TestPrepareInvocationConfigDefaultsRuntimeHosts(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
 	t.Setenv("DOCKER_HOST", "")
 	t.Setenv("PODMAN_HOST", "")
 

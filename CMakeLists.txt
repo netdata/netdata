@@ -4007,8 +4007,7 @@ install(PROGRAMS
 
 if(ENABLE_CGROUP_NAME)
     add_go_target(cgroup-name-target cgroup-name
-                  src/collectors/cgroups.plugin/cgroup-name .
-                  EXTRA_LDFLAGS "-X main.sbindirPost=${sbindir_POST}")
+                  src/collectors/cgroups.plugin/cgroup-name .)
     install(PROGRAMS
             ${CMAKE_BINARY_DIR}/cgroup-name
             COMPONENT netdata

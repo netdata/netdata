@@ -9,7 +9,6 @@ import (
 )
 
 func TestRunContract(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
 	t.Setenv("NETDATA_HOST_PREFIX", "")
 	t.Setenv("DOCKER_HOST", "")
 	t.Setenv("PODMAN_HOST", "")

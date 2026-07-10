@@ -10,7 +10,6 @@ import (
 )
 
 func TestMainDispatchPureBranches(t *testing.T) {
-	t.Setenv("PATH", t.TempDir())
 	t.Setenv("NETDATA_HOST_PREFIX", "")
 	t.Setenv("DOCKER_HOST", "")
 	t.Setenv("PODMAN_HOST", "")
@@ -89,7 +88,6 @@ func TestMainDispatchPureBranches(t *testing.T) {
 
 func TestProxmoxBranches(t *testing.T) {
 	tmp := t.TempDir()
-	t.Setenv("PATH", tmp)
 	t.Setenv("NETDATA_HOST_PREFIX", tmp)
 	t.Setenv("DOCKER_HOST", "")
 	t.Setenv("PODMAN_HOST", "")

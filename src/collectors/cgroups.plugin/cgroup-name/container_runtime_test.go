@@ -272,7 +272,6 @@ func TestMirroredDockerAndPodmanAPIFixtures(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Setenv("PATH", tmp)
-	t.Setenv("NETDATA_LOG_LEVEL", "emerg")
 
 	inspectJSON := func(name, image string) string {
 		return `{"Name":"/` + name + `","Config":{"Env":["PATH=/usr/bin"],"Image":"` + image + `","Labels":{"com.docker.compose.service":"ignored","netdata.cloud/service":"payments","netdata.cloud/team":"platform"}}}`
@@ -308,20 +307,19 @@ func TestMirroredDockerAndPodmanAPIFixtures(t *testing.T) {
 				_, _ = w.Write([]byte(inspectJSON(test.wantName, test.image)))
 			}))
 			defer server.Close()
-			t.Setenv("DOCKER_HOST", "")
-			t.Setenv("PODMAN_HOST", "")
 
 			var cgroup string
+			config := invocationConfig{logLevel: ndlpEmerg}
 			if test.podman {
-				t.Setenv("PODMAN_HOST", server.URL)
+				config.podmanHost = server.URL
 				cgroup = "user.slice/user-1000.slice/user-1000.service/user.slice/libpod-" + id + ".scope/container"
 			} else {
-				t.Setenv("DOCKER_HOST", server.URL)
+				config.dockerHost = server.URL
 				cgroup = "system.slice/docker-" + id + ".scope"
 			}
 
 			var out bytes.Buffer
-			if code := run([]string{"cgroup-name", cgroup, cgroup}, &out); code != exitSuccess {
+			if code := runWithConfig([]string{"cgroup-name", cgroup, cgroup}, &out, config); code != exitSuccess {
 				t.Fatalf("exit code: want %d got %d", exitSuccess, code)
 			}
 			got := strings.TrimSpace(out.String())
