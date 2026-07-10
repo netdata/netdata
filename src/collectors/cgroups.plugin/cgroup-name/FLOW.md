@@ -7,6 +7,26 @@ It maps the legacy `cgroup-name.sh.in` flow line-by-line by behavior. The
 binary must preserve the script's branch order, exit codes, output format,
 logging payload, environment handling, and known bugs.
 
+## Source ownership
+
+- `main.go`: process entry point only.
+- `run.go`: argv, stdout, and exit-code contract.
+- `config.go`: environment preparation and immutable invocation configuration.
+- `resolver.go`: top-level resolution orchestration and explicit result types.
+- `observability.go`: logfmt logging, shared deadline, and call timing.
+- `cgroup_resolver.go`: non-Kubernetes dispatch and local cgroup-name heuristics.
+- `container_runtime.go`: Docker/Podman command and API resolution.
+- `http.go`: bounded HTTP, Unix-socket transport, and Kubernetes TLS policy.
+- `json.go` and `labels.go`: shared ordered JSON and label value models.
+- `kubernetes.go`: Kubernetes cgroup interpretation and result assembly.
+- `kubernetes_metadata.go`: cache/source orchestration for Kubernetes metadata.
+- `kubernetes_sources.go`: API server, kubelet, kubectl, and GCP metadata sources.
+- `kubernetes_cache.go`: private atomic cache persistence and lookup.
+- `kubernetes_model.go`: Kubernetes pod JSON projection.
+
+Tests use the matching `*_test.go` ownership file. `run_test.go` protects the
+external process contract across all internal boundaries.
+
 ## Startup
 
 - Extend `PATH` before every lookup: existing `PATH` plus
