@@ -317,8 +317,8 @@ Need a dedicated integration? [Submit a feature request](https://github.com/netd
 | Integration | Description |
 |-------------|-------------|
 | [Amazon CloudWatch](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/cloudwatch/integrations/amazon_cloudwatch.md) | Monitor AWS infrastructure through Amazon CloudWatch. |
-| [AWS EC2 Compute instances](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/aws_ec2_compute_instances.md) | Track AWS EC2 instances key metrics for optimized performance and cost management. |
-| [AWS Quota](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/aws_quota.md) | Monitor AWS service quotas for effective resource usage and cost management. |
+| [AWS EC2 Compute instances](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/aws_ec2_compute_instances.md) | Monitor Amazon EC2 inventory and capacity information exposed by AWS EC2 Exporter. |
+| [AWS Quota](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/aws_quota.md) | Monitor AWS Service Quotas exposed by aws_quota_exporter. |
 | [Azure API Management](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_api_management.md) | :::info |
 | [Azure App Service](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_app_service.md) | :::info |
 | [Azure Application Gateway](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/azure_monitor/integrations/azure_application_gateway.md) | :::info |

@@ -53,6 +53,12 @@ Monitored services:
 - AWS Site-to-Site VPN (VPN connections)
 - Amazon EKS (Kubernetes control plane: API server, scheduler, etcd)
 
+This collector queries runtime metrics from Amazon CloudWatch. It complements the
+[AWS EC2 Compute instances](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/aws_ec2_compute_instances.md)
+integration, which exposes EC2 inventory and capacity information, and the
+[AWS Quota](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/prometheus/integrations/aws_quota.md) integration, which exposes
+AWS Service Quotas. These integrations use different AWS data sources and do not replace one another.
+
 [Each service is defined by a profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default) -- a YAML file declaring its CloudWatch namespace, the metrics and statistics to collect, and a chart template -- so coverage can be extended without code changes.
 
 :::tip Need a service that isn't listed?
