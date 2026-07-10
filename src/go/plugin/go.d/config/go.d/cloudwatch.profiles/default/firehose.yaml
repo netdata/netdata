@@ -62,7 +62,7 @@ template:
     instances:
       by_labels: [account_id, region, delivery_stream_name]
   charts:
-    - id: cw_firehose_records
+    - id: aws_cloudwatch_firehose_records
       context: records
       title: Firehose Records
       family: Records
@@ -73,7 +73,7 @@ template:
           name: incoming
         - selector: delivery_to_s3_records_sum
           name: delivered_s3
-    - id: cw_firehose_bytes
+    - id: aws_cloudwatch_firehose_bytes
       context: bytes
       title: Firehose Throughput
       family: Throughput
@@ -84,7 +84,7 @@ template:
           name: incoming
         - selector: delivery_to_s3_bytes_sum
           name: delivered_s3
-    - id: cw_firehose_put_requests
+    - id: aws_cloudwatch_firehose_put_requests
       context: put_requests
       title: Firehose Put Requests
       family: Requests
@@ -93,7 +93,7 @@ template:
       dimensions:
         - selector: incoming_put_requests_sum
           name: put_requests
-    - id: cw_firehose_throttled
+    - id: aws_cloudwatch_firehose_throttled
       context: throttled_records
       title: Firehose Throttled Records
       family: Throttling
@@ -102,7 +102,7 @@ template:
       dimensions:
         - selector: throttled_records_sum
           name: throttled
-    - id: cw_firehose_s3_freshness
+    - id: aws_cloudwatch_firehose_s3_freshness
       context: s3_data_freshness
       title: Firehose S3 Delivery Freshness
       family: Delivery
@@ -111,7 +111,7 @@ template:
       dimensions:
         - selector: delivery_to_s3_data_freshness_maximum
           name: age
-    - id: cw_firehose_s3_success
+    - id: aws_cloudwatch_firehose_s3_success
       context: s3_delivery_success
       title: Firehose S3 Delivery Success
       family: Delivery
@@ -123,7 +123,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_firehose_limits
+    # - id: aws_cloudwatch_firehose_limits
     #   context: throughput_limits
     #   title: Firehose Throughput Limits
     #   family: Limits
@@ -132,7 +132,7 @@ template:
     #   dimensions:
     #     - selector: bytes_per_second_limit_average
     #       name: bytes_limit
-    # - id: cw_firehose_record_limits
+    # - id: aws_cloudwatch_firehose_record_limits
     #   context: record_rate_limits
     #   title: Firehose Record Rate Limit
     #   family: Limits

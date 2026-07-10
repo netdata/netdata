@@ -22,7 +22,7 @@ template:
     instances:
       by_labels: [account_id, region, volume_id]
   charts:
-    - id: cw_ebs_stalled_io_check
+    - id: aws_cloudwatch_ebs_stalled_io_check
       context: stalled_io_check
       title: EBS Volume Stalled I/O Check
       family: Health

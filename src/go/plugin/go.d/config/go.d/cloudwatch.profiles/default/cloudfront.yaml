@@ -75,7 +75,7 @@ template:
     instances:
       by_labels: [account_id, region, distribution_id]
   charts:
-    - id: cw_cloudfront_requests
+    - id: aws_cloudwatch_cloudfront_requests
       context: requests
       title: CloudFront Requests
       family: Requests
@@ -84,7 +84,7 @@ template:
       dimensions:
         - selector: requests_sum
           name: requests
-    - id: cw_cloudfront_traffic
+    - id: aws_cloudwatch_cloudfront_traffic
       context: traffic
       title: CloudFront Traffic
       family: Traffic
@@ -95,7 +95,7 @@ template:
           name: downloaded
         - selector: bytes_uploaded_sum
           name: uploaded
-    - id: cw_cloudfront_error_rate
+    - id: aws_cloudwatch_cloudfront_error_rate
       context: error_rate
       title: CloudFront Error Rate
       family: Errors
@@ -111,7 +111,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric(s).
     # ----------------------------------------------------------------------------------------
-    # - id: cw_cloudfront_cache_hit_rate
+    # - id: aws_cloudwatch_cloudfront_cache_hit_rate
     #   context: cache_hit_rate
     #   title: CloudFront Cache Hit Rate
     #   family: Cache
@@ -120,7 +120,7 @@ template:
     #   dimensions:
     #     - selector: cache_hit_rate_average
     #       name: hit_rate
-    # - id: cw_cloudfront_status_error_rate
+    # - id: aws_cloudwatch_cloudfront_status_error_rate
     #   context: status_error_rate
     #   title: CloudFront Error Rate by Status Code
     #   family: Errors
@@ -139,7 +139,7 @@ template:
     #       name: "503"
     #     - selector: error_rate_504_average
     #       name: "504"
-    # - id: cw_cloudfront_origin_latency
+    # - id: aws_cloudwatch_cloudfront_origin_latency
     #   context: origin_latency
     #   title: CloudFront Origin Latency
     #   family: Latency

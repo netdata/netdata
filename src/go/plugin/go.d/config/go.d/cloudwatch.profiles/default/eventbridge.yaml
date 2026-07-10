@@ -76,7 +76,7 @@ template:
     instances:
       by_labels: [account_id, region, rule_name]
   charts:
-    - id: cw_eventbridge_invocations
+    - id: aws_cloudwatch_eventbridge_invocations
       context: invocations
       title: EventBridge Target Invocations
       family: Invocations
@@ -87,7 +87,7 @@ template:
           name: invocations
         - selector: failed_invocations_sum
           name: failed
-    - id: cw_eventbridge_rule_activity
+    - id: aws_cloudwatch_eventbridge_rule_activity
       context: rule_activity
       title: EventBridge Rule Activity
       family: Rules
@@ -98,7 +98,7 @@ template:
           name: matched_events
         - selector: triggered_rules_sum
           name: triggered_rules
-    - id: cw_eventbridge_latency
+    - id: aws_cloudwatch_eventbridge_latency
       context: latency
       title: EventBridge Ingestion-to-Invocation Latency
       family: Latency
@@ -114,7 +114,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric(s).
     # ----------------------------------------------------------------------------------------
-    # - id: cw_eventbridge_dlq
+    # - id: aws_cloudwatch_eventbridge_dlq
     #   context: dlq
     #   title: EventBridge Dead-Letter Invocations
     #   family: Invocations
@@ -127,7 +127,7 @@ template:
     #       name: sent_to_dlq
     #     - selector: invocations_failed_to_be_sent_to_dlq_sum
     #       name: failed_to_dlq
-    # - id: cw_eventbridge_throttled
+    # - id: aws_cloudwatch_eventbridge_throttled
     #   context: throttled_rules
     #   title: EventBridge Throttled Rules
     #   family: Rules
@@ -136,7 +136,7 @@ template:
     #   dimensions:
     #     - selector: throttled_rules_sum
     #       name: throttled
-    # - id: cw_eventbridge_attempts
+    # - id: aws_cloudwatch_eventbridge_attempts
     #   context: invocation_attempts
     #   title: EventBridge Invocation Attempts
     #   family: Invocations

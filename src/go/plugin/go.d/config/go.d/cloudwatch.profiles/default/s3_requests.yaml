@@ -81,7 +81,7 @@ template:
     instances:
       by_labels: [account_id, region, bucket_name, filter_id]
   charts:
-    - id: cw_s3_requests
+    - id: aws_cloudwatch_s3_requests
       context: requests
       title: S3 Requests
       family: Requests
@@ -98,7 +98,7 @@ template:
           name: delete
         - selector: head_requests_sum
           name: head
-    - id: cw_s3_request_errors
+    - id: aws_cloudwatch_s3_request_errors
       context: request_errors
       title: S3 Request Errors
       family: Errors
@@ -109,7 +109,7 @@ template:
           name: 4xx
         - selector: errors_5xx_sum
           name: 5xx
-    - id: cw_s3_request_latency
+    - id: aws_cloudwatch_s3_request_latency
       context: request_latency
       title: S3 Request Latency
       family: Latency
@@ -120,7 +120,7 @@ template:
           name: first_byte
         - selector: total_request_latency_average
           name: total
-    - id: cw_s3_request_traffic
+    - id: aws_cloudwatch_s3_request_traffic
       context: request_traffic
       title: S3 Request Data Transfer
       family: Traffic
@@ -134,7 +134,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_s3_extra_requests
+    # - id: aws_cloudwatch_s3_extra_requests
     #   context: extra_requests
     #   title: S3 List, Post, and Select Requests
     #   family: Requests
