@@ -78,8 +78,13 @@ LOG_FORWARDER *log_forwarder_start(void) {
     }
 
     // make sure read() will not block on this pipe
+    // On Windows, pipes do not support non-blocking mode via ioctlsocket (WSAENOTSOCK).
+    // The Windows poll path (WaitForMultipleObjects + PeekNamedPipe) guarantees data
+    // is present before read() is called, so non-blocking mode is not needed there.
+#ifndef OS_WINDOWS
     if(sock_setnonblock(lf->pipe_fds[PIPE_READ], true) != 1)
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Log forwarder: Failed to set non-blocking mode");
+#endif
 
     lf->running = true;
     __atomic_store_n(&lf->initialized, false, __ATOMIC_RELEASE);
