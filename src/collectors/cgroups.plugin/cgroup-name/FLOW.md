@@ -332,9 +332,9 @@ or:
 
 The payload before the newline is at most 8190 bytes, so the C consumer's
 8192-byte buffer receives the complete record plus newline and terminator.
-Oversized records and short/failed writes produce fatal exit `1` without
-partial stdout. The C consumer independently rejects records without a newline;
-after the normal retry ladder, monitoring continues with the raw cgroup name.
+Oversized records and short/failed writes produce fatal exit `1`; the C
+consumer rejects any incomplete record, so partial stdout is never applied.
+After the normal retry ladder, monitoring continues with the raw cgroup name.
 Kubernetes-prefixed `k8s_netdata.cloud/cgroup.name` and
 `k8s_netdata.cloud/ignore` are control annotations at that boundary; other
 `k8s_netdata.cloud/*` annotations remain ordinary labels.
