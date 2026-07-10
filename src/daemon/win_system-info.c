@@ -75,6 +75,14 @@ static void netdata_windows_cpu_from_system_info(struct rrdhost_system_info *sys
 
     char *arch = netdata_windows_arch(sysInfo.wProcessorArchitecture);
     (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_ARCHITECTURE", arch);
+
+    // GetSystemInfo() cannot fail, so CPU info (arch, logical count) is always gathered here.
+    // Record the detection method unconditionally, independent of the optional registry probe
+    // (freq/vendor/model) that may fail. Not stored in the struct; consumed from the environment
+    // by anonymous-statistics.sh (mirrors the Linux system-info.sh dispatch, and the RAM/disk
+    // detection pattern in this file).
+    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD);
+    nd_setenv("NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
 }
 
 static void netdata_windows_cpu_vendor_model(struct rrdhost_system_info *systemInfo,
@@ -111,10 +119,6 @@ static void netdata_windows_cpu_from_registry(struct rrdhost_system_info *system
 
     netdata_windows_cpu_vendor_model(systemInfo, lKey, "NETDATA_SYSTEM_CPU_VENDOR", "VendorIdentifier");
     netdata_windows_cpu_vendor_model(systemInfo, lKey, "NETDATA_SYSTEM_CPU_MODEL", "ProcessorNameString");
-    // Not stored in the struct; consumed from the environment by anonymous-statistics.sh
-    // (mirrors the Linux system-info.sh dispatch that nd_setenv()s every key).
-    (void)rrdhost_system_info_set_by_name(systemInfo, "NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD);
-    nd_setenv("NETDATA_SYSTEM_CPU_DETECTION", NETDATA_WIN_DETECTION_METHOD, 1);
 }
 
 static void netdata_windows_get_cpu(struct rrdhost_system_info *systemInfo)
