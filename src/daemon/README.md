@@ -125,7 +125,7 @@ The nice level ranges from -20 (the highest priority) to 19 (the lowest priority
 
 ## Windows WMI Startup Timeout (Windows only)
 
-When running on Windows, the Netdata Agent classifies whether the host is bare metal or a virtual machine (Hyper-V, VMware, VirtualBox, KVM, QEMU, Parallels, Xen, etc.) by probing the host's WMI, SMBIOS, and registry. To keep agent startup from blocking on a slow or unhealthy WMI provider, each WMI query uses a bounded timeout before falling back to the next detection path.
+When running on Windows, the Netdata Agent classifies whether the host is bare metal or a virtual machine (Hyper-V, VMware, VirtualBox, KVM, QEMU, Parallels, Xen, etc.) by probing the host's WMI, SMBIOS, and registry. To bound how long agent startup can wait on a slow or unhealthy WMI provider, each WMI query uses a timeout before falling back to the next detection path. This bounds — but does not eliminate — the startup delay; see the connection cap note below.
 
 <details>
 <summary>Tune the WMI startup timeout</summary>
@@ -141,7 +141,9 @@ To change the timeout, [edit](/docs/netdata-agent/configuration/README.md#edit-c
 
 **Default**: `5000` (5 seconds).
 
-**Behavior when a WMI query times out**: The probe chain falls back to the next detection path (SMBIOS strings, registry key existence) and ultimately reports `NETDATA_SYSTEM_VIRTUALIZATION = none` for bare metal or the matching hypervisor name (e.g. `microsoft` for Hyper-V, `vmware`, `oracle` for VirtualBox). A timeout is logged at debug level and never blocks startup.
+**Behavior when a WMI query times out**: The probe chain falls back to the next detection path (SMBIOS strings, registry key existence) and ultimately reports `NETDATA_SYSTEM_VIRTUALIZATION = none` for bare metal or the matching hypervisor name (e.g. `microsoft` for Hyper-V, `vmware`, `oracle` for VirtualBox). A timeout is logged at debug level.
+
+**Startup delay is bounded, not eliminated**: This option only bounds each WMI *query*. The initial WMI *connection* is bounded separately at roughly 2 minutes (a Windows `WBEM_FLAG_CONNECT_USE_MAX_WAIT` limit, independent of this option and outside the 100–60000 ms range). Startup runs two WMI probes (virtualization and container), so on an unhealthy WMI service the worst-case added startup delay is approximately a 2-minute connection plus this query timeout for each probe. Operators debugging slow Windows startup should account for the connection cap, not just this setting.
 
 This option has no effect on Linux, macOS, or FreeBSD; those operating systems use `src/daemon/system-info.sh` for virt/container detection and do not call WMI.
 
