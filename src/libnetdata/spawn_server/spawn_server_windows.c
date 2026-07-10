@@ -31,16 +31,16 @@ static void update_cygpath_env(void) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot convert Cygwin/MSYS2 base path to Windows path: %s", strerror(errno));
         return;
     }
+    nd_setenv("NETDATA_CYGWIN_BASE_PATH", win_path, 1);
+    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Cygwin/MSYS2 base path set to '%s'", win_path);
 #else
     // On UCRT64 there is no Cygwin layer. NETDATA_WINDOWS_PATH_PREFIX is the
     // Windows installation directory (e.g. "C:\Program Files\Netdata") where
     // MSYS2 is bundled, baked in at build time via cmake config.h.
     strncpyz(win_path, NETDATA_WINDOWS_PATH_PREFIX, sizeof(win_path));
-#endif
-
     nd_setenv("NETDATA_CYGWIN_BASE_PATH", win_path, 1);
-
-    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Cygwin/MSYS2 base path set to '%s'", win_path);
+    nd_log(NDLS_COLLECTORS, NDLP_INFO, "Windows install prefix set to '%s'", win_path);
+#endif
 }
 
 SPAWN_SERVER* spawn_server_create(SPAWN_SERVER_OPTIONS options __maybe_unused, const char *name, spawn_request_callback_t cb  __maybe_unused, int argc __maybe_unused, const char **argv __maybe_unused) {
