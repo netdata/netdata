@@ -170,7 +170,7 @@ int registry_db_save(void) {
     netdata_log_debug(D_REGISTRY, "REGISTRY: saved %d persons", persons_saved);
 
     // save the totals
-    fprintf(fp, "T\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\n",
+    int totals_saved = fprintf(fp, "T\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\t%016llx\n",
             registry.persons_count,
             registry.machines_count,
             registry.usages_count + 1, // this is required - it is lost on db rotation
@@ -179,7 +179,19 @@ int registry_db_save(void) {
             registry.machines_urls_count
     );
 
-    fclose(fp);
+    int saved_errno = errno;
+    if(fclose(fp) != 0 || totals_saved < 0) {
+        if(totals_saved >= 0)
+            saved_errno = errno;
+
+        unlink(tmp_filename);
+        registry.consecutive_save_failures++;
+        registry.last_save_failure = now_realtime_sec();
+        errno = saved_errno;
+        netdata_log_error("REGISTRY: Cannot save temporary registry file '%s'", tmp_filename);
+        nd_log_limits_reset();
+        return -1;
+    }
 
     errno_clear();
 
