@@ -283,8 +283,9 @@ static bool machine_guid_write_to_file(const char *directory, const char *filena
         return machine_guid_close_and_unlink_temporary(fd, tmp_filename, saved_errno, "write failure");
     }
 
-    // Keep the established daemon permissions without changing the process-wide umask.
-    if (fchmod(fd, 0440) != 0) {
+    mode_t current_umask = umask(0); // Flawfinder: ignore - read and immediately restore the startup umask.
+    umask(current_umask); // Flawfinder: ignore - restore the startup umask.
+    if (fchmod(fd, 0444 & ~current_umask) != 0) {
         int saved_errno = errno;
         nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot set permissions on temporary GUID file '%s'", tmp_filename);
         return machine_guid_close_and_unlink_temporary(fd, tmp_filename, saved_errno, "permission failure");
