@@ -655,13 +655,22 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         struct rrdengine_journalfile *journalfile = datafile->journalfile;
 
         logged = false;
+        bool acquired = false;
         size_t iterations = 10;
-        while(!datafile_acquire_for_deletion(datafile) && --iterations > 0) {
+        while(!(acquired = datafile_acquire_for_deletion(datafile)) && --iterations > 0) {
             if(!logged) {
                 netdata_log_info("Waiting to acquire data file %u of tier %d to close it...", datafile->fileno, ctx->config.tier);
                 logged = true;
             }
             sleep_usec(100 * USEC_PER_MS);
+        }
+
+        if(!acquired) {
+            // users still hold lockers on this datafile - closing and freeing it
+            // would be a use-after-free for them; leaking it at shutdown is safer
+            netdata_log_error("Cannot acquire data file %u of tier %d to close it - it is still in use - skipping it.",
+                              datafile->fileno, ctx->config.tier);
+            continue;
         }
 
         logged = false;
