@@ -140,6 +140,10 @@ static void spawn_server_release_stderr_fd(SPAWN_SERVER *server, SPAWN_INSTANCE 
         return;
 
     if(si->stderr_log_token != LOG_FORWARDER_TOKEN_NONE) {
+        // a valid token means the forwarder adopted the fd and closes it on
+        // every path (worker delete, or thread-exit cleanup); a false return
+        // means it is already closed or about to be - raw-closing the number
+        // here could close an unrelated, recycled descriptor
         log_forwarder_del_and_close_token(server->log_forwarder, si->stderr_log_token);
         si->stderr_log_token = LOG_FORWARDER_TOKEN_NONE;
     }
