@@ -242,15 +242,42 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
         goto cleanup;
     }
 
-    // Set up the STARTUPINFO structure
-    STARTUPINFO si;
+    // Build an explicit handle-inheritance list: PROC_THREAD_ATTRIBUTE_HANDLE_LIST
+    // restricts inheritance to exactly these three pipe ends.  No handle-table
+    // walk is needed; every other inheritable handle in the parent is excluded.
+    SIZE_T attr_size = 0;
+    InitializeProcThreadAttributeList(NULL, 1, 0, &attr_size);
+    LPPROC_THREAD_ATTRIBUTE_LIST attr_list = HeapAlloc(GetProcessHeap(), 0, attr_size);
+    if (!attr_list || !InitializeProcThreadAttributeList(attr_list, 1, 0, &attr_size)) {
+        spinlock_unlock(&spinlock);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Cannot init attribute list for request No %zu, command: %s",
+               instance->request_id, command);
+        if (attr_list) HeapFree(GetProcessHeap(), 0, attr_list);
+        goto cleanup;
+    }
+    HANDLE inherit_handles[3] = { stdin_read_handle, stdout_write_handle, stderr_write_handle };
+    if (!UpdateProcThreadAttribute(attr_list, 0, PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+                                   inherit_handles, sizeof(inherit_handles), NULL, NULL)) {
+        spinlock_unlock(&spinlock);
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: Cannot set handle list attribute for request No %zu, command: %s",
+               instance->request_id, command);
+        DeleteProcThreadAttributeList(attr_list);
+        HeapFree(GetProcessHeap(), 0, attr_list);
+        goto cleanup;
+    }
+
+    // Set up the STARTUPINFOEX structure
+    STARTUPINFOEX si;
     PROCESS_INFORMATION pi;
     ZeroMemory(&si, sizeof(si));
-    si.cb = sizeof(si);
-    si.dwFlags = STARTF_USESTDHANDLES;
-    si.hStdInput = stdin_read_handle;
-    si.hStdOutput = stdout_write_handle;
-    si.hStdError = stderr_write_handle;
+    si.StartupInfo.cb = sizeof(si);
+    si.StartupInfo.dwFlags = STARTF_USESTDHANDLES;
+    si.StartupInfo.hStdInput = stdin_read_handle;
+    si.StartupInfo.hStdOutput = stdout_write_handle;
+    si.StartupInfo.hStdError = stderr_write_handle;
+    si.lpAttributeList = attr_list;
 
     // Retrieve the current environment block
     char* env_block = GetEnvironmentStrings();
@@ -260,22 +287,25 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
            "SPAWN PARENT: Running request No %zu, command: '%s'",
            instance->request_id, command);
 
-    int fds_to_keep_open[] = { pipe_stdin[PIPE_READ], pipe_stdout[PIPE_WRITE], pipe_stderr[PIPE_WRITE] };
-    os_close_all_non_std_open_fds_except(fds_to_keep_open, 3, CLOSE_RANGE_CLOEXEC);
-
-    // Spawn the process
+    // EXTENDED_STARTUPINFO_PRESENT tells CreateProcess to honour lpAttributeList,
+    // which restricts handle inheritance to the three pipe ends listed above.
     errno_clear();
-    if (!CreateProcess(NULL, command, NULL, NULL, TRUE, 0, env_block, NULL, &si, &pi)) {
+    if (!CreateProcess(NULL, command, NULL, NULL, TRUE, EXTENDED_STARTUPINFO_PRESENT,
+                       env_block, NULL, &si.StartupInfo, &pi)) {
         spinlock_unlock(&spinlock);
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: cannot CreateProcess() for request No %zu, command: %s",
                instance->request_id, command);
+        DeleteProcThreadAttributeList(attr_list);
+        HeapFree(GetProcessHeap(), 0, attr_list);
         if(env_block)
             FreeEnvironmentStrings(env_block);
         goto cleanup;
     }
 
     FreeEnvironmentStrings(env_block);
+    DeleteProcThreadAttributeList(attr_list);
+    HeapFree(GetProcessHeap(), 0, attr_list);
 
     // When we create a process with the CreateProcess function, it returns two handles:
     // - one for the process (pi.hProcess) and
