@@ -18,9 +18,19 @@ type materializedChartState struct {
 	lifecycle          program.LifecyclePolicy
 	lastSeenSuccessSeq uint64
 	dimensions         map[string]*materializedDimensionState
-	orderedDims        []string
+	presentation       *materializedChartPresentation
 	orderedDimsDirty   bool
 	scratchEntries     map[string]*dimBuildEntry
+}
+
+// materializedChartPresentation is an immutable, copy-on-write snapshot of
+// derived chart presentation state. Transactional clones can share it until
+// dimension ordering or labels change.
+type materializedChartPresentation struct {
+	orderedDims     []string
+	labelValues     map[string]string
+	labelMembership []chartLabelMembership
+	labelScratch    *chartLabelScratch
 }
 
 // materializedDimensionState tracks one materialized dimension in a chart.
@@ -69,7 +79,7 @@ func (c *materializedChartState) clone() *materializedChartState {
 		meta:               c.meta,
 		lifecycle:          c.lifecycle,
 		lastSeenSuccessSeq: c.lastSeenSuccessSeq,
-		orderedDims:        append([]string(nil), c.orderedDims...),
+		presentation:       c.presentation,
 		orderedDimsDirty:   c.orderedDimsDirty,
 	}
 	if len(c.dimensions) > 0 {
@@ -108,7 +118,7 @@ func (s *materializedState) ensureChart(
 		if chart.templateID != templateID {
 			chart.templateID = templateID
 			chart.dimensions = make(map[string]*materializedDimensionState)
-			chart.orderedDims = nil
+			chart.presentation = nil
 			chart.orderedDimsDirty = false
 			chart.scratchEntries = nil
 		}
@@ -166,12 +176,17 @@ func (c *materializedChartState) removeDimension(name string) {
 }
 
 func (c *materializedChartState) orderedDimensionNames() []string {
-	if !c.orderedDimsDirty && len(c.orderedDims) == len(c.dimensions) {
-		return c.orderedDims
+	if !c.orderedDimsDirty && c.presentation != nil && len(c.presentation.orderedDims) == len(c.dimensions) {
+		return c.presentation.orderedDims
 	}
-	c.orderedDims = orderedMaterializedDimensionNames(c.dimensions)
+	next := materializedChartPresentation{}
+	if c.presentation != nil {
+		next = *c.presentation
+	}
+	next.orderedDims = orderedMaterializedDimensionNames(c.dimensions)
+	c.presentation = &next
 	c.orderedDimsDirty = false
-	return c.orderedDims
+	return c.presentation.orderedDims
 }
 
 func (c *materializedChartState) checkoutScratchEntries(dimCap int) map[string]*dimBuildEntry {
@@ -179,6 +194,13 @@ func (c *materializedChartState) checkoutScratchEntries(dimCap int) map[string]*
 		return c.scratchEntries
 	}
 	c.scratchEntries = make(map[string]*dimBuildEntry, dimCap)
+	return c.scratchEntries
+}
+
+func (c *materializedChartState) dimensionScratchEntries() map[string]*dimBuildEntry {
+	if c == nil {
+		return nil
+	}
 	return c.scratchEntries
 }
 
@@ -203,6 +225,21 @@ func (c *materializedChartState) pruneScratchEntries(currentSeq uint64) {
 		}
 		delete(c.scratchEntries, name)
 	}
+}
+
+func (c *materializedChartState) replaceLabels(
+	values map[string]string,
+	membership []chartLabelMembership,
+	scratch *chartLabelScratch,
+) {
+	next := materializedChartPresentation{}
+	if c.presentation != nil {
+		next = *c.presentation
+	}
+	next.labelValues = values
+	next.labelMembership = membership
+	next.labelScratch = scratch
+	c.presentation = &next
 }
 
 func shouldExpire(lastSeenSuccessSeq, currentSuccessSeq uint64, expireAfterCycles int) bool {

@@ -17,14 +17,14 @@ func BenchmarkBuildPlanMutableLabels(b *testing.B) {
 	for _, chartCount := range []int{100, 1000, 10000} {
 		b.Run(fmt.Sprintf("unchanged_chart_scaling/charts_%d/labels_4", chartCount), func(b *testing.B) {
 			reader := newBenchmarkMutableLabelReader(b, chartCount, 1, 4, nil)
-			benchmarkMutableLabelPlanning(b, chartCount, 1, 4, reader)
+			benchmarkMutableLabelPlanning(b, chartCount, 1, 4, 0, reader)
 		})
 	}
 
 	for _, labelCount := range []int{0, 4, 16, 64} {
 		b.Run(fmt.Sprintf("unchanged_label_scaling/charts_100/dims_10/labels_%d", labelCount), func(b *testing.B) {
 			reader := newBenchmarkMutableLabelReader(b, 100, 10, labelCount, nil)
-			benchmarkMutableLabelPlanning(b, 100, 10, labelCount, reader)
+			benchmarkMutableLabelPlanning(b, 100, 10, labelCount, 0, reader)
 		})
 	}
 
@@ -38,20 +38,20 @@ func BenchmarkBuildPlanMutableLabels(b *testing.B) {
 	} {
 		b.Run(fmt.Sprintf("unchanged_shape/charts_%d/dims_%d/labels_4", shape.charts, shape.dims), func(b *testing.B) {
 			reader := newBenchmarkMutableLabelReader(b, shape.charts, shape.dims, 4, nil)
-			benchmarkMutableLabelPlanning(b, shape.charts, shape.dims, 4, reader)
+			benchmarkMutableLabelPlanning(b, shape.charts, shape.dims, 4, 0, reader)
 		})
 	}
 
 	b.Run("one_changed/charts_1000/dims_10/labels_4", func(b *testing.B) {
 		base := newBenchmarkMutableLabelReader(b, 1000, 10, 4, nil)
 		changed := newBenchmarkMutableLabelReader(b, 1000, 10, 4, func(chart int) bool { return chart == 0 })
-		benchmarkMutableLabelPlanning(b, 1000, 10, 4, base, changed)
+		benchmarkMutableLabelPlanning(b, 1000, 10, 4, 1, base, changed)
 	})
 
 	b.Run("all_changed/charts_1000/dims_10/labels_4", func(b *testing.B) {
 		base := newBenchmarkMutableLabelReader(b, 1000, 10, 4, nil)
 		changed := newBenchmarkMutableLabelReader(b, 1000, 10, 4, func(int) bool { return true })
-		benchmarkMutableLabelPlanning(b, 1000, 10, 4, base, changed)
+		benchmarkMutableLabelPlanning(b, 1000, 10, 4, 1000, base, changed)
 	})
 }
 
@@ -90,12 +90,12 @@ func BenchmarkBuildPlanMutableLabelsCreate(b *testing.B) {
 				benchmarkMutableLabelPlanSink = plan
 			}
 			b.StopTimer()
-			benchmarkAssertActionMix(b, benchmarkMutableLabelPlanSink, chartCount, chartCount, chartCount)
+			benchmarkAssertActionMix(b, benchmarkMutableLabelPlanSink, chartCount, chartCount, 0, chartCount)
 		})
 	}
 }
 
-func benchmarkMutableLabelPlanning(b *testing.B, chartCount, dimsPerChart, labelCount int, readers ...*benchmarkSequenceReader) {
+func benchmarkMutableLabelPlanning(b *testing.B, chartCount, dimsPerChart, labelCount, expectedLabelUpdates int, readers ...*benchmarkSequenceReader) {
 	b.Helper()
 	if len(readers) == 0 {
 		b.Fatal("at least one reader is required")
@@ -112,7 +112,7 @@ func benchmarkMutableLabelPlanning(b *testing.B, chartCount, dimsPerChart, label
 	if err != nil {
 		b.Fatalf("materialize charts: %v", err)
 	}
-	benchmarkAssertActionMix(b, initial, chartCount, chartCount*dimsPerChart, chartCount)
+	benchmarkAssertActionMix(b, initial, chartCount, chartCount*dimsPerChart, 0, chartCount)
 	for _, reader := range readers {
 		reader.raw.ForEachSeriesIdentityRaw(func(metrix.SeriesIdentity, metrix.SeriesMeta, string, []metrix.Label, metrix.SampleValue) {})
 	}
@@ -136,7 +136,7 @@ func benchmarkMutableLabelPlanning(b *testing.B, chartCount, dimsPerChart, label
 		benchmarkMutableLabelPlanSink = plan
 	}
 	b.StopTimer()
-	benchmarkAssertActionMix(b, benchmarkMutableLabelPlanSink, 0, 0, chartCount)
+	benchmarkAssertActionMix(b, benchmarkMutableLabelPlanSink, 0, 0, expectedLabelUpdates, chartCount)
 }
 
 type benchmarkSequenceReader struct {
@@ -247,18 +247,19 @@ func benchmarkActionKindCount(plan Plan, kind ActionKind) int {
 	return count
 }
 
-func benchmarkAssertActionMix(b *testing.B, plan Plan, createCharts, createDimensions, updateCharts int) {
+func benchmarkAssertActionMix(b *testing.B, plan Plan, createCharts, createDimensions, updateChartLabels, updateCharts int) {
 	b.Helper()
-	wantTotal := createCharts + createDimensions + updateCharts
+	wantTotal := createCharts + createDimensions + updateChartLabels + updateCharts
 	if len(plan.Actions) != wantTotal {
 		b.Fatalf("actions = %d, want %d", len(plan.Actions), wantTotal)
 	}
 	expected := map[ActionKind]int{
-		ActionCreateChart:     createCharts,
-		ActionCreateDimension: createDimensions,
-		ActionUpdateChart:     updateCharts,
-		ActionRemoveDimension: 0,
-		ActionRemoveChart:     0,
+		ActionCreateChart:       createCharts,
+		ActionCreateDimension:   createDimensions,
+		ActionUpdateChartLabels: updateChartLabels,
+		ActionUpdateChart:       updateCharts,
+		ActionRemoveDimension:   0,
+		ActionRemoveChart:       0,
 	}
 	for kind, want := range expected {
 		if got := benchmarkActionKindCount(plan, kind); got != want {

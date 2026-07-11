@@ -197,6 +197,18 @@ source files for evidence.
   retry path handles it. Limit only fail-soft warnings/errors where collection
   continues with partial or stale data.
 
+## Chart Label Identity
+
+- Labels used by `instances.by_labels` or a dimension `name_from_label` define
+  chart or dimension identity. Changing one creates a new chart or dimension;
+  collectors MUST NOT use identity churn merely to refresh metadata.
+- `label_promotion` defines non-identity chart metadata. Chartengine reconciles
+  its effective intersection on existing charts and emits a complete
+  replacement only when it changes.
+- Collectors MUST continue publishing numeric samples at their required cadence.
+  A label-only replacement updates chart metadata; it is not a substitute for
+  numeric sample-and-hold output.
+
 ## Host Scopes
 
 - Host scopes SHOULD be used only after a product decision says the data belongs

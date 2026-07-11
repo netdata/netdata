@@ -26,43 +26,57 @@ func BenchmarkApplyPlanChartCreateLabels(b *testing.B) {
 	for _, chartCount := range []int{1, 100, 1000} {
 		for _, labelCount := range []int{0, 4, 16, 64} {
 			b.Run(fmt.Sprintf("charts_%d/labels_%d", chartCount, labelCount), func(b *testing.B) {
-				plan := benchmarkChartLabelPlan(chartCount, labelCount)
-				writer := &benchmarkByteCounter{}
-				api := netdataapi.New(writer)
-				env := EmitEnv{
-					TypeID:      "benchmark.job",
-					UpdateEvery: 1,
-					Plugin:      "go.d.plugin",
-					Module:      "benchmark",
-					JobName:     "benchmark",
-					JobLabels:   map[string]string{"configured": "label"},
-				}
-				if err := ApplyPlan(api, plan, env); err != nil {
-					b.Fatalf("warm label plan: %v", err)
-				}
-				warmBytes := writer.bytes
-				if warmBytes == 0 {
-					b.Fatal("warm label plan emitted no bytes")
-				}
-				b.SetBytes(warmBytes)
-
-				b.ReportAllocs()
-				b.ResetTimer()
-				b.ReportMetric(float64(chartCount), "charts/op")
-				b.ReportMetric(float64(chartCount*labelCount), "promoted_labels/op")
-				for range b.N {
-					writer.bytes = 0
-					if err := ApplyPlan(api, plan, env); err != nil {
-						b.Fatalf("apply label plan: %v", err)
-					}
-					benchmarkChartLabelWireBytes = writer.bytes
-				}
-				b.StopTimer()
-				if writer.bytes != warmBytes {
-					b.Fatalf("wire bytes = %d, want %d", writer.bytes, warmBytes)
-				}
+				benchmarkApplyChartLabels(b, benchmarkChartLabelPlan(chartCount, labelCount), chartCount, labelCount)
 			})
 		}
+	}
+}
+
+func BenchmarkApplyPlanChartUpdateLabels(b *testing.B) {
+	for _, chartCount := range []int{1, 100, 1000} {
+		for _, labelCount := range []int{0, 4, 16, 64} {
+			b.Run(fmt.Sprintf("charts_%d/labels_%d", chartCount, labelCount), func(b *testing.B) {
+				benchmarkApplyChartLabels(b, benchmarkChartLabelUpdatePlan(chartCount, labelCount), chartCount, labelCount)
+			})
+		}
+	}
+}
+
+func benchmarkApplyChartLabels(b *testing.B, plan Plan, chartCount, labelCount int) {
+	b.Helper()
+	writer := &benchmarkByteCounter{}
+	api := netdataapi.New(writer)
+	env := EmitEnv{
+		TypeID:      "benchmark.job",
+		UpdateEvery: 1,
+		Plugin:      "go.d.plugin",
+		Module:      "benchmark",
+		JobName:     "benchmark",
+		JobLabels:   map[string]string{"configured": "label"},
+	}
+	if err := ApplyPlan(api, plan, env); err != nil {
+		b.Fatalf("warm label plan: %v", err)
+	}
+	warmBytes := writer.bytes
+	if warmBytes == 0 {
+		b.Fatal("warm label plan emitted no bytes")
+	}
+	b.SetBytes(warmBytes)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	b.ReportMetric(float64(chartCount), "charts/op")
+	b.ReportMetric(float64(chartCount*labelCount), "promoted_labels/op")
+	for range b.N {
+		writer.bytes = 0
+		if err := ApplyPlan(api, plan, env); err != nil {
+			b.Fatalf("apply label plan: %v", err)
+		}
+		benchmarkChartLabelWireBytes = writer.bytes
+	}
+	b.StopTimer()
+	if writer.bytes != warmBytes {
+		b.Fatalf("wire bytes = %d, want %d", writer.bytes, warmBytes)
 	}
 }
 
@@ -118,6 +132,20 @@ func benchmarkChartLabelPlan(chartCount, labelCount int) Plan {
 				Type:    chartengine.ChartTypeLine,
 			},
 			Labels: labels,
+		})
+	}
+	return Plan{Actions: actions}
+}
+
+func benchmarkChartLabelUpdatePlan(chartCount, labelCount int) Plan {
+	created := benchmarkChartLabelPlan(chartCount, labelCount)
+	actions := make([]EngineAction, 0, chartCount)
+	for _, action := range created.Actions {
+		create := action.(chartengine.CreateChartAction)
+		actions = append(actions, chartengine.UpdateChartLabelsAction{
+			ChartID: create.ChartID,
+			Meta:    create.Meta,
+			Labels:  create.Labels,
 		})
 	}
 	return Plan{Actions: actions}

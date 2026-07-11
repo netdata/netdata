@@ -4,6 +4,7 @@ package chartengine
 
 import (
 	"fmt"
+	"maps"
 	"math"
 	"sort"
 	"strconv"
@@ -50,7 +51,9 @@ func (v labelSliceView) CloneMap() map[string]string {
 	return out
 }
 
-// Plan is the deterministic planner output consumed by chartemit.
+// Plan is the deterministic planner output consumed by chartemit. Actions and
+// their referenced maps and slices are immutable snapshots; consumers must not
+// mutate them.
 //
 // Current scope:
 //   - create/update/remove actions for chart and dimension lifecycle,
@@ -101,7 +104,7 @@ type chartState struct {
 	chartID         string
 	meta            program.ChartMeta
 	lifecycle       program.LifecyclePolicy
-	labels          *chartLabelAccumulator
+	labelScratch    *chartLabelScratch
 	entries         map[string]*dimBuildEntry
 	observedCount   int
 	currentBuildSeq uint64
@@ -260,6 +263,7 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 	actionCounts := actionKindCounts(out.Actions)
 	sample.actionCreateChart = actionCounts.actionCreateChart
 	sample.actionCreateDimension = actionCounts.actionCreateDimension
+	sample.actionUpdateChartLabels = actionCounts.actionUpdateChartLabels
 	sample.actionUpdateChart = actionCounts.actionUpdateChart
 	sample.actionRemoveDimension = actionCounts.actionRemoveDimension
 	sample.actionRemoveChart = actionCounts.actionRemoveChart
@@ -366,7 +370,15 @@ func (e *Engine) preparePlanBuildContext(
 func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 	var firstErr error
 	buildSeq := ctx.collectMeta.LastSuccessSeq
-	process := func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels metrix.LabelView, v metrix.SampleValue) {
+	process := func(
+		identity metrix.SeriesIdentity,
+		meta metrix.SeriesMeta,
+		name string,
+		labels metrix.LabelView,
+		rawLabels []metrix.Label,
+		raw bool,
+		v metrix.SampleValue,
+	) {
 		ctx.seriesScanned++
 		if firstErr != nil {
 			return
@@ -424,7 +436,7 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 		}
 
 		for _, route := range routes {
-			if err := ctx.accumulateRoute(ctx.index, route, meta, labels, v); err != nil {
+			if err := ctx.accumulateRoute(ctx.index, route, identity, meta, labels, rawLabels, raw, v); err != nil {
 				firstErr = err
 				return
 			}
@@ -435,13 +447,13 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 		view := &labelSliceView{}
 		rawIter.ForEachSeriesIdentityRaw(func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels []metrix.Label, v metrix.SampleValue) {
 			view.items = labels
-			process(identity, meta, name, view, v)
+			process(identity, meta, name, view, labels, true, v)
 		})
 		return firstErr
 	}
 
 	ctx.flat.ForEachSeriesIdentity(func(identity metrix.SeriesIdentity, meta metrix.SeriesMeta, name string, labels metrix.LabelView, v metrix.SampleValue) {
-		process(identity, meta, name, labels, v)
+		process(identity, meta, name, labels, nil, false, v)
 	})
 	return firstErr
 }
@@ -449,8 +461,11 @@ func (e *Engine) scanPlanSeries(ctx *planBuildContext) error {
 func (ctx *planBuildContext) accumulateRoute(
 	index matchIndex,
 	route routeBinding,
+	identity metrix.SeriesIdentity,
 	seriesMeta metrix.SeriesMeta,
 	labels metrix.LabelView,
+	rawLabels []metrix.Label,
+	raw bool,
 	value metrix.SampleValue,
 ) error {
 	cs, exists := ctx.chartsByID[route.ChartID]
@@ -486,28 +501,35 @@ func (ctx *planBuildContext) accumulateRoute(
 
 		dimCap := ctx.dimCapHints[route.ChartID]
 		var entries map[string]*dimBuildEntry
-		var labelsAcc *chartLabelAccumulator
-		if matChart := ctx.materializedByID[route.ChartID]; matChart != nil {
+		matChart := ctx.materializedByID[route.ChartID]
+		matchingMaterializedChart := matChart != nil && matChart.templateID == route.ChartTemplateID
+		if matchingMaterializedChart {
 			entries = matChart.checkoutScratchEntries(dimCap)
-			// Labels are only emitted on chart creation, so skip observe work for existing charts.
-			labelsAcc = nil
 		} else {
 			entries = make(map[string]*dimBuildEntry, dimCap)
-			labelsAcc = newAutogenChartLabelAccumulator()
-			if !route.Autogen {
-				chart, ok := index.chartsByID[route.ChartTemplateID]
-				if !ok {
-					return fmt.Errorf("chartengine: route references unknown chart template %q", route.ChartTemplateID)
-				}
-				labelsAcc = newChartLabelAccumulator(chart)
-			}
 		}
+
+		var labelScratch *chartLabelScratch
+		if matchingMaterializedChart && matChart.presentation != nil {
+			labelScratch = matChart.presentation.labelScratch
+		}
+		if labelScratch == nil && route.Autogen {
+			labelScratch = &chartLabelScratch{accumulator: newAutogenChartLabelAccumulator()}
+		}
+		if labelScratch == nil {
+			chart, ok := index.chartsByID[route.ChartTemplateID]
+			if !ok {
+				return fmt.Errorf("chartengine: route references unknown chart template %q", route.ChartTemplateID)
+			}
+			labelScratch = &chartLabelScratch{accumulator: newChartLabelAccumulator(chart)}
+		}
+		labelScratch.resetObservations()
 		cs = &chartState{
 			templateID:      route.ChartTemplateID,
 			chartID:         route.ChartID,
 			meta:            route.Meta,
 			lifecycle:       route.Lifecycle,
-			labels:          labelsAcc,
+			labelScratch:    labelScratch,
 			entries:         entries,
 			currentBuildSeq: ctx.buildCycle,
 		}
@@ -547,8 +569,8 @@ func (ctx *planBuildContext) accumulateRoute(
 		entry.value += value
 	}
 
-	if cs.labels != nil {
-		if err := cs.labels.observe(labels, route.DimensionKeyLabel); err != nil {
+	if cs.labelScratch != nil {
+		if err := cs.labelScratch.observe(identity, labels, rawLabels, raw, route.DimensionKeyLabel); err != nil {
 			return err
 		}
 	}
@@ -580,21 +602,30 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 	for _, chartID := range chartIDs {
 		cs := ctx.chartsByID[chartID]
 		matChart, chartCreated := ctx.materialized.ensureChart(cs.chartID, cs.templateID, cs.meta, cs.lifecycle)
-		if chartCreated {
-			chartLabels := map[string]string(nil)
-			if cs.labels != nil {
-				labels, err := cs.labels.materialize()
-				if err != nil {
-					return err
-				}
-				chartLabels = labels
+		previousPresentation := matChart.presentation
+		membershipChanged := previousPresentation == nil || !cs.labelScratch.membershipMatches(previousPresentation.labelMembership)
+		if membershipChanged {
+			if err := cs.labelScratch.reconcile(); err != nil {
+				return err
 			}
-			ctx.out.Actions = append(ctx.out.Actions, CreateChartAction{
-				ChartTemplateID: cs.templateID,
-				ChartID:         cs.chartID,
-				Meta:            cs.meta,
-				Labels:          chartLabels,
-			})
+			chartLabels := cs.labelScratch.accumulator.materialize()
+			matChart.replaceLabels(chartLabels, cs.labelScratch.cloneMembership(), cs.labelScratch)
+			if chartCreated {
+				ctx.out.Actions = append(ctx.out.Actions, CreateChartAction{
+					ChartTemplateID: cs.templateID,
+					ChartID:         cs.chartID,
+					Meta:            cs.meta,
+					Labels:          chartLabels,
+				})
+			} else if previousPresentation == nil || !maps.Equal(previousPresentation.labelValues, chartLabels) {
+				ctx.out.Actions = append(ctx.out.Actions, UpdateChartLabelsAction{
+					ChartID: cs.chartID,
+					Meta:    cs.meta,
+					Labels:  chartLabels,
+				})
+			}
+		} else if chartCreated {
+			return fmt.Errorf("chartengine: new chart %q unexpectedly matched prior label membership", cs.chartID)
 		}
 		matChart.lastSeenSuccessSeq = ctx.collectMeta.LastSuccessSeq
 
