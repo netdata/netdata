@@ -4,6 +4,7 @@ package cloudwatch
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -14,22 +15,22 @@ import (
 )
 
 // querySample is one observed value for a series identity in a collect cycle.
-// account+region+period is its scheduling group (drives retention re-emit scheduling).
+// target+region+period is its scheduling group (drives retention re-emit scheduling).
 type querySample struct {
 	seriesName string
 	labels     []metrix.Label
 	tagLabels  []metrix.Label // non-identity enrichment labels; emitted but not in observedKey
 	value      float64
-	account    string
+	target     string
 	region     string
 	period     int
 }
 
 // plannedQuery ties a synthetic GetMetricData query Id back to the series it
-// populates and the account/region/period that determine its client and window.
+// populates and the target/region/period that determine its client and window.
 type plannedQuery struct {
 	id         string
-	account    string
+	target     string
 	region     string
 	period     int
 	seriesName string
@@ -39,22 +40,52 @@ type plannedQuery struct {
 	query      cwtypes.MetricDataQuery
 }
 
-// queryGroupKey groups queries that share a CloudWatch client and time window; it is
-// also the per-(account, region, period) scheduling unit. account is part of the key
-// because the same region is queried under each account's own credentials (a distinct
-// client), so accounts must batch and schedule independently.
+// queryGroupKey groups queries that share a target client and time window.
 type queryGroupKey struct {
-	account string
-	region  string
-	period  int
+	target string
+	region string
+	period int
 }
 
 func (q plannedQuery) groupKey() queryGroupKey {
-	return queryGroupKey{account: q.account, region: q.region, period: q.period}
+	return queryGroupKey{target: q.target, region: q.region, period: q.period}
 }
 
 func (s querySample) groupKey() queryGroupKey {
-	return queryGroupKey{account: s.account, region: s.region, period: s.period}
+	return queryGroupKey{target: s.target, region: s.region, period: s.period}
+}
+
+func (c *Collector) invalidateQueryPlan() {
+	c.planDirty = true
+}
+
+// currentQueryPlan returns the immutable query blueprint for the current target,
+// discovery, and tag snapshots. Those inputs change on a much slower cadence than
+// Collect, so rebuilding only on invalidation avoids repeating per-series
+// allocations during every collection cycle.
+func (c *Collector) currentQueryPlan() []plannedQuery {
+	if !c.planDirty {
+		return c.queryPlan
+	}
+	previous := c.queryPlan
+	c.queryPlan = c.buildQueryPlan()
+	c.queryGroups, c.queriesByGroup = groupQueryPlan(c.queryPlan)
+	c.observations.reconcilePlan(previous, c.queryPlan)
+	c.planDirty = false
+	return c.queryPlan
+}
+
+func groupQueryPlan(plan []plannedQuery) ([]queryGroupKey, map[queryGroupKey][]plannedQuery) {
+	byGroup := make(map[queryGroupKey][]plannedQuery)
+	var order []queryGroupKey
+	for _, query := range plan {
+		key := query.groupKey()
+		if _, ok := byGroup[key]; !ok {
+			order = append(order, key)
+		}
+		byGroup[key] = append(byGroup[key], query)
+	}
+	return order, byGroup
 }
 
 // queryWindow computes the GetMetricData time window for a metric of the given
@@ -72,29 +103,57 @@ func queryWindow(now time.Time, period, queryOffset int) (start, end time.Time) 
 	return time.Unix(endSec-periodSec, 0).UTC(), time.Unix(endSec, 0).UTC()
 }
 
-// buildQueryPlan builds one GetMetricData query per (account × instance × metric ×
-// statistic) across the discovery snapshot. Query Ids are q0..qN; each maps back to
-// its series name and instance labels via the returned plannedQuery.
+// buildQueryPlan follows compiled scope order and keeps the first query for each
+// final emitted identity. This resolves dynamic overlap when distinct targets later
+// resolve to the same account and discover the same resource.
 func (c *Collector) buildQueryPlan() []plannedQuery {
+	if c.plan == nil {
+		return nil
+	}
 	var plan []plannedQuery
 	idx := 0
-	for _, acct := range c.accounts {
-		for _, prof := range c.profiles {
-			nDims := len(prof.Config.Instance.Dimensions)
-			for _, region := range c.regions() {
-				instances := c.discovery.Instances[discoveryKey{Account: acct.accountID, Profile: prof.Name, Region: region}]
-				for _, inst := range instances {
-					if len(inst.DimensionValues) != nDims {
-						continue // defensive: snapshot/profile mismatch
-					}
-					labels, dims := c.instanceLabelsAndDims(acct.accountID, prof, region, inst)
-					tagLabels := c.tagLabelsFor(acct.accountID, region, prof, inst.DimensionValues)
-					plan = append(plan, c.metricQueries(acct.accountID, prof, region, labels, tagLabels, dims, &idx)...)
+	seen := make(map[string]struct{})
+	shadowed := 0
+	for _, scope := range c.plan.Scopes {
+		resolved, ok := c.resolvedTargetByRef(scope.Target.Name)
+		if !ok {
+			continue
+		}
+		prof := scope.Profile
+		nDims := len(prof.Config.Instance.Dimensions)
+		instances := c.discovery.Instances[discoveryKey{Target: scope.Target.Name, Profile: prof.Name, Region: scope.Region}]
+		for _, inst := range instances {
+			if len(inst.DimensionValues) != nDims {
+				continue // defensive: snapshot/profile mismatch
+			}
+			labels, dims := c.instanceLabelsAndDims(resolved.accountID, prof, scope.Region, inst)
+			tagLabels := c.tagLabelsFor(scope.Target.Name, resolved.accountID, scope.Region, prof, inst.DimensionValues)
+			queries := c.metricQueries(scope.Target.Name, prof, scope.Region, labels, tagLabels, dims, &idx)
+			for _, query := range queries {
+				key := finalSeriesKey(query.seriesName, query.labels)
+				if _, ok := seen[key]; ok {
+					shadowed++
+					continue
 				}
+				seen[key] = struct{}{}
+				plan = append(plan, query)
 			}
 		}
 	}
+	if shadowed > 0 {
+		c.Limit(logKeyRuleShadowed, 1, recurringLogEvery).
+			Warningf("CloudWatch collection rules shadowed %d duplicate final series; earliest rule/target order owns each series", shadowed)
+	}
 	return plan
+}
+
+func finalSeriesKey(seriesName string, labels []metrix.Label) string {
+	var key strings.Builder
+	key.WriteString(seriesName)
+	for _, label := range labels {
+		key.WriteString("\x00" + label.Key + "\x00" + label.Value)
+	}
+	return key.String()
 }
 
 // instanceLabelsAndDims builds the metrix identity labels
@@ -123,7 +182,7 @@ func (c *Collector) instanceLabelsAndDims(accountID string, prof cwprofiles.Reso
 
 // metricQueries builds the planned queries for one instance: one per
 // (metric × statistic), allocating sequential q<idx> ids through idx.
-func (c *Collector) metricQueries(accountID string, prof cwprofiles.ResolvedProfile, region string, labels, tagLabels []metrix.Label, dims []cwtypes.Dimension, idx *int) []plannedQuery {
+func (c *Collector) metricQueries(targetRef string, prof cwprofiles.ResolvedProfile, region string, labels, tagLabels []metrix.Label, dims []cwtypes.Dimension, idx *int) []plannedQuery {
 	var out []plannedQuery
 	for _, m := range prof.Config.Metrics {
 		period := prof.Config.EffectivePeriod(m)
@@ -133,7 +192,7 @@ func (c *Collector) metricQueries(accountID string, prof cwprofiles.ResolvedProf
 			*idx++
 			out = append(out, plannedQuery{
 				id:         id,
-				account:    accountID,
+				target:     targetRef,
 				region:     region,
 				period:     period,
 				seriesName: cwprofiles.ExportedSeriesName(prof.Name, m.ID, token),

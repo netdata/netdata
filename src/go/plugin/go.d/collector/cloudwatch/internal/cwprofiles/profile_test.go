@@ -34,12 +34,12 @@ func validProfile() Profile {
 			},
 			Charts: []charttpl.Chart{
 				{
-					ID: "cw_ec2_cpu", Context: "cpu_utilization", Title: "EC2 CPU Utilization",
+					ID: "aws_cloudwatch_ec2_cpu", Context: "cpu_utilization", Title: "EC2 CPU Utilization",
 					Family: "CPU", Units: "percentage", Algorithm: "absolute",
 					Dimensions: []charttpl.Dimension{{Selector: "cpu_utilization_average", Name: "average"}},
 				},
 				{
-					ID: "cw_ec2_network", Context: "network_traffic", Title: "EC2 Network Traffic",
+					ID: "aws_cloudwatch_ec2_network", Context: "network_traffic", Title: "EC2 Network Traffic",
 					Family: "Network", Units: "bytes/s", Algorithm: "absolute",
 					Dimensions: []charttpl.Dimension{{Selector: "network_in_sum", Name: "in"}},
 				},
@@ -86,6 +86,37 @@ func TestProfile_Validate(t *testing.T) {
 			mutate:      func(p *Profile) { p.Period = 0 },
 			wantErr:     true,
 			errContains: "period",
+		},
+		"supported regions valid": {
+			mutate: func(p *Profile) { p.SupportedRegions = []string{"us-east-1", "eu-west-1"} },
+		},
+		"supported regions eusc partition valid": {
+			mutate: func(p *Profile) { p.SupportedRegions = []string{"eusc-de-east-1"} },
+		},
+		"supported region with surrounding whitespace invalid": {
+			mutate:      func(p *Profile) { p.SupportedRegions = []string{" us-east-1 "} },
+			wantErr:     true,
+			errContains: "canonical",
+		},
+		"supported region with uppercase invalid": {
+			mutate:      func(p *Profile) { p.SupportedRegions = []string{"US-EAST-1"} },
+			wantErr:     true,
+			errContains: "canonical",
+		},
+		"supported regions explicit empty invalid": {
+			mutate:      func(p *Profile) { p.SupportedRegions = []string{} },
+			wantErr:     true,
+			errContains: "supported_regions",
+		},
+		"supported regions invalid code": {
+			mutate:      func(p *Profile) { p.SupportedRegions = []string{"global"} },
+			wantErr:     true,
+			errContains: "supported_regions",
+		},
+		"supported regions duplicate": {
+			mutate:      func(p *Profile) { p.SupportedRegions = []string{"us-east-1", "us-east-1"} },
+			wantErr:     true,
+			errContains: "duplicate",
 		},
 		"per-metric period override invalid": {
 			mutate:      func(p *Profile) { p.Metrics[0].Period = 45 },
@@ -306,6 +337,19 @@ func TestProfile_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProfile_SupportedRegionsCanonicalAndMatch(t *testing.T) {
+	p := validProfile()
+	p.SupportedRegions = []string{"us-east-1", "eu-west-1"}
+	require.NoError(t, p.Normalize("ec2"))
+	require.NoError(t, p.Validate("profile", "ec2"))
+	assert.Equal(t, []string{"us-east-1", "eu-west-1"}, p.SupportedRegions)
+	assert.True(t, p.SupportsRegion("US-EAST-1"))
+	assert.False(t, p.SupportsRegion("ap-southeast-1"))
+
+	unrestricted := validProfile()
+	assert.True(t, unrestricted.SupportsRegion("ap-southeast-1"))
 }
 
 func TestWalkChartAlgorithms_NestedGroup(t *testing.T) {

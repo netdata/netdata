@@ -862,6 +862,11 @@ bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_sta
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
+    if(unlikely(!parser)) {
+        stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
+        return false;
+    }
+
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
         ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),

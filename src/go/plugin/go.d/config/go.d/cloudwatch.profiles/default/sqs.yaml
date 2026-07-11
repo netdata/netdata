@@ -61,7 +61,7 @@ template:
     instances:
       by_labels: [account_id, region, queue_name]
   charts:
-    - id: cw_sqs_message_throughput
+    - id: aws_cloudwatch_sqs_message_throughput
       context: message_throughput
       title: SQS Message Throughput
       family: Messages
@@ -74,7 +74,7 @@ template:
           name: received
         - selector: number_of_messages_deleted_sum
           name: deleted
-    - id: cw_sqs_empty_receives
+    - id: aws_cloudwatch_sqs_empty_receives
       context: empty_receives
       title: SQS Empty Receives
       family: Messages
@@ -83,7 +83,7 @@ template:
       dimensions:
         - selector: number_of_empty_receives_sum
           name: empty
-    - id: cw_sqs_queue_depth
+    - id: aws_cloudwatch_sqs_queue_depth
       context: queue_depth
       title: SQS Queue Depth
       family: Queue
@@ -96,7 +96,7 @@ template:
           name: not_visible
         - selector: approximate_number_of_messages_delayed_average
           name: delayed
-    - id: cw_sqs_oldest_message_age
+    - id: aws_cloudwatch_sqs_oldest_message_age
       context: oldest_message_age
       title: SQS Age of Oldest Message
       family: Queue
@@ -105,7 +105,7 @@ template:
       dimensions:
         - selector: approximate_age_of_oldest_message_average
           name: age
-    - id: cw_sqs_message_size
+    - id: aws_cloudwatch_sqs_message_size
       context: message_size
       title: SQS Sent Message Size
       family: Messages
@@ -117,7 +117,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_sqs_deduplicated_messages
+    # - id: aws_cloudwatch_sqs_deduplicated_messages
     #   context: deduplicated_messages
     #   title: SQS Deduplicated Sent Messages
     #   family: Messages
@@ -126,7 +126,7 @@ template:
     #   dimensions:
     #     - selector: number_of_deduplicated_sent_messages_sum
     #       name: deduplicated
-    # - id: cw_sqs_inflight_groups
+    # - id: aws_cloudwatch_sqs_inflight_groups
     #   context: inflight_message_groups
     #   title: SQS Message Groups With Inflight Messages
     #   family: Queue

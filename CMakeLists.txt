@@ -1686,6 +1686,8 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/mem-pgfaults.h
         src/collectors/common-contexts/mem-available.h
         src/collectors/common-contexts/power-supply.h
+        src/collectors/common-contexts/hw-sensors.h
+        src/collectors/common-contexts/hw-sensors-function.h
 )
 
 set(INTERCOMMUNICATION_COLLECTORS_FILES

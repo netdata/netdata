@@ -3,6 +3,7 @@
 package cloudwatch
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
@@ -62,10 +64,9 @@ func ec2QueryProfile() cwprofiles.Profile {
 
 func ec2QueryCollector(regions []string, instancesByRegion map[string][][]string) *Collector {
 	c := New()
-	c.Config.Regions = regions
+	configureExactRule(c, regions, []string{"ec2"})
 	c.applyDefaults()
-	c.accounts = []cwAccount{{accountID: "123456789012"}}
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}}
+	setSingleTargetPlan(c, "123456789012", regions, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 
 	insts := make(map[discoveryKey][]discoveredInstance)
 	for region, list := range instancesByRegion {
@@ -73,7 +74,7 @@ func ec2QueryCollector(regions []string, instancesByRegion map[string][][]string
 		for _, vals := range list {
 			di = append(di, discoveredInstance{DimensionValues: vals})
 		}
-		insts[discoveryKey{Account: "123456789012", Profile: "ec2", Region: region}] = di
+		insts[discoveryKey{Target: "base", Profile: "ec2", Region: region}] = di
 	}
 	c.discovery = discoverySnapshot{Instances: insts}
 	return c
@@ -135,10 +136,8 @@ func TestBuildQueryPlan_ConstantDimension(t *testing.T) {
 	// A constant (match-and-query-only) dimension is sent in the GetMetricData
 	// query but is not emitted as an identity label.
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
-	c.applyDefaults()
-	c.accounts = []cwAccount{{accountID: "123456789012"}}
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "cloudfront", Config: cwprofiles.Profile{
+	configureExactRule(c, []string{"us-east-1"}, []string{"cloudfront"})
+	profiles := []cwprofiles.ResolvedProfile{{Name: "cloudfront", Config: cwprofiles.Profile{
 		Namespace: "AWS/CloudFront",
 		Period:    300,
 		Instance: cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{
@@ -149,8 +148,9 @@ func TestBuildQueryPlan_ConstantDimension(t *testing.T) {
 			{ID: "requests", MetricName: "Requests", Statistics: []string{"sum"}, Rate: true},
 		},
 	}}}
+	setSingleTargetPlan(c, "123456789012", []string{"us-east-1"}, profiles)
 	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
-		{Account: "123456789012", Profile: "cloudfront", Region: "us-east-1"}: {{DimensionValues: []string{"E1", "Global"}}},
+		{Target: "base", Profile: "cloudfront", Region: "us-east-1"}: {{DimensionValues: []string{"E1", "Global"}}},
 	}}
 
 	plan := c.buildQueryPlan()
@@ -194,6 +194,47 @@ func TestBuildQueryPlan_MultiRegionAndEmpty(t *testing.T) {
 	assert.Empty(t, empty.buildQueryPlan(), "no discovered instances -> empty plan")
 }
 
+func TestCurrentQueryPlan_CachesUntilInputsChange(t *testing.T) {
+	c := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{
+		"us-east-1": {{"i-1"}},
+	})
+
+	first := c.currentQueryPlan()
+	require.NotEmpty(t, first)
+	second := c.currentQueryPlan()
+	require.NotEmpty(t, second)
+	assert.Same(t, &first[0], &second[0], "unchanged inputs reuse the compiled query blueprint")
+	group := first[0].groupKey()
+	c.observations.nextQueryAt[group] = time.Unix(1_000_000_300, 0)
+
+	c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}] = append(
+		c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}],
+		discoveredInstance{DimensionValues: []string{"i-2"}},
+	)
+	assert.Len(t, c.currentQueryPlan(), len(first), "mutating an input without invalidation does not rebuild")
+
+	c.invalidateQueryPlan()
+	assert.Len(t, c.currentQueryPlan(), len(first)*2, "input invalidation rebuilds the query blueprint")
+	assert.NotContains(t, c.observations.nextQueryAt, group, "adding a query to an existing group makes the expanded group immediately due")
+}
+
+func BenchmarkCurrentQueryPlanCached(b *testing.B) {
+	instances := make([][]string, 256)
+	for i := range instances {
+		instances[i] = []string{fmt.Sprintf("i-%d", i)}
+	}
+	c := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{"us-east-1": instances})
+	require.NotEmpty(b, c.currentQueryPlan())
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if len(c.currentQueryPlan()) == 0 {
+			b.Fatal("cached plan unexpectedly empty")
+		}
+	}
+}
+
 // gmdCloudWatch is a thread-safe GetMetricData fake: every query gets f.value
 // unless its Id is in gaps (or gapAll).
 type gmdCloudWatch struct {
@@ -203,6 +244,7 @@ type gmdCloudWatch struct {
 	value  float64
 	gaps   map[string]bool
 	gapAll bool
+	status cwtypes.StatusCode
 }
 
 func (f *gmdCloudWatch) ListMetrics(context.Context, *cloudwatch.ListMetricsInput, ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
@@ -219,7 +261,7 @@ func (f *gmdCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetri
 	results := make([]cwtypes.MetricDataResult, 0, len(in.MetricDataQueries))
 	for _, q := range in.MetricDataQueries {
 		id := aws.ToString(q.Id)
-		r := cwtypes.MetricDataResult{Id: aws.String(id)}
+		r := cwtypes.MetricDataResult{Id: aws.String(id), StatusCode: f.status}
 		if !f.gapAll && !f.gaps[id] {
 			r.Values = []float64{f.value}
 			r.Timestamps = []time.Time{time.Unix(1, 0)}
@@ -275,13 +317,68 @@ func TestExecuteQueries(t *testing.T) {
 	}
 }
 
+func TestExecuteQueries_ReportsIndependentChunkFailures(t *testing.T) {
+	const sensitive = "SENSITIVE_API_MESSAGE"
+	var logs bytes.Buffer
+	c := New()
+	c.Logger = logger.NewWithWriter(&logs)
+	c.applyDefaults()
+	failing := &gmdCloudWatch{err: errors.New(sensitive)}
+	c.clients.clients[clientKey{target: "target-a", region: "us-east-1"}] = failing
+	c.clients.clients[clientKey{target: "target-b", region: "eu-west-1"}] = failing
+	plan := []plannedQuery{
+		{id: "q0", target: "target-a", region: "us-east-1", period: 300, query: cwtypes.MetricDataQuery{Id: aws.String("q0")}},
+		{id: "q1", target: "target-b", region: "eu-west-1", period: 600, query: cwtypes.MetricDataQuery{Id: aws.String("q1")}},
+	}
+
+	_, _, _, err := c.executeQueries(context.Background(), plan, time.Unix(1_000_000_000, 0))
+	require.Error(t, err)
+	assert.Contains(t, logs.String(), "target-a")
+	assert.Contains(t, logs.String(), "us-east-1")
+	assert.Contains(t, logs.String(), "target-b")
+	assert.Contains(t, logs.String(), "eu-west-1")
+	assert.Contains(t, logs.String(), "period 300s")
+	assert.Contains(t, logs.String(), "period 600s")
+	assert.NotContains(t, logs.String(), sensitive)
+}
+
+func TestExecuteQueries_ReportsIndependentForbiddenResults(t *testing.T) {
+	var logs bytes.Buffer
+	c := New()
+	c.Logger = logger.NewWithWriter(&logs)
+	c.applyDefaults()
+	c.clients.clients[clientKey{target: "target-a", region: "us-east-1"}] = &gmdCloudWatch{status: cwtypes.StatusCodeForbidden}
+	c.clients.clients[clientKey{target: "target-b", region: "eu-west-1"}] = &gmdCloudWatch{status: cwtypes.StatusCodeForbidden}
+	plan := []plannedQuery{
+		forbiddenTestQuery("q0", "target-a", "us-east-1", "AWS/EC2", 300),
+		forbiddenTestQuery("q1", "target-b", "eu-west-1", "AWS/RDS", 600),
+	}
+
+	samples, _, _, err := c.executeQueries(context.Background(), plan, time.Unix(1_000_000_000, 0))
+	require.NoError(t, err)
+	assert.Empty(t, samples)
+	for _, want := range []string{"target-a", "us-east-1", "AWS/EC2", "300s", "target-b", "eu-west-1", "AWS/RDS", "600s"} {
+		assert.Contains(t, logs.String(), want)
+	}
+}
+
+func forbiddenTestQuery(id, target, region, namespace string, period int) plannedQuery {
+	return plannedQuery{
+		id: id, target: target, region: region, period: period,
+		query: cwtypes.MetricDataQuery{
+			Id:         aws.String(id),
+			MetricStat: &cwtypes.MetricStat{Metric: &cwtypes.Metric{Namespace: aws.String(namespace)}},
+		},
+	}
+}
+
 // TestBuildChunkJobs verifies query batching into GetMetricData-sized chunks (one
-// job per chunk) and that a group whose (account, region) client failed is skipped and
+// job per chunk) and that a group whose (target, region) client failed is skipped and
 // marked failed. chunkSize is an explicit argument, so production passes the fixed
 // metricsPerQuery (the AWS 500/call maximum) while tests exercise the multi-chunk
 // split without constructing 500+ queries.
 func TestBuildChunkJobs(t *testing.T) {
-	key := queryGroupKey{region: "us-east-1", period: 300}
+	key := queryGroupKey{target: "base", region: "us-east-1", period: 300}
 	groupOf := func(n int) map[queryGroupKey][]cwtypes.MetricDataQuery {
 		qs := make([]cwtypes.MetricDataQuery, n)
 		for i := range qs {
@@ -289,28 +386,27 @@ func TestBuildChunkJobs(t *testing.T) {
 		}
 		return map[queryGroupKey][]cwtypes.MetricDataQuery{key: qs}
 	}
-	ok := map[clientKey]cloudwatchClient{{region: "us-east-1"}: &gmdCloudWatch{}}
+	ok := map[clientKey]cloudwatchClient{{target: "base", region: "us-east-1"}: &gmdCloudWatch{}}
 
 	tests := map[string]struct {
 		groups       map[queryGroupKey][]cwtypes.MetricDataQuery
 		groupClients map[clientKey]cloudwatchClient
-		groupErrs    map[clientKey]error
 		chunkSize    int
 		wantJobs     int
 		wantQueries  int
 		wantFailed   bool
 	}{
-		"all queries fit one chunk":             {groups: groupOf(6), groupClients: ok, chunkSize: 500, wantJobs: 1, wantQueries: 6},
-		"split into even chunks":                {groups: groupOf(6), groupClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 6},
-		"uneven last chunk":                     {groups: groupOf(5), groupClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 5},
-		"group without an account client fails": {groups: groupOf(6), groupClients: map[clientKey]cloudwatchClient{}, groupErrs: map[clientKey]error{{region: "us-east-1"}: errors.New("no client")}, chunkSize: 2, wantJobs: 0, wantFailed: true},
+		"all queries fit one chunk":           {groups: groupOf(6), groupClients: ok, chunkSize: 500, wantJobs: 1, wantQueries: 6},
+		"split into even chunks":              {groups: groupOf(6), groupClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 6},
+		"uneven last chunk":                   {groups: groupOf(5), groupClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 5},
+		"group without a target client fails": {groups: groupOf(6), groupClients: map[clientKey]cloudwatchClient{}, chunkSize: 2, wantJobs: 0, wantFailed: true},
 	}
 
 	c := New()
 	c.applyDefaults()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			jobs, failed := c.buildChunkJobs(tc.groups, tc.groupClients, tc.groupErrs, time.Unix(1_000_000_000, 0), tc.chunkSize)
+			jobs, failed := c.buildChunkJobs(tc.groups, tc.groupClients, time.Unix(1_000_000_000, 0), tc.chunkSize)
 			require.Len(t, jobs, tc.wantJobs)
 			total := 0
 			for _, j := range jobs {

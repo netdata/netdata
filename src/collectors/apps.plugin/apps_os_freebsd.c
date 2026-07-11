@@ -79,15 +79,20 @@ bool apps_os_read_pid_fds_freebsd(struct pid_stat *p, void *ptr) {
 
     bfdsbuf = fdsbuf;
     efdsbuf = fdsbuf + size;
-    while (bfdsbuf < efdsbuf) {
+    while ((size_t)(efdsbuf - bfdsbuf) >= sizeof(((struct kinfo_file *)0)->kf_structsize)) {
         fds = (struct kinfo_file *)(uintptr_t)bfdsbuf;
-        if (unlikely(fds->kf_structsize == 0))
+        if (unlikely(fds->kf_structsize <= 0))
+            break;
+
+        size_t kf_structsize = (size_t)fds->kf_structsize;
+        if (unlikely(kf_structsize <= offsetof(struct kinfo_file, kf_path) ||
+                     kf_structsize > (size_t)(efdsbuf - bfdsbuf)))
             break;
 
         // do not process file descriptors for current working directory, root directory,
         // jail directory, ktrace vnode, text vnode and controlling terminal
         if (unlikely(fds->kf_fd < 0)) {
-            bfdsbuf += fds->kf_structsize;
+            bfdsbuf += kf_structsize;
             continue;
         }
 
@@ -178,7 +183,7 @@ bool apps_os_read_pid_fds_freebsd(struct pid_stat *p, void *ptr) {
         else
             p->fds[fdid].fd = -p->fds[fdid].fd;
 
-        bfdsbuf += fds->kf_structsize;
+        bfdsbuf += kf_structsize;
     }
 
     return true;
