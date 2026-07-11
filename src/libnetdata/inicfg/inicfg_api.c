@@ -336,14 +336,16 @@ time_t inicfg_get_duration_seconds(struct config *root, const char *section, con
 
     const char *s = string2str(opt->value);
 
-    int result = 0;
-    if(!duration_parse_seconds(s, &result)) {
+    int parsed = 0;
+    time_t result = 0;
+    if(!duration_parse_seconds(s, &parsed) ||
+       (parsed < 0 && __builtin_sub_overflow((time_t)0, parsed, &result))) {
         netdata_log_error("config option '[%s].%s = %s' is configured with an invalid duration", section, name, s);
         inicfg_set_raw_value(root, section, name, default_str, CONFIG_VALUE_TYPE_DURATION_IN_SECS);
         return default_value;
     }
 
-    return ABS(result);
+    return parsed < 0 ? result : (time_t)parsed;
 }
 
 time_t inicfg_set_duration_seconds(struct config *root, const char *section, const char *name, time_t value) {
