@@ -207,7 +207,7 @@ func validateResourceTagFilters(path string, filters []ResourceTagFilterConfig) 
 		seenValues := make(map[string]struct{}, len(filter.Values))
 		for j, value := range filter.Values {
 			if _, ok := seenValues[value]; ok {
-				errs = append(errs, fmt.Errorf("%s.values contains duplicate value %q at index %d", itemPath, value, j))
+				errs = append(errs, fmt.Errorf("%s.values contains a duplicate value at index %d", itemPath, j))
 			} else {
 				seenValues[value] = struct{}{}
 			}

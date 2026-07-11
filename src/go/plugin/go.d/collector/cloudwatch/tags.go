@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sort"
 	"time"
 
 	rgtatypes "github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi/types"
@@ -34,14 +35,24 @@ func (m tagMembership) add(scopeID int, joinKey string) {
 	m[scopeID][joinKey] = struct{}{}
 }
 
-func (m tagMembership) merge(other tagMembership) {
+// tagGroupSnapshot is the independently cached result of one RGTA fetch group.
+// A failed refresh keeps the last complete result but marks its policy scopes
+// unknown and expires only this group for retry.
+type tagGroupSnapshot struct {
+	group           tagFetchGroup
+	members         tagMembership
+	labels          map[tagCacheKey][]metrix.Label
+	confirmedLabels map[tagCacheKey]struct{}
+	lastSuccess     time.Time
+	expiresAt       time.Time
+	unknown         bool
+}
+
+// share copies only the scope index; the per-scope member sets are immutable once
+// a fetch result is installed and can be shared by the effective snapshot.
+func (m tagMembership) share(other tagMembership) {
 	for scopeID, joinKeys := range other {
-		if m[scopeID] == nil && len(joinKeys) > 0 {
-			m[scopeID] = make(map[string]struct{}, len(joinKeys))
-		}
-		for joinKey := range joinKeys {
-			m[scopeID][joinKey] = struct{}{}
-		}
+		m[scopeID] = joinKeys
 	}
 }
 
@@ -70,6 +81,7 @@ type tagSnapshot struct {
 	labels    map[tagCacheKey][]metrix.Label
 	members   tagMembership
 	unknown   map[int]struct{}
+	groups    map[tagFetchKey]tagGroupSnapshot
 	fetchedAt time.Time
 	expiresAt time.Time
 }
@@ -115,6 +127,10 @@ func (s tagSnapshot) sameEffective(other tagSnapshot) bool {
 // markTagsStale forces the next refreshTags to re-fetch even within the TTL.
 func (c *Collector) markTagsStale() {
 	c.tags.expiresAt = time.Time{}
+	for key, state := range c.tags.groups {
+		state.expiresAt = time.Time{}
+		c.tags.groups[key] = state
+	}
 }
 
 // profileDimLabels returns a profile's identifying (non-constant) dimension labels —
@@ -139,7 +155,7 @@ func (c *Collector) computeTagLabelPlans() {
 		return
 	}
 	for _, p := range c.plan.Profiles {
-		if _, ok := tagJoins[p.Name]; !ok {
+		if c.plan.TagJoins[p.Name] == nil {
 			continue
 		}
 		plan, warnings := resolveTagPlan(c.Labels.ResourceTags, profileDimLabels(p.Config))
@@ -181,25 +197,8 @@ func (c *Collector) refreshTags(ctx context.Context) {
 	}
 
 	ttl := time.Duration(c.Discovery.RefreshEvery) * time.Second
-
-	next := tagSnapshot{
-		labels:    make(map[tagCacheKey][]metrix.Label),
-		members:   make(tagMembership),
-		unknown:   make(map[int]struct{}),
-		fetchedAt: now,
-		expiresAt: now.Add(ttl),
-	}
-
-	groups := c.tagFetchGroups()
-	results := make([]tagFetchResult, len(groups))
-	p := pool.New().WithMaxGoroutines(max(1, apiConcurrency))
-	for i := range groups {
-		i := i
-		p.Go(func() {
-			results[i] = c.fetchTagGroup(ctx, groups[i])
-		})
-	}
-	p.Wait()
+	states, due := selectDueTagGroups(c.tagFetchGroups(), c.tags.groups, now)
+	results := c.fetchTagGroups(ctx, due)
 
 	// If the parent collect context was canceled or timed out during the fan-out, do
 	// NOT commit next or advance the TTL: that would suppress tag retries until the next
@@ -210,31 +209,8 @@ func (c *Collector) refreshTags(ctx context.Context) {
 		return
 	}
 
-	var failures []operationFailure
-	confirmedLabels := make(map[tagCacheKey]struct{})
-	for _, result := range results {
-		if result.err != nil {
-			carryForwardTagGroup(&next, c.tags, result.group, confirmedLabels)
-			failures = append(failures, operationFailure{
-				Target: result.group.key.target,
-				Region: result.group.key.region,
-				Scope:  fmt.Sprintf("profiles=%d", len(result.group.profiles)),
-				Err:    result.err,
-			})
-			continue
-		}
-		next.members.merge(result.members)
-		for key := range result.confirmedLabels {
-			confirmedLabels[key] = struct{}{}
-			delete(next.labels, key)
-		}
-		for key, labels := range result.labels {
-			next.labels[key] = labels
-		}
-	}
-	if len(failures) > 0 {
-		next.expiresAt = time.Time{}
-	}
+	failures := applyTagFetchResults(states, c.tags.groups, results, now, ttl)
+	next := mergeTagGroupSnapshots(states, now, now.Add(ttl))
 	c.warnOperationFailures(logKeyTagRefreshFailed, "resource tag lookup", " (retaining fail-closed membership and last-known labels)", failures)
 
 	changed := !next.sameEffective(c.tags)
@@ -244,46 +220,127 @@ func (c *Collector) refreshTags(ctx context.Context) {
 	}
 }
 
-func carryForwardTagGroup(dst *tagSnapshot, previous tagSnapshot, group tagFetchGroup, confirmedLabels map[tagCacheKey]struct{}) {
-	for _, scopeIDs := range group.scopeIDsByProfile {
-		for _, scopeID := range scopeIDs {
-			dst.unknown[scopeID] = struct{}{}
+func selectDueTagGroups(groups []tagFetchGroup, previous map[tagFetchKey]tagGroupSnapshot, now time.Time) (map[tagFetchKey]tagGroupSnapshot, []tagFetchGroup) {
+	states := make(map[tagFetchKey]tagGroupSnapshot, len(groups))
+	var due []tagFetchGroup
+	for _, group := range groups {
+		state, ok := previous[group.key]
+		if ok && now.Before(state.expiresAt) {
+			state.group = group
+			states[group.key] = state
+			continue
+		}
+		due = append(due, group)
+	}
+	return states, due
+}
+
+func (c *Collector) fetchTagGroups(ctx context.Context, groups []tagFetchGroup) []tagFetchResult {
+	results := make([]tagFetchResult, len(groups))
+	p := pool.New().WithMaxGoroutines(max(1, apiConcurrency))
+	for i := range groups {
+		i := i
+		p.Go(func() {
+			results[i] = c.fetchTagGroup(ctx, groups[i])
+		})
+	}
+	p.Wait()
+	return results
+}
+
+func applyTagFetchResults(states, previous map[tagFetchKey]tagGroupSnapshot, results []tagFetchResult, now time.Time, ttl time.Duration) []operationFailure {
+	var failures []operationFailure
+	for _, result := range results {
+		if result.err == nil {
+			states[result.group.key] = tagGroupSnapshot{
+				group: result.group, members: result.members, labels: result.labels,
+				confirmedLabels: result.confirmedLabels,
+				lastSuccess:     now,
+				expiresAt:       now.Add(ttl),
+			}
+			continue
+		}
+
+		state := previous[result.group.key]
+		state.group = result.group
+		state.unknown = true
+		state.expiresAt = time.Time{}
+		if state.members == nil {
+			state.members = make(tagMembership)
+		}
+		if state.labels == nil {
+			state.labels = make(map[tagCacheKey][]metrix.Label)
+		}
+		if state.confirmedLabels == nil {
+			state.confirmedLabels = make(map[tagCacheKey]struct{})
+		}
+		states[result.group.key] = state
+		failures = append(failures, operationFailure{
+			Target: result.group.key.target,
+			Region: result.group.key.region,
+			Scope:  fmt.Sprintf("profiles=%d", len(result.group.joins)),
+			Err:    result.err,
+		})
+	}
+	return failures
+}
+
+func mergeTagGroupSnapshots(states map[tagFetchKey]tagGroupSnapshot, fetchedAt, emptyExpiresAt time.Time) tagSnapshot {
+	labelCapacity := 0
+	membershipCapacity := 0
+	unknownCapacity := 0
+	for _, state := range states {
+		labelCapacity = max(labelCapacity, len(state.confirmedLabels))
+		membershipCapacity += len(state.members)
+		if state.unknown {
+			for _, scopeIDs := range state.group.scopeIDsByProfile {
+				unknownCapacity += len(scopeIDs)
+			}
 		}
 	}
-	for _, scopeIDs := range group.scopeIDsByProfile {
-		for _, scopeID := range scopeIDs {
-			joinKeys := previous.members[scopeID]
-			if len(joinKeys) == 0 {
-				continue
+	next := tagSnapshot{
+		labels: make(map[tagCacheKey][]metrix.Label, labelCapacity), members: make(tagMembership, membershipCapacity),
+		unknown: make(map[int]struct{}, unknownCapacity), groups: states,
+		fetchedAt: fetchedAt, expiresAt: emptyExpiresAt,
+	}
+	keys := make([]tagFetchKey, 0, len(states))
+	for key := range states {
+		keys = append(keys, key)
+	}
+	if len(keys) > 1 {
+		sort.Slice(keys, func(i, j int) bool {
+			a, b := states[keys[i]], states[keys[j]]
+			if !a.lastSuccess.Equal(b.lastSuccess) {
+				return a.lastSuccess.Before(b.lastSuccess)
 			}
-			copied := make(map[string]struct{}, len(joinKeys))
-			for joinKey := range joinKeys {
-				copied[joinKey] = struct{}{}
+			return lessTagFetchKey(keys[i], keys[j])
+		})
+	}
+	for _, key := range keys {
+		state := states[key]
+		next.members.share(state.members)
+		if state.unknown {
+			for _, scopeIDs := range state.group.scopeIDsByProfile {
+				for _, scopeID := range scopeIDs {
+					next.unknown[scopeID] = struct{}{}
+				}
 			}
-			dst.members[scopeID] = copied
+		}
+		if state.expiresAt.IsZero() || state.expiresAt.Before(next.expiresAt) {
+			next.expiresAt = state.expiresAt
+		}
+		for labelKey := range state.confirmedLabels {
+			delete(next.labels, labelKey)
+			if labels, ok := state.labels[labelKey]; ok {
+				next.labels[labelKey] = labels
+			}
 		}
 	}
-	if !group.hasLabels {
-		return
-	}
-	for profile, candidates := range group.candidatesByProfile {
-		for joinKey := range candidates {
-			key := tagCacheKey{
-				target: group.key.target, account: group.account, region: group.key.region,
-				profile: profile, joinKey: joinKey,
-			}
-			if _, confirmed := confirmedLabels[key]; confirmed {
-				continue
-			}
-			if labels, ok := previous.labels[key]; ok {
-				dst.labels[key] = labels
-			}
-		}
-	}
+	return next
 }
 
 func selectedTagMap(tags []rgtatypes.Tag, selected map[string]struct{}) map[string]string {
-	out := make(map[string]string, len(selected))
+	out := make(map[string]string, min(len(tags), len(selected)))
 	for _, t := range tags {
 		if t.Key == nil || t.Value == nil {
 			continue
@@ -311,15 +368,14 @@ func applyTagPlan(plan []resolvedTag, tags map[string]string) []metrix.Label {
 
 // tagLabelsFor returns the cached, non-identity tag labels for one discovered
 // instance, or nil when tags are off, the profile has no join, or none are cached.
-func (c *Collector) tagLabelsFor(target, account, region string, prof cwprofiles.ResolvedProfile, values []string) []metrix.Label {
+func (c *Collector) tagLabelsFor(target, account, region string, prof cwprofiles.ResolvedProfile, join *tagJoin, values []string) []metrix.Label {
 	if len(c.tags.labels) == 0 {
 		return nil
 	}
-	tj, ok := tagJoins[prof.Name]
-	if !ok {
+	if join == nil {
 		return nil
 	}
-	jk, ok := tj.instanceJoinKey(prof.Config.DimensionNames(), values)
+	jk, ok := join.instanceJoinKey(prof.Config.DimensionNames(), values)
 	if !ok {
 		return nil
 	}

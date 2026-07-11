@@ -6,11 +6,15 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
+	"slices"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi"
 	rgtatypes "github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi/types"
 
@@ -35,6 +39,33 @@ type fakeRGTA struct {
 	gotFilters  []string // ResourceTypeFilters seen on the most recent request
 	gotTags     []rgtatypes.TagFilter
 	gotPageSize int32
+}
+
+type recordingRGTA struct {
+	mu        sync.Mutex
+	resources []rgtatypes.ResourceTagMapping
+	inputs    []*resourcegroupstaggingapi.GetResourcesInput
+}
+
+type staticRGTA struct {
+	resources []rgtatypes.ResourceTagMapping
+}
+
+func (f staticRGTA) GetResources(context.Context, *resourcegroupstaggingapi.GetResourcesInput, ...func(*resourcegroupstaggingapi.Options)) (*resourcegroupstaggingapi.GetResourcesOutput, error) {
+	return &resourcegroupstaggingapi.GetResourcesOutput{ResourceTagMappingList: f.resources}, nil
+}
+
+func (f *recordingRGTA) GetResources(_ context.Context, in *resourcegroupstaggingapi.GetResourcesInput, _ ...func(*resourcegroupstaggingapi.Options)) (*resourcegroupstaggingapi.GetResourcesOutput, error) {
+	f.mu.Lock()
+	f.inputs = append(f.inputs, in)
+	f.mu.Unlock()
+	return &resourcegroupstaggingapi.GetResourcesOutput{ResourceTagMappingList: f.resources}, nil
+}
+
+func (f *recordingRGTA) requests() []*resourcegroupstaggingapi.GetResourcesInput {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.inputs)
 }
 
 func (f *fakeRGTA) GetResources(_ context.Context, in *resourcegroupstaggingapi.GetResourcesInput, _ ...func(*resourcegroupstaggingapi.Options)) (*resourcegroupstaggingapi.GetResourcesOutput, error) {
@@ -76,6 +107,21 @@ func rgtaResource(arn string, kv ...string) rgtatypes.ResourceTagMapping {
 	return m
 }
 
+func resourceTagPolicyConfig(count int) Config {
+	defaults := false
+	cfg := validBaseConfig()
+	cfg.Rules = nil
+	for i := range count {
+		filters := []ResourceTagFilterConfig{{Key: "policy", Values: []string{strconv.Itoa(i)}}}
+		cfg.Rules = append(cfg.Rules, RuleConfig{
+			Name: fmt.Sprintf("policy-%d", i), Targets: []string{"base"}, Regions: []string{"us-east-1"},
+			Profiles: &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}},
+			Filters:  &RuleFiltersConfig{ResourceTags: &filters},
+		})
+	}
+	return cfg
+}
+
 // seriesLabels returns the label set of the single emitted series whose name has the
 // given prefix (fails if not exactly one), read from the collector's metric store.
 func seriesLabels(t *testing.T, c *Collector, namePrefix string) map[string]string {
@@ -97,7 +143,7 @@ func seriesLabels(t *testing.T, c *Collector, namePrefix string) map[string]stri
 }
 
 // ec2TagCollector wires the end-to-end EC2 collector with a fake RGTA client and the
-// given tag allowlist. The instance is i-1 in account 000000000000, region us-east-1.
+// given resource-tag label config. The instance is i-1 in account 000000000000, region us-east-1.
 func ec2TagCollector(t *testing.T, tags []ResourceTagLabelConfig, rgta rgtaClient) *Collector {
 	t.Helper()
 	c, _ := endToEndCollector(10)
@@ -113,7 +159,7 @@ func TestCollect_TagEnrichment(t *testing.T) {
 		rgta  *fakeRGTA
 		check func(t *testing.T, labels map[string]string)
 	}{
-		"attaches allowlisted tags as non-identity labels (with rename)": {
+		"attaches selected tags as non-identity labels (with rename)": {
 			tags: []ResourceTagLabelConfig{{Key: "owner"}, {Key: "team", Label: "squad"}},
 			rgta: &fakeRGTA{resources: []rgtatypes.ResourceTagMapping{
 				rgtaResource("arn:aws:ec2:us-east-1:000000000000:instance/i-1", "owner", "alice", "team", "sre"),
@@ -167,6 +213,78 @@ func TestCollect_TagEnrichment(t *testing.T) {
 			tc.check(t, seriesLabels(t, c, "ec2.cpu_utilization_average"))
 		})
 	}
+}
+
+func TestCollect_ResourceTagFilteringFromPublicConfig(t *testing.T) {
+	defaults := false
+	replacement := []ResourceTagFilterConfig{{Key: "owner", Values: []string{"platform"}}}
+	disabled := []ResourceTagFilterConfig{}
+	cfg := validBaseConfig()
+	cfg.Targets = []TargetConfig{
+		{Name: "inherited", Credentials: "sdk_default"},
+		{Name: "replacement", Credentials: "sdk_default"},
+		{Name: "fallback", Credentials: "sdk_default"},
+	}
+	cfg.Defaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production"}}}
+	cfg.Rules = []RuleConfig{
+		{
+			Name: "inherited", Targets: []string{"inherited"}, Regions: []string{"us-east-1"},
+			Profiles: &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}},
+		},
+		{
+			Name: "replacement", Targets: []string{"replacement"}, Regions: []string{"us-east-1"},
+			Profiles: &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}},
+			Filters:  &RuleFiltersConfig{ResourceTags: &replacement},
+		},
+		{
+			Name: "fallback", Targets: []string{"fallback"}, Regions: []string{"us-east-1"},
+			Profiles: &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}},
+			Filters:  &RuleFiltersConfig{ResourceTags: &disabled},
+		},
+	}
+
+	cw := &nsCloudWatch{byNS: map[string][]cwtypes.Metric{"AWS/EC2": {
+		mkMetric("CPUUtilization", "InstanceId", "i-prod"),
+		mkMetric("CPUUtilization", "InstanceId", "i-owner"),
+		mkMetric("CPUUtilization", "InstanceId", "i-other"),
+	}}}
+	rgta := &recordingRGTA{resources: []rgtatypes.ResourceTagMapping{
+		rgtaResource("arn:aws:ec2:us-east-1:000000000000:instance/i-prod", "environment", "production"),
+		rgtaResource("arn:aws:ec2:us-east-1:000000000000:instance/i-owner", "owner", "platform"),
+		rgtaResource("arn:aws:ec2:us-east-1:000000000000:instance/i-other", "environment", "development"),
+	}}
+	c := New()
+	c.Config = cfg
+	c.newCatalog = cwprofiles.DefaultCatalog
+	c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
+		return aws.Config{Region: region}, nil
+	}
+	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
+	c.newCloudWatchClient = func(aws.Config) cloudwatchClient { return cw }
+	c.newRGTAClient = func(aws.Config) rgtaClient { return rgta }
+	c.now = func() time.Time { return time.Unix(1_000_000_000, 0) }
+
+	require.NoError(t, c.Init(context.Background()))
+	require.NoError(t, c.Collect(context.Background()))
+	require.Len(t, c.plan.Scopes, 3)
+	assert.Equal(t, "environment", c.plan.Scopes[0].TagFilter[0].key, "omitted rule filter inherits the job default")
+	assert.Equal(t, "owner", c.plan.Scopes[1].TagFilter[0].key, "present rule filter replaces the job default")
+	assert.Empty(t, c.plan.Scopes[2].TagFilter, "an explicit empty rule filter disables the job default")
+	assert.Equal(t, map[string]string{
+		"i-prod": "inherited", "i-owner": "replacement", "i-other": "fallback",
+	}, queryOwnersByInstance(c.queryPlan))
+
+	requests := rgta.requests()
+	require.Len(t, requests, 2, "the unfiltered fallback rule does not make an RGTA request")
+	gotFilters := make(map[string][]string)
+	for _, request := range requests {
+		require.Len(t, request.TagFilters, 1)
+		gotFilters[aws.ToString(request.TagFilters[0].Key)] = request.TagFilters[0].Values
+		assert.Equal(t, []string{"ec2:instance"}, request.ResourceTypeFilters)
+	}
+	assert.Equal(t, map[string][]string{
+		"environment": {"production"}, "owner": {"platform"},
+	}, gotFilters)
 }
 
 func TestCollect_TagRetentionReEmitCarriesTags(t *testing.T) {
@@ -318,6 +436,46 @@ func TestRefreshTags_FilterMembershipFailureLifecycle(t *testing.T) {
 	assert.True(t, c.tags.scopeSelected(7, "i-1"), "a later failure retains last-known membership")
 }
 
+func TestRefreshTags_FailedGroupRetriesWithoutRefetchingHealthyGroup(t *testing.T) {
+	healthy := &fakeRGTA{resources: []rgtatypes.ResourceTagMapping{
+		rgtaResource("arn:aws:ec2:us-east-1:000000000000:instance/i-east", "environment", "production"),
+	}}
+	failing := &fakeRGTA{err: errors.New("throttled")}
+	c := New()
+	configureExactRule(c, []string{"us-east-1", "us-west-2"}, []string{"ec2"})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1", "us-west-2"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
+	for i := range c.plan.Scopes {
+		c.plan.Scopes[i].ID = i
+		c.plan.Scopes[i].TagFilter = []resourceTagFilter{{key: "environment", values: []string{"production"}}}
+	}
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+		{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-east"}}},
+		{Target: "base", Profile: "ec2", Region: "us-west-2"}: {{DimensionValues: []string{"i-west"}}},
+	}}
+	c.rgtaClients = newClientCache(func(_ context.Context, _, region string) (rgtaClient, error) {
+		if region == "us-east-1" {
+			return healthy, nil
+		}
+		return failing, nil
+	})
+	c.now = func() time.Time { return time.Unix(1_000_000_000, 0) }
+
+	c.refreshTags(context.Background())
+	require.Equal(t, 1, healthy.calls)
+	require.Equal(t, 1, failing.calls)
+	assert.False(t, c.tags.scopeUnknown(0))
+	assert.True(t, c.tags.scopeSelected(0, "i-east"))
+	assert.True(t, c.tags.scopeUnknown(1))
+
+	healthy.err = errors.New("healthy group must not be called before its TTL")
+	c.refreshTags(context.Background())
+
+	assert.Equal(t, 1, healthy.calls, "a healthy group remains cached until its own TTL")
+	assert.Equal(t, 2, failing.calls, "the failed group retries on the next collect")
+	assert.False(t, c.tags.scopeUnknown(0), "an unnecessary retry must not turn fresh membership unknown")
+	assert.True(t, c.tags.scopeSelected(0, "i-east"))
+}
+
 func TestRefreshTags_FirstSuccessfulEmptySnapshotInvalidatesImplicitUnknown(t *testing.T) {
 	rgta := &fakeRGTA{}
 	c := New()
@@ -390,6 +548,55 @@ func TestWalkResourceTags_PaginatesAndUsesNativeFilters(t *testing.T) {
 	assert.Equal(t, []string{"ec2:instance"}, fake.gotFilters, "ResourceTypeFilters is passed through to RGTA")
 	require.Equal(t, []rgtatypes.TagFilter{{Key: aws.String("env"), Values: []string{"prod", "staging"}}}, fake.gotTags)
 	assert.Equal(t, int32(100), fake.gotPageSize)
+}
+
+func TestTagFetchGroups_SeparateFetchIdentityFromPolicyScopes(t *testing.T) {
+	catalog, err := cwprofiles.DefaultCatalog()
+	require.NoError(t, err)
+
+	t.Run("same predicate shares one fetch across profiles", func(t *testing.T) {
+		defaults := false
+		filters := []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production"}}}
+		cfg := validBaseConfig()
+		cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2", "ebs"}}
+		cfg.Rules[0].Filters = &RuleFiltersConfig{ResourceTags: &filters}
+		cfg.applyDefaults()
+		plan, _, err := compileConfig(cfg, catalog)
+		require.NoError(t, err)
+		c := New()
+		c.plan = plan
+		c.resolvedByRef = map[string]resolvedTarget{"base": {target: plan.Targets[0], accountID: "000000000000"}}
+		c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+			{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
+			{Target: "base", Profile: "ebs", Region: "us-east-1"}: {{DimensionValues: []string{"vol-1"}}},
+		}}
+		c.tagLabelPlans = map[string][]resolvedTag{}
+
+		groups := c.tagFetchGroups()
+		require.Len(t, groups, 1)
+		assert.ElementsMatch(t, []string{"ec2:instance", "ec2:volume"}, groups[0].resourceTypes)
+		assert.Len(t, groups[0].joins, 2)
+	})
+
+	t.Run("different predicates remain separate", func(t *testing.T) {
+		cfg := resourceTagPolicyConfig(4)
+		cfg.applyDefaults()
+		plan, _, err := compileConfig(cfg, catalog)
+		require.NoError(t, err)
+		c := New()
+		c.plan = plan
+		c.resolvedByRef = map[string]resolvedTarget{"base": {target: plan.Targets[0], accountID: "000000000000"}}
+		c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+			{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
+		}}
+		c.tagLabelPlans = map[string][]resolvedTag{}
+
+		groups := c.tagFetchGroups()
+		require.Len(t, groups, 4)
+		for _, group := range groups {
+			assert.Len(t, group.scopeIDsByProfile["ec2"], 1)
+		}
+	})
 }
 
 func tagUnitCollector(t *testing.T, rgta rgtaClient) *Collector {
@@ -489,8 +696,11 @@ func TestIndexFetchedResource_SkipsForeignAccountRegion(t *testing.T) {
 	members := tagMembership{}
 	labels := map[tagCacheKey][]metrix.Label{}
 	confirmed := map[tagCacheKey]struct{}{}
+	join, err := resolveTagJoinProfile(cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2QueryProfile()})
+	require.NoError(t, err)
 	group := tagFetchGroup{
 		key: tagFetchKey{target: "base", region: "us-east-1"}, account: "000000000000",
+		joins:                  map[string]*tagJoin{"ec2": join},
 		profilesByResourceType: map[string][]string{"ec2:instance": {"ec2"}},
 		scopeIDsByProfile:      map[string][]int{"ec2": {7}},
 		tagKeys:                map[string]struct{}{"owner": {}},
@@ -514,60 +724,73 @@ func TestIndexFetchedResource_SkipsForeignAccountRegion(t *testing.T) {
 	assert.Equal(t, map[tagCacheKey]struct{}{wantLabelKey: {}}, confirmed)
 }
 
-func TestCarryForwardTagGroup_RetainsOnlyGroupState(t *testing.T) {
+func TestMergeTagGroupSnapshots_RetainsIndependentGroupState(t *testing.T) {
 	matching := tagCacheKey{target: "first", account: "000000000000", region: "us-east-1", profile: "ec2", joinKey: "i-1"}
-	notFailed := tagCacheKey{target: "second", account: "000000000000", region: "us-east-1", profile: "ec2", joinKey: "i-2"}
-	previous := tagSnapshot{
-		labels: map[tagCacheKey][]metrix.Label{
-			matching:  {{Key: "owner", Value: "one"}},
-			notFailed: {{Key: "owner", Value: "two"}},
-		},
-		members: tagMembership{7: {"i-1": {}}, 8: {"i-2": {}}},
-	}
-	dst := tagSnapshot{labels: map[tagCacheKey][]metrix.Label{}, members: tagMembership{}, unknown: map[int]struct{}{}}
-	group := tagFetchGroup{
+	healthy := tagCacheKey{target: "second", account: "000000000000", region: "us-east-1", profile: "ec2", joinKey: "i-2"}
+	now := time.Unix(1_000_000_000, 0)
+	failedGroup := tagFetchGroup{
 		key: tagFetchKey{target: "first", region: "us-east-1"}, account: "000000000000",
 		scopeIDsByProfile:   map[string][]int{"ec2": {7}},
 		candidatesByProfile: map[string]map[string]struct{}{"ec2": {"i-1": {}}},
-		hasLabels:           true,
+	}
+	healthyGroup := tagFetchGroup{
+		key: tagFetchKey{target: "second", region: "us-east-1"}, account: "000000000000",
+		scopeIDsByProfile: map[string][]int{"ec2": {8}},
+	}
+	states := map[tagFetchKey]tagGroupSnapshot{
+		failedGroup.key: {
+			group: failedGroup, members: tagMembership{7: {"i-1": {}}},
+			labels:          map[tagCacheKey][]metrix.Label{matching: {{Key: "owner", Value: "one"}}},
+			confirmedLabels: map[tagCacheKey]struct{}{matching: {}},
+			lastSuccess:     now.Add(-time.Minute), unknown: true,
+		},
+		healthyGroup.key: {
+			group: healthyGroup, members: tagMembership{8: {"i-2": {}}},
+			labels:          map[tagCacheKey][]metrix.Label{healthy: {{Key: "owner", Value: "two"}}},
+			confirmedLabels: map[tagCacheKey]struct{}{healthy: {}},
+			lastSuccess:     now, expiresAt: now.Add(time.Minute),
+		},
 	}
 
-	carryForwardTagGroup(&dst, previous, group, nil)
+	got := mergeTagGroupSnapshots(states, now, now.Add(time.Minute))
 
-	assert.Equal(t, map[tagCacheKey][]metrix.Label{matching: previous.labels[matching]}, dst.labels)
-	assert.Equal(t, tagMembership{7: {"i-1": {}}}, dst.members)
-	assert.Equal(t, map[int]struct{}{7: {}}, dst.unknown)
+	assert.Equal(t, map[tagCacheKey][]metrix.Label{
+		matching: {{Key: "owner", Value: "one"}}, healthy: {{Key: "owner", Value: "two"}},
+	}, got.labels)
+	assert.Equal(t, tagMembership{7: {"i-1": {}}, 8: {"i-2": {}}}, got.members)
+	assert.Equal(t, map[int]struct{}{7: {}}, got.unknown)
+	assert.True(t, got.expiresAt.IsZero(), "the failed group remains due without expiring the healthy group's own state")
 }
 
-func BenchmarkCarryForwardTagsFailures(b *testing.B) {
+func BenchmarkMergeTagGroupSnapshots(b *testing.B) {
 	const cachedTags = 8192
-	previous := tagSnapshot{
-		labels:  make(map[tagCacheKey][]metrix.Label, cachedTags),
-		members: tagMembership{7: make(map[string]struct{}, cachedTags)},
-	}
 	group := tagFetchGroup{
 		key: tagFetchKey{target: "target", region: "us-east-1"}, account: "000000000000",
 		scopeIDsByProfile:   map[string][]int{"ec2": {7}},
 		candidatesByProfile: map[string]map[string]struct{}{"ec2": make(map[string]struct{}, cachedTags)},
-		hasLabels:           true,
+	}
+	state := tagGroupSnapshot{
+		group: group, members: tagMembership{7: make(map[string]struct{}, cachedTags)},
+		labels:          make(map[tagCacheKey][]metrix.Label, cachedTags),
+		confirmedLabels: make(map[tagCacheKey]struct{}, cachedTags), unknown: true,
 	}
 	for i := range cachedTags {
 		joinKey := strconv.Itoa(i)
-		previous.labels[tagCacheKey{
+		key := tagCacheKey{
 			target: "target", account: "000000000000", region: "us-east-1", profile: "ec2", joinKey: joinKey,
-		}] = nil
-		previous.members.add(7, joinKey)
+		}
+		state.labels[key] = nil
+		state.confirmedLabels[key] = struct{}{}
+		state.members.add(7, joinKey)
 		group.candidatesByProfile["ec2"][joinKey] = struct{}{}
 	}
+	states := map[tagFetchKey]tagGroupSnapshot{group.key: state}
 
 	b.ReportAllocs()
 	for range b.N {
-		dst := tagSnapshot{
-			labels: make(map[tagCacheKey][]metrix.Label, cachedTags), members: make(tagMembership), unknown: make(map[int]struct{}),
-		}
-		carryForwardTagGroup(&dst, previous, group, nil)
-		if len(dst.labels) != cachedTags || len(dst.members[7]) != cachedTags {
-			b.Fatalf("carried forward %d labels and %d members, want %d", len(dst.labels), len(dst.members[7]), cachedTags)
+		got := mergeTagGroupSnapshots(states, time.Time{}, time.Time{})
+		if len(got.labels) != cachedTags || len(got.members[7]) != cachedTags {
+			b.Fatalf("merged %d labels and %d members, want %d", len(got.labels), len(got.members[7]), cachedTags)
 		}
 	}
 }
@@ -575,6 +798,10 @@ func BenchmarkCarryForwardTagsFailures(b *testing.B) {
 func BenchmarkIndexFetchedResources(b *testing.B) {
 	for _, count := range []int{100, 1000, 10000} {
 		b.Run(strconv.Itoa(count), func(b *testing.B) {
+			join, err := resolveTagJoinProfile(cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2QueryProfile()})
+			if err != nil {
+				b.Fatal(err)
+			}
 			resources := make([]rgtatypes.ResourceTagMapping, count)
 			candidates := make(map[string]struct{}, count)
 			for i := range resources {
@@ -587,6 +814,7 @@ func BenchmarkIndexFetchedResources(b *testing.B) {
 			}
 			group := tagFetchGroup{
 				key: tagFetchKey{target: "base", region: "us-east-1"}, account: "000000000000",
+				joins:                  map[string]*tagJoin{"ec2": join},
 				filters:                []resourceTagFilter{{key: "environment", values: []string{"production"}}},
 				profilesByResourceType: map[string][]string{"ec2:instance": {"ec2"}},
 				scopeIDsByProfile:      map[string][]int{"ec2": {7}},
@@ -607,6 +835,59 @@ func BenchmarkIndexFetchedResources(b *testing.B) {
 				if len(members[7]) != count || len(labels) != count {
 					b.Fatalf("indexed %d members and %d labels, want %d", len(members[7]), len(labels), count)
 				}
+			}
+		})
+	}
+}
+
+func BenchmarkRefreshTagsPolicyCount(b *testing.B) {
+	const resources = 1000
+	catalog, err := cwprofiles.DefaultCatalog()
+	if err != nil {
+		b.Fatal(err)
+	}
+	for _, policies := range []int{1, 4} {
+		b.Run(fmt.Sprintf("policies=%d", policies), func(b *testing.B) {
+			cfg := resourceTagPolicyConfig(policies)
+			cfg.applyDefaults()
+			plan, _, err := compileConfig(cfg, catalog)
+			if err != nil {
+				b.Fatal(err)
+			}
+			mappings := make([]rgtatypes.ResourceTagMapping, resources)
+			instances := make([]discoveredInstance, resources)
+			for i := range resources {
+				id := fmt.Sprintf("i-%d", i)
+				instances[i] = discoveredInstance{DimensionValues: []string{id}}
+				mappings[i] = rgtaResource(
+					"arn:aws:ec2:us-east-1:000000000000:instance/"+id,
+					"policy", strconv.Itoa(i%policies),
+				)
+			}
+			c := New()
+			c.Config = cfg
+			c.plan = plan
+			c.resolvedByRef = map[string]resolvedTarget{
+				"base": {target: plan.Targets[0], accountID: "000000000000"},
+			}
+			c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+				{Target: "base", Profile: "ec2", Region: "us-east-1"}: instances,
+			}}
+			client := staticRGTA{resources: mappings}
+			c.rgtaClients = newClientCache(func(context.Context, string, string) (rgtaClient, error) {
+				return client, nil
+			})
+			c.now = func() time.Time { return time.Unix(1_000_000_000, 0) }
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				c.markTagsStale()
+				c.refreshTags(context.Background())
+			}
+			b.StopTimer()
+			if got := len(c.tags.members); got != policies {
+				b.Fatalf("got %d policy membership sets, want %d", got, policies)
 			}
 		})
 	}

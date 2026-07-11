@@ -13,6 +13,7 @@ type collectionPlan struct {
 	Targets  []*collectionTarget
 	Scopes   []collectionScope
 	Profiles []cwprofiles.ResolvedProfile
+	TagJoins map[string]*tagJoin
 }
 
 type collectionTarget struct {
@@ -28,6 +29,7 @@ type collectionScope struct {
 	Profile   cwprofiles.ResolvedProfile
 	Region    string
 	TagFilter []resourceTagFilter
+	TagJoin   *tagJoin
 }
 
 func (s collectionScope) hasTagFilter() bool { return len(s.TagFilter) > 0 }

@@ -142,6 +142,19 @@ func TestConfig_validateResourceTagConfiguration(t *testing.T) {
 	}
 }
 
+func TestConfig_validateResourceTagConfiguration_RedactsDuplicateValue(t *testing.T) {
+	const sensitive = "SENSITIVE_TAG_VALUE"
+	cfg := validBaseConfig()
+	cfg.Defaults.Filters.ResourceTags = []ResourceTagFilterConfig{{
+		Key: "environment", Values: []string{sensitive, sensitive},
+	}}
+
+	err := cfg.validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate value")
+	assert.NotContains(t, err.Error(), sensitive)
+}
+
 func TestConfigSchema_RuntimeContract(t *testing.T) {
 	data, err := os.ReadFile("config_schema.json")
 	require.NoError(t, err)

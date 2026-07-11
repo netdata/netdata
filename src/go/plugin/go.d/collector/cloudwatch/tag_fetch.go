@@ -21,6 +21,16 @@ type tagFetchKey struct {
 	target, region, filter string
 }
 
+func lessTagFetchKey(a, b tagFetchKey) bool {
+	if a.target != b.target {
+		return a.target < b.target
+	}
+	if a.region != b.region {
+		return a.region < b.region
+	}
+	return a.filter < b.filter
+}
+
 // tagFetchGroup is one deduplicated RGTA request stream. Policy scopes sharing
 // target, region, and exact predicate share the fetch while retaining separate
 // ordered membership identities.
@@ -29,13 +39,12 @@ type tagFetchGroup struct {
 	account string
 	filters []resourceTagFilter
 
-	profiles               map[string]struct{}
+	joins                  map[string]*tagJoin
 	profilesByResourceType map[string][]string
 	scopeIDsByProfile      map[string][]int
 	candidatesByProfile    map[string]map[string]struct{}
 	tagKeys                map[string]struct{}
 	resourceTypes          []string
-	hasLabels              bool
 }
 
 type tagFetchResult struct {
@@ -53,8 +62,8 @@ func (c *Collector) tagFetchGroups() []tagFetchGroup {
 		if !ok {
 			return
 		}
-		join, ok := tagJoins[scope.Profile.Name]
-		if !ok {
+		join := scope.TagJoin
+		if join == nil {
 			return
 		}
 		instances := c.discovery.Instances[discoveryKey{Target: scope.Target.Name, Profile: scope.Profile.Name, Region: scope.Region}]
@@ -68,7 +77,7 @@ func (c *Collector) tagFetchGroups() []tagFetchGroup {
 		if group == nil {
 			group = &tagFetchGroup{
 				key: key, account: resolved.accountID, filters: filters,
-				profiles:               make(map[string]struct{}),
+				joins:                  make(map[string]*tagJoin),
 				profilesByResourceType: make(map[string][]string),
 				scopeIDsByProfile:      make(map[string][]int),
 				candidatesByProfile:    make(map[string]map[string]struct{}),
@@ -79,8 +88,8 @@ func (c *Collector) tagFetchGroups() []tagFetchGroup {
 			}
 			groups[key] = group
 		}
-		if _, exists := group.profiles[scope.Profile.Name]; !exists {
-			group.profiles[scope.Profile.Name] = struct{}{}
+		if _, exists := group.joins[scope.Profile.Name]; !exists {
+			group.joins[scope.Profile.Name] = join
 			for _, resourceType := range join.resourceTypes {
 				group.profilesByResourceType[resourceType] = append(group.profilesByResourceType[resourceType], scope.Profile.Name)
 				if !slices.Contains(group.resourceTypes, resourceType) {
@@ -89,7 +98,6 @@ func (c *Collector) tagFetchGroups() []tagFetchGroup {
 			}
 			for _, label := range c.tagLabelPlans[scope.Profile.Name] {
 				group.tagKeys[label.awsKey] = struct{}{}
-				group.hasLabels = true
 			}
 		}
 		if includeMembership && !slices.Contains(group.scopeIDsByProfile[scope.Profile.Name], scope.ID) {
@@ -126,14 +134,7 @@ func (c *Collector) tagFetchGroups() []tagFetchGroup {
 		out = append(out, *group)
 	}
 	sort.Slice(out, func(i, j int) bool {
-		a, b := out[i].key, out[j].key
-		if a.target != b.target {
-			return a.target < b.target
-		}
-		if a.region != b.region {
-			return a.region < b.region
-		}
-		return a.filter < b.filter
+		return lessTagFetchKey(out[i].key, out[j].key)
 	})
 	return out
 }
@@ -219,7 +220,10 @@ func indexFetchedResource(
 		return
 	}
 	for _, profileName := range profileNames {
-		join := tagJoins[profileName]
+		join := group.joins[profileName]
+		if join == nil {
+			continue
+		}
 		joinKey, ok := join.arnJoinKey(parsed)
 		if !ok {
 			continue

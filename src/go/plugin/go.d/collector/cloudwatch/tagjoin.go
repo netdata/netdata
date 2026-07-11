@@ -32,68 +32,83 @@ import (
 // collide with another discovered instance, so associations are internal, reviewed,
 // and covered by ARN-shape tests rather than inferred from arbitrary profiles.
 type tagJoin struct {
+	namespace     string
 	resourceTypes []string
 	joinDims      []string
 	arnValues     func(a arn.ARN) ([]string, bool)
 }
 
-// tagJoins is the per-profile (by basename) join registry. Only profiles listed
-// here can use generic resource-tag filtering and labels. Labels-only use skips
-// an unregistered profile; an effective filter applies the compiler's explicit
-// skip/error policy instead of collecting that profile unfiltered.
+// tagJoins is the registry of association definitions by stock profile basename.
+// The compiler binds a definition only when the effective profile still has its
+// expected namespace and identifying dimensions; runtime code receives that
+// validated capability and never infers safety from the basename alone.
 var tagJoins = map[string]tagJoin{
-	// Sound single-dimension joins: default extractor (resource-id = last segment).
-	"ec2":         {resourceTypes: []string{"ec2:instance"}, joinDims: []string{"InstanceId"}},
-	"ebs":         {resourceTypes: []string{"ec2:volume"}, joinDims: []string{"VolumeId"}},
-	"efs":         {resourceTypes: []string{"elasticfilesystem:file-system"}, joinDims: []string{"FileSystemId"}},
-	"nat_gateway": {resourceTypes: []string{"ec2:natgateway"}, joinDims: []string{"NatGatewayId"}},
-	"vpn":         {resourceTypes: []string{"ec2:vpn-connection"}, joinDims: []string{"VpnId"}},
+	// Sound single-dimension joins using the default resource-id extractor.
+	"ec2":         {namespace: "AWS/EC2", resourceTypes: []string{"ec2:instance"}, joinDims: []string{"InstanceId"}},
+	"ebs":         {namespace: "AWS/EBS", resourceTypes: []string{"ec2:volume"}, joinDims: []string{"VolumeId"}},
+	"efs":         {namespace: "AWS/EFS", resourceTypes: []string{"elasticfilesystem:file-system"}, joinDims: []string{"FileSystemId"}},
+	"nat_gateway": {namespace: "AWS/NATGateway", resourceTypes: []string{"ec2:natgateway"}, joinDims: []string{"NatGatewayId"}},
+	"vpn":         {namespace: "AWS/VPN", resourceTypes: []string{"ec2:vpn-connection"}, joinDims: []string{"VpnId"}},
 	// rds and docdb share the rds:db ARN type. The join is unambiguous because a
 	// DBInstanceIdentifier is unique per account+region across the rds:db family
 	// (RDS/DocDB/Neptune), so an ARN matches at most one discovered instance and
 	// cross-family entries are inert. (Confirmed in live smoke.)
-	"rds":      {resourceTypes: []string{"rds:db"}, joinDims: []string{"DBInstanceIdentifier"}},
-	"docdb":    {resourceTypes: []string{"rds:db"}, joinDims: []string{"DBInstanceIdentifier"}},
-	"lambda":   {resourceTypes: []string{"lambda:function"}, joinDims: []string{"FunctionName"}},
-	"sqs":      {resourceTypes: []string{"sqs"}, joinDims: []string{"QueueName"}},
-	"sns":      {resourceTypes: []string{"sns"}, joinDims: []string{"TopicName"}},
-	"eks":      {resourceTypes: []string{"eks:cluster"}, joinDims: []string{"ClusterName"}},
-	"kinesis":  {resourceTypes: []string{"kinesis:stream"}, joinDims: []string{"StreamName"}},
-	"firehose": {resourceTypes: []string{"firehose:deliverystream"}, joinDims: []string{"DeliveryStreamName"}},
-	"redshift": {resourceTypes: []string{"redshift:cluster"}, joinDims: []string{"ClusterIdentifier"}},
-	"dynamodb": {resourceTypes: []string{"dynamodb:table"}, joinDims: []string{"TableName"}},
+	"rds":      {namespace: "AWS/RDS", resourceTypes: []string{"rds:db"}, joinDims: []string{"DBInstanceIdentifier"}},
+	"docdb":    {namespace: "AWS/DocDB", resourceTypes: []string{"rds:db"}, joinDims: []string{"DBInstanceIdentifier"}},
+	"lambda":   {namespace: "AWS/Lambda", resourceTypes: []string{"lambda:function"}, joinDims: []string{"FunctionName"}},
+	"sqs":      {namespace: "AWS/SQS", resourceTypes: []string{"sqs"}, joinDims: []string{"QueueName"}},
+	"sns":      {namespace: "AWS/SNS", resourceTypes: []string{"sns"}, joinDims: []string{"TopicName"}},
+	"eks":      {namespace: "AWS/EKS", resourceTypes: []string{"eks:cluster"}, joinDims: []string{"ClusterName"}},
+	"kinesis":  {namespace: "AWS/Kinesis", resourceTypes: []string{"kinesis:stream"}, joinDims: []string{"StreamName"}},
+	"firehose": {namespace: "AWS/Firehose", resourceTypes: []string{"firehose:deliverystream"}, joinDims: []string{"DeliveryStreamName"}},
+	"redshift": {namespace: "AWS/Redshift", resourceTypes: []string{"redshift:cluster"}, joinDims: []string{"ClusterIdentifier"}},
+	"dynamodb": {namespace: "AWS/DynamoDB", resourceTypes: []string{"dynamodb:table"}, joinDims: []string{"TableName"}},
 
 	// Parent-resource joins: joinDims is the parent dimension only, so children
 	// (across storage_type / filter_id / operation) inherit the parent's tags.
-	"s3":                 {resourceTypes: []string{"s3"}, joinDims: []string{"BucketName"}},
-	"s3_requests":        {resourceTypes: []string{"s3"}, joinDims: []string{"BucketName"}},
-	"dynamodb_operation": {resourceTypes: []string{"dynamodb:table"}, joinDims: []string{"TableName"}},
+	"s3":                 {namespace: "AWS/S3", resourceTypes: []string{"s3"}, joinDims: []string{"BucketName"}},
+	"s3_requests":        {namespace: "AWS/S3", resourceTypes: []string{"s3"}, joinDims: []string{"BucketName"}},
+	"dynamodb_operation": {namespace: "AWS/DynamoDB", resourceTypes: []string{"dynamodb:table"}, joinDims: []string{"TableName"}},
 
 	// Overrides: shared/quirky ARN shapes.
-	"elb":            {resourceTypes: []string{"elasticloadbalancing:loadbalancer"}, joinDims: []string{"LoadBalancerName"}, arnValues: elbClassicARNValues},
-	"alb":            {resourceTypes: []string{"elasticloadbalancing:loadbalancer"}, joinDims: []string{"LoadBalancer"}, arnValues: albARNValues},
-	"nlb":            {resourceTypes: []string{"elasticloadbalancing:loadbalancer"}, joinDims: []string{"LoadBalancer"}, arnValues: nlbARNValues},
-	"alb_target":     {resourceTypes: []string{"elasticloadbalancing:targetgroup"}, joinDims: []string{"TargetGroup"}, arnValues: albTargetARNValues},
-	"ecs":            {resourceTypes: []string{"ecs:service"}, joinDims: []string{"ClusterName", "ServiceName"}, arnValues: ecsARNValues},
-	"opensearch":     {resourceTypes: []string{"es:domain"}, joinDims: []string{"ClientId", "DomainName"}, arnValues: opensearchARNValues},
-	"step_functions": {resourceTypes: []string{"states:stateMachine"}, joinDims: []string{"StateMachineArn"}, arnValues: stepFunctionsARNValues},
+	"elb":            {namespace: "AWS/ELB", resourceTypes: []string{"elasticloadbalancing:loadbalancer"}, joinDims: []string{"LoadBalancerName"}, arnValues: elbClassicARNValues},
+	"alb":            {namespace: "AWS/ApplicationELB", resourceTypes: []string{"elasticloadbalancing:loadbalancer"}, joinDims: []string{"LoadBalancer"}, arnValues: albARNValues},
+	"nlb":            {namespace: "AWS/NetworkELB", resourceTypes: []string{"elasticloadbalancing:loadbalancer"}, joinDims: []string{"LoadBalancer"}, arnValues: nlbARNValues},
+	"alb_target":     {namespace: "AWS/ApplicationELB", resourceTypes: []string{"elasticloadbalancing:targetgroup"}, joinDims: []string{"TargetGroup"}, arnValues: albTargetARNValues},
+	"ecs":            {namespace: "AWS/ECS", resourceTypes: []string{"ecs:service"}, joinDims: []string{"ClusterName", "ServiceName"}, arnValues: ecsARNValues},
+	"opensearch":     {namespace: "AWS/ES", resourceTypes: []string{"es:domain"}, joinDims: []string{"ClientId", "DomainName"}, arnValues: opensearchARNValues},
+	"step_functions": {namespace: "AWS/States", resourceTypes: []string{"states:stateMachine"}, joinDims: []string{"StateMachineArn"}, arnValues: stepFunctionsARNValues},
 	// eventbridge is default-bus-only ({RuleName}); its override rejects custom-bus
 	// rule ARNs so a custom-bus rule cannot mis-tag a same-named default-bus rule.
-	"eventbridge": {resourceTypes: []string{"events:rule"}, joinDims: []string{"RuleName"}, arnValues: eventbridgeARNValues},
+	"eventbridge": {namespace: "AWS/Events", resourceTypes: []string{"events:rule"}, joinDims: []string{"RuleName"}, arnValues: eventbridgeARNValues},
 }
 
-func validateTagJoinProfile(profile cwprofiles.ResolvedProfile) error {
+func resolveTagJoinProfile(profile cwprofiles.ResolvedProfile) (*tagJoin, error) {
 	join, ok := tagJoins[profile.Name]
 	if !ok {
-		return fmt.Errorf("profile is not registered")
+		return nil, fmt.Errorf("profile is not registered")
 	}
-	dimensions := profile.Config.DimensionNames()
+	if profile.Config.Namespace != join.namespace {
+		return nil, fmt.Errorf("association requires namespace %q", join.namespace)
+	}
 	for _, name := range join.joinDims {
-		if indexOfString(dimensions, name) < 0 {
-			return fmt.Errorf("association requires dimension %q", name)
+		found := false
+		for _, dimension := range profile.Config.Instance.Dimensions {
+			if dimension.Name != name {
+				continue
+			}
+			found = true
+			if dimension.IsConstant() {
+				return nil, fmt.Errorf("association requires identifying dimension %q", name)
+			}
+			break
+		}
+		if !found {
+			return nil, fmt.Errorf("association requires dimension %q", name)
 		}
 	}
-	return nil
+	resolved := join
+	return &resolved, nil
 }
 
 // defaultARNValues extracts a single-segment resource id: the part after the FIRST

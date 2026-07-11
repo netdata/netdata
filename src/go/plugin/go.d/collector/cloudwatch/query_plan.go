@@ -132,7 +132,7 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 		prof := scope.Profile
 		nDims := len(prof.Config.Instance.Dimensions)
 		dimNames := prof.Config.DimensionNames()
-		join, hasJoin := tagJoins[prof.Name]
+		join := scope.TagJoin
 		membershipUnknown := scope.hasTagFilter() && c.tags.scopeUnknown(scope.ID)
 		instances := c.discovery.Instances[discoveryKey{Target: scope.Target.Name, Profile: prof.Name, Region: scope.Region}]
 		for _, inst := range instances {
@@ -146,7 +146,7 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 			}
 
 			if scope.hasTagFilter() {
-				if !hasJoin {
+				if join == nil {
 					owned[instanceKey] = struct{}{}
 					reserved++
 					continue
@@ -175,7 +175,7 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 				return nil, fmt.Errorf("CloudWatch query plan contains more than limits.max_instances=%d final instances", maxInstances)
 			}
 			labels, dims := c.instanceLabelsAndDims(resolved.accountID, prof, scope.Region, inst)
-			tagLabels := c.tagLabelsFor(scope.Target.Name, resolved.accountID, scope.Region, prof, inst.DimensionValues)
+			tagLabels := c.tagLabelsFor(scope.Target.Name, resolved.accountID, scope.Region, prof, join, inst.DimensionValues)
 			queries := c.metricQueries(scope.Target.Name, prof, scope.Region, labels, tagLabels, dims, &idx)
 			plan = append(plan, queries...)
 		}
@@ -193,15 +193,15 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 
 func finalInstanceKey(profileName, accountID, region string, dimensions []cwprofiles.InstanceDimension, values []string) string {
 	var key strings.Builder
-	writeSignaturePart(&key, profileName)
-	writeSignaturePart(&key, accountID)
-	writeSignaturePart(&key, region)
+	writeLengthPrefixed(&key, profileName)
+	writeLengthPrefixed(&key, accountID)
+	writeLengthPrefixed(&key, region)
 	for i, dimension := range dimensions {
 		if dimension.IsConstant() {
 			continue
 		}
-		writeSignaturePart(&key, dimension.Label)
-		writeSignaturePart(&key, values[i])
+		writeLengthPrefixed(&key, dimension.Label)
+		writeLengthPrefixed(&key, values[i])
 	}
 	return key.String()
 }

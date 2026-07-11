@@ -4,7 +4,6 @@ package cloudwatch
 
 import (
 	"slices"
-	"strconv"
 	"strings"
 )
 
@@ -29,20 +28,14 @@ func compileResourceTagFilters(config []ResourceTagFilterConfig) []resourceTagFi
 func resourceTagFilterSignature(filters []resourceTagFilter) string {
 	var b strings.Builder
 	for _, filter := range filters {
-		writeSignaturePart(&b, filter.key)
+		writeLengthPrefixed(&b, filter.key)
 		b.WriteByte(':')
 		for _, value := range filter.values {
-			writeSignaturePart(&b, value)
+			writeLengthPrefixed(&b, value)
 		}
 		b.WriteByte(';')
 	}
 	return b.String()
-}
-
-func writeSignaturePart(b *strings.Builder, value string) {
-	b.WriteString(strconv.Itoa(len(value)))
-	b.WriteByte(':')
-	b.WriteString(value)
 }
 
 func resourceMatchesFilters(tags map[string]string, filters []resourceTagFilter) bool {

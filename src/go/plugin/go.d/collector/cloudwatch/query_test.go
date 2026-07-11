@@ -241,8 +241,11 @@ func filteredOverlapCollector(t *testing.T) *Collector {
 	})
 	require.NoError(t, c.ensureTargets(context.Background()))
 	require.Len(t, c.plan.Scopes, 2)
+	join, err := resolveTagJoinProfile(c.plan.Scopes[0].Profile)
+	require.NoError(t, err)
 	c.plan.Scopes[0].ID = 0
 	c.plan.Scopes[0].TagFilter = []resourceTagFilter{{key: "environment", values: []string{"production"}}}
+	c.plan.Scopes[0].TagJoin = join
 	c.plan.Scopes[1].ID = 1
 	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}: {

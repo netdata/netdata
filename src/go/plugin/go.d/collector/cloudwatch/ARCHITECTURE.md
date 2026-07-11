@@ -285,8 +285,8 @@ Discovery then finds which *instances* of those profiles exist per target and re
   the series gaps until fresh data, and a stale value is never re-emitted.
   Without an explicit override, only `rate: true` metrics at `sum` or
   `sample_count` default to zero; every other statistic gaps. The cache otherwise
-  persists until the instance leaves discovery and `pruneObserved` drops it.
-- `pruneObserved` drops both cached series and per-(target, region, period) schedule entries
+  persists until the instance leaves discovery and `reconcilePlan` drops it.
+- `reconcilePlan` drops both cached series and per-(target, region, period) schedule entries
   absent from the current plan when that immutable plan is rebuilt, so removed resources
   stop being re-emitted and a group that later reappears is queried on its first cycle
   back rather than waiting for a stale schedule entry to expire.
@@ -309,7 +309,8 @@ refreshDiscovery → refreshTags → buildQueryPlan → … → observe
 - **Failure state.** A failed filtered group becomes `unknown`. On the first failure,
   every candidate is withheld and reserved from lower-priority rules. After a success,
   last-known matched members continue to be queried while every other candidate remains
-  reserved. Failed groups retry next collect; successful groups use the discovery TTL.
+  reserved. Freshness and retry state are fetch-group-local: failed groups retry next
+  collect while successful groups keep their result until its discovery TTL expires.
   Optional label enrichment carries last-known labels and never controls identity.
 - **Label resolution (`tagresolve.go`).** `resolveTagPlan` turns
   `labels.resource_tags` into a per-profile `awsKey → label` plan once. Global config
@@ -317,10 +318,12 @@ refreshDiscovery → refreshTags → buildQueryPlan → … → observe
   `account_id`, `region`, or dimension labels are skipped with one warning. The optional
   `label` resolves collisions; the default is the sanitized key (`Name` → `name`).
 - **ARN↔dimension join (`tagjoin.go`).** RGTA returns ARN + tags; the cache is keyed by
-  the profile's ARN-projectable `joinKey`. A per-profile mapper (a default
-  last-resource-segment extractor plus overrides for ALB/NLB/target-group/ECS/OpenSearch/
+  the profile's ARN-projectable `joinKey`. A namespace-bound per-profile mapper (a
+  default single-component resource-id extractor plus overrides for ALB/NLB/target-group/ECS/OpenSearch/
   Step-Functions) derives the `joinKey` from the ARN, and the instance side projects its
-  dimension values onto the same key. Parent-resource profiles (S3,
+  dimension values onto the same key. The compiler accepts a registered mapper only
+  when an override retains its expected CloudWatch namespace and every join dimension
+  remains identifying (not constant). Parent-resource profiles (S3,
   DynamoDB-operation, and ALB-target) key on the parent dimension so children
   inherit its tags.
   A default-selected profile without a safe association is skipped when filtering is
