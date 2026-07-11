@@ -1675,6 +1675,101 @@ static int test_rrdset_rejects_invalid_update_every(void) {
     return rc;
 }
 
+static int test_rrdr_relative_window_extreme_values(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    const time_t maximum = (time_t)(((uintmax_t)1 << (sizeof(time_t) * CHAR_BIT - 1)) - 1);
+    const time_t minimum = -maximum - 1;
+    int errors = 0;
+
+#define RRDR_WINDOW_CHECK(condition, message) do {                                  \
+        if(!(condition)) {                                                          \
+            fprintf(stderr, "%s: %s\n", __FUNCTION__, (message));                \
+            errors++;                                                               \
+        }                                                                            \
+    } while(0)
+
+    RRDR_WINDOW_CHECK(rrdr_relative_window_value_is_relative(-API_RELATIVE_TIME_MAX),
+                      "negative relative boundary was classified as absolute");
+    RRDR_WINDOW_CHECK(rrdr_relative_window_value_is_relative(API_RELATIVE_TIME_MAX),
+                      "positive relative boundary was classified as absolute");
+    RRDR_WINDOW_CHECK(!rrdr_relative_window_value_is_relative(-API_RELATIVE_TIME_MAX - 1),
+                      "value below the relative boundary was classified as relative");
+    RRDR_WINDOW_CHECK(!rrdr_relative_window_value_is_relative(API_RELATIVE_TIME_MAX + 1),
+                      "value above the relative boundary was classified as relative");
+    RRDR_WINDOW_CHECK(!rrdr_relative_window_value_is_relative(minimum),
+                      "minimum time_t was classified as relative");
+    RRDR_WINDOW_CHECK(!rrdr_relative_window_value_is_relative(maximum),
+                      "maximum time_t was classified as relative");
+
+    {
+        const time_t now = 2000000000;
+        time_t after = -300;
+        time_t before = -60;
+        bool relative = rrdr_relative_window_to_absolute(&after, &before, now);
+
+        RRDR_WINDOW_CHECK(relative, "ordinary relative window was classified as absolute");
+        RRDR_WINDOW_CHECK(before == now - 60, "ordinary relative before changed");
+        RRDR_WINDOW_CHECK(after == now - 60 - 300 + 1, "ordinary relative after changed");
+    }
+
+    {
+        time_t after = minimum + 100;
+        time_t before = maximum;
+        bool relative = rrdr_relative_window_to_absolute(&after, &before, maximum - 1);
+
+        RRDR_WINDOW_CHECK(!relative, "absolute future window was classified as relative");
+        RRDR_WINDOW_CHECK(before == maximum - 1, "future before was not shifted to now");
+        RRDR_WINDOW_CHECK(after == minimum + 99, "wide intermediate changed a representable shifted after");
+    }
+
+    {
+        time_t after = -3;
+        time_t before = minimum + 1;
+        bool relative = rrdr_relative_window_to_absolute(&after, &before, 123);
+
+        RRDR_WINDOW_CHECK(relative, "mixed relative window was classified as absolute");
+        RRDR_WINDOW_CHECK(before == minimum + 1, "absolute before changed without a future shift");
+        RRDR_WINDOW_CHECK(after == minimum, "unrepresentable relative after did not saturate to time_t minimum");
+    }
+
+    {
+        time_t after = maximum;
+        time_t before = minimum;
+        bool relative = rrdr_relative_window_to_absolute(&after, &before, 123);
+
+        RRDR_WINDOW_CHECK(!relative, "extreme absolute window was classified as relative");
+        RRDR_WINDOW_CHECK(before == 123, "extreme future before was not shifted to now");
+        RRDR_WINDOW_CHECK(after == minimum, "unrepresentable future shift did not saturate to time_t minimum");
+    }
+
+    {
+        time_t after = -1;
+        time_t before = -1;
+        bool relative = rrdr_relative_window_to_absolute(&after, &before, minimum);
+
+        RRDR_WINDOW_CHECK(relative, "minimum-now relative window was classified as absolute");
+        RRDR_WINDOW_CHECK(before == minimum, "minimum-now before did not saturate");
+        RRDR_WINDOW_CHECK(after == minimum, "minimum-now after did not saturate");
+    }
+
+    {
+        time_t after = minimum;
+        time_t before = maximum;
+        time_t now;
+        bool absolute = rrdr_relative_window_to_absolute_query(&after, &before, &now, false);
+        time_t minimum_query_time = now - (10 * 365 * 86400);
+
+        RRDR_WINDOW_CHECK(absolute, "query wrapper changed absolute classification");
+        RRDR_WINDOW_CHECK(before == now, "query wrapper changed shifted before");
+        RRDR_WINDOW_CHECK(after == minimum_query_time, "query wrapper did not apply its existing lower clamp");
+    }
+
+#undef RRDR_WINDOW_CHECK
+
+    return errors;
+}
+
 int run_all_mockup_tests(void)
 {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
@@ -1701,6 +1796,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_rrdset_rejects_invalid_update_every())
+        return 1;
+
+    if(test_rrdr_relative_window_extreme_values())
         return 1;
 
     if(!test_variable_renames())

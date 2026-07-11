@@ -772,8 +772,9 @@ static inline bool lqs_request_parse_and_validate(LOGS_QUERY_STATUS *lqs, BUFFER
         rq->before_s = tmp;
     }
 
-    if(rq->after_s == rq->before_s)
-        rq->after_s = rq->before_s - LQS_DEFAULT_QUERY_DURATION;
+    if(rq->after_s == rq->before_s &&
+       __builtin_sub_overflow(rq->before_s, (time_t)LQS_DEFAULT_QUERY_DURATION, &rq->after_s))
+        rq->after_s = rq->before_s;
 
     rq->after_ut = rq->after_s * USEC_PER_SEC;
     rq->before_ut = (rq->before_s * USEC_PER_SEC) + USEC_PER_SEC - 1;

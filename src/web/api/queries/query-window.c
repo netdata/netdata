@@ -57,7 +57,8 @@ bool query_target_calculate_window(QUERY_TARGET *qt) {
 
     query_debug_log_init();
 
-    if (ABS(before_requested) <= API_RELATIVE_TIME_MAX || ABS(after_requested) <= API_RELATIVE_TIME_MAX) {
+    if (rrdr_relative_window_value_is_relative(before_requested) ||
+        rrdr_relative_window_value_is_relative(after_requested)) {
         relative_period_requested = true;
         natural_points = true;
         options |= RRDR_OPTION_NATURAL_POINTS;
