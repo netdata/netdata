@@ -459,6 +459,12 @@ static BOOL isValidInstanceDefinition(
                 pInstance->NameOffset > byte_length - pInstance->NameLength))
         return FALSE;
 
+    // when a name exists, it must live after the fixed header - otherwise
+    // header bytes would be decoded as the instance name
+    // (NameLength == 0 with NameOffset == 0 is valid for unnamed instances)
+    if(unlikely(pInstance->NameLength && pInstance->NameOffset < sizeof(*pInstance)))
+        return FALSE;
+
     return TRUE;
 }
 
