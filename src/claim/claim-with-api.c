@@ -24,7 +24,7 @@ static bool check_and_generate_certificates() {
     CLEAN_CHAR_P *private_key_file = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "private.pem");
     CLEAN_CHAR_P *public_key_file = filename_from_path_entry_strdupz(netdata_configured_cloud_dir, "public.pem");
 
-    // Check if private key exists
+    // Check if the public key exists; it is the completion marker for the pair.
     fp = fopen(public_key_file, "r");
     if (fp) {
         fclose(fp);
@@ -66,17 +66,29 @@ static bool check_and_generate_certificates() {
         EVP_PKEY_free(pkey);
         return false;
     }
-    fclose(fp);
+    if (fclose(fp) != 0) {
+        claim_agent_failure_reason_set("Cannot write private key file: %s", private_key_file);
+        EVP_PKEY_free(pkey);
+        return false;
+    }
 
     // Save public key
     fp = fopen(public_key_file, "wb");
     if (!fp || !PEM_write_PUBKEY(fp, pkey)) {
         claim_agent_failure_reason_set("Cannot write public key file: %s", public_key_file);
-        if (fp) fclose(fp);
+        if (fp) {
+            fclose(fp);
+            unlink(public_key_file);
+        }
         EVP_PKEY_free(pkey);
         return false;
     }
-    fclose(fp);
+    if (fclose(fp) != 0) {
+        claim_agent_failure_reason_set("Cannot write public key file: %s", public_key_file);
+        unlink(public_key_file);
+        EVP_PKEY_free(pkey);
+        return false;
+    }
 
     EVP_PKEY_free(pkey);
     return true;
