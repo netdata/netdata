@@ -153,20 +153,6 @@ func TestTagJoins_DimsExistInProfiles(t *testing.T) {
 	}
 }
 
-func TestResourceTypeFiltersAndIndex(t *testing.T) {
-	joins := map[string]tagJoin{
-		"ec2": tagJoins["ec2"],
-		"elb": tagJoins["elb"],
-		"alb": tagJoins["alb"],
-		"nlb": tagJoins["nlb"],
-	}
-	assert.ElementsMatch(t, []string{"ec2:instance", "elasticloadbalancing:loadbalancer"}, resourceTypeFilters(joins))
-
-	idx := resourceTypeIndex(joins)
-	assert.ElementsMatch(t, []string{"ec2"}, idx["ec2:instance"])
-	assert.ElementsMatch(t, []string{"elb", "alb", "nlb"}, idx["elasticloadbalancing:loadbalancer"])
-}
-
 func mustParseARN(t *testing.T, s string) arn.ARN {
 	t.Helper()
 	a, err := arn.Parse(s)

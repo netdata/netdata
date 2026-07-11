@@ -22,10 +22,15 @@ type collectionTarget struct {
 }
 
 type collectionScope struct {
-	Target  *collectionTarget
-	Profile cwprofiles.ResolvedProfile
-	Region  string
+	ID        int
+	Rule      string
+	Target    *collectionTarget
+	Profile   cwprofiles.ResolvedProfile
+	Region    string
+	TagFilter []resourceTagFilter
 }
+
+func (s collectionScope) hasTagFilter() bool { return len(s.TagFilter) > 0 }
 
 func (c *Collector) ensurePlan() error {
 	if c.plan != nil {

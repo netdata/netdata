@@ -213,9 +213,9 @@ func discoverAll(
 	return results
 }
 
-// buildDiscoverySnapshot assembles a snapshot from per-target results. Targets
-// that errored are returned as a separate error list (the caller logs them and
-// applies fail-soft); only non-empty successful targets populate the snapshot.
+// buildDiscoverySnapshot assembles a snapshot from namespace-group results and
+// returns the number of failed groups. Failed groups retain their previous
+// profile instances; successful groups replace theirs.
 func buildDiscoverySnapshot(results []discoveryGroupResult, prev map[discoveryKey][]discoveredInstance, now time.Time, refreshEvery int) (discoverySnapshot, int) {
 	snap := discoverySnapshot{
 		Instances: make(map[discoveryKey][]discoveredInstance),
@@ -247,7 +247,7 @@ func buildDiscoverySnapshot(results []discoveryGroupResult, prev map[discoveryKe
 
 // highInstanceCountWarn is the discovered-instance count at or above which the
 // collector logs a cost-visibility warning. Collection is never truncated.
-const highInstanceCountWarn = 1000
+const highInstanceCountWarn = defaultMaxInstances
 
 func (c *Collector) loadCatalog() (cwprofiles.Catalog, error) {
 	if c.newCatalog != nil {
@@ -310,6 +310,7 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	}
 
 	c.discovery = snap
+	c.markTagsStale()
 	c.invalidateQueryPlan()
 	c.logDiscovery(snap)
 

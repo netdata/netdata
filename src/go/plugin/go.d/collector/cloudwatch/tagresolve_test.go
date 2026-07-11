@@ -15,7 +15,7 @@ func TestSanitizeLabel(t *testing.T) {
 		"Environment":               "environment",
 		"aws:autoscaling:groupName": "aws_autoscaling_groupname",
 		"app.kubernetes.io/team":    "app_kubernetes_io_team",
-		"123abc":                    "123abc", // stays invalid (leading digit); resolveTagPlan skips it
+		"123abc":                    "123abc", // stays invalid; config validation requires an explicit valid label
 	}
 	for in, want := range tests {
 		t.Run(in, func(t *testing.T) {
@@ -26,7 +26,7 @@ func TestSanitizeLabel(t *testing.T) {
 
 func TestResolveTagPlan(t *testing.T) {
 	tests := map[string]struct {
-		tags      []TagConfig
+		tags      []ResourceTagLabelConfig
 		dimLabels []string
 		wantPlan  []resolvedTag
 		wantWarn  int
@@ -37,59 +37,34 @@ func TestResolveTagPlan(t *testing.T) {
 			wantWarn: 0,
 		},
 		"plain keys pass through": {
-			tags:     []TagConfig{{Name: "owner"}, {Name: "project"}},
+			tags:     []ResourceTagLabelConfig{{Key: "owner"}, {Key: "project"}},
 			wantPlan: []resolvedTag{{"owner", "owner"}, {"project", "project"}},
 		},
 		"Name sanitizes to name": {
-			tags:     []TagConfig{{Name: "Name"}},
+			tags:     []ResourceTagLabelConfig{{Key: "Name"}},
 			wantPlan: []resolvedTag{{"Name", "name"}},
 		},
 		"rename overrides default": {
-			tags:     []TagConfig{{Name: "Name", Rename: "instance_name"}},
+			tags:     []ResourceTagLabelConfig{{Key: "Name", Label: "instance_name"}},
 			wantPlan: []resolvedTag{{"Name", "instance_name"}},
 		},
 		"region tag collides with reserved -> skipped": {
-			tags:     []TagConfig{{Name: "region"}},
+			tags:     []ResourceTagLabelConfig{{Key: "region"}},
 			wantPlan: nil,
 			wantWarn: 1,
 		},
 		"region tag renamed -> kept": {
-			tags:     []TagConfig{{Name: "region", Rename: "aws_region"}},
+			tags:     []ResourceTagLabelConfig{{Key: "region", Label: "aws_region"}},
 			wantPlan: []resolvedTag{{"region", "aws_region"}},
 		},
 		"collision with a profile dimension label -> skipped": {
-			tags:      []TagConfig{{Name: "instance_id"}},
+			tags:      []ResourceTagLabelConfig{{Key: "instance_id"}},
 			dimLabels: []string{"instance_id"},
 			wantPlan:  nil,
 			wantWarn:  1,
 		},
-		"duplicate AWS key -> one kept": {
-			tags:     []TagConfig{{Name: "owner"}, {Name: "owner"}},
-			wantPlan: []resolvedTag{{"owner", "owner"}},
-			wantWarn: 1,
-		},
-		"two keys sanitizing to the same label -> second skipped": {
-			tags:     []TagConfig{{Name: "Name"}, {Name: "name"}},
-			wantPlan: []resolvedTag{{"Name", "name"}},
-			wantWarn: 1,
-		},
-		"invalid rename -> skipped": {
-			tags:     []TagConfig{{Name: "foo", Rename: "Bad-Name"}},
-			wantPlan: nil,
-			wantWarn: 1,
-		},
-		"key sanitizing to an invalid label -> skipped": {
-			tags:     []TagConfig{{Name: "123abc"}},
-			wantPlan: nil,
-			wantWarn: 1,
-		},
-		"empty name -> skipped": {
-			tags:     []TagConfig{{Name: "  "}},
-			wantPlan: nil,
-			wantWarn: 1,
-		},
 		"survivors kept when mixed with skips": {
-			tags:      []TagConfig{{Name: "owner"}, {Name: "region"}, {Name: "project"}},
+			tags:      []ResourceTagLabelConfig{{Key: "owner"}, {Key: "region"}, {Key: "project"}},
 			dimLabels: []string{"instance_id"},
 			wantPlan:  []resolvedTag{{"owner", "owner"}, {"project", "project"}},
 			wantWarn:  1,

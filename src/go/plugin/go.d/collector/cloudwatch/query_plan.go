@@ -63,16 +63,20 @@ func (c *Collector) invalidateQueryPlan() {
 // discovery, and tag snapshots. Those inputs change on a much slower cadence than
 // Collect, so rebuilding only on invalidation avoids repeating per-series
 // allocations during every collection cycle.
-func (c *Collector) currentQueryPlan() []plannedQuery {
+func (c *Collector) currentQueryPlan() ([]plannedQuery, error) {
 	if !c.planDirty {
-		return c.queryPlan
+		return c.queryPlan, nil
+	}
+	next, err := c.buildQueryPlan()
+	if err != nil {
+		return nil, err
 	}
 	previous := c.queryPlan
-	c.queryPlan = c.buildQueryPlan()
+	c.queryPlan = next
 	c.queryGroups, c.queriesByGroup = groupQueryPlan(c.queryPlan)
 	c.observations.reconcilePlan(previous, c.queryPlan)
 	c.planDirty = false
-	return c.queryPlan
+	return c.queryPlan, nil
 }
 
 func groupQueryPlan(plan []plannedQuery) ([]queryGroupKey, map[queryGroupKey][]plannedQuery) {
@@ -103,17 +107,23 @@ func queryWindow(now time.Time, period, queryOffset int) (start, end time.Time) 
 	return time.Unix(endSec-periodSec, 0).UTC(), time.Unix(endSec, 0).UTC()
 }
 
-// buildQueryPlan follows compiled scope order and keeps the first query for each
-// final emitted identity. This resolves dynamic overlap when distinct targets later
-// resolve to the same account and discover the same resource.
-func (c *Collector) buildQueryPlan() []plannedQuery {
+// buildQueryPlan follows compiled scope order and assigns each final instance to
+// its earliest matching rule. An unknown tag-filter result reserves the candidate
+// from lower rules without querying it, which keeps failures fail-closed.
+func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 	if c.plan == nil {
-		return nil
+		return nil, nil
 	}
 	var plan []plannedQuery
 	idx := 0
-	seen := make(map[string]struct{})
+	owned := make(map[string]struct{})
 	shadowed := 0
+	reserved := 0
+	instanceCount := 0
+	maxInstances := c.Limits.MaxInstances
+	if maxInstances <= 0 {
+		maxInstances = defaultMaxInstances
+	}
 	for _, scope := range c.plan.Scopes {
 		resolved, ok := c.resolvedTargetByRef(scope.Target.Name)
 		if !ok {
@@ -121,37 +131,77 @@ func (c *Collector) buildQueryPlan() []plannedQuery {
 		}
 		prof := scope.Profile
 		nDims := len(prof.Config.Instance.Dimensions)
+		dimNames := prof.Config.DimensionNames()
+		join, hasJoin := tagJoins[prof.Name]
+		membershipUnknown := scope.hasTagFilter() && c.tags.scopeUnknown(scope.ID)
 		instances := c.discovery.Instances[discoveryKey{Target: scope.Target.Name, Profile: prof.Name, Region: scope.Region}]
 		for _, inst := range instances {
 			if len(inst.DimensionValues) != nDims {
 				continue // defensive: snapshot/profile mismatch
 			}
+			instanceKey := finalInstanceKey(prof.Name, resolved.accountID, scope.Region, prof.Config.Instance.Dimensions, inst.DimensionValues)
+			if _, exists := owned[instanceKey]; exists {
+				shadowed++
+				continue
+			}
+
+			if scope.hasTagFilter() {
+				if !hasJoin {
+					owned[instanceKey] = struct{}{}
+					reserved++
+					continue
+				}
+				joinKey, ok := join.instanceJoinKey(dimNames, inst.DimensionValues)
+				if !ok {
+					owned[instanceKey] = struct{}{}
+					reserved++
+					continue
+				}
+				selected := c.tags.scopeSelected(scope.ID, joinKey)
+				if !selected && !membershipUnknown {
+					continue
+				}
+				owned[instanceKey] = struct{}{}
+				if !selected {
+					reserved++
+					continue
+				}
+			} else {
+				owned[instanceKey] = struct{}{}
+			}
+
+			instanceCount++
+			if instanceCount > maxInstances {
+				return nil, fmt.Errorf("CloudWatch query plan contains more than limits.max_instances=%d final instances", maxInstances)
+			}
 			labels, dims := c.instanceLabelsAndDims(resolved.accountID, prof, scope.Region, inst)
 			tagLabels := c.tagLabelsFor(scope.Target.Name, resolved.accountID, scope.Region, prof, inst.DimensionValues)
 			queries := c.metricQueries(scope.Target.Name, prof, scope.Region, labels, tagLabels, dims, &idx)
-			for _, query := range queries {
-				key := finalSeriesKey(query.seriesName, query.labels)
-				if _, ok := seen[key]; ok {
-					shadowed++
-					continue
-				}
-				seen[key] = struct{}{}
-				plan = append(plan, query)
-			}
+			plan = append(plan, queries...)
 		}
 	}
 	if shadowed > 0 {
 		c.Limit(logKeyRuleShadowed, 1, recurringLogEvery).
-			Warningf("CloudWatch collection rules shadowed %d duplicate final series; earliest rule/target order owns each series", shadowed)
+			Warningf("CloudWatch collection rules shadowed %d duplicate final instance(s); earliest matching rule/target order owns each instance", shadowed)
 	}
-	return plan
+	if reserved > 0 {
+		c.Limit(logKeyTagRefreshFailed+"_reserved", 1, recurringLogEvery).
+			Warningf("CloudWatch resource tag filtering reserved %d instance(s) from lower-priority rules while membership was unknown", reserved)
+	}
+	return plan, nil
 }
 
-func finalSeriesKey(seriesName string, labels []metrix.Label) string {
+func finalInstanceKey(profileName, accountID, region string, dimensions []cwprofiles.InstanceDimension, values []string) string {
 	var key strings.Builder
-	key.WriteString(seriesName)
-	for _, label := range labels {
-		key.WriteString("\x00" + label.Key + "\x00" + label.Value)
+	writeSignaturePart(&key, profileName)
+	writeSignaturePart(&key, accountID)
+	writeSignaturePart(&key, region)
+	for i, dimension := range dimensions {
+		if dimension.IsConstant() {
+			continue
+		}
+		writeSignaturePart(&key, dimension.Label)
+		writeSignaturePart(&key, values[i])
 	}
 	return key.String()
 }

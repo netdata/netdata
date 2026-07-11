@@ -3,6 +3,7 @@
 package cloudwatch
 
 import (
+	"fmt"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
@@ -22,13 +23,14 @@ import (
 //     parent-resource profile (e.g. S3 across storage_type) it is only the parent
 //     dimension, so every child instance inherits the parent's tags.
 //   - arnValues extracts the joinDims values from an ARN (nil => defaultARNValues,
-//     the resource-id after the last '/' or ':'). It returns ok=false when the ARN
+//     a single-segment resource id after the first '/' or ':'). It returns ok=false when the ARN
 //     is not this profile's flavour (e.g. a classic-ELB extractor rejects an ALB
 //     ARN), so a shared resource type can fan out to the right profile.
 //
-// Safety: a wrong extraction can only MISS (the arn-side key won't equal any
-// instance-side key, so that resource contributes no tags) — it can never mislabel,
-// because the instance side always uses the real discovered dimension values.
+// Safety requirement: every registered extractor must reject ambiguous ARN shapes
+// and project exactly the dimensions named by joinDims. A wrong projection could
+// collide with another discovered instance, so associations are internal, reviewed,
+// and covered by ARN-shape tests rather than inferred from arbitrary profiles.
 type tagJoin struct {
 	resourceTypes []string
 	joinDims      []string
@@ -36,9 +38,9 @@ type tagJoin struct {
 }
 
 // tagJoins is the per-profile (by basename) join registry. Only profiles listed
-// here are tag-enriched; a profile with no entry (risky/ambiguous joins like
-// cloudfront/api_gateway/msk/elasticache, or non-taggable auto_scaling/bedrock)
-// simply carries no tags — graceful under INV.2.
+// here can use generic resource-tag filtering and labels. Labels-only use skips
+// an unregistered profile; an effective filter applies the compiler's explicit
+// skip/error policy instead of collecting that profile unfiltered.
 var tagJoins = map[string]tagJoin{
 	// Sound single-dimension joins: default extractor (resource-id = last segment).
 	"ec2":         {resourceTypes: []string{"ec2:instance"}, joinDims: []string{"InstanceId"}},
@@ -78,6 +80,20 @@ var tagJoins = map[string]tagJoin{
 	// eventbridge is default-bus-only ({RuleName}); its override rejects custom-bus
 	// rule ARNs so a custom-bus rule cannot mis-tag a same-named default-bus rule.
 	"eventbridge": {resourceTypes: []string{"events:rule"}, joinDims: []string{"RuleName"}, arnValues: eventbridgeARNValues},
+}
+
+func validateTagJoinProfile(profile cwprofiles.ResolvedProfile) error {
+	join, ok := tagJoins[profile.Name]
+	if !ok {
+		return fmt.Errorf("profile is not registered")
+	}
+	dimensions := profile.Config.DimensionNames()
+	for _, name := range join.joinDims {
+		if indexOfString(dimensions, name) < 0 {
+			return fmt.Errorf("association requires dimension %q", name)
+		}
+	}
+	return nil
 }
 
 // defaultARNValues extracts a single-segment resource id: the part after the FIRST
@@ -209,6 +225,13 @@ func (tj tagJoin) arnJoinKey(a arn.ARN) (string, bool) {
 // instanceJoinKey computes this profile's join key from a discovered instance's
 // dimension values (ordered by dimNames = Profile.DimensionNames()).
 func (tj tagJoin) instanceJoinKey(dimNames, values []string) (string, bool) {
+	if len(tj.joinDims) == 1 {
+		idx := indexOfString(dimNames, tj.joinDims[0])
+		if idx < 0 || idx >= len(values) {
+			return "", false
+		}
+		return values[idx], true
+	}
 	parts := make([]string, len(tj.joinDims))
 	for i, jd := range tj.joinDims {
 		idx := indexOfString(dimNames, jd)
@@ -236,46 +259,4 @@ func deriveResourceType(a arn.ARN) string {
 		return a.Service + ":" + a.Resource[:i]
 	}
 	return a.Service
-}
-
-// selectedTagJoins returns the registered joins for the given selected profiles,
-// keyed by profile basename. Profiles with no registered join are omitted (no tags).
-func selectedTagJoins(profiles []cwprofiles.ResolvedProfile) map[string]tagJoin {
-	out := make(map[string]tagJoin)
-	for _, p := range profiles {
-		if tj, ok := tagJoins[p.Name]; ok {
-			out[p.Name] = tj
-		}
-	}
-	return out
-}
-
-// resourceTypeFilters is the deduped union of ResourceTypeFilters across the given
-// joins, to narrow the RGTA GetResources scan.
-func resourceTypeFilters(joins map[string]tagJoin) []string {
-	seen := make(map[string]struct{})
-	var out []string
-	for _, tj := range joins {
-		for _, rt := range tj.resourceTypes {
-			if _, dup := seen[rt]; dup {
-				continue
-			}
-			seen[rt] = struct{}{}
-			out = append(out, rt)
-		}
-	}
-	return out
-}
-
-// resourceTypeIndex maps each resource-type to the profile basenames that claim it
-// (a shared type like elasticloadbalancing:loadbalancer fans out to elb/alb/nlb,
-// disambiguated by each join's arnValues).
-func resourceTypeIndex(joins map[string]tagJoin) map[string][]string {
-	out := make(map[string][]string)
-	for name, tj := range joins {
-		for _, rt := range tj.resourceTypes {
-			out[rt] = append(out[rt], name)
-		}
-	}
-	return out
 }

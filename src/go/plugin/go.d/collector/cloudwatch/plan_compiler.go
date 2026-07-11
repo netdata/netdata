@@ -25,16 +25,21 @@ type planCompiler struct {
 	usedCredentials  map[string]struct{}
 	usedTargets      map[string]struct{}
 	selectedProfiles map[string]cwprofiles.ResolvedProfile
-	seenScopes       map[string]string
+	seenScopes       map[compiledScopeKey]string
 	targetPartitions map[string]map[string]struct{}
 	candidateChecks  int
 }
 
+type compiledScopeKey struct {
+	target, profile, region, filter string
+}
+
 type ruleDiagnostics struct {
-	ruleName       string
-	skippedProfile []string
-	shadowed       int
-	shadowSample   *shadowSample
+	ruleName              string
+	skippedProfile        []string
+	skippedTagAssociation []string
+	shadowed              int
+	shadowSample          *shadowSample
 }
 
 type shadowSample struct {
@@ -62,7 +67,7 @@ func newPlanCompiler(cfg Config, catalog cwprofiles.Catalog) *planCompiler {
 		usedCredentials:   make(map[string]struct{}),
 		usedTargets:       make(map[string]struct{}),
 		selectedProfiles:  make(map[string]cwprofiles.ResolvedProfile),
-		seenScopes:        make(map[string]string),
+		seenScopes:        make(map[compiledScopeKey]string),
 		targetPartitions:  make(map[string]map[string]struct{}),
 	}
 }
@@ -112,6 +117,8 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 		return diagnostics, err
 	}
 	regions := normalizeRegions(rule.Regions)
+	tagFilters := compileResourceTagFilters(rule.effectiveResourceTagFilters(pc.cfg.Defaults.Filters.ResourceTags))
+	filterKey := resourceTagFilterSignature(tagFilters)
 
 	candidates := len(targets) * len(profiles) * len(regions)
 	if candidates > maxCandidateScopeChecks-pc.candidateChecks {
@@ -138,6 +145,15 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 			diagnostics.skippedProfile = append(diagnostics.skippedProfile, profile.Name)
 			continue
 		}
+		if len(tagFilters) > 0 {
+			if err := validateTagJoinProfile(profile); err != nil {
+				if _, explicit := explicitlyIncluded[profile.Name]; explicit {
+					return diagnostics, fmt.Errorf("%s explicitly includes profile %q with resource tag filtering, but it has no safe tag association: %w", path, profile.Name, err)
+				}
+				diagnostics.skippedTagAssociation = append(diagnostics.skippedTagAssociation, profile.Name)
+				continue
+			}
+		}
 		eligibleProfiles = append(eligibleProfiles, profileRegions{profile: profile, regions: supported})
 	}
 	if len(eligibleProfiles) == 0 {
@@ -148,7 +164,7 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 		pc.usedTargets[target.Name] = struct{}{}
 		for _, selected := range eligibleProfiles {
 			for _, region := range selected.regions {
-				if err := pc.addScope(ruleName, target, selected.profile, region, &diagnostics); err != nil {
+				if err := pc.addScope(ruleName, target, selected.profile, region, tagFilters, filterKey, &diagnostics); err != nil {
 					return diagnostics, err
 				}
 			}
@@ -157,8 +173,8 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 	return diagnostics, nil
 }
 
-func (pc *planCompiler) addScope(ruleName string, target *collectionTarget, profile cwprofiles.ResolvedProfile, region string, diagnostics *ruleDiagnostics) error {
-	key := target.Name + "\x00" + profile.Name + "\x00" + region
+func (pc *planCompiler) addScope(ruleName string, target *collectionTarget, profile cwprofiles.ResolvedProfile, region string, tagFilters []resourceTagFilter, filterKey string, diagnostics *ruleDiagnostics) error {
+	key := compiledScopeKey{target: target.Name, profile: profile.Name, region: region, filter: filterKey}
 	if owner, ok := pc.seenScopes[key]; ok {
 		diagnostics.shadowed++
 		if diagnostics.shadowSample == nil {
@@ -170,7 +186,10 @@ func (pc *planCompiler) addScope(ruleName string, target *collectionTarget, prof
 		return fmt.Errorf("compiled collection scopes exceed maximum %d", maxCompiledScopes)
 	}
 	pc.seenScopes[key] = ruleName
-	pc.plan.Scopes = append(pc.plan.Scopes, collectionScope{Target: target, Profile: profile, Region: region})
+	pc.plan.Scopes = append(pc.plan.Scopes, collectionScope{
+		ID: len(pc.plan.Scopes), Rule: ruleName, Target: target, Profile: profile, Region: region,
+		TagFilter: tagFilters,
+	})
 	pc.selectedProfiles[profile.Name] = profile
 	if !slices.Contains(target.Regions, region) {
 		target.Regions = append(target.Regions, region)
@@ -216,6 +235,9 @@ func (d ruleDiagnostics) messages() []string {
 	var messages []string
 	if len(d.skippedProfile) > 0 {
 		messages = append(messages, fmt.Sprintf("rule %q skips default profiles unsupported in its regions: %s", d.ruleName, strings.Join(d.skippedProfile, ", ")))
+	}
+	if len(d.skippedTagAssociation) > 0 {
+		messages = append(messages, fmt.Sprintf("rule %q skips default profiles without a safe resource-tag association: %s", d.ruleName, strings.Join(d.skippedTagAssociation, ", ")))
 	}
 	if d.shadowed > 0 {
 		sample := d.shadowSample

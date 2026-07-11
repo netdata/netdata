@@ -171,6 +171,88 @@ func TestCompileConfig_StaticScopeFirstRuleWins(t *testing.T) {
 	assert.Contains(t, diagnostics[0], `rule "first" owns`)
 }
 
+func TestCompileConfig_ResourceTagFilterInheritanceReplacementAndDisable(t *testing.T) {
+	defaults := false
+	selector := &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
+	override := []ResourceTagFilterConfig{{Key: "team", Values: []string{"sre"}}}
+	disabled := []ResourceTagFilterConfig{}
+	cfg := validBaseConfig()
+	cfg.Defaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production"}}}
+	cfg.Rules = []RuleConfig{
+		{Name: "inherited", Targets: []string{"base"}, Profiles: selector, Regions: []string{"us-east-1"}},
+		{Name: "replaced", Targets: []string{"base"}, Profiles: selector, Regions: []string{"us-east-1"}, Filters: &RuleFiltersConfig{ResourceTags: &override}},
+		{Name: "disabled", Targets: []string{"base"}, Profiles: selector, Regions: []string{"us-east-1"}, Filters: &RuleFiltersConfig{ResourceTags: &disabled}},
+	}
+
+	plan, diagnostics, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	assert.Empty(t, diagnostics)
+	require.Len(t, plan.Scopes, 3, "distinct effective predicates remain ordered policy scopes")
+	assert.Equal(t, []string{"inherited", "replaced", "disabled"}, []string{plan.Scopes[0].Rule, plan.Scopes[1].Rule, plan.Scopes[2].Rule})
+	assert.Equal(t, []resourceTagFilter{{key: "environment", values: []string{"production"}}}, plan.Scopes[0].TagFilter)
+	assert.Equal(t, []resourceTagFilter{{key: "team", values: []string{"sre"}}}, plan.Scopes[1].TagFilter)
+	assert.Empty(t, plan.Scopes[2].TagFilter)
+}
+
+func TestCompileConfig_EquivalentResourceTagFiltersDeduplicate(t *testing.T) {
+	defaults := false
+	selector := &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
+	first := []ResourceTagFilterConfig{
+		{Key: "team", Values: []string{"platform", "sre"}},
+		{Key: "environment", Values: []string{"production"}},
+	}
+	second := []ResourceTagFilterConfig{
+		{Key: "environment", Values: []string{"production"}},
+		{Key: "team", Values: []string{"sre", "platform"}},
+	}
+	cfg := validBaseConfig()
+	cfg.Rules = []RuleConfig{
+		{Name: "owner", Targets: []string{"base"}, Profiles: selector, Regions: []string{"us-east-1"}, Filters: &RuleFiltersConfig{ResourceTags: &first}},
+		{Name: "duplicate", Targets: []string{"base"}, Profiles: selector, Regions: []string{"us-east-1"}, Filters: &RuleFiltersConfig{ResourceTags: &second}},
+	}
+
+	plan, diagnostics, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	assert.Len(t, plan.Scopes, 1)
+	require.Len(t, diagnostics, 1)
+	assert.Contains(t, diagnostics[0], "shadowed")
+}
+
+func TestCompileConfig_ResourceTagFilterUnsupportedProfiles(t *testing.T) {
+	filter := []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production"}}}
+
+	t.Run("default selection skips unsupported profiles", func(t *testing.T) {
+		cfg := validBaseConfig()
+		cfg.Defaults.Filters.ResourceTags = filter
+		plan, diagnostics, err := compileTestConfig(t, cfg)
+		require.NoError(t, err)
+		assert.NotContains(t, scopeProfileNames(plan.Scopes), "api_gateway")
+		assert.Contains(t, strings.Join(diagnostics, "\n"), "api_gateway")
+	})
+
+	t.Run("explicit unsupported profile fails", func(t *testing.T) {
+		defaults := false
+		cfg := validBaseConfig()
+		cfg.Defaults.Filters.ResourceTags = filter
+		cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"api_gateway"}}
+		_, _, err := compileTestConfig(t, cfg)
+		assert.ErrorContains(t, err, "no safe tag association")
+	})
+
+	t.Run("explicit empty override permits unsupported profile unfiltered", func(t *testing.T) {
+		defaults := false
+		disabled := []ResourceTagFilterConfig{}
+		cfg := validBaseConfig()
+		cfg.Defaults.Filters.ResourceTags = filter
+		cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"api_gateway"}}
+		cfg.Rules[0].Filters = &RuleFiltersConfig{ResourceTags: &disabled}
+		plan, _, err := compileTestConfig(t, cfg)
+		require.NoError(t, err)
+		require.Len(t, plan.Scopes, 1)
+		assert.Empty(t, plan.Scopes[0].TagFilter)
+	})
+}
+
 func TestCompileConfig_TargetMayUseStaticCredentialsForAssumeRole(t *testing.T) {
 	cfg := validBaseConfig()
 	cfg.Credentials = []CredentialSourceConfig{
