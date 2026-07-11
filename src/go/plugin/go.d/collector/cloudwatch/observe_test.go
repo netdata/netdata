@@ -516,7 +516,7 @@ func TestPruneObserved(t *testing.T) {
 func TestPruneObserved_DropsStaleScheduleForVanishedGroup(t *testing.T) {
 	// A group that leaves the plan must lose its schedule entry, so a later
 	// reappearance is unscheduled (immediately due) rather than blocked until a stale
-	// nextQueryAt expires. The two groups here differ ONLY by account, which pins that
+	// nextQueryAt expires. The two groups here differ ONLY by target, which pins that
 	// target is part of the (target, region, period) schedule key — a regression that
 	// dropped target from the key would keep the vanished group.
 	c := New()
@@ -532,11 +532,11 @@ func TestPruneObserved_DropsStaleScheduleForVanishedGroup(t *testing.T) {
 		{Key: "instance_id", Value: "i-1"},
 	}
 
-	// Plan retains only account 111111111111's group; account 222222222222 is gone.
+	// Plan retains only the first target's group; the second target is gone.
 	c.observations.pruneObserved([]plannedQuery{
 		{seriesName: "ec2.cpu_utilization_average", labels: labels, target: "first", region: "us-east-1", period: 300},
 	})
 
 	assert.Contains(t, c.observations.nextQueryAt, inPlan, "a group still in the plan keeps its schedule")
-	assert.NotContains(t, c.observations.nextQueryAt, vanished, "a group that left the plan (differing only by account) loses its schedule")
+	assert.NotContains(t, c.observations.nextQueryAt, vanished, "a group that left the plan (differing only by target) loses its schedule")
 }

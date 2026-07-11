@@ -16,14 +16,19 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 )
 
-// tagCacheKey identifies a resource's resolved tag labels by account, region, the
-// profile they enrich, and the profile's ARN-projectable join key.
+// tagCacheKey identifies resolved tag labels by target execution identity, account
+// attribution, region, profile, and the profile's ARN-projectable join key.
 type tagCacheKey struct {
 	target  string
 	account string
 	region  string
 	profile string
 	joinKey string
+}
+
+type tagScopeKey struct {
+	target string
+	region string
 }
 
 // tagSnapshot is the cached result of one tag refresh: resolved labels per resource,
@@ -41,7 +46,7 @@ func (s tagSnapshot) expired(now time.Time) bool {
 }
 
 // markTagsStale forces the next refreshTags to re-fetch even within the TTL. Called
-// when a new account resolves: its tags must be fetched this cycle, before its charts
+// when a new target resolves: its tags must be fetched this cycle, before its charts
 // are created, because chart labels are set only at chart creation.
 func (c *Collector) markTagsStale() {
 	c.tags.expiresAt = time.Time{}
@@ -113,7 +118,7 @@ func (c *Collector) refreshTags(ctx context.Context) {
 	}
 
 	// Fetch each (target, region) concurrently (bounded), so a slow or hung RGTA
-	// endpoint cannot serialize into an accounts x regions x timeout collection stall;
+	// endpoint cannot serialize into a targets x regions x timeout collection stall;
 	// the per-call timeout bounds each fetch. Indexing into the shared map is done
 	// serially afterwards to avoid a data race. Mirrors discovery's fan-out.
 	type tagFetch struct {
@@ -159,14 +164,21 @@ func (c *Collector) refreshTags(ctx context.Context) {
 		return
 	}
 
+	var failedScopes map[tagScopeKey]struct{}
 	var failures []operationFailure
 	for _, t := range targets {
 		if t.err != nil {
-			c.carryForwardTags(next.labels, t.target, t.region)
+			if failedScopes == nil {
+				failedScopes = make(map[tagScopeKey]struct{})
+			}
+			failedScopes[tagScopeKey{target: t.target, region: t.region}] = struct{}{}
 			failures = append(failures, operationFailure{Target: t.target, Region: t.region, Err: t.err})
 			continue
 		}
 		indexResourceTags(next.labels, t.target, t.account, t.region, t.resources, rtIndex, joins, c.tagPlans)
+	}
+	if len(failedScopes) > 0 {
+		carryForwardFailedTags(next.labels, c.tags.labels, failedScopes)
 	}
 	c.warnOperationFailures(logKeyTagRefreshFailed, "tag lookup", " (using last-known tags)", failures)
 
@@ -174,11 +186,11 @@ func (c *Collector) refreshTags(ctx context.Context) {
 	c.invalidateQueryPlan()
 }
 
-// carryForwardTags copies the previous snapshot's entries for one (target, region)
-// into dst, so a transient RGTA failure keeps that scope's last-known tags.
-func (c *Collector) carryForwardTags(dst map[tagCacheKey][]metrix.Label, target, region string) {
-	for k, v := range c.tags.labels {
-		if k.target == target && k.region == region {
+// carryForwardFailedTags scans the previous snapshot once, preserving entries for
+// every target-region whose RGTA refresh failed.
+func carryForwardFailedTags(dst, previous map[tagCacheKey][]metrix.Label, failed map[tagScopeKey]struct{}) {
+	for k, v := range previous {
+		if _, ok := failed[tagScopeKey{target: k.target, region: k.region}]; ok {
 			dst[k] = v
 		}
 	}

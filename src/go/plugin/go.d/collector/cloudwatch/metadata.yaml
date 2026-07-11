@@ -113,7 +113,7 @@ modules:
 
           :::
         method_description: |
-          The collector compiles named credential sources, monitored targets, and ordered collection rules into an immutable runtime plan. It discovers available metrics with CloudWatch `ListMetrics`, sharing a scan when target, region, namespace, and recent-activity behavior match, then applies each profile's exact dimension matcher. It queries the resulting metric series in `GetMetricData` batches. Each target resolves its AWS account id through `sts:GetCallerIdentity`; target names remain distinct execution identities even when they resolve to the same account. Rule order resolves overlap: the first rule that produces a final metric series owns it.
+          The collector compiles named credential sources, monitored targets, and ordered collection rules into an immutable runtime plan. It discovers available metrics with CloudWatch `ListMetrics`, sharing a scan when target, region, namespace, and recent-activity behavior match, then applies each profile's exact dimension matcher. It queries the resulting metric series in `GetMetricData` batches. Each target resolves its AWS account id through `sts:GetCallerIdentity`; target names remain distinct execution identities even when they resolve to the same account. Rule order, then target order within each rule, resolves overlap: the first rule/target that produces a final metric series owns it.
       supported_platforms:
         include: []
         exclude: []
@@ -257,7 +257,7 @@ modules:
               required: false
               group: Targets
             - name: rules
-              description: Ordered collection rules. Each rule selects targets, profiles, and regions. The earliest rule owns any duplicate final metric series.
+              description: Ordered collection rules. Each rule selects targets, profiles, and regions. Earlier rules own duplicate final metric series; within one rule, the earliest entry in `rules[].targets` owns the series.
               default_value: ""
               required: true
               group: Rules
@@ -267,7 +267,7 @@ modules:
               required: true
               group: Rules
             - name: rules[].targets
-              description: Names of monitored targets selected by this rule.
+              description: Ordered names of monitored targets selected by this rule. Order breaks overlap ties within the rule.
               default_value: ""
               required: true
               group: Rules

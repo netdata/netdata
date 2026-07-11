@@ -154,6 +154,19 @@ func validateRules(cfg Config) error {
 		if err := validateRuleRegions(path, rule.Regions); err != nil {
 			errs = append(errs, err)
 		}
+		for _, field := range []struct {
+			name  string
+			value any
+		}{
+			{name: "filters", value: rule.Filters},
+			{name: "labels", value: rule.Labels},
+			{name: "series", value: rule.Series},
+			{name: "query", value: rule.Query},
+		} {
+			if field.value != nil {
+				errs = append(errs, fmt.Errorf("%s.%s is reserved for a later phase", path, field.name))
+			}
+		}
 	}
 	return errors.Join(errs...)
 }

@@ -53,6 +53,10 @@ type RuleConfig struct {
 	Targets  []string               `yaml:"targets" json:"targets"`
 	Profiles *ProfileSelectorConfig `yaml:"profiles,omitempty" json:"profiles,omitempty"`
 	Regions  []string               `yaml:"regions" json:"regions"`
+	Filters  any                    `yaml:"filters,omitempty" json:"filters,omitempty"`
+	Labels   any                    `yaml:"labels,omitempty" json:"labels,omitempty"`
+	Series   any                    `yaml:"series,omitempty" json:"series,omitempty"`
+	Query    any                    `yaml:"query,omitempty" json:"query,omitempty"`
 }
 
 type ProfileSelectorConfig struct {

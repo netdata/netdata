@@ -14,7 +14,7 @@ import (
 )
 
 // querySample is one observed value for a series identity in a collect cycle.
-// account+region+period is its scheduling group (drives retention re-emit scheduling).
+// target+region+period is its scheduling group (drives retention re-emit scheduling).
 type querySample struct {
 	seriesName string
 	labels     []metrix.Label
@@ -26,7 +26,7 @@ type querySample struct {
 }
 
 // plannedQuery ties a synthetic GetMetricData query Id back to the series it
-// populates and the account/region/period that determine its client and window.
+// populates and the target/region/period that determine its client and window.
 type plannedQuery struct {
 	id         string
 	target     string

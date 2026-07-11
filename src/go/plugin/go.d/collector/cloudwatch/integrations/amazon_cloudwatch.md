@@ -75,7 +75,7 @@ Replace `AWS/<Service>` with the service namespace (for example `AWS/AmazonMQ`) 
 :::
 
 
-The collector compiles named credential sources, monitored targets, and ordered collection rules into an immutable runtime plan. It discovers available metrics with CloudWatch `ListMetrics`, sharing a scan when target, region, namespace, and recent-activity behavior match, then applies each profile's exact dimension matcher. It queries the resulting metric series in `GetMetricData` batches. Each target resolves its AWS account id through `sts:GetCallerIdentity`; target names remain distinct execution identities even when they resolve to the same account. Rule order resolves overlap: the first rule that produces a final metric series owns it.
+The collector compiles named credential sources, monitored targets, and ordered collection rules into an immutable runtime plan. It discovers available metrics with CloudWatch `ListMetrics`, sharing a scan when target, region, namespace, and recent-activity behavior match, then applies each profile's exact dimension matcher. It queries the resulting metric series in `GetMetricData` batches. Each target resolves its AWS account id through `sts:GetCallerIdentity`; target names remain distinct execution identities even when they resolve to the same account. Rule order, then target order within each rule, resolves overlap: the first rule/target that produces a final metric series owns it.
 
 
 This collector is supported on all platforms.
@@ -193,9 +193,9 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | targets[].credentials | Name of the credential source used by this target. |  | yes |
 |  | targets[].assume_role.role_arn | Optional IAM role ARN to assume using the target's credential source. |  | no |
 |  | targets[].assume_role.external_id | Optional value supplied by the role owner when the role trust policy requires an external ID. It is not an AWS password or access key. |  | no |
-| **Rules** | rules | Ordered collection rules. Each rule selects targets, profiles, and regions. The earliest rule owns any duplicate final metric series. |  | yes |
+| **Rules** | rules | Ordered collection rules. Each rule selects targets, profiles, and regions. Earlier rules own duplicate final metric series; within one rule, the earliest entry in `rules[].targets` owns the series. |  | yes |
 |  | rules[].name | Unique rule name used in diagnostics. |  | yes |
-|  | rules[].targets | Names of monitored targets selected by this rule. |  | yes |
+|  | rules[].targets | Ordered names of monitored targets selected by this rule. Order breaks overlap ties within the rule. |  | yes |
 |  | rules[].profiles.defaults | Include all default-enabled profiles. Defaults to `true` when `profiles` or `defaults` is omitted. | yes | no |
 |  | rules[].profiles.include | Profile basenames to add explicitly. Set `defaults` to `false` to collect only this list, including profiles disabled by default. |  | no |
 |  | rules[].profiles.exclude | Profile basenames to remove from the selected set. A profile cannot be both included and excluded. |  | no |

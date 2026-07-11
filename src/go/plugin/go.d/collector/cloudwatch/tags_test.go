@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -242,7 +243,7 @@ func tagUnitCollector(t *testing.T, rgta rgtaClient) *Collector {
 }
 
 func TestRefreshTags_MarkStaleForcesRefetchWithinTTL(t *testing.T) {
-	// A newly-resolved account marks tags stale so its tags are fetched the same cycle
+	// A newly-resolved target marks tags stale so its tags are fetched the same cycle
 	// (before its charts are created), even though the global TTL is still valid.
 	rgta := &fakeRGTA{resources: []rgtatypes.ResourceTagMapping{
 		rgtaResource("arn:aws:ec2:us-east-1:000000000000:instance/i-1", "owner", "alice"),
@@ -328,4 +329,56 @@ func TestIndexResourceTags_SkipsForeignAccountRegion(t *testing.T) {
 
 	require.Len(t, dst, 1, "only the same-account, same-region resource is cached")
 	assert.Contains(t, dst, tagCacheKey{target: "base", account: "000000000000", region: "us-east-1", profile: "ec2", joinKey: "i-ok"})
+}
+
+func TestCarryForwardFailedTags_CopiesOnlyFailedScopes(t *testing.T) {
+	matchingFirst := tagCacheKey{target: "first", region: "us-east-1", joinKey: "i-1"}
+	matchingSecond := tagCacheKey{target: "second", region: "eu-west-1", joinKey: "i-2"}
+	notFailed := tagCacheKey{target: "third", region: "us-east-1", joinKey: "i-3"}
+	previous := map[tagCacheKey][]metrix.Label{
+		matchingFirst:  {{Key: "owner", Value: "one"}},
+		matchingSecond: {{Key: "owner", Value: "two"}},
+		notFailed:      {{Key: "owner", Value: "three"}},
+	}
+	failed := map[tagScopeKey]struct{}{
+		{target: "first", region: "us-east-1"}:  {},
+		{target: "second", region: "eu-west-1"}: {},
+	}
+	dst := make(map[tagCacheKey][]metrix.Label)
+
+	carryForwardFailedTags(dst, previous, failed)
+
+	assert.Equal(t, map[tagCacheKey][]metrix.Label{
+		matchingFirst:  previous[matchingFirst],
+		matchingSecond: previous[matchingSecond],
+	}, dst)
+}
+
+func BenchmarkCarryForwardTagsFailures(b *testing.B) {
+	const (
+		cachedTags = 8192
+		failures   = 64
+	)
+	c := New()
+	c.tags.labels = make(map[tagCacheKey][]metrix.Label, cachedTags)
+	for i := range cachedTags {
+		c.tags.labels[tagCacheKey{
+			target:  "target-" + strconv.Itoa(i%failures),
+			region:  "us-east-1",
+			joinKey: strconv.Itoa(i),
+		}] = nil
+	}
+	failed := make(map[tagScopeKey]struct{}, failures)
+	for i := range failures {
+		failed[tagScopeKey{target: "target-" + strconv.Itoa(i), region: "us-east-1"}] = struct{}{}
+	}
+
+	b.ReportAllocs()
+	for range b.N {
+		dst := make(map[tagCacheKey][]metrix.Label, cachedTags)
+		carryForwardFailedTags(dst, c.tags.labels, failed)
+		if len(dst) != cachedTags {
+			b.Fatalf("carried forward %d tags, want %d", len(dst), cachedTags)
+		}
+	}
 }

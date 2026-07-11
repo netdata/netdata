@@ -167,7 +167,7 @@ func (s discoverySnapshot) expired(now time.Time) bool {
 	return s.FetchedAt.IsZero() || !now.Before(s.ExpiresAt)
 }
 
-// totalInstances is the instance count across all (account, profile, region) keys.
+// totalInstances is the instance count across all (target, profile, region) keys.
 func (s discoverySnapshot) totalInstances() int {
 	n := 0
 	for _, insts := range s.Instances {
@@ -257,7 +257,7 @@ func (c *Collector) loadCatalog() (cwprofiles.Catalog, error) {
 }
 
 // markDiscoveryStale forces the next refreshDiscovery to re-run (without treating it
-// as a first pass), so an account resolved after the current snapshot was already
+// as a first pass), so a target resolved after the current snapshot was already
 // fetched is discovered on the very next cycle instead of waiting out
 // discovery.refresh_every. ensureTargets runs before refreshDiscovery in collect(),
 // so a same-cycle resolution is picked up the same cycle.
@@ -302,8 +302,8 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	c.warnOperationFailures(logKeyDiscoveryTargetFailed, "discovery", " (using last-known instances)", failures)
 
 	// Only a first-ever pass where EVERY target errored is fatal. An empty but
-	// successful target (a resource-free account/region/profile) is not a failure —
-	// with shared regions across many accounts, empty successes are expected — and
+	// successful target (a resource-free target/region/profile) is not a failure —
+	// with shared regions across many targets, empty successes are expected — and
 	// any carried-forward snapshot keeps the collector running.
 	if c.discovery.FetchedAt.IsZero() && len(results) > 0 && failedGroups == len(results) {
 		return fmt.Errorf("CloudWatch discovery failed for all %d target/region/namespace groups", len(results))
@@ -322,7 +322,7 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 
 // logDiscovery reports the discovered-resources summary: at Info when it changes
 // (first discovery, or a per-service count change) so operators can see what the
-// collector found, and the full per-(account, profile, region) breakdown at Debug every refresh.
+// collector found, and the full per-(target, profile, region) breakdown at Debug every refresh.
 func (c *Collector) logDiscovery(snap discoverySnapshot) {
 	byProfile := make(map[string]int)
 	for k, insts := range snap.Instances {

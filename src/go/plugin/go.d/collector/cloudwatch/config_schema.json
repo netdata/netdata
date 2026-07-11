@@ -89,7 +89,7 @@
       },
       "rules": {
         "title": "Collection rules",
-        "description": "Ordered target, profile, and region selections. Earlier rules own overlapping final metric series.",
+        "description": "Ordered target, profile, and region selections. Earlier rules own overlapping final metric series; within one rule, earlier targets own overlaps.",
         "type": "array",
         "minItems": 1,
         "maxItems": 256,
@@ -100,6 +100,7 @@
             "name": {"title": "Name", "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
             "targets": {
               "title": "Targets",
+              "description": "Ordered target references. Order breaks overlap ties within this rule.",
               "type": "array",
               "minItems": 1,
               "maxItems": 256,

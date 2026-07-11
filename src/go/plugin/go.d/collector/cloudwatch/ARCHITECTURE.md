@@ -108,7 +108,7 @@ flowchart TD
   first `Collect`; an unbuilt template would fail the job.
 - **Collect** runs the whole cycle (below). `ensurePlan` short-circuits once
   compiled; `ensureTargets` retries only unresolved targets.
-- **Cleanup** resets the compiled runtime, resolved targets, cached template,
+- **Cleanup** resets the collection plan, resolved targets, cached template,
   discovery/query snapshots, client caches, and observation schedule so a framework
   re-Init after failed autodetection starts clean. The `metrix` store is created
   once in `New` and persists — it is not recreated.
@@ -120,7 +120,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    A("ensure compiled runtime + target account ids")
+    A("ensure collection plan + target account ids")
     B("refreshDiscovery<br/>shared ListMetrics scans per compatible target scope")
     C("currentQueryPlan<br/>cached until target/discovery/tag inputs change")
     D("dueGroups + filterDueQueries<br/>keep only (target, region, period) groups due now")
@@ -142,13 +142,15 @@ flowchart TD
 
 ## Configuration Compilation
 
-`config.go`, `config_decode.go`, `config_validate.go`, `plan.go`,
-`plan_compiler.go`, and `runtime.go` separate the raw operator contract,
+`config.go`, `config_validate.go`, `plan.go`, `plan_compiler.go`, and
+`runtime.go` separate the raw operator contract,
 compiler state, and installed execution plan:
 
-- YAML decoding rejects unknown keys recursively. Known future rule fields
-  (`filters`, `labels`, `series`, and `query`) are decoded and then rejected with
-  a focused validation error until their implementation phases land.
+- YAML and JSON use normal typed decoding; unknown keys are ignored. `Config.validate`
+  decides whether the resulting configuration is valid during `Init` / `Check`.
+  Known future rule fields (`filters`, `labels`, `series`, and `query`) remain typed
+  so non-null values are rejected until their implementation phases land; null is
+  equivalent to omission.
 - Named credential sources describe only credential acquisition. Named targets
   describe monitored identities and optional role assumption. Ordered rules bind
   targets to profile selectors and regions.
@@ -415,7 +417,7 @@ Each target's AWS account id is resolved through STS `GetCallerIdentity`
 fail-soft and retried: an unresolved target stays pending while healthy targets
 continue; only a cycle with no resolved target fails. Named targets are never
 deduplicated by account id because their permissions and visible resources may
-differ. Dynamic final-series overlap is deduplicated later by ordered rule
+differ. Dynamic final-series overlap is deduplicated later by ordered rule/target
 precedence. AWS does not require an explicit IAM permission grant for
 `GetCallerIdentity`.
 

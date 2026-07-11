@@ -4,7 +4,6 @@ package cloudwatch
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -168,23 +167,29 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 		assert.Error(t, validateRuntimeConfigMap(t, cfg))
 	})
 
-	permissiveSchemaCases := map[string]func(map[string]any){
+	unknownFieldCases := map[string]func(map[string]any){
 		"unknown top-level field": func(cfg map[string]any) { cfg["unknown"] = true },
 		"unknown nested field": func(cfg map[string]any) {
 			cfg["targets"] = []any{map[string]any{"name": "base", "credentials": "sdk_default", "unknown": true}}
 		},
-		"default credentials with static field": func(cfg map[string]any) {
-			cfg["credentials"] = map[string]any{"sdk_default": map[string]any{"type": "default", "access_key_id": "rejected-at-runtime"}}
-		},
 	}
-	for name, mutate := range permissiveSchemaCases {
-		t.Run("runtime authority/"+name, func(t *testing.T) {
+	for name, mutate := range unknownFieldCases {
+		t.Run("unknown fields ignored/"+name, func(t *testing.T) {
 			cfg := cloneConfigMap(t, valid)
 			mutate(cfg)
 			assert.NoError(t, schema.Validate(cfg))
-			assert.Error(t, validateRuntimeConfigMap(t, cfg))
+			assert.NoError(t, validateRuntimeConfigMap(t, cfg))
 		})
 	}
+
+	t.Run("runtime rejects default credentials with a non-empty static field", func(t *testing.T) {
+		cfg := cloneConfigMap(t, valid)
+		cfg["credentials"] = map[string]any{"sdk_default": map[string]any{
+			"type": "default", "access_key_id": "rejected-at-runtime",
+		}}
+		assert.NoError(t, schema.Validate(cfg))
+		assert.Error(t, validateRuntimeConfigMap(t, cfg))
+	})
 }
 
 func cloneConfigMap(t *testing.T, src map[string]any) map[string]any {
@@ -214,58 +219,40 @@ func TestConfig_TagsDecode(t *testing.T) {
 	assert.Equal(t, []TagConfig{{Name: "owner"}, {Name: "Name", Rename: "instance_name"}}, cfg.Tags)
 }
 
-func TestConfig_YAMLRejectsUnknownKeys(t *testing.T) {
-	tests := map[string]string{
-		"root":       "unknown: true\n",
-		"credential": "credentials:\n  base:\n    type: default\n    typo: true\n",
-		"target":     "targets:\n  - name: base\n    credentials: base\n    typo: true\n",
-		"rule":       "rules:\n  - name: base\n    targets: [base]\n    regions: [us-east-1]\n    typo: true\n",
-		"profiles":   "rules:\n  - name: base\n    targets: [base]\n    regions: [us-east-1]\n    profiles:\n      typo: true\n",
-		"discovery":  "discovery:\n  typo: true\n",
-		"tags":       "tags:\n  - name: owner\n    typo: true\n",
+func TestConfig_validateRejectsReservedRuleFields(t *testing.T) {
+	tests := map[string]func(*RuleConfig){
+		"filters": func(rule *RuleConfig) { rule.Filters = map[string]any{} },
+		"labels":  func(rule *RuleConfig) { rule.Labels = []any{} },
+		"series":  func(rule *RuleConfig) { rule.Series = false },
+		"query":   func(rule *RuleConfig) { rule.Query = "unsupported" },
 	}
-	for name, data := range tests {
+	for name, mutate := range tests {
 		t.Run(name, func(t *testing.T) {
-			var cfg Config
-			assert.ErrorContains(t, yaml.Unmarshal([]byte(data), &cfg), "unknown config key")
+			cfg := validBaseConfig()
+			mutate(&cfg.Rules[0])
+			assert.ErrorContains(t, cfg.validate(), "reserved for a later phase")
 		})
 	}
 }
 
-func TestConfig_YAMLRejectsReservedRuleKeysEvenWhenNull(t *testing.T) {
-	tests := map[string]string{
-		"filters explicit null": "filters: null",
-		"labels bare null":      "labels:",
-		"series explicit null":  "series: null",
-		"query bare null":       "query:",
+func TestConfig_DecodedReservedRuleFieldsReachRuntimeValidation(t *testing.T) {
+	tests := map[string]struct {
+		decode func(*RuleConfig) error
+	}{
+		"YAML": {decode: func(rule *RuleConfig) error {
+			return yaml.Unmarshal([]byte("filters: {}\n"), rule)
+		}},
+		"JSON": {decode: func(rule *RuleConfig) error {
+			return json.Unmarshal([]byte(`{"query":{}}`), rule)
+		}},
 	}
-	for name, field := range tests {
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			data := "credentials:\n  sdk_default:\n    type: default\ntargets:\n  - name: base\n    credentials: sdk_default\nrules:\n  - name: base-defaults\n    targets: [base]\n    regions: [us-east-1]\n    " + field + "\n"
-			var cfg Config
-			assert.ErrorContains(t, yaml.Unmarshal([]byte(data), &cfg), "reserved for a later phase")
+			cfg := validBaseConfig()
+			require.NoError(t, tc.decode(&cfg.Rules[0]))
+			assert.ErrorContains(t, cfg.validate(), "reserved for a later phase")
 		})
 	}
-}
-
-func TestConfig_JSONRejectsReservedRuleKeysEvenWhenNull(t *testing.T) {
-	for _, key := range []string{"filters", "labels", "series", "query"} {
-		t.Run(key, func(t *testing.T) {
-			data := fmt.Sprintf(`{
-  "credentials":{"sdk_default":{"type":"default"}},
-  "targets":[{"name":"base","credentials":"sdk_default"}],
-  "rules":[{"name":"base-defaults","targets":["base"],"regions":["us-east-1"],%q:null}]
-}`, key)
-			var cfg Config
-			assert.ErrorContains(t, json.Unmarshal([]byte(data), &cfg), "reserved for a later phase")
-		})
-	}
-}
-
-func TestConfig_YAMLAcceptsFrameworkKeys(t *testing.T) {
-	var cfg Config
-	err := yaml.Unmarshal([]byte("name: example\nmodule: cloudwatch\npriority: 100\nlabels:\n  site: test\n"), &cfg)
-	assert.NoError(t, err)
 }
 
 func TestNormalizeRegions(t *testing.T) {

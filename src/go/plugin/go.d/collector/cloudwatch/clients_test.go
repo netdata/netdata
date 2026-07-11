@@ -18,6 +18,17 @@ import (
 // trivial T=string fake so the memoize/distinct-key/reset/error semantics are
 // verified independently of the CloudWatch and RGTA client surfaces.
 
+type observedDoneContext struct {
+	context.Context
+	once    sync.Once
+	entered chan<- struct{}
+}
+
+func (c *observedDoneContext) Done() <-chan struct{} {
+	c.once.Do(func() { c.entered <- struct{}{} })
+	return c.Context.Done()
+}
+
 func TestClientCache_MemoizesPerTargetRegion(t *testing.T) {
 	var builds int
 	cache := newClientCache(func(_ context.Context, target, region string) (string, error) {
@@ -36,7 +47,7 @@ func TestClientCache_MemoizesPerTargetRegion(t *testing.T) {
 
 	_, err = cache.forTargetRegion(context.Background(), "a2", "us-east-1")
 	require.NoError(t, err)
-	assert.Equal(t, 2, builds, "a distinct account rebuilds")
+	assert.Equal(t, 2, builds, "a distinct target rebuilds")
 
 	cache.reset()
 	_, err = cache.forTargetRegion(context.Background(), "a1", "us-east-1")
@@ -100,32 +111,41 @@ func TestClientCache_CoalescesConcurrentSameKey(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			const callers = 8
 			var builds atomic.Int32
-			started := make(chan struct{}, callers)
+			started := make(chan struct{})
 			release := make(chan struct{})
 			cache := newClientCache(func(_ context.Context, target, region string) (string, error) {
 				builds.Add(1)
-				started <- struct{}{}
+				close(started)
 				<-release
 				return target + "/" + region, tc.buildErr
 			})
 
-			start := make(chan struct{})
 			results := make(chan string, callers)
 			errs := make(chan error, callers)
 			var wg sync.WaitGroup
-			for range callers {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				result, err := cache.forTargetRegion(context.Background(), "base", "us-east-1")
+				results <- result
+				errs <- err
+			}()
+			<-started
+
+			entered := make(chan struct{}, callers-1)
+			for range callers - 1 {
 				wg.Add(1)
 				go func() {
 					defer wg.Done()
-					<-start
-					result, err := cache.forTargetRegion(context.Background(), "base", "us-east-1")
+					ctx := &observedDoneContext{Context: context.Background(), entered: entered}
+					result, err := cache.forTargetRegion(ctx, "base", "us-east-1")
 					results <- result
 					errs <- err
 				}()
 			}
-			close(start)
-			<-started
-			time.Sleep(25 * time.Millisecond) // let every caller reach the blocked same-key path
+			for range callers - 1 {
+				<-entered
+			}
 			close(release)
 			wg.Wait()
 			close(results)
