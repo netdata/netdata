@@ -357,8 +357,18 @@ procfile *procfile_readall(procfile *ff) {
                 return NULL;
             }
 
-            if(likely(!r))
+            if(likely(!r)) {
+                // the buffer is full to the last byte; procfile_parser() needs
+                // one spare byte to '\0'-terminate the last word without
+                // overwriting the last data byte
+                if(unlikely(ff->len >= ff->size)) {
+                    ff = reallocz(ff, sizeof(procfile) + ff->size + 1);
+                    ff->size++;
+                    ff->stats.memory++;
+                    ff->stats.resizes++;
+                }
                 break;
+            }
 
             return procfile_readall_file_too_large(ff);
         }
