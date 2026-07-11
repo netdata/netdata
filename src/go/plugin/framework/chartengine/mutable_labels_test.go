@@ -32,8 +32,8 @@ const mutableLabelsTestTemplate = "version: v1\n" +
 func TestMaterializedChartPresentationDoesNotOwnMutableLabelWorkspace(t *testing.T) {
 	typ := reflect.TypeFor[materializedChartPresentation]()
 	fields := make([]string, 0, typ.NumField())
-	for i := range typ.NumField() {
-		fields = append(fields, typ.Field(i).Name)
+	for field := range typ.Fields() {
+		fields = append(fields, field.Name)
 	}
 	assert.Equal(t, []string{"orderedDims", "labelValues", "labelMembership"}, fields,
 		"committed chart presentation must contain only semantic copy-on-write state")
