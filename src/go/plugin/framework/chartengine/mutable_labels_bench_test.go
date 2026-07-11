@@ -42,17 +42,25 @@ func BenchmarkBuildPlanMutableLabels(b *testing.B) {
 		})
 	}
 
-	b.Run("one_changed/charts_1000/dims_10/labels_4", func(b *testing.B) {
-		base := newBenchmarkMutableLabelReader(b, 1000, 10, 4, nil)
-		changed := newBenchmarkMutableLabelReader(b, 1000, 10, 4, func(chart int) bool { return chart == 0 })
-		benchmarkMutableLabelPlanning(b, 1000, 10, 4, 1, base, changed)
-	})
+	for _, labelCount := range []int{4, 16, 64} {
+		b.Run(fmt.Sprintf("one_changed/charts_1000/dims_10/labels_%d", labelCount), func(b *testing.B) {
+			base := newBenchmarkMutableLabelReader(b, 1000, 10, labelCount, nil)
+			changed := newBenchmarkMutableLabelReader(b, 1000, 10, labelCount, func(chart int) bool { return chart == 0 })
+			benchmarkMutableLabelPlanning(b, 1000, 10, labelCount, 1, base, changed)
+		})
 
-	b.Run("all_changed/charts_1000/dims_10/labels_4", func(b *testing.B) {
-		base := newBenchmarkMutableLabelReader(b, 1000, 10, 4, nil)
-		changed := newBenchmarkMutableLabelReader(b, 1000, 10, 4, func(int) bool { return true })
-		benchmarkMutableLabelPlanning(b, 1000, 10, 4, 1000, base, changed)
-	})
+		b.Run(fmt.Sprintf("all_changed/charts_1000/dims_10/labels_%d", labelCount), func(b *testing.B) {
+			base := newBenchmarkMutableLabelReader(b, 1000, 10, labelCount, nil)
+			changed := newBenchmarkMutableLabelReader(b, 1000, 10, labelCount, func(int) bool { return true })
+			benchmarkMutableLabelPlanning(b, 1000, 10, labelCount, 1000, base, changed)
+		})
+
+		b.Run(fmt.Sprintf("membership_changed_effective_labels_unchanged/charts_1000/dims_10/labels_%d", labelCount), func(b *testing.B) {
+			base := newBenchmarkMutableLabelReaderWithMembershipChange(b, 1000, 10, labelCount, func(int) bool { return false })
+			changed := newBenchmarkMutableLabelReaderWithMembershipChange(b, 1000, 10, labelCount, func(chart int) bool { return chart == 0 })
+			benchmarkMutableLabelPlanning(b, 1000, 10, labelCount, 0, base, changed)
+		})
+	}
 }
 
 func BenchmarkBuildPlanMutableLabelsCreate(b *testing.B) {
@@ -173,6 +181,27 @@ func (r *benchmarkSequenceReader) FlattenedRead() bool {
 }
 
 func newBenchmarkMutableLabelReader(b *testing.B, chartCount, dimsPerChart, labelCount int, changed func(int) bool) *benchmarkSequenceReader {
+	return newBenchmarkMutableLabelReaderWithMutations(b, chartCount, dimsPerChart, labelCount, changed, nil)
+}
+
+func newBenchmarkMutableLabelReaderWithMembershipChange(
+	b *testing.B,
+	chartCount,
+	dimsPerChart,
+	labelCount int,
+	changed func(int) bool,
+) *benchmarkSequenceReader {
+	return newBenchmarkMutableLabelReaderWithMutations(b, chartCount, dimsPerChart, labelCount, nil, changed)
+}
+
+func newBenchmarkMutableLabelReaderWithMutations(
+	b *testing.B,
+	chartCount,
+	dimsPerChart,
+	labelCount int,
+	promotedChanged func(int) bool,
+	membershipChanged func(int) bool,
+) *benchmarkSequenceReader {
 	b.Helper()
 	store := metrix.NewCollectorStore()
 	managed, ok := metrix.AsCycleManagedStore(store)
@@ -191,9 +220,16 @@ func newBenchmarkMutableLabelReader(b *testing.B, chartCount, dimsPerChart, labe
 				metrix.Label{Key: "chart_id", Value: strconv.Itoa(chart)},
 				metrix.Label{Key: "dim_id", Value: strconv.Itoa(dimension)},
 			)
+			if membershipChanged != nil {
+				value := "base"
+				if membershipChanged(chart) {
+					value = "next"
+				}
+				labels = append(labels, metrix.Label{Key: "membership_marker", Value: value})
+			}
 			for label := range labelCount {
 				value := "base_" + strconv.Itoa(label)
-				if changed != nil && changed(chart) {
+				if promotedChanged != nil && promotedChanged(chart) {
 					value = "next_" + strconv.Itoa(label)
 				}
 				labels = append(labels, metrix.Label{Key: fmt.Sprintf("label_%02d", label), Value: value})

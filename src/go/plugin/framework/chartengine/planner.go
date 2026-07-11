@@ -196,6 +196,7 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 		e.logWarningf("chartengine build prepare failed: %v", err)
 		return Plan{}, materializedState{}, 0, 0, 0, false, err
 	}
+	defer ctx.releaseLabelObservations()
 	phaseStartedAt = time.Now()
 	if err := validateBuildReaderForInferredDimensions(ctx.index, reader); err != nil {
 		sample.phaseValidateSeconds = time.Since(phaseStartedAt).Seconds()
@@ -274,6 +275,18 @@ func (e *Engine) preparePlan(reader metrix.Reader) (Plan, materializedState, uin
 	attemptID := e.nextAttemptIDLocked()
 	e.state.outstanding = attemptID
 	return out, staged, e.state.engineEpoch, e.state.commitSeq, attemptID, true, nil
+}
+
+func (ctx *planBuildContext) releaseLabelObservations() {
+	if ctx == nil {
+		return
+	}
+	for _, chart := range ctx.chartsByID {
+		if chart == nil || chart.labelScratch == nil {
+			continue
+		}
+		chart.labelScratch.releaseObservations()
+	}
 }
 
 func validateBuildReaderForInferredDimensions(index matchIndex, reader metrix.Reader) error {
@@ -473,6 +486,7 @@ func (ctx *planBuildContext) accumulateRoute(
 		if !route.Autogen && isAutogenTemplateID(cs.templateID) {
 			// Template wins over autogen on chart-id collision.
 			ctx.chartOwners[route.ChartID] = route.ChartTemplateID
+			cs.labelScratch.releaseObservations()
 			delete(ctx.chartsByID, route.ChartID)
 			cs = nil
 			exists = false
@@ -609,7 +623,7 @@ func (e *Engine) materializePlanCharts(ctx *planBuildContext) error {
 				return err
 			}
 			chartLabels := cs.labelScratch.accumulator.materialize()
-			matChart.replaceLabels(chartLabels, cs.labelScratch.cloneMembership(), cs.labelScratch)
+			matChart.replaceLabels(maps.Clone(chartLabels), cs.labelScratch.cloneMembership(), cs.labelScratch)
 			if chartCreated {
 				ctx.out.Actions = append(ctx.out.Actions, CreateChartAction{
 					ChartTemplateID: cs.templateID,

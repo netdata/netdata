@@ -124,6 +124,26 @@ func (s *chartLabelScratch) resetObservations() {
 	s.observations = s.observations[:0]
 }
 
+func (s *chartLabelScratch) releaseObservations() {
+	if s == nil {
+		return
+	}
+	current := len(s.observations)
+	clear(s.observations)
+	// Keep steady-state reuse, but discard a historical high-water allocation
+	// once current membership falls below half its capacity.
+	if cap(s.observations) > current*2 {
+		if current == 0 {
+			s.observations = nil
+		} else {
+			s.observations = make([]chartLabelObservation, 0, current)
+		}
+	} else {
+		s.observations = s.observations[:0]
+	}
+	s.raw = false
+}
+
 func (s *chartLabelScratch) observe(
 	identity metrix.SeriesIdentity,
 	labels metrix.LabelView,

@@ -23,9 +23,10 @@ type materializedChartState struct {
 	scratchEntries     map[string]*dimBuildEntry
 }
 
-// materializedChartPresentation is an immutable, copy-on-write snapshot of
-// derived chart presentation state. Transactional clones can share it until
-// dimension ordering or labels change.
+// materializedChartPresentation uses copy-on-write for ordered dimensions,
+// canonical labels, and membership. labelScratch is non-semantic reconciler
+// storage: observations are cleared before PreparePlan returns and retained
+// capacity follows current, not historical, membership.
 type materializedChartPresentation struct {
 	orderedDims     []string
 	labelValues     map[string]string
