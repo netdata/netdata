@@ -109,6 +109,24 @@ static uint64_t bearer_token_signature(nd_uuid_t token, struct bearer_token *bt)
     return XXH3_64bits(&signature_payload, sizeof(signature_payload));
 }
 
+static bool bearer_token_write_file(FILE *fp, const char *data, size_t len) {
+    size_t written = fwrite(data, 1, len, fp);
+    int saved_errno = errno;
+    bool failed = ferror(fp) || written != len;
+
+    if(fclose(fp) != 0) {
+        if(!failed)
+            saved_errno = errno;
+
+        failed = true;
+    }
+
+    if(failed)
+        errno = saved_errno;
+
+    return !failed;
+}
+
 static bool bearer_token_save_to_file(nd_uuid_t token, struct bearer_token *bt) {
     CLEAN_BUFFER *wb = buffer_create(0, NULL);
     buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_MINIFY);
@@ -133,13 +151,8 @@ static bool bearer_token_save_to_file(nd_uuid_t token, struct bearer_token *bt) 
         return false;
     }
 
-    size_t len = buffer_strlen(wb);
-    size_t written = fwrite(buffer_tostring(wb), 1, len, fp);
-    int saved_errno = errno;
-    if(fclose(fp) != 0 || written != len) {
-        if(written == len)
-            saved_errno = errno;
-
+    if(!bearer_token_write_file(fp, buffer_tostring(wb), buffer_strlen(wb))) {
+        int saved_errno = errno;
         unlink(filename);
         errno = saved_errno;
         nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot save file '%s'", filename);
