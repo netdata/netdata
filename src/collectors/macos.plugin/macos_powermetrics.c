@@ -528,7 +528,9 @@ static void macos_powermetrics_store_sample(const struct macos_powermetrics_samp
     pm.sample_sequence++;
     pm.failed_permanently = false;
     pm.logged_unavailable = false;
-    pm.logged_loop_failure = false;
+    // logged_loop_failure is NOT reset here: probe samples are also stored,
+    // so resetting per sample would re-arm the log-once guard every failed
+    // loop cycle and flood the log. It is reset only after a productive loop.
     pm.logged_parse_error = false;
     netdata_mutex_unlock(&pm.mutex);
 }
@@ -591,10 +593,10 @@ static POPEN_INSTANCE *macos_powermetrics_start_loop(const struct macos_powermet
         NULL,
     };
 
+    // no -n: powermetrics must stream until netdata stops it
+    // (-n 0 means "zero samples and exit" on current macOS)
     const char *argv_direct[] = {
         pm.command,
-        "-n",
-        "0",
         "-b",
         "0",
         "-i",
@@ -818,8 +820,12 @@ static void macos_powermetrics_thread(void *ptr __maybe_unused)
         bool loop_produced_sample = sequence_after_loop > sequence_before_loop;
         macos_powermetrics_sleep_interruptibly(
             loop_produced_sample ? MACOS_POWERMETRICS_INITIAL_BACKOFF_MS : backoff_ms);
-        if (loop_produced_sample)
+        if (loop_produced_sample) {
             backoff_ms = MACOS_POWERMETRICS_INITIAL_BACKOFF_MS;
+            netdata_mutex_lock(&pm.mutex);
+            pm.logged_loop_failure = false;
+            netdata_mutex_unlock(&pm.mutex);
+        }
         else {
             if (backoff_ms < MACOS_POWERMETRICS_MAX_BACKOFF_MS)
                 backoff_ms *= 2;
@@ -915,7 +921,7 @@ static void macos_powermetrics_add_sensor_labels(
     rrdlabels_add(st->rrdlabels, "chip_id", "powermetrics", RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "device", "powermetrics", RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "feature", feature, RRDLABEL_SRC_AUTO);
-    rrdlabels_add(st->rrdlabels, "name", label, RRDLABEL_SRC_AUTO);
+    rrdlabels_add(st->rrdlabels, "label", label, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "path", path, RRDLABEL_SRC_AUTO);
     rrdlabels_add(st->rrdlabels, "sensor", feature, RRDLABEL_SRC_AUTO);
 }
