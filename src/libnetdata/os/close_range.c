@@ -40,6 +40,16 @@ int os_get_fd_open_max(void) {
 }
 
 void os_close_range(int first, int last, int flags) {
+#if defined(OS_WINDOWS)
+    // Windows has no fork/exec, so inherited-fd cleanup is not needed.
+    // Spawn processes use CreateProcess with PROC_THREAD_ATTRIBUTE_HANDLE_LIST,
+    // which restricts inheritance to explicitly listed handles without any
+    // handle-table walk.  The fd_is_valid() stub also always returns true here
+    // (fcntl F_GETFD returns 0 unconditionally), making a brute-force close
+    // loop incorrect.
+    (void)first; (void)last; (void)flags;
+    return;
+#endif
 #if defined(HAVE_CLOSE_RANGE)
     if(close_range(first, last, flags) == 0) return;
 #endif
