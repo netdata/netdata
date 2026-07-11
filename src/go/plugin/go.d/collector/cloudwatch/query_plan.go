@@ -66,9 +66,10 @@ func (c *Collector) currentQueryPlan() []plannedQuery {
 	if !c.planDirty {
 		return c.queryPlan
 	}
+	previous := c.queryPlan
 	c.queryPlan = c.buildQueryPlan()
 	c.queryGroups, c.queriesByGroup = groupQueryPlan(c.queryPlan)
-	c.observations.pruneObserved(c.queryPlan)
+	c.observations.reconcilePlan(previous, c.queryPlan)
 	c.planDirty = false
 	return c.queryPlan
 }

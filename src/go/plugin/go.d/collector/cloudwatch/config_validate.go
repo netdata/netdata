@@ -25,10 +25,11 @@ func validateConfigStructure(cfg Config) error {
 		return err
 	}
 	credentialNames, credentialErr := validateCredentials(cfg)
+	targetNames, targetErr := validateTargets(cfg, credentialNames)
 	return errors.Join(
 		credentialErr,
-		validateTargets(cfg, credentialNames),
-		validateRules(cfg),
+		targetErr,
+		validateRules(cfg, targetNames),
 	)
 }
 
@@ -86,15 +87,17 @@ func validateCredentials(cfg Config) (map[string]struct{}, error) {
 	return names, errors.Join(errs...)
 }
 
-func validateTargets(cfg Config, credentialNames map[string]struct{}) error {
+func validateTargets(cfg Config, credentialNames map[string]struct{}) (map[string]struct{}, error) {
 	if len(cfg.Targets) == 0 {
-		return errors.New("'targets' must contain at least one entry")
+		return nil, errors.New("'targets' must contain at least one entry")
 	}
+	names := make(map[string]struct{}, len(cfg.Targets))
 	seen := make(map[string]struct{}, len(cfg.Targets))
 	var errs []error
 	for i, target := range cfg.Targets {
 		path := fmt.Sprintf("targets[%d]", i)
 		name := target.Name
+		names[name] = struct{}{}
 		if err := validateCanonicalString(path+".name", name); err != nil {
 			errs = append(errs, err)
 		} else if !configNamePattern.MatchString(name) {
@@ -126,10 +129,10 @@ func validateTargets(cfg Config, credentialNames map[string]struct{}) error {
 			}
 		}
 	}
-	return errors.Join(errs...)
+	return names, errors.Join(errs...)
 }
 
-func validateRules(cfg Config) error {
+func validateRules(cfg Config, targetNames map[string]struct{}) error {
 	if len(cfg.Rules) == 0 {
 		return errors.New("'rules' must contain at least one entry")
 	}
@@ -150,9 +153,19 @@ func validateRules(cfg Config) error {
 		if len(rule.Targets) == 0 {
 			errs = append(errs, fmt.Errorf("%s.targets must contain at least one target", path))
 		} else {
-			for j, target := range rule.Targets {
-				if err := validateCanonicalString(fmt.Sprintf("%s.targets[%d]", path, j), target); err != nil {
+			seenTargets := make(map[string]struct{}, len(rule.Targets))
+			for j, targetRef := range rule.Targets {
+				refPath := fmt.Sprintf("%s.targets[%d]", path, j)
+				if err := validateCanonicalString(refPath, targetRef); err != nil {
 					errs = append(errs, err)
+				} else if targetRef == "" {
+					errs = append(errs, fmt.Errorf("%s must not be empty", refPath))
+				} else if _, ok := seenTargets[targetRef]; ok {
+					errs = append(errs, fmt.Errorf("%s.targets contains duplicate target %q", path, targetRef))
+				} else if _, ok := targetNames[targetRef]; !ok {
+					errs = append(errs, fmt.Errorf("%s.targets references unknown target %q", path, targetRef))
+				} else {
+					seenTargets[targetRef] = struct{}{}
 				}
 			}
 		}

@@ -487,7 +487,7 @@ func TestCleanup_ResetsRuntimeState(t *testing.T) {
 	assert.Empty(t, c.discovery.Instances)
 }
 
-func TestPruneObserved(t *testing.T) {
+func TestReconcilePlan(t *testing.T) {
 	ecLabels := func(instance string) []metrix.Label {
 		return []metrix.Label{
 			{Key: "account_id", Value: "000000000000"},
@@ -496,7 +496,13 @@ func TestPruneObserved(t *testing.T) {
 		}
 	}
 	groupKey := queryGroupKey{target: "base", region: "us-east-1", period: 300}
-	keep := observedSeries{seriesName: "ec2.cpu_utilization_average", labels: ecLabels("i-1"), value: 1, groupKey: groupKey}
+	keep := observedSeries{
+		seriesName: "ec2.cpu_utilization_average",
+		labels:     ecLabels("i-1"),
+		tagLabels:  []metrix.Label{{Key: "owner", Value: "old"}},
+		value:      1,
+		groupKey:   groupKey,
+	}
 	drop := observedSeries{seriesName: "ec2.cpu_utilization_average", labels: ecLabels("i-2"), value: 2, groupKey: groupKey}
 
 	c := New()
@@ -505,15 +511,24 @@ func TestPruneObserved(t *testing.T) {
 		observedKey(drop.seriesName, drop.labels): drop,
 	}
 
-	// Plan reflects discovery with only i-1 remaining.
-	c.observations.pruneObserved([]plannedQuery{{seriesName: keep.seriesName, labels: keep.labels}})
+	// Current plan reflects discovery with only i-1 remaining and refreshed tags.
+	previous := []plannedQuery{{
+		seriesName: keep.seriesName, labels: keep.labels, tagLabels: keep.tagLabels,
+		target: groupKey.target, region: groupKey.region, period: groupKey.period,
+	}}
+	current := []plannedQuery{{
+		seriesName: keep.seriesName, labels: keep.labels, tagLabels: []metrix.Label{{Key: "owner", Value: "new"}},
+		target: groupKey.target, region: groupKey.region, period: groupKey.period,
+	}}
+	c.observations.reconcilePlan(previous, current)
 
 	require.Len(t, c.observations.lastObserved, 1)
 	assert.Contains(t, c.observations.lastObserved, observedKey(keep.seriesName, keep.labels))
 	assert.NotContains(t, c.observations.lastObserved, observedKey(drop.seriesName, drop.labels))
+	assert.Equal(t, []metrix.Label{{Key: "owner", Value: "new"}}, c.observations.lastObserved[observedKey(keep.seriesName, keep.labels)].tagLabels)
 }
 
-func TestPruneObserved_DropsStaleScheduleForVanishedGroup(t *testing.T) {
+func TestReconcilePlan_DropsStaleScheduleForVanishedGroup(t *testing.T) {
 	// A group that leaves the plan must lose its schedule entry, so a later
 	// reappearance is unscheduled (immediately due) rather than blocked until a stale
 	// nextQueryAt expires. The two groups here differ ONLY by target, which pins that
@@ -532,10 +547,15 @@ func TestPruneObserved_DropsStaleScheduleForVanishedGroup(t *testing.T) {
 		{Key: "instance_id", Value: "i-1"},
 	}
 
-	// Plan retains only the first target's group; the second target is gone.
-	c.observations.pruneObserved([]plannedQuery{
+	previous := []plannedQuery{
 		{seriesName: "ec2.cpu_utilization_average", labels: labels, target: "first", region: "us-east-1", period: 300},
-	})
+		{seriesName: "ec2.cpu_utilization_average", labels: append(labels, metrix.Label{Key: "variant", Value: "second"}), target: "second", region: "us-east-1", period: 300},
+	}
+	// Current plan retains only the first target's group; the second target is gone.
+	current := []plannedQuery{
+		{seriesName: "ec2.cpu_utilization_average", labels: labels, target: "first", region: "us-east-1", period: 300},
+	}
+	c.observations.reconcilePlan(previous, current)
 
 	assert.Contains(t, c.observations.nextQueryAt, inPlan, "a group still in the plan keeps its schedule")
 	assert.NotContains(t, c.observations.nextQueryAt, vanished, "a group that left the plan (differing only by target) loses its schedule")

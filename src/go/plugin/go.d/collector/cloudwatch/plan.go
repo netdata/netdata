@@ -26,28 +26,12 @@ func compileConfig(cfg Config, catalog cwprofiles.Catalog) (*collectionPlan, []s
 	return newPlanCompiler(cfg, catalog).compile()
 }
 
-func resolveRuleTargets(path string, refs []string, targets map[string]*collectionTarget) ([]*collectionTarget, error) {
-	seen := make(map[string]struct{}, len(refs))
+func resolveRuleTargets(refs []string, targets map[string]*collectionTarget) []*collectionTarget {
 	out := make([]*collectionTarget, 0, len(refs))
-	for i, raw := range refs {
-		ref := raw
-		if err := validateCanonicalString(fmt.Sprintf("%s.targets[%d]", path, i), ref); err != nil {
-			return nil, err
-		}
-		if ref == "" {
-			return nil, fmt.Errorf("%s.targets[%d] must not be empty", path, i)
-		}
-		if _, ok := seen[ref]; ok {
-			return nil, fmt.Errorf("%s.targets contains duplicate target %q", path, ref)
-		}
-		target, ok := targets[ref]
-		if !ok {
-			return nil, fmt.Errorf("%s.targets references unknown target %q", path, ref)
-		}
-		seen[ref] = struct{}{}
-		out = append(out, target)
+	for _, ref := range refs {
+		out = append(out, targets[ref])
 	}
-	return out, nil
+	return out
 }
 
 func resolveRuleProfiles(path string, selector *ProfileSelectorConfig, all []cwprofiles.ResolvedProfile, byName map[string]cwprofiles.ResolvedProfile) ([]cwprofiles.ResolvedProfile, map[string]struct{}, error) {

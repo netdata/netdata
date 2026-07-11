@@ -106,10 +106,7 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 	ruleName := rule.Name
 	diagnostics := ruleDiagnostics{ruleName: ruleName}
 
-	targets, err := resolveRuleTargets(path, rule.Targets, pc.targetsByRef)
-	if err != nil {
-		return diagnostics, err
-	}
+	targets := resolveRuleTargets(rule.Targets, pc.targetsByRef)
 	profiles, explicitlyIncluded, err := resolveRuleProfiles(path, rule.Profiles, pc.profiles, pc.profilesByName)
 	if err != nil {
 		return diagnostics, err

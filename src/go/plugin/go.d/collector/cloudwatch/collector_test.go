@@ -138,6 +138,30 @@ func TestCollector_Init(t *testing.T) {
 			}(),
 			wantErr: true,
 		},
+		"unknown rule target": {
+			cfg: func() Config {
+				cfg := validConfig()
+				cfg.Rules[0].Targets = []string{"missing"}
+				return cfg
+			}(),
+			wantErr: true,
+		},
+		"duplicate rule target": {
+			cfg: func() Config {
+				cfg := validConfig()
+				cfg.Rules[0].Targets = []string{"base", "base"}
+				return cfg
+			}(),
+			wantErr: true,
+		},
+		"empty rule target": {
+			cfg: func() Config {
+				cfg := validConfig()
+				cfg.Rules[0].Targets = []string{""}
+				return cfg
+			}(),
+			wantErr: true,
+		},
 	}
 
 	for name, tc := range tests {

@@ -98,7 +98,7 @@ func filterDueQueries(groups []queryGroupKey, queriesByGroup map[queryGroupKey][
 // into nil-as-zero; otherwise (a gauge, or a per-result error/absent id) its
 // cached value is dropped so it gaps until fresh data — no stale value, no false
 // 0. A cached value otherwise survives across cycles until its instance leaves
-// discovery and pruneObserved drops it.
+// discovery and reconcilePlan drops it.
 func (o *observationStore) observe(dueQueries []plannedQuery, samples []querySample, noData map[string]bool, queried map[queryGroupKey]bool) {
 	meter := o.store.Write().SnapshotMeter("")
 
@@ -168,24 +168,38 @@ func writeSample(meter metrix.SnapshotMeter, seriesName string, labels, tagLabel
 	meter.WithLabels(all...).Gauge(seriesName, metrix.WithFloat(true)).Observe(value)
 }
 
-// pruneObserved drops both the retention-cache entries and the per-(target, region,
-// period) schedule entries that are no longer in the current query plan. Dropping
-// the retention cache stops a removed resource from being re-emitted. Dropping the
-// schedule ensures a (target, region, period) group that fully left discovery and later
-// reappears is treated as unscheduled — and so queried on its first cycle back —
-// instead of waiting for a stale nextQueryAt (up to a full period, e.g. ~24h for a
-// daily group) to expire.
-func (o *observationStore) pruneObserved(plan []plannedQuery) {
-	validSeries := make(map[string]struct{}, len(plan))
-	validGroups := make(map[queryGroupKey]struct{})
-	for _, pq := range plan {
-		validSeries[observedKey(pq.seriesName, pq.labels)] = struct{}{}
-		validGroups[pq.groupKey()] = struct{}{}
+// reconcilePlan aligns retained observations and group schedules with a rebuilt
+// query plan. A retained value belongs to the final series identity, so it survives
+// an execution-target ownership change but follows the current scheduling group and
+// non-identity labels. New queries make their group immediately due; vanished groups
+// lose stale schedules so a later reappearance is also immediately due.
+func (o *observationStore) reconcilePlan(previous, current []plannedQuery) {
+	previousGroups := make(map[string]queryGroupKey, len(previous))
+	for _, pq := range previous {
+		previousGroups[observedKey(pq.seriesName, pq.labels)] = pq.groupKey()
 	}
-	for key := range o.lastObserved {
-		if _, ok := validSeries[key]; !ok {
-			delete(o.lastObserved, key)
+
+	currentBySeries := make(map[string]plannedQuery, len(current))
+	validGroups := make(map[queryGroupKey]struct{})
+	for _, pq := range current {
+		key := observedKey(pq.seriesName, pq.labels)
+		group := pq.groupKey()
+		currentBySeries[key] = pq
+		validGroups[group] = struct{}{}
+		if previousGroup, ok := previousGroups[key]; !ok || previousGroup != group {
+			delete(o.nextQueryAt, group)
 		}
+	}
+	for key, observed := range o.lastObserved {
+		pq, ok := currentBySeries[key]
+		if !ok {
+			delete(o.lastObserved, key)
+			continue
+		}
+		observed.labels = pq.labels
+		observed.tagLabels = pq.tagLabels
+		observed.groupKey = pq.groupKey()
+		o.lastObserved[key] = observed
 	}
 	for key := range o.nextQueryAt {
 		if _, ok := validGroups[key]; !ok {

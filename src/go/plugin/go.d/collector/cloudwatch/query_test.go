@@ -204,6 +204,8 @@ func TestCurrentQueryPlan_CachesUntilInputsChange(t *testing.T) {
 	second := c.currentQueryPlan()
 	require.NotEmpty(t, second)
 	assert.Same(t, &first[0], &second[0], "unchanged inputs reuse the compiled query blueprint")
+	group := first[0].groupKey()
+	c.observations.nextQueryAt[group] = time.Unix(1_000_000_300, 0)
 
 	c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}] = append(
 		c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}],
@@ -213,6 +215,7 @@ func TestCurrentQueryPlan_CachesUntilInputsChange(t *testing.T) {
 
 	c.invalidateQueryPlan()
 	assert.Len(t, c.currentQueryPlan(), len(first)*2, "input invalidation rebuilds the query blueprint")
+	assert.NotContains(t, c.observations.nextQueryAt, group, "adding a query to an existing group makes the expanded group immediately due")
 }
 
 func BenchmarkCurrentQueryPlanCached(b *testing.B) {
