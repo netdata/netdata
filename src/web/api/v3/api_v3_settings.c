@@ -179,17 +179,21 @@ static inline int settings_put(struct web_client *w, char *file) {
             HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
     size_t len = strlen(updated_json_str);
-    if(fwrite(updated_json_str, 1, len, fp) != len) {
-        fclose(fp);
+    size_t written = fwrite(updated_json_str, 1, len, fp);
+    int saved_errno = errno;
+    if(fclose(fp) != 0 || written != len) {
+        if(written == len)
+            saved_errno = errno;
+
         unlink(tmp_filename);
         rw_spinlock_write_unlock(&settings_spinlock);
+        errno = saved_errno;
         nd_log(NDLS_DAEMON, NDLP_ERR, "cannot save settings to file '%s'", tmp_filename);
         return rrd_call_function_error(
             w->response.data,
             "Cannot save payload to file",
             HTTP_RESP_INTERNAL_SERVER_ERROR);
     }
-    fclose(fp);
 
     char filename[FILENAME_MAX];
     settings_filename(filename, file, NULL);
