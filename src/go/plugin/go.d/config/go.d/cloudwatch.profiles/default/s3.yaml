@@ -22,7 +22,7 @@ metrics:
   # each needs its own profile:
   #   - Request metrics  {BucketName, FilterId}  -- opt-in per bucket, billed at custom-metric
   #     rates (AllRequests, GetRequests, 4xxErrors, ...). Collected by the s3_requests profile
-  #     (enable with profiles.mode: combined).
+  #     (enable explicitly with rules[].profiles.include).
   #   - Replication      {SourceBucket, DestinationBucket, RuleId}  -- when S3 replication metrics
   #     are enabled (ReplicationLatency, BytesPendingReplication, ...).
   # See: https://docs.aws.amazon.com/AmazonS3/latest/userguide/metrics-dimensions.html

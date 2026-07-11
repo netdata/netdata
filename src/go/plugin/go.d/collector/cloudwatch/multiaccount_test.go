@@ -11,14 +11,11 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// seqSTS returns account ids in call order, so identity[i] (resolved in order by
-// ensureAccounts) maps to accounts[i]. failAt[i] makes the i-th call error.
 type seqSTS struct {
 	accounts []string
 	failAt   map[int]bool
@@ -31,126 +28,87 @@ func (f *seqSTS) GetCallerIdentity(context.Context, *sts.GetCallerIdentityInput,
 	if f.failAt[i] {
 		return nil, errors.New("sts denied")
 	}
-	acct := ""
+	account := ""
 	if i < len(f.accounts) {
-		acct = f.accounts[i]
+		account = f.accounts[i]
 	}
-	return &sts.GetCallerIdentityOutput{Account: aws.String(acct)}, nil
+	return &sts.GetCallerIdentityOutput{Account: aws.String(account)}, nil
 }
 
-func assumeRoleCollector(t *testing.T, roles []awsauth.AssumeRole, includeBase bool, sts stsClient) *Collector {
+func twoTargetConfig() Config {
+	falseValue := false
+	cfg := validBaseConfig()
+	cfg.Targets = []TargetConfig{
+		{Name: "first", Credentials: "sdk_default"},
+		{Name: "second", Credentials: "sdk_default"},
+	}
+	cfg.Rules = []RuleConfig{{
+		Name: "both", Targets: []string{"first", "second"}, Regions: []string{"us-east-1"},
+		Profiles: &ProfileSelectorConfig{Defaults: &falseValue, Include: []string{"ec2"}},
+	}}
+	return cfg
+}
+
+func multiTargetCollector(t *testing.T, client stsClient) *Collector {
 	t.Helper()
 	c := New()
-	c.Config = Config{
-		Regions: []string{"us-east-1"},
-		Auth: awsauth.Config{
-			Mode:           awsauth.ModeAssumeRole,
-			ModeAssumeRole: &awsauth.ModeAssumeRoleConfig{Roles: roles, IncludeBaseAccount: includeBase},
-		},
-	}
+	c.Config = twoTargetConfig()
 	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
-	c.newSTSClient = func(aws.Config) stsClient { return sts }
+	c.newSTSClient = func(aws.Config) stsClient { return client }
 	require.NoError(t, c.Init(context.Background()))
+	require.NoError(t, c.ensureRuntime())
 	return c
 }
 
-func twoRoles() []awsauth.AssumeRole {
-	return []awsauth.AssumeRole{
-		{RoleARN: "arn:aws:iam::111111111111:role/netdata"},
-		{RoleARN: "arn:aws:iam::222222222222:role/netdata"},
-	}
+func TestEnsureTargets_RetainsSameAccountTargets(t *testing.T) {
+	c := multiTargetCollector(t, &seqSTS{accounts: []string{"111111111111", "111111111111"}})
+	require.NoError(t, c.ensureTargets(context.Background()))
+	require.Len(t, c.resolvedTargets, 2)
+	assert.Equal(t, []string{"first", "second"}, c.resolvedTargetRefs())
+	assert.Equal(t, "111111111111", c.resolvedTargets[0].accountID)
+	assert.Equal(t, "111111111111", c.resolvedTargets[1].accountID)
 }
 
-func TestEnsureAccounts_MultiRole(t *testing.T) {
-	c := assumeRoleCollector(t, twoRoles(), false, &seqSTS{accounts: []string{"111111111111", "222222222222"}})
-
-	require.NoError(t, c.ensureAccounts(context.Background()))
-	assert.Equal(t, []string{"111111111111", "222222222222"}, c.accountIDs(), "one distinct account per role")
+func TestEnsureTargets_FailureIsolationAndRetry(t *testing.T) {
+	sts := &seqSTS{accounts: []string{"111111111111", "", "222222222222"}, failAt: map[int]bool{1: true}}
+	c := multiTargetCollector(t, sts)
+	require.NoError(t, c.ensureTargets(context.Background()))
+	assert.Equal(t, []string{"first"}, c.resolvedTargetRefs())
+	require.NoError(t, c.ensureTargets(context.Background()))
+	assert.Equal(t, []string{"first", "second"}, c.resolvedTargetRefs())
 }
 
-func TestEnsureAccounts_DeduplicatesSameAccount(t *testing.T) {
-	// Two roles that resolve to the same account id must collapse to one account —
-	// they would otherwise collide on the {account_id, region, dimensions} identity.
-	c := assumeRoleCollector(t, twoRoles(), false, &seqSTS{accounts: []string{"111111111111", "111111111111"}})
-
-	require.NoError(t, c.ensureAccounts(context.Background()))
-	assert.Equal(t, []string{"111111111111"}, c.accountIDs(), "duplicate account id is skipped")
-}
-
-func TestEnsureAccounts_FailureIsolation(t *testing.T) {
-	// One role failing STS must not sink the others (fail-soft).
-	c := assumeRoleCollector(t, twoRoles(), false, &seqSTS{
-		accounts: []string{"", "222222222222"},
-		failAt:   map[int]bool{0: true},
-	})
-
-	require.NoError(t, c.ensureAccounts(context.Background()))
-	assert.Equal(t, []string{"222222222222"}, c.accountIDs(), "the healthy account is still monitored")
-}
-
-func TestEnsureAccounts_AllFailIsFatal(t *testing.T) {
-	c := assumeRoleCollector(t, twoRoles(), false, &seqSTS{failAt: map[int]bool{0: true, 1: true}})
-
-	err := c.ensureAccounts(context.Background())
-	assert.Error(t, err, "no account resolving must fail Check")
-	assert.Empty(t, c.accounts)
-}
-
-func TestEnsureAccounts_IncludeBaseAccount(t *testing.T) {
-	// assume_role identities are [role, ..., base]; with include_base_account the base
-	// identity resolves to its own account too.
-	c := assumeRoleCollector(t, twoRoles(), true, &seqSTS{accounts: []string{"111111111111", "222222222222", "999999999999"}})
-
-	require.NoError(t, c.ensureAccounts(context.Background()))
-	assert.Equal(t, []string{"111111111111", "222222222222", "999999999999"}, c.accountIDs(),
-		"the base identity's account is monitored alongside the roles")
-}
-
-func TestEnsureAccounts_RetriesPendingIdentity(t *testing.T) {
-	// Role A resolves on the first cycle; role B fails once (transient) and must be
-	// retried on a later cycle rather than being dropped for the job's lifetime.
-	c := assumeRoleCollector(t, twoRoles(), false, &seqSTS{
-		accounts: []string{"111111111111", "", "222222222222"},
-		failAt:   map[int]bool{1: true}, // second STS call (role B, first attempt) fails
-	})
-
-	require.NoError(t, c.ensureAccounts(context.Background()))
-	assert.Equal(t, []string{"111111111111"}, c.accountIDs(), "role A resolves; role B is pending, not fatal")
-
-	require.NoError(t, c.ensureAccounts(context.Background()))
-	assert.Equal(t, []string{"111111111111", "222222222222"}, c.accountIDs(),
-		"the transiently-failed role is retried and eventually starts collecting")
-}
-
-// TestBuildQueryPlan_MultiAccount is the INV.2 analog for the account dimension:
-// adding accounts only ADDS series (each stamped with its account_id); it never drops
-// an instance. Each account's discovery is queried under its own account_id.
-func TestBuildQueryPlan_MultiAccount(t *testing.T) {
-	c := New()
-	c.Config.Regions = []string{"us-east-1"}
-	c.applyDefaults()
-	c.accounts = []cwAccount{{accountID: "111111111111"}, {accountID: "222222222222"}}
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}}
+func TestBuildQueryPlan_FirstTargetOwnsSameAccountSeries(t *testing.T) {
+	c := multiTargetCollector(t, &seqSTS{accounts: []string{"111111111111", "111111111111"}})
+	require.NoError(t, c.ensureTargets(context.Background()))
 	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
-		{Account: "111111111111", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
-		{Account: "222222222222", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-2"}}},
+		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
+		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 	}}
-
 	plan := c.buildQueryPlan()
-	require.Len(t, plan, 6, "2 accounts x 1 instance x (1 + 2 statistics)")
-
-	instByAccount := map[string]map[string]bool{}
-	for _, pq := range plan {
-		acct := labelValue(pq.labels, "account_id")
-		assert.Equal(t, pq.account, acct, "the account_id label matches the query's account")
-		if instByAccount[acct] == nil {
-			instByAccount[acct] = map[string]bool{}
-		}
-		instByAccount[acct][labelValue(pq.labels, "instance_id")] = true
+	require.NotEmpty(t, plan)
+	perInstance := 0
+	for _, metric := range c.runtime.Scopes[0].Profile.Config.Metrics {
+		perInstance += len(metric.Statistics)
 	}
+	assert.Len(t, plan, perInstance)
+	for _, query := range plan {
+		assert.Equal(t, "first", query.target)
+		assert.Equal(t, "111111111111", query.account)
+	}
+}
 
-	assert.Equal(t, map[string]map[string]bool{
-		"111111111111": {"i-1": true},
-		"222222222222": {"i-2": true},
-	}, instByAccount, "each account collects its own instances, labeled with its own account_id")
+func TestBuildQueryPlan_SameAccountDisjointResourcesSurvive(t *testing.T) {
+	c := multiTargetCollector(t, &seqSTS{accounts: []string{"111111111111", "111111111111"}})
+	require.NoError(t, c.ensureTargets(context.Background()))
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
+		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-2"}}},
+	}}
+	plan := c.buildQueryPlan()
+	perInstance := 0
+	for _, metric := range c.runtime.Scopes[0].Profile.Config.Metrics {
+		perInstance += len(metric.Statistics)
+	}
+	assert.Len(t, plan, perInstance*2)
 }

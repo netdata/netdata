@@ -2,7 +2,7 @@
 version: v1
 display_name: AWS DynamoDB Operations
 namespace: AWS/DynamoDB
-disabled: true   # deep-grain profile ({TableName, Operation}); opt in with profiles.mode: combined
+disabled: true   # deep-grain profile ({TableName, Operation}); opt in with rules[].profiles.include
 period: 60
 instance:
   dimensions:

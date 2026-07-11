@@ -2,7 +2,7 @@
 version: v1
 display_name: AWS S3 Request Metrics
 namespace: AWS/S3
-disabled: true   # deep-grain profile ({BucketName, FilterId}); opt in with profiles.mode: combined
+disabled: true   # deep-grain profile ({BucketName, FilterId}); opt in with rules[].profiles.include
 period: 60
 # S3 request metrics are opt-in per bucket (a CloudWatch metrics configuration) and are billed at
 # CloudWatch custom-metric rates. This profile collects nothing until request metrics are enabled on

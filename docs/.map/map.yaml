@@ -462,6 +462,11 @@ sidebar:
         items:
           - type: integration_placeholder
             integration_kind: secretstore
+      - meta:
+          label: AWS CloudWatch Profile Format
+          edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/cloudwatch/profile-format.md
+          description: Define CloudWatch namespaces, supported regions, resource dimensions, metrics, statistics, and dynamic charts in reusable profiles.
+          keywords: [aws, cloudwatch, profiles, collectors, metrics]
       - type: integration_placeholder
         integration_kind: collectors
   # Exporting Metrics

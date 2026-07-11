@@ -203,12 +203,7 @@ func TestCollect_E2E(t *testing.T) {
 	for name, tc := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			c := New()
-			c.Config.Regions = []string{"us-east-1"}
-			c.Profiles = ProfilesConfig{
-				Mode:      profilesModeExact,
-				ModeExact: &ProfilesExactConfig{Entries: profileEntries(tc.profiles)},
-			}
-			c.applyDefaults()
+			configureExactRule(c, []string{"us-east-1"}, tc.profiles)
 			c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 			useFakeClient(c, &e2eCloudWatch{list: tc.listMetrics, values: tc.gmd, ts: time.Unix(1, 0)})
 			c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
@@ -228,14 +223,6 @@ type e2eScenario struct {
 	listMetrics map[string][]cwtypes.Metric
 	gmd         map[string]float64 // e2eKey -> value; NaN or absent => gap
 	wantSeries  map[string]metrix.SampleValue
-}
-
-func profileEntries(names []string) []ProfileEntry {
-	out := make([]ProfileEntry, len(names))
-	for i, name := range names {
-		out[i] = ProfileEntry{Name: name}
-	}
-	return out
 }
 
 // e2eCloudWatch is a fixture-driven fake serving both CloudWatch APIs. ListMetrics
@@ -305,7 +292,7 @@ func seriesName(key string) string {
 }
 
 // TestAllStockProfiles_PipelineChartComplete is the full-catalog sweep: for EVERY
-// stock profile (combined mode includes disabled opt-in profiles), it feeds a
+// stock profile (including profiles disabled by default), it feeds a
 // synthetic instance with a datapoint for every (metric, statistic), runs the real
 // collect, and asserts (a) every profile's every active series is produced and
 // (b) every produced series flows into a chart (AssertChartCoverage). Profiles that
@@ -319,12 +306,14 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 	require.NoError(t, err)
 	profiles := cat.AllProfiles()
 	require.NotEmpty(t, profiles)
+	profileNames := make([]string, 0, len(profiles))
 
 	list := map[string][]cwtypes.Metric{}
 	values := map[string]float64{}
 	wantNames := map[string]struct{}{}
 
 	for _, rp := range profiles {
+		profileNames = append(profileNames, rp.Name)
 		prof := rp.Config
 		require.NotEmptyf(t, prof.Metrics, "%s has no metrics", rp.Name)
 		require.NotEmptyf(t, prof.Instance.Dimensions, "%s has no instance dimensions", rp.Name)
@@ -355,9 +344,7 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 	}
 
 	c := New()
-	c.Config.Regions = []string{region}
-	c.Profiles = ProfilesConfig{Mode: profilesModeCombined} // include disabled opt-in profiles
-	c.applyDefaults()
+	configureExactRule(c, []string{region}, profileNames)
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 	useFakeClient(c, &e2eCloudWatch{list: list, values: values, ts: time.Unix(1, 0)})
 	c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
@@ -380,9 +367,7 @@ func TestCollect_MultiRegion(t *testing.T) {
 	const account = "000000000000"
 
 	c := New()
-	c.Config.Regions = []string{"us-east-1", "eu-west-1"}
-	c.Profiles = ProfilesConfig{Mode: profilesModeExact, ModeExact: &ProfilesExactConfig{Entries: profileEntries([]string{"ec2"})}}
-	c.applyDefaults()
+	configureExactRule(c, []string{"us-east-1", "eu-west-1"}, []string{"ec2"})
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 	useFakeClient(c, &e2eCloudWatch{
 		list:   map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
@@ -417,9 +402,7 @@ func TestCollect_DiscoveryFailSoft(t *testing.T) {
 
 	newBase := func(regions ...string) *Collector {
 		c := New()
-		c.Config.Regions = regions
-		c.Profiles = ProfilesConfig{Mode: profilesModeExact, ModeExact: &ProfilesExactConfig{Entries: profileEntries([]string{"ec2"})}}
-		c.applyDefaults()
+		configureExactRule(c, regions, []string{"ec2"})
 		c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 		c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
 		return c

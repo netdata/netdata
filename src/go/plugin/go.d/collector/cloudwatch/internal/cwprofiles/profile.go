@@ -39,6 +39,7 @@ var reservedLabels = map[string]struct{}{"account_id": {}, "region": {}}
 var (
 	reNamespace  = regexp.MustCompile(`^[A-Za-z0-9/._-]+$`)
 	reIdentityID = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
+	reRegion     = regexp.MustCompile(`^[a-z]{2}(?:-[a-z0-9]+)+-[0-9]+$`)
 	rePercentile = regexp.MustCompile(`^p(\d{1,2}(\.\d{1,2})?|100(\.0{1,2})?)$`)
 )
 
@@ -59,17 +60,27 @@ var statStrings = map[string]string{
 // validate (e.g. a dimension using Constant in place of Label) is rejected by an
 // older binary; see InstanceDimension.
 type Profile struct {
-	Version     string         `yaml:"version" json:"version,omitempty"`
-	DisplayName string         `yaml:"display_name" json:"display_name,omitempty"`
-	Namespace   string         `yaml:"namespace" json:"namespace,omitempty"`
-	Period      int            `yaml:"period" json:"period,omitempty"`
-	Instance    InstanceSpec   `yaml:"instance" json:"instance"`
-	Metrics     []Metric       `yaml:"metrics" json:"metrics,omitempty"`
-	Template    charttpl.Group `yaml:"template" json:"template"`
-	// Disabled excludes the profile from profiles.mode auto; it is selected by mode
-	// combined, by naming it in mode exact, or by a user-dir copy that drops this
-	// field. Omitted decodes to false = enabled, so no pointer is needed.
+	Version     string `yaml:"version" json:"version,omitempty"`
+	DisplayName string `yaml:"display_name" json:"display_name,omitempty"`
+	Namespace   string `yaml:"namespace" json:"namespace,omitempty"`
+	// SupportedRegions restricts profiles for services whose CloudWatch metrics
+	// are published only in specific regions. Nil means unrestricted.
+	SupportedRegions []string       `yaml:"supported_regions,omitempty" json:"supported_regions,omitempty"`
+	Period           int            `yaml:"period" json:"period,omitempty"`
+	Instance         InstanceSpec   `yaml:"instance" json:"instance"`
+	Metrics          []Metric       `yaml:"metrics" json:"metrics,omitempty"`
+	Template         charttpl.Group `yaml:"template" json:"template"`
+	// Disabled excludes the profile from the default-enabled set. A collection rule
+	// can still include it explicitly by profile name. Omitted decodes to false.
 	Disabled bool `yaml:"disabled,omitempty" json:"disabled,omitempty"`
+}
+
+func (p Profile) SupportsRegion(region string) bool {
+	if len(p.SupportedRegions) == 0 {
+		return true
+	}
+	region = strings.ToLower(strings.TrimSpace(region))
+	return slices.Contains(p.SupportedRegions, region)
 }
 
 // InstanceSpec declares the exact CloudWatch dimension-NAME set that defines an
@@ -149,6 +160,9 @@ func (m Metric) EmitZeroOnNoData(token string) bool {
 // to the fully-qualified series name (<baseName>.cpu_utilization_average), so stock
 // profiles can be authored without repeating the profile prefix.
 func (p *Profile) Normalize(baseName string) error {
+	for i := range p.SupportedRegions {
+		p.SupportedRegions[i] = strings.ToLower(strings.TrimSpace(p.SupportedRegions[i]))
+	}
 	visible := visibleSeriesForProfile(baseName, p.Metrics)
 	normalizeGroupSelectors(baseName, visible, &p.Template)
 	return nil
@@ -169,6 +183,23 @@ func (p Profile) Validate(prefix, baseName string) error {
 	}
 	if !IsValidNamespace(p.Namespace) {
 		errs = append(errs, fmt.Errorf("%s: 'namespace' is invalid (must match %q)", prefix, reNamespace.String()))
+	}
+	if p.SupportedRegions != nil {
+		if len(p.SupportedRegions) == 0 {
+			errs = append(errs, fmt.Errorf("%s: 'supported_regions' must not be empty when set", prefix))
+		}
+		seen := make(map[string]struct{}, len(p.SupportedRegions))
+		for i, region := range p.SupportedRegions {
+			if !reRegion.MatchString(region) {
+				errs = append(errs, fmt.Errorf("%s.supported_regions[%d]: %q is not a valid AWS region", prefix, i, region))
+				continue
+			}
+			if _, ok := seen[region]; ok {
+				errs = append(errs, fmt.Errorf("%s: duplicate supported region %q", prefix, region))
+				continue
+			}
+			seen[region] = struct{}{}
+		}
 	}
 	if !isValidPeriod(p.Period) {
 		errs = append(errs, fmt.Errorf("%s: 'period' must be a positive multiple of %d seconds", prefix, minPeriod))

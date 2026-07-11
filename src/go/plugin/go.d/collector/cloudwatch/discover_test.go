@@ -320,18 +320,24 @@ func TestDiscoverAll(t *testing.T) {
 		return &nsCloudWatch{byNS: regionData[region]}, nil
 	}
 
-	results := discoverAll(context.Background(), newClient,
-		[]string{"000000000000"}, []cwprofiles.ResolvedProfile{ec2, s3}, []string{"us-east-1", "us-west-2"}, true, 5, 0)
+	var groups []discoveryGroup
+	for _, region := range []string{"us-east-1", "us-west-2"} {
+		groups = append(groups,
+			discoveryGroup{Target: "base", Region: region, Namespace: "AWS/EC2", RecentlyActive: true, Profiles: []cwprofiles.ResolvedProfile{ec2}},
+			discoveryGroup{Target: "base", Region: region, Namespace: "AWS/S3", Profiles: []cwprofiles.ResolvedProfile{s3}},
+		)
+	}
+	results := discoverAll(context.Background(), newClient, groups, 5, 0)
 	require.Len(t, results, 4)
 
 	snap, errs := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
 	require.Empty(t, errs)
 
 	assert.Equal(t, 4, snap.totalInstances())
-	assert.Equal(t, [][]string{{"i-1"}}, dimValues(snap.Instances[discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-east-1"}]))
-	assert.Equal(t, [][]string{{"i-2"}, {"i-3"}}, dimValues(snap.Instances[discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-west-2"}]))
-	assert.Equal(t, [][]string{{"b1", "StandardStorage"}}, dimValues(snap.Instances[discoveryKey{Account: "000000000000", Profile: "s3", Region: "us-east-1"}]))
-	assert.NotContains(t, snap.Instances, discoveryKey{Account: "000000000000", Profile: "s3", Region: "us-west-2"}, "empty target must be omitted")
+	assert.Equal(t, [][]string{{"i-1"}}, dimValues(snap.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}]))
+	assert.Equal(t, [][]string{{"i-2"}, {"i-3"}}, dimValues(snap.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-west-2"}]))
+	assert.Equal(t, [][]string{{"b1", "StandardStorage"}}, dimValues(snap.Instances[discoveryKey{Target: "base", Profile: "s3", Region: "us-east-1"}]))
+	assert.NotContains(t, snap.Instances, discoveryKey{Target: "base", Profile: "s3", Region: "us-west-2"}, "empty target must be omitted")
 
 	assert.Equal(t, time.Unix(1000, 0), snap.FetchedAt)
 	assert.Equal(t, time.Unix(1300, 0), snap.ExpiresAt)
@@ -349,30 +355,69 @@ func TestDiscoverAll_ClientBuildErrorIsPerTarget(t *testing.T) {
 		}}, nil
 	}
 
-	results := discoverAll(context.Background(), newClient,
-		[]string{"000000000000"}, []cwprofiles.ResolvedProfile{ec2}, []string{"us-east-1", "bad-region"}, true, 5, 0)
+	results := discoverAll(context.Background(), newClient, []discoveryGroup{
+		{Target: "base", Region: "us-east-1", Namespace: "AWS/EC2", RecentlyActive: true, Profiles: []cwprofiles.ResolvedProfile{ec2}},
+		{Target: "base", Region: "bad-region", Namespace: "AWS/EC2", RecentlyActive: true, Profiles: []cwprofiles.ResolvedProfile{ec2}},
+	}, 5, 0)
 
 	snap, errs := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
 	require.Len(t, errs, 1)
 	assert.Contains(t, errs[0].Error(), "bad-region")
 	assert.Equal(t, 1, snap.totalInstances())
-	assert.Contains(t, snap.Instances, discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-east-1"})
+	assert.Contains(t, snap.Instances, discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"})
+}
+
+func TestCollector_DiscoveryGroupsDeduplicateCompatibleNamespaceScans(t *testing.T) {
+	falseValue := false
+	cfg := validBaseConfig()
+	cfg.Rules[0].Profiles = &ProfileSelectorConfig{
+		Defaults: &falseValue,
+		Include:  []string{"alb", "alb_target_health"},
+	}
+	runtime, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	c := New()
+	c.runtime = runtime
+	resolved := resolvedTarget{target: runtime.Targets[0], accountID: "000000000000"}
+	c.resolvedTargets = []resolvedTarget{resolved}
+	c.resolvedByRef = map[string]resolvedTarget{"base": resolved}
+
+	groups := c.discoveryGroups()
+	require.Len(t, groups, 1)
+	assert.Equal(t, "AWS/ApplicationELB", groups[0].Namespace)
+	assert.Equal(t, []string{"alb", "alb_target_health"}, []string{groups[0].Profiles[0].Name, groups[0].Profiles[1].Name})
+
+	fake := &nsCloudWatch{byNS: map[string][]cwtypes.Metric{"AWS/ApplicationELB": {}}}
+	results := discoverAll(context.Background(), func(_, _ string) (cloudwatchClient, error) { return fake, nil }, groups, 5, 0)
+	assert.Len(t, results, 2, "one shared scan still produces one result per profile")
+	assert.Equal(t, 1, fake.calls, "compatible profiles share one ListMetrics scan")
+}
+
+func TestCollector_DiscoveryGroupsKeepRecentlyActiveBehaviorSeparate(t *testing.T) {
+	c := New()
+	fast := resolved("fast", dimProfile("AWS/Shared", 300, "Id"))
+	slow := resolved("slow", dimProfile("AWS/Shared", 86400, "Id"))
+	setSingleTargetRuntime(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{fast, slow})
+
+	groups := c.discoveryGroups()
+	require.Len(t, groups, 2)
+	assert.NotEqual(t, groups[0].RecentlyActive, groups[1].RecentlyActive)
 }
 
 func TestBuildDiscoverySnapshot_FailSoftCarriesForward(t *testing.T) {
 	prev := map[discoveryKey][]discoveredInstance{
-		{Account: "000000000000", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
-		{Account: "000000000000", Profile: "ec2", Region: "us-west-2"}: {{DimensionValues: []string{"i-9"}}},
+		{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
+		{Target: "base", Profile: "ec2", Region: "us-west-2"}: {{DimensionValues: []string{"i-9"}}},
 	}
 	results := []discoveryResult{
-		{Key: discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-east-1"}, Instances: []discoveredInstance{{DimensionValues: []string{"i-2"}}}}, // refreshed
-		{Key: discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-west-2"}, Err: errors.New("throttled")},                                        // failed
+		{Key: discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}, Instances: []discoveredInstance{{DimensionValues: []string{"i-2"}}}},
+		{Key: discoveryKey{Target: "base", Profile: "ec2", Region: "us-west-2"}, Err: errors.New("throttled")},
 	}
 
 	snap, errs := buildDiscoverySnapshot(results, prev, time.Unix(1000, 0), 300)
 	require.Len(t, errs, 1)
-	assert.Equal(t, [][]string{{"i-2"}}, dimValues(snap.Instances[discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-east-1"}]), "succeeded target is refreshed")
-	assert.Equal(t, [][]string{{"i-9"}}, dimValues(snap.Instances[discoveryKey{Account: "000000000000", Profile: "ec2", Region: "us-west-2"}]), "failed target carries forward last-known instances")
+	assert.Equal(t, [][]string{{"i-2"}}, dimValues(snap.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}]), "succeeded target is refreshed")
+	assert.Equal(t, [][]string{{"i-9"}}, dimValues(snap.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-west-2"}]), "failed target carries forward last-known instances")
 }
 
 func TestDiscoverySnapshot_Expired(t *testing.T) {
@@ -394,74 +439,11 @@ func dimValues(insts []discoveredInstance) [][]string {
 	return out
 }
 
-func TestCollector_selectProfiles(t *testing.T) {
-	catalog, err := cwprofiles.LoadFromDefaultDirs()
-	require.NoError(t, err)
-
-	t.Run("auto selects enabled profiles", func(t *testing.T) {
-		c := &Collector{Config: Config{Profiles: ProfilesConfig{Mode: profilesModeAuto}}}
-		got, err := c.selectProfiles(catalog)
-		require.NoError(t, err)
-		enabled := 0
-		for _, p := range catalog.AllProfiles() {
-			if !p.Config.Disabled {
-				enabled++
-			}
-		}
-		assert.Len(t, got, enabled)
-		assert.Less(t, enabled, len(catalog.AllProfiles()), "expected some profiles disabled by default")
-	})
-
-	t.Run("combined selects all profiles", func(t *testing.T) {
-		c := &Collector{Config: Config{Profiles: ProfilesConfig{Mode: profilesModeCombined}}}
-		got, err := c.selectProfiles(catalog)
-		require.NoError(t, err)
-		assert.Len(t, got, len(catalog.AllProfiles()))
-	})
-
-	t.Run("exact selects matching profiles by basename", func(t *testing.T) {
-		c := &Collector{Config: Config{Profiles: ProfilesConfig{
-			Mode:      profilesModeExact,
-			ModeExact: &ProfilesExactConfig{Entries: []ProfileEntry{{Name: "ec2"}, {Name: "s3"}}},
-		}}}
-		got, err := c.selectProfiles(catalog)
-		require.NoError(t, err)
-		require.Len(t, got, 2)
-		assert.Equal(t, "ec2", got[0].Name)
-		assert.Equal(t, "s3", got[1].Name)
-	})
-
-	t.Run("exact with no match errors", func(t *testing.T) {
-		c := &Collector{Config: Config{Profiles: ProfilesConfig{
-			Mode:      profilesModeExact,
-			ModeExact: &ProfilesExactConfig{Entries: []ProfileEntry{{Name: "bogus"}}},
-		}}}
-		_, err := c.selectProfiles(catalog)
-		assert.Error(t, err)
-	})
-
-	t.Run("exact selects a default-disabled opt-in profile by name", func(t *testing.T) {
-		c := &Collector{Config: Config{Profiles: ProfilesConfig{
-			Mode:      profilesModeExact,
-			ModeExact: &ProfilesExactConfig{Entries: []ProfileEntry{{Name: "alb_target"}}},
-		}}}
-		got, err := c.selectProfiles(catalog)
-		require.NoError(t, err)
-		require.Len(t, got, 1)
-		assert.Equal(t, "alb_target", got[0].Name, "exact selects a disabled profile by basename")
-	})
-
-	t.Run("unsupported mode errors", func(t *testing.T) {
-		c := &Collector{Config: Config{Profiles: ProfilesConfig{Mode: "weird"}}}
-		_, err := c.selectProfiles(catalog)
-		assert.Error(t, err)
-	})
-}
-
 func newDiscoveryTestCollector(regionMetrics map[string]map[string][]cwtypes.Metric) (*Collector, map[string]*nsCloudWatch) {
 	c := New()
-	c.Config.Regions = regionsOf(regionMetrics)
-	c.applyDefaults()
+	regions := regionsOf(regionMetrics)
+	configureExactRule(c, regions, []string{"ec2"})
+	setSingleTargetRuntime(c, "000000000000", regions, []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))})
 
 	fakes := make(map[string]*nsCloudWatch, len(regionMetrics))
 	for region, byNS := range regionMetrics {
@@ -481,8 +463,6 @@ func TestCollector_refreshDiscovery_TTLCaching(t *testing.T) {
 		"us-east-1": {"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
 		"us-west-2": {"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-2")}},
 	})
-	c.profiles = []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))}
-	c.accounts = []cwAccount{{accountID: "000000000000"}}
 
 	base := time.Unix(1000, 0)
 	c.now = func() time.Time { return base }
@@ -504,10 +484,8 @@ func TestCollector_refreshDiscovery_TTLCaching(t *testing.T) {
 
 func TestCollector_refreshDiscovery_TotalFailureFirstPassErrors(t *testing.T) {
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
-	c.applyDefaults()
-	c.profiles = []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))}
-	c.accounts = []cwAccount{{accountID: "000000000000"}}
+	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
+	setSingleTargetRuntime(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))})
 	c.now = func() time.Time { return time.Unix(1000, 0) }
 	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) {
 		return aws.Config{}, errors.New("no credentials")
@@ -534,10 +512,8 @@ func TestCollector_refreshDiscovery_EmptySuccessPlusFailureNotFatalOnFirstPass(t
 	// One target succeeds with zero instances (a resource-free region) while another
 	// errors. On the first pass this must NOT be fatal — not every target failed.
 	c := New()
-	c.Config.Regions = []string{"us-east-1", "us-west-2"}
-	c.applyDefaults()
-	c.accounts = []cwAccount{{accountID: "000000000000"}}
-	c.profiles = []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))}
+	configureExactRule(c, []string{"us-east-1", "us-west-2"}, []string{"ec2"})
+	setSingleTargetRuntime(c, "000000000000", []string{"us-east-1", "us-west-2"}, []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))})
 	c.now = func() time.Time { return time.Unix(1000, 0) }
 	c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
 		return aws.Config{Region: region}, nil
@@ -558,11 +534,10 @@ func TestCollector_collect_LateResolvedAccountDiscoveredSameCycle(t *testing.T) 
 	// Role A resolves first and populates a fresh discovery snapshot; role B fails
 	// once. When B resolves on a later cycle — still within discovery.refresh_every —
 	// it must be discovered that same cycle, not after the TTL expires.
-	c := assumeRoleCollector(t, twoRoles(), false, &seqSTS{
+	c := multiTargetCollector(t, &seqSTS{
 		accounts: []string{"111111111111", "", "222222222222"},
 		failAt:   map[int]bool{1: true},
 	})
-	c.profiles = []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))}
 	c.newCloudWatchClient = func(aws.Config) cloudwatchClient {
 		return &nsCloudWatch{byNS: map[string][]cwtypes.Metric{
 			"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")},
@@ -572,15 +547,15 @@ func TestCollector_collect_LateResolvedAccountDiscoveredSameCycle(t *testing.T) 
 	c.now = func() time.Time { return base }
 
 	require.NoError(t, c.collect(context.Background()))
-	require.Equal(t, []string{"111111111111"}, c.accountIDs())
-	assert.Contains(t, c.discovery.Instances, discoveryKey{Account: "111111111111", Profile: "ec2", Region: "us-east-1"})
-	assert.NotContains(t, c.discovery.Instances, discoveryKey{Account: "222222222222", Profile: "ec2", Region: "us-east-1"})
+	require.Equal(t, []string{"first"}, c.resolvedTargetRefs())
+	assert.Contains(t, c.discovery.Instances, discoveryKey{Target: "first", Profile: "ec2", Region: "us-east-1"})
+	assert.NotContains(t, c.discovery.Instances, discoveryKey{Target: "second", Profile: "ec2", Region: "us-east-1"})
 
 	// Next cycle, still inside the 300s TTL: role B resolves and is discovered now.
 	c.now = func() time.Time { return base.Add(60 * time.Second) }
 	require.NoError(t, c.collect(context.Background()))
-	require.Equal(t, []string{"111111111111", "222222222222"}, c.accountIDs())
-	assert.Contains(t, c.discovery.Instances, discoveryKey{Account: "222222222222", Profile: "ec2", Region: "us-east-1"},
+	require.Equal(t, []string{"first", "second"}, c.resolvedTargetRefs())
+	assert.Contains(t, c.discovery.Instances, discoveryKey{Target: "second", Profile: "ec2", Region: "us-east-1"},
 		"a late-resolved account is discovered the same cycle, not after refresh_every")
 }
 
@@ -588,12 +563,10 @@ func TestCollector_collect_runsDiscovery(t *testing.T) {
 	c, _ := newDiscoveryTestCollector(map[string]map[string][]cwtypes.Metric{
 		"us-east-1": {"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
 	})
-	c.profiles = []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))}
 	c.now = func() time.Time { return time.Unix(1000, 0) }
-	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
 
 	require.NoError(t, c.collect(context.Background()))
-	assert.Equal(t, []string{"000000000000"}, c.accountIDs())
+	assert.Equal(t, []string{"base"}, c.resolvedTargetRefs())
 	assert.Equal(t, 1, c.discovery.totalInstances())
 }
 

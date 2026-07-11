@@ -20,421 +20,166 @@
       },
       "vnode": {
         "title": "Vnode",
-        "description": "Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes).",
+        "description": "Associates this data collection job with a Virtual Node.",
         "type": "string"
       },
-      "regions": {
-        "title": "Regions",
-        "description": "AWS regions to collect from. At least one region is required (AWS is region-scoped), and all regions must belong to the same AWS partition.",
+      "credentials": {
+        "title": "Credential sources",
+        "description": "Named sources used by monitored targets. A source uses either the AWS SDK default chain or explicit static/session credentials.",
+        "type": "object",
+        "minProperties": 1,
+        "maxProperties": 64,
+        "default": {"sdk_default": {"type": "default"}},
+        "propertyNames": {"pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+        "additionalProperties": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": {
+              "title": "Type",
+              "type": "string",
+              "enum": ["default", "static"]
+            },
+            "access_key_id": {
+              "title": "Access key ID",
+              "type": "string"
+            },
+            "secret_access_key": {
+              "title": "Secret access key",
+              "type": "string",
+              "sensitive": true
+            },
+            "session_token": {
+              "title": "Session token",
+              "type": "string",
+              "sensitive": true
+            }
+          },
+          "required": ["type"],
+          "allOf": [
+            {
+              "if": {"properties": {"type": {"const": "static"}}},
+              "then": {"required": ["access_key_id", "secret_access_key"]}
+            }
+          ]
+        }
+      },
+      "targets": {
+        "title": "Monitored targets",
+        "description": "Named AWS identities to monitor. A target uses one credential source directly or uses it to assume one role.",
         "type": "array",
+        "minItems": 1,
+        "maxItems": 256,
+        "default": [{"name": "base", "credentials": "sdk_default"}],
         "items": {
-          "title": "Region",
-          "type": "string"
-        },
-        "minItems": 1
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {"title": "Name", "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+            "credentials": {"title": "Credential source", "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+            "assume_role": {
+              "title": "Assume role",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "role_arn": {"title": "Role ARN", "type": "string"},
+                "external_id": {
+                  "title": "External ID",
+                  "description": "Value supplied by the role owner when its trust policy requires one. It is not an AWS password or access key.",
+                  "type": "string"
+                }
+              },
+              "required": ["role_arn"]
+            }
+          },
+          "required": ["name", "credentials"]
+        }
       },
-      "auth": {
-        "title": "Authentication",
-        "type": "object",
-        "properties": {
-          "mode": {
-            "title": "Mode",
-            "description": "How Netdata obtains AWS credentials: `default` uses the AWS SDK credential chain (environment, shared config, EC2 instance profile, EKS IRSA); `access_key` uses static keys; `assume_role` assumes an IAM role.",
-            "type": "string",
-            "enum": [
-              "default",
-              "access_key",
-              "assume_role"
-            ],
-            "default": "default"
-          }
-        },
-        "dependencies": {
-          "mode": {
-            "oneOf": [
-              {
-                "properties": {
-                  "mode": {
-                    "const": "default"
-                  }
-                }
-              },
-              {
-                "properties": {
-                  "mode": {
-                    "const": "access_key"
-                  },
-                  "mode_access_key": {
-                    "title": "Access key",
-                    "type": "object",
-                    "properties": {
-                      "access_key_id": {
-                        "title": "Access key ID",
-                        "type": "string"
-                      },
-                      "secret_access_key": {
-                        "title": "Secret access key",
-                        "type": "string",
-                        "sensitive": true
-                      },
-                      "session_token": {
-                        "title": "Session token",
-                        "type": "string",
-                        "sensitive": true
-                      }
-                    },
-                    "required": [
-                      "access_key_id",
-                      "secret_access_key"
-                    ]
-                  }
-                },
-                "required": [
-                  "mode_access_key"
-                ]
-              },
-              {
-                "properties": {
-                  "mode": {
-                    "const": "assume_role"
-                  },
-                  "mode_assume_role": {
-                    "title": "Assume role",
-                    "type": "object",
-                    "properties": {
-                      "roles": {
-                        "title": "Roles",
-                        "description": "IAM roles to assume -- one per AWS account to monitor. Each metric series is labeled with the account id the role resolves to (via sts:GetCallerIdentity).",
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "role_arn": {
-                              "title": "Role ARN",
-                              "type": "string"
-                            },
-                            "external_id": {
-                              "title": "External ID",
-                              "type": "string",
-                              "sensitive": true
-                            }
-                          },
-                          "required": [
-                            "role_arn"
-                          ]
-                        },
-                        "minItems": 1
-                      },
-                      "include_base_account": {
-                        "title": "Include base account",
-                        "description": "Also monitor the base identity's own account (the identity used to assume the roles). Off by default: with roles set, only the assumed-role accounts are monitored.",
-                        "type": "boolean",
-                        "default": false
-                      }
-                    },
-                    "required": [
-                      "roles"
-                    ]
-                  }
-                },
-                "required": [
-                  "mode_assume_role"
-                ]
+      "rules": {
+        "title": "Collection rules",
+        "description": "Ordered target, profile, and region selections. Earlier rules own overlapping final metric series.",
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 256,
+        "default": [{"name": "base-defaults", "targets": ["base"], "regions": ["us-east-1"]}],
+        "items": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "name": {"title": "Name", "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
+            "targets": {
+              "title": "Targets",
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": {"type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"}
+            },
+            "profiles": {
+              "title": "Profiles",
+              "description": "Omit to select default-enabled profiles. Include adds profiles; exclude removes profiles.",
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "defaults": {"title": "Include defaults", "type": "boolean", "default": true},
+                "include": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}},
+                "exclude": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}}
               }
-            ]
-          }
-        },
-        "required": [
-          "mode"
-        ]
-      },
-      "profiles": {
-        "title": "Profiles",
-        "type": "object",
-        "properties": {
-          "mode": {
-            "title": "Mode",
-            "description": "Which service profiles to collect: `auto` uses the default-enabled profiles, including narrow ALB/NLB target health; `exact` uses only the profiles you list by basename; `combined` adds disabled opt-in profiles to the default set.",
-            "type": "string",
-            "enum": [
-              "auto",
-              "exact",
-              "combined"
-            ],
-            "default": "auto"
-          }
-        },
-        "dependencies": {
-          "mode": {
-            "oneOf": [
-              {
-                "properties": {
-                  "mode": {
-                    "const": "auto"
-                  }
-                }
-              },
-              {
-                "properties": {
-                  "mode": {
-                    "const": "exact"
-                  },
-                  "mode_exact": {
-                    "title": "Exact profiles",
-                    "type": "object",
-                    "properties": {
-                      "entries": {
-                        "title": "Entries",
-                        "type": "array",
-                        "items": {
-                          "type": "object",
-                          "properties": {
-                            "name": {
-                              "title": "Profile",
-                              "description": "Profile basename to collect (e.g. `ec2`, `alb_target`).",
-                              "type": "string",
-                              "pattern": "^[a-z][a-z0-9_]*$"
-                            }
-                          },
-                          "required": [
-                            "name"
-                          ]
-                        }
-                      }
-                    },
-                    "required": [
-                      "entries"
-                    ]
-                  }
-                },
-                "required": [
-                  "mode_exact"
-                ]
-              },
-              {
-                "properties": {
-                  "mode": {
-                    "const": "combined"
-                  }
-                }
-              }
-            ]
-          }
+            },
+            "regions": {
+              "title": "Regions",
+              "description": "AWS regions collected by this rule. Profile-specific supported-region restrictions are applied automatically.",
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": {"type": "string", "pattern": "^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+-[0-9]+$"}
+            }
+          },
+          "required": ["name", "targets", "regions"]
         }
       },
       "discovery": {
         "title": "Discovery",
         "type": "object",
+        "additionalProperties": false,
         "properties": {
-          "refresh_every": {
-            "title": "Refresh every",
-            "description": "How often to re-discover metrics, in seconds.",
-            "type": "integer",
-            "minimum": 60,
-            "default": 300
-          },
-          "recently_active_only": {
-            "title": "Recently active only",
-            "description": "List only metrics active in the last 3h (auto-disabled for metrics whose period exceeds 3h, e.g. daily S3 storage metrics).",
-            "type": "boolean",
-            "default": true
-          }
+          "refresh_every": {"title": "Refresh interval", "type": "integer", "minimum": 60, "default": 300},
+          "recently_active_only": {"title": "Recently active only", "type": "boolean", "default": true}
         }
       },
       "tags": {
-        "title": "Resource tags",
-        "description": "AWS resource tags to attach as labels on collected metrics, looked up via the Resource Groups Tagging API. Empty by default; listing any tag enables tag lookup and requires the tag:GetResources IAM permission. Tag values may contain personal data (e.g. owner emails) -- only list tags you want exposed as labels.",
+        "title": "Resource tag labels",
         "type": "array",
         "items": {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
-            "name": {
-              "title": "Tag key",
-              "description": "AWS tag key to collect (case-sensitive), e.g. owner. Becomes the sanitized label (e.g. owner) unless renamed.",
-              "type": "string"
-            },
-            "rename": {
-              "title": "Label name",
-              "description": "Optional Netdata label name to use instead of the sanitized tag key. Use it when the sanitized key would be invalid (for example an aws:-prefixed key) or collides with a built-in label such as region.",
-              "type": "string",
-              "pattern": "^[a-z][a-z0-9_]*$"
-            }
+            "name": {"title": "AWS tag key", "type": "string"},
+            "rename": {"title": "Netdata label", "type": "string"}
           },
-          "required": [
-            "name"
-          ]
+          "required": ["name"]
         }
       },
       "query_offset": {
         "title": "Query offset",
-        "description": "Seconds subtracted from now when querying, to account for CloudWatch publish latency.",
+        "description": "Delay in seconds applied before querying completed CloudWatch periods.",
         "type": "integer",
         "minimum": 0,
         "default": 600
       },
       "timeout": {
         "title": "Timeout",
-        "description": "AWS API call timeout, in seconds.",
+        "description": "Per-request timeout in seconds.",
         "type": "number",
         "minimum": 0,
         "default": 30
       }
     },
-    "required": [
-      "regions",
-      "auth"
-    ]
+    "required": ["credentials", "targets", "rules"]
   },
   "uiSchema": {
-    "uiOptions": {
-      "fullPage": true
-    },
-    "regions": {
-      "ui:listFlavour": "list",
-      "ui:help": "AWS regions to collect from. Add one region per row. At least one is required, and all regions must belong to the same AWS partition (standard, GovCloud, or China). Global services report to a single region -- e.g. Amazon CloudFront publishes only in us-east-1 -- so include that region to collect them.",
-      "items": {
-        "ui:placeholder": "us-east-1"
-      }
-    },
-    "auth": {
-      "mode": {
-        "ui:help": "How Netdata obtains AWS credentials: `default` uses the AWS SDK credential chain, `access_key` uses static keys, and `assume_role` assumes an IAM role.",
-        "ui:widget": "radio",
-        "ui:options": {
-          "inline": true
-        }
-      },
-      "mode_access_key": {
-        "access_key_id": {
-          "ui:help": "AWS access key ID.",
-          "ui:placeholder": "AKIA..."
-        },
-        "secret_access_key": {
-          "ui:help": "AWS secret access key.",
-          "ui:widget": "password"
-        },
-        "session_token": {
-          "ui:help": "Optional session token, required only for temporary credentials.",
-          "ui:widget": "password"
-        }
-      },
-      "mode_assume_role": {
-        "roles": {
-          "ui:listFlavour": "list",
-          "ui:help": "IAM roles to assume -- add one row per AWS account to monitor. Each metric is labeled with the account the role resolves to.",
-          "items": {
-            "role_arn": {
-              "ui:help": "ARN of the IAM role to assume.",
-              "ui:placeholder": "arn:aws:iam::123456789012:role/NetdataCloudWatch"
-            },
-            "external_id": {
-              "ui:help": "Optional external ID required by the role's trust policy.",
-              "ui:widget": "password"
-            }
-          }
-        },
-        "include_base_account": {
-          "ui:help": "Also monitor the base identity's own account (the identity used to assume the roles). Leave off if the base identity is a dedicated monitoring account with no workloads of its own."
-        }
-      }
-    },
-    "profiles": {
-      "mode": {
-        "ui:help": "Which service profiles to collect: `auto` uses the default-enabled profiles, including narrow ALB/NLB target health; `exact` uses only the profiles you list by basename; `combined` adds disabled opt-in profiles to the default set.",
-        "ui:widget": "radio",
-        "ui:options": {
-          "inline": true
-        }
-      },
-      "mode_exact": {
-        "entries": {
-          "ui:listFlavour": "list",
-          "ui:help": "Profiles to collect, one basename per row.",
-          "items": {
-            "name": {
-              "ui:help": "Profile basename (e.g. ec2, alb_target).",
-              "ui:placeholder": "ec2"
-            }
-          }
-        }
-      }
-    },
-    "tags": {
-      "ui:listFlavour": "list",
-      "ui:help": "AWS resource tags to attach as labels. Add one row per tag. Leave empty to disable tag enrichment (no extra IAM or API calls). Tag values may contain personal data (e.g. owner emails) -- only list tags you want exposed.",
-      "items": {
-        "name": {
-          "ui:help": "AWS tag key (case-sensitive).",
-          "ui:placeholder": "owner"
-        },
-        "rename": {
-          "ui:help": "Optional label name; defaults to the sanitized tag key. Use it to rename or to resolve a collision (e.g. the tag 'region' -> 'aws_region').",
-          "ui:placeholder": "aws_region"
-        }
-      }
-    },
-    "discovery": {
-      "refresh_every": {
-        "ui:help": "How often to re-run metric discovery (ListMetrics). Discovery is cheap; raise this only to cut API load on very large accounts."
-      },
-      "recently_active_only": {
-        "ui:help": "List only metrics active in the last 3h. Automatically disabled for profiles with a longer period (e.g. daily S3 storage) so those are not hidden."
-      }
-    },
-    "query_offset": {
-      "ui:help": "Seconds subtracted from now when querying, to account for CloudWatch publish latency. Increase it if you see gaps at the leading edge of charts."
-    },
-    "timeout": {
-      "ui:help": "AWS API call timeout, in seconds. Accepts decimals for sub-second granularity (for example, `0.5` for 500ms)."
-    },
-    "vnode": {
-      "ui:help": "Optional virtual node name used to group this job's charts under a specific Netdata virtual node.",
-      "ui:placeholder": "To use this option, first create a Virtual Node and then reference its name here."
-    },
-    "ui:flavour": "tabs",
-    "ui:options": {
-      "tabs": [
-        {
-          "title": "Base",
-          "fields": [
-            "regions",
-            "update_every",
-            "autodetection_retry",
-            "query_offset",
-            "timeout"
-          ]
-        },
-        {
-          "title": "Auth",
-          "fields": [
-            "auth"
-          ]
-        },
-        {
-          "title": "Profiles",
-          "fields": [
-            "profiles"
-          ]
-        },
-        {
-          "title": "Discovery",
-          "fields": [
-            "discovery"
-          ]
-        },
-        {
-          "title": "Tags",
-          "fields": [
-            "tags"
-          ]
-        },
-        {
-          "title": "Virtual Node",
-          "fields": [
-            "vnode"
-          ]
-        }
-      ]
-    }
+    "uiOptions": {"fullPage": true},
+    "timeout": {"ui:help": "Accepts decimals for sub-second values."}
   }
 }

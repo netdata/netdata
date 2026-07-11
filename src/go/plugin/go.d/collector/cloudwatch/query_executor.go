@@ -17,7 +17,7 @@ import (
 )
 
 // chunkJob is one GetMetricData call: a chunk of a group's queries together with
-// the (account, region) client and time window they share.
+// the (target, region) client and time window they share.
 type chunkJob struct {
 	key    queryGroupKey
 	client cloudwatchClient
@@ -44,12 +44,12 @@ func withTimeout(ctx context.Context, d time.Duration) (context.Context, context
 	return context.WithTimeout(ctx, d)
 }
 
-// executeQueries runs the planned queries grouped by (account, region, period) — each
+// executeQueries runs the planned queries grouped by (target, region, period) — each
 // group shares a CloudWatch client and a time window — chunked to the
 // GetMetricData ≤500-query limit, and runs the chunks concurrently bounded by
 // apiConcurrency, each bounded by the configured timeout. It returns the
-// collected samples and the set of (account, region, period) groups that did NOT fully
-// succeed (an (account, region) client failed, or a chunk errored), so the caller advances
+// collected samples and the set of (target, region, period) groups that did NOT fully
+// succeed (a (target, region) client failed, or a chunk errored), so the caller advances
 // the query schedule only for groups that succeeded. An all-failed pass returns
 // an error.
 func (c *Collector) executeQueries(ctx context.Context, plan []plannedQuery, now time.Time) ([]querySample, map[string]bool, map[queryGroupKey]bool, error) {
@@ -59,7 +59,7 @@ func (c *Collector) executeQueries(ctx context.Context, plan []plannedQuery, now
 
 	byID, groups := indexPlan(plan)
 	groupClients, groupErrs := c.resolveGroupClients(ctx, groups)
-	c.Debugf("CloudWatch query: %d planned quer(y/ies) in %d (account,region,period) group(s); %d client(s) ready, %d failed",
+	c.Debugf("CloudWatch query: %d planned quer(y/ies) in %d (target,region,period) group(s); %d client(s) ready, %d failed",
 		len(plan), len(groups), len(groupClients), len(groupErrs))
 
 	jobs, failedGroups := c.buildChunkJobs(groups, groupClients, groupErrs, now, metricsPerQuery)
@@ -79,7 +79,7 @@ func (c *Collector) executeQueries(ctx context.Context, plan []plannedQuery, now
 }
 
 // indexPlan indexes the plan by query Id and groups the queries by
-// (account, region, period) for batched execution.
+// (target, region, period) for batched execution.
 func indexPlan(plan []plannedQuery) (map[string]plannedQuery, map[queryGroupKey][]cwtypes.MetricDataQuery) {
 	byID := make(map[string]plannedQuery, len(plan))
 	groups := make(map[queryGroupKey][]cwtypes.MetricDataQuery)
@@ -91,22 +91,22 @@ func indexPlan(plan []plannedQuery) (map[string]plannedQuery, map[queryGroupKey]
 	return byID, groups
 }
 
-// resolveGroupClients builds one client per (account, region) once per pass,
+// resolveGroupClients builds one client per (target, region) once per pass,
 // recording per-pair build errors so a failed pair is attempted only once this pass.
-// forAccountRegion is concurrency-safe; resolving up front keeps client building off
+// forTargetRegion is concurrency-safe; resolving up front keeps client building off
 // the fan-out below.
 func (c *Collector) resolveGroupClients(ctx context.Context, groups map[queryGroupKey][]cwtypes.MetricDataQuery) (map[clientKey]cloudwatchClient, map[clientKey]error) {
 	clients := make(map[clientKey]cloudwatchClient)
 	errs := make(map[clientKey]error)
 	for key := range groups {
-		ck := clientKey{account: key.account, region: key.region}
+		ck := clientKey{target: key.target, region: key.region}
 		if _, ok := clients[ck]; ok {
 			continue
 		}
 		if _, bad := errs[ck]; bad {
 			continue
 		}
-		client, err := c.clients.forAccountRegion(ctx, key.account, key.region)
+		client, err := c.clients.forTargetRegion(ctx, key.target, key.region)
 		if err != nil {
 			errs[ck] = err
 			continue
@@ -117,18 +117,18 @@ func (c *Collector) resolveGroupClients(ctx context.Context, groups map[queryGro
 }
 
 // buildChunkJobs splits each group's queries into GetMetricData-sized chunks
-// paired with the group's (account, region) client and time window. A group whose
-// (account, region) client failed is marked failed and skipped.
+// paired with the group's (target, region) client and time window. A group whose
+// (target, region) client failed is marked failed and skipped.
 func (c *Collector) buildChunkJobs(groups map[queryGroupKey][]cwtypes.MetricDataQuery, groupClients map[clientKey]cloudwatchClient, groupErrs map[clientKey]error, now time.Time, chunkSize int) ([]chunkJob, map[queryGroupKey]bool) {
 	failedGroups := make(map[queryGroupKey]bool)
 	var jobs []chunkJob
 	for key, queries := range groups {
-		ck := clientKey{account: key.account, region: key.region}
+		ck := clientKey{target: key.target, region: key.region}
 		client, ok := groupClients[ck]
 		if !ok {
 			failedGroups[key] = true
-			c.Limit(logKeyQueryClientFailed+":"+key.account+"/"+key.region, 1, recurringLogEvery).
-				Warningf("CloudWatch query: build client for account %q region %q: %v", key.account, key.region, groupErrs[ck])
+			c.Limit(logKeyQueryClientFailed, 1, recurringLogEvery).
+				Warningf("CloudWatch query: build client for target %q region %q: %v", key.target, key.region, groupErrs[ck])
 			continue
 		}
 		start, end := queryWindow(now, key.period, c.QueryOffset)
@@ -163,8 +163,8 @@ func (c *Collector) collectChunkResults(results []chunkResult, failedGroups map[
 		if r.err != nil {
 			failures++
 			failedGroups[r.key] = true
-			c.Limit(logKeyGetMetricDataFailed+":"+r.key.account+"/"+r.key.region, 1, recurringLogEvery).
-				Warningf("CloudWatch GetMetricData (account %q, region %q, period %ds): %v", r.key.account, r.key.region, r.key.period, r.err)
+			c.Limit(logKeyGetMetricDataFailed, 1, recurringLogEvery).
+				Warningf("CloudWatch GetMetricData (target %q, region %q, period %ds): %v", r.key.target, r.key.region, r.key.period, r.err)
 			continue
 		}
 		samples = append(samples, r.samples...)
@@ -238,7 +238,7 @@ func (c *Collector) runGetMetricData(ctx context.Context, client cloudwatchClien
 		id := aws.ToString(q.Id)
 		if value, ok := valueByID[id]; ok {
 			pq := byID[id]
-			samples = append(samples, querySample{seriesName: pq.seriesName, labels: pq.labels, tagLabels: pq.tagLabels, value: value, account: pq.account, region: pq.region, period: pq.period})
+			samples = append(samples, querySample{seriesName: pq.seriesName, labels: pq.labels, tagLabels: pq.tagLabels, value: value, target: pq.target, account: pq.account, region: pq.region, period: pq.period})
 			continue
 		}
 		if usableByID[id] {

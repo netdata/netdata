@@ -6,85 +6,82 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 )
 
-// cwAccount is one resolved AWS account the collector monitors: the auth identity
-// used to build its clients, and its account id (resolved via sts:GetCallerIdentity).
-type cwAccount struct {
-	identity  awsauth.Identity
+// resolvedTarget binds one configured target identity to its STS-resolved account.
+// Target reference remains the execution identity; accountID is output attribution.
+type resolvedTarget struct {
+	target    *targetRuntime
 	accountID string
 }
 
-// ensureAccounts resolves the AWS account id for every configured identity via
+// ensureTargets resolves the AWS account id for every configured target via
 // sts:GetCallerIdentity. account_id is part of every series' identity, so at least
-// one account MUST resolve; if none do, Check fails. Resolution is fail-soft AND
-// retried: an identity whose config-build or STS/AssumeRole call fails stays pending
+// one target MUST resolve; if none do, Check fails. Resolution is fail-soft AND
+// retried: a target whose config-build or STS/AssumeRole call fails stays pending
 // and is retried on the next cycle (rate-limited warning), so a transient failure
-// does not silently drop an account for the lifetime of the job. Two identities that
-// resolve to the same account id are de-duplicated (first kept) — with a shared
-// region list they would otherwise collide on the {account_id, region, dimensions}
-// series identity.
-func (c *Collector) ensureAccounts(ctx context.Context) error {
-	identities := c.Auth.Identities()
+// does not silently drop a target for the lifetime of the job. Targets are never
+// deduplicated by account id because credentials can expose different resources.
+func (c *Collector) ensureTargets(ctx context.Context) error {
+	if c.runtime == nil {
+		return errors.New("CloudWatch collection plan is not compiled")
+	}
 	if c.resolvedRefs == nil {
-		c.resolvedRefs = make(map[string]struct{}, len(identities))
-		c.seenAccountID = make(map[string]string, len(identities))
+		c.resolvedRefs = make(map[string]struct{}, len(c.runtime.Targets))
+		c.resolvedByRef = make(map[string]resolvedTarget, len(c.runtime.Targets))
 	}
 
-	// Short-circuit once every configured identity has resolved (to a kept account
-	// or an intentionally-skipped duplicate). Until then, retry the pending ones.
+	// Short-circuit once every configured target has resolved. Until then, retry
+	// the pending ones.
 	allResolved := true
-	for _, id := range identities {
-		if _, ok := c.resolvedRefs[id.Ref]; !ok {
+	for _, target := range c.runtime.Targets {
+		if _, ok := c.resolvedRefs[target.Name]; !ok {
 			allResolved = false
 			break
 		}
 	}
 	if allResolved {
-		if len(c.accounts) == 0 {
-			return errors.New("no AWS accounts resolved")
+		if len(c.resolvedTargets) == 0 {
+			return errors.New("no AWS targets resolved")
 		}
 		return nil
 	}
 
-	region := c.regions()[0] // validated non-empty in Init
 	var lastErr error
 
-	for _, id := range identities {
-		if _, ok := c.resolvedRefs[id.Ref]; ok {
-			continue // already resolved (kept or deduped)
+	for _, target := range c.runtime.Targets {
+		if _, ok := c.resolvedRefs[target.Name]; ok {
+			continue // already resolved
 		}
-		acctID, err := c.resolveAccountID(ctx, id, region)
+		region := target.Regions[0]
+		acctID, err := c.resolveAccountID(ctx, target.Identity, region)
 		if err != nil {
 			lastErr = err
 			// Keep the identity pending and retry next cycle; throttle the warning so a
 			// persistently unreachable role does not warn every cycle.
-			c.Limit(logKeyAccountResolveFailed+":"+id.Ref, 1, recurringLogEvery).
+			c.Limit(logKeyAccountResolveFailed+":"+target.Name, 1, recurringLogEvery).
 				Warningf("CloudWatch: %v (will retry next cycle)", err)
 			continue
 		}
-		c.resolvedRefs[id.Ref] = struct{}{}
-		if firstRef, dup := c.seenAccountID[acctID]; dup {
-			c.Warningf("CloudWatch: identity %q resolves to account %s already monitored via %q; skipping the duplicate", id.Ref, acctID, firstRef)
-			continue
-		}
-		c.seenAccountID[acctID] = id.Ref
-		c.accounts = append(c.accounts, cwAccount{identity: id, accountID: acctID})
+		c.resolvedRefs[target.Name] = struct{}{}
+		resolved := resolvedTarget{target: target, accountID: acctID}
+		c.resolvedTargets = append(c.resolvedTargets, resolved)
+		c.resolvedByRef[target.Name] = resolved
+		c.invalidateQueryPlan()
 		c.markDiscoveryStale() // discover the newly-resolved account this cycle, not after refresh_every
 		c.markTagsStale()      // and fetch its tags this cycle, so its first charts are created tagged
-		c.Infof("CloudWatch: monitoring %d AWS account(s): %s", len(c.accounts), strings.Join(c.accountIDs(), ", "))
+		c.Infof("CloudWatch: target %q resolved to AWS account %s", target.Name, acctID)
 	}
 
-	if len(c.accounts) == 0 {
+	if len(c.resolvedTargets) == 0 {
 		if lastErr != nil {
 			return fmt.Errorf("no AWS account could be resolved (the 'sts:GetCallerIdentity' permission is required): %w", lastErr)
 		}
-		return errors.New("no AWS accounts resolved")
+		return errors.New("no AWS targets resolved")
 	}
 	return nil
 }
@@ -109,20 +106,15 @@ func (c *Collector) resolveAccountID(ctx context.Context, id awsauth.Identity, r
 	return *out.Account, nil
 }
 
-// identityForAccount returns the auth identity for a resolved account id.
-func (c *Collector) identityForAccount(account string) (awsauth.Identity, bool) {
-	for _, a := range c.accounts {
-		if a.accountID == account {
-			return a.identity, true
-		}
-	}
-	return awsauth.Identity{}, false
+func (c *Collector) resolvedTargetByRef(ref string) (resolvedTarget, bool) {
+	target, ok := c.resolvedByRef[ref]
+	return target, ok
 }
 
-func (c *Collector) accountIDs() []string {
-	ids := make([]string, 0, len(c.accounts))
-	for _, a := range c.accounts {
-		ids = append(ids, a.accountID)
+func (c *Collector) resolvedTargetRefs() []string {
+	refs := make([]string, 0, len(c.resolvedTargets))
+	for _, target := range c.resolvedTargets {
+		refs = append(refs, target.target.Name)
 	}
-	return ids
+	return refs
 }

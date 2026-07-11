@@ -62,10 +62,9 @@ func ec2QueryProfile() cwprofiles.Profile {
 
 func ec2QueryCollector(regions []string, instancesByRegion map[string][][]string) *Collector {
 	c := New()
-	c.Config.Regions = regions
+	configureExactRule(c, regions, []string{"ec2"})
 	c.applyDefaults()
-	c.accounts = []cwAccount{{accountID: "123456789012"}}
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}}
+	setSingleTargetRuntime(c, "123456789012", regions, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 
 	insts := make(map[discoveryKey][]discoveredInstance)
 	for region, list := range instancesByRegion {
@@ -73,7 +72,7 @@ func ec2QueryCollector(regions []string, instancesByRegion map[string][][]string
 		for _, vals := range list {
 			di = append(di, discoveredInstance{DimensionValues: vals})
 		}
-		insts[discoveryKey{Account: "123456789012", Profile: "ec2", Region: region}] = di
+		insts[discoveryKey{Target: "base", Profile: "ec2", Region: region}] = di
 	}
 	c.discovery = discoverySnapshot{Instances: insts}
 	return c
@@ -135,10 +134,8 @@ func TestBuildQueryPlan_ConstantDimension(t *testing.T) {
 	// A constant (match-and-query-only) dimension is sent in the GetMetricData
 	// query but is not emitted as an identity label.
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
-	c.applyDefaults()
-	c.accounts = []cwAccount{{accountID: "123456789012"}}
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "cloudfront", Config: cwprofiles.Profile{
+	configureExactRule(c, []string{"us-east-1"}, []string{"cloudfront"})
+	profiles := []cwprofiles.ResolvedProfile{{Name: "cloudfront", Config: cwprofiles.Profile{
 		Namespace: "AWS/CloudFront",
 		Period:    300,
 		Instance: cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{
@@ -149,8 +146,9 @@ func TestBuildQueryPlan_ConstantDimension(t *testing.T) {
 			{ID: "requests", MetricName: "Requests", Statistics: []string{"sum"}, Rate: true},
 		},
 	}}}
+	setSingleTargetRuntime(c, "123456789012", []string{"us-east-1"}, profiles)
 	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
-		{Account: "123456789012", Profile: "cloudfront", Region: "us-east-1"}: {{DimensionValues: []string{"E1", "Global"}}},
+		{Target: "base", Profile: "cloudfront", Region: "us-east-1"}: {{DimensionValues: []string{"E1", "Global"}}},
 	}}
 
 	plan := c.buildQueryPlan()
@@ -192,6 +190,27 @@ func TestBuildQueryPlan_MultiRegionAndEmpty(t *testing.T) {
 
 	empty := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{})
 	assert.Empty(t, empty.buildQueryPlan(), "no discovered instances -> empty plan")
+}
+
+func TestCurrentQueryPlan_CachesUntilInputsChange(t *testing.T) {
+	c := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{
+		"us-east-1": {{"i-1"}},
+	})
+
+	first := c.currentQueryPlan()
+	require.NotEmpty(t, first)
+	second := c.currentQueryPlan()
+	require.NotEmpty(t, second)
+	assert.Same(t, &first[0], &second[0], "unchanged inputs reuse the compiled query blueprint")
+
+	c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}] = append(
+		c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}],
+		discoveredInstance{DimensionValues: []string{"i-2"}},
+	)
+	assert.Len(t, c.currentQueryPlan(), len(first), "mutating an input without invalidation does not rebuild")
+
+	c.invalidateQueryPlan()
+	assert.Len(t, c.currentQueryPlan(), len(first)*2, "input invalidation rebuilds the query blueprint")
 }
 
 // gmdCloudWatch is a thread-safe GetMetricData fake: every query gets f.value
@@ -276,12 +295,12 @@ func TestExecuteQueries(t *testing.T) {
 }
 
 // TestBuildChunkJobs verifies query batching into GetMetricData-sized chunks (one
-// job per chunk) and that a group whose (account, region) client failed is skipped and
+// job per chunk) and that a group whose (target, region) client failed is skipped and
 // marked failed. chunkSize is an explicit argument, so production passes the fixed
 // metricsPerQuery (the AWS 500/call maximum) while tests exercise the multi-chunk
 // split without constructing 500+ queries.
 func TestBuildChunkJobs(t *testing.T) {
-	key := queryGroupKey{region: "us-east-1", period: 300}
+	key := queryGroupKey{target: "base", region: "us-east-1", period: 300}
 	groupOf := func(n int) map[queryGroupKey][]cwtypes.MetricDataQuery {
 		qs := make([]cwtypes.MetricDataQuery, n)
 		for i := range qs {
@@ -289,7 +308,7 @@ func TestBuildChunkJobs(t *testing.T) {
 		}
 		return map[queryGroupKey][]cwtypes.MetricDataQuery{key: qs}
 	}
-	ok := map[clientKey]cloudwatchClient{{region: "us-east-1"}: &gmdCloudWatch{}}
+	ok := map[clientKey]cloudwatchClient{{target: "base", region: "us-east-1"}: &gmdCloudWatch{}}
 
 	tests := map[string]struct {
 		groups       map[queryGroupKey][]cwtypes.MetricDataQuery
@@ -300,10 +319,10 @@ func TestBuildChunkJobs(t *testing.T) {
 		wantQueries  int
 		wantFailed   bool
 	}{
-		"all queries fit one chunk":             {groups: groupOf(6), groupClients: ok, chunkSize: 500, wantJobs: 1, wantQueries: 6},
-		"split into even chunks":                {groups: groupOf(6), groupClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 6},
-		"uneven last chunk":                     {groups: groupOf(5), groupClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 5},
-		"group without an account client fails": {groups: groupOf(6), groupClients: map[clientKey]cloudwatchClient{}, groupErrs: map[clientKey]error{{region: "us-east-1"}: errors.New("no client")}, chunkSize: 2, wantJobs: 0, wantFailed: true},
+		"all queries fit one chunk":           {groups: groupOf(6), groupClients: ok, chunkSize: 500, wantJobs: 1, wantQueries: 6},
+		"split into even chunks":              {groups: groupOf(6), groupClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 6},
+		"uneven last chunk":                   {groups: groupOf(5), groupClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 5},
+		"group without a target client fails": {groups: groupOf(6), groupClients: map[clientKey]cloudwatchClient{}, groupErrs: map[clientKey]error{{target: "base", region: "us-east-1"}: errors.New("no client")}, chunkSize: 2, wantJobs: 0, wantFailed: true},
 	}
 
 	c := New()

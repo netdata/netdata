@@ -2,45 +2,37 @@
   "vnode": "ok",
   "update_every": 123,
   "autodetection_retry": 123,
-  "regions": [
-    "ok"
-  ],
-  "auth": {
-    "mode": "ok",
-    "mode_access_key": {
-      "access_key_id": "ok",
-      "secret_access_key": "ok",
-      "session_token": "ok"
-    },
-    "mode_assume_role": {
-      "roles": [
-        {
-          "role_arn": "ok",
-          "external_id": "ok"
-        }
-      ]
+  "credentials": {
+    "sdk_default": {"type": "default"},
+    "bootstrap": {
+      "type": "static",
+      "access_key_id": "${env:AWS_ACCESS_KEY_ID}",
+      "secret_access_key": "${env:AWS_SECRET_ACCESS_KEY}",
+      "session_token": "${env:AWS_SESSION_TOKEN}"
     }
   },
-  "profiles": {
-    "mode": "ok",
-    "mode_exact": {
-      "entries": [
-        {
-          "name": "ok"
-        }
-      ]
-    }
-  },
-  "discovery": {
-    "refresh_every": 123,
-    "recently_active_only": true
-  },
-  "tags": [
+  "targets": [
+    {"name": "base", "credentials": "sdk_default"},
     {
-      "name": "ok",
-      "rename": "ok"
+      "name": "production",
+      "credentials": "bootstrap",
+      "assume_role": {
+        "role_arn": "arn:aws:iam::000000000000:role/example",
+        "external_id": "${env:AWS_EXTERNAL_ID}"
+      }
     }
   ],
+  "rules": [
+    {"name": "base-defaults", "targets": ["base"], "regions": ["us-east-1"]},
+    {
+      "name": "production-services",
+      "targets": ["production"],
+      "profiles": {"defaults": false, "include": ["ec2", "rds"], "exclude": ["cloudfront"]},
+      "regions": ["us-east-1", "eu-west-1"]
+    }
+  ],
+  "discovery": {"refresh_every": 123, "recently_active_only": true},
+  "tags": [{"name": "ok", "rename": "ok"}],
   "query_offset": 123,
   "timeout": 123.123
 }

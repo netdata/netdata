@@ -183,17 +183,15 @@ func TestRefreshTags_FirstFailureNoneThenSuccessThenCarryForward(t *testing.T) {
 		},
 	}
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
+	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
 	c.Config.Tags = []TagConfig{{Name: "owner"}}
-	c.applyDefaults()
-	c.accounts = []cwAccount{{accountID: "000000000000"}}
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}}
+	setSingleTargetRuntime(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
 	c.newRGTAClient = func(aws.Config) rgtaClient { return rgta }
 	c.computeTagPlans()
 	require.NotEmpty(t, c.tagPlans, "owner resolves to a plan for ec2")
 
-	key := tagCacheKey{account: "000000000000", region: "us-east-1", profile: "ec2", joinKey: "i-1"}
+	key := tagCacheKey{target: "base", account: "000000000000", region: "us-east-1", profile: "ec2", joinKey: "i-1"}
 	base := time.Unix(1_000_000_000, 0)
 	ttl := time.Duration(c.Discovery.RefreshEvery) * time.Second
 
@@ -233,11 +231,9 @@ func TestGetAllResources_PaginatesAndFiltersByType(t *testing.T) {
 func tagUnitCollector(t *testing.T, rgta rgtaClient) *Collector {
 	t.Helper()
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
+	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
 	c.Config.Tags = []TagConfig{{Name: "owner"}}
-	c.applyDefaults()
-	c.accounts = []cwAccount{{accountID: "000000000000"}}
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}}
+	setSingleTargetRuntime(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
 	c.newRGTAClient = func(aws.Config) rgtaClient { return rgta }
 	return c
@@ -295,8 +291,8 @@ func TestIndexResourceTags_SkipsForeignAccountRegion(t *testing.T) {
 		rgtaResource("arn:aws:ec2:us-east-1:999999999999:instance/i-acct", "owner", "b"),   // wrong account
 		rgtaResource("arn:aws:ec2:eu-west-1:000000000000:instance/i-region", "owner", "c"), // wrong region
 	}
-	indexResourceTags(dst, "000000000000", "us-east-1", resources, rtIndex, joins, plans)
+	indexResourceTags(dst, "base", "000000000000", "us-east-1", resources, rtIndex, joins, plans)
 
 	require.Len(t, dst, 1, "only the same-account, same-region resource is cached")
-	assert.Contains(t, dst, tagCacheKey{account: "000000000000", region: "us-east-1", profile: "ec2", joinKey: "i-ok"})
+	assert.Contains(t, dst, tagCacheKey{target: "base", account: "000000000000", region: "us-east-1", profile: "ec2", joinKey: "i-ok"})
 }

@@ -90,7 +90,7 @@ metrics:
   # Narrow target-health collection at {LoadBalancer, TargetGroup} is collected by the default
   # alb_target_health profile. Broader per-target / target-group metrics (HealthyHostCount,
   # RequestCountPerTarget, TargetConnectionErrorCount, ...) are collected by the disabled alb_target
-  # profile -- enable it with profiles.mode: combined or exact.
+  # profile -- enable it explicitly with rules[].profiles.include.
   # Also at {LoadBalancer}: HTTPCode_ELB_500/502/503/504_Count (5xx detail), and the DDoS-protection,
   # auth (ELBAuth*), Target Optimizer (TargetControl*), and LCU-reservation (PeakLCUs/ReservedLCUs)
   # families. See: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html

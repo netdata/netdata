@@ -12,6 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -51,10 +52,39 @@ func (f *fakeSTS) GetCallerIdentity(context.Context, *sts.GetCallerIdentityInput
 }
 
 func validConfig() Config {
-	return Config{
-		Regions: []string{"us-east-1"},
-		Auth:    awsauth.Config{Mode: awsauth.ModeDefault},
+	return validBaseConfig()
+}
+
+func configureExactRule(c *Collector, regions, profiles []string) {
+	defaults := false
+	c.Config = validConfig()
+	c.Config.Rules[0].Regions = regions
+	c.Config.Rules[0].Profiles = &ProfileSelectorConfig{
+		Defaults: &defaults,
+		Include:  profiles,
 	}
+	c.applyDefaults()
+}
+
+func setSingleTargetRuntime(c *Collector, account string, regions []string, profiles []cwprofiles.ResolvedProfile) {
+	identity := awsauth.NewIdentity("base", awsauth.CredentialConfig{Type: awsauth.CredentialTypeDefault}, nil)
+	target := &targetRuntime{Name: "base", Identity: identity, Regions: regions}
+	runtime := &collectorRuntime{
+		Targets:      []*targetRuntime{target},
+		TargetsByRef: map[string]*targetRuntime{"base": target},
+		Profiles:     profiles,
+	}
+	for _, region := range regions {
+		for _, profile := range profiles {
+			runtime.Scopes = append(runtime.Scopes, collectionScope{RuleName: "test", Target: target, Profile: profile, Region: region})
+		}
+	}
+	resolved := resolvedTarget{target: target, accountID: account}
+	c.runtime = runtime
+	c.resolvedTargets = []resolvedTarget{resolved}
+	c.resolvedByRef = map[string]resolvedTarget{"base": resolved}
+	c.resolvedRefs = map[string]struct{}{"base": {}}
+	c.invalidateQueryPlan()
 }
 
 func newTestCollector(t *testing.T, cfg Config, f *fakeSTS) *Collector {
@@ -82,23 +112,19 @@ func TestCollector_Init(t *testing.T) {
 		cfg     Config
 		wantErr bool
 	}{
-		"valid default auth": {
+		"valid default credentials": {
 			cfg: validConfig(),
 		},
-		"missing regions": {
-			cfg:     Config{Auth: awsauth.Config{Mode: awsauth.ModeDefault}},
+		"missing rules": {
+			cfg:     func() Config { cfg := validConfig(); cfg.Rules = nil; return cfg }(),
 			wantErr: true,
 		},
-		"invalid auth mode": {
-			cfg:     Config{Regions: []string{"us-east-1"}, Auth: awsauth.Config{Mode: "bogus"}},
-			wantErr: true,
-		},
-		"profiles exact without entries": {
-			cfg: Config{
-				Regions:  []string{"us-east-1"},
-				Auth:     awsauth.Config{Mode: awsauth.ModeDefault},
-				Profiles: ProfilesConfig{Mode: profilesModeExact},
-			},
+		"invalid credential type": {
+			cfg: func() Config {
+				cfg := validConfig()
+				cfg.Credentials["sdk_default"] = awsauth.CredentialConfig{Type: "bogus"}
+				return cfg
+			}(),
 			wantErr: true,
 		},
 	}
@@ -125,7 +151,6 @@ func TestCollector_Init_appliesDefaults(t *testing.T) {
 	assert.Equal(t, defaultUpdateEvery, c.UpdateEvery)
 	assert.Equal(t, defaultDiscoveryRefresh, c.Discovery.RefreshEvery)
 	assert.Equal(t, defaultQueryOffset, c.QueryOffset)
-	assert.Equal(t, profilesModeAuto, c.Profiles.Mode)
 	assert.True(t, c.recentlyActiveOnly())
 }
 
@@ -136,7 +161,8 @@ func TestCollector_Check(t *testing.T) {
 		require.NoError(t, c.Init(context.Background()))
 
 		require.NoError(t, c.Check(context.Background()))
-		assert.Equal(t, []string{"000000000000"}, c.accountIDs())
+		require.Len(t, c.resolvedTargets, 1)
+		assert.Equal(t, "000000000000", c.resolvedTargets[0].accountID)
 		assert.Equal(t, 1, f.calls)
 
 		require.NoError(t, c.Check(context.Background()))

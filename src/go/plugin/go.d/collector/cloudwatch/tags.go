@@ -19,6 +19,7 @@ import (
 // tagCacheKey identifies a resource's resolved tag labels by account, region, the
 // profile they enrich, and the profile's ARN-projectable join key.
 type tagCacheKey struct {
+	target  string
 	account string
 	region  string
 	profile string
@@ -26,8 +27,8 @@ type tagCacheKey struct {
 }
 
 // tagSnapshot is the cached result of one tag refresh: resolved labels per resource,
-// with a TTL. On a per-(account, region) RGTA failure the previous snapshot's entries
-// for that (account, region) are carried forward (last-known); a first-run failure
+// with a TTL. On a per-(target, region) RGTA failure the previous snapshot's entries
+// for that (target, region) are carried forward (last-known); a first-run failure
 // simply yields no tags. Never gates series existence (INV.2).
 type tagSnapshot struct {
 	labels    map[tagCacheKey][]metrix.Label
@@ -66,7 +67,7 @@ func (c *Collector) computeTagPlans() {
 		return
 	}
 	plans := make(map[string][]resolvedTag)
-	for _, p := range c.profiles {
+	for _, p := range c.runtime.Profiles {
 		if _, ok := tagJoins[p.Name]; !ok {
 			continue
 		}
@@ -83,7 +84,7 @@ func (c *Collector) computeTagPlans() {
 }
 
 // refreshTags rebuilds the tag cache when its TTL has expired. It is best-effort and
-// NEVER gates collection: a per-(account, region) failure carries last-known tags
+// NEVER gates collection: a per-(target, region) failure carries last-known tags
 // forward (or yields none on the first pass). Opt-in: with no configured tags (so no
 // resolved plans) it is a no-op and no RGTA client is ever built.
 func (c *Collector) refreshTags(ctx context.Context) {
@@ -101,7 +102,7 @@ func (c *Collector) refreshTags(ctx context.Context) {
 		return
 	}
 
-	joins := selectedTagJoins(c.profiles)
+	joins := selectedTagJoins(c.runtime.Profiles)
 	filters := resourceTypeFilters(joins)
 	rtIndex := resourceTypeIndex(joins)
 	ttl := time.Duration(c.Discovery.RefreshEvery) * time.Second
@@ -112,27 +113,35 @@ func (c *Collector) refreshTags(ctx context.Context) {
 		expiresAt: now.Add(ttl),
 	}
 
-	// Fetch each (account, region) concurrently (bounded), so a slow or hung RGTA
+	// Fetch each (target, region) concurrently (bounded), so a slow or hung RGTA
 	// endpoint cannot serialize into an accounts x regions x timeout collection stall;
 	// the per-call timeout bounds each fetch. Indexing into the shared map is done
 	// serially afterwards to avoid a data race. Mirrors discovery's fan-out.
 	type tagFetch struct {
-		account, region string
-		resources       []rgtatypes.ResourceTagMapping
-		err             error
+		target, account, region string
+		resources               []rgtatypes.ResourceTagMapping
+		err                     error
 	}
 	var targets []tagFetch
-	for _, account := range c.accountIDs() {
-		for _, region := range c.regions() {
-			targets = append(targets, tagFetch{account: account, region: region})
+	seenTargets := make(map[string]struct{})
+	for _, scope := range c.runtime.Scopes {
+		resolved, ok := c.resolvedTargetByRef(scope.Target.Name)
+		if !ok {
+			continue
 		}
+		key := scope.Target.Name + "\x00" + scope.Region
+		if _, ok := seenTargets[key]; ok {
+			continue
+		}
+		seenTargets[key] = struct{}{}
+		targets = append(targets, tagFetch{target: scope.Target.Name, account: resolved.accountID, region: scope.Region})
 	}
 
 	p := pool.New().WithMaxGoroutines(max(1, apiConcurrency))
 	for i := range targets {
 		t := &targets[i]
 		p.Go(func() {
-			client, err := c.rgtaClients.forAccountRegion(ctx, t.account, t.region)
+			client, err := c.rgtaClients.forTargetRegion(ctx, t.target, t.region)
 			if err != nil {
 				t.err = fmt.Errorf("build client: %w", err)
 				return
@@ -153,22 +162,23 @@ func (c *Collector) refreshTags(ctx context.Context) {
 
 	for _, t := range targets {
 		if t.err != nil {
-			c.carryForwardTags(next.labels, t.account, t.region)
-			c.Limit(logKeyTagRefreshFailed+":"+t.account+"/"+t.region, 1, recurringLogEvery).
-				Warningf("CloudWatch tag lookup for account %q region %q failed: %v (using last-known tags)", t.account, t.region, t.err)
+			c.carryForwardTags(next.labels, t.target, t.region)
+			c.Limit(logKeyTagRefreshFailed, 1, recurringLogEvery).
+				Warningf("CloudWatch tag lookup for target %q region %q failed: %v (using last-known tags)", t.target, t.region, t.err)
 			continue
 		}
-		indexResourceTags(next.labels, t.account, t.region, t.resources, rtIndex, joins, c.tagPlans)
+		indexResourceTags(next.labels, t.target, t.account, t.region, t.resources, rtIndex, joins, c.tagPlans)
 	}
 
 	c.tags = next
+	c.invalidateQueryPlan()
 }
 
-// carryForwardTags copies the previous snapshot's entries for one (account, region)
+// carryForwardTags copies the previous snapshot's entries for one (target, region)
 // into dst, so a transient RGTA failure keeps that scope's last-known tags.
-func (c *Collector) carryForwardTags(dst map[tagCacheKey][]metrix.Label, account, region string) {
+func (c *Collector) carryForwardTags(dst map[tagCacheKey][]metrix.Label, target, region string) {
 	for k, v := range c.tags.labels {
-		if k.account == account && k.region == region {
+		if k.target == target && k.region == region {
 			dst[k] = v
 		}
 	}
@@ -205,7 +215,7 @@ func getAllResources(ctx context.Context, client rgtaClient, filters []string, t
 // no selected profile claims, or whose join key cannot be built is skipped.
 func indexResourceTags(
 	dst map[tagCacheKey][]metrix.Label,
-	account, region string,
+	target, account, region string,
 	resources []rgtatypes.ResourceTagMapping,
 	rtIndex map[string][]string,
 	joins map[string]tagJoin,
@@ -219,7 +229,7 @@ func indexResourceTags(
 		if err != nil {
 			continue
 		}
-		// RGTA is queried per (account, region), so a resource whose ARN names a
+		// RGTA is queried per (target, region), so a resource whose ARN names a
 		// different account or region should not appear; skip it if it does, so tags
 		// are never cached against the wrong target. Empty ARN fields (e.g. S3, which
 		// carries no account/region) are allowed.
@@ -244,7 +254,7 @@ func indexResourceTags(
 			if len(labels) == 0 {
 				continue
 			}
-			dst[tagCacheKey{account: account, region: region, profile: profName, joinKey: jk}] = labels
+			dst[tagCacheKey{target: target, account: account, region: region, profile: profName, joinKey: jk}] = labels
 		}
 	}
 }
@@ -275,7 +285,7 @@ func applyTagPlan(plan []resolvedTag, tags map[string]string) []metrix.Label {
 
 // tagLabelsFor returns the cached, non-identity tag labels for one discovered
 // instance, or nil when tags are off, the profile has no join, or none are cached.
-func (c *Collector) tagLabelsFor(account, region string, prof cwprofiles.ResolvedProfile, values []string) []metrix.Label {
+func (c *Collector) tagLabelsFor(target, account, region string, prof cwprofiles.ResolvedProfile, values []string) []metrix.Label {
 	if len(c.tags.labels) == 0 {
 		return nil
 	}
@@ -287,5 +297,5 @@ func (c *Collector) tagLabelsFor(account, region string, prof cwprofiles.Resolve
 	if !ok {
 		return nil
 	}
-	return c.tags.labels[tagCacheKey{account: account, region: region, profile: prof.Name, joinKey: jk}]
+	return c.tags.labels[tagCacheKey{target: target, account: account, region: region, profile: prof.Name, joinKey: jk}]
 }

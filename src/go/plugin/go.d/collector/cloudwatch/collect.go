@@ -5,10 +5,10 @@ package cloudwatch
 import "context"
 
 func (c *Collector) collect(ctx context.Context) error {
-	if err := c.ensureAccounts(ctx); err != nil {
+	if err := c.ensureRuntime(); err != nil {
 		return err
 	}
-	if err := c.ensureProfiles(); err != nil {
+	if err := c.ensureTargets(ctx); err != nil {
 		return err
 	}
 	if err := c.refreshDiscovery(ctx); err != nil {
@@ -16,7 +16,7 @@ func (c *Collector) collect(ctx context.Context) error {
 	}
 	c.refreshTags(ctx) // best-effort tag enrichment; never gates collection (INV.2)
 
-	plan := c.buildQueryPlan()
+	plan := c.currentQueryPlan()
 	c.observations.pruneObserved(plan)
 
 	now := c.now()
@@ -34,7 +34,7 @@ func (c *Collector) collect(ctx context.Context) error {
 		return err
 	}
 
-	// A (account, region, period) group is "queried" only if it was due AND nothing failed
+	// A (target, region, period) group is "queried" only if it was due AND nothing failed
 	// for it. Advance the schedule only for those; the rest (not due, or
 	// due-but-failed) re-emit their cached values and remain due for retry.
 	queried := make(map[queryGroupKey]bool, len(due))

@@ -17,18 +17,18 @@ type observedSeries struct {
 	labels     []metrix.Label
 	tagLabels  []metrix.Label // non-identity enrichment; re-emitted with the series, not in observedKey
 	value      float64
-	groupKey   queryGroupKey // (account, region, effective period) — the scheduling unit
+	groupKey   queryGroupKey // (target, region, effective period) — the scheduling unit
 }
 
 // observationStore owns the metric write path together with the per-series
-// retention cache and the per-(account, region, period) query schedule. Keeping these
+// retention cache and the per-(target, region, period) query schedule. Keeping these
 // together isolates retention/scheduling from the rest of the collector: it
 // re-emits not-due series every cycle so daily metrics stay visible, and prunes
 // series whose instance has disappeared from discovery.
 type observationStore struct {
 	store        metrix.CollectorStore
 	lastObserved map[string]observedSeries   // last value per series, for retention re-emit
-	nextQueryAt  map[queryGroupKey]time.Time // next due time per (account, region, effective period)
+	nextQueryAt  map[queryGroupKey]time.Time // next due time per (target, region, effective period)
 }
 
 func newObservationStore(store metrix.CollectorStore) *observationStore {
@@ -46,10 +46,10 @@ func (o *observationStore) reset() {
 	o.nextQueryAt = make(map[queryGroupKey]time.Time)
 }
 
-// dueGroups returns the set of (account, region, period) groups due for querying at now.
+// dueGroups returns the set of (target, region, period) groups due for querying at now.
 // It does NOT advance the schedule — the caller advances nextQueryAt only for
 // groups that actually succeeded, so a transient failure is retried next cycle
-// rather than skipped for a full period. Scheduling is per (account, region, period) so a
+// rather than skipped for a full period. Scheduling is per (target, region, period) so a
 // failure in one region does not force healthy regions of the same period to
 // re-query early. A group not yet scheduled is always due (first cycle).
 func (o *observationStore) dueGroups(plan []plannedQuery, now time.Time) map[queryGroupKey]bool {
@@ -91,7 +91,7 @@ func filterDueQueries(plan []plannedQuery, due map[queryGroupKey]bool) []planned
 // this cycle (not due, or due-but-failed) so long-period metrics stay visible.
 //
 // dueQueries is every query issued this cycle; `queried` is the subset of
-// (account, region, period) groups that succeeded; `noData` is the set of query ids that
+// (target, region, period) groups that succeeded; `noData` is the set of query ids that
 // got a usable result with no datapoint. A due series with no sample is recorded
 // as 0 only when it is a genuine no-data result (in noData) AND its metric opts
 // into nil-as-zero; otherwise (a gauge, or a per-result error/absent id) its
@@ -167,10 +167,10 @@ func writeSample(meter metrix.SnapshotMeter, seriesName string, labels, tagLabel
 	meter.WithLabels(all...).Gauge(seriesName, metrix.WithFloat(true)).Observe(value)
 }
 
-// pruneObserved drops both the retention-cache entries and the per-(account, region,
+// pruneObserved drops both the retention-cache entries and the per-(target, region,
 // period) schedule entries that are no longer in the current query plan. Dropping
 // the retention cache stops a removed resource from being re-emitted. Dropping the
-// schedule ensures a (account, region, period) group that fully left discovery and later
+// schedule ensures a (target, region, period) group that fully left discovery and later
 // reappears is treated as unscheduled — and so queried on its first cycle back —
 // instead of waiting for a stale nextQueryAt (up to a full period, e.g. ~24h for a
 // daily group) to expire.

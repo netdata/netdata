@@ -28,6 +28,7 @@ const (
 	logKeyAccountResolveFailed   = "account_resolve_failed"
 	logKeyTagPlanWarn            = "tag_plan_warn"
 	logKeyTagRefreshFailed       = "tag_refresh_failed"
+	logKeyRuleShadowed           = "rule_shadowed"
 )
 
 //go:embed "config_schema.json"
@@ -50,7 +51,6 @@ func New() *Collector {
 		Config: Config{
 			UpdateEvery:        defaultUpdateEvery,
 			AutoDetectionRetry: defaultAutoDetectRetry,
-			Profiles:           ProfilesConfig{Mode: profilesModeAuto},
 			Discovery:          DiscoveryConfig{RefreshEvery: defaultDiscoveryRefresh},
 			QueryOffset:        defaultQueryOffset,
 			Timeout:            defaultTimeout,
@@ -63,8 +63,8 @@ func New() *Collector {
 		newRGTAClient:       defaultNewRGTAClient,
 	}
 	c.observations = newObservationStore(c.store)
-	c.clients = newClientCache(c.buildAccountRegionClient)
-	c.rgtaClients = newClientCache(c.buildAccountRegionRGTAClient)
+	c.clients = newClientCache(c.buildTargetRegionClient)
+	c.rgtaClients = newClientCache(c.buildTargetRegionRGTAClient)
 	return c
 }
 
@@ -82,19 +82,21 @@ type Collector struct {
 	newRGTAClient       func(cfg aws.Config) rgtaClient
 	newCatalog          func() (cwprofiles.Catalog, error) // nil => cwprofiles.DefaultCatalog
 
-	accounts          []cwAccount         // resolved AWS accounts (one per auth identity, deduped by account id)
-	resolvedRefs      map[string]struct{} // identity Refs already resolved (kept or deduped); the rest are retried each cycle
-	seenAccountID     map[string]string   // account id -> first identity Ref, for cross-cycle dedup
+	runtime           *collectorRuntime
+	resolvedTargets   []resolvedTarget
+	resolvedByRef     map[string]resolvedTarget
+	resolvedRefs      map[string]struct{} // target refs already resolved; the rest are retried each cycle
 	chartTemplateYAML string
 
-	profiles    []cwprofiles.ResolvedProfile   // candidate profiles selected per profiles.mode
-	clients     *clientCache[cloudwatchClient] // CloudWatch client cache, one per (account, region)
-	rgtaClients *clientCache[rgtaClient]       // RGTA (tag) client cache, one per (account, region)
+	clients     *clientCache[cloudwatchClient] // one per (target, region)
+	rgtaClients *clientCache[rgtaClient]       // one per (target, region)
 	discovery   discoverySnapshot
+	queryPlan   []plannedQuery
+	planDirty   bool
 
 	discoverySig string // last-logged discovered-resources summary; Info re-logs only when it changes
 
-	observations *observationStore // retention cache + per-(account, region, period) query schedule
+	observations *observationStore // retention cache + per-(target, region, period) query schedule
 
 	tags     tagSnapshot              // resource tag cache, refreshed with discovery (empty when tags unconfigured)
 	tagPlans map[string][]resolvedTag // per-profile resolved tag->label plans (nil when tags unconfigured)
@@ -106,13 +108,10 @@ func (c *Collector) Init(context.Context) error {
 }
 
 func (c *Collector) Check(ctx context.Context) error {
-	if err := c.ensureAccounts(ctx); err != nil {
+	if err := c.ensureRuntime(); err != nil {
 		return err
 	}
-	// Resolve profiles and build the chart template here too: the framework
-	// validates ChartTemplateYAML() in postCheck, before the first Collect, so an
-	// empty template would fail the job before collection ever starts.
-	return c.ensureProfiles()
+	return c.ensureTargets(ctx)
 }
 
 func (c *Collector) Collect(ctx context.Context) error {
@@ -123,12 +122,14 @@ func (c *Collector) Cleanup(context.Context) {
 	// Reset runtime state so a framework re-Init (e.g. after a failed
 	// autodetection retry on the same instance) starts clean, mirroring
 	// azure_monitor. All ensure*/refresh paths rebuild lazily.
-	c.accounts = nil
+	c.runtime = nil
+	c.resolvedTargets = nil
+	c.resolvedByRef = nil
 	c.resolvedRefs = nil
-	c.seenAccountID = nil
-	c.profiles = nil
 	c.chartTemplateYAML = ""
 	c.discovery = discoverySnapshot{}
+	c.queryPlan = nil
+	c.planDirty = true
 	c.discoverySig = ""
 	c.clients.reset()
 	c.rgtaClients.reset()
