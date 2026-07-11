@@ -737,6 +737,9 @@ func (e *Engine) reconcileChangedChartLabels(ctx *planBuildContext) error {
 		return nil
 	}
 
+	// A mismatch may be discovered after a matching prefix whose labels were not
+	// retained. Replay the immutable current snapshot only on changed cycles and
+	// use the same route walk so selection and autogen semantics cannot diverge.
 	return e.forEachPlanSeriesRoute(ctx, true)
 }
 

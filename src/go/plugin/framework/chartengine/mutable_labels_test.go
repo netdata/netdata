@@ -273,6 +273,45 @@ func TestBuildPlanCanonicalMembershipTracksCurrentCardinality(t *testing.T) {
 	assertCanonicalLabelMembership(t, engine, 1)
 }
 
+func TestBuildPlanChangedFirstMembershipShrinksCanonicalCapacity(t *testing.T) {
+	tests := map[string]struct {
+		owner       string
+		wantUpdated bool
+	}{
+		"effective labels unchanged": {owner: "owner-a"},
+		"effective labels changed":   {owner: "owner-b", wantUpdated: true},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			engine, store, cycle, meter, gauge := newMutableLabelsTestState(t)
+
+			series := make([]mutableLabelSeries, 128)
+			for i := range series {
+				series[i] = mutableLabelSeries{
+					instance: "node-1",
+					owner:    "owner-a",
+					zone:     "zone-a",
+					shard:    fmt.Sprintf("shard-%03d", i),
+				}
+			}
+			observeMutableLabelSeries(t, cycle, meter, gauge, series...)
+			_, err := buildPlan(engine, store.Read(metrix.ReadFlatten()))
+			require.NoError(t, err)
+			assertCanonicalLabelMembership(t, engine, 128)
+
+			changed := series[0]
+			changed.shard = "changed-first-member"
+			changed.owner = tc.owner
+			observeMutableLabelSeries(t, cycle, meter, gauge, changed)
+			plan, err := buildPlan(engine, store.Read(metrix.ReadFlatten()))
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantUpdated, findUpdateChartLabelsAction(plan) != nil)
+			assertCanonicalLabelMembership(t, engine, 1)
+		})
+	}
+}
+
 func TestBuildPlanAbortedHighCardinalityProposalDoesNotEnterCommittedLabelState(t *testing.T) {
 	engine, store, cycle, meter, gauge := newMutableLabelsTestState(t)
 

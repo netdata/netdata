@@ -19,6 +19,12 @@ func BenchmarkBuildPlanMutableLabels(b *testing.B) {
 			reader := newBenchmarkMutableLabelReader(b, chartCount, 1, 4, nil)
 			benchmarkMutableLabelPlanning(b, chartCount, 1, 4, 0, reader)
 		})
+
+		b.Run(fmt.Sprintf("one_changed_unrelated_series_scaling/charts_%d/labels_4", chartCount), func(b *testing.B) {
+			base := newBenchmarkMutableLabelReader(b, chartCount, 1, 4, nil)
+			changed := newBenchmarkMutableLabelReader(b, chartCount, 1, 4, func(chart int) bool { return chart == 0 })
+			benchmarkMutableLabelPlanning(b, chartCount, 1, 4, 1, base, changed)
+		})
 	}
 
 	for _, labelCount := range []int{0, 4, 16, 64} {

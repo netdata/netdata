@@ -150,9 +150,8 @@ func (t *chartLabelTracker) observeMembership(
 	}
 
 	if t.change == nil {
-		capacity := max(len(previousMembership), t.observed)
 		t.change = &chartLabelChange{
-			proposedMembership:  make([]chartLabelMembership, 0, capacity),
+			proposedMembership:  make([]chartLabelMembership, 0, t.observed),
 			reconcileDuringScan: t.previous == nil,
 		}
 		t.change.proposedMembership = append(t.change.proposedMembership, previousMembership[:index]...)
