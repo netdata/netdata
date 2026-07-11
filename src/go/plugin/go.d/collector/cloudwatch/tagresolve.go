@@ -40,10 +40,10 @@ func sanitizeLabel(key string) string {
 // dimLabels. Profile-specific collisions are non-fatal: the entry is skipped and
 // described in warnings because tag labels are optional enrichment.
 //
-// An entry is skipped when its target label:
-//   - equals a reserved identity label (account_id, region) or one of the profile's
-//     dimension labels — which would duplicate an emitted label key and panic metrix;
-//   - duplicates an already-surviving tag's label.
+// Job-level validation has already rejected duplicate AWS keys and emitted labels.
+// At this profile-specific stage, an entry is skipped only when its target label
+// equals a reserved identity label (account_id, region) or one of the profile's
+// dimension labels, which would duplicate an emitted label key and panic metrix.
 //
 // The surviving plan is the same for every instance of the profile; only the tag
 // VALUES differ per resource, applied at cache-build time.
