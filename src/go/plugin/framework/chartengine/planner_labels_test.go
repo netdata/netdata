@@ -65,7 +65,7 @@ func TestChartLabelAccumulatorIntersectsLabels(t *testing.T) {
 				},
 			}
 
-			acc := newChartLabelAccumulator(chart)
+			acc := newChartLabelAccumulator(compileChartLabelPolicy(chart))
 			require.NotNil(t, acc)
 
 			for _, labels := range tc.observed {

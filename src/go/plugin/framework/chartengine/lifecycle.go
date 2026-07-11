@@ -24,14 +24,11 @@ type materializedChartState struct {
 }
 
 // materializedChartPresentation uses copy-on-write for ordered dimensions,
-// canonical labels, and membership. labelScratch is non-semantic reconciler
-// storage: observations are cleared before PreparePlan returns and retained
-// capacity follows current, not historical, membership.
+// canonical labels, and exact series membership.
 type materializedChartPresentation struct {
 	orderedDims     []string
 	labelValues     map[string]string
 	labelMembership []chartLabelMembership
-	labelScratch    *chartLabelScratch
 }
 
 // materializedDimensionState tracks one materialized dimension in a chart.
@@ -231,7 +228,6 @@ func (c *materializedChartState) pruneScratchEntries(currentSeq uint64) {
 func (c *materializedChartState) replaceLabels(
 	values map[string]string,
 	membership []chartLabelMembership,
-	scratch *chartLabelScratch,
 ) {
 	next := materializedChartPresentation{}
 	if c.presentation != nil {
@@ -239,7 +235,15 @@ func (c *materializedChartState) replaceLabels(
 	}
 	next.labelValues = values
 	next.labelMembership = membership
-	next.labelScratch = scratch
+	c.presentation = &next
+}
+
+func (c *materializedChartState) replaceLabelMembership(membership []chartLabelMembership) {
+	next := materializedChartPresentation{}
+	if c.presentation != nil {
+		next = *c.presentation
+	}
+	next.labelMembership = membership
 	c.presentation = &next
 }
 

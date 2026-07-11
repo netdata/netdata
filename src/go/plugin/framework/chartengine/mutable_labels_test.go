@@ -4,6 +4,7 @@ package chartengine
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -27,6 +28,16 @@ const mutableLabelsTestTemplate = "version: v1\n" +
 	"        dimensions:\n" +
 	"          - selector: service_value\n" +
 	"            name: value\n"
+
+func TestMaterializedChartPresentationDoesNotOwnMutableLabelWorkspace(t *testing.T) {
+	typ := reflect.TypeFor[materializedChartPresentation]()
+	fields := make([]string, 0, typ.NumField())
+	for i := range typ.NumField() {
+		fields = append(fields, typ.Field(i).Name)
+	}
+	assert.Equal(t, []string{"orderedDims", "labelValues", "labelMembership"}, fields,
+		"committed chart presentation must contain only semantic copy-on-write state")
+}
 
 func TestBuildPlanUpdatesMutableNonIdentityLabels(t *testing.T) {
 	engine, store, cycle, meter, gauge := newMutableLabelsTestState(t)
@@ -91,7 +102,7 @@ func TestBuildPlanMutableLabelUpdateRetriesAfterAbort(t *testing.T) {
 	attempt, err := engine.PreparePlan(reader)
 	require.NoError(t, err)
 	require.NotNil(t, findUpdateChartLabelsAction(attempt.Plan()))
-	assertReleasedLabelObservations(t, engine, 2)
+	assertCanonicalLabelMembership(t, engine, 1)
 	attempt.Abort()
 
 	retry, err := engine.PreparePlan(reader)
@@ -234,7 +245,7 @@ func TestBuildPlanActionLabelsDoNotAliasCommittedState(t *testing.T) {
 	assert.Equal(t, "owner-c", updateAgain.Labels["owner"])
 }
 
-func TestBuildPlanReleasesRawLabelObservationsAfterCardinalityDrop(t *testing.T) {
+func TestBuildPlanCanonicalMembershipTracksCurrentCardinality(t *testing.T) {
 	engine, store, cycle, meter, gauge := newMutableLabelsTestState(t)
 
 	series := make([]mutableLabelSeries, 128)
@@ -249,12 +260,51 @@ func TestBuildPlanReleasesRawLabelObservationsAfterCardinalityDrop(t *testing.T)
 	observeMutableLabelSeries(t, cycle, meter, gauge, series...)
 	_, err := buildPlan(engine, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
-	assertReleasedLabelObservations(t, engine, 256)
+	assertCanonicalLabelMembership(t, engine, 128)
+
+	observeMutableLabelSeries(t, cycle, meter, gauge, series[:100]...)
+	_, err = buildPlan(engine, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+	assertCanonicalLabelMembership(t, engine, 100)
 
 	observeMutableLabelSeries(t, cycle, meter, gauge, series[0])
 	_, err = buildPlan(engine, store.Read(metrix.ReadFlatten()))
 	require.NoError(t, err)
-	assertReleasedLabelObservations(t, engine, 2)
+	assertCanonicalLabelMembership(t, engine, 1)
+}
+
+func TestBuildPlanAbortedHighCardinalityProposalDoesNotEnterCommittedLabelState(t *testing.T) {
+	engine, store, cycle, meter, gauge := newMutableLabelsTestState(t)
+
+	series := make([]mutableLabelSeries, 128)
+	for i := range series {
+		series[i] = mutableLabelSeries{
+			instance: "node-1",
+			owner:    "owner-a",
+			zone:     "zone-a",
+			shard:    fmt.Sprintf("shard-%03d", i),
+		}
+	}
+	observeMutableLabelSeries(t, cycle, meter, gauge, series[0])
+	_, err := buildPlan(engine, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+	assertCanonicalLabelMembership(t, engine, 1)
+
+	observeMutableLabelSeries(t, cycle, meter, gauge, series...)
+	attempt, err := engine.PreparePlan(store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+	assertCanonicalLabelMembership(t, engine, 1)
+	staged := attempt.state.materialized.charts["service_node-1"]
+	require.NotNil(t, staged)
+	require.NotNil(t, staged.presentation)
+	assert.Len(t, staged.presentation.labelMembership, 128)
+	attempt.Abort()
+
+	observeMutableLabelSeries(t, cycle, meter, gauge, series[0])
+	retry, err := buildPlan(engine, store.Read(metrix.ReadFlatten()))
+	require.NoError(t, err)
+	assert.Equal(t, []ActionKind{ActionUpdateChart}, actionKinds(retry.Actions))
+	assertCanonicalLabelMembership(t, engine, 1)
 }
 
 type mutableLabelSeries struct {
@@ -268,19 +318,16 @@ type genericMutableLabelReader struct {
 	metrix.Reader
 }
 
-func assertReleasedLabelObservations(t *testing.T, engine *Engine, maxCapacity int) {
+func assertCanonicalLabelMembership(t *testing.T, engine *Engine, want int) {
 	t.Helper()
 	chart := engine.state.materialized.charts["service_node-1"]
 	require.NotNil(t, chart)
 	require.NotNil(t, chart.presentation)
-	scratch := chart.presentation.labelScratch
-	require.NotNil(t, scratch)
-	assert.Zero(t, len(scratch.observations))
-	assert.LessOrEqual(t, cap(scratch.observations), maxCapacity)
-	for _, observation := range scratch.observations[:cap(scratch.observations)] {
-		assert.Empty(t, observation.seriesID)
-		assert.Empty(t, observation.dimensionKeyLabel)
-		assert.Nil(t, observation.rawLabels)
+	assert.Len(t, chart.presentation.labelMembership, want)
+	assert.LessOrEqual(t, cap(chart.presentation.labelMembership), max(1, want*2))
+	for _, membership := range chart.presentation.labelMembership[len(chart.presentation.labelMembership):cap(chart.presentation.labelMembership)] {
+		assert.Empty(t, membership.seriesID)
+		assert.Empty(t, membership.dimensionKeyLabel)
 	}
 }
 
