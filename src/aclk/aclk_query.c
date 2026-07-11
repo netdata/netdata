@@ -222,5 +222,6 @@ int send_bin_msg(mqtt_wss_client client, aclk_query_t *query)
         query->data.bin_payload.size,
         query->data.bin_payload.topic,
         query->data.bin_payload.msg_name);
+    query->data.bin_payload.payload = NULL;
     return 0;
 }

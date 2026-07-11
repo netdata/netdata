@@ -126,6 +126,7 @@ struct send_alarm_checkpoint parse_send_alarm_checkpoint(const char *data, size_
 char *generate_alarm_checkpoint(size_t *len, struct alarm_checkpoint *data);
 
 alarm_snapshot_proto_ptr_t generate_alarm_snapshot_proto(struct alarm_snapshot *data);
+void destroy_alarm_snapshot_proto(alarm_snapshot_proto_ptr_t snapshot);
 void add_alarm_log_entry2snapshot(alarm_snapshot_proto_ptr_t snapshot, struct alarm_log_entry *data);
 char *generate_alarm_snapshot_bin(size_t *len, alarm_snapshot_proto_ptr_t snapshot);
 
