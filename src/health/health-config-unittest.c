@@ -338,6 +338,45 @@ static int run_db_lookup_test(const db_lookup_test_case_t *test) {
     return errors;
 }
 
+static int test_db_lookup_frequency_boundaries(int *passed) {
+    static const struct {
+        int after;
+        const char *every;
+        int expected_every;
+        const char *description;
+    } tests[] = {
+        { INT_MIN, NULL, INT_MIN < -INT_MAX ? 0 : INT_MAX, "minimum after uses a representable frequency" },
+        { INT_MIN, "1s", 1, "minimum after accepts an explicit frequency" },
+        { INT_MIN + 1, NULL, -(INT_MIN + 1), "adjacent minimum after keeps its magnitude" },
+        { -1, NULL, 1, "ordinary negative after keeps its magnitude" },
+        { INT_MAX, NULL, INT_MAX, "maximum after keeps its magnitude" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        char buffer[128];
+        snprintfz(buffer, sizeof(buffer), "average %ds%s%s",
+                  tests[i].after, tests[i].every ? " every " : "", tests[i].every ? tests[i].every : "");
+
+        struct rrd_alert_config ac = { 0 };
+        ac.time_group_value = NAN;
+
+        int result = health_parse_db_lookup(1, "unittest", buffer, &ac);
+        if(!result || ac.after != tests[i].after || ac.update_every != tests[i].expected_every) {
+            fprintf(stderr,
+                    "FAILED [%s]: result=%d after=%d update_every=%d\n",
+                    tests[i].description, result, ac.after, ac.update_every);
+            failed++;
+        }
+        else
+            (*passed)++;
+
+        string_freez(ac.dimensions);
+    }
+
+    return failed;
+}
+
 int health_config_unittest(void) {
     int passed = 0;
     int failed = 0;
@@ -357,6 +396,8 @@ int health_config_unittest(void) {
             failed += errors;
         }
     }
+
+    failed += test_db_lookup_frequency_boundaries(&passed);
 
     fprintf(stderr, "\n===================================================\n");
     fprintf(stderr, "Health config parser tests: %d passed, %d failed\n\n", passed, failed);

@@ -309,8 +309,9 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
         return 0;
     }
 
-    // sane defaults
-    ac->update_every = ABS(ac->after);
+    // derive the default only when its positive magnitude fits in int
+    if(ac->after >= -INT_MAX)
+        ac->update_every = ABS(ac->after);
 
     // now we may have optional parameters
     while(*s) {
