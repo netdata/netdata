@@ -312,6 +312,56 @@ func TestBuildPlanChangedFirstMembershipShrinksCanonicalCapacity(t *testing.T) {
 	}
 }
 
+func TestBuildPlanReplaysReaderOnlyAfterMatchingMembershipPrefix(t *testing.T) {
+	tests := map[string]struct {
+		changed        []mutableLabelSeries
+		wantIterations int
+	}{
+		"first member mismatch": {
+			changed: []mutableLabelSeries{
+				{instance: "node-1", owner: "owner-a", zone: "zone-a", shard: "shard-0"},
+				{instance: "node-1", owner: "owner-a", zone: "zone-a", shard: "shard-b"},
+			},
+			wantIterations: 1,
+		},
+		"later member mismatch": {
+			changed: []mutableLabelSeries{
+				{instance: "node-1", owner: "owner-a", zone: "zone-a", shard: "shard-a"},
+				{instance: "node-1", owner: "owner-a", zone: "zone-a", shard: "shard-z"},
+			},
+			wantIterations: 2,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			engine, store, cycle, meter, gauge := newMutableLabelsTestState(t)
+			initial := []mutableLabelSeries{
+				{instance: "node-1", owner: "owner-a", zone: "zone-a", shard: "shard-a"},
+				{instance: "node-1", owner: "owner-a", zone: "zone-a", shard: "shard-b"},
+			}
+			observeMutableLabelSeries(t, cycle, meter, gauge, initial...)
+			_, err := buildPlan(engine, store.Read(metrix.ReadFlatten()))
+			require.NoError(t, err)
+
+			observeMutableLabelSeries(t, cycle, meter, gauge, tc.changed...)
+			reader := newCountingMutableLabelReader(t, store.Read(metrix.ReadFlatten()))
+			plan, err := buildPlan(engine, reader)
+			require.NoError(t, err)
+			assert.Equal(t, tc.wantIterations, reader.iterations)
+			assert.Equal(t, []ActionKind{ActionUpdateChart}, actionKinds(plan.Actions))
+			chart := engine.state.materialized.charts["service_node-1"]
+			require.NotNil(t, chart)
+			require.NotNil(t, chart.presentation)
+			assert.Equal(t, map[string]string{
+				"instance": "node-1",
+				"owner":    "owner-a",
+				"zone":     "zone-a",
+			}, chart.presentation.labelValues)
+		})
+	}
+}
+
 func TestBuildPlanAbortedHighCardinalityProposalDoesNotEnterCommittedLabelState(t *testing.T) {
 	engine, store, cycle, meter, gauge := newMutableLabelsTestState(t)
 
@@ -355,6 +405,24 @@ type mutableLabelSeries struct {
 
 type genericMutableLabelReader struct {
 	metrix.Reader
+}
+
+type countingMutableLabelReader struct {
+	metrix.Reader
+	raw        metrix.SeriesIdentityRawIterator
+	iterations int
+}
+
+func newCountingMutableLabelReader(t *testing.T, reader metrix.Reader) *countingMutableLabelReader {
+	t.Helper()
+	raw, ok := reader.(metrix.SeriesIdentityRawIterator)
+	require.True(t, ok)
+	return &countingMutableLabelReader{Reader: reader, raw: raw}
+}
+
+func (r *countingMutableLabelReader) ForEachSeriesIdentityRaw(fn func(metrix.SeriesIdentity, metrix.SeriesMeta, string, []metrix.Label, metrix.SampleValue)) {
+	r.iterations++
+	r.raw.ForEachSeriesIdentityRaw(fn)
 }
 
 func assertCanonicalLabelMembership(t *testing.T, engine *Engine, want int) {

@@ -152,7 +152,7 @@ func (t *chartLabelTracker) observeMembership(
 	if t.change == nil {
 		t.change = &chartLabelChange{
 			proposedMembership:  make([]chartLabelMembership, 0, t.observed),
-			reconcileDuringScan: t.previous == nil,
+			reconcileDuringScan: t.previous == nil || index == 0,
 		}
 		t.change.proposedMembership = append(t.change.proposedMembership, previousMembership[:index]...)
 	}
