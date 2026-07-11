@@ -1025,7 +1025,7 @@ void create_aclk_config(RRDHOST *host, nd_uuid_t *host_uuid __maybe_unused, nd_u
     // the CAS pairs with ACQUIRE loads of host->aclk_host_config in readers so they
     // cannot observe the pointer with zero-initialized fields (host == NULL etc.).
     aclk_host_config->host = host;
-    aclk_host_config->stream_alerts = false;
+    aclk_alert_streaming_set(aclk_host_config, false);
     time_t now = now_realtime_sec();
     aclk_host_config->node_info_send_time = (host == localhost || NULL == localhost) ? now - 25 : now;
 

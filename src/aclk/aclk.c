@@ -1067,7 +1067,7 @@ static void fill_alert_status_for_host(BUFFER *wb, RRDHOST *host)
         "\n\t\tCheckpoints: %d"
         "\n\t\tAlert count: %d"
         "\n\t\tAlert snapshot count: %d",
-        aclk_host_config->stream_alerts,
+        aclk_alert_streaming_enabled(aclk_host_config),
         aclk_host_config->checkpoint_count,
         aclk_host_config->alert_count,
         aclk_host_config->snapshot_count);
@@ -1191,7 +1191,7 @@ static void fill_alert_status_for_host_json(json_object *obj, RRDHOST *host)
     if (!aclk_host_config)
         return;
 
-    json_object *tmp = json_object_new_int(aclk_host_config->stream_alerts);
+    json_object *tmp = json_object_new_int(aclk_alert_streaming_enabled(aclk_host_config));
     json_object_object_add(obj, "updates", tmp);
 
     tmp = json_object_new_int(aclk_host_config->checkpoint_count);
