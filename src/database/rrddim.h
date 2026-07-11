@@ -165,6 +165,10 @@ size_t rrddim_size(void);
 #define rrddim_foreach_done(rd) \
     dfe_done(rd)
 
+static inline int64_t rrddim_scale_magnitude(int32_t value) {
+    return value < 0 ? -(int64_t)value : (int64_t)value;
+}
+
 struct pluginsd_rrddim {
     RRDDIM_ACQUIRED *rda;
     RRDDIM *rd;

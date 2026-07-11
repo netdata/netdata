@@ -297,8 +297,8 @@ static void rrddim_react_callback(const DICTIONARY_ITEM *item __maybe_unused, vo
                 continue;
 
             if(td->algorithm != rd->algorithm
-               || ABS(td->multiplier) != ABS(rd->multiplier)
-               || ABS(td->divisor)    != ABS(rd->divisor)) {
+               || rrddim_scale_magnitude(td->multiplier) != rrddim_scale_magnitude(rd->multiplier)
+               || rrddim_scale_magnitude(td->divisor)    != rrddim_scale_magnitude(rd->divisor)) {
                 if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
 #ifdef NETDATA_INTERNAL_CHECKS
                     netdata_log_info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already "

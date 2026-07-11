@@ -1618,6 +1618,62 @@ static int test_rrdmetric_algorithm_follows_rrddim(void) {
     return rc;
 }
 
+static int test_rrddim_scale_minimum_magnitude(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    int rc = 0;
+    if(rrddim_scale_magnitude(INT32_MIN) != (int64_t)INT32_MAX + 1) {
+        fprintf(stderr, "%s: INT32_MIN magnitude is not representable\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    RRDSET *st_insert = rrdset_create_localhost(
+        "netdata", "unittest-scale-min-insert", "unittest-scale-min-insert", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    RRDDIM *insert_a = rrddim_add(st_insert, "a", NULL, INT32_MIN, INT32_MIN, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *insert_b = rrddim_add(st_insert, "b", NULL, INT32_MIN, INT32_MIN, RRD_ALGORITHM_ABSOLUTE);
+
+    if(insert_a->multiplier != INT32_MIN || insert_a->divisor != INT32_MIN ||
+       insert_b->multiplier != INT32_MIN || insert_b->divisor != INT32_MIN ||
+       rrdset_flag_check(st_insert, RRDSET_FLAG_HETEROGENEOUS)) {
+        fprintf(stderr, "%s: identical signed-minimum dimensions were not preserved as homogeneous\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    RRDSET *st_multiplier = rrdset_create_localhost(
+        "netdata", "unittest-scale-min-multiplier", "unittest-scale-min-multiplier", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st_multiplier, "a", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    rrddim_add(st_multiplier, "b", NULL, INT32_MIN, 1, RRD_ALGORITHM_ABSOLUTE);
+    rrdset_flag_set(st_multiplier, RRDSET_FLAG_HOMOGENEOUS_CHECK);
+    rrdset_update_heterogeneous_flag(st_multiplier);
+    if(!rrdset_flag_check(st_multiplier, RRDSET_FLAG_HETEROGENEOUS)) {
+        fprintf(stderr, "%s: differing signed-minimum multiplier was not heterogeneous\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    RRDSET *st_divisor = rrdset_create_localhost(
+        "netdata", "unittest-scale-min-divisor", "unittest-scale-min-divisor", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st_divisor, "a", NULL, 1, INT32_MIN, RRD_ALGORITHM_ABSOLUTE);
+    rrddim_add(st_divisor, "b", NULL, 1, INT32_MIN, RRD_ALGORITHM_ABSOLUTE);
+    rrdset_flag_set(st_divisor, RRDSET_FLAG_HOMOGENEOUS_CHECK);
+    rrdset_update_heterogeneous_flag(st_divisor);
+    if(rrdset_flag_check(st_divisor, RRDSET_FLAG_HETEROGENEOUS)) {
+        fprintf(stderr, "%s: identical signed-minimum divisors were not homogeneous\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
 static int test_rrdset_rejects_invalid_update_every(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
@@ -1793,6 +1849,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_rrdmetric_algorithm_follows_rrddim())
+        return 1;
+
+    if(test_rrddim_scale_minimum_magnitude())
         return 1;
 
     if(test_rrdset_rejects_invalid_update_every())
