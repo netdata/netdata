@@ -248,7 +248,7 @@ int main(int argc, char **argv)
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
 
-    for (iteration = 0; iteration < 86400; iteration++) {
+    for (iteration = 0; iteration < 86400 && !__atomic_load_n(&debugfs_plugin_exit, __ATOMIC_ACQUIRE); iteration++) {
         heartbeat_next(&hb);
         int enabled = 0;
 
@@ -284,5 +284,11 @@ int main(int argc, char **argv)
     fprintf(stdout, "EXIT\n");
     fflush(stdout);
     netdata_mutex_unlock(&stdout_mutex);
+
+    // when the functions evloop reader requested the exit (QUIT / stdin
+    // error), propagate the exit status it recorded
+    if (__atomic_load_n(&debugfs_plugin_exit, __ATOMIC_ACQUIRE))
+        return debugfs_exit_status;
+
     return 0;
 }

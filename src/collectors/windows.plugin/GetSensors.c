@@ -933,9 +933,13 @@ int dict_sensors_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *val
     sensors_data_chart(sd, *update_every);
 
     if (sd->sensor_data_type == NETDATA_WIN_SENSOR_CELSIUS && sd->div_factor > 0)
+        // same value math as the per-sensor chart dimensions, including the
+        // external-config multiplier override
         hw_sensors_temperature_histogram_add(
             &sensors_temperature_histogram,
-            (((NETDATA_DOUBLE)sd->current_data_value[0] + sd->add_factor) * sd->mult_factor) / sd->div_factor);
+            (((NETDATA_DOUBLE)sd->current_data_value[0] + sd->add_factor) *
+             (sd->external_config ? (NETDATA_DOUBLE)sd->external_config->multiplier : sd->mult_factor)) /
+                sd->div_factor);
 
     return 1;
 }

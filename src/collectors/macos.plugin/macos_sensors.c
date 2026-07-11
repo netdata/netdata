@@ -7,6 +7,7 @@
 #define _COMMON_PLUGIN_NAME "macos.plugin"
 #define _COMMON_PLUGIN_MODULE_NAME "sensors"
 #include "../common-contexts/common-contexts.h"
+#include "../common-contexts/hw-sensors-function.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
@@ -192,8 +193,13 @@ struct macos_sensor_rollup {
 static struct macos_sensor_rollup *sensor_rollups_root = NULL;
 
 // guards sensor_charts_root and per-sensor values between the collection
-// cycle and the "sensors" function threads
+// cycle, the "sensors" function threads and cleanup
+// (netdata_mutex_t is uv_mutex_t - it has no static initializer)
 static netdata_mutex_t macos_sensors_mutex;
+
+static void __attribute__((constructor)) macos_sensors_mutex_init(void) {
+    netdata_mutex_init(&macos_sensors_mutex);
+}
 
 static const struct macos_hid_sensor_source macos_hid_sensor_sources[] = {
     {
@@ -1164,6 +1170,9 @@ static bool macos_sensors_collect_hid_source(const struct macos_hid_sensor_sourc
     // kind, the product name alone is the sensor identity. Appending per-boot
     // identifiers unconditionally (as done before) minted new time-series on
     // every reboot. Only true duplicates get a service-specific suffix.
+    // Known trade-off: if a duplicate product appears mid-run (hot-plug), the
+    // first device's identity changes from bare product to a suffixed one -
+    // acceptable, since built-in sensors do not hot-plug in practice.
     char (*products)[128] = callocz((size_t)count ? (size_t)count : 1, sizeof(*products));
     for (CFIndex i = 0; i < count; i++) {
         IOHIDServiceClientRef svc = (IOHIDServiceClientRef)CFArrayGetValueAtIndex(services, i);
@@ -1370,220 +1379,8 @@ static int macos_sensors_function(
 
     buffer_json_array_close(wb); // data
 
-    buffer_json_member_add_object(wb, "columns");
-    {
-        size_t field_id = 0;
-
-        buffer_rrdf_table_add_field(wb, field_id++, "Chart", "Per-Sensor Chart ID",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Label", "Sensor Label",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Kind", "Sensor Kind",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Subsystem", "Hardware Subsystem",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Source", "Discovery Source",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Device", "Device / Chip",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Sensor", "Sensor Identifier",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Reading", "Current Reading",
-                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                3, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_VISIBLE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Units", "Reading Units",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "State", "Collection State",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Charts", "Charting Mode",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Count", "Sensors Count",
-                RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                0, "sensors", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Temperature", "Temperature",
-                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                2, "degrees Celsius", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Fan", "Fan Speed",
-                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                0, "rpm", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Voltage", "Voltage",
-                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                3, "V", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Current", "Current",
-                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                3, "A", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Power", "Power",
-                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                2, "W", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-    }
-    buffer_json_object_close(wb); // columns
-
-    buffer_json_member_add_string(wb, "default_sort_column", "Label");
-
-    buffer_json_member_add_object(wb, "charts");
-    {
-        buffer_json_member_add_object(wb, "Sensors");
-        {
-            buffer_json_member_add_string(wb, "name", "Sensors");
-            buffer_json_member_add_string(wb, "type", "stacked-bar");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Count");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        static const char *kind_charts[] = {"Temperature", "Fan", "Voltage", "Current", "Power"};
-        for (size_t i = 0; i < _countof(kind_charts); i++) {
-            buffer_json_member_add_object(wb, kind_charts[i]);
-            {
-                buffer_json_member_add_string(wb, "name", kind_charts[i]);
-                buffer_json_member_add_string(wb, "type", "stacked-bar");
-                buffer_json_member_add_array(wb, "columns");
-                {
-                    buffer_json_add_array_item_string(wb, kind_charts[i]);
-                }
-                buffer_json_array_close(wb);
-            }
-            buffer_json_object_close(wb);
-        }
-    }
-    buffer_json_object_close(wb); // charts
-
-    buffer_json_member_add_array(wb, "default_charts");
-    {
-        buffer_json_add_array_item_array(wb);
-        buffer_json_add_array_item_string(wb, "Sensors");
-        buffer_json_add_array_item_string(wb, "Subsystem");
-        buffer_json_array_close(wb);
-
-        buffer_json_add_array_item_array(wb);
-        buffer_json_add_array_item_string(wb, "Temperature");
-        buffer_json_add_array_item_string(wb, "Subsystem");
-        buffer_json_array_close(wb);
-    }
-    buffer_json_array_close(wb);
-
-    buffer_json_member_add_object(wb, "group_by");
-    {
-        buffer_json_member_add_object(wb, "Kind");
-        {
-            buffer_json_member_add_string(wb, "name", "Sensors by Kind");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Kind");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        buffer_json_member_add_object(wb, "Subsystem");
-        {
-            buffer_json_member_add_string(wb, "name", "Sensors by Subsystem");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Subsystem");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        buffer_json_member_add_object(wb, "Source");
-        {
-            buffer_json_member_add_string(wb, "name", "Sensors by Discovery Source");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Source");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        buffer_json_member_add_object(wb, "Device");
-        {
-            buffer_json_member_add_string(wb, "name", "Sensors by Device");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "Device");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-
-        buffer_json_member_add_object(wb, "State");
-        {
-            buffer_json_member_add_string(wb, "name", "Sensors by Collection State");
-            buffer_json_member_add_array(wb, "columns");
-            {
-                buffer_json_add_array_item_string(wb, "State");
-            }
-            buffer_json_array_close(wb);
-        }
-        buffer_json_object_close(wb);
-    }
-    buffer_json_object_close(wb); // group_by
+    hw_sensors_function_columns(wb);
+    hw_sensors_function_presentation(wb);
     buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
     buffer_json_finalize(wb);
 
@@ -1600,12 +1397,7 @@ int do_macos_sensors(int update_every, usec_t dt __maybe_unused)
             return 1;
     }
 
-    static bool sensors_initialized = false;
-    if (unlikely(!sensors_initialized)) {
-        netdata_mutex_init(&macos_sensors_mutex);
-        macos_sensors_init();
-        sensors_initialized = true;
-    }
+    macos_sensors_init();
 
     netdata_mutex_lock(&macos_sensors_mutex);
 
@@ -1647,6 +1439,10 @@ bool macos_sensors_fan_available(void)
 
 void macos_sensors_cleanup(void)
 {
+    // serialize with in-flight "sensors" function requests: they must not
+    // observe the list while it is being freed
+    netdata_mutex_lock(&macos_sensors_mutex);
+
     while (sensor_charts_root) {
         struct macos_sensor_chart *s = sensor_charts_root;
         sensor_charts_root = s->next;
@@ -1657,6 +1453,19 @@ void macos_sensors_cleanup(void)
         struct macos_smc_sensor_candidate *c = smc_candidates_root;
         smc_candidates_root = c->next;
         freez(c);
+    }
+
+    while (sensor_rollups_root) {
+        struct macos_sensor_rollup *r = sensor_rollups_root;
+        sensor_rollups_root = r->next;
+        if (r->st)
+            rrdset_is_obsolete___safe_from_collector_thread(r->st);
+        freez(r);
+    }
+
+    if (temperature_histogram.st) {
+        rrdset_is_obsolete___safe_from_collector_thread(temperature_histogram.st);
+        memset(&temperature_histogram, 0, sizeof(temperature_histogram));
     }
 
     macos_smc_close(&smc_connection);
@@ -1670,4 +1479,6 @@ void macos_sensors_cleanup(void)
     smc_gpu_temperature_available = false;
     hid_gpu_temperature_available = false;
     smc_fan_available = false;
+
+    netdata_mutex_unlock(&macos_sensors_mutex);
 }

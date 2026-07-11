@@ -12,14 +12,15 @@
 //
 // Buckets are DISJOINT bands (not cumulative): each dimension counts the
 // sensors whose current reading falls inside its band only, and every sensor
-// increments exactly one bucket. Dimensions are named after the band's upper
-// bound, in degrees Celsius: 10C-wide bands through the benign range,
-// 5C-wide bands in the 80-100C action zone, one overflow bucket above 100C.
+// increments exactly one bucket. Dimensions are named after the band's
+// EXCLUSIVE upper bound, in degrees Celsius: dimension "40" counts t < 40,
+// "50" counts 40 <= t < 50, ..., "100" counts 95 <= t < 100, and "+Inf"
+// counts t >= 100. 10C-wide bands through the benign range, 5C-wide bands
+// in the 80-100C action zone.
 //
 // Producers using this header: macos.plugin, windows.plugin.
-// Producers mirroring this contract (different emission mechanisms — keep in
-// sync by hand): go.d/collector/sensors (Go), debugfs.plugin libsensors
-// (PLUGINSD text protocol).
+// Producers mirroring this contract (different emission mechanism - keep in
+// sync by hand): debugfs.plugin libsensors (PLUGINSD text protocol).
 
 #define HW_SENSORS_TEMPERATURE_HISTOGRAM_CONTEXT "system.hw.sensor.temperature.histogram"
 #define HW_SENSORS_TEMPERATURE_HISTOGRAM_TITLE "Temperature Sensors Distribution"
