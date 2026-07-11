@@ -135,6 +135,12 @@ static void rrd_functions_worker_globals_worker_main(void *arg) {
             dictionary_del(wg->worker_queue, j->transaction);
             dictionary_acquired_item_release(wg->worker_queue, acquired);
             dictionary_garbage_collect(wg->worker_queue);
+
+            // when all workers become idle, return the freed query memory to the OS;
+            // otherwise glibc keeps it in its arenas and the plugin retains the RSS
+            // high-water mark of the biggest query it ever executed
+            if(!dictionary_entries(wg->worker_queue))
+                mallocz_release_as_much_memory_to_the_system();
         }
     }
 }
