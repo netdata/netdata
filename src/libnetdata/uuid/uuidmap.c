@@ -432,6 +432,11 @@ static int uuidmap_destroy_referenced_entry_unittest(void) {
     };
 
     int errors = 0;
+
+    // in the full unittest sequence, earlier tests may still hold referenced
+    // entries in the global map - the expectations below are relative to them
+    size_t baseline = uuidmap_destroy();
+
     UUIDMAP_ID id = uuidmap_create(test_uuid);
     if(!id) {
         fprintf(stderr, "ERROR: Cannot create UUID for referenced destroy test\n");
@@ -439,8 +444,9 @@ static int uuidmap_destroy_referenced_entry_unittest(void) {
     }
 
     size_t referenced = uuidmap_destroy();
-    if(referenced != 1) {
-        fprintf(stderr, "ERROR: UUID destroy returned %zu referenced entries, expected 1\n", referenced);
+    if(referenced != baseline + 1) {
+        fprintf(stderr, "ERROR: UUID destroy returned %zu referenced entries, expected %zu\n",
+                referenced, baseline + 1);
         errors++;
     }
 
@@ -457,8 +463,9 @@ static int uuidmap_destroy_referenced_entry_unittest(void) {
     uuidmap_free(id);
 
     referenced = uuidmap_destroy();
-    if(referenced != 0) {
-        fprintf(stderr, "ERROR: UUID destroy returned %zu referenced entries after release, expected 0\n", referenced);
+    if(referenced != baseline) {
+        fprintf(stderr, "ERROR: UUID destroy returned %zu referenced entries after release, expected %zu\n",
+                referenced, baseline);
         errors++;
     }
 
