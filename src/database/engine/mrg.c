@@ -158,10 +158,13 @@ size_t mrg_destroy(MRG *mrg) {
         JudyLFreeArray(&mrg->index[partition].uuid_judy, PJE0);
     }
 
-    mrg_unlock_all_partitions(mrg);
-
+    // destroy the ARALs while still holding all partition locks:
+    // metric_add_and_acquire() allocates from them under a partition lock,
+    // so it cannot race with this teardown
     for (size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++)
         aral_destroy(mrg->index[partition].aral);
+
+    mrg_unlock_all_partitions(mrg);
 
     // Unregister the aral statistics
     pulse_aral_unregister_statistics(&mrg_aral_statistics);

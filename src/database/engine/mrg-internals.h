@@ -255,7 +255,6 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
 
     size_t partition = uuid_to_uuidmap_partition(*entry->uuid);
 
-    METRIC *allocation = aral_mallocz(mrg->index[partition].aral);
     Pvoid_t *PValue;
 
     while(1) {
@@ -284,7 +283,6 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
                 *ret = false;
 
             uuidmap_free(id);
-            aral_freez(mrg->index[partition].aral, allocation);
 
             mrg_stats_judy_mem(mrg, partition, JudyAllocThreadPulseGetAndReset());
             return metric;
@@ -293,7 +291,10 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
         break;
     }
 
-    METRIC *metric = allocation;
+    // allocate under the partition write lock: mrg_destroy() destroys the
+    // ARALs while holding all partition locks, so the allocator cannot be
+    // destroyed while we hold this lock
+    METRIC *metric = aral_mallocz(mrg->index[partition].aral);
     metric->uuid = id;
     metric->section = entry->section;
     metric->first_time_s = MAX(0, entry->first_time_s);
