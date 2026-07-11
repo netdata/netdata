@@ -148,6 +148,13 @@ static bool parse_number_with_underscores(const char *str, size_t len, long long
     return false;
 }
 
+static inline struct json_object *yaml_scalar_json_or_error(struct json_object *json, BUFFER *error) {
+    if (unlikely(!json))
+        buffer_strcat(error, "Failed to create JSON scalar");
+
+    return json;
+}
+
 static struct json_object *yaml_scalar_to_json(yaml_node_t *node, BUFFER *error, YAML2JSON_FLAGS flags) {
     const char *value = (const char *)node->data.scalar.value;
     size_t length = node->data.scalar.length;
@@ -161,13 +168,13 @@ static struct json_object *yaml_scalar_to_json(yaml_node_t *node, BUFFER *error,
 
     // If YAML2JSON_ALL_VALUES_AS_STRINGS flag is set, always return as string
     if (flags & YAML2JSON_ALL_VALUES_AS_STRINGS) {
-        return json_object_new_string_len(value, json_length);
+        return yaml_scalar_json_or_error(json_object_new_string_len(value, json_length), error);
     }
 
     // Only plain scalars get implicit type conversion (null/bool/number).
     // Quoted, literal block (|), and folded block (>) scalars are always strings.
     if (node->data.scalar.style != YAML_PLAIN_SCALAR_STYLE) {
-        return json_object_new_string_len(value, json_length);
+        return yaml_scalar_json_or_error(json_object_new_string_len(value, json_length), error);
     }
 
     // Handle null and tilde (case-insensitive for null)
@@ -181,13 +188,13 @@ static struct json_object *yaml_scalar_to_json(yaml_node_t *node, BUFFER *error,
     if ((length == 4 && strcasecmp(value, "true") == 0) ||
         (length == 3 && strcasecmp(value, "yes") == 0) ||
         (length == 2 && strcasecmp(value, "on") == 0)) {
-        return json_object_new_boolean(1);
+        return yaml_scalar_json_or_error(json_object_new_boolean(1), error);
     }
 
     if ((length == 5 && strcasecmp(value, "false") == 0) ||
         (length == 2 && strcasecmp(value, "no") == 0) ||
         (length == 3 && strcasecmp(value, "off") == 0)) {
-        return json_object_new_boolean(0);
+        return yaml_scalar_json_or_error(json_object_new_boolean(0), error);
     }
 
     // Try to parse as number
@@ -215,12 +222,12 @@ static struct json_object *yaml_scalar_to_json(yaml_node_t *node, BUFFER *error,
                 if (cleaned_len > 2) {
                     long long int_val = strtoll(cleaned + 2, &endptr, base);
                     if (errno == 0 && *endptr == '\0')
-                        return json_object_new_int64(int_val);
+                        return yaml_scalar_json_or_error(json_object_new_int64(int_val), error);
                 }
             } else {
                 long long int_val = strtoll(value + 2, &endptr, base);
                 if (errno == 0 && endptr == value + length)
-                    return json_object_new_int64(int_val);
+                    return yaml_scalar_json_or_error(json_object_new_int64(int_val), error);
             }
         }
     }
@@ -241,9 +248,9 @@ static struct json_object *yaml_scalar_to_json(yaml_node_t *node, BUFFER *error,
         
         if (parse_number_with_underscores(value, length, &int_result, &double_result, &is_double)) {
             if (is_double) {
-                return json_object_new_double(double_result);
+                return yaml_scalar_json_or_error(json_object_new_double(double_result), error);
             } else {
-                return json_object_new_int64(int_result);
+                return yaml_scalar_json_or_error(json_object_new_int64(int_result), error);
             }
         }
     }
@@ -251,18 +258,18 @@ static struct json_object *yaml_scalar_to_json(yaml_node_t *node, BUFFER *error,
     // Try integer
     long long int_val = strtoll(value, &endptr, 10);
     if (errno == 0 && endptr == value + length && *value != '\0') {
-        return json_object_new_int64(int_val);
+        return yaml_scalar_json_or_error(json_object_new_int64(int_val), error);
     }
 
     // Try double
     errno = 0;
     double double_val = strtod(value, &endptr);
     if (errno == 0 && endptr == value + length && *value != '\0') {
-        return json_object_new_double(double_val);
+        return yaml_scalar_json_or_error(json_object_new_double(double_val), error);
     }
 
     // Default to string
-    return json_object_new_string_len(value, json_length);
+    return yaml_scalar_json_or_error(json_object_new_string_len(value, json_length), error);
 }
 
 static struct json_object *yaml_node_to_json(yaml_document_t *document, yaml_node_t *node, BUFFER *error, YAML2JSON_FLAGS flags, int depth) {
