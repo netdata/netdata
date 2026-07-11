@@ -148,7 +148,16 @@ static bool machine_guid_write_to_file(const char *filename, ND_MACHINE_GUID *ho
         return false;
     }
 
-    close(fd);
+    if (close(fd) != 0) {
+        int saved_errno = errno;
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot close the temporary GUID file '%s'", tmp_filename);
+
+        if (unlink(tmp_filename) != 0)
+            nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot remove the temporary GUID file '%s' after close failure", tmp_filename);
+
+        errno = saved_errno;
+        return false;
+    }
 
     struct timespec times[2] = {
         usec_to_timespec(h.last_modified_ut), // access time
