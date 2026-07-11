@@ -103,7 +103,7 @@ func TestLoadFromDefaultDirs_LoadsStockProfiles(t *testing.T) {
 		"eventbridge":       "AWS/Events",
 		"vpn":               "AWS/VPN",
 		"eks":               "AWS/EKS",
-		// opt-in profiles (disabled by default; profiles.mode combined)
+		// opt-in profiles (disabled by default; rules may include them explicitly)
 		"alb_target":         "AWS/ApplicationELB",
 		"dynamodb_operation": "AWS/DynamoDB",
 		"ebs_stalled_io":     "AWS/EBS",
@@ -113,6 +113,11 @@ func TestLoadFromDefaultDirs_LoadsStockProfiles(t *testing.T) {
 		prof, ok := catalog.Get(baseName)
 		if assert.Truef(t, ok, "missing stock profile %q", baseName) {
 			assert.Equalf(t, namespace, prof.Namespace, "profile %q namespace", baseName)
+			if baseName == "cloudfront" {
+				assert.Equal(t, []string{"us-east-1"}, prof.SupportedRegions)
+			} else {
+				assert.Emptyf(t, prof.SupportedRegions, "profile %q should remain region-unrestricted", baseName)
+			}
 		}
 	}
 }

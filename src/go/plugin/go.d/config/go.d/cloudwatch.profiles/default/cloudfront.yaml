@@ -2,13 +2,14 @@
 # Amazon CloudFront distribution metrics (namespace AWS/CloudFront).
 #
 # CloudFront is a global service: CloudWatch publishes its metrics ONLY in us-east-1,
-# and every metric carries a constant Region="Global" dimension. A job must include
-# us-east-1 in `regions` or no CloudFront data is discovered. The constant Region
-# dimension is matched and queried but not emitted as a label (it carries no
-# per-distribution identity).
+# and every metric carries a constant Region="Global" dimension. supported_regions
+# lets the rule compiler apply that restriction. The constant Region dimension is
+# matched and queried but not emitted as a label (it carries no per-distribution
+# identity).
 version: v1
 display_name: AWS CloudFront
 namespace: AWS/CloudFront
+supported_regions: [us-east-1]
 period: 300
 instance:
   dimensions:

@@ -6,85 +6,90 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/sourcegraph/conc/pool"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 )
 
-// cwAccount is one resolved AWS account the collector monitors: the auth identity
-// used to build its clients, and its account id (resolved via sts:GetCallerIdentity).
-type cwAccount struct {
-	identity  awsauth.Identity
+// resolvedTarget binds one configured target identity to its STS-resolved account.
+// Target reference remains the execution identity; accountID is output attribution.
+type resolvedTarget struct {
+	target    *collectionTarget
 	accountID string
 }
 
-// ensureAccounts resolves the AWS account id for every configured identity via
+type targetResolution struct {
+	target    *collectionTarget
+	accountID string
+	err       error
+}
+
+// ensureTargets resolves the AWS account id for every configured target via
 // sts:GetCallerIdentity. account_id is part of every series' identity, so at least
-// one account MUST resolve; if none do, Check fails. Resolution is fail-soft AND
-// retried: an identity whose config-build or STS/AssumeRole call fails stays pending
+// one target MUST resolve; if none do, Check fails. Resolution is fail-soft AND
+// retried: a target whose config-build or STS/AssumeRole call fails stays pending
 // and is retried on the next cycle (rate-limited warning), so a transient failure
-// does not silently drop an account for the lifetime of the job. Two identities that
-// resolve to the same account id are de-duplicated (first kept) — with a shared
-// region list they would otherwise collide on the {account_id, region, dimensions}
-// series identity.
-func (c *Collector) ensureAccounts(ctx context.Context) error {
-	identities := c.Auth.Identities()
-	if c.resolvedRefs == nil {
-		c.resolvedRefs = make(map[string]struct{}, len(identities))
-		c.seenAccountID = make(map[string]string, len(identities))
+// does not silently drop a target for the lifetime of the job. Targets are never
+// deduplicated by account id because credentials can expose different resources.
+func (c *Collector) ensureTargets(ctx context.Context) error {
+	if c.plan == nil {
+		return errors.New("CloudWatch collection plan is not compiled")
+	}
+	if c.resolvedByRef == nil {
+		c.resolvedByRef = make(map[string]resolvedTarget, len(c.plan.Targets))
 	}
 
-	// Short-circuit once every configured identity has resolved (to a kept account
-	// or an intentionally-skipped duplicate). Until then, retry the pending ones.
-	allResolved := true
-	for _, id := range identities {
-		if _, ok := c.resolvedRefs[id.Ref]; !ok {
-			allResolved = false
-			break
-		}
-	}
-	if allResolved {
-		if len(c.accounts) == 0 {
-			return errors.New("no AWS accounts resolved")
+	// Short-circuit once every configured target has resolved. Until then, retry
+	// the pending ones.
+	if len(c.resolvedByRef) == len(c.plan.Targets) {
+		if len(c.resolvedByRef) == 0 {
+			return errors.New("no AWS targets resolved")
 		}
 		return nil
 	}
 
-	region := c.regions()[0] // validated non-empty in Init
-	var lastErr error
-
-	for _, id := range identities {
-		if _, ok := c.resolvedRefs[id.Ref]; ok {
-			continue // already resolved (kept or deduped)
+	var pending []*collectionTarget
+	for _, target := range c.plan.Targets {
+		if _, ok := c.resolvedByRef[target.Name]; ok {
+			continue // already resolved
 		}
-		acctID, err := c.resolveAccountID(ctx, id, region)
-		if err != nil {
-			lastErr = err
-			// Keep the identity pending and retry next cycle; throttle the warning so a
-			// persistently unreachable role does not warn every cycle.
-			c.Limit(logKeyAccountResolveFailed+":"+id.Ref, 1, recurringLogEvery).
-				Warningf("CloudWatch: %v (will retry next cycle)", err)
-			continue
-		}
-		c.resolvedRefs[id.Ref] = struct{}{}
-		if firstRef, dup := c.seenAccountID[acctID]; dup {
-			c.Warningf("CloudWatch: identity %q resolves to account %s already monitored via %q; skipping the duplicate", id.Ref, acctID, firstRef)
-			continue
-		}
-		c.seenAccountID[acctID] = id.Ref
-		c.accounts = append(c.accounts, cwAccount{identity: id, accountID: acctID})
-		c.markDiscoveryStale() // discover the newly-resolved account this cycle, not after refresh_every
-		c.markTagsStale()      // and fetch its tags this cycle, so its first charts are created tagged
-		c.Infof("CloudWatch: monitoring %d AWS account(s): %s", len(c.accounts), strings.Join(c.accountIDs(), ", "))
+		pending = append(pending, target)
 	}
 
-	if len(c.accounts) == 0 {
-		if lastErr != nil {
-			return fmt.Errorf("no AWS account could be resolved (the 'sts:GetCallerIdentity' permission is required): %w", lastErr)
+	p := pool.NewWithResults[targetResolution]().WithMaxGoroutines(maxTargets)
+	for _, target := range pending {
+		p.Go(func() targetResolution {
+			accountID, err := c.resolveAccountID(ctx, target.Identity, target.Regions[0])
+			return targetResolution{target: target, accountID: accountID, err: err}
+		})
+	}
+	results := p.Wait()
+
+	var failures []operationFailure
+	for _, result := range results {
+		target := result.target
+		if result.err != nil {
+			failures = append(failures, operationFailure{Target: target.Name, Region: target.Regions[0], Err: result.err})
+			continue
 		}
-		return errors.New("no AWS accounts resolved")
+		resolved := resolvedTarget{target: target, accountID: result.accountID}
+		c.resolvedByRef[target.Name] = resolved
+		c.invalidateQueryPlan()
+		c.markDiscoveryStale() // discover the newly-resolved account this cycle, not after refresh_every
+		c.markTagsStale()      // and fetch its tags this cycle, so its first charts are created tagged
+		c.Infof("CloudWatch: target %q resolved to AWS account %s", target.Name, result.accountID)
+	}
+	c.warnOperationFailures(logKeyAccountResolveFailed, "account resolution", " (will retry next cycle)", failures)
+
+	if len(c.resolvedByRef) == 0 {
+		if len(failures) > 0 {
+			last := failures[len(failures)-1]
+			return fmt.Errorf("no AWS target could be resolved (%d failed); last failure for target %q region %q: %w",
+				len(failures), last.Target, last.Region, sanitizeAWSError(last.Err))
+		}
+		return errors.New("no AWS targets resolved")
 	}
 	return nil
 }
@@ -96,33 +101,20 @@ func (c *Collector) resolveAccountID(ctx context.Context, id awsauth.Identity, r
 
 	cfg, err := c.newAWSConfig(cctx, id, region)
 	if err != nil {
-		return "", fmt.Errorf("identity %q (region %q): building AWS config: %w", id.Ref, region, err)
+		return "", fmt.Errorf("build AWS configuration: %w", sanitizeAWSError(err))
 	}
 
 	out, err := c.newSTSClient(cfg).GetCallerIdentity(cctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
-		return "", fmt.Errorf("identity %q (region %q): sts:GetCallerIdentity: %w", id.Ref, region, err)
+		return "", fmt.Errorf("GetCallerIdentity: %w", sanitizeAWSError(err))
 	}
 	if out.Account == nil || *out.Account == "" {
-		return "", fmt.Errorf("identity %q (region %q): sts:GetCallerIdentity returned no account id", id.Ref, region)
+		return "", errors.New("GetCallerIdentity returned no account ID")
 	}
 	return *out.Account, nil
 }
 
-// identityForAccount returns the auth identity for a resolved account id.
-func (c *Collector) identityForAccount(account string) (awsauth.Identity, bool) {
-	for _, a := range c.accounts {
-		if a.accountID == account {
-			return a.identity, true
-		}
-	}
-	return awsauth.Identity{}, false
-}
-
-func (c *Collector) accountIDs() []string {
-	ids := make([]string, 0, len(c.accounts))
-	for _, a := range c.accounts {
-		ids = append(ids, a.accountID)
-	}
-	return ids
+func (c *Collector) resolvedTargetByRef(ref string) (resolvedTarget, bool) {
+	target, ok := c.resolvedByRef[ref]
+	return target, ok
 }

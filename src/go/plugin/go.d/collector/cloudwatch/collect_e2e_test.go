@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
@@ -203,12 +204,7 @@ func TestCollect_E2E(t *testing.T) {
 	for name, tc := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			c := New()
-			c.Config.Regions = []string{"us-east-1"}
-			c.Profiles = ProfilesConfig{
-				Mode:      profilesModeExact,
-				ModeExact: &ProfilesExactConfig{Entries: profileEntries(tc.profiles)},
-			}
-			c.applyDefaults()
+			configureExactRule(c, []string{"us-east-1"}, tc.profiles)
 			c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 			useFakeClient(c, &e2eCloudWatch{list: tc.listMetrics, values: tc.gmd, ts: time.Unix(1, 0)})
 			c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
@@ -230,23 +226,16 @@ type e2eScenario struct {
 	wantSeries  map[string]metrix.SampleValue
 }
 
-func profileEntries(names []string) []ProfileEntry {
-	out := make([]ProfileEntry, len(names))
-	for i, name := range names {
-		out[i] = ProfileEntry{Name: name}
-	}
-	return out
-}
-
 // e2eCloudWatch is a fixture-driven fake serving both CloudWatch APIs. ListMetrics
 // answers per namespace; GetMetricData answers per (namespace, metric, statistic,
 // dimensions), echoing back each query's synthetic Id.
 type e2eCloudWatch struct {
-	mu      sync.Mutex
-	list    map[string][]cwtypes.Metric
-	values  map[string]float64
-	ts      time.Time
-	listErr error // when set, ListMetrics fails (discovery error path)
+	mu       sync.Mutex
+	list     map[string][]cwtypes.Metric
+	values   map[string]float64
+	ts       time.Time
+	listErr  error // when set, ListMetrics fails (discovery error path)
+	getCalls int
 }
 
 func (f *e2eCloudWatch) ListMetrics(_ context.Context, in *cloudwatch.ListMetricsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
@@ -261,6 +250,7 @@ func (f *e2eCloudWatch) ListMetrics(_ context.Context, in *cloudwatch.ListMetric
 func (f *e2eCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetricDataInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.getCalls++
 	results := make([]cwtypes.MetricDataResult, 0, len(in.MetricDataQueries))
 	for _, q := range in.MetricDataQueries {
 		r := cwtypes.MetricDataResult{Id: q.Id}
@@ -273,6 +263,52 @@ func (f *e2eCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetri
 		results = append(results, r)
 	}
 	return &cloudwatch.GetMetricDataOutput{MetricDataResults: results}, nil
+}
+
+func TestCollect_OrderedRulesFirstTargetOwnsSameAccountSeries(t *testing.T) {
+	const account = "000000000000"
+	defaults := false
+	cfg := validBaseConfig()
+	cfg.Targets = []TargetConfig{
+		{Name: "first", Credentials: "sdk_default"},
+		{Name: "second", Credentials: "sdk_default"},
+	}
+	selector := &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
+	cfg.Rules = []RuleConfig{
+		{Name: "first-rule", Targets: []string{"first"}, Profiles: selector, Regions: []string{"us-east-1"}},
+		{Name: "second-rule", Targets: []string{"second"}, Profiles: selector, Regions: []string{"us-east-1"}},
+	}
+
+	first := &e2eCloudWatch{
+		list:   map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
+		values: map[string]float64{e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"): 5},
+		ts:     time.Unix(1, 0),
+	}
+	second := &e2eCloudWatch{
+		list:   map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
+		values: map[string]float64{e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"): 9},
+		ts:     time.Unix(1, 0),
+	}
+
+	c := New()
+	c.Config = cfg
+	c.newAWSConfig = func(_ context.Context, identity awsauth.Identity, _ string) (aws.Config, error) {
+		return aws.Config{Region: identity.Ref}, nil
+	}
+	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
+	c.newCloudWatchClient = func(cfg aws.Config) cloudwatchClient {
+		if cfg.Region == "first" {
+			return first
+		}
+		return second
+	}
+	c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
+
+	series, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(5), series[`ec2.cpu_utilization_average{account_id="000000000000",instance_id="i-1",region="us-east-1"}`])
+	assert.Equal(t, 1, first.getCalls)
+	assert.Zero(t, second.getCalls, "the later rule's duplicate final series must not be queried")
 }
 
 // e2eKey builds the fixture key from (namespace, metric, statistic) plus dimension
@@ -305,7 +341,7 @@ func seriesName(key string) string {
 }
 
 // TestAllStockProfiles_PipelineChartComplete is the full-catalog sweep: for EVERY
-// stock profile (combined mode includes disabled opt-in profiles), it feeds a
+// stock profile (including profiles disabled by default), it feeds a
 // synthetic instance with a datapoint for every (metric, statistic), runs the real
 // collect, and asserts (a) every profile's every active series is produced and
 // (b) every produced series flows into a chart (AssertChartCoverage). Profiles that
@@ -319,12 +355,14 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 	require.NoError(t, err)
 	profiles := cat.AllProfiles()
 	require.NotEmpty(t, profiles)
+	profileNames := make([]string, 0, len(profiles))
 
 	list := map[string][]cwtypes.Metric{}
 	values := map[string]float64{}
 	wantNames := map[string]struct{}{}
 
 	for _, rp := range profiles {
+		profileNames = append(profileNames, rp.Name)
 		prof := rp.Config
 		require.NotEmptyf(t, prof.Metrics, "%s has no metrics", rp.Name)
 		require.NotEmptyf(t, prof.Instance.Dimensions, "%s has no instance dimensions", rp.Name)
@@ -355,9 +393,7 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 	}
 
 	c := New()
-	c.Config.Regions = []string{region}
-	c.Profiles = ProfilesConfig{Mode: profilesModeCombined} // include disabled opt-in profiles
-	c.applyDefaults()
+	configureExactRule(c, []string{region}, profileNames)
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 	useFakeClient(c, &e2eCloudWatch{list: list, values: values, ts: time.Unix(1, 0)})
 	c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
@@ -380,9 +416,7 @@ func TestCollect_MultiRegion(t *testing.T) {
 	const account = "000000000000"
 
 	c := New()
-	c.Config.Regions = []string{"us-east-1", "eu-west-1"}
-	c.Profiles = ProfilesConfig{Mode: profilesModeExact, ModeExact: &ProfilesExactConfig{Entries: profileEntries([]string{"ec2"})}}
-	c.applyDefaults()
+	configureExactRule(c, []string{"us-east-1", "eu-west-1"}, []string{"ec2"})
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 	useFakeClient(c, &e2eCloudWatch{
 		list:   map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
@@ -417,9 +451,7 @@ func TestCollect_DiscoveryFailSoft(t *testing.T) {
 
 	newBase := func(regions ...string) *Collector {
 		c := New()
-		c.Config.Regions = regions
-		c.Profiles = ProfilesConfig{Mode: profilesModeExact, ModeExact: &ProfilesExactConfig{Entries: profileEntries([]string{"ec2"})}}
-		c.applyDefaults()
+		configureExactRule(c, regions, []string{"ec2"})
 		c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 		c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
 		return c

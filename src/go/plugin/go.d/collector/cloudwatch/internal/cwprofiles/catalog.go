@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"path/filepath"
 	"runtime"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -97,7 +96,7 @@ func decodeProfileBytes(data []byte, baseName string) (Profile, error) {
 }
 
 // AllProfiles returns every loaded profile (stock + user), sorted by basename.
-// This is the candidate set for profiles.mode=auto.
+// The collection-rule compiler selects from this catalog.
 func (c Catalog) AllProfiles() []ResolvedProfile {
 	named := c.Sorted()
 	out := make([]ResolvedProfile, 0, len(named))
@@ -107,34 +106,10 @@ func (c Catalog) AllProfiles() []ResolvedProfile {
 	return out
 }
 
-// ProfilesByBaseNames returns the loaded profiles whose basename matches any of
-// the given basenames, sorted by basename. It is the candidate set for
-// profiles.mode=exact and returns matching profiles regardless of their
-// default-enabled/disabled flag, so an opt-in profile can be selected by name.
-func (c Catalog) ProfilesByBaseNames(names []string) []ResolvedProfile {
-	want := make(map[string]struct{}, len(names))
-	for _, n := range names {
-		if n = strings.TrimSpace(n); n != "" {
-			want[n] = struct{}{}
-		}
-	}
-	if len(want) == 0 {
-		return nil
-	}
-
-	var out []ResolvedProfile
-	for _, n := range c.Sorted() {
-		if _, ok := want[n.Name]; ok {
-			out = append(out, ResolvedProfile{Name: n.Name, Config: n.Profile})
-		}
-	}
-	return out
-}
-
 // validateUniqueChartIDs ensures no two loaded profiles render a chart with the
 // same id. chartengine keys charts by id and, on a cross-template id collision,
 // silently keeps the first and drops the rest, so a colliding chart would simply
-// vanish (e.g. in profiles.mode combined, where every profile is active). A
+// vanish when overlapping profiles are selected together. A
 // collision between two stock profiles is a packaging bug and is fatal; a
 // collision involving a user profile is logged (its colliding chart is dropped).
 // isStock reports the effective origin of a profile by basename (a user override

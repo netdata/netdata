@@ -3,8 +3,10 @@
 package cloudwatch
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi"
 	rgtatypes "github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi/types"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
@@ -183,17 +186,15 @@ func TestRefreshTags_FirstFailureNoneThenSuccessThenCarryForward(t *testing.T) {
 		},
 	}
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
+	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
 	c.Config.Tags = []TagConfig{{Name: "owner"}}
-	c.applyDefaults()
-	c.accounts = []cwAccount{{accountID: "000000000000"}}
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}}
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
 	c.newRGTAClient = func(aws.Config) rgtaClient { return rgta }
 	c.computeTagPlans()
 	require.NotEmpty(t, c.tagPlans, "owner resolves to a plan for ec2")
 
-	key := tagCacheKey{account: "000000000000", region: "us-east-1", profile: "ec2", joinKey: "i-1"}
+	key := tagCacheKey{target: "base", account: "000000000000", region: "us-east-1", profile: "ec2", joinKey: "i-1"}
 	base := time.Unix(1_000_000_000, 0)
 	ttl := time.Duration(c.Discovery.RefreshEvery) * time.Second
 
@@ -233,18 +234,16 @@ func TestGetAllResources_PaginatesAndFiltersByType(t *testing.T) {
 func tagUnitCollector(t *testing.T, rgta rgtaClient) *Collector {
 	t.Helper()
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
+	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
 	c.Config.Tags = []TagConfig{{Name: "owner"}}
-	c.applyDefaults()
-	c.accounts = []cwAccount{{accountID: "000000000000"}}
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}}
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
 	c.newRGTAClient = func(aws.Config) rgtaClient { return rgta }
 	return c
 }
 
 func TestRefreshTags_MarkStaleForcesRefetchWithinTTL(t *testing.T) {
-	// A newly-resolved account marks tags stale so its tags are fetched the same cycle
+	// A newly-resolved target marks tags stale so its tags are fetched the same cycle
 	// (before its charts are created), even though the global TTL is still valid.
 	rgta := &fakeRGTA{resources: []rgtatypes.ResourceTagMapping{
 		rgtaResource("arn:aws:ec2:us-east-1:000000000000:instance/i-1", "owner", "alice"),
@@ -282,6 +281,37 @@ func TestRefreshTags_CanceledContextDoesNotAdvanceTTL(t *testing.T) {
 	assert.Empty(t, c.tags.labels, "a canceled refresh must not commit a snapshot")
 }
 
+type failingRGTA struct{ err error }
+
+func (f failingRGTA) GetResources(context.Context, *resourcegroupstaggingapi.GetResourcesInput, ...func(*resourcegroupstaggingapi.Options)) (*resourcegroupstaggingapi.GetResourcesOutput, error) {
+	return nil, f.err
+}
+
+func TestRefreshTags_ReportsIndependentTargetFailures(t *testing.T) {
+	const sensitive = "SENSITIVE_TAG_API_MESSAGE"
+	var logs bytes.Buffer
+	c := New()
+	c.Logger = logger.NewWithWriter(&logs)
+	c.Config = twoTargetConfig()
+	c.Config.Tags = []TagConfig{{Name: "owner"}}
+	require.NoError(t, c.Init(context.Background()))
+	require.NoError(t, c.ensurePlan())
+	c.resolvedByRef = make(map[string]resolvedTarget)
+	for _, target := range c.plan.Targets {
+		resolved := resolvedTarget{target: target, accountID: "000000000000"}
+		c.resolvedByRef[target.Name] = resolved
+	}
+	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
+	c.newRGTAClient = func(aws.Config) rgtaClient { return failingRGTA{err: errors.New(sensitive)} }
+
+	c.refreshTags(context.Background())
+
+	assert.Contains(t, logs.String(), "first")
+	assert.Contains(t, logs.String(), "second")
+	assert.Contains(t, logs.String(), "us-east-1")
+	assert.NotContains(t, logs.String(), sensitive)
+}
+
 func TestIndexResourceTags_SkipsForeignAccountRegion(t *testing.T) {
 	// RGTA is queried per (account, region); a resource whose ARN names a different
 	// account or region must not be cached against the queried target.
@@ -295,8 +325,60 @@ func TestIndexResourceTags_SkipsForeignAccountRegion(t *testing.T) {
 		rgtaResource("arn:aws:ec2:us-east-1:999999999999:instance/i-acct", "owner", "b"),   // wrong account
 		rgtaResource("arn:aws:ec2:eu-west-1:000000000000:instance/i-region", "owner", "c"), // wrong region
 	}
-	indexResourceTags(dst, "000000000000", "us-east-1", resources, rtIndex, joins, plans)
+	indexResourceTags(dst, "base", "000000000000", "us-east-1", resources, rtIndex, joins, plans)
 
 	require.Len(t, dst, 1, "only the same-account, same-region resource is cached")
-	assert.Contains(t, dst, tagCacheKey{account: "000000000000", region: "us-east-1", profile: "ec2", joinKey: "i-ok"})
+	assert.Contains(t, dst, tagCacheKey{target: "base", account: "000000000000", region: "us-east-1", profile: "ec2", joinKey: "i-ok"})
+}
+
+func TestCarryForwardFailedTags_CopiesOnlyFailedScopes(t *testing.T) {
+	matchingFirst := tagCacheKey{target: "first", region: "us-east-1", joinKey: "i-1"}
+	matchingSecond := tagCacheKey{target: "second", region: "eu-west-1", joinKey: "i-2"}
+	notFailed := tagCacheKey{target: "third", region: "us-east-1", joinKey: "i-3"}
+	previous := map[tagCacheKey][]metrix.Label{
+		matchingFirst:  {{Key: "owner", Value: "one"}},
+		matchingSecond: {{Key: "owner", Value: "two"}},
+		notFailed:      {{Key: "owner", Value: "three"}},
+	}
+	failed := map[tagScopeKey]struct{}{
+		{target: "first", region: "us-east-1"}:  {},
+		{target: "second", region: "eu-west-1"}: {},
+	}
+	dst := make(map[tagCacheKey][]metrix.Label)
+
+	carryForwardFailedTags(dst, previous, failed)
+
+	assert.Equal(t, map[tagCacheKey][]metrix.Label{
+		matchingFirst:  previous[matchingFirst],
+		matchingSecond: previous[matchingSecond],
+	}, dst)
+}
+
+func BenchmarkCarryForwardTagsFailures(b *testing.B) {
+	const (
+		cachedTags = 8192
+		failures   = 64
+	)
+	c := New()
+	c.tags.labels = make(map[tagCacheKey][]metrix.Label, cachedTags)
+	for i := range cachedTags {
+		c.tags.labels[tagCacheKey{
+			target:  "target-" + strconv.Itoa(i%failures),
+			region:  "us-east-1",
+			joinKey: strconv.Itoa(i),
+		}] = nil
+	}
+	failed := make(map[tagScopeKey]struct{}, failures)
+	for i := range failures {
+		failed[tagScopeKey{target: "target-" + strconv.Itoa(i), region: "us-east-1"}] = struct{}{}
+	}
+
+	b.ReportAllocs()
+	for range b.N {
+		dst := make(map[tagCacheKey][]metrix.Label, cachedTags)
+		carryForwardFailedTags(dst, c.tags.labels, failed)
+		if len(dst) != cachedTags {
+			b.Fatalf("carried forward %d tags, want %d", len(dst), cachedTags)
+		}
+	}
 }

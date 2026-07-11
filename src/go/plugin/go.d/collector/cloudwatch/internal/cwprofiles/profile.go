@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsregion"
 )
 
 // VersionV1 is the supported profile schema version.
@@ -59,17 +60,26 @@ var statStrings = map[string]string{
 // validate (e.g. a dimension using Constant in place of Label) is rejected by an
 // older binary; see InstanceDimension.
 type Profile struct {
-	Version     string         `yaml:"version" json:"version,omitempty"`
-	DisplayName string         `yaml:"display_name" json:"display_name,omitempty"`
-	Namespace   string         `yaml:"namespace" json:"namespace,omitempty"`
-	Period      int            `yaml:"period" json:"period,omitempty"`
-	Instance    InstanceSpec   `yaml:"instance" json:"instance"`
-	Metrics     []Metric       `yaml:"metrics" json:"metrics,omitempty"`
-	Template    charttpl.Group `yaml:"template" json:"template"`
-	// Disabled excludes the profile from profiles.mode auto; it is selected by mode
-	// combined, by naming it in mode exact, or by a user-dir copy that drops this
-	// field. Omitted decodes to false = enabled, so no pointer is needed.
+	Version     string `yaml:"version" json:"version,omitempty"`
+	DisplayName string `yaml:"display_name" json:"display_name,omitempty"`
+	Namespace   string `yaml:"namespace" json:"namespace,omitempty"`
+	// SupportedRegions restricts profiles for services whose CloudWatch metrics
+	// are published only in specific regions. Nil means unrestricted.
+	SupportedRegions []string       `yaml:"supported_regions,omitempty" json:"supported_regions,omitempty"`
+	Period           int            `yaml:"period" json:"period,omitempty"`
+	Instance         InstanceSpec   `yaml:"instance" json:"instance"`
+	Metrics          []Metric       `yaml:"metrics" json:"metrics,omitempty"`
+	Template         charttpl.Group `yaml:"template" json:"template"`
+	// Disabled excludes the profile from the default-enabled set. A collection rule
+	// can still include it explicitly by profile name. Omitted decodes to false.
 	Disabled bool `yaml:"disabled,omitempty" json:"disabled,omitempty"`
+}
+
+func (p Profile) SupportsRegion(region string) bool {
+	if len(p.SupportedRegions) == 0 {
+		return true
+	}
+	return slices.Contains(p.SupportedRegions, awsregion.Normalize(region))
 }
 
 // InstanceSpec declares the exact CloudWatch dimension-NAME set that defines an
@@ -169,6 +179,27 @@ func (p Profile) Validate(prefix, baseName string) error {
 	}
 	if !IsValidNamespace(p.Namespace) {
 		errs = append(errs, fmt.Errorf("%s: 'namespace' is invalid (must match %q)", prefix, reNamespace.String()))
+	}
+	if p.SupportedRegions != nil {
+		if len(p.SupportedRegions) == 0 {
+			errs = append(errs, fmt.Errorf("%s: 'supported_regions' must not be empty when set", prefix))
+		}
+		seen := make(map[string]struct{}, len(p.SupportedRegions))
+		for i, region := range p.SupportedRegions {
+			if canonical := awsregion.Normalize(region); region != canonical {
+				errs = append(errs, fmt.Errorf("%s.supported_regions[%d]: %q is not canonical; use %q", prefix, i, region, canonical))
+				continue
+			}
+			if !awsregion.Valid(region) {
+				errs = append(errs, fmt.Errorf("%s.supported_regions[%d]: %q is not a valid AWS region", prefix, i, region))
+				continue
+			}
+			if _, ok := seen[region]; ok {
+				errs = append(errs, fmt.Errorf("%s: duplicate supported region %q", prefix, region))
+				continue
+			}
+			seen[region] = struct{}{}
+		}
 	}
 	if !isValidPeriod(p.Period) {
 		errs = append(errs, fmt.Errorf("%s: 'period' must be a positive multiple of %d seconds", prefix, minPeriod))
