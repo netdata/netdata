@@ -148,19 +148,26 @@ static bool parse_number_with_underscores(const char *str, size_t len, long long
     return false;
 }
 
-static struct json_object *yaml_scalar_to_json(yaml_node_t *node, YAML2JSON_FLAGS flags) {
+static struct json_object *yaml_scalar_to_json(yaml_node_t *node, BUFFER *error, YAML2JSON_FLAGS flags) {
     const char *value = (const char *)node->data.scalar.value;
     size_t length = node->data.scalar.length;
 
+    if (unlikely(length >= INT_MAX)) {
+        buffer_sprintf(error, "YAML scalar is too long (max %d bytes)", INT_MAX - 1);
+        return NULL;
+    }
+
+    int json_length = (int)length;
+
     // If YAML2JSON_ALL_VALUES_AS_STRINGS flag is set, always return as string
     if (flags & YAML2JSON_ALL_VALUES_AS_STRINGS) {
-        return json_object_new_string_len(value, (int)length);
+        return json_object_new_string_len(value, json_length);
     }
 
     // Only plain scalars get implicit type conversion (null/bool/number).
     // Quoted, literal block (|), and folded block (>) scalars are always strings.
     if (node->data.scalar.style != YAML_PLAIN_SCALAR_STYLE) {
-        return json_object_new_string_len(value, (int)length);
+        return json_object_new_string_len(value, json_length);
     }
 
     // Handle null and tilde (case-insensitive for null)
@@ -255,7 +262,7 @@ static struct json_object *yaml_scalar_to_json(yaml_node_t *node, YAML2JSON_FLAG
     }
 
     // Default to string
-    return json_object_new_string_len(value, (int)length);
+    return json_object_new_string_len(value, json_length);
 }
 
 static struct json_object *yaml_node_to_json(yaml_document_t *document, yaml_node_t *node, BUFFER *error, YAML2JSON_FLAGS flags, int depth) {
@@ -271,7 +278,7 @@ static struct json_object *yaml_node_to_json(yaml_document_t *document, yaml_nod
 
     switch (node->type) {
         case YAML_SCALAR_NODE:
-            return yaml_scalar_to_json(node, flags);
+            return yaml_scalar_to_json(node, error, flags);
 
         case YAML_SEQUENCE_NODE:
             return yaml_sequence_to_json(document, node, error, flags, depth + 1);
