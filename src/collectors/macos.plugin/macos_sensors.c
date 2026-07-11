@@ -197,6 +197,11 @@ static struct macos_sensor_rollup *sensor_rollups_root = NULL;
 // (netdata_mutex_t is uv_mutex_t - it has no static initializer)
 static netdata_mutex_t macos_sensors_mutex;
 
+// deliberately no matching destructor: this code runs inside the daemon,
+// which calls exit() while collector and function threads may still hold
+// this mutex - destroying a held uv mutex aborts. external plugins (e.g.
+// debugfs.plugin) pair a destructor because their main() joins all threads
+// before returning.
 static void __attribute__((constructor)) macos_sensors_mutex_init(void) {
     netdata_mutex_init(&macos_sensors_mutex);
 }

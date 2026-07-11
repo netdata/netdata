@@ -533,3 +533,293 @@ modules:
                 - name: silent
                 - name: printk
                 - name: panic
+  - meta:
+      plugin_name: debugfs.plugin
+      module_name: libsensors
+      monitored_instance:
+        name: Linux Hardware Sensors (libsensors)
+        link: 'https://hwmon.wiki.kernel.org/lm_sensors'
+        categories:
+          - data-collection.hardware-and-sensors
+        icon_filename: 'microchip.svg'
+      related_resources:
+        integrations:
+          list: []
+      info_provided_to_referring_integrations:
+        description: ''
+      keywords:
+        - sensors
+        - temperature
+        - voltage
+        - fan
+        - current
+        - power
+        - energy
+        - humidity
+        - hwmon
+        - lm-sensors
+    overview:
+      data_collection:
+        metrics_description: >
+          Collects hardware sensor readings (temperature, voltage, fan speed, current, power,
+          energy, humidity and intrusion state) from all hardware monitoring chips exposed by
+          the Linux hwmon subsystem. Every sensor gets its own chart, a cross-platform
+          temperature histogram summarizes all temperature sensors in fixed bands, and a live
+          `sensors` function lists every discovered sensor with its current reading and state.
+        method_description: >
+          Uses a bundled copy of the libsensors library (the same library behind the `sensors`
+          command) to enumerate and read the hardware monitoring chips exposed under
+          `/sys/class/hwmon`.
+      supported_platforms:
+        include:
+          - Linux
+        exclude: []
+      multi_instance: false
+      additional_permissions:
+        description: >
+          The hwmon sysfs attributes are generally world-readable, so no additional permissions
+          beyond the ones the debugfs plugin already has are required.
+      default_behavior:
+        auto_detection:
+          description: >
+            All hardware monitoring chips exposed by the hwmon subsystem are detected and
+            collected automatically. The collection interval is automatically raised above the
+            configured update every when reading the sensors is slow.
+        limits:
+          description: ''
+        performance_impact:
+          description: ''
+    setup:
+      prerequisites:
+        list: []
+      configuration:
+        file:
+          name: 'netdata.conf'
+          section_name: '[plugin:debugfs]'
+          description: 'This is netdata main configuration file.'
+        options:
+          description: ''
+          folding:
+            title: 'Config options'
+            enabled: true
+          list:
+            - name: update every
+              description: Data collection frequency.
+              default_value: 1
+              required: false
+            - name: command options
+              description: Additinal parameters for collector
+              default_value: ""
+              required: false
+        examples:
+          folding:
+            enabled: true
+            title: ''
+          list: []
+    troubleshooting:
+      problems:
+        list: []
+    alerts: []
+    metrics:
+      folding:
+        title: Metrics
+        enabled: false
+      description: >
+        Per-sensor charts are created for every supported reading of every discovered sensor;
+        the alarm charts expose only the states each sensor driver actually supports. The
+        temperature histogram is a single host-wide chart with the same fixed bands on every
+        operating system: each dimension is a DISJOINT band named after its EXCLUSIVE upper
+        bound in degrees Celsius, and every temperature sensor is counted in exactly one band.
+      availability: []
+      scopes:
+        - name: sensor
+          description: "These metrics refer to a hardware sensor chip feature."
+          labels:
+            - name: feature
+              description: Stable sensor feature identifier
+            - name: label
+              description: Human-readable sensor label
+            - name: chip_id
+              description: Sensor chip identifier
+            - name: path
+              description: The hwmon sysfs path of the sensor chip
+            - name: subsystem
+              description: Hardware subsystem the sensor chip belongs to
+            - name: driver
+              description: Kernel driver providing the sensor
+          metrics:
+            - name: system.hw.sensor.temperature.input
+              description: Sensor Temperature
+              unit: "degrees Celsius"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.temperature.alarm
+              description: Sensor Temperature Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+            - name: system.hw.sensor.voltage.input
+              description: Sensor Voltage
+              unit: "Volts"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.voltage.average
+              description: Sensor Voltage Average
+              unit: "Volts"
+              chart_type: line
+              dimensions:
+                - name: average
+            - name: system.hw.sensor.voltage.alarm
+              description: Sensor Voltage Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+            - name: system.hw.sensor.fan.input
+              description: Sensor Fan Speed
+              unit: "rotations per minute"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.fan.alarm
+              description: Sensor Fan Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+            - name: system.hw.sensor.current.input
+              description: Sensor Current
+              unit: "Amperes"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.current.average
+              description: Sensor Current Average
+              unit: "Amperes"
+              chart_type: line
+              dimensions:
+                - name: average
+            - name: system.hw.sensor.current.alarm
+              description: Sensor Current Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+            - name: system.hw.sensor.power.input
+              description: Sensor Power
+              unit: "Watts"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.power.average
+              description: Sensor Power Average
+              unit: "Watts"
+              chart_type: line
+              dimensions:
+                - name: average
+            - name: system.hw.sensor.power.alarm
+              description: Sensor Power Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+            - name: system.hw.sensor.energy.input
+              description: Sensor Energy
+              unit: "Joules"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.energy.alarm
+              description: Sensor Energy Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+            - name: system.hw.sensor.humidity.input
+              description: Sensor Humidity
+              unit: "percentage"
+              chart_type: line
+              dimensions:
+                - name: input
+            - name: system.hw.sensor.humidity.alarm
+              description: Sensor Humidity Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+            - name: system.hw.sensor.intrusion.alarm
+              description: Sensor Intrusion Alarm Status
+              unit: "status"
+              chart_type: line
+              dimensions:
+                - name: clear
+                - name: warning
+                - name: cap
+                - name: alarm
+                - name: critical
+                - name: emergency
+                - name: fault
+        - name: global
+          description: "Host-wide summary of all temperature sensors."
+          labels: []
+          metrics:
+            - name: system.hw.sensor.temperature.histogram
+              description: Distribution of all temperature sensors in fixed bands
+              unit: "sensors"
+              chart_type: heatmap
+              dimensions:
+                - name: "40"
+                - name: "50"
+                - name: "60"
+                - name: "70"
+                - name: "80"
+                - name: "85"
+                - name: "90"
+                - name: "95"
+                - name: "100"
+                - name: "+Inf"
