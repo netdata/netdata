@@ -26,9 +26,37 @@ static bool wrap_parse_int64(json_object *jobj, const char *member,
     return true;
 }
 
+static bool wrap_parse_int64_to_int16(json_object *jobj, const char *member,
+                                      int16_t *dst, BUFFER *error, int flags) {
+    const char *path = "";
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, member, *dst, error, flags);
+    return true;
+}
+
+static bool wrap_parse_int64_to_int(json_object *jobj, const char *member,
+                                    int *dst, BUFFER *error, int flags) {
+    const char *path = "";
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, member, *dst, error, flags);
+    return true;
+}
+
+static bool wrap_parse_int64_to_uint32(json_object *jobj, const char *member,
+                                       uint32_t *dst, BUFFER *error, int flags) {
+    const char *path = "";
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, member, *dst, error, flags);
+    return true;
+}
+
 // --- UINT64 ---
 static bool wrap_parse_uint64(json_object *jobj, const char *member,
                               uint64_t *dst, BUFFER *error, int flags) {
+    const char *path = "";
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, member, *dst, error, flags);
+    return true;
+}
+
+static bool wrap_parse_uint64_to_uint32(json_object *jobj, const char *member,
+                                        uint32_t *dst, BUFFER *error, int flags) {
     const char *path = "";
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, member, *dst, error, flags);
     return true;
@@ -373,11 +401,146 @@ static int test_parse_int64(void) {
     T(ok && dst == 0, "int64: int 0");
     json_object_put(root);
 
-    // --- type: double (truncated) ---
-    root = json_object_new_object();
-    json_object_object_add(root, "k", json_object_new_double(3.7));
-    dst = 0; R(); ok = wrap_parse_int64(root, "k", &dst, error, 0);
-    T(ok && dst == 3, "int64: double 3.7→3");
+    // --- type: double (truncated, with destination-aware range checks) ---
+    {
+        const double limit = (double)(UINT64_C(1) << 63);
+        const double below_limit = nextafter(limit, 0.0);
+        struct {
+            double value;
+            bool expected_ok;
+            int64_t expected;
+            const char *description;
+        } tests[] = {
+            { -INFINITY, false, 0, "int64: double -infinity rejected" },
+            { nextafter(-limit, -INFINITY), false, 0, "int64: double below INT64_MIN rejected" },
+            { -limit, true, INT64_MIN, "int64: double INT64_MIN accepted" },
+            { -3.7, true, -3, "int64: double -3.7→-3" },
+            { 3.7, true, 3, "int64: double 3.7→3" },
+            { below_limit, true, (int64_t)below_limit, "int64: largest double below 2^63 accepted" },
+            { limit, false, 0, "int64: double 2^63 rejected" },
+            { INFINITY, false, 0, "int64: double infinity rejected" },
+            { NAN, false, 0, "int64: double NaN rejected" },
+        };
+
+        for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+            root = json_object_new_object();
+            json_object_object_add(root, "k", json_object_new_double(tests[i].value));
+            dst = INT64_C(0x123456789); R();
+            ok = wrap_parse_int64(root, "k", &dst, error, JSONC_OPTIONAL);
+            T(ok == tests[i].expected_ok && (!ok || dst == tests[i].expected), tests[i].description);
+            T(ok || dst == INT64_C(0x123456789), "int64: rejected double leaves destination unchanged");
+            json_object_put(root);
+        }
+    }
+
+    // Narrow signed destinations retain every value whose truncated result fits.
+    {
+        int16_t dst16;
+        struct {
+            double value;
+            bool expected_ok;
+            int16_t expected;
+            const char *description;
+        } tests[] = {
+            { (double)INT16_MIN - 0.5, true, INT16_MIN, "int16: fractional lower endpoint accepted" },
+            { (double)INT16_MIN - 1.0, false, 0, "int16: value below lower endpoint rejected" },
+            { (double)INT16_MAX + 0.5, true, INT16_MAX, "int16: fractional upper endpoint accepted" },
+            { (double)INT16_MAX + 1.0, false, 0, "int16: value above upper endpoint rejected" },
+        };
+
+        for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+            root = json_object_new_object();
+            json_object_object_add(root, "k", json_object_new_double(tests[i].value));
+            dst16 = 1234; R();
+            ok = wrap_parse_int64_to_int16(root, "k", &dst16, error, JSONC_OPTIONAL);
+            T(ok == tests[i].expected_ok && (!ok || dst16 == tests[i].expected), tests[i].description);
+            T(ok || dst16 == 1234, "int16: rejected double leaves destination unchanged");
+            json_object_put(root);
+        }
+    }
+
+    {
+        int dst_int;
+        const double lower = -(double)(UINT64_C(1) << (sizeof(dst_int) * CHAR_BIT - 1));
+        const double upper = -lower;
+        struct {
+            double value;
+            bool expected_ok;
+            int expected;
+            const char *description;
+        } tests[] = {
+            { lower - 0.5, true, INT_MIN, "int: fractional lower endpoint accepted" },
+            { lower - 1.0, false, 0, "int: value below lower endpoint rejected" },
+            { upper - 0.5, true, INT_MAX, "int: fractional upper endpoint accepted" },
+            { upper, false, 0, "int: value above upper endpoint rejected" },
+        };
+
+        for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+            root = json_object_new_object();
+            json_object_object_add(root, "k", json_object_new_double(tests[i].value));
+            dst_int = 123456; R();
+            ok = wrap_parse_int64_to_int(root, "k", &dst_int, error, JSONC_OPTIONAL);
+            T(ok == tests[i].expected_ok && (!ok || dst_int == tests[i].expected), tests[i].description);
+            T(ok || dst_int == 123456, "int: rejected double leaves destination unchanged");
+            json_object_put(root);
+        }
+    }
+
+    // The signed macro also has uint32_t destinations in current stream and health callers.
+    {
+        uint32_t dst32;
+        const double upper = (double)(UINT64_C(1) << 32);
+        struct {
+            double value;
+            bool expected_ok;
+            uint32_t expected;
+            const char *description;
+        } tests[] = {
+            { -1.0, false, 0, "int64-to-uint32: -1 rejected" },
+            { -0.5, true, 0, "int64-to-uint32: negative fraction truncates to zero" },
+            { upper - 0.5, true, UINT32_MAX, "int64-to-uint32: fractional upper endpoint accepted" },
+            { upper, false, 0, "int64-to-uint32: 2^32 rejected" },
+        };
+
+        for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+            root = json_object_new_object();
+            json_object_object_add(root, "k", json_object_new_double(tests[i].value));
+            dst32 = UINT32_C(123456); R();
+            ok = wrap_parse_int64_to_uint32(root, "k", &dst32, error, JSONC_OPTIONAL);
+            T(ok == tests[i].expected_ok && (!ok || dst32 == tests[i].expected), tests[i].description);
+            T(ok || dst32 == UINT32_C(123456), "int64-to-uint32: rejected double leaves destination unchanged");
+            json_object_put(root);
+        }
+    }
+
+    // Exact integer syntax remains on json-c's integer branch without double rounding.
+    root = json_tokener_parse("{\"k\":9223372036854775807}");
+    json_object *integer_value = NULL;
+    T(root && json_object_object_get_ex(root, "k", &integer_value) &&
+      json_object_is_type(integer_value, json_type_int),
+      "int64: parsed INT64_MAX uses json_type_int");
+    dst = 0; R(); ok = wrap_parse_int64(root, "k", &dst, error, JSONC_OPTIONAL);
+    T(ok && dst == INT64_MAX, "int64: parsed integer INT64_MAX preserved exactly");
+    json_object_put(root);
+
+    root = json_tokener_parse("{\"k\":-9223372036854775808}");
+    dst = 0; R(); ok = wrap_parse_int64(root, "k", &dst, error, JSONC_OPTIONAL);
+    T(ok && dst == INT64_MIN, "int64: parsed integer INT64_MIN preserved exactly");
+    json_object_put(root);
+
+    root = json_tokener_parse("{\"k\":9223372036854775807.0}");
+    dst = 0; R(); ok = wrap_parse_int64(root, "k", &dst, error, JSONC_OPTIONAL);
+    T(!ok, "int64: parsed double rounded to 2^63 rejected");
+    json_object_put(root);
+
+    root = json_tokener_parse("{\"k\":-9223372036854775808.0}");
+    dst = 0; R(); ok = wrap_parse_int64(root, "k", &dst, error, JSONC_OPTIONAL);
+    T(ok && dst == INT64_MIN, "int64: parsed double INT64_MIN accepted");
+    json_object_put(root);
+
+    root = json_tokener_parse("{\"k\":1e400}");
+    dst = 0; R(); ok = wrap_parse_int64(root, "k", &dst, error, JSONC_OPTIONAL);
+    T(!ok, "int64: parsed exponent overflow rejected");
     json_object_put(root);
 
     // --- type: boolean ---
@@ -492,10 +655,90 @@ static int test_parse_uint64(void) {
     json_object_put(root);
 
     // --- type: double ---
-    root = json_object_new_object();
-    json_object_object_add(root, "k", json_object_new_double(3.7));
-    dst = 0; R(); ok = wrap_parse_uint64(root, "k", &dst, error, 0);
-    T(ok && dst == 3, "uint64: double 3.7→3");
+    {
+        struct {
+            double value;
+            bool expected_ok;
+            uint64_t expected;
+            const char *description;
+        } tests[] = {
+            { -INFINITY, false, 0, "uint64: double -infinity rejected" },
+            { -1.0, false, 0, "uint64: double -1 rejected" },
+            { -0.5, false, 0, "uint64: negative fractional double rejected" },
+            { -0.0, true, 0, "uint64: double -0.0→0" },
+            { 0.5, true, 0, "uint64: double 0.5→0" },
+            { 3.7, true, 3, "uint64: double 3.7→3" },
+            { INFINITY, false, 0, "uint64: double infinity rejected" },
+            { NAN, false, 0, "uint64: double NaN rejected" },
+        };
+
+        for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+            root = json_object_new_object();
+            json_object_object_add(root, "k", json_object_new_double(tests[i].value));
+            dst = UINT64_C(0x123456789); R();
+            ok = wrap_parse_uint64(root, "k", &dst, error, JSONC_OPTIONAL);
+            T(ok == tests[i].expected_ok && (!ok || dst == tests[i].expected), tests[i].description);
+            json_object_put(root);
+        }
+
+        const double limit = (double)(UINT64_C(1) << 63) * 2.0;
+        const double below_limit = nextafter(limit, 0.0);
+
+        root = json_object_new_object();
+        json_object_object_add(root, "k", json_object_new_double(below_limit));
+        dst = 0; R(); ok = wrap_parse_uint64(root, "k", &dst, error, JSONC_OPTIONAL);
+        T(ok && dst == (uint64_t)below_limit, "uint64: largest double below 2^64 accepted");
+        json_object_put(root);
+
+        root = json_object_new_object();
+        json_object_object_add(root, "k", json_object_new_double(limit));
+        dst = 0; R(); ok = wrap_parse_uint64(root, "k", &dst, error, JSONC_OPTIONAL);
+        T(!ok, "uint64: double 2^64 rejected");
+        json_object_put(root);
+
+        const double uint64_max_as_double = (double)UINT64_MAX;
+        root = json_object_new_object();
+        json_object_object_add(root, "k", json_object_new_double(uint64_max_as_double));
+        dst = 0; R(); ok = wrap_parse_uint64(root, "k", &dst, error, JSONC_OPTIONAL);
+        if(uint64_max_as_double < limit)
+            T(ok && dst == UINT64_MAX, "uint64: representable double UINT64_MAX accepted");
+        else
+            T(!ok, "uint64: rounded double UINT64_MAX rejected at 2^64");
+        json_object_put(root);
+    }
+
+    // The macro parses uint64 first, then preserves the integer branch's
+    // existing assignment conversion for narrower destinations.
+    {
+        const double above_uint32 = (double)UINT32_MAX + 1.0;
+        uint32_t dst32 = UINT32_MAX;
+
+        root = json_object_new_object();
+        json_object_object_add(root, "k", json_object_new_double(above_uint32));
+        R(); ok = wrap_parse_uint64_to_uint32(root, "k", &dst32, error, JSONC_OPTIONAL);
+        T(ok && dst32 == 0, "uint64: valid double narrows like integer path");
+        json_object_put(root);
+    }
+
+    // json-c retains integer syntax through its uint64 representation, without
+    // rounding UINT64_MAX through double.
+    root = json_tokener_parse("{\"k\":18446744073709551615}");
+    json_object *integer_value = NULL;
+    T(root && json_object_object_get_ex(root, "k", &integer_value) &&
+      json_object_is_type(integer_value, json_type_int),
+      "uint64: parsed UINT64_MAX uses json_type_int");
+    dst = 0; R(); ok = wrap_parse_uint64(root, "k", &dst, error, JSONC_OPTIONAL);
+    T(ok && dst == UINT64_MAX, "uint64: parsed integer UINT64_MAX preserved exactly");
+    json_object_put(root);
+
+    root = json_tokener_parse("{\"k\":18446744073709551615.0}");
+    dst = 0; R(); ok = wrap_parse_uint64(root, "k", &dst, error, JSONC_OPTIONAL);
+    T(!ok, "uint64: parsed double rounded to 2^64 rejected");
+    json_object_put(root);
+
+    root = json_tokener_parse("{\"k\":1e400}");
+    dst = 0; R(); ok = wrap_parse_uint64(root, "k", &dst, error, JSONC_OPTIONAL);
+    T(!ok, "uint64: parsed exponent overflow rejected");
     json_object_put(root);
 
     // --- type: boolean ---
