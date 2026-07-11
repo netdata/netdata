@@ -36,6 +36,7 @@ uint16_t aclk_send_bin_message_subtopic_pid(mqtt_wss_client client, char *msg, s
 
     if (unlikely(!topic)) {
         netdata_log_error("Couldn't get topic. Aborting message send.");
+        freez(msg);
         return 0;
     }
 
