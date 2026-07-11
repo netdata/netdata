@@ -133,7 +133,7 @@ func TestCollector_Init(t *testing.T) {
 		"invalid credential type": {
 			cfg: func() Config {
 				cfg := validConfig()
-				cfg.Credentials["sdk_default"] = awsauth.CredentialConfig{Type: "bogus"}
+				cfg.Credentials[0].Type = "bogus"
 				return cfg
 			}(),
 			wantErr: true,

@@ -2,9 +2,10 @@
   "vnode": "ok",
   "update_every": 123,
   "autodetection_retry": 123,
-  "credentials": {
-    "sdk_default": {"type": "default"},
-    "bootstrap": {
+  "credentials": [
+    {"name": "sdk_default", "type": "default"},
+    {
+      "name": "bootstrap",
       "type": "static",
       "type_static": {
         "access_key_id": "${env:AWS_ACCESS_KEY_ID}",
@@ -12,7 +13,7 @@
         "session_token": "${env:AWS_SESSION_TOKEN}"
       }
     }
-  },
+  ],
   "targets": [
     {"name": "base", "credentials": "sdk_default"},
     {

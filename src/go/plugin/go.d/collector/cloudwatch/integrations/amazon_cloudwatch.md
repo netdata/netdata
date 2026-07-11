@@ -183,12 +183,13 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | autodetection_retry | Recheck interval (seconds) when the job fails to start. Default `0` means no retry; set a positive value to keep retrying. | 0 | no |
 |  | query_offset | Seconds subtracted from the current time when building query windows, to account for CloudWatch publish latency. The effective offset is `max(query_offset, period)`. | 600 | no |
 |  | timeout | Timeout for AWS API requests (seconds). | 30 | no |
-| **Authentication** | credentials | Map of named credential sources. Every source has a `type` of `default` (AWS SDK default chain) or `static` (explicit access/session credentials in `type_static`). Credential sources are reusable by targets and every defined source must be used. |  | yes |
-|  | credentials.NAME.type | Credential source type: `default` uses the AWS SDK chain; `static` requires `type_static`. |  | yes |
-|  | credentials.NAME.type_static | Configuration used only when the credential source `type` is `static`. |  | no |
-|  | credentials.NAME.type_static.access_key_id | AWS access key ID. Required in `type_static`. Use a go.d secret reference such as `${env:AWS_ACCESS_KEY_ID}`. |  | no |
-|  | credentials.NAME.type_static.secret_access_key | AWS secret access key. Required in `type_static`. Use a go.d secret reference; do not store plaintext credentials in the file. |  | no |
-|  | credentials.NAME.type_static.session_token | Optional AWS session token in `type_static` for temporary credentials. Use a go.d secret reference. |  | no |
+| **Authentication** | credentials | List of named credential sources. Every source has a `type` of `default` (AWS SDK default chain) or `static` (explicit access/session credentials in `type_static`). Credential sources are reusable by targets and every defined source must be used. |  | yes |
+|  | credentials[].name | Credential source name referenced by targets. |  | yes |
+|  | credentials[].type | Credential source type: `default` uses the AWS SDK chain; `static` requires `type_static`. |  | yes |
+|  | credentials[].type_static | Configuration used only when the credential source `type` is `static`. |  | no |
+|  | credentials[].type_static.access_key_id | AWS access key ID. Required in `type_static`. Use a go.d secret reference such as `${env:AWS_ACCESS_KEY_ID}`. |  | no |
+|  | credentials[].type_static.secret_access_key | AWS secret access key. Required in `type_static`. Use a go.d secret reference; do not store plaintext credentials in the file. |  | no |
+|  | credentials[].type_static.session_token | Optional AWS session token in `type_static` for temporary credentials. Use a go.d secret reference. |  | no |
 | **Targets** | targets | Up to 64 named monitored AWS identities. A target uses one credential source directly or uses that source to assume one role. Targets remain distinct even when they resolve to the same AWS account. |  | yes |
 |  | targets[].name | Target name referenced by collection rules. |  | yes |
 |  | targets[].credentials | Name of the credential source used by this target. |  | yes |
@@ -257,7 +258,7 @@ Monitor the base AWS identity in `us-east-1` using the SDK default credential ch
 jobs:
   - name: default_credentials
     credentials:
-      sdk_default:
+      - name: sdk_default
         type: default
     targets:
       - name: base
@@ -280,7 +281,7 @@ Use one static/session credential source to assume roles for multiple monitored 
 jobs:
   - name: cross_account
     credentials:
-      bootstrap:
+      - name: bootstrap
         type: static
         type_static:
           access_key_id: ${env:AWS_ACCESS_KEY_ID}
@@ -314,7 +315,7 @@ Collect only EC2 and RDS for the explicitly visible base target.
 jobs:
   - name: ec2_rds
     credentials:
-      sdk_default:
+      - name: sdk_default
         type: default
     targets:
       - name: base
@@ -340,7 +341,7 @@ Select defaults and explicitly add disabled opt-in profiles such as broad ALB ta
 jobs:
   - name: defaults_and_opt_in
     credentials:
-      sdk_default:
+      - name: sdk_default
         type: default
     targets:
       - name: base

@@ -21,8 +21,8 @@ import (
 func validBaseConfig() Config {
 	return Config{
 		UpdateEvery: 60,
-		Credentials: map[string]awsauth.CredentialConfig{
-			"sdk_default": {Type: awsauth.CredentialTypeDefault},
+		Credentials: []CredentialSourceConfig{
+			{Name: "sdk_default", CredentialConfig: awsauth.CredentialConfig{Type: awsauth.CredentialTypeDefault}},
 		},
 		Targets:     []TargetConfig{{Name: "base", Credentials: "sdk_default"}},
 		Rules:       []RuleConfig{{Name: "base-defaults", Targets: []string{"base"}, Regions: []string{"us-east-1"}}},
@@ -42,7 +42,16 @@ func TestConfig_validate(t *testing.T) {
 		"no targets":                   {mutate: func(c *Config) { c.Targets = nil }, wantErr: true},
 		"no rules":                     {mutate: func(c *Config) { c.Rules = nil }, wantErr: true},
 		"unknown credential reference": {mutate: func(c *Config) { c.Targets[0].Credentials = "missing" }, wantErr: true},
-		"duplicate target":             {mutate: func(c *Config) { c.Targets = append(c.Targets, c.Targets[0]) }, wantErr: true},
+		"duplicate credential": {mutate: func(c *Config) {
+			c.Credentials = append(c.Credentials, c.Credentials[0])
+		}, wantErr: true},
+		"invalid credential name": {mutate: func(c *Config) {
+			c.Credentials[0].Name = "INVALID NAME"
+		}, wantErr: true},
+		"noncanonical credential name": {mutate: func(c *Config) {
+			c.Credentials[0].Name = " sdk_default "
+		}, wantErr: true},
+		"duplicate target": {mutate: func(c *Config) { c.Targets = append(c.Targets, c.Targets[0]) }, wantErr: true},
 		"invalid role ARN account": {mutate: func(c *Config) {
 			c.Targets[0].AssumeRole = &awsauth.AssumeRoleConfig{RoleARN: "arn:aws:iam::account:role/example"}
 		}, wantErr: true},
@@ -87,7 +96,7 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 		assert.Contains(t, doc.JSONSchema.Properties, key)
 	}
 	for key, want := range map[string]string{
-		"credentials": `{"sdk_default":{"type":"default"}}`,
+		"credentials": `[{"name":"sdk_default","type":"default"}]`,
 		"targets":     `[{"name":"base","credentials":"sdk_default"}]`,
 		"rules":       `[{"name":"base-defaults","targets":["base"],"regions":["us-east-1"]}]`,
 	} {
@@ -142,6 +151,12 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 		assert.Equalf(t, 1, seen[field], "top-level schema field %q tab references", field)
 	}
 
+	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "credentials")["ui:listFlavour"])
+	assert.Equal(t, "sdk_default", schemaObjectAt(t, doc, "uiSchema", "credentials", "items", "name")["ui:placeholder"])
+	assert.Equal(t, "radio", schemaObjectAt(t, doc, "uiSchema", "credentials", "items", "type")["ui:widget"])
+	assert.Equal(t, true, schemaObjectAt(t, doc, "uiSchema", "credentials", "items", "type", "ui:options")["inline"])
+	assert.NotEmpty(t, schemaObjectAt(t, doc, "uiSchema", "credentials", "items", "type_static", "secret_access_key")["ui:help"])
+	assert.Equal(t, "password", schemaObjectAt(t, doc, "uiSchema", "credentials", "items", "type_static", "secret_access_key")["ui:widget"])
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "targets")["ui:listFlavour"])
 	assert.Equal(t, "production", schemaObjectAt(t, doc, "uiSchema", "targets", "items", "name")["ui:placeholder"])
 	assert.Equal(t, "arn:aws:iam::[ACCOUNT]:role/netdata-cloudwatch",
@@ -163,11 +178,12 @@ func TestConfigSchema_CredentialTypeSelector(t *testing.T) {
 	var doc map[string]any
 	require.NoError(t, json.Unmarshal(data, &doc))
 
-	const sourceNamePattern = "^[a-z][a-z0-9_-]{0,63}$"
-	source := schemaObjectAt(t, doc, "jsonSchema", "properties", "credentials", "patternProperties", sourceNamePattern)
+	source := schemaObjectAt(t, doc, "jsonSchema", "properties", "credentials", "items")
+	assert.ElementsMatch(t, []string{"name", "type"}, schemaStringSlice(t, source["required"], "credential source required"))
 	typeSchema := schemaObjectAt(t, source, "properties", "type")
 	assert.Equal(t, []string{"default", "static"}, schemaStringSlice(t, typeSchema["enum"], "credential type enum"))
 	assert.Equal(t, "default", typeSchema["default"])
+	assert.Equal(t, "^[a-z][a-z0-9_-]{0,63}$", schemaObjectAt(t, source, "properties", "name")["pattern"])
 
 	dependency := schemaObjectAt(t, source, "dependencies", "type")
 	branches, ok := dependency["oneOf"].([]any)
@@ -223,7 +239,7 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 
 	valid := map[string]any{
 		"name":        "cloudwatch",
-		"credentials": map[string]any{"sdk_default": map[string]any{"type": "default"}},
+		"credentials": []any{map[string]any{"name": "sdk_default", "type": "default"}},
 		"targets":     []any{map[string]any{"name": "base", "credentials": "sdk_default"}},
 		"rules":       []any{map[string]any{"name": "base-defaults", "targets": []any{"base"}, "regions": []any{"us-east-1"}}},
 	}
@@ -232,8 +248,8 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 
 	t.Run("nested static credential source is valid", func(t *testing.T) {
 		cfg := cloneConfigMap(t, valid)
-		cfg["credentials"] = map[string]any{"static": map[string]any{
-			"type": "static", "type_static": map[string]any{
+		cfg["credentials"] = []any{map[string]any{
+			"name": "static", "type": "static", "type_static": map[string]any{
 				"access_key_id": "key", "secret_access_key": "secret", "session_token": "token",
 			},
 		}}
@@ -244,23 +260,47 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 
 	t.Run("flat static fields are not compatibility decoded", func(t *testing.T) {
 		cfg := cloneConfigMap(t, valid)
-		cfg["credentials"] = map[string]any{"sdk_default": map[string]any{
-			"type": "static", "access_key_id": "key", "secret_access_key": "secret",
+		cfg["credentials"] = []any{map[string]any{
+			"name": "sdk_default", "type": "static", "access_key_id": "key", "secret_access_key": "secret",
 		}}
+		assert.Error(t, schema.Validate(cfg))
+		assert.Error(t, validateRuntimeConfigMap(t, cfg))
+	})
+
+	t.Run("credential map is not compatibility decoded", func(t *testing.T) {
+		cfg := cloneConfigMap(t, valid)
+		cfg["credentials"] = map[string]any{"sdk_default": map[string]any{"type": "default"}}
+		assert.Error(t, schema.Validate(cfg))
+		assert.Error(t, validateRuntimeConfigMap(t, cfg))
+	})
+
+	t.Run("duplicate credential names fail runtime validation", func(t *testing.T) {
+		cfg := cloneConfigMap(t, valid)
+		cfg["credentials"] = []any{
+			map[string]any{"name": "sdk_default", "type": "default"},
+			map[string]any{"name": "sdk_default", "type": "default"},
+		}
+		assert.NoError(t, schema.Validate(cfg))
+		assert.Error(t, validateRuntimeConfigMap(t, cfg))
+	})
+
+	t.Run("credential name remains required", func(t *testing.T) {
+		cfg := cloneConfigMap(t, valid)
+		cfg["credentials"] = []any{map[string]any{"type": "default"}}
 		assert.Error(t, schema.Validate(cfg))
 		assert.Error(t, validateRuntimeConfigMap(t, cfg))
 	})
 
 	strictCases := map[string]func(map[string]any){
 		"credential type has surrounding whitespace": func(cfg map[string]any) {
-			cfg["credentials"] = map[string]any{"sdk_default": map[string]any{"type": " default "}}
+			cfg["credentials"] = []any{map[string]any{"name": "sdk_default", "type": " default "}}
 		},
 		"credential type is mixed case": func(cfg map[string]any) {
-			cfg["credentials"] = map[string]any{"sdk_default": map[string]any{"type": "DEFAULT"}}
+			cfg["credentials"] = []any{map[string]any{"name": "sdk_default", "type": "DEFAULT"}}
 		},
 		"static access key is whitespace only": func(cfg map[string]any) {
-			cfg["credentials"] = map[string]any{"sdk_default": map[string]any{
-				"type": "static", "type_static": map[string]any{
+			cfg["credentials"] = []any{map[string]any{
+				"name": "sdk_default", "type": "static", "type_static": map[string]any{
 					"access_key_id": " ", "secret_access_key": "secret",
 				},
 			}}
@@ -292,8 +332,8 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 
 	t.Run("required static fields remain enforced", func(t *testing.T) {
 		cfg := cloneConfigMap(t, valid)
-		cfg["credentials"] = map[string]any{"sdk_default": map[string]any{
-			"type": "static", "type_static": map[string]any{"access_key_id": "key"},
+		cfg["credentials"] = []any{map[string]any{
+			"name": "sdk_default", "type": "static", "type_static": map[string]any{"access_key_id": "key"},
 		}}
 		assert.Error(t, schema.Validate(cfg))
 		assert.Error(t, validateRuntimeConfigMap(t, cfg))
@@ -316,8 +356,8 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 
 	t.Run("runtime rejects inactive static configuration", func(t *testing.T) {
 		cfg := cloneConfigMap(t, valid)
-		cfg["credentials"] = map[string]any{"sdk_default": map[string]any{
-			"type": "default", "type_static": map[string]any{
+		cfg["credentials"] = []any{map[string]any{
+			"name": "sdk_default", "type": "default", "type_static": map[string]any{
 				"access_key_id": "rejected-at-runtime", "secret_access_key": "secret",
 			},
 		}}

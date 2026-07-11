@@ -5,7 +5,6 @@ package cloudwatch
 import (
 	"fmt"
 	"slices"
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
@@ -16,11 +15,12 @@ import (
 type planCompiler struct {
 	cfg Config
 
-	plan           *collectionPlan
-	targetsByRef   map[string]*collectionTarget
-	targetRoleARN  map[string]string
-	profiles       []cwprofiles.ResolvedProfile
-	profilesByName map[string]cwprofiles.ResolvedProfile
+	plan              *collectionPlan
+	credentialsByName map[string]awsauth.CredentialConfig
+	targetsByRef      map[string]*collectionTarget
+	targetRoleARN     map[string]string
+	profiles          []cwprofiles.ResolvedProfile
+	profilesByName    map[string]cwprofiles.ResolvedProfile
 
 	usedCredentials  map[string]struct{}
 	usedTargets      map[string]struct{}
@@ -47,18 +47,23 @@ func newPlanCompiler(cfg Config, catalog cwprofiles.Catalog) *planCompiler {
 	for _, profile := range profiles {
 		profilesByName[profile.Name] = profile
 	}
+	credentialsByName := make(map[string]awsauth.CredentialConfig, len(cfg.Credentials))
+	for _, source := range cfg.Credentials {
+		credentialsByName[source.Name] = source.CredentialConfig
+	}
 	return &planCompiler{
-		cfg:              cfg,
-		plan:             &collectionPlan{Targets: make([]*collectionTarget, 0, len(cfg.Targets))},
-		targetsByRef:     make(map[string]*collectionTarget, len(cfg.Targets)),
-		targetRoleARN:    make(map[string]string, len(cfg.Targets)),
-		profiles:         profiles,
-		profilesByName:   profilesByName,
-		usedCredentials:  make(map[string]struct{}),
-		usedTargets:      make(map[string]struct{}),
-		selectedProfiles: make(map[string]cwprofiles.ResolvedProfile),
-		seenScopes:       make(map[string]string),
-		targetPartitions: make(map[string]map[string]struct{}),
+		cfg:               cfg,
+		plan:              &collectionPlan{Targets: make([]*collectionTarget, 0, len(cfg.Targets))},
+		credentialsByName: credentialsByName,
+		targetsByRef:      make(map[string]*collectionTarget, len(cfg.Targets)),
+		targetRoleARN:     make(map[string]string, len(cfg.Targets)),
+		profiles:          profiles,
+		profilesByName:    profilesByName,
+		usedCredentials:   make(map[string]struct{}),
+		usedTargets:       make(map[string]struct{}),
+		selectedProfiles:  make(map[string]cwprofiles.ResolvedProfile),
+		seenScopes:        make(map[string]string),
+		targetPartitions:  make(map[string]map[string]struct{}),
 	}
 }
 
@@ -85,7 +90,7 @@ func (pc *planCompiler) compileTargets() {
 		credentialRef := target.Credentials
 		compiled := &collectionTarget{
 			Name:     name,
-			Identity: awsauth.NewIdentity(name, pc.cfg.Credentials[credentialRef], target.AssumeRole),
+			Identity: awsauth.NewIdentity(name, pc.credentialsByName[credentialRef], target.AssumeRole),
 		}
 		pc.plan.Targets = append(pc.plan.Targets, compiled)
 		pc.targetsByRef[name] = compiled
@@ -194,14 +199,9 @@ func (pc *planCompiler) validateUsageAndPartitions() error {
 		}
 	}
 
-	credentialNames := make([]string, 0, len(pc.cfg.Credentials))
-	for name := range pc.cfg.Credentials {
-		credentialNames = append(credentialNames, name)
-	}
-	sort.Strings(credentialNames)
-	for _, name := range credentialNames {
-		if _, ok := pc.usedCredentials[name]; !ok {
-			return fmt.Errorf("credential %q is not referenced by any target", name)
+	for _, source := range pc.cfg.Credentials {
+		if _, ok := pc.usedCredentials[source.Name]; !ok {
+			return fmt.Errorf("credential %q is not referenced by any target", source.Name)
 		}
 	}
 	return nil

@@ -2,9 +2,9 @@ vnode: "ok"
 update_every: 123
 autodetection_retry: 123
 credentials:
-  sdk_default:
+  - name: sdk_default
     type: default
-  bootstrap:
+  - name: bootstrap
     type: static
     type_static:
       access_key_id: "${env:AWS_ACCESS_KEY_ID}"

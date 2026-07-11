@@ -173,11 +173,14 @@ func TestCompileConfig_StaticScopeFirstRuleWins(t *testing.T) {
 
 func TestCompileConfig_TargetMayUseStaticCredentialsForAssumeRole(t *testing.T) {
 	cfg := validBaseConfig()
-	cfg.Credentials = map[string]awsauth.CredentialConfig{
-		"bootstrap": {
-			Type: awsauth.CredentialTypeStatic,
-			TypeStatic: &awsauth.StaticCredentialConfig{
-				AccessKeyID: "key", SecretAccessKey: "secret",
+	cfg.Credentials = []CredentialSourceConfig{
+		{
+			Name: "bootstrap",
+			CredentialConfig: awsauth.CredentialConfig{
+				Type: awsauth.CredentialTypeStatic,
+				TypeStatic: &awsauth.StaticCredentialConfig{
+					AccessKeyID: "key", SecretAccessKey: "secret",
+				},
 			},
 		},
 	}
@@ -205,7 +208,9 @@ func TestCompileConfig_RejectsMixedPartitionsPerTarget(t *testing.T) {
 
 func TestCompileConfig_RejectsUnusedDefinitions(t *testing.T) {
 	cfg := validBaseConfig()
-	cfg.Credentials["unused"] = awsauth.CredentialConfig{Type: awsauth.CredentialTypeDefault}
+	cfg.Credentials = append(cfg.Credentials, CredentialSourceConfig{
+		Name: "unused", CredentialConfig: awsauth.CredentialConfig{Type: awsauth.CredentialTypeDefault},
+	})
 	_, _, err := compileTestConfig(t, cfg)
 	assert.ErrorContains(t, err, "credential \"unused\" is not referenced")
 }

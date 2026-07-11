@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"sort"
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsregion"
@@ -25,9 +24,10 @@ func validateConfigStructure(cfg Config) error {
 	if err := validateRawLimits(cfg); err != nil {
 		return err
 	}
+	credentialNames, credentialErr := validateCredentials(cfg)
 	return errors.Join(
-		validateCredentials(cfg),
-		validateTargets(cfg),
+		credentialErr,
+		validateTargets(cfg, credentialNames),
 		validateRules(cfg),
 	)
 }
@@ -58,30 +58,35 @@ func validateRawLimits(cfg Config) error {
 	return nil
 }
 
-func validateCredentials(cfg Config) error {
+func validateCredentials(cfg Config) (map[string]struct{}, error) {
 	if len(cfg.Credentials) == 0 {
-		return errors.New("'credentials' must contain at least one entry")
+		return nil, errors.New("'credentials' must contain at least one entry")
 	}
-	names := make([]string, 0, len(cfg.Credentials))
-	for name := range cfg.Credentials {
-		names = append(names, name)
-	}
-	sort.Strings(names)
 
+	names := make(map[string]struct{}, len(cfg.Credentials))
+	seen := make(map[string]struct{}, len(cfg.Credentials))
 	var errs []error
-	for _, name := range names {
-		// Map keys cannot be normalized without changing reference identity.
-		if !configNamePattern.MatchString(name) {
-			errs = append(errs, fmt.Errorf("credential name %q must match %q", name, configNamePattern.String()))
+	for i, source := range cfg.Credentials {
+		path := fmt.Sprintf("credentials[%d]", i)
+		name := source.Name
+		names[name] = struct{}{}
+		if err := validateCanonicalString(path+".name", name); err != nil {
+			errs = append(errs, err)
+		} else if !configNamePattern.MatchString(name) {
+			errs = append(errs, fmt.Errorf("%s.name %q must match %q", path, name, configNamePattern.String()))
+		} else if _, ok := seen[name]; ok {
+			errs = append(errs, fmt.Errorf("duplicate credential name %q", name))
+		} else {
+			seen[name] = struct{}{}
 		}
-		if err := cfg.Credentials[name].ValidateWithPath(fmt.Sprintf("credentials.%s", name)); err != nil {
+		if err := source.CredentialConfig.ValidateWithPath(path); err != nil {
 			errs = append(errs, err)
 		}
 	}
-	return errors.Join(errs...)
+	return names, errors.Join(errs...)
 }
 
-func validateTargets(cfg Config) error {
+func validateTargets(cfg Config, credentialNames map[string]struct{}) error {
 	if len(cfg.Targets) == 0 {
 		return errors.New("'targets' must contain at least one entry")
 	}
@@ -105,7 +110,7 @@ func validateTargets(cfg Config) error {
 			errs = append(errs, err)
 		} else if credentialRef == "" {
 			errs = append(errs, fmt.Errorf("%s.credentials is required", path))
-		} else if _, ok := cfg.Credentials[credentialRef]; !ok {
+		} else if _, ok := credentialNames[credentialRef]; !ok {
 			errs = append(errs, fmt.Errorf("%s.credentials references unknown credential %q", path, credentialRef))
 		}
 		if target.AssumeRole != nil {

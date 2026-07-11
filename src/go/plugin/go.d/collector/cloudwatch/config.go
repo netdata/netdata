@@ -30,16 +30,22 @@ const (
 )
 
 type Config struct {
-	UpdateEvery        int                                 `yaml:"update_every,omitempty" json:"update_every,omitempty"`
-	AutoDetectionRetry int                                 `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
-	Vnode              string                              `yaml:"vnode,omitempty" json:"vnode"`
-	Credentials        map[string]awsauth.CredentialConfig `yaml:"credentials" json:"credentials"`
-	Targets            []TargetConfig                      `yaml:"targets" json:"targets"`
-	Rules              []RuleConfig                        `yaml:"rules" json:"rules"`
-	Discovery          DiscoveryConfig                     `yaml:"discovery" json:"discovery"`
-	Tags               []TagConfig                         `yaml:"tags,omitempty" json:"tags,omitempty"`
-	QueryOffset        int                                 `yaml:"query_offset,omitempty" json:"query_offset"`
-	Timeout            confopt.Duration                    `yaml:"timeout,omitempty" json:"timeout"`
+	UpdateEvery        int                      `yaml:"update_every,omitempty" json:"update_every,omitempty"`
+	AutoDetectionRetry int                      `yaml:"autodetection_retry,omitempty" json:"autodetection_retry,omitempty"`
+	Vnode              string                   `yaml:"vnode,omitempty" json:"vnode"`
+	Credentials        []CredentialSourceConfig `yaml:"credentials" json:"credentials"`
+	Targets            []TargetConfig           `yaml:"targets" json:"targets"`
+	Rules              []RuleConfig             `yaml:"rules" json:"rules"`
+	Discovery          DiscoveryConfig          `yaml:"discovery" json:"discovery"`
+	Tags               []TagConfig              `yaml:"tags,omitempty" json:"tags,omitempty"`
+	QueryOffset        int                      `yaml:"query_offset,omitempty" json:"query_offset"`
+	Timeout            confopt.Duration         `yaml:"timeout,omitempty" json:"timeout"`
+}
+
+// CredentialSourceConfig names one reusable base-credential configuration.
+type CredentialSourceConfig struct {
+	Name                     string `yaml:"name" json:"name"`
+	awsauth.CredentialConfig `yaml:",inline"`
 }
 
 type TargetConfig struct {
