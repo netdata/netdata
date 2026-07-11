@@ -4,6 +4,10 @@
 #include "windows-internals.h"
 #include "libnetdata/os/windows-wmi/windows-wmi.h"
 
+#define _COMMON_PLUGIN_NAME "windows.plugin"
+#define _COMMON_PLUGIN_MODULE_NAME "GetSensors"
+#include "../common-contexts/common-contexts.h"
+
 #include <windows.h>
 #include <wchar.h>
 
@@ -796,7 +800,7 @@ static void sensors_states_chart(struct sensor_data *sd, int update_every)
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add(sd->st_sensor_state->rrdlabels, "name", sd->name, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(sd->st_sensor_state->rrdlabels, "label", sd->name, RRDLABEL_SRC_AUTO);
         rrdlabels_add(sd->st_sensor_state->rrdlabels, "manufacturer", sd->manufacturer, RRDLABEL_SRC_AUTO);
         rrdlabels_add(sd->st_sensor_state->rrdlabels, "model", sd->model, RRDLABEL_SRC_AUTO);
 
@@ -869,7 +873,7 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
             update_every,
             RRDSET_TYPE_LINE);
 
-        rrdlabels_add(sd->st_sensor_data->rrdlabels, "name", sd->name, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(sd->st_sensor_data->rrdlabels, "label", sd->name, RRDLABEL_SRC_AUTO);
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "manufacturer", sd->manufacturer, RRDLABEL_SRC_AUTO);
         rrdlabels_add(sd->st_sensor_data->rrdlabels, "model", sd->model, RRDLABEL_SRC_AUTO);
 
@@ -910,6 +914,9 @@ static void sensors_data_chart(struct sensor_data *sd, int update_every)
     rrdset_done(sd->st_sensor_data);
 }
 
+// cross-OS temperature histogram - contract in common-contexts/hw-sensors.h
+static HW_SENSORS_TEMPERATURE_HISTOGRAM sensors_temperature_histogram = {0};
+
 int dict_sensors_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused)
 {
     int *update_every = data;
@@ -924,6 +931,11 @@ int dict_sensors_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *val
         return 1;
 
     sensors_data_chart(sd, *update_every);
+
+    if (sd->sensor_data_type == NETDATA_WIN_SENSOR_CELSIUS && sd->div_factor > 0)
+        hw_sensors_temperature_histogram_add(
+            &sensors_temperature_histogram,
+            (((NETDATA_DOUBLE)sd->current_data_value[0] + sd->add_factor) * sd->mult_factor) / sd->div_factor);
 
     return 1;
 }
@@ -940,7 +952,10 @@ int do_GetSensors(int update_every, usec_t dt __maybe_unused)
     }
 
     __netdata_mutex_lock(&sensors_mutex);
+    hw_sensors_temperature_histogram_reset(&sensors_temperature_histogram);
     dictionary_sorted_walkthrough_read(sensors, dict_sensors_charts_cb, &update_every);
+    common_hw_sensors_temperature_histogram(
+        &sensors_temperature_histogram, update_every, "windows.plugin", "GetSensors");
     __netdata_mutex_unlock(&sensors_mutex);
     return 0;
 }

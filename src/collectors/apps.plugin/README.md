@@ -140,6 +140,28 @@ interpreters: process1 process2 process3
 
 - For each process specified, all of its subprocesses will be automatically grouped, not just the matched process itself.
 
+### Automatic grouping on macOS
+
+On macOS, `launchd` spawns almost every process directly, and Apple ships hundreds of distinct helper processes (XPC services, app extensions, framework helpers, standalone daemons).
+To keep the number of groups meaningful, processes that do not match any group in `apps_groups.conf` are grouped automatically based on their executable path:
+
+| Executable                                                            | Group                                              |
+|-----------------------------------------------------------------------|----------------------------------------------------|
+| Application bundles (`*.app`, `*.appex`), Apple or third-party        | one group per application (`Finder`, `Xcode`, ...) |
+| Apple framework helpers (binaries inside `*.framework` bundles)       | `system-frameworks`                                |
+| Apple standalone daemons (`/usr/libexec`, `/usr/sbin`, `/bin`, ...)   | `system-daemons`                                   |
+| Driver extensions (`*.dext`)                                          | `driver-extensions`                                |
+| Third-party frameworks                                                | one group per framework                            |
+| Third-party plain binaries                                            | one group per process name                         |
+
+Since `apps_groups.conf` matches take precedence over automatic grouping, aggregated components can be re-exposed individually by naming them in the configuration.
+The stock configuration already re-exposes famous, long-stable macOS components (`windowserver`, `spotlight`, `media-analysis`, `coreaudio`, `fseventsd`, `icloud`, `nsurlsessiond`, `timemachine`, `videotoolbox`) — see the `MacOS system components of interest` section of `apps_groups.conf`.
+To re-expose any other component, add a line, e.g.:
+
+```text
+airdrop-sharing: sharingd
+```
+
 ### Matching processes
 
 `apps.plugin` uses different fields for process matching depending on the operating system:

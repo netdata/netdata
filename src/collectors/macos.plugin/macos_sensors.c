@@ -4,6 +4,10 @@
 #include "macos_smc.h"
 #include "plugin_macos.h"
 
+#define _COMMON_PLUGIN_NAME "macos.plugin"
+#define _COMMON_PLUGIN_MODULE_NAME "sensors"
+#include "../common-contexts/common-contexts.h"
+
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
 #include <ctype.h>
@@ -59,6 +63,8 @@ struct macos_sensor_chart {
 
     bool seen;
     unsigned missing_cycles;
+    NETDATA_DOUBLE last_value;
+    bool has_value;
     RRDSET *st;
     RRDDIM *rd;
 
@@ -151,6 +157,43 @@ static bool hid_gpu_temperature_available = false;
 static bool smc_fan_available = false;
 static bool last_gpu_temperature_available = false;
 static bool last_gpu_power_available = false;
+
+// per-channel charts are opt-in for high-cardinality kinds; the default view
+// is the summary charts (per-subsystem rollups + the temperature histogram)
+static bool do_per_sensor_charts[MACOS_SENSOR_KIND_COUNT] = {
+    [MACOS_SENSOR_TEMPERATURE] = false,
+    [MACOS_SENSOR_FAN] = true,
+    [MACOS_SENSOR_VOLTAGE] = false,
+    [MACOS_SENSOR_CURRENT] = false,
+    [MACOS_SENSOR_POWER] = false,
+};
+
+static HW_SENSORS_TEMPERATURE_HISTOGRAM temperature_histogram = {0};
+
+struct macos_sensor_rollup {
+    enum macos_sensor_kind kind;
+    char subsystem[64];
+
+    RRDSET *st;
+    RRDDIM *rd_min;
+    RRDDIM *rd_avg;
+    RRDDIM *rd_max;
+    RRDDIM *rd_sum;
+    bool obsolete;
+
+    unsigned count;
+    NETDATA_DOUBLE min;
+    NETDATA_DOUBLE max;
+    NETDATA_DOUBLE sum;
+
+    struct macos_sensor_rollup *next;
+};
+
+static struct macos_sensor_rollup *sensor_rollups_root = NULL;
+
+// guards sensor_charts_root and per-sensor values between the collection
+// cycle and the "sensors" function threads
+static netdata_mutex_t macos_sensors_mutex;
 
 static const struct macos_hid_sensor_source macos_hid_sensor_sources[] = {
     {
@@ -581,13 +624,104 @@ static void macos_sensors_free_chart(struct macos_sensor_chart *s)
     freez(s);
 }
 
+static struct macos_sensor_rollup *macos_sensors_get_or_create_rollup(enum macos_sensor_kind kind, const char *subsystem)
+{
+    for (struct macos_sensor_rollup *r = sensor_rollups_root; r; r = r->next) {
+        if (r->kind == kind && !strcmp(r->subsystem, subsystem))
+            return r;
+    }
+
+    struct macos_sensor_rollup *r = callocz(1, sizeof(*r));
+    r->kind = kind;
+    snprintfz(r->subsystem, sizeof(r->subsystem), "%s", subsystem);
+    r->next = sensor_rollups_root;
+    sensor_rollups_root = r;
+    return r;
+}
+
+static void macos_sensors_update_rollup_chart(struct macos_sensor_rollup *r, int update_every)
+{
+    if (!r->count) {
+        if (r->st && !r->obsolete) {
+            rrdset_is_obsolete___safe_from_collector_thread(r->st);
+            r->obsolete = true;
+        }
+        return;
+    }
+
+    const struct macos_sensor_kind_def *def = &macos_sensor_defs[r->kind];
+
+    if (!r->st) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        const char *context;
+        const char *title;
+        int priority;
+
+        if (r->kind == MACOS_SENSOR_TEMPERATURE) {
+            snprintfz(id, sizeof(id), "temperature_subsystem_%s", r->subsystem);
+            context = "system.hw.sensor.temperature.subsystem";
+            title = "Temperature Summary";
+            priority = NETDATA_CHART_PRIO_SENSORS - 8;
+        }
+        else {
+            snprintfz(id, sizeof(id), "power_subsystem_%s", r->subsystem);
+            context = "system.hw.sensor.power.subsystem";
+            title = "Power Summary";
+            priority = NETDATA_CHART_PRIO_SENSORS - 6;
+        }
+
+        netdata_fix_chart_id(id);
+
+        r->st = rrdset_create_localhost(
+            "sensors",
+            id,
+            NULL,
+            def->family,
+            context,
+            title,
+            def->units,
+            "macos.plugin",
+            "sensors",
+            priority,
+            update_every,
+            RRDSET_TYPE_LINE);
+
+        rrdlabels_add(r->st->rrdlabels, "subsystem", r->subsystem, RRDLABEL_SRC_AUTO);
+
+        if (r->kind == MACOS_SENSOR_TEMPERATURE) {
+            r->rd_min = rrddim_add(r->st, "min", NULL, 1, def->divisor, RRD_ALGORITHM_ABSOLUTE);
+            r->rd_avg = rrddim_add(r->st, "avg", NULL, 1, def->divisor, RRD_ALGORITHM_ABSOLUTE);
+            r->rd_max = rrddim_add(r->st, "max", NULL, 1, def->divisor, RRD_ALGORITHM_ABSOLUTE);
+        }
+        else
+            r->rd_sum = rrddim_add(r->st, "power", NULL, 1, def->divisor, RRD_ALGORITHM_ABSOLUTE);
+    }
+
+    if (r->obsolete) {
+        rrdset_isnot_obsolete___safe_from_collector_thread(r->st);
+        r->obsolete = false;
+    }
+
+    if (r->kind == MACOS_SENSOR_TEMPERATURE) {
+        rrddim_set_by_pointer(r->st, r->rd_min, (collected_number)llround(r->min * (NETDATA_DOUBLE)def->divisor));
+        rrddim_set_by_pointer(
+            r->st, r->rd_avg,
+            (collected_number)llround(r->sum / (NETDATA_DOUBLE)r->count * (NETDATA_DOUBLE)def->divisor));
+        rrddim_set_by_pointer(r->st, r->rd_max, (collected_number)llround(r->max * (NETDATA_DOUBLE)def->divisor));
+    }
+    else
+        rrddim_set_by_pointer(r->st, r->rd_sum, (collected_number)llround(r->sum * (NETDATA_DOUBLE)def->divisor));
+
+    rrdset_done(r->st);
+}
+
 static void macos_sensors_begin_cycle(void)
 {
     for (struct macos_sensor_chart *s = sensor_charts_root; s; s = s->next)
         s->seen = false;
 }
 
-static void macos_sensors_finish_cycle(bool smc_attempted, bool hid_attempted)
+static void macos_sensors_finish_cycle(bool smc_attempted, bool hid_attempted, int update_every)
 {
     struct macos_sensor_chart **pp = &sensor_charts_root;
     while (*pp) {
@@ -606,8 +740,10 @@ static void macos_sensors_finish_cycle(bool smc_attempted, bool hid_attempted)
 
         if (!s->seen) {
             if (s->missing_cycles < MACOS_SENSORS_MISSING_CYCLES_BEFORE_OBSOLETE &&
-                ++s->missing_cycles == MACOS_SENSORS_MISSING_CYCLES_BEFORE_OBSOLETE)
+                ++s->missing_cycles == MACOS_SENSORS_MISSING_CYCLES_BEFORE_OBSOLETE) {
                 macos_sensors_obsolete_chart(s);
+                s->has_value = false;
+            }
 
             pp = &s->next;
             continue;
@@ -627,6 +763,42 @@ static void macos_sensors_finish_cycle(bool smc_attempted, bool hid_attempted)
         else if (s->kind == MACOS_SENSOR_TEMPERATURE && strcmp(s->subsystem, "gpu") == 0)
             smc_gpu_temperature_available = true;
     }
+
+    // ------------------------------------------------------------------
+    // summary views: temperature histogram + per-subsystem rollups.
+    // SMC values refresh on their own cadence; the last known value of each
+    // sensor is used until the sensor is missing long enough to be obsoleted.
+
+    hw_sensors_temperature_histogram_reset(&temperature_histogram);
+
+    for (struct macos_sensor_rollup *r = sensor_rollups_root; r; r = r->next) {
+        r->count = 0;
+        r->min = r->max = r->sum = 0.0;
+    }
+
+    for (struct macos_sensor_chart *s = sensor_charts_root; s; s = s->next) {
+        if (!s->has_value || s->missing_cycles >= MACOS_SENSORS_MISSING_CYCLES_BEFORE_OBSOLETE)
+            continue;
+
+        if (s->kind != MACOS_SENSOR_TEMPERATURE && s->kind != MACOS_SENSOR_POWER)
+            continue;
+
+        if (s->kind == MACOS_SENSOR_TEMPERATURE)
+            hw_sensors_temperature_histogram_add(&temperature_histogram, s->last_value);
+
+        struct macos_sensor_rollup *r = macos_sensors_get_or_create_rollup(s->kind, s->subsystem);
+        if (!r->count || s->last_value < r->min)
+            r->min = s->last_value;
+        if (!r->count || s->last_value > r->max)
+            r->max = s->last_value;
+        r->sum += s->last_value;
+        r->count++;
+    }
+
+    common_hw_sensors_temperature_histogram(&temperature_histogram, update_every, "macos.plugin", "sensors");
+
+    for (struct macos_sensor_rollup *r = sensor_rollups_root; r; r = r->next)
+        macos_sensors_update_rollup_chart(r, update_every);
 }
 
 static void macos_sensors_update_chart(
@@ -656,6 +828,13 @@ static void macos_sensors_update_chart(
 
     s->seen = true;
     s->missing_cycles = 0;
+    s->last_value = value;
+    s->has_value = true;
+
+    // high-cardinality kinds chart per-channel only when enabled; the value
+    // is still collected above to feed the summary charts
+    if (!do_per_sensor_charts[s->kind])
+        return;
 
     if (!s->st) {
         s->st = rrdset_create_localhost(
@@ -677,7 +856,7 @@ static void macos_sensors_update_chart(
         rrdlabels_add(s->st->rrdlabels, "chip_id", s->chip_id, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "device", s->chip_id, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "feature", s->feature, RRDLABEL_SRC_AUTO);
-        rrdlabels_add(s->st->rrdlabels, "name", s->label, RRDLABEL_SRC_AUTO);
+        rrdlabels_add(s->st->rrdlabels, "label", s->label, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "path", s->path, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "source", s->source, RRDLABEL_SRC_AUTO);
         rrdlabels_add(s->st->rrdlabels, "sensor", s->feature, RRDLABEL_SRC_AUTO);
@@ -940,6 +1119,21 @@ static bool macos_sensors_cf_value_identifier(CFTypeRef value, char *dst, size_t
 
 static bool macos_sensors_hid_service_identifier(IOHIDServiceClientRef service, char *dst, size_t dst_size)
 {
+    // Prefer LocationID: it derives from the hardware topology and is stable
+    // across reboots. IORegistryEntryID is unique per boot, so identities
+    // built from it would mint new time-series on every system restart.
+    CFTypeRef location_id = macos_iohid_service_copy_property(service, CFSTR("LocationID"));
+    if (location_id) {
+        bool ok = macos_sensors_cf_value_identifier(location_id, dst, dst_size);
+        CFRelease(location_id);
+        if (ok) {
+            char prefixed[128];
+            snprintfz(prefixed, sizeof(prefixed), "location_%s", dst);
+            snprintfz(dst, dst_size, "%s", prefixed);
+            return true;
+        }
+    }
+
     CFTypeRef registry_id = macos_iohid_service_get_registry_id(service);
     if (macos_sensors_cf_value_identifier(registry_id, dst, dst_size)) {
         char prefixed[128];
@@ -948,19 +1142,7 @@ static bool macos_sensors_hid_service_identifier(IOHIDServiceClientRef service, 
         return true;
     }
 
-    CFTypeRef location_id = macos_iohid_service_copy_property(service, CFSTR("LocationID"));
-    if (!location_id)
-        return false;
-
-    bool ok = macos_sensors_cf_value_identifier(location_id, dst, dst_size);
-    CFRelease(location_id);
-    if (!ok)
-        return false;
-
-    char prefixed[128];
-    snprintfz(prefixed, sizeof(prefixed), "location_%s", dst);
-    snprintfz(dst, dst_size, "%s", prefixed);
-    return true;
+    return false;
 }
 
 static bool macos_sensors_collect_hid_source(const struct macos_hid_sensor_source *source, int update_every)
@@ -977,6 +1159,20 @@ static bool macos_sensors_collect_hid_source(const struct macos_hid_sensor_sourc
         return true;
 
     CFIndex count = CFArrayGetCount(services);
+
+    // Identity stability: when a service's product name is unique within this
+    // kind, the product name alone is the sensor identity. Appending per-boot
+    // identifiers unconditionally (as done before) minted new time-series on
+    // every reboot. Only true duplicates get a service-specific suffix.
+    char (*products)[128] = callocz((size_t)count ? (size_t)count : 1, sizeof(*products));
+    for (CFIndex i = 0; i < count; i++) {
+        IOHIDServiceClientRef svc = (IOHIDServiceClientRef)CFArrayGetValueAtIndex(services, i);
+        if (svc && macos_sensors_hid_product_name(svc, products[i], sizeof(products[i])))
+            netdata_fix_chart_id(products[i]);
+        else
+            products[i][0] = '\0';
+    }
+
     for (CFIndex i = 0; i < count; i++) {
         IOHIDServiceClientRef service = (IOHIDServiceClientRef)CFArrayGetValueAtIndex(services, i);
         if (!service)
@@ -1005,23 +1201,31 @@ static bool macos_sensors_collect_hid_source(const struct macos_hid_sensor_sourc
         if (!macos_sensors_validate_value(source->kind, value))
             continue;
 
-        char feature[128];
-        char base_feature[128] = "";
-        if (has_product) {
-            snprintfz(base_feature, sizeof(base_feature), "%s", label);
-            netdata_fix_chart_id(base_feature);
+        bool product_is_unique = false;
+        if (products[i][0]) {
+            product_is_unique = true;
+            for (CFIndex j = 0; j < count; j++) {
+                if (j != i && strcmp(products[j], products[i]) == 0) {
+                    product_is_unique = false;
+                    break;
+                }
+            }
         }
 
-        char service_identifier[128] = "";
-        bool has_service_identifier =
-            macos_sensors_hid_service_identifier(service, service_identifier, sizeof(service_identifier));
+        char feature[128];
+        if (product_is_unique) {
+            snprintfz(feature, sizeof(feature), "%s", products[i]);
+        }
+        else {
+            char service_identifier[128] = "";
+            if (!macos_sensors_hid_service_identifier(service, service_identifier, sizeof(service_identifier)))
+                continue;
 
-        if (base_feature[0] && has_service_identifier)
-            snprintfz(feature, sizeof(feature), "%s_%s", base_feature, service_identifier);
-        else if (has_service_identifier)
-            snprintfz(feature, sizeof(feature), "%s_%s", source->feature_prefix, service_identifier);
-        else
-            continue;
+            if (products[i][0])
+                snprintfz(feature, sizeof(feature), "%s_%s", products[i], service_identifier);
+            else
+                snprintfz(feature, sizeof(feature), "%s_%s", source->feature_prefix, service_identifier);
+        }
 
         netdata_fix_chart_id(feature);
 
@@ -1050,6 +1254,7 @@ static bool macos_sensors_collect_hid_source(const struct macos_hid_sensor_sourc
             hid_gpu_temperature_available = true;
     }
 
+    freez(products);
     CFRelease(services);
     return true;
 }
@@ -1088,7 +1293,302 @@ static void macos_sensors_init(void)
     if (smc_collection_every_s < 1)
         smc_collection_every_s = 1;
 
+    do_per_sensor_charts[MACOS_SENSOR_TEMPERATURE] = inicfg_get_boolean(
+        &netdata_config, "plugin:macos:sensors", "per sensor temperature charts",
+        do_per_sensor_charts[MACOS_SENSOR_TEMPERATURE]);
+    do_per_sensor_charts[MACOS_SENSOR_FAN] = inicfg_get_boolean(
+        &netdata_config, "plugin:macos:sensors", "per sensor fan charts",
+        do_per_sensor_charts[MACOS_SENSOR_FAN]);
+    do_per_sensor_charts[MACOS_SENSOR_VOLTAGE] = inicfg_get_boolean(
+        &netdata_config, "plugin:macos:sensors", "per sensor voltage charts",
+        do_per_sensor_charts[MACOS_SENSOR_VOLTAGE]);
+    do_per_sensor_charts[MACOS_SENSOR_CURRENT] = inicfg_get_boolean(
+        &netdata_config, "plugin:macos:sensors", "per sensor current charts",
+        do_per_sensor_charts[MACOS_SENSOR_CURRENT]);
+    do_per_sensor_charts[MACOS_SENSOR_POWER] = inicfg_get_boolean(
+        &netdata_config, "plugin:macos:sensors", "per sensor power charts",
+        do_per_sensor_charts[MACOS_SENSOR_POWER]);
+
     initialized = true;
+}
+
+#define MACOS_SENSORS_FUNCTION_HELP                                                                                    \
+    "Lists all hardware sensors discovered on this host (SMC and IOHID), with their current readings - including "    \
+    "the sensors that are aggregated into the summary charts and not charted individually."
+
+static int macos_sensors_function(
+    BUFFER *wb, const char *function __maybe_unused, BUFFER *payload __maybe_unused, const char *source __maybe_unused)
+{
+    netdata_mutex_lock(&macos_sensors_mutex);
+
+    buffer_flush(wb);
+    wb->content_type = CT_APPLICATION_JSON;
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    buffer_json_member_add_string(wb, "hostname", rrdhost_hostname(localhost));
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", 1);
+    buffer_json_member_add_boolean(wb, "has_history", false);
+    buffer_json_member_add_string(wb, "help", MACOS_SENSORS_FUNCTION_HELP);
+    buffer_json_member_add_array(wb, "data");
+
+    for (struct macos_sensor_chart *s = sensor_charts_root; s; s = s->next) {
+        const struct macos_sensor_kind_def *def = &macos_sensor_defs[s->kind];
+        bool fresh = s->has_value && s->missing_cycles < MACOS_SENSORS_MISSING_CYCLES_BEFORE_OBSOLETE;
+        NETDATA_DOUBLE reading = fresh ? s->last_value : NAN;
+
+        // the chart id this sensor has (or would have) in per-sensor mode,
+        // so users can correlate function rows with dashboard charts
+        char chart_id[RRD_ID_LENGTH_MAX + 16];
+        snprintfz(chart_id, sizeof(chart_id), "sensors.%s", s->id);
+
+        buffer_json_add_array_item_array(wb);
+
+        buffer_json_add_array_item_string(wb, chart_id);
+        buffer_json_add_array_item_string(wb, s->label);
+        buffer_json_add_array_item_string(wb, def->name);
+        buffer_json_add_array_item_string(wb, s->subsystem);
+        buffer_json_add_array_item_string(wb, s->source);
+        buffer_json_add_array_item_string(wb, s->chip_id);
+        buffer_json_add_array_item_string(wb, s->feature);
+        buffer_json_add_array_item_double(wb, reading);
+        buffer_json_add_array_item_string(wb, def->units);
+        buffer_json_add_array_item_string(wb, fresh ? "ok" : "missing");
+        buffer_json_add_array_item_string(wb, do_per_sensor_charts[s->kind] ? "per-sensor" : "summary");
+        buffer_json_add_array_item_uint64(wb, 1); // Count - enables grouped sensor-count charts
+
+        // per-kind value columns - they power the per-kind aggregation tiles
+        buffer_json_add_array_item_double(wb, s->kind == MACOS_SENSOR_TEMPERATURE ? reading : NAN);
+        buffer_json_add_array_item_double(wb, s->kind == MACOS_SENSOR_FAN ? reading : NAN);
+        buffer_json_add_array_item_double(wb, s->kind == MACOS_SENSOR_VOLTAGE ? reading : NAN);
+        buffer_json_add_array_item_double(wb, s->kind == MACOS_SENSOR_CURRENT ? reading : NAN);
+        buffer_json_add_array_item_double(wb, s->kind == MACOS_SENSOR_POWER ? reading : NAN);
+
+        buffer_json_array_close(wb);
+    }
+
+    buffer_json_array_close(wb); // data
+
+    buffer_json_member_add_object(wb, "columns");
+    {
+        size_t field_id = 0;
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Chart", "Per-Sensor Chart ID",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Label", "Sensor Label",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Kind", "Sensor Kind",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Subsystem", "Hardware Subsystem",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Source", "Discovery Source",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Device", "Device / Chip",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Sensor", "Sensor Identifier",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Reading", "Current Reading",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                3, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Units", "Reading Units",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "State", "Collection State",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Charts", "Charting Mode",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Count", "Sensors Count",
+                RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                0, "sensors", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Temperature", "Temperature",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "degrees Celsius", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Fan", "Fan Speed",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                0, "rpm", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Voltage", "Voltage",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                3, "V", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Current", "Current",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                3, "A", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Power", "Power",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "W", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+    }
+    buffer_json_object_close(wb); // columns
+
+    buffer_json_member_add_string(wb, "default_sort_column", "Label");
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        buffer_json_member_add_object(wb, "Sensors");
+        {
+            buffer_json_member_add_string(wb, "name", "Sensors");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Count");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        static const char *kind_charts[] = {"Temperature", "Fan", "Voltage", "Current", "Power"};
+        for (size_t i = 0; i < _countof(kind_charts); i++) {
+            buffer_json_member_add_object(wb, kind_charts[i]);
+            {
+                buffer_json_member_add_string(wb, "name", kind_charts[i]);
+                buffer_json_member_add_string(wb, "type", "stacked-bar");
+                buffer_json_member_add_array(wb, "columns");
+                {
+                    buffer_json_add_array_item_string(wb, kind_charts[i]);
+                }
+                buffer_json_array_close(wb);
+            }
+            buffer_json_object_close(wb);
+        }
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Sensors");
+        buffer_json_add_array_item_string(wb, "Subsystem");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Temperature");
+        buffer_json_add_array_item_string(wb, "Subsystem");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        buffer_json_member_add_object(wb, "Kind");
+        {
+            buffer_json_member_add_string(wb, "name", "Sensors by Kind");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Kind");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "Subsystem");
+        {
+            buffer_json_member_add_string(wb, "name", "Sensors by Subsystem");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Subsystem");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "Source");
+        {
+            buffer_json_member_add_string(wb, "name", "Sensors by Discovery Source");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Source");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "Device");
+        {
+            buffer_json_member_add_string(wb, "name", "Sensors by Device");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Device");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        buffer_json_member_add_object(wb, "State");
+        {
+            buffer_json_member_add_string(wb, "name", "Sensors by Collection State");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "State");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+    }
+    buffer_json_object_close(wb); // group_by
+    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
+    buffer_json_finalize(wb);
+
+    netdata_mutex_unlock(&macos_sensors_mutex);
+    return HTTP_RESP_OK;
 }
 
 int do_macos_sensors(int update_every, usec_t dt __maybe_unused)
@@ -1100,7 +1600,14 @@ int do_macos_sensors(int update_every, usec_t dt __maybe_unused)
             return 1;
     }
 
-    macos_sensors_init();
+    static bool sensors_initialized = false;
+    if (unlikely(!sensors_initialized)) {
+        netdata_mutex_init(&macos_sensors_mutex);
+        macos_sensors_init();
+        sensors_initialized = true;
+    }
+
+    netdata_mutex_lock(&macos_sensors_mutex);
 
     macos_sensors_begin_cycle();
     bool smc_attempted = false;
@@ -1109,7 +1616,21 @@ int do_macos_sensors(int update_every, usec_t dt __maybe_unused)
         smc_attempted = macos_sensors_collect_smc(update_every);
     if (do_hid)
         hid_attempted = macos_sensors_collect_hid(update_every);
-    macos_sensors_finish_cycle(smc_attempted, hid_attempted);
+    macos_sensors_finish_cycle(smc_attempted, hid_attempted, update_every);
+
+    netdata_mutex_unlock(&macos_sensors_mutex);
+
+    // expose the function only on hosts that actually have sensors
+    // (only this collection thread mutates the sensors list)
+    static bool function_registered = false;
+    if (unlikely(!function_registered && sensor_charts_root)) {
+        rrd_function_add_inline(localhost, NULL, "sensors", 10,
+                                RRDFUNCTIONS_PRIORITY_DEFAULT, RRDFUNCTIONS_VERSION_DEFAULT,
+                                MACOS_SENSORS_FUNCTION_HELP,
+                                "top", HTTP_ACCESS_ANONYMOUS_DATA,
+                                macos_sensors_function);
+        function_registered = true;
+    }
 
     return 0;
 }

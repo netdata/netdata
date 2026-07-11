@@ -1211,6 +1211,354 @@ static int sensors_collect_data(void) {
     return subfeatures_collected ? 0 : 1;
 }
 
+// ----------------------------------------------------------------------------
+// cross-OS temperature histogram
+//
+// MIRRORS src/collectors/common-contexts/hw-sensors.h (PERMANENT contract,
+// keep in sync by hand - this plugin emits PLUGINSD text, not RRDSET calls):
+// disjoint buckets named by their upper bound in degrees Celsius; every
+// sensor increments exactly one bucket.
+
+#define LIBSENSORS_HISTOGRAM_BUCKETS 10
+
+static const double libsensors_histogram_upper_bounds[LIBSENSORS_HISTOGRAM_BUCKETS - 1] = {
+    40, 50, 60, 70, 80, 85, 90, 95, 100,
+};
+
+static const char *libsensors_histogram_dimensions[LIBSENSORS_HISTOGRAM_BUCKETS] = {
+    "40", "50", "60", "70", "80", "85", "90", "95", "100", "+Inf",
+};
+
+static void libsensors_emit_temperature_histogram(int update_every, const char *name) {
+    static bool exposed = false;
+
+    uint32_t counts[LIBSENSORS_HISTOGRAM_BUCKETS] = {0};
+    size_t total = 0;
+
+    SENSOR *s;
+    dfe_start_read(sensors_dict, s) {
+        if (s->feature.type != SENSORS_FEATURE_TEMP || isnan(s->input))
+            continue;
+
+        size_t i = 0;
+        while (i < LIBSENSORS_HISTOGRAM_BUCKETS - 1 && s->input >= libsensors_histogram_upper_bounds[i])
+            i++;
+
+        counts[i]++;
+        total++;
+    }
+    dfe_done(s);
+
+    if (!total)
+        return;
+
+    if (!exposed) {
+        printf(
+            PLUGINSD_KEYWORD_CHART
+            " 'sensors.temperature_histogram' '' 'Temperature Sensors Distribution' 'sensors' 'Temperature' "
+            "'system.hw.sensor.temperature.histogram' heatmap 69990 %d '' debugfs %s\n",
+            update_every, name);
+
+        for (size_t i = 0; i < LIBSENSORS_HISTOGRAM_BUCKETS; i++)
+            printf(PLUGINSD_KEYWORD_DIMENSION " '%s' '' absolute 1 1 ''\n", libsensors_histogram_dimensions[i]);
+
+        exposed = true;
+    }
+
+    printf(PLUGINSD_KEYWORD_BEGIN " 'sensors.temperature_histogram'\n");
+    for (size_t i = 0; i < LIBSENSORS_HISTOGRAM_BUCKETS; i++)
+        printf(
+            PLUGINSD_KEYWORD_SET " '%s' = %u\n", libsensors_histogram_dimensions[i], (unsigned)counts[i]);
+    printf(PLUGINSD_KEYWORD_END "\n");
+}
+
+// ----------------------------------------------------------------------------
+// the "sensors" function
+//
+// Cross-OS contract (mirrors the macos.plugin implementation - keep the
+// column schema, charts, group_by and registration-follows-discovery rule in
+// sync by hand): one table row per sensor; the per-sensor chart id is the
+// unique key and the only sticky column.
+
+#define LIBSENSORS_FUNCTION_SENSORS_HELP                                                                               \
+    "Lists all hardware sensors discovered on this host, with their current readings."
+
+// guards sensors_dict contents between the collection thread and function threads
+static netdata_mutex_t sensors_data_mutex = NETDATA_MUTEX_INITIALIZER;
+
+static const char *libsensors_state_to_string(SENSOR_STATE state) {
+    switch(state) {
+        case SENSOR_STATE_CLEAR: return "clear";
+        case SENSOR_STATE_WARNING: return "warning";
+        case SENSOR_STATE_ALARM: return "alarm";
+        case SENSOR_STATE_CRITICAL: return "critical";
+        case SENSOR_STATE_EMERGENCY: return "emergency";
+        case SENSOR_STATE_FAULT: return "fault";
+        case SENSOR_STATE_CAP: return "cap";
+        default: return "unknown";
+    }
+}
+
+static void libsensors_function_sensors(
+    const char *transaction, char *function __maybe_unused, usec_t *stop_monotonic_ut __maybe_unused,
+    bool *cancelled __maybe_unused, BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
+    const char *source __maybe_unused, void *data __maybe_unused)
+{
+    BUFFER *wb = buffer_create(4096, NULL);
+
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    const char *hostname = getenv("NETDATA_HOSTNAME");
+    buffer_json_member_add_string(wb, "hostname", hostname ? hostname : "localhost");
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", 1);
+    buffer_json_member_add_boolean(wb, "has_history", false);
+    buffer_json_member_add_string(wb, "help", LIBSENSORS_FUNCTION_SENSORS_HELP);
+    buffer_json_member_add_array(wb, "data");
+
+    netdata_mutex_lock(&sensors_data_mutex);
+
+    if (sensors_dict) {
+        SENSOR *s;
+        dfe_start_read(sensors_dict, s) {
+            bool fresh = !isnan(s->input);
+            const char *kind = SENSOR_TYPE_2str(s->feature.type);
+            const char *label =
+                (s->feature.label) ? string2str(s->feature.label) : string2str(s->feature.name);
+
+            char chart_id[RRD_ID_LENGTH_MAX + 16];
+            snprintfz(chart_id, sizeof(chart_id), "sensors.%s_input", string2str(s->id));
+
+            buffer_json_add_array_item_array(wb);
+
+            buffer_json_add_array_item_string(wb, chart_id);
+            buffer_json_add_array_item_string(wb, label);
+            buffer_json_add_array_item_string(wb, kind);
+            buffer_json_add_array_item_string(wb, string2str(s->chip.subsystem));
+            buffer_json_add_array_item_string(wb, "libsensors");
+            buffer_json_add_array_item_string(wb, string2str(s->chip.id));
+            buffer_json_add_array_item_string(wb, string2str(s->feature.name));
+            buffer_json_add_array_item_double(wb, s->input);
+            buffer_json_add_array_item_string(wb, s->config.units);
+            buffer_json_add_array_item_string(wb, fresh ? libsensors_state_to_string(s->state) : "missing");
+            buffer_json_add_array_item_string(wb, "per-sensor");
+            buffer_json_add_array_item_uint64(wb, 1); // Count - enables grouped sensor-count charts
+
+            // per-kind value columns - they power the per-kind aggregation tiles
+            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_TEMP ? s->input : NAN);
+            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_FAN ? s->input : NAN);
+            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_IN ? s->input : NAN);
+            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_CURR ? s->input : NAN);
+            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_POWER ? s->input : NAN);
+
+            buffer_json_array_close(wb);
+        }
+        dfe_done(s);
+    }
+
+    netdata_mutex_unlock(&sensors_data_mutex);
+
+    buffer_json_array_close(wb); // data
+
+    buffer_json_member_add_object(wb, "columns");
+    {
+        size_t field_id = 0;
+
+        buffer_rrdf_table_add_field(wb, field_id++, "Chart", "Per-Sensor Chart ID",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Label", "Sensor Label",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Kind", "Sensor Kind",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Subsystem", "Hardware Subsystem",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Source", "Discovery Source",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Device", "Device / Chip",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Sensor", "Sensor Identifier",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Reading", "Current Reading",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                3, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Units", "Reading Units",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "State", "Sensor State",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_VISIBLE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Charts", "Charting Mode",
+                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
+                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
+                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Count", "Sensors Count",
+                RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                0, "sensors", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Temperature", "Temperature",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "degrees Celsius", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Fan", "Fan Speed",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                0, "rpm", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Voltage", "Voltage",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                3, "V", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Current", "Current",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                3, "A", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+        buffer_rrdf_table_add_field(wb, field_id++, "Power", "Power",
+                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
+                2, "W", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
+                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+                RRDF_FIELD_OPTS_NONE,
+                NULL);
+    }
+    buffer_json_object_close(wb); // columns
+
+    buffer_json_member_add_string(wb, "default_sort_column", "Label");
+
+    buffer_json_member_add_object(wb, "charts");
+    {
+        buffer_json_member_add_object(wb, "Sensors");
+        {
+            buffer_json_member_add_string(wb, "name", "Sensors");
+            buffer_json_member_add_string(wb, "type", "stacked-bar");
+            buffer_json_member_add_array(wb, "columns");
+            {
+                buffer_json_add_array_item_string(wb, "Count");
+            }
+            buffer_json_array_close(wb);
+        }
+        buffer_json_object_close(wb);
+
+        static const char *kind_charts[] = {"Temperature", "Fan", "Voltage", "Current", "Power"};
+        for (size_t i = 0; i < _countof(kind_charts); i++) {
+            buffer_json_member_add_object(wb, kind_charts[i]);
+            {
+                buffer_json_member_add_string(wb, "name", kind_charts[i]);
+                buffer_json_member_add_string(wb, "type", "stacked-bar");
+                buffer_json_member_add_array(wb, "columns");
+                {
+                    buffer_json_add_array_item_string(wb, kind_charts[i]);
+                }
+                buffer_json_array_close(wb);
+            }
+            buffer_json_object_close(wb);
+        }
+    }
+    buffer_json_object_close(wb); // charts
+
+    buffer_json_member_add_array(wb, "default_charts");
+    {
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Sensors");
+        buffer_json_add_array_item_string(wb, "Subsystem");
+        buffer_json_array_close(wb);
+
+        buffer_json_add_array_item_array(wb);
+        buffer_json_add_array_item_string(wb, "Temperature");
+        buffer_json_add_array_item_string(wb, "Subsystem");
+        buffer_json_array_close(wb);
+    }
+    buffer_json_array_close(wb);
+
+    buffer_json_member_add_object(wb, "group_by");
+    {
+        static const struct {
+            const char *id;
+            const char *name;
+        } groups[] = {
+            {"Kind", "Sensors by Kind"},
+            {"Subsystem", "Sensors by Subsystem"},
+            {"Device", "Sensors by Device"},
+            {"State", "Sensors by State"},
+        };
+
+        for (size_t i = 0; i < _countof(groups); i++) {
+            buffer_json_member_add_object(wb, groups[i].id);
+            {
+                buffer_json_member_add_string(wb, "name", groups[i].name);
+                buffer_json_member_add_array(wb, "columns");
+                {
+                    buffer_json_add_array_item_string(wb, groups[i].id);
+                }
+                buffer_json_array_close(wb);
+            }
+            buffer_json_object_close(wb);
+        }
+    }
+    buffer_json_object_close(wb); // group_by
+
+    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
+    buffer_json_finalize(wb);
+
+    wb->response_code = HTTP_RESP_OK;
+    wb->content_type = CT_APPLICATION_JSON;
+    wb->expires = now_realtime_sec() + 1;
+    pluginsd_function_result_to_stdout(transaction, wb);
+    buffer_free(wb);
+}
+
+void module_libsensors_register_functions(struct functions_evloop_globals *wg) {
+    functions_evloop_add_function(
+        wg, "sensors", libsensors_function_sensors, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
+}
+
 static bool libsensors_running = false;
 static int libsensors_update_every = 1;
 
@@ -1289,19 +1637,36 @@ void libsensors_thread(void *ptr __maybe_unused) {
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
 
+    bool function_declared = false;
+
     while(!nd_thread_signaled_to_cancel()) {
         heartbeat_next(&hb);
 
-        if(sensors_collect_data())
+        netdata_mutex_lock(&sensors_data_mutex);
+        int collect_failed = sensors_collect_data();
+        netdata_mutex_unlock(&sensors_data_mutex);
+
+        if(collect_failed)
             break;
 
         netdata_mutex_lock(&stdout_mutex);
+
+        // expose the function only on hosts that actually have sensors
+        if(!function_declared && dictionary_entries(sensors_dict)) {
+            fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"sensors\" %d \"%s\" \"top\" " HTTP_ACCESS_FORMAT " %d\n",
+                    PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, LIBSENSORS_FUNCTION_SENSORS_HELP,
+                    (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_ANONYMOUS_DATA),
+                    RRDFUNCTIONS_PRIORITY_DEFAULT / 10);
+            function_declared = true;
+        }
 
         SENSOR *s;
         dfe_start_read(sensors_dict, s) {
             sensor_process(s, update_every, "sensors");
         }
         dfe_done(s);
+
+        libsensors_emit_temperature_histogram(update_every, "sensors");
 
         fflush(stdout);
         netdata_mutex_unlock(&stdout_mutex);

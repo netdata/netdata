@@ -136,6 +136,161 @@ bool apps_os_get_pid_cmdline_macos(struct pid_stat *p, char *cmdline, size_t max
     return true;
 }
 
+// --------------------------------------------------------------------------------------------------------------------
+// tree target naming
+//
+// macOS has a flat process tree: launchd (pid 1) spawns almost everything, so
+// the tree fallback would otherwise create one group per distinct process name
+// (hundreds of XPC services, appex widgets, framework helpers and standalone
+// daemons). Instead, we derive the group from the executable path:
+//
+// - Apple's bundle grammar is a stable, decades-old contract: *.app / *.appex
+//   identify applications, *.framework the owning subsystem, *.dext driver
+//   extensions - new macOS components follow it automatically, so this needs
+//   no per-version maintenance.
+// - The system volume is sealed (SIP since 10.11, SSV since 11.0), so path
+//   prefixes reliably separate Apple system binaries from user software.
+//
+// Groups derived for processes not matched by apps_groups.conf:
+// - applications (Apple or not): one group per application bundle
+// - user software: one group per framework bundle; comm for plain binaries
+// - Apple framework helpers: aggregated into "system-frameworks"
+// - Apple standalone daemons: aggregated into "system-daemons"
+// - driver extensions: aggregated into "driver-extensions"
+//
+// apps_groups.conf matches run before tree grouping, so users can re-expose
+// any aggregated component by naming it there.
+
+static const char *apple_system_prefixes[] = {
+    "/System/",         // frameworks, system apps, CoreServices, Cryptexes, iOSSupport
+    "/usr/libexec/",
+    "/usr/sbin/",
+    "/usr/bin/",
+    "/sbin/",
+    "/bin/",
+    "/Library/Apple/",  // Apple-managed additions (e.g. Rosetta)
+};
+
+static bool is_apple_system_path(const char *path) {
+    for(size_t i = 0; i < sizeof(apple_system_prefixes) / sizeof(apple_system_prefixes[0]) ; i++) {
+        if(strncmp(path, apple_system_prefixes[i], strlen(apple_system_prefixes[i])) == 0)
+            return true;
+    }
+    return false;
+}
+
+static bool component_has_suffix(const char *s, size_t len, const char *suffix) {
+    size_t slen = strlen(suffix);
+    return len > slen && strncmp(s + len - slen, suffix, slen) == 0;
+}
+
+static STRING *string_from_path_component(const char *s, size_t len) {
+    char buf[FILENAME_MAX + 1];
+    if(len > FILENAME_MAX) len = FILENAME_MAX;
+    memcpy(buf, s, len);
+    buf[len] = '\0';
+
+    sanitize_apps_plugin_chart_meta(buf);
+    if(!buf[0]) return NULL;
+
+    return string_strdupz(buf);
+}
+
+static bool macos_get_executable_path(pid_t pid, char *path, size_t size) {
+    if(proc_pidpath(pid, path, (uint32_t)size) > 0 && path[0] == '/')
+        return true;
+
+    // proc_pidpath() fails for some entitled/protected processes (e.g. staged
+    // OS-update services); KERN_PROCARGS2 still exposes the executable path
+    // recorded by the kernel at exec time, as its first string.
+    int mib[3] = {CTL_KERN, KERN_PROCARGS2, pid};
+    size_t args_size = 0;
+    if(sysctl(mib, 3, NULL, &args_size, NULL, 0) == -1 || args_size <= sizeof(int))
+        return false;
+
+    char *args = mallocz(args_size);
+    if(sysctl(mib, 3, args, &args_size, NULL, 0) == -1 || args_size <= sizeof(int)) {
+        freez(args);
+        return false;
+    }
+
+    // layout: [argc][executable path]\0[padding]\0[argv[0]]...
+    const char *exec_path = args + sizeof(int);
+    size_t len = strnlen(exec_path, args_size - sizeof(int));
+    bool ok = (len > 0 && len < size && exec_path[0] == '/');
+    if(ok) {
+        memcpy(path, exec_path, len);
+        path[len] = '\0';
+    }
+
+    freez(args);
+    return ok;
+}
+
+STRING *apps_os_tree_target_name_macos(struct pid_stat *p) {
+    // launchd keeps its own name; interpreters keep their script-derived comm
+    if(p->pid == INIT_PID || is_process_an_interpreter(p))
+        return NULL;
+
+    char path[PROC_PIDPATHINFO_MAXSIZE];
+    if(!macos_get_executable_path(p->pid, path, sizeof(path)))
+        return NULL; // no executable path: fall back to comm naming
+
+    const char *app = NULL, *fw = NULL;
+    size_t app_len = 0, fw_len = 0;
+    bool has_dext = false;
+
+    for(const char *s = path + 1; *s ;) {
+        const char *e = strchr(s, '/');
+        size_t len = e ? (size_t)(e - s) : strlen(s);
+
+        if(len) {
+            if(component_has_suffix(s, len, ".framework")) {
+                // keep the innermost framework
+                fw = s;
+                fw_len = len - strlen(".framework");
+            }
+            else if(!app && !fw && component_has_suffix(s, len, ".app")) {
+                // keep the outermost application not owned by a framework
+                app = s;
+                app_len = len - strlen(".app");
+            }
+            else if(!app && !fw && component_has_suffix(s, len, ".appex")) {
+                app = s;
+                app_len = len - strlen(".appex");
+            }
+            else if(component_has_suffix(s, len, ".dext"))
+                has_dext = true;
+        }
+
+        if(!e) break;
+        s = e + 1;
+    }
+
+    // applications keep their own group, Apple or not
+    if(app)
+        return string_from_path_component(app, app_len);
+
+    if(has_dext)
+        return string_strdupz("driver-extensions");
+
+    bool apple = is_apple_system_path(path);
+
+    if(fw) {
+        if(apple)
+            return string_strdupz("system-frameworks");
+
+        // user-land framework helpers (e.g. Xcode's CoreSimulator)
+        return string_from_path_component(fw, fw_len);
+    }
+
+    if(apple)
+        return string_strdupz("system-daemons");
+
+    // user-land plain binaries keep the default comm naming
+    return NULL;
+}
+
 #if MAC_OS_X_VERSION_MIN_REQUIRED >= 110000
 bool apps_os_read_pid_io_macos(struct pid_stat *p, void *ptr) {
     struct pid_info *pi = ptr;

@@ -112,6 +112,7 @@ void apps_managers_and_aggregators_init(void) {
     managed_list_add(&tree.managers, "init");
 #elif defined(OS_MACOS)
     managed_list_add(&tree.managers, "launchd");
+    managed_list_add(&tree.managers, "sshd-session");   // per-connection ssh session managers
 #endif
 
 #if defined(OS_WINDOWS)
@@ -184,11 +185,16 @@ struct target *get_tree_target(struct pid_stat *p) {
         search_for = string_dup(KernelAggregator);
     }
     else {
+        // OS-specific naming (macOS: derived from the executable path)
+        search_for = apps_os_tree_target_name(p);
+
+        if(!search_for) {
 #if (PROCESSES_HAVE_COMM_AND_NAME == 1)
-        search_for = string_dup(p->name ? p->name : p->comm);
+            search_for = string_dup(p->name ? p->name : p->comm);
 #else
-        search_for = string_dup(p->comm);
+            search_for = string_dup(p->comm);
 #endif
+        }
     }
 
     // find an existing target with the required name

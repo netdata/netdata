@@ -236,6 +236,14 @@ int main(int argc, char **argv)
 
     debugfs_parse_args(argc, argv);
 
+    // the event loop for functions served by the modules
+    static bool debugfs_plugin_exit = false;
+    static int debugfs_exit_status = 0;
+    struct functions_evloop_globals *wg =
+        functions_evloop_init(1, "DEBUGFS", &stdout_mutex, &debugfs_plugin_exit, &debugfs_exit_status);
+
+    module_libsensors_register_functions(wg);
+
     size_t iteration;
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
