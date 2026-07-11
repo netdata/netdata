@@ -10,7 +10,9 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-use sfsq_cli::traces::{TraceArgs, run_trace};
+use sfsq_cli::traces::{
+    TagValuesArgs, TagsArgs, TraceArgs, run_tag_values, run_tags, run_trace,
+};
 use sfsq_cli::{Args, init_tracing, is_broken_pipe, run};
 
 /// Inspect OpenTelemetry logs stored in Netdata WAL/SFST files.
@@ -33,6 +35,11 @@ enum Cmd {
     /// Reconstruct one trace across sealed SFSTs and traces WALs
     /// (cross-source trace-by-id over `sfsq::traces`).
     Trace(TraceArgs),
+    /// Enumerate tag keys across sealed SFSTs and traces WALs
+    /// (`sfsq::traces` tag enumeration).
+    Tags(TagsArgs),
+    /// Enumerate one tag's values across sealed SFSTs and traces WALs.
+    TagValues(TagValuesArgs),
 }
 
 fn main() -> ExitCode {
@@ -40,8 +47,14 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     let stdout = io::stdout();
     let mut out = stdout.lock();
-    if let Some(Cmd::Trace(trace_args)) = &cli.cmd {
-        return match run_trace(trace_args, &mut out) {
+    let subcommand = match &cli.cmd {
+        Some(Cmd::Trace(args)) => Some(run_trace(args, &mut out)),
+        Some(Cmd::Tags(args)) => Some(run_tags(args, &mut out)),
+        Some(Cmd::TagValues(args)) => Some(run_tag_values(args, &mut out)),
+        None => None,
+    };
+    if let Some(result) = subcommand {
+        return match result {
             Ok(()) => ExitCode::SUCCESS,
             Err(e) if is_broken_pipe(&e) => ExitCode::SUCCESS,
             Err(e) => {

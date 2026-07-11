@@ -1,12 +1,17 @@
-//! `sfsq-cli trace` — cross-source trace-by-id from the terminal, without
-//! a running agent: the dev/real-use front door of `sfsq::traces`
-//! (phase 4a). Point it at any mix of sealed SFSTs and traces WALs; the
-//! engine merges them through the shared combiner and the tool prints the
-//! trace forest plus the query status.
+//! `sfsq-cli trace` / `tags` / `tag-values` — the traces query engine
+//! from the terminal, without a running agent: the dev/real-use front
+//! door of `sfsq::traces` (phases 4a/4b). Point any subcommand at a mix
+//! of sealed SFSTs and traces WALs; `trace` merges one trace through the
+//! shared combiner, `tags` / `tag-values` enumerate the tag vocabulary
+//! off the dictionaries.
 //!
 //! WAL inputs are served as tail scans over the file's full frame range —
 //! right for shut-down or recovered WALs (the dev case); an actively
 //! written WAL should be queried through a live agent instead.
+//!
+//! The scope/intrinsic spellings here (`--scope span`, `--key status`)
+//! are this DEV TOOL's rendering of the engine's typed vocabulary — not
+//! a wire contract; wire adapters (the Tempo shim) define their own.
 
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -16,8 +21,9 @@ use anyhow::{Context, Result, bail};
 use tokio_util::sync::CancellationToken;
 
 use sfsq::traces::{
-    QueryStatus, SourceId, TraceQuery, TraceSfstCandidate, TraceSource, TraceWalTail, WalCoverage,
-    trace_by_id,
+    QueryStatus, SourceId, TagKey, TagNamesQuery, TagScope, TagValuesQuery, TimeWindow,
+    TraceIntrinsic, TraceQuery, TraceSfstCandidate, TraceSource, TraceWalTail, WalCoverage,
+    tag_names, tag_values, trace_by_id,
 };
 
 /// Reconstruct one trace across sealed SFSTs and traces WALs.
@@ -53,17 +59,15 @@ fn parse_trace_id(s: &str) -> Result<sfst::TraceId> {
     Ok(sfst::TraceId::from(bytes))
 }
 
-pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
-    if args.sfsts.is_empty() && args.wals.is_empty() {
+/// Build the engine source set from CLI paths: sealed SFSTs by summary
+/// read (maps header/TOC/SUMR pages only — the engine maps the file
+/// separately for the actual work), WALs as whole-range tails.
+fn build_sources(sfsts: &[PathBuf], wals: &[PathBuf]) -> Result<Vec<TraceSource>> {
+    if sfsts.is_empty() && wals.is_empty() {
         bail!("provide at least one --sfst or --wal source");
     }
-    let trace_id = parse_trace_id(&args.trace_id)?;
-
     let mut sources: Vec<TraceSource> = Vec::new();
-    for path in &args.sfsts {
-        // Summary only — maps the file and faults in header/TOC/SUMR
-        // pages, never the whole file (the engine maps it separately for
-        // the actual lookup).
+    for path in sfsts {
         let summary = sfst::read_summary_path(path)
             .with_context(|| format!("not a readable SFST: {}", path.display()))?;
         sources.push(TraceSource::Sfst(TraceSfstCandidate {
@@ -73,7 +77,7 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
             coverage: None,
         }));
     }
-    for path in &args.wals {
+    for path in wals {
         let len = std::fs::metadata(path)
             .with_context(|| format!("stat {}", path.display()))?
             .len();
@@ -93,6 +97,12 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
             },
         }));
     }
+    Ok(sources)
+}
+
+pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
+    let trace_id = parse_trace_id(&args.trace_id)?;
+    let sources = build_sources(&args.sfsts, &args.wals)?;
 
     let mut query = TraceQuery::new(trace_id);
     if let Some(cap) = args.span_cap {
@@ -156,4 +166,263 @@ pub fn run_trace(args: &TraceArgs, out: &mut dyn std::io::Write) -> Result<()> {
         }
     }
     Ok(())
+}
+
+// ── Tag enumeration (phase 4b) ─────────────────────────────────────────
+
+/// A [`TagScope`] as a CLI word (this tool's rendering, not a wire
+/// contract).
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub enum ScopeArg {
+    Resource,
+    Span,
+    Instrumentation,
+    Event,
+    Link,
+    Intrinsic,
+}
+
+impl From<ScopeArg> for TagScope {
+    fn from(s: ScopeArg) -> TagScope {
+        match s {
+            ScopeArg::Resource => TagScope::Resource,
+            ScopeArg::Span => TagScope::Span,
+            ScopeArg::Instrumentation => TagScope::Instrumentation,
+            ScopeArg::Event => TagScope::Event,
+            ScopeArg::Link => TagScope::Link,
+            ScopeArg::Intrinsic => TagScope::Intrinsic,
+        }
+    }
+}
+
+/// The CLI spelling of each intrinsic (kebab-case), used by `--key`
+/// under `--scope intrinsic` and by the output rendering.
+const INTRINSIC_WORDS: [(&str, TraceIntrinsic); 17] = [
+    ("name", TraceIntrinsic::Name),
+    ("kind", TraceIntrinsic::Kind),
+    ("status", TraceIntrinsic::Status),
+    ("status-message", TraceIntrinsic::StatusMessage),
+    ("instrumentation-name", TraceIntrinsic::InstrumentationName),
+    ("instrumentation-version", TraceIntrinsic::InstrumentationVersion),
+    ("event-name", TraceIntrinsic::EventName),
+    ("duration", TraceIntrinsic::Duration),
+    ("span-id", TraceIntrinsic::SpanId),
+    ("parent-span-id", TraceIntrinsic::ParentSpanId),
+    ("trace-id", TraceIntrinsic::TraceId),
+    ("link-span-id", TraceIntrinsic::LinkSpanId),
+    ("link-trace-id", TraceIntrinsic::LinkTraceId),
+    ("event-time-since-start", TraceIntrinsic::EventTimeSinceStart),
+    ("root-name", TraceIntrinsic::RootName),
+    ("root-service-name", TraceIntrinsic::RootServiceName),
+    ("trace-duration", TraceIntrinsic::TraceDuration),
+];
+
+fn scope_word(scope: TagScope) -> &'static str {
+    match scope {
+        TagScope::Resource => "resource",
+        TagScope::Span => "span",
+        TagScope::Instrumentation => "instrumentation",
+        TagScope::Event => "event",
+        TagScope::Link => "link",
+        TagScope::Intrinsic => "intrinsic",
+    }
+}
+
+fn key_word(key: &TagKey) -> String {
+    match key {
+        TagKey::Attribute(a) => a.clone(),
+        TagKey::Intrinsic(i) => INTRINSIC_WORDS
+            .iter()
+            .find(|(_, v)| v == i)
+            .map(|(w, _)| (*w).to_string())
+            .expect("every intrinsic has a CLI word"),
+    }
+}
+
+/// Parse `--key` against the scope: attribute scopes take the bare key
+/// verbatim; the intrinsic scope takes one of the kebab-case words.
+fn parse_key(scope: TagScope, key: &str) -> Result<TagKey> {
+    if scope != TagScope::Intrinsic {
+        return Ok(TagKey::Attribute(key.to_string()));
+    }
+    INTRINSIC_WORDS
+        .iter()
+        .find(|(w, _)| *w == key)
+        .map(|(_, i)| TagKey::Intrinsic(*i))
+        .ok_or_else(|| {
+            let words: Vec<&str> = INTRINSIC_WORDS.iter().map(|(w, _)| *w).collect();
+            anyhow::anyhow!("unknown intrinsic {key:?}; one of: {}", words.join(", "))
+        })
+}
+
+/// Both-or-neither `--start-ns`/`--end-ns` into an engine window.
+fn parse_window(start_ns: Option<i64>, end_ns: Option<i64>) -> Result<Option<TimeWindow>> {
+    match (start_ns, end_ns) {
+        (None, None) => Ok(None),
+        (Some(s), Some(e)) => Ok(Some(TimeWindow::new(s, e)?)),
+        _ => bail!("--start-ns and --end-ns must be given together"),
+    }
+}
+
+fn status_word(status: &QueryStatus) -> String {
+    match status {
+        QueryStatus::Complete => "complete".to_string(),
+        QueryStatus::Partial(reasons) => format!("PARTIAL {reasons:?}"),
+    }
+}
+
+/// Enumerate tag keys across sealed SFSTs and traces WALs.
+#[derive(Debug, clap::Args)]
+pub struct TagsArgs {
+    /// A sealed traces SFST file. Repeatable.
+    #[arg(long = "sfst")]
+    pub sfsts: Vec<PathBuf>,
+
+    /// A flattened traces WAL file, scanned whole as a tail. Repeatable.
+    #[arg(long = "wal")]
+    pub wals: Vec<PathBuf>,
+
+    /// Enumerate only one scope.
+    #[arg(long, value_enum)]
+    pub scope: Option<ScopeArg>,
+
+    /// Cap the key list (exact truncation flag); 0 is rejected.
+    #[arg(long)]
+    pub max_keys: Option<usize>,
+
+    /// Window start, nanoseconds since the epoch (half-open; file-granular
+    /// pruning). Requires --end-ns.
+    #[arg(long, allow_hyphen_values = true)]
+    pub start_ns: Option<i64>,
+
+    /// Window end, nanoseconds since the epoch (exclusive). Requires
+    /// --start-ns.
+    #[arg(long, allow_hyphen_values = true)]
+    pub end_ns: Option<i64>,
+}
+
+pub fn run_tags(args: &TagsArgs, out: &mut dyn std::io::Write) -> Result<()> {
+    let sources = build_sources(&args.sfsts, &args.wals)?;
+    let mut query = TagNamesQuery::new();
+    if let Some(scope) = args.scope {
+        query = query.scope(scope.into());
+    }
+    if let Some(max) = args.max_keys {
+        query = query.max_keys(max);
+    }
+    if let Some(window) = parse_window(args.start_ns, args.end_ns)? {
+        query = query.window(window);
+    }
+    let data = tag_names(
+        sources,
+        query,
+        CancellationToken::new(),
+        Arc::new(AtomicUsize::new(0)),
+    )?;
+    for (scope, key) in &data.keys {
+        writeln!(out, "{} {}", scope_word(*scope), key_word(key))?;
+    }
+    writeln!(
+        out,
+        "{} key(s), truncated {}, status {}",
+        data.keys.len(),
+        data.truncated,
+        status_word(&data.status),
+    )?;
+    Ok(())
+}
+
+/// Enumerate one tag's values across sealed SFSTs and traces WALs.
+#[derive(Debug, clap::Args)]
+pub struct TagValuesArgs {
+    /// A sealed traces SFST file. Repeatable.
+    #[arg(long = "sfst")]
+    pub sfsts: Vec<PathBuf>,
+
+    /// A flattened traces WAL file, scanned whole as a tail. Repeatable.
+    #[arg(long = "wal")]
+    pub wals: Vec<PathBuf>,
+
+    /// The tag's scope.
+    #[arg(long, value_enum)]
+    pub scope: ScopeArg,
+
+    /// The tag key: the bare attribute name, or (under --scope intrinsic)
+    /// an intrinsic word such as `status` or `event-name`.
+    #[arg(long)]
+    pub key: String,
+
+    /// Cap the value list (exact truncation flag); 0 is rejected.
+    #[arg(long)]
+    pub max_values: Option<usize>,
+
+    /// Window start, nanoseconds since the epoch (half-open; file-granular
+    /// pruning). Requires --end-ns.
+    #[arg(long, allow_hyphen_values = true)]
+    pub start_ns: Option<i64>,
+
+    /// Window end, nanoseconds since the epoch (exclusive). Requires
+    /// --start-ns.
+    #[arg(long, allow_hyphen_values = true)]
+    pub end_ns: Option<i64>,
+}
+
+pub fn run_tag_values(args: &TagValuesArgs, out: &mut dyn std::io::Write) -> Result<()> {
+    let scope: TagScope = args.scope.into();
+    let key = parse_key(scope, &args.key)?;
+    let sources = build_sources(&args.sfsts, &args.wals)?;
+    let mut query = TagValuesQuery::new(scope, key);
+    if let Some(max) = args.max_values {
+        query = query.max_values(max);
+    }
+    if let Some(window) = parse_window(args.start_ns, args.end_ns)? {
+        query = query.window(window);
+    }
+    let data = tag_values(
+        sources,
+        query,
+        CancellationToken::new(),
+        Arc::new(AtomicUsize::new(0)),
+    )?;
+    for v in &data.values {
+        let kind = v
+            .kind
+            .map(|k| format!("{k:?}"))
+            .unwrap_or_else(|| "none".to_string());
+        writeln!(out, "{} kind={kind}", v.value)?;
+    }
+    writeln!(
+        out,
+        "{} value(s), truncated {}, status {}",
+        data.values.len(),
+        data.truncated,
+        status_word(&data.status),
+    )?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The CLI word table must stay in lockstep with the engine's
+    /// intrinsic set: a variant without a word would make `key_word`
+    /// PANIC while rendering `tags` output (the parse side already
+    /// fails gracefully). Walks the engine's `ALL`, so adding an
+    /// intrinsic engine-side breaks this test until the CLI learns it.
+    #[test]
+    fn every_intrinsic_has_a_cli_word() {
+        for intrinsic in TraceIntrinsic::ALL {
+            assert!(
+                INTRINSIC_WORDS.iter().any(|(_, v)| *v == intrinsic),
+                "intrinsic {intrinsic:?} has no CLI word in INTRINSIC_WORDS"
+            );
+        }
+        // And the table holds nothing stale: same size, distinct words.
+        assert_eq!(INTRINSIC_WORDS.len(), TraceIntrinsic::ALL.len());
+        let mut words: Vec<&str> = INTRINSIC_WORDS.iter().map(|(w, _)| *w).collect();
+        words.sort_unstable();
+        words.dedup();
+        assert_eq!(words.len(), INTRINSIC_WORDS.len(), "duplicate CLI words");
+    }
 }

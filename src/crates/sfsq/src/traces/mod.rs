@@ -1,5 +1,5 @@
 //! Multi-source trace-query subsystem (phase 4a: cross-source
-//! trace-by-id).
+//! trace-by-id; phase 4b: tag / tag-value enumeration).
 //!
 //! Same philosophy as [`logs`](crate::logs): neutral, transport-free —
 //! plain Rust data in and out, no wire concerns; the consumer (the Tempo
@@ -24,6 +24,8 @@
 mod by_id;
 mod sources;
 mod status;
+mod tags;
+mod vocab;
 mod wal_scan;
 
 pub use by_id::{DEFAULT_SPAN_CAP, FieldKinds, TraceData, TraceQuery, TraceRequestError, trace_by_id};
@@ -32,4 +34,9 @@ pub use sources::{
     validate_sources,
 };
 pub use status::{PartialReason, QueryStatus, StatusBuilder};
+pub use tags::{
+    TagNamesData, TagNamesQuery, TagRequestError, TagValue, TagValuesData, TagValuesQuery,
+    TimeWindow, tag_names, tag_values,
+};
+pub use vocab::{TagKey, TagScope, TraceIntrinsic, storage_to_tag};
 pub use wal_scan::{TraceScanError, TraceWalScan};

@@ -7,248 +7,22 @@
 //! UNSET ids, and mixed part_keys. Plus the status-honesty contract:
 //! failures, caps, and cancellation are reported, never silent.
 
-use std::path::{Path, PathBuf};
+mod common;
+
 use std::sync::Arc;
 use std::sync::atomic::AtomicUsize;
 
-use file_registry::{ByteSize, MonotonicClock};
-use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
-use opentelemetry_proto::tonic::common::v1::{AnyValue, KeyValue, any_value::Value as Av};
-use opentelemetry_proto::tonic::resource::v1::Resource;
-use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span};
 use tokio_util::sync::CancellationToken;
 
+use common::{
+    SpanSpec, TRACE, kv_double, kv_int, kv_str, memory_source, req, sealed_source, sp,
+    tail_source, write_wal,
+};
 use sfsq::Source;
 use sfsq::traces::{
-    PartialReason, QueryStatus, SourceId, TraceQuery, TraceSfstCandidate, TraceSource,
-    TraceWalTail, WalCoverage, trace_by_id,
+    PartialReason, SourceId, TraceQuery, TraceSfstCandidate, TraceSource,
+    WalCoverage, trace_by_id,
 };
-
-const TRACE: [u8; 16] = [0xABu8; 16];
-
-fn kv_str(k: &str, v: &str) -> KeyValue {
-    KeyValue {
-        key: k.into(),
-        value: Some(AnyValue {
-            value: Some(Av::StringValue(v.into())),
-        }),
-    }
-}
-
-fn kv_int(k: &str, v: i64) -> KeyValue {
-    KeyValue {
-        key: k.into(),
-        value: Some(AnyValue {
-            value: Some(Av::IntValue(v)),
-        }),
-    }
-}
-
-fn kv_double(k: &str, v: f64) -> KeyValue {
-    KeyValue {
-        key: k.into(),
-        value: Some(AnyValue {
-            value: Some(Av::DoubleValue(v)),
-        }),
-    }
-}
-
-#[derive(Clone)]
-struct SpanSpec {
-    id: [u8; 8],
-    parent: [u8; 8],
-    start: u64,
-    end: u64,
-    name: &'static str,
-    kind: i32,
-    attrs: Vec<KeyValue>,
-    events: Vec<(&'static str, Vec<KeyValue>)>,
-    links: Vec<([u8; 16], [u8; 8], Vec<KeyValue>)>,
-}
-
-fn sp(id: u8, parent: u8, start: u64, name: &'static str) -> SpanSpec {
-    SpanSpec {
-        id: [id; 8],
-        parent: [parent; 8],
-        start,
-        end: start + 50,
-        name,
-        kind: 0,
-        attrs: Vec::new(),
-        events: Vec::new(),
-        links: Vec::new(),
-    }
-}
-
-fn to_otlp(s: &SpanSpec) -> Span {
-    use opentelemetry_proto::tonic::trace::v1::span::{Event, Link};
-    Span {
-        trace_id: TRACE.to_vec(),
-        span_id: s.id.to_vec(),
-        parent_span_id: if s.parent == [0u8; 8] {
-            Vec::new()
-        } else {
-            s.parent.to_vec()
-        },
-        start_time_unix_nano: s.start,
-        end_time_unix_nano: s.end,
-        name: s.name.into(),
-        kind: s.kind,
-        attributes: s.attrs.clone(),
-        events: s
-            .events
-            .iter()
-            .map(|(name, attrs)| Event {
-                time_unix_nano: s.start + 1,
-                name: (*name).into(),
-                attributes: attrs.clone(),
-                ..Default::default()
-            })
-            .collect(),
-        links: s
-            .links
-            .iter()
-            .map(|(tid, sid, attrs)| Link {
-                trace_id: tid.to_vec(),
-                span_id: sid.to_vec(),
-                attributes: attrs.clone(),
-                ..Default::default()
-            })
-            .collect(),
-        ..Default::default()
-    }
-}
-
-fn req(spans: &[SpanSpec]) -> ExportTraceServiceRequest {
-    ExportTraceServiceRequest {
-        resource_spans: vec![ResourceSpans {
-            resource: Some(Resource {
-                attributes: vec![kv_str("service.name", "svc")],
-                ..Default::default()
-            }),
-            scope_spans: vec![ScopeSpans {
-                spans: spans.iter().map(to_otlp).collect(),
-                ..Default::default()
-            }],
-            ..Default::default()
-        }],
-    }
-}
-
-/// Write requests into a fresh traces WAL under `dir`, one frame per
-/// request, returning the WAL path. `meta_tag` differentiates part_key /
-/// content_meta blobs across "streams" (the engine must not care).
-fn write_wal(dir: &Path, reqs: Vec<ExportTraceServiceRequest>, meta_tag: &str) -> PathBuf {
-    let sub = dir.join(format!("wal-{meta_tag}-{}", rand_suffix()));
-    std::fs::create_dir_all(&sub).unwrap();
-    let seq = Arc::new(wal::SeqAllocator::ephemeral(0));
-    let config = wal::Config {
-        rotation: wal::RotationConfig {
-            max_entries: usize::MAX,
-            max_file_size: ByteSize(u64::MAX),
-            max_duration: None,
-        },
-        crc_enabled: true,
-        compression_enabled: true,
-    };
-    let mut writer = wal::Writer::new(
-        &sub,
-        config,
-        seq,
-        wal::FileStamp {
-            pipeline_id: 1,
-            payload_format: ng_flatten::TRACE_FRAME_PAYLOAD_FORMAT,
-        },
-        wal::test_identity(),
-    )
-    .unwrap();
-    let mut clock = MonotonicClock::new();
-    for mut r in reqs {
-        let count: usize = r
-            .resource_spans
-            .iter()
-            .flat_map(|rs| rs.scope_spans.iter())
-            .map(|ss| ss.spans.len())
-            .sum();
-        if count == 0 {
-            continue;
-        }
-        let base = clock.now_ns().as_u64();
-        ng_flatten::normalize_trace_request(&mut r, base, None);
-        let (flat, _) = ng_flatten::flatten_trace_request(r);
-        let data = ng_flatten::encode_trace_frame(&flat).unwrap();
-        writer
-            .write_frame(
-                0,
-                meta_tag.as_bytes(),
-                &data,
-                wal::FrameMeta {
-                    entry_count: count,
-                    ingestion_ns: clock.now_ns(),
-                    log_ts_range: None,
-                },
-            )
-            .unwrap();
-    }
-    writer.shutdown_all().unwrap();
-    std::fs::read_dir(&sub)
-        .unwrap()
-        .filter_map(Result::ok)
-        .map(|e| e.path())
-        .find(|p| p.extension().is_some_and(|x| x == "wal"))
-        .expect("a wal file was written")
-}
-
-fn rand_suffix() -> String {
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static N: AtomicU64 = AtomicU64::new(0);
-    format!("{}", N.fetch_add(1, Ordering::Relaxed))
-}
-
-/// The whole WAL's frame range (header to EOF — a shut-down test WAL).
-fn whole_range(wal_path: &Path) -> wal::FrameRange {
-    let len = std::fs::metadata(wal_path).unwrap().len();
-    wal::FrameRange::new(wal::HEADER_SIZE as u64, len)
-}
-
-fn sealed_source(dir: &Path, wal_path: &Path, id: &str) -> TraceSource {
-    let out = dir.join(format!("{id}.sfst"));
-    ng_index::build_sfst_traces_file(wal_path, &out, &ng_index::Metrics::new()).unwrap();
-    let bytes = std::fs::read(&out).unwrap();
-    let summary = sfst::read_summary(&bytes).unwrap();
-    TraceSource::Sfst(TraceSfstCandidate {
-        source_id: SourceId::new(id.to_string()),
-        summary,
-        source: Source::File(out),
-        coverage: None,
-    })
-}
-
-fn memory_source(wal_path: &Path, id: &str) -> TraceSource {
-    let range = whole_range(wal_path);
-    let (summary, bytes) = ng_index::build_sfst_traces_range(wal_path, range).unwrap();
-    TraceSource::Sfst(TraceSfstCandidate {
-        source_id: SourceId::new(id.to_string()),
-        summary,
-        source: Source::Memory(Arc::new(bytes)),
-        coverage: Some(WalCoverage {
-            wal_id: id.into(),
-            range,
-        }),
-    })
-}
-
-fn tail_source(wal_path: &Path, id: &str) -> TraceSource {
-    let range = whole_range(wal_path);
-    TraceSource::Tail(TraceWalTail {
-        source_id: SourceId::new(id.to_string()),
-        path: wal_path.to_owned(),
-        coverage: WalCoverage {
-            wal_id: id.into(),
-            range,
-        },
-    })
-}
 
 fn run(sources: Vec<TraceSource>) -> sfsq::traces::TraceData {
     trace_by_id(
@@ -444,8 +218,8 @@ fn unequal_resends_pick_the_same_canonical_copy_however_split() {
     let mut late = sp(7, 0, 900, "late-copy");
     late.end = 950;
 
-    let wal_early = write_wal(dir.path(), vec![req(&[early.clone()])], "e");
-    let wal_late = write_wal(dir.path(), vec![req(&[late.clone()])], "l");
+    let wal_early = write_wal(dir.path(), vec![req(std::slice::from_ref(&early))], "e");
+    let wal_late = write_wal(dir.path(), vec![req(std::slice::from_ref(&late))], "l");
 
     let a = run(vec![
         sealed_source(dir.path(), &wal_early, "s-early"),
@@ -540,19 +314,11 @@ fn request_validation_rejects_unset_id_zero_cap_and_bad_source_sets() {
         sfsq::traces::TraceRequestError::SourceSet(_)
     ));
 
-    // Overlapping WAL coverage (chunk and tail over intersecting ranges).
+    // Overlapping WAL coverage (chunk and tail over intersecting ranges
+    // of the same WAL — both helpers derive wal_id from the path, so the
+    // collision is caught exactly as in production).
     let err = trace_by_id(
-        vec![memory_source(&wal, "one-wal"), {
-            let range = whole_range(&wal);
-            TraceSource::Tail(TraceWalTail {
-                source_id: SourceId::new("one-wal-tail"),
-                path: wal.clone(),
-                coverage: WalCoverage {
-                    wal_id: "one-wal".into(),
-                    range,
-                },
-            })
-        }],
+        vec![memory_source(&wal, "one-wal"), tail_source(&wal, "one-wal-tail")],
         TraceQuery::new(sfst::TraceId::from(TRACE)),
         CancellationToken::new(),
         Arc::new(AtomicUsize::new(0)),

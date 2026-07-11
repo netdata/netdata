@@ -36,6 +36,7 @@
 //! crafted frames is part of the deferred DoS-hardening follow-up
 //! (user ruling, phase 3 — tracked in the plan repo).
 
+use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use sfst::{SpanRef, SpanSource, TraceEvent, TraceLink, TraceSpan};
@@ -77,6 +78,17 @@ pub struct TraceWalScan {
     /// (`ng_index::to_sfst_tree` + `derive_scalar_kinds`), so tail and
     /// sealed kinds agree by construction.
     field_kinds: Vec<(String, sfst::ValueKind)>,
+    /// Storage field → distinct rendered values over the scanned frames —
+    /// the tail's counterpart of a sealed file's value dictionaries, for
+    /// tag enumeration. Built from EXACTLY the entry set the seal interns
+    /// (phase-4b pin C5): resource ∪ scope ∪ span entries (including
+    /// `_kind`/`_status_code`/`trace_state`; the mapping layer filters,
+    /// same as for sealed field tables) PLUS the structured
+    /// `events.name`, `events.attributes.*`, `links.attributes.*` under
+    /// their storage prefixes. Values render through the same
+    /// [`ng_flatten::build_kv`] as the sealed dictionaries, so tail and
+    /// sealed value bytes agree by construction.
+    pair_table: BTreeMap<String, BTreeSet<String>>,
 }
 
 impl TraceWalScan {
@@ -102,7 +114,17 @@ impl TraceWalScan {
         }
         let mut spans: Vec<DecodedSpan> = Vec::new();
         let mut kv = String::new();
+        let mut pair_table: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
         let mut frame_no = 0u64;
+        // Storage keys never contain '=' (the flattener sanitizes them),
+        // so the first '=' is always the key/value boundary; the value
+        // keeps any '=' of its own.
+        fn split_kv(kv: &str) -> (String, String) {
+            match kv.split_once('=') {
+                Some((k, v)) => (k.to_string(), v.to_string()),
+                None => (kv.to_string(), String::new()),
+            }
+        }
         // Accumulates the frames' typed schema trees — the source of the
         // field-kind map, exactly as the seal accumulates its on-disk tree.
         let mut flattener = ng_flatten::Flattener::new();
@@ -120,43 +142,47 @@ impl TraceWalScan {
             let paths: Vec<String> = (0..tree.len() as ng_flatten::NodeId)
                 .map(|id| tree.path(id))
                 .collect();
-            let render = |entries: &[ng_flatten::Entry], kv: &mut String| -> Vec<(String, String)> {
+            // Every renderer records the FULL storage pair into the tag
+            // pair table (pin C5) before any prefix stripping.
+            type PairTable = BTreeMap<String, BTreeSet<String>>;
+            let render = |entries: &[ng_flatten::Entry],
+                          kv: &mut String,
+                          table: &mut PairTable|
+             -> Vec<(String, String)> {
                 entries
                     .iter()
                     .map(|e| {
                         ng_flatten::build_kv(&paths[e.node as usize], &e.value, kv);
-                        match kv.split_once('=') {
-                            Some((k, v)) => (k.to_string(), v.to_string()),
-                            None => (kv.clone(), String::new()),
-                        }
+                        let (k, v) = split_kv(kv);
+                        table.entry(k.clone()).or_default().insert(v.clone());
+                        (k, v)
                     })
                     .collect()
             };
             // An attribute entry rendered with its scope prefix stripped —
             // the tail counterpart of the sealed path's `kv_attr`.
-            let render_attr =
-                |e: &ng_flatten::Entry, prefix: &str, kv: &mut String| -> (String, String) {
-                    ng_flatten::build_kv(&paths[e.node as usize], &e.value, kv);
-                    match kv.split_once('=') {
-                        Some((k, v)) => (
-                            k.strip_prefix(prefix).unwrap_or(k).to_string(),
-                            v.to_string(),
-                        ),
-                        None => (kv.clone(), String::new()),
-                    }
-                };
+            let render_attr = |e: &ng_flatten::Entry,
+                               prefix: &str,
+                               kv: &mut String,
+                               table: &mut PairTable|
+             -> (String, String) {
+                ng_flatten::build_kv(&paths[e.node as usize], &e.value, kv);
+                let (k, v) = split_kv(kv);
+                table.entry(k.clone()).or_default().insert(v.clone());
+                (k.strip_prefix(prefix).map(str::to_string).unwrap_or(k), v)
+            };
 
             for rg in &flattened.resources {
-                let resource_fields = render(&rg.resource, &mut kv);
+                let resource_fields = render(&rg.resource, &mut kv, &mut pair_table);
                 for sg in &rg.scopes {
-                    let scope_fields = render(&sg.scope, &mut kv);
+                    let scope_fields = render(&sg.scope, &mut kv, &mut pair_table);
                     for record in &sg.spans {
                         let mut fields = Vec::with_capacity(
                             resource_fields.len() + scope_fields.len() + record.entries.len(),
                         );
                         fields.extend_from_slice(&resource_fields);
                         fields.extend_from_slice(&scope_fields);
-                        fields.extend(render(&record.entries, &mut kv));
+                        fields.extend(render(&record.entries, &mut kv, &mut pair_table));
                         let kind = fields
                             .iter()
                             .find(|(k, _)| k == "_kind")
@@ -173,15 +199,22 @@ impl TraceWalScan {
                                         &ev.name.value,
                                         &mut kv,
                                     );
-                                    kv.split_once('=')
-                                        .map(|(_, v)| v.to_string())
-                                        .unwrap_or_default()
+                                    let (k, v) = split_kv(&kv);
+                                    pair_table.entry(k).or_default().insert(v.clone());
+                                    v
                                 },
                                 dropped_attributes_count: ev.dropped_attributes_count,
                                 attributes: ev
                                     .attributes
                                     .iter()
-                                    .map(|e| render_attr(e, "events.attributes.", &mut kv))
+                                    .map(|e| {
+                                        render_attr(
+                                            e,
+                                            "events.attributes.",
+                                            &mut kv,
+                                            &mut pair_table,
+                                        )
+                                    })
                                     .collect(),
                             })
                             .collect();
@@ -197,7 +230,14 @@ impl TraceWalScan {
                                 attributes: l
                                     .attributes
                                     .iter()
-                                    .map(|e| render_attr(e, "links.attributes.", &mut kv))
+                                    .map(|e| {
+                                        render_attr(
+                                            e,
+                                            "links.attributes.",
+                                            &mut kv,
+                                            &mut pair_table,
+                                        )
+                                    })
                                     .collect(),
                             })
                             .collect();
@@ -228,7 +268,11 @@ impl TraceWalScan {
             return Err(TraceScanError::TooManySpans(spans.len()));
         }
         let field_kinds = ng_index::to_sfst_tree(&flattener.into_tree()).derive_scalar_kinds();
-        Ok(TraceWalScan { spans, field_kinds })
+        Ok(TraceWalScan {
+            spans,
+            field_kinds,
+            pair_table,
+        })
     }
 
     /// Number of decoded spans in the range.
@@ -240,6 +284,12 @@ impl TraceWalScan {
     /// struct field's doc).
     pub fn field_kinds(&self) -> &[(String, sfst::ValueKind)] {
         &self.field_kinds
+    }
+
+    /// Storage field → distinct rendered values over the scanned frames
+    /// (see the struct field's doc) — the tail's tag dictionaries.
+    pub fn pair_table(&self) -> &BTreeMap<String, BTreeSet<String>> {
+        &self.pair_table
     }
 }
 

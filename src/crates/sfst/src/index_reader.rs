@@ -487,6 +487,59 @@ impl<'a> IndexReader<'a> {
         Ok(table)
     }
 
+    /// Enumerate the distinct stored values of one field, in the
+    /// dictionary's sorted order, with the `field=` prefix stripped by
+    /// LENGTH (values may themselves contain `=`; splitting on the first
+    /// `=` would truncate them).
+    ///
+    /// Reads only the field's own dictionary chunk (primary FST prefix
+    /// scan, MF FST, or HF arena) — never stream batches, per-row
+    /// columns, or the trace index/bloom — which is what makes tag-value
+    /// enumeration affordable across whole retention. A field absent
+    /// from this file's field table is [`Error::UnknownField`] (callers
+    /// consult [`field_table`](Self::field_table) first; filtering-style
+    /// absent-matches-nothing is the caller's call to make, not this
+    /// accessor's).
+    pub fn field_values(&self, field_name: &str) -> Result<Vec<String>, crate::Error> {
+        // Storage field names never contain '=' (the flattener rewrites it
+        // to '_' at intern time). A '='-containing name therefore can
+        // never match this file's field table, so the locate_field gate
+        // below returns UnknownField before any prefix work — in release
+        // builds included; the length strip is unreachable for such
+        // names on well-formed files. The assert documents the invariant
+        // loudly for development.
+        debug_assert!(
+            !field_name.contains('='),
+            "field names must not contain '=' (flattener invariant)"
+        );
+        let prefix_len = field_name.len() + 1; // strip "field=" → the value bytes
+        let mut out = Vec::new();
+        match self.locate_field(field_name) {
+            None => return Err(crate::Error::UnknownField(field_name.to_string())),
+            Some(FieldLocation::Low) => {
+                let prefix = format!("{field_name}=");
+                for (kv_bytes, _) in self.primary.prefix_pairs(prefix.as_bytes()) {
+                    out.push(String::from_utf8_lossy(&kv_bytes[prefix_len..]).into_owned());
+                }
+            }
+            // Every key in a mid/high chunk belongs to this one field.
+            Some(FieldLocation::Mid(idx)) => {
+                let chunk = self.sfst.mid_field(idx)?;
+                chunk.for_each(|kv_bytes, _| {
+                    out.push(String::from_utf8_lossy(&kv_bytes[prefix_len..]).into_owned());
+                });
+            }
+            Some(FieldLocation::High(idx)) => {
+                let hf = self.sfst.high_field(idx)?;
+                out.extend(
+                    hf.keys()
+                        .map(|k| String::from_utf8_lossy(&k[prefix_len..]).into_owned()),
+                );
+            }
+        }
+        Ok(out)
+    }
+
     /// Resolve sorted, deduplicated KvIds to their `key=value` strings,
     /// decoding only the chunks whose fields the ids touch.
     ///
