@@ -68,7 +68,7 @@ modules:
               default_value: 1
               required: false
             - name: command options
-              description: Additinal parameters for collector
+              description: Additional parameters for collector
               default_value: ""
               required: false
         examples:
@@ -211,7 +211,7 @@ modules:
               default_value: 1
               required: false
             - name: command options
-              description: Additinal parameters for collector
+              description: Additional parameters for collector
               default_value: ""
               required: false
         examples:
@@ -353,7 +353,7 @@ modules:
               default_value: 1
               required: false
             - name: command options
-              description: Additinal parameters for collector
+              description: Additional parameters for collector
               default_value: ""
               required: false
         examples:
@@ -608,7 +608,7 @@ modules:
               default_value: 1
               required: false
             - name: command options
-              description: Additinal parameters for collector
+              description: Additional parameters for collector
               default_value: ""
               required: false
         examples:

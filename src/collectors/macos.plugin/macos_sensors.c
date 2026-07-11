@@ -1423,8 +1423,11 @@ int do_macos_sensors(int update_every, usec_t dt __maybe_unused)
 
     netdata_mutex_unlock(&macos_sensors_mutex);
 
-    // expose the function only on hosts that actually have sensors
-    // (only this collection thread mutates the sensors list)
+    // expose the function only on hosts that actually have sensors.
+    // reading sensor_charts_root without the mutex is safe: collection (add),
+    // this check, and macos_sensors_cleanup() (remove - a pthread cleanup
+    // handler of this same plugin thread) all run on this thread; the
+    // function workers are the only other readers and they take the mutex
     static bool function_registered = false;
     if (unlikely(!function_registered && sensor_charts_root)) {
         rrd_function_add_inline(localhost, NULL, "sensors", 10,

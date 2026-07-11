@@ -1022,9 +1022,11 @@ void do_Sensors_cleanup()
         memset(&sensors_temperature_histogram, 0, sizeof(sensors_temperature_histogram));
     }
 
-    __netdata_mutex_destroy(&sensors_mutex);
+    // destroy the mutex last, in case a future dictionary delete callback
+    // ever needs it (today none does; the sensor thread is already joined)
     dictionary_destroy(sensors);
     sensors = NULL;
+    __netdata_mutex_destroy(&sensors_mutex);
     // Note: pSensorManager is owned and cleaned up by the sensor thread itself
     // No additional cleanup needed here since the thread has already released resources
 }
