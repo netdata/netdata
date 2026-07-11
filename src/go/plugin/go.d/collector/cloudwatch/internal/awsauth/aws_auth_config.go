@@ -22,14 +22,19 @@ const (
 	CredentialTypeStatic  = "static"
 )
 
+// StaticCredentialConfig contains explicit long-lived or temporary AWS credentials.
+type StaticCredentialConfig struct {
+	AccessKeyID     string `yaml:"access_key_id,omitempty" json:"access_key_id,omitempty"`
+	SecretAccessKey string `yaml:"secret_access_key,omitempty" json:"secret_access_key,omitempty"`
+	SessionToken    string `yaml:"session_token,omitempty" json:"session_token,omitempty"`
+}
+
 // CredentialConfig describes only how the base AWS credentials are acquired.
 // Which identity is monitored, including optional role assumption, is a separate
 // Identity compiled from a CloudWatch target.
 type CredentialConfig struct {
-	Type            string `yaml:"type" json:"type"`
-	AccessKeyID     string `yaml:"access_key_id,omitempty" json:"access_key_id,omitempty"`
-	SecretAccessKey string `yaml:"secret_access_key,omitempty" json:"secret_access_key,omitempty"`
-	SessionToken    string `yaml:"session_token,omitempty" json:"session_token,omitempty"`
+	Type       string                  `yaml:"type" json:"type"`
+	TypeStatic *StaticCredentialConfig `yaml:"type_static,omitempty" json:"type_static,omitempty"`
 }
 
 type AssumeRoleConfig struct {
@@ -59,14 +64,18 @@ func (c CredentialConfig) ValidateWithPath(path string) error {
 
 	switch c.Type {
 	case CredentialTypeDefault:
-		if c.AccessKeyID != "" || c.SecretAccessKey != "" || c.SessionToken != "" {
-			return fmt.Errorf("%s %q cannot contain static credential fields", typeField, CredentialTypeDefault)
+		if c.TypeStatic != nil {
+			return fmt.Errorf("%s is not allowed when %s is %q", fieldPath(path, "type_static"), typeField, CredentialTypeDefault)
 		}
 	case CredentialTypeStatic:
+		if c.TypeStatic == nil {
+			return errors.New(fieldPath(path, "type_static") + " is required")
+		}
+		staticPath := fieldPath(path, "type_static")
 		errs := []error{
-			validateCredentialValue(fieldPath(path, "access_key_id"), c.AccessKeyID, true),
-			validateCredentialValue(fieldPath(path, "secret_access_key"), c.SecretAccessKey, true),
-			validateCredentialValue(fieldPath(path, "session_token"), c.SessionToken, false),
+			validateCredentialValue(fieldPath(staticPath, "access_key_id"), c.TypeStatic.AccessKeyID, true),
+			validateCredentialValue(fieldPath(staticPath, "secret_access_key"), c.TypeStatic.SecretAccessKey, true),
+			validateCredentialValue(fieldPath(staticPath, "session_token"), c.TypeStatic.SessionToken, false),
 		}
 		return errors.Join(errs...)
 	default:
@@ -152,11 +161,12 @@ func (id Identity) NewConfig(ctx context.Context, opts ConfigOptions) (aws.Confi
 		loadOpts = append(loadOpts, awsconfig.WithRegion(region))
 	}
 	if id.credentials.Type == CredentialTypeStatic {
+		static := id.credentials.TypeStatic
 		loadOpts = append(loadOpts, awsconfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(
-				id.credentials.AccessKeyID,
-				id.credentials.SecretAccessKey,
-				id.credentials.SessionToken,
+				static.AccessKeyID,
+				static.SecretAccessKey,
+				static.SessionToken,
 			),
 		))
 	}

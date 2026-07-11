@@ -183,11 +183,12 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | autodetection_retry | Recheck interval (seconds) when the job fails to start. Default `0` means no retry; set a positive value to keep retrying. | 0 | no |
 |  | query_offset | Seconds subtracted from the current time when building query windows, to account for CloudWatch publish latency. The effective offset is `max(query_offset, period)`. | 600 | no |
 |  | timeout | Timeout for AWS API requests (seconds). | 30 | no |
-| **Authentication** | credentials | Map of named credential sources. Every source has a `type` of `default` (AWS SDK default chain) or `static` (explicit access/session credentials). Credential sources are reusable by targets and every defined source must be used. |  | yes |
-|  | credentials.NAME.type | Credential source type: `default` or `static`. |  | yes |
-|  | credentials.NAME.access_key_id | AWS access key ID. Required for a `static` source. Use a go.d secret reference such as `${env:AWS_ACCESS_KEY_ID}`. |  | no |
-|  | credentials.NAME.secret_access_key | AWS secret access key. Required for a `static` source. Use a go.d secret reference; do not store plaintext credentials in the file. |  | no |
-|  | credentials.NAME.session_token | Optional AWS session token for temporary static credentials. Use a go.d secret reference. |  | no |
+| **Authentication** | credentials | Map of named credential sources. Every source has a `type` of `default` (AWS SDK default chain) or `static` (explicit access/session credentials in `type_static`). Credential sources are reusable by targets and every defined source must be used. |  | yes |
+|  | credentials.NAME.type | Credential source type: `default` uses the AWS SDK chain; `static` requires `type_static`. |  | yes |
+|  | credentials.NAME.type_static | Configuration used only when the credential source `type` is `static`. |  | no |
+|  | credentials.NAME.type_static.access_key_id | AWS access key ID. Required in `type_static`. Use a go.d secret reference such as `${env:AWS_ACCESS_KEY_ID}`. |  | no |
+|  | credentials.NAME.type_static.secret_access_key | AWS secret access key. Required in `type_static`. Use a go.d secret reference; do not store plaintext credentials in the file. |  | no |
+|  | credentials.NAME.type_static.session_token | Optional AWS session token in `type_static` for temporary credentials. Use a go.d secret reference. |  | no |
 | **Targets** | targets | Up to 64 named monitored AWS identities. A target uses one credential source directly or uses that source to assume one role. Targets remain distinct even when they resolve to the same AWS account. |  | yes |
 |  | targets[].name | Target name referenced by collection rules. |  | yes |
 |  | targets[].credentials | Name of the credential source used by this target. |  | yes |
@@ -281,9 +282,10 @@ jobs:
     credentials:
       bootstrap:
         type: static
-        access_key_id: ${env:AWS_ACCESS_KEY_ID}
-        secret_access_key: ${env:AWS_SECRET_ACCESS_KEY}
-        session_token: ${env:AWS_SESSION_TOKEN}
+        type_static:
+          access_key_id: ${env:AWS_ACCESS_KEY_ID}
+          secret_access_key: ${env:AWS_SECRET_ACCESS_KEY}
+          session_token: ${env:AWS_SESSION_TOKEN}
     targets:
       - name: production
         credentials: bootstrap

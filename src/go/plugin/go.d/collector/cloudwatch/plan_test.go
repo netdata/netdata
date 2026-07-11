@@ -174,7 +174,12 @@ func TestCompileConfig_StaticScopeFirstRuleWins(t *testing.T) {
 func TestCompileConfig_TargetMayUseStaticCredentialsForAssumeRole(t *testing.T) {
 	cfg := validBaseConfig()
 	cfg.Credentials = map[string]awsauth.CredentialConfig{
-		"bootstrap": {Type: awsauth.CredentialTypeStatic, AccessKeyID: "key", SecretAccessKey: "secret"},
+		"bootstrap": {
+			Type: awsauth.CredentialTypeStatic,
+			TypeStatic: &awsauth.StaticCredentialConfig{
+				AccessKeyID: "key", SecretAccessKey: "secret",
+			},
+		},
 	}
 	cfg.Targets = []TargetConfig{{
 		Name: "production", Credentials: "bootstrap",

@@ -412,6 +412,12 @@ or layers one `AssumeRole` provider over it, so static credentials can bootstrap
 cross-account roles without environment indirection. The collector builds an
 `aws.Config` per (target, region).
 
+Credential sources use a required `type` selector. `type: default` has no
+branch-specific configuration; `type: static` requires a `type_static` object
+containing `access_key_id`, `secret_access_key`, and an optional
+`session_token`. Keeping branch-specific fields nested makes the runtime model
+match the conditional DynCfg form.
+
 Each target's AWS account id is resolved through STS `GetCallerIdentity`
 (`identity.go`, `ensureTargets`) and stamped on its series. Resolution is
 fail-soft and retried: an unresolved target stays pending while healthy targets

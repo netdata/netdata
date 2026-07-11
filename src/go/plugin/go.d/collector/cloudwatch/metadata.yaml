@@ -207,27 +207,32 @@ modules:
               required: false
               group: Collection
             - name: credentials
-              description: Map of named credential sources. Every source has a `type` of `default` (AWS SDK default chain) or `static` (explicit access/session credentials). Credential sources are reusable by targets and every defined source must be used.
+              description: Map of named credential sources. Every source has a `type` of `default` (AWS SDK default chain) or `static` (explicit access/session credentials in `type_static`). Credential sources are reusable by targets and every defined source must be used.
               default_value: ""
               required: true
               group: Authentication
             - name: credentials.NAME.type
-              description: "Credential source type: `default` or `static`."
+              description: "Credential source type: `default` uses the AWS SDK chain; `static` requires `type_static`."
               default_value: ""
               required: true
               group: Authentication
-            - name: credentials.NAME.access_key_id
-              description: AWS access key ID. Required for a `static` source. Use a go.d secret reference such as `${env:AWS_ACCESS_KEY_ID}`.
+            - name: credentials.NAME.type_static
+              description: Configuration used only when the credential source `type` is `static`.
               default_value: ""
               required: false
               group: Authentication
-            - name: credentials.NAME.secret_access_key
-              description: AWS secret access key. Required for a `static` source. Use a go.d secret reference; do not store plaintext credentials in the file.
+            - name: credentials.NAME.type_static.access_key_id
+              description: AWS access key ID. Required in `type_static`. Use a go.d secret reference such as `${env:AWS_ACCESS_KEY_ID}`.
               default_value: ""
               required: false
               group: Authentication
-            - name: credentials.NAME.session_token
-              description: Optional AWS session token for temporary static credentials. Use a go.d secret reference.
+            - name: credentials.NAME.type_static.secret_access_key
+              description: AWS secret access key. Required in `type_static`. Use a go.d secret reference; do not store plaintext credentials in the file.
+              default_value: ""
+              required: false
+              group: Authentication
+            - name: credentials.NAME.type_static.session_token
+              description: Optional AWS session token in `type_static` for temporary credentials. Use a go.d secret reference.
               default_value: ""
               required: false
               group: Authentication
@@ -340,9 +345,10 @@ modules:
                     credentials:
                       bootstrap:
                         type: static
-                        access_key_id: ${env:AWS_ACCESS_KEY_ID}
-                        secret_access_key: ${env:AWS_SECRET_ACCESS_KEY}
-                        session_token: ${env:AWS_SESSION_TOKEN}
+                        type_static:
+                          access_key_id: ${env:AWS_ACCESS_KEY_ID}
+                          secret_access_key: ${env:AWS_SECRET_ACCESS_KEY}
+                          session_token: ${env:AWS_SESSION_TOKEN}
                     targets:
                       - name: production
                         credentials: bootstrap

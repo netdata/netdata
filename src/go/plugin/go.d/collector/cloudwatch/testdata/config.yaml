@@ -6,9 +6,10 @@ credentials:
     type: default
   bootstrap:
     type: static
-    access_key_id: "${env:AWS_ACCESS_KEY_ID}"
-    secret_access_key: "${env:AWS_SECRET_ACCESS_KEY}"
-    session_token: "${env:AWS_SESSION_TOKEN}"
+    type_static:
+      access_key_id: "${env:AWS_ACCESS_KEY_ID}"
+      secret_access_key: "${env:AWS_SECRET_ACCESS_KEY}"
+      session_token: "${env:AWS_SESSION_TOKEN}"
 targets:
   - name: base
     credentials: sdk_default

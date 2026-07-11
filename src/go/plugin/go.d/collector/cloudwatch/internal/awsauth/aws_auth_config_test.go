@@ -20,22 +20,26 @@ func TestCredentialConfig_ValidateWithPath(t *testing.T) {
 		wantErr bool
 	}{
 		"default": {cfg: CredentialConfig{Type: CredentialTypeDefault}},
-		"default rejects static fields": {
-			cfg:     CredentialConfig{Type: CredentialTypeDefault, AccessKeyID: "unexpected"},
+		"default rejects static config": {
+			cfg:     CredentialConfig{Type: CredentialTypeDefault, TypeStatic: &StaticCredentialConfig{AccessKeyID: "unexpected"}},
 			wantErr: true,
 		},
 		"static": {
-			cfg: CredentialConfig{Type: CredentialTypeStatic, AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret"},
+			cfg: CredentialConfig{Type: CredentialTypeStatic, TypeStatic: &StaticCredentialConfig{AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret"}},
 		},
 		"static with session token": {
-			cfg: CredentialConfig{Type: CredentialTypeStatic, AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "token"},
+			cfg: CredentialConfig{Type: CredentialTypeStatic, TypeStatic: &StaticCredentialConfig{AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "token"}},
+		},
+		"static missing config": {
+			cfg:     CredentialConfig{Type: CredentialTypeStatic},
+			wantErr: true,
 		},
 		"static missing id": {
-			cfg:     CredentialConfig{Type: CredentialTypeStatic, SecretAccessKey: "secret"},
+			cfg:     CredentialConfig{Type: CredentialTypeStatic, TypeStatic: &StaticCredentialConfig{SecretAccessKey: "secret"}},
 			wantErr: true,
 		},
 		"static missing secret": {
-			cfg:     CredentialConfig{Type: CredentialTypeStatic, AccessKeyID: "AKIAEXAMPLE"},
+			cfg:     CredentialConfig{Type: CredentialTypeStatic, TypeStatic: &StaticCredentialConfig{AccessKeyID: "AKIAEXAMPLE"}},
 			wantErr: true,
 		},
 		"type must be canonical": {
@@ -43,7 +47,7 @@ func TestCredentialConfig_ValidateWithPath(t *testing.T) {
 			wantErr: true,
 		},
 		"static values reject surrounding whitespace": {
-			cfg:     CredentialConfig{Type: CredentialTypeStatic, AccessKeyID: " AKIAEXAMPLE", SecretAccessKey: "secret "},
+			cfg:     CredentialConfig{Type: CredentialTypeStatic, TypeStatic: &StaticCredentialConfig{AccessKeyID: " AKIAEXAMPLE", SecretAccessKey: "secret "}},
 			wantErr: true,
 		},
 		"missing type": {wantErr: true},
@@ -74,7 +78,10 @@ func TestIdentity_NewConfig(t *testing.T) {
 
 	t.Run("static credentials and session token", func(t *testing.T) {
 		id := NewIdentity("base", CredentialConfig{
-			Type: CredentialTypeStatic, AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "session",
+			Type: CredentialTypeStatic,
+			TypeStatic: &StaticCredentialConfig{
+				AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "session",
+			},
 		}, nil)
 		cfg, err := id.NewConfig(ctx, ConfigOptions{Region: "eu-west-1"})
 		require.NoError(t, err)
@@ -127,7 +134,10 @@ func TestIdentity_StaticCredentialsAssumeRole(t *testing.T) {
 
 	t.Setenv("AWS_ENDPOINT_URL_STS", srv.URL)
 	id := NewIdentity("production", CredentialConfig{
-		Type: CredentialTypeStatic, AccessKeyID: "AKIABASEIDENTITY", SecretAccessKey: "base-secret",
+		Type: CredentialTypeStatic,
+		TypeStatic: &StaticCredentialConfig{
+			AccessKeyID: "AKIABASEIDENTITY", SecretAccessKey: "base-secret",
+		},
 	}, &AssumeRoleConfig{RoleARN: "arn:aws:iam::000000000000:role/example", ExternalID: "ext-123"})
 	cfg, err := id.NewConfig(ctx, ConfigOptions{Region: "us-west-2"})
 	require.NoError(t, err)
@@ -148,7 +158,10 @@ func TestIdentity_StaticCredentialsAssumeRole(t *testing.T) {
 
 func TestCredentialConfig_YAMLRoundTrip(t *testing.T) {
 	want := CredentialConfig{
-		Type: CredentialTypeStatic, AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "token",
+		Type: CredentialTypeStatic,
+		TypeStatic: &StaticCredentialConfig{
+			AccessKeyID: "AKIAEXAMPLE", SecretAccessKey: "secret", SessionToken: "token",
+		},
 	}
 	data, err := yaml.Marshal(want)
 	require.NoError(t, err)
