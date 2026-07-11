@@ -5,6 +5,7 @@ package cloudwatch
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -17,12 +18,15 @@ import (
 )
 
 type seqSTS struct {
+	mu       sync.Mutex
 	accounts []string
 	failAt   map[int]bool
 	calls    int
 }
 
 func (f *seqSTS) GetCallerIdentity(context.Context, *sts.GetCallerIdentityInput, ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	i := f.calls
 	f.calls++
 	if f.failAt[i] {
@@ -49,19 +53,24 @@ func twoTargetConfig() Config {
 	return cfg
 }
 
-func multiTargetCollector(t *testing.T, client stsClient) *Collector {
+func multiTargetCollector(t *testing.T, clients map[string]stsClient) *Collector {
 	t.Helper()
 	c := New()
 	c.Config = twoTargetConfig()
-	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
-	c.newSTSClient = func(aws.Config) stsClient { return client }
+	c.newAWSConfig = func(_ context.Context, identity awsauth.Identity, _ string) (aws.Config, error) {
+		return aws.Config{Region: identity.Ref}, nil
+	}
+	c.newSTSClient = func(cfg aws.Config) stsClient { return clients[cfg.Region] }
 	require.NoError(t, c.Init(context.Background()))
-	require.NoError(t, c.ensureRuntime())
+	require.NoError(t, c.ensurePlan())
 	return c
 }
 
 func TestEnsureTargets_RetainsSameAccountTargets(t *testing.T) {
-	c := multiTargetCollector(t, &seqSTS{accounts: []string{"111111111111", "111111111111"}})
+	c := multiTargetCollector(t, map[string]stsClient{
+		"first":  &seqSTS{accounts: []string{"111111111111"}},
+		"second": &seqSTS{accounts: []string{"111111111111"}},
+	})
 	require.NoError(t, c.ensureTargets(context.Background()))
 	require.Len(t, c.resolvedTargets, 2)
 	assert.Equal(t, []string{"first", "second"}, c.resolvedTargetRefs())
@@ -70,8 +79,10 @@ func TestEnsureTargets_RetainsSameAccountTargets(t *testing.T) {
 }
 
 func TestEnsureTargets_FailureIsolationAndRetry(t *testing.T) {
-	sts := &seqSTS{accounts: []string{"111111111111", "", "222222222222"}, failAt: map[int]bool{1: true}}
-	c := multiTargetCollector(t, sts)
+	c := multiTargetCollector(t, map[string]stsClient{
+		"first":  &seqSTS{accounts: []string{"111111111111"}},
+		"second": &seqSTS{accounts: []string{"", "222222222222"}, failAt: map[int]bool{0: true}},
+	})
 	require.NoError(t, c.ensureTargets(context.Background()))
 	assert.Equal(t, []string{"first"}, c.resolvedTargetRefs())
 	require.NoError(t, c.ensureTargets(context.Background()))
@@ -79,7 +90,10 @@ func TestEnsureTargets_FailureIsolationAndRetry(t *testing.T) {
 }
 
 func TestBuildQueryPlan_FirstTargetOwnsSameAccountSeries(t *testing.T) {
-	c := multiTargetCollector(t, &seqSTS{accounts: []string{"111111111111", "111111111111"}})
+	c := multiTargetCollector(t, map[string]stsClient{
+		"first":  &seqSTS{accounts: []string{"111111111111"}},
+		"second": &seqSTS{accounts: []string{"111111111111"}},
+	})
 	require.NoError(t, c.ensureTargets(context.Background()))
 	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
@@ -88,7 +102,7 @@ func TestBuildQueryPlan_FirstTargetOwnsSameAccountSeries(t *testing.T) {
 	plan := c.buildQueryPlan()
 	require.NotEmpty(t, plan)
 	perInstance := 0
-	for _, metric := range c.runtime.Scopes[0].Profile.Config.Metrics {
+	for _, metric := range c.plan.Scopes[0].Profile.Config.Metrics {
 		perInstance += len(metric.Statistics)
 	}
 	assert.Len(t, plan, perInstance)
@@ -99,7 +113,10 @@ func TestBuildQueryPlan_FirstTargetOwnsSameAccountSeries(t *testing.T) {
 }
 
 func TestBuildQueryPlan_SameAccountDisjointResourcesSurvive(t *testing.T) {
-	c := multiTargetCollector(t, &seqSTS{accounts: []string{"111111111111", "111111111111"}})
+	c := multiTargetCollector(t, map[string]stsClient{
+		"first":  &seqSTS{accounts: []string{"111111111111"}},
+		"second": &seqSTS{accounts: []string{"111111111111"}},
+	})
 	require.NoError(t, c.ensureTargets(context.Background()))
 	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
@@ -107,7 +124,7 @@ func TestBuildQueryPlan_SameAccountDisjointResourcesSurvive(t *testing.T) {
 	}}
 	plan := c.buildQueryPlan()
 	perInstance := 0
-	for _, metric := range c.runtime.Scopes[0].Profile.Config.Metrics {
+	for _, metric := range c.plan.Scopes[0].Profile.Config.Metrics {
 		perInstance += len(metric.Statistics)
 	}
 	assert.Len(t, plan, perInstance*2)

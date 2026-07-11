@@ -135,38 +135,12 @@ func (c Config) validate() error {
 	return errors.Join(errs...)
 }
 
-// regionPartition maps an AWS region to its partition. account_id and the STS
-// endpoint are partition-scoped, so a job's regions must not span partitions.
-func regionPartition(region string) string {
-	switch {
-	case strings.HasPrefix(region, "us-gov-"):
-		return "aws-us-gov"
-	case strings.HasPrefix(region, "cn-"):
-		return "aws-cn"
-	case strings.HasPrefix(region, "us-isob-"):
-		return "aws-iso-b"
-	case strings.HasPrefix(region, "us-isof-"):
-		return "aws-iso-f"
-	case strings.HasPrefix(region, "us-iso-"):
-		return "aws-iso"
-	case strings.HasPrefix(region, "eu-isoe-"):
-		return "aws-iso-e"
-	case strings.HasPrefix(region, "eusc-"):
-		return "aws-eusc"
-	default:
-		// Unrecognized regions fall back to the standard partition; extend this
-		// switch as AWS ships new partitions. A wrong guess here is never worse
-		// than this fallback, which is the pre-existing behavior.
-		return "aws"
-	}
-}
-
 func normalizeRegions(regions []string) []string {
 	out := make([]string, 0, len(regions))
 	seen := make(map[string]struct{}, len(regions))
 	for _, r := range regions {
 		// AWS region codes are canonically lowercase, so lowercasing is loss-less and
-		// makes both dedupe and partition detection (regionPartition) case-insensitive.
+		// makes both dedupe and partition detection case-insensitive.
 		v := strings.ToLower(strings.TrimSpace(r))
 		if v == "" {
 			continue

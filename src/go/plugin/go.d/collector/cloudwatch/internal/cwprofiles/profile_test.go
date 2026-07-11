@@ -90,6 +90,9 @@ func TestProfile_Validate(t *testing.T) {
 		"supported regions valid": {
 			mutate: func(p *Profile) { p.SupportedRegions = []string{"us-east-1", "eu-west-1"} },
 		},
+		"supported regions eusc partition valid": {
+			mutate: func(p *Profile) { p.SupportedRegions = []string{"eusc-de-east-1"} },
+		},
 		"supported regions explicit empty invalid": {
 			mutate:      func(p *Profile) { p.SupportedRegions = []string{} },
 			wantErr:     true,

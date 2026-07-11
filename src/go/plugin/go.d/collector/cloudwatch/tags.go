@@ -67,14 +67,13 @@ func (c *Collector) computeTagPlans() {
 		return
 	}
 	plans := make(map[string][]resolvedTag)
-	for _, p := range c.runtime.Profiles {
+	for _, p := range c.plan.Profiles {
 		if _, ok := tagJoins[p.Name]; !ok {
 			continue
 		}
 		plan, warnings := resolveTagPlan(c.Tags, profileDimLabels(p.Config))
 		for _, w := range warnings {
-			c.Limit(logKeyTagPlanWarn+":"+p.Name+":"+w, 1, recurringLogEvery).
-				Warningf("CloudWatch tags (profile %q): %s", p.Name, w)
+			c.Warningf("CloudWatch tags (profile %q): %s", p.Name, w)
 		}
 		if len(plan) > 0 {
 			plans[p.Name] = plan
@@ -102,7 +101,7 @@ func (c *Collector) refreshTags(ctx context.Context) {
 		return
 	}
 
-	joins := selectedTagJoins(c.runtime.Profiles)
+	joins := selectedTagJoins(c.plan.Profiles)
 	filters := resourceTypeFilters(joins)
 	rtIndex := resourceTypeIndex(joins)
 	ttl := time.Duration(c.Discovery.RefreshEvery) * time.Second
@@ -124,7 +123,7 @@ func (c *Collector) refreshTags(ctx context.Context) {
 	}
 	var targets []tagFetch
 	seenTargets := make(map[string]struct{})
-	for _, scope := range c.runtime.Scopes {
+	for _, scope := range c.plan.Scopes {
 		resolved, ok := c.resolvedTargetByRef(scope.Target.Name)
 		if !ok {
 			continue
@@ -160,15 +159,16 @@ func (c *Collector) refreshTags(ctx context.Context) {
 		return
 	}
 
+	var failures []operationFailure
 	for _, t := range targets {
 		if t.err != nil {
 			c.carryForwardTags(next.labels, t.target, t.region)
-			c.Limit(logKeyTagRefreshFailed, 1, recurringLogEvery).
-				Warningf("CloudWatch tag lookup for target %q region %q failed: %v (using last-known tags)", t.target, t.region, t.err)
+			failures = append(failures, operationFailure{Target: t.target, Region: t.region, Err: t.err})
 			continue
 		}
 		indexResourceTags(next.labels, t.target, t.account, t.region, t.resources, rtIndex, joins, c.tagPlans)
 	}
+	c.warnOperationFailures(logKeyTagRefreshFailed, "tag lookup", " (using last-known tags)", failures)
 
 	c.tags = next
 	c.invalidateQueryPlan()

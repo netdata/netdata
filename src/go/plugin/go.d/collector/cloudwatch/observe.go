@@ -52,14 +52,9 @@ func (o *observationStore) reset() {
 // rather than skipped for a full period. Scheduling is per (target, region, period) so a
 // failure in one region does not force healthy regions of the same period to
 // re-query early. A group not yet scheduled is always due (first cycle).
-func (o *observationStore) dueGroups(plan []plannedQuery, now time.Time) map[queryGroupKey]bool {
-	groups := make(map[queryGroupKey]struct{})
-	for _, pq := range plan {
-		groups[pq.groupKey()] = struct{}{}
-	}
-
+func (o *observationStore) dueGroups(groups []queryGroupKey, now time.Time) map[queryGroupKey]bool {
 	due := make(map[queryGroupKey]bool, len(groups))
-	for key := range groups {
+	for _, key := range groups {
 		next, scheduled := o.nextQueryAt[key]
 		if !scheduled || !now.Before(next) {
 			due[key] = true
@@ -76,11 +71,17 @@ func (o *observationStore) advanceSchedule(queried map[queryGroupKey]bool, now t
 	}
 }
 
-func filterDueQueries(plan []plannedQuery, due map[queryGroupKey]bool) []plannedQuery {
-	out := make([]plannedQuery, 0, len(plan))
-	for _, pq := range plan {
-		if due[pq.groupKey()] {
-			out = append(out, pq)
+func filterDueQueries(groups []queryGroupKey, queriesByGroup map[queryGroupKey][]plannedQuery, due map[queryGroupKey]bool) []plannedQuery {
+	count := 0
+	for _, key := range groups {
+		if due[key] {
+			count += len(queriesByGroup[key])
+		}
+	}
+	out := make([]plannedQuery, 0, count)
+	for _, key := range groups {
+		if due[key] {
+			out = append(out, queriesByGroup[key]...)
 		}
 	}
 	return out

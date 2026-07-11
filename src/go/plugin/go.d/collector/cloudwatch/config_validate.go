@@ -1,0 +1,165 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package cloudwatch
+
+import (
+	"errors"
+	"fmt"
+	"regexp"
+	"sort"
+	"strings"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsregion"
+)
+
+const (
+	maxCredentialSources = 64
+	maxTargets           = 64
+	maxRules             = 256
+	maxReferencesPerRule = 256
+)
+
+var configNamePattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,63}$`)
+
+func validateConfigStructure(cfg Config) error {
+	if err := validateRawLimits(cfg); err != nil {
+		return err
+	}
+	return errors.Join(
+		validateCredentials(cfg),
+		validateTargets(cfg),
+		validateRules(cfg),
+	)
+}
+
+// validateRawLimits runs before any allocation proportional to user input.
+func validateRawLimits(cfg Config) error {
+	switch {
+	case len(cfg.Credentials) > maxCredentialSources:
+		return fmt.Errorf("'credentials' contains %d entries; maximum is %d", len(cfg.Credentials), maxCredentialSources)
+	case len(cfg.Targets) > maxTargets:
+		return fmt.Errorf("'targets' contains %d entries; maximum is %d", len(cfg.Targets), maxTargets)
+	case len(cfg.Rules) > maxRules:
+		return fmt.Errorf("'rules' contains %d entries; maximum is %d", len(cfg.Rules), maxRules)
+	}
+	for i, rule := range cfg.Rules {
+		path := fmt.Sprintf("rules[%d]", i)
+		switch {
+		case len(rule.Targets) > maxReferencesPerRule:
+			return fmt.Errorf("%s.targets contains %d entries; maximum is %d", path, len(rule.Targets), maxReferencesPerRule)
+		case len(rule.Regions) > maxReferencesPerRule:
+			return fmt.Errorf("%s.regions contains %d entries; maximum is %d", path, len(rule.Regions), maxReferencesPerRule)
+		case rule.Profiles != nil && len(rule.Profiles.Include) > maxReferencesPerRule:
+			return fmt.Errorf("%s.profiles.include contains %d entries; maximum is %d", path, len(rule.Profiles.Include), maxReferencesPerRule)
+		case rule.Profiles != nil && len(rule.Profiles.Exclude) > maxReferencesPerRule:
+			return fmt.Errorf("%s.profiles.exclude contains %d entries; maximum is %d", path, len(rule.Profiles.Exclude), maxReferencesPerRule)
+		}
+	}
+	return nil
+}
+
+func validateCredentials(cfg Config) error {
+	if len(cfg.Credentials) == 0 {
+		return errors.New("'credentials' must contain at least one entry")
+	}
+	names := make([]string, 0, len(cfg.Credentials))
+	for name := range cfg.Credentials {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	var errs []error
+	for _, name := range names {
+		if !configNamePattern.MatchString(name) {
+			errs = append(errs, fmt.Errorf("credential name %q must match %q", name, configNamePattern.String()))
+		}
+		if err := cfg.Credentials[name].ValidateWithPath(fmt.Sprintf("credentials.%s", name)); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func validateTargets(cfg Config) error {
+	if len(cfg.Targets) == 0 {
+		return errors.New("'targets' must contain at least one entry")
+	}
+	seen := make(map[string]struct{}, len(cfg.Targets))
+	var errs []error
+	for i, target := range cfg.Targets {
+		path := fmt.Sprintf("targets[%d]", i)
+		name := strings.TrimSpace(target.Name)
+		if !configNamePattern.MatchString(name) {
+			errs = append(errs, fmt.Errorf("%s.name %q must match %q", path, target.Name, configNamePattern.String()))
+		} else if _, ok := seen[name]; ok {
+			errs = append(errs, fmt.Errorf("duplicate target name %q", name))
+		} else {
+			seen[name] = struct{}{}
+		}
+
+		credentialRef := strings.TrimSpace(target.Credentials)
+		if credentialRef == "" {
+			errs = append(errs, fmt.Errorf("%s.credentials is required", path))
+		} else if _, ok := cfg.Credentials[credentialRef]; !ok {
+			errs = append(errs, fmt.Errorf("%s.credentials references unknown credential %q", path, credentialRef))
+		}
+		if target.AssumeRole != nil {
+			if strings.TrimSpace(target.AssumeRole.RoleARN) == "" {
+				errs = append(errs, fmt.Errorf("%s.assume_role.role_arn is required", path))
+			} else if _, err := rolePartition(target.AssumeRole.RoleARN); err != nil {
+				errs = append(errs, fmt.Errorf("%s.assume_role.role_arn is invalid: %w", path, err))
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func validateRules(cfg Config) error {
+	if len(cfg.Rules) == 0 {
+		return errors.New("'rules' must contain at least one entry")
+	}
+	seen := make(map[string]struct{}, len(cfg.Rules))
+	var errs []error
+	for i, rule := range cfg.Rules {
+		path := fmt.Sprintf("rules[%d]", i)
+		name := strings.TrimSpace(rule.Name)
+		if !configNamePattern.MatchString(name) {
+			errs = append(errs, fmt.Errorf("%s.name %q must match %q", path, rule.Name, configNamePattern.String()))
+		} else if _, ok := seen[name]; ok {
+			errs = append(errs, fmt.Errorf("duplicate rule name %q", name))
+		} else {
+			seen[name] = struct{}{}
+		}
+		if len(rule.Targets) == 0 {
+			errs = append(errs, fmt.Errorf("%s.targets must contain at least one target", path))
+		}
+		if err := validateRuleRegions(path, rule.Regions); err != nil {
+			errs = append(errs, err)
+		}
+		if rule.Filters != nil || rule.Labels != nil || rule.Series != nil || rule.Query != nil {
+			errs = append(errs, fmt.Errorf("%s contains fields reserved for a later phase", path))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func validateRuleRegions(path string, regions []string) error {
+	if len(regions) == 0 {
+		return fmt.Errorf("%s.regions must contain at least one region", path)
+	}
+	seen := make(map[string]struct{}, len(regions))
+	var errs []error
+	for i, raw := range regions {
+		region := awsregion.Normalize(raw)
+		if !awsregion.Valid(region) {
+			errs = append(errs, fmt.Errorf("%s.regions[%d] %q is not a valid AWS region", path, i, raw))
+			continue
+		}
+		if _, ok := seen[region]; ok {
+			errs = append(errs, fmt.Errorf("%s.regions contains duplicate region %q", path, region))
+			continue
+		}
+		seen[region] = struct{}{}
+	}
+	return errors.Join(errs...)
+}

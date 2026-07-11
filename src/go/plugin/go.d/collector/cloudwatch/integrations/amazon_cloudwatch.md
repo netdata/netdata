@@ -82,7 +82,7 @@ This collector is supported on all platforms.
 
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
-Every target requires `cloudwatch:ListMetrics`, `cloudwatch:GetMetricData`, and `sts:GetCallerIdentity`. A credential source used by a target with `assume_role` additionally requires `sts:AssumeRole` for that role ARN. Resource tag enrichment (the optional `tags` option) additionally requires `tag:GetResources`.
+Every target requires `cloudwatch:ListMetrics` and `cloudwatch:GetMetricData`. The collector calls `sts:GetCallerIdentity` for account attribution, but [AWS does not require an explicit permission grant for that operation](https://docs.aws.amazon.com/STS/latest/APIReference/API_GetCallerIdentity.html). A credential source used by a target with `assume_role` additionally requires `sts:AssumeRole` for that role ARN. Resource tag enrichment (the optional `tags` option) additionally requires `tag:GetResources`.
 
 
 ### Default Behavior
@@ -126,7 +126,7 @@ UI configuration requires paid Netdata Cloud plan.
 
 #### Create an AWS IAM identity with CloudWatch read access
 
-The collector needs an IAM identity (user or role) allowed to read CloudWatch metrics and resolve the AWS account identity.
+The collector needs an IAM identity (user or role) allowed to read CloudWatch metrics. It resolves the AWS account identity with `GetCallerIdentity`, which does not require an explicit permission grant.
 
 Attach a policy such as:
 
@@ -138,8 +138,7 @@ Attach a policy such as:
       "Effect": "Allow",
       "Action": [
         "cloudwatch:ListMetrics",
-        "cloudwatch:GetMetricData",
-        "sts:GetCallerIdentity"
+        "cloudwatch:GetMetricData"
       ],
       "Resource": "*"
     }
@@ -147,7 +146,7 @@ Attach a policy such as:
 }
 ```
 
-`cloudwatch:ListMetrics`, `cloudwatch:GetMetricData`, and `sts:GetCallerIdentity` do not support resource-level permissions, so `"Resource": "*"` is required -- this is already least-privilege for these read actions. Scope `sts:AssumeRole` to the specific role ARN(s) rather than `*`. To enable resource tag enrichment (the optional `tags` option), also grant `tag:GetResources` (it likewise requires `"Resource": "*"`).
+`cloudwatch:ListMetrics` and `cloudwatch:GetMetricData` do not support resource-level permissions, so `"Resource": "*"` is required -- this is already least-privilege for these read actions. `GetCallerIdentity` needs no explicit grant. Scope `sts:AssumeRole` to the specific role ARN(s) rather than `*`. To enable resource tag enrichment (the optional `tags` option), also grant `tag:GetResources` (it likewise requires `"Resource": "*"`).
 
 Define one or more named credential sources:
 
@@ -189,7 +188,7 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | credentials.NAME.access_key_id | AWS access key ID. Required for a `static` source. Use a go.d secret reference such as `${env:AWS_ACCESS_KEY_ID}`. |  | no |
 |  | credentials.NAME.secret_access_key | AWS secret access key. Required for a `static` source. Use a go.d secret reference; do not store plaintext credentials in the file. |  | no |
 |  | credentials.NAME.session_token | Optional AWS session token for temporary static credentials. Use a go.d secret reference. |  | no |
-| **Targets** | targets | Named monitored AWS identities. A target uses one credential source directly or uses that source to assume one role. Targets remain distinct even when they resolve to the same AWS account. |  | yes |
+| **Targets** | targets | Up to 64 named monitored AWS identities. A target uses one credential source directly or uses that source to assume one role. Targets remain distinct even when they resolve to the same AWS account. |  | yes |
 |  | targets[].name | Target name referenced by collection rules. |  | yes |
 |  | targets[].credentials | Name of the credential source used by this target. |  | yes |
 |  | targets[].assume_role.role_arn | Optional IAM role ARN to assume using the target's credential source. |  | no |
@@ -537,7 +536,7 @@ docker logs netdata 2>&1 | grep cloudwatch
 
 Check the following:
 
-- **Permissions** -- each target allows `cloudwatch:ListMetrics`, `cloudwatch:GetMetricData`, and `sts:GetCallerIdentity`; targets with `assume_role` also require `sts:AssumeRole` on the source identity.
+- **Permissions** -- each target allows `cloudwatch:ListMetrics` and `cloudwatch:GetMetricData`; `GetCallerIdentity` needs no explicit grant. Targets with `assume_role` also require `sts:AssumeRole` on the source identity.
 - **Rules** -- `rules[].targets`, `rules[].profiles`, and `rules[].regions` select the expected target, service, and region. CloudFront publishes metrics only in `us-east-1`; its profile enforces this automatically.
 - **Resources are active** -- confirm in the AWS CloudWatch console that the resources are publishing metrics.
 - **Collector logs** -- check for authentication or API errors:

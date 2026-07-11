@@ -3,6 +3,7 @@
 package cloudwatch
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -15,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
@@ -213,6 +215,23 @@ func TestCurrentQueryPlan_CachesUntilInputsChange(t *testing.T) {
 	assert.Len(t, c.currentQueryPlan(), len(first)*2, "input invalidation rebuilds the query blueprint")
 }
 
+func BenchmarkCurrentQueryPlanCached(b *testing.B) {
+	instances := make([][]string, 256)
+	for i := range instances {
+		instances[i] = []string{fmt.Sprintf("i-%d", i)}
+	}
+	c := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{"us-east-1": instances})
+	require.NotEmpty(b, c.currentQueryPlan())
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		if len(c.currentQueryPlan()) == 0 {
+			b.Fatal("cached plan unexpectedly empty")
+		}
+	}
+}
+
 // gmdCloudWatch is a thread-safe GetMetricData fake: every query gets f.value
 // unless its Id is in gaps (or gapAll).
 type gmdCloudWatch struct {
@@ -294,6 +313,29 @@ func TestExecuteQueries(t *testing.T) {
 	}
 }
 
+func TestExecuteQueries_ReportsIndependentChunkFailures(t *testing.T) {
+	const sensitive = "SENSITIVE_API_MESSAGE"
+	var logs bytes.Buffer
+	c := New()
+	c.Logger = logger.NewWithWriter(&logs)
+	c.applyDefaults()
+	failing := &gmdCloudWatch{err: errors.New(sensitive)}
+	c.clients.clients[clientKey{target: "target-a", region: "us-east-1"}] = failing
+	c.clients.clients[clientKey{target: "target-b", region: "eu-west-1"}] = failing
+	plan := []plannedQuery{
+		{id: "q0", target: "target-a", region: "us-east-1", period: 300, query: cwtypes.MetricDataQuery{Id: aws.String("q0")}},
+		{id: "q1", target: "target-b", region: "eu-west-1", period: 300, query: cwtypes.MetricDataQuery{Id: aws.String("q1")}},
+	}
+
+	_, _, _, err := c.executeQueries(context.Background(), plan, time.Unix(1_000_000_000, 0))
+	require.Error(t, err)
+	assert.Contains(t, logs.String(), "target-a")
+	assert.Contains(t, logs.String(), "us-east-1")
+	assert.Contains(t, logs.String(), "target-b")
+	assert.Contains(t, logs.String(), "eu-west-1")
+	assert.NotContains(t, logs.String(), sensitive)
+}
+
 // TestBuildChunkJobs verifies query batching into GetMetricData-sized chunks (one
 // job per chunk) and that a group whose (target, region) client failed is skipped and
 // marked failed. chunkSize is an explicit argument, so production passes the fixed
@@ -313,7 +355,6 @@ func TestBuildChunkJobs(t *testing.T) {
 	tests := map[string]struct {
 		groups       map[queryGroupKey][]cwtypes.MetricDataQuery
 		groupClients map[clientKey]cloudwatchClient
-		groupErrs    map[clientKey]error
 		chunkSize    int
 		wantJobs     int
 		wantQueries  int
@@ -322,14 +363,14 @@ func TestBuildChunkJobs(t *testing.T) {
 		"all queries fit one chunk":           {groups: groupOf(6), groupClients: ok, chunkSize: 500, wantJobs: 1, wantQueries: 6},
 		"split into even chunks":              {groups: groupOf(6), groupClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 6},
 		"uneven last chunk":                   {groups: groupOf(5), groupClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 5},
-		"group without a target client fails": {groups: groupOf(6), groupClients: map[clientKey]cloudwatchClient{}, groupErrs: map[clientKey]error{{target: "base", region: "us-east-1"}: errors.New("no client")}, chunkSize: 2, wantJobs: 0, wantFailed: true},
+		"group without a target client fails": {groups: groupOf(6), groupClients: map[clientKey]cloudwatchClient{}, chunkSize: 2, wantJobs: 0, wantFailed: true},
 	}
 
 	c := New()
 	c.applyDefaults()
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			jobs, failed := c.buildChunkJobs(tc.groups, tc.groupClients, tc.groupErrs, time.Unix(1_000_000_000, 0), tc.chunkSize)
+			jobs, failed := c.buildChunkJobs(tc.groups, tc.groupClients, time.Unix(1_000_000_000, 0), tc.chunkSize)
 			require.Len(t, jobs, tc.wantJobs)
 			total := 0
 			for _, j := range jobs {

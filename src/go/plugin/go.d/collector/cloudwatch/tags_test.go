@@ -3,6 +3,7 @@
 package cloudwatch
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"testing"
@@ -12,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi"
 	rgtatypes "github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi/types"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
@@ -276,6 +278,38 @@ func TestRefreshTags_CanceledContextDoesNotAdvanceTTL(t *testing.T) {
 
 	assert.True(t, c.tags.expired(c.now()), "a canceled refresh must not advance the TTL")
 	assert.Empty(t, c.tags.labels, "a canceled refresh must not commit a snapshot")
+}
+
+type failingRGTA struct{ err error }
+
+func (f failingRGTA) GetResources(context.Context, *resourcegroupstaggingapi.GetResourcesInput, ...func(*resourcegroupstaggingapi.Options)) (*resourcegroupstaggingapi.GetResourcesOutput, error) {
+	return nil, f.err
+}
+
+func TestRefreshTags_ReportsIndependentTargetFailures(t *testing.T) {
+	const sensitive = "SENSITIVE_TAG_API_MESSAGE"
+	var logs bytes.Buffer
+	c := New()
+	c.Logger = logger.NewWithWriter(&logs)
+	c.Config = twoTargetConfig()
+	c.Config.Tags = []TagConfig{{Name: "owner"}}
+	require.NoError(t, c.Init(context.Background()))
+	require.NoError(t, c.ensurePlan())
+	c.resolvedByRef = make(map[string]resolvedTarget)
+	for _, target := range c.plan.Targets {
+		resolved := resolvedTarget{target: target, accountID: "000000000000"}
+		c.resolvedTargets = append(c.resolvedTargets, resolved)
+		c.resolvedByRef[target.Name] = resolved
+	}
+	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
+	c.newRGTAClient = func(aws.Config) rgtaClient { return failingRGTA{err: errors.New(sensitive)} }
+
+	c.refreshTags(context.Background())
+
+	assert.Contains(t, logs.String(), "first")
+	assert.Contains(t, logs.String(), "second")
+	assert.Contains(t, logs.String(), "us-east-1")
+	assert.NotContains(t, logs.String(), sensitive)
 }
 
 func TestIndexResourceTags_SkipsForeignAccountRegion(t *testing.T) {

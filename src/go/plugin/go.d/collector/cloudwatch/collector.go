@@ -26,7 +26,6 @@ const (
 	logKeyGetMetricDataFailed    = "getmetricdata_failed"
 	logKeyGetMetricDataForbidden = "getmetricdata_forbidden"
 	logKeyAccountResolveFailed   = "account_resolve_failed"
-	logKeyTagPlanWarn            = "tag_plan_warn"
 	logKeyTagRefreshFailed       = "tag_refresh_failed"
 	logKeyRuleShadowed           = "rule_shadowed"
 )
@@ -82,17 +81,19 @@ type Collector struct {
 	newRGTAClient       func(cfg aws.Config) rgtaClient
 	newCatalog          func() (cwprofiles.Catalog, error) // nil => cwprofiles.DefaultCatalog
 
-	runtime           *collectorRuntime
+	plan              *collectionPlan
 	resolvedTargets   []resolvedTarget
 	resolvedByRef     map[string]resolvedTarget
 	resolvedRefs      map[string]struct{} // target refs already resolved; the rest are retried each cycle
 	chartTemplateYAML string
 
-	clients     *clientCache[cloudwatchClient] // one per (target, region)
-	rgtaClients *clientCache[rgtaClient]       // one per (target, region)
-	discovery   discoverySnapshot
-	queryPlan   []plannedQuery
-	planDirty   bool
+	clients        *clientCache[cloudwatchClient] // one per (target, region)
+	rgtaClients    *clientCache[rgtaClient]       // one per (target, region)
+	discovery      discoverySnapshot
+	queryPlan      []plannedQuery
+	queryGroups    []queryGroupKey
+	queriesByGroup map[queryGroupKey][]plannedQuery
+	planDirty      bool
 
 	discoverySig string // last-logged discovered-resources summary; Info re-logs only when it changes
 
@@ -108,7 +109,7 @@ func (c *Collector) Init(context.Context) error {
 }
 
 func (c *Collector) Check(ctx context.Context) error {
-	if err := c.ensureRuntime(); err != nil {
+	if err := c.ensurePlan(); err != nil {
 		return err
 	}
 	return c.ensureTargets(ctx)
@@ -122,13 +123,15 @@ func (c *Collector) Cleanup(context.Context) {
 	// Reset runtime state so a framework re-Init (e.g. after a failed
 	// autodetection retry on the same instance) starts clean, mirroring
 	// azure_monitor. All ensure*/refresh paths rebuild lazily.
-	c.runtime = nil
+	c.plan = nil
 	c.resolvedTargets = nil
 	c.resolvedByRef = nil
 	c.resolvedRefs = nil
 	c.chartTemplateYAML = ""
 	c.discovery = discoverySnapshot{}
 	c.queryPlan = nil
+	c.queryGroups = nil
+	c.queriesByGroup = nil
 	c.planDirty = true
 	c.discoverySig = ""
 	c.clients.reset()

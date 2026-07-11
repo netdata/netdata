@@ -42,52 +42,6 @@ func profileUsesRecentlyActive(prof cwprofiles.Profile, enabled bool) bool {
 	return enabled && prof.MaxEffectivePeriod() <= recentlyActiveMaxPeriod
 }
 
-// discoverInstances lists every metric in the profile's namespace once (MetricName
-// omitted) and returns the distinct instances whose dimension-NAME set EXACTLY
-// matches the profile's instance dimensions. This collapses CloudWatch's
-// multi-granularity fan-out (a metric published under several dimension sets) to
-// the chosen granularity, and dedups instances shared across metrics.
-func discoverInstances(ctx context.Context, client cloudwatchClient, prof cwprofiles.Profile, useRecentlyActive bool) ([]discoveredInstance, error) {
-	dimNames := prof.DimensionNames()
-
-	seen := make(map[string]struct{})
-	var instances []discoveredInstance
-	var nextToken *string
-
-	for {
-		in := &cloudwatch.ListMetricsInput{Namespace: aws.String(prof.Namespace), NextToken: nextToken}
-		if useRecentlyActive {
-			in.RecentlyActive = cwtypes.RecentlyActivePt3h
-		}
-
-		out, err := client.ListMetrics(ctx, in)
-		if err != nil {
-			return nil, err
-		}
-		for _, m := range out.Metrics {
-			values, ok := matchInstanceDimensions(m.Dimensions, dimNames)
-			if !ok {
-				continue
-			}
-			if !constantDimensionsHold(prof.Instance.Dimensions, values) {
-				continue // fail-closed: a pinned constant dimension had a different value
-			}
-			key := strings.Join(values, instanceKeySep)
-			if _, dup := seen[key]; dup {
-				continue
-			}
-			seen[key] = struct{}{}
-			instances = append(instances, discoveredInstance{DimensionValues: values})
-		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
-	}
-
-	return instances, nil
-}
-
 // discoverProfileGroup scans one namespace once and applies each participating
 // profile's exact dimension matcher while streaming pages.
 func discoverProfileGroup(ctx context.Context, client cloudwatchClient, profiles []cwprofiles.ResolvedProfile, useRecentlyActive bool) (map[string][]discoveredInstance, error) {
@@ -222,10 +176,12 @@ func (s discoverySnapshot) totalInstances() int {
 	return n
 }
 
-// discoveryResult is the outcome of discovering one (account, profile, region) target.
-type discoveryResult struct {
-	Key       discoveryKey
-	Instances []discoveredInstance
+// discoveryGroupResult is one shared ListMetrics scan. Keeping failures at the
+// group boundary prevents one upstream error from expanding into one warning per
+// participating profile.
+type discoveryGroupResult struct {
+	Group     discoveryGroup
+	Instances map[string][]discoveredInstance
 	Err       error
 }
 
@@ -237,68 +193,56 @@ func discoverAll(
 	groups []discoveryGroup,
 	maxConcurrency int,
 	timeout time.Duration,
-) []discoveryResult {
-	groupResults := make([][]discoveryResult, len(groups))
+) []discoveryGroupResult {
+	results := make([]discoveryGroupResult, len(groups))
 	p := pool.New().WithMaxGoroutines(max(1, maxConcurrency))
 	for i, group := range groups {
 		p.Go(func() {
+			result := discoveryGroupResult{Group: group}
 			client, err := newClient(group.Target, group.Region)
 			if err == nil {
 				cctx, cancel := withTimeout(ctx, timeout)
 				defer cancel()
-				var instances map[string][]discoveredInstance
-				instances, err = discoverProfileGroup(cctx, client, group.Profiles, group.RecentlyActive)
-				if err == nil {
-					results := make([]discoveryResult, 0, len(group.Profiles))
-					for _, profile := range group.Profiles {
-						key := discoveryKey{Target: group.Target, Profile: profile.Name, Region: group.Region}
-						results = append(results, discoveryResult{Key: key, Instances: instances[profile.Name]})
-					}
-					groupResults[i] = results
-					return
-				}
+				result.Instances, err = discoverProfileGroup(cctx, client, group.Profiles, group.RecentlyActive)
 			}
-			results := make([]discoveryResult, 0, len(group.Profiles))
-			for _, profile := range group.Profiles {
-				key := discoveryKey{Target: group.Target, Profile: profile.Name, Region: group.Region}
-				results = append(results, discoveryResult{Key: key, Err: err})
-			}
-			groupResults[i] = results
+			result.Err = err
+			results[i] = result
 		})
 	}
 	p.Wait()
-
-	var results []discoveryResult
-	for _, group := range groupResults {
-		results = append(results, group...)
-	}
 	return results
 }
 
 // buildDiscoverySnapshot assembles a snapshot from per-target results. Targets
 // that errored are returned as a separate error list (the caller logs them and
 // applies fail-soft); only non-empty successful targets populate the snapshot.
-func buildDiscoverySnapshot(results []discoveryResult, prev map[discoveryKey][]discoveredInstance, now time.Time, refreshEvery int) (discoverySnapshot, []error) {
+func buildDiscoverySnapshot(results []discoveryGroupResult, prev map[discoveryKey][]discoveredInstance, now time.Time, refreshEvery int) (discoverySnapshot, int) {
 	snap := discoverySnapshot{
 		Instances: make(map[discoveryKey][]discoveredInstance),
 		FetchedAt: now,
 		ExpiresAt: now.Add(time.Duration(refreshEvery) * time.Second),
 	}
 
-	var errs []error
-	for _, r := range results {
-		if r.Err != nil {
-			errs = append(errs, fmt.Errorf("discovery %s/%s/%s: %w", r.Key.Target, r.Key.Profile, r.Key.Region, r.Err))
-			if insts, ok := prev[r.Key]; ok && len(insts) > 0 {
-				snap.Instances[r.Key] = insts // fail-soft: keep this target's last-known instances
+	failures := 0
+	for _, result := range results {
+		if result.Err != nil {
+			failures++
+			for _, profile := range result.Group.Profiles {
+				key := discoveryKey{Target: result.Group.Target, Profile: profile.Name, Region: result.Group.Region}
+				if insts, ok := prev[key]; ok && len(insts) > 0 {
+					snap.Instances[key] = insts
+				}
 			}
 			continue
 		}
-		if len(r.Instances) > 0 {
-			snap.Instances[r.Key] = r.Instances
+		for _, profile := range result.Group.Profiles {
+			key := discoveryKey{Target: result.Group.Target, Profile: profile.Name, Region: result.Group.Region}
+			if instances := result.Instances[profile.Name]; len(instances) > 0 {
+				snap.Instances[key] = instances
+			}
 		}
 	}
-	return snap, errs
+	return snap, failures
 }
 
 // highInstanceCountWarn is the discovered-instance count at or above which the
@@ -344,24 +288,22 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	}
 	// Failed targets carry forward their previous instances, so a transient
 	// per-region/namespace failure does not drop series (spec: keep last snapshot).
-	snap, errs := buildDiscoverySnapshot(results, c.discovery.Instances, now, c.Discovery.RefreshEvery)
+	snap, failedGroups := buildDiscoverySnapshot(results, c.discovery.Instances, now, c.Discovery.RefreshEvery)
 
-	// Per-target failures are tolerated (last-known instances are carried forward),
-	// so throttle each target's warning: a persistently unreachable region must not
-	// warn every cycle.
-	for _, r := range results {
-		if r.Err != nil {
-			c.Limit(logKeyDiscoveryTargetFailed+":"+r.Key.Target+"/"+r.Key.Profile+"/"+r.Key.Region, 1, recurringLogEvery).
-				Warningf("CloudWatch discovery %s/%s/%s failed (using last-known instances): %v", r.Key.Target, r.Key.Profile, r.Key.Region, r.Err)
+	var failures []operationFailure
+	for _, result := range results {
+		if result.Err != nil {
+			failures = append(failures, operationFailure{Target: result.Group.Target, Region: result.Group.Region, Err: result.Err})
 		}
 	}
+	c.warnOperationFailures(logKeyDiscoveryTargetFailed, "discovery", " (using last-known instances)", failures)
 
 	// Only a first-ever pass where EVERY target errored is fatal. An empty but
 	// successful target (a resource-free account/region/profile) is not a failure —
 	// with shared regions across many accounts, empty successes are expected — and
 	// any carried-forward snapshot keeps the collector running.
-	if c.discovery.FetchedAt.IsZero() && len(results) > 0 && len(errs) == len(results) {
-		return fmt.Errorf("CloudWatch discovery failed for all %d (target, profile, region) scopes", len(results))
+	if c.discovery.FetchedAt.IsZero() && len(results) > 0 && failedGroups == len(results) {
+		return fmt.Errorf("CloudWatch discovery failed for all %d target/region/namespace groups", len(results))
 	}
 
 	c.discovery = snap
@@ -408,7 +350,7 @@ func (c *Collector) logDiscovery(snap discoverySnapshot) {
 }
 
 func (c *Collector) discoveryGroups() []discoveryGroup {
-	if c.runtime == nil {
+	if c.plan == nil {
 		return nil
 	}
 	resolved := make(map[string]struct{}, len(c.resolvedTargets))
@@ -418,7 +360,7 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 
 	index := make(map[string]int)
 	var groups []discoveryGroup
-	for _, scope := range c.runtime.Scopes {
+	for _, scope := range c.plan.Scopes {
 		if _, ok := resolved[scope.Target.Name]; !ok {
 			continue
 		}

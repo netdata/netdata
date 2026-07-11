@@ -78,8 +78,14 @@ func dimProfile(namespace string, period int, dimNames ...string) cwprofiles.Pro
 	}
 }
 
-func TestDiscoverInstances(t *testing.T) {
-	// discoverInstances lists one page and keeps only the metrics whose dimension-NAME
+func discoverOneProfile(ctx context.Context, client cloudwatchClient, profile cwprofiles.Profile, useRecentlyActive bool) ([]discoveredInstance, error) {
+	const profileName = "test"
+	instances, err := discoverProfileGroup(ctx, client, []cwprofiles.ResolvedProfile{{Name: profileName, Config: profile}}, useRecentlyActive)
+	return instances[profileName], err
+}
+
+func TestDiscoverProfileGroup(t *testing.T) {
+	// discoverOneProfile lists one page and keeps only the metrics whose dimension-NAME
 	// set exactly equals the profile's, collapsing CloudWatch's multi-granularity
 	// fan-out to one deduped instance per identity, in list order.
 	tests := map[string]struct {
@@ -136,7 +142,7 @@ func TestDiscoverInstances(t *testing.T) {
 			client := &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{page(tc.metrics, "")}}
 			prof := dimProfile(tc.namespace, tc.period, tc.dims...)
 
-			got, err := discoverInstances(context.Background(), client, prof, tc.recentlyActive)
+			got, err := discoverOneProfile(context.Background(), client, prof, tc.recentlyActive)
 			require.NoError(t, err)
 
 			gotDimValues := make([][]string, len(got))
@@ -188,7 +194,7 @@ func TestConstantDimensionsHold(t *testing.T) {
 	}
 }
 
-func TestDiscoverInstances_ConstantDimensionFailClosed(t *testing.T) {
+func TestDiscoverProfileGroup_ConstantDimensionFailClosed(t *testing.T) {
 	// A constant dimension is part of the exact NAME-set match, but only metrics
 	// whose value equals the pinned constant are kept (fail-closed). The constant
 	// value is retained in DimensionValues so it can be sent in the query.
@@ -208,7 +214,7 @@ func TestDiscoverInstances_ConstantDimensionFailClosed(t *testing.T) {
 	}
 	client := &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{page(metrics, "")}}
 
-	got, err := discoverInstances(context.Background(), client, prof, false)
+	got, err := discoverOneProfile(context.Background(), client, prof, false)
 	require.NoError(t, err)
 
 	gotDimValues := make([][]string, len(got))
@@ -218,14 +224,14 @@ func TestDiscoverInstances_ConstantDimensionFailClosed(t *testing.T) {
 	assert.Equal(t, [][]string{{"E1", "Global"}, {"E2", "Global"}}, gotDimValues)
 }
 
-func TestDiscoverInstances_Pagination(t *testing.T) {
+func TestDiscoverProfileGroup_Pagination(t *testing.T) {
 	client := &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{
 		page([]cwtypes.Metric{mkMetric("CPUUtilization", "InstanceId", "i-1")}, "next"),
 		page([]cwtypes.Metric{mkMetric("CPUUtilization", "InstanceId", "i-2")}, ""),
 	}}
 
 	prof := dimProfile("AWS/EC2", 300, "InstanceId")
-	got, err := discoverInstances(context.Background(), client, prof, true)
+	got, err := discoverOneProfile(context.Background(), client, prof, true)
 	require.NoError(t, err)
 
 	require.Len(t, got, 2)
@@ -238,7 +244,7 @@ func TestDiscoverInstances_Pagination(t *testing.T) {
 	assert.Equal(t, "next", *client.inputs[1].NextToken)
 }
 
-func TestDiscoverInstances_RecentlyActiveAndNamespace(t *testing.T) {
+func TestDiscoverProfileGroup_RecentlyActiveAndNamespace(t *testing.T) {
 	tests := map[string]struct {
 		useRecentlyActive  bool
 		wantRecentlyActive cwtypes.RecentlyActive
@@ -252,7 +258,7 @@ func TestDiscoverInstances_RecentlyActiveAndNamespace(t *testing.T) {
 			client := &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{page(nil, "")}}
 			prof := dimProfile("AWS/EC2", 300, "InstanceId")
 
-			_, err := discoverInstances(context.Background(), client, prof, tc.useRecentlyActive)
+			_, err := discoverOneProfile(context.Background(), client, prof, tc.useRecentlyActive)
 			require.NoError(t, err)
 
 			require.Len(t, client.inputs, 1)
@@ -265,16 +271,16 @@ func TestDiscoverInstances_RecentlyActiveAndNamespace(t *testing.T) {
 	}
 }
 
-func TestDiscoverInstances_EmptyAndError(t *testing.T) {
+func TestDiscoverProfileGroup_EmptyAndError(t *testing.T) {
 	prof := dimProfile("AWS/EC2", 300, "InstanceId")
 
 	empty := &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{page(nil, "")}}
-	got, err := discoverInstances(context.Background(), empty, prof, true)
+	got, err := discoverOneProfile(context.Background(), empty, prof, true)
 	require.NoError(t, err)
 	assert.Empty(t, got)
 
 	failing := &fakeCloudWatch{err: errors.New("access denied")}
-	_, err = discoverInstances(context.Background(), failing, prof, true)
+	_, err = discoverOneProfile(context.Background(), failing, prof, true)
 	assert.Error(t, err)
 }
 
@@ -330,8 +336,8 @@ func TestDiscoverAll(t *testing.T) {
 	results := discoverAll(context.Background(), newClient, groups, 5, 0)
 	require.Len(t, results, 4)
 
-	snap, errs := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
-	require.Empty(t, errs)
+	snap, failures := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
+	require.Zero(t, failures)
 
 	assert.Equal(t, 4, snap.totalInstances())
 	assert.Equal(t, [][]string{{"i-1"}}, dimValues(snap.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}]))
@@ -360,9 +366,8 @@ func TestDiscoverAll_ClientBuildErrorIsPerTarget(t *testing.T) {
 		{Target: "base", Region: "bad-region", Namespace: "AWS/EC2", RecentlyActive: true, Profiles: []cwprofiles.ResolvedProfile{ec2}},
 	}, 5, 0)
 
-	snap, errs := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
-	require.Len(t, errs, 1)
-	assert.Contains(t, errs[0].Error(), "bad-region")
+	snap, failures := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
+	require.Equal(t, 1, failures)
 	assert.Equal(t, 1, snap.totalInstances())
 	assert.Contains(t, snap.Instances, discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"})
 }
@@ -374,10 +379,10 @@ func TestCollector_DiscoveryGroupsDeduplicateCompatibleNamespaceScans(t *testing
 		Defaults: &falseValue,
 		Include:  []string{"alb", "alb_target_health"},
 	}
-	runtime, err := compileTestConfig(t, cfg)
+	runtime, _, err := compileTestConfig(t, cfg)
 	require.NoError(t, err)
 	c := New()
-	c.runtime = runtime
+	c.plan = runtime
 	resolved := resolvedTarget{target: runtime.Targets[0], accountID: "000000000000"}
 	c.resolvedTargets = []resolvedTarget{resolved}
 	c.resolvedByRef = map[string]resolvedTarget{"base": resolved}
@@ -389,7 +394,8 @@ func TestCollector_DiscoveryGroupsDeduplicateCompatibleNamespaceScans(t *testing
 
 	fake := &nsCloudWatch{byNS: map[string][]cwtypes.Metric{"AWS/ApplicationELB": {}}}
 	results := discoverAll(context.Background(), func(_, _ string) (cloudwatchClient, error) { return fake, nil }, groups, 5, 0)
-	assert.Len(t, results, 2, "one shared scan still produces one result per profile")
+	require.Len(t, results, 1, "one shared scan produces one group result")
+	assert.Len(t, results[0].Instances, 0)
 	assert.Equal(t, 1, fake.calls, "compatible profiles share one ListMetrics scan")
 }
 
@@ -409,13 +415,14 @@ func TestBuildDiscoverySnapshot_FailSoftCarriesForward(t *testing.T) {
 		{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 		{Target: "base", Profile: "ec2", Region: "us-west-2"}: {{DimensionValues: []string{"i-9"}}},
 	}
-	results := []discoveryResult{
-		{Key: discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}, Instances: []discoveredInstance{{DimensionValues: []string{"i-2"}}}},
-		{Key: discoveryKey{Target: "base", Profile: "ec2", Region: "us-west-2"}, Err: errors.New("throttled")},
+	profile := resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))
+	results := []discoveryGroupResult{
+		{Group: discoveryGroup{Target: "base", Region: "us-east-1", Profiles: []cwprofiles.ResolvedProfile{profile}}, Instances: map[string][]discoveredInstance{"ec2": {{DimensionValues: []string{"i-2"}}}}},
+		{Group: discoveryGroup{Target: "base", Region: "us-west-2", Profiles: []cwprofiles.ResolvedProfile{profile}}, Err: errors.New("throttled")},
 	}
 
-	snap, errs := buildDiscoverySnapshot(results, prev, time.Unix(1000, 0), 300)
-	require.Len(t, errs, 1)
+	snap, failures := buildDiscoverySnapshot(results, prev, time.Unix(1000, 0), 300)
+	require.Equal(t, 1, failures)
 	assert.Equal(t, [][]string{{"i-2"}}, dimValues(snap.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}]), "succeeded target is refreshed")
 	assert.Equal(t, [][]string{{"i-9"}}, dimValues(snap.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-west-2"}]), "failed target carries forward last-known instances")
 }
@@ -534,9 +541,9 @@ func TestCollector_collect_LateResolvedAccountDiscoveredSameCycle(t *testing.T) 
 	// Role A resolves first and populates a fresh discovery snapshot; role B fails
 	// once. When B resolves on a later cycle — still within discovery.refresh_every —
 	// it must be discovered that same cycle, not after the TTL expires.
-	c := multiTargetCollector(t, &seqSTS{
-		accounts: []string{"111111111111", "", "222222222222"},
-		failAt:   map[int]bool{1: true},
+	c := multiTargetCollector(t, map[string]stsClient{
+		"first":  &seqSTS{accounts: []string{"111111111111"}},
+		"second": &seqSTS{accounts: []string{"", "222222222222"}, failAt: map[int]bool{0: true}},
 	})
 	c.newCloudWatchClient = func(aws.Config) cloudwatchClient {
 		return &nsCloudWatch{byNS: map[string][]cwtypes.Metric{

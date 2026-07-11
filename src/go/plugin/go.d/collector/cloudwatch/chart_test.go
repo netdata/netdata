@@ -30,20 +30,20 @@ func chartTestCollector(t *testing.T, baseNames ...string) *Collector {
 	require.Len(t, profs, len(baseNames))
 
 	c := New()
-	c.runtime = &collectorRuntime{Profiles: profs}
+	c.plan = &collectionPlan{Profiles: profs}
 	return c
 }
 
 func TestBuildChartSpec_InjectsDimensionOptions(t *testing.T) {
 	c := chartTestCollector(t, "ec2")
 
-	spec := buildChartSpec(c.runtime.Profiles)
+	spec := buildChartSpec(c.plan.Profiles)
 	require.Len(t, spec.Groups, 1)
 
 	group := spec.Groups[0]
 	assert.NotEmpty(t, group.Metrics, "template.metrics (visible series) is injected")
 
-	series := profileSeries("ec2", c.runtime.Profiles[0].Config)
+	series := profileSeries("ec2", c.plan.Profiles[0].Config)
 	dims := 0
 	for _, chart := range group.Charts {
 		for _, d := range chart.Dimensions {
@@ -65,10 +65,10 @@ func TestBuildChartSpec_DoesNotMutateCatalog(t *testing.T) {
 	c := chartTestCollector(t, "ec2")
 
 	// Building the spec deep-copies each profile template before injecting options.
-	buildChartSpec(c.runtime.Profiles)
+	buildChartSpec(c.plan.Profiles)
 
 	// The deep copy must leave the resolved profile's template untouched.
-	for _, chart := range c.runtime.Profiles[0].Config.Template.Charts {
+	for _, chart := range c.plan.Profiles[0].Config.Template.Charts {
 		for _, d := range chart.Dimensions {
 			assert.Nilf(t, d.Options, "catalog profile dimension %q must not be mutated", d.Selector)
 		}
@@ -140,8 +140,8 @@ func TestEnsureRuntime_BuildsValidChartTemplate(t *testing.T) {
 		}
 	}
 
-	require.NoError(t, c.ensureRuntime())
-	assert.Len(t, c.runtime.Profiles, enabled)
+	require.NoError(t, c.ensurePlan())
+	assert.Len(t, c.plan.Profiles, enabled)
 
 	require.NotEmpty(t, c.chartTemplateYAML)
 	collecttest.AssertChartTemplateSchema(t, c.chartTemplateYAML)
@@ -162,8 +162,8 @@ func TestEnsureRuntime_ExplicitAllBuildsValidChartTemplate(t *testing.T) {
 	c.Config.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &falseValue, Include: names}
 	c.applyDefaults()
 
-	require.NoError(t, c.ensureRuntime())
-	assert.Len(t, c.runtime.Profiles, len(cat.AllProfiles()))
+	require.NoError(t, c.ensurePlan())
+	assert.Len(t, c.plan.Profiles, len(cat.AllProfiles()))
 
 	require.NotEmpty(t, c.chartTemplateYAML)
 	collecttest.AssertChartTemplateSchema(t, c.chartTemplateYAML)

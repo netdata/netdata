@@ -66,38 +66,64 @@ type clientKey struct {
 // (target, region); only successes are cached, so a transient credential error is
 // retried next call.
 type clientCache[T any] struct {
-	mu      sync.Mutex
-	clients map[clientKey]T
-	build   func(ctx context.Context, target, region string) (T, error)
+	mu       sync.Mutex
+	clients  map[clientKey]T
+	building map[clientKey]*clientBuild[T]
+	build    func(ctx context.Context, target, region string) (T, error)
+}
+
+type clientBuild[T any] struct {
+	ready  chan struct{}
+	client T
+	err    error
 }
 
 func newClientCache[T any](build func(ctx context.Context, target, region string) (T, error)) *clientCache[T] {
 	return &clientCache[T]{
-		clients: make(map[clientKey]T),
-		build:   build,
+		clients:  make(map[clientKey]T),
+		building: make(map[clientKey]*clientBuild[T]),
+		build:    build,
 	}
 }
 
 func (cc *clientCache[T]) forTargetRegion(ctx context.Context, target, region string) (T, error) {
 	key := clientKey{target: target, region: region}
 	cc.mu.Lock()
-	defer cc.mu.Unlock()
 	if client, ok := cc.clients[key]; ok {
+		cc.mu.Unlock()
 		return client, nil
 	}
-	client, err := cc.build(ctx, target, region)
-	if err != nil {
-		var zero T
-		return zero, err
+	if pending, ok := cc.building[key]; ok {
+		cc.mu.Unlock()
+		select {
+		case <-pending.ready:
+			return pending.client, pending.err
+		case <-ctx.Done():
+			var zero T
+			return zero, ctx.Err()
+		}
 	}
-	cc.clients[key] = client
-	return client, nil
+	pending := &clientBuild[T]{ready: make(chan struct{})}
+	cc.building[key] = pending
+	cc.mu.Unlock()
+
+	pending.client, pending.err = cc.build(ctx, target, region)
+
+	cc.mu.Lock()
+	delete(cc.building, key)
+	if pending.err == nil {
+		cc.clients[key] = pending.client
+	}
+	close(pending.ready)
+	cc.mu.Unlock()
+	return pending.client, pending.err
 }
 
 func (cc *clientCache[T]) reset() {
 	cc.mu.Lock()
 	defer cc.mu.Unlock()
 	cc.clients = make(map[clientKey]T)
+	cc.building = make(map[clientKey]*clientBuild[T])
 }
 
 // buildTargetRegionClient constructs a CloudWatch client for one (target, region)

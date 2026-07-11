@@ -20,6 +20,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
@@ -229,11 +230,12 @@ type e2eScenario struct {
 // answers per namespace; GetMetricData answers per (namespace, metric, statistic,
 // dimensions), echoing back each query's synthetic Id.
 type e2eCloudWatch struct {
-	mu      sync.Mutex
-	list    map[string][]cwtypes.Metric
-	values  map[string]float64
-	ts      time.Time
-	listErr error // when set, ListMetrics fails (discovery error path)
+	mu       sync.Mutex
+	list     map[string][]cwtypes.Metric
+	values   map[string]float64
+	ts       time.Time
+	listErr  error // when set, ListMetrics fails (discovery error path)
+	getCalls int
 }
 
 func (f *e2eCloudWatch) ListMetrics(_ context.Context, in *cloudwatch.ListMetricsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
@@ -248,6 +250,7 @@ func (f *e2eCloudWatch) ListMetrics(_ context.Context, in *cloudwatch.ListMetric
 func (f *e2eCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetricDataInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.getCalls++
 	results := make([]cwtypes.MetricDataResult, 0, len(in.MetricDataQueries))
 	for _, q := range in.MetricDataQueries {
 		r := cwtypes.MetricDataResult{Id: q.Id}
@@ -260,6 +263,52 @@ func (f *e2eCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetri
 		results = append(results, r)
 	}
 	return &cloudwatch.GetMetricDataOutput{MetricDataResults: results}, nil
+}
+
+func TestCollect_OrderedRulesFirstTargetOwnsSameAccountSeries(t *testing.T) {
+	const account = "000000000000"
+	defaults := false
+	cfg := validBaseConfig()
+	cfg.Targets = []TargetConfig{
+		{Name: "first", Credentials: "sdk_default"},
+		{Name: "second", Credentials: "sdk_default"},
+	}
+	selector := &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
+	cfg.Rules = []RuleConfig{
+		{Name: "first-rule", Targets: []string{"first"}, Profiles: selector, Regions: []string{"us-east-1"}},
+		{Name: "second-rule", Targets: []string{"second"}, Profiles: selector, Regions: []string{"us-east-1"}},
+	}
+
+	first := &e2eCloudWatch{
+		list:   map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
+		values: map[string]float64{e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"): 5},
+		ts:     time.Unix(1, 0),
+	}
+	second := &e2eCloudWatch{
+		list:   map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
+		values: map[string]float64{e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"): 9},
+		ts:     time.Unix(1, 0),
+	}
+
+	c := New()
+	c.Config = cfg
+	c.newAWSConfig = func(_ context.Context, identity awsauth.Identity, _ string) (aws.Config, error) {
+		return aws.Config{Region: identity.Ref}, nil
+	}
+	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
+	c.newCloudWatchClient = func(cfg aws.Config) cloudwatchClient {
+		if cfg.Region == "first" {
+			return first
+		}
+		return second
+	}
+	c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
+
+	series, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(5), series[`ec2.cpu_utilization_average{account_id="000000000000",instance_id="i-1",region="us-east-1"}`])
+	assert.Equal(t, 1, first.getCalls)
+	assert.Zero(t, second.getCalls, "the later rule's duplicate final series must not be queried")
 }
 
 // e2eKey builds the fixture key from (namespace, metric, statistic) plus dimension

@@ -149,8 +149,10 @@ example; the loader qualifies it with the profile name.
 
 ## Chart template rules
 
-The `template` uses Netdata's dynamic chart-template format. CloudWatch profiles
-have additional invariants:
+The `template` uses Netdata's dynamic chart-template format. See the complete
+[Chart Template Format](/src/go/plugin/framework/charttpl/README.md) for every
+group, chart, instance, label-promotion, lifecycle, dimension, presentation,
+and selector field. CloudWatch profiles add these restrictions:
 
 - Every chart must set `algorithm: absolute`. CloudWatch returns per-period
   aggregates, not cumulative counters.

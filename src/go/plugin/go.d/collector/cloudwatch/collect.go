@@ -5,7 +5,7 @@ package cloudwatch
 import "context"
 
 func (c *Collector) collect(ctx context.Context) error {
-	if err := c.ensureRuntime(); err != nil {
+	if err := c.ensurePlan(); err != nil {
 		return err
 	}
 	if err := c.ensureTargets(ctx); err != nil {
@@ -17,12 +17,11 @@ func (c *Collector) collect(ctx context.Context) error {
 	c.refreshTags(ctx) // best-effort tag enrichment; never gates collection (INV.2)
 
 	plan := c.currentQueryPlan()
-	c.observations.pruneObserved(plan)
 
 	now := c.now()
-	due := c.observations.dueGroups(plan, now)
+	due := c.observations.dueGroups(c.queryGroups, now)
 
-	dueQueries := filterDueQueries(plan, due)
+	dueQueries := filterDueQueries(c.queryGroups, c.queriesByGroup, due)
 	samples, noData, failed, err := c.executeQueries(ctx, dueQueries, now)
 	if err != nil {
 		return err

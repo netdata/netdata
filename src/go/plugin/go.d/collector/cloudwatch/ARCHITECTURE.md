@@ -79,8 +79,8 @@ owns the `Collector` struct and lifecycle.
 flowchart TD
     Init("Init<br/>applyDefaults + validate<br/>no AWS calls")
     Check("Check")
-    Runtime("ensureRuntime<br/>load catalog · compile rules<br/>build + cache chart template")
-    Targets("ensureTargets<br/>STS GetCallerIdentity per target<br/>fail-soft · retry pending")
+    Runtime("ensurePlan<br/>load catalog · compile rules<br/>build + cache chart template")
+    Targets("ensureTargets<br/>concurrent STS GetCallerIdentity<br/>fail-soft · retry pending")
     Post("framework postCheck<br/>validate ChartTemplateYAML via chartengine")
     Collect("Collect<br/>every update_every")
     Cycle("collect cycle<br/>discover → plan → schedule → execute → observe")
@@ -102,11 +102,11 @@ flowchart TD
 
 - **Init** does config only (`applyDefaults`, `validate`) — no network.
 - **Check** compiles the configuration, builds the chart template, and resolves
-  each target's account id through STS. The template is built here because the
+  up to 64 target account IDs concurrently through STS. The template is built here because the
   framework's `postCheck`
   validates `ChartTemplateYAML()` through `chartengine.LoadYAML` before the
   first `Collect`; an unbuilt template would fail the job.
-- **Collect** runs the whole cycle (below). `ensureRuntime` short-circuits once
+- **Collect** runs the whole cycle (below). `ensurePlan` short-circuits once
   compiled; `ensureTargets` retries only unresolved targets.
 - **Cleanup** resets the compiled runtime, resolved targets, cached template,
   discovery/query snapshots, client caches, and observation schedule so a framework
@@ -142,8 +142,9 @@ flowchart TD
 
 ## Configuration Compilation
 
-`config.go`, `config_decode.go`, `plan.go`, and `runtime.go` separate the raw
-operator contract from execution state:
+`config.go`, `config_decode.go`, `config_validate.go`, `plan.go`,
+`plan_compiler.go`, and `runtime.go` separate the raw operator contract,
+compiler state, and installed execution plan:
 
 - YAML decoding rejects unknown keys recursively. Known future rule fields
   (`filters`, `labels`, `series`, and `query`) are decoded and then rejected with
@@ -151,15 +152,15 @@ operator contract from execution state:
 - Named credential sources describe only credential acquisition. Named targets
   describe monitored identities and optional role assumption. Ordered rules bind
   targets to profile selectors and regions.
-- `compileConfig` resolves every reference, rejects unused credential/target
+- `compileConfig` coordinates a private staged compiler that resolves every reference, rejects unused credential/target
   definitions, applies profile defaults/include/exclude semantics, intersects
   intrinsic supported regions, enforces target/role partition consistency, and
   emits immutable ordered scopes.
-- Exact duplicate target/profile/region scopes are removed statically with a
-  shadow diagnostic. Same-account cross-target overlap remains until discovery,
+- Exact duplicate target/profile/region scopes are removed statically with one
+  bounded aggregate diagnostic per affected rule. Same-account cross-target overlap remains until discovery,
   where final emitted-series identity can be evaluated correctly.
-- Fixed internal caps bound credentials, targets, rules, list references, and
-  compiled scopes. Overflow fails compilation and never installs a partial plan;
+- Fixed internal caps bound credentials, 64 targets, rules, list references,
+  candidate-scope evaluation, and compiled scopes. Overflow fails compilation and never installs a partial plan;
   these safeguards are not public tuning settings.
 
 ## Discovery
@@ -271,14 +272,14 @@ Discovery then finds which *instances* of those profiles exist per target and re
   extra AWS cost. (Exception: a total-failure cycle — every due query fails —
   returns an error before `observe`, so nothing is written that cycle and the
   schedule stays due for retry.) A series in a *successfully queried* group that returned no
-  datapoint is reconciled per the metric's no-data policy: `nil_as_zero` metrics
-  (sum/count — "no activity") record **0**; the rest **drop** the cached value so
+  datapoint is reconciled per the metric's no-data policy: metrics whose effective
+  policy is `nil_as_zero: true` record **0**; the rest **drop** the cached value so
   the series gaps until fresh data, and a stale value is never re-emitted.
-  `nil_as_zero` defaults to the metric's `rate` flag (rate/sum counts → 0, gauges
-  → gap) and is overridable per metric. The cache otherwise persists until the
-  instance leaves discovery and `pruneObserved` drops it.
+  Without an explicit override, only `rate: true` metrics at `sum` or
+  `sample_count` default to zero; every other statistic gaps. The cache otherwise
+  persists until the instance leaves discovery and `pruneObserved` drops it.
 - `pruneObserved` drops both cached series and per-(target, region, period) schedule entries
-  absent from the current plan (a resource or metric went away), so removed resources
+  absent from the current plan when that immutable plan is rebuilt, so removed resources
   stop being re-emitted and a group that later reappears is queried on its first cycle
   back rather than waiting for a stale schedule entry to expire.
 
@@ -326,7 +327,7 @@ refreshDiscovery → refreshTags → buildQueryPlan → … → observe
 
 ## Dynamic Charts
 
-`chart.go`, built once by `ensureRuntime` and cached in `chartTemplateYAML`.
+`chart.go`, built once by `ensurePlan` and cached in `chartTemplateYAML`.
 
 ```text
 for each selected profile:
@@ -409,13 +410,14 @@ or layers one `AssumeRole` provider over it, so static credentials can bootstrap
 cross-account roles without environment indirection. The collector builds an
 `aws.Config` per (target, region).
 
-Each target's AWS account id is resolved through `sts:GetCallerIdentity`
+Each target's AWS account id is resolved through STS `GetCallerIdentity`
 (`identity.go`, `ensureTargets`) and stamped on its series. Resolution is
 fail-soft and retried: an unresolved target stays pending while healthy targets
 continue; only a cycle with no resolved target fails. Named targets are never
 deduplicated by account id because their permissions and visible resources may
 differ. Dynamic final-series overlap is deduplicated later by ordered rule
-precedence.
+precedence. AWS does not require an explicit IAM permission grant for
+`GetCallerIdentity`.
 
 Partition consistency is enforced per target. A target cannot span AWS
 partitions, and an assumed-role ARN partition must match the selected regions
@@ -461,8 +463,8 @@ verify current per-region prices on the CloudWatch pricing page.)
 - **Query window is a settled bucket** — offset by `max(query_offset, period)`
   with period alignment.
 - **No-data policy is per-metric** — a successfully-queried empty result records
-  0 (`nil_as_zero`, the default for `rate`/sum counts) or gaps (the default for
-  gauges); not-due / failed series re-emit their last value so long-period metrics
+  0 (`nil_as_zero`, defaulting on only for `rate: true` `sum`/`sample_count`) or
+  gaps; not-due / failed series re-emit their last value so long-period metrics
   stay visible.
 - **Schedule advances only on success**, per (target, region, period).
 - **Fail-soft discovery** — carry forward on error; only a first-ever total

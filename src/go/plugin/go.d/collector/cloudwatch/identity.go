@@ -8,6 +8,7 @@ import (
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/service/sts"
+	"github.com/sourcegraph/conc/pool"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 )
@@ -15,8 +16,14 @@ import (
 // resolvedTarget binds one configured target identity to its STS-resolved account.
 // Target reference remains the execution identity; accountID is output attribution.
 type resolvedTarget struct {
-	target    *targetRuntime
+	target    *collectionTarget
 	accountID string
+}
+
+type targetResolution struct {
+	target    *collectionTarget
+	accountID string
+	err       error
 }
 
 // ensureTargets resolves the AWS account id for every configured target via
@@ -27,18 +34,18 @@ type resolvedTarget struct {
 // does not silently drop a target for the lifetime of the job. Targets are never
 // deduplicated by account id because credentials can expose different resources.
 func (c *Collector) ensureTargets(ctx context.Context) error {
-	if c.runtime == nil {
+	if c.plan == nil {
 		return errors.New("CloudWatch collection plan is not compiled")
 	}
 	if c.resolvedRefs == nil {
-		c.resolvedRefs = make(map[string]struct{}, len(c.runtime.Targets))
-		c.resolvedByRef = make(map[string]resolvedTarget, len(c.runtime.Targets))
+		c.resolvedRefs = make(map[string]struct{}, len(c.plan.Targets))
+		c.resolvedByRef = make(map[string]resolvedTarget, len(c.plan.Targets))
 	}
 
 	// Short-circuit once every configured target has resolved. Until then, retry
 	// the pending ones.
 	allResolved := true
-	for _, target := range c.runtime.Targets {
+	for _, target := range c.plan.Targets {
 		if _, ok := c.resolvedRefs[target.Name]; !ok {
 			allResolved = false
 			break
@@ -51,35 +58,46 @@ func (c *Collector) ensureTargets(ctx context.Context) error {
 		return nil
 	}
 
-	var lastErr error
-
-	for _, target := range c.runtime.Targets {
+	var pending []*collectionTarget
+	for _, target := range c.plan.Targets {
 		if _, ok := c.resolvedRefs[target.Name]; ok {
 			continue // already resolved
 		}
-		region := target.Regions[0]
-		acctID, err := c.resolveAccountID(ctx, target.Identity, region)
-		if err != nil {
-			lastErr = err
-			// Keep the identity pending and retry next cycle; throttle the warning so a
-			// persistently unreachable role does not warn every cycle.
-			c.Limit(logKeyAccountResolveFailed+":"+target.Name, 1, recurringLogEvery).
-				Warningf("CloudWatch: %v (will retry next cycle)", err)
+		pending = append(pending, target)
+	}
+
+	p := pool.NewWithResults[targetResolution]().WithMaxGoroutines(maxTargets)
+	for _, target := range pending {
+		p.Go(func() targetResolution {
+			accountID, err := c.resolveAccountID(ctx, target.Identity, target.Regions[0])
+			return targetResolution{target: target, accountID: accountID, err: err}
+		})
+	}
+	results := p.Wait()
+
+	var failures []operationFailure
+	for _, result := range results {
+		target := result.target
+		if result.err != nil {
+			failures = append(failures, operationFailure{Target: target.Name, Region: target.Regions[0], Err: result.err})
 			continue
 		}
 		c.resolvedRefs[target.Name] = struct{}{}
-		resolved := resolvedTarget{target: target, accountID: acctID}
+		resolved := resolvedTarget{target: target, accountID: result.accountID}
 		c.resolvedTargets = append(c.resolvedTargets, resolved)
 		c.resolvedByRef[target.Name] = resolved
 		c.invalidateQueryPlan()
 		c.markDiscoveryStale() // discover the newly-resolved account this cycle, not after refresh_every
 		c.markTagsStale()      // and fetch its tags this cycle, so its first charts are created tagged
-		c.Infof("CloudWatch: target %q resolved to AWS account %s", target.Name, acctID)
+		c.Infof("CloudWatch: target %q resolved to AWS account %s", target.Name, result.accountID)
 	}
+	c.warnOperationFailures(logKeyAccountResolveFailed, "account resolution", " (will retry next cycle)", failures)
 
 	if len(c.resolvedTargets) == 0 {
-		if lastErr != nil {
-			return fmt.Errorf("no AWS account could be resolved (the 'sts:GetCallerIdentity' permission is required): %w", lastErr)
+		if len(failures) > 0 {
+			last := failures[len(failures)-1]
+			return fmt.Errorf("no AWS target could be resolved (%d failed); last failure for target %q region %q: %w",
+				len(failures), last.Target, last.Region, sanitizeAWSError(last.Err))
 		}
 		return errors.New("no AWS targets resolved")
 	}
@@ -93,15 +111,15 @@ func (c *Collector) resolveAccountID(ctx context.Context, id awsauth.Identity, r
 
 	cfg, err := c.newAWSConfig(cctx, id, region)
 	if err != nil {
-		return "", fmt.Errorf("identity %q (region %q): building AWS config: %w", id.Ref, region, err)
+		return "", fmt.Errorf("build AWS configuration: %w", sanitizeAWSError(err))
 	}
 
 	out, err := c.newSTSClient(cfg).GetCallerIdentity(cctx, &sts.GetCallerIdentityInput{})
 	if err != nil {
-		return "", fmt.Errorf("identity %q (region %q): sts:GetCallerIdentity: %w", id.Ref, region, err)
+		return "", fmt.Errorf("GetCallerIdentity: %w", sanitizeAWSError(err))
 	}
 	if out.Account == nil || *out.Account == "" {
-		return "", fmt.Errorf("identity %q (region %q): sts:GetCallerIdentity returned no account id", id.Ref, region)
+		return "", errors.New("GetCallerIdentity returned no account ID")
 	}
 	return *out.Account, nil
 }

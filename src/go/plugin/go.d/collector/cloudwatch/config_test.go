@@ -12,6 +12,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 
+	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -100,6 +101,48 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 	assert.Equal(t, 2, strings.Count(string(data), `"sensitive": true`), "only secret access key and session token are sensitive widgets")
 }
 
+func TestConfigSchema_ValidationParity(t *testing.T) {
+	data, err := os.ReadFile("config_schema.json")
+	require.NoError(t, err)
+	var doc struct {
+		JSONSchema any `json:"jsonSchema"`
+	}
+	require.NoError(t, json.Unmarshal(data, &doc))
+
+	compiler := jsonschema.NewCompiler()
+	require.NoError(t, compiler.AddResource("cloudwatch-config.json", doc.JSONSchema))
+	schema, err := compiler.Compile("cloudwatch-config.json")
+	require.NoError(t, err)
+
+	valid := map[string]any{
+		"name":        "cloudwatch",
+		"credentials": map[string]any{"sdk_default": map[string]any{"type": "default"}},
+		"targets":     []any{map[string]any{"name": "base", "credentials": "sdk_default"}},
+		"rules":       []any{map[string]any{"name": "base-defaults", "targets": []any{"base"}, "regions": []any{"us-east-1"}}},
+	}
+	require.NoError(t, schema.Validate(valid))
+
+	tests := map[string]func(map[string]any){
+		"unknown top-level field": func(cfg map[string]any) { cfg["unknown"] = true },
+		"default credentials with access key": func(cfg map[string]any) {
+			cfg["credentials"] = map[string]any{"sdk_default": map[string]any{"type": "default", "access_key_id": "must-not-be-accepted"}}
+		},
+		"static credentials without secret": func(cfg map[string]any) {
+			cfg["credentials"] = map[string]any{"sdk_default": map[string]any{"type": "static", "access_key_id": "key"}}
+		},
+	}
+	for name, mutate := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := make(map[string]any, len(valid))
+			for key, value := range valid {
+				cfg[key] = value
+			}
+			mutate(cfg)
+			assert.Error(t, schema.Validate(cfg))
+		})
+	}
+}
+
 func TestConfig_TagsDecode(t *testing.T) {
 	var cfg Config
 	require.NoError(t, yaml.Unmarshal([]byte("tags:\n  - name: owner\n  - name: Name\n    rename: instance_name\n"), &cfg))
@@ -128,17 +171,6 @@ func TestConfig_YAMLAcceptsFrameworkKeys(t *testing.T) {
 	var cfg Config
 	err := yaml.Unmarshal([]byte("name: example\nmodule: cloudwatch\npriority: 100\nlabels:\n  site: test\n"), &cfg)
 	assert.NoError(t, err)
-}
-
-func TestRegionPartition(t *testing.T) {
-	tests := map[string]string{
-		"us-east-1": "aws", "cn-north-1": "aws-cn", "us-gov-west-1": "aws-us-gov",
-		"us-iso-east-1": "aws-iso", "us-isob-east-1": "aws-iso-b", "us-isof-south-1": "aws-iso-f",
-		"eu-isoe-west-1": "aws-iso-e", "eusc-de-east-1": "aws-eusc",
-	}
-	for region, want := range tests {
-		t.Run(region, func(t *testing.T) { assert.Equal(t, want, regionPartition(region)) })
-	}
 }
 
 func TestNormalizeRegions(t *testing.T) {

@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsregion"
 )
 
 // VersionV1 is the supported profile schema version.
@@ -39,7 +40,6 @@ var reservedLabels = map[string]struct{}{"account_id": {}, "region": {}}
 var (
 	reNamespace  = regexp.MustCompile(`^[A-Za-z0-9/._-]+$`)
 	reIdentityID = regexp.MustCompile(`^[a-z][a-z0-9_]*$`)
-	reRegion     = regexp.MustCompile(`^[a-z]{2}(?:-[a-z0-9]+)+-[0-9]+$`)
 	rePercentile = regexp.MustCompile(`^p(\d{1,2}(\.\d{1,2})?|100(\.0{1,2})?)$`)
 )
 
@@ -190,7 +190,7 @@ func (p Profile) Validate(prefix, baseName string) error {
 		}
 		seen := make(map[string]struct{}, len(p.SupportedRegions))
 		for i, region := range p.SupportedRegions {
-			if !reRegion.MatchString(region) {
+			if !awsregion.Valid(region) {
 				errs = append(errs, fmt.Errorf("%s.supported_regions[%d]: %q is not a valid AWS region", prefix, i, region))
 				continue
 			}

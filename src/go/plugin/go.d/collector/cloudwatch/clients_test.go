@@ -5,7 +5,9 @@ package cloudwatch
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -53,4 +55,35 @@ func TestClientCache_BuildErrorNotCached(t *testing.T) {
 	_, err = cache.forTargetRegion(context.Background(), "a1", "r1")
 	require.Error(t, err)
 	assert.Equal(t, 2, builds, "a failed build is retried, not cached")
+}
+
+func TestClientCache_DistinctKeysBuildConcurrently(t *testing.T) {
+	started := make(chan struct{}, 2)
+	release := make(chan struct{})
+	cache := newClientCache(func(_ context.Context, target, region string) (string, error) {
+		started <- struct{}{}
+		<-release
+		return target + "/" + region, nil
+	})
+
+	var wg sync.WaitGroup
+	for _, target := range []string{"first", "second"} {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, _ = cache.forTargetRegion(context.Background(), target, "us-east-1")
+		}()
+	}
+
+	allStarted := true
+	for range 2 {
+		select {
+		case <-started:
+		case <-time.After(250 * time.Millisecond):
+			allStarted = false
+		}
+	}
+	close(release)
+	wg.Wait()
+	assert.True(t, allStarted, "one slow client build must not serialize a distinct target/region")
 }

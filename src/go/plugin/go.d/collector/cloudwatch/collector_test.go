@@ -3,14 +3,18 @@
 package cloudwatch
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
@@ -68,19 +72,18 @@ func configureExactRule(c *Collector, regions, profiles []string) {
 
 func setSingleTargetRuntime(c *Collector, account string, regions []string, profiles []cwprofiles.ResolvedProfile) {
 	identity := awsauth.NewIdentity("base", awsauth.CredentialConfig{Type: awsauth.CredentialTypeDefault}, nil)
-	target := &targetRuntime{Name: "base", Identity: identity, Regions: regions}
-	runtime := &collectorRuntime{
-		Targets:      []*targetRuntime{target},
-		TargetsByRef: map[string]*targetRuntime{"base": target},
-		Profiles:     profiles,
+	target := &collectionTarget{Name: "base", Identity: identity, Regions: regions}
+	runtime := &collectionPlan{
+		Targets:  []*collectionTarget{target},
+		Profiles: profiles,
 	}
 	for _, region := range regions {
 		for _, profile := range profiles {
-			runtime.Scopes = append(runtime.Scopes, collectionScope{RuleName: "test", Target: target, Profile: profile, Region: region})
+			runtime.Scopes = append(runtime.Scopes, collectionScope{Target: target, Profile: profile, Region: region})
 		}
 	}
 	resolved := resolvedTarget{target: target, accountID: account}
-	c.runtime = runtime
+	c.plan = runtime
 	c.resolvedTargets = []resolvedTarget{resolved}
 	c.resolvedByRef = map[string]resolvedTarget{"base": resolved}
 	c.resolvedRefs = map[string]struct{}{"base": {}}
@@ -154,6 +157,19 @@ func TestCollector_Init_appliesDefaults(t *testing.T) {
 	assert.True(t, c.recentlyActiveOnly())
 }
 
+func TestCollector_InitRejectsTargetCapBeforeDetailedTraversal(t *testing.T) {
+	cfg := validConfig()
+	for i := 1; i <= maxTargets; i++ {
+		cfg.Targets = append(cfg.Targets, TargetConfig{Name: "INVALID NAME", Credentials: "sdk_default"})
+	}
+	c := New()
+	c.Config = cfg
+	err := c.Init(context.Background())
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "maximum is 64")
+	assert.NotContains(t, err.Error(), "must match")
+}
+
 func TestCollector_Check(t *testing.T) {
 	t.Run("resolves account id via STS and is idempotent", func(t *testing.T) {
 		f := &fakeSTS{account: "000000000000"}
@@ -184,4 +200,76 @@ func TestCollector_Check(t *testing.T) {
 
 		assert.Error(t, c.Check(context.Background()))
 	})
+
+	t.Run("sanitizes provider errors in return and logs", func(t *testing.T) {
+		const sensitive = "SENSITIVE_PROVIDER_DETAIL"
+		var buf bytes.Buffer
+		f := &fakeSTS{err: errors.New(sensitive)}
+		c := newTestCollector(t, validConfig(), f)
+		c.Logger = logger.NewWithWriter(&buf)
+		require.NoError(t, c.Init(context.Background()))
+
+		err := c.Check(context.Background())
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), sensitive)
+		assert.NotContains(t, buf.String(), sensitive)
+	})
+}
+
+type concurrentSTS struct {
+	started chan struct{}
+	release chan struct{}
+	current atomic.Int32
+	maximum atomic.Int32
+}
+
+func (f *concurrentSTS) GetCallerIdentity(context.Context, *sts.GetCallerIdentityInput, ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+	current := f.current.Add(1)
+	for {
+		maximum := f.maximum.Load()
+		if current <= maximum || f.maximum.CompareAndSwap(maximum, current) {
+			break
+		}
+	}
+	f.started <- struct{}{}
+	<-f.release
+	f.current.Add(-1)
+	return &sts.GetCallerIdentityOutput{Account: aws.String("000000000000")}, nil
+}
+
+func TestCollector_CheckResolvesAllTargetsConcurrently(t *testing.T) {
+	defaults := false
+	cfg := validConfig()
+	cfg.Targets = []TargetConfig{
+		{Name: "target-a", Credentials: "sdk_default"},
+		{Name: "target-b", Credentials: "sdk_default"},
+		{Name: "target-c", Credentials: "sdk_default"},
+	}
+	cfg.Rules[0].Targets = []string{"target-a", "target-b", "target-c"}
+	cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
+
+	fake := &concurrentSTS{started: make(chan struct{}, len(cfg.Targets)), release: make(chan struct{})}
+	c := New()
+	c.Config = cfg
+	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
+	c.newSTSClient = func(aws.Config) stsClient { return fake }
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- c.Check(context.Background()) }()
+
+	allStarted := true
+	for range cfg.Targets {
+		select {
+		case <-fake.started:
+		case <-time.After(250 * time.Millisecond):
+			allStarted = false
+		}
+		if !allStarted {
+			break
+		}
+	}
+	close(fake.release)
+	require.NoError(t, <-errCh)
+	assert.True(t, allStarted, "every target must be attempted without waiting for another target's timeout")
+	assert.Equal(t, int32(len(cfg.Targets)), fake.maximum.Load())
 }

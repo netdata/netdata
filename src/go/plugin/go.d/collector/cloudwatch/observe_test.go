@@ -481,7 +481,7 @@ func TestCleanup_ResetsRuntimeState(t *testing.T) {
 	c.Cleanup(context.Background())
 
 	assert.Empty(t, c.resolvedTargets)
-	assert.Nil(t, c.runtime)
+	assert.Nil(t, c.plan)
 	assert.Empty(t, c.observations.lastObserved)
 	assert.Empty(t, c.observations.nextQueryAt)
 	assert.Empty(t, c.discovery.Instances)

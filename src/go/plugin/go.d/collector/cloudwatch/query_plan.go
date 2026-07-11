@@ -69,8 +69,23 @@ func (c *Collector) currentQueryPlan() []plannedQuery {
 		return c.queryPlan
 	}
 	c.queryPlan = c.buildQueryPlan()
+	c.queryGroups, c.queriesByGroup = groupQueryPlan(c.queryPlan)
+	c.observations.pruneObserved(c.queryPlan)
 	c.planDirty = false
 	return c.queryPlan
+}
+
+func groupQueryPlan(plan []plannedQuery) ([]queryGroupKey, map[queryGroupKey][]plannedQuery) {
+	byGroup := make(map[queryGroupKey][]plannedQuery)
+	var order []queryGroupKey
+	for _, query := range plan {
+		key := query.groupKey()
+		if _, ok := byGroup[key]; !ok {
+			order = append(order, key)
+		}
+		byGroup[key] = append(byGroup[key], query)
+	}
+	return order, byGroup
 }
 
 // queryWindow computes the GetMetricData time window for a metric of the given
@@ -92,14 +107,14 @@ func queryWindow(now time.Time, period, queryOffset int) (start, end time.Time) 
 // final emitted identity. This resolves dynamic overlap when distinct targets later
 // resolve to the same account and discover the same resource.
 func (c *Collector) buildQueryPlan() []plannedQuery {
-	if c.runtime == nil {
+	if c.plan == nil {
 		return nil
 	}
 	var plan []plannedQuery
 	idx := 0
 	seen := make(map[string]struct{})
 	shadowed := 0
-	for _, scope := range c.runtime.Scopes {
+	for _, scope := range c.plan.Scopes {
 		resolved, ok := c.resolvedTargetByRef(scope.Target.Name)
 		if !ok {
 			continue
