@@ -30,6 +30,10 @@ struct rrddim_constructor {
 
 };
 
+static inline int32_t rrddim_normalize_divisor(int32_t divisor) {
+    return divisor ? divisor : 1;
+}
+
 // isolated call to appear
 // separate in statistics
 static void *rrddim_alloc_db(size_t entries) {
@@ -61,8 +65,7 @@ static void rrddim_insert_callback(const DICTIONARY_ITEM *item __maybe_unused, v
 
     rd->algorithm = ctr->algorithm;
     rd->multiplier = ctr->multiplier;
-    rd->divisor = ctr->divisor;
-    if(!rd->divisor) rd->divisor = 1;
+    rd->divisor = rrddim_normalize_divisor(ctr->divisor);
 
     rd->rrdset = st;
 
@@ -444,6 +447,8 @@ inline int rrddim_set_multiplier(RRDSET *st, RRDDIM *rd, int32_t multiplier) {
 }
 
 inline int rrddim_set_divisor(RRDSET *st, RRDDIM *rd, int32_t divisor) {
+    divisor = rrddim_normalize_divisor(divisor);
+
     if(unlikely(rd->divisor == divisor))
         return 0;
 

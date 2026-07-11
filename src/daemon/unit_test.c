@@ -1674,6 +1674,54 @@ static int test_rrddim_scale_minimum_magnitude(void) {
     return rc;
 }
 
+static int test_rrddim_divisor_normalization(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-divisor-normalization", "unittest-divisor-normalization", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "d", NULL, 1, 0, RRD_ALGORITHM_ABSOLUTE);
+
+    int rc = 0;
+    if(rd->divisor != 1) {
+        fprintf(stderr, "%s: construction stored zero divisor as %d instead of 1\n", __FUNCTION__, rd->divisor);
+        rc = 1;
+    }
+
+    if(rrddim_set_divisor(st, rd, 7) != 1 || rd->divisor != 7) {
+        fprintf(stderr, "%s: valid positive divisor was not preserved\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    if(rrddim_set_divisor(st, rd, 0) != 1 || rd->divisor != 1) {
+        fprintf(stderr, "%s: zero divisor update was not normalized to 1\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    if(rrddim_set_divisor(st, rd, 0) != 0 || rd->divisor != 1) {
+        fprintf(stderr, "%s: repeated normalized zero update was not a no-op\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    if(rrddim_set_divisor(st, rd, -7) != 1 || rd->divisor != -7) {
+        fprintf(stderr, "%s: valid negative divisor was not preserved\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    RRDDIM *same_rd = rrddim_add(st, "d", NULL, 1, 0, RRD_ALGORITHM_ABSOLUTE);
+    if(same_rd != rd || rd->divisor != 1) {
+        fprintf(stderr, "%s: conflict update did not preserve identity and normalize zero divisor\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
 static int test_rrdset_rejects_invalid_update_every(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
@@ -1852,6 +1900,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_rrddim_scale_minimum_magnitude())
+        return 1;
+
+    if(test_rrddim_divisor_normalization())
         return 1;
 
     if(test_rrdset_rejects_invalid_update_every())
