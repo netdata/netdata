@@ -1530,7 +1530,8 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                         web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH);
 
                     // check if there is a filename extension
-                    while (--e > s) {
+                    while (e > s + 1) {
+                        e--;
                         if (*e == '/')
                             break;
                         if(*e == '.') {
