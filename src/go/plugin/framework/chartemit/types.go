@@ -34,11 +34,12 @@ type Plan = chartengine.Plan
 // Action aliases keep chartemit independent from planner internals while
 // reusing the action model.
 type (
-	EngineAction          = chartengine.EngineAction
-	CreateChartAction     = chartengine.CreateChartAction
-	CreateDimensionAction = chartengine.CreateDimensionAction
-	UpdateChartAction     = chartengine.UpdateChartAction
-	UpdateDimensionValue  = chartengine.UpdateDimensionValue
-	RemoveDimensionAction = chartengine.RemoveDimensionAction
-	RemoveChartAction     = chartengine.RemoveChartAction
+	EngineAction            = chartengine.EngineAction
+	CreateChartAction       = chartengine.CreateChartAction
+	CreateDimensionAction   = chartengine.CreateDimensionAction
+	UpdateChartLabelsAction = chartengine.UpdateChartLabelsAction
+	UpdateChartAction       = chartengine.UpdateChartAction
+	UpdateDimensionValue    = chartengine.UpdateDimensionValue
+	RemoveDimensionAction   = chartengine.RemoveDimensionAction
+	RemoveChartAction       = chartengine.RemoveChartAction
 )
