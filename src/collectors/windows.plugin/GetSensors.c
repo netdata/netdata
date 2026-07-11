@@ -323,6 +323,7 @@ struct sensor_data {
     bool first_time;
     bool enabled;
     bool read_ok; // last collection cycle read this sensor's value successfully
+    size_t seen_generation; // last enumeration pass that returned this sensor
     enum netdata_win_sensor_monitored sensor_data_type;
     struct win_sensor_config *config;
     struct netdata_sensors_extra_values *values;
@@ -352,6 +353,12 @@ struct sensor_data {
 };
 
 DICTIONARY *sensors;
+
+// bumped by the sensor thread after each COMPLETED enumeration pass, so
+// consumers can tell current sensors from ones that disappeared from the
+// Sensor API; guarded by sensors_mutex. not bumped on failed polls - a
+// transient API failure freezes the last known state instead of aging it out
+static size_t sensors_enum_generation = 0;
 
 static void netdata_sensors_free_extra_values(struct netdata_sensors_extra_values *values)
 {
@@ -638,6 +645,11 @@ static void netdata_get_sensors()
         __netdata_mutex_lock(&sensors_mutex);
         struct sensor_data *sd = dictionary_set(sensors, thread_values, NULL, sizeof(*sd));
 
+        // stamped with the NEXT generation: ">= sensors_enum_generation"
+        // keeps a sensor alive through the in-flight pass and expires it one
+        // completed pass after it disappears from the enumeration
+        sd->seen_generation = sensors_enum_generation + 1;
+
         if (unlikely(!sd->initialized)) {
             netdata_initialize_sensor_dict(sd, pSensor);
             sd->initialized = true;
@@ -691,6 +703,10 @@ static void netdata_get_sensors()
 
         pSensor->lpVtbl->Release(pSensor);
     }
+
+    __netdata_mutex_lock(&sensors_mutex);
+    sensors_enum_generation++;
+    __netdata_mutex_unlock(&sensors_mutex);
 
     pSensorCollection->lpVtbl->Release(pSensorCollection);
 }
@@ -937,7 +953,8 @@ int dict_sensors_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *val
 
     sensors_data_chart(sd, *update_every);
 
-    if (sd->sensor_data_type == NETDATA_WIN_SENSOR_CELSIUS && sd->div_factor > 0 && sd->read_ok) {
+    if (sd->sensor_data_type == NETDATA_WIN_SENSOR_CELSIUS && sd->div_factor > 0 && sd->read_ok &&
+        sd->seen_generation >= sensors_enum_generation) {
         // same value math as the per-sensor chart dimensions, including the
         // external-config multiplier override
         NETDATA_DOUBLE celsius =
