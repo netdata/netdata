@@ -1230,8 +1230,11 @@ static const char *libsensors_histogram_dimensions[LIBSENSORS_HISTOGRAM_BUCKETS]
     "40", "50", "60", "70", "80", "85", "90", "95", "100", "+Inf",
 };
 
+// file scope so cleanup can reset it - a future in-process restart of this
+// module must re-emit the CHART definition
+static bool libsensors_histogram_exposed = false;
+
 static void libsensors_emit_temperature_histogram(int update_every, const char *name) {
-    static bool exposed = false;
 
     uint32_t counts[LIBSENSORS_HISTOGRAM_BUCKETS] = {0};
     size_t total = 0;
@@ -1252,10 +1255,10 @@ static void libsensors_emit_temperature_histogram(int update_every, const char *
 
     // before the chart exists, zero sensors means nothing to expose;
     // after it exists, keep sending (zero counts are truthful data)
-    if (!exposed && !total)
+    if (!libsensors_histogram_exposed && !total)
         return;
 
-    if (!exposed) {
+    if (!libsensors_histogram_exposed) {
         printf(
             PLUGINSD_KEYWORD_CHART
             " 'sensors.temperature_histogram' '' 'Temperature Sensors Distribution' 'sensors' 'Temperature' "
@@ -1265,7 +1268,7 @@ static void libsensors_emit_temperature_histogram(int update_every, const char *
         for (size_t i = 0; i < LIBSENSORS_HISTOGRAM_BUCKETS; i++)
             printf(PLUGINSD_KEYWORD_DIMENSION " '%s' '' absolute 1 1 ''\n", libsensors_histogram_dimensions[i]);
 
-        exposed = true;
+        libsensors_histogram_exposed = true;
     }
 
     printf(PLUGINSD_KEYWORD_BEGIN " 'sensors.temperature_histogram'\n");
@@ -1493,6 +1496,13 @@ void libsensors_thread(void *ptr __maybe_unused) {
 
         netdata_mutex_lock(&sensors_data_mutex);
         int collect_failed = sensors_collect_data();
+        if(!collect_failed) {
+            // refresh derived values/states in the same locked section, so a
+            // concurrent "sensors" function request never observes values
+            // from the previous cycle
+            SENSOR *t;
+            dfe_start_read(sensors_dict, t) { set_sensor_state(t); } dfe_done(t);
+        }
         netdata_mutex_unlock(&sensors_data_mutex);
 
         if(collect_failed)
@@ -1536,6 +1546,7 @@ cleanup:
     netdata_mutex_lock(&sensors_data_mutex);
     dictionary_destroy(sensors_dict);
     sensors_dict = NULL;
+    libsensors_histogram_exposed = false;
     netdata_mutex_unlock(&sensors_data_mutex);
 }
 
