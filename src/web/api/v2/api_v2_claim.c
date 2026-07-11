@@ -118,6 +118,21 @@ typedef enum {
 
 static void claim_add_user_info_command(BUFFER *wb) {
     const char *filename = netdata_random_session_id_get_filename();
+
+    if(!filename) {
+        // netdata_random_session_id_get_filename() returns NULL when the random
+        // session id file could not be created (e.g. netdata_configured_varlib_dir
+        // is not writable by the agent). Without this guard the code below
+        // dereferences NULL (strchr) and the agent crashes with SIGSEGV on every
+        // /api/v2/claim and /api/v3/claim request, which the web UI issues on load.
+        buffer_json_member_add_string(wb, "key_filename", "");
+        buffer_json_member_add_string(wb, "cmd", "");
+        buffer_json_member_add_string(wb, "help",
+            "Netdata could not create its claiming verification file. "
+            "Make sure the Netdata library directory is writable by the Netdata user.");
+        return;
+    }
+
     CLEAN_BUFFER *os_cmd = buffer_create(0, NULL);
 
     const char *os_filename;
