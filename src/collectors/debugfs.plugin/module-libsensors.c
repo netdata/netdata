@@ -964,8 +964,9 @@ static size_t states_count(SENSOR_STATE state) {
 }
 
 static void sensor_process(SENSOR *s, int update_every, const char *name) {
-    // evaluate the state of the feature
-    set_sensor_state(s);
+    // the caller has already evaluated the sensor state via set_sensor_state()
+    // in the collect-locked section, so that concurrent "sensors" function
+    // requests observe values and states from the same cycle
     internal_fatal(s->state == 0,
                    "SENSORS: state %u is not a valid state", s->state);
 
@@ -1241,7 +1242,9 @@ static void libsensors_emit_temperature_histogram(int update_every, const char *
 
     SENSOR *s;
     dfe_start_read(sensors_dict, s) {
-        if (s->feature.type != SENSORS_FEATURE_TEMP || isnan(s->input))
+        // skip sensors missing from this cycle's enumeration too: their
+        // cached s->input holds the last value they ever reported
+        if (s->feature.type != SENSORS_FEATURE_TEMP || !s->read || isnan(s->input))
             continue;
 
         size_t i = 0;
@@ -1295,6 +1298,10 @@ static netdata_mutex_t sensors_data_mutex;
 
 static void __attribute__((constructor)) sensors_data_mutex_init(void) {
     netdata_mutex_init(&sensors_data_mutex);
+}
+
+static void __attribute__((destructor)) sensors_data_mutex_destroy(void) {
+    netdata_mutex_destroy(&sensors_data_mutex);
 }
 
 static const char *libsensors_function_state(SENSOR *s) {
@@ -1352,6 +1359,11 @@ static void libsensors_function_sensors(
             snprintfz(chart_id, sizeof(chart_id), "sensors.%s%s", string2str(s->id),
                       (!s->exposed_input && s->exposed_states) ? "_alarm" : "_input");
 
+            // a sensor missing from this cycle's enumeration keeps its stale
+            // cached value in s->input - report NAN so the Reading column
+            // agrees with the "missing" state
+            NETDATA_DOUBLE reading = s->read ? s->input : NAN;
+
             buffer_json_add_array_item_array(wb);
 
             buffer_json_add_array_item_string(wb, chart_id);
@@ -1361,18 +1373,18 @@ static void libsensors_function_sensors(
             buffer_json_add_array_item_string(wb, "libsensors");
             buffer_json_add_array_item_string(wb, string2str(s->chip.id));
             buffer_json_add_array_item_string(wb, string2str(s->feature.name));
-            buffer_json_add_array_item_double(wb, s->input);
+            buffer_json_add_array_item_double(wb, reading);
             buffer_json_add_array_item_string(wb, units);
             buffer_json_add_array_item_string(wb, libsensors_function_state(s));
             buffer_json_add_array_item_string(wb, "per-sensor");
             buffer_json_add_array_item_uint64(wb, 1); // Count - enables grouped sensor-count charts
 
             // per-kind value columns - they power the per-kind aggregation tiles
-            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_TEMP ? s->input : NAN);
-            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_FAN ? s->input : NAN);
-            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_IN ? s->input : NAN);
-            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_CURR ? s->input : NAN);
-            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_POWER ? s->input : NAN);
+            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_TEMP ? reading : NAN);
+            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_FAN ? reading : NAN);
+            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_IN ? reading : NAN);
+            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_CURR ? reading : NAN);
+            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_POWER ? reading : NAN);
 
             buffer_json_array_close(wb);
         }
@@ -1548,6 +1560,8 @@ cleanup:
     sensors_dict = NULL;
     libsensors_histogram_exposed = false;
     netdata_mutex_unlock(&sensors_data_mutex);
+
+    sensors_cleanup(); // releases libsensors' internal state
 }
 
 static ND_THREAD *libsensors = NULL;

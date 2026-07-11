@@ -46,6 +46,11 @@ static inline void hw_sensors_temperature_histogram_reset(HW_SENSORS_TEMPERATURE
 }
 
 static inline void hw_sensors_temperature_histogram_add(HW_SENSORS_TEMPERATURE_HISTOGRAM *h, NETDATA_DOUBLE celsius) {
+    // NAN fails every comparison below and would silently land in the first
+    // bucket - reject invalid readings here to protect all producers
+    if (unlikely(!isfinite(celsius)))
+        return;
+
     size_t i = 0;
     while (i < HW_SENSORS_TEMPERATURE_HISTOGRAM_BUCKETS - 1 &&
            celsius >= (NETDATA_DOUBLE)hw_sensors_temperature_histogram_upper_bounds[i])

@@ -281,6 +281,11 @@ int main(int argc, char **argv)
         }
     }
 
+    // whether the functions evloop reader (QUIT / stdin error) requested this
+    // exit - latched before cancelling the threads, because cancellation also
+    // makes the reader set the exit flag on its way out
+    bool evloop_requested_exit = __atomic_load_n(&debugfs_plugin_exit, __ATOMIC_ACQUIRE);
+
     // stop serving functions before tearing down the modules' state: a
     // worker running concurrently with shutdown could otherwise write a
     // function result after the terminal EXIT marker, or use freed state
@@ -295,8 +300,9 @@ int main(int argc, char **argv)
     netdata_mutex_unlock(&stdout_mutex);
 
     // when the functions evloop reader requested the exit (QUIT / stdin
-    // error), propagate the exit status it recorded
-    if (__atomic_load_n(&debugfs_plugin_exit, __ATOMIC_ACQUIRE))
+    // error), propagate the exit status it recorded; on our own exit paths
+    // (daily restart, all modules disabled, EPIPE) keep our own status
+    if (evloop_requested_exit)
         return debugfs_exit_status;
 
     return rc;

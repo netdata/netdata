@@ -322,6 +322,7 @@ struct sensor_data {
     bool initialized;
     bool first_time;
     bool enabled;
+    bool read_ok; // last collection cycle read this sensor's value successfully
     enum netdata_win_sensor_monitored sensor_data_type;
     struct win_sensor_config *config;
     struct netdata_sensors_extra_values *values;
@@ -517,6 +518,7 @@ static void netdata_sensors_get_data(struct sensor_data *sd, ISensor *pSensor)
             sd->sensor_data_type = i;
             sd->config = &configs[i];
             sd->enabled = true;
+            sd->read_ok = true;
 
             if (i == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X) {
                 netdata_collect_sensor_data(&sd->current_data_value[1],
@@ -557,6 +559,7 @@ static void netdata_sensors_get_custom_data(struct sensor_data *sd, ISensor *pSe
                 sd->sensor_data_type = i;
                 sd->config = &configs[NETDATA_WIN_SENSOR_LAST_WELL_DEFINED];
                 sd->enabled = true;
+                sd->read_ok = true;
                 sd->current_data_value[0] = current;
             }  else {
                 if (unlikely(!sd->values)) {
@@ -649,10 +652,12 @@ static void netdata_get_sensors()
             if (unlikely(!sd->enabled))
                 netdata_sensors_get_custom_data(sd, pSensor);
         } else if (likely(sd->enabled)) {
-            netdata_collect_sensor_data(&sd->current_data_value[0],
-                                        pSensor,
-                                        sensor_keys[sd->sensor_data_type],
-                                        sd->div_factor);
+            // on failure the value is forced to 0 - track validity so the
+            // temperature histogram does not count failed reads as 0 degrees
+            sd->read_ok = netdata_collect_sensor_data(&sd->current_data_value[0],
+                                                      pSensor,
+                                                      sensor_keys[sd->sensor_data_type],
+                                                      sd->div_factor);
             if (sd->sensor_data_type == NETDATA_WIN_SENSOR_TYPE_DISTANCE_X) {
                 netdata_collect_sensor_data(&sd->current_data_value[1],
                                             pSensor,
@@ -932,7 +937,7 @@ int dict_sensors_charts_cb(const DICTIONARY_ITEM *item __maybe_unused, void *val
 
     sensors_data_chart(sd, *update_every);
 
-    if (sd->sensor_data_type == NETDATA_WIN_SENSOR_CELSIUS && sd->div_factor > 0) {
+    if (sd->sensor_data_type == NETDATA_WIN_SENSOR_CELSIUS && sd->div_factor > 0 && sd->read_ok) {
         // same value math as the per-sensor chart dimensions, including the
         // external-config multiplier override
         NETDATA_DOUBLE celsius =
@@ -992,6 +997,13 @@ void do_Sensors_cleanup()
 
     if (!sensors)
         return;
+
+    // retire the histogram chart like the per-sensor charts the dictionary
+    // destructor obsoletes below, and forget its state for a future lifecycle
+    if (sensors_temperature_histogram.st) {
+        rrdset_is_obsolete___safe_from_collector_thread(sensors_temperature_histogram.st);
+        memset(&sensors_temperature_histogram, 0, sizeof(sensors_temperature_histogram));
+    }
 
     __netdata_mutex_destroy(&sensors_mutex);
     dictionary_destroy(sensors);

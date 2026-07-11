@@ -325,7 +325,9 @@ static void rrd_functions_worker_globals_reader_main(void *arg) {
     }
 
     int status = 0;
-    if(!__atomic_load_n(wg->plugin_should_exit, __ATOMIC_ACQUIRE)) {
+    if(!__atomic_load_n(wg->plugin_should_exit, __ATOMIC_ACQUIRE) && !nd_thread_signaled_to_cancel()) {
+        // a genuine stdin EOF/error - not a QUIT command and not the plugin
+        // shutting down on its own and cancelling this thread
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Read error on stdin");
         status = 1;
     }
