@@ -136,6 +136,14 @@ void apps_managers_and_aggregators_init(void) {
     managed_list_add(&tree.interpreters, "python3");
     managed_list_add(&tree.interpreters, "sh");
     managed_list_add(&tree.interpreters, "bash");
+    // the remaining login shells shipped with macOS (/etc/shells) - a shell
+    // that is a tree root (e.g. an SSH session) must group by its comm, not
+    // by the path-derived Apple system bucket
+    managed_list_add(&tree.interpreters, "zsh");
+    managed_list_add(&tree.interpreters, "dash");
+    managed_list_add(&tree.interpreters, "csh");
+    managed_list_add(&tree.interpreters, "tcsh");
+    managed_list_add(&tree.interpreters, "ksh");
     managed_list_add(&tree.interpreters, "node");
     managed_list_add(&tree.interpreters, "perl");
 }
