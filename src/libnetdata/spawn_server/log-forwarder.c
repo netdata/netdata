@@ -221,27 +221,31 @@ bool log_forwarder_del_and_close_token(LOG_FORWARDER *lf, LOG_FORWARDER_TOKEN to
 }
 
 void log_forwarder_annotate_token_name(LOG_FORWARDER *lf, LOG_FORWARDER_TOKEN token, const char *cmd) {
-    if(!lf || !lf->running || token == LOG_FORWARDER_TOKEN_NONE || !cmd || !*cmd) return;
+    if(!lf || token == LOG_FORWARDER_TOKEN_NONE || !cmd || !*cmd) return;
 
     spinlock_lock(&lf->spinlock);
 
-    LOG_FORWARDER_ENTRY *entry = log_forwarder_find_entry_unsafe(lf, token);
-    if (entry) {
-        freez(entry->cmd);
-        entry->cmd = strdupz(cmd);
+    if(lf->running) {
+        LOG_FORWARDER_ENTRY *entry = log_forwarder_find_entry_unsafe(lf, token);
+        if (entry) {
+            freez(entry->cmd);
+            entry->cmd = strdupz(cmd);
+        }
     }
 
     spinlock_unlock(&lf->spinlock);
 }
 
 void log_forwarder_annotate_token_pid(LOG_FORWARDER *lf, LOG_FORWARDER_TOKEN token, pid_t pid) {
-    if(!lf || !lf->running || token == LOG_FORWARDER_TOKEN_NONE) return;
+    if(!lf || token == LOG_FORWARDER_TOKEN_NONE) return;
 
     spinlock_lock(&lf->spinlock);
 
-    LOG_FORWARDER_ENTRY *entry = log_forwarder_find_entry_unsafe(lf, token);
-    if (entry)
-        entry->pid = pid;
+    if(lf->running) {
+        LOG_FORWARDER_ENTRY *entry = log_forwarder_find_entry_unsafe(lf, token);
+        if (entry)
+            entry->pid = pid;
+    }
 
     spinlock_unlock(&lf->spinlock);
 }
