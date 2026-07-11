@@ -115,8 +115,6 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
     UUIDMAP_ID id = uuidmap_acquire_by_uuid(uuid);
     if(id != 0) return id;
 
-    uuidmap_init_aral();
-
     // we didn't find it - let's add it
 
     uint8_t partition = uuid_to_uuidmap_partition(uuid);
@@ -160,6 +158,11 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid) {
     PValue = JudyLIns(&uuid_map.p[partition].id_to_uuid, id, PJE0);
     if (!PValue || PValue == PJERR)
         fatal("UUIDMAP: corrupted JudyL array");
+
+    // initialize the ARAL at its point of use: a concurrent uuidmap_destroy()
+    // may have destroyed it after any earlier check, but it needs all
+    // partition locks, so the write lock we hold here excludes it
+    uuidmap_init_aral();
 
     struct uuidmap_entry *ue = aral_mallocz(uuid_map.ar);
     nd_uuid_copy(ue->uuid, uuid);
