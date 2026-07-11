@@ -86,7 +86,7 @@ func setSingleTargetPlan(c *Collector, account string, regions []string, profile
 	for _, region := range regions {
 		for _, profile := range profiles {
 			plan.Scopes = append(plan.Scopes, collectionScope{
-				Target: target, Profile: profile, Region: region, TagJoin: plan.TagJoins[profile.Name],
+				Target: target, Profile: profile, Region: region,
 			})
 		}
 	}

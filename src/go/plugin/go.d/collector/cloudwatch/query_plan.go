@@ -124,7 +124,7 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 	if maxInstances <= 0 {
 		maxInstances = defaultMaxInstances
 	}
-	for _, scope := range c.plan.Scopes {
+	for scopeID, scope := range c.plan.Scopes {
 		resolved, ok := c.resolvedTargetByRef(scope.Target.Name)
 		if !ok {
 			continue
@@ -132,8 +132,8 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 		prof := scope.Profile
 		nDims := len(prof.Config.Instance.Dimensions)
 		dimNames := prof.Config.DimensionNames()
-		join := scope.TagJoin
-		membershipUnknown := scope.hasTagFilter() && c.tags.scopeUnknown(scope.ID)
+		join := c.plan.TagJoins[prof.Name]
+		membershipUnknown := scope.hasTagFilter() && c.tags.scopeUnknown(scopeID)
 		instances := c.discovery.Instances[discoveryKey{Target: scope.Target.Name, Profile: prof.Name, Region: scope.Region}]
 		for _, inst := range instances {
 			if len(inst.DimensionValues) != nDims {
@@ -157,7 +157,7 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 					reserved++
 					continue
 				}
-				selected := c.tags.scopeSelected(scope.ID, joinKey)
+				selected := c.tags.scopeSelected(scopeID, joinKey)
 				if !selected && !membershipUnknown {
 					continue
 				}

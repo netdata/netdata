@@ -100,6 +100,7 @@ type Collector struct {
 
 	tags          tagSnapshot              // resource-tag membership and label cache, refreshed with discovery
 	tagLabelPlans map[string][]resolvedTag // per-profile resolved tag->label plans (nil until compiled)
+	tagFetchPlan  []tagFetchGroup          // immutable discovery-derived RGTA topology (nil when invalidated)
 }
 
 func (c *Collector) Init(context.Context) error {
@@ -136,6 +137,7 @@ func (c *Collector) Cleanup(context.Context) {
 	c.observations.reset()
 	c.tags = tagSnapshot{}
 	c.tagLabelPlans = nil
+	c.tagFetchPlan = nil
 }
 
 func (c *Collector) Configuration() any { return c.Config }

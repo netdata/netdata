@@ -434,7 +434,7 @@ func TestCollector_DiscoveryGroupsDeduplicateProfileAcrossTagPolicies(t *testing
 	plan, _, err := compileTestConfig(t, cfg)
 	require.NoError(t, err)
 	require.Len(t, plan.Scopes, 2, "different tag policies remain distinct collection scopes")
-	assert.Same(t, plan.Scopes[0].TagJoin, plan.Scopes[1].TagJoin, "profile association is validated and compiled once")
+	assert.NotNil(t, plan.TagJoins["ec2"], "profile association is validated and compiled once")
 
 	c := New()
 	c.plan = plan
@@ -571,15 +571,18 @@ func TestCollector_refreshDiscovery_TTLCaching(t *testing.T) {
 	assert.Equal(t, 2, c.discovery.totalInstances())
 	callsAfterFirst := fakes["us-east-1"].calls
 	assert.Positive(t, callsAfterFirst)
+	c.tagFetchPlan = []tagFetchGroup{{key: tagFetchKey{target: "topology-sentinel"}}}
 
 	// Within TTL: no refetch.
 	require.NoError(t, c.refreshDiscovery(context.Background()))
 	assert.Equal(t, callsAfterFirst, fakes["us-east-1"].calls, "must not refetch within TTL")
+	assert.Len(t, c.tagFetchPlan, 1, "cached tag topology follows the discovery lifetime")
 
 	// After TTL: refetch.
 	c.now = func() time.Time { return base.Add(301 * time.Second) }
 	require.NoError(t, c.refreshDiscovery(context.Background()))
 	assert.Greater(t, fakes["us-east-1"].calls, callsAfterFirst, "must refetch after TTL")
+	assert.Nil(t, c.tagFetchPlan, "a new discovery snapshot invalidates tag fetch topology")
 }
 
 func TestCollector_refreshDiscovery_TotalFailureFirstPassErrors(t *testing.T) {

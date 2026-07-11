@@ -306,6 +306,9 @@ refreshDiscovery → refreshTags → buildQueryPlan → … → observe
   share a fetch group. Each request supplies native `TagFilters` and the union of
   compatible `ResourceTypeFilters`; pages are streamed directly into membership and
   label indexes, locally rechecked, and intersected with discovered candidates.
+  Fetch topology is rebuilt only when discovery changes, and predicate groups share
+  one candidate index per target/region/profile. Cached results retain membership,
+  labels, scope ids, and freshness—not fetch-time candidate maps.
 - **Failure state.** A failed filtered group becomes `unknown`. On the first failure,
   every candidate is withheld and reserved from lower-priority rules. After a success,
   last-known matched members continue to be queried while every other candidate remains
@@ -448,14 +451,15 @@ aws-eusc).
 
 ## Concurrency
 
-- `apiConcurrency` (5) bounds both the discovery fan-out and the GetMetricData
-  chunk execution, via `conc/pool`. `metricsPerQuery` (500) is the GetMetricData
-  batch size. Both are internal constants, not config.
+- `apiConcurrency` (5) bounds ListMetrics discovery, RGTA fetch groups, and
+  GetMetricData chunk execution via `conc/pool`. `metricsPerQuery` (500) is the
+  GetMetricData batch size. Both are internal constants, not config.
 - `clientCache` builds at most one CloudWatch client per (target, region), under
   a mutex, caching only successes (a transient credential error is retried next
   call).
 - The top-level `collect` stages run sequentially, and the per-cycle `store`
-  write is single-threaded. Only discovery and query execution fan out.
+  write is single-threaded. Discovery, resource-tag lookup, and query execution
+  fan out within their respective stages.
 
 ## Cost Model
 

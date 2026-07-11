@@ -188,7 +188,6 @@ func TestCompileConfig_ResourceTagFilterInheritanceReplacementAndDisable(t *test
 	require.NoError(t, err)
 	assert.Empty(t, diagnostics)
 	require.Len(t, plan.Scopes, 3, "distinct effective predicates remain ordered policy scopes")
-	assert.Equal(t, []string{"inherited", "replaced", "disabled"}, []string{plan.Scopes[0].Rule, plan.Scopes[1].Rule, plan.Scopes[2].Rule})
 	assert.Equal(t, []resourceTagFilter{{key: "environment", values: []string{"production"}}}, plan.Scopes[0].TagFilter)
 	assert.Equal(t, []resourceTagFilter{{key: "team", values: []string{"sre"}}}, plan.Scopes[1].TagFilter)
 	assert.Empty(t, plan.Scopes[2].TagFilter)

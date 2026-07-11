@@ -31,7 +31,7 @@ func TestResolveTagPlan(t *testing.T) {
 		wantPlan  []resolvedTag
 		wantWarn  int
 	}{
-		"empty allowlist disables": {
+		"empty selection disables": {
 			tags:     nil,
 			wantPlan: nil,
 			wantWarn: 0,

@@ -310,6 +310,7 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	}
 
 	c.discovery = snap
+	c.invalidateTagFetchPlan()
 	c.markTagsStale()
 	c.invalidateQueryPlan()
 	c.logDiscovery(snap)

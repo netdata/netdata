@@ -39,7 +39,7 @@ func (m tagMembership) add(scopeID int, joinKey string) {
 // A failed refresh keeps the last complete result but marks its policy scopes
 // unknown and expires only this group for retry.
 type tagGroupSnapshot struct {
-	group           tagFetchGroup
+	scopeIDs        []int
 	members         tagMembership
 	labels          map[tagCacheKey][]metrix.Label
 	confirmedLabels map[tagCacheKey]struct{}
@@ -145,7 +145,7 @@ func profileDimLabels(prof cwprofiles.Profile) []string {
 	return out
 }
 
-// computeTagLabelPlans resolves the per-profile tag-label plan once (the allowlist and
+// computeTagLabelPlans resolves the per-profile tag-label plan once (the selection and
 // profiles are fixed per job) and logs each skip once. Profiles with no registered
 // ARN join or an empty resolved plan are omitted, so they carry no tags.
 func (c *Collector) computeTagLabelPlans() {
@@ -197,7 +197,7 @@ func (c *Collector) refreshTags(ctx context.Context) {
 	}
 
 	ttl := time.Duration(c.Discovery.RefreshEvery) * time.Second
-	states, due := selectDueTagGroups(c.tagFetchGroups(), c.tags.groups, now)
+	states, due := selectDueTagGroups(c.currentTagFetchPlan(), c.tags.groups, now)
 	results := c.fetchTagGroups(ctx, due)
 
 	// If the parent collect context was canceled or timed out during the fan-out, do
@@ -226,7 +226,6 @@ func selectDueTagGroups(groups []tagFetchGroup, previous map[tagFetchKey]tagGrou
 	for _, group := range groups {
 		state, ok := previous[group.key]
 		if ok && now.Before(state.expiresAt) {
-			state.group = group
 			states[group.key] = state
 			continue
 		}
@@ -253,7 +252,7 @@ func applyTagFetchResults(states, previous map[tagFetchKey]tagGroupSnapshot, res
 	for _, result := range results {
 		if result.err == nil {
 			states[result.group.key] = tagGroupSnapshot{
-				group: result.group, members: result.members, labels: result.labels,
+				scopeIDs: tagGroupScopeIDs(result.group), members: result.members, labels: result.labels,
 				confirmedLabels: result.confirmedLabels,
 				lastSuccess:     now,
 				expiresAt:       now.Add(ttl),
@@ -262,7 +261,7 @@ func applyTagFetchResults(states, previous map[tagFetchKey]tagGroupSnapshot, res
 		}
 
 		state := previous[result.group.key]
-		state.group = result.group
+		state.scopeIDs = tagGroupScopeIDs(result.group)
 		state.unknown = true
 		state.expiresAt = time.Time{}
 		if state.members == nil {
@@ -285,6 +284,15 @@ func applyTagFetchResults(states, previous map[tagFetchKey]tagGroupSnapshot, res
 	return failures
 }
 
+func tagGroupScopeIDs(group tagFetchGroup) []int {
+	var scopeIDs []int
+	for _, ids := range group.scopeIDsByProfile {
+		scopeIDs = append(scopeIDs, ids...)
+	}
+	sort.Ints(scopeIDs)
+	return scopeIDs
+}
+
 func mergeTagGroupSnapshots(states map[tagFetchKey]tagGroupSnapshot, fetchedAt, emptyExpiresAt time.Time) tagSnapshot {
 	labelCapacity := 0
 	membershipCapacity := 0
@@ -293,9 +301,7 @@ func mergeTagGroupSnapshots(states map[tagFetchKey]tagGroupSnapshot, fetchedAt, 
 		labelCapacity = max(labelCapacity, len(state.confirmedLabels))
 		membershipCapacity += len(state.members)
 		if state.unknown {
-			for _, scopeIDs := range state.group.scopeIDsByProfile {
-				unknownCapacity += len(scopeIDs)
-			}
+			unknownCapacity += len(state.scopeIDs)
 		}
 	}
 	next := tagSnapshot{
@@ -320,10 +326,8 @@ func mergeTagGroupSnapshots(states map[tagFetchKey]tagGroupSnapshot, fetchedAt, 
 		state := states[key]
 		next.members.share(state.members)
 		if state.unknown {
-			for _, scopeIDs := range state.group.scopeIDsByProfile {
-				for _, scopeID := range scopeIDs {
-					next.unknown[scopeID] = struct{}{}
-				}
+			for _, scopeID := range state.scopeIDs {
+				next.unknown[scopeID] = struct{}{}
 			}
 		}
 		if state.expiresAt.IsZero() || state.expiresAt.Before(next.expiresAt) {

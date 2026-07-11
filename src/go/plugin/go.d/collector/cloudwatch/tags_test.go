@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"slices"
 	"strconv"
 	"sync"
@@ -405,7 +406,6 @@ func TestRefreshTags_FilterMembershipFailureLifecycle(t *testing.T) {
 	c := New()
 	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
-	c.plan.Scopes[0].ID = 7
 	c.plan.Scopes[0].TagFilter = []resourceTagFilter{{key: "environment", values: []string{"production"}}}
 	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
 		{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
@@ -416,14 +416,14 @@ func TestRefreshTags_FilterMembershipFailureLifecycle(t *testing.T) {
 	c.now = func() time.Time { return base }
 
 	c.refreshTags(context.Background())
-	assert.True(t, c.tags.scopeUnknown(7), "a first failure is unknown")
-	assert.False(t, c.tags.scopeSelected(7, "i-1"))
+	assert.True(t, c.tags.scopeUnknown(0), "a first failure is unknown")
+	assert.False(t, c.tags.scopeSelected(0, "i-1"))
 	assert.True(t, c.tags.expired(base), "a failed group retries next collect")
 
 	rgta.err = nil
 	c.refreshTags(context.Background())
-	assert.False(t, c.tags.scopeUnknown(7))
-	assert.True(t, c.tags.scopeSelected(7, "i-1"))
+	assert.False(t, c.tags.scopeUnknown(0))
+	assert.True(t, c.tags.scopeSelected(0, "i-1"))
 	assert.False(t, c.tags.expired(base), "a successful refresh advances the TTL")
 	require.Len(t, rgta.gotTags, 1)
 	assert.Equal(t, "environment", aws.ToString(rgta.gotTags[0].Key))
@@ -432,8 +432,8 @@ func TestRefreshTags_FilterMembershipFailureLifecycle(t *testing.T) {
 	rgta.err = errors.New("throttled again")
 	c.markTagsStale()
 	c.refreshTags(context.Background())
-	assert.True(t, c.tags.scopeUnknown(7))
-	assert.True(t, c.tags.scopeSelected(7, "i-1"), "a later failure retains last-known membership")
+	assert.True(t, c.tags.scopeUnknown(0))
+	assert.True(t, c.tags.scopeSelected(0, "i-1"), "a later failure retains last-known membership")
 }
 
 func TestRefreshTags_FailedGroupRetriesWithoutRefetchingHealthyGroup(t *testing.T) {
@@ -445,7 +445,6 @@ func TestRefreshTags_FailedGroupRetriesWithoutRefetchingHealthyGroup(t *testing.
 	configureExactRule(c, []string{"us-east-1", "us-west-2"}, []string{"ec2"})
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1", "us-west-2"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 	for i := range c.plan.Scopes {
-		c.plan.Scopes[i].ID = i
 		c.plan.Scopes[i].TagFilter = []resourceTagFilter{{key: "environment", values: []string{"production"}}}
 	}
 	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
@@ -466,6 +465,9 @@ func TestRefreshTags_FailedGroupRetriesWithoutRefetchingHealthyGroup(t *testing.
 	assert.False(t, c.tags.scopeUnknown(0))
 	assert.True(t, c.tags.scopeSelected(0, "i-east"))
 	assert.True(t, c.tags.scopeUnknown(1))
+	require.Len(t, c.tagFetchPlan, 2)
+	firstTopology := &c.tagFetchPlan[0]
+	c.tagFetchPlan[0].candidatesByProfile["ec2"]["topology-sentinel"] = struct{}{}
 
 	healthy.err = errors.New("healthy group must not be called before its TTL")
 	c.refreshTags(context.Background())
@@ -474,6 +476,8 @@ func TestRefreshTags_FailedGroupRetriesWithoutRefetchingHealthyGroup(t *testing.
 	assert.Equal(t, 2, failing.calls, "the failed group retries on the next collect")
 	assert.False(t, c.tags.scopeUnknown(0), "an unnecessary retry must not turn fresh membership unknown")
 	assert.True(t, c.tags.scopeSelected(0, "i-east"))
+	assert.Same(t, firstTopology, &c.tagFetchPlan[0], "failed-group retry reuses discovery-derived topology")
+	assert.Contains(t, c.tagFetchPlan[0].candidatesByProfile["ec2"], "topology-sentinel")
 }
 
 func TestRefreshTags_FirstSuccessfulEmptySnapshotInvalidatesImplicitUnknown(t *testing.T) {
@@ -481,7 +485,6 @@ func TestRefreshTags_FirstSuccessfulEmptySnapshotInvalidatesImplicitUnknown(t *t
 	c := New()
 	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
-	c.plan.Scopes[0].ID = 7
 	c.plan.Scopes[0].TagFilter = []resourceTagFilter{{key: "environment", values: []string{"production"}}}
 	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
 		{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
@@ -494,7 +497,7 @@ func TestRefreshTags_FirstSuccessfulEmptySnapshotInvalidatesImplicitUnknown(t *t
 	c.refreshTags(context.Background())
 
 	assert.False(t, c.tags.fetchedAt.IsZero())
-	assert.False(t, c.tags.scopeUnknown(7))
+	assert.False(t, c.tags.scopeUnknown(0))
 	assert.True(t, c.planDirty, "known-empty membership must rebuild a plan previously compiled from implicit unknown state")
 }
 
@@ -505,7 +508,6 @@ func TestRefreshTags_LaterPageFailureIsAtomic(t *testing.T) {
 	c := New()
 	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
-	c.plan.Scopes[0].ID = 7
 	c.plan.Scopes[0].TagFilter = []resourceTagFilter{{key: "environment", values: []string{"production"}}}
 	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
 		{Target: "base", Profile: "ec2", Region: "us-east-1"}: {
@@ -517,8 +519,8 @@ func TestRefreshTags_LaterPageFailureIsAtomic(t *testing.T) {
 	c.now = func() time.Time { return time.Unix(1_000_000_000, 0) }
 
 	c.refreshTags(context.Background())
-	require.True(t, c.tags.scopeSelected(7, "i-1"))
-	require.False(t, c.tags.scopeUnknown(7))
+	require.True(t, c.tags.scopeSelected(0, "i-1"))
+	require.False(t, c.tags.scopeUnknown(0))
 
 	rgta.resources = []rgtatypes.ResourceTagMapping{
 		rgtaResource("arn:aws:ec2:us-east-1:000000000000:instance/i-2", "environment", "production"),
@@ -527,9 +529,9 @@ func TestRefreshTags_LaterPageFailureIsAtomic(t *testing.T) {
 	c.markTagsStale()
 	c.refreshTags(context.Background())
 
-	assert.True(t, c.tags.scopeUnknown(7))
-	assert.True(t, c.tags.scopeSelected(7, "i-1"), "the prior complete snapshot is retained")
-	assert.False(t, c.tags.scopeSelected(7, "i-2"), "partial data from the failed refresh is discarded")
+	assert.True(t, c.tags.scopeUnknown(0))
+	assert.True(t, c.tags.scopeSelected(0, "i-1"), "the prior complete snapshot is retained")
+	assert.False(t, c.tags.scopeSelected(0, "i-2"), "partial data from the failed refresh is discarded")
 }
 
 func TestWalkResourceTags_PaginatesAndUsesNativeFilters(t *testing.T) {
@@ -572,7 +574,7 @@ func TestTagFetchGroups_SeparateFetchIdentityFromPolicyScopes(t *testing.T) {
 		}}
 		c.tagLabelPlans = map[string][]resolvedTag{}
 
-		groups := c.tagFetchGroups()
+		groups := c.currentTagFetchPlan()
 		require.Len(t, groups, 1)
 		assert.ElementsMatch(t, []string{"ec2:instance", "ec2:volume"}, groups[0].resourceTypes)
 		assert.Len(t, groups[0].joins, 2)
@@ -591,10 +593,15 @@ func TestTagFetchGroups_SeparateFetchIdentityFromPolicyScopes(t *testing.T) {
 		}}
 		c.tagLabelPlans = map[string][]resolvedTag{}
 
-		groups := c.tagFetchGroups()
+		groups := c.currentTagFetchPlan()
 		require.Len(t, groups, 4)
 		for _, group := range groups {
 			assert.Len(t, group.scopeIDsByProfile["ec2"], 1)
+		}
+		groups[0].candidatesByProfile["ec2"]["shared-sentinel"] = struct{}{}
+		for _, group := range groups[1:] {
+			assert.Contains(t, group.candidatesByProfile["ec2"], "shared-sentinel",
+				"predicate groups must share one discovery-derived candidate index")
 		}
 	})
 }
@@ -739,13 +746,13 @@ func TestMergeTagGroupSnapshots_RetainsIndependentGroupState(t *testing.T) {
 	}
 	states := map[tagFetchKey]tagGroupSnapshot{
 		failedGroup.key: {
-			group: failedGroup, members: tagMembership{7: {"i-1": {}}},
+			scopeIDs: []int{7}, members: tagMembership{7: {"i-1": {}}},
 			labels:          map[tagCacheKey][]metrix.Label{matching: {{Key: "owner", Value: "one"}}},
 			confirmedLabels: map[tagCacheKey]struct{}{matching: {}},
 			lastSuccess:     now.Add(-time.Minute), unknown: true,
 		},
 		healthyGroup.key: {
-			group: healthyGroup, members: tagMembership{8: {"i-2": {}}},
+			scopeIDs: []int{8}, members: tagMembership{8: {"i-2": {}}},
 			labels:          map[tagCacheKey][]metrix.Label{healthy: {{Key: "owner", Value: "two"}}},
 			confirmedLabels: map[tagCacheKey]struct{}{healthy: {}},
 			lastSuccess:     now, expiresAt: now.Add(time.Minute),
@@ -770,7 +777,7 @@ func BenchmarkMergeTagGroupSnapshots(b *testing.B) {
 		candidatesByProfile: map[string]map[string]struct{}{"ec2": make(map[string]struct{}, cachedTags)},
 	}
 	state := tagGroupSnapshot{
-		group: group, members: tagMembership{7: make(map[string]struct{}, cachedTags)},
+		scopeIDs: []int{7}, members: tagMembership{7: make(map[string]struct{}, cachedTags)},
 		labels:          make(map[tagCacheKey][]metrix.Label, cachedTags),
 		confirmedLabels: make(map[tagCacheKey]struct{}, cachedTags), unknown: true,
 	}
@@ -888,6 +895,52 @@ func BenchmarkRefreshTagsPolicyCount(b *testing.B) {
 			b.StopTimer()
 			if got := len(c.tags.members); got != policies {
 				b.Fatalf("got %d policy membership sets, want %d", got, policies)
+			}
+		})
+	}
+}
+
+func BenchmarkRefreshTagsFailedGroupRetry(b *testing.B) {
+	regions := []string{"ap-southeast-1", "eu-west-1", "us-east-1", "us-west-2"}
+	for _, candidates := range []int{100, 10000} {
+		b.Run(fmt.Sprintf("candidates_per_group=%d", candidates), func(b *testing.B) {
+			c := New()
+			c.Logger = logger.NewWithWriter(io.Discard)
+			configureExactRule(c, regions, []string{"ec2"})
+			setSingleTargetPlan(c, "000000000000", regions, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
+			for i := range c.plan.Scopes {
+				c.plan.Scopes[i].TagFilter = []resourceTagFilter{{key: "environment", values: []string{"production"}}}
+			}
+			instances := make([]discoveredInstance, candidates)
+			for i := range instances {
+				instances[i] = discoveredInstance{DimensionValues: []string{fmt.Sprintf("i-%d", i)}}
+			}
+			c.discovery = discoverySnapshot{Instances: make(map[discoveryKey][]discoveredInstance)}
+			clients := make(map[string]*fakeRGTA, len(regions))
+			for _, region := range regions {
+				c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: region}] = instances
+				clients[region] = &fakeRGTA{}
+			}
+			clients["us-west-2"].err = errors.New("throttled")
+			c.rgtaClients = newClientCache(func(_ context.Context, _, region string) (rgtaClient, error) {
+				return clients[region], nil
+			})
+			c.now = func() time.Time { return time.Unix(1_000_000_000, 0) }
+			c.refreshTags(context.Background())
+			if len(c.tagFetchPlan) != len(regions) {
+				b.Fatalf("got %d topology groups, want %d", len(c.tagFetchPlan), len(regions))
+			}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				c.refreshTags(context.Background())
+			}
+			b.StopTimer()
+			for _, region := range regions[:len(regions)-1] {
+				if clients[region].calls != 1 {
+					b.Fatalf("healthy region %s called %d times, want 1", region, clients[region].calls)
+				}
 			}
 		})
 	}

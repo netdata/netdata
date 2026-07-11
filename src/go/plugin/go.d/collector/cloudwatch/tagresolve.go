@@ -20,7 +20,7 @@ type resolvedTag struct {
 
 // sanitizeLabel derives a default label from an AWS tag key: lowercase, with every
 // character outside [a-z0-9_] replaced by '_'. The result may still be invalid
-// (e.g. a leading digit); resolveTagPlan validates it and skips on failure.
+// (e.g. a leading digit); configuration validation rejects such a derived label.
 func sanitizeLabel(key string) string {
 	var b strings.Builder
 	b.Grow(len(key))

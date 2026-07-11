@@ -23,13 +23,10 @@ type collectionTarget struct {
 }
 
 type collectionScope struct {
-	ID        int
-	Rule      string
 	Target    *collectionTarget
 	Profile   cwprofiles.ResolvedProfile
 	Region    string
 	TagFilter []resourceTagFilter
-	TagJoin   *tagJoin
 }
 
 func (s collectionScope) hasTagFilter() bool { return len(s.TagFilter) > 0 }

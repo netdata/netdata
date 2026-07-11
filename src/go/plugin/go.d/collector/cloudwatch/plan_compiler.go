@@ -21,7 +21,6 @@ type planCompiler struct {
 	targetRoleARN     map[string]string
 	profiles          []cwprofiles.ResolvedProfile
 	profilesByName    map[string]cwprofiles.ResolvedProfile
-	tagJoinsByProfile map[string]*tagJoin
 	tagJoinErrors     map[string]error
 
 	usedCredentials  map[string]struct{}
@@ -58,19 +57,17 @@ func newPlanCompiler(cfg Config, catalog cwprofiles.Catalog) *planCompiler {
 	for _, source := range cfg.Credentials {
 		credentialsByName[source.Name] = source.CredentialConfig
 	}
-	tagJoinsByProfile := make(map[string]*tagJoin)
 	return &planCompiler{
 		cfg: cfg,
 		plan: &collectionPlan{
 			Targets:  make([]*collectionTarget, 0, len(cfg.Targets)),
-			TagJoins: tagJoinsByProfile,
+			TagJoins: make(map[string]*tagJoin),
 		},
 		credentialsByName: credentialsByName,
 		targetsByRef:      make(map[string]*collectionTarget, len(cfg.Targets)),
 		targetRoleARN:     make(map[string]string, len(cfg.Targets)),
 		profiles:          profiles,
 		profilesByName:    profilesByName,
-		tagJoinsByProfile: tagJoinsByProfile,
 		tagJoinErrors:     make(map[string]error),
 		usedCredentials:   make(map[string]struct{}),
 		usedTargets:       make(map[string]struct{}),
@@ -137,7 +134,6 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 	type profileRegions struct {
 		profile cwprofiles.ResolvedProfile
 		regions []string
-		tagJoin *tagJoin
 	}
 	eligibleProfiles := make([]profileRegions, 0, len(profiles))
 	for _, profile := range profiles {
@@ -154,9 +150,8 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 			diagnostics.skippedProfile = append(diagnostics.skippedProfile, profile.Name)
 			continue
 		}
-		var tagJoin *tagJoin
 		if len(tagFilters) > 0 || len(pc.cfg.Labels.ResourceTags) > 0 {
-			resolved, err := pc.resolveTagJoin(profile)
+			_, err := pc.resolveTagJoin(profile)
 			if err != nil && len(tagFilters) > 0 {
 				if _, explicit := explicitlyIncluded[profile.Name]; explicit {
 					return diagnostics, fmt.Errorf("%s explicitly includes profile %q with resource tag filtering, but it has no safe tag association: %w", path, profile.Name, err)
@@ -164,9 +159,8 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 				diagnostics.skippedTagAssociation = append(diagnostics.skippedTagAssociation, profile.Name)
 				continue
 			}
-			tagJoin = resolved
 		}
-		eligibleProfiles = append(eligibleProfiles, profileRegions{profile: profile, regions: supported, tagJoin: tagJoin})
+		eligibleProfiles = append(eligibleProfiles, profileRegions{profile: profile, regions: supported})
 	}
 	if len(eligibleProfiles) == 0 {
 		return diagnostics, fmt.Errorf("%s compiles to no collection scopes", path)
@@ -176,7 +170,7 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 		pc.usedTargets[target.Name] = struct{}{}
 		for _, selected := range eligibleProfiles {
 			for _, region := range selected.regions {
-				if err := pc.addScope(ruleName, target, selected.profile, region, tagFilters, filterKey, selected.tagJoin, &diagnostics); err != nil {
+				if err := pc.addScope(ruleName, target, selected.profile, region, tagFilters, filterKey, &diagnostics); err != nil {
 					return diagnostics, err
 				}
 			}
@@ -185,7 +179,7 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 	return diagnostics, nil
 }
 
-func (pc *planCompiler) addScope(ruleName string, target *collectionTarget, profile cwprofiles.ResolvedProfile, region string, tagFilters []resourceTagFilter, filterKey string, tagJoin *tagJoin, diagnostics *ruleDiagnostics) error {
+func (pc *planCompiler) addScope(ruleName string, target *collectionTarget, profile cwprofiles.ResolvedProfile, region string, tagFilters []resourceTagFilter, filterKey string, diagnostics *ruleDiagnostics) error {
 	key := compiledScopeKey{target: target.Name, profile: profile.Name, region: region, filter: filterKey}
 	if owner, ok := pc.seenScopes[key]; ok {
 		diagnostics.shadowed++
@@ -199,8 +193,7 @@ func (pc *planCompiler) addScope(ruleName string, target *collectionTarget, prof
 	}
 	pc.seenScopes[key] = ruleName
 	pc.plan.Scopes = append(pc.plan.Scopes, collectionScope{
-		ID: len(pc.plan.Scopes), Rule: ruleName, Target: target, Profile: profile, Region: region,
-		TagFilter: tagFilters, TagJoin: tagJoin,
+		Target: target, Profile: profile, Region: region, TagFilter: tagFilters,
 	})
 	pc.selectedProfiles[profile.Name] = profile
 	if !slices.Contains(target.Regions, region) {
@@ -214,7 +207,7 @@ func (pc *planCompiler) addScope(ruleName string, target *collectionTarget, prof
 }
 
 func (pc *planCompiler) resolveTagJoin(profile cwprofiles.ResolvedProfile) (*tagJoin, error) {
-	if join, ok := pc.tagJoinsByProfile[profile.Name]; ok {
+	if join, ok := pc.plan.TagJoins[profile.Name]; ok {
 		return join, nil
 	}
 	if err, ok := pc.tagJoinErrors[profile.Name]; ok {
@@ -225,7 +218,7 @@ func (pc *planCompiler) resolveTagJoin(profile cwprofiles.ResolvedProfile) (*tag
 		pc.tagJoinErrors[profile.Name] = err
 		return nil, err
 	}
-	pc.tagJoinsByProfile[profile.Name] = join
+	pc.plan.TagJoins[profile.Name] = join
 	return join, nil
 }
 

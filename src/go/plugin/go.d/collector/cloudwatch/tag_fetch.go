@@ -55,18 +55,31 @@ type tagFetchResult struct {
 	err             error
 }
 
-func (c *Collector) tagFetchGroups() []tagFetchGroup {
+func (c *Collector) currentTagFetchPlan() []tagFetchGroup {
+	if c.tagFetchPlan == nil {
+		c.tagFetchPlan = c.buildTagFetchPlan()
+	}
+	return c.tagFetchPlan
+}
+
+func (c *Collector) invalidateTagFetchPlan() {
+	c.tagFetchPlan = nil
+}
+
+func (c *Collector) buildTagFetchPlan() []tagFetchGroup {
 	groups := make(map[tagFetchKey]*tagFetchGroup)
-	addScope := func(scope collectionScope, filters []resourceTagFilter, includeMembership bool) {
+	candidateIndexes := make(map[discoveryKey]map[string]struct{})
+	addScope := func(scopeID int, scope collectionScope, filters []resourceTagFilter, includeMembership bool) {
 		resolved, ok := c.resolvedTargetByRef(scope.Target.Name)
 		if !ok {
 			return
 		}
-		join := scope.TagJoin
+		join := c.plan.TagJoins[scope.Profile.Name]
 		if join == nil {
 			return
 		}
-		instances := c.discovery.Instances[discoveryKey{Target: scope.Target.Name, Profile: scope.Profile.Name, Region: scope.Region}]
+		candidateKey := discoveryKey{Target: scope.Target.Name, Profile: scope.Profile.Name, Region: scope.Region}
+		instances := c.discovery.Instances[candidateKey]
 		if len(instances) == 0 {
 			return
 		}
@@ -100,28 +113,29 @@ func (c *Collector) tagFetchGroups() []tagFetchGroup {
 				group.tagKeys[label.awsKey] = struct{}{}
 			}
 		}
-		if includeMembership && !slices.Contains(group.scopeIDsByProfile[scope.Profile.Name], scope.ID) {
-			group.scopeIDsByProfile[scope.Profile.Name] = append(group.scopeIDsByProfile[scope.Profile.Name], scope.ID)
+		if includeMembership && !slices.Contains(group.scopeIDsByProfile[scope.Profile.Name], scopeID) {
+			group.scopeIDsByProfile[scope.Profile.Name] = append(group.scopeIDsByProfile[scope.Profile.Name], scopeID)
 		}
-		candidates := group.candidatesByProfile[scope.Profile.Name]
-		if candidates == nil {
+		candidates, indexed := candidateIndexes[candidateKey]
+		if !indexed {
 			candidates = make(map[string]struct{}, len(instances))
-			group.candidatesByProfile[scope.Profile.Name] = candidates
-		}
-		dimNames := scope.Profile.Config.DimensionNames()
-		for _, instance := range instances {
-			if joinKey, ok := join.instanceJoinKey(dimNames, instance.DimensionValues); ok {
-				candidates[joinKey] = struct{}{}
+			dimNames := scope.Profile.Config.DimensionNames()
+			for _, instance := range instances {
+				if joinKey, ok := join.instanceJoinKey(dimNames, instance.DimensionValues); ok {
+					candidates[joinKey] = struct{}{}
+				}
 			}
+			candidateIndexes[candidateKey] = candidates
 		}
+		group.candidatesByProfile[scope.Profile.Name] = candidates
 	}
 
-	for _, scope := range c.plan.Scopes {
+	for scopeID, scope := range c.plan.Scopes {
 		if scope.hasTagFilter() {
-			addScope(scope, scope.TagFilter, true)
+			addScope(scopeID, scope, scope.TagFilter, true)
 		}
 		if len(c.tagLabelPlans[scope.Profile.Name]) > 0 && !scope.hasTagFilter() {
-			addScope(scope, nil, false)
+			addScope(scopeID, scope, nil, false)
 		}
 	}
 

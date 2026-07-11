@@ -20,11 +20,10 @@ const (
 	defaultTimeout          = confopt.Duration(30 * time.Second)
 )
 
-// apiConcurrency bounds concurrent AWS API calls (discovery fan-out and
-// GetMetricData query chunks); 5 stays well under CloudWatch's account-level
-// request rates. metricsPerQuery is the GetMetricData batch size; 500 is the AWS
-// hard maximum per call. Neither is an operator decision, so both are fixed
-// constants rather than config.
+// apiConcurrency bounds concurrent AWS API calls (ListMetrics discovery,
+// resource-tag lookup, and GetMetricData query chunks). metricsPerQuery is the
+// GetMetricData batch size; 500 is the AWS hard maximum per call. Neither is an
+// operator decision, so both are fixed constants rather than config.
 const (
 	apiConcurrency  = 5
 	metricsPerQuery = 500
