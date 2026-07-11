@@ -31,12 +31,12 @@
         "maxProperties": 64,
         "default": {"sdk_default": {"type": "default"}},
         "propertyNames": {"pattern": "^[a-z][a-z0-9_-]{0,63}$"},
-        "additionalProperties": {
-          "oneOf": [
+        "patternProperties": {
+          "^[a-z][a-z0-9_-]{0,63}$": {
+            "oneOf": [
             {
               "title": "AWS SDK default chain",
               "type": "object",
-              "additionalProperties": false,
               "properties": {
                 "type": {"title": "Type", "const": "default"}
               },
@@ -45,16 +45,16 @@
             {
               "title": "Static or session credentials",
               "type": "object",
-              "additionalProperties": false,
               "properties": {
                 "type": {"title": "Type", "const": "static"},
-                "access_key_id": {"title": "Access key ID", "type": "string", "minLength": 1},
-                "secret_access_key": {"title": "Secret access key", "type": "string", "minLength": 1, "sensitive": true},
-                "session_token": {"title": "Session token", "type": "string", "sensitive": true}
+                "access_key_id": {"title": "Access key ID", "type": "string", "pattern": "^\\S(?:.*\\S)?$"},
+                "secret_access_key": {"title": "Secret access key", "type": "string", "pattern": "^\\S(?:.*\\S)?$", "sensitive": true},
+                "session_token": {"title": "Session token", "type": "string", "pattern": "^(?:|\\S(?:.*\\S)?)$", "sensitive": true}
               },
               "required": ["type", "access_key_id", "secret_access_key"]
             }
-          ]
+            ]
+          }
         }
       },
       "targets": {
@@ -66,20 +66,19 @@
         "default": [{"name": "base", "credentials": "sdk_default"}],
         "items": {
           "type": "object",
-          "additionalProperties": false,
           "properties": {
             "name": {"title": "Name", "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
             "credentials": {"title": "Credential source", "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
             "assume_role": {
               "title": "Assume role",
               "type": "object",
-              "additionalProperties": false,
               "properties": {
-                "role_arn": {"title": "Role ARN", "type": "string"},
+                "role_arn": {"title": "Role ARN", "type": "string", "pattern": "^\\S(?:.*\\S)?$"},
                 "external_id": {
                   "title": "External ID",
                   "description": "Value supplied by the role owner when its trust policy requires one. It is not an AWS password or access key.",
-                  "type": "string"
+                  "type": "string",
+                  "pattern": "^(?:|\\S(?:.*\\S)?)$"
                 }
               },
               "required": ["role_arn"]
@@ -97,7 +96,6 @@
         "default": [{"name": "base-defaults", "targets": ["base"], "regions": ["us-east-1"]}],
         "items": {
           "type": "object",
-          "additionalProperties": false,
           "properties": {
             "name": {"title": "Name", "type": "string", "pattern": "^[a-z][a-z0-9_-]{0,63}$"},
             "targets": {
@@ -112,7 +110,6 @@
               "title": "Profiles",
               "description": "Omit to select default-enabled profiles. Include adds profiles; exclude removes profiles.",
               "type": "object",
-              "additionalProperties": false,
               "properties": {
                 "defaults": {"title": "Include defaults", "type": "boolean", "default": true},
                 "include": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"}},
@@ -126,7 +123,7 @@
               "minItems": 1,
               "maxItems": 256,
               "uniqueItems": true,
-              "items": {"type": "string", "pattern": "^[A-Za-z0-9]+(?:-[A-Za-z0-9]+)+-[0-9]+$"}
+              "items": {"type": "string", "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)+-[0-9]+$"}
             }
           },
           "required": ["name", "targets", "regions"]
@@ -135,7 +132,6 @@
       "discovery": {
         "title": "Discovery",
         "type": "object",
-        "additionalProperties": false,
         "properties": {
           "refresh_every": {"title": "Refresh interval", "type": "integer", "minimum": 60, "default": 300},
           "recently_active_only": {"title": "Recently active only", "type": "boolean", "default": true}
@@ -146,7 +142,6 @@
         "type": "array",
         "items": {
           "type": "object",
-          "additionalProperties": false,
           "properties": {
             "name": {"title": "AWS tag key", "type": "string"},
             "rename": {"title": "Netdata label", "type": "string"}
@@ -169,11 +164,7 @@
         "default": 30
       }
     },
-    "required": ["credentials", "targets", "rules"],
-    "additionalProperties": false,
-    "patternProperties": {
-      "^name$": {}
-    }
+    "required": ["credentials", "targets", "rules"]
   },
   "uiSchema": {
     "uiOptions": {"fullPage": true},

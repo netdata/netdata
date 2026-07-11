@@ -30,7 +30,10 @@ func resolveRuleTargets(path string, refs []string, targets map[string]*collecti
 	seen := make(map[string]struct{}, len(refs))
 	out := make([]*collectionTarget, 0, len(refs))
 	for i, raw := range refs {
-		ref := strings.TrimSpace(raw)
+		ref := raw
+		if err := validateCanonicalString(fmt.Sprintf("%s.targets[%d]", path, i), ref); err != nil {
+			return nil, err
+		}
 		if ref == "" {
 			return nil, fmt.Errorf("%s.targets[%d] must not be empty", path, i)
 		}
@@ -102,7 +105,10 @@ func nilIfSelector(selector *ProfileSelectorConfig, fn func(*ProfileSelectorConf
 func normalizedUniqueProfileNames(path string, values []string, known map[string]cwprofiles.ResolvedProfile) (map[string]struct{}, error) {
 	out := make(map[string]struct{}, len(values))
 	for i, raw := range values {
-		name := strings.TrimSpace(raw)
+		name := raw
+		if err := validateCanonicalString(fmt.Sprintf("%s[%d]", path, i), name); err != nil {
+			return nil, err
+		}
 		if name == "" {
 			return nil, fmt.Errorf("%s[%d] must not be empty", path, i)
 		}
@@ -134,7 +140,7 @@ func validateRolePartition(targetName, roleARN string, partitions map[string]str
 }
 
 func rolePartition(roleARN string) (string, error) {
-	parsed, err := arn.Parse(strings.TrimSpace(roleARN))
+	parsed, err := arn.Parse(roleARN)
 	if err != nil {
 		return "", fmt.Errorf("invalid ARN syntax")
 	}

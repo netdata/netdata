@@ -72,10 +72,10 @@ func TestEnsureTargets_RetainsSameAccountTargets(t *testing.T) {
 		"second": &seqSTS{accounts: []string{"111111111111"}},
 	})
 	require.NoError(t, c.ensureTargets(context.Background()))
-	require.Len(t, c.resolvedTargets, 2)
-	assert.Equal(t, []string{"first", "second"}, c.resolvedTargetRefs())
-	assert.Equal(t, "111111111111", c.resolvedTargets[0].accountID)
-	assert.Equal(t, "111111111111", c.resolvedTargets[1].accountID)
+	require.Len(t, c.resolvedByRef, 2)
+	assert.Equal(t, []string{"first", "second"}, resolvedTargetNames(c))
+	assert.Equal(t, "111111111111", c.resolvedByRef["first"].accountID)
+	assert.Equal(t, "111111111111", c.resolvedByRef["second"].accountID)
 }
 
 func TestEnsureTargets_FailureIsolationAndRetry(t *testing.T) {
@@ -84,9 +84,9 @@ func TestEnsureTargets_FailureIsolationAndRetry(t *testing.T) {
 		"second": &seqSTS{accounts: []string{"", "222222222222"}, failAt: map[int]bool{0: true}},
 	})
 	require.NoError(t, c.ensureTargets(context.Background()))
-	assert.Equal(t, []string{"first"}, c.resolvedTargetRefs())
+	assert.Equal(t, []string{"first"}, resolvedTargetNames(c))
 	require.NoError(t, c.ensureTargets(context.Background()))
-	assert.Equal(t, []string{"first", "second"}, c.resolvedTargetRefs())
+	assert.Equal(t, []string{"first", "second"}, resolvedTargetNames(c))
 }
 
 func TestBuildQueryPlan_FirstTargetOwnsSameAccountSeries(t *testing.T) {
@@ -108,7 +108,7 @@ func TestBuildQueryPlan_FirstTargetOwnsSameAccountSeries(t *testing.T) {
 	assert.Len(t, plan, perInstance)
 	for _, query := range plan {
 		assert.Equal(t, "first", query.target)
-		assert.Equal(t, "111111111111", query.account)
+		assert.Equal(t, "111111111111", labelValue(query.labels, "account_id"))
 	}
 }
 

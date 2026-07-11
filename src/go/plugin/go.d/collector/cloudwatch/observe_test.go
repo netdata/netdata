@@ -85,7 +85,7 @@ func (f *fullCloudWatch) getMetricDataCalls() int {
 func endToEndCollector(gmdValue float64) (*Collector, *fullCloudWatch) {
 	c := New()
 	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
-	setSingleTargetRuntime(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 
 	fake := &fullCloudWatch{
 		list:     map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
@@ -215,7 +215,7 @@ func TestObserve_PerRegionScheduleIsolation(t *testing.T) {
 	}
 	c := New()
 	configureExactRule(c, []string{"us-east-1", "us-west-2"}, []string{"ec2"})
-	setSingleTargetRuntime(c, "000000000000", []string{"us-east-1", "us-west-2"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2}})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1", "us-west-2"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2}})
 	c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
 		return aws.Config{Region: region}, nil
 	}
@@ -251,7 +251,7 @@ func TestCollect_QueryFailureRetriesNextCycle(t *testing.T) {
 	}
 	c := New()
 	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
-	setSingleTargetRuntime(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 	useFakeClient(c, fake)
 
 	base := time.Unix(1_000_000_000, 0)
@@ -296,7 +296,7 @@ func TestObserve_DailySeriesSurvivesEvictionWindow(t *testing.T) {
 	}
 	c := New()
 	configureExactRule(c, []string{"us-east-1"}, []string{"s3"})
-	setSingleTargetRuntime(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "s3", Config: dailyProfile}})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "s3", Config: dailyProfile}})
 	useFakeClient(c, fake)
 
 	base := time.Unix(1_000_000_000, 0)
@@ -336,7 +336,7 @@ func TestObserve_MultiPeriodScheduling(t *testing.T) {
 	}
 	c := New()
 	configureExactRule(c, []string{"us-east-1"}, []string{"ec2", "s3"})
-	setSingleTargetRuntime(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2}, {Name: "s3", Config: s3}})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2}, {Name: "s3", Config: s3}})
 	useFakeClient(c, fake)
 
 	base := time.Unix(1_000_000_000, 0)
@@ -402,7 +402,7 @@ func TestObserve_RateMetricNoDataZeroFilled(t *testing.T) {
 		Instance:  cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "FunctionName", Label: "function_name"}}},
 		Metrics:   []cwprofiles.Metric{{ID: "errors", MetricName: "Errors", Statistics: []string{"sum"}, Rate: true}},
 	}}}
-	setSingleTargetRuntime(c, "000000000000", []string{"us-east-1"}, profiles)
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, profiles)
 
 	fake := &fullCloudWatch{
 		list:     map[string][]cwtypes.Metric{"AWS/Lambda": {mkMetric("Errors", "FunctionName", "fn-1")}},
@@ -451,7 +451,7 @@ func TestObserve_RateMetricNoUsableResultGaps(t *testing.T) {
 				Instance:  cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "FunctionName", Label: "function_name"}}},
 				Metrics:   []cwprofiles.Metric{{ID: "errors", MetricName: "Errors", Statistics: []string{"sum"}, Rate: true}},
 			}}}
-			setSingleTargetRuntime(c, "000000000000", []string{"us-east-1"}, profiles)
+			setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, profiles)
 
 			fake := &fullCloudWatch{
 				list:     map[string][]cwtypes.Metric{"AWS/Lambda": {mkMetric("Errors", "FunctionName", "fn-1")}},
@@ -474,13 +474,13 @@ func TestCleanup_ResetsRuntimeState(t *testing.T) {
 
 	_, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	require.NotEmpty(t, c.resolvedTargets)
+	require.NotEmpty(t, c.resolvedByRef)
 	require.NotEmpty(t, c.observations.lastObserved)
 	require.NotEmpty(t, c.observations.nextQueryAt)
 
 	c.Cleanup(context.Background())
 
-	assert.Empty(t, c.resolvedTargets)
+	assert.Empty(t, c.resolvedByRef)
 	assert.Nil(t, c.plan)
 	assert.Empty(t, c.observations.lastObserved)
 	assert.Empty(t, c.observations.nextQueryAt)
@@ -534,7 +534,7 @@ func TestPruneObserved_DropsStaleScheduleForVanishedGroup(t *testing.T) {
 
 	// Plan retains only account 111111111111's group; account 222222222222 is gone.
 	c.observations.pruneObserved([]plannedQuery{
-		{seriesName: "ec2.cpu_utilization_average", labels: labels, target: "first", account: "111111111111", region: "us-east-1", period: 300},
+		{seriesName: "ec2.cpu_utilization_average", labels: labels, target: "first", region: "us-east-1", period: 300},
 	})
 
 	assert.Contains(t, c.observations.nextQueryAt, inPlan, "a group still in the plan keeps its schedule")

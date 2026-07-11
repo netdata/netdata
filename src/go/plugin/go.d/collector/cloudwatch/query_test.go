@@ -66,7 +66,7 @@ func ec2QueryCollector(regions []string, instancesByRegion map[string][][]string
 	c := New()
 	configureExactRule(c, regions, []string{"ec2"})
 	c.applyDefaults()
-	setSingleTargetRuntime(c, "123456789012", regions, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
+	setSingleTargetPlan(c, "123456789012", regions, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 
 	insts := make(map[discoveryKey][]discoveredInstance)
 	for region, list := range instancesByRegion {
@@ -148,7 +148,7 @@ func TestBuildQueryPlan_ConstantDimension(t *testing.T) {
 			{ID: "requests", MetricName: "Requests", Statistics: []string{"sum"}, Rate: true},
 		},
 	}}}
-	setSingleTargetRuntime(c, "123456789012", []string{"us-east-1"}, profiles)
+	setSingleTargetPlan(c, "123456789012", []string{"us-east-1"}, profiles)
 	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
 		{Target: "base", Profile: "cloudfront", Region: "us-east-1"}: {{DimensionValues: []string{"E1", "Global"}}},
 	}}
@@ -241,6 +241,7 @@ type gmdCloudWatch struct {
 	value  float64
 	gaps   map[string]bool
 	gapAll bool
+	status cwtypes.StatusCode
 }
 
 func (f *gmdCloudWatch) ListMetrics(context.Context, *cloudwatch.ListMetricsInput, ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
@@ -257,7 +258,7 @@ func (f *gmdCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetri
 	results := make([]cwtypes.MetricDataResult, 0, len(in.MetricDataQueries))
 	for _, q := range in.MetricDataQueries {
 		id := aws.ToString(q.Id)
-		r := cwtypes.MetricDataResult{Id: aws.String(id)}
+		r := cwtypes.MetricDataResult{Id: aws.String(id), StatusCode: f.status}
 		if !f.gapAll && !f.gaps[id] {
 			r.Values = []float64{f.value}
 			r.Timestamps = []time.Time{time.Unix(1, 0)}
@@ -324,7 +325,7 @@ func TestExecuteQueries_ReportsIndependentChunkFailures(t *testing.T) {
 	c.clients.clients[clientKey{target: "target-b", region: "eu-west-1"}] = failing
 	plan := []plannedQuery{
 		{id: "q0", target: "target-a", region: "us-east-1", period: 300, query: cwtypes.MetricDataQuery{Id: aws.String("q0")}},
-		{id: "q1", target: "target-b", region: "eu-west-1", period: 300, query: cwtypes.MetricDataQuery{Id: aws.String("q1")}},
+		{id: "q1", target: "target-b", region: "eu-west-1", period: 600, query: cwtypes.MetricDataQuery{Id: aws.String("q1")}},
 	}
 
 	_, _, _, err := c.executeQueries(context.Background(), plan, time.Unix(1_000_000_000, 0))
@@ -333,7 +334,39 @@ func TestExecuteQueries_ReportsIndependentChunkFailures(t *testing.T) {
 	assert.Contains(t, logs.String(), "us-east-1")
 	assert.Contains(t, logs.String(), "target-b")
 	assert.Contains(t, logs.String(), "eu-west-1")
+	assert.Contains(t, logs.String(), "period 300s")
+	assert.Contains(t, logs.String(), "period 600s")
 	assert.NotContains(t, logs.String(), sensitive)
+}
+
+func TestExecuteQueries_ReportsIndependentForbiddenResults(t *testing.T) {
+	var logs bytes.Buffer
+	c := New()
+	c.Logger = logger.NewWithWriter(&logs)
+	c.applyDefaults()
+	c.clients.clients[clientKey{target: "target-a", region: "us-east-1"}] = &gmdCloudWatch{status: cwtypes.StatusCodeForbidden}
+	c.clients.clients[clientKey{target: "target-b", region: "eu-west-1"}] = &gmdCloudWatch{status: cwtypes.StatusCodeForbidden}
+	plan := []plannedQuery{
+		forbiddenTestQuery("q0", "target-a", "us-east-1", "AWS/EC2", 300),
+		forbiddenTestQuery("q1", "target-b", "eu-west-1", "AWS/RDS", 600),
+	}
+
+	samples, _, _, err := c.executeQueries(context.Background(), plan, time.Unix(1_000_000_000, 0))
+	require.NoError(t, err)
+	assert.Empty(t, samples)
+	for _, want := range []string{"target-a", "us-east-1", "AWS/EC2", "300s", "target-b", "eu-west-1", "AWS/RDS", "600s"} {
+		assert.Contains(t, logs.String(), want)
+	}
+}
+
+func forbiddenTestQuery(id, target, region, namespace string, period int) plannedQuery {
+	return plannedQuery{
+		id: id, target: target, region: region, period: period,
+		query: cwtypes.MetricDataQuery{
+			Id:         aws.String(id),
+			MetricStat: &cwtypes.MetricStat{Metric: &cwtypes.Metric{Namespace: aws.String(namespace)}},
+		},
+	}
 }
 
 // TestBuildChunkJobs verifies query batching into GetMetricData-sized chunks (one

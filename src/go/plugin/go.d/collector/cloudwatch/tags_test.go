@@ -187,7 +187,7 @@ func TestRefreshTags_FirstFailureNoneThenSuccessThenCarryForward(t *testing.T) {
 	c := New()
 	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
 	c.Config.Tags = []TagConfig{{Name: "owner"}}
-	setSingleTargetRuntime(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
 	c.newRGTAClient = func(aws.Config) rgtaClient { return rgta }
 	c.computeTagPlans()
@@ -235,7 +235,7 @@ func tagUnitCollector(t *testing.T, rgta rgtaClient) *Collector {
 	c := New()
 	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
 	c.Config.Tags = []TagConfig{{Name: "owner"}}
-	setSingleTargetRuntime(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
 	c.newRGTAClient = func(aws.Config) rgtaClient { return rgta }
 	return c
@@ -298,7 +298,6 @@ func TestRefreshTags_ReportsIndependentTargetFailures(t *testing.T) {
 	c.resolvedByRef = make(map[string]resolvedTarget)
 	for _, target := range c.plan.Targets {
 		resolved := resolvedTarget{target: target, accountID: "000000000000"}
-		c.resolvedTargets = append(c.resolvedTargets, resolved)
 		c.resolvedByRef[target.Name] = resolved
 	}
 	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }

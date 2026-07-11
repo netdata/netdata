@@ -62,6 +62,7 @@ func sanitizeAWSError(err error) error {
 type operationFailure struct {
 	Target string
 	Region string
+	Scope  string
 	Err    error
 }
 
@@ -71,7 +72,11 @@ func (c *Collector) warnOperationFailures(limiterKey, operation, suffix string, 
 	}
 	var samples []string
 	for _, failure := range failures[:min(len(failures), maxFailureLogSamples)] {
-		samples = append(samples, fmt.Sprintf("target %q region %q: %v", failure.Target, failure.Region, sanitizeAWSError(failure.Err)))
+		scope := ""
+		if failure.Scope != "" {
+			scope = " " + failure.Scope
+		}
+		samples = append(samples, fmt.Sprintf("target %q region %q%s: %v", failure.Target, failure.Region, scope, sanitizeAWSError(failure.Err)))
 	}
 	if remaining := len(failures) - len(samples); remaining > 0 {
 		samples = append(samples, fmt.Sprintf("and %d more", remaining))

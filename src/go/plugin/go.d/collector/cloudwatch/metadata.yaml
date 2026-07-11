@@ -287,7 +287,7 @@ modules:
               required: false
               group: Rules
             - name: rules[].regions
-              description: AWS regions selected by this rule. The compiler intersects them with intrinsic profile restrictions; for example, CloudFront supports only `us-east-1`.
+              description: Canonical lowercase AWS region codes selected by this rule. The compiler intersects them with intrinsic profile restrictions; for example, CloudFront supports only `us-east-1`.
               default_value: ""
               required: true
               group: Rules

@@ -37,22 +37,14 @@ func (c *Collector) ensureTargets(ctx context.Context) error {
 	if c.plan == nil {
 		return errors.New("CloudWatch collection plan is not compiled")
 	}
-	if c.resolvedRefs == nil {
-		c.resolvedRefs = make(map[string]struct{}, len(c.plan.Targets))
+	if c.resolvedByRef == nil {
 		c.resolvedByRef = make(map[string]resolvedTarget, len(c.plan.Targets))
 	}
 
 	// Short-circuit once every configured target has resolved. Until then, retry
 	// the pending ones.
-	allResolved := true
-	for _, target := range c.plan.Targets {
-		if _, ok := c.resolvedRefs[target.Name]; !ok {
-			allResolved = false
-			break
-		}
-	}
-	if allResolved {
-		if len(c.resolvedTargets) == 0 {
+	if len(c.resolvedByRef) == len(c.plan.Targets) {
+		if len(c.resolvedByRef) == 0 {
 			return errors.New("no AWS targets resolved")
 		}
 		return nil
@@ -60,7 +52,7 @@ func (c *Collector) ensureTargets(ctx context.Context) error {
 
 	var pending []*collectionTarget
 	for _, target := range c.plan.Targets {
-		if _, ok := c.resolvedRefs[target.Name]; ok {
+		if _, ok := c.resolvedByRef[target.Name]; ok {
 			continue // already resolved
 		}
 		pending = append(pending, target)
@@ -82,9 +74,7 @@ func (c *Collector) ensureTargets(ctx context.Context) error {
 			failures = append(failures, operationFailure{Target: target.Name, Region: target.Regions[0], Err: result.err})
 			continue
 		}
-		c.resolvedRefs[target.Name] = struct{}{}
 		resolved := resolvedTarget{target: target, accountID: result.accountID}
-		c.resolvedTargets = append(c.resolvedTargets, resolved)
 		c.resolvedByRef[target.Name] = resolved
 		c.invalidateQueryPlan()
 		c.markDiscoveryStale() // discover the newly-resolved account this cycle, not after refresh_every
@@ -93,7 +83,7 @@ func (c *Collector) ensureTargets(ctx context.Context) error {
 	}
 	c.warnOperationFailures(logKeyAccountResolveFailed, "account resolution", " (will retry next cycle)", failures)
 
-	if len(c.resolvedTargets) == 0 {
+	if len(c.resolvedByRef) == 0 {
 		if len(failures) > 0 {
 			last := failures[len(failures)-1]
 			return fmt.Errorf("no AWS target could be resolved (%d failed); last failure for target %q region %q: %w",
@@ -127,12 +117,4 @@ func (c *Collector) resolveAccountID(ctx context.Context, id awsauth.Identity, r
 func (c *Collector) resolvedTargetByRef(ref string) (resolvedTarget, bool) {
 	target, ok := c.resolvedByRef[ref]
 	return target, ok
-}
-
-func (c *Collector) resolvedTargetRefs() []string {
-	refs := make([]string, 0, len(c.resolvedTargets))
-	for _, target := range c.resolvedTargets {
-		refs = append(refs, target.target.Name)
-	}
-	return refs
 }

@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -86,4 +87,92 @@ func TestClientCache_DistinctKeysBuildConcurrently(t *testing.T) {
 	close(release)
 	wg.Wait()
 	assert.True(t, allStarted, "one slow client build must not serialize a distinct target/region")
+}
+
+func TestClientCache_CoalescesConcurrentSameKey(t *testing.T) {
+	tests := map[string]struct {
+		buildErr error
+	}{
+		"shared success": {},
+		"shared error":   {buildErr: errors.New("build failed")},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			const callers = 8
+			var builds atomic.Int32
+			started := make(chan struct{}, callers)
+			release := make(chan struct{})
+			cache := newClientCache(func(_ context.Context, target, region string) (string, error) {
+				builds.Add(1)
+				started <- struct{}{}
+				<-release
+				return target + "/" + region, tc.buildErr
+			})
+
+			start := make(chan struct{})
+			results := make(chan string, callers)
+			errs := make(chan error, callers)
+			var wg sync.WaitGroup
+			for range callers {
+				wg.Add(1)
+				go func() {
+					defer wg.Done()
+					<-start
+					result, err := cache.forTargetRegion(context.Background(), "base", "us-east-1")
+					results <- result
+					errs <- err
+				}()
+			}
+			close(start)
+			<-started
+			time.Sleep(25 * time.Millisecond) // let every caller reach the blocked same-key path
+			close(release)
+			wg.Wait()
+			close(results)
+			close(errs)
+
+			assert.Equal(t, int32(1), builds.Load())
+			for result := range results {
+				assert.Equal(t, "base/us-east-1", result)
+			}
+			for err := range errs {
+				if tc.buildErr == nil {
+					assert.NoError(t, err)
+				} else {
+					assert.ErrorIs(t, err, tc.buildErr)
+				}
+			}
+		})
+	}
+}
+
+func TestClientCache_SameKeyWaiterCancellationDoesNotCancelBuild(t *testing.T) {
+	var builds atomic.Int32
+	started := make(chan struct{})
+	release := make(chan struct{})
+	cache := newClientCache(func(_ context.Context, target, region string) (string, error) {
+		builds.Add(1)
+		close(started)
+		<-release
+		return target + "/" + region, nil
+	})
+
+	first := make(chan error, 1)
+	go func() {
+		_, err := cache.forTargetRegion(context.Background(), "base", "us-east-1")
+		first <- err
+	}()
+	<-started
+
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, err := cache.forTargetRegion(ctx, "base", "us-east-1")
+	assert.ErrorIs(t, err, context.Canceled)
+
+	close(release)
+	require.NoError(t, <-first)
+	result, err := cache.forTargetRegion(context.Background(), "base", "us-east-1")
+	require.NoError(t, err)
+	assert.Equal(t, "base/us-east-1", result)
+	assert.Equal(t, int32(1), builds.Load())
 }

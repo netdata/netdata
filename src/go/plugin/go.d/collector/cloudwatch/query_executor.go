@@ -31,6 +31,7 @@ type chunkResult struct {
 	key     queryGroupKey
 	samples []querySample
 	noData  map[string]bool // query ids with a usable result but no datapoint (zero-fill eligible)
+	issues  []queryResultIssue
 	err     error
 }
 
@@ -150,8 +151,8 @@ func (c *Collector) runChunkJobs(ctx context.Context, jobs []chunkJob, byID map[
 		p.Go(func() chunkResult {
 			cctx, cancel := withTimeout(ctx, c.Timeout.Duration())
 			defer cancel()
-			samples, noData, err := c.runGetMetricData(cctx, j.client, j.chunk, j.start, j.end, byID)
-			return chunkResult{key: j.key, samples: samples, noData: noData, err: err}
+			samples, noData, issues, err := c.runGetMetricData(cctx, j.client, j.chunk, j.start, j.end, byID)
+			return chunkResult{key: j.key, samples: samples, noData: noData, issues: issues, err: err}
 		})
 	}
 	return p.Wait()
@@ -163,11 +164,15 @@ func (c *Collector) collectChunkResults(results []chunkResult, failedGroups map[
 	noData = make(map[string]bool)
 	failures := 0
 	var operationFailures []operationFailure
+	var resultIssues []queryResultIssue
 	for _, r := range results {
+		resultIssues = append(resultIssues, r.issues...)
 		if r.err != nil {
 			failures++
 			failedGroups[r.key] = true
-			operationFailures = append(operationFailures, operationFailure{Target: r.key.target, Region: r.key.region, Err: r.err})
+			operationFailures = append(operationFailures, operationFailure{
+				Target: r.key.target, Region: r.key.region, Scope: fmt.Sprintf("period %ds", r.key.period), Err: r.err,
+			})
 			continue
 		}
 		samples = append(samples, r.samples...)
@@ -176,6 +181,7 @@ func (c *Collector) collectChunkResults(results []chunkResult, failedGroups map[
 		}
 	}
 	c.warnOperationFailures(logKeyGetMetricDataFailed, "GetMetricData", "", operationFailures)
+	c.warnQueryResultIssues(resultIssues)
 	return samples, noData, failures == len(results)
 }
 
@@ -186,9 +192,10 @@ func (c *Collector) collectChunkResults(results []chunkResult, failedGroups map[
 // datapoint. A per-result InternalError/Forbidden (or a missing result) is NOT
 // in noData, so observe gaps that series rather than zero-filling it — an
 // error must not read as a real 0 for nil_as_zero metrics.
-func (c *Collector) runGetMetricData(ctx context.Context, client cloudwatchClient, chunk []cwtypes.MetricDataQuery, start, end time.Time, byID map[string]plannedQuery) ([]querySample, map[string]bool, error) {
+func (c *Collector) runGetMetricData(ctx context.Context, client cloudwatchClient, chunk []cwtypes.MetricDataQuery, start, end time.Time, byID map[string]plannedQuery) ([]querySample, map[string]bool, []queryResultIssue, error) {
 	valueByID := make(map[string]float64, len(chunk))
 	usableByID := make(map[string]bool, len(chunk)) // saw a usable (non-error) result for this id
+	issueCounts := make(map[queryResultIssue]int)
 	var nextToken *string
 
 	for {
@@ -200,7 +207,7 @@ func (c *Collector) runGetMetricData(ctx context.Context, client cloudwatchClien
 			NextToken:         nextToken,
 		})
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, queryResultIssues(issueCounts), err
 		}
 
 		for _, r := range out.MetricDataResults {
@@ -217,8 +224,13 @@ func (c *Collector) runGetMetricData(ctx context.Context, client cloudwatchClien
 				c.Debugf("CloudWatch GetMetricData result %q: InternalError (transient); skipping this period", aws.ToString(r.Id))
 				continue
 			case cwtypes.StatusCodeForbidden:
-				c.Limit(logKeyGetMetricDataForbidden, 1, recurringLogEvery).
-					Warningf("CloudWatch GetMetricData: access denied for one or more metrics (result Forbidden); verify the IAM identity is allowed cloudwatch:GetMetricData")
+				if pq, ok := byID[*r.Id]; ok {
+					issue := queryResultIssue{
+						target: pq.target, region: pq.region, namespace: queryNamespace(pq.query),
+						period: pq.period, status: r.StatusCode,
+					}
+					issueCounts[issue]++
+				}
 				continue
 			}
 			usableByID[*r.Id] = true
@@ -242,7 +254,7 @@ func (c *Collector) runGetMetricData(ctx context.Context, client cloudwatchClien
 		id := aws.ToString(q.Id)
 		if value, ok := valueByID[id]; ok {
 			pq := byID[id]
-			samples = append(samples, querySample{seriesName: pq.seriesName, labels: pq.labels, tagLabels: pq.tagLabels, value: value, target: pq.target, account: pq.account, region: pq.region, period: pq.period})
+			samples = append(samples, querySample{seriesName: pq.seriesName, labels: pq.labels, tagLabels: pq.tagLabels, value: value, target: pq.target, region: pq.region, period: pq.period})
 			continue
 		}
 		if usableByID[id] {
@@ -250,5 +262,5 @@ func (c *Collector) runGetMetricData(ctx context.Context, client cloudwatchClien
 		}
 		// else: errored or absent id -> not eligible; observe gaps the series
 	}
-	return samples, noData, nil
+	return samples, noData, queryResultIssues(issueCounts), nil
 }

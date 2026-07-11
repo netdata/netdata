@@ -2,13 +2,17 @@
 
 package cloudwatch
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 type configYAMLKeySpec struct {
-	children map[string]configYAMLKeySpec
-	elem     *configYAMLKeySpec
-	mapElem  *configYAMLKeySpec
-	allowAny bool
+	children               map[string]configYAMLKeySpec
+	elem                   *configYAMLKeySpec
+	mapElem                *configYAMLKeySpec
+	allowAny               bool
+	rejectReservedRuleKeys bool
 }
 
 var (
@@ -24,10 +28,12 @@ var (
 	profileSelectorYAMLSpec = configYAMLKeySpec{children: map[string]configYAMLKeySpec{
 		"defaults": {}, "include": {}, "exclude": {},
 	}}
-	ruleYAMLSpec = configYAMLKeySpec{children: map[string]configYAMLKeySpec{
-		"name": {}, "targets": {}, "profiles": profileSelectorYAMLSpec, "regions": {},
-		"filters": {}, "labels": {}, "series": {}, "query": {},
-	}}
+	ruleYAMLSpec = configYAMLKeySpec{
+		children: map[string]configYAMLKeySpec{
+			"name": {}, "targets": {}, "profiles": profileSelectorYAMLSpec, "regions": {},
+		},
+		rejectReservedRuleKeys: true,
+	}
 	tagYAMLSpec = configYAMLKeySpec{children: map[string]configYAMLKeySpec{
 		"name": {}, "rename": {},
 	}}
@@ -57,6 +63,47 @@ func (c *Config) UnmarshalYAML(unmarshal func(any) error) error {
 
 	type plain Config
 	return unmarshal((*plain)(c))
+}
+
+func (r *RuleConfig) UnmarshalYAML(unmarshal func(any) error) error {
+	var raw map[string]any
+	if err := unmarshal(&raw); err != nil {
+		return err
+	}
+	for key := range raw {
+		if isReservedRuleKey(key) {
+			return reservedRuleKeyError(key)
+		}
+	}
+	type plain RuleConfig
+	return unmarshal((*plain)(r))
+}
+
+func (r *RuleConfig) UnmarshalJSON(data []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+	for key := range raw {
+		if isReservedRuleKey(key) {
+			return reservedRuleKeyError(key)
+		}
+	}
+	type plain RuleConfig
+	return json.Unmarshal(data, (*plain)(r))
+}
+
+func isReservedRuleKey(key string) bool {
+	switch key {
+	case "filters", "labels", "series", "query":
+		return true
+	default:
+		return false
+	}
+}
+
+func reservedRuleKeyError(key string) error {
+	return fmt.Errorf("rule field %q is reserved for a later phase", key)
 }
 
 func rejectUnknownConfigYAMLKeys(node any, spec configYAMLKeySpec, path string) error {
@@ -107,6 +154,9 @@ func rejectConfigYAMLMapEntry(key string, value any, spec configYAMLKeySpec, pat
 	}
 	child, ok := spec.children[key]
 	if !ok {
+		if spec.rejectReservedRuleKeys && isReservedRuleKey(key) {
+			return reservedRuleKeyError(key)
+		}
 		return fmt.Errorf("%sunknown config key %q", configPathPrefix(path), key)
 	}
 	return rejectUnknownConfigYAMLKeys(value, child, childPath)

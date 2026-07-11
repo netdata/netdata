@@ -70,6 +70,7 @@ func validateCredentials(cfg Config) error {
 
 	var errs []error
 	for _, name := range names {
+		// Map keys cannot be normalized without changing reference identity.
 		if !configNamePattern.MatchString(name) {
 			errs = append(errs, fmt.Errorf("credential name %q must match %q", name, configNamePattern.String()))
 		}
@@ -88,8 +89,10 @@ func validateTargets(cfg Config) error {
 	var errs []error
 	for i, target := range cfg.Targets {
 		path := fmt.Sprintf("targets[%d]", i)
-		name := strings.TrimSpace(target.Name)
-		if !configNamePattern.MatchString(name) {
+		name := target.Name
+		if err := validateCanonicalString(path+".name", name); err != nil {
+			errs = append(errs, err)
+		} else if !configNamePattern.MatchString(name) {
 			errs = append(errs, fmt.Errorf("%s.name %q must match %q", path, target.Name, configNamePattern.String()))
 		} else if _, ok := seen[name]; ok {
 			errs = append(errs, fmt.Errorf("duplicate target name %q", name))
@@ -97,17 +100,24 @@ func validateTargets(cfg Config) error {
 			seen[name] = struct{}{}
 		}
 
-		credentialRef := strings.TrimSpace(target.Credentials)
-		if credentialRef == "" {
+		credentialRef := target.Credentials
+		if err := validateCanonicalString(path+".credentials", credentialRef); err != nil {
+			errs = append(errs, err)
+		} else if credentialRef == "" {
 			errs = append(errs, fmt.Errorf("%s.credentials is required", path))
 		} else if _, ok := cfg.Credentials[credentialRef]; !ok {
 			errs = append(errs, fmt.Errorf("%s.credentials references unknown credential %q", path, credentialRef))
 		}
 		if target.AssumeRole != nil {
-			if strings.TrimSpace(target.AssumeRole.RoleARN) == "" {
+			if err := validateCanonicalString(path+".assume_role.role_arn", target.AssumeRole.RoleARN); err != nil {
+				errs = append(errs, err)
+			} else if target.AssumeRole.RoleARN == "" {
 				errs = append(errs, fmt.Errorf("%s.assume_role.role_arn is required", path))
 			} else if _, err := rolePartition(target.AssumeRole.RoleARN); err != nil {
 				errs = append(errs, fmt.Errorf("%s.assume_role.role_arn is invalid: %w", path, err))
+			}
+			if err := validateCanonicalString(path+".assume_role.external_id", target.AssumeRole.ExternalID); err != nil {
+				errs = append(errs, err)
 			}
 		}
 	}
@@ -122,8 +132,10 @@ func validateRules(cfg Config) error {
 	var errs []error
 	for i, rule := range cfg.Rules {
 		path := fmt.Sprintf("rules[%d]", i)
-		name := strings.TrimSpace(rule.Name)
-		if !configNamePattern.MatchString(name) {
+		name := rule.Name
+		if err := validateCanonicalString(path+".name", name); err != nil {
+			errs = append(errs, err)
+		} else if !configNamePattern.MatchString(name) {
 			errs = append(errs, fmt.Errorf("%s.name %q must match %q", path, rule.Name, configNamePattern.String()))
 		} else if _, ok := seen[name]; ok {
 			errs = append(errs, fmt.Errorf("duplicate rule name %q", name))
@@ -132,12 +144,15 @@ func validateRules(cfg Config) error {
 		}
 		if len(rule.Targets) == 0 {
 			errs = append(errs, fmt.Errorf("%s.targets must contain at least one target", path))
+		} else {
+			for j, target := range rule.Targets {
+				if err := validateCanonicalString(fmt.Sprintf("%s.targets[%d]", path, j), target); err != nil {
+					errs = append(errs, err)
+				}
+			}
 		}
 		if err := validateRuleRegions(path, rule.Regions); err != nil {
 			errs = append(errs, err)
-		}
-		if rule.Filters != nil || rule.Labels != nil || rule.Series != nil || rule.Query != nil {
-			errs = append(errs, fmt.Errorf("%s contains fields reserved for a later phase", path))
 		}
 	}
 	return errors.Join(errs...)
@@ -151,6 +166,10 @@ func validateRuleRegions(path string, regions []string) error {
 	var errs []error
 	for i, raw := range regions {
 		region := awsregion.Normalize(raw)
+		if raw != region {
+			errs = append(errs, fmt.Errorf("%s.regions[%d] %q is not canonical; use %q", path, i, raw, region))
+			continue
+		}
 		if !awsregion.Valid(region) {
 			errs = append(errs, fmt.Errorf("%s.regions[%d] %q is not a valid AWS region", path, i, raw))
 			continue
@@ -162,4 +181,11 @@ func validateRuleRegions(path string, regions []string) error {
 		seen[region] = struct{}{}
 	}
 	return errors.Join(errs...)
+}
+
+func validateCanonicalString(path, value string) error {
+	if value != strings.TrimSpace(value) {
+		return fmt.Errorf("%s must not contain surrounding whitespace", path)
+	}
+	return nil
 }

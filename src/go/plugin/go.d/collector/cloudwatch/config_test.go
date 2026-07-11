@@ -4,6 +4,7 @@ package cloudwatch
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -48,8 +49,7 @@ func TestConfig_validate(t *testing.T) {
 		}, wantErr: true},
 		"rule without regions":        {mutate: func(c *Config) { c.Rules[0].Regions = nil }, wantErr: true},
 		"invalid region":              {mutate: func(c *Config) { c.Rules[0].Regions = []string{"global"} }, wantErr: true},
-		"duplicate normalized region": {mutate: func(c *Config) { c.Rules[0].Regions = []string{"us-east-1", " US-EAST-1 "} }, wantErr: true},
-		"future rule field":           {mutate: func(c *Config) { c.Rules[0].Query = map[string]any{"period": 300} }, wantErr: true},
+		"noncanonical region":         {mutate: func(c *Config) { c.Rules[0].Regions = []string{"us-east-1", " US-EAST-1 "} }, wantErr: true},
 		"update_every below minimum":  {mutate: func(c *Config) { c.UpdateEvery = 30 }, wantErr: true},
 		"refresh_every below minimum": {mutate: func(c *Config) { c.Discovery.RefreshEvery = 30 }, wantErr: true},
 		"negative query_offset":       {mutate: func(c *Config) { c.QueryOffset = -1 }, wantErr: true},
@@ -99,6 +99,7 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 		assert.JSONEq(t, want, string(property.Default), key)
 	}
 	assert.Equal(t, 2, strings.Count(string(data), `"sensitive": true`), "only secret access key and session token are sensitive widgets")
+	assert.NotContains(t, string(data), `"additionalProperties"`)
 }
 
 func TestConfigSchema_ValidationParity(t *testing.T) {
@@ -121,26 +122,90 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 		"rules":       []any{map[string]any{"name": "base-defaults", "targets": []any{"base"}, "regions": []any{"us-east-1"}}},
 	}
 	require.NoError(t, schema.Validate(valid))
+	require.NoError(t, validateRuntimeConfigMap(t, valid))
 
-	tests := map[string]func(map[string]any){
-		"unknown top-level field": func(cfg map[string]any) { cfg["unknown"] = true },
-		"default credentials with access key": func(cfg map[string]any) {
-			cfg["credentials"] = map[string]any{"sdk_default": map[string]any{"type": "default", "access_key_id": "must-not-be-accepted"}}
+	strictCases := map[string]func(map[string]any){
+		"credential type has surrounding whitespace": func(cfg map[string]any) {
+			cfg["credentials"] = map[string]any{"sdk_default": map[string]any{"type": " default "}}
 		},
-		"static credentials without secret": func(cfg map[string]any) {
-			cfg["credentials"] = map[string]any{"sdk_default": map[string]any{"type": "static", "access_key_id": "key"}}
+		"credential type is mixed case": func(cfg map[string]any) {
+			cfg["credentials"] = map[string]any{"sdk_default": map[string]any{"type": "DEFAULT"}}
+		},
+		"static access key is whitespace only": func(cfg map[string]any) {
+			cfg["credentials"] = map[string]any{"sdk_default": map[string]any{
+				"type": "static", "access_key_id": " ", "secret_access_key": "secret",
+			}}
+		},
+		"target name has surrounding whitespace": func(cfg map[string]any) {
+			cfg["targets"] = []any{map[string]any{"name": " base ", "credentials": "sdk_default"}}
+		},
+		"target reference has surrounding whitespace": func(cfg map[string]any) {
+			cfg["rules"] = []any{map[string]any{"name": "base-defaults", "targets": []any{" base "}, "regions": []any{"us-east-1"}}}
+		},
+		"profile reference has surrounding whitespace": func(cfg map[string]any) {
+			cfg["rules"] = []any{map[string]any{
+				"name": "base-defaults", "targets": []any{"base"}, "regions": []any{"us-east-1"},
+				"profiles": map[string]any{"defaults": false, "include": []any{" ec2 "}},
+			}}
+		},
+		"region is not canonical lowercase": func(cfg map[string]any) {
+			cfg["rules"] = []any{map[string]any{"name": "base-defaults", "targets": []any{"base"}, "regions": []any{"US-EAST-1"}}}
 		},
 	}
-	for name, mutate := range tests {
+	for name, mutate := range strictCases {
 		t.Run(name, func(t *testing.T) {
-			cfg := make(map[string]any, len(valid))
-			for key, value := range valid {
-				cfg[key] = value
-			}
+			cfg := cloneConfigMap(t, valid)
 			mutate(cfg)
 			assert.Error(t, schema.Validate(cfg))
+			assert.Error(t, validateRuntimeConfigMap(t, cfg))
 		})
 	}
+
+	t.Run("required static fields remain enforced", func(t *testing.T) {
+		cfg := cloneConfigMap(t, valid)
+		cfg["credentials"] = map[string]any{"sdk_default": map[string]any{"type": "static", "access_key_id": "key"}}
+		assert.Error(t, schema.Validate(cfg))
+		assert.Error(t, validateRuntimeConfigMap(t, cfg))
+	})
+
+	permissiveSchemaCases := map[string]func(map[string]any){
+		"unknown top-level field": func(cfg map[string]any) { cfg["unknown"] = true },
+		"unknown nested field": func(cfg map[string]any) {
+			cfg["targets"] = []any{map[string]any{"name": "base", "credentials": "sdk_default", "unknown": true}}
+		},
+		"default credentials with static field": func(cfg map[string]any) {
+			cfg["credentials"] = map[string]any{"sdk_default": map[string]any{"type": "default", "access_key_id": "rejected-at-runtime"}}
+		},
+	}
+	for name, mutate := range permissiveSchemaCases {
+		t.Run("runtime authority/"+name, func(t *testing.T) {
+			cfg := cloneConfigMap(t, valid)
+			mutate(cfg)
+			assert.NoError(t, schema.Validate(cfg))
+			assert.Error(t, validateRuntimeConfigMap(t, cfg))
+		})
+	}
+}
+
+func cloneConfigMap(t *testing.T, src map[string]any) map[string]any {
+	t.Helper()
+	data, err := json.Marshal(src)
+	require.NoError(t, err)
+	var dst map[string]any
+	require.NoError(t, json.Unmarshal(data, &dst))
+	return dst
+}
+
+func validateRuntimeConfigMap(t *testing.T, raw map[string]any) error {
+	t.Helper()
+	data, err := yaml.Marshal(raw)
+	require.NoError(t, err)
+	var cfg Config
+	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return err
+	}
+	_, _, err = compileTestConfig(t, cfg)
+	return err
 }
 
 func TestConfig_TagsDecode(t *testing.T) {
@@ -167,6 +232,36 @@ func TestConfig_YAMLRejectsUnknownKeys(t *testing.T) {
 	}
 }
 
+func TestConfig_YAMLRejectsReservedRuleKeysEvenWhenNull(t *testing.T) {
+	tests := map[string]string{
+		"filters explicit null": "filters: null",
+		"labels bare null":      "labels:",
+		"series explicit null":  "series: null",
+		"query bare null":       "query:",
+	}
+	for name, field := range tests {
+		t.Run(name, func(t *testing.T) {
+			data := "credentials:\n  sdk_default:\n    type: default\ntargets:\n  - name: base\n    credentials: sdk_default\nrules:\n  - name: base-defaults\n    targets: [base]\n    regions: [us-east-1]\n    " + field + "\n"
+			var cfg Config
+			assert.ErrorContains(t, yaml.Unmarshal([]byte(data), &cfg), "reserved for a later phase")
+		})
+	}
+}
+
+func TestConfig_JSONRejectsReservedRuleKeysEvenWhenNull(t *testing.T) {
+	for _, key := range []string{"filters", "labels", "series", "query"} {
+		t.Run(key, func(t *testing.T) {
+			data := fmt.Sprintf(`{
+  "credentials":{"sdk_default":{"type":"default"}},
+  "targets":[{"name":"base","credentials":"sdk_default"}],
+  "rules":[{"name":"base-defaults","targets":["base"],"regions":["us-east-1"],%q:null}]
+}`, key)
+			var cfg Config
+			assert.ErrorContains(t, json.Unmarshal([]byte(data), &cfg), "reserved for a later phase")
+		})
+	}
+}
+
 func TestConfig_YAMLAcceptsFrameworkKeys(t *testing.T) {
 	var cfg Config
 	err := yaml.Unmarshal([]byte("name: example\nmodule: cloudwatch\npriority: 100\nlabels:\n  site: test\n"), &cfg)
@@ -175,5 +270,5 @@ func TestConfig_YAMLAcceptsFrameworkKeys(t *testing.T) {
 
 func TestNormalizeRegions(t *testing.T) {
 	assert.Equal(t, []string{"us-east-1", "eu-west-1"},
-		normalizeRegions([]string{"us-east-1", " US-EAST-1 ", "EU-West-1", "", "eu-west-1"}))
+		normalizeRegions([]string{"us-east-1", "us-east-1", "eu-west-1", "", "eu-west-1"}))
 }

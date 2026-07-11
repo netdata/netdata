@@ -4,11 +4,11 @@ package cloudwatch
 
 import (
 	"errors"
-	"strings"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsregion"
 )
 
 const (
@@ -53,13 +53,6 @@ type RuleConfig struct {
 	Targets  []string               `yaml:"targets" json:"targets"`
 	Profiles *ProfileSelectorConfig `yaml:"profiles,omitempty" json:"profiles,omitempty"`
 	Regions  []string               `yaml:"regions" json:"regions"`
-
-	// Reserved for focused later phases. Keeping these fields visible to the
-	// decoder lets Phase 3 reject them instead of silently ignoring file config.
-	Filters any `yaml:"filters,omitempty" json:"filters,omitempty"`
-	Labels  any `yaml:"labels,omitempty" json:"labels,omitempty"`
-	Series  any `yaml:"series,omitempty" json:"series,omitempty"`
-	Query   any `yaml:"query,omitempty" json:"query,omitempty"`
 }
 
 type ProfileSelectorConfig struct {
@@ -139,9 +132,7 @@ func normalizeRegions(regions []string) []string {
 	out := make([]string, 0, len(regions))
 	seen := make(map[string]struct{}, len(regions))
 	for _, r := range regions {
-		// AWS region codes are canonically lowercase, so lowercasing is loss-less and
-		// makes both dedupe and partition detection case-insensitive.
-		v := strings.ToLower(strings.TrimSpace(r))
+		v := awsregion.Normalize(r)
 		if v == "" {
 			continue
 		}

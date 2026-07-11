@@ -21,7 +21,6 @@ type querySample struct {
 	tagLabels  []metrix.Label // non-identity enrichment labels; emitted but not in observedKey
 	value      float64
 	target     string
-	account    string
 	region     string
 	period     int
 }
@@ -31,7 +30,6 @@ type querySample struct {
 type plannedQuery struct {
 	id         string
 	target     string
-	account    string
 	region     string
 	period     int
 	seriesName string
@@ -128,7 +126,7 @@ func (c *Collector) buildQueryPlan() []plannedQuery {
 			}
 			labels, dims := c.instanceLabelsAndDims(resolved.accountID, prof, scope.Region, inst)
 			tagLabels := c.tagLabelsFor(scope.Target.Name, resolved.accountID, scope.Region, prof, inst.DimensionValues)
-			queries := c.metricQueries(scope.Target.Name, resolved.accountID, prof, scope.Region, labels, tagLabels, dims, &idx)
+			queries := c.metricQueries(scope.Target.Name, prof, scope.Region, labels, tagLabels, dims, &idx)
 			for _, query := range queries {
 				key := finalSeriesKey(query.seriesName, query.labels)
 				if _, ok := seen[key]; ok {
@@ -181,7 +179,7 @@ func (c *Collector) instanceLabelsAndDims(accountID string, prof cwprofiles.Reso
 
 // metricQueries builds the planned queries for one instance: one per
 // (metric × statistic), allocating sequential q<idx> ids through idx.
-func (c *Collector) metricQueries(targetRef, accountID string, prof cwprofiles.ResolvedProfile, region string, labels, tagLabels []metrix.Label, dims []cwtypes.Dimension, idx *int) []plannedQuery {
+func (c *Collector) metricQueries(targetRef string, prof cwprofiles.ResolvedProfile, region string, labels, tagLabels []metrix.Label, dims []cwtypes.Dimension, idx *int) []plannedQuery {
 	var out []plannedQuery
 	for _, m := range prof.Config.Metrics {
 		period := prof.Config.EffectivePeriod(m)
@@ -192,7 +190,6 @@ func (c *Collector) metricQueries(targetRef, accountID string, prof cwprofiles.R
 			out = append(out, plannedQuery{
 				id:         id,
 				target:     targetRef,
-				account:    accountID,
 				region:     region,
 				period:     period,
 				seriesName: cwprofiles.ExportedSeriesName(prof.Name, m.ID, token),

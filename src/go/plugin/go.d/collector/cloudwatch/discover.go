@@ -5,7 +5,6 @@ package cloudwatch
 import (
 	"context"
 	"fmt"
-	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -44,7 +43,8 @@ func profileUsesRecentlyActive(prof cwprofiles.Profile, enabled bool) bool {
 
 // discoverProfileGroup scans one namespace once and applies each participating
 // profile's exact dimension matcher while streaming pages.
-func discoverProfileGroup(ctx context.Context, client cloudwatchClient, profiles []cwprofiles.ResolvedProfile, useRecentlyActive bool) (map[string][]discoveredInstance, error) {
+func discoverProfileGroup(ctx context.Context, client cloudwatchClient, group discoveryGroup) (map[string][]discoveredInstance, error) {
+	profiles := group.Profiles
 	if len(profiles) == 0 {
 		return nil, nil
 	}
@@ -61,8 +61,8 @@ func discoverProfileGroup(ctx context.Context, client cloudwatchClient, profiles
 	instances := make(map[string][]discoveredInstance, len(profiles))
 	var nextToken *string
 	for {
-		in := &cloudwatch.ListMetricsInput{Namespace: aws.String(profiles[0].Config.Namespace), NextToken: nextToken}
-		if useRecentlyActive {
+		in := &cloudwatch.ListMetricsInput{Namespace: aws.String(group.Namespace), NextToken: nextToken}
+		if group.RecentlyActive {
 			in.RecentlyActive = cwtypes.RecentlyActivePt3h
 		}
 		out, err := client.ListMetrics(ctx, in)
@@ -203,7 +203,7 @@ func discoverAll(
 			if err == nil {
 				cctx, cancel := withTimeout(ctx, timeout)
 				defer cancel()
-				result.Instances, err = discoverProfileGroup(cctx, client, group.Profiles, group.RecentlyActive)
+				result.Instances, err = discoverProfileGroup(cctx, client, group)
 			}
 			result.Err = err
 			results[i] = result
@@ -293,7 +293,10 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	var failures []operationFailure
 	for _, result := range results {
 		if result.Err != nil {
-			failures = append(failures, operationFailure{Target: result.Group.Target, Region: result.Group.Region, Err: result.Err})
+			failures = append(failures, operationFailure{
+				Target: result.Group.Target, Region: result.Group.Region,
+				Scope: fmt.Sprintf("namespace %q", result.Group.Namespace), Err: result.Err,
+			})
 		}
 	}
 	c.warnOperationFailures(logKeyDiscoveryTargetFailed, "discovery", " (using last-known instances)", failures)
@@ -353,23 +356,19 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 	if c.plan == nil {
 		return nil
 	}
-	resolved := make(map[string]struct{}, len(c.resolvedTargets))
-	for _, target := range c.resolvedTargets {
-		resolved[target.target.Name] = struct{}{}
-	}
 
 	index := make(map[string]int)
 	var groups []discoveryGroup
 	for _, scope := range c.plan.Scopes {
-		if _, ok := resolved[scope.Target.Name]; !ok {
+		if _, ok := c.resolvedByRef[scope.Target.Name]; !ok {
 			continue
 		}
 		recent := profileUsesRecentlyActive(scope.Profile.Config, c.recentlyActiveOnly())
 		key := fmt.Sprintf("%s\x00%s\x00%s\x00%t", scope.Target.Name, scope.Region, scope.Profile.Config.Namespace, recent)
 		if i, ok := index[key]; ok {
-			if !slices.ContainsFunc(groups[i].Profiles, func(profile cwprofiles.ResolvedProfile) bool { return profile.Name == scope.Profile.Name }) {
-				groups[i].Profiles = append(groups[i].Profiles, scope.Profile)
-			}
+			// Compiled scopes are unique by target/profile/region, so a profile can
+			// occur only once in a compatible discovery group.
+			groups[i].Profiles = append(groups[i].Profiles, scope.Profile)
 			continue
 		}
 		index[key] = len(groups)

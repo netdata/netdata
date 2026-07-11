@@ -93,6 +93,16 @@ func TestProfile_Validate(t *testing.T) {
 		"supported regions eusc partition valid": {
 			mutate: func(p *Profile) { p.SupportedRegions = []string{"eusc-de-east-1"} },
 		},
+		"supported region with surrounding whitespace invalid": {
+			mutate:      func(p *Profile) { p.SupportedRegions = []string{" us-east-1 "} },
+			wantErr:     true,
+			errContains: "canonical",
+		},
+		"supported region with uppercase invalid": {
+			mutate:      func(p *Profile) { p.SupportedRegions = []string{"US-EAST-1"} },
+			wantErr:     true,
+			errContains: "canonical",
+		},
 		"supported regions explicit empty invalid": {
 			mutate:      func(p *Profile) { p.SupportedRegions = []string{} },
 			wantErr:     true,
@@ -329,9 +339,9 @@ func TestProfile_Validate(t *testing.T) {
 	}
 }
 
-func TestProfile_SupportedRegionsNormalizeAndMatch(t *testing.T) {
+func TestProfile_SupportedRegionsCanonicalAndMatch(t *testing.T) {
 	p := validProfile()
-	p.SupportedRegions = []string{" US-EAST-1 ", "EU-West-1"}
+	p.SupportedRegions = []string{"us-east-1", "eu-west-1"}
 	require.NoError(t, p.Normalize("ec2"))
 	require.NoError(t, p.Validate("profile", "ec2"))
 	assert.Equal(t, []string{"us-east-1", "eu-west-1"}, p.SupportedRegions)

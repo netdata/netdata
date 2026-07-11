@@ -29,10 +29,10 @@ func TestCompileConfig_RuleSelectors(t *testing.T) {
 		Name: "services", Targets: []string{"base"}, Regions: []string{"us-east-1"},
 		Profiles: &ProfileSelectorConfig{Defaults: &falseValue, Include: []string{"ec2", "rds"}},
 	}}
-	runtime, _, err := compileTestConfig(t, cfg)
+	plan, _, err := compileTestConfig(t, cfg)
 	require.NoError(t, err)
-	assert.Len(t, runtime.Scopes, 2)
-	assert.Equal(t, []string{"ec2", "rds"}, []string{runtime.Scopes[0].Profile.Name, runtime.Scopes[1].Profile.Name})
+	assert.Len(t, plan.Scopes, 2)
+	assert.Equal(t, []string{"ec2", "rds"}, []string{plan.Scopes[0].Profile.Name, plan.Scopes[1].Profile.Name})
 }
 
 func TestCompileConfig_RuleSelectorDefaultsAndExclusions(t *testing.T) {
@@ -124,10 +124,10 @@ func scopeProfileNames(scopes []collectionScope) []string {
 func TestCompileConfig_DefaultUnsupportedRegionIsSkipped(t *testing.T) {
 	cfg := validBaseConfig()
 	cfg.Rules[0].Regions = []string{"eu-west-1"}
-	runtime, diagnostics, err := compileTestConfig(t, cfg)
+	plan, diagnostics, err := compileTestConfig(t, cfg)
 	require.NoError(t, err)
 	assert.NotEmpty(t, diagnostics)
-	for _, scope := range runtime.Scopes {
+	for _, scope := range plan.Scopes {
 		assert.NotEqual(t, "cloudfront", scope.Profile.Name)
 	}
 }
@@ -164,9 +164,9 @@ func TestCompileConfig_StaticScopeFirstRuleWins(t *testing.T) {
 		{Name: "first", Targets: []string{"base"}, Profiles: selector, Regions: []string{"us-east-1"}},
 		{Name: "second", Targets: []string{"base"}, Profiles: selector, Regions: []string{"us-east-1"}},
 	}
-	runtime, diagnostics, err := compileTestConfig(t, cfg)
+	plan, diagnostics, err := compileTestConfig(t, cfg)
 	require.NoError(t, err)
-	require.Len(t, runtime.Scopes, 1)
+	require.Len(t, plan.Scopes, 1)
 	assert.Contains(t, diagnostics[0], "shadowed")
 	assert.Contains(t, diagnostics[0], `rule "first" owns`)
 }
@@ -181,9 +181,9 @@ func TestCompileConfig_TargetMayUseStaticCredentialsForAssumeRole(t *testing.T) 
 		AssumeRole: &awsauth.AssumeRoleConfig{RoleARN: "arn:aws:iam::000000000000:role/netdata"},
 	}}
 	cfg.Rules[0].Targets = []string{"production"}
-	runtime, _, err := compileTestConfig(t, cfg)
+	plan, _, err := compileTestConfig(t, cfg)
 	require.NoError(t, err)
-	assert.Equal(t, "production", runtime.Targets[0].Identity.Ref)
+	assert.Equal(t, "production", plan.Targets[0].Identity.Ref)
 }
 
 func TestCompileConfig_RejectsMixedPartitionsPerTarget(t *testing.T) {
@@ -232,9 +232,9 @@ func TestCompileConfig_AggregatesShadowDiagnosticsPerRule(t *testing.T) {
 		{Name: "shadowed", Targets: refs, Profiles: selector, Regions: []string{"us-east-1"}},
 	}
 
-	runtime, diagnostics, err := compileTestConfig(t, cfg)
+	plan, diagnostics, err := compileTestConfig(t, cfg)
 	require.NoError(t, err)
-	assert.Len(t, runtime.Scopes, 16)
+	assert.Len(t, plan.Scopes, 16)
 	assert.Len(t, diagnostics, 1, "one later rule produces one bounded aggregate diagnostic")
 	assert.Contains(t, diagnostics[0], "16")
 }
@@ -260,8 +260,8 @@ func TestCompileConfig_RejectsCandidateScopeAmplification(t *testing.T) {
 		})
 	}
 
-	runtime, _, err := compileTestConfig(t, cfg)
-	assert.Nil(t, runtime)
+	plan, _, err := compileTestConfig(t, cfg)
+	assert.Nil(t, plan)
 	assert.ErrorContains(t, err, "candidate collection scopes exceed maximum")
 }
 
@@ -283,7 +283,7 @@ func TestCompileConfig_RejectsCompiledScopeOverflowWithoutPartialPlan(t *testing
 		}},
 	}}
 
-	runtime, _, err := compileTestConfig(t, cfg)
-	assert.Nil(t, runtime, "overflow must not return a partial runtime plan")
+	plan, _, err := compileTestConfig(t, cfg)
+	assert.Nil(t, plan, "overflow must not return a partial plan plan")
 	assert.ErrorContains(t, err, "compiled collection scopes exceed maximum")
 }

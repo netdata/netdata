@@ -78,7 +78,7 @@ The filename without `.yaml` is the profile name. In the example, a file named
 | `version` | yes | Profile schema version. The supported value is `v1`. |
 | `display_name` | yes | Human-readable service name. |
 | `namespace` | yes | CloudWatch namespace, such as `AWS/EC2`. |
-| `supported_regions` | no | Non-empty list of regions where this namespace publishes metrics. Omit for unrestricted regional services. |
+| `supported_regions` | no | Non-empty list of canonical lowercase region codes where this namespace publishes metrics. Omit for unrestricted regional services. |
 | `disabled` | no | When `true`, collection rules do not select the profile through their default set. A rule can still name it explicitly in `profiles.include`. |
 | `period` | yes | Default CloudWatch period in seconds. It must be a positive multiple of 60, up to 86400. |
 | `instance` | yes | Exact dimension set that identifies one collected resource. |

@@ -47,34 +47,45 @@ type ConfigOptions struct {
 	STSRegion string
 }
 
-func (c CredentialConfig) NormalizedType() string {
-	return strings.ToLower(strings.TrimSpace(c.Type))
-}
-
 func (c CredentialConfig) ValidateWithPath(path string) error {
 	typeField := fieldPath(path, "type")
-	typ := c.NormalizedType()
-	if typ == "" {
+	if strings.TrimSpace(c.Type) == "" {
 		return errors.New(typeField + " is required")
 	}
+	canonicalType := strings.ToLower(strings.TrimSpace(c.Type))
+	if c.Type != canonicalType {
+		return fmt.Errorf("%s must use canonical value %q", typeField, canonicalType)
+	}
 
-	switch typ {
+	switch c.Type {
 	case CredentialTypeDefault:
-		if strings.TrimSpace(c.AccessKeyID) != "" || strings.TrimSpace(c.SecretAccessKey) != "" || strings.TrimSpace(c.SessionToken) != "" {
+		if c.AccessKeyID != "" || c.SecretAccessKey != "" || c.SessionToken != "" {
 			return fmt.Errorf("%s %q cannot contain static credential fields", typeField, CredentialTypeDefault)
 		}
 	case CredentialTypeStatic:
-		var errs []error
-		if strings.TrimSpace(c.AccessKeyID) == "" {
-			errs = append(errs, errors.New(fieldPath(path, "access_key_id")+" is required"))
-		}
-		if strings.TrimSpace(c.SecretAccessKey) == "" {
-			errs = append(errs, errors.New(fieldPath(path, "secret_access_key")+" is required"))
+		errs := []error{
+			validateCredentialValue(fieldPath(path, "access_key_id"), c.AccessKeyID, true),
+			validateCredentialValue(fieldPath(path, "secret_access_key"), c.SecretAccessKey, true),
+			validateCredentialValue(fieldPath(path, "session_token"), c.SessionToken, false),
 		}
 		return errors.Join(errs...)
 	default:
 		return fmt.Errorf("%s %q is invalid: expected one of %q, %q",
 			typeField, c.Type, CredentialTypeDefault, CredentialTypeStatic)
+	}
+	return nil
+}
+
+func validateCredentialValue(path, value string, required bool) error {
+	canonical := strings.TrimSpace(value)
+	if canonical == "" {
+		if required {
+			return errors.New(path + " is required")
+		}
+		return nil
+	}
+	if value != canonical {
+		return errors.New(path + " must not contain surrounding whitespace")
 	}
 	return nil
 }
@@ -88,7 +99,7 @@ type Identity struct {
 }
 
 func NewIdentity(ref string, credentials CredentialConfig, role *AssumeRoleConfig) Identity {
-	id := Identity{Ref: strings.TrimSpace(ref), credentials: credentials}
+	id := Identity{Ref: ref, credentials: credentials}
 	if role != nil {
 		v := *role
 		id.role = &v
@@ -104,14 +115,25 @@ func NewIdentity(ref string, credentials CredentialConfig, role *AssumeRoleConfi
 //	assumed-role identity -> the base identity assumes the role via a regional STS
 //	  endpoint, cached.
 func (id Identity) NewConfig(ctx context.Context, opts ConfigOptions) (aws.Config, error) {
-	if strings.TrimSpace(id.Ref) == "" {
+	if id.Ref == "" {
 		return aws.Config{}, errors.New("target reference is required")
+	}
+	if id.Ref != strings.TrimSpace(id.Ref) {
+		return aws.Config{}, errors.New("target reference must not contain surrounding whitespace")
 	}
 	if err := id.credentials.ValidateWithPath("credentials"); err != nil {
 		return aws.Config{}, err
 	}
-	if id.role != nil && strings.TrimSpace(id.role.RoleARN) == "" {
-		return aws.Config{}, errors.New("assume_role.role_arn is required")
+	if id.role != nil {
+		if strings.TrimSpace(id.role.RoleARN) == "" {
+			return aws.Config{}, errors.New("assume_role.role_arn is required")
+		}
+		if id.role.RoleARN != strings.TrimSpace(id.role.RoleARN) {
+			return aws.Config{}, errors.New("assume_role.role_arn must not contain surrounding whitespace")
+		}
+		if id.role.ExternalID != strings.TrimSpace(id.role.ExternalID) {
+			return aws.Config{}, errors.New("assume_role.external_id must not contain surrounding whitespace")
+		}
 	}
 
 	region := strings.TrimSpace(opts.Region)
@@ -129,12 +151,12 @@ func (id Identity) NewConfig(ctx context.Context, opts ConfigOptions) (aws.Confi
 	if region != "" {
 		loadOpts = append(loadOpts, awsconfig.WithRegion(region))
 	}
-	if id.credentials.NormalizedType() == CredentialTypeStatic {
+	if id.credentials.Type == CredentialTypeStatic {
 		loadOpts = append(loadOpts, awsconfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(
-				strings.TrimSpace(id.credentials.AccessKeyID),
-				strings.TrimSpace(id.credentials.SecretAccessKey),
-				strings.TrimSpace(id.credentials.SessionToken),
+				id.credentials.AccessKeyID,
+				id.credentials.SecretAccessKey,
+				id.credentials.SessionToken,
 			),
 		))
 	}
@@ -156,10 +178,10 @@ func (id Identity) NewConfig(ctx context.Context, opts ConfigOptions) (aws.Confi
 			o.Region = stsRegion
 		}
 	})
-	provider := stscreds.NewAssumeRoleProvider(stsClient, strings.TrimSpace(id.role.RoleARN), func(o *stscreds.AssumeRoleOptions) {
+	provider := stscreds.NewAssumeRoleProvider(stsClient, id.role.RoleARN, func(o *stscreds.AssumeRoleOptions) {
 		o.RoleSessionName = "netdata" // stable session name for legible CloudTrail entries
-		if v := strings.TrimSpace(id.role.ExternalID); v != "" {
-			o.ExternalID = aws.String(v)
+		if id.role.ExternalID != "" {
+			o.ExternalID = aws.String(id.role.ExternalID)
 		}
 	})
 	base.Credentials = aws.NewCredentialsCache(provider)

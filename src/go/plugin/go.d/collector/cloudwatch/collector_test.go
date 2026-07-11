@@ -70,24 +70,32 @@ func configureExactRule(c *Collector, regions, profiles []string) {
 	c.applyDefaults()
 }
 
-func setSingleTargetRuntime(c *Collector, account string, regions []string, profiles []cwprofiles.ResolvedProfile) {
+func setSingleTargetPlan(c *Collector, account string, regions []string, profiles []cwprofiles.ResolvedProfile) {
 	identity := awsauth.NewIdentity("base", awsauth.CredentialConfig{Type: awsauth.CredentialTypeDefault}, nil)
 	target := &collectionTarget{Name: "base", Identity: identity, Regions: regions}
-	runtime := &collectionPlan{
+	plan := &collectionPlan{
 		Targets:  []*collectionTarget{target},
 		Profiles: profiles,
 	}
 	for _, region := range regions {
 		for _, profile := range profiles {
-			runtime.Scopes = append(runtime.Scopes, collectionScope{Target: target, Profile: profile, Region: region})
+			plan.Scopes = append(plan.Scopes, collectionScope{Target: target, Profile: profile, Region: region})
 		}
 	}
 	resolved := resolvedTarget{target: target, accountID: account}
-	c.plan = runtime
-	c.resolvedTargets = []resolvedTarget{resolved}
+	c.plan = plan
 	c.resolvedByRef = map[string]resolvedTarget{"base": resolved}
-	c.resolvedRefs = map[string]struct{}{"base": {}}
 	c.invalidateQueryPlan()
+}
+
+func resolvedTargetNames(c *Collector) []string {
+	var names []string
+	for _, target := range c.plan.Targets {
+		if _, ok := c.resolvedByRef[target.Name]; ok {
+			names = append(names, target.Name)
+		}
+	}
+	return names
 }
 
 func newTestCollector(t *testing.T, cfg Config, f *fakeSTS) *Collector {
@@ -177,8 +185,8 @@ func TestCollector_Check(t *testing.T) {
 		require.NoError(t, c.Init(context.Background()))
 
 		require.NoError(t, c.Check(context.Background()))
-		require.Len(t, c.resolvedTargets, 1)
-		assert.Equal(t, "000000000000", c.resolvedTargets[0].accountID)
+		require.Len(t, c.resolvedByRef, 1)
+		assert.Equal(t, "000000000000", c.resolvedByRef["base"].accountID)
 		assert.Equal(t, 1, f.calls)
 
 		require.NoError(t, c.Check(context.Background()))

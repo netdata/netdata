@@ -79,8 +79,7 @@ func (p Profile) SupportsRegion(region string) bool {
 	if len(p.SupportedRegions) == 0 {
 		return true
 	}
-	region = strings.ToLower(strings.TrimSpace(region))
-	return slices.Contains(p.SupportedRegions, region)
+	return slices.Contains(p.SupportedRegions, awsregion.Normalize(region))
 }
 
 // InstanceSpec declares the exact CloudWatch dimension-NAME set that defines an
@@ -160,9 +159,6 @@ func (m Metric) EmitZeroOnNoData(token string) bool {
 // to the fully-qualified series name (<baseName>.cpu_utilization_average), so stock
 // profiles can be authored without repeating the profile prefix.
 func (p *Profile) Normalize(baseName string) error {
-	for i := range p.SupportedRegions {
-		p.SupportedRegions[i] = strings.ToLower(strings.TrimSpace(p.SupportedRegions[i]))
-	}
 	visible := visibleSeriesForProfile(baseName, p.Metrics)
 	normalizeGroupSelectors(baseName, visible, &p.Template)
 	return nil
@@ -190,6 +186,10 @@ func (p Profile) Validate(prefix, baseName string) error {
 		}
 		seen := make(map[string]struct{}, len(p.SupportedRegions))
 		for i, region := range p.SupportedRegions {
+			if canonical := awsregion.Normalize(region); region != canonical {
+				errs = append(errs, fmt.Errorf("%s.supported_regions[%d]: %q is not canonical; use %q", prefix, i, region, canonical))
+				continue
+			}
 			if !awsregion.Valid(region) {
 				errs = append(errs, fmt.Errorf("%s.supported_regions[%d]: %q is not a valid AWS region", prefix, i, region))
 				continue

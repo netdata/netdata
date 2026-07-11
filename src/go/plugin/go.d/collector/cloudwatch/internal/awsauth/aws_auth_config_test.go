@@ -38,6 +38,14 @@ func TestCredentialConfig_ValidateWithPath(t *testing.T) {
 			cfg:     CredentialConfig{Type: CredentialTypeStatic, AccessKeyID: "AKIAEXAMPLE"},
 			wantErr: true,
 		},
+		"type must be canonical": {
+			cfg:     CredentialConfig{Type: " DEFAULT "},
+			wantErr: true,
+		},
+		"static values reject surrounding whitespace": {
+			cfg:     CredentialConfig{Type: CredentialTypeStatic, AccessKeyID: " AKIAEXAMPLE", SecretAccessKey: "secret "},
+			wantErr: true,
+		},
 		"missing type": {wantErr: true},
 		"invalid type": {cfg: CredentialConfig{Type: "bogus"}, wantErr: true},
 	}

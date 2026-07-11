@@ -82,9 +82,7 @@ type Collector struct {
 	newCatalog          func() (cwprofiles.Catalog, error) // nil => cwprofiles.DefaultCatalog
 
 	plan              *collectionPlan
-	resolvedTargets   []resolvedTarget
 	resolvedByRef     map[string]resolvedTarget
-	resolvedRefs      map[string]struct{} // target refs already resolved; the rest are retried each cycle
 	chartTemplateYAML string
 
 	clients        *clientCache[cloudwatchClient] // one per (target, region)
@@ -124,9 +122,7 @@ func (c *Collector) Cleanup(context.Context) {
 	// autodetection retry on the same instance) starts clean, mirroring
 	// azure_monitor. All ensure*/refresh paths rebuild lazily.
 	c.plan = nil
-	c.resolvedTargets = nil
 	c.resolvedByRef = nil
-	c.resolvedRefs = nil
 	c.chartTemplateYAML = ""
 	c.discovery = discoverySnapshot{}
 	c.queryPlan = nil

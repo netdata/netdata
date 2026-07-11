@@ -124,7 +124,7 @@ func TestInjectDimensionOptions_PreservesAuthoredOptions(t *testing.T) {
 	assert.True(t, opts.Hidden, "authored hidden flag is preserved")
 }
 
-func TestEnsureRuntime_BuildsValidChartTemplate(t *testing.T) {
+func TestEnsurePlan_BuildsValidChartTemplate(t *testing.T) {
 	c := New()
 	c.Config = validConfig()
 	c.applyDefaults()
@@ -147,7 +147,7 @@ func TestEnsureRuntime_BuildsValidChartTemplate(t *testing.T) {
 	collecttest.AssertChartTemplateSchema(t, c.chartTemplateYAML)
 }
 
-func TestEnsureRuntime_ExplicitAllBuildsValidChartTemplate(t *testing.T) {
+func TestEnsurePlan_ExplicitAllBuildsValidChartTemplate(t *testing.T) {
 	c := New()
 	c.newCatalog = cwprofiles.LoadFromDefaultDirs
 

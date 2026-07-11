@@ -81,8 +81,8 @@ func (pc *planCompiler) compile() (*collectionPlan, []string, error) {
 
 func (pc *planCompiler) compileTargets() {
 	for _, target := range pc.cfg.Targets {
-		name := strings.TrimSpace(target.Name)
-		credentialRef := strings.TrimSpace(target.Credentials)
+		name := target.Name
+		credentialRef := target.Credentials
 		compiled := &collectionTarget{
 			Name:     name,
 			Identity: awsauth.NewIdentity(name, pc.cfg.Credentials[credentialRef], target.AssumeRole),
@@ -91,14 +91,14 @@ func (pc *planCompiler) compileTargets() {
 		pc.targetsByRef[name] = compiled
 		pc.usedCredentials[credentialRef] = struct{}{}
 		if target.AssumeRole != nil {
-			pc.targetRoleARN[name] = strings.TrimSpace(target.AssumeRole.RoleARN)
+			pc.targetRoleARN[name] = target.AssumeRole.RoleARN
 		}
 	}
 }
 
 func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics, error) {
 	path := fmt.Sprintf("rules[%d]", index)
-	ruleName := strings.TrimSpace(rule.Name)
+	ruleName := rule.Name
 	diagnostics := ruleDiagnostics{ruleName: ruleName}
 
 	targets, err := resolveRuleTargets(path, rule.Targets, pc.targetsByRef)

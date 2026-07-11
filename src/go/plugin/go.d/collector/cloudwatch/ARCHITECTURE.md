@@ -464,8 +464,9 @@ verify current per-region prices on the CloudWatch pricing page.)
   with period alignment.
 - **No-data policy is per-metric** — a successfully-queried empty result records
   0 (`nil_as_zero`, defaulting on only for `rate: true` `sum`/`sample_count`) or
-  gaps; not-due / failed series re-emit their last value so long-period metrics
-  stay visible.
+  gaps. Not-due series and groups skipped by client/chunk transport failures
+  re-emit their last value; per-result `InternalError`, `Forbidden`, missing
+  results, and successful gap-policy no-data drop the stale value.
 - **Schedule advances only on success**, per (target, region, period).
 - **Fail-soft discovery** — carry forward on error; only a first-ever total
   failure is fatal.
