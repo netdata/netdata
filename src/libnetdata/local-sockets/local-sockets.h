@@ -978,10 +978,16 @@ static inline int local_sockets_libmnl_cb_error(const struct nlmsghdr *nlh, void
 
 static inline int local_sockets_libmnl_cb_done(const struct nlmsghdr *nlh, void *data __maybe_unused) {
     int err;
+    size_t payload_len = mnl_nlmsg_get_payload_len(nlh);
 
     // Dump errors are carried in NLMSG_DONE, which libmnl's default callback ignores.
-    if(mnl_nlmsg_get_payload_len(nlh) < sizeof(err))
+    if(!payload_len)
         return MNL_CB_STOP;
+
+    if(payload_len < sizeof(err)) {
+        errno = EBADMSG;
+        return MNL_CB_ERROR;
+    }
 
     memcpy(&err, mnl_nlmsg_get_payload(nlh), sizeof(err));
     if(err >= 0)

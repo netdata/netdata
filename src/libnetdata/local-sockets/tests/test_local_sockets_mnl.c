@@ -58,6 +58,17 @@ static bool test_done_error(void) {
     return expect_result(result, MNL_CB_ERROR, errno, ENOENT, "error-bearing NLMSG_DONE");
 }
 
+static bool test_truncated_done(void) {
+    char buf[256] = { 0 };
+    struct nlmsghdr *nlh = mnl_nlmsg_put_header(buf);
+    nlh->nlmsg_type = NLMSG_DONE;
+    nlh->nlmsg_len++;
+
+    errno = 0;
+    int result = local_sockets_libmnl_cb_run(buf, nlh->nlmsg_len, 0, 0, NULL, NULL);
+    return expect_result(result, MNL_CB_ERROR, errno, EBADMSG, "truncated NLMSG_DONE");
+}
+
 static bool test_nlmsg_error(void) {
     char buf[256] = { 0 };
     struct nlmsgerr error = { .error = -EOPNOTSUPP };
@@ -110,6 +121,7 @@ int main(void) {
     ok = test_done_without_payload() && ok;
     ok = test_done_success() && ok;
     ok = test_done_error() && ok;
+    ok = test_truncated_done() && ok;
     ok = test_nlmsg_error() && ok;
     ok = test_nlmsg_error_ack() && ok;
     ok = test_truncated_nlmsg_error() && ok;
