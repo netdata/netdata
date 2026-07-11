@@ -111,12 +111,12 @@ void mcp_websocket_on_message(struct websocket_server_client *wsc, const char *m
     }
 
     if (json_object_is_type(request, json_type_array)) {
-        int len = (int)json_object_array_length(request);
+        size_t len = json_object_array_length(request);
         BUFFER **responses = NULL;
         size_t responses_used = 0;
         size_t responses_size = 0;
 
-        for (int i = 0; i < len; i++) {
+        for (size_t i = 0; i < len; i++) {
             struct json_object *req_item = json_object_array_get_idx(request, i);
             BUFFER *resp_item = mcp_jsonrpc_process_single_request(mcpc, req_item, NULL);
             if (resp_item) {
