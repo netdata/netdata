@@ -4,6 +4,7 @@ package cloudwatch
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -147,11 +148,12 @@ func (c *Collector) buildQueryPlan() []plannedQuery {
 }
 
 func finalSeriesKey(seriesName string, labels []metrix.Label) string {
-	key := seriesName
+	var key strings.Builder
+	key.WriteString(seriesName)
 	for _, label := range labels {
-		key += "\x00" + label.Key + "\x00" + label.Value
+		key.WriteString("\x00" + label.Key + "\x00" + label.Value)
 	}
-	return key
+	return key.String()
 }
 
 // instanceLabelsAndDims builds the metrix identity labels

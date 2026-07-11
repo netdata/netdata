@@ -80,11 +80,9 @@ func TestClientCache_DistinctKeysBuildConcurrently(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for _, target := range []string{"first", "second"} {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			_, _ = cache.forTargetRegion(context.Background(), target, "us-east-1")
-		}()
+		})
 	}
 
 	allStarted := true
@@ -123,25 +121,21 @@ func TestClientCache_CoalescesConcurrentSameKey(t *testing.T) {
 			results := make(chan string, callers)
 			errs := make(chan error, callers)
 			var wg sync.WaitGroup
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				result, err := cache.forTargetRegion(context.Background(), "base", "us-east-1")
 				results <- result
 				errs <- err
-			}()
+			})
 			<-started
 
 			entered := make(chan struct{}, callers-1)
 			for range callers - 1 {
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
+				wg.Go(func() {
 					ctx := &observedDoneContext{Context: context.Background(), entered: entered}
 					result, err := cache.forTargetRegion(ctx, "base", "us-east-1")
 					results <- result
 					errs <- err
-				}()
+				})
 			}
 			for range callers - 1 {
 				<-entered
