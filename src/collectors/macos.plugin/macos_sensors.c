@@ -1165,6 +1165,10 @@ static bool macos_sensors_collect_hid_source(const struct macos_hid_sensor_sourc
         return true;
 
     CFIndex count = CFArrayGetCount(services);
+    if (!count) {
+        CFRelease(services);
+        return true;
+    }
 
     // Identity stability: when a service's product name is unique within this
     // kind, the product name alone is the sensor identity. Appending per-boot
@@ -1173,7 +1177,9 @@ static bool macos_sensors_collect_hid_source(const struct macos_hid_sensor_sourc
     // Known trade-off: if a duplicate product appears mid-run (hot-plug), the
     // first device's identity changes from bare product to a suffixed one -
     // acceptable, since built-in sensors do not hot-plug in practice.
-    char (*products)[128] = callocz((size_t)count ? (size_t)count : 1, sizeof(*products));
+    // the O(count^2) duplicate scan below is fine: Apple Silicon exposes at
+    // most a few dozen IOHID services per kind
+    char (*products)[128] = callocz((size_t)count, sizeof(*products));
     for (CFIndex i = 0; i < count; i++) {
         IOHIDServiceClientRef svc = (IOHIDServiceClientRef)CFArrayGetValueAtIndex(services, i);
         if (svc && macos_sensors_hid_product_name(svc, products[i], sizeof(products[i])))

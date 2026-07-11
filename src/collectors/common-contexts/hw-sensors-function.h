@@ -36,114 +36,84 @@
 // The registration-follows-discovery rule also applies to every producer:
 // the function is only registered/declared once at least one sensor exists.
 
-static inline void hw_sensors_function_columns(BUFFER *wb) {
-    buffer_json_member_add_object(wb, "columns");
-    {
-        size_t field_id = 0;
+typedef struct {
+    const char *id;
+    const char *name;
+    RRDF_FIELD_TYPE type;
+    RRDF_FIELD_TRANSFORM transform;
+    int decimal_points;
+    const char *units;
+    RRDF_FIELD_SORT sort;
+    RRDF_FIELD_SUMMARY summary;
+    RRDF_FIELD_FILTER filter;
+    RRDF_FIELD_OPTIONS options;
+} hw_sensors_function_column;
 
-        buffer_rrdf_table_add_field(wb, field_id++, "Chart", "Per-Sensor Chart ID",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Label", "Sensor Label",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Kind", "Sensor Kind",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Subsystem", "Hardware Subsystem",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Source", "Discovery Source",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Device", "Device / Chip",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Sensor", "Sensor Identifier",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Reading", "Current Reading",
-                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                3, NULL, NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_VISIBLE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Units", "Reading Units",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "State", "Sensor State",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_VISIBLE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Charts", "Charting Mode",
-                RRDF_FIELD_TYPE_STRING, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NONE,
-                0, NULL, NAN, RRDF_FIELD_SORT_ASCENDING, NULL,
-                RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Count", "Sensors Count",
-                RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                0, "sensors", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Temperature", "Temperature",
-                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                2, "degrees Celsius", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Fan", "Fan Speed",
-                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                0, "rpm", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Voltage", "Voltage",
-                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                3, "V", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Current", "Current",
-                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                3, "A", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
-        buffer_rrdf_table_add_field(wb, field_id++, "Power", "Power",
-                RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_VISUAL_VALUE, RRDF_FIELD_TRANSFORM_NUMBER,
-                2, "W", NAN, RRDF_FIELD_SORT_DESCENDING, NULL,
-                RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
-                RRDF_FIELD_OPTS_NONE,
-                NULL);
+static inline void hw_sensors_function_columns(BUFFER *wb) {
+    static const hw_sensors_function_column columns[] = {
+        {"Chart", "Per-Sensor Chart ID", RRDF_FIELD_TYPE_STRING, RRDF_FIELD_TRANSFORM_NONE, 0, NULL,
+         RRDF_FIELD_SORT_ASCENDING, RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+         RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_UNIQUE_KEY | RRDF_FIELD_OPTS_STICKY},
+        {"Label", "Sensor Label", RRDF_FIELD_TYPE_STRING, RRDF_FIELD_TRANSFORM_NONE, 0, NULL,
+         RRDF_FIELD_SORT_ASCENDING, RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+         RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH},
+        {"Kind", "Sensor Kind", RRDF_FIELD_TYPE_STRING, RRDF_FIELD_TRANSFORM_NONE, 0, NULL,
+         RRDF_FIELD_SORT_ASCENDING, RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+         RRDF_FIELD_OPTS_VISIBLE},
+        {"Subsystem", "Hardware Subsystem", RRDF_FIELD_TYPE_STRING, RRDF_FIELD_TRANSFORM_NONE, 0, NULL,
+         RRDF_FIELD_SORT_ASCENDING, RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+         RRDF_FIELD_OPTS_VISIBLE},
+        {"Source", "Discovery Source", RRDF_FIELD_TYPE_STRING, RRDF_FIELD_TRANSFORM_NONE, 0, NULL,
+         RRDF_FIELD_SORT_ASCENDING, RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+         RRDF_FIELD_OPTS_NONE},
+        {"Device", "Device / Chip", RRDF_FIELD_TYPE_STRING, RRDF_FIELD_TRANSFORM_NONE, 0, NULL,
+         RRDF_FIELD_SORT_ASCENDING, RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+         RRDF_FIELD_OPTS_NONE},
+        {"Sensor", "Sensor Identifier", RRDF_FIELD_TYPE_STRING, RRDF_FIELD_TRANSFORM_NONE, 0, NULL,
+         RRDF_FIELD_SORT_ASCENDING, RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+         RRDF_FIELD_OPTS_NONE},
+        {"Reading", "Current Reading", RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_TRANSFORM_NUMBER, 3, NULL,
+         RRDF_FIELD_SORT_DESCENDING, RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+         RRDF_FIELD_OPTS_VISIBLE},
+        {"Units", "Reading Units", RRDF_FIELD_TYPE_STRING, RRDF_FIELD_TRANSFORM_NONE, 0, NULL,
+         RRDF_FIELD_SORT_ASCENDING, RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+         RRDF_FIELD_OPTS_VISIBLE | RRDF_FIELD_OPTS_FULL_WIDTH},
+        {"State", "Sensor State", RRDF_FIELD_TYPE_STRING, RRDF_FIELD_TRANSFORM_NONE, 0, NULL,
+         RRDF_FIELD_SORT_ASCENDING, RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+         RRDF_FIELD_OPTS_VISIBLE},
+        {"Charts", "Charting Mode", RRDF_FIELD_TYPE_STRING, RRDF_FIELD_TRANSFORM_NONE, 0, NULL,
+         RRDF_FIELD_SORT_ASCENDING, RRDF_FIELD_SUMMARY_COUNT, RRDF_FIELD_FILTER_MULTISELECT,
+         RRDF_FIELD_OPTS_NONE},
+        {"Count", "Sensors Count", RRDF_FIELD_TYPE_INTEGER, RRDF_FIELD_TRANSFORM_NUMBER, 0, "sensors",
+         RRDF_FIELD_SORT_DESCENDING, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+         RRDF_FIELD_OPTS_NONE},
+        {"Temperature", "Temperature", RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_TRANSFORM_NUMBER, 2, "degrees Celsius",
+         RRDF_FIELD_SORT_DESCENDING, RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+         RRDF_FIELD_OPTS_NONE},
+        {"Fan", "Fan Speed", RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_TRANSFORM_NUMBER, 0, "rpm",
+         RRDF_FIELD_SORT_DESCENDING, RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+         RRDF_FIELD_OPTS_NONE},
+        {"Voltage", "Voltage", RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_TRANSFORM_NUMBER, 3, "V",
+         RRDF_FIELD_SORT_DESCENDING, RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+         RRDF_FIELD_OPTS_NONE},
+        {"Current", "Current", RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_TRANSFORM_NUMBER, 3, "A",
+         RRDF_FIELD_SORT_DESCENDING, RRDF_FIELD_SUMMARY_MAX, RRDF_FIELD_FILTER_NONE,
+         RRDF_FIELD_OPTS_NONE},
+        {"Power", "Power", RRDF_FIELD_TYPE_BAR_WITH_INTEGER, RRDF_FIELD_TRANSFORM_NUMBER, 2, "W",
+         RRDF_FIELD_SORT_DESCENDING, RRDF_FIELD_SUMMARY_SUM, RRDF_FIELD_FILTER_NONE,
+         RRDF_FIELD_OPTS_NONE},
+    };
+
+    buffer_json_member_add_object(wb, "columns");
+
+    for (size_t i = 0; i < sizeof(columns) / sizeof(columns[0]); i++) {
+        const hw_sensors_function_column *c = &columns[i];
+        buffer_rrdf_table_add_field(wb, i, c->id, c->name,
+                c->type, RRDF_FIELD_VISUAL_VALUE, c->transform,
+                c->decimal_points, c->units, NAN, c->sort, NULL,
+                c->summary, c->filter, c->options, NULL);
     }
+
     buffer_json_object_close(wb); // columns
 }
 

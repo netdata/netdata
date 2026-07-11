@@ -248,6 +248,7 @@ int main(int argc, char **argv)
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
 
+    int rc = 0;
     for (iteration = 0; iteration < 86400 && !__atomic_load_n(&debugfs_plugin_exit, __ATOMIC_ACQUIRE); iteration++) {
         heartbeat_next(&hb);
         int enabled = 0;
@@ -264,7 +265,8 @@ int main(int argc, char **argv)
 
         if (!enabled) {
             netdata_log_info("all modules are disabled, exiting...");
-            return 1;
+            rc = 1;
+            break;
         }
 
         netdata_mutex_lock(&stdout_mutex);
@@ -274,9 +276,16 @@ int main(int argc, char **argv)
 
         if (ferror(stdout) && errno == EPIPE) {
             netdata_log_error("error writing to stdout: EPIPE. Exiting...");
-            return 1;
+            rc = 1;
+            break;
         }
     }
+
+    // stop serving functions before tearing down the modules' state: a
+    // worker running concurrently with shutdown could otherwise write a
+    // function result after the terminal EXIT marker, or use freed state
+    functions_evloop_cancel_threads(wg);
+    functions_evloop_join_threads(wg);
 
     module_libsensors_cleanup();
 
@@ -290,5 +299,5 @@ int main(int argc, char **argv)
     if (__atomic_load_n(&debugfs_plugin_exit, __ATOMIC_ACQUIRE))
         return debugfs_exit_status;
 
-    return 0;
+    return rc;
 }

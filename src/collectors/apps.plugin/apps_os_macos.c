@@ -245,6 +245,13 @@ STRING *apps_os_tree_target_name_macos(struct pid_stat *p) {
         size_t len = e ? (size_t)(e - s) : strlen(s);
 
         if(len) {
+            // precedence is intentionally asymmetric:
+            // - an application counts only when NOT inside a framework
+            //   (frameworks embed helper .apps that belong to the framework)
+            //   and the OUTERMOST such application wins (helpers inside an
+            //   app belong to the app);
+            // - frameworks keep the INNERMOST match (the actual owner);
+            // - when both matched, the application wins (see below).
             if(component_has_suffix(s, len, ".framework")) {
                 // keep the innermost framework
                 fw = s;
