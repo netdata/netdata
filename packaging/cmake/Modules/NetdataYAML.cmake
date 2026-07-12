@@ -56,7 +56,10 @@ macro(netdata_detect_libyaml)
                 netdata_bundle_libyaml()
                 set(ENABLE_BUNDLED_LIBYAML True PARENT_SCOPE)
                 set(NETDATA_YAML_LDFLAGS yaml)
-                get_target_property(NETDATA_YAML_INCLUDE_DIRS yaml INTERFACE_INCLUDE_DIRECTORIES)
+                get_target_property(NETDATA_YAML_TARGET_INCLUDE_DIRS yaml INTERFACE_INCLUDE_DIRECTORIES)
+                # Pinned libyaml exposes yaml.h first and its generated config.h second.
+                # Prepend only the public headers; the yaml target propagates the full interface.
+                list(GET NETDATA_YAML_TARGET_INCLUDE_DIRS 0 NETDATA_YAML_INCLUDE_DIRS)
                 get_target_property(NETDATA_YAML_CFLAGS_OTHER yaml INTERFACE_COMPILE_DEFINITIONS)
         else()
                 set(NETDATA_YAML_LDFLAGS ${YAML_LDFLAGS})
