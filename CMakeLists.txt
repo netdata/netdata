@@ -1559,6 +1559,8 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/mem-pgfaults.h
         src/collectors/common-contexts/mem-available.h
         src/collectors/common-contexts/power-supply.h
+        src/collectors/common-contexts/hw-sensors.h
+        src/collectors/common-contexts/hw-sensors-function.h
 )
 
 set(INTERCOMMUNICATION_COLLECTORS_FILES
@@ -1961,6 +1963,15 @@ set(MACOS_PLUGIN_FILES
         src/collectors/macos.plugin/macos_sysctl.c
         src/collectors/macos.plugin/macos_mach_smi.c
         src/collectors/macos.plugin/macos_fw.c
+        src/collectors/macos.plugin/macos_power.c
+        src/collectors/macos.plugin/macos_iohid.c
+        src/collectors/macos.plugin/macos_iohid.h
+        src/collectors/macos.plugin/macos_smc.c
+        src/collectors/macos.plugin/macos_smc.h
+        src/collectors/macos.plugin/macos_gpu.c
+        src/collectors/macos.plugin/macos_sensors.c
+        src/collectors/macos.plugin/macos_powermetrics.c
+        src/collectors/macos.plugin/macos_nvme.c
 )
 
 set(FREEBSD_PLUGIN_FILES
