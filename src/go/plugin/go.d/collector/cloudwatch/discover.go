@@ -298,6 +298,31 @@ func (s discoverySnapshot) totalInstances() int {
 	return n
 }
 
+func (s discoverySnapshot) validateRetainedBounds() error {
+	instances := 0
+	retainedBytes := 0
+	for _, discovered := range s.Instances {
+		if len(discovered) > maxCandidateInstancesPerRefresh-instances {
+			return safeCollectorErrorf(
+				"CloudWatch discovery merged snapshot retains more than %d candidate instances",
+				maxCandidateInstancesPerRefresh,
+			)
+		}
+		instances += len(discovered)
+		for _, instance := range discovered {
+			weight := retainedDiscoveredInstanceBytes(instance)
+			if weight > maxRetainedCandidateBytesPerRefresh-retainedBytes {
+				return safeCollectorErrorf(
+					"CloudWatch discovery merged snapshot retains more than %d MiB of candidate instance data",
+					maxRetainedCandidateBytesPerRefresh>>20,
+				)
+			}
+			retainedBytes += weight
+		}
+	}
+	return nil
+}
+
 // discoveryGroupResult is one shared ListMetrics scan. Keeping failures at the
 // group boundary prevents one upstream error from expanding into one warning per
 // participating profile.
@@ -334,9 +359,9 @@ func discoverAll(
 		runs[i].scanner = newDiscoveryGroupScanner(group)
 	}
 
-	// Complete the first-page phase before scheduling any continuation. This
-	// makes the budget's per-group reservation real rather than merely numeric:
-	// one fast, deep namespace cannot consume another group's first operation.
+	// Complete the first-page phase before scheduling any continuation. Every
+	// group that reaches ListMetrics gets its first admitted operation before a
+	// fast, deep namespace can consume the remaining operation budget.
 	p := pool.New().WithMaxGoroutines(max(1, maxConcurrency))
 	for i, group := range groups {
 		p.Go(func() {
@@ -364,8 +389,8 @@ func discoverAll(
 		return results, err
 	}
 
-	// Continuations share only the operation budget left after all executable
-	// groups have completed their first operation.
+	// Continuations share only the operation budget left after every non-skipped,
+	// successfully client-resolved group has attempted its first operation.
 	p = pool.New().WithMaxGoroutines(max(1, maxConcurrency))
 	for i, group := range groups {
 		if results[i].Err != nil || runs[i].scanner.done {
@@ -396,8 +421,9 @@ func discoverAll(
 
 // buildDiscoverySnapshot assembles a snapshot from namespace-group results and
 // returns the number of failed groups. Failed groups retain their previous
-// profile instances; successful groups replace theirs.
-func buildDiscoverySnapshot(results []discoveryGroupResult, prev map[discoveryKey][]discoveredInstance, now time.Time, refreshEvery int) (discoverySnapshot, int) {
+// profile instances; successful groups replace theirs. The merged effective
+// snapshot must fit the same retained-state bounds as a fresh scan.
+func buildDiscoverySnapshot(results []discoveryGroupResult, prev map[discoveryKey][]discoveredInstance, now time.Time, refreshEvery int) (discoverySnapshot, int, error) {
 	snap := discoverySnapshot{
 		Instances: make(map[discoveryKey][]discoveredInstance),
 		FetchedAt: now,
@@ -423,7 +449,10 @@ func buildDiscoverySnapshot(results []discoveryGroupResult, prev map[discoveryKe
 			}
 		}
 	}
-	return snap, failures
+	if err := snap.validateRetainedBounds(); err != nil {
+		return discoverySnapshot{}, failures, err
+	}
+	return snap, failures, nil
 }
 
 // highInstanceCountWarn is the discovered-instance count at or above which the
@@ -446,8 +475,19 @@ func (c *Collector) markDiscoveryStale() {
 	c.discovery.ExpiresAt = time.Time{}
 }
 
+func (c *Collector) discardDiscoveryRefresh(err error) error {
+	completedAt := c.now()
+	c.Limit(logKeyDiscoveryTargetFailed+"_aggregate", 1, recurringLogEvery).
+		Warningf("CloudWatch discovery refresh was discarded atomically: %v", sanitizeAWSError(err))
+	if c.discovery.FetchedAt.IsZero() {
+		return fmt.Errorf("CloudWatch discovery refresh failed: %w", sanitizeAWSError(err))
+	}
+	c.discovery.ExpiresAt = completedAt.Add(time.Duration(c.Discovery.RefreshEvery) * time.Second)
+	return nil
+}
+
 // refreshDiscovery refreshes the discovery snapshot when its TTL has expired.
-// Per-target failures are logged and tolerated; a total failure keeps the
+// Per-target failures are logged and tolerated; an aggregate failure keeps the
 // previous snapshot, or errors on the very first pass when there is none.
 func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	now := c.now()
@@ -468,18 +508,14 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 		return err
 	}
 	if aggregateErr != nil {
-		completedAt := c.now()
-		c.Limit(logKeyDiscoveryTargetFailed+"_aggregate", 1, recurringLogEvery).
-			Warningf("CloudWatch discovery refresh was discarded atomically: %v", sanitizeAWSError(aggregateErr))
-		if c.discovery.FetchedAt.IsZero() {
-			return fmt.Errorf("CloudWatch discovery refresh failed: %w", sanitizeAWSError(aggregateErr))
-		}
-		c.discovery.ExpiresAt = completedAt.Add(time.Duration(c.Discovery.RefreshEvery) * time.Second)
-		return nil
+		return c.discardDiscoveryRefresh(aggregateErr)
 	}
 	// Failed targets carry forward their previous instances, so a transient
 	// per-region/namespace failure does not drop series (spec: keep last snapshot).
-	snap, failedGroups := buildDiscoverySnapshot(results, c.discovery.Instances, now, c.Discovery.RefreshEvery)
+	snap, failedGroups, err := buildDiscoverySnapshot(results, c.discovery.Instances, now, c.Discovery.RefreshEvery)
+	if err != nil {
+		return c.discardDiscoveryRefresh(err)
+	}
 
 	var failures []operationFailure
 	for _, result := range results {

@@ -194,10 +194,12 @@ Discovery then finds which *instances* of those profiles exist per target and re
   filtered ListMetrics stream beside the unfiltered superset.
   `discoverAll` fans out over those groups concurrently
   (bounded by `apiConcurrency`), with one CloudWatch client per (target, region).
-- `discoverAll` uses two phases: every executable group runs its first `ListMetrics`
-  operation before any group may request a continuation page. Continuations then
-  share the remaining job-level operation budget. Explicit authorization denial
-  cancels queued namespace work only in the same `(target, region)` lane.
+- `discoverAll` uses two phases: every non-skipped group that resolves a client
+  attempts its first admitted `ListMetrics` operation before any group may request
+  a continuation page. Skipped groups and client-resolution failures consume no
+  operation budget. Continuations share the remaining job-level budget. Explicit
+  authorization denial cancels queued namespace work only in the same
+  `(target, region)` lane.
 - Each `discoveryGroupScanner` pages one shared namespace and applies an index
   compiled from each profile's canonical exact dimension-name set.
   Each returned metric's dimensions are canonicalized once; profiles with a different
@@ -223,18 +225,22 @@ Discovery then finds which *instances* of those profiles exist per target and re
   operations, 50,000 scanned metrics, 1,000,000 residual matches, 20,000 retained
   candidates, and 64 MiB of conservatively weighted retained-candidate storage.
   The configured `timeout` is shared by the whole discovery stage. Admission happens
-  before each continuation call; the AWS SDK may still retry an admitted operation
-  up to five wire attempts.
+  immediately before every actual first-page or continuation call; the AWS SDK may
+  still retry an admitted operation up to five wire attempts.
 - **Snapshot + carry-forward**: `buildDiscoverySnapshot` stores instances for
   successful targets and **carries forward the previous instances for errored
-  targets**, so a transient per-region/namespace failure never drops series.
-  Only a first-ever pass where every scope errors is fatal; after any
-  snapshot exists, discovery errors are warnings.
-- **Aggregate discovery failure is atomic**: budget or stage-timeout exhaustion
-  discards all results from that refresh. An existing snapshot and its dependent
-  tag/query/observation state remain active, with the next attempt scheduled after
-  `discovery.refresh_every`. A first-ever aggregate failure is returned to the job
-  runner; parent cancellation changes neither snapshot state nor retry scheduling.
+  targets**, so a transient per-region/namespace failure never drops series. The
+  merged effective snapshot is rechecked against the aggregate candidate-count and
+  weighted-memory bounds before installation, preventing rotating partial failures
+  from accumulating retained groups beyond the refresh envelope. Only a first-ever
+  pass where every scope errors is fatal; after any snapshot exists, discovery
+  errors are warnings.
+- **Aggregate discovery failure is atomic**: budget/stage-timeout exhaustion or a
+  merged-snapshot bound violation discards all results from that refresh. An existing
+  snapshot and its dependent tag/query/observation state remain active, with the next
+  attempt scheduled after `discovery.refresh_every`. A first-ever aggregate failure
+  is returned to the job runner; parent cancellation changes neither snapshot state
+  nor retry scheduling.
 - A warning fires at ≥1000 discovered instances as an early cost signal. The
   separate final-instance limit is applied later, after tag filtering and overlap.
 

@@ -417,12 +417,16 @@ type nsCloudWatch struct {
 	mu    sync.Mutex
 	byNS  map[string][]cwtypes.Metric
 	calls int
+	err   error
 }
 
 func (f *nsCloudWatch) ListMetrics(_ context.Context, in *cloudwatch.ListMetricsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.calls++
+	if f.err != nil {
+		return nil, f.err
+	}
 	return &cloudwatch.ListMetricsOutput{Metrics: f.byNS[aws.ToString(in.Namespace)]}, nil
 }
 
@@ -463,7 +467,8 @@ func TestDiscoverAll(t *testing.T) {
 	results := discoverAllForTest(t, newClient, groups, 5)
 	require.Len(t, results, 4)
 
-	snap, failures := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
+	snap, failures, err := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
+	require.NoError(t, err)
 	require.Zero(t, failures)
 
 	assert.Equal(t, 4, snap.totalInstances())
@@ -506,7 +511,8 @@ func TestDiscoverAll_ClientBuildErrorIsPerTarget(t *testing.T) {
 		{Target: "base", Region: "bad-region", Namespace: "AWS/EC2", RecentlyActive: true, Profiles: []cwprofiles.ResolvedProfile{ec2}},
 	}, 5)
 
-	snap, failures := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
+	snap, failures, err := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
+	require.NoError(t, err)
 	require.Equal(t, 1, failures)
 	assert.Equal(t, 1, snap.totalInstances())
 	assert.Contains(t, snap.Instances, discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"})
@@ -623,10 +629,26 @@ func TestBuildDiscoverySnapshot_FailSoftCarriesForward(t *testing.T) {
 		{Group: discoveryGroup{Target: "base", Region: "us-west-2", Profiles: []cwprofiles.ResolvedProfile{profile}}, Err: errors.New("throttled")},
 	}
 
-	snap, failures := buildDiscoverySnapshot(results, prev, time.Unix(1000, 0), 300)
+	snap, failures, err := buildDiscoverySnapshot(results, prev, time.Unix(1000, 0), 300)
+	require.NoError(t, err)
 	require.Equal(t, 1, failures)
 	assert.Equal(t, [][]string{{"i-2"}}, dimValues(snap.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}]), "succeeded target is refreshed")
 	assert.Equal(t, [][]string{{"i-9"}}, dimValues(snap.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-west-2"}]), "failed target carries forward last-known instances")
+}
+
+func TestDiscoverySnapshot_WeightedRetainedBound(t *testing.T) {
+	values := make([]string, 30)
+	for i := range values {
+		values[i] = strings.Repeat("x", 1024)
+	}
+	instance := discoveredInstance{DimensionValues: values}
+	instances := make([]discoveredInstance, maxRetainedCandidateBytesPerRefresh/retainedDiscoveredInstanceBytes(instance)+1)
+	for i := range instances {
+		instances[i] = instance
+	}
+	snap := discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{{}: instances}}
+
+	assert.ErrorContains(t, snap.validateRetainedBounds(), "more than 64 MiB")
 }
 
 func TestDiscoverAll_CoalescesAuthorizationFailureWithinTargetRegion(t *testing.T) {
@@ -983,6 +1005,68 @@ func TestCollector_refreshDiscovery_AggregateFailureIsAtomicWithSnapshot(t *test
 	assert.Equal(t, sentinel, c.queryPlan[0].key)
 	assert.False(t, c.planDirty)
 	assert.Equal(t, float64(42), c.observations.queries[sentinel].observation)
+}
+
+func TestCollector_refreshDiscovery_MergedSnapshotBoundsAreAtomicAcrossPartialFailures(t *testing.T) {
+	metrics := func(prefix string, count int) []cwtypes.Metric {
+		got := make([]cwtypes.Metric, count)
+		for i := range got {
+			got[i] = mkMetric("CPUUtilization", "InstanceId", fmt.Sprintf("%s-%d", prefix, i))
+		}
+		return got
+	}
+
+	base := time.Unix(1000, 0)
+	now := base
+	c, fakes := newDiscoveryTestCollector(map[string]map[string][]cwtypes.Metric{
+		"us-east-1": {"AWS/EC2": metrics("east-initial", maxCandidateInstancesPerRefresh/2)},
+		"us-west-2": {"AWS/EC2": metrics("west-initial", maxCandidateInstancesPerRefresh/2)},
+	})
+	c.now = func() time.Time { return now }
+	require.NoError(t, c.refreshDiscovery(context.Background()))
+	require.Equal(t, maxCandidateInstancesPerRefresh, c.discovery.totalInstances())
+
+	initialFetchedAt := c.discovery.FetchedAt
+	eastKey := discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}
+	westKey := discoveryKey{Target: "base", Profile: "ec2", Region: "us-west-2"}
+	sentinel := testStructuralID("sentinel")
+	c.tagFetchPlan = []tagFetchGroup{{key: tagFetchKey{target: "sentinel"}}}
+	c.queryPlan = []plannedQuery{{key: sentinel}}
+	c.planDirty = false
+	c.observations.queries[sentinel] = queryState{hasObservation: true, observation: 42}
+
+	assertAtomicDiscard := func() {
+		t.Helper()
+		require.NoError(t, c.refreshDiscovery(context.Background()))
+		assert.Equal(t, maxCandidateInstancesPerRefresh, c.discovery.totalInstances())
+		require.Len(t, c.discovery.Instances[eastKey], maxCandidateInstancesPerRefresh/2)
+		require.Len(t, c.discovery.Instances[westKey], maxCandidateInstancesPerRefresh/2)
+		assert.Equal(t, "east-initial-0", c.discovery.Instances[eastKey][0].DimensionValues[0])
+		assert.Equal(t, "west-initial-0", c.discovery.Instances[westKey][0].DimensionValues[0])
+		assert.Equal(t, initialFetchedAt, c.discovery.FetchedAt)
+		assert.Equal(t, now.Add(time.Duration(c.Discovery.RefreshEvery)*time.Second), c.discovery.ExpiresAt)
+		require.Len(t, c.tagFetchPlan, 1)
+		assert.Equal(t, "sentinel", c.tagFetchPlan[0].key.target)
+		require.Len(t, c.queryPlan, 1)
+		assert.Equal(t, sentinel, c.queryPlan[0].key)
+		assert.False(t, c.planDirty)
+		assert.Equal(t, float64(42), c.observations.queries[sentinel].observation)
+	}
+
+	// A successful replacement plus the failed region's retained instances would
+	// install 20,001 candidates unless the merged snapshot is checked atomically.
+	now = base.Add(301 * time.Second)
+	fakes["us-east-1"].byNS["AWS/EC2"] = metrics("east-replacement", maxCandidateInstancesPerRefresh/2+1)
+	fakes["us-west-2"].err = errors.New("throttled")
+	assertAtomicDiscard()
+
+	// Reverse the failure on the next refresh. Rotating failures must not let
+	// per-group retained results accumulate beyond the aggregate bound.
+	now = base.Add(602 * time.Second)
+	fakes["us-east-1"].err = errors.New("throttled")
+	fakes["us-west-2"].err = nil
+	fakes["us-west-2"].byNS["AWS/EC2"] = metrics("west-replacement", maxCandidateInstancesPerRefresh/2+1)
+	assertAtomicDiscard()
 }
 
 func TestCollector_refreshDiscovery_AggregateFailureFirstPassErrors(t *testing.T) {

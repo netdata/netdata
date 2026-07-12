@@ -12,12 +12,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestNewDiscoveryBudget_FirstOperationReservations(t *testing.T) {
+func TestNewDiscoveryBudget_GroupCapacity(t *testing.T) {
 	_, err := newDiscoveryBudget(maxListMetricsOperationsPerRefresh, func(error) {})
 	require.NoError(t, err)
 
 	_, err = newDiscoveryBudget(maxListMetricsOperationsPerRefresh+1, func(error) {})
-	assert.ErrorContains(t, err, "requires 101 first ListMetrics operations")
+	assert.ErrorContains(t, err, "defines 101 groups")
 }
 
 func TestDiscoveryBudget_ListMetricsOperations(t *testing.T) {
@@ -106,8 +106,7 @@ func TestDiscoveryBudget_ConcurrentCandidateReservationsDoNotOvershoot(t *testin
 }
 
 func TestRetainedCandidateBytes(t *testing.T) {
-	assert.Equal(t,
-		len("one\x1ftwo")+retainedCandidateBaseBytes+2*retainedCandidatePerDimensionBytes,
-		retainedCandidateBytes("one\x1ftwo", 2),
-	)
+	want := len("one\x1ftwo") + retainedCandidateBaseBytes + 2*retainedCandidatePerDimensionBytes
+	assert.Equal(t, want, retainedCandidateBytes("one\x1ftwo", 2))
+	assert.Equal(t, want, retainedDiscoveredInstanceBytes(discoveredInstance{DimensionValues: []string{"one", "two"}}))
 }

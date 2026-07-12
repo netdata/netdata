@@ -37,7 +37,7 @@ type discoveryBudget struct {
 func newDiscoveryBudget(groupCount int, cancel context.CancelCauseFunc) (*discoveryBudget, error) {
 	if groupCount > maxListMetricsOperationsPerRefresh {
 		return nil, safeCollectorErrorf(
-			"CloudWatch discovery requires %d first ListMetrics operations; maximum is %d",
+			"CloudWatch discovery defines %d groups; the %d-operation refresh budget cannot admit every group",
 			groupCount, maxListMetricsOperationsPerRefresh,
 		)
 	}
@@ -130,7 +130,19 @@ func (b *discoveryBudget) failure() error {
 }
 
 func retainedCandidateBytes(packedValues string, dimensions int) int {
-	return len(packedValues) + retainedCandidateBaseBytes + dimensions*retainedCandidatePerDimensionBytes
+	return retainedCandidatePayloadBytes(len(packedValues), dimensions)
+}
+
+func retainedCandidatePayloadBytes(packedBytes, dimensions int) int {
+	return packedBytes + retainedCandidateBaseBytes + dimensions*retainedCandidatePerDimensionBytes
+}
+
+func retainedDiscoveredInstanceBytes(instance discoveredInstance) int {
+	packedBytes := max(0, len(instance.DimensionValues)-1) * len(instanceKeySep)
+	for _, value := range instance.DimensionValues {
+		packedBytes += len(value)
+	}
+	return retainedCandidatePayloadBytes(packedBytes, len(instance.DimensionValues))
 }
 
 type discoveryLaneKey struct {
