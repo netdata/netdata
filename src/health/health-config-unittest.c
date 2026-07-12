@@ -452,6 +452,245 @@ static int test_dyncfg_update_every_boundaries(int *passed) {
     return failed;
 }
 
+static int test_dyncfg_delay_multiplier_boundaries(int *passed) {
+    static const struct {
+        const char *multiplier;
+        int expected_code;
+        const char *description;
+    } tests[] = {
+        { "0", HTTP_RESP_OK, "zero multiplier remains accepted" },
+        { "-1", HTTP_RESP_OK, "negative multiplier remains accepted" },
+        { "0.5", HTTP_RESP_OK, "fractional multiplier remains accepted" },
+        { "9223372036854775807", HTTP_RESP_OK, "maximum int64 multiplier remains accepted" },
+        { "-9223372036854775808", HTTP_RESP_OK, "minimum int64 multiplier remains accepted" },
+        { "3.4028234663852886e38", HTTP_RESP_OK, "FLT_MAX multiplier remains accepted" },
+        { "3.4028236e38", HTTP_RESP_BAD_REQUEST, "value above FLT_MAX is rejected before narrowing" },
+        { "1e100", HTTP_RESP_BAD_REQUEST, "large finite double is rejected before narrowing" },
+        { "\"nan\"", HTTP_RESP_BAD_REQUEST, "NaN string is rejected" },
+        { "\"inf\"", HTTP_RESP_BAD_REQUEST, "infinity string is rejected" },
+        { "null", HTTP_RESP_BAD_REQUEST, "null multiplier is rejected" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        CLEAN_BUFFER *payload = buffer_create(0, NULL);
+        CLEAN_BUFFER *result = buffer_create(0, NULL);
+
+        buffer_sprintf(payload,
+                       "{\"format_version\":1,\"rules\":[{\"enabled\":true,\"type\":\"instance\","
+                       "\"config\":{\"value\":{},\"action\":{\"delay\":{\"up\":1,\"down\":0,\"max\":10,"
+                       "\"multiplier\":%s}},\"match\":{\"on\":\"chart\"}}}]}",
+                       tests[i].multiplier);
+
+        int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_USERCONFIG, "unittest",
+                                    payload, NULL, NULL, result, HTTP_ACCESS_NONE, NULL, NULL);
+        bool has_expected_error = code == HTTP_RESP_OK || strstr(buffer_tostring(result), "multiplier") != NULL;
+
+        if(code != tests[i].expected_code || !has_expected_error) {
+            fprintf(stderr, "FAILED [%s]: code=%d response='%s'\n",
+                    tests[i].description, code, buffer_tostring(result));
+            failed++;
+        }
+        else
+            (*passed)++;
+    }
+
+    return failed;
+}
+
+static int run_delay_parse_case(
+    const char *input, int initial_max,
+    int expected_up, int expected_down, int expected_max, float expected_multiplier,
+    const char *description) {
+    char buffer[256];
+    strncpyz(buffer, input, sizeof(buffer) - 1);
+
+    int up = 123;
+    int down = 456;
+    int max = initial_max;
+    float multiplier = 7.0f;
+
+    int result = health_parse_delay(1, "unittest", buffer, &up, &down, &max, &multiplier);
+    if(!result || up != expected_up || down != expected_down || max != expected_max ||
+       multiplier != expected_multiplier) {
+        fprintf(stderr,
+                "FAILED [%s]: result=%d up=%d down=%d max=%d multiplier=%g\n",
+                description, result, up, down, max, (double)multiplier);
+        return 1;
+    }
+
+    return 0;
+}
+
+static int test_delay_parser_multiplier_boundaries(int *passed) {
+    static const struct {
+        const char *input;
+        int initial_max;
+        int expected_up;
+        int expected_down;
+        int expected_max;
+        float expected_multiplier;
+        const char *description;
+    } tests[] = {
+        { "up 10s", 0, 10, 0, 10, 1.0f, "omitted values keep documented defaults" },
+        { "down 15m multiplier 1.5", 0, 0, 900, 1350, 1.5f, "ordinary fractional multiplier" },
+        { "up 3s multiplier 0.5", 0, 3, 0, 1, 0.5f, "fractional product truncates toward zero" },
+        { "up -3s multiplier 1.5", 0, -3, 0, 0, 1.5f, "negative duration preserves zero default max" },
+        { "up 10s multiplier 2 max 7s", 0, 10, 0, 7, 2.0f, "explicit maximum remains authoritative" },
+        { "up 10s multiplier 0", 0, 10, 0, 10, 1.0f, "zero multiplier uses text default" },
+        { "up 10s multiplier -2", 0, 10, 0, 10, 1.0f, "negative multiplier uses text default" },
+        { "up 10s multiplier nan", 0, 10, 0, 10, 1.0f, "NaN multiplier uses text default" },
+        { "up 10s multiplier inf", 0, 10, 0, 10, 1.0f, "infinite multiplier uses text default" },
+        { "max 7s", 0, 0, 0, 7, 1.0f, "explicit maximum with omitted delays" },
+        { "up 2s", 5, 2, 0, 5, 1.0f, "prior larger maximum remains unchanged" },
+        { "up 16777220s", 16777219, 16777220, 0, 16777219, 1.0f,
+          "prior maximum preserves the existing float comparison" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        int rc = run_delay_parse_case(
+            tests[i].input, tests[i].initial_max,
+            tests[i].expected_up, tests[i].expected_down, tests[i].expected_max,
+            tests[i].expected_multiplier, tests[i].description);
+        failed += rc;
+        if(!rc)
+            (*passed)++;
+    }
+
+    char input[256];
+    snprintfz(input, sizeof(input), "up %ds", INT_MAX);
+    int rc = run_delay_parse_case(input, 0, INT_MAX, 0, INT_MAX, 1.0f,
+                                  "INT_MAX duration has a representable default maximum");
+    failed += rc;
+    if(!rc)
+        (*passed)++;
+
+    snprintfz(input, sizeof(input), "up %ds", INT_MAX);
+    rc = run_delay_parse_case(input, INT_MAX - 1, INT_MAX, 0, INT_MAX - 1, 1.0f,
+                              "rounded INT_MAX product preserves the prior maximum comparison");
+    failed += rc;
+    if(!rc)
+        (*passed)++;
+
+    snprintfz(input, sizeof(input), "down %ds multiplier 2", INT_MIN);
+    rc = run_delay_parse_case(input, 0, 0, INT_MIN, 0, 2.0f,
+                              "INT_MIN negative product does not change the default maximum");
+    failed += rc;
+    if(!rc)
+        (*passed)++;
+
+    snprintfz(input, sizeof(input), "up 1s multiplier %a", (double)FLT_MAX);
+    rc = run_delay_parse_case(input, 0, 1, 0, INT_MAX, FLT_MAX,
+                              "largest finite multiplier bounds the omitted maximum");
+    failed += rc;
+    if(!rc)
+        (*passed)++;
+
+    return failed;
+}
+
+static int test_delay_multiplier_runtime_boundaries(int *passed) {
+    static const struct {
+        int delay;
+        float multiplier;
+        int maximum;
+        int expected;
+        const char *description;
+    } tests[] = {
+        { 10, 1.5f, 100, 15, "ordinary multiplication" },
+        { 3, 1.5f, 100, 4, "positive fractional truncation" },
+        { -3, 1.5f, 100, -4, "negative fractional truncation" },
+        { 10, 2.0f, 15, 15, "configured maximum clamps product" },
+        { 10, 2.0f, -5, -5, "negative configured maximum keeps existing clamp semantics" },
+        { 10, 0.0f, 100, 0, "zero Dynamic Configuration multiplier" },
+        { 10, -2.0f, 100, -20, "negative Dynamic Configuration multiplier" },
+        { INT_MAX, 1.0f, INT_MAX, INT_MAX, "INT_MAX float rounding is bounded" },
+        { INT_MAX, 0.5f, INT_MAX, 1073741824, "large representable product keeps float rounding" },
+        { INT_MIN, 2.0f, INT_MAX, INT_MIN, "negative out-of-range product uses lower endpoint" },
+        { INT_MAX, -1.0f, INT_MAX, INT_MIN, "negative boundary product remains representable" },
+        { INT_MIN, -1.0f, 17, 17, "positive out-of-range product uses configured maximum" },
+        { 1, FLT_MAX, 123, 123, "largest positive finite multiplier uses configured maximum" },
+        { -1, FLT_MAX, INT_MAX, INT_MIN, "largest negative product uses lower endpoint" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        int actual = health_delay_apply_multiplier(tests[i].delay, tests[i].multiplier, tests[i].maximum);
+        if(actual != tests[i].expected) {
+            fprintf(stderr, "FAILED [%s]: expected=%d actual=%d\n",
+                    tests[i].description, tests[i].expected, actual);
+            failed++;
+        }
+        else
+            (*passed)++;
+    }
+
+    return failed;
+}
+
+static int test_prototype_rejects_non_finite_delay_multiplier(int *passed) {
+    static const float tests[] = { NAN, INFINITY, -INFINITY };
+    int failed = 0;
+
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        RRD_ALERT_PROTOTYPE ap = { 0 };
+        ap.match.on.chart = string_strdupz("chart");
+        ap.config.name = string_strdupz("unittest");
+        ap.config.source = string_strdupz("unittest");
+        ap.config.update_every = 1;
+        ap.config.delay_multiplier = tests[i];
+
+        const char *failed_at = NULL;
+        int error = 0;
+        ap.config.calculation = expression_parse("1", &failed_at, &error);
+
+        char *msg = NULL;
+        if(!ap.config.calculation || health_prototype_add(&ap, &msg) || !msg ||
+           strcmp(msg, "non-finite delay multiplier") != 0) {
+            fprintf(stderr,
+                    "FAILED [prototype rejects non-finite delay multiplier %g]: msg='%s'\n",
+                    (double)tests[i], msg ? msg : "");
+            failed++;
+        }
+        else
+            (*passed)++;
+
+        health_prototype_cleanup(&ap);
+    }
+
+    RRD_ALERT_PROTOTYPE ap = { 0 };
+    ap.match.on.chart = string_strdupz("chart");
+    ap.config.name = string_strdupz("unittest");
+    ap.config.source = string_strdupz("unittest");
+    ap.config.update_every = 1;
+    ap.config.delay_multiplier = 1.0f;
+
+    const char *failed_at = NULL;
+    int error = 0;
+    ap.config.calculation = expression_parse("1", &failed_at, &error);
+
+    RRD_ALERT_PROTOTYPE *second = callocz(1, sizeof(*second));
+    second->config.name = string_strdupz("unittest");
+    second->config.source = string_strdupz("unittest");
+    second->config.delay_multiplier = NAN;
+    DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(ap._internal.next, second, _internal.prev, _internal.next);
+
+    char *msg = NULL;
+    if(!ap.config.calculation || health_prototype_add(&ap, &msg) || !msg ||
+       strcmp(msg, "non-finite delay multiplier") != 0) {
+        fprintf(stderr, "FAILED [prototype rejects non-finite multiplier in later rule]: msg='%s'\n",
+                msg ? msg : "");
+        failed++;
+    }
+    else
+        (*passed)++;
+
+    health_prototype_cleanup(&ap);
+
+    return failed;
+}
+
 static int test_prototype_rejects_non_positive_update_every(int *passed) {
     static const int tests[] = { -1, 0 };
     int failed = 0;
@@ -501,6 +740,10 @@ int health_config_unittest(void) {
 
     failed += test_db_lookup_frequency_boundaries(&passed);
     failed += test_dyncfg_update_every_boundaries(&passed);
+    failed += test_dyncfg_delay_multiplier_boundaries(&passed);
+    failed += test_delay_parser_multiplier_boundaries(&passed);
+    failed += test_delay_multiplier_runtime_boundaries(&passed);
+    failed += test_prototype_rejects_non_finite_delay_multiplier(&passed);
     failed += test_prototype_rejects_non_positive_update_every(&passed);
 
     fprintf(stderr, "\n===================================================\n");

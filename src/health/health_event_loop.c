@@ -625,13 +625,10 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     rc->delay_last = 0;
                     rc->delay_up_to_timestamp = 0;
                 } else {
-                    rc->delay_up_current = (int)((float)rc->delay_up_current * rc->config.delay_multiplier);
-                    if (rc->delay_up_current > rc->config.delay_max_duration)
-                        rc->delay_up_current = rc->config.delay_max_duration;
-
-                    rc->delay_down_current = (int)((float)rc->delay_down_current * rc->config.delay_multiplier);
-                    if (rc->delay_down_current > rc->config.delay_max_duration)
-                        rc->delay_down_current = rc->config.delay_max_duration;
+                    rc->delay_up_current = health_delay_apply_multiplier(
+                        rc->delay_up_current, rc->config.delay_multiplier, rc->config.delay_max_duration);
+                    rc->delay_down_current = health_delay_apply_multiplier(
+                        rc->delay_down_current, rc->config.delay_multiplier, rc->config.delay_max_duration);
                 }
 
                 if (status > rc->status)

@@ -450,6 +450,17 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, char **msg) {
         return false;
     }
 
+    for(RRD_ALERT_PROTOTYPE *t = ap; t; t = t->_internal.next) {
+        if(!isfinite(t->config.delay_multiplier)) {
+            netdata_log_error(
+                "HEALTH: alert '%s' has a non-finite delay multiplier. Source: %s",
+                string2str(t->config.name), string2str(t->config.source));
+            if(msg)
+                *msg = "non-finite delay multiplier";
+            return false;
+        }
+    }
+
     // activate the match patterns in it
     bool enabled = false;
     for(RRD_ALERT_PROTOTYPE *t = ap; t ;t = t->_internal.next) {

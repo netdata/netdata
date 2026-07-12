@@ -137,7 +137,19 @@ static bool parse_config_action_delay(json_object *jobj, const char *path, struc
     JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "up", config->delay_up_duration, error, flags);
     JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "down", config->delay_down_duration, error, flags);
     JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "max", config->delay_max_duration, error, flags);
-    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "multiplier", config->delay_multiplier, error, flags);
+
+    json_object *jmultiplier = NULL;
+    bool multiplier_is_int = json_object_object_get_ex(jobj, "multiplier", &jmultiplier) &&
+                             jmultiplier && json_object_is_type(jmultiplier, json_type_int);
+
+    double multiplier = config->delay_multiplier;
+    JSONC_PARSE_DOUBLE_OR_ERROR_AND_RETURN(jobj, path, "multiplier", multiplier, error, flags);
+    if(!isfinite(multiplier) || multiplier < -(double)FLT_MAX || multiplier > (double)FLT_MAX) {
+        buffer_sprintf(error, "non-finite or out-of-range value for '%s.multiplier'", path);
+        return false;
+    }
+    config->delay_multiplier = multiplier_is_int ? (float)json_object_get_int64(jmultiplier) : (float)multiplier;
+
     return true;
 }
 
