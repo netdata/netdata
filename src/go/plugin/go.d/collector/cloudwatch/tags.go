@@ -283,9 +283,9 @@ func applyTagFetchResults(states, previous map[tagFetchKey]tagGroupSnapshot, res
 }
 
 func tagGroupMembershipIDs(group tagFetchGroup) []int {
-	var membershipIDs []int
-	for _, ids := range group.membershipIDsByProfile {
-		membershipIDs = append(membershipIDs, ids...)
+	membershipIDs := make([]int, 0, len(group.membershipIDByProfile))
+	for _, id := range group.membershipIDByProfile {
+		membershipIDs = append(membershipIDs, id)
 	}
 	sort.Ints(membershipIDs)
 	return membershipIDs

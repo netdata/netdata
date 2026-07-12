@@ -179,14 +179,16 @@ func resolveMetricGroup(path string, selector ProfileMetricSelectorConfig, profi
 			return fmt.Errorf("%s.name references unknown MetricName %q in profile %q", metricPath, entry.Name, profile.Name)
 		}
 		statistics := entry.Statistics
+		statisticsPath := metricPath + ".statistics"
 		if statistics == nil {
 			statistics = selector.Statistics
+			statisticsPath = path + ".statistics"
 		}
 		for j, raw := range statistics {
 			statistic := normalizeMetricStatistic(raw)
 			series, ok := findCompiledSeries(available, metricIndex, statistic)
 			if !ok {
-				return fmt.Errorf("%s.statistics[%d] %q is not exported for MetricName %q in profile %q", metricPath, j, raw, entry.Name, profile.Name)
+				return fmt.Errorf("%s[%d] %q is not exported for MetricName %q in profile %q", statisticsPath, j, raw, entry.Name, profile.Name)
 			}
 			selected[series.Ordinal] = struct{}{}
 		}

@@ -306,6 +306,14 @@ func TestBuildQueryPlan_SeriesOwnershipAcrossTargets(t *testing.T) {
 	}, queryOwnersBySeries(plan))
 }
 
+func TestSeriesOwnershipClaimsEachOrdinalOnce(t *testing.T) {
+	var ownership seriesOwnership
+	for _, ordinal := range []int{0, 63, 64, 255} {
+		assert.Truef(t, ownership.claim(ordinal), "first claim for ordinal %d", ordinal)
+		assert.Falsef(t, ownership.claim(ordinal), "duplicate claim for ordinal %d", ordinal)
+	}
+}
+
 func TestBuildQueryPlan_UnknownTagMembershipReservesOnlySelectedSeries(t *testing.T) {
 	c := filteredOverlapCollector(t)
 	first := &c.plan.Scopes[0]

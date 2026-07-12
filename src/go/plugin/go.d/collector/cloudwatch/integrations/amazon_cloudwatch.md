@@ -219,7 +219,7 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | labels.resource_tags[].label | Optional Netdata label key. When omitted, the AWS key is normalized (`Name` becomes `name`). Use an explicit label to avoid invalid names or collisions with identity labels such as `region`. |  | no |
 | **Limits** | limits.max_instances | Maximum distinct final CloudWatch resource instances that emit at least one selected series after filtering and exported-series overlap resolution. Metric/statistic fan-out is not counted. Overflow rejects the refreshed plan; collection never truncates to the first N resources. | 1000 | no |
 | **Discovery** | discovery.refresh_every | How often (seconds) to re-discover metrics. Minimum 60. | 300 | no |
-|  | discovery.recently_active_only | List only metrics active in the last 3 hours. Automatically disabled for metrics whose period exceeds 3 hours (such as the daily S3 storage metrics). | yes | no |
+|  | discovery.recently_active_only | Use CloudWatch's three-hour activity filter only when every selected series sharing a target, region, and namespace scan has a period of 3 hours or less. Any longer-period participant (such as daily S3 storage metrics) keeps the shared scan unfiltered. | yes | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 

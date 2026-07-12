@@ -80,6 +80,7 @@ func TestCompileConfig_MetricSelectionRejectsUnknownOrUnselectedEntries(t *testi
 	tests := map[string]struct {
 		group   ProfileMetricSelectorConfig
 		message string
+		path    string
 	}{
 		"profile not selected by rule": {
 			group: ProfileMetricSelectorConfig{
@@ -101,6 +102,7 @@ func TestCompileConfig_MetricSelectionRejectsUnknownOrUnselectedEntries(t *testi
 				Include: []MetricSelectionConfig{{Name: "CPUUtilization"}},
 			},
 			message: "is not exported",
+			path:    "rules[0].metrics[0].statistics[0]",
 		},
 	}
 
@@ -111,6 +113,9 @@ func TestCompileConfig_MetricSelectionRejectsUnknownOrUnselectedEntries(t *testi
 			cfg.Rules[0].Metrics = []ProfileMetricSelectorConfig{tc.group}
 			_, _, err := compileTestConfig(t, cfg)
 			assert.ErrorContains(t, err, tc.message)
+			if tc.path != "" {
+				assert.ErrorContains(t, err, tc.path)
+			}
 		})
 	}
 }

@@ -368,7 +368,6 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 
 	type groupKey struct {
 		target, region, namespace string
-		recentlyActive            bool
 	}
 	type profileKey struct {
 		target, profile, region string
@@ -392,9 +391,10 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 		recent := recentlyActive[pk]
 		key := groupKey{
 			target: scope.Target.Name, region: scope.Region,
-			namespace: scope.Profile.Config.Namespace, recentlyActive: recent,
+			namespace: scope.Profile.Config.Namespace,
 		}
 		if i, ok := index[key]; ok {
+			groups[i].RecentlyActive = groups[i].RecentlyActive && recent
 			if _, seen := seenProfiles[pk]; !seen {
 				groups[i].Profiles = append(groups[i].Profiles, scope.Profile)
 				seenProfiles[pk] = struct{}{}

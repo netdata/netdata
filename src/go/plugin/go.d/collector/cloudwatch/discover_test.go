@@ -449,15 +449,25 @@ func TestCollector_DiscoveryGroupsDeduplicateProfileAcrossTagPolicies(t *testing
 	assert.Equal(t, "ec2", groups[0].Profiles[0].Name)
 }
 
-func TestCollector_DiscoveryGroupsKeepRecentlyActiveBehaviorSeparate(t *testing.T) {
+func TestCollector_DiscoveryGroupsCoalesceToLeastRestrictiveRecentlyActivePolicy(t *testing.T) {
 	c := New()
-	fast := resolved("fast", dimProfile("AWS/Shared", 300, "Id"))
+	fastProfile := dimProfile("AWS/Shared", 300, "Id")
+	fastProfile.Metrics = append(fastProfile.Metrics,
+		cwprofiles.Metric{ID: "daily", MetricName: "Daily", Statistics: []string{"average"}, Period: 86400})
+	fast := resolved("fast", fastProfile)
 	slow := resolved("slow", dimProfile("AWS/Shared", 86400, "Id"))
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{fast, slow})
+	c.plan.Scopes[0].SelectedSeries = c.plan.Scopes[0].SelectedSeries[:1]
 
 	groups := c.discoveryGroups()
-	require.Len(t, groups, 2)
-	assert.NotEqual(t, groups[0].RecentlyActive, groups[1].RecentlyActive)
+	require.Len(t, groups, 1, "one namespace must produce one ListMetrics scan")
+	assert.False(t, groups[0].RecentlyActive, "one long-period profile makes the shared scan unfiltered")
+	assert.Equal(t, []string{"fast", "slow"}, []string{groups[0].Profiles[0].Name, groups[0].Profiles[1].Name})
+
+	fake := &nsCloudWatch{byNS: map[string][]cwtypes.Metric{"AWS/Shared": {}}}
+	results := discoverAll(context.Background(), func(_, _ string) (cloudwatchClient, error) { return fake, nil }, groups, 5, 0)
+	require.Len(t, results, 1)
+	assert.Equal(t, 1, fake.calls, "the unfiltered superset scan replaces a redundant filtered sibling scan")
 }
 
 func TestCollector_DiscoveryGroupsUseUnionOfSelectedSeriesPeriods(t *testing.T) {

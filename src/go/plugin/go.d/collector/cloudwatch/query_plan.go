@@ -47,9 +47,31 @@ type queryGroupKey struct {
 	period int
 }
 
-type seriesOwnershipKey struct {
-	instance string
-	series   string
+type seriesOwnership struct {
+	firstWord uint64
+	overflow  []uint64
+}
+
+func (o *seriesOwnership) claim(ordinal int) bool {
+	word := ordinal / 64
+	mask := uint64(1) << uint(ordinal%64)
+	if word == 0 {
+		if o.firstWord&mask != 0 {
+			return false
+		}
+		o.firstWord |= mask
+		return true
+	}
+
+	index := word - 1
+	if index >= len(o.overflow) {
+		o.overflow = append(o.overflow, make([]uint64, index-len(o.overflow)+1)...)
+	}
+	if o.overflow[index]&mask != 0 {
+		return false
+	}
+	o.overflow[index] |= mask
+	return true
 }
 
 func (q plannedQuery) groupKey() queryGroupKey {
@@ -127,7 +149,7 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 		tagLabels []metrix.Label
 		dims      []cwtypes.Dimension
 	}
-	owned := make(map[seriesOwnershipKey]struct{})
+	owned := make(map[string]seriesOwnership)
 	presentations := make(map[string]instancePresentation)
 	shadowed := 0
 	reserved := 0
@@ -172,15 +194,15 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 			}
 
 			selected := make([]compiledSeries, 0, len(scope.SelectedSeries))
+			ownership := owned[instanceKey]
 			for _, series := range scope.SelectedSeries {
-				key := seriesOwnershipKey{instance: instanceKey, series: series.Name}
-				if _, exists := owned[key]; exists {
+				if !ownership.claim(series.Ordinal) {
 					shadowed++
 					continue
 				}
-				owned[key] = struct{}{}
 				selected = append(selected, series)
 			}
+			owned[instanceKey] = ownership
 			if len(selected) == 0 {
 				continue
 			}
@@ -212,16 +234,16 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 	return plan, nil
 }
 
-func reserveSelectedSeries(owned map[seriesOwnershipKey]struct{}, instanceKey string, series []compiledSeries) int {
+func reserveSelectedSeries(owned map[string]seriesOwnership, instanceKey string, series []compiledSeries) int {
+	ownership := owned[instanceKey]
 	reserved := 0
 	for _, item := range series {
-		key := seriesOwnershipKey{instance: instanceKey, series: item.Name}
-		if _, exists := owned[key]; exists {
+		if !ownership.claim(item.Ordinal) {
 			continue
 		}
-		owned[key] = struct{}{}
 		reserved++
 	}
+	owned[instanceKey] = ownership
 	return reserved
 }
 

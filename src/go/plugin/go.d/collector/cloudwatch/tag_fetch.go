@@ -32,8 +32,8 @@ func lessTagFetchKey(a, b tagFetchKey) bool {
 }
 
 // tagFetchGroup is one deduplicated RGTA request stream. Policy scopes sharing
-// target, region, and exact predicate share the fetch while retaining separate
-// ordered membership identities.
+// target, region, and exact predicate share the fetch and one membership identity
+// per participating profile.
 type tagFetchGroup struct {
 	key     tagFetchKey
 	account string
@@ -41,7 +41,7 @@ type tagFetchGroup struct {
 
 	joins                  map[string]*tagJoin
 	profilesByResourceType map[string][]string
-	membershipIDsByProfile map[string][]int
+	membershipIDByProfile  map[string]int
 	candidatesByProfile    map[string]map[string]struct{}
 	tagKeys                map[string]struct{}
 	resourceTypes          []string
@@ -92,7 +92,7 @@ func (c *Collector) buildTagFetchPlan() []tagFetchGroup {
 				key: key, account: resolved.accountID, filters: filters,
 				joins:                  make(map[string]*tagJoin),
 				profilesByResourceType: make(map[string][]string),
-				membershipIDsByProfile: make(map[string][]int),
+				membershipIDByProfile:  make(map[string]int),
 				candidatesByProfile:    make(map[string]map[string]struct{}),
 				tagKeys:                make(map[string]struct{}),
 			}
@@ -113,8 +113,8 @@ func (c *Collector) buildTagFetchPlan() []tagFetchGroup {
 				group.tagKeys[label.awsKey] = struct{}{}
 			}
 		}
-		if includeMembership && !slices.Contains(group.membershipIDsByProfile[scope.Profile.Name], scope.TagMembershipID) {
-			group.membershipIDsByProfile[scope.Profile.Name] = append(group.membershipIDsByProfile[scope.Profile.Name], scope.TagMembershipID)
+		if includeMembership {
+			group.membershipIDByProfile[scope.Profile.Name] = scope.TagMembershipID
 		}
 		candidates, indexed := candidateIndexes[candidateKey]
 		if !indexed {
@@ -245,7 +245,7 @@ func indexFetchedResource(
 		if _, candidate := group.candidatesByProfile[profileName][joinKey]; !candidate {
 			continue
 		}
-		for _, membershipID := range group.membershipIDsByProfile[profileName] {
+		if membershipID, ok := group.membershipIDByProfile[profileName]; ok {
 			members.add(membershipID, joinKey)
 		}
 		plan := labelPlans[profileName]

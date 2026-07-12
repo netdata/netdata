@@ -185,10 +185,11 @@ Discovery then finds which *instances* of those profiles exist per target and re
 `discover.go`. `refreshDiscovery` re-runs only when the snapshot TTL
 (`discovery.refresh_every`, default 300s) has expired.
 
-- `discoveryGroups` coalesces compiled scopes by target, region, namespace, and
-  `RecentlyActive` behavior. The decision uses the union of periods selected for
-  each target/profile/region, so one long-period selected series disables PT3H for
-  that profile matcher without creating a duplicate ListMetrics stream.
+- `discoveryGroups` coalesces compiled scopes by target, region, and namespace.
+  Each target/profile/region matcher first uses the union of its selected-series
+  periods; the shared namespace scan then takes the least restrictive result, so
+  one long-period participant disables PT3H instead of creating a redundant
+  filtered ListMetrics stream beside the unfiltered superset.
   `discoverAll` fans out over those groups concurrently
   (bounded by `apiConcurrency`), with one CloudWatch client per (target, region).
 - `discoverProfileGroup` pages `ListMetrics` once for the shared namespace and
@@ -201,10 +202,10 @@ Discovery then finds which *instances* of those profiles exist per target and re
   (`constantDimensionsHold`, fail-closed), so a constant dimension can never merge
   distinct instances onto one unlabeled series.
 - **Recently-active-only** is period-aware: the `ListMetrics RecentlyActive=PT3H`
-  filter is applied only when every metric in the profile has a period ≤ 3h.
-  PT3H is the only value CloudWatch accepts, so applying it to a daily profile
-  (S3) would hide the metric most of the day. Configurable
-  (`discovery.recently_active_only`, default true).
+  filter is applied only when every selected series participating in the shared
+  target/region/namespace scan has a period ≤ 3h. PT3H is the only value CloudWatch
+  accepts, so applying it to a daily profile (S3) would hide the metric most of
+  the day. Configurable (`discovery.recently_active_only`, default true).
 - **Snapshot + carry-forward**: `buildDiscoverySnapshot` stores instances for
   successful targets and **carries forward the previous instances for errored
   targets**, so a transient per-region/namespace failure never drops series.

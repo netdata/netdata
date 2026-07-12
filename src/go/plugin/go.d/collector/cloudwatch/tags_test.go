@@ -596,7 +596,7 @@ func TestTagFetchGroups_SeparateFetchIdentityFromPolicyScopes(t *testing.T) {
 		groups := c.currentTagFetchPlan()
 		require.Len(t, groups, 4)
 		for _, group := range groups {
-			assert.Len(t, group.membershipIDsByProfile["ec2"], 1)
+			assert.Contains(t, group.membershipIDByProfile, "ec2")
 		}
 		groups[0].candidatesByProfile["ec2"]["shared-sentinel"] = struct{}{}
 		for _, group := range groups[1:] {
@@ -709,7 +709,7 @@ func TestIndexFetchedResource_SkipsForeignAccountRegion(t *testing.T) {
 		key: tagFetchKey{target: "base", region: "us-east-1"}, account: "000000000000",
 		joins:                  map[string]*tagJoin{"ec2": join},
 		profilesByResourceType: map[string][]string{"ec2:instance": {"ec2"}},
-		membershipIDsByProfile: map[string][]int{"ec2": {7}},
+		membershipIDByProfile:  map[string]int{"ec2": 7},
 		tagKeys:                map[string]struct{}{"owner": {}},
 		candidatesByProfile: map[string]map[string]struct{}{"ec2": {
 			"i-ok": {}, "i-acct": {}, "i-region": {},
@@ -737,12 +737,12 @@ func TestMergeTagGroupSnapshots_RetainsIndependentGroupState(t *testing.T) {
 	now := time.Unix(1_000_000_000, 0)
 	failedGroup := tagFetchGroup{
 		key: tagFetchKey{target: "first", region: "us-east-1"}, account: "000000000000",
-		membershipIDsByProfile: map[string][]int{"ec2": {7}},
-		candidatesByProfile:    map[string]map[string]struct{}{"ec2": {"i-1": {}}},
+		membershipIDByProfile: map[string]int{"ec2": 7},
+		candidatesByProfile:   map[string]map[string]struct{}{"ec2": {"i-1": {}}},
 	}
 	healthyGroup := tagFetchGroup{
 		key: tagFetchKey{target: "second", region: "us-east-1"}, account: "000000000000",
-		membershipIDsByProfile: map[string][]int{"ec2": {8}},
+		membershipIDByProfile: map[string]int{"ec2": 8},
 	}
 	states := map[tagFetchKey]tagGroupSnapshot{
 		failedGroup.key: {
@@ -773,8 +773,8 @@ func BenchmarkMergeTagGroupSnapshots(b *testing.B) {
 	const cachedTags = 8192
 	group := tagFetchGroup{
 		key: tagFetchKey{target: "target", region: "us-east-1"}, account: "000000000000",
-		membershipIDsByProfile: map[string][]int{"ec2": {7}},
-		candidatesByProfile:    map[string]map[string]struct{}{"ec2": make(map[string]struct{}, cachedTags)},
+		membershipIDByProfile: map[string]int{"ec2": 7},
+		candidatesByProfile:   map[string]map[string]struct{}{"ec2": make(map[string]struct{}, cachedTags)},
 	}
 	state := tagGroupSnapshot{
 		membershipIDs: []int{7}, members: tagMembership{7: make(map[string]struct{}, cachedTags)},
@@ -824,7 +824,7 @@ func BenchmarkIndexFetchedResources(b *testing.B) {
 				joins:                  map[string]*tagJoin{"ec2": join},
 				filters:                []resourceTagFilter{{key: "environment", values: []string{"production"}}},
 				profilesByResourceType: map[string][]string{"ec2:instance": {"ec2"}},
-				membershipIDsByProfile: map[string][]int{"ec2": {7}},
+				membershipIDByProfile:  map[string]int{"ec2": 7},
 				candidatesByProfile:    map[string]map[string]struct{}{"ec2": candidates},
 				tagKeys:                map[string]struct{}{"environment": {}, "owner": {}},
 			}

@@ -707,7 +707,7 @@
         "ui:help": "How often to rediscover matching CloudWatch metrics and resources."
       },
       "recently_active_only": {
-        "ui:help": "When enabled, collect only metrics with recent datapoints. Disable this to retain inactive metrics discovered by CloudWatch."
+        "ui:help": "When enabled, use CloudWatch's three-hour filter only when every selected series sharing a namespace scan has a period of three hours or less. A longer-period participant keeps the shared scan unfiltered."
       }
     },
     "vnode": {

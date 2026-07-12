@@ -387,7 +387,7 @@ modules:
               required: false
               group: Discovery
             - name: discovery.recently_active_only
-              description: List only metrics active in the last 3 hours. Automatically disabled for metrics whose period exceeds 3 hours (such as the daily S3 storage metrics).
+              description: Use CloudWatch's three-hour activity filter only when every selected series sharing a target, region, and namespace scan has a period of 3 hours or less. Any longer-period participant (such as daily S3 storage metrics) keeps the shared scan unfiltered.
               default_value: true
               required: false
               group: Discovery
