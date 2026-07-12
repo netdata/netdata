@@ -18,8 +18,8 @@ mod trace_plan;
 
 pub use session::TraceFileSession;
 pub use trace_plan::{
-    CompiledTracePlan, NumberCmp, PlanMatcher, PlanTerm, ScanWork, TracePlan,
-    numeric_token_matches,
+    CompiledTracePlan, IdColumnKind, LinkIdMatch, NumberCmp, PlanMatcher, PlanTerm, ScanWork,
+    TracePlan, numeric_token_matches,
 };
 
 use crate::{

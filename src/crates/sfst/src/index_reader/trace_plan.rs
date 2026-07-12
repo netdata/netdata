@@ -134,6 +134,38 @@ pub enum PlanTerm {
         intervals: Vec<(Option<i64>, Option<i64>)>,
         negated: bool,
     },
+    /// Rows whose SPAN/PSPN column id is any of `ids` (`negated`: an id
+    /// PRESENT and matching none — the all-zero UNSET sentinel counts
+    /// as ABSENT, so a root span never satisfies a negated parent-id
+    /// comparison). A fixed-width column read, excluded from the work
+    /// units.
+    IdColumn {
+        column: IdColumnKind,
+        ids: Vec<crate::SpanId>,
+        negated: bool,
+    },
+    /// Rows with at least one link whose span id / trace id is among
+    /// the given ids — an LNKB row scan with NO pre-filter: every
+    /// visited row feeds the work counter and the budget (the pinned
+    /// `link:*` unit). An absent LNKB chunk is a correct no-match (no
+    /// pre-EVNB/LNKB production files exist); a corrupt one errors.
+    /// POSITIVE only — the negated form's semantics are an open
+    /// design question (see the engine crate's SOW).
+    LinkIds { ids: LinkIdMatch },
+}
+
+/// Which per-row id column an [`PlanTerm::IdColumn`] term scans.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IdColumnKind {
+    SpanId,
+    ParentSpanId,
+}
+
+/// The id set of a [`PlanTerm::LinkIds`] term.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum LinkIdMatch {
+    Span(Vec<crate::SpanId>),
+    Trace(Vec<crate::TraceId>),
 }
 
 impl PlanTerm {
@@ -251,6 +283,70 @@ impl IndexReader<'_> {
                     }
                     resolved.push(Some(ResolvedTerm { matches, presence }));
                     durations.push(None);
+                }
+                PlanTerm::IdColumn {
+                    column,
+                    ids,
+                    negated,
+                } => {
+                    // Fixed-width column read over the caller's range
+                    // (excluded from the work units, like DURN).
+                    let ids_match = |id: crate::SpanId| -> bool {
+                        if id.is_unset() {
+                            return false; // UNSET = absent, both polarities
+                        }
+                        ids.contains(&id) != *negated
+                    };
+                    // SPAN and PSPN are distinct arena types over the
+                    // same SpanId values; collect through one closure.
+                    let collect = |len: usize,
+                                   get: &dyn Fn(usize) -> crate::SpanId|
+                     -> Result<Vec<u32>, crate::Error> {
+                        if (len as u32) < range_hi {
+                            return Err(crate::Error::CorruptIndex(format!(
+                                "trace plan: id column length {len} < range end {range_hi}",
+                            )));
+                        }
+                        Ok((range_lo..range_hi)
+                            .filter(|&pos| ids_match(get(pos as usize)))
+                            .collect())
+                    };
+                    let positions: Vec<u32> = match column {
+                        IdColumnKind::SpanId => {
+                            let c = self.span_ids()?;
+                            collect(c.len(), &|i| c.get(i))?
+                        }
+                        IdColumnKind::ParentSpanId => {
+                            let c = self.parent_span_ids()?;
+                            collect(c.len(), &|i| c.get(i))?
+                        }
+                    };
+                    resolved.push(None);
+                    durations.push(Some(PosSet::from_sorted(positions, total)));
+                }
+                PlanTerm::LinkIds { ids } => {
+                    // LNKB row scan, no pre-filter: every visited row
+                    // counts and the budget aborts mid-scan (a `None`
+                    // plan is never used).
+                    let mut positions: Vec<u32> = Vec::new();
+                    if self.has_link_index() {
+                        let links = self.link_index()?;
+                        for pos in range_lo..range_hi {
+                            work.rows_visited += 1;
+                            if work.rows_visited > ceiling {
+                                return Ok(None);
+                            }
+                            let hit = links.links_for_row(pos).any(|l| match ids {
+                                LinkIdMatch::Span(wanted) => wanted.contains(&l.span_id),
+                                LinkIdMatch::Trace(wanted) => wanted.contains(&l.trace_id),
+                            });
+                            if hit {
+                                positions.push(pos);
+                            }
+                        }
+                    }
+                    resolved.push(None);
+                    durations.push(Some(PosSet::from_sorted(positions, total)));
                 }
                 PlanTerm::Duration { intervals, negated } => {
                     // One DURN pass over the caller's range only (a

@@ -143,6 +143,12 @@ pub enum PredicateError {
     MixedValueTypes { target: String },
     #[error("a condition on {target} compares against NaN, which matches nothing")]
     NanValue { target: String },
+    #[error("{target} takes {width}-char hex ids, got {value:?}")]
+    InvalidIdValue {
+        target: String,
+        value: String,
+        width: usize,
+    },
     /// The construct is valid grammar but outside this build's evaluable
     /// subset (the stage-A/stage-B boundary, decision 26A) — named so the
     /// caller sees exactly which construct to avoid, never a silently
@@ -241,6 +247,26 @@ impl Condition {
                     if !all_text {
                         return Err(PredicateError::TextValueRequired { op: self.op, target });
                     }
+                    // Ids are fixed-width hex text (W3C rendering):
+                    // 16 chars for span ids, 32 for trace ids.
+                    let width = match i {
+                        TraceIntrinsic::TraceId | TraceIntrinsic::LinkTraceId => 32,
+                        _ => 16,
+                    };
+                    for value in &self.values {
+                        let PredicateValue::Text(hex) = value else {
+                            unreachable!("all_text checked above");
+                        };
+                        if hex.len() != width
+                            || !hex.bytes().all(|b| b.is_ascii_hexdigit())
+                        {
+                            return Err(PredicateError::InvalidIdValue {
+                                target,
+                                value: hex.clone(),
+                                width,
+                            });
+                        }
+                    }
                 }
                 IntrinsicClass::Nanos => {
                     if self.op.is_regex() {
@@ -303,6 +329,29 @@ impl Condition {
                 ),
                 CompareOp::Eq | CompareOp::Regex | CompareOp::NotEq | CompareOp::NotRegex,
             ) => None,
+            // The colon-set ids: span/parent by column scan (both
+            // polarities — single-valued, no subgroup fork); trace:id
+            // pins/filters the candidate set; link ids POSITIVE only
+            // (the negated subgroup semantics are an open design
+            // question for the refine step).
+            (
+                PredicateTarget::Intrinsic(SpanId | ParentSpanId | TraceId),
+                CompareOp::Eq | CompareOp::NotEq,
+            ) => None,
+            (
+                PredicateTarget::Intrinsic(LinkSpanId | LinkTraceId),
+                CompareOp::Eq,
+            ) => None,
+            (PredicateTarget::Intrinsic(LinkSpanId | LinkTraceId), CompareOp::NotEq) => {
+                Some(format!("negated {} (subgroup semantics, refine step)", self.target))
+            }
+            // event:name POSITIVE forms ride the flat events.name token
+            // (one such condition per predicate — see ensure_evaluable);
+            // negated forms wait for the subgroup-semantics decision.
+            (PredicateTarget::Intrinsic(EventName), CompareOp::Eq | CompareOp::Regex) => None,
+            (PredicateTarget::Intrinsic(EventName), CompareOp::NotEq | CompareOp::NotRegex) => {
+                Some(format!("negated {} (subgroup semantics, refine step)", self.target))
+            }
             (PredicateTarget::Attribute(TagScope::Event | TagScope::Link, _), _) => {
                 Some(format!("{} (structural refine)", self.target))
             }
@@ -333,6 +382,24 @@ impl Predicate {
                 return Err(PredicateError::NotYetEvaluable { construct });
             }
         }
+        // Two event:name conditions would need the single-event
+        // subgroup conjunction — the structural-refine step's machinery.
+        let event_names = self
+            .conditions
+            .iter()
+            .filter(|c| {
+                matches!(
+                    c.target,
+                    PredicateTarget::Intrinsic(TraceIntrinsic::EventName)
+                )
+            })
+            .count();
+        if event_names > 1 {
+            return Err(PredicateError::NotYetEvaluable {
+                construct: "multiple event:name conditions (single-event subgroup, refine step)"
+                    .to_string(),
+            });
+        }
         Ok(())
     }
 
@@ -357,6 +424,50 @@ impl Predicate {
             Predicate {
                 conditions: trace_level,
             },
+        )
+    }
+
+    /// Strip `trace:id` conditions out of the predicate — they are
+    /// neither span-local (a `TraceSpan` carries no trace id) nor
+    /// trace-level intrinsics; they constrain the ENGINE's candidate
+    /// set: `=` values intersect into a PIN set (phase-1 discovery is
+    /// skipped — pins go straight to assembly), `!=` values union into
+    /// an exclusion filter at pool admission. Run BEFORE the R3-2
+    /// partition. Hex parsing is infallible post-validation.
+    pub(crate) fn split_trace_id_conditions(&self) -> (Predicate, TraceIdConstraints) {
+        let mut rest = Vec::with_capacity(self.conditions.len());
+        let mut pins: Option<std::collections::BTreeSet<sfst::TraceId>> = None;
+        let mut excluded: std::collections::BTreeSet<sfst::TraceId> =
+            std::collections::BTreeSet::new();
+        for condition in &self.conditions {
+            if !matches!(
+                condition.target,
+                PredicateTarget::Intrinsic(TraceIntrinsic::TraceId)
+            ) {
+                rest.push(condition.clone());
+                continue;
+            }
+            let ids = condition.values.iter().map(|v| {
+                let PredicateValue::Text(hex) = v else {
+                    unreachable!("validated: id values are text");
+                };
+                sfst::TraceId::from(parse_hex::<16>(hex))
+            });
+            match condition.op {
+                CompareOp::Eq => {
+                    let set: std::collections::BTreeSet<sfst::TraceId> = ids.collect();
+                    pins = Some(match pins {
+                        None => set,
+                        Some(prev) => prev.intersection(&set).copied().collect(),
+                    });
+                }
+                CompareOp::NotEq => excluded.extend(ids),
+                _ => unreachable!("validated: trace:id takes = / !="),
+            }
+        }
+        (
+            Predicate { conditions: rest },
+            TraceIdConstraints { pins, excluded },
         )
     }
 
@@ -410,6 +521,51 @@ impl Predicate {
                             },
                         ),
                     });
+                }
+                (
+                    PredicateTarget::Intrinsic(
+                        i @ (TraceIntrinsic::SpanId | TraceIntrinsic::ParentSpanId),
+                    ),
+                    op,
+                ) => {
+                    terms.push(PlanTerm::IdColumn {
+                        column: match i {
+                            TraceIntrinsic::SpanId => sfst::IdColumnKind::SpanId,
+                            _ => sfst::IdColumnKind::ParentSpanId,
+                        },
+                        ids: hex_span_ids(&condition.values),
+                        negated: matches!(op, CompareOp::NotEq),
+                    });
+                }
+                (
+                    PredicateTarget::Intrinsic(TraceIntrinsic::LinkSpanId),
+                    CompareOp::Eq,
+                ) => {
+                    terms.push(PlanTerm::LinkIds {
+                        ids: sfst::LinkIdMatch::Span(hex_span_ids(&condition.values)),
+                    });
+                }
+                (
+                    PredicateTarget::Intrinsic(TraceIntrinsic::LinkTraceId),
+                    CompareOp::Eq,
+                ) => {
+                    terms.push(PlanTerm::LinkIds {
+                        ids: sfst::LinkIdMatch::Trace(
+                            condition
+                                .values
+                                .iter()
+                                .map(|v| {
+                                    let PredicateValue::Text(hex) = v else {
+                                        unreachable!("validated: id values are text");
+                                    };
+                                    sfst::TraceId::from(parse_hex::<16>(hex))
+                                })
+                                .collect(),
+                        ),
+                    });
+                }
+                (PredicateTarget::Intrinsic(TraceIntrinsic::TraceId), _) => {
+                    unreachable!("trace:id conditions are split out before lowering")
                 }
                 (target, op) => {
                     let fields: Vec<String> = match target {
@@ -501,6 +657,39 @@ impl Predicate {
     }
 }
 
+/// The engine-level candidate constraints of `trace:id` conditions
+/// (see [`Predicate::split_trace_id_conditions`]).
+pub(crate) struct TraceIdConstraints {
+    /// `Some` = the candidate set is EXACTLY these ids (already the
+    /// intersection of every `trace:id =` condition; may be empty).
+    pub(crate) pins: Option<std::collections::BTreeSet<sfst::TraceId>>,
+    /// Ids excluded by `trace:id !=` conditions.
+    pub(crate) excluded: std::collections::BTreeSet<sfst::TraceId>,
+}
+
+/// Parse a validated fixed-width hex id (validation guarantees length
+/// and hex digits).
+fn parse_hex<const N: usize>(hex: &str) -> [u8; N] {
+    let mut bytes = [0u8; N];
+    for (i, chunk) in hex.as_bytes().chunks(2).enumerate() {
+        bytes[i] = u8::from_str_radix(std::str::from_utf8(chunk).expect("ascii hex"), 16)
+            .expect("validated hex");
+    }
+    bytes
+}
+
+fn hex_span_ids(values: &[PredicateValue]) -> Vec<sfst::SpanId> {
+    values
+        .iter()
+        .map(|v| {
+            let PredicateValue::Text(hex) = v else {
+                unreachable!("validated: id values are text");
+            };
+            sfst::SpanId::from(parse_hex::<8>(hex))
+        })
+        .collect()
+}
+
 /// Inclusive `[min_ns, max_ns]` bounds for a duration comparison —
 /// shared by the plan lowering and the span-side evaluator so the two
 /// paths convert exclusivity identically (integer nanoseconds, so
@@ -570,6 +759,14 @@ enum EvalTerm {
         intervals: Vec<(Option<i64>, Option<i64>)>,
         negated: bool,
     },
+    IdColumn {
+        column: sfst::IdColumnKind,
+        ids: Vec<sfst::SpanId>,
+        negated: bool,
+    },
+    LinkIds {
+        ids: sfst::LinkIdMatch,
+    },
 }
 
 /// The span-side predicate evaluator — the single source of truth for
@@ -616,6 +813,16 @@ impl EvalPredicate {
                     intervals: intervals.clone(),
                     negated: *negated,
                 },
+                PlanTerm::IdColumn {
+                    column,
+                    ids,
+                    negated,
+                } => EvalTerm::IdColumn {
+                    column: *column,
+                    ids: ids.clone(),
+                    negated: *negated,
+                },
+                PlanTerm::LinkIds { ids } => EvalTerm::LinkIds { ids: ids.clone() },
             })
             .collect();
         Self { terms }
@@ -639,14 +846,27 @@ impl EvalPredicate {
                 // the unscoped disjunction; multi-valued fields yield
                 // several entries). Negation is the pinned
                 // presence ∩ complement: present with NO matching value.
+                // Materialized spans expose event names STRUCTURED (the
+                // flat `events.name` token exists only in the raw
+                // dictionaries) — the R3-3 translation gathers them from
+                // `TraceEvent.name`.
                 let mut present = false;
                 let mut any_match = false;
-                for (k, v) in &span.fields {
-                    if fields.iter().any(|f| f == k) {
+                {
+                    let mut visit = |value: &str| {
                         present = true;
-                        if matcher.value_matches(v) {
+                        if matcher.value_matches(value) {
                             any_match = true;
-                            break;
+                        }
+                    };
+                    for (k, v) in &span.fields {
+                        if fields.iter().any(|f| f == k) {
+                            visit(v);
+                        }
+                    }
+                    if fields.iter().any(|f| f == "events.name") {
+                        for event in &span.events {
+                            visit(&event.name);
                         }
                     }
                 }
@@ -659,6 +879,26 @@ impl EvalPredicate {
                 });
                 in_any != *negated
             }
+            EvalTerm::IdColumn {
+                column,
+                ids,
+                negated,
+            } => {
+                let id = match column {
+                    sfst::IdColumnKind::SpanId => span.span_id,
+                    sfst::IdColumnKind::ParentSpanId => span.parent_span_id,
+                };
+                // The UNSET sentinel is ABSENT for both polarities: a
+                // root span never satisfies `span:parentID != x`.
+                if id.is_unset() {
+                    return false;
+                }
+                ids.contains(&id) != *negated
+            }
+            EvalTerm::LinkIds { ids } => span.links.iter().any(|l| match ids {
+                sfst::LinkIdMatch::Span(wanted) => wanted.contains(&l.span_id),
+                sfst::LinkIdMatch::Trace(wanted) => wanted.contains(&l.trace_id),
+            }),
         })
     }
 }
@@ -892,12 +1132,91 @@ mod tests {
             vec![text("v")],
         ))
         .contains("refine"));
+        // The colon set: span/parent/trace ids both polarities; link
+        // ids and event:name positive-only (the negated subgroup
+        // semantics are the recorded open question).
+        for i in [
+            TraceIntrinsic::SpanId,
+            TraceIntrinsic::ParentSpanId,
+        ] {
+            for op in [CompareOp::Eq, CompareOp::NotEq] {
+                evaluable(cond(
+                    PredicateTarget::Intrinsic(i),
+                    op,
+                    vec![text("00f067aa0ba902b7")],
+                ));
+            }
+        }
+        for op in [CompareOp::Eq, CompareOp::NotEq] {
+            evaluable(cond(
+                PredicateTarget::Intrinsic(TraceIntrinsic::TraceId),
+                op,
+                vec![text("4bf92f3577b34da6a3ce929d0e0e4736")],
+            ));
+        }
+        evaluable(cond(
+            PredicateTarget::Intrinsic(TraceIntrinsic::LinkSpanId),
+            CompareOp::Eq,
+            vec![text("00f067aa0ba902b7")],
+        ));
+        evaluable(cond(
+            PredicateTarget::Intrinsic(TraceIntrinsic::LinkTraceId),
+            CompareOp::Eq,
+            vec![text("4bf92f3577b34da6a3ce929d0e0e4736")],
+        ));
         assert!(rejected(cond(
+            PredicateTarget::Intrinsic(TraceIntrinsic::LinkSpanId),
+            CompareOp::NotEq,
+            vec![text("00f067aa0ba902b7")],
+        ))
+        .contains("subgroup"));
+        evaluable(cond(
             PredicateTarget::Intrinsic(TraceIntrinsic::EventName),
             CompareOp::Eq,
             vec![text("v")],
+        ));
+        evaluable(cond(
+            PredicateTarget::Intrinsic(TraceIntrinsic::EventName),
+            CompareOp::Regex,
+            vec![text("v.*")],
+        ));
+        assert!(rejected(cond(
+            PredicateTarget::Intrinsic(TraceIntrinsic::EventName),
+            CompareOp::NotEq,
+            vec![text("v")],
         ))
-        .contains("EventName"));
+        .contains("subgroup"));
+        // TWO event:name conditions need the single-event subgroup.
+        let two = Predicate {
+            conditions: vec![
+                cond(
+                    PredicateTarget::Intrinsic(TraceIntrinsic::EventName),
+                    CompareOp::Eq,
+                    vec![text("a")],
+                ),
+                cond(
+                    PredicateTarget::Intrinsic(TraceIntrinsic::EventName),
+                    CompareOp::Eq,
+                    vec![text("b")],
+                ),
+            ],
+        };
+        assert!(matches!(
+            two.ensure_evaluable(),
+            Err(PredicateError::NotYetEvaluable { construct }) if construct.contains("multiple event:name")
+        ));
+        // Malformed hex ids fail STRUCTURAL validation.
+        assert!(matches!(
+            (Predicate {
+                conditions: vec![cond(
+                    PredicateTarget::Intrinsic(TraceIntrinsic::SpanId),
+                    CompareOp::Eq,
+                    vec![text("not-hex")],
+                )]
+            })
+            .validate(),
+            Err(PredicateError::InvalidIdValue { width: 16, .. })
+        ));
         assert!(rejected(cond(
             PredicateTarget::Intrinsic(TraceIntrinsic::RootServiceName),
             CompareOp::Eq,
@@ -916,12 +1235,6 @@ mod tests {
             vec![PredicateValue::Integer(5)],
         ))
         .contains("EventTimeSinceStart"));
-        assert!(rejected(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::SpanId),
-            CompareOp::Eq,
-            vec![text("00f067aa0ba902b7")],
-        ))
-        .contains("SpanId"));
     }
 
     /// Partition (R3-2): trace-level intrinsics split out; everything

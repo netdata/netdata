@@ -152,6 +152,7 @@ fn early_requests() -> Vec<ExportTraceServiceRequest> {
             SpanSpec {
                 status: Some((2, "boom")),
                 attrs: vec![kv_str("http.method", "POST")],
+                events: vec![("exception", vec![kv_str("exception.type", "IOError")])],
                 ..span_in(2, 0x21, 0, 1_100 * NS, "POST /orders")
             },
             SpanSpec {
@@ -163,6 +164,7 @@ fn early_requests() -> Vec<ExportTraceServiceRequest> {
             SpanSpec {
                 kind: 5, // CONSUMER
                 attrs: vec![kv_str("queue", "q1"), kv_str("retries", "3")],
+                links: vec![(tid(1), [0x11; 8], vec![kv_str("rel", "follows")])],
                 ..span_in(4, 0x41, 0, 1_200 * NS, "consume")
             },
             // T6's CANONICAL copy (chronologically first).
@@ -453,6 +455,109 @@ fn oracle_equivalence_under_relayouts() {
             )])),
             vec![hex(4)],
         ),
+        (
+            // span:id — the SPAN column scan; T5's middle child.
+            "span-id",
+            SearchQuery::new(pred(vec![intrinsic(
+                TraceIntrinsic::SpanId,
+                CompareOp::Eq,
+                vec![text("5252525252525252")],
+            )])),
+            vec![hex(5)],
+        ),
+        (
+            // span:parentID — children of T5's root.
+            "parent-id",
+            SearchQuery::new(pred(vec![intrinsic(
+                TraceIntrinsic::ParentSpanId,
+                CompareOp::Eq,
+                vec![text("5151515151515151")],
+            )])),
+            vec![hex(5)],
+        ),
+        (
+            // Negated parent id: parent PRESENT and ≠ T5's root — roots
+            // (unset parent = absent) never satisfy it.
+            "negated-parent-id",
+            SearchQuery::new(pred(vec![intrinsic(
+                TraceIntrinsic::ParentSpanId,
+                CompareOp::NotEq,
+                vec![text("5151515151515151")],
+            )])),
+            vec![hex(3), hex(1)],
+        ),
+        (
+            // trace:id pins the candidate set; the span-local remainder
+            // still applies in phase 2.
+            "trace-id-pin",
+            SearchQuery::new(pred(vec![
+                intrinsic(
+                    TraceIntrinsic::TraceId,
+                    CompareOp::Eq,
+                    vec![text(&hex(5)), text(&hex(2))],
+                ),
+                intrinsic(TraceIntrinsic::Status, CompareOp::Eq, vec![text("ERROR")]),
+            ])),
+            vec![hex(5), hex(2)],
+        ),
+        (
+            // A pin whose remainder fails phase-2 re-evaluation drops.
+            "trace-id-pin-no-match",
+            SearchQuery::new(pred(vec![
+                intrinsic(TraceIntrinsic::TraceId, CompareOp::Eq, vec![text(&hex(1))]),
+                intrinsic(TraceIntrinsic::Status, CompareOp::Eq, vec![text("ERROR")]),
+            ])),
+            vec![],
+        ),
+        (
+            // trace:id != excludes at pool admission.
+            "trace-id-excluded",
+            SearchQuery::new(pred(vec![
+                intrinsic(TraceIntrinsic::Status, CompareOp::Eq, vec![text("ERROR")]),
+                intrinsic(TraceIntrinsic::TraceId, CompareOp::NotEq, vec![text(&hex(5))]),
+            ])),
+            vec![hex(2)],
+        ),
+        (
+            // link:spanID / link:traceID — the LNKB row scan; T4 links
+            // to T1's root span.
+            "link-span-id",
+            SearchQuery::new(pred(vec![intrinsic(
+                TraceIntrinsic::LinkSpanId,
+                CompareOp::Eq,
+                vec![text("1111111111111111")],
+            )])),
+            vec![hex(4)],
+        ),
+        (
+            "link-trace-id",
+            SearchQuery::new(pred(vec![intrinsic(
+                TraceIntrinsic::LinkTraceId,
+                CompareOp::Eq,
+                vec![text(&hex(1))],
+            )])),
+            vec![hex(4)],
+        ),
+        (
+            // event:name rides the flat events.name token; the span-side
+            // evaluator gathers from the STRUCTURED event names.
+            "event-name",
+            SearchQuery::new(pred(vec![intrinsic(
+                TraceIntrinsic::EventName,
+                CompareOp::Eq,
+                vec![text("exception")],
+            )])),
+            vec![hex(2)],
+        ),
+        (
+            "event-name-regex",
+            SearchQuery::new(pred(vec![intrinsic(
+                TraceIntrinsic::EventName,
+                CompareOp::Regex,
+                vec![text("exc.*")],
+            )])),
+            vec![hex(2)],
+        ),
     ];
 
     let world = world(dir.path());
@@ -654,19 +759,28 @@ fn request_validation_matrix() {
     ));
     // Stage-B constructs: named not-yet-evaluable request errors.
     for stage_b in [
-        // Steps 7-9 constructs stay not-yet-evaluable after step 6.
+        // Steps 8-9 constructs stay not-yet-evaluable after step 7.
         cond(
             PredicateTarget::Attribute(TagScope::Event, "msg".into()),
             CompareOp::Eq,
             vec![text("v")],
         ),
-        intrinsic(TraceIntrinsic::EventName, CompareOp::Eq, vec![text("e")]),
+        intrinsic(TraceIntrinsic::EventName, CompareOp::NotEq, vec![text("e")]),
+        intrinsic(
+            TraceIntrinsic::LinkSpanId,
+            CompareOp::NotEq,
+            vec![text("00f067aa0ba902b7")],
+        ),
+        intrinsic(
+            TraceIntrinsic::EventTimeSinceStart,
+            CompareOp::Gt,
+            vec![PredicateValue::Integer(5)],
+        ),
         intrinsic(
             TraceIntrinsic::TraceDuration,
             CompareOp::Gt,
             vec![PredicateValue::Integer(5)],
         ),
-        intrinsic(TraceIntrinsic::SpanId, CompareOp::Eq, vec![text("00f067aa0ba902b7")]),
     ] {
         assert!(
             matches!(
@@ -1047,6 +1161,40 @@ fn budget_truncated_old_source_cannot_falsify_completeness() {
         SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m", "yes")])).limit(1),
     );
     assert_eq!(ids(&unbudgeted), vec![hex(249)]);
+}
+
+/// `trace:id =` pins bypass phase-1 discovery entirely: the search
+/// answers with a ZERO visited-rows budget (assembly is not a
+/// discovery cost), proving no scan ran.
+#[test]
+fn trace_id_pins_skip_discovery() {
+    let dir = tempfile::tempdir().unwrap();
+    let mut all = early_requests();
+    all.extend(late_requests());
+    let wal = write_wal(dir.path(), all, "world");
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let data = run(
+        sources,
+        SearchQuery::new(pred(vec![intrinsic(
+            TraceIntrinsic::TraceId,
+            CompareOp::Eq,
+            vec![text(&hex(5))],
+        )]))
+        .visited_rows_ceiling_for_tests(0),
+    );
+    assert_eq!(ids(&data), vec![hex(5)]);
+    assert_eq!(data.status, QueryStatus::Complete);
+    // Two contradictory pins intersect to nothing: Complete empty.
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let none = run(
+        sources,
+        SearchQuery::new(pred(vec![
+            intrinsic(TraceIntrinsic::TraceId, CompareOp::Eq, vec![text(&hex(5))]),
+            intrinsic(TraceIntrinsic::TraceId, CompareOp::Eq, vec![text(&hex(4))]),
+        ])),
+    );
+    assert!(none.traces.is_empty());
+    assert_eq!(none.status, QueryStatus::Complete);
 }
 
 /// UNSET trace ids never become candidates (TRCE carries zeros for

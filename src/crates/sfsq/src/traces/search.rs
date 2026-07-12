@@ -311,16 +311,26 @@ impl FileDiscovery {
 /// best-first — `(newest start, then smallest trace_id)` per the pinned
 /// raw ranking. Examined traces never re-enter (a refill can only
 /// re-discover them at an equal-or-worse rank).
-#[derive(Default)]
 struct CandidatePool {
     ranked: BTreeSet<(std::cmp::Reverse<i64>, TraceId)>,
     best: HashMap<TraceId, i64>,
     examined: HashSet<TraceId>,
+    /// Ids excluded by `trace:id !=` conditions — never admitted.
+    excluded: BTreeSet<TraceId>,
 }
 
 impl CandidatePool {
+    fn new(excluded: BTreeSet<TraceId>) -> Self {
+        Self {
+            ranked: BTreeSet::new(),
+            best: HashMap::new(),
+            examined: HashSet::new(),
+            excluded,
+        }
+    }
+
     fn add(&mut self, trace_id: TraceId, start_ns: i64) {
-        if self.examined.contains(&trace_id) {
+        if self.examined.contains(&trace_id) || self.excluded.contains(&trace_id) {
             return;
         }
         match self.best.get_mut(&trace_id) {
@@ -405,10 +415,13 @@ pub fn search(
         }
     }
 
-    // Stage A: `ensure_evaluable` rejected trace-level intrinsics, so
-    // the trace-level part is empty; the partition is still the pinned
-    // seam (R3-2) stage B fills.
-    let (span_local, _trace_level) = query.predicate.partition();
+    // `trace:id` conditions split out FIRST (they constrain the
+    // candidate set, not the spans); the R3-2 partition applies to the
+    // remainder. `ensure_evaluable` still rejects trace-level
+    // intrinsics, so the trace-level part stays empty until the
+    // post-assembly step lands.
+    let (remainder, trace_ids) = query.predicate.split_trace_id_conditions();
+    let (span_local, _trace_level) = remainder.partition();
     let plan = span_local.to_trace_plan();
     let eval = EvalPredicate::new(&plan);
 
@@ -496,8 +509,24 @@ pub fn search(
         *acc = Some(acc.map_or(bound, |b| b.max(bound)));
     };
     let mut files: Vec<FileDiscovery> = Vec::new();
-    let mut pool = CandidatePool::default();
+    let mut pool = CandidatePool::new(trace_ids.excluded);
+    // `trace:id =` PINS the candidate set: discovery is skipped whole —
+    // the pins go straight to assembly (examine-all ranks; UNSET ids
+    // are not traces and drop per the pinned candidate rule), and
+    // phase-2 re-evaluation still applies the span-local remainder +
+    // window, so exactness holds.
+    let pinned = trace_ids.pins.is_some();
+    if let Some(pins) = trace_ids.pins {
+        for trace_id in pins {
+            if !trace_id.is_unset() {
+                pool.add(trace_id, i64::MAX);
+            }
+        }
+    }
     for (reader, source) in &readers {
+        if pinned {
+            break;
+        }
         if cancel.is_cancelled() {
             return Ok(cancelled_empty(status));
         }
@@ -554,6 +583,9 @@ pub fn search(
         }
     }
     'tails: for (source_id, scan) in &tails {
+        if pinned {
+            break;
+        }
         if cancel.is_cancelled() {
             return Ok(cancelled_empty(status));
         }
