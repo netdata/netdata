@@ -561,14 +561,15 @@ static size_t print_uint64(char *dst, uint64_t value) {
 ALWAYS_INLINE
 static size_t print_int64(char *dst, int64_t value) {
     size_t len = 0;
+    uint64_t magnitude = (uint64_t)value;
 
     if(value < 0) {
         *dst++ = '-';
-        value = -value;
+        magnitude = UINT64_C(0) - magnitude;
         len++;
     }
 
-    return print_uint64(dst, value) + len;
+    return print_uint64(dst, magnitude) + len;
 }
 
 #define UINT64_MAX_LENGTH (24) // 21 should be enough
@@ -646,13 +647,14 @@ static void buffer_print_uint64_base64(BUFFER *wb, uint64_t value) {
 ALWAYS_INLINE
 static void buffer_print_int64_hex(BUFFER *wb, int64_t value) {
     buffer_need_bytes(wb, 2);
+    uint64_t magnitude = (uint64_t)value;
 
     if(value < 0) {
         buffer_putc(wb, '-');
-        value = -value;
+        magnitude = UINT64_C(0) - magnitude;
     }
 
-    buffer_print_uint64_hex(wb, (uint64_t)value);
+    buffer_print_uint64_hex(wb, magnitude);
 
     buffer_overflow_check(wb);
 }
@@ -660,13 +662,14 @@ static void buffer_print_int64_hex(BUFFER *wb, int64_t value) {
 ALWAYS_INLINE
 static void buffer_print_int64_base64(BUFFER *wb, int64_t value) {
     buffer_need_bytes(wb, 2);
+    uint64_t magnitude = (uint64_t)value;
 
     if(value < 0) {
         buffer_putc(wb, '-');
-        value = -value;
+        magnitude = UINT64_C(0) - magnitude;
     }
 
-    buffer_print_uint64_base64(wb, (uint64_t)value);
+    buffer_print_uint64_base64(wb, magnitude);
 
     buffer_overflow_check(wb);
 }

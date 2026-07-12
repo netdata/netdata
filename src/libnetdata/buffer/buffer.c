@@ -535,6 +535,10 @@ int buffer_unittest(void) {
     buffer_int64_roundtrip(wb, NUMBER_ENCODING_HEX, (int64_t)-9223372036854775807ULL, "-0x7FFFFFFFFFFFFFFF");
     buffer_int64_roundtrip(wb, NUMBER_ENCODING_BASE64, (int64_t)-9223372036854775807ULL, "-#H//////////");
 
+    errors += buffer_int64_roundtrip(wb, NUMBER_ENCODING_DECIMAL, INT64_MIN, "-9223372036854775808");
+    errors += buffer_int64_roundtrip(wb, NUMBER_ENCODING_HEX, INT64_MIN, "-0x8000000000000000");
+    errors += buffer_int64_roundtrip(wb, NUMBER_ENCODING_BASE64, INT64_MIN, "-#IAAAAAAAAAA");
+
     static const struct {
         const char *encoded;
         int64_t expected;
