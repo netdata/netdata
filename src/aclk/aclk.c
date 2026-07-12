@@ -109,7 +109,6 @@ static void aclk_ssl_keylog_cb(const SSL *ssl, const char *line)
 #endif
 
 #if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
-OSSL_DECODER_CTX *aclk_dctx = NULL;
 EVP_PKEY *aclk_private_key = NULL;
 #else
 static RSA *aclk_private_key = NULL;
@@ -119,10 +118,6 @@ static int load_private_key()
     if (aclk_private_key != NULL) {
 #if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
         EVP_PKEY_free(aclk_private_key);
-        if (aclk_dctx)
-            OSSL_DECODER_CTX_free(aclk_dctx);
-
-        aclk_dctx = NULL;
 #else
         RSA_free(aclk_private_key);
 #endif
@@ -139,44 +134,57 @@ static int load_private_key()
     }
     netdata_log_debug(D_ACLK, "Claimed agent loaded private key len=%ld bytes", bytes_read);
 
+    int rc = 1;
     BIO *key_bio = BIO_new_mem_buf(private_key, -1);
     if (key_bio==NULL) {
         netdata_log_error("ACLK: Claimed agent cannot establish ACLK - failed to create BIO for key");
-        goto biofailed;
+        goto cleanup;
     }
 
 #if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
-    aclk_dctx = OSSL_DECODER_CTX_new_for_pkey(&aclk_private_key, "PEM", NULL,
-                                              "RSA",
-                                              OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
-                                              NULL, NULL);
+    OSSL_DECODER_CTX *dctx = OSSL_DECODER_CTX_new_for_pkey(&aclk_private_key, "PEM", NULL,
+                                                          "RSA",
+                                                          OSSL_KEYMGMT_SELECT_PRIVATE_KEY,
+                                                          NULL, NULL);
 
-    if (!aclk_dctx) {
+    if (!dctx) {
         netdata_log_error("ACLK: Loading private key (from claiming) failed - no OpenSSL Decoders found");
-        goto biofailed;
+        goto cleanup;
     }
 
     // this is necesseary to avoid RSA key with wrong size
-    if (!OSSL_DECODER_from_bio(aclk_dctx, key_bio)) {
+    int decoded = OSSL_DECODER_from_bio(dctx, key_bio);
+    OSSL_DECODER_CTX_free(dctx);
+    if (!decoded) {
         netdata_log_error("ACLK: Decoding private key (from claiming) failed - invalid format.");
-        goto biofailed;
+        goto cleanup;
     }
 #else
     aclk_private_key = PEM_read_bio_RSAPrivateKey(key_bio, NULL, NULL, NULL);
-#endif
     BIO_free(key_bio);
+    key_bio = NULL;
+#endif
     if (aclk_private_key!=NULL)
-    {
-        freez(private_key);
-        return 0;
+        rc = 0;
+    else {
+        char err[512];
+        ERR_error_string_n(ERR_get_error(), err, sizeof(err));
+        netdata_log_error("ACLK: Claimed agent cannot establish ACLK - cannot create private key: %s", err);
     }
-    char err[512];
-    ERR_error_string_n(ERR_get_error(), err, sizeof(err));
-    netdata_log_error("ACLK: Claimed agent cannot establish ACLK - cannot create private key: %s", err);
 
-biofailed:
+cleanup:
+    if (key_bio)
+        BIO_free(key_bio);
+    if (rc && aclk_private_key) {
+#if OPENSSL_VERSION_NUMBER >= OPENSSL_VERSION_300
+        EVP_PKEY_free(aclk_private_key);
+#else
+        RSA_free(aclk_private_key);
+#endif
+        aclk_private_key = NULL;
+    }
     freez(private_key);
-    return 1;
+    return rc;
 }
 
 /**
