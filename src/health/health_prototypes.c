@@ -432,7 +432,7 @@ bool health_prototype_add(RRD_ALERT_PROTOTYPE *ap, char **msg) {
         }
     }
 
-    if(!ap->config.update_every) {
+    if(ap->config.update_every <= 0) {
         netdata_log_error(
             "HEALTH: alert '%s' has no frequency (parameter 'every'). Source: %s",
             string2str(ap->config.name), string2str(ap->config.source));

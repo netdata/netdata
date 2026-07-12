@@ -111,7 +111,19 @@ static bool parse_config_value(json_object *jobj, const char *path, struct rrd_a
     JSONC_PARSE_SUBOBJECT_CB(jobj, path, "database_lookup", config, parse_config_value_database_lookup, error, flags);
     JSONC_PARSE_TXT2EXPRESSION_OR_ERROR_AND_RETURN(jobj, path, "calculation", config->calculation, error, JSONC_OPTIONAL);
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "units", config->units, error, JSONC_OPTIONAL);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "update_every", config->update_every, error, flags);
+    int64_t update_every = config->update_every;
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "update_every", update_every, error, flags);
+    if(update_every < 0) {
+        buffer_sprintf(error, "negative value for '%s.update_every'", path);
+        return false;
+    }
+    if(update_every > INT_MAX) {
+        buffer_sprintf(error, "value for '%s.update_every' exceeds maximum %d", path, INT_MAX);
+        return false;
+    }
+
+    config->update_every = (int)update_every;
+
     return true;
 }
 

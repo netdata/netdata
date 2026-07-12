@@ -141,7 +141,7 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, time_t now, time_t *next_run) 
         return 0;
     }
 
-    if(unlikely(!rc->config.update_every)) {
+    if(unlikely(rc->config.update_every <= 0)) {
         netdata_log_debug(D_HEALTH, "Health not running alarm '%s.%s'. It does not have an update frequency", rrdcalc_chart_name(rc), rrdcalc_name(rc));
         return 0;
     }

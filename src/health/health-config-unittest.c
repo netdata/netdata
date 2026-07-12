@@ -342,14 +342,19 @@ static int test_db_lookup_frequency_boundaries(int *passed) {
     static const struct {
         int after;
         const char *every;
+        bool expected_result;
         int expected_every;
         const char *description;
     } tests[] = {
-        { INT_MIN, NULL, INT_MIN < -INT_MAX ? 0 : INT_MAX, "minimum after uses a representable frequency" },
-        { INT_MIN, "1s", 1, "minimum after accepts an explicit frequency" },
-        { INT_MIN + 1, NULL, -(INT_MIN + 1), "adjacent minimum after keeps its magnitude" },
-        { -1, NULL, 1, "ordinary negative after keeps its magnitude" },
-        { INT_MAX, NULL, INT_MAX, "maximum after keeps its magnitude" },
+        { INT_MIN, NULL, true, INT_MIN < -INT_MAX ? 0 : INT_MAX, "minimum after uses a representable frequency" },
+        { INT_MIN, "1s", true, 1, "minimum after accepts an explicit frequency" },
+        { INT_MIN + 1, NULL, true, -(INT_MIN + 1), "adjacent minimum after keeps its magnitude" },
+        { -600, "-1s", false, 600, "negative frequency preserves the derived default" },
+        { -600, "0s", true, 0, "zero frequency remains the missing-frequency sentinel" },
+        { -600, "1s", true, 1, "minimum positive frequency is accepted" },
+        { -600, "10s", true, 10, "ordinary positive frequency is accepted" },
+        { -1, NULL, true, 1, "ordinary negative after keeps its magnitude" },
+        { INT_MAX, NULL, true, INT_MAX, "maximum after keeps its magnitude" },
     };
 
     int failed = 0;
@@ -362,7 +367,8 @@ static int test_db_lookup_frequency_boundaries(int *passed) {
         ac.time_group_value = NAN;
 
         int result = health_parse_db_lookup(1, "unittest", buffer, &ac);
-        if(!result || ac.after != tests[i].after || ac.update_every != tests[i].expected_every) {
+        if((bool)result != tests[i].expected_result || ac.after != tests[i].after ||
+           ac.update_every != tests[i].expected_every) {
             fprintf(stderr,
                     "FAILED [%s]: result=%d after=%d update_every=%d\n",
                     tests[i].description, result, ac.after, ac.update_every);
@@ -372,6 +378,102 @@ static int test_db_lookup_frequency_boundaries(int *passed) {
             (*passed)++;
 
         string_freez(ac.dimensions);
+    }
+
+    return failed;
+}
+
+static int test_dyncfg_update_every_boundaries(int *passed) {
+    static const struct {
+        const char *value_member;
+        int expected_code;
+        bool expected_every;
+        const char *expected_error;
+        const char *description;
+    } tests[] = {
+        { "", HTTP_RESP_OK, false, NULL, "omitted frequency remains optional for user config conversion" },
+        { "\"update_every\":0", HTTP_RESP_OK, false, NULL, "zero frequency remains the missing-frequency sentinel" },
+        { "\"update_every\":-1", HTTP_RESP_BAD_REQUEST, false, "negative", "negative integer frequency is rejected" },
+        { "\"update_every\":\"-1\"", HTTP_RESP_BAD_REQUEST, false, "negative", "negative string frequency is rejected" },
+        { "\"update_every\":-4294967295", HTTP_RESP_BAD_REQUEST, false, "negative", "large negative integer cannot wrap positive" },
+        { "\"update_every\":\"-4294967295\"", HTTP_RESP_BAD_REQUEST, false, "negative", "large negative string cannot wrap positive" },
+        { "\"update_every\":9223372036854775807", HTTP_RESP_BAD_REQUEST, false, "maximum", "out-of-range positive frequency is rejected" },
+        { "\"update_every\":1", HTTP_RESP_OK, true, NULL, "minimum positive frequency is accepted" },
+        { "\"update_every\":10", HTTP_RESP_OK, true, NULL, "ordinary positive frequency is accepted" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        CLEAN_BUFFER *payload = buffer_create(0, NULL);
+        CLEAN_BUFFER *result = buffer_create(0, NULL);
+
+        buffer_sprintf(payload,
+                       "{\"format_version\":1,\"rules\":[{\"enabled\":true,\"type\":\"instance\","
+                       "\"config\":{\"value\":{%s},\"match\":{\"on\":\"chart\"}}}]}",
+                       tests[i].value_member);
+
+        int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_USERCONFIG, "unittest",
+                                    payload, NULL, NULL, result, HTTP_ACCESS_NONE, NULL, NULL);
+        bool has_every = strstr(buffer_tostring(result), "every: ") != NULL;
+        bool has_expected_error = !tests[i].expected_error ||
+                                  strstr(buffer_tostring(result), tests[i].expected_error) != NULL;
+
+        if(code != tests[i].expected_code || has_every != tests[i].expected_every ||
+           !has_expected_error) {
+            fprintf(stderr,
+                    "FAILED [%s]: code=%d has_every=%d response='%s'\n",
+                    tests[i].description, code, has_every, buffer_tostring(result));
+            failed++;
+        }
+        else
+            (*passed)++;
+    }
+
+    CLEAN_BUFFER *payload = buffer_create(0, NULL);
+    CLEAN_BUFFER *result = buffer_create(0, NULL);
+    buffer_strcat(payload,
+                  "{\"format_version\":1,\"rules\":["
+                  "{\"enabled\":true,\"type\":\"instance\",\"config\":{"
+                  "\"value\":{\"update_every\":1},\"match\":{\"on\":\"first\"}}},"
+                  "{\"enabled\":true,\"type\":\"instance\",\"config\":{"
+                  "\"value\":{\"update_every\":-1},\"match\":{\"on\":\"second\"}}}]}" );
+
+    int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_USERCONFIG, "unittest",
+                                payload, NULL, NULL, result, HTTP_ACCESS_NONE, NULL, NULL);
+    if(code != HTTP_RESP_BAD_REQUEST || !strstr(buffer_tostring(result), "negative")) {
+        fprintf(stderr,
+                "FAILED [negative frequency in a later rule is rejected]: code=%d response='%s'\n",
+                code, buffer_tostring(result));
+        failed++;
+    }
+    else
+        (*passed)++;
+
+    return failed;
+}
+
+static int test_prototype_rejects_non_positive_update_every(int *passed) {
+    static const int tests[] = { -1, 0 };
+    int failed = 0;
+
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        RRD_ALERT_PROTOTYPE ap = { 0 };
+        ap.match.on.chart = string_strdupz("chart");
+        ap.config.name = string_strdupz("unittest");
+        ap.config.source = string_strdupz("unittest");
+        ap.config.update_every = tests[i];
+
+        char *msg = NULL;
+        if(health_prototype_add(&ap, &msg) || !msg || strcmp(msg, "missing update frequency") != 0) {
+            fprintf(stderr,
+                    "FAILED [prototype rejects update_every=%d]: msg='%s'\n",
+                    tests[i], msg ? msg : "");
+            failed++;
+        }
+        else
+            (*passed)++;
+
+        health_prototype_cleanup(&ap);
     }
 
     return failed;
@@ -398,6 +500,8 @@ int health_config_unittest(void) {
     }
 
     failed += test_db_lookup_frequency_boundaries(&passed);
+    failed += test_dyncfg_update_every_boundaries(&passed);
+    failed += test_prototype_rejects_non_positive_update_every(&passed);
 
     fprintf(stderr, "\n===================================================\n");
     fprintf(stderr, "Health config parser tests: %d passed, %d failed\n\n", passed, failed);

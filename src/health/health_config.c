@@ -112,6 +112,15 @@ static inline ALERT_ACTION_OPTIONS health_parse_options(const char *s) {
     return options;
 }
 
+static inline bool health_parse_update_every(const char *value, int *update_every) {
+    int parsed;
+    if(!duration_parse_seconds(value, &parsed) || parsed < 0)
+        return false;
+
+    *update_every = parsed;
+    return true;
+}
+
 static inline int health_parse_repeat(
         size_t line,
         const char *file,
@@ -336,7 +345,7 @@ int health_parse_db_lookup(size_t line, const char *filename, char *string, stru
             while(*s && !isspace((uint8_t)*s)) s++;
             while(*s && isspace((uint8_t)*s)) *s++ = '\0';
 
-            if (!duration_parse_seconds(value, &ac->update_every)) {
+            if (!health_parse_update_every(value, &ac->update_every)) {
                 netdata_log_error("Health configuration at line %zu of file '%s': invalid duration '%s' for '%s' keyword",
                                   line, filename, value, key);
                 return 0;
@@ -763,7 +772,7 @@ int health_readfile(const char *filename, void *data __maybe_unused, bool stock_
             health_parse_db_lookup(line, filename, value, ac);
         }
         else if(hash == hash_every && !strcasecmp(key, HEALTH_EVERY_KEY)) {
-            if(!duration_parse_seconds(value, &ac->update_every))
+            if(!health_parse_update_every(value, &ac->update_every))
                 netdata_log_error(
                     "Health configuration at line %zu of file '%s' for alarm '%s' at key '%s' "
                     "cannot parse duration: '%s'.",
