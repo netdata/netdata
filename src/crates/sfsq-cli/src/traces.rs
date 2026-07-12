@@ -415,11 +415,12 @@ pub struct SearchArgs {
     #[arg(long = "wal")]
     pub wals: Vec<PathBuf>,
 
-    /// A filter condition, repeatable (conditions AND):
-    /// `resource.KEY=VALUE`, `span.KEY=~REGEX`,
-    /// `instrumentation.KEY=VALUE`, or an intrinsic word
-    /// (`name=GET /`, `status=ERROR`, `kind=SERVER`, …). This is the dev
-    /// tool's rendering of the engine's typed predicate, not a wire
+    /// A filter condition, repeatable (conditions AND). TARGET is
+    /// `SCOPE.KEY` (resource/span/instrumentation/event/link), `.KEY`
+    /// (unscoped: resource ∪ span), or an intrinsic word (`name`,
+    /// `status`, `kind`, …). OPS: `=`, `!=` (text), `=~`, `!~`
+    /// (anchored regex), `>`, `<`, `>=`, `<=` (numeric). This is the
+    /// dev tool's rendering of the engine's typed predicate, not a wire
     /// grammar; values are engine storage labels.
     #[arg(long = "where")]
     pub conditions: Vec<String>,
@@ -451,17 +452,30 @@ pub struct SearchArgs {
     pub end_ns: Option<i64>,
 }
 
-/// Parse one `--where` condition: `TARGET=VALUE` or `TARGET=~REGEX`
-/// (first occurrence splits; regex checked first so `=~` never parses
-/// as `=` with a `~value`).
+/// Parse one `--where` condition: `TARGET <op> VALUE` (multi-char ops
+/// checked first so `=~` never parses as `=` with a `~value`, `>=`
+/// never as `>` with `=value`). Ordering ops take numeric values;
+/// `=`/`!=`/`=~`/`!~` take text.
 fn parse_condition(spec: &str) -> Result<Condition> {
-    let (target_word, op, value) = if let Some((t, v)) = spec.split_once("=~") {
-        (t, CompareOp::Regex, v)
-    } else if let Some((t, v)) = spec.split_once('=') {
-        (t, CompareOp::Eq, v)
-    } else {
-        bail!("--where must be TARGET=VALUE or TARGET=~REGEX, got {spec:?}");
-    };
+    const OPS: [(&str, CompareOp); 8] = [
+        ("=~", CompareOp::Regex),
+        ("!~", CompareOp::NotRegex),
+        ("!=", CompareOp::NotEq),
+        (">=", CompareOp::Gte),
+        ("<=", CompareOp::Lte),
+        (">", CompareOp::Gt),
+        ("<", CompareOp::Lt),
+        ("=", CompareOp::Eq),
+    ];
+    let (target_word, op, value) = OPS
+        .iter()
+        .filter_map(|(sym, op)| {
+            spec.find(sym)
+                .map(|at| (at, sym.len(), *op))
+        })
+        .min_by_key(|&(at, len, _)| (at, std::cmp::Reverse(len)))
+        .map(|(at, len, op)| (&spec[..at], op, &spec[at + len..]))
+        .ok_or_else(|| anyhow::anyhow!("--where must be TARGET<op>VALUE, got {spec:?}"))?;
     // An empty value is a structurally valid predicate that matches no
     // well-formed dictionary entry — in this dev tool it is always a
     // typo, so fail loudly instead of returning a silent empty result.
@@ -469,16 +483,34 @@ fn parse_condition(spec: &str) -> Result<Condition> {
         bail!("--where {spec:?} has an empty value");
     }
     let target = parse_target(target_word.trim())?;
+    let value = if matches!(
+        op,
+        CompareOp::Gt | CompareOp::Lt | CompareOp::Gte | CompareOp::Lte
+    ) {
+        if let Ok(n) = value.parse::<i64>() {
+            PredicateValue::Integer(n)
+        } else if let Ok(f) = value.parse::<f64>() {
+            PredicateValue::Float(f)
+        } else {
+            bail!("--where {spec:?}: ordering comparisons take a numeric value");
+        }
+    } else {
+        PredicateValue::Text(value.to_string())
+    };
     Ok(Condition {
         target,
         op,
-        values: vec![PredicateValue::Text(value.to_string())],
+        values: vec![value],
     })
 }
 
 /// A `--where` target: `SCOPE.KEY` for the attribute scopes, a bare
 /// intrinsic word otherwise.
 fn parse_target(word: &str) -> Result<PredicateTarget> {
+    // `.KEY` = the unscoped attribute (resource ∪ span disjunction).
+    if let Some(key) = word.strip_prefix('.') {
+        return Ok(PredicateTarget::UnscopedAttribute(key.to_string()));
+    }
     for (scope_name, scope) in [
         ("resource", TagScope::Resource),
         ("span", TagScope::Span),

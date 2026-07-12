@@ -17,7 +17,10 @@ mod session;
 mod trace_plan;
 
 pub use session::TraceFileSession;
-pub use trace_plan::{CompiledTracePlan, PlanTerm, ScanWork, TracePlan};
+pub use trace_plan::{
+    CompiledTracePlan, NumberCmp, PlanMatcher, PlanTerm, ScanWork, TracePlan,
+    numeric_token_matches,
+};
 
 use crate::{
     BitmapValue, Bucket, FacetResult, FieldEntry, FieldTier, Filter, Grid, Histogram, IdRanges,
@@ -1757,6 +1760,16 @@ impl PosSet {
         self.bitmap = self
             .bitmap
             .and(&self.data, &other.bitmap, &other.data, &mut out);
+        self.data = out;
+    }
+
+    /// In-place difference (`self \= other`) — negation's
+    /// `presence ∩ complement(match)`.
+    fn and_not_assign(&mut self, other: &Self) {
+        let mut out = Vec::new();
+        self.bitmap = self
+            .bitmap
+            .and_not(&self.data, &other.bitmap, &other.data, &mut out);
         self.data = out;
     }
 

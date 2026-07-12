@@ -139,6 +139,10 @@ pub enum PredicateError {
     NonIntegerDuration,
     #[error("invalid regex pattern {pattern:?}: {msg}")]
     InvalidPattern { pattern: String, msg: String },
+    #[error("a condition on {target} mixes text and numeric values")]
+    MixedValueTypes { target: String },
+    #[error("a condition on {target} compares against NaN, which matches nothing")]
+    NanValue { target: String },
     /// The construct is valid grammar but outside this build's evaluable
     /// subset (the stage-A/stage-B boundary, decision 26A) — named so the
     /// caller sees exactly which construct to avoid, never a silently
@@ -193,6 +197,19 @@ impl Condition {
         let all_numeric = self.values.iter().all(|v| {
             matches!(v, PredicateValue::Integer(_) | PredicateValue::Float(_))
         });
+        // One condition compares against ONE value class: mixing text
+        // and numbers has no coherent multi-value semantics (and the
+        // form grammar never generates it); a NaN never compares.
+        if !all_text && !all_numeric {
+            return Err(PredicateError::MixedValueTypes { target });
+        }
+        if self
+            .values
+            .iter()
+            .any(|v| matches!(v, PredicateValue::Float(f) if f.is_nan()))
+        {
+            return Err(PredicateError::NanValue { target });
+        }
 
         match &self.target {
             PredicateTarget::Attribute(TagScope::Intrinsic, key) => {
@@ -250,50 +267,44 @@ impl Condition {
         Ok(())
     }
 
-    /// Whether stage A evaluates this condition — see the module docs.
-    /// `None` = evaluable; `Some(construct)` names the stage-B construct.
-    fn stage_b_construct(&self) -> Option<String> {
+    /// Whether this build evaluates this condition — see the module
+    /// docs. `None` = evaluable; `Some(construct)` names the
+    /// not-yet-evaluable construct. After stage-B step 6 the evaluable
+    /// set covers negation, the unscoped disjunction, and
+    /// dictionary-numeric comparisons; the remaining gaps are the
+    /// colon-set ids, event/link structural refine, and the
+    /// trace-level intrinsics (steps 7-9).
+    fn unevaluable_construct(&self) -> Option<String> {
         use TraceIntrinsic::*;
         match (&self.target, self.op) {
-            // Duration bounds are the stage-A baseline; multi-value
-            // equality on it is a degenerate disjunction (stage B).
+            // Duration: bounds, equality (any arity — an interval set),
+            // and negated equality all evaluate on the DURN column.
             (PredicateTarget::Intrinsic(Duration), op)
-                if op.is_ordering() || (op == CompareOp::Eq && self.values.len() == 1) =>
+                if op.is_ordering() || matches!(op, CompareOp::Eq | CompareOp::NotEq) =>
             {
                 None
             }
-            (PredicateTarget::Intrinsic(Duration), CompareOp::Eq) => {
-                Some("multi-value duration equality".to_string())
-            }
+            // Attribute scopes (incl. the unscoped disjunction): every
+            // op — tokens for text, the dictionary-numeric path for
+            // numbers, presence ∩ complement for negation.
             (
                 PredicateTarget::Attribute(
                     TagScope::Resource | TagScope::Span | TagScope::Instrumentation,
                     _,
                 )
-                | PredicateTarget::Intrinsic(
+                | PredicateTarget::UnscopedAttribute(_),
+                _,
+            ) => None,
+            // Dictionary-backed intrinsics except event:name (refine).
+            (
+                PredicateTarget::Intrinsic(
                     Name | Kind | Status | StatusMessage | InstrumentationName
                     | InstrumentationVersion,
                 ),
-                CompareOp::Eq | CompareOp::Regex,
-            ) => {
-                if self
-                    .values
-                    .iter()
-                    .all(|v| matches!(v, PredicateValue::Text(_)))
-                {
-                    None
-                } else {
-                    Some(format!("numeric comparison on {}", self.target))
-                }
-            }
-            (_, CompareOp::NotEq | CompareOp::NotRegex) => {
-                Some(format!("negated comparison on {}", self.target))
-            }
+                CompareOp::Eq | CompareOp::Regex | CompareOp::NotEq | CompareOp::NotRegex,
+            ) => None,
             (PredicateTarget::Attribute(TagScope::Event | TagScope::Link, _), _) => {
                 Some(format!("{} (structural refine)", self.target))
-            }
-            (PredicateTarget::UnscopedAttribute(_), _) => {
-                Some(format!("{} (resource ∪ span disjunction)", self.target))
             }
             (PredicateTarget::Intrinsic(RootName | RootServiceName | TraceDuration), _) => {
                 Some(format!("trace-level {}", self.target))
@@ -318,7 +329,7 @@ impl Predicate {
     /// adds evaluation arms; the AST itself never changes shape.
     pub(crate) fn ensure_evaluable(&self) -> Result<(), PredicateError> {
         for condition in &self.conditions {
-            if let Some(construct) = condition.stage_b_construct() {
+            if let Some(construct) = condition.unevaluable_construct() {
                 return Err(PredicateError::NotYetEvaluable { construct });
             }
         }
@@ -352,21 +363,44 @@ impl Predicate {
     /// Lower the (span-local, validated, evaluable) conditions to the
     /// neutral per-file plan — THE single lowering both evaluation paths
     /// share (module docs). Storage names come only from the vocabulary.
+    ///
+    /// Duration lowering: conjunctive bounds (orderings and single-value
+    /// equality) INTERSECT into one positive interval term (one DURN
+    /// pass however many bounds); a multi-value equality becomes one
+    /// term with point intervals; a `!=` becomes one NEGATED term with
+    /// point intervals ("in no interval" = no value equals).
     pub(crate) fn to_trace_plan(&self) -> TracePlan {
         let mut terms = Vec::with_capacity(self.conditions.len());
-        // Duration conditions intersect into ONE interval term (appended
-        // after the token terms) so several bounds cost one DURN pass —
-        // max of the mins, min of the maxes; an empty intersection
-        // matches nothing in both evaluators.
-        let mut duration: Option<(Option<i64>, Option<i64>)> = None;
+        let mut bound: Option<(Option<i64>, Option<i64>)> = None;
         for condition in &self.conditions {
+            let integers = || -> Vec<i64> {
+                condition
+                    .values
+                    .iter()
+                    .map(|v| match v {
+                        PredicateValue::Integer(n) => *n,
+                        _ => unreachable!("validated: duration values are integers"),
+                    })
+                    .collect()
+            };
             match (&condition.target, condition.op) {
+                (PredicateTarget::Intrinsic(TraceIntrinsic::Duration), CompareOp::NotEq) => {
+                    terms.push(PlanTerm::Duration {
+                        intervals: integers().into_iter().map(|v| (Some(v), Some(v))).collect(),
+                        negated: true,
+                    });
+                }
+                (PredicateTarget::Intrinsic(TraceIntrinsic::Duration), CompareOp::Eq)
+                    if condition.values.len() > 1 =>
+                {
+                    terms.push(PlanTerm::Duration {
+                        intervals: integers().into_iter().map(|v| (Some(v), Some(v))).collect(),
+                        negated: false,
+                    });
+                }
                 (PredicateTarget::Intrinsic(TraceIntrinsic::Duration), op) => {
-                    let PredicateValue::Integer(v) = condition.values[0] else {
-                        unreachable!("validated: duration values are integers");
-                    };
-                    let (min_ns, max_ns) = duration_bounds(op, v);
-                    duration = Some(match duration {
+                    let (min_ns, max_ns) = duration_bounds(op, integers()[0]);
+                    bound = Some(match bound {
                         None => (min_ns, max_ns),
                         Some((lo, hi)) => (
                             std::cmp::max(lo, min_ns), // None < Some: unbounded loses
@@ -377,47 +411,91 @@ impl Predicate {
                         ),
                     });
                 }
-                (target, CompareOp::Eq | CompareOp::Regex) => {
-                    let field = match target {
+                (target, op) => {
+                    let fields: Vec<String> = match target {
                         PredicateTarget::Attribute(scope, key) => {
                             let prefix = scope
                                 .attribute_prefix()
                                 .expect("validated: not the Intrinsic scope");
-                            format!("{prefix}{key}")
+                            vec![format!("{prefix}{key}")]
                         }
-                        PredicateTarget::Intrinsic(i) => i
-                            .dictionary_field()
-                            .expect("evaluable intrinsics are dictionary-backed")
-                            .to_string(),
-                        PredicateTarget::UnscopedAttribute(_) => {
-                            unreachable!("unscoped attributes are stage B (ensure_evaluable)")
-                        }
+                        // The unscoped attribute is the pinned
+                        // resource ∪ span disjunction.
+                        PredicateTarget::UnscopedAttribute(key) => vec![
+                            format!(
+                                "{}{key}",
+                                TagScope::Resource
+                                    .attribute_prefix()
+                                    .expect("attribute scope")
+                            ),
+                            format!(
+                                "{}{key}",
+                                TagScope::Span.attribute_prefix().expect("attribute scope")
+                            ),
+                        ],
+                        PredicateTarget::Intrinsic(i) => vec![
+                            i.dictionary_field()
+                                .expect("evaluable intrinsics are dictionary-backed")
+                                .to_string(),
+                        ],
                     };
-                    let mut exact = Vec::new();
-                    let mut patterns = Vec::new();
-                    for value in &condition.values {
-                        let PredicateValue::Text(text) = value else {
-                            unreachable!("validated: evaluable token values are text");
+                    let negated = matches!(op, CompareOp::NotEq | CompareOp::NotRegex);
+                    let numeric = condition
+                        .values
+                        .iter()
+                        .any(|v| matches!(v, PredicateValue::Integer(_) | PredicateValue::Float(_)));
+                    let matcher = if numeric {
+                        // Dictionary-numeric: equality against any of the
+                        // values, or the single ordering comparison.
+                        let values: Vec<f64> = condition
+                            .values
+                            .iter()
+                            .map(|v| match v {
+                                PredicateValue::Integer(n) => *n as f64,
+                                PredicateValue::Float(f) => *f,
+                                PredicateValue::Text(_) => {
+                                    unreachable!("validated: values are homogeneous")
+                                }
+                            })
+                            .collect();
+                        let cmp = match op {
+                            CompareOp::Eq | CompareOp::NotEq => sfst::NumberCmp::Eq,
+                            CompareOp::Gt => sfst::NumberCmp::Gt,
+                            CompareOp::Lt => sfst::NumberCmp::Lt,
+                            CompareOp::Gte => sfst::NumberCmp::Gte,
+                            CompareOp::Lte => sfst::NumberCmp::Lte,
+                            CompareOp::Regex | CompareOp::NotRegex => {
+                                unreachable!("validated: regex takes text patterns")
+                            }
                         };
-                        match condition.op {
-                            CompareOp::Eq => exact.push(text.clone()),
-                            CompareOp::Regex => patterns.push(text.clone()),
-                            _ => unreachable!("matched above"),
+                        sfst::PlanMatcher::Number { cmp, values }
+                    } else {
+                        let mut exact = Vec::new();
+                        let mut patterns = Vec::new();
+                        for value in &condition.values {
+                            let PredicateValue::Text(text) = value else {
+                                unreachable!("validated: values are homogeneous");
+                            };
+                            match op {
+                                CompareOp::Eq | CompareOp::NotEq => exact.push(text.clone()),
+                                CompareOp::Regex | CompareOp::NotRegex => {
+                                    patterns.push(text.clone())
+                                }
+                                _ => unreachable!("validated: ordering needs numeric values"),
+                            }
                         }
-                    }
-                    terms.push(PlanTerm::Tokens {
-                        field,
-                        exact,
-                        patterns,
+                        sfst::PlanMatcher::Tokens { exact, patterns }
+                    };
+                    terms.push(PlanTerm::Fields {
+                        fields,
+                        matcher,
+                        negated,
                     });
-                }
-                (target, op) => {
-                    unreachable!("stage-B construct {op:?} on {target} passed ensure_evaluable")
                 }
             }
         }
-        if let Some((min_ns, max_ns)) = duration {
-            terms.push(PlanTerm::Duration { min_ns, max_ns });
+        if let Some((min_ns, max_ns)) = bound {
+            terms.push(PlanTerm::duration(min_ns, max_ns));
         }
         TracePlan { terms }
     }
@@ -449,18 +527,48 @@ fn duration_bounds(op: CompareOp, v: i64) -> (Option<i64>, Option<i64>) {
     }
 }
 
+/// The compiled token/number matcher of one span-side term.
+enum EvalMatcher {
+    Tokens {
+        exact: Vec<String>,
+        patterns: Vec<regex::bytes::Regex>,
+    },
+    Number {
+        cmp: sfst::NumberCmp,
+        values: Vec<f64>,
+    },
+}
+
+impl EvalMatcher {
+    /// Whether one rendered field value satisfies the matcher — token
+    /// equality / anchored regex, or the SAME numeric comparator the
+    /// dictionary walks use ([`sfst::numeric_token_matches`]), so the
+    /// two paths cannot diverge on parsing or comparison.
+    fn value_matches(&self, value: &str) -> bool {
+        match self {
+            EvalMatcher::Tokens { exact, patterns } => {
+                exact.iter().any(|e| e == value)
+                    || patterns.iter().any(|p| p.is_match(value.as_bytes()))
+            }
+            EvalMatcher::Number { cmp, values } => values
+                .iter()
+                .any(|&rhs| sfst::numeric_token_matches(value, *cmp, rhs)),
+        }
+    }
+}
+
 /// One term of the span-side evaluator — the compiled twin of
 /// [`sfst::PlanTerm`], built FROM the plan (one lowering; see the module
 /// docs). Patterns are pre-compiled once per predicate, not per span.
 enum EvalTerm {
-    Tokens {
-        field: String,
-        exact: Vec<String>,
-        patterns: Vec<regex::bytes::Regex>,
+    Fields {
+        fields: Vec<String>,
+        matcher: EvalMatcher,
+        negated: bool,
     },
     Duration {
-        min_ns: Option<i64>,
-        max_ns: Option<i64>,
+        intervals: Vec<(Option<i64>, Option<i64>)>,
+        negated: bool,
     },
 }
 
@@ -480,24 +588,33 @@ impl EvalPredicate {
             .terms
             .iter()
             .map(|term| match term {
-                PlanTerm::Tokens {
-                    field,
-                    exact,
-                    patterns,
-                } => EvalTerm::Tokens {
-                    field: field.clone(),
-                    exact: exact.clone(),
-                    patterns: patterns
-                        .iter()
-                        .map(|p| {
-                            sfst::compile_pattern(p)
-                                .expect("patterns validated at the request boundary")
-                        })
-                        .collect(),
+                PlanTerm::Fields {
+                    fields,
+                    matcher,
+                    negated,
+                } => EvalTerm::Fields {
+                    fields: fields.clone(),
+                    matcher: match matcher {
+                        sfst::PlanMatcher::Tokens { exact, patterns } => EvalMatcher::Tokens {
+                            exact: exact.clone(),
+                            patterns: patterns
+                                .iter()
+                                .map(|p| {
+                                    sfst::compile_pattern(p)
+                                        .expect("patterns validated at the request boundary")
+                                })
+                                .collect(),
+                        },
+                        sfst::PlanMatcher::Number { cmp, values } => EvalMatcher::Number {
+                            cmp: *cmp,
+                            values: values.clone(),
+                        },
+                    },
+                    negated: *negated,
                 },
-                PlanTerm::Duration { min_ns, max_ns } => EvalTerm::Duration {
-                    min_ns: *min_ns,
-                    max_ns: *max_ns,
+                PlanTerm::Duration { intervals, negated } => EvalTerm::Duration {
+                    intervals: intervals.clone(),
+                    negated: *negated,
                 },
             })
             .collect();
@@ -513,21 +630,34 @@ impl EvalPredicate {
             return false;
         }
         self.terms.iter().all(|term| match term {
-            EvalTerm::Tokens {
-                field,
-                exact,
-                patterns,
-            } => span
-                .fields
-                .iter()
-                .filter(|(k, _)| k == field)
-                .any(|(_, v)| {
-                    exact.iter().any(|e| e == v)
-                        || patterns.iter().any(|p| p.is_match(v.as_bytes()))
-                }),
-            EvalTerm::Duration { min_ns, max_ns } => {
-                min_ns.is_none_or(|lo| span.duration_ns >= lo)
-                    && max_ns.is_none_or(|hi| span.duration_ns <= hi)
+            EvalTerm::Fields {
+                fields,
+                matcher,
+                negated,
+            } => {
+                // Values gathered across the term's fields (several for
+                // the unscoped disjunction; multi-valued fields yield
+                // several entries). Negation is the pinned
+                // presence ∩ complement: present with NO matching value.
+                let mut present = false;
+                let mut any_match = false;
+                for (k, v) in &span.fields {
+                    if fields.iter().any(|f| f == k) {
+                        present = true;
+                        if matcher.value_matches(v) {
+                            any_match = true;
+                            break;
+                        }
+                    }
+                }
+                if *negated { present && !any_match } else { any_match }
+            }
+            EvalTerm::Duration { intervals, negated } => {
+                let in_any = intervals.iter().any(|&(lo, hi)| {
+                    lo.is_none_or(|lo| span.duration_ns >= lo)
+                        && hi.is_none_or(|hi| span.duration_ns <= hi)
+                });
+                in_any != *negated
             }
         })
     }
@@ -671,7 +801,7 @@ mod tests {
     /// The stage boundary: the positive subset passes; every recorded
     /// B-construct is named, not silently mis-evaluated.
     #[test]
-    fn stage_a_evaluability_boundary() {
+    fn evaluability_boundary() {
         let evaluable = |c: Condition| {
             Predicate { conditions: vec![c] }.ensure_evaluable().unwrap();
         };
@@ -682,7 +812,10 @@ mod tests {
             }
         };
 
+        // Attribute scopes and the unscoped disjunction: every op.
         evaluable(cond(span_attr("x"), CompareOp::Eq, vec![text("a"), text("b")]));
+        evaluable(cond(span_attr("x"), CompareOp::NotEq, vec![text("v")]));
+        evaluable(cond(span_attr("x"), CompareOp::NotRegex, vec![text("v.*")]));
         evaluable(cond(
             PredicateTarget::Attribute(TagScope::Resource, "service.name".into()),
             CompareOp::Regex,
@@ -693,6 +826,24 @@ mod tests {
             CompareOp::Eq,
             vec![text("v")],
         ));
+        evaluable(cond(
+            PredicateTarget::UnscopedAttribute("x".into()),
+            CompareOp::Eq,
+            vec![text("v")],
+        ));
+        evaluable(cond(
+            PredicateTarget::UnscopedAttribute("x".into()),
+            CompareOp::NotRegex,
+            vec![text("v.*")],
+        ));
+        // Dictionary numerics on attributes.
+        evaluable(cond(span_attr("x"), CompareOp::Gt, vec![PredicateValue::Integer(5)]));
+        evaluable(cond(
+            span_attr("x"),
+            CompareOp::Eq,
+            vec![PredicateValue::Integer(5), PredicateValue::Float(1.5)],
+        ));
+        // Dictionary-backed intrinsics except event:name: all four ops.
         for i in [
             TraceIntrinsic::Name,
             TraceIntrinsic::Kind,
@@ -701,7 +852,7 @@ mod tests {
             TraceIntrinsic::InstrumentationName,
             TraceIntrinsic::InstrumentationVersion,
         ] {
-            for op in [CompareOp::Eq, CompareOp::Regex] {
+            for op in [CompareOp::Eq, CompareOp::Regex, CompareOp::NotEq, CompareOp::NotRegex] {
                 evaluable(cond(
                     PredicateTarget::Intrinsic(i),
                     op,
@@ -709,6 +860,7 @@ mod tests {
                 ));
             }
         }
+        // Duration: bounds, multi-value equality, negated equality.
         for op in [CompareOp::Gt, CompareOp::Lt, CompareOp::Gte, CompareOp::Lte, CompareOp::Eq] {
             evaluable(cond(
                 PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
@@ -716,19 +868,27 @@ mod tests {
                 vec![PredicateValue::Integer(100)],
             ));
         }
-
-        // Named rejections for the stage-B constructs.
-        assert!(rejected(cond(span_attr("x"), CompareOp::NotEq, vec![text("v")]))
-            .contains("negated"));
-        assert!(rejected(cond(
-            PredicateTarget::UnscopedAttribute("x".into()),
+        evaluable(cond(
+            PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
             CompareOp::Eq,
-            vec![text("v")],
-        ))
-        .contains("unscoped"));
+            vec![PredicateValue::Integer(1), PredicateValue::Integer(2)],
+        ));
+        evaluable(cond(
+            PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+            CompareOp::NotEq,
+            vec![PredicateValue::Integer(3)],
+        ));
+
+        // Named rejections for the constructs steps 7-9 still own.
         assert!(rejected(cond(
             PredicateTarget::Attribute(TagScope::Event, "msg".into()),
             CompareOp::Eq,
+            vec![text("v")],
+        ))
+        .contains("refine"));
+        assert!(rejected(cond(
+            PredicateTarget::Attribute(TagScope::Link, "rel".into()),
+            CompareOp::NotEq,
             vec![text("v")],
         ))
         .contains("refine"));
@@ -745,23 +905,17 @@ mod tests {
         ))
         .contains("trace-level"));
         assert!(rejected(cond(
-            span_attr("x"),
+            PredicateTarget::Intrinsic(TraceIntrinsic::TraceDuration),
             CompareOp::Gt,
             vec![PredicateValue::Integer(5)],
         ))
-        .contains("Gt"));
+        .contains("trace-level"));
         assert!(rejected(cond(
-            span_attr("x"),
-            CompareOp::Eq,
+            PredicateTarget::Intrinsic(TraceIntrinsic::EventTimeSinceStart),
+            CompareOp::Gt,
             vec![PredicateValue::Integer(5)],
         ))
-        .contains("numeric"));
-        assert!(rejected(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
-            CompareOp::Eq,
-            vec![PredicateValue::Integer(1), PredicateValue::Integer(2)],
-        ))
-        .contains("multi-value"));
+        .contains("EventTimeSinceStart"));
         assert!(rejected(cond(
             PredicateTarget::Intrinsic(TraceIntrinsic::SpanId),
             CompareOp::Eq,
@@ -851,26 +1005,15 @@ mod tests {
         assert_eq!(
             plan.terms,
             vec![
-                PlanTerm::Tokens {
-                    field: "resource.attributes.service.name".into(),
-                    exact: vec!["svc".into()],
-                    patterns: vec![],
-                },
-                PlanTerm::Tokens {
-                    field: "status_code".into(),
-                    exact: vec!["ERROR".into()],
-                    patterns: vec![],
-                },
-                PlanTerm::Tokens {
-                    field: "attributes.http.method".into(),
-                    exact: vec![],
-                    patterns: vec!["GET|PUT".into()],
-                },
+                PlanTerm::tokens(
+                    "resource.attributes.service.name",
+                    vec!["svc".into()],
+                    vec![],
+                ),
+                PlanTerm::tokens("status_code", vec!["ERROR".into()], vec![]),
+                PlanTerm::tokens("attributes.http.method", vec![], vec!["GET|PUT".into()]),
                 // Both duration bounds intersect into ONE interval term.
-                PlanTerm::Duration {
-                    min_ns: Some(101),
-                    max_ns: Some(500),
-                },
+                PlanTerm::duration(Some(101), Some(500)),
             ]
         );
         assert!(Predicate::all().to_trace_plan().terms.is_empty());
@@ -891,10 +1034,87 @@ mod tests {
         };
         assert_eq!(
             contradictory.to_trace_plan().terms,
-            vec![PlanTerm::Duration {
-                min_ns: Some(501),
-                max_ns: Some(99),
-            }]
+            vec![PlanTerm::duration(Some(501), Some(99))]
+        );
+        // Stage-B lowerings: negation, unscoped disjunction, numerics,
+        // multi-value and negated duration equality.
+        let stage_b = Predicate {
+            conditions: vec![
+                cond(span_attr("x"), CompareOp::NotEq, vec![text("a"), text("b")]),
+                cond(
+                    PredicateTarget::UnscopedAttribute("env".into()),
+                    CompareOp::Eq,
+                    vec![text("prod")],
+                ),
+                cond(
+                    span_attr("code"),
+                    CompareOp::Gte,
+                    vec![PredicateValue::Integer(500)],
+                ),
+                cond(
+                    span_attr("ratio"),
+                    CompareOp::Eq,
+                    vec![PredicateValue::Float(0.5), PredicateValue::Integer(2)],
+                ),
+                cond(
+                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    CompareOp::Eq,
+                    vec![PredicateValue::Integer(10), PredicateValue::Integer(20)],
+                ),
+                cond(
+                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    CompareOp::NotEq,
+                    vec![PredicateValue::Integer(30)],
+                ),
+            ],
+        };
+        assert_eq!(
+            stage_b.to_trace_plan().terms,
+            vec![
+                PlanTerm::Fields {
+                    fields: vec!["attributes.x".into()],
+                    matcher: sfst::PlanMatcher::Tokens {
+                        exact: vec!["a".into(), "b".into()],
+                        patterns: vec![],
+                    },
+                    negated: true,
+                },
+                PlanTerm::Fields {
+                    fields: vec![
+                        "resource.attributes.env".into(),
+                        "attributes.env".into(),
+                    ],
+                    matcher: sfst::PlanMatcher::Tokens {
+                        exact: vec!["prod".into()],
+                        patterns: vec![],
+                    },
+                    negated: false,
+                },
+                PlanTerm::Fields {
+                    fields: vec!["attributes.code".into()],
+                    matcher: sfst::PlanMatcher::Number {
+                        cmp: sfst::NumberCmp::Gte,
+                        values: vec![500.0],
+                    },
+                    negated: false,
+                },
+                PlanTerm::Fields {
+                    fields: vec!["attributes.ratio".into()],
+                    matcher: sfst::PlanMatcher::Number {
+                        cmp: sfst::NumberCmp::Eq,
+                        values: vec![0.5, 2.0],
+                    },
+                    negated: false,
+                },
+                PlanTerm::Duration {
+                    intervals: vec![(Some(10), Some(10)), (Some(20), Some(20))],
+                    negated: false,
+                },
+                PlanTerm::Duration {
+                    intervals: vec![(Some(30), Some(30))],
+                    negated: true,
+                },
+            ]
         );
     }
 
@@ -1028,5 +1248,107 @@ mod tests {
         assert!(matches(vec![], w(1_000, 1_001)));
         assert!(!matches(vec![], w(0, 1_000)));
         assert!(!matches(vec![], w(1_001, 2_000)));
+
+        // ── Stage B: negation — present-and-no-value-matches ────────
+        assert!(matches(
+            vec![cond(span_attr("tag"), CompareOp::NotEq, vec![text("c")])],
+            None
+        ));
+        // A multi-valued field with ONE matching value fails `!=`.
+        assert!(!matches(
+            vec![cond(span_attr("tag"), CompareOp::NotEq, vec![text("a")])],
+            None
+        ));
+        // An ABSENT attribute never satisfies a negated comparison.
+        assert!(!matches(
+            vec![cond(span_attr("absent"), CompareOp::NotEq, vec![text("v")])],
+            None
+        ));
+        assert!(!matches(
+            vec![cond(span_attr("absent"), CompareOp::NotRegex, vec![text("v.*")])],
+            None
+        ));
+        // Negated regex.
+        assert!(matches(
+            vec![cond(
+                PredicateTarget::Intrinsic(TraceIntrinsic::Name),
+                CompareOp::NotRegex,
+                vec![text("POST.*")],
+            )],
+            None
+        ));
+        // ── Stage B: the unscoped disjunction gathers both scopes ───
+        assert!(matches(
+            vec![cond(
+                PredicateTarget::UnscopedAttribute("service.name".into()),
+                CompareOp::Eq,
+                vec![text("svc")],
+            )],
+            None
+        ));
+        assert!(matches(
+            vec![cond(
+                PredicateTarget::UnscopedAttribute("tag".into()),
+                CompareOp::Eq,
+                vec![text("b")],
+            )],
+            None
+        ));
+        assert!(!matches(
+            vec![cond(
+                PredicateTarget::UnscopedAttribute("nowhere".into()),
+                CompareOp::NotEq,
+                vec![text("v")],
+            )],
+            None
+        ));
+        // ── Stage B: numerics via the shared comparator ─────────────
+        let span2 = TraceSpan {
+            fields: vec![
+                ("attributes.code".into(), "500".into()),
+                ("attributes.label".into(), "not-a-number".into()),
+            ],
+            ..span.clone()
+        };
+        let m2 = |c: Condition| span_matches(&span2, &Predicate { conditions: vec![c] }, None);
+        assert!(m2(cond(
+            span_attr("code"),
+            CompareOp::Gte,
+            vec![PredicateValue::Integer(500)],
+        )));
+        assert!(m2(cond(
+            span_attr("code"),
+            CompareOp::Eq,
+            vec![PredicateValue::Float(500.0)],
+        )));
+        assert!(!m2(cond(
+            span_attr("code"),
+            CompareOp::Gt,
+            vec![PredicateValue::Integer(500)],
+        )));
+        // Unparseable values never match — positively OR negatively…
+        assert!(!m2(cond(
+            span_attr("label"),
+            CompareOp::Gte,
+            vec![PredicateValue::Integer(0)],
+        )));
+        // …but a present unparseable value DOES satisfy a negated
+        // numeric equality (present, and no value numerically equals).
+        assert!(m2(cond(
+            span_attr("label"),
+            CompareOp::NotEq,
+            vec![PredicateValue::Integer(5)],
+        )));
+        // Negated duration equality.
+        assert!(m2(cond(
+            PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+            CompareOp::NotEq,
+            vec![PredicateValue::Integer(999)],
+        )));
+        assert!(!m2(cond(
+            PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+            CompareOp::NotEq,
+            vec![PredicateValue::Integer(250)],
+        )));
     }
 }

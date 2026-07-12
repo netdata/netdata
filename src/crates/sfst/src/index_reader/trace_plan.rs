@@ -4,21 +4,38 @@
 //! The cross-source engine (`sfsq::traces::search`) lowers its predicate
 //! AST per candidate file into a neutral [`TracePlan`] — a conjunction of
 //! terms in STORAGE field names — and this module executes it: one
-//! compilation resolving every term to a position set (dictionary lookups
-//! for low/mid tiers, ONE shared stream-batch scan for all high-card
-//! terms — the `materialize_fields` precedent — and a DURN column pass
-//! for duration bounds), then any number of RANK-BOUNDED extractions of
-//! the newest-K matched positions. Position algebra ([`super::PosSet`])
-//! stays private to the format crate; the seam is plan in,
-//! positions + work out.
+//! compilation resolving every term to a position set, then any number
+//! of RANK-BOUNDED extractions of the newest-K matched positions.
+//! Position algebra ([`super::PosSet`]) stays private to the format
+//! crate; the seam is plan in, positions + work out.
+//!
+//! # The term algebra
+//!
+//! Every dictionary term is `fields × matcher × negated`:
+//!
+//! - `fields` holds ONE storage field, or several OR-combined (the
+//!   grammar's unscoped attribute = resource ∪ span disjunction);
+//! - the matcher selects tokens — exact values and anchored regexes, or
+//!   a NUMERIC comparison evaluated at the dictionary (each distinct
+//!   stored value parsed once; unparseable values never match);
+//! - `negated` applies the pinned negation rule
+//!   `presence(fields) ∩ complement(match)`: an absent attribute never
+//!   satisfies a negated comparison.
+//!
+//! Terms resolve per tier: low/mid dictionary lookups and walks; ALL
+//! high-card probes (matches AND presence sets alike — a presence probe
+//! is just a full-field target set) share ONE stream-batch pass — the
+//! `materialize_fields` precedent. Duration terms scan the DURN column
+//! slice clipped to the caller's range, testing an OR of inclusive
+//! intervals (optionally negated).
 //!
 //! # Work accounting (the search cost guard's units)
 //!
 //! [`ScanWork::rows_visited`] counts every row VISITED (not matched) by
 //! work that scales with data, per the pinned ceiling units:
 //!
-//! - each row of a stream batch scanned for high-card terms — counted
-//!   ONCE per compilation however many high-card terms share the pass;
+//! - each row of a stream batch scanned for high-card probes — counted
+//!   ONCE per compilation however many probes share the pass;
 //! - each EMITTED matched position (rank-bounded extraction makes
 //!   emission itself the bounded unit).
 //!
@@ -45,38 +62,102 @@
 //! all) compiles to the full-range set, so extraction costs O(K) per
 //! file — the most common UI query stays bounded.
 
-use crate::query::Matcher;
+use super::{FieldLocation, IndexReader, KvId, KvIdSet, PosSet};
 
-use super::{FieldLocation, IndexReader, KvIdSet, PosSet};
-
-/// One term of a per-file plan (AND-combined by [`TracePlan`]).
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum PlanTerm {
-    /// Rows carrying `field=v` for any `v` in `exact` or matching any of
-    /// `patterns` (full-value-anchored regex sources, the `=~` op) — the
-    /// OR-of-values within one field. A field absent from the file
-    /// matches nothing (absent-matches-nothing, the `compile_filter`
-    /// precedent).
+/// How a [`PlanTerm::Fields`] term selects dictionary tokens.
+#[derive(Debug, Clone, PartialEq)]
+pub enum PlanMatcher {
+    /// Any `v` in `exact`, or any full-value-anchored regex in
+    /// `patterns` matching `v` — the OR-of-values within a term.
     Tokens {
-        /// STORAGE field name (the caller constructs it through its
-        /// vocabulary mapping; this crate does not interpret names).
-        field: String,
         exact: Vec<String>,
         patterns: Vec<String>,
     },
-    /// Rows whose DURN duration lies in the INCLUSIVE `[min_ns, max_ns]`
-    /// interval (either bound optional; the caller maps its `>`/`<`
-    /// exclusive ops to inclusive bounds on integer nanoseconds).
-    /// Errors if the file carries no DURN column (not a traces file).
-    Duration {
-        min_ns: Option<i64>,
-        max_ns: Option<i64>,
+    /// Distinct stored values parsed as numbers and compared to ANY of
+    /// `values` (the pinned dictionary-numeric rule; several values =
+    /// the grammar's multi-value numeric equality); stored values that
+    /// do not parse never match. See [`numeric_token_matches`].
+    Number { cmp: NumberCmp, values: Vec<f64> },
+}
+
+/// The numeric comparison of [`PlanMatcher::Number`]. Negated
+/// comparisons (`!=`) are the term's `negated` flag, not an operator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum NumberCmp {
+    Eq,
+    Gt,
+    Lt,
+    Gte,
+    Lte,
+}
+
+/// THE numeric token comparator — shared verbatim by the dictionary
+/// walks here and by the span-side evaluator in the engine crate, so
+/// the raw index path and the canonical span path can never disagree on
+/// what a numeric comparison means. A value that does not parse as a
+/// number never matches; a NaN `rhs` matches nothing.
+pub fn numeric_token_matches(value: &str, cmp: NumberCmp, rhs: f64) -> bool {
+    let Ok(v) = value.parse::<f64>() else {
+        return false;
+    };
+    match cmp {
+        NumberCmp::Eq => v == rhs,
+        NumberCmp::Gt => v > rhs,
+        NumberCmp::Lt => v < rhs,
+        NumberCmp::Gte => v >= rhs,
+        NumberCmp::Lte => v <= rhs,
+    }
+}
+
+/// One term of a per-file plan (AND-combined by [`TracePlan`]).
+#[derive(Debug, Clone, PartialEq)]
+pub enum PlanTerm {
+    /// Rows selected by `matcher` over the union of `fields` (one
+    /// STORAGE field name, or several for the unscoped resource ∪ span
+    /// disjunction — the caller constructs names through its vocabulary
+    /// mapping; this crate does not interpret them). `negated` applies
+    /// `presence(fields) ∩ complement(match)` — a field absent from the
+    /// file contributes nothing to presence, so an absent attribute
+    /// never satisfies a negated comparison; a positive term on an
+    /// absent field matches nothing (the `compile_filter` precedent).
+    Fields {
+        fields: Vec<String>,
+        matcher: PlanMatcher,
+        negated: bool,
     },
+    /// Rows whose DURN duration lies in ANY of the INCLUSIVE
+    /// `[min_ns, max_ns]` intervals (bounds optional; the caller maps
+    /// exclusive ops to inclusive integer bounds), the whole test
+    /// inverted by `negated` (`!=` = "in no interval"). Errors if the
+    /// file carries no DURN column (not a traces file).
+    Duration {
+        intervals: Vec<(Option<i64>, Option<i64>)>,
+        negated: bool,
+    },
+}
+
+impl PlanTerm {
+    /// Convenience for the common single-field positive token term.
+    pub fn tokens(field: impl Into<String>, exact: Vec<String>, patterns: Vec<String>) -> Self {
+        PlanTerm::Fields {
+            fields: vec![field.into()],
+            matcher: PlanMatcher::Tokens { exact, patterns },
+            negated: false,
+        }
+    }
+
+    /// Convenience for a single positive duration interval.
+    pub fn duration(min_ns: Option<i64>, max_ns: Option<i64>) -> Self {
+        PlanTerm::Duration {
+            intervals: vec![(min_ns, max_ns)],
+            negated: false,
+        }
+    }
 }
 
 /// A per-file search plan: the conjunction of `terms` (empty = match
 /// every row — the `{}` query).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct TracePlan {
     pub terms: Vec<PlanTerm>,
 }
@@ -98,19 +179,28 @@ pub struct CompiledTracePlan {
     universe: u32,
 }
 
+/// One per-field resolution: a set already known (low/mid tiers, absent
+/// fields) or the index of a high-card probe the shared stream-batch
+/// pass will fill.
+enum Part {
+    Ready(PosSet),
+    Probe(usize),
+}
+
+/// One term's field parts awaiting combination: `matches` OR-combine;
+/// `presence` (negated terms only) OR-combines before the difference.
+struct ResolvedTerm {
+    matches: Vec<Part>,
+    presence: Option<Vec<Part>>,
+}
+
 impl IndexReader<'_> {
     /// Resolve `plan` against this file for queries within the position
     /// range `[lo, hi)` (the caller's window; pass `(0, record_count)`
-    /// for the whole file). Dictionary terms resolve per tier (low/mid
-    /// lookups; high-card terms share ONE stream-batch scan, its visited
-    /// rows counted once into `work` and bounded by `ceiling` —
-    /// `Ok(None)` when the budget ran out mid-scan, deterministically);
-    /// duration bounds scan the DURN column CLIPPED to the range (which
-    /// is what keeps that pass out of the work units). An empty
-    /// conjunction compiles to the full range. A term whose field this
-    /// file lacks collapses the conjunction to empty — and
-    /// short-circuits the remaining work, deterministically (term order
-    /// is the plan's, high-card scan last).
+    /// for the whole file). See the module docs for the term algebra,
+    /// tier resolution, and work accounting. `Ok(None)` = the visited
+    /// budget ran out inside the shared stream-batch scan; a truncated
+    /// plan is never returned (it would under-approximate).
     ///
     /// The compiled plan answers `count_in_range`/`newest_in_range`
     /// correctly only for sub-ranges of `[lo, hi)` (duration positions
@@ -124,95 +214,154 @@ impl IndexReader<'_> {
     ) -> Result<Option<CompiledTracePlan>, crate::Error> {
         let total = self.summary().record_count;
         let (range_lo, range_hi) = (range.0.min(total), range.1.min(total));
-        let mut acc: Option<PosSet> = None;
-        let and_in = |set: PosSet, acc: &mut Option<PosSet>| match acc {
-            None => *acc = Some(set),
-            Some(a) => a.and_assign(&set),
-        };
-        let empty = |acc: &Option<PosSet>| acc.as_ref().is_some_and(PosSet::is_empty);
 
-        // High-card terms are deferred and share one stream-batch pass.
-        let mut high_terms: Vec<(KvIdSet, u8)> = Vec::new();
-
+        // ── Resolve every term: dictionary work only (uncounted) ─────
+        let mut probes: Vec<(KvIdSet, u8)> = Vec::new();
+        let mut resolved: Vec<Option<ResolvedTerm>> = Vec::new(); // None = Duration slot
+        let mut durations: Vec<Option<PosSet>> = Vec::new(); // parallel, ugly-free zip below
         for term in &plan.terms {
-            if empty(&acc) {
-                break;
-            }
             match term {
-                PlanTerm::Tokens {
-                    field,
-                    exact,
-                    patterns,
-                } => match self.locate_field(field) {
-                    None => and_in(PosSet::empty(total), &mut acc),
-                    Some(FieldLocation::High(idx)) => {
-                        let exact_refs: Vec<&str> = exact.iter().map(String::as_str).collect();
-                        let compiled: Vec<regex::bytes::Regex> = patterns
+                PlanTerm::Fields {
+                    fields,
+                    matcher,
+                    negated,
+                } => {
+                    let compiled_patterns = match matcher {
+                        PlanMatcher::Tokens { patterns, .. } => patterns
                             .iter()
                             .map(|p| crate::query::compile_pattern(p))
-                            .collect::<Result<_, _>>()?;
-                        let (targets, mask) =
-                            self.high_targets(field, idx, &exact_refs, &compiled)?;
-                        // A term matching no dictionary value collapses the
-                        // conjunction NOW — deferring it would run the
-                        // stream-batch scan for the other high terms only to
-                        // AND everything to empty afterwards.
-                        if targets.is_empty() {
-                            and_in(PosSet::empty(total), &mut acc);
-                        } else {
-                            high_terms.push((targets, mask));
+                            .collect::<Result<Vec<_>, _>>()?,
+                        PlanMatcher::Number { .. } => Vec::new(),
+                    };
+                    let mut matches = Vec::with_capacity(fields.len());
+                    let mut presence = negated.then(|| Vec::with_capacity(fields.len()));
+                    for field in fields {
+                        let (m, p) = self.resolve_field(
+                            field,
+                            matcher,
+                            &compiled_patterns,
+                            *negated,
+                            total,
+                            &mut probes,
+                        )?;
+                        matches.push(m);
+                        if let (Some(acc), Some(part)) = (presence.as_mut(), p) {
+                            acc.push(part);
                         }
                     }
-                    Some(FieldLocation::Low | FieldLocation::Mid(_)) => {
-                        // The existing per-tier resolution (exact lookups +
-                        // anchored-pattern dictionary walks) — dictionary
-                        // work, excluded from the counters.
-                        let matchers: Vec<Matcher> = exact
-                            .iter()
-                            .map(|v| Matcher::Exact(v.clone()))
-                            .chain(patterns.iter().map(|p| Matcher::Pattern(p.clone())))
-                            .collect();
-                        and_in(self.field_values_or(field, &matchers)?, &mut acc);
-                    }
-                },
-                PlanTerm::Duration { min_ns, max_ns } => {
+                    resolved.push(Some(ResolvedTerm { matches, presence }));
+                    durations.push(None);
+                }
+                PlanTerm::Duration { intervals, negated } => {
                     // One DURN pass over the caller's range only (a
                     // fixed-width column read bounded by the window —
                     // the basis for excluding it from the counters);
                     // positions ascend by construction.
-                    let durations = self.durations()?;
-                    let lo = min_ns.unwrap_or(i64::MIN);
-                    let hi = max_ns.unwrap_or(i64::MAX);
-                    let column = durations
+                    let column = self.durations()?;
+                    let column = column
                         .0
                         .get(range_lo as usize..range_hi as usize)
                         .ok_or_else(|| {
                             crate::Error::CorruptIndex(format!(
                                 "trace plan: DURN length {} < range end {range_hi}",
-                                durations.0.len()
+                                column.0.len()
                             ))
                         })?;
+                    let in_any = |d: i64| {
+                        intervals.iter().any(|&(lo, hi)| {
+                            lo.is_none_or(|lo| d >= lo) && hi.is_none_or(|hi| d <= hi)
+                        })
+                    };
                     let positions: Vec<u32> = column
                         .iter()
                         .enumerate()
-                        .filter(|&(_, &d)| lo <= d && d <= hi)
+                        .filter(|&(_, &d)| in_any(d) != *negated)
                         .map(|(i, _)| range_lo + i as u32)
                         .collect();
-                    and_in(PosSet::from_sorted(positions, total), &mut acc);
+                    resolved.push(None);
+                    durations.push(Some(PosSet::from_sorted(positions, total)));
                 }
             }
         }
 
-        if !high_terms.is_empty() && !empty(&acc) {
-            let refs: Vec<(&KvIdSet, u8)> =
-                high_terms.iter().map(|(t, m)| (t, *m)).collect();
-            let Some(sets) =
-                self.scan_high_multi(&refs, total, ceiling, &mut work.rows_visited)?
-            else {
-                return Ok(None); // budget ran out mid-scan
+        // ── Probe-free short-circuit: if the terms already resolvable
+        // collapse the conjunction, the stream-batch scan is wasted
+        // work — skip it, deterministically. ──────────────────────────
+        let combine_ready = |term: &ResolvedTerm| -> Option<PosSet> {
+            // A term combines WITHOUT the scan only if all parts are ready.
+            let or_parts = |parts: &[Part]| -> Option<PosSet> {
+                let mut acc = PosSet::empty(total);
+                for part in parts {
+                    match part {
+                        Part::Ready(set) => acc.or_assign(set),
+                        Part::Probe(_) => return None,
+                    }
+                }
+                Some(acc)
             };
-            for set in sets {
-                and_in(set, &mut acc);
+            let matched = or_parts(&term.matches)?;
+            match &term.presence {
+                None => Some(matched),
+                Some(parts) => {
+                    let mut presence = or_parts(parts)?;
+                    presence.and_not_assign(&matched);
+                    Some(presence)
+                }
+            }
+        };
+        let ready_empty = resolved.iter().flatten().any(|term| {
+            combine_ready(term).is_some_and(|set| set.is_empty())
+        }) || durations.iter().flatten().any(PosSet::is_empty);
+        let probe_sets: Vec<PosSet> = if probes.is_empty() || ready_empty {
+            probes.iter().map(|_| PosSet::empty(total)).collect()
+        } else {
+            let refs: Vec<(&KvIdSet, u8)> = probes.iter().map(|(t, m)| (t, *m)).collect();
+            match self.scan_high_multi(&refs, total, ceiling, &mut work.rows_visited)? {
+                Some(sets) => sets,
+                None => return Ok(None), // budget ran out mid-scan
+            }
+        };
+        if ready_empty {
+            return Ok(Some(CompiledTracePlan {
+                set: PosSet::empty(total),
+                universe: total,
+            }));
+        }
+
+        // ── Combine in plan order ─────────────────────────────────────
+        let materialize = |parts: &[Part]| -> PosSet {
+            let mut acc = PosSet::empty(total);
+            for part in parts {
+                match part {
+                    Part::Ready(set) => acc.or_assign(set),
+                    Part::Probe(i) => acc.or_assign(&probe_sets[*i]),
+                }
+            }
+            acc
+        };
+        let mut acc: Option<PosSet> = None;
+        for (term, duration) in resolved.iter().zip(&durations) {
+            let set = match (term, duration) {
+                (Some(term), _) => {
+                    let matched = materialize(&term.matches);
+                    match &term.presence {
+                        None => matched,
+                        Some(parts) => {
+                            let mut presence = materialize(parts);
+                            presence.and_not_assign(&matched);
+                            presence
+                        }
+                    }
+                }
+                (None, Some(set)) => set.clone(),
+                (None, None) => unreachable!("every slot is a term or a duration"),
+            };
+            match &mut acc {
+                None => acc = Some(set),
+                Some(a) => a.and_assign(&set),
+            }
+            if acc.as_ref().is_some_and(PosSet::is_empty) {
+                break;
             }
         }
 
@@ -220,6 +369,125 @@ impl IndexReader<'_> {
             set: acc.unwrap_or_else(|| PosSet::full(total)),
             universe: total,
         }))
+    }
+
+    /// Resolve one field of a term: the MATCH part and (for negated
+    /// terms) the PRESENCE part, each a ready set (low/mid, absent) or
+    /// a registered high-card probe. Dictionary work only.
+    fn resolve_field(
+        &self,
+        field: &str,
+        matcher: &PlanMatcher,
+        compiled_patterns: &[regex::bytes::Regex],
+        want_presence: bool,
+        total: u32,
+        probes: &mut Vec<(KvIdSet, u8)>,
+    ) -> Result<(Part, Option<Part>), crate::Error> {
+        let prefix_len = field.len() + 1;
+        // Whether a `field=value` key's VALUE bytes match this matcher
+        // (patterns are anchored; numeric values parse-and-compare).
+        let value_matches = |kv_bytes: &[u8]| -> bool {
+            let value = &kv_bytes[prefix_len..];
+            match matcher {
+                PlanMatcher::Tokens { exact, .. } => {
+                    exact.iter().any(|e| e.as_bytes() == value)
+                        || compiled_patterns.iter().any(|r| r.is_match(value))
+                }
+                PlanMatcher::Number { cmp, values } => std::str::from_utf8(value)
+                    .is_ok_and(|v| values.iter().any(|&rhs| numeric_token_matches(v, *cmp, rhs))),
+            }
+        };
+
+        let location = match self.locate_field(field) {
+            Some(loc) => loc,
+            None => {
+                // Absent field: no matches, no presence.
+                let presence = want_presence.then(|| Part::Ready(PosSet::empty(total)));
+                return Ok((Part::Ready(PosSet::empty(total)), presence));
+            }
+        };
+
+        match location {
+            FieldLocation::Low => {
+                let prefix = format!("{field}=");
+                let mut matched = PosSet::empty(total);
+                let mut presence = want_presence.then(|| PosSet::empty(total));
+                self.primary
+                    .prefix_for_each(prefix.as_bytes(), |kv_bytes, bv| {
+                        if value_matches(kv_bytes) {
+                            matched.or_assign(&PosSet::from_value(bv));
+                        }
+                        if let Some(p) = presence.as_mut() {
+                            p.or_assign(&PosSet::from_value(bv));
+                        }
+                    });
+                Ok((Part::Ready(matched), presence.map(Part::Ready)))
+            }
+            FieldLocation::Mid(idx) => {
+                let chunk = self.sfst.mid_field(idx)?;
+                let mut matched = PosSet::empty(total);
+                let mut presence = want_presence.then(|| PosSet::empty(total));
+                chunk.for_each(|kv_bytes, bv| {
+                    if value_matches(kv_bytes) {
+                        matched.or_assign(&PosSet::from_value(bv));
+                    }
+                    if let Some(p) = presence.as_mut() {
+                        p.or_assign(&PosSet::from_value(bv));
+                    }
+                });
+                Ok((Part::Ready(matched), presence.map(Part::Ready)))
+            }
+            FieldLocation::High(idx) => {
+                let hf = self.sfst.high_field(idx)?;
+                let base = self.high_kv_id(idx, 0).0;
+                let mut targets = KvIdSet::new(base, hf.len() as u32);
+                let mut mask: u8 = 0;
+                match matcher {
+                    // Exact-only terms keep the pinned KvId fast path
+                    // (binary search per value); everything else walks
+                    // the dictionary once.
+                    PlanMatcher::Tokens { exact, patterns } if patterns.is_empty() => {
+                        for value in exact {
+                            let kv = format!("{field}={value}");
+                            if let Ok(local) = hf.binary_search(kv.as_bytes()) {
+                                targets.insert(KvId(base + local as u32));
+                                mask |= hf.masks[local];
+                            }
+                        }
+                    }
+                    _ => {
+                        for (local, key) in hf.keys().enumerate() {
+                            if value_matches(key) {
+                                targets.insert(KvId(base + local as u32));
+                                mask |= hf.masks[local];
+                            }
+                        }
+                    }
+                }
+                let matched = if targets.is_empty() {
+                    // Nothing to find: skip the scan for this part.
+                    Part::Ready(PosSet::empty(total))
+                } else {
+                    probes.push((targets, mask));
+                    Part::Probe(probes.len() - 1)
+                };
+                let presence = if want_presence {
+                    // Presence = any KvId of the field: a full-range
+                    // target set probed in the same shared pass.
+                    let mut all = KvIdSet::new(base, hf.len() as u32);
+                    let mut all_mask: u8 = 0;
+                    for (local, m) in hf.masks.iter().enumerate() {
+                        all.insert(KvId(base + local as u32));
+                        all_mask |= m;
+                    }
+                    probes.push((all, all_mask));
+                    Some(Part::Probe(probes.len() - 1))
+                } else {
+                    None
+                };
+                Ok((matched, presence))
+            }
+        }
     }
 }
 

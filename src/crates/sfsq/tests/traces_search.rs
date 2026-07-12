@@ -162,7 +162,7 @@ fn early_requests() -> Vec<ExportTraceServiceRequest> {
         req_with(svc_b, None, &[
             SpanSpec {
                 kind: 5, // CONSUMER
-                attrs: vec![kv_str("queue", "q1")],
+                attrs: vec![kv_str("queue", "q1"), kv_str("retries", "3")],
                 ..span_in(4, 0x41, 0, 1_200 * NS, "consume")
             },
             // T6's CANONICAL copy (chronologically first).
@@ -384,6 +384,75 @@ fn oracle_equivalence_under_relayouts() {
             )])),
             vec![hex(3), hex(2), hex(1)],
         ),
+        (
+            // Negation: a span with the attribute PRESENT and ≠ GET —
+            // only T2's POST span; spans without http.method never
+            // satisfy a negated comparison.
+            "negated-attribute",
+            SearchQuery::new(pred(vec![cond(
+                PredicateTarget::Attribute(TagScope::Span, "http.method".into()),
+                CompareOp::NotEq,
+                vec![text("GET")],
+            )])),
+            vec![hex(2)],
+        ),
+        (
+            // Negated-absent + resend direction: `ghost` exists ONLY on
+            // T6's losing resend, so no CANONICAL span has it present —
+            // nothing satisfies `ghost != x`, however the raw copies
+            // look.
+            "negated-absent-attribute",
+            SearchQuery::new(pred(vec![cond(
+                PredicateTarget::Attribute(TagScope::Span, "ghost".into()),
+                CompareOp::NotEq,
+                vec![text("x")],
+            )])),
+            vec![],
+        ),
+        (
+            // Negated intrinsic with skip-at-flatten absence: the kind
+            // LABEL exists only on T1's SERVER and T4's CONSUMER spans
+            // (UNSPECIFIED is skipped), so `kind != SERVER` = T4 alone.
+            "negated-kind",
+            SearchQuery::new(pred(vec![intrinsic(
+                TraceIntrinsic::Kind,
+                CompareOp::NotEq,
+                vec![text("SERVER")],
+            )])),
+            vec![hex(4)],
+        ),
+        (
+            // The unscoped disjunction: `env` is a RESOURCE attribute of
+            // svc-a; the unscoped lookup reaches it.
+            "unscoped-attribute",
+            SearchQuery::new(pred(vec![cond(
+                PredicateTarget::UnscopedAttribute("env".into()),
+                CompareOp::Eq,
+                vec![text("prod")],
+            )])),
+            vec![hex(3), hex(2), hex(1)],
+        ),
+        (
+            // Dictionary numerics: `retries` renders as the token "3".
+            "numeric-attribute",
+            SearchQuery::new(pred(vec![cond(
+                PredicateTarget::Attribute(TagScope::Span, "retries".into()),
+                CompareOp::Gte,
+                vec![PredicateValue::Integer(2)],
+            )])),
+            vec![hex(4)],
+        ),
+        (
+            // Numeric equality accepts the float spelling of an integer
+            // token (the dictionary-numeric rule, not byte equality).
+            "numeric-float-eq",
+            SearchQuery::new(pred(vec![cond(
+                PredicateTarget::Attribute(TagScope::Span, "retries".into()),
+                CompareOp::Eq,
+                vec![PredicateValue::Float(3.0)],
+            )])),
+            vec![hex(4)],
+        ),
     ];
 
     let world = world(dir.path());
@@ -585,18 +654,9 @@ fn request_validation_matrix() {
     ));
     // Stage-B constructs: named not-yet-evaluable request errors.
     for stage_b in [
-        cond(
-            PredicateTarget::Attribute(TagScope::Span, "x".into()),
-            CompareOp::NotEq,
-            vec![text("v")],
-        ),
+        // Steps 7-9 constructs stay not-yet-evaluable after step 6.
         cond(
             PredicateTarget::Attribute(TagScope::Event, "msg".into()),
-            CompareOp::Eq,
-            vec![text("v")],
-        ),
-        cond(
-            PredicateTarget::UnscopedAttribute("x".into()),
             CompareOp::Eq,
             vec![text("v")],
         ),

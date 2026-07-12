@@ -17,13 +17,21 @@ struct FixtureRow {
     m: String,
     h: String,
     h2: String,
+    /// Sparse low-card field: `yes` on i%4==0, `no` on i%4==2, ABSENT on
+    /// odd rows — the negation/presence semantics probe.
+    s: Option<String>,
+    /// Mid-card numeric-valued field (`i % 50`).
+    num: i64,
+    /// High-card numeric-valued field (`(i % 130).5`).
+    fnum: f64,
     dur: i64,
 }
 
 const N: usize = 256;
 
 /// 256 rows, one field per tier (threshold 10): `l` low (2 values),
-/// `m` mid (16), `h`/`h2` high (128 each), ascending timestamps
+/// `m` mid (16), `h`/`h2` high (128 each), `s` sparse low, `num` mid
+/// numeric (50), `fnum` high numeric (130), ascending timestamps
 /// (position == insertion index), plus a DURN column `dur = i * 10`.
 fn fixture() -> (Vec<u8>, Vec<FixtureRow>) {
     let arena = Bump::new();
@@ -36,14 +44,26 @@ fn fixture() -> (Vec<u8>, Vec<FixtureRow>) {
             m: format!("v{:02}", i % 16),
             h: format!("w{:03}", i % 128),
             h2: format!("x{:03}", (i * 7) % 128),
+            s: match i % 4 {
+                0 => Some("yes".to_string()),
+                2 => Some("no".to_string()),
+                _ => None,
+            },
+            num: (i % 50) as i64,
+            fnum: (i % 130) as f64 + 0.5,
             dur: (i as i64) * 10,
         };
-        let tokens = [
+        let mut tokens = vec![
             format!("l={}", row.l),
             format!("m={}", row.m),
             format!("h={}", row.h),
             format!("h2={}", row.h2),
+            format!("num={}", row.num),
+            format!("fnum={}", row.fnum),
         ];
+        if let Some(s) = &row.s {
+            tokens.push(format!("s={s}"));
+        }
         let slots: Vec<_> = tokens.iter().map(|kv| ri.intern(None, kv)).collect();
         ri.row(1_000 + i as i64, &slots);
         durations.push(row.dur);
@@ -56,15 +76,40 @@ fn fixture() -> (Vec<u8>, Vec<FixtureRow>) {
 }
 
 fn tokens(field: &str, exact: &[&str], patterns: &[&str]) -> PlanTerm {
-    PlanTerm::Tokens {
-        field: field.to_string(),
-        exact: exact.iter().map(|s| s.to_string()).collect(),
-        patterns: patterns.iter().map(|s| s.to_string()).collect(),
-    }
+    PlanTerm::tokens(
+        field,
+        exact.iter().map(|s| s.to_string()).collect(),
+        patterns.iter().map(|s| s.to_string()).collect(),
+    )
 }
 
 fn plan(terms: Vec<PlanTerm>) -> TracePlan {
     TracePlan { terms }
+}
+
+fn not_tokens(field: &str, exact: &[&str], patterns: &[&str]) -> PlanTerm {
+    let PlanTerm::Fields {
+        fields, matcher, ..
+    } = tokens(field, exact, patterns)
+    else {
+        unreachable!()
+    };
+    PlanTerm::Fields {
+        fields,
+        matcher,
+        negated: true,
+    }
+}
+
+fn number(field: &str, cmp: crate::NumberCmp, values: &[f64], negated: bool) -> PlanTerm {
+    PlanTerm::Fields {
+        fields: vec![field.to_string()],
+        matcher: crate::PlanMatcher::Number {
+            cmp,
+            values: values.to_vec(),
+        },
+        negated,
+    }
 }
 
 /// Whole-file, unbounded compile — the shape most tests need.
@@ -153,21 +198,121 @@ fn tier_matrix_matches_the_oracle() {
         ),
         // Duration bounds, alone and with a token term.
         (
-            plan(vec![PlanTerm::Duration {
-                min_ns: Some(100),
-                max_ns: Some(500),
-            }]),
+            plan(vec![PlanTerm::duration(Some(100), Some(500))]),
             Box::new(|r: &FixtureRow| (100..=500).contains(&r.dur)),
         ),
         (
             plan(vec![
                 tokens("l", &["b"], &[]),
-                PlanTerm::Duration {
-                    min_ns: Some(1_000),
-                    max_ns: None,
-                },
+                PlanTerm::duration(Some(1_000), None),
             ]),
             Box::new(|r: &FixtureRow| r.l == "b" && r.dur >= 1_000),
+        ),
+        // ── Stage B: negation (presence ∩ complement) per tier ──────
+        // Sparse low field: absent rows never satisfy a negation.
+        (
+            plan(vec![not_tokens("s", &["yes"], &[])]),
+            Box::new(|r: &FixtureRow| r.s.as_deref().is_some_and(|s| s != "yes")),
+        ),
+        // Negated regex on a sparse field.
+        (
+            plan(vec![not_tokens("s", &[], &["y.*"])]),
+            Box::new(|r: &FixtureRow| r.s.as_deref().is_some_and(|s| !s.starts_with('y'))),
+        ),
+        // Mid and high tiers (fields present on every row).
+        (
+            plan(vec![not_tokens("m", &["v03", "v04"], &[])]),
+            Box::new(|r: &FixtureRow| r.m != "v03" && r.m != "v04"),
+        ),
+        (
+            plan(vec![not_tokens("h", &["w005"], &[])]),
+            Box::new(|r: &FixtureRow| r.h != "w005"),
+        ),
+        // A negated term on an ABSENT field matches nothing.
+        (plan(vec![not_tokens("absent", &["x"], &[])]), Box::new(|_| false)),
+        // ── Stage B: multi-field OR (the unscoped disjunction) ──────
+        (
+            plan(vec![PlanTerm::Fields {
+                fields: vec!["s".to_string(), "l".to_string()],
+                matcher: crate::PlanMatcher::Tokens {
+                    exact: vec!["yes".to_string(), "a".to_string()],
+                    patterns: vec![],
+                },
+                negated: false,
+            }]),
+            Box::new(|r: &FixtureRow| {
+                r.s.as_deref() == Some("yes") || r.l == "a"
+            }),
+        ),
+        // Negated multi-field: present in either, matching in neither.
+        (
+            plan(vec![PlanTerm::Fields {
+                fields: vec!["s".to_string(), "l".to_string()],
+                matcher: crate::PlanMatcher::Tokens {
+                    exact: vec!["yes".to_string(), "a".to_string()],
+                    patterns: vec![],
+                },
+                negated: true,
+            }]),
+            Box::new(|r: &FixtureRow| {
+                let matches =
+                    r.s.as_deref() == Some("yes") || r.l == "a";
+                !matches // l is always present, so presence always holds
+            }),
+        ),
+        // ── Stage B: dictionary numerics ────────────────────────────
+        (
+            plan(vec![number("num", crate::NumberCmp::Gte, &[45.0], false)]),
+            Box::new(|r: &FixtureRow| r.num >= 45),
+        ),
+        (
+            plan(vec![number("fnum", crate::NumberCmp::Lt, &[3.0], false)]),
+            Box::new(|r: &FixtureRow| r.fnum < 3.0),
+        ),
+        (
+            plan(vec![number(
+                "num",
+                crate::NumberCmp::Eq,
+                &[5.0, 7.0],
+                false,
+            )]),
+            Box::new(|r: &FixtureRow| r.num == 5 || r.num == 7),
+        ),
+        // Negated numeric equality: present and no value equals.
+        (
+            plan(vec![number("num", crate::NumberCmp::Eq, &[5.0], true)]),
+            Box::new(|r: &FixtureRow| r.num != 5),
+        ),
+        // Unparseable stored values never match a numeric comparison.
+        (
+            plan(vec![number("m", crate::NumberCmp::Gte, &[0.0], false)]),
+            Box::new(|_| false),
+        ),
+        // ── Stage B: duration interval sets, straight and negated ───
+        (
+            plan(vec![PlanTerm::Duration {
+                intervals: vec![(Some(0), Some(50)), (Some(1_000), Some(1_100))],
+                negated: false,
+            }]),
+            Box::new(|r: &FixtureRow| {
+                (0..=50).contains(&r.dur) || (1_000..=1_100).contains(&r.dur)
+            }),
+        ),
+        (
+            plan(vec![PlanTerm::Duration {
+                intervals: vec![(Some(100), Some(100)), (Some(200), Some(200))],
+                negated: true,
+            }]),
+            Box::new(|r: &FixtureRow| r.dur != 100 && r.dur != 200),
+        ),
+        // ── Stage B composed: negation ∧ numeric ∧ token ────────────
+        (
+            plan(vec![
+                tokens("l", &["a"], &[]),
+                not_tokens("m", &["v02"], &[]),
+                number("num", crate::NumberCmp::Lt, &[40.0], false),
+            ]),
+            Box::new(|r: &FixtureRow| r.l == "a" && r.m != "v02" && r.num < 40),
         ),
         // The empty conjunction: every row.
         (TracePlan::default(), Box::new(|_| true)),
@@ -240,10 +385,7 @@ fn work_counts_one_shared_stream_batch_pass() {
         &plan(vec![
             tokens("l", &["a"], &[]),
             tokens("m", &[], &["v.*"]),
-            PlanTerm::Duration {
-                min_ns: Some(0),
-                max_ns: None,
-            },
+            PlanTerm::duration(Some(0), None),
         ]),
         &mut work,
     );
@@ -377,10 +519,7 @@ fn duration_term_requires_the_durn_column() {
     let mut work = ScanWork::default();
     assert!(
         idx.compile_trace_plan(
-            &plan(vec![PlanTerm::Duration {
-                min_ns: Some(0),
-                max_ns: None,
-            }]),
+            &plan(vec![PlanTerm::duration(Some(0), None)]),
             (0, 1),
             u64::MAX,
             &mut work,
@@ -420,10 +559,7 @@ fn compile_budget_stops_the_stream_batch_scan() {
 fn duration_scan_is_clipped_to_the_range() {
     let (bytes, rows) = fixture();
     let idx = IndexReader::open(&bytes).unwrap();
-    let p = plan(vec![PlanTerm::Duration {
-        min_ns: Some(0),
-        max_ns: None,
-    }]);
+    let p = plan(vec![PlanTerm::duration(Some(0), None)]);
     let mut work = ScanWork::default();
     let compiled = idx
         .compile_trace_plan(&p, (10, 20), u64::MAX, &mut work)
