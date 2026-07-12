@@ -103,6 +103,7 @@ pub struct SearchQuery {
     limit: usize,
     spss: usize,
     visited_ceiling: u64,
+    span_cap: usize,
 }
 
 impl SearchQuery {
@@ -113,6 +114,7 @@ impl SearchQuery {
             limit: DEFAULT_SEARCH_LIMIT,
             spss: DEFAULT_SPSS,
             visited_ceiling: VISITED_ROWS_CEILING,
+            span_cap: DEFAULT_SPAN_CAP,
         }
     }
 
@@ -146,6 +148,17 @@ impl SearchQuery {
     #[doc(hidden)]
     pub fn visited_rows_ceiling_for_tests(mut self, ceiling: u64) -> Self {
         self.visited_ceiling = ceiling;
+        self
+    }
+
+    /// Test-only override of the assembly span cap (must be non-zero) —
+    /// the capped-candidate honesty paths are provable without a
+    /// 65k-span corpus. NOT a tuning surface (decision 23A: search's
+    /// cap is not caller-tunable); production uses [`DEFAULT_SPAN_CAP`]
+    /// unconditionally.
+    #[doc(hidden)]
+    pub fn span_cap_for_tests(mut self, cap: usize) -> Self {
+        self.span_cap = cap;
         self
     }
 }
@@ -638,7 +651,7 @@ pub fn search(
                 break;
             }
             let (_, trace_id) = pool.pop().expect("peeked above");
-            let outcome = combine(&mut merged, trace_id, Some(DEFAULT_SPAN_CAP), &|| {
+            let outcome = combine(&mut merged, trace_id, Some(query.span_cap), &|| {
                 cancel.is_cancelled()
             });
             assembled_count += 1;
@@ -662,6 +675,15 @@ pub fn search(
             let matched: Vec<usize> = (0..trace.spans.len())
                 .filter(|&i| eval.matches(&trace.spans[i], query.window))
                 .collect();
+            // Dropping a TRUNCATED candidate is not a proven non-match:
+            // the raw match that made it a candidate may live beyond the
+            // span cap, unseen by the re-evaluation. Evaluating past the
+            // cap would unbound the very work the cap bounds, so the
+            // honest answer is Partial{SizeCap} — never a silent
+            // Complete missing a possibly-matching trace.
+            if matched.is_empty() && outcome.truncated {
+                status.add(PartialReason::SizeCap);
+            }
             if let Some(&newest) = matched.last() {
                 // Spans are in combiner total order (ascending start), so
                 // the last matched index is the newest matched span.

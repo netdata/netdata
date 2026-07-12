@@ -828,6 +828,68 @@ fn exact_drain_at_the_ceiling_stays_complete() {
     assert_eq!(data.status, QueryStatus::Complete);
 }
 
+/// The span-cap honesty pair: a capped candidate whose RETAINED spans
+/// fail the predicate is not a proven non-match (the matching span may
+/// live beyond the cap) — dropping it makes the query Partial{SizeCap},
+/// never a silent Complete; a capped candidate whose retained spans DO
+/// match returns inexact with SizeCap.
+#[test]
+fn capped_candidates_are_never_silently_dropped() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc")];
+    let reqs = vec![req_with(svc, None, &[
+        // Trace 9: three spans; with cap 2 the retained set is the
+        // earliest two (A, B) — the predicate match (C) is beyond it.
+        SpanSpec {
+            attrs: vec![kv_str("a", "yes")],
+            ..span_in(9, 0x91, 0, 100 * NS, "a-span")
+        },
+        span_in(9, 0x92, 0x91, 200 * NS, "b-span"),
+        SpanSpec {
+            attrs: vec![kv_str("m", "yes")],
+            ..span_in(9, 0x93, 0x91, 300 * NS, "c-span")
+        },
+        // Trace 8: an independent match proving results still flow.
+        SpanSpec {
+            attrs: vec![kv_str("m", "yes")],
+            ..span_in(8, 0x81, 0, 400 * NS, "other")
+        },
+    ])];
+    let wal = write_wal(dir.path(), reqs, "capped");
+
+    // Direction 1: the match is BEYOND the cap → trace 9 drops, but the
+    // query is Partial{SizeCap} — its absence is not proven.
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let dropped = run(
+        sources,
+        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m", "yes")])).span_cap_for_tests(2),
+    );
+    assert_eq!(ids(&dropped), vec![hex(8)]);
+    assert!(dropped.status.has(PartialReason::SizeCap));
+
+    // Direction 2: a retained span matches → trace 9 returns, capped:
+    // inexact, SizeCap, counts over the retained set only.
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let kept = run(
+        sources,
+        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "a", "yes")])).span_cap_for_tests(2),
+    );
+    assert_eq!(ids(&kept), vec![hex(9)]);
+    assert!(kept.status.has(PartialReason::SizeCap));
+    let t9 = &kept.traces[0];
+    assert!(!t9.exact);
+    assert_eq!((t9.span_count, t9.matched_count), (2, 1));
+
+    // Sanity: without the cap both directions are Complete and exact.
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let uncapped = run(
+        sources,
+        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m", "yes")])),
+    );
+    assert_eq!(ids(&uncapped), vec![hex(8), hex(9)]);
+    assert_eq!(uncapped.status, QueryStatus::Complete);
+}
+
 /// UNSET trace ids never become candidates (TRCE carries zeros for
 /// them; a by-UNSET group is not a trace).
 #[test]
