@@ -372,8 +372,17 @@ impl Condition {
             {
                 None
             }
-            (PredicateTarget::Intrinsic(RootName | RootServiceName | TraceDuration), _) => {
-                Some(format!("trace-level {}", self.target))
+            // Trace-level intrinsics evaluate post-assembly (tri-state,
+            // decision 15). Values are single-valued per trace, so
+            // negation carries no subgroup fork.
+            (
+                PredicateTarget::Intrinsic(RootName | RootServiceName),
+                CompareOp::Eq | CompareOp::NotEq | CompareOp::Regex | CompareOp::NotRegex,
+            ) => None,
+            (PredicateTarget::Intrinsic(TraceDuration), op)
+                if op.is_ordering() || matches!(op, CompareOp::Eq | CompareOp::NotEq) =>
+            {
+                None
             }
             (target, op) => Some(format!("{op:?} on {target}")),
         }
@@ -1015,6 +1024,101 @@ fn eval_group_condition(c: &sfst::GroupCondition) -> EvalGroupCondition {
     }
 }
 
+/// The post-assembly evaluator of the TRACE-LEVEL partition half
+/// (decision 15 / pin R3-2): boolean over the assembled trace's root
+/// name, root service, and envelope duration — the ENGINE owns the
+/// tri-state (an assembled trace whose values are unreliable — capped
+/// or degraded — is excluded as indeterminate before this evaluator is
+/// consulted). Absent root values never satisfy a condition, negated
+/// forms included (the absent-never-satisfies rule; values are
+/// single-valued per trace, so no subgroup fork exists).
+pub(crate) struct TraceLevelEval {
+    conditions: Vec<TraceLevelCondition>,
+}
+
+enum TraceLevelCondition {
+    RootName { matcher: EvalMatcher, negated: bool },
+    RootService { matcher: EvalMatcher, negated: bool },
+    Duration {
+        intervals: Vec<(Option<i64>, Option<i64>)>,
+        negated: bool,
+    },
+}
+
+impl TraceLevelEval {
+    /// Compile the trace-level predicate half (validated, evaluable).
+    pub(crate) fn new(trace_level: &Predicate) -> Self {
+        let conditions = trace_level
+            .conditions
+            .iter()
+            .map(|condition| {
+                let negated =
+                    matches!(condition.op, CompareOp::NotEq | CompareOp::NotRegex);
+                match &condition.target {
+                    PredicateTarget::Intrinsic(TraceIntrinsic::RootName) => {
+                        TraceLevelCondition::RootName {
+                            matcher: eval_matcher(&condition_matcher(condition.op, &condition.values)),
+                            negated,
+                        }
+                    }
+                    PredicateTarget::Intrinsic(TraceIntrinsic::RootServiceName) => {
+                        TraceLevelCondition::RootService {
+                            matcher: eval_matcher(&condition_matcher(condition.op, &condition.values)),
+                            negated,
+                        }
+                    }
+                    PredicateTarget::Intrinsic(TraceIntrinsic::TraceDuration) => {
+                        let intervals = condition
+                            .values
+                            .iter()
+                            .map(|v| {
+                                let PredicateValue::Integer(n) = v else {
+                                    unreachable!("validated: nanos values are integers");
+                                };
+                                duration_bounds(
+                                    if negated { CompareOp::Eq } else { condition.op },
+                                    *n,
+                                )
+                            })
+                            .collect();
+                        TraceLevelCondition::Duration { intervals, negated }
+                    }
+                    other => unreachable!("not a trace-level target: {other}"),
+                }
+            })
+            .collect();
+        Self { conditions }
+    }
+
+    /// Whether the assembled trace's values satisfy every condition.
+    pub(crate) fn matches(
+        &self,
+        root_name: Option<&str>,
+        root_service: Option<&str>,
+        trace_duration_ns: i64,
+    ) -> bool {
+        let text = |value: Option<&str>, matcher: &EvalMatcher, negated: bool| match value {
+            None => false, // absent never satisfies, negated included
+            Some(v) => matcher.value_matches(v) != negated,
+        };
+        self.conditions.iter().all(|c| match c {
+            TraceLevelCondition::RootName { matcher, negated } => {
+                text(root_name, matcher, *negated)
+            }
+            TraceLevelCondition::RootService { matcher, negated } => {
+                text(root_service, matcher, *negated)
+            }
+            TraceLevelCondition::Duration { intervals, negated } => {
+                let in_any = intervals.iter().any(|&(lo, hi)| {
+                    lo.is_none_or(|lo| trace_duration_ns >= lo)
+                        && hi.is_none_or(|hi| trace_duration_ns <= hi)
+                });
+                in_any != *negated
+            }
+        })
+    }
+}
+
 /// Whether one span (with its resource/scope context — a span's fields
 /// carry the flattened resource and scope entries) satisfies the
 /// SPAN-LOCAL `predicate` and the optional window. The pinned span-side
@@ -1344,18 +1448,24 @@ mod tests {
             .validate(),
             Err(PredicateError::InvalidIdValue { width: 16, .. })
         ));
-        assert!(rejected(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::RootServiceName),
-            CompareOp::Eq,
-            vec![text("v")],
-        ))
-        .contains("trace-level"));
-        assert!(rejected(cond(
+        // Trace-level intrinsics are evaluable post-assembly.
+        for op in [CompareOp::Eq, CompareOp::NotEq, CompareOp::Regex, CompareOp::NotRegex] {
+            evaluable(cond(
+                PredicateTarget::Intrinsic(TraceIntrinsic::RootServiceName),
+                op,
+                vec![text("v")],
+            ));
+        }
+        evaluable(cond(
             PredicateTarget::Intrinsic(TraceIntrinsic::TraceDuration),
             CompareOp::Gt,
             vec![PredicateValue::Integer(5)],
-        ))
-        .contains("trace-level"));
+        ));
+        evaluable(cond(
+            PredicateTarget::Intrinsic(TraceIntrinsic::TraceDuration),
+            CompareOp::NotEq,
+            vec![PredicateValue::Integer(5)],
+        ));
     }
 
     /// Partition (R3-2): trace-level intrinsics split out; everything

@@ -659,6 +659,59 @@ fn oracle_equivalence_under_relayouts() {
             ])),
             vec![hex(4)],
         ),
+        (
+            // Trace-level only: phase-1 candidates come from All over
+            // the window (C-4); the root evaluates post-assembly.
+            "root-service",
+            SearchQuery::new(pred(vec![intrinsic(
+                TraceIntrinsic::RootServiceName,
+                CompareOp::Eq,
+                vec![text("svc-a")],
+            )])),
+            vec![hex(3), hex(2), hex(1)],
+        ),
+        (
+            "root-name-regex",
+            SearchQuery::new(pred(vec![intrinsic(
+                TraceIntrinsic::RootName,
+                CompareOp::Regex,
+                vec![text("GET .*")],
+            )])),
+            vec![hex(3), hex(1)],
+        ),
+        (
+            "negated-root-name",
+            SearchQuery::new(pred(vec![intrinsic(
+                TraceIntrinsic::RootName,
+                CompareOp::NotEq,
+                vec![text("GET /users")],
+            )])),
+            vec![hex(3), hex(5), hex(6), hex(4), hex(2)],
+        ),
+        (
+            // Envelope duration: only T3 spans a second-scale envelope.
+            "trace-duration",
+            SearchQuery::new(pred(vec![intrinsic(
+                TraceIntrinsic::TraceDuration,
+                CompareOp::Gt,
+                vec![PredicateValue::Integer((100 * NS) as i64)],
+            )])),
+            vec![hex(3)],
+        ),
+        (
+            // MIXED: the span-local half lowers to the file plans, the
+            // trace-level half applies post-assembly (C-4).
+            "mixed-trace-level",
+            SearchQuery::new(pred(vec![
+                intrinsic(TraceIntrinsic::Status, CompareOp::Eq, vec![text("ERROR")]),
+                intrinsic(
+                    TraceIntrinsic::RootServiceName,
+                    CompareOp::Eq,
+                    vec![text("svc-b")],
+                ),
+            ])),
+            vec![hex(5)],
+        ),
     ];
 
     let world = world(dir.path());
@@ -872,11 +925,6 @@ fn request_validation_matrix() {
             TraceIntrinsic::LinkSpanId,
             CompareOp::NotEq,
             vec![text("00f067aa0ba902b7")],
-        ),
-        intrinsic(
-            TraceIntrinsic::TraceDuration,
-            CompareOp::Gt,
-            vec![PredicateValue::Integer(5)],
         ),
     ] {
         assert!(
@@ -1292,6 +1340,50 @@ fn trace_id_pins_skip_discovery() {
     );
     assert!(none.traces.is_empty());
     assert_eq!(none.status, QueryStatus::Complete);
+}
+
+/// Decision 15 tri-state: a CAPPED trace's root/envelope values are
+/// unreliable, so a trace-level condition EXCLUDES it as indeterminate
+/// (never guessed either way) and the query stays Partial via the
+/// examined-truncated SizeCap.
+#[test]
+fn trace_level_conditions_exclude_indeterminate_candidates() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc")];
+    let reqs = vec![req_with(svc, None, &[
+        span_in(9, 0x91, 0, 100 * NS, "root-9"),
+        span_in(9, 0x92, 0x91, 200 * NS, "child"),
+        span_in(9, 0x93, 0x91, 300 * NS, "child-2"),
+        span_in(8, 0x81, 0, 400 * NS, "root-8"),
+    ])];
+    let wal = write_wal(dir.path(), reqs, "tristate");
+    // Uncapped: both roots match the regex.
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let full = run(
+        sources,
+        SearchQuery::new(pred(vec![intrinsic(
+            TraceIntrinsic::RootName,
+            CompareOp::Regex,
+            vec![text("root-.*")],
+        )])),
+    );
+    assert_eq!(ids(&full), vec![hex(8), hex(9)]);
+    assert_eq!(full.status, QueryStatus::Complete);
+    // Capped at 2: trace 9 assembles truncated → INDETERMINATE for the
+    // trace-level condition → excluded; trace 8 (complete) returns;
+    // SizeCap marks the exclusion's cause.
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let capped = run(
+        sources,
+        SearchQuery::new(pred(vec![intrinsic(
+            TraceIntrinsic::RootName,
+            CompareOp::Regex,
+            vec![text("root-.*")],
+        )]))
+        .span_cap_for_tests(2),
+    );
+    assert_eq!(ids(&capped), vec![hex(8)]);
+    assert!(capped.status.has(PartialReason::SizeCap));
 }
 
 /// UNSET trace ids never become candidates (TRCE carries zeros for

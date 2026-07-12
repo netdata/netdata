@@ -52,7 +52,7 @@ use sfst::trace_combine::{SpanSource, combine};
 use sfst::{ScanWork, TraceId};
 
 use super::by_id::{DEFAULT_SPAN_CAP, FieldKinds};
-use super::predicate::{EvalPredicate, Predicate, PredicateError};
+use super::predicate::{EvalPredicate, Predicate, PredicateError, TraceLevelEval};
 use super::sources::{SourceId, SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
 use super::vocab::{TagScope, TraceIntrinsic};
@@ -417,13 +417,15 @@ pub fn search(
 
     // `trace:id` conditions split out FIRST (they constrain the
     // candidate set, not the spans); the R3-2 partition applies to the
-    // remainder. `ensure_evaluable` still rejects trace-level
-    // intrinsics, so the trace-level part stays empty until the
-    // post-assembly step lands.
+    // remainder. A trace-level-only predicate leaves the span-local
+    // half empty — phase-1 candidates come from `All` over the window
+    // (pin C-4) via the empty plan.
     let (remainder, trace_ids) = query.predicate.split_trace_id_conditions();
-    let (span_local, _trace_level) = remainder.partition();
+    let (span_local, trace_level) = remainder.partition();
     let plan = span_local.to_trace_plan();
     let eval = EvalPredicate::new(&plan);
+    let trace_level_eval =
+        (!trace_level.is_all()).then(|| TraceLevelEval::new(&trace_level));
 
     let mut status = StatusBuilder::new();
     let mut work = ScanWork::default();
@@ -762,6 +764,25 @@ pub fn search(
                     query.spss,
                     !outcome.truncated && !merge_failed && !degraded_assembly,
                 );
+                // Trace-level conditions evaluate post-assembly as
+                // TRI-STATE (decision 15): an inexact trace's root and
+                // envelope values are unreliable — the candidate is
+                // EXCLUDED as indeterminate (the underlying cause
+                // already marked the query Partial: SizeCap at the
+                // examined-truncated rule, SourceFailure at the
+                // failure sites), never guessed either way.
+                if let Some(tl) = &trace_level_eval {
+                    if !summary.exact {
+                        continue; // indeterminate → excluded
+                    }
+                    if !tl.matches(
+                        summary.root_name.as_deref(),
+                        summary.root_service.as_deref(),
+                        summary.duration_ns,
+                    ) {
+                        continue; // decided no-match
+                    }
+                }
                 final_ranks.insert((std::cmp::Reverse(rank.0), rank.1));
                 finals.push(Assembled {
                     summary,
