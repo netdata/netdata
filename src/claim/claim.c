@@ -148,7 +148,7 @@ bool load_claiming_state(void) {
     if (aclk_online()) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "CLAIM: agent was already connected to NC - forcing reconnection under new credentials");
-        disconnect_req = ACLK_RELOAD_CONF;
+        __atomic_store_n(&disconnect_req, ACLK_RELOAD_CONF, __ATOMIC_RELAXED);
     }
     __atomic_store_n(&aclk_disable_runtime, 0, __ATOMIC_RELAXED);
 

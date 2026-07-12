@@ -342,9 +342,11 @@ static int handle_connection(mqtt_wss_client client)
             return 1;
         }
 
-        if (disconnect_req != ACLK_NO_DISCONNECT) {
+        ACLK_DISCONNECT_ACTION action = __atomic_load_n(&disconnect_req, __ATOMIC_RELAXED);
+        if (action != ACLK_NO_DISCONNECT) {
+            action = __atomic_exchange_n(&disconnect_req, ACLK_NO_DISCONNECT, __ATOMIC_RELAXED);
             const char *reason;
-            switch (disconnect_req) {
+            switch (action) {
                 case ACLK_CLOUD_DISCONNECT:
                     worker_is_busy(WORKER_ACLK_CMD_DISCONNECT);
                     reason = "cloud request";
@@ -370,7 +372,6 @@ static int handle_connection(mqtt_wss_client client)
 
             nd_log(NDLS_DAEMON, NDLP_NOTICE, "Going to restart connection due to \"%s\"", reason);
 
-            disconnect_req = ACLK_NO_DISCONNECT;
             aclk_graceful_disconnect(client);
             aclk_shared_state.mqtt_shutdown_msg_id = -1;
             aclk_shared_state.mqtt_shutdown_msg_rcvd = 0;
