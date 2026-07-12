@@ -1781,7 +1781,7 @@ bool daemon_status_file_deadly_signal_received(EXIT_REASON reason, SIGNAL_CODE c
 static SPINLOCK shutdown_timeout_spinlock = SPINLOCK_INITIALIZER;
 
 NEVER_INLINE
-void daemon_status_file_shutdown_timeout(BUFFER *trace) {
+void daemon_status_file_shutdown_timeout(const char *step, BUFFER *trace) {
     FUNCTION_RUN_ONCE();
 
     spinlock_lock(&shutdown_timeout_spinlock);
@@ -1790,11 +1790,26 @@ void daemon_status_file_shutdown_timeout(BUFFER *trace) {
     dsf_acquire(session_status);
     exit_initiated_add(EXIT_REASON_SHUTDOWN_TIMEOUT);
     session_status.exit_reason |= EXIT_REASON_SHUTDOWN_TIMEOUT;
-    if(trace && buffer_strlen(trace) && stack_trace_is_empty(&session_status))
-        safecpy(session_status.fatal.stack_trace, buffer_tostring(trace));
-    dsf_release(session_status);
+    if(trace && buffer_strlen(trace) && stack_trace_is_empty(&session_status)) {
+        const char *timings = buffer_tostring(trace);
+        size_t rolling_header_length = strlen(DAEMON_STATUS_FILE_ROLLING_SHUTDOWN_TIMINGS_HEADER);
+
+        if(strncmp(timings, DAEMON_STATUS_FILE_ROLLING_SHUTDOWN_TIMINGS_HEADER, rolling_header_length) == 0)
+            snprintfz(session_status.fatal.stack_trace, sizeof(session_status.fatal.stack_trace),
+                      "shutdown timings:%s", &timings[rolling_header_length]);
+        else if(strncmp(timings, STACK_TRACE_INFO_PREFIX, strlen(STACK_TRACE_INFO_PREFIX)) == 0)
+            snprintfz(session_status.fatal.stack_trace, sizeof(session_status.fatal.stack_trace),
+                      "shutdown timings: %s", &timings[strlen(STACK_TRACE_INFO_PREFIX)]);
+        else
+            safecpy(session_status.fatal.stack_trace, timings);
+    }
+
+    if(step && *step && !session_status.fatal.message[0])
+        snprintfz(session_status.fatal.message, sizeof(session_status.fatal.message),
+                  "shutdown timed out at step: %s", step);
 
     safecpy(session_status.fatal.function, "shutdown_timeout");
+    dsf_release(session_status);
     daemon_status_file_publish_fatal_snapshot(&session_status);
     daemon_status_file_session_status_writer_leave();
 
