@@ -175,6 +175,20 @@ func TestConfig_validateMetricSelector(t *testing.T) {
 				},
 			}},
 		},
+		"empty group statistics": {
+			selectors: []ProfileMetricSelectorConfig{{
+				Profile: "ec2", Statistics: []string{},
+				Include: []MetricSelectionConfig{{Name: "CPUUtilization", Statistics: []string{"Average"}}},
+			}},
+			wantErr: "statistics must contain at least one entry when present",
+		},
+		"empty metric statistics": {
+			selectors: []ProfileMetricSelectorConfig{{
+				Profile: "ec2", Statistics: []string{"Average"},
+				Include: []MetricSelectionConfig{{Name: "CPUUtilization", Statistics: []string{}}},
+			}},
+			wantErr: "statistics must contain at least one entry when present",
+		},
 		"empty groups": {selectors: []ProfileMetricSelectorConfig{}, wantErr: "must contain at least one profile group"},
 		"empty profile": {
 			selectors: []ProfileMetricSelectorConfig{{Include: []MetricSelectionConfig{{Name: "CPUUtilization", Statistics: []string{"Average"}}}}},
@@ -440,6 +454,32 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 		assert.Error(t, schema.Validate(cfg))
 		assert.Error(t, validateRuntimeConfigMap(t, cfg))
 	})
+
+	for name, metrics := range map[string][]any{
+		"empty group statistics": {
+			map[string]any{
+				"profile": "ec2", "statistics": []any{},
+				"include": []any{map[string]any{"name": "CPUUtilization", "statistics": []any{"Average"}}},
+			},
+		},
+		"empty metric statistics": {
+			map[string]any{
+				"profile": "ec2", "statistics": []any{"Average"},
+				"include": []any{map[string]any{"name": "CPUUtilization", "statistics": []any{}}},
+			},
+		},
+	} {
+		t.Run(name+" are rejected", func(t *testing.T) {
+			cfg := cloneConfigMap(t, valid)
+			cfg["rules"] = []any{map[string]any{
+				"name": "selected", "targets": []any{"base"}, "regions": []any{"us-east-1"},
+				"profiles": map[string]any{"defaults": false, "include": []any{"ec2"}},
+				"metrics":  metrics,
+			}}
+			assert.Error(t, schema.Validate(cfg))
+			assert.Error(t, validateRuntimeConfigMap(t, cfg))
+		})
+	}
 
 	t.Run("resource tag filter inheritance and explicit disable are valid", func(t *testing.T) {
 		cfg := cloneConfigMap(t, valid)

@@ -467,26 +467,7 @@ func BenchmarkBuildQueryPlanSeriesSelection(b *testing.B) {
 			for _, overlappingScopes := range []int{1, 4} {
 				name := fmt.Sprintf("instances_%d/series_%s/scopes_%d", instances, selected, overlappingScopes)
 				b.Run(name, func(b *testing.B) {
-					values := make([][]string, instances)
-					for i := range values {
-						values[i] = []string{fmt.Sprintf("i-%d", i)}
-					}
-					c := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{"us-east-1": values})
-					c.Logger = logger.NewWithWriter(io.Discard)
-					c.Limits.MaxInstances = instances + 1
-					if selected == "one" {
-						c.plan.Scopes[0].SelectedSeries = c.plan.Scopes[0].SelectedSeries[:1]
-					}
-					base := c.plan.Scopes[0]
-					baseInstances := c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}]
-					for i := 1; i < overlappingScopes; i++ {
-						target := &collectionTarget{Name: fmt.Sprintf("target-%d", i)}
-						scope := base
-						scope.Target = target
-						c.plan.Scopes = append(c.plan.Scopes, scope)
-						c.resolvedByRef[target.Name] = resolvedTarget{target: target, accountID: "123456789012"}
-						c.discovery.Instances[discoveryKey{Target: target.Name, Profile: "ec2", Region: "us-east-1"}] = baseInstances
-					}
+					c := seriesSelectionBenchmarkCollector(instances, selected, overlappingScopes)
 
 					b.ReportAllocs()
 					b.ResetTimer()
@@ -501,6 +482,55 @@ func BenchmarkBuildQueryPlanSeriesSelection(b *testing.B) {
 			}
 		}
 	}
+}
+
+func BenchmarkCurrentQueryPlanDirtySeriesSelection(b *testing.B) {
+	for _, instances := range []int{100, 1000, 10000} {
+		for _, selected := range []string{"all", "one"} {
+			for _, overlappingScopes := range []int{1, 4} {
+				name := fmt.Sprintf("instances_%d/series_%s/scopes_%d", instances, selected, overlappingScopes)
+				b.Run(name, func(b *testing.B) {
+					c := seriesSelectionBenchmarkCollector(instances, selected, overlappingScopes)
+					require.NotEmpty(b, requireCurrentQueryPlan(b, c))
+
+					b.ReportAllocs()
+					b.ResetTimer()
+					for range b.N {
+						c.invalidateQueryPlan()
+						plan, err := c.currentQueryPlan()
+						if err != nil {
+							b.Fatal(err)
+						}
+						goruntime.KeepAlive(plan)
+					}
+				})
+			}
+		}
+	}
+}
+
+func seriesSelectionBenchmarkCollector(instances int, selected string, overlappingScopes int) *Collector {
+	values := make([][]string, instances)
+	for i := range values {
+		values[i] = []string{fmt.Sprintf("i-%d", i)}
+	}
+	c := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{"us-east-1": values})
+	c.Logger = logger.NewWithWriter(io.Discard)
+	c.Limits.MaxInstances = instances + 1
+	if selected == "one" {
+		c.plan.Scopes[0].SelectedSeries = c.plan.Scopes[0].SelectedSeries[:1]
+	}
+	base := c.plan.Scopes[0]
+	baseInstances := c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}]
+	for i := 1; i < overlappingScopes; i++ {
+		target := &collectionTarget{Name: fmt.Sprintf("target-%d", i)}
+		scope := base
+		scope.Target = target
+		c.plan.Scopes = append(c.plan.Scopes, scope)
+		c.resolvedByRef[target.Name] = resolvedTarget{target: target, accountID: "123456789012"}
+		c.discovery.Instances[discoveryKey{Target: target.Name, Profile: "ec2", Region: "us-east-1"}] = baseInstances
+	}
+	return c
 }
 
 // gmdCloudWatch is a thread-safe GetMetricData fake: every query gets f.value

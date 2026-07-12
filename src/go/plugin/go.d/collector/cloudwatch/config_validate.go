@@ -87,7 +87,7 @@ func validateRawMetricSelectorLimits(path string, selectors []ProfileMetricSelec
 				return fmt.Errorf("%s.include[%d].statistics contains %d entries; maximum is %d", groupPath, j, len(metric.Statistics), maxReferencesPerRule)
 			}
 			count := len(metric.Statistics)
-			if count == 0 {
+			if metric.Statistics == nil {
 				count = len(selector.Statistics)
 			}
 			expanded += count
@@ -258,7 +258,7 @@ func validateMetricSelectors(path string, selectors []ProfileMetricSelectorConfi
 				seenMetrics[metric.Name] = struct{}{}
 			}
 			errs = append(errs, validateMetricStatistics(metricPath+".statistics", metric.Statistics))
-			if len(metric.Statistics) == 0 && len(selector.Statistics) == 0 {
+			if metric.Statistics == nil && selector.Statistics == nil {
 				errs = append(errs, fmt.Errorf("%s must define statistics or inherit them from %s.statistics", metricPath, groupPath))
 			}
 		}
@@ -267,6 +267,9 @@ func validateMetricSelectors(path string, selectors []ProfileMetricSelectorConfi
 }
 
 func validateMetricStatistics(path string, statistics []string) error {
+	if statistics != nil && len(statistics) == 0 {
+		return fmt.Errorf("%s must contain at least one entry when present", path)
+	}
 	seen := make(map[string]struct{}, len(statistics))
 	var errs []error
 	for i, raw := range statistics {

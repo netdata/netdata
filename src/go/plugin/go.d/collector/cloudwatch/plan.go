@@ -179,7 +179,7 @@ func resolveMetricGroup(path string, selector ProfileMetricSelectorConfig, profi
 			return fmt.Errorf("%s.name references unknown MetricName %q in profile %q", metricPath, entry.Name, profile.Name)
 		}
 		statistics := entry.Statistics
-		if len(statistics) == 0 {
+		if statistics == nil {
 			statistics = selector.Statistics
 		}
 		for j, raw := range statistics {
