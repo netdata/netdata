@@ -7,7 +7,8 @@ use std::io::Cursor;
 use bumpalo::Bump;
 
 use crate::{
-    Durations, IndexReader, IndexWriter, PlanTerm, RowIndex, ScanWork, TracePlan,
+    CompiledTracePlan, Durations, IndexReader, IndexWriter, PlanTerm, RowIndex, ScanWork,
+    TracePlan,
 };
 
 /// One fixture row's field values, mirrored for the oracle.
@@ -64,6 +65,13 @@ fn tokens(field: &str, exact: &[&str], patterns: &[&str]) -> PlanTerm {
 
 fn plan(terms: Vec<PlanTerm>) -> TracePlan {
     TracePlan { terms }
+}
+
+/// Whole-file, unbounded compile — the shape most tests need.
+fn compile(idx: &IndexReader<'_>, p: &TracePlan, work: &mut ScanWork) -> CompiledTracePlan {
+    idx.compile_trace_plan(p, (0, idx.summary().record_count), u64::MAX, work)
+        .unwrap()
+        .expect("an unbounded compile cannot run out of budget")
 }
 
 /// The newest `k` matching positions in `[lo, hi)`, ascending — the
@@ -167,7 +175,7 @@ fn tier_matrix_matches_the_oracle() {
 
     for (ci, (p, pred)) in cases.iter().enumerate() {
         let mut work = ScanWork::default();
-        let compiled = idx.compile_trace_plan(p, &mut work).unwrap();
+        let compiled = compile(&idx, p, &mut work);
         for &(lo, hi) in &[(0u32, N as u32), (10, 200), (100, 101), (0, 5)] {
             for &k in &[1usize, 5, N] {
                 let mut w = ScanWork::default();
@@ -195,12 +203,11 @@ fn absent_field_collapses_the_conjunction() {
     let (bytes, _) = fixture();
     let idx = IndexReader::open(&bytes).unwrap();
     let mut work = ScanWork::default();
-    let compiled = idx
-        .compile_trace_plan(
-            &plan(vec![tokens("l", &["a"], &[]), tokens("absent", &["x"], &[])]),
-            &mut work,
-        )
-        .unwrap();
+    let compiled = compile(
+        &idx,
+        &plan(vec![tokens("l", &["a"], &[]), tokens("absent", &["x"], &[])]),
+        &mut work,
+    );
     assert_eq!(compiled.count_in_range(0, N as u32), 0);
     assert_eq!(
         compiled.newest_in_range(0, N as u32, 5, &mut work),
@@ -208,14 +215,14 @@ fn absent_field_collapses_the_conjunction() {
     );
     // Short-circuit: the high-card scan after the collapse never ran.
     let mut work = ScanWork::default();
-    idx.compile_trace_plan(
+    compile(
+        &idx,
         &plan(vec![
             tokens("absent", &["x"], &[]),
             tokens("h", &[], &["w.*"]),
         ]),
         &mut work,
-    )
-    .unwrap();
+    );
     assert_eq!(work.rows_visited, 0, "collapsed plan skips the SB scan");
 }
 
@@ -228,7 +235,8 @@ fn work_counts_one_shared_stream_batch_pass() {
 
     // Low + mid + duration: no rows visited at compile.
     let mut work = ScanWork::default();
-    idx.compile_trace_plan(
+    compile(
+        &idx,
         &plan(vec![
             tokens("l", &["a"], &[]),
             tokens("m", &[], &["v.*"]),
@@ -238,32 +246,29 @@ fn work_counts_one_shared_stream_batch_pass() {
             },
         ]),
         &mut work,
-    )
-    .unwrap();
+    );
     assert_eq!(work.rows_visited, 0, "dictionary/column terms are free");
 
     // One high term matching every value: the pass visits every row once.
     let mut one = ScanWork::default();
-    idx.compile_trace_plan(&plan(vec![tokens("h", &[], &["w.*"])]), &mut one)
-        .unwrap();
+    compile(&idx, &plan(vec![tokens("h", &[], &["w.*"])]), &mut one);
     assert_eq!(one.rows_visited, N as u64);
 
     // TWO high terms: still ONE pass — not 2×N.
     let mut two = ScanWork::default();
-    idx.compile_trace_plan(
+    compile(
+        &idx,
         &plan(vec![
             tokens("h", &[], &["w.*"]),
             tokens("h2", &[], &["x.*"]),
         ]),
         &mut two,
-    )
-    .unwrap();
+    );
     assert_eq!(two.rows_visited, N as u64, "shared pass counted once");
 
     // A narrow exact high term visits only its masked batches.
     let mut narrow = ScanWork::default();
-    idx.compile_trace_plan(&plan(vec![tokens("h", &["w005"], &[])]), &mut narrow)
-        .unwrap();
+    compile(&idx, &plan(vec![tokens("h", &["w005"], &[])]), &mut narrow);
     let batch_size = crate::stream_batch_size(N as u32);
     let rows_of_batch = |b: u32| -> u64 {
         let start = b * batch_size;
@@ -296,18 +301,14 @@ fn match_all_extraction_is_rank_bounded_and_row_free() {
     }
     let idx = IndexReader::open(&corrupted).unwrap();
     let mut work = ScanWork::default();
-    let compiled = idx
-        .compile_trace_plan(&TracePlan::default(), &mut work)
-        .unwrap();
+    let compiled = compile(&idx, &TracePlan::default(), &mut work);
     assert_eq!(work.rows_visited, 0, "match-all compiles without row work");
     let got = compiled.newest_in_range(0, N as u32, 3, &mut work);
     assert_eq!(got, vec![N as u32 - 3, N as u32 - 2, N as u32 - 1]);
     assert_eq!(work.rows_visited, 3, "O(K) emission for match-all");
     // Low/mid dictionary terms work on the corrupted file too.
     let mut w2 = ScanWork::default();
-    let low = idx
-        .compile_trace_plan(&plan(vec![tokens("l", &["a"], &[])]), &mut w2)
-        .unwrap();
+    let low = compile(&idx, &plan(vec![tokens("l", &["a"], &[])]), &mut w2);
     assert_eq!(low.count_in_range(0, N as u32), (N / 2) as u64);
 }
 
@@ -319,7 +320,7 @@ fn extraction_edges() {
     let idx = IndexReader::open(&bytes).unwrap();
     let mut work = ScanWork::default();
     let p = plan(vec![tokens("m", &["v03"], &[])]);
-    let compiled = idx.compile_trace_plan(&p, &mut work).unwrap();
+    let compiled = compile(&idx, &p, &mut work);
     let matched = oracle(&rows, |r| r.m == "v03", 0, N as u32, N);
 
     assert!(compiled.newest_in_range(0, N as u32, 0, &mut work).is_empty());
@@ -348,7 +349,12 @@ fn malformed_pattern_fails_compilation() {
         let mut work = ScanWork::default();
         assert!(
             matches!(
-                idx.compile_trace_plan(&plan(vec![tokens(field, &[], &["("])]), &mut work),
+                idx.compile_trace_plan(
+                    &plan(vec![tokens(field, &[], &["("])]),
+                    (0, N as u32),
+                    u64::MAX,
+                    &mut work,
+                ),
                 Err(crate::Error::InvalidPattern(_))
             ),
             "field {field}"
@@ -375,8 +381,59 @@ fn duration_term_requires_the_durn_column() {
                 min_ns: Some(0),
                 max_ns: None,
             }]),
+            (0, 1),
+            u64::MAX,
             &mut work,
         )
         .is_err()
+    );
+}
+
+/// The compile budget is enforced INSIDE the stream-batch scan: a
+/// high-card plan whose scan would exceed the ceiling stops and returns
+/// `None` (a truncated plan must never be used) with the counter
+/// stopped one past the ceiling — never a whole-file overshoot.
+#[test]
+fn compile_budget_stops_the_stream_batch_scan() {
+    let (bytes, _) = fixture();
+    let idx = IndexReader::open(&bytes).unwrap();
+    let p = plan(vec![tokens("h", &[], &["w.*"])]);
+    let mut work = ScanWork::default();
+    let out = idx
+        .compile_trace_plan(&p, (0, N as u32), 10, &mut work)
+        .unwrap();
+    assert!(out.is_none(), "budget-truncated compile yields no plan");
+    assert_eq!(work.rows_visited, 11, "stopped one past the ceiling");
+    // Dictionary-only plans never consume the budget: a ceiling of 0
+    // still compiles them.
+    let mut w2 = ScanWork::default();
+    let low = idx
+        .compile_trace_plan(&plan(vec![tokens("l", &["a"], &[])]), (0, N as u32), 0, &mut w2)
+        .unwrap();
+    assert!(low.is_some());
+    assert_eq!(w2.rows_visited, 0);
+}
+
+/// The DURN pass is clipped to the caller's range (what keeps it out of
+/// the work units): positions outside the range never enter the set.
+#[test]
+fn duration_scan_is_clipped_to_the_range() {
+    let (bytes, rows) = fixture();
+    let idx = IndexReader::open(&bytes).unwrap();
+    let p = plan(vec![PlanTerm::Duration {
+        min_ns: Some(0),
+        max_ns: None,
+    }]);
+    let mut work = ScanWork::default();
+    let compiled = idx
+        .compile_trace_plan(&p, (10, 20), u64::MAX, &mut work)
+        .unwrap()
+        .expect("in budget");
+    assert_eq!(compiled.count_in_range(10, 20), 10);
+    // Nothing outside the compile range was collected.
+    assert_eq!(compiled.count_in_range(0, N as u32), 10);
+    assert_eq!(
+        compiled.newest_in_range(10, 20, N, &mut work),
+        oracle(&rows, |_| true, 10, 20, N)
     );
 }

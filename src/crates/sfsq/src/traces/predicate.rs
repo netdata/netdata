@@ -150,10 +150,10 @@ pub enum PredicateError {
 /// The intrinsic's comparison class — which operators and value types
 /// are structurally valid on it (full grammar, both stages).
 enum IntrinsicClass {
-    /// Free-form string: `= != =~ !~` with text values.
+    /// String-valued (free-form names/messages AND the closed kind/
+    /// status label sets — regex over labels is valid grammar, pin 26A):
+    /// `= != =~ !~` with text values.
     Text,
-    /// Closed keyword set (kind/status labels): `= !=` with text values.
-    Keyword,
     /// Nanosecond quantity: `= != > < >= <=` with integer values.
     Nanos,
     /// Fixed-width id in hex text: `= !=` with text values.
@@ -163,9 +163,8 @@ enum IntrinsicClass {
 fn intrinsic_class(i: TraceIntrinsic) -> IntrinsicClass {
     use TraceIntrinsic::*;
     match i {
-        Name | StatusMessage | InstrumentationName | InstrumentationVersion | EventName
-        | RootName | RootServiceName => IntrinsicClass::Text,
-        Kind | Status => IntrinsicClass::Keyword,
+        Name | Kind | Status | StatusMessage | InstrumentationName | InstrumentationVersion
+        | EventName | RootName | RootServiceName => IntrinsicClass::Text,
         Duration | TraceDuration | EventTimeSinceStart => IntrinsicClass::Nanos,
         SpanId | ParentSpanId | TraceId | LinkSpanId | LinkTraceId => IntrinsicClass::Id,
     }
@@ -218,7 +217,7 @@ impl Condition {
                         return Err(PredicateError::TextValueRequired { op: self.op, target });
                     }
                 }
-                IntrinsicClass::Keyword | IntrinsicClass::Id => {
+                IntrinsicClass::Id => {
                     if !matches!(self.op, CompareOp::Eq | CompareOp::NotEq) {
                         return Err(PredicateError::InvalidOpForTarget { op: self.op, target });
                     }
@@ -410,13 +409,22 @@ impl Predicate {
 /// Inclusive `[min_ns, max_ns]` bounds for a duration comparison —
 /// shared by the plan lowering and the span-side evaluator so the two
 /// paths convert exclusivity identically (integer nanoseconds, so
-/// `> v ⇔ ≥ v+1`).
+/// `> v ⇔ ≥ v+1`). A comparison no i64 satisfies (`> i64::MAX`,
+/// `< i64::MIN`) becomes the explicit EMPTY interval — saturating there
+/// would wrongly keep the extreme value itself matching.
 fn duration_bounds(op: CompareOp, v: i64) -> (Option<i64>, Option<i64>) {
+    const EMPTY: (Option<i64>, Option<i64>) = (Some(i64::MAX), Some(i64::MIN));
     match op {
         CompareOp::Eq => (Some(v), Some(v)),
-        CompareOp::Gt => (Some(v.saturating_add(1)), None),
+        CompareOp::Gt => match v.checked_add(1) {
+            Some(min) => (Some(min), None),
+            None => EMPTY,
+        },
         CompareOp::Gte => (Some(v), None),
-        CompareOp::Lt => (None, Some(v.saturating_sub(1))),
+        CompareOp::Lt => match v.checked_sub(1) {
+            Some(max) => (None, Some(max)),
+            None => EMPTY,
+        },
         CompareOp::Lte => (None, Some(v)),
         CompareOp::NotEq | CompareOp::Regex | CompareOp::NotRegex => {
             unreachable!("not a duration bound op (validated)")
@@ -599,11 +607,17 @@ mod tests {
             )),
             PredicateError::InvalidOpForTarget { .. }
         ));
+        // Regex over the kind/status LABEL sets is valid grammar (26A).
+        ok(cond(
+            PredicateTarget::Intrinsic(TraceIntrinsic::Kind),
+            CompareOp::Regex,
+            vec![text("SER.*")],
+        ));
         assert!(matches!(
             err(cond(
                 PredicateTarget::Intrinsic(TraceIntrinsic::Kind),
-                CompareOp::Regex,
-                vec![text("SER.*")],
+                CompareOp::Gt,
+                vec![text("SERVER")],
             )),
             PredicateError::InvalidOpForTarget { .. }
         ));
@@ -670,11 +684,13 @@ mod tests {
             TraceIntrinsic::InstrumentationName,
             TraceIntrinsic::InstrumentationVersion,
         ] {
-            evaluable(cond(
-                PredicateTarget::Intrinsic(i),
-                CompareOp::Eq,
-                vec![text("v")],
-            ));
+            for op in [CompareOp::Eq, CompareOp::Regex] {
+                evaluable(cond(
+                    PredicateTarget::Intrinsic(i),
+                    op,
+                    vec![text("v")],
+                ));
+            }
         }
         for op in [CompareOp::Gt, CompareOp::Lt, CompareOp::Gte, CompareOp::Lte, CompareOp::Eq] {
             evaluable(cond(
@@ -942,6 +958,33 @@ mod tests {
                 CompareOp::Gt,
                 vec![PredicateValue::Integer(250)],
             )],
+            None
+        ));
+        // Unsatisfiable extremes match nothing — even a span whose
+        // duration IS the extreme (the saturating-conversion trap).
+        let mut extreme = span.clone();
+        extreme.duration_ns = i64::MAX;
+        assert!(!span_matches(
+            &extreme,
+            &Predicate {
+                conditions: vec![cond(
+                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    CompareOp::Gt,
+                    vec![PredicateValue::Integer(i64::MAX)],
+                )],
+            },
+            None
+        ));
+        extreme.duration_ns = i64::MIN;
+        assert!(!span_matches(
+            &extreme,
+            &Predicate {
+                conditions: vec![cond(
+                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    CompareOp::Lt,
+                    vec![PredicateValue::Integer(i64::MIN)],
+                )],
+            },
             None
         ));
         // Window: span-START-in-window, half-open.

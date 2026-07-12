@@ -323,6 +323,17 @@ fn oracle_equivalence_under_relayouts() {
             vec![hex(4)],
         ),
         (
+            // Regex over the kind LABEL set is stage-A evaluable (26A):
+            // matches T4's CONSUMER (1200s) and T1's SERVER (1000s).
+            "kind-regex",
+            SearchQuery::new(pred(vec![intrinsic(
+                TraceIntrinsic::Kind,
+                CompareOp::Regex,
+                vec![text("SERVER|CONSUMER")],
+            )])),
+            vec![hex(4), hex(1)],
+        ),
+        (
             "duration-floor",
             SearchQuery::new(pred(vec![intrinsic(
                 TraceIntrinsic::Duration,

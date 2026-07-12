@@ -166,6 +166,11 @@ pub enum SearchRequestError {
     WindowNotInCompletion(SourceId),
     #[error(transparent)]
     Predicate(#[from] PredicateError),
+    /// `search` itself never constructs a [`TimeWindow`] (the query
+    /// carries one ready-built), so this variant is reached only through
+    /// the `From` conversion — kept so a caller assembling a request can
+    /// `?` window construction into the one request-error type (the
+    /// R2-8 wrapper contract, mirroring `TagRequestError`).
     #[error(transparent)]
     Window(#[from] WindowError),
     #[error(transparent)]
@@ -482,7 +487,14 @@ pub fn search(
         {
             continue;
         }
-        match discovery_state(reader, &plan, query.window, &mut work) {
+        match discovery_state(
+            reader,
+            &plan,
+            query.window,
+            query.visited_ceiling,
+            &mut work,
+            &mut discovery_truncated,
+        ) {
             Ok(Some(file)) => files.push(file),
             Ok(None) => {}
             Err(e) => {
@@ -507,9 +519,15 @@ pub fn search(
         }
         // The tail is small (bounded by rotation): evaluate every
         // decoded span through the SAME span-side evaluator phase 2
-        // uses; each visited span feeds the ceiling (pin R2-10).
+        // uses; each visited span feeds the ceiling (pin R2-10), which
+        // is enforced PER SPAN — a between-sources check alone could
+        // overshoot by a whole tail.
         for (trace_id, span) in scan.spans_with_ids() {
             work.rows_visited += 1;
+            if work.rows_visited > query.visited_ceiling {
+                discovery_truncated = true;
+                break;
+            }
             if !trace_id.is_unset() && eval.matches(span, query.window) {
                 pool.add(trace_id, span.start_ns);
             }
@@ -518,13 +536,20 @@ pub fn search(
 
     // Initial per-file over-collection. A ceiling breach mid-way leaves
     // the remaining files unexhausted, which the main loop's
-    // undiscovered-threat check sees on its own.
+    // undiscovered-threat check sees on its own. Extensions are clamped
+    // to the remaining budget (+1 so the breach registers) — emission
+    // itself must not overshoot.
+    let clamp = |count: usize, work: &ScanWork, ceiling: u64| -> usize {
+        let remaining = ceiling.saturating_sub(work.rows_visited).saturating_add(1);
+        count.min(usize::try_from(remaining).unwrap_or(usize::MAX))
+    };
     let mut k = query.limit.saturating_mul(OVER_COLLECTION_FACTOR).max(1);
     for file in &mut files {
         if work.rows_visited > query.visited_ceiling {
             break;
         }
-        file.extend(k, &mut work, &mut pool);
+        let count = clamp(k, &work, query.visited_ceiling);
+        file.extend(count, &mut work, &mut pool);
     }
 
     // ── Phase 2: sessions over the whole completion snapshot ─────────
@@ -607,15 +632,19 @@ pub fn search(
                 cancel.is_cancelled()
             });
             assembled_count += 1;
-            if outcome.cancelled {
-                return Ok(cancelled_empty(status));
-            }
+            // Failures fold into the status BEFORE the cancellation
+            // return: observed reasons coexist with Cancelled (the
+            // status-model contract) — an early return here must not
+            // hide a real source failure.
             let mut merge_failed = false;
             for (idx, e) in &outcome.failures {
                 let who = origin.get(*idx).map(String::as_str).unwrap_or("?");
                 tracing::warn!("sfsq traces: source {who} failed during merge: {e}");
                 status.add(PartialReason::SourceFailure);
                 merge_failed = true;
+            }
+            if outcome.cancelled {
+                return Ok(cancelled_empty(status));
             }
             let trace = outcome.trace;
             // Phase-2 re-evaluation against the CANONICAL spans: the
@@ -660,7 +689,8 @@ pub fn search(
             if work.rows_visited > query.visited_ceiling {
                 break;
             }
-            file.extend(grow, &mut work, &mut pool);
+            let count = clamp(grow, &work, query.visited_ceiling);
+            file.extend(count, &mut work, &mut pool);
         }
         // Progress is guaranteed: an unexhausted file either emits or
         // exhausts, so the threat re-check terminates the loop.
@@ -731,15 +761,20 @@ pub fn search(
     })
 }
 
-/// Build one window file's phase-1 state: compile the plan (work
-/// counted), resolve the window's position range, and decode the
-/// candidate-mapping columns once (owned, so grow-K rounds touch no
-/// reader). `Ok(None)` = the window range is empty in this file.
+/// Build one window file's phase-1 state: resolve the window's position
+/// range, decode the candidate-mapping columns once (owned, so grow-K
+/// rounds touch no reader), and compile the plan against that range
+/// (work counted, budget-bounded). `Ok(None)` = the window range is
+/// empty in this file, OR the visited budget ran out mid-compilation —
+/// the latter sets `truncated` so the engine can never claim
+/// completeness over the file it could not afford to scan.
 fn discovery_state(
     reader: &sfst::IndexReader<'_>,
     plan: &sfst::TracePlan,
     window: Option<TimeWindow>,
+    ceiling: u64,
     work: &mut ScanWork,
+    truncated: &mut bool,
 ) -> Result<Option<FileDiscovery>, sfst::Error> {
     let total = reader.summary().record_count;
     let timestamps = reader.load_timestamps()?;
@@ -758,7 +793,10 @@ fn discovery_state(
             timestamps.len(),
         )));
     }
-    let compiled = reader.compile_trace_plan(plan, work)?;
+    let Some(compiled) = reader.compile_trace_plan(plan, (lo, hi), ceiling, work)? else {
+        *truncated = true;
+        return Ok(None);
+    };
     Ok(Some(FileDiscovery {
         compiled,
         trace_ids,

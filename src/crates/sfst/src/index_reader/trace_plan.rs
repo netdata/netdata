@@ -22,8 +22,14 @@
 //! - each EMITTED matched position (rank-bounded extraction makes
 //!   emission itself the bounded unit).
 //!
+//! The caller's `ceiling` is enforced INSIDE the stream-batch scan (a
+//! counter alone could overshoot by a whole file): a compilation whose
+//! scan would exceed it stops and returns `Ok(None)` — a truncated
+//! plan must never be used, it would under-approximate.
+//!
 //! Deliberately EXCLUDED (bounded by construction): dictionary walks
-//! (FST/arena — dictionary-sized), the DURN column pass and other
+//! (FST/arena — dictionary-sized), the DURN column pass (clipped to the
+//! caller's position range, so it is window-bounded) and other
 //! fixed-width column reads, and the `range_cardinality` probes of the
 //! extraction (tree walks, not row visits).
 //!
@@ -93,19 +99,31 @@ pub struct CompiledTracePlan {
 }
 
 impl IndexReader<'_> {
-    /// Resolve `plan` against this file. Dictionary terms resolve per
-    /// tier (low/mid lookups; high-card terms share ONE stream-batch
-    /// scan, its visited rows counted once into `work`); duration bounds
-    /// resolve against the DURN column. An empty conjunction compiles to
-    /// the full range. A term whose field this file lacks collapses the
-    /// conjunction to empty — and short-circuits the remaining work,
-    /// deterministically (term order is the plan's, high-card scan last).
+    /// Resolve `plan` against this file for queries within the position
+    /// range `[lo, hi)` (the caller's window; pass `(0, record_count)`
+    /// for the whole file). Dictionary terms resolve per tier (low/mid
+    /// lookups; high-card terms share ONE stream-batch scan, its visited
+    /// rows counted once into `work` and bounded by `ceiling` —
+    /// `Ok(None)` when the budget ran out mid-scan, deterministically);
+    /// duration bounds scan the DURN column CLIPPED to the range (which
+    /// is what keeps that pass out of the work units). An empty
+    /// conjunction compiles to the full range. A term whose field this
+    /// file lacks collapses the conjunction to empty — and
+    /// short-circuits the remaining work, deterministically (term order
+    /// is the plan's, high-card scan last).
+    ///
+    /// The compiled plan answers `count_in_range`/`newest_in_range`
+    /// correctly only for sub-ranges of `[lo, hi)` (duration positions
+    /// outside it were never collected).
     pub fn compile_trace_plan(
         &self,
         plan: &TracePlan,
+        range: (u32, u32),
+        ceiling: u64,
         work: &mut ScanWork,
-    ) -> Result<CompiledTracePlan, crate::Error> {
+    ) -> Result<Option<CompiledTracePlan>, crate::Error> {
         let total = self.summary().record_count;
+        let (range_lo, range_hi) = (range.0.min(total), range.1.min(total));
         let mut acc: Option<PosSet> = None;
         let and_in = |set: PosSet, acc: &mut Option<PosSet>| match acc {
             None => *acc = Some(set),
@@ -148,17 +166,27 @@ impl IndexReader<'_> {
                     }
                 },
                 PlanTerm::Duration { min_ns, max_ns } => {
-                    // One DURN pass (fixed-width column, excluded from the
-                    // counters); positions ascend by construction.
+                    // One DURN pass over the caller's range only (a
+                    // fixed-width column read bounded by the window —
+                    // the basis for excluding it from the counters);
+                    // positions ascend by construction.
                     let durations = self.durations()?;
                     let lo = min_ns.unwrap_or(i64::MIN);
                     let hi = max_ns.unwrap_or(i64::MAX);
-                    let positions: Vec<u32> = durations
+                    let column = durations
                         .0
+                        .get(range_lo as usize..range_hi as usize)
+                        .ok_or_else(|| {
+                            crate::Error::CorruptIndex(format!(
+                                "trace plan: DURN length {} < range end {range_hi}",
+                                durations.0.len()
+                            ))
+                        })?;
+                    let positions: Vec<u32> = column
                         .iter()
                         .enumerate()
                         .filter(|&(_, &d)| lo <= d && d <= hi)
-                        .map(|(i, _)| i as u32)
+                        .map(|(i, _)| range_lo + i as u32)
                         .collect();
                     and_in(PosSet::from_sorted(positions, total), &mut acc);
                 }
@@ -168,15 +196,20 @@ impl IndexReader<'_> {
         if !high_terms.is_empty() && !empty(&acc) {
             let refs: Vec<(&KvIdSet, u8)> =
                 high_terms.iter().map(|(t, m)| (t, *m)).collect();
-            for set in self.scan_high_multi(&refs, total, &mut work.rows_visited)? {
+            let Some(sets) =
+                self.scan_high_multi(&refs, total, ceiling, &mut work.rows_visited)?
+            else {
+                return Ok(None); // budget ran out mid-scan
+            };
+            for set in sets {
                 and_in(set, &mut acc);
             }
         }
 
-        Ok(CompiledTracePlan {
+        Ok(Some(CompiledTracePlan {
             set: acc.unwrap_or_else(|| PosSet::full(total)),
             universe: total,
-        })
+        }))
     }
 }
 
