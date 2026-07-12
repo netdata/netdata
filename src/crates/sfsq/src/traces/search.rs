@@ -360,11 +360,12 @@ fn outranks(a: (i64, TraceId), b: (i64, TraceId)) -> bool {
 }
 
 /// One assembled, predicate-surviving candidate awaiting final ranking.
+/// (Truncation is not carried here: an examined truncated candidate
+/// already made the whole query Partial{SizeCap} at assembly.)
 struct Assembled {
     summary: TraceSummary,
     /// Canonical rank: (newest matched canonical span start, trace_id).
     rank: (i64, TraceId),
-    truncated: bool,
     /// Merge-source indices that contributed retained spans (the
     /// FieldKinds domain when this trace is returned).
     contributing: Vec<usize>,
@@ -669,21 +670,24 @@ pub fn search(
             if outcome.cancelled {
                 return Ok(cancelled_empty(status));
             }
+            // ANY examined truncated candidate makes the query
+            // Partial{SizeCap}: its beyond-cap spans are unseen (the cap
+            // keeps the EARLIEST spans, so unseen matched spans can only
+            // be newer), which leaves every downstream outcome unproven —
+            // a drop is not a proven non-match, a computed rank is an
+            // under-estimate that can wrongly trim the trace out of the
+            // top-K, and a returned summary undercounts. Evaluating past
+            // the cap would unbound the very work the cap bounds, so
+            // honesty is the answer.
+            if outcome.truncated {
+                status.add(PartialReason::SizeCap);
+            }
             let trace = outcome.trace;
             // Phase-2 re-evaluation against the CANONICAL spans: the
             // over-approximation drop point.
             let matched: Vec<usize> = (0..trace.spans.len())
                 .filter(|&i| eval.matches(&trace.spans[i], query.window))
                 .collect();
-            // Dropping a TRUNCATED candidate is not a proven non-match:
-            // the raw match that made it a candidate may live beyond the
-            // span cap, unseen by the re-evaluation. Evaluating past the
-            // cap would unbound the very work the cap bounds, so the
-            // honest answer is Partial{SizeCap} — never a silent
-            // Complete missing a possibly-matching trace.
-            if matched.is_empty() && outcome.truncated {
-                status.add(PartialReason::SizeCap);
-            }
             if let Some(&newest) = matched.last() {
                 // Spans are in combiner total order (ascending start), so
                 // the last matched index is the newest matched span.
@@ -699,7 +703,6 @@ pub fn search(
                 finals.push(Assembled {
                     summary,
                     rank,
-                    truncated: outcome.truncated,
                     contributing: outcome.contributing_sources,
                 });
             }
@@ -733,9 +736,6 @@ pub fn search(
         (std::cmp::Reverse(a.rank.0), a.rank.1).cmp(&(std::cmp::Reverse(b.rank.0), b.rank.1))
     });
     finals.truncate(query.limit);
-    if finals.iter().any(|f| f.truncated) {
-        status.add(PartialReason::SizeCap);
-    }
 
     // ── FieldKinds over the RETURNED traces (pin R2-13) ───────────────
     let mut kinds: BTreeMap<String, sfst::ValueKind> = BTreeMap::new();

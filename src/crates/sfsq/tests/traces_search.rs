@@ -839,20 +839,32 @@ fn capped_candidates_are_never_silently_dropped() {
     let svc = vec![kv_str("service.name", "svc")];
     let reqs = vec![req_with(svc, None, &[
         // Trace 9: three spans; with cap 2 the retained set is the
-        // earliest two (A, B) — the predicate match (C) is beyond it.
+        // earliest two (A, B). `m` exists only beyond the cap (C);
+        // `a` only on the retained A; `m2` on ALL THREE — so for `m2`
+        // the raw rank is 600s (C) while the computed retained rank is
+        // only 200s (B).
         SpanSpec {
-            attrs: vec![kv_str("a", "yes")],
+            attrs: vec![kv_str("a", "yes"), kv_str("m2", "yes")],
             ..span_in(9, 0x91, 0, 100 * NS, "a-span")
         },
-        span_in(9, 0x92, 0x91, 200 * NS, "b-span"),
         SpanSpec {
-            attrs: vec![kv_str("m", "yes")],
-            ..span_in(9, 0x93, 0x91, 300 * NS, "c-span")
+            attrs: vec![kv_str("m2", "yes")],
+            ..span_in(9, 0x92, 0x91, 200 * NS, "b-span")
         },
-        // Trace 8: an independent match proving results still flow.
+        SpanSpec {
+            attrs: vec![kv_str("m", "yes"), kv_str("m2", "yes")],
+            ..span_in(9, 0x93, 0x91, 600 * NS, "c-span")
+        },
+        // Trace 8: an independent `m` match proving results still flow.
         SpanSpec {
             attrs: vec![kv_str("m", "yes")],
             ..span_in(8, 0x81, 0, 400 * NS, "other")
+        },
+        // Trace 7: a single-span match NEWER than trace 9's RETAINED
+        // rank but older than its true one — the trimming displacer.
+        SpanSpec {
+            attrs: vec![kv_str("a", "yes"), kv_str("m2", "yes")],
+            ..span_in(7, 0x71, 0, 500 * NS, "displacer")
         },
     ])];
     let wal = write_wal(dir.path(), reqs, "capped");
@@ -874,19 +886,42 @@ fn capped_candidates_are_never_silently_dropped() {
         sources,
         SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "a", "yes")])).span_cap_for_tests(2),
     );
-    assert_eq!(ids(&kept), vec![hex(9)]);
+    assert_eq!(ids(&kept), vec![hex(7), hex(9)]);
     assert!(kept.status.has(PartialReason::SizeCap));
-    let t9 = &kept.traces[0];
+    let t9 = &kept.traces[1];
     assert!(!t9.exact);
     assert_eq!((t9.span_count, t9.matched_count), (2, 1));
 
-    // Sanity: without the cap both directions are Complete and exact.
+    // Direction 3 (the trimmed-out shape): for `m2`, trace 9's computed
+    // rank comes from its RETAINED spans (200s) though its true newest
+    // match is beyond the cap (600s). With limit 1 it is trimmed behind
+    // trace 7 (500s) — the wrong top-1 — so the query MUST say SizeCap:
+    // a trimmed truncated candidate's real rank is unproven.
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let trimmed = run(
+        sources,
+        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m2", "yes")]))
+            .span_cap_for_tests(2)
+            .limit(1),
+    );
+    assert_eq!(ids(&trimmed), vec![hex(7)]);
+    assert!(trimmed.status.has(PartialReason::SizeCap));
+    // …and without the cap the true top-1 is trace 9 (600s), Complete.
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let true_top = run(
+        sources,
+        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m2", "yes")])).limit(1),
+    );
+    assert_eq!(ids(&true_top), vec![hex(9)]);
+    assert_eq!(true_top.status, QueryStatus::Complete);
+
+    // Sanity: without the cap the `m` query is Complete and exact.
     let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
     let uncapped = run(
         sources,
         SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m", "yes")])),
     );
-    assert_eq!(ids(&uncapped), vec![hex(8), hex(9)]);
+    assert_eq!(ids(&uncapped), vec![hex(9), hex(8)]);
     assert_eq!(uncapped.status, QueryStatus::Complete);
 }
 
