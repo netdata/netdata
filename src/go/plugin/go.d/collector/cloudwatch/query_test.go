@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	goruntime "runtime"
 	"sync"
 	"testing"
 	"time"
@@ -89,12 +90,26 @@ func labelValue(labels []metrix.Label, key string) string {
 	return ""
 }
 
+func requireBuildQueryPlan(t testing.TB, c *Collector) []plannedQuery {
+	t.Helper()
+	plan, err := c.buildQueryPlan()
+	require.NoError(t, err)
+	return plan
+}
+
+func requireCurrentQueryPlan(t testing.TB, c *Collector) []plannedQuery {
+	t.Helper()
+	plan, err := c.currentQueryPlan()
+	require.NoError(t, err)
+	return plan
+}
+
 func TestBuildQueryPlan(t *testing.T) {
 	c := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{
 		"us-east-1": {{"i-1"}, {"i-2"}},
 	})
 
-	plan := c.buildQueryPlan()
+	plan := requireBuildQueryPlan(t, c)
 	require.Len(t, plan, 6) // 2 instances x (1 + 2 statistics)
 
 	ids := make(map[string]bool)
@@ -153,7 +168,7 @@ func TestBuildQueryPlan_ConstantDimension(t *testing.T) {
 		{Target: "base", Profile: "cloudfront", Region: "us-east-1"}: {{DimensionValues: []string{"E1", "Global"}}},
 	}}
 
-	plan := c.buildQueryPlan()
+	plan := requireBuildQueryPlan(t, c)
 	require.Len(t, plan, 1)
 	pq := plan[0]
 
@@ -181,7 +196,7 @@ func TestBuildQueryPlan_MultiRegionAndEmpty(t *testing.T) {
 		"us-west-2": {{"i-2"}},
 	})
 
-	plan := c.buildQueryPlan()
+	plan := requireBuildQueryPlan(t, c)
 	perRegion := map[string]int{}
 	for _, pq := range plan {
 		assert.Equal(t, pq.region, labelValue(pq.labels, "region"), "region label matches the query's region")
@@ -191,7 +206,7 @@ func TestBuildQueryPlan_MultiRegionAndEmpty(t *testing.T) {
 	assert.Equal(t, 3, perRegion["us-west-2"])
 
 	empty := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{})
-	assert.Empty(t, empty.buildQueryPlan(), "no discovered instances -> empty plan")
+	assert.Empty(t, requireBuildQueryPlan(t, empty), "no discovered instances -> empty plan")
 }
 
 func TestCurrentQueryPlan_CachesUntilInputsChange(t *testing.T) {
@@ -199,9 +214,9 @@ func TestCurrentQueryPlan_CachesUntilInputsChange(t *testing.T) {
 		"us-east-1": {{"i-1"}},
 	})
 
-	first := c.currentQueryPlan()
+	first := requireCurrentQueryPlan(t, c)
 	require.NotEmpty(t, first)
-	second := c.currentQueryPlan()
+	second := requireCurrentQueryPlan(t, c)
 	require.NotEmpty(t, second)
 	assert.Same(t, &first[0], &second[0], "unchanged inputs reuse the compiled query blueprint")
 	group := first[0].groupKey()
@@ -211,11 +226,110 @@ func TestCurrentQueryPlan_CachesUntilInputsChange(t *testing.T) {
 		c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}],
 		discoveredInstance{DimensionValues: []string{"i-2"}},
 	)
-	assert.Len(t, c.currentQueryPlan(), len(first), "mutating an input without invalidation does not rebuild")
+	assert.Len(t, requireCurrentQueryPlan(t, c), len(first), "mutating an input without invalidation does not rebuild")
 
 	c.invalidateQueryPlan()
-	assert.Len(t, c.currentQueryPlan(), len(first)*2, "input invalidation rebuilds the query blueprint")
+	assert.Len(t, requireCurrentQueryPlan(t, c), len(first)*2, "input invalidation rebuilds the query blueprint")
 	assert.NotContains(t, c.observations.nextQueryAt, group, "adding a query to an existing group makes the expanded group immediately due")
+}
+
+func filteredOverlapCollector(t *testing.T) *Collector {
+	t.Helper()
+	c := multiTargetCollector(t, map[string]stsClient{
+		"first":  &seqSTS{accounts: []string{"111111111111"}},
+		"second": &seqSTS{accounts: []string{"111111111111"}},
+	})
+	require.NoError(t, c.ensureTargets(context.Background()))
+	require.Len(t, c.plan.Scopes, 2)
+	join, err := resolveTagJoinProfile(c.plan.Scopes[0].Profile)
+	require.NoError(t, err)
+	c.plan.TagJoins["ec2"] = join
+	c.plan.Scopes[0].TagFilter = []resourceTagFilter{{key: "environment", values: []string{"production"}}}
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+		{Target: "first", Profile: "ec2", Region: "us-east-1"}: {
+			{DimensionValues: []string{"i-1"}}, {DimensionValues: []string{"i-2"}},
+		},
+		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {
+			{DimensionValues: []string{"i-1"}}, {DimensionValues: []string{"i-2"}},
+		},
+	}}
+	return c
+}
+
+func queryOwnersByInstance(plan []plannedQuery) map[string]string {
+	owners := make(map[string]string)
+	for _, query := range plan {
+		owners[labelValue(query.labels, "instance_id")] = query.target
+	}
+	return owners
+}
+
+func TestBuildQueryPlan_OrderedResourceTagFiltering(t *testing.T) {
+	t.Run("known non-match falls through to lower rule", func(t *testing.T) {
+		c := filteredOverlapCollector(t)
+		c.tags = tagSnapshot{
+			members: tagMembership{0: {"i-1": {}}},
+			unknown: map[int]struct{}{}, fetchedAt: time.Unix(1, 0),
+		}
+
+		plan := requireBuildQueryPlan(t, c)
+		assert.Equal(t, map[string]string{"i-1": "first", "i-2": "second"}, queryOwnersByInstance(plan))
+	})
+
+	t.Run("first failure reserves every candidate from lower rules", func(t *testing.T) {
+		c := filteredOverlapCollector(t)
+		c.tags = tagSnapshot{members: tagMembership{}, unknown: map[int]struct{}{0: {}}}
+
+		assert.Empty(t, requireBuildQueryPlan(t, c))
+	})
+
+	t.Run("later failure queries last-known members and reserves the rest", func(t *testing.T) {
+		c := filteredOverlapCollector(t)
+		c.tags = tagSnapshot{
+			members: tagMembership{0: {"i-1": {}}},
+			unknown: map[int]struct{}{0: {}},
+		}
+
+		plan := requireBuildQueryPlan(t, c)
+		assert.Equal(t, map[string]string{"i-1": "first"}, queryOwnersByInstance(plan))
+	})
+}
+
+func TestBuildQueryPlan_MaxInstances(t *testing.T) {
+	t.Run("counts final instances before metric expansion", func(t *testing.T) {
+		c := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{"us-east-1": {{"i-1"}, {"i-2"}}})
+		c.Limits.MaxInstances = 1
+		plan, err := c.buildQueryPlan()
+		assert.Nil(t, plan)
+		assert.ErrorContains(t, err, "limits.max_instances=1")
+	})
+
+	t.Run("overlapping copies count once", func(t *testing.T) {
+		c := filteredOverlapCollector(t)
+		c.plan.Scopes[0].TagFilter = nil
+		c.discovery.Instances[discoveryKey{Target: "first", Profile: "ec2", Region: "us-east-1"}] = []discoveredInstance{{DimensionValues: []string{"i-1"}}}
+		c.discovery.Instances[discoveryKey{Target: "second", Profile: "ec2", Region: "us-east-1"}] = []discoveredInstance{{DimensionValues: []string{"i-1"}}}
+		c.Limits.MaxInstances = 1
+		assert.NotEmpty(t, requireBuildQueryPlan(t, c))
+	})
+}
+
+func TestCurrentQueryPlan_OverflowRetainsLastValidPlan(t *testing.T) {
+	c := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{"us-east-1": {{"i-1"}}})
+	c.Limits.MaxInstances = 1
+	previous := requireCurrentQueryPlan(t, c)
+	require.NotEmpty(t, previous)
+
+	c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}] = append(
+		c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}],
+		discoveredInstance{DimensionValues: []string{"i-2"}},
+	)
+	c.invalidateQueryPlan()
+	plan, err := c.currentQueryPlan()
+	assert.Nil(t, plan)
+	assert.ErrorContains(t, err, "limits.max_instances=1")
+	assert.Equal(t, previous, c.queryPlan, "a rejected refresh does not replace the last valid plan")
+	assert.True(t, c.planDirty, "the next collect retries the rejected refresh")
 }
 
 func BenchmarkCurrentQueryPlanCached(b *testing.B) {
@@ -224,13 +338,49 @@ func BenchmarkCurrentQueryPlanCached(b *testing.B) {
 		instances[i] = []string{fmt.Sprintf("i-%d", i)}
 	}
 	c := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{"us-east-1": instances})
-	require.NotEmpty(b, c.currentQueryPlan())
+	require.NotEmpty(b, requireCurrentQueryPlan(b, c))
 
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		if len(c.currentQueryPlan()) == 0 {
+		plan, err := c.currentQueryPlan()
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(plan) == 0 {
 			b.Fatal("cached plan unexpectedly empty")
+		}
+	}
+}
+
+func BenchmarkBuildQueryPlan(b *testing.B) {
+	for _, instances := range []int{100, 1000, 10000} {
+		for _, selectedPercent := range []int{100, 10} {
+			b.Run(fmt.Sprintf("instances_%d/selected_%d_percent", instances, selectedPercent), func(b *testing.B) {
+				values := make([][]string, instances)
+				for i := range values {
+					values[i] = []string{fmt.Sprintf("i-%d", i)}
+				}
+				c := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{"us-east-1": values})
+				c.Limits.MaxInstances = instances + 1
+				if selectedPercent < 100 {
+					c.plan.Scopes[0].TagFilter = []resourceTagFilter{{key: "environment", values: []string{"production"}}}
+					c.tags = tagSnapshot{members: make(tagMembership), unknown: map[int]struct{}{}, fetchedAt: time.Unix(1, 0)}
+					for i := 0; i < instances; i += 100 / selectedPercent {
+						c.tags.members.add(0, fmt.Sprintf("i-%d", i))
+					}
+				}
+
+				b.ReportAllocs()
+				b.ResetTimer()
+				for range b.N {
+					plan, err := c.buildQueryPlan()
+					if err != nil {
+						b.Fatal(err)
+					}
+					goruntime.KeepAlive(plan)
+				}
+			})
 		}
 	}
 }
@@ -301,7 +451,7 @@ func TestExecuteQueries(t *testing.T) {
 			c := ec2QueryCollector([]string{"us-east-1"}, tc.instances)
 			useFakeClient(c, tc.fake)
 
-			samples, _, _, err := c.executeQueries(context.Background(), c.buildQueryPlan(), time.Unix(1_000_000_000, 0))
+			samples, _, _, err := c.executeQueries(context.Background(), requireBuildQueryPlan(t, c), time.Unix(1_000_000_000, 0))
 			if tc.wantErr {
 				assert.Error(t, err)
 				return
@@ -451,7 +601,7 @@ func (f *pagingGMD) GetMetricData(_ context.Context, in *cloudwatch.GetMetricDat
 
 func TestExecuteQueries_PaginationAndDedup(t *testing.T) {
 	c := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{"us-east-1": {{"i-1"}}})
-	plan := c.buildQueryPlan()
+	plan := requireBuildQueryPlan(t, c)
 	require.Len(t, plan, 3) // cpu_utilization_average, duration_average, duration_p90
 
 	fake := &pagingGMD{
@@ -524,7 +674,7 @@ func TestExecuteQueries_RegionClientFailures(t *testing.T) {
 			}
 			c.newCloudWatchClient = func(aws.Config) cloudwatchClient { return fake }
 
-			samples, _, _, err := c.executeQueries(context.Background(), c.buildQueryPlan(), time.Unix(1_000_000_000, 0))
+			samples, _, _, err := c.executeQueries(context.Background(), requireBuildQueryPlan(t, c), time.Unix(1_000_000_000, 0))
 			if tc.wantErr {
 				assert.Error(t, err)
 				return

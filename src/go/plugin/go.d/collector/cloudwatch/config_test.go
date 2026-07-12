@@ -4,6 +4,7 @@ package cloudwatch
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -78,6 +79,82 @@ func TestConfig_validate(t *testing.T) {
 	}
 }
 
+func TestConfig_validateResourceTagConfiguration(t *testing.T) {
+	filters := func(entries ...ResourceTagFilterConfig) *[]ResourceTagFilterConfig { return &entries }
+	tests := map[string]struct {
+		mutate  func(*Config)
+		wantErr string
+	}{
+		"valid exact filters and labels": {mutate: func(c *Config) {
+			c.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production", "staging"}}}
+			c.Rules[0].Filters = &RuleFiltersConfig{ResourceTags: filters(ResourceTagFilterConfig{Key: "team", Values: []string{"sre"}})}
+			c.Labels.ResourceTags = []ResourceTagLabelConfig{{Key: "Owner", Label: "resource_owner"}}
+		}},
+		"filter key required": {mutate: func(c *Config) {
+			c.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Values: []string{"production"}}}
+		}, wantErr: ".key must not be empty"},
+		"filter values required": {mutate: func(c *Config) {
+			c.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment"}}
+		}, wantErr: ".values must contain at least one value"},
+		"duplicate filter key rejected": {mutate: func(c *Config) {
+			c.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{
+				{Key: "environment", Values: []string{"production"}},
+				{Key: "environment", Values: []string{"staging"}},
+			}
+		}, wantErr: "duplicate key"},
+		"duplicate exact value rejected": {mutate: func(c *Config) {
+			c.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production", "production"}}}
+		}, wantErr: "duplicate value"},
+		"more than 50 keys rejected": {mutate: func(c *Config) {
+			for i := range maxResourceTagFilters + 1 {
+				c.RuleDefaults.Filters.ResourceTags = append(c.RuleDefaults.Filters.ResourceTags, ResourceTagFilterConfig{Key: fmt.Sprintf("key-%d", i), Values: []string{"value"}})
+			}
+		}, wantErr: "maximum is 50"},
+		"more than 20 values rejected": {mutate: func(c *Config) {
+			entry := ResourceTagFilterConfig{Key: "environment"}
+			for i := range maxResourceTagValues + 1 {
+				entry.Values = append(entry.Values, fmt.Sprintf("value-%d", i))
+			}
+			c.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{entry}
+		}, wantErr: "maximum is 20"},
+		"label key required": {mutate: func(c *Config) {
+			c.Labels.ResourceTags = []ResourceTagLabelConfig{{Label: "owner"}}
+		}, wantErr: ".key must not be empty"},
+		"invalid emitted label rejected": {mutate: func(c *Config) {
+			c.Labels.ResourceTags = []ResourceTagLabelConfig{{Key: "Owner", Label: "Bad-Label"}}
+		}, wantErr: "not a valid label key"},
+		"duplicate emitted label rejected": {mutate: func(c *Config) {
+			c.Labels.ResourceTags = []ResourceTagLabelConfig{{Key: "Owner", Label: "owner"}, {Key: "owner", Label: "owner"}}
+		}, wantErr: "duplicate label"},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := validBaseConfig()
+			tc.mutate(&cfg)
+			err := cfg.validate()
+			if tc.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestConfig_validateResourceTagConfiguration_RedactsDuplicateValue(t *testing.T) {
+	const sensitive = "SENSITIVE_TAG_VALUE"
+	cfg := validBaseConfig()
+	cfg.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{{
+		Key: "environment", Values: []string{sensitive, sensitive},
+	}}
+
+	err := cfg.validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "duplicate value")
+	assert.NotContains(t, err.Error(), sensitive)
+}
+
 func TestConfigSchema_RuntimeContract(t *testing.T) {
 	data, err := os.ReadFile("config_schema.json")
 	require.NoError(t, err)
@@ -91,10 +168,12 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 	assert.ElementsMatch(t, []string{"credentials", "targets", "rules"}, doc.JSONSchema.Required)
 	for _, key := range []string{
 		"update_every", "autodetection_retry", "vnode", "credentials", "targets", "rules",
-		"discovery", "tags", "query_offset", "timeout",
+		"rule_defaults", "labels", "limits", "discovery", "query_offset", "timeout",
 	} {
 		assert.Contains(t, doc.JSONSchema.Properties, key)
 	}
+	assert.NotContains(t, doc.JSONSchema.Properties, "defaults")
+	assert.NotContains(t, doc.JSONSchema.Properties, "tags")
 	for key, want := range map[string]string{
 		"credentials": `[{"name":"sdk_default","type":"default"}]`,
 		"targets":     `[{"name":"base","credentials":"sdk_default"}]`,
@@ -124,11 +203,12 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 		title  string
 		fields []string
 	}{
-		{title: "Base", fields: []string{"update_every", "autodetection_retry", "query_offset", "timeout"}},
+		{title: "Base", fields: []string{"update_every", "autodetection_retry", "query_offset", "timeout", "limits"}},
 		{title: "Credentials", fields: []string{"credentials"}},
 		{title: "Targets", fields: []string{"targets"}},
-		{title: "Collection Rules", fields: []string{"rules"}},
-		{title: "Discovery & Tags", fields: []string{"discovery", "tags"}},
+		{title: "Collection Rules", fields: []string{"rule_defaults", "rules"}},
+		{title: "Resource Tags", fields: []string{"labels"}},
+		{title: "Discovery", fields: []string{"discovery"}},
 		{title: "Virtual Node", fields: []string{"vnode"}},
 	}
 	tabs, ok := schemaObjectAt(t, doc, "uiSchema", "ui:options")["tabs"].([]any)
@@ -165,8 +245,10 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "targets")["ui:listFlavour"])
 	assert.Equal(t, "ec2", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "profiles", "include", "items")["ui:placeholder"])
 	assert.Equal(t, "us-east-1", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "regions", "items")["ui:placeholder"])
-	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "tags")["ui:listFlavour"])
-	assert.Equal(t, "Environment", schemaObjectAt(t, doc, "uiSchema", "tags", "items", "name")["ui:placeholder"])
+	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rule_defaults", "filters", "resource_tags")["ui:listFlavour"])
+	assert.Equal(t, "Environment", schemaObjectAt(t, doc, "uiSchema", "rule_defaults", "filters", "resource_tags", "items", "key")["ui:placeholder"])
+	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "labels", "resource_tags")["ui:listFlavour"])
+	assert.Equal(t, "Owner", schemaObjectAt(t, doc, "uiSchema", "labels", "resource_tags", "items", "key")["ui:placeholder"])
 	assert.NotEmpty(t, schemaObjectAt(t, doc, "uiSchema", "credentials")["ui:help"])
 	assert.NotEmpty(t, schemaObjectAt(t, doc, "uiSchema", "discovery", "recently_active_only")["ui:help"])
 	assert.NotEmpty(t, schemaObjectAt(t, doc, "uiSchema", "vnode")["ui:placeholder"])
@@ -245,6 +327,32 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 	}
 	require.NoError(t, schema.Validate(valid))
 	require.NoError(t, validateRuntimeConfigMap(t, valid))
+
+	t.Run("resource tag filter inheritance and explicit disable are valid", func(t *testing.T) {
+		cfg := cloneConfigMap(t, valid)
+		cfg["rule_defaults"] = map[string]any{"filters": map[string]any{"resource_tags": []any{
+			map[string]any{"key": "environment", "values": []any{"production", "staging"}},
+		}}}
+		cfg["labels"] = map[string]any{"resource_tags": []any{
+			map[string]any{"key": "Owner", "label": "resource_owner"},
+		}}
+		cfg["limits"] = map[string]any{"max_instances": 2000}
+		cfg["rules"] = []any{
+			map[string]any{"name": "filtered", "targets": []any{"base"}, "regions": []any{"us-east-1"}, "profiles": map[string]any{"defaults": false, "include": []any{"ec2"}}},
+			map[string]any{"name": "unfiltered", "targets": []any{"base"}, "regions": []any{"us-east-1"}, "profiles": map[string]any{"defaults": false, "include": []any{"cloudfront"}}, "filters": map[string]any{"resource_tags": []any{}}},
+		}
+		assert.NoError(t, schema.Validate(cfg))
+		assert.NoError(t, validateRuntimeConfigMap(t, cfg))
+	})
+
+	t.Run("resource tag filter requires at least one value", func(t *testing.T) {
+		cfg := cloneConfigMap(t, valid)
+		cfg["rule_defaults"] = map[string]any{"filters": map[string]any{"resource_tags": []any{
+			map[string]any{"key": "environment", "values": []any{}},
+		}}}
+		assert.Error(t, schema.Validate(cfg))
+		assert.Error(t, validateRuntimeConfigMap(t, cfg))
+	})
 
 	t.Run("nested static credential source is valid", func(t *testing.T) {
 		cfg := cloneConfigMap(t, valid)
@@ -387,46 +495,34 @@ func validateRuntimeConfigMap(t *testing.T, raw map[string]any) error {
 	return err
 }
 
-func TestConfig_TagsDecode(t *testing.T) {
+func TestConfig_ResourceTagLabelsDecode(t *testing.T) {
 	var cfg Config
-	require.NoError(t, yaml.Unmarshal([]byte("tags:\n  - name: owner\n  - name: Name\n    rename: instance_name\n"), &cfg))
-	assert.Equal(t, []TagConfig{{Name: "owner"}, {Name: "Name", Rename: "instance_name"}}, cfg.Tags)
+	require.NoError(t, yaml.Unmarshal([]byte("labels:\n  resource_tags:\n    - key: owner\n    - key: Name\n      label: instance_name\n"), &cfg))
+	assert.Equal(t, []ResourceTagLabelConfig{{Key: "owner"}, {Key: "Name", Label: "instance_name"}}, cfg.Labels.ResourceTags)
 }
 
-func TestConfig_validateRejectsReservedRuleFields(t *testing.T) {
-	tests := map[string]func(*RuleConfig){
-		"filters": func(rule *RuleConfig) { rule.Filters = map[string]any{} },
-		"labels":  func(rule *RuleConfig) { rule.Labels = []any{} },
-		"series":  func(rule *RuleConfig) { rule.Series = false },
-		"query":   func(rule *RuleConfig) { rule.Query = "unsupported" },
-	}
-	for name, mutate := range tests {
-		t.Run(name, func(t *testing.T) {
-			cfg := validBaseConfig()
-			mutate(&cfg.Rules[0])
-			assert.ErrorContains(t, cfg.validate(), "reserved for a later phase")
-		})
-	}
+func TestConfig_LegacyTopLevelTagsAreNotDecoded(t *testing.T) {
+	var cfg Config
+	require.NoError(t, yaml.Unmarshal([]byte("tags:\n  - name: owner\n    rename: resource_owner\n"), &cfg))
+	assert.Empty(t, cfg.Labels.ResourceTags, "the removed prototype has no alias or compatibility decoder")
 }
 
-func TestConfig_DecodedReservedRuleFieldsReachRuntimeValidation(t *testing.T) {
-	tests := map[string]struct {
-		decode func(*RuleConfig) error
-	}{
-		"YAML": {decode: func(rule *RuleConfig) error {
-			return yaml.Unmarshal([]byte("filters: {}\n"), rule)
-		}},
-		"JSON": {decode: func(rule *RuleConfig) error {
-			return json.Unmarshal([]byte(`{"query":{}}`), rule)
-		}},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			cfg := validBaseConfig()
-			require.NoError(t, tc.decode(&cfg.Rules[0]))
-			assert.ErrorContains(t, cfg.validate(), "reserved for a later phase")
-		})
-	}
+func TestConfig_ReplacedDefaultsKeyIsNotDecoded(t *testing.T) {
+	var cfg Config
+	require.NoError(t, yaml.Unmarshal([]byte("defaults:\n  filters:\n    resource_tags:\n      - key: env\n        values: [prod]\n"), &cfg))
+	assert.Empty(t, cfg.RuleDefaults.Filters.ResourceTags, "the replaced key has no alias or compatibility decoder")
+}
+
+func TestConfig_ResourceTagFilterInheritanceDecode(t *testing.T) {
+	var cfg Config
+	require.NoError(t, yaml.Unmarshal([]byte("rule_defaults:\n  filters:\n    resource_tags:\n      - key: env\n        values: [prod]\nrules:\n  - name: inherit\n  - name: disable\n    filters:\n      resource_tags: []\n"), &cfg))
+	require.Len(t, cfg.Rules, 2)
+	assert.Nil(t, cfg.Rules[0].Filters)
+	require.NotNil(t, cfg.Rules[1].Filters)
+	require.NotNil(t, cfg.Rules[1].Filters.ResourceTags)
+	assert.Empty(t, *cfg.Rules[1].Filters.ResourceTags)
+	assert.Equal(t, cfg.RuleDefaults.Filters.ResourceTags, cfg.Rules[0].effectiveResourceTagFilters(cfg.RuleDefaults.Filters.ResourceTags))
+	assert.Empty(t, cfg.Rules[1].effectiveResourceTagFilters(cfg.RuleDefaults.Filters.ResourceTags))
 }
 
 func TestNormalizeRegions(t *testing.T) {

@@ -75,14 +75,14 @@ Replace `AWS/<Service>` with the service namespace (for example `AWS/AmazonMQ`) 
 :::
 
 
-The collector compiles named credential sources, monitored targets, and ordered collection rules into an immutable runtime plan. It discovers available metrics with CloudWatch `ListMetrics`, sharing a scan when target, region, namespace, and recent-activity behavior match, then applies each profile's exact dimension matcher. It queries the resulting metric series in `GetMetricData` batches. Each target resolves its AWS account id through `sts:GetCallerIdentity`; target names remain distinct execution identities even when they resolve to the same account. Rule order, then target order within each rule, resolves overlap: the first rule/target that produces a final metric series owns it.
+The collector compiles named credential sources, monitored targets, and ordered collection rules into an immutable runtime plan. It discovers available metrics with CloudWatch `ListMetrics`, sharing a scan when target, region, namespace, and recent-activity behavior match, then applies each profile's exact dimension matcher. Optional resource-tag predicates are resolved with the Resource Groups Tagging API before query expansion. It queries the selected metric series in `GetMetricData` batches. Each target resolves its AWS account id through `sts:GetCallerIdentity`; target names remain distinct execution identities even when they resolve to the same account. Rule order, then target order within each rule, resolves overlap: the first matching rule/target that produces a final resource instance owns it.
 
 
 This collector is supported on all platforms.
 
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
-Every target requires `cloudwatch:ListMetrics` and `cloudwatch:GetMetricData`. The collector calls `sts:GetCallerIdentity` for account attribution, but [AWS does not require an explicit permission grant for that operation](https://docs.aws.amazon.com/STS/latest/APIReference/API_GetCallerIdentity.html). A credential source used by a target with `assume_role` additionally requires `sts:AssumeRole` for that role ARN. Resource tag enrichment (the optional `tags` option) additionally requires `tag:GetResources`.
+Every target requires `cloudwatch:ListMetrics` and `cloudwatch:GetMetricData`. The collector calls `sts:GetCallerIdentity` for account attribution, but [AWS does not require an explicit permission grant for that operation](https://docs.aws.amazon.com/STS/latest/APIReference/API_GetCallerIdentity.html). A credential source used by a target with `assume_role` additionally requires `sts:AssumeRole` for that role ARN. Resource tag filtering (`rule_defaults.filters.resource_tags` or `rules[].filters.resource_tags`) and resource tag labels (`labels.resource_tags`) additionally require `tag:GetResources`.
 
 
 ### Default Behavior
@@ -96,13 +96,13 @@ A rule that omits `profiles` selects all default-enabled profiles for its target
 
 - Minimum collection interval is 60 seconds (CloudWatch's minimum metric period).
 - CloudWatch publishes metrics with a delay; the effective query offset is `max(query_offset, period)`, so long-period metrics (such as the daily S3 storage metrics) are inherently about one period behind.
-- There is no cap on discovered resources; a warning is logged at 1000 or more discovered instances (collection is never truncated).
-- Resources are labeled by their identifying CloudWatch dimensions (for example EC2 `instance_id`). Selected resource tags can additionally be attached as labels via the opt-in `tags` option (using the Resource Groups Tagging API); tags are enrichment only and never change a resource's identity. (A dimension that is constant across resources, such as CloudFront's `Region=Global`, is used to match and query metrics but is not turned into a label.)
+- `limits.max_instances` defaults to 1000 distinct final resource instances after tag filtering and overlap resolution. Exceeding it rejects the refreshed query plan; resources are never silently truncated.
+- Resources are labeled by their identifying CloudWatch dimensions (for example EC2 `instance_id`). Selected resource tags can additionally be attached as non-identity labels via `labels.resource_tags`; changing those tags updates labels without changing chart identity. (A dimension that is constant across resources, such as CloudFront's `Region=Global`, is used to match and query metrics but is not turned into a label.)
 
 
 #### Performance Impact
 
-AWS bills CloudWatch API usage. `GetMetricData` (the metric queries) is the cost driver, billed per metric requested; `ListMetrics` discovery falls under the free tier and then costs a fraction as much. As a rough anchor, `GetMetricData` is billed at roughly $0.01 per 1,000 metrics requested -- confirm current [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) for your region. Each combination of target, instance, metric, and statistic is one billed query, run once per its own period (not once per collection cycle), so cost scales with selected targets, discovered instances, metrics, statistics, and their periods -- not with `update_every`. The collector minimizes it with curated profiles, single-statistic defaults, exact dimension filtering, shared compatible discovery scans, cached discovery/query plans, and `recently_active_only`. To reduce cost further, narrow `rules[].targets`, `rules[].profiles`, or `rules[].regions`.
+AWS bills CloudWatch API usage. `GetMetricData` (the metric queries) is the cost driver, billed per metric requested; `ListMetrics` discovery falls under the free tier and then costs a fraction as much. As a rough anchor, `GetMetricData` is billed at roughly $0.01 per 1,000 metrics requested -- confirm current [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) for your region. Each combination of target, instance, metric, and statistic is one billed query, run once per its own period (not once per collection cycle), so cost scales with selected targets, selected instances, metrics, statistics, and their periods -- not with `update_every`. The collector minimizes it with curated profiles, exact resource-tag and dimension filtering, single-statistic defaults, shared compatible discovery scans, cached discovery/query plans, and `recently_active_only`. To reduce cost further, narrow `rules[].targets`, `rules[].profiles`, `rules[].regions`, or configure resource tag filters.
 
 
 ## Setup
@@ -146,7 +146,7 @@ Attach a policy such as:
 }
 ```
 
-`cloudwatch:ListMetrics` and `cloudwatch:GetMetricData` do not support resource-level permissions, so `"Resource": "*"` is required -- this is already least-privilege for these read actions. `GetCallerIdentity` needs no explicit grant. Scope `sts:AssumeRole` to the specific role ARN(s) rather than `*`. To enable resource tag enrichment (the optional `tags` option), also grant `tag:GetResources` (it likewise requires `"Resource": "*"`).
+`cloudwatch:ListMetrics` and `cloudwatch:GetMetricData` do not support resource-level permissions, so `"Resource": "*"` is required -- this is already least-privilege for these read actions. `GetCallerIdentity` needs no explicit grant. Scope `sts:AssumeRole` to the specific role ARN(s) rather than `*`. To enable resource tag filtering or labels, also grant `tag:GetResources` (it likewise requires `"Resource": "*"`).
 
 Define one or more named credential sources:
 
@@ -195,16 +195,25 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | targets[].credentials | Name of the credential source used by this target. |  | yes |
 |  | targets[].assume_role.role_arn | Optional IAM role ARN to assume using the target's credential source. |  | no |
 |  | targets[].assume_role.external_id | Optional value supplied by the role owner when the role trust policy requires an external ID. It is not an AWS password or access key. |  | no |
-| **Rules** | rules | Ordered collection rules. Each rule selects targets, profiles, and regions. Earlier rules own duplicate final metric series; within one rule, the earliest entry in `rules[].targets` owns the series. |  | yes |
+| **Rules** | rules | Ordered collection rules. Each rule selects targets, profiles, regions, and optional resource-tag filters. The earliest matching rule and target own each overlapping final resource instance. |  | yes |
 |  | rules[].name | Unique rule name used in diagnostics. |  | yes |
 |  | rules[].targets | Ordered names of monitored targets selected by this rule. Order breaks overlap ties within the rule. |  | yes |
 |  | rules[].profiles.defaults | Include all default-enabled profiles. Defaults to `true` when `profiles` or `defaults` is omitted. | yes | no |
 |  | rules[].profiles.include | Profile basenames to add explicitly. Set `defaults` to `false` to collect only this list, including profiles disabled by default. |  | no |
 |  | rules[].profiles.exclude | Profile basenames to remove from the selected set. A profile cannot be both included and excluded. |  | no |
 |  | rules[].regions | Canonical lowercase AWS region codes selected by this rule. The compiler intersects them with intrinsic profile restrictions; for example, CloudFront supports only `us-east-1`. |  | yes |
+| **Resource Filters** | rule_defaults.filters.resource_tags | Job-wide list of exact, case-sensitive AWS resource tag predicates inherited by rules that omit `rules[].filters.resource_tags`. All keys must match; any listed value for one key may match. The Resource Groups Tagging API performs the focused lookup and requires `tag:GetResources`. |  | no |
+|  | rule_defaults.filters.resource_tags[].key | Exact AWS resource tag key. A filter list supports at most 50 distinct keys. |  | yes |
+|  | rule_defaults.filters.resource_tags[].values | One to 20 exact, case-sensitive accepted values for this key. Values for one key are ORed. |  | yes |
+|  | rules[].filters.resource_tags | Per-rule replacement for `rule_defaults.filters.resource_tags`. Omit it to inherit the default, provide a non-empty list to replace the default, or set `[]` to disable tag filtering for this rule. |  | no |
+|  | rules[].filters.resource_tags[].key | Exact AWS resource tag key. A filter list supports at most 50 distinct keys. |  | yes |
+|  | rules[].filters.resource_tags[].values | One to 20 exact, case-sensitive accepted values for this key. Values for one key are ORed. |  | yes |
+| **Resource Labels** | labels.resource_tags | Optional AWS resource tags copied to charts as non-identity labels. This is presentation only and does not select resources. Tag values may contain personal data, so expose only keys intended for Netdata. Requires `tag:GetResources`. |  | no |
+|  | labels.resource_tags[].key | Exact, case-sensitive AWS resource tag key. |  | yes |
+|  | labels.resource_tags[].label | Optional Netdata label key. When omitted, the AWS key is normalized (`Name` becomes `name`). Use an explicit label to avoid invalid names or collisions with identity labels such as `region`. |  | no |
+| **Limits** | limits.max_instances | Maximum distinct final CloudWatch resource instances after filtering and ordered-rule overlap resolution, before metric/statistic expansion. Overflow rejects the refreshed plan; collection never truncates to the first N resources. | 1000 | no |
 | **Discovery** | discovery.refresh_every | How often (seconds) to re-discover metrics. Minimum 60. | 300 | no |
 |  | discovery.recently_active_only | List only metrics active in the last 3 hours. Automatically disabled for metrics whose period exceeds 3 hours (such as the daily S3 storage metrics). | yes | no |
-| **Tags** | tags | Optional allowlist of AWS resource tags to attach as extra labels on collected metrics, looked up via the Resource Groups Tagging API. Empty by default -- with no tags listed, no tag lookup runs and no extra IAM is needed. Each entry has a `name` (the AWS tag key, case-sensitive) and an optional `rename` (the Netdata label name; the default is the sanitized key, so `Name` becomes `name`). Use `rename` when the key is not a valid label (for example an `aws:`-prefixed key) or collides with a built-in label such as `region`. Enabling tags requires the `tag:GetResources` IAM permission. Note: tag values become label values and may contain personal data (such as owner emails), so list only tags you want exposed as labels. Tags apply only to profiles with a supported resource-ARN join; some services are not tag-enriched: Auto Scaling and Bedrock (not taggable via the Resource Groups Tagging API), and -- pending a reliable ARN join -- API Gateway, CloudFront, MSK, and ElastiCache. Tags behave as create-time chart labels: a tag that first appears or changes value after a chart already exists is reflected only when that chart is next recreated. |  | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
@@ -353,6 +362,49 @@ jobs:
           defaults: true
           include: [alb_target, dynamodb_operation, s3_requests, ebs_stalled_io]
         regions: [us-east-1]
+
+```
+</details>
+
+###### Filter resources by tag and add tag labels
+
+Apply one job-wide exact tag filter, disable it for an unsupported profile, and expose selected AWS tags as mutable non-identity chart labels.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: tagged_resources
+    credentials:
+      - name: sdk_default
+        type: default
+    targets:
+      - name: base
+        credentials: sdk_default
+    rule_defaults:
+      filters:
+        resource_tags:
+          - key: managed-by
+            values: [platform]
+    rules:
+      - name: filtered-defaults
+        targets: [base]
+        regions: [us-east-1]
+      - name: unfiltered-cloudfront
+        targets: [base]
+        profiles:
+          defaults: false
+          include: [cloudfront]
+        regions: [us-east-1]
+        filters:
+          resource_tags: []
+    labels:
+      resource_tags:
+        - key: Name
+        - key: owner
+          label: resource_owner
+    limits:
+      max_instances: 1000
 
 ```
 </details>
@@ -539,8 +591,9 @@ docker logs netdata 2>&1 | grep cloudwatch
 
 Check the following:
 
-- **Permissions** -- each target allows `cloudwatch:ListMetrics` and `cloudwatch:GetMetricData`; `GetCallerIdentity` needs no explicit grant. Targets with `assume_role` also require `sts:AssumeRole` on the source identity.
+- **Permissions** -- each target allows `cloudwatch:ListMetrics` and `cloudwatch:GetMetricData`; `GetCallerIdentity` needs no explicit grant. Targets with `assume_role` also require `sts:AssumeRole` on the source identity. Resource tag filtering or labels require `tag:GetResources`.
 - **Rules** -- `rules[].targets`, `rules[].profiles`, and `rules[].regions` select the expected target, service, and region. CloudFront publishes metrics only in `us-east-1`; its profile enforces this automatically.
+- **Resource filters** -- a rule that omits `filters.resource_tags` inherits `rule_defaults.filters.resource_tags`. An explicitly included profile without a safe Resource Groups Tagging API association is rejected; use `filters.resource_tags: []` for a deliberate unfiltered rule.
 - **Resources are active** -- confirm in the AWS CloudWatch console that the resources are publishing metrics.
 - **Collector logs** -- check for authentication or API errors:
   ```bash

@@ -79,7 +79,7 @@ func (c *Collector) ensureTargets(ctx context.Context) error {
 		c.invalidateQueryPlan()
 		c.markDiscoveryStale() // discover the newly-resolved account this cycle, not after refresh_every
 		c.markTagsStale()      // and fetch its tags this cycle, so its first charts are created tagged
-		c.Infof("CloudWatch: target %q resolved to AWS account %s", target.Name, result.accountID)
+		c.Infof("CloudWatch: target %q resolved successfully", target.Name)
 	}
 	c.warnOperationFailures(logKeyAccountResolveFailed, "account resolution", " (will retry next cycle)", failures)
 

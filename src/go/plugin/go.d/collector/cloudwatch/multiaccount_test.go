@@ -100,7 +100,7 @@ func TestBuildQueryPlan_FirstTargetOwnsSameAccountSeries(t *testing.T) {
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
 		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 	}}
-	plan := c.buildQueryPlan()
+	plan := requireBuildQueryPlan(t, c)
 	require.NotEmpty(t, plan)
 	perInstance := 0
 	for _, metric := range c.plan.Scopes[0].Profile.Config.Metrics {
@@ -123,7 +123,7 @@ func TestBuildQueryPlan_SameAccountDisjointResourcesSurvive(t *testing.T) {
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
 		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-2"}}},
 	}}
-	plan := c.buildQueryPlan()
+	plan := requireBuildQueryPlan(t, c)
 	perInstance := 0
 	for _, metric := range c.plan.Scopes[0].Profile.Config.Metrics {
 		perInstance += len(metric.Statistics)
@@ -142,7 +142,7 @@ func TestCurrentQueryPlan_RebindsRetainedSeriesWhenEarlierTargetTakesOwnership(t
 		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 	}}
 
-	oldPlan := c.currentQueryPlan()
+	oldPlan := requireCurrentQueryPlan(t, c)
 	require.NotEmpty(t, oldPlan)
 	oldQuery := oldPlan[0]
 	require.Equal(t, "second", oldQuery.target)
@@ -166,7 +166,7 @@ func TestCurrentQueryPlan_RebindsRetainedSeriesWhenEarlierTargetTakesOwnership(t
 	require.NoError(t, cycle.CommitCycleSuccess())
 
 	require.NoError(t, c.ensureTargets(context.Background()))
-	newPlan := c.currentQueryPlan()
+	newPlan := requireCurrentQueryPlan(t, c)
 	require.NotEmpty(t, newPlan)
 	newQuery := newPlan[0]
 	require.Equal(t, "first", newQuery.target)

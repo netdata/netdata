@@ -171,7 +171,7 @@
       },
       "rules": {
         "title": "Collection rules",
-        "description": "Ordered target, profile, and region selections. Earlier rules own overlapping final metric series; within one rule, earlier targets own overlaps.",
+        "description": "Ordered target, profile, region, and resource-filter selections. The earliest matching rule and target own each overlapping final resource instance.",
         "type": "array",
         "minItems": 1,
         "maxItems": 256,
@@ -247,6 +247,43 @@
                 "type": "string",
                 "pattern": "^[a-z0-9]+(?:-[a-z0-9]+)+-[0-9]+$"
               }
+            },
+            "filters": {
+              "title": "Resource filters",
+              "description": "Selection predicates for this rule. Omit resource_tags to inherit the job default; set it to an empty list to disable the default for this rule.",
+              "type": "object",
+              "properties": {
+                "resource_tags": {
+                  "title": "AWS resource tag filters",
+                  "description": "Replaces the job-default resource tag filters for this rule. All keys must match; any listed value may match for one key. Keys and values are exact and case-sensitive. An explicitly included profile without a safe resource-tag association is rejected.",
+                  "type": "array",
+                  "maxItems": 50,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "key": {
+                        "title": "AWS tag key",
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "values": {
+                        "title": "Accepted values",
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 20,
+                        "uniqueItems": true,
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "required": [
+                      "key",
+                      "values"
+                    ]
+                  }
+                }
+              }
             }
           },
           "required": [
@@ -254,6 +291,93 @@
             "targets",
             "regions"
           ]
+        }
+      },
+      "rule_defaults": {
+        "title": "Rule defaults",
+        "description": "Job-wide defaults inherited by collection rules that do not replace them.",
+        "type": "object",
+        "properties": {
+          "filters": {
+            "title": "Resource filters",
+            "type": "object",
+            "properties": {
+              "resource_tags": {
+                "title": "Default AWS resource tag filters",
+                "description": "Select only resources matching these exact tags unless a rule replaces or explicitly disables the list. All keys must match; any listed value may match for one key. Default-selected profiles without a safe resource-tag association are skipped with a diagnostic.",
+                "type": "array",
+                "maxItems": 50,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "title": "AWS tag key",
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "values": {
+                      "title": "Accepted values",
+                      "type": "array",
+                      "minItems": 1,
+                      "maxItems": 20,
+                      "uniqueItems": true,
+                      "items": {
+                        "type": "string"
+                      }
+                    }
+                  },
+                  "required": [
+                    "key",
+                    "values"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      },
+      "labels": {
+        "title": "Resource labels",
+        "description": "Optional AWS resource tags copied to every matching Netdata chart as non-identity labels.",
+        "type": "object",
+        "properties": {
+          "resource_tags": {
+            "title": "AWS resource tag labels",
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "title": "AWS tag key",
+                  "type": "string",
+                  "minLength": 1
+                },
+                "label": {
+                  "title": "Netdata label",
+                  "description": "Optional label key. When omitted, the AWS tag key is normalized to a Netdata label key.",
+                  "type": "string",
+                  "pattern": "^(?:|[a-z][a-z0-9_]*)$"
+                }
+              },
+              "required": [
+                "key"
+              ]
+            }
+          }
+        }
+      },
+      "limits": {
+        "title": "Collection limits",
+        "description": "Safety bounds applied after resource filtering and ordered-rule overlap resolution.",
+        "type": "object",
+        "properties": {
+          "max_instances": {
+            "title": "Maximum instances",
+            "description": "Maximum distinct final CloudWatch resource instances. Metric and statistic fan-out is not counted. Raise this explicitly for intentionally larger jobs.",
+            "type": "integer",
+            "minimum": 1,
+            "default": 1000
+          }
         }
       },
       "discovery": {
@@ -271,26 +395,6 @@
             "type": "boolean",
             "default": true
           }
-        }
-      },
-      "tags": {
-        "title": "Resource tag labels",
-        "type": "array",
-        "items": {
-          "type": "object",
-          "properties": {
-            "name": {
-              "title": "AWS tag key",
-              "type": "string"
-            },
-            "rename": {
-              "title": "Netdata label",
-              "type": "string"
-            }
-          },
-          "required": [
-            "name"
-          ]
         }
       },
       "query_offset": {
@@ -389,7 +493,7 @@
     },
     "rules": {
       "ui:listFlavour": "list",
-      "ui:help": "Add ordered collection rules. Earlier rules own overlapping final metric series; target order breaks ties within a rule.",
+      "ui:help": "Add ordered collection rules. The earliest matching rule and target own each overlapping final resource instance.",
       "items": {
         "name": {
           "ui:help": "Stable rule name used in validation and diagnostics.",
@@ -428,7 +532,71 @@
           "items": {
             "ui:placeholder": "us-east-1"
           }
+        },
+        "filters": {
+          "ui:help": "Omit Resource tags to inherit the job default. A non-empty list replaces the default; an explicit empty list disables tag filtering for this rule.",
+          "resource_tags": {
+            "ui:listFlavour": "list",
+            "ui:help": "Exact, case-sensitive AWS tag predicates. All keys must match; any value listed for one key may match. Explicitly included profiles must support safe resource-tag association.",
+            "items": {
+              "key": {
+                "ui:help": "Exact AWS resource tag key.",
+                "ui:placeholder": "Environment"
+              },
+              "values": {
+                "ui:listFlavour": "list",
+                "ui:help": "Accepted exact values for this key.",
+                "items": {
+                  "ui:placeholder": "production"
+                }
+              }
+            }
+          }
         }
+      }
+    },
+    "rule_defaults": {
+      "ui:help": "Defaults inherited by rules that do not provide their own value.",
+      "filters": {
+        "resource_tags": {
+          "ui:listFlavour": "list",
+          "ui:help": "Default exact AWS resource tag predicates. All keys must match; any listed value may match for one key. Unsupported default-selected profiles are skipped and reported.",
+          "items": {
+            "key": {
+              "ui:help": "Exact, case-sensitive AWS resource tag key.",
+              "ui:placeholder": "Environment"
+            },
+            "values": {
+              "ui:listFlavour": "list",
+              "ui:help": "Accepted exact, case-sensitive values for this key.",
+              "items": {
+                "ui:placeholder": "production"
+              }
+            }
+          }
+        }
+      }
+    },
+    "labels": {
+      "resource_tags": {
+        "ui:listFlavour": "list",
+        "ui:help": "Copy selected AWS tags to Netdata chart labels. This affects presentation only and does not select resources.",
+        "items": {
+          "key": {
+            "ui:help": "Exact AWS resource tag key.",
+            "ui:placeholder": "Owner"
+          },
+          "label": {
+            "ui:help": "Optional Netdata label key. Leave empty to normalize the AWS tag key automatically.",
+            "ui:placeholder": "resource_owner"
+          }
+        }
+      }
+    },
+    "limits": {
+      "max_instances": {
+        "ui:help": "Maximum distinct final resource instances after filtering and overlap resolution. Raise this only for an intentionally larger job.",
+        "ui:placeholder": "1000"
       }
     },
     "discovery": {
@@ -437,20 +605,6 @@
       },
       "recently_active_only": {
         "ui:help": "When enabled, collect only metrics with recent datapoints. Disable this to retain inactive metrics discovered by CloudWatch."
-      }
-    },
-    "tags": {
-      "ui:listFlavour": "list",
-      "ui:help": "Copy selected AWS resource tags to Netdata labels. This requires the Resource Groups Tagging API permission.",
-      "items": {
-        "name": {
-          "ui:help": "Exact AWS resource tag key.",
-          "ui:placeholder": "Environment"
-        },
-        "rename": {
-          "ui:help": "Optional Netdata label name. Leave empty to use the AWS tag key.",
-          "ui:placeholder": "environment"
-        }
       }
     },
     "vnode": {
@@ -466,7 +620,8 @@
             "update_every",
             "autodetection_retry",
             "query_offset",
-            "timeout"
+            "timeout",
+            "limits"
           ]
         },
         {
@@ -484,14 +639,20 @@
         {
           "title": "Collection Rules",
           "fields": [
+            "rule_defaults",
             "rules"
           ]
         },
         {
-          "title": "Discovery & Tags",
+          "title": "Resource Tags",
           "fields": [
-            "discovery",
-            "tags"
+            "labels"
+          ]
+        },
+        {
+          "title": "Discovery",
+          "fields": [
+            "discovery"
           ]
         },
         {

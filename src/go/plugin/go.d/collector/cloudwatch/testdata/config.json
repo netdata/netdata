@@ -3,7 +3,10 @@
   "update_every": 123,
   "autodetection_retry": 123,
   "credentials": [
-    {"name": "sdk_default", "type": "default"},
+    {
+      "name": "sdk_default",
+      "type": "default"
+    },
     {
       "name": "bootstrap",
       "type": "static",
@@ -15,7 +18,10 @@
     }
   ],
   "targets": [
-    {"name": "base", "credentials": "sdk_default"},
+    {
+      "name": "base",
+      "credentials": "sdk_default"
+    },
     {
       "name": "production",
       "credentials": "bootstrap",
@@ -26,16 +32,74 @@
     }
   ],
   "rules": [
-    {"name": "base-defaults", "targets": ["base"], "regions": ["us-east-1"]},
+    {
+      "name": "base-defaults",
+      "targets": [
+        "base"
+      ],
+      "regions": [
+        "us-east-1"
+      ]
+    },
     {
       "name": "production-services",
-      "targets": ["production"],
-      "profiles": {"defaults": false, "include": ["ec2", "rds"], "exclude": ["cloudfront"]},
-      "regions": ["us-east-1", "eu-west-1"]
+      "targets": [
+        "production"
+      ],
+      "profiles": {
+        "defaults": false,
+        "include": [
+          "ec2",
+          "rds"
+        ],
+        "exclude": [
+          "cloudfront"
+        ]
+      },
+      "regions": [
+        "us-east-1",
+        "eu-west-1"
+      ],
+      "filters": {
+        "resource_tags": [
+          {
+            "key": "environment",
+            "values": [
+              "production",
+              "staging"
+            ]
+          }
+        ]
+      }
     }
   ],
-  "discovery": {"refresh_every": 123, "recently_active_only": true},
-  "tags": [{"name": "ok", "rename": "ok"}],
+  "rule_defaults": {
+    "filters": {
+      "resource_tags": [
+        {
+          "key": "managed-by",
+          "values": [
+            "platform"
+          ]
+        }
+      ]
+    }
+  },
+  "labels": {
+    "resource_tags": [
+      {
+        "key": "owner",
+        "label": "resource_owner"
+      }
+    ]
+  },
+  "limits": {
+    "max_instances": 123
+  },
+  "discovery": {
+    "refresh_every": 123,
+    "recently_active_only": true
+  },
   "query_offset": 123,
   "timeout": 123.123
 }

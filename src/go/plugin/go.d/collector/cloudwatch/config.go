@@ -16,14 +16,14 @@ const (
 	defaultAutoDetectRetry  = 0
 	defaultDiscoveryRefresh = 300
 	defaultQueryOffset      = 600
+	defaultMaxInstances     = 1000
 	defaultTimeout          = confopt.Duration(30 * time.Second)
 )
 
-// apiConcurrency bounds concurrent AWS API calls (discovery fan-out and
-// GetMetricData query chunks); 5 stays well under CloudWatch's account-level
-// request rates. metricsPerQuery is the GetMetricData batch size; 500 is the AWS
-// hard maximum per call. Neither is an operator decision, so both are fixed
-// constants rather than config.
+// apiConcurrency bounds concurrent AWS API calls (ListMetrics discovery,
+// resource-tag lookup, and GetMetricData query chunks). metricsPerQuery is the
+// GetMetricData batch size; 500 is the AWS hard maximum per call. Neither is an
+// operator decision, so both are fixed constants rather than config.
 const (
 	apiConcurrency  = 5
 	metricsPerQuery = 500
@@ -36,8 +36,10 @@ type Config struct {
 	Credentials        []CredentialSourceConfig `yaml:"credentials" json:"credentials"`
 	Targets            []TargetConfig           `yaml:"targets" json:"targets"`
 	Rules              []RuleConfig             `yaml:"rules" json:"rules"`
+	RuleDefaults       RuleDefaultsConfig       `yaml:"rule_defaults,omitempty" json:"rule_defaults"`
+	Labels             LabelsConfig             `yaml:"labels,omitempty" json:"labels"`
+	Limits             LimitsConfig             `yaml:"limits,omitempty" json:"limits"`
 	Discovery          DiscoveryConfig          `yaml:"discovery" json:"discovery"`
-	Tags               []TagConfig              `yaml:"tags,omitempty" json:"tags,omitempty"`
 	QueryOffset        int                      `yaml:"query_offset,omitempty" json:"query_offset"`
 	Timeout            confopt.Duration         `yaml:"timeout,omitempty" json:"timeout"`
 }
@@ -59,10 +61,41 @@ type RuleConfig struct {
 	Targets  []string               `yaml:"targets" json:"targets"`
 	Profiles *ProfileSelectorConfig `yaml:"profiles,omitempty" json:"profiles,omitempty"`
 	Regions  []string               `yaml:"regions" json:"regions"`
-	Filters  any                    `yaml:"filters,omitempty" json:"filters,omitempty"`
-	Labels   any                    `yaml:"labels,omitempty" json:"labels,omitempty"`
-	Series   any                    `yaml:"series,omitempty" json:"series,omitempty"`
-	Query    any                    `yaml:"query,omitempty" json:"query,omitempty"`
+	Filters  *RuleFiltersConfig     `yaml:"filters,omitempty" json:"filters,omitempty"`
+}
+
+type RuleDefaultsConfig struct {
+	Filters RuleDefaultFiltersConfig `yaml:"filters,omitempty" json:"filters"`
+}
+
+type RuleDefaultFiltersConfig struct {
+	ResourceTags []ResourceTagFilterConfig `yaml:"resource_tags,omitempty" json:"resource_tags,omitempty"`
+}
+
+// RuleFiltersConfig distinguishes an omitted resource_tags field (inherit the
+// per-job default) from an explicitly empty list (disable it for this rule).
+type RuleFiltersConfig struct {
+	ResourceTags *[]ResourceTagFilterConfig `yaml:"resource_tags,omitempty" json:"resource_tags,omitempty"`
+}
+
+type ResourceTagFilterConfig struct {
+	Key    string   `yaml:"key" json:"key"`
+	Values []string `yaml:"values" json:"values"`
+}
+
+type LabelsConfig struct {
+	ResourceTags []ResourceTagLabelConfig `yaml:"resource_tags,omitempty" json:"resource_tags,omitempty"`
+}
+
+// ResourceTagLabelConfig maps one exact AWS tag key to a Netdata label. Label
+// defaults to the sanitized AWS key when omitted.
+type ResourceTagLabelConfig struct {
+	Key   string `yaml:"key" json:"key"`
+	Label string `yaml:"label,omitempty" json:"label,omitempty"`
+}
+
+type LimitsConfig struct {
+	MaxInstances int `yaml:"max_instances,omitempty" json:"max_instances"`
 }
 
 type ProfileSelectorConfig struct {
@@ -73,17 +106,6 @@ type ProfileSelectorConfig struct {
 
 func (c *ProfileSelectorConfig) includesDefaults() bool {
 	return c == nil || c.Defaults == nil || *c.Defaults
-}
-
-// TagConfig selects one AWS resource tag to emit as an additional label. Name is
-// the AWS tag key (case-sensitive). Rename optionally sets the Netdata label name;
-// without it the label is the sanitized tag key. An empty allowlist disables tag
-// enrichment entirely (no RGTA calls, no extra IAM). Tag resolution -- sanitize,
-// collision skip-and-warn, per-service ARN join -- is non-fatal and runs after
-// profile selection, never in config validation.
-type TagConfig struct {
-	Name   string `yaml:"name" json:"name"`
-	Rename string `yaml:"rename,omitempty" json:"rename,omitempty"`
 }
 
 type DiscoveryConfig struct {
@@ -111,6 +133,9 @@ func (c *Config) applyDefaults() {
 	if c.QueryOffset <= 0 {
 		c.QueryOffset = defaultQueryOffset
 	}
+	if c.Limits.MaxInstances == 0 {
+		c.Limits.MaxInstances = defaultMaxInstances
+	}
 	if c.Timeout.Duration() == 0 {
 		c.Timeout = defaultTimeout
 	}
@@ -131,11 +156,21 @@ func (c Config) validate() error {
 	if c.Timeout.Duration() < 0 {
 		errs = append(errs, errors.New("'timeout' cannot be negative"))
 	}
+	if c.Limits.MaxInstances < 0 {
+		errs = append(errs, errors.New("'limits.max_instances' must be >= 1"))
+	}
 	if err := validateConfigStructure(c); err != nil {
 		errs = append(errs, err)
 	}
 
 	return errors.Join(errs...)
+}
+
+func (r RuleConfig) effectiveResourceTagFilters(defaults []ResourceTagFilterConfig) []ResourceTagFilterConfig {
+	if r.Filters == nil || r.Filters.ResourceTags == nil {
+		return defaults
+	}
+	return *r.Filters.ResourceTags
 }
 
 func normalizeRegions(regions []string) []string {

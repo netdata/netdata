@@ -76,10 +76,18 @@ func setSingleTargetPlan(c *Collector, account string, regions []string, profile
 	plan := &collectionPlan{
 		Targets:  []*collectionTarget{target},
 		Profiles: profiles,
+		TagJoins: make(map[string]*tagJoin),
+	}
+	for _, profile := range profiles {
+		if join, err := resolveTagJoinProfile(profile); err == nil {
+			plan.TagJoins[profile.Name] = join
+		}
 	}
 	for _, region := range regions {
 		for _, profile := range profiles {
-			plan.Scopes = append(plan.Scopes, collectionScope{Target: target, Profile: profile, Region: region})
+			plan.Scopes = append(plan.Scopes, collectionScope{
+				Target: target, Profile: profile, Region: region,
+			})
 		}
 	}
 	resolved := resolvedTarget{target: target, accountID: account}

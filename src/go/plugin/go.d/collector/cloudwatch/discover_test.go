@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -416,6 +417,37 @@ func TestCollector_DiscoveryGroupsDeduplicateCompatibleNamespaceScans(t *testing
 	assert.Equal(t, 1, fake.calls, "compatible profiles share one ListMetrics scan")
 }
 
+func TestCollector_DiscoveryGroupsDeduplicateProfileAcrossTagPolicies(t *testing.T) {
+	falseValue := false
+	filters := func(value string) *RuleFiltersConfig {
+		entries := []ResourceTagFilterConfig{{Key: "environment", Values: []string{value}}}
+		return &RuleFiltersConfig{ResourceTags: &entries}
+	}
+	cfg := validBaseConfig()
+	cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &falseValue, Include: []string{"ec2"}}
+	cfg.Rules[0].Filters = filters("production")
+	cfg.Rules = append(cfg.Rules, RuleConfig{
+		Name: "staging", Targets: []string{"base"}, Regions: []string{"us-east-1"},
+		Profiles: &ProfileSelectorConfig{Defaults: &falseValue, Include: []string{"ec2"}},
+		Filters:  filters("staging"),
+	})
+	plan, _, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	require.Len(t, plan.Scopes, 2, "different tag policies remain distinct collection scopes")
+	assert.NotNil(t, plan.TagJoins["ec2"], "profile association is validated and compiled once")
+
+	c := New()
+	c.plan = plan
+	c.resolvedByRef = map[string]resolvedTarget{
+		"base": {target: plan.Targets[0], accountID: "000000000000"},
+	}
+
+	groups := c.discoveryGroups()
+	require.Len(t, groups, 1)
+	require.Len(t, groups[0].Profiles, 1, "shared discovery contains one matcher per profile")
+	assert.Equal(t, "ec2", groups[0].Profiles[0].Name)
+}
+
 func TestCollector_DiscoveryGroupsKeepRecentlyActiveBehaviorSeparate(t *testing.T) {
 	c := New()
 	fast := resolved("fast", dimProfile("AWS/Shared", 300, "Id"))
@@ -452,6 +484,50 @@ func TestDiscoverySnapshot_Expired(t *testing.T) {
 	assert.False(t, snap.expired(time.Unix(1299, 0)))
 	assert.True(t, snap.expired(time.Unix(1300, 0)))
 	assert.True(t, snap.expired(time.Unix(1500, 0)))
+}
+
+func BenchmarkDiscoverProfileGroupPolicyCount(b *testing.B) {
+	const instances = 1000
+	catalog, err := cwprofiles.DefaultCatalog()
+	if err != nil {
+		b.Fatal(err)
+	}
+	metrics := make([]cwtypes.Metric, instances)
+	for i := range instances {
+		metrics[i] = mkMetric("CPUUtilization", "InstanceId", fmt.Sprintf("i-%d", i))
+	}
+	for _, policies := range []int{1, 4} {
+		b.Run(fmt.Sprintf("policies=%d", policies), func(b *testing.B) {
+			cfg := resourceTagPolicyConfig(policies)
+			cfg.applyDefaults()
+			plan, _, err := compileConfig(cfg, catalog)
+			if err != nil {
+				b.Fatal(err)
+			}
+			c := New()
+			c.plan = plan
+			c.resolvedByRef = map[string]resolvedTarget{
+				"base": {target: plan.Targets[0], accountID: "000000000000"},
+			}
+			groups := c.discoveryGroups()
+			if len(groups) != 1 || len(groups[0].Profiles) != 1 {
+				b.Fatalf("got %d groups with %d profiles, want one shared group/profile", len(groups), len(groups[0].Profiles))
+			}
+			client := &nsCloudWatch{byNS: map[string][]cwtypes.Metric{"AWS/EC2": metrics}}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				got, err := discoverProfileGroup(context.Background(), client, groups[0])
+				if err != nil {
+					b.Fatal(err)
+				}
+				if len(got["ec2"]) != instances {
+					b.Fatalf("discovered %d instances, want %d", len(got["ec2"]), instances)
+				}
+			}
+		})
+	}
 }
 
 // dimValues extracts the dimension-value slices for stable comparison.
@@ -495,15 +571,18 @@ func TestCollector_refreshDiscovery_TTLCaching(t *testing.T) {
 	assert.Equal(t, 2, c.discovery.totalInstances())
 	callsAfterFirst := fakes["us-east-1"].calls
 	assert.Positive(t, callsAfterFirst)
+	c.tagFetchPlan = []tagFetchGroup{{key: tagFetchKey{target: "topology-sentinel"}}}
 
 	// Within TTL: no refetch.
 	require.NoError(t, c.refreshDiscovery(context.Background()))
 	assert.Equal(t, callsAfterFirst, fakes["us-east-1"].calls, "must not refetch within TTL")
+	assert.Len(t, c.tagFetchPlan, 1, "cached tag topology follows the discovery lifetime")
 
 	// After TTL: refetch.
 	c.now = func() time.Time { return base.Add(301 * time.Second) }
 	require.NoError(t, c.refreshDiscovery(context.Background()))
 	assert.Greater(t, fakes["us-east-1"].calls, callsAfterFirst, "must refetch after TTL")
+	assert.Nil(t, c.tagFetchPlan, "a new discovery snapshot invalidates tag fetch topology")
 }
 
 func TestCollector_refreshDiscovery_TotalFailureFirstPassErrors(t *testing.T) {

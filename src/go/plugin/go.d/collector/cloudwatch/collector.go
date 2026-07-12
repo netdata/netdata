@@ -52,6 +52,7 @@ func New() *Collector {
 			AutoDetectionRetry: defaultAutoDetectRetry,
 			Discovery:          DiscoveryConfig{RefreshEvery: defaultDiscoveryRefresh},
 			QueryOffset:        defaultQueryOffset,
+			Limits:             LimitsConfig{MaxInstances: defaultMaxInstances},
 			Timeout:            defaultTimeout,
 		},
 		store:               metrix.NewCollectorStore(),
@@ -97,8 +98,9 @@ type Collector struct {
 
 	observations *observationStore // retention cache + per-(target, region, period) query schedule
 
-	tags     tagSnapshot              // resource tag cache, refreshed with discovery (empty when tags unconfigured)
-	tagPlans map[string][]resolvedTag // per-profile resolved tag->label plans (nil when tags unconfigured)
+	tags          tagSnapshot              // resource-tag membership and label cache, refreshed with discovery
+	tagLabelPlans map[string][]resolvedTag // per-profile resolved tag->label plans (nil until compiled)
+	tagFetchPlan  []tagFetchGroup          // immutable discovery-derived RGTA topology (nil when invalidated)
 }
 
 func (c *Collector) Init(context.Context) error {
@@ -134,7 +136,8 @@ func (c *Collector) Cleanup(context.Context) {
 	c.rgtaClients.reset()
 	c.observations.reset()
 	c.tags = tagSnapshot{}
-	c.tagPlans = nil
+	c.tagLabelPlans = nil
+	c.tagFetchPlan = nil
 }
 
 func (c *Collector) Configuration() any { return c.Config }

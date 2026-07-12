@@ -14,9 +14,12 @@ func (c *Collector) collect(ctx context.Context) error {
 	if err := c.refreshDiscovery(ctx); err != nil {
 		return err
 	}
-	c.refreshTags(ctx) // best-effort tag enrichment; never gates collection (INV.2)
+	c.refreshTags(ctx)
 
-	plan := c.currentQueryPlan()
+	plan, err := c.currentQueryPlan()
+	if err != nil {
+		return err
+	}
 
 	now := c.now()
 	due := c.observations.dueGroups(c.queryGroups, now)
