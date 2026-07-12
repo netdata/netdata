@@ -593,3 +593,50 @@ fn empty_high_targets_skip_the_stream_batch_scan() {
     assert_eq!(compiled.count_in_range(0, N as u32), 0);
     assert_eq!(work.rows_visited, 0, "no batch was scanned");
 }
+
+/// A statically impossible subgroup (this fixture has no LNKB/EVNB
+/// chunks) joins the pre-scan short-circuit: the unrelated high-card
+/// scan never runs, so a provably irrelevant file cannot burn the
+/// budget into a false WorkCeiling.
+#[test]
+fn impossible_subgroup_skips_the_budgeted_scan() {
+    let (bytes, _) = fixture();
+    let idx = IndexReader::open(&bytes).unwrap();
+    let p = plan(vec![
+        tokens("h", &[], &["w.*"]),
+        PlanTerm::LinkGroup {
+            conditions: vec![crate::GroupCondition::LinkSpanIds(vec![
+                crate::SpanId::from([0x11; 8]),
+            ])],
+        },
+    ]);
+    let mut work = ScanWork::default();
+    // Even a ZERO budget compiles: nothing needs scanning.
+    let compiled = idx
+        .compile_trace_plan(&p, (0, N as u32), 0, &mut work)
+        .unwrap()
+        .expect("no scan needed");
+    assert_eq!(compiled.count_in_range(0, N as u32), 0);
+    assert_eq!(work.rows_visited, 0);
+    // Same proof for an event group whose matching-KvId set is empty
+    // (the value exists in no dictionary).
+    let p = plan(vec![
+        tokens("h", &[], &["w.*"]),
+        PlanTerm::EventGroup {
+            conditions: vec![crate::GroupCondition::Field {
+                field: "events.name".to_string(),
+                matcher: crate::PlanMatcher::Tokens {
+                    exact: vec!["no-such-event".to_string()],
+                    patterns: vec![],
+                },
+            }],
+        },
+    ]);
+    let mut work = ScanWork::default();
+    let compiled = idx
+        .compile_trace_plan(&p, (0, N as u32), 0, &mut work)
+        .unwrap()
+        .expect("no scan needed");
+    assert_eq!(compiled.count_in_range(0, N as u32), 0);
+    assert_eq!(work.rows_visited, 0);
+}

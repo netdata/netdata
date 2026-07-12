@@ -954,7 +954,9 @@ impl EvalPredicate {
                         .iter()
                         .any(|(k, v)| k == bare_key && matcher.value_matches(v)),
                     EvalGroupCondition::TimeSince(intervals) => {
-                        let dt = (e.time_unix_nano as i64).saturating_sub(span.start_ns);
+                        // Saturating, mirroring the index-side refine.
+                        let t = i64::try_from(e.time_unix_nano).unwrap_or(i64::MAX);
+                        let dt = t.saturating_sub(span.start_ns);
                         intervals.iter().any(|&(lo, hi)| {
                             lo.is_none_or(|lo| dt >= lo) && hi.is_none_or(|hi| dt <= hi)
                         })
@@ -1883,6 +1885,26 @@ mod tests {
             CompareOp::NotEq,
             vec![PredicateValue::Integer(5)],
         )));
+        // event:timeSinceStart saturates far-future event times (a
+        // wrapping cast would flip them negative and fail `> 0`).
+        let mut far = span.clone();
+        far.events = vec![sfst::TraceEvent {
+            time_unix_nano: u64::MAX,
+            name: "far".into(),
+            dropped_attributes_count: 0,
+            attributes: vec![],
+        }];
+        assert!(span_matches(
+            &far,
+            &Predicate {
+                conditions: vec![cond(
+                    PredicateTarget::Intrinsic(TraceIntrinsic::EventTimeSinceStart),
+                    CompareOp::Gt,
+                    vec![PredicateValue::Integer(0)],
+                )],
+            },
+            None
+        ));
         // Negated duration equality.
         assert!(m2(cond(
             PredicateTarget::Intrinsic(TraceIntrinsic::Duration),

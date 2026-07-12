@@ -253,6 +253,11 @@ struct GroupSlot {
     /// Flat pre-filter parts (AND-combined; empty = whole range).
     prefilter: Vec<Part>,
     conditions: Vec<ResolvedGroupCondition>,
+    /// Statically proven empty for THIS file (its chunk is absent, or a
+    /// condition's matching-KvId set is empty) — joins the pre-scan
+    /// short-circuit so an unrelated budgeted scan is never charged for
+    /// a file this group already ruled out.
+    impossible: bool,
 }
 
 /// A subgroup condition resolved for KvId-level refine.
@@ -477,6 +482,15 @@ impl IndexReader<'_> {
                         )?;
                         parts.push((m, None));
                     }
+                    let chunk_absent = if is_event {
+                        !self.has_event_index()
+                    } else {
+                        !self.has_link_index()
+                    };
+                    let impossible = chunk_absent
+                        || resolved_conditions.iter().any(|c| {
+                            matches!(c, ResolvedGroupCondition::Kv(kvids) if kvids.is_empty())
+                        });
                     resolved.push(None);
                     durations.push(None);
                     groups.push(GroupSlot {
@@ -484,6 +498,7 @@ impl IndexReader<'_> {
                         is_event,
                         prefilter: parts.into_iter().map(|(m, _)| m).collect(),
                         conditions: resolved_conditions,
+                        impossible,
                     });
                 }
                 PlanTerm::Duration { intervals, negated } => {
@@ -543,9 +558,26 @@ impl IndexReader<'_> {
                 }
             }
         };
+        let group_ready_empty = |group: &GroupSlot| -> bool {
+            if group.impossible {
+                return true;
+            }
+            // An all-ready pre-filter that ANDs to empty leaves the
+            // refine nothing to visit.
+            let mut acc: Option<PosSet> = None;
+            for part in &group.prefilter {
+                let Part::Ready(set) = part else { return false };
+                match &mut acc {
+                    None => acc = Some(set.clone()),
+                    Some(a) => a.and_assign(set),
+                }
+            }
+            acc.is_some_and(|set| set.is_empty())
+        };
         let ready_empty = resolved.iter().flatten().any(|term| {
             combine_ready(term).is_some_and(|set| set.is_empty())
-        }) || durations.iter().flatten().any(PosSet::is_empty);
+        }) || durations.iter().flatten().any(PosSet::is_empty)
+            || groups.iter().any(group_ready_empty);
         let probe_sets: Vec<PosSet> = if probes.is_empty() || ready_empty {
             probes.iter().map(|_| PosSet::empty(total)).collect()
         } else {
@@ -566,6 +598,10 @@ impl IndexReader<'_> {
         // a single event/link must satisfy the whole subgroup — every
         // event/link record visited counts and the budget aborts. ─────
         for group in &groups {
+            if group.impossible {
+                durations[group.term_index] = Some(PosSet::empty(total));
+                continue;
+            }
             let mut prefilter: Option<PosSet> = None;
             for part in &group.prefilter {
                 let set = match part {
@@ -601,7 +637,12 @@ impl IndexReader<'_> {
                                             || e.attr_refs.iter().any(|id| kvids.contains(&id.0))
                                     }
                                     ResolvedGroupCondition::TimeSince(intervals) => {
-                                        let dt = (e.time_unix_nano as i64).saturating_sub(start);
+                                        // Saturating, matching the recorded
+                                        // ingest semantics — a wrapping cast
+                                        // would flip far-future times negative.
+                                        let t = i64::try_from(e.time_unix_nano)
+                                            .unwrap_or(i64::MAX);
+                                        let dt = t.saturating_sub(start);
                                         intervals.iter().any(|&(lo, hi)| {
                                             lo.is_none_or(|lo| dt >= lo)
                                                 && hi.is_none_or(|hi| dt <= hi)
