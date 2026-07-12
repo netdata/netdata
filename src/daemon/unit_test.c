@@ -1806,6 +1806,31 @@ static int test_rrdr_relative_window_extreme_values(void) {
     RRDR_WINDOW_CHECK(!rrdr_relative_window_value_is_relative(maximum),
                       "maximum time_t was classified as relative");
 
+    struct {
+        time_t after;
+        time_t before;
+        bool absolute;
+        const char *name;
+    } query_wrapper_cases[] = {
+        { .after = -300, .before = -60, .absolute = false, .name = "relative" },
+        { .after = 0, .before = 0, .absolute = false, .name = "default" },
+        { .after = -300, .before = maximum, .absolute = false, .name = "mixed" },
+        { .after = maximum - 100, .before = maximum, .absolute = true, .name = "future absolute" },
+        { .after = minimum, .before = maximum, .absolute = true, .name = "extreme absolute" },
+    };
+
+    for(size_t i = 0; i < _countof(query_wrapper_cases); i++) {
+        time_t after = query_wrapper_cases[i].after;
+        time_t before = query_wrapper_cases[i].before;
+        bool absolute = rrdr_relative_window_to_absolute_query(&after, &before, NULL, true);
+
+        if(absolute != query_wrapper_cases[i].absolute) {
+            fprintf(stderr, "%s: query wrapper misclassified %s window as %s\n", __FUNCTION__,
+                    query_wrapper_cases[i].name, absolute ? "absolute" : "relative");
+            errors++;
+        }
+    }
+
     {
         const time_t now = 2000000000;
         time_t after = -300;

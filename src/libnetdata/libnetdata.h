@@ -279,7 +279,10 @@ static inline bool rrdr_relative_window_value_is_relative(time_t value) {
     return value >= -API_RELATIVE_TIME_MAX && value <= API_RELATIVE_TIME_MAX;
 }
 
+// Returns true if either endpoint was relative.
 bool rrdr_relative_window_to_absolute(time_t *after, time_t *before, time_t now);
+
+// Returns true if both endpoints were absolute.
 bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_t *now_ptr, bool unittest);
 
 int netdata_base64_decode(unsigned char *out, const unsigned char *in, int in_len);

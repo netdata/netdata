@@ -547,7 +547,7 @@ bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_
     time_t before_requested = *before;
     time_t after_requested = *after;
 
-    int absolute_period_requested = rrdr_relative_window_to_absolute(&after_requested, &before_requested, now);
+    bool relative_period_requested = rrdr_relative_window_to_absolute(&after_requested, &before_requested, now);
 
     time_t absolute_minimum_time = rrdr_time_wide_to_time_t(rrdr_time_wide_subtract(
         rrdr_time_wide_from_time_t(now), rrdr_time_wide_from_time_t(10 * 365 * 86400)));
@@ -569,7 +569,7 @@ bool rrdr_relative_window_to_absolute_query(time_t *after, time_t *before, time_
     *before = before_requested;
     *after = after_requested;
 
-    return (absolute_period_requested != 1);
+    return !relative_period_requested;
 }
 
 

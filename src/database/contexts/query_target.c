@@ -1266,9 +1266,9 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
     if(query_target_has_percentage_of_group(qt))
         qt->window.options &= ~RRDR_OPTION_PERCENTAGE;
 
-    qt->internal.relative = rrdr_relative_window_to_absolute_query(&qt->window.after, &qt->window.before
-                                                                   , &qt->window.now, unittest_running
-                                                                  );
+    bool absolute_period_requested = rrdr_relative_window_to_absolute_query(
+        &qt->window.after, &qt->window.before, &qt->window.now, unittest_running);
+    qt->internal.relative = !absolute_period_requested;
 
     // prepare our local variables - we need these across all these functions
     QUERY_TARGET_LOCALS qtl = {
