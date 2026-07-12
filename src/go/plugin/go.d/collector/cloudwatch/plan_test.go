@@ -549,14 +549,21 @@ func TestCompileConfig_DiscoveryGroupLimit(t *testing.T) {
 
 	plan, _, err := compileTestConfig(t, cfg)
 	require.NoError(t, err)
-	assert.Len(t, plan.Scopes, maxDiscoveryGroups)
+	assert.Len(t, plan.Scopes, defaultMaxDiscoveryGroups)
 
 	cfg.Rules[0].Regions = []string{"us-east-1", "us-west-2"}
 	plan, _, err = compileTestConfig(t, cfg)
 	assert.Nil(t, plan)
 	assert.ErrorContains(t, err, "derives 65 discovery groups")
-	assert.ErrorContains(t, err, "maximum is 64")
+	assert.ErrorContains(t, err, "limits.max_discovery_groups=64")
+	assert.ErrorContains(t, err, "raise the safeguard")
 	assert.ErrorContains(t, err, "split the collection across multiple jobs")
+
+	raised := 2 * defaultMaxDiscoveryGroups
+	cfg.Limits.MaxDiscoveryGroups = &raised
+	plan, _, err = compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	assert.Len(t, plan.Scopes, raised)
 }
 
 func TestCompileConfig_DiscoveryGroupsShareTargetRegionNamespace(t *testing.T) {

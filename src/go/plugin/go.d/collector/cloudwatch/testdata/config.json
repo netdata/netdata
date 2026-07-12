@@ -125,7 +125,8 @@
     ]
   },
   "limits": {
-    "max_instances": 123
+    "max_instances": 123,
+    "max_discovery_groups": 123
   },
   "discovery": {
     "refresh_every": 123,

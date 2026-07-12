@@ -61,6 +61,14 @@ func TestConfig_validate(t *testing.T) {
 		"update_every below minimum":  {mutate: func(c *Config) { c.UpdateEvery = 30 }, wantErr: true},
 		"refresh_every below minimum": {mutate: func(c *Config) { c.Discovery.RefreshEvery = 30 }, wantErr: true},
 		"negative timeout":            {mutate: func(c *Config) { c.Timeout = confopt.Duration(-time.Second) }, wantErr: true},
+		"discovery group limit below minimum": {mutate: func(c *Config) {
+			value := 0
+			c.Limits.MaxDiscoveryGroups = &value
+		}, wantErr: true},
+		"discovery group limit above structural maximum": {mutate: func(c *Config) {
+			value := maxCompiledScopes + 1
+			c.Limits.MaxDiscoveryGroups = &value
+		}, wantErr: true},
 	}
 
 	for name, tc := range tests {
@@ -269,6 +277,11 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 	}
 	assert.NotContains(t, doc.JSONSchema.Properties, "defaults")
 	assert.NotContains(t, doc.JSONSchema.Properties, "tags")
+	var fullDoc map[string]any
+	require.NoError(t, json.Unmarshal(data, &fullDoc))
+	discoveryGroupLimit := schemaObjectAt(t, fullDoc, "jsonSchema", "properties", "limits", "properties", "max_discovery_groups")
+	assert.Equal(t, float64(defaultMaxDiscoveryGroups), discoveryGroupLimit["default"])
+	assert.Equal(t, float64(maxCompiledScopes), discoveryGroupLimit["maximum"])
 	for key, want := range map[string]string{
 		"credentials": `[{"name":"sdk_default","type":"default"}]`,
 		"targets":     `[{"name":"base","credentials":"sdk_default"}]`,
@@ -348,6 +361,7 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 	assert.Equal(t, "us-east-1", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "regions", "items")["ui:placeholder"])
 	assert.Equal(t, "5m", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "query", "period")["ui:placeholder"])
 	assert.Equal(t, "30m", schemaObjectAt(t, doc, "uiSchema", "rule_defaults", "query", "lookback")["ui:placeholder"])
+	assert.Equal(t, "64", schemaObjectAt(t, doc, "uiSchema", "limits", "max_discovery_groups")["ui:placeholder"])
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rule_defaults", "filters", "resource_tags")["ui:listFlavour"])
 	assert.Equal(t, "Environment", schemaObjectAt(t, doc, "uiSchema", "rule_defaults", "filters", "resource_tags", "items", "key")["ui:placeholder"])
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "labels", "resource_tags")["ui:listFlavour"])
@@ -536,7 +550,7 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 		cfg["labels"] = map[string]any{"resource_tags": []any{
 			map[string]any{"key": "Owner", "label": "resource_owner"},
 		}}
-		cfg["limits"] = map[string]any{"max_instances": 2000}
+		cfg["limits"] = map[string]any{"max_instances": 2000, "max_discovery_groups": 128}
 		cfg["rules"] = []any{
 			map[string]any{"name": "filtered", "targets": []any{"base"}, "regions": []any{"us-east-1"}, "profiles": map[string]any{"defaults": false, "include": []any{"ec2"}}},
 			map[string]any{"name": "unfiltered", "targets": []any{"base"}, "regions": []any{"us-east-1"}, "profiles": map[string]any{"defaults": false, "include": []any{"cloudfront"}}, "filters": map[string]any{"resource_tags": []any{}}},
@@ -544,6 +558,15 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 		assert.NoError(t, schema.Validate(cfg))
 		assert.NoError(t, validateRuntimeConfigMap(t, cfg))
 	})
+
+	for name, value := range map[string]int{"zero": 0, "above structural maximum": maxCompiledScopes + 1} {
+		t.Run("discovery group limit "+name+" is rejected", func(t *testing.T) {
+			cfg := cloneConfigMap(t, valid)
+			cfg["limits"] = map[string]any{"max_discovery_groups": value}
+			assert.Error(t, schema.Validate(cfg))
+			assert.Error(t, validateRuntimeConfigMap(t, cfg))
+		})
+	}
 
 	t.Run("resource tag filter requires at least one value", func(t *testing.T) {
 		cfg := cloneConfigMap(t, valid)
@@ -689,6 +712,10 @@ func validateRuntimeConfigMap(t *testing.T, raw map[string]any) error {
 	require.NoError(t, err)
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		return err
+	}
+	cfg.applyDefaults()
+	if err := cfg.validate(); err != nil {
 		return err
 	}
 	_, _, err = compileTestConfig(t, cfg)

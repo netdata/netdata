@@ -194,6 +194,8 @@ func TestCollector_Init_appliesDefaults(t *testing.T) {
 
 	assert.Equal(t, defaultUpdateEvery, c.UpdateEvery)
 	assert.Equal(t, defaultDiscoveryRefresh, c.Discovery.RefreshEvery)
+	require.NotNil(t, c.Limits.MaxDiscoveryGroups)
+	assert.Equal(t, defaultMaxDiscoveryGroups, *c.Limits.MaxDiscoveryGroups)
 	assert.True(t, c.recentlyActiveOnly())
 }
 

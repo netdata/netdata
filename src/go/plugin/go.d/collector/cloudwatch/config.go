@@ -4,6 +4,7 @@ package cloudwatch
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
@@ -12,11 +13,12 @@ import (
 )
 
 const (
-	defaultUpdateEvery      = 60
-	defaultAutoDetectRetry  = 0
-	defaultDiscoveryRefresh = 300
-	defaultMaxInstances     = 1000
-	defaultTimeout          = confopt.Duration(30 * time.Second)
+	defaultUpdateEvery        = 60
+	defaultAutoDetectRetry    = 0
+	defaultDiscoveryRefresh   = 300
+	defaultMaxInstances       = 1000
+	defaultMaxDiscoveryGroups = 64
+	defaultTimeout            = confopt.Duration(30 * time.Second)
 )
 
 // apiConcurrency bounds concurrent AWS API calls (ListMetrics discovery,
@@ -127,6 +129,15 @@ type ResourceTagLabelConfig struct {
 
 type LimitsConfig struct {
 	MaxInstances int `yaml:"max_instances,omitempty" json:"max_instances"`
+	// Pointer distinguishes omission (default 64) from an explicit invalid zero.
+	MaxDiscoveryGroups *int `yaml:"max_discovery_groups,omitempty" json:"max_discovery_groups,omitempty"`
+}
+
+func (c LimitsConfig) maxDiscoveryGroups() int {
+	if c.MaxDiscoveryGroups == nil {
+		return defaultMaxDiscoveryGroups
+	}
+	return *c.MaxDiscoveryGroups
 }
 
 type DiscoveryConfig struct {
@@ -149,11 +160,13 @@ func (c *Config) applyDefaults() {
 		c.Discovery.RefreshEvery = defaultDiscoveryRefresh
 	}
 	if c.Discovery.RecentlyActiveOnly == nil {
-		v := true
-		c.Discovery.RecentlyActiveOnly = &v
+		c.Discovery.RecentlyActiveOnly = new(true)
 	}
 	if c.Limits.MaxInstances == 0 {
 		c.Limits.MaxInstances = defaultMaxInstances
+	}
+	if c.Limits.MaxDiscoveryGroups == nil {
+		c.Limits.MaxDiscoveryGroups = new(defaultMaxDiscoveryGroups)
 	}
 	if c.Timeout.Duration() == 0 {
 		c.Timeout = defaultTimeout
@@ -174,6 +187,9 @@ func (c Config) validate() error {
 	}
 	if c.Limits.MaxInstances < 0 {
 		errs = append(errs, errors.New("'limits.max_instances' must be >= 1"))
+	}
+	if value := c.Limits.maxDiscoveryGroups(); value < 1 || value > maxCompiledScopes {
+		errs = append(errs, fmt.Errorf("'limits.max_discovery_groups' must be between 1 and %d", maxCompiledScopes))
 	}
 	if err := validateConfigStructure(c); err != nil {
 		errs = append(errs, err)

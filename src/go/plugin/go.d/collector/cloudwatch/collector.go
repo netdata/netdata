@@ -51,8 +51,11 @@ func New() *Collector {
 			UpdateEvery:        defaultUpdateEvery,
 			AutoDetectionRetry: defaultAutoDetectRetry,
 			Discovery:          DiscoveryConfig{RefreshEvery: defaultDiscoveryRefresh},
-			Limits:             LimitsConfig{MaxInstances: defaultMaxInstances},
-			Timeout:            defaultTimeout,
+			Limits: LimitsConfig{
+				MaxInstances:       defaultMaxInstances,
+				MaxDiscoveryGroups: new(defaultMaxDiscoveryGroups),
+			},
+			Timeout: defaultTimeout,
 		},
 		store:               metrix.NewCollectorStore(),
 		now:                 time.Now,

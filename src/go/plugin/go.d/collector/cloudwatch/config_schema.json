@@ -485,7 +485,7 @@
       },
       "limits": {
         "title": "Collection limits",
-        "description": "Safety bounds applied after resource filtering and exported-series overlap resolution.",
+        "description": "Operator safeguards that reject unexpectedly large compiled work without truncating collection.",
         "type": "object",
         "properties": {
           "max_instances": {
@@ -494,6 +494,14 @@
             "type": "integer",
             "minimum": 1,
             "default": 1000
+          },
+          "max_discovery_groups": {
+            "title": "Maximum discovery groups",
+            "description": "Maximum unique target, region, and CloudWatch namespace combinations. Raise this explicitly for an intentionally larger job; increasing it permits more ListMetrics work.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 4096,
+            "default": 64
           }
         }
       },
@@ -766,6 +774,10 @@
       "max_instances": {
         "ui:help": "Maximum distinct final resource instances that emit at least one selected series after filtering and overlap resolution. Raise this only for an intentionally larger job.",
         "ui:placeholder": "1000"
+      },
+      "max_discovery_groups": {
+        "ui:help": "Safeguard for unique target, region, and namespace discovery groups. Compatible rules and profiles share groups. Raise this only when the resulting ListMetrics work is intentional; splitting across jobs remains available.",
+        "ui:placeholder": "64"
       }
     },
     "discovery": {

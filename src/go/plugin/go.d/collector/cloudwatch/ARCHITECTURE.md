@@ -174,7 +174,8 @@ compiler state, and installed execution plan:
   ordered policy scopes even when they share one discovery scan.
 - Fixed internal caps bound credentials, 64 targets, rules, list references,
   candidate-scope evaluation, and compiled scopes. Overflow fails compilation and never installs a partial plan;
-  `limits.max_instances` is the separate public bound on final selected instances.
+  `limits.max_instances` and `limits.max_discovery_groups` are operator safeguards for final selected instances and
+  intended discovery breadth.
 
 ## Discovery
 
@@ -206,9 +207,10 @@ Discovery then finds which *instances* of those profiles exist per target and re
   target/region/namespace scan has `publication_delay + lookback + period ≤ 3h`. PT3H is the only value CloudWatch
   accepts, so applying it to a daily profile (S3) would hide the metric most of
   the day. Configurable (`discovery.recently_active_only`, default true).
-- A job is limited to 64 unique `(target, region, namespace)` groups. Compatible
-  rules and profiles share one group. Larger valid installations split across
-  jobs. Each group is additionally bounded to 100 pages, 50,000 scanned metrics,
+- `limits.max_discovery_groups` bounds unique `(target, region, namespace)` groups
+  (default 64, valid 1..4,096). Compatible rules and profiles share one group.
+  Raising the safeguard permits proportionally more ListMetrics work; larger valid
+  installations may instead split across jobs. Each group is additionally bounded to 100 pages, 50,000 scanned metrics,
   and 20,000 candidate profile instances; repeated pagination tokens fail the
   whole group rather than truncating it.
 - **Snapshot + carry-forward**: `buildDiscoverySnapshot` stores instances for
@@ -521,11 +523,11 @@ verify current per-region prices on the CloudWatch pricing page.)
   existing chart but cannot change its identity or overwrite an identity label.
 - **Compiled configuration** — operator-facing credentials, targets, and ordered
   rules are validated and expanded once. Discovery, tag-label presentation,
-  `limits.max_instances`, `timeout`, `vnode`, and the framework's
+  `limits.max_instances`, `limits.max_discovery_groups`, `timeout`, `vnode`, and the framework's
   common fields remain job-level settings.
-  Concurrency and all AWS-work bounds are internal constants. Discovery is
-  limited to 64 unique `(target, region, namespace)` groups per job; compatible
-  rules/profiles share a group, and larger valid installations split across jobs.
+  Concurrency and per-request/per-group AWS-work bounds are internal constants.
+  Discovery breadth uses the explicit operator safeguard; compatible rules/profiles
+  share a group, and larger valid installations can raise it or split across jobs.
 
 ## Where To Change Things
 

@@ -98,7 +98,7 @@ A rule that omits `profiles` selects all default-enabled profiles for its target
 - Query timing resolves field-by-field from `rules[].query`, `rule_defaults.query`, profile metric/profile values, and the built-in 10-minute publication delay. The stock daily S3 storage profile uses a one-day publication delay.
 - A successful sparse query can replay its newest eligible CloudWatch value for up to `lookback`. During transient AWS failures, the retained value can be replayed longer, until a successful query replaces or expires it.
 - `limits.max_instances` defaults to 1000 distinct final resource instances after tag filtering and overlap resolution. Exceeding it rejects the refreshed query plan; resources are never silently truncated.
-- Discovery is bounded to 64 unique `(target, region, namespace)` groups per job. Compatible rules and profiles share a group. Exceeding the fixed bound can indicate accidental expansion or a legitimate larger installation; split the configuration across jobs to preserve coverage while bounding each job's AWS work.
+- `limits.max_discovery_groups` defaults to 64 unique `(target, region, namespace)` groups per job. Compatible rules and profiles share a group. The safeguard catches accidental expansion; intentionally larger installations can raise it (up to the structural maximum of 4096) or split collection across jobs. Increasing it permits proportionally more `ListMetrics` work.
 - Resources are labeled by their identifying CloudWatch dimensions (for example EC2 `instance_id`). Selected resource tags can additionally be attached as non-identity labels via `labels.resource_tags`; changing those tags updates labels without changing chart identity. (A dimension that is constant across resources, such as CloudFront's `Region=Global`, is used to match and query metrics but is not turned into a label.)
 
 
@@ -227,6 +227,7 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | labels.resource_tags[].key | Exact, case-sensitive AWS resource tag key. |  | yes |
 |  | labels.resource_tags[].label | Optional Netdata label key. When omitted, the AWS key is normalized (`Name` becomes `name`). Use an explicit label to avoid invalid names or collisions with identity labels such as `region`. |  | no |
 | **Limits** | limits.max_instances | Maximum distinct final CloudWatch resource instances that emit at least one selected series after filtering and exported-series overlap resolution. Metric/statistic fan-out is not counted. Overflow rejects the refreshed plan; collection never truncates to the first N resources. | 1000 | no |
+|  | limits.max_discovery_groups | Maximum unique `(target, region, namespace)` discovery groups compiled for the job. Compatible rules and profiles share groups. Raise the default safeguard only when the additional `ListMetrics` work is intentional; larger installations can instead split collection across jobs. Valid range 1–4096. | 64 | no |
 | **Discovery** | discovery.refresh_every | How often (seconds) to re-discover metrics. Minimum 60. | 300 | no |
 |  | discovery.recently_active_only | Use CloudWatch's three-hour activity filter only when every selected series sharing a target, region, and namespace scan has `publication_delay + lookback + period` of 3 hours or less. Any longer-horizon participant keeps the shared scan unfiltered. | yes | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
@@ -433,6 +434,7 @@ jobs:
           label: resource_owner
     limits:
       max_instances: 1000
+      max_discovery_groups: 64
 
 ```
 </details>
@@ -655,9 +657,9 @@ CloudWatch publishes metrics with a delay.
 
 ### Discovery group limit exceeded
 
-A discovery group is one unique `(target, region, namespace)` combination. Compatible rules and profiles share the same group. Each job is limited to 64 groups to bound `ListMetrics` work.
+A discovery group is one unique `(target, region, namespace)` combination. Compatible rules and profiles share the same group. `limits.max_discovery_groups` defaults to 64 to bound accidental `ListMetrics` expansion.
 
-This can result from accidental target/region/profile expansion or from a legitimate large installation. Split the configuration across multiple jobs; this preserves metric coverage while keeping each job within the fixed discovery-work boundary.
+This can result from accidental target/region/profile expansion or from a legitimate large installation. Verify the derived scope first. For intentional scale, raise the safeguard (maximum 4096) or split the configuration across multiple jobs. Splitting preserves metric coverage while bounding each job's discovery work; raising the value permits proportionally more `ListMetrics` calls and refresh time.
 
 
 ### Access denied or authentication errors

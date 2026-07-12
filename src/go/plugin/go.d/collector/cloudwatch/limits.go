@@ -2,10 +2,9 @@
 
 package cloudwatch
 
-// Fixed safety envelopes bound configuration expansion and AWS response work.
-// They are collector invariants rather than operator tuning knobs.
+// Fixed safety envelopes bound query expansion and AWS response work. The
+// operator-controlled discovery-group safeguard is part of LimitsConfig.
 const (
-	maxDiscoveryGroups            = 64
 	maxQueryBuckets               = 1440
 	maxDatapointsPerRequest       = 30000
 	maxGetMetricDataPages         = 2
