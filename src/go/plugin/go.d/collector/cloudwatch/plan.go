@@ -107,6 +107,101 @@ func normalizedUniqueProfileNames(path string, values []string, known map[string
 	return out, nil
 }
 
+func compileProfileSeries(profile cwprofiles.ResolvedProfile) []compiledSeries {
+	var series []compiledSeries
+	for metricIndex, metric := range profile.Config.Metrics {
+		period := profile.Config.EffectivePeriod(metric)
+		for _, statistic := range metric.Statistics {
+			token := cwprofiles.NormalizeStatistic(statistic)
+			series = append(series, compiledSeries{
+				Ordinal: len(series), MetricIndex: metricIndex, Statistic: token,
+				Name: cwprofiles.ExportedSeriesName(profile.Name, metric.ID, token), Period: period,
+			})
+		}
+	}
+	return series
+}
+
+func resolveRuleMetrics(path string, selector *MetricSelectorConfig, profiles []cwprofiles.ResolvedProfile, seriesByProfile map[string][]compiledSeries) (map[string][]compiledSeries, map[string]struct{}, error) {
+	selected := make(map[string][]compiledSeries, len(profiles))
+	explicitProfiles := make(map[string]struct{})
+	if selector == nil {
+		for _, profile := range profiles {
+			selected[profile.Name] = seriesByProfile[profile.Name]
+		}
+		return selected, explicitProfiles, nil
+	}
+
+	profilesByName := make(map[string]cwprofiles.ResolvedProfile, len(profiles))
+	for _, profile := range profiles {
+		profilesByName[profile.Name] = profile
+	}
+	selectedOrdinals := make(map[string]map[int]struct{})
+	for i, entry := range selector.Include {
+		itemPath := fmt.Sprintf("%s.metrics.include[%d]", path, i)
+		profile, ok := profilesByName[entry.Profile]
+		if !ok {
+			return nil, nil, fmt.Errorf("%s.profile references profile %q not selected by this rule", itemPath, entry.Profile)
+		}
+		explicitProfiles[profile.Name] = struct{}{}
+
+		metricIndex := -1
+		for idx, metric := range profile.Config.Metrics {
+			if metric.MetricName == entry.Metric {
+				metricIndex = idx
+				break
+			}
+		}
+		if metricIndex < 0 {
+			return nil, nil, fmt.Errorf("%s.metric references unknown MetricName %q in profile %q", itemPath, entry.Metric, profile.Name)
+		}
+
+		statistic := normalizeMetricStatistic(entry.Statistic)
+		matchedOrdinal := -1
+		for i := range seriesByProfile[profile.Name] {
+			candidate := seriesByProfile[profile.Name][i]
+			if candidate.MetricIndex == metricIndex && candidate.Statistic == statistic {
+				matchedOrdinal = candidate.Ordinal
+				break
+			}
+		}
+		if matchedOrdinal < 0 {
+			return nil, nil, fmt.Errorf("%s.statistic %q is not exported for MetricName %q in profile %q", itemPath, entry.Statistic, entry.Metric, profile.Name)
+		}
+		if selectedOrdinals[profile.Name] == nil {
+			selectedOrdinals[profile.Name] = make(map[int]struct{})
+		}
+		selectedOrdinals[profile.Name][matchedOrdinal] = struct{}{}
+	}
+
+	for _, profile := range profiles {
+		ordinals := selectedOrdinals[profile.Name]
+		for _, series := range seriesByProfile[profile.Name] {
+			if _, ok := ordinals[series.Ordinal]; ok {
+				selected[profile.Name] = append(selected[profile.Name], series)
+			}
+		}
+	}
+	if len(explicitProfiles) == 0 {
+		return nil, nil, fmt.Errorf("%s.metrics selects no metrics", path)
+	}
+	return selected, explicitProfiles, nil
+}
+
+func normalizeMetricStatistic(raw string) string {
+	if raw == "" || raw != strings.TrimSpace(raw) {
+		return ""
+	}
+	if strings.EqualFold(raw, "SampleCount") {
+		return "sample_count"
+	}
+	token := cwprofiles.NormalizeStatistic(raw)
+	if token == "sample_count" {
+		return ""
+	}
+	return token
+}
+
 func validateRolePartition(targetName, roleARN string, partitions map[string]struct{}) error {
 	if roleARN == "" || len(partitions) == 0 {
 		return nil

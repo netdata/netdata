@@ -35,6 +35,84 @@ func TestCompileConfig_RuleSelectors(t *testing.T) {
 	assert.Equal(t, []string{"ec2", "rds"}, []string{plan.Scopes[0].Profile.Name, plan.Scopes[1].Profile.Name})
 }
 
+func TestCompileConfig_ExactMetricSelection(t *testing.T) {
+	defaults := false
+	cfg := validBaseConfig()
+	cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
+	cfg.Rules[0].Metrics = &MetricSelectorConfig{Include: []MetricSelectorEntryConfig{
+		{Profile: "ec2", Metric: "NetworkIn", Statistic: "sum"},
+		{Profile: "ec2", Metric: "CPUUtilization", Statistic: "AVERAGE"},
+	}}
+
+	plan, _, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	require.Len(t, plan.Scopes, 1)
+	assert.Equal(t, []string{"ec2.cpu_utilization_average", "ec2.network_in_sum"}, compiledSeriesNames(plan.Scopes[0].SelectedSeries))
+}
+
+func TestCompileConfig_MetricSelectionRejectsUnknownOrUnselectedEntries(t *testing.T) {
+	defaults := false
+	tests := map[string]struct {
+		entry   MetricSelectorEntryConfig
+		message string
+	}{
+		"profile not selected by rule": {
+			entry:   MetricSelectorEntryConfig{Profile: "rds", Metric: "CPUUtilization", Statistic: "Average"},
+			message: "not selected by this rule",
+		},
+		"unknown MetricName": {
+			entry:   MetricSelectorEntryConfig{Profile: "ec2", Metric: "DoesNotExist", Statistic: "Average"},
+			message: "unknown MetricName",
+		},
+		"statistic not exported": {
+			entry:   MetricSelectorEntryConfig{Profile: "ec2", Metric: "CPUUtilization", Statistic: "Sum"},
+			message: "is not exported",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := validBaseConfig()
+			cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
+			cfg.Rules[0].Metrics = &MetricSelectorConfig{Include: []MetricSelectorEntryConfig{tc.entry}}
+			_, _, err := compileTestConfig(t, cfg)
+			assert.ErrorContains(t, err, tc.message)
+		})
+	}
+}
+
+func TestCompileConfig_PartialMetricShadowingSharesTagMembership(t *testing.T) {
+	defaults := false
+	profileSelector := &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
+	metric := func(entries ...MetricSelectorEntryConfig) *MetricSelectorConfig {
+		return &MetricSelectorConfig{Include: entries}
+	}
+	cpu := MetricSelectorEntryConfig{Profile: "ec2", Metric: "CPUUtilization", Statistic: "Average"}
+	network := MetricSelectorEntryConfig{Profile: "ec2", Metric: "NetworkIn", Statistic: "Sum"}
+	cfg := validBaseConfig()
+	cfg.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production"}}}
+	cfg.Rules = []RuleConfig{
+		{Name: "first", Targets: []string{"base"}, Profiles: profileSelector, Metrics: metric(cpu), Regions: []string{"us-east-1"}},
+		{Name: "second", Targets: []string{"base"}, Profiles: profileSelector, Metrics: metric(network, cpu), Regions: []string{"us-east-1"}},
+	}
+
+	plan, diagnostics, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	require.Len(t, plan.Scopes, 2)
+	assert.Equal(t, []string{"ec2.cpu_utilization_average"}, compiledSeriesNames(plan.Scopes[0].SelectedSeries))
+	assert.Equal(t, []string{"ec2.network_in_sum"}, compiledSeriesNames(plan.Scopes[1].SelectedSeries))
+	assert.Equal(t, plan.Scopes[0].TagMembershipID, plan.Scopes[1].TagMembershipID)
+	assert.Contains(t, strings.Join(diagnostics, "\n"), "1 metric selection(s) shadowed")
+}
+
+func compiledSeriesNames(series []compiledSeries) []string {
+	names := make([]string, len(series))
+	for i, item := range series {
+		names[i] = item.Name
+	}
+	return names
+}
+
 func TestCompileConfig_RuleSelectorDefaultsAndExclusions(t *testing.T) {
 	t.Run("omitted selector uses enabled defaults", func(t *testing.T) {
 		plan, _, err := compileTestConfig(t, validBaseConfig())
@@ -307,6 +385,14 @@ func TestCompileConfig_RejectsRawLimitsBeforeCompilation(t *testing.T) {
 	assert.NotContains(t, err.Error(), "must match", "raw cap overflow must fail before walking oversized target entries")
 }
 
+func TestCompileConfig_RejectsMetricSelectorOverflowBeforeEntryValidation(t *testing.T) {
+	cfg := validBaseConfig()
+	cfg.Rules[0].Metrics = &MetricSelectorConfig{Include: make([]MetricSelectorEntryConfig, maxReferencesPerRule+1)}
+	_, _, err := compileTestConfig(t, cfg)
+	assert.ErrorContains(t, err, "rules[0].metrics.include contains 257 entries; maximum is 256")
+	assert.NotContains(t, err.Error(), "profile must not be empty", "the raw bound must fail before walking oversized entries")
+}
+
 func TestCompileConfig_AggregatesShadowDiagnosticsPerRule(t *testing.T) {
 	defaults := false
 	cfg := validBaseConfig()
@@ -327,7 +413,7 @@ func TestCompileConfig_AggregatesShadowDiagnosticsPerRule(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, plan.Scopes, 16)
 	assert.Len(t, diagnostics, 1, "one later rule produces one bounded aggregate diagnostic")
-	assert.Contains(t, diagnostics[0], "16")
+	assert.Contains(t, diagnostics[0], fmt.Sprintf("%d metric selection(s)", 16*len(plan.Scopes[0].SelectedSeries)))
 }
 
 func TestCompileConfig_RejectsCandidateScopeAmplification(t *testing.T) {

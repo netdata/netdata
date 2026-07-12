@@ -28,6 +28,14 @@ rules:
       defaults: false
       include: [ec2, rds]
       exclude: [cloudfront]
+    metrics:
+      include:
+        - profile: ec2
+          metric: CPUUtilization
+          statistic: Average
+        - profile: rds
+          metric: DatabaseConnections
+          statistic: Average
     regions: [us-east-1, eu-west-1]
     filters:
       resource_tags:

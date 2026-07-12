@@ -21,12 +21,14 @@ type planCompiler struct {
 	targetRoleARN     map[string]string
 	profiles          []cwprofiles.ResolvedProfile
 	profilesByName    map[string]cwprofiles.ResolvedProfile
+	seriesByProfile   map[string][]compiledSeries
 	tagJoinErrors     map[string]error
 
 	usedCredentials  map[string]struct{}
 	usedTargets      map[string]struct{}
 	selectedProfiles map[string]cwprofiles.ResolvedProfile
-	seenScopes       map[compiledScopeKey]string
+	staticOwners     map[compiledScopeKey]map[int]string
+	membershipIDs    map[compiledScopeKey]int
 	targetPartitions map[string]map[string]struct{}
 	candidateChecks  int
 }
@@ -50,8 +52,10 @@ type shadowSample struct {
 func newPlanCompiler(cfg Config, catalog cwprofiles.Catalog) *planCompiler {
 	profiles := catalog.AllProfiles()
 	profilesByName := make(map[string]cwprofiles.ResolvedProfile, len(profiles))
+	seriesByProfile := make(map[string][]compiledSeries, len(profiles))
 	for _, profile := range profiles {
 		profilesByName[profile.Name] = profile
+		seriesByProfile[profile.Name] = compileProfileSeries(profile)
 	}
 	credentialsByName := make(map[string]awsauth.CredentialConfig, len(cfg.Credentials))
 	for _, source := range cfg.Credentials {
@@ -68,11 +72,13 @@ func newPlanCompiler(cfg Config, catalog cwprofiles.Catalog) *planCompiler {
 		targetRoleARN:     make(map[string]string, len(cfg.Targets)),
 		profiles:          profiles,
 		profilesByName:    profilesByName,
+		seriesByProfile:   seriesByProfile,
 		tagJoinErrors:     make(map[string]error),
 		usedCredentials:   make(map[string]struct{}),
 		usedTargets:       make(map[string]struct{}),
 		selectedProfiles:  make(map[string]cwprofiles.ResolvedProfile),
-		seenScopes:        make(map[compiledScopeKey]string),
+		staticOwners:      make(map[compiledScopeKey]map[int]string),
+		membershipIDs:     make(map[compiledScopeKey]int),
 		targetPartitions:  make(map[string]map[string]struct{}),
 	}
 }
@@ -121,11 +127,24 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 	if err != nil {
 		return diagnostics, err
 	}
+	selectedSeries, metricProfiles, err := resolveRuleMetrics(path, rule.Metrics, profiles, pc.seriesByProfile)
+	if err != nil {
+		return diagnostics, err
+	}
+	for name := range metricProfiles {
+		explicitlyIncluded[name] = struct{}{}
+	}
 	regions := normalizeRegions(rule.Regions)
 	tagFilters := compileResourceTagFilters(rule.effectiveResourceTagFilters(pc.cfg.RuleDefaults.Filters.ResourceTags))
 	filterKey := resourceTagFilterSignature(tagFilters)
 
-	candidates := len(targets) * len(profiles) * len(regions)
+	selectedProfileCount := 0
+	for _, profile := range profiles {
+		if len(selectedSeries[profile.Name]) > 0 {
+			selectedProfileCount++
+		}
+	}
+	candidates := len(targets) * selectedProfileCount * len(regions)
 	if candidates > maxCandidateScopeChecks-pc.candidateChecks {
 		return diagnostics, fmt.Errorf("candidate collection scopes exceed maximum %d", maxCandidateScopeChecks)
 	}
@@ -137,6 +156,9 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 	}
 	eligibleProfiles := make([]profileRegions, 0, len(profiles))
 	for _, profile := range profiles {
+		if len(selectedSeries[profile.Name]) == 0 {
+			continue
+		}
 		var supported []string
 		for _, region := range regions {
 			if profile.Config.SupportsRegion(region) {
@@ -170,7 +192,7 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 		pc.usedTargets[target.Name] = struct{}{}
 		for _, selected := range eligibleProfiles {
 			for _, region := range selected.regions {
-				if err := pc.addScope(ruleName, target, selected.profile, region, tagFilters, filterKey, &diagnostics); err != nil {
+				if err := pc.addScope(ruleName, target, selected.profile, region, tagFilters, filterKey, selectedSeries[selected.profile.Name], &diagnostics); err != nil {
 					return diagnostics, err
 				}
 			}
@@ -179,21 +201,39 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 	return diagnostics, nil
 }
 
-func (pc *planCompiler) addScope(ruleName string, target *collectionTarget, profile cwprofiles.ResolvedProfile, region string, tagFilters []resourceTagFilter, filterKey string, diagnostics *ruleDiagnostics) error {
+func (pc *planCompiler) addScope(ruleName string, target *collectionTarget, profile cwprofiles.ResolvedProfile, region string, tagFilters []resourceTagFilter, filterKey string, selectedSeries []compiledSeries, diagnostics *ruleDiagnostics) error {
 	key := compiledScopeKey{target: target.Name, profile: profile.Name, region: region, filter: filterKey}
-	if owner, ok := pc.seenScopes[key]; ok {
-		diagnostics.shadowed++
-		if diagnostics.shadowSample == nil {
-			diagnostics.shadowSample = &shadowSample{owner: owner, target: target.Name, profile: profile.Name, region: region}
+	owners := pc.staticOwners[key]
+	if owners == nil {
+		owners = make(map[int]string, len(selectedSeries))
+		pc.staticOwners[key] = owners
+	}
+	unshadowed := make([]compiledSeries, 0, len(selectedSeries))
+	for _, series := range selectedSeries {
+		if owner, ok := owners[series.Ordinal]; ok {
+			diagnostics.shadowed++
+			if diagnostics.shadowSample == nil {
+				diagnostics.shadowSample = &shadowSample{owner: owner, target: target.Name, profile: profile.Name, region: region}
+			}
+			continue
 		}
+		owners[series.Ordinal] = ruleName
+		unshadowed = append(unshadowed, series)
+	}
+	if len(unshadowed) == 0 {
 		return nil
 	}
 	if len(pc.plan.Scopes) == maxCompiledScopes {
 		return fmt.Errorf("compiled collection scopes exceed maximum %d", maxCompiledScopes)
 	}
-	pc.seenScopes[key] = ruleName
+	membershipID, ok := pc.membershipIDs[key]
+	if !ok {
+		membershipID = len(pc.membershipIDs)
+		pc.membershipIDs[key] = membershipID
+	}
 	pc.plan.Scopes = append(pc.plan.Scopes, collectionScope{
 		Target: target, Profile: profile, Region: region, TagFilter: tagFilters,
+		TagMembershipID: membershipID, SelectedSeries: unshadowed,
 	})
 	pc.selectedProfiles[profile.Name] = profile
 	if !slices.Contains(target.Regions, region) {
@@ -263,7 +303,7 @@ func (d ruleDiagnostics) messages() []string {
 	if d.shadowed > 0 {
 		sample := d.shadowSample
 		messages = append(messages, fmt.Sprintf(
-			"rule %q has %d scope(s) shadowed by earlier rules; example: rule %q owns target %q, profile %q, region %q",
+			"rule %q has %d metric selection(s) shadowed by earlier rules; example: rule %q owns target %q, profile %q, region %q",
 			d.ruleName, d.shadowed, sample.owner, sample.target, sample.profile, sample.region,
 		))
 	}

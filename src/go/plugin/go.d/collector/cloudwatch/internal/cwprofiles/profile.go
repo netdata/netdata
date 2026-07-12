@@ -260,6 +260,8 @@ func (m Metric) validate(profilePrefix string, idx int) error {
 	}
 	if strings.TrimSpace(m.MetricName) == "" {
 		errs = append(errs, fmt.Errorf("%s: 'metric_name' is required", prefix))
+	} else if m.MetricName != strings.TrimSpace(m.MetricName) {
+		errs = append(errs, fmt.Errorf("%s: 'metric_name' must not have surrounding whitespace", prefix))
 	}
 	if m.Period != 0 && !isValidPeriod(m.Period) {
 		errs = append(errs, fmt.Errorf("%s: 'period' override must be a positive multiple of %d seconds", prefix, minPeriod))
@@ -484,19 +486,6 @@ func (p Profile) EffectivePeriod(m Metric) int {
 		return m.Period
 	}
 	return p.Period
-}
-
-// MaxEffectivePeriod is the largest effective period across the profile's
-// metrics. It drives the period-aware RecentlyActive decision (a profile with
-// any long-period metric must not be pruned by ListMetrics RecentlyActive=PT3H).
-func (p Profile) MaxEffectivePeriod() int {
-	largest := p.Period
-	for _, m := range p.Metrics {
-		if ep := p.EffectivePeriod(m); ep > largest {
-			largest = ep
-		}
-	}
-	return largest
 }
 
 // DimensionNames returns the profile's instance dimension CloudWatch names in

@@ -56,6 +56,20 @@
           "cloudfront"
         ]
       },
+      "metrics": {
+        "include": [
+          {
+            "profile": "ec2",
+            "metric": "CPUUtilization",
+            "statistic": "Average"
+          },
+          {
+            "profile": "rds",
+            "metric": "DatabaseConnections",
+            "statistic": "Average"
+          }
+        ]
+      },
       "regions": [
         "us-east-1",
         "eu-west-1"

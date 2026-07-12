@@ -155,6 +155,56 @@ func TestConfig_validateResourceTagConfiguration_RedactsDuplicateValue(t *testin
 	assert.NotContains(t, err.Error(), sensitive)
 }
 
+func TestConfig_validateMetricSelector(t *testing.T) {
+	valid := MetricSelectorEntryConfig{Profile: "ec2", Metric: "CPUUtilization", Statistic: "Average"}
+	tests := map[string]struct {
+		include []MetricSelectorEntryConfig
+		wantErr string
+	}{
+		"valid AWS spelling": {include: []MetricSelectorEntryConfig{valid}},
+		"valid case-insensitive statistic": {
+			include: []MetricSelectorEntryConfig{{Profile: "ec2", Metric: "CPUUtilization", Statistic: "average"}},
+		},
+		"empty include": {wantErr: "must contain at least one metric"},
+		"empty profile": {
+			include: []MetricSelectorEntryConfig{{Metric: "CPUUtilization", Statistic: "Average"}},
+			wantErr: ".profile must not be empty",
+		},
+		"empty metric": {
+			include: []MetricSelectorEntryConfig{{Profile: "ec2", Statistic: "Average"}},
+			wantErr: ".metric must not be empty",
+		},
+		"surrounding whitespace": {
+			include: []MetricSelectorEntryConfig{{Profile: "ec2", Metric: " CPUUtilization", Statistic: "Average"}},
+			wantErr: "must not contain surrounding whitespace",
+		},
+		"internal statistic spelling": {
+			include: []MetricSelectorEntryConfig{{Profile: "ec2", Metric: "CPUUtilization", Statistic: "sample_count"}},
+			wantErr: "statistic is not valid",
+		},
+		"duplicate after statistic normalization": {
+			include: []MetricSelectorEntryConfig{
+				valid,
+				{Profile: "ec2", Metric: "CPUUtilization", Statistic: "average"},
+			},
+			wantErr: "duplicate metric selection",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := validBaseConfig()
+			cfg.Rules[0].Metrics = &MetricSelectorConfig{Include: tc.include}
+			err := cfg.validate()
+			if tc.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tc.wantErr)
+			}
+		})
+	}
+}
+
 func TestConfigSchema_RuntimeContract(t *testing.T) {
 	data, err := os.ReadFile("config_schema.json")
 	require.NoError(t, err)
@@ -244,6 +294,10 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules")["ui:listFlavour"])
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "targets")["ui:listFlavour"])
 	assert.Equal(t, "ec2", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "profiles", "include", "items")["ui:placeholder"])
+	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "include")["ui:listFlavour"])
+	assert.Equal(t, "ec2", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "include", "items", "profile")["ui:placeholder"])
+	assert.Equal(t, "CPUUtilization", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "include", "items", "metric")["ui:placeholder"])
+	assert.Equal(t, "Average", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "include", "items", "statistic")["ui:placeholder"])
 	assert.Equal(t, "us-east-1", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "regions", "items")["ui:placeholder"])
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rule_defaults", "filters", "resource_tags")["ui:listFlavour"])
 	assert.Equal(t, "Environment", schemaObjectAt(t, doc, "uiSchema", "rule_defaults", "filters", "resource_tags", "items", "key")["ui:placeholder"])
@@ -327,6 +381,29 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 	}
 	require.NoError(t, schema.Validate(valid))
 	require.NoError(t, validateRuntimeConfigMap(t, valid))
+
+	t.Run("exact metric selection is valid", func(t *testing.T) {
+		cfg := cloneConfigMap(t, valid)
+		cfg["rules"] = []any{map[string]any{
+			"name": "selected", "targets": []any{"base"}, "regions": []any{"us-east-1"},
+			"profiles": map[string]any{"defaults": false, "include": []any{"ec2"}},
+			"metrics": map[string]any{"include": []any{
+				map[string]any{"profile": "ec2", "metric": "CPUUtilization", "statistic": "Average"},
+			}},
+		}}
+		assert.NoError(t, schema.Validate(cfg))
+		assert.NoError(t, validateRuntimeConfigMap(t, cfg))
+	})
+
+	t.Run("empty metric selection is rejected", func(t *testing.T) {
+		cfg := cloneConfigMap(t, valid)
+		cfg["rules"] = []any{map[string]any{
+			"name": "selected", "targets": []any{"base"}, "regions": []any{"us-east-1"},
+			"metrics": map[string]any{"include": []any{}},
+		}}
+		assert.Error(t, schema.Validate(cfg))
+		assert.Error(t, validateRuntimeConfigMap(t, cfg))
+	})
 
 	t.Run("resource tag filter inheritance and explicit disable are valid", func(t *testing.T) {
 		cfg := cloneConfigMap(t, valid)
@@ -499,6 +576,21 @@ func TestConfig_ResourceTagLabelsDecode(t *testing.T) {
 	var cfg Config
 	require.NoError(t, yaml.Unmarshal([]byte("labels:\n  resource_tags:\n    - key: owner\n    - key: Name\n      label: instance_name\n"), &cfg))
 	assert.Equal(t, []ResourceTagLabelConfig{{Key: "owner"}, {Key: "Name", Label: "instance_name"}}, cfg.Labels.ResourceTags)
+}
+
+func TestConfig_MetricSelectorDecode(t *testing.T) {
+	var cfg Config
+	require.NoError(t, yaml.Unmarshal([]byte("rules:\n  - metrics:\n      include:\n        - profile: ec2\n          metric: CPUUtilization\n          statistic: Average\n"), &cfg))
+	require.Len(t, cfg.Rules, 1)
+	require.NotNil(t, cfg.Rules[0].Metrics)
+	assert.Equal(t, []MetricSelectorEntryConfig{{Profile: "ec2", Metric: "CPUUtilization", Statistic: "Average"}}, cfg.Rules[0].Metrics.Include)
+}
+
+func TestConfig_SeriesSelectorIsNotCompatibilityDecoded(t *testing.T) {
+	var cfg Config
+	require.NoError(t, yaml.Unmarshal([]byte("rules:\n  - series:\n      include:\n        - profile: ec2\n          metric: CPUUtilization\n          statistic: Average\n"), &cfg))
+	require.Len(t, cfg.Rules, 1)
+	assert.Nil(t, cfg.Rules[0].Metrics, "the discarded draft name has no alias or compatibility decoder")
 }
 
 func TestConfig_LegacyTopLevelTagsAreNotDecoded(t *testing.T) {

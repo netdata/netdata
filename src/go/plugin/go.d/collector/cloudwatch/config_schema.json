@@ -171,7 +171,7 @@
       },
       "rules": {
         "title": "Collection rules",
-        "description": "Ordered target, profile, region, and resource-filter selections. The earliest matching rule and target own each overlapping final resource instance.",
+        "description": "Ordered target, profile, metric, region, and resource-filter selections. The earliest matching rule and target own each overlapping exported metric/statistic series.",
         "type": "array",
         "minItems": 1,
         "maxItems": 256,
@@ -235,6 +235,52 @@
                   }
                 }
               }
+            },
+            "metrics": {
+              "title": "Metrics",
+              "description": "Optional exact metric/statistic allowlist that narrows the profiles selected by this rule. Omit it to collect every metric exported by those profiles.",
+              "type": "object",
+              "properties": {
+                "include": {
+                  "title": "Included metrics",
+                  "description": "Exact profile, AWS MetricName, and statistic tuples. Statistics use AWS names such as Average, Sum, SampleCount, or p99 (case-insensitive).",
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 256,
+                  "uniqueItems": true,
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "profile": {
+                        "title": "Profile",
+                        "description": "Profile basename. It must already be selected by this rule's profiles option.",
+                        "type": "string",
+                        "pattern": "^[a-z][a-z0-9_]*$"
+                      },
+                      "metric": {
+                        "title": "AWS MetricName",
+                        "description": "Exact, case-sensitive CloudWatch MetricName exported by the profile.",
+                        "type": "string",
+                        "pattern": "^\\S(?:.*\\S)?$"
+                      },
+                      "statistic": {
+                        "title": "Statistic",
+                        "description": "AWS statistic name: Average, Minimum, Maximum, Sum, SampleCount, or p<N>. Named statistics are case-insensitive.",
+                        "type": "string",
+                        "pattern": "^\\S(?:.*\\S)?$"
+                      }
+                    },
+                    "required": [
+                      "profile",
+                      "metric",
+                      "statistic"
+                    ]
+                  }
+                }
+              },
+              "required": [
+                "include"
+              ]
             },
             "regions": {
               "title": "Regions",
@@ -368,7 +414,7 @@
       },
       "limits": {
         "title": "Collection limits",
-        "description": "Safety bounds applied after resource filtering and ordered-rule overlap resolution.",
+        "description": "Safety bounds applied after resource filtering and exported-series overlap resolution.",
         "type": "object",
         "properties": {
           "max_instances": {
@@ -493,7 +539,7 @@
     },
     "rules": {
       "ui:listFlavour": "list",
-      "ui:help": "Add ordered collection rules. The earliest matching rule and target own each overlapping final resource instance.",
+      "ui:help": "Add ordered collection rules. The earliest matching rule and target own each overlapping exported metric/statistic series.",
       "items": {
         "name": {
           "ui:help": "Stable rule name used in validation and diagnostics.",
@@ -523,6 +569,27 @@
             "ui:help": "Profile basenames to remove from this rule's selection.",
             "items": {
               "ui:placeholder": "cloudfront"
+            }
+          }
+        },
+        "metrics": {
+          "ui:help": "Optional exact allowlist that narrows the selected profiles. Omit it to collect every metric exported by those profiles.",
+          "include": {
+            "ui:listFlavour": "list",
+            "ui:help": "Add exact profile, AWS MetricName, and statistic tuples. Every tuple must exist in the selected profile.",
+            "items": {
+              "profile": {
+                "ui:help": "Profile basename already selected by this rule.",
+                "ui:placeholder": "ec2"
+              },
+              "metric": {
+                "ui:help": "Exact, case-sensitive AWS MetricName from the profile.",
+                "ui:placeholder": "CPUUtilization"
+              },
+              "statistic": {
+                "ui:help": "AWS statistic name. Named statistics are case-insensitive.",
+                "ui:placeholder": "Average"
+              }
             }
           }
         },
@@ -595,7 +662,7 @@
     },
     "limits": {
       "max_instances": {
-        "ui:help": "Maximum distinct final resource instances after filtering and overlap resolution. Raise this only for an intentionally larger job.",
+        "ui:help": "Maximum distinct final resource instances that emit at least one selected series after filtering and overlap resolution. Raise this only for an intentionally larger job.",
         "ui:placeholder": "1000"
       }
     },

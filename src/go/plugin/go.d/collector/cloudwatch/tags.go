@@ -29,18 +29,18 @@ type tagCacheKey struct {
 
 type tagMembership map[int]map[string]struct{}
 
-func (m tagMembership) add(scopeID int, joinKey string) {
-	if m[scopeID] == nil {
-		m[scopeID] = make(map[string]struct{})
+func (m tagMembership) add(membershipID int, joinKey string) {
+	if m[membershipID] == nil {
+		m[membershipID] = make(map[string]struct{})
 	}
-	m[scopeID][joinKey] = struct{}{}
+	m[membershipID][joinKey] = struct{}{}
 }
 
 // tagGroupSnapshot is the independently cached result of one RGTA fetch group.
-// A failed refresh keeps the last complete result but marks its policy scopes
-// unknown and expires only this group for retry.
+// A failed refresh keeps the last complete result but marks its membership
+// identities unknown and expires only this group for retry.
 type tagGroupSnapshot struct {
-	scopeIDs        []int
+	membershipIDs   []int
 	members         tagMembership
 	labels          map[tagCacheKey][]metrix.Label
 	confirmedLabels map[tagCacheKey]struct{}
@@ -59,8 +59,8 @@ func (m tagMembership) equal(other tagMembership) bool {
 	if len(m) != len(other) {
 		return false
 	}
-	for scopeID, joinKeys := range m {
-		otherJoinKeys, ok := other[scopeID]
+	for membershipID, joinKeys := range m {
+		otherJoinKeys, ok := other[membershipID]
 		if !ok || len(joinKeys) != len(otherJoinKeys) {
 			return false
 		}
@@ -74,8 +74,8 @@ func (m tagMembership) equal(other tagMembership) bool {
 }
 
 // tagSnapshot is one immutable view of tag-filter membership and emitted resource
-// labels. A failed scope is unknown: last-known members remain selected, while all
-// other candidates are reserved from lower-priority rules until the next retry.
+// labels. A failed membership is unknown: last-known members remain selected,
+// while other candidates reserve the affected selected series until the next retry.
 type tagSnapshot struct {
 	labels    map[tagCacheKey][]metrix.Label
 	members   tagMembership
@@ -89,16 +89,16 @@ func (s tagSnapshot) expired(now time.Time) bool {
 	return s.fetchedAt.IsZero() || !now.Before(s.expiresAt)
 }
 
-func (s tagSnapshot) scopeUnknown(scopeID int) bool {
+func (s tagSnapshot) membershipUnknown(membershipID int) bool {
 	if s.fetchedAt.IsZero() {
 		return true
 	}
-	_, ok := s.unknown[scopeID]
+	_, ok := s.unknown[membershipID]
 	return ok
 }
 
-func (s tagSnapshot) scopeSelected(scopeID int, joinKey string) bool {
-	_, ok := s.members[scopeID][joinKey]
+func (s tagSnapshot) membershipSelected(membershipID int, joinKey string) bool {
+	_, ok := s.members[membershipID][joinKey]
 	return ok
 }
 
@@ -250,7 +250,7 @@ func applyTagFetchResults(states, previous map[tagFetchKey]tagGroupSnapshot, res
 	for _, result := range results {
 		if result.err == nil {
 			states[result.group.key] = tagGroupSnapshot{
-				scopeIDs: tagGroupScopeIDs(result.group), members: result.members, labels: result.labels,
+				membershipIDs: tagGroupMembershipIDs(result.group), members: result.members, labels: result.labels,
 				confirmedLabels: result.confirmedLabels,
 				lastSuccess:     now,
 				expiresAt:       now.Add(ttl),
@@ -259,7 +259,7 @@ func applyTagFetchResults(states, previous map[tagFetchKey]tagGroupSnapshot, res
 		}
 
 		state := previous[result.group.key]
-		state.scopeIDs = tagGroupScopeIDs(result.group)
+		state.membershipIDs = tagGroupMembershipIDs(result.group)
 		state.unknown = true
 		state.expiresAt = time.Time{}
 		if state.members == nil {
@@ -282,13 +282,13 @@ func applyTagFetchResults(states, previous map[tagFetchKey]tagGroupSnapshot, res
 	return failures
 }
 
-func tagGroupScopeIDs(group tagFetchGroup) []int {
-	var scopeIDs []int
-	for _, ids := range group.scopeIDsByProfile {
-		scopeIDs = append(scopeIDs, ids...)
+func tagGroupMembershipIDs(group tagFetchGroup) []int {
+	var membershipIDs []int
+	for _, ids := range group.membershipIDsByProfile {
+		membershipIDs = append(membershipIDs, ids...)
 	}
-	sort.Ints(scopeIDs)
-	return scopeIDs
+	sort.Ints(membershipIDs)
+	return membershipIDs
 }
 
 func mergeTagGroupSnapshots(states map[tagFetchKey]tagGroupSnapshot, fetchedAt, emptyExpiresAt time.Time) tagSnapshot {
@@ -299,7 +299,7 @@ func mergeTagGroupSnapshots(states map[tagFetchKey]tagGroupSnapshot, fetchedAt, 
 		labelCapacity = max(labelCapacity, len(state.confirmedLabels))
 		membershipCapacity += len(state.members)
 		if state.unknown {
-			unknownCapacity += len(state.scopeIDs)
+			unknownCapacity += len(state.membershipIDs)
 		}
 	}
 	next := tagSnapshot{
@@ -324,8 +324,8 @@ func mergeTagGroupSnapshots(states map[tagFetchKey]tagGroupSnapshot, fetchedAt, 
 		state := states[key]
 		next.members.share(state.members)
 		if state.unknown {
-			for _, scopeID := range state.scopeIDs {
-				next.unknown[scopeID] = struct{}{}
+			for _, membershipID := range state.membershipIDs {
+				next.unknown[membershipID] = struct{}{}
 			}
 		}
 		if state.expiresAt.IsZero() || state.expiresAt.Before(next.expiresAt) {

@@ -41,7 +41,7 @@ type tagFetchGroup struct {
 
 	joins                  map[string]*tagJoin
 	profilesByResourceType map[string][]string
-	scopeIDsByProfile      map[string][]int
+	membershipIDsByProfile map[string][]int
 	candidatesByProfile    map[string]map[string]struct{}
 	tagKeys                map[string]struct{}
 	resourceTypes          []string
@@ -69,7 +69,7 @@ func (c *Collector) invalidateTagFetchPlan() {
 func (c *Collector) buildTagFetchPlan() []tagFetchGroup {
 	groups := make(map[tagFetchKey]*tagFetchGroup)
 	candidateIndexes := make(map[discoveryKey]map[string]struct{})
-	addScope := func(scopeID int, scope collectionScope, filters []resourceTagFilter, includeMembership bool) {
+	addScope := func(scope collectionScope, filters []resourceTagFilter, includeMembership bool) {
 		resolved, ok := c.resolvedTargetByRef(scope.Target.Name)
 		if !ok {
 			return
@@ -92,7 +92,7 @@ func (c *Collector) buildTagFetchPlan() []tagFetchGroup {
 				key: key, account: resolved.accountID, filters: filters,
 				joins:                  make(map[string]*tagJoin),
 				profilesByResourceType: make(map[string][]string),
-				scopeIDsByProfile:      make(map[string][]int),
+				membershipIDsByProfile: make(map[string][]int),
 				candidatesByProfile:    make(map[string]map[string]struct{}),
 				tagKeys:                make(map[string]struct{}),
 			}
@@ -113,8 +113,8 @@ func (c *Collector) buildTagFetchPlan() []tagFetchGroup {
 				group.tagKeys[label.awsKey] = struct{}{}
 			}
 		}
-		if includeMembership && !slices.Contains(group.scopeIDsByProfile[scope.Profile.Name], scopeID) {
-			group.scopeIDsByProfile[scope.Profile.Name] = append(group.scopeIDsByProfile[scope.Profile.Name], scopeID)
+		if includeMembership && !slices.Contains(group.membershipIDsByProfile[scope.Profile.Name], scope.TagMembershipID) {
+			group.membershipIDsByProfile[scope.Profile.Name] = append(group.membershipIDsByProfile[scope.Profile.Name], scope.TagMembershipID)
 		}
 		candidates, indexed := candidateIndexes[candidateKey]
 		if !indexed {
@@ -130,12 +130,12 @@ func (c *Collector) buildTagFetchPlan() []tagFetchGroup {
 		group.candidatesByProfile[scope.Profile.Name] = candidates
 	}
 
-	for scopeID, scope := range c.plan.Scopes {
+	for _, scope := range c.plan.Scopes {
 		if scope.hasTagFilter() {
-			addScope(scopeID, scope, scope.TagFilter, true)
+			addScope(scope, scope.TagFilter, true)
 		}
 		if len(c.tagLabelPlans[scope.Profile.Name]) > 0 && !scope.hasTagFilter() {
-			addScope(scopeID, scope, nil, false)
+			addScope(scope, nil, false)
 		}
 	}
 
@@ -245,8 +245,8 @@ func indexFetchedResource(
 		if _, candidate := group.candidatesByProfile[profileName][joinKey]; !candidate {
 			continue
 		}
-		for _, scopeID := range group.scopeIDsByProfile[profileName] {
-			members.add(scopeID, joinKey)
+		for _, membershipID := range group.membershipIDsByProfile[profileName] {
+			members.add(membershipID, joinKey)
 		}
 		plan := labelPlans[profileName]
 		if len(plan) == 0 {

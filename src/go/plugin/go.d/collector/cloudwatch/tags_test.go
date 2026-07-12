@@ -416,14 +416,14 @@ func TestRefreshTags_FilterMembershipFailureLifecycle(t *testing.T) {
 	c.now = func() time.Time { return base }
 
 	c.refreshTags(context.Background())
-	assert.True(t, c.tags.scopeUnknown(0), "a first failure is unknown")
-	assert.False(t, c.tags.scopeSelected(0, "i-1"))
+	assert.True(t, c.tags.membershipUnknown(0), "a first failure is unknown")
+	assert.False(t, c.tags.membershipSelected(0, "i-1"))
 	assert.True(t, c.tags.expired(base), "a failed group retries next collect")
 
 	rgta.err = nil
 	c.refreshTags(context.Background())
-	assert.False(t, c.tags.scopeUnknown(0))
-	assert.True(t, c.tags.scopeSelected(0, "i-1"))
+	assert.False(t, c.tags.membershipUnknown(0))
+	assert.True(t, c.tags.membershipSelected(0, "i-1"))
 	assert.False(t, c.tags.expired(base), "a successful refresh advances the TTL")
 	require.Len(t, rgta.gotTags, 1)
 	assert.Equal(t, "environment", aws.ToString(rgta.gotTags[0].Key))
@@ -432,8 +432,8 @@ func TestRefreshTags_FilterMembershipFailureLifecycle(t *testing.T) {
 	rgta.err = errors.New("throttled again")
 	c.markTagsStale()
 	c.refreshTags(context.Background())
-	assert.True(t, c.tags.scopeUnknown(0))
-	assert.True(t, c.tags.scopeSelected(0, "i-1"), "a later failure retains last-known membership")
+	assert.True(t, c.tags.membershipUnknown(0))
+	assert.True(t, c.tags.membershipSelected(0, "i-1"), "a later failure retains last-known membership")
 }
 
 func TestRefreshTags_FailedGroupRetriesWithoutRefetchingHealthyGroup(t *testing.T) {
@@ -462,9 +462,9 @@ func TestRefreshTags_FailedGroupRetriesWithoutRefetchingHealthyGroup(t *testing.
 	c.refreshTags(context.Background())
 	require.Equal(t, 1, healthy.calls)
 	require.Equal(t, 1, failing.calls)
-	assert.False(t, c.tags.scopeUnknown(0))
-	assert.True(t, c.tags.scopeSelected(0, "i-east"))
-	assert.True(t, c.tags.scopeUnknown(1))
+	assert.False(t, c.tags.membershipUnknown(0))
+	assert.True(t, c.tags.membershipSelected(0, "i-east"))
+	assert.True(t, c.tags.membershipUnknown(1))
 	require.Len(t, c.tagFetchPlan, 2)
 	firstTopology := &c.tagFetchPlan[0]
 	c.tagFetchPlan[0].candidatesByProfile["ec2"]["topology-sentinel"] = struct{}{}
@@ -474,8 +474,8 @@ func TestRefreshTags_FailedGroupRetriesWithoutRefetchingHealthyGroup(t *testing.
 
 	assert.Equal(t, 1, healthy.calls, "a healthy group remains cached until its own TTL")
 	assert.Equal(t, 2, failing.calls, "the failed group retries on the next collect")
-	assert.False(t, c.tags.scopeUnknown(0), "an unnecessary retry must not turn fresh membership unknown")
-	assert.True(t, c.tags.scopeSelected(0, "i-east"))
+	assert.False(t, c.tags.membershipUnknown(0), "an unnecessary retry must not turn fresh membership unknown")
+	assert.True(t, c.tags.membershipSelected(0, "i-east"))
 	assert.Same(t, firstTopology, &c.tagFetchPlan[0], "failed-group retry reuses discovery-derived topology")
 	assert.Contains(t, c.tagFetchPlan[0].candidatesByProfile["ec2"], "topology-sentinel")
 }
@@ -497,7 +497,7 @@ func TestRefreshTags_FirstSuccessfulEmptySnapshotInvalidatesImplicitUnknown(t *t
 	c.refreshTags(context.Background())
 
 	assert.False(t, c.tags.fetchedAt.IsZero())
-	assert.False(t, c.tags.scopeUnknown(0))
+	assert.False(t, c.tags.membershipUnknown(0))
 	assert.True(t, c.planDirty, "known-empty membership must rebuild a plan previously compiled from implicit unknown state")
 }
 
@@ -519,8 +519,8 @@ func TestRefreshTags_LaterPageFailureIsAtomic(t *testing.T) {
 	c.now = func() time.Time { return time.Unix(1_000_000_000, 0) }
 
 	c.refreshTags(context.Background())
-	require.True(t, c.tags.scopeSelected(0, "i-1"))
-	require.False(t, c.tags.scopeUnknown(0))
+	require.True(t, c.tags.membershipSelected(0, "i-1"))
+	require.False(t, c.tags.membershipUnknown(0))
 
 	rgta.resources = []rgtatypes.ResourceTagMapping{
 		rgtaResource("arn:aws:ec2:us-east-1:000000000000:instance/i-2", "environment", "production"),
@@ -529,9 +529,9 @@ func TestRefreshTags_LaterPageFailureIsAtomic(t *testing.T) {
 	c.markTagsStale()
 	c.refreshTags(context.Background())
 
-	assert.True(t, c.tags.scopeUnknown(0))
-	assert.True(t, c.tags.scopeSelected(0, "i-1"), "the prior complete snapshot is retained")
-	assert.False(t, c.tags.scopeSelected(0, "i-2"), "partial data from the failed refresh is discarded")
+	assert.True(t, c.tags.membershipUnknown(0))
+	assert.True(t, c.tags.membershipSelected(0, "i-1"), "the prior complete snapshot is retained")
+	assert.False(t, c.tags.membershipSelected(0, "i-2"), "partial data from the failed refresh is discarded")
 }
 
 func TestWalkResourceTags_PaginatesAndUsesNativeFilters(t *testing.T) {
@@ -596,7 +596,7 @@ func TestTagFetchGroups_SeparateFetchIdentityFromPolicyScopes(t *testing.T) {
 		groups := c.currentTagFetchPlan()
 		require.Len(t, groups, 4)
 		for _, group := range groups {
-			assert.Len(t, group.scopeIDsByProfile["ec2"], 1)
+			assert.Len(t, group.membershipIDsByProfile["ec2"], 1)
 		}
 		groups[0].candidatesByProfile["ec2"]["shared-sentinel"] = struct{}{}
 		for _, group := range groups[1:] {
@@ -709,7 +709,7 @@ func TestIndexFetchedResource_SkipsForeignAccountRegion(t *testing.T) {
 		key: tagFetchKey{target: "base", region: "us-east-1"}, account: "000000000000",
 		joins:                  map[string]*tagJoin{"ec2": join},
 		profilesByResourceType: map[string][]string{"ec2:instance": {"ec2"}},
-		scopeIDsByProfile:      map[string][]int{"ec2": {7}},
+		membershipIDsByProfile: map[string][]int{"ec2": {7}},
 		tagKeys:                map[string]struct{}{"owner": {}},
 		candidatesByProfile: map[string]map[string]struct{}{"ec2": {
 			"i-ok": {}, "i-acct": {}, "i-region": {},
@@ -737,22 +737,22 @@ func TestMergeTagGroupSnapshots_RetainsIndependentGroupState(t *testing.T) {
 	now := time.Unix(1_000_000_000, 0)
 	failedGroup := tagFetchGroup{
 		key: tagFetchKey{target: "first", region: "us-east-1"}, account: "000000000000",
-		scopeIDsByProfile:   map[string][]int{"ec2": {7}},
-		candidatesByProfile: map[string]map[string]struct{}{"ec2": {"i-1": {}}},
+		membershipIDsByProfile: map[string][]int{"ec2": {7}},
+		candidatesByProfile:    map[string]map[string]struct{}{"ec2": {"i-1": {}}},
 	}
 	healthyGroup := tagFetchGroup{
 		key: tagFetchKey{target: "second", region: "us-east-1"}, account: "000000000000",
-		scopeIDsByProfile: map[string][]int{"ec2": {8}},
+		membershipIDsByProfile: map[string][]int{"ec2": {8}},
 	}
 	states := map[tagFetchKey]tagGroupSnapshot{
 		failedGroup.key: {
-			scopeIDs: []int{7}, members: tagMembership{7: {"i-1": {}}},
+			membershipIDs: []int{7}, members: tagMembership{7: {"i-1": {}}},
 			labels:          map[tagCacheKey][]metrix.Label{matching: {{Key: "owner", Value: "one"}}},
 			confirmedLabels: map[tagCacheKey]struct{}{matching: {}},
 			lastSuccess:     now.Add(-time.Minute), unknown: true,
 		},
 		healthyGroup.key: {
-			scopeIDs: []int{8}, members: tagMembership{8: {"i-2": {}}},
+			membershipIDs: []int{8}, members: tagMembership{8: {"i-2": {}}},
 			labels:          map[tagCacheKey][]metrix.Label{healthy: {{Key: "owner", Value: "two"}}},
 			confirmedLabels: map[tagCacheKey]struct{}{healthy: {}},
 			lastSuccess:     now, expiresAt: now.Add(time.Minute),
@@ -773,11 +773,11 @@ func BenchmarkMergeTagGroupSnapshots(b *testing.B) {
 	const cachedTags = 8192
 	group := tagFetchGroup{
 		key: tagFetchKey{target: "target", region: "us-east-1"}, account: "000000000000",
-		scopeIDsByProfile:   map[string][]int{"ec2": {7}},
-		candidatesByProfile: map[string]map[string]struct{}{"ec2": make(map[string]struct{}, cachedTags)},
+		membershipIDsByProfile: map[string][]int{"ec2": {7}},
+		candidatesByProfile:    map[string]map[string]struct{}{"ec2": make(map[string]struct{}, cachedTags)},
 	}
 	state := tagGroupSnapshot{
-		scopeIDs: []int{7}, members: tagMembership{7: make(map[string]struct{}, cachedTags)},
+		membershipIDs: []int{7}, members: tagMembership{7: make(map[string]struct{}, cachedTags)},
 		labels:          make(map[tagCacheKey][]metrix.Label, cachedTags),
 		confirmedLabels: make(map[tagCacheKey]struct{}, cachedTags), unknown: true,
 	}
@@ -824,7 +824,7 @@ func BenchmarkIndexFetchedResources(b *testing.B) {
 				joins:                  map[string]*tagJoin{"ec2": join},
 				filters:                []resourceTagFilter{{key: "environment", values: []string{"production"}}},
 				profilesByResourceType: map[string][]string{"ec2:instance": {"ec2"}},
-				scopeIDsByProfile:      map[string][]int{"ec2": {7}},
+				membershipIDsByProfile: map[string][]int{"ec2": {7}},
 				candidatesByProfile:    map[string]map[string]struct{}{"ec2": candidates},
 				tagKeys:                map[string]struct{}{"environment": {}, "owner": {}},
 			}

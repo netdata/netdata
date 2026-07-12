@@ -78,6 +78,7 @@ func dimProfile(namespace string, period int, dimNames ...string) cwprofiles.Pro
 		Namespace: namespace,
 		Period:    period,
 		Instance:  cwprofiles.InstanceSpec{Dimensions: dims},
+		Metrics:   []cwprofiles.Metric{{ID: "m", MetricName: "M", Statistics: []string{"average"}}},
 	}
 }
 
@@ -459,6 +460,28 @@ func TestCollector_DiscoveryGroupsKeepRecentlyActiveBehaviorSeparate(t *testing.
 	assert.NotEqual(t, groups[0].RecentlyActive, groups[1].RecentlyActive)
 }
 
+func TestCollector_DiscoveryGroupsUseUnionOfSelectedSeriesPeriods(t *testing.T) {
+	c := New()
+	profile := cwprofiles.ResolvedProfile{Name: "mixed", Config: cwprofiles.Profile{
+		Namespace: "AWS/Shared", Period: 300,
+		Instance: cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "Id", Label: "id"}}},
+		Metrics: []cwprofiles.Metric{
+			{ID: "fast", MetricName: "Fast", Statistics: []string{"average"}},
+			{ID: "slow", MetricName: "Slow", Statistics: []string{"average"}, Period: 86400},
+		},
+	}}
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{profile})
+	all := compileProfileSeries(profile)
+	c.plan.Scopes[0].SelectedSeries = all[:1]
+	second := c.plan.Scopes[0]
+	second.SelectedSeries = all[1:]
+	c.plan.Scopes = append(c.plan.Scopes, second)
+
+	groups := c.discoveryGroups()
+	require.Len(t, groups, 1, "one profile must not trigger duplicate ListMetrics streams")
+	assert.False(t, groups[0].RecentlyActive, "one selected daily series disables PT3H for the shared profile matcher")
+}
+
 func TestBuildDiscoverySnapshot_FailSoftCarriesForward(t *testing.T) {
 	prev := map[discoveryKey][]discoveredInstance{
 		{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
@@ -684,16 +707,16 @@ func regionsOf(m map[string]map[string][]cwtypes.Metric) []string {
 	return out
 }
 
-func TestProfileUsesRecentlyActive(t *testing.T) {
+func TestSelectedSeriesUseRecentlyActive(t *testing.T) {
 	ec2 := dimProfile("AWS/EC2", 300, "InstanceId")
 	s3 := dimProfile("AWS/S3", 86400, "BucketName")
 
-	assert.True(t, profileUsesRecentlyActive(ec2, true))
-	assert.False(t, profileUsesRecentlyActive(ec2, false))
-	assert.False(t, profileUsesRecentlyActive(s3, true), "daily period must disable PT3H")
+	assert.True(t, selectedSeriesUseRecentlyActive(compileProfileSeries(cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2}), true))
+	assert.False(t, selectedSeriesUseRecentlyActive(compileProfileSeries(cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2}), false))
+	assert.False(t, selectedSeriesUseRecentlyActive(compileProfileSeries(cwprofiles.ResolvedProfile{Name: "s3", Config: s3}), true), "daily period must disable PT3H")
 
 	// A per-metric override beyond 3h also disables PT3H for the whole profile.
 	mixed := dimProfile("AWS/Custom", 300, "Id")
 	mixed.Metrics = []cwprofiles.Metric{{ID: "m", MetricName: "M", Statistics: []string{"average"}, Period: 86400}}
-	assert.False(t, profileUsesRecentlyActive(mixed, true))
+	assert.False(t, selectedSeriesUseRecentlyActive(compileProfileSeries(cwprofiles.ResolvedProfile{Name: "mixed", Config: mixed}), true))
 }

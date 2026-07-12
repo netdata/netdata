@@ -150,19 +150,26 @@ compiler state, and installed execution plan:
   decides whether the resulting configuration is valid during `Init` / `Check`.
 - Named credential sources describe only credential acquisition. Named targets
   describe monitored identities and optional role assumption. Ordered rules bind
-  targets to profile selectors, regions, and effective resource-tag predicates.
+  targets to profile selectors, optional exact metric/statistic allowlists,
+  regions, and effective resource-tag predicates. Omitting `metrics` selects every
+  exported series from the selected profiles; `metrics.include` narrows that set.
 - `rule_defaults.filters.resource_tags` is inherited when a rule omits
   `filters.resource_tags`; a present list replaces the default and `[]` disables it.
   Predicates are canonicalized once: exact case-sensitive keys are ANDed and the
   exact values for one key are ORed.
 - `compileConfig` coordinates a private staged compiler that resolves every reference, rejects unused credential/target
-  definitions, applies profile defaults/include/exclude semantics, intersects
+  definitions, applies profile defaults/include/exclude semantics, resolves exact
+  `{profile, AWS MetricName, statistic}` entries into canonical exported-series
+  descriptors, intersects
   intrinsic supported regions, enforces target/role partition consistency, and
   emits immutable ordered scopes.
-- Exact duplicate target/profile/region/predicate scopes are removed statically with one
-  bounded aggregate diagnostic per affected rule. Same-account cross-target overlap remains until discovery,
-  where final instance identity can be evaluated correctly. Scopes with different
-  predicates remain ordered policy scopes even when they share one discovery scan.
+- Ordered policy scopes and tag-membership identities are separate. Scopes with the
+  same target/profile/region/predicate share one membership identity, and already-owned
+  exported series are removed statically with one bounded aggregate diagnostic per
+  affected rule. A partially overlapping scope retains its unshadowed series.
+  Same-account cross-target overlap remains until discovery, where final instance
+  identity can be evaluated correctly. Scopes with different predicates remain
+  ordered policy scopes even when they share one discovery scan.
 - Fixed internal caps bound credentials, 64 targets, rules, list references,
   candidate-scope evaluation, and compiled scopes. Overflow fails compilation and never installs a partial plan;
   `limits.max_instances` is the separate public bound on final selected instances.
@@ -177,7 +184,10 @@ Discovery then finds which *instances* of those profiles exist per target and re
 (`discovery.refresh_every`, default 300s) has expired.
 
 - `discoveryGroups` coalesces compiled scopes by target, region, namespace, and
-  `RecentlyActive` behavior. `discoverAll` fans out over those groups concurrently
+  `RecentlyActive` behavior. The decision uses the union of periods selected for
+  each target/profile/region, so one long-period selected series disables PT3H for
+  that profile matcher without creating a duplicate ListMetrics stream.
+  `discoverAll` fans out over those groups concurrently
   (bounded by `apiConcurrency`), with one CloudWatch client per (target, region).
 - `discoverProfileGroup` pages `ListMetrics` once for the shared namespace and
   applies every grouped profile matcher while streaming the response.
@@ -207,15 +217,22 @@ Discovery then finds which *instances* of those profiles exist per target and re
 
 - `currentQueryPlan` reuses an immutable blueprint until a target resolves or a
   discovery/tag snapshot changes. `buildQueryPlan` emits one `plannedQuery` per
-  `instance × metric × statistic` when that blueprint is invalidated.
+  `instance × selected exported series` when that blueprint is invalidated.
   Identity labels are `{account_id, region}` plus one label per identifying
   instance dimension (a `constant` dimension is sent in the query but not
   labeled). The exported series name is `<profile>.<metric_id>_<statistic>`.
-- Resource-tag membership is applied before metric/statistic expansion. Compiled
-  scope order and a final-instance identity set enforce rule precedence: the first
-  matching rule/target owns the whole instance. This catches dynamic
-  overlap when distinct targets resolve to the same account and see the same resource.
-- `limits.max_instances` counts those owned final instances, not planned metric
+- Resource-tag membership is applied before selected-series expansion. Compiled
+  scope order and `{final instance, exported series}` ownership enforce rule precedence:
+  the first matching rule/target owns each overlapping series. Unknown tag membership
+  reserves only the scope's selected series, so disjoint lower-rule selections remain
+  eligible while failures stay fail-closed. This also catches dynamic overlap when
+  distinct targets resolve to the same account and see the same resource.
+- The first scope that emits any series for a final instance supplies one immutable
+  identity/dimension/tag-label presentation reused by sibling series, even when later
+  siblings are owned by another target. Chart-level mutable labels therefore remain
+  deterministic.
+- `limits.max_instances` counts final instances that emit at least one selected series,
+  not planned metric
   queries. Overflow rejects the rebuilt plan atomically and leaves the previous
   immutable plan installed; there is no first-N truncation.
 - Queries are grouped by `queryGroupKey{target, region, period}` — the batch unit
@@ -308,7 +325,7 @@ refreshDiscovery → refreshTags → buildQueryPlan → … → observe
   label indexes, locally rechecked, and intersected with discovered candidates.
   Fetch topology is rebuilt only when discovery changes, and predicate groups share
   one candidate index per target/region/profile. Cached results retain membership,
-  labels, scope ids, and freshness—not fetch-time candidate maps.
+  labels, shared membership ids, and freshness—not fetch-time candidate maps.
 - **Failure state.** A failed filtered group becomes `unknown`. On the first failure,
   every candidate is withheld and reserved from lower-priority rules. After a success,
   last-known matched members continue to be queried while every other candidate remains

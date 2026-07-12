@@ -62,6 +62,8 @@ func validateRawLimits(cfg Config) error {
 			return fmt.Errorf("%s.profiles.exclude contains %d entries; maximum is %d", path, len(rule.Profiles.Exclude), maxReferencesPerRule)
 		case rule.Filters != nil && rule.Filters.ResourceTags != nil && len(*rule.Filters.ResourceTags) > maxResourceTagFilters:
 			return fmt.Errorf("%s.filters.resource_tags contains %d entries; maximum is %d", path, len(*rule.Filters.ResourceTags), maxResourceTagFilters)
+		case rule.Metrics != nil && len(rule.Metrics.Include) > maxReferencesPerRule:
+			return fmt.Errorf("%s.metrics.include contains %d entries; maximum is %d", path, len(rule.Metrics.Include), maxReferencesPerRule)
 		}
 	}
 	return nil
@@ -182,6 +184,46 @@ func validateRules(cfg Config, targetNames map[string]struct{}) error {
 		}
 		if rule.Filters != nil && rule.Filters.ResourceTags != nil {
 			errs = append(errs, validateResourceTagFilters(path+".filters.resource_tags", *rule.Filters.ResourceTags))
+		}
+		if rule.Metrics != nil {
+			errs = append(errs, validateMetricSelector(path+".metrics", *rule.Metrics))
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func validateMetricSelector(path string, selector MetricSelectorConfig) error {
+	if len(selector.Include) == 0 {
+		return fmt.Errorf("%s.include must contain at least one metric", path)
+	}
+	type tuple struct{ profile, metric, statistic string }
+	seen := make(map[tuple]struct{}, len(selector.Include))
+	var errs []error
+	for i, entry := range selector.Include {
+		itemPath := fmt.Sprintf("%s.include[%d]", path, i)
+		if err := validateCanonicalString(itemPath+".profile", entry.Profile); err != nil {
+			errs = append(errs, err)
+		} else if entry.Profile == "" {
+			errs = append(errs, fmt.Errorf("%s.profile must not be empty", itemPath))
+		}
+		if err := validateCanonicalString(itemPath+".metric", entry.Metric); err != nil {
+			errs = append(errs, err)
+		} else if entry.Metric == "" {
+			errs = append(errs, fmt.Errorf("%s.metric must not be empty", itemPath))
+		}
+		if err := validateCanonicalString(itemPath+".statistic", entry.Statistic); err != nil {
+			errs = append(errs, err)
+		}
+		statistic := normalizeMetricStatistic(entry.Statistic)
+		if statistic == "" {
+			errs = append(errs, fmt.Errorf("%s.statistic is not valid (use Average|Minimum|Maximum|Sum|SampleCount|p<N>)", itemPath))
+			continue
+		}
+		key := tuple{profile: entry.Profile, metric: entry.Metric, statistic: statistic}
+		if _, ok := seen[key]; ok {
+			errs = append(errs, fmt.Errorf("%s.include contains duplicate metric selection at index %d", path, i))
+		} else {
+			seen[key] = struct{}{}
 		}
 	}
 	return errors.Join(errs...)
