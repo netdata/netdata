@@ -4,9 +4,11 @@ package cloudwatch
 
 import (
 	"context"
+	"crypto/sha256"
 	"fmt"
 	"io"
 	goruntime "runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -81,7 +83,7 @@ func TestBuildQueryPlan(t *testing.T) {
 	plan := requireBuildQueryPlan(t, c)
 	require.Len(t, plan, 6) // 2 instances x (1 + 2 statistics)
 
-	ids := make(map[string]bool)
+	ids := make(map[structuralID]bool)
 	byInstance := make(map[string][]plannedQuery)
 	for _, pq := range plan {
 		ids[pq.key] = true
@@ -416,6 +418,81 @@ func TestBuildQueryPlan_OversizedWorkStopsBeforeFullQueryAllocation(t *testing.T
 	// post-build validator exceeded 1.03m. This generous ceiling protects early
 	// rejection without turning ordinary allocation tuning into a test contract.
 	assert.Less(t, allocations, float64(350000), "query work must be rejected before allocating the oversized planned-query set")
+}
+
+func TestBuildQueryPlan_MaximumPayloadUsesCompactInternalIdentities(t *testing.T) {
+	const (
+		instanceCount  = 10
+		metricCount    = 20
+		dimensionCount = 30
+		valueBytes     = 1024
+	)
+	c := maximumPayloadQueryPlanCollector(instanceCount, metricCount, dimensionCount, valueBytes)
+
+	plan, err := c.buildQueryPlan()
+	require.NoError(t, err)
+	require.Len(t, plan, instanceCount*metricCount)
+	identityBytes := 0
+	for _, query := range plan {
+		identityBytes += len(query.key) + len(query.billingKey)
+	}
+	assert.LessOrEqual(t, identityBytes, len(plan)*2*sha256.Size,
+		"internal observation and billing identities must remain fixed-size at maximum dimension payloads")
+}
+
+func maximumPayloadQueryPlanCollector(instanceCount, metricCount, dimensionCount, valueBytes int) *Collector {
+	dimensions := make([]cwprofiles.InstanceDimension, dimensionCount)
+	for i := range dimensions {
+		dimensions[i] = cwprofiles.InstanceDimension{Name: fmt.Sprintf("Dimension%d", i), Label: fmt.Sprintf("dimension_%d", i)}
+	}
+	metrics := make([]cwprofiles.Metric, metricCount)
+	for i := range metrics {
+		metrics[i] = cwprofiles.Metric{ID: fmt.Sprintf("metric_%d", i), MetricName: fmt.Sprintf("Metric%d", i), Statistics: []string{"average"}}
+	}
+	profile := cwprofiles.ResolvedProfile{Name: "maximum_payload", Config: cwprofiles.Profile{
+		Namespace: "AWS/Test", Period: 300,
+		Instance: cwprofiles.InstanceSpec{Dimensions: dimensions},
+		Metrics:  metrics,
+	}}
+	c := New()
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{profile})
+	c.Limits.MaxInstances = instanceCount + 1
+	instances := make([]discoveredInstance, instanceCount)
+	for i := range instances {
+		values := make([]string, dimensionCount)
+		for j := range values {
+			prefix := fmt.Sprintf("instance-%03d-dimension-%02d-", i, j)
+			values[j] = prefix + strings.Repeat("x", valueBytes-len(prefix))
+		}
+		instances[i] = discoveredInstance{DimensionValues: values}
+	}
+	c.discovery.Instances = map[discoveryKey][]discoveredInstance{
+		{Target: "base", Profile: profile.Name, Region: "us-east-1"}: instances,
+	}
+	return c
+}
+
+func BenchmarkBuildQueryPlanMaximumPayload(b *testing.B) {
+	const (
+		instanceCount  = 1000
+		metricCount    = 20
+		dimensionCount = 30
+		valueBytes     = 1024
+	)
+	c := maximumPayloadQueryPlanCollector(instanceCount, metricCount, dimensionCount, valueBytes)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		plan, err := c.buildQueryPlan()
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(plan) != instanceCount*metricCount {
+			b.Fatalf("query plan length = %d, want %d", len(plan), instanceCount*metricCount)
+		}
+		goruntime.KeepAlive(plan)
+	}
 }
 
 func BenchmarkCurrentQueryPlanCached(b *testing.B) {

@@ -71,10 +71,8 @@ func (s *discoveryGroupScanner) scanPage(ctx context.Context, client cloudwatchC
 	if s.done {
 		return nil
 	}
-	if s.pages > 0 {
-		if err := budget.reserveContinuationOperation(); err != nil {
-			return err
-		}
+	if err := budget.reserveListMetricsOperation(); err != nil {
+		return err
 	}
 
 	in := &cloudwatch.ListMetricsInput{Namespace: aws.String(s.group.Namespace), NextToken: s.nextToken}
@@ -464,8 +462,8 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	// If the parent context was canceled or timed out during the fan-out, abort before
 	// committing: buildDiscoverySnapshot would otherwise carry forward instances (or
 	// accept a partial first snapshot) and advance the TTL, so the next cycle would skip
-	// discovery. A per-call GetMetricData/ListMetrics timeout uses a derived context and
-	// does not trip this, so it stays fail-soft.
+	// discovery. Operation-scoped GetMetricData timeouts use derived contexts and
+	// do not trip this, so they stay fail-soft.
 	if err := ctx.Err(); err != nil {
 		return err
 	}

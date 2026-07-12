@@ -4,8 +4,6 @@ package cloudwatch
 
 import (
 	"fmt"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -18,8 +16,8 @@ import (
 // plannedQuery is one stable series query. Request-local IDs and batch membership
 // are assigned only when a due query is executed.
 type plannedQuery struct {
-	key        string
-	billingKey string // structural metric identity without statistic; internal AWS cost grouping
+	key        structuralID
+	billingKey structuralID // structural metric identity without statistic; internal AWS cost grouping
 	target     string
 	region     string
 	policy     queryPolicy
@@ -32,9 +30,11 @@ type plannedQuery struct {
 }
 
 type instancePresentation struct {
-	labels    []metrix.Label
-	tagLabels []metrix.Label
-	dims      []cwtypes.Dimension
+	instanceID  structuralID
+	dimensionID structuralID
+	labels      []metrix.Label
+	tagLabels   []metrix.Label
+	dims        []cwtypes.Dimension
 }
 
 type queryPlanCandidate struct {
@@ -42,7 +42,7 @@ type queryPlanCandidate struct {
 	profile      cwprofiles.ResolvedProfile
 	region       string
 	series       []compiledSeries
-	billingKeys  []string
+	billingKeys  []structuralID
 	presentation instancePresentation
 }
 
@@ -105,8 +105,8 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 	}
 	budget := newQueryWorkBudget()
 	var candidates []queryPlanCandidate
-	owned := make(map[string]seriesOwnership)
-	presentations := make(map[string]instancePresentation)
+	owned := make(map[structuralID]seriesOwnership)
+	presentations := make(map[structuralID]instancePresentation)
 	shadowed := 0
 	reserved := 0
 	maxInstances := c.Limits.MaxInstances
@@ -128,7 +128,7 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 			if len(inst.DimensionValues) != nDims {
 				continue // defensive: snapshot/profile mismatch
 			}
-			instanceKey := finalInstanceKey(prof.Name, resolved.accountID, scope.Region, prof.Config.Instance.Dimensions, inst.DimensionValues)
+			instanceKey := finalInstanceID(prof.Name, resolved.accountID, scope.Region, prof.Config.Instance.Dimensions, inst.DimensionValues)
 			if scope.hasTagFilter() {
 				if join == nil {
 					reserved += reserveSelectedSeries(owned, instanceKey, scope.SelectedSeries)
@@ -170,22 +170,25 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 				}
 				labels, dims := c.instanceLabelsAndDims(resolved.accountID, prof, scope.Region, inst)
 				presentation = instancePresentation{
+					instanceID: instanceKey, dimensionID: metricDimensionID(prof.Config.Namespace, dims),
 					labels: labels, dims: dims,
 					tagLabels: c.tagLabelsFor(scope.Target.Name, resolved.accountID, scope.Region, prof, join, inst.DimensionValues),
 				}
 				presentations[instanceKey] = presentation
 			}
-			billingKeys := make([]string, len(selected))
-			byMetric := make([]string, len(prof.Config.Metrics))
+			billingKeys := make([]structuralID, len(selected))
+			byMetric := make([]structuralID, len(prof.Config.Metrics))
+			byMetricSet := make([]bool, len(prof.Config.Metrics))
 			for i, series := range selected {
 				if err := budget.reserveQuery(series.Policy); err != nil {
 					return nil, err
 				}
 				metric := prof.Config.Metrics[series.MetricIndex]
 				billingKey := byMetric[series.MetricIndex]
-				if billingKey == "" {
-					billingKey = metricBillingKey(prof.Config.Namespace, metric.MetricName, presentation.dims)
+				if !byMetricSet[series.MetricIndex] {
+					billingKey = metricBillingKey(prof.Config.Namespace, metric.MetricName, presentation.dimensionID)
 					byMetric[series.MetricIndex] = billingKey
+					byMetricSet[series.MetricIndex] = true
 				}
 				billingKeys[i] = billingKey
 				budget.addBillingGroup(
@@ -220,7 +223,7 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 	return plan, nil
 }
 
-func reserveSelectedSeries(owned map[string]seriesOwnership, instanceKey string, series []compiledSeries) int {
+func reserveSelectedSeries(owned map[structuralID]seriesOwnership, instanceKey structuralID, series []compiledSeries) int {
 	ownership := owned[instanceKey]
 	reserved := 0
 	for _, item := range series {
@@ -233,19 +236,19 @@ func reserveSelectedSeries(owned map[string]seriesOwnership, instanceKey string,
 	return reserved
 }
 
-func finalInstanceKey(profileName, accountID, region string, dimensions []cwprofiles.InstanceDimension, values []string) string {
-	var key strings.Builder
-	writeLengthPrefixed(&key, profileName)
-	writeLengthPrefixed(&key, accountID)
-	writeLengthPrefixed(&key, region)
+func finalInstanceID(profileName, accountID, region string, dimensions []cwprofiles.InstanceDimension, values []string) structuralID {
+	key := newStructuralIDBuilder("final-instance")
+	key.addString(profileName)
+	key.addString(accountID)
+	key.addString(region)
 	for i, dimension := range dimensions {
 		if dimension.IsConstant() {
 			continue
 		}
-		writeLengthPrefixed(&key, dimension.Label)
-		writeLengthPrefixed(&key, values[i])
+		key.addString(dimension.Label)
+		key.addString(values[i])
 	}
-	return key.String()
+	return key.sum()
 }
 
 // instanceLabelsAndDims builds the metrix identity labels
@@ -300,7 +303,7 @@ func buildSeriesQueries(candidate queryPlanCandidate) []plannedQuery {
 				},
 			},
 		}
-		pq.key = plannedQueryKey(pq)
+		pq.key = plannedQueryKey(pq, candidate.presentation.instanceID)
 		out = append(out, pq)
 	}
 	return out
@@ -308,29 +311,19 @@ func buildSeriesQueries(candidate queryPlanCandidate) []plannedQuery {
 
 // plannedQueryKey identifies execution state independently of rule names,
 // scope order, request-local IDs, and batch membership.
-func plannedQueryKey(q plannedQuery) string {
-	var key strings.Builder
-	writeLengthPrefixed(&key, q.target)
-	writeLengthPrefixed(&key, q.region)
-	writeLengthPrefixed(&key, q.seriesName)
-	for _, label := range q.labels {
-		writeLengthPrefixed(&key, label.Key)
-		writeLengthPrefixed(&key, label.Value)
-	}
-	writeLengthPrefixed(&key, strconv.FormatInt(int64(q.policy.period/time.Second), 10))
-	writeLengthPrefixed(&key, strconv.FormatInt(int64(q.policy.lookback/time.Second), 10))
-	writeLengthPrefixed(&key, strconv.FormatInt(int64(q.policy.publicationDelay/time.Second), 10))
-	writeLengthPrefixed(&key, queryNamespace(q.query))
+func plannedQueryKey(q plannedQuery, instanceID structuralID) structuralID {
+	key := newStructuralIDBuilder("planned-query")
+	key.addString(q.target)
+	key.addString(q.region)
+	key.addID(instanceID)
+	key.addString(q.seriesName)
+	key.addInt64(int64(q.policy.period / time.Second))
+	key.addInt64(int64(q.policy.lookback / time.Second))
+	key.addInt64(int64(q.policy.publicationDelay / time.Second))
+	key.addID(q.billingKey)
 	if q.query.MetricStat != nil {
-		writeLengthPrefixed(&key, aws.ToString(q.query.MetricStat.Stat))
-		writeLengthPrefixed(&key, strconv.FormatInt(int64(aws.ToInt32(q.query.MetricStat.Period)), 10))
-		if metric := q.query.MetricStat.Metric; metric != nil {
-			writeLengthPrefixed(&key, aws.ToString(metric.MetricName))
-			for _, dim := range metric.Dimensions {
-				writeLengthPrefixed(&key, aws.ToString(dim.Name))
-				writeLengthPrefixed(&key, aws.ToString(dim.Value))
-			}
-		}
+		key.addString(aws.ToString(q.query.MetricStat.Stat))
+		key.addInt64(int64(aws.ToInt32(q.query.MetricStat.Period)))
 	}
-	return key.String()
+	return key.sum()
 }

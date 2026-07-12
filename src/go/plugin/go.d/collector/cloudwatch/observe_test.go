@@ -638,25 +638,27 @@ func TestCleanup_ResetsRuntimeState(t *testing.T) {
 
 func TestReconcilePlan(t *testing.T) {
 	c := New()
-	c.observations.queries = map[string]queryState{
-		"keep": {hasObservation: true, observation: 1},
-		"drop": {hasObservation: true, observation: 2},
+	keep, drop := testStructuralID("keep"), testStructuralID("drop")
+	c.observations.queries = map[structuralID]queryState{
+		keep: {hasObservation: true, observation: 1},
+		drop: {hasObservation: true, observation: 2},
 	}
-	c.observations.reconcilePlan([]plannedQuery{{key: "keep"}})
+	c.observations.reconcilePlan([]plannedQuery{{key: keep}})
 
 	require.Len(t, c.observations.queries, 1)
-	assert.Contains(t, c.observations.queries, "keep")
-	assert.NotContains(t, c.observations.queries, "drop")
+	assert.Contains(t, c.observations.queries, keep)
+	assert.NotContains(t, c.observations.queries, drop)
 }
 
 func TestReconcilePlan_DropsStateForVanishedTargetQuery(t *testing.T) {
 	c := New()
-	c.observations.queries = map[string]queryState{
-		"first-target":  {lastCompletedEnd: time.Unix(1_000_000_300, 0)},
-		"second-target": {lastCompletedEnd: time.Unix(1_000_000_300, 0)},
+	first, second := testStructuralID("first-target"), testStructuralID("second-target")
+	c.observations.queries = map[structuralID]queryState{
+		first:  {lastCompletedEnd: time.Unix(1_000_000_300, 0)},
+		second: {lastCompletedEnd: time.Unix(1_000_000_300, 0)},
 	}
-	c.observations.reconcilePlan([]plannedQuery{{key: "first-target"}})
+	c.observations.reconcilePlan([]plannedQuery{{key: first}})
 
-	assert.Contains(t, c.observations.queries, "first-target")
-	assert.NotContains(t, c.observations.queries, "second-target")
+	assert.Contains(t, c.observations.queries, first)
+	assert.NotContains(t, c.observations.queries, second)
 }

@@ -43,20 +43,20 @@ type queryOutcome struct {
 // so only an exactly equivalent rebuilt query can retain state.
 type observationStore struct {
 	store   metrix.CollectorStore
-	queries map[string]queryState
+	queries map[structuralID]queryState
 }
 
 func newObservationStore(store metrix.CollectorStore) *observationStore {
 	return &observationStore{
 		store:   store,
-		queries: make(map[string]queryState),
+		queries: make(map[structuralID]queryState),
 	}
 }
 
 // reset clears the retention cache and schedule so a framework re-Init starts
 // clean (the metrix store itself persists and is reused).
 func (o *observationStore) reset() {
-	o.queries = make(map[string]queryState)
+	o.queries = make(map[structuralID]queryState)
 }
 
 func (o *observationStore) dueQueries(plan []plannedQuery, now time.Time) []plannedQuery {
@@ -81,7 +81,7 @@ func queryIsDue(state queryState, exists bool, windowEnd, now time.Time) bool {
 	return state.retryWindowEnd.Before(windowEnd) || !now.Before(state.nextRetryAt)
 }
 
-func (o *observationStore) applyOutcomes(due []plannedQuery, outcomes map[string]queryOutcome, retryBase time.Duration) error {
+func (o *observationStore) applyOutcomes(due []plannedQuery, outcomes map[structuralID]queryOutcome, retryBase time.Duration) error {
 	if len(outcomes) != len(due) {
 		return fmt.Errorf("CloudWatch query execution returned %d outcomes for %d due queries", len(outcomes), len(due))
 	}
@@ -161,7 +161,7 @@ func transientRetryDelay(base, period time.Duration, count int) time.Duration {
 }
 
 func (o *observationStore) reconcilePlan(current []plannedQuery) {
-	valid := make(map[string]struct{}, len(current))
+	valid := make(map[structuralID]struct{}, len(current))
 	for _, query := range current {
 		valid[query.key] = struct{}{}
 	}

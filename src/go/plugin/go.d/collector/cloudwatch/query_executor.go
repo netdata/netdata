@@ -20,21 +20,22 @@ type queryBatch struct {
 
 type queryBatchResult struct {
 	batch       queryBatch
-	outcomes    map[string]queryOutcome
+	outcomes    map[structuralID]queryOutcome
 	issues      []queryResultIssue
 	completedAt time.Time
 	err         error
 }
 
 type queryExecution struct {
-	outcomes  map[string]queryOutcome
+	outcomes  map[structuralID]queryOutcome
 	terminal  int
 	transient int
 }
 
-// withTimeout bounds one CloudWatch operation (a paginated ListMetrics sequence
-// or a GetMetricData chunk) by the configured timeout. A non-positive timeout
-// leaves the context unbounded. Callers must always defer the returned cancel.
+// withTimeout bounds one identity, resource-tag, or GetMetricData operation by
+// the configured timeout. Discovery owns a separate stage-wide deadline. A
+// non-positive timeout leaves the context unbounded. Callers must always defer
+// the returned cancel.
 func withTimeout(ctx context.Context, d time.Duration) (context.Context, context.CancelFunc) {
 	if d <= 0 {
 		return context.WithCancel(ctx)
@@ -43,7 +44,7 @@ func withTimeout(ctx context.Context, d time.Duration) (context.Context, context
 }
 
 func (c *Collector) executeQueries(ctx context.Context, due []plannedQuery, now time.Time) queryExecution {
-	execution := queryExecution{outcomes: make(map[string]queryOutcome, len(due))}
+	execution := queryExecution{outcomes: make(map[structuralID]queryOutcome, len(due))}
 	if len(due) == 0 {
 		return execution
 	}

@@ -694,6 +694,30 @@ func TestDiscoverAll_ProtectsFirstOperationBeforeContinuations(t *testing.T) {
 	assert.Equal(t, maxListMetricsOperationsPerRefresh, fake.callCount("AWS/Deep")+fake.callCount("AWS/Shallow"))
 }
 
+func TestDiscoverAll_ClientFailureDoesNotConsumeListMetricsBudget(t *testing.T) {
+	profile := func(name, namespace string) cwprofiles.ResolvedProfile {
+		return resolved(name, dimProfile(namespace, 300, "Id"))
+	}
+	groups := []discoveryGroup{
+		{Target: "failed", Region: "us-east-1", Namespace: "AWS/Failed", Profiles: []cwprofiles.ResolvedProfile{profile("failed", "AWS/Failed")}},
+		{Target: "healthy", Region: "us-east-1", Namespace: "AWS/Deep", Profiles: []cwprofiles.ResolvedProfile{profile("deep", "AWS/Deep")}},
+	}
+	fake := &operationRecordingCloudWatch{calls: make(map[string]int)}
+
+	results, err := discoverAll(context.Background(), func(_ context.Context, target, _ string) (cloudwatchClient, error) {
+		if target == "failed" {
+			return nil, errors.New("client build failed")
+		}
+		return fake, nil
+	}, groups, 1, time.Second)
+
+	require.NoError(t, err)
+	require.Len(t, results, 2)
+	assert.ErrorContains(t, results[1].Err, "requires more than 100 pages")
+	assert.Equal(t, maxListMetricsOperationsPerRefresh, fake.callCount("AWS/Deep"),
+		"a group that never reaches ListMetrics must not consume an admitted-operation slot")
+}
+
 func TestDiscoverAll_SharedStageTimeout(t *testing.T) {
 	profile := resolved("blocked", dimProfile("AWS/Blocked", 300, "Id"))
 	results, err := discoverAll(context.Background(), func(context.Context, string, string) (cloudwatchClient, error) {
@@ -945,9 +969,10 @@ func TestCollector_refreshDiscovery_AggregateFailureIsAtomicWithSnapshot(t *test
 	}
 	c.discovery = discoverySnapshot{Instances: oldInstances, FetchedAt: base.Add(-time.Hour), ExpiresAt: base}
 	c.tagFetchPlan = []tagFetchGroup{{key: tagFetchKey{target: "sentinel"}}}
-	c.queryPlan = []plannedQuery{{key: "sentinel"}}
+	sentinel := testStructuralID("sentinel")
+	c.queryPlan = []plannedQuery{{key: sentinel}}
 	c.planDirty = false
-	c.observations.queries["sentinel"] = queryState{hasObservation: true, observation: 42}
+	c.observations.queries[sentinel] = queryState{hasObservation: true, observation: 42}
 
 	require.NoError(t, c.refreshDiscovery(context.Background()))
 
@@ -955,9 +980,9 @@ func TestCollector_refreshDiscovery_AggregateFailureIsAtomicWithSnapshot(t *test
 	assert.Equal(t, base.Add(-time.Hour), c.discovery.FetchedAt)
 	assert.Equal(t, base.Add(300*time.Second), c.discovery.ExpiresAt)
 	assert.Equal(t, "sentinel", c.tagFetchPlan[0].key.target)
-	assert.Equal(t, "sentinel", c.queryPlan[0].key)
+	assert.Equal(t, sentinel, c.queryPlan[0].key)
 	assert.False(t, c.planDirty)
-	assert.Equal(t, float64(42), c.observations.queries["sentinel"].observation)
+	assert.Equal(t, float64(42), c.observations.queries[sentinel].observation)
 }
 
 func TestCollector_refreshDiscovery_AggregateFailureFirstPassErrors(t *testing.T) {

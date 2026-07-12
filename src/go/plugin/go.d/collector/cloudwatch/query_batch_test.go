@@ -16,12 +16,16 @@ import (
 
 func testPlannedQuery(key, target, region, namespace string, period int) plannedQuery {
 	return plannedQuery{
-		key: key, target: target, region: region,
+		key: testStructuralID(key), target: target, region: region,
 		policy: queryPolicy{period: time.Duration(period) * time.Second, lookback: time.Duration(period) * time.Second, publicationDelay: defaultPublicationDelay},
 		query: cwtypes.MetricDataQuery{
 			MetricStat: &cwtypes.MetricStat{Metric: &cwtypes.Metric{Namespace: aws.String(namespace)}, Period: aws.Int32(int32(period))},
 		},
 	}
+}
+
+func testStructuralID(value string) structuralID {
+	return structuralIDFromStrings("test", value)
 }
 
 func TestBuildQueryBatches_PointAwareWidth(t *testing.T) {
@@ -81,9 +85,9 @@ func TestBuildQueryBatches_DoesNotSplitMetricBillingGroup(t *testing.T) {
 
 func TestPackBillingUnitShapes(t *testing.T) {
 	t.Run("fragmentation is included in batch count", func(t *testing.T) {
-		groups := make(map[string]int)
+		groups := make(map[structuralID]int)
 		for i := range 13 {
-			groups[fmt.Sprintf("metric-%d", i)] = 3
+			groups[testStructuralID(fmt.Sprintf("metric-%d", i))] = 3
 		}
 		units, batches := packBillingUnitShapes(groups, 20)
 		assert.Len(t, units, 13)
@@ -91,7 +95,7 @@ func TestPackBillingUnitShapes(t *testing.T) {
 	})
 
 	t.Run("more than five statistics becomes multiple whole billing units", func(t *testing.T) {
-		units, batches := packBillingUnitShapes(map[string]int{"metric": 6}, 20)
+		units, batches := packBillingUnitShapes(map[structuralID]int{testStructuralID("metric"): 6}, 20)
 		require.Len(t, units, 2)
 		assert.ElementsMatch(t, []int{5, 1}, []int{units[0].size, units[1].size})
 		assert.Equal(t, 1, batches)
@@ -104,8 +108,11 @@ func TestMetricBillingKey_DimensionOrderIndependent(t *testing.T) {
 		{Name: aws.String("Resource"), Value: aws.String("fn-1:alias")},
 	}
 	second := []cwtypes.Dimension{first[1], first[0]}
-	assert.Equal(t, metricBillingKey("AWS/Lambda", "Invocations", first), metricBillingKey("AWS/Lambda", "Invocations", second))
-	assert.NotEqual(t, metricBillingKey("AWS/Lambda", "Invocations", first), metricBillingKey("AWS/Lambda", "Errors", first))
+	firstID := metricDimensionID("AWS/Lambda", first)
+	secondID := metricDimensionID("AWS/Lambda", second)
+	assert.Equal(t, firstID, secondID)
+	assert.Equal(t, metricBillingKey("AWS/Lambda", "Invocations", firstID), metricBillingKey("AWS/Lambda", "Invocations", secondID))
+	assert.NotEqual(t, metricBillingKey("AWS/Lambda", "Invocations", firstID), metricBillingKey("AWS/Lambda", "Errors", firstID))
 }
 
 func TestValidatePlannedQueryWork_Boundaries(t *testing.T) {
@@ -113,7 +120,7 @@ func TestValidatePlannedQueryWork_Boundaries(t *testing.T) {
 	makeQueries := func(count int, policy queryPolicy) []plannedQuery {
 		queries := make([]plannedQuery, count)
 		for i := range queries {
-			queries[i] = plannedQuery{key: fmt.Sprintf("q%d", i), target: "base", region: "us-east-1", policy: policy}
+			queries[i] = plannedQuery{key: testStructuralID(fmt.Sprintf("q%d", i)), target: "base", region: "us-east-1", policy: policy}
 		}
 		return queries
 	}

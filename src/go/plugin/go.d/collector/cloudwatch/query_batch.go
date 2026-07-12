@@ -3,9 +3,9 @@
 package cloudwatch
 
 import (
+	"bytes"
 	"fmt"
 	"slices"
-	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
@@ -26,17 +26,17 @@ func (q plannedQuery) batchKey() queryBatchKey {
 }
 
 func queryBatchWidth(policy queryPolicy) int {
-	return min(metricsPerQuery, maxDatapointsPerRequest/policy.bucketCount())
+	return min(maxQueriesPerRequest, maxDatapointsPerRequest/policy.bucketCount())
 }
 
 type queryWorkBudget struct {
 	queries         int
 	totalDatapoints int
-	billingGroups   map[queryBatchKey]map[string]int
+	billingGroups   map[queryBatchKey]map[structuralID]int
 }
 
 func newQueryWorkBudget() *queryWorkBudget {
-	return &queryWorkBudget{billingGroups: make(map[queryBatchKey]map[string]int)}
+	return &queryWorkBudget{billingGroups: make(map[queryBatchKey]map[structuralID]int)}
 }
 
 func (b *queryWorkBudget) reserveQuery(policy queryPolicy) error {
@@ -55,10 +55,10 @@ func (b *queryWorkBudget) reserveQuery(policy queryPolicy) error {
 	return nil
 }
 
-func (b *queryWorkBudget) addBillingGroup(batchKey queryBatchKey, metricKey string) {
+func (b *queryWorkBudget) addBillingGroup(batchKey queryBatchKey, metricKey structuralID) {
 	groups := b.billingGroups[batchKey]
 	if groups == nil {
-		groups = make(map[string]int)
+		groups = make(map[structuralID]int)
 		b.billingGroups[batchKey] = groups
 	}
 	groups[metricKey]++
@@ -88,7 +88,7 @@ func validatePlannedQueryWork(plan []plannedQuery) error {
 }
 
 type billingUnitShape struct {
-	metricKey string
+	metricKey structuralID
 	part      int
 	size      int
 	batch     int
@@ -97,7 +97,7 @@ type billingUnitShape struct {
 // packBillingUnitShapes applies deterministic first-fit-decreasing packing to
 // whole <=5-statistic billing units. Both work validation and execution use the
 // returned assignment, so their batch counts cannot drift.
-func packBillingUnitShapes(groups map[string]int, width int) ([]billingUnitShape, int) {
+func packBillingUnitShapes(groups map[structuralID]int, width int) ([]billingUnitShape, int) {
 	var units []billingUnitShape
 	for key, count := range groups {
 		for part := 0; count > 0; part++ {
@@ -110,11 +110,8 @@ func packBillingUnitShapes(groups map[string]int, width int) ([]billingUnitShape
 		if a.size != b.size {
 			return b.size - a.size
 		}
-		if a.metricKey < b.metricKey {
-			return -1
-		}
-		if a.metricKey > b.metricKey {
-			return 1
+		if cmp := bytes.Compare(a.metricKey[:], b.metricKey[:]); cmp != 0 {
+			return cmp
 		}
 		return a.part - b.part
 	})
@@ -139,8 +136,8 @@ func packBillingUnitShapes(groups map[string]int, width int) ([]billingUnitShape
 }
 
 func packQueryGroup(queries []plannedQuery, width int) [][]plannedQuery {
-	groups := make(map[string][]plannedQuery)
-	counts := make(map[string]int)
+	groups := make(map[structuralID][]plannedQuery)
+	counts := make(map[structuralID]int)
 	for _, query := range queries {
 		key := queryMetricBillingKey(query)
 		groups[key] = append(groups[key], query)
@@ -155,18 +152,19 @@ func packQueryGroup(queries []plannedQuery, width int) [][]plannedQuery {
 	return batches
 }
 
-func queryMetricBillingKey(query plannedQuery) string {
-	if query.billingKey != "" {
+func queryMetricBillingKey(query plannedQuery) structuralID {
+	if query.billingKey != (structuralID{}) {
 		return query.billingKey
 	}
 	if query.query.MetricStat == nil || query.query.MetricStat.Metric == nil {
-		return ""
+		return structuralID{}
 	}
 	metric := query.query.MetricStat.Metric
-	return metricBillingKey(aws.ToString(metric.Namespace), aws.ToString(metric.MetricName), metric.Dimensions)
+	dimensionID := metricDimensionID(aws.ToString(metric.Namespace), metric.Dimensions)
+	return metricBillingKey(aws.ToString(metric.Namespace), aws.ToString(metric.MetricName), dimensionID)
 }
 
-func metricBillingKey(namespace, metricName string, dimensions []cwtypes.Dimension) string {
+func metricDimensionID(namespace string, dimensions []cwtypes.Dimension) structuralID {
 	dims := slices.Clone(dimensions)
 	slices.SortFunc(dims, func(a, b cwtypes.Dimension) int {
 		an, bn := aws.ToString(a.Name), aws.ToString(b.Name)
@@ -185,12 +183,19 @@ func metricBillingKey(namespace, metricName string, dimensions []cwtypes.Dimensi
 		}
 		return 0
 	})
-	var key strings.Builder
-	writeLengthPrefixed(&key, namespace)
-	writeLengthPrefixed(&key, metricName)
+	key := newStructuralIDBuilder("metric-dimensions")
+	key.addString(namespace)
 	for _, dim := range dims {
-		writeLengthPrefixed(&key, aws.ToString(dim.Name))
-		writeLengthPrefixed(&key, aws.ToString(dim.Value))
+		key.addString(aws.ToString(dim.Name))
+		key.addString(aws.ToString(dim.Value))
 	}
-	return key.String()
+	return key.sum()
+}
+
+func metricBillingKey(namespace, metricName string, dimensionID structuralID) structuralID {
+	key := newStructuralIDBuilder("metric-billing")
+	key.addString(namespace)
+	key.addString(metricName)
+	key.addID(dimensionID)
+	return key.sum()
 }

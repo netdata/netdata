@@ -22,12 +22,12 @@ const (
 )
 
 // apiConcurrency bounds concurrent AWS API calls (ListMetrics discovery,
-// resource-tag lookup, and GetMetricData query chunks). metricsPerQuery is the
-// GetMetricData batch size; 500 is the AWS hard maximum per call. Neither is an
-// operator decision, so both are fixed constants rather than config.
+// resource-tag lookup, and GetMetricData query chunks). maxQueriesPerRequest is
+// the AWS ceiling; the datapoint budget may reduce the actual batch width.
+// Neither is an operator decision, so both are fixed constants rather than config.
 const (
-	apiConcurrency  = 5
-	metricsPerQuery = 500
+	apiConcurrency       = 5
+	maxQueriesPerRequest = 500
 )
 
 type Config struct {

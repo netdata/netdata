@@ -23,7 +23,7 @@ type responseQueryState struct {
 	issue        queryResultIssueKind
 }
 
-func runGetMetricData(ctx context.Context, batch queryBatch) (map[string]queryOutcome, []queryResultIssue, error) {
+func runGetMetricData(ctx context.Context, batch queryBatch) (map[structuralID]queryOutcome, []queryResultIssue, error) {
 	requestQueries := make([]cwtypes.MetricDataQuery, len(batch.queries))
 	byID := make(map[string]*responseQueryState, len(batch.queries))
 	for i, query := range batch.queries {
@@ -137,8 +137,8 @@ func accumulateCandidate(state *responseQueryState, values []float64, timestamps
 	}
 }
 
-func responseOutcomes(states map[string]*responseQueryState, batch queryBatch) map[string]queryOutcome {
-	outcomes := make(map[string]queryOutcome, len(states))
+func responseOutcomes(states map[string]*responseQueryState, batch queryBatch) map[structuralID]queryOutcome {
+	outcomes := make(map[structuralID]queryOutcome, len(states))
 	for _, state := range states {
 		kind := queryOutcomeTransient
 		switch {

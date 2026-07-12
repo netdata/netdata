@@ -548,7 +548,7 @@
       "ui:help": "How often to retry a failed job check. Set to `0` to disable retries."
     },
     "timeout": {
-      "ui:help": "Per-request timeout. Accepts decimals for sub-second granularity (for example, `0.5` for 500ms)."
+      "ui:help": "AWS operation timeout. Identity, resource-tag, and query operations use it for their operation scope; discovery shares one timeout across its whole refresh stage. Accepts decimals for sub-second granularity (for example, `0.5` for 500ms)."
     },
     "credentials": {
       "ui:listFlavour": "list",

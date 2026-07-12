@@ -20,15 +20,15 @@ func TestNewDiscoveryBudget_FirstOperationReservations(t *testing.T) {
 	assert.ErrorContains(t, err, "requires 101 first ListMetrics operations")
 }
 
-func TestDiscoveryBudget_ContinuationOperations(t *testing.T) {
+func TestDiscoveryBudget_ListMetricsOperations(t *testing.T) {
 	ctx, cancel := context.WithCancelCause(context.Background())
 	budget, err := newDiscoveryBudget(defaultMaxDiscoveryGroups, cancel)
 	require.NoError(t, err)
 
-	for range maxListMetricsOperationsPerRefresh - defaultMaxDiscoveryGroups {
-		require.NoError(t, budget.reserveContinuationOperation())
+	for range maxListMetricsOperationsPerRefresh {
+		require.NoError(t, budget.reserveListMetricsOperation())
 	}
-	err = budget.reserveContinuationOperation()
+	err = budget.reserveListMetricsOperation()
 	assert.ErrorContains(t, err, "more than 100 ListMetrics SDK operations")
 	assert.Equal(t, err, context.Cause(ctx))
 }

@@ -273,6 +273,10 @@ Discovery then finds which *instances* of those profiles exist per target and re
   series identity, and effective policy. Rule name, scope order, request ID,
   batch membership, and mutable tag labels are excluded. Equivalent rule-only
   ownership transfers preserve state; target/query/identity/policy changes do not.
+  Internal ownership, observation, and billing maps use domain-separated 256-bit
+  structural digests so maximum-length dimension payloads are hashed once instead
+  of copied into every series key. Emitted labels, chart identity, and AWS query
+  dimensions remain exact strings.
 - Completion is per stable query. A query is due when the aligned eligible window
   end is newer than its last terminal completion. Adding a sibling query never
   makes completed siblings due, and clock jumps query only the current rolling
@@ -504,8 +508,9 @@ aws-eusc).
 ## Concurrency
 
 - `apiConcurrency` (5) bounds ListMetrics discovery, RGTA fetch groups, and
-  GetMetricData chunk execution via `conc/pool`. `metricsPerQuery` (500) is the
-  GetMetricData batch size. Both are internal constants, not config.
+  GetMetricData chunk execution via `conc/pool`. `maxQueriesPerRequest` (500) is
+  the AWS request ceiling; the datapoint budget may reduce actual batch width.
+  Both are internal constants, not config.
 - ListMetrics discovery first pages and continuation pages use separate bounded
   fan-out phases so continuation depth cannot starve another group of its first call.
 - `clientCache` builds at most one CloudWatch client per (target, region), under
@@ -577,8 +582,10 @@ verify current per-region prices on the CloudWatch pricing page.)
   Go change. Add a matching `metadata.yaml` monitored-instance entry and
   regenerate the integration docs.
 - **Change discovery** (matching, fan-out, snapshot/TTL, recently-active):
-  `discover.go`.
-- **Change query identity or plan expansion**: `query_plan.go`.
+  `discover.go`; aggregate admission, stage timeout, and authorization lanes are
+  in `discovery_budget.go`.
+- **Change query identity or plan expansion**: `structural_id.go` and
+  `query_plan.go`.
 - **Change timing-policy resolution or aligned windows**: `query_policy.go`.
 - **Change request packing and AWS work limits**: `query_batch.go` and
   `limits.go`.

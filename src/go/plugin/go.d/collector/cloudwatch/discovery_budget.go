@@ -27,7 +27,7 @@ type discoveryBudget struct {
 	cancel context.CancelCauseFunc
 	err    error
 
-	continuationOperations int
+	remainingOperations    int
 	scannedMetrics         int
 	matcherEvaluations     int
 	candidateInstances     int
@@ -42,26 +42,26 @@ func newDiscoveryBudget(groupCount int, cancel context.CancelCauseFunc) (*discov
 		)
 	}
 	return &discoveryBudget{
-		cancel:                 cancel,
-		continuationOperations: maxListMetricsOperationsPerRefresh - groupCount,
+		cancel:              cancel,
+		remainingOperations: maxListMetricsOperationsPerRefresh,
 	}, nil
 }
 
-func (b *discoveryBudget) reserveContinuationOperation() error {
+func (b *discoveryBudget) reserveListMetricsOperation() error {
 	b.mu.Lock()
 	if b.err != nil {
 		err := b.err
 		b.mu.Unlock()
 		return err
 	}
-	if b.continuationOperations == 0 {
+	if b.remainingOperations == 0 {
 		err := safeCollectorErrorf("CloudWatch discovery requires more than %d ListMetrics SDK operations in one refresh", maxListMetricsOperationsPerRefresh)
 		b.err = err
 		b.mu.Unlock()
 		b.cancel(err)
 		return err
 	}
-	b.continuationOperations--
+	b.remainingOperations--
 	b.mu.Unlock()
 	return nil
 }
