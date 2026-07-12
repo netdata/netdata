@@ -61,13 +61,11 @@ func TestConfig_validate(t *testing.T) {
 		"update_every below minimum":  {mutate: func(c *Config) { c.UpdateEvery = 30 }, wantErr: true},
 		"refresh_every below minimum": {mutate: func(c *Config) { c.Discovery.RefreshEvery = 30 }, wantErr: true},
 		"negative timeout":            {mutate: func(c *Config) { c.Timeout = confopt.Duration(-time.Second) }, wantErr: true},
-		"discovery group limit below minimum": {mutate: func(c *Config) {
-			value := 0
-			c.Limits.MaxDiscoveryGroups = &value
+		"negative discovery group limit": {mutate: func(c *Config) {
+			c.Limits.MaxDiscoveryGroups = -1
 		}, wantErr: true},
 		"discovery group limit above structural maximum": {mutate: func(c *Config) {
-			value := maxCompiledScopes + 1
-			c.Limits.MaxDiscoveryGroups = &value
+			c.Limits.MaxDiscoveryGroups = maxCompiledScopes + 1
 		}, wantErr: true},
 	}
 
@@ -559,7 +557,7 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 		assert.NoError(t, validateRuntimeConfigMap(t, cfg))
 	})
 
-	for name, value := range map[string]int{"zero": 0, "above structural maximum": maxCompiledScopes + 1} {
+	for name, value := range map[string]int{"negative": -1, "above structural maximum": maxCompiledScopes + 1} {
 		t.Run("discovery group limit "+name+" is rejected", func(t *testing.T) {
 			cfg := cloneConfigMap(t, valid)
 			cfg["limits"] = map[string]any{"max_discovery_groups": value}

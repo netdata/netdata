@@ -53,7 +53,7 @@ func New() *Collector {
 			Discovery:          DiscoveryConfig{RefreshEvery: defaultDiscoveryRefresh},
 			Limits: LimitsConfig{
 				MaxInstances:       defaultMaxInstances,
-				MaxDiscoveryGroups: new(defaultMaxDiscoveryGroups),
+				MaxDiscoveryGroups: defaultMaxDiscoveryGroups,
 			},
 			Timeout: defaultTimeout,
 		},

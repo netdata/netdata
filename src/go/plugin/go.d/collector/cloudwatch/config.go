@@ -128,16 +128,15 @@ type ResourceTagLabelConfig struct {
 }
 
 type LimitsConfig struct {
-	MaxInstances int `yaml:"max_instances,omitempty" json:"max_instances"`
-	// Pointer distinguishes omission (default 64) from an explicit invalid zero.
-	MaxDiscoveryGroups *int `yaml:"max_discovery_groups,omitempty" json:"max_discovery_groups,omitempty"`
+	MaxInstances       int `yaml:"max_instances,omitempty" json:"max_instances"`
+	MaxDiscoveryGroups int `yaml:"max_discovery_groups,omitempty" json:"max_discovery_groups"`
 }
 
 func (c LimitsConfig) maxDiscoveryGroups() int {
-	if c.MaxDiscoveryGroups == nil {
+	if c.MaxDiscoveryGroups == 0 {
 		return defaultMaxDiscoveryGroups
 	}
-	return *c.MaxDiscoveryGroups
+	return c.MaxDiscoveryGroups
 }
 
 type DiscoveryConfig struct {
@@ -165,8 +164,8 @@ func (c *Config) applyDefaults() {
 	if c.Limits.MaxInstances == 0 {
 		c.Limits.MaxInstances = defaultMaxInstances
 	}
-	if c.Limits.MaxDiscoveryGroups == nil {
-		c.Limits.MaxDiscoveryGroups = new(defaultMaxDiscoveryGroups)
+	if c.Limits.MaxDiscoveryGroups == 0 {
+		c.Limits.MaxDiscoveryGroups = defaultMaxDiscoveryGroups
 	}
 	if c.Timeout.Duration() == 0 {
 		c.Timeout = defaultTimeout

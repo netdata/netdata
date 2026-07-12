@@ -560,7 +560,7 @@ func TestCompileConfig_DiscoveryGroupLimit(t *testing.T) {
 	assert.ErrorContains(t, err, "split the collection across multiple jobs")
 
 	raised := 2 * defaultMaxDiscoveryGroups
-	cfg.Limits.MaxDiscoveryGroups = &raised
+	cfg.Limits.MaxDiscoveryGroups = raised
 	plan, _, err = compileTestConfig(t, cfg)
 	require.NoError(t, err)
 	assert.Len(t, plan.Scopes, raised)
