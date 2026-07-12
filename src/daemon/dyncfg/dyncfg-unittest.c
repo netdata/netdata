@@ -575,6 +575,208 @@ void dyncfg_unittest_delete_cb(const DICTIONARY_ITEM *item __maybe_unused, void 
     freez((void *)v->source);
 }
 
+static void dyncfg_file_unittest_check(bool condition, const char *test) {
+    if(condition)
+        return;
+
+    nd_log(NDLS_DAEMON, NDLP_ERR, "DYNCFG FILE UNITTEST: failed test '%s'", test);
+    dyncfg_unittest_register_error(NULL, NULL);
+}
+
+static bool dyncfg_file_unittest_write(const char *d_name, const void *data, size_t size) {
+    char filename[PATH_MAX];
+    snprintfz(filename, sizeof(filename), "%s/%s", dyncfg_globals.dir, d_name);
+
+    FILE *fp = fopen(filename, "wb");
+    if(!fp)
+        return false;
+
+    bool ok = fwrite(data, 1, size, fp) == size;
+    if(fclose(fp) != 0)
+        ok = false;
+    if(!ok)
+        unlink(filename);
+
+    return ok;
+}
+
+static void dyncfg_file_unittest_unlink(const char *d_name) {
+    char filename[PATH_MAX];
+    snprintfz(filename, sizeof(filename), "%s/%s", dyncfg_globals.dir, d_name);
+    unlink(filename);
+}
+
+static void dyncfg_file_unittest_remove(const char *id) {
+    dictionary_del(dyncfg_globals.nodes, id);
+    dictionary_garbage_collect(dyncfg_globals.nodes);
+    dyncfg_file_delete(id);
+}
+
+static void dyncfg_file_unittest_load_text(const char *test, const char *d_name, const char *text) {
+    if(!dyncfg_file_unittest_write(d_name, text, strlen(text))) {
+        dyncfg_file_unittest_check(false, test);
+        return;
+    }
+
+    dyncfg_file_load(d_name);
+    dyncfg_file_unittest_unlink(d_name);
+}
+
+static void dyncfg_file_unittest(void) {
+    static const unsigned char payload[] = { '{', '}', '\0', 'x' };
+    const char *writer_id = "unittest:dyncfg-load:writer";
+
+    DYNCFG saved = {
+        .host_uuid = UUID_ZERO,
+        .template = string_strdupz("unittest:dyncfg-load"),
+        .path = string_strdupz("/unittests/dyncfg-load"),
+        .cmds = DYNCFG_CMD_GET | DYNCFG_CMD_SCHEMA | DYNCFG_CMD_UPDATE | DYNCFG_CMD_REMOVE,
+        .type = DYNCFG_TYPE_JOB,
+        .sync = true,
+        .dyncfg = {
+            .saves = 0,
+            .user_disabled = true,
+            .source_type = DYNCFG_SOURCE_TYPE_DYNCFG,
+            .source = string_strdupz("dyncfg-file-unittest"),
+            .payload = buffer_create(sizeof(payload), NULL),
+            .created_ut = 1,
+            .modified_ut = 2,
+        },
+    };
+    buffer_memcat(saved.dyncfg.payload, payload, sizeof(payload));
+    saved.dyncfg.payload->content_type = CT_APPLICATION_JSON;
+
+    dyncfg_file_save(writer_id, &saved);
+    CLEAN_CHAR_P *escaped_writer_id = dyncfg_escape_id_for_filename(writer_id);
+    char writer_d_name[FILENAME_MAX];
+    snprintfz(writer_d_name, sizeof(writer_d_name), "%s.dyncfg", escaped_writer_id);
+    dyncfg_file_load(writer_d_name);
+
+    DYNCFG *loaded = dictionary_get(dyncfg_globals.nodes, writer_id);
+    dyncfg_file_unittest_check(loaded != NULL, "production writer artifact is accepted");
+    if(loaded) {
+        dyncfg_file_unittest_check(loaded->type == DYNCFG_TYPE_JOB, "writer type is preserved");
+        dyncfg_file_unittest_check(loaded->dyncfg.saves == 1, "writer save count is preserved");
+        dyncfg_file_unittest_check(loaded->dyncfg.user_disabled, "writer disabled state is preserved");
+        dyncfg_file_unittest_check(
+            loaded->dyncfg.payload && loaded->dyncfg.payload->content_type == CT_APPLICATION_JSON,
+            "writer content type is preserved");
+        dyncfg_file_unittest_check(
+            loaded->dyncfg.payload && loaded->dyncfg.payload->len == sizeof(payload) &&
+                memcmp(loaded->dyncfg.payload->buffer, payload, sizeof(payload)) == 0,
+            "writer payload bytes are preserved");
+    }
+    dyncfg_file_unittest_remove(writer_id);
+    dyncfg_cleanup(&saved);
+
+    const char *minimal_id = "unittest:dyncfg-load:minimal";
+    dyncfg_file_unittest_load_text(
+        "minimal forward-compatible artifact write", "unittest-dyncfg-load-minimal.dyncfg",
+        "version=99\nfuture_key=future value\nid=unittest:dyncfg-load:minimal\n");
+    loaded = dictionary_get(dyncfg_globals.nodes, minimal_id);
+    dyncfg_file_unittest_check(loaded != NULL, "unknown fields and newer versions are accepted");
+    if(loaded) {
+        dyncfg_file_unittest_check(loaded->type == DYNCFG_TYPE_SINGLE, "missing type keeps default");
+        dyncfg_file_unittest_check(loaded->current.status == DYNCFG_STATUS_ORPHAN, "minimal file is orphaned");
+        dyncfg_file_unittest_check(!loaded->dyncfg.payload, "missing payload remains absent");
+    }
+    dyncfg_file_unittest_remove(minimal_id);
+
+    const char *malformed_id = "unittest:dyncfg-load:malformed-metadata";
+    dyncfg_file_unittest_load_text(
+        "malformed optional metadata write", "unittest-dyncfg-load-malformed-metadata.dyncfg",
+        "id=unittest:dyncfg-load:malformed-metadata\n"
+        "type=not-a-type\nsource_type=not-a-source\ncreated=not-a-number\nmodified=-\n"
+        "sync=not-a-bool\nuser_disabled=not-a-bool\nsaves=not-a-number\ncmds=not-a-command\n");
+    loaded = dictionary_get(dyncfg_globals.nodes, malformed_id);
+    dyncfg_file_unittest_check(loaded != NULL, "malformed optional metadata retains compatibility defaults");
+    if(loaded) {
+        dyncfg_file_unittest_check(loaded->type == DYNCFG_TYPE_SINGLE, "unknown type defaults to single");
+        dyncfg_file_unittest_check(
+            loaded->dyncfg.source_type == DYNCFG_SOURCE_TYPE_INTERNAL,
+            "unknown source type defaults to internal");
+    }
+    dyncfg_file_unittest_remove(malformed_id);
+
+    const char *empty_payload_id = "unittest:dyncfg-load:empty-payload";
+    dyncfg_file_unittest_load_text(
+        "empty payload write", "unittest-dyncfg-load-empty-payload.dyncfg",
+        "id=unittest:dyncfg-load:empty-payload\ncontent_type=application/json\ncontent_length=0\n---\n");
+    loaded = dictionary_get(dyncfg_globals.nodes, empty_payload_id);
+    dyncfg_file_unittest_check(
+        loaded && loaded->dyncfg.payload && loaded->dyncfg.payload->len == 0,
+        "empty payload section is accepted");
+    dyncfg_file_unittest_remove(empty_payload_id);
+
+    const char *mismatch_id = "unittest:dyncfg-load:length-mismatch";
+    dyncfg_file_unittest_load_text(
+        "advisory content length write", "unittest-dyncfg-load-length-mismatch.dyncfg",
+        "id=unittest:dyncfg-load:length-mismatch\ncontent_type=application/json\ncontent_length=99\n---\nabc");
+    loaded = dictionary_get(dyncfg_globals.nodes, mismatch_id);
+    dyncfg_file_unittest_check(
+        loaded && loaded->dyncfg.payload && loaded->dyncfg.payload->len == 3 &&
+            memcmp(loaded->dyncfg.payload->buffer, "abc", 3) == 0,
+        "declared length mismatch preserves complete remaining bytes");
+    dyncfg_file_unittest_remove(mismatch_id);
+
+    size_t entries_before = dictionary_entries(dyncfg_globals.nodes);
+    dyncfg_file_unittest_load_text(
+        "missing id write", "unittest-dyncfg-load-missing-id.dyncfg",
+        "path=/unittests\nsource=cleanup-check\ncontent_type=application/json\ncontent_length=2\n---\n{}");
+    dyncfg_file_unittest_check(
+        dictionary_entries(dyncfg_globals.nodes) == entries_before, "missing id is not published");
+
+    entries_before = dictionary_entries(dyncfg_globals.nodes);
+    dyncfg_file_unittest_load_text(
+        "empty id write", "unittest-dyncfg-load-empty-id.dyncfg", "id=\npath=/unittests\n");
+    dyncfg_file_unittest_check(
+        dictionary_entries(dyncfg_globals.nodes) == entries_before, "empty id is not published");
+
+    const char *compatible_id = "unittest dyncfg load compatible";
+    dyncfg_file_unittest_load_text(
+        "historical id syntax write", "unittest-dyncfg-load-compatible-id.dyncfg",
+        "id=unittest dyncfg load compatible\npath=/unittests\n");
+    loaded = dictionary_get(dyncfg_globals.nodes, compatible_id);
+    dyncfg_file_unittest_check(loaded != NULL, "historically accepted id syntax remains compatible");
+    dyncfg_file_unittest_remove(compatible_id);
+
+    CLEAN_BUFFER *read_buffer = buffer_create(8, NULL);
+    FILE *short_fp = tmpfile();
+    dyncfg_file_unittest_check(short_fp != NULL, "create short-read stream");
+    if(short_fp) {
+        dyncfg_file_unittest_check(
+            fwrite("abc", 1, 3, short_fp) == 3 && fseek(short_fp, 0, SEEK_SET) == 0,
+            "prepare short-read stream");
+
+        bool ok = dyncfg_file_read_payload(short_fp, read_buffer, 5);
+        dyncfg_file_unittest_check(!ok && read_buffer->len == 3, "short payload read is rejected");
+        fclose(short_fp);
+    }
+
+#ifndef OS_WINDOWS
+    int error_pipe[2] = { -1, -1 };
+    bool error_pipe_ready =
+        pipe(error_pipe) == 0 && sock_setnonblock(error_pipe[PIPE_READ], true) == 1;
+    dyncfg_file_unittest_check(error_pipe_ready, "create nonblocking read-error stream");
+    if(error_pipe_ready) {
+        FILE *error_fp = fdopen(error_pipe[PIPE_READ], "r");
+        dyncfg_file_unittest_check(error_fp != NULL, "open nonblocking read-error stream");
+        if(error_fp) {
+            bool ok = dyncfg_file_read_payload(error_fp, read_buffer, 1);
+            dyncfg_file_unittest_check(
+                !ok && read_buffer->len == 0 && ferror(error_fp), "payload stream error is rejected");
+            fclose(error_fp);
+            error_pipe[PIPE_READ] = -1;
+        }
+    }
+
+    if(error_pipe[PIPE_READ] != -1)
+        close(error_pipe[PIPE_READ]);
+    if(error_pipe[PIPE_WRITE] != -1)
+        close(error_pipe[PIPE_WRITE]);
+#endif
+}
+
 int dyncfg_unittest(void) {
     dyncfg_unittest_data.nodes = dictionary_create(DICT_OPTION_NONE);
     dictionary_register_delete_callback(dyncfg_unittest_data.nodes, dyncfg_unittest_delete_cb, NULL);
@@ -582,6 +784,7 @@ int dyncfg_unittest(void) {
     dyncfg_unittest_cleanup_files();
     rrd_functions_inflight_init();
     dyncfg_init(false);
+    dyncfg_file_unittest();
 
     // ------------------------------------------------------------------------
     // create the thread for testing async communication
