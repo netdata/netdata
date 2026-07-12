@@ -500,8 +500,11 @@ static void stream_receiver_remove_internal(struct stream_thread *sth, struct re
 
     receiver_set_exit_reason(rpt, reason, false);
 
+    // rpt->host may be NULL here (e.g. removal on an early handshake failure,
+    // before the host is attached) -- this path null-checks it below at the
+    // iface/replication reads, so guard the log field too.
     ND_LOG_STACK lgs[] = {
-        ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host->hostname),
+        ND_LOG_FIELD_STR(NDF_NIDL_NODE, rpt->host ? rpt->host->hostname : NULL),
         ND_LOG_FIELD_TXT(NDF_SRC_IP, rpt->remote_ip),
         ND_LOG_FIELD_TXT(NDF_SRC_PORT, rpt->remote_port),
         ND_LOG_FIELD_CB(NDF_SRC_TRANSPORT, stream_receiver_log_transport, rpt),
