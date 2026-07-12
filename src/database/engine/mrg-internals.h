@@ -63,6 +63,8 @@ struct mrg {
     } __attribute__((aligned(64))) index[UUIDMAP_PARTITIONS];
 };
 
+_Static_assert(_Alignof(MRG) == 64, "MRG must remain cache-line aligned");
+
 static inline void MRG_STATS_DUPLICATE_ADD(MRG *mrg, size_t partition) {
     __atomic_add_fetch(&mrg->index[partition].stats.additions_duplicate, 1, __ATOMIC_RELAXED);
 }
