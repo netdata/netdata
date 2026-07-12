@@ -466,15 +466,64 @@ typedef struct https_req_ctx {
 
     http_parse_ctx parse_ctx;
 
-    time_t req_start_time;
+    usec_t req_start_ut;
+    usec_t req_timeout_ut;
 } https_req_ctx_t;
 
+static usec_t https_req_timeout_to_usec(time_t timeout_s) {
+    if (timeout_s <= 0)
+        return 0;
+
+    if ((uint64_t)timeout_s > UINT64_MAX / USEC_PER_SEC)
+        return UINT64_MAX;
+
+    return (usec_t)timeout_s * USEC_PER_SEC;
+}
+
+static bool https_req_timed_out_at(const https_req_ctx_t *ctx, usec_t now_ut) {
+    return now_ut - ctx->req_start_ut >= ctx->req_timeout_ut;
+}
+
 static int https_req_check_timedout(https_req_ctx_t *ctx) {
-    if (now_realtime_sec() > ctx->req_start_time + ctx->request->timeout_s) {
+    if (https_req_timed_out_at(ctx, now_monotonic_usec())) {
         netdata_log_error("ACLK: request timed out");
         return 1;
     }
     return 0;
+}
+
+int https_client_timeout_unittest(void) {
+    int errors = 0;
+    https_req_t request = HTTPS_REQ_T_INITIALIZER;
+    https_req_ctx_t ctx = {
+        .request = &request,
+        .req_start_ut = 100 * USEC_PER_SEC,
+        .req_timeout_ut = https_req_timeout_to_usec(request.timeout_s),
+    };
+
+    request.timeout_s = 30;
+    if (https_req_timed_out_at(&ctx, ctx.req_start_ut + 30 * USEC_PER_SEC - 1)) {
+        fprintf(stderr, "https client timeout unittest FAILED: expired before monotonic deadline\n");
+        errors++;
+    }
+    if (!https_req_timed_out_at(&ctx, ctx.req_start_ut + 30 * USEC_PER_SEC)) {
+        fprintf(stderr, "https client timeout unittest FAILED: did not expire at monotonic deadline\n");
+        errors++;
+    }
+
+    request.timeout_s = 0;
+    ctx.req_timeout_ut = https_req_timeout_to_usec(request.timeout_s);
+    if (!https_req_timed_out_at(&ctx, ctx.req_start_ut)) {
+        fprintf(stderr, "https client timeout unittest FAILED: non-positive timeout did not expire\n");
+        errors++;
+    }
+
+    if (errors)
+        fprintf(stderr, "https client timeout unittest: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "https client timeout unittest: OK\n");
+
+    return errors;
 }
 
 static char *_ssl_err_tos(int err)
@@ -778,7 +827,9 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
     }
 
     https_req_ctx_t *ctx = callocz(1, sizeof(https_req_ctx_t));
-    ctx->req_start_time = now_realtime_sec();
+    ctx->request = request;
+    ctx->req_start_ut = now_monotonic_usec();
+    ctx->req_timeout_ut = https_req_timeout_to_usec(request->timeout_s);
 
     ctx->buf_rx = rbuf_create(RX_BUFFER_SIZE, RX_BUFFER_SIZE);
     if (!ctx->buf_rx) {
@@ -836,8 +887,6 @@ https_client_resp_t https_request(https_req_t *request, https_req_response_t *re
             goto exit_sock;
         }
     }
-    ctx->request = request;
-
     ctx->ssl_ctx = netdata_ssl_create_client_ctx(0);
     if (ctx->ssl_ctx==NULL) {
         rc = HTTPS_CLIENT_RESP_NO_SSL_CTX;

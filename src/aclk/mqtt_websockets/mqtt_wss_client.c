@@ -528,6 +528,7 @@ int mqtt_wss_connect(
 
     client->poll_fds[POLLFD_PIPE].events = POLLIN;
     client->poll_fds[POLLFD_SOCKET].events = POLLIN;
+    client->last_io_progress_ut = now_monotonic_usec();
     // wait till MQTT connection is established
     while (!client->mqtt_connected) {
         int rc = mqtt_wss_service(client, 60 * MSEC_PER_SEC);
@@ -637,6 +638,42 @@ static void set_socket_pollfds(mqtt_wss_client client, int ssl_ret) {
         client->poll_fds[POLLFD_SOCKET].events |= POLLIN;
 }
 
+static bool mqtt_wss_io_watchdog_expired_at(mqtt_wss_client client, usec_t now_ut) {
+    return now_ut - client->last_io_progress_ut >
+           (usec_t)MQTT_WSS_IO_WATCHDOG_SECS * USEC_PER_SEC;
+}
+
+int mqtt_wss_client_timeout_unittest(void) {
+    int errors = 0;
+    struct mqtt_wss_client_struct client = {
+        .last_io_progress_ut = 100 * USEC_PER_SEC,
+        .mqtt_connected = 0,
+    };
+    const usec_t watchdog_ut = (usec_t)MQTT_WSS_IO_WATCHDOG_SECS * USEC_PER_SEC;
+
+    if (mqtt_wss_io_watchdog_expired_at(&client, client.last_io_progress_ut + watchdog_ut)) {
+        fprintf(stderr, "mqtt wss timeout unittest FAILED: expired at inclusive progress boundary\n");
+        errors++;
+    }
+    if (!mqtt_wss_io_watchdog_expired_at(&client, client.last_io_progress_ut + watchdog_ut + 1)) {
+        fprintf(stderr, "mqtt wss timeout unittest FAILED: pre-CONNACK watchdog did not expire\n");
+        errors++;
+    }
+
+    client.mqtt_connected = 1;
+    if (!mqtt_wss_io_watchdog_expired_at(&client, client.last_io_progress_ut + watchdog_ut + 1)) {
+        fprintf(stderr, "mqtt wss timeout unittest FAILED: established watchdog did not expire\n");
+        errors++;
+    }
+
+    if (errors)
+        fprintf(stderr, "mqtt wss timeout unittest: %d ERROR(S)\n", errors);
+    else
+        fprintf(stderr, "mqtt wss timeout unittest: OK\n");
+
+    return errors;
+}
+
 static int handle_mqtt_internal(mqtt_wss_client client)
 {
     int rc = mqtt_ng_sync(client->mqtt);
@@ -742,26 +779,25 @@ int mqtt_wss_service(mqtt_wss_client client, int timeout_ms)
     // Tear the connection down if the socket reports an unrecoverable error, or if we keep
     // being re-entered with poll() reporting readiness but making no forward progress (a
     // spin). In either case drop so the outer loop reconnects, rather than burning a core
-    // indefinitely. Guarded to an established connection (the handshake has its own timeouts).
-    if (client->mqtt_connected) {
-        // POLLERR/POLLNVAL are unrecoverable -> drop now. POLLHUP is intentionally NOT an
-        // immediate drop: it can accompany still-readable data (a graceful close carrying a
-        // final frame), so we let it fall through to SSL_read below, which drains the
-        // remaining bytes and then reports the close cleanly (SSL_ERROR_ZERO_RETURN). A dead
-        // socket that keeps signalling readiness without progress is caught by the watchdog.
-        if (unlikely(client->poll_fds[POLLFD_SOCKET].revents & (POLLERR | POLLNVAL))) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "ACLK: socket poll() reported error (revents=0x%x); dropping connection",
-                   (unsigned)client->poll_fds[POLLFD_SOCKET].revents);
-            return MQTT_WSS_ERR_CONN_DROP;
-        }
-        if (unlikely(now_monotonic_usec() - client->last_io_progress_ut >
-                     (usec_t)MQTT_WSS_IO_WATCHDOG_SECS * USEC_PER_SEC)) {
-            nd_log(NDLS_DAEMON, NDLP_ERR,
-                   "ACLK: no I/O progress for %d seconds while poll() kept reporting readiness; "
-                   "dropping connection to break a CPU spin", MQTT_WSS_IO_WATCHDOG_SECS);
-            return MQTT_WSS_ERR_CONN_DROP;
-        }
+    // indefinitely. This applies during TLS/WebSocket/MQTT setup too: the connect loop uses
+    // this same service function before CONNACK, and is equally vulnerable to ready-without-
+    // progress spins.
+    // POLLERR/POLLNVAL are unrecoverable -> drop now. POLLHUP is intentionally NOT an
+    // immediate drop: it can accompany still-readable data (a graceful close carrying a
+    // final frame), so we let it fall through to SSL_read below, which drains the
+    // remaining bytes and then reports the close cleanly (SSL_ERROR_ZERO_RETURN). A dead
+    // socket that keeps signalling readiness without progress is caught by the watchdog.
+    if (unlikely(client->poll_fds[POLLFD_SOCKET].revents & (POLLERR | POLLNVAL))) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "ACLK: socket poll() reported error (revents=0x%x); dropping connection",
+               (unsigned)client->poll_fds[POLLFD_SOCKET].revents);
+        return MQTT_WSS_ERR_CONN_DROP;
+    }
+    if (unlikely(mqtt_wss_io_watchdog_expired_at(client, now_monotonic_usec()))) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "ACLK: no I/O progress for %d seconds while poll() kept reporting readiness; "
+               "dropping connection to break a CPU spin", MQTT_WSS_IO_WATCHDOG_SECS);
+        return MQTT_WSS_ERR_CONN_DROP;
     }
 
     client->poll_fds[POLLFD_SOCKET].events = 0;
