@@ -50,6 +50,16 @@ type operationRecordingCloudWatch struct {
 	calls map[string]int
 }
 
+type cancelingWriter struct {
+	cancel context.CancelFunc
+	once   sync.Once
+}
+
+func (w *cancelingWriter) Write(p []byte) (int, error) {
+	w.once.Do(w.cancel)
+	return len(p), nil
+}
+
 type blockingListMetrics struct{}
 
 func (blockingListMetrics) ListMetrics(ctx context.Context, _ *cloudwatch.ListMetricsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
@@ -903,6 +913,14 @@ func dimValues(insts []discoveredInstance) [][]string {
 	return out
 }
 
+func discoveryTestMetrics(prefix string, count int) []cwtypes.Metric {
+	metrics := make([]cwtypes.Metric, count)
+	for i := range metrics {
+		metrics[i] = mkMetric("CPUUtilization", "InstanceId", fmt.Sprintf("%s-%d", prefix, i))
+	}
+	return metrics
+}
+
 func newDiscoveryTestCollector(regionMetrics map[string]map[string][]cwtypes.Metric) (*Collector, map[string]*nsCloudWatch) {
 	c := New()
 	regions := regionsOf(regionMetrics)
@@ -1008,19 +1026,11 @@ func TestCollector_refreshDiscovery_AggregateFailureIsAtomicWithSnapshot(t *test
 }
 
 func TestCollector_refreshDiscovery_MergedSnapshotBoundsAreAtomicAcrossPartialFailures(t *testing.T) {
-	metrics := func(prefix string, count int) []cwtypes.Metric {
-		got := make([]cwtypes.Metric, count)
-		for i := range got {
-			got[i] = mkMetric("CPUUtilization", "InstanceId", fmt.Sprintf("%s-%d", prefix, i))
-		}
-		return got
-	}
-
 	base := time.Unix(1000, 0)
 	now := base
 	c, fakes := newDiscoveryTestCollector(map[string]map[string][]cwtypes.Metric{
-		"us-east-1": {"AWS/EC2": metrics("east-initial", maxCandidateInstancesPerRefresh/2)},
-		"us-west-2": {"AWS/EC2": metrics("west-initial", maxCandidateInstancesPerRefresh/2)},
+		"us-east-1": {"AWS/EC2": discoveryTestMetrics("east-initial", maxCandidateInstancesPerRefresh/2)},
+		"us-west-2": {"AWS/EC2": discoveryTestMetrics("west-initial", maxCandidateInstancesPerRefresh/2)},
 	})
 	c.now = func() time.Time { return now }
 	require.NoError(t, c.refreshDiscovery(context.Background()))
@@ -1056,7 +1066,7 @@ func TestCollector_refreshDiscovery_MergedSnapshotBoundsAreAtomicAcrossPartialFa
 	// A successful replacement plus the failed region's retained instances would
 	// install 20,001 candidates unless the merged snapshot is checked atomically.
 	now = base.Add(301 * time.Second)
-	fakes["us-east-1"].byNS["AWS/EC2"] = metrics("east-replacement", maxCandidateInstancesPerRefresh/2+1)
+	fakes["us-east-1"].byNS["AWS/EC2"] = discoveryTestMetrics("east-replacement", maxCandidateInstancesPerRefresh/2+1)
 	fakes["us-west-2"].err = errors.New("throttled")
 	assertAtomicDiscard()
 
@@ -1065,7 +1075,7 @@ func TestCollector_refreshDiscovery_MergedSnapshotBoundsAreAtomicAcrossPartialFa
 	now = base.Add(602 * time.Second)
 	fakes["us-east-1"].err = errors.New("throttled")
 	fakes["us-west-2"].err = nil
-	fakes["us-west-2"].byNS["AWS/EC2"] = metrics("west-replacement", maxCandidateInstancesPerRefresh/2+1)
+	fakes["us-west-2"].byNS["AWS/EC2"] = discoveryTestMetrics("west-replacement", maxCandidateInstancesPerRefresh/2+1)
 	assertAtomicDiscard()
 }
 
@@ -1096,6 +1106,80 @@ func TestCollector_refreshDiscovery_ParentCancellationDoesNotScheduleRefresh(t *
 	assert.Equal(t, base, c.discovery.ExpiresAt)
 }
 
+func TestCollector_refreshDiscovery_ParentCancellationAfterSnapshotBuildDoesNotAdvanceState(t *testing.T) {
+	base := time.Unix(1000, 0)
+
+	t.Run("cancellation wins over merged snapshot overflow", func(t *testing.T) {
+		now := base
+		var cancel context.CancelFunc
+		cancelOnDiscard := false
+		nowCallsAfterArm := 0
+		c, fakes := newDiscoveryTestCollector(map[string]map[string][]cwtypes.Metric{
+			"us-east-1": {"AWS/EC2": discoveryTestMetrics("east-initial", maxCandidateInstancesPerRefresh/2)},
+			"us-west-2": {"AWS/EC2": discoveryTestMetrics("west-initial", maxCandidateInstancesPerRefresh/2)},
+		})
+		c.now = func() time.Time {
+			if cancelOnDiscard {
+				nowCallsAfterArm++
+				if nowCallsAfterArm == 2 {
+					cancel()
+				}
+			}
+			return now
+		}
+		require.NoError(t, c.refreshDiscovery(context.Background()))
+		require.Equal(t, maxCandidateInstancesPerRefresh, c.discovery.totalInstances())
+		initialFetchedAt := c.discovery.FetchedAt
+		initialExpiresAt := c.discovery.ExpiresAt
+
+		now = base.Add(301 * time.Second)
+		fakes["us-east-1"].byNS["AWS/EC2"] = discoveryTestMetrics("east-replacement", maxCandidateInstancesPerRefresh/2+1)
+		fakes["us-west-2"].err = errors.New("throttled")
+		ctx, cancelParent := context.WithCancel(context.Background())
+		defer cancelParent()
+		cancel = cancelParent
+		cancelOnDiscard = true
+
+		// The first armed clock read starts this refresh; the second is the discard
+		// scheduler's state boundary after merged-snapshot validation fails.
+		err := c.refreshDiscovery(ctx)
+
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.Equal(t, initialExpiresAt, c.discovery.ExpiresAt, "cancellation must beat aggregate discard scheduling")
+		assert.Equal(t, initialFetchedAt, c.discovery.FetchedAt)
+		assert.Equal(t, maxCandidateInstancesPerRefresh, c.discovery.totalInstances())
+	})
+
+	t.Run("cancellation wins at successful commit boundary", func(t *testing.T) {
+		now := base
+		c, fakes := newDiscoveryTestCollector(map[string]map[string][]cwtypes.Metric{
+			"us-east-1": {"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "east-old")}},
+			"us-west-2": {"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "west-old")}},
+		})
+		c.now = func() time.Time { return now }
+		require.NoError(t, c.refreshDiscovery(context.Background()))
+		key := discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}
+		initialFetchedAt := c.discovery.FetchedAt
+		initialExpiresAt := c.discovery.ExpiresAt
+
+		now = base.Add(301 * time.Second)
+		fakes["us-east-1"].byNS["AWS/EC2"] = []cwtypes.Metric{mkMetric("CPUUtilization", "InstanceId", "east-new")}
+		fakes["us-west-2"].err = errors.New("throttled")
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		c.Logger = logger.NewWithWriter(&cancelingWriter{cancel: cancel})
+
+		// The partial-failure warning cancels the real parent after merged-snapshot
+		// validation and immediately before the successful commit boundary.
+		err := c.refreshDiscovery(ctx)
+
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.Equal(t, initialExpiresAt, c.discovery.ExpiresAt)
+		assert.Equal(t, initialFetchedAt, c.discovery.FetchedAt)
+		assert.Equal(t, [][]string{{"east-old"}}, dimValues(c.discovery.Instances[key]))
+	})
+}
+
 // errListMetrics is a CloudWatch client whose ListMetrics always errors — used to
 // make one discovery target fail while others succeed.
 type errListMetrics struct{}
@@ -1110,7 +1194,7 @@ func (errListMetrics) GetMetricData(_ context.Context, in *cloudwatch.GetMetricD
 
 func TestCollector_refreshDiscovery_EmptySuccessPlusFailureNotFatalOnFirstPass(t *testing.T) {
 	// One target succeeds with zero instances (a resource-free region) while another
-	// errors. On the first pass this must NOT be fatal — not every target failed.
+	// errors. On the first pass this must NOT be fatal — not every group failed.
 	c := New()
 	configureExactRule(c, []string{"us-east-1", "us-west-2"}, []string{"ec2"})
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1", "us-west-2"}, []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))})

@@ -475,9 +475,12 @@ func (c *Collector) markDiscoveryStale() {
 	c.discovery.ExpiresAt = time.Time{}
 }
 
-func (c *Collector) discardDiscoveryRefresh(err error) error {
+func (c *Collector) discardDiscoveryRefresh(ctx context.Context, err error) error {
 	completedAt := c.now()
-	c.Limit(logKeyDiscoveryTargetFailed+"_aggregate", 1, recurringLogEvery).
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
+	}
+	c.Limit(logKeyDiscoveryGroupFailed+"_aggregate", 1, recurringLogEvery).
 		Warningf("CloudWatch discovery refresh was discarded atomically: %v", sanitizeAWSError(err))
 	if c.discovery.FetchedAt.IsZero() {
 		return fmt.Errorf("CloudWatch discovery refresh failed: %w", sanitizeAWSError(err))
@@ -487,7 +490,7 @@ func (c *Collector) discardDiscoveryRefresh(err error) error {
 }
 
 // refreshDiscovery refreshes the discovery snapshot when its TTL has expired.
-// Per-target failures are logged and tolerated; an aggregate failure keeps the
+// Per-group failures are logged and tolerated; an aggregate failure keeps the
 // previous snapshot, or errors on the very first pass when there is none.
 func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	now := c.now()
@@ -508,13 +511,18 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 		return err
 	}
 	if aggregateErr != nil {
-		return c.discardDiscoveryRefresh(aggregateErr)
+		return c.discardDiscoveryRefresh(ctx, aggregateErr)
 	}
-	// Failed targets carry forward their previous instances, so a transient
-	// per-region/namespace failure does not drop series (spec: keep last snapshot).
+	// Failed discovery groups carry forward their previous instances, so a
+	// transient target/region/namespace failure does not drop series.
 	snap, failedGroups, err := buildDiscoverySnapshot(results, c.discovery.Instances, now, c.Discovery.RefreshEvery)
+	// Snapshot merging and retained-bound validation happen after fan-out. Parent
+	// cancellation during that work must win over both discard scheduling and commit.
+	if ctxErr := ctx.Err(); ctxErr != nil {
+		return ctxErr
+	}
 	if err != nil {
-		return c.discardDiscoveryRefresh(err)
+		return c.discardDiscoveryRefresh(ctx, err)
 	}
 
 	var failures []operationFailure
@@ -526,14 +534,17 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 			})
 		}
 	}
-	c.warnOperationFailures(logKeyDiscoveryTargetFailed, "discovery", " (using last-known instances)", failures)
+	c.warnOperationFailures(logKeyDiscoveryGroupFailed, "discovery", " (using last-known instances)", failures)
 
-	// Only a first-ever pass where EVERY target errored is fatal. An empty but
-	// successful target (a resource-free target/region/profile) is not a failure —
+	// Only a first-ever pass where EVERY discovery group errored is fatal. An
+	// empty but successful group is not a failure —
 	// with shared regions across many targets, empty successes are expected — and
 	// any carried-forward snapshot keeps the collector running.
 	if c.discovery.FetchedAt.IsZero() && len(results) > 0 && failedGroups == len(results) {
 		return fmt.Errorf("CloudWatch discovery failed for all %d target/region/namespace groups", len(results))
+	}
+	if err := ctx.Err(); err != nil {
+		return err
 	}
 
 	c.discovery = snap

@@ -20,7 +20,7 @@ import (
 const recurringLogEvery = time.Hour
 
 const (
-	logKeyDiscoveryTargetFailed  = "discovery_target_failed"
+	logKeyDiscoveryGroupFailed   = "discovery_group_failed"
 	logKeyHighInstanceCount      = "high_instance_count"
 	logKeyQueryClientFailed      = "query_client_failed"
 	logKeyGetMetricDataFailed    = "getmetricdata_failed"

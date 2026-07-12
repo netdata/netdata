@@ -228,13 +228,13 @@ Discovery then finds which *instances* of those profiles exist per target and re
   immediately before every actual first-page or continuation call; the AWS SDK may
   still retry an admitted operation up to five wire attempts.
 - **Snapshot + carry-forward**: `buildDiscoverySnapshot` stores instances for
-  successful targets and **carries forward the previous instances for errored
-  targets**, so a transient per-region/namespace failure never drops series. The
-  merged effective snapshot is rechecked against the aggregate candidate-count and
-  weighted-memory bounds before installation, preventing rotating partial failures
-  from accumulating retained groups beyond the refresh envelope. Only a first-ever
-  pass where every scope errors is fatal; after any snapshot exists, discovery
-  errors are warnings.
+  successful target/region/namespace groups and **carries forward the previous
+  instances for errored groups**, so a transient group failure never drops series.
+  The merged effective snapshot is rechecked against the aggregate candidate-count
+  and weighted-memory bounds before installation, preventing rotating partial
+  failures from accumulating retained groups beyond the refresh envelope. Only a
+  first-ever pass where every group errors is fatal; after any snapshot exists,
+  discovery errors are warnings.
 - **Aggregate discovery failure is atomic**: budget/stage-timeout exhaustion or a
   merged-snapshot bound violation discards all results from that refresh. An existing
   snapshot and its dependent tag/query/observation state remain active, with the next
@@ -542,13 +542,14 @@ The two CloudWatch APIs bill differently, and the design leans on that:
   batch boundary.
 - **Per-query aligned-window completion is the governor** — a metric is queried
   once per effective period (a 300s metric every aligned 300s window, a daily metric every ~24h),
-  not every collect cycle, so cost tracks profile periods rather than
+  not every collect cycle, so cost tracks each series' effective query period rather than
   `update_every`. Between queries, values are re-emitted from cache at zero AWS
   cost (see Observation And Metrics).
 
-Narrow the bill with focused rule target/profile/region selections or longer
-profile periods; discovery frequency is a minor lever. (Rates are AWS's published model —
-verify current per-region prices on the CloudWatch pricing page.)
+Narrow the bill with focused rule target/profile/region selections or longer effective
+periods configured through rule/default query timing; profile periods are the fallback.
+Discovery frequency is a minor lever. (Rates are AWS's published model — verify current
+per-region prices on the CloudWatch pricing page.)
 
 ## Key Invariants
 
