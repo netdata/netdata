@@ -421,10 +421,17 @@ static unsigned long long str2ull_encoded(const char *s) {
 
 ALWAYS_INLINE
 static long long str2ll_encoded(const char *s) {
+    unsigned long long n;
+
     if(*s == '-')
-        return (long long)-str2ull_encoded(&s[1]);
+        n = -str2ull_encoded(&s[1]);
     else
-        return (long long) str2ull_encoded(s);
+        n = str2ull_encoded(s);
+
+    if(n <= (unsigned long long)LLONG_MAX)
+        return (long long)n;
+
+    return LLONG_MIN + (long long)(n - (unsigned long long)LLONG_MAX - 1);
 }
 
 ALWAYS_INLINE
