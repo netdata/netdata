@@ -452,6 +452,160 @@ static int test_dyncfg_update_every_boundaries(int *passed) {
     return failed;
 }
 
+typedef enum {
+    DYNCFG_INTEGER_DB_LOOKUP,
+    DYNCFG_INTEGER_DELAY,
+    DYNCFG_INTEGER_REPEAT,
+} DYNCFG_INTEGER_SECTION;
+
+static int test_dyncfg_integer_destination_boundaries(int *passed) {
+    static const struct {
+        DYNCFG_INTEGER_SECTION section;
+        const char *member;
+        const char *value;
+        int expected_code;
+        const char *description;
+        const char *expected_text;
+        const char *expected_absent_text;
+    } tests[] = {
+        { DYNCFG_INTEGER_DB_LOOKUP, "after", "-2147483648", HTTP_RESP_OK, "after accepts INT_MIN", "-2147483648s" },
+        { DYNCFG_INTEGER_DB_LOOKUP, "after", "2147483647", HTTP_RESP_OK, "after accepts INT_MAX", "2147483647s" },
+        { DYNCFG_INTEGER_DB_LOOKUP, "before", "-2147483648", HTTP_RESP_OK, "before accepts INT_MIN", "at -2147483648s" },
+        { DYNCFG_INTEGER_DB_LOOKUP, "before", "2147483647", HTTP_RESP_OK, "before accepts INT_MAX", "at 2147483647s" },
+        { DYNCFG_INTEGER_DELAY, "up", "-2147483648", HTTP_RESP_OK, "delay up accepts INT_MIN", "-2147483648s" },
+        { DYNCFG_INTEGER_DELAY, "up", "2147483647", HTTP_RESP_OK, "delay up accepts INT_MAX", "2147483647s" },
+        { DYNCFG_INTEGER_DELAY, "down", "-2147483648", HTTP_RESP_OK, "delay down accepts INT_MIN", "down -2147483648s" },
+        { DYNCFG_INTEGER_DELAY, "down", "2147483647", HTTP_RESP_OK, "delay down accepts INT_MAX", "down 2147483647s" },
+        { DYNCFG_INTEGER_DELAY, "max", "-2147483648", HTTP_RESP_OK, "delay max accepts INT_MIN", "max -2147483648s" },
+        { DYNCFG_INTEGER_DELAY, "max", "2147483647", HTTP_RESP_OK, "delay max accepts INT_MAX", "max 2147483647s" },
+        { DYNCFG_INTEGER_REPEAT, "warning", "0", HTTP_RESP_OK, "warning repeat accepts zero", " off" },
+        { DYNCFG_INTEGER_REPEAT, "warning", "2147483647", HTTP_RESP_OK, "warning repeat accepts INT_MAX", "warning 2147483647s" },
+        { DYNCFG_INTEGER_REPEAT, "critical", "0", HTTP_RESP_OK, "critical repeat accepts zero", " off" },
+        { DYNCFG_INTEGER_REPEAT, "critical", "2147483647", HTTP_RESP_OK, "critical repeat accepts INT_MAX", "critical 2147483647s" },
+
+        { DYNCFG_INTEGER_DB_LOOKUP, "after", "1.5", HTTP_RESP_OK, "after preserves fractional-double truncation", "1s" },
+        { DYNCFG_INTEGER_DB_LOOKUP, "after", "true", HTTP_RESP_OK, "after preserves boolean conversion", "1s" },
+        { DYNCFG_INTEGER_DB_LOOKUP, "after", "null", HTTP_RESP_OK, "after preserves null conversion", NULL, "lookup" },
+        { DYNCFG_INTEGER_DELAY, "up", "-1.5", HTTP_RESP_OK, "delay preserves negative fractional-double truncation", "-1s" },
+        { DYNCFG_INTEGER_DELAY, "up", "false", HTTP_RESP_OK, "delay preserves false conversion", NULL, "delay" },
+        { DYNCFG_INTEGER_DELAY, "up", "null", HTTP_RESP_OK, "delay preserves null conversion", NULL, "delay" },
+        { DYNCFG_INTEGER_REPEAT, "warning", "1.5", HTTP_RESP_OK, "repeat preserves fractional-double truncation", "warning 1s" },
+        { DYNCFG_INTEGER_REPEAT, "warning", "true", HTTP_RESP_OK, "repeat preserves boolean conversion", "warning 1s" },
+        { DYNCFG_INTEGER_REPEAT, "warning", "null", HTTP_RESP_OK, "repeat preserves null conversion", " off" },
+
+        { DYNCFG_INTEGER_DB_LOOKUP, "after", "2147483648", HTTP_RESP_BAD_REQUEST, "after rejects integer above INT_MAX" },
+        { DYNCFG_INTEGER_DB_LOOKUP, "after", "\"2147483648\"", HTTP_RESP_BAD_REQUEST, "after rejects string above INT_MAX" },
+        { DYNCFG_INTEGER_DB_LOOKUP, "after", "-2147483649", HTTP_RESP_BAD_REQUEST, "after rejects integer below INT_MIN" },
+        { DYNCFG_INTEGER_DB_LOOKUP, "after", "\"-2147483649\"", HTTP_RESP_BAD_REQUEST, "after rejects string below INT_MIN" },
+        { DYNCFG_INTEGER_DB_LOOKUP, "before", "2147483648", HTTP_RESP_BAD_REQUEST, "before rejects integer above INT_MAX" },
+        { DYNCFG_INTEGER_DB_LOOKUP, "before", "\"2147483648\"", HTTP_RESP_BAD_REQUEST, "before rejects string above INT_MAX" },
+        { DYNCFG_INTEGER_DB_LOOKUP, "before", "-2147483649", HTTP_RESP_BAD_REQUEST, "before rejects integer below INT_MIN" },
+        { DYNCFG_INTEGER_DB_LOOKUP, "before", "\"-2147483649\"", HTTP_RESP_BAD_REQUEST, "before rejects string below INT_MIN" },
+
+        { DYNCFG_INTEGER_DELAY, "up", "2147483648", HTTP_RESP_BAD_REQUEST, "delay up rejects integer above INT_MAX" },
+        { DYNCFG_INTEGER_DELAY, "up", "\"2147483648\"", HTTP_RESP_BAD_REQUEST, "delay up rejects string above INT_MAX" },
+        { DYNCFG_INTEGER_DELAY, "up", "-2147483649", HTTP_RESP_BAD_REQUEST, "delay up rejects integer below INT_MIN" },
+        { DYNCFG_INTEGER_DELAY, "up", "\"-2147483649\"", HTTP_RESP_BAD_REQUEST, "delay up rejects string below INT_MIN" },
+        { DYNCFG_INTEGER_DELAY, "down", "2147483648", HTTP_RESP_BAD_REQUEST, "delay down rejects integer above INT_MAX" },
+        { DYNCFG_INTEGER_DELAY, "down", "\"2147483648\"", HTTP_RESP_BAD_REQUEST, "delay down rejects string above INT_MAX" },
+        { DYNCFG_INTEGER_DELAY, "down", "-2147483649", HTTP_RESP_BAD_REQUEST, "delay down rejects integer below INT_MIN" },
+        { DYNCFG_INTEGER_DELAY, "down", "\"-2147483649\"", HTTP_RESP_BAD_REQUEST, "delay down rejects string below INT_MIN" },
+        { DYNCFG_INTEGER_DELAY, "max", "2147483648", HTTP_RESP_BAD_REQUEST, "delay max rejects integer above INT_MAX" },
+        { DYNCFG_INTEGER_DELAY, "max", "\"2147483648\"", HTTP_RESP_BAD_REQUEST, "delay max rejects string above INT_MAX" },
+        { DYNCFG_INTEGER_DELAY, "max", "-2147483649", HTTP_RESP_BAD_REQUEST, "delay max rejects integer below INT_MIN" },
+        { DYNCFG_INTEGER_DELAY, "max", "\"-2147483649\"", HTTP_RESP_BAD_REQUEST, "delay max rejects string below INT_MIN" },
+
+        { DYNCFG_INTEGER_REPEAT, "warning", "-1", HTTP_RESP_BAD_REQUEST, "warning repeat rejects negative integer" },
+        { DYNCFG_INTEGER_REPEAT, "warning", "\"-1\"", HTTP_RESP_BAD_REQUEST, "warning repeat rejects negative string" },
+        { DYNCFG_INTEGER_REPEAT, "warning", "2147483648", HTTP_RESP_BAD_REQUEST, "warning repeat rejects integer above INT_MAX" },
+        { DYNCFG_INTEGER_REPEAT, "warning", "\"2147483648\"", HTTP_RESP_BAD_REQUEST, "warning repeat rejects string above INT_MAX" },
+        { DYNCFG_INTEGER_REPEAT, "critical", "-1", HTTP_RESP_BAD_REQUEST, "critical repeat rejects negative integer" },
+        { DYNCFG_INTEGER_REPEAT, "critical", "\"-1\"", HTTP_RESP_BAD_REQUEST, "critical repeat rejects negative string" },
+        { DYNCFG_INTEGER_REPEAT, "critical", "2147483648", HTTP_RESP_BAD_REQUEST, "critical repeat rejects integer above INT_MAX" },
+        { DYNCFG_INTEGER_REPEAT, "critical", "\"2147483648\"", HTTP_RESP_BAD_REQUEST, "critical repeat rejects string above INT_MAX" },
+
+        { DYNCFG_INTEGER_DB_LOOKUP, "after", "2147483648.0", HTTP_RESP_BAD_REQUEST, "after rejects double above INT_MAX" },
+        { DYNCFG_INTEGER_DB_LOOKUP, "after", "-2147483649.0", HTTP_RESP_BAD_REQUEST, "after rejects double below INT_MIN" },
+        { DYNCFG_INTEGER_DELAY, "up", "2147483648.0", HTTP_RESP_BAD_REQUEST, "delay rejects double above INT_MAX" },
+        { DYNCFG_INTEGER_DELAY, "up", "-2147483649.0", HTTP_RESP_BAD_REQUEST, "delay rejects double below INT_MIN" },
+        { DYNCFG_INTEGER_REPEAT, "warning", "-1.0", HTTP_RESP_BAD_REQUEST, "repeat rejects negative double" },
+        { DYNCFG_INTEGER_REPEAT, "warning", "2147483648.0", HTTP_RESP_BAD_REQUEST, "repeat rejects double above INT_MAX" },
+    };
+
+    int failed = 0;
+    for(size_t i = 0; i < sizeof(tests) / sizeof(tests[0]); i++) {
+        CLEAN_BUFFER *payload = buffer_create(0, NULL);
+        CLEAN_BUFFER *result = buffer_create(0, NULL);
+
+        buffer_strcat(payload, "{\"format_version\":1,\"rules\":[{\"enabled\":true,\"type\":\"instance\",\"config\":{");
+        switch(tests[i].section) {
+            case DYNCFG_INTEGER_DB_LOOKUP:
+                if(strcmp(tests[i].member, "before") == 0)
+                    buffer_sprintf(payload, "\"value\":{\"database_lookup\":{\"after\":1,\"before\":%s}}",
+                                   tests[i].value);
+                else
+                    buffer_sprintf(payload, "\"value\":{\"database_lookup\":{\"%s\":%s}}",
+                                   tests[i].member, tests[i].value);
+                break;
+            case DYNCFG_INTEGER_DELAY:
+                if(strcmp(tests[i].member, "max") == 0)
+                    buffer_sprintf(payload, "\"value\":{},\"action\":{\"delay\":{\"up\":1,\"max\":%s}}",
+                                   tests[i].value);
+                else
+                    buffer_sprintf(payload, "\"value\":{},\"action\":{\"delay\":{\"%s\":%s}}",
+                                   tests[i].member, tests[i].value);
+                break;
+            case DYNCFG_INTEGER_REPEAT:
+                buffer_sprintf(payload, "\"value\":{},\"action\":{\"repeat\":{\"enabled\":true,\"%s\":%s}}",
+                               tests[i].member, tests[i].value);
+                break;
+        }
+        buffer_strcat(payload, ",\"match\":{\"on\":\"chart\"}}}]}" );
+
+        int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_USERCONFIG, "unittest",
+                                    payload, NULL, NULL, result, HTTP_ACCESS_NONE, NULL, NULL);
+        bool has_field_error = tests[i].expected_code == HTTP_RESP_OK ||
+                               (strstr(buffer_tostring(result), tests[i].member) &&
+                                strstr(buffer_tostring(result), "range"));
+        bool has_expected_text = !tests[i].expected_text ||
+                                 strstr(buffer_tostring(result), tests[i].expected_text);
+        bool lacks_unexpected_text = !tests[i].expected_absent_text ||
+                                     !strstr(buffer_tostring(result), tests[i].expected_absent_text);
+
+        if(code != tests[i].expected_code || !has_field_error || !has_expected_text || !lacks_unexpected_text) {
+            fprintf(stderr, "FAILED [%s]: code=%d response='%s'\n",
+                    tests[i].description, code, buffer_tostring(result));
+            failed++;
+        }
+        else
+            (*passed)++;
+    }
+
+    CLEAN_BUFFER *payload = buffer_create(0, NULL);
+    CLEAN_BUFFER *result = buffer_create(0, NULL);
+    buffer_strcat(payload,
+                  "{\"format_version\":1,\"rules\":["
+                  "{\"enabled\":true,\"type\":\"instance\",\"config\":{"
+                  "\"value\":{},\"action\":{\"delay\":{\"up\":1}},\"match\":{\"on\":\"first\"}}},"
+                  "{\"enabled\":true,\"type\":\"instance\",\"config\":{"
+                  "\"value\":{},\"action\":{\"repeat\":{\"enabled\":true,\"warning\":-1}},"
+                  "\"match\":{\"on\":\"second\"}}}]}" );
+
+    int code = dyncfg_health_cb(NULL, "health:alert:prototype", DYNCFG_CMD_USERCONFIG, "unittest",
+                                payload, NULL, NULL, result, HTTP_ACCESS_NONE, NULL, NULL);
+    if(code != HTTP_RESP_BAD_REQUEST || !strstr(buffer_tostring(result), "warning") ||
+       !strstr(buffer_tostring(result), "range")) {
+        fprintf(stderr,
+                "FAILED [invalid repeat in a later rule rejects the complete prototype]: code=%d response='%s'\n",
+                code, buffer_tostring(result));
+        failed++;
+    }
+    else
+        (*passed)++;
+
+    return failed;
+}
+
 static int test_dyncfg_delay_multiplier_boundaries(int *passed) {
     static const struct {
         const char *multiplier;
@@ -740,6 +894,7 @@ int health_config_unittest(void) {
 
     failed += test_db_lookup_frequency_boundaries(&passed);
     failed += test_dyncfg_update_every_boundaries(&passed);
+    failed += test_dyncfg_integer_destination_boundaries(&passed);
     failed += test_dyncfg_delay_multiplier_boundaries(&passed);
     failed += test_delay_parser_multiplier_boundaries(&passed);
     failed += test_delay_multiplier_runtime_boundaries(&passed);

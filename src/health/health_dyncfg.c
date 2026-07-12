@@ -22,6 +22,19 @@ static char *health_dyncfg_alert_prototype_id_strdupz(const char *alert_name) {
 // ---------------------------------------------------------------------------------------------------------------------
 // parse the json object of an alert definition
 
+static bool parse_bounded_int64(json_object *jobj, const char *path, const char *member, int64_t *value,
+                                int64_t minimum, int64_t maximum, BUFFER *error, unsigned flags) {
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, member, *value, error, flags);
+
+    if(*value < minimum || *value > maximum) {
+        buffer_sprintf(error, "value for '%s.%s' is outside range [%" PRId64 ", %" PRId64 "]",
+                       path, member, minimum, maximum);
+        return false;
+    }
+
+    return true;
+}
+
 static void dims_grouping_to_rrdr_options(RRD_ALERT_PROTOTYPE *ap) {
     ap->config.options &= ~(RRDR_OPTIONS_DIMS_AGGREGATION);
 
@@ -81,8 +94,15 @@ static bool parse_match(json_object *jobj, const char *path, struct rrd_alert_ma
 }
 
 static bool parse_config_value_database_lookup(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, unsigned flags) {
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "after", config->after, error, flags);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "before", config->before, error, flags);
+    int64_t after = config->after;
+    int64_t before = config->before;
+    if(!parse_bounded_int64(jobj, path, "after", &after, INT_MIN, INT_MAX, error, flags) ||
+       !parse_bounded_int64(jobj, path, "before", &before, INT_MIN, INT_MAX, error, flags))
+        return false;
+
+    config->after = (int)after;
+    config->before = (int)before;
+
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "time_group", time_grouping_txt2id, config->time_group, error, flags);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "dims_group", alerts_dims_grouping2id, config->dims_group, error, flags);
     JSONC_PARSE_TXT2ENUM_OR_ERROR_AND_RETURN(jobj, path, "data_source", alerts_data_sources2id, config->data_source, error, flags);
@@ -134,9 +154,17 @@ static bool parse_config_conditions(json_object *jobj, const char *path, struct 
 }
 
 static bool parse_config_action_delay(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, unsigned flags) {
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "up", config->delay_up_duration, error, flags);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "down", config->delay_down_duration, error, flags);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "max", config->delay_max_duration, error, flags);
+    int64_t up = config->delay_up_duration;
+    int64_t down = config->delay_down_duration;
+    int64_t max = config->delay_max_duration;
+    if(!parse_bounded_int64(jobj, path, "up", &up, INT_MIN, INT_MAX, error, flags) ||
+       !parse_bounded_int64(jobj, path, "down", &down, INT_MIN, INT_MAX, error, flags) ||
+       !parse_bounded_int64(jobj, path, "max", &max, INT_MIN, INT_MAX, error, flags))
+        return false;
+
+    config->delay_up_duration = (int)up;
+    config->delay_down_duration = (int)down;
+    config->delay_max_duration = (int)max;
 
     json_object *jmultiplier = NULL;
     bool multiplier_is_int = json_object_object_get_ex(jobj, "multiplier", &jmultiplier) &&
@@ -155,8 +183,16 @@ static bool parse_config_action_delay(json_object *jobj, const char *path, struc
 
 static bool parse_config_action_repeat(json_object *jobj, const char *path, struct rrd_alert_config *config, BUFFER *error, unsigned flags) {
     JSONC_PARSE_BOOL_OR_ERROR_AND_RETURN(jobj, path, "enabled", config->has_custom_repeat_config, error, flags);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "warning", config->warn_repeat_every, error, flags);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "critical", config->crit_repeat_every, error, flags);
+
+    int64_t warning = config->warn_repeat_every;
+    int64_t critical = config->crit_repeat_every;
+    if(!parse_bounded_int64(jobj, path, "warning", &warning, 0, INT_MAX, error, flags) ||
+       !parse_bounded_int64(jobj, path, "critical", &critical, 0, INT_MAX, error, flags))
+        return false;
+
+    config->warn_repeat_every = (uint32_t)warning;
+    config->crit_repeat_every = (uint32_t)critical;
+
     return true;
 }
 
