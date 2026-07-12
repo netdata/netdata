@@ -61,6 +61,9 @@ pub fn kv_null(k: &str) -> KeyValue {
 
 #[derive(Clone)]
 pub struct SpanSpec {
+    /// The owning trace (defaults to the shared [`TRACE`]; the search
+    /// suite builds multi-trace corpora).
+    pub trace: [u8; 16],
     pub id: [u8; 8],
     pub parent: [u8; 8],
     pub start: u64,
@@ -79,6 +82,7 @@ pub struct SpanSpec {
 
 pub fn sp(id: u8, parent: u8, start: u64, name: &'static str) -> SpanSpec {
     SpanSpec {
+        trace: TRACE,
         id: [id; 8],
         parent: [parent; 8],
         start,
@@ -96,7 +100,7 @@ pub fn sp(id: u8, parent: u8, start: u64, name: &'static str) -> SpanSpec {
 pub fn to_otlp(s: &SpanSpec) -> Span {
     use opentelemetry_proto::tonic::trace::v1::span::{Event, Link};
     Span {
-        trace_id: TRACE.to_vec(),
+        trace_id: s.trace.to_vec(),
         span_id: s.id.to_vec(),
         parent_span_id: if s.parent == [0u8; 8] {
             Vec::new()

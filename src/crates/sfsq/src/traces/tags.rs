@@ -45,35 +45,8 @@ use super::sources::{SourceSetError, TraceSource, validate_sources};
 use super::status::{PartialReason, QueryStatus, StatusBuilder};
 use super::vocab::{TagKey, TagScope, TraceIntrinsic, storage_to_tag};
 use super::wal_scan::TraceWalScan;
+use super::window::{TimeWindow, WindowError};
 use crate::source::map_source;
-
-/// A half-open `[start_ns, end_ns)` nanosecond window (pin C3).
-/// Construction validates `start_ns < end_ns`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct TimeWindow {
-    start_ns: i64,
-    end_ns: i64,
-}
-
-impl TimeWindow {
-    pub fn new(start_ns: i64, end_ns: i64) -> Result<Self, TagRequestError> {
-        if start_ns >= end_ns {
-            return Err(TagRequestError::InvalidWindow { start_ns, end_ns });
-        }
-        Ok(Self { start_ns, end_ns })
-    }
-
-    /// Whether a summary's inclusive-seconds `[min_s, max_s]` range
-    /// overlaps this window: the file range expands to nanoseconds as
-    /// `[min_s·10⁹, (max_s+1)·10⁹)` (saturating) and the two half-open
-    /// ranges intersect iff each starts before the other ends.
-    fn overlaps_summary(&self, min_s: u32, max_s: u32) -> bool {
-        const NS: i64 = 1_000_000_000;
-        let file_start = i64::from(min_s).saturating_mul(NS);
-        let file_end = (i64::from(max_s) + 1).saturating_mul(NS);
-        self.start_ns < file_end && file_start < self.end_ns
-    }
-}
 
 /// A tag-names request. [`new`](Self::new) enumerates every scope,
 /// unlimited; narrow with the builder methods.
@@ -151,8 +124,8 @@ impl TagValuesQuery {
 pub enum TagRequestError {
     #[error("a zero key/value limit would return nothing; omit the limit or raise it")]
     ZeroLimit,
-    #[error("invalid time window [{start_ns}, {end_ns}): start must be before end")]
-    InvalidWindow { start_ns: i64, end_ns: i64 },
+    #[error(transparent)]
+    Window(#[from] WindowError),
     /// The static virtual/dictionary split is known at the boundary
     /// (decision 18B), so asking for a virtual intrinsic's values is a
     /// caller bug, not a data condition.

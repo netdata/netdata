@@ -556,11 +556,11 @@ fn request_validation_rejects_bad_requests() {
     ));
     assert!(matches!(
         TimeWindow::new(5, 5),
-        Err(TagRequestError::InvalidWindow { .. })
+        Err(sfsq::traces::WindowError::Invalid { .. })
     ));
     assert!(matches!(
         TimeWindow::new(9, 3),
-        Err(TagRequestError::InvalidWindow { .. })
+        Err(sfsq::traces::WindowError::Invalid { .. })
     ));
 
     // Pin C4: intrinsic key outside the Intrinsic scope…

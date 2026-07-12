@@ -21,9 +21,10 @@ use anyhow::{Context, Result, bail};
 use tokio_util::sync::CancellationToken;
 
 use sfsq::traces::{
-    QueryStatus, SourceId, TagKey, TagNamesQuery, TagScope, TagValuesQuery, TimeWindow,
+    CompareOp, Condition, Predicate, PredicateTarget, PredicateValue, QueryStatus, SearchQuery,
+    SearchSources, SourceId, TagKey, TagNamesQuery, TagScope, TagValuesQuery, TimeWindow,
     TraceIntrinsic, TraceQuery, TraceSfstCandidate, TraceSource, TraceWalTail, WalCoverage,
-    tag_names, tag_values, trace_by_id,
+    search, tag_names, tag_values, trace_by_id,
 };
 
 /// Reconstruct one trace across sealed SFSTs and traces WALs.
@@ -396,6 +397,182 @@ pub fn run_tag_values(args: &TagValuesArgs, out: &mut dyn std::io::Write) -> Res
         "{} value(s), truncated {}, status {}",
         data.values.len(),
         data.truncated,
+        status_word(&data.status),
+    )?;
+    Ok(())
+}
+
+// ── Search (phase 4c) ──────────────────────────────────────────────────
+
+/// Search for traces across sealed SFSTs and traces WALs.
+#[derive(Debug, clap::Args)]
+pub struct SearchArgs {
+    /// A sealed traces SFST file. Repeatable.
+    #[arg(long = "sfst")]
+    pub sfsts: Vec<PathBuf>,
+
+    /// A flattened traces WAL file, scanned whole as a tail. Repeatable.
+    #[arg(long = "wal")]
+    pub wals: Vec<PathBuf>,
+
+    /// A filter condition, repeatable (conditions AND):
+    /// `resource.KEY=VALUE`, `span.KEY=~REGEX`,
+    /// `instrumentation.KEY=VALUE`, or an intrinsic word
+    /// (`name=GET /`, `status=ERROR`, `kind=SERVER`, …). This is the dev
+    /// tool's rendering of the engine's typed predicate, not a wire
+    /// grammar; values are engine storage labels.
+    #[arg(long = "where")]
+    pub conditions: Vec<String>,
+
+    /// Minimum span duration, inclusive nanoseconds.
+    #[arg(long)]
+    pub min_duration_ns: Option<i64>,
+
+    /// Maximum span duration, inclusive nanoseconds.
+    #[arg(long)]
+    pub max_duration_ns: Option<i64>,
+
+    /// Result limit (top-K most recent traces; default 20, 0 rejected).
+    #[arg(long)]
+    pub limit: Option<usize>,
+
+    /// Matched spans attached per trace (default 3, max 128, 0 = none).
+    #[arg(long)]
+    pub spss: Option<usize>,
+
+    /// Window start, nanoseconds since the epoch (half-open; span-START
+    /// semantics). Requires --end-ns.
+    #[arg(long, allow_hyphen_values = true)]
+    pub start_ns: Option<i64>,
+
+    /// Window end, nanoseconds since the epoch (exclusive). Requires
+    /// --start-ns.
+    #[arg(long, allow_hyphen_values = true)]
+    pub end_ns: Option<i64>,
+}
+
+/// Parse one `--where` condition: `TARGET=VALUE` or `TARGET=~REGEX`
+/// (first occurrence splits; regex checked first so `=~` never parses
+/// as `=` with a `~value`).
+fn parse_condition(spec: &str) -> Result<Condition> {
+    let (target_word, op, value) = if let Some((t, v)) = spec.split_once("=~") {
+        (t, CompareOp::Regex, v)
+    } else if let Some((t, v)) = spec.split_once('=') {
+        (t, CompareOp::Eq, v)
+    } else {
+        bail!("--where must be TARGET=VALUE or TARGET=~REGEX, got {spec:?}");
+    };
+    let target = parse_target(target_word.trim())?;
+    Ok(Condition {
+        target,
+        op,
+        values: vec![PredicateValue::Text(value.to_string())],
+    })
+}
+
+/// A `--where` target: `SCOPE.KEY` for the attribute scopes, a bare
+/// intrinsic word otherwise.
+fn parse_target(word: &str) -> Result<PredicateTarget> {
+    for (scope_name, scope) in [
+        ("resource", TagScope::Resource),
+        ("span", TagScope::Span),
+        ("instrumentation", TagScope::Instrumentation),
+        ("event", TagScope::Event),
+        ("link", TagScope::Link),
+    ] {
+        if let Some(key) = word.strip_prefix(scope_name).and_then(|r| r.strip_prefix('.')) {
+            return Ok(PredicateTarget::Attribute(scope, key.to_string()));
+        }
+    }
+    INTRINSIC_WORDS
+        .iter()
+        .find(|(w, _)| *w == word)
+        .map(|(_, i)| PredicateTarget::Intrinsic(*i))
+        .ok_or_else(|| {
+            anyhow::anyhow!(
+                "unknown --where target {word:?}: use SCOPE.KEY \
+                 (resource/span/instrumentation/event/link) or an intrinsic word"
+            )
+        })
+}
+
+pub fn run_search(args: &SearchArgs, out: &mut dyn std::io::Write) -> Result<()> {
+    let mut conditions: Vec<Condition> = args
+        .conditions
+        .iter()
+        .map(|spec| parse_condition(spec))
+        .collect::<Result<_>>()?;
+    if let Some(min) = args.min_duration_ns {
+        conditions.push(Condition {
+            target: PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+            op: CompareOp::Gte,
+            values: vec![PredicateValue::Integer(min)],
+        });
+    }
+    if let Some(max) = args.max_duration_ns {
+        conditions.push(Condition {
+            target: PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+            op: CompareOp::Lte,
+            values: vec![PredicateValue::Integer(max)],
+        });
+    }
+
+    let mut query = SearchQuery::new(Predicate { conditions });
+    if let Some(window) = parse_window(args.start_ns, args.end_ns)? {
+        query = query.window(window);
+    }
+    if let Some(limit) = args.limit {
+        query = query.limit(limit);
+    }
+    if let Some(spss) = args.spss {
+        query = query.spss(spss);
+    }
+
+    // The dev shape: one flat set of paths serves both roles (window =
+    // completion — trivially a subset).
+    let sources = SearchSources {
+        window: build_sources(&args.sfsts, &args.wals)?,
+        completion: build_sources(&args.sfsts, &args.wals)?,
+    };
+    let data = search(
+        sources,
+        query,
+        CancellationToken::new(),
+        Arc::new(AtomicUsize::new(0)),
+    )?;
+
+    for t in &data.traces {
+        writeln!(
+            out,
+            "{} {} / {} start={} dur={}ns spans={} errors={} matched={}{}",
+            t.trace_id,
+            t.root_service.as_deref().unwrap_or("<no service>"),
+            t.root_name.as_deref().unwrap_or("<unnamed>"),
+            t.start_ns,
+            t.duration_ns,
+            t.span_count,
+            t.error_count,
+            t.matched_count,
+            if t.exact { "" } else { " [inexact]" },
+        )?;
+        for span in &t.matched_spans {
+            let name = span
+                .fields
+                .iter()
+                .find(|(k, _)| k == "name")
+                .map(|(_, v)| v.as_str())
+                .unwrap_or("<unnamed>");
+            writeln!(
+                out,
+                "  {} start={} dur={}ns",
+                name, span.start_ns, span.duration_ns
+            )?;
+        }
+    }
+    writeln!(
+        out,
+        "{} trace(s), status {}",
+        data.traces.len(),
         status_word(&data.status),
     )?;
     Ok(())

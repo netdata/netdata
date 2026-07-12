@@ -69,7 +69,8 @@ pub mod registry;
 
 pub use error::Error;
 pub use index_reader::{
-    BitmapFilter, IndexReader, Trace, TraceEvent, TraceFileSession, TraceLink, TraceSpan,
+    BitmapFilter, CompiledTracePlan, IndexReader, PlanTerm, ScanWork, Trace, TraceEvent,
+    TraceFileSession, TraceLink, TracePlan, TraceSpan,
 };
 pub use index_writer::IndexWriter;
 pub use kv_interner::KvSlot;

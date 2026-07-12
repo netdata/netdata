@@ -14,8 +14,10 @@ use crate::PrefixMap;
 use crate::reader::ChunkReader;
 
 mod session;
+mod trace_plan;
 
 pub use session::TraceFileSession;
+pub use trace_plan::{CompiledTracePlan, PlanTerm, ScanWork, TracePlan};
 
 use crate::{
     BitmapValue, Bucket, FacetResult, FieldEntry, FieldTier, Filter, Grid, Histogram, IdRanges,
@@ -1284,33 +1286,11 @@ impl<'a> IndexReader<'a> {
             FieldLocation::High(idx) => {
                 // High-card values are addressed by KvId; the set is built by
                 // scanning the SB batches indicated by the union of the matched
-                // values' batch masks. Exact values are found by binary search
-                // over the sorted key dictionary, patterns by a linear scan of
-                // it. Matched positions are ascending (batch start increases,
-                // position within increases), so they feed `from_sorted`.
-                let hf = self.sfst.high_field(idx)?;
-                // Matched KvIds for this field fall in the contiguous range
-                // [base, base + cardinality); `base` is fixed for the field, so
-                // resolve it once rather than per matched value.
-                let base = self.high_kv_id(idx, 0).0;
-                let mut targets = KvIdSet::new(base, hf.len() as u32);
-                let mut combined_mask: u8 = 0;
-                for value in &exacts {
-                    let kv = format!("{field}={value}");
-                    if let Ok(local) = hf.binary_search(kv.as_bytes()) {
-                        targets.insert(KvId(base + local as u32));
-                        combined_mask |= hf.masks[local];
-                    }
-                }
-                if !patterns.is_empty() {
-                    for (local, key) in hf.keys().enumerate() {
-                        if value_matches(key) {
-                            targets.insert(KvId(base + local as u32));
-                            combined_mask |= hf.masks[local];
-                        }
-                    }
-                }
-                self.scan_high_positions(&targets, combined_mask, total)
+                // values' batch masks. Matched positions are ascending (batch
+                // start increases, position within increases), so they feed
+                // `from_sorted`.
+                let (targets, mask) = self.high_targets(field, idx, &exacts, &patterns)?;
+                self.scan_high_positions(&targets, mask, total)
             }
         }
     }
@@ -1380,12 +1360,52 @@ impl<'a> IndexReader<'a> {
         Ok(result)
     }
 
+    /// One high-card field's matched-value targets: the [`KvIdSet`] of
+    /// KvIds whose value is in `exacts` (binary search over the sorted
+    /// key dictionary) or matches any of `patterns` (a linear dictionary
+    /// scan), plus the OR of the matched values' per-value batch masks.
+    /// Dictionary work only — no stream batch is touched here.
+    fn high_targets(
+        &self,
+        field: &str,
+        idx: u16,
+        exacts: &[&str],
+        patterns: &[regex::bytes::Regex],
+    ) -> Result<(KvIdSet, u8), crate::Error> {
+        let prefix_len = field.len() + 1;
+        let hf = self.sfst.high_field(idx)?;
+        // Matched KvIds for this field fall in the contiguous range
+        // [base, base + cardinality); `base` is fixed for the field, so
+        // resolve it once rather than per matched value.
+        let base = self.high_kv_id(idx, 0).0;
+        let mut targets = KvIdSet::new(base, hf.len() as u32);
+        let mut mask: u8 = 0;
+        for value in exacts {
+            let kv = format!("{field}={value}");
+            if let Ok(local) = hf.binary_search(kv.as_bytes()) {
+                targets.insert(KvId(base + local as u32));
+                mask |= hf.masks[local];
+            }
+        }
+        if !patterns.is_empty() {
+            for (local, key) in hf.keys().enumerate() {
+                let value = &key[prefix_len..];
+                if patterns.iter().any(|regex| regex.is_match(value)) {
+                    targets.insert(KvId(base + local as u32));
+                    mask |= hf.masks[local];
+                }
+            }
+        }
+        Ok((targets, mask))
+    }
+
     /// Positions of rows containing any KvId in `targets`, scanning only the
     /// stream batches selected by `mask` (bit `b` set ⇒ batch `b` may hold a
     /// target — the OR of the matched values' per-value batch masks). Empty
     /// `targets` yields an empty set. Shared by the high-card paths of
     /// [`field_values_or`](Self::field_values_or) and
-    /// [`query_positions`](Self::query_positions).
+    /// [`query_positions`](Self::query_positions), which have no work
+    /// ceiling to feed (hence the throwaway counter).
     fn scan_high_positions(
         &self,
         targets: &KvIdSet,
@@ -1395,22 +1415,47 @@ impl<'a> IndexReader<'a> {
         if targets.is_empty() {
             return Ok(PosSet::empty(total));
         }
+        let mut rows_visited = 0u64;
+        Ok(self
+            .scan_high_multi(&[(targets, mask)], total, &mut rows_visited)?
+            .pop()
+            .expect("one term in → one set out"))
+    }
+
+    /// Position sets for SEVERAL high-card terms resolved in ONE
+    /// stream-batch pass over the union of their batch masks (the
+    /// `materialize_fields` precedent) — the traces search plan counts
+    /// each visited row once into `rows_visited` however many terms
+    /// probe it. Matched positions ascend (batch start increases,
+    /// position within increases), so they feed `from_sorted`.
+    fn scan_high_multi(
+        &self,
+        terms: &[(&KvIdSet, u8)],
+        total: u32,
+        rows_visited: &mut u64,
+    ) -> Result<Vec<PosSet>, crate::Error> {
+        let union_mask = terms.iter().fold(0u8, |m, &(_, term_mask)| m | term_mask);
+        let mut per_term: Vec<Vec<u32>> = vec![Vec::new(); terms.len()];
         let batch_size = crate::stream_batch_size(total);
-        let num_batches = crate::num_stream_batches(total);
-        let mut positions: Vec<u32> = Vec::new();
-        for b in 0..num_batches {
-            if (mask >> b) & 1 == 0 {
+        for b in 0..crate::num_stream_batches(total) {
+            if (union_mask >> b) & 1 == 0 {
                 continue;
             }
             let batch_start = u32::from(b) * batch_size;
             let batch = self.sfst.stream_batch(b)?;
+            *rows_visited += batch.num_rows() as u64;
             for i in 0..batch.num_rows() {
-                if batch.row(i).any(|id| targets.contains(id)) {
-                    positions.push(batch_start + i as u32);
+                for (t, &(targets, _)) in terms.iter().enumerate() {
+                    if batch.row(i).any(|id| targets.contains(id)) {
+                        per_term[t].push(batch_start + i as u32);
+                    }
                 }
             }
         }
-        Ok(PosSet::from_sorted(positions, total))
+        Ok(per_term
+            .into_iter()
+            .map(|positions| PosSet::from_sorted(positions, total))
+            .collect())
     }
 
     /// Per-value `(value, count)` pairs for `field` restricted to `scope`.

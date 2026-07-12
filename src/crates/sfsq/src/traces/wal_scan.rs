@@ -280,6 +280,13 @@ impl TraceWalScan {
         self.spans.len()
     }
 
+    /// Every decoded span with its trace id, in decode order — the
+    /// search phase-1 tail path (the caller filters UNSET ids and
+    /// counts each visited span into its work ceiling).
+    pub fn spans_with_ids(&self) -> impl Iterator<Item = (sfst::TraceId, &TraceSpan)> {
+        self.spans.iter().map(|d| (d.trace_id, &d.span))
+    }
+
     /// Field → coalesced scalar kind over the scanned frames (see the
     /// struct field's doc).
     pub fn field_kinds(&self) -> &[(String, sfst::ValueKind)] {
