@@ -442,13 +442,9 @@ static inline int rrdr_time_wide_compare(rrdr_time_wide_t a, rrdr_time_wide_t b)
 _Static_assert((time_t)-1 < (time_t)0, "time-window normalization requires signed time_t");
 _Static_assert(sizeof(time_t) <= sizeof(uintmax_t), "time_t must fit in uintmax_t");
 
-static inline time_t rrdr_time_t_maximum(void) {
-    return (time_t)(((uintmax_t)1 << (sizeof(time_t) * CHAR_BIT - 1)) - 1);
-}
-
 static inline time_t rrdr_time_wide_to_time_t(rrdr_time_wide_t value) {
-    const time_t maximum = rrdr_time_t_maximum();
-    const time_t minimum = -maximum - 1;
+    const time_t maximum = nd_time_t_max();
+    const time_t minimum = nd_time_t_min();
     const rrdr_time_wide_t maximum_wide = rrdr_time_wide_from_time_t(maximum);
     const rrdr_time_wide_t minimum_wide = rrdr_time_wide_from_time_t(minimum);
 
