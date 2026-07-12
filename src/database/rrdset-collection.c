@@ -818,7 +818,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
                     }
                     else {
                         rd->collector.calculated_value +=
-                            (NETDATA_DOUBLE)((int64_t)(rd->collector.collected.i.collected_value - rd->collector.collected.i.last_collected_value))
+                            (NETDATA_DOUBLE)((int64_t)(new - last))
                             * (NETDATA_DOUBLE) rd->multiplier
                             / (NETDATA_DOUBLE) rd->divisor;
                     }
