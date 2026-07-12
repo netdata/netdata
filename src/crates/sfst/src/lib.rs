@@ -69,7 +69,7 @@ pub mod registry;
 
 pub use error::Error;
 pub use index_reader::{
-    BitmapFilter, CompiledTracePlan, IdColumnKind, IndexReader, LinkIdMatch, NumberCmp,
+    BitmapFilter, CompiledTracePlan, GroupCondition, IdColumnKind, IndexReader, NumberCmp,
     PlanMatcher, PlanTerm, ScanWork, Trace, TraceEvent, TraceFileSession, TraceLink, TracePlan,
     TraceSpan, numeric_token_matches,
 };

@@ -144,14 +144,40 @@ pub enum PlanTerm {
         ids: Vec<crate::SpanId>,
         negated: bool,
     },
-    /// Rows with at least one link whose span id / trace id is among
-    /// the given ids — an LNKB row scan with NO pre-filter: every
-    /// visited row feeds the work counter and the budget (the pinned
-    /// `link:*` unit). An absent LNKB chunk is a correct no-match (no
-    /// pre-EVNB/LNKB production files exist); a corrupt one errors.
-    /// POSITIVE only — the negated form's semantics are an open
-    /// design question (see the engine crate's SOW).
-    LinkIds { ids: LinkIdMatch },
+    /// The EVENT subgroup (pinned spanset semantics C-3): rows where a
+    /// SINGLE event satisfies every condition. Flat-token pre-filter
+    /// (AND of each field condition's flat set; the events.name
+    /// presence set when only computed conditions remain) → MANDATORY
+    /// EVNB structural refine at KvId level; every event record visited
+    /// by the refine feeds the counter and the budget. An absent EVNB
+    /// chunk is a correct no-match; a corrupt one errors. POSITIVE
+    /// conditions only — negated subgroup semantics are an open design
+    /// question (see the engine crate's SOW).
+    EventGroup { conditions: Vec<GroupCondition> },
+    /// The LINK subgroup — as [`EventGroup`](Self::EventGroup) over
+    /// LNKB. Id conditions have NO flat tokens (deliberate), so an
+    /// id-only group scans every row in range (the pinned no-prefilter
+    /// `link:*` unit).
+    LinkGroup { conditions: Vec<GroupCondition> },
+}
+
+/// One condition of an event/link subgroup.
+#[derive(Debug, Clone, PartialEq)]
+pub enum GroupCondition {
+    /// A dictionary condition on a FULL storage name
+    /// (`events.attributes.X`, `events.name`, `links.attributes.X`) —
+    /// refined by KvId membership against the tokens the matcher
+    /// selects from the field's dictionary.
+    Field { field: String, matcher: PlanMatcher },
+    /// `event:timeSinceStart` in any of the inclusive ns intervals —
+    /// computed in refine from the event time and the row start
+    /// (event groups only).
+    TimeSinceStart {
+        intervals: Vec<(Option<i64>, Option<i64>)>,
+    },
+    /// Link span/trace ids (link groups only; read from the LinkRef).
+    LinkSpanIds(Vec<crate::SpanId>),
+    LinkTraceIds(Vec<crate::TraceId>),
 }
 
 /// Which per-row id column an [`PlanTerm::IdColumn`] term scans.
@@ -159,13 +185,6 @@ pub enum PlanTerm {
 pub enum IdColumnKind {
     SpanId,
     ParentSpanId,
-}
-
-/// The id set of a [`PlanTerm::LinkIds`] term.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum LinkIdMatch {
-    Span(Vec<crate::SpanId>),
-    Trace(Vec<crate::TraceId>),
 }
 
 impl PlanTerm {
@@ -226,6 +245,75 @@ struct ResolvedTerm {
     presence: Option<Vec<Part>>,
 }
 
+/// One event/link subgroup awaiting the post-pass structural refine.
+struct GroupSlot {
+    /// Which term slot the refined set fills.
+    term_index: usize,
+    is_event: bool,
+    /// Flat pre-filter parts (AND-combined; empty = whole range).
+    prefilter: Vec<Part>,
+    conditions: Vec<ResolvedGroupCondition>,
+}
+
+/// A subgroup condition resolved for KvId-level refine.
+enum ResolvedGroupCondition {
+    /// Matching KvIds of the condition's dictionary field (empty =
+    /// unsatisfiable in this file).
+    Kv(std::collections::HashSet<u32>),
+    TimeSince(Vec<(Option<i64>, Option<i64>)>),
+    LinkSpanIds(Vec<crate::SpanId>),
+    LinkTraceIds(Vec<crate::TraceId>),
+}
+
+/// Iterate candidate rows through a per-row refine closure, counting
+/// every visited row and (via the closure's counter) every event/link
+/// record into the budgeted work counter — `None` = budget ran out
+/// (record-count overshoot is bounded by one row's records).
+fn refine_rows(
+    positions: impl Iterator<Item = u32>,
+    total: u32,
+    ceiling: u64,
+    work: &mut ScanWork,
+    mut row_matches: impl FnMut(u32, &mut u64) -> bool,
+) -> Option<PosSet> {
+    let mut matched: Vec<u32> = Vec::new();
+    for pos in positions {
+        work.rows_visited += 1;
+        if work.rows_visited > ceiling {
+            return None;
+        }
+        let mut records = 0u64;
+        let hit = row_matches(pos, &mut records);
+        work.rows_visited += records;
+        if work.rows_visited > ceiling {
+            return None;
+        }
+        if hit {
+            matched.push(pos);
+        }
+    }
+    Some(PosSet::from_sorted(matched, total))
+}
+
+/// Whether a `field=value` key's VALUE bytes satisfy `matcher` (shared
+/// by the per-tier set walks and the subgroup KvId collection).
+fn matcher_hits(
+    kv_bytes: &[u8],
+    prefix_len: usize,
+    matcher: &PlanMatcher,
+    compiled_patterns: &[regex::bytes::Regex],
+) -> bool {
+    let value = &kv_bytes[prefix_len..];
+    match matcher {
+        PlanMatcher::Tokens { exact, .. } => {
+            exact.iter().any(|e| e.as_bytes() == value)
+                || compiled_patterns.iter().any(|r| r.is_match(value))
+        }
+        PlanMatcher::Number { cmp, values } => std::str::from_utf8(value)
+            .is_ok_and(|v| values.iter().any(|&rhs| numeric_token_matches(v, *cmp, rhs))),
+    }
+}
+
 impl IndexReader<'_> {
     /// Resolve `plan` against this file for queries within the position
     /// range `[lo, hi)` (the caller's window; pass `(0, record_count)`
@@ -251,6 +339,7 @@ impl IndexReader<'_> {
         let mut probes: Vec<(KvIdSet, u8)> = Vec::new();
         let mut resolved: Vec<Option<ResolvedTerm>> = Vec::new(); // None = Duration slot
         let mut durations: Vec<Option<PosSet>> = Vec::new(); // parallel, ugly-free zip below
+        let mut groups: Vec<GroupSlot> = Vec::new(); // event/link subgroups (refined post-pass)
         for term in &plan.terms {
             match term {
                 PlanTerm::Fields {
@@ -324,29 +413,78 @@ impl IndexReader<'_> {
                     resolved.push(None);
                     durations.push(Some(PosSet::from_sorted(positions, total)));
                 }
-                PlanTerm::LinkIds { ids } => {
-                    // LNKB row scan, no pre-filter: every visited row
-                    // counts and the budget aborts mid-scan (a `None`
-                    // plan is never used).
-                    let mut positions: Vec<u32> = Vec::new();
-                    if self.has_link_index() {
-                        let links = self.link_index()?;
-                        for pos in range_lo..range_hi {
-                            work.rows_visited += 1;
-                            if work.rows_visited > ceiling {
-                                return Ok(None);
+                PlanTerm::EventGroup { conditions } | PlanTerm::LinkGroup { conditions } => {
+                    let is_event = matches!(term, PlanTerm::EventGroup { .. });
+                    // Pre-filter: AND of each Field condition's flat
+                    // set; a group with only computed conditions falls
+                    // back to the events.name presence set (every event
+                    // interns a name token) or — for link groups, whose
+                    // id conditions deliberately have no flat tokens —
+                    // to the whole range (the pinned no-prefilter scan).
+                    let mut parts: Vec<(Part, Option<Part>)> = Vec::new();
+                    let mut resolved_conditions: Vec<ResolvedGroupCondition> = Vec::new();
+                    for condition in conditions {
+                        match condition {
+                            GroupCondition::Field { field, matcher } => {
+                                let compiled_patterns = match matcher {
+                                    PlanMatcher::Tokens { patterns, .. } => patterns
+                                        .iter()
+                                        .map(|pat| crate::query::compile_pattern(pat))
+                                        .collect::<Result<Vec<_>, _>>()?,
+                                    PlanMatcher::Number { .. } => Vec::new(),
+                                };
+                                let (m, _) = self.resolve_field(
+                                    field,
+                                    matcher,
+                                    &compiled_patterns,
+                                    false,
+                                    total,
+                                    &mut probes,
+                                )?;
+                                parts.push((m, None));
+                                resolved_conditions.push(ResolvedGroupCondition::Kv(
+                                    self.field_matching_kvids(field, matcher, &compiled_patterns)?,
+                                ));
                             }
-                            let hit = links.links_for_row(pos).any(|l| match ids {
-                                LinkIdMatch::Span(wanted) => wanted.contains(&l.span_id),
-                                LinkIdMatch::Trace(wanted) => wanted.contains(&l.trace_id),
-                            });
-                            if hit {
-                                positions.push(pos);
+                            GroupCondition::TimeSinceStart { intervals } => {
+                                resolved_conditions
+                                    .push(ResolvedGroupCondition::TimeSince(intervals.clone()));
+                            }
+                            GroupCondition::LinkSpanIds(ids) => {
+                                resolved_conditions
+                                    .push(ResolvedGroupCondition::LinkSpanIds(ids.clone()));
+                            }
+                            GroupCondition::LinkTraceIds(ids) => {
+                                resolved_conditions
+                                    .push(ResolvedGroupCondition::LinkTraceIds(ids.clone()));
                             }
                         }
                     }
+                    if parts.is_empty() && is_event {
+                        // Presence pre-filter via events.name.
+                        let names = PlanMatcher::Tokens {
+                            exact: Vec::new(),
+                            patterns: vec![".*".to_string()],
+                        };
+                        let compiled = vec![crate::query::compile_pattern(".*")?];
+                        let (m, _) = self.resolve_field(
+                            "events.name",
+                            &names,
+                            &compiled,
+                            false,
+                            total,
+                            &mut probes,
+                        )?;
+                        parts.push((m, None));
+                    }
                     resolved.push(None);
-                    durations.push(Some(PosSet::from_sorted(positions, total)));
+                    durations.push(None);
+                    groups.push(GroupSlot {
+                        term_index: resolved.len() - 1,
+                        is_event,
+                        prefilter: parts.into_iter().map(|(m, _)| m).collect(),
+                        conditions: resolved_conditions,
+                    });
                 }
                 PlanTerm::Duration { intervals, negated } => {
                     // One DURN pass over the caller's range only (a
@@ -424,6 +562,97 @@ impl IndexReader<'_> {
             }));
         }
 
+        // ── Structural refine per subgroup (MANDATORY, decision 10):
+        // a single event/link must satisfy the whole subgroup — every
+        // event/link record visited counts and the budget aborts. ─────
+        for group in &groups {
+            let mut prefilter: Option<PosSet> = None;
+            for part in &group.prefilter {
+                let set = match part {
+                    Part::Ready(set) => set.clone(),
+                    Part::Probe(i) => probe_sets[*i].clone(),
+                };
+                match &mut prefilter {
+                    None => prefilter = Some(set),
+                    Some(acc) => acc.and_assign(&set),
+                }
+            }
+            let mut range_set = PosSet::range(range_lo, range_hi, total);
+            if let Some(pre) = prefilter {
+                range_set.and_assign(&pre);
+            }
+            let set = if group.is_event {
+                if self.has_event_index() {
+                    let events = self.event_index()?;
+                    let timestamps = self.load_timestamps()?;
+                    let Some(set) = refine_rows(
+                        range_set.iter(),
+                        total,
+                        ceiling,
+                        work,
+                        |pos, count| {
+                            let start = timestamps.at(pos).unwrap_or(0);
+                            let mut hit = false;
+                            for e in events.events_for_row(pos) {
+                                *count += 1;
+                                let ok = group.conditions.iter().all(|c| match c {
+                                    ResolvedGroupCondition::Kv(kvids) => {
+                                        kvids.contains(&e.name.0)
+                                            || e.attr_refs.iter().any(|id| kvids.contains(&id.0))
+                                    }
+                                    ResolvedGroupCondition::TimeSince(intervals) => {
+                                        let dt = (e.time_unix_nano as i64).saturating_sub(start);
+                                        intervals.iter().any(|&(lo, hi)| {
+                                            lo.is_none_or(|lo| dt >= lo)
+                                                && hi.is_none_or(|hi| dt <= hi)
+                                        })
+                                    }
+                                    _ => false, // link-only conditions never match events
+                                });
+                                if ok {
+                                    hit = true;
+                                    break;
+                                }
+                            }
+                            hit
+                        },
+                    ) else {
+                        return Ok(None);
+                    };
+                    set
+                } else {
+                    PosSet::empty(total) // absent chunk = correct no-match
+                }
+            } else if self.has_link_index() {
+                let links = self.link_index()?;
+                let Some(set) = refine_rows(range_set.iter(), total, ceiling, work, |pos, count| {
+                    let mut hit = false;
+                    for l in links.links_for_row(pos) {
+                        *count += 1;
+                        let ok = group.conditions.iter().all(|c| match c {
+                            ResolvedGroupCondition::Kv(kvids) => {
+                                l.attr_refs.iter().any(|id| kvids.contains(&id.0))
+                            }
+                            ResolvedGroupCondition::LinkSpanIds(ids) => ids.contains(&l.span_id),
+                            ResolvedGroupCondition::LinkTraceIds(ids) => ids.contains(&l.trace_id),
+                            ResolvedGroupCondition::TimeSince(_) => false, // event-only
+                        });
+                        if ok {
+                            hit = true;
+                            break;
+                        }
+                    }
+                    hit
+                }) else {
+                    return Ok(None);
+                };
+                set
+            } else {
+                PosSet::empty(total)
+            };
+            durations[group.term_index] = Some(set);
+        }
+
         // ── Combine in plan order ─────────────────────────────────────
         let materialize = |parts: &[Part]| -> PosSet {
             let mut acc = PosSet::empty(total);
@@ -480,19 +709,8 @@ impl IndexReader<'_> {
         probes: &mut Vec<(KvIdSet, u8)>,
     ) -> Result<(Part, Option<Part>), crate::Error> {
         let prefix_len = field.len() + 1;
-        // Whether a `field=value` key's VALUE bytes match this matcher
-        // (patterns are anchored; numeric values parse-and-compare).
-        let value_matches = |kv_bytes: &[u8]| -> bool {
-            let value = &kv_bytes[prefix_len..];
-            match matcher {
-                PlanMatcher::Tokens { exact, .. } => {
-                    exact.iter().any(|e| e.as_bytes() == value)
-                        || compiled_patterns.iter().any(|r| r.is_match(value))
-                }
-                PlanMatcher::Number { cmp, values } => std::str::from_utf8(value)
-                    .is_ok_and(|v| values.iter().any(|&rhs| numeric_token_matches(v, *cmp, rhs))),
-            }
-        };
+        let value_matches =
+            |kv_bytes: &[u8]| matcher_hits(kv_bytes, prefix_len, matcher, compiled_patterns);
 
         let location = match self.locate_field(field) {
             Some(loc) => loc,
@@ -584,6 +802,67 @@ impl IndexReader<'_> {
                 Ok((matched, presence))
             }
         }
+    }
+
+    /// The KvIds of `field`'s dictionary tokens selected by `matcher` —
+    /// the subgroup refine's membership sets. KvIds are assigned per
+    /// field in field-table order with values in dictionary order (the
+    /// tested `resolve_kv_strings` labeling), so the id of the `i`-th
+    /// walked value is `field_start + i`. An absent field yields the
+    /// empty set (unsatisfiable subgroup condition in this file).
+    fn field_matching_kvids(
+        &self,
+        field: &str,
+        matcher: &PlanMatcher,
+        compiled_patterns: &[regex::bytes::Regex],
+    ) -> Result<std::collections::HashSet<u32>, crate::Error> {
+        let mut start = 0u32;
+        let mut present = false;
+        for entry in self.field_table().iter() {
+            if entry.name == field {
+                present = true;
+                break;
+            }
+            start += entry.cardinality;
+        }
+        let mut out = std::collections::HashSet::new();
+        if !present {
+            return Ok(out);
+        }
+        let prefix_len = field.len() + 1;
+        let hits = |kv: &[u8]| matcher_hits(kv, prefix_len, matcher, compiled_patterns);
+        match self.locate_field(field) {
+            None => {}
+            Some(FieldLocation::Low) => {
+                let prefix = format!("{field}=");
+                let mut off = 0u32;
+                self.primary.prefix_for_each(prefix.as_bytes(), |kv_bytes, _| {
+                    if hits(kv_bytes) {
+                        out.insert(start + off);
+                    }
+                    off += 1;
+                });
+            }
+            Some(FieldLocation::Mid(idx)) => {
+                let chunk = self.sfst.mid_field(idx)?;
+                let mut off = 0u32;
+                chunk.for_each(|kv_bytes, _| {
+                    if hits(kv_bytes) {
+                        out.insert(start + off);
+                    }
+                    off += 1;
+                });
+            }
+            Some(FieldLocation::High(idx)) => {
+                let hf = self.sfst.high_field(idx)?;
+                for (local, key) in hf.keys().enumerate() {
+                    if hits(key) {
+                        out.insert(start + local as u32);
+                    }
+                }
+            }
+        }
+        Ok(out)
     }
 }
 

@@ -352,8 +352,25 @@ impl Condition {
             (PredicateTarget::Intrinsic(EventName), CompareOp::NotEq | CompareOp::NotRegex) => {
                 Some(format!("negated {} (subgroup semantics, refine step)", self.target))
             }
+            // Event/link-scoped attributes: POSITIVE forms evaluate
+            // through the subgroup refine; negated forms sit on the
+            // recorded open question (flat negation vs single-item
+            // subgroup semantics).
+            (
+                PredicateTarget::Attribute(TagScope::Event | TagScope::Link, _),
+                CompareOp::Eq | CompareOp::Regex | CompareOp::Gt | CompareOp::Lt
+                | CompareOp::Gte | CompareOp::Lte,
+            ) => None,
             (PredicateTarget::Attribute(TagScope::Event | TagScope::Link, _), _) => {
-                Some(format!("{} (structural refine)", self.target))
+                Some(format!("negated {} (subgroup semantics, refine step)", self.target))
+            }
+            // event:timeSinceStart computes in the refine; != would be a
+            // negated per-event condition — deferred with the fork for a
+            // uniform rule.
+            (PredicateTarget::Intrinsic(EventTimeSinceStart), op)
+                if op.is_ordering() || op == CompareOp::Eq =>
+            {
+                None
             }
             (PredicateTarget::Intrinsic(RootName | RootServiceName | TraceDuration), _) => {
                 Some(format!("trace-level {}", self.target))
@@ -381,24 +398,6 @@ impl Predicate {
             if let Some(construct) = condition.unevaluable_construct() {
                 return Err(PredicateError::NotYetEvaluable { construct });
             }
-        }
-        // Two event:name conditions would need the single-event
-        // subgroup conjunction — the structural-refine step's machinery.
-        let event_names = self
-            .conditions
-            .iter()
-            .filter(|c| {
-                matches!(
-                    c.target,
-                    PredicateTarget::Intrinsic(TraceIntrinsic::EventName)
-                )
-            })
-            .count();
-        if event_names > 1 {
-            return Err(PredicateError::NotYetEvaluable {
-                construct: "multiple event:name conditions (single-event subgroup, refine step)"
-                    .to_string(),
-            });
         }
         Ok(())
     }
@@ -483,6 +482,11 @@ impl Predicate {
     pub(crate) fn to_trace_plan(&self) -> TracePlan {
         let mut terms = Vec::with_capacity(self.conditions.len());
         let mut bound: Option<(Option<i64>, Option<i64>)> = None;
+        // Event/link-scoped conditions collect into ONE subgroup each
+        // (pinned spanset semantics: a single event/link satisfies the
+        // whole scoped conjunction), appended after the span terms.
+        let mut event_group: Vec<sfst::GroupCondition> = Vec::new();
+        let mut link_group: Vec<sfst::GroupCondition> = Vec::new();
         for condition in &self.conditions {
             let integers = || -> Vec<i64> {
                 condition
@@ -541,27 +545,62 @@ impl Predicate {
                     PredicateTarget::Intrinsic(TraceIntrinsic::LinkSpanId),
                     CompareOp::Eq,
                 ) => {
-                    terms.push(PlanTerm::LinkIds {
-                        ids: sfst::LinkIdMatch::Span(hex_span_ids(&condition.values)),
-                    });
+                    link_group.push(sfst::GroupCondition::LinkSpanIds(hex_span_ids(
+                        &condition.values,
+                    )));
                 }
                 (
                     PredicateTarget::Intrinsic(TraceIntrinsic::LinkTraceId),
                     CompareOp::Eq,
                 ) => {
-                    terms.push(PlanTerm::LinkIds {
-                        ids: sfst::LinkIdMatch::Trace(
-                            condition
-                                .values
-                                .iter()
-                                .map(|v| {
-                                    let PredicateValue::Text(hex) = v else {
-                                        unreachable!("validated: id values are text");
-                                    };
-                                    sfst::TraceId::from(parse_hex::<16>(hex))
-                                })
-                                .collect(),
-                        ),
+                    link_group.push(sfst::GroupCondition::LinkTraceIds(
+                        condition
+                            .values
+                            .iter()
+                            .map(|v| {
+                                let PredicateValue::Text(hex) = v else {
+                                    unreachable!("validated: id values are text");
+                                };
+                                sfst::TraceId::from(parse_hex::<16>(hex))
+                            })
+                            .collect(),
+                    ));
+                }
+                (PredicateTarget::Intrinsic(TraceIntrinsic::EventName), op) => {
+                    event_group.push(sfst::GroupCondition::Field {
+                        field: TraceIntrinsic::EventName
+                            .dictionary_field()
+                            .expect("dictionary-backed")
+                            .to_string(),
+                        matcher: condition_matcher(op, &condition.values),
+                    });
+                }
+                (PredicateTarget::Intrinsic(TraceIntrinsic::EventTimeSinceStart), op) => {
+                    let intervals: Vec<(Option<i64>, Option<i64>)> = condition
+                        .values
+                        .iter()
+                        .map(|v| {
+                            let PredicateValue::Integer(n) = v else {
+                                unreachable!("validated: nanos values are integers");
+                            };
+                            duration_bounds(if op == CompareOp::Eq { CompareOp::Eq } else { op }, *n)
+                        })
+                        .collect();
+                    event_group.push(sfst::GroupCondition::TimeSinceStart { intervals });
+                }
+                (PredicateTarget::Attribute(scope @ (TagScope::Event | TagScope::Link), key), op) => {
+                    let field = format!(
+                        "{}{key}",
+                        scope.attribute_prefix().expect("attribute scope")
+                    );
+                    let group = if *scope == TagScope::Event {
+                        &mut event_group
+                    } else {
+                        &mut link_group
+                    };
+                    group.push(sfst::GroupCondition::Field {
+                        field,
+                        matcher: condition_matcher(op, &condition.values),
                     });
                 }
                 (PredicateTarget::Intrinsic(TraceIntrinsic::TraceId), _) => {
@@ -596,55 +635,9 @@ impl Predicate {
                         ],
                     };
                     let negated = matches!(op, CompareOp::NotEq | CompareOp::NotRegex);
-                    let numeric = condition
-                        .values
-                        .iter()
-                        .any(|v| matches!(v, PredicateValue::Integer(_) | PredicateValue::Float(_)));
-                    let matcher = if numeric {
-                        // Dictionary-numeric: equality against any of the
-                        // values, or the single ordering comparison.
-                        let values: Vec<f64> = condition
-                            .values
-                            .iter()
-                            .map(|v| match v {
-                                PredicateValue::Integer(n) => *n as f64,
-                                PredicateValue::Float(f) => *f,
-                                PredicateValue::Text(_) => {
-                                    unreachable!("validated: values are homogeneous")
-                                }
-                            })
-                            .collect();
-                        let cmp = match op {
-                            CompareOp::Eq | CompareOp::NotEq => sfst::NumberCmp::Eq,
-                            CompareOp::Gt => sfst::NumberCmp::Gt,
-                            CompareOp::Lt => sfst::NumberCmp::Lt,
-                            CompareOp::Gte => sfst::NumberCmp::Gte,
-                            CompareOp::Lte => sfst::NumberCmp::Lte,
-                            CompareOp::Regex | CompareOp::NotRegex => {
-                                unreachable!("validated: regex takes text patterns")
-                            }
-                        };
-                        sfst::PlanMatcher::Number { cmp, values }
-                    } else {
-                        let mut exact = Vec::new();
-                        let mut patterns = Vec::new();
-                        for value in &condition.values {
-                            let PredicateValue::Text(text) = value else {
-                                unreachable!("validated: values are homogeneous");
-                            };
-                            match op {
-                                CompareOp::Eq | CompareOp::NotEq => exact.push(text.clone()),
-                                CompareOp::Regex | CompareOp::NotRegex => {
-                                    patterns.push(text.clone())
-                                }
-                                _ => unreachable!("validated: ordering needs numeric values"),
-                            }
-                        }
-                        sfst::PlanMatcher::Tokens { exact, patterns }
-                    };
                     terms.push(PlanTerm::Fields {
                         fields,
-                        matcher,
+                        matcher: condition_matcher(op, &condition.values),
                         negated,
                     });
                 }
@@ -653,7 +646,61 @@ impl Predicate {
         if let Some((min_ns, max_ns)) = bound {
             terms.push(PlanTerm::duration(min_ns, max_ns));
         }
+        if !event_group.is_empty() {
+            terms.push(PlanTerm::EventGroup {
+                conditions: event_group,
+            });
+        }
+        if !link_group.is_empty() {
+            terms.push(PlanTerm::LinkGroup {
+                conditions: link_group,
+            });
+        }
         TracePlan { terms }
+    }
+}
+
+/// The dictionary matcher of one condition — token selection for text
+/// values, the dictionary-numeric comparison for numbers (negation is
+/// the TERM's flag, so `!=`/`!~` produce the same matcher as `=`/`=~`).
+fn condition_matcher(op: CompareOp, values: &[PredicateValue]) -> sfst::PlanMatcher {
+    let numeric = values
+        .iter()
+        .any(|v| matches!(v, PredicateValue::Integer(_) | PredicateValue::Float(_)));
+    if numeric {
+        let values: Vec<f64> = values
+            .iter()
+            .map(|v| match v {
+                PredicateValue::Integer(n) => *n as f64,
+                PredicateValue::Float(f) => *f,
+                PredicateValue::Text(_) => unreachable!("validated: values are homogeneous"),
+            })
+            .collect();
+        let cmp = match op {
+            CompareOp::Eq | CompareOp::NotEq => sfst::NumberCmp::Eq,
+            CompareOp::Gt => sfst::NumberCmp::Gt,
+            CompareOp::Lt => sfst::NumberCmp::Lt,
+            CompareOp::Gte => sfst::NumberCmp::Gte,
+            CompareOp::Lte => sfst::NumberCmp::Lte,
+            CompareOp::Regex | CompareOp::NotRegex => {
+                unreachable!("validated: regex takes text patterns")
+            }
+        };
+        sfst::PlanMatcher::Number { cmp, values }
+    } else {
+        let mut exact = Vec::new();
+        let mut patterns = Vec::new();
+        for value in values {
+            let PredicateValue::Text(text) = value else {
+                unreachable!("validated: values are homogeneous");
+            };
+            match op {
+                CompareOp::Eq | CompareOp::NotEq => exact.push(text.clone()),
+                CompareOp::Regex | CompareOp::NotRegex => patterns.push(text.clone()),
+                _ => unreachable!("validated: ordering needs numeric values"),
+            }
+        }
+        sfst::PlanMatcher::Tokens { exact, patterns }
     }
 }
 
@@ -764,9 +811,23 @@ enum EvalTerm {
         ids: Vec<sfst::SpanId>,
         negated: bool,
     },
-    LinkIds {
-        ids: sfst::LinkIdMatch,
+    EventGroup {
+        conditions: Vec<EvalGroupCondition>,
     },
+    LinkGroup {
+        conditions: Vec<EvalGroupCondition>,
+    },
+}
+
+/// A subgroup condition on the span side, with the R3-3 storage→bare
+/// key translation applied once at build: materialized spans expose
+/// event/link attributes PREFIX-STRIPPED and event names structured.
+enum EvalGroupCondition {
+    EventName(EvalMatcher),
+    Attr { bare_key: String, matcher: EvalMatcher },
+    TimeSince(Vec<(Option<i64>, Option<i64>)>),
+    LinkSpanIds(Vec<sfst::SpanId>),
+    LinkTraceIds(Vec<sfst::TraceId>),
 }
 
 /// The span-side predicate evaluator — the single source of truth for
@@ -791,22 +852,7 @@ impl EvalPredicate {
                     negated,
                 } => EvalTerm::Fields {
                     fields: fields.clone(),
-                    matcher: match matcher {
-                        sfst::PlanMatcher::Tokens { exact, patterns } => EvalMatcher::Tokens {
-                            exact: exact.clone(),
-                            patterns: patterns
-                                .iter()
-                                .map(|p| {
-                                    sfst::compile_pattern(p)
-                                        .expect("patterns validated at the request boundary")
-                                })
-                                .collect(),
-                        },
-                        sfst::PlanMatcher::Number { cmp, values } => EvalMatcher::Number {
-                            cmp: *cmp,
-                            values: values.clone(),
-                        },
-                    },
+                    matcher: eval_matcher(matcher),
                     negated: *negated,
                 },
                 PlanTerm::Duration { intervals, negated } => EvalTerm::Duration {
@@ -822,7 +868,12 @@ impl EvalPredicate {
                     ids: ids.clone(),
                     negated: *negated,
                 },
-                PlanTerm::LinkIds { ids } => EvalTerm::LinkIds { ids: ids.clone() },
+                PlanTerm::EventGroup { conditions } => EvalTerm::EventGroup {
+                    conditions: conditions.iter().map(eval_group_condition).collect(),
+                },
+                PlanTerm::LinkGroup { conditions } => EvalTerm::LinkGroup {
+                    conditions: conditions.iter().map(eval_group_condition).collect(),
+                },
             })
             .collect();
         Self { terms }
@@ -844,29 +895,18 @@ impl EvalPredicate {
             } => {
                 // Values gathered across the term's fields (several for
                 // the unscoped disjunction; multi-valued fields yield
-                // several entries). Negation is the pinned
-                // presence ∩ complement: present with NO matching value.
-                // Materialized spans expose event names STRUCTURED (the
-                // flat `events.name` token exists only in the raw
-                // dictionaries) — the R3-3 translation gathers them from
-                // `TraceEvent.name`.
+                // several entries; event/link names and attributes live
+                // in the subgroup terms, never here). Negation is the
+                // pinned presence ∩ complement: present with NO matching
+                // value.
                 let mut present = false;
                 let mut any_match = false;
-                {
-                    let mut visit = |value: &str| {
+                for (k, v) in &span.fields {
+                    if fields.iter().any(|f| f == k) {
                         present = true;
-                        if matcher.value_matches(value) {
+                        if matcher.value_matches(v) {
                             any_match = true;
-                        }
-                    };
-                    for (k, v) in &span.fields {
-                        if fields.iter().any(|f| f == k) {
-                            visit(v);
-                        }
-                    }
-                    if fields.iter().any(|f| f == "events.name") {
-                        for event in &span.events {
-                            visit(&event.name);
+                            break;
                         }
                     }
                 }
@@ -895,11 +935,83 @@ impl EvalPredicate {
                 }
                 ids.contains(&id) != *negated
             }
-            EvalTerm::LinkIds { ids } => span.links.iter().any(|l| match ids {
-                sfst::LinkIdMatch::Span(wanted) => wanted.contains(&l.span_id),
-                sfst::LinkIdMatch::Trace(wanted) => wanted.contains(&l.trace_id),
+            // The pinned subgroup semantics: ONE event/link satisfies
+            // every condition of its group.
+            EvalTerm::EventGroup { conditions } => span.events.iter().any(|e| {
+                conditions.iter().all(|c| match c {
+                    EvalGroupCondition::EventName(m) => m.value_matches(&e.name),
+                    EvalGroupCondition::Attr { bare_key, matcher } => e
+                        .attributes
+                        .iter()
+                        .any(|(k, v)| k == bare_key && matcher.value_matches(v)),
+                    EvalGroupCondition::TimeSince(intervals) => {
+                        let dt = (e.time_unix_nano as i64).saturating_sub(span.start_ns);
+                        intervals.iter().any(|&(lo, hi)| {
+                            lo.is_none_or(|lo| dt >= lo) && hi.is_none_or(|hi| dt <= hi)
+                        })
+                    }
+                    _ => false, // link-only conditions never hold on events
+                })
+            }),
+            EvalTerm::LinkGroup { conditions } => span.links.iter().any(|l| {
+                conditions.iter().all(|c| match c {
+                    EvalGroupCondition::Attr { bare_key, matcher } => l
+                        .attributes
+                        .iter()
+                        .any(|(k, v)| k == bare_key && matcher.value_matches(v)),
+                    EvalGroupCondition::LinkSpanIds(ids) => ids.contains(&l.span_id),
+                    EvalGroupCondition::LinkTraceIds(ids) => ids.contains(&l.trace_id),
+                    _ => false, // event-only conditions never hold on links
+                })
             }),
         })
+    }
+}
+
+/// Compile one plan matcher for span-side use (patterns validated at
+/// the request boundary).
+fn eval_matcher(matcher: &sfst::PlanMatcher) -> EvalMatcher {
+    match matcher {
+        sfst::PlanMatcher::Tokens { exact, patterns } => EvalMatcher::Tokens {
+            exact: exact.clone(),
+            patterns: patterns
+                .iter()
+                .map(|p| {
+                    sfst::compile_pattern(p).expect("patterns validated at the request boundary")
+                })
+                .collect(),
+        },
+        sfst::PlanMatcher::Number { cmp, values } => EvalMatcher::Number {
+            cmp: *cmp,
+            values: values.clone(),
+        },
+    }
+}
+
+/// Build one span-side subgroup condition from its plan form — the
+/// single site of the R3-3 prefix translation.
+fn eval_group_condition(c: &sfst::GroupCondition) -> EvalGroupCondition {
+    match c {
+        sfst::GroupCondition::Field { field, matcher } => {
+            let matcher = eval_matcher(matcher);
+            if field == "events.name" {
+                EvalGroupCondition::EventName(matcher)
+            } else {
+                let bare = field
+                    .strip_prefix("events.attributes.")
+                    .or_else(|| field.strip_prefix("links.attributes."))
+                    .expect("subgroup fields are events.name or event/link attributes");
+                EvalGroupCondition::Attr {
+                    bare_key: bare.to_string(),
+                    matcher,
+                }
+            }
+        }
+        sfst::GroupCondition::TimeSinceStart { intervals } => {
+            EvalGroupCondition::TimeSince(intervals.clone())
+        }
+        sfst::GroupCondition::LinkSpanIds(ids) => EvalGroupCondition::LinkSpanIds(ids.clone()),
+        sfst::GroupCondition::LinkTraceIds(ids) => EvalGroupCondition::LinkTraceIds(ids.clone()),
     }
 }
 
@@ -1119,19 +1231,35 @@ mod tests {
             vec![PredicateValue::Integer(3)],
         ));
 
-        // Named rejections for the constructs steps 7-9 still own.
-        assert!(rejected(cond(
+        // Subgroup positives are evaluable through the refine…
+        evaluable(cond(
             PredicateTarget::Attribute(TagScope::Event, "msg".into()),
             CompareOp::Eq,
             vec![text("v")],
+        ));
+        evaluable(cond(
+            PredicateTarget::Attribute(TagScope::Link, "rel".into()),
+            CompareOp::Regex,
+            vec![text("v.*")],
+        ));
+        evaluable(cond(
+            PredicateTarget::Intrinsic(TraceIntrinsic::EventTimeSinceStart),
+            CompareOp::Gt,
+            vec![PredicateValue::Integer(5)],
+        ));
+        // …their NEGATED forms sit on the recorded open question.
+        assert!(rejected(cond(
+            PredicateTarget::Attribute(TagScope::Event, "msg".into()),
+            CompareOp::NotEq,
+            vec![text("v")],
         ))
-        .contains("refine"));
+        .contains("subgroup"));
         assert!(rejected(cond(
             PredicateTarget::Attribute(TagScope::Link, "rel".into()),
             CompareOp::NotEq,
             vec![text("v")],
         ))
-        .contains("refine"));
+        .contains("subgroup"));
         // The colon set: span/parent/trace ids both polarities; link
         // ids and event:name positive-only (the negated subgroup
         // semantics are the recorded open question).
@@ -1186,7 +1314,9 @@ mod tests {
             vec![text("v")],
         ))
         .contains("subgroup"));
-        // TWO event:name conditions need the single-event subgroup.
+        // TWO event:name conditions form a single-event subgroup —
+        // well-defined (one event named both = unsatisfiable) and
+        // evaluable through the refine.
         let two = Predicate {
             conditions: vec![
                 cond(
@@ -1201,10 +1331,7 @@ mod tests {
                 ),
             ],
         };
-        assert!(matches!(
-            two.ensure_evaluable(),
-            Err(PredicateError::NotYetEvaluable { construct }) if construct.contains("multiple event:name")
-        ));
+        two.ensure_evaluable().unwrap();
         // Malformed hex ids fail STRUCTURAL validation.
         assert!(matches!(
             (Predicate {
@@ -1229,12 +1356,6 @@ mod tests {
             vec![PredicateValue::Integer(5)],
         ))
         .contains("trace-level"));
-        assert!(rejected(cond(
-            PredicateTarget::Intrinsic(TraceIntrinsic::EventTimeSinceStart),
-            CompareOp::Gt,
-            vec![PredicateValue::Integer(5)],
-        ))
-        .contains("EventTimeSinceStart"));
     }
 
     /// Partition (R3-2): trace-level intrinsics split out; everything

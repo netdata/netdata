@@ -152,7 +152,10 @@ fn early_requests() -> Vec<ExportTraceServiceRequest> {
             SpanSpec {
                 status: Some((2, "boom")),
                 attrs: vec![kv_str("http.method", "POST")],
-                events: vec![("exception", vec![kv_str("exception.type", "IOError")])],
+                events: vec![
+                    ("exception", vec![kv_str("exception.type", "IOError")]),
+                    ("retry", vec![kv_str("attempt", "2")]),
+                ],
                 ..span_in(2, 0x21, 0, 1_100 * NS, "POST /orders")
             },
             SpanSpec {
@@ -164,7 +167,10 @@ fn early_requests() -> Vec<ExportTraceServiceRequest> {
             SpanSpec {
                 kind: 5, // CONSUMER
                 attrs: vec![kv_str("queue", "q1"), kv_str("retries", "3")],
-                links: vec![(tid(1), [0x11; 8], vec![kv_str("rel", "follows")])],
+                links: vec![
+                    (tid(1), [0x11; 8], vec![kv_str("rel", "follows")]),
+                    (tid(2), [0x22; 8], vec![kv_str("rel", "other")]),
+                ],
                 ..span_in(4, 0x41, 0, 1_200 * NS, "consume")
             },
             // T6's CANONICAL copy (chronologically first).
@@ -558,6 +564,101 @@ fn oracle_equivalence_under_relayouts() {
             )])),
             vec![hex(2)],
         ),
+        (
+            // Event attribute through the structural refine.
+            "event-attr",
+            SearchQuery::new(pred(vec![attr_eq(TagScope::Event, "exception.type", "IOError")])),
+            vec![hex(2)],
+        ),
+        (
+            // Same-event conjunction: name + attribute on ONE event.
+            "event-subgroup-same",
+            SearchQuery::new(pred(vec![
+                intrinsic(TraceIntrinsic::EventName, CompareOp::Eq, vec![text("retry")]),
+                attr_eq(TagScope::Event, "attempt", "2"),
+            ])),
+            vec![hex(2)],
+        ),
+        (
+            // THE refine-conjunction counterexample: both flat tokens
+            // exist on T2's span (different events), but NO single event
+            // carries both — the mandatory refine rejects what a loose
+            // span-level match would leak.
+            "event-subgroup-counterexample",
+            SearchQuery::new(pred(vec![
+                attr_eq(TagScope::Event, "exception.type", "IOError"),
+                attr_eq(TagScope::Event, "attempt", "2"),
+            ])),
+            vec![],
+        ),
+        (
+            // Cross-condition on names: no single event is named both.
+            "event-two-names-unsatisfiable",
+            SearchQuery::new(pred(vec![
+                intrinsic(TraceIntrinsic::EventName, CompareOp::Eq, vec![text("exception")]),
+                intrinsic(TraceIntrinsic::EventName, CompareOp::Eq, vec![text("retry")]),
+            ])),
+            vec![],
+        ),
+        (
+            // event:timeSinceStart computes in the refine (the corpus
+            // writes events at start + 1ns).
+            "event-time-since-start",
+            SearchQuery::new(pred(vec![intrinsic(
+                TraceIntrinsic::EventTimeSinceStart,
+                CompareOp::Lte,
+                vec![PredicateValue::Integer(1)],
+            )])),
+            vec![hex(2)],
+        ),
+        (
+            "event-time-since-start-none",
+            SearchQuery::new(pred(vec![intrinsic(
+                TraceIntrinsic::EventTimeSinceStart,
+                CompareOp::Gt,
+                vec![PredicateValue::Integer(1)],
+            )])),
+            vec![],
+        ),
+        (
+            // Link attribute + link id on the SAME link.
+            "link-subgroup-same",
+            SearchQuery::new(pred(vec![
+                attr_eq(TagScope::Link, "rel", "follows"),
+                intrinsic(
+                    TraceIntrinsic::LinkSpanId,
+                    CompareOp::Eq,
+                    vec![text("1111111111111111")],
+                ),
+            ])),
+            vec![hex(4)],
+        ),
+        (
+            // The LINK counterexample: attribute from one link, id from
+            // the other — no single link has both.
+            "link-subgroup-counterexample",
+            SearchQuery::new(pred(vec![
+                attr_eq(TagScope::Link, "rel", "other"),
+                intrinsic(
+                    TraceIntrinsic::LinkSpanId,
+                    CompareOp::Eq,
+                    vec![text("1111111111111111")],
+                ),
+            ])),
+            vec![],
+        ),
+        (
+            "link-subgroup-other",
+            SearchQuery::new(pred(vec![
+                attr_eq(TagScope::Link, "rel", "other"),
+                intrinsic(
+                    TraceIntrinsic::LinkSpanId,
+                    CompareOp::Eq,
+                    vec![text("2222222222222222")],
+                ),
+            ])),
+            vec![hex(4)],
+        ),
     ];
 
     let world = world(dir.path());
@@ -759,10 +860,11 @@ fn request_validation_matrix() {
     ));
     // Stage-B constructs: named not-yet-evaluable request errors.
     for stage_b in [
-        // Steps 8-9 constructs stay not-yet-evaluable after step 7.
+        // Negated subgroup forms (the recorded open question) and the
+        // trace-level intrinsics stay not-yet-evaluable after step 8.
         cond(
             PredicateTarget::Attribute(TagScope::Event, "msg".into()),
-            CompareOp::Eq,
+            CompareOp::NotEq,
             vec![text("v")],
         ),
         intrinsic(TraceIntrinsic::EventName, CompareOp::NotEq, vec![text("e")]),
@@ -770,11 +872,6 @@ fn request_validation_matrix() {
             TraceIntrinsic::LinkSpanId,
             CompareOp::NotEq,
             vec![text("00f067aa0ba902b7")],
-        ),
-        intrinsic(
-            TraceIntrinsic::EventTimeSinceStart,
-            CompareOp::Gt,
-            vec![PredicateValue::Integer(5)],
         ),
         intrinsic(
             TraceIntrinsic::TraceDuration,
