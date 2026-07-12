@@ -443,7 +443,7 @@ static unsigned long aclk_reconnect_delay() {
     unsigned long recon_delay;
     time_t now;
 
-    if (aclk_disable_runtime) {
+    if (__atomic_load_n(&aclk_disable_runtime, __ATOMIC_RELAXED)) {
         aclk_tbeb_reset();
         return 60 * MSEC_PER_SEC;
     }
@@ -1125,8 +1125,9 @@ char *aclk_state(void)
     time_t next_connection_attempt_snapshot = __atomic_load_n(&next_connection_attempt, __ATOMIC_RELAXED);
     float last_backoff_value_snapshot;
     __atomic_load(&last_backoff_value, &last_backoff_value_snapshot, __ATOMIC_RELAXED);
+    bool disable_runtime = __atomic_load_n(&aclk_disable_runtime, __ATOMIC_RELAXED);
 
-    buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_is_online ? "Yes" : "No", connection_counter > 0 ? (connection_counter - 1) : 0, aclk_disable_runtime ? "Yes" : "No");
+    buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_is_online ? "Yes" : "No", connection_counter > 0 ? (connection_counter - 1) : 0, disable_runtime ? "Yes" : "No");
     if (last_conn_time_mqtt_snapshot && ((tmptr = localtime_r(&last_conn_time_mqtt_snapshot, &tmbuf))) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
@@ -1315,7 +1316,7 @@ char *aclk_state_json(void)
         tmp = json_object_new_double(last_backoff_value_snapshot);
     json_object_object_add(msg, "last-backoff-value", tmp);
 
-    tmp = json_object_new_boolean(aclk_disable_runtime);
+    tmp = json_object_new_boolean(__atomic_load_n(&aclk_disable_runtime, __ATOMIC_RELAXED));
     json_object_object_add(msg, "banned-by-cloud", tmp);
 
     grp = json_object_new_array();

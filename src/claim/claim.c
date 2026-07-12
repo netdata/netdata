@@ -150,7 +150,7 @@ bool load_claiming_state(void) {
                "CLAIM: agent was already connected to NC - forcing reconnection under new credentials");
         disconnect_req = ACLK_RELOAD_CONF;
     }
-    aclk_disable_runtime = 0;
+    __atomic_store_n(&aclk_disable_runtime, 0, __ATOMIC_RELAXED);
 
     ND_UUID uuid = claimed_id_load();
     if(UUIDiszero(uuid)) {

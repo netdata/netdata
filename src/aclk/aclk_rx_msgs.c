@@ -370,7 +370,7 @@ int handle_disconnect_req(const char *msg, size_t msg_len)
         return 1;
     if (cmd->permaban) {
         netdata_log_error("Cloud Banned This Agent!");
-        aclk_disable_runtime = 1;
+        __atomic_store_n(&aclk_disable_runtime, 1, __ATOMIC_RELAXED);
     }
     netdata_log_info("Cloud requested disconnect (EC=%u, \"%s\")", (unsigned int)cmd->error_code, cmd->error_description);
     if (cmd->reconnect_after_s > 0) {
