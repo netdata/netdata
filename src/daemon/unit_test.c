@@ -1675,6 +1675,62 @@ static int test_rrddim_scale_minimum_magnitude(void) {
     return rc;
 }
 
+static int test_rrddim_collected_minimum_magnitude(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    RRDSET *st = rrdset_create_localhost(
+        "netdata", "unittest-collected-min-magnitude", "unittest-collected-min-magnitude", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1,
+        nd_profile.update_every, RRDSET_TYPE_LINE);
+    RRDDIM *rd_int = rrddim_add(st, "int", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    RRDDIM *rd_float = rrddim_add(st, "float", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    memset(&rd_float->collector.collected, 0, sizeof(rd_float->collector.collected));
+    rrddim_option_set(rd_float, RRDDIM_OPTION_VALUE_FLOAT);
+
+    const struct {
+        collected_number value;
+        uint64_t expected_max;
+    } cases[] = {
+        { 0, 0 },
+        { 1, 1 },
+        { -1, 1 },
+        { LLONG_MAX, (uint64_t)LLONG_MAX },
+        { -LLONG_MAX, (uint64_t)LLONG_MAX },
+        { LLONG_MIN, UINT64_C(1) << 63 },
+        { 7, UINT64_C(1) << 63 },
+    };
+
+    int rc = 0;
+    for(size_t i = 0; i < _countof(cases); i++) {
+        rrddim_set_by_pointer(st, rd_int, cases[i].value);
+        uint64_t actual = rrddim_collected_max_as_uint64(rd_int);
+        if(actual != cases[i].expected_max) {
+            fprintf(stderr, "%s: case %zu maximum is %" PRIu64 ", expected %" PRIu64 "\n",
+                    __FUNCTION__, i, actual, cases[i].expected_max);
+            rc = 1;
+        }
+    }
+
+    if(rd_int->collector.collected.i.collected_value_max != INT64_MIN ||
+       rrddim_collected_max_as_double(rd_int) != (NETDATA_DOUBLE)(UINT64_C(1) << 63)) {
+        fprintf(stderr, "%s: integer 2^63 maximum representation was not preserved\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    rrddim_set_by_pointer(st, rd_float, LLONG_MIN);
+    rrddim_set_by_pointer(st, rd_float, 7);
+    if(rd_float->collector.collected.f.collected_value_max != (NETDATA_DOUBLE)(UINT64_C(1) << 63)) {
+        fprintf(stderr, "%s: float lane did not preserve the LLONG_MIN magnitude\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
 static int test_rrddim_divisor_normalization(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
@@ -2090,6 +2146,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_rrddim_scale_minimum_magnitude())
+        return 1;
+
+    if(test_rrddim_collected_minimum_magnitude())
         return 1;
 
     if(test_rrddim_divisor_normalization())

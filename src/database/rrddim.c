@@ -682,13 +682,7 @@ collected_number rrddim_timed_set_by_pointer(RRDSET *st __maybe_unused, RRDDIM *
 //        *((int64_t *)Pvalue) = *((int64_t *)Pvalue) + 1;
 //    spinlock_unlock(&st->rrdhost->accounting.spinlock);
 
-    NETDATA_DOUBLE v = value >= 0 ? (NETDATA_DOUBLE)value : (NETDATA_DOUBLE)(-value);
-    if (unlikely(v > rrddim_collected_max_as_double(rd))) {
-        if(rrddim_is_float(rd))
-            rrddim_set_collected_max_float(rd, v);
-        else
-            rrddim_set_collected_max_int(rd, (int64_t)v);
-    }
+    rrddim_update_collected_max_from_int(rd, value);
     // For int dims return the last collected int; for float dims the integer return is meaningless, so return 0 to avoid truncation misuse.
     if(rrddim_is_float(rd))
         return 0;
