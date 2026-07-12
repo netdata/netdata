@@ -325,34 +325,36 @@ func TestBuildQueryPlan_FirstEmittingScopeSuppliesSiblingTagLabels(t *testing.T)
 }
 
 func TestBuildQueryPlan_OrderedResourceTagFiltering(t *testing.T) {
-	t.Run("known non-match falls through to lower rule", func(t *testing.T) {
-		c := filteredOverlapCollector(t)
-		c.tags = tagSnapshot{
-			members: tagMembership{0: {"i-1": {}}},
-			unknown: map[int]struct{}{}, fetchedAt: time.Unix(1, 0),
-		}
-
-		plan := requireBuildQueryPlan(t, c)
-		assert.Equal(t, map[string]string{"i-1": "first", "i-2": "second"}, queryOwnersByInstance(plan))
-	})
-
-	t.Run("first failure reserves every candidate from lower rules", func(t *testing.T) {
-		c := filteredOverlapCollector(t)
-		c.tags = tagSnapshot{members: tagMembership{}, unknown: map[int]struct{}{0: {}}}
-
-		assert.Empty(t, requireBuildQueryPlan(t, c))
-	})
-
-	t.Run("later failure queries last-known members and reserves the rest", func(t *testing.T) {
-		c := filteredOverlapCollector(t)
-		c.tags = tagSnapshot{
-			members: tagMembership{0: {"i-1": {}}},
-			unknown: map[int]struct{}{0: {}},
-		}
-
-		plan := requireBuildQueryPlan(t, c)
-		assert.Equal(t, map[string]string{"i-1": "first"}, queryOwnersByInstance(plan))
-	})
+	tests := map[string]struct {
+		tags       tagSnapshot
+		wantOwners map[string]string
+	}{
+		"known non-match falls through to lower rule": {
+			tags: tagSnapshot{
+				members: tagMembership{0: {"i-1": {}}},
+				unknown: map[int]struct{}{}, fetchedAt: time.Unix(1, 0),
+			},
+			wantOwners: map[string]string{"i-1": "first", "i-2": "second"},
+		},
+		"first failure reserves every candidate from lower rules": {
+			tags:       tagSnapshot{members: tagMembership{}, unknown: map[int]struct{}{0: {}}},
+			wantOwners: map[string]string{},
+		},
+		"later failure queries last-known members and reserves the rest": {
+			tags: tagSnapshot{
+				members: tagMembership{0: {"i-1": {}}},
+				unknown: map[int]struct{}{0: {}},
+			},
+			wantOwners: map[string]string{"i-1": "first"},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := filteredOverlapCollector(t)
+			c.tags = tc.tags
+			assert.Equal(t, tc.wantOwners, queryOwnersByInstance(requireBuildQueryPlan(t, c)))
+		})
+	}
 }
 
 func TestBuildQueryPlan_MaxInstances(t *testing.T) {

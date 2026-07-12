@@ -164,24 +164,31 @@ func TestTagJoins_DimsExistInProfiles(t *testing.T) {
 }
 
 func TestResolveTagJoinProfile_RejectsIncompatibleOverride(t *testing.T) {
-	t.Run("namespace changed", func(t *testing.T) {
-		profile := cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2QueryProfile()}
-		profile.Config.Namespace = "Custom/Unrelated"
-
-		_, err := resolveTagJoinProfile(profile)
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "namespace")
-	})
-
-	t.Run("join dimension made constant", func(t *testing.T) {
-		profile := cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2QueryProfile()}
-		profile.Config.Instance.Dimensions[0].Label = ""
-		profile.Config.Instance.Dimensions[0].Constant = aws.String("i-fixed")
-
-		_, err := resolveTagJoinProfile(profile)
-		require.Error(t, err)
-		assert.ErrorContains(t, err, "identifying")
-	})
+	tests := map[string]struct {
+		mutate  func(*cwprofiles.ResolvedProfile)
+		wantErr string
+	}{
+		"namespace changed": {
+			mutate:  func(profile *cwprofiles.ResolvedProfile) { profile.Config.Namespace = "Custom/Unrelated" },
+			wantErr: "namespace",
+		},
+		"join dimension made constant": {
+			mutate: func(profile *cwprofiles.ResolvedProfile) {
+				profile.Config.Instance.Dimensions[0].Label = ""
+				profile.Config.Instance.Dimensions[0].Constant = aws.String("i-fixed")
+			},
+			wantErr: "identifying",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			profile := cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2QueryProfile()}
+			tc.mutate(&profile)
+			_, err := resolveTagJoinProfile(profile)
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
+	}
 }
 
 func mustParseARN(t *testing.T, s string) arn.ARN {

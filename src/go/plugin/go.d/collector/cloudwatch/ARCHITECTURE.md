@@ -38,12 +38,13 @@ charts under the `cloudwatch.` namespace.
 flowchart LR
     cfg("Config<br/>credentials · targets · ordered rules")
     disc("Discover<br/>ListMetrics<br/>cheap / free tier")
+    tags("Resolve tags<br/>membership + labels")
     plan("Plan + state<br/>stable query + policy")
     query("Query<br/>GetMetricData<br/>billed — the cost driver")
     store("metrix store<br/>gauges + labels")
     charts("Dynamic charts<br/>cloudwatch.*")
 
-    cfg --> disc --> plan --> query --> store --> charts
+    cfg --> disc --> tags --> plan --> query --> store --> charts
 
     classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
     classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
@@ -51,7 +52,7 @@ flowchart LR
     classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
 
     class cfg input
-    class disc,plan sched
+    class disc,tags,plan sched
     class query effect
     class store,charts commit
 ```
@@ -62,13 +63,14 @@ Each collection cycle (`collect.go`), in order:
    (`plan.go`, `identity.go`);
 2. discover live instances per (target, profile, region) with `ListMetrics`
    (`discover.go`);
-3. reuse or rebuild the stable per-series query blueprint
+3. resolve resource-tag membership and optional chart labels (`tags.go`);
+4. reuse or rebuild the stable per-series query blueprint
    (`query_plan.go`);
-4. execute the due queries in concurrent batches (`query_executor.go`);
-5. apply explicit per-query outcomes to completion, retry, and source-observation state (`observe.go`);
-6. write retained observations or synthetic zero presentation as float gauges into `metrix`, stamped with
+5. execute the due queries in concurrent batches (`query_executor.go`);
+6. apply explicit per-query outcomes to completion, retry, and source-observation state (`observe.go`);
+7. write retained observations or synthetic zero presentation as float gauges into `metrix`, stamped with
    `{account_id, region, <dimension labels>}`, and re-emit not-due series (`query_emit.go`);
-7. serve a chart template built once from the selected profiles (`chart.go`).
+8. serve a chart template built once from the selected profiles (`chart.go`).
 
 ## Lifecycle
 
@@ -84,7 +86,7 @@ flowchart TD
     Targets("ensureTargets<br/>concurrent STS GetCallerIdentity<br/>fail-soft · retry pending")
     Post("framework postCheck<br/>validate ChartTemplateYAML via chartengine")
     Collect("Collect<br/>every update_every")
-    Cycle("collect cycle<br/>discover → plan → schedule → execute → observe")
+    Cycle("collect cycle<br/>discover → tags → plan → schedule → execute → observe")
 
     Init --> Check
     Check --> Runtime --> Targets --> Post
@@ -123,12 +125,13 @@ flowchart TD
 flowchart TD
     A("ensure collection plan + target account ids")
     B("refreshDiscovery<br/>shared ListMetrics scans per compatible target scope")
-    C("currentQueryPlan<br/>cached until target/discovery/tag inputs change")
-    D("dueQueries<br/>keep stable queries with a newer eligible window")
-    E("executeQueries<br/>batched · concurrent GetMetricData")
-    F("apply outcomes + emit<br/>write gauges · re-emit retained")
+    C("refreshTags<br/>resolve filter membership + non-identity labels")
+    D("currentQueryPlan<br/>cached until target/discovery/tag inputs change")
+    E("dueQueries<br/>keep stable queries with a newer eligible window")
+    F("executeQueries<br/>batched · concurrent GetMetricData")
+    G("apply outcomes + emit<br/>write gauges · re-emit retained")
 
-    A --> B --> C --> D --> E --> F
+    A --> B --> C --> D --> E --> F --> G
 
     classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
     classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
@@ -136,9 +139,9 @@ flowchart TD
     classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
 
     class A input
-    class B,C,D sched
-    class E effect
-    class F commit
+    class B,C,D,E sched
+    class F effect
+    class G commit
 ```
 
 ## Configuration Compilation
@@ -250,131 +253,12 @@ Discovery then finds which *instances* of those profiles exist per target and re
 - A warning fires at ≥1000 discovered instances as an early cost signal. The
   separate final-instance limit is applied later, after tag filtering and overlap.
 
-## Query Planning And Scheduling
+## Resource Tag Filtering And Labels
 
-`query_plan.go` + `observe.go`.
-
-- `currentQueryPlan` reuses an immutable blueprint until a target resolves or a
-  discovery/tag snapshot changes. `buildQueryPlan` emits one `plannedQuery` per
-  `instance × selected exported series` when that blueprint is invalidated.
-  Identity labels are `{account_id, region}` plus one label per identifying
-  instance dimension (a `constant` dimension is sent in the query but not
-  labeled). The exported series name is `<profile>.<metric_id>_<statistic>`.
-- Resource-tag membership is applied before selected-series expansion. Compiled
-  scope order and `{final instance, exported series}` ownership enforce rule precedence:
-  the first matching rule/target owns each overlapping series. Unknown tag membership
-  reserves only the scope's selected series, so disjoint lower-rule selections remain
-  eligible while failures stay fail-closed. This also catches dynamic overlap when
-  distinct targets resolve to the same account and see the same resource.
-- The first scope that emits any series for a final instance supplies one immutable
-  identity/dimension/tag-label presentation reused by sibling series, even when later
-  siblings are owned by another target. Chart-level mutable labels therefore remain
-  deterministic.
-- `limits.max_instances` counts final instances that emit at least one selected series,
-  not planned metric
-  queries. Overflow rejects the rebuilt plan atomically and leaves the previous
-  immutable plan installed; there is no first-N truncation.
-- Each `plannedQuery` contains a fully resolved `{period, lookback,
-  publication_delay}` policy. Resolution is field-by-field: rule, rule defaults,
-  profile metric/profile, then the built-in publication-delay fallback.
-  Publication delay is collector scheduling policy, not an AWS SLA. In particular,
-  the stock S3 storage profile's `1d` is a conservative choice; AWS documents that
-  storage metrics are reported once per day but does not guarantee delivery within
-  one day.
-- Its stable key includes execution target, region, structural AWS query, final
-  series identity, and effective policy. Rule name, scope order, request ID,
-  batch membership, and mutable tag labels are excluded. Equivalent rule-only
-  ownership transfers preserve state; target/query/identity/policy changes do not.
-  Internal ownership, observation, and billing maps use domain-separated 256-bit
-  structural digests so maximum-length dimension payloads are hashed once instead
-  of copied into every series key. Emitted labels, chart identity, and AWS query
-  dimensions remain exact strings.
-- Completion is per stable query. A query is due when the aligned eligible window
-  end is newer than its last terminal completion. Adding a sibling query never
-  makes completed siblings due, and clock jumps query only the current rolling
-  window rather than backfilling missed buckets.
-- A transient attempt leaves completion unchanged and starts retry state for that
-  stable query and eligible window. The first retry waits one `update_every`; each
-  later delay doubles and is capped at the effective period. A new eligible window
-  is immediately due and resets the sequence. `Complete` and `Forbidden` clear it;
-  parent-context cancellation advances neither retry nor completion state.
-- Query-plan construction atomically rejects more than 20,000 queries, 600,000
-  all-due datapoints, 40 all-due batches, or 1,440 buckets per query. A lightweight
-  candidate/work preflight applies those bounds before constructing AWS query structs
-  or stable keys, so raising `max_instances` cannot allocate an unbounded query plan
-  before rejection.
-
-## Query Execution
-
-`query_batch.go` + `query_executor.go` + `query_response.go`:
-
-- Due queries are grouped deterministically by target, region, and exact policy.
-  The rolling window is `end = align_down(now - publication_delay, period)` and
-  `start = end - lookback`.
-- Batch width is `min(500, 30000 / bucket_count)`. Queries sharing one structural
-  CloudWatch metric identity are divided into billing units of at most five statistics;
-  deterministic packing keeps each unit whole while respecting width. Work preflight
-  and execution use the same packer. Every request sets exact `MaxDatapoints =
-  queries_in_batch × bucket_count`; concurrency remains bounded by `apiConcurrency`,
-  with one configured timeout shared by the batch's pages.
-- Request IDs (`q0`, `q1`, …) exist only inside one batch. Pagination is bounded
-  to two calls. A page failure preserves siblings already marked `Complete`.
-- Values are paired with their timestamps; response/page order is not trusted.
-  The newest finite pair is eligible only when its full bucket lies inside the
-  window. `PartialData` may contribute a candidate but remains transient unless
-  a later result for that query is `Complete`.
-- `Complete` is terminal success. `Forbidden` is terminal authorization failure.
-  Client/request failure, `InternalError`, missing/unknown status, unresolved
-  `PartialData`, and pagination overflow are transient for only the affected
-  queries. Bounded warnings identify those unresolved results; successful siblings
-  remain complete and are not reissued.
-
-## Observation And Metrics
-
-`observe.go` keeps per-query completion and retained raw CloudWatch values;
-`query_emit.go` writes one snapshot frame per cycle:
-
-- `meter := store.Write().SnapshotMeter("")`; each sample becomes
-  `meter.WithLabels(labels...).Gauge(series, metrix.WithFloat(true)).Observe(v)`.
-- **Always a gauge.** CloudWatch returns per-period aggregates (Sum, Average, …)
-  as absolute points, so gauge last-write-wins maps directly. Every profile
-  chart must declare `algorithm: absolute` (enforced by profile validation);
-  there is no counter/delta tracking.
-- **Float is a metric-level hint.** `metrix.WithFloat(true)` marks the metric
-  family float-native; `chartengine` inherits that onto the chart dimension, so
-  fractional values render at full precision without a per-dimension
-  `options.float`.
-- **Retention re-emit (sample-and-hold).** This decouples two cadences: the
-  **query cadence** follows each series' aligned effective period, while the **write cadence** is the collect loop
-  (`update_every`, free `metrix` writes). Netdata expects a value per dimension
-  per collect cycle, so a series whose group was **not** queried this cycle (not
-  due, or due-but-failed) is re-written from its last cached value — a long-period
-  metric (e.g. daily S3) renders as a continuous step line instead of gaps, at no
-  extra AWS cost. A successful rolling-window query keeps the newest eligible
-  datapoint while it remains inside `lookback`; once expired, `nil_as_zero` records
-  zero and other metrics gap.
-  Synthetic zero is presentation state, not a timestamped source observation, so
-  it cannot outrank a real older bucket that appears in a later rolling query.
-  Without an explicit override, only `rate: true` metrics at `sum` or
-  `sample_count` default to zero; every other statistic gaps. The cache otherwise
-  persists until a terminal success expires/replaces it or `reconcilePlan` drops
-  the stable key. Transient failures intentionally replay retained values beyond
-  lookback and follow the per-query retry backoff. `Forbidden` clears the value and completes
-  only the attempted window.
-- Rate totals are cached raw and divided by the effective period during emission.
-  A total transient first-cycle failure with no retained frame returns an error;
-  the same failure with useful retained values replays them and returns success.
-  Parent cancellation aborts before state is advanced.
-
-## Resource Tag Filtering And Labels (`tags.go`, `tag_fetch.go`, `tagjoin.go`, `tagresolve.go`)
-
-Resource-tag predicates select instances before query expansion. Separately,
-`labels.resource_tags` copies selected AWS tags to **non-identity** chart labels.
-Both use one resolution stage between discovery and query planning:
-
-```text
-refreshDiscovery → refreshTags → buildQueryPlan → … → observe
-```
+`tags.go`, `tag_fetch.go`, `tagjoin.go`, and `tagresolve.go` form the stage
+between discovery and query planning. Resource-tag predicates decide which
+discovered instances a rule may query. Separately, `labels.resource_tags`
+copies selected AWS tags to **non-identity** chart labels.
 
 - **Focused fetches.** A Resource Groups Tagging API (RGTA) client is cached per
   `{target, region}`. Policy scopes sharing target, region, and canonical predicate
@@ -409,13 +293,180 @@ refreshDiscovery → refreshTags → buildQueryPlan → … → observe
   effective; explicitly including one is a config error unless that rule disables or
   replaces the filter. Labels-only use remains best-effort for unsupported profiles.
 - **Emission split.** Identity `labels` (`{account_id, region, <dims>}`) and `tagLabels`
-  travel separately through `plannedQuery`. `writeSample`
-  emits `labels + tagLabels` in a fresh slice; the stable query key uses identity
-  labels but excludes tag labels, so a tag change never churns query state. `chartengine` `auto_intersection`
-  then promotes the tag labels as non-identity chart labels — no template change.
-  A changed effective label set invalidates the plan once; the current plan supplies
-  the new labels and the normal numeric snapshot causes chartengine to
-  emit a label-only chart-definition update for an existing chart.
+  travel separately through `plannedQuery`. `writeSample` emits `labels + tagLabels`
+  in a fresh slice; the stable query key uses identity labels but excludes tag labels,
+  so a tag change never churns query state. `chartengine` `auto_intersection` then
+  promotes the tag labels as non-identity chart labels—no template change. A changed
+  effective label set invalidates the plan once; the current plan supplies the new
+  labels and the normal numeric snapshot causes chartengine to emit a label-only
+  chart-definition update for an existing chart.
+
+## Journey Of One Stable Query
+
+The query subsystem is easiest to understand as one series moving through the
+same state machine on every collection cycle:
+
+```text
+resolved policy + discovered instance + selected exported series
+  → stable query identity
+  → aligned eligible window
+  → due or retry decision
+  → cost-aware GetMetricData batch
+  → per-query outcome
+  → completion, retry, and observation state
+  → retained value, synthetic zero, or gap
+```
+
+The rolling window is `end = align_down(now - publication_delay, period)` and
+`start = end - lookback`. For example, with `period=5m`, `lookback=15m`,
+`publication_delay=10m`, and `now=12:17`, the eligible window is
+`[11:50, 12:05)`. The next window becomes eligible at `12:20`; intervening
+collection cycles after terminal completion re-emit the retained presentation
+without another AWS query.
+
+One batch can contain queries that finish differently. Outcomes update each
+stable query independently:
+
+| Outcome | Completion state | Retry state | Retained observation | Current emission |
+| --- | --- | --- | --- | --- |
+| `Complete` with a datapoint | Advance to this window | Clear | Keep the newest eligible point | Value |
+| `Complete` without a datapoint | Advance to this window | Clear | Keep only while still inside lookback; otherwise clear | Retained value while present; after expiry, synthetic zero for `nil_as_zero`, otherwise gap |
+| `Forbidden` | Advance to this window | Clear | Clear | Gap |
+| Transient failure | Do not advance | Exponential backoff | Preserve, even beyond lookback | Retained value or zero when available; otherwise gap |
+| Parent cancellation | Do not advance | Do not change | Do not change | Abort the frame |
+
+## Query Plan And Stable Identity
+
+`query_plan.go` builds the immutable per-series blueprint.
+
+- `currentQueryPlan` reuses an immutable blueprint until a target resolves or a
+  discovery/tag snapshot changes. `buildQueryPlan` emits one `plannedQuery` per
+  `instance × selected exported series` when that blueprint is invalidated.
+  Identity labels are `{account_id, region}` plus one label per identifying
+  instance dimension (a `constant` dimension is sent in the query but not
+  labeled). The exported series name is `<profile>.<metric_id>_<statistic>`.
+- Resource-tag membership is applied before selected-series expansion. Compiled
+  scope order and `{final instance, exported series}` ownership enforce rule precedence:
+  the first matching rule/target owns each overlapping series. Unknown tag membership
+  reserves only the scope's selected series, so disjoint lower-rule selections remain
+  eligible while failures stay fail-closed. This also catches dynamic overlap when
+  distinct targets resolve to the same account and see the same resource.
+- The first scope that emits any series for a final instance supplies one immutable
+  identity/dimension/tag-label presentation reused by sibling series, even when later
+  siblings are owned by another target. Chart-level mutable labels therefore remain
+  deterministic.
+- `limits.max_instances` counts final instances that emit at least one selected series,
+  not planned metric queries. Overflow rejects the candidate plan atomically; the
+  current collection cycle returns an error and does **not** execute or emit the
+  previous plan. The previous immutable plan and its state remain intact, and the
+  dirty flag remains set so a later cycle can rebuild from corrected inputs. There
+  is no first-N truncation.
+- Each `plannedQuery` contains a fully resolved `{period, lookback,
+  publication_delay}` policy. Resolution is field-by-field: rule, rule defaults,
+  profile metric/profile, then the built-in publication-delay fallback.
+  Publication delay is collector scheduling policy, not an AWS SLA. In particular,
+  the stock S3 storage profile's `1d` is a conservative choice; AWS documents that
+  storage metrics are reported once per day but does not guarantee delivery within
+  one day.
+- Its stable key includes execution target, region, structural AWS query, final
+  series identity, and effective policy. Rule name, scope order, request ID,
+  batch membership, and mutable tag labels are excluded. Equivalent rule-only
+  ownership transfers preserve state; target/query/identity/policy changes do not.
+
+## Scheduling And State Transitions
+
+`observe.go` owns due-window selection, completion, retry, and retained
+observation state per stable query.
+
+- Completion is per stable query. A query is due when the aligned eligible window
+  end is newer than its last terminal completion. Adding a sibling query never
+  makes completed siblings due, and clock jumps query only the current rolling
+  window rather than backfilling missed buckets.
+- A transient attempt leaves completion unchanged and starts retry state for that
+  stable query and eligible window. The first retry waits one `update_every`; each
+  later delay doubles and is capped at the effective period. A new eligible window
+  is immediately due and resets the sequence. `Complete` and `Forbidden` clear it;
+  parent-context cancellation advances neither retry nor completion state.
+
+## Batching And AWS Responses
+
+`query_batch.go` + `query_executor.go` + `query_response.go`:
+
+- Due queries are grouped deterministically by target, region, and exact policy,
+  then packed into bounded concurrent `GetMetricData` requests.
+- A page failure preserves siblings already marked `Complete`; only unresolved
+  queries inherit the request failure.
+- Values are paired with their timestamps; response/page order is not trusted.
+  The newest finite pair is eligible only when its full bucket lies inside the
+  window. `PartialData` may contribute a candidate but remains transient unless
+  a later result for that query is `Complete`.
+- `Complete` is terminal success. `Forbidden` is terminal authorization failure.
+  Client/request failure, `InternalError`, missing/unknown status, unresolved
+  `PartialData`, and pagination overflow are transient for only the affected
+  queries. Bounded warnings identify those unresolved results; successful siblings
+  remain complete and are not reissued.
+
+## Emission And Sample-And-Hold
+
+`observe.go` keeps per-query completion and retained raw CloudWatch values;
+`query_emit.go` writes one snapshot frame per cycle:
+
+- `meter := store.Write().SnapshotMeter("")`; each sample becomes
+  `meter.WithLabels(labels...).Gauge(series, metrix.WithFloat(true)).Observe(v)`.
+- **Always a gauge.** CloudWatch returns per-period aggregates (Sum, Average, …)
+  as absolute points, so gauge last-write-wins maps directly. Every profile
+  chart must declare `algorithm: absolute` (enforced by profile validation);
+  there is no counter/delta tracking.
+- **Float is a metric-level hint.** `metrix.WithFloat(true)` marks the metric
+  family float-native; `chartengine` inherits that onto the chart dimension, so
+  fractional values render at full precision without a per-dimension
+  `options.float`.
+- **Retention re-emit (sample-and-hold).** This decouples two cadences: the
+  **query cadence** follows each series' aligned effective period, while the **write cadence** is the collect loop
+  (`update_every`, free `metrix` writes). Netdata expects a value per dimension
+  per collect cycle, so a stable query that is not due, or whose current attempt
+  is transient, is re-written from its last cached value—a long-period metric
+  (e.g. daily S3) renders as a continuous step line instead of gaps, at no extra
+  AWS cost. Queries sharing one request still retain and emit independently. A
+  successful rolling-window query keeps the newest eligible
+  datapoint while it remains inside `lookback`; once expired, `nil_as_zero` records
+  zero and other metrics gap.
+  Synthetic zero is presentation state, not a timestamped source observation, so
+  it cannot outrank a real older bucket that appears in a later rolling query.
+  Without an explicit override, only `rate: true` metrics at `sum` or
+  `sample_count` default to zero; every other statistic gaps. The cache otherwise
+  persists until a terminal success expires/replaces it or `reconcilePlan` drops
+  the stable key. Transient failures intentionally replay retained values beyond
+  lookback and follow the per-query retry backoff. `Forbidden` clears the value and completes
+  only the attempted window.
+- Rate totals are cached raw and divided by the effective period during emission.
+  A collection cycle returns an error when every due query is transient and the
+  complete current plan emits zero samples. This is not limited to the first cycle:
+  it can also happen after a plan change leaves no retained presentation. Any retained
+  observation or retained synthetic zero makes the cycle fail-soft and is replayed.
+  Parent cancellation aborts before state is advanced or a frame is committed.
+
+## Query Implementation Safeguards
+
+These details bound cost and memory, but do not change the query state machine:
+
+- Internal ownership, observation, and billing maps use domain-separated 256-bit
+  structural digests so maximum-length dimension payloads are hashed once instead
+  of copied into every series key. Emitted labels, chart identity, and AWS query
+  dimensions remain exact strings.
+- Query-plan construction atomically rejects more than 20,000 queries, 600,000
+  all-due datapoints, 40 all-due batches, or 1,440 buckets per query. A lightweight
+  candidate/work preflight applies those bounds before constructing AWS query structs
+  or stable keys, so raising `max_instances` cannot allocate an unbounded query plan
+  before rejection.
+- Batch width is `min(500, 30000 / bucket_count)`. Queries sharing one structural
+  CloudWatch metric identity are divided into billing units of at most five statistics;
+  deterministic packing keeps each unit whole while respecting width. Work preflight
+  and execution use the same packer. Every request sets exact `MaxDatapoints =
+  queries_in_batch × bucket_count`; concurrency remains bounded by `apiConcurrency`,
+  with one configured timeout shared by the batch's pages.
+- Request IDs (`q0`, `q1`, …) exist only inside one batch. Pagination is bounded
+  to two calls.
 
 ## Dynamic Charts
 
@@ -550,7 +601,7 @@ The two CloudWatch APIs bill differently, and the design leans on that:
   once per effective period (a 300s metric every aligned 300s window, a daily metric every ~24h),
   not every collect cycle, so cost tracks each series' effective query period rather than
   `update_every`. Between queries, values are re-emitted from cache at zero AWS
-  cost (see Observation And Metrics).
+  cost (see Emission And Sample-And-Hold).
 
 Narrow the bill with focused rule target/profile/region selections or longer effective
 periods configured through rule/default query timing; profile periods are the fallback.

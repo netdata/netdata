@@ -194,21 +194,23 @@ func TestObservationStore_InvariantErrorsDoNotExposeQueryIdentity(t *testing.T) 
 	completedAt := time.Unix(1_000_000_000, 0)
 	start, end := queryWindow(completedAt, query.policy)
 
-	t.Run("missing outcome", func(t *testing.T) {
-		err := store.applyOutcomes([]plannedQuery{query}, map[structuralID]queryOutcome{testStructuralID("other"): {
+	tests := map[string]struct {
+		outcomes map[structuralID]queryOutcome
+	}{
+		"missing outcome": {outcomes: map[structuralID]queryOutcome{testStructuralID("other"): {
 			kind: queryOutcomeComplete, windowStart: start, windowEnd: end, completedAt: completedAt,
-		}}, time.Minute)
-		require.Error(t, err)
-		assert.NotContains(t, err.Error(), sensitiveIdentity)
-	})
-
-	t.Run("missing completion time", func(t *testing.T) {
-		err := store.applyOutcomes([]plannedQuery{query}, map[structuralID]queryOutcome{query.key: {
+		}}},
+		"missing completion time": {outcomes: map[structuralID]queryOutcome{query.key: {
 			kind: queryOutcomeComplete, windowStart: start, windowEnd: end,
-		}}, time.Minute)
-		require.Error(t, err)
-		assert.NotContains(t, err.Error(), sensitiveIdentity)
-	})
+		}}},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := store.applyOutcomes([]plannedQuery{query}, tc.outcomes, time.Minute)
+			require.Error(t, err)
+			assert.NotContains(t, err.Error(), sensitiveIdentity)
+		})
+	}
 }
 
 func TestTransientRetryDelay(t *testing.T) {

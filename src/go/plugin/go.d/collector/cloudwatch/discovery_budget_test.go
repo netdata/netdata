@@ -65,23 +65,34 @@ func TestDiscoveryBudget_WorkReservations(t *testing.T) {
 }
 
 func TestDiscoveryBudget_CandidateReservationIsTransactional(t *testing.T) {
-	t.Run("count", func(t *testing.T) {
-		budget := testDiscoveryBudget(1)
-		for range maxCandidateInstancesPerRefresh {
-			require.NoError(t, budget.reserveCandidate(1))
-		}
-		assert.ErrorContains(t, budget.reserveCandidate(1), "more than 20000 candidate instances")
-		assert.Equal(t, maxCandidateInstancesPerRefresh, budget.candidateInstances)
-		assert.Equal(t, maxCandidateInstancesPerRefresh, budget.retainedCandidateBytes)
-	})
-
-	t.Run("weighted bytes", func(t *testing.T) {
-		budget := testDiscoveryBudget(1)
-		require.NoError(t, budget.reserveCandidate(maxRetainedCandidateBytesPerRefresh))
-		assert.ErrorContains(t, budget.reserveCandidate(1), "more than 64 MiB")
-		assert.Equal(t, 1, budget.candidateInstances)
-		assert.Equal(t, maxRetainedCandidateBytesPerRefresh, budget.retainedCandidateBytes)
-	})
+	tests := map[string]struct {
+		reservation int
+		attempts    int
+		wantErr     string
+		wantCount   int
+		wantBytes   int
+	}{
+		"count": {
+			reservation: 1, attempts: maxCandidateInstancesPerRefresh,
+			wantErr:   "more than 20000 candidate instances",
+			wantCount: maxCandidateInstancesPerRefresh, wantBytes: maxCandidateInstancesPerRefresh,
+		},
+		"weighted bytes": {
+			reservation: maxRetainedCandidateBytesPerRefresh, attempts: 1,
+			wantErr: "more than 64 MiB", wantCount: 1, wantBytes: maxRetainedCandidateBytesPerRefresh,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			budget := testDiscoveryBudget(1)
+			for range tc.attempts {
+				require.NoError(t, budget.reserveCandidate(tc.reservation))
+			}
+			assert.ErrorContains(t, budget.reserveCandidate(1), tc.wantErr)
+			assert.Equal(t, tc.wantCount, budget.candidateInstances)
+			assert.Equal(t, tc.wantBytes, budget.retainedCandidateBytes)
+		})
+	}
 }
 
 func TestDiscoveryBudget_ConcurrentCandidateReservationsDoNotOvershoot(t *testing.T) {

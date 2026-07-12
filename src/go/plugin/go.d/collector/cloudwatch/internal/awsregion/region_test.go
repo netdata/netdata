@@ -9,11 +9,12 @@ import (
 )
 
 func TestValid(t *testing.T) {
-	for _, region := range []string{"us-east-1", "cn-north-1", "us-gov-west-1", "eusc-de-east-1"} {
-		t.Run(region, func(t *testing.T) { assert.True(t, Valid(region)) })
+	tests := map[string]bool{
+		"us-east-1": true, "cn-north-1": true, "us-gov-west-1": true, "eusc-de-east-1": true,
+		"": false, "global": false, "us-east": false, "us east 1": false,
 	}
-	for _, region := range []string{"", "global", "us-east", "us east 1"} {
-		t.Run(region, func(t *testing.T) { assert.False(t, Valid(region)) })
+	for region, want := range tests {
+		t.Run(region, func(t *testing.T) { assert.Equal(t, want, Valid(region)) })
 	}
 }
 

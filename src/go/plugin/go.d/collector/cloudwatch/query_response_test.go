@@ -68,28 +68,42 @@ func TestRunGetMetricData_SelectsNewestEligibleFinitePair(t *testing.T) {
 
 func TestRunGetMetricData_PartialRequiresLaterComplete(t *testing.T) {
 	query := testPlannedQuery("stable", "base", "us-east-1", "AWS/EC2", 300)
-
-	t.Run("later complete applies accumulated candidate", func(t *testing.T) {
-		fake := &scriptedGetMetricData{pages: []*cloudwatch.GetMetricDataOutput{
-			{MetricDataResults: []cwtypes.MetricDataResult{metricResult("q0", cwtypes.StatusCodePartialData, []float64{1}, []time.Time{time.Unix(300, 0)})}, NextToken: aws.String("next")},
-			{MetricDataResults: []cwtypes.MetricDataResult{metricResult("q0", cwtypes.StatusCodeComplete, []float64{2}, []time.Time{time.Unix(600, 0)})}},
-		}}
-		outcomes, _, err := runGetMetricData(context.Background(), responseTestBatch(fake, query))
-		require.NoError(t, err)
-		assert.Equal(t, float64(2), outcomes[query.key].value)
-	})
-
-	t.Run("unresolved partial remains transient", func(t *testing.T) {
-		fake := &scriptedGetMetricData{pages: []*cloudwatch.GetMetricDataOutput{{MetricDataResults: []cwtypes.MetricDataResult{
-			metricResult("q0", cwtypes.StatusCodePartialData, []float64{1}, []time.Time{time.Unix(300, 0)}),
-		}}}}
-		outcomes, issues, err := runGetMetricData(context.Background(), responseTestBatch(fake, query))
-		require.NoError(t, err)
-		require.Contains(t, outcomes, query.key)
-		assert.Equal(t, queryOutcomeTransient, outcomes[query.key].kind)
-		require.Len(t, issues, 1)
-		assert.Equal(t, queryIssuePartialData, issues[0].kind)
-	})
+	tests := map[string]struct {
+		pages     []*cloudwatch.GetMetricDataOutput
+		wantKind  queryOutcomeKind
+		wantValue float64
+		wantIssue queryResultIssueKind
+	}{
+		"later complete applies accumulated candidate": {
+			pages: []*cloudwatch.GetMetricDataOutput{
+				{MetricDataResults: []cwtypes.MetricDataResult{metricResult("q0", cwtypes.StatusCodePartialData, []float64{1}, []time.Time{time.Unix(300, 0)})}, NextToken: aws.String("next")},
+				{MetricDataResults: []cwtypes.MetricDataResult{metricResult("q0", cwtypes.StatusCodeComplete, []float64{2}, []time.Time{time.Unix(600, 0)})}},
+			},
+			wantKind: queryOutcomeComplete, wantValue: 2,
+		},
+		"unresolved partial remains transient": {
+			pages: []*cloudwatch.GetMetricDataOutput{{MetricDataResults: []cwtypes.MetricDataResult{
+				metricResult("q0", cwtypes.StatusCodePartialData, []float64{1}, []time.Time{time.Unix(300, 0)}),
+			}}},
+			wantKind: queryOutcomeTransient, wantValue: 1, wantIssue: queryIssuePartialData,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fake := &scriptedGetMetricData{pages: tc.pages}
+			outcomes, issues, err := runGetMetricData(context.Background(), responseTestBatch(fake, query))
+			require.NoError(t, err)
+			require.Contains(t, outcomes, query.key)
+			assert.Equal(t, tc.wantKind, outcomes[query.key].kind)
+			assert.Equal(t, tc.wantValue, outcomes[query.key].value)
+			if tc.wantIssue == "" {
+				assert.Empty(t, issues)
+			} else {
+				require.Len(t, issues, 1)
+				assert.Equal(t, tc.wantIssue, issues[0].kind)
+			}
+		})
+	}
 }
 
 func TestRunGetMetricData_InternalErrorCandidateIsNotAcceptedByLaterComplete(t *testing.T) {
@@ -134,17 +148,20 @@ func TestRunGetMetricData_PageFailurePreservesCompletedSiblings(t *testing.T) {
 func TestRunGetMetricData_RequestAuthorizationIsTerminalForUnresolvedQueries(t *testing.T) {
 	first := testPlannedQuery("first", "base", "us-east-1", "AWS/EC2", 300)
 	second := testPlannedQuery("second", "base", "us-east-1", "AWS/EC2", 300)
-
-	t.Run("first page access denied", func(t *testing.T) {
-		fake := &scriptedGetMetricData{errs: map[int]error{0: &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "sensitive"}}}
-		outcomes, _, err := runGetMetricData(context.Background(), responseTestBatch(fake, first, second))
-		require.Error(t, err)
-		assert.Equal(t, queryOutcomeForbidden, outcomes[first.key].kind)
-		assert.Equal(t, queryOutcomeForbidden, outcomes[second.key].kind)
-	})
-
-	t.Run("later page preserves completed sibling", func(t *testing.T) {
-		fake := &scriptedGetMetricData{
+	tests := map[string]struct {
+		pages     []*cloudwatch.GetMetricDataOutput
+		errs      map[int]error
+		queries   []plannedQuery
+		wantKinds map[structuralID]queryOutcomeKind
+	}{
+		"first page access denied": {
+			errs:    map[int]error{0: &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "sensitive"}},
+			queries: []plannedQuery{first, second},
+			wantKinds: map[structuralID]queryOutcomeKind{
+				first.key: queryOutcomeForbidden, second.key: queryOutcomeForbidden,
+			},
+		},
+		"later page preserves completed sibling": {
 			pages: []*cloudwatch.GetMetricDataOutput{{
 				MetricDataResults: []cwtypes.MetricDataResult{
 					metricResult("q0", cwtypes.StatusCodeComplete, []float64{1}, []time.Time{time.Unix(300, 0)}),
@@ -152,20 +169,28 @@ func TestRunGetMetricData_RequestAuthorizationIsTerminalForUnresolvedQueries(t *
 				},
 				NextToken: aws.String("next"),
 			}},
-			errs: map[int]error{1: &smithy.GenericAPIError{Code: "NotAuthorized", Message: "sensitive"}},
-		}
-		outcomes, _, err := runGetMetricData(context.Background(), responseTestBatch(fake, first, second))
-		require.Error(t, err)
-		assert.Equal(t, queryOutcomeComplete, outcomes[first.key].kind)
-		assert.Equal(t, queryOutcomeForbidden, outcomes[second.key].kind)
-	})
-
-	t.Run("expired token remains transient", func(t *testing.T) {
-		fake := &scriptedGetMetricData{errs: map[int]error{0: &smithy.GenericAPIError{Code: "ExpiredTokenException", Message: "sensitive"}}}
-		outcomes, _, err := runGetMetricData(context.Background(), responseTestBatch(fake, first))
-		require.Error(t, err)
-		assert.Equal(t, queryOutcomeTransient, outcomes[first.key].kind)
-	})
+			errs:    map[int]error{1: &smithy.GenericAPIError{Code: "NotAuthorized", Message: "sensitive"}},
+			queries: []plannedQuery{first, second},
+			wantKinds: map[structuralID]queryOutcomeKind{
+				first.key: queryOutcomeComplete, second.key: queryOutcomeForbidden,
+			},
+		},
+		"expired token remains transient": {
+			errs:      map[int]error{0: &smithy.GenericAPIError{Code: "ExpiredTokenException", Message: "sensitive"}},
+			queries:   []plannedQuery{first},
+			wantKinds: map[structuralID]queryOutcomeKind{first.key: queryOutcomeTransient},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fake := &scriptedGetMetricData{pages: tc.pages, errs: tc.errs}
+			outcomes, _, err := runGetMetricData(context.Background(), responseTestBatch(fake, tc.queries...))
+			require.Error(t, err)
+			for key, want := range tc.wantKinds {
+				assert.Equal(t, want, outcomes[key].kind)
+			}
+		})
+	}
 }
 
 func TestRunGetMetricData_OperationForbiddenMessageIsTerminalForUnresolvedQueries(t *testing.T) {

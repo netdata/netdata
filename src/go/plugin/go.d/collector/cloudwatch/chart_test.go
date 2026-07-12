@@ -67,11 +67,6 @@ func TestBuildChartSpec_DoesNotMutateCatalog(t *testing.T) {
 }
 
 func TestEnsurePlan_BuildsValidChartTemplate(t *testing.T) {
-	c := New()
-	c.Config = validConfig()
-	c.applyDefaults()
-	c.newCatalog = cwprofiles.LoadFromDefaultDirs
-
 	cat, err := cwprofiles.LoadFromDefaultDirs()
 	require.NoError(t, err)
 
@@ -82,33 +77,34 @@ func TestEnsurePlan_BuildsValidChartTemplate(t *testing.T) {
 		}
 	}
 
-	require.NoError(t, c.ensurePlan())
-	assert.Len(t, c.plan.Profiles, enabled)
-
-	require.NotEmpty(t, c.chartTemplateYAML)
-	collecttest.AssertChartTemplateSchema(t, c.chartTemplateYAML)
-}
-
-func TestEnsurePlan_ExplicitAllBuildsValidChartTemplate(t *testing.T) {
-	c := New()
-	c.newCatalog = cwprofiles.LoadFromDefaultDirs
-
-	cat, err := cwprofiles.LoadFromDefaultDirs()
-	require.NoError(t, err)
-	falseValue := false
 	var names []string
 	for _, profile := range cat.AllProfiles() {
 		names = append(names, profile.Name)
 	}
-	c.Config = validConfig()
-	c.Config.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &falseValue, Include: names}
-	c.applyDefaults()
+	tests := map[string]struct {
+		explicitAll bool
+		wantCount   int
+	}{
+		"default-enabled profiles": {wantCount: enabled},
+		"explicit all profiles":    {explicitAll: true, wantCount: len(cat.AllProfiles())},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := New()
+			c.Config = validConfig()
+			if tc.explicitAll {
+				falseValue := false
+				c.Config.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &falseValue, Include: names}
+			}
+			c.applyDefaults()
+			c.newCatalog = cwprofiles.LoadFromDefaultDirs
 
-	require.NoError(t, c.ensurePlan())
-	assert.Len(t, c.plan.Profiles, len(cat.AllProfiles()))
-
-	require.NotEmpty(t, c.chartTemplateYAML)
-	collecttest.AssertChartTemplateSchema(t, c.chartTemplateYAML)
+			require.NoError(t, c.ensurePlan())
+			assert.Len(t, c.plan.Profiles, tc.wantCount)
+			require.NotEmpty(t, c.chartTemplateYAML)
+			collecttest.AssertChartTemplateSchema(t, c.chartTemplateYAML)
+		})
+	}
 }
 
 func TestProfileSeries_ContainsEveryExportedStatistic(t *testing.T) {

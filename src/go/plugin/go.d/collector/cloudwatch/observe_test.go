@@ -414,15 +414,21 @@ func TestCollect_ParentCancellationDoesNotAdvanceQueryState(t *testing.T) {
 }
 
 func TestWithTimeout(t *testing.T) {
-	ctx, cancel := withTimeout(context.Background(), 0)
-	defer cancel()
-	_, ok := ctx.Deadline()
-	assert.False(t, ok, "non-positive timeout leaves the context unbounded")
-
-	ctx2, cancel2 := withTimeout(context.Background(), time.Second)
-	defer cancel2()
-	_, ok = ctx2.Deadline()
-	assert.True(t, ok, "positive timeout sets a deadline")
+	tests := map[string]struct {
+		timeout      time.Duration
+		wantDeadline bool
+	}{
+		"non-positive timeout": {},
+		"positive timeout":     {timeout: time.Second, wantDeadline: true},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := withTimeout(context.Background(), tc.timeout)
+			defer cancel()
+			_, got := ctx.Deadline()
+			assert.Equal(t, tc.wantDeadline, got)
+		})
+	}
 }
 
 func TestObserve_DailySeriesSurvivesEvictionWindow(t *testing.T) {
@@ -637,28 +643,37 @@ func TestCleanup_ResetsRuntimeState(t *testing.T) {
 }
 
 func TestReconcilePlan(t *testing.T) {
-	c := New()
-	keep, drop := testStructuralID("keep"), testStructuralID("drop")
-	c.observations.queries = map[structuralID]queryState{
-		keep: {hasObservation: true, observation: 1},
-		drop: {hasObservation: true, observation: 2},
+	keepObservation, dropObservation := testStructuralID("keep"), testStructuralID("drop")
+	keepTarget, dropTarget := testStructuralID("first-target"), testStructuralID("second-target")
+	tests := map[string]struct {
+		initial map[structuralID]queryState
+		keep    structuralID
+		drop    structuralID
+	}{
+		"drops vanished observation": {
+			initial: map[structuralID]queryState{
+				keepObservation: {hasObservation: true, observation: 1},
+				dropObservation: {hasObservation: true, observation: 2},
+			},
+			keep: keepObservation, drop: dropObservation,
+		},
+		"drops vanished target query": {
+			initial: map[structuralID]queryState{
+				keepTarget: {lastCompletedEnd: time.Unix(1_000_000_300, 0)},
+				dropTarget: {lastCompletedEnd: time.Unix(1_000_000_300, 0)},
+			},
+			keep: keepTarget, drop: dropTarget,
+		},
 	}
-	c.observations.reconcilePlan([]plannedQuery{{key: keep}})
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := New()
+			c.observations.queries = tc.initial
+			c.observations.reconcilePlan([]plannedQuery{{key: tc.keep}})
 
-	require.Len(t, c.observations.queries, 1)
-	assert.Contains(t, c.observations.queries, keep)
-	assert.NotContains(t, c.observations.queries, drop)
-}
-
-func TestReconcilePlan_DropsStateForVanishedTargetQuery(t *testing.T) {
-	c := New()
-	first, second := testStructuralID("first-target"), testStructuralID("second-target")
-	c.observations.queries = map[structuralID]queryState{
-		first:  {lastCompletedEnd: time.Unix(1_000_000_300, 0)},
-		second: {lastCompletedEnd: time.Unix(1_000_000_300, 0)},
+			require.Len(t, c.observations.queries, 1)
+			assert.Contains(t, c.observations.queries, tc.keep)
+			assert.NotContains(t, c.observations.queries, tc.drop)
+		})
 	}
-	c.observations.reconcilePlan([]plannedQuery{{key: first}})
-
-	assert.Contains(t, c.observations.queries, first)
-	assert.NotContains(t, c.observations.queries, second)
 }

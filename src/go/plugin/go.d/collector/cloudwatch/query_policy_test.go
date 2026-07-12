@@ -167,6 +167,20 @@ func TestValidateQueryPolicyConfig_RawDurations(t *testing.T) {
 }
 
 func TestQueryPolicy_RecentlyActiveUsesFullHorizon(t *testing.T) {
-	assert.True(t, (queryPolicy{period: time.Hour, lookback: time.Hour, publicationDelay: time.Hour}).useRecentlyActive())
-	assert.False(t, (queryPolicy{period: time.Hour, lookback: time.Hour, publicationDelay: time.Hour + time.Second}).useRecentlyActive())
+	tests := map[string]struct {
+		policy queryPolicy
+		want   bool
+	}{
+		"exact three-hour horizon": {
+			policy: queryPolicy{period: time.Hour, lookback: time.Hour, publicationDelay: time.Hour}, want: true,
+		},
+		"horizon exceeds three hours": {
+			policy: queryPolicy{period: time.Hour, lookback: time.Hour, publicationDelay: time.Hour + time.Second},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, tc.policy.useRecentlyActive())
+		})
+	}
 }

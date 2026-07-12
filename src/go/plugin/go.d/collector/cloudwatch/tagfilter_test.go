@@ -14,11 +14,21 @@ func TestResourceMatchesFilters_ExactANDOR(t *testing.T) {
 		{Key: "environment", Values: []string{"production"}},
 	})
 
-	assert.True(t, resourceMatchesFilters(map[string]string{"team": "sre", "environment": "production"}, filters))
-	assert.True(t, resourceMatchesFilters(map[string]string{"team": "platform", "environment": "production"}, filters))
-	assert.False(t, resourceMatchesFilters(map[string]string{"team": "SRE", "environment": "production"}, filters), "values are case-sensitive")
-	assert.False(t, resourceMatchesFilters(map[string]string{"team": "sre"}, filters), "every key is required")
-	assert.False(t, resourceMatchesFilters(map[string]string{"team": "sre", "environment": "production-east"}, filters), "values are exact")
+	tests := map[string]struct {
+		tags map[string]string
+		want bool
+	}{
+		"first OR value":       {tags: map[string]string{"team": "sre", "environment": "production"}, want: true},
+		"second OR value":      {tags: map[string]string{"team": "platform", "environment": "production"}, want: true},
+		"case-sensitive value": {tags: map[string]string{"team": "SRE", "environment": "production"}},
+		"every key required":   {tags: map[string]string{"team": "sre"}},
+		"exact value required": {tags: map[string]string{"team": "sre", "environment": "production-east"}},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, resourceMatchesFilters(tc.tags, filters))
+		})
+	}
 }
 
 func TestResourceTagFilterSignature_CanonicalAndCollisionSafe(t *testing.T) {

@@ -410,15 +410,24 @@ func TestDiscoverProfileGroup_RecentlyActiveAndNamespace(t *testing.T) {
 
 func TestDiscoverProfileGroup_EmptyAndError(t *testing.T) {
 	prof := dimProfile("AWS/EC2", 300, "InstanceId")
-
-	empty := &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{page(nil, "")}}
-	got, err := discoverOneProfile(context.Background(), empty, prof, true)
-	require.NoError(t, err)
-	assert.Empty(t, got)
-
-	failing := &fakeCloudWatch{err: errors.New("access denied")}
-	_, err = discoverOneProfile(context.Background(), failing, prof, true)
-	assert.Error(t, err)
+	tests := map[string]struct {
+		client  *fakeCloudWatch
+		wantErr bool
+	}{
+		"empty result": {client: &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{page(nil, "")}}},
+		"AWS error":    {client: &fakeCloudWatch{err: errors.New("access denied")}, wantErr: true},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := discoverOneProfile(context.Background(), tc.client, prof, true)
+			if tc.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Empty(t, got)
+			}
+		})
+	}
 }
 
 // nsCloudWatch is a thread-safe fake that returns metrics keyed by the requested
@@ -764,13 +773,22 @@ func TestDiscoverAll_SharedStageTimeout(t *testing.T) {
 }
 
 func TestDiscoverySnapshot_Expired(t *testing.T) {
-	var zero discoverySnapshot
-	assert.True(t, zero.expired(time.Unix(1000, 0)), "never-fetched snapshot is expired")
-
 	snap := discoverySnapshot{FetchedAt: time.Unix(1000, 0), ExpiresAt: time.Unix(1300, 0)}
-	assert.False(t, snap.expired(time.Unix(1299, 0)))
-	assert.True(t, snap.expired(time.Unix(1300, 0)))
-	assert.True(t, snap.expired(time.Unix(1500, 0)))
+	tests := map[string]struct {
+		snapshot discoverySnapshot
+		now      time.Time
+		want     bool
+	}{
+		"never fetched":     {now: time.Unix(1000, 0), want: true},
+		"before expiration": {snapshot: snap, now: time.Unix(1299, 0)},
+		"at expiration":     {snapshot: snap, now: time.Unix(1300, 0), want: true},
+		"after expiration":  {snapshot: snap, now: time.Unix(1500, 0), want: true},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, tc.snapshot.expired(tc.now))
+		})
+	}
 }
 
 func BenchmarkDiscoverProfileGroupPolicyCount(b *testing.B) {
@@ -1275,50 +1293,53 @@ func TestDiscoverProfileGroup_WorkBounds(t *testing.T) {
 		}}},
 	}
 
-	t.Run("exact page maximum", func(t *testing.T) {
-		pages := make([]*cloudwatch.ListMetricsOutput, maxListMetricsPages)
-		for i := range pages {
-			pages[i] = &cloudwatch.ListMetricsOutput{}
-			if i+1 < len(pages) {
-				pages[i].NextToken = aws.String(fmt.Sprintf("page-%d", i+1))
+	exactPages := make([]*cloudwatch.ListMetricsOutput, maxListMetricsPages)
+	exceededPages := make([]*cloudwatch.ListMetricsOutput, maxListMetricsPages)
+	for i := range exactPages {
+		exactPages[i] = &cloudwatch.ListMetricsOutput{}
+		if i+1 < len(exactPages) {
+			exactPages[i].NextToken = aws.String(fmt.Sprintf("page-%d", i+1))
+		}
+		exceededPages[i] = &cloudwatch.ListMetricsOutput{NextToken: aws.String(fmt.Sprintf("page-%d", i+1))}
+	}
+	candidateMetrics := make([]cwtypes.Metric, maxCandidateInstancesPerGroup+1)
+	for i := range candidateMetrics {
+		candidateMetrics[i] = mkMetric("CPUUtilization", "InstanceId", fmt.Sprintf("i-%d", i))
+	}
+
+	tests := map[string]struct {
+		client  cloudwatchClient
+		wantErr string
+	}{
+		"exact page maximum": {client: &fakeCloudWatch{pages: exactPages}},
+		"page maximum exceeded": {
+			client: &fakeCloudWatch{pages: exceededPages}, wantErr: "requires more than 100 pages",
+		},
+		"repeated pagination token": {
+			client: &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{
+				{NextToken: aws.String("repeat")}, {NextToken: aws.String("repeat")},
+			}},
+			wantErr: "repeated pagination token",
+		},
+		"scanned metric maximum exceeded": {
+			client:  &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{{Metrics: make([]cwtypes.Metric, maxScannedMetricsPerGroup+1)}}},
+			wantErr: "scanned more than 50000 metrics",
+		},
+		"candidate instance maximum exceeded": {
+			client:  &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{{Metrics: candidateMetrics}}},
+			wantErr: "found more than 20000 candidate instances",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := scanDiscoveryGroupForTest(context.Background(), tc.client, group)
+			if tc.wantErr == "" {
+				require.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tc.wantErr)
 			}
-		}
-		_, err := scanDiscoveryGroupForTest(context.Background(), &fakeCloudWatch{pages: pages}, group)
-		require.NoError(t, err)
-	})
-
-	t.Run("page maximum exceeded", func(t *testing.T) {
-		pages := make([]*cloudwatch.ListMetricsOutput, maxListMetricsPages)
-		for i := range pages {
-			pages[i] = &cloudwatch.ListMetricsOutput{NextToken: aws.String(fmt.Sprintf("page-%d", i+1))}
-		}
-		_, err := scanDiscoveryGroupForTest(context.Background(), &fakeCloudWatch{pages: pages}, group)
-		assert.ErrorContains(t, err, "requires more than 100 pages")
-	})
-
-	t.Run("repeated pagination token", func(t *testing.T) {
-		pages := []*cloudwatch.ListMetricsOutput{
-			{NextToken: aws.String("repeat")},
-			{NextToken: aws.String("repeat")},
-		}
-		_, err := scanDiscoveryGroupForTest(context.Background(), &fakeCloudWatch{pages: pages}, group)
-		assert.ErrorContains(t, err, "repeated pagination token")
-	})
-
-	t.Run("scanned metric maximum exceeded", func(t *testing.T) {
-		pages := []*cloudwatch.ListMetricsOutput{{Metrics: make([]cwtypes.Metric, maxScannedMetricsPerGroup+1)}}
-		_, err := scanDiscoveryGroupForTest(context.Background(), &fakeCloudWatch{pages: pages}, group)
-		assert.ErrorContains(t, err, "scanned more than 50000 metrics")
-	})
-
-	t.Run("candidate instance maximum exceeded", func(t *testing.T) {
-		metrics := make([]cwtypes.Metric, maxCandidateInstancesPerGroup+1)
-		for i := range metrics {
-			metrics[i] = mkMetric("CPUUtilization", "InstanceId", fmt.Sprintf("i-%d", i))
-		}
-		_, err := scanDiscoveryGroupForTest(context.Background(), &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{{Metrics: metrics}}}, group)
-		assert.ErrorContains(t, err, "found more than 20000 candidate instances")
-	})
+		})
+	}
 
 	t.Run("residual matcher evaluation maximum exceeded", func(t *testing.T) {
 		const profileCount = 1001
@@ -1391,13 +1412,24 @@ func regionsOf(m map[string]map[string][]cwtypes.Metric) []string {
 func TestSelectedSeriesUseRecentlyActive(t *testing.T) {
 	ec2 := dimProfile("AWS/EC2", 300, "InstanceId")
 	s3 := dimProfile("AWS/S3", 86400, "BucketName")
-
-	assert.True(t, selectedSeriesUseRecentlyActive(testCompiledSeries(cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2}), true))
-	assert.False(t, selectedSeriesUseRecentlyActive(testCompiledSeries(cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2}), false))
-	assert.False(t, selectedSeriesUseRecentlyActive(testCompiledSeries(cwprofiles.ResolvedProfile{Name: "s3", Config: s3}), true), "daily period must disable PT3H")
-
-	// A per-metric override beyond 3h also disables PT3H for the whole profile.
 	mixed := dimProfile("AWS/Custom", 300, "Id")
 	mixed.Metrics = []cwprofiles.Metric{{ID: "m", MetricName: "M", Statistics: []string{"average"}, Period: 86400}}
-	assert.False(t, selectedSeriesUseRecentlyActive(testCompiledSeries(cwprofiles.ResolvedProfile{Name: "mixed", Config: mixed}), true))
+	tests := map[string]struct {
+		profile cwprofiles.ResolvedProfile
+		enabled bool
+		want    bool
+	}{
+		"eligible profile": {profile: cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2}, enabled: true, want: true},
+		"disabled":         {profile: cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2}},
+		"daily profile":    {profile: cwprofiles.ResolvedProfile{Name: "s3", Config: s3}, enabled: true},
+		"daily metric override": {
+			profile: cwprofiles.ResolvedProfile{Name: "mixed", Config: mixed}, enabled: true,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := selectedSeriesUseRecentlyActive(testCompiledSeries(tc.profile), tc.enabled)
+			assert.Equal(t, tc.want, got)
+		})
+	}
 }

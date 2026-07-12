@@ -125,28 +125,41 @@ func TestValidatePlannedQueryWork_Boundaries(t *testing.T) {
 		return queries
 	}
 
-	t.Run("exact query and batch maximum", func(t *testing.T) {
-		queries := makeQueries(maxPlannedQueries, basePolicy)
-		require.NoError(t, validatePlannedQueryWork(queries))
-	})
-
-	t.Run("query maximum exceeded", func(t *testing.T) {
-		err := validatePlannedQueryWork(makeQueries(maxPlannedQueries+1, basePolicy))
-		assert.ErrorContains(t, err, "maximum 20000")
-	})
-
-	t.Run("datapoint maximum exceeded", func(t *testing.T) {
-		policy := queryPolicy{period: time.Minute, lookback: maxQueryBuckets * time.Minute}
-		err := validatePlannedQueryWork(makeQueries(maxPlannedDatapoints/maxQueryBuckets+2, policy))
-		assert.ErrorContains(t, err, "more than 600000 datapoints")
-	})
-
-	t.Run("batch maximum exceeded", func(t *testing.T) {
-		queries := makeQueries(maxPlannedQueryBatches+1, basePolicy)
-		for i := range queries {
-			queries[i].target = fmt.Sprintf("target-%d", i)
-		}
-		err := validatePlannedQueryWork(queries)
-		assert.ErrorContains(t, err, "more than 40 GetMetricData batches")
-	})
+	tests := map[string]struct {
+		count   int
+		policy  queryPolicy
+		mutate  func([]plannedQuery)
+		wantErr string
+	}{
+		"exact query and batch maximum": {count: maxPlannedQueries, policy: basePolicy},
+		"query maximum exceeded":        {count: maxPlannedQueries + 1, policy: basePolicy, wantErr: "maximum 20000"},
+		"datapoint maximum exceeded": {
+			count:   maxPlannedDatapoints/maxQueryBuckets + 2,
+			policy:  queryPolicy{period: time.Minute, lookback: maxQueryBuckets * time.Minute},
+			wantErr: "more than 600000 datapoints",
+		},
+		"batch maximum exceeded": {
+			count: maxPlannedQueryBatches + 1, policy: basePolicy,
+			mutate: func(queries []plannedQuery) {
+				for i := range queries {
+					queries[i].target = fmt.Sprintf("target-%d", i)
+				}
+			},
+			wantErr: "more than 40 GetMetricData batches",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			queries := makeQueries(tc.count, tc.policy)
+			if tc.mutate != nil {
+				tc.mutate(queries)
+			}
+			err := validatePlannedQueryWork(queries)
+			if tc.wantErr == "" {
+				assert.NoError(t, err)
+			} else {
+				assert.ErrorContains(t, err, tc.wantErr)
+			}
+		})
+	}
 }

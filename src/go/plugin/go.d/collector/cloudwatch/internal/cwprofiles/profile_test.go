@@ -392,42 +392,44 @@ func TestWalkChartAlgorithms_NestedGroup(t *testing.T) {
 	assert.Contains(t, errs[0].Error(), "absolute")
 }
 
-func TestProfile_Normalize_prefixesSelectors(t *testing.T) {
-	p := validProfile()
-	require.NoError(t, p.Normalize("ec2"))
-
-	assert.Equal(t, "ec2.cpu_utilization_average", p.Template.Charts[0].Dimensions[0].Selector)
-	assert.Equal(t, "ec2.network_in_sum", p.Template.Charts[1].Dimensions[0].Selector)
-}
-
-func TestProfile_Normalize_leavesUnknownSelectorUntouched(t *testing.T) {
-	p := validProfile()
-	p.Template.Charts[0].Dimensions[0].Selector = "unknown_series"
-	require.NoError(t, p.Normalize("ec2"))
-
-	assert.Equal(t, "unknown_series", p.Template.Charts[0].Dimensions[0].Selector)
-}
-
-func TestProfile_Normalize_prefixesDecimalPercentileSelector(t *testing.T) {
-	// A decimal-percentile statistic token carries a dot (p99.9), so the exported
-	// series name (ec2.latency_p99_9-form: ec2.latency_p99.9) has two dots. The
-	// shorthand selector must still be prefixed, not mistaken for already-qualified.
-	p := validProfile()
-	p.Metrics = append(p.Metrics, Metric{ID: "latency", MetricName: "Latency", Statistics: []string{"p99.9"}})
-	p.Template.Charts[0].Dimensions[0].Selector = "latency_p99.9"
-	require.NoError(t, p.Normalize("ec2"))
-
-	assert.Equal(t, "ec2.latency_p99.9", p.Template.Charts[0].Dimensions[0].Selector)
-}
-
-func TestProfile_Normalize_leavesQualifiedSelectorUntouched(t *testing.T) {
-	// An already-qualified selector must be left unchanged: the double-prefixed
-	// candidate (ec2.ec2.cpu_utilization_average) is not a visible series.
-	p := validProfile()
-	p.Template.Charts[0].Dimensions[0].Selector = "ec2.cpu_utilization_average"
-	require.NoError(t, p.Normalize("ec2"))
-
-	assert.Equal(t, "ec2.cpu_utilization_average", p.Template.Charts[0].Dimensions[0].Selector)
+func TestProfile_Normalize_Selectors(t *testing.T) {
+	tests := map[string]struct {
+		mutate func(*Profile)
+		want   map[int]string
+	}{
+		"prefixes selectors": {
+			want: map[int]string{0: "ec2.cpu_utilization_average", 1: "ec2.network_in_sum"},
+		},
+		"leaves unknown selector untouched": {
+			mutate: func(p *Profile) { p.Template.Charts[0].Dimensions[0].Selector = "unknown_series" },
+			want:   map[int]string{0: "unknown_series"},
+		},
+		// A percentile token's dot does not make the shorthand selector qualified.
+		"prefixes decimal percentile selector": {
+			mutate: func(p *Profile) {
+				p.Metrics = append(p.Metrics, Metric{ID: "latency", MetricName: "Latency", Statistics: []string{"p99.9"}})
+				p.Template.Charts[0].Dimensions[0].Selector = "latency_p99.9"
+			},
+			want: map[int]string{0: "ec2.latency_p99.9"},
+		},
+		// An already-qualified visible selector must not be prefixed a second time.
+		"leaves qualified selector untouched": {
+			mutate: func(p *Profile) { p.Template.Charts[0].Dimensions[0].Selector = "ec2.cpu_utilization_average" },
+			want:   map[int]string{0: "ec2.cpu_utilization_average"},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := validProfile()
+			if tc.mutate != nil {
+				tc.mutate(&p)
+			}
+			require.NoError(t, p.Normalize("ec2"))
+			for chart, want := range tc.want {
+				assert.Equal(t, want, p.Template.Charts[chart].Dimensions[0].Selector)
+			}
+		})
+	}
 }
 
 func TestNormalizeStatistic(t *testing.T) {
@@ -475,14 +477,33 @@ func TestStatString(t *testing.T) {
 }
 
 func TestExportedSeriesName(t *testing.T) {
-	assert.Equal(t, "ec2.cpu_utilization_average", ExportedSeriesName("ec2", "cpu_utilization", "average"))
-	assert.Equal(t, "lambda.duration_p90", ExportedSeriesName("lambda", "duration", "p90"))
+	tests := map[string]struct {
+		profile, metric, statistic, want string
+	}{
+		"standard statistic": {profile: "ec2", metric: "cpu_utilization", statistic: "average", want: "ec2.cpu_utilization_average"},
+		"percentile":         {profile: "lambda", metric: "duration", statistic: "p90", want: "lambda.duration_p90"},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, ExportedSeriesName(tc.profile, tc.metric, tc.statistic))
+		})
+	}
 }
 
 func TestProfile_EffectivePeriod(t *testing.T) {
 	p := Profile{Period: 300}
-	assert.Equal(t, 300, p.EffectivePeriod(Metric{}))
-	assert.Equal(t, 60, p.EffectivePeriod(Metric{Period: 60}))
+	tests := map[string]struct {
+		metric Metric
+		want   int
+	}{
+		"inherits profile": {want: 300},
+		"metric override":  {metric: Metric{Period: 60}, want: 60},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tc.want, p.EffectivePeriod(tc.metric))
+		})
+	}
 }
 
 func TestProfile_DimensionNames(t *testing.T) {

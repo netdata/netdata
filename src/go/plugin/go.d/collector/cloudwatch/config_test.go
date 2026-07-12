@@ -509,218 +509,234 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 	schema, err := compiler.Compile("cloudwatch-config.json")
 	require.NoError(t, err)
 
-	valid := map[string]any{
+	base := map[string]any{
 		"name":        "cloudwatch",
 		"credentials": []any{map[string]any{"name": "sdk_default", "type": "default"}},
 		"targets":     []any{map[string]any{"name": "base", "credentials": "sdk_default"}},
 		"rules":       []any{map[string]any{"name": "base-defaults", "targets": []any{"base"}, "regions": []any{"us-east-1"}}},
 	}
-	require.NoError(t, schema.Validate(valid))
-	require.NoError(t, validateRuntimeConfigMap(t, valid))
 
-	t.Run("exact metric selection is valid", func(t *testing.T) {
-		cfg := cloneConfigMap(t, valid)
-		cfg["rules"] = []any{map[string]any{
-			"name": "selected", "targets": []any{"base"}, "regions": []any{"us-east-1"},
-			"profiles": map[string]any{"defaults": false, "include": []any{"ec2"}},
-			"metrics": []any{map[string]any{
-				"profile": "ec2", "statistics": []any{"Average"},
-				"include": []any{map[string]any{"name": "CPUUtilization"}},
-			}},
-		}}
-		assert.NoError(t, schema.Validate(cfg))
-		assert.NoError(t, validateRuntimeConfigMap(t, cfg))
-	})
-
-	t.Run("empty metric selection is rejected", func(t *testing.T) {
-		cfg := cloneConfigMap(t, valid)
-		cfg["rules"] = []any{map[string]any{
-			"name": "selected", "targets": []any{"base"}, "regions": []any{"us-east-1"},
-			"metrics": []any{},
-		}}
-		assert.Error(t, schema.Validate(cfg))
-		assert.Error(t, validateRuntimeConfigMap(t, cfg))
-	})
-
-	for name, metrics := range map[string][]any{
-		"empty group statistics": {
-			map[string]any{
-				"profile": "ec2", "statistics": []any{},
-				"include": []any{map[string]any{"name": "CPUUtilization", "statistics": []any{"Average"}}},
+	tests := map[string]struct {
+		mutate         func(map[string]any)
+		wantSchemaErr  bool
+		wantRuntimeErr bool
+	}{
+		"base configuration": {},
+		"exact metric selection": {
+			mutate: func(cfg map[string]any) {
+				cfg["rules"] = []any{map[string]any{
+					"name": "selected", "targets": []any{"base"}, "regions": []any{"us-east-1"},
+					"profiles": map[string]any{"defaults": false, "include": []any{"ec2"}},
+					"metrics": []any{map[string]any{
+						"profile": "ec2", "statistics": []any{"Average"},
+						"include": []any{map[string]any{"name": "CPUUtilization"}},
+					}},
+				}}
 			},
+		},
+		"empty metric selection": {
+			mutate: func(cfg map[string]any) {
+				cfg["rules"] = []any{map[string]any{
+					"name": "selected", "targets": []any{"base"}, "regions": []any{"us-east-1"},
+					"metrics": []any{},
+				}}
+			},
+			wantSchemaErr: true, wantRuntimeErr: true,
+		},
+		"empty group statistics": {
+			mutate: func(cfg map[string]any) {
+				cfg["rules"] = []any{map[string]any{
+					"name": "selected", "targets": []any{"base"}, "regions": []any{"us-east-1"},
+					"profiles": map[string]any{"defaults": false, "include": []any{"ec2"}},
+					"metrics": []any{map[string]any{
+						"profile": "ec2", "statistics": []any{},
+						"include": []any{map[string]any{"name": "CPUUtilization", "statistics": []any{"Average"}}},
+					}},
+				}}
+			},
+			wantSchemaErr: true, wantRuntimeErr: true,
 		},
 		"empty metric statistics": {
-			map[string]any{
-				"profile": "ec2", "statistics": []any{"Average"},
-				"include": []any{map[string]any{"name": "CPUUtilization", "statistics": []any{}}},
+			mutate: func(cfg map[string]any) {
+				cfg["rules"] = []any{map[string]any{
+					"name": "selected", "targets": []any{"base"}, "regions": []any{"us-east-1"},
+					"profiles": map[string]any{"defaults": false, "include": []any{"ec2"}},
+					"metrics": []any{map[string]any{
+						"profile": "ec2", "statistics": []any{"Average"},
+						"include": []any{map[string]any{"name": "CPUUtilization", "statistics": []any{}}},
+					}},
+				}}
+			},
+			wantSchemaErr: true, wantRuntimeErr: true,
+		},
+		"resource tag filter inheritance and explicit disable": {
+			mutate: func(cfg map[string]any) {
+				cfg["rule_defaults"] = map[string]any{"filters": map[string]any{"resource_tags": []any{
+					map[string]any{"key": "environment", "values": []any{"production", "staging"}},
+				}}}
+				cfg["labels"] = map[string]any{"resource_tags": []any{
+					map[string]any{"key": "Owner", "label": "resource_owner"},
+				}}
+				cfg["limits"] = map[string]any{"max_instances": 2000, "max_discovery_groups": 80}
+				cfg["rules"] = []any{
+					map[string]any{"name": "filtered", "targets": []any{"base"}, "regions": []any{"us-east-1"}, "profiles": map[string]any{"defaults": false, "include": []any{"ec2"}}},
+					map[string]any{"name": "unfiltered", "targets": []any{"base"}, "regions": []any{"us-east-1"}, "profiles": map[string]any{"defaults": false, "include": []any{"cloudfront"}}, "filters": map[string]any{"resource_tags": []any{}}},
+				}
 			},
 		},
-	} {
-		t.Run(name+" are rejected", func(t *testing.T) {
-			cfg := cloneConfigMap(t, valid)
-			cfg["rules"] = []any{map[string]any{
-				"name": "selected", "targets": []any{"base"}, "regions": []any{"us-east-1"},
-				"profiles": map[string]any{"defaults": false, "include": []any{"ec2"}},
-				"metrics":  metrics,
-			}}
-			assert.Error(t, schema.Validate(cfg))
-			assert.Error(t, validateRuntimeConfigMap(t, cfg))
-		})
-	}
-
-	t.Run("resource tag filter inheritance and explicit disable are valid", func(t *testing.T) {
-		cfg := cloneConfigMap(t, valid)
-		cfg["rule_defaults"] = map[string]any{"filters": map[string]any{"resource_tags": []any{
-			map[string]any{"key": "environment", "values": []any{"production", "staging"}},
-		}}}
-		cfg["labels"] = map[string]any{"resource_tags": []any{
-			map[string]any{"key": "Owner", "label": "resource_owner"},
-		}}
-		cfg["limits"] = map[string]any{"max_instances": 2000, "max_discovery_groups": 80}
-		cfg["rules"] = []any{
-			map[string]any{"name": "filtered", "targets": []any{"base"}, "regions": []any{"us-east-1"}, "profiles": map[string]any{"defaults": false, "include": []any{"ec2"}}},
-			map[string]any{"name": "unfiltered", "targets": []any{"base"}, "regions": []any{"us-east-1"}, "profiles": map[string]any{"defaults": false, "include": []any{"cloudfront"}}, "filters": map[string]any{"resource_tags": []any{}}},
-		}
-		assert.NoError(t, schema.Validate(cfg))
-		assert.NoError(t, validateRuntimeConfigMap(t, cfg))
-	})
-
-	for name, value := range map[string]int{"negative": -1, "above synchronous maximum": maxDiscoveryGroupsPerJob + 1} {
-		t.Run("discovery group limit "+name+" is rejected", func(t *testing.T) {
-			cfg := cloneConfigMap(t, valid)
-			cfg["limits"] = map[string]any{"max_discovery_groups": value}
-			assert.Error(t, schema.Validate(cfg))
-			assert.Error(t, validateRuntimeConfigMap(t, cfg))
-		})
-	}
-
-	t.Run("resource tag filter requires at least one value", func(t *testing.T) {
-		cfg := cloneConfigMap(t, valid)
-		cfg["rule_defaults"] = map[string]any{"filters": map[string]any{"resource_tags": []any{
-			map[string]any{"key": "environment", "values": []any{}},
-		}}}
-		assert.Error(t, schema.Validate(cfg))
-		assert.Error(t, validateRuntimeConfigMap(t, cfg))
-	})
-
-	t.Run("nested static credential source is valid", func(t *testing.T) {
-		cfg := cloneConfigMap(t, valid)
-		cfg["credentials"] = []any{map[string]any{
-			"name": "static", "type": "static", "type_static": map[string]any{
-				"access_key_id": "key", "secret_access_key": "secret", "session_token": "token",
+		"negative discovery group limit": {
+			mutate:        func(cfg map[string]any) { cfg["limits"] = map[string]any{"max_discovery_groups": -1} },
+			wantSchemaErr: true, wantRuntimeErr: true,
+		},
+		"discovery group limit above synchronous maximum": {
+			mutate: func(cfg map[string]any) {
+				cfg["limits"] = map[string]any{"max_discovery_groups": maxDiscoveryGroupsPerJob + 1}
 			},
-		}}
-		cfg["targets"] = []any{map[string]any{"name": "base", "credentials": "static"}}
-		assert.NoError(t, schema.Validate(cfg))
-		assert.NoError(t, validateRuntimeConfigMap(t, cfg))
-	})
-
-	t.Run("flat static fields are not compatibility decoded", func(t *testing.T) {
-		cfg := cloneConfigMap(t, valid)
-		cfg["credentials"] = []any{map[string]any{
-			"name": "sdk_default", "type": "static", "access_key_id": "key", "secret_access_key": "secret",
-		}}
-		assert.Error(t, schema.Validate(cfg))
-		assert.Error(t, validateRuntimeConfigMap(t, cfg))
-	})
-
-	t.Run("credential map is not compatibility decoded", func(t *testing.T) {
-		cfg := cloneConfigMap(t, valid)
-		cfg["credentials"] = map[string]any{"sdk_default": map[string]any{"type": "default"}}
-		assert.Error(t, schema.Validate(cfg))
-		assert.Error(t, validateRuntimeConfigMap(t, cfg))
-	})
-
-	t.Run("duplicate credential names fail runtime validation", func(t *testing.T) {
-		cfg := cloneConfigMap(t, valid)
-		cfg["credentials"] = []any{
-			map[string]any{"name": "sdk_default", "type": "default"},
-			map[string]any{"name": "sdk_default", "type": "default"},
-		}
-		assert.NoError(t, schema.Validate(cfg))
-		assert.Error(t, validateRuntimeConfigMap(t, cfg))
-	})
-
-	t.Run("credential name remains required", func(t *testing.T) {
-		cfg := cloneConfigMap(t, valid)
-		cfg["credentials"] = []any{map[string]any{"type": "default"}}
-		assert.Error(t, schema.Validate(cfg))
-		assert.Error(t, validateRuntimeConfigMap(t, cfg))
-	})
-
-	strictCases := map[string]func(map[string]any){
-		"credential type has surrounding whitespace": func(cfg map[string]any) {
-			cfg["credentials"] = []any{map[string]any{"name": "sdk_default", "type": " default "}}
+			wantSchemaErr: true, wantRuntimeErr: true,
 		},
-		"credential type is mixed case": func(cfg map[string]any) {
-			cfg["credentials"] = []any{map[string]any{"name": "sdk_default", "type": "DEFAULT"}}
+		"resource tag filter without values": {
+			mutate: func(cfg map[string]any) {
+				cfg["rule_defaults"] = map[string]any{"filters": map[string]any{"resource_tags": []any{
+					map[string]any{"key": "environment", "values": []any{}},
+				}}}
+			},
+			wantSchemaErr: true, wantRuntimeErr: true,
 		},
-		"static access key is whitespace only": func(cfg map[string]any) {
-			cfg["credentials"] = []any{map[string]any{
-				"name": "sdk_default", "type": "static", "type_static": map[string]any{
-					"access_key_id": " ", "secret_access_key": "secret",
-				},
-			}}
+		"nested static credential source": {
+			mutate: func(cfg map[string]any) {
+				cfg["credentials"] = []any{map[string]any{
+					"name": "static", "type": "static", "type_static": map[string]any{
+						"access_key_id": "key", "secret_access_key": "secret", "session_token": "token",
+					},
+				}}
+				cfg["targets"] = []any{map[string]any{"name": "base", "credentials": "static"}}
+			},
 		},
-		"target name has surrounding whitespace": func(cfg map[string]any) {
-			cfg["targets"] = []any{map[string]any{"name": " base ", "credentials": "sdk_default"}}
+		"flat static fields": {
+			mutate: func(cfg map[string]any) {
+				cfg["credentials"] = []any{map[string]any{
+					"name": "sdk_default", "type": "static", "access_key_id": "key", "secret_access_key": "secret",
+				}}
+			},
+			wantSchemaErr: true, wantRuntimeErr: true,
 		},
-		"target reference has surrounding whitespace": func(cfg map[string]any) {
-			cfg["rules"] = []any{map[string]any{"name": "base-defaults", "targets": []any{" base "}, "regions": []any{"us-east-1"}}}
+		"credential map": {
+			mutate: func(cfg map[string]any) {
+				cfg["credentials"] = map[string]any{"sdk_default": map[string]any{"type": "default"}}
+			},
+			wantSchemaErr: true, wantRuntimeErr: true,
 		},
-		"profile reference has surrounding whitespace": func(cfg map[string]any) {
-			cfg["rules"] = []any{map[string]any{
-				"name": "base-defaults", "targets": []any{"base"}, "regions": []any{"us-east-1"},
-				"profiles": map[string]any{"defaults": false, "include": []any{" ec2 "}},
-			}}
+		"duplicate credential names": {
+			mutate: func(cfg map[string]any) {
+				cfg["credentials"] = []any{
+					map[string]any{"name": "sdk_default", "type": "default"},
+					map[string]any{"name": "sdk_default", "type": "default"},
+				}
+			},
+			wantRuntimeErr: true,
 		},
-		"region is not canonical lowercase": func(cfg map[string]any) {
-			cfg["rules"] = []any{map[string]any{"name": "base-defaults", "targets": []any{"base"}, "regions": []any{"US-EAST-1"}}}
+		"credential without name": {
+			mutate: func(cfg map[string]any) {
+				cfg["credentials"] = []any{map[string]any{"type": "default"}}
+			},
+			wantSchemaErr: true, wantRuntimeErr: true,
+		},
+		"credential type with surrounding whitespace": {
+			mutate: func(cfg map[string]any) {
+				cfg["credentials"] = []any{map[string]any{"name": "sdk_default", "type": " default "}}
+			},
+			wantSchemaErr: true, wantRuntimeErr: true,
+		},
+		"mixed-case credential type": {
+			mutate: func(cfg map[string]any) {
+				cfg["credentials"] = []any{map[string]any{"name": "sdk_default", "type": "DEFAULT"}}
+			},
+			wantSchemaErr: true, wantRuntimeErr: true,
+		},
+		"whitespace-only static access key": {
+			mutate: func(cfg map[string]any) {
+				cfg["credentials"] = []any{map[string]any{
+					"name": "sdk_default", "type": "static", "type_static": map[string]any{
+						"access_key_id": " ", "secret_access_key": "secret",
+					},
+				}}
+			},
+			wantSchemaErr: true, wantRuntimeErr: true,
+		},
+		"target name with surrounding whitespace": {
+			mutate: func(cfg map[string]any) {
+				cfg["targets"] = []any{map[string]any{"name": " base ", "credentials": "sdk_default"}}
+			},
+			wantSchemaErr: true, wantRuntimeErr: true,
+		},
+		"target reference with surrounding whitespace": {
+			mutate: func(cfg map[string]any) {
+				cfg["rules"] = []any{map[string]any{"name": "base-defaults", "targets": []any{" base "}, "regions": []any{"us-east-1"}}}
+			},
+			wantSchemaErr: true, wantRuntimeErr: true,
+		},
+		"profile reference with surrounding whitespace": {
+			mutate: func(cfg map[string]any) {
+				cfg["rules"] = []any{map[string]any{
+					"name": "base-defaults", "targets": []any{"base"}, "regions": []any{"us-east-1"},
+					"profiles": map[string]any{"defaults": false, "include": []any{" ec2 "}},
+				}}
+			},
+			wantSchemaErr: true, wantRuntimeErr: true,
+		},
+		"non-canonical region": {
+			mutate: func(cfg map[string]any) {
+				cfg["rules"] = []any{map[string]any{"name": "base-defaults", "targets": []any{"base"}, "regions": []any{"US-EAST-1"}}}
+			},
+			wantSchemaErr: true, wantRuntimeErr: true,
+		},
+		"missing required static field": {
+			mutate: func(cfg map[string]any) {
+				cfg["credentials"] = []any{map[string]any{
+					"name": "sdk_default", "type": "static", "type_static": map[string]any{"access_key_id": "key"},
+				}}
+			},
+			wantSchemaErr: true, wantRuntimeErr: true,
+		},
+		"unknown top-level field": {
+			mutate: func(cfg map[string]any) { cfg["unknown"] = true },
+		},
+		"unknown nested field": {
+			mutate: func(cfg map[string]any) {
+				cfg["targets"] = []any{map[string]any{"name": "base", "credentials": "sdk_default", "unknown": true}}
+			},
+		},
+		"inactive static configuration": {
+			mutate: func(cfg map[string]any) {
+				cfg["credentials"] = []any{map[string]any{
+					"name": "sdk_default", "type": "default", "type_static": map[string]any{
+						"access_key_id": "rejected-at-runtime", "secret_access_key": "secret",
+					},
+				}}
+			},
+			wantRuntimeErr: true,
 		},
 	}
-	for name, mutate := range strictCases {
+
+	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			cfg := cloneConfigMap(t, valid)
-			mutate(cfg)
-			assert.Error(t, schema.Validate(cfg))
-			assert.Error(t, validateRuntimeConfigMap(t, cfg))
+			cfg := cloneConfigMap(t, base)
+			if tc.mutate != nil {
+				tc.mutate(cfg)
+			}
+
+			if tc.wantSchemaErr {
+				assert.Error(t, schema.Validate(cfg))
+			} else {
+				assert.NoError(t, schema.Validate(cfg))
+			}
+			if tc.wantRuntimeErr {
+				assert.Error(t, validateRuntimeConfigMap(t, cfg))
+			} else {
+				assert.NoError(t, validateRuntimeConfigMap(t, cfg))
+			}
 		})
 	}
-
-	t.Run("required static fields remain enforced", func(t *testing.T) {
-		cfg := cloneConfigMap(t, valid)
-		cfg["credentials"] = []any{map[string]any{
-			"name": "sdk_default", "type": "static", "type_static": map[string]any{"access_key_id": "key"},
-		}}
-		assert.Error(t, schema.Validate(cfg))
-		assert.Error(t, validateRuntimeConfigMap(t, cfg))
-	})
-
-	unknownFieldCases := map[string]func(map[string]any){
-		"unknown top-level field": func(cfg map[string]any) { cfg["unknown"] = true },
-		"unknown nested field": func(cfg map[string]any) {
-			cfg["targets"] = []any{map[string]any{"name": "base", "credentials": "sdk_default", "unknown": true}}
-		},
-	}
-	for name, mutate := range unknownFieldCases {
-		t.Run("unknown fields ignored/"+name, func(t *testing.T) {
-			cfg := cloneConfigMap(t, valid)
-			mutate(cfg)
-			assert.NoError(t, schema.Validate(cfg))
-			assert.NoError(t, validateRuntimeConfigMap(t, cfg))
-		})
-	}
-
-	t.Run("runtime rejects inactive static configuration", func(t *testing.T) {
-		cfg := cloneConfigMap(t, valid)
-		cfg["credentials"] = []any{map[string]any{
-			"name": "sdk_default", "type": "default", "type_static": map[string]any{
-				"access_key_id": "rejected-at-runtime", "secret_access_key": "secret",
-			},
-		}}
-		assert.NoError(t, schema.Validate(cfg))
-		assert.Error(t, validateRuntimeConfigMap(t, cfg))
-	})
 }
 
 func cloneConfigMap(t *testing.T, src map[string]any) map[string]any {

@@ -86,14 +86,50 @@ func TestFinalInstanceID_IdentityContract(t *testing.T) {
 		{Name: "Kind", Constant: &constant},
 	}
 	base := finalInstanceID("profile", "000000000000", "us-east-1", dimensions, []string{"i-1", "fixed"})
-
-	assert.Equal(t, base, finalInstanceID("profile", "000000000000", "us-east-1", dimensions, []string{"i-1", "other"}),
-		"constant dimensions are match/query constraints, not final chart identity")
-	assert.NotEqual(t, base, finalInstanceID("other", "000000000000", "us-east-1", dimensions, []string{"i-1", "fixed"}))
-	assert.NotEqual(t, base, finalInstanceID("profile", "111111111111", "us-east-1", dimensions, []string{"i-1", "fixed"}))
-	assert.NotEqual(t, base, finalInstanceID("profile", "000000000000", "us-west-2", dimensions, []string{"i-1", "fixed"}))
-	assert.NotEqual(t, base, finalInstanceID("profile", "000000000000", "us-east-1", dimensions, []string{"i-2", "fixed"}))
 	renamed := append([]cwprofiles.InstanceDimension(nil), dimensions...)
 	renamed[0].Label = "resource_id"
-	assert.NotEqual(t, base, finalInstanceID("profile", "000000000000", "us-east-1", renamed, []string{"i-1", "fixed"}))
+
+	tests := map[string]struct {
+		profile    string
+		account    string
+		region     string
+		dimensions []cwprofiles.InstanceDimension
+		values     []string
+		wantEqual  bool
+	}{
+		"constant dimension excluded": {
+			profile: "profile", account: "000000000000", region: "us-east-1",
+			dimensions: dimensions, values: []string{"i-1", "other"}, wantEqual: true,
+		},
+		"profile changes identity": {
+			profile: "other", account: "000000000000", region: "us-east-1",
+			dimensions: dimensions, values: []string{"i-1", "fixed"},
+		},
+		"account changes identity": {
+			profile: "profile", account: "111111111111", region: "us-east-1",
+			dimensions: dimensions, values: []string{"i-1", "fixed"},
+		},
+		"region changes identity": {
+			profile: "profile", account: "000000000000", region: "us-west-2",
+			dimensions: dimensions, values: []string{"i-1", "fixed"},
+		},
+		"dimension value changes identity": {
+			profile: "profile", account: "000000000000", region: "us-east-1",
+			dimensions: dimensions, values: []string{"i-2", "fixed"},
+		},
+		"dimension label changes identity": {
+			profile: "profile", account: "000000000000", region: "us-east-1",
+			dimensions: renamed, values: []string{"i-1", "fixed"},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got := finalInstanceID(tc.profile, tc.account, tc.region, tc.dimensions, tc.values)
+			if tc.wantEqual {
+				assert.Equal(t, base, got)
+			} else {
+				assert.NotEqual(t, base, got)
+			}
+		})
+	}
 }
