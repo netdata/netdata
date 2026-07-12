@@ -5,6 +5,7 @@ package cloudwatch
 import (
 	"context"
 	"fmt"
+	"maps"
 	"slices"
 	"sort"
 	"time"
@@ -51,9 +52,7 @@ type tagGroupSnapshot struct {
 // share copies only the scope index; the per-scope member sets are immutable once
 // a fetch result is installed and can be shared by the effective snapshot.
 func (m tagMembership) share(other tagMembership) {
-	for scopeID, joinKeys := range other {
-		m[scopeID] = joinKeys
-	}
+	maps.Copy(m, other)
 }
 
 func (m tagMembership) equal(other tagMembership) bool {
@@ -238,7 +237,6 @@ func (c *Collector) fetchTagGroups(ctx context.Context, groups []tagFetchGroup) 
 	results := make([]tagFetchResult, len(groups))
 	p := pool.New().WithMaxGoroutines(max(1, apiConcurrency))
 	for i := range groups {
-		i := i
 		p.Go(func() {
 			results[i] = c.fetchTagGroup(ctx, groups[i])
 		})
