@@ -45,24 +45,15 @@ func selectedSeriesUseRecentlyActive(series []compiledSeries, enabled bool) bool
 // discoverProfileGroup scans one namespace once and applies each participating
 // profile's exact dimension matcher while streaming pages.
 func discoverProfileGroup(ctx context.Context, client cloudwatchClient, group discoveryGroup) (map[string][]discoveredInstance, error) {
-	profiles := group.Profiles
-	if len(profiles) == 0 {
+	if len(group.Profiles) == 0 {
 		return nil, nil
 	}
-	type matcher struct {
-		profile cwprofiles.ResolvedProfile
-		dims    []string
-		seen    map[string]struct{}
-	}
-	matchers := make([]matcher, len(profiles))
-	for i, profile := range profiles {
-		matchers[i] = matcher{profile: profile, dims: profile.Config.DimensionNames(), seen: make(map[string]struct{})}
-	}
+	matchers := newDiscoveryMatcherIndex(group.Profiles)
 
-	instances := make(map[string][]discoveredInstance, len(profiles))
+	instances := make(map[string][]discoveredInstance, len(group.Profiles))
 	var nextToken *string
 	seenTokens := make(map[string]struct{})
-	pages, scannedMetrics, candidateInstances := 0, 0, 0
+	pages, scannedMetrics, candidateInstances, matcherEvaluations := 0, 0, 0, 0
 	for {
 		in := &cloudwatch.ListMetricsInput{Namespace: aws.String(group.Namespace), NextToken: nextToken}
 		if group.RecentlyActive {
@@ -72,19 +63,40 @@ func discoverProfileGroup(ctx context.Context, client cloudwatchClient, group di
 		if err != nil {
 			return nil, err
 		}
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
 		pages++
 		scannedMetrics += len(out.Metrics)
 		if scannedMetrics > maxScannedMetricsPerGroup {
 			return nil, safeCollectorErrorf("ListMetrics scanned more than %d metrics for one discovery group", maxScannedMetricsPerGroup)
 		}
 		for _, metric := range out.Metrics {
-			for i := range matchers {
-				m := &matchers[i]
-				values, ok := matchInstanceDimensions(metric.Dimensions, m.dims)
-				if !ok || !constantDimensionsHold(m.profile.Config.Instance.Dimensions, values) {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+			signature, values, ok := canonicalMetricDimensions(metric.Dimensions)
+			if !ok {
+				continue
+			}
+			for _, m := range matchers[signature] {
+				matcherEvaluations++
+				if matcherEvaluations > maxDiscoveryMatcherEvaluationsPerGroup {
+					return nil, safeCollectorErrorf(
+						"ListMetrics requires more than %d residual profile matches for one discovery group",
+						maxDiscoveryMatcherEvaluationsPerGroup,
+					)
+				}
+				if matcherEvaluations%256 == 0 {
+					if err := ctx.Err(); err != nil {
+						return nil, err
+					}
+				}
+				if !m.constantsHold(values) {
 					continue
 				}
-				key := strings.Join(values, instanceKeySep)
+				ordered := m.orderedValues(values)
+				key := strings.Join(ordered, instanceKeySep)
 				if _, ok := m.seen[key]; ok {
 					continue
 				}
@@ -93,7 +105,7 @@ func discoverProfileGroup(ctx context.Context, client cloudwatchClient, group di
 				if candidateInstances > maxCandidateInstancesPerGroup {
 					return nil, safeCollectorErrorf("ListMetrics found more than %d candidate instances for one discovery group", maxCandidateInstancesPerGroup)
 				}
-				instances[m.profile.Name] = append(instances[m.profile.Name], discoveredInstance{DimensionValues: values})
+				instances[m.profileName] = append(instances[m.profileName], discoveredInstance{DimensionValues: ordered})
 			}
 		}
 		if out.NextToken == nil || *out.NextToken == "" {
@@ -111,50 +123,101 @@ func discoverProfileGroup(ctx context.Context, client cloudwatchClient, group di
 	return instances, nil
 }
 
-// matchInstanceDimensions returns the metric's dimension values ordered by
-// dimNames, but only if the metric's dimension-NAME set EXACTLY equals dimNames
-// (same cardinality, same names). A metric with extra or missing dimensions does
-// not match, so e.g. an ALB metric under {LoadBalancer,TargetGroup} is rejected
-// by a {LoadBalancer}-only profile.
-func matchInstanceDimensions(dims []cwtypes.Dimension, dimNames []string) ([]string, bool) {
-	if len(dims) != len(dimNames) {
-		return nil, false
-	}
-
-	byName := make(map[string]string, len(dims))
-	for _, d := range dims {
-		if d.Name == nil || d.Value == nil {
-			return nil, false
-		}
-		byName[*d.Name] = *d.Value
-	}
-	if len(byName) != len(dimNames) {
-		return nil, false // duplicate dimension names in the metric
-	}
-
-	values := make([]string, len(dimNames))
-	for i, name := range dimNames {
-		v, ok := byName[name]
-		if !ok {
-			return nil, false
-		}
-		values[i] = v
-	}
-	return values, true
+type discoveryDimension struct {
+	name  string
+	value string
 }
 
-// constantDimensionsHold reports whether every match-and-query-only (constant)
-// dimension in the profile has its pinned value in this metric's dimension values
-// (ordered to match the profile's declared dimensions). A mismatch fails the match
-// closed: a constant dimension is not emitted as a label, so admitting a differing
-// value would collapse distinct instances onto one unlabeled series.
-func constantDimensionsHold(dims []cwprofiles.InstanceDimension, values []string) bool {
-	for i, d := range dims {
-		if d.Constant != nil && values[i] != *d.Constant {
+type discoveryConstant struct {
+	index int
+	value string
+}
+
+type discoveryMatcher struct {
+	profileName string
+	outputOrder []int
+	constants   []discoveryConstant
+	seen        map[string]struct{}
+}
+
+// newDiscoveryMatcherIndex groups profiles by their exact dimension-name set.
+// ListMetrics dimensions are canonicalized once per metric, so profiles with a
+// different shape are rejected by one map lookup instead of a full scan.
+func newDiscoveryMatcherIndex(profiles []cwprofiles.ResolvedProfile) map[string][]*discoveryMatcher {
+	index := make(map[string][]*discoveryMatcher)
+	for _, profile := range profiles {
+		dims := profile.Config.Instance.Dimensions
+		names := make([]string, len(dims))
+		for i, dim := range dims {
+			names[i] = dim.Name
+		}
+		sort.Strings(names)
+
+		m := &discoveryMatcher{
+			profileName: profile.Name,
+			outputOrder: make([]int, len(dims)),
+			seen:        make(map[string]struct{}),
+		}
+		for i, dim := range dims {
+			canonicalIndex := sort.SearchStrings(names, dim.Name)
+			m.outputOrder[i] = canonicalIndex
+			if dim.Constant != nil {
+				m.constants = append(m.constants, discoveryConstant{index: canonicalIndex, value: *dim.Constant})
+			}
+		}
+		signature := dimensionNameSignature(names)
+		index[signature] = append(index[signature], m)
+	}
+	return index
+}
+
+// canonicalMetricDimensions returns a collision-safe signature and values in
+// canonical name order. Nil components and repeated names fail closed.
+func canonicalMetricDimensions(dims []cwtypes.Dimension) (string, []string, bool) {
+	canonical := make([]discoveryDimension, len(dims))
+	for i, dim := range dims {
+		if dim.Name == nil || dim.Value == nil {
+			return "", nil, false
+		}
+		canonical[i] = discoveryDimension{name: *dim.Name, value: *dim.Value}
+	}
+	sort.Slice(canonical, func(i, j int) bool { return canonical[i].name < canonical[j].name })
+
+	names := make([]string, len(canonical))
+	values := make([]string, len(canonical))
+	for i, dim := range canonical {
+		if i > 0 && canonical[i-1].name == dim.name {
+			return "", nil, false
+		}
+		names[i] = dim.name
+		values[i] = dim.value
+	}
+	return dimensionNameSignature(names), values, true
+}
+
+func dimensionNameSignature(names []string) string {
+	var b strings.Builder
+	for _, name := range names {
+		writeLengthPrefixed(&b, name)
+	}
+	return b.String()
+}
+
+func (m *discoveryMatcher) constantsHold(canonicalValues []string) bool {
+	for _, constant := range m.constants {
+		if canonicalValues[constant.index] != constant.value {
 			return false
 		}
 	}
 	return true
+}
+
+func (m *discoveryMatcher) orderedValues(canonicalValues []string) []string {
+	values := make([]string, len(m.outputOrder))
+	for i, canonicalIndex := range m.outputOrder {
+		values[i] = canonicalValues[canonicalIndex]
+	}
+	return values
 }
 
 // discoveryKey identifies a discovered instance set by target, profile, and region.

@@ -128,10 +128,11 @@ modules:
         limits:
           description: |
             - Minimum collection interval is 60 seconds (CloudWatch's minimum metric period).
-            - Query timing resolves field-by-field from `rules[].query`, `rule_defaults.query`, profile metric/profile values, and the built-in 10-minute publication delay. The stock daily S3 storage profile uses a one-day publication delay.
+            - Query timing resolves field-by-field from `rules[].query`, `rule_defaults.query`, profile metric/profile values, and the built-in 10-minute publication delay. The stock daily S3 storage profile uses a conservative one-day collector policy. AWS documents that S3 storage metrics are reported once per day, but does not guarantee publication within one day.
             - A successful sparse query can replay its newest eligible CloudWatch value for up to `lookback`. During transient AWS failures, the retained value can be replayed longer, until a successful query replaces or expires it.
             - `limits.max_instances` defaults to 1000 distinct final resource instances after tag filtering and overlap resolution. Exceeding it rejects the refreshed query plan; resources are never silently truncated.
             - `limits.max_discovery_groups` defaults to 64 unique `(target, region, namespace)` groups per job. Compatible rules and profiles share a group. The safeguard catches accidental expansion; intentionally larger installations can raise it (up to the structural maximum of 4096) or split collection across jobs. Increasing it permits proportionally more `ListMetrics` work.
+            - Each discovery group is independently bounded to 100 `ListMetrics` pages, 50,000 scanned metrics, 1,000,000 residual same-shape profile matches, and 20,000 candidate instances. Overflow fails the group without replacing its previous snapshot.
             - Resources are labeled by their identifying CloudWatch dimensions (for example EC2 `instance_id`). Selected resource tags can additionally be attached as non-identity labels via `labels.resource_tags`; changing those tags updates labels without changing chart identity. (A dimension that is constant across resources, such as CloudFront's `Region=Global`, is used to match and query metrics but is not turned into a label.)
         performance_impact:
           description: |
@@ -344,7 +345,7 @@ modules:
               required: false
               group: Query Policy
             - name: rule_defaults.query.publication_delay
-              description: Default wait after a bucket closes before it becomes eligible. Omission falls through to the profile value and then the built-in `10m` fallback. Setting this option overrides profile-specific delays for every inheriting rule, including the stock S3 storage profile's conservative `1d`; use a shorter default only after verifying each workload's publication timing.
+              description: Default collector wait after a bucket closes before it becomes eligible. This is a scheduling policy, not an AWS publication guarantee. Omission falls through to the profile value and then the built-in `10m` fallback. Setting this option overrides profile-specific delays for every inheriting rule, including the stock S3 storage profile's conservative `1d`; AWS documents only that S3 storage metrics are reported once per day, so use a shorter default only after verifying each workload's publication timing.
               default_value: ""
               required: false
               group: Query Policy
@@ -364,7 +365,7 @@ modules:
               required: false
               group: Query Policy
             - name: rules[].query.publication_delay
-              description: Wait after a bucket closes before querying it. Explicit `0s` is allowed for metrics known to publish immediately.
+              description: Collector wait after a bucket closes before querying it. This is a scheduling policy, not an AWS publication guarantee. Explicit `0s` is allowed for metrics known to publish immediately.
               default_value: ""
               required: false
               group: Query Policy
@@ -591,7 +592,7 @@ modules:
             description: |
               - **Profile selection** -- omit `rules[].profiles` to select defaults, or ensure the service basename appears under `rules[].profiles.include` and is not excluded.
               - **Metric selection** -- omit `rules[].metrics` to collect every metric exported by selected profiles. When configured, verify each profile group names a selected profile, every `include[].name` is an exact AWS MetricName, and every metric has effective statistics from either its replacement list or the group default.
-              - **Daily metrics** -- S3 storage metrics are published once per day. They are inherently delayed by about a day, and `recently_active_only` is automatically disabled for them.
+              - **Daily metrics** -- AWS documents that S3 storage metrics are reported once per day, but does not state a publication-within-one-day guarantee. The stock profile therefore uses a conservative `1d` collector delay policy, and `recently_active_only` is automatically disabled for its long query horizon.
               - **Resource activity** -- some metrics only appear when the resource is actively processing data (for example, EventBridge and Bedrock publish a metric only when its value is non-zero).
               - **Auto Scaling group metrics** -- Auto Scaling group metrics (`cloudwatch.auto_scaling.*`) are not published until group-metrics collection is enabled on the group (`aws autoscaling enable-metrics-collection --granularity 1Minute`). Amazon EKS managed node groups have it enabled by default.
               - **EKS control-plane metrics** -- EKS control-plane metrics (`cloudwatch.eks.*`) are published to the `AWS/EKS` namespace automatically, at no additional EKS charge, only for clusters running Kubernetes 1.28 or later; older clusters do not report them. These are distinct from Container Insights / the CloudWatch Observability add-on (agent-based, billed separately).

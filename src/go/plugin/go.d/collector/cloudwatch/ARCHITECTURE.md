@@ -65,10 +65,10 @@ Each collection cycle (`collect.go`), in order:
 3. reuse or rebuild the stable per-series query blueprint
    (`query_plan.go`);
 4. execute the due queries in concurrent batches (`query_executor.go`);
-5. apply per-query outcomes and write each retained value as a float gauge into `metrix`, stamped with
-   `{account_id, region, <dimension labels>}`, and re-emit cached values for
-   not-due series (`observe.go`);
-6. serve a chart template built once from the selected profiles (`chart.go`).
+5. apply explicit per-query outcomes to completion, retry, and source-observation state (`observe.go`);
+6. write retained observations or synthetic zero presentation as float gauges into `metrix`, stamped with
+   `{account_id, region, <dimension labels>}`, and re-emit not-due series (`query_emit.go`);
+7. serve a chart template built once from the selected profiles (`chart.go`).
 
 ## Lifecycle
 
@@ -195,14 +195,13 @@ Discovery then finds which *instances* of those profiles exist per target and re
   `discoverAll` fans out over those groups concurrently
   (bounded by `apiConcurrency`), with one CloudWatch client per (target, region).
 - `discoverProfileGroup` pages `ListMetrics` once for the shared namespace and
-  applies every grouped profile matcher while streaming the response.
-  `matchInstanceDimensions` keeps a returned metric only if its dimension-**name**
-  set exactly equals the profile's set — same names, same cardinality. This
-  collapses CloudWatch's multi-granularity fan-out to the chosen instance grain
-  and dedups shared instances. A dimension pinned to a `constant` value is
-  additionally kept only when the metric's value for it equals that constant
-  (`constantDimensionsHold`, fail-closed), so a constant dimension can never merge
-  distinct instances onto one unlabeled series.
+  applies an index compiled from each profile's canonical exact dimension-name set.
+  Each returned metric's dimensions are canonicalized once; profiles with a different
+  shape are rejected by the index lookup, while same-shape profiles evaluate only
+  their pinned constants. This collapses CloudWatch's multi-granularity fan-out to
+  the chosen instance grain and dedups shared instances. Constant mismatches fail
+  closed, so a constant dimension can never merge distinct instances onto one
+  unlabeled series.
 - **Recently-active-only** is horizon-aware: the `ListMetrics RecentlyActive=PT3H`
   filter is applied only when every selected series participating in the shared
   target/region/namespace scan has `publication_delay + lookback + period ≤ 3h`. PT3H is the only value CloudWatch
@@ -212,8 +211,10 @@ Discovery then finds which *instances* of those profiles exist per target and re
   (default 64, valid 1..4,096). Compatible rules and profiles share one group.
   Raising the safeguard permits proportionally more ListMetrics work; larger valid
   installations may instead split across jobs. Each group is additionally bounded to 100 pages, 50,000 scanned metrics,
-  and 20,000 candidate profile instances; repeated pagination tokens fail the
-  whole group rather than truncating it.
+  1,000,000 residual same-shape profile matches, and 20,000 candidate profile instances;
+  repeated pagination tokens fail the whole group rather than truncating it. The
+  residual bound was measured after indexed routing and prevents adversarial
+  metric-by-profile CPU expansion without limiting profile count directly.
 - **Snapshot + carry-forward**: `buildDiscoverySnapshot` stores instances for
   successful targets and **carries forward the previous instances for errored
   targets**, so a transient per-region/namespace failure never drops series.
@@ -249,6 +250,10 @@ Discovery then finds which *instances* of those profiles exist per target and re
 - Each `plannedQuery` contains a fully resolved `{period, lookback,
   publication_delay}` policy. Resolution is field-by-field: rule, rule defaults,
   profile metric/profile, then the built-in publication-delay fallback.
+  Publication delay is collector scheduling policy, not an AWS SLA. In particular,
+  the stock S3 storage profile's `1d` is a conservative choice; AWS documents that
+  storage metrics are reported once per day but does not guarantee delivery within
+  one day.
 - Its stable key includes execution target, region, structural AWS query, final
   series identity, and effective policy. Rule name, scope order, request ID,
   batch membership, and mutable tag labels are excluded. Equivalent rule-only
@@ -311,6 +316,8 @@ Discovery then finds which *instances* of those profiles exist per target and re
   extra AWS cost. A successful rolling-window query keeps the newest eligible
   datapoint while it remains inside `lookback`; once expired, `nil_as_zero` records
   zero and other metrics gap.
+  Synthetic zero is presentation state, not a timestamped source observation, so
+  it cannot outrank a real older bucket that appears in a later rolling query.
   Without an explicit override, only `rate: true` metrics at `sum` or
   `sample_count` default to zero; every other statistic gaps. The cache otherwise
   persists until a terminal success expires/replaces it or `reconcilePlan` drops

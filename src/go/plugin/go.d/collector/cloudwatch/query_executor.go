@@ -20,10 +20,11 @@ type queryBatch struct {
 }
 
 type queryBatchResult struct {
-	batch    queryBatch
-	outcomes map[string]queryOutcome
-	issues   []queryResultIssue
-	err      error
+	batch       queryBatch
+	outcomes    map[string]queryOutcome
+	issues      []queryResultIssue
+	completedAt time.Time
+	err         error
 }
 
 type queryExecution struct {
@@ -43,17 +44,27 @@ func withTimeout(ctx context.Context, d time.Duration) (context.Context, context
 }
 
 func (c *Collector) executeQueries(ctx context.Context, due []plannedQuery, now time.Time) queryExecution {
-	execution := queryExecution{outcomes: make(map[string]queryOutcome)}
+	execution := queryExecution{outcomes: make(map[string]queryOutcome, len(due))}
 	if len(due) == 0 {
 		return execution
 	}
 
 	clients, clientErrs := c.resolveQueryClients(ctx, due)
+	clientResolutionAt := c.now()
 	var failures []operationFailure
 	for key, err := range clientErrs {
 		failures = append(failures, operationFailure{Target: key.target, Region: key.region, Err: err})
 	}
 	c.warnOperationFailures(logKeyQueryClientFailed, "query client creation", "", failures)
+	for _, query := range due {
+		if _, failed := clientErrs[clientKey{target: query.target, region: query.region}]; !failed {
+			continue
+		}
+		start, end := queryWindow(now, query.policy)
+		execution.outcomes[query.key] = queryOutcome{
+			kind: queryOutcomeTransient, windowStart: start, windowEnd: end, completedAt: clientResolutionAt,
+		}
+	}
 
 	batches := buildQueryBatches(due, clients, now)
 	results := c.runQueryBatches(ctx, batches)
@@ -67,13 +78,19 @@ func (c *Collector) executeQueries(ctx context.Context, due []plannedQuery, now 
 			})
 		}
 		for key, outcome := range result.outcomes {
+			outcome.completedAt = result.completedAt
 			execution.outcomes[key] = outcome
 		}
 	}
 	c.warnOperationFailures(logKeyGetMetricDataFailed, "GetMetricData", "", failures[len(clientErrs):])
 	c.warnQueryResultIssues(issues)
-	execution.terminal = len(execution.outcomes)
-	execution.transient = len(due) - execution.terminal
+	for _, outcome := range execution.outcomes {
+		if outcome.kind == queryOutcomeTransient {
+			execution.transient++
+		} else {
+			execution.terminal++
+		}
+	}
 	return execution
 }
 
@@ -137,7 +154,7 @@ func (c *Collector) runQueryBatches(ctx context.Context, batches []queryBatch) [
 			cctx, cancel := withTimeout(ctx, c.Timeout.Duration())
 			defer cancel()
 			outcomes, issues, err := runGetMetricData(cctx, batch)
-			return queryBatchResult{batch: batch, outcomes: outcomes, issues: issues, err: err}
+			return queryBatchResult{batch: batch, outcomes: outcomes, issues: issues, completedAt: c.now(), err: err}
 		})
 	}
 	return p.Wait()

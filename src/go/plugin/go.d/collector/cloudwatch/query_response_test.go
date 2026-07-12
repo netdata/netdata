@@ -84,7 +84,8 @@ func TestRunGetMetricData_PartialRequiresLaterComplete(t *testing.T) {
 		}}}}
 		outcomes, issues, err := runGetMetricData(context.Background(), responseTestBatch(fake, query))
 		require.NoError(t, err)
-		assert.Empty(t, outcomes)
+		require.Contains(t, outcomes, query.key)
+		assert.Equal(t, queryOutcomeTransient, outcomes[query.key].kind)
 		require.Len(t, issues, 1)
 		assert.Equal(t, queryIssuePartialData, issues[0].kind)
 	})
@@ -123,8 +124,10 @@ func TestRunGetMetricData_PageFailurePreservesCompletedSiblings(t *testing.T) {
 	}
 	outcomes, _, err := runGetMetricData(context.Background(), responseTestBatch(fake, first, second))
 	require.Error(t, err)
-	assert.Contains(t, outcomes, first.key)
-	assert.NotContains(t, outcomes, second.key)
+	require.Contains(t, outcomes, first.key)
+	require.Contains(t, outcomes, second.key)
+	assert.Equal(t, queryOutcomeComplete, outcomes[first.key].kind)
+	assert.Equal(t, queryOutcomeTransient, outcomes[second.key].kind)
 }
 
 func TestRunGetMetricData_BoundsPaginationAtTwoCalls(t *testing.T) {
@@ -135,7 +138,8 @@ func TestRunGetMetricData_BoundsPaginationAtTwoCalls(t *testing.T) {
 	}}
 	outcomes, issues, err := runGetMetricData(context.Background(), responseTestBatch(fake, query))
 	require.NoError(t, err)
-	assert.Empty(t, outcomes)
+	require.Contains(t, outcomes, query.key)
+	assert.Equal(t, queryOutcomeTransient, outcomes[query.key].kind)
 	assert.Equal(t, maxGetMetricDataPages, fake.calls)
 	require.Len(t, issues, 1)
 	assert.Equal(t, queryIssuePaginationLimit, issues[0].kind)
@@ -156,7 +160,8 @@ func TestRunGetMetricData_ReportsUnresolvedResultKinds(t *testing.T) {
 			fake := &scriptedGetMetricData{pages: []*cloudwatch.GetMetricDataOutput{{MetricDataResults: tc.results}}}
 			outcomes, issues, err := runGetMetricData(context.Background(), responseTestBatch(fake, query))
 			require.NoError(t, err)
-			assert.Empty(t, outcomes)
+			require.Contains(t, outcomes, query.key)
+			assert.Equal(t, queryOutcomeTransient, outcomes[query.key].kind)
 			require.Len(t, issues, 1)
 			assert.Equal(t, tc.want, issues[0].kind)
 		})

@@ -7,9 +7,39 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func testPlannedQuery(key, target, region, namespace string, period int) plannedQuery {
+	return plannedQuery{
+		key: key, target: target, region: region,
+		policy: queryPolicy{period: time.Duration(period) * time.Second, lookback: time.Duration(period) * time.Second, publicationDelay: defaultPublicationDelay},
+		query: cwtypes.MetricDataQuery{
+			MetricStat: &cwtypes.MetricStat{Metric: &cwtypes.Metric{Namespace: aws.String(namespace)}, Period: aws.Int32(int32(period))},
+		},
+	}
+}
+
+func TestBuildQueryBatches_PointAwareWidth(t *testing.T) {
+	policy := queryPolicy{period: time.Minute, lookback: 24 * time.Hour, publicationDelay: 0}
+	width := queryBatchWidth(policy)
+	assert.Equal(t, 20, width)
+	queries := make([]plannedQuery, 45)
+	for i := range queries {
+		queries[i] = testPlannedQuery(fmt.Sprintf("q%d", i), "base", "us-east-1", "AWS/EC2", 60)
+		queries[i].policy = policy
+	}
+	clients := map[clientKey]cloudwatchClient{{target: "base", region: "us-east-1"}: &gmdCloudWatch{}}
+	batches := buildQueryBatches(queries, clients, time.Unix(1_000_000_000, 0))
+	require.Len(t, batches, 3)
+	assert.Len(t, batches[0].queries, 20)
+	assert.Len(t, batches[1].queries, 20)
+	assert.Len(t, batches[2].queries, 5)
+}
 
 func TestValidatePlannedQueryWork_Boundaries(t *testing.T) {
 	basePolicy := queryPolicy{period: time.Minute, lookback: time.Minute}

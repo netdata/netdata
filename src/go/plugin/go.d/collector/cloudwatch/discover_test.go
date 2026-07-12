@@ -34,6 +34,32 @@ type fakeCloudWatch struct {
 	getMetricData func(context.Context, *cloudwatch.GetMetricDataInput) (*cloudwatch.GetMetricDataOutput, error)
 }
 
+type cancelingListMetrics struct {
+	cancel context.CancelFunc
+	out    *cloudwatch.ListMetricsOutput
+}
+
+type staticListMetrics struct {
+	out *cloudwatch.ListMetricsOutput
+}
+
+func (f cancelingListMetrics) ListMetrics(context.Context, *cloudwatch.ListMetricsInput, ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
+	f.cancel()
+	return f.out, nil
+}
+
+func (cancelingListMetrics) GetMetricData(context.Context, *cloudwatch.GetMetricDataInput, ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+	return nil, nil
+}
+
+func (f staticListMetrics) ListMetrics(context.Context, *cloudwatch.ListMetricsInput, ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
+	return f.out, nil
+}
+
+func (staticListMetrics) GetMetricData(context.Context, *cloudwatch.GetMetricDataInput, ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+	return nil, nil
+}
+
 func (f *fakeCloudWatch) ListMetrics(_ context.Context, in *cloudwatch.ListMetricsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
 	f.inputs = append(f.inputs, in)
 	if f.err != nil {
@@ -131,8 +157,8 @@ func TestDiscoverProfileGroup(t *testing.T) {
 			metrics: []cwtypes.Metric{
 				mkMetric("BucketSizeBytes", "BucketName", "b1", "StorageType", "StandardStorage"),
 				mkMetric("NumberOfObjects", "BucketName", "b1", "StorageType", "AllStorageTypes"),
-				mkMetric("BucketSizeBytes", "BucketName", "b2", "StorageType", "StandardStorage"),
-				mkMetric("BucketSizeBytes", "BucketName", "b1"), // wrong cardinality -> rejected
+				mkMetric("BucketSizeBytes", "StorageType", "StandardStorage", "BucketName", "b2"), // AWS order is irrelevant
+				mkMetric("BucketSizeBytes", "BucketName", "b1"),                                   // wrong cardinality -> rejected
 			},
 			namespace:      "AWS/S3",
 			period:         86400,
@@ -170,42 +196,54 @@ func TestDiscoverProfileGroup(t *testing.T) {
 	}
 }
 
-func TestMatchInstanceDimensions_DuplicateNameRejected(t *testing.T) {
+func TestDiscoverProfileGroup_CancellationStopsLocalMatching(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	client := cancelingListMetrics{
+		cancel: cancel,
+		out:    &cloudwatch.ListMetricsOutput{Metrics: []cwtypes.Metric{mkMetric("M", "Id", "one")}},
+	}
+	profile := dimProfile("AWS/Test", 300, "Id")
+
+	_, err := discoverOneProfile(ctx, client, profile, false)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestCanonicalMetricDimensions_DuplicateNameRejected(t *testing.T) {
 	// Same cardinality as the profile but a repeated dimension name must not match.
 	dims := []cwtypes.Dimension{
 		{Name: aws.String("InstanceId"), Value: aws.String("i-1")},
 		{Name: aws.String("InstanceId"), Value: aws.String("i-2")},
 	}
-	_, ok := matchInstanceDimensions(dims, []string{"InstanceId", "ImageId"})
+	_, _, ok := canonicalMetricDimensions(dims)
 	assert.False(t, ok)
 }
 
-func TestConstantDimensionsHold(t *testing.T) {
+func TestDiscoveryMatcher_ConstantDimensionsHold(t *testing.T) {
 	tests := map[string]struct {
-		dims   []cwprofiles.InstanceDimension
-		values []string
-		want   bool
+		constants []discoveryConstant
+		values    []string
+		want      bool
 	}{
 		"no constant dimensions": {
-			dims:   []cwprofiles.InstanceDimension{{Name: "InstanceId", Label: "instance_id"}},
 			values: []string{"i-1"},
 			want:   true,
 		},
 		"constant value matches": {
-			dims:   []cwprofiles.InstanceDimension{{Name: "DistributionId", Label: "distribution_id"}, {Name: "Region", Constant: aws.String("Global")}},
-			values: []string{"E1", "Global"},
-			want:   true,
+			constants: []discoveryConstant{{index: 1, value: "Global"}},
+			values:    []string{"E1", "Global"},
+			want:      true,
 		},
 		"constant value mismatch fails closed": {
-			dims:   []cwprofiles.InstanceDimension{{Name: "DistributionId", Label: "distribution_id"}, {Name: "Region", Constant: aws.String("Global")}},
-			values: []string{"E1", "us-east-1"},
-			want:   false,
+			constants: []discoveryConstant{{index: 1, value: "Global"}},
+			values:    []string{"E1", "us-east-1"},
+			want:      false,
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, constantDimensionsHold(tc.dims, tc.values))
+			matcher := discoveryMatcher{constants: tc.constants}
+			assert.Equal(t, tc.want, matcher.constantsHold(tc.values))
 		})
 	}
 }
@@ -774,6 +812,65 @@ func TestDiscoverProfileGroup_WorkBounds(t *testing.T) {
 		_, err := discoverProfileGroup(context.Background(), &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{{Metrics: metrics}}}, group)
 		assert.ErrorContains(t, err, "found more than 20000 candidate instances")
 	})
+
+	t.Run("residual matcher evaluation maximum exceeded", func(t *testing.T) {
+		const profileCount = 1001
+		const metricCount = 1000
+		profiles := make([]cwprofiles.ResolvedProfile, profileCount)
+		for i := range profiles {
+			constant := fmt.Sprintf("kind-%d", i)
+			profiles[i] = cwprofiles.ResolvedProfile{
+				Name: fmt.Sprintf("profile-%d", i),
+				Config: cwprofiles.Profile{Instance: cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{
+					{Name: "Id", Label: "id"},
+					{Name: "Kind", Constant: &constant},
+				}}},
+			}
+		}
+		metrics := make([]cwtypes.Metric, metricCount)
+		for i := range metrics {
+			metrics[i] = mkMetric("M", "Id", fmt.Sprintf("id-%d", i), "Kind", "unmatched")
+		}
+		group := discoveryGroup{Namespace: "AWS/Test", Profiles: profiles}
+
+		_, err := discoverProfileGroup(context.Background(), staticListMetrics{
+			out: &cloudwatch.ListMetricsOutput{Metrics: metrics},
+		}, group)
+		assert.ErrorContains(t, err, "more than 1000000 residual profile matches")
+	})
+}
+
+func BenchmarkDiscoverProfileGroup_ResidualMatching(b *testing.B) {
+	const profiles = 1000
+	const metrics = 1000
+	group := discoveryGroup{Namespace: "AWS/Test", Profiles: make([]cwprofiles.ResolvedProfile, profiles)}
+	for i := range group.Profiles {
+		constant := fmt.Sprintf("kind-%d", i)
+		group.Profiles[i] = cwprofiles.ResolvedProfile{
+			Name: fmt.Sprintf("profile-%d", i),
+			Config: cwprofiles.Profile{Instance: cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{
+				{Name: "Id", Label: "id"},
+				{Name: "Kind", Constant: &constant},
+			}}},
+		}
+	}
+	listed := make([]cwtypes.Metric, metrics)
+	for i := range listed {
+		listed[i] = mkMetric("M", "Kind", "unmatched", "Id", fmt.Sprintf("id-%d", i))
+	}
+	client := staticListMetrics{out: &cloudwatch.ListMetricsOutput{Metrics: listed}}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		instances, err := discoverProfileGroup(context.Background(), client, group)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(instances) != 0 {
+			b.Fatalf("expected no matches, got %d profiles", len(instances))
+		}
+	}
 }
 
 func regionsOf(m map[string]map[string][]cwtypes.Metric) []string {

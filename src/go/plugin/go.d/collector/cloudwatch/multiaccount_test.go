@@ -146,7 +146,7 @@ func TestCurrentQueryPlan_ClearsRetainedSeriesWhenTargetOwnershipChanges(t *test
 	require.NotEmpty(t, oldPlan)
 	oldQuery := oldPlan[0]
 	require.Equal(t, "second", oldQuery.target)
-	c.observations.queries[oldQuery.key] = queryState{hasValue: true, value: 42, valueAt: time.Unix(1, 0), lastCompletedEnd: time.Unix(2, 0)}
+	c.observations.queries[oldQuery.key] = queryState{hasObservation: true, observation: 42, observationAt: time.Unix(1, 0), lastCompletedEnd: time.Unix(2, 0)}
 
 	require.NoError(t, c.ensureTargets(context.Background()))
 	newPlan := requireCurrentQueryPlan(t, c)

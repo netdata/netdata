@@ -9,10 +9,13 @@ func (o *observationStore) emit(plan []plannedQuery) int {
 	written := 0
 	for _, query := range plan {
 		state, ok := o.queries[query.key]
-		if !ok || !state.hasValue {
+		if !ok || (!state.hasObservation && !state.emitZero) {
 			continue
 		}
-		value := state.value
+		value := state.observation
+		if state.emitZero {
+			value = 0
+		}
 		if query.rate {
 			value /= query.policy.period.Seconds()
 		}

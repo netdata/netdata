@@ -46,7 +46,7 @@ func runGetMetricData(ctx context.Context, batch queryBatch) (map[string]queryOu
 			MaxDatapoints:     aws.Int32(int32(len(batch.queries) * batch.key.policy.bucketCount())),
 		})
 		if err != nil {
-			return completedOutcomes(byID, batch), queryResultIssues(issueCounts), err
+			return responseOutcomes(byID, batch), queryResultIssues(issueCounts), err
 		}
 
 		for _, result := range out.MetricDataResults {
@@ -94,7 +94,7 @@ func runGetMetricData(ctx context.Context, batch queryBatch) (map[string]queryOu
 			period: int(state.query.policy.period / time.Second), kind: kind,
 		}]++
 	}
-	return completedOutcomes(byID, batch), queryResultIssues(issueCounts), nil
+	return responseOutcomes(byID, batch), queryResultIssues(issueCounts), nil
 }
 
 func accumulateCandidate(state *responseQueryState, values []float64, timestamps []time.Time, start, end time.Time) {
@@ -111,8 +111,8 @@ func accumulateCandidate(state *responseQueryState, values []float64, timestamps
 	}
 }
 
-func completedOutcomes(states map[string]*responseQueryState, batch queryBatch) map[string]queryOutcome {
-	outcomes := make(map[string]queryOutcome)
+func responseOutcomes(states map[string]*responseQueryState, batch queryBatch) map[string]queryOutcome {
+	outcomes := make(map[string]queryOutcome, len(states))
 	for _, state := range states {
 		kind := queryOutcomeTransient
 		switch {
@@ -120,8 +120,6 @@ func completedOutcomes(states map[string]*responseQueryState, batch queryBatch) 
 			kind = queryOutcomeForbidden
 		case state.complete:
 			kind = queryOutcomeComplete
-		default:
-			continue
 		}
 		outcomes[state.query.key] = queryOutcome{
 			kind: kind, windowStart: batch.start, windowEnd: batch.end,

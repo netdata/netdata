@@ -373,7 +373,7 @@
                 },
                 "publication_delay": {
                   "title": "Publication delay",
-                  "description": "How long CloudWatch is allowed to publish a completed bucket before it becomes eligible. Use 0s only for metrics known to publish immediately.",
+                  "description": "Collector policy for how long to wait after a bucket closes before querying it. This is not an AWS publication guarantee. Use 0s only for metrics known to publish immediately.",
                   "type": "string",
                   "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
                 }
@@ -446,6 +446,7 @@
               },
               "publication_delay": {
                 "title": "Publication delay",
+                "description": "Default collector wait after a bucket closes. This is a scheduling policy, not an AWS publication guarantee.",
                 "type": "string",
                 "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
               }
@@ -713,7 +714,7 @@
             "ui:placeholder": "30m"
           },
           "publication_delay": {
-            "ui:help": "Wait after a period closes before treating it as eligible, allowing delayed CloudWatch publication.",
+            "ui:help": "Collector wait after a period closes before querying it. This is not an AWS publication guarantee.",
             "ui:placeholder": "10m"
           }
         }
@@ -750,7 +751,7 @@
           "ui:placeholder": "30m"
         },
         "publication_delay": {
-          "ui:help": "Default publication delay inherited by every rule that omits it. This overrides profile-specific delays, including the stock S3 storage profile's conservative 1d delay. Use a shorter default only after verifying publication timing for every inheriting workload.",
+          "ui:help": "Default collector wait inherited by every rule that omits it. This overrides profile-specific delays, including the stock S3 storage profile's conservative 1d policy. AWS documents that S3 storage metrics are reported once per day, but does not guarantee publication within one day. Use a shorter default only after verifying every inheriting workload.",
           "ui:placeholder": "10m"
         }
       }

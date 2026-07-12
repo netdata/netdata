@@ -17,6 +17,31 @@ func longDuration(value time.Duration) *confopt.LongDuration {
 	return &v
 }
 
+func TestQueryWindow(t *testing.T) {
+	now := time.Unix(1_000_000_000, 0)
+
+	tests := map[string]struct {
+		policy             queryPolicy
+		wantStart, wantEnd int64
+	}{
+		"5m period, 10m delay": {policy: queryPolicy{period: 5 * time.Minute, lookback: 5 * time.Minute, publicationDelay: 10 * time.Minute}, wantStart: 999_999_000, wantEnd: 999_999_300},
+		"5m period, 2m delay":  {policy: queryPolicy{period: 5 * time.Minute, lookback: 5 * time.Minute, publicationDelay: 2 * time.Minute}, wantStart: 999_999_300, wantEnd: 999_999_600},
+		"daily settled bucket": {policy: queryPolicy{period: 24 * time.Hour, lookback: 24 * time.Hour, publicationDelay: 24 * time.Hour}, wantStart: 999_820_800, wantEnd: 999_907_200},
+		"15m rolling lookback": {policy: queryPolicy{period: 5 * time.Minute, lookback: 15 * time.Minute, publicationDelay: 10 * time.Minute}, wantStart: 999_998_400, wantEnd: 999_999_300},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			start, end := queryWindow(now, tc.policy)
+			assert.Equal(t, tc.wantStart, start.Unix(), "start")
+			assert.Equal(t, tc.wantEnd, end.Unix(), "end")
+			assert.Equal(t, int64(tc.policy.lookback/time.Second), end.Unix()-start.Unix(), "window length == lookback")
+			assert.Zero(t, end.Unix()%int64(tc.policy.period/time.Second), "end is aligned to a period boundary")
+			assert.True(t, end.Before(now), "window ends in the past")
+		})
+	}
+}
+
 func TestResolveSeriesPolicies_ProfileMetricAndRulePeriod(t *testing.T) {
 	profile := cwprofiles.ResolvedProfile{Name: "service", Config: cwprofiles.Profile{
 		Period: 300,

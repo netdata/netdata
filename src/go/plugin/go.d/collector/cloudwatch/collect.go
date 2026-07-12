@@ -35,7 +35,9 @@ func (c *Collector) collect(ctx context.Context) error {
 		return err
 	}
 
-	c.observations.applyOutcomes(due, execution.outcomes, now, time.Duration(c.UpdateEvery)*time.Second)
+	if err := c.observations.applyOutcomes(due, execution.outcomes, time.Duration(c.UpdateEvery)*time.Second); err != nil {
+		return err
+	}
 	written := c.observations.emit(plan)
 
 	c.Debugf("CloudWatch collect: %d planned quer(y/ies), %d due, %d terminal outcome(s), %d transient outcome(s), %d emitted sample(s)",

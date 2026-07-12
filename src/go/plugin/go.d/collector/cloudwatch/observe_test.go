@@ -8,6 +8,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,14 +28,15 @@ import (
 
 // fullCloudWatch serves both ListMetrics (discovery) and GetMetricData (query).
 type fullCloudWatch struct {
-	mu        sync.Mutex
-	list      map[string][]cwtypes.Metric
-	gmdValue  float64
-	gap       bool
-	status    cwtypes.StatusCode // when set, every GetMetricData result carries this status
-	omit      bool               // when true, GetMetricData returns no results at all
-	listCalls int
-	gmdCalls  int
+	mu           sync.Mutex
+	list         map[string][]cwtypes.Metric
+	gmdValue     float64
+	gmdTimestamp time.Time
+	gap          bool
+	status       cwtypes.StatusCode // when set, every GetMetricData result carries this status
+	omit         bool               // when true, GetMetricData returns no results at all
+	listCalls    int
+	gmdCalls     int
 }
 
 func (f *fullCloudWatch) ListMetrics(_ context.Context, in *cloudwatch.ListMetricsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
@@ -60,7 +62,11 @@ func (f *fullCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetr
 		r := cwtypes.MetricDataResult{Id: q.Id, StatusCode: status}
 		if !f.gap {
 			r.Values = []float64{f.gmdValue}
-			r.Timestamps = []time.Time{aws.ToTime(in.EndTime).Add(-time.Duration(aws.ToInt32(q.MetricStat.Period)) * time.Second)}
+			timestamp := f.gmdTimestamp
+			if timestamp.IsZero() {
+				timestamp = aws.ToTime(in.EndTime).Add(-time.Duration(aws.ToInt32(q.MetricStat.Period)) * time.Second)
+			}
+			r.Timestamps = []time.Time{timestamp}
 		}
 		results = append(results, r)
 	}
@@ -77,6 +83,12 @@ func (f *fullCloudWatch) setGap(gap bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.gap = gap
+}
+
+func (f *fullCloudWatch) setTimestamp(timestamp time.Time) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.gmdTimestamp = timestamp
 }
 
 func (f *fullCloudWatch) setStatus(status cwtypes.StatusCode) {
@@ -180,6 +192,21 @@ type flakeyCloudWatch struct {
 	value        float64
 	failGMDUntil int
 	gmdCalls     int
+}
+
+type finishingFailureCloudWatch struct {
+	clock    *atomic.Int64
+	finishAt time.Time
+	list     map[string][]cwtypes.Metric
+}
+
+func (f *finishingFailureCloudWatch) ListMetrics(_ context.Context, in *cloudwatch.ListMetricsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
+	return &cloudwatch.ListMetricsOutput{Metrics: f.list[aws.ToString(in.Namespace)]}, nil
+}
+
+func (f *finishingFailureCloudWatch) GetMetricData(context.Context, *cloudwatch.GetMetricDataInput, ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+	f.clock.Store(f.finishAt.UnixNano())
+	return nil, errors.New("throttled")
 }
 
 func (f *flakeyCloudWatch) ListMetrics(_ context.Context, in *cloudwatch.ListMetricsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
@@ -308,6 +335,30 @@ func TestCollect_QueryFailureBacksOffWithinEligibleWindow(t *testing.T) {
 	assert.Equal(t, 3, fake.getMetricDataCalls())
 	collectAt(5 * time.Minute)
 	assert.Equal(t, 4, fake.getMetricDataCalls(), "a newly eligible window resets backoff and is immediately due")
+}
+
+func TestCollect_TransientRetryStartsAtAttemptCompletion(t *testing.T) {
+	base := time.Unix(1_000_000_000, 0)
+	finishAt := base.Add(2 * time.Minute)
+	var clock atomic.Int64
+	clock.Store(base.UnixNano())
+	fake := &finishingFailureCloudWatch{
+		clock: &clock, finishAt: finishAt,
+		list: map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
+	}
+	c := New()
+	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
+	useFakeClient(c, fake)
+	c.now = func() time.Time { return time.Unix(0, clock.Load()) }
+
+	err := c.collect(context.Background())
+	require.Error(t, err)
+	require.Len(t, c.queryPlan, 3)
+	for _, query := range c.queryPlan {
+		state := c.observations.queries[query.key]
+		assert.Equal(t, finishAt.Add(time.Minute), state.nextRetryAt, "retry delay starts when the transient attempt finishes")
+	}
 }
 
 func TestCollect_TransientResultWithCacheWarnsAndBacksOff(t *testing.T) {
@@ -536,6 +587,43 @@ func TestObserve_RateMetricNoDataZeroFilled(t *testing.T) {
 	assert.Equal(t, metrix.SampleValue(0), seriesValue(t, s3, `lambda.errors_sum{`), "zero is re-emitted between queries")
 }
 
+func TestObserve_LateSparseRateDatapointReplacesSyntheticZero(t *testing.T) {
+	c := New()
+	configureExactRule(c, []string{"us-east-1"}, []string{"lambda"})
+	c.Config.Rules[0].Query = &QueryPolicyConfig{
+		Lookback:         longDuration(15 * time.Minute),
+		PublicationDelay: longDuration(0),
+	}
+	profiles := []cwprofiles.ResolvedProfile{{Name: "lambda", Config: cwprofiles.Profile{
+		Namespace: "AWS/Lambda",
+		Period:    300,
+		Instance:  cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "FunctionName", Label: "function_name"}}},
+		Metrics:   []cwprofiles.Metric{{ID: "errors", MetricName: "Errors", Statistics: []string{"sum"}, Rate: true}},
+	}}}
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, profiles)
+
+	fake := &fullCloudWatch{
+		list: map[string][]cwtypes.Metric{"AWS/Lambda": {mkMetric("Errors", "FunctionName", "fn-1")}},
+		gap:  true,
+	}
+	useFakeClient(c, fake)
+	base := time.Unix(900, 0)
+
+	c.now = func() time.Time { return base }
+	first, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(0), seriesValue(t, first, `lambda.errors_sum{`))
+
+	fake.setGap(false)
+	fake.setValue(600)
+	fake.setTimestamp(base.Add(-10 * time.Minute))
+	c.now = func() time.Time { return base.Add(5 * time.Minute) }
+	second, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(2), seriesValue(t, second, `lambda.errors_sum{`),
+		"a real late bucket must replace the earlier zero presentation and use rate normalization")
+}
+
 func TestObserve_RateMetricNonterminalAndForbiddenResultsGap(t *testing.T) {
 	// A nil-as-zero (rate) metric must GAP, not record a false 0, when the query
 	// yields no USABLE datapoint — a per-result error or an absent result. Zero-fill
@@ -599,8 +687,8 @@ func TestCleanup_ResetsRuntimeState(t *testing.T) {
 func TestReconcilePlan(t *testing.T) {
 	c := New()
 	c.observations.queries = map[string]queryState{
-		"keep": {hasValue: true, value: 1},
-		"drop": {hasValue: true, value: 2},
+		"keep": {hasObservation: true, observation: 1},
+		"drop": {hasObservation: true, observation: 2},
 	}
 	c.observations.reconcilePlan([]plannedQuery{{key: "keep"}})
 

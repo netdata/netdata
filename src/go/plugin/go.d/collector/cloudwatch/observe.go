@@ -3,6 +3,7 @@
 package cloudwatch
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
@@ -13,9 +14,10 @@ type queryState struct {
 	retryWindowEnd   time.Time
 	nextRetryAt      time.Time
 	transientCount   int
-	valueAt          time.Time
-	value            float64
-	hasValue         bool
+	observationAt    time.Time
+	observation      float64
+	hasObservation   bool
+	emitZero         bool
 }
 
 type queryOutcomeKind uint8
@@ -30,6 +32,7 @@ type queryOutcome struct {
 	kind         queryOutcomeKind
 	windowStart  time.Time
 	windowEnd    time.Time
+	completedAt  time.Time
 	datapointAt  time.Time
 	value        float64
 	hasDatapoint bool
@@ -78,11 +81,24 @@ func queryIsDue(state queryState, exists bool, windowEnd, now time.Time) bool {
 	return state.retryWindowEnd.Before(windowEnd) || !now.Before(state.nextRetryAt)
 }
 
-func (o *observationStore) applyOutcomes(due []plannedQuery, outcomes map[string]queryOutcome, attemptedAt time.Time, retryBase time.Duration) {
+func (o *observationStore) applyOutcomes(due []plannedQuery, outcomes map[string]queryOutcome, retryBase time.Duration) error {
+	if len(outcomes) != len(due) {
+		return fmt.Errorf("CloudWatch query execution returned %d outcomes for %d due queries", len(outcomes), len(due))
+	}
 	for _, query := range due {
 		outcome, ok := outcomes[query.key]
-		if !ok || outcome.kind == queryOutcomeTransient {
-			o.markTransient(query, attemptedAt, retryBase)
+		if !ok {
+			return fmt.Errorf("CloudWatch query execution omitted outcome for planned query %q", query.key)
+		}
+		if outcome.completedAt.IsZero() {
+			return fmt.Errorf("CloudWatch query execution omitted completion time for planned query %q", query.key)
+		}
+	}
+
+	for _, query := range due {
+		outcome := outcomes[query.key]
+		if outcome.kind == queryOutcomeTransient {
+			o.markTransient(query, outcome, retryBase)
 			continue
 		}
 
@@ -92,38 +108,35 @@ func (o *observationStore) applyOutcomes(due []plannedQuery, outcomes map[string
 		state.transientCount = 0
 		state.lastCompletedEnd = outcome.windowEnd
 		if outcome.kind == queryOutcomeForbidden {
-			state.hasValue = false
+			state.hasObservation = false
+			state.emitZero = false
 			o.queries[query.key] = state
 			continue
 		}
 
 		if outcome.hasDatapoint && !outcome.datapointAt.Before(outcome.windowStart) && !outcome.datapointAt.Add(query.policy.period).After(outcome.windowEnd) &&
-			(!state.hasValue || !outcome.datapointAt.Before(state.valueAt)) {
-			state.value = outcome.value
-			state.valueAt = outcome.datapointAt
-			state.hasValue = true
+			(!state.hasObservation || !outcome.datapointAt.Before(state.observationAt)) {
+			state.observation = outcome.value
+			state.observationAt = outcome.datapointAt
+			state.hasObservation = true
 		}
-		if state.hasValue && state.valueAt.Before(outcome.windowStart) {
-			state.hasValue = false
+		if state.hasObservation && state.observationAt.Before(outcome.windowStart) {
+			state.hasObservation = false
 		}
-		if !state.hasValue && query.nilAsZero {
-			state.value = 0
-			state.valueAt = outcome.windowEnd.Add(-query.policy.period)
-			state.hasValue = true
-		}
+		state.emitZero = !state.hasObservation && query.nilAsZero
 		o.queries[query.key] = state
 	}
+	return nil
 }
 
-func (o *observationStore) markTransient(query plannedQuery, attemptedAt time.Time, retryBase time.Duration) {
+func (o *observationStore) markTransient(query plannedQuery, outcome queryOutcome, retryBase time.Duration) {
 	state := o.queries[query.key]
-	_, windowEnd := queryWindow(attemptedAt, query.policy)
-	if !state.retryWindowEnd.Equal(windowEnd) {
+	if !state.retryWindowEnd.Equal(outcome.windowEnd) {
 		state.transientCount = 0
 	}
 	state.transientCount++
-	state.retryWindowEnd = windowEnd
-	state.nextRetryAt = attemptedAt.Add(transientRetryDelay(retryBase, query.policy.period, state.transientCount))
+	state.retryWindowEnd = outcome.windowEnd
+	state.nextRetryAt = outcome.completedAt.Add(transientRetryDelay(retryBase, query.policy.period, state.transientCount))
 	o.queries[query.key] = state
 }
 
