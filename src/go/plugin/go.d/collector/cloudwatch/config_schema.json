@@ -238,49 +238,72 @@
             },
             "metrics": {
               "title": "Metrics",
-              "description": "Optional exact metric/statistic allowlist that narrows the profiles selected by this rule. Omit it to collect every metric exported by those profiles.",
-              "type": "object",
-              "properties": {
-                "include": {
-                  "title": "Included metrics",
-                  "description": "Exact profile, AWS MetricName, and statistic tuples. Statistics use AWS names such as Average, Sum, SampleCount, or p99 (case-insensitive).",
-                  "type": "array",
-                  "minItems": 1,
-                  "maxItems": 256,
-                  "uniqueItems": true,
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "profile": {
-                        "title": "Profile",
-                        "description": "Profile basename. It must already be selected by this rule's profiles option.",
-                        "type": "string",
-                        "pattern": "^[a-z][a-z0-9_]*$"
+              "description": "Optional per-profile exact metric/statistic allowlists that narrow the profiles selected by this rule. Omit metrics to collect every metric exported by those profiles.",
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 256,
+              "uniqueItems": true,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "profile": {
+                    "title": "Profile",
+                    "description": "Profile basename. It must already be selected by this rule's profiles option and may appear in only one metrics group.",
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*$"
+                  },
+                  "statistics": {
+                    "title": "Default statistics",
+                    "description": "Default statistics inherited by included metrics that omit their own statistics. Named AWS statistics are case-insensitive.",
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 256,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "string",
+                      "pattern": "^\\S(?:.*\\S)?$"
+                    }
+                  },
+                  "include": {
+                    "title": "Included metrics",
+                    "description": "Exact, case-sensitive AWS MetricNames. A metric-level statistics list replaces the group default.",
+                    "type": "array",
+                    "minItems": 1,
+                    "maxItems": 256,
+                    "uniqueItems": true,
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "title": "AWS MetricName",
+                          "description": "Exact, case-sensitive CloudWatch MetricName exported by the profile.",
+                          "type": "string",
+                          "pattern": "^\\S(?:.*\\S)?$"
+                        },
+                        "statistics": {
+                          "title": "Statistics",
+                          "description": "Optional replacement for the group default. Use Average, Minimum, Maximum, Sum, SampleCount, or p<N>; named statistics are case-insensitive.",
+                          "type": "array",
+                          "minItems": 1,
+                          "maxItems": 256,
+                          "uniqueItems": true,
+                          "items": {
+                            "type": "string",
+                            "pattern": "^\\S(?:.*\\S)?$"
+                          }
+                        }
                       },
-                      "metric": {
-                        "title": "AWS MetricName",
-                        "description": "Exact, case-sensitive CloudWatch MetricName exported by the profile.",
-                        "type": "string",
-                        "pattern": "^\\S(?:.*\\S)?$"
-                      },
-                      "statistic": {
-                        "title": "Statistic",
-                        "description": "AWS statistic name: Average, Minimum, Maximum, Sum, SampleCount, or p<N>. Named statistics are case-insensitive.",
-                        "type": "string",
-                        "pattern": "^\\S(?:.*\\S)?$"
-                      }
-                    },
-                    "required": [
-                      "profile",
-                      "metric",
-                      "statistic"
-                    ]
+                      "required": [
+                        "name"
+                      ]
+                    }
                   }
-                }
-              },
-              "required": [
-                "include"
-              ]
+                },
+                "required": [
+                  "profile",
+                  "include"
+                ]
+              }
             },
             "regions": {
               "title": "Regions",
@@ -573,22 +596,35 @@
           }
         },
         "metrics": {
-          "ui:help": "Optional exact allowlist that narrows the selected profiles. Omit it to collect every metric exported by those profiles.",
-          "include": {
-            "ui:listFlavour": "list",
-            "ui:help": "Add exact profile, AWS MetricName, and statistic tuples. Every tuple must exist in the selected profile.",
-            "items": {
-              "profile": {
-                "ui:help": "Profile basename already selected by this rule.",
-                "ui:placeholder": "ec2"
-              },
-              "metric": {
-                "ui:help": "Exact, case-sensitive AWS MetricName from the profile.",
-                "ui:placeholder": "CPUUtilization"
-              },
-              "statistic": {
-                "ui:help": "AWS statistic name. Named statistics are case-insensitive.",
+          "ui:listFlavour": "list",
+          "ui:help": "Optional exact allowlists grouped by profile. Omit this list to collect every metric exported by the selected profiles.",
+          "items": {
+            "profile": {
+              "ui:help": "Profile basename already selected by this rule. Add each profile at most once.",
+              "ui:placeholder": "ec2"
+            },
+            "statistics": {
+              "ui:listFlavour": "list",
+              "ui:help": "Default AWS statistics inherited by metrics that omit their own list.",
+              "items": {
                 "ui:placeholder": "Average"
+              }
+            },
+            "include": {
+              "ui:listFlavour": "list",
+              "ui:help": "Exact AWS MetricNames. A metric-level statistics list replaces the group default.",
+              "items": {
+                "name": {
+                  "ui:help": "Exact, case-sensitive AWS MetricName from the profile.",
+                  "ui:placeholder": "CPUUtilization"
+                },
+                "statistics": {
+                  "ui:listFlavour": "list",
+                  "ui:help": "Optional replacement statistics for this metric.",
+                  "items": {
+                    "ui:placeholder": "Maximum"
+                  }
+                }
               }
             }
           }

@@ -5,6 +5,7 @@ package cloudwatch
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
@@ -122,10 +123,10 @@ func compileProfileSeries(profile cwprofiles.ResolvedProfile) []compiledSeries {
 	return series
 }
 
-func resolveRuleMetrics(path string, selector *MetricSelectorConfig, profiles []cwprofiles.ResolvedProfile, seriesByProfile map[string][]compiledSeries) (map[string][]compiledSeries, map[string]struct{}, error) {
+func resolveRuleMetrics(path string, selectors []ProfileMetricSelectorConfig, profiles []cwprofiles.ResolvedProfile, seriesByProfile map[string][]compiledSeries) (map[string][]compiledSeries, map[string]struct{}, error) {
 	selected := make(map[string][]compiledSeries, len(profiles))
 	explicitProfiles := make(map[string]struct{})
-	if selector == nil {
+	if selectors == nil {
 		for _, profile := range profiles {
 			selected[profile.Name] = seriesByProfile[profile.Name]
 		}
@@ -136,42 +137,22 @@ func resolveRuleMetrics(path string, selector *MetricSelectorConfig, profiles []
 	for _, profile := range profiles {
 		profilesByName[profile.Name] = profile
 	}
-	selectedOrdinals := make(map[string]map[int]struct{})
-	for i, entry := range selector.Include {
-		itemPath := fmt.Sprintf("%s.metrics.include[%d]", path, i)
-		profile, ok := profilesByName[entry.Profile]
+	selectedOrdinals := make(map[string]map[int]struct{}, len(selectors))
+	for i, selector := range selectors {
+		groupPath := fmt.Sprintf("%s.metrics[%d]", path, i)
+		profile, ok := profilesByName[selector.Profile]
 		if !ok {
-			return nil, nil, fmt.Errorf("%s.profile references profile %q not selected by this rule", itemPath, entry.Profile)
+			return nil, nil, fmt.Errorf("%s.profile references profile %q not selected by this rule", groupPath, selector.Profile)
 		}
 		explicitProfiles[profile.Name] = struct{}{}
-
-		metricIndex := -1
-		for idx, metric := range profile.Config.Metrics {
-			if metric.MetricName == entry.Metric {
-				metricIndex = idx
-				break
-			}
+		ordinals := selectedOrdinals[profile.Name]
+		if ordinals == nil {
+			ordinals = make(map[int]struct{})
+			selectedOrdinals[profile.Name] = ordinals
 		}
-		if metricIndex < 0 {
-			return nil, nil, fmt.Errorf("%s.metric references unknown MetricName %q in profile %q", itemPath, entry.Metric, profile.Name)
+		if err := resolveMetricGroup(groupPath, selector, profile, seriesByProfile[profile.Name], ordinals); err != nil {
+			return nil, nil, err
 		}
-
-		statistic := normalizeMetricStatistic(entry.Statistic)
-		matchedOrdinal := -1
-		for i := range seriesByProfile[profile.Name] {
-			candidate := seriesByProfile[profile.Name][i]
-			if candidate.MetricIndex == metricIndex && candidate.Statistic == statistic {
-				matchedOrdinal = candidate.Ordinal
-				break
-			}
-		}
-		if matchedOrdinal < 0 {
-			return nil, nil, fmt.Errorf("%s.statistic %q is not exported for MetricName %q in profile %q", itemPath, entry.Statistic, entry.Metric, profile.Name)
-		}
-		if selectedOrdinals[profile.Name] == nil {
-			selectedOrdinals[profile.Name] = make(map[int]struct{})
-		}
-		selectedOrdinals[profile.Name][matchedOrdinal] = struct{}{}
 	}
 
 	for _, profile := range profiles {
@@ -186,6 +167,40 @@ func resolveRuleMetrics(path string, selector *MetricSelectorConfig, profiles []
 		return nil, nil, fmt.Errorf("%s.metrics selects no metrics", path)
 	}
 	return selected, explicitProfiles, nil
+}
+
+func resolveMetricGroup(path string, selector ProfileMetricSelectorConfig, profile cwprofiles.ResolvedProfile, available []compiledSeries, selected map[int]struct{}) error {
+	for i, entry := range selector.Include {
+		metricPath := fmt.Sprintf("%s.include[%d]", path, i)
+		metricIndex := slices.IndexFunc(profile.Config.Metrics, func(metric cwprofiles.Metric) bool {
+			return metric.MetricName == entry.Name
+		})
+		if metricIndex < 0 {
+			return fmt.Errorf("%s.name references unknown MetricName %q in profile %q", metricPath, entry.Name, profile.Name)
+		}
+		statistics := entry.Statistics
+		if len(statistics) == 0 {
+			statistics = selector.Statistics
+		}
+		for j, raw := range statistics {
+			statistic := normalizeMetricStatistic(raw)
+			series, ok := findCompiledSeries(available, metricIndex, statistic)
+			if !ok {
+				return fmt.Errorf("%s.statistics[%d] %q is not exported for MetricName %q in profile %q", metricPath, j, raw, entry.Name, profile.Name)
+			}
+			selected[series.Ordinal] = struct{}{}
+		}
+	}
+	return nil
+}
+
+func findCompiledSeries(series []compiledSeries, metricIndex int, statistic string) (compiledSeries, bool) {
+	for _, candidate := range series {
+		if candidate.MetricIndex == metricIndex && candidate.Statistic == statistic {
+			return candidate, true
+		}
+	}
+	return compiledSeries{}, false
 }
 
 func normalizeMetricStatistic(raw string) string {

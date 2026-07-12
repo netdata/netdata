@@ -89,7 +89,7 @@ Every target requires `cloudwatch:ListMetrics` and `cloudwatch:GetMetricData`. T
 
 #### Auto-Detection
 
-A rule that omits `profiles` selects all default-enabled profiles for its targets and regions. A rule that omits `metrics` collects every metric exported by those profiles; `metrics.include` narrows it to exact profile, AWS MetricName, and statistic tuples. The collector emits charts only for profiles with live metrics. Discovery and the query blueprint are cached; discovery refreshes every `discovery.refresh_every` seconds (default 300).
+A rule that omits `profiles` selects all default-enabled profiles for its targets and regions. A rule that omits `metrics` collects every metric exported by those profiles. When present, `metrics` groups exact AWS MetricNames by profile; group statistics are inherited by included metrics unless a metric supplies a replacement list. The collector emits charts only for profiles with live metrics. Discovery and the query blueprint are cached; discovery refreshes every `discovery.refresh_every` seconds (default 300).
 
 
 #### Limits
@@ -201,10 +201,12 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | rules[].profiles.defaults | Include all default-enabled profiles. Defaults to `true` when `profiles` or `defaults` is omitted. | yes | no |
 |  | rules[].profiles.include | Profile basenames to add explicitly. Set `defaults` to `false` to collect only this list, including profiles disabled by default. |  | no |
 |  | rules[].profiles.exclude | Profile basenames to remove from the selected set. A profile cannot be both included and excluded. |  | no |
-|  | rules[].metrics.include | Optional exact metric/statistic allowlist that narrows the profiles selected by this rule. Omit `metrics` to collect every metric exported by those profiles. Each rule supports at most 256 entries. |  | no |
-|  | rules[].metrics.include[].profile | Profile basename. It must already be selected by `rules[].profiles`. |  | yes |
-|  | rules[].metrics.include[].metric | Exact, case-sensitive AWS CloudWatch MetricName exported by the profile. |  | yes |
-|  | rules[].metrics.include[].statistic | AWS statistic name (`Average`, `Minimum`, `Maximum`, `Sum`, `SampleCount`, or `p<N>`). Named statistics are case-insensitive and must be exported by the selected profile metric. |  | yes |
+|  | rules[].metrics | Optional per-profile exact metric/statistic allowlists that narrow the profiles selected by this rule. Omit `metrics` to collect every metric exported by those profiles. The expanded rule supports at most 256 metric/statistic selections. |  | no |
+|  | rules[].metrics[].profile | Profile basename. It must already be selected by `rules[].profiles` and may appear in only one metrics group per rule. |  | yes |
+|  | rules[].metrics[].statistics | Optional non-empty default AWS statistics inherited by included metrics that omit their own list. Named statistics are case-insensitive. |  | no |
+|  | rules[].metrics[].include | Non-empty list of exact, case-sensitive AWS CloudWatch MetricNames exported by this profile. Duplicate names are rejected. |  | yes |
+|  | rules[].metrics[].include[].name | Exact, case-sensitive AWS CloudWatch MetricName exported by the profile. |  | yes |
+|  | rules[].metrics[].include[].statistics | Optional non-empty replacement for the group statistics. Use `Average`, `Minimum`, `Maximum`, `Sum`, `SampleCount`, or `p<N>`; named statistics are case-insensitive. A metric with no replacement must inherit a group default. |  | no |
 |  | rules[].regions | Canonical lowercase AWS region codes selected by this rule. The compiler intersects them with intrinsic profile restrictions; for example, CloudFront supports only `us-east-1`. |  | yes |
 | **Resource Filters** | rule_defaults.filters.resource_tags | Job-wide list of exact, case-sensitive AWS resource tag predicates inherited by rules that omit `rules[].filters.resource_tags`. All keys must match; any listed value for one key may match. The Resource Groups Tagging API performs the focused lookup and requires `tag:GetResources`. |  | no |
 |  | rule_defaults.filters.resource_tags[].key | Exact AWS resource tag key. A filter list supports at most 50 distinct keys. |  | yes |
@@ -340,13 +342,14 @@ jobs:
           defaults: false
           include: [ec2, rds]
         metrics:
-          include:
-            - profile: ec2
-              metric: CPUUtilization
-              statistic: Average
-            - profile: rds
-              metric: DatabaseConnections
-              statistic: Average
+          - profile: ec2
+            statistics: [Average]
+            include:
+              - name: CPUUtilization
+          - profile: rds
+            statistics: [Average]
+            include:
+              - name: DatabaseConnections
         regions: [us-east-1]
 
 ```
@@ -619,7 +622,7 @@ Check the following:
 ### Missing metrics for some services
 
 - **Profile selection** -- omit `rules[].profiles` to select defaults, or ensure the service basename appears under `rules[].profiles.include` and is not excluded.
-- **Metric selection** -- omit `rules[].metrics` to collect every metric exported by selected profiles, or verify each `metrics.include` tuple uses the exact profile basename and AWS MetricName plus a statistic exported by that profile.
+- **Metric selection** -- omit `rules[].metrics` to collect every metric exported by selected profiles. When configured, verify each profile group names a selected profile, every `include[].name` is an exact AWS MetricName, and every metric has effective statistics from either its replacement list or the group default.
 - **Daily metrics** -- S3 storage metrics are published once per day. They are inherently delayed by about a day, and `recently_active_only` is automatically disabled for them.
 - **Resource activity** -- some metrics only appear when the resource is actively processing data (for example, EventBridge and Bedrock publish a metric only when its value is non-zero).
 - **Auto Scaling group metrics** -- Auto Scaling group metrics (`cloudwatch.auto_scaling.*`) are not published until group-metrics collection is enabled on the group (`aws autoscaling enable-metrics-collection --granularity 1Minute`). Amazon EKS managed node groups have it enabled by default.

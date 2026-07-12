@@ -39,9 +39,12 @@ func TestCompileConfig_ExactMetricSelection(t *testing.T) {
 	defaults := false
 	cfg := validBaseConfig()
 	cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
-	cfg.Rules[0].Metrics = &MetricSelectorConfig{Include: []MetricSelectorEntryConfig{
-		{Profile: "ec2", Metric: "NetworkIn", Statistic: "sum"},
-		{Profile: "ec2", Metric: "CPUUtilization", Statistic: "AVERAGE"},
+	cfg.Rules[0].Metrics = []ProfileMetricSelectorConfig{{
+		Profile: "ec2", Statistics: []string{"sum"},
+		Include: []MetricSelectionConfig{
+			{Name: "NetworkIn"},
+			{Name: "CPUUtilization", Statistics: []string{"AVERAGE"}},
+		},
 	}}
 
 	plan, _, err := compileTestConfig(t, cfg)
@@ -50,22 +53,53 @@ func TestCompileConfig_ExactMetricSelection(t *testing.T) {
 	assert.Equal(t, []string{"ec2.cpu_utilization_average", "ec2.network_in_sum"}, compiledSeriesNames(plan.Scopes[0].SelectedSeries))
 }
 
+func TestCompileConfig_MetricSelectionExpandsMultipleStatistics(t *testing.T) {
+	defaults := false
+	cfg := validBaseConfig()
+	cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"lambda"}}
+	cfg.Rules[0].Metrics = []ProfileMetricSelectorConfig{{
+		Profile: "lambda",
+		Include: []MetricSelectionConfig{{
+			Name:       "Duration",
+			Statistics: []string{"Average", "Maximum", "p90"},
+		}},
+	}}
+
+	plan, _, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	require.Len(t, plan.Scopes, 1)
+	assert.Equal(t, []string{
+		"lambda.duration_average",
+		"lambda.duration_maximum",
+		"lambda.duration_p90",
+	}, compiledSeriesNames(plan.Scopes[0].SelectedSeries))
+}
+
 func TestCompileConfig_MetricSelectionRejectsUnknownOrUnselectedEntries(t *testing.T) {
 	defaults := false
 	tests := map[string]struct {
-		entry   MetricSelectorEntryConfig
+		group   ProfileMetricSelectorConfig
 		message string
 	}{
 		"profile not selected by rule": {
-			entry:   MetricSelectorEntryConfig{Profile: "rds", Metric: "CPUUtilization", Statistic: "Average"},
+			group: ProfileMetricSelectorConfig{
+				Profile: "rds", Statistics: []string{"Average"},
+				Include: []MetricSelectionConfig{{Name: "CPUUtilization"}},
+			},
 			message: "not selected by this rule",
 		},
 		"unknown MetricName": {
-			entry:   MetricSelectorEntryConfig{Profile: "ec2", Metric: "DoesNotExist", Statistic: "Average"},
+			group: ProfileMetricSelectorConfig{
+				Profile: "ec2", Statistics: []string{"Average"},
+				Include: []MetricSelectionConfig{{Name: "DoesNotExist"}},
+			},
 			message: "unknown MetricName",
 		},
 		"statistic not exported": {
-			entry:   MetricSelectorEntryConfig{Profile: "ec2", Metric: "CPUUtilization", Statistic: "Sum"},
+			group: ProfileMetricSelectorConfig{
+				Profile: "ec2", Statistics: []string{"Sum"},
+				Include: []MetricSelectionConfig{{Name: "CPUUtilization"}},
+			},
 			message: "is not exported",
 		},
 	}
@@ -74,7 +108,7 @@ func TestCompileConfig_MetricSelectionRejectsUnknownOrUnselectedEntries(t *testi
 		t.Run(name, func(t *testing.T) {
 			cfg := validBaseConfig()
 			cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
-			cfg.Rules[0].Metrics = &MetricSelectorConfig{Include: []MetricSelectorEntryConfig{tc.entry}}
+			cfg.Rules[0].Metrics = []ProfileMetricSelectorConfig{tc.group}
 			_, _, err := compileTestConfig(t, cfg)
 			assert.ErrorContains(t, err, tc.message)
 		})
@@ -84,16 +118,16 @@ func TestCompileConfig_MetricSelectionRejectsUnknownOrUnselectedEntries(t *testi
 func TestCompileConfig_PartialMetricShadowingSharesTagMembership(t *testing.T) {
 	defaults := false
 	profileSelector := &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
-	metric := func(entries ...MetricSelectorEntryConfig) *MetricSelectorConfig {
-		return &MetricSelectorConfig{Include: entries}
+	metrics := func(entries ...MetricSelectionConfig) []ProfileMetricSelectorConfig {
+		return []ProfileMetricSelectorConfig{{Profile: "ec2", Include: entries}}
 	}
-	cpu := MetricSelectorEntryConfig{Profile: "ec2", Metric: "CPUUtilization", Statistic: "Average"}
-	network := MetricSelectorEntryConfig{Profile: "ec2", Metric: "NetworkIn", Statistic: "Sum"}
+	cpu := MetricSelectionConfig{Name: "CPUUtilization", Statistics: []string{"Average"}}
+	network := MetricSelectionConfig{Name: "NetworkIn", Statistics: []string{"Sum"}}
 	cfg := validBaseConfig()
 	cfg.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production"}}}
 	cfg.Rules = []RuleConfig{
-		{Name: "first", Targets: []string{"base"}, Profiles: profileSelector, Metrics: metric(cpu), Regions: []string{"us-east-1"}},
-		{Name: "second", Targets: []string{"base"}, Profiles: profileSelector, Metrics: metric(network, cpu), Regions: []string{"us-east-1"}},
+		{Name: "first", Targets: []string{"base"}, Profiles: profileSelector, Metrics: metrics(cpu), Regions: []string{"us-east-1"}},
+		{Name: "second", Targets: []string{"base"}, Profiles: profileSelector, Metrics: metrics(network, cpu), Regions: []string{"us-east-1"}},
 	}
 
 	plan, diagnostics, err := compileTestConfig(t, cfg)
@@ -386,11 +420,40 @@ func TestCompileConfig_RejectsRawLimitsBeforeCompilation(t *testing.T) {
 }
 
 func TestCompileConfig_RejectsMetricSelectorOverflowBeforeEntryValidation(t *testing.T) {
-	cfg := validBaseConfig()
-	cfg.Rules[0].Metrics = &MetricSelectorConfig{Include: make([]MetricSelectorEntryConfig, maxReferencesPerRule+1)}
-	_, _, err := compileTestConfig(t, cfg)
-	assert.ErrorContains(t, err, "rules[0].metrics.include contains 257 entries; maximum is 256")
-	assert.NotContains(t, err.Error(), "profile must not be empty", "the raw bound must fail before walking oversized entries")
+	expandedMetrics := make([]MetricSelectionConfig, 129)
+	for i := range expandedMetrics {
+		expandedMetrics[i].Statistics = []string{"Average", "Maximum"}
+	}
+	tests := map[string]struct {
+		metrics []ProfileMetricSelectorConfig
+		message string
+	}{
+		"profile groups": {
+			metrics: make([]ProfileMetricSelectorConfig, maxReferencesPerRule+1),
+			message: "rules[0].metrics contains 257 entries; maximum is 256",
+		},
+		"metrics in group": {
+			metrics: []ProfileMetricSelectorConfig{{Profile: "ec2", Statistics: []string{"Average"}, Include: make([]MetricSelectionConfig, maxReferencesPerRule+1)}},
+			message: "rules[0].metrics[0].include contains 257 entries; maximum is 256",
+		},
+		"statistics in group": {
+			metrics: []ProfileMetricSelectorConfig{{Profile: "ec2", Statistics: make([]string, maxReferencesPerRule+1), Include: []MetricSelectionConfig{{Name: "CPUUtilization"}}}},
+			message: "rules[0].metrics[0].statistics contains 257 entries; maximum is 256",
+		},
+		"expanded selections": {
+			metrics: []ProfileMetricSelectorConfig{{Profile: "ec2", Include: expandedMetrics}},
+			message: "rules[0].metrics expands to more than 256 metric/statistic selections",
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := validBaseConfig()
+			cfg.Rules[0].Metrics = tc.metrics
+			_, _, err := compileTestConfig(t, cfg)
+			assert.ErrorContains(t, err, tc.message)
+			assert.NotContains(t, err.Error(), "profile must not be empty", "raw bounds must fail before walking oversized entries")
+		})
+	}
 }
 
 func TestCompileConfig_AggregatesShadowDiagnosticsPerRule(t *testing.T) {

@@ -152,15 +152,17 @@ compiler state, and installed execution plan:
   describe monitored identities and optional role assumption. Ordered rules bind
   targets to profile selectors, optional exact metric/statistic allowlists,
   regions, and effective resource-tag predicates. Omitting `metrics` selects every
-  exported series from the selected profiles; `metrics.include` narrows that set.
+  exported series from the selected profiles. When present, `metrics` contains one
+  group per narrowed profile: group statistics are inherited by included exact
+  MetricNames unless an entry supplies a replacement statistics list.
 - `rule_defaults.filters.resource_tags` is inherited when a rule omits
   `filters.resource_tags`; a present list replaces the default and `[]` disables it.
   Predicates are canonicalized once: exact case-sensitive keys are ANDed and the
   exact values for one key are ORed.
 - `compileConfig` coordinates a private staged compiler that resolves every reference, rejects unused credential/target
-  definitions, applies profile defaults/include/exclude semantics, resolves exact
-  `{profile, AWS MetricName, statistic}` entries into canonical exported-series
-  descriptors, intersects
+  definitions, applies profile defaults/include/exclude semantics, rejects duplicate
+  profile groups/MetricNames/normalized statistics, resolves inherited and replaced
+  statistics into canonical exact exported-series descriptors, intersects
   intrinsic supported regions, enforces target/role partition consistency, and
   emits immutable ordered scopes.
 - Ordered policy scopes and tag-membership identities are separate. Scopes with the

@@ -57,12 +57,12 @@ type TargetConfig struct {
 }
 
 type RuleConfig struct {
-	Name     string                 `yaml:"name" json:"name"`
-	Targets  []string               `yaml:"targets" json:"targets"`
-	Profiles *ProfileSelectorConfig `yaml:"profiles,omitempty" json:"profiles,omitempty"`
-	Metrics  *MetricSelectorConfig  `yaml:"metrics,omitempty" json:"metrics,omitempty"`
-	Regions  []string               `yaml:"regions" json:"regions"`
-	Filters  *RuleFiltersConfig     `yaml:"filters,omitempty" json:"filters,omitempty"`
+	Name     string                        `yaml:"name" json:"name"`
+	Targets  []string                      `yaml:"targets" json:"targets"`
+	Profiles *ProfileSelectorConfig        `yaml:"profiles,omitempty" json:"profiles,omitempty"`
+	Metrics  []ProfileMetricSelectorConfig `yaml:"metrics,omitempty" json:"metrics,omitempty"`
+	Regions  []string                      `yaml:"regions" json:"regions"`
+	Filters  *RuleFiltersConfig            `yaml:"filters,omitempty" json:"filters,omitempty"`
 }
 
 type ProfileSelectorConfig struct {
@@ -75,14 +75,15 @@ func (c *ProfileSelectorConfig) includesDefaults() bool {
 	return c == nil || c.Defaults == nil || *c.Defaults
 }
 
-type MetricSelectorConfig struct {
-	Include []MetricSelectorEntryConfig `yaml:"include" json:"include"`
+type ProfileMetricSelectorConfig struct {
+	Profile    string                  `yaml:"profile" json:"profile"`
+	Statistics []string                `yaml:"statistics,omitempty" json:"statistics,omitempty"`
+	Include    []MetricSelectionConfig `yaml:"include" json:"include"`
 }
 
-type MetricSelectorEntryConfig struct {
-	Profile   string `yaml:"profile" json:"profile"`
-	Metric    string `yaml:"metric" json:"metric"`
-	Statistic string `yaml:"statistic" json:"statistic"`
+type MetricSelectionConfig struct {
+	Name       string   `yaml:"name" json:"name"`
+	Statistics []string `yaml:"statistics,omitempty" json:"statistics,omitempty"`
 }
 
 type RuleDefaultsConfig struct {

@@ -62,8 +62,38 @@ func validateRawLimits(cfg Config) error {
 			return fmt.Errorf("%s.profiles.exclude contains %d entries; maximum is %d", path, len(rule.Profiles.Exclude), maxReferencesPerRule)
 		case rule.Filters != nil && rule.Filters.ResourceTags != nil && len(*rule.Filters.ResourceTags) > maxResourceTagFilters:
 			return fmt.Errorf("%s.filters.resource_tags contains %d entries; maximum is %d", path, len(*rule.Filters.ResourceTags), maxResourceTagFilters)
-		case rule.Metrics != nil && len(rule.Metrics.Include) > maxReferencesPerRule:
-			return fmt.Errorf("%s.metrics.include contains %d entries; maximum is %d", path, len(rule.Metrics.Include), maxReferencesPerRule)
+		case len(rule.Metrics) > maxReferencesPerRule:
+			return fmt.Errorf("%s.metrics contains %d entries; maximum is %d", path, len(rule.Metrics), maxReferencesPerRule)
+		}
+		if err := validateRawMetricSelectorLimits(path+".metrics", rule.Metrics); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateRawMetricSelectorLimits(path string, selectors []ProfileMetricSelectorConfig) error {
+	expanded := 0
+	for i, selector := range selectors {
+		groupPath := fmt.Sprintf("%s[%d]", path, i)
+		if len(selector.Statistics) > maxReferencesPerRule {
+			return fmt.Errorf("%s.statistics contains %d entries; maximum is %d", groupPath, len(selector.Statistics), maxReferencesPerRule)
+		}
+		if len(selector.Include) > maxReferencesPerRule {
+			return fmt.Errorf("%s.include contains %d entries; maximum is %d", groupPath, len(selector.Include), maxReferencesPerRule)
+		}
+		for j, metric := range selector.Include {
+			if len(metric.Statistics) > maxReferencesPerRule {
+				return fmt.Errorf("%s.include[%d].statistics contains %d entries; maximum is %d", groupPath, j, len(metric.Statistics), maxReferencesPerRule)
+			}
+			count := len(metric.Statistics)
+			if count == 0 {
+				count = len(selector.Statistics)
+			}
+			expanded += count
+			if expanded > maxReferencesPerRule {
+				return fmt.Errorf("%s expands to more than %d metric/statistic selections", path, maxReferencesPerRule)
+			}
 		}
 	}
 	return nil
@@ -186,44 +216,73 @@ func validateRules(cfg Config, targetNames map[string]struct{}) error {
 			errs = append(errs, validateResourceTagFilters(path+".filters.resource_tags", *rule.Filters.ResourceTags))
 		}
 		if rule.Metrics != nil {
-			errs = append(errs, validateMetricSelector(path+".metrics", *rule.Metrics))
+			errs = append(errs, validateMetricSelectors(path+".metrics", rule.Metrics))
 		}
 	}
 	return errors.Join(errs...)
 }
 
-func validateMetricSelector(path string, selector MetricSelectorConfig) error {
-	if len(selector.Include) == 0 {
-		return fmt.Errorf("%s.include must contain at least one metric", path)
+func validateMetricSelectors(path string, selectors []ProfileMetricSelectorConfig) error {
+	if len(selectors) == 0 {
+		return fmt.Errorf("%s must contain at least one profile group", path)
 	}
-	type tuple struct{ profile, metric, statistic string }
-	seen := make(map[tuple]struct{}, len(selector.Include))
+	seenProfiles := make(map[string]struct{}, len(selectors))
 	var errs []error
-	for i, entry := range selector.Include {
-		itemPath := fmt.Sprintf("%s.include[%d]", path, i)
-		if err := validateCanonicalString(itemPath+".profile", entry.Profile); err != nil {
+	for i, selector := range selectors {
+		groupPath := fmt.Sprintf("%s[%d]", path, i)
+		if err := validateCanonicalString(groupPath+".profile", selector.Profile); err != nil {
 			errs = append(errs, err)
-		} else if entry.Profile == "" {
-			errs = append(errs, fmt.Errorf("%s.profile must not be empty", itemPath))
+		} else if selector.Profile == "" {
+			errs = append(errs, fmt.Errorf("%s.profile must not be empty", groupPath))
+		} else if _, ok := seenProfiles[selector.Profile]; ok {
+			errs = append(errs, fmt.Errorf("%s contains duplicate profile %q", path, selector.Profile))
+		} else {
+			seenProfiles[selector.Profile] = struct{}{}
 		}
-		if err := validateCanonicalString(itemPath+".metric", entry.Metric); err != nil {
-			errs = append(errs, err)
-		} else if entry.Metric == "" {
-			errs = append(errs, fmt.Errorf("%s.metric must not be empty", itemPath))
-		}
-		if err := validateCanonicalString(itemPath+".statistic", entry.Statistic); err != nil {
-			errs = append(errs, err)
-		}
-		statistic := normalizeMetricStatistic(entry.Statistic)
-		if statistic == "" {
-			errs = append(errs, fmt.Errorf("%s.statistic is not valid (use Average|Minimum|Maximum|Sum|SampleCount|p<N>)", itemPath))
+		errs = append(errs, validateMetricStatistics(groupPath+".statistics", selector.Statistics))
+		if len(selector.Include) == 0 {
+			errs = append(errs, fmt.Errorf("%s.include must contain at least one metric", groupPath))
 			continue
 		}
-		key := tuple{profile: entry.Profile, metric: entry.Metric, statistic: statistic}
-		if _, ok := seen[key]; ok {
-			errs = append(errs, fmt.Errorf("%s.include contains duplicate metric selection at index %d", path, i))
+
+		seenMetrics := make(map[string]struct{}, len(selector.Include))
+		for j, metric := range selector.Include {
+			metricPath := fmt.Sprintf("%s.include[%d]", groupPath, j)
+			if err := validateCanonicalString(metricPath+".name", metric.Name); err != nil {
+				errs = append(errs, err)
+			} else if metric.Name == "" {
+				errs = append(errs, fmt.Errorf("%s.name must not be empty", metricPath))
+			} else if _, ok := seenMetrics[metric.Name]; ok {
+				errs = append(errs, fmt.Errorf("%s.include contains duplicate metric %q", groupPath, metric.Name))
+			} else {
+				seenMetrics[metric.Name] = struct{}{}
+			}
+			errs = append(errs, validateMetricStatistics(metricPath+".statistics", metric.Statistics))
+			if len(metric.Statistics) == 0 && len(selector.Statistics) == 0 {
+				errs = append(errs, fmt.Errorf("%s must define statistics or inherit them from %s.statistics", metricPath, groupPath))
+			}
+		}
+	}
+	return errors.Join(errs...)
+}
+
+func validateMetricStatistics(path string, statistics []string) error {
+	seen := make(map[string]struct{}, len(statistics))
+	var errs []error
+	for i, raw := range statistics {
+		itemPath := fmt.Sprintf("%s[%d]", path, i)
+		if err := validateCanonicalString(itemPath, raw); err != nil {
+			errs = append(errs, err)
+		}
+		statistic := normalizeMetricStatistic(raw)
+		if statistic == "" {
+			errs = append(errs, fmt.Errorf("%s is not valid (use Average|Minimum|Maximum|Sum|SampleCount|p<N>)", itemPath))
+			continue
+		}
+		if _, ok := seen[statistic]; ok {
+			errs = append(errs, fmt.Errorf("%s contains duplicate statistic %q", path, raw))
 		} else {
-			seen[key] = struct{}{}
+			seen[statistic] = struct{}{}
 		}
 	}
 	return errors.Join(errs...)
