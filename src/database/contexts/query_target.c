@@ -1358,7 +1358,10 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
 
     // we need the available db retention for this call
     // so it has to be done last
-    query_target_calculate_window(qt);
+    if(unlikely(!query_target_calculate_window(qt))) {
+        query_target_release(qt);
+        return NULL;
+    }
 
     qt->timings.preprocessed_ut = now_monotonic_usec();
 

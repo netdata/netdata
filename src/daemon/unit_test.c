@@ -2,6 +2,7 @@
 
 #include "common.h"
 #include "web/api/formatters/rrd2json.h"
+#include "web/api/queries/query-internal.h"
 #include "database/contexts/rrdcontext-internal.h"
 #ifdef OS_WINDOWS
 #include "win_system-info.h"
@@ -1899,6 +1900,170 @@ static int test_rrdr_relative_window_extreme_values(void) {
     return errors;
 }
 
+static void query_window_test_target_init(
+    QUERY_TARGET *qt, time_t after, time_t before, size_t points, time_t resampling_time,
+    RRDR_TIME_GROUPING grouping, RRDR_OPTIONS options, time_t update_every) {
+    *qt = (QUERY_TARGET){
+        .request = {
+            .after = after,
+            .before = before,
+            .points = points,
+            .resampling_time = resampling_time,
+            .time_group_method = grouping,
+        },
+        .window = {
+            .options = options,
+            .after = after,
+            .before = before,
+        },
+        .db = {
+            .first_time_s = 1000000000,
+            .last_time_s = 1000000600,
+            .minimum_latest_update_every_s = update_every,
+        },
+    };
+    snprintfz(qt->id, sizeof(qt->id) - 1, "query-window-unittest");
+}
+
+static int test_query_window_resampling_boundaries(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    const time_t maximum = (time_t)(((uintmax_t)1 << (sizeof(time_t) * CHAR_BIT - 1)) - 1);
+    int errors = 0;
+
+#define QUERY_WINDOW_CHECK(condition, message) do {                                 \
+        if(!(condition)) {                                                          \
+            fprintf(stderr, "%s: %s\n", __FUNCTION__, (message));                \
+            errors++;                                                               \
+        }                                                                            \
+    } while(0)
+
+    for(RRDR_TIME_GROUPING grouping = RRDR_GROUPING_AVERAGE;
+        grouping <= RRDR_GROUPING_EXTREMES; grouping++) {
+        QUERY_TARGET qt;
+        query_window_test_target_init(
+            &qt, 1000000001, 1000000600, 10, 60, grouping, RRDR_OPTION_NOT_ALIGNED, 1);
+
+        QUERY_WINDOW_CHECK(query_target_calculate_window(&qt), "valid grouping mode was rejected");
+        QUERY_WINDOW_CHECK(qt.window.time_group_method == grouping, "grouping mode changed");
+        QUERY_WINDOW_CHECK(qt.window.after == 1000000001 && qt.window.before == 1000000600,
+                           "unaligned resampling window changed");
+        QUERY_WINDOW_CHECK(qt.window.points == 10 && qt.window.group == 60,
+                           "unaligned resampling point layout changed");
+        QUERY_WINDOW_CHECK(qt.window.resampling_group == 60 && qt.window.resampling_divisor == 1.0,
+                           "unaligned resampling ratio changed");
+    }
+
+    {
+        QUERY_TARGET qt;
+        query_window_test_target_init(&qt, 1000000001, 1000000600, 10, 60, RRDR_GROUPING_AVERAGE, 0, 1);
+        QUERY_WINDOW_CHECK(query_target_calculate_window(&qt), "valid aligned window was rejected");
+        QUERY_WINDOW_CHECK(qt.window.after == 1000000021 && qt.window.before == 1000000620,
+                           "aligned resampling endpoints changed");
+        QUERY_WINDOW_CHECK(qt.window.points == 10 && qt.window.group == 60,
+                           "aligned resampling point layout changed");
+    }
+
+    {
+        QUERY_TARGET qt;
+        query_window_test_target_init(
+            &qt, 1000000001, 1000000600, 10, 60, RRDR_GROUPING_AVERAGE,
+            RRDR_OPTION_NATURAL_POINTS | RRDR_OPTION_NOT_ALIGNED, 5);
+        QUERY_WINDOW_CHECK(query_target_calculate_window(&qt), "valid natural-points window was rejected");
+        QUERY_WINDOW_CHECK(qt.window.after == 1000000005 && qt.window.before == 1000000600,
+                           "natural-points endpoints changed");
+        QUERY_WINDOW_CHECK(qt.window.points == 10 && qt.window.group == 12 &&
+                           qt.window.query_granularity == 5 && qt.window.resampling_group == 12,
+                           "natural-points layout changed");
+    }
+
+    {
+        QUERY_TARGET qt;
+        query_window_test_target_init(
+            &qt, -600, 0, 10, 0, RRDR_GROUPING_AVERAGE, RRDR_OPTION_NOT_ALIGNED, 1);
+        QUERY_WINDOW_CHECK(query_target_calculate_window(&qt), "valid relative window was rejected");
+        QUERY_WINDOW_CHECK(qt.window.relative, "relative window classification changed");
+    }
+
+    if(maximum > INT_MAX) {
+        const time_t large_resampling = (time_t)((uint64_t)INT_MAX + 1);
+        QUERY_TARGET qt;
+        query_window_test_target_init(
+            &qt, 1000000000, 1000000600, 2, large_resampling,
+            RRDR_GROUPING_AVERAGE, RRDR_OPTION_NOT_ALIGNED, 1);
+        QUERY_WINDOW_CHECK(query_target_calculate_window(&qt), "representable cadence above INT_MAX was rejected");
+        QUERY_WINDOW_CHECK(qt.window.group == (size_t)large_resampling,
+                           "cadence above INT_MAX was narrowed");
+        QUERY_WINDOW_CHECK(qt.window.after == (time_t)(1000000600LL - 4294967295LL),
+                           "large representable final window changed");
+
+        time_t timestamps[2] = { 0 };
+        RRDR r = {
+            .n = 2,
+            .t = timestamps,
+            .internal = { .qt = &qt },
+        };
+        rrd2rrdr_set_timestamps(&r);
+        QUERY_WINDOW_CHECK(r.view.update_every == large_resampling,
+                           "RRDR cadence above INT_MAX was narrowed");
+        QUERY_WINDOW_CHECK(timestamps[1] == qt.window.before,
+                           "large representable timestamps did not end at before");
+
+        if(sizeof(time_t) > sizeof(size_t)) {
+            const time_t duration_above_size_max = (time_t)(((uint64_t)INT_MAX + 1) * 5);
+            query_window_test_target_init(
+                &qt, 1000000000, 1000000600, 2, duration_above_size_max,
+                RRDR_GROUPING_AVERAGE,
+                RRDR_OPTION_NATURAL_POINTS | RRDR_OPTION_NOT_ALIGNED, 5);
+            QUERY_WINDOW_CHECK(query_target_calculate_window(&qt),
+                               "representable time64 duration above SIZE_MAX was rejected");
+            QUERY_WINDOW_CHECK(qt.window.group == (size_t)((uint64_t)INT_MAX + 1),
+                               "time64 duration above SIZE_MAX changed its group");
+        }
+    }
+
+    for(size_t i = 0; i < 2; i++) {
+        QUERY_TARGET qt;
+        query_window_test_target_init(
+            &qt, 1000000000, 1000000600, 2, maximum, RRDR_GROUPING_AVERAGE,
+            i ? RRDR_OPTION_NOT_ALIGNED : 0, 1);
+        QUERY_WINDOW_CHECK(!query_target_calculate_window(&qt),
+                           "unrepresentable maximum resampling window was accepted");
+    }
+
+    {
+        RRDSET *st = rrdset_create_localhost(
+            "netdata", "unittest-query-window-resampling", "unittest-query-window-resampling",
+            "netdata", NULL, "Unit Testing", "x", "unittest", NULL, 1, 1, RRDSET_TYPE_LINE);
+        rrddim_add(st, "d", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+        QUERY_TARGET_REQUEST request = {
+            .version = 1,
+            .st = st,
+            .after = 1000000000,
+            .before = 1000000600,
+            .points = 2,
+            .resampling_time = maximum,
+            .time_group_method = RRDR_GROUPING_AVERAGE,
+            .options = RRDR_OPTION_NOT_ALIGNED,
+            .query_source = QUERY_SOURCE_UNITTEST,
+            .priority = STORAGE_PRIORITY_SYNCHRONOUS,
+        };
+
+        QUERY_WINDOW_CHECK(!query_target_create(&request),
+                           "query target accepted an unrepresentable resampling window");
+
+        request.resampling_time = 60;
+        QUERY_TARGET *qt = query_target_create(&request);
+        QUERY_WINDOW_CHECK(qt, "query target pool did not recover after rejected window");
+        query_target_release(qt);
+    }
+
+#undef QUERY_WINDOW_CHECK
+
+    return errors;
+}
+
 int run_all_mockup_tests(void)
 {
     fprintf(stderr, "%s() running...\n", __FUNCTION__ );
@@ -1934,6 +2099,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_rrdr_relative_window_extreme_values())
+        return 1;
+
+    if(test_query_window_resampling_boundaries())
         return 1;
 
     if(!test_variable_renames())
