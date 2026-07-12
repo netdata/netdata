@@ -293,8 +293,8 @@
           ]
         }
       },
-      "defaults": {
-        "title": "Collection defaults",
+      "rule_defaults": {
+        "title": "Rule defaults",
         "description": "Job-wide defaults inherited by collection rules that do not replace them.",
         "type": "object",
         "properties": {
@@ -555,7 +555,7 @@
         }
       }
     },
-    "defaults": {
+    "rule_defaults": {
       "ui:help": "Defaults inherited by rules that do not provide their own value.",
       "filters": {
         "resource_tags": {
@@ -639,13 +639,13 @@
         {
           "title": "Collection Rules",
           "fields": [
+            "rule_defaults",
             "rules"
           ]
         },
         {
           "title": "Resource Tags",
           "fields": [
-            "defaults",
             "labels"
           ]
         },

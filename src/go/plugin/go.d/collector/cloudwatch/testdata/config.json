@@ -35,7 +35,7 @@
       "filters": {"resource_tags": [{"key": "environment", "values": ["production", "staging"]}]}
     }
   ],
-  "defaults": {"filters": {"resource_tags": [{"key": "managed-by", "values": ["platform"]}]}},
+  "rule_defaults": {"filters": {"resource_tags": [{"key": "managed-by", "values": ["platform"]}]}},
   "labels": {"resource_tags": [{"key": "owner", "label": "resource_owner"}]},
   "limits": {"max_instances": 123},
   "discovery": {"refresh_every": 123, "recently_active_only": true},

@@ -82,7 +82,7 @@ This collector is supported on all platforms.
 
 This collector supports collecting metrics from multiple instances of this integration, including remote instances.
 
-Every target requires `cloudwatch:ListMetrics` and `cloudwatch:GetMetricData`. The collector calls `sts:GetCallerIdentity` for account attribution, but [AWS does not require an explicit permission grant for that operation](https://docs.aws.amazon.com/STS/latest/APIReference/API_GetCallerIdentity.html). A credential source used by a target with `assume_role` additionally requires `sts:AssumeRole` for that role ARN. Resource tag filtering (`defaults.filters.resource_tags` or `rules[].filters.resource_tags`) and resource tag labels (`labels.resource_tags`) additionally require `tag:GetResources`.
+Every target requires `cloudwatch:ListMetrics` and `cloudwatch:GetMetricData`. The collector calls `sts:GetCallerIdentity` for account attribution, but [AWS does not require an explicit permission grant for that operation](https://docs.aws.amazon.com/STS/latest/APIReference/API_GetCallerIdentity.html). A credential source used by a target with `assume_role` additionally requires `sts:AssumeRole` for that role ARN. Resource tag filtering (`rule_defaults.filters.resource_tags` or `rules[].filters.resource_tags`) and resource tag labels (`labels.resource_tags`) additionally require `tag:GetResources`.
 
 
 ### Default Behavior
@@ -202,10 +202,10 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | rules[].profiles.include | Profile basenames to add explicitly. Set `defaults` to `false` to collect only this list, including profiles disabled by default. |  | no |
 |  | rules[].profiles.exclude | Profile basenames to remove from the selected set. A profile cannot be both included and excluded. |  | no |
 |  | rules[].regions | Canonical lowercase AWS region codes selected by this rule. The compiler intersects them with intrinsic profile restrictions; for example, CloudFront supports only `us-east-1`. |  | yes |
-| **Resource Filters** | defaults.filters.resource_tags | Job-wide list of exact, case-sensitive AWS resource tag predicates inherited by rules that omit `rules[].filters.resource_tags`. All keys must match; any listed value for one key may match. The Resource Groups Tagging API performs the focused lookup and requires `tag:GetResources`. |  | no |
-|  | defaults.filters.resource_tags[].key | Exact AWS resource tag key. A filter list supports at most 50 distinct keys. |  | yes |
-|  | defaults.filters.resource_tags[].values | One to 20 exact, case-sensitive accepted values for this key. Values for one key are ORed. |  | yes |
-|  | rules[].filters.resource_tags | Per-rule replacement for `defaults.filters.resource_tags`. Omit it to inherit the default, provide a non-empty list to replace the default, or set `[]` to disable tag filtering for this rule. |  | no |
+| **Resource Filters** | rule_defaults.filters.resource_tags | Job-wide list of exact, case-sensitive AWS resource tag predicates inherited by rules that omit `rules[].filters.resource_tags`. All keys must match; any listed value for one key may match. The Resource Groups Tagging API performs the focused lookup and requires `tag:GetResources`. |  | no |
+|  | rule_defaults.filters.resource_tags[].key | Exact AWS resource tag key. A filter list supports at most 50 distinct keys. |  | yes |
+|  | rule_defaults.filters.resource_tags[].values | One to 20 exact, case-sensitive accepted values for this key. Values for one key are ORed. |  | yes |
+|  | rules[].filters.resource_tags | Per-rule replacement for `rule_defaults.filters.resource_tags`. Omit it to inherit the default, provide a non-empty list to replace the default, or set `[]` to disable tag filtering for this rule. |  | no |
 |  | rules[].filters.resource_tags[].key | Exact AWS resource tag key. A filter list supports at most 50 distinct keys. |  | yes |
 |  | rules[].filters.resource_tags[].values | One to 20 exact, case-sensitive accepted values for this key. Values for one key are ORed. |  | yes |
 | **Resource Labels** | labels.resource_tags | Optional AWS resource tags copied to charts as non-identity labels. This is presentation only and does not select resources. Tag values may contain personal data, so expose only keys intended for Netdata. Requires `tag:GetResources`. |  | no |
@@ -381,7 +381,7 @@ jobs:
     targets:
       - name: base
         credentials: sdk_default
-    defaults:
+    rule_defaults:
       filters:
         resource_tags:
           - key: managed-by
@@ -593,7 +593,7 @@ Check the following:
 
 - **Permissions** -- each target allows `cloudwatch:ListMetrics` and `cloudwatch:GetMetricData`; `GetCallerIdentity` needs no explicit grant. Targets with `assume_role` also require `sts:AssumeRole` on the source identity. Resource tag filtering or labels require `tag:GetResources`.
 - **Rules** -- `rules[].targets`, `rules[].profiles`, and `rules[].regions` select the expected target, service, and region. CloudFront publishes metrics only in `us-east-1`; its profile enforces this automatically.
-- **Resource filters** -- a rule that omits `filters.resource_tags` inherits `defaults.filters.resource_tags`. An explicitly included profile without a safe Resource Groups Tagging API association is rejected; use `filters.resource_tags: []` for a deliberate unfiltered rule.
+- **Resource filters** -- a rule that omits `filters.resource_tags` inherits `rule_defaults.filters.resource_tags`. An explicitly included profile without a safe Resource Groups Tagging API association is rejected; use `filters.resource_tags: []` for a deliberate unfiltered rule.
 - **Resources are active** -- confirm in the AWS CloudWatch console that the resources are publishing metrics.
 - **Collector logs** -- check for authentication or API errors:
   ```bash

@@ -86,28 +86,28 @@ func TestConfig_validateResourceTagConfiguration(t *testing.T) {
 		wantErr string
 	}{
 		"valid exact filters and labels": {mutate: func(c *Config) {
-			c.Defaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production", "staging"}}}
+			c.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production", "staging"}}}
 			c.Rules[0].Filters = &RuleFiltersConfig{ResourceTags: filters(ResourceTagFilterConfig{Key: "team", Values: []string{"sre"}})}
 			c.Labels.ResourceTags = []ResourceTagLabelConfig{{Key: "Owner", Label: "resource_owner"}}
 		}},
 		"filter key required": {mutate: func(c *Config) {
-			c.Defaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Values: []string{"production"}}}
+			c.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Values: []string{"production"}}}
 		}, wantErr: ".key must not be empty"},
 		"filter values required": {mutate: func(c *Config) {
-			c.Defaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment"}}
+			c.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment"}}
 		}, wantErr: ".values must contain at least one value"},
 		"duplicate filter key rejected": {mutate: func(c *Config) {
-			c.Defaults.Filters.ResourceTags = []ResourceTagFilterConfig{
+			c.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{
 				{Key: "environment", Values: []string{"production"}},
 				{Key: "environment", Values: []string{"staging"}},
 			}
 		}, wantErr: "duplicate key"},
 		"duplicate exact value rejected": {mutate: func(c *Config) {
-			c.Defaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production", "production"}}}
+			c.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production", "production"}}}
 		}, wantErr: "duplicate value"},
 		"more than 50 keys rejected": {mutate: func(c *Config) {
 			for i := range maxResourceTagFilters + 1 {
-				c.Defaults.Filters.ResourceTags = append(c.Defaults.Filters.ResourceTags, ResourceTagFilterConfig{Key: fmt.Sprintf("key-%d", i), Values: []string{"value"}})
+				c.RuleDefaults.Filters.ResourceTags = append(c.RuleDefaults.Filters.ResourceTags, ResourceTagFilterConfig{Key: fmt.Sprintf("key-%d", i), Values: []string{"value"}})
 			}
 		}, wantErr: "maximum is 50"},
 		"more than 20 values rejected": {mutate: func(c *Config) {
@@ -115,7 +115,7 @@ func TestConfig_validateResourceTagConfiguration(t *testing.T) {
 			for i := range maxResourceTagValues + 1 {
 				entry.Values = append(entry.Values, fmt.Sprintf("value-%d", i))
 			}
-			c.Defaults.Filters.ResourceTags = []ResourceTagFilterConfig{entry}
+			c.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{entry}
 		}, wantErr: "maximum is 20"},
 		"label key required": {mutate: func(c *Config) {
 			c.Labels.ResourceTags = []ResourceTagLabelConfig{{Label: "owner"}}
@@ -145,7 +145,7 @@ func TestConfig_validateResourceTagConfiguration(t *testing.T) {
 func TestConfig_validateResourceTagConfiguration_RedactsDuplicateValue(t *testing.T) {
 	const sensitive = "SENSITIVE_TAG_VALUE"
 	cfg := validBaseConfig()
-	cfg.Defaults.Filters.ResourceTags = []ResourceTagFilterConfig{{
+	cfg.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{{
 		Key: "environment", Values: []string{sensitive, sensitive},
 	}}
 
@@ -168,10 +168,11 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 	assert.ElementsMatch(t, []string{"credentials", "targets", "rules"}, doc.JSONSchema.Required)
 	for _, key := range []string{
 		"update_every", "autodetection_retry", "vnode", "credentials", "targets", "rules",
-		"defaults", "labels", "limits", "discovery", "query_offset", "timeout",
+		"rule_defaults", "labels", "limits", "discovery", "query_offset", "timeout",
 	} {
 		assert.Contains(t, doc.JSONSchema.Properties, key)
 	}
+	assert.NotContains(t, doc.JSONSchema.Properties, "defaults")
 	assert.NotContains(t, doc.JSONSchema.Properties, "tags")
 	for key, want := range map[string]string{
 		"credentials": `[{"name":"sdk_default","type":"default"}]`,
@@ -205,8 +206,8 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 		{title: "Base", fields: []string{"update_every", "autodetection_retry", "query_offset", "timeout", "limits"}},
 		{title: "Credentials", fields: []string{"credentials"}},
 		{title: "Targets", fields: []string{"targets"}},
-		{title: "Collection Rules", fields: []string{"rules"}},
-		{title: "Resource Tags", fields: []string{"defaults", "labels"}},
+		{title: "Collection Rules", fields: []string{"rule_defaults", "rules"}},
+		{title: "Resource Tags", fields: []string{"labels"}},
 		{title: "Discovery", fields: []string{"discovery"}},
 		{title: "Virtual Node", fields: []string{"vnode"}},
 	}
@@ -244,8 +245,8 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "targets")["ui:listFlavour"])
 	assert.Equal(t, "ec2", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "profiles", "include", "items")["ui:placeholder"])
 	assert.Equal(t, "us-east-1", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "regions", "items")["ui:placeholder"])
-	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "defaults", "filters", "resource_tags")["ui:listFlavour"])
-	assert.Equal(t, "Environment", schemaObjectAt(t, doc, "uiSchema", "defaults", "filters", "resource_tags", "items", "key")["ui:placeholder"])
+	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rule_defaults", "filters", "resource_tags")["ui:listFlavour"])
+	assert.Equal(t, "Environment", schemaObjectAt(t, doc, "uiSchema", "rule_defaults", "filters", "resource_tags", "items", "key")["ui:placeholder"])
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "labels", "resource_tags")["ui:listFlavour"])
 	assert.Equal(t, "Owner", schemaObjectAt(t, doc, "uiSchema", "labels", "resource_tags", "items", "key")["ui:placeholder"])
 	assert.NotEmpty(t, schemaObjectAt(t, doc, "uiSchema", "credentials")["ui:help"])
@@ -329,7 +330,7 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 
 	t.Run("resource tag filter inheritance and explicit disable are valid", func(t *testing.T) {
 		cfg := cloneConfigMap(t, valid)
-		cfg["defaults"] = map[string]any{"filters": map[string]any{"resource_tags": []any{
+		cfg["rule_defaults"] = map[string]any{"filters": map[string]any{"resource_tags": []any{
 			map[string]any{"key": "environment", "values": []any{"production", "staging"}},
 		}}}
 		cfg["labels"] = map[string]any{"resource_tags": []any{
@@ -346,7 +347,7 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 
 	t.Run("resource tag filter requires at least one value", func(t *testing.T) {
 		cfg := cloneConfigMap(t, valid)
-		cfg["defaults"] = map[string]any{"filters": map[string]any{"resource_tags": []any{
+		cfg["rule_defaults"] = map[string]any{"filters": map[string]any{"resource_tags": []any{
 			map[string]any{"key": "environment", "values": []any{}},
 		}}}
 		assert.Error(t, schema.Validate(cfg))
@@ -506,16 +507,22 @@ func TestConfig_LegacyTopLevelTagsAreNotDecoded(t *testing.T) {
 	assert.Empty(t, cfg.Labels.ResourceTags, "the removed prototype has no alias or compatibility decoder")
 }
 
+func TestConfig_ReplacedDefaultsKeyIsNotDecoded(t *testing.T) {
+	var cfg Config
+	require.NoError(t, yaml.Unmarshal([]byte("defaults:\n  filters:\n    resource_tags:\n      - key: env\n        values: [prod]\n"), &cfg))
+	assert.Empty(t, cfg.RuleDefaults.Filters.ResourceTags, "the replaced key has no alias or compatibility decoder")
+}
+
 func TestConfig_ResourceTagFilterInheritanceDecode(t *testing.T) {
 	var cfg Config
-	require.NoError(t, yaml.Unmarshal([]byte("defaults:\n  filters:\n    resource_tags:\n      - key: env\n        values: [prod]\nrules:\n  - name: inherit\n  - name: disable\n    filters:\n      resource_tags: []\n"), &cfg))
+	require.NoError(t, yaml.Unmarshal([]byte("rule_defaults:\n  filters:\n    resource_tags:\n      - key: env\n        values: [prod]\nrules:\n  - name: inherit\n  - name: disable\n    filters:\n      resource_tags: []\n"), &cfg))
 	require.Len(t, cfg.Rules, 2)
 	assert.Nil(t, cfg.Rules[0].Filters)
 	require.NotNil(t, cfg.Rules[1].Filters)
 	require.NotNil(t, cfg.Rules[1].Filters.ResourceTags)
 	assert.Empty(t, *cfg.Rules[1].Filters.ResourceTags)
-	assert.Equal(t, cfg.Defaults.Filters.ResourceTags, cfg.Rules[0].effectiveResourceTagFilters(cfg.Defaults.Filters.ResourceTags))
-	assert.Empty(t, cfg.Rules[1].effectiveResourceTagFilters(cfg.Defaults.Filters.ResourceTags))
+	assert.Equal(t, cfg.RuleDefaults.Filters.ResourceTags, cfg.Rules[0].effectiveResourceTagFilters(cfg.RuleDefaults.Filters.ResourceTags))
+	assert.Empty(t, cfg.Rules[1].effectiveResourceTagFilters(cfg.RuleDefaults.Filters.ResourceTags))
 }
 
 func TestNormalizeRegions(t *testing.T) {

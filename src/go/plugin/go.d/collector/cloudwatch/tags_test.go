@@ -226,7 +226,7 @@ func TestCollect_ResourceTagFilteringFromPublicConfig(t *testing.T) {
 		{Name: "replacement", Credentials: "sdk_default"},
 		{Name: "fallback", Credentials: "sdk_default"},
 	}
-	cfg.Defaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production"}}}
+	cfg.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production"}}}
 	cfg.Rules = []RuleConfig{
 		{
 			Name: "inherited", Targets: []string{"inherited"}, Regions: []string{"us-east-1"},

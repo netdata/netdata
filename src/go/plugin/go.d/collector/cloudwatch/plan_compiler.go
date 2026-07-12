@@ -122,7 +122,7 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 		return diagnostics, err
 	}
 	regions := normalizeRegions(rule.Regions)
-	tagFilters := compileResourceTagFilters(rule.effectiveResourceTagFilters(pc.cfg.Defaults.Filters.ResourceTags))
+	tagFilters := compileResourceTagFilters(rule.effectiveResourceTagFilters(pc.cfg.RuleDefaults.Filters.ResourceTags))
 	filterKey := resourceTagFilterSignature(tagFilters)
 
 	candidates := len(targets) * len(profiles) * len(regions)

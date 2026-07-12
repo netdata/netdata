@@ -33,7 +33,7 @@ rules:
       resource_tags:
         - key: environment
           values: [production, staging]
-defaults:
+rule_defaults:
   filters:
     resource_tags:
       - key: managed-by

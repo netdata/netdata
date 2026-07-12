@@ -177,7 +177,7 @@ func TestCompileConfig_ResourceTagFilterInheritanceReplacementAndDisable(t *test
 	override := []ResourceTagFilterConfig{{Key: "team", Values: []string{"sre"}}}
 	disabled := []ResourceTagFilterConfig{}
 	cfg := validBaseConfig()
-	cfg.Defaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production"}}}
+	cfg.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production"}}}
 	cfg.Rules = []RuleConfig{
 		{Name: "inherited", Targets: []string{"base"}, Profiles: selector, Regions: []string{"us-east-1"}},
 		{Name: "replaced", Targets: []string{"base"}, Profiles: selector, Regions: []string{"us-east-1"}, Filters: &RuleFiltersConfig{ResourceTags: &override}},
@@ -222,7 +222,7 @@ func TestCompileConfig_ResourceTagFilterUnsupportedProfiles(t *testing.T) {
 
 	t.Run("default selection skips unsupported profiles", func(t *testing.T) {
 		cfg := validBaseConfig()
-		cfg.Defaults.Filters.ResourceTags = filter
+		cfg.RuleDefaults.Filters.ResourceTags = filter
 		plan, diagnostics, err := compileTestConfig(t, cfg)
 		require.NoError(t, err)
 		assert.NotContains(t, scopeProfileNames(plan.Scopes), "api_gateway")
@@ -232,7 +232,7 @@ func TestCompileConfig_ResourceTagFilterUnsupportedProfiles(t *testing.T) {
 	t.Run("explicit unsupported profile fails", func(t *testing.T) {
 		defaults := false
 		cfg := validBaseConfig()
-		cfg.Defaults.Filters.ResourceTags = filter
+		cfg.RuleDefaults.Filters.ResourceTags = filter
 		cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"api_gateway"}}
 		_, _, err := compileTestConfig(t, cfg)
 		assert.ErrorContains(t, err, "no safe tag association")
@@ -242,7 +242,7 @@ func TestCompileConfig_ResourceTagFilterUnsupportedProfiles(t *testing.T) {
 		defaults := false
 		disabled := []ResourceTagFilterConfig{}
 		cfg := validBaseConfig()
-		cfg.Defaults.Filters.ResourceTags = filter
+		cfg.RuleDefaults.Filters.ResourceTags = filter
 		cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"api_gateway"}}
 		cfg.Rules[0].Filters = &RuleFiltersConfig{ResourceTags: &disabled}
 		plan, _, err := compileTestConfig(t, cfg)

@@ -151,7 +151,7 @@ compiler state, and installed execution plan:
 - Named credential sources describe only credential acquisition. Named targets
   describe monitored identities and optional role assumption. Ordered rules bind
   targets to profile selectors, regions, and effective resource-tag predicates.
-- `defaults.filters.resource_tags` is inherited when a rule omits
+- `rule_defaults.filters.resource_tags` is inherited when a rule omits
   `filters.resource_tags`; a present list replaces the default and `[]` disables it.
   Predicates are canonicalized once: exact case-sensitive keys are ANDed and the
   exact values for one key are ORed.

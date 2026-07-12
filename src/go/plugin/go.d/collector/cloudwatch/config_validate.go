@@ -31,7 +31,7 @@ func validateConfigStructure(cfg Config) error {
 	return errors.Join(
 		credentialErr,
 		targetErr,
-		validateResourceTagFilters("defaults.filters.resource_tags", cfg.Defaults.Filters.ResourceTags),
+		validateResourceTagFilters("rule_defaults.filters.resource_tags", cfg.RuleDefaults.Filters.ResourceTags),
 		validateResourceTagLabels("labels.resource_tags", cfg.Labels.ResourceTags),
 		validateRules(cfg, targetNames),
 	)
@@ -46,8 +46,8 @@ func validateRawLimits(cfg Config) error {
 		return fmt.Errorf("'targets' contains %d entries; maximum is %d", len(cfg.Targets), maxTargets)
 	case len(cfg.Rules) > maxRules:
 		return fmt.Errorf("'rules' contains %d entries; maximum is %d", len(cfg.Rules), maxRules)
-	case len(cfg.Defaults.Filters.ResourceTags) > maxResourceTagFilters:
-		return fmt.Errorf("'defaults.filters.resource_tags' contains %d entries; maximum is %d", len(cfg.Defaults.Filters.ResourceTags), maxResourceTagFilters)
+	case len(cfg.RuleDefaults.Filters.ResourceTags) > maxResourceTagFilters:
+		return fmt.Errorf("'rule_defaults.filters.resource_tags' contains %d entries; maximum is %d", len(cfg.RuleDefaults.Filters.ResourceTags), maxResourceTagFilters)
 	}
 	for i, rule := range cfg.Rules {
 		path := fmt.Sprintf("rules[%d]", i)

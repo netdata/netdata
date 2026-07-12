@@ -36,7 +36,7 @@ type Config struct {
 	Credentials        []CredentialSourceConfig `yaml:"credentials" json:"credentials"`
 	Targets            []TargetConfig           `yaml:"targets" json:"targets"`
 	Rules              []RuleConfig             `yaml:"rules" json:"rules"`
-	Defaults           DefaultsConfig           `yaml:"defaults,omitempty" json:"defaults,omitempty"`
+	RuleDefaults       RuleDefaultsConfig       `yaml:"rule_defaults,omitempty" json:"rule_defaults,omitempty"`
 	Labels             LabelsConfig             `yaml:"labels,omitempty" json:"labels,omitempty"`
 	Limits             LimitsConfig             `yaml:"limits,omitempty" json:"limits,omitempty"`
 	Discovery          DiscoveryConfig          `yaml:"discovery" json:"discovery"`
@@ -64,11 +64,11 @@ type RuleConfig struct {
 	Filters  *RuleFiltersConfig     `yaml:"filters,omitempty" json:"filters,omitempty"`
 }
 
-type DefaultsConfig struct {
-	Filters DefaultFiltersConfig `yaml:"filters,omitempty" json:"filters,omitempty"`
+type RuleDefaultsConfig struct {
+	Filters RuleDefaultFiltersConfig `yaml:"filters,omitempty" json:"filters,omitempty"`
 }
 
-type DefaultFiltersConfig struct {
+type RuleDefaultFiltersConfig struct {
 	ResourceTags []ResourceTagFilterConfig `yaml:"resource_tags,omitempty" json:"resource_tags,omitempty"`
 }
 
