@@ -135,7 +135,7 @@ static int str2i(const char *s) {
 
     if(unlikely(*s == '-')) {
         s++;
-        return -(int) str2u(s);
+        return (int)-str2u(s);
     }
     else {
         if(unlikely(*s == '+')) s++;
@@ -162,7 +162,7 @@ static long str2l(const char *s) {
 
     if(unlikely(*s == '-')) {
         s++;
-        return -(long) str2ul(s);
+        return (long)-str2ul(s);
     }
     else {
         if(unlikely(*s == '+')) s++;
@@ -222,7 +222,7 @@ static long long str2ll(const char *s, char **endptr) {
 
     if(unlikely(*s == '-')) {
         s++;
-        return -(long long) str2uint64_t(s, endptr);
+        return (long long)-str2uint64_t(s, endptr);
     }
     else {
         if(unlikely(*s == '+')) s++;
@@ -422,7 +422,7 @@ static unsigned long long str2ull_encoded(const char *s) {
 ALWAYS_INLINE
 static long long str2ll_encoded(const char *s) {
     if(*s == '-')
-        return -(long long) str2ull_encoded(&s[1]);
+        return (long long)-str2ull_encoded(&s[1]);
     else
         return (long long) str2ull_encoded(s);
 }
