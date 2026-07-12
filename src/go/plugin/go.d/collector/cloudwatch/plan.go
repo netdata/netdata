@@ -5,6 +5,7 @@ package cloudwatch
 import (
 	"fmt"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
@@ -105,6 +106,117 @@ func normalizedUniqueProfileNames(path string, values []string, known map[string
 		out[name] = struct{}{}
 	}
 	return out, nil
+}
+
+func compileProfileSeries(profile cwprofiles.ResolvedProfile) []compiledSeries {
+	var series []compiledSeries
+	for metricIndex, metric := range profile.Config.Metrics {
+		period := profile.Config.EffectivePeriod(metric)
+		for _, statistic := range metric.Statistics {
+			token := cwprofiles.NormalizeStatistic(statistic)
+			series = append(series, compiledSeries{
+				Ordinal: len(series), MetricIndex: metricIndex, Statistic: token,
+				Name: cwprofiles.ExportedSeriesName(profile.Name, metric.ID, token), Period: period,
+			})
+		}
+	}
+	return series
+}
+
+func resolveRuleMetrics(path string, selectors []ProfileMetricSelectorConfig, profiles []cwprofiles.ResolvedProfile, seriesByProfile map[string][]compiledSeries) (map[string][]compiledSeries, map[string]struct{}, error) {
+	selected := make(map[string][]compiledSeries, len(profiles))
+	explicitProfiles := make(map[string]struct{})
+	if selectors == nil {
+		for _, profile := range profiles {
+			selected[profile.Name] = seriesByProfile[profile.Name]
+		}
+		return selected, explicitProfiles, nil
+	}
+
+	profilesByName := make(map[string]cwprofiles.ResolvedProfile, len(profiles))
+	for _, profile := range profiles {
+		profilesByName[profile.Name] = profile
+	}
+	selectedOrdinals := make(map[string]map[int]struct{}, len(selectors))
+	for i, selector := range selectors {
+		groupPath := fmt.Sprintf("%s.metrics[%d]", path, i)
+		profile, ok := profilesByName[selector.Profile]
+		if !ok {
+			return nil, nil, fmt.Errorf("%s.profile references profile %q not selected by this rule", groupPath, selector.Profile)
+		}
+		explicitProfiles[profile.Name] = struct{}{}
+		ordinals := selectedOrdinals[profile.Name]
+		if ordinals == nil {
+			ordinals = make(map[int]struct{})
+			selectedOrdinals[profile.Name] = ordinals
+		}
+		if err := resolveMetricGroup(groupPath, selector, profile, seriesByProfile[profile.Name], ordinals); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	for _, profile := range profiles {
+		ordinals := selectedOrdinals[profile.Name]
+		for _, series := range seriesByProfile[profile.Name] {
+			if _, ok := ordinals[series.Ordinal]; ok {
+				selected[profile.Name] = append(selected[profile.Name], series)
+			}
+		}
+	}
+	if len(explicitProfiles) == 0 {
+		return nil, nil, fmt.Errorf("%s.metrics selects no metrics", path)
+	}
+	return selected, explicitProfiles, nil
+}
+
+func resolveMetricGroup(path string, selector ProfileMetricSelectorConfig, profile cwprofiles.ResolvedProfile, available []compiledSeries, selected map[int]struct{}) error {
+	for i, entry := range selector.Include {
+		metricPath := fmt.Sprintf("%s.include[%d]", path, i)
+		metricIndex := slices.IndexFunc(profile.Config.Metrics, func(metric cwprofiles.Metric) bool {
+			return metric.MetricName == entry.Name
+		})
+		if metricIndex < 0 {
+			return fmt.Errorf("%s.name references unknown MetricName %q in profile %q", metricPath, entry.Name, profile.Name)
+		}
+		statistics := entry.Statistics
+		statisticsPath := metricPath + ".statistics"
+		if statistics == nil {
+			statistics = selector.Statistics
+			statisticsPath = path + ".statistics"
+		}
+		for j, raw := range statistics {
+			statistic := normalizeMetricStatistic(raw)
+			series, ok := findCompiledSeries(available, metricIndex, statistic)
+			if !ok {
+				return fmt.Errorf("%s[%d] %q is not exported for MetricName %q in profile %q", statisticsPath, j, raw, entry.Name, profile.Name)
+			}
+			selected[series.Ordinal] = struct{}{}
+		}
+	}
+	return nil
+}
+
+func findCompiledSeries(series []compiledSeries, metricIndex int, statistic string) (compiledSeries, bool) {
+	for _, candidate := range series {
+		if candidate.MetricIndex == metricIndex && candidate.Statistic == statistic {
+			return candidate, true
+		}
+	}
+	return compiledSeries{}, false
+}
+
+func normalizeMetricStatistic(raw string) string {
+	if raw == "" || raw != strings.TrimSpace(raw) {
+		return ""
+	}
+	if strings.EqualFold(raw, "SampleCount") {
+		return "sample_count"
+	}
+	token := cwprofiles.NormalizeStatistic(raw)
+	if token == "sample_count" {
+		return ""
+	}
+	return token
 }
 
 func validateRolePartition(targetName, roleARN string, partitions map[string]struct{}) error {

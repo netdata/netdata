@@ -34,11 +34,18 @@ type discoveredInstance struct {
 	DimensionValues []string
 }
 
-// profileUsesRecentlyActive reports whether a profile's ListMetrics call should
-// set RecentlyActive=PT3H: only when enabled by config AND every metric's
-// effective period is within the PT3H window.
-func profileUsesRecentlyActive(prof cwprofiles.Profile, enabled bool) bool {
-	return enabled && prof.MaxEffectivePeriod() <= recentlyActiveMaxPeriod
+// selectedSeriesUseRecentlyActive reports whether ListMetrics may safely use
+// RecentlyActive=PT3H for the selected series.
+func selectedSeriesUseRecentlyActive(series []compiledSeries, enabled bool) bool {
+	if !enabled || len(series) == 0 {
+		return false
+	}
+	for _, item := range series {
+		if item.Period > recentlyActiveMaxPeriod {
+			return false
+		}
+	}
+	return true
 }
 
 // discoverProfileGroup scans one namespace once and applies each participating
@@ -185,8 +192,9 @@ type discoveryGroupResult struct {
 	Err       error
 }
 
-// discoverAll runs one ListMetrics scan per compatible target/region/namespace/
-// RecentlyActive group and applies all grouped profiles to that streamed response.
+// discoverAll runs one ListMetrics scan per target/region/namespace group and
+// applies all grouped profiles to that streamed response. The group already holds
+// the least restrictive RecentlyActive policy required by its selected series.
 func discoverAll(
 	ctx context.Context,
 	newClient func(target, region string) (cloudwatchClient, error),
@@ -361,11 +369,17 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 
 	type groupKey struct {
 		target, region, namespace string
-		recentlyActive            bool
 	}
 	type profileKey struct {
-		group   groupKey
-		profile string
+		target, profile, region string
+	}
+	recentlyActive := make(map[profileKey]bool)
+	for _, scope := range c.plan.Scopes {
+		key := profileKey{target: scope.Target.Name, profile: scope.Profile.Name, region: scope.Region}
+		recent := selectedSeriesUseRecentlyActive(scope.SelectedSeries, c.recentlyActiveOnly())
+		if previous, ok := recentlyActive[key]; !ok || (previous && !recent) {
+			recentlyActive[key] = recent
+		}
 	}
 	index := make(map[groupKey]int)
 	seenProfiles := make(map[profileKey]struct{})
@@ -374,13 +388,14 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 		if _, ok := c.resolvedByRef[scope.Target.Name]; !ok {
 			continue
 		}
-		recent := profileUsesRecentlyActive(scope.Profile.Config, c.recentlyActiveOnly())
+		pk := profileKey{target: scope.Target.Name, profile: scope.Profile.Name, region: scope.Region}
+		recent := recentlyActive[pk]
 		key := groupKey{
 			target: scope.Target.Name, region: scope.Region,
-			namespace: scope.Profile.Config.Namespace, recentlyActive: recent,
+			namespace: scope.Profile.Config.Namespace,
 		}
 		if i, ok := index[key]; ok {
-			pk := profileKey{group: key, profile: scope.Profile.Name}
+			groups[i].RecentlyActive = groups[i].RecentlyActive && recent
 			if _, seen := seenProfiles[pk]; !seen {
 				groups[i].Profiles = append(groups[i].Profiles, scope.Profile)
 				seenProfiles[pk] = struct{}{}
@@ -392,7 +407,7 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 			Target: scope.Target.Name, Region: scope.Region, Namespace: scope.Profile.Config.Namespace,
 			RecentlyActive: recent, Profiles: []cwprofiles.ResolvedProfile{scope.Profile},
 		})
-		seenProfiles[profileKey{group: key, profile: scope.Profile.Name}] = struct{}{}
+		seenProfiles[pk] = struct{}{}
 	}
 	return groups
 }

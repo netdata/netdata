@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	goruntime "runtime"
 	"sync"
@@ -264,6 +265,91 @@ func queryOwnersByInstance(plan []plannedQuery) map[string]string {
 	return owners
 }
 
+func queryOwnersBySeries(plan []plannedQuery) map[string]string {
+	owners := make(map[string]string)
+	for _, query := range plan {
+		owners[query.seriesName] = query.target
+	}
+	return owners
+}
+
+func selectCompiledSeries(t *testing.T, scope collectionScope, names ...string) []compiledSeries {
+	t.Helper()
+	wanted := make(map[string]struct{}, len(names))
+	for _, name := range names {
+		wanted[name] = struct{}{}
+	}
+	var selected []compiledSeries
+	for _, series := range compileProfileSeries(scope.Profile) {
+		if _, ok := wanted[series.Name]; ok {
+			selected = append(selected, series)
+			delete(wanted, series.Name)
+		}
+	}
+	require.Empty(t, wanted, "requested test series must exist in the profile")
+	return selected
+}
+
+func TestBuildQueryPlan_SeriesOwnershipAcrossTargets(t *testing.T) {
+	// filteredOverlapCollector compiles the stock EC2 profile; its network series
+	// let these scopes exercise partial overlap rather than a synthetic fixture.
+	c := filteredOverlapCollector(t)
+	c.plan.Scopes[0].TagFilter = nil
+	c.plan.Scopes[0].SelectedSeries = selectCompiledSeries(t, c.plan.Scopes[0], "ec2.cpu_utilization_average", "ec2.network_in_sum")
+	c.plan.Scopes[1].SelectedSeries = selectCompiledSeries(t, c.plan.Scopes[1], "ec2.network_in_sum", "ec2.network_out_sum")
+	c.discovery.Instances[discoveryKey{Target: "first", Profile: "ec2", Region: "us-east-1"}] = []discoveredInstance{{DimensionValues: []string{"i-1"}}}
+	c.discovery.Instances[discoveryKey{Target: "second", Profile: "ec2", Region: "us-east-1"}] = []discoveredInstance{{DimensionValues: []string{"i-1"}}}
+
+	plan := requireBuildQueryPlan(t, c)
+	assert.Equal(t, map[string]string{
+		"ec2.cpu_utilization_average": "first",
+		"ec2.network_in_sum":          "first",
+		"ec2.network_out_sum":         "second",
+	}, queryOwnersBySeries(plan))
+}
+
+func TestSeriesOwnershipClaimsEachOrdinalOnce(t *testing.T) {
+	var ownership seriesOwnership
+	for _, ordinal := range []int{0, 63, 64, 255} {
+		assert.Truef(t, ownership.claim(ordinal), "first claim for ordinal %d", ordinal)
+		assert.Falsef(t, ownership.claim(ordinal), "duplicate claim for ordinal %d", ordinal)
+	}
+}
+
+func TestBuildQueryPlan_UnknownTagMembershipReservesOnlySelectedSeries(t *testing.T) {
+	c := filteredOverlapCollector(t)
+	first := &c.plan.Scopes[0]
+	first.SelectedSeries = selectCompiledSeries(t, *first, "ec2.cpu_utilization_average")
+	c.tags = tagSnapshot{members: tagMembership{}, unknown: map[int]struct{}{first.TagMembershipID: {}}}
+
+	plan := requireBuildQueryPlan(t, c)
+	owners := queryOwnersBySeries(plan)
+	assert.NotContains(t, owners, "ec2.cpu_utilization_average")
+	assert.Len(t, owners, len(compileProfileSeries(c.plan.Scopes[1].Profile))-1)
+	for _, owner := range owners {
+		assert.Equal(t, "second", owner)
+	}
+}
+
+func TestBuildQueryPlan_FirstEmittingScopeSuppliesSiblingTagLabels(t *testing.T) {
+	c := filteredOverlapCollector(t)
+	c.plan.Scopes[0].TagFilter = nil
+	c.plan.Scopes[0].SelectedSeries = selectCompiledSeries(t, c.plan.Scopes[0], "ec2.cpu_utilization_average")
+	c.plan.Scopes[1].SelectedSeries = selectCompiledSeries(t, c.plan.Scopes[1], "ec2.network_in_sum", "ec2.network_out_sum")
+	c.discovery.Instances[discoveryKey{Target: "first", Profile: "ec2", Region: "us-east-1"}] = []discoveredInstance{{DimensionValues: []string{"i-1"}}}
+	c.discovery.Instances[discoveryKey{Target: "second", Profile: "ec2", Region: "us-east-1"}] = []discoveredInstance{{DimensionValues: []string{"i-1"}}}
+	c.tags.labels = map[tagCacheKey][]metrix.Label{
+		{target: "first", account: "111111111111", region: "us-east-1", profile: "ec2", joinKey: "i-1"}:  {{Key: "owner", Value: "first"}},
+		{target: "second", account: "111111111111", region: "us-east-1", profile: "ec2", joinKey: "i-1"}: {{Key: "owner", Value: "second"}},
+	}
+
+	plan := requireBuildQueryPlan(t, c)
+	require.Len(t, plan, 3)
+	for _, query := range plan {
+		assert.Equal(t, "first", labelValue(query.tagLabels, "owner"), query.seriesName)
+	}
+}
+
 func TestBuildQueryPlan_OrderedResourceTagFiltering(t *testing.T) {
 	t.Run("known non-match falls through to lower rule", func(t *testing.T) {
 		c := filteredOverlapCollector(t)
@@ -383,6 +469,93 @@ func BenchmarkBuildQueryPlan(b *testing.B) {
 			})
 		}
 	}
+}
+
+func BenchmarkBuildQueryPlanSeriesSelection(b *testing.B) {
+	for _, instances := range []int{100, 1000, 10000} {
+		for _, selected := range []string{"all", "one"} {
+			for _, overlappingScopes := range []int{1, 4} {
+				name := fmt.Sprintf("instances_%d/series_%s/scopes_%d", instances, selected, overlappingScopes)
+				b.Run(name, func(b *testing.B) {
+					c := seriesSelectionBenchmarkCollector(instances, selected, overlappingScopes)
+
+					b.ReportAllocs()
+					b.ResetTimer()
+					for range b.N {
+						plan, err := c.buildQueryPlan()
+						if err != nil {
+							b.Fatal(err)
+						}
+						goruntime.KeepAlive(plan)
+					}
+				})
+			}
+		}
+	}
+}
+
+func BenchmarkCurrentQueryPlanDirtySeriesSelection(b *testing.B) {
+	for _, instances := range []int{100, 1000, 10000} {
+		for _, selected := range []string{"all", "one"} {
+			for _, overlappingScopes := range []int{1, 4} {
+				name := fmt.Sprintf("instances_%d/series_%s/scopes_%d", instances, selected, overlappingScopes)
+				b.Run(name, func(b *testing.B) {
+					c := seriesSelectionBenchmarkCollector(instances, selected, overlappingScopes)
+					initial := requireCurrentQueryPlan(b, c)
+					require.NotEmpty(b, initial)
+					for _, query := range initial {
+						key := observedKey(query.seriesName, query.labels)
+						c.observations.lastObserved[key] = observedSeries{
+							seriesName: query.seriesName,
+							labels:     query.labels,
+							tagLabels:  query.tagLabels,
+							groupKey:   query.groupKey(),
+						}
+						c.observations.nextQueryAt[query.groupKey()] = time.Unix(1, 0)
+					}
+					expectedQueries := len(initial)
+
+					b.ReportAllocs()
+					b.ResetTimer()
+					for range b.N {
+						c.invalidateQueryPlan()
+						plan, err := c.currentQueryPlan()
+						if err != nil {
+							b.Fatal(err)
+						}
+						if len(plan) != expectedQueries {
+							b.Fatalf("query plan length = %d, want %d", len(plan), expectedQueries)
+						}
+						goruntime.KeepAlive(plan)
+					}
+				})
+			}
+		}
+	}
+}
+
+func seriesSelectionBenchmarkCollector(instances int, selected string, overlappingScopes int) *Collector {
+	values := make([][]string, instances)
+	for i := range values {
+		values[i] = []string{fmt.Sprintf("i-%d", i)}
+	}
+	c := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{"us-east-1": values})
+	c.Logger = logger.NewWithWriter(io.Discard)
+	c.Limits.MaxInstances = instances + 1
+	if selected == "one" {
+		c.plan.Scopes[0].SelectedSeries = c.plan.Scopes[0].SelectedSeries[:1]
+	}
+	base := c.plan.Scopes[0]
+	baseInstances := c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}]
+	for i := 1; i < overlappingScopes; i++ {
+		target := &collectionTarget{Name: fmt.Sprintf("target-%d", i)}
+		scope := base
+		scope.Target = target
+		c.plan.Scopes = append(c.plan.Scopes, scope)
+		c.resolvedByRef[target.Name] = resolvedTarget{target: target, accountID: "123456789012"}
+		c.discovery.Instances[discoveryKey{Target: target.Name, Profile: "ec2", Region: "us-east-1"}] = baseInstances
+	}
+	return c
 }
 
 // gmdCloudWatch is a thread-safe GetMetricData fake: every query gets f.value

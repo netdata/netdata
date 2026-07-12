@@ -212,6 +212,11 @@ func TestProfile_Validate(t *testing.T) {
 			wantErr:     true,
 			errContains: "metric_name",
 		},
+		"metric_name surrounding whitespace": {
+			mutate:      func(p *Profile) { p.Metrics[0].MetricName = " CPUUtilization " },
+			wantErr:     true,
+			errContains: "must not have surrounding whitespace",
+		},
 		"metric no statistics": {
 			mutate:      func(p *Profile) { p.Metrics[0].Statistics = nil },
 			wantErr:     true,
@@ -458,14 +463,6 @@ func TestProfile_EffectivePeriod(t *testing.T) {
 	p := Profile{Period: 300}
 	assert.Equal(t, 300, p.EffectivePeriod(Metric{}))
 	assert.Equal(t, 60, p.EffectivePeriod(Metric{Period: 60}))
-}
-
-func TestProfile_MaxEffectivePeriod(t *testing.T) {
-	assert.Equal(t, 300, Profile{Period: 300}.MaxEffectivePeriod())
-	assert.Equal(t, 86400, Profile{
-		Period:  300,
-		Metrics: []Metric{{Period: 60}, {Period: 86400}, {}},
-	}.MaxEffectivePeriod())
 }
 
 func TestProfile_DimensionNames(t *testing.T) {

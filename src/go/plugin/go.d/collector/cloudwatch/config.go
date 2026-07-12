@@ -57,11 +57,33 @@ type TargetConfig struct {
 }
 
 type RuleConfig struct {
-	Name     string                 `yaml:"name" json:"name"`
-	Targets  []string               `yaml:"targets" json:"targets"`
-	Profiles *ProfileSelectorConfig `yaml:"profiles,omitempty" json:"profiles,omitempty"`
-	Regions  []string               `yaml:"regions" json:"regions"`
-	Filters  *RuleFiltersConfig     `yaml:"filters,omitempty" json:"filters,omitempty"`
+	Name     string                        `yaml:"name" json:"name"`
+	Targets  []string                      `yaml:"targets" json:"targets"`
+	Profiles *ProfileSelectorConfig        `yaml:"profiles,omitempty" json:"profiles,omitempty"`
+	Metrics  []ProfileMetricSelectorConfig `yaml:"metrics,omitempty" json:"metrics,omitempty"`
+	Regions  []string                      `yaml:"regions" json:"regions"`
+	Filters  *RuleFiltersConfig            `yaml:"filters,omitempty" json:"filters,omitempty"`
+}
+
+type ProfileSelectorConfig struct {
+	Defaults *bool    `yaml:"defaults,omitempty" json:"defaults,omitempty"`
+	Include  []string `yaml:"include,omitempty" json:"include,omitempty"`
+	Exclude  []string `yaml:"exclude,omitempty" json:"exclude,omitempty"`
+}
+
+func (c *ProfileSelectorConfig) includesDefaults() bool {
+	return c == nil || c.Defaults == nil || *c.Defaults
+}
+
+type ProfileMetricSelectorConfig struct {
+	Profile    string                  `yaml:"profile" json:"profile"`
+	Statistics []string                `yaml:"statistics,omitempty" json:"statistics,omitempty"`
+	Include    []MetricSelectionConfig `yaml:"include" json:"include"`
+}
+
+type MetricSelectionConfig struct {
+	Name       string   `yaml:"name" json:"name"`
+	Statistics []string `yaml:"statistics,omitempty" json:"statistics,omitempty"`
 }
 
 type RuleDefaultsConfig struct {
@@ -98,21 +120,12 @@ type LimitsConfig struct {
 	MaxInstances int `yaml:"max_instances,omitempty" json:"max_instances"`
 }
 
-type ProfileSelectorConfig struct {
-	Defaults *bool    `yaml:"defaults,omitempty" json:"defaults,omitempty"`
-	Include  []string `yaml:"include,omitempty" json:"include,omitempty"`
-	Exclude  []string `yaml:"exclude,omitempty" json:"exclude,omitempty"`
-}
-
-func (c *ProfileSelectorConfig) includesDefaults() bool {
-	return c == nil || c.Defaults == nil || *c.Defaults
-}
-
 type DiscoveryConfig struct {
 	RefreshEvery int `yaml:"refresh_every,omitempty" json:"refresh_every"`
 	// RecentlyActiveOnly is period-aware: when enabled, ListMetrics uses
-	// RecentlyActive=PT3H only for metrics whose period is <= 3h. It is a
-	// pointer so the (true) default can be distinguished from an explicit false.
+	// RecentlyActive=PT3H only when every series selected for one profile matcher
+	// has a period <= 3h. It is a pointer so the (true) default can be
+	// distinguished from an explicit false.
 	RecentlyActiveOnly *bool `yaml:"recently_active_only,omitempty" json:"recently_active_only,omitempty"`
 }
 
