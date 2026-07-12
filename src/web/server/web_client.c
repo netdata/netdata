@@ -506,13 +506,23 @@ static int web_server_static_file(struct web_client *w, char *filename) {
     if(is_dir && !web_client_flag_check(w, WEB_CLIENT_FLAG_PATH_HAS_TRAILING_SLASH))
         return append_slash_to_url_and_redirect(w);
 
-    // open the file
-    int fd = open(web_filename, O_RDONLY | O_CLOEXEC);
+    // Avoid open-time effects for known special objects; O_NONBLOCK covers FIFO replacement races.
+    int fd = -1;
+    if(!S_ISREG(statbuf.st_mode))
+        errno = EINVAL;
+    else
+        fd = open(web_filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
 
     if(fd != -1 && fstat(fd, &statbuf) != 0) {
         int saved_errno = errno;
         close(fd);
         errno = saved_errno;
+        fd = -1;
+    }
+
+    if(fd != -1 && !S_ISREG(statbuf.st_mode)) {
+        close(fd);
+        errno = EINVAL;
         fd = -1;
     }
 
