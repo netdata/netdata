@@ -473,10 +473,16 @@ static int yaml_add_object_to_document(yaml_document_t *document, struct json_ob
 
     json_object_object_foreach(object, key, value) {
         size_t key_len = strlen(key);
+        if (unlikely(key_len >= INT_MAX)) {
+            buffer_sprintf(error, "JSON object key is too long for YAML generation (max %d bytes)", INT_MAX - 1);
+            return 0;
+        }
+
+        int yaml_key_len = (int)key_len;
         yaml_scalar_style_t key_style = yaml_string_scalar_style(key, key_len);
         int key_node = yaml_document_add_scalar(document, NULL,
                                                (yaml_char_t *)key,
-                                               key_len,
+                                               yaml_key_len,
                                                key_style);
         if (!key_node) {
             buffer_sprintf(error, "Failed to add key '%s' to YAML document", key);
@@ -568,11 +574,17 @@ static int yaml_add_json_to_document(yaml_document_t *document, struct json_obje
         case json_type_string: {
             const char *str = json_object_get_string(json);
             size_t len = json_object_get_string_len(json);
+            if (unlikely(len >= INT_MAX)) {
+                buffer_sprintf(error, "JSON string is too long for YAML generation (max %d bytes)", INT_MAX - 1);
+                return 0;
+            }
+
+            int yaml_len = (int)len;
             yaml_scalar_style_t style = yaml_string_scalar_style(str, len);
 
             return yaml_document_add_scalar(document, NULL,
                                           (yaml_char_t *)str,
-                                          len,
+                                          yaml_len,
                                           style);
         }
 
