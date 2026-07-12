@@ -145,10 +145,10 @@ bool claim_id_matches_any(const char *claim_id) {
  * If this happens with the ACLK active under an old claim then we MUST KILL THE LINK
  */
 bool load_claiming_state(void) {
-    if (aclk_online()) {
+    bool reconnect_aclk = aclk_online();
+    if (reconnect_aclk) {
         nd_log(NDLS_DAEMON, NDLP_ERR,
                "CLAIM: agent was already connected to NC - forcing reconnection under new credentials");
-        __atomic_store_n(&disconnect_req, ACLK_RELOAD_CONF, __ATOMIC_RELAXED);
     }
     __atomic_store_n(&aclk_disable_runtime, 0, __ATOMIC_RELAXED);
 
@@ -168,6 +168,9 @@ bool load_claiming_state(void) {
 
     invalidate_node_instances(&localhost->host_id.uuid, have_claimed_id ? &uuid.uuid : NULL);
     metaqueue_store_claim_id(&localhost->host_id.uuid, have_claimed_id ? &uuid.uuid : NULL);
+
+    if (reconnect_aclk)
+        __atomic_store_n(&disconnect_req, ACLK_RELOAD_CONF, __ATOMIC_RELAXED);
 
     errno_clear();
 
