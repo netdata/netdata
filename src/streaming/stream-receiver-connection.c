@@ -377,6 +377,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     rpt->config.update_every = nd_profile.update_every;
 
     // parse the parameters and fill rpt and rpt->system_info
+    bool invalid_hops = false;
 
     while(decoded_query_string) {
         char *value = strsep_skip_consecutive_separators(&decoded_query_string, "&");
@@ -414,8 +415,12 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
             rpt->utc_offset = (int32_t)strtol(value, NULL, 0);
 
         else if(!strcmp(name, "hops")) {
-            rpt->hops = (int16_t)strtol(value, NULL, 0);
-            rrdhost_system_info_hops_set(rpt->system_info, rpt->hops);
+            int16_t hops;
+            invalid_hops = !stream_receiver_parse_hops(value, &hops);
+            if(!invalid_hops) {
+                rpt->hops = hops;
+                rrdhost_system_info_hops_set(rpt->system_info, rpt->hops);
+            }
         }
 
         else if(!strcmp(name, "ml_capable"))
@@ -479,6 +484,16 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
     }
 
     // check if we should accept this connection
+
+    if(invalid_hops) {
+        stream_receiver_log_status(
+            rpt,
+            "rejecting streaming connection; request has an invalid hops value",
+            STREAM_HANDSHAKE_PARENT_DENIED_ACCESS, NDLP_WARNING);
+
+        stream_receiver_free(rpt);
+        return stream_receiver_response_permission_denied(w);
+    }
 
     if(!rpt->key || !*rpt->key) {
         stream_receiver_log_status(

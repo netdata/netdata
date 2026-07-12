@@ -3139,6 +3139,10 @@ if(OS_LINUX)
     target_link_libraries(apps-cgroups-lookup-client-abort-test libnetdata)
 endif()
 
+add_executable(stream-receiver-hops-test EXCLUDE_FROM_ALL
+        src/streaming/tests/stream-handshake-hops-test.c)
+target_link_libraries(stream-receiver-hops-test libnetdata)
+
 if(ENABLE_CGROUPS_LOOKUP_SERVER)
     add_executable(cgroup-lookup-netipc-test EXCLUDE_FROM_ALL
             src/collectors/cgroups.plugin/tests/test_cgroup_lookup_netipc.c
