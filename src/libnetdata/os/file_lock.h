@@ -41,6 +41,16 @@ typedef struct file_lock {
 FILE_LOCK file_lock_get(const char *filename);
 
 /**
+ * Get an exclusive file lock, waiting for the current owner if necessary.
+ *
+ * The lock is automatically released when the process exits or crashes.
+ *
+ * @param filename UTF-8 encoded filename (MSYS2/Cygwin path format or native Windows path on Windows)
+ * @return FILE_LOCK The lock handle. Use FILE_LOCK_OK() to check if lock was acquired
+ */
+FILE_LOCK file_lock_get_wait(const char *filename);
+
+/**
  * Release a file lock
  *
  * Releases a previously acquired file lock. After calling this function,

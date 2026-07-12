@@ -51,7 +51,7 @@ static bool machine_guid_check_blacklisted(const char *guid) {
     return false;
 }
 
-static bool machine_guid_read_from_file(const char *filename, ND_MACHINE_GUID *host_id) {
+static bool machine_guid_read_from_file(const char *filename, ND_MACHINE_GUID *host_id, bool log_errors) {
     if (!filename || !*filename)
         return false;
 
@@ -60,32 +60,42 @@ static bool machine_guid_read_from_file(const char *filename, ND_MACHINE_GUID *h
 
     int fd = open(filename, O_RDONLY | O_CLOEXEC);
     if (fd == -1) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot open GUID file '%s' for reading", filename);
+        if(log_errors)
+            nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot open GUID file '%s' for reading", filename);
         return false;
     }
 
-    if (read(fd, h.txt, sizeof(h.txt) - 1) != sizeof(h.txt) - 1) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot read GUID file '%s'", filename);
+    ssize_t bytes;
+    do {
+        bytes = read(fd, h.txt, sizeof(h.txt) - 1);
+    } while(bytes < 0 && errno == EINTR);
+
+    if (bytes != sizeof(h.txt) - 1) {
+        if(log_errors)
+            nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot read GUID file '%s'", filename);
         close(fd);
         return false;
     }
     h.txt[sizeof(h.txt) - 1] = '\0';
 
     if (uuid_parse(h.txt, h.uuid.uuid) != 0) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot parse GUID from file '%s'", filename);
+        if(log_errors)
+            nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot parse GUID from file '%s'", filename);
         close(fd);
         return false;
     }
 
     if (UUIDiszero(h.uuid)) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: GUID read from file '%s' is zero", filename);
+        if(log_errors)
+            nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: GUID read from file '%s' is zero", filename);
         close(fd);
         return false;
     }
 
     struct stat st;
     if (fstat(fd, &st) != 0) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot stat the GUID file '%s'", filename);
+        if(log_errors)
+            nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot stat the GUID file '%s'", filename);
         close(fd);
         return false;
     }
@@ -114,10 +124,101 @@ static struct timespec usec_to_timespec(usec_t usec) {
     return ts;
 }
 
-static bool machine_guid_write_to_file(const char *filename, ND_MACHINE_GUID *host_id) {
-    static size_t save_id = 0;
+static bool machine_guid_unlink_temporary(const char *tmp_filename, int saved_errno, const char *reason) {
+    if (unlink(tmp_filename) != 0 && errno != ENOENT)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "MACHINE_GUID: cannot remove the temporary GUID file '%s' after %s",
+               tmp_filename, reason);
 
-    if (!filename || !*filename)
+    errno = saved_errno;
+    return false;
+}
+
+static bool machine_guid_close_and_unlink_temporary(
+    int fd, const char *tmp_filename, int saved_errno, const char *reason) {
+    if (close(fd) != 0)
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "MACHINE_GUID: cannot close the temporary GUID file '%s' after %s",
+               tmp_filename, reason);
+
+    return machine_guid_unlink_temporary(tmp_filename, saved_errno, reason);
+}
+
+static bool machine_guid_rename_and_sync(const char *directory, const char *tmp_filename, const char *filename) {
+#if defined(OS_WINDOWS)
+    UNUSED(directory);
+
+    wchar_t *windows_tmp = os_translate_msys_to_windows_pathW(tmp_filename);
+    wchar_t *windows_final = os_translate_msys_to_windows_pathW(filename);
+    if (!windows_tmp || !windows_final) {
+        freez(windows_tmp);
+        freez(windows_final);
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "MACHINE_GUID: cannot translate GUID publication paths for Windows");
+        errno = EINVAL;
+        return false;
+    }
+
+    bool moved = MoveFileExW(windows_tmp, windows_final, MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+    DWORD error = moved ? ERROR_SUCCESS : GetLastError();
+    freez(windows_tmp);
+    freez(windows_final);
+
+    if (!moved) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "MACHINE_GUID: cannot move temporary GUID file '%s' to '%s' (Windows error %lu)",
+               tmp_filename, filename, (unsigned long)error);
+        errno = EIO;
+        return false;
+    }
+
+    return true;
+#else
+    if (rename(tmp_filename, filename) != 0) {
+        int saved_errno = errno;
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "MACHINE_GUID: cannot rename temporary GUID file '%s' to '%s'",
+               tmp_filename, filename);
+        errno = saved_errno;
+        return false;
+    }
+
+    int directory_flags = O_RDONLY | O_CLOEXEC;
+#ifdef O_DIRECTORY
+    directory_flags |= O_DIRECTORY;
+#endif
+    int directory_fd = open(directory, directory_flags);
+    if (directory_fd == -1) {
+        int saved_errno = errno;
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "MACHINE_GUID: cannot open GUID directory '%s' for synchronization", directory);
+        errno = saved_errno;
+        return false;
+    }
+
+    if (fsync(directory_fd) != 0) {
+        int saved_errno = errno;
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "MACHINE_GUID: cannot synchronize GUID directory '%s'", directory);
+        if (close(directory_fd) != 0)
+            nd_log(NDLS_DAEMON, NDLP_ERR,
+                   "MACHINE_GUID: cannot close GUID directory '%s' after synchronization failure", directory);
+        errno = saved_errno;
+        return false;
+    }
+
+    if (close(directory_fd) != 0) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "MACHINE_GUID: cannot close GUID directory '%s' after synchronization", directory);
+        return false;
+    }
+
+    return true;
+#endif
+}
+
+static bool machine_guid_write_to_file(const char *directory, const char *filename, ND_MACHINE_GUID *host_id) {
+    if (!directory || !*directory || !filename || !*filename)
         return false;
 
     ND_MACHINE_GUID h;
@@ -132,31 +233,47 @@ static bool machine_guid_write_to_file(const char *filename, ND_MACHINE_GUID *ho
     // Create the text representation before writing.
     uuid_unparse_lower(h.uuid.uuid, h.txt);
 
-    // Use a temporary filename for atomic writes.
+    // Use an exclusive temporary file so concurrent processes and stale files cannot collide.
     char tmp_filename[FILENAME_MAX];
-    snprintf(tmp_filename, sizeof(tmp_filename), "%s.%zu", filename, __atomic_add_fetch(&save_id, 1, __ATOMIC_RELAXED));
+    int rc = snprintf(tmp_filename, sizeof(tmp_filename), "%s.tmp.XXXXXX", filename);
+    if (rc < 0 || (size_t)rc >= sizeof(tmp_filename)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR,
+               "MACHINE_GUID: temporary GUID filename for '%s' is too long", filename);
+        errno = ENAMETOOLONG;
+        return false;
+    }
 
-    int fd = open(tmp_filename, O_WRONLY | O_CREAT | O_TRUNC, 0444);
+    int fd = mkstemp(tmp_filename);
     if (fd == -1) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot create the temporary GUID file '%s'", tmp_filename);
         return false;
     }
 
-    if (write(fd, h.txt, sizeof(h.txt) - 1) != sizeof(h.txt) - 1) {
+    size_t written = 0;
+    while (written < sizeof(h.txt) - 1) {
+        ssize_t bytes = write(fd, &h.txt[written], sizeof(h.txt) - 1 - written);
+        if (bytes > 0) {
+            written += (size_t)bytes;
+            continue;
+        }
+
+        if (bytes < 0 && errno == EINTR)
+            continue;
+
+        if (bytes == 0)
+            errno = EIO;
+
+        int saved_errno = errno;
         nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot write GUID to the temporary GUID file '%s'", tmp_filename);
-        close(fd);
-        return false;
+        return machine_guid_close_and_unlink_temporary(fd, tmp_filename, saved_errno, "write failure");
     }
 
-    if (close(fd) != 0) {
+    mode_t current_umask = umask(0); // Flawfinder: ignore - read and immediately restore the startup umask.
+    umask(current_umask); // Flawfinder: ignore - restore the startup umask.
+    if (fchmod(fd, 0444 & ~current_umask) != 0) {
         int saved_errno = errno;
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot close the temporary GUID file '%s'", tmp_filename);
-
-        if (unlink(tmp_filename) != 0)
-            nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot remove the temporary GUID file '%s' after close failure", tmp_filename);
-
-        errno = saved_errno;
-        return false;
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot set permissions on temporary GUID file '%s'", tmp_filename);
+        return machine_guid_close_and_unlink_temporary(fd, tmp_filename, saved_errno, "permission failure");
     }
 
     struct timespec times[2] = {
@@ -164,15 +281,24 @@ static bool machine_guid_write_to_file(const char *filename, ND_MACHINE_GUID *ho
         usec_to_timespec(h.last_modified_ut), // modification time
     };
 
-    // Update file timestamps.
     if (utimensat(AT_FDCWD, tmp_filename, times, 0) < 0)
         nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot update the timestamps of the temporary GUID file '%s'", tmp_filename);
 
-    // Rename the temporary file to the target filename atomically.
-    if (rename(tmp_filename, filename) != 0) {
-        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot rename temporary GUID file '%s' to '%s'", tmp_filename, filename);
-        unlink(tmp_filename);
-        return false;
+    if (fsync(fd) != 0) {
+        int saved_errno = errno;
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot synchronize temporary GUID file '%s'", tmp_filename);
+        return machine_guid_close_and_unlink_temporary(fd, tmp_filename, saved_errno, "synchronization failure");
+    }
+
+    if (close(fd) != 0) {
+        int saved_errno = errno;
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot close the temporary GUID file '%s'", tmp_filename);
+        return machine_guid_unlink_temporary(tmp_filename, saved_errno, "close failure");
+    }
+
+    if (!machine_guid_rename_and_sync(directory, tmp_filename, filename)) {
+        int saved_errno = errno;
+        return machine_guid_unlink_temporary(tmp_filename, saved_errno, "publication failure");
     }
 
     nd_log(NDLS_DAEMON, NDLP_INFO, "MACHINE_GUID: GUID saved to file '%s'", filename);
@@ -187,22 +313,35 @@ static SPINLOCK nd_machine_guid_spinlock = SPINLOCK_INITIALIZER;
 static ND_MACHINE_GUID machine_guid_get_or_create(void) {
     char pathname[FILENAME_MAX];
     char filename[FILENAME_MAX];
+    char lock_filename[FILENAME_MAX];
 
     netdata_conf_section_directories();
 
     ND_MACHINE_GUID h;
     memset(&h, 0, sizeof(h));
 
-    // Build the file path.
-    snprintfz(pathname, sizeof(pathname), "%s/registry", netdata_configured_varlib_dir);
-    snprintfz(filename, sizeof(filename), "%s/%s", pathname, "netdata.public.unique.id");
+    bool paths_valid = true;
+    int rc = snprintf(pathname, sizeof(pathname), "%s/registry", netdata_configured_varlib_dir);
+    if (rc < 0 || (size_t)rc >= sizeof(pathname)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: registry directory path is too long");
+        paths_valid = false;
+    }
+
+    if (paths_valid) {
+        rc = snprintf(filename, sizeof(filename), "%s/%s", pathname, "netdata.public.unique.id");
+        if (rc < 0 || (size_t)rc >= sizeof(filename)) {
+            nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: GUID filename is too long");
+            paths_valid = false;
+        }
+    }
 
     // Attempt to read the GUID from the file.
-    if (machine_guid_read_from_file(filename, &h))
+    if (paths_valid && machine_guid_read_from_file(filename, &h, true))
         return h;
 
     // Log failure to read the file.
-    nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: failed to read GUID from file '%s'", filename);
+    if (paths_valid)
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: failed to read GUID from file '%s'", filename);
 
     // Attempt to retrieve GUID from daemon status file.
     h = daemon_status_file_get_host_id();
@@ -219,6 +358,9 @@ static ND_MACHINE_GUID machine_guid_get_or_create(void) {
     h.last_modified_ut = now_realtime_usec();
     rfc3339_datetime_ut(h.last_modified_ut_rfc3339, sizeof(h.last_modified_ut_rfc3339), h.last_modified_ut, 2, true);
     nd_machine_guid = h;
+
+    if (!paths_valid)
+        return h;
 
     // Avoid a check-then-create race; mkdir() + EEXIST is sufficient.
     errno_clear();
@@ -238,9 +380,30 @@ static ND_MACHINE_GUID machine_guid_get_or_create(void) {
         }
     }
 
+    // The lock file must persist so every contender continues to lock the same inode.
+    rc = snprintf(lock_filename, sizeof(lock_filename), "%s.lock", filename);
+    if (rc < 0 || (size_t)rc >= sizeof(lock_filename)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: lock filename for '%s' is too long", filename);
+        return h;
+    }
+
+    FILE_LOCK lock = file_lock_get_wait(lock_filename);
+    if (!FILE_LOCK_OK(lock)) {
+        nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot acquire publication lock '%s'", lock_filename);
+        return h;
+    }
+
+    ND_MACHINE_GUID published;
+    if (machine_guid_read_from_file(filename, &published, false)) {
+        file_lock_release(lock);
+        return published;
+    }
+
     errno_clear();
-    if (!machine_guid_write_to_file(filename, &h))
+    if (!machine_guid_write_to_file(pathname, filename, &h))
         nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot save GUID to file '%s'", filename);
+
+    file_lock_release(lock);
 
     return h;
 }
