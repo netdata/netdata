@@ -25,11 +25,10 @@ func validBaseConfig() Config {
 		Credentials: []CredentialSourceConfig{
 			{Name: "sdk_default", CredentialConfig: awsauth.CredentialConfig{Type: awsauth.CredentialTypeDefault}},
 		},
-		Targets:     []TargetConfig{{Name: "base", Credentials: "sdk_default"}},
-		Rules:       []RuleConfig{{Name: "base-defaults", Targets: []string{"base"}, Regions: []string{"us-east-1"}}},
-		Discovery:   DiscoveryConfig{RefreshEvery: 300},
-		QueryOffset: 600,
-		Timeout:     defaultTimeout,
+		Targets:   []TargetConfig{{Name: "base", Credentials: "sdk_default"}},
+		Rules:     []RuleConfig{{Name: "base-defaults", Targets: []string{"base"}, Regions: []string{"us-east-1"}}},
+		Discovery: DiscoveryConfig{RefreshEvery: 300},
+		Timeout:   defaultTimeout,
 	}
 }
 
@@ -61,7 +60,6 @@ func TestConfig_validate(t *testing.T) {
 		"noncanonical region":         {mutate: func(c *Config) { c.Rules[0].Regions = []string{"us-east-1", " US-EAST-1 "} }, wantErr: true},
 		"update_every below minimum":  {mutate: func(c *Config) { c.UpdateEvery = 30 }, wantErr: true},
 		"refresh_every below minimum": {mutate: func(c *Config) { c.Discovery.RefreshEvery = 30 }, wantErr: true},
-		"negative query_offset":       {mutate: func(c *Config) { c.QueryOffset = -1 }, wantErr: true},
 		"negative timeout":            {mutate: func(c *Config) { c.Timeout = confopt.Duration(-time.Second) }, wantErr: true},
 	}
 
@@ -265,7 +263,7 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 	assert.ElementsMatch(t, []string{"credentials", "targets", "rules"}, doc.JSONSchema.Required)
 	for _, key := range []string{
 		"update_every", "autodetection_retry", "vnode", "credentials", "targets", "rules",
-		"rule_defaults", "labels", "limits", "discovery", "query_offset", "timeout",
+		"rule_defaults", "labels", "limits", "discovery", "timeout",
 	} {
 		assert.Contains(t, doc.JSONSchema.Properties, key)
 	}
@@ -300,7 +298,7 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 		title  string
 		fields []string
 	}{
-		{title: "Base", fields: []string{"update_every", "autodetection_retry", "query_offset", "timeout", "limits"}},
+		{title: "Base", fields: []string{"update_every", "autodetection_retry", "timeout", "limits"}},
 		{title: "Credentials", fields: []string{"credentials"}},
 		{title: "Targets", fields: []string{"targets"}},
 		{title: "Collection Rules", fields: []string{"rule_defaults", "rules"}},
@@ -348,6 +346,8 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 	assert.Equal(t, "CPUUtilization", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "include", "items", "name")["ui:placeholder"])
 	assert.Equal(t, "Maximum", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "include", "items", "statistics", "items")["ui:placeholder"])
 	assert.Equal(t, "us-east-1", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "regions", "items")["ui:placeholder"])
+	assert.Equal(t, "5m", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "query", "period")["ui:placeholder"])
+	assert.Equal(t, "30m", schemaObjectAt(t, doc, "uiSchema", "rule_defaults", "query", "lookback")["ui:placeholder"])
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rule_defaults", "filters", "resource_tags")["ui:listFlavour"])
 	assert.Equal(t, "Environment", schemaObjectAt(t, doc, "uiSchema", "rule_defaults", "filters", "resource_tags", "items", "key")["ui:placeholder"])
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "labels", "resource_tags")["ui:listFlavour"])
@@ -355,6 +355,53 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 	assert.NotEmpty(t, schemaObjectAt(t, doc, "uiSchema", "credentials")["ui:help"])
 	assert.NotEmpty(t, schemaObjectAt(t, doc, "uiSchema", "discovery", "recently_active_only")["ui:help"])
 	assert.NotEmpty(t, schemaObjectAt(t, doc, "uiSchema", "vnode")["ui:placeholder"])
+}
+
+func TestConfigSchema_QueryPolicyHasNoMaterializedDefaults(t *testing.T) {
+	data, err := os.ReadFile("config_schema.json")
+	require.NoError(t, err)
+	var doc map[string]any
+	require.NoError(t, json.Unmarshal(data, &doc))
+	assert.NotContains(t, string(data), "query_offset")
+
+	ruleQuery := schemaObjectAt(t, doc, "jsonSchema", "properties", "rules", "items", "properties", "query", "properties")
+	defaultQuery := schemaObjectAt(t, doc, "jsonSchema", "properties", "rule_defaults", "properties", "query", "properties")
+	for _, field := range []string{"period", "lookback", "publication_delay"} {
+		for _, query := range []map[string]any{ruleQuery, defaultQuery} {
+			property := schemaObjectAt(t, query, field)
+			assert.NotContainsf(t, property, "default", "%s must preserve omission for runtime precedence", field)
+			assert.Equal(t, "string", property["type"])
+		}
+	}
+}
+
+func TestConfig_QueryPolicyPresenceAndCanonicalSerialization(t *testing.T) {
+	var cfg Config
+	require.NoError(t, yaml.Unmarshal([]byte(`
+rule_defaults:
+  query:
+    period: 5m
+rules:
+  - name: sample
+    query:
+      publication_delay: 0s
+`), &cfg))
+	require.NotNil(t, cfg.RuleDefaults.Query)
+	require.NotNil(t, cfg.RuleDefaults.Query.Period)
+	assert.Equal(t, 5*time.Minute, cfg.RuleDefaults.Query.Period.Duration())
+	require.Len(t, cfg.Rules, 1)
+	require.NotNil(t, cfg.Rules[0].Query)
+	require.NotNil(t, cfg.Rules[0].Query.PublicationDelay)
+	assert.Zero(t, cfg.Rules[0].Query.PublicationDelay.Duration())
+
+	encoded, err := yaml.Marshal(cfg)
+	require.NoError(t, err)
+	assert.Contains(t, string(encoded), "period: 5m")
+	assert.Contains(t, string(encoded), "publication_delay: 0s")
+
+	omitted, err := yaml.Marshal(Config{Rules: []RuleConfig{{Name: "sample"}}})
+	require.NoError(t, err)
+	assert.NotContains(t, string(omitted), "query:")
 }
 
 func TestConfigSchema_CredentialTypeSelector(t *testing.T) {

@@ -17,12 +17,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 )
 
-// recentlyActiveMaxPeriod is the upper bound (seconds) for using ListMetrics
-// RecentlyActive=PT3H. PT3H is the only value CloudWatch accepts and it hides
-// metrics whose last datapoint is older than ~3h, so it MUST NOT be used for
-// profiles with longer periods (e.g. S3 daily), or they would vanish ~21h/day.
-const recentlyActiveMaxPeriod = 3 * 60 * 60
-
 // instanceKeySep separates dimension values in an instance dedup key. It is the
 // ASCII unit separator, which cannot appear in CloudWatch dimension values.
 const instanceKeySep = "\x1f"
@@ -41,7 +35,7 @@ func selectedSeriesUseRecentlyActive(series []compiledSeries, enabled bool) bool
 		return false
 	}
 	for _, item := range series {
-		if item.Period > recentlyActiveMaxPeriod {
+		if item.Policy.period == 0 || !item.Policy.useRecentlyActive() {
 			return false
 		}
 	}
@@ -67,6 +61,8 @@ func discoverProfileGroup(ctx context.Context, client cloudwatchClient, group di
 
 	instances := make(map[string][]discoveredInstance, len(profiles))
 	var nextToken *string
+	seenTokens := make(map[string]struct{})
+	pages, scannedMetrics, candidateInstances := 0, 0, 0
 	for {
 		in := &cloudwatch.ListMetricsInput{Namespace: aws.String(group.Namespace), NextToken: nextToken}
 		if group.RecentlyActive {
@@ -75,6 +71,11 @@ func discoverProfileGroup(ctx context.Context, client cloudwatchClient, group di
 		out, err := client.ListMetrics(ctx, in)
 		if err != nil {
 			return nil, err
+		}
+		pages++
+		scannedMetrics += len(out.Metrics)
+		if scannedMetrics > maxScannedMetricsPerGroup {
+			return nil, safeCollectorErrorf("ListMetrics scanned more than %d metrics for one discovery group", maxScannedMetricsPerGroup)
 		}
 		for _, metric := range out.Metrics {
 			for i := range matchers {
@@ -88,12 +89,23 @@ func discoverProfileGroup(ctx context.Context, client cloudwatchClient, group di
 					continue
 				}
 				m.seen[key] = struct{}{}
+				candidateInstances++
+				if candidateInstances > maxCandidateInstancesPerGroup {
+					return nil, safeCollectorErrorf("ListMetrics found more than %d candidate instances for one discovery group", maxCandidateInstancesPerGroup)
+				}
 				instances[m.profile.Name] = append(instances[m.profile.Name], discoveredInstance{DimensionValues: values})
 			}
 		}
 		if out.NextToken == nil || *out.NextToken == "" {
 			break
 		}
+		if pages == maxListMetricsPages {
+			return nil, safeCollectorErrorf("ListMetrics requires more than %d pages for one discovery group", maxListMetricsPages)
+		}
+		if _, ok := seenTokens[*out.NextToken]; ok {
+			return nil, safeCollectorError("ListMetrics returned a repeated pagination token")
+		}
+		seenTokens[*out.NextToken] = struct{}{}
 		nextToken = out.NextToken
 	}
 	return instances, nil
@@ -367,9 +379,6 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 		return nil
 	}
 
-	type groupKey struct {
-		target, region, namespace string
-	}
 	type profileKey struct {
 		target, profile, region string
 	}
@@ -381,7 +390,7 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 			recentlyActive[key] = recent
 		}
 	}
-	index := make(map[groupKey]int)
+	index := make(map[discoveryGroupKey]int)
 	seenProfiles := make(map[profileKey]struct{})
 	var groups []discoveryGroup
 	for _, scope := range c.plan.Scopes {
@@ -390,7 +399,7 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 		}
 		pk := profileKey{target: scope.Target.Name, profile: scope.Profile.Name, region: scope.Region}
 		recent := recentlyActive[pk]
-		key := groupKey{
+		key := discoveryGroupKey{
 			target: scope.Target.Name, region: scope.Region,
 			namespace: scope.Profile.Config.Namespace,
 		}

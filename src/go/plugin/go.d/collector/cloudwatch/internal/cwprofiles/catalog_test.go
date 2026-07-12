@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/profilecatalog"
@@ -113,6 +114,10 @@ func TestLoadFromDefaultDirs_LoadsStockProfiles(t *testing.T) {
 		prof, ok := catalog.Get(baseName)
 		if assert.Truef(t, ok, "missing stock profile %q", baseName) {
 			assert.Equalf(t, namespace, prof.Namespace, "profile %q namespace", baseName)
+			if baseName == "s3" {
+				require.NotNil(t, prof.PublicationDelay)
+				assert.Equal(t, 24*time.Hour, prof.PublicationDelay.Duration())
+			}
 			if baseName == "cloudfront" {
 				assert.Equal(t, []string{"us-east-1"}, prof.SupportedRegions)
 			} else {
@@ -163,8 +168,7 @@ func TestDecodeProfileBytes(t *testing.T) {
 		"valid": {
 			data: minimalProfileYAML,
 		},
-		// The decoder is non-strict: unknown keys are ignored (forward-compat — an
-		// older collector tolerates profiles carrying newer optional fields).
+		// The decoder is non-strict: unknown keys are ignored.
 		"unknown top-level key ignored": {
 			data: minimalProfileYAML + "bogus_key: 1\n",
 		},

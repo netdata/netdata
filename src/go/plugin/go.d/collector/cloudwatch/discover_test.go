@@ -18,6 +18,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,7 +48,15 @@ func (f *fakeCloudWatch) GetMetricData(ctx context.Context, in *cloudwatch.GetMe
 	if f.getMetricData != nil {
 		return f.getMetricData(ctx, in)
 	}
-	return &cloudwatch.GetMetricDataOutput{}, nil
+	return completeNoData(in), nil
+}
+
+func completeNoData(in *cloudwatch.GetMetricDataInput) *cloudwatch.GetMetricDataOutput {
+	results := make([]cwtypes.MetricDataResult, 0, len(in.MetricDataQueries))
+	for _, query := range in.MetricDataQueries {
+		results = append(results, cwtypes.MetricDataResult{Id: query.Id, StatusCode: cwtypes.StatusCodeComplete})
+	}
+	return &cloudwatch.GetMetricDataOutput{MetricDataResults: results}
 }
 
 func mkMetric(name string, nameValuePairs ...string) cwtypes.Metric {
@@ -306,8 +315,8 @@ func (f *nsCloudWatch) ListMetrics(_ context.Context, in *cloudwatch.ListMetrics
 	return &cloudwatch.ListMetricsOutput{Metrics: f.byNS[aws.ToString(in.Namespace)]}, nil
 }
 
-func (f *nsCloudWatch) GetMetricData(context.Context, *cloudwatch.GetMetricDataInput, ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
-	return &cloudwatch.GetMetricDataOutput{}, nil
+func (f *nsCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetricDataInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+	return completeNoData(in), nil
 }
 
 func resolved(name string, prof cwprofiles.Profile) cwprofiles.ResolvedProfile {
@@ -470,7 +479,7 @@ func TestCollector_DiscoveryGroupsCoalesceToLeastRestrictiveRecentlyActivePolicy
 	assert.Equal(t, 1, fake.calls, "the unfiltered superset scan replaces a redundant filtered sibling scan")
 }
 
-func TestCollector_DiscoveryGroupsUseUnionOfSelectedSeriesPeriods(t *testing.T) {
+func TestCollector_DiscoveryGroupsUseUnionOfSelectedSeriesPolicies(t *testing.T) {
 	c := New()
 	profile := cwprofiles.ResolvedProfile{Name: "mixed", Config: cwprofiles.Profile{
 		Namespace: "AWS/Shared", Period: 300,
@@ -643,8 +652,8 @@ func (errListMetrics) ListMetrics(context.Context, *cloudwatch.ListMetricsInput,
 	return nil, errors.New("throttled")
 }
 
-func (errListMetrics) GetMetricData(context.Context, *cloudwatch.GetMetricDataInput, ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
-	return &cloudwatch.GetMetricDataOutput{}, nil
+func (errListMetrics) GetMetricData(_ context.Context, in *cloudwatch.GetMetricDataInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+	return completeNoData(in), nil
 }
 
 func TestCollector_refreshDiscovery_EmptySuccessPlusFailureNotFatalOnFirstPass(t *testing.T) {
@@ -685,14 +694,16 @@ func TestCollector_collect_LateResolvedAccountDiscoveredSameCycle(t *testing.T) 
 	base := time.Unix(1000, 0)
 	c.now = func() time.Time { return base }
 
-	require.NoError(t, c.collect(context.Background()))
+	_, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
 	require.Equal(t, []string{"first"}, resolvedTargetNames(c))
 	assert.Contains(t, c.discovery.Instances, discoveryKey{Target: "first", Profile: "ec2", Region: "us-east-1"})
 	assert.NotContains(t, c.discovery.Instances, discoveryKey{Target: "second", Profile: "ec2", Region: "us-east-1"})
 
 	// Next cycle, still inside the 300s TTL: role B resolves and is discovered now.
 	c.now = func() time.Time { return base.Add(60 * time.Second) }
-	require.NoError(t, c.collect(context.Background()))
+	_, err = collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
 	require.Equal(t, []string{"first", "second"}, resolvedTargetNames(c))
 	assert.Contains(t, c.discovery.Instances, discoveryKey{Target: "second", Profile: "ec2", Region: "us-east-1"},
 		"a late-resolved account is discovered the same cycle, not after refresh_every")
@@ -704,9 +715,65 @@ func TestCollector_collect_runsDiscovery(t *testing.T) {
 	})
 	c.now = func() time.Time { return time.Unix(1000, 0) }
 
-	require.NoError(t, c.collect(context.Background()))
+	_, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
 	assert.Equal(t, []string{"base"}, resolvedTargetNames(c))
 	assert.Equal(t, 1, c.discovery.totalInstances())
+}
+
+func TestDiscoverProfileGroup_WorkBounds(t *testing.T) {
+	group := discoveryGroup{
+		Target: "base", Region: "us-east-1", Namespace: "AWS/EC2",
+		Profiles: []cwprofiles.ResolvedProfile{{Name: "ec2", Config: cwprofiles.Profile{
+			Namespace: "AWS/EC2",
+			Instance:  cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "InstanceId", Label: "instance_id"}}},
+		}}},
+	}
+
+	t.Run("exact page maximum", func(t *testing.T) {
+		pages := make([]*cloudwatch.ListMetricsOutput, maxListMetricsPages)
+		for i := range pages {
+			pages[i] = &cloudwatch.ListMetricsOutput{}
+			if i+1 < len(pages) {
+				pages[i].NextToken = aws.String(fmt.Sprintf("page-%d", i+1))
+			}
+		}
+		_, err := discoverProfileGroup(context.Background(), &fakeCloudWatch{pages: pages}, group)
+		require.NoError(t, err)
+	})
+
+	t.Run("page maximum exceeded", func(t *testing.T) {
+		pages := make([]*cloudwatch.ListMetricsOutput, maxListMetricsPages)
+		for i := range pages {
+			pages[i] = &cloudwatch.ListMetricsOutput{NextToken: aws.String(fmt.Sprintf("page-%d", i+1))}
+		}
+		_, err := discoverProfileGroup(context.Background(), &fakeCloudWatch{pages: pages}, group)
+		assert.ErrorContains(t, err, "requires more than 100 pages")
+	})
+
+	t.Run("repeated pagination token", func(t *testing.T) {
+		pages := []*cloudwatch.ListMetricsOutput{
+			{NextToken: aws.String("repeat")},
+			{NextToken: aws.String("repeat")},
+		}
+		_, err := discoverProfileGroup(context.Background(), &fakeCloudWatch{pages: pages}, group)
+		assert.ErrorContains(t, err, "repeated pagination token")
+	})
+
+	t.Run("scanned metric maximum exceeded", func(t *testing.T) {
+		pages := []*cloudwatch.ListMetricsOutput{{Metrics: make([]cwtypes.Metric, maxScannedMetricsPerGroup+1)}}
+		_, err := discoverProfileGroup(context.Background(), &fakeCloudWatch{pages: pages}, group)
+		assert.ErrorContains(t, err, "scanned more than 50000 metrics")
+	})
+
+	t.Run("candidate instance maximum exceeded", func(t *testing.T) {
+		metrics := make([]cwtypes.Metric, maxCandidateInstancesPerGroup+1)
+		for i := range metrics {
+			metrics[i] = mkMetric("CPUUtilization", "InstanceId", fmt.Sprintf("i-%d", i))
+		}
+		_, err := discoverProfileGroup(context.Background(), &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{{Metrics: metrics}}}, group)
+		assert.ErrorContains(t, err, "found more than 20000 candidate instances")
+	})
 }
 
 func regionsOf(m map[string]map[string][]cwtypes.Metric) []string {

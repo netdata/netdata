@@ -194,7 +194,6 @@ func TestCollector_Init_appliesDefaults(t *testing.T) {
 
 	assert.Equal(t, defaultUpdateEvery, c.UpdateEvery)
 	assert.Equal(t, defaultDiscoveryRefresh, c.Discovery.RefreshEvery)
-	assert.Equal(t, defaultQueryOffset, c.QueryOffset)
 	assert.True(t, c.recentlyActiveOnly())
 }
 

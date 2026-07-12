@@ -41,7 +41,7 @@ func TestCollect_E2E(t *testing.T) {
 	const account = "000000000000"
 
 	scenarios := map[string]e2eScenario{
-		"ec2 single dimension, rate sums stored undivided": {
+		"ec2 single dimension, rate sums normalized by effective period": {
 			profiles: []string{"ec2"},
 			listMetrics: map[string][]cwtypes.Metric{
 				"AWS/EC2": {
@@ -55,7 +55,7 @@ func TestCollect_E2E(t *testing.T) {
 			},
 			gmd: map[string]float64{
 				e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"):    3.2,
-				e2eKey("AWS/EC2", "NetworkIn", "Sum", "InstanceId", "i-1"):             1500, // raw Sum, undivided in the store
+				e2eKey("AWS/EC2", "NetworkIn", "Sum", "InstanceId", "i-1"):             1500,
 				e2eKey("AWS/EC2", "NetworkOut", "Sum", "InstanceId", "i-1"):            900,
 				e2eKey("AWS/EC2", "DiskReadOps", "Sum", "InstanceId", "i-1"):           10,
 				e2eKey("AWS/EC2", "DiskWriteOps", "Sum", "InstanceId", "i-1"):          20,
@@ -63,10 +63,10 @@ func TestCollect_E2E(t *testing.T) {
 			},
 			wantSeries: map[string]metrix.SampleValue{
 				`ec2.cpu_utilization_average{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:     3.2,
-				`ec2.network_in_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:              1500,
-				`ec2.network_out_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:             900,
-				`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:           10,
-				`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:          20,
+				`ec2.network_in_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:              1500.0 / 300,
+				`ec2.network_out_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:             900.0 / 300,
+				`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:           10.0 / 300,
+				`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:          20.0 / 300,
 				`ec2.status_check_failed_maximum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`: 0,
 			},
 		},
@@ -107,9 +107,9 @@ func TestCollect_E2E(t *testing.T) {
 				e2eKey("AWS/Lambda", "Duration", "p90", "FunctionName", "fn-1"):     200,
 			},
 			wantSeries: map[string]metrix.SampleValue{
-				`lambda.invocations_sum{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:  100,
-				`lambda.errors_sum{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:       2,
-				`lambda.throttles_sum{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:    1,
+				`lambda.invocations_sum{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:  100.0 / 300,
+				`lambda.errors_sum{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:       2.0 / 300,
+				`lambda.throttles_sum{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:    1.0 / 300,
 				`lambda.duration_average{account_id="000000000000",function_name="fn-1",region="us-east-1"}`: 120.5,
 				`lambda.duration_maximum{account_id="000000000000",function_name="fn-1",region="us-east-1"}`: 350,
 				`lambda.duration_p90{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:     200,
@@ -151,7 +151,7 @@ func TestCollect_E2E(t *testing.T) {
 				e2eKey("AWS/ApplicationELB", "RequestCount", "Sum", "LoadBalancer", "app/lb2/bbb"): 70,
 			},
 			wantSeries: map[string]metrix.SampleValue{
-				`alb.request_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:             50,
+				`alb.request_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:             50.0 / 300,
 				`alb.active_connection_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:   0,
 				`alb.http_code_target_2xx_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:      0,
 				`alb.http_code_target_3xx_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:      0,
@@ -163,7 +163,7 @@ func TestCollect_E2E(t *testing.T) {
 				`alb.new_connection_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:      0,
 				`alb.processed_bytes_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:           0,
 				`alb.rejected_connection_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`: 0,
-				`alb.request_count_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:             70,
+				`alb.request_count_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:             70.0 / 300,
 				`alb.active_connection_count_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:   0,
 				`alb.http_code_target_2xx_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:      0,
 				`alb.http_code_target_3xx_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:      0,
@@ -191,9 +191,9 @@ func TestCollect_E2E(t *testing.T) {
 				// NetworkIn is absent -> no datapoint -> rate/sum metric -> recorded as 0.
 			},
 			wantSeries: map[string]metrix.SampleValue{
-				`ec2.network_out_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:             900,
-				`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:           10,
-				`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:          20,
+				`ec2.network_out_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:             900.0 / 300,
+				`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:           10.0 / 300,
+				`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:          20.0 / 300,
 				`ec2.status_check_failed_maximum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`: 0,
 				`ec2.network_in_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:              0,
 				// cpu_utilization_average (gauge, NaN) gaps; network_in_sum (rate, no data) records 0.
@@ -253,11 +253,11 @@ func (f *e2eCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetri
 	f.getCalls++
 	results := make([]cwtypes.MetricDataResult, 0, len(in.MetricDataQueries))
 	for _, q := range in.MetricDataQueries {
-		r := cwtypes.MetricDataResult{Id: q.Id}
+		r := cwtypes.MetricDataResult{Id: q.Id, StatusCode: cwtypes.StatusCodeComplete}
 		if q.MetricStat != nil {
 			if v, ok := f.values[e2eKeyFromMetricStat(q.MetricStat)]; ok {
 				r.Values = []float64{v}
-				r.Timestamps = []time.Time{f.ts}
+				r.Timestamps = []time.Time{aws.ToTime(in.EndTime).Add(-time.Duration(aws.ToInt32(q.MetricStat.Period)) * time.Second)}
 			}
 		}
 		results = append(results, r)

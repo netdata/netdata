@@ -10,7 +10,7 @@ not here.
 The one rule that shapes most of what follows:
 
 > `GetMetricData` is billed per query, so the collector queries each metric only
-> as often as its period and re-emits cached values in between — cost tracks the
+> when its next aligned effective-period window is eligible and re-emits cached values in between — cost tracks the
 > profiles you run, not how often Netdata collects.
 
 ## What It Does
@@ -37,7 +37,7 @@ charts under the `cloudwatch.` namespace.
 flowchart LR
     cfg("Config<br/>credentials · targets · ordered rules")
     disc("Discover<br/>ListMetrics<br/>cheap / free tier")
-    plan("Plan + schedule<br/>per target/region/period")
+    plan("Plan + state<br/>stable query + policy")
     query("Query<br/>GetMetricData<br/>billed — the cost driver")
     store("metrix store<br/>gauges + labels")
     charts("Dynamic charts<br/>cloudwatch.*")
@@ -61,10 +61,10 @@ Each collection cycle (`collect.go`), in order:
    (`plan.go`, `identity.go`);
 2. discover live instances per (target, profile, region) with `ListMetrics`
    (`discover.go`);
-3. reuse or rebuild the query blueprint, grouped by (target, region, period)
+3. reuse or rebuild the stable per-series query blueprint
    (`query_plan.go`);
 4. execute the due queries in concurrent batches (`query_executor.go`);
-5. write each value as a float gauge into `metrix`, stamped with
+5. apply per-query outcomes and write each retained value as a float gauge into `metrix`, stamped with
    `{account_id, region, <dimension labels>}`, and re-emit cached values for
    not-due series (`observe.go`);
 6. serve a chart template built once from the selected profiles (`chart.go`).
@@ -109,7 +109,7 @@ flowchart TD
 - **Collect** runs the whole cycle (below). `ensurePlan` short-circuits once
   compiled; `ensureTargets` retries only unresolved targets.
 - **Cleanup** resets the collection plan, resolved targets, cached template,
-  discovery/query snapshots, client caches, and observation schedule so a framework
+  discovery/query snapshots, client caches, and per-query observation state so a framework
   re-Init after failed autodetection starts clean. The `metrix` store is created
   once in `New` and persists — it is not recreated.
 - **ChartTemplateYAML** returns the cached string; no work at call time.
@@ -123,9 +123,9 @@ flowchart TD
     A("ensure collection plan + target account ids")
     B("refreshDiscovery<br/>shared ListMetrics scans per compatible target scope")
     C("currentQueryPlan<br/>cached until target/discovery/tag inputs change")
-    D("dueGroups + filterDueQueries<br/>keep only (target, region, period) groups due now")
+    D("dueQueries<br/>keep stable queries with a newer eligible window")
     E("executeQueries<br/>batched · concurrent GetMetricData")
-    F("advanceSchedule + observe<br/>write gauges · re-emit retained")
+    F("apply outcomes + emit<br/>write gauges · re-emit retained")
 
     A --> B --> C --> D --> E --> F
 
@@ -186,9 +186,9 @@ Discovery then finds which *instances* of those profiles exist per target and re
 (`discovery.refresh_every`, default 300s) has expired.
 
 - `discoveryGroups` coalesces compiled scopes by target, region, and namespace.
-  Each target/profile/region matcher first uses the union of its selected-series
-  periods; the shared namespace scan then takes the least restrictive result, so
-  one long-period participant disables PT3H instead of creating a redundant
+  Each target/profile/region matcher first evaluates the full horizons of its selected series;
+  the shared namespace scan then takes the least restrictive result, so
+  one long-horizon participant disables PT3H instead of creating a redundant
   filtered ListMetrics stream beside the unfiltered superset.
   `discoverAll` fans out over those groups concurrently
   (bounded by `apiConcurrency`), with one CloudWatch client per (target, region).
@@ -201,11 +201,16 @@ Discovery then finds which *instances* of those profiles exist per target and re
   additionally kept only when the metric's value for it equals that constant
   (`constantDimensionsHold`, fail-closed), so a constant dimension can never merge
   distinct instances onto one unlabeled series.
-- **Recently-active-only** is period-aware: the `ListMetrics RecentlyActive=PT3H`
+- **Recently-active-only** is horizon-aware: the `ListMetrics RecentlyActive=PT3H`
   filter is applied only when every selected series participating in the shared
-  target/region/namespace scan has a period ≤ 3h. PT3H is the only value CloudWatch
+  target/region/namespace scan has `publication_delay + lookback + period ≤ 3h`. PT3H is the only value CloudWatch
   accepts, so applying it to a daily profile (S3) would hide the metric most of
   the day. Configurable (`discovery.recently_active_only`, default true).
+- A job is limited to 64 unique `(target, region, namespace)` groups. Compatible
+  rules and profiles share one group. Larger valid installations split across
+  jobs. Each group is additionally bounded to 100 pages, 50,000 scanned metrics,
+  and 20,000 candidate profile instances; repeated pagination tokens fail the
+  whole group rather than truncating it.
 - **Snapshot + carry-forward**: `buildDiscoverySnapshot` stores instances for
   successful targets and **carries forward the previous instances for errored
   targets**, so a transient per-region/namespace failure never drops series.
@@ -238,46 +243,45 @@ Discovery then finds which *instances* of those profiles exist per target and re
   not planned metric
   queries. Overflow rejects the rebuilt plan atomically and leaves the previous
   immutable plan installed; there is no first-N truncation.
-- Queries are grouped by `queryGroupKey{target, region, period}` — the batch unit
-  (shared client and time window) and the scheduling unit.
-- The `observationStore` keeps a per-(target, region, period) `nextQueryAt`. `dueGroups`
-  returns groups whose next time has arrived (or the first cycle);
-  `filterDueQueries` drops the rest. So a period-86400 (S3 daily) group is
-  queried far less often than the 60s collect cycle, while a 300s group runs
-  every few cycles.
-- The schedule advances **only for groups queried successfully**
-  (`advanceSchedule`), so a failed region retries next cycle instead of skipping
-  a whole period.
+- Each `plannedQuery` contains a fully resolved `{period, lookback,
+  publication_delay}` policy. Resolution is field-by-field: rule, rule defaults,
+  profile metric/profile, then the built-in publication-delay fallback.
+- Its stable key includes execution target, region, structural AWS query, final
+  series identity, and effective policy. Rule name, scope order, request ID,
+  batch membership, and mutable tag labels are excluded. Equivalent rule-only
+  ownership transfers preserve state; target/query/identity/policy changes do not.
+- Completion is per stable query. A query is due when the aligned eligible window
+  end is newer than its last terminal completion. Adding a sibling query never
+  makes completed siblings due, and clock jumps query only the current rolling
+  window rather than backfilling missed buckets.
+- Query-plan construction atomically rejects more than 20,000 queries, 600,000
+  all-due datapoints, 40 all-due batches, or 1,440 buckets per query.
 
 ## Query Execution
 
-`query_executor.go`. `executeQueries`:
+`query_batch.go` + `query_executor.go` + `query_response.go`:
 
-- `indexPlan` groups the plan by (target, region, period); `resolveGroupClients`
-  builds one client per (target, region) up front (errors recorded once per pass).
-- `buildChunkJobs` computes the time window and splits each group into chunks of
-  `metricsPerQuery` (500, the `GetMetricData` per-call hard maximum), one job
-  per chunk. The chunk size is an explicit argument so tests can exercise the
-  split without 500+ queries.
-- `runChunkJobs` runs the chunk jobs concurrently (bounded by `apiConcurrency`,
-  each under `timeout`).
-- `runGetMetricData` calls `GetMetricData` with `ScanBy` descending (newest
-  first), follows `NextToken`, and keeps the **first value per query id** (the
-  newest). A per-result `InternalError` / `Forbidden` (or a missing result) marks
-  the query id **unusable**, so its series gaps rather than zero-filling; a usable
-  result with no datapoint (or `NaN` / `Inf`) is a clean no-data outcome that
-  `observe` resolves per the metric's `nil_as_zero` policy (0 or gap). `PartialData`
-  is normal pagination (followed via `NextToken`) and stays usable.
-- The **query window** is `[end-period, end]` where
-  `end = alignedNow - max(query_offset, period)`. Aligning to the period and
-  offsetting by at least one period guarantees the queried bucket is already
-  published and settled.
-- If every chunk errors, the whole pass errors; otherwise partial failures are
-  tolerated and their groups stay due.
+- Due queries are grouped deterministically by target, region, and exact policy.
+  The rolling window is `end = align_down(now - publication_delay, period)` and
+  `start = end - lookback`.
+- Batch width is `min(500, 30000 / bucket_count)`. Every request sets exact
+  `MaxDatapoints = queries_in_batch × bucket_count`; concurrency remains bounded
+  by `apiConcurrency`, with one configured timeout shared by the batch's pages.
+- Request IDs (`q0`, `q1`, …) exist only inside one batch. Pagination is bounded
+  to two calls. A page failure preserves siblings already marked `Complete`.
+- Values are paired with their timestamps; response/page order is not trusted.
+  The newest finite pair is eligible only when its full bucket lies inside the
+  window. `PartialData` may contribute a candidate but remains transient unless
+  a later result for that query is `Complete`.
+- `Complete` is terminal success. `Forbidden` is terminal authorization failure.
+  Client/request failure, `InternalError`, missing/unknown status, unresolved
+  `PartialData`, and pagination overflow are transient for only the affected
+  queries.
 
 ## Observation And Metrics
 
-`observe.go`. `observe` writes one snapshot frame per cycle:
+`observe.go` keeps per-query completion and retained raw CloudWatch values;
+`query_emit.go` writes one snapshot frame per cycle:
 
 - `meter := store.Write().SnapshotMeter("")`; each sample becomes
   `meter.WithLabels(labels...).Gauge(series, metrix.WithFloat(true)).Observe(v)`.
@@ -288,28 +292,26 @@ Discovery then finds which *instances* of those profiles exist per target and re
 - **Float is a metric-level hint.** `metrix.WithFloat(true)` marks the metric
   family float-native; `chartengine` inherits that onto the chart dimension, so
   fractional values render at full precision without a per-dimension
-  `options.float`. (Rate divisors, by contrast, *are* injected per dimension —
-  see Charts.)
+  `options.float`.
 - **Retention re-emit (sample-and-hold).** This decouples two cadences: the
-  **query cadence** is each metric's *period* (the paid `GetMetricData` calls,
-  gated by the schedule), while the **write cadence** is the collect loop
+  **query cadence** follows each series' aligned effective period, while the **write cadence** is the collect loop
   (`update_every`, free `metrix` writes). Netdata expects a value per dimension
   per collect cycle, so a series whose group was **not** queried this cycle (not
   due, or due-but-failed) is re-written from its last cached value — a long-period
   metric (e.g. daily S3) renders as a continuous step line instead of gaps, at no
-  extra AWS cost. (Exception: a total-failure cycle — every due query fails —
-  returns an error before `observe`, so nothing is written that cycle and the
-  schedule stays due for retry.) A series in a *successfully queried* group that returned no
-  datapoint is reconciled per the metric's no-data policy: metrics whose effective
-  policy is `nil_as_zero: true` record **0**; the rest **drop** the cached value so
-  the series gaps until fresh data, and a stale value is never re-emitted.
+  extra AWS cost. A successful rolling-window query keeps the newest eligible
+  datapoint while it remains inside `lookback`; once expired, `nil_as_zero` records
+  zero and other metrics gap.
   Without an explicit override, only `rate: true` metrics at `sum` or
   `sample_count` default to zero; every other statistic gaps. The cache otherwise
-  persists until the instance leaves discovery and `reconcilePlan` drops it.
-- `reconcilePlan` drops both cached series and per-(target, region, period) schedule entries
-  absent from the current plan when that immutable plan is rebuilt, so removed resources
-  stop being re-emitted and a group that later reappears is queried on its first cycle
-  back rather than waiting for a stale schedule entry to expire.
+  persists until a terminal success expires/replaces it or `reconcilePlan` drops
+  the stable key. Transient failures intentionally replay retained values beyond
+  lookback and remain due for retry. `Forbidden` clears the value and completes
+  only the attempted window.
+- Rate totals are cached raw and divided by the effective period during emission.
+  A total transient first-cycle failure with no retained frame returns an error;
+  the same failure with useful retained values replays them and returns success.
+  Parent cancellation aborts before state is advanced.
 
 ## Resource Tag Filtering And Labels (`tags.go`, `tag_fetch.go`, `tagjoin.go`, `tagresolve.go`)
 
@@ -354,13 +356,12 @@ refreshDiscovery → refreshTags → buildQueryPlan → … → observe
   effective; explicitly including one is a config error unless that rule disables or
   replaces the filter. Labels-only use remains best-effort for unsupported profiles.
 - **Emission split.** Identity `labels` (`{account_id, region, <dims>}`) and `tagLabels`
-  travel separately through `plannedQuery`/`querySample`/`observedSeries`. `writeSample`
-  emits `labels + tagLabels` in a fresh slice; `observedKey` (the retention/scheduling
-  identity) uses **identity labels only**, so a tag change never churns scheduling, and
-  retention re-emit carries the last-known `tagLabels`. `chartengine` `auto_intersection`
+  travel separately through `plannedQuery`. `writeSample`
+  emits `labels + tagLabels` in a fresh slice; the stable query key uses identity
+  labels but excludes tag labels, so a tag change never churns query state. `chartengine` `auto_intersection`
   then promotes the tag labels as non-identity chart labels — no template change.
-  A changed effective label set invalidates the plan once; observation reconciliation
-  updates retained tag labels and the normal numeric snapshot causes chartengine to
+  A changed effective label set invalidates the plan once; the current plan supplies
+  the new labels and the normal numeric snapshot causes chartengine to
   emit a label-only chart-definition update for an existing chart.
 
 ## Dynamic Charts
@@ -371,18 +372,14 @@ refreshDiscovery → refreshTags → buildQueryPlan → … → observe
 for each selected profile:
   group := profile.Template.Clone()          # typed deep copy; never mutate the catalog
   group.Metrics = sorted(visible series)     # collector-owned visible-series list
-  injectDimensionOptions(group, series)      # sets options.divisor = period on rate dims; keeps authored options
 assemble charttpl.Spec{Version, ContextNamespace: "cloudwatch", Groups}
 return spec.MarshalTemplate()                # Validate + yaml.v2 marshal, then cached
 ```
 
 - Uses the framework `charttpl` primitives: `Group.Clone()` (typed deep copy, so
   the shared profile catalog is never mutated) and `Spec.MarshalTemplate()`.
-- `selectorSeriesName` extracts a dimension selector's target metric with the
-  same `metrix/selector` library the chart engine matches with, so the injected
-  divisor always agrees with the engine.
-- `float` is not injected here (it is the metric-level hint above); only the
-  rate `divisor` is.
+- Rate divisors are not part of the chart template because rules can override
+  profile periods. Rate normalization happens on the emitted numeric value.
 
 ## Profiles (`cwprofiles/`)
 
@@ -409,12 +406,9 @@ Load and resolution (`catalog.go`):
   user profile **overrides** a stock profile with the same basename.
 - Invalid **stock** profiles are fatal; invalid **user** profiles are logged and
   skipped.
-- Decode is **non-strict** (unknown keys ignored), so a profile that merely *adds*
-  optional fields a newer collector understands still loads on an older binary —
-  but only while old validation still passes. It is not a blanket guarantee: a
-  profile that relies on a newer field to validate is rejected by an older binary
-  (e.g. a dimension using `constant` omits `label`, which an older binary still
-  requires).
+- Decode is **non-strict** (unknown keys ignored), matching collector job
+  decoding. Validation remains authoritative for supported typed profile fields
+  and their semantic invariants.
 - **Profile selection is rule-driven**, not discovery-driven. Omitting
   `rules[].profiles` includes every default-enabled profile. `defaults: false`
   with `include` selects only named profiles; `defaults: true` with `include`
@@ -493,8 +487,8 @@ The two CloudWatch APIs bill differently, and the design leans on that:
   result pages. Raise it only to cut API load on very large accounts.
 - **`GetMetricData` (query) is the cost driver** — it is always billed (~$0.01
   per 1,000 metrics requested) and scales with metric count × query frequency.
-- **Per-`(target, region, period)` scheduling is the governor** — a metric is queried
-  once per its own period (a 300s metric every 300s, a daily metric every ~24h),
+- **Per-query aligned-window completion is the governor** — a metric is queried
+  once per effective period (a 300s metric every aligned 300s window, a daily metric every ~24h),
   not every collect cycle, so cost tracks profile periods rather than
   `update_every`. Between queries, values are re-emitted from cache at zero AWS
   cost (see Observation And Metrics).
@@ -507,14 +501,14 @@ verify current per-region prices on the CloudWatch pricing page.)
 
 - **Instance identity = exact dimension-name match** — a metric joins a profile
   only if its dimension-name set equals the profile's exactly.
-- **Query window is a settled bucket** — offset by `max(query_offset, period)`
-  with period alignment.
+- **Query window is policy-driven** — `end = align_down(now - publication_delay,
+  period)` and `start = end - lookback`; the newest fully eligible finite bucket wins.
 - **No-data policy is per-metric** — a successfully-queried empty result records
   0 (`nil_as_zero`, defaulting on only for `rate: true` `sum`/`sample_count`) or
-  gaps. Not-due series and groups skipped by client/chunk transport failures
-  re-emit their last value; per-result `InternalError`, `Forbidden`, missing
-  results, and successful gap-policy no-data drop the stale value.
-- **Schedule advances only on success**, per (target, region, period).
+  gaps after a terminal successful window expires the retained datapoint.
+  Transient client/request/result failures retain and replay state; `Forbidden`
+  clears state and completes the attempted window.
+- **Completion advances per stable query**, never per batch or group.
 - **Fail-soft discovery** — carry forward on error; only a first-ever total
   failure is fatal.
 - **Job-level placement** — AWS resources are chart instances via `by_labels`.
@@ -527,10 +521,11 @@ verify current per-region prices on the CloudWatch pricing page.)
   existing chart but cannot change its identity or overwrite an identity label.
 - **Compiled configuration** — operator-facing credentials, targets, and ordered
   rules are validated and expanded once. Discovery, tag-label presentation,
-  `limits.max_instances`, `query_offset`, `timeout`, `vnode`, and the framework's
+  `limits.max_instances`, `timeout`, `vnode`, and the framework's
   common fields remain job-level settings.
-  Concurrency, batch size, and the recently-active period bound are internal
-  constants.
+  Concurrency and all AWS-work bounds are internal constants. Discovery is
+  limited to 64 unique `(target, region, namespace)` groups per job; compatible
+  rules/profiles share a group, and larger valid installations split across jobs.
 
 ## Where To Change Things
 
@@ -541,12 +536,18 @@ verify current per-region prices on the CloudWatch pricing page.)
   regenerate the integration docs.
 - **Change discovery** (matching, fan-out, snapshot/TTL, recently-active):
   `discover.go`.
-- **Change query batching, windows, pagination, or gap handling**:
-  `query_plan.go` (planning + window) and `query_executor.go` (execution).
-- **Change per-period scheduling or retention/re-emit**: `observe.go`.
-- **Change how samples become metrics** (labels, float hint, gauge): `observe.go`.
-- **Change chart generation** (rate divisor, namespace, template assembly):
-  `chart.go`, plus the profile `template`.
+- **Change query identity or plan expansion**: `query_plan.go`.
+- **Change timing-policy resolution or aligned windows**: `query_policy.go`.
+- **Change request packing and AWS work limits**: `query_batch.go` and
+  `limits.go`.
+- **Change result pagination, status handling, or datapoint selection**:
+  `query_response.go`.
+- **Change execution orchestration**: `query_executor.go`.
+- **Change scheduling, retention, correction, or gap state**: `observe.go`.
+- **Change how retained observations become metrics** (rate normalization,
+  labels, float hint): `query_emit.go`.
+- **Change chart generation** (namespace or template assembly): `chart.go`, plus
+  the profile `template`.
 - **Change auth**: `internal/awsauth` (collector-local; extract to a shared package only when a second AWS consumer appears).
 - **Add or change a config option**: `config.go` + `config_schema.json` +
   `metadata.yaml` + stock `cloudwatch.conf` + regenerated `integrations/` docs

@@ -266,7 +266,8 @@ func TestCollect_ResourceTagFilteringFromPublicConfig(t *testing.T) {
 	c.now = func() time.Time { return time.Unix(1_000_000_000, 0) }
 
 	require.NoError(t, c.Init(context.Background()))
-	require.NoError(t, c.Collect(context.Background()))
+	_, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
 	require.Len(t, c.plan.Scopes, 3)
 	assert.Equal(t, "environment", c.plan.Scopes[0].TagFilter[0].key, "omitted rule filter inherits the job default")
 	assert.Equal(t, "owner", c.plan.Scopes[1].TagFilter[0].key, "present rule filter replaces the job default")

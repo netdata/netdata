@@ -51,7 +51,6 @@ func New() *Collector {
 			UpdateEvery:        defaultUpdateEvery,
 			AutoDetectionRetry: defaultAutoDetectRetry,
 			Discovery:          DiscoveryConfig{RefreshEvery: defaultDiscoveryRefresh},
-			QueryOffset:        defaultQueryOffset,
 			Limits:             LimitsConfig{MaxInstances: defaultMaxInstances},
 			Timeout:            defaultTimeout,
 		},
@@ -86,17 +85,15 @@ type Collector struct {
 	resolvedByRef     map[string]resolvedTarget
 	chartTemplateYAML string
 
-	clients        *clientCache[cloudwatchClient] // one per (target, region)
-	rgtaClients    *clientCache[rgtaClient]       // one per (target, region)
-	discovery      discoverySnapshot
-	queryPlan      []plannedQuery
-	queryGroups    []queryGroupKey
-	queriesByGroup map[queryGroupKey][]plannedQuery
-	planDirty      bool
+	clients     *clientCache[cloudwatchClient] // one per (target, region)
+	rgtaClients *clientCache[rgtaClient]       // one per (target, region)
+	discovery   discoverySnapshot
+	queryPlan   []plannedQuery
+	planDirty   bool
 
 	discoverySig string // last-logged discovered-resources summary; Info re-logs only when it changes
 
-	observations *observationStore // retention cache + per-(target, region, period) query schedule
+	observations *observationStore // per-stable-query completion and retained values
 
 	tags          tagSnapshot              // resource-tag membership and label cache, refreshed with discovery
 	tagLabelPlans map[string][]resolvedTag // per-profile resolved tag->label plans (nil until compiled)
@@ -128,8 +125,6 @@ func (c *Collector) Cleanup(context.Context) {
 	c.chartTemplateYAML = ""
 	c.discovery = discoverySnapshot{}
 	c.queryPlan = nil
-	c.queryGroups = nil
-	c.queriesByGroup = nil
 	c.planDirty = true
 	c.discoverySig = ""
 	c.clients.reset()

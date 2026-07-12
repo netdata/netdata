@@ -42,7 +42,12 @@ rules:
       resource_tags:
         - key: environment
           values: [production, staging]
+    query:
+      publication_delay: 0s
 rule_defaults:
+  query:
+    period: 5m
+    lookback: 30m
   filters:
     resource_tags:
       - key: managed-by
@@ -56,5 +61,4 @@ limits:
 discovery:
   refresh_every: 123
   recently_active_only: true
-query_offset: 123
 timeout: 123.123

@@ -7,6 +7,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
 
@@ -111,12 +112,17 @@ func normalizedUniqueProfileNames(path string, values []string, known map[string
 func compileProfileSeries(profile cwprofiles.ResolvedProfile) []compiledSeries {
 	var series []compiledSeries
 	for metricIndex, metric := range profile.Config.Metrics {
-		period := profile.Config.EffectivePeriod(metric)
+		period := time.Duration(profile.Config.EffectivePeriod(metric)) * time.Second
+		delay := defaultPublicationDelay
+		if profile.Config.PublicationDelay != nil {
+			delay = profile.Config.PublicationDelay.Duration()
+		}
 		for _, statistic := range metric.Statistics {
 			token := cwprofiles.NormalizeStatistic(statistic)
 			series = append(series, compiledSeries{
 				Ordinal: len(series), MetricIndex: metricIndex, Statistic: token,
-				Name: cwprofiles.ExportedSeriesName(profile.Name, metric.ID, token), Period: period,
+				Name:   cwprofiles.ExportedSeriesName(profile.Name, metric.ID, token),
+				Policy: queryPolicy{period: period, lookback: period, publicationDelay: delay},
 			})
 		}
 	}

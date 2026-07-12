@@ -75,7 +75,7 @@ Replace `AWS/<Service>` with the service namespace (for example `AWS/AmazonMQ`) 
 :::
 
 
-The collector compiles named credential sources, monitored targets, and ordered collection rules into an immutable runtime plan. It discovers available metrics with one CloudWatch `ListMetrics` scan per target, region, and namespace, using the least restrictive recent-activity policy required by the participating selected series, then applies each profile's exact dimension matcher. Optional resource-tag predicates are resolved with the Resource Groups Tagging API before query expansion. It queries the selected metric series in `GetMetricData` batches. Each target resolves its AWS account id through `sts:GetCallerIdentity`; target names remain distinct execution identities even when they resolve to the same account. Rule order, then target order within each rule, resolves overlap: the first matching rule/target owns each overlapping exported metric/statistic series.
+The collector compiles named credential sources, monitored targets, and ordered collection rules into an immutable runtime plan. It discovers available metrics with one CloudWatch `ListMetrics` scan per target, region, and namespace, using the least restrictive recent-activity policy required by the participating selected series, then applies each profile's exact dimension matcher. Optional resource-tag predicates are resolved with the Resource Groups Tagging API before query expansion. Each selected series has a resolved query policy: aggregation period, rolling lookback, and publication delay. `GetMetricData` searches the aligned rolling window for the newest complete finite datapoint, while Netdata receives the retained numeric value on every collection cycle. Each target resolves its AWS account id through `sts:GetCallerIdentity`; target names remain distinct execution identities even when they resolve to the same account. Rule order, then target order within each rule, resolves overlap: the first matching rule/target owns each overlapping exported metric/statistic series.
 
 
 This collector is supported on all platforms.
@@ -95,14 +95,16 @@ A rule that omits `profiles` selects all default-enabled profiles for its target
 #### Limits
 
 - Minimum collection interval is 60 seconds (CloudWatch's minimum metric period).
-- CloudWatch publishes metrics with a delay; the effective query offset is `max(query_offset, period)`, so long-period metrics (such as the daily S3 storage metrics) are inherently about one period behind.
+- Query timing resolves field-by-field from `rules[].query`, `rule_defaults.query`, profile metric/profile values, and the built-in 10-minute publication delay. The stock daily S3 storage profile uses a one-day publication delay.
+- A successful sparse query can replay its newest eligible CloudWatch value for up to `lookback`. During transient AWS failures, the retained value can be replayed longer, until a successful query replaces or expires it.
 - `limits.max_instances` defaults to 1000 distinct final resource instances after tag filtering and overlap resolution. Exceeding it rejects the refreshed query plan; resources are never silently truncated.
+- Discovery is bounded to 64 unique `(target, region, namespace)` groups per job. Compatible rules and profiles share a group. Exceeding the fixed bound can indicate accidental expansion or a legitimate larger installation; split the configuration across jobs to preserve coverage while bounding each job's AWS work.
 - Resources are labeled by their identifying CloudWatch dimensions (for example EC2 `instance_id`). Selected resource tags can additionally be attached as non-identity labels via `labels.resource_tags`; changing those tags updates labels without changing chart identity. (A dimension that is constant across resources, such as CloudFront's `Region=Global`, is used to match and query metrics but is not turned into a label.)
 
 
 #### Performance Impact
 
-AWS bills CloudWatch API usage. `GetMetricData` (the metric queries) is the cost driver, billed per metric requested; `ListMetrics` discovery falls under the free tier and then costs a fraction as much. As a rough anchor, `GetMetricData` is billed at roughly $0.01 per 1,000 metrics requested -- confirm current [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) for your region. Each combination of target, instance, metric, and statistic is one billed query, run once per its own period (not once per collection cycle), so cost scales with selected targets, selected instances, metrics, statistics, and their periods -- not with `update_every`. The collector minimizes it with curated profiles, exact metric and resource-tag selection, exact dimension matching, single-statistic defaults, shared compatible discovery scans, cached discovery/query plans, and `recently_active_only`. To reduce cost further, narrow `rules[].targets`, `rules[].profiles`, `rules[].metrics`, `rules[].regions`, or configure resource tag filters.
+AWS bills CloudWatch API usage. `GetMetricData` (the metric queries) is the cost driver, billed per metric requested; `ListMetrics` discovery falls under the free tier and then costs a fraction as much. As a rough anchor, `GetMetricData` is billed at roughly $0.01 per 1,000 metrics requested -- confirm current [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) for your region. Each combination of target, instance, metric, and statistic is one billed query, run once per its effective query period (not once per collection cycle), so cost scales with selected targets, selected instances, metrics, statistics, periods, and lookback response work -- not with `update_every`. Longer lookbacks increase requested datapoints and can disable CloudWatch's three-hour recently-active discovery filter. The collector minimizes work with curated profiles, exact metric and resource-tag selection, exact dimension matching, single-statistic defaults, shared compatible discovery scans, cached discovery/query plans, and `recently_active_only`. To reduce cost further, narrow `rules[].targets`, `rules[].profiles`, `rules[].metrics`, `rules[].regions`, or configure resource tag filters.
 
 
 ## Setup
@@ -181,7 +183,6 @@ A user profile file with the same basename as a stock profile overrides it.
 |:------|:-----|:------------|:--------|:---------:|
 | **Collection** | update_every | Data collection interval (seconds). Must be at least 60 (CloudWatch's minimum period). | 60 | no |
 |  | autodetection_retry | Recheck interval (seconds) when the job fails to start. Default `0` means no retry; set a positive value to keep retrying. | 0 | no |
-|  | query_offset | Seconds subtracted from the current time when building query windows, to account for CloudWatch publish latency. The effective offset is `max(query_offset, period)`. | 600 | no |
 |  | timeout | Timeout for AWS API requests (seconds). | 30 | no |
 | **Authentication** | credentials | List of named credential sources. Every source has a `type` of `default` (AWS SDK default chain) or `static` (explicit access/session credentials in `type_static`). Credential sources are reusable by targets and every defined source must be used. |  | yes |
 |  | credentials[].name | Credential source name referenced by targets. |  | yes |
@@ -208,6 +209,14 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | rules[].metrics[].include[].name | Exact, case-sensitive AWS CloudWatch MetricName exported by the profile. |  | yes |
 |  | rules[].metrics[].include[].statistics | Optional non-empty replacement for the group statistics. Use `Average`, `Minimum`, `Maximum`, `Sum`, `SampleCount`, or `p<N>`; named statistics are case-insensitive. A metric with no replacement must inherit a group default. |  | no |
 |  | rules[].regions | Canonical lowercase AWS region codes selected by this rule. The compiler intersects them with intrinsic profile restrictions; for example, CloudFront supports only `us-east-1`. |  | yes |
+| **Query Policy** | rule_defaults.query | Shared query timing inherited field-by-field by collection rules. Omitted fields continue to profile or built-in fallbacks. |  | no |
+|  | rule_defaults.query.period | Default CloudWatch aggregation period from `1m` through `1d`, as an exact multiple of `1m`. An omitted rule period inherits this value before profile metric/profile periods. |  | no |
+|  | rule_defaults.query.lookback | Default rolling window searched for the newest eligible datapoint. It must be at least the effective period, an exact period multiple, and no more than 1,440 buckets. |  | no |
+|  | rule_defaults.query.publication_delay | Default wait after a bucket closes before it becomes eligible. Omission falls through to the profile value and then the built-in `10m` fallback. |  | no |
+|  | rules[].query | Optional query timing overrides for this rule. Each omitted field independently inherits `rule_defaults.query`, then the relevant profile or built-in fallback. |  | no |
+|  | rules[].query.period | CloudWatch aggregation period for every series selected by this rule. Rate metrics are normalized using this effective period. |  | no |
+|  | rules[].query.lookback | Rolling window searched for the newest complete finite datapoint. Successful queries may present the retained datapoint as current for up to this duration; longer lookbacks increase response work. |  | no |
+|  | rules[].query.publication_delay | Wait after a bucket closes before querying it. Explicit `0s` is allowed for metrics known to publish immediately. |  | no |
 | **Resource Filters** | rule_defaults.filters.resource_tags | Job-wide list of exact, case-sensitive AWS resource tag predicates inherited by rules that omit `rules[].filters.resource_tags`. All keys must match; any listed value for one key may match. The Resource Groups Tagging API performs the focused lookup and requires `tag:GetResources`. |  | no |
 |  | rule_defaults.filters.resource_tags[].key | Exact AWS resource tag key. A filter list supports at most 50 distinct keys. |  | yes |
 |  | rule_defaults.filters.resource_tags[].values | One to 20 exact, case-sensitive accepted values for this key. Values for one key are ORed. |  | yes |
@@ -219,7 +228,7 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | labels.resource_tags[].label | Optional Netdata label key. When omitted, the AWS key is normalized (`Name` becomes `name`). Use an explicit label to avoid invalid names or collisions with identity labels such as `region`. |  | no |
 | **Limits** | limits.max_instances | Maximum distinct final CloudWatch resource instances that emit at least one selected series after filtering and exported-series overlap resolution. Metric/statistic fan-out is not counted. Overflow rejects the refreshed plan; collection never truncates to the first N resources. | 1000 | no |
 | **Discovery** | discovery.refresh_every | How often (seconds) to re-discover metrics. Minimum 60. | 300 | no |
-|  | discovery.recently_active_only | Use CloudWatch's three-hour activity filter only when every selected series sharing a target, region, and namespace scan has a period of 3 hours or less. Any longer-period participant (such as daily S3 storage metrics) keeps the shared scan unfiltered. | yes | no |
+|  | discovery.recently_active_only | Use CloudWatch's three-hour activity filter only when every selected series sharing a target, region, and namespace scan has `publication_delay + lookback + period` of 3 hours or less. Any longer-horizon participant keeps the shared scan unfiltered. | yes | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
 
 
@@ -351,6 +360,10 @@ jobs:
             include:
               - name: DatabaseConnections
         regions: [us-east-1]
+        query:
+          period: 5m
+          lookback: 30m
+          publication_delay: 10m
 
 ```
 </details>
@@ -633,8 +646,18 @@ Check the following:
 
 CloudWatch publishes metrics with a delay.
 
-- The collector uses `query_offset` (default 600 seconds), and the effective offset is at least one full metric period.
-- If charts still have gaps, increase `query_offset`.
+- Keep `rules[].query.period` at or above the metric's real publication cadence. A shorter override increases billed query frequency but cannot make AWS publish more often, so it can create empty windows.
+- Set `rules[].query.publication_delay` when a workload publishes completed buckets later than its profile or the built-in `10m` fallback.
+- Set `rules[].query.lookback` to search a wider rolling window for sparse datapoints. It must be an exact multiple of the effective period.
+- A successful query presents its newest eligible datapoint on every Netdata collection cycle, so an old CloudWatch value can appear current for up to `lookback`. During transient AWS failures, replay can continue longer until a successful query replaces or expires it.
+- Longer lookbacks increase response work and may disable `recently_active_only` for the shared discovery scan.
+
+
+### Discovery group limit exceeded
+
+A discovery group is one unique `(target, region, namespace)` combination. Compatible rules and profiles share the same group. Each job is limited to 64 groups to bound `ListMetrics` work.
+
+This can result from accidental target/region/profile expansion or from a legitimate large installation. Split the configuration across multiple jobs; this preserves metric coverage while keeping each job within the fixed discovery-work boundary.
 
 
 ### Access denied or authentication errors

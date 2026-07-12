@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsregion"
@@ -30,7 +31,12 @@ type planCompiler struct {
 	staticOwners     map[compiledScopeKey]map[int]string
 	membershipIDs    map[compiledScopeKey]int
 	targetPartitions map[string]map[string]struct{}
+	discoveryGroups  map[discoveryGroupKey]struct{}
 	candidateChecks  int
+}
+
+type discoveryGroupKey struct {
+	target, region, namespace string
 }
 
 type compiledScopeKey struct {
@@ -80,6 +86,7 @@ func newPlanCompiler(cfg Config, catalog cwprofiles.Catalog) *planCompiler {
 		staticOwners:      make(map[compiledScopeKey]map[int]string),
 		membershipIDs:     make(map[compiledScopeKey]int),
 		targetPartitions:  make(map[string]map[string]struct{}),
+		discoveryGroups:   make(map[discoveryGroupKey]struct{}),
 	}
 }
 
@@ -153,6 +160,7 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 	type profileRegions struct {
 		profile cwprofiles.ResolvedProfile
 		regions []string
+		series  []compiledSeries
 	}
 	eligibleProfiles := make([]profileRegions, 0, len(profiles))
 	for _, profile := range profiles {
@@ -182,7 +190,11 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 				continue
 			}
 		}
-		eligibleProfiles = append(eligibleProfiles, profileRegions{profile: profile, regions: supported})
+		series, err := resolveSeriesPolicies(path, rule.Query, pc.cfg.RuleDefaults.Query, profile, selectedSeries[profile.Name])
+		if err != nil {
+			return diagnostics, err
+		}
+		eligibleProfiles = append(eligibleProfiles, profileRegions{profile: profile, regions: supported, series: series})
 	}
 	if len(eligibleProfiles) == 0 {
 		return diagnostics, fmt.Errorf("%s compiles to no collection scopes", path)
@@ -192,7 +204,7 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 		pc.usedTargets[target.Name] = struct{}{}
 		for _, selected := range eligibleProfiles {
 			for _, region := range selected.regions {
-				if err := pc.addScope(ruleName, target, selected.profile, region, tagFilters, filterKey, selectedSeries[selected.profile.Name], &diagnostics); err != nil {
+				if err := pc.addScope(path, ruleName, target, selected.profile, region, tagFilters, filterKey, selected.series, &diagnostics); err != nil {
 					return diagnostics, err
 				}
 			}
@@ -201,7 +213,7 @@ func (pc *planCompiler) compileRule(index int, rule RuleConfig) (ruleDiagnostics
 	return diagnostics, nil
 }
 
-func (pc *planCompiler) addScope(ruleName string, target *collectionTarget, profile cwprofiles.ResolvedProfile, region string, tagFilters []resourceTagFilter, filterKey string, selectedSeries []compiledSeries, diagnostics *ruleDiagnostics) error {
+func (pc *planCompiler) addScope(path, ruleName string, target *collectionTarget, profile cwprofiles.ResolvedProfile, region string, tagFilters []resourceTagFilter, filterKey string, selectedSeries []compiledSeries, diagnostics *ruleDiagnostics) error {
 	key := compiledScopeKey{target: target.Name, profile: profile.Name, region: region, filter: filterKey}
 	owners := pc.staticOwners[key]
 	if owners == nil {
@@ -222,6 +234,13 @@ func (pc *planCompiler) addScope(ruleName string, target *collectionTarget, prof
 	}
 	if len(unshadowed) == 0 {
 		return nil
+	}
+	discoveryKey := discoveryGroupKey{target: target.Name, region: region, namespace: profile.Config.Namespace}
+	if _, ok := pc.discoveryGroups[discoveryKey]; !ok {
+		if len(pc.discoveryGroups) == maxDiscoveryGroups {
+			return fmt.Errorf("%s derives %d discovery groups (unique target, region, namespace combinations); maximum is %d; split the collection across multiple jobs", path, len(pc.discoveryGroups)+1, maxDiscoveryGroups)
+		}
+		pc.discoveryGroups[discoveryKey] = struct{}{}
 	}
 	if len(pc.plan.Scopes) == maxCompiledScopes {
 		return fmt.Errorf("compiled collection scopes exceed maximum %d", maxCompiledScopes)
@@ -244,6 +263,20 @@ func (pc *planCompiler) addScope(ruleName string, target *collectionTarget, prof
 	}
 	pc.targetPartitions[target.Name][awsregion.Partition(region)] = struct{}{}
 	return nil
+}
+
+func resolveSeriesPolicies(path string, rule, defaults *QueryPolicyConfig, profile cwprofiles.ResolvedProfile, series []compiledSeries) ([]compiledSeries, error) {
+	out := make([]compiledSeries, len(series))
+	for i, item := range series {
+		metric := profile.Config.Metrics[item.MetricIndex]
+		policy, err := resolveQueryPolicy(path, rule, defaults, int(item.Policy.period/time.Second), profile.Config.PublicationDelay)
+		if err != nil {
+			return nil, fmt.Errorf("%s profile %q MetricName %q statistic %q: %w", path, profile.Name, metric.MetricName, item.Statistic, err)
+		}
+		item.Policy = policy
+		out[i] = item
+	}
+	return out, nil
 }
 
 func (pc *planCompiler) resolveTagJoin(profile cwprofiles.ResolvedProfile) (*tagJoin, error) {

@@ -2,7 +2,10 @@
 
 package cloudwatch
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 func (c *Collector) collect(ctx context.Context) error {
 	if err := c.ensurePlan(); err != nil {
@@ -22,13 +25,8 @@ func (c *Collector) collect(ctx context.Context) error {
 	}
 
 	now := c.now()
-	due := c.observations.dueGroups(c.queryGroups, now)
-
-	dueQueries := filterDueQueries(c.queryGroups, c.queriesByGroup, due)
-	samples, noData, failed, err := c.executeQueries(ctx, dueQueries, now)
-	if err != nil {
-		return err
-	}
+	due := c.observations.dueQueries(plan, now)
+	execution := c.executeQueries(ctx, due, now)
 	// If the parent context was canceled or timed out during discovery/query, abort
 	// the cycle instead of committing a partial/stale frame. A per-call GetMetricData
 	// timeout uses a derived context, so it does not trip this and stays fail-soft.
@@ -36,19 +34,13 @@ func (c *Collector) collect(ctx context.Context) error {
 		return err
 	}
 
-	// A (target, region, period) group is "queried" only if it was due AND nothing failed
-	// for it. Advance the schedule only for those; the rest (not due, or
-	// due-but-failed) re-emit their cached values and remain due for retry.
-	queried := make(map[queryGroupKey]bool, len(due))
-	for key := range due {
-		if !failed[key] {
-			queried[key] = true
-		}
-	}
-	c.observations.advanceSchedule(queried, now)
-	c.observations.observe(dueQueries, samples, noData, queried)
+	c.observations.applyOutcomes(due, execution.outcomes)
+	written := c.observations.emit(plan)
 
-	c.Debugf("CloudWatch collect: %d planned quer(y/ies), %d group(s) due, %d sample(s), %d group(s) failed this cycle",
-		len(plan), len(due), len(samples), len(failed))
+	c.Debugf("CloudWatch collect: %d planned quer(y/ies), %d due, %d terminal outcome(s), %d transient outcome(s), %d emitted sample(s)",
+		len(plan), len(due), execution.terminal, execution.transient, written)
+	if len(due) > 0 && execution.terminal == 0 && execution.transient == len(due) && written == 0 {
+		return errors.New("all due CloudWatch queries failed transiently and no retained observations are available")
+	}
 	return nil
 }

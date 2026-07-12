@@ -15,7 +15,6 @@ const (
 	defaultUpdateEvery      = 60
 	defaultAutoDetectRetry  = 0
 	defaultDiscoveryRefresh = 300
-	defaultQueryOffset      = 600
 	defaultMaxInstances     = 1000
 	defaultTimeout          = confopt.Duration(30 * time.Second)
 )
@@ -40,7 +39,6 @@ type Config struct {
 	Labels             LabelsConfig             `yaml:"labels,omitempty" json:"labels"`
 	Limits             LimitsConfig             `yaml:"limits,omitempty" json:"limits"`
 	Discovery          DiscoveryConfig          `yaml:"discovery" json:"discovery"`
-	QueryOffset        int                      `yaml:"query_offset,omitempty" json:"query_offset"`
 	Timeout            confopt.Duration         `yaml:"timeout,omitempty" json:"timeout"`
 }
 
@@ -63,6 +61,7 @@ type RuleConfig struct {
 	Metrics  []ProfileMetricSelectorConfig `yaml:"metrics,omitempty" json:"metrics,omitempty"`
 	Regions  []string                      `yaml:"regions" json:"regions"`
 	Filters  *RuleFiltersConfig            `yaml:"filters,omitempty" json:"filters,omitempty"`
+	Query    *QueryPolicyConfig            `yaml:"query,omitempty" json:"query,omitempty"`
 }
 
 type ProfileSelectorConfig struct {
@@ -88,6 +87,16 @@ type MetricSelectionConfig struct {
 
 type RuleDefaultsConfig struct {
 	Filters RuleDefaultFiltersConfig `yaml:"filters,omitempty" json:"filters"`
+	Query   *QueryPolicyConfig       `yaml:"query,omitempty" json:"query,omitempty"`
+}
+
+// QueryPolicyConfig overrides CloudWatch query timing for a collection rule.
+// Pointers preserve omission so rule values can inherit rule_defaults and
+// profile values without sentinel durations.
+type QueryPolicyConfig struct {
+	Period           *confopt.LongDuration `yaml:"period,omitempty" json:"period,omitempty"`
+	Lookback         *confopt.LongDuration `yaml:"lookback,omitempty" json:"lookback,omitempty"`
+	PublicationDelay *confopt.LongDuration `yaml:"publication_delay,omitempty" json:"publication_delay,omitempty"`
 }
 
 type RuleDefaultFiltersConfig struct {
@@ -122,9 +131,9 @@ type LimitsConfig struct {
 
 type DiscoveryConfig struct {
 	RefreshEvery int `yaml:"refresh_every,omitempty" json:"refresh_every"`
-	// RecentlyActiveOnly is period-aware: when enabled, ListMetrics uses
-	// RecentlyActive=PT3H only when every series selected for one profile matcher
-	// has a period <= 3h. It is a pointer so the (true) default can be
+	// RecentlyActiveOnly is horizon-aware: when enabled, ListMetrics uses
+	// RecentlyActive=PT3H only when every selected series has publication delay,
+	// lookback, and period totaling no more than 3h. It is a pointer so the true default can be
 	// distinguished from an explicit false.
 	RecentlyActiveOnly *bool `yaml:"recently_active_only,omitempty" json:"recently_active_only,omitempty"`
 }
@@ -143,9 +152,6 @@ func (c *Config) applyDefaults() {
 		v := true
 		c.Discovery.RecentlyActiveOnly = &v
 	}
-	if c.QueryOffset <= 0 {
-		c.QueryOffset = defaultQueryOffset
-	}
 	if c.Limits.MaxInstances == 0 {
 		c.Limits.MaxInstances = defaultMaxInstances
 	}
@@ -162,9 +168,6 @@ func (c Config) validate() error {
 	}
 	if c.Discovery.RefreshEvery < 60 {
 		errs = append(errs, errors.New("'discovery.refresh_every' must be >= 60 seconds"))
-	}
-	if c.QueryOffset < 0 {
-		errs = append(errs, errors.New("'query_offset' cannot be negative"))
 	}
 	if c.Timeout.Duration() < 0 {
 		errs = append(errs, errors.New("'timeout' cannot be negative"))

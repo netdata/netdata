@@ -4,12 +4,19 @@ package cwprofiles
 
 import (
 	"testing"
+	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func profileDuration(value time.Duration) *confopt.LongDuration {
+	v := confopt.LongDuration(value)
+	return &v
+}
 
 // validProfile returns a minimal valid EC2-shaped profile with shorthand
 // selectors (as authored in stock YAML, before Normalize).
@@ -86,6 +93,19 @@ func TestProfile_Validate(t *testing.T) {
 			mutate:      func(p *Profile) { p.Period = 0 },
 			wantErr:     true,
 			errContains: "period",
+		},
+		"publication delay zero": {
+			mutate: func(p *Profile) { p.PublicationDelay = profileDuration(0) },
+		},
+		"publication delay negative": {
+			mutate:      func(p *Profile) { p.PublicationDelay = profileDuration(-time.Second) },
+			wantErr:     true,
+			errContains: "publication_delay",
+		},
+		"publication delay subsecond": {
+			mutate:      func(p *Profile) { p.PublicationDelay = profileDuration(time.Second + time.Millisecond) },
+			wantErr:     true,
+			errContains: "whole seconds",
 		},
 		"supported regions valid": {
 			mutate: func(p *Profile) { p.SupportedRegions = []string{"us-east-1", "eu-west-1"} },

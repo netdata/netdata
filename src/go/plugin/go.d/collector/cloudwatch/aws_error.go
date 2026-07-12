@@ -11,6 +11,14 @@ import (
 
 const maxFailureLogSamples = 4
 
+type safeCollectorError string
+
+func (e safeCollectorError) Error() string { return string(e) }
+
+func safeCollectorErrorf(format string, args ...any) error {
+	return safeCollectorError(fmt.Sprintf(format, args...))
+}
+
 type sanitizedAWSError struct {
 	description string
 	cause       error
@@ -24,6 +32,9 @@ func (e sanitizedAWSError) Unwrap() error { return e.cause }
 func sanitizeAWSError(err error) error {
 	if err == nil {
 		return nil
+	}
+	if safe, ok := errors.AsType[safeCollectorError](err); ok {
+		return safe
 	}
 	switch {
 	case errors.Is(err, context.DeadlineExceeded):
