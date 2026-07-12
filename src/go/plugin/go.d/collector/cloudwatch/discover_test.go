@@ -1111,22 +1111,11 @@ func TestCollector_refreshDiscovery_ParentCancellationAfterSnapshotBuildDoesNotA
 
 	t.Run("cancellation wins over merged snapshot overflow", func(t *testing.T) {
 		now := base
-		var cancel context.CancelFunc
-		cancelOnDiscard := false
-		nowCallsAfterArm := 0
 		c, fakes := newDiscoveryTestCollector(map[string]map[string][]cwtypes.Metric{
 			"us-east-1": {"AWS/EC2": discoveryTestMetrics("east-initial", maxCandidateInstancesPerRefresh/2)},
 			"us-west-2": {"AWS/EC2": discoveryTestMetrics("west-initial", maxCandidateInstancesPerRefresh/2)},
 		})
-		c.now = func() time.Time {
-			if cancelOnDiscard {
-				nowCallsAfterArm++
-				if nowCallsAfterArm == 2 {
-					cancel()
-				}
-			}
-			return now
-		}
+		c.now = func() time.Time { return now }
 		require.NoError(t, c.refreshDiscovery(context.Background()))
 		require.Equal(t, maxCandidateInstancesPerRefresh, c.discovery.totalInstances())
 		initialFetchedAt := c.discovery.FetchedAt
@@ -1137,17 +1126,35 @@ func TestCollector_refreshDiscovery_ParentCancellationAfterSnapshotBuildDoesNotA
 		fakes["us-west-2"].err = errors.New("throttled")
 		ctx, cancelParent := context.WithCancel(context.Background())
 		defer cancelParent()
-		cancel = cancelParent
-		cancelOnDiscard = true
+		c.Logger = logger.NewWithWriter(&cancelingWriter{cancel: cancelParent})
 
-		// The first armed clock read starts this refresh; the second is the discard
-		// scheduler's state boundary after merged-snapshot validation fails.
+		// Aggregate diagnostics cancel the real parent after merged validation and
+		// immediately before retry scheduling.
 		err := c.refreshDiscovery(ctx)
 
 		assert.ErrorIs(t, err, context.Canceled)
 		assert.Equal(t, initialExpiresAt, c.discovery.ExpiresAt, "cancellation must beat aggregate discard scheduling")
 		assert.Equal(t, initialFetchedAt, c.discovery.FetchedAt)
 		assert.Equal(t, maxCandidateInstancesPerRefresh, c.discovery.totalInstances())
+	})
+
+	t.Run("cancellation wins over first-pass all-group failure", func(t *testing.T) {
+		c := New()
+		configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
+		setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))})
+		c.now = func() time.Time { return base }
+		c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) {
+			return aws.Config{}, errors.New("no credentials")
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		c.Logger = logger.NewWithWriter(&cancelingWriter{cancel: cancel})
+
+		err := c.refreshDiscovery(ctx)
+
+		assert.ErrorIs(t, err, context.Canceled)
+		assert.True(t, c.discovery.FetchedAt.IsZero())
+		assert.True(t, c.discovery.ExpiresAt.IsZero())
 	})
 
 	t.Run("cancellation wins at successful commit boundary", func(t *testing.T) {
@@ -1161,6 +1168,7 @@ func TestCollector_refreshDiscovery_ParentCancellationAfterSnapshotBuildDoesNotA
 		key := discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}
 		initialFetchedAt := c.discovery.FetchedAt
 		initialExpiresAt := c.discovery.ExpiresAt
+		initialSig := c.discoverySig
 
 		now = base.Add(301 * time.Second)
 		fakes["us-east-1"].byNS["AWS/EC2"] = []cwtypes.Metric{mkMetric("CPUUtilization", "InstanceId", "east-new")}
@@ -1176,6 +1184,7 @@ func TestCollector_refreshDiscovery_ParentCancellationAfterSnapshotBuildDoesNotA
 		assert.ErrorIs(t, err, context.Canceled)
 		assert.Equal(t, initialExpiresAt, c.discovery.ExpiresAt)
 		assert.Equal(t, initialFetchedAt, c.discovery.FetchedAt)
+		assert.Equal(t, initialSig, c.discoverySig)
 		assert.Equal(t, [][]string{{"east-old"}}, dimValues(c.discovery.Instances[key]))
 	})
 }

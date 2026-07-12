@@ -475,20 +475,6 @@ func (c *Collector) markDiscoveryStale() {
 	c.discovery.ExpiresAt = time.Time{}
 }
 
-func (c *Collector) discardDiscoveryRefresh(ctx context.Context, err error) error {
-	completedAt := c.now()
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		return ctxErr
-	}
-	c.Limit(logKeyDiscoveryGroupFailed+"_aggregate", 1, recurringLogEvery).
-		Warningf("CloudWatch discovery refresh was discarded atomically: %v", sanitizeAWSError(err))
-	if c.discovery.FetchedAt.IsZero() {
-		return fmt.Errorf("CloudWatch discovery refresh failed: %w", sanitizeAWSError(err))
-	}
-	c.discovery.ExpiresAt = completedAt.Add(time.Duration(c.Discovery.RefreshEvery) * time.Second)
-	return nil
-}
-
 // refreshDiscovery refreshes the discovery snapshot when its TTL has expired.
 // Per-group failures are logged and tolerated; an aggregate failure keeps the
 // previous snapshot, or errors on the very first pass when there is none.
@@ -510,86 +496,55 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	var (
+		disposition discoveryDisposition
+		diagnostics discoveryDiagnostics
+	)
 	if aggregateErr != nil {
-		return c.discardDiscoveryRefresh(ctx, aggregateErr)
-	}
-	// Failed discovery groups carry forward their previous instances, so a
-	// transient target/region/namespace failure does not drop series.
-	snap, failedGroups, err := buildDiscoverySnapshot(results, c.discovery.Instances, now, c.Discovery.RefreshEvery)
-	// Snapshot merging and retained-bound validation happen after fan-out. Parent
-	// cancellation during that work must win over both discard scheduling and commit.
-	if ctxErr := ctx.Err(); ctxErr != nil {
-		return ctxErr
-	}
-	if err != nil {
-		return c.discardDiscoveryRefresh(ctx, err)
-	}
+		diagnostics.aggregateFailure = aggregateErr
+		disposition = c.aggregateFailureDisposition(aggregateErr)
+	} else {
+		// Failed discovery groups carry forward their previous instances, so a
+		// transient target/region/namespace failure does not drop series.
+		snap, failedGroups, err := buildDiscoverySnapshot(results, c.discovery.Instances, now, c.Discovery.RefreshEvery)
+		// Snapshot merging and retained-bound validation happen after fan-out. This
+		// early check avoids diagnostics work; applyDiscoveryDisposition remains the
+		// correctness boundary for every terminal outcome.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+		if err != nil {
+			diagnostics.aggregateFailure = err
+			disposition = c.aggregateFailureDisposition(err)
+		} else {
+			for _, result := range results {
+				if result.Err != nil {
+					diagnostics.groupFailures = append(diagnostics.groupFailures, operationFailure{
+						Target: result.Group.Target, Region: result.Group.Region,
+						Scope: fmt.Sprintf("namespace %q", result.Group.Namespace), Err: result.Err,
+					})
+				}
+			}
 
-	var failures []operationFailure
-	for _, result := range results {
-		if result.Err != nil {
-			failures = append(failures, operationFailure{
-				Target: result.Group.Target, Region: result.Group.Region,
-				Scope: fmt.Sprintf("namespace %q", result.Group.Namespace), Err: result.Err,
-			})
+			// An empty successful group is not a failure; with shared regions across
+			// many targets, empty successes are expected.
+			if c.discovery.FetchedAt.IsZero() && len(results) > 0 && failedGroups == len(results) {
+				disposition = discoveryDisposition{
+					kind: discoveryDispositionFail,
+					err:  fmt.Errorf("CloudWatch discovery failed for all %d target/region/namespace groups", len(results)),
+				}
+			} else {
+				report := newDiscoveryReport(snap, c.discoverySig)
+				diagnostics.report = &report
+				disposition = discoveryDisposition{
+					kind: discoveryDispositionInstall, snapshot: snap, discoverySig: report.sig,
+				}
+			}
 		}
 	}
-	c.warnOperationFailures(logKeyDiscoveryGroupFailed, "discovery", " (using last-known instances)", failures)
 
-	// Only a first-ever pass where EVERY discovery group errored is fatal. An
-	// empty but successful group is not a failure —
-	// with shared regions across many targets, empty successes are expected — and
-	// any carried-forward snapshot keeps the collector running.
-	if c.discovery.FetchedAt.IsZero() && len(results) > 0 && failedGroups == len(results) {
-		return fmt.Errorf("CloudWatch discovery failed for all %d target/region/namespace groups", len(results))
-	}
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	c.discovery = snap
-	c.invalidateTagFetchPlan()
-	c.markTagsStale()
-	c.invalidateQueryPlan()
-	c.logDiscovery(snap)
-
-	if n := snap.totalInstances(); n >= highInstanceCountWarn {
-		c.Limit(logKeyHighInstanceCount, 1, recurringLogEvery).
-			Warningf("CloudWatch discovered %d instances; this scales GetMetricData cost — narrow collection rules if this is unexpected", n)
-	}
-	return nil
-}
-
-// logDiscovery reports the discovered-resources summary: at Info when it changes
-// (first discovery, or a per-service count change) so operators can see what the
-// collector found, and the full per-(target, profile, region) breakdown at Debug every refresh.
-func (c *Collector) logDiscovery(snap discoverySnapshot) {
-	byProfile := make(map[string]int)
-	for k, insts := range snap.Instances {
-		byProfile[k.Profile] += len(insts)
-	}
-	names := make([]string, 0, len(byProfile))
-	for name := range byProfile {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	var b strings.Builder
-	for i, name := range names {
-		if i > 0 {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(&b, "%s=%d", name, byProfile[name])
-	}
-	summary := b.String()
-
-	c.Debugf("CloudWatch discovery: %d instance(s) across %d (target, profile, region) scope(s): %s",
-		snap.totalInstances(), len(snap.Instances), summary)
-
-	if sig := fmt.Sprintf("%d|%s", snap.totalInstances(), summary); sig != c.discoverySig {
-		c.discoverySig = sig
-		c.Infof("CloudWatch discovered %d instance(s): %s", snap.totalInstances(), summary)
-	}
+	c.emitDiscoveryDiagnostics(diagnostics)
+	return c.applyDiscoveryDisposition(ctx, disposition)
 }
 
 func (c *Collector) discoveryGroups() []discoveryGroup {

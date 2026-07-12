@@ -241,6 +241,12 @@ Discovery then finds which *instances* of those profiles exist per target and re
   attempt scheduled after `discovery.refresh_every`. A first-ever aggregate failure
   is returned to the job runner; parent cancellation changes neither snapshot state
   nor retry scheduling.
+- **One terminal disposition gate owns cancellation precedence**: refresh work computes
+  exactly one install, retry-schedule, or first-pass-error outcome and prepares all
+  diagnostics without mutating discovery state. Diagnostics run first; one final parent
+  cancellation check then immediately applies or returns the outcome with no logging,
+  clock read, or callback between the gate and disposition. Earlier checks only avoid
+  unnecessary local work.
 - A warning fires at ≥1000 discovered instances as an early cost signal. The
   separate final-instance limit is applied later, after tag filtering and overlap.
 
@@ -588,9 +594,10 @@ per-region prices on the CloudWatch pricing page.)
   metrics, chart template). A new service that fits the profile model needs no
   Go change. Add a matching `metadata.yaml` monitored-instance entry and
   regenerate the integration docs.
-- **Change discovery** (matching, fan-out, snapshot/TTL, recently-active):
-  `discover.go`; aggregate admission, stage timeout, and authorization lanes are
-  in `discovery_budget.go`.
+- **Change discovery**: matching, fan-out, snapshot assembly/TTL, and recently-active
+  policy are in `discover.go`; terminal diagnostics and install/retry/fail application
+  are in `discovery_disposition.go`; aggregate admission, stage timeout, and
+  authorization lanes are in `discovery_budget.go`.
 - **Change query identity or plan expansion**: `structural_id.go` and
   `query_plan.go`.
 - **Change timing-policy resolution or aligned windows**: `query_policy.go`.
