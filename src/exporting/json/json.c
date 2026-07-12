@@ -130,6 +130,47 @@ int format_host_labels_json_plaintext(struct instance *instance, RRDHOST *host)
     return 0;
 }
 
+static void format_dimension_json_plaintext_prefix(
+    BUFFER *wb,
+    const char *prefix,
+    const char *hostname,
+    const char *labels,
+    const char *chart_id,
+    const char *chart_name,
+    const char *chart_family,
+    const char *chart_context,
+    const char *chart_type,
+    const char *units,
+    const char *dimension_id,
+    const char *dimension_name,
+    bool stored) {
+    buffer_strcat(wb, "{\"prefix\":\"");
+    buffer_json_strcat(wb, prefix);
+    buffer_strcat(wb, "\",\"hostname\":\"");
+    buffer_json_strcat(wb, hostname);
+    buffer_strcat(wb, "\",");
+    buffer_strcat(wb, labels);
+
+    buffer_strcat(wb, "\"chart_id\":\"");
+    buffer_json_strcat(wb, chart_id);
+    buffer_strcat(wb, "\",\"chart_name\":\"");
+    buffer_json_strcat(wb, chart_name);
+    buffer_strcat(wb, "\",\"chart_family\":\"");
+    buffer_json_strcat(wb, chart_family);
+    buffer_strcat(wb, stored ? "\",\"chart_context\": \"" : "\",\"chart_context\":\"");
+    buffer_json_strcat(wb, chart_context);
+    buffer_strcat(wb, "\",\"chart_type\":\"");
+    buffer_json_strcat(wb, chart_type);
+    buffer_strcat(wb, stored ? "\",\"units\": \"" : "\",\"units\":\"");
+    buffer_json_strcat(wb, units);
+
+    buffer_strcat(wb, "\",\"id\":\"");
+    buffer_json_strcat(wb, dimension_id);
+    buffer_strcat(wb, "\",\"name\":\"");
+    buffer_json_strcat(wb, dimension_name);
+    buffer_strcat(wb, "\",\"value\":");
+}
+
 /**
  * Format dimension using collected data for JSON connector
  *
@@ -147,29 +188,11 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         buffer_strcat(instance->buffer, ",\n");
     }
 
-    buffer_sprintf(
+    format_dimension_json_plaintext_prefix(
         instance->buffer,
-
-        "{"
-        "\"prefix\":\"%s\","
-        "\"hostname\":\"%s\","
-        "%s"
-
-        "\"chart_id\":\"%s\","
-        "\"chart_name\":\"%s\","
-        "\"chart_family\":\"%s\","
-        "\"chart_context\":\"%s\","
-        "\"chart_type\":\"%s\","
-        "\"units\":\"%s\","
-
-        "\"id\":\"%s\","
-        "\"name\":\"%s\","
-        "\"value\":",
-
         instance->config.prefix,
         (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "",
-
         rrdset_id(st),
         rrdset_name(st),
         rrdset_family(st),
@@ -177,7 +200,8 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         rrdset_parts_type(st),
         rrdset_units(st),
         rrddim_id(rd),
-        rrddim_name(rd));
+        rrddim_name(rd),
+        false);
 
     if(rrddim_is_float(rd))
         buffer_sprintf(instance->buffer, NETDATA_DOUBLE_FORMAT, rrddim_last_collected_as_double(rd));
@@ -217,30 +241,11 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
             buffer_strcat(instance->buffer, ",\n");
     }
 
-    buffer_sprintf(
+    format_dimension_json_plaintext_prefix(
         instance->buffer,
-        "{"
-        "\"prefix\":\"%s\","
-        "\"hostname\":\"%s\","
-        "%s"
-
-        "\"chart_id\":\"%s\","
-        "\"chart_name\":\"%s\","
-        "\"chart_family\":\"%s\","
-        "\"chart_context\": \"%s\","
-        "\"chart_type\":\"%s\","
-        "\"units\": \"%s\","
-
-        "\"id\":\"%s\","
-        "\"name\":\"%s\","
-        "\"value\":" NETDATA_DOUBLE_FORMAT ","
-
-        "\"timestamp\": %llu}",
-
         instance->config.prefix,
         (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "",
-
         rrdset_id(st),
         rrdset_name(st),
         rrdset_family(st),
@@ -249,8 +254,12 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
         rrdset_units(st),
         rrddim_id(rd),
         rrddim_name(rd),
-        value,
+        true);
 
+    buffer_sprintf(
+        instance->buffer,
+        NETDATA_DOUBLE_FORMAT ",\"timestamp\": %llu}",
+        value,
         (unsigned long long)last_t);
 
     if (instance->config.type != EXPORTING_CONNECTOR_TYPE_JSON_HTTP) {
@@ -311,4 +320,115 @@ void json_http_prepare_header(struct instance *instance)
         (unsigned long int) buffer_strlen(simple_connector_data->last_buffer->buffer));
 
     return;
+}
+
+static int json_plaintext_unittest_case(
+    const char *description,
+    bool stored,
+    const char *prefix,
+    const char *hostname,
+    const char *chart_id,
+    const char *chart_name,
+    const char *chart_family,
+    const char *chart_context,
+    const char *chart_type,
+    const char *units,
+    const char *dimension_id,
+    const char *dimension_name,
+    const char *expected) {
+    BUFFER *wb = buffer_create(0, NULL);
+    format_dimension_json_plaintext_prefix(
+        wb,
+        prefix,
+        hostname,
+        "\"labels\":{\"label\":\"value\"},",
+        chart_id,
+        chart_name,
+        chart_family,
+        chart_context,
+        chart_type,
+        units,
+        dimension_id,
+        dimension_name,
+        stored);
+    buffer_strcat(wb, stored ? "1.5,\"timestamp\": 42}" : "1.5,\"timestamp\":42}");
+
+    int errors = 0;
+    if(strcmp(buffer_tostring(wb), expected) != 0) {
+        fprintf(
+            stderr,
+            "exporting JSON %s output mismatch\nexpected: %s\nactual:   %s\n",
+            description,
+            expected,
+            buffer_tostring(wb));
+        errors++;
+    }
+
+    json_object *root = json_tokener_parse(buffer_tostring(wb));
+    json_object *member = NULL, *labels = NULL;
+#define CHECK_JSON_STRING(key, value)                                                                                   \
+    (!json_object_object_get_ex(root, key, &member) || strcmp(json_object_get_string(member), value) != 0)
+    if(!root || !json_object_is_type(root, json_type_object) || json_object_object_length(root) != 13 ||
+       CHECK_JSON_STRING("prefix", prefix) || CHECK_JSON_STRING("hostname", hostname) ||
+       CHECK_JSON_STRING("chart_id", chart_id) || CHECK_JSON_STRING("chart_name", chart_name) ||
+       CHECK_JSON_STRING("chart_family", chart_family) || CHECK_JSON_STRING("chart_context", chart_context) ||
+       CHECK_JSON_STRING("chart_type", chart_type) || CHECK_JSON_STRING("units", units) ||
+       CHECK_JSON_STRING("id", dimension_id) || CHECK_JSON_STRING("name", dimension_name) ||
+       !json_object_object_get_ex(root, "labels", &labels) || !json_object_is_type(labels, json_type_object) ||
+       !json_object_object_get_ex(labels, "label", &member) || strcmp(json_object_get_string(member), "value") != 0 ||
+       !json_object_object_get_ex(root, "value", &member) || json_object_get_double(member) != 1.5 ||
+       !json_object_object_get_ex(root, "timestamp", &member) || json_object_get_int64(member) != 42) {
+        fprintf(stderr, "exporting JSON %s schema or decoded value mismatch\n", description);
+        errors++;
+    }
+#undef CHECK_JSON_STRING
+
+    if(root)
+        json_object_put(root);
+    buffer_free(wb);
+    return errors;
+}
+
+int exporting_json_connector_unittest(void) {
+    int errors = 0;
+
+    errors += json_plaintext_unittest_case(
+        "ordinary collected metadata",
+        false,
+        "netdata",
+        "localhost",
+        "chart.id",
+        "chart.name",
+        "family",
+        "context",
+        "line",
+        "units",
+        "dimension.id",
+        "dimension.name",
+        "{\"prefix\":\"netdata\",\"hostname\":\"localhost\",\"labels\":{\"label\":\"value\"},"
+        "\"chart_id\":\"chart.id\",\"chart_name\":\"chart.name\",\"chart_family\":\"family\","
+        "\"chart_context\":\"context\",\"chart_type\":\"line\",\"units\":\"units\","
+        "\"id\":\"dimension.id\",\"name\":\"dimension.name\",\"value\":1.5,\"timestamp\":42}");
+
+    errors += json_plaintext_unittest_case(
+        "hostile stored metadata",
+        true,
+        "pre\"\\\x01",
+        "host\nname",
+        "chart\tid",
+        "chart\rname",
+        "family\bname",
+        "context\fname",
+        "type\"name",
+        "units\\name",
+        "dimension\"id",
+        "dimension\nname",
+        "{\"prefix\":\"pre\\\"\\\\\\u0001\",\"hostname\":\"host\\nname\","
+        "\"labels\":{\"label\":\"value\"},\"chart_id\":\"chart\\tid\","
+        "\"chart_name\":\"chart\\rname\",\"chart_family\":\"family\\bname\","
+        "\"chart_context\": \"context\\fname\",\"chart_type\":\"type\\\"name\","
+        "\"units\": \"units\\\\name\",\"id\":\"dimension\\\"id\","
+        "\"name\":\"dimension\\nname\",\"value\":1.5,\"timestamp\": 42}");
+
+    return errors;
 }

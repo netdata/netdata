@@ -296,6 +296,29 @@ int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host) {
     return 0;
 }
 
+static void format_opentsdb_http_prefix(
+    BUFFER *wb,
+    const char *prefix,
+    const char *chart_name,
+    const char *dimension_name,
+    unsigned long long timestamp) {
+    buffer_strcat(wb, "{\"metric\":\"");
+    buffer_json_strcat(wb, prefix);
+    buffer_putc(wb, '.');
+    buffer_json_strcat(wb, chart_name);
+    buffer_putc(wb, '.');
+    buffer_json_strcat(wb, dimension_name);
+    buffer_sprintf(wb, "\",\"timestamp\":%llu,\"value\":", timestamp);
+}
+
+static void format_opentsdb_http_suffix(BUFFER *wb, const char *hostname, const char *labels) {
+    buffer_strcat(wb, ",\"tags\":{\"host\":\"");
+    buffer_json_strcat(wb, hostname);
+    buffer_strcat(wb, "\"");
+    buffer_strcat(wb, labels);
+    buffer_strcat(wb, "}}");
+}
+
 /**
  * Format dimension using collected data for OpenTSDB HTTP connector
  *
@@ -323,12 +346,8 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
     if (buffer_strlen((BUFFER *)instance->buffer) > 2)
         buffer_strcat(instance->buffer, ",\n");
 
-    buffer_sprintf(
+    format_opentsdb_http_prefix(
         instance->buffer,
-        "{"
-        "\"metric\":\"%s.%s.%s\","
-        "\"timestamp\":%llu,"
-        "\"value\":",
         instance->config.prefix,
         chart_name,
         dimension_name,
@@ -339,13 +358,8 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
     else
         buffer_sprintf(instance->buffer, COLLECTED_NUMBER_FORMAT, (collected_number)rrddim_last_collected_raw_int(rd));
 
-    buffer_sprintf(
+    format_opentsdb_http_suffix(
         instance->buffer,
-        ","
-        "\"tags\":{"
-        "\"host\":\"%s\"%s"
-        "}"
-        "}",
         (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "");
 
@@ -385,23 +399,89 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
     if (buffer_strlen((BUFFER *)instance->buffer) > 2)
         buffer_strcat(instance->buffer, ",\n");
 
-    buffer_sprintf(
+    format_opentsdb_http_prefix(
         instance->buffer,
-        "{"
-        "\"metric\":\"%s.%s.%s\","
-        "\"timestamp\":%llu,"
-        "\"value\":" NETDATA_DOUBLE_FORMAT ","
-        "\"tags\":{"
-        "\"host\":\"%s\"%s"
-        "}"
-        "}",
         instance->config.prefix,
         chart_name,
         dimension_name,
-        (unsigned long long)last_t,
-        value,
+        (unsigned long long)last_t);
+
+    buffer_sprintf(instance->buffer, NETDATA_DOUBLE_FORMAT, value);
+
+    format_opentsdb_http_suffix(
+        instance->buffer,
         (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "");
 
     return 0;
+}
+
+static int opentsdb_http_unittest_case(
+    const char *description,
+    const char *prefix,
+    const char *chart_name,
+    const char *dimension_name,
+    const char *hostname,
+    const char *expected) {
+    BUFFER *wb = buffer_create(0, NULL);
+    format_opentsdb_http_prefix(wb, prefix, chart_name, dimension_name, 42);
+    buffer_strcat(wb, "1.5");
+    format_opentsdb_http_suffix(wb, hostname, ",\"label\":\"value\"");
+
+    int errors = 0;
+    if(strcmp(buffer_tostring(wb), expected) != 0) {
+        fprintf(
+            stderr,
+            "OpenTSDB HTTP JSON %s output mismatch\nexpected: %s\nactual:   %s\n",
+            description,
+            expected,
+            buffer_tostring(wb));
+        errors++;
+    }
+
+    char metric[1024];
+    snprintfz(metric, sizeof(metric), "%s.%s.%s", prefix, chart_name, dimension_name);
+
+    json_object *root = json_tokener_parse(buffer_tostring(wb));
+    json_object *member = NULL, *tags = NULL;
+    if(!root || !json_object_is_type(root, json_type_object) || json_object_object_length(root) != 4 ||
+       !json_object_object_get_ex(root, "metric", &member) || strcmp(json_object_get_string(member), metric) != 0 ||
+       !json_object_object_get_ex(root, "timestamp", &member) || json_object_get_int64(member) != 42 ||
+       !json_object_object_get_ex(root, "value", &member) || json_object_get_double(member) != 1.5 ||
+       !json_object_object_get_ex(root, "tags", &tags) || !json_object_is_type(tags, json_type_object) ||
+       json_object_object_length(tags) != 2 || !json_object_object_get_ex(tags, "host", &member) ||
+       strcmp(json_object_get_string(member), hostname) != 0 ||
+       !json_object_object_get_ex(tags, "label", &member) || strcmp(json_object_get_string(member), "value") != 0) {
+        fprintf(stderr, "OpenTSDB HTTP JSON %s schema or decoded value mismatch\n", description);
+        errors++;
+    }
+
+    if(root)
+        json_object_put(root);
+    buffer_free(wb);
+    return errors;
+}
+
+int exporting_opentsdb_http_unittest(void) {
+    int errors = 0;
+
+    errors += opentsdb_http_unittest_case(
+        "ordinary metadata",
+        "netdata",
+        "chart.name",
+        "dimension.name",
+        "localhost",
+        "{\"metric\":\"netdata.chart.name.dimension.name\",\"timestamp\":42,\"value\":1.5,"
+        "\"tags\":{\"host\":\"localhost\",\"label\":\"value\"}}");
+
+    errors += opentsdb_http_unittest_case(
+        "hostile metadata",
+        "pre\"\\\x01",
+        "chart\nname",
+        "dimension\tname",
+        "host\r\"\\name",
+        "{\"metric\":\"pre\\\"\\\\\\u0001.chart\\nname.dimension\\tname\",\"timestamp\":42,"
+        "\"value\":1.5,\"tags\":{\"host\":\"host\\r\\\"\\\\name\",\"label\":\"value\"}}");
+
+    return errors;
 }
