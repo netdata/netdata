@@ -82,7 +82,7 @@ The filename without `.yaml` is the profile name. In the example, a file named
 | `supported_regions` | no | Non-empty list of canonical lowercase region codes where this namespace publishes metrics. Omit for unrestricted regional services. |
 | `disabled` | no | When `true`, collection rules do not select the profile through their default set. A rule can still name it explicitly in `profiles.include`. |
 | `period` | yes | Default CloudWatch period in seconds. It must be a positive multiple of 60, up to 86400. |
-| `publication_delay` | no | How long a completed bucket may take to appear. Use a canonical duration such as `10m` or `1d`. Omission uses the collector's built-in `10m` fallback; collection rules may override it. |
+| `publication_delay` | no | Collector wait after a bucket closes before querying it. This is scheduling policy, not an AWS publication SLA. Use a canonical duration such as `10m` or `1d`. Omission uses the collector's built-in `10m` fallback; collection rules may override it. |
 | `instance` | yes | Exact dimension set that identifies one collected resource. |
 | `metrics` | yes | Metrics and statistics queried for every discovered instance. |
 | `template` | yes | Dynamic chart template populated from the exported series. |

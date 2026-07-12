@@ -390,6 +390,34 @@ func TestCurrentQueryPlan_OverflowRetainsLastValidPlan(t *testing.T) {
 	assert.True(t, c.planDirty, "the next collect retries the rejected refresh")
 }
 
+func TestBuildQueryPlan_OversizedWorkStopsBeforeFullQueryAllocation(t *testing.T) {
+	const instancesPerRegion = 20000
+	const totalInstances = 2 * instancesPerRegion
+	values := make([][]string, instancesPerRegion)
+	for i := range values {
+		values[i] = []string{fmt.Sprintf("i-%d", i)}
+	}
+	c := ec2QueryCollector([]string{"us-east-1", "us-west-2"}, map[string][][]string{
+		"us-east-1": values,
+		"us-west-2": values,
+	})
+	for i := range c.plan.Scopes {
+		c.plan.Scopes[i].SelectedSeries = c.plan.Scopes[i].SelectedSeries[:1]
+	}
+	c.Limits.MaxInstances = totalInstances + 1
+
+	var err error
+	allocations := testing.AllocsPerRun(1, func() {
+		_, err = c.buildQueryPlan()
+	})
+	require.ErrorContains(t, err, "maximum 20000")
+	t.Logf("oversized plan allocations: %.0f", allocations)
+	// The preflight path measures about 300k allocations on this fixture; the old
+	// post-build validator exceeded 1.03m. This generous ceiling protects early
+	// rejection without turning ordinary allocation tuning into a test contract.
+	assert.Less(t, allocations, float64(350000), "query work must be rejected before allocating the oversized planned-query set")
+}
+
 func BenchmarkCurrentQueryPlanCached(b *testing.B) {
 	instances := make([][]string, 256)
 	for i := range instances {

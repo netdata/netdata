@@ -359,6 +359,10 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 	assert.Equal(t, "us-east-1", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "regions", "items")["ui:placeholder"])
 	assert.Equal(t, "5m", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "query", "period")["ui:placeholder"])
 	assert.Equal(t, "30m", schemaObjectAt(t, doc, "uiSchema", "rule_defaults", "query", "lookback")["ui:placeholder"])
+	defaultLookbackHelp, ok := schemaObjectAt(t, doc, "uiSchema", "rule_defaults", "query", "lookback")["ui:help"].(string)
+	require.True(t, ok)
+	assert.Contains(t, defaultLookbackHelp, "old CloudWatch value")
+	assert.Contains(t, defaultLookbackHelp, "transient")
 	defaultDelayHelp, ok := schemaObjectAt(t, doc, "uiSchema", "rule_defaults", "query", "publication_delay")["ui:help"].(string)
 	require.True(t, ok)
 	assert.Contains(t, defaultDelayHelp, "overrides profile-specific delays")
@@ -374,6 +378,23 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 	require.True(t, ok)
 	assert.Contains(t, recentlyActiveHelp, "publication_delay + lookback + period")
 	assert.NotEmpty(t, schemaObjectAt(t, doc, "uiSchema", "vnode")["ui:placeholder"])
+}
+
+func TestMetadata_TwoRuleQueryPolicyExample(t *testing.T) {
+	data, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	text := string(data)
+
+	for _, want := range []string{
+		"name: lambda-activity",
+		"name: lambda-latency",
+		"name: Invocations",
+		"name: Duration",
+		"period: 5m",
+		"period: 1m",
+	} {
+		assert.Contains(t, text, want)
+	}
 }
 
 func TestConfigSchema_QueryPolicyHasNoMaterializedDefaults(t *testing.T) {

@@ -206,9 +206,12 @@ func TestExecuteQueries_PaginationAndDedup(t *testing.T) {
 	for _, query := range plan {
 		byName[query.seriesName] = execution.outcomes[query.key].value
 	}
-	assert.Equal(t, float64(10), byName["ec2.cpu_utilization_average"], "first (newest) value per Id wins across pages")
-	assert.Equal(t, float64(20), byName["ec2.duration_average"])
-	assert.Equal(t, float64(30), byName["ec2.duration_p90"])
+	var values []float64
+	for _, value := range byName {
+		values = append(values, value)
+	}
+	assert.ElementsMatch(t, []float64{10, 20, 30}, values)
+	assert.NotContains(t, values, float64(99), "the duplicate q0 value on the later page must not replace the first candidate")
 
 	// Each GetMetricData request scans newest-first over the same aligned window,
 	// and the second page carries the NextToken the first page returned.

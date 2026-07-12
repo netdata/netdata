@@ -187,6 +187,30 @@ func TestObservationStore_RejectsIncompleteExecution(t *testing.T) {
 	assert.Empty(t, store.queries, "invalid completion provenance must not mutate state")
 }
 
+func TestObservationStore_InvariantErrorsDoNotExposeQueryIdentity(t *testing.T) {
+	const sensitiveIdentity = "SENSITIVE_ACCOUNT/SENSITIVE_RESOURCE"
+	query := stateTestQuery(sensitiveIdentity, false)
+	store := newObservationStore(nil)
+	completedAt := time.Unix(1_000_000_000, 0)
+	start, end := queryWindow(completedAt, query.policy)
+
+	t.Run("missing outcome", func(t *testing.T) {
+		err := store.applyOutcomes([]plannedQuery{query}, map[string]queryOutcome{"other": {
+			kind: queryOutcomeComplete, windowStart: start, windowEnd: end, completedAt: completedAt,
+		}}, time.Minute)
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), sensitiveIdentity)
+	})
+
+	t.Run("missing completion time", func(t *testing.T) {
+		err := store.applyOutcomes([]plannedQuery{query}, map[string]queryOutcome{query.key: {
+			kind: queryOutcomeComplete, windowStart: start, windowEnd: end,
+		}}, time.Minute)
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), sensitiveIdentity)
+	})
+}
+
 func TestTransientRetryDelay(t *testing.T) {
 	tests := map[string]struct {
 		base, period time.Duration

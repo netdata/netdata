@@ -85,13 +85,13 @@ func (o *observationStore) applyOutcomes(due []plannedQuery, outcomes map[string
 	if len(outcomes) != len(due) {
 		return fmt.Errorf("CloudWatch query execution returned %d outcomes for %d due queries", len(outcomes), len(due))
 	}
-	for _, query := range due {
+	for i, query := range due {
 		outcome, ok := outcomes[query.key]
 		if !ok {
-			return fmt.Errorf("CloudWatch query execution omitted outcome for planned query %q", query.key)
+			return fmt.Errorf("CloudWatch query execution omitted outcome for due query at index %d", i)
 		}
 		if outcome.completedAt.IsZero() {
-			return fmt.Errorf("CloudWatch query execution omitted completion time for planned query %q", query.key)
+			return fmt.Errorf("CloudWatch query execution omitted completion time for due query at index %d", i)
 		}
 	}
 

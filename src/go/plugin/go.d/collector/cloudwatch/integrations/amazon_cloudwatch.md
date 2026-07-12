@@ -97,6 +97,7 @@ A rule that omits `profiles` selects all default-enabled profiles for its target
 - Minimum collection interval is 60 seconds (CloudWatch's minimum metric period).
 - Query timing resolves field-by-field from `rules[].query`, `rule_defaults.query`, profile metric/profile values, and the built-in 10-minute publication delay. The stock daily S3 storage profile uses a conservative one-day collector policy. AWS documents that S3 storage metrics are reported once per day, but does not guarantee publication within one day.
 - A successful sparse query can replay its newest eligible CloudWatch value for up to `lookback`. During transient AWS failures, the retained value can be replayed longer, until a successful query replaces or expires it.
+- Query-plan preflight rejects more than 20,000 selected series, 600,000 all-due datapoints, or 40 packed `GetMetricData` requests before allocating AWS query structures. Billing units of up to five statistics for one structural metric are kept in one request.
 - `limits.max_instances` defaults to 1000 distinct final resource instances after tag filtering and overlap resolution. Exceeding it rejects the refreshed query plan; resources are never silently truncated.
 - `limits.max_discovery_groups` defaults to 64 unique `(target, region, namespace)` groups per job. Compatible rules and profiles share a group. The safeguard catches accidental expansion; intentionally larger installations can raise it (up to the structural maximum of 4096) or split collection across jobs. Increasing it permits proportionally more `ListMetrics` work.
 - Each discovery group is independently bounded to 100 `ListMetrics` pages, 50,000 scanned metrics, 1,000,000 residual same-shape profile matches, and 20,000 candidate instances. Overflow fails the group without replacing its previous snapshot.
@@ -105,7 +106,7 @@ A rule that omits `profiles` selects all default-enabled profiles for its target
 
 #### Performance Impact
 
-AWS bills CloudWatch API usage. `GetMetricData` is the cost driver; `ListMetrics` discovery falls under the free tier and then costs a fraction as much. As a rough anchor, `GetMetricData` is billed at roughly $0.01 per 1,000 metrics requested -- confirm current [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) for your region. The collector sends one query per selected metric/statistic series, but for AWS billing up to five statistics requested for the same metric count as one metric request. In normal operation each series is queried once per newly eligible effective-period window, not once per Netdata collection cycle. A transient request or result failure retries that series after one `update_every`; subsequent delays double within the same eligible window and are capped at its effective period. Those retries are also billable, so `update_every` affects failure-time cost even though it does not set normal query cadence. Cost otherwise scales with selected targets, instances, metrics, statistics beyond AWS's grouping, periods, and lookback response work. Longer lookbacks increase requested datapoints and can disable CloudWatch's three-hour recently-active discovery filter. The collector minimizes work with curated profiles, exact metric and resource-tag selection, exact dimension matching, single-statistic defaults, completed-sibling isolation, bounded retry backoff, shared compatible discovery scans, cached discovery/query plans, and `recently_active_only`. To reduce cost further, narrow `rules[].targets`, `rules[].profiles`, `rules[].metrics`, `rules[].regions`, or configure resource tag filters.
+AWS bills CloudWatch API usage. `GetMetricData` is the cost driver; `ListMetrics` discovery falls under the free tier and then costs a fraction as much. As a rough anchor, `GetMetricData` is billed at roughly $0.01 per 1,000 metrics requested -- confirm current [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) for your region. The collector sends one query per selected metric/statistic series, but for AWS billing up to five statistics requested for the same metric count as one metric request. Point-aware batching keeps each such five-statistic billing unit in one request. In normal operation each series is queried once per newly eligible effective-period window, not once per Netdata collection cycle. A transient request or result failure retries that series after one `update_every`; subsequent delays double within the same eligible window and are capped at its effective period. Those retries are also billable, so `update_every` affects failure-time cost even though it does not set normal query cadence. Cost otherwise scales with selected targets, instances, metrics, statistics beyond AWS's grouping, periods, and lookback response work. Longer lookbacks increase requested datapoints and can disable CloudWatch's three-hour recently-active discovery filter. The collector minimizes work with curated profiles, exact metric and resource-tag selection, exact dimension matching, single-statistic defaults, completed-sibling isolation, bounded retry backoff, billing-group-preserving batches, shared compatible discovery scans, cached discovery/query plans, and `recently_active_only`. To reduce cost further, narrow `rules[].targets`, `rules[].profiles`, `rules[].metrics`, `rules[].regions`, or configure resource tag filters.
 
 
 ## Setup
@@ -331,15 +332,15 @@ jobs:
 ```
 </details>
 
-###### Specific metrics only
+###### Different timing for metrics in one profile
 
-Collect only EC2 CPU utilization and RDS database connections for the explicitly visible base target.
+Use disjoint exact metric selections when one service needs different query timing. Earlier rules own only the metric/statistic series they select, so these two Lambda rules do not shadow each other.
 
 <details open><summary>Config</summary>
 
 ```yaml
 jobs:
-  - name: ec2_rds
+  - name: lambda_split_policy
     credentials:
       - name: sdk_default
         type: default
@@ -347,25 +348,36 @@ jobs:
       - name: base
         credentials: sdk_default
     rules:
-      - name: core-services
+      - name: lambda-activity
         targets: [base]
         profiles:
           defaults: false
-          include: [ec2, rds]
+          include: [lambda]
         metrics:
-          - profile: ec2
-            statistics: [Average]
+          - profile: lambda
+            statistics: [Sum]
             include:
-              - name: CPUUtilization
-          - profile: rds
-            statistics: [Average]
-            include:
-              - name: DatabaseConnections
+              - name: Invocations
         regions: [us-east-1]
         query:
           period: 5m
           lookback: 30m
           publication_delay: 10m
+      - name: lambda-latency
+        targets: [base]
+        profiles:
+          defaults: false
+          include: [lambda]
+        metrics:
+          - profile: lambda
+            statistics: [Average, p90]
+            include:
+              - name: Duration
+        regions: [us-east-1]
+        query:
+          period: 1m
+          lookback: 5m
+          publication_delay: 5m
 
 ```
 </details>

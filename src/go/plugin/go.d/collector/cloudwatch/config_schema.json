@@ -748,6 +748,7 @@
           "ui:placeholder": "5m"
         },
         "lookback": {
+          "ui:help": "Default rolling window inherited by rules. A successful query can present an old CloudWatch value as current for up to this lookback; transient failures can replay it longer. Longer windows also increase response work.",
           "ui:placeholder": "30m"
         },
         "publication_delay": {

@@ -268,7 +268,10 @@ Discovery then finds which *instances* of those profiles exist per target and re
   is immediately due and resets the sequence. `Complete` and `Forbidden` clear it;
   parent-context cancellation advances neither retry nor completion state.
 - Query-plan construction atomically rejects more than 20,000 queries, 600,000
-  all-due datapoints, 40 all-due batches, or 1,440 buckets per query.
+  all-due datapoints, 40 all-due batches, or 1,440 buckets per query. A lightweight
+  candidate/work preflight applies those bounds before constructing AWS query structs
+  or stable keys, so raising `max_instances` cannot allocate an unbounded query plan
+  before rejection.
 
 ## Query Execution
 
@@ -277,9 +280,12 @@ Discovery then finds which *instances* of those profiles exist per target and re
 - Due queries are grouped deterministically by target, region, and exact policy.
   The rolling window is `end = align_down(now - publication_delay, period)` and
   `start = end - lookback`.
-- Batch width is `min(500, 30000 / bucket_count)`. Every request sets exact
-  `MaxDatapoints = queries_in_batch × bucket_count`; concurrency remains bounded
-  by `apiConcurrency`, with one configured timeout shared by the batch's pages.
+- Batch width is `min(500, 30000 / bucket_count)`. Queries sharing one structural
+  CloudWatch metric identity are divided into billing units of at most five statistics;
+  deterministic packing keeps each unit whole while respecting width. Work preflight
+  and execution use the same packer. Every request sets exact `MaxDatapoints =
+  queries_in_batch × bucket_count`; concurrency remains bounded by `apiConcurrency`,
+  with one configured timeout shared by the batch's pages.
 - Request IDs (`q0`, `q1`, …) exist only inside one batch. Pagination is bounded
   to two calls. A page failure preserves siblings already marked `Complete`.
 - Values are paired with their timestamps; response/page order is not trusted.
@@ -503,6 +509,9 @@ The two CloudWatch APIs bill differently, and the design leans on that:
   result pages. Raise it only to cut API load on very large accounts.
 - **`GetMetricData` (query) is the cost driver** — it is always billed (~$0.01
   per 1,000 metrics requested) and scales with metric count × query frequency.
+  Point-aware batching keeps each AWS billing unit of up to five statistics for
+  one structural metric in a single request, avoiding duplicate billing at a
+  batch boundary.
 - **Per-query aligned-window completion is the governor** — a metric is queried
   once per effective period (a 300s metric every aligned 300s window, a daily metric every ~24h),
   not every collect cycle, so cost tracks profile periods rather than

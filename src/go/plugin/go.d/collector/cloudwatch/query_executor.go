@@ -5,7 +5,6 @@ package cloudwatch
 import (
 	"context"
 	"fmt"
-	"slices"
 	"time"
 
 	"github.com/sourcegraph/conc/pool"
@@ -140,7 +139,7 @@ func buildQueryBatches(queries []plannedQuery, clients map[clientKey]cloudwatchC
 	for _, group := range groups {
 		client := clients[clientKey{target: group.key.target, region: group.key.region}]
 		start, end := queryWindow(now, group.key.policy)
-		for chunk := range slices.Chunk(group.queries, queryBatchWidth(group.key.policy)) {
+		for _, chunk := range packQueryGroup(group.queries, queryBatchWidth(group.key.policy)) {
 			batches = append(batches, queryBatch{key: group.key, client: client, queries: chunk, start: start, end: end})
 		}
 	}

@@ -19,6 +19,7 @@ import (
 // are assigned only when a due query is executed.
 type plannedQuery struct {
 	key        string
+	billingKey string // structural metric identity without statistic; internal AWS cost grouping
 	target     string
 	region     string
 	policy     queryPolicy
@@ -28,6 +29,21 @@ type plannedQuery struct {
 	nilAsZero  bool           // record 0 (vs a gap) when the query returns no datapoint
 	rate       bool           // normalize a per-period total to a per-second value on write
 	query      cwtypes.MetricDataQuery
+}
+
+type instancePresentation struct {
+	labels    []metrix.Label
+	tagLabels []metrix.Label
+	dims      []cwtypes.Dimension
+}
+
+type queryPlanCandidate struct {
+	targetRef    string
+	profile      cwprofiles.ResolvedProfile
+	region       string
+	series       []compiledSeries
+	billingKeys  []string
+	presentation instancePresentation
 }
 
 type seriesOwnership struct {
@@ -87,12 +103,8 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 	if c.plan == nil {
 		return nil, nil
 	}
-	var plan []plannedQuery
-	type instancePresentation struct {
-		labels    []metrix.Label
-		tagLabels []metrix.Label
-		dims      []cwtypes.Dimension
-	}
+	budget := newQueryWorkBudget()
+	var candidates []queryPlanCandidate
 	owned := make(map[string]seriesOwnership)
 	presentations := make(map[string]instancePresentation)
 	shadowed := 0
@@ -163,9 +175,32 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 				}
 				presentations[instanceKey] = presentation
 			}
-			queries := c.seriesQueries(scope.Target.Name, prof, scope.Region, selected, presentation.labels, presentation.tagLabels, presentation.dims)
-			plan = append(plan, queries...)
+			billingKeys := make([]string, len(selected))
+			byMetric := make([]string, len(prof.Config.Metrics))
+			for i, series := range selected {
+				if err := budget.reserveQuery(series.Policy); err != nil {
+					return nil, err
+				}
+				metric := prof.Config.Metrics[series.MetricIndex]
+				billingKey := byMetric[series.MetricIndex]
+				if billingKey == "" {
+					billingKey = metricBillingKey(prof.Config.Namespace, metric.MetricName, presentation.dims)
+					byMetric[series.MetricIndex] = billingKey
+				}
+				billingKeys[i] = billingKey
+				budget.addBillingGroup(
+					queryBatchKey{target: scope.Target.Name, region: scope.Region, policy: series.Policy},
+					billingKey,
+				)
+			}
+			candidates = append(candidates, queryPlanCandidate{
+				targetRef: scope.Target.Name, profile: prof, region: scope.Region,
+				series: selected, billingKeys: billingKeys, presentation: presentation,
+			})
 		}
+	}
+	if err := budget.validateBatches(); err != nil {
+		return nil, err
 	}
 	if shadowed > 0 {
 		c.Limit(logKeyRuleShadowed, 1, recurringLogEvery).
@@ -174,6 +209,10 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 	if reserved > 0 {
 		c.Limit(logKeyTagRefreshFailed+"_reserved", 1, recurringLogEvery).
 			Warningf("CloudWatch resource tag filtering reserved %d exported series from lower-priority rules while membership was unknown", reserved)
+	}
+	plan := make([]plannedQuery, 0, budget.queries)
+	for _, candidate := range candidates {
+		plan = append(plan, buildSeriesQueries(candidate)...)
 	}
 	if err := validatePlannedQueryWork(plan); err != nil {
 		return nil, err
@@ -233,26 +272,28 @@ func (c *Collector) instanceLabelsAndDims(accountID string, prof cwprofiles.Reso
 	return labels, dims
 }
 
-// seriesQueries builds the stable planned queries for one instance.
-func (c *Collector) seriesQueries(targetRef string, prof cwprofiles.ResolvedProfile, region string, series []compiledSeries, labels, tagLabels []metrix.Label, dims []cwtypes.Dimension) []plannedQuery {
-	out := make([]plannedQuery, 0, len(series))
-	for _, selected := range series {
-		m := prof.Config.Metrics[selected.MetricIndex]
+// buildSeriesQueries constructs the stable queries only after the candidate set
+// has passed the query/datapoint/batch preflight.
+func buildSeriesQueries(candidate queryPlanCandidate) []plannedQuery {
+	out := make([]plannedQuery, 0, len(candidate.series))
+	for i, selected := range candidate.series {
+		m := candidate.profile.Config.Metrics[selected.MetricIndex]
 		pq := plannedQuery{
-			target:     targetRef,
-			region:     region,
+			target:     candidate.targetRef,
+			region:     candidate.region,
 			policy:     selected.Policy,
+			billingKey: candidate.billingKeys[i],
 			seriesName: selected.Name,
-			labels:     labels,
-			tagLabels:  tagLabels,
+			labels:     candidate.presentation.labels,
+			tagLabels:  candidate.presentation.tagLabels,
 			nilAsZero:  m.EmitZeroOnNoData(selected.Statistic),
 			rate:       m.Rate && cwprofiles.IsPerPeriodTotal(selected.Statistic),
 			query: cwtypes.MetricDataQuery{
 				MetricStat: &cwtypes.MetricStat{
 					Metric: &cwtypes.Metric{
-						Namespace:  aws.String(prof.Config.Namespace),
+						Namespace:  aws.String(candidate.profile.Config.Namespace),
 						MetricName: aws.String(m.MetricName),
-						Dimensions: dims,
+						Dimensions: candidate.presentation.dims,
 					},
 					Period: aws.Int32(int32(selected.Policy.period / time.Second)),
 					Stat:   aws.String(cwprofiles.StatString(selected.Statistic)),
