@@ -58,10 +58,24 @@ static bool machine_guid_read_from_file(const char *filename, ND_MACHINE_GUID *h
     ND_MACHINE_GUID h;
     memset(&h, 0, sizeof(h));
 
-    int fd = open(filename, O_RDONLY | O_CLOEXEC);
+    struct stat st;
+    if (stat(filename, &st) != 0 || !S_ISREG(st.st_mode)) {
+        if(log_errors)
+            nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot open GUID file '%s' for reading", filename);
+        return false;
+    }
+
+    int fd = open(filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
     if (fd == -1) {
         if(log_errors)
             nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot open GUID file '%s' for reading", filename);
+        return false;
+    }
+
+    if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
+        if(log_errors)
+            nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot stat the GUID file '%s'", filename);
+        close(fd);
         return false;
     }
 
@@ -92,13 +106,14 @@ static bool machine_guid_read_from_file(const char *filename, ND_MACHINE_GUID *h
         return false;
     }
 
-    struct stat st;
+    // Preserve the original post-read timestamp and metadata-error semantics.
     if (fstat(fd, &st) != 0) {
         if(log_errors)
             nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot stat the GUID file '%s'", filename);
         close(fd);
         return false;
     }
+
     close(fd);
 
     // Recreate the text version of it, ensuring lowercase format.
