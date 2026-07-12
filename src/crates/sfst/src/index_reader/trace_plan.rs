@@ -217,6 +217,10 @@ pub struct TracePlan {
 /// for exactly what counts.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct ScanWork {
+    /// The pinned "visited rows" ceiling unit — despite the name it
+    /// counts every budgeted VISIT, not only whole rows: stream-batch
+    /// rows scanned, refine rows AND event/link records walked, and
+    /// emitted extraction positions. One counter, one ceiling.
     pub rows_visited: u64,
 }
 
@@ -466,7 +470,11 @@ impl IndexReader<'_> {
                         }
                     }
                     if parts.is_empty() && is_event {
-                        // Presence pre-filter via events.name.
+                        // Presence pre-filter via events.name — every
+                        // event interns a name token. Link groups have
+                        // NO equivalent (links intern no universal
+                        // token), which is exactly why id-only link
+                        // groups are the pinned no-prefilter full scan.
                         let names = PlanMatcher::Tokens {
                             exact: Vec::new(),
                             patterns: vec![".*".to_string()],

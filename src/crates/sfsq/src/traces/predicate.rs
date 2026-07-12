@@ -345,9 +345,10 @@ impl Condition {
             (PredicateTarget::Intrinsic(LinkSpanId | LinkTraceId), CompareOp::NotEq) => {
                 Some(format!("negated {} (subgroup semantics, refine step)", self.target))
             }
-            // event:name POSITIVE forms ride the flat events.name token
-            // (one such condition per predicate — see ensure_evaluable);
-            // negated forms wait for the subgroup-semantics decision.
+            // event:name POSITIVE forms evaluate through the event
+            // subgroup (any number of conditions — a single event must
+            // satisfy them all); negated forms wait for the
+            // subgroup-semantics decision.
             (PredicateTarget::Intrinsic(EventName), CompareOp::Eq | CompareOp::Regex) => None,
             (PredicateTarget::Intrinsic(EventName), CompareOp::NotEq | CompareOp::NotRegex) => {
                 Some(format!("negated {} (subgroup semantics, refine step)", self.target))
@@ -371,6 +372,9 @@ impl Condition {
                 if op.is_ordering() || op == CompareOp::Eq =>
             {
                 None
+            }
+            (PredicateTarget::Intrinsic(EventTimeSinceStart), _) => {
+                Some(format!("negated {} (subgroup semantics, refine step)", self.target))
             }
             // Trace-level intrinsics evaluate post-assembly (tri-state,
             // decision 15). Values are single-valued per trace, so
@@ -523,7 +527,10 @@ impl Predicate {
                     });
                 }
                 (PredicateTarget::Intrinsic(TraceIntrinsic::Duration), op) => {
-                    let (min_ns, max_ns) = duration_bounds(op, integers()[0]);
+                    let PredicateValue::Integer(n) = condition.values[0] else {
+                        unreachable!("validated: duration values are integers");
+                    };
+                    let (min_ns, max_ns) = duration_bounds(op, n);
                     bound = Some(match bound {
                         None => (min_ns, max_ns),
                         Some((lo, hi)) => (
@@ -592,7 +599,7 @@ impl Predicate {
                             let PredicateValue::Integer(n) = v else {
                                 unreachable!("validated: nanos values are integers");
                             };
-                            duration_bounds(if op == CompareOp::Eq { CompareOp::Eq } else { op }, *n)
+                            duration_bounds(op, *n)
                         })
                         .collect();
                     event_group.push(sfst::GroupCondition::TimeSinceStart { intervals });

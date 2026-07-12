@@ -1386,6 +1386,47 @@ fn trace_level_conditions_exclude_indeterminate_candidates() {
     assert!(capped.status.has(PartialReason::SizeCap));
 }
 
+/// The subgroup refine is budget-bounded: a ceiling landing mid-refine
+/// truncates discovery deterministically (Partial{WorkCeiling}), never
+/// a silent partial refine.
+#[test]
+fn refine_budget_abort_is_honest() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc")];
+    // 20 spans, two events each — the refine visits rows AND records.
+    let reqs: Vec<ExportTraceServiceRequest> = (0..20u64)
+        .map(|i| {
+            req_with(svc.clone(), None, &[SpanSpec {
+                events: vec![
+                    ("boot", vec![kv_str("seq", "1")]),
+                    ("work", vec![kv_str("seq", "2")]),
+                ],
+                ..span_in((i + 1) as u8, 0x10, 0, (100 + i) * NS, "spanned")
+            }])
+        })
+        .collect();
+    let wal = write_wal(dir.path(), reqs, "refine-budget");
+    let q = |ceiling: u64| {
+        SearchQuery::new(pred(vec![attr_eq(TagScope::Event, "seq", "2")]))
+            .visited_rows_ceiling_for_tests(ceiling)
+    };
+    // Unbudgeted: all 20 match through the refine.
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let full = run(sources, q(u64::MAX).limit(30));
+    assert_eq!(full.traces.len(), 20);
+    assert_eq!(full.status, QueryStatus::Complete);
+    // A ceiling mid-refine: the file is budget-truncated at compile, so
+    // discovery finds nothing and the standing threat is WorkCeiling.
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let cut = run(sources, q(10).limit(30));
+    assert!(cut.status.has(PartialReason::WorkCeiling));
+    assert!(cut.traces.is_empty());
+    // Determinism of the truncated shape.
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    let again = run(sources, q(10).limit(30));
+    assert_eq!(norm(&cut), norm(&again));
+}
+
 /// UNSET trace ids never become candidates (TRCE carries zeros for
 /// them; a by-UNSET group is not a trace).
 #[test]
