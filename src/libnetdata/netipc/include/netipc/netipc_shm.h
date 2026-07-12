@@ -41,7 +41,7 @@ typedef enum {
     NIPC_SHM_OK = 0,
     NIPC_SHM_ERR_PATH_TOO_LONG,     /* SHM path exceeds limit */
     NIPC_SHM_ERR_OPEN,              /* open/shm_open failed */
-    NIPC_SHM_ERR_TRUNCATE,          /* ftruncate failed */
+    NIPC_SHM_ERR_TRUNCATE,          /* legacy compatibility; creation no longer truncates */
     NIPC_SHM_ERR_MMAP,              /* mmap failed */
     NIPC_SHM_ERR_BAD_MAGIC,         /* header magic mismatch */
     NIPC_SHM_ERR_BAD_VERSION,       /* header version mismatch */
@@ -53,6 +53,7 @@ typedef enum {
     NIPC_SHM_ERR_TIMEOUT,           /* futex wait timed out */
     NIPC_SHM_ERR_BAD_PARAM,         /* invalid argument */
     NIPC_SHM_ERR_PEER_DEAD,         /* owner process has exited */
+    NIPC_SHM_ERR_ALLOCATE,          /* backing allocation failed; errno preserved */
 } nipc_shm_error_t;
 
 /* ------------------------------------------------------------------ */
@@ -216,6 +217,17 @@ bool nipc_shm_owner_alive(const nipc_shm_ctx_t *ctx);
  * is dead (or whose generation mismatches) are unlinked.
  */
 void nipc_shm_cleanup_stale(const char *run_dir, const char *service_name);
+
+#ifdef NIPC_INTERNAL_TESTING
+typedef enum {
+    NIPC_SHM_TEST_FAULT_NONE = 0,
+    NIPC_SHM_TEST_FAULT_ALLOCATE,
+} nipc_shm_test_fault_site_t;
+
+void nipc_shm_test_fault_set(nipc_shm_test_fault_site_t site,
+                             int error_number);
+void nipc_shm_test_fault_clear(void);
+#endif
 
 /* Get the file descriptor for external event integration. */
 static inline int nipc_shm_fd(const nipc_shm_ctx_t *ctx) {
