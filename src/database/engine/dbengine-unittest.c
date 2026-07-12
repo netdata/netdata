@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "database/rrd.h"
+#include "database/rrddim-collection.h"
 
 #ifdef ENABLE_DBENGINE
 
@@ -356,6 +357,105 @@ static size_t dbengine_test_rrdr_single_region(
     return errors + value_errors + time_errors + update_every_errors;
 }
 
+static size_t test_dbengine_burst_retention_case(
+    RRDHOST *host, const char *id,
+    size_t points, size_t leading_gaps, bool flush_before_check,
+    time_t expected_first, time_t expected_last) {
+    size_t errors = 0;
+
+    fprintf(stderr, "DBENGINE Burst Retention Test: '%s', %zu points (%zu leading gaps)...\n",
+            id, points, leading_gaps);
+
+    RRDSET *st = rrdset_create(host, "netdata", id, id, "netdata", NULL, "Unit Testing", "a value", "unittest",
+                               NULL, 1, 1, RRDSET_TYPE_LINE);
+    RRDDIM *rd = rrddim_add(st, "dim", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    // burst-store points at fixed timestamps, the way the streaming receiver
+    // stores replicated history of a newly-created chart: many points land in
+    // the open hot page before any retention reader runs
+    time_t t0 = START_TIMESTAMP;
+    for(size_t p = 0; p < points; p++) {
+        if(p < leading_gaps)
+            rrddim_store_metric(rd, (usec_t)(t0 + 1 + (time_t)p) * USEC_PER_SEC, NAN, SN_EMPTY_SLOT);
+        else
+            rrddim_store_metric(rd, (usec_t)(t0 + 1 + (time_t)p) * USEC_PER_SEC, (NETDATA_DOUBLE)(p % 10), SN_DEFAULT_FLAGS);
+    }
+
+    // gap-only cases must flush before the first retention read: pages that
+    // never received a real value are discarded at flush and must not leave
+    // any retention behind
+    if(flush_before_check) {
+        for(size_t tier = 0; tier < nd_profile.storage_tiers; tier++)
+            storage_engine_store_flush(rd->tiers[tier].sch);
+    }
+
+    // this is the first retention reader; it used to stamp first_time_s from
+    // the newest hot point (sub-page bursts) or the first page flush had
+    // already stamped the page end time (multi-page bursts), hiding all
+    // earlier points of the burst from queries until a restart
+    time_t first = 0, last = 0;
+    rrdeng_metric_retention_by_id(host->db[0].si, rd->uuid, &first, &last);
+
+    if(first != expected_first) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' first_entry is %ld, expected %ld\n",
+                id, first, expected_first);
+        errors++;
+    }
+
+    if(last != expected_last) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' last_entry is %ld, expected %ld\n",
+                id, last, expected_last);
+        errors++;
+    }
+
+    // a second read must return the same retention (the first read must not
+    // have persisted anything different)
+    time_t first2 = 0, last2 = 0;
+    rrdeng_metric_retention_by_id(host->db[0].si, rd->uuid, &first2, &last2);
+
+    if(first2 != first || last2 != last) {
+        fprintf(stderr, " >>> DBENGINE: BURST RETENTION: '%s' retention is not stable across reads: "
+                        "%ld - %ld, then %ld - %ld\n",
+                id, first, last, first2, last2);
+        errors++;
+    }
+
+    return errors;
+}
+
+static size_t test_dbengine_burst_retention(RRDHOST *host) {
+    size_t errors = 0;
+    time_t t0 = START_TIMESTAMP;
+
+    // sub-page burst: no page flush happens while storing
+    errors += test_dbengine_burst_retention_case(host, "dbengine-burst-subpage",
+                                                 100, 0, false, t0 + 1, t0 + 100);
+
+    // multi-page burst: the first pages fill and are flushed while storing
+    errors += test_dbengine_burst_retention_case(host, "dbengine-burst-multipage",
+                                                 4000, 0, false, t0 + 1, t0 + 4000);
+
+    // leading gaps: retention starts at the page start (like journal replay
+    // registers pages with leading gaps), stamped when the first real value
+    // arrives
+    errors += test_dbengine_burst_retention_case(host, "dbengine-burst-leading-gaps",
+                                                 100, 5, false, t0 + 1, t0 + 100);
+
+    // gap-only pages: discarded at flush, so the page start must NOT be
+    // recorded as retention; what remains is the pre-existing reader
+    // fallback from latest_time_s_hot (which survives the flush - the
+    // flush's clear is filtered out by mrg_metric_set_hot_latest_time_s
+    // ignoring zero), giving first == last == the last gap time
+    errors += test_dbengine_burst_retention_case(host, "dbengine-burst-all-gaps",
+                                                 100, 100, true, t0 + 100, t0 + 100);
+
+    // gap-only pages discarded at page-full rotation: same, at capacity
+    errors += test_dbengine_burst_retention_case(host, "dbengine-burst-all-gaps-capacity",
+                                                 1100, 1100, true, t0 + 1100, t0 + 1100);
+
+    return errors;
+}
+
 int test_dbengine(void) {
     // provide enough threads to dbengine
     setenv("UV_THREADPOOL_SIZE", "48", 1);
@@ -370,6 +470,8 @@ int test_dbengine(void) {
     RRDHOST *host = dbengine_rrdhost_find_or_create("unittest-dbengine");
     if(!host)
         fatal("Failed to initialize host");
+
+    errors += test_dbengine_burst_retention(host);
 
     RRDSET *st[CHARTS] = { 0 };
     RRDDIM *rd[CHARTS][DIMS] = { 0 };
