@@ -437,3 +437,23 @@ fn duration_scan_is_clipped_to_the_range() {
         oracle(&rows, |_| true, 10, 20, N)
     );
 }
+
+/// A high-card term matching NO dictionary value collapses the
+/// conjunction before the stream-batch scan runs — the other high
+/// terms' scan would be wasted work.
+#[test]
+fn empty_high_targets_skip_the_stream_batch_scan() {
+    let (bytes, _) = fixture();
+    let idx = IndexReader::open(&bytes).unwrap();
+    let mut work = ScanWork::default();
+    let compiled = compile(
+        &idx,
+        &plan(vec![
+            tokens("h", &["no-such-value"], &[]),
+            tokens("h2", &[], &["x.*"]),
+        ]),
+        &mut work,
+    );
+    assert_eq!(compiled.count_in_range(0, N as u32), 0);
+    assert_eq!(work.rows_visited, 0, "no batch was scanned");
+}

@@ -151,7 +151,17 @@ impl IndexReader<'_> {
                             .iter()
                             .map(|p| crate::query::compile_pattern(p))
                             .collect::<Result<_, _>>()?;
-                        high_terms.push(self.high_targets(field, idx, &exact_refs, &compiled)?);
+                        let (targets, mask) =
+                            self.high_targets(field, idx, &exact_refs, &compiled)?;
+                        // A term matching no dictionary value collapses the
+                        // conjunction NOW — deferring it would run the
+                        // stream-batch scan for the other high terms only to
+                        // AND everything to empty afterwards.
+                        if targets.is_empty() {
+                            and_in(PosSet::empty(total), &mut acc);
+                        } else {
+                            high_terms.push((targets, mask));
+                        }
                     }
                     Some(FieldLocation::Low | FieldLocation::Mid(_)) => {
                         // The existing per-tier resolution (exact lookups +

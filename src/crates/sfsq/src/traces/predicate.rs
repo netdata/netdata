@@ -354,6 +354,11 @@ impl Predicate {
     /// share (module docs). Storage names come only from the vocabulary.
     pub(crate) fn to_trace_plan(&self) -> TracePlan {
         let mut terms = Vec::with_capacity(self.conditions.len());
+        // Duration conditions intersect into ONE interval term (appended
+        // after the token terms) so several bounds cost one DURN pass —
+        // max of the mins, min of the maxes; an empty intersection
+        // matches nothing in both evaluators.
+        let mut duration: Option<(Option<i64>, Option<i64>)> = None;
         for condition in &self.conditions {
             match (&condition.target, condition.op) {
                 (PredicateTarget::Intrinsic(TraceIntrinsic::Duration), op) => {
@@ -361,7 +366,16 @@ impl Predicate {
                         unreachable!("validated: duration values are integers");
                     };
                     let (min_ns, max_ns) = duration_bounds(op, v);
-                    terms.push(PlanTerm::Duration { min_ns, max_ns });
+                    duration = Some(match duration {
+                        None => (min_ns, max_ns),
+                        Some((lo, hi)) => (
+                            std::cmp::max(lo, min_ns), // None < Some: unbounded loses
+                            match (hi, max_ns) {
+                                (Some(a), Some(b)) => Some(a.min(b)),
+                                (a, b) => a.or(b),
+                            },
+                        ),
+                    });
                 }
                 (target, CompareOp::Eq | CompareOp::Regex) => {
                     let field = match target {
@@ -401,6 +415,9 @@ impl Predicate {
                     unreachable!("stage-B construct {op:?} on {target} passed ensure_evaluable")
                 }
             }
+        }
+        if let Some((min_ns, max_ns)) = duration {
+            terms.push(PlanTerm::Duration { min_ns, max_ns });
         }
         TracePlan { terms }
     }
@@ -849,17 +866,36 @@ mod tests {
                     exact: vec![],
                     patterns: vec!["GET|PUT".into()],
                 },
+                // Both duration bounds intersect into ONE interval term.
                 PlanTerm::Duration {
                     min_ns: Some(101),
-                    max_ns: None,
-                },
-                PlanTerm::Duration {
-                    min_ns: None,
                     max_ns: Some(500),
                 },
             ]
         );
         assert!(Predicate::all().to_trace_plan().terms.is_empty());
+        // Contradictory bounds intersect to an empty interval.
+        let contradictory = Predicate {
+            conditions: vec![
+                cond(
+                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    CompareOp::Gt,
+                    vec![PredicateValue::Integer(500)],
+                ),
+                cond(
+                    PredicateTarget::Intrinsic(TraceIntrinsic::Duration),
+                    CompareOp::Lt,
+                    vec![PredicateValue::Integer(100)],
+                ),
+            ],
+        };
+        assert_eq!(
+            contradictory.to_trace_plan().terms,
+            vec![PlanTerm::Duration {
+                min_ns: Some(501),
+                max_ns: Some(99),
+            }]
+        );
     }
 
     /// The span-side evaluator: token terms (exact + anchored regex,

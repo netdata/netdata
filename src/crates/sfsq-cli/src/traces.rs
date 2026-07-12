@@ -462,6 +462,12 @@ fn parse_condition(spec: &str) -> Result<Condition> {
     } else {
         bail!("--where must be TARGET=VALUE or TARGET=~REGEX, got {spec:?}");
     };
+    // An empty value is a structurally valid predicate that matches no
+    // well-formed dictionary entry — in this dev tool it is always a
+    // typo, so fail loudly instead of returning a silent empty result.
+    if value.is_empty() {
+        bail!("--where {spec:?} has an empty value");
+    }
     let target = parse_target(target_word.trim())?;
     Ok(Condition {
         target,
