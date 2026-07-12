@@ -192,8 +192,9 @@ type discoveryGroupResult struct {
 	Err       error
 }
 
-// discoverAll runs one ListMetrics scan per compatible target/region/namespace/
-// RecentlyActive group and applies all grouped profiles to that streamed response.
+// discoverAll runs one ListMetrics scan per target/region/namespace group and
+// applies all grouped profiles to that streamed response. The group already holds
+// the least restrictive RecentlyActive policy required by its selected series.
 func discoverAll(
 	ctx context.Context,
 	newClient func(target, region string) (cloudwatchClient, error),

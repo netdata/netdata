@@ -330,9 +330,10 @@ refreshDiscovery → refreshTags → buildQueryPlan → … → observe
   one candidate index per target/region/profile. Cached results retain membership,
   labels, shared membership ids, and freshness—not fetch-time candidate maps.
 - **Failure state.** A failed filtered group becomes `unknown`. On the first failure,
-  every candidate is withheld and reserved from lower-priority rules. After a success,
-  last-known matched members continue to be queried while every other candidate remains
-  reserved. Freshness and retry state are fetch-group-local: failed groups retry next
+  its selected series are withheld for every candidate and reserved from lower-priority
+  rules; disjoint series remain eligible. After a success, last-known matched members
+  continue to query those series while the same series remain reserved for every other
+  candidate. Freshness and retry state are fetch-group-local: failed groups retry next
   collect while successful groups keep their result until its discovery TTL expires.
   Optional label enrichment carries last-known labels and never controls identity.
 - **Label resolution (`tagresolve.go`).** `resolveTagPlan` turns
@@ -520,7 +521,8 @@ verify current per-region prices on the CloudWatch pricing page.)
   They use the configured job `vnode` or the Agent host; no per-target/resource
   HostScope is generated.
 - **Tag filters fail closed** — unknown membership never becomes unfiltered
-  collection and never allows a lower-priority rule to claim the candidate.
+  collection and never allows a lower-priority rule to claim the unknown higher
+  rule's selected series; disjoint series remain eligible.
 - **Tag labels are non-identity** — `labels.resource_tags` can update labels on an
   existing chart but cannot change its identity or overwrite an identity label.
 - **Compiled configuration** — operator-facing credentials, targets, and ordered

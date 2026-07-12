@@ -49,7 +49,7 @@ type tagGroupSnapshot struct {
 	unknown         bool
 }
 
-// share copies only the scope index; the per-scope member sets are immutable once
+// share copies only the membership-identity index. Member sets are immutable once
 // a fetch result is installed and can be shared by the effective snapshot.
 func (m tagMembership) share(other tagMembership) {
 	maps.Copy(m, other)

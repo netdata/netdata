@@ -499,7 +499,19 @@ func BenchmarkCurrentQueryPlanDirtySeriesSelection(b *testing.B) {
 				name := fmt.Sprintf("instances_%d/series_%s/scopes_%d", instances, selected, overlappingScopes)
 				b.Run(name, func(b *testing.B) {
 					c := seriesSelectionBenchmarkCollector(instances, selected, overlappingScopes)
-					require.NotEmpty(b, requireCurrentQueryPlan(b, c))
+					initial := requireCurrentQueryPlan(b, c)
+					require.NotEmpty(b, initial)
+					for _, query := range initial {
+						key := observedKey(query.seriesName, query.labels)
+						c.observations.lastObserved[key] = observedSeries{
+							seriesName: query.seriesName,
+							labels:     query.labels,
+							tagLabels:  query.tagLabels,
+							groupKey:   query.groupKey(),
+						}
+						c.observations.nextQueryAt[query.groupKey()] = time.Unix(1, 0)
+					}
+					expectedQueries := len(initial)
 
 					b.ReportAllocs()
 					b.ResetTimer()
@@ -508,6 +520,9 @@ func BenchmarkCurrentQueryPlanDirtySeriesSelection(b *testing.B) {
 						plan, err := c.currentQueryPlan()
 						if err != nil {
 							b.Fatal(err)
+						}
+						if len(plan) != expectedQueries {
+							b.Fatalf("query plan length = %d, want %d", len(plan), expectedQueries)
 						}
 						goruntime.KeepAlive(plan)
 					}
