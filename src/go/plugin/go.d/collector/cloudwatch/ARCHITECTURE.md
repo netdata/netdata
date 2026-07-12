@@ -194,8 +194,12 @@ Discovery then finds which *instances* of those profiles exist per target and re
   filtered ListMetrics stream beside the unfiltered superset.
   `discoverAll` fans out over those groups concurrently
   (bounded by `apiConcurrency`), with one CloudWatch client per (target, region).
-- `discoverProfileGroup` pages `ListMetrics` once for the shared namespace and
-  applies an index compiled from each profile's canonical exact dimension-name set.
+- `discoverAll` uses two phases: every executable group runs its first `ListMetrics`
+  operation before any group may request a continuation page. Continuations then
+  share the remaining job-level operation budget. Explicit authorization denial
+  cancels queued namespace work only in the same `(target, region)` lane.
+- Each `discoveryGroupScanner` pages one shared namespace and applies an index
+  compiled from each profile's canonical exact dimension-name set.
   Each returned metric's dimensions are canonicalized once; profiles with a different
   shape are rejected by the index lookup, while same-shape profiles evaluate only
   their pinned constants. This collapses CloudWatch's multi-granularity fan-out to
@@ -208,18 +212,29 @@ Discovery then finds which *instances* of those profiles exist per target and re
   accepts, so applying it to a daily profile (S3) would hide the metric most of
   the day. Configurable (`discovery.recently_active_only`, default true).
 - `limits.max_discovery_groups` bounds unique `(target, region, namespace)` groups
-  (default 64, valid 1..4,096). Compatible rules and profiles share one group.
-  Raising the safeguard permits proportionally more ListMetrics work; larger valid
-  installations may instead split across jobs. Each group is additionally bounded to 100 pages, 50,000 scanned metrics,
+  (default 64, valid 1..100). Compatible rules and profiles share one group. The
+  default is an accidental-expansion safeguard; larger jobs may raise it to 100,
+  while larger collection must be split across jobs. Each group is additionally bounded to 100 pages, 50,000 scanned metrics,
   1,000,000 residual same-shape profile matches, and 20,000 candidate profile instances;
   repeated pagination tokens fail the whole group rather than truncating it. The
   residual bound was measured after indexed routing and prevents adversarial
   metric-by-profile CPU expansion without limiting profile count directly.
+- One discovery refresh has aggregate ceilings of 100 admitted ListMetrics SDK
+  operations, 50,000 scanned metrics, 1,000,000 residual matches, 20,000 retained
+  candidates, and 64 MiB of conservatively weighted retained-candidate storage.
+  The configured `timeout` is shared by the whole discovery stage. Admission happens
+  before each continuation call; the AWS SDK may still retry an admitted operation
+  up to five wire attempts.
 - **Snapshot + carry-forward**: `buildDiscoverySnapshot` stores instances for
   successful targets and **carries forward the previous instances for errored
   targets**, so a transient per-region/namespace failure never drops series.
   Only a first-ever pass where every scope errors is fatal; after any
   snapshot exists, discovery errors are warnings.
+- **Aggregate discovery failure is atomic**: budget or stage-timeout exhaustion
+  discards all results from that refresh. An existing snapshot and its dependent
+  tag/query/observation state remain active, with the next attempt scheduled after
+  `discovery.refresh_every`. A first-ever aggregate failure is returned to the job
+  runner; parent cancellation changes neither snapshot state nor retry scheduling.
 - A warning fires at ≥1000 discovered instances as an early cost signal. The
   separate final-instance limit is applied later, after tag filtering and overlap.
 
@@ -491,6 +506,8 @@ aws-eusc).
 - `apiConcurrency` (5) bounds ListMetrics discovery, RGTA fetch groups, and
   GetMetricData chunk execution via `conc/pool`. `metricsPerQuery` (500) is the
   GetMetricData batch size. Both are internal constants, not config.
+- ListMetrics discovery first pages and continuation pages use separate bounded
+  fan-out phases so continuation depth cannot starve another group of its first call.
 - `clientCache` builds at most one CloudWatch client per (target, region), under
   a mutex, caching only successes (a transient credential error is retried next
   call).

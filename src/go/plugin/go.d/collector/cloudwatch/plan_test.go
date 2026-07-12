@@ -528,7 +528,7 @@ func TestCompileConfig_RejectsCompiledScopeOverflowWithoutPartialPlan(t *testing
 	}
 
 	plan, _, err := compileTestConfig(t, cfg)
-	assert.Nil(t, plan, "overflow must not return a partial plan plan")
+	assert.Nil(t, plan, "overflow must not return a partial plan")
 	assert.ErrorContains(t, err, "compiled collection scopes exceed maximum")
 }
 
@@ -559,11 +559,20 @@ func TestCompileConfig_DiscoveryGroupLimit(t *testing.T) {
 	assert.ErrorContains(t, err, "raise the safeguard")
 	assert.ErrorContains(t, err, "split the collection across multiple jobs")
 
-	raised := 2 * defaultMaxDiscoveryGroups
+	raised := maxDiscoveryGroupsPerJob
 	cfg.Limits.MaxDiscoveryGroups = raised
+	cfg.Rules[0].Targets = refs[:raised/len(cfg.Rules[0].Regions)]
+	cfg.Targets = cfg.Targets[:len(cfg.Rules[0].Targets)]
 	plan, _, err = compileTestConfig(t, cfg)
 	require.NoError(t, err)
 	assert.Len(t, plan.Scopes, raised)
+
+	cfg.Rules[0].Regions = append(cfg.Rules[0].Regions, "eu-west-1")
+	plan, _, err = compileTestConfig(t, cfg)
+	assert.Nil(t, plan)
+	require.ErrorContains(t, err, "derives 101 discovery groups")
+	assert.NotContains(t, err.Error(), "raise the safeguard")
+	assert.Contains(t, err.Error(), "split the collection across multiple jobs")
 }
 
 func TestCompileConfig_DiscoveryGroupsShareTargetRegionNamespace(t *testing.T) {

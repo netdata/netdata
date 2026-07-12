@@ -46,6 +46,9 @@ func runGetMetricData(ctx context.Context, batch queryBatch) (map[string]queryOu
 			MaxDatapoints:     aws.Int32(int32(len(batch.queries) * batch.key.policy.bucketCount())),
 		})
 		if err != nil {
+			if isAWSAuthorizationError(err) {
+				markUnresolvedForbidden(byID)
+			}
 			return responseOutcomes(byID, batch), queryResultIssues(issueCounts), err
 		}
 
@@ -69,6 +72,10 @@ func runGetMetricData(ctx context.Context, batch queryBatch) (map[string]queryOu
 			default:
 				state.issue = queryIssueUnknownStatus
 			}
+		}
+		if hasForbiddenOperationMessage(out.Messages) {
+			markUnresolvedForbidden(byID)
+			break
 		}
 
 		if out.NextToken == nil || *out.NextToken == "" {
@@ -95,6 +102,25 @@ func runGetMetricData(ctx context.Context, batch queryBatch) (map[string]queryOu
 		}]++
 	}
 	return responseOutcomes(byID, batch), queryResultIssues(issueCounts), nil
+}
+
+func hasForbiddenOperationMessage(messages []cwtypes.MessageData) bool {
+	for _, message := range messages {
+		if isAWSAuthorizationCode(aws.ToString(message.Code)) {
+			return true
+		}
+	}
+	return false
+}
+
+func markUnresolvedForbidden(states map[string]*responseQueryState) {
+	for _, state := range states {
+		if state.complete {
+			continue
+		}
+		state.forbidden = true
+		state.issue = queryIssueForbidden
+	}
 }
 
 func accumulateCandidate(state *responseQueryState, values []float64, timestamps []time.Time, start, end time.Time) {

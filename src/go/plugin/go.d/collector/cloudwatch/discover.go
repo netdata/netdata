@@ -42,85 +42,118 @@ func selectedSeriesUseRecentlyActive(series []compiledSeries, enabled bool) bool
 	return true
 }
 
-// discoverProfileGroup scans one namespace once and applies each participating
-// profile's exact dimension matcher while streaming pages.
-func discoverProfileGroup(ctx context.Context, client cloudwatchClient, group discoveryGroup) (map[string][]discoveredInstance, error) {
-	if len(group.Profiles) == 0 {
-		return nil, nil
-	}
-	matchers := newDiscoveryMatcherIndex(group.Profiles)
+// discoveryGroupScanner owns the pagination and matching state for one group.
+// discoverAll runs every scanner's first page before allowing any scanner to
+// consume the shared continuation-operation budget.
+type discoveryGroupScanner struct {
+	group              discoveryGroup
+	matchers           map[string][]*discoveryMatcher
+	instances          map[string][]discoveredInstance
+	nextToken          *string
+	seenTokens         map[string]struct{}
+	pages              int
+	scannedMetrics     int
+	candidateInstances int
+	matcherEvaluations int
+	done               bool
+}
 
-	instances := make(map[string][]discoveredInstance, len(group.Profiles))
-	var nextToken *string
-	seenTokens := make(map[string]struct{})
-	pages, scannedMetrics, candidateInstances, matcherEvaluations := 0, 0, 0, 0
-	for {
-		in := &cloudwatch.ListMetricsInput{Namespace: aws.String(group.Namespace), NextToken: nextToken}
-		if group.RecentlyActive {
-			in.RecentlyActive = cwtypes.RecentlyActivePt3h
+func newDiscoveryGroupScanner(group discoveryGroup) *discoveryGroupScanner {
+	return &discoveryGroupScanner{
+		group:      group,
+		matchers:   newDiscoveryMatcherIndex(group.Profiles),
+		instances:  make(map[string][]discoveredInstance, len(group.Profiles)),
+		seenTokens: make(map[string]struct{}),
+	}
+}
+
+func (s *discoveryGroupScanner) scanPage(ctx context.Context, client cloudwatchClient, budget *discoveryBudget) error {
+	if s.done {
+		return nil
+	}
+	if s.pages > 0 {
+		if err := budget.reserveContinuationOperation(); err != nil {
+			return err
 		}
-		out, err := client.ListMetrics(ctx, in)
-		if err != nil {
-			return nil, err
-		}
+	}
+
+	in := &cloudwatch.ListMetricsInput{Namespace: aws.String(s.group.Namespace), NextToken: s.nextToken}
+	if s.group.RecentlyActive {
+		in.RecentlyActive = cwtypes.RecentlyActivePt3h
+	}
+	out, err := client.ListMetrics(ctx, in)
+	if err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	s.pages++
+	s.scannedMetrics += len(out.Metrics)
+	if s.scannedMetrics > maxScannedMetricsPerGroup {
+		return safeCollectorErrorf("ListMetrics scanned more than %d metrics for one discovery group", maxScannedMetricsPerGroup)
+	}
+	if err := budget.reserveScannedMetrics(len(out.Metrics)); err != nil {
+		return err
+	}
+	for _, metric := range out.Metrics {
 		if err := ctx.Err(); err != nil {
-			return nil, err
+			return err
 		}
-		pages++
-		scannedMetrics += len(out.Metrics)
-		if scannedMetrics > maxScannedMetricsPerGroup {
-			return nil, safeCollectorErrorf("ListMetrics scanned more than %d metrics for one discovery group", maxScannedMetricsPerGroup)
+		signature, values, ok := canonicalMetricDimensions(metric.Dimensions)
+		if !ok {
+			continue
 		}
-		for _, metric := range out.Metrics {
-			if err := ctx.Err(); err != nil {
-				return nil, err
+		matching := s.matchers[signature]
+		if len(matching) > maxDiscoveryMatcherEvaluationsPerGroup-s.matcherEvaluations {
+			return safeCollectorErrorf(
+				"ListMetrics requires more than %d residual profile matches for one discovery group",
+				maxDiscoveryMatcherEvaluationsPerGroup,
+			)
+		}
+		s.matcherEvaluations += len(matching)
+		if err := budget.reserveMatcherEvaluations(len(matching)); err != nil {
+			return err
+		}
+		for i, m := range matching {
+			if i%256 == 0 {
+				if err := ctx.Err(); err != nil {
+					return err
+				}
 			}
-			signature, values, ok := canonicalMetricDimensions(metric.Dimensions)
-			if !ok {
+			if !m.constantsHold(values) {
 				continue
 			}
-			for _, m := range matchers[signature] {
-				matcherEvaluations++
-				if matcherEvaluations > maxDiscoveryMatcherEvaluationsPerGroup {
-					return nil, safeCollectorErrorf(
-						"ListMetrics requires more than %d residual profile matches for one discovery group",
-						maxDiscoveryMatcherEvaluationsPerGroup,
-					)
-				}
-				if matcherEvaluations%256 == 0 {
-					if err := ctx.Err(); err != nil {
-						return nil, err
-					}
-				}
-				if !m.constantsHold(values) {
-					continue
-				}
-				ordered := m.orderedValues(values)
-				key := strings.Join(ordered, instanceKeySep)
-				if _, ok := m.seen[key]; ok {
-					continue
-				}
-				m.seen[key] = struct{}{}
-				candidateInstances++
-				if candidateInstances > maxCandidateInstancesPerGroup {
-					return nil, safeCollectorErrorf("ListMetrics found more than %d candidate instances for one discovery group", maxCandidateInstancesPerGroup)
-				}
-				instances[m.profileName] = append(instances[m.profileName], discoveredInstance{DimensionValues: ordered})
+			key := m.packedValues(values)
+			if _, ok := m.seen[key]; ok {
+				continue
 			}
+			if s.candidateInstances == maxCandidateInstancesPerGroup {
+				return safeCollectorErrorf("ListMetrics found more than %d candidate instances for one discovery group", maxCandidateInstancesPerGroup)
+			}
+			if err := budget.reserveCandidate(retainedCandidateBytes(key, len(m.outputOrder))); err != nil {
+				return err
+			}
+			s.candidateInstances++
+			m.seen[key] = struct{}{}
+			s.instances[m.profileName] = append(s.instances[m.profileName], discoveredInstance{DimensionValues: strings.Split(key, instanceKeySep)})
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		if pages == maxListMetricsPages {
-			return nil, safeCollectorErrorf("ListMetrics requires more than %d pages for one discovery group", maxListMetricsPages)
-		}
-		if _, ok := seenTokens[*out.NextToken]; ok {
-			return nil, safeCollectorError("ListMetrics returned a repeated pagination token")
-		}
-		seenTokens[*out.NextToken] = struct{}{}
-		nextToken = out.NextToken
 	}
-	return instances, nil
+
+	if out.NextToken == nil || *out.NextToken == "" {
+		s.done = true
+		return nil
+	}
+	if s.pages == maxListMetricsPages {
+		return safeCollectorErrorf("ListMetrics requires more than %d pages for one discovery group", maxListMetricsPages)
+	}
+	if _, ok := s.seenTokens[*out.NextToken]; ok {
+		return safeCollectorError("ListMetrics returned a repeated pagination token")
+	}
+	s.seenTokens[*out.NextToken] = struct{}{}
+	s.nextToken = out.NextToken
+	return nil
 }
 
 type discoveryDimension struct {
@@ -212,12 +245,21 @@ func (m *discoveryMatcher) constantsHold(canonicalValues []string) bool {
 	return true
 }
 
-func (m *discoveryMatcher) orderedValues(canonicalValues []string) []string {
-	values := make([]string, len(m.outputOrder))
-	for i, canonicalIndex := range m.outputOrder {
-		values[i] = canonicalValues[canonicalIndex]
+func (m *discoveryMatcher) packedValues(canonicalValues []string) string {
+	var size int
+	for _, canonicalIndex := range m.outputOrder {
+		size += len(canonicalValues[canonicalIndex])
 	}
-	return values
+	size += max(0, len(m.outputOrder)-1) * len(instanceKeySep)
+	var b strings.Builder
+	b.Grow(size)
+	for i, canonicalIndex := range m.outputOrder {
+		if i > 0 {
+			b.WriteString(instanceKeySep)
+		}
+		b.WriteString(canonicalValues[canonicalIndex])
+	}
+	return b.String()
 }
 
 // discoveryKey identifies a discovered instance set by target, profile, and region.
@@ -272,28 +314,86 @@ type discoveryGroupResult struct {
 // the least restrictive RecentlyActive policy required by its selected series.
 func discoverAll(
 	ctx context.Context,
-	newClient func(target, region string) (cloudwatchClient, error),
+	newClient func(context.Context, string, string) (cloudwatchClient, error),
 	groups []discoveryGroup,
 	maxConcurrency int,
 	timeout time.Duration,
-) []discoveryGroupResult {
+) ([]discoveryGroupResult, error) {
+	controller, err := newDiscoveryController(ctx, groups, timeout)
+	if err != nil {
+		return nil, err
+	}
+	defer controller.close()
+
 	results := make([]discoveryGroupResult, len(groups))
+	type groupRun struct {
+		scanner *discoveryGroupScanner
+		client  cloudwatchClient
+	}
+	runs := make([]groupRun, len(groups))
+	for i, group := range groups {
+		results[i].Group = group
+		runs[i].scanner = newDiscoveryGroupScanner(group)
+	}
+
+	// Complete the first-page phase before scheduling any continuation. This
+	// makes the budget's per-group reservation real rather than merely numeric:
+	// one fast, deep namespace cannot consume another group's first operation.
 	p := pool.New().WithMaxGoroutines(max(1, maxConcurrency))
 	for i, group := range groups {
 		p.Go(func() {
-			result := discoveryGroupResult{Group: group}
-			client, err := newClient(group.Target, group.Region)
-			if err == nil {
-				cctx, cancel := withTimeout(ctx, timeout)
-				defer cancel()
-				result.Instances, err = discoverProfileGroup(cctx, client, group)
+			lane := controller.lane(group)
+			if err := context.Cause(lane.ctx); err != nil {
+				results[i].Err = err
+				return
 			}
-			result.Err = err
-			results[i] = result
+			client, err := newClient(lane.ctx, group.Target, group.Region)
+			if err == nil {
+				runs[i].client = client
+				err = runs[i].scanner.scanPage(lane.ctx, client, controller.budget)
+			}
+			if isAWSAuthorizationError(err) {
+				controller.denyLane(group, err)
+			}
+			results[i].Err = err
+			if err == nil && runs[i].scanner.done {
+				results[i].Instances = runs[i].scanner.instances
+			}
 		})
 	}
 	p.Wait()
-	return results
+	if err := controller.failure(); err != nil {
+		return results, err
+	}
+
+	// Continuations share only the operation budget left after all executable
+	// groups have completed their first operation.
+	p = pool.New().WithMaxGoroutines(max(1, maxConcurrency))
+	for i, group := range groups {
+		if results[i].Err != nil || runs[i].scanner.done {
+			continue
+		}
+		p.Go(func() {
+			lane := controller.lane(group)
+			if err := context.Cause(lane.ctx); err != nil {
+				results[i].Err = err
+				return
+			}
+			for !runs[i].scanner.done {
+				err := runs[i].scanner.scanPage(lane.ctx, runs[i].client, controller.budget)
+				if err != nil {
+					if isAWSAuthorizationError(err) {
+						controller.denyLane(group, err)
+					}
+					results[i].Err = err
+					return
+				}
+			}
+			results[i].Instances = runs[i].scanner.instances
+		})
+	}
+	p.Wait()
+	return results, controller.failure()
 }
 
 // buildDiscoverySnapshot assembles a snapshot from namespace-group results and
@@ -357,10 +457,10 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 		return nil
 	}
 
-	newClient := func(target, region string) (cloudwatchClient, error) {
-		return c.clients.forTargetRegion(ctx, target, region)
+	newClient := func(callCtx context.Context, target, region string) (cloudwatchClient, error) {
+		return c.clients.forTargetRegion(callCtx, target, region)
 	}
-	results := discoverAll(ctx, newClient, c.discoveryGroups(), apiConcurrency, c.Timeout.Duration())
+	results, aggregateErr := discoverAll(ctx, newClient, c.discoveryGroups(), apiConcurrency, c.Timeout.Duration())
 	// If the parent context was canceled or timed out during the fan-out, abort before
 	// committing: buildDiscoverySnapshot would otherwise carry forward instances (or
 	// accept a partial first snapshot) and advance the TTL, so the next cycle would skip
@@ -368,6 +468,16 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	// does not trip this, so it stays fail-soft.
 	if err := ctx.Err(); err != nil {
 		return err
+	}
+	if aggregateErr != nil {
+		completedAt := c.now()
+		c.Limit(logKeyDiscoveryTargetFailed+"_aggregate", 1, recurringLogEvery).
+			Warningf("CloudWatch discovery refresh was discarded atomically: %v", sanitizeAWSError(aggregateErr))
+		if c.discovery.FetchedAt.IsZero() {
+			return fmt.Errorf("CloudWatch discovery refresh failed: %w", sanitizeAWSError(aggregateErr))
+		}
+		c.discovery.ExpiresAt = completedAt.Add(time.Duration(c.Discovery.RefreshEvery) * time.Second)
+		return nil
 	}
 	// Failed targets carry forward their previous instances, so a transient
 	// per-region/namespace failure does not drop series (spec: keep last snapshot).

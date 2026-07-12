@@ -187,8 +187,8 @@ func (c Config) validate() error {
 	if c.Limits.MaxInstances < 0 {
 		errs = append(errs, errors.New("'limits.max_instances' must be >= 1"))
 	}
-	if value := c.Limits.maxDiscoveryGroups(); value < 1 || value > maxCompiledScopes {
-		errs = append(errs, fmt.Errorf("'limits.max_discovery_groups' must be between 1 and %d", maxCompiledScopes))
+	if value := c.Limits.maxDiscoveryGroups(); value < 1 || value > maxDiscoveryGroupsPerJob {
+		errs = append(errs, fmt.Errorf("'limits.max_discovery_groups' must be between 1 and %d", maxDiscoveryGroupsPerJob))
 	}
 	if err := validateConfigStructure(c); err != nil {
 		errs = append(errs, err)

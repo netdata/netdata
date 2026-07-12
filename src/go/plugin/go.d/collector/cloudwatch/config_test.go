@@ -64,8 +64,8 @@ func TestConfig_validate(t *testing.T) {
 		"negative discovery group limit": {mutate: func(c *Config) {
 			c.Limits.MaxDiscoveryGroups = -1
 		}, wantErr: true},
-		"discovery group limit above structural maximum": {mutate: func(c *Config) {
-			c.Limits.MaxDiscoveryGroups = maxCompiledScopes + 1
+		"discovery group limit above synchronous maximum": {mutate: func(c *Config) {
+			c.Limits.MaxDiscoveryGroups = maxDiscoveryGroupsPerJob + 1
 		}, wantErr: true},
 	}
 
@@ -279,7 +279,7 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 	require.NoError(t, json.Unmarshal(data, &fullDoc))
 	discoveryGroupLimit := schemaObjectAt(t, fullDoc, "jsonSchema", "properties", "limits", "properties", "max_discovery_groups")
 	assert.Equal(t, float64(defaultMaxDiscoveryGroups), discoveryGroupLimit["default"])
-	assert.Equal(t, float64(maxCompiledScopes), discoveryGroupLimit["maximum"])
+	assert.Equal(t, float64(maxDiscoveryGroupsPerJob), discoveryGroupLimit["maximum"])
 	for key, want := range map[string]string{
 		"credentials": `[{"name":"sdk_default","type":"default"}]`,
 		"targets":     `[{"name":"base","credentials":"sdk_default"}]`,
@@ -576,7 +576,7 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 		cfg["labels"] = map[string]any{"resource_tags": []any{
 			map[string]any{"key": "Owner", "label": "resource_owner"},
 		}}
-		cfg["limits"] = map[string]any{"max_instances": 2000, "max_discovery_groups": 128}
+		cfg["limits"] = map[string]any{"max_instances": 2000, "max_discovery_groups": 80}
 		cfg["rules"] = []any{
 			map[string]any{"name": "filtered", "targets": []any{"base"}, "regions": []any{"us-east-1"}, "profiles": map[string]any{"defaults": false, "include": []any{"ec2"}}},
 			map[string]any{"name": "unfiltered", "targets": []any{"base"}, "regions": []any{"us-east-1"}, "profiles": map[string]any{"defaults": false, "include": []any{"cloudfront"}}, "filters": map[string]any{"resource_tags": []any{}}},
@@ -585,7 +585,7 @@ func TestConfigSchema_ValidationParity(t *testing.T) {
 		assert.NoError(t, validateRuntimeConfigMap(t, cfg))
 	})
 
-	for name, value := range map[string]int{"negative": -1, "above structural maximum": maxCompiledScopes + 1} {
+	for name, value := range map[string]int{"negative": -1, "above synchronous maximum": maxDiscoveryGroupsPerJob + 1} {
 		t.Run("discovery group limit "+name+" is rejected", func(t *testing.T) {
 			cfg := cloneConfigMap(t, valid)
 			cfg["limits"] = map[string]any{"max_discovery_groups": value}

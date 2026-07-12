@@ -498,10 +498,10 @@
           },
           "max_discovery_groups": {
             "title": "Maximum discovery groups",
-            "description": "Maximum unique target, region, and CloudWatch namespace combinations. Raise this explicitly for an intentionally larger job; increasing it permits more ListMetrics work.",
+            "description": "Maximum unique target, region, and CloudWatch namespace combinations. The default catches accidental expansion. Valid range 1–100; split larger collection across jobs.",
             "type": "integer",
             "minimum": 1,
-            "maximum": 4096,
+            "maximum": 100,
             "default": 64
           }
         }
@@ -525,7 +525,7 @@
       },
       "timeout": {
         "title": "Timeout",
-        "description": "Per-request timeout in seconds.",
+        "description": "AWS operation timeout in seconds. Discovery shares one timeout across its whole refresh stage.",
         "type": "number",
         "minimum": 0,
         "default": 30
@@ -779,7 +779,7 @@
         "ui:placeholder": "1000"
       },
       "max_discovery_groups": {
-        "ui:help": "Safeguard for unique target, region, and namespace discovery groups. Compatible rules and profiles share groups. Raise this only when the resulting ListMetrics work is intentional; splitting across jobs remains available.",
+        "ui:help": "Safeguard for unique target, region, and namespace discovery groups. Compatible rules and profiles share groups. The default 64 is intended to catch accidental expansion; the hard maximum is 100 because every group needs at least one ListMetrics operation in the bounded refresh. Split larger collection across jobs.",
         "ui:placeholder": "64"
       }
     },

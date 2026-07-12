@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/aws/smithy-go"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
@@ -41,6 +43,43 @@ type cancelingListMetrics struct {
 
 type staticListMetrics struct {
 	out *cloudwatch.ListMetricsOutput
+}
+
+type operationRecordingCloudWatch struct {
+	mu    sync.Mutex
+	calls map[string]int
+}
+
+type blockingListMetrics struct{}
+
+func (blockingListMetrics) ListMetrics(ctx context.Context, _ *cloudwatch.ListMetricsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func (blockingListMetrics) GetMetricData(context.Context, *cloudwatch.GetMetricDataInput, ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+	return nil, nil
+}
+
+func (f *operationRecordingCloudWatch) ListMetrics(_ context.Context, in *cloudwatch.ListMetricsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	namespace := aws.ToString(in.Namespace)
+	f.calls[namespace]++
+	if namespace == "AWS/Deep" {
+		return &cloudwatch.ListMetricsOutput{NextToken: aws.String(fmt.Sprintf("page-%d", f.calls[namespace]))}, nil
+	}
+	return &cloudwatch.ListMetricsOutput{}, nil
+}
+
+func (*operationRecordingCloudWatch) GetMetricData(context.Context, *cloudwatch.GetMetricDataInput, ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+	return nil, nil
+}
+
+func (f *operationRecordingCloudWatch) callCount(namespace string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.calls[namespace]
 }
 
 func (f cancelingListMetrics) ListMetrics(context.Context, *cloudwatch.ListMetricsInput, ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
@@ -117,9 +156,43 @@ func dimProfile(namespace string, period int, dimNames ...string) cwprofiles.Pro
 	}
 }
 
+func testDiscoveryBudget(groupCount int) *discoveryBudget {
+	budget, err := newDiscoveryBudget(groupCount, func(error) {})
+	if err != nil {
+		panic(err)
+	}
+	return budget
+}
+
+func scanDiscoveryGroupForTest(ctx context.Context, client cloudwatchClient, group discoveryGroup) (map[string][]discoveredInstance, error) {
+	if len(group.Profiles) == 0 {
+		return nil, nil
+	}
+	scanner := newDiscoveryGroupScanner(group)
+	budget := testDiscoveryBudget(1)
+	for !scanner.done {
+		if err := scanner.scanPage(ctx, client, budget); err != nil {
+			return nil, err
+		}
+	}
+	return scanner.instances, nil
+}
+
+func discoverAllForTest(
+	t testing.TB,
+	newClient func(context.Context, string, string) (cloudwatchClient, error),
+	groups []discoveryGroup,
+	maxConcurrency int,
+) []discoveryGroupResult {
+	t.Helper()
+	results, err := discoverAll(context.Background(), newClient, groups, maxConcurrency, time.Second)
+	require.NoError(t, err)
+	return results
+}
+
 func discoverOneProfile(ctx context.Context, client cloudwatchClient, profile cwprofiles.Profile, useRecentlyActive bool) ([]discoveredInstance, error) {
 	const profileName = "test"
-	instances, err := discoverProfileGroup(ctx, client, discoveryGroup{
+	instances, err := scanDiscoveryGroupForTest(ctx, client, discoveryGroup{
 		Namespace: profile.Namespace, RecentlyActive: useRecentlyActive,
 		Profiles: []cwprofiles.ResolvedProfile{{Name: profileName, Config: profile}},
 	})
@@ -376,7 +449,7 @@ func TestDiscoverAll(t *testing.T) {
 		},
 	}
 
-	newClient := func(_, region string) (cloudwatchClient, error) {
+	newClient := func(_ context.Context, _, region string) (cloudwatchClient, error) {
 		return &nsCloudWatch{byNS: regionData[region]}, nil
 	}
 
@@ -387,7 +460,7 @@ func TestDiscoverAll(t *testing.T) {
 			discoveryGroup{Target: "base", Region: region, Namespace: "AWS/S3", Profiles: []cwprofiles.ResolvedProfile{s3}},
 		)
 	}
-	results := discoverAll(context.Background(), newClient, groups, 5, 0)
+	results := discoverAllForTest(t, newClient, groups, 5)
 	require.Len(t, results, 4)
 
 	snap, failures := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
@@ -408,9 +481,9 @@ func TestDiscoverAll_UsesCompiledGroupNamespace(t *testing.T) {
 	fake := &nsCloudWatch{byNS: map[string][]cwtypes.Metric{
 		"AWS/CompiledNamespace": {mkMetric("CPUUtilization", "InstanceId", "i-1")},
 	}}
-	results := discoverAll(context.Background(), func(_, _ string) (cloudwatchClient, error) { return fake, nil }, []discoveryGroup{{
+	results := discoverAllForTest(t, func(context.Context, string, string) (cloudwatchClient, error) { return fake, nil }, []discoveryGroup{{
 		Target: "base", Region: "us-east-1", Namespace: "AWS/CompiledNamespace", Profiles: []cwprofiles.ResolvedProfile{profile},
-	}}, 1, 0)
+	}}, 1)
 
 	require.Len(t, results, 1)
 	assert.Equal(t, [][]string{{"i-1"}}, dimValues(results[0].Instances["custom"]))
@@ -419,7 +492,7 @@ func TestDiscoverAll_UsesCompiledGroupNamespace(t *testing.T) {
 func TestDiscoverAll_ClientBuildErrorIsPerTarget(t *testing.T) {
 	ec2 := resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))
 
-	newClient := func(_, region string) (cloudwatchClient, error) {
+	newClient := func(_ context.Context, _, region string) (cloudwatchClient, error) {
 		if region == "bad-region" {
 			return nil, errors.New("no credentials for region")
 		}
@@ -428,10 +501,10 @@ func TestDiscoverAll_ClientBuildErrorIsPerTarget(t *testing.T) {
 		}}, nil
 	}
 
-	results := discoverAll(context.Background(), newClient, []discoveryGroup{
+	results := discoverAllForTest(t, newClient, []discoveryGroup{
 		{Target: "base", Region: "us-east-1", Namespace: "AWS/EC2", RecentlyActive: true, Profiles: []cwprofiles.ResolvedProfile{ec2}},
 		{Target: "base", Region: "bad-region", Namespace: "AWS/EC2", RecentlyActive: true, Profiles: []cwprofiles.ResolvedProfile{ec2}},
-	}, 5, 0)
+	}, 5)
 
 	snap, failures := buildDiscoverySnapshot(results, nil, time.Unix(1000, 0), 300)
 	require.Equal(t, 1, failures)
@@ -459,7 +532,7 @@ func TestCollector_DiscoveryGroupsDeduplicateCompatibleNamespaceScans(t *testing
 	assert.Equal(t, []string{"alb", "alb_target_health"}, []string{groups[0].Profiles[0].Name, groups[0].Profiles[1].Name})
 
 	fake := &nsCloudWatch{byNS: map[string][]cwtypes.Metric{"AWS/ApplicationELB": {}}}
-	results := discoverAll(context.Background(), func(_, _ string) (cloudwatchClient, error) { return fake, nil }, groups, 5, 0)
+	results := discoverAllForTest(t, func(context.Context, string, string) (cloudwatchClient, error) { return fake, nil }, groups, 5)
 	require.Len(t, results, 1, "one shared scan produces one group result")
 	assert.Len(t, results[0].Instances, 0)
 	assert.Equal(t, 1, fake.calls, "compatible profiles share one ListMetrics scan")
@@ -512,7 +585,7 @@ func TestCollector_DiscoveryGroupsCoalesceToLeastRestrictiveRecentlyActivePolicy
 	assert.Equal(t, []string{"fast", "slow"}, []string{groups[0].Profiles[0].Name, groups[0].Profiles[1].Name})
 
 	fake := &nsCloudWatch{byNS: map[string][]cwtypes.Metric{"AWS/Shared": {}}}
-	results := discoverAll(context.Background(), func(_, _ string) (cloudwatchClient, error) { return fake, nil }, groups, 5, 0)
+	results := discoverAllForTest(t, func(context.Context, string, string) (cloudwatchClient, error) { return fake, nil }, groups, 5)
 	require.Len(t, results, 1)
 	assert.Equal(t, 1, fake.calls, "the unfiltered superset scan replaces a redundant filtered sibling scan")
 }
@@ -554,6 +627,84 @@ func TestBuildDiscoverySnapshot_FailSoftCarriesForward(t *testing.T) {
 	require.Equal(t, 1, failures)
 	assert.Equal(t, [][]string{{"i-2"}}, dimValues(snap.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}]), "succeeded target is refreshed")
 	assert.Equal(t, [][]string{{"i-9"}}, dimValues(snap.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-west-2"}]), "failed target carries forward last-known instances")
+}
+
+func TestDiscoverAll_CoalescesAuthorizationFailureWithinTargetRegion(t *testing.T) {
+	profile := func(name, namespace string) cwprofiles.ResolvedProfile {
+		return cwprofiles.ResolvedProfile{Name: name, Config: cwprofiles.Profile{
+			Namespace: namespace,
+			Instance:  cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "Id", Label: "id"}}},
+		}}
+	}
+	groups := []discoveryGroup{
+		{Target: "base", Region: "us-east-1", Namespace: "AWS/First", Profiles: []cwprofiles.ResolvedProfile{profile("first", "AWS/First")}},
+		{Target: "base", Region: "us-east-1", Namespace: "AWS/Second", Profiles: []cwprofiles.ResolvedProfile{profile("second", "AWS/Second")}},
+	}
+	fake := &fakeCloudWatch{err: &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "sensitive"}}
+
+	results := discoverAllForTest(t, func(context.Context, string, string) (cloudwatchClient, error) { return fake, nil }, groups, 1)
+	require.Len(t, results, 2)
+	assert.Len(t, fake.inputs, 1, "the first explicit authorization denial must skip queued sibling namespaces in the same target/region")
+	assert.Error(t, results[0].Err)
+	assert.Error(t, results[1].Err)
+}
+
+func TestDiscoverAll_AuthorizationFailureDoesNotCancelUnrelatedLane(t *testing.T) {
+	profile := func(name, namespace string) cwprofiles.ResolvedProfile {
+		return resolved(name, dimProfile(namespace, 300, "Id"))
+	}
+	groups := []discoveryGroup{
+		{Target: "denied", Region: "us-east-1", Namespace: "AWS/First", Profiles: []cwprofiles.ResolvedProfile{profile("first", "AWS/First")}},
+		{Target: "denied", Region: "us-east-1", Namespace: "AWS/Second", Profiles: []cwprofiles.ResolvedProfile{profile("second", "AWS/Second")}},
+		{Target: "allowed", Region: "us-east-1", Namespace: "AWS/Allowed", Profiles: []cwprofiles.ResolvedProfile{profile("allowed", "AWS/Allowed")}},
+	}
+	denied := &fakeCloudWatch{err: &smithy.GenericAPIError{Code: "AccessDeniedException", Message: "sensitive"}}
+	allowed := &nsCloudWatch{byNS: map[string][]cwtypes.Metric{"AWS/Allowed": {}}}
+
+	results := discoverAllForTest(t, func(_ context.Context, target, _ string) (cloudwatchClient, error) {
+		if target == "denied" {
+			return denied, nil
+		}
+		return allowed, nil
+	}, groups, 1)
+
+	require.Len(t, results, 3)
+	assert.Len(t, denied.inputs, 1)
+	assert.Equal(t, 1, allowed.calls, "authorization denial in one target/region lane must not cancel another lane")
+	assert.NoError(t, results[2].Err)
+}
+
+func TestDiscoverAll_ProtectsFirstOperationBeforeContinuations(t *testing.T) {
+	profile := func(name, namespace string) cwprofiles.ResolvedProfile {
+		return resolved(name, dimProfile(namespace, 300, "Id"))
+	}
+	groups := []discoveryGroup{
+		{Target: "base", Region: "us-east-1", Namespace: "AWS/Deep", Profiles: []cwprofiles.ResolvedProfile{profile("deep", "AWS/Deep")}},
+		{Target: "base", Region: "us-east-1", Namespace: "AWS/Shallow", Profiles: []cwprofiles.ResolvedProfile{profile("shallow", "AWS/Shallow")}},
+	}
+	fake := &operationRecordingCloudWatch{calls: make(map[string]int)}
+
+	results, err := discoverAll(context.Background(), func(context.Context, string, string) (cloudwatchClient, error) {
+		return fake, nil
+	}, groups, 1, time.Second)
+
+	assert.ErrorContains(t, err, "more than 100 ListMetrics SDK operations")
+	require.Len(t, results, 2)
+	assert.Equal(t, 1, fake.callCount("AWS/Shallow"), "the shallow group's first operation must run before deep-group continuations")
+	assert.Equal(t, maxListMetricsOperationsPerRefresh, fake.callCount("AWS/Deep")+fake.callCount("AWS/Shallow"))
+}
+
+func TestDiscoverAll_SharedStageTimeout(t *testing.T) {
+	profile := resolved("blocked", dimProfile("AWS/Blocked", 300, "Id"))
+	results, err := discoverAll(context.Background(), func(context.Context, string, string) (cloudwatchClient, error) {
+		return blockingListMetrics{}, nil
+	}, []discoveryGroup{{
+		Target: "base", Region: "us-east-1", Namespace: "AWS/Blocked", Profiles: []cwprofiles.ResolvedProfile{profile},
+	}}, 1, 10*time.Millisecond)
+
+	assert.ErrorContains(t, err, "discovery stage timed out")
+	require.Len(t, results, 1)
+	assert.Error(t, results[0].Err)
 }
 
 func TestDiscoverySnapshot_Expired(t *testing.T) {
@@ -598,7 +749,7 @@ func BenchmarkDiscoverProfileGroupPolicyCount(b *testing.B) {
 			b.ReportAllocs()
 			b.ResetTimer()
 			for range b.N {
-				got, err := discoverProfileGroup(context.Background(), client, groups[0])
+				got, err := scanDiscoveryGroupForTest(context.Background(), client, groups[0])
 				if err != nil {
 					b.Fatal(err)
 				}
@@ -607,6 +758,93 @@ func BenchmarkDiscoverProfileGroupPolicyCount(b *testing.B) {
 				}
 			}
 		})
+	}
+}
+
+func BenchmarkDiscoverProfileGroupCandidateDimensions(b *testing.B) {
+	const instances = 1000
+	for _, dimensions := range []int{1, 10, 30} {
+		b.Run(fmt.Sprintf("dimensions=%d", dimensions), func(b *testing.B) {
+			profileDims := make([]cwprofiles.InstanceDimension, dimensions)
+			for i := range profileDims {
+				profileDims[i] = cwprofiles.InstanceDimension{Name: fmt.Sprintf("Dimension%d", i), Label: fmt.Sprintf("dimension_%d", i)}
+			}
+			group := discoveryGroup{
+				Namespace: "AWS/Test",
+				Profiles: []cwprofiles.ResolvedProfile{{
+					Name:   "test",
+					Config: cwprofiles.Profile{Instance: cwprofiles.InstanceSpec{Dimensions: profileDims}},
+				}},
+			}
+			metrics := make([]cwtypes.Metric, instances)
+			for i := range metrics {
+				dims := make([]cwtypes.Dimension, dimensions)
+				for j := range dims {
+					dims[j] = cwtypes.Dimension{
+						Name:  aws.String(fmt.Sprintf("Dimension%d", j)),
+						Value: aws.String(fmt.Sprintf("instance-%d-value-%d", i, j)),
+					}
+				}
+				metrics[i] = cwtypes.Metric{Dimensions: dims, MetricName: aws.String("Metric"), Namespace: aws.String("AWS/Test")}
+			}
+			client := staticListMetrics{out: &cloudwatch.ListMetricsOutput{Metrics: metrics}}
+
+			b.ReportAllocs()
+			b.ResetTimer()
+			for range b.N {
+				got, err := scanDiscoveryGroupForTest(context.Background(), client, group)
+				if err != nil {
+					b.Fatal(err)
+				}
+				if len(got["test"]) != instances {
+					b.Fatalf("discovered %d instances, want %d", len(got["test"]), instances)
+				}
+			}
+		})
+	}
+}
+
+func BenchmarkDiscoverProfileGroupMaximumCandidatePayload(b *testing.B) {
+	const (
+		instances  = 1000
+		dimensions = 30
+		valueBytes = 1024
+	)
+	profileDims := make([]cwprofiles.InstanceDimension, dimensions)
+	for i := range profileDims {
+		profileDims[i] = cwprofiles.InstanceDimension{Name: fmt.Sprintf("Dimension%d", i), Label: fmt.Sprintf("dimension_%d", i)}
+	}
+	group := discoveryGroup{
+		Namespace: "AWS/Test",
+		Profiles: []cwprofiles.ResolvedProfile{{
+			Name:   "test",
+			Config: cwprofiles.Profile{Instance: cwprofiles.InstanceSpec{Dimensions: profileDims}},
+		}},
+	}
+	metrics := make([]cwtypes.Metric, instances)
+	for i := range metrics {
+		dims := make([]cwtypes.Dimension, dimensions)
+		for j := range dims {
+			prefix := fmt.Sprintf("instance-%06d-dimension-%02d-", i, j)
+			dims[j] = cwtypes.Dimension{
+				Name:  aws.String(fmt.Sprintf("Dimension%d", j)),
+				Value: aws.String(prefix + strings.Repeat("x", valueBytes-len(prefix))),
+			}
+		}
+		metrics[i] = cwtypes.Metric{Dimensions: dims, MetricName: aws.String("Metric"), Namespace: aws.String("AWS/Test")}
+	}
+	client := staticListMetrics{out: &cloudwatch.ListMetricsOutput{Metrics: metrics}}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		got, err := scanDiscoveryGroupForTest(context.Background(), client, group)
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(got["test"]) != instances {
+			b.Fatalf("discovered %d instances, want %d", len(got["test"]), instances)
+		}
 	}
 }
 
@@ -680,6 +918,73 @@ func TestCollector_refreshDiscovery_TotalFailureFirstPassErrors(t *testing.T) {
 	assert.Error(t, err, "all-target failure on the first pass must surface")
 	assert.True(t, c.discovery.FetchedAt.IsZero())
 	assert.Contains(t, logs.String(), "AWS/EC2")
+}
+
+func newAggregateFailureCollector(now time.Time) (*Collector, *operationRecordingCloudWatch) {
+	c := New()
+	c.Discovery.RefreshEvery = 300
+	profiles := []cwprofiles.ResolvedProfile{
+		resolved("deep", dimProfile("AWS/Deep", 300, "Id")),
+		resolved("shallow", dimProfile("AWS/Shallow", 300, "Id")),
+	}
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, profiles)
+	c.now = func() time.Time { return now }
+	fake := &operationRecordingCloudWatch{calls: make(map[string]int)}
+	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) {
+		return aws.Config{Region: "us-east-1"}, nil
+	}
+	c.newCloudWatchClient = func(aws.Config) cloudwatchClient { return fake }
+	return c, fake
+}
+
+func TestCollector_refreshDiscovery_AggregateFailureIsAtomicWithSnapshot(t *testing.T) {
+	base := time.Unix(1000, 0)
+	c, _ := newAggregateFailureCollector(base)
+	oldInstances := map[discoveryKey][]discoveredInstance{
+		{Target: "base", Profile: "deep", Region: "us-east-1"}: {{DimensionValues: []string{"old"}}},
+	}
+	c.discovery = discoverySnapshot{Instances: oldInstances, FetchedAt: base.Add(-time.Hour), ExpiresAt: base}
+	c.tagFetchPlan = []tagFetchGroup{{key: tagFetchKey{target: "sentinel"}}}
+	c.queryPlan = []plannedQuery{{key: "sentinel"}}
+	c.planDirty = false
+	c.observations.queries["sentinel"] = queryState{hasObservation: true, observation: 42}
+
+	require.NoError(t, c.refreshDiscovery(context.Background()))
+
+	assert.Equal(t, oldInstances, c.discovery.Instances)
+	assert.Equal(t, base.Add(-time.Hour), c.discovery.FetchedAt)
+	assert.Equal(t, base.Add(300*time.Second), c.discovery.ExpiresAt)
+	assert.Equal(t, "sentinel", c.tagFetchPlan[0].key.target)
+	assert.Equal(t, "sentinel", c.queryPlan[0].key)
+	assert.False(t, c.planDirty)
+	assert.Equal(t, float64(42), c.observations.queries["sentinel"].observation)
+}
+
+func TestCollector_refreshDiscovery_AggregateFailureFirstPassErrors(t *testing.T) {
+	c, _ := newAggregateFailureCollector(time.Unix(1000, 0))
+
+	err := c.refreshDiscovery(context.Background())
+
+	assert.ErrorContains(t, err, "more than 100 ListMetrics SDK operations")
+	assert.True(t, c.discovery.FetchedAt.IsZero())
+	assert.True(t, c.discovery.ExpiresAt.IsZero())
+}
+
+func TestCollector_refreshDiscovery_ParentCancellationDoesNotScheduleRefresh(t *testing.T) {
+	base := time.Unix(1000, 0)
+	c, _ := newAggregateFailureCollector(base)
+	c.discovery = discoverySnapshot{
+		Instances: map[discoveryKey][]discoveredInstance{},
+		FetchedAt: base.Add(-time.Hour),
+		ExpiresAt: base,
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	err := c.refreshDiscovery(ctx)
+
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Equal(t, base, c.discovery.ExpiresAt)
 }
 
 // errListMetrics is a CloudWatch client whose ListMetrics always errors — used to
@@ -776,7 +1081,7 @@ func TestDiscoverProfileGroup_WorkBounds(t *testing.T) {
 				pages[i].NextToken = aws.String(fmt.Sprintf("page-%d", i+1))
 			}
 		}
-		_, err := discoverProfileGroup(context.Background(), &fakeCloudWatch{pages: pages}, group)
+		_, err := scanDiscoveryGroupForTest(context.Background(), &fakeCloudWatch{pages: pages}, group)
 		require.NoError(t, err)
 	})
 
@@ -785,7 +1090,7 @@ func TestDiscoverProfileGroup_WorkBounds(t *testing.T) {
 		for i := range pages {
 			pages[i] = &cloudwatch.ListMetricsOutput{NextToken: aws.String(fmt.Sprintf("page-%d", i+1))}
 		}
-		_, err := discoverProfileGroup(context.Background(), &fakeCloudWatch{pages: pages}, group)
+		_, err := scanDiscoveryGroupForTest(context.Background(), &fakeCloudWatch{pages: pages}, group)
 		assert.ErrorContains(t, err, "requires more than 100 pages")
 	})
 
@@ -794,13 +1099,13 @@ func TestDiscoverProfileGroup_WorkBounds(t *testing.T) {
 			{NextToken: aws.String("repeat")},
 			{NextToken: aws.String("repeat")},
 		}
-		_, err := discoverProfileGroup(context.Background(), &fakeCloudWatch{pages: pages}, group)
+		_, err := scanDiscoveryGroupForTest(context.Background(), &fakeCloudWatch{pages: pages}, group)
 		assert.ErrorContains(t, err, "repeated pagination token")
 	})
 
 	t.Run("scanned metric maximum exceeded", func(t *testing.T) {
 		pages := []*cloudwatch.ListMetricsOutput{{Metrics: make([]cwtypes.Metric, maxScannedMetricsPerGroup+1)}}
-		_, err := discoverProfileGroup(context.Background(), &fakeCloudWatch{pages: pages}, group)
+		_, err := scanDiscoveryGroupForTest(context.Background(), &fakeCloudWatch{pages: pages}, group)
 		assert.ErrorContains(t, err, "scanned more than 50000 metrics")
 	})
 
@@ -809,7 +1114,7 @@ func TestDiscoverProfileGroup_WorkBounds(t *testing.T) {
 		for i := range metrics {
 			metrics[i] = mkMetric("CPUUtilization", "InstanceId", fmt.Sprintf("i-%d", i))
 		}
-		_, err := discoverProfileGroup(context.Background(), &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{{Metrics: metrics}}}, group)
+		_, err := scanDiscoveryGroupForTest(context.Background(), &fakeCloudWatch{pages: []*cloudwatch.ListMetricsOutput{{Metrics: metrics}}}, group)
 		assert.ErrorContains(t, err, "found more than 20000 candidate instances")
 	})
 
@@ -833,7 +1138,7 @@ func TestDiscoverProfileGroup_WorkBounds(t *testing.T) {
 		}
 		group := discoveryGroup{Namespace: "AWS/Test", Profiles: profiles}
 
-		_, err := discoverProfileGroup(context.Background(), staticListMetrics{
+		_, err := scanDiscoveryGroupForTest(context.Background(), staticListMetrics{
 			out: &cloudwatch.ListMetricsOutput{Metrics: metrics},
 		}, group)
 		assert.ErrorContains(t, err, "more than 1000000 residual profile matches")
@@ -863,7 +1168,7 @@ func BenchmarkDiscoverProfileGroup_ResidualMatching(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for range b.N {
-		instances, err := discoverProfileGroup(context.Background(), client, group)
+		instances, err := scanDiscoveryGroupForTest(context.Background(), client, group)
 		if err != nil {
 			b.Fatal(err)
 		}

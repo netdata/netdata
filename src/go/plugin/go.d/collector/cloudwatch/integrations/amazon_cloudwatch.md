@@ -99,8 +99,10 @@ A rule that omits `profiles` selects all default-enabled profiles for its target
 - A successful sparse query can replay its newest eligible CloudWatch value for up to `lookback`. During transient AWS failures, the retained value can be replayed longer, until a successful query replaces or expires it.
 - Query-plan preflight rejects more than 20,000 selected series, 600,000 all-due datapoints, or 40 packed `GetMetricData` requests before allocating AWS query structures. Billing units of up to five statistics for one structural metric are kept in one request.
 - `limits.max_instances` defaults to 1000 distinct final resource instances after tag filtering and overlap resolution. Exceeding it rejects the refreshed query plan; resources are never silently truncated.
-- `limits.max_discovery_groups` defaults to 64 unique `(target, region, namespace)` groups per job. Compatible rules and profiles share a group. The safeguard catches accidental expansion; intentionally larger installations can raise it (up to the structural maximum of 4096) or split collection across jobs. Increasing it permits proportionally more `ListMetrics` work.
+- `limits.max_discovery_groups` defaults to 64 unique `(target, region, namespace)` groups per job. Compatible rules and profiles share a group. The safeguard catches accidental expansion and can be raised to the hard maximum of 100; larger collection must be split across jobs so every group can receive one operation within the bounded refresh.
 - Each discovery group is independently bounded to 100 `ListMetrics` pages, 50,000 scanned metrics, 1,000,000 residual same-shape profile matches, and 20,000 candidate instances. Overflow fails the group without replacing its previous snapshot.
+- One discovery refresh is additionally bounded to 100 admitted `ListMetrics` SDK operations, 50,000 scanned metrics, 1,000,000 residual profile matches, 20,000 retained candidates, 64 MiB of conservatively weighted candidate storage, and one shared `timeout`. Every executable group runs its first operation before continuations share the remaining operation budget. The AWS SDK can retry each admitted operation up to five wire attempts.
+- Aggregate discovery-limit or timeout exhaustion discards the attempted refresh atomically. An existing snapshot remains active and discovery retries after `discovery.refresh_every`; a first-ever failure makes the collection attempt fail so the job runner applies its retry penalty.
 - Resources are labeled by their identifying CloudWatch dimensions (for example EC2 `instance_id`). Selected resource tags can additionally be attached as non-identity labels via `labels.resource_tags`; changing those tags updates labels without changing chart identity. (A dimension that is constant across resources, such as CloudFront's `Region=Global`, is used to match and query metrics but is not turned into a label.)
 
 
@@ -185,7 +187,7 @@ A user profile file with the same basename as a stock profile overrides it.
 |:------|:-----|:------------|:--------|:---------:|
 | **Collection** | update_every | Data collection interval (seconds). Must be at least 60 (CloudWatch's minimum period). | 60 | no |
 |  | autodetection_retry | Recheck interval (seconds) when the job fails to start. Default `0` means no retry; set a positive value to keep retrying. | 0 | no |
-|  | timeout | Timeout for AWS API requests (seconds). | 30 | no |
+|  | timeout | AWS operation timeout (seconds). Identity, resource-tag, and query operations use it for their operation scope; discovery shares one timeout across its whole refresh stage. | 30 | no |
 | **Authentication** | credentials | List of named credential sources. Every source has a `type` of `default` (AWS SDK default chain) or `static` (explicit access/session credentials in `type_static`). Credential sources are reusable by targets and every defined source must be used. |  | yes |
 |  | credentials[].name | Credential source name referenced by targets. |  | yes |
 |  | credentials[].type | Credential source type: `default` uses the AWS SDK chain; `static` requires `type_static`. |  | yes |
@@ -229,7 +231,7 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | labels.resource_tags[].key | Exact, case-sensitive AWS resource tag key. |  | yes |
 |  | labels.resource_tags[].label | Optional Netdata label key. When omitted, the AWS key is normalized (`Name` becomes `name`). Use an explicit label to avoid invalid names or collisions with identity labels such as `region`. |  | no |
 | **Limits** | limits.max_instances | Maximum distinct final CloudWatch resource instances that emit at least one selected series after filtering and exported-series overlap resolution. Metric/statistic fan-out is not counted. Overflow rejects the refreshed plan; collection never truncates to the first N resources. | 1000 | no |
-|  | limits.max_discovery_groups | Maximum unique `(target, region, namespace)` discovery groups compiled for the job. Compatible rules and profiles share groups. Raise the default safeguard only when the additional `ListMetrics` work is intentional; larger installations can instead split collection across jobs. Valid range 1–4096. | 64 | no |
+|  | limits.max_discovery_groups | Maximum unique `(target, region, namespace)` discovery groups compiled for the job. Compatible rules and profiles share groups. The default is an accidental-expansion safeguard; raise it only for intentional work. Valid range 1–100. Split larger collection across jobs because each group requires one protected `ListMetrics` operation in the bounded refresh. | 64 | no |
 | **Discovery** | discovery.refresh_every | How often (seconds) to re-discover metrics. Minimum 60. | 300 | no |
 |  | discovery.recently_active_only | Use CloudWatch's three-hour activity filter only when every selected series sharing a target, region, and namespace scan has `publication_delay + lookback + period` of 3 hours or less. Any longer-horizon participant keeps the shared scan unfiltered. | yes | no |
 | **Virtual Node** | vnode | Associates this data collection job with a [Virtual Node](https://learn.netdata.cloud/docs/netdata-agent/configuration/organize-systems-metrics-and-alerts#virtual-nodes). |  | no |
@@ -674,7 +676,7 @@ CloudWatch publishes metrics with a delay.
 
 A discovery group is one unique `(target, region, namespace)` combination. Compatible rules and profiles share the same group. `limits.max_discovery_groups` defaults to 64 to bound accidental `ListMetrics` expansion.
 
-This can result from accidental target/region/profile expansion or from a legitimate large installation. Verify the derived scope first. For intentional scale, raise the safeguard (maximum 4096) or split the configuration across multiple jobs. Splitting preserves metric coverage while bounding each job's discovery work; raising the value permits proportionally more `ListMetrics` calls and refresh time.
+This can result from accidental target/region/profile expansion or from a legitimate large installation. Verify the derived scope first. For intentional scale, raise the safeguard up to 100. Beyond 100, split the configuration across multiple jobs: one bounded refresh admits at most 100 `ListMetrics` SDK operations and reserves one first operation for every executable group. Splitting preserves metric coverage while keeping each job's discovery cost, memory, and completion time bounded.
 
 
 ### Access denied or authentication errors

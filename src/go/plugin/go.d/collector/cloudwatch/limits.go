@@ -12,6 +12,7 @@ const (
 	maxPlannedQueries                      = 20000
 	maxPlannedDatapoints                   = 600000
 	maxPlannedQueryBatches                 = 40
+	maxDiscoveryGroupsPerJob               = 100
 	maxListMetricsPages                    = 100
 	maxScannedMetricsPerGroup              = 50000
 	maxCandidateInstancesPerGroup          = 20000
