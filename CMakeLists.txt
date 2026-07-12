@@ -3388,6 +3388,14 @@ if(ENABLE_PLUGIN_LOCAL_LISTENERS)
                 DESTINATION usr/libexec/netdata/plugins.d)
 endif()
 
+if(OS_LINUX AND MNL_FOUND)
+        add_executable(local-sockets-mnl-test EXCLUDE_FROM_ALL
+                src/libnetdata/local-sockets/tests/test_local_sockets_mnl.c)
+        target_compile_options(local-sockets-mnl-test PRIVATE ${MNL_CFLAGS_OTHER})
+        target_include_directories(local-sockets-mnl-test PRIVATE ${MNL_INCLUDE_DIRS})
+        target_link_libraries(local-sockets-mnl-test libnetdata ${MNL_LIBRARIES})
+endif()
+
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
         if(USE_LTO AND CMAKE_C_COMPILER_ID STREQUAL "GNU" AND CMAKE_SIZEOF_VOID_P EQUAL 4)
                 # GCC still performs LTO when linking slim LTO static archives into a
