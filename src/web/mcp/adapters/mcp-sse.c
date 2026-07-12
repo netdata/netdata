@@ -156,7 +156,7 @@ int mcp_sse_handle_request(struct rrdhost *host __maybe_unused, struct web_clien
 #ifdef NETDATA_MCP_DEV_PREVIEW_API_KEY
     mcp_api_key_verified = mcp_sse_apply_api_key(w);
 #endif
-    if (netdata_is_protected_by_bearer && !mcp_api_key_verified) {
+    if (netdata_bearer_protection_is_enabled() && !mcp_api_key_verified) {
         buffer_flush(w->response.data);
         w->response.data->content_type = CT_TEXT_EVENT_STREAM;
         mcp_http_disable_compression(w);

@@ -44,8 +44,10 @@ pub enum ShmError {
     PathTooLong,
     /// open/shm_open failed.
     Open(i32),
-    /// ftruncate failed.
+    /// Legacy compatibility; SHM creation no longer uses ftruncate.
     Truncate(i32),
+    /// Backing storage allocation failed.
+    Allocate(i32),
     /// mmap failed.
     Mmap(i32),
     /// Header magic mismatch.
@@ -76,6 +78,7 @@ impl std::fmt::Display for ShmError {
             ShmError::PathTooLong => write!(f, "SHM path exceeds limit"),
             ShmError::Open(e) => write!(f, "open failed: errno {e}"),
             ShmError::Truncate(e) => write!(f, "ftruncate failed: errno {e}"),
+            ShmError::Allocate(e) => write!(f, "SHM allocation failed: errno {e}"),
             ShmError::Mmap(e) => write!(f, "mmap failed: errno {e}"),
             ShmError::BadMagic => write!(f, "SHM header magic mismatch"),
             ShmError::BadVersion => write!(f, "SHM header version mismatch"),
@@ -269,25 +272,15 @@ impl ShmContext {
             return Err(ShmError::Open(errno()));
         }
 
-        if unsafe { libc::ftruncate(fd, region_size as libc::off_t) } < 0 {
-            let e = errno();
+        if let Err(e) = allocate_region(fd, region_size) {
             unsafe {
                 libc::close(fd);
                 libc::unlink(c_path.as_ptr());
             }
-            return Err(ShmError::Truncate(e));
+            return Err(ShmError::Allocate(e));
         }
 
-        let base = unsafe {
-            libc::mmap(
-                ptr::null_mut(),
-                region_size,
-                libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_SHARED,
-                fd,
-                0,
-            )
-        };
+        let base = unsafe { map_region(fd, region_size) };
         if base == libc::MAP_FAILED {
             let e = errno();
             unsafe {
@@ -868,6 +861,109 @@ fn path_to_cstring(path: &Path) -> Result<std::ffi::CString, ShmError> {
 
 fn errno() -> i32 {
     unsafe { *libc::__errno_location() }
+}
+
+/// Reserve all backing storage before exposing the region through mmap.
+///
+/// Linux may interrupt fallocate before it changes the file, so retry EINTR.
+/// Every other error is returned to the caller; SHM has no unsafe sparse-file
+/// fallback.
+fn allocate_region(fd: i32, region_size: usize) -> Result<(), i32> {
+    loop {
+        #[cfg(test)]
+        record_fallocate_call();
+
+        #[cfg(test)]
+        let result = match take_fallocate_fault() {
+            Some(error) => {
+                unsafe { *libc::__errno_location() = error };
+                -1
+            }
+            None => unsafe { libc::fallocate(fd, 0, 0, region_size as libc::off_t) },
+        };
+
+        #[cfg(not(test))]
+        let result = unsafe { libc::fallocate(fd, 0, 0, region_size as libc::off_t) };
+
+        if result == 0 {
+            return Ok(());
+        }
+
+        let error = errno();
+        if error != libc::EINTR {
+            return Err(error);
+        }
+    }
+}
+
+unsafe fn map_region(fd: i32, region_size: usize) -> *mut libc::c_void {
+    #[cfg(test)]
+    record_mmap_call();
+
+    libc::mmap(
+        ptr::null_mut(),
+        region_size,
+        libc::PROT_READ | libc::PROT_WRITE,
+        libc::MAP_SHARED,
+        fd,
+        0,
+    )
+}
+
+#[cfg(test)]
+#[derive(Default)]
+struct ShmSyscallTestState {
+    fallocate_faults: std::collections::VecDeque<i32>,
+    fallocate_calls: usize,
+    mmap_calls: usize,
+}
+
+#[cfg(test)]
+thread_local! {
+    static SHM_SYSCALL_TEST_STATE: std::cell::RefCell<ShmSyscallTestState> =
+        std::cell::RefCell::new(ShmSyscallTestState::default());
+}
+
+#[cfg(test)]
+fn install_fallocate_faults(errors: &[i32]) {
+    SHM_SYSCALL_TEST_STATE.with(|state| {
+        let mut state = state.borrow_mut();
+        assert!(
+            state.fallocate_faults.is_empty(),
+            "fallocate fault sequence already installed"
+        );
+        state.fallocate_faults.extend(errors.iter().copied());
+        state.fallocate_calls = 0;
+        state.mmap_calls = 0;
+    });
+}
+
+#[cfg(test)]
+fn clear_fallocate_faults() {
+    SHM_SYSCALL_TEST_STATE.with(|state| *state.borrow_mut() = ShmSyscallTestState::default());
+}
+
+#[cfg(test)]
+fn take_fallocate_fault() -> Option<i32> {
+    SHM_SYSCALL_TEST_STATE.with(|state| state.borrow_mut().fallocate_faults.pop_front())
+}
+
+#[cfg(test)]
+fn record_fallocate_call() {
+    SHM_SYSCALL_TEST_STATE.with(|state| state.borrow_mut().fallocate_calls += 1);
+}
+
+#[cfg(test)]
+fn record_mmap_call() {
+    SHM_SYSCALL_TEST_STATE.with(|state| state.borrow_mut().mmap_calls += 1);
+}
+
+#[cfg(test)]
+fn syscall_test_counts() -> (usize, usize) {
+    SHM_SYSCALL_TEST_STATE.with(|state| {
+        let state = state.borrow();
+        (state.fallocate_calls, state.mmap_calls)
+    })
 }
 
 fn pid_alive(pid: i32) -> bool {

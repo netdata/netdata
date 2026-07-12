@@ -467,6 +467,15 @@ static void myMessageCallback(int id __maybe_unused, const char *message, int si
     webrtc_execute_api_request(chan, request, request_size, binary);
 }
 
+static bool webrtc_conn_is_linked_unsafe(WEBRTC_CONN *conn) {
+    for(WEBRTC_CONN *t = webrtc_base.unsafe.head; t ;t = t->link.next) {
+        if(t == conn)
+            return true;
+    }
+
+    return false;
+}
+
 //#define WEBRTC_MAX_REQUEST_SIZE 65536
 //
 //static void myAvailableCallback(int id, void *user_ptr) {
@@ -488,19 +497,32 @@ static void myMessageCallback(int id __maybe_unused, const char *message, int si
 //    }
 //}
 
-static void myDataChannelCallback(int pc __maybe_unused, int dc, void *user_ptr) {
+static void myDataChannelCallback(int pc, int dc, void *user_ptr) {
     webrtc_set_thread_name();
 
     WEBRTC_CONN *conn = user_ptr;
-    internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
-
     WEBRTC_DC *chan = callocz(1, sizeof(WEBRTC_DC));
     chan->dc = dc;
     chan->conn = conn;
 
+    spinlock_lock(&webrtc_base.unsafe.spinlock);
+    if(unlikely(!webrtc_conn_is_linked_unsafe(conn) || webrtc_conn_state(conn) == RTC_CLOSED)) {
+        spinlock_unlock(&webrtc_base.unsafe.spinlock);
+
+        internal_error(true, "WEBRTC[%d],DC[%d]: ignoring data channel for closed connection.", pc, dc);
+        freez(chan);
+        if(rtcDeleteDataChannel(dc) != RTC_ERR_SUCCESS)
+            netdata_log_error("WEBRTC[%d],DC[%d]: rtcDeleteDataChannel() failed.", pc, dc);
+
+        return;
+    }
+
+    internal_fatal(conn->pc != pc, "WEBRTC[%d]: pc mismatch, expected %d, got %d", conn->pc, conn->pc, pc);
+
     spinlock_lock(&conn->channels.spinlock);
     DOUBLE_LINKED_LIST_APPEND_ITEM_UNSAFE(conn->channels.head, chan, link.prev, link.next);
     spinlock_unlock(&conn->channels.spinlock);
+    spinlock_unlock(&webrtc_base.unsafe.spinlock);
 
     rtcSetUserPointer(dc, chan);
 

@@ -1,3 +1,7 @@
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 /*
  * netipc_shm.c - L1 POSIX SHM transport (Linux only).
  *
@@ -352,11 +356,18 @@ nipc_shm_error_t nipc_shm_server_create(const char *run_dir,
         return NIPC_SHM_ERR_OPEN;
     }
 
-    if (ftruncate(fd, (off_t)region_size) < 0) {
+    int allocate_rc;
+    do {
+        allocate_rc = fallocate(fd, 0, 0, (off_t)region_size);
+    } while (allocate_rc < 0 && errno == EINTR);
+
+    if (allocate_rc < 0) {
+        int allocation_errno = errno;
         close(fd);
         unlinkat(dir_fd, shm_name, 0);
         close(dir_fd);
-        return NIPC_SHM_ERR_TRUNCATE;
+        errno = allocation_errno;
+        return NIPC_SHM_ERR_ALLOCATE;
     }
 
     void *map = mmap(NULL, region_size, PROT_READ | PROT_WRITE,

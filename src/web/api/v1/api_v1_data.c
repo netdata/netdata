@@ -130,6 +130,7 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
     fix_google_param(outFileName);
 
     RRDSET *st = NULL;
+    RRDSET_ACQUIRED *rsa = NULL;
     ONEWAYALLOC *owa = onewayalloc_create(0);
     QUERY_TARGET *qt = NULL;
 
@@ -140,8 +141,9 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
 
     if(chart && !context) {
         // check if this is a specific chart
-        st = rrdset_find(host, chart, false);
-        if (!st) st = rrdset_find_byname(host, chart);
+        rsa = rrdset_find_and_acquire(host, chart, false);
+        if (!rsa) rsa = rrdset_find_byname_and_acquire(host, chart);
+        st = rrdset_acquired_to_rrdset(rsa);
     }
 
     long long before = (before_str && *before_str)?str2l(before_str):0;
@@ -247,6 +249,7 @@ int api_v1_data(RRDHOST *host, struct web_client *w, char *url) {
 
 cleanup:
     query_target_release(qt);
+    rrdset_acquired_release(rsa);
     onewayalloc_destroy(owa);
     buffer_free(dimensions);
     return ret;

@@ -3,15 +3,20 @@
 package cloudwatch
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"os"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -51,10 +56,55 @@ func (f *fakeSTS) GetCallerIdentity(context.Context, *sts.GetCallerIdentityInput
 }
 
 func validConfig() Config {
-	return Config{
-		Regions: []string{"us-east-1"},
-		Auth:    awsauth.Config{Mode: awsauth.ModeDefault},
+	return validBaseConfig()
+}
+
+func configureExactRule(c *Collector, regions, profiles []string) {
+	defaults := false
+	c.Config = validConfig()
+	c.Config.Rules[0].Regions = regions
+	c.Config.Rules[0].Profiles = &ProfileSelectorConfig{
+		Defaults: &defaults,
+		Include:  profiles,
 	}
+	c.applyDefaults()
+}
+
+func setSingleTargetPlan(c *Collector, account string, regions []string, profiles []cwprofiles.ResolvedProfile) {
+	identity := awsauth.NewIdentity("base", awsauth.CredentialConfig{Type: awsauth.CredentialTypeDefault}, nil)
+	target := &collectionTarget{Name: "base", Identity: identity, Regions: regions}
+	plan := &collectionPlan{
+		Targets:  []*collectionTarget{target},
+		Profiles: profiles,
+		TagJoins: make(map[string]*tagJoin),
+	}
+	for _, profile := range profiles {
+		if join, err := resolveTagJoinProfile(profile); err == nil {
+			plan.TagJoins[profile.Name] = join
+		}
+	}
+	for _, region := range regions {
+		for _, profile := range profiles {
+			plan.Scopes = append(plan.Scopes, collectionScope{
+				Target: target, Profile: profile, Region: region, TagMembershipID: len(plan.Scopes),
+				SelectedSeries: compileProfileSeries(profile),
+			})
+		}
+	}
+	resolved := resolvedTarget{target: target, accountID: account}
+	c.plan = plan
+	c.resolvedByRef = map[string]resolvedTarget{"base": resolved}
+	c.invalidateQueryPlan()
+}
+
+func resolvedTargetNames(c *Collector) []string {
+	var names []string
+	for _, target := range c.plan.Targets {
+		if _, ok := c.resolvedByRef[target.Name]; ok {
+			names = append(names, target.Name)
+		}
+	}
+	return names
 }
 
 func newTestCollector(t *testing.T, cfg Config, f *fakeSTS) *Collector {
@@ -82,23 +132,43 @@ func TestCollector_Init(t *testing.T) {
 		cfg     Config
 		wantErr bool
 	}{
-		"valid default auth": {
+		"valid default credentials": {
 			cfg: validConfig(),
 		},
-		"missing regions": {
-			cfg:     Config{Auth: awsauth.Config{Mode: awsauth.ModeDefault}},
+		"missing rules": {
+			cfg:     func() Config { cfg := validConfig(); cfg.Rules = nil; return cfg }(),
 			wantErr: true,
 		},
-		"invalid auth mode": {
-			cfg:     Config{Regions: []string{"us-east-1"}, Auth: awsauth.Config{Mode: "bogus"}},
+		"invalid credential type": {
+			cfg: func() Config {
+				cfg := validConfig()
+				cfg.Credentials[0].Type = "bogus"
+				return cfg
+			}(),
 			wantErr: true,
 		},
-		"profiles exact without entries": {
-			cfg: Config{
-				Regions:  []string{"us-east-1"},
-				Auth:     awsauth.Config{Mode: awsauth.ModeDefault},
-				Profiles: ProfilesConfig{Mode: profilesModeExact},
-			},
+		"unknown rule target": {
+			cfg: func() Config {
+				cfg := validConfig()
+				cfg.Rules[0].Targets = []string{"missing"}
+				return cfg
+			}(),
+			wantErr: true,
+		},
+		"duplicate rule target": {
+			cfg: func() Config {
+				cfg := validConfig()
+				cfg.Rules[0].Targets = []string{"base", "base"}
+				return cfg
+			}(),
+			wantErr: true,
+		},
+		"empty rule target": {
+			cfg: func() Config {
+				cfg := validConfig()
+				cfg.Rules[0].Targets = []string{""}
+				return cfg
+			}(),
 			wantErr: true,
 		},
 	}
@@ -125,8 +195,20 @@ func TestCollector_Init_appliesDefaults(t *testing.T) {
 	assert.Equal(t, defaultUpdateEvery, c.UpdateEvery)
 	assert.Equal(t, defaultDiscoveryRefresh, c.Discovery.RefreshEvery)
 	assert.Equal(t, defaultQueryOffset, c.QueryOffset)
-	assert.Equal(t, profilesModeAuto, c.Profiles.Mode)
 	assert.True(t, c.recentlyActiveOnly())
+}
+
+func TestCollector_InitRejectsTargetCapBeforeDetailedTraversal(t *testing.T) {
+	cfg := validConfig()
+	for i := 1; i <= maxTargets; i++ {
+		cfg.Targets = append(cfg.Targets, TargetConfig{Name: "INVALID NAME", Credentials: "sdk_default"})
+	}
+	c := New()
+	c.Config = cfg
+	err := c.Init(context.Background())
+	require.Error(t, err)
+	assert.ErrorContains(t, err, "maximum is 64")
+	assert.NotContains(t, err.Error(), "must match")
 }
 
 func TestCollector_Check(t *testing.T) {
@@ -136,7 +218,8 @@ func TestCollector_Check(t *testing.T) {
 		require.NoError(t, c.Init(context.Background()))
 
 		require.NoError(t, c.Check(context.Background()))
-		assert.Equal(t, []string{"000000000000"}, c.accountIDs())
+		require.Len(t, c.resolvedByRef, 1)
+		assert.Equal(t, "000000000000", c.resolvedByRef["base"].accountID)
 		assert.Equal(t, 1, f.calls)
 
 		require.NoError(t, c.Check(context.Background()))
@@ -158,4 +241,76 @@ func TestCollector_Check(t *testing.T) {
 
 		assert.Error(t, c.Check(context.Background()))
 	})
+
+	t.Run("sanitizes provider errors in return and logs", func(t *testing.T) {
+		const sensitive = "SENSITIVE_PROVIDER_DETAIL"
+		var buf bytes.Buffer
+		f := &fakeSTS{err: errors.New(sensitive)}
+		c := newTestCollector(t, validConfig(), f)
+		c.Logger = logger.NewWithWriter(&buf)
+		require.NoError(t, c.Init(context.Background()))
+
+		err := c.Check(context.Background())
+		require.Error(t, err)
+		assert.NotContains(t, err.Error(), sensitive)
+		assert.NotContains(t, buf.String(), sensitive)
+	})
+}
+
+type concurrentSTS struct {
+	started chan struct{}
+	release chan struct{}
+	current atomic.Int32
+	maximum atomic.Int32
+}
+
+func (f *concurrentSTS) GetCallerIdentity(context.Context, *sts.GetCallerIdentityInput, ...func(*sts.Options)) (*sts.GetCallerIdentityOutput, error) {
+	current := f.current.Add(1)
+	for {
+		maximum := f.maximum.Load()
+		if current <= maximum || f.maximum.CompareAndSwap(maximum, current) {
+			break
+		}
+	}
+	f.started <- struct{}{}
+	<-f.release
+	f.current.Add(-1)
+	return &sts.GetCallerIdentityOutput{Account: aws.String("000000000000")}, nil
+}
+
+func TestCollector_CheckResolvesAllTargetsConcurrently(t *testing.T) {
+	defaults := false
+	cfg := validConfig()
+	cfg.Targets = []TargetConfig{
+		{Name: "target-a", Credentials: "sdk_default"},
+		{Name: "target-b", Credentials: "sdk_default"},
+		{Name: "target-c", Credentials: "sdk_default"},
+	}
+	cfg.Rules[0].Targets = []string{"target-a", "target-b", "target-c"}
+	cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
+
+	fake := &concurrentSTS{started: make(chan struct{}, len(cfg.Targets)), release: make(chan struct{})}
+	c := New()
+	c.Config = cfg
+	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
+	c.newSTSClient = func(aws.Config) stsClient { return fake }
+
+	errCh := make(chan error, 1)
+	go func() { errCh <- c.Check(context.Background()) }()
+
+	allStarted := true
+	for range cfg.Targets {
+		select {
+		case <-fake.started:
+		case <-time.After(250 * time.Millisecond):
+			allStarted = false
+		}
+		if !allStarted {
+			break
+		}
+	}
+	close(fake.release)
+	require.NoError(t, <-errCh)
+	assert.True(t, allStarted, "every target must be attempted without waiting for another target's timeout")
+	assert.Equal(t, int32(len(cfg.Targets)), fake.maximum.Load())
 }

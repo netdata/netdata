@@ -103,7 +103,7 @@ func TestLoadFromDefaultDirs_LoadsStockProfiles(t *testing.T) {
 		"eventbridge":       "AWS/Events",
 		"vpn":               "AWS/VPN",
 		"eks":               "AWS/EKS",
-		// opt-in profiles (disabled by default; profiles.mode combined)
+		// opt-in profiles (disabled by default; rules may include them explicitly)
 		"alb_target":         "AWS/ApplicationELB",
 		"dynamodb_operation": "AWS/DynamoDB",
 		"ebs_stalled_io":     "AWS/EBS",
@@ -113,6 +113,11 @@ func TestLoadFromDefaultDirs_LoadsStockProfiles(t *testing.T) {
 		prof, ok := catalog.Get(baseName)
 		if assert.Truef(t, ok, "missing stock profile %q", baseName) {
 			assert.Equalf(t, namespace, prof.Namespace, "profile %q namespace", baseName)
+			if baseName == "cloudfront" {
+				assert.Equal(t, []string{"us-east-1"}, prof.SupportedRegions)
+			} else {
+				assert.Emptyf(t, prof.SupportedRegions, "profile %q should remain region-unrestricted", baseName)
+			}
 		}
 	}
 }
@@ -270,22 +275,22 @@ func TestValidateUniqueChartIDs(t *testing.T) {
 		wantErr  bool
 	}{
 		"unique ids": {
-			profiles: []profilecatalog.Named[Profile]{mkNamed("a", "cw_a"), mkNamed("b", "cw_b")},
+			profiles: []profilecatalog.Named[Profile]{mkNamed("a", "aws_cloudwatch_a"), mkNamed("b", "aws_cloudwatch_b")},
 			stock:    map[string]bool{"a": true, "b": true},
 		},
 		"stock-vs-stock duplicate is fatal": {
-			profiles: []profilecatalog.Named[Profile]{mkNamed("a", "cw_dup"), mkNamed("b", "cw_dup")},
+			profiles: []profilecatalog.Named[Profile]{mkNamed("a", "aws_cloudwatch_dup"), mkNamed("b", "aws_cloudwatch_dup")},
 			stock:    map[string]bool{"a": true, "b": true},
 			wantErr:  true,
 		},
 		"user-profile duplicate is tolerated (warned, not fatal)": {
-			profiles: []profilecatalog.Named[Profile]{mkNamed("a", "cw_dup"), mkNamed("b", "cw_dup")},
+			profiles: []profilecatalog.Named[Profile]{mkNamed("a", "aws_cloudwatch_dup"), mkNamed("b", "aws_cloudwatch_dup")},
 			stock:    map[string]bool{"a": true, "b": false}, // "b" is a user profile
 		},
 		"user override of a stock profile is not misclassified as stock": {
 			// "a" is a user override (effective origin user) that collides with stock
 			// "b"; a user-involved collision warns, it must not be a fatal stock dup.
-			profiles: []profilecatalog.Named[Profile]{mkNamed("a", "cw_dup"), mkNamed("b", "cw_dup")},
+			profiles: []profilecatalog.Named[Profile]{mkNamed("a", "aws_cloudwatch_dup"), mkNamed("b", "aws_cloudwatch_dup")},
 			stock:    map[string]bool{"a": false, "b": true},
 		},
 	}

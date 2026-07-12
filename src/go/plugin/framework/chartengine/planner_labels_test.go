@@ -65,7 +65,7 @@ func TestChartLabelAccumulatorIntersectsLabels(t *testing.T) {
 				},
 			}
 
-			acc := newChartLabelAccumulator(chart)
+			acc := newChartLabelAccumulator(compileChartLabelPolicy(chart))
 			require.NotNil(t, acc)
 
 			for _, labels := range tc.observed {
@@ -73,8 +73,7 @@ func TestChartLabelAccumulatorIntersectsLabels(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			got, err := acc.materialize()
-			require.NoError(t, err)
+			got := acc.materialize()
 			assert.Equal(t, tc.want, got)
 			assert.NotContains(t, got, "mode")
 			assert.NotContains(t, got, "selector_fixed")

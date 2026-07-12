@@ -17,18 +17,18 @@ type observedSeries struct {
 	labels     []metrix.Label
 	tagLabels  []metrix.Label // non-identity enrichment; re-emitted with the series, not in observedKey
 	value      float64
-	groupKey   queryGroupKey // (account, region, effective period) — the scheduling unit
+	groupKey   queryGroupKey // (target, region, effective period) — the scheduling unit
 }
 
 // observationStore owns the metric write path together with the per-series
-// retention cache and the per-(account, region, period) query schedule. Keeping these
+// retention cache and the per-(target, region, period) query schedule. Keeping these
 // together isolates retention/scheduling from the rest of the collector: it
 // re-emits not-due series every cycle so daily metrics stay visible, and prunes
 // series whose instance has disappeared from discovery.
 type observationStore struct {
 	store        metrix.CollectorStore
 	lastObserved map[string]observedSeries   // last value per series, for retention re-emit
-	nextQueryAt  map[queryGroupKey]time.Time // next due time per (account, region, effective period)
+	nextQueryAt  map[queryGroupKey]time.Time // next due time per (target, region, effective period)
 }
 
 func newObservationStore(store metrix.CollectorStore) *observationStore {
@@ -46,20 +46,15 @@ func (o *observationStore) reset() {
 	o.nextQueryAt = make(map[queryGroupKey]time.Time)
 }
 
-// dueGroups returns the set of (account, region, period) groups due for querying at now.
+// dueGroups returns the set of (target, region, period) groups due for querying at now.
 // It does NOT advance the schedule — the caller advances nextQueryAt only for
 // groups that actually succeeded, so a transient failure is retried next cycle
-// rather than skipped for a full period. Scheduling is per (account, region, period) so a
+// rather than skipped for a full period. Scheduling is per (target, region, period) so a
 // failure in one region does not force healthy regions of the same period to
 // re-query early. A group not yet scheduled is always due (first cycle).
-func (o *observationStore) dueGroups(plan []plannedQuery, now time.Time) map[queryGroupKey]bool {
-	groups := make(map[queryGroupKey]struct{})
-	for _, pq := range plan {
-		groups[pq.groupKey()] = struct{}{}
-	}
-
+func (o *observationStore) dueGroups(groups []queryGroupKey, now time.Time) map[queryGroupKey]bool {
 	due := make(map[queryGroupKey]bool, len(groups))
-	for key := range groups {
+	for _, key := range groups {
 		next, scheduled := o.nextQueryAt[key]
 		if !scheduled || !now.Before(next) {
 			due[key] = true
@@ -76,11 +71,17 @@ func (o *observationStore) advanceSchedule(queried map[queryGroupKey]bool, now t
 	}
 }
 
-func filterDueQueries(plan []plannedQuery, due map[queryGroupKey]bool) []plannedQuery {
-	out := make([]plannedQuery, 0, len(plan))
-	for _, pq := range plan {
-		if due[pq.groupKey()] {
-			out = append(out, pq)
+func filterDueQueries(groups []queryGroupKey, queriesByGroup map[queryGroupKey][]plannedQuery, due map[queryGroupKey]bool) []plannedQuery {
+	count := 0
+	for _, key := range groups {
+		if due[key] {
+			count += len(queriesByGroup[key])
+		}
+	}
+	out := make([]plannedQuery, 0, count)
+	for _, key := range groups {
+		if due[key] {
+			out = append(out, queriesByGroup[key]...)
 		}
 	}
 	return out
@@ -91,13 +92,13 @@ func filterDueQueries(plan []plannedQuery, due map[queryGroupKey]bool) []planned
 // this cycle (not due, or due-but-failed) so long-period metrics stay visible.
 //
 // dueQueries is every query issued this cycle; `queried` is the subset of
-// (account, region, period) groups that succeeded; `noData` is the set of query ids that
+// (target, region, period) groups that succeeded; `noData` is the set of query ids that
 // got a usable result with no datapoint. A due series with no sample is recorded
 // as 0 only when it is a genuine no-data result (in noData) AND its metric opts
 // into nil-as-zero; otherwise (a gauge, or a per-result error/absent id) its
 // cached value is dropped so it gaps until fresh data — no stale value, no false
 // 0. A cached value otherwise survives across cycles until its instance leaves
-// discovery and pruneObserved drops it.
+// discovery and reconcilePlan drops it.
 func (o *observationStore) observe(dueQueries []plannedQuery, samples []querySample, noData map[string]bool, queried map[queryGroupKey]bool) {
 	meter := o.store.Write().SnapshotMeter("")
 
@@ -167,24 +168,38 @@ func writeSample(meter metrix.SnapshotMeter, seriesName string, labels, tagLabel
 	meter.WithLabels(all...).Gauge(seriesName, metrix.WithFloat(true)).Observe(value)
 }
 
-// pruneObserved drops both the retention-cache entries and the per-(account, region,
-// period) schedule entries that are no longer in the current query plan. Dropping
-// the retention cache stops a removed resource from being re-emitted. Dropping the
-// schedule ensures a (account, region, period) group that fully left discovery and later
-// reappears is treated as unscheduled — and so queried on its first cycle back —
-// instead of waiting for a stale nextQueryAt (up to a full period, e.g. ~24h for a
-// daily group) to expire.
-func (o *observationStore) pruneObserved(plan []plannedQuery) {
-	validSeries := make(map[string]struct{}, len(plan))
-	validGroups := make(map[queryGroupKey]struct{})
-	for _, pq := range plan {
-		validSeries[observedKey(pq.seriesName, pq.labels)] = struct{}{}
-		validGroups[pq.groupKey()] = struct{}{}
+// reconcilePlan aligns retained observations and group schedules with a rebuilt
+// query plan. A retained value belongs to the final series identity, so it survives
+// an execution-target ownership change but follows the current scheduling group and
+// non-identity labels. New queries make their group immediately due; vanished groups
+// lose stale schedules so a later reappearance is also immediately due.
+func (o *observationStore) reconcilePlan(previous, current []plannedQuery) {
+	previousGroups := make(map[string]queryGroupKey, len(previous))
+	for _, pq := range previous {
+		previousGroups[observedKey(pq.seriesName, pq.labels)] = pq.groupKey()
 	}
-	for key := range o.lastObserved {
-		if _, ok := validSeries[key]; !ok {
-			delete(o.lastObserved, key)
+
+	currentBySeries := make(map[string]plannedQuery, len(current))
+	validGroups := make(map[queryGroupKey]struct{})
+	for _, pq := range current {
+		key := observedKey(pq.seriesName, pq.labels)
+		group := pq.groupKey()
+		currentBySeries[key] = pq
+		validGroups[group] = struct{}{}
+		if previousGroup, ok := previousGroups[key]; !ok || previousGroup != group {
+			delete(o.nextQueryAt, group)
 		}
+	}
+	for key, observed := range o.lastObserved {
+		pq, ok := currentBySeries[key]
+		if !ok {
+			delete(o.lastObserved, key)
+			continue
+		}
+		observed.labels = pq.labels
+		observed.tagLabels = pq.tagLabels
+		observed.groupKey = pq.groupKey()
+		o.lastObserved[key] = observed
 	}
 	for key := range o.nextQueryAt {
 		if _, ok := validGroups[key]; !ok {

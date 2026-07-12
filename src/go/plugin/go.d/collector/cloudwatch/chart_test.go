@@ -30,22 +30,20 @@ func chartTestCollector(t *testing.T, baseNames ...string) *Collector {
 	require.Len(t, profs, len(baseNames))
 
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
-	c.applyDefaults()
-	c.profiles = profs
+	c.plan = &collectionPlan{Profiles: profs}
 	return c
 }
 
 func TestBuildChartSpec_InjectsDimensionOptions(t *testing.T) {
 	c := chartTestCollector(t, "ec2")
 
-	spec := buildChartSpec(c.profiles)
+	spec := buildChartSpec(c.plan.Profiles)
 	require.Len(t, spec.Groups, 1)
 
 	group := spec.Groups[0]
 	assert.NotEmpty(t, group.Metrics, "template.metrics (visible series) is injected")
 
-	series := profileSeries("ec2", c.profiles[0].Config)
+	series := profileSeries("ec2", c.plan.Profiles[0].Config)
 	dims := 0
 	for _, chart := range group.Charts {
 		for _, d := range chart.Dimensions {
@@ -67,10 +65,10 @@ func TestBuildChartSpec_DoesNotMutateCatalog(t *testing.T) {
 	c := chartTestCollector(t, "ec2")
 
 	// Building the spec deep-copies each profile template before injecting options.
-	buildChartSpec(c.profiles)
+	buildChartSpec(c.plan.Profiles)
 
 	// The deep copy must leave the resolved profile's template untouched.
-	for _, chart := range c.profiles[0].Config.Template.Charts {
+	for _, chart := range c.plan.Profiles[0].Config.Template.Charts {
 		for _, d := range chart.Dimensions {
 			assert.Nilf(t, d.Options, "catalog profile dimension %q must not be mutated", d.Selector)
 		}
@@ -126,10 +124,9 @@ func TestInjectDimensionOptions_PreservesAuthoredOptions(t *testing.T) {
 	assert.True(t, opts.Hidden, "authored hidden flag is preserved")
 }
 
-func TestEnsureProfiles_BuildsValidChartTemplate(t *testing.T) {
+func TestEnsurePlan_BuildsValidChartTemplate(t *testing.T) {
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
-	c.Profiles = ProfilesConfig{Mode: profilesModeAuto}
+	c.Config = validConfig()
 	c.applyDefaults()
 	c.newCatalog = cwprofiles.LoadFromDefaultDirs
 
@@ -143,25 +140,30 @@ func TestEnsureProfiles_BuildsValidChartTemplate(t *testing.T) {
 		}
 	}
 
-	require.NoError(t, c.ensureProfiles())
-	assert.Len(t, c.profiles, enabled)
+	require.NoError(t, c.ensurePlan())
+	assert.Len(t, c.plan.Profiles, enabled)
 
 	require.NotEmpty(t, c.chartTemplateYAML)
 	collecttest.AssertChartTemplateSchema(t, c.chartTemplateYAML)
 }
 
-func TestEnsureProfiles_CombinedBuildsValidChartTemplate(t *testing.T) {
+func TestEnsurePlan_ExplicitAllBuildsValidChartTemplate(t *testing.T) {
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
-	c.Profiles = ProfilesConfig{Mode: profilesModeCombined}
-	c.applyDefaults()
 	c.newCatalog = cwprofiles.LoadFromDefaultDirs
 
 	cat, err := cwprofiles.LoadFromDefaultDirs()
 	require.NoError(t, err)
+	falseValue := false
+	var names []string
+	for _, profile := range cat.AllProfiles() {
+		names = append(names, profile.Name)
+	}
+	c.Config = validConfig()
+	c.Config.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &falseValue, Include: names}
+	c.applyDefaults()
 
-	require.NoError(t, c.ensureProfiles())
-	assert.Len(t, c.profiles, len(cat.AllProfiles())) // combined = every profile, including disabled opt-in profiles
+	require.NoError(t, c.ensurePlan())
+	assert.Len(t, c.plan.Profiles, len(cat.AllProfiles()))
 
 	require.NotEmpty(t, c.chartTemplateYAML)
 	collecttest.AssertChartTemplateSchema(t, c.chartTemplateYAML)

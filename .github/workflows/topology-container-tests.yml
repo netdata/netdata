@@ -10,6 +10,7 @@ on:
       - 'src/collectors/apps.plugin/**'
       - 'src/collectors/network-viewer.plugin/**'
       - 'src/collectors/common-cgroups/**'
+      - 'src/libnetdata/local-sockets/**'
       - 'src/libnetdata/netipc/**'
   pull_request:
     paths:
@@ -18,6 +19,7 @@ on:
       - 'src/collectors/apps.plugin/**'
       - 'src/collectors/network-viewer.plugin/**'
       - 'src/collectors/common-cgroups/**'
+      - 'src/libnetdata/local-sockets/**'
       - 'src/libnetdata/netipc/**'
 
 concurrency:
@@ -33,6 +35,7 @@ env:
     apps-cgroups-lookup-client-abort-test
     cgroup-lookup-netipc-test
     cgroup-orchestrator-test
+    local-sockets-mnl-test
     network-viewer-apps-lookup-client-test
     network-viewer-topology-containers-test
 
@@ -58,7 +61,7 @@ jobs:
             cmake ninja-build pkg-config flex bison g++ \
             libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
             liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
-            libjson-c-dev libyaml-dev zlib1g-dev uuid-dev python3-jsonschema \
+            libjson-c-dev libyaml-dev libmnl-dev zlib1g-dev uuid-dev python3-jsonschema \
             libprotobuf-dev protobuf-compiler
 
       - name: Configure
@@ -117,7 +120,7 @@ jobs:
             cmake ninja-build pkg-config flex bison g++ \
             libatomic1 libsystemd-dev libpcre2-dev libcurl4-openssl-dev \
             liblz4-dev libzstd-dev libuv1-dev libssl-dev libelf-dev \
-            libjson-c-dev libyaml-dev zlib1g-dev uuid-dev \
+            libjson-c-dev libyaml-dev libmnl-dev zlib1g-dev uuid-dev \
             libprotobuf-dev protobuf-compiler
 
       - name: Configure

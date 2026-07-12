@@ -431,8 +431,10 @@ int main(int argc, char **argv)
 
         bool cancelled = false;
         usec_t stop_monotonic_ut = now_monotonic_usec() + 600 * USEC_PER_SEC;
+        // "__logs_sources" is LQS_PARAMETER_SOURCE (logs_query_status.h); a plain
+        // "source:" is parsed as a filter on a user field named "source" and matches nothing
         char buf[] =
-            "systemd-journal after:-8640000 before:0 direction:backward last:200 data_only:false slice:true facets: source:all";
+            "systemd-journal after:-8640000 before:0 direction:backward last:200 data_only:false slice:true facets: __logs_sources:all";
         function_systemd_journal("123", buf, &stop_monotonic_ut, &cancelled, NULL, HTTP_ACCESS_ALL, NULL, NULL);
         exit(1);
     }

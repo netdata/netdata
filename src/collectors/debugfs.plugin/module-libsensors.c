@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "debugfs_plugin.h"
+#include "../common-contexts/hw-sensors-function.h"
 
 #define NETDATA_CALCULATED_STATES 1
 
@@ -963,8 +964,9 @@ static size_t states_count(SENSOR_STATE state) {
 }
 
 static void sensor_process(SENSOR *s, int update_every, const char *name) {
-    // evaluate the state of the feature
-    set_sensor_state(s);
+    // the caller has already evaluated the sensor state via set_sensor_state()
+    // in the collect-locked section, so that concurrent "sensors" function
+    // requests observe values and states from the same cycle
     internal_fatal(s->state == 0,
                    "SENSORS: state %u is not a valid state", s->state);
 
@@ -1211,6 +1213,212 @@ static int sensors_collect_data(void) {
     return subfeatures_collected ? 0 : 1;
 }
 
+// ----------------------------------------------------------------------------
+// cross-OS temperature histogram
+//
+// MIRRORS src/collectors/common-contexts/hw-sensors.h (PERMANENT contract,
+// keep in sync by hand - this plugin emits PLUGINSD text, not RRDSET calls):
+// disjoint buckets named by their upper bound in degrees Celsius; every
+// sensor increments exactly one bucket.
+
+#define LIBSENSORS_HISTOGRAM_BUCKETS 10
+
+static const double libsensors_histogram_upper_bounds[LIBSENSORS_HISTOGRAM_BUCKETS - 1] = {
+    40, 50, 60, 70, 80, 85, 90, 95, 100,
+};
+
+static const char *libsensors_histogram_dimensions[LIBSENSORS_HISTOGRAM_BUCKETS] = {
+    "40", "50", "60", "70", "80", "85", "90", "95", "100", "+Inf",
+};
+
+// file scope so cleanup can reset it - a future in-process restart of this
+// module must re-emit the CHART definition
+static bool libsensors_histogram_exposed = false;
+
+static void libsensors_emit_temperature_histogram(int update_every, const char *name) {
+
+    uint32_t counts[LIBSENSORS_HISTOGRAM_BUCKETS] = {0};
+    size_t total = 0;
+
+    SENSOR *s;
+    dfe_start_read(sensors_dict, s) {
+        // skip sensors missing from this cycle's enumeration too: their
+        // cached s->input holds the last value they ever reported
+        if (s->feature.type != SENSORS_FEATURE_TEMP || !s->read || isnan(s->input))
+            continue;
+
+        size_t i = 0;
+        while (i < LIBSENSORS_HISTOGRAM_BUCKETS - 1 && s->input >= libsensors_histogram_upper_bounds[i])
+            i++;
+
+        counts[i]++;
+        total++;
+    }
+    dfe_done(s);
+
+    // before the chart exists, zero sensors means nothing to expose;
+    // after it exists, keep sending (zero counts are truthful data)
+    if (!libsensors_histogram_exposed && !total)
+        return;
+
+    if (!libsensors_histogram_exposed) {
+        printf(
+            PLUGINSD_KEYWORD_CHART
+            " 'sensors.temperature_histogram' '' 'Temperature Sensors Distribution' 'sensors' 'Temperature' "
+            "'system.hw.sensor.temperature.histogram' heatmap 69990 %d '' debugfs %s\n",
+            update_every, name);
+
+        for (size_t i = 0; i < LIBSENSORS_HISTOGRAM_BUCKETS; i++)
+            printf(PLUGINSD_KEYWORD_DIMENSION " '%s' '' absolute 1 1 ''\n", libsensors_histogram_dimensions[i]);
+
+        libsensors_histogram_exposed = true;
+    }
+
+    printf(PLUGINSD_KEYWORD_BEGIN " 'sensors.temperature_histogram'\n");
+    for (size_t i = 0; i < LIBSENSORS_HISTOGRAM_BUCKETS; i++)
+        printf(
+            PLUGINSD_KEYWORD_SET " '%s' = %u\n", libsensors_histogram_dimensions[i], (unsigned)counts[i]);
+    printf(PLUGINSD_KEYWORD_END "\n");
+}
+
+// ----------------------------------------------------------------------------
+// the "sensors" function
+//
+// Cross-OS contract (mirrors the macos.plugin implementation - keep the
+// column schema, charts, group_by and registration-follows-discovery rule in
+// sync by hand): one table row per sensor; the per-sensor chart id is the
+// unique key and the only sticky column.
+
+#define LIBSENSORS_FUNCTION_SENSORS_HELP                                                                               \
+    "Lists all hardware sensors discovered on this host, with their current readings."
+
+// guards sensors_dict contents between the collection thread and function threads
+// (netdata_mutex_t is uv_mutex_t - it has no static initializer)
+static netdata_mutex_t sensors_data_mutex;
+
+static void __attribute__((constructor)) sensors_data_mutex_init(void) {
+    netdata_mutex_init(&sensors_data_mutex);
+}
+
+static void __attribute__((destructor)) sensors_data_mutex_destroy(void) {
+    netdata_mutex_destroy(&sensors_data_mutex);
+}
+
+static const char *libsensors_function_state(SENSOR *s) {
+    if (!s->read)
+        return "missing";
+
+    // cross-OS convention: the healthy state is reported as "ok"
+    if (s->state == SENSOR_STATE_CLEAR)
+        return "ok";
+
+    return SENSOR_STATE_2str(s->state);
+}
+
+static void libsensors_function_sensors(
+    const char *transaction, char *function __maybe_unused, usec_t *stop_monotonic_ut __maybe_unused,
+    bool *cancelled __maybe_unused, BUFFER *payload __maybe_unused, HTTP_ACCESS access __maybe_unused,
+    const char *source __maybe_unused, void *data __maybe_unused)
+{
+    BUFFER *wb = buffer_create(4096, NULL);
+
+    buffer_json_initialize(wb, "\"", "\"", 0, true, BUFFER_JSON_OPTIONS_DEFAULT);
+
+    const char *hostname = getenv("NETDATA_HOSTNAME");
+    buffer_json_member_add_string(wb, "hostname", hostname ? hostname : "localhost");
+    buffer_json_member_add_uint64(wb, "status", HTTP_RESP_OK);
+    buffer_json_member_add_string(wb, "type", "table");
+    buffer_json_member_add_time_t(wb, "update_every", 1);
+    buffer_json_member_add_boolean(wb, "has_history", false);
+    buffer_json_member_add_string(wb, "help", LIBSENSORS_FUNCTION_SENSORS_HELP);
+    buffer_json_member_add_array(wb, "data");
+
+    netdata_mutex_lock(&sensors_data_mutex);
+
+    if (sensors_dict) {
+        SENSOR *s;
+        dfe_start_read(sensors_dict, s) {
+            // function-row Kind and Units use the cross-OS names
+            // (libsensors' "curr" -> "current", "Volts" -> "V", ...)
+            const char *kind = (s->feature.type == SENSORS_FEATURE_CURR) ? "current"
+                                                                         : SENSOR_TYPE_2str(s->feature.type);
+            const char *units = s->config.units;
+            switch (s->feature.type) {
+                case SENSORS_FEATURE_IN: units = "V"; break;
+                case SENSORS_FEATURE_CURR: units = "A"; break;
+                case SENSORS_FEATURE_POWER: units = "W"; break;
+                default: break;
+            }
+
+            const char *label =
+                (s->feature.label) ? string2str(s->feature.label) : string2str(s->feature.name);
+
+            // point to the chart this sensor actually has: state-only sensors
+            // (e.g. intrusion) have an _alarm chart, not an _input one
+            char chart_id[RRD_ID_LENGTH_MAX + 16];
+            snprintfz(chart_id, sizeof(chart_id), "sensors.%s%s", string2str(s->id),
+                      (!s->exposed_input && s->exposed_states) ? "_alarm" : "_input");
+
+            // a sensor missing from this cycle's enumeration keeps its stale
+            // cached value in s->input - report NAN so the Reading column
+            // agrees with the "missing" state
+            NETDATA_DOUBLE reading = s->read ? s->input : NAN;
+
+            buffer_json_add_array_item_array(wb);
+
+            buffer_json_add_array_item_string(wb, chart_id);
+            buffer_json_add_array_item_string(wb, label);
+            buffer_json_add_array_item_string(wb, kind);
+            buffer_json_add_array_item_string(wb, string2str(s->chip.subsystem));
+            buffer_json_add_array_item_string(wb, "libsensors");
+            buffer_json_add_array_item_string(wb, string2str(s->chip.id));
+            buffer_json_add_array_item_string(wb, string2str(s->feature.name));
+            buffer_json_add_array_item_double(wb, reading);
+            buffer_json_add_array_item_string(wb, units);
+            buffer_json_add_array_item_string(wb, libsensors_function_state(s));
+            buffer_json_add_array_item_string(wb, "per-sensor");
+            buffer_json_add_array_item_uint64(wb, 1); // Count - enables grouped sensor-count charts
+
+            // per-kind value columns - they power the per-kind aggregation tiles
+            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_TEMP ? reading : NAN);
+            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_FAN ? reading : NAN);
+            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_IN ? reading : NAN);
+            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_CURR ? reading : NAN);
+            buffer_json_add_array_item_double(wb, s->feature.type == SENSORS_FEATURE_POWER ? reading : NAN);
+
+            buffer_json_array_close(wb);
+        }
+        dfe_done(s);
+    }
+
+    netdata_mutex_unlock(&sensors_data_mutex);
+
+    buffer_json_array_close(wb); // data
+
+    hw_sensors_function_columns(wb);
+    hw_sensors_function_presentation(wb);
+
+    buffer_json_member_add_time_t(wb, "expires", now_realtime_sec() + 1);
+    buffer_json_finalize(wb);
+
+    wb->response_code = HTTP_RESP_OK;
+    wb->content_type = CT_APPLICATION_JSON;
+    wb->expires = now_realtime_sec() + 1;
+
+    // serialize the multi-write function result with the collector's
+    // CHART/SET emission - interleaving would corrupt the PLUGINSD stream
+    netdata_mutex_lock(&stdout_mutex);
+    pluginsd_function_result_to_stdout(transaction, wb);
+    netdata_mutex_unlock(&stdout_mutex);
+
+    buffer_free(wb);
+}
+
+void module_libsensors_register_functions(struct functions_evloop_globals *wg) {
+    functions_evloop_add_function(
+        wg, "sensors", libsensors_function_sensors, PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, NULL);
+}
+
 static bool libsensors_running = false;
 static int libsensors_update_every = 1;
 
@@ -1239,16 +1447,20 @@ void libsensors_thread(void *ptr __maybe_unused) {
     {
         SENSOR *s;
 
+        netdata_mutex_lock(&sensors_data_mutex);
         sensors_collect_data(); // do the first before starting measurements
         dfe_start_read(sensors_dict, s) { set_sensor_state(s); } dfe_done(s);
+        netdata_mutex_unlock(&sensors_data_mutex);
 
         usec_t max_ut = 0;
         size_t samples = 0;
         usec_t started_ut = now_monotonic_usec();
         for(size_t i = 0; i < 5; i++) {
             usec_t before_ut = now_monotonic_usec();
+            netdata_mutex_lock(&sensors_data_mutex);
             sensors_collect_data();
             dfe_start_read(sensors_dict, s) { set_sensor_state(s); } dfe_done(s);
+            netdata_mutex_unlock(&sensors_data_mutex);
             usec_t after_ut = now_monotonic_usec();
             max_ut = MAX(max_ut, after_ut - before_ut);
             samples++;
@@ -1289,13 +1501,41 @@ void libsensors_thread(void *ptr __maybe_unused) {
     heartbeat_t hb;
     heartbeat_init(&hb, update_every * USEC_PER_SEC);
 
+    bool function_declared = false;
+
     while(!nd_thread_signaled_to_cancel()) {
         heartbeat_next(&hb);
 
-        if(sensors_collect_data())
+        netdata_mutex_lock(&sensors_data_mutex);
+        int collect_failed = sensors_collect_data();
+        if(!collect_failed) {
+            // refresh derived values/states in the same locked section, so a
+            // concurrent "sensors" function request never observes values
+            // from the previous cycle
+            SENSOR *t;
+            dfe_start_read(sensors_dict, t) { set_sensor_state(t); } dfe_done(t);
+        }
+        netdata_mutex_unlock(&sensors_data_mutex);
+
+        if(collect_failed)
             break;
 
+        // lock order: stdout_mutex first, then sensors_data_mutex.
+        // sensor_process() mutates sensor state and the "sensors" function
+        // threads traverse the dictionary, so emission needs both. the
+        // function threads never hold sensors_data_mutex while waiting for
+        // stdout_mutex, so this ordering cannot deadlock.
         netdata_mutex_lock(&stdout_mutex);
+        netdata_mutex_lock(&sensors_data_mutex);
+
+        // expose the function only on hosts that actually have sensors
+        if(!function_declared && dictionary_entries(sensors_dict)) {
+            fprintf(stdout, PLUGINSD_KEYWORD_FUNCTION " GLOBAL \"sensors\" %d \"%s\" \"top\" " HTTP_ACCESS_FORMAT " %d\n",
+                    PLUGINS_FUNCTIONS_TIMEOUT_DEFAULT, LIBSENSORS_FUNCTION_SENSORS_HELP,
+                    (HTTP_ACCESS_FORMAT_CAST)(HTTP_ACCESS_ANONYMOUS_DATA),
+                    RRDFUNCTIONS_PRIORITY_DEFAULT);
+            function_declared = true;
+        }
 
         SENSOR *s;
         dfe_start_read(sensors_dict, s) {
@@ -1303,6 +1543,9 @@ void libsensors_thread(void *ptr __maybe_unused) {
         }
         dfe_done(s);
 
+        libsensors_emit_temperature_histogram(update_every, "sensors");
+
+        netdata_mutex_unlock(&sensors_data_mutex);
         fflush(stdout);
         netdata_mutex_unlock(&stdout_mutex);
     }
@@ -1310,8 +1553,15 @@ void libsensors_thread(void *ptr __maybe_unused) {
 cleanup:
     libsensors_running = false;
 
+    // serialize with in-flight "sensors" function requests: they must either
+    // finish before the dictionary is destroyed, or observe it as NULL
+    netdata_mutex_lock(&sensors_data_mutex);
     dictionary_destroy(sensors_dict);
     sensors_dict = NULL;
+    libsensors_histogram_exposed = false;
+    netdata_mutex_unlock(&sensors_data_mutex);
+
+    sensors_cleanup(); // releases libsensors' internal state
 }
 
 static ND_THREAD *libsensors = NULL;

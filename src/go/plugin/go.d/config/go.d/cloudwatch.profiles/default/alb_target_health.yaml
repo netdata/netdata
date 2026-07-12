@@ -23,7 +23,7 @@ template:
     instances:
       by_labels: [account_id, region, load_balancer, target_group]
   charts:
-    - id: cw_alb_target_health_unhealthy_hosts
+    - id: aws_cloudwatch_alb_target_health_unhealthy_hosts
       context: unhealthy_hosts
       title: ALB Target Group Unhealthy Hosts
       family: Hosts
