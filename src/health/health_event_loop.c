@@ -160,7 +160,7 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, RRDSET *st, time_t now, time_t
     time_t first = rrdset_first_entry_s(st);
     time_t last = rrdset_last_entry_s(st);
 
-    if(unlikely(now + update_every < first /* || now - update_every > last */)) {
+    if(unlikely(nd_time_t_add_compare(now, update_every, first) < 0 /* || now - update_every > last */)) {
         netdata_log_debug(D_HEALTH
                           , "Health not examining alarm '%s.%s' yet (wanted time is out of bounds - we need %lu but got %lu - %lu)."
                           , rrdcalc_chart_name(rc), rrdcalc_name(rc), (unsigned long) now, (unsigned long) first
@@ -169,9 +169,11 @@ static inline int rrdcalc_isrunnable(RRDCALC *rc, RRDSET *st, time_t now, time_t
     }
 
     if(RRDCALC_HAS_DB_LOOKUP(rc)) {
-        time_t needed = now + rc->config.before + rc->config.after;
+        intmax_t lookup_offset = (intmax_t)rc->config.before + (intmax_t)rc->config.after;
+        time_t needed = nd_time_t_add_saturating(now, lookup_offset);
 
-        if(needed + update_every < first || needed - update_every > last) {
+        if(nd_time_t_add_compare(now, lookup_offset + update_every, first) < 0 ||
+           nd_time_t_add_compare(now, lookup_offset - update_every, last) > 0) {
             netdata_log_debug(D_HEALTH,
                 "Health not examining alarm '%s.%s' yet (not enough data yet - we need %lu but got %lu - %lu).",
                 rrdcalc_chart_name(rc),
@@ -395,7 +397,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                health_globals.config.postpone_alarms_during_hibernation_for_seconds);
 
         host->health.delay_up_to =
-            now + health_globals.config.postpone_alarms_during_hibernation_for_seconds;
+            nd_time_t_add_saturating(now, health_globals.config.postpone_alarms_during_hibernation_for_seconds);
     }
 
     if (unlikely(host->health.delay_up_to)) {
@@ -471,7 +473,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
         // has stopped being collected for 60 seconds
         if (unlikely(rc->status != RRDCALC_STATUS_REMOVED &&
                      rrdset_flag_check(st, RRDSET_FLAG_OBSOLETE) &&
-                     now > (st->last_collected_time.tv_sec + 60))) {
+                     nd_time_t_add_compare(st->last_collected_time.tv_sec, 60, now) < 0)) {
 
             if (!rrdcalc_isrepeating(rc)) {
                 worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
@@ -696,7 +698,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                 //      delay = (int)(rc->delay_up_to_timestamp - now);
 
                 rc->delay_last = delay;
-                rc->delay_up_to_timestamp = now + delay;
+                rc->delay_up_to_timestamp = nd_time_t_add_saturating(now, delay);
 
                 ALARM_ENTRY *ae = health_create_alarm_entry(
                     host,
@@ -740,7 +742,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
             }
 
             rc->last_updated = now;
-            rc->next_update = now + rc->config.update_every;
+            rc->next_update = nd_time_t_add_saturating(now, rc->config.update_every);
 
             if (*next_run > rc->next_update)
                 *next_run = rc->next_update;
@@ -775,7 +777,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
             else
                 continue;
 
-            if(unlikely(repeat_every > 0 && (rc->last_repeat + repeat_every) <= now)) {
+            if(unlikely(repeat_every > 0 && nd_time_t_add_compare(rc->last_repeat, repeat_every, now) <= 0)) {
                 RRDSET *st = NULL;
                 RRDSET_ACQUIRED *rsa = rrdcalc_rrdset_acquire_linked(host, rc, &st);
                 if(unlikely(!rsa))
@@ -785,6 +787,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     rrdset_acquired_release(rsa);
                     continue;
                 }
+
 
                 worker_is_busy(WORKER_HEALTH_JOB_ALARM_LOG_ENTRY);
                 rc->last_repeat = now;
@@ -873,7 +876,7 @@ static void health_event_loop(void) {
 
         time_t now = now_realtime_sec();
         bool apply_hibernation_delay = false;
-        time_t next_run = now + health_globals.config.run_at_least_every_seconds;
+        time_t next_run = nd_time_t_add_saturating(now, health_globals.config.run_at_least_every_seconds);
 
         if (unlikely(check_if_resumed_from_suspension())) {
             apply_hibernation_delay = true;

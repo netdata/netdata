@@ -187,7 +187,7 @@ static void insert_alert_queue(
     if (!aclk_host_config)
         return;
 
-    time_t submit_delay = trigger_time + calculate_delay(old_status, new_status);
+    time_t submit_delay = nd_time_t_add_saturating(trigger_time, calculate_delay(old_status, new_status));
 
     int param = 0;
     SQLITE_BIND_FAIL(done, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));

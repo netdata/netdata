@@ -977,6 +977,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/clocks/clocks.h
         src/libnetdata/clocks/clocks-internals.h
         src/libnetdata/clocks/clocks-unittest.c
+        src/libnetdata/clocks/time_t_arithmetic.h
         src/libnetdata/completion/completion.c
         src/libnetdata/completion/completion.h
         src/libnetdata/datetime/iso8601.c
