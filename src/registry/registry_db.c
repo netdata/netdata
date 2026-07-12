@@ -113,8 +113,9 @@ int registry_db_save(void) {
     // Implement exponential backoff for save failures
     if(registry.consecutive_save_failures > 0) {
         time_t now = now_realtime_sec();
-        time_t backoff_seconds = 60 * (1 << (registry.consecutive_save_failures - 1)); // 60s, 120s, 240s, etc.
-        if(backoff_seconds > 3600) backoff_seconds = 3600; // Cap at 1 hour
+        time_t backoff_seconds = registry.consecutive_save_failures < 7 ?
+                                     60 * (1 << (registry.consecutive_save_failures - 1)) : // 60s, 120s, etc.
+                                     3600; // Cap at 1 hour
         
         if((now - registry.last_save_failure) < backoff_seconds) {
             netdata_log_debug(D_REGISTRY, "REGISTRY: skipping save due to backoff (failed %d times, waiting %ld seconds)", 
