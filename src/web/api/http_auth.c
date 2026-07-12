@@ -17,6 +17,21 @@ struct bearer_token {
     time_t expires_s;
 };
 
+static void bearer_token_insert_callback(
+    const DICTIONARY_ITEM *item __maybe_unused, void *value __maybe_unused, void *data) {
+    bool *inserted = data;
+    if(inserted)
+        *inserted = true;
+}
+
+static DICTIONARY *bearer_tokens_dictionary_create(void) {
+    DICTIONARY *dict = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
+        NULL, sizeof(struct bearer_token));
+    dictionary_register_insert_callback(dict, bearer_token_insert_callback, NULL);
+    return dict;
+}
+
 static void bearer_tokens_path(char out[FILENAME_MAX]) {
     filename_from_path_entry(out, netdata_configured_varlib_dir, "bearer_tokens", NULL);
 }
@@ -134,26 +149,37 @@ static bool bearer_token_save_to_file(nd_uuid_t token, struct bearer_token *bt) 
     return true;
 }
 
-static time_t bearer_create_token_internal(nd_uuid_t token, HTTP_USER_ROLE user_role, HTTP_ACCESS access, nd_uuid_t cloud_account_id, const char *client_name, time_t created_s, time_t expires_s, bool save) {
+static const DICTIONARY_ITEM *bearer_token_set_and_acquire(
+    nd_uuid_t token, HTTP_USER_ROLE user_role, HTTP_ACCESS access,
+    nd_uuid_t cloud_account_id, const char *client_name,
+    time_t created_s, time_t expires_s, bool *inserted) {
     char uuid_str[UUID_COMPACT_STR_LEN];
     uuid_unparse_lower_compact(token, uuid_str);
 
-    struct bearer_token t = { 0 }, *bt;
-    const DICTIONARY_ITEM  *item = dictionary_set_and_acquire_item(netdata_authorized_bearers, uuid_str, &t, sizeof(t));
-    bt = dictionary_acquired_item_value(item);
+    struct bearer_token candidate = {
+        .access = access,
+        .user_role = user_role,
+        .created_s = created_s,
+        .expires_s = expires_s,
+    };
+    uuid_copy(candidate.cloud_account_id, cloud_account_id);
+    strncpyz(candidate.client_name, client_name, sizeof(candidate.client_name) - 1);
 
-    if(!bt->created_s) {
-        bt->created_s = created_s;
-        bt->expires_s = expires_s;
-        bt->user_role = user_role;
-        bt->access = access;
+    *inserted = false;
+    return dictionary_set_and_acquire_item_advanced(
+        netdata_authorized_bearers, uuid_str, -1,
+        &candidate, sizeof(candidate), inserted);
+}
 
-        uuid_copy(bt->cloud_account_id, cloud_account_id);
-        strncpyz(bt->client_name, client_name, sizeof(bt->client_name) - 1);
+static time_t bearer_create_token_internal(nd_uuid_t token, HTTP_USER_ROLE user_role, HTTP_ACCESS access, nd_uuid_t cloud_account_id, const char *client_name, time_t created_s, time_t expires_s, bool save) {
+    bool inserted;
+    const DICTIONARY_ITEM *item = bearer_token_set_and_acquire(
+        token, user_role, access, cloud_account_id, client_name,
+        created_s, expires_s, &inserted);
+    struct bearer_token *bt = dictionary_acquired_item_value(item);
 
-        if(save)
-            bearer_token_save_to_file(token, bt);
-    }
+    if(inserted && save)
+        bearer_token_save_to_file(token, bt);
 
     time_t expiration = bt->expires_s;
 
@@ -353,9 +379,7 @@ void bearer_tokens_init(void) {
         "bearer token protection",
         netdata_bearer_protection_is_enabled()));
 
-    netdata_authorized_bearers = dictionary_create_advanced(
-        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,
-        NULL, sizeof(struct bearer_token));
+    netdata_authorized_bearers = bearer_tokens_dictionary_create();
 
     bearer_tokens_load_from_disk();
 }
