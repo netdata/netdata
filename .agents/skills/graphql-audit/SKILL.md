@@ -101,6 +101,7 @@ bash .agents/skills/graphql-audit/scripts/codeql-dismiss.sh \
 ```
 
 Comments are stored verbatim; keep them short, factual, and ASCII.
+GitHub rejects dismissal comments longer than 280 characters.
 
 ### Step 4 — bulk dismissal
 
