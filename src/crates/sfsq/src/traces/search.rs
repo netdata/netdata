@@ -266,8 +266,18 @@ impl FileDiscovery {
             Some(&lowest) => {
                 // The extraction band [lowest, band_bottom) held exactly
                 // `emitted.len()` matches; fewer than requested means the
-                // whole remaining range was drained.
+                // whole remaining range was drained. An EXACTLY-full band
+                // may have drained it too — probe (a bitmap-tree count,
+                // not a row visit) so a file with nothing left below is
+                // never mistaken for an undiscovered threat: that would
+                // turn a provably complete result Partial{WorkCeiling}
+                // when the ceiling was crossed by the last match.
                 self.band_bottom = if emitted.len() < count { self.lo } else { lowest };
+                if self.band_bottom > self.lo
+                    && self.compiled.count_in_range(self.lo, self.band_bottom) == 0
+                {
+                    self.band_bottom = self.lo;
+                }
             }
         }
         for &pos in &emitted {

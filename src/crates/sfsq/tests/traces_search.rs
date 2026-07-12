@@ -796,6 +796,38 @@ fn visited_rows_ceiling_gates_refill() {
     assert_eq!(norm(&data), norm(&again), "ceiling termination is deterministic");
 }
 
+/// A ceiling crossed by the very LAST match must not turn a provably
+/// complete result Partial: an exactly-full extraction that drained the
+/// range marks its file exhausted (the exhaustion probe), so no phantom
+/// undiscovered threat survives.
+#[test]
+fn exact_drain_at_the_ceiling_stays_complete() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc")];
+    // The match must sit ABOVE the range floor (an older non-matching
+    // row below it), else the band collapses to `lo` trivially and the
+    // exactly-full-band case never arises.
+    let reqs = vec![req_with(svc, None, &[
+        span_in(7, 0x71, 0, 500 * NS, "older-unrelated"),
+        SpanSpec {
+            attrs: vec![kv_str("m", "yes")],
+            ..span_in(9, 0x91, 0, 1_000 * NS, "the-only-match")
+        },
+        span_in(8, 0x81, 0, 2_000 * NS, "unrelated"),
+    ])];
+    let wal = write_wal(dir.path(), reqs, "drain");
+    let sources = both_roles(|| vec![sealed_source(dir.path(), &wal, "one")]);
+    // Ceiling 0: the clamp allows exactly one emission, which IS the
+    // only match — complete, not WorkCeiling.
+    let data = run(
+        sources,
+        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m", "yes")]))
+            .visited_rows_ceiling_for_tests(0),
+    );
+    assert_eq!(ids(&data), vec![hex(9)]);
+    assert_eq!(data.status, QueryStatus::Complete);
+}
+
 /// UNSET trace ids never become candidates (TRCE carries zeros for
 /// them; a by-UNSET group is not a trace).
 #[test]
