@@ -925,6 +925,70 @@ fn capped_candidates_are_never_silently_dropped() {
     assert_eq!(uncapped.status, QueryStatus::Complete);
 }
 
+/// A budget-truncated setup source whose SUMMARY range cannot outrank
+/// the Nth final is no threat: the result stays Complete (the
+/// truncation threat is a rank bound, not a bare flag). The budget is
+/// sized so the newer file compiles but the older file's high-card
+/// stream-batch scan runs out mid-compilation.
+#[test]
+fn budget_truncated_old_source_cannot_falsify_completeness() {
+    let dir = tempfile::tempdir().unwrap();
+    let svc = vec![kv_str("service.name", "svc")];
+    // 120 distinct values → the `hc` field is high-card (production
+    // threshold 100), so compiling `hc =~ .*` scans stream batches.
+    let old: Vec<ExportTraceServiceRequest> = (0..120u64)
+        .map(|i| {
+            req_with(svc.clone(), None, &[SpanSpec {
+                attrs: vec![kv_str("m", "yes"), kv_str("hc", &format!("v{i:03}"))],
+                ..span_in((i + 1) as u8, 0x10, 0, (100 + i) * NS, "old")
+            }])
+        })
+        .collect();
+    let new: Vec<ExportTraceServiceRequest> = (0..120u64)
+        .map(|i| {
+            req_with(svc.clone(), None, &[SpanSpec {
+                attrs: vec![kv_str("m", "yes"), kv_str("hc", &format!("w{i:03}"))],
+                ..span_in((i + 130) as u8, 0x10, 0, (1_000 + i) * NS, "new")
+            }])
+        })
+        .collect();
+    let wal_old = write_wal(dir.path(), old, "old");
+    let wal_new = write_wal(dir.path(), new, "new");
+    // SourceId order decides processing order: "a-new" compiles first
+    // (120 rows), "b-old" starts within budget and truncates mid-scan.
+    let sources = || {
+        both_roles(|| {
+            vec![
+                sealed_source(dir.path(), &wal_new, "a-new"),
+                sealed_source(dir.path(), &wal_old, "b-old"),
+            ]
+        })
+    };
+    let q = || {
+        SearchQuery::new(pred(vec![
+            attr_eq(TagScope::Span, "m", "yes"),
+            cond(
+                PredicateTarget::Attribute(TagScope::Span, "hc".into()),
+                CompareOp::Regex,
+                vec![text(".*")],
+            ),
+        ]))
+        .limit(1)
+        .visited_rows_ceiling_for_tests(130)
+    };
+    let data = run(sources(), q());
+    // The top-1 comes from the new file (1119s); the truncated old
+    // file's bound (~220s) cannot outrank it — provably Complete.
+    assert_eq!(ids(&data), vec![hex(249)]);
+    assert_eq!(data.status, QueryStatus::Complete);
+    // Sanity: the unbudgeted answer is the same top-1.
+    let unbudgeted = run(
+        sources(),
+        SearchQuery::new(pred(vec![attr_eq(TagScope::Span, "m", "yes")])).limit(1),
+    );
+    assert_eq!(ids(&unbudgeted), vec![hex(249)]);
+}
+
 /// UNSET trace ids never become candidates (TRCE carries zeros for
 /// them; a by-UNSET group is not a trace).
 #[test]

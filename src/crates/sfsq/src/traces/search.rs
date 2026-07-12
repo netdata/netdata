@@ -482,10 +482,19 @@ pub fn search(
     }
 
     // ── Phase 1 setup: discovery state per window file, tail matches ──
-    // A visited-rows breach here stops FURTHER discovery work; sources
-    // it never reached are recorded as truncated discovery so the main
-    // loop can never claim completeness over them.
-    let mut discovery_truncated = false;
+    // A visited-rows breach here stops FURTHER discovery work — but a
+    // budget-truncated SFST still has its summary time range, which
+    // BOUNDS any candidate rank it could have contributed (candidates
+    // start inside the file's range ∩ the window). Tracking that bound
+    // instead of a bare flag lets the main loop prove completeness when
+    // the Nth final already outranks everything a skipped source could
+    // hold; a truncated TAIL has no time metadata, so its threat stays
+    // unbounded.
+    let mut truncated_up_to: Option<i64> = None; // exclusive ns bound
+    let mut truncated_unbounded = false;
+    let merge_bound = |acc: &mut Option<i64>, bound: i64| {
+        *acc = Some(acc.map_or(bound, |b| b.max(bound)));
+    };
     let mut files: Vec<FileDiscovery> = Vec::new();
     let mut pool = CandidatePool::default();
     for (reader, source) in &readers {
@@ -494,10 +503,6 @@ pub fn search(
         }
         if !window_ids.contains(source.source_id()) {
             continue;
-        }
-        if work.rows_visited > query.visited_ceiling {
-            discovery_truncated = true;
-            break;
         }
         let TraceSource::Sfst(c) = source else {
             unreachable!("readers hold SFST sources only")
@@ -511,16 +516,34 @@ pub fn search(
         {
             continue;
         }
+        // The exclusive upper bound on any in-window candidate start
+        // this file could hold: its inclusive-seconds summary end,
+        // expanded like the overlap test, clipped by the window.
+        let file_end = (i64::from(c.summary.max_timestamp_s) + 1)
+            .saturating_mul(1_000_000_000);
+        let rank_bound = match query.window {
+            Some(w) => file_end.min(w.range_ns().end),
+            None => file_end,
+        };
+        if work.rows_visited > query.visited_ceiling {
+            merge_bound(&mut truncated_up_to, rank_bound);
+            continue;
+        }
+        let mut budget_truncated = false;
         match discovery_state(
             reader,
             &plan,
             query.window,
             query.visited_ceiling,
             &mut work,
-            &mut discovery_truncated,
+            &mut budget_truncated,
         ) {
             Ok(Some(file)) => files.push(file),
-            Ok(None) => {}
+            Ok(None) => {
+                if budget_truncated {
+                    merge_bound(&mut truncated_up_to, rank_bound);
+                }
+            }
             Err(e) => {
                 tracing::warn!(
                     "sfsq traces: source {} failed phase-1 compilation: {e}",
@@ -530,7 +553,7 @@ pub fn search(
             }
         }
     }
-    for (source_id, scan) in &tails {
+    'tails: for (source_id, scan) in &tails {
         if cancel.is_cancelled() {
             return Ok(cancelled_empty(status));
         }
@@ -538,7 +561,7 @@ pub fn search(
             continue;
         }
         if work.rows_visited > query.visited_ceiling {
-            discovery_truncated = true;
+            truncated_unbounded = true;
             break;
         }
         // The tail is small (bounded by rotation): evaluate every
@@ -549,8 +572,8 @@ pub fn search(
         for (trace_id, span) in scan.spans_with_ids() {
             work.rows_visited += 1;
             if work.rows_visited > query.visited_ceiling {
-                discovery_truncated = true;
-                break;
+                truncated_unbounded = true;
+                break 'tails;
             }
             if !trace_id.is_unset() && eval.matches(span, query.window) {
                 pool.add(trace_id, span.start_ns);
@@ -628,9 +651,17 @@ pub fn search(
             (Some(raw), Some(nth)) => outranks(raw, nth),
         };
         // An undiscovered candidate's trace id is unknown, so an equal
-        // start conservatively counts as a possible outrank; discovery
-        // work a ceiling cut short is a standing threat by definition.
-        let undiscovered_threat = discovery_truncated
+        // start conservatively counts as a possible outrank. Budget-
+        // truncated setup sources threaten only while the Nth final
+        // does not outrank their summary bound (a truncated tail is
+        // unbounded) — a provably complete result stays Complete.
+        let truncation_threat = truncated_unbounded
+            || match (truncated_up_to, nth_final) {
+                (None, _) => false,
+                (Some(_), None) => true,
+                (Some(bound), Some((nth_start, _))) => bound > nth_start,
+            };
+        let undiscovered_threat = truncation_threat
             || match nth_final {
                 None => files.iter().any(|f| !f.exhausted()),
                 Some((nth_start, _)) => files
@@ -798,8 +829,9 @@ pub fn search(
 /// rounds touch no reader), and compile the plan against that range
 /// (work counted, budget-bounded). `Ok(None)` = the window range is
 /// empty in this file, OR the visited budget ran out mid-compilation —
-/// the latter sets `truncated` so the engine can never claim
-/// completeness over the file it could not afford to scan.
+/// the latter sets `truncated` so the engine records the file's rank
+/// bound as a standing threat instead of claiming completeness over
+/// data it could not afford to scan.
 fn discovery_state(
     reader: &sfst::IndexReader<'_>,
     plan: &sfst::TracePlan,
