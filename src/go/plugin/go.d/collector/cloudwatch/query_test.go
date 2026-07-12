@@ -291,6 +291,8 @@ func selectCompiledSeries(t *testing.T, scope collectionScope, names ...string) 
 }
 
 func TestBuildQueryPlan_SeriesOwnershipAcrossTargets(t *testing.T) {
+	// filteredOverlapCollector compiles the stock EC2 profile; its network series
+	// let these scopes exercise partial overlap rather than a synthetic fixture.
 	c := filteredOverlapCollector(t)
 	c.plan.Scopes[0].TagFilter = nil
 	c.plan.Scopes[0].SelectedSeries = selectCompiledSeries(t, c.plan.Scopes[0], "ec2.cpu_utilization_average", "ec2.network_in_sum")
