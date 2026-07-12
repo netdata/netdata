@@ -1731,6 +1731,125 @@ static int test_rrddim_collected_minimum_magnitude(void) {
     return rc;
 }
 
+static int test_rrdset_homogeneity_multiplier_sign(void) {
+    fprintf(stderr, "%s() running...\n", __FUNCTION__);
+
+    RRD_DB_MODE old_default_rrd_memory_mode = default_rrd_memory_mode;
+    default_rrd_memory_mode = RRD_DB_MODE_ALLOC;
+
+    struct homogeneity_case {
+        const char *name;
+        int32_t multiplier_a;
+        int32_t multiplier_b;
+        int32_t divisor_a;
+        int32_t divisor_b;
+        RRD_ALGORITHM algorithm_a;
+        RRD_ALGORITHM algorithm_b;
+        bool heterogeneous;
+    } cases[] = {
+        { "negative-positive", -1, 1, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, false },
+        { "negative-negative", -1, -1, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, false },
+        { "positive-negative", 1, -1, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, false },
+        { "unequal-magnitude", -1, 2, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, true },
+        { "unequal-divisor", -1, 1, 1, 2, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, true },
+        { "unequal-algorithm", -1, 1, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_INCREMENTAL, true },
+        { "minimum-magnitude", INT32_MIN, INT32_MIN, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, false },
+        { "minimum-unequal", INT32_MIN, 1, 1, 1, RRD_ALGORITHM_ABSOLUTE, RRD_ALGORITHM_ABSOLUTE, true },
+    };
+
+    int rc = 0;
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        char id[RRD_ID_LENGTH_MAX + 1];
+        snprintfz(id, RRD_ID_LENGTH_MAX, "unittest-homogeneity-%s", cases[i].name);
+
+        RRDSET *st = rrdset_create_localhost(
+            "netdata", id, id, "netdata", NULL, "Unit Testing", "x", "unittest", NULL, 1,
+            nd_profile.update_every, RRDSET_TYPE_LINE);
+        rrddim_add(st, "a", NULL, cases[i].multiplier_a, cases[i].divisor_a, cases[i].algorithm_a);
+        rrddim_add(st, "b", NULL, cases[i].multiplier_b, cases[i].divisor_b, cases[i].algorithm_b);
+
+        bool immediate = rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS);
+        if(immediate != cases[i].heterogeneous) {
+            fprintf(stderr, "%s: %s insertion classified heterogeneous=%d, expected %d\n",
+                    __FUNCTION__, cases[i].name, immediate, cases[i].heterogeneous);
+            rc = 1;
+        }
+
+        rrdset_flag_set(st, RRDSET_FLAG_HOMOGENEOUS_CHECK);
+        rrdset_update_heterogeneous_flag(st);
+        bool deferred = rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS);
+        if(deferred != cases[i].heterogeneous ||
+           rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK)) {
+            fprintf(stderr, "%s: %s deferred classified heterogeneous=%d, expected %d (check pending=%d)\n",
+                    __FUNCTION__, cases[i].name, deferred, cases[i].heterogeneous,
+                    rrdset_flag_check(st, RRDSET_FLAG_HOMOGENEOUS_CHECK));
+            rc = 1;
+        }
+    }
+
+    RRDSET *st_single = rrdset_create_localhost(
+        "netdata", "unittest-homogeneity-single", "unittest-homogeneity-single", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st_single, "a", NULL, -1, 1, RRD_ALGORITHM_ABSOLUTE);
+    rrdset_flag_set(st_single, RRDSET_FLAG_HOMOGENEOUS_CHECK);
+    rrdset_update_heterogeneous_flag(st_single);
+    if(rrdset_flag_check(st_single, RRDSET_FLAG_HETEROGENEOUS) ||
+       rrdset_flag_check(st_single, RRDSET_FLAG_HOMOGENEOUS_CHECK)) {
+        fprintf(stderr, "%s: one negative dimension was not homogeneous after deferred recomputation\n", __FUNCTION__);
+        rc = 1;
+    }
+
+    RRDSET *st_update = rrdset_create_localhost(
+        "netdata", "unittest-homogeneity-update", "unittest-homogeneity-update", "netdata", NULL,
+        "Unit Testing", "x", "unittest", NULL, 1, nd_profile.update_every, RRDSET_TYPE_LINE);
+    rrddim_add(st_update, "a", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+    rrddim_add(st_update, "b", NULL, 1, 1, RRD_ALGORITHM_ABSOLUTE);
+
+    RRDDIM *first = NULL, *second = NULL, *rd;
+    rrddim_foreach_read(rd, st_update) {
+        if(!first)
+            first = rd;
+        else if(!second)
+            second = rd;
+    }
+    rrddim_foreach_done(rd);
+
+    if(!first || !second) {
+        fprintf(stderr, "%s: failed to locate both metadata-update dimensions\n", __FUNCTION__);
+        rc = 1;
+    }
+    else {
+        rrddim_set_multiplier(st_update, first, -1);
+        if(!rrdset_flag_check(st_update, RRDSET_FLAG_HOMOGENEOUS_CHECK)) {
+            fprintf(stderr, "%s: multiplier metadata update did not request homogeneity recomputation\n", __FUNCTION__);
+            rc = 1;
+        }
+
+        rrdset_update_heterogeneous_flag(st_update);
+        if(rrdset_flag_check(st_update, RRDSET_FLAG_HETEROGENEOUS)) {
+            fprintf(stderr, "%s: equal magnitudes became heterogeneous after first-dimension sign update\n", __FUNCTION__);
+            rc = 1;
+        }
+
+        rrddim_set_multiplier(st_update, second, 2);
+        rrdset_update_heterogeneous_flag(st_update);
+        if(!rrdset_flag_check(st_update, RRDSET_FLAG_HETEROGENEOUS)) {
+            fprintf(stderr, "%s: unequal updated magnitudes were not heterogeneous\n", __FUNCTION__);
+            rc = 1;
+        }
+
+        rrddim_set_multiplier(st_update, second, -1);
+        rrdset_update_heterogeneous_flag(st_update);
+        if(rrdset_flag_check(st_update, RRDSET_FLAG_HETEROGENEOUS)) {
+            fprintf(stderr, "%s: restoring equal negative magnitudes did not clear heterogeneity\n", __FUNCTION__);
+            rc = 1;
+        }
+    }
+
+    default_rrd_memory_mode = old_default_rrd_memory_mode;
+    return rc;
+}
+
 static int test_rrddim_divisor_normalization(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
@@ -2149,6 +2268,9 @@ int run_all_mockup_tests(void)
         return 1;
 
     if(test_rrddim_collected_minimum_magnitude())
+        return 1;
+
+    if(test_rrdset_homogeneity_multiplier_sign())
         return 1;
 
     if(test_rrddim_divisor_normalization())

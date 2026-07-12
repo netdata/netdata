@@ -179,13 +179,13 @@ void rrdset_update_heterogeneous_flag(RRDSET *st) {
 
     bool init = false, is_heterogeneous = false;
     RRD_ALGORITHM algorithm;
-    int32_t multiplier;
+    int64_t multiplier;
     int64_t divisor;
 
     rrddim_foreach_read(rd, st) {
         if(!init) {
             algorithm = rd->algorithm;
-            multiplier = rd->multiplier;
+            multiplier = rrddim_scale_magnitude(rd->multiplier);
             divisor = rrddim_scale_magnitude(rd->divisor);
             init = true;
             continue;
@@ -196,7 +196,7 @@ void rrdset_update_heterogeneous_flag(RRDSET *st) {
             if(!rrdset_flag_check(st, RRDSET_FLAG_HETEROGENEOUS)) {
                 #ifdef NETDATA_INTERNAL_CHECKS
                 netdata_log_info("Dimension '%s' added on chart '%s' of host '%s' is not homogeneous to other dimensions already present "
-                     "(algorithm is '%s' vs '%s', multiplier is %d vs %d, "
+                     "(algorithm is '%s' vs '%s', multiplier is %d vs %" PRId64 ", "
                      "divisor is %d vs %" PRId64 ").",
                      rrddim_name(rd),
                      rrdset_name(st),
