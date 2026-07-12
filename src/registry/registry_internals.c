@@ -194,16 +194,19 @@ REGISTRY_PERSON *registry_request_delete(const char *person_guid, char *machine_
 
     STRING *d_url = string_strdupz(delete_url);
     REGISTRY_PERSON_URL *dpu = registry_person_url_index_find(p, d_url);
-    string_freez(d_url);
 
     if(!dpu) {
         netdata_log_info("Registry Delete Request: URL not found for person: '%s', machine '%s', url '%s', delete url '%s'", p->guid
              , m->guid, string2str(pu->url), delete_url);
+        string_freez(d_url);
         return NULL;
     }
 
-    registry_log('D', p, m, pu->url, string2str(dpu->url));
+    STRING *request_url = string_dup(pu->url);
     registry_person_unlink_from_url(p, dpu);
+    registry_log('D', p, m, request_url, string2str(d_url));
+    string_freez(request_url);
+    string_freez(d_url);
 
     return p;
 }
