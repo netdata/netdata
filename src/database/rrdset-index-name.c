@@ -119,3 +119,22 @@ RRDSET *rrdset_find_byname(RRDHOST *host, const char *name) {
 
     return(st);
 }
+
+RRDSET_ACQUIRED *rrdset_find_byname_and_acquire(RRDHOST *host, const char *name) {
+    if (unlikely(!host->rrdset_root_index_name))
+        return NULL;
+
+    const DICTIONARY_ITEM *name_item = dictionary_get_and_acquire_item(host->rrdset_root_index_name, name);
+    if (!name_item)
+        return NULL;
+
+    RRDSET *st = dictionary_acquired_item_value(name_item);
+    RRDSET_ACQUIRED *rsa = NULL;
+
+    if (st && rrdset_is_discoverable(st))
+        rsa = rrdset_find_and_acquire(host, rrdset_id(st), false);
+
+    dictionary_acquired_item_release(host->rrdset_root_index_name, name_item);
+
+    return rsa;
+}
