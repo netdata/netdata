@@ -22,7 +22,7 @@ type planCompiler struct {
 	targetRoleARN     map[string]string
 	profiles          []cwprofiles.ResolvedProfile
 	profilesByName    map[string]cwprofiles.ResolvedProfile
-	seriesByProfile   map[string][]compiledSeries
+	seriesByProfile   map[string][]profileSeriesSpec
 	tagJoinErrors     map[string]error
 
 	usedCredentials  map[string]struct{}
@@ -58,7 +58,7 @@ type shadowSample struct {
 func newPlanCompiler(cfg Config, catalog cwprofiles.Catalog) *planCompiler {
 	profiles := catalog.AllProfiles()
 	profilesByName := make(map[string]cwprofiles.ResolvedProfile, len(profiles))
-	seriesByProfile := make(map[string][]compiledSeries, len(profiles))
+	seriesByProfile := make(map[string][]profileSeriesSpec, len(profiles))
 	for _, profile := range profiles {
 		profilesByName[profile.Name] = profile
 		seriesByProfile[profile.Name] = compileProfileSeries(profile)
@@ -268,16 +268,18 @@ func (pc *planCompiler) addScope(path, ruleName string, target *collectionTarget
 	return nil
 }
 
-func resolveSeriesPolicies(path string, rule, defaults *QueryPolicyConfig, profile cwprofiles.ResolvedProfile, series []compiledSeries) ([]compiledSeries, error) {
+func resolveSeriesPolicies(path string, rule, defaults *QueryPolicyConfig, profile cwprofiles.ResolvedProfile, series []profileSeriesSpec) ([]compiledSeries, error) {
 	out := make([]compiledSeries, len(series))
 	for i, item := range series {
 		metric := profile.Config.Metrics[item.MetricIndex]
-		policy, err := resolveQueryPolicy(path, rule, defaults, int(item.Policy.period/time.Second), profile.Config.PublicationDelay)
+		policy, err := resolveQueryPolicy(path, rule, defaults, int(item.Period/time.Second), profile.Config.PublicationDelay)
 		if err != nil {
 			return nil, fmt.Errorf("%s profile %q MetricName %q statistic %q: %w", path, profile.Name, metric.MetricName, item.Statistic, err)
 		}
-		item.Policy = policy
-		out[i] = item
+		out[i] = compiledSeries{
+			Ordinal: item.Ordinal, MetricIndex: item.MetricIndex, Statistic: item.Statistic,
+			Name: item.Name, Policy: policy,
+		}
 	}
 	return out, nil
 }

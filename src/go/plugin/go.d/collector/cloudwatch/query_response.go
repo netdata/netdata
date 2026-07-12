@@ -20,6 +20,7 @@ type responseQueryState struct {
 	hasCandidate bool
 	complete     bool
 	forbidden    bool
+	issue        queryResultIssueKind
 }
 
 func runGetMetricData(ctx context.Context, batch queryBatch) (map[string]queryOutcome, []queryResultIssue, error) {
@@ -34,6 +35,7 @@ func runGetMetricData(ctx context.Context, batch queryBatch) (map[string]queryOu
 
 	issueCounts := make(map[queryResultIssue]int)
 	var nextToken *string
+	paginationLimitReached := false
 	for page := 0; page < maxGetMetricDataPages; page++ {
 		out, err := batch.client.GetMetricData(ctx, &cloudwatch.GetMetricDataInput{
 			MetricDataQueries: requestQueries,
@@ -52,16 +54,20 @@ func runGetMetricData(ctx context.Context, batch queryBatch) (map[string]queryOu
 			if state == nil || state.complete || state.forbidden {
 				continue
 			}
-			accumulateCandidate(state, result.Values, result.Timestamps, batch.start, batch.end)
 			switch result.StatusCode {
 			case cwtypes.StatusCodeComplete:
+				accumulateCandidate(state, result.Values, result.Timestamps, batch.start, batch.end)
 				state.complete = true
+			case cwtypes.StatusCodePartialData:
+				accumulateCandidate(state, result.Values, result.Timestamps, batch.start, batch.end)
+				state.issue = queryIssuePartialData
 			case cwtypes.StatusCodeForbidden:
 				state.forbidden = true
-				issueCounts[queryResultIssue{
-					target: state.query.target, region: state.query.region, namespace: queryNamespace(state.query.query),
-					period: int(state.query.policy.period / time.Second), status: result.StatusCode,
-				}]++
+				state.issue = queryIssueForbidden
+			case cwtypes.StatusCodeInternalError:
+				state.issue = queryIssueInternalError
+			default:
+				state.issue = queryIssueUnknownStatus
 			}
 		}
 
@@ -69,6 +75,24 @@ func runGetMetricData(ctx context.Context, batch queryBatch) (map[string]queryOu
 			break
 		}
 		nextToken = out.NextToken
+		paginationLimitReached = page == maxGetMetricDataPages-1
+	}
+	for _, state := range byID {
+		if state.complete {
+			continue
+		}
+		kind := state.issue
+		if state.forbidden {
+			kind = queryIssueForbidden
+		} else if paginationLimitReached {
+			kind = queryIssuePaginationLimit
+		} else if kind == "" {
+			kind = queryIssueMissingResult
+		}
+		issueCounts[queryResultIssue{
+			target: state.query.target, region: state.query.region, namespace: queryNamespace(state.query.query),
+			period: int(state.query.policy.period / time.Second), kind: kind,
+		}]++
 	}
 	return completedOutcomes(byID, batch), queryResultIssues(issueCounts), nil
 }

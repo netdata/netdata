@@ -284,7 +284,7 @@ func selectCompiledSeries(t *testing.T, scope collectionScope, names ...string) 
 		wanted[name] = struct{}{}
 	}
 	var selected []compiledSeries
-	for _, series := range compileProfileSeries(scope.Profile) {
+	for _, series := range scope.SelectedSeries {
 		if _, ok := wanted[series.Name]; ok {
 			selected = append(selected, series)
 			delete(wanted, series.Name)
@@ -329,7 +329,7 @@ func TestBuildQueryPlan_UnknownTagMembershipReservesOnlySelectedSeries(t *testin
 	plan := requireBuildQueryPlan(t, c)
 	owners := queryOwnersBySeries(plan)
 	assert.NotContains(t, owners, "ec2.cpu_utilization_average")
-	assert.Len(t, owners, len(compileProfileSeries(c.plan.Scopes[1].Profile))-1)
+	assert.Len(t, owners, len(c.plan.Scopes[1].SelectedSeries)-1)
 	for _, owner := range owners {
 		assert.Equal(t, "second", owner)
 	}

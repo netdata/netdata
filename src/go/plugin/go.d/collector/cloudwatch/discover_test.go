@@ -490,7 +490,7 @@ func TestCollector_DiscoveryGroupsUseUnionOfSelectedSeriesPolicies(t *testing.T)
 		},
 	}}
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{profile})
-	all := compileProfileSeries(profile)
+	all := testCompiledSeries(profile)
 	c.plan.Scopes[0].SelectedSeries = all[:1]
 	second := c.plan.Scopes[0]
 	second.SelectedSeries = all[1:]
@@ -788,12 +788,12 @@ func TestSelectedSeriesUseRecentlyActive(t *testing.T) {
 	ec2 := dimProfile("AWS/EC2", 300, "InstanceId")
 	s3 := dimProfile("AWS/S3", 86400, "BucketName")
 
-	assert.True(t, selectedSeriesUseRecentlyActive(compileProfileSeries(cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2}), true))
-	assert.False(t, selectedSeriesUseRecentlyActive(compileProfileSeries(cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2}), false))
-	assert.False(t, selectedSeriesUseRecentlyActive(compileProfileSeries(cwprofiles.ResolvedProfile{Name: "s3", Config: s3}), true), "daily period must disable PT3H")
+	assert.True(t, selectedSeriesUseRecentlyActive(testCompiledSeries(cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2}), true))
+	assert.False(t, selectedSeriesUseRecentlyActive(testCompiledSeries(cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2}), false))
+	assert.False(t, selectedSeriesUseRecentlyActive(testCompiledSeries(cwprofiles.ResolvedProfile{Name: "s3", Config: s3}), true), "daily period must disable PT3H")
 
 	// A per-metric override beyond 3h also disables PT3H for the whole profile.
 	mixed := dimProfile("AWS/Custom", 300, "Id")
 	mixed.Metrics = []cwprofiles.Metric{{ID: "m", MetricName: "M", Statistics: []string{"average"}, Period: 86400}}
-	assert.False(t, selectedSeriesUseRecentlyActive(compileProfileSeries(cwprofiles.ResolvedProfile{Name: "mixed", Config: mixed}), true))
+	assert.False(t, selectedSeriesUseRecentlyActive(testCompiledSeries(cwprofiles.ResolvedProfile{Name: "mixed", Config: mixed}), true))
 }

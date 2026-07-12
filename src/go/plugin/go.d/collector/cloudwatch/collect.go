@@ -5,6 +5,7 @@ package cloudwatch
 import (
 	"context"
 	"errors"
+	"time"
 )
 
 func (c *Collector) collect(ctx context.Context) error {
@@ -34,7 +35,7 @@ func (c *Collector) collect(ctx context.Context) error {
 		return err
 	}
 
-	c.observations.applyOutcomes(due, execution.outcomes)
+	c.observations.applyOutcomes(due, execution.outcomes, now, time.Duration(c.UpdateEvery)*time.Second)
 	written := c.observations.emit(plan)
 
 	c.Debugf("CloudWatch collect: %d planned quer(y/ies), %d due, %d terminal outcome(s), %d transient outcome(s), %d emitted sample(s)",

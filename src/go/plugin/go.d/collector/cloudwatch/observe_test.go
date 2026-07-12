@@ -3,6 +3,7 @@
 package cloudwatch
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
@@ -75,6 +77,12 @@ func (f *fullCloudWatch) setGap(gap bool) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.gap = gap
+}
+
+func (f *fullCloudWatch) setStatus(status cwtypes.StatusCode) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.status = status
 }
 
 func (f *fullCloudWatch) getMetricDataCalls() int {
@@ -272,6 +280,64 @@ func TestCollect_QueryFailureRetriesNextCycle(t *testing.T) {
 	series, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
 	assert.NotEmpty(t, series, "a failed period is retried the next cycle, not skipped for a full period")
+}
+
+func TestCollect_QueryFailureBacksOffWithinEligibleWindow(t *testing.T) {
+	fake := &flakeyCloudWatch{
+		list:         map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
+		failGMDUntil: 1 << 30,
+	}
+	c := New()
+	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
+	useFakeClient(c, fake)
+
+	base := time.Unix(1_000_000_000, 0)
+	collectAt := func(offset time.Duration) {
+		c.now = func() time.Time { return base.Add(offset) }
+		_, _ = collecttest.CollectScalarSeries(c)
+	}
+
+	collectAt(0)
+	assert.Equal(t, 1, fake.getMetricDataCalls())
+	collectAt(time.Minute)
+	assert.Equal(t, 2, fake.getMetricDataCalls(), "the first retry waits one update_every")
+	collectAt(2 * time.Minute)
+	assert.Equal(t, 2, fake.getMetricDataCalls(), "the second retry delay doubles to two update_every intervals")
+	collectAt(3 * time.Minute)
+	assert.Equal(t, 3, fake.getMetricDataCalls())
+	collectAt(5 * time.Minute)
+	assert.Equal(t, 4, fake.getMetricDataCalls(), "a newly eligible window resets backoff and is immediately due")
+}
+
+func TestCollect_TransientResultWithCacheWarnsAndBacksOff(t *testing.T) {
+	c, fake := endToEndCollector(10)
+	var logs bytes.Buffer
+	c.Logger = logger.NewWithWriter(&logs)
+	base := time.Unix(1_000_000_000, 0)
+
+	c.now = func() time.Time { return base }
+	first, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	require.NotEmpty(t, first)
+
+	fake.setStatus(cwtypes.StatusCodeInternalError)
+	c.now = func() time.Time { return base.Add(5 * time.Minute) }
+	replayed, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	require.NotEmpty(t, replayed, "a transient result preserves the retained frame")
+	assert.Contains(t, logs.String(), "InternalError")
+
+	calls := fake.getMetricDataCalls()
+	c.now = func() time.Time { return base.Add(6 * time.Minute) }
+	_, err = collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, calls+1, fake.getMetricDataCalls(), "the first retry is due after one update_every")
+
+	c.now = func() time.Time { return base.Add(7 * time.Minute) }
+	_, err = collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, calls+1, fake.getMetricDataCalls(), "the second transient retry is backed off")
 }
 
 type cancelingCloudWatch struct {

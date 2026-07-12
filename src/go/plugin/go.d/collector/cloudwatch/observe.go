@@ -10,6 +10,9 @@ import (
 
 type queryState struct {
 	lastCompletedEnd time.Time
+	retryWindowEnd   time.Time
+	nextRetryAt      time.Time
+	transientCount   int
 	valueAt          time.Time
 	value            float64
 	hasValue         bool
@@ -58,21 +61,35 @@ func (o *observationStore) dueQueries(plan []plannedQuery, now time.Time) []plan
 	for _, query := range plan {
 		_, end := queryWindow(now, query.policy)
 		state, ok := o.queries[query.key]
-		if !ok || state.lastCompletedEnd.Before(end) {
+		if queryIsDue(state, ok, end, now) {
 			due = append(due, query)
 		}
 	}
 	return due
 }
 
-func (o *observationStore) applyOutcomes(due []plannedQuery, outcomes map[string]queryOutcome) {
+func queryIsDue(state queryState, exists bool, windowEnd, now time.Time) bool {
+	if !exists {
+		return true
+	}
+	if !state.lastCompletedEnd.Before(windowEnd) || state.retryWindowEnd.After(windowEnd) {
+		return false
+	}
+	return state.retryWindowEnd.Before(windowEnd) || !now.Before(state.nextRetryAt)
+}
+
+func (o *observationStore) applyOutcomes(due []plannedQuery, outcomes map[string]queryOutcome, attemptedAt time.Time, retryBase time.Duration) {
 	for _, query := range due {
 		outcome, ok := outcomes[query.key]
 		if !ok || outcome.kind == queryOutcomeTransient {
+			o.markTransient(query, attemptedAt, retryBase)
 			continue
 		}
 
 		state := o.queries[query.key]
+		state.retryWindowEnd = time.Time{}
+		state.nextRetryAt = time.Time{}
+		state.transientCount = 0
 		state.lastCompletedEnd = outcome.windowEnd
 		if outcome.kind == queryOutcomeForbidden {
 			state.hasValue = false
@@ -96,6 +113,38 @@ func (o *observationStore) applyOutcomes(due []plannedQuery, outcomes map[string
 		}
 		o.queries[query.key] = state
 	}
+}
+
+func (o *observationStore) markTransient(query plannedQuery, attemptedAt time.Time, retryBase time.Duration) {
+	state := o.queries[query.key]
+	_, windowEnd := queryWindow(attemptedAt, query.policy)
+	if !state.retryWindowEnd.Equal(windowEnd) {
+		state.transientCount = 0
+	}
+	state.transientCount++
+	state.retryWindowEnd = windowEnd
+	state.nextRetryAt = attemptedAt.Add(transientRetryDelay(retryBase, query.policy.period, state.transientCount))
+	o.queries[query.key] = state
+}
+
+func transientRetryDelay(base, period time.Duration, count int) time.Duration {
+	if base <= 0 {
+		base = time.Minute
+	}
+	if period <= 0 {
+		return base
+	}
+	if base >= period {
+		return period
+	}
+	delay := base
+	for range max(0, count-1) {
+		if delay >= period/2 {
+			return period
+		}
+		delay *= 2
+	}
+	return delay
 }
 
 func (o *observationStore) reconcilePlan(current []plannedQuery) {

@@ -25,6 +25,7 @@ const (
 	logKeyQueryClientFailed      = "query_client_failed"
 	logKeyGetMetricDataFailed    = "getmetricdata_failed"
 	logKeyGetMetricDataForbidden = "getmetricdata_forbidden"
+	logKeyGetMetricDataTransient = "getmetricdata_transient"
 	logKeyAccountResolveFailed   = "account_resolve_failed"
 	logKeyTagRefreshFailed       = "tag_refresh_failed"
 	logKeyRuleShadowed           = "rule_shadowed"

@@ -750,6 +750,7 @@
           "ui:placeholder": "30m"
         },
         "publication_delay": {
+          "ui:help": "Default publication delay inherited by every rule that omits it. This overrides profile-specific delays, including the stock S3 storage profile's conservative 1d delay. Use a shorter default only after verifying publication timing for every inheriting workload.",
           "ui:placeholder": "10m"
         }
       }
@@ -785,7 +786,7 @@
         "ui:help": "How often to rediscover matching CloudWatch metrics and resources."
       },
       "recently_active_only": {
-        "ui:help": "When enabled, use CloudWatch's three-hour filter only when every selected series sharing a namespace scan has a period of three hours or less. A longer-period participant keeps the shared scan unfiltered."
+        "ui:help": "When enabled, use CloudWatch's three-hour filter only when every selected series sharing a namespace scan has publication_delay + lookback + period of three hours or less. A longer-horizon participant keeps the shared scan unfiltered."
       }
     },
     "vnode": {

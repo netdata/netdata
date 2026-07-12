@@ -9,9 +9,10 @@ not here.
 
 The one rule that shapes most of what follows:
 
-> `GetMetricData` is billed per query, so the collector queries each metric only
-> when its next aligned effective-period window is eligible and re-emits cached values in between — cost tracks the
-> profiles you run, not how often Netdata collects.
+> `GetMetricData` is billed by requested metrics, so the collector normally queries
+> each series only when its next aligned effective-period window is eligible and re-emits cached values in between.
+> Transient failures use bounded per-query backoff; `update_every` therefore affects failure-time retry cost, not the
+> normal successful cadence.
 
 ## What It Does
 
@@ -256,6 +257,11 @@ Discovery then finds which *instances* of those profiles exist per target and re
   end is newer than its last terminal completion. Adding a sibling query never
   makes completed siblings due, and clock jumps query only the current rolling
   window rather than backfilling missed buckets.
+- A transient attempt leaves completion unchanged and starts retry state for that
+  stable query and eligible window. The first retry waits one `update_every`; each
+  later delay doubles and is capped at the effective period. A new eligible window
+  is immediately due and resets the sequence. `Complete` and `Forbidden` clear it;
+  parent-context cancellation advances neither retry nor completion state.
 - Query-plan construction atomically rejects more than 20,000 queries, 600,000
   all-due datapoints, 40 all-due batches, or 1,440 buckets per query.
 
@@ -278,7 +284,8 @@ Discovery then finds which *instances* of those profiles exist per target and re
 - `Complete` is terminal success. `Forbidden` is terminal authorization failure.
   Client/request failure, `InternalError`, missing/unknown status, unresolved
   `PartialData`, and pagination overflow are transient for only the affected
-  queries.
+  queries. Bounded warnings identify those unresolved results; successful siblings
+  remain complete and are not reissued.
 
 ## Observation And Metrics
 
@@ -308,7 +315,7 @@ Discovery then finds which *instances* of those profiles exist per target and re
   `sample_count` default to zero; every other statistic gaps. The cache otherwise
   persists until a terminal success expires/replaces it or `reconcilePlan` drops
   the stable key. Transient failures intentionally replay retained values beyond
-  lookback and remain due for retry. `Forbidden` clears the value and completes
+  lookback and follow the per-query retry backoff. `Forbidden` clears the value and completes
   only the attempted window.
 - Rate totals are cached raw and divided by the effective period during emission.
   A total transient first-cycle failure with no retained frame returns an error;

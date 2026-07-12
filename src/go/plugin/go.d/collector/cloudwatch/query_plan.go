@@ -282,6 +282,7 @@ func plannedQueryKey(q plannedQuery) string {
 	writeLengthPrefixed(&key, queryNamespace(q.query))
 	if q.query.MetricStat != nil {
 		writeLengthPrefixed(&key, aws.ToString(q.query.MetricStat.Stat))
+		writeLengthPrefixed(&key, strconv.FormatInt(int64(aws.ToInt32(q.query.MetricStat.Period)), 10))
 		if metric := q.query.MetricStat.Metric; metric != nil {
 			writeLengthPrefixed(&key, aws.ToString(metric.MetricName))
 			for _, dim := range metric.Dimensions {

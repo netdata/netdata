@@ -82,10 +82,30 @@ func TestRunGetMetricData_PartialRequiresLaterComplete(t *testing.T) {
 		fake := &scriptedGetMetricData{pages: []*cloudwatch.GetMetricDataOutput{{MetricDataResults: []cwtypes.MetricDataResult{
 			metricResult("q0", cwtypes.StatusCodePartialData, []float64{1}, []time.Time{time.Unix(300, 0)}),
 		}}}}
-		outcomes, _, err := runGetMetricData(context.Background(), responseTestBatch(fake, query))
+		outcomes, issues, err := runGetMetricData(context.Background(), responseTestBatch(fake, query))
 		require.NoError(t, err)
 		assert.Empty(t, outcomes)
+		require.Len(t, issues, 1)
+		assert.Equal(t, queryIssuePartialData, issues[0].kind)
 	})
+}
+
+func TestRunGetMetricData_InternalErrorCandidateIsNotAcceptedByLaterComplete(t *testing.T) {
+	query := testPlannedQuery("stable", "base", "us-east-1", "AWS/EC2", 300)
+	fake := &scriptedGetMetricData{pages: []*cloudwatch.GetMetricDataOutput{
+		{MetricDataResults: []cwtypes.MetricDataResult{
+			metricResult("q0", cwtypes.StatusCodeInternalError, []float64{99}, []time.Time{time.Unix(600, 0)}),
+		}, NextToken: aws.String("next")},
+		{MetricDataResults: []cwtypes.MetricDataResult{
+			metricResult("q0", cwtypes.StatusCodeComplete, nil, nil),
+		}},
+	}}
+
+	outcomes, issues, err := runGetMetricData(context.Background(), responseTestBatch(fake, query))
+	require.NoError(t, err)
+	require.Contains(t, outcomes, query.key)
+	assert.False(t, outcomes[query.key].hasDatapoint)
+	assert.Empty(t, issues)
 }
 
 func TestRunGetMetricData_PageFailurePreservesCompletedSiblings(t *testing.T) {
@@ -113,8 +133,32 @@ func TestRunGetMetricData_BoundsPaginationAtTwoCalls(t *testing.T) {
 		{MetricDataResults: []cwtypes.MetricDataResult{metricResult("q0", cwtypes.StatusCodePartialData, nil, nil)}, NextToken: aws.String("second")},
 		{MetricDataResults: []cwtypes.MetricDataResult{metricResult("q0", cwtypes.StatusCodePartialData, nil, nil)}, NextToken: aws.String("third")},
 	}}
-	outcomes, _, err := runGetMetricData(context.Background(), responseTestBatch(fake, query))
+	outcomes, issues, err := runGetMetricData(context.Background(), responseTestBatch(fake, query))
 	require.NoError(t, err)
 	assert.Empty(t, outcomes)
 	assert.Equal(t, maxGetMetricDataPages, fake.calls)
+	require.Len(t, issues, 1)
+	assert.Equal(t, queryIssuePaginationLimit, issues[0].kind)
+}
+
+func TestRunGetMetricData_ReportsUnresolvedResultKinds(t *testing.T) {
+	query := testPlannedQuery("stable", "base", "us-east-1", "AWS/EC2", 300)
+	tests := map[string]struct {
+		results []cwtypes.MetricDataResult
+		want    queryResultIssueKind
+	}{
+		"missing":        {want: queryIssueMissingResult},
+		"internal error": {results: []cwtypes.MetricDataResult{metricResult("q0", cwtypes.StatusCodeInternalError, nil, nil)}, want: queryIssueInternalError},
+		"unknown status": {results: []cwtypes.MetricDataResult{metricResult("q0", cwtypes.StatusCode("Unknown"), nil, nil)}, want: queryIssueUnknownStatus},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			fake := &scriptedGetMetricData{pages: []*cloudwatch.GetMetricDataOutput{{MetricDataResults: tc.results}}}
+			outcomes, issues, err := runGetMetricData(context.Background(), responseTestBatch(fake, query))
+			require.NoError(t, err)
+			assert.Empty(t, outcomes)
+			require.Len(t, issues, 1)
+			assert.Equal(t, tc.want, issues[0].kind)
+		})
+	}
 }

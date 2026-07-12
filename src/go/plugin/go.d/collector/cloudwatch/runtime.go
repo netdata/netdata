@@ -4,6 +4,7 @@ package cloudwatch
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
@@ -32,6 +33,16 @@ type collectionScope struct {
 }
 
 func (s collectionScope) hasTagFilter() bool { return len(s.TagFilter) > 0 }
+
+// profileSeriesSpec is the profile-defined series shape before rule query policy
+// inheritance is resolved.
+type profileSeriesSpec struct {
+	Ordinal     int
+	MetricIndex int
+	Statistic   string
+	Name        string
+	Period      time.Duration
+}
 
 type compiledSeries struct {
 	Ordinal     int

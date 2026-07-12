@@ -27,8 +27,8 @@ func TestResolveSeriesPolicies_ProfileMetricAndRulePeriod(t *testing.T) {
 	}}
 	base := compileProfileSeries(profile)
 	require.Len(t, base, 2)
-	assert.Equal(t, time.Minute, base[0].Policy.period)
-	assert.Equal(t, 5*time.Minute, base[1].Policy.period)
+	assert.Equal(t, time.Minute, base[0].Period)
+	assert.Equal(t, 5*time.Minute, base[1].Period)
 
 	resolved, err := resolveSeriesPolicies("rules[0]", &QueryPolicyConfig{Period: longDuration(2 * time.Minute)}, nil, profile, base)
 	require.NoError(t, err)
