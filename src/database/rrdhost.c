@@ -212,13 +212,17 @@ void rrdhost_tz_free(RRDHOST_TZ *tz) {
     tz->utc_offset = 0;
 }
 
-RRDHOST_IDENTITY rrdhost_identity_acquire(RRDHOST *host) {
-    RRDHOST_IDENTITY identity;
+static inline RRDHOST_IDENTITY rrdhost_identity_acquire_unsafe(RRDHOST *host) {
+    return (RRDHOST_IDENTITY) {
+        .hostname = string_dup(host->hostname),
+        .prog_name = string_dup(host->program_name),
+        .prog_version = string_dup(host->program_version),
+    };
+}
 
+RRDHOST_IDENTITY rrdhost_identity_acquire(RRDHOST *host) {
     spinlock_lock(&host->rrdhost_update_lock);
-    identity.hostname = string_dup(host->hostname);
-    identity.prog_name = string_dup(host->program_name);
-    identity.prog_version = string_dup(host->program_version);
+    RRDHOST_IDENTITY identity = rrdhost_identity_acquire_unsafe(host);
     spinlock_unlock(&host->rrdhost_update_lock);
 
     return identity;
@@ -231,6 +235,26 @@ void rrdhost_identity_release(RRDHOST_IDENTITY *identity) {
     identity->hostname = NULL;
     identity->prog_name = NULL;
     identity->prog_version = NULL;
+}
+
+RRDHOST_METADATA_IDENTITY rrdhost_metadata_identity_acquire(RRDHOST *host) {
+    spinlock_lock(&host->rrdhost_update_lock);
+    RRDHOST_METADATA_IDENTITY identity = {
+        .common = rrdhost_identity_acquire_unsafe(host),
+        .registry_hostname = string_dup(host->registry_hostname),
+        .os = string_dup(host->os),
+    };
+    spinlock_unlock(&host->rrdhost_update_lock);
+
+    return identity;
+}
+
+void rrdhost_metadata_identity_release(RRDHOST_METADATA_IDENTITY *identity) {
+    rrdhost_identity_release(&identity->common);
+    string_freez(identity->registry_hostname);
+    string_freez(identity->os);
+    identity->registry_hostname = NULL;
+    identity->os = NULL;
 }
 
 // ----------------------------------------------------------------------------

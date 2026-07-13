@@ -1095,12 +1095,14 @@ static int store_host_metadata(RRDHOST *host)
     if (!PREPARE_STATEMENT(db_meta, SQL_STORE_HOST_INFO, &res))
         return false;
 
+    RRDHOST_METADATA_IDENTITY identity = rrdhost_metadata_identity_acquire(host);
+
     int param = 0;
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_blob(res, ++param, &host->host_id.uuid, sizeof(host->host_id.uuid), SQLITE_STATIC));
-    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_hostname(host), 0));
-    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_registry_hostname(host), 1));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, string2str(identity.common.hostname), 0));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, string2str(identity.registry_hostname), 1));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->rrd_update_every));
-    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_os(host), 1));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, string2str(identity.os), 1));
     host_tz = rrdhost_tz_get(host);
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, host_tz.timezone, 1));
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, "", 1));
@@ -1108,8 +1110,8 @@ static int store_host_metadata(RRDHOST *host)
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host->rrd_memory_mode));
     SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, host_tz.abbrev_timezone, 1));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, host_tz.utc_offset));
-    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_program_name(host), 1));
-    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, rrdhost_program_version(host), 1));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, string2str(identity.common.prog_name), 1));
+    SQLITE_BIND_FAIL(bind_fail, bind_text_null(res, ++param, string2str(identity.common.prog_version), 1));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int64(res, ++param, host->rrd_history_entries));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int(res, ++param, (int)host->health.enabled));
     SQLITE_BIND_FAIL(bind_fail, sqlite3_bind_int64(res, ++param, (sqlite3_int64) host->stream.snd.status.last_connected));
@@ -1117,9 +1119,10 @@ static int store_host_metadata(RRDHOST *host)
     int store_rc = sqlite3_step_monitored(res);
 
     if (unlikely(store_rc != SQLITE_DONE))
-        error_report("Failed to store host %s, rc = %d", rrdhost_hostname(host), store_rc);
+        error_report("Failed to store host %s, rc = %d", string2str(identity.common.hostname), store_rc);
 
     SQLITE_FINALIZE(res);
+    rrdhost_metadata_identity_release(&identity);
     rrdhost_tz_free(&host_tz);
 
     return store_rc != SQLITE_DONE;
@@ -1127,6 +1130,7 @@ static int store_host_metadata(RRDHOST *host)
 bind_fail:
     REPORT_BIND_FAIL(res, param);
     SQLITE_FINALIZE(res);
+    rrdhost_metadata_identity_release(&identity);
     rrdhost_tz_free(&host_tz);
     return 1;
 }

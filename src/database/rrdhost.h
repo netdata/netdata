@@ -539,6 +539,15 @@ typedef struct {
 RRDHOST_IDENTITY rrdhost_identity_acquire(RRDHOST *host);
 void rrdhost_identity_release(RRDHOST_IDENTITY *identity);
 
+typedef struct {
+    RRDHOST_IDENTITY common;
+    STRING *registry_hostname;
+    STRING *os;
+} RRDHOST_METADATA_IDENTITY;
+
+RRDHOST_METADATA_IDENTITY rrdhost_metadata_identity_acquire(RRDHOST *host);
+void rrdhost_metadata_identity_release(RRDHOST_METADATA_IDENTITY *identity);
+
 // Thread-safe timezone snapshot from an RRDHOST.
 // The returned struct owns strdup'd copies; release with rrdhost_tz_free().
 typedef struct {
