@@ -101,13 +101,11 @@ func TestDiscoveryBudget_ConcurrentCandidateReservationsDoNotOvershoot(t *testin
 	var admitted atomic.Int32
 	var wg sync.WaitGroup
 	for range 100 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			if budget.reserveCandidate(reservation) == nil {
 				admitted.Add(1)
 			}
-		}()
+		})
 	}
 	wg.Wait()
 

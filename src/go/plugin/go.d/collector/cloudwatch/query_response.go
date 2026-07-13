@@ -36,7 +36,7 @@ func runGetMetricData(ctx context.Context, batch queryBatch) (map[structuralID]q
 	issueCounts := make(map[queryResultIssue]int)
 	var nextToken *string
 	paginationLimitReached := false
-	for page := 0; page < maxGetMetricDataPages; page++ {
+	for page := range maxGetMetricDataPages {
 		out, err := batch.client.GetMetricData(ctx, &cloudwatch.GetMetricDataInput{
 			MetricDataQueries: requestQueries,
 			StartTime:         aws.Time(batch.start),
