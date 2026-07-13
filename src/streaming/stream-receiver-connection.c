@@ -416,11 +416,12 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
 
         else if(!strcmp(name, "hops")) {
             int16_t hops;
-            invalid_hops = !stream_receiver_parse_hops(value, &hops);
-            if(!invalid_hops) {
+            if(stream_receiver_parse_hops(value, &hops)) {
                 rpt->hops = hops;
                 rrdhost_system_info_hops_set(rpt->system_info, rpt->hops);
             }
+            else
+                invalid_hops = true;
         }
 
         else if(!strcmp(name, "ml_capable"))
