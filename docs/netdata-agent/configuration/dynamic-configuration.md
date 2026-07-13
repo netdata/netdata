@@ -177,6 +177,14 @@ Learn more about this access method: [From Space Settings](#quick-access-methods
 <br/>
 </details>
 
+:::note
+
+**How UI changes take effect, and what they change on disk**
+
+When you submit an alert or collector change from the UI, it is applied on the node **immediately** — there is no scheduled synchronization to wait for. Your edit is saved as a dynamic configuration that **overrides** the node's built-in alert definitions. Those stock files stay untouched and are simply superseded by your UI edit.
+
+:::
+
 ## Collectors
 
 :::tip
