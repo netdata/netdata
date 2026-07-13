@@ -37,7 +37,22 @@ gantt
 |:-------:|:--------------------------------------------------------------------------------------------:|:------------------------:|:---------------:|
 | `tier0` |            native resolution (metrics collected per-second as stored per-second)             |         4 bytes          |    0.6 bytes    |
 | `tier1` | 60 iterations of `tier0`, so when metrics are collected per-second, this tier is per-minute. |         16 bytes         |     6 bytes     |
-| `tier2` |  60 iterations of `tier1`, so when metrics are collected per second, this tier is per-hour.  |         16 bytes         |    18 bytes     |
+| `tier2` |  60 iterations of `tier1`, so when metrics are collected per second, this tier is per-hour.  |         16 bytes         |     18 bytes     |
+
+:::note
+
+**How `update every` affects tier resolution and retention**
+
+Tier resolution is measured in iterations of the collection interval, not in fixed wall-clock time. When you change `update every` in `netdata.conf`, the resolution of every higher tier shifts proportionally:
+
+- **Default (`update every = 1s`):** `tier1` is per-minute, `tier2` is per-hour.
+- **`update every = 5s`:** `tier1` becomes about 5 minutes, `tier2` becomes about 5 hours.
+
+**Retention time limits do not need to change.** The per-tier time limits (for example, 14 days, 3 months, 2 years) are wall-clock durations that apply the same way regardless of your `update every`.
+
+Because a longer `update every` collects fewer samples per unit of time, the same per-tier disk size limit holds more time of data. If you raise `update every`, you may optionally reduce `dbengine tier N retention size` to reclaim disk space, but it is not required.
+
+:::
 
 ### Default Disk Footprint
 
