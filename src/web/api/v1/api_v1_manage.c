@@ -20,11 +20,16 @@ static char *get_mgmt_api_key(void) {
     if(lstat(api_key_filename, &st) == 0 && S_ISREG(st.st_mode))
         fd = open(api_key_filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK | O_NOFOLLOW);
 #else
-    if(stat(api_key_filename, &st) == 0 && S_ISREG(st.st_mode))
+    struct stat path_st;
+    if(lstat(api_key_filename, &path_st) == 0 && S_ISREG(path_st.st_mode))
         fd = open(api_key_filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
 #endif
     if(fd != -1) {
-        if(fstat(fd, &st) != 0 || !S_ISREG(st.st_mode))
+        if(fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)
+#ifndef O_NOFOLLOW
+           || st.st_dev != path_st.st_dev || st.st_ino != path_st.st_ino
+#endif
+        )
             netdata_log_error("Management API key file '%s' is not a regular file, regenerating.", api_key_filename);
         else {
             char buf[GUID_LEN + 1];
