@@ -3,25 +3,28 @@
 import json
 import sys
 
-from ruamel.yaml import YAML
+from pathlib import Path
 
-yaml = YAML(typ='safe')
+SELF = Path(__file__)
+
+sys.path.insert(0, str(SELF.parent.parent.parent / 'packaging' / 'data'))
+
+import distros
+
+data = distros.load_distro_data()
 entries = list()
 native_only = sys.argv[1]
 
-with open('.github/data/distros.yml') as f:
-    data = yaml.load(f)
-
-for arch in data['static_arches']:
-    if native_only == '1' and data['arch_data'][arch]['qemu']:
+for arch in data.static_arches:
+    if native_only == '1' and data.arch_data[arch].qemu:
         continue
 
     entries.append({
-        'arch': arch,
-        'runner': data['arch_data'][arch]['runner'],
-        'qemu': data['arch_data'][arch]['qemu'],
+        'arch': str(arch),
+        'runner': data.arch_data[arch].runner,
+        'qemu': data.arch_data[arch].qemu,
     })
 
-entries.sort(key=lambda k: data['arch_order'].index(k['arch']))
+entries.sort(key=lambda k: data.arch_order.index(distros.Arch(k['arch'])))
 matrix = json.dumps({'include': entries}, sort_keys=True)
 print(matrix)
