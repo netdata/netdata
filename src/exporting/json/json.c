@@ -118,6 +118,19 @@ int format_host_labels_json_plaintext(struct instance *instance, RRDHOST *host)
     if (!instance->labels_buffer)
         instance->labels_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
 
+    if (!instance->metric_prefix_buffer)
+        instance->metric_prefix_buffer = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
+    else
+        buffer_flush(instance->metric_prefix_buffer);
+
+    if (host == localhost)
+        buffer_strcat(instance->metric_prefix_buffer, instance->config.hostname);
+    else {
+        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+        buffer_strcat(instance->metric_prefix_buffer, string2str(identity.hostname));
+        rrdhost_identity_release(&identity);
+    }
+
     if (unlikely(!sending_labels_configured(instance)))
         return 0;
 
@@ -189,7 +202,6 @@ static bool format_dimension_stored_json_plaintext_value_is_exportable(NETDATA_D
 int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM *rd)
 {
     RRDSET *st = rd->rrdset;
-    RRDHOST *host = st->rrdhost;
 
     if (instance->config.type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP) {
         if (buffer_strlen((BUFFER *)instance->buffer) > 2)
@@ -199,7 +211,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
     format_dimension_json_plaintext_prefix(
         instance->buffer,
         instance->config.prefix,
-        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
+        buffer_tostring(instance->metric_prefix_buffer),
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "",
         rrdset_id(st),
         rrdset_name(st),
@@ -236,7 +248,6 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
 int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd)
 {
     RRDSET *st = rd->rrdset;
-    RRDHOST *host = st->rrdhost;
 
     time_t last_t;
     NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
@@ -252,7 +263,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
     format_dimension_json_plaintext_prefix(
         instance->buffer,
         instance->config.prefix,
-        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
+        buffer_tostring(instance->metric_prefix_buffer),
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "",
         rrdset_id(st),
         rrdset_name(st),

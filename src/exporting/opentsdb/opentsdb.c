@@ -345,6 +345,19 @@ int format_host_labels_opentsdb_http(struct instance *instance, RRDHOST *host) {
     if (!instance->labels_buffer)
         instance->labels_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
 
+    if (!instance->metric_prefix_buffer)
+        instance->metric_prefix_buffer = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
+    else
+        buffer_flush(instance->metric_prefix_buffer);
+
+    if (host == localhost)
+        buffer_strcat(instance->metric_prefix_buffer, instance->config.hostname);
+    else {
+        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+        buffer_strcat(instance->metric_prefix_buffer, string2str(identity.hostname));
+        rrdhost_identity_release(&identity);
+    }
+
     if (unlikely(!sending_labels_configured(instance)))
         return 0;
 
@@ -379,7 +392,7 @@ static void format_opentsdb_http_suffix(BUFFER *wb, const char *hostname, const 
 
 static bool format_opentsdb_http_metric(
     struct instance *instance,
-    RRDHOST *host,
+    const char *hostname,
     const char *prefix,
     const char *chart_name,
     const char *dimension_name,
@@ -403,7 +416,7 @@ static bool format_opentsdb_http_metric(
 
     format_opentsdb_http_suffix(
         wb,
-        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
+        hostname,
         instance->labels_buffer ? buffer_tostring(instance->labels_buffer) : "");
     return true;
 }
@@ -418,7 +431,6 @@ static bool format_opentsdb_http_metric(
 int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *rd)
 {
     RRDSET *st = rd->rrdset;
-    RRDHOST *host = st->rrdhost;
 
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
@@ -435,7 +447,7 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
     if(rrddim_is_float(rd))
         format_opentsdb_http_metric(
             instance,
-            host,
+            buffer_tostring(instance->metric_prefix_buffer),
             instance->config.prefix,
             chart_name,
             dimension_name,
@@ -446,7 +458,7 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
     else
         format_opentsdb_http_metric(
             instance,
-            host,
+            buffer_tostring(instance->metric_prefix_buffer),
             instance->config.prefix,
             chart_name,
             dimension_name,
@@ -468,7 +480,6 @@ int format_dimension_collected_opentsdb_http(struct instance *instance, RRDDIM *
 int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
 {
     RRDSET *st = rd->rrdset;
-    RRDHOST *host = st->rrdhost;
 
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
@@ -487,7 +498,7 @@ int format_dimension_stored_opentsdb_http(struct instance *instance, RRDDIM *rd)
 
     format_opentsdb_http_metric(
         instance,
-        host,
+        buffer_tostring(instance->metric_prefix_buffer),
         instance->config.prefix,
         chart_name,
         dimension_name,
@@ -585,7 +596,7 @@ static int opentsdb_number_unittest(void) {
         };
         bool http_record = format_opentsdb_http_metric(
             &http_instance,
-            localhost,
+            "localhost",
             "netdata",
             "chart.name",
             "dimension.name",
@@ -662,13 +673,13 @@ static int opentsdb_number_unittest(void) {
         .buffer = http_batch,
     };
     bool first_record = format_opentsdb_http_metric(
-        &http_instance, localhost, "netdata", "chart", "first", 42, true, 1.5, 0);
+        &http_instance, "localhost", "netdata", "chart", "first", 42, true, 1.5, 0);
     size_t before_omission = buffer_strlen(http_batch);
     bool omitted_record = format_opentsdb_http_metric(
-        &http_instance, localhost, "netdata", "chart", "omitted", 42, true, INFINITY, 0);
+        &http_instance, "localhost", "netdata", "chart", "omitted", 42, true, INFINITY, 0);
     size_t after_omission = buffer_strlen(http_batch);
     bool second_record = format_opentsdb_http_metric(
-        &http_instance, localhost, "netdata", "chart", "second", 42, true, -2.5, 0);
+        &http_instance, "localhost", "netdata", "chart", "second", 42, true, -2.5, 0);
     buffer_strcat(http_batch, "\n]\n");
 
     BUFFER *expected_batch = buffer_create(0, NULL);
@@ -702,7 +713,7 @@ static int opentsdb_number_unittest(void) {
         .buffer = integers,
     };
     bool integer_record = format_opentsdb_http_metric(
-        &integer_instance, localhost, "netdata", "chart", "integer", 42, false, NAN, INT64_MIN);
+        &integer_instance, "localhost", "netdata", "chart", "integer", 42, false, NAN, INT64_MIN);
     BUFFER *expected_integers = buffer_create(0, NULL);
     buffer_strcat(expected_integers, "[\n");
     format_opentsdb_http_prefix(expected_integers, "netdata", "chart", "integer", 42);
