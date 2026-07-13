@@ -50,14 +50,18 @@ modules:
       default_behavior:
         auto_detection:
           description: |
-            Automatically discovers and exposes all available sensors on the system through the [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface) interface.
+            This collector ships disabled by default. Once enabled, it automatically discovers and exposes all available sensors on the system through the [sysfs](https://www.kernel.org/doc/Documentation/hwmon/sysfs-interface) interface.
         limits:
           description: ""
         performance_impact:
           description: ""
     setup:
       prerequisites:
-        list: []
+        list:
+          - title: "Linux hardware monitoring (hwmon) driver."
+            description: "A kernel hwmon driver for your hardware must be loaded and expose sensor readings under `/sys/class/hwmon` (for example `k10temp` for AMD, `coretemp` for Intel). Confirm the driver is loaded with `lsmod | grep -E 'k10temp|coretemp|zenpower'`."
+          - title: "Enable the sensors collector."
+            description: "This collector ships disabled by default and will not collect any metrics until it is explicitly enabled. Add a `sensors` job from the UI (**Nodes → Configure this node → Collectors → Jobs → sensors**) or create `go.d/sensors.conf`."
       configuration:
         file:
           name: go.d/sensors.conf
