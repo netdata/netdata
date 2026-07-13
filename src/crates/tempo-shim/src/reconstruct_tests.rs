@@ -172,7 +172,28 @@ fn root_and_absent_status() {
     let out = reconstruct_trace(TraceId::from(TRACE), &trace, &kinds());
     let s = &out.resource_spans[0].scope_spans[0].spans[0];
     assert!(s.parent_span_id.is_empty(), "root parent renders absent");
-    assert!(s.status.is_none(), "no status facets -> no Status message");
+    // Status is ALWAYS materialized (all-zero = UNSET): Grafana's
+    // by-id transform panics on a nil Status/Scope message.
+    let status = s.status.as_ref().expect("status always present");
+    assert_eq!(status.code, 0);
+    assert!(status.message.is_empty());
+}
+
+#[test]
+fn scope_always_present_even_without_scope_fields() {
+    let mut sp = span();
+    sp.fields.retain(|(k, _)| !k.starts_with("scope."));
+    let trace = sfst::Trace {
+        spans: vec![sp],
+        roots: vec![0],
+        children: vec![vec![]],
+    };
+    let out = reconstruct_trace(TraceId::from(TRACE), &trace, &kinds());
+    let scope = out.resource_spans[0].scope_spans[0]
+        .scope
+        .as_ref()
+        .expect("scope always present (Grafana derefs it)");
+    assert!(scope.name.is_empty());
 }
 
 #[test]

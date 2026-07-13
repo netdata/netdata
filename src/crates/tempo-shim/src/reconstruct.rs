@@ -107,13 +107,18 @@ fn reconstruct_span(
         }
     }
     // The raw-int facet is authoritative; the label is the fallback for
-    // rows whose `_status_code` facet is missing.
+    // rows whose `_status_code` facet is missing. Status is ALWAYS
+    // emitted, even all-zero (UNSET): Grafana's `spanToSpanRow`
+    // dereferences `span.Status` unconditionally
+    // (`pkg/tempo/trace_transform.go:136-138`) and a nil message panics
+    // its whole by-id transform — "Grafana-faithful" includes always
+    // materializing the message the way Tempo's own responses do.
     let code = status_code.unwrap_or(match status_label {
         "OK" => 1,
         "ERROR" => 2,
         _ => 0,
     });
-    let status = (code != 0 || !status_message.is_empty()).then_some(Status {
+    let status = Some(Status {
         message: status_message,
         code,
     });
@@ -165,13 +170,14 @@ fn reconstruct_span(
         status,
     };
 
-    let scope = (!scope_name.is_empty() || !scope_version.is_empty() || !scope_attrs.is_empty())
-        .then_some(InstrumentationScope {
-            name: scope_name,
-            version: scope_version,
-            attributes: scope_attrs,
-            dropped_attributes_count: 0,
-        });
+    // Always Some for the same reason as `status`: the transform reads
+    // `libraryTags.Name`/`.Version` without a nil check.
+    let scope = Some(InstrumentationScope {
+        name: scope_name,
+        version: scope_version,
+        attributes: scope_attrs,
+        dropped_attributes_count: 0,
+    });
 
     ResourceSpans {
         resource: Some(Resource {
