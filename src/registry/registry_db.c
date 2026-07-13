@@ -103,6 +103,79 @@ static inline int registry_person_save(const DICTIONARY_ITEM *item __maybe_unuse
 // ----------------------------------------------------------------------------
 // SAVE THE REGISTRY DATABASE
 
+static FILE *registry_db_open_tmp_file(const char *filename) {
+    struct stat before;
+    bool reuse = lstat(filename, &before) == 0;
+    if(reuse && !S_ISREG(before.st_mode)) {
+        errno = EINVAL;
+        return NULL;
+    }
+
+    if(!reuse && errno != ENOENT)
+        return NULL;
+
+    int flags = O_WRONLY;
+    if(reuse) {
+        flags |= O_NOFOLLOW;
+        flags |= O_NONBLOCK;
+    }
+    else
+        flags |= O_CREAT | O_EXCL;
+
+    int fd = open(filename, flags, 0666);
+    if(fd == -1)
+        return NULL;
+
+    struct stat after;
+    if(fstat(fd, &after) != 0) {
+        int saved_errno = errno;
+        if(!reuse)
+            unlink(filename);
+        close(fd);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    if(!S_ISREG(after.st_mode) ||
+       (reuse && (before.st_dev != after.st_dev || before.st_ino != after.st_ino))) {
+        if(!reuse)
+            unlink(filename);
+        close(fd);
+        errno = EINVAL;
+        return NULL;
+    }
+
+    if(reuse) {
+        // O_NONBLOCK protects validation from FIFO races; the returned stream must retain fopen() semantics.
+        int status_flags = fcntl(fd, F_GETFL);
+        if(status_flags == -1 || fcntl(fd, F_SETFL, status_flags & ~(O_NONBLOCK | O_NOFOLLOW)) != 0) {
+            int saved_errno = errno;
+            close(fd);
+            errno = saved_errno;
+            return NULL;
+        }
+    }
+
+    FILE *fp = fdopen(fd, "w");
+    if(!fp) {
+        int saved_errno = errno;
+        if(!reuse)
+            unlink(filename);
+        close(fd);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    if(reuse && ftruncate(fileno(fp), 0) != 0) {
+        int saved_errno = errno;
+        fclose(fp);
+        errno = saved_errno;
+        return NULL;
+    }
+
+    return fp;
+}
+
 int registry_db_save(void) {
     if(unlikely(!registry.enabled))
         return -1;
@@ -135,7 +208,7 @@ int registry_db_save(void) {
     snprintfz(old_tmp_filename, FILENAME_MAX, "%s.old.tmp", registry.db_filename);
 
     netdata_log_debug(D_REGISTRY, "REGISTRY: Creating file '%s'", tmp_filename);
-    FILE *fp = fopen(tmp_filename, "w");
+    FILE *fp = registry_db_open_tmp_file(tmp_filename);
     if(!fp) {
         netdata_log_error("REGISTRY: Cannot create file: %s", tmp_filename);
         nd_log_limits_reset();
