@@ -343,7 +343,7 @@ The `--pss` option controls PSS sampling behavior:
 
 ### Integration with eBPF
 
-To monitor network bandwidth (upload and download) per application, enable the `apps` option in `ebpf.d/network.conf` for the [eBPF Socket](/src/collectors/ebpf.plugin/integrations/ebpf_socket.md) collector. This adds a per-application **Bandwidth** chart alongside the other eBPF apps charts.
+To monitor network bandwidth (upload and download) per application, enable the [`socket` program](/src/collectors/ebpf.plugin/README.md#ebpf-programs-configuration-options) (disabled by default) in `ebpf.d.conf`, then enable the `apps` option in `ebpf.d/network.conf` for the [eBPF Socket](/src/collectors/ebpf.plugin/integrations/ebpf_socket.md) collector. This adds a per-application **Bandwidth** chart alongside the other eBPF apps charts.
 
 If you don't see charts under the **eBPF syscall** or **eBPF net** sections, you should edit your
 [`ebpf.d.conf`](/src/collectors/ebpf.plugin/README.md#configure-the-ebpf-collector) file to ensure the eBPF program is enabled.
