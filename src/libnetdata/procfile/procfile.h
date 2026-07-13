@@ -37,6 +37,7 @@ typedef struct {
 #define PROCFILE_FLAG_NO_ERROR_ON_FILE_IO 0x00000001 // Do not log anything
 #define PROCFILE_FLAG_ERROR_ON_ERROR_LOG  0x00000002 // Store inside `error.log`
 #define PROCFILE_FLAG_NONSEEKABLE         0x00000004 // File doesn't support lseek(), reopen instead
+#define PROCFILE_FLAG_NEEDS_SEEK          0x00000008 // Internal: fd needs lseek before next read
 
 typedef enum __attribute__ ((__packed__)) procfile_separator {
     PF_CHAR_IS_SEPARATOR,
