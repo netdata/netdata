@@ -110,20 +110,4 @@ bool GetWin32ComputerSystemInfo(Win32ComputerSystemInfo *out) {
     return true;
 }
 
-bool GetWin32OperatingSystemInfo(Win32OperatingSystemInfo *out) {
-    if(!out) return false;
-    memset(out, 0, sizeof(*out));
-
-    IWbemClassObject *pclsObj = wmi_exec_single_row_query(
-        L"SELECT Caption FROM Win32_OperatingSystem",
-        "GetWin32OperatingSystemInfo()");
-    if(!pclsObj)
-        return false;
-
-    wmi_get_string_property(pclsObj, L"Caption", out->Caption, sizeof(out->Caption));
-    out->Populated = true;
-    pclsObj->lpVtbl->Release(pclsObj);
-    return true;
-}
-
 #endif

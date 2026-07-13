@@ -13,13 +13,7 @@ typedef struct {
     bool Populated;
 } Win32ComputerSystemInfo;
 
-typedef struct {
-    char Caption[256];
-    bool Populated;
-} Win32OperatingSystemInfo;
-
 bool GetWin32ComputerSystemInfo(Win32ComputerSystemInfo *out);
-bool GetWin32OperatingSystemInfo(Win32OperatingSystemInfo *out);
 
 #endif
 
