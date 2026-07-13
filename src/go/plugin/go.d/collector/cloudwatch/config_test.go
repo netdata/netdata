@@ -12,6 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
@@ -483,9 +484,47 @@ func TestMetadata_PrivateLinkEndpointOperatorContract(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, diagnostics)
 	require.Len(t, plan.Scopes, 3)
-	assert.Equal(t, []string{"endpoint-averages", "endpoint-six-hour-bytes", "endpoint-subnets"}, []string{
-		cfg.Rules[0].Name, cfg.Rules[1].Name, cfg.Rules[2].Name,
-	})
+	wantScopes := []struct {
+		profile string
+		series  []string
+		policy  cwquery.Policy
+	}{
+		{
+			profile: "privatelink_endpoint",
+			series: []string{
+				"privatelink_endpoint.active_connections_average",
+				"privatelink_endpoint.bytes_processed_average",
+				"privatelink_endpoint.new_connections_average",
+			},
+			policy: cwquery.Policy{Period: time.Minute, Lookback: 5 * time.Minute, PublicationDelay: 5 * time.Minute},
+		},
+		{
+			profile: "privatelink_endpoint",
+			series:  []string{"privatelink_endpoint.bytes_processed_sum"},
+			policy:  cwquery.Policy{Period: 6 * time.Hour, Lookback: 6 * time.Hour, PublicationDelay: 5 * time.Minute},
+		},
+		{
+			profile: "privatelink_endpoint_subnet",
+			series: []string{
+				"privatelink_endpoint_subnet.active_connections_average",
+				"privatelink_endpoint_subnet.bytes_processed_average",
+				"privatelink_endpoint_subnet.bytes_processed_sum",
+				"privatelink_endpoint_subnet.new_connections_average",
+				"privatelink_endpoint_subnet.new_connections_sum",
+				"privatelink_endpoint_subnet.packets_dropped_sum",
+				"privatelink_endpoint_subnet.rst_packets_received_sum",
+			},
+			policy: cwquery.Policy{Period: 5 * time.Minute, Lookback: 5 * time.Minute, PublicationDelay: 5 * time.Minute},
+		},
+	}
+	for i, want := range wantScopes {
+		scope := plan.Scopes[i]
+		assert.Equal(t, want.profile, scope.Profile.Name)
+		assert.Equal(t, want.series, compiledSeriesNames(scope.SelectedSeries))
+		for _, series := range scope.SelectedSeries {
+			assert.Equal(t, want.policy, series.Policy, series.Name)
+		}
+	}
 
 	for _, want := range []string{
 		"privatelink_endpoint",
