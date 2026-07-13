@@ -129,7 +129,7 @@ func accumulateCandidate(state *responseQueryState, values []float64, timestamps
 		if math.IsNaN(value) || math.IsInf(value, 0) || timestamp.Before(start) || timestamp.Add(state.query.policy.period).After(end) {
 			continue
 		}
-		if !state.hasCandidate || !timestamp.Before(state.datapointAt) {
+		if !state.hasCandidate || timestamp.After(state.datapointAt) {
 			state.value = value
 			state.datapointAt = timestamp
 			state.hasCandidate = true

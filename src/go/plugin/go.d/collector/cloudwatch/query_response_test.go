@@ -87,6 +87,17 @@ func TestRunGetMetricData_PartialRequiresLaterComplete(t *testing.T) {
 			}}},
 			wantKind: queryOutcomeTransient, wantValue: 1, wantIssue: queryIssuePartialData,
 		},
+		"equal timestamp on later partial page keeps first value": {
+			pages: []*cloudwatch.GetMetricDataOutput{
+				{MetricDataResults: []cwtypes.MetricDataResult{
+					metricResult("q0", cwtypes.StatusCodePartialData, []float64{10}, []time.Time{time.Unix(600, 0)}),
+				}, NextToken: aws.String("next")},
+				{MetricDataResults: []cwtypes.MetricDataResult{
+					metricResult("q0", cwtypes.StatusCodePartialData, []float64{99}, []time.Time{time.Unix(600, 0)}),
+				}},
+			},
+			wantKind: queryOutcomeTransient, wantValue: 10, wantIssue: queryIssuePartialData,
+		},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
