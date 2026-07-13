@@ -84,6 +84,12 @@ static struct json_object *yaml_mapping_to_json(yaml_document_t *document, yaml_
             return NULL;
         }
 
+        if (unlikely(memchr(key_node->data.scalar.value, '\0', key_node->data.scalar.length))) {
+            buffer_strcat(error, "YAML mapping key contains an embedded NUL byte");
+            json_object_put(object);
+            return NULL;
+        }
+
         const char *key = (const char *)key_node->data.scalar.value;
         size_t error_len = buffer_strlen(error);
         struct json_object *value_obj = yaml_node_to_json(document, value_node, error, flags, depth);
