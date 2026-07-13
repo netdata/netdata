@@ -3109,9 +3109,9 @@ Per dimension:
 #### Claim Information Fields (present when `response != CLAIM_RESP_ACTION_OK`)
 
 12. ✅ `can_be_claimed` - boolean - Whether agent can currently be claimed
-13. ✅ `key_filename` - string - Full path to the session ID verification file
-14. ✅ `cmd` - string - OS-specific command to retrieve session ID (e.g., "sudo cat /path/to/file" or "docker exec netdata cat /path")
-15. ✅ `help` - string - Help message explaining how to verify server ownership
+13. ✅ `key_filename` - string - Full path to the session ID verification file; present after a filename was cached by a successful publication
+14. ✅ `cmd` - string - OS-specific command to retrieve session ID; present after a filename was cached by a successful publication (e.g., "sudo cat /path/to/file" or "docker exec netdata cat /path")
+15. ✅ `help` - string - Help message explaining how to verify server ownership; present after a filename was cached by a successful publication
 
 #### Agent Object (`agent`) - always present
 
@@ -3123,7 +3123,7 @@ Per dimension:
 ### RESPONSE SCENARIOS
 
 **Scenario 1: Info Request (no parameters or no key)**
-- Returns: Fields 3-19 (cloud status + can_be_claimed + user info + agent info)
+- Returns: Fields 3-12 and 16-19; fields 13-15 are also present after a verification key filename has been cached by a successful publication
 - HTTP Status: 200 OK
 
 **Scenario 2: Successful Claim**
@@ -3131,11 +3131,11 @@ Per dimension:
 - HTTP Status: 200 OK
 
 **Scenario 3: Failed Claim (invalid key/parameters)**
-- Returns: Fields 1-2 (success=false), 3-19 (cloud status + can_be_claimed + user info + agent info)
+- Returns: Fields 1-12 and 16-19; fields 13-15 are also present after a verification key filename has been cached by any successful publication
 - HTTP Status: 400 Bad Request
 
 **Scenario 4: Failed Claim (claim action failed)**
-- Returns: Fields 1-2 (success=false), 3-19 (cloud status + can_be_claimed + user info + agent info)
+- Returns: Fields 1-12 and 16-19; fields 13-15 are also present after a verification key filename has been cached by any successful publication
 - HTTP Status: 200 OK
 
 ### VERIFICATION SUMMARY
@@ -3148,6 +3148,7 @@ Per dimension:
 **Notes:**
 - V3 API always returns JSON (V2 could return plain text for errors)
 - Session ID is regenerated after each claim attempt (successful or failed) to prevent brute force attacks
+- `key_filename`, `cmd`, and `help` are omitted if no verification key filename has ever been cached by a successful publication
 - Agent can only be claimed when cloud status is AVAILABLE, OFFLINE, or INDIRECT
 - Parameter validation uses character whitelist: alphanumeric + `.,-:/_`
 

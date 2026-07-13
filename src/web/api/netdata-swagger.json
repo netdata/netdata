@@ -4679,15 +4679,15 @@
                     },
                     "key_filename": {
                       "type": "string",
-                      "description": "Full path to the file containing the verification key.\nPresent in info and error responses (not present after successful claim).\nPlatform-specific path (Linux: /var/lib/netdata/..., Windows: C:\\...).\n"
+                      "description": "Full path to the file containing the verification key.\nPresent in info and error responses after the verification key file has been published successfully at least once.\nNot present after a successful claim or if no verification key file has ever been published successfully.\nPlatform-specific path (Linux: /var/lib/netdata/..., Windows: C:\\...).\n"
                     },
                     "cmd": {
                       "type": "string",
-                      "description": "OS-specific command to retrieve the verification key.\nPresent in info and error responses.\n- Linux: \"sudo cat /var/lib/netdata/netdata_random_session_id\"\n- Docker: \"docker exec netdata cat /var/lib/netdata/netdata_random_session_id\"\n- Windows: \"more C:\\path\\to\\netdata_random_session_id\"\n"
+                      "description": "OS-specific command to retrieve the verification key.\nPresent in info and error responses after the verification key file has been published successfully at least once.\n- Linux: \"sudo cat /var/lib/netdata/netdata_random_session_id\"\n- Docker: \"docker exec netdata cat /var/lib/netdata/netdata_random_session_id\"\n- Windows: \"more C:\\path\\to\\netdata_random_session_id\"\n"
                     },
                     "help": {
                       "type": "string",
-                      "description": "Human-readable instructions for obtaining the verification key.\nPresent in info and error responses.\n"
+                      "description": "Human-readable instructions for obtaining the verification key.\nPresent in info and error responses after the verification key file has been published successfully at least once.\n"
                     },
                     "agents": {
                       "type": "array",

@@ -6576,13 +6576,14 @@ paths:
                     type: string
                     description: |
                       Full path to the file containing the verification key.
-                      Present in info and error responses (not present after successful claim).
+                      Present in info and error responses after the verification key file has been published successfully at least once.
+                      Not present after a successful claim or if no verification key file has ever been published successfully.
                       Platform-specific path (Linux: /var/lib/netdata/..., Windows: C:\...).
                   cmd:
                     type: string
                     description: |
                       OS-specific command to retrieve the verification key.
-                      Present in info and error responses.
+                      Present in info and error responses after the verification key file has been published successfully at least once.
                       - Linux: "sudo cat /var/lib/netdata/netdata_random_session_id"
                       - Docker: "docker exec netdata cat /var/lib/netdata/netdata_random_session_id"
                       - Windows: "more C:\path\to\netdata_random_session_id"
@@ -6590,7 +6591,7 @@ paths:
                     type: string
                     description: |
                       Human-readable instructions for obtaining the verification key.
-                      Present in info and error responses.
+                      Present in info and error responses after the verification key file has been published successfully at least once.
                   agents:
                     type: array
                     description: Agent information for the claimed node(s)
