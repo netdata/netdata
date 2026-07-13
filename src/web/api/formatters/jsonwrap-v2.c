@@ -330,8 +330,11 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
             buffer_json_object_close(wb); // scope
 
             buffer_json_member_add_object(wb, "selectors");
-            if (qt->request.host)
-                buffer_json_member_add_string(wb, "nodes", rrdhost_hostname(qt->request.host));
+            if (qt->request.host) {
+                RRDHOST_IDENTITY identity = rrdhost_identity_acquire(qt->request.host);
+                buffer_json_member_add_string(wb, "nodes", string2str(identity.hostname));
+                rrdhost_identity_release(&identity);
+            }
             else
                 buffer_json_member_add_string(wb, "nodes", qt->request.nodes);
             buffer_json_member_add_string(wb, "contexts", qt->request.contexts);
