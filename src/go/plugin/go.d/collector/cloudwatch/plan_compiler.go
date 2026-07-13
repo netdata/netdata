@@ -287,7 +287,7 @@ func resolveSeriesPolicies(path string, rule, defaults *cwquery.Config, profile 
 	out := make([]compiledSeries, len(series))
 	for i, item := range series {
 		metric := profile.Config.Metrics[item.MetricIndex]
-		policy, err := resolveQueryPolicy(path, rule, defaults, metric.Query, profile.Config.Query)
+		policy, err := cwquery.Resolve(path, rule, defaults, metric.Query, profile.Config.Query)
 		if err != nil {
 			return nil, fmt.Errorf("%s profile %q MetricName %q statistic %q: %w", path, profile.Name, metric.MetricName, item.Statistic, err)
 		}

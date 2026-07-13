@@ -35,7 +35,7 @@ func selectedSeriesUseRecentlyActive(series []compiledSeries, enabled bool) bool
 		return false
 	}
 	for _, item := range series {
-		if item.Policy.period == 0 || !item.Policy.useRecentlyActive() {
+		if item.Policy.Period == 0 || !queryPolicyUsesRecentlyActive(item.Policy) {
 			return false
 		}
 	}
@@ -479,17 +479,17 @@ func (c *Collector) markDiscoveryStale() {
 }
 
 // refreshDiscovery refreshes the discovery snapshot when its TTL has expired.
-// Per-group failures are logged and tolerated. Aggregate and first-pass total
-// failures retain dynamic state when executable static scopes keep the cycle
-// useful; otherwise a first-pass failure is returned.
+// Per-group failures are logged and tolerated. Aggregate and total failures
+// retain prior dynamic state when the cycle can continue; otherwise a first-pass
+// failure is returned.
 func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	now := c.now()
+	if !c.discovery.expired(now) {
+		return nil
+	}
 	groups := c.discoveryGroups()
 	if len(groups) == 0 {
 		return ctx.Err()
-	}
-	if !c.discovery.expired(now) {
-		return nil
 	}
 
 	newClient := func(callCtx context.Context, target, region string) (cloudwatchClient, error) {
@@ -536,8 +536,8 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 
 			// An empty successful group is not a failure; with shared regions across
 			// many targets, empty successes are expected.
-			if c.discovery.FetchedAt.IsZero() && len(results) > 0 && failedGroups == len(results) {
-				if c.hasExecutableStaticScopes() {
+			if len(results) > 0 && failedGroups == len(results) {
+				if !c.discovery.FetchedAt.IsZero() || c.hasExecutableStaticScopes() {
 					disposition = discoveryDisposition{
 						kind:    discoveryDispositionRetry,
 						retryAt: now.Add(time.Duration(c.Discovery.RefreshEvery) * time.Second),

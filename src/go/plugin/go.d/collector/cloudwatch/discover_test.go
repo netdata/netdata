@@ -986,6 +986,39 @@ func TestCollector_refreshDiscovery_TTLCaching(t *testing.T) {
 	assert.Nil(t, c.tagFetchPlan, "a new discovery snapshot invalidates tag fetch topology")
 }
 
+func TestCollector_refreshDiscovery_TotalFailureRetainsSuccessfulSnapshot(t *testing.T) {
+	base := time.Unix(1000, 0)
+	now := base
+	c, fakes := newDiscoveryTestCollector(map[string]map[string][]cwtypes.Metric{
+		"us-east-1": {"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
+	})
+	c.now = func() time.Time { return now }
+	require.NoError(t, c.refreshDiscovery(context.Background()))
+
+	previous := c.discovery
+	previousSig := c.discoverySig
+	sentinel := testStructuralID("sentinel")
+	c.tagFetchPlan = []tagFetchGroup{{key: tagFetchKey{target: "sentinel"}}}
+	c.queryPlan = []plannedQuery{{key: sentinel}}
+	c.planDirty = false
+	c.observations.queries[sentinel] = queryState{hasObservation: true, observation: 42}
+
+	now = base.Add(time.Duration(c.Discovery.RefreshEvery+1) * time.Second)
+	fakes["us-east-1"].err = errors.New("throttled")
+	require.NoError(t, c.refreshDiscovery(context.Background()))
+
+	assert.Equal(t, previous.Instances, c.discovery.Instances)
+	assert.Equal(t, previous.FetchedAt, c.discovery.FetchedAt)
+	assert.Equal(t, now.Add(time.Duration(c.Discovery.RefreshEvery)*time.Second), c.discovery.ExpiresAt)
+	assert.Equal(t, previousSig, c.discoverySig)
+	require.Len(t, c.tagFetchPlan, 1)
+	assert.Equal(t, "sentinel", c.tagFetchPlan[0].key.target)
+	require.Len(t, c.queryPlan, 1)
+	assert.Equal(t, sentinel, c.queryPlan[0].key)
+	assert.False(t, c.planDirty)
+	assert.Equal(t, float64(42), c.observations.queries[sentinel].observation)
+}
+
 func TestCollector_refreshDiscovery_TotalFailureFirstPassErrors(t *testing.T) {
 	var logs bytes.Buffer
 	c := New()

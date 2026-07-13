@@ -645,7 +645,7 @@ modules:
             description: |
               Check the following:
 
-              - **Permissions** -- each target allows `cloudwatch:ListMetrics` and `cloudwatch:GetMetricData`; `GetCallerIdentity` needs no explicit grant. Targets with `assume_role` also require `sts:AssumeRole` on the source identity. Resource tag filtering or labels require `tag:GetResources`.
+              - **Permissions** -- every target allows `cloudwatch:GetMetricData`; targets selecting any profile with dynamic dimensions also require `cloudwatch:ListMetrics`. All-constant profiles such as `billing_total` skip discovery and do not need `ListMetrics`. `GetCallerIdentity` needs no explicit grant. Targets with `assume_role` also require `sts:AssumeRole` on the source identity. Resource tag filtering or labels require `tag:GetResources`.
               - **Rules** -- `rules[].targets`, `rules[].profiles`, optional `rules[].metrics`, and `rules[].regions` select the expected target, service, exact metric/statistic, and region. CloudFront publishes metrics only in `us-east-1`; its profile enforces this automatically.
               - **Resource filters** -- a rule that omits `filters.resource_tags` inherits `rule_defaults.filters.resource_tags`. An explicitly included profile without a safe Resource Groups Tagging API association is rejected; use `filters.resource_tags: []` for a deliberate unfiltered rule.
               - **Resources are active** -- confirm in the AWS CloudWatch console that the resources are publishing metrics.

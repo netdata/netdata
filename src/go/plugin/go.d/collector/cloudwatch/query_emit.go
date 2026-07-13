@@ -17,7 +17,7 @@ func (o *observationStore) emit(plan []plannedQuery) int {
 			value = 0
 		}
 		if query.rate {
-			value /= query.policy.period.Seconds()
+			value /= query.policy.Period.Seconds()
 		}
 		writeSample(meter, query.seriesName, query.labels, query.tagLabels, value)
 		written++

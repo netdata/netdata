@@ -43,7 +43,7 @@ func runGetMetricData(ctx context.Context, batch queryBatch) (map[structuralID]q
 			EndTime:           aws.Time(batch.end),
 			ScanBy:            cwtypes.ScanByTimestampDescending,
 			NextToken:         nextToken,
-			MaxDatapoints:     aws.Int32(int32(len(batch.queries) * batch.key.policy.bucketCount())),
+			MaxDatapoints:     aws.Int32(int32(len(batch.queries) * batch.key.policy.BucketCount())),
 		})
 		if err != nil {
 			if isAWSAuthorizationError(err) {
@@ -98,7 +98,7 @@ func runGetMetricData(ctx context.Context, batch queryBatch) (map[structuralID]q
 		}
 		issueCounts[queryResultIssue{
 			target: state.query.target, region: state.query.region, namespace: queryNamespace(state.query.query),
-			period: int(state.query.policy.period / time.Second), kind: kind,
+			period: int(state.query.policy.Period / time.Second), kind: kind,
 		}]++
 	}
 	return responseOutcomes(byID, batch), queryResultIssues(issueCounts), nil
@@ -126,7 +126,7 @@ func markUnresolvedForbidden(states map[string]*responseQueryState) {
 func accumulateCandidate(state *responseQueryState, values []float64, timestamps []time.Time, start, end time.Time) {
 	for i := 0; i < min(len(values), len(timestamps)); i++ {
 		value, timestamp := values[i], timestamps[i]
-		if math.IsNaN(value) || math.IsInf(value, 0) || timestamp.Before(start) || timestamp.Add(state.query.policy.period).After(end) {
+		if math.IsNaN(value) || math.IsInf(value, 0) || timestamp.Before(start) || timestamp.Add(state.query.policy.Period).After(end) {
 			continue
 		}
 		if !state.hasCandidate || timestamp.After(state.datapointAt) {

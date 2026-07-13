@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 )
 
 // plannedQuery is one stable series query. Request-local IDs and batch membership
@@ -20,7 +21,7 @@ type plannedQuery struct {
 	billingKey structuralID // structural metric identity without statistic; internal AWS cost grouping
 	target     string
 	region     string
-	policy     queryPolicy
+	policy     cwquery.Policy
 	seriesName string
 	labels     []metrix.Label
 	tagLabels  []metrix.Label // non-identity enrichment labels; emitted but not in observedKey
@@ -298,7 +299,7 @@ func buildSeriesQueries(candidate queryPlanCandidate) []plannedQuery {
 						MetricName: aws.String(m.MetricName),
 						Dimensions: candidate.presentation.dims,
 					},
-					Period: aws.Int32(int32(selected.Policy.period / time.Second)),
+					Period: aws.Int32(int32(selected.Policy.Period / time.Second)),
 					Stat:   aws.String(cwprofiles.StatString(selected.Statistic)),
 				},
 			},
@@ -317,9 +318,9 @@ func plannedQueryKey(q plannedQuery, instanceID structuralID) structuralID {
 	key.addString(q.region)
 	key.addID(instanceID)
 	key.addString(q.seriesName)
-	key.addInt64(int64(q.policy.period / time.Second))
-	key.addInt64(int64(q.policy.lookback / time.Second))
-	key.addInt64(int64(q.policy.publicationDelay / time.Second))
+	key.addInt64(int64(q.policy.Period / time.Second))
+	key.addInt64(int64(q.policy.Lookback / time.Second))
+	key.addInt64(int64(q.policy.PublicationDelay / time.Second))
 	key.addID(q.billingKey)
 	if q.query.MetricStat != nil {
 		key.addString(aws.ToString(q.query.MetricStat.Stat))

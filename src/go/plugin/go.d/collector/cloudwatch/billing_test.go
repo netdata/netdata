@@ -12,6 +12,7 @@ import (
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -247,8 +248,8 @@ func TestBillingTotal_BuildsStaticQueryWithoutDiscovery(t *testing.T) {
 	assert.Equal(t, "EstimatedCharges", aws.ToString(query.query.MetricStat.Metric.MetricName))
 	assert.Equal(t, "Maximum", aws.ToString(query.query.MetricStat.Stat))
 	assert.Equal(t, int32(600), aws.ToInt32(query.query.MetricStat.Period))
-	assert.Equal(t, queryPolicy{
-		period: 10 * time.Minute, lookback: 24 * time.Hour, publicationDelay: defaultPublicationDelay,
+	assert.Equal(t, cwquery.Policy{
+		Period: 10 * time.Minute, Lookback: 24 * time.Hour, PublicationDelay: cwquery.DefaultPublicationDelay,
 	}, query.policy)
 	assert.Equal(t, "000000000000", labelValue(query.labels, "account_id"))
 	assert.Equal(t, "us-east-1", labelValue(query.labels, "region"))

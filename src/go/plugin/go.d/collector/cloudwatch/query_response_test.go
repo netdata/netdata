@@ -13,6 +13,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 	"github.com/aws/smithy-go"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,7 +38,7 @@ func (f *scriptedGetMetricData) GetMetricData(context.Context, *cloudwatch.GetMe
 }
 
 func responseTestBatch(client cloudwatchClient, queries ...plannedQuery) queryBatch {
-	policy := queryPolicy{period: 5 * time.Minute, lookback: 15 * time.Minute}
+	policy := cwquery.Policy{Period: 5 * time.Minute, Lookback: 15 * time.Minute}
 	for i := range queries {
 		queries[i].policy = policy
 	}

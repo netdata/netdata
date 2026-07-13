@@ -13,8 +13,8 @@ const (
 	minPeriod               = time.Minute
 	maxPeriod               = 24 * time.Hour
 	DefaultPublicationDelay = 10 * time.Minute
+	MaxBuckets              = 1440
 	maxReliableHorizon      = 14 * 24 * time.Hour
-	maxBuckets              = 1440
 )
 
 // Config defines optional CloudWatch query defaults. Callers compose profile,
@@ -30,6 +30,16 @@ type Policy struct {
 	Period           time.Duration
 	Lookback         time.Duration
 	PublicationDelay time.Duration
+}
+
+// BucketCount returns the number of period buckets in the lookback window.
+func (p Policy) BucketCount() int {
+	return int(p.Lookback / p.Period)
+}
+
+// Horizon returns the full age range needed for discovery freshness decisions.
+func (p Policy) Horizon() time.Duration {
+	return p.PublicationDelay + p.Lookback + p.Period
 }
 
 // Validate checks the raw fields present in cfg. Cross-field constraints are
@@ -126,8 +136,8 @@ func Resolve(path string, rule, defaults, metric *Config, profile Config) (Polic
 		return Policy{}, fmt.Errorf("%s must be an exact multiple of the effective period %s", lookbackPath, period)
 	}
 	buckets := lookback / period
-	if buckets > maxBuckets {
-		return Policy{}, fmt.Errorf("%s spans %d buckets; maximum is %d", lookbackPath, buckets, maxBuckets)
+	if buckets > MaxBuckets {
+		return Policy{}, fmt.Errorf("%s spans %d buckets; maximum is %d", lookbackPath, buckets, MaxBuckets)
 	}
 	if delay > maxReliableHorizon || lookback > maxReliableHorizon || period > maxReliableHorizon-delay-lookback {
 		return Policy{}, fmt.Errorf("%s query horizon (publication_delay + lookback + period) exceeds %s", path, maxReliableHorizon)

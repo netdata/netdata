@@ -7,6 +7,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 )
 
 type collectionPlan struct {
@@ -55,7 +56,7 @@ type compiledSeries struct {
 	MetricIndex int
 	Statistic   string
 	Name        string
-	Policy      queryPolicy
+	Policy      cwquery.Policy
 }
 
 func (c *Collector) ensurePlan() error {
