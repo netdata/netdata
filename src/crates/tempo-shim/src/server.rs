@@ -407,7 +407,14 @@ async fn tag_values_endpoint(
             (vec![(scope, TagKey::Attribute(key))], TagValueStyle::Typed)
         }
         // An unscoped tag is the resource ∪ span union, mirroring its
-        // search semantics.
+        // search semantics — which is Tempo's OWN rule: it routes
+        // AttributeScopeNone conditions to span+resource only
+        // (tempo vparquet4/block_traceql.go:1665-1670); event/link/
+        // instrumentation attributes require their explicit scope
+        // there too. Grafana's unscoped picker flattens every
+        // non-intrinsic scope into the list, so it can offer tags this
+        // lookup returns no values for — the identical dead-end exists
+        // against real Tempo (a UI quirk, not a shim divergence).
         PredicateTarget::UnscopedAttribute(key) => (
             vec![
                 (TagScope::Resource, TagKey::Attribute(key.clone())),
