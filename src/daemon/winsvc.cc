@@ -270,7 +270,19 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
 
     // Run the agent
     netdata_service_log("Running the agent...");
-    netdata_main(argc, argv);
+    int rc = netdata_main(argc, argv);
+
+    if (rc != 10) {
+        // netdata_main() exited early — bad arguments, --help, or an
+        // initialisation error.  Transition to STOPPED so the SCM records
+        // the failure instead of leaving the service stuck in SERVICE_RUNNING
+        // waiting for a stop event that will never be signalled internally.
+        netdata_service_log("Agent exited early with rc=%d, stopping service.", rc);
+        svc_status.dwServiceSpecificExitCode = rc;
+        ReportSvcStatus(SERVICE_STOPPED, ERROR_SERVICE_SPECIFIC_ERROR, 0, 0);
+        return;
+    }
+
     netdata_service_log("Agent has been started...");
 
     // netdata_main() spawns background threads and returns once the agent is
