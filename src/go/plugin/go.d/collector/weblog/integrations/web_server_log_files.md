@@ -114,7 +114,7 @@ Notes:
 |:------|:-----|:------------|:--------|:---------:|
 | **Collection** | update_every | Data collection frequency. | 1 | no |
 |  | autodetection_retry | Recheck interval in seconds. Zero means no recheck will be scheduled. | 0 | no |
-| **Target** | path | Path to the web server log file. |  | yes |
+| **Target** | [path](#option-target-path) | Path to the web server log file. Supports shell glob patterns. |  | yes |
 |  | exclude_path | Path to exclude. | *.gz | no |
 | **Customization** | [url_patterns](#option-customization-url-patterns) | List of URL patterns. | [] | no |
 |  | url_patterns.name | Used as a dimension name. |  | yes |
@@ -131,6 +131,26 @@ Notes:
 |  | [json_config.mapping](#option-parser-json-config-mapping) | JSON fields mapping to **known fields**. |  | yes |
 |  | regexp_config | RegExp log parser config. |  | no |
 |  | [regexp_config.pattern](#option-parser-regexp-config-pattern) | RegExp pattern with named groups. |  | yes |
+
+<a id="option-target-path"></a>
+##### path
+
+Each `web_log` job follows a **single** log file. `path` accepts a shell glob pattern, but when a glob matches multiple files the collector reads only **one** of them at a time (the last in name order) — it does not merge data from every match into one stream.
+
+To monitor several log files, add a separate job for each one. For example, cPanel/WHM writes a separate Apache access log per user at `/var/lib/apache2/domlogs/<user>-ssl_log`. Collect every user's traffic with one job per file:
+
+```yaml
+jobs:
+  - name: user1_ssl_log
+    path: /var/lib/apache2/domlogs/user1-ssl_log
+  - name: user2_ssl_log
+    path: /var/lib/apache2/domlogs/user2-ssl_log
+```
+
+A glob such as `/var/lib/apache2/domlogs/*-ssl_log` will **not** follow every matching log — only one file is read, so the remaining traffic is silently missing. Use one job per file to cover every log you need.
+
+See the [web log collection guide](https://github.com/netdata/netdata/blob/master/docs/developer-and-contributor-corner/collect-apache-nginx-web-logs#monitor-multiple-log-files) for details.
+
 
 <a id="option-customization-url-patterns"></a>
 ##### url_patterns
