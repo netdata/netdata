@@ -2,27 +2,31 @@
 '''Generate the build matrix for the EOL check jobs.'''
 
 import json
+import sys
 
-from ruamel.yaml import YAML
+from pathlib import Path
 
-yaml = YAML(typ='safe')
+SELF = Path(__file__)
+
+sys.path.insert(0, str(SELF.parent.parent.parent / 'packaging' / 'data'))
+
+import distros
+
+data = distros.load_distro_data()
 entries = list()
 
-with open('.github/data/distros.yml') as f:
-    data = yaml.load(f)
-
-for item in data['include']:
-    if 'eol_check' in item and item['eol_check']:
-        if isinstance(item['eol_check'], str):
-            distro = item['eol_check']
+for item in data.include:
+    if item.eol_check:
+        if isinstance(item.eol_check, str):
+            distro = item.eol_check
         else:
-            distro = item['distro']
+            distro = item.distro
 
         entries.append({
             'distro': distro,
-            'release': item['version'],
-            'full_name': f'{ item["distro"] } { item["version"] }',
-            'lts': 1 if 'eol_lts' in item and item['eol_lts'] else 0,
+            'release': item.version,
+            'full_name': f'{item.distro} {item.version}',
+            'lts': 1 if item.eol_lts else 0,
         })
 
 entries.sort(key=lambda k: (k['distro'], k['release']))
