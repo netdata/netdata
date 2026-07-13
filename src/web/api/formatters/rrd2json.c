@@ -263,22 +263,30 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         }
         break;
 
-    case DATASOURCE_CSV_JSON_ARRAY:
+    case DATASOURCE_CSV_JSON_ARRAY: {
+        // JSON has no date type: without a numeric timestamp option the csv
+        // renderer emits an unquoted local-time date string, making the
+        // whole response invalid JSON - this format is always numeric
+        RRDR_OPTIONS csv_options = options | RRDR_OPTION_LABEL_QUOTES;
+        if(!(csv_options & RRDR_OPTION_MILLISECONDS))
+            csv_options |= RRDR_OPTION_SECONDS;
+
         wb->content_type = CT_APPLICATION_JSON;
         if(options & RRDR_OPTION_JSON_WRAP) {
             wrapper_begin(r, wb);
             buffer_json_member_add_array(wb, "result");
-            rrdr2csv(r, wb, format, options | RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
+            rrdr2csv(r, wb, format, csv_options, "[", ",", "]", ",\n");
             buffer_json_array_close(wb);
             wrapper_end(r, wb);
         }
         else {
             wb->content_type = CT_APPLICATION_JSON;
             buffer_strcat(wb, "[\n");
-            rrdr2csv(r, wb, format, options | RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
+            rrdr2csv(r, wb, format, csv_options, "[", ",", "]", ",\n");
             buffer_strcat(wb, "\n]");
         }
         break;
+    }
 
     case DATASOURCE_TSV:
         if(options & RRDR_OPTION_JSON_WRAP) {
