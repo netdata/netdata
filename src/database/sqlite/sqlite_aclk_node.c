@@ -72,9 +72,10 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
         host_version = stream_receiver_program_version_strdupz(host);
 
     RRDHOST_TZ host_tz = rrdhost_tz_get(host);
+    RRDHOST_METADATA_IDENTITY identity = rrdhost_metadata_identity_acquire(host);
 
-    node_info.data.name = rrdhost_hostname(host);
-    node_info.data.os = rrdhost_os(host);
+    node_info.data.name = string2str(identity.common.hostname);
+    node_info.data.os = string2str(identity.os);
     node_info.data.version = host_version ? host_version : NETDATA_VERSION;
     node_info.data.release_channel = get_release_channel();
     node_info.data.timezone = host_tz.abbrev_timezone;
@@ -95,10 +96,11 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
         NDLP_DEBUG,
         "ACLK RES [%s (%s)]: NODE INFO SENT for guid [%s] (%s)",
         aclk_host_config->node_id,
-        rrdhost_hostname(host),
+        string2str(identity.common.hostname),
         host->machine_guid,
         host == localhost ? "parent" : "child");
 
+    rrdhost_metadata_identity_release(&identity);
     rrd_rdunlock();
     rrdhost_tz_free(&host_tz);
     freez(node_info.node_instance_capabilities);
