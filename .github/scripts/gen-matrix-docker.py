@@ -26,6 +26,6 @@ for arch in data.docker_arches:
         'runner': data.arch_data[arch].runner,
     })
 
-entries.sort(key=lambda k: data.arch_order.index(k['arch']))
+entries.sort(key=lambda k: data.arch_order.index(distros.Arch(k['arch'])))
 matrix = json.dumps({'include': entries}, sort_keys=True)
 print(matrix)
