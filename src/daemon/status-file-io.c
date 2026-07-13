@@ -12,6 +12,17 @@ static const char *status_file_io_fallback_dirs[] = {
     ".",
 };
 
+static bool status_file_io_obsolete_removed = false;
+static _Alignas(8) uint64_t status_file_io_tmp_attempt_counter = 0;
+
+_Static_assert(__atomic_always_lock_free(sizeof(status_file_io_obsolete_removed),
+                                         &status_file_io_obsolete_removed),
+               "signal-safe status cleanup state must be lock-free");
+_Static_assert(__alignof__(status_file_io_tmp_attempt_counter) >= sizeof(status_file_io_tmp_attempt_counter),
+               "signal-safe status temporary counter must be naturally aligned");
+_Static_assert(__atomic_always_lock_free(sizeof(status_file_io_tmp_attempt_counter), NULL),
+               "signal-safe status temporary counter must be lock-free");
+
 static void status_file_io_fallback_dirs_update(void) {
     status_file_io_fallback_dirs[0] = netdata_configured_cache_dir;
 }
@@ -43,7 +54,8 @@ static void status_file_io_remove_obsolete(const char *protected_dir, const char
     // IMPORTANT: NO LOCKS OR ALLOCATIONS HERE, THIS FUNCTION IS CALLED FROM SIGNAL HANDLERS
     // THIS FUNCTION MUST USE ONLY ASYNC-SIGNAL-SAFE OPERATIONS
 
-    FUNCTION_RUN_ONCE();
+    if(__atomic_exchange_n(&status_file_io_obsolete_removed, true, __ATOMIC_RELAXED))
+        return;
 
     char dst[FILENAME_MAX];
 
@@ -111,13 +123,11 @@ static bool status_file_io_save_this(const char *directory, const char *filename
     if(!directory || !*directory)
         return false;
 
-    static uint64_t tmp_attempt_counter = 0;
-
     char final[FILENAME_MAX];
     char temp[FILENAME_MAX];
     char tid_str[UINT64_MAX_LENGTH];
 
-    print_uint64(tid_str, __atomic_add_fetch(&tmp_attempt_counter, 1, __ATOMIC_RELAXED));
+    print_uint64(tid_str, __atomic_add_fetch(&status_file_io_tmp_attempt_counter, 1, __ATOMIC_RELAXED));
     size_t dir_len = strlen(directory);
     size_t fil_len = strlen(filename);
     size_t tid_len = strlen(tid_str);
