@@ -12,6 +12,7 @@ static inline size_t dictionary_locks_init(DICTIONARY *dict) {
     if(likely(!is_dictionary_single_threaded(dict))) {
         rw_spinlock_init(&dict->index.rw_spinlock);
         rw_spinlock_init(&dict->items.rw_spinlock);
+        spinlock_init(&dict->items.pending_deletion_spinlock);
     }
 
     return 0;

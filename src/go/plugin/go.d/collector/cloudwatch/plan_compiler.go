@@ -6,11 +6,11 @@ import (
 	"fmt"
 	"slices"
 	"strings"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsregion"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 )
 
 type planCompiler struct {
@@ -235,32 +235,43 @@ func (pc *planCompiler) addScope(path, ruleName string, target *collectionTarget
 	if len(unshadowed) == 0 {
 		return nil
 	}
-	discoveryKey := discoveryGroupKey{target: target.Name, region: region, namespace: profile.Config.Namespace}
-	if _, ok := pc.discoveryGroups[discoveryKey]; !ok {
-		if limit := pc.cfg.Limits.maxDiscoveryGroups(); len(pc.discoveryGroups) == limit {
-			guidance := "split the collection across multiple jobs"
-			if limit < maxDiscoveryGroupsPerJob {
-				guidance = fmt.Sprintf("raise the safeguard up to %d for intentional scale or %s", maxDiscoveryGroupsPerJob, guidance)
+	staticValues, static := profile.Config.StaticInstanceValues()
+	if !static {
+		discoveryKey := discoveryGroupKey{target: target.Name, region: region, namespace: profile.Config.Namespace}
+		if _, ok := pc.discoveryGroups[discoveryKey]; !ok {
+			if limit := pc.cfg.Limits.maxDiscoveryGroups(); len(pc.discoveryGroups) == limit {
+				guidance := "split the collection across multiple jobs"
+				if limit < maxDiscoveryGroupsPerJob {
+					guidance = fmt.Sprintf("raise the safeguard up to %d for intentional scale or %s", maxDiscoveryGroupsPerJob, guidance)
+				}
+				return fmt.Errorf(
+					"%s derives %d discovery groups (unique target, region, namespace combinations); exceeds limits.max_discovery_groups=%d; %s",
+					path, len(pc.discoveryGroups)+1, limit, guidance,
+				)
 			}
-			return fmt.Errorf(
-				"%s derives %d discovery groups (unique target, region, namespace combinations); exceeds limits.max_discovery_groups=%d; %s",
-				path, len(pc.discoveryGroups)+1, limit, guidance,
-			)
+			pc.discoveryGroups[discoveryKey] = struct{}{}
 		}
-		pc.discoveryGroups[discoveryKey] = struct{}{}
 	}
 	if len(pc.plan.Scopes) == maxCompiledScopes {
 		return fmt.Errorf("compiled collection scopes exceed maximum %d", maxCompiledScopes)
 	}
-	membershipID, ok := pc.membershipIDs[key]
-	if !ok {
-		membershipID = len(pc.membershipIDs)
-		pc.membershipIDs[key] = membershipID
+	membershipID := -1
+	if len(tagFilters) > 0 {
+		var ok bool
+		membershipID, ok = pc.membershipIDs[key]
+		if !ok {
+			membershipID = len(pc.membershipIDs)
+			pc.membershipIDs[key] = membershipID
+		}
 	}
-	pc.plan.Scopes = append(pc.plan.Scopes, collectionScope{
+	scope := collectionScope{
 		Target: target, Profile: profile, Region: region, TagFilter: tagFilters,
 		TagMembershipID: membershipID, SelectedSeries: unshadowed,
-	})
+	}
+	if static {
+		scope.StaticInstance = &collectionInstance{DimensionValues: staticValues}
+	}
+	pc.plan.Scopes = append(pc.plan.Scopes, scope)
 	pc.selectedProfiles[profile.Name] = profile
 	if !slices.Contains(target.Regions, region) {
 		target.Regions = append(target.Regions, region)
@@ -272,11 +283,23 @@ func (pc *planCompiler) addScope(path, ruleName string, target *collectionTarget
 	return nil
 }
 
-func resolveSeriesPolicies(path string, rule, defaults *QueryPolicyConfig, profile cwprofiles.ResolvedProfile, series []profileSeriesSpec) ([]compiledSeries, error) {
+func resolveSeriesPolicies(path string, rule, defaults *cwquery.Config, profile cwprofiles.ResolvedProfile, series []profileSeriesSpec) ([]compiledSeries, error) {
 	out := make([]compiledSeries, len(series))
 	for i, item := range series {
 		metric := profile.Config.Metrics[item.MetricIndex]
-		policy, err := resolveQueryPolicy(path, rule, defaults, int(item.Period/time.Second), profile.Config.PublicationDelay)
+		policy, err := cwquery.Resolve(cwquery.Resolution{
+			Path: path,
+			Profile: cwquery.Source{
+				Config: &profile.Config.Query,
+				Path:   fmt.Sprintf("profile %q.query", profile.Name),
+			},
+			Metric: cwquery.Source{
+				Config: metric.Query,
+				Path:   fmt.Sprintf("profile %q.metrics[%d].query", profile.Name, item.MetricIndex),
+			},
+			RuleDefaults: cwquery.Source{Config: defaults, Path: "rule_defaults.query"},
+			Rule:         cwquery.Source{Config: rule, Path: path + ".query"},
+		})
 		if err != nil {
 			return nil, fmt.Errorf("%s profile %q MetricName %q statistic %q: %w", path, profile.Name, metric.MetricName, item.Statistic, err)
 		}

@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS EC2
 namespace: AWS/EC2
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: InstanceId

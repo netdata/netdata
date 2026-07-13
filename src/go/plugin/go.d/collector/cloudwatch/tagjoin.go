@@ -63,12 +63,18 @@ var tagJoins = map[string]tagJoin{
 	"firehose": {namespace: "AWS/Firehose", resourceTypes: []string{"firehose:deliverystream"}, joinDims: []string{"DeliveryStreamName"}},
 	"redshift": {namespace: "AWS/Redshift", resourceTypes: []string{"redshift:cluster"}, joinDims: []string{"ClusterIdentifier"}},
 	"dynamodb": {namespace: "AWS/DynamoDB", resourceTypes: []string{"dynamodb:table"}, joinDims: []string{"TableName"}},
+	"privatelink_endpoint": {
+		namespace: "AWS/PrivateLinkEndpoints", resourceTypes: []string{"ec2:vpc-endpoint"}, joinDims: []string{"VPC Endpoint Id"},
+	},
 
 	// Parent-resource joins: joinDims is the parent dimension only, so children
 	// (across storage_type / filter_id / operation) inherit the parent's tags.
 	"s3":                 {namespace: "AWS/S3", resourceTypes: []string{"s3"}, joinDims: []string{"BucketName"}},
 	"s3_requests":        {namespace: "AWS/S3", resourceTypes: []string{"s3"}, joinDims: []string{"BucketName"}},
 	"dynamodb_operation": {namespace: "AWS/DynamoDB", resourceTypes: []string{"dynamodb:table"}, joinDims: []string{"TableName"}},
+	"privatelink_endpoint_subnet": {
+		namespace: "AWS/PrivateLinkEndpoints", resourceTypes: []string{"ec2:vpc-endpoint"}, joinDims: []string{"VPC Endpoint Id"},
+	},
 
 	// Overrides: shared/quirky ARN shapes.
 	"elb":            {namespace: "AWS/ELB", resourceTypes: []string{"elasticloadbalancing:loadbalancer"}, joinDims: []string{"LoadBalancerName"}, arnValues: elbClassicARNValues},

@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 )
 
 // plannedQuery is one stable series query. Request-local IDs and batch membership
@@ -20,7 +21,7 @@ type plannedQuery struct {
 	billingKey structuralID // structural metric identity without statistic; internal AWS cost grouping
 	target     string
 	region     string
-	policy     queryPolicy
+	policy     cwquery.Policy
 	seriesName string
 	labels     []metrix.Label
 	tagLabels  []metrix.Label // non-identity enrichment labels; emitted but not in observedKey
@@ -123,7 +124,7 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 		dimNames := prof.Config.DimensionNames()
 		join := c.plan.TagJoins[prof.Name]
 		membershipUnknown := scope.hasTagFilter() && c.tags.membershipUnknown(scope.TagMembershipID)
-		instances := c.discovery.Instances[discoveryKey{Target: scope.Target.Name, Profile: prof.Name, Region: scope.Region}]
+		instances := scope.instances(c.discovery)
 		for _, inst := range instances {
 			if len(inst.DimensionValues) != nDims {
 				continue // defensive: snapshot/profile mismatch
@@ -257,7 +258,7 @@ func finalInstanceID(profileName, accountID, region string, dimensions []cwprofi
 // dimensions are included in the query dimensions but omitted from the labels. The
 // returned label slice is shared read-only by all of the instance's planned
 // queries, so callers must not append to it.
-func (c *Collector) instanceLabelsAndDims(accountID string, prof cwprofiles.ResolvedProfile, region string, inst discoveredInstance) ([]metrix.Label, []cwtypes.Dimension) {
+func (c *Collector) instanceLabelsAndDims(accountID string, prof cwprofiles.ResolvedProfile, region string, inst collectionInstance) ([]metrix.Label, []cwtypes.Dimension) {
 	pdims := prof.Config.Instance.Dimensions
 	dims := make([]cwtypes.Dimension, len(pdims))
 	labels := make([]metrix.Label, 0, len(pdims)+2)
@@ -298,7 +299,7 @@ func buildSeriesQueries(candidate queryPlanCandidate) []plannedQuery {
 						MetricName: aws.String(m.MetricName),
 						Dimensions: candidate.presentation.dims,
 					},
-					Period: aws.Int32(int32(selected.Policy.period / time.Second)),
+					Period: aws.Int32(int32(selected.Policy.Period / time.Second)),
 					Stat:   aws.String(cwprofiles.StatString(selected.Statistic)),
 				},
 			},
@@ -317,9 +318,9 @@ func plannedQueryKey(q plannedQuery, instanceID structuralID) structuralID {
 	key.addString(q.region)
 	key.addID(instanceID)
 	key.addString(q.seriesName)
-	key.addInt64(int64(q.policy.period / time.Second))
-	key.addInt64(int64(q.policy.lookback / time.Second))
-	key.addInt64(int64(q.policy.publicationDelay / time.Second))
+	key.addInt64(int64(q.policy.Period / time.Second))
+	key.addInt64(int64(q.policy.Lookback / time.Second))
+	key.addInt64(int64(q.policy.PublicationDelay / time.Second))
 	key.addID(q.billingKey)
 	if q.query.MetricStat != nil {
 		key.addString(aws.ToString(q.query.MetricStat.Stat))

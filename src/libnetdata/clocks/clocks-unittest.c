@@ -89,6 +89,19 @@ static int clocks_retry_treats_backward_monotonic_sample_as_no_elapsed_time(void
     return errors;
 }
 
+static int clocks_usec_delta_or_zero_saturates_backward_samples(void) {
+    int errors = 0;
+
+    CLOCKS_TEST(clocks_usec_delta_or_zero(250 * USEC_PER_MS, 100 * USEC_PER_MS) == 150 * USEC_PER_MS,
+                "normal unsigned microsecond delta is preserved");
+    CLOCKS_TEST(clocks_usec_delta_or_zero(100 * USEC_PER_MS, 100 * USEC_PER_MS) == 0,
+                "equal unsigned microsecond samples produce zero delta");
+    CLOCKS_TEST(clocks_usec_delta_or_zero(100 * USEC_PER_MS, 250 * USEC_PER_MS) == 0,
+                "backward unsigned microsecond sample saturates to zero");
+
+    return errors;
+}
+
 int clocks_unittest(void) {
     int errors = 0;
 
@@ -98,6 +111,7 @@ int clocks_unittest(void) {
     errors += clocks_retry_clamps_inflated_remaining_time();
     errors += clocks_retry_stops_when_budget_is_exhausted();
     errors += clocks_retry_treats_backward_monotonic_sample_as_no_elapsed_time();
+    errors += clocks_usec_delta_or_zero_saturates_backward_samples();
 
     if(errors)
         fprintf(stderr, "clocks unittest: %d ERROR(S)\n", errors);

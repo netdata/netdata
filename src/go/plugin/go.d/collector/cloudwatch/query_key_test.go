@@ -44,9 +44,9 @@ func TestPlannedQueryKey_StableIdentityContract(t *testing.T) {
 	mutations := map[string]func(*plannedQuery, *structuralID){
 		"target":            func(q *plannedQuery, _ *structuralID) { q.target = "other" },
 		"region":            func(q *plannedQuery, _ *structuralID) { q.region = "us-west-2" },
-		"policy period":     func(q *plannedQuery, _ *structuralID) { q.policy.period += time.Minute },
-		"lookback":          func(q *plannedQuery, _ *structuralID) { q.policy.lookback += 5 * time.Minute },
-		"publication delay": func(q *plannedQuery, _ *structuralID) { q.policy.publicationDelay += time.Minute },
+		"policy period":     func(q *plannedQuery, _ *structuralID) { q.policy.Period += time.Minute },
+		"lookback":          func(q *plannedQuery, _ *structuralID) { q.policy.Lookback += 5 * time.Minute },
+		"publication delay": func(q *plannedQuery, _ *structuralID) { q.policy.PublicationDelay += time.Minute },
 		"series":            func(q *plannedQuery, _ *structuralID) { q.seriesName = "ec2.other_average" },
 		"identity": func(_ *plannedQuery, id *structuralID) {
 			*id = finalInstanceID("ec2", "000000000000", "us-east-1", profileDims, []string{"i-2"})

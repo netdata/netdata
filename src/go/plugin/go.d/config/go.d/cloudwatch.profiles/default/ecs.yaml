@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon ECS
 namespace: AWS/ECS
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: ClusterName

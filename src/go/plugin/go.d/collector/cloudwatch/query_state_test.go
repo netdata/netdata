@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,7 +14,7 @@ import (
 func stateTestQuery(key string, nilAsZero bool) plannedQuery {
 	return plannedQuery{
 		key: testStructuralID(key), nilAsZero: nilAsZero,
-		policy: queryPolicy{period: 5 * time.Minute, lookback: 15 * time.Minute, publicationDelay: 0},
+		policy: cwquery.Policy{Period: 5 * time.Minute, Lookback: 15 * time.Minute, PublicationDelay: 0},
 	}
 }
 

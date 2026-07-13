@@ -4,8 +4,10 @@ package cloudwatch
 
 import (
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -109,7 +111,7 @@ func TestEnsurePlan_BuildsValidChartTemplate(t *testing.T) {
 
 func TestProfileSeries_ContainsEveryExportedStatistic(t *testing.T) {
 	prof := cwprofiles.Profile{
-		Period: 300,
+		Query: cwquery.Config{Period: longDuration(5 * time.Minute)},
 		Metrics: []cwprofiles.Metric{
 			{ID: "req", Statistics: []string{"sum", "average"}, Rate: true},
 			{ID: "evt", Statistics: []string{"sample_count"}, Rate: true},

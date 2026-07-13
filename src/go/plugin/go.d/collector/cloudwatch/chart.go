@@ -18,8 +18,8 @@ func buildChartTemplate(profiles []cwprofiles.ResolvedProfile) (string, error) {
 }
 
 // buildChartSpec builds the chart-template spec and injects template.metrics.
-// Rate normalization is applied to observations using the rule-resolved period,
-// so chart dimensions need no static profile-period divisor. Each profile's template is deep-copied
+// Rate normalization is applied to observations using the resolved query period,
+// so chart dimensions need no static profile divisor. Each profile's template is deep-copied
 // (Group.Clone) before injection so the shared profile catalog is never mutated.
 // The assembled spec is validated when buildChartTemplate marshals it.
 func buildChartSpec(profiles []cwprofiles.ResolvedProfile) charttpl.Spec {

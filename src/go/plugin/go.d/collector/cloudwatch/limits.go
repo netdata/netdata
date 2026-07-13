@@ -6,7 +6,6 @@ package cloudwatch
 // discovery matching. The operator-controlled discovery-group safeguard is
 // part of LimitsConfig.
 const (
-	maxQueryBuckets                        = 1440
 	maxDatapointsPerRequest                = 30000
 	maxGetMetricDataPages                  = 2
 	maxPlannedQueries                      = 20000

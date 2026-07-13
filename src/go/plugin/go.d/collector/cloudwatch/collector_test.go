@@ -85,10 +85,14 @@ func setSingleTargetPlan(c *Collector, account string, regions []string, profile
 	}
 	for _, region := range regions {
 		for _, profile := range profiles {
-			plan.Scopes = append(plan.Scopes, collectionScope{
+			scope := collectionScope{
 				Target: target, Profile: profile, Region: region, TagMembershipID: len(plan.Scopes),
 				SelectedSeries: testCompiledSeries(profile),
-			})
+			}
+			if values, ok := profile.Config.StaticInstanceValues(); ok {
+				scope.StaticInstance = &collectionInstance{DimensionValues: values}
+			}
+			plan.Scopes = append(plan.Scopes, scope)
 		}
 	}
 	resolved := resolvedTarget{target: target, accountID: account}

@@ -9,6 +9,8 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 )
 
 // CloudWatch bills up to five statistics requested for the same metric in one
@@ -18,15 +20,15 @@ const maxStatisticsPerMetricBillingUnit = 5
 
 type queryBatchKey struct {
 	target, region string
-	policy         queryPolicy
+	policy         cwquery.Policy
 }
 
 func (q plannedQuery) batchKey() queryBatchKey {
 	return queryBatchKey{target: q.target, region: q.region, policy: q.policy}
 }
 
-func queryBatchWidth(policy queryPolicy) int {
-	return min(maxQueriesPerRequest, maxDatapointsPerRequest/policy.bucketCount())
+func queryBatchWidth(policy cwquery.Policy) int {
+	return min(maxQueriesPerRequest, maxDatapointsPerRequest/policy.BucketCount())
 }
 
 type queryWorkBudget struct {
@@ -39,9 +41,9 @@ func newQueryWorkBudget() *queryWorkBudget {
 	return &queryWorkBudget{billingGroups: make(map[queryBatchKey]map[structuralID]int)}
 }
 
-func (b *queryWorkBudget) reserveQuery(policy queryPolicy) error {
-	buckets := policy.bucketCount()
-	if buckets <= 0 || buckets > maxQueryBuckets {
+func (b *queryWorkBudget) reserveQuery(policy cwquery.Policy) error {
+	buckets := policy.BucketCount()
+	if buckets <= 0 || buckets > cwquery.MaxBuckets {
 		return fmt.Errorf("CloudWatch query plan contains an invalid %d-bucket query", buckets)
 	}
 	if b.queries >= maxPlannedQueries {

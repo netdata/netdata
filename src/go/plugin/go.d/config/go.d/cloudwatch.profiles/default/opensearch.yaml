@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon OpenSearch Service
 namespace: AWS/ES
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: ClientId

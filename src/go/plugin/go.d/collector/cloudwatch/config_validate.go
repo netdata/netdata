@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsregion"
 )
 
@@ -32,7 +34,7 @@ func validateConfigStructure(cfg Config) error {
 		credentialErr,
 		targetErr,
 		validateResourceTagFilters("rule_defaults.filters.resource_tags", cfg.RuleDefaults.Filters.ResourceTags),
-		validateQueryPolicyConfig("rule_defaults.query", cfg.RuleDefaults.Query),
+		cwquery.Validate("rule_defaults.query", cfg.RuleDefaults.Query),
 		validateResourceTagLabels("labels.resource_tags", cfg.Labels.ResourceTags),
 		validateRules(cfg, targetNames),
 	)
@@ -219,7 +221,7 @@ func validateRules(cfg Config, targetNames map[string]struct{}) error {
 		if rule.Metrics != nil {
 			errs = append(errs, validateMetricSelectors(path+".metrics", rule.Metrics))
 		}
-		errs = append(errs, validateQueryPolicyConfig(path+".query", rule.Query))
+		errs = append(errs, cwquery.Validate(path+".query", rule.Query))
 	}
 	return errors.Join(errs...)
 }

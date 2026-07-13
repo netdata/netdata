@@ -3,11 +3,13 @@
 package cwprofiles
 
 import (
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +27,7 @@ func validProfile() Profile {
 		Version:     VersionV1,
 		DisplayName: "AWS EC2",
 		Namespace:   "AWS/EC2",
-		Period:      300,
+		Query:       cwquery.Config{Period: profileDuration(5 * time.Minute)},
 		Instance: InstanceSpec{Dimensions: []InstanceDimension{
 			{Name: "InstanceId", Label: "instance_id"},
 		}},
@@ -85,25 +87,25 @@ func TestProfile_Validate(t *testing.T) {
 			errContains: "namespace",
 		},
 		"period not multiple of 60": {
-			mutate:      func(p *Profile) { p.Period = 90 },
+			mutate:      func(p *Profile) { p.Query.Period = profileDuration(90 * time.Second) },
 			wantErr:     true,
 			errContains: "period",
 		},
-		"period zero": {
-			mutate:      func(p *Profile) { p.Period = 0 },
+		"period omitted": {
+			mutate:      func(p *Profile) { p.Query.Period = nil },
 			wantErr:     true,
 			errContains: "period",
 		},
 		"publication delay zero": {
-			mutate: func(p *Profile) { p.PublicationDelay = profileDuration(0) },
+			mutate: func(p *Profile) { p.Query.PublicationDelay = profileDuration(0) },
 		},
 		"publication delay negative": {
-			mutate:      func(p *Profile) { p.PublicationDelay = profileDuration(-time.Second) },
+			mutate:      func(p *Profile) { p.Query.PublicationDelay = profileDuration(-time.Second) },
 			wantErr:     true,
 			errContains: "publication_delay",
 		},
 		"publication delay subsecond": {
-			mutate:      func(p *Profile) { p.PublicationDelay = profileDuration(time.Second + time.Millisecond) },
+			mutate:      func(p *Profile) { p.Query.PublicationDelay = profileDuration(time.Second + time.Millisecond) },
 			wantErr:     true,
 			errContains: "whole seconds",
 		},
@@ -139,7 +141,7 @@ func TestProfile_Validate(t *testing.T) {
 			errContains: "duplicate",
 		},
 		"per-metric period override invalid": {
-			mutate:      func(p *Profile) { p.Metrics[0].Period = 45 },
+			mutate:      func(p *Profile) { p.Metrics[0].Query = &cwquery.Config{Period: profileDuration(45 * time.Second)} },
 			wantErr:     true,
 			errContains: "period",
 		},
@@ -199,7 +201,7 @@ func TestProfile_Validate(t *testing.T) {
 			errContains: "whitespace",
 		},
 		"period above maximum": {
-			mutate:      func(p *Profile) { p.Period = 172800 },
+			mutate:      func(p *Profile) { p.Query.Period = profileDuration(48 * time.Hour) },
 			wantErr:     true,
 			errContains: "period",
 		},
@@ -364,6 +366,41 @@ func TestProfile_Validate(t *testing.T) {
 	}
 }
 
+func TestProfile_ValidateQueryErrorsUseExactSourceOnce(t *testing.T) {
+	tests := map[string]struct {
+		mutate          func(*Profile)
+		wantPath        string
+		unqualifiedPath string
+	}{
+		"profile query": {
+			mutate:          func(p *Profile) { p.Query.Period = profileDuration(90 * time.Second) },
+			wantPath:        `profile "ec2".query.period`,
+			unqualifiedPath: "profile query.period",
+		},
+		"metric query": {
+			mutate: func(p *Profile) {
+				p.Metrics[0].Query = &cwquery.Config{Period: profileDuration(45 * time.Second)}
+			},
+			wantPath:        `profile "ec2".metrics[0].query.period`,
+			unqualifiedPath: "profile metric query.period",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := validProfile()
+			tc.mutate(&p)
+			require.NoError(t, p.Normalize("ec2"))
+
+			err := p.Validate(`profile "ec2"`, "ec2")
+
+			require.Error(t, err)
+			assert.Equal(t, 1, strings.Count(err.Error(), tc.wantPath))
+			assert.NotContains(t, err.Error(), tc.unqualifiedPath)
+		})
+	}
+}
+
 func TestProfile_SupportedRegionsCanonicalAndMatch(t *testing.T) {
 	p := validProfile()
 	p.SupportedRegions = []string{"us-east-1", "eu-west-1"}
@@ -490,28 +527,44 @@ func TestExportedSeriesName(t *testing.T) {
 	}
 }
 
-func TestProfile_EffectivePeriod(t *testing.T) {
-	p := Profile{Period: 300}
-	tests := map[string]struct {
-		metric Metric
-		want   int
-	}{
-		"inherits profile": {want: 300},
-		"metric override":  {metric: Metric{Period: 60}, want: 60},
-	}
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			assert.Equal(t, tc.want, p.EffectivePeriod(tc.metric))
-		})
-	}
-}
-
 func TestProfile_DimensionNames(t *testing.T) {
 	p := Profile{Instance: InstanceSpec{Dimensions: []InstanceDimension{
 		{Name: "BucketName", Label: "bucket_name"},
 		{Name: "StorageType", Label: "storage_type"},
 	}}}
 	assert.Equal(t, []string{"BucketName", "StorageType"}, p.DimensionNames())
+}
+
+func TestProfile_StaticInstanceValues(t *testing.T) {
+	usd := "USD"
+	global := "Global"
+	tests := map[string]struct {
+		profile Profile
+		want    []string
+		static  bool
+	}{
+		"all constants": {
+			profile: Profile{Instance: InstanceSpec{Dimensions: []InstanceDimension{
+				{Name: "Currency", Constant: &usd},
+				{Name: "Region", Constant: &global},
+			}}},
+			want: []string{"USD", "Global"}, static: true,
+		},
+		"identifying dimension": {
+			profile: Profile{Instance: InstanceSpec{Dimensions: []InstanceDimension{
+				{Name: "Currency", Constant: &usd},
+				{Name: "ServiceName", Label: "service_name"},
+			}}},
+		},
+		"no dimensions": {},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, ok := tc.profile.StaticInstanceValues()
+			assert.Equal(t, tc.static, ok)
+			assert.Equal(t, tc.want, got)
+		})
+	}
 }
 
 func TestMetric_EmitZeroOnNoData(t *testing.T) {

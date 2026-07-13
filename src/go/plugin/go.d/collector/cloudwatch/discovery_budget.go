@@ -137,7 +137,7 @@ func retainedCandidatePayloadBytes(packedBytes, dimensions int) int {
 	return packedBytes + retainedCandidateBaseBytes + dimensions*retainedCandidatePerDimensionBytes
 }
 
-func retainedDiscoveredInstanceBytes(instance discoveredInstance) int {
+func retainedDiscoveredInstanceBytes(instance collectionInstance) int {
 	packedBytes := max(0, len(instance.DimensionValues)-1) * len(instanceKeySep)
 	for _, value := range instance.DimensionValues {
 		packedBytes += len(value)

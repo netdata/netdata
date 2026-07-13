@@ -10,7 +10,8 @@ version: v1
 display_name: AWS CloudFront
 namespace: AWS/CloudFront
 supported_regions: [us-east-1]
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: DistributionId
