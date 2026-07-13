@@ -120,7 +120,9 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
     // source RRDR: the formatters expect the reduced result to be
     // structurally identical to the original one - a missing array either
     // crashes them (gbc on the aggregatable path) or silently drops output
-    // sections (dgbc, vh, dqp, dl)
+    // sections (dgbc, vh, dqp, dl); hgbc is intentionally NOT mirrored -
+    // it is internal to the group-by passes and consumed (freed and NULLed)
+    // by rrd2rrdr_group_by_finalize() before this reduction runs
     if(new_r->d) {
         if(r->dp)
             new_r->dp = onewayalloc_callocz(owa, new_r->d, sizeof(*new_r->dp));
