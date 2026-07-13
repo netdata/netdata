@@ -10,6 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsregion"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 )
 
 const (
@@ -63,7 +64,7 @@ type RuleConfig struct {
 	Metrics  []ProfileMetricSelectorConfig `yaml:"metrics,omitempty" json:"metrics,omitempty"`
 	Regions  []string                      `yaml:"regions" json:"regions"`
 	Filters  *RuleFiltersConfig            `yaml:"filters,omitempty" json:"filters,omitempty"`
-	Query    *QueryPolicyConfig            `yaml:"query,omitempty" json:"query,omitempty"`
+	Query    *cwquery.Config               `yaml:"query,omitempty" json:"query,omitempty"`
 }
 
 type ProfileSelectorConfig struct {
@@ -89,16 +90,7 @@ type MetricSelectionConfig struct {
 
 type RuleDefaultsConfig struct {
 	Filters RuleDefaultFiltersConfig `yaml:"filters,omitempty" json:"filters"`
-	Query   *QueryPolicyConfig       `yaml:"query,omitempty" json:"query,omitempty"`
-}
-
-// QueryPolicyConfig overrides CloudWatch query timing for a collection rule.
-// Pointers preserve omission so rule values can inherit rule_defaults and
-// profile values without sentinel durations.
-type QueryPolicyConfig struct {
-	Period           *confopt.LongDuration `yaml:"period,omitempty" json:"period,omitempty"`
-	Lookback         *confopt.LongDuration `yaml:"lookback,omitempty" json:"lookback,omitempty"`
-	PublicationDelay *confopt.LongDuration `yaml:"publication_delay,omitempty" json:"publication_delay,omitempty"`
+	Query   *cwquery.Config          `yaml:"query,omitempty" json:"query,omitempty"`
 }
 
 type RuleDefaultFiltersConfig struct {

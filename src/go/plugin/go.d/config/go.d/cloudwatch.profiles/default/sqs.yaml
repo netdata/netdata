@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS SQS
 namespace: AWS/SQS
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: QueueName

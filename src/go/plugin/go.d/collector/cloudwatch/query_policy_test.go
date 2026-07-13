@@ -8,6 +8,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -15,6 +16,10 @@ import (
 func longDuration(value time.Duration) *confopt.LongDuration {
 	v := confopt.LongDuration(value)
 	return &v
+}
+
+func profileQuery(period time.Duration) cwquery.Config {
+	return cwquery.Config{Period: longDuration(period)}
 }
 
 func TestQueryWindow(t *testing.T) {
@@ -44,66 +49,73 @@ func TestQueryWindow(t *testing.T) {
 
 func TestResolveSeriesPolicies_ProfileMetricAndRulePeriod(t *testing.T) {
 	profile := cwprofiles.ResolvedProfile{Name: "service", Config: cwprofiles.Profile{
-		Period: 300,
+		Query: profileQuery(5 * time.Minute),
 		Metrics: []cwprofiles.Metric{
-			{ID: "fast", MetricName: "Fast", Statistics: []string{"average"}, Period: 60},
+			{ID: "fast", MetricName: "Fast", Statistics: []string{"average"}, Query: &cwquery.Config{Period: longDuration(time.Minute)}},
 			{ID: "normal", MetricName: "Normal", Statistics: []string{"average"}},
 		},
 	}}
 	base := compileProfileSeries(profile)
 	require.Len(t, base, 2)
-	assert.Equal(t, time.Minute, base[0].Period)
-	assert.Equal(t, 5*time.Minute, base[1].Period)
 
-	resolved, err := resolveSeriesPolicies("rules[0]", &QueryPolicyConfig{Period: longDuration(2 * time.Minute)}, nil, profile, base)
+	resolved, err := resolveSeriesPolicies("rules[0]", nil, nil, profile, base)
+	require.NoError(t, err)
+	assert.Equal(t, time.Minute, resolved[0].Policy.period)
+	assert.Equal(t, 5*time.Minute, resolved[1].Policy.period)
+
+	resolved, err = resolveSeriesPolicies("rules[0]", &cwquery.Config{Period: longDuration(2 * time.Minute)}, nil, profile, base)
 	require.NoError(t, err)
 	assert.Equal(t, 2*time.Minute, resolved[0].Policy.period)
 	assert.Equal(t, 2*time.Minute, resolved[1].Policy.period)
 }
 
 func TestResolveQueryPolicy_Precedence(t *testing.T) {
-	profileDelay := longDuration(time.Hour)
 	tests := map[string]struct {
-		rule, defaults *QueryPolicyConfig
-		profilePeriod  int
-		profileDelay   *confopt.LongDuration
+		rule, defaults *cwquery.Config
+		metric         *cwquery.Config
+		profile        cwquery.Config
 		want           queryPolicy
 	}{
 		"profile and built-in fallbacks": {
-			profilePeriod: 300,
-			want:          queryPolicy{period: 5 * time.Minute, lookback: 5 * time.Minute, publicationDelay: defaultPublicationDelay},
+			profile: profileQuery(5 * time.Minute),
+			want:    queryPolicy{period: 5 * time.Minute, lookback: 5 * time.Minute, publicationDelay: defaultPublicationDelay},
 		},
 		"profile publication delay": {
-			profilePeriod: 300, profileDelay: profileDelay,
-			want: queryPolicy{period: 5 * time.Minute, lookback: 5 * time.Minute, publicationDelay: time.Hour},
+			profile: cwquery.Config{Period: longDuration(5 * time.Minute), PublicationDelay: longDuration(time.Hour)},
+			want:    queryPolicy{period: 5 * time.Minute, lookback: 5 * time.Minute, publicationDelay: time.Hour},
+		},
+		"metric overrides profile field by field": {
+			metric:  &cwquery.Config{Period: longDuration(time.Hour), Lookback: longDuration(6 * time.Hour), PublicationDelay: longDuration(30 * time.Minute)},
+			profile: cwquery.Config{Period: longDuration(5 * time.Minute), Lookback: longDuration(10 * time.Minute), PublicationDelay: longDuration(time.Hour)},
+			want:    queryPolicy{period: time.Hour, lookback: 6 * time.Hour, publicationDelay: 30 * time.Minute},
 		},
 		"rule defaults override profile field by field": {
-			defaults: &QueryPolicyConfig{
+			defaults: &cwquery.Config{
 				Period: longDuration(time.Hour), Lookback: longDuration(6 * time.Hour),
 				PublicationDelay: longDuration(30 * time.Minute),
 			},
-			profilePeriod: 300, profileDelay: profileDelay,
-			want: queryPolicy{period: time.Hour, lookback: 6 * time.Hour, publicationDelay: 30 * time.Minute},
+			profile: cwquery.Config{Period: longDuration(5 * time.Minute), PublicationDelay: longDuration(time.Hour)},
+			want:    queryPolicy{period: time.Hour, lookback: 6 * time.Hour, publicationDelay: 30 * time.Minute},
 		},
 		"rule overrides defaults field by field": {
-			rule: &QueryPolicyConfig{Period: longDuration(2 * time.Hour), PublicationDelay: longDuration(0)},
-			defaults: &QueryPolicyConfig{
+			rule: &cwquery.Config{Period: longDuration(2 * time.Hour), PublicationDelay: longDuration(0)},
+			defaults: &cwquery.Config{
 				Period: longDuration(time.Hour), Lookback: longDuration(6 * time.Hour),
 				PublicationDelay: longDuration(30 * time.Minute),
 			},
-			profilePeriod: 300, profileDelay: profileDelay,
-			want: queryPolicy{period: 2 * time.Hour, lookback: 6 * time.Hour, publicationDelay: 0},
+			profile: cwquery.Config{Period: longDuration(5 * time.Minute), PublicationDelay: longDuration(time.Hour)},
+			want:    queryPolicy{period: 2 * time.Hour, lookback: 6 * time.Hour, publicationDelay: 0},
 		},
 		"omitted lookback follows resolved period": {
-			rule:          &QueryPolicyConfig{Period: longDuration(2 * time.Hour)},
-			profilePeriod: 300,
-			want:          queryPolicy{period: 2 * time.Hour, lookback: 2 * time.Hour, publicationDelay: defaultPublicationDelay},
+			rule:    &cwquery.Config{Period: longDuration(2 * time.Hour)},
+			profile: profileQuery(5 * time.Minute),
+			want:    queryPolicy{period: 2 * time.Hour, lookback: 2 * time.Hour, publicationDelay: defaultPublicationDelay},
 		},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got, err := resolveQueryPolicy("rules[0]", tc.rule, tc.defaults, tc.profilePeriod, tc.profileDelay)
+			got, err := resolveQueryPolicy("rules[0]", tc.rule, tc.defaults, tc.metric, tc.profile)
 			require.NoError(t, err)
 			assert.Equal(t, tc.want, got)
 		})
@@ -113,26 +125,26 @@ func TestResolveQueryPolicy_Precedence(t *testing.T) {
 func TestResolveQueryPolicy_Validation(t *testing.T) {
 	maxWholeSecondDuration := (time.Duration(1<<63-1) / time.Second) * time.Second
 	tests := map[string]struct {
-		policy  QueryPolicyConfig
+		policy  cwquery.Config
 		wantErr string
 	}{
-		"minimum period":                         {policy: QueryPolicyConfig{Period: longDuration(time.Minute)}},
-		"maximum period":                         {policy: QueryPolicyConfig{Period: longDuration(24 * time.Hour)}},
-		"period below minimum":                   {policy: QueryPolicyConfig{Period: longDuration(30 * time.Second)}, wantErr: "exact multiple"},
-		"period not minute multiple":             {policy: QueryPolicyConfig{Period: longDuration(90 * time.Second)}, wantErr: "exact multiple"},
-		"period above maximum":                   {policy: QueryPolicyConfig{Period: longDuration(24*time.Hour + time.Minute)}, wantErr: "between"},
-		"lookback below period":                  {policy: QueryPolicyConfig{Period: longDuration(5 * time.Minute), Lookback: longDuration(time.Minute)}, wantErr: "at least"},
-		"lookback not period multiple":           {policy: QueryPolicyConfig{Period: longDuration(5 * time.Minute), Lookback: longDuration(6 * time.Minute)}, wantErr: "exact multiple"},
-		"exact bucket maximum":                   {policy: QueryPolicyConfig{Period: longDuration(time.Minute), Lookback: longDuration(1440 * time.Minute), PublicationDelay: longDuration(0)}},
-		"bucket maximum exceeded":                {policy: QueryPolicyConfig{Period: longDuration(time.Minute), Lookback: longDuration(1441 * time.Minute), PublicationDelay: longDuration(0)}, wantErr: "maximum is 1440"},
-		"exact reliable horizon":                 {policy: QueryPolicyConfig{Period: longDuration(time.Hour), Lookback: longDuration(12*24*time.Hour + 23*time.Hour), PublicationDelay: longDuration(24 * time.Hour)}},
-		"reliable horizon exceeded":              {policy: QueryPolicyConfig{Period: longDuration(time.Hour), Lookback: longDuration(12*24*time.Hour + 23*time.Hour), PublicationDelay: longDuration(24*time.Hour + time.Second)}, wantErr: "exceeds 336h0m0s"},
-		"duration limit cannot overflow horizon": {policy: QueryPolicyConfig{PublicationDelay: longDuration(maxWholeSecondDuration)}, wantErr: "query horizon"},
+		"minimum period":                         {policy: cwquery.Config{Period: longDuration(time.Minute)}},
+		"maximum period":                         {policy: cwquery.Config{Period: longDuration(24 * time.Hour)}},
+		"period below minimum":                   {policy: cwquery.Config{Period: longDuration(30 * time.Second)}, wantErr: "exact multiple"},
+		"period not minute multiple":             {policy: cwquery.Config{Period: longDuration(90 * time.Second)}, wantErr: "exact multiple"},
+		"period above maximum":                   {policy: cwquery.Config{Period: longDuration(24*time.Hour + time.Minute)}, wantErr: "between"},
+		"lookback below period":                  {policy: cwquery.Config{Period: longDuration(5 * time.Minute), Lookback: longDuration(time.Minute)}, wantErr: "at least"},
+		"lookback not period multiple":           {policy: cwquery.Config{Period: longDuration(5 * time.Minute), Lookback: longDuration(6 * time.Minute)}, wantErr: "exact multiple"},
+		"exact bucket maximum":                   {policy: cwquery.Config{Period: longDuration(time.Minute), Lookback: longDuration(1440 * time.Minute), PublicationDelay: longDuration(0)}},
+		"bucket maximum exceeded":                {policy: cwquery.Config{Period: longDuration(time.Minute), Lookback: longDuration(1441 * time.Minute), PublicationDelay: longDuration(0)}, wantErr: "maximum is 1440"},
+		"exact reliable horizon":                 {policy: cwquery.Config{Period: longDuration(time.Hour), Lookback: longDuration(12*24*time.Hour + 23*time.Hour), PublicationDelay: longDuration(24 * time.Hour)}},
+		"reliable horizon exceeded":              {policy: cwquery.Config{Period: longDuration(time.Hour), Lookback: longDuration(12*24*time.Hour + 23*time.Hour), PublicationDelay: longDuration(24*time.Hour + time.Second)}, wantErr: "exceeds 336h0m0s"},
+		"duration limit cannot overflow horizon": {policy: cwquery.Config{Period: longDuration(5 * time.Minute), PublicationDelay: longDuration(maxWholeSecondDuration)}, wantErr: "query horizon"},
 	}
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			got, err := resolveQueryPolicy("rules[0]", &tc.policy, nil, 300, nil)
+			got, err := resolveQueryPolicy("rules[0]", nil, nil, &tc.policy, profileQuery(5*time.Minute))
 			if tc.wantErr == "" {
 				require.NoError(t, err)
 				assert.Positive(t, got.bucketCount())
@@ -143,20 +155,20 @@ func TestResolveQueryPolicy_Validation(t *testing.T) {
 	}
 }
 
-func TestValidateQueryPolicyConfig_RawDurations(t *testing.T) {
+func TestQueryConfig_RawDurations(t *testing.T) {
 	tests := map[string]struct {
-		policy  *QueryPolicyConfig
+		policy  *cwquery.Config
 		wantErr string
 	}{
 		"omitted":             {},
-		"explicit zero delay": {policy: &QueryPolicyConfig{PublicationDelay: longDuration(0)}},
-		"zero lookback":       {policy: &QueryPolicyConfig{Lookback: longDuration(0)}, wantErr: "must be positive"},
-		"negative delay":      {policy: &QueryPolicyConfig{PublicationDelay: longDuration(-time.Second)}, wantErr: "must not be negative"},
-		"subsecond lookback":  {policy: &QueryPolicyConfig{Lookback: longDuration(time.Second + time.Millisecond)}, wantErr: "whole seconds"},
+		"explicit zero delay": {policy: &cwquery.Config{PublicationDelay: longDuration(0)}},
+		"zero lookback":       {policy: &cwquery.Config{Lookback: longDuration(0)}, wantErr: "must be positive"},
+		"negative delay":      {policy: &cwquery.Config{PublicationDelay: longDuration(-time.Second)}, wantErr: "must not be negative"},
+		"subsecond lookback":  {policy: &cwquery.Config{Lookback: longDuration(time.Second + time.Millisecond)}, wantErr: "whole seconds"},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			err := validateQueryPolicyConfig("rules[0].query", tc.policy)
+			err := cwquery.Validate("rules[0].query", tc.policy)
 			if tc.wantErr == "" {
 				assert.NoError(t, err)
 			} else {

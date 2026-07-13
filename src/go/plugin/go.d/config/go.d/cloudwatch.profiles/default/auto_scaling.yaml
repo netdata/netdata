@@ -11,7 +11,8 @@
 version: v1
 display_name: AWS Auto Scaling
 namespace: AWS/AutoScaling
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: AutoScalingGroupName

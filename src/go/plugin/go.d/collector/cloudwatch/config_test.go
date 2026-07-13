@@ -350,6 +350,11 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules")["ui:listFlavour"])
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "targets")["ui:listFlavour"])
 	assert.Equal(t, "ec2", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "profiles", "include", "items")["ui:placeholder"])
+	billingProfileHelp, ok := schemaObjectAt(t, doc, "uiSchema", "rules", "items", "profiles", "include")["ui:help"].(string)
+	require.True(t, ok)
+	for _, profile := range []string{"billing_total", "billing_service", "billing_linked_account", "billing_linked_account_service"} {
+		assert.Contains(t, billingProfileHelp, profile)
+	}
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics")["ui:listFlavour"])
 	assert.Equal(t, "ec2", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "profile")["ui:placeholder"])
 	assert.Equal(t, "Average", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "statistics", "items")["ui:placeholder"])
@@ -392,6 +397,30 @@ func TestMetadata_TwoRuleQueryPolicyExample(t *testing.T) {
 		"name: Duration",
 		"period: 5m",
 		"period: 1m",
+	} {
+		assert.Contains(t, text, want)
+	}
+}
+
+func TestMetadata_BillingOperatorContract(t *testing.T) {
+	data, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	text := string(data)
+
+	for _, want := range []string{
+		"billing_total",
+		"billing_service",
+		"billing_linked_account",
+		"billing_linked_account_service",
+		"resource_tags: []",
+		"data collection cannot be disabled",
+		"about 15 minutes",
+		"management/payer account",
+		"Amazon Partner Network (APN)",
+		"UTC month boundary",
+		"28,800 metric requests per day",
+		"AWS charges `GetMetricData` by metrics requested",
+		"Billing dimensions are not AWS Resource Groups Tagging API resources",
 	} {
 		assert.Contains(t, text, want)
 	}

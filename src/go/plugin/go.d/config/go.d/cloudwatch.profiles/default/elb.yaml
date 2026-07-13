@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS ELB (Classic)
 namespace: AWS/ELB
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: LoadBalancerName

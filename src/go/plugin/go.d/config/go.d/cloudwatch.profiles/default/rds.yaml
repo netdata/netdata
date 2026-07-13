@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS RDS
 namespace: AWS/RDS
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: DBInstanceIdentifier

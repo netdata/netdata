@@ -123,7 +123,7 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 		dimNames := prof.Config.DimensionNames()
 		join := c.plan.TagJoins[prof.Name]
 		membershipUnknown := scope.hasTagFilter() && c.tags.membershipUnknown(scope.TagMembershipID)
-		instances := c.discovery.Instances[discoveryKey{Target: scope.Target.Name, Profile: prof.Name, Region: scope.Region}]
+		instances := scope.instances(c.discovery)
 		for _, inst := range instances {
 			if len(inst.DimensionValues) != nDims {
 				continue // defensive: snapshot/profile mismatch

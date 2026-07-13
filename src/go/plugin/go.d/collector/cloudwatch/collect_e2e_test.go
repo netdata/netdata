@@ -23,6 +23,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
@@ -42,6 +43,19 @@ func TestCollect_E2E(t *testing.T) {
 	const account = "000000000000"
 
 	scenarios := map[string]e2eScenario{
+		"billing total uses its static Currency grain": {
+			profiles: []string{"billing_total"},
+			gmd: map[string]float64{
+				e2eKey("AWS/Billing", "EstimatedCharges", "Maximum", "Currency", "USD"): 123.45,
+			},
+			wantSeries: map[string]metrix.SampleValue{
+				`billing_total.estimated_charges_maximum{account_id="000000000000",region="us-east-1"}`: 123.45,
+			},
+		},
+		"billing total no-data is a successful gauge gap": {
+			profiles:   []string{"billing_total"},
+			wantSeries: map[string]metrix.SampleValue{},
+		},
 		"ec2 single dimension, rate sums normalized by effective period": {
 			profiles: []string{"ec2"},
 			listMetrics: map[string][]cwtypes.Metric{
@@ -324,12 +338,12 @@ func TestCollect_TwoRulesApplyIndependentQueryPolicies(t *testing.T) {
 		{
 			Name: "lambda-fast", Targets: []string{"base"}, Profiles: selector, Regions: []string{"us-east-1"},
 			Metrics: []ProfileMetricSelectorConfig{{Profile: "lambda", Statistics: []string{"Sum"}, Include: []MetricSelectionConfig{{Name: "Invocations"}}}},
-			Query:   &QueryPolicyConfig{Period: longDuration(time.Minute), Lookback: longDuration(5 * time.Minute), PublicationDelay: longDuration(0)},
+			Query:   &cwquery.Config{Period: longDuration(time.Minute), Lookback: longDuration(5 * time.Minute), PublicationDelay: longDuration(0)},
 		},
 		{
 			Name: "lambda-sparse", Targets: []string{"base"}, Profiles: selector, Regions: []string{"us-east-1"},
 			Metrics: []ProfileMetricSelectorConfig{{Profile: "lambda", Statistics: []string{"Sum"}, Include: []MetricSelectionConfig{{Name: "Errors"}}}},
-			Query:   &QueryPolicyConfig{Period: longDuration(5 * time.Minute), Lookback: longDuration(15 * time.Minute), PublicationDelay: longDuration(0)},
+			Query:   &cwquery.Config{Period: longDuration(5 * time.Minute), Lookback: longDuration(15 * time.Minute), PublicationDelay: longDuration(0)},
 		},
 	}
 

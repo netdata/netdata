@@ -283,10 +283,13 @@ type discoverySnapshot struct {
 	ExpiresAt time.Time
 }
 
-// expired reports whether the snapshot must be refreshed at now (never fetched,
-// or past its TTL).
+// expired reports whether the snapshot must be refreshed at now. A failed first
+// pass can have no FetchedAt but a future ExpiresAt that schedules its retry.
 func (s discoverySnapshot) expired(now time.Time) bool {
-	return s.FetchedAt.IsZero() || !now.Before(s.ExpiresAt)
+	if s.FetchedAt.IsZero() {
+		return s.ExpiresAt.IsZero() || !now.Before(s.ExpiresAt)
+	}
+	return !now.Before(s.ExpiresAt)
 }
 
 // totalInstances is the instance count across all (target, profile, region) keys.
@@ -476,10 +479,15 @@ func (c *Collector) markDiscoveryStale() {
 }
 
 // refreshDiscovery refreshes the discovery snapshot when its TTL has expired.
-// Per-group failures are logged and tolerated; an aggregate failure keeps the
-// previous snapshot, or errors on the very first pass when there is none.
+// Per-group failures are logged and tolerated. Aggregate and first-pass total
+// failures retain dynamic state when executable static scopes keep the cycle
+// useful; otherwise a first-pass failure is returned.
 func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	now := c.now()
+	groups := c.discoveryGroups()
+	if len(groups) == 0 {
+		return ctx.Err()
+	}
 	if !c.discovery.expired(now) {
 		return nil
 	}
@@ -487,7 +495,7 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	newClient := func(callCtx context.Context, target, region string) (cloudwatchClient, error) {
 		return c.clients.forTargetRegion(callCtx, target, region)
 	}
-	results, aggregateErr := discoverAll(ctx, newClient, c.discoveryGroups(), apiConcurrency, c.Timeout.Duration())
+	results, aggregateErr := discoverAll(ctx, newClient, groups, apiConcurrency, c.Timeout.Duration())
 	// If the parent context was canceled or timed out during the fan-out, abort before
 	// committing: buildDiscoverySnapshot would otherwise carry forward instances (or
 	// accept a partial first snapshot) and advance the TTL, so the next cycle would skip
@@ -502,7 +510,7 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	)
 	if aggregateErr != nil {
 		diagnostics.aggregateFailure = aggregateErr
-		disposition = c.aggregateFailureDisposition(aggregateErr)
+		disposition = c.aggregateFailureDisposition(aggregateErr, c.hasExecutableStaticScopes())
 	} else {
 		// Failed discovery groups carry forward their previous instances, so a
 		// transient target/region/namespace failure does not drop series.
@@ -515,7 +523,7 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 		}
 		if err != nil {
 			diagnostics.aggregateFailure = err
-			disposition = c.aggregateFailureDisposition(err)
+			disposition = c.aggregateFailureDisposition(err, c.hasExecutableStaticScopes())
 		} else {
 			for _, result := range results {
 				if result.Err != nil {
@@ -529,9 +537,16 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 			// An empty successful group is not a failure; with shared regions across
 			// many targets, empty successes are expected.
 			if c.discovery.FetchedAt.IsZero() && len(results) > 0 && failedGroups == len(results) {
-				disposition = discoveryDisposition{
-					kind: discoveryDispositionFail,
-					err:  fmt.Errorf("CloudWatch discovery failed for all %d target/region/namespace groups", len(results)),
+				if c.hasExecutableStaticScopes() {
+					disposition = discoveryDisposition{
+						kind:    discoveryDispositionRetry,
+						retryAt: now.Add(time.Duration(c.Discovery.RefreshEvery) * time.Second),
+					}
+				} else {
+					disposition = discoveryDisposition{
+						kind: discoveryDispositionFail,
+						err:  fmt.Errorf("CloudWatch discovery failed for all %d target/region/namespace groups", len(results)),
+					}
 				}
 			} else {
 				report := newDiscoveryReport(snap, c.discoverySig)
@@ -557,6 +572,9 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 	}
 	recentlyActive := make(map[profileKey]bool)
 	for _, scope := range c.plan.Scopes {
+		if scope.StaticInstance != nil {
+			continue
+		}
 		key := profileKey{target: scope.Target.Name, profile: scope.Profile.Name, region: scope.Region}
 		recent := selectedSeriesUseRecentlyActive(scope.SelectedSeries, c.recentlyActiveOnly())
 		if previous, ok := recentlyActive[key]; !ok || (previous && !recent) {
@@ -567,6 +585,9 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 	seenProfiles := make(map[profileKey]struct{})
 	var groups []discoveryGroup
 	for _, scope := range c.plan.Scopes {
+		if scope.StaticInstance != nil {
+			continue
+		}
 		if _, ok := c.resolvedByRef[scope.Target.Name]; !ok {
 			continue
 		}
@@ -592,4 +613,19 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 		seenProfiles[pk] = struct{}{}
 	}
 	return groups
+}
+
+func (c *Collector) hasExecutableStaticScopes() bool {
+	if c.plan == nil {
+		return false
+	}
+	for _, scope := range c.plan.Scopes {
+		if scope.StaticInstance == nil {
+			continue
+		}
+		if _, ok := c.resolvedTargetByRef(scope.Target.Name); ok {
+			return true
+		}
+	}
+	return false
 }

@@ -17,6 +17,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,7 +26,7 @@ import (
 func ec2QueryProfile() cwprofiles.Profile {
 	return cwprofiles.Profile{
 		Namespace: "AWS/EC2",
-		Period:    300,
+		Query:     cwquery.Config{Period: longDuration(5 * time.Minute)},
 		Instance:  cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "InstanceId", Label: "instance_id"}}},
 		Metrics: []cwprofiles.Metric{
 			{ID: "cpu_utilization", MetricName: "CPUUtilization", Statistics: []string{"average"}},
@@ -125,7 +126,7 @@ func TestBuildQueryPlan_ConstantDimension(t *testing.T) {
 	configureExactRule(c, []string{"us-east-1"}, []string{"cloudfront"})
 	profiles := []cwprofiles.ResolvedProfile{{Name: "cloudfront", Config: cwprofiles.Profile{
 		Namespace: "AWS/CloudFront",
-		Period:    300,
+		Query:     cwquery.Config{Period: longDuration(5 * time.Minute)},
 		Instance: cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{
 			{Name: "DistributionId", Label: "distribution_id"},
 			{Name: "Region", Constant: aws.String("Global")},
@@ -210,16 +211,26 @@ func TestCurrentQueryPlan_CachesUntilInputsChange(t *testing.T) {
 
 func filteredOverlapCollector(t *testing.T) *Collector {
 	t.Helper()
-	c := multiTargetCollector(t, map[string]stsClient{
+	defaults := false
+	filters := []ResourceTagFilterConfig{{Key: "environment", Values: []string{"production"}}}
+	cfg := twoTargetConfig()
+	cfg.Rules = []RuleConfig{
+		{
+			Name: "first", Targets: []string{"first"}, Regions: []string{"us-east-1"},
+			Profiles: &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}},
+			Filters:  &RuleFiltersConfig{ResourceTags: &filters},
+		},
+		{
+			Name: "second", Targets: []string{"second"}, Regions: []string{"us-east-1"},
+			Profiles: &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}},
+		},
+	}
+	c := multiTargetCollectorWithConfig(t, cfg, map[string]stsClient{
 		"first":  &seqSTS{accounts: []string{"111111111111"}},
 		"second": &seqSTS{accounts: []string{"111111111111"}},
 	})
 	require.NoError(t, c.ensureTargets(context.Background()))
 	require.Len(t, c.plan.Scopes, 2)
-	join, err := resolveTagJoinProfile(c.plan.Scopes[0].Profile)
-	require.NoError(t, err)
-	c.plan.TagJoins["ec2"] = join
-	c.plan.Scopes[0].TagFilter = []resourceTagFilter{{key: "environment", values: []string{"production"}}}
 	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}: {
 			{DimensionValues: []string{"i-1"}}, {DimensionValues: []string{"i-2"}},
@@ -452,7 +463,7 @@ func maximumPayloadQueryPlanCollector(instanceCount, metricCount, dimensionCount
 		metrics[i] = cwprofiles.Metric{ID: fmt.Sprintf("metric_%d", i), MetricName: fmt.Sprintf("Metric%d", i), Statistics: []string{"average"}}
 	}
 	profile := cwprofiles.ResolvedProfile{Name: "maximum_payload", Config: cwprofiles.Profile{
-		Namespace: "AWS/Test", Period: 300,
+		Namespace: "AWS/Test", Query: cwquery.Config{Period: longDuration(5 * time.Minute)},
 		Instance: cwprofiles.InstanceSpec{Dimensions: dimensions},
 		Metrics:  metrics,
 	}}

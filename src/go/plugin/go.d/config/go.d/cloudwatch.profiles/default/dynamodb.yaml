@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS DynamoDB
 namespace: AWS/DynamoDB
-period: 60
+query:
+  period: 1m
 instance:
   dimensions:
     - name: TableName
@@ -19,11 +20,13 @@ metrics:
   - id: provisioned_read_capacity_units
     metric_name: ProvisionedReadCapacityUnits
     statistics: [average]
-    period: 300
+    query:
+      period: 5m
   - id: provisioned_write_capacity_units
     metric_name: ProvisionedWriteCapacityUnits
     statistics: [average]
-    period: 300
+    query:
+      period: 5m
   - id: read_throttle_events
     metric_name: ReadThrottleEvents
     statistics: [sum]
