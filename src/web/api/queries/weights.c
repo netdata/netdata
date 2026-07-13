@@ -427,6 +427,7 @@ struct query_weights_data {
     struct query_timings timings;
 
     size_t examined_dimensions;
+    bool anomaly_bit_used;
     bool register_zero;
 
     DICTIONARY *results;
@@ -449,6 +450,7 @@ struct query_weights_thread_data {
     DICTIONARY *local_results;
     WEIGHTS_STATS local_stats;
     size_t local_examined_dimensions;
+    bool local_anomaly_bit_used;
     struct query_versions local_versions;
     RRDHOST **hosts;
     struct completion completion;
@@ -484,6 +486,7 @@ void query_weights_worker_thread(void *arg)
     // Initialize local statistics
     memset(&thread_data->local_stats, 0, sizeof(WEIGHTS_STATS));
     thread_data->local_examined_dimensions = 0;
+    thread_data->local_anomaly_bit_used = false;
     memset(&thread_data->local_versions, 0, sizeof(struct query_versions));
 
     // Process assigned hosts
@@ -516,6 +519,7 @@ void query_weights_worker_thread(void *arg)
         local_qwd.results = thread_data->local_results;
         local_qwd.stats = thread_data->local_stats;
         local_qwd.examined_dimensions = thread_data->local_examined_dimensions;
+        local_qwd.anomaly_bit_used = thread_data->local_anomaly_bit_used;
         local_qwd.versions = thread_data->local_versions;
 
         char uuid[UUID_STR_LEN];
@@ -560,6 +564,7 @@ void query_weights_worker_thread(void *arg)
 
         // Process the host using the callback
         ssize_t ret = weights_do_node_callback(&local_qwd, host, queryable_host);
+        thread_data->local_anomaly_bit_used = local_qwd.anomaly_bit_used;
         if (ret < 0)
             break;
 
@@ -2196,12 +2201,13 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
             break;
 
         case WEIGHTS_METHOD_ANOMALY_RATE:
-            qwr->options |= RRDR_OPTION_ANOMALY_BIT;
+            qwd->anomaly_bit_used = true;
             rrdset_weights_value(
                     host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->after, qwr->before,
-                    qwr->options, qwr->time_group_method, qwr->time_group_options, qwr->tier,
+                    qwr->options | RRDR_OPTION_ANOMALY_BIT,
+                    qwr->time_group_method, qwr->time_group_options, qwr->tier,
                     &qwd->stats, qwd->register_zero
             );
             break;
@@ -2413,6 +2419,7 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
 
     // Wait for all threads to complete
     ssize_t total_added = 0;
+    bool anomaly_bit_used = false;
     for (size_t i = 0; i < num_threads; i++) {
         completion_wait_for(&thread_data[i].completion);
         completion_destroy(&thread_data[i].completion);
@@ -2423,6 +2430,7 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
 
         // Accumulate examined dimensions
         __atomic_fetch_add(&qwd->examined_dimensions, thread_data[i].local_examined_dimensions, __ATOMIC_RELAXED);
+        anomaly_bit_used |= thread_data[i].local_anomaly_bit_used;
 
         // Merge version hashes
         qwd->versions.contexts_hard_hash += thread_data[i].local_versions.contexts_hard_hash;
@@ -2434,6 +2442,7 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
         register_result_destroy(thread_data[i].local_results);
     }
 
+    qwd->anomaly_bit_used |= anomaly_bit_used;
     total_added = (ssize_t) dictionary_entries(qwd->results);
 
     // Cleanup
@@ -2606,6 +2615,10 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             query_scope_foreach_host_parallel(qwd.scope_nodes_sp, qwd.nodes_sp, &qwd);
         }
     }
+
+    // Preserve response metadata only after worker reads of the request have finished.
+    if(qwd.anomaly_bit_used)
+        qwr->options |= RRDR_OPTION_ANOMALY_BIT;
 
     if(!qwd.register_zero) {
         // put it back, to show it in the response
