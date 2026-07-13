@@ -427,10 +427,65 @@ func TestMetadata_BillingOperatorContract(t *testing.T) {
 	}
 }
 
+func metadataExampleConfig(t *testing.T, exampleName string) Config {
+	t.Helper()
+	data, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	var metadata struct {
+		Modules []struct {
+			Setup struct {
+				Configuration struct {
+					Examples struct {
+						List []struct {
+							Name   string `yaml:"name"`
+							Config string `yaml:"config"`
+						} `yaml:"list"`
+					} `yaml:"examples"`
+				} `yaml:"configuration"`
+			} `yaml:"setup"`
+		} `yaml:"modules"`
+	}
+	require.NoError(t, yaml.Unmarshal(data, &metadata))
+	for _, module := range metadata.Modules {
+		for _, example := range module.Setup.Configuration.Examples.List {
+			if example.Name != exampleName {
+				continue
+			}
+			var configFile struct {
+				Jobs []Config `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(example.Config), &configFile))
+			require.Len(t, configFile.Jobs, 1)
+			return configFile.Jobs[0]
+		}
+	}
+	require.FailNowf(t, "metadata example not found", "name=%q", exampleName)
+	return Config{}
+}
+
 func TestMetadata_PrivateLinkEndpointOperatorContract(t *testing.T) {
 	data, err := os.ReadFile("metadata.yaml")
 	require.NoError(t, err)
 	text := string(data)
+	var metadata struct {
+		Modules []struct {
+			Meta struct {
+				Keywords []string `yaml:"keywords"`
+			} `yaml:"meta"`
+		} `yaml:"modules"`
+	}
+	require.NoError(t, yaml.Unmarshal(data, &metadata))
+	require.Len(t, metadata.Modules, 1)
+	assert.Subset(t, metadata.Modules[0].Meta.Keywords, []string{"privatelink", "private link", "vpc endpoint"})
+
+	cfg := metadataExampleConfig(t, "AWS PrivateLink endpoints with split timing")
+	plan, diagnostics, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	require.Empty(t, diagnostics)
+	require.Len(t, plan.Scopes, 3)
+	assert.Equal(t, []string{"endpoint-averages", "endpoint-six-hour-bytes", "endpoint-subnets"}, []string{
+		cfg.Rules[0].Name, cfg.Rules[1].Name, cfg.Rules[2].Name,
+	})
 
 	for _, want := range []string{
 		"privatelink_endpoint",
@@ -441,9 +496,6 @@ func TestMetadata_PrivateLinkEndpointOperatorContract(t *testing.T) {
 		"subnet_id",
 		"seven additional metric/statistic queries",
 		"1,440 metric requests per day",
-		"period: 1m",
-		"period: 6h",
-		"resource_tags",
 	} {
 		assert.Contains(t, text, want)
 	}

@@ -7,15 +7,71 @@ import (
 	"testing"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	rgtatypes "github.com/aws/aws-sdk-go-v2/service/resourcegroupstaggingapi/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 )
+
+type privateLinkChartDimensionContract struct {
+	selector string
+	name     string
+}
+
+type privateLinkChartContract struct {
+	id         string
+	context    string
+	title      string
+	family     string
+	units      string
+	dimensions []privateLinkChartDimensionContract
+}
+
+func privateLinkChartContracts(profileName string) []privateLinkChartContract {
+	prefix := "aws_cloudwatch_" + profileName + "_"
+	return []privateLinkChartContract{
+		{
+			id: prefix + "active_connections", context: "active_connections", title: "PrivateLink Active Connections",
+			family: "Connections", units: "connections",
+			dimensions: []privateLinkChartDimensionContract{{selector: "active_connections_average", name: "active"}},
+		},
+		{
+			id: prefix + "average_processed_bytes", context: "average_processed_bytes", title: "PrivateLink Average Processed Bytes",
+			family: "Traffic", units: "bytes",
+			dimensions: []privateLinkChartDimensionContract{{selector: "bytes_processed_average", name: "average"}},
+		},
+		{
+			id: prefix + "processed_bytes", context: "processed_bytes", title: "PrivateLink Processed Bytes",
+			family: "Traffic", units: "bytes/s",
+			dimensions: []privateLinkChartDimensionContract{{selector: "bytes_processed_sum", name: "processed"}},
+		},
+		{
+			id: prefix + "average_new_connections", context: "average_new_connections", title: "PrivateLink Average New Connections",
+			family: "Connections", units: "connections",
+			dimensions: []privateLinkChartDimensionContract{{selector: "new_connections_average", name: "average"}},
+		},
+		{
+			id: prefix + "new_connections", context: "new_connections", title: "PrivateLink New Connections",
+			family: "Connections", units: "connections/s",
+			dimensions: []privateLinkChartDimensionContract{{selector: "new_connections_sum", name: "new"}},
+		},
+		{
+			id: prefix + "packet_problems", context: "packet_problems", title: "PrivateLink Packet Problems",
+			family: "Packets", units: "packets/s",
+			dimensions: []privateLinkChartDimensionContract{
+				{selector: "packets_dropped_sum", name: "dropped"},
+				{selector: "rst_packets_received_sum", name: "reset_received"},
+			},
+		},
+	}
+}
 
 func TestPrivateLinkEndpointProfiles_PublicContract(t *testing.T) {
 	catalog, err := cwprofiles.LoadFromDefaultDirs()
@@ -29,7 +85,7 @@ func TestPrivateLinkEndpointProfiles_PublicContract(t *testing.T) {
 		disabled   bool
 		dimensions []cwprofiles.InstanceDimension
 		byLabels   []string
-		chartIDs   []string
+		charts     []privateLinkChartContract
 	}{
 		"privatelink_endpoint": {
 			dimensions: []cwprofiles.InstanceDimension{
@@ -39,14 +95,7 @@ func TestPrivateLinkEndpointProfiles_PublicContract(t *testing.T) {
 				{Name: "VPC Id", Label: "vpc_id"},
 			},
 			byLabels: []string{"account_id", "region", "endpoint_type", "service_name", "vpc_endpoint_id", "vpc_id"},
-			chartIDs: []string{
-				"aws_cloudwatch_privatelink_endpoint_active_connections",
-				"aws_cloudwatch_privatelink_endpoint_average_processed_bytes",
-				"aws_cloudwatch_privatelink_endpoint_processed_bytes",
-				"aws_cloudwatch_privatelink_endpoint_average_new_connections",
-				"aws_cloudwatch_privatelink_endpoint_new_connections",
-				"aws_cloudwatch_privatelink_endpoint_packet_problems",
-			},
+			charts:   privateLinkChartContracts("privatelink_endpoint"),
 		},
 		"privatelink_endpoint_subnet": {
 			disabled: true,
@@ -58,14 +107,7 @@ func TestPrivateLinkEndpointProfiles_PublicContract(t *testing.T) {
 				{Name: "VPC Id", Label: "vpc_id"},
 			},
 			byLabels: []string{"account_id", "region", "endpoint_type", "service_name", "subnet_id", "vpc_endpoint_id", "vpc_id"},
-			chartIDs: []string{
-				"aws_cloudwatch_privatelink_endpoint_subnet_active_connections",
-				"aws_cloudwatch_privatelink_endpoint_subnet_average_processed_bytes",
-				"aws_cloudwatch_privatelink_endpoint_subnet_processed_bytes",
-				"aws_cloudwatch_privatelink_endpoint_subnet_average_new_connections",
-				"aws_cloudwatch_privatelink_endpoint_subnet_new_connections",
-				"aws_cloudwatch_privatelink_endpoint_subnet_packet_problems",
-			},
+			charts:   privateLinkChartContracts("privatelink_endpoint_subnet"),
 		},
 	}
 
@@ -102,10 +144,20 @@ func TestPrivateLinkEndpointProfiles_PublicContract(t *testing.T) {
 			require.NotNil(t, profile.Template.ChartDefaults)
 			require.NotNil(t, profile.Template.ChartDefaults.Instances)
 			assert.Equal(t, tc.byLabels, profile.Template.ChartDefaults.Instances.ByLabels)
-			require.Len(t, profile.Template.Charts, len(tc.chartIDs))
-			for i, chart := range profile.Template.Charts {
-				assert.Equal(t, tc.chartIDs[i], chart.ID)
+			require.Len(t, profile.Template.Charts, len(tc.charts))
+			for i, want := range tc.charts {
+				chart := profile.Template.Charts[i]
+				assert.Equal(t, want.id, chart.ID)
+				assert.Equal(t, want.context, chart.Context)
+				assert.Equal(t, want.title, chart.Title)
+				assert.Equal(t, want.family, chart.Family)
+				assert.Equal(t, want.units, chart.Units)
 				assert.Equal(t, "absolute", chart.Algorithm)
+				require.Len(t, chart.Dimensions, len(want.dimensions))
+				for j, dimension := range want.dimensions {
+					assert.Equal(t, profileName+"."+dimension.selector, chart.Dimensions[j].Selector)
+					assert.Equal(t, dimension.name, chart.Dimensions[j].Name)
+				}
 			}
 		})
 	}
@@ -263,27 +315,40 @@ func TestPrivateLinkEndpointProfiles_ResourceTagsJoinParentEndpoint(t *testing.T
 	assert.Equal(t, map[string]struct{}{"vpce-1": {}}, group.candidatesByProfile["privatelink_endpoint"])
 	assert.Equal(t, map[string]struct{}{"vpce-1": {}}, group.candidatesByProfile["privatelink_endpoint_subnet"])
 
-	members := make(tagMembership)
-	labels := make(map[tagCacheKey][]metrix.Label)
-	confirmed := make(map[tagCacheKey]struct{})
-	indexFetchedResource(members, labels, confirmed, group,
+	rgta := &fakeRGTA{resources: []rgtatypes.ResourceTagMapping{
 		rgtaResource("arn:aws:ec2:us-east-1:000000000000:vpc-endpoint/vpce-1", "environment", "production", "owner", "platform"),
-		c.tagLabelPlans,
-	)
+	}}
+	c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
+		return aws.Config{Region: region}, nil
+	}
+	c.newRGTAClient = func(aws.Config) rgtaClient { return rgta }
+	c.now = func() time.Time { return time.Unix(1_000_000_000, 0) }
+	c.refreshTags(context.Background())
+	require.Equal(t, 1, rgta.calls, "both profiles share one VPC endpoint RGTA request")
+	assert.Equal(t, []string{"ec2:vpc-endpoint"}, rgta.gotFilters)
+	require.Len(t, rgta.gotTags, 1)
+	assert.Equal(t, "environment", aws.ToString(rgta.gotTags[0].Key))
+	assert.Equal(t, []string{"production"}, rgta.gotTags[0].Values)
+
 	for _, profileName := range []string{"privatelink_endpoint", "privatelink_endpoint_subnet"} {
 		membershipID, ok := group.membershipIDByProfile[profileName]
 		require.True(t, ok)
-		assert.Contains(t, members[membershipID], "vpce-1")
-		assert.Equal(t, []metrix.Label{{Key: "owner", Value: "platform"}}, labels[tagCacheKey{
+		assert.True(t, c.tags.membershipSelected(membershipID, "vpce-1"))
+		assert.Equal(t, []metrix.Label{{Key: "owner", Value: "platform"}}, c.tags.labels[tagCacheKey{
 			target: "base", account: "000000000000", region: "us-east-1", profile: profileName, joinKey: "vpce-1",
 		}])
 	}
-	c.tags.labels = labels
 	for _, scope := range c.plan.Scopes {
 		for _, instance := range c.discovery.Instances[discoveryKey{Target: "base", Profile: scope.Profile.Name, Region: "us-east-1"}] {
 			assert.Equal(t, []metrix.Label{{Key: "owner", Value: "platform"}}, c.tagLabelsFor(
 				"base", "000000000000", "us-east-1", scope.Profile, c.plan.TagJoins[scope.Profile.Name], instance.DimensionValues,
 			), "every subnet child inherits the parent endpoint label")
 		}
+	}
+	queries, err := c.buildQueryPlan()
+	require.NoError(t, err)
+	require.Len(t, queries, 21, "one endpoint and two subnet children each export seven selected series")
+	for _, query := range queries {
+		assert.Equal(t, "platform", labelValue(query.tagLabels, "owner"), query.seriesName)
 	}
 }

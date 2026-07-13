@@ -44,7 +44,8 @@ var statStrings = map[string]string{
 	"sample_count": "SampleCount",
 }
 
-// Profile is one CloudWatch namespace's curated metric and chart definition.
+// Profile defines one exact CloudWatch namespace/dimension grain and its
+// curated metrics and charts. Multiple profiles may share a namespace.
 type Profile struct {
 	Version     string `yaml:"version" json:"version,omitempty"`
 	DisplayName string `yaml:"display_name" json:"display_name,omitempty"`

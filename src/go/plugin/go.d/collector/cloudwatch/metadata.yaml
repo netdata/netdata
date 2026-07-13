@@ -28,6 +28,9 @@ modules:
         - api gateway
         - step functions
         - nat gateway
+        - privatelink
+        - private link
+        - vpc endpoint
         - kinesis
         - firehose
         - sns
@@ -103,7 +106,7 @@ modules:
           [AWS Quota](/src/go/plugin/go.d/collector/prometheus/integrations/aws_quota.md) integration, which exposes
           AWS Service Quotas. These integrations use different AWS data sources and do not replace one another.
 
-          [Each service is defined by a profile](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default) -- a YAML file declaring its CloudWatch namespace, supported regions, resource dimensions, metrics, statistics, and chart template -- so coverage can be extended without code changes. See the [AWS CloudWatch profile format](/src/go/plugin/go.d/collector/cloudwatch/profile-format.md) for the complete schema and authoring rules.
+          [CloudWatch coverage is defined by one or more profiles](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default) -- YAML files declaring a CloudWatch namespace, an exact resource-dimension grain, supported regions, metrics, statistics, and chart template. A service can use multiple profiles when AWS publishes distinct grains, and coverage can be extended without collector code changes. See the [AWS CloudWatch profile format](/src/go/plugin/go.d/collector/cloudwatch/profile-format.md) for the complete schema and authoring rules.
 
           :::tip Need a service that isn't listed?
 

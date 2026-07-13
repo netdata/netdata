@@ -85,6 +85,36 @@ func TestCollect_E2E(t *testing.T) {
 				`ec2.status_check_failed_maximum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`: 0,
 			},
 		},
+		"PrivateLink endpoint keeps Average gauges and normalizes Sum totals": {
+			profiles: []string{"privatelink_endpoint"},
+			listMetrics: map[string][]cwtypes.Metric{
+				"AWS/PrivateLinkEndpoints": {
+					mkMetric("ActiveConnections", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"),
+					mkMetric("BytesProcessed", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"),
+					mkMetric("NewConnections", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"),
+					mkMetric("PacketsDropped", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"),
+					mkMetric("RstPacketsReceived", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"),
+				},
+			},
+			gmd: map[string]float64{
+				e2eKey("AWS/PrivateLinkEndpoints", "ActiveConnections", "Average", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"): 17,
+				e2eKey("AWS/PrivateLinkEndpoints", "BytesProcessed", "Average", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"):    100,
+				e2eKey("AWS/PrivateLinkEndpoints", "BytesProcessed", "Sum", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"):        1500,
+				e2eKey("AWS/PrivateLinkEndpoints", "NewConnections", "Average", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"):    2,
+				e2eKey("AWS/PrivateLinkEndpoints", "NewConnections", "Sum", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"):        600,
+				e2eKey("AWS/PrivateLinkEndpoints", "PacketsDropped", "Sum", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"):        30,
+				e2eKey("AWS/PrivateLinkEndpoints", "RstPacketsReceived", "Sum", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"):    60,
+			},
+			wantSeries: map[string]metrix.SampleValue{
+				`privatelink_endpoint.active_connections_average{account_id="000000000000",endpoint_type="Interface",region="us-east-1",service_name="service-1",vpc_endpoint_id="vpce-1",vpc_id="vpc-1"}`: 17,
+				`privatelink_endpoint.bytes_processed_average{account_id="000000000000",endpoint_type="Interface",region="us-east-1",service_name="service-1",vpc_endpoint_id="vpce-1",vpc_id="vpc-1"}`:    100,
+				`privatelink_endpoint.bytes_processed_sum{account_id="000000000000",endpoint_type="Interface",region="us-east-1",service_name="service-1",vpc_endpoint_id="vpce-1",vpc_id="vpc-1"}`:        1500.0 / 300,
+				`privatelink_endpoint.new_connections_average{account_id="000000000000",endpoint_type="Interface",region="us-east-1",service_name="service-1",vpc_endpoint_id="vpce-1",vpc_id="vpc-1"}`:    2,
+				`privatelink_endpoint.new_connections_sum{account_id="000000000000",endpoint_type="Interface",region="us-east-1",service_name="service-1",vpc_endpoint_id="vpce-1",vpc_id="vpc-1"}`:        600.0 / 300,
+				`privatelink_endpoint.packets_dropped_sum{account_id="000000000000",endpoint_type="Interface",region="us-east-1",service_name="service-1",vpc_endpoint_id="vpce-1",vpc_id="vpc-1"}`:        30.0 / 300,
+				`privatelink_endpoint.rst_packets_received_sum{account_id="000000000000",endpoint_type="Interface",region="us-east-1",service_name="service-1",vpc_endpoint_id="vpce-1",vpc_id="vpc-1"}`:   60.0 / 300,
+			},
+		},
 		"s3 multi-dimension identity, daily period": {
 			profiles: []string{"s3"},
 			listMetrics: map[string][]cwtypes.Metric{
