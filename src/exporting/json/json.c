@@ -171,6 +171,14 @@ static void format_dimension_json_plaintext_prefix(
     buffer_strcat(wb, "\",\"value\":");
 }
 
+static void format_dimension_json_plaintext_value(BUFFER *wb, NETDATA_DOUBLE value) {
+    buffer_print_netdata_double_fixed(wb, value);
+}
+
+static bool format_dimension_stored_json_plaintext_value_is_exportable(NETDATA_DOUBLE value) {
+    return !isnan(value);
+}
+
 /**
  * Format dimension using collected data for JSON connector
  *
@@ -204,7 +212,7 @@ int format_dimension_collected_json_plaintext(struct instance *instance, RRDDIM 
         false);
 
     if(rrddim_is_float(rd))
-        buffer_sprintf(instance->buffer, NETDATA_DOUBLE_FORMAT, rrddim_last_collected_as_double(rd));
+        format_dimension_json_plaintext_value(instance->buffer, rrddim_last_collected_as_double(rd));
     else
         buffer_sprintf(instance->buffer, COLLECTED_NUMBER_FORMAT, (collected_number)rrddim_last_collected_raw_int(rd));
 
@@ -233,7 +241,7 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
     time_t last_t;
     NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
-    if(isnan(value))
+    if(!format_dimension_stored_json_plaintext_value_is_exportable(value))
         return 0;
 
     if (instance->config.type == EXPORTING_CONNECTOR_TYPE_JSON_HTTP) {
@@ -256,11 +264,8 @@ int format_dimension_stored_json_plaintext(struct instance *instance, RRDDIM *rd
         rrddim_name(rd),
         true);
 
-    buffer_sprintf(
-        instance->buffer,
-        NETDATA_DOUBLE_FORMAT ",\"timestamp\": %llu}",
-        value,
-        (unsigned long long)last_t);
+    format_dimension_json_plaintext_value(instance->buffer, value);
+    buffer_sprintf(instance->buffer, ",\"timestamp\": %llu}", (unsigned long long)last_t);
 
     if (instance->config.type != EXPORTING_CONNECTOR_TYPE_JSON_HTTP) {
         buffer_strcat(instance->buffer, "\n");
@@ -351,7 +356,8 @@ static int json_plaintext_unittest_case(
         dimension_id,
         dimension_name,
         stored);
-    buffer_strcat(wb, stored ? "1.5,\"timestamp\": 42}" : "1.5,\"timestamp\":42}");
+    format_dimension_json_plaintext_value(wb, 1.5);
+    buffer_strcat(wb, stored ? ",\"timestamp\": 42}" : ",\"timestamp\":42}");
 
     int errors = 0;
     if(strcmp(buffer_tostring(wb), expected) != 0) {
@@ -389,6 +395,123 @@ static int json_plaintext_unittest_case(
     return errors;
 }
 
+static int json_plaintext_number_unittest_case(
+    const char *description, NETDATA_DOUBLE value, bool stored, bool expect_record, bool expect_null) {
+    int errors = 0;
+    BUFFER *actual_value = buffer_create(0, NULL);
+    BUFFER *expected_value = buffer_create(0, NULL);
+    BUFFER *record = buffer_create(0, NULL);
+
+    if(expect_record) {
+        format_dimension_json_plaintext_value(actual_value, value);
+        if(expect_null)
+            buffer_strcat(expected_value, "null");
+        else
+            buffer_sprintf(expected_value, NETDATA_DOUBLE_FORMAT, value);
+
+        if(strcmp(buffer_tostring(actual_value), buffer_tostring(expected_value)) != 0) {
+            fprintf(
+                stderr,
+                "exporting JSON %s %s numeric output mismatch\nexpected: %s\nactual:   %s\n",
+                stored ? "stored" : "collected",
+                description,
+                buffer_tostring(expected_value),
+                buffer_tostring(actual_value));
+            errors++;
+        }
+
+        format_dimension_json_plaintext_prefix(
+            record,
+            "netdata",
+            "localhost",
+            "\"labels\":{},",
+            "chart.id",
+            "chart.name",
+            "family",
+            "context",
+            "line",
+            "units",
+            "dimension.id",
+            "dimension.name",
+            stored);
+        format_dimension_json_plaintext_value(record, value);
+        buffer_strcat(record, stored ? ",\"timestamp\": 42}" : ",\"timestamp\":42}");
+
+        json_object *root = json_tokener_parse(buffer_tostring(record));
+        json_object *member = NULL;
+        if(!root || !json_object_is_type(root, json_type_object) ||
+           !json_object_object_get_ex(root, "value", &member)) {
+            fprintf(stderr, "exporting JSON %s %s record is not valid JSON\n",
+                    stored ? "stored" : "collected", description);
+            errors++;
+        }
+
+        if(root)
+            json_object_put(root);
+    }
+    else if(format_dimension_stored_json_plaintext_value_is_exportable(value)) {
+        fprintf(stderr, "exporting JSON stored %s should remain an omitted gap\n", description);
+        errors++;
+    }
+
+    buffer_free(record);
+    buffer_free(expected_value);
+    buffer_free(actual_value);
+    return errors;
+}
+
+static int json_plaintext_transport_unittest(void) {
+    int errors = 0;
+
+    BUFFER *plaintext = buffer_create(0, NULL);
+    buffer_strcat(plaintext, "{\"value\":");
+    format_dimension_json_plaintext_value(plaintext, INFINITY);
+    buffer_strcat(plaintext, ",\"timestamp\":42}\n");
+    if(strcmp(buffer_tostring(plaintext), "{\"value\":null,\"timestamp\":42}\n") != 0) {
+        fprintf(stderr, "exporting JSON plaintext transport framing mismatch\n");
+        errors++;
+    }
+    buffer_free(plaintext);
+
+    struct instance instance = { 0 };
+    instance.config.name = "JSON unit test";
+    instance.connector_specific_data = callocz(1, sizeof(struct simple_connector_data));
+    instance.buffer = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
+
+    struct simple_connector_data *connector = instance.connector_specific_data;
+    struct simple_connector_buffer *queued = callocz(1, sizeof(*queued));
+    queued->header = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
+    queued->buffer = buffer_create(0, &netdata_buffers_statistics.buffers_exporters);
+    queued->next = queued;
+    connector->first_buffer = connector->last_buffer = queued;
+
+    open_batch_json_http(&instance);
+    buffer_strcat(instance.buffer, "{\"value\":");
+    format_dimension_json_plaintext_value(instance.buffer, 1.5);
+    buffer_strcat(instance.buffer, "},\n{\"value\":");
+    format_dimension_json_plaintext_value(instance.buffer, -INFINITY);
+    buffer_strcat(instance.buffer, "}");
+    instance.stats.buffered_metrics = 2;
+    close_batch_json_http(&instance);
+
+    const char *expected = "[\n{\"value\":1.5000000},\n{\"value\":null}\n]\n";
+    const size_t expected_size = strlen(expected);
+    if(strcmp(buffer_tostring(queued->buffer), expected) != 0 || queued->buffered_metrics != 2 ||
+       queued->buffered_bytes != expected_size || queued->used != 1 ||
+       connector->total_buffered_metrics != 2 || instance.stats.buffered_metrics != 0 ||
+       (size_t)instance.stats.buffered_bytes != expected_size || buffer_strlen((BUFFER *)instance.buffer) != 0) {
+        fprintf(stderr, "exporting JSON HTTP batch, counter, or retry-buffer mismatch\n");
+        errors++;
+    }
+
+    buffer_free(instance.buffer);
+    buffer_free(queued->header);
+    buffer_free(queued->buffer);
+    freez(queued);
+    freez(connector);
+    return errors;
+}
+
 int exporting_json_connector_unittest(void) {
     int errors = 0;
 
@@ -408,7 +531,7 @@ int exporting_json_connector_unittest(void) {
         "{\"prefix\":\"netdata\",\"hostname\":\"localhost\",\"labels\":{\"label\":\"value\"},"
         "\"chart_id\":\"chart.id\",\"chart_name\":\"chart.name\",\"chart_family\":\"family\","
         "\"chart_context\":\"context\",\"chart_type\":\"line\",\"units\":\"units\","
-        "\"id\":\"dimension.id\",\"name\":\"dimension.name\",\"value\":1.5,\"timestamp\":42}");
+        "\"id\":\"dimension.id\",\"name\":\"dimension.name\",\"value\":1.5000000,\"timestamp\":42}");
 
     errors += json_plaintext_unittest_case(
         "hostile stored metadata",
@@ -428,7 +551,46 @@ int exporting_json_connector_unittest(void) {
         "\"chart_name\":\"chart\\rname\",\"chart_family\":\"family\\bname\","
         "\"chart_context\": \"context\\fname\",\"chart_type\":\"type\\\"name\","
         "\"units\": \"units\\\\name\",\"id\":\"dimension\\\"id\","
-        "\"name\":\"dimension\\nname\",\"value\":1.5,\"timestamp\": 42}");
+        "\"name\":\"dimension\\nname\",\"value\":1.5000000,\"timestamp\": 42}");
+
+#ifdef NETDATA_WITH_LONG_DOUBLE
+    const NETDATA_DOUBLE minimum_normal = LDBL_MIN;
+    const NETDATA_DOUBLE minimum_subnormal = nextafterl(0.0L, 1.0L);
+#else
+    const NETDATA_DOUBLE minimum_normal = DBL_MIN;
+    const NETDATA_DOUBLE minimum_subnormal = nextafter(0.0, 1.0);
+#endif
+    const struct {
+        const char *description;
+        NETDATA_DOUBLE value;
+        bool expect_null;
+    } number_cases[] = {
+        { "positive zero", 0.0, false },
+        { "negative zero", copysignndd(0.0, -1.0), false },
+        { "maximum finite", NETDATA_DOUBLE_MAX, false },
+        { "minimum finite", -NETDATA_DOUBLE_MAX, false },
+        { "minimum positive normal", minimum_normal, false },
+        { "minimum negative normal", -minimum_normal, false },
+        { "minimum positive subnormal", minimum_subnormal, false },
+        { "minimum negative subnormal", -minimum_subnormal, false },
+        { "NaN", NAN, true },
+        { "positive infinity", INFINITY, true },
+        { "negative infinity", -INFINITY, true },
+    };
+
+    for(size_t i = 0; i < _countof(number_cases); i++) {
+        const bool stored_record = !isnan(number_cases[i].value);
+        errors += json_plaintext_number_unittest_case(
+            number_cases[i].description, number_cases[i].value, false, true, number_cases[i].expect_null);
+        errors += json_plaintext_number_unittest_case(
+            number_cases[i].description,
+            number_cases[i].value,
+            true,
+            stored_record,
+            number_cases[i].expect_null);
+    }
+
+    errors += json_plaintext_transport_unittest();
 
     return errors;
 }

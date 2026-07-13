@@ -163,6 +163,10 @@ static void allmetrics_json_dimension_begin(
     buffer_strcat(wb, "\",\n\t\t\t\t\"value\": ");
 }
 
+static void allmetrics_json_value(BUFFER *wb, NETDATA_DOUBLE value) {
+    buffer_print_netdata_double_fixed(wb, value);
+}
+
 void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_string, BUFFER *wb) {
     analytics_log_json();
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT, true);
@@ -202,10 +206,7 @@ void rrd_stats_api_v1_charts_allmetrics_json(RRDHOST *host, const char *filter_s
                         rrddim_id(rd),
                         rrddim_name(rd));
 
-                    if(isnan(rd->collector.last_stored_value))
-                        buffer_strcat(wb, "null");
-                    else
-                        buffer_sprintf(wb, NETDATA_DOUBLE_FORMAT, rd->collector.last_stored_value);
+                    allmetrics_json_value(wb, rd->collector.last_stored_value);
 
                     buffer_strcat(wb, "\n\t\t\t}");
 
@@ -239,7 +240,8 @@ static int allmetrics_json_unittest_case(
     buffer_strcat(wb, "{");
     allmetrics_json_chart_begin(wb, false, chart_id, chart_name, family, context, units, 42);
     allmetrics_json_dimension_begin(wb, false, dimension_id, dimension_name);
-    buffer_strcat(wb, "1.5\n\t\t\t}\n\t\t}\n\t}\n}");
+    allmetrics_json_value(wb, 1.5);
+    buffer_strcat(wb, "\n\t\t\t}\n\t\t}\n\t}\n}");
 
     if(strcmp(buffer_tostring(wb), expected) != 0) {
         fprintf(stderr, "allmetrics JSON %s output mismatch\nexpected: %s\nactual:   %s\n",
@@ -274,6 +276,46 @@ static int allmetrics_json_unittest_case(
     return errors;
 }
 
+static int allmetrics_json_value_unittest_case(
+    const char *description, NETDATA_DOUBLE value, bool expect_null) {
+    int errors = 0;
+    BUFFER *actual = buffer_create(0, NULL);
+    BUFFER *expected = buffer_create(0, NULL);
+    BUFFER *document = buffer_create(0, NULL);
+
+    allmetrics_json_value(actual, value);
+    if(expect_null)
+        buffer_strcat(expected, "null");
+    else
+        buffer_sprintf(expected, NETDATA_DOUBLE_FORMAT, value);
+
+    if(strcmp(buffer_tostring(actual), buffer_tostring(expected)) != 0) {
+        fprintf(
+            stderr,
+            "allmetrics JSON %s numeric output mismatch\nexpected: %s\nactual:   %s\n",
+            description,
+            buffer_tostring(expected),
+            buffer_tostring(actual));
+        errors++;
+    }
+
+    buffer_sprintf(document, "{\"value\":%s}", buffer_tostring(actual));
+    json_object *root = json_tokener_parse(buffer_tostring(document));
+    json_object *member = NULL;
+    if(!root || !json_object_is_type(root, json_type_object) || json_object_object_length(root) != 1 ||
+       !json_object_object_get_ex(root, "value", &member)) {
+        fprintf(stderr, "allmetrics JSON %s numeric output is not valid JSON\n", description);
+        errors++;
+    }
+
+    if(root)
+        json_object_put(root);
+    buffer_free(document);
+    buffer_free(expected);
+    buffer_free(actual);
+    return errors;
+}
+
 int api_v1_allmetrics_json_unittest(void) {
     int errors = 0;
 
@@ -290,7 +332,7 @@ int api_v1_allmetrics_json_unittest(void) {
         "\t\t\"dimensions\": {\n"
         "\t\t\t\"dimension.id\": {\n"
         "\t\t\t\t\"name\": \"dimension.name\",\n"
-        "\t\t\t\t\"value\": 1.5\n"
+        "\t\t\t\t\"value\": 1.5000000\n"
         "\t\t\t}\n"
         "\t\t}\n"
         "\t}\n"
@@ -310,7 +352,7 @@ int api_v1_allmetrics_json_unittest(void) {
         "\t\t\"dimensions\": {\n"
         "\t\t\t\"dimension\\rkey\": {\n"
         "\t\t\t\t\"name\": \"dimension\\bname \xCE\xA9\",\n"
-        "\t\t\t\t\"value\": 1.5\n"
+        "\t\t\t\t\"value\": 1.5000000\n"
         "\t\t\t}\n"
         "\t\t}\n"
         "\t}\n"
@@ -342,6 +384,35 @@ int api_v1_allmetrics_json_unittest(void) {
         errors++;
     }
     buffer_free(wb);
+
+#ifdef NETDATA_WITH_LONG_DOUBLE
+    const NETDATA_DOUBLE minimum_normal = LDBL_MIN;
+    const NETDATA_DOUBLE minimum_subnormal = nextafterl(0.0L, 1.0L);
+#else
+    const NETDATA_DOUBLE minimum_normal = DBL_MIN;
+    const NETDATA_DOUBLE minimum_subnormal = nextafter(0.0, 1.0);
+#endif
+    const struct {
+        const char *description;
+        NETDATA_DOUBLE value;
+        bool expect_null;
+    } number_cases[] = {
+        { "positive zero", 0.0, false },
+        { "negative zero", copysignndd(0.0, -1.0), false },
+        { "maximum finite", NETDATA_DOUBLE_MAX, false },
+        { "minimum finite", -NETDATA_DOUBLE_MAX, false },
+        { "minimum positive normal", minimum_normal, false },
+        { "minimum negative normal", -minimum_normal, false },
+        { "minimum positive subnormal", minimum_subnormal, false },
+        { "minimum negative subnormal", -minimum_subnormal, false },
+        { "NaN", NAN, true },
+        { "positive infinity", INFINITY, true },
+        { "negative infinity", -INFINITY, true },
+    };
+
+    for(size_t i = 0; i < _countof(number_cases); i++)
+        errors += allmetrics_json_value_unittest_case(
+            number_cases[i].description, number_cases[i].value, number_cases[i].expect_null);
 
     return errors;
 }
