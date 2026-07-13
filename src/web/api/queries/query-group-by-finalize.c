@@ -2,6 +2,11 @@
 
 #include "query-internal.h"
 
+// hgbc packs, per point, the count of hidden (percentage denominator)
+// contributions and, in the top bit, whether any of them was itself partial
+#define HGBC_PARTIAL_FLAG (1U << 31)
+#define HGBC_COUNT_MASK   (~HGBC_PARTIAL_FLAG)
+
 void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t d_tmp,
                                          RRDR_GROUP_BY_FUNCTION group_by_aggregate_function,
                                          STORAGE_POINT *query_points, size_t pass __maybe_unused) {
@@ -71,6 +76,42 @@ void rrd2rrdr_group_by_add_metric(RRDR *r_dst, size_t d_dst, RRDR *r_tmp, size_t
             *co |= (o_tmp & (RRDR_VALUE_RESET | RRDR_VALUE_PARTIAL));
             *ar += ar_tmp;
             (*gbc)++;
+        }
+        else if(r_dst->hgbc) {
+            // count the hidden (denominator) contributions too, so that
+            // an incomplete denominator can be detected as partial; a
+            // denominator source that is itself partial (a shadow bucket
+            // stamped at its own pass) taints the point through the top
+            // bit - hgbc is internal to group-by and never leaves finalize
+            r_dst->hgbc[idx_dst]++;
+            if(o_tmp & RRDR_VALUE_PARTIAL)
+                r_dst->hgbc[idx_dst] |= HGBC_PARTIAL_FLAG;
+        }
+    }
+}
+
+// stamp RRDR_VALUE_PARTIAL on every point that received fewer contributions
+// than the sources mapped into its dimension - visible sources are counted
+// by gbc, hidden (percentage denominator) sources by hgbc; this runs at
+// EVERY group-by pass, because the next pass only sees whole groups: a group
+// missing some of its own members would otherwise arrive complete-looking
+// there; visible flags propagate upward with the values through
+// rrd2rrdr_group_by_add_metric(), hidden flags through the hgbc top bit
+static void rrd2rrdr_group_by_stamp_partial(RRDR *r, const uint32_t *expected_gbc, const uint32_t *expected_hgbc) {
+    for(size_t i = 0; i < r->n ;i++) {
+        for(size_t d = 0; d < r->d ;d++) {
+            size_t idx = i * r->d + d;
+
+            uint32_t gbc = r->gbc[idx];
+            if(!gbc)
+                // points without visible contributions are empty, not partial
+                continue;
+
+            uint32_t hgbc = r->hgbc ? r->hgbc[idx] : 0;
+            if(gbc != expected_gbc[d] ||
+               (hgbc & HGBC_COUNT_MASK) != expected_hgbc[d] ||
+               (hgbc & HGBC_PARTIAL_FLAG))
+                r->o[idx] |= RRDR_VALUE_PARTIAL;
         }
     }
 }
@@ -252,22 +293,64 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
 
     // do the additional passes on RRDRs
     RRDR *last_r = r_tmp->group_by.r;
+
+    // how many sources are expected to contribute to every point of each
+    // dimension, in the units gbc counts at each pass: metrics at the first
+    // pass, prior-pass groups at later passes; dgbc cannot be this comparand
+    // - it counts metrics at every pass, including the hidden ones - so
+    // complete data would flag PARTIAL; the split between expected_gbc and
+    // expected_hgbc mirrors the routing rule of
+    // rrd2rrdr_group_by_add_metric(): hidden sources feed the percentage
+    // denominator (vh) and are counted by hgbc, never by gbc
+    ONEWAYALLOC *owa = last_r->internal.owa;
+    uint32_t *expected_gbc = onewayalloc_callocz(owa, last_r->d, sizeof(*expected_gbc));
+    uint32_t *expected_hgbc = onewayalloc_callocz(owa, last_r->d, sizeof(*expected_hgbc));
+
+    // the first pass received its contributions per metric during query
+    // execution
+    for(size_t m = 0; m < qt->query.used ;m++) {
+        QUERY_METRIC *qm = query_metric(qt, m);
+        if((qm->status & RRDR_DIMENSION_HIDDEN) && last_r->vh)
+            expected_hgbc[qm->grouped_as.first_slot]++;
+        else
+            expected_gbc[qm->grouped_as.first_slot]++;
+    }
+    rrd2rrdr_group_by_stamp_partial(last_r, expected_gbc, expected_hgbc);
+
     rrdr2rrdr_group_by_calculate_percentage_of_group(last_r);
 
     RRDR *r = last_r->group_by.r;
     size_t pass = 0;
     while(r) {
         pass++;
+        onewayalloc_freez(owa, expected_gbc);
+        onewayalloc_freez(owa, expected_hgbc);
+        expected_gbc = onewayalloc_callocz(owa, r->d, sizeof(*expected_gbc));
+        expected_hgbc = onewayalloc_callocz(owa, r->d, sizeof(*expected_hgbc));
+
         for(size_t d = 0; d < last_r->d ;d++) {
+            if((last_r->od[d] & RRDR_DIMENSION_HIDDEN) && r->vh)
+                expected_hgbc[last_r->dgbs[d]]++;
+            else
+                expected_gbc[last_r->dgbs[d]]++;
+
             rrd2rrdr_group_by_add_metric(r, last_r->dgbs[d], last_r, d,
                                          qt->request.group_by[pass].aggregation,
                                          &last_r->dqp[d], pass);
         }
+        rrd2rrdr_group_by_stamp_partial(r, expected_gbc, expected_hgbc);
         rrdr2rrdr_group_by_calculate_percentage_of_group(r);
 
         last_r = r;
         r = last_r->group_by.r;
     }
+
+    onewayalloc_freez(owa, expected_gbc);
+    onewayalloc_freez(owa, expected_hgbc);
+
+    // the hidden contribution counters are internal to the group-by passes
+    onewayalloc_freez(owa, last_r->hgbc);
+    last_r->hgbc = NULL;
 
     // free all RRDRs except the last one
     r = r_tmp;
@@ -320,9 +403,6 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
 
             if(likely(gbc)) {
                 *co &= ~RRDR_VALUE_EMPTY;
-
-                if(gbc != r->dgbc[d])
-                    *co |= RRDR_VALUE_PARTIAL;
 
                 NETDATA_DOUBLE n;
 

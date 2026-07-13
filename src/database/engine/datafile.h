@@ -24,11 +24,6 @@ struct rrdengine_instance;
 #define MAX_DATAFILES (65536 * 4) /* Supports up to 64TiB for now */
 #define TARGET_DATAFILES (100)
 
-// When trying to acquire a datafile for deletion and an attempt to evict pages is completed
-// the acquire for deletion will return true after this timeout
-#define DATAFILE_DELETE_TIMEOUT_SHORT (1)
-#define DATAFILE_DELETE_TIMEOUT_LONG (120)
-
 typedef enum __attribute__ ((__packed__)) {
     DATAFILE_ACQUIRE_OPEN_CACHE = 0,
     DATAFILE_ACQUIRE_PAGE_DETAILS,
@@ -80,7 +75,6 @@ struct rrdengine_datafile {
         unsigned lockers_by_reason[DATAFILE_ACQUIRE_MAX];
         bool available;
         bool pending_deletion;
-        time_t time_to_evict;
     } users;
 
     struct {
@@ -94,7 +88,7 @@ struct rrdengine_datafile {
 bool datafile_acquire(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason);
 void datafile_release_with_trace(struct rrdengine_datafile *df, DATAFILE_ACQUIRE_REASONS reason, const char *func);
 #define datafile_release(df, reason) datafile_release_with_trace(df, reason, __FUNCTION__)
-bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdown);
+bool datafile_acquire_for_deletion(struct rrdengine_datafile *df);
 
 void datafile_list_insert(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);
 void datafile_list_delete_unsafe(struct rrdengine_instance *ctx, struct rrdengine_datafile *datafile);

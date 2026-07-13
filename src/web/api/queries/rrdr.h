@@ -75,6 +75,7 @@ typedef struct rrdresult {
     RRDR_VALUE_FLAGS *o;      // array n x d options for each value returned
     NETDATA_DOUBLE *ar;       // array n x d of anomaly rates (0 - 100)
     uint32_t *gbc;            // array n x d of group by count - NOT ALLOCATED when RRDR is created
+    uint32_t *hgbc;           // array n x d of hidden (vh) group by count, internal to group-by - NOT ALLOCATED when RRDR is created
 
     struct {
         size_t group;         // how many collected values were grouped for each row - NEEDED BY GROUPING FUNCTIONS
