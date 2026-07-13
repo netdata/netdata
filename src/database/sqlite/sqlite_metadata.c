@@ -1093,7 +1093,7 @@ static int store_host_metadata(RRDHOST *host)
     RRDHOST_TZ host_tz = { 0 };
 
     if (!PREPARE_STATEMENT(db_meta, SQL_STORE_HOST_INFO, &res))
-        return false;
+        return 1;
 
     RRDHOST_METADATA_IDENTITY identity = rrdhost_metadata_identity_acquire(host);
 
