@@ -495,10 +495,17 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 r->gbc = onewayalloc_callocz(
                     owa, onewayalloc_mul_or_fatal(r->n, r->d, "RRDR group-by counts"), sizeof(*r->gbc));
 
-                if(hidden_dimensions && ((group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) || (aggregation_method == RRDR_GROUP_BY_FUNCTION_PERCENTAGE)))
+                if(hidden_dimensions && ((group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) || (aggregation_method == RRDR_GROUP_BY_FUNCTION_PERCENTAGE))) {
                     // this is where we are going to group the hidden dimensions
                     r->vh = onewayalloc_mallocz(
                         owa, onewayalloc_mul3_or_fatal(r->n, r->d, sizeof(*r->vh), "RRDR hidden values"));
+
+                    // to know when the hidden (denominator) side of a point is
+                    // incomplete, its contributions are counted like gbc counts
+                    // the visible ones
+                    r->hgbc = onewayalloc_callocz(
+                        owa, onewayalloc_mul_or_fatal(r->n, r->d, "RRDR hidden group-by counts"), sizeof(*r->hgbc));
+                }
             }
         }
 
