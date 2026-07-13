@@ -288,13 +288,15 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
     if(!query_target_aggregatable(qt) && r->partial_data_trimming.expected_after < qt->window.before)
         rrdr2rrdr_group_by_partial_trimming(r);
 
-    // percentage points are already normalized (0-100), so their sts pair must
-    // average over the view rows to stay consistent with min/max (row extremes),
-    // not over the per-point source contributions (gbc); in aggregatable (raw)
-    // mode the values are not percentaged and the cloud derives the statistics,
-    // so the (sum, gbc) pair is kept as-is
-    bool percentage_stats_by_rows =
-        aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE && !query_target_aggregatable(qt);
+    // for every aggregation except AVERAGE the plotted value is already the
+    // final group aggregate (the percentage, the sum, the min, the max), so
+    // the sts pair must average over the view rows to stay consistent with
+    // min/max (row extremes), not over the per-point source contributions
+    // (gbc); AVERAGE accumulates pre-division group sums, so its (sum, gbc)
+    // pair is a correct weighted mean; in aggregatable (raw) mode the cloud
+    // derives the statistics, so the (sum, gbc) pair is kept as-is
+    bool stats_by_rows =
+        aggregation != RRDR_GROUP_BY_FUNCTION_AVERAGE && !query_target_aggregatable(qt);
 
     // apply averaging, remove RRDR_VALUE_EMPTY, find the non-zero dimensions, min and max
     size_t global_min_max_values = 0;
@@ -326,9 +328,9 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
 
                 sum += *cn;
 
-                // when the sts pair is per-row (percentage), the anomaly rate must
-                // also be accumulated per-row (the row mean), not per-contribution
-                ars += percentage_stats_by_rows ? (*ar / (NETDATA_DOUBLE)gbc) : *ar;
+                // when the sts pair is per-row, the anomaly rate must also be
+                // accumulated per-row (the row mean), not per-contribution
+                ars += stats_by_rows ? (*ar / (NETDATA_DOUBLE)gbc) : *ar;
 
                 if(aggregation == RRDR_GROUP_BY_FUNCTION_AVERAGE && !query_target_aggregatable(qt))
                     n = (*cn /= gbc);
@@ -361,7 +363,7 @@ RRDR *rrd2rrdr_group_by_finalize(RRDR *r_tmp) {
                         global_max = n;
                 }
 
-                count += percentage_stats_by_rows ? 1 : gbc;
+                count += stats_by_rows ? 1 : gbc;
             }
         }
 
