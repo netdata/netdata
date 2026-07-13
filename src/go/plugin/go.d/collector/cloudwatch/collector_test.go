@@ -87,7 +87,7 @@ func setSingleTargetPlan(c *Collector, account string, regions []string, profile
 		for _, profile := range profiles {
 			plan.Scopes = append(plan.Scopes, collectionScope{
 				Target: target, Profile: profile, Region: region, TagMembershipID: len(plan.Scopes),
-				SelectedSeries: compileProfileSeries(profile),
+				SelectedSeries: testCompiledSeries(profile),
 			})
 		}
 	}
@@ -95,6 +95,14 @@ func setSingleTargetPlan(c *Collector, account string, regions []string, profile
 	c.plan = plan
 	c.resolvedByRef = map[string]resolvedTarget{"base": resolved}
 	c.invalidateQueryPlan()
+}
+
+func testCompiledSeries(profile cwprofiles.ResolvedProfile) []compiledSeries {
+	series, err := resolveSeriesPolicies("test", nil, nil, profile, compileProfileSeries(profile))
+	if err != nil {
+		panic(err)
+	}
+	return series
 }
 
 func resolvedTargetNames(c *Collector) []string {
@@ -194,7 +202,7 @@ func TestCollector_Init_appliesDefaults(t *testing.T) {
 
 	assert.Equal(t, defaultUpdateEvery, c.UpdateEvery)
 	assert.Equal(t, defaultDiscoveryRefresh, c.Discovery.RefreshEvery)
-	assert.Equal(t, defaultQueryOffset, c.QueryOffset)
+	assert.Equal(t, defaultMaxDiscoveryGroups, c.Limits.MaxDiscoveryGroups)
 	assert.True(t, c.recentlyActiveOnly())
 }
 

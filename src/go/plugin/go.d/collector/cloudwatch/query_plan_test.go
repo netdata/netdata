@@ -3,54 +3,24 @@
 package cloudwatch
 
 import (
-	"bytes"
 	"context"
-	"errors"
+	"crypto/sha256"
 	"fmt"
 	"io"
-	"math"
 	goruntime "runtime"
-	"sync"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
-	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
-	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-func TestQueryWindow(t *testing.T) {
-	now := time.Unix(1_000_000_000, 0)
-
-	tests := map[string]struct {
-		period, offset     int
-		wantStart, wantEnd int64
-	}{
-		"5m period, default offset":                  {period: 300, offset: 600, wantStart: 999_999_000, wantEnd: 999_999_300},
-		"5m period, offset below period uses period": {period: 300, offset: 120, wantStart: 999_999_300, wantEnd: 999_999_600},
-		"daily period reads a settled bucket":        {period: 86400, offset: 600, wantStart: 999_820_800, wantEnd: 999_907_200},
-		"offset not a period multiple stays aligned": {period: 300, offset: 601, wantStart: 999_999_000, wantEnd: 999_999_300},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			start, end := queryWindow(now, tc.period, tc.offset)
-			assert.Equal(t, tc.wantStart, start.Unix(), "start")
-			assert.Equal(t, tc.wantEnd, end.Unix(), "end")
-			assert.Equal(t, int64(tc.period), end.Unix()-start.Unix(), "window length == period")
-			assert.Zero(t, end.Unix()%int64(tc.period), "end is aligned to a period boundary")
-			assert.True(t, end.Before(now), "window ends in the past")
-		})
-	}
-}
 
 func ec2QueryProfile() cwprofiles.Profile {
 	return cwprofiles.Profile{
@@ -113,13 +83,13 @@ func TestBuildQueryPlan(t *testing.T) {
 	plan := requireBuildQueryPlan(t, c)
 	require.Len(t, plan, 6) // 2 instances x (1 + 2 statistics)
 
-	ids := make(map[string]bool)
+	ids := make(map[structuralID]bool)
 	byInstance := make(map[string][]plannedQuery)
 	for _, pq := range plan {
-		ids[pq.id] = true
+		ids[pq.key] = true
 		byInstance[labelValue(pq.labels, "instance_id")] = append(byInstance[labelValue(pq.labels, "instance_id")], pq)
 	}
-	assert.Len(t, ids, 6, "query Ids are unique")
+	assert.Len(t, ids, 6, "stable query keys are unique")
 	require.Len(t, byInstance, 2)
 
 	for inst, qs := range byInstance {
@@ -220,8 +190,11 @@ func TestCurrentQueryPlan_CachesUntilInputsChange(t *testing.T) {
 	second := requireCurrentQueryPlan(t, c)
 	require.NotEmpty(t, second)
 	assert.Same(t, &first[0], &second[0], "unchanged inputs reuse the compiled query blueprint")
-	group := first[0].groupKey()
-	c.observations.nextQueryAt[group] = time.Unix(1_000_000_300, 0)
+	now := time.Unix(1_000_000_000, 0)
+	for _, query := range first {
+		_, end := queryWindow(now, query.policy)
+		c.observations.queries[query.key] = queryState{lastCompletedEnd: end}
+	}
 
 	c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}] = append(
 		c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}],
@@ -230,8 +203,9 @@ func TestCurrentQueryPlan_CachesUntilInputsChange(t *testing.T) {
 	assert.Len(t, requireCurrentQueryPlan(t, c), len(first), "mutating an input without invalidation does not rebuild")
 
 	c.invalidateQueryPlan()
-	assert.Len(t, requireCurrentQueryPlan(t, c), len(first)*2, "input invalidation rebuilds the query blueprint")
-	assert.NotContains(t, c.observations.nextQueryAt, group, "adding a query to an existing group makes the expanded group immediately due")
+	rebuilt := requireCurrentQueryPlan(t, c)
+	assert.Len(t, rebuilt, len(first)*2, "input invalidation rebuilds the query blueprint")
+	assert.Len(t, c.observations.dueQueries(rebuilt, now), len(first), "only queries for the new instance become due")
 }
 
 func filteredOverlapCollector(t *testing.T) *Collector {
@@ -280,7 +254,7 @@ func selectCompiledSeries(t *testing.T, scope collectionScope, names ...string) 
 		wanted[name] = struct{}{}
 	}
 	var selected []compiledSeries
-	for _, series := range compileProfileSeries(scope.Profile) {
+	for _, series := range scope.SelectedSeries {
 		if _, ok := wanted[series.Name]; ok {
 			selected = append(selected, series)
 			delete(wanted, series.Name)
@@ -325,7 +299,7 @@ func TestBuildQueryPlan_UnknownTagMembershipReservesOnlySelectedSeries(t *testin
 	plan := requireBuildQueryPlan(t, c)
 	owners := queryOwnersBySeries(plan)
 	assert.NotContains(t, owners, "ec2.cpu_utilization_average")
-	assert.Len(t, owners, len(compileProfileSeries(c.plan.Scopes[1].Profile))-1)
+	assert.Len(t, owners, len(c.plan.Scopes[1].SelectedSeries)-1)
 	for _, owner := range owners {
 		assert.Equal(t, "second", owner)
 	}
@@ -351,34 +325,36 @@ func TestBuildQueryPlan_FirstEmittingScopeSuppliesSiblingTagLabels(t *testing.T)
 }
 
 func TestBuildQueryPlan_OrderedResourceTagFiltering(t *testing.T) {
-	t.Run("known non-match falls through to lower rule", func(t *testing.T) {
-		c := filteredOverlapCollector(t)
-		c.tags = tagSnapshot{
-			members: tagMembership{0: {"i-1": {}}},
-			unknown: map[int]struct{}{}, fetchedAt: time.Unix(1, 0),
-		}
-
-		plan := requireBuildQueryPlan(t, c)
-		assert.Equal(t, map[string]string{"i-1": "first", "i-2": "second"}, queryOwnersByInstance(plan))
-	})
-
-	t.Run("first failure reserves every candidate from lower rules", func(t *testing.T) {
-		c := filteredOverlapCollector(t)
-		c.tags = tagSnapshot{members: tagMembership{}, unknown: map[int]struct{}{0: {}}}
-
-		assert.Empty(t, requireBuildQueryPlan(t, c))
-	})
-
-	t.Run("later failure queries last-known members and reserves the rest", func(t *testing.T) {
-		c := filteredOverlapCollector(t)
-		c.tags = tagSnapshot{
-			members: tagMembership{0: {"i-1": {}}},
-			unknown: map[int]struct{}{0: {}},
-		}
-
-		plan := requireBuildQueryPlan(t, c)
-		assert.Equal(t, map[string]string{"i-1": "first"}, queryOwnersByInstance(plan))
-	})
+	tests := map[string]struct {
+		tags       tagSnapshot
+		wantOwners map[string]string
+	}{
+		"known non-match falls through to lower rule": {
+			tags: tagSnapshot{
+				members: tagMembership{0: {"i-1": {}}},
+				unknown: map[int]struct{}{}, fetchedAt: time.Unix(1, 0),
+			},
+			wantOwners: map[string]string{"i-1": "first", "i-2": "second"},
+		},
+		"first failure reserves every candidate from lower rules": {
+			tags:       tagSnapshot{members: tagMembership{}, unknown: map[int]struct{}{0: {}}},
+			wantOwners: map[string]string{},
+		},
+		"later failure queries last-known members and reserves the rest": {
+			tags: tagSnapshot{
+				members: tagMembership{0: {"i-1": {}}},
+				unknown: map[int]struct{}{0: {}},
+			},
+			wantOwners: map[string]string{"i-1": "first"},
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := filteredOverlapCollector(t)
+			c.tags = tc.tags
+			assert.Equal(t, tc.wantOwners, queryOwnersByInstance(requireBuildQueryPlan(t, c)))
+		})
+	}
 }
 
 func TestBuildQueryPlan_MaxInstances(t *testing.T) {
@@ -418,6 +394,109 @@ func TestCurrentQueryPlan_OverflowRetainsLastValidPlan(t *testing.T) {
 	assert.True(t, c.planDirty, "the next collect retries the rejected refresh")
 }
 
+func TestBuildQueryPlan_OversizedWorkStopsBeforeFullQueryAllocation(t *testing.T) {
+	const instancesPerRegion = 20000
+	const totalInstances = 2 * instancesPerRegion
+	values := make([][]string, instancesPerRegion)
+	for i := range values {
+		values[i] = []string{fmt.Sprintf("i-%d", i)}
+	}
+	c := ec2QueryCollector([]string{"us-east-1", "us-west-2"}, map[string][][]string{
+		"us-east-1": values,
+		"us-west-2": values,
+	})
+	for i := range c.plan.Scopes {
+		c.plan.Scopes[i].SelectedSeries = c.plan.Scopes[i].SelectedSeries[:1]
+	}
+	c.Limits.MaxInstances = totalInstances + 1
+
+	var err error
+	allocations := testing.AllocsPerRun(1, func() {
+		_, err = c.buildQueryPlan()
+	})
+	require.ErrorContains(t, err, "maximum 20000")
+	t.Logf("oversized plan allocations: %.0f", allocations)
+	// The preflight path measures about 300k allocations on this fixture; the old
+	// post-build validator exceeded 1.03m. This generous ceiling protects early
+	// rejection without turning ordinary allocation tuning into a test contract.
+	assert.Less(t, allocations, float64(350000), "query work must be rejected before allocating the oversized planned-query set")
+}
+
+func TestBuildQueryPlan_MaximumPayloadUsesCompactInternalIdentities(t *testing.T) {
+	const (
+		instanceCount  = 10
+		metricCount    = 20
+		dimensionCount = 30
+		valueBytes     = 1024
+	)
+	c := maximumPayloadQueryPlanCollector(instanceCount, metricCount, dimensionCount, valueBytes)
+
+	plan, err := c.buildQueryPlan()
+	require.NoError(t, err)
+	require.Len(t, plan, instanceCount*metricCount)
+	identityBytes := 0
+	for _, query := range plan {
+		identityBytes += len(query.key) + len(query.billingKey)
+	}
+	assert.LessOrEqual(t, identityBytes, len(plan)*2*sha256.Size,
+		"internal observation and billing identities must remain fixed-size at maximum dimension payloads")
+}
+
+func maximumPayloadQueryPlanCollector(instanceCount, metricCount, dimensionCount, valueBytes int) *Collector {
+	dimensions := make([]cwprofiles.InstanceDimension, dimensionCount)
+	for i := range dimensions {
+		dimensions[i] = cwprofiles.InstanceDimension{Name: fmt.Sprintf("Dimension%d", i), Label: fmt.Sprintf("dimension_%d", i)}
+	}
+	metrics := make([]cwprofiles.Metric, metricCount)
+	for i := range metrics {
+		metrics[i] = cwprofiles.Metric{ID: fmt.Sprintf("metric_%d", i), MetricName: fmt.Sprintf("Metric%d", i), Statistics: []string{"average"}}
+	}
+	profile := cwprofiles.ResolvedProfile{Name: "maximum_payload", Config: cwprofiles.Profile{
+		Namespace: "AWS/Test", Period: 300,
+		Instance: cwprofiles.InstanceSpec{Dimensions: dimensions},
+		Metrics:  metrics,
+	}}
+	c := New()
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{profile})
+	c.Limits.MaxInstances = instanceCount + 1
+	instances := make([]discoveredInstance, instanceCount)
+	for i := range instances {
+		values := make([]string, dimensionCount)
+		for j := range values {
+			prefix := fmt.Sprintf("instance-%03d-dimension-%02d-", i, j)
+			values[j] = prefix + strings.Repeat("x", valueBytes-len(prefix))
+		}
+		instances[i] = discoveredInstance{DimensionValues: values}
+	}
+	c.discovery.Instances = map[discoveryKey][]discoveredInstance{
+		{Target: "base", Profile: profile.Name, Region: "us-east-1"}: instances,
+	}
+	return c
+}
+
+func BenchmarkBuildQueryPlanMaximumPayload(b *testing.B) {
+	const (
+		instanceCount  = 1000
+		metricCount    = 20
+		dimensionCount = 30
+		valueBytes     = 1024
+	)
+	c := maximumPayloadQueryPlanCollector(instanceCount, metricCount, dimensionCount, valueBytes)
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for range b.N {
+		plan, err := c.buildQueryPlan()
+		if err != nil {
+			b.Fatal(err)
+		}
+		if len(plan) != instanceCount*metricCount {
+			b.Fatalf("query plan length = %d, want %d", len(plan), instanceCount*metricCount)
+		}
+		goruntime.KeepAlive(plan)
+	}
+}
+
 func BenchmarkCurrentQueryPlanCached(b *testing.B) {
 	instances := make([][]string, 256)
 	for i := range instances {
@@ -440,7 +519,7 @@ func BenchmarkCurrentQueryPlanCached(b *testing.B) {
 }
 
 func BenchmarkBuildQueryPlan(b *testing.B) {
-	for _, instances := range []int{100, 1000, 10000} {
+	for _, instances := range queryPlanBenchmarkInstanceCounts() {
 		for _, selectedPercent := range []int{100, 10} {
 			b.Run(fmt.Sprintf("instances_%d/selected_%d_percent", instances, selectedPercent), func(b *testing.B) {
 				values := make([][]string, instances)
@@ -472,7 +551,7 @@ func BenchmarkBuildQueryPlan(b *testing.B) {
 }
 
 func BenchmarkBuildQueryPlanSeriesSelection(b *testing.B) {
-	for _, instances := range []int{100, 1000, 10000} {
+	for _, instances := range queryPlanBenchmarkInstanceCounts() {
 		for _, selected := range []string{"all", "one"} {
 			for _, overlappingScopes := range []int{1, 4} {
 				name := fmt.Sprintf("instances_%d/series_%s/scopes_%d", instances, selected, overlappingScopes)
@@ -495,7 +574,7 @@ func BenchmarkBuildQueryPlanSeriesSelection(b *testing.B) {
 }
 
 func BenchmarkCurrentQueryPlanDirtySeriesSelection(b *testing.B) {
-	for _, instances := range []int{100, 1000, 10000} {
+	for _, instances := range queryPlanBenchmarkInstanceCounts() {
 		for _, selected := range []string{"all", "one"} {
 			for _, overlappingScopes := range []int{1, 4} {
 				name := fmt.Sprintf("instances_%d/series_%s/scopes_%d", instances, selected, overlappingScopes)
@@ -504,14 +583,7 @@ func BenchmarkCurrentQueryPlanDirtySeriesSelection(b *testing.B) {
 					initial := requireCurrentQueryPlan(b, c)
 					require.NotEmpty(b, initial)
 					for _, query := range initial {
-						key := observedKey(query.seriesName, query.labels)
-						c.observations.lastObserved[key] = observedSeries{
-							seriesName: query.seriesName,
-							labels:     query.labels,
-							tagLabels:  query.tagLabels,
-							groupKey:   query.groupKey(),
-						}
-						c.observations.nextQueryAt[query.groupKey()] = time.Unix(1, 0)
+						c.observations.queries[query.key] = queryState{lastCompletedEnd: time.Unix(1, 0)}
 					}
 					expectedQueries := len(initial)
 
@@ -532,6 +604,12 @@ func BenchmarkCurrentQueryPlanDirtySeriesSelection(b *testing.B) {
 			}
 		}
 	}
+}
+
+func queryPlanBenchmarkInstanceCounts() []int {
+	// The full EC2 fixture exports three series, so 6,000 instances exercise a
+	// large valid plan (18,000 queries) below maxPlannedQueries.
+	return []int{100, 1000, 6000}
 }
 
 func seriesSelectionBenchmarkCollector(instances int, selected string, overlappingScopes int) *Collector {
@@ -556,307 +634,4 @@ func seriesSelectionBenchmarkCollector(instances int, selected string, overlappi
 		c.discovery.Instances[discoveryKey{Target: target.Name, Profile: "ec2", Region: "us-east-1"}] = baseInstances
 	}
 	return c
-}
-
-// gmdCloudWatch is a thread-safe GetMetricData fake: every query gets f.value
-// unless its Id is in gaps (or gapAll).
-type gmdCloudWatch struct {
-	mu     sync.Mutex
-	calls  int
-	err    error
-	value  float64
-	gaps   map[string]bool
-	gapAll bool
-	status cwtypes.StatusCode
-}
-
-func (f *gmdCloudWatch) ListMetrics(context.Context, *cloudwatch.ListMetricsInput, ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
-	return &cloudwatch.ListMetricsOutput{}, nil
-}
-
-func (f *gmdCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetricDataInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	f.calls++
-	if f.err != nil {
-		return nil, f.err
-	}
-	results := make([]cwtypes.MetricDataResult, 0, len(in.MetricDataQueries))
-	for _, q := range in.MetricDataQueries {
-		id := aws.ToString(q.Id)
-		r := cwtypes.MetricDataResult{Id: aws.String(id), StatusCode: f.status}
-		if !f.gapAll && !f.gaps[id] {
-			r.Values = []float64{f.value}
-			r.Timestamps = []time.Time{time.Unix(1, 0)}
-		}
-		results = append(results, r)
-	}
-	return &cloudwatch.GetMetricDataOutput{MetricDataResults: results}, nil
-}
-
-func TestExecuteQueries(t *testing.T) {
-	one := map[string][][]string{"us-east-1": {{"i-1"}}}
-	two := map[string][][]string{"us-east-1": {{"i-1"}, {"i-2"}}}
-
-	tests := map[string]struct {
-		instances   map[string][][]string
-		fake        *gmdCloudWatch
-		wantSamples int
-		wantValue   float64
-		wantErr     bool
-	}{
-		"all queries return a value": {
-			instances: two, fake: &gmdCloudWatch{value: 42}, wantSamples: 6, wantValue: 42,
-		},
-		"missing datapoints are gaps": {
-			instances: one, fake: &gmdCloudWatch{gapAll: true}, wantSamples: 0,
-		},
-		"non-finite datapoints are gaps": {
-			instances: one, fake: &gmdCloudWatch{value: math.NaN()}, wantSamples: 0,
-		},
-		"all GetMetricData calls failing errors": {
-			instances: one, fake: &gmdCloudWatch{err: errors.New("throttled")}, wantErr: true,
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			c := ec2QueryCollector([]string{"us-east-1"}, tc.instances)
-			useFakeClient(c, tc.fake)
-
-			samples, _, _, err := c.executeQueries(context.Background(), requireBuildQueryPlan(t, c), time.Unix(1_000_000_000, 0))
-			if tc.wantErr {
-				assert.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			assert.Len(t, samples, tc.wantSamples)
-			for _, s := range samples {
-				assert.Equal(t, tc.wantValue, s.value)
-				assert.NotEmpty(t, s.seriesName)
-				assert.Equal(t, "123456789012", labelValue(s.labels, "account_id"))
-			}
-		})
-	}
-}
-
-func TestExecuteQueries_ReportsIndependentChunkFailures(t *testing.T) {
-	const sensitive = "SENSITIVE_API_MESSAGE"
-	var logs bytes.Buffer
-	c := New()
-	c.Logger = logger.NewWithWriter(&logs)
-	c.applyDefaults()
-	failing := &gmdCloudWatch{err: errors.New(sensitive)}
-	c.clients.clients[clientKey{target: "target-a", region: "us-east-1"}] = failing
-	c.clients.clients[clientKey{target: "target-b", region: "eu-west-1"}] = failing
-	plan := []plannedQuery{
-		{id: "q0", target: "target-a", region: "us-east-1", period: 300, query: cwtypes.MetricDataQuery{Id: aws.String("q0")}},
-		{id: "q1", target: "target-b", region: "eu-west-1", period: 600, query: cwtypes.MetricDataQuery{Id: aws.String("q1")}},
-	}
-
-	_, _, _, err := c.executeQueries(context.Background(), plan, time.Unix(1_000_000_000, 0))
-	require.Error(t, err)
-	assert.Contains(t, logs.String(), "target-a")
-	assert.Contains(t, logs.String(), "us-east-1")
-	assert.Contains(t, logs.String(), "target-b")
-	assert.Contains(t, logs.String(), "eu-west-1")
-	assert.Contains(t, logs.String(), "period 300s")
-	assert.Contains(t, logs.String(), "period 600s")
-	assert.NotContains(t, logs.String(), sensitive)
-}
-
-func TestExecuteQueries_ReportsIndependentForbiddenResults(t *testing.T) {
-	var logs bytes.Buffer
-	c := New()
-	c.Logger = logger.NewWithWriter(&logs)
-	c.applyDefaults()
-	c.clients.clients[clientKey{target: "target-a", region: "us-east-1"}] = &gmdCloudWatch{status: cwtypes.StatusCodeForbidden}
-	c.clients.clients[clientKey{target: "target-b", region: "eu-west-1"}] = &gmdCloudWatch{status: cwtypes.StatusCodeForbidden}
-	plan := []plannedQuery{
-		forbiddenTestQuery("q0", "target-a", "us-east-1", "AWS/EC2", 300),
-		forbiddenTestQuery("q1", "target-b", "eu-west-1", "AWS/RDS", 600),
-	}
-
-	samples, _, _, err := c.executeQueries(context.Background(), plan, time.Unix(1_000_000_000, 0))
-	require.NoError(t, err)
-	assert.Empty(t, samples)
-	for _, want := range []string{"target-a", "us-east-1", "AWS/EC2", "300s", "target-b", "eu-west-1", "AWS/RDS", "600s"} {
-		assert.Contains(t, logs.String(), want)
-	}
-}
-
-func forbiddenTestQuery(id, target, region, namespace string, period int) plannedQuery {
-	return plannedQuery{
-		id: id, target: target, region: region, period: period,
-		query: cwtypes.MetricDataQuery{
-			Id:         aws.String(id),
-			MetricStat: &cwtypes.MetricStat{Metric: &cwtypes.Metric{Namespace: aws.String(namespace)}},
-		},
-	}
-}
-
-// TestBuildChunkJobs verifies query batching into GetMetricData-sized chunks (one
-// job per chunk) and that a group whose (target, region) client failed is skipped and
-// marked failed. chunkSize is an explicit argument, so production passes the fixed
-// metricsPerQuery (the AWS 500/call maximum) while tests exercise the multi-chunk
-// split without constructing 500+ queries.
-func TestBuildChunkJobs(t *testing.T) {
-	key := queryGroupKey{target: "base", region: "us-east-1", period: 300}
-	groupOf := func(n int) map[queryGroupKey][]cwtypes.MetricDataQuery {
-		qs := make([]cwtypes.MetricDataQuery, n)
-		for i := range qs {
-			qs[i] = cwtypes.MetricDataQuery{Id: aws.String(fmt.Sprintf("q%d", i))}
-		}
-		return map[queryGroupKey][]cwtypes.MetricDataQuery{key: qs}
-	}
-	ok := map[clientKey]cloudwatchClient{{target: "base", region: "us-east-1"}: &gmdCloudWatch{}}
-
-	tests := map[string]struct {
-		groups       map[queryGroupKey][]cwtypes.MetricDataQuery
-		groupClients map[clientKey]cloudwatchClient
-		chunkSize    int
-		wantJobs     int
-		wantQueries  int
-		wantFailed   bool
-	}{
-		"all queries fit one chunk":           {groups: groupOf(6), groupClients: ok, chunkSize: 500, wantJobs: 1, wantQueries: 6},
-		"split into even chunks":              {groups: groupOf(6), groupClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 6},
-		"uneven last chunk":                   {groups: groupOf(5), groupClients: ok, chunkSize: 2, wantJobs: 3, wantQueries: 5},
-		"group without a target client fails": {groups: groupOf(6), groupClients: map[clientKey]cloudwatchClient{}, chunkSize: 2, wantJobs: 0, wantFailed: true},
-	}
-
-	c := New()
-	c.applyDefaults()
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			jobs, failed := c.buildChunkJobs(tc.groups, tc.groupClients, time.Unix(1_000_000_000, 0), tc.chunkSize)
-			require.Len(t, jobs, tc.wantJobs)
-			total := 0
-			for _, j := range jobs {
-				assert.LessOrEqual(t, len(j.chunk), tc.chunkSize, "no chunk exceeds chunkSize")
-				total += len(j.chunk)
-			}
-			assert.Equal(t, tc.wantQueries, total, "every query is chunked exactly once")
-			assert.Equal(t, tc.wantFailed, failed[key])
-		})
-	}
-}
-
-// pagingGMD returns one page per GetMetricData call (with the matching NextToken).
-type pagingGMD struct {
-	pages  []map[string]float64
-	tokens []string
-	calls  int
-	reqs   []*cloudwatch.GetMetricDataInput
-}
-
-func (f *pagingGMD) ListMetrics(context.Context, *cloudwatch.ListMetricsInput, ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
-	return &cloudwatch.ListMetricsOutput{}, nil
-}
-
-func (f *pagingGMD) GetMetricData(_ context.Context, in *cloudwatch.GetMetricDataInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
-	f.reqs = append(f.reqs, in)
-	idx := f.calls
-	f.calls++
-	out := &cloudwatch.GetMetricDataOutput{}
-	for id, v := range f.pages[idx] {
-		out.MetricDataResults = append(out.MetricDataResults, cwtypes.MetricDataResult{
-			Id:         aws.String(id),
-			Values:     []float64{v},
-			Timestamps: []time.Time{time.Unix(1, 0)},
-		})
-	}
-	if idx < len(f.tokens) && f.tokens[idx] != "" {
-		out.NextToken = aws.String(f.tokens[idx])
-	}
-	return out, nil
-}
-
-func TestExecuteQueries_PaginationAndDedup(t *testing.T) {
-	c := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{"us-east-1": {{"i-1"}}})
-	plan := requireBuildQueryPlan(t, c)
-	require.Len(t, plan, 3) // cpu_utilization_average, duration_average, duration_p90
-
-	fake := &pagingGMD{
-		pages: []map[string]float64{
-			{plan[0].id: 10}, // page 1: newest value for q0
-			{plan[0].id: 99, plan[1].id: 20, plan[2].id: 30}, // page 2: stale dup q0 (ignored) + q1,q2
-		},
-		tokens: []string{"page2", ""},
-	}
-	useFakeClient(c, fake)
-
-	samples, _, _, err := c.executeQueries(context.Background(), plan, time.Unix(1_000_000_000, 0))
-	require.NoError(t, err)
-	require.Len(t, samples, 3)
-	assert.Equal(t, 2, fake.calls, "followed NextToken to the second page")
-
-	byName := map[string]float64{}
-	for _, s := range samples {
-		byName[s.seriesName] = s.value
-	}
-	assert.Equal(t, float64(10), byName["ec2.cpu_utilization_average"], "first (newest) value per Id wins across pages")
-	assert.Equal(t, float64(20), byName["ec2.duration_average"])
-	assert.Equal(t, float64(30), byName["ec2.duration_p90"])
-
-	// Each GetMetricData request scans newest-first over the same aligned window,
-	// and the second page carries the NextToken the first page returned.
-	require.Len(t, fake.reqs, 2)
-	for i, r := range fake.reqs {
-		assert.Equal(t, cwtypes.ScanByTimestampDescending, r.ScanBy, "req %d ScanBy", i)
-		assert.Equal(t, int64(999_999_000), aws.ToTime(r.StartTime).Unix(), "req %d start", i)
-		assert.Equal(t, int64(999_999_300), aws.ToTime(r.EndTime).Unix(), "req %d end", i)
-	}
-	assert.Nil(t, fake.reqs[0].NextToken, "first page has no NextToken")
-	assert.Equal(t, "page2", aws.ToString(fake.reqs[1].NextToken), "second page uses the returned token")
-}
-
-func TestExecuteQueries_RegionClientFailures(t *testing.T) {
-	tests := map[string]struct {
-		regions     []string
-		instances   map[string][][]string
-		failRegion  func(region string) bool
-		wantErr     bool
-		wantSamples int
-		wantRegion  string
-	}{
-		"all clients fail errors": {
-			regions:    []string{"us-east-1"},
-			instances:  map[string][][]string{"us-east-1": {{"i-1"}}},
-			failRegion: func(string) bool { return true },
-			wantErr:    true,
-		},
-		"a usable region is not aborted by another region's failure": {
-			regions:     []string{"good", "bad"},
-			instances:   map[string][][]string{"good": {{"i-1"}}, "bad": {{"i-2"}}},
-			failRegion:  func(r string) bool { return r == "bad" },
-			wantSamples: 3, // only the good region's instance (1 instance x 3 series)
-			wantRegion:  "good",
-		},
-	}
-
-	for name, tc := range tests {
-		t.Run(name, func(t *testing.T) {
-			c := ec2QueryCollector(tc.regions, tc.instances)
-			fake := &gmdCloudWatch{value: 7}
-			c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
-				if tc.failRegion(region) {
-					return aws.Config{}, errors.New("no credentials for region")
-				}
-				return aws.Config{Region: region}, nil
-			}
-			c.newCloudWatchClient = func(aws.Config) cloudwatchClient { return fake }
-
-			samples, _, _, err := c.executeQueries(context.Background(), requireBuildQueryPlan(t, c), time.Unix(1_000_000_000, 0))
-			if tc.wantErr {
-				assert.Error(t, err)
-				return
-			}
-			require.NoError(t, err)
-			assert.Len(t, samples, tc.wantSamples)
-			for _, s := range samples {
-				assert.Equal(t, tc.wantRegion, labelValue(s.labels, "region"))
-			}
-		})
-	}
 }

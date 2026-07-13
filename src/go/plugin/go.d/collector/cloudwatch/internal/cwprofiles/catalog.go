@@ -75,9 +75,7 @@ func loadFromDirs(specs []profilecatalog.DirSpec) (Catalog, error) {
 }
 
 // decodeProfileBytes decodes, normalizes, and validates one profile. It is the
-// single decode path shared by file loading and tests. The decoder is non-strict
-// (unknown keys are ignored), so an older collector tolerates profiles that carry
-// newer optional fields.
+// single decode path shared by file loading and tests. Unknown keys are ignored.
 func decodeProfileBytes(data []byte, baseName string) (Profile, error) {
 	var cfg Profile
 	dec := yaml.NewDecoder(bytes.NewReader(data))

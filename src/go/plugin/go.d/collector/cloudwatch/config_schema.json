@@ -353,6 +353,31 @@
                   }
                 }
               }
+            },
+            "query": {
+              "title": "Query policy",
+              "description": "Optional CloudWatch query timing overrides for this rule. Omitted fields inherit rule defaults and profile values.",
+              "type": "object",
+              "properties": {
+                "period": {
+                  "title": "Aggregation period",
+                  "description": "CloudWatch aggregation period. Must be from 1m through 1d and an exact multiple of 1m. A period shorter than the metric's real publication cadence increases query frequency without making AWS publish more often.",
+                  "type": "string",
+                  "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
+                },
+                "lookback": {
+                  "title": "Rolling lookback",
+                  "description": "Rolling query horizon. Must be at least the effective period, an exact period multiple, and no more than 1,440 buckets.",
+                  "type": "string",
+                  "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
+                },
+                "publication_delay": {
+                  "title": "Publication delay",
+                  "description": "Collector policy for how long to wait after a bucket closes before querying it. This is not an AWS publication guarantee. Use 0s only for metrics known to publish immediately.",
+                  "type": "string",
+                  "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
+                }
+              }
             }
           },
           "required": [
@@ -402,6 +427,30 @@
                 }
               }
             }
+          },
+          "query": {
+            "title": "Default query policy",
+            "description": "Shared CloudWatch query timing inherited field-by-field by collection rules.",
+            "type": "object",
+            "properties": {
+              "period": {
+                "title": "Aggregation period",
+                "description": "Default CloudWatch aggregation period. A period shorter than a metric's real publication cadence increases query frequency without making AWS publish more often.",
+                "type": "string",
+                "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
+              },
+              "lookback": {
+                "title": "Rolling lookback",
+                "type": "string",
+                "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
+              },
+              "publication_delay": {
+                "title": "Publication delay",
+                "description": "Default collector wait after a bucket closes. This is a scheduling policy, not an AWS publication guarantee.",
+                "type": "string",
+                "pattern": "^[0-9]+(?:s|m|h|d|w|mo|y)$"
+              }
+            }
           }
         }
       },
@@ -437,7 +486,7 @@
       },
       "limits": {
         "title": "Collection limits",
-        "description": "Safety bounds applied after resource filtering and exported-series overlap resolution.",
+        "description": "Operator safeguards that reject unexpectedly large compiled work without truncating collection.",
         "type": "object",
         "properties": {
           "max_instances": {
@@ -446,6 +495,14 @@
             "type": "integer",
             "minimum": 1,
             "default": 1000
+          },
+          "max_discovery_groups": {
+            "title": "Maximum discovery groups",
+            "description": "Maximum unique target, region, and CloudWatch namespace combinations. The default catches accidental expansion. Valid range 1–100; split larger collection across jobs.",
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100,
+            "default": 64
           }
         }
       },
@@ -466,16 +523,9 @@
           }
         }
       },
-      "query_offset": {
-        "title": "Query offset",
-        "description": "Delay in seconds applied before querying completed CloudWatch periods.",
-        "type": "integer",
-        "minimum": 0,
-        "default": 600
-      },
       "timeout": {
         "title": "Timeout",
-        "description": "Per-request timeout in seconds.",
+        "description": "AWS operation timeout in seconds. Discovery shares one timeout across its whole refresh stage.",
         "type": "number",
         "minimum": 0,
         "default": 30
@@ -497,11 +547,8 @@
     "autodetection_retry": {
       "ui:help": "How often to retry a failed job check. Set to `0` to disable retries."
     },
-    "query_offset": {
-      "ui:help": "Delay CloudWatch queries to allow completed metric periods to become available."
-    },
     "timeout": {
-      "ui:help": "Per-request timeout. Accepts decimals for sub-second granularity (for example, `0.5` for 500ms)."
+      "ui:help": "AWS operation timeout. Identity, resource-tag, and query operations use it for their operation scope; discovery shares one timeout across its whole refresh stage. Accepts decimals for sub-second granularity (for example, `0.5` for 500ms)."
     },
     "credentials": {
       "ui:listFlavour": "list",
@@ -655,6 +702,21 @@
               }
             }
           }
+        },
+        "query": {
+          "ui:help": "Override CloudWatch timing for this rule. Omitted fields inherit rule defaults and profile values. A successful query may replay the newest eligible value for up to the lookback; transient failures may replay it longer.",
+          "period": {
+            "ui:help": "Aggregation period used by CloudWatch and for per-second rate normalization. Do not set it below the metric's real publication cadence: that adds billed queries and may produce empty windows.",
+            "ui:placeholder": "5m"
+          },
+          "lookback": {
+            "ui:help": "Rolling window searched for the newest eligible datapoint. Longer windows increase response work.",
+            "ui:placeholder": "30m"
+          },
+          "publication_delay": {
+            "ui:help": "Collector wait after a period closes before querying it. This is not an AWS publication guarantee.",
+            "ui:placeholder": "10m"
+          }
         }
       }
     },
@@ -678,6 +740,21 @@
             }
           }
         }
+      },
+      "query": {
+        "ui:help": "Shared query timing inherited field-by-field by collection rules.",
+        "period": {
+          "ui:help": "Default aggregation period inherited by rules. Do not set it below participating metrics' real publication cadence: that adds billed queries and may produce empty windows.",
+          "ui:placeholder": "5m"
+        },
+        "lookback": {
+          "ui:help": "Default rolling window inherited by rules. A successful query can present an old CloudWatch value as current for up to this lookback; transient failures can replay it longer. Longer windows also increase response work.",
+          "ui:placeholder": "30m"
+        },
+        "publication_delay": {
+          "ui:help": "Default collector wait inherited by every rule that omits it. This overrides profile-specific delays, including the stock S3 storage profile's conservative 1d policy. AWS documents that S3 storage metrics are reported once per day, but does not guarantee publication within one day. Use a shorter default only after verifying every inheriting workload.",
+          "ui:placeholder": "10m"
+        }
       }
     },
     "labels": {
@@ -700,6 +777,10 @@
       "max_instances": {
         "ui:help": "Maximum distinct final resource instances that emit at least one selected series after filtering and overlap resolution. Raise this only for an intentionally larger job.",
         "ui:placeholder": "1000"
+      },
+      "max_discovery_groups": {
+        "ui:help": "Safeguard for unique target, region, and namespace discovery groups. Compatible rules and profiles share groups. The default 64 is intended to catch accidental expansion; the hard maximum is 100 because every group needs at least one ListMetrics operation in the bounded refresh. Split larger collection across jobs.",
+        "ui:placeholder": "64"
       }
     },
     "discovery": {
@@ -707,7 +788,7 @@
         "ui:help": "How often to rediscover matching CloudWatch metrics and resources."
       },
       "recently_active_only": {
-        "ui:help": "When enabled, use CloudWatch's three-hour filter only when every selected series sharing a namespace scan has a period of three hours or less. A longer-period participant keeps the shared scan unfiltered."
+        "ui:help": "When enabled, use CloudWatch's three-hour filter only when every selected series sharing a namespace scan has publication_delay + lookback + period of three hours or less. A longer-horizon participant keeps the shared scan unfiltered."
       }
     },
     "vnode": {
@@ -722,7 +803,6 @@
           "fields": [
             "update_every",
             "autodetection_retry",
-            "query_offset",
             "timeout",
             "limits"
           ]

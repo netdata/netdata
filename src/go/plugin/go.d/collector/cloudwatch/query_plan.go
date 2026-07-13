@@ -4,7 +4,6 @@ package cloudwatch
 
 import (
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -14,37 +13,37 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 )
 
-// querySample is one observed value for a series identity in a collect cycle.
-// target+region+period is its scheduling group (drives retention re-emit scheduling).
-type querySample struct {
-	seriesName string
-	labels     []metrix.Label
-	tagLabels  []metrix.Label // non-identity enrichment labels; emitted but not in observedKey
-	value      float64
-	target     string
-	region     string
-	period     int
-}
-
-// plannedQuery ties a synthetic GetMetricData query Id back to the series it
-// populates and the target/region/period that determine its client and window.
+// plannedQuery is one stable series query. Request-local IDs and batch membership
+// are assigned only when a due query is executed.
 type plannedQuery struct {
-	id         string
+	key        structuralID
+	billingKey structuralID // structural metric identity without statistic; internal AWS cost grouping
 	target     string
 	region     string
-	period     int
+	policy     queryPolicy
 	seriesName string
 	labels     []metrix.Label
 	tagLabels  []metrix.Label // non-identity enrichment labels; emitted but not in observedKey
 	nilAsZero  bool           // record 0 (vs a gap) when the query returns no datapoint
+	rate       bool           // normalize a per-period total to a per-second value on write
 	query      cwtypes.MetricDataQuery
 }
 
-// queryGroupKey groups queries that share a target client and time window.
-type queryGroupKey struct {
-	target string
-	region string
-	period int
+type instancePresentation struct {
+	instanceID  structuralID
+	dimensionID structuralID
+	labels      []metrix.Label
+	tagLabels   []metrix.Label
+	dims        []cwtypes.Dimension
+}
+
+type queryPlanCandidate struct {
+	targetRef    string
+	profile      cwprofiles.ResolvedProfile
+	region       string
+	series       []compiledSeries
+	billingKeys  []structuralID
+	presentation instancePresentation
 }
 
 type seriesOwnership struct {
@@ -74,14 +73,6 @@ func (o *seriesOwnership) claim(ordinal int) bool {
 	return true
 }
 
-func (q plannedQuery) groupKey() queryGroupKey {
-	return queryGroupKey{target: q.target, region: q.region, period: q.period}
-}
-
-func (s querySample) groupKey() queryGroupKey {
-	return queryGroupKey{target: s.target, region: s.region, period: s.period}
-}
-
 func (c *Collector) invalidateQueryPlan() {
 	c.planDirty = true
 }
@@ -98,40 +89,10 @@ func (c *Collector) currentQueryPlan() ([]plannedQuery, error) {
 	if err != nil {
 		return nil, err
 	}
-	previous := c.queryPlan
 	c.queryPlan = next
-	c.queryGroups, c.queriesByGroup = groupQueryPlan(c.queryPlan)
-	c.observations.reconcilePlan(previous, c.queryPlan)
+	c.observations.reconcilePlan(c.queryPlan)
 	c.planDirty = false
 	return c.queryPlan, nil
-}
-
-func groupQueryPlan(plan []plannedQuery) ([]queryGroupKey, map[queryGroupKey][]plannedQuery) {
-	byGroup := make(map[queryGroupKey][]plannedQuery)
-	var order []queryGroupKey
-	for _, query := range plan {
-		key := query.groupKey()
-		if _, ok := byGroup[key]; !ok {
-			order = append(order, key)
-		}
-		byGroup[key] = append(byGroup[key], query)
-	}
-	return order, byGroup
-}
-
-// queryWindow computes the GetMetricData time window for a metric of the given
-// period: effective_offset = max(query_offset, period); end = align(now −
-// effective_offset, period); start = end − period. Aligning the end to a period
-// boundary AFTER the offset keeps the window period-aligned even when query_offset
-// is not a multiple of the period (GetMetricData expects period-aligned bounds),
-// and an offset ≥ period keeps the queried bucket already published (e.g. S3 daily
-// reads a full, settled day rather than a partial current one).
-func queryWindow(now time.Time, period, queryOffset int) (start, end time.Time) {
-	periodSec := int64(period)
-	effectiveOffset := max(periodSec, int64(queryOffset))
-	endSec := now.Unix() - effectiveOffset
-	endSec -= endSec % periodSec // align to a period boundary after the offset
-	return time.Unix(endSec-periodSec, 0).UTC(), time.Unix(endSec, 0).UTC()
 }
 
 // buildQueryPlan follows compiled scope order and assigns each selected exported
@@ -142,15 +103,10 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 	if c.plan == nil {
 		return nil, nil
 	}
-	var plan []plannedQuery
-	idx := 0
-	type instancePresentation struct {
-		labels    []metrix.Label
-		tagLabels []metrix.Label
-		dims      []cwtypes.Dimension
-	}
-	owned := make(map[string]seriesOwnership)
-	presentations := make(map[string]instancePresentation)
+	budget := newQueryWorkBudget()
+	var candidates []queryPlanCandidate
+	owned := make(map[structuralID]seriesOwnership)
+	presentations := make(map[structuralID]instancePresentation)
 	shadowed := 0
 	reserved := 0
 	maxInstances := c.Limits.MaxInstances
@@ -172,7 +128,7 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 			if len(inst.DimensionValues) != nDims {
 				continue // defensive: snapshot/profile mismatch
 			}
-			instanceKey := finalInstanceKey(prof.Name, resolved.accountID, scope.Region, prof.Config.Instance.Dimensions, inst.DimensionValues)
+			instanceKey := finalInstanceID(prof.Name, resolved.accountID, scope.Region, prof.Config.Instance.Dimensions, inst.DimensionValues)
 			if scope.hasTagFilter() {
 				if join == nil {
 					reserved += reserveSelectedSeries(owned, instanceKey, scope.SelectedSeries)
@@ -214,14 +170,40 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 				}
 				labels, dims := c.instanceLabelsAndDims(resolved.accountID, prof, scope.Region, inst)
 				presentation = instancePresentation{
+					instanceID: instanceKey, dimensionID: metricDimensionID(prof.Config.Namespace, dims),
 					labels: labels, dims: dims,
 					tagLabels: c.tagLabelsFor(scope.Target.Name, resolved.accountID, scope.Region, prof, join, inst.DimensionValues),
 				}
 				presentations[instanceKey] = presentation
 			}
-			queries := c.seriesQueries(scope.Target.Name, prof, scope.Region, selected, presentation.labels, presentation.tagLabels, presentation.dims, &idx)
-			plan = append(plan, queries...)
+			billingKeys := make([]structuralID, len(selected))
+			byMetric := make([]structuralID, len(prof.Config.Metrics))
+			byMetricSet := make([]bool, len(prof.Config.Metrics))
+			for i, series := range selected {
+				if err := budget.reserveQuery(series.Policy); err != nil {
+					return nil, err
+				}
+				metric := prof.Config.Metrics[series.MetricIndex]
+				billingKey := byMetric[series.MetricIndex]
+				if !byMetricSet[series.MetricIndex] {
+					billingKey = metricBillingKey(prof.Config.Namespace, metric.MetricName, presentation.dimensionID)
+					byMetric[series.MetricIndex] = billingKey
+					byMetricSet[series.MetricIndex] = true
+				}
+				billingKeys[i] = billingKey
+				budget.addBillingGroup(
+					queryBatchKey{target: scope.Target.Name, region: scope.Region, policy: series.Policy},
+					billingKey,
+				)
+			}
+			candidates = append(candidates, queryPlanCandidate{
+				targetRef: scope.Target.Name, profile: prof, region: scope.Region,
+				series: selected, billingKeys: billingKeys, presentation: presentation,
+			})
 		}
+	}
+	if err := budget.validateBatches(); err != nil {
+		return nil, err
 	}
 	if shadowed > 0 {
 		c.Limit(logKeyRuleShadowed, 1, recurringLogEvery).
@@ -231,10 +213,17 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 		c.Limit(logKeyTagRefreshFailed+"_reserved", 1, recurringLogEvery).
 			Warningf("CloudWatch resource tag filtering reserved %d exported series from lower-priority rules while membership was unknown", reserved)
 	}
+	plan := make([]plannedQuery, 0, budget.queries)
+	for _, candidate := range candidates {
+		plan = append(plan, buildSeriesQueries(candidate)...)
+	}
+	if err := validatePlannedQueryWork(plan); err != nil {
+		return nil, err
+	}
 	return plan, nil
 }
 
-func reserveSelectedSeries(owned map[string]seriesOwnership, instanceKey string, series []compiledSeries) int {
+func reserveSelectedSeries(owned map[structuralID]seriesOwnership, instanceKey structuralID, series []compiledSeries) int {
 	ownership := owned[instanceKey]
 	reserved := 0
 	for _, item := range series {
@@ -247,19 +236,19 @@ func reserveSelectedSeries(owned map[string]seriesOwnership, instanceKey string,
 	return reserved
 }
 
-func finalInstanceKey(profileName, accountID, region string, dimensions []cwprofiles.InstanceDimension, values []string) string {
-	var key strings.Builder
-	writeLengthPrefixed(&key, profileName)
-	writeLengthPrefixed(&key, accountID)
-	writeLengthPrefixed(&key, region)
+func finalInstanceID(profileName, accountID, region string, dimensions []cwprofiles.InstanceDimension, values []string) structuralID {
+	key := newStructuralIDBuilder("final-instance")
+	key.addString(profileName)
+	key.addString(accountID)
+	key.addString(region)
 	for i, dimension := range dimensions {
 		if dimension.IsConstant() {
 			continue
 		}
-		writeLengthPrefixed(&key, dimension.Label)
-		writeLengthPrefixed(&key, values[i])
+		key.addString(dimension.Label)
+		key.addString(values[i])
 	}
-	return key.String()
+	return key.sum()
 }
 
 // instanceLabelsAndDims builds the metrix identity labels
@@ -286,36 +275,55 @@ func (c *Collector) instanceLabelsAndDims(accountID string, prof cwprofiles.Reso
 	return labels, dims
 }
 
-// seriesQueries builds the planned queries for one instance from its compiled
-// selected-series descriptors, allocating sequential q<idx> ids through idx.
-func (c *Collector) seriesQueries(targetRef string, prof cwprofiles.ResolvedProfile, region string, series []compiledSeries, labels, tagLabels []metrix.Label, dims []cwtypes.Dimension, idx *int) []plannedQuery {
-	out := make([]plannedQuery, 0, len(series))
-	for _, selected := range series {
-		m := prof.Config.Metrics[selected.MetricIndex]
-		id := fmt.Sprintf("q%d", *idx)
-		(*idx)++
-		out = append(out, plannedQuery{
-			id:         id,
-			target:     targetRef,
-			region:     region,
-			period:     selected.Period,
+// buildSeriesQueries constructs the stable queries only after the candidate set
+// has passed the query/datapoint/batch preflight.
+func buildSeriesQueries(candidate queryPlanCandidate) []plannedQuery {
+	out := make([]plannedQuery, 0, len(candidate.series))
+	for i, selected := range candidate.series {
+		m := candidate.profile.Config.Metrics[selected.MetricIndex]
+		pq := plannedQuery{
+			target:     candidate.targetRef,
+			region:     candidate.region,
+			policy:     selected.Policy,
+			billingKey: candidate.billingKeys[i],
 			seriesName: selected.Name,
-			labels:     labels,
-			tagLabels:  tagLabels,
+			labels:     candidate.presentation.labels,
+			tagLabels:  candidate.presentation.tagLabels,
 			nilAsZero:  m.EmitZeroOnNoData(selected.Statistic),
+			rate:       m.Rate && cwprofiles.IsPerPeriodTotal(selected.Statistic),
 			query: cwtypes.MetricDataQuery{
-				Id: aws.String(id),
 				MetricStat: &cwtypes.MetricStat{
 					Metric: &cwtypes.Metric{
-						Namespace:  aws.String(prof.Config.Namespace),
+						Namespace:  aws.String(candidate.profile.Config.Namespace),
 						MetricName: aws.String(m.MetricName),
-						Dimensions: dims,
+						Dimensions: candidate.presentation.dims,
 					},
-					Period: aws.Int32(int32(selected.Period)),
+					Period: aws.Int32(int32(selected.Policy.period / time.Second)),
 					Stat:   aws.String(cwprofiles.StatString(selected.Statistic)),
 				},
 			},
-		})
+		}
+		pq.key = plannedQueryKey(pq, candidate.presentation.instanceID)
+		out = append(out, pq)
 	}
 	return out
+}
+
+// plannedQueryKey identifies execution state independently of rule names,
+// scope order, request-local IDs, and batch membership.
+func plannedQueryKey(q plannedQuery, instanceID structuralID) structuralID {
+	key := newStructuralIDBuilder("planned-query")
+	key.addString(q.target)
+	key.addString(q.region)
+	key.addID(instanceID)
+	key.addString(q.seriesName)
+	key.addInt64(int64(q.policy.period / time.Second))
+	key.addInt64(int64(q.policy.lookback / time.Second))
+	key.addInt64(int64(q.policy.publicationDelay / time.Second))
+	key.addID(q.billingKey)
+	if q.query.MetricStat != nil {
+		key.addString(aws.ToString(q.query.MetricStat.Stat))
+		key.addInt64(int64(aws.ToInt32(q.query.MetricStat.Period)))
+	}
+	return key.sum()
 }

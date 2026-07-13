@@ -11,6 +11,37 @@ import (
 
 const maxFailureLogSamples = 4
 
+type safeCollectorError string
+
+func (e safeCollectorError) Error() string { return string(e) }
+
+func safeCollectorErrorf(format string, args ...any) error {
+	return safeCollectorError(fmt.Sprintf(format, args...))
+}
+
+func awsErrorCode(err error) string {
+	var apiErr interface {
+		ErrorCode() string
+	}
+	if errors.As(err, &apiErr) {
+		return strings.TrimSpace(apiErr.ErrorCode())
+	}
+	return ""
+}
+
+func isAWSAuthorizationCode(code string) bool {
+	switch strings.TrimSpace(code) {
+	case "AccessDenied", "AccessDeniedException", "NotAuthorized", "Forbidden":
+		return true
+	default:
+		return false
+	}
+}
+
+func isAWSAuthorizationError(err error) bool {
+	return isAWSAuthorizationCode(awsErrorCode(err))
+}
+
 type sanitizedAWSError struct {
 	description string
 	cause       error
@@ -25,6 +56,9 @@ func sanitizeAWSError(err error) error {
 	if err == nil {
 		return nil
 	}
+	if safe, ok := errors.AsType[safeCollectorError](err); ok {
+		return safe
+	}
 	switch {
 	case errors.Is(err, context.DeadlineExceeded):
 		return sanitizedAWSError{description: "AWS request timed out", cause: err}
@@ -33,11 +67,8 @@ func sanitizeAWSError(err error) error {
 	}
 
 	var details []string
-	var apiErr interface {
-		ErrorCode() string
-	}
-	if errors.As(err, &apiErr) && strings.TrimSpace(apiErr.ErrorCode()) != "" {
-		details = append(details, "code="+apiErr.ErrorCode())
+	if code := awsErrorCode(err); code != "" {
+		details = append(details, "code="+code)
 	}
 	var responseErr interface {
 		HTTPStatusCode() int

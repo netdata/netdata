@@ -489,17 +489,14 @@ func TestCompileConfig_RejectsCandidateScopeAmplification(t *testing.T) {
 	cfg := validBaseConfig()
 	cfg.Targets = nil
 	var refs []string
-	for i := range 16 {
+	for i := range maxTargets {
 		name := fmt.Sprintf("target-%d", i)
 		cfg.Targets = append(cfg.Targets, TargetConfig{Name: name, Credentials: "sdk_default"})
 		refs = append(refs, name)
 	}
-	selector := &ProfileSelectorConfig{Defaults: &defaults, Include: []string{
-		"api_gateway", "auto_scaling", "bedrock", "dynamodb", "ebs", "ec2", "efs", "eks", "elasticache",
-		"elb", "eventbridge", "firehose", "kinesis", "lambda", "nat_gateway", "opensearch", "rds",
-	}}
+	selector := &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"s3", "s3_requests"}}
 	cfg.Rules = nil
-	for i := range 64 {
+	for i := range 129 {
 		cfg.Rules = append(cfg.Rules, RuleConfig{
 			Name: fmt.Sprintf("rule-%d", i), Targets: refs, Profiles: selector, Regions: []string{"us-east-1"},
 		})
@@ -520,15 +517,74 @@ func TestCompileConfig_RejectsCompiledScopeOverflowWithoutPartialPlan(t *testing
 		cfg.Targets = append(cfg.Targets, TargetConfig{Name: name, Credentials: "sdk_default"})
 		refs = append(refs, name)
 	}
+	cfg.Rules = nil
+	for i := range 65 {
+		filters := []ResourceTagFilterConfig{{Key: "rule", Values: []string{fmt.Sprintf("%d", i)}}}
+		cfg.Rules = append(cfg.Rules, RuleConfig{
+			Name: fmt.Sprintf("expanded-%d", i), Targets: refs, Regions: []string{"us-east-1"},
+			Profiles: &ProfileSelectorConfig{Defaults: &falseValue, Include: []string{"ec2"}},
+			Filters:  &RuleFiltersConfig{ResourceTags: &filters},
+		})
+	}
+
+	plan, _, err := compileTestConfig(t, cfg)
+	assert.Nil(t, plan, "overflow must not return a partial plan")
+	assert.ErrorContains(t, err, "compiled collection scopes exceed maximum")
+}
+
+func TestCompileConfig_DiscoveryGroupLimit(t *testing.T) {
+	defaults := false
+	cfg := validBaseConfig()
+	cfg.Targets = nil
+	var refs []string
+	for i := range maxTargets {
+		name := fmt.Sprintf("target-%d", i)
+		cfg.Targets = append(cfg.Targets, TargetConfig{Name: name, Credentials: "sdk_default"})
+		refs = append(refs, name)
+	}
 	cfg.Rules = []RuleConfig{{
-		Name: "expanded", Targets: refs, Regions: []string{"us-east-1", "us-east-2", "us-west-1", "us-west-2"},
-		Profiles: &ProfileSelectorConfig{Defaults: &falseValue, Include: []string{
-			"api_gateway", "auto_scaling", "bedrock", "dynamodb", "ebs", "ec2", "efs", "eks", "elasticache",
-			"elb", "eventbridge", "firehose", "kinesis", "lambda", "nat_gateway", "opensearch", "rds",
-		}},
+		Name: "exact-limit", Targets: refs, Regions: []string{"us-east-1"},
+		Profiles: &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}},
 	}}
 
 	plan, _, err := compileTestConfig(t, cfg)
-	assert.Nil(t, plan, "overflow must not return a partial plan plan")
-	assert.ErrorContains(t, err, "compiled collection scopes exceed maximum")
+	require.NoError(t, err)
+	assert.Len(t, plan.Scopes, defaultMaxDiscoveryGroups)
+
+	cfg.Rules[0].Regions = []string{"us-east-1", "us-west-2"}
+	plan, _, err = compileTestConfig(t, cfg)
+	assert.Nil(t, plan)
+	assert.ErrorContains(t, err, "derives 65 discovery groups")
+	assert.ErrorContains(t, err, "limits.max_discovery_groups=64")
+	assert.ErrorContains(t, err, "raise the safeguard")
+	assert.ErrorContains(t, err, "split the collection across multiple jobs")
+
+	raised := maxDiscoveryGroupsPerJob
+	cfg.Limits.MaxDiscoveryGroups = raised
+	cfg.Rules[0].Targets = refs[:raised/len(cfg.Rules[0].Regions)]
+	cfg.Targets = cfg.Targets[:len(cfg.Rules[0].Targets)]
+	plan, _, err = compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	assert.Len(t, plan.Scopes, raised)
+
+	cfg.Rules[0].Regions = append(cfg.Rules[0].Regions, "eu-west-1")
+	plan, _, err = compileTestConfig(t, cfg)
+	assert.Nil(t, plan)
+	require.ErrorContains(t, err, "derives 101 discovery groups")
+	assert.NotContains(t, err.Error(), "raise the safeguard")
+	assert.Contains(t, err.Error(), "split the collection across multiple jobs")
+}
+
+func TestCompileConfig_DiscoveryGroupsShareTargetRegionNamespace(t *testing.T) {
+	defaults := false
+	cfg := validBaseConfig()
+	cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"s3", "s3_requests"}}
+
+	catalog, err := cwprofiles.LoadFromDefaultDirs()
+	require.NoError(t, err)
+	compiler := newPlanCompiler(cfg, catalog)
+	plan, _, err := compiler.compile()
+	require.NoError(t, err)
+	assert.Len(t, plan.Scopes, 2)
+	assert.Len(t, compiler.discoveryGroups, 1, "profiles sharing target, region, and namespace share one discovery group")
 }

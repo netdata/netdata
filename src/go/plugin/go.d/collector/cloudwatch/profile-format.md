@@ -19,6 +19,7 @@ namespace: AWS/Example
 supported_regions: [us-east-1]  # optional; omit when unrestricted
 disabled: true                  # optional; exclude from the default-enabled set
 period: 300
+publication_delay: 10m          # optional profile-level publication fallback
 
 instance:
   dimensions:
@@ -81,6 +82,7 @@ The filename without `.yaml` is the profile name. In the example, a file named
 | `supported_regions` | no | Non-empty list of canonical lowercase region codes where this namespace publishes metrics. Omit for unrestricted regional services. |
 | `disabled` | no | When `true`, collection rules do not select the profile through their default set. A rule can still name it explicitly in `profiles.include`. |
 | `period` | yes | Default CloudWatch period in seconds. It must be a positive multiple of 60, up to 86400. |
+| `publication_delay` | no | Collector wait after a bucket closes before querying it. This is scheduling policy, not an AWS publication SLA. Use a canonical duration such as `10m` or `1d`. Omission uses the collector's built-in `10m` fallback; collection rules may override it. |
 | `instance` | yes | Exact dimension set that identifies one collected resource. |
 | `metrics` | yes | Metrics and statistics queried for every discovered instance. |
 | `template` | yes | Dynamic chart template populated from the exported series. |
@@ -164,8 +166,8 @@ and selector field. CloudWatch profiles add these restrictions:
 - Every dimension selector must resolve to a series exported by the profile.
 - Chart IDs must be unique across the complete loaded profile catalog.
 
-The collector injects the period divisor for rate metrics and marks all emitted
-CloudWatch metric families as floating-point values.
+The collector divides rate totals by the effective rule period before emission
+and marks all emitted CloudWatch metric families as floating-point values.
 
 ## Authoring workflow
 
