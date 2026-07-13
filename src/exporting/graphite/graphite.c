@@ -318,7 +318,7 @@ int format_dimension_stored_graphite_plaintext(struct instance *instance, RRDDIM
         (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
         RRD_ID_LENGTH_MAX);
 
-    time_t last_t;
+    time_t last_t = 0;
     NETDATA_DOUBLE value = exporting_calculate_value_from_stored_data(instance, rd, &last_t);
 
     return format_graphite_metric_stored(
