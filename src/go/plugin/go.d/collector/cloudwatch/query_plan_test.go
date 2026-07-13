@@ -41,11 +41,11 @@ func ec2QueryCollector(regions []string, instancesByRegion map[string][][]string
 	c.applyDefaults()
 	setSingleTargetPlan(c, "123456789012", regions, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 
-	insts := make(map[discoveryKey][]discoveredInstance)
+	insts := make(map[discoveryKey][]collectionInstance)
 	for region, list := range instancesByRegion {
-		di := make([]discoveredInstance, 0, len(list))
+		di := make([]collectionInstance, 0, len(list))
 		for _, vals := range list {
-			di = append(di, discoveredInstance{DimensionValues: vals})
+			di = append(di, collectionInstance{DimensionValues: vals})
 		}
 		insts[discoveryKey{Target: "base", Profile: "ec2", Region: region}] = di
 	}
@@ -136,7 +136,7 @@ func TestBuildQueryPlan_ConstantDimension(t *testing.T) {
 		},
 	}}}
 	setSingleTargetPlan(c, "123456789012", []string{"us-east-1"}, profiles)
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "base", Profile: "cloudfront", Region: "us-east-1"}: {{DimensionValues: []string{"E1", "Global"}}},
 	}}
 
@@ -199,7 +199,7 @@ func TestCurrentQueryPlan_CachesUntilInputsChange(t *testing.T) {
 
 	c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}] = append(
 		c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}],
-		discoveredInstance{DimensionValues: []string{"i-2"}},
+		collectionInstance{DimensionValues: []string{"i-2"}},
 	)
 	assert.Len(t, requireCurrentQueryPlan(t, c), len(first), "mutating an input without invalidation does not rebuild")
 
@@ -231,7 +231,7 @@ func filteredOverlapCollector(t *testing.T) *Collector {
 	})
 	require.NoError(t, c.ensureTargets(context.Background()))
 	require.Len(t, c.plan.Scopes, 2)
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}: {
 			{DimensionValues: []string{"i-1"}}, {DimensionValues: []string{"i-2"}},
 		},
@@ -282,8 +282,8 @@ func TestBuildQueryPlan_SeriesOwnershipAcrossTargets(t *testing.T) {
 	c.plan.Scopes[0].TagFilter = nil
 	c.plan.Scopes[0].SelectedSeries = selectCompiledSeries(t, c.plan.Scopes[0], "ec2.cpu_utilization_average", "ec2.network_in_sum")
 	c.plan.Scopes[1].SelectedSeries = selectCompiledSeries(t, c.plan.Scopes[1], "ec2.network_in_sum", "ec2.network_out_sum")
-	c.discovery.Instances[discoveryKey{Target: "first", Profile: "ec2", Region: "us-east-1"}] = []discoveredInstance{{DimensionValues: []string{"i-1"}}}
-	c.discovery.Instances[discoveryKey{Target: "second", Profile: "ec2", Region: "us-east-1"}] = []discoveredInstance{{DimensionValues: []string{"i-1"}}}
+	c.discovery.Instances[discoveryKey{Target: "first", Profile: "ec2", Region: "us-east-1"}] = []collectionInstance{{DimensionValues: []string{"i-1"}}}
+	c.discovery.Instances[discoveryKey{Target: "second", Profile: "ec2", Region: "us-east-1"}] = []collectionInstance{{DimensionValues: []string{"i-1"}}}
 
 	plan := requireBuildQueryPlan(t, c)
 	assert.Equal(t, map[string]string{
@@ -321,8 +321,8 @@ func TestBuildQueryPlan_FirstEmittingScopeSuppliesSiblingTagLabels(t *testing.T)
 	c.plan.Scopes[0].TagFilter = nil
 	c.plan.Scopes[0].SelectedSeries = selectCompiledSeries(t, c.plan.Scopes[0], "ec2.cpu_utilization_average")
 	c.plan.Scopes[1].SelectedSeries = selectCompiledSeries(t, c.plan.Scopes[1], "ec2.network_in_sum", "ec2.network_out_sum")
-	c.discovery.Instances[discoveryKey{Target: "first", Profile: "ec2", Region: "us-east-1"}] = []discoveredInstance{{DimensionValues: []string{"i-1"}}}
-	c.discovery.Instances[discoveryKey{Target: "second", Profile: "ec2", Region: "us-east-1"}] = []discoveredInstance{{DimensionValues: []string{"i-1"}}}
+	c.discovery.Instances[discoveryKey{Target: "first", Profile: "ec2", Region: "us-east-1"}] = []collectionInstance{{DimensionValues: []string{"i-1"}}}
+	c.discovery.Instances[discoveryKey{Target: "second", Profile: "ec2", Region: "us-east-1"}] = []collectionInstance{{DimensionValues: []string{"i-1"}}}
 	c.tags.labels = map[tagCacheKey][]metrix.Label{
 		{target: "first", account: "111111111111", region: "us-east-1", profile: "ec2", joinKey: "i-1"}:  {{Key: "owner", Value: "first"}},
 		{target: "second", account: "111111111111", region: "us-east-1", profile: "ec2", joinKey: "i-1"}: {{Key: "owner", Value: "second"}},
@@ -380,8 +380,8 @@ func TestBuildQueryPlan_MaxInstances(t *testing.T) {
 	t.Run("overlapping copies count once", func(t *testing.T) {
 		c := filteredOverlapCollector(t)
 		c.plan.Scopes[0].TagFilter = nil
-		c.discovery.Instances[discoveryKey{Target: "first", Profile: "ec2", Region: "us-east-1"}] = []discoveredInstance{{DimensionValues: []string{"i-1"}}}
-		c.discovery.Instances[discoveryKey{Target: "second", Profile: "ec2", Region: "us-east-1"}] = []discoveredInstance{{DimensionValues: []string{"i-1"}}}
+		c.discovery.Instances[discoveryKey{Target: "first", Profile: "ec2", Region: "us-east-1"}] = []collectionInstance{{DimensionValues: []string{"i-1"}}}
+		c.discovery.Instances[discoveryKey{Target: "second", Profile: "ec2", Region: "us-east-1"}] = []collectionInstance{{DimensionValues: []string{"i-1"}}}
 		c.Limits.MaxInstances = 1
 		assert.NotEmpty(t, requireBuildQueryPlan(t, c))
 	})
@@ -395,7 +395,7 @@ func TestCurrentQueryPlan_OverflowRetainsLastValidPlan(t *testing.T) {
 
 	c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}] = append(
 		c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: "us-east-1"}],
-		discoveredInstance{DimensionValues: []string{"i-2"}},
+		collectionInstance{DimensionValues: []string{"i-2"}},
 	)
 	c.invalidateQueryPlan()
 	plan, err := c.currentQueryPlan()
@@ -470,16 +470,16 @@ func maximumPayloadQueryPlanCollector(instanceCount, metricCount, dimensionCount
 	c := New()
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{profile})
 	c.Limits.MaxInstances = instanceCount + 1
-	instances := make([]discoveredInstance, instanceCount)
+	instances := make([]collectionInstance, instanceCount)
 	for i := range instances {
 		values := make([]string, dimensionCount)
 		for j := range values {
 			prefix := fmt.Sprintf("instance-%03d-dimension-%02d-", i, j)
 			values[j] = prefix + strings.Repeat("x", valueBytes-len(prefix))
 		}
-		instances[i] = discoveredInstance{DimensionValues: values}
+		instances[i] = collectionInstance{DimensionValues: values}
 	}
-	c.discovery.Instances = map[discoveryKey][]discoveredInstance{
+	c.discovery.Instances = map[discoveryKey][]collectionInstance{
 		{Target: "base", Profile: profile.Name, Region: "us-east-1"}: instances,
 	}
 	return c

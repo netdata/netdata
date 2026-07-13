@@ -90,7 +90,7 @@ func setSingleTargetPlan(c *Collector, account string, regions []string, profile
 				SelectedSeries: testCompiledSeries(profile),
 			}
 			if values, ok := profile.Config.StaticInstanceValues(); ok {
-				scope.StaticInstance = &discoveredInstance{DimensionValues: values}
+				scope.StaticInstance = &collectionInstance{DimensionValues: values}
 			}
 			plan.Scopes = append(plan.Scopes, scope)
 		}

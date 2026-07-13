@@ -221,7 +221,7 @@ func TestCollect_E2E(t *testing.T) {
 			c := New()
 			configureExactRule(c, []string{"us-east-1"}, tc.profiles)
 			c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
-			useFakeClient(c, &e2eCloudWatch{list: tc.listMetrics, values: tc.gmd, ts: time.Unix(1, 0)})
+			useFakeClient(c, &e2eCloudWatch{list: tc.listMetrics, values: tc.gmd})
 			c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
 
 			series, err := collecttest.CollectScalarSeries(c)
@@ -248,7 +248,6 @@ type e2eCloudWatch struct {
 	mu       sync.Mutex
 	list     map[string][]cwtypes.Metric
 	values   map[string]float64
-	ts       time.Time
 	listErr  error // when set, ListMetrics fails (discovery error path)
 	getCalls int
 }
@@ -278,6 +277,40 @@ func (f *e2eCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetri
 		results = append(results, r)
 	}
 	return &cloudwatch.GetMetricDataOutput{MetricDataResults: results}, nil
+}
+
+func (f *e2eCloudWatch) replaceValues(values map[string]float64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.values = values
+}
+
+func TestCollect_BillingTotalRetainsPriorMonthUntilLookbackExpires(t *testing.T) {
+	const seriesKey = `billing_total.estimated_charges_maximum{account_id="000000000000",region="us-east-1"}`
+	valueKey := e2eKey("AWS/Billing", "EstimatedCharges", "Maximum", "Currency", "USD")
+	fake := &e2eCloudWatch{values: map[string]float64{valueKey: 123.45}}
+	c := New()
+	configureExactRule(c, []string{"us-east-1"}, []string{"billing_total"})
+	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
+	useFakeClient(c, fake)
+
+	now := time.Date(2026, time.August, 1, 0, 5, 0, 0, time.UTC)
+	c.now = func() time.Time { return now }
+	series, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(123.45), series[seriesKey], "the first query observes the July 31 bucket")
+
+	fake.replaceValues(nil)
+	now = time.Date(2026, time.August, 1, 0, 15, 0, 0, time.UTC)
+	series, err = collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(123.45), series[seriesKey], "the August no-data result retains the July observation")
+
+	now = time.Date(2026, time.August, 2, 0, 15, 0, 0, time.UTC)
+	series, err = collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.NotContains(t, series, seriesKey, "the July observation expires after leaving the 24h lookback")
+	assert.Equal(t, 3, fake.getCalls)
 }
 
 type policyQueryRequest struct {
@@ -403,12 +436,10 @@ func TestCollect_OrderedRulesFirstTargetOwnsSameAccountSeries(t *testing.T) {
 	first := &e2eCloudWatch{
 		list:   map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
 		values: map[string]float64{e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"): 5},
-		ts:     time.Unix(1, 0),
 	}
 	second := &e2eCloudWatch{
 		list:   map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
 		values: map[string]float64{e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"): 9},
-		ts:     time.Unix(1, 0),
 	}
 
 	c := New()
@@ -516,7 +547,7 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 	c := New()
 	configureExactRule(c, []string{region}, profileNames)
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
-	useFakeClient(c, &e2eCloudWatch{list: list, values: values, ts: time.Unix(1, 0)})
+	useFakeClient(c, &e2eCloudWatch{list: list, values: values})
 	c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
 
 	series, err := collecttest.CollectScalarSeries(c)
@@ -542,7 +573,6 @@ func TestCollect_MultiRegion(t *testing.T) {
 	useFakeClient(c, &e2eCloudWatch{
 		list:   map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
 		values: map[string]float64{e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"): 5},
-		ts:     time.Unix(1, 0),
 	})
 	c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
 
@@ -590,7 +620,6 @@ func TestCollect_DiscoveryFailSoft(t *testing.T) {
 		good := &e2eCloudWatch{
 			list:   map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
 			values: map[string]float64{e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"): 7},
-			ts:     time.Unix(1, 0),
 		}
 		bad := &e2eCloudWatch{listErr: errors.New("region unavailable")}
 		useFakeClient(c, good) // sets the region-aware newAWSConfig

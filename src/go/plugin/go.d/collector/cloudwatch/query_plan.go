@@ -258,7 +258,7 @@ func finalInstanceID(profileName, accountID, region string, dimensions []cwprofi
 // dimensions are included in the query dimensions but omitted from the labels. The
 // returned label slice is shared read-only by all of the instance's planned
 // queries, so callers must not append to it.
-func (c *Collector) instanceLabelsAndDims(accountID string, prof cwprofiles.ResolvedProfile, region string, inst discoveredInstance) ([]metrix.Label, []cwtypes.Dimension) {
+func (c *Collector) instanceLabelsAndDims(accountID string, prof cwprofiles.ResolvedProfile, region string, inst collectionInstance) ([]metrix.Label, []cwtypes.Dimension) {
 	pdims := prof.Config.Instance.Dimensions
 	dims := make([]cwtypes.Dimension, len(pdims))
 	labels := make([]metrix.Label, 0, len(pdims)+2)

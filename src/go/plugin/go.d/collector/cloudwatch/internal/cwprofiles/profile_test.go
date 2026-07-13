@@ -3,6 +3,7 @@
 package cwprofiles
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -361,6 +362,41 @@ func TestProfile_Validate(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
+		})
+	}
+}
+
+func TestProfile_ValidateQueryErrorsUseExactSourceOnce(t *testing.T) {
+	tests := map[string]struct {
+		mutate          func(*Profile)
+		wantPath        string
+		unqualifiedPath string
+	}{
+		"profile query": {
+			mutate:          func(p *Profile) { p.Query.Period = profileDuration(90 * time.Second) },
+			wantPath:        `profile "ec2".query.period`,
+			unqualifiedPath: "profile query.period",
+		},
+		"metric query": {
+			mutate: func(p *Profile) {
+				p.Metrics[0].Query = &cwquery.Config{Period: profileDuration(45 * time.Second)}
+			},
+			wantPath:        `profile "ec2".metrics[0].query.period`,
+			unqualifiedPath: "profile metric query.period",
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := validProfile()
+			tc.mutate(&p)
+			require.NoError(t, p.Normalize("ec2"))
+
+			err := p.Validate(`profile "ec2"`, "ec2")
+
+			require.Error(t, err)
+			assert.Equal(t, 1, strings.Count(err.Error(), tc.wantPath))
+			assert.NotContains(t, err.Error(), tc.unqualifiedPath)
 		})
 	}
 }

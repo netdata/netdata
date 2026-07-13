@@ -100,7 +100,7 @@ func TestBuildQueryPlan_FirstTargetOwnsSameAccountSeries(t *testing.T) {
 		"second": &seqSTS{accounts: []string{"111111111111"}},
 	})
 	require.NoError(t, c.ensureTargets(context.Background()))
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
 		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 	}}
@@ -123,7 +123,7 @@ func TestBuildQueryPlan_SameAccountDisjointResourcesSurvive(t *testing.T) {
 		"second": &seqSTS{accounts: []string{"111111111111"}},
 	})
 	require.NoError(t, c.ensureTargets(context.Background()))
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
 		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-2"}}},
 	}}
@@ -141,7 +141,7 @@ func TestCurrentQueryPlan_ClearsRetainedSeriesWhenTargetOwnershipChanges(t *test
 		"second": &seqSTS{accounts: []string{"111111111111"}},
 	})
 	require.NoError(t, c.ensureTargets(context.Background()))
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
 		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 	}}

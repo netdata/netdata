@@ -25,6 +25,21 @@ type Config struct {
 	PublicationDelay *confopt.LongDuration `yaml:"publication_delay,omitempty" json:"publication_delay,omitempty"`
 }
 
+// Source associates query values with their user-facing configuration path.
+type Source struct {
+	Config *Config
+	Path   string
+}
+
+// Resolution defines the low-to-high query precedence sources for one series.
+type Resolution struct {
+	Path         string
+	Profile      Source
+	Metric       Source
+	RuleDefaults Source
+	Rule         Source
+}
+
 // Policy is the fully resolved timing contract for one exported series.
 type Policy struct {
 	Period           time.Duration
@@ -77,47 +92,21 @@ func ValidateProfile(path string, cfg Config) error {
 // Resolve applies field precedence rule > rule defaults > metric > profile,
 // then validates the effective policy. Lookback falls back to the resolved
 // period and publication delay to the collector-wide default.
-func Resolve(path string, rule, defaults, metric *Config, profile Config) (Policy, error) {
-	if profile.Period == nil {
-		return Policy{}, fmt.Errorf("profile query.period is required")
+func Resolve(input Resolution) (Policy, error) {
+	if input.Profile.Config == nil || input.Profile.Config.Period == nil {
+		return Policy{}, fmt.Errorf("%s.period is required", sourcePath(input.Profile, "profile query"))
 	}
-	period, periodPath := profile.Period.Duration(), "profile query.period"
-	if metric != nil && metric.Period != nil {
-		period, periodPath = metric.Period.Duration(), "profile metric query.period"
-	}
-	if defaults != nil && defaults.Period != nil {
-		period, periodPath = defaults.Period.Duration(), "rule_defaults.query.period"
-	}
-	if rule != nil && rule.Period != nil {
-		period, periodPath = rule.Period.Duration(), path+".query.period"
-	}
+	sources := []Source{input.Profile, input.Metric, input.RuleDefaults, input.Rule}
+	period, periodPath, _ := resolveDuration(sources, "period", func(cfg *Config) *confopt.LongDuration { return cfg.Period })
 
 	lookback, lookbackPath := period, periodPath
-	if profile.Lookback != nil {
-		lookback, lookbackPath = profile.Lookback.Duration(), "profile query.lookback"
-	}
-	if metric != nil && metric.Lookback != nil {
-		lookback, lookbackPath = metric.Lookback.Duration(), "profile metric query.lookback"
-	}
-	if defaults != nil && defaults.Lookback != nil {
-		lookback, lookbackPath = defaults.Lookback.Duration(), "rule_defaults.query.lookback"
-	}
-	if rule != nil && rule.Lookback != nil {
-		lookback, lookbackPath = rule.Lookback.Duration(), path+".query.lookback"
+	if value, path, ok := resolveDuration(sources, "lookback", func(cfg *Config) *confopt.LongDuration { return cfg.Lookback }); ok {
+		lookback, lookbackPath = value, path
 	}
 
 	delay, delayPath := DefaultPublicationDelay, "built-in publication delay"
-	if profile.PublicationDelay != nil {
-		delay, delayPath = profile.PublicationDelay.Duration(), "profile query.publication_delay"
-	}
-	if metric != nil && metric.PublicationDelay != nil {
-		delay, delayPath = metric.PublicationDelay.Duration(), "profile metric query.publication_delay"
-	}
-	if defaults != nil && defaults.PublicationDelay != nil {
-		delay, delayPath = defaults.PublicationDelay.Duration(), "rule_defaults.query.publication_delay"
-	}
-	if rule != nil && rule.PublicationDelay != nil {
-		delay, delayPath = rule.PublicationDelay.Duration(), path+".query.publication_delay"
+	if value, path, ok := resolveDuration(sources, "publication_delay", func(cfg *Config) *confopt.LongDuration { return cfg.PublicationDelay }); ok {
+		delay, delayPath = value, path
 	}
 
 	if err := validatePeriod(periodPath, period); err != nil {
@@ -140,9 +129,35 @@ func Resolve(path string, rule, defaults, metric *Config, profile Config) (Polic
 		return Policy{}, fmt.Errorf("%s spans %d buckets; maximum is %d", lookbackPath, buckets, MaxBuckets)
 	}
 	if delay > maxReliableHorizon || lookback > maxReliableHorizon || period > maxReliableHorizon-delay-lookback {
-		return Policy{}, fmt.Errorf("%s query horizon (publication_delay + lookback + period) exceeds %s", path, maxReliableHorizon)
+		return Policy{}, fmt.Errorf("%s query horizon (publication_delay + lookback + period) exceeds %s", input.Path, maxReliableHorizon)
 	}
 	return Policy{Period: period, Lookback: lookback, PublicationDelay: delay}, nil
+}
+
+func resolveDuration(sources []Source, fieldName string, field func(*Config) *confopt.LongDuration) (time.Duration, string, bool) {
+	var (
+		value time.Duration
+		path  string
+		ok    bool
+	)
+	for _, source := range sources {
+		if source.Config == nil {
+			continue
+		}
+		if raw := field(source.Config); raw != nil {
+			value = raw.Duration()
+			path = sourcePath(source, "query") + "." + fieldName
+			ok = true
+		}
+	}
+	return value, path, ok
+}
+
+func sourcePath(source Source, fallback string) string {
+	if source.Path != "" {
+		return source.Path
+	}
+	return fallback
 }
 
 func validatePeriod(path string, value time.Duration) error {

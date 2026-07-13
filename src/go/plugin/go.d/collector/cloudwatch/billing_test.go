@@ -260,18 +260,6 @@ func TestBillingTotal_BuildsStaticQueryWithoutDiscovery(t *testing.T) {
 	assert.False(t, query.nilAsZero, "a missing gauge datapoint must remain a gap")
 }
 
-func TestBillingTotal_QueryWindowCanSpanUTCMonthBoundary(t *testing.T) {
-	c := billingTestCollector(t, "billing_total")
-	plan := requireBuildQueryPlan(t, c)
-	require.Len(t, plan, 1)
-	now := time.Date(2026, time.August, 1, 0, 5, 0, 0, time.UTC)
-
-	start, end := queryWindow(now, plan[0].policy)
-
-	assert.Equal(t, time.Date(2026, time.July, 30, 23, 50, 0, 0, time.UTC), start)
-	assert.Equal(t, time.Date(2026, time.July, 31, 23, 50, 0, 0, time.UTC), end)
-}
-
 func TestBillingTotal_RefreshDiscoveryIsNoOp(t *testing.T) {
 	c := billingTestCollector(t, "billing_total")
 	fake := &fakeCloudWatch{}

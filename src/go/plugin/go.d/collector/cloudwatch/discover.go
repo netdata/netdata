@@ -21,13 +21,6 @@ import (
 // ASCII unit separator, which cannot appear in CloudWatch dimension values.
 const instanceKeySep = "\x1f"
 
-// discoveredInstance is one instance of a profile: the CloudWatch dimension
-// values for the profile's exact instance dimension-set, ordered to match
-// Profile.DimensionNames().
-type discoveredInstance struct {
-	DimensionValues []string
-}
-
 // selectedSeriesUseRecentlyActive reports whether ListMetrics may safely use
 // RecentlyActive=PT3H for the selected series.
 func selectedSeriesUseRecentlyActive(series []compiledSeries, enabled bool) bool {
@@ -48,7 +41,7 @@ func selectedSeriesUseRecentlyActive(series []compiledSeries, enabled bool) bool
 type discoveryGroupScanner struct {
 	group              discoveryGroup
 	matchers           map[string][]*discoveryMatcher
-	instances          map[string][]discoveredInstance
+	instances          map[string][]collectionInstance
 	nextToken          *string
 	seenTokens         map[string]struct{}
 	pages              int
@@ -62,7 +55,7 @@ func newDiscoveryGroupScanner(group discoveryGroup) *discoveryGroupScanner {
 	return &discoveryGroupScanner{
 		group:      group,
 		matchers:   newDiscoveryMatcherIndex(group.Profiles),
-		instances:  make(map[string][]discoveredInstance, len(group.Profiles)),
+		instances:  make(map[string][]collectionInstance, len(group.Profiles)),
 		seenTokens: make(map[string]struct{}),
 	}
 }
@@ -135,7 +128,7 @@ func (s *discoveryGroupScanner) scanPage(ctx context.Context, client cloudwatchC
 			}
 			s.candidateInstances++
 			m.seen[key] = struct{}{}
-			s.instances[m.profileName] = append(s.instances[m.profileName], discoveredInstance{DimensionValues: strings.Split(key, instanceKeySep)})
+			s.instances[m.profileName] = append(s.instances[m.profileName], collectionInstance{DimensionValues: strings.Split(key, instanceKeySep)})
 		}
 	}
 
@@ -278,7 +271,7 @@ type discoveryGroup struct {
 // discoverySnapshot is the cached result of one discovery pass across all
 // candidate profiles and regions.
 type discoverySnapshot struct {
-	Instances map[discoveryKey][]discoveredInstance
+	Instances map[discoveryKey][]collectionInstance
 	FetchedAt time.Time
 	ExpiresAt time.Time
 }
@@ -331,7 +324,7 @@ func (s discoverySnapshot) validateRetainedBounds() error {
 // participating profile.
 type discoveryGroupResult struct {
 	Group     discoveryGroup
-	Instances map[string][]discoveredInstance
+	Instances map[string][]collectionInstance
 	Err       error
 }
 
@@ -426,9 +419,9 @@ func discoverAll(
 // returns the number of failed groups. Failed groups retain their previous
 // profile instances; successful groups replace theirs. The merged effective
 // snapshot must fit the same retained-state bounds as a fresh scan.
-func buildDiscoverySnapshot(results []discoveryGroupResult, prev map[discoveryKey][]discoveredInstance, now time.Time, refreshEvery int) (discoverySnapshot, int, error) {
+func buildDiscoverySnapshot(results []discoveryGroupResult, prev map[discoveryKey][]collectionInstance, now time.Time, refreshEvery int) (discoverySnapshot, int, error) {
 	snap := discoverySnapshot{
-		Instances: make(map[discoveryKey][]discoveredInstance),
+		Instances: make(map[discoveryKey][]collectionInstance),
 		FetchedAt: now,
 		ExpiresAt: now.Add(time.Duration(refreshEvery) * time.Second),
 	}
@@ -499,8 +492,8 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	// If the parent context was canceled or timed out during the fan-out, abort before
 	// committing: buildDiscoverySnapshot would otherwise carry forward instances (or
 	// accept a partial first snapshot) and advance the TTL, so the next cycle would skip
-	// discovery. Operation-scoped GetMetricData timeouts use derived contexts and
-	// do not trip this, so they stay fail-soft.
+	// discovery. ListMetrics errors and the discovery stage's derived timeout do
+	// not cancel the parent context, so they stay fail-soft.
 	if err := ctx.Err(); err != nil {
 		return err
 	}

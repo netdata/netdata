@@ -269,7 +269,7 @@ func (pc *planCompiler) addScope(path, ruleName string, target *collectionTarget
 		TagMembershipID: membershipID, SelectedSeries: unshadowed,
 	}
 	if static {
-		scope.StaticInstance = &discoveredInstance{DimensionValues: staticValues}
+		scope.StaticInstance = &collectionInstance{DimensionValues: staticValues}
 	}
 	pc.plan.Scopes = append(pc.plan.Scopes, scope)
 	pc.selectedProfiles[profile.Name] = profile
@@ -287,7 +287,19 @@ func resolveSeriesPolicies(path string, rule, defaults *cwquery.Config, profile 
 	out := make([]compiledSeries, len(series))
 	for i, item := range series {
 		metric := profile.Config.Metrics[item.MetricIndex]
-		policy, err := cwquery.Resolve(path, rule, defaults, metric.Query, profile.Config.Query)
+		policy, err := cwquery.Resolve(cwquery.Resolution{
+			Path: path,
+			Profile: cwquery.Source{
+				Config: &profile.Config.Query,
+				Path:   fmt.Sprintf("profile %q.query", profile.Name),
+			},
+			Metric: cwquery.Source{
+				Config: metric.Query,
+				Path:   fmt.Sprintf("profile %q.metrics[%d].query", profile.Name, item.MetricIndex),
+			},
+			RuleDefaults: cwquery.Source{Config: defaults, Path: "rule_defaults.query"},
+			Rule:         cwquery.Source{Config: rule, Path: path + ".query"},
+		})
 		if err != nil {
 			return nil, fmt.Errorf("%s profile %q MetricName %q statistic %q: %w", path, profile.Name, metric.MetricName, item.Statistic, err)
 		}

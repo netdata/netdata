@@ -182,7 +182,9 @@ func (p Profile) Validate(prefix, baseName string) error {
 			seen[region] = struct{}{}
 		}
 	}
-	errs = append(errs, cwquery.ValidateProfile(prefix+".query", p.Query))
+	profileQueryPath := prefix + ".query"
+	profileQueryErr := cwquery.ValidateProfile(profileQueryPath, p.Query)
+	errs = append(errs, profileQueryErr)
 
 	errs = append(errs, validateInstanceDimensions(prefix, p.Instance.Dimensions))
 
@@ -199,11 +201,19 @@ func (p Profile) Validate(prefix, baseName string) error {
 	seenMetricIDs := map[string]struct{}{}
 	seenMetricNames := map[string]struct{}{}
 	for i, metric := range p.Metrics {
-		if err := metric.validate(prefix, i); err != nil {
+		metricPath := fmt.Sprintf("%s.metrics[%d]", prefix, i)
+		if err := metric.validate(metricPath); err != nil {
 			errs = append(errs, err)
 		}
-		if p.Query.Period != nil {
-			if _, err := cwquery.Resolve(fmt.Sprintf("%s.metrics[%d]", prefix, i), nil, nil, metric.Query, p.Query); err != nil {
+		metricQueryPath := metricPath + ".query"
+		metricQueryErr := cwquery.Validate(metricQueryPath, metric.Query)
+		errs = append(errs, metricQueryErr)
+		if profileQueryErr == nil && metricQueryErr == nil {
+			if _, err := cwquery.Resolve(cwquery.Resolution{
+				Path:    metricPath,
+				Profile: cwquery.Source{Config: &p.Query, Path: profileQueryPath},
+				Metric:  cwquery.Source{Config: metric.Query, Path: metricQueryPath},
+			}); err != nil {
 				errs = append(errs, err)
 			}
 		}
@@ -235,8 +245,7 @@ func (p Profile) Validate(prefix, baseName string) error {
 	return errors.Join(errs...)
 }
 
-func (m Metric) validate(profilePrefix string, idx int) error {
-	prefix := fmt.Sprintf("%s.metrics[%d]", profilePrefix, idx)
+func (m Metric) validate(prefix string) error {
 	var errs []error
 
 	if !IsValidIdentityID(m.ID) {
@@ -247,7 +256,6 @@ func (m Metric) validate(profilePrefix string, idx int) error {
 	} else if m.MetricName != strings.TrimSpace(m.MetricName) {
 		errs = append(errs, fmt.Errorf("%s: 'metric_name' must not have surrounding whitespace", prefix))
 	}
-	errs = append(errs, cwquery.Validate(prefix+".query", m.Query))
 	if len(m.Statistics) == 0 {
 		errs = append(errs, fmt.Errorf("%s: 'statistics' must contain at least one statistic", prefix))
 	}

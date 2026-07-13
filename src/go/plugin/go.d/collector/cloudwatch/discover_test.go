@@ -175,7 +175,7 @@ func testDiscoveryBudget(groupCount int) *discoveryBudget {
 	return budget
 }
 
-func scanDiscoveryGroupForTest(ctx context.Context, client cloudwatchClient, group discoveryGroup) (map[string][]discoveredInstance, error) {
+func scanDiscoveryGroupForTest(ctx context.Context, client cloudwatchClient, group discoveryGroup) (map[string][]collectionInstance, error) {
 	if len(group.Profiles) == 0 {
 		return nil, nil
 	}
@@ -201,7 +201,7 @@ func discoverAllForTest(
 	return results
 }
 
-func discoverOneProfile(ctx context.Context, client cloudwatchClient, profile cwprofiles.Profile, useRecentlyActive bool) ([]discoveredInstance, error) {
+func discoverOneProfile(ctx context.Context, client cloudwatchClient, profile cwprofiles.Profile, useRecentlyActive bool) ([]collectionInstance, error) {
 	const profileName = "test"
 	instances, err := scanDiscoveryGroupForTest(ctx, client, discoveryGroup{
 		Namespace: profile.Namespace, RecentlyActive: useRecentlyActive,
@@ -639,13 +639,13 @@ func TestCollector_DiscoveryGroupsUseUnionOfSelectedSeriesPolicies(t *testing.T)
 }
 
 func TestBuildDiscoverySnapshot_FailSoftCarriesForward(t *testing.T) {
-	prev := map[discoveryKey][]discoveredInstance{
+	prev := map[discoveryKey][]collectionInstance{
 		{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 		{Target: "base", Profile: "ec2", Region: "us-west-2"}: {{DimensionValues: []string{"i-9"}}},
 	}
 	profile := resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))
 	results := []discoveryGroupResult{
-		{Group: discoveryGroup{Target: "base", Region: "us-east-1", Profiles: []cwprofiles.ResolvedProfile{profile}}, Instances: map[string][]discoveredInstance{"ec2": {{DimensionValues: []string{"i-2"}}}}},
+		{Group: discoveryGroup{Target: "base", Region: "us-east-1", Profiles: []cwprofiles.ResolvedProfile{profile}}, Instances: map[string][]collectionInstance{"ec2": {{DimensionValues: []string{"i-2"}}}}},
 		{Group: discoveryGroup{Target: "base", Region: "us-west-2", Profiles: []cwprofiles.ResolvedProfile{profile}}, Err: errors.New("throttled")},
 	}
 
@@ -661,12 +661,12 @@ func TestDiscoverySnapshot_WeightedRetainedBound(t *testing.T) {
 	for i := range values {
 		values[i] = strings.Repeat("x", 1024)
 	}
-	instance := discoveredInstance{DimensionValues: values}
-	instances := make([]discoveredInstance, maxRetainedCandidateBytesPerRefresh/retainedDiscoveredInstanceBytes(instance)+1)
+	instance := collectionInstance{DimensionValues: values}
+	instances := make([]collectionInstance, maxRetainedCandidateBytesPerRefresh/retainedDiscoveredInstanceBytes(instance)+1)
 	for i := range instances {
 		instances[i] = instance
 	}
-	snap := discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{{}: instances}}
+	snap := discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{{}: instances}}
 
 	assert.ErrorContains(t, snap.validateRetainedBounds(), "more than 64 MiB")
 }
@@ -924,7 +924,7 @@ func BenchmarkDiscoverProfileGroupMaximumCandidatePayload(b *testing.B) {
 }
 
 // dimValues extracts the dimension-value slices for stable comparison.
-func dimValues(insts []discoveredInstance) [][]string {
+func dimValues(insts []collectionInstance) [][]string {
 	out := make([][]string, len(insts))
 	for i, ins := range insts {
 		out[i] = ins.DimensionValues
@@ -1066,7 +1066,7 @@ func newAggregateFailureCollector(now time.Time, includeStatic bool) (*Collector
 func TestCollector_refreshDiscovery_AggregateFailureIsAtomicWithSnapshot(t *testing.T) {
 	base := time.Unix(1000, 0)
 	c, _ := newAggregateFailureCollector(base, false)
-	oldInstances := map[discoveryKey][]discoveredInstance{
+	oldInstances := map[discoveryKey][]collectionInstance{
 		{Target: "base", Profile: "deep", Region: "us-east-1"}: {{DimensionValues: []string{"old"}}},
 	}
 	c.discovery = discoverySnapshot{Instances: oldInstances, FetchedAt: base.Add(-time.Hour), ExpiresAt: base}
@@ -1167,7 +1167,7 @@ func TestCollector_refreshDiscovery_ParentCancellationDoesNotScheduleRefresh(t *
 	base := time.Unix(1000, 0)
 	c, _ := newAggregateFailureCollector(base, false)
 	c.discovery = discoverySnapshot{
-		Instances: map[discoveryKey][]discoveredInstance{},
+		Instances: map[discoveryKey][]collectionInstance{},
 		FetchedAt: base.Add(-time.Hour),
 		ExpiresAt: base,
 	}
