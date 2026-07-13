@@ -5410,6 +5410,7 @@ version = "0.1.3"
 dependencies = [
  "opentelemetry-proto",
  "prost",
+ "serde_json",
  "sfsq",
  "sfst",
  "thiserror 2.0.18",

@@ -18,3 +18,4 @@ sfsq = { workspace = true }
 thiserror = { workspace = true }
 opentelemetry-proto = { workspace = true }
 prost = { workspace = true }
+serde_json = { workspace = true }

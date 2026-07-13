@@ -19,6 +19,7 @@
 
 mod duration;
 mod error;
+mod json;
 mod keywords;
 mod parse;
 pub mod pb;
@@ -27,6 +28,7 @@ mod request;
 
 pub use duration::parse_duration_ns;
 pub use error::ParseError;
+pub use json::{search_response_json, tag_names_json, tag_values_json};
 pub use parse::parse_query;
 pub use reconstruct::reconstruct_trace;
 pub use request::{RequestError, parse_trace_id_hex, window_from_unix_seconds};

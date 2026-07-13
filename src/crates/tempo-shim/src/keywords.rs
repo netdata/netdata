@@ -83,6 +83,46 @@ fn intrinsic(name: &str) -> Option<TraceIntrinsic> {
     })
 }
 
+/// The canonical wire name for each engine intrinsic — the reverse of
+/// [`resolve_field`]'s table, used by tag enumeration. Where a v1 name
+/// and a colon alias both exist the v1 name wins (it is what the form's
+/// static filter pickers use).
+pub(crate) fn intrinsic_wire_name(i: TraceIntrinsic) -> &'static str {
+    use TraceIntrinsic::*;
+    match i {
+        Name => "name",
+        Kind => "kind",
+        Status => "status",
+        StatusMessage => "statusMessage",
+        Duration => "duration",
+        TraceDuration => "traceDuration",
+        RootName => "rootName",
+        RootServiceName => "rootServiceName",
+        SpanId => "span:id",
+        ParentSpanId => "span:parentID",
+        TraceId => "trace:id",
+        EventName => "event:name",
+        EventTimeSinceStart => "event:timeSinceStart",
+        InstrumentationName => "instrumentation:name",
+        InstrumentationVersion => "instrumentation:version",
+        LinkSpanId => "link:spanID",
+        LinkTraceId => "link:traceID",
+    }
+}
+
+/// The Tempo scope names of the tags-v2 response
+/// (`tempopb.SearchTagsV2Scope.name`).
+pub(crate) fn scope_wire_name(scope: TagScope) -> &'static str {
+    match scope {
+        TagScope::Resource => "resource",
+        TagScope::Span => "span",
+        TagScope::Instrumentation => "instrumentation",
+        TagScope::Event => "event",
+        TagScope::Link => "link",
+        TagScope::Intrinsic => "intrinsic",
+    }
+}
+
 /// Resolve a field token to its predicate target. Precedence: leading
 /// dot = unscoped attribute; exact intrinsic name (colon forms
 /// included); scope prefix; otherwise a bare ad-hoc field — the
