@@ -208,7 +208,7 @@
             },
             "profiles": {
               "title": "Profiles",
-              "description": "Omit to select default-enabled profiles. Include adds profiles; exclude removes profiles.",
+              "description": "Omit to select default-enabled profiles. Include adds profiles; exclude removes profiles. Billing profiles are opt-in: billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
               "type": "object",
               "properties": {
                 "defaults": {
@@ -217,6 +217,7 @@
                   "default": true
                 },
                 "include": {
+                  "description": "Additional profile basenames. Opt-in Billing choices are billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
                   "type": "array",
                   "maxItems": 256,
                   "uniqueItems": true,
@@ -623,13 +624,13 @@
           }
         },
         "profiles": {
-          "ui:help": "Choose which stock or user CloudWatch profiles this rule collects. Omit this section to use all default-enabled profiles.",
+          "ui:help": "Choose which stock or user CloudWatch profiles this rule collects. Omit this section to use all default-enabled profiles. Billing is opt-in through billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
           "defaults": {
             "ui:help": "Include all default-enabled profiles before applying include and exclude lists."
           },
           "include": {
             "ui:listFlavour": "list",
-            "ui:help": "Additional profile basenames to include.",
+            "ui:help": "Additional profile basenames to include. Billing choices are billing_total, billing_service, billing_linked_account, and billing_linked_account_service; use us-east-1 and disable inherited resource-tag filters for them.",
             "items": {
               "ui:placeholder": "ec2"
             }

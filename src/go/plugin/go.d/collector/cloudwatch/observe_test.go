@@ -20,6 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -230,7 +231,7 @@ func (f *flakeyCloudWatch) getMetricDataCalls() int {
 
 func TestObserve_PerRegionScheduleIsolation(t *testing.T) {
 	ec2 := cwprofiles.Profile{
-		Namespace: "AWS/EC2", Period: 300,
+		Namespace: "AWS/EC2", Query: cwquery.Config{Period: longDuration(5 * time.Minute)},
 		Instance: cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "InstanceId", Label: "instance_id"}}},
 		Metrics:  []cwprofiles.Metric{{ID: "cpu_utilization", MetricName: "CPUUtilization", Statistics: []string{"average"}}},
 	}
@@ -436,7 +437,7 @@ func TestObserve_DailySeriesSurvivesEvictionWindow(t *testing.T) {
 	// survives the metrix 10-unseen-cycle eviction (spec retention acceptance).
 	dailyProfile := cwprofiles.Profile{
 		Namespace: "AWS/S3",
-		Period:    86400,
+		Query:     cwquery.Config{Period: longDuration(24 * time.Hour)},
 		Instance:  cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "BucketName", Label: "bucket_name"}}},
 		Metrics:   []cwprofiles.Metric{{ID: "bucket_size_bytes", MetricName: "BucketSizeBytes", Statistics: []string{"average"}}},
 	}
@@ -468,12 +469,12 @@ func TestObserve_MultiPeriodScheduling(t *testing.T) {
 	// One job with a 300s profile and an 86400s profile: when only the 300s
 	// period is due, it re-queries while the daily one re-emits its cached value.
 	ec2 := cwprofiles.Profile{
-		Namespace: "AWS/EC2", Period: 300,
+		Namespace: "AWS/EC2", Query: cwquery.Config{Period: longDuration(5 * time.Minute)},
 		Instance: cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "InstanceId", Label: "instance_id"}}},
 		Metrics:  []cwprofiles.Metric{{ID: "cpu_utilization", MetricName: "CPUUtilization", Statistics: []string{"average"}}},
 	}
 	s3 := cwprofiles.Profile{
-		Namespace: "AWS/S3", Period: 86400,
+		Namespace: "AWS/S3", Query: cwquery.Config{Period: longDuration(24 * time.Hour)},
 		Instance: cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "BucketName", Label: "bucket_name"}}},
 		Metrics:  []cwprofiles.Metric{{ID: "bucket_size", MetricName: "BucketSizeBytes", Statistics: []string{"average"}}},
 	}
@@ -548,7 +549,7 @@ func TestObserve_RateMetricNoDataZeroFilled(t *testing.T) {
 	configureExactRule(c, []string{"us-east-1"}, []string{"lambda"})
 	profiles := []cwprofiles.ResolvedProfile{{Name: "lambda", Config: cwprofiles.Profile{
 		Namespace: "AWS/Lambda",
-		Period:    300,
+		Query:     cwquery.Config{Period: longDuration(5 * time.Minute)},
 		Instance:  cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "FunctionName", Label: "function_name"}}},
 		Metrics:   []cwprofiles.Metric{{ID: "errors", MetricName: "Errors", Statistics: []string{"sum"}, Rate: true}},
 	}}}
@@ -600,7 +601,7 @@ func TestObserve_RateMetricNonterminalAndForbiddenResultsGap(t *testing.T) {
 			configureExactRule(c, []string{"us-east-1"}, []string{"lambda"})
 			profiles := []cwprofiles.ResolvedProfile{{Name: "lambda", Config: cwprofiles.Profile{
 				Namespace: "AWS/Lambda",
-				Period:    300,
+				Query:     cwquery.Config{Period: longDuration(5 * time.Minute)},
 				Instance:  cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "FunctionName", Label: "function_name"}}},
 				Metrics:   []cwprofiles.Metric{{ID: "errors", MetricName: "Errors", Statistics: []string{"sum"}, Rate: true}},
 			}}}

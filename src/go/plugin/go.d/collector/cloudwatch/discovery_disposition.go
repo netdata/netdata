@@ -40,8 +40,8 @@ type discoveryDiagnostics struct {
 	report           *discoveryReport
 }
 
-func (c *Collector) aggregateFailureDisposition(err error) discoveryDisposition {
-	if c.discovery.FetchedAt.IsZero() {
+func (c *Collector) aggregateFailureDisposition(err error, canContinue bool) discoveryDisposition {
+	if c.discovery.FetchedAt.IsZero() && !canContinue {
 		return discoveryDisposition{
 			kind: discoveryDispositionFail,
 			err:  fmt.Errorf("CloudWatch discovery refresh failed: %w", sanitizeAWSError(err)),
@@ -110,7 +110,7 @@ func (c *Collector) emitDiscoveryDiagnostics(diagnostics discoveryDiagnostics) {
 		c.Limit(logKeyDiscoveryGroupFailed+"_aggregate", 1, recurringLogEvery).
 			Warningf("CloudWatch discovery refresh was discarded atomically: %v", sanitizeAWSError(diagnostics.aggregateFailure))
 	}
-	c.warnOperationFailures(logKeyDiscoveryGroupFailed, "discovery", " (using last-known instances)", diagnostics.groupFailures)
+	c.warnOperationFailures(logKeyDiscoveryGroupFailed, "discovery", " (retaining previous dynamic instances where available)", diagnostics.groupFailures)
 	if diagnostics.report == nil {
 		return
 	}

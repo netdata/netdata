@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon MSK
 namespace: AWS/Kafka
-period: 300
+query:
+  period: 5m
 # Broker grain. The CloudWatch dimension names contain literal spaces ("Cluster Name", "Broker ID");
 # only the DEFAULT (free) monitoring level is collected here -- PER_BROKER / PER_TOPIC_* levels are
 # paid and opt-in. *PerSec metrics are already per-second rates (average, not sum).

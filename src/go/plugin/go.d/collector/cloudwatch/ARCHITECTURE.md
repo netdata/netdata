@@ -30,20 +30,24 @@ scopes of its own.
 
 ## Big Picture
 
-Config picks the services; the collector discovers what actually exists, queries
-it on a per-period schedule to keep the bill down, and renders the results as
-charts under the `cloudwatch.` namespace.
+Config picks the services; the collector discovers what actually exists when a
+profile has identifying dimensions, queries each resulting instance on a
+per-period schedule, and renders the results as charts under the `cloudwatch.`
+namespace. A profile whose dimensions are all constants already describes one
+complete instance, so compilation creates that static instance directly.
 
 ```mermaid
 flowchart LR
     cfg("Config<br/>credentials · targets · ordered rules")
-    disc("Discover<br/>ListMetrics<br/>cheap / free tier")
+    static("Static instance<br/>all dimensions known")
+    disc("Discover dynamic instances<br/>ListMetrics<br/>cheap / free tier")
     tags("Resolve tags<br/>membership + labels")
     plan("Plan + state<br/>stable query + policy")
     query("Query<br/>GetMetricData<br/>billed — the cost driver")
     store("metrix store<br/>gauges + labels")
     charts("Dynamic charts<br/>cloudwatch.*")
 
+    cfg --> static --> plan
     cfg --> disc --> tags --> plan --> query --> store --> charts
 
     classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
@@ -52,7 +56,7 @@ flowchart LR
     classDef commit fill:#d8f3e0,stroke:#2da44e,color:#0b3d1f;
 
     class cfg input
-    class disc,tags,plan sched
+    class static,disc,tags,plan sched
     class query effect
     class store,charts commit
 ```
@@ -61,8 +65,9 @@ Each collection cycle (`collect.go`), in order:
 
 1. compile the raw configuration and resolve one AWS account id per target
    (`plan.go`, `identity.go`);
-2. discover live instances per (target, profile, region) with `ListMetrics`
-   (`discover.go`);
+2. use compiler-created instances for all-constant profiles; for dynamic
+   profiles, share one `ListMetrics` scan per (target, region, namespace) and
+   match each participating profile against that stream (`discover.go`);
 3. resolve resource-tag membership and optional chart labels (`tags.go`);
 4. reuse or rebuild the stable per-series query blueprint
    (`query_plan.go`);
@@ -176,6 +181,10 @@ compiler state, and installed execution plan:
   Same-account cross-target overlap remains until discovery, where final instance
   identity can be evaluated correctly. Scopes with different predicates remain
   ordered policy scopes even when they share one discovery scan.
+- A profile whose dimensions are all constants compiles one immutable static
+  instance into each eligible target/region scope. It consumes no discovery-group
+  budget and needs no resource-tag fetch; query ownership and every final-instance
+  and query-work limit still apply normally.
 - Fixed internal caps bound credentials, 64 targets, rules, list references,
   candidate-scope evaluation, and compiled scopes. Overflow fails compilation and never installs a partial plan;
   `limits.max_instances` and `limits.max_discovery_groups` are operator safeguards for final selected instances and
@@ -189,6 +198,10 @@ Discovery then finds which *instances* of those profiles exist per target and re
 
 `discover.go`. `refreshDiscovery` re-runs only when the snapshot TTL
 (`discovery.refresh_every`, default 300s) has expired.
+
+All-constant scopes are omitted from discovery groups. A static-only plan makes
+`refreshDiscovery` a true no-op: no `ListMetrics`, snapshot installation, TTL
+advance, or dependent tag/query invalidation.
 
 - `discoveryGroups` coalesces compiled scopes by target, region, and namespace.
   Each target/profile/region matcher first evaluates the full horizons of its selected series;
@@ -236,14 +249,17 @@ Discovery then finds which *instances* of those profiles exist per target and re
   The merged effective snapshot is rechecked against the aggregate candidate-count
   and weighted-memory bounds before installation, preventing rotating partial
   failures from accumulating retained groups beyond the refresh envelope. Only a
-  first-ever pass where every group errors is fatal; after any snapshot exists,
-  discovery errors are warnings.
+  first-ever pass where every group errors is fatal only when no executable static
+  scope exists. With static work, the empty prior dynamic state is retained and a
+  retry is scheduled after `discovery.refresh_every`.
 - **Aggregate discovery failure is atomic**: budget/stage-timeout exhaustion or a
   merged-snapshot bound violation discards all results from that refresh. An existing
   snapshot and its dependent tag/query/observation state remain active, with the next
   attempt scheduled after `discovery.refresh_every`. A first-ever aggregate failure
-  is returned to the job runner; parent cancellation changes neither snapshot state
-  nor retry scheduling.
+  is returned to the job runner only when no executable static scope exists.
+  Otherwise static queries continue while dynamic discovery waits for its retry.
+  Parent cancellation changes neither snapshot state nor retry scheduling and is
+  always returned.
 - **One terminal disposition gate owns cancellation precedence**: refresh work computes
   exactly one install, retry-schedule, or first-pass-error outcome and prepares all
   diagnostics without mutating discovery state. Diagnostics run first; one final parent
@@ -363,7 +379,9 @@ stable query independently:
   is no first-N truncation.
 - Each `plannedQuery` contains a fully resolved `{period, lookback,
   publication_delay}` policy. Resolution is field-by-field: rule, rule defaults,
-  profile metric/profile, then the built-in publication-delay fallback.
+  profile metric, profile defaults, then the built-in lookback/publication-delay
+  fallbacks. Profile `query.period` is required; the lookback fallback follows the
+  resolved period.
   Publication delay is collector scheduling policy, not an AWS SLA. In particular,
   the stock S3 storage profile's `1d` is a conservative choice; AWS documents that
   storage metrics are reported once per day but does not guarantee delivery within
@@ -483,7 +501,8 @@ return spec.MarshalTemplate()                # Validate + yaml.v2 marshal, then 
 - Uses the framework `charttpl` primitives: `Group.Clone()` (typed deep copy, so
   the shared profile catalog is never mutated) and `Spec.MarshalTemplate()`.
 - Rate divisors are not part of the chart template because rules can override
-  profile periods. Rate normalization happens on the emitted numeric value.
+  nested profile query defaults. Rate normalization happens on the emitted
+  numeric value using the effective period.
 
 ## Profiles (`cwprofiles/`)
 
@@ -495,14 +514,16 @@ lockstep with every profile-schema change.
 
 A `Profile` declares: `namespace` (e.g. `AWS/EC2`), optional
 `supported_regions` (an intrinsic restriction for services such as CloudFront),
-`period`, `instance`
+required nested `query.period` plus optional `query.lookback` and
+`query.publication_delay`, `instance`
 dimensions (the CloudWatch dimension names that identify one instance; each is
 either mapped to a Netdata `label`, or pinned to a `constant` value — a
 match-and-query-only dimension that is matched and queried but not emitted as a
 label, for a constant CloudWatch dimension such as CloudFront's `Region=Global`),
 `metrics` (with `statistics`, optional `rate`,
-optional per-metric `period`, and optional `nil_as_zero` — record 0 vs gap on a
-no-datapoint result, defaulting to `rate`), and a `charttpl.Group` `template`.
+optional per-metric nested `query` field overrides, and optional `nil_as_zero` —
+record 0 vs gap on a no-datapoint result, defaulting to `rate`), and a
+`charttpl.Group` `template`.
 
 Load and resolution (`catalog.go`):
 
@@ -587,11 +608,12 @@ aws-eusc).
 
 The two CloudWatch APIs bill differently, and the design leans on that:
 
-- **`ListMetrics` (discovery) is cheap** — it falls under CloudWatch's free API
+- **`ListMetrics` (dynamic discovery) is cheap** — it falls under CloudWatch's free API
   tier (~1M requests/month), then ~$0.01 per 1,000 requests, and returns only
   metric metadata (no per-datapoint charge). So `discovery.refresh_every`
   (default 300s) barely moves the bill; the recently-active filter further trims
-  result pages. Raise it only to cut API load on very large accounts.
+  result pages. All-constant profiles make no `ListMetrics` call. Raise
+  `discovery.refresh_every` only to cut API load on very large dynamic catalogs.
 - **`GetMetricData` (query) is the cost driver** — it is always billed (~$0.01
   per 1,000 metrics requested) and scales with metric count × query frequency.
   Point-aware batching keeps each AWS billing unit of up to five statistics for
@@ -604,7 +626,7 @@ The two CloudWatch APIs bill differently, and the design leans on that:
   cost (see Emission And Sample-And-Hold).
 
 Narrow the bill with focused rule target/profile/region selections or longer effective
-periods configured through rule/default query timing; profile periods are the fallback.
+periods configured through rule/default query timing; nested profile query defaults are the fallback.
 Discovery frequency is a minor lever. (Rates are AWS's published model — verify current
 per-region prices on the CloudWatch pricing page.)
 
@@ -620,8 +642,10 @@ per-region prices on the CloudWatch pricing page.)
   Transient client/request/result failures retain and replay state; `Forbidden`
   clears state and completes the attempted window.
 - **Completion advances per stable query**, never per batch or group.
-- **Fail-soft discovery** — carry forward on error; only a first-ever total
-  failure is fatal.
+- **Fail-soft discovery** — carry forward on error. A first-ever total or
+  aggregate failure is fatal only when no executable static scope exists; static
+  work keeps the cycle useful while dynamic discovery retries. Parent cancellation
+  is always fatal and state-neutral.
 - **Job-level placement** — AWS resources are chart instances via `by_labels`.
   They use the configured job `vnode` or the Agent host; no per-target/resource
   HostScope is generated.
@@ -651,7 +675,8 @@ per-region prices on the CloudWatch pricing page.)
   authorization lanes are in `discovery_budget.go`.
 - **Change query identity or plan expansion**: `structural_id.go` and
   `query_plan.go`.
-- **Change timing-policy resolution or aligned windows**: `query_policy.go`.
+- **Change timing defaults or validation**: `internal/cwquery/config.go`.
+- **Change collector policy resolution or aligned windows**: `query_policy.go`.
 - **Change request packing and AWS work limits**: `query_batch.go` and
   `limits.go`.
 - **Change result pagination, status handling, or datapoint selection**:

@@ -117,5 +117,5 @@ func TestDiscoveryBudget_ConcurrentCandidateReservationsDoNotOvershoot(t *testin
 func TestRetainedCandidateBytes(t *testing.T) {
 	want := len("one\x1ftwo") + retainedCandidateBaseBytes + 2*retainedCandidatePerDimensionBytes
 	assert.Equal(t, want, retainedCandidateBytes("one\x1ftwo", 2))
-	assert.Equal(t, want, retainedDiscoveredInstanceBytes(discoveredInstance{DimensionValues: []string{"one", "two"}}))
+	assert.Equal(t, want, retainedDiscoveredInstanceBytes(collectionInstance{DimensionValues: []string{"one", "two"}}))
 }

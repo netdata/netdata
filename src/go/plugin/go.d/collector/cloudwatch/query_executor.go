@@ -74,7 +74,7 @@ func (c *Collector) executeQueries(ctx context.Context, due []plannedQuery, now 
 		if result.err != nil {
 			failures = append(failures, operationFailure{
 				Target: result.batch.key.target, Region: result.batch.key.region,
-				Scope: fmt.Sprintf("period %s", result.batch.key.policy.period), Err: result.err,
+				Scope: fmt.Sprintf("period %s", result.batch.key.policy.Period), Err: result.err,
 			})
 		}
 		for key, outcome := range result.outcomes {

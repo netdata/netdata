@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon ElastiCache
 namespace: AWS/ElastiCache
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: CacheClusterId

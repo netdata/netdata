@@ -20,6 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 
 	"github.com/stretchr/testify/assert"
@@ -160,7 +161,7 @@ func dimProfile(namespace string, period int, dimNames ...string) cwprofiles.Pro
 	}
 	return cwprofiles.Profile{
 		Namespace: namespace,
-		Period:    period,
+		Query:     cwquery.Config{Period: longDuration(time.Duration(period) * time.Second)},
 		Instance:  cwprofiles.InstanceSpec{Dimensions: dims},
 		Metrics:   []cwprofiles.Metric{{ID: "m", MetricName: "M", Statistics: []string{"average"}}},
 	}
@@ -174,7 +175,7 @@ func testDiscoveryBudget(groupCount int) *discoveryBudget {
 	return budget
 }
 
-func scanDiscoveryGroupForTest(ctx context.Context, client cloudwatchClient, group discoveryGroup) (map[string][]discoveredInstance, error) {
+func scanDiscoveryGroupForTest(ctx context.Context, client cloudwatchClient, group discoveryGroup) (map[string][]collectionInstance, error) {
 	if len(group.Profiles) == 0 {
 		return nil, nil
 	}
@@ -200,7 +201,7 @@ func discoverAllForTest(
 	return results
 }
 
-func discoverOneProfile(ctx context.Context, client cloudwatchClient, profile cwprofiles.Profile, useRecentlyActive bool) ([]discoveredInstance, error) {
+func discoverOneProfile(ctx context.Context, client cloudwatchClient, profile cwprofiles.Profile, useRecentlyActive bool) ([]collectionInstance, error) {
 	const profileName = "test"
 	instances, err := scanDiscoveryGroupForTest(ctx, client, discoveryGroup{
 		Namespace: profile.Namespace, RecentlyActive: useRecentlyActive,
@@ -337,7 +338,7 @@ func TestDiscoverProfileGroup_ConstantDimensionFailClosed(t *testing.T) {
 	// value is retained in DimensionValues so it can be sent in the query.
 	prof := cwprofiles.Profile{
 		Namespace: "AWS/CloudFront",
-		Period:    300,
+		Query:     cwquery.Config{Period: longDuration(5 * time.Minute)},
 		Instance: cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{
 			{Name: "DistributionId", Label: "distribution_id"},
 			{Name: "Region", Constant: aws.String("Global")},
@@ -598,7 +599,7 @@ func TestCollector_DiscoveryGroupsCoalesceToLeastRestrictiveRecentlyActivePolicy
 	c := New()
 	fastProfile := dimProfile("AWS/Shared", 300, "Id")
 	fastProfile.Metrics = append(fastProfile.Metrics,
-		cwprofiles.Metric{ID: "daily", MetricName: "Daily", Statistics: []string{"average"}, Period: 86400})
+		cwprofiles.Metric{ID: "daily", MetricName: "Daily", Statistics: []string{"average"}, Query: &cwquery.Config{Period: longDuration(24 * time.Hour)}})
 	fast := resolved("fast", fastProfile)
 	slow := resolved("slow", dimProfile("AWS/Shared", 86400, "Id"))
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{fast, slow})
@@ -618,11 +619,11 @@ func TestCollector_DiscoveryGroupsCoalesceToLeastRestrictiveRecentlyActivePolicy
 func TestCollector_DiscoveryGroupsUseUnionOfSelectedSeriesPolicies(t *testing.T) {
 	c := New()
 	profile := cwprofiles.ResolvedProfile{Name: "mixed", Config: cwprofiles.Profile{
-		Namespace: "AWS/Shared", Period: 300,
+		Namespace: "AWS/Shared", Query: cwquery.Config{Period: longDuration(5 * time.Minute)},
 		Instance: cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "Id", Label: "id"}}},
 		Metrics: []cwprofiles.Metric{
 			{ID: "fast", MetricName: "Fast", Statistics: []string{"average"}},
-			{ID: "slow", MetricName: "Slow", Statistics: []string{"average"}, Period: 86400},
+			{ID: "slow", MetricName: "Slow", Statistics: []string{"average"}, Query: &cwquery.Config{Period: longDuration(24 * time.Hour)}},
 		},
 	}}
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{profile})
@@ -638,13 +639,13 @@ func TestCollector_DiscoveryGroupsUseUnionOfSelectedSeriesPolicies(t *testing.T)
 }
 
 func TestBuildDiscoverySnapshot_FailSoftCarriesForward(t *testing.T) {
-	prev := map[discoveryKey][]discoveredInstance{
+	prev := map[discoveryKey][]collectionInstance{
 		{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 		{Target: "base", Profile: "ec2", Region: "us-west-2"}: {{DimensionValues: []string{"i-9"}}},
 	}
 	profile := resolved("ec2", dimProfile("AWS/EC2", 300, "InstanceId"))
 	results := []discoveryGroupResult{
-		{Group: discoveryGroup{Target: "base", Region: "us-east-1", Profiles: []cwprofiles.ResolvedProfile{profile}}, Instances: map[string][]discoveredInstance{"ec2": {{DimensionValues: []string{"i-2"}}}}},
+		{Group: discoveryGroup{Target: "base", Region: "us-east-1", Profiles: []cwprofiles.ResolvedProfile{profile}}, Instances: map[string][]collectionInstance{"ec2": {{DimensionValues: []string{"i-2"}}}}},
 		{Group: discoveryGroup{Target: "base", Region: "us-west-2", Profiles: []cwprofiles.ResolvedProfile{profile}}, Err: errors.New("throttled")},
 	}
 
@@ -660,12 +661,12 @@ func TestDiscoverySnapshot_WeightedRetainedBound(t *testing.T) {
 	for i := range values {
 		values[i] = strings.Repeat("x", 1024)
 	}
-	instance := discoveredInstance{DimensionValues: values}
-	instances := make([]discoveredInstance, maxRetainedCandidateBytesPerRefresh/retainedDiscoveredInstanceBytes(instance)+1)
+	instance := collectionInstance{DimensionValues: values}
+	instances := make([]collectionInstance, maxRetainedCandidateBytesPerRefresh/retainedDiscoveredInstanceBytes(instance)+1)
 	for i := range instances {
 		instances[i] = instance
 	}
-	snap := discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{{}: instances}}
+	snap := discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{{}: instances}}
 
 	assert.ErrorContains(t, snap.validateRetainedBounds(), "more than 64 MiB")
 }
@@ -923,7 +924,7 @@ func BenchmarkDiscoverProfileGroupMaximumCandidatePayload(b *testing.B) {
 }
 
 // dimValues extracts the dimension-value slices for stable comparison.
-func dimValues(insts []discoveredInstance) [][]string {
+func dimValues(insts []collectionInstance) [][]string {
 	out := make([][]string, len(insts))
 	for i, ins := range insts {
 		out[i] = ins.DimensionValues
@@ -985,6 +986,39 @@ func TestCollector_refreshDiscovery_TTLCaching(t *testing.T) {
 	assert.Nil(t, c.tagFetchPlan, "a new discovery snapshot invalidates tag fetch topology")
 }
 
+func TestCollector_refreshDiscovery_TotalFailureRetainsSuccessfulSnapshot(t *testing.T) {
+	base := time.Unix(1000, 0)
+	now := base
+	c, fakes := newDiscoveryTestCollector(map[string]map[string][]cwtypes.Metric{
+		"us-east-1": {"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
+	})
+	c.now = func() time.Time { return now }
+	require.NoError(t, c.refreshDiscovery(context.Background()))
+
+	previous := c.discovery
+	previousSig := c.discoverySig
+	sentinel := testStructuralID("sentinel")
+	c.tagFetchPlan = []tagFetchGroup{{key: tagFetchKey{target: "sentinel"}}}
+	c.queryPlan = []plannedQuery{{key: sentinel}}
+	c.planDirty = false
+	c.observations.queries[sentinel] = queryState{hasObservation: true, observation: 42}
+
+	now = base.Add(time.Duration(c.Discovery.RefreshEvery+1) * time.Second)
+	fakes["us-east-1"].err = errors.New("throttled")
+	require.NoError(t, c.refreshDiscovery(context.Background()))
+
+	assert.Equal(t, previous.Instances, c.discovery.Instances)
+	assert.Equal(t, previous.FetchedAt, c.discovery.FetchedAt)
+	assert.Equal(t, now.Add(time.Duration(c.Discovery.RefreshEvery)*time.Second), c.discovery.ExpiresAt)
+	assert.Equal(t, previousSig, c.discoverySig)
+	require.Len(t, c.tagFetchPlan, 1)
+	assert.Equal(t, "sentinel", c.tagFetchPlan[0].key.target)
+	require.Len(t, c.queryPlan, 1)
+	assert.Equal(t, sentinel, c.queryPlan[0].key)
+	assert.False(t, c.planDirty)
+	assert.Equal(t, float64(42), c.observations.queries[sentinel].observation)
+}
+
 func TestCollector_refreshDiscovery_TotalFailureFirstPassErrors(t *testing.T) {
 	var logs bytes.Buffer
 	c := New()
@@ -1002,12 +1036,22 @@ func TestCollector_refreshDiscovery_TotalFailureFirstPassErrors(t *testing.T) {
 	assert.Contains(t, logs.String(), "AWS/EC2")
 }
 
-func newAggregateFailureCollector(now time.Time) (*Collector, *operationRecordingCloudWatch) {
+func newAggregateFailureCollector(now time.Time, includeStatic bool) (*Collector, *operationRecordingCloudWatch) {
 	c := New()
 	c.Discovery.RefreshEvery = 300
 	profiles := []cwprofiles.ResolvedProfile{
 		resolved("deep", dimProfile("AWS/Deep", 300, "Id")),
 		resolved("shallow", dimProfile("AWS/Shallow", 300, "Id")),
+	}
+	if includeStatic {
+		profiles = append(profiles, resolved("static", cwprofiles.Profile{
+			Namespace: "AWS/Static",
+			Query:     cwquery.Config{Period: longDuration(5 * time.Minute)},
+			Instance: cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{
+				{Name: "Known", Constant: aws.String("value")},
+			}},
+			Metrics: []cwprofiles.Metric{{ID: "m", MetricName: "M", Statistics: []string{"average"}}},
+		}))
 	}
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, profiles)
 	c.now = func() time.Time { return now }
@@ -1021,8 +1065,8 @@ func newAggregateFailureCollector(now time.Time) (*Collector, *operationRecordin
 
 func TestCollector_refreshDiscovery_AggregateFailureIsAtomicWithSnapshot(t *testing.T) {
 	base := time.Unix(1000, 0)
-	c, _ := newAggregateFailureCollector(base)
-	oldInstances := map[discoveryKey][]discoveredInstance{
+	c, _ := newAggregateFailureCollector(base, false)
+	oldInstances := map[discoveryKey][]collectionInstance{
 		{Target: "base", Profile: "deep", Region: "us-east-1"}: {{DimensionValues: []string{"old"}}},
 	}
 	c.discovery = discoverySnapshot{Instances: oldInstances, FetchedAt: base.Add(-time.Hour), ExpiresAt: base}
@@ -1098,7 +1142,7 @@ func TestCollector_refreshDiscovery_MergedSnapshotBoundsAreAtomicAcrossPartialFa
 }
 
 func TestCollector_refreshDiscovery_AggregateFailureFirstPassErrors(t *testing.T) {
-	c, _ := newAggregateFailureCollector(time.Unix(1000, 0))
+	c, _ := newAggregateFailureCollector(time.Unix(1000, 0), false)
 
 	err := c.refreshDiscovery(context.Background())
 
@@ -1107,11 +1151,23 @@ func TestCollector_refreshDiscovery_AggregateFailureFirstPassErrors(t *testing.T
 	assert.True(t, c.discovery.ExpiresAt.IsZero())
 }
 
+func TestCollector_refreshDiscovery_AggregateFailureFirstPassRetriesWithStaticScope(t *testing.T) {
+	base := time.Unix(1000, 0)
+	c, _ := newAggregateFailureCollector(base, true)
+	require.Len(t, requireCurrentQueryPlan(t, c), 1, "the static scope is executable before discovery")
+
+	require.NoError(t, c.refreshDiscovery(context.Background()))
+
+	assert.True(t, c.discovery.FetchedAt.IsZero())
+	assert.Equal(t, base.Add(300*time.Second), c.discovery.ExpiresAt)
+	require.Len(t, requireCurrentQueryPlan(t, c), 1, "aggregate discovery failure must preserve static work")
+}
+
 func TestCollector_refreshDiscovery_ParentCancellationDoesNotScheduleRefresh(t *testing.T) {
 	base := time.Unix(1000, 0)
-	c, _ := newAggregateFailureCollector(base)
+	c, _ := newAggregateFailureCollector(base, false)
 	c.discovery = discoverySnapshot{
-		Instances: map[discoveryKey][]discoveredInstance{},
+		Instances: map[discoveryKey][]collectionInstance{},
 		FetchedAt: base.Add(-time.Hour),
 		ExpiresAt: base,
 	}
@@ -1413,7 +1469,7 @@ func TestSelectedSeriesUseRecentlyActive(t *testing.T) {
 	ec2 := dimProfile("AWS/EC2", 300, "InstanceId")
 	s3 := dimProfile("AWS/S3", 86400, "BucketName")
 	mixed := dimProfile("AWS/Custom", 300, "Id")
-	mixed.Metrics = []cwprofiles.Metric{{ID: "m", MetricName: "M", Statistics: []string{"average"}, Period: 86400}}
+	mixed.Metrics = []cwprofiles.Metric{{ID: "m", MetricName: "M", Statistics: []string{"average"}, Query: &cwquery.Config{Period: longDuration(24 * time.Hour)}}}
 	tests := map[string]struct {
 		profile cwprofiles.ResolvedProfile
 		enabled bool

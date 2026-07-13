@@ -169,7 +169,7 @@ func (c *Collector) computeTagLabelPlans() {
 }
 
 func (c *Collector) hasTagWork() bool {
-	if len(c.Labels.ResourceTags) > 0 {
+	if len(c.tagLabelPlans) > 0 {
 		return true
 	}
 	for _, scope := range c.plan.Scopes {
@@ -184,11 +184,11 @@ func (c *Collector) hasTagWork() bool {
 // fail-closed: first-run membership is unknown, and later failures retain last-known
 // members. Failed groups retry on the next collect instead of advancing the TTL.
 func (c *Collector) refreshTags(ctx context.Context) {
-	if !c.hasTagWork() {
-		return
-	}
 	if c.tagLabelPlans == nil {
 		c.computeTagLabelPlans()
+	}
+	if !c.hasTagWork() {
+		return
 	}
 	now := c.now()
 	if !c.tags.expired(now) {

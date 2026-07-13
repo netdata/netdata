@@ -4,11 +4,18 @@ package cloudwatch
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 )
+
+// collectionInstance contains one profile instance's dimension values in the
+// same order as the profile's exact dimension set. It is used by both static
+// plan instances and dynamically discovered instances.
+type collectionInstance struct {
+	DimensionValues []string
+}
 
 type collectionPlan struct {
 	Targets  []*collectionTarget
@@ -30,9 +37,17 @@ type collectionScope struct {
 	TagFilter       []resourceTagFilter
 	TagMembershipID int
 	SelectedSeries  []compiledSeries
+	StaticInstance  *collectionInstance
 }
 
 func (s collectionScope) hasTagFilter() bool { return len(s.TagFilter) > 0 }
+
+func (s collectionScope) instances(snapshot discoverySnapshot) []collectionInstance {
+	if s.StaticInstance != nil {
+		return []collectionInstance{*s.StaticInstance}
+	}
+	return snapshot.Instances[discoveryKey{Target: s.Target.Name, Profile: s.Profile.Name, Region: s.Region}]
+}
 
 // profileSeriesSpec is the profile-defined series shape before rule query policy
 // inheritance is resolved.
@@ -41,7 +56,6 @@ type profileSeriesSpec struct {
 	MetricIndex int
 	Statistic   string
 	Name        string
-	Period      time.Duration
 }
 
 type compiledSeries struct {
@@ -49,7 +63,7 @@ type compiledSeries struct {
 	MetricIndex int
 	Statistic   string
 	Name        string
-	Policy      queryPolicy
+	Policy      cwquery.Policy
 }
 
 func (c *Collector) ensurePlan() error {

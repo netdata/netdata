@@ -3,7 +3,8 @@ version: v1
 display_name: AWS ALB Target Groups
 namespace: AWS/ApplicationELB
 disabled: true   # deep-grain profile ({LoadBalancer, TargetGroup}); opt in with rules[].profiles.include
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: LoadBalancer

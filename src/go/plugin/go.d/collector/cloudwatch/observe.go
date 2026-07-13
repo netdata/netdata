@@ -114,7 +114,7 @@ func (o *observationStore) applyOutcomes(due []plannedQuery, outcomes map[struct
 			continue
 		}
 
-		if outcome.hasDatapoint && !outcome.datapointAt.Before(outcome.windowStart) && !outcome.datapointAt.Add(query.policy.period).After(outcome.windowEnd) &&
+		if outcome.hasDatapoint && !outcome.datapointAt.Before(outcome.windowStart) && !outcome.datapointAt.Add(query.policy.Period).After(outcome.windowEnd) &&
 			(!state.hasObservation || !outcome.datapointAt.Before(state.observationAt)) {
 			state.observation = outcome.value
 			state.observationAt = outcome.datapointAt
@@ -136,7 +136,7 @@ func (o *observationStore) markTransient(query plannedQuery, outcome queryOutcom
 	}
 	state.transientCount++
 	state.retryWindowEnd = outcome.windowEnd
-	state.nextRetryAt = outcome.completedAt.Add(transientRetryDelay(retryBase, query.policy.period, state.transientCount))
+	state.nextRetryAt = outcome.completedAt.Add(transientRetryDelay(retryBase, query.policy.Period, state.transientCount))
 	o.queries[query.key] = state
 }
 

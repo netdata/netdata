@@ -55,9 +55,13 @@ func twoTargetConfig() Config {
 }
 
 func multiTargetCollector(t *testing.T, clients map[string]stsClient) *Collector {
+	return multiTargetCollectorWithConfig(t, twoTargetConfig(), clients)
+}
+
+func multiTargetCollectorWithConfig(t *testing.T, cfg Config, clients map[string]stsClient) *Collector {
 	t.Helper()
 	c := New()
-	c.Config = twoTargetConfig()
+	c.Config = cfg
 	c.newAWSConfig = func(_ context.Context, identity awsauth.Identity, _ string) (aws.Config, error) {
 		return aws.Config{Region: identity.Ref}, nil
 	}
@@ -96,7 +100,7 @@ func TestBuildQueryPlan_FirstTargetOwnsSameAccountSeries(t *testing.T) {
 		"second": &seqSTS{accounts: []string{"111111111111"}},
 	})
 	require.NoError(t, c.ensureTargets(context.Background()))
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
 		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 	}}
@@ -119,7 +123,7 @@ func TestBuildQueryPlan_SameAccountDisjointResourcesSurvive(t *testing.T) {
 		"second": &seqSTS{accounts: []string{"111111111111"}},
 	})
 	require.NoError(t, c.ensureTargets(context.Background()))
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
 		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-2"}}},
 	}}
@@ -137,7 +141,7 @@ func TestCurrentQueryPlan_ClearsRetainedSeriesWhenTargetOwnershipChanges(t *test
 		"second": &seqSTS{accounts: []string{"111111111111"}},
 	})
 	require.NoError(t, c.ensureTargets(context.Background()))
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
 		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 	}}

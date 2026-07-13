@@ -2,8 +2,9 @@
 version: v1
 display_name: AWS S3
 namespace: AWS/S3
-period: 86400
-publication_delay: 1d
+query:
+  period: 24h
+  publication_delay: 24h
 instance:
   dimensions:
     - name: BucketName

@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS NLB Target Health
 namespace: AWS/NetworkELB
-period: 300
+query:
+  period: 5m
 # Narrow default target-group health profile. NLB target-health metrics are published at
 # {LoadBalancer, TargetGroup}, while the main nlb profile intentionally stays at {LoadBalancer}.
 instance:

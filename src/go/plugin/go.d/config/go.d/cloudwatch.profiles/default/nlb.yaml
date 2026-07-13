@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS Network Load Balancer
 namespace: AWS/NetworkELB
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: LoadBalancer

@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS Step Functions
 namespace: AWS/States
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: StateMachineArn

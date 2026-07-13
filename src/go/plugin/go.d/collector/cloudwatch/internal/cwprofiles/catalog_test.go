@@ -14,12 +14,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 const minimalProfileYAML = `version: v1
 display_name: Test
 namespace: AWS/Test
-period: 60
+query:
+  period: 1m
 instance:
   dimensions:
     - name: InstanceId
@@ -72,38 +74,42 @@ func TestLoadFromDefaultDirs_LoadsStockProfiles(t *testing.T) {
 	// Lock the curated stock set and its namespaces so a renamed/dropped
 	// profile is caught.
 	wantNamespaces := map[string]string{
-		"ec2":               "AWS/EC2",
-		"rds":               "AWS/RDS",
-		"elb":               "AWS/ELB",
-		"alb":               "AWS/ApplicationELB",
-		"alb_target_health": "AWS/ApplicationELB",
-		"s3":                "AWS/S3",
-		"lambda":            "AWS/Lambda",
-		"sqs":               "AWS/SQS",
-		"dynamodb":          "AWS/DynamoDB",
-		"nlb":               "AWS/NetworkELB",
-		"nlb_target_health": "AWS/NetworkELB",
-		"nat_gateway":       "AWS/NATGateway",
-		"step_functions":    "AWS/States",
-		"api_gateway":       "AWS/ApiGateway",
-		"kinesis":           "AWS/Kinesis",
-		"firehose":          "AWS/Firehose",
-		"sns":               "AWS/SNS",
-		"ebs":               "AWS/EBS",
-		"efs":               "AWS/EFS",
-		"ecs":               "AWS/ECS",
-		"elasticache":       "AWS/ElastiCache",
-		"opensearch":        "AWS/ES",
-		"docdb":             "AWS/DocDB",
-		"redshift":          "AWS/Redshift",
-		"msk":               "AWS/Kafka",
-		"msk_cluster":       "AWS/Kafka",
-		"cloudfront":        "AWS/CloudFront",
-		"auto_scaling":      "AWS/AutoScaling",
-		"bedrock":           "AWS/Bedrock",
-		"eventbridge":       "AWS/Events",
-		"vpn":               "AWS/VPN",
-		"eks":               "AWS/EKS",
+		"ec2":                            "AWS/EC2",
+		"rds":                            "AWS/RDS",
+		"elb":                            "AWS/ELB",
+		"alb":                            "AWS/ApplicationELB",
+		"alb_target_health":              "AWS/ApplicationELB",
+		"s3":                             "AWS/S3",
+		"lambda":                         "AWS/Lambda",
+		"sqs":                            "AWS/SQS",
+		"dynamodb":                       "AWS/DynamoDB",
+		"nlb":                            "AWS/NetworkELB",
+		"nlb_target_health":              "AWS/NetworkELB",
+		"nat_gateway":                    "AWS/NATGateway",
+		"step_functions":                 "AWS/States",
+		"api_gateway":                    "AWS/ApiGateway",
+		"kinesis":                        "AWS/Kinesis",
+		"firehose":                       "AWS/Firehose",
+		"sns":                            "AWS/SNS",
+		"ebs":                            "AWS/EBS",
+		"efs":                            "AWS/EFS",
+		"ecs":                            "AWS/ECS",
+		"elasticache":                    "AWS/ElastiCache",
+		"opensearch":                     "AWS/ES",
+		"docdb":                          "AWS/DocDB",
+		"redshift":                       "AWS/Redshift",
+		"msk":                            "AWS/Kafka",
+		"msk_cluster":                    "AWS/Kafka",
+		"cloudfront":                     "AWS/CloudFront",
+		"auto_scaling":                   "AWS/AutoScaling",
+		"bedrock":                        "AWS/Bedrock",
+		"billing_linked_account":         "AWS/Billing",
+		"billing_linked_account_service": "AWS/Billing",
+		"billing_service":                "AWS/Billing",
+		"billing_total":                  "AWS/Billing",
+		"eventbridge":                    "AWS/Events",
+		"vpn":                            "AWS/VPN",
+		"eks":                            "AWS/EKS",
 		// opt-in profiles (disabled by default; rules may include them explicitly)
 		"alb_target":         "AWS/ApplicationELB",
 		"dynamodb_operation": "AWS/DynamoDB",
@@ -115,13 +121,21 @@ func TestLoadFromDefaultDirs_LoadsStockProfiles(t *testing.T) {
 		if assert.Truef(t, ok, "missing stock profile %q", baseName) {
 			assert.Equalf(t, namespace, prof.Namespace, "profile %q namespace", baseName)
 			if baseName == "s3" {
-				require.NotNil(t, prof.PublicationDelay)
-				assert.Equal(t, 24*time.Hour, prof.PublicationDelay.Duration())
+				require.NotNil(t, prof.Query.PublicationDelay)
+				assert.Equal(t, 24*time.Hour, prof.Query.PublicationDelay.Duration())
 			}
-			if baseName == "cloudfront" {
+			if baseName == "cloudfront" || strings.HasPrefix(baseName, "billing_") {
 				assert.Equal(t, []string{"us-east-1"}, prof.SupportedRegions)
 			} else {
 				assert.Emptyf(t, prof.SupportedRegions, "profile %q should remain region-unrestricted", baseName)
+			}
+			if strings.HasPrefix(baseName, "billing_") {
+				assert.Truef(t, prof.Disabled, "profile %q should remain opt-in", baseName)
+				require.NotNil(t, prof.Query.Period)
+				require.NotNil(t, prof.Query.Lookback)
+				assert.Equal(t, 10*time.Minute, prof.Query.Period.Duration())
+				assert.Equal(t, 24*time.Hour, prof.Query.Lookback.Duration())
+				assert.Nil(t, prof.Query.PublicationDelay)
 			}
 		}
 	}
@@ -156,6 +170,42 @@ func TestLoadFromDefaultDirs_StockProfilesUseSelectorShorthand(t *testing.T) {
 				continue
 			}
 			assert.NotContainsf(t, selector, ".", "stock profile %q should use selector shorthand, found %q", entry.Name(), selector)
+		}
+	}
+}
+
+func TestLoadFromDefaultDirs_StockProfilesUseNestedQueryDefaults(t *testing.T) {
+	dir := cwProfilesDirFromThisFile()
+	require.NotEmpty(t, dir)
+
+	entries, err := os.ReadDir(dir)
+	require.NoError(t, err)
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		ext := strings.ToLower(filepath.Ext(entry.Name()))
+		if ext != ".yaml" && ext != ".yml" {
+			continue
+		}
+
+		raw, err := os.ReadFile(filepath.Join(dir, entry.Name()))
+		require.NoError(t, err)
+		var doc map[string]any
+		require.NoError(t, yaml.Unmarshal(raw, &doc))
+		assert.NotContainsf(t, doc, "period", "%s retains a flat profile period", entry.Name())
+		assert.NotContainsf(t, doc, "lookback", "%s retains a flat profile lookback", entry.Name())
+		assert.NotContainsf(t, doc, "publication_delay", "%s retains a flat profile publication delay", entry.Name())
+		assert.Containsf(t, doc, "query", "%s must declare profile query defaults", entry.Name())
+
+		metrics, ok := doc["metrics"].([]any)
+		require.Truef(t, ok, "%s metrics must be a YAML sequence", entry.Name())
+		for i, rawMetric := range metrics {
+			metric, ok := rawMetric.(map[string]any)
+			require.Truef(t, ok, "%s metric %d must be a YAML object", entry.Name(), i)
+			assert.NotContainsf(t, metric, "period", "%s metric %d retains a flat period", entry.Name(), i)
+			assert.NotContainsf(t, metric, "lookback", "%s metric %d retains a flat lookback", entry.Name(), i)
+			assert.NotContainsf(t, metric, "publication_delay", "%s metric %d retains a flat publication delay", entry.Name(), i)
 		}
 	}
 }

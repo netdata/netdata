@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS ALB Target Health
 namespace: AWS/ApplicationELB
-period: 300
+query:
+  period: 5m
 # Narrow default target-group health profile. The broader alb_target profile stays disabled by
 # default because it collects multiple per-target-group metrics; this profile collects only the
 # AWS-recommended unhealthy-host statistic needed by stock health alerts.

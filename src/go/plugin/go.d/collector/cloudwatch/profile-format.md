@@ -18,8 +18,10 @@ display_name: AWS Example Service
 namespace: AWS/Example
 supported_regions: [us-east-1]  # optional; omit when unrestricted
 disabled: true                  # optional; exclude from the default-enabled set
-period: 300
-publication_delay: 10m          # optional profile-level publication fallback
+query:
+  period: 5m                    # required profile default
+  lookback: 15m                 # optional retrieval horizon
+  publication_delay: 10m        # optional settling delay
 
 instance:
   dimensions:
@@ -36,7 +38,9 @@ metrics:
   - id: latency
     metric_name: Latency
     statistics: [average, p99]
-    period: 60                  # optional metric-level override
+    query:                      # optional field-by-field overrides
+      period: 1m
+      lookback: 5m
     nil_as_zero: false          # optional no-datapoint policy
 
 template:
@@ -81,8 +85,7 @@ The filename without `.yaml` is the profile name. In the example, a file named
 | `namespace` | yes | CloudWatch namespace, such as `AWS/EC2`. |
 | `supported_regions` | no | Non-empty list of canonical lowercase region codes where this namespace publishes metrics. Omit for unrestricted regional services. |
 | `disabled` | no | When `true`, collection rules do not select the profile through their default set. A rule can still name it explicitly in `profiles.include`. |
-| `period` | yes | Default CloudWatch period in seconds. It must be a positive multiple of 60, up to 86400. |
-| `publication_delay` | no | Collector wait after a bucket closes before querying it. This is scheduling policy, not an AWS publication SLA. Use a canonical duration such as `10m` or `1d`. Omission uses the collector's built-in `10m` fallback; collection rules may override it. |
+| `query` | yes | Profile query defaults. `query.period` is required; `lookback` and `publication_delay` are optional. |
 | `instance` | yes | Exact dimension set that identifies one collected resource. |
 | `metrics` | yes | Metrics and statistics queried for every discovered instance. |
 | `template` | yes | Dynamic chart template populated from the exported series. |
@@ -107,6 +110,32 @@ The collection-rule compiler intersects `rules[].regions` with this list:
 
 An explicitly empty list is invalid; omit the field for unrestricted profiles.
 
+## Query defaults
+
+`query` defines the profile's CloudWatch timing defaults:
+
+| Field | Required | Description |
+|:------|:--------:|:------------|
+| `period` | yes at profile level | CloudWatch aggregation period. It must be from `1m` through `24h` and an exact multiple of one minute. |
+| `lookback` | no | Rolling retrieval horizon. It must be at least one period, an exact multiple of the effective period, and no more than 1,440 buckets. Omission follows the resolved period. |
+| `publication_delay` | no | How long the collector waits after a bucket closes before querying it. This is collector scheduling policy, not an AWS publication SLA. Omission uses the collector's built-in `10m` fallback. Zero is valid. |
+
+Durations accept duration strings or numeric seconds. Stock profiles use
+canonical strings such as `1m`, `10m`, and `24h`; custom profiles should do the
+same for readability.
+
+Every metric may define an optional `query` object with the same fields. Job
+configuration resolves each field independently in this order, from highest to
+lowest precedence:
+
+1. `rules[].query`
+2. `rule_defaults.query`
+3. `metrics[].query`
+4. profile `query`
+
+After inheritance, the collector validates the complete policy. The combined
+`publication_delay + lookback + period` horizon must not exceed 14 days.
+
 ## Instance dimensions
 
 `instance.dimensions` is the exact CloudWatch dimension-name set accepted during
@@ -126,6 +155,11 @@ Dimension names and constant values are matched verbatim and must not have
 leading or trailing whitespace. Names and emitted labels must be unique within
 the profile.
 
+When every declared dimension is constant, the collector already knows the
+complete instance and queries it directly. Such profiles do not call
+`ListMetrics`. Profiles with at least one identifying dimension use discovery
+normally.
+
 ## Metrics
 
 Every `metrics` entry supports:
@@ -136,7 +170,7 @@ Every `metrics` entry supports:
 | `metric_name` | yes | CloudWatch metric name, matched verbatim. |
 | `statistics` | yes | One or more of `average`, `minimum`, `maximum`, `sum`, `sample_count`, or a percentile such as `p90` or `p99.9`. |
 | `rate` | no | Divide a per-period `sum` or `sample_count` by the effective period and present it per second. Requires one of those total statistics. |
-| `period` | no | Metric-specific period override, with the same validation as the profile period. |
+| `query` | no | Metric-specific `period`, `lookback`, and/or `publication_delay` overrides. Omitted fields inherit independently. |
 | `nil_as_zero` | no | Record a clean no-datapoint response as `0` (`true`) or a gap (`false`). When omitted, rate totals default to zero and other statistics default to gaps. |
 
 Metric IDs and CloudWatch metric names must be unique within a profile. The
@@ -166,7 +200,7 @@ and selector field. CloudWatch profiles add these restrictions:
 - Every dimension selector must resolve to a series exported by the profile.
 - Chart IDs must be unique across the complete loaded profile catalog.
 
-The collector divides rate totals by the effective rule period before emission
+The collector divides rate totals by the effective query period before emission
 and marks all emitted CloudWatch metric families as floating-point values.
 
 ## Authoring workflow

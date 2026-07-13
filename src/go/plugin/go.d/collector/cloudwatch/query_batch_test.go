@@ -9,6 +9,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,7 +18,7 @@ import (
 func testPlannedQuery(key, target, region, namespace string, period int) plannedQuery {
 	return plannedQuery{
 		key: testStructuralID(key), target: target, region: region,
-		policy: queryPolicy{period: time.Duration(period) * time.Second, lookback: time.Duration(period) * time.Second, publicationDelay: defaultPublicationDelay},
+		policy: cwquery.Policy{Period: time.Duration(period) * time.Second, Lookback: time.Duration(period) * time.Second, PublicationDelay: cwquery.DefaultPublicationDelay},
 		query: cwtypes.MetricDataQuery{
 			MetricStat: &cwtypes.MetricStat{Metric: &cwtypes.Metric{Namespace: aws.String(namespace)}, Period: aws.Int32(int32(period))},
 		},
@@ -29,7 +30,7 @@ func testStructuralID(value string) structuralID {
 }
 
 func TestBuildQueryBatches_PointAwareWidth(t *testing.T) {
-	policy := queryPolicy{period: time.Minute, lookback: 24 * time.Hour, publicationDelay: 0}
+	policy := cwquery.Policy{Period: time.Minute, Lookback: 24 * time.Hour, PublicationDelay: 0}
 	width := queryBatchWidth(policy)
 	assert.Equal(t, 20, width)
 	queries := make([]plannedQuery, 45)
@@ -46,7 +47,7 @@ func TestBuildQueryBatches_PointAwareWidth(t *testing.T) {
 }
 
 func TestBuildQueryBatches_DoesNotSplitMetricBillingGroup(t *testing.T) {
-	policy := queryPolicy{period: time.Minute, lookback: 24 * time.Hour}
+	policy := cwquery.Policy{Period: time.Minute, Lookback: 24 * time.Hour}
 	queries := make([]plannedQuery, 0, 22)
 	for i := range 19 {
 		query := testPlannedQuery(fmt.Sprintf("single-%d", i), "base", "us-east-1", "AWS/Test", 60)
@@ -116,8 +117,8 @@ func TestMetricBillingKey_DimensionOrderIndependent(t *testing.T) {
 }
 
 func TestValidatePlannedQueryWork_Boundaries(t *testing.T) {
-	basePolicy := queryPolicy{period: time.Minute, lookback: time.Minute}
-	makeQueries := func(count int, policy queryPolicy) []plannedQuery {
+	basePolicy := cwquery.Policy{Period: time.Minute, Lookback: time.Minute}
+	makeQueries := func(count int, policy cwquery.Policy) []plannedQuery {
 		queries := make([]plannedQuery, count)
 		for i := range queries {
 			queries[i] = plannedQuery{key: testStructuralID(fmt.Sprintf("q%d", i)), target: "base", region: "us-east-1", policy: policy}
@@ -127,15 +128,15 @@ func TestValidatePlannedQueryWork_Boundaries(t *testing.T) {
 
 	tests := map[string]struct {
 		count   int
-		policy  queryPolicy
+		policy  cwquery.Policy
 		mutate  func([]plannedQuery)
 		wantErr string
 	}{
 		"exact query and batch maximum": {count: maxPlannedQueries, policy: basePolicy},
 		"query maximum exceeded":        {count: maxPlannedQueries + 1, policy: basePolicy, wantErr: "maximum 20000"},
 		"datapoint maximum exceeded": {
-			count:   maxPlannedDatapoints/maxQueryBuckets + 2,
-			policy:  queryPolicy{period: time.Minute, lookback: maxQueryBuckets * time.Minute},
+			count:   maxPlannedDatapoints/cwquery.MaxBuckets + 2,
+			policy:  cwquery.Policy{Period: time.Minute, Lookback: cwquery.MaxBuckets * time.Minute},
 			wantErr: "more than 600000 datapoints",
 		},
 		"batch maximum exceeded": {
