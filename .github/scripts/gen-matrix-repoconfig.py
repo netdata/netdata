@@ -1,25 +1,29 @@
 #!/usr/bin/env python3
 
 import json
+import sys
 
-from ruamel.yaml import YAML
+from pathlib import Path
 
-yaml = YAML(typ='safe')
+SELF = Path(__file__)
+
+sys.path.insert(0, str(SELF.parent.parent.parent / 'packaging' / 'data'))
+
+import distros
+
+data = distros.load_distro_data()
 entries = list()
 
-with open('.github/data/distros.yml') as f:
-    data = yaml.load(f)
-
-for i, v in enumerate(data['include']):
-    if 'packages' in data['include'][i]:
+for item in data.include:
+    if item.packages is not None:
         entries.append({
-            'distro': data['include'][i]['distro'],
-            'version': data['include'][i]['version'],
-            'pkgclouddistro': data['include'][i]['packages']['repo_distro'],
-            'format': data['include'][i]['packages']['type'],
-            'base_image': data['include'][i]['base_image'] if 'base_image' in data['include'][i] else ':'.join([data['include'][i]['distro'], data['include'][i]['version']]),
-            'platform': data['platform_map']['amd64'],
-            'arches': ' '.join(['"' + x + '"' for x in data['include'][i]['packages']['arches']])
+            'distro': item.distro,
+            'version': item.version,
+            'pkgclouddistro': item.packages.repo_distro,
+            'format': str(item.packages.type),
+            'base_image': item.base_image,
+            'platform': data.platform_map[distros.Arch.AMD64],
+            'arches': ' '.join(['"' + str(x) + '"' for x in item.packages.arches])
         })
 
 entries.sort(key=lambda k: (k['distro'], k['version']))
