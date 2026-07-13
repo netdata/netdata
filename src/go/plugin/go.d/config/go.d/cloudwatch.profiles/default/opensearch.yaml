@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon OpenSearch Service
 namespace: AWS/ES
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: ClientId
@@ -80,7 +81,7 @@ template:
     instances:
       by_labels: [account_id, region, client_id, domain_name]
   charts:
-    - id: cw_os_cluster_status
+    - id: aws_cloudwatch_os_cluster_status
       context: cluster_status
       title: OpenSearch Cluster Status
       family: Health
@@ -93,7 +94,7 @@ template:
           name: yellow
         - selector: cluster_status_red_maximum
           name: red
-    - id: cw_os_writes_blocked
+    - id: aws_cloudwatch_os_writes_blocked
       context: index_writes_blocked
       title: OpenSearch Cluster Index Writes Blocked
       family: Health
@@ -102,7 +103,7 @@ template:
       dimensions:
         - selector: cluster_index_writes_blocked_maximum
           name: blocked
-    - id: cw_os_nodes
+    - id: aws_cloudwatch_os_nodes
       context: nodes
       title: OpenSearch Nodes
       family: Nodes
@@ -111,7 +112,7 @@ template:
       dimensions:
         - selector: nodes_maximum
           name: nodes
-    - id: cw_os_cpu
+    - id: aws_cloudwatch_os_cpu
       context: cpu
       title: OpenSearch CPU Utilization
       family: CPU
@@ -122,7 +123,7 @@ template:
           name: cpu
         - selector: cpu_utilization_maximum
           name: maximum
-    - id: cw_os_jvm_pressure
+    - id: aws_cloudwatch_os_jvm_pressure
       context: jvm_memory_pressure
       title: OpenSearch JVM Memory Pressure
       family: JVM
@@ -131,7 +132,7 @@ template:
       dimensions:
         - selector: jvm_memory_pressure_maximum
           name: pressure
-    - id: cw_os_free_storage
+    - id: aws_cloudwatch_os_free_storage
       context: free_storage_space
       title: OpenSearch Free Storage Space
       family: Storage
@@ -140,7 +141,7 @@ template:
       dimensions:
         - selector: free_storage_space_average
           name: free
-    - id: cw_os_operation_rate
+    - id: aws_cloudwatch_os_operation_rate
       context: operation_rate
       title: OpenSearch Search and Indexing Rate
       family: Operations
@@ -151,7 +152,7 @@ template:
           name: search
         - selector: indexing_rate_average
           name: indexing
-    - id: cw_os_latency
+    - id: aws_cloudwatch_os_latency
       context: latency
       title: OpenSearch Search and Indexing Latency
       family: Latency
@@ -162,7 +163,7 @@ template:
           name: search
         - selector: indexing_latency_average
           name: indexing
-    - id: cw_os_old_gen_jvm_pressure
+    - id: aws_cloudwatch_os_old_gen_jvm_pressure
       context: old_gen_jvm_memory_pressure
       title: OpenSearch Old-Gen JVM Memory Pressure
       family: JVM
@@ -171,7 +172,7 @@ template:
       dimensions:
         - selector: old_gen_jvm_memory_pressure_maximum
           name: pressure
-    - id: cw_os_snapshot_failure
+    - id: aws_cloudwatch_os_snapshot_failure
       context: automated_snapshot_failure
       title: OpenSearch Automated Snapshot Failure
       family: Health
@@ -183,7 +184,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_os_documents
+    # - id: aws_cloudwatch_os_documents
     #   context: documents
     #   title: OpenSearch Documents
     #   family: Documents
@@ -194,7 +195,7 @@ template:
     #       name: searchable
     #     - selector: deleted_documents_maximum
     #       name: deleted
-    # - id: cw_os_shards
+    # - id: aws_cloudwatch_os_shards
     #   context: shards
     #   title: OpenSearch Shards
     #   family: Shards

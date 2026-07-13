@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS Lambda
 namespace: AWS/Lambda
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: FunctionName
@@ -50,7 +51,7 @@ template:
     instances:
       by_labels: [account_id, region, function_name]
   charts:
-    - id: cw_lambda_invocations
+    - id: aws_cloudwatch_lambda_invocations
       context: invocations
       title: Lambda Invocations
       family: Invocations
@@ -59,7 +60,7 @@ template:
       dimensions:
         - selector: invocations_sum
           name: invocations
-    - id: cw_lambda_errors
+    - id: aws_cloudwatch_lambda_errors
       context: errors
       title: Lambda Errors and Throttles
       family: Errors
@@ -70,7 +71,7 @@ template:
           name: errors
         - selector: throttles_sum
           name: throttles
-    - id: cw_lambda_duration
+    - id: aws_cloudwatch_lambda_duration
       context: duration
       title: Lambda Duration
       family: Duration
@@ -86,7 +87,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_lambda_concurrency
+    # - id: aws_cloudwatch_lambda_concurrency
     #   context: concurrent_executions
     #   title: Lambda Concurrent Executions
     #   family: Concurrency
@@ -95,7 +96,7 @@ template:
     #   dimensions:
     #     - selector: concurrent_executions_maximum
     #       name: concurrent
-    # - id: cw_lambda_dead_letter_errors
+    # - id: aws_cloudwatch_lambda_dead_letter_errors
     #   context: dead_letter_errors
     #   title: Lambda Dead Letter Errors
     #   family: Errors
@@ -104,7 +105,7 @@ template:
     #   dimensions:
     #     - selector: dead_letter_errors_sum
     #       name: dead_letter
-    # - id: cw_lambda_iterator_age
+    # - id: aws_cloudwatch_lambda_iterator_age
     #   context: iterator_age
     #   title: Lambda Iterator Age
     #   family: Streams

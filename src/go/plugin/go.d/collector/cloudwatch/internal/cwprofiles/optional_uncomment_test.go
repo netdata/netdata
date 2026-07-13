@@ -83,7 +83,7 @@ func TestStockProfiles_OptionalBlocksUncommentValid(t *testing.T) {
 // structural key and stay commented.
 func uncommentOptionalBlocks(raw string) string {
 	keys := []string{
-		"- id:", "metric_name:", "statistics:", "period:", "rate:",
+		"- id:", "metric_name:", "statistics:", "query:", "period:", "lookback:", "publication_delay:", "rate:",
 		"context:", "title:", "family:", "units:", "algorithm:", "dimensions:",
 		"- selector:", "selector:", "name:",
 	}

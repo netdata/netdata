@@ -11,7 +11,8 @@
 version: v1
 display_name: AWS Auto Scaling
 namespace: AWS/AutoScaling
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: AutoScalingGroupName
@@ -87,7 +88,7 @@ template:
     instances:
       by_labels: [account_id, region, auto_scaling_group_name]
   charts:
-    - id: cw_autoscaling_sizing
+    - id: aws_cloudwatch_autoscaling_sizing
       context: sizing
       title: Auto Scaling Group Sizing
       family: Capacity
@@ -102,7 +103,7 @@ template:
           name: desired
         - selector: group_total_instances_average
           name: total
-    - id: cw_autoscaling_instances
+    - id: aws_cloudwatch_autoscaling_instances
       context: instances
       title: Auto Scaling Group Instances by State
       family: Instances
@@ -120,7 +121,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric(s).
     # ----------------------------------------------------------------------------------------
-    # - id: cw_autoscaling_capacity_units
+    # - id: aws_cloudwatch_autoscaling_capacity_units
     #   context: capacity_units
     #   title: Auto Scaling Group Capacity Units by State
     #   family: Capacity
@@ -137,7 +138,7 @@ template:
     #       name: standby
     #     - selector: group_terminating_capacity_average
     #       name: terminating
-    # - id: cw_autoscaling_warm_pool
+    # - id: aws_cloudwatch_autoscaling_warm_pool
     #   context: warm_pool
     #   title: Auto Scaling Warm Pool Capacity
     #   family: Warm Pool

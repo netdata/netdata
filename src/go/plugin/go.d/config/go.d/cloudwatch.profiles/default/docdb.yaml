@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon DocumentDB
 namespace: AWS/DocDB
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: DBInstanceIdentifier
@@ -75,7 +76,7 @@ template:
     instances:
       by_labels: [account_id, region, db_instance_identifier]
   charts:
-    - id: cw_docdb_cpu
+    - id: aws_cloudwatch_docdb_cpu
       context: cpu
       title: DocumentDB CPU Utilization
       family: CPU
@@ -84,7 +85,7 @@ template:
       dimensions:
         - selector: cpu_utilization_average
           name: cpu
-    - id: cw_docdb_memory
+    - id: aws_cloudwatch_docdb_memory
       context: freeable_memory
       title: DocumentDB Freeable Memory
       family: Memory
@@ -93,7 +94,7 @@ template:
       dimensions:
         - selector: freeable_memory_average
           name: freeable
-    - id: cw_docdb_connections
+    - id: aws_cloudwatch_docdb_connections
       context: connections
       title: DocumentDB Connections
       family: Connections
@@ -102,7 +103,7 @@ template:
       dimensions:
         - selector: database_connections_average
           name: connections
-    - id: cw_docdb_cache
+    - id: aws_cloudwatch_docdb_cache
       context: buffer_cache_hit_ratio
       title: DocumentDB Buffer Cache Hit Ratio
       family: Cache
@@ -111,7 +112,7 @@ template:
       dimensions:
         - selector: buffer_cache_hit_ratio_average
           name: hit_ratio
-    - id: cw_docdb_iops
+    - id: aws_cloudwatch_docdb_iops
       context: iops
       title: DocumentDB Disk IOPS
       family: Throughput
@@ -122,7 +123,7 @@ template:
           name: read
         - selector: write_iops_average
           name: write
-    - id: cw_docdb_latency
+    - id: aws_cloudwatch_docdb_latency
       context: latency
       title: DocumentDB Disk Latency
       family: Latency
@@ -133,7 +134,7 @@ template:
           name: read
         - selector: write_latency_average
           name: write
-    - id: cw_docdb_throughput
+    - id: aws_cloudwatch_docdb_throughput
       context: throughput
       title: DocumentDB Disk Throughput
       family: Throughput
@@ -144,7 +145,7 @@ template:
           name: read
         - selector: write_throughput_average
           name: write
-    - id: cw_docdb_replica_lag
+    - id: aws_cloudwatch_docdb_replica_lag
       context: replica_lag
       title: DocumentDB Replica Lag
       family: Replication
@@ -153,7 +154,7 @@ template:
       dimensions:
         - selector: db_instance_replica_lag_average
           name: lag
-    - id: cw_docdb_cursors_timed_out
+    - id: aws_cloudwatch_docdb_cursors_timed_out
       context: cursors_timed_out
       title: DocumentDB Cursors Timed Out
       family: Cursors
@@ -165,7 +166,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_docdb_documents
+    # - id: aws_cloudwatch_docdb_documents
     #   context: documents
     #   title: DocumentDB Document Operations
     #   family: Operations
@@ -176,7 +177,7 @@ template:
     #       name: inserted
     #     - selector: documents_deleted_sum
     #       name: deleted
-    # - id: cw_docdb_swap
+    # - id: aws_cloudwatch_docdb_swap
     #   context: swap_usage
     #   title: DocumentDB Swap Usage
     #   family: Memory
@@ -185,7 +186,7 @@ template:
     #   dimensions:
     #     - selector: swap_usage_average
     #       name: swap
-    # - id: cw_docdb_disk_queue
+    # - id: aws_cloudwatch_docdb_disk_queue
     #   context: disk_queue_depth
     #   title: DocumentDB Disk Queue Depth
     #   family: Disk

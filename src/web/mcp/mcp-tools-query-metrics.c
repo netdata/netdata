@@ -542,7 +542,7 @@ MCP_RETURN_CODE mcp_tool_query_metrics_execute(MCP_CLIENT *mcpc, struct json_obj
                    RRDR_OPTION_ABSOLUTE | RRDR_OPTION_JSON_WRAP | RRDR_OPTION_RETURN_JWAR |
                    RRDR_OPTION_VIRTUAL_POINTS | RRDR_OPTION_NOT_ALIGNED | RRDR_OPTION_NONZERO |
                    RRDR_OPTION_MINIFY | RRDR_OPTION_MINIMAL_STATS | RRDR_OPTION_LONG_JSON_KEYS |
-                   RRDR_OPTION_MCP_INFO | RRDR_OPTION_RFC3339,
+                   RRDR_OPTION_MCP_INFO | RRDR_OPTION_RFC3339 | RRDR_OPTION_CARDINALITY_ALL,
         .time_group_method = time_group,
         .time_group_options = time_group_options,
         .resampling_time = 0,

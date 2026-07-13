@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS EC2
 namespace: AWS/EC2
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: InstanceId
@@ -92,7 +93,7 @@ template:
     instances:
       by_labels: [account_id, region, instance_id]
   charts:
-    - id: cw_ec2_cpu
+    - id: aws_cloudwatch_ec2_cpu
       context: cpu_utilization
       title: EC2 CPU Utilization
       family: CPU
@@ -101,7 +102,7 @@ template:
       dimensions:
         - selector: cpu_utilization_average
           name: average
-    - id: cw_ec2_network
+    - id: aws_cloudwatch_ec2_network
       context: network_traffic
       title: EC2 Network Traffic
       family: Network
@@ -112,7 +113,7 @@ template:
           name: in
         - selector: network_out_sum
           name: out
-    - id: cw_ec2_disk_ops
+    - id: aws_cloudwatch_ec2_disk_ops
       context: disk_ops
       title: EC2 Disk Operations
       family: Disk
@@ -123,7 +124,7 @@ template:
           name: read
         - selector: disk_write_ops_sum
           name: write
-    - id: cw_ec2_status_check
+    - id: aws_cloudwatch_ec2_status_check
       context: status_check_failed
       title: EC2 Status Check Failures
       family: Status
@@ -137,7 +138,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_ec2_disk_bandwidth
+    # - id: aws_cloudwatch_ec2_disk_bandwidth
     #   context: disk_bandwidth
     #   title: EC2 Disk Bandwidth
     #   family: Disk
@@ -148,7 +149,7 @@ template:
     #       name: read
     #     - selector: disk_write_bytes_sum
     #       name: write
-    # - id: cw_ec2_network_packets
+    # - id: aws_cloudwatch_ec2_network_packets
     #   context: network_packets
     #   title: EC2 Network Packets
     #   family: Network
@@ -159,7 +160,7 @@ template:
     #       name: in
     #     - selector: network_packets_out_sum
     #       name: out
-    # - id: cw_ec2_status_check_detail
+    # - id: aws_cloudwatch_ec2_status_check_detail
     #   context: status_check_failed_detail
     #   title: EC2 Status Check Failures by Type
     #   family: Status
@@ -170,7 +171,7 @@ template:
     #       name: instance
     #     - selector: status_check_failed_system_maximum
     #       name: system
-    # - id: cw_ec2_cpu_credits
+    # - id: aws_cloudwatch_ec2_cpu_credits
     #   context: cpu_credits
     #   title: EC2 CPU Credits
     #   family: CPU
@@ -181,7 +182,7 @@ template:
     #       name: used
     #     - selector: cpu_credit_balance_average
     #       name: balance
-    # - id: cw_ec2_ebs_iops
+    # - id: aws_cloudwatch_ec2_ebs_iops
     #   context: ebs_iops
     #   title: EC2 EBS IOPS
     #   family: EBS
@@ -192,7 +193,7 @@ template:
     #       name: read
     #     - selector: ebs_write_ops_sum
     #       name: write
-    # - id: cw_ec2_ebs_throughput
+    # - id: aws_cloudwatch_ec2_ebs_throughput
     #   context: ebs_throughput
     #   title: EC2 EBS Throughput
     #   family: EBS

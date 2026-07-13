@@ -28,6 +28,8 @@ static volatile bool spawn_server_exit = false;
 static volatile bool spawn_server_sigchld = false;
 static SPAWN_REQUEST *spawn_server_requests = NULL;
 
+#define SPAWN_SERVER_IOV_MAX 10
+
 static size_t spawn_server_max_unix_socket_path_length(void) {
     struct sockaddr_un server_addr = { 0 };
     return sizeof(server_addr.sun_path) - 1;
@@ -114,25 +116,46 @@ static void* argv_encode(const char **argv, size_t *out_size) {
     return buffer;
 }
 
+static const char *argv_find_next(const char *ptr, const char *end) {
+    return memchr(ptr, '\0', (size_t)(end - ptr));
+}
+
 // Function to decode argv or envp
 static const char** argv_decode(const char *buffer, size_t size) {
+    if(!buffer || !size || buffer[size - 1] != '\0')
+        return NULL;
+
     size_t count = 0;
     const char *ptr = buffer;
-    while (ptr < buffer + size) {
-        if(ptr && *ptr) {
+    const char *end = buffer + size;
+    bool found_final_empty_string = false;
+    while (ptr < end) {
+        if(*ptr) {
+            const char *next = argv_find_next(ptr, end);
+            if(!next)
+                return NULL;
+
             count++;
-            ptr += strlen(ptr) + 1;
+            ptr = next + 1;
         }
-        else
+        else {
+            if(ptr != end - 1)
+                return NULL;
+
+            found_final_empty_string = true;
             break;
+        }
     }
+
+    if(!found_final_empty_string)
+        return NULL;
 
     const char **argv = mallocz((count + 1) * sizeof(char *));
 
     ptr = buffer;
     for (size_t i = 0; i < count; i++) {
         argv[i] = ptr;
-        ptr += strlen(ptr) + 1;
+        ptr = argv_find_next(ptr, end) + 1;
     }
     argv[count] = NULL; // Null-terminate the array
 
@@ -459,14 +482,239 @@ typedef enum __attribute__((packed)) {
     SPAWN_SERVER_MSG_PING,
 } SPAWN_SERVER_MSG;
 
+static void spawn_server_close_received_fds(void *control, size_t controllen) {
+    const size_t header_len = CMSG_LEN(0);
+
+    if(!control || controllen < header_len)
+        return;
+
+    unsigned char *current = control;
+    size_t remaining = controllen;
+
+    while(remaining >= header_len) {
+        struct cmsghdr *cmsg = (struct cmsghdr *)current;
+        if(cmsg->cmsg_len < header_len)
+            break;
+
+        if(cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_RIGHTS ||
+           cmsg->cmsg_len < CMSG_LEN(sizeof(int)))
+            goto next_cmsg;
+
+        uintptr_t data_start = (uintptr_t)CMSG_DATA(cmsg);
+        uintptr_t control_end = (uintptr_t)current + remaining;
+        if(data_start < (uintptr_t)current || data_start >= control_end)
+            goto next_cmsg;
+
+        size_t fd_bytes = cmsg->cmsg_len - CMSG_LEN(0);
+        size_t available_bytes = control_end - data_start;
+        if(fd_bytes > available_bytes)
+            fd_bytes = available_bytes;
+
+        int *fds = (int *)(void *)data_start;
+        for(size_t i = 0; i < fd_bytes / sizeof(int); i++)
+            close(fds[i]);
+
+next_cmsg:
+        if(cmsg->cmsg_len > remaining)
+            break;
+
+        size_t next_cmsg_len = CMSG_SPACE(cmsg->cmsg_len - header_len);
+        if(!next_cmsg_len || next_cmsg_len > remaining)
+            break;
+
+        current += next_cmsg_len;
+        remaining -= next_cmsg_len;
+    }
+}
+
+static bool spawn_server_iov_total_size(const struct iovec *iov, size_t iovlen, size_t *total) {
+    size_t bytes = 0;
+
+    for(size_t i = 0; i < iovlen; i++) {
+        if(unlikely(iov[i].iov_len > SIZE_MAX - bytes))
+            return false;
+
+        bytes += iov[i].iov_len;
+    }
+
+    *total = bytes;
+    return true;
+}
+
+static void spawn_server_iov_advance(struct iovec *iov, size_t iovlen, size_t *first, size_t bytes) {
+    while(bytes && *first < iovlen) {
+        if(bytes < iov[*first].iov_len) {
+            iov[*first].iov_base = (char *)iov[*first].iov_base + bytes;
+            iov[*first].iov_len -= bytes;
+            return;
+        }
+
+        bytes -= iov[*first].iov_len;
+        (*first)++;
+    }
+}
+
+static bool spawn_server_recvmsg_fully(int sock, const struct iovec *iov, size_t iovlen,
+                                       void *control, size_t controllen, size_t *received_controllen,
+                                       const char *description) {
+    if(received_controllen)
+        *received_controllen = 0;
+
+    if(unlikely(iovlen > SPAWN_SERVER_IOV_MAX)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: cannot recvmsg() %s: too many iovecs (%zu)",
+               description, iovlen);
+        return false;
+    }
+
+    struct iovec pending[SPAWN_SERVER_IOV_MAX];
+    memcpy(pending, iov, sizeof(*iov) * iovlen);
+
+    size_t remaining;
+    if(unlikely(!spawn_server_iov_total_size(pending, iovlen, &remaining))) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: cannot recvmsg() %s: iovec byte count overflows",
+               description);
+        return false;
+    }
+
+    size_t first = 0;
+    size_t control_received = 0;
+
+    while(remaining) {
+        struct msghdr msg = {
+            .msg_iov = &pending[first],
+            .msg_iovlen = iovlen - first,
+        };
+
+        if(control && !control_received) {
+            msg.msg_control = control;
+            msg.msg_controllen = controllen;
+        }
+
+        ssize_t bytes = recvmsg(sock, &msg, 0);
+        if(bytes < 0) {
+            if(errno == EINTR)
+                continue;
+
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: failed to recvmsg() %s.",
+                   description);
+            spawn_server_close_received_fds(control, control_received);
+            return false;
+        }
+
+        if(bytes == 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: peer closed socket while receiving %s.",
+                   description);
+            spawn_server_close_received_fds(control, control_received);
+            return false;
+        }
+
+        if(msg.msg_flags & MSG_CTRUNC) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: received truncated control message while receiving %s.",
+                   description);
+            spawn_server_close_received_fds(control, msg.msg_controllen);
+            return false;
+        }
+
+        if(control && !control_received && msg.msg_controllen)
+            control_received = msg.msg_controllen;
+
+        if(unlikely((size_t)bytes > remaining)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN SERVER: recvmsg() returned more bytes than requested while receiving %s.",
+                   description);
+            spawn_server_close_received_fds(control, control_received);
+            return false;
+        }
+
+        spawn_server_iov_advance(pending, iovlen, &first, (size_t)bytes);
+        remaining -= (size_t)bytes;
+    }
+
+    if(received_controllen)
+        *received_controllen = control_received;
+
+    return true;
+}
+
+static bool spawn_server_sendmsg_fully(int sock, const struct iovec *iov, size_t iovlen,
+                                       void *control, size_t controllen, const char *description) {
+    if(unlikely(iovlen > SPAWN_SERVER_IOV_MAX)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: cannot sendmsg() %s: too many iovecs (%zu)",
+               description, iovlen);
+        return false;
+    }
+
+    struct iovec pending[SPAWN_SERVER_IOV_MAX];
+    memcpy(pending, iov, sizeof(*iov) * iovlen);
+
+    size_t remaining;
+    if(unlikely(!spawn_server_iov_total_size(pending, iovlen, &remaining))) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN PARENT: cannot sendmsg() %s: iovec byte count overflows",
+               description);
+        return false;
+    }
+
+    size_t first = 0;
+    bool control_sent = !control || !controllen;
+
+    while(remaining) {
+        struct msghdr msg = {
+            .msg_iov = &pending[first],
+            .msg_iovlen = iovlen - first,
+        };
+
+        if(!control_sent) {
+            msg.msg_control = control;
+            msg.msg_controllen = controllen;
+        }
+
+        ssize_t bytes = sendmsg(sock, &msg, 0);
+        if(bytes < 0) {
+            if(errno == EINTR)
+                continue;
+
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: failed to sendmsg() %s.",
+                   description);
+            return false;
+        }
+
+        if(bytes == 0) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: sendmsg() made no progress while sending %s.",
+                   description);
+            return false;
+        }
+
+        control_sent = true;
+
+        if(unlikely((size_t)bytes > remaining)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR,
+                   "SPAWN PARENT: sendmsg() returned more bytes than requested while sending %s.",
+                   description);
+            return false;
+        }
+
+        spawn_server_iov_advance(pending, iovlen, &first, (size_t)bytes);
+        remaining -= (size_t)bytes;
+    }
+
+    return true;
+}
+
 static bool spawn_server_is_running(const char *path) {
-    struct msghdr msg = {0};
     struct iovec iov[7];
     SPAWN_SERVER_MSG msg_type = SPAWN_SERVER_MSG_PING;
     size_t dummy_size = 0;
     SPAWN_INSTANCE_TYPE dummy_type = 0;
     ND_UUID magic = UUID_ZERO;
-    char cmsgbuf[CMSG_SPACE(sizeof(int))] __attribute__((aligned(sizeof(size_t))));
 
     iov[0].iov_base = &msg_type;
     iov[0].iov_len = sizeof(msg_type);
@@ -489,18 +737,11 @@ static bool spawn_server_is_running(const char *path) {
     iov[6].iov_base = &dummy_type;
     iov[6].iov_len = sizeof(dummy_type);
 
-    msg.msg_iov = iov;
-    msg.msg_iovlen = 7;
-    msg.msg_control = cmsgbuf;
-    msg.msg_controllen = sizeof(cmsgbuf);
-
     int sock = connect_to_spawn_server(path, false);
     if(sock == -1)
         return false;
 
-    int rc = sendmsg(sock, &msg, 0);
-    if (rc < 0) {
-        // cannot send the message
+    if(!spawn_server_sendmsg_fully(sock, iov, 7, NULL, 0, "spawn server ping")) {
         close(sock);
         return false;
     }
@@ -530,7 +771,7 @@ static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
     struct cmsghdr *cmsg;
     SPAWN_SERVER_MSG msg_type = SPAWN_SERVER_MSG_REQUEST;
     char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)] __attribute__((aligned(sizeof(size_t))));
-    struct iovec iov[11];
+    struct iovec iov[SPAWN_SERVER_IOV_MAX];
 
     // We send 1 request with 10 iovec in it
     // The request will be received in 2 parts
@@ -567,11 +808,6 @@ static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
     iov[9].iov_base = (char *)request->data;
     iov[9].iov_len = request->data_size;
 
-    iov[10].iov_base = NULL;
-    iov[10].iov_len = 0;
-
-    msg.msg_iov = iov;
-    msg.msg_iovlen = 11;
     msg.msg_control = cmsgbuf;
     msg.msg_controllen = CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS);
 
@@ -582,17 +818,13 @@ static bool spawn_server_send_request(ND_UUID *magic, SPAWN_REQUEST *request) {
 
     memcpy(CMSG_DATA(cmsg), request->fds, sizeof(int) * SPAWN_SERVER_TRANSFER_FDS);
 
-    int rc = sendmsg(request->sock, &msg, 0);
-
-    if (rc < 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN PARENT: Failed to sendmsg() request to spawn server using socket %d.", request->sock);
+    if(!spawn_server_sendmsg_fully(request->sock, iov, 10, cmsgbuf, CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS),
+                                   "request to spawn server"))
         goto cleanup;
-    }
-    else {
-        ret = true;
-        // fprintf(stderr, "PARENT: sent request %zu on socket %d (fds: %d, %d, %d, %d) from tid %d\n",
-        //     request->request_id, request->socket, request->fds[0], request->fds[1], request->fds[2], request->fds[3], os_gettid());
-    }
+
+    ret = true;
+    // fprintf(stderr, "PARENT: sent request %zu on socket %d (fds: %d, %d, %d, %d) from tid %d\n",
+    //     request->request_id, request->socket, request->fds[0], request->fds[1], request->fds[2], request->fds[3], os_gettid());
 
 cleanup:
     freez(encoded_env);
@@ -612,6 +844,7 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     SPAWN_INSTANCE_TYPE type;
     char cmsgbuf[CMSG_SPACE(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)] __attribute__((aligned(sizeof(size_t))));
     char *envp_encoded = NULL, *argv_encoded = NULL, *data = NULL;
+    const char **envp_decoded = NULL, **argv_decoded = NULL;
     int stdin_fd = -1, stdout_fd = -1, stderr_fd = -1, custom_fd = -1;
 
     // First recvmsg() to read sizes and control message
@@ -641,45 +874,31 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     msg.msg_control = cmsgbuf;
     msg.msg_controllen = sizeof(cmsgbuf);
 
-    if (recvmsg(sock, &msg, 0) < 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: failed to recvmsg() the first part of the request.");
+    memset(cmsgbuf, 0, sizeof(cmsgbuf));
+    size_t received_controllen = 0;
+    if(!spawn_server_recvmsg_fully(sock, iov, 7, cmsgbuf, sizeof(cmsgbuf), &received_controllen,
+                                   "the first part of the request")) {
         close(sock);
         return;
     }
 
     if(msg_type == SPAWN_SERVER_MSG_PING) {
+        spawn_server_close_received_fds(cmsgbuf, received_controllen);
         spawn_server_send_status_ping(sock);
         close(sock);
         return;
     }
 
-    if(!UUIDeq(magic, server->magic)) {
+    if(msg_type != SPAWN_SERVER_MSG_REQUEST) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: Invalid authorization key for request %zu. "
-            "Rejecting request.",
-            request_id);
+               "SPAWN SERVER: invalid request message type %u. Rejecting request.",
+               (unsigned)msg_type);
+        spawn_server_close_received_fds(cmsgbuf, received_controllen);
         close(sock);
         return;
     }
 
-    if(type == SPAWN_INSTANCE_TYPE_EXEC && !(server->options & SPAWN_SERVER_OPTION_EXEC)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: Request %zu wants to exec, but exec is not allowed for this spawn server. "
-            "Rejecting request.",
-            request_id);
-        close(sock);
-        return;
-    }
-
-    if(type == SPAWN_INSTANCE_TYPE_CALLBACK && !(server->options & SPAWN_SERVER_OPTION_CALLBACK)) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR,
-            "SPAWN SERVER: Request %zu wants to run a callback, but callbacks are not allowed for this spawn server. "
-            "Rejecting request.",
-            request_id);
-        close(sock);
-        return;
-    }
+    msg.msg_controllen = received_controllen;
 
     // Extract file descriptors from control message
     struct cmsghdr *cmsg = CMSG_FIRSTHDR(&msg);
@@ -687,12 +906,14 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN SERVER: Received invalid control message (expected %zu bytes, received %zu bytes)",
                (size_t)(CMSG_LEN(sizeof(int) * SPAWN_SERVER_TRANSFER_FDS)), (size_t)(cmsg?cmsg->cmsg_len:0));
+        spawn_server_close_received_fds(cmsgbuf, received_controllen);
         close(sock);
         return;
     }
 
     if (cmsg->cmsg_level != SOL_SOCKET || cmsg->cmsg_type != SCM_RIGHTS) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: Received unexpected control message type.");
+        spawn_server_close_received_fds(cmsgbuf, received_controllen);
         close(sock);
         return;
     }
@@ -710,6 +931,37 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
         goto cleanup;
     }
 
+    if(!UUIDeq(magic, server->magic)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN SERVER: Invalid authorization key for request %zu. "
+            "Rejecting request.",
+            request_id);
+        goto cleanup;
+    }
+
+    if(type == SPAWN_INSTANCE_TYPE_EXEC && !(server->options & SPAWN_SERVER_OPTION_EXEC)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN SERVER: Request %zu wants to exec, but exec is not allowed for this spawn server. "
+            "Rejecting request.",
+            request_id);
+        goto cleanup;
+    }
+
+    if(type == SPAWN_INSTANCE_TYPE_CALLBACK && !(server->options & SPAWN_SERVER_OPTION_CALLBACK)) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+            "SPAWN SERVER: Request %zu wants to run a callback, but callbacks are not allowed for this spawn server. "
+            "Rejecting request.",
+            request_id);
+        goto cleanup;
+    }
+
+    if(env_size == 0 || argv_size == 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: invalid encoded request sizes, env = %zu, argv = %zu",
+               env_size, argv_size);
+        goto cleanup;
+    }
+
     // Second recvmsg() to read buffer contents
     iov[0].iov_base = envp_encoded = mallocz(env_size);
     iov[0].iov_len = env_size;
@@ -723,9 +975,16 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
     msg.msg_control = NULL;
     msg.msg_controllen = 0;
 
-    ssize_t total_bytes_received = recvmsg(sock, &msg, 0);
-    if (total_bytes_received < 0) {
-        nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN SERVER: failed to recvmsg() the second part of the request.");
+    if(!spawn_server_recvmsg_fully(sock, iov, msg.msg_iovlen, NULL, 0, NULL,
+                                   "the second part of the request"))
+        goto cleanup;
+
+    envp_decoded = argv_decode(envp_encoded, env_size);
+    argv_decoded = argv_decode(argv_encoded, argv_size);
+    if(!envp_decoded || !argv_decoded) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR,
+               "SPAWN SERVER: received malformed encoded argv/envp buffers for request %zu",
+               request_id);
         goto cleanup;
     }
 
@@ -743,12 +1002,14 @@ static void spawn_server_receive_request(int sock, SPAWN_SERVER *server) {
             [2] = stderr_fd,
             [3] = custom_fd,
         },
-        .envp = argv_decode(envp_encoded, env_size),
-        .argv = argv_decode(argv_encoded, argv_size),
+        .envp = envp_decoded,
+        .argv = argv_decoded,
         .data = data,
         .data_size = data_size,
         .type = type
     };
+    envp_decoded = NULL;
+    argv_decoded = NULL;
 
     // all allocations given to the request are now handled by this
     spawn_server_execute_request(server, rq);
@@ -765,6 +1026,8 @@ cleanup:
     if(stdout_fd != -1) close(stdout_fd);
     if(stderr_fd != -1) close(stderr_fd);
     if(custom_fd != -1) close(custom_fd);
+    freez((void *)envp_decoded);
+    freez((void *)argv_decoded);
     freez(envp_encoded);
     freez(argv_encoded);
     freez(data);

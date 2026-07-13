@@ -267,7 +267,9 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
     QUERY_TARGET *qt = r->internal.qt;
     RRDR_OPTIONS options = qt->window.options;
 
-    bool send_count = query_target_aggregatable(qt);
+    // aggregatable results need the per-point counts, but an RRDR without
+    // group-by (a v1 query) has no gbc array to read them from
+    bool send_count = query_target_aggregatable(qt) && r->gbc;
     bool send_hidden = send_count && r->vh && query_has_group_by_aggregation_percentage(qt);
 
     buffer_json_member_add_object(wb, "result");
@@ -316,7 +318,7 @@ void rrdr2json_v2(RRDR *r, BUFFER *wb) {
             NETDATA_DOUBLE *ch = send_hidden ? &r->vh[i * r->d ] : NULL;
             RRDR_VALUE_FLAGS *co = &r->o[ i * r->d ];
             NETDATA_DOUBLE *ar = &r->ar[ i * r->d ];
-            uint32_t *gbc = &r->gbc [ i * r->d ];
+            uint32_t *gbc = r->gbc ? &r->gbc[ i * r->d ] : NULL;
             time_t now = r->t[i];
 
             buffer_json_add_array_item_array(wb); // row

@@ -9,6 +9,14 @@ struct web_client;
 
 extern bool netdata_is_protected_by_bearer;
 
+static inline bool netdata_bearer_protection_is_enabled(void) {
+    return __atomic_load_n(&netdata_is_protected_by_bearer, __ATOMIC_RELAXED);
+}
+
+static inline void netdata_bearer_protection_set_enabled(bool enabled) {
+    __atomic_store_n(&netdata_is_protected_by_bearer, enabled, __ATOMIC_RELAXED);
+}
+
 bool extract_bearer_token_from_request(struct web_client *w, char *dst, size_t dst_len);
 
 time_t bearer_create_token(nd_uuid_t *uuid, HTTP_USER_ROLE user_role, HTTP_ACCESS access, nd_uuid_t cloud_account_id, const char *client_name);

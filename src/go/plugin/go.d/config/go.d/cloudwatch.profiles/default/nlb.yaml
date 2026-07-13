@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS Network Load Balancer
 namespace: AWS/NetworkELB
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: LoadBalancer
@@ -63,7 +64,7 @@ template:
     instances:
       by_labels: [account_id, region, load_balancer]
   charts:
-    - id: cw_nlb_active_flows
+    - id: aws_cloudwatch_nlb_active_flows
       context: active_flows
       title: NLB Active Flow Count
       family: Flows
@@ -72,7 +73,7 @@ template:
       dimensions:
         - selector: active_flow_count_average
           name: active
-    - id: cw_nlb_new_flows
+    - id: aws_cloudwatch_nlb_new_flows
       context: new_flows
       title: NLB New Flow Count
       family: Flows
@@ -81,7 +82,7 @@ template:
       dimensions:
         - selector: new_flow_count_sum
           name: new
-    - id: cw_nlb_throughput
+    - id: aws_cloudwatch_nlb_throughput
       context: processed_bytes
       title: NLB Processed Bytes
       family: Traffic
@@ -90,7 +91,7 @@ template:
       dimensions:
         - selector: processed_bytes_sum
           name: processed
-    - id: cw_nlb_packets
+    - id: aws_cloudwatch_nlb_packets
       context: processed_packets
       title: NLB Processed Packets
       family: Traffic
@@ -99,7 +100,7 @@ template:
       dimensions:
         - selector: processed_packets_sum
           name: processed
-    - id: cw_nlb_consumed_lcus
+    - id: aws_cloudwatch_nlb_consumed_lcus
       context: consumed_lcus
       title: NLB Consumed LCUs
       family: Capacity
@@ -108,7 +109,7 @@ template:
       dimensions:
         - selector: consumed_lcus_average
           name: lcus
-    - id: cw_nlb_tcp_resets
+    - id: aws_cloudwatch_nlb_tcp_resets
       context: tcp_resets
       title: NLB TCP Resets
       family: Resets
@@ -124,7 +125,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_nlb_tls_errors
+    # - id: aws_cloudwatch_nlb_tls_errors
     #   context: client_tls_negotiation_errors
     #   title: NLB Client TLS Negotiation Errors
     #   family: TLS
@@ -133,7 +134,7 @@ template:
     #   dimensions:
     #     - selector: client_tls_negotiation_errors_sum
     #       name: errors
-    # - id: cw_nlb_port_allocation_errors
+    # - id: aws_cloudwatch_nlb_port_allocation_errors
     #   context: port_allocation_errors
     #   title: NLB Port Allocation Errors
     #   family: Errors

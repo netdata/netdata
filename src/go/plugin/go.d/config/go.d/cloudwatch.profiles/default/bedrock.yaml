@@ -7,7 +7,8 @@
 version: v1
 display_name: Amazon Bedrock
 namespace: AWS/Bedrock
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: ModelId
@@ -68,7 +69,7 @@ template:
     instances:
       by_labels: [account_id, region, model_id]
   charts:
-    - id: cw_bedrock_invocations
+    - id: aws_cloudwatch_bedrock_invocations
       context: invocations
       title: Bedrock Invocations
       family: Invocations
@@ -77,7 +78,7 @@ template:
       dimensions:
         - selector: invocations_sum
           name: invocations
-    - id: cw_bedrock_errors
+    - id: aws_cloudwatch_bedrock_errors
       context: errors
       title: Bedrock Invocation Errors
       family: Errors
@@ -90,7 +91,7 @@ template:
           name: server
         - selector: invocation_throttles_sum
           name: throttled
-    - id: cw_bedrock_tokens
+    - id: aws_cloudwatch_bedrock_tokens
       context: tokens
       title: Bedrock Token Throughput
       family: Tokens
@@ -101,7 +102,7 @@ template:
           name: input
         - selector: output_tokens_sum
           name: output
-    - id: cw_bedrock_latency
+    - id: aws_cloudwatch_bedrock_latency
       context: latency
       title: Bedrock Invocation Latency
       family: Latency
@@ -115,7 +116,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric(s).
     # ----------------------------------------------------------------------------------------
-    # - id: cw_bedrock_quota_usage
+    # - id: aws_cloudwatch_bedrock_quota_usage
     #   context: quota_usage
     #   title: Bedrock Estimated TPM Quota Usage
     #   family: Tokens
@@ -124,7 +125,7 @@ template:
     #   dimensions:
     #     - selector: estimated_tpm_quota_usage_sum
     #       name: estimated
-    # - id: cw_bedrock_cache_tokens
+    # - id: aws_cloudwatch_bedrock_cache_tokens
     #   context: cache_tokens
     #   title: Bedrock Prompt Cache Tokens
     #   family: Tokens

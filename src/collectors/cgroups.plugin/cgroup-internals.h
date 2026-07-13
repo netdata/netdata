@@ -198,7 +198,7 @@ struct cgroup {
     uint32_t hash_chart_id;
 
     // 'cgroup_name' label value.
-    // by default this is the *id (path), later changed to the resolved name (cgroup-name.sh) or systemd service name.
+    // by default this is the *id (path), later changed to the resolved name (cgroup-name) or systemd service name.
     char *name;
 
     RRDLABELS *chart_labels;
@@ -339,6 +339,7 @@ extern bool cgroup_enable_pressure;
 extern bool cgroup_enable_cpuacct_cpu_shares;
 
 extern int cgroup_check_for_new_every;
+extern int cgroup_name_timeout_ms;
 extern int cgroup_update_every;
 
 extern char *cgroup_cpuacct_base;
@@ -411,7 +412,7 @@ static inline int matches_enabled_cgroup_names(char *name) {
 }
 
 static inline int matches_enabled_cgroup_renames(char *id) {
-    return simple_pattern_matches(enabled_cgroup_renames, id);
+    return cgroups_rename_script && simple_pattern_matches(enabled_cgroup_renames, id);
 }
 
 static inline int matches_systemd_services_cgroups(char *id) {

@@ -33,6 +33,7 @@ jobs:
             .github/workflows/go-tests.yml
             packaging/cmake/
             src/go/**
+            src/collectors/cgroups.plugin/cgroup-name/**
           files_ignore: |
             **/*.md
             src/go/**/metadata.yaml
@@ -59,6 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.get-version.outputs.matrix }}
+      build_matrix: ${{ steps.get-version.outputs.build_matrix }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -161,7 +163,7 @@ jobs:
           - linux/arm64
           - linux/ppc64le
           - windows/amd64
-        include: ${{ fromJson(needs.matrix.outputs.matrix) }}
+        include: ${{ fromJson(needs.matrix.outputs.build_matrix) }}
     steps:
       - name: Skip Check
         id: skip

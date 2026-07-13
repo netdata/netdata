@@ -53,13 +53,13 @@ bool netdata_random_session_id_generate(void) {
     return ret;
 }
 
-static const char *netdata_random_session_id_get_filename(void) {
+static char *netdata_random_session_id_filename_strdupz(void) {
     spinlock_lock(&netdata_random_session_id_spinlock);
 
     if(!netdata_random_session_id_filename)
         netdata_random_session_id_generate_unlocked();
 
-    const char *filename = netdata_random_session_id_filename;
+    char *filename = netdata_random_session_id_filename ? strdupz(netdata_random_session_id_filename) : NULL;
     spinlock_unlock(&netdata_random_session_id_spinlock);
 
     return filename;
@@ -117,7 +117,7 @@ typedef enum {
 } CLAIM_RESPONSE;
 
 static void claim_add_user_info_command(BUFFER *wb) {
-    const char *filename = netdata_random_session_id_get_filename();
+    CLEAN_CHAR_P *filename = netdata_random_session_id_filename_strdupz();
     CLEAN_BUFFER *os_cmd = buffer_create(0, NULL);
 
     const char *os_filename;

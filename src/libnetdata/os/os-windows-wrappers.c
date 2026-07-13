@@ -89,6 +89,16 @@ bool netdata_registry_get_string(char *out, unsigned int length, void *hKey, cha
     return status;
 }
 
+bool netdata_registry_key_exists(void *hKey, const char *subKey) {
+    HKEY lKey;
+    long ret = RegOpenKeyEx(hKey, subKey, 0, KEY_READ, &lKey);
+    if (ret != ERROR_SUCCESS)
+        return false;
+
+    RegCloseKey(lKey);
+    return true;
+}
+
 bool EnableWindowsPrivilege(const char *privilegeName) {
     HANDLE hToken;
     LUID luid;

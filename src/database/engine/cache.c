@@ -1703,7 +1703,7 @@ static ALWAYS_INLINE PGC_PAGE *page_find_and_acquire_once(PGC *cache, Word_t sec
             page = page_find_and_acquire_exact_unsafe(cache, pages_judy_pptr, start_time_s);
             if(!page) {
                 page = page_find_and_acquire_prev_unsafe(cache, pages_judy_pptr, start_time_s);
-                if(page && start_time_s > page->end_time_s) {
+                if(page && start_time_s > __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED)) {
                     // found a page starting before our timestamp
                     // but our timestamp is not included in it
                     page_release(cache, page, false);
@@ -2310,7 +2310,7 @@ time_t pgc_page_start_time_s(PGC_PAGE *page) {
 }
 
 time_t pgc_page_end_time_s(PGC_PAGE *page) {
-    return page->end_time_s;
+    return __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED);
 }
 
 uint32_t pgc_page_update_every_s(PGC_PAGE *page) {
@@ -2326,8 +2326,8 @@ uint32_t pgc_page_fix_update_every(PGC_PAGE *page, uint32_t update_every_s) {
 }
 
 time_t pgc_page_fix_end_time_s(PGC_PAGE *page, time_t end_time_s) {
-    page->end_time_s = end_time_s;
-    return page->end_time_s;
+    __atomic_store_n(&page->end_time_s, end_time_s, __ATOMIC_RELAXED);
+    return end_time_s;
 }
 
 void *pgc_page_data(PGC_PAGE *page) {
@@ -2625,7 +2625,7 @@ void pgc_open_cache_to_journal_v2(
             mi->metric = metric;
             mi->uuid = uuid;
             mi->first_time_s = page->start_time_s;
-            mi->last_time_s = page->end_time_s;
+            mi->last_time_s = __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED);
             mi->number_of_pages = 1;
             mi->page_list_header = 0;
             mi->JudyL_pages_by_start_time = NULL;
@@ -2639,8 +2639,9 @@ void pgc_open_cache_to_journal_v2(
             mrg_metric_release(main_mrg, metric);
             if(page->start_time_s < mi->first_time_s)
                 mi->first_time_s = page->start_time_s;
-            if(page->end_time_s > mi->last_time_s)
-                mi->last_time_s = page->end_time_s;
+            time_t page_end_time_s = __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED);
+            if(page_end_time_s > mi->last_time_s)
+                mi->last_time_s = page_end_time_s;
         }
 
         PValue = JudyLIns(&mi->JudyL_pages_by_start_time, page->start_time_s, PJE0);
@@ -2652,7 +2653,7 @@ void pgc_open_cache_to_journal_v2(
         if(!*PValue) {
             struct jv2_page_info *pi = aral_mallocz(ar_pi);
             pi->start_time_s = page->start_time_s;
-            pi->end_time_s = page->end_time_s;
+            pi->end_time_s = __atomic_load_n(&page->end_time_s, __ATOMIC_RELAXED);
             pi->update_every_s = pgc_page_update_every_s(page);
             pi->page_length = page_size_from_assumed_size(cache, page->assumed_size);
             pi->page = page;

@@ -134,6 +134,11 @@ There are eight sections in the file which you can configure:
 | enabled | Enable or disable direct AppleSMC and IOHID hardware sensor monitoring. | yes | no |
 | SMC sensors | Enable or disable direct AppleSMC hardware temperature, fan, voltage, current, and power sensor monitoring. | yes | no |
 | IOHID sensors | Enable or disable direct IOHID temperature, current, and voltage sensor monitoring. | yes | no |
+| per sensor temperature charts | Chart every temperature sensor individually, in addition to the per-subsystem summary charts and the temperature histogram. | no | no |
+| per sensor fan charts | Chart every fan sensor individually. | yes | no |
+| per sensor voltage charts | Chart every voltage sensor individually (per-regulator rails), in addition to the summary charts. | no | no |
+| per sensor current charts | Chart every current sensor individually (per-regulator rails), in addition to the summary charts. | no | no |
+| per sensor power charts | Chart every power sensor individually, in addition to the per-subsystem power summary charts. | no | no |
 | discovery every | How often to rescan AppleSMC for available hardware sensor keys. | 300s | no |
 | SMC sample every | How often to read values from discovered AppleSMC hardware sensor keys. | 10s | no |
 | sample every | Output interval passed to the long-running native `powermetrics` loop sampler. | 1s | no |
@@ -388,7 +393,7 @@ Labels:
 | subsystem | Hardware subsystem inferred from the sensor source, used with driver for Linux-compatible hardware sensor grouping |
 | chip_id | Sensor chip or macOS service identifier |
 | feature | Stable sensor feature identifier |
-| name | Human-readable sensor name |
+| label | Human-readable sensor label |
 | path | Stable source path for the sensor |
 | source | Data source |
 | sensor | Sensor name |
@@ -403,6 +408,9 @@ Metrics:
 | system.hw.sensor.voltage.input | input | V |
 | system.hw.sensor.current.input | input | A |
 | system.hw.sensor.power.input | input | W |
+| system.hw.sensor.temperature.subsystem | min, avg, max | degrees Celsius |
+| system.hw.sensor.power.subsystem | power | W |
+| system.hw.sensor.temperature.histogram | 40, 50, 60, 70, 80, 85, 90, 95, 100, +Inf | sensors |
 | system.hw.sensor.state.input | nominal, moderate, heavy, sleeping, trapping, undefined | status |
 
 ### Per nvme device

@@ -103,7 +103,7 @@ void datafile_release_with_trace(struct rrdengine_datafile *df, DATAFILE_ACQUIRE
     spinlock_tracked_unlock(&df->users.spinlock);
 }
 
-bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdown)
+bool datafile_acquire_for_deletion(struct rrdengine_datafile *df)
 {
     bool can_be_deleted = false;
     bool marked_pending = false;
@@ -134,8 +134,8 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
     spinlock_tracked_unlock(&df->users.spinlock);
 
     if(marked_pending)
-        netdata_log_info("DBENGINE: tier %d: " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " is pending deletion (%s)",
-                         datafile_ctx(df)->config.tier, df->tier, df->fileno, is_shutdown ? "shutdown" : "runtime");
+        netdata_log_info("DBENGINE: tier %d: " DATAFILE_PREFIX RRDENG_FILE_NUMBER_PRINT_TMPL " is pending deletion",
+                         datafile_ctx(df)->config.tier, df->tier, df->fileno);
 
     if(can_be_deleted)
         return true;
@@ -165,44 +165,6 @@ bool datafile_acquire_for_deletion(struct rrdengine_datafile *df, bool is_shutdo
         if(!df->users.lockers)
             can_be_deleted = true;
 
-        else if(!clean_pages_in_open_cache && !hot_pages_in_open_cache) {
-            time_t now_s = now_monotonic_sec();
-
-            if(!df->users.time_to_evict) {
-                df->users.time_to_evict = now_s + (is_shutdown ? DATAFILE_DELETE_TIMEOUT_SHORT : DATAFILE_DELETE_TIMEOUT_LONG);
-                internal_error(true, "DBENGINE: datafile %u of tier %d pending deletion has %u lockers "
-                                     "(oc:%u, pd:%u, rt:%u, ix:%u), writers %zu/%zu, open-cache clean/hot %zu/%zu "
-                                     "- will force-delete shortly (scanned in %"PRIu64" usecs)",
-                               df->fileno, datafile_ctx(df)->config.tier,
-                               df->users.lockers,
-                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
-                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
-                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_RETENTION],
-                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_INDEXING],
-                               writers_running,
-                               flushed_to_open_running,
-                               clean_pages_in_open_cache,
-                               hot_pages_in_open_cache,
-                               time_to_scan_ut);
-            }
-            else if(now_s > df->users.time_to_evict) {
-                can_be_deleted = true;
-                internal_error(true, "DBENGINE: datafile %u of tier %d pending deletion has %u lockers "
-                                     "(oc:%u, pd:%u, rt:%u, ix:%u), writers %zu/%zu, open-cache clean/hot %zu/%zu "
-                                     "- forcing delete now (scanned in %"PRIu64" usecs)",
-                               df->fileno, datafile_ctx(df)->config.tier,
-                               df->users.lockers,
-                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_OPEN_CACHE],
-                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_PAGE_DETAILS],
-                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_RETENTION],
-                               df->users.lockers_by_reason[DATAFILE_ACQUIRE_INDEXING],
-                               writers_running,
-                               flushed_to_open_running,
-                               clean_pages_in_open_cache,
-                               hot_pages_in_open_cache,
-                               time_to_scan_ut);
-            }
-        }
     }
 
     if(!can_be_deleted)
@@ -744,13 +706,22 @@ void finalize_data_files(struct rrdengine_instance *ctx)
         struct rrdengine_journalfile *journalfile = datafile->journalfile;
 
         logged = false;
+        bool acquired = false;
         size_t iterations = 10;
-        while(!datafile_acquire_for_deletion(datafile, true) && --iterations > 0) {
+        while(!(acquired = datafile_acquire_for_deletion(datafile)) && --iterations > 0) {
             if(!logged) {
                 netdata_log_info("Waiting to acquire data file %u of tier %d to close it...", datafile->fileno, ctx->config.tier);
                 logged = true;
             }
             sleep_usec(100 * USEC_PER_MS);
+        }
+
+        if(!acquired) {
+            // users still hold lockers on this datafile - closing and freeing it
+            // would be a use-after-free for them; leaking it at shutdown is safer
+            netdata_log_error("Cannot acquire data file %u of tier %d to close it - it is still in use - skipping it.",
+                              datafile->fileno, ctx->config.tier);
+            continue;
         }
 
         logged = false;

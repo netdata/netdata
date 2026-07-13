@@ -36,6 +36,7 @@ typedef enum __attribute__ ((__packed__)) item_flags {
     ITEM_FLAG_NONE              = 0,
     ITEM_FLAG_DELETED           = (1 << 0), // this item is marked deleted, so it is not available for traversal (deleted from the index too)
     ITEM_FLAG_BEING_CREATED     = (1 << 1), // this item is currently being created - this flag is removed when construction finishes
+    ITEM_FLAG_PENDING_DELETION  = (1 << 2), // this deleted item is counted in pending_deletion_items
 
     // IMPORTANT: This is 8-bit
 } ITEM_FLAGS;
@@ -151,6 +152,7 @@ struct dictionary {
     struct {
         DICTIONARY_ITEM *list;          // the double linked list of all items in the dictionary
         RW_SPINLOCK rw_spinlock;        // protect the linked-list
+        SPINLOCK pending_deletion_spinlock; // protect delete flag / last-reference accounting
         pid_t writer_pid;               // the gettid() of the writer
         uint32_t writer_depth;          // nesting of write locks
     } items;

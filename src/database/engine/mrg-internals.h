@@ -145,8 +145,11 @@ static time_t mrg_metric_get_first_time_s_smart(MRG *mrg __maybe_unused, METRIC 
 
         if(first_time_s <= 0)
             first_time_s = 0;
-        else
-            __atomic_store_n(&metric->first_time_s, first_time_s, __ATOMIC_RELAXED);
+        else if(!set_metric_field_with_condition(metric->first_time_s, first_time_s, _current <= 0))
+            // lost the race to a concurrent writer publishing the real
+            // retention start (the collector, when the page gets its first
+            // real value) - never overwrite it
+            first_time_s = __atomic_load_n(&metric->first_time_s, __ATOMIC_RELAXED);
     }
 
     return first_time_s;
@@ -255,7 +258,6 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
 
     size_t partition = uuid_to_uuidmap_partition(*entry->uuid);
 
-    METRIC *allocation = aral_mallocz(mrg->index[partition].aral);
     Pvoid_t *PValue;
 
     while(1) {
@@ -284,7 +286,6 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
                 *ret = false;
 
             uuidmap_free(id);
-            aral_freez(mrg->index[partition].aral, allocation);
 
             mrg_stats_judy_mem(mrg, partition, JudyAllocThreadPulseGetAndReset());
             return metric;
@@ -293,7 +294,10 @@ static METRIC *metric_add_and_acquire(MRG *mrg, MRG_ENTRY *entry, bool *ret) {
         break;
     }
 
-    METRIC *metric = allocation;
+    // allocate under the partition write lock: mrg_destroy() destroys the
+    // ARALs while holding all partition locks, so the allocator cannot be
+    // destroyed while we hold this lock
+    METRIC *metric = aral_mallocz(mrg->index[partition].aral);
     metric->uuid = id;
     metric->section = entry->section;
     metric->first_time_s = MAX(0, entry->first_time_s);

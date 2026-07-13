@@ -42,7 +42,7 @@ UUIDMAP_ID uuidmap_create(const nd_uuid_t uuid);
 // uuidmap_free() on the returned ID.
 UUIDMAP_ID uuidmap_acquire(const nd_uuid_t uuid);
 
-// returns the number of entries still referenced (although freed)
+// returns the number of entries still referenced; non-zero leaves UUIDMap intact
 size_t uuidmap_destroy(void);
 
 // delete a uuid from the map

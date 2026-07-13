@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon ElastiCache
 namespace: AWS/ElastiCache
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: CacheClusterId
@@ -82,7 +83,7 @@ template:
     instances:
       by_labels: [account_id, region, cache_cluster_id, cache_node_id]
   charts:
-    - id: cw_ec_cpu
+    - id: aws_cloudwatch_ec_cpu
       context: cpu
       title: ElastiCache CPU Utilization
       family: CPU
@@ -93,7 +94,7 @@ template:
           name: host
         - selector: engine_cpu_utilization_average
           name: engine
-    - id: cw_ec_memory
+    - id: aws_cloudwatch_ec_memory
       context: memory
       title: ElastiCache Memory
       family: Memory
@@ -104,7 +105,7 @@ template:
           name: freeable
         - selector: bytes_used_for_cache_average
           name: used_for_cache
-    - id: cw_ec_memory_usage
+    - id: aws_cloudwatch_ec_memory_usage
       context: memory_usage
       title: ElastiCache Database Memory Usage
       family: Memory
@@ -113,7 +114,7 @@ template:
       dimensions:
         - selector: database_memory_usage_percentage_average
           name: used
-    - id: cw_ec_connections
+    - id: aws_cloudwatch_ec_connections
       context: connections
       title: ElastiCache Current Connections
       family: Connections
@@ -122,7 +123,7 @@ template:
       dimensions:
         - selector: curr_connections_average
           name: current
-    - id: cw_ec_new_connections
+    - id: aws_cloudwatch_ec_new_connections
       context: new_connections
       title: ElastiCache New Connections
       family: Connections
@@ -131,7 +132,7 @@ template:
       dimensions:
         - selector: new_connections_sum
           name: new
-    - id: cw_ec_hitrate
+    - id: aws_cloudwatch_ec_hitrate
       context: hitrate
       title: ElastiCache Cache Hits and Misses
       family: Keyspace
@@ -142,7 +143,7 @@ template:
           name: hits
         - selector: cache_misses_sum
           name: misses
-    - id: cw_ec_evictions
+    - id: aws_cloudwatch_ec_evictions
       context: evictions
       title: ElastiCache Evictions
       family: Keyspace
@@ -151,7 +152,7 @@ template:
       dimensions:
         - selector: evictions_sum
           name: evictions
-    - id: cw_ec_network
+    - id: aws_cloudwatch_ec_network
       context: network
       title: ElastiCache Network Traffic
       family: Network
@@ -165,7 +166,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_ec_replication
+    # - id: aws_cloudwatch_ec_replication
     #   context: replication
     #   title: ElastiCache Replication
     #   family: Replication
@@ -174,7 +175,7 @@ template:
     #   dimensions:
     #     - selector: replication_bytes_sum
     #       name: bytes
-    # - id: cw_ec_swap
+    # - id: aws_cloudwatch_ec_swap
     #   context: swap_usage
     #   title: ElastiCache Swap Usage
     #   family: Memory
@@ -183,7 +184,7 @@ template:
     #   dimensions:
     #     - selector: swap_usage_average
     #       name: swap
-    # - id: cw_ec_replication_lag
+    # - id: aws_cloudwatch_ec_replication_lag
     #   context: replication_lag
     #   title: ElastiCache Replication Lag
     #   family: Replication
@@ -192,7 +193,7 @@ template:
     #   dimensions:
     #     - selector: replication_lag_average
     #       name: lag
-    # - id: cw_ec_items
+    # - id: aws_cloudwatch_ec_items
     #   context: items
     #   title: ElastiCache Current Items
     #   family: Keyspace

@@ -240,6 +240,7 @@ typedef enum __attribute__ ((__packed__)) {
     RRDENG_PAGE_UPDATE_EVERY_CHANGE   = (1 << 11),
     RRDENG_PAGE_STEP_TOO_SMALL        = (1 << 12),
     RRDENG_PAGE_STEP_UNALIGNED        = (1 << 13),
+    RRDENG_PAGE_RETENTION_RECORDED    = (1 << 14),
 } RRDENG_COLLECT_PAGE_FLAGS;
 
 struct rrdeng_collect_handle {

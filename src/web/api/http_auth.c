@@ -342,8 +342,11 @@ bool web_client_bearer_token_auth(struct web_client *w, const char *v) {
 }
 
 void bearer_tokens_init(void) {
-    netdata_is_protected_by_bearer =
-        inicfg_get_boolean(&netdata_config, CONFIG_SECTION_WEB, "bearer token protection", netdata_is_protected_by_bearer);
+    netdata_bearer_protection_set_enabled(inicfg_get_boolean(
+        &netdata_config,
+        CONFIG_SECTION_WEB,
+        "bearer token protection",
+        netdata_bearer_protection_is_enabled()));
 
     netdata_authorized_bearers = dictionary_create_advanced(
         DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE,

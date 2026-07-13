@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon MSK
 namespace: AWS/Kafka
-period: 300
+query:
+  period: 5m
 # Broker grain. The CloudWatch dimension names contain literal spaces ("Cluster Name", "Broker ID");
 # only the DEFAULT (free) monitoring level is collected here -- PER_BROKER / PER_TOPIC_* levels are
 # paid and opt-in. *PerSec metrics are already per-second rates (average, not sum).
@@ -82,7 +83,7 @@ template:
     instances:
       by_labels: [account_id, region, cluster_name, broker_id]
   charts:
-    - id: cw_msk_throughput
+    - id: aws_cloudwatch_msk_throughput
       context: throughput
       title: MSK Broker Throughput
       family: Throughput
@@ -93,7 +94,7 @@ template:
           name: in
         - selector: bytes_out_per_sec_average
           name: out
-    - id: cw_msk_messages
+    - id: aws_cloudwatch_msk_messages
       context: messages
       title: MSK Broker Messages In
       family: Throughput
@@ -102,7 +103,7 @@ template:
       dimensions:
         - selector: messages_in_per_sec_average
           name: in
-    - id: cw_msk_cpu
+    - id: aws_cloudwatch_msk_cpu
       context: cpu
       title: MSK Broker CPU
       family: CPU
@@ -115,7 +116,7 @@ template:
           name: system
         - selector: cpu_idle_average
           name: idle
-    - id: cw_msk_disk
+    - id: aws_cloudwatch_msk_disk
       context: disk_used
       title: MSK Broker Disk Used
       family: Disk
@@ -126,7 +127,7 @@ template:
           name: data_logs
         - selector: root_disk_used_average
           name: root
-    - id: cw_msk_memory
+    - id: aws_cloudwatch_msk_memory
       context: memory
       title: MSK Broker Memory
       family: Memory
@@ -137,7 +138,7 @@ template:
           name: used
         - selector: memory_free_average
           name: free
-    - id: cw_msk_heap_memory_after_gc
+    - id: aws_cloudwatch_msk_heap_memory_after_gc
       context: heap_memory_after_gc
       title: MSK Broker Heap Memory After GC
       family: Memory
@@ -146,7 +147,7 @@ template:
       dimensions:
         - selector: heap_memory_after_gc_average
           name: used
-    - id: cw_msk_partitions
+    - id: aws_cloudwatch_msk_partitions
       context: partitions
       title: MSK Broker Partitions
       family: Partitions
@@ -159,7 +160,7 @@ template:
           name: leaders
         - selector: under_replicated_partitions_maximum
           name: under_replicated
-    - id: cw_msk_isr
+    - id: aws_cloudwatch_msk_isr
       context: under_min_isr
       title: MSK Under-Min-ISR Partitions
       family: Partitions
@@ -168,7 +169,7 @@ template:
       dimensions:
         - selector: under_min_isr_partition_count_maximum
           name: under_min_isr
-    - id: cw_msk_connections
+    - id: aws_cloudwatch_msk_connections
       context: connections
       title: MSK Broker Connections
       family: Connections
@@ -180,7 +181,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_msk_cpu_io_wait
+    # - id: aws_cloudwatch_msk_cpu_io_wait
     #   context: cpu_io_wait
     #   title: MSK Broker CPU I/O Wait
     #   family: CPU

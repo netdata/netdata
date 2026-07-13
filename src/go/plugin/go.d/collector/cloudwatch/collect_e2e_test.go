@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -20,7 +21,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/pkg/collecttest"
 )
 
@@ -40,7 +43,20 @@ func TestCollect_E2E(t *testing.T) {
 	const account = "000000000000"
 
 	scenarios := map[string]e2eScenario{
-		"ec2 single dimension, rate sums stored undivided": {
+		"billing total uses its static Currency grain": {
+			profiles: []string{"billing_total"},
+			gmd: map[string]float64{
+				e2eKey("AWS/Billing", "EstimatedCharges", "Maximum", "Currency", "USD"): 123.45,
+			},
+			wantSeries: map[string]metrix.SampleValue{
+				`billing_total.estimated_charges_maximum{account_id="000000000000",region="us-east-1"}`: 123.45,
+			},
+		},
+		"billing total no-data is a successful gauge gap": {
+			profiles:   []string{"billing_total"},
+			wantSeries: map[string]metrix.SampleValue{},
+		},
+		"ec2 single dimension, rate sums normalized by effective period": {
 			profiles: []string{"ec2"},
 			listMetrics: map[string][]cwtypes.Metric{
 				"AWS/EC2": {
@@ -54,7 +70,7 @@ func TestCollect_E2E(t *testing.T) {
 			},
 			gmd: map[string]float64{
 				e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"):    3.2,
-				e2eKey("AWS/EC2", "NetworkIn", "Sum", "InstanceId", "i-1"):             1500, // raw Sum, undivided in the store
+				e2eKey("AWS/EC2", "NetworkIn", "Sum", "InstanceId", "i-1"):             1500,
 				e2eKey("AWS/EC2", "NetworkOut", "Sum", "InstanceId", "i-1"):            900,
 				e2eKey("AWS/EC2", "DiskReadOps", "Sum", "InstanceId", "i-1"):           10,
 				e2eKey("AWS/EC2", "DiskWriteOps", "Sum", "InstanceId", "i-1"):          20,
@@ -62,11 +78,41 @@ func TestCollect_E2E(t *testing.T) {
 			},
 			wantSeries: map[string]metrix.SampleValue{
 				`ec2.cpu_utilization_average{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:     3.2,
-				`ec2.network_in_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:              1500,
-				`ec2.network_out_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:             900,
-				`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:           10,
-				`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:          20,
+				`ec2.network_in_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:              1500.0 / 300,
+				`ec2.network_out_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:             900.0 / 300,
+				`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:           10.0 / 300,
+				`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:          20.0 / 300,
 				`ec2.status_check_failed_maximum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`: 0,
+			},
+		},
+		"PrivateLink endpoint keeps Average gauges and normalizes Sum totals": {
+			profiles: []string{"privatelink_endpoint"},
+			listMetrics: map[string][]cwtypes.Metric{
+				"AWS/PrivateLinkEndpoints": {
+					mkMetric("ActiveConnections", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"),
+					mkMetric("BytesProcessed", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"),
+					mkMetric("NewConnections", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"),
+					mkMetric("PacketsDropped", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"),
+					mkMetric("RstPacketsReceived", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"),
+				},
+			},
+			gmd: map[string]float64{
+				e2eKey("AWS/PrivateLinkEndpoints", "ActiveConnections", "Average", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"): 17,
+				e2eKey("AWS/PrivateLinkEndpoints", "BytesProcessed", "Average", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"):    100,
+				e2eKey("AWS/PrivateLinkEndpoints", "BytesProcessed", "Sum", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"):        1500,
+				e2eKey("AWS/PrivateLinkEndpoints", "NewConnections", "Average", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"):    2,
+				e2eKey("AWS/PrivateLinkEndpoints", "NewConnections", "Sum", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"):        600,
+				e2eKey("AWS/PrivateLinkEndpoints", "PacketsDropped", "Sum", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"):        30,
+				e2eKey("AWS/PrivateLinkEndpoints", "RstPacketsReceived", "Sum", "Endpoint Type", "Interface", "Service Name", "service-1", "VPC Endpoint Id", "vpce-1", "VPC Id", "vpc-1"):    60,
+			},
+			wantSeries: map[string]metrix.SampleValue{
+				`privatelink_endpoint.active_connections_average{account_id="000000000000",endpoint_type="Interface",region="us-east-1",service_name="service-1",vpc_endpoint_id="vpce-1",vpc_id="vpc-1"}`: 17,
+				`privatelink_endpoint.bytes_processed_average{account_id="000000000000",endpoint_type="Interface",region="us-east-1",service_name="service-1",vpc_endpoint_id="vpce-1",vpc_id="vpc-1"}`:    100,
+				`privatelink_endpoint.bytes_processed_sum{account_id="000000000000",endpoint_type="Interface",region="us-east-1",service_name="service-1",vpc_endpoint_id="vpce-1",vpc_id="vpc-1"}`:        1500.0 / 300,
+				`privatelink_endpoint.new_connections_average{account_id="000000000000",endpoint_type="Interface",region="us-east-1",service_name="service-1",vpc_endpoint_id="vpce-1",vpc_id="vpc-1"}`:    2,
+				`privatelink_endpoint.new_connections_sum{account_id="000000000000",endpoint_type="Interface",region="us-east-1",service_name="service-1",vpc_endpoint_id="vpce-1",vpc_id="vpc-1"}`:        600.0 / 300,
+				`privatelink_endpoint.packets_dropped_sum{account_id="000000000000",endpoint_type="Interface",region="us-east-1",service_name="service-1",vpc_endpoint_id="vpce-1",vpc_id="vpc-1"}`:        30.0 / 300,
+				`privatelink_endpoint.rst_packets_received_sum{account_id="000000000000",endpoint_type="Interface",region="us-east-1",service_name="service-1",vpc_endpoint_id="vpce-1",vpc_id="vpc-1"}`:   60.0 / 300,
 			},
 		},
 		"s3 multi-dimension identity, daily period": {
@@ -106,9 +152,9 @@ func TestCollect_E2E(t *testing.T) {
 				e2eKey("AWS/Lambda", "Duration", "p90", "FunctionName", "fn-1"):     200,
 			},
 			wantSeries: map[string]metrix.SampleValue{
-				`lambda.invocations_sum{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:  100,
-				`lambda.errors_sum{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:       2,
-				`lambda.throttles_sum{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:    1,
+				`lambda.invocations_sum{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:  100.0 / 300,
+				`lambda.errors_sum{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:       2.0 / 300,
+				`lambda.throttles_sum{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:    1.0 / 300,
 				`lambda.duration_average{account_id="000000000000",function_name="fn-1",region="us-east-1"}`: 120.5,
 				`lambda.duration_maximum{account_id="000000000000",function_name="fn-1",region="us-east-1"}`: 350,
 				`lambda.duration_p90{account_id="000000000000",function_name="fn-1",region="us-east-1"}`:     200,
@@ -150,7 +196,7 @@ func TestCollect_E2E(t *testing.T) {
 				e2eKey("AWS/ApplicationELB", "RequestCount", "Sum", "LoadBalancer", "app/lb2/bbb"): 70,
 			},
 			wantSeries: map[string]metrix.SampleValue{
-				`alb.request_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:             50,
+				`alb.request_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:             50.0 / 300,
 				`alb.active_connection_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:   0,
 				`alb.http_code_target_2xx_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:      0,
 				`alb.http_code_target_3xx_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:      0,
@@ -162,7 +208,7 @@ func TestCollect_E2E(t *testing.T) {
 				`alb.new_connection_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:      0,
 				`alb.processed_bytes_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`:           0,
 				`alb.rejected_connection_count_sum{account_id="000000000000",load_balancer="app/lb1/aaa",region="us-east-1"}`: 0,
-				`alb.request_count_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:             70,
+				`alb.request_count_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:             70.0 / 300,
 				`alb.active_connection_count_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:   0,
 				`alb.http_code_target_2xx_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:      0,
 				`alb.http_code_target_3xx_sum{account_id="000000000000",load_balancer="app/lb2/bbb",region="us-east-1"}`:      0,
@@ -190,9 +236,9 @@ func TestCollect_E2E(t *testing.T) {
 				// NetworkIn is absent -> no datapoint -> rate/sum metric -> recorded as 0.
 			},
 			wantSeries: map[string]metrix.SampleValue{
-				`ec2.network_out_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:             900,
-				`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:           10,
-				`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:          20,
+				`ec2.network_out_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:             900.0 / 300,
+				`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:           10.0 / 300,
+				`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:          20.0 / 300,
 				`ec2.status_check_failed_maximum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`: 0,
 				`ec2.network_in_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:              0,
 				// cpu_utilization_average (gauge, NaN) gaps; network_in_sum (rate, no data) records 0.
@@ -203,14 +249,9 @@ func TestCollect_E2E(t *testing.T) {
 	for name, tc := range scenarios {
 		t.Run(name, func(t *testing.T) {
 			c := New()
-			c.Config.Regions = []string{"us-east-1"}
-			c.Profiles = ProfilesConfig{
-				Mode:      profilesModeExact,
-				ModeExact: &ProfilesExactConfig{Entries: profileEntries(tc.profiles)},
-			}
-			c.applyDefaults()
+			configureExactRule(c, []string{"us-east-1"}, tc.profiles)
 			c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
-			useFakeClient(c, &e2eCloudWatch{list: tc.listMetrics, values: tc.gmd, ts: time.Unix(1, 0)})
+			useFakeClient(c, &e2eCloudWatch{list: tc.listMetrics, values: tc.gmd})
 			c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
 
 			series, err := collecttest.CollectScalarSeries(c)
@@ -230,23 +271,15 @@ type e2eScenario struct {
 	wantSeries  map[string]metrix.SampleValue
 }
 
-func profileEntries(names []string) []ProfileEntry {
-	out := make([]ProfileEntry, len(names))
-	for i, name := range names {
-		out[i] = ProfileEntry{Name: name}
-	}
-	return out
-}
-
 // e2eCloudWatch is a fixture-driven fake serving both CloudWatch APIs. ListMetrics
 // answers per namespace; GetMetricData answers per (namespace, metric, statistic,
 // dimensions), echoing back each query's synthetic Id.
 type e2eCloudWatch struct {
-	mu      sync.Mutex
-	list    map[string][]cwtypes.Metric
-	values  map[string]float64
-	ts      time.Time
-	listErr error // when set, ListMetrics fails (discovery error path)
+	mu       sync.Mutex
+	list     map[string][]cwtypes.Metric
+	values   map[string]float64
+	listErr  error // when set, ListMetrics fails (discovery error path)
+	getCalls int
 }
 
 func (f *e2eCloudWatch) ListMetrics(_ context.Context, in *cloudwatch.ListMetricsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
@@ -261,18 +294,203 @@ func (f *e2eCloudWatch) ListMetrics(_ context.Context, in *cloudwatch.ListMetric
 func (f *e2eCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetricDataInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	f.getCalls++
 	results := make([]cwtypes.MetricDataResult, 0, len(in.MetricDataQueries))
 	for _, q := range in.MetricDataQueries {
-		r := cwtypes.MetricDataResult{Id: q.Id}
+		r := cwtypes.MetricDataResult{Id: q.Id, StatusCode: cwtypes.StatusCodeComplete}
 		if q.MetricStat != nil {
 			if v, ok := f.values[e2eKeyFromMetricStat(q.MetricStat)]; ok {
 				r.Values = []float64{v}
-				r.Timestamps = []time.Time{f.ts}
+				r.Timestamps = []time.Time{aws.ToTime(in.EndTime).Add(-time.Duration(aws.ToInt32(q.MetricStat.Period)) * time.Second)}
 			}
 		}
 		results = append(results, r)
 	}
 	return &cloudwatch.GetMetricDataOutput{MetricDataResults: results}, nil
+}
+
+func (f *e2eCloudWatch) replaceValues(values map[string]float64) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.values = values
+}
+
+func TestCollect_BillingTotalRetainsPriorMonthUntilLookbackExpires(t *testing.T) {
+	const seriesKey = `billing_total.estimated_charges_maximum{account_id="000000000000",region="us-east-1"}`
+	valueKey := e2eKey("AWS/Billing", "EstimatedCharges", "Maximum", "Currency", "USD")
+	fake := &e2eCloudWatch{values: map[string]float64{valueKey: 123.45}}
+	c := New()
+	configureExactRule(c, []string{"us-east-1"}, []string{"billing_total"})
+	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
+	useFakeClient(c, fake)
+
+	now := time.Date(2026, time.August, 1, 0, 5, 0, 0, time.UTC)
+	c.now = func() time.Time { return now }
+	series, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(123.45), series[seriesKey], "the first query observes the July 31 bucket")
+
+	fake.replaceValues(nil)
+	now = time.Date(2026, time.August, 1, 0, 15, 0, 0, time.UTC)
+	series, err = collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(123.45), series[seriesKey], "the August no-data result retains the July observation")
+
+	now = time.Date(2026, time.August, 2, 0, 15, 0, 0, time.UTC)
+	series, err = collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.NotContains(t, series, seriesKey, "the July observation expires after leaving the 24h lookback")
+	assert.Equal(t, 3, fake.getCalls)
+}
+
+type policyQueryRequest struct {
+	period      int32
+	windowStart time.Time
+	windowEnd   time.Time
+}
+
+type sparsePolicyCloudWatch struct {
+	mu       sync.Mutex
+	requests map[string][]policyQueryRequest
+}
+
+func (f *sparsePolicyCloudWatch) ListMetrics(_ context.Context, _ *cloudwatch.ListMetricsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
+	return &cloudwatch.ListMetricsOutput{Metrics: []cwtypes.Metric{
+		mkMetric("Invocations", "FunctionName", "fn-1"),
+		mkMetric("Errors", "FunctionName", "fn-1"),
+	}}, nil
+}
+
+func (f *sparsePolicyCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetricDataInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	results := make([]cwtypes.MetricDataResult, 0, len(in.MetricDataQueries))
+	for _, query := range in.MetricDataQueries {
+		metric := aws.ToString(query.MetricStat.Metric.MetricName)
+		period := aws.ToInt32(query.MetricStat.Period)
+		f.requests[metric] = append(f.requests[metric], policyQueryRequest{
+			period: period, windowStart: aws.ToTime(in.StartTime), windowEnd: aws.ToTime(in.EndTime),
+		})
+		result := cwtypes.MetricDataResult{Id: query.Id, StatusCode: cwtypes.StatusCodeComplete}
+		switch metric {
+		case "Invocations":
+			result.Values = []float64{float64(period)}
+			result.Timestamps = []time.Time{aws.ToTime(in.EndTime).Add(-time.Duration(period) * time.Second)}
+		case "Errors":
+			if !aws.ToTime(in.EndTime).Before(time.Unix(1200, 0)) {
+				result.Values = []float64{600}
+				result.Timestamps = []time.Time{time.Unix(300, 0)}
+			}
+		}
+		results = append(results, result)
+	}
+	return &cloudwatch.GetMetricDataOutput{MetricDataResults: results}, nil
+}
+
+func (f *sparsePolicyCloudWatch) requestsFor(metric string) []policyQueryRequest {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return slices.Clone(f.requests[metric])
+}
+
+func TestCollect_TwoRulesApplyIndependentQueryPolicies(t *testing.T) {
+	defaults := false
+	selector := &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"lambda"}}
+	cfg := validBaseConfig()
+	cfg.Rules = []RuleConfig{
+		{
+			Name: "lambda-fast", Targets: []string{"base"}, Profiles: selector, Regions: []string{"us-east-1"},
+			Metrics: []ProfileMetricSelectorConfig{{Profile: "lambda", Statistics: []string{"Sum"}, Include: []MetricSelectionConfig{{Name: "Invocations"}}}},
+			Query:   &cwquery.Config{Period: longDuration(time.Minute), Lookback: longDuration(5 * time.Minute), PublicationDelay: longDuration(0)},
+		},
+		{
+			Name: "lambda-sparse", Targets: []string{"base"}, Profiles: selector, Regions: []string{"us-east-1"},
+			Metrics: []ProfileMetricSelectorConfig{{Profile: "lambda", Statistics: []string{"Sum"}, Include: []MetricSelectionConfig{{Name: "Errors"}}}},
+			Query:   &cwquery.Config{Period: longDuration(5 * time.Minute), Lookback: longDuration(15 * time.Minute), PublicationDelay: longDuration(0)},
+		},
+	}
+
+	fake := &sparsePolicyCloudWatch{requests: make(map[string][]policyQueryRequest)}
+	c := New()
+	c.Config = cfg
+	useFakeClient(c, fake)
+	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
+	base := time.Unix(900, 0)
+
+	c.now = func() time.Time { return base }
+	first, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(1), seriesValue(t, first, `lambda.invocations_sum{`))
+	assert.Equal(t, metrix.SampleValue(0), seriesValue(t, first, `lambda.errors_sum{`))
+
+	c.now = func() time.Time { return base.Add(5 * time.Minute) }
+	second, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(1), seriesValue(t, second, `lambda.invocations_sum{`))
+	assert.Equal(t, metrix.SampleValue(2), seriesValue(t, second, `lambda.errors_sum{`),
+		"the real late bucket replaces zero and uses the sparse rule's five-minute divisor")
+
+	invocations := fake.requestsFor("Invocations")
+	require.Len(t, invocations, 2)
+	assert.Equal(t, int32(60), invocations[0].period)
+	assert.Equal(t, int64(600), invocations[0].windowStart.Unix())
+	assert.Equal(t, int64(900), invocations[0].windowEnd.Unix())
+	assert.Equal(t, int32(60), invocations[1].period)
+	assert.Equal(t, int64(900), invocations[1].windowStart.Unix())
+	assert.Equal(t, int64(1200), invocations[1].windowEnd.Unix())
+
+	errors := fake.requestsFor("Errors")
+	require.Len(t, errors, 2)
+	assert.Equal(t, int32(300), errors[0].period)
+	assert.Equal(t, int64(0), errors[0].windowStart.Unix())
+	assert.Equal(t, int64(900), errors[0].windowEnd.Unix())
+	assert.Equal(t, int32(300), errors[1].period)
+	assert.Equal(t, int64(300), errors[1].windowStart.Unix())
+	assert.Equal(t, int64(1200), errors[1].windowEnd.Unix())
+}
+
+func TestCollect_OrderedRulesFirstTargetOwnsSameAccountSeries(t *testing.T) {
+	const account = "000000000000"
+	defaults := false
+	cfg := validBaseConfig()
+	cfg.Targets = []TargetConfig{
+		{Name: "first", Credentials: "sdk_default"},
+		{Name: "second", Credentials: "sdk_default"},
+	}
+	selector := &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
+	cfg.Rules = []RuleConfig{
+		{Name: "first-rule", Targets: []string{"first"}, Profiles: selector, Regions: []string{"us-east-1"}},
+		{Name: "second-rule", Targets: []string{"second"}, Profiles: selector, Regions: []string{"us-east-1"}},
+	}
+
+	first := &e2eCloudWatch{
+		list:   map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
+		values: map[string]float64{e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"): 5},
+	}
+	second := &e2eCloudWatch{
+		list:   map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
+		values: map[string]float64{e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"): 9},
+	}
+
+	c := New()
+	c.Config = cfg
+	c.newAWSConfig = func(_ context.Context, identity awsauth.Identity, _ string) (aws.Config, error) {
+		return aws.Config{Region: identity.Ref}, nil
+	}
+	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
+	c.newCloudWatchClient = func(cfg aws.Config) cloudwatchClient {
+		if cfg.Region == "first" {
+			return first
+		}
+		return second
+	}
+	c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
+
+	series, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(5), series[`ec2.cpu_utilization_average{account_id="000000000000",instance_id="i-1",region="us-east-1"}`])
+	assert.Equal(t, 1, first.getCalls)
+	assert.Zero(t, second.getCalls, "the later rule's duplicate final series must not be queried")
 }
 
 // e2eKey builds the fixture key from (namespace, metric, statistic) plus dimension
@@ -305,7 +523,7 @@ func seriesName(key string) string {
 }
 
 // TestAllStockProfiles_PipelineChartComplete is the full-catalog sweep: for EVERY
-// stock profile (combined mode includes disabled opt-in profiles), it feeds a
+// stock profile (including profiles disabled by default), it feeds a
 // synthetic instance with a datapoint for every (metric, statistic), runs the real
 // collect, and asserts (a) every profile's every active series is produced and
 // (b) every produced series flows into a chart (AssertChartCoverage). Profiles that
@@ -319,12 +537,14 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 	require.NoError(t, err)
 	profiles := cat.AllProfiles()
 	require.NotEmpty(t, profiles)
+	profileNames := make([]string, 0, len(profiles))
 
 	list := map[string][]cwtypes.Metric{}
 	values := map[string]float64{}
 	wantNames := map[string]struct{}{}
 
 	for _, rp := range profiles {
+		profileNames = append(profileNames, rp.Name)
 		prof := rp.Config
 		require.NotEmptyf(t, prof.Metrics, "%s has no metrics", rp.Name)
 		require.NotEmptyf(t, prof.Instance.Dimensions, "%s has no instance dimensions", rp.Name)
@@ -355,11 +575,9 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 	}
 
 	c := New()
-	c.Config.Regions = []string{region}
-	c.Profiles = ProfilesConfig{Mode: profilesModeCombined} // include disabled opt-in profiles
-	c.applyDefaults()
+	configureExactRule(c, []string{region}, profileNames)
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
-	useFakeClient(c, &e2eCloudWatch{list: list, values: values, ts: time.Unix(1, 0)})
+	useFakeClient(c, &e2eCloudWatch{list: list, values: values})
 	c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
 
 	series, err := collecttest.CollectScalarSeries(c)
@@ -380,14 +598,11 @@ func TestCollect_MultiRegion(t *testing.T) {
 	const account = "000000000000"
 
 	c := New()
-	c.Config.Regions = []string{"us-east-1", "eu-west-1"}
-	c.Profiles = ProfilesConfig{Mode: profilesModeExact, ModeExact: &ProfilesExactConfig{Entries: profileEntries([]string{"ec2"})}}
-	c.applyDefaults()
+	configureExactRule(c, []string{"us-east-1", "eu-west-1"}, []string{"ec2"})
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 	useFakeClient(c, &e2eCloudWatch{
 		list:   map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
 		values: map[string]float64{e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"): 5},
-		ts:     time.Unix(1, 0),
 	})
 	c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
 
@@ -417,9 +632,7 @@ func TestCollect_DiscoveryFailSoft(t *testing.T) {
 
 	newBase := func(regions ...string) *Collector {
 		c := New()
-		c.Config.Regions = regions
-		c.Profiles = ProfilesConfig{Mode: profilesModeExact, ModeExact: &ProfilesExactConfig{Entries: profileEntries([]string{"ec2"})}}
-		c.applyDefaults()
+		configureExactRule(c, regions, []string{"ec2"})
 		c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 		c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
 		return c
@@ -437,7 +650,6 @@ func TestCollect_DiscoveryFailSoft(t *testing.T) {
 		good := &e2eCloudWatch{
 			list:   map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
 			values: map[string]float64{e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"): 7},
-			ts:     time.Unix(1, 0),
 		}
 		bad := &e2eCloudWatch{listErr: errors.New("region unavailable")}
 		useFakeClient(c, good) // sets the region-aware newAWSConfig

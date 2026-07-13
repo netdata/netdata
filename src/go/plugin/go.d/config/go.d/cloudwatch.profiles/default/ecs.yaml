@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon ECS
 namespace: AWS/ECS
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: ClusterName
@@ -37,7 +38,7 @@ template:
     instances:
       by_labels: [account_id, region, cluster_name, service_name]
   charts:
-    - id: cw_ecs_utilization
+    - id: aws_cloudwatch_ecs_utilization
       context: utilization
       title: ECS Service Utilization
       family: Utilization
@@ -48,7 +49,7 @@ template:
           name: cpu
         - selector: memory_utilization_average
           name: memory
-    - id: cw_ecs_ebs_filesystem
+    - id: aws_cloudwatch_ecs_ebs_filesystem
       context: ebs_filesystem_utilization
       title: ECS EBS Filesystem Utilization
       family: Utilization
@@ -57,7 +58,7 @@ template:
       dimensions:
         - selector: ebs_filesystem_utilization_average
           name: ebs_filesystem
-    - id: cw_ecs_tasks
+    - id: aws_cloudwatch_ecs_tasks
       context: live_task_count
       title: ECS Live Task Count
       family: Tasks

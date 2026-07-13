@@ -2,8 +2,9 @@
 version: v1
 display_name: AWS DynamoDB Operations
 namespace: AWS/DynamoDB
-disabled: true   # deep-grain profile ({TableName, Operation}); opt in with profiles.mode: combined
-period: 60
+disabled: true   # deep-grain profile ({TableName, Operation}); opt in with rules[].profiles.include
+query:
+  period: 1m
 instance:
   dimensions:
     - name: TableName
@@ -43,7 +44,7 @@ template:
     instances:
       by_labels: [account_id, region, table_name, operation]
   charts:
-    - id: cw_ddb_op_latency
+    - id: aws_cloudwatch_ddb_op_latency
       context: successful_request_latency
       title: DynamoDB Successful Request Latency
       family: Latency
@@ -52,7 +53,7 @@ template:
       dimensions:
         - selector: successful_request_latency_average
           name: latency
-    - id: cw_ddb_op_system_errors
+    - id: aws_cloudwatch_ddb_op_system_errors
       context: system_errors
       title: DynamoDB System Errors
       family: Errors
@@ -61,7 +62,7 @@ template:
       dimensions:
         - selector: system_errors_sum
           name: system_errors
-    - id: cw_ddb_op_throttled_requests
+    - id: aws_cloudwatch_ddb_op_throttled_requests
       context: throttled_requests
       title: DynamoDB Throttled Requests
       family: Throttling
@@ -70,7 +71,7 @@ template:
       dimensions:
         - selector: throttled_requests_sum
           name: throttled
-    - id: cw_ddb_op_returned_items
+    - id: aws_cloudwatch_ddb_op_returned_items
       context: returned_item_count
       title: DynamoDB Returned Items
       family: Items
@@ -82,7 +83,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_ddb_op_fault_injection
+    # - id: aws_cloudwatch_ddb_op_fault_injection
     #   context: fault_injection_errors
     #   title: DynamoDB Fault Injection Errors
     #   family: Errors
