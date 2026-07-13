@@ -467,6 +467,24 @@ bool claim_agent(const char *url, const char *token, const char *rooms, const ch
     return done;
 }
 
+static bool claim_extra_opts_has_token(const char *opts, const char *token, size_t token_len) {
+    while(opts && *opts) {
+        while(isspace((uint8_t)*opts))
+            opts++;
+
+        const char *end = opts;
+        while(*end && !isspace((uint8_t)*end))
+            end++;
+
+        if((size_t)(end - opts) == token_len && memcmp(opts, token, token_len) == 0)
+            return true;
+
+        opts = end;
+    }
+
+    return false;
+}
+
 bool claim_agent_from_environment(void) {
     const char *url = getenv("NETDATA_CLAIM_URL");
     if(!url || !*url) {
@@ -488,7 +506,7 @@ bool claim_agent_from_environment(void) {
 
     bool insecure = CONFIG_BOOLEAN_NO;
     const char *from_env = getenv("NETDATA_EXTRA_CLAIM_OPTS");
-    if(from_env && *from_env && strstr(from_env, "-insecure") == 0)
+    if(claim_extra_opts_has_token(from_env, "-insecure", sizeof("-insecure") - 1))
         insecure = CONFIG_BOOLEAN_YES;
 
     return claim_agent(url, token, rooms, proxy, insecure);
