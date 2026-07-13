@@ -118,7 +118,7 @@ class FullDistroEntry:
     bundle_sentry: dict[Arch, bool]
     eol_check: str | bool = False
     eol_lts: bool = False
-    base_image: str | None = None
+    base_image: Annotated[str, Field(default_factory=lambda data: f'{data.get('distro')}:{data.get('version')}')]
     env_prep: Annotated[str, Field(min_length=1)] | None = None
     jsonc_removal: Annotated[str, Field(min_length=1)] | None = None
     packages: PackagingInfo | None = None
@@ -136,7 +136,7 @@ class LegacyDistroEntry:
     bundle_sentry: dict[Arch, bool] | None = None
     eol_check: str | bool = False
     eol_lts: bool = False
-    base_image: str | None = None
+    base_image: Annotated[str, Field(default_factory=lambda data: f'{data.get('distro')}:{data.get('version')}')]
     env_prep: Annotated[str, Field(min_length=1)] | None = None
     jsonc_removal: Annotated[str, Field(min_length=1)] | None = None
     packages: PackagingInfo | None = None
