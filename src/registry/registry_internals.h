@@ -72,6 +72,8 @@ struct registry {
 
 extern struct registry registry;
 
+FILE *registry_fopen_regular(const char *filename, const char *mode);
+
 // REGISTRY LOW-LEVEL REQUESTS (in registry-internals.c)
 REGISTRY_PERSON *registry_request_access(const char *person_guid, char *machine_guid, char *url, char *name, time_t when);
 REGISTRY_PERSON *registry_request_delete(const char *person_guid, char *machine_guid, char *url, char *delete_url, time_t when);

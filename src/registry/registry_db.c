@@ -348,7 +348,7 @@ size_t registry_db_load(void) {
     size_t line = 0;
 
     netdata_log_debug(D_REGISTRY, "REGISTRY: loading active db from: '%s'", registry.db_filename);
-    FILE *fp = fopen(registry.db_filename, "r");
+    FILE *fp = registry_fopen_regular(registry.db_filename, "r");
     if(!fp) {
         if (errno != ENOENT)
             netdata_log_error("REGISTRY: cannot open registry file: '%s'", registry.db_filename);
