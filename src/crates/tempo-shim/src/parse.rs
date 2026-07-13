@@ -224,10 +224,12 @@ fn lex(input: &str) -> Result<Vec<Spanned>, ParseError> {
 }
 
 /// Bare-token characters: attribute keys (dots, slashes, dashes,
-/// underscores), colon-form intrinsics, numbers, durations (µ included
-/// via `is_alphanumeric`).
+/// underscores, and the flattener's `[]` array-element marker — tag
+/// autocomplete advertises those paths, so the parser must accept them
+/// back), colon-form intrinsics, numbers, durations (µ included via
+/// `is_alphanumeric`).
 fn is_word_char(c: char) -> bool {
-    c.is_alphanumeric() || matches!(c, '_' | '.' | ':' | '/' | '-')
+    c.is_alphanumeric() || matches!(c, '_' | '.' | ':' | '/' | '-' | '[' | ']')
 }
 
 // ── Parser ──────────────────────────────────────────────────────────

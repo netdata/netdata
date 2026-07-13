@@ -46,6 +46,32 @@ pub(crate) fn status_keyword_to_storage(kw: &str) -> Option<&'static str> {
 
 pub(crate) const STATUS_ALLOWED: &str = "ok, error, unset";
 
+/// Storage label → TraceQL keyword, the reverse maps for tag-value
+/// enumeration: the engine returns the storage labels
+/// (`SERVER`/`ERROR`, `vocab.rs` docs) and the wire must show the
+/// lowercase keywords the form generates back — otherwise autocomplete
+/// offers values the keyword tables reject. Unknown labels pass through
+/// unchanged (foreign data stays visible).
+pub(crate) fn storage_kind_to_keyword(label: &str) -> Option<&'static str> {
+    match label {
+        "INTERNAL" => Some("internal"),
+        "SERVER" => Some("server"),
+        "CLIENT" => Some("client"),
+        "PRODUCER" => Some("producer"),
+        "CONSUMER" => Some("consumer"),
+        "UNSPECIFIED" => Some("unspecified"),
+        _ => None,
+    }
+}
+
+pub(crate) fn storage_status_to_keyword(label: &str) -> Option<&'static str> {
+    match label {
+        "OK" => Some("ok"),
+        "ERROR" => Some("error"),
+        _ => None,
+    }
+}
+
 /// Attribute scope prefixes the form generates (`utils.ts:55-68`).
 const SCOPE_PREFIXES: [(&str, TagScope); 5] = [
     ("resource.", TagScope::Resource),

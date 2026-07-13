@@ -29,7 +29,22 @@ use serde_json::{Map, Value, json};
 use sfsq::traces::{SearchData, TagNamesData, TagValuesData, TraceSummary};
 use sfst::ValueKind;
 
-use crate::keywords::{intrinsic_wire_name, scope_wire_name};
+use crate::keywords::{
+    intrinsic_wire_name, scope_wire_name, storage_kind_to_keyword, storage_status_to_keyword,
+};
+
+/// How a tag's values render on the wire: schema-kind-typed for data
+/// attributes and free-text intrinsics, or a closed keyword set for the
+/// enum intrinsics — the engine stores UPPERCASE labels, the form's
+/// keyword tables want the lowercase TraceQL words and `type:
+/// "keyword"` (which also keeps the form from offering regex operators
+/// the enum grammar rejects).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TagValueStyle {
+    Typed,
+    KindKeywords,
+    StatusKeywords,
+}
 
 /// `tempopb.SearchResponse` for `GET /api/search`.
 pub fn search_response_json(data: &SearchData) -> String {
@@ -162,6 +177,9 @@ pub fn tag_names_json(data: &TagNamesData) -> String {
             .collect();
         out.insert("scopes".to_string(), Value::Array(scopes));
     }
+    // Tempo's v2 tag paths always populate the metrics message pointer;
+    // an empty `{}` matches its all-zero rendering.
+    out.insert("metrics".to_string(), json!({}));
     Value::Object(out).to_string()
 }
 
@@ -171,24 +189,36 @@ pub fn tag_names_json(data: &TagNamesData) -> String {
 /// is `"float"`; kinds without a Tempo equivalent (and the kindless
 /// pin-C1 values) fall back to `"string"` — the plugin uses `type`
 /// for display only.
-pub fn tag_values_json(data: &TagValuesData) -> String {
+pub fn tag_values_json(data: &TagValuesData, style: TagValueStyle) -> String {
     let mut out = Map::new();
     if !data.values.is_empty() {
         let values: Vec<Value> = data
             .values
             .iter()
-            .map(|v| {
-                let kind = match v.kind {
-                    Some(ValueKind::Int) => "int",
-                    Some(ValueKind::Double) => "float",
-                    Some(ValueKind::Bool) => "bool",
-                    _ => "string",
-                };
-                json!({ "type": kind, "value": v.value })
+            .map(|v| match style {
+                TagValueStyle::Typed => {
+                    let kind = match v.kind {
+                        Some(ValueKind::Int) => "int",
+                        Some(ValueKind::Double) => "float",
+                        Some(ValueKind::Bool) => "bool",
+                        _ => "string",
+                    };
+                    json!({ "type": kind, "value": v.value })
+                }
+                TagValueStyle::KindKeywords | TagValueStyle::StatusKeywords => {
+                    // Unknown labels (foreign data) pass through visible.
+                    let mapped = match style {
+                        TagValueStyle::KindKeywords => storage_kind_to_keyword(&v.value),
+                        _ => storage_status_to_keyword(&v.value),
+                    }
+                    .unwrap_or(v.value.as_str());
+                    json!({ "type": "keyword", "value": mapped })
+                }
             })
             .collect();
         out.insert("tagValues".to_string(), Value::Array(values));
     }
+    out.insert("metrics".to_string(), json!({}));
     Value::Object(out).to_string()
 }
 

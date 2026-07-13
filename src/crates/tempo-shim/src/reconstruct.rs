@@ -18,9 +18,7 @@
 
 use std::collections::HashMap;
 
-use opentelemetry_proto::tonic::common::v1::{
-    AnyValue, ArrayValue, InstrumentationScope, KeyValue, KeyValueList, any_value,
-};
+use opentelemetry_proto::tonic::common::v1::{AnyValue, InstrumentationScope, KeyValue, any_value};
 use opentelemetry_proto::tonic::resource::v1::Resource;
 use opentelemetry_proto::tonic::trace::v1::{ResourceSpans, ScopeSpans, Span, Status, span};
 use sfsq::traces::FieldKinds;
@@ -208,6 +206,14 @@ fn key_value(key: &str, value: Option<any_value::Value>) -> KeyValue {
 /// A token that fails its kind's parse falls back to a string value
 /// rather than dropping the attribute (defensive: the renderings are
 /// our own writer's, so this only fires on foreign/corrupt input).
+///
+/// Only scalar kinds can appear here: the engine's kind map is
+/// `derive_scalar_kinds` output, which drops `Null` and folds empty
+/// containers away — a null/empty-container-only attribute has NO map
+/// entry and surfaces as its rendered token string (`""`/`"[]"`/`"{}"`)
+/// via the fallback. Synthesizing container values from those token
+/// shapes would be exactly the infer-from-string-shape the fidelity
+/// guardrail prohibits, so the string fallback is the contract.
 fn typed_value(kind: Option<&ValueKind>, token: &str) -> Option<any_value::Value> {
     use any_value::Value;
     Some(match kind {
@@ -228,10 +234,8 @@ fn typed_value(kind: Option<&ValueKind>, token: &str) -> Option<any_value::Value
             Some(bytes) => Value::BytesValue(bytes),
             None => Value::StringValue(token.to_string()),
         },
-        Some(ValueKind::EmptyArray) => Value::ArrayValue(ArrayValue { values: Vec::new() }),
-        Some(ValueKind::EmptyKvlist) => Value::KvlistValue(KeyValueList { values: Vec::new() }),
-        Some(ValueKind::Null) => return None,
-        // Str, container kinds, and unknown fields: the literal token.
+        // Str, non-scalar kinds (unreachable via derive_scalar_kinds),
+        // and unknown fields: the literal token.
         _ => Value::StringValue(token.to_string()),
     })
 }

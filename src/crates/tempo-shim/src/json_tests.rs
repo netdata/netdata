@@ -9,7 +9,7 @@ use sfsq::traces::{
 };
 use sfst::{SpanId, TraceId, TraceSpan, ValueKind};
 
-use super::{search_response_json, tag_names_json, tag_values_json};
+use super::{TagValueStyle, search_response_json, tag_names_json, tag_values_json};
 
 fn matched_span() -> TraceSpan {
     TraceSpan {
@@ -153,7 +153,7 @@ fn tag_names_golden() {
     };
     assert_eq!(
         tag_names_json(&data),
-        r#"{"scopes":[{"name":"resource","tags":["service.name"]},{"name":"span","tags":["http.route","http.status_code"]},{"name":"intrinsic","tags":["name","span:parentID","link:traceID"]}]}"#
+        r#"{"metrics":{},"scopes":[{"name":"resource","tags":["service.name"]},{"name":"span","tags":["http.route","http.status_code"]},{"name":"intrinsic","tags":["name","span:parentID","link:traceID"]}]}"#
     );
     // No keys at all → jsonpb omits the empty repeated field.
     let empty = TagNamesData {
@@ -161,7 +161,7 @@ fn tag_names_golden() {
         truncated: false,
         status: QueryStatus::Complete,
     };
-    assert_eq!(tag_names_json(&empty), "{}");
+    assert_eq!(tag_names_json(&empty), r#"{"metrics":{}}"#);
 }
 
 #[test]
@@ -178,13 +178,46 @@ fn tag_values_golden() {
         status: QueryStatus::Complete,
     };
     assert_eq!(
-        tag_values_json(&data),
-        r#"{"tagValues":[{"type":"string","value":"cart"},{"type":"int","value":"7"},{"type":"float","value":"0.5"},{"type":"bool","value":"true"},{"type":"string","value":"kindless"}]}"#
+        tag_values_json(&data, TagValueStyle::Typed),
+        r#"{"metrics":{},"tagValues":[{"type":"string","value":"cart"},{"type":"int","value":"7"},{"type":"float","value":"0.5"},{"type":"bool","value":"true"},{"type":"string","value":"kindless"}]}"#
     );
     let empty = TagValuesData {
         values: Vec::new(),
         truncated: false,
         status: QueryStatus::Complete,
     };
-    assert_eq!(tag_values_json(&empty), "{}");
+    assert_eq!(tag_values_json(&empty, TagValueStyle::Typed), r#"{"metrics":{}}"#);
+}
+
+#[test]
+fn tag_values_enum_keywords() {
+    // The enum intrinsics render as lowercase TraceQL keywords with
+    // type "keyword" (the form's operator gating reads the type); the
+    // engine's storage labels never reach the wire. Unknown labels
+    // pass through visible.
+    let kinds = TagValuesData {
+        values: vec![
+            TagValue { value: "SERVER".into(), kind: Some(ValueKind::Str) },
+            TagValue { value: "CLIENT".into(), kind: Some(ValueKind::Str) },
+            TagValue { value: "WEIRD".into(), kind: Some(ValueKind::Str) },
+        ],
+        truncated: false,
+        status: QueryStatus::Complete,
+    };
+    assert_eq!(
+        tag_values_json(&kinds, TagValueStyle::KindKeywords),
+        r#"{"metrics":{},"tagValues":[{"type":"keyword","value":"server"},{"type":"keyword","value":"client"},{"type":"keyword","value":"WEIRD"}]}"#
+    );
+    let statuses = TagValuesData {
+        values: vec![
+            TagValue { value: "ERROR".into(), kind: Some(ValueKind::Str) },
+            TagValue { value: "OK".into(), kind: Some(ValueKind::Str) },
+        ],
+        truncated: false,
+        status: QueryStatus::Complete,
+    };
+    assert_eq!(
+        tag_values_json(&statuses, TagValueStyle::StatusKeywords),
+        r#"{"metrics":{},"tagValues":[{"type":"keyword","value":"error"},{"type":"keyword","value":"ok"}]}"#
+    );
 }

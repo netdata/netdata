@@ -378,6 +378,15 @@ fn bare_value_classification() {
     // Duration-looking words on ATTRIBUTES are text (an attribute
     // holding the string "1.2ms" matches verbatim).
     parses_to("{.f=1.2ms}", vec![cond(unscoped("f"), CompareOp::Eq, vec![text("1.2ms")])]);
+    // The flattener's array-element paths (`tags[]`) round-trip: tag
+    // autocomplete advertises them, so the parser accepts them back.
+    parses_to(
+        "{span.tags[]=\"x\" && .arr[].deep=1}",
+        vec![
+            cond(scoped(TagScope::Span, "tags[]"), CompareOp::Eq, vec![text("x")]),
+            cond(unscoped("arr[].deep"), CompareOp::Eq, vec![PredicateValue::Integer(1)]),
+        ],
+    );
 }
 
 #[track_caller]
