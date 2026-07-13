@@ -321,11 +321,19 @@ async fn trace_v1(
     // v1 semantics: 404 for a missing trace, RAW `tempopb.Trace` bytes
     // (no envelope — the plugin proto.Unmarshals straight into Trace)
     // for a found one. The v1 wire has no status field; partiality
-    // still gets the diagnostic header (the plugin ignores it).
-    if data.trace.spans.is_empty() {
-        return Ok(StatusCode::NOT_FOUND.into_response());
-    }
+    // still gets the diagnostic header (the plugin ignores it) — on the
+    // 404 too, where Partial means "not found among the READABLE
+    // sources" rather than a proven absence.
     let partial = partial_header("trace-by-id (v1)", &data.status);
+    if data.trace.spans.is_empty() {
+        let mut resp = StatusCode::NOT_FOUND.into_response();
+        if let Some(partial) = partial
+            && let Ok(value) = partial.parse()
+        {
+            resp.headers_mut().insert(PARTIAL_HEADER, value);
+        }
+        return Ok(resp);
+    }
     let trace = reconstruct_trace(trace_id, &data.trace, &data.field_kinds);
     let mut resp = (
         [(header::CONTENT_TYPE, "application/protobuf")],
@@ -409,6 +417,17 @@ async fn tag_values_endpoint(
         ),
     };
 
+    // Both scope queries of an unscoped union come from ONE consistent
+    // snapshot (two copies with equal source ids), and each carries the
+    // caller's limit: a scope's returned values are its sorted prefix,
+    // so any value in the true union's top-`limit` is inside one of the
+    // prefixes — the sorted merge below plus a global cap is exact.
+    let mut source_sets: Vec<Vec<TraceSource>> = if queries.len() == 2 {
+        let (a, b) = st.supplier.snapshot_pair().await.map_err(ApiError::Internal)?;
+        vec![a, b]
+    } else {
+        vec![st.supplier.snapshot().await.map_err(ApiError::Internal)?]
+    };
     let mut merged: Option<TagValuesData> = None;
     for (scope, key) in queries {
         let mut query = TagValuesQuery::new(scope, key);
@@ -418,14 +437,14 @@ async fn tag_values_endpoint(
         if let Some(l) = limit {
             query = query.max_values(l);
         }
-        let sources = st.supplier.snapshot().await.map_err(ApiError::Internal)?;
+        let sources = source_sets.pop().expect("one source set per query");
         let data = run_engine(move || {
             tag_values(sources, query, CancellationToken::new(), fresh_progress())
         })
         .await??;
         merged = Some(match merged {
             None => data,
-            Some(prev) => merge_tag_values(prev, data),
+            Some(prev) => merge_tag_values(prev, data, limit),
         });
     }
     let data = merged.expect("queries is never empty");
@@ -433,10 +452,12 @@ async fn tag_values_endpoint(
     Ok(json_response(tag_values_json(&data, style), partial))
 }
 
-/// Fold two per-scope value sets into one (the unscoped union): values
-/// dedup by string (first kind wins), truncation ORs, partial reasons
-/// union.
-fn merge_tag_values(mut a: TagValuesData, b: TagValuesData) -> TagValuesData {
+/// Fold two per-scope value sets into one (the unscoped union): a
+/// sorted merge deduped by value bytes (first kind wins — engine values
+/// arrive sorted, and the merge re-sorts defensively), then ONE global
+/// cap with an exact `truncated` (either scope truncated, or the union
+/// itself overflowed the cap); partial reasons union.
+fn merge_tag_values(mut a: TagValuesData, b: TagValuesData, limit: Option<usize>) -> TagValuesData {
     let known: std::collections::HashSet<String> =
         a.values.iter().map(|v| v.value.clone()).collect();
     for v in b.values {
@@ -444,7 +465,14 @@ fn merge_tag_values(mut a: TagValuesData, b: TagValuesData) -> TagValuesData {
             a.values.push(v);
         }
     }
+    a.values.sort_by(|x, y| x.value.cmp(&y.value));
     a.truncated |= b.truncated;
+    if let Some(limit) = limit
+        && a.values.len() > limit
+    {
+        a.values.truncate(limit);
+        a.truncated = true;
+    }
     a.status = match (a.status, b.status) {
         (QueryStatus::Complete, s) | (s, QueryStatus::Complete) => s,
         (QueryStatus::Partial(mut x), QueryStatus::Partial(y)) => {

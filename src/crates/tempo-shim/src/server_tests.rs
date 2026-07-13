@@ -149,6 +149,48 @@ async fn request_errors_are_400() {
     assert_eq!(status, StatusCode::BAD_REQUEST);
 }
 
+#[test]
+fn unscoped_tag_values_merge_is_sorted_capped_and_exact() {
+    use sfsq::traces::{QueryStatus, TagValue, TagValuesData};
+    let val = |s: &str| TagValue { value: s.into(), kind: None };
+    let a = TagValuesData {
+        values: vec![val("b"), val("z")],
+        truncated: false,
+        status: QueryStatus::Complete,
+    };
+    let b = TagValuesData {
+        values: vec![val("a"), val("b")],
+        truncated: false,
+        status: QueryStatus::Complete,
+    };
+    // Sorted union {a, b, z} capped at 2 → {a, b}, truncated becomes
+    // true because the union overflowed even though neither scope did.
+    let merged = super::merge_tag_values(a, b, Some(2));
+    assert_eq!(
+        merged.values.iter().map(|v| v.value.as_str()).collect::<Vec<_>>(),
+        vec!["a", "b"]
+    );
+    assert!(merged.truncated);
+
+    // No cap: full sorted dedup, not truncated.
+    let a = TagValuesData {
+        values: vec![val("b"), val("z")],
+        truncated: false,
+        status: QueryStatus::Complete,
+    };
+    let b = TagValuesData {
+        values: vec![val("a"), val("b")],
+        truncated: false,
+        status: QueryStatus::Complete,
+    };
+    let merged = super::merge_tag_values(a, b, None);
+    assert_eq!(
+        merged.values.iter().map(|v| v.value.as_str()).collect::<Vec<_>>(),
+        vec!["a", "b", "z"]
+    );
+    assert!(!merged.truncated);
+}
+
 #[tokio::test]
 async fn supplier_failure_is_500() {
     let app = router(std::sync::Arc::new(Failing));

@@ -292,6 +292,17 @@ fn validate(config: &PluginConfig) -> Result<()> {
         anyhow::bail!("remote_storage.uri must be set when remote_storage.enabled is true");
     }
 
+    // The Tempo shim serves the DEFAULT tenant with no authentication of
+    // its own. Combining it with tenant auth would silently expose one
+    // tenant's data on an unauthenticated port while hiding the rest —
+    // refuse the combination outright rather than serve it wrong.
+    if config.auth.enabled && config.traces.tempo.enabled {
+        anyhow::bail!(
+            "traces.tempo cannot be enabled together with auth: the Tempo shim has no \
+             authentication and serves only the default tenant; disable one of the two"
+        );
+    }
+
     if !config.endpoint.path.contains(':') {
         anyhow::bail!(
             "endpoint must be in format host:port, got: {}",
@@ -921,6 +932,23 @@ logs:
             format!("{err:#}").contains("logs.tempo is not a valid option"),
             "{err:#}"
         );
+    }
+
+    #[test]
+    fn tempo_rejected_with_auth_enabled() {
+        // The shim has no auth and serves the default tenant only —
+        // combining it with tenant auth is refused at config load.
+        let err = resolve_with_user(
+            "auth:\n  enabled: true\ntraces:\n  tempo:\n    enabled: true\n",
+        )
+        .unwrap_err();
+        assert!(
+            format!("{err:#}").contains("traces.tempo cannot be enabled together with auth"),
+            "{err:#}"
+        );
+        // Either alone is fine.
+        assert!(resolve_with_user("auth:\n  enabled: true\n").is_ok());
+        assert!(resolve_with_user("traces:\n  tempo:\n    enabled: true\n").is_ok());
     }
 
     // -- Validation --

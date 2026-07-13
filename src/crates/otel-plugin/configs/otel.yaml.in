@@ -123,7 +123,9 @@ traces:
   # trace-by-id, search, tag autocomplete). Point a stock Grafana Tempo
   # datasource at the bind address (leave the datasource's gRPC
   # streaming option off). No authentication: keep the bind on
-  # localhost unless the network path to it is trusted.
+  # localhost unless the network path to it is trusted. Cannot be
+  # combined with `auth.enabled: true` (the shim serves the default
+  # tenant only; the config is refused at load).
   # tempo:
   #   enabled: false
   #   bind: "127.0.0.1:3200"

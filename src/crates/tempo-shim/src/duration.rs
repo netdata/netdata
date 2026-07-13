@@ -60,6 +60,15 @@ mod tests {
     }
 
     #[test]
+    fn sub_nanosecond_rounds_to_zero() {
+        // Deliberate: a raw-editor `0.0000001ms` is ordinary rounding to
+        // 0ns, a well-defined predicate value (the form's UI never goes
+        // below µs) — pinned so the behavior is a choice, not an
+        // accident.
+        assert_eq!(parse_duration_ns("0.0000001ms"), Ok(0));
+    }
+
+    #[test]
     fn rejects() {
         assert!(parse_duration_ns("100").is_err()); // no unit
         assert!(parse_duration_ns("ms").is_err()); // no number
