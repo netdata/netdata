@@ -208,7 +208,7 @@
             },
             "profiles": {
               "title": "Profiles",
-              "description": "Omit to select default-enabled profiles. Include adds profiles; exclude removes profiles. Billing profiles are opt-in: billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
+              "description": "Omit to select default-enabled profiles. Include adds profiles; exclude removes profiles. The higher-cardinality PrivateLink subnet profile is opt-in as privatelink_endpoint_subnet. Billing profiles are also opt-in: billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
               "type": "object",
               "properties": {
                 "defaults": {
@@ -217,7 +217,7 @@
                   "default": true
                 },
                 "include": {
-                  "description": "Additional profile basenames. Opt-in Billing choices are billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
+                  "description": "Additional profile basenames. PrivateLink subnet metrics use the opt-in privatelink_endpoint_subnet profile. Opt-in Billing choices are billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
                   "type": "array",
                   "maxItems": 256,
                   "uniqueItems": true,
@@ -624,13 +624,13 @@
           }
         },
         "profiles": {
-          "ui:help": "Choose which stock or user CloudWatch profiles this rule collects. Omit this section to use all default-enabled profiles. Billing is opt-in through billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
+          "ui:help": "Choose which stock or user CloudWatch profiles this rule collects. Omit this section to use all default-enabled profiles. PrivateLink subnet metrics are opt-in through privatelink_endpoint_subnet. Billing is opt-in through billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
           "defaults": {
             "ui:help": "Include all default-enabled profiles before applying include and exclude lists."
           },
           "include": {
             "ui:listFlavour": "list",
-            "ui:help": "Additional profile basenames to include. Billing choices are billing_total, billing_service, billing_linked_account, and billing_linked_account_service; use us-east-1 and disable inherited resource-tag filters for them.",
+            "ui:help": "Additional profile basenames to include. Use privatelink_endpoint_subnet for the higher-cardinality per-subnet PrivateLink view. Billing choices are billing_total, billing_service, billing_linked_account, and billing_linked_account_service; use us-east-1 and disable inherited resource-tag filters for them.",
             "items": {
               "ui:placeholder": "ec2"
             }

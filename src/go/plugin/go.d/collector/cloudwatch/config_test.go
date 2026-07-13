@@ -12,6 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 
 	"github.com/santhosh-tekuri/jsonschema/v6"
 	"github.com/stretchr/testify/assert"
@@ -350,11 +351,12 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules")["ui:listFlavour"])
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "targets")["ui:listFlavour"])
 	assert.Equal(t, "ec2", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "profiles", "include", "items")["ui:placeholder"])
-	billingProfileHelp, ok := schemaObjectAt(t, doc, "uiSchema", "rules", "items", "profiles", "include")["ui:help"].(string)
+	profileIncludeHelp, ok := schemaObjectAt(t, doc, "uiSchema", "rules", "items", "profiles", "include")["ui:help"].(string)
 	require.True(t, ok)
 	for _, profile := range []string{"billing_total", "billing_service", "billing_linked_account", "billing_linked_account_service"} {
-		assert.Contains(t, billingProfileHelp, profile)
+		assert.Contains(t, profileIncludeHelp, profile)
 	}
+	assert.Contains(t, profileIncludeHelp, "privatelink_endpoint_subnet")
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics")["ui:listFlavour"])
 	assert.Equal(t, "ec2", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "profile")["ui:placeholder"])
 	assert.Equal(t, "Average", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "statistics", "items")["ui:placeholder"])
@@ -421,6 +423,118 @@ func TestMetadata_BillingOperatorContract(t *testing.T) {
 		"28,800 metric requests per day",
 		"AWS charges `GetMetricData` by metrics requested",
 		"Billing dimensions are not AWS Resource Groups Tagging API resources",
+	} {
+		assert.Contains(t, text, want)
+	}
+}
+
+func metadataExampleConfig(t *testing.T, exampleName string) Config {
+	t.Helper()
+	data, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	var metadata struct {
+		Modules []struct {
+			Setup struct {
+				Configuration struct {
+					Examples struct {
+						List []struct {
+							Name   string `yaml:"name"`
+							Config string `yaml:"config"`
+						} `yaml:"list"`
+					} `yaml:"examples"`
+				} `yaml:"configuration"`
+			} `yaml:"setup"`
+		} `yaml:"modules"`
+	}
+	require.NoError(t, yaml.Unmarshal(data, &metadata))
+	for _, module := range metadata.Modules {
+		for _, example := range module.Setup.Configuration.Examples.List {
+			if example.Name != exampleName {
+				continue
+			}
+			var configFile struct {
+				Jobs []Config `yaml:"jobs"`
+			}
+			require.NoError(t, yaml.Unmarshal([]byte(example.Config), &configFile))
+			require.Len(t, configFile.Jobs, 1)
+			return configFile.Jobs[0]
+		}
+	}
+	require.FailNowf(t, "metadata example not found", "name=%q", exampleName)
+	return Config{}
+}
+
+func TestMetadata_PrivateLinkEndpointOperatorContract(t *testing.T) {
+	data, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	text := string(data)
+	var metadata struct {
+		Modules []struct {
+			Meta struct {
+				Keywords []string `yaml:"keywords"`
+			} `yaml:"meta"`
+		} `yaml:"modules"`
+	}
+	require.NoError(t, yaml.Unmarshal(data, &metadata))
+	require.Len(t, metadata.Modules, 1)
+	assert.Subset(t, metadata.Modules[0].Meta.Keywords, []string{"privatelink", "private link", "vpc endpoint"})
+
+	cfg := metadataExampleConfig(t, "AWS PrivateLink endpoints with split timing")
+	plan, diagnostics, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	require.Empty(t, diagnostics)
+	require.Len(t, plan.Scopes, 3)
+	wantScopes := []struct {
+		profile string
+		series  []string
+		policy  cwquery.Policy
+	}{
+		{
+			profile: "privatelink_endpoint",
+			series: []string{
+				"privatelink_endpoint.active_connections_average",
+				"privatelink_endpoint.bytes_processed_average",
+				"privatelink_endpoint.new_connections_average",
+			},
+			policy: cwquery.Policy{Period: time.Minute, Lookback: 5 * time.Minute, PublicationDelay: 5 * time.Minute},
+		},
+		{
+			profile: "privatelink_endpoint",
+			series:  []string{"privatelink_endpoint.bytes_processed_sum"},
+			policy:  cwquery.Policy{Period: 6 * time.Hour, Lookback: 6 * time.Hour, PublicationDelay: 5 * time.Minute},
+		},
+		{
+			profile: "privatelink_endpoint_subnet",
+			series: []string{
+				"privatelink_endpoint_subnet.active_connections_average",
+				"privatelink_endpoint_subnet.bytes_processed_average",
+				"privatelink_endpoint_subnet.bytes_processed_sum",
+				"privatelink_endpoint_subnet.new_connections_average",
+				"privatelink_endpoint_subnet.new_connections_sum",
+				"privatelink_endpoint_subnet.packets_dropped_sum",
+				"privatelink_endpoint_subnet.rst_packets_received_sum",
+			},
+			policy: cwquery.Policy{Period: 5 * time.Minute, Lookback: 5 * time.Minute, PublicationDelay: 5 * time.Minute},
+		},
+	}
+	for i, want := range wantScopes {
+		scope := plan.Scopes[i]
+		assert.Equal(t, want.profile, scope.Profile.Name)
+		assert.Equal(t, want.series, compiledSeriesNames(scope.SelectedSeries))
+		for _, series := range scope.SelectedSeries {
+			assert.Equal(t, want.policy, series.Policy, series.Name)
+		}
+	}
+
+	for _, want := range []string{
+		"privatelink_endpoint",
+		"privatelink_endpoint_subnet",
+		"AWS/PrivateLinkEndpoints",
+		"AWS/PrivateLinkServices",
+		"endpoint_type",
+		"subnet_id",
+		"seven additional metric/statistic queries",
+		"1,440 metric requests per day",
 	} {
 		assert.Contains(t, text, want)
 	}

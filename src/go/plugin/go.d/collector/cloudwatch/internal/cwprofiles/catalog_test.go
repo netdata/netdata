@@ -107,6 +107,8 @@ func TestLoadFromDefaultDirs_LoadsStockProfiles(t *testing.T) {
 		"billing_linked_account_service": "AWS/Billing",
 		"billing_service":                "AWS/Billing",
 		"billing_total":                  "AWS/Billing",
+		"privatelink_endpoint":           "AWS/PrivateLinkEndpoints",
+		"privatelink_endpoint_subnet":    "AWS/PrivateLinkEndpoints",
 		"eventbridge":                    "AWS/Events",
 		"vpn":                            "AWS/VPN",
 		"eks":                            "AWS/EKS",
