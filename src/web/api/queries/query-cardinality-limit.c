@@ -94,10 +94,9 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
 
     // The reduced RRDR keeps the top (cardinality_limit - 1) dimensions and
     // folds the rest into one "remaining N dimensions" aggregate slot;
-    // queried_count > cardinality_limit here, so remaining_count >= 2
+    // queried_count > cardinality_limit here, so at least 2 dimensions fold
     size_t new_d = qt->request.cardinality_limit;
     size_t kept_dimensions = new_d - 1;
-    size_t remaining_count = queried_count - kept_dimensions;
 
     RRDR *new_r = rrdr_create(owa, qt, new_d, r->n);
     if (!new_r) {
@@ -216,6 +215,7 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
     // Create the "remaining N dimensions" aggregate dimension
     {
         size_t remaining_idx = kept_dimensions;
+        size_t remaining_count = queried_count - kept_dimensions;
 
         char remaining_name[256];
         snprintfz(remaining_name, sizeof(remaining_name), "remaining %zu dimensions", remaining_count);
