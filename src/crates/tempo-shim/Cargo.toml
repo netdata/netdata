@@ -16,3 +16,5 @@ path = "src/lib.rs"
 sfst = { workspace = true }
 sfsq = { workspace = true }
 thiserror = { workspace = true }
+opentelemetry-proto = { workspace = true }
+prost = { workspace = true }

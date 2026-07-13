@@ -5408,6 +5408,8 @@ dependencies = [
 name = "tempo-shim"
 version = "0.1.3"
 dependencies = [
+ "opentelemetry-proto",
+ "prost",
  "sfsq",
  "sfst",
  "thiserror 2.0.18",
