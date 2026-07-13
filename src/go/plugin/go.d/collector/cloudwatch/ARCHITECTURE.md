@@ -65,9 +65,9 @@ Each collection cycle (`collect.go`), in order:
 
 1. compile the raw configuration and resolve one AWS account id per target
    (`plan.go`, `identity.go`);
-2. use compiler-created instances for all-constant profiles and discover live
-   instances for the other profiles per (target, profile, region) with
-   `ListMetrics` (`discover.go`);
+2. use compiler-created instances for all-constant profiles; for dynamic
+   profiles, share one `ListMetrics` scan per (target, region, namespace) and
+   match each participating profile against that stream (`discover.go`);
 3. resolve resource-tag membership and optional chart labels (`tags.go`);
 4. reuse or rebuild the stable per-series query blueprint
    (`query_plan.go`);
