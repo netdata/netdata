@@ -6,6 +6,22 @@
 
 __thread ND_WMI nd_wmi = { 0 };
 
+void wmi_bstr_to_multibyte(char *dst, size_t dst_size, BSTR src)
+{
+    if (!dst_size)
+        return;
+
+    dst[0] = '\0';
+
+    if (!src)
+        return;
+
+    if (!utf16_to_utf8(dst, dst_size, src, -1, NULL)) {
+        dst[0] = '\0';
+        return;
+    }
+}
+
 HRESULT InitializeWMI(void) {
     if(nd_wmi.pLoc && nd_wmi.pSvc) return S_OK;
     CleanupWMI();
@@ -35,7 +51,7 @@ HRESULT InitializeWMI(void) {
             EOAC_NONE,
             NULL
     );
-    if (FAILED(hr)) {
+    if (FAILED(hr) && hr != RPC_E_TOO_LATE) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Failed to initialize security. Error code = 0x%X", hr);
         CleanupWMI();
         return hr;
@@ -53,7 +69,12 @@ HRESULT InitializeWMI(void) {
         return hr;
     }
 
-    // Connect to WMI
+    // Connect to WMI.
+    // These probes run synchronously on the daemon startup path (before rrd_init()), so a
+    // hung/unhealthy WMI service would otherwise block agent startup indefinitely. The query
+    // iteration is already time-bounded (Next() in the GetSystemInfo helper), but ConnectServer()
+    // has no custom-timeout knob; WBEM_FLAG_CONNECT_USE_MAX_WAIT is the only mechanism and caps
+    // the connect at ~2 minutes, turning an indefinite hang into a bounded delay.
     BSTR namespacePath = SysAllocString(L"ROOT\\CIMV2");
     hr = (*pLoc)->lpVtbl->ConnectServer(
             *pLoc,
@@ -61,7 +82,7 @@ HRESULT InitializeWMI(void) {
             NULL,
             NULL,
             0,
-            0,
+            WBEM_FLAG_CONNECT_USE_MAX_WAIT,
             0,
             0,
             pSvc
