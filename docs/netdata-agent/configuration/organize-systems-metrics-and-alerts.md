@@ -110,7 +110,7 @@ Add your own labels to categorize systems by any criteria you need.
     sudo ./edit-config netdata.conf
     ```
 
-    :::note Windows
+    :::note
     On Windows, Netdata configuration lives at `C:\Program Files\Netdata\etc\netdata` (default install location) and there is no `sudo`. Open the bundled MSYS2 shell — for example `Win + R`, then `"C:\Program Files\Netdata\msys2.exe"` — and edit `netdata.conf`:
 
     ```bash
