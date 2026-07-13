@@ -5,12 +5,16 @@
 
 #include "clocks.h"
 
+static inline usec_t clocks_usec_delta_or_zero(usec_t now_ut, usec_t old_ut) {
+    return now_ut >= old_ut ? now_ut - old_ut : 0;
+}
+
 static inline bool sleep_usec_prepare_retry_after_eintr(
         usec_t usec,
         usec_t started_monotonic_ut,
         usec_t now_monotonic_ut,
         struct timespec *req) {
-    usec_t elapsed_ut = now_monotonic_ut > started_monotonic_ut ? now_monotonic_ut - started_monotonic_ut : 0;
+    usec_t elapsed_ut = clocks_usec_delta_or_zero(now_monotonic_ut, started_monotonic_ut);
     if(elapsed_ut >= usec)
         return false;
 

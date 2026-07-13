@@ -530,6 +530,41 @@ static size_t unittest_check_dictionary(const char *label, DICTIONARY *dict, siz
     return errors;
 }
 
+static size_t dictionary_unittest_last_release_before_delete_mark(void) {
+    size_t errors = 0;
+    const char *name = "pending-delete-race";
+
+    fprintf(stderr, "\nTesting last-release/delete-mark race accounting:\n");
+
+    DICTIONARY *dict = dictionary_create(DICT_OPTION_NONE | DICT_OPTION_NAME_LINK_DONT_CLONE);
+    dictionary_set(dict, name, "VALUE", 6);
+    DICTIONARY_ITEM *item = (DICTIONARY_ITEM *)dictionary_get_and_acquire_item(dict, name);
+
+    errors += unittest_check_dictionary("pre-race", dict, 1, 1, 0, 1, 0);
+
+    dictionary_index_lock_wrlock(dict);
+    if(hashtable_delete_unsafe(dict, item_get_name(item), item_get_name_len(item), item) == 0) {
+        fprintf(stderr, "failed to remove race item from index\n");
+        errors++;
+    }
+    else
+        pointer_del(dict, item);
+    dictionary_index_wrlock_unlock(dict);
+
+    dict_item_shared_set_deleted(dict, item);
+    item_release(dict, item);
+    dict_item_set_deleted(dict, item);
+
+    errors += unittest_check_dictionary("post-race", dict, 0, 0, 1, 0, 1);
+
+    dictionary_garbage_collect(dict);
+    errors += unittest_check_dictionary("post-gc", dict, 0, 0, 0, 0, 0);
+
+    dictionary_destroy(dict);
+
+    return errors;
+}
+
 static int check_item_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data) {
     return value == data;
 }
@@ -1893,6 +1928,8 @@ int dictionary_unittest(size_t entries) {
     // check reference counters
     {
         fprintf(stderr, "\nTesting reference counters:\n");
+        errors += dictionary_unittest_last_release_before_delete_mark();
+
         dict = dictionary_create(DICT_OPTION_NONE | DICT_OPTION_NAME_LINK_DONT_CLONE);
         errors += unittest_check_dictionary("", dict, 0, 0, 0, 0, 0);
 

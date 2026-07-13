@@ -401,10 +401,10 @@ usec_t heartbeat_next(heartbeat_t *hb) {
     spinlock_lock(&heartbeat_alignment_spinlock);
     now = now_realtime_usec();
 
-    dt = now - hb->realtime;
+    dt = clocks_usec_delta_or_zero(now, hb->realtime);
 
     if(hb->statistics_id < HEARTBEAT_ALIGNMENT_STATISTICS_SIZE) {
-        heartbeat_alignment_values[hb->statistics_id].dt += now - next;
+        heartbeat_alignment_values[hb->statistics_id].dt += clocks_usec_delta_or_zero(now, next);
         heartbeat_alignment_values[hb->statistics_id].sequence++;
     }
     spinlock_unlock(&heartbeat_alignment_spinlock);

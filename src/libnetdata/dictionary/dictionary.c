@@ -192,10 +192,10 @@ void garbage_collect_pending_deletes(DICTIONARY *dict) {
 
             if(item_is_not_referenced_and_can_be_removed(dict, item)) {
                 DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(dict->items.list, item, prev, next);
+                pending = item_pending_deletion_clear(dict, item);
                 dict_item_free_with_hooks(dict, item);
                 deleted++;
 
-                pending = DICTIONARY_PENDING_DELETES_MINUS1(dict);
                 if (!pending)
                     break;
             }
