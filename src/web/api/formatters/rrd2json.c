@@ -268,14 +268,14 @@ int data_query_execute(ONEWAYALLOC *owa, BUFFER *wb, QUERY_TARGET *qt, time_t *l
         if(options & RRDR_OPTION_JSON_WRAP) {
             wrapper_begin(r, wb);
             buffer_json_member_add_array(wb, "result");
-            rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
+            rrdr2csv(r, wb, format, options | RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
             buffer_json_array_close(wb);
             wrapper_end(r, wb);
         }
         else {
             wb->content_type = CT_APPLICATION_JSON;
             buffer_strcat(wb, "[\n");
-            rrdr2csv(r, wb, format, options + RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
+            rrdr2csv(r, wb, format, options | RRDR_OPTION_LABEL_QUOTES, "[", ",", "]", ",\n");
             buffer_strcat(wb, "\n]");
         }
         break;
