@@ -17,12 +17,12 @@ void buffer_json_agent_status_id(BUFFER *wb, size_t ai, usec_t duration_ut) {
     buffer_json_object_close(wb);
 }
 
-void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, size_t ni, usec_t duration_ut, bool status) {
+void buffer_json_node_add_v2(BUFFER *wb, RRDHOST *host, const RRDHOST_IDENTITY *identity, size_t ni, usec_t duration_ut, bool status) {
     buffer_json_member_add_string(wb, JSKEY(machine_guid), host->machine_guid);
 
     if(!UUIDiszero(host->node_id))
         buffer_json_member_add_uuid(wb, JSKEY(node_id), host->node_id.uuid);
-    buffer_json_member_add_string(wb, JSKEY(hostname), rrdhost_hostname(host));
+    buffer_json_member_add_string(wb, JSKEY(hostname), string2str(identity->hostname));
     buffer_json_member_add_uint64(wb, JSKEY(node_index), ni);
 
     if(status)

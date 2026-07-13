@@ -1064,8 +1064,10 @@ static size_t registered_results_to_json_multinode_no_group_by(
             if(!dun->exposed)
                 continue;
 
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(dun->host);
             buffer_json_add_array_item_object(wb);
-            buffer_json_node_add_v2(wb, dun->host, dun->i, dun->duration_ut, true);
+            buffer_json_node_add_v2(wb, dun->host, &identity, dun->i, dun->duration_ut, true);
+            rrdhost_identity_release(&identity);
             buffer_json_object_close(wb);
         }
         dfe_done(dun);
