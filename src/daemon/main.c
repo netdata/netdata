@@ -237,6 +237,7 @@ int query_plan_unittest(void);
 int api_v1_allmetrics_json_unittest(void);
 int exporting_json_connector_unittest(void);
 int exporting_opentsdb_http_unittest(void);
+int exporting_opentsdb_telnet_unittest(void);
 #ifdef ENABLE_ML
 int ml_unittest(void);
 #endif
@@ -450,6 +451,7 @@ int netdata_main(int argc, char **argv) {
                             if (api_v1_allmetrics_json_unittest()) return 1;
                             if (exporting_json_connector_unittest()) return 1;
                             if (exporting_opentsdb_http_unittest()) return 1;
+                            if (exporting_opentsdb_telnet_unittest()) return 1;
                             if (ringbuffer_unittest()) return 1;
                             if (log_stack_unittest()) return 1;
                             if (clocks_unittest()) return 1;

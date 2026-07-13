@@ -134,8 +134,38 @@ void sanitize_opentsdb_label_value(char *dst, const char *src, size_t len)
     *dst = '\0';
 }
 
+static void buffer_strcat_opentsdb_telnet_value(BUFFER *wb, const char *src) {
+    size_t len = strlen(src);
+
+    buffer_need_bytes(wb, len + 1);
+    sanitize_opentsdb_label_value(&wb->buffer[wb->len], src, len);
+    wb->len += len;
+    buffer_overflow_check(wb);
+}
+
+static void format_opentsdb_telnet_prefix(
+    BUFFER *wb,
+    const char *prefix,
+    const char *chart_name,
+    const char *dimension_name,
+    unsigned long long timestamp) {
+    buffer_strcat(wb, "put ");
+    buffer_strcat_opentsdb_telnet_value(wb, prefix);
+    buffer_sprintf(wb, ".%s.%s %llu ", chart_name, dimension_name, timestamp);
+}
+
+static void format_opentsdb_telnet_host(BUFFER *wb, const char *hostname) {
+    buffer_strcat(wb, " host=");
+    buffer_strcat_opentsdb_telnet_value(wb, hostname);
+}
+
+static void format_opentsdb_telnet_suffix(BUFFER *wb, const char *host_and_labels) {
+    buffer_strcat(wb, host_and_labels);
+    buffer_putc(wb, '\n');
+}
+
 /**
- * Format host labels for JSON connector
+ * Format host identity and labels for OpenTSDB Telnet connector
  *
  * @param instance an instance data structure.
  * @param host a data collecting host.
@@ -145,6 +175,14 @@ void sanitize_opentsdb_label_value(char *dst, const char *src, size_t len)
 int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host) {
     if(!instance->labels_buffer)
         instance->labels_buffer = buffer_create(1024, &netdata_buffers_statistics.buffers_exporters);
+
+    if(host == localhost)
+        format_opentsdb_telnet_host(instance->labels_buffer, instance->config.hostname);
+    else {
+        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+        format_opentsdb_telnet_host(instance->labels_buffer, string2str(identity.hostname));
+        rrdhost_identity_release(&identity);
+    }
 
     if (unlikely(!sending_labels_configured(instance)))
         return 0;
@@ -166,7 +204,6 @@ int format_host_labels_opentsdb_telnet(struct instance *instance, RRDHOST *host)
 int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM *rd)
 {
     RRDSET *st = rd->rrdset;
-    RRDHOST *host = st->rrdhost;
 
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
@@ -180,28 +217,19 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
         (instance->config.options & EXPORTING_OPTION_SEND_NAMES && rd->name) ? rrddim_name(rd) : rrddim_id(rd),
         RRD_ID_LENGTH_MAX);
 
+    format_opentsdb_telnet_prefix(
+        instance->buffer,
+        instance->config.prefix,
+        chart_name,
+        dimension_name,
+        (unsigned long long)rd->collector.last_collected_time.tv_sec);
+
     if(rrddim_is_float(rd))
-        buffer_sprintf(
-            instance->buffer,
-            "put %s.%s.%s %llu " NETDATA_DOUBLE_FORMAT " host=%s%s\n",
-            instance->config.prefix,
-            chart_name,
-            dimension_name,
-            (unsigned long long)rd->collector.last_collected_time.tv_sec,
-            rrddim_last_collected_as_double(rd),
-            (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-            (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "");
+        buffer_sprintf(instance->buffer, NETDATA_DOUBLE_FORMAT, rrddim_last_collected_as_double(rd));
     else
-        buffer_sprintf(
-            instance->buffer,
-            "put %s.%s.%s %llu " COLLECTED_NUMBER_FORMAT " host=%s%s\n",
-            instance->config.prefix,
-            chart_name,
-            dimension_name,
-            (unsigned long long)rd->collector.last_collected_time.tv_sec,
-            (collected_number)rrddim_last_collected_raw_int(rd),
-            (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-            (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "");
+        buffer_sprintf(instance->buffer, COLLECTED_NUMBER_FORMAT, (collected_number)rrddim_last_collected_raw_int(rd));
+
+    format_opentsdb_telnet_suffix(instance->buffer, buffer_tostring(instance->labels_buffer));
 
     return 0;
 }
@@ -216,7 +244,6 @@ int format_dimension_collected_opentsdb_telnet(struct instance *instance, RRDDIM
 int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *rd)
 {
     RRDSET *st = rd->rrdset;
-    RRDHOST *host = st->rrdhost;
 
     char chart_name[RRD_ID_LENGTH_MAX + 1];
     exporting_name_copy(
@@ -236,16 +263,16 @@ int format_dimension_stored_opentsdb_telnet(struct instance *instance, RRDDIM *r
     if(isnan(value))
         return 0;
 
-    buffer_sprintf(
+    format_opentsdb_telnet_prefix(
         instance->buffer,
-        "put %s.%s.%s %llu " NETDATA_DOUBLE_FORMAT " host=%s%s\n",
         instance->config.prefix,
         chart_name,
         dimension_name,
-        (unsigned long long)last_t,
-        value,
-        (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-        (instance->labels_buffer) ? buffer_tostring(instance->labels_buffer) : "");
+        (unsigned long long)last_t);
+
+    buffer_sprintf(instance->buffer, NETDATA_DOUBLE_FORMAT, value);
+
+    format_opentsdb_telnet_suffix(instance->buffer, buffer_tostring(instance->labels_buffer));
 
     return 0;
 }
@@ -482,6 +509,136 @@ int exporting_opentsdb_http_unittest(void) {
         "host\r\"\\name",
         "{\"metric\":\"pre\\\"\\\\\\u0001.chart\\nname.dimension\\tname\",\"timestamp\":42,"
         "\"value\":1.5,\"tags\":{\"host\":\"host\\r\\\"\\\\name\",\"label\":\"value\"}}");
+
+    return errors;
+}
+
+static int opentsdb_telnet_unittest_case(
+    const char *description,
+    const char *prefix,
+    const char *hostname,
+    const char *labels,
+    const char *expected) {
+    BUFFER *host_and_labels = buffer_create(0, NULL);
+    format_opentsdb_telnet_host(host_and_labels, hostname);
+    buffer_strcat(host_and_labels, labels);
+
+    BUFFER *wb = buffer_create(0, NULL);
+    format_opentsdb_telnet_prefix(wb, prefix, "chart.name", "dimension.name", 42);
+    buffer_strcat(wb, "1.5");
+    format_opentsdb_telnet_suffix(wb, buffer_tostring(host_and_labels));
+
+    int errors = 0;
+    if(strcmp(buffer_tostring(wb), expected) != 0) {
+        fprintf(
+            stderr,
+            "OpenTSDB Telnet %s output mismatch\nexpected: %s\nactual:   %s\n",
+            description,
+            expected,
+            buffer_tostring(wb));
+        errors++;
+    }
+
+    size_t newline_count = 0;
+    for(const char *s = buffer_tostring(wb); *s; s++) {
+        if(*s == '\n')
+            newline_count++;
+        else if(*s == '\r' || *s == '\t') {
+            fprintf(stderr, "OpenTSDB Telnet %s output retained a protocol delimiter\n", description);
+            errors++;
+            break;
+        }
+    }
+
+    if(newline_count != 1 || !buffer_strlen(wb) || wb->buffer[wb->len - 1] != '\n') {
+        fprintf(stderr, "OpenTSDB Telnet %s output is not exactly one newline-terminated command\n", description);
+        errors++;
+    }
+
+    buffer_free(wb);
+    buffer_free(host_and_labels);
+    return errors;
+}
+
+int exporting_opentsdb_telnet_unittest(void) {
+    int errors = 0;
+
+    errors += opentsdb_telnet_unittest_case(
+        "ordinary metadata",
+        "netdata",
+        "localhost",
+        " label=value",
+        "put netdata.chart.name.dimension.name 42 1.5 host=localhost label=value\n");
+
+    errors += opentsdb_telnet_unittest_case(
+        "allowed punctuation",
+        "Netdata-A_9/part.",
+        "Host-A_9/path.example",
+        " label=value",
+        "put Netdata-A_9/part..chart.name.dimension.name 42 1.5 host=Host-A_9/path.example label=value\n");
+
+    errors += opentsdb_telnet_unittest_case(
+        "hostile metadata",
+        "pre fix\tbad\r\nput",
+        "host name\tbad\r\nput",
+        " label=value",
+        "put pre_fix_bad__put.chart.name.dimension.name 42 1.5 host=host_name_bad__put label=value\n");
+
+    errors += opentsdb_telnet_unittest_case(
+        "all-invalid metadata",
+        " \t\r\n",
+        " \t\r\n",
+        " label=value",
+        "put ____.chart.name.dimension.name 42 1.5 host=____ label=value\n");
+
+    errors += opentsdb_telnet_unittest_case(
+        "empty metadata",
+        "",
+        "",
+        "",
+        "put .chart.name.dimension.name 42 1.5 host=\n");
+
+    errors += opentsdb_telnet_unittest_case(
+        "colliding invalid metadata",
+        "pre fix",
+        "host name",
+        "",
+        "put pre_fix.chart.name.dimension.name 42 1.5 host=host_name\n");
+
+    errors += opentsdb_telnet_unittest_case(
+        "colliding valid metadata",
+        "pre_fix",
+        "host_name",
+        "",
+        "put pre_fix.chart.name.dimension.name 42 1.5 host=host_name\n");
+
+    char long_prefix[4097];
+    char long_hostname[4097];
+    memset(long_prefix, 'p', sizeof(long_prefix) - 1);
+    memset(long_hostname, 'h', sizeof(long_hostname) - 1);
+    long_prefix[1024] = '\n';
+    long_hostname[3072] = '\t';
+    long_prefix[sizeof(long_prefix) - 1] = '\0';
+    long_hostname[sizeof(long_hostname) - 1] = '\0';
+
+    BUFFER *host_and_labels = buffer_create(0, NULL);
+    format_opentsdb_telnet_host(host_and_labels, long_hostname);
+
+    BUFFER *wb = buffer_create(0, NULL);
+    format_opentsdb_telnet_prefix(wb, long_prefix, "chart.name", "dimension.name", 42);
+    buffer_strcat(wb, "1.5");
+    format_opentsdb_telnet_suffix(wb, buffer_tostring(host_and_labels));
+
+    const size_t expected_length = strlen("put ") + strlen(long_prefix) + strlen(".chart.name.dimension.name 42 1.5 host=") +
+                                   strlen(long_hostname) + 1;
+    if(buffer_strlen(wb) != expected_length || wb->buffer[sizeof("put ") - 1 + 1024] != '_' ||
+       strchr(buffer_tostring(wb), '\t') || strchr(buffer_tostring(wb), '\r') ||
+       strchr(buffer_tostring(wb), '\n') != &wb->buffer[wb->len - 1]) {
+        fprintf(stderr, "OpenTSDB Telnet long metadata was truncated or retained a protocol delimiter\n");
+        errors++;
+    }
+    buffer_free(wb);
+    buffer_free(host_and_labels);
 
     return errors;
 }
