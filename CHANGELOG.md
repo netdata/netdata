@@ -654,6 +654,12 @@
 - Bounded-cardinality process grouping (macOS) and hardware sensors summaries, histogram and function ([#23085](https://github.com/netdata/netdata/issues/23085))
 - Feat(go.d/chartengine): update mutable chart labels ([#23087](https://github.com/netdata/netdata/issues/23087))
 - Fix systemd-journal.plugin memory retention after queries and its apps.plugin accounting ([#23089](https://github.com/netdata/netdata/issues/23089))
+- Fix UDP socket fallback when inet_diag handlers are missing ([#23091](https://github.com/netdata/netdata/issues/23091))
+- Netdata fixes part 54 ([#23057](https://github.com/netdata/netdata/issues/23057))
+- Feat(go.d/cloudwatch): add resource tag filtering ([#23090](https://github.com/netdata/netdata/issues/23090))
+- Regenerate integrations docs ([#23088](https://github.com/netdata/netdata/issues/23088))
+- Feat(go.d/cloudwatch): add exact metric selection ([#23092](https://github.com/netdata/netdata/issues/23092))
+- Update vendored NetIPC SHM allocation ([#23093](https://github.com/netdata/netdata/issues/23093))
 
 ## [2.10.0] - 2026-04-09
 
