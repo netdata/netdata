@@ -532,7 +532,7 @@ static void generate_as_collected_from_metric(BUFFER *wb,
 
 static void prometheus_print_os_info(
     BUFFER *wb,
-    RRDHOST *host,
+    const char *hostname,
     PROMETHEUS_OUTPUT_OPTIONS output_options)
 {
     FILE *fp;
@@ -550,7 +550,7 @@ static void prometheus_print_os_info(
         return;
     }
 
-    buffer_sprintf(wb, "netdata_os_info{instance=\"%s\"", rrdhost_hostname(host));
+    buffer_sprintf(wb, "netdata_os_info{instance=\"%s\"", hostname);
 
     while (fgets(buf, BUFSIZ, fp)) {
       char *in, *sanitized;
@@ -864,10 +864,11 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
     PROMETHEUS_OUTPUT_OPTIONS output_options,
     PROM_CONTEXT_OPTIONS_JudyLSet *context_options)
 {
+    RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
     SIMPLE_PATTERN *filter = simple_pattern_create(filter_string, NULL, SIMPLE_PATTERN_EXACT, true);
 
     char hostname[PROMETHEUS_ELEMENT_MAX + 1];
-    prometheus_label_copy(hostname, rrdhost_hostname(host), sizeof(hostname));
+    prometheus_label_copy(hostname, string2str(identity.hostname), sizeof(hostname));
 
     format_host_labels_prometheus(instance, host);
 
@@ -875,8 +876,8 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         wb,
         "netdata_info{instance=\"%s\",application=\"%s\",version=\"%s\"",
         hostname,
-        rrdhost_program_name(host),
-        rrdhost_program_version(host));
+        string2str(identity.prog_name),
+        string2str(identity.prog_version));
 
     if (instance->labels_buffer && *buffer_tostring(instance->labels_buffer)) {
         buffer_sprintf(wb, ",%s", buffer_tostring(instance->labels_buffer));
@@ -896,7 +897,7 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
         buffer_flush(instance->labels_buffer);
 
     if (instance->config.options & EXPORTING_OPTION_SEND_AUTOMATIC_LABELS)
-        prometheus_print_os_info(wb, host, output_options);
+        prometheus_print_os_info(wb, string2str(identity.hostname), output_options);
 
 
     BUFFER *plabels_buffer = buffer_create(0, NULL);
@@ -924,7 +925,10 @@ static void rrd_stats_api_v1_charts_allmetrics_prometheus(
 
     // for each context
     if (!host->rrdctx.contexts) {
-        netdata_log_error("%s(): request for host '%s' that does not have rrdcontexts initialized.", __FUNCTION__, rrdhost_hostname(host));
+        netdata_log_error(
+            "%s(): request for host '%s' that does not have rrdcontexts initialized.",
+            __FUNCTION__,
+            string2str(identity.hostname));
         goto allmetrics_cleanup;
     }
 
@@ -934,6 +938,7 @@ allmetrics_cleanup:
     simple_pattern_free(filter);
     buffer_free(plabels_buffer);
     string_freez(opts.prometheus);
+    rrdhost_identity_release(&identity);
 }
 
 /**
