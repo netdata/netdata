@@ -39,23 +39,15 @@ All of Netdata's documentation **assumes your config directory is at** `/etc/net
 
 ### On Windows
 
-On Windows, the **Netdata config directory** is located at `C:\Program Files\Netdata\etc\netdata`.
-
-The default alert templates — Netdata's built-in health configuration files (`.conf`) that define the stock alerts — ship in the stock configuration directory at `C:\Program Files\Netdata\usr\lib\netdata\conf.d\health.d\`. Browse the files there to see which alerts ship with Netdata.
-
-To customize an alert, edit the corresponding `.conf` file in your config directory's `health.d` subdirectory instead: `C:\Program Files\Netdata\etc\netdata\health.d\`. Editing your copy here — rather than in the stock directory — ensures your changes survive Agent updates.
+On Windows, the **Netdata config directory** is located at `C:\Program Files\Netdata\etc\netdata`. Like on Linux, this directory contains configuration files, a few directories for specific configurations (including `health.d` for your alert overrides), and the `edit-config` helper script.
 
 :::note
 
-The `edit-config` helper script referenced in the Linux steps above requires the bundled MSYS2 shell that ships with Netdata for Windows — see [Editing configuration files](/packaging/windows/WINDOWS_INSTALLER.md#editing-configuration-files) for how to open it and use `edit-config` there. Because `C:\Program Files\Netdata` is a protected system directory, run the MSYS2 shell with Administrator privileges. After saving, reload your alert configuration without restarting the Agent:
-
-```powershell
-& "C:\Program Files\Netdata\usr\bin\netdatacli.exe" reload-health
-```
+`edit-config` requires the bundled MSYS2 shell that ships with Netdata for Windows — see [Editing configuration files](/packaging/windows/WINDOWS_INSTALLER.md#editing-configuration-files) for how to open it and use `edit-config` there. Because `C:\Program Files\Netdata` is a protected system directory, run the MSYS2 shell with Administrator privileges.
 
 :::
 
-For the full alert configuration syntax, see the [health configuration reference](/src/health/REFERENCE.md).
+For alert-specific configuration on Windows — where the stock alert templates ship, where to place your overrides, and how to reload without restarting the Agent — see [How to Edit Health Configuration Files](/src/health/REFERENCE.md#how-to-edit-health-configuration-files) in the health configuration reference.
 
 ## Edit Configuration Files
 
