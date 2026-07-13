@@ -155,6 +155,14 @@ Dimension names and constant values are matched verbatim and must not have
 leading or trailing whitespace. Names and emitted labels must be unique within
 the profile.
 
+When AWS publishes the same MetricNames at multiple exact dimension sets, write
+one profile per grain. Use separate profile and context names so the identities
+cannot merge, and mark a higher-cardinality grain `disabled: true` when it should
+be opt-in. `privatelink_endpoint.yaml` and
+`privatelink_endpoint_subnet.yaml` are the stock parent/child example: the child
+adds `Subnet Id`, while the collector's reviewed tag-association registry joins
+both profiles on their parent `VPC Endpoint Id`.
+
 When every declared dimension is constant, the collector already knows the
 complete instance and queries it directly. Such profiles do not call
 `ListMetrics`. Profiles with at least one identifying dimension use discovery
@@ -169,7 +177,7 @@ Every `metrics` entry supports:
 | `id` | yes | Stable lowercase identifier used in exported series names and chart selectors. |
 | `metric_name` | yes | CloudWatch metric name, matched verbatim. |
 | `statistics` | yes | One or more of `average`, `minimum`, `maximum`, `sum`, `sample_count`, or a percentile such as `p90` or `p99.9`. |
-| `rate` | no | Divide a per-period `sum` or `sample_count` by the effective period and present it per second. Requires one of those total statistics. |
+| `rate` | no | Divide each per-period `sum` or `sample_count` sibling by the effective period and present it per second. Other statistics on the same metric, such as `average`, remain unchanged. Requires at least one total statistic. |
 | `query` | no | Metric-specific `period`, `lookback`, and/or `publication_delay` overrides. Omitted fields inherit independently. |
 | `nil_as_zero` | no | Record a clean no-datapoint response as `0` (`true`) or a gap (`false`). When omitted, rate totals default to zero and other statistics default to gaps. |
 

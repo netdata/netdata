@@ -350,11 +350,12 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules")["ui:listFlavour"])
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "targets")["ui:listFlavour"])
 	assert.Equal(t, "ec2", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "profiles", "include", "items")["ui:placeholder"])
-	billingProfileHelp, ok := schemaObjectAt(t, doc, "uiSchema", "rules", "items", "profiles", "include")["ui:help"].(string)
+	profileIncludeHelp, ok := schemaObjectAt(t, doc, "uiSchema", "rules", "items", "profiles", "include")["ui:help"].(string)
 	require.True(t, ok)
 	for _, profile := range []string{"billing_total", "billing_service", "billing_linked_account", "billing_linked_account_service"} {
-		assert.Contains(t, billingProfileHelp, profile)
+		assert.Contains(t, profileIncludeHelp, profile)
 	}
+	assert.Contains(t, profileIncludeHelp, "privatelink_endpoint_subnet")
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics")["ui:listFlavour"])
 	assert.Equal(t, "ec2", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "profile")["ui:placeholder"])
 	assert.Equal(t, "Average", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "statistics", "items")["ui:placeholder"])
@@ -421,6 +422,28 @@ func TestMetadata_BillingOperatorContract(t *testing.T) {
 		"28,800 metric requests per day",
 		"AWS charges `GetMetricData` by metrics requested",
 		"Billing dimensions are not AWS Resource Groups Tagging API resources",
+	} {
+		assert.Contains(t, text, want)
+	}
+}
+
+func TestMetadata_PrivateLinkEndpointOperatorContract(t *testing.T) {
+	data, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	text := string(data)
+
+	for _, want := range []string{
+		"privatelink_endpoint",
+		"privatelink_endpoint_subnet",
+		"AWS/PrivateLinkEndpoints",
+		"AWS/PrivateLinkServices",
+		"endpoint_type",
+		"subnet_id",
+		"seven additional metric/statistic queries",
+		"1,440 metric requests per day",
+		"period: 1m",
+		"period: 6h",
+		"resource_tags",
 	} {
 		assert.Contains(t, text, want)
 	}

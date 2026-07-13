@@ -107,6 +107,8 @@ func TestLoadFromDefaultDirs_LoadsStockProfiles(t *testing.T) {
 		"billing_linked_account_service": "AWS/Billing",
 		"billing_service":                "AWS/Billing",
 		"billing_total":                  "AWS/Billing",
+		"privatelink_endpoint":           "AWS/PrivateLinkEndpoints",
+		"privatelink_endpoint_subnet":    "AWS/PrivateLinkEndpoints",
 		"eventbridge":                    "AWS/Events",
 		"vpn":                            "AWS/VPN",
 		"eks":                            "AWS/EKS",
@@ -136,6 +138,15 @@ func TestLoadFromDefaultDirs_LoadsStockProfiles(t *testing.T) {
 				assert.Equal(t, 10*time.Minute, prof.Query.Period.Duration())
 				assert.Equal(t, 24*time.Hour, prof.Query.Lookback.Duration())
 				assert.Nil(t, prof.Query.PublicationDelay)
+			}
+			if baseName == "privatelink_endpoint" || baseName == "privatelink_endpoint_subnet" {
+				assert.Equal(t, baseName == "privatelink_endpoint_subnet", prof.Disabled)
+				require.NotNil(t, prof.Query.Period)
+				require.NotNil(t, prof.Query.Lookback)
+				require.NotNil(t, prof.Query.PublicationDelay)
+				assert.Equal(t, 5*time.Minute, prof.Query.Period.Duration())
+				assert.Equal(t, 5*time.Minute, prof.Query.Lookback.Duration())
+				assert.Equal(t, 5*time.Minute, prof.Query.PublicationDelay.Duration())
 			}
 		}
 	}

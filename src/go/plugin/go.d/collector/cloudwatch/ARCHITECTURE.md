@@ -303,8 +303,8 @@ copies selected AWS tags to **non-identity** chart labels.
   dimension values onto the same key. The compiler accepts a registered mapper only
   when an override retains its expected CloudWatch namespace and every join dimension
   remains identifying (not constant). Parent-resource profiles (S3,
-  DynamoDB-operation, and ALB-target) key on the parent dimension so children
-  inherit its tags.
+  DynamoDB-operation, ALB-target, and PrivateLink endpoint-by-subnet) key on the
+  parent dimension so children inherit its tags.
   A default-selected profile without a safe association is skipped when filtering is
   effective; explicitly including one is a config error unless that rule disables or
   replaces the filter. Labels-only use remains best-effort for unsupported profiles.
@@ -557,6 +557,27 @@ Profile validation invariants (`profile.go`) — these are load-bearing:
 - `rate: true` requires a `sum` or `sample_count` statistic (the per-second value
   divides a per-period total — the summed value or the observation count — by the
   period).
+
+### PrivateLink endpoint grains
+
+`AWS/PrivateLinkEndpoints` demonstrates why one namespace can need multiple
+profiles. AWS publishes the same metric names at two exact dimension sets:
+
+- `privatelink_endpoint` identifies the endpoint by `endpoint_type`,
+  `service_name`, `vpc_endpoint_id`, and `vpc_id`. It is default-enabled.
+- `privatelink_endpoint_subnet` adds `subnet_id`. It is opt-in because one
+  endpoint can fan out into several chart instances.
+
+The profiles share one namespace discovery scan. Both join RGTA
+`ec2:vpc-endpoint` resources on `VPC Endpoint Id`; subnet instances therefore
+inherit their parent endpoint's filter membership and mutable tag labels.
+
+Each instance exports seven series across five CloudWatch MetricNames. Mixed
+`Average` and `Sum` entries are intentional: `Average` remains the raw gauge,
+while `rate: true` normalizes only the `Sum` sibling to a per-second value. Stock
+timing is `period=5m`, `lookback=5m`, and `publication_delay=5m`. Exact
+metric/statistic rules can assign one-minute Average and six-hour Sum policies
+without either rule shadowing the other's series.
 
 ## Credentials, Targets, And Account Identity
 
