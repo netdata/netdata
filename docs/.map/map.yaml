@@ -96,6 +96,11 @@ sidebar:
           - meta:
               label: Docker
               edit_url: https://github.com/netdata/netdata/edit/master/packaging/docker/README.md
+            items:
+              - meta:
+                  label: Docker container environment variables
+                  edit_url: https://github.com/netdata/netdata/edit/master/docs/deployment-guides/docker-container-environment-variables.md
+                  description: Reference for every environment variable honored by the official Netdata Docker image entrypoint.
           - meta:
               label: Kubernetes
               edit_url: https://github.com/netdata/netdata/edit/master/packaging/installer/methods/kubernetes.md
