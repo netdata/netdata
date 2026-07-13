@@ -47,7 +47,7 @@ To customize an alert, edit the corresponding `.conf` file in your config direct
 
 :::note
 
-The `edit-config` helper script referenced in the Linux steps above is Linux-only. On Windows, edit these files directly in a text editor run as Administrator. After saving, reload your alert configuration without restarting the Agent:
+The `edit-config` helper script referenced in the Linux steps above requires the bundled MSYS2 shell that ships with Netdata for Windows — see [Editing configuration files](/packaging/windows/WINDOWS_INSTALLER.md#editing-configuration-files) for how to open it and use `edit-config` there. Because `C:\Program Files\Netdata` is a protected system directory, run the MSYS2 shell with Administrator privileges. After saving, reload your alert configuration without restarting the Agent:
 
 ```powershell
 & "C:\Program Files\Netdata\usr\bin\netdatacli.exe" reload-health
@@ -63,6 +63,8 @@ For the full alert configuration syntax, see the [health configuration reference
 <summary><strong>Method 1: Using `edit-config` (Recommended)</strong></summary>
 
 You should use the `edit-config` script for making configuration changes. This script lives inside your config directory and helps you manage and safely edit configuration files.
+
+On Windows, run `edit-config` from the bundled MSYS2 shell — see [On Windows](#on-windows) above.
 
 To edit `netdata.conf`:
 
