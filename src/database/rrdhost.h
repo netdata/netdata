@@ -327,6 +327,7 @@ struct rrdhost {
     // locks
 
     SPINLOCK rrdhost_update_lock;
+    RW_SPINLOCK metadata_lifetime_lock;
 
     // ------------------------------------------------------------------------
     // ML handle
@@ -516,7 +517,7 @@ RRDHOST *rrdhost_find_or_create(
 void rrdhost_free_all(void);
 
 void rrdhost_free___while_having_rrd_wrlock(RRDHOST *host);
-void rrdhost_free___without_having_rrd_wrlock(RRDHOST *host);
+void rrdhost_free___consume_metadata_lifetime_writelock(RRDHOST *host);
 void rrdhost_cleanup_data_collection_and_health(RRDHOST *host);
 
 bool rrdhost_should_be_cleaned_up(RRDHOST *host, RRDHOST *protected_host, time_t now_s);
