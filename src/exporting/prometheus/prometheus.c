@@ -47,33 +47,51 @@ inline int can_send_rrdset(struct instance *instance, RRDSET *st, SIMPLE_PATTERN
             rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_SEND);
         } else {
             rrdset_flag_set(st, RRDSET_FLAG_EXPORTING_IGNORE);
-            netdata_log_debug(
-                D_EXPORTING,
-                "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
-                rrdset_id(st),
-                rrdhost_hostname(host));
+#ifdef NETDATA_INTERNAL_CHECKS
+            if(unlikely(debug_flags & D_EXPORTING)) {
+                RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+                netdata_log_debug(
+                    D_EXPORTING,
+                    "EXPORTING: not sending chart '%s' of host '%s', because it is disabled for exporting.",
+                    rrdset_id(st),
+                    string2str(identity.hostname));
+                rrdhost_identity_release(&identity);
+            }
+#endif
             return 0;
         }
     }
 
     if (unlikely(!rrdset_is_available_for_exporting_and_alarms(st))) {
-        netdata_log_debug(
-            D_EXPORTING,
-            "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.",
-            rrdset_id(st),
-            rrdhost_hostname(host));
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(unlikely(debug_flags & D_EXPORTING)) {
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+            netdata_log_debug(
+                D_EXPORTING,
+                "EXPORTING: not sending chart '%s' of host '%s', because it is not available for exporting.",
+                rrdset_id(st),
+                string2str(identity.hostname));
+            rrdhost_identity_release(&identity);
+        }
+#endif
         return 0;
     }
 
     if (unlikely(
             st->rrd_memory_mode == RRD_DB_MODE_NONE &&
             !(EXPORTING_OPTIONS_DATA_SOURCE(instance->config.options) == EXPORTING_SOURCE_DATA_AS_COLLECTED))) {
-        netdata_log_debug(
-            D_EXPORTING,
-            "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting connector requires database access.",
-            rrdset_id(st),
-            rrdhost_hostname(host),
-            rrd_memory_mode_name(host->rrd_memory_mode));
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(unlikely(debug_flags & D_EXPORTING)) {
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+            netdata_log_debug(
+                D_EXPORTING,
+                "EXPORTING: not sending chart '%s' of host '%s' because its memory mode is '%s' and the exporting connector requires database access.",
+                rrdset_id(st),
+                string2str(identity.hostname),
+                rrd_memory_mode_name(host->rrd_memory_mode));
+            rrdhost_identity_release(&identity);
+        }
+#endif
         return 0;
     }
 

@@ -243,15 +243,29 @@ int format_dimension_prometheus_remote_write(struct instance *instance, RRDDIM *
             // we need as-collected / raw data
 
             if (unlikely(rd->collector.last_collected_time.tv_sec < instance->after)) {
-                netdata_log_debug(
-                    D_EXPORTING,
-                    "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', "
-                    "its last data collection (%lu) is not within our timeframe (%lu to %lu)",
-                    rrddim_id(rd), rrdset_id(rd->rrdset),
-                    (host == localhost) ? instance->config.hostname : rrdhost_hostname(host),
-                    (unsigned long)rd->collector.last_collected_time.tv_sec,
-                    (unsigned long)instance->after,
-                    (unsigned long)instance->before);
+#ifdef NETDATA_INTERNAL_CHECKS
+                if(unlikely(debug_flags & D_EXPORTING)) {
+                    RRDHOST_IDENTITY identity = { 0 };
+                    const char *host_name;
+
+                    if(host == localhost)
+                        host_name = instance->config.hostname;
+                    else {
+                        identity = rrdhost_identity_acquire(host);
+                        host_name = string2str(identity.hostname);
+                    }
+
+                    netdata_log_debug(
+                        D_EXPORTING,
+                        "EXPORTING: not sending dimension '%s' of chart '%s' from host '%s', "
+                        "its last data collection (%lu) is not within our timeframe (%lu to %lu)",
+                        rrddim_id(rd), rrdset_id(rd->rrdset), host_name,
+                        (unsigned long)rd->collector.last_collected_time.tv_sec,
+                        (unsigned long)instance->after,
+                        (unsigned long)instance->before);
+                    rrdhost_identity_release(&identity);
+                }
+#endif
                 return 0;
             }
 
