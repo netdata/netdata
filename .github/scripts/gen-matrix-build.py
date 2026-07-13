@@ -25,11 +25,6 @@ for item in data.include:
         'version': item.version,
     }
 
-    if item.base_image is not None:
-        entry['distro'] = item.base_image
-    else:
-        entry['distro'] = ':'.join([item.distro, item.version])
-
     if item.env_prep is not None:
         entry['env_prep'] = item.env_prep
 
