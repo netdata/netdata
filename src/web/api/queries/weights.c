@@ -56,6 +56,7 @@ typedef enum {
 struct register_result {
     RESULT_FLAGS flags;
     RRDHOST *host;
+    STRING *hostname;
     RRDCONTEXT_ACQUIRED *rca;
     RRDINSTANCE_ACQUIRED *ria;
     RRDMETRIC_ACQUIRED *rma;
@@ -64,6 +65,62 @@ struct register_result {
     STORAGE_POINT baseline;
     usec_t duration_ut;
 };
+
+struct weights_host_snapshot {
+    RRDHOST *host;
+    STRING *hostname;
+};
+
+static bool weights_host_snapshot_conflict_callback(
+    const DICTIONARY_ITEM *item __maybe_unused, void *old_value __maybe_unused, void *new_value, void *data __maybe_unused) {
+    struct weights_host_snapshot *snapshot = new_value;
+
+    string_freez(snapshot->hostname);
+    snapshot->hostname = NULL;
+    return false;
+}
+
+static void weights_host_snapshot_delete_callback(
+    const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct weights_host_snapshot *snapshot = value;
+
+    string_freez(snapshot->hostname);
+    snapshot->hostname = NULL;
+}
+
+static DICTIONARY *weights_host_snapshots_init(void) {
+    DICTIONARY *snapshots = dictionary_create_advanced(
+        DICT_OPTION_DONT_OVERWRITE_VALUE | DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct weights_host_snapshot));
+
+    dictionary_register_conflict_callback(snapshots, weights_host_snapshot_conflict_callback, NULL);
+    dictionary_register_delete_callback(snapshots, weights_host_snapshot_delete_callback, NULL);
+    return snapshots;
+}
+
+static struct weights_host_snapshot *weights_host_snapshot_get(DICTIONARY *snapshots, RRDHOST *host) {
+    char key[2 * sizeof(void *) + 3];
+    int key_len = snprintfz(key, sizeof(key), "%p", (void *)host);
+
+    struct weights_host_snapshot *snapshot = dictionary_get_advanced(snapshots, key, key_len);
+    if(likely(snapshot))
+        return snapshot;
+
+    RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+    struct weights_host_snapshot candidate = {
+        .host = host,
+        .hostname = identity.hostname,
+    };
+    identity.hostname = NULL;
+    rrdhost_identity_release(&identity);
+
+    snapshot = dictionary_set_advanced(snapshots, key, key_len, &candidate, sizeof(candidate), NULL);
+    if(unlikely(!snapshot)) {
+        string_freez(candidate.hostname);
+        fatal("QUERY WEIGHTS: failed to retain a host hostname");
+    }
+
+    return snapshot;
+}
 
 static DICTIONARY *register_result_init() {
     DICTIONARY *results = dictionary_create_advanced(DICT_OPTION_FIXED_SIZE, NULL, sizeof(struct register_result));
@@ -108,7 +165,8 @@ static void merge_results_dictionaries(DICTIONARY *main_results, DICTIONARY *loc
 static ssize_t weights_do_node_callback(void *data, RRDHOST *host, bool queryable);
 static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca, bool queryable_context);
 
-static void register_result(DICTIONARY *results, RRDHOST *host, RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria,
+static void register_result(DICTIONARY *results, RRDHOST *host, STRING *hostname,
+                            RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria,
                             RRDMETRIC_ACQUIRED *rma, NETDATA_DOUBLE value, RESULT_FLAGS flags,
                             STORAGE_POINT *highlighted, STORAGE_POINT *baseline, WEIGHTS_STATS *stats,
                             bool register_zero, usec_t duration_ut) {
@@ -129,6 +187,7 @@ static void register_result(DICTIONARY *results, RRDHOST *host, RRDCONTEXT_ACQUI
     struct register_result t = {
         .flags = flags,
         .host = host,
+        .hostname = hostname,
         .rca = rca,
         .ria = ria,
         .rma = rma,
@@ -371,6 +430,8 @@ struct query_weights_data {
     bool register_zero;
 
     DICTIONARY *results;
+    DICTIONARY *host_snapshots;
+    struct weights_host_snapshot *host_snapshot;
     WEIGHTS_STATS stats;
     RRDHOST **hosts_array;
     size_t total_hosts;
@@ -463,9 +524,12 @@ void query_weights_worker_thread(void *arg)
         else
             uuid[0] = '\0';
 
+        local_qwd.host_snapshot = weights_host_snapshot_get(local_qwd.host_snapshots, host);
+
         SIMPLE_PATTERN_RESULT match = SP_MATCHED_POSITIVE;
         if(main_qwd->scope_nodes_sp) {
-            match = simple_pattern_matches_string_extract(main_qwd->scope_nodes_sp, host->hostname, NULL, 0);
+            match = simple_pattern_matches_string_extract(
+                main_qwd->scope_nodes_sp, local_qwd.host_snapshot->hostname, NULL, 0);
             if(match == SP_NOT_MATCHED) {
                 match = simple_pattern_matches_extract(main_qwd->scope_nodes_sp, host->machine_guid, NULL, 0);
                 if(match == SP_NOT_MATCHED && *uuid)
@@ -477,7 +541,8 @@ void query_weights_worker_thread(void *arg)
             continue;
 
         if(main_qwd->nodes_sp) {
-            match = simple_pattern_matches_string_extract(main_qwd->nodes_sp, host->hostname, NULL, 0);
+            match = simple_pattern_matches_string_extract(
+                main_qwd->nodes_sp, local_qwd.host_snapshot->hostname, NULL, 0);
             if(match == SP_NOT_MATCHED) {
                 match = simple_pattern_matches_extract(main_qwd->nodes_sp, host->machine_guid, NULL, 0);
                 if(match == SP_NOT_MATCHED && *uuid)
@@ -1198,7 +1263,7 @@ static size_t registered_results_to_json_multinode_group_by(
                 buffer_fast_strcat(key, "@", 1);
                 buffer_fast_strcat(name, "@", 1);
                 buffer_strcat(key, node_uuid);
-                buffer_strcat(name, rrdhost_hostname(t->host));
+                buffer_strcat(name, string2str(t->hostname));
             }
         }
         if(qwd->qwr->group_by.group_by & RRDR_GROUP_BY_NODE) {
@@ -1208,7 +1273,7 @@ static size_t registered_results_to_json_multinode_group_by(
             }
 
             buffer_strcat(key, node_uuid);
-            buffer_strcat(name, rrdhost_hostname(t->host));
+            buffer_strcat(name, string2str(t->hostname));
         }
         if(qwd->qwr->group_by.group_by & RRDR_GROUP_BY_CONTEXT) {
             if(buffer_strlen(key)) {
@@ -1550,7 +1615,7 @@ cleanup:
 }
 
 static void rrdset_metric_correlations_ks2(
-        RRDHOST *host,
+        RRDHOST *host, STRING *hostname,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
         time_t baseline_after, time_t baseline_before,
@@ -1605,7 +1670,7 @@ static void rrdset_metric_correlations_ks2(
 
         // to spread the results evenly, 0.0 needs to be the less correlated and 1.0 the most correlated
         // so, we flip the result of kstwo()
-        register_result(results, host, rca, ria, rma, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, &highlighted_sp,
+        register_result(results, host, hostname, rca, ria, rma, 1.0 - prob, RESULT_IS_BASE_HIGH_RATIO, &highlighted_sp,
                         &baseline_sp, stats, register_zero, ended_ut - started_ut);
     }
 
@@ -1627,7 +1692,7 @@ static void merge_query_value_to_stats(QUERY_VALUE *qv, WEIGHTS_STATS *stats, si
 }
 
 static void rrdset_metric_correlations_volume(
-        RRDHOST *host,
+        RRDHOST *host, STRING *hostname,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
         time_t baseline_after, time_t baseline_before,
@@ -1694,7 +1759,7 @@ static void rrdset_metric_correlations_volume(
         pcent = highlight_countif.value;
     }
 
-    register_result(results, host, rca, ria, rma, pcent, flags, &highlight_average.sp, &baseline_average.sp, stats,
+    register_result(results, host, hostname, rca, ria, rma, pcent, flags, &highlight_average.sp, &baseline_average.sp, stats,
                     register_zero, baseline_average.duration_ut + highlight_average.duration_ut + highlight_countif.duration_ut);
 }
 
@@ -1702,7 +1767,7 @@ static void rrdset_metric_correlations_volume(
 // VALUE / ANOMALY RATE algorithm functions
 
 static void rrdset_weights_value(
-        RRDHOST *host,
+        RRDHOST *host, STRING *hostname,
         RRDCONTEXT_ACQUIRED *rca, RRDINSTANCE_ACQUIRED *ria, RRDMETRIC_ACQUIRED *rma,
         DICTIONARY *results,
         time_t after, time_t before,
@@ -1719,7 +1784,7 @@ static void rrdset_weights_value(
     merge_query_value_to_stats(&qv, stats, 1);
 
     if(netdata_double_isnumber(qv.value))
-        register_result(results, host, rca, ria, rma, qv.value, 0, &qv.sp, NULL, stats, register_zero, qv.duration_ut);
+        register_result(results, host, hostname, rca, ria, rma, qv.value, 0, &qv.sp, NULL, stats, register_zero, qv.duration_ut);
 }
 
 static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qwd) {
@@ -1765,6 +1830,8 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
     };
 
     size_t queries = 0;
+    RRDHOST *last_host = NULL;
+    struct weights_host_snapshot *host_snapshot = NULL;
     for(size_t d = 0; d < r->d ;d++) {
         qwd->examined_dimensions++;
 
@@ -1786,7 +1853,12 @@ static void rrdset_weights_multi_dimensional_value(struct query_weights_data *qw
             QUERY_CONTEXT *qc = query_context(r->internal.qt, qm->link.query_context_id);
             QUERY_NODE *qn = query_node(r->internal.qt, qm->link.query_node_id);
 
-            register_result(qwd->results, qn->rrdhost, qc->rca, qi->ria, qd->rma, qv.value, 0,
+            if(!host_snapshot || qn->rrdhost != last_host) {
+                last_host = qn->rrdhost;
+                host_snapshot = weights_host_snapshot_get(qwd->host_snapshots, last_host);
+            }
+
+            register_result(qwd->results, qn->rrdhost, host_snapshot->hostname, qc->rca, qi->ria, qd->rma, qv.value, 0,
                             &r->internal.qt->query.array[d].query_points, NULL,
                             &qwd->stats, qwd->register_zero, qm->duration_ut);
         }
@@ -1969,7 +2041,7 @@ static int registered_results_to_json_mcp_callback(const DICTIONARY_ITEM *item _
 
     // Add metadata
     // Add node name
-    buffer_json_add_array_item_string(wb, rrdhost_hostname(t->host));
+    buffer_json_add_array_item_string(wb, string2str(t->hostname));
     
     // Add context
     buffer_json_add_array_item_string(wb, rrdcontext_acquired_id(t->rca));
@@ -2115,7 +2187,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
     switch(qwr->method) {
         case WEIGHTS_METHOD_VALUE:
             rrdset_weights_value(
-                    host, rca, ria, rma,
+                    host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->after, qwr->before,
                     qwr->options, qwr->time_group_method, qwr->time_group_options, qwr->tier,
@@ -2126,7 +2198,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
         case WEIGHTS_METHOD_ANOMALY_RATE:
             qwr->options |= RRDR_OPTION_ANOMALY_BIT;
             rrdset_weights_value(
-                    host, rca, ria, rma,
+                    host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->after, qwr->before,
                     qwr->options, qwr->time_group_method, qwr->time_group_options, qwr->tier,
@@ -2136,7 +2208,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
 
         case WEIGHTS_METHOD_MC_VOLUME:
             rrdset_metric_correlations_volume(
-                    host, rca, ria, rma,
+                    host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->baseline_after, qwr->baseline_before,
                     qwr->after, qwr->before,
@@ -2148,7 +2220,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
         default:
         case WEIGHTS_METHOD_MC_KS2:
             rrdset_metric_correlations_ks2(
-                    host, rca, ria, rma,
+                    host, qwd->host_snapshot->hostname, rca, ria, rma,
                     qwd->results,
                     qwr->baseline_after, qwr->baseline_before,
                     qwr->after, qwr->before, qwr->points,
@@ -2379,6 +2451,9 @@ static ssize_t weights_do_node_callback(void *data, RRDHOST *host, bool queryabl
 
     struct query_weights_data *qwd = data;
 
+    if(!qwd->host_snapshot || qwd->host_snapshot->host != host)
+        qwd->host_snapshot = weights_host_snapshot_get(qwd->host_snapshots, host);
+
     ssize_t ret = query_scope_foreach_context(host, qwd->qwr->scope_contexts,
                                 qwd->scope_contexts_sp, qwd->contexts_sp,
                                 weights_do_context_callback, queryable, qwd);
@@ -2422,6 +2497,7 @@ int web_api_v12_weights(BUFFER *wb, QUERY_WEIGHTS_REQUEST *qwr) {
             .examined_dimensions = 0,
             .register_zero = true,
             .results = register_result_init(),
+            .host_snapshots = weights_host_snapshots_init(),
             .stats = {},
             .shifts = 0,
             .total_workload = {0}, // Initialize workload statistics
@@ -2645,6 +2721,7 @@ cleanup:
     pattern_array_free(qwd.labels_pa);
 
     register_result_destroy(qwd.results);
+    dictionary_destroy(qwd.host_snapshots);
 
     if(error) {
         buffer_flush(wb);
