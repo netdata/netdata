@@ -909,7 +909,7 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     // before startup completes.  Also skip during shutdown to avoid a deadlock
     // with active collectors.
     nd_win_trace("daemon_status_file_refresh: rrdstats_metadata_collect");
-    if(status != DAEMON_STATUS_INITIALIZING && !exit_initiated_get())
+    if(session_status.status != DAEMON_STATUS_INITIALIZING && !exit_initiated_get())
         session_status.metrics_metadata = rrdstats_metadata_collect();
 
     // Update disk footprint at most once every 10 minutes (600 seconds).
