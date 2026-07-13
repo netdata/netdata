@@ -372,6 +372,8 @@ impl ConfigOverride {
     /// Reject overrides that parse but are not valid in their position.
     /// `journal_dir` (the former plugin's read-only journal location) is a
     /// logs-only key; there are no legacy traces journals to point at.
+    /// `tempo` (the Tempo HTTP shim) is traces-only; there is no logs
+    /// query surface behind it.
     fn validate(&self) -> Result<()> {
         if self
             .traces
@@ -381,6 +383,12 @@ impl ConfigOverride {
             anyhow::bail!(
                 "traces.journal_dir is not a valid option: journal_dir points at the \
                  former plugin's log journals and is only accepted under 'logs:'"
+            );
+        }
+        if self.logs.as_ref().is_some_and(|l| l.tempo.is_some()) {
+            anyhow::bail!(
+                "logs.tempo is not a valid option: the Tempo shim serves the traces \
+                 query engine and is only accepted under 'traces:'"
             );
         }
         Ok(())
@@ -887,6 +895,30 @@ logs:
             resolve_with_user("traces:\n  journal_dir: /var/log/netdata/otel/v1\n").unwrap_err();
         assert!(
             format!("{err:#}").contains("traces.journal_dir is not a valid option"),
+            "{err:#}"
+        );
+    }
+
+    #[test]
+    fn tempo_accepted_under_traces_only() {
+        // Stock default: disabled, localhost:3200.
+        let config = resolve_with_user("").unwrap();
+        assert!(!config.traces.tempo.enabled);
+        assert_eq!(config.traces.tempo.bind, "127.0.0.1:3200");
+
+        // The traces override merges into the lifecycle config.
+        let config =
+            resolve_with_user("traces:\n  tempo:\n    enabled: true\n    bind: \"0.0.0.0:3200\"\n")
+                .unwrap();
+        assert!(config.traces.tempo.enabled);
+        assert_eq!(config.traces.tempo.bind, "0.0.0.0:3200");
+        let lifecycle = config.lifecycle_for(bridge::signals::Signal::Traces);
+        assert!(lifecycle.tempo.enabled);
+        // Logs never grow a Tempo listener.
+        assert!(!config.logs.tempo.enabled);
+        let err = resolve_with_user("logs:\n  tempo:\n    enabled: true\n").unwrap_err();
+        assert!(
+            format!("{err:#}").contains("logs.tempo is not a valid option"),
             "{err:#}"
         );
     }

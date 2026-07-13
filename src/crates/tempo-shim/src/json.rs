@@ -103,9 +103,11 @@ fn summary_json(t: &TraceSummary, kinds: &HashMap<&str, ValueKind>) -> Value {
 
 /// One `tempopb.Span` inside a spanSet: hex ids as strings, nanosecond
 /// uint64s as strings, span-level attributes typed by schema kind.
+/// Fields insert in a fixed order (proto tag order) — with
+/// `preserve_order` the emission order IS the insertion order, so it
+/// must not depend on the span's field iteration.
 fn span_json(s: &sfst::TraceSpan, kinds: &HashMap<&str, ValueKind>) -> Value {
-    let mut out = Map::new();
-    out.insert("spanID".to_string(), json!(s.span_id.to_string()));
+    let mut name = "";
     let mut attributes = Vec::new();
     for (key, token) in &s.fields {
         if let Some(attr) = key.strip_prefix("attributes.") {
@@ -113,9 +115,14 @@ fn span_json(s: &sfst::TraceSpan, kinds: &HashMap<&str, ValueKind>) -> Value {
                 "key": attr,
                 "value": any_value_json(kinds.get(key.as_str()), token),
             }));
-        } else if key == "name" && !token.is_empty() {
-            out.insert("name".to_string(), json!(token));
+        } else if key == "name" {
+            name = token;
         }
+    }
+    let mut out = Map::new();
+    out.insert("spanID".to_string(), json!(s.span_id.to_string()));
+    if !name.is_empty() {
+        out.insert("name".to_string(), json!(name));
     }
     if s.start_ns > 0 {
         out.insert("startTimeUnixNano".to_string(), json!(s.start_ns.to_string()));

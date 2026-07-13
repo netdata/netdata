@@ -35,6 +35,19 @@ pub(super) struct SignalOverride {
     /// by `resolve_legacy_journal_dir` reading the raw file, not merged here.
     #[serde(default)]
     pub(super) journal_dir: Option<PathBuf>,
+    /// The Tempo HTTP API shim (temporary scaffolding for Grafana). Valid
+    /// under `traces:` only — rejected for `logs:` at resolve.
+    #[serde(default)]
+    pub(super) tempo: Option<TempoOverride>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(super) struct TempoOverride {
+    #[serde(default)]
+    pub(super) enabled: Option<bool>,
+    #[serde(default)]
+    pub(super) bind: Option<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -102,6 +115,7 @@ impl SignalOverride {
             || self.catalog.as_ref().is_some_and(|c| c.has_any())
             || self.ingest.as_ref().is_some_and(|i| i.has_any())
             || self.journal_dir.is_some()
+            || self.tempo.is_some()
     }
 }
 
@@ -154,6 +168,14 @@ pub(super) fn apply_signal(config: &mut SignalConfig, o: &SignalOverride) {
         }
         if let Some(v) = i.future_skew {
             config.ingest.future_skew = v;
+        }
+    }
+    if let Some(t) = &o.tempo {
+        if let Some(v) = t.enabled {
+            config.tempo.enabled = v;
+        }
+        if let Some(v) = &t.bind {
+            config.tempo.bind = v.clone();
         }
     }
 }

@@ -27,6 +27,7 @@ mod pipeline;
 mod retention;
 mod rpc;
 mod traces_pipeline;
+mod traces_query;
 mod uploader;
 
 use file_lifecycle::Pipeline;
@@ -284,8 +285,11 @@ impl Ledger {
 
         // The traces pipeline: shares the same cleaner/uploader/storage but has
         // its own `{base}/traces/...` dirs, the traces seal
-        // (`ng_index::build_sfst_traces_file`), and a stub query handler until
-        // the traces query engine lands (plan decision D5).
+        // (`ng_index::build_sfst_traces_file`), a stub Function handler (plan
+        // decision D5 — no traces Function/MCP surface yet), and the optional
+        // Tempo HTTP shim (config `traces.tempo`), which shares the process-
+        // global chunk cache (seqs are process-global, so keys never collide
+        // with logs).
         let traces = traces_pipeline::build_traces_pipeline(
             Signal::Traces,
             traces_lifecycle,
@@ -296,6 +300,7 @@ impl Ledger {
             &mut cleaner,
             uploader.as_mut(),
             storage.as_ref(),
+            chunk_cache.clone(),
             &pipeline_tx,
         )
         .await?;

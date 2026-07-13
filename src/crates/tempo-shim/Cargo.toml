@@ -18,4 +18,16 @@ sfsq = { workspace = true }
 thiserror = { workspace = true }
 opentelemetry-proto = { workspace = true }
 prost = { workspace = true }
-serde_json = { workspace = true }
+# preserve_order pins the serializer to insertion order regardless of
+# workspace feature unification (other crates enable it; without it here
+# a standalone build would silently reorder to BTreeMap-alphabetical and
+# the golden fixtures would depend on the build context).
+serde_json = { workspace = true, features = ["preserve_order"] }
+async-trait = { workspace = true }
+axum = { workspace = true }
+tokio = { workspace = true }
+tokio-util = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tower = { workspace = true, features = ["util"] }

@@ -104,6 +104,7 @@ impl PluginConfig {
             },
             ingest: tuning.ingest.clone(),
             read_cache_dir: root.join("remote-read"),
+            tempo: tuning.tempo.clone(),
         }
     }
 
@@ -219,6 +220,11 @@ pub struct SignalConfig {
     /// Ingestion time-bounds (P3): reject out-of-window records per-record.
     #[serde(default)]
     pub ingest: IngestConfig,
+    /// The Tempo HTTP API shim (temporary scaffolding for Grafana).
+    /// Meaningful under `traces:` only — the plugin's config resolve
+    /// rejects it under `logs:`; it defaults to disabled everywhere.
+    #[serde(default)]
+    pub tempo: TempoConfig,
 }
 
 impl Default for SignalConfig {
@@ -230,6 +236,7 @@ impl Default for SignalConfig {
             retention: RetentionPolicy::default(),
             catalog: CatalogTuning::default(),
             ingest: IngestConfig::default(),
+            tempo: TempoConfig::default(),
         }
     }
 }
@@ -335,6 +342,37 @@ pub struct LifecycleConfig {
     /// (`{base_dir}/{signal}/remote-read`). Used only when the shell has remote
     /// storage enabled.
     pub read_cache_dir: PathBuf,
+    /// The Tempo shim listener (traces only; disabled by default).
+    pub tempo: TempoConfig,
+}
+
+/// The Tempo HTTP API shim: a Grafana-compatible query surface over the
+/// traces query engine, served by the ledger worker on its own socket.
+/// TEMPORARY SCAFFOLDING (SOW-20260712-traces-tempo-shim): off in stock
+/// config, bound to localhost by default, no auth — exposing it beyond
+/// localhost is the operator's documented call.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TempoConfig {
+    /// Whether the shim's HTTP listener starts at all.
+    #[serde(default)]
+    pub enabled: bool,
+    /// Listen address; 3200 is the Tempo community-convention port.
+    #[serde(default = "default_tempo_bind")]
+    pub bind: String,
+}
+
+impl Default for TempoConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            bind: default_tempo_bind(),
+        }
+    }
+}
+
+fn default_tempo_bind() -> String {
+    "127.0.0.1:3200".to_string()
 }
 
 /// Remote object storage configuration. Global across signals: one on/off and

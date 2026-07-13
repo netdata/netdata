@@ -77,7 +77,7 @@ fn search_response_golden() {
     // `{}`, no spanSet/serviceStats/status fields.
     assert_eq!(
         search_response_json(&data),
-        r#"{"metrics":{},"traces":[{"durationMs":42,"rootServiceName":"cart","rootTraceName":"GET /cart","spanSets":[{"matched":2,"spans":[{"attributes":[{"key":"http.status_code","value":{"intValue":"500"}},{"key":"ratio","value":{"doubleValue":0.5}},{"key":"note","value":{"stringValue":"x"}}],"durationNanos":"250000","name":"GET /cart","spanID":"0102030405060708","startTimeUnixNano":"1700000000000000001"}]}],"startTimeUnixNano":"1700000000000000001","traceID":"0af7651916cd43dd8448eb211c80319c"}]}"#
+        r#"{"traces":[{"traceID":"0af7651916cd43dd8448eb211c80319c","rootServiceName":"cart","rootTraceName":"GET /cart","startTimeUnixNano":"1700000000000000001","durationMs":42,"spanSets":[{"spans":[{"spanID":"0102030405060708","name":"GET /cart","startTimeUnixNano":"1700000000000000001","durationNanos":"250000","attributes":[{"key":"http.status_code","value":{"intValue":"500"}},{"key":"ratio","value":{"doubleValue":0.5}},{"key":"note","value":{"stringValue":"x"}}]}],"matched":2}]}],"metrics":{}}"#
     );
 }
 
@@ -106,7 +106,7 @@ fn search_response_empty_and_zero_omission() {
     };
     assert_eq!(
         search_response_json(&data),
-        r#"{"metrics":{},"traces":[{"traceID":"0af7651916cd43dd8448eb211c80319c"}]}"#
+        r#"{"traces":[{"traceID":"0af7651916cd43dd8448eb211c80319c"}],"metrics":{}}"#
     );
 }
 
@@ -153,7 +153,7 @@ fn tag_names_golden() {
     };
     assert_eq!(
         tag_names_json(&data),
-        r#"{"metrics":{},"scopes":[{"name":"resource","tags":["service.name"]},{"name":"span","tags":["http.route","http.status_code"]},{"name":"intrinsic","tags":["name","span:parentID","link:traceID"]}]}"#
+        r#"{"scopes":[{"name":"resource","tags":["service.name"]},{"name":"span","tags":["http.route","http.status_code"]},{"name":"intrinsic","tags":["name","span:parentID","link:traceID"]}],"metrics":{}}"#
     );
     // No keys at all → jsonpb omits the empty repeated field.
     let empty = TagNamesData {
@@ -179,7 +179,7 @@ fn tag_values_golden() {
     };
     assert_eq!(
         tag_values_json(&data, TagValueStyle::Typed),
-        r#"{"metrics":{},"tagValues":[{"type":"string","value":"cart"},{"type":"int","value":"7"},{"type":"float","value":"0.5"},{"type":"bool","value":"true"},{"type":"string","value":"kindless"}]}"#
+        r#"{"tagValues":[{"type":"string","value":"cart"},{"type":"int","value":"7"},{"type":"float","value":"0.5"},{"type":"bool","value":"true"},{"type":"string","value":"kindless"}],"metrics":{}}"#
     );
     let empty = TagValuesData {
         values: Vec::new(),
@@ -206,7 +206,7 @@ fn tag_values_enum_keywords() {
     };
     assert_eq!(
         tag_values_json(&kinds, TagValueStyle::KindKeywords),
-        r#"{"metrics":{},"tagValues":[{"type":"keyword","value":"server"},{"type":"keyword","value":"client"},{"type":"keyword","value":"WEIRD"}]}"#
+        r#"{"tagValues":[{"type":"keyword","value":"server"},{"type":"keyword","value":"client"},{"type":"keyword","value":"WEIRD"}],"metrics":{}}"#
     );
     let statuses = TagValuesData {
         values: vec![
@@ -218,6 +218,6 @@ fn tag_values_enum_keywords() {
     };
     assert_eq!(
         tag_values_json(&statuses, TagValueStyle::StatusKeywords),
-        r#"{"metrics":{},"tagValues":[{"type":"keyword","value":"error"},{"type":"keyword","value":"ok"}]}"#
+        r#"{"tagValues":[{"type":"keyword","value":"error"},{"type":"keyword","value":"ok"}],"metrics":{}}"#
     );
 }

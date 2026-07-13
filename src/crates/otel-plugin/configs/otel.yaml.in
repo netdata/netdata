@@ -118,3 +118,12 @@ traces:
     # Per-tenant overrides (any subset of the fields above):
     # my-tenant:
     #   max_age: "30 days"
+
+  # Grafana Tempo-compatible HTTP API over the stored traces (echo,
+  # trace-by-id, search, tag autocomplete). Point a stock Grafana Tempo
+  # datasource at the bind address (leave the datasource's gRPC
+  # streaming option off). No authentication: keep the bind on
+  # localhost unless the network path to it is trusted.
+  # tempo:
+  #   enabled: false
+  #   bind: "127.0.0.1:3200"
