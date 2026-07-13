@@ -489,6 +489,30 @@ void query_weights_worker_thread(void *arg)
     thread_data->local_anomaly_bit_used = false;
     memset(&thread_data->local_versions, 0, sizeof(struct query_versions));
 
+    // Copy only immutable query inputs; mutable state is shared atomically or owned by this worker.
+    struct query_weights_data local_qwd = {
+        .qwr = main_qwd->qwr,
+        .shared_qwd = main_qwd,
+        .scope_contexts_sp = main_qwd->scope_contexts_sp,
+        .scope_instances_sp = main_qwd->scope_instances_sp,
+        .scope_dimensions_sp = main_qwd->scope_dimensions_sp,
+        .contexts_sp = main_qwd->contexts_sp,
+        .instances_sp = main_qwd->instances_sp,
+        .dimensions_sp = main_qwd->dimensions_sp,
+        .alerts_sp = main_qwd->alerts_sp,
+        .scope_labels_pa = main_qwd->scope_labels_pa,
+        .labels_pa = main_qwd->labels_pa,
+        .timeout_us = main_qwd->timeout_us,
+        .timings.received_ut = main_qwd->timings.received_ut,
+        .examined_dimensions = thread_data->local_examined_dimensions,
+        .anomaly_bit_used = thread_data->local_anomaly_bit_used,
+        .register_zero = main_qwd->register_zero,
+        .results = thread_data->local_results,
+        .host_snapshots = main_qwd->host_snapshots,
+        .stats = thread_data->local_stats,
+        .shifts = main_qwd->shifts,
+    };
+
     // Process assigned hosts
     for (size_t i = 0; i < thread_data->host_count; i++) {
         RRDHOST *host = thread_data->hosts[i];
@@ -512,15 +536,6 @@ void query_weights_worker_thread(void *arg)
             __atomic_store_n(&main_qwd->interrupted, true, __ATOMIC_RELAXED);
             break;
         }
-
-        // Create a local query_weights_data for this thread
-        struct query_weights_data local_qwd = *main_qwd;
-        local_qwd.shared_qwd = main_qwd;
-        local_qwd.results = thread_data->local_results;
-        local_qwd.stats = thread_data->local_stats;
-        local_qwd.examined_dimensions = thread_data->local_examined_dimensions;
-        local_qwd.anomaly_bit_used = thread_data->local_anomaly_bit_used;
-        local_qwd.versions = thread_data->local_versions;
 
         char uuid[UUID_STR_LEN];
         if(!UUIDiszero(host->node_id))
