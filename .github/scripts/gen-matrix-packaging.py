@@ -31,25 +31,19 @@ for item in data.include:
     if item.packages is not None:
         for arch in item.packages.arches:
             if arch in ALWAYS_RUN_ARCHES or not run_limited:
-                entry = {
+                entries.append({
                     'distro': item.distro,
                     'version': item.version,
                     'repo_distro': item.packages.repo_distro,
                     'format': str(item.packages.type),
                     'builder_rev': item.packages.builder_rev,
+                    'base_image': item.base_image,
                     'platform': str(data.platform_map[arch]),
                     'bundle_sentry': item.bundle_sentry[arch],
                     'arch': str(arch),
                     'runner': data.arch_data[arch].runner,
                     'qemu': data.arch_data[arch].qemu,
-                }
-
-            if item.base_image is not None:
-                entry['distro'] = item.base_image
-            else:
-                entry['distro'] = ':'.join([item.distro, item.version])
-
-            entries.append(entry)
+                })
 
 entries.sort(key=lambda k: (data.arch_order.index(distros.Arch(k['arch'])), k['distro'], k['version']))
 matrix = json.dumps({'include': entries}, sort_keys=True)
