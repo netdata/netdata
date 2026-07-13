@@ -65,9 +65,6 @@ int aclk_disable_runtime = 0;
 
 ACLK_DISCONNECT_ACTION disconnect_req = ACLK_NO_DISCONNECT;
 
-usec_t aclk_session_us = 0;
-time_t aclk_session_sec = 0;
-
 time_t last_conn_time_mqtt = 0;
 time_t last_conn_time_appl = 0;
 time_t last_disconnect_time = 0;
@@ -752,9 +749,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         }
 #endif
 
-        aclk_session_newarch = now_realtime_usec();
-        aclk_session_sec = aclk_session_newarch / USEC_PER_SEC;
-        aclk_session_us = aclk_session_newarch % USEC_PER_SEC;
+        aclk_session_store(now_realtime_usec());
 
         mqtt_conn_params.will_msg = aclk_generate_lwt(&mqtt_conn_params.will_msg_len);
 
@@ -1007,7 +1002,7 @@ void aclk_update_node_instance_job(RRDHOST *host, int live, int queryable, struc
         .hops = hops,
         .live = live,
         .queryable = queryable,
-        .session_id = aclk_session_newarch};
+        .session_id = aclk_session_load()};
 
     char node_id[UUID_STR_LEN];
     uuid_unparse_lower(host->node_id.uuid, node_id);
