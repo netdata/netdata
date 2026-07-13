@@ -111,7 +111,7 @@ Add your own labels to categorize systems by any criteria you need.
     ```
 
     :::note Windows
-    On Windows, Netdata configuration lives at `C:\Program Files\Netdata\etc\netdata` and there is no `sudo`. Open the bundled MSYS2 shell — for example `Win + R`, then `"C:\Program Files\Netdata\msys2.exe"` — and edit `netdata.conf`:
+    On Windows, Netdata configuration lives at `C:\Program Files\Netdata\etc\netdata` (default install location) and there is no `sudo`. Open the bundled MSYS2 shell — for example `Win + R`, then `"C:\Program Files\Netdata\msys2.exe"` — and edit `netdata.conf`:
 
     ```bash
     cd /etc/netdata
@@ -126,7 +126,7 @@ Add your own labels to categorize systems by any criteria you need.
     & "C:\Program Files\Netdata\usr\bin\netdatacli.exe" reload-labels
     ```
 
-    Verify your labels at `http://localhost:19999/api/v1/info`. See [editing configuration files on Windows](/packaging/windows/WINDOWS_INSTALLER.md#editing-configuration-files) for the full MSYS2 environment workflow.
+    Verify your labels at `http://HOST-IP:19999/api/v1/info`. See [editing configuration files on Windows](/packaging/windows/WINDOWS_INSTALLER.md#editing-configuration-files) for the full MSYS2 environment workflow.
     :::
 
 2. Add a `[host labels]` section:
