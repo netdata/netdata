@@ -55,7 +55,7 @@ pub async fn run_worker(socket_path: &str) -> Result<()> {
     let config = match conn.recv().await? {
         IngestorRequest::Configure(config) => {
             tracing::info!("received plugin configuration from supervisor");
-            config
+            *config
         }
         other => {
             anyhow::bail!("expected Configure, got {:?}", other);

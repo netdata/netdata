@@ -37,7 +37,7 @@ pub const IPC_MAX_MESSAGE_SIZE: usize = 16 * 1024 * 1024;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IngestorRequest {
     /// Configuration for the worker (sent once after connection).
-    Configure(PluginConfig),
+    Configure(Box<PluginConfig>),
     /// Execute a function.
     Call {
         transaction: String,
@@ -77,7 +77,7 @@ pub enum IngestorResponse {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum LedgerRequest {
     /// Configuration for the worker (sent once after connection).
-    Configure(PluginConfig),
+    Configure(Box<PluginConfig>),
     /// Execute a function.
     Call {
         transaction: String,
