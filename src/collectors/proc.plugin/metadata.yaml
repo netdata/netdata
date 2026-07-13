@@ -2763,9 +2763,9 @@ modules:
           description: ""
           labels:
             - name: interface_type
-              description: TBD
+              description: "Either `virtual` (for virtual/software interfaces) or `real` (for physical interfaces)."
             - name: device
-              description: TBD
+              description: "The network interface name (e.g., `eth0`, `wlan0`)."
           metrics:
             - name: net.net
               description: Bandwidth
