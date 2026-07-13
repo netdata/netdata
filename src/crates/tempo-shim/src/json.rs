@@ -164,6 +164,9 @@ fn any_value_json(kind: Option<&ValueKind>, token: &str) -> Value {
 /// engine keys grouped per scope, intrinsics under the `intrinsic`
 /// scope with their wire names (16A — the name table lives here).
 pub fn tag_names_json(data: &TagNamesData) -> String {
+    // The engine delivers `keys` sorted by `(TagScope, TagKey)`
+    // (BTreeSet), so first-seen grouping yields the canonical scope
+    // order (Resource, Span, Instrumentation, Event, Link, Intrinsic).
     let mut scopes: Vec<(&'static str, Vec<String>)> = Vec::new();
     for (scope, key) in &data.keys {
         let wire = scope_wire_name(*scope);

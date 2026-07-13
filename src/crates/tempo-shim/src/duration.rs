@@ -3,9 +3,12 @@
 //! The form's duration input admits decimals and the full unit set —
 //! validation regex `\d+(?:\.\d)?\d*(?:us|µs|ns|ms|s|m|h)`
 //! (`SearchTraceQLEditor/DurationInput.tsx:16`) — so the parser accepts
-//! `300µs`, `1.2ms`, `2m`, `1h`, not just integral `100ms`. The engine
-//! takes durations as [`sfsq::traces::PredicateValue::Integer`]
-//! nanoseconds.
+//! `300µs`, `1.2ms`, `2m`, `1h`, not just integral `100ms`. The parser
+//! is deliberately a little MORE permissive than that regex (`.5ms`,
+//! `5.ms` parse); the form never generates those shapes, and rejecting
+//! them would only make the raw editor stricter for no benefit. The
+//! engine takes durations as
+//! [`sfsq::traces::PredicateValue::Integer`] nanoseconds.
 
 /// Parse a duration literal to nanoseconds. Errors carry the human
 /// reason (the caller wraps position/literal context).
