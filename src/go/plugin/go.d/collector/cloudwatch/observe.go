@@ -3,204 +3,171 @@
 package cloudwatch
 
 import (
-	"strings"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 )
 
-// observedSeries caches the last value written for a series so that not-due
-// series (e.g. daily S3 metrics queried far less often than the collect cycle)
-// are re-emitted every cycle and stay continuously visible.
-type observedSeries struct {
-	seriesName string
-	labels     []metrix.Label
-	tagLabels  []metrix.Label // non-identity enrichment; re-emitted with the series, not in observedKey
-	value      float64
-	groupKey   queryGroupKey // (account, region, effective period) — the scheduling unit
+type queryState struct {
+	lastCompletedEnd time.Time
+	retryWindowEnd   time.Time
+	nextRetryAt      time.Time
+	transientCount   int
+	observationAt    time.Time
+	observation      float64
+	hasObservation   bool
+	emitZero         bool
 }
 
-// observationStore owns the metric write path together with the per-series
-// retention cache and the per-(account, region, period) query schedule. Keeping these
-// together isolates retention/scheduling from the rest of the collector: it
-// re-emits not-due series every cycle so daily metrics stay visible, and prunes
-// series whose instance has disappeared from discovery.
+type queryOutcomeKind uint8
+
+const (
+	queryOutcomeTransient queryOutcomeKind = iota
+	queryOutcomeComplete
+	queryOutcomeForbidden
+)
+
+type queryOutcome struct {
+	kind         queryOutcomeKind
+	windowStart  time.Time
+	windowEnd    time.Time
+	completedAt  time.Time
+	datapointAt  time.Time
+	value        float64
+	hasDatapoint bool
+}
+
+// observationStore owns per-query completion and retained numeric state. Query
+// identity includes target, structural AWS query, series identity, and policy,
+// so only an exactly equivalent rebuilt query can retain state.
 type observationStore struct {
-	store        metrix.CollectorStore
-	lastObserved map[string]observedSeries   // last value per series, for retention re-emit
-	nextQueryAt  map[queryGroupKey]time.Time // next due time per (account, region, effective period)
+	store   metrix.CollectorStore
+	queries map[structuralID]queryState
 }
 
 func newObservationStore(store metrix.CollectorStore) *observationStore {
 	return &observationStore{
-		store:        store,
-		lastObserved: make(map[string]observedSeries),
-		nextQueryAt:  make(map[queryGroupKey]time.Time),
+		store:   store,
+		queries: make(map[structuralID]queryState),
 	}
 }
 
 // reset clears the retention cache and schedule so a framework re-Init starts
 // clean (the metrix store itself persists and is reused).
 func (o *observationStore) reset() {
-	o.lastObserved = make(map[string]observedSeries)
-	o.nextQueryAt = make(map[queryGroupKey]time.Time)
+	o.queries = make(map[structuralID]queryState)
 }
 
-// dueGroups returns the set of (account, region, period) groups due for querying at now.
-// It does NOT advance the schedule — the caller advances nextQueryAt only for
-// groups that actually succeeded, so a transient failure is retried next cycle
-// rather than skipped for a full period. Scheduling is per (account, region, period) so a
-// failure in one region does not force healthy regions of the same period to
-// re-query early. A group not yet scheduled is always due (first cycle).
-func (o *observationStore) dueGroups(plan []plannedQuery, now time.Time) map[queryGroupKey]bool {
-	groups := make(map[queryGroupKey]struct{})
-	for _, pq := range plan {
-		groups[pq.groupKey()] = struct{}{}
-	}
-
-	due := make(map[queryGroupKey]bool, len(groups))
-	for key := range groups {
-		next, scheduled := o.nextQueryAt[key]
-		if !scheduled || !now.Before(next) {
-			due[key] = true
+func (o *observationStore) dueQueries(plan []plannedQuery, now time.Time) []plannedQuery {
+	due := make([]plannedQuery, 0, len(plan))
+	for _, query := range plan {
+		_, end := queryWindow(now, query.policy)
+		state, ok := o.queries[query.key]
+		if queryIsDue(state, ok, end, now) {
+			due = append(due, query)
 		}
 	}
 	return due
 }
 
-// advanceSchedule pushes each successfully-queried group's next-query time
-// forward by its period.
-func (o *observationStore) advanceSchedule(queried map[queryGroupKey]bool, now time.Time) {
-	for key := range queried {
-		o.nextQueryAt[key] = now.Add(time.Duration(key.period) * time.Second)
+func queryIsDue(state queryState, exists bool, windowEnd, now time.Time) bool {
+	if !exists {
+		return true
 	}
+	if !state.lastCompletedEnd.Before(windowEnd) || state.retryWindowEnd.After(windowEnd) {
+		return false
+	}
+	return state.retryWindowEnd.Before(windowEnd) || !now.Before(state.nextRetryAt)
 }
 
-func filterDueQueries(plan []plannedQuery, due map[queryGroupKey]bool) []plannedQuery {
-	out := make([]plannedQuery, 0, len(plan))
-	for _, pq := range plan {
-		if due[pq.groupKey()] {
-			out = append(out, pq)
-		}
+func (o *observationStore) applyOutcomes(due []plannedQuery, outcomes map[structuralID]queryOutcome, retryBase time.Duration) error {
+	if len(outcomes) != len(due) {
+		return fmt.Errorf("CloudWatch query execution returned %d outcomes for %d due queries", len(outcomes), len(due))
 	}
-	return out
-}
-
-// observe writes this cycle's samples, reconciles due series that returned no
-// datapoint, and re-emits cached values for series whose period was NOT queried
-// this cycle (not due, or due-but-failed) so long-period metrics stay visible.
-//
-// dueQueries is every query issued this cycle; `queried` is the subset of
-// (account, region, period) groups that succeeded; `noData` is the set of query ids that
-// got a usable result with no datapoint. A due series with no sample is recorded
-// as 0 only when it is a genuine no-data result (in noData) AND its metric opts
-// into nil-as-zero; otherwise (a gauge, or a per-result error/absent id) its
-// cached value is dropped so it gaps until fresh data — no stale value, no false
-// 0. A cached value otherwise survives across cycles until its instance leaves
-// discovery and pruneObserved drops it.
-func (o *observationStore) observe(dueQueries []plannedQuery, samples []querySample, noData map[string]bool, queried map[queryGroupKey]bool) {
-	meter := o.store.Write().SnapshotMeter("")
-
-	observedThisCycle := make(map[string]bool, len(samples))
-	for _, s := range samples {
-		key := observedKey(s.seriesName, s.labels)
-		writeSample(meter, s.seriesName, s.labels, s.tagLabels, s.value)
-		o.lastObserved[key] = observedSeries{
-			seriesName: s.seriesName,
-			labels:     s.labels,
-			tagLabels:  s.tagLabels,
-			value:      s.value,
-			groupKey:   s.groupKey(),
+	for i, query := range due {
+		outcome, ok := outcomes[query.key]
+		if !ok {
+			return fmt.Errorf("CloudWatch query execution omitted outcome for due query at index %d", i)
 		}
-		observedThisCycle[key] = true
-	}
-
-	// Reconcile due series with no sample this cycle. Zero-fill only a genuine
-	// no-datapoint result (in noData) for a nil-as-zero metric; a per-result error
-	// (InternalError/Forbidden, not in noData) or a gauge drops its cache so the
-	// series gaps rather than recording a false 0.
-	for _, pq := range dueQueries {
-		if !queried[pq.groupKey()] {
-			continue // group failed this cycle: keep cache, re-emit below, retry next cycle
-		}
-		key := observedKey(pq.seriesName, pq.labels)
-		if observedThisCycle[key] {
-			continue // had a datapoint
-		}
-		if pq.nilAsZero && noData[pq.id] {
-			writeSample(meter, pq.seriesName, pq.labels, pq.tagLabels, 0)
-			o.lastObserved[key] = observedSeries{
-				seriesName: pq.seriesName,
-				labels:     pq.labels,
-				tagLabels:  pq.tagLabels,
-				value:      0,
-				groupKey:   pq.groupKey(),
-			}
-			observedThisCycle[key] = true
-		} else {
-			delete(o.lastObserved, key) // genuine gap: stop re-emitting the last value
+		if outcome.completedAt.IsZero() {
+			return fmt.Errorf("CloudWatch query execution omitted completion time for due query at index %d", i)
 		}
 	}
 
-	for key, obs := range o.lastObserved {
-		if observedThisCycle[key] || queried[obs.groupKey] {
+	for _, query := range due {
+		outcome := outcomes[query.key]
+		if outcome.kind == queryOutcomeTransient {
+			o.markTransient(query, outcome, retryBase)
 			continue
 		}
-		writeSample(meter, obs.seriesName, obs.labels, obs.tagLabels, obs.value)
+
+		state := o.queries[query.key]
+		state.retryWindowEnd = time.Time{}
+		state.nextRetryAt = time.Time{}
+		state.transientCount = 0
+		state.lastCompletedEnd = outcome.windowEnd
+		if outcome.kind == queryOutcomeForbidden {
+			state.hasObservation = false
+			state.emitZero = false
+			o.queries[query.key] = state
+			continue
+		}
+
+		if outcome.hasDatapoint && !outcome.datapointAt.Before(outcome.windowStart) && !outcome.datapointAt.Add(query.policy.period).After(outcome.windowEnd) &&
+			(!state.hasObservation || !outcome.datapointAt.Before(state.observationAt)) {
+			state.observation = outcome.value
+			state.observationAt = outcome.datapointAt
+			state.hasObservation = true
+		}
+		if state.hasObservation && state.observationAt.Before(outcome.windowStart) {
+			state.hasObservation = false
+		}
+		state.emitZero = !state.hasObservation && query.nilAsZero
+		o.queries[query.key] = state
 	}
+	return nil
 }
 
-func writeSample(meter metrix.SnapshotMeter, seriesName string, labels, tagLabels []metrix.Label, value float64) {
-	// Identity labels are shared read-only across an instance's queries, so tag
-	// enrichment is concatenated into a FRESH slice, never appended onto labels.
-	// tagLabels are non-identity (not part of observedKey), so a tag change never
-	// churns retention/scheduling.
-	all := labels
-	if len(tagLabels) > 0 {
-		all = make([]metrix.Label, 0, len(labels)+len(tagLabels))
-		all = append(all, labels...)
-		all = append(all, tagLabels...)
+func (o *observationStore) markTransient(query plannedQuery, outcome queryOutcome, retryBase time.Duration) {
+	state := o.queries[query.key]
+	if !state.retryWindowEnd.Equal(outcome.windowEnd) {
+		state.transientCount = 0
 	}
-	// WithFloat marks the metric float-native; chartengine inherits that onto the
-	// chart dimension, so CloudWatch's fractional values render at full precision
-	// without injecting options.float per dimension.
-	meter.WithLabels(all...).Gauge(seriesName, metrix.WithFloat(true)).Observe(value)
+	state.transientCount++
+	state.retryWindowEnd = outcome.windowEnd
+	state.nextRetryAt = outcome.completedAt.Add(transientRetryDelay(retryBase, query.policy.period, state.transientCount))
+	o.queries[query.key] = state
 }
 
-// pruneObserved drops both the retention-cache entries and the per-(account, region,
-// period) schedule entries that are no longer in the current query plan. Dropping
-// the retention cache stops a removed resource from being re-emitted. Dropping the
-// schedule ensures a (account, region, period) group that fully left discovery and later
-// reappears is treated as unscheduled — and so queried on its first cycle back —
-// instead of waiting for a stale nextQueryAt (up to a full period, e.g. ~24h for a
-// daily group) to expire.
-func (o *observationStore) pruneObserved(plan []plannedQuery) {
-	validSeries := make(map[string]struct{}, len(plan))
-	validGroups := make(map[queryGroupKey]struct{})
-	for _, pq := range plan {
-		validSeries[observedKey(pq.seriesName, pq.labels)] = struct{}{}
-		validGroups[pq.groupKey()] = struct{}{}
+func transientRetryDelay(base, period time.Duration, count int) time.Duration {
+	if base <= 0 {
+		base = time.Minute
 	}
-	for key := range o.lastObserved {
-		if _, ok := validSeries[key]; !ok {
-			delete(o.lastObserved, key)
+	if period <= 0 {
+		return base
+	}
+	if base >= period {
+		return period
+	}
+	delay := base
+	for range max(0, count-1) {
+		if delay >= period/2 {
+			return period
+		}
+		delay *= 2
+	}
+	return delay
+}
+
+func (o *observationStore) reconcilePlan(current []plannedQuery) {
+	valid := make(map[structuralID]struct{}, len(current))
+	for _, query := range current {
+		valid[query.key] = struct{}{}
+	}
+	for key := range o.queries {
+		if _, ok := valid[key]; !ok {
+			delete(o.queries, key)
 		}
 	}
-	for key := range o.nextQueryAt {
-		if _, ok := validGroups[key]; !ok {
-			delete(o.nextQueryAt, key)
-		}
-	}
-}
-
-// observedKey is the stable identity of a series: its name plus its label values
-// in declared order ({account_id, region, <identifying dimension labels>}).
-func observedKey(seriesName string, labels []metrix.Label) string {
-	var b strings.Builder
-	b.WriteString(seriesName)
-	for _, l := range labels {
-		b.WriteString(instanceKeySep)
-		b.WriteString(l.Value)
-	}
-	return b.String()
 }

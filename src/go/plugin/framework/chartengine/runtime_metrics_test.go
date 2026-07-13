@@ -390,6 +390,16 @@ func TestEngineRuntimeObservabilityScenarios(t *testing.T) {
 	}
 }
 
+func TestActionKindCountsIncludesChartLabelUpdates(t *testing.T) {
+	got := actionKindCounts([]EngineAction{
+		UpdateChartLabelsAction{},
+		UpdateChartAction{},
+	})
+
+	assert.Equal(t, 1, got.actionUpdateChartLabels)
+	assert.Equal(t, 1, got.actionUpdateChart)
+}
+
 func testNow() time.Time {
 	return time.Now().Add(-time.Second)
 }

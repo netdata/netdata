@@ -3,8 +3,10 @@
 package chartemit
 
 import (
+	"cmp"
 	"fmt"
 	"math"
+	"slices"
 	"sort"
 	"strings"
 
@@ -22,6 +24,7 @@ const (
 type normalizedActions struct {
 	createCharts     map[string]CreateChartAction
 	createDimsByID   map[string][]CreateDimensionAction
+	updateLabels     []UpdateChartLabelsAction
 	updateCharts     []UpdateChartAction
 	removeDimensions []RemoveDimensionAction
 	removeCharts     []RemoveChartAction
@@ -59,6 +62,7 @@ func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 		return err
 	}
 	emitCreatePhase(api, env, normalized)
+	emitLabelUpdatePhase(api, env, normalized.updateLabels)
 	emitUpdatePhase(api, env, normalized.updateCharts)
 	emitRemovePhase(api, env, normalized)
 	return nil
@@ -67,6 +71,7 @@ func ApplyPlan(api *netdataapi.API, plan Plan, env EmitEnv) error {
 func hasEmissions(actions normalizedActions) bool {
 	return len(actions.createCharts) > 0 ||
 		len(actions.createDimsByID) > 0 ||
+		len(actions.updateLabels) > 0 ||
 		len(actions.updateCharts) > 0 ||
 		len(actions.removeDimensions) > 0 ||
 		len(actions.removeCharts) > 0
@@ -111,6 +116,9 @@ func validateTypeIDBudget(typeID string, actions normalizedActions) error {
 	for chartID := range actions.createDimsByID {
 		seen[chartID] = struct{}{}
 	}
+	for _, update := range actions.updateLabels {
+		seen[update.ChartID] = struct{}{}
+	}
 	for _, update := range actions.updateCharts {
 		seen[update.ChartID] = struct{}{}
 	}
@@ -130,16 +138,21 @@ func validateTypeIDBudget(typeID string, actions normalizedActions) error {
 }
 
 func normalizeActions(actions []EngineAction) normalizedActions {
-	out := normalizedActions{
-		createCharts:   make(map[string]CreateChartAction),
-		createDimsByID: make(map[string][]CreateDimensionAction),
-	}
+	var out normalizedActions
 	for _, action := range actions {
 		switch v := action.(type) {
 		case CreateChartAction:
+			if out.createCharts == nil {
+				out.createCharts = make(map[string]CreateChartAction)
+			}
 			out.createCharts[v.ChartID] = v
 		case CreateDimensionAction:
+			if out.createDimsByID == nil {
+				out.createDimsByID = make(map[string][]CreateDimensionAction)
+			}
 			out.createDimsByID[v.ChartID] = append(out.createDimsByID[v.ChartID], v)
+		case UpdateChartLabelsAction:
+			out.updateLabels = append(out.updateLabels, v)
 		case UpdateChartAction:
 			out.updateCharts = append(out.updateCharts, v)
 		case RemoveDimensionAction:
@@ -188,9 +201,6 @@ func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 			continue
 		}
 		emitChart(api, env, chartID, dims[0].ChartMeta, false)
-		// Dimension-only chart creation path still needs chart labels and commit.
-		emitChartLabels(api, env, nil)
-		api.CLABELCOMMIT()
 		for _, dim := range dims {
 			emitDimension(api, dimensionEmission{
 				Name:       dim.Name,
@@ -201,6 +211,22 @@ func emitCreatePhase(api *netdataapi.API, env EmitEnv, actions normalizedActions
 				Divisor:    dim.Divisor,
 			})
 		}
+	}
+}
+
+func emitLabelUpdatePhase(api *netdataapi.API, env EmitEnv, updates []UpdateChartLabelsAction) {
+	if len(updates) == 0 {
+		return
+	}
+	if len(updates) > 1 {
+		slices.SortFunc(updates, func(a, b UpdateChartLabelsAction) int {
+			return cmp.Compare(a.ChartID, b.ChartID)
+		})
+	}
+	for _, update := range updates {
+		emitChart(api, env, update.ChartID, update.Meta, false)
+		emitChartLabels(api, env, update.Labels)
+		api.CLABELCOMMIT()
 	}
 }
 

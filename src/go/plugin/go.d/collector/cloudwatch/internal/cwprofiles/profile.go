@@ -9,8 +9,11 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
+	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsregion"
 )
 
 // VersionV1 is the supported profile schema version.
@@ -52,24 +55,32 @@ var statStrings = map[string]string{
 	"sample_count": "SampleCount",
 }
 
-// Profile is one CloudWatch namespace's curated metric+chart definition. The
-// schema is additive-only across phases; the YAML decoder is non-strict, so an
-// older binary tolerates unknown fields a newer profile carries — but only when
-// old validation still passes. A profile that depends on a newer field to
-// validate (e.g. a dimension using Constant in place of Label) is rejected by an
-// older binary; see InstanceDimension.
+// Profile is one CloudWatch namespace's curated metric and chart definition.
 type Profile struct {
-	Version     string         `yaml:"version" json:"version,omitempty"`
-	DisplayName string         `yaml:"display_name" json:"display_name,omitempty"`
-	Namespace   string         `yaml:"namespace" json:"namespace,omitempty"`
-	Period      int            `yaml:"period" json:"period,omitempty"`
-	Instance    InstanceSpec   `yaml:"instance" json:"instance"`
-	Metrics     []Metric       `yaml:"metrics" json:"metrics,omitempty"`
-	Template    charttpl.Group `yaml:"template" json:"template"`
-	// Disabled excludes the profile from profiles.mode auto; it is selected by mode
-	// combined, by naming it in mode exact, or by a user-dir copy that drops this
-	// field. Omitted decodes to false = enabled, so no pointer is needed.
+	Version     string `yaml:"version" json:"version,omitempty"`
+	DisplayName string `yaml:"display_name" json:"display_name,omitempty"`
+	Namespace   string `yaml:"namespace" json:"namespace,omitempty"`
+	// SupportedRegions restricts profiles for services whose CloudWatch metrics
+	// are published only in specific regions. Nil means unrestricted.
+	SupportedRegions []string `yaml:"supported_regions,omitempty" json:"supported_regions,omitempty"`
+	Period           int      `yaml:"period" json:"period,omitempty"`
+	// PublicationDelay is the profile-level settling delay for metrics that are
+	// published after their aggregation period closes. Omitted profiles inherit
+	// the collector's built-in fallback.
+	PublicationDelay *confopt.LongDuration `yaml:"publication_delay,omitempty" json:"publication_delay,omitempty"`
+	Instance         InstanceSpec          `yaml:"instance" json:"instance"`
+	Metrics          []Metric              `yaml:"metrics" json:"metrics,omitempty"`
+	Template         charttpl.Group        `yaml:"template" json:"template"`
+	// Disabled excludes the profile from the default-enabled set. A collection rule
+	// can still include it explicitly by profile name. Omitted decodes to false.
 	Disabled bool `yaml:"disabled,omitempty" json:"disabled,omitempty"`
+}
+
+func (p Profile) SupportsRegion(region string) bool {
+	if len(p.SupportedRegions) == 0 {
+		return true
+	}
+	return slices.Contains(p.SupportedRegions, awsregion.Normalize(region))
 }
 
 // InstanceSpec declares the exact CloudWatch dimension-NAME set that defines an
@@ -93,10 +104,6 @@ type InstanceSpec struct {
 // Use Constant for a dimension that is constant across instances and so carries no
 // Netdata identity (e.g. CloudFront's Region="Global"). Exactly one of Label or
 // Constant must be set.
-//
-// Forward-compat caveat: a profile that uses Constant (omitting Label) is rejected
-// by an OLDER collector binary, whose validation still requires Label. This is
-// benign for stock profiles, which ship with their binary.
 type InstanceDimension struct {
 	Name     string  `yaml:"name" json:"name,omitempty"`
 	Label    string  `yaml:"label" json:"label,omitempty"`
@@ -112,9 +119,8 @@ type Metric struct {
 	ID         string   `yaml:"id" json:"id,omitempty"`
 	MetricName string   `yaml:"metric_name" json:"metric_name,omitempty"`
 	Statistics []string `yaml:"statistics" json:"statistics,omitempty"`
-	// Rate, when true, presents the value as per-second (value / period). The
-	// collector injects divisor=period + float on the chart dimension. It
-	// requires a sum statistic.
+	// Rate, when true, presents each per-period total as a per-second value using
+	// the effective rule period. It requires a sum or sample_count statistic.
 	Rate bool `yaml:"rate,omitempty" json:"rate,omitempty"`
 	// Period optionally overrides the profile-level Period for this metric.
 	Period int `yaml:"period,omitempty" json:"period,omitempty"`
@@ -170,8 +176,35 @@ func (p Profile) Validate(prefix, baseName string) error {
 	if !IsValidNamespace(p.Namespace) {
 		errs = append(errs, fmt.Errorf("%s: 'namespace' is invalid (must match %q)", prefix, reNamespace.String()))
 	}
+	if p.SupportedRegions != nil {
+		if len(p.SupportedRegions) == 0 {
+			errs = append(errs, fmt.Errorf("%s: 'supported_regions' must not be empty when set", prefix))
+		}
+		seen := make(map[string]struct{}, len(p.SupportedRegions))
+		for i, region := range p.SupportedRegions {
+			if canonical := awsregion.Normalize(region); region != canonical {
+				errs = append(errs, fmt.Errorf("%s.supported_regions[%d]: %q is not canonical; use %q", prefix, i, region, canonical))
+				continue
+			}
+			if !awsregion.Valid(region) {
+				errs = append(errs, fmt.Errorf("%s.supported_regions[%d]: %q is not a valid AWS region", prefix, i, region))
+				continue
+			}
+			if _, ok := seen[region]; ok {
+				errs = append(errs, fmt.Errorf("%s: duplicate supported region %q", prefix, region))
+				continue
+			}
+			seen[region] = struct{}{}
+		}
+	}
 	if !isValidPeriod(p.Period) {
 		errs = append(errs, fmt.Errorf("%s: 'period' must be a positive multiple of %d seconds", prefix, minPeriod))
+	}
+	if p.PublicationDelay != nil && p.PublicationDelay.Duration() < 0 {
+		errs = append(errs, fmt.Errorf("%s: 'publication_delay' must not be negative", prefix))
+	}
+	if p.PublicationDelay != nil && p.PublicationDelay.Duration()%time.Second != 0 {
+		errs = append(errs, fmt.Errorf("%s: 'publication_delay' must use whole seconds", prefix))
 	}
 
 	errs = append(errs, validateInstanceDimensions(prefix, p.Instance.Dimensions))
@@ -229,6 +262,8 @@ func (m Metric) validate(profilePrefix string, idx int) error {
 	}
 	if strings.TrimSpace(m.MetricName) == "" {
 		errs = append(errs, fmt.Errorf("%s: 'metric_name' is required", prefix))
+	} else if m.MetricName != strings.TrimSpace(m.MetricName) {
+		errs = append(errs, fmt.Errorf("%s: 'metric_name' must not have surrounding whitespace", prefix))
 	}
 	if m.Period != 0 && !isValidPeriod(m.Period) {
 		errs = append(errs, fmt.Errorf("%s: 'period' override must be a positive multiple of %d seconds", prefix, minPeriod))
@@ -453,19 +488,6 @@ func (p Profile) EffectivePeriod(m Metric) int {
 		return m.Period
 	}
 	return p.Period
-}
-
-// MaxEffectivePeriod is the largest effective period across the profile's
-// metrics. It drives the period-aware RecentlyActive decision (a profile with
-// any long-period metric must not be pruned by ListMetrics RecentlyActive=PT3H).
-func (p Profile) MaxEffectivePeriod() int {
-	largest := p.Period
-	for _, m := range p.Metrics {
-		if ep := p.EffectivePeriod(m); ep > largest {
-			largest = ep
-		}
-	}
-	return largest
 }
 
 // DimensionNames returns the profile's instance dimension CloudWatch names in

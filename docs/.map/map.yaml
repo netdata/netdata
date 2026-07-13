@@ -462,6 +462,16 @@ sidebar:
         items:
           - type: integration_placeholder
             integration_kind: secretstore
+      - meta:
+          label: Chart Template Format
+          edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/framework/charttpl/README.md
+          description: Define dynamic Netdata chart groups, instances, labels, dimensions, lifecycle, and presentation using declarative templates.
+          keywords: [charts, templates, collectors, dimensions, labels]
+      - meta:
+          label: AWS CloudWatch Profile Format
+          edit_url: https://github.com/netdata/netdata/edit/master/src/go/plugin/go.d/collector/cloudwatch/profile-format.md
+          description: Define CloudWatch namespaces, supported regions, resource dimensions, metrics, statistics, and dynamic charts in reusable profiles.
+          keywords: [aws, cloudwatch, profiles, collectors, metrics]
       - type: integration_placeholder
         integration_kind: collectors
   # Exporting Metrics

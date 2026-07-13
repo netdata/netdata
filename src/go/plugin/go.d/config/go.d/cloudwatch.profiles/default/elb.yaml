@@ -74,7 +74,7 @@ template:
     instances:
       by_labels: [account_id, region, load_balancer_name]
   charts:
-    - id: cw_elb_requests
+    - id: aws_cloudwatch_elb_requests
       context: request_count
       title: ELB Request Count
       family: Requests
@@ -83,7 +83,7 @@ template:
       dimensions:
         - selector: request_count_sum
           name: requests
-    - id: cw_elb_backend_response_codes
+    - id: aws_cloudwatch_elb_backend_response_codes
       context: backend_response_codes
       title: ELB Backend Response Codes
       family: Responses
@@ -98,7 +98,7 @@ template:
           name: 4xx
         - selector: http_code_backend_5xx_sum
           name: 5xx
-    - id: cw_elb_elb_response_codes
+    - id: aws_cloudwatch_elb_elb_response_codes
       context: elb_response_codes
       title: ELB Load Balancer Response Codes
       family: Responses
@@ -109,7 +109,7 @@ template:
           name: 4xx
         - selector: http_code_elb_5xx_sum
           name: 5xx
-    - id: cw_elb_backend_errors
+    - id: aws_cloudwatch_elb_backend_errors
       context: backend_connection_errors
       title: ELB Backend Connection Errors
       family: Errors
@@ -118,7 +118,7 @@ template:
       dimensions:
         - selector: backend_connection_errors_sum
           name: errors
-    - id: cw_elb_latency
+    - id: aws_cloudwatch_elb_latency
       context: latency
       title: ELB Latency
       family: Latency
@@ -127,7 +127,7 @@ template:
       dimensions:
         - selector: latency_average
           name: latency
-    - id: cw_elb_host_count
+    - id: aws_cloudwatch_elb_host_count
       context: host_count
       title: ELB Host Count
       family: Hosts
@@ -138,7 +138,7 @@ template:
           name: healthy
         - selector: unhealthy_host_count_average
           name: unhealthy
-    - id: cw_elb_spillover
+    - id: aws_cloudwatch_elb_spillover
       context: spillover_count
       title: ELB Spillover Count
       family: Queue
@@ -150,7 +150,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_elb_surge_queue
+    # - id: aws_cloudwatch_elb_surge_queue
     #   context: surge_queue_length
     #   title: ELB Surge Queue Length
     #   family: Queue
@@ -159,7 +159,7 @@ template:
     #   dimensions:
     #     - selector: surge_queue_length_maximum
     #       name: queued
-    # - id: cw_elb_desync
+    # - id: aws_cloudwatch_elb_desync
     #   context: desync_mitigation
     #   title: ELB Desync Mitigation Non-Compliant Requests
     #   family: Requests

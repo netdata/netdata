@@ -135,6 +135,12 @@ static void rrd_functions_worker_globals_worker_main(void *arg) {
             dictionary_del(wg->worker_queue, j->transaction);
             dictionary_acquired_item_release(wg->worker_queue, acquired);
             dictionary_garbage_collect(wg->worker_queue);
+
+            // when all workers become idle, return the freed query memory to the OS;
+            // otherwise glibc keeps it in its arenas and the plugin retains the RSS
+            // high-water mark of the biggest query it ever executed
+            if(!dictionary_entries(wg->worker_queue))
+                mallocz_release_as_much_memory_to_the_system();
         }
     }
 }
@@ -325,7 +331,9 @@ static void rrd_functions_worker_globals_reader_main(void *arg) {
     }
 
     int status = 0;
-    if(!__atomic_load_n(wg->plugin_should_exit, __ATOMIC_ACQUIRE)) {
+    if(!__atomic_load_n(wg->plugin_should_exit, __ATOMIC_ACQUIRE) && !nd_thread_signaled_to_cancel()) {
+        // a genuine stdin EOF/error - not a QUIT command and not the plugin
+        // shutting down on its own and cancelling this thread
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Read error on stdin");
         status = 1;
     }

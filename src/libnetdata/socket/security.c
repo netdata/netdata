@@ -503,30 +503,35 @@ bool netdata_ssl_connect(NETDATA_SSL *ssl) {
     return true;
 }
 
-bool netdata_ssl_accept(NETDATA_SSL *ssl) {
+NETDATA_SSL_HANDSHAKE_RESULT netdata_ssl_accept_nonblocking(NETDATA_SSL *ssl) {
     errno = 0;
     ssl->ssl_errno = 0;
 
     if(unlikely(!is_handshake_initialized(ssl, "accept")))
-        return false;
+        return NETDATA_SSL_HANDSHAKE_FAILED;
 
-    SSL_set_accept_state(ssl->conn);
+    // SSL_get_error() inspects the thread-local error queue, so it must be
+    // empty before the SSL I/O call (see man SSL_get_error).
+    ERR_clear_error();
 
-    int err;
-    while ((err = SSL_accept(ssl->conn)) != 1) {
-        if(!want_read_write_should_retry(ssl, err))
-            break;
+    int ret = SSL_accept(ssl->conn);
+    if(ret == 1) {
+        ssl->state = NETDATA_SSL_STATE_COMPLETE;
+        return NETDATA_SSL_HANDSHAKE_COMPLETE;
     }
 
-    if (err != 1) {
-        err = SSL_get_error(ssl->conn, err);
-        netdata_ssl_log_error_queue("SSL_accept", ssl, err);
-        ssl->state = NETDATA_SSL_STATE_FAILED;
-        return false;
+    int err = SSL_get_error(ssl->conn, ret);
+    if(err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) {
+        ssl->ssl_errno = err;
+        errno = EWOULDBLOCK;
+        return NETDATA_SSL_HANDSHAKE_PENDING;
     }
 
-    ssl->state = NETDATA_SSL_STATE_COMPLETE;
-    return true;
+    int saved_errno = errno;
+    netdata_ssl_log_error_queue("SSL_accept", ssl, err);
+    errno = saved_errno;
+    ssl->state = NETDATA_SSL_STATE_FAILED;
+    return NETDATA_SSL_HANDSHAKE_FAILED;
 }
 
 /**

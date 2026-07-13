@@ -5,6 +5,7 @@ package cloudwatch
 import (
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -146,25 +147,48 @@ func TestTagJoins_DimsExistInProfiles(t *testing.T) {
 	for name, tj := range tagJoins {
 		p, ok := byName[name]
 		require.Truef(t, ok, "tagJoins references unknown profile %q", name)
-		dims := p.Config.DimensionNames()
+		assert.Equalf(t, p.Config.Namespace, tj.namespace, "profile %q association namespace", name)
 		for _, jd := range tj.joinDims {
-			assert.Containsf(t, dims, jd, "profile %q joinDim %q missing from dimensions %v", name, jd, dims)
+			var dimension *cwprofiles.InstanceDimension
+			for i := range p.Config.Instance.Dimensions {
+				if p.Config.Instance.Dimensions[i].Name == jd {
+					dimension = &p.Config.Instance.Dimensions[i]
+					break
+				}
+			}
+			if assert.NotNilf(t, dimension, "profile %q joinDim %q missing", name, jd) {
+				assert.Falsef(t, dimension.IsConstant(), "profile %q joinDim %q must identify the resource", name, jd)
+			}
 		}
 	}
 }
 
-func TestResourceTypeFiltersAndIndex(t *testing.T) {
-	joins := map[string]tagJoin{
-		"ec2": tagJoins["ec2"],
-		"elb": tagJoins["elb"],
-		"alb": tagJoins["alb"],
-		"nlb": tagJoins["nlb"],
+func TestResolveTagJoinProfile_RejectsIncompatibleOverride(t *testing.T) {
+	tests := map[string]struct {
+		mutate  func(*cwprofiles.ResolvedProfile)
+		wantErr string
+	}{
+		"namespace changed": {
+			mutate:  func(profile *cwprofiles.ResolvedProfile) { profile.Config.Namespace = "Custom/Unrelated" },
+			wantErr: "namespace",
+		},
+		"join dimension made constant": {
+			mutate: func(profile *cwprofiles.ResolvedProfile) {
+				profile.Config.Instance.Dimensions[0].Label = ""
+				profile.Config.Instance.Dimensions[0].Constant = aws.String("i-fixed")
+			},
+			wantErr: "identifying",
+		},
 	}
-	assert.ElementsMatch(t, []string{"ec2:instance", "elasticloadbalancing:loadbalancer"}, resourceTypeFilters(joins))
-
-	idx := resourceTypeIndex(joins)
-	assert.ElementsMatch(t, []string{"ec2"}, idx["ec2:instance"])
-	assert.ElementsMatch(t, []string{"elb", "alb", "nlb"}, idx["elasticloadbalancing:loadbalancer"])
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			profile := cwprofiles.ResolvedProfile{Name: "ec2", Config: ec2QueryProfile()}
+			tc.mutate(&profile)
+			_, err := resolveTagJoinProfile(profile)
+			require.Error(t, err)
+			assert.ErrorContains(t, err, tc.wantErr)
+		})
+	}
 }
 
 func mustParseARN(t *testing.T, s string) arn.ARN {

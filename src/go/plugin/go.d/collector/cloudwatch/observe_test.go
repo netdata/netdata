@@ -3,10 +3,12 @@
 package cloudwatch
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,6 +16,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
+	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
@@ -51,13 +54,14 @@ func (f *fullCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetr
 	}
 	results := make([]cwtypes.MetricDataResult, 0, len(in.MetricDataQueries))
 	for _, q := range in.MetricDataQueries {
-		r := cwtypes.MetricDataResult{Id: q.Id}
-		if f.status != "" {
-			r.StatusCode = f.status
+		status := f.status
+		if status == "" {
+			status = cwtypes.StatusCodeComplete
 		}
+		r := cwtypes.MetricDataResult{Id: q.Id, StatusCode: status}
 		if !f.gap {
 			r.Values = []float64{f.gmdValue}
-			r.Timestamps = []time.Time{time.Unix(1, 0)}
+			r.Timestamps = []time.Time{aws.ToTime(in.EndTime).Add(-time.Duration(aws.ToInt32(q.MetricStat.Period)) * time.Second)}
 		}
 		results = append(results, r)
 	}
@@ -76,6 +80,12 @@ func (f *fullCloudWatch) setGap(gap bool) {
 	f.gap = gap
 }
 
+func (f *fullCloudWatch) setStatus(status cwtypes.StatusCode) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.status = status
+}
+
 func (f *fullCloudWatch) getMetricDataCalls() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -84,15 +94,13 @@ func (f *fullCloudWatch) getMetricDataCalls() int {
 
 func endToEndCollector(gmdValue float64) (*Collector, *fullCloudWatch) {
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
-	c.applyDefaults()
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}}
+	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 
 	fake := &fullCloudWatch{
 		list:     map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
 		gmdValue: gmdValue,
 	}
-	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
 	useFakeClient(c, fake)
 	return c, fake
 }
@@ -123,8 +131,7 @@ func TestCheck_PopulatesChartTemplateBeforeCollect(t *testing.T) {
 	// The framework validates ChartTemplateYAML() in postCheck — after Check and
 	// before the first Collect — so Check must leave a non-empty, valid template.
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
-	c.Profiles = ProfilesConfig{Mode: profilesModeAuto}
+	c.Config = validConfig()
 	c.applyDefaults()
 	c.newCatalog = cwprofiles.LoadFromDefaultDirs
 	c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
@@ -176,6 +183,21 @@ type flakeyCloudWatch struct {
 	gmdCalls     int
 }
 
+type finishingFailureCloudWatch struct {
+	clock    *atomic.Int64
+	finishAt time.Time
+	list     map[string][]cwtypes.Metric
+}
+
+func (f *finishingFailureCloudWatch) ListMetrics(_ context.Context, in *cloudwatch.ListMetricsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
+	return &cloudwatch.ListMetricsOutput{Metrics: f.list[aws.ToString(in.Namespace)]}, nil
+}
+
+func (f *finishingFailureCloudWatch) GetMetricData(context.Context, *cloudwatch.GetMetricDataInput, ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+	f.clock.Store(f.finishAt.UnixNano())
+	return nil, errors.New("throttled")
+}
+
 func (f *flakeyCloudWatch) ListMetrics(_ context.Context, in *cloudwatch.ListMetricsInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -191,7 +213,11 @@ func (f *flakeyCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMe
 	}
 	results := make([]cwtypes.MetricDataResult, 0, len(in.MetricDataQueries))
 	for _, q := range in.MetricDataQueries {
-		results = append(results, cwtypes.MetricDataResult{Id: q.Id, Values: []float64{f.value}, Timestamps: []time.Time{time.Unix(1, 0)}})
+		results = append(results, cwtypes.MetricDataResult{
+			Id: q.Id, Values: []float64{f.value},
+			Timestamps: []time.Time{aws.ToTime(in.EndTime).Add(-time.Duration(aws.ToInt32(q.MetricStat.Period)) * time.Second)},
+			StatusCode: cwtypes.StatusCodeComplete,
+		})
 	}
 	return &cloudwatch.GetMetricDataOutput{MetricDataResults: results}, nil
 }
@@ -217,15 +243,13 @@ func TestObserve_PerRegionScheduleIsolation(t *testing.T) {
 		failGMDUntil: 1 << 30, // always fail GetMetricData
 	}
 	c := New()
-	c.Config.Regions = []string{"good", "bad"}
-	c.applyDefaults()
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2}}
-	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
+	configureExactRule(c, []string{"us-east-1", "us-west-2"}, []string{"ec2"})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1", "us-west-2"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2}})
 	c.newAWSConfig = func(_ context.Context, _ awsauth.Identity, region string) (aws.Config, error) {
 		return aws.Config{Region: region}, nil
 	}
 	c.newCloudWatchClient = func(cfg aws.Config) cloudwatchClient {
-		if cfg.Region == "bad" {
+		if cfg.Region == "us-west-2" {
 			return bad
 		}
 		return good
@@ -242,8 +266,8 @@ func TestObserve_PerRegionScheduleIsolation(t *testing.T) {
 	// Cycle 2 at +60s: good's (good,300) advanced -> not due; bad's stayed due.
 	// Only the failed region is retried; the healthy one is NOT re-queried.
 	c.now = func() time.Time { return base.Add(60 * time.Second) }
-	_, err = collecttest.CollectScalarSeries(c) // only bad is due and still failing -> cycle errors
-	require.Error(t, err, "the still-failing region makes the cycle error")
+	_, err = collecttest.CollectScalarSeries(c) // only bad is due and still failing; the good cached frame remains useful
+	require.NoError(t, err, "a retained useful frame keeps a total transient retry fail-soft")
 	assert.Equal(t, 1, good.getMetricDataCalls(), "healthy region not re-queried because a sibling region failed")
 	assert.Greater(t, bad.getMetricDataCalls(), 1, "failed region stays due and is retried next cycle")
 }
@@ -255,10 +279,8 @@ func TestCollect_QueryFailureRetriesNextCycle(t *testing.T) {
 		failGMDUntil: 1, // the first GetMetricData fails
 	}
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
-	c.applyDefaults()
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}}
-	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
+	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 	useFakeClient(c, fake)
 
 	base := time.Unix(1_000_000_000, 0)
@@ -276,16 +298,137 @@ func TestCollect_QueryFailureRetriesNextCycle(t *testing.T) {
 	assert.NotEmpty(t, series, "a failed period is retried the next cycle, not skipped for a full period")
 }
 
-func TestWithTimeout(t *testing.T) {
-	ctx, cancel := withTimeout(context.Background(), 0)
-	defer cancel()
-	_, ok := ctx.Deadline()
-	assert.False(t, ok, "non-positive timeout leaves the context unbounded")
+func TestCollect_QueryFailureBacksOffWithinEligibleWindow(t *testing.T) {
+	fake := &flakeyCloudWatch{
+		list:         map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
+		failGMDUntil: 1 << 30,
+	}
+	c := New()
+	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
+	useFakeClient(c, fake)
 
-	ctx2, cancel2 := withTimeout(context.Background(), time.Second)
-	defer cancel2()
-	_, ok = ctx2.Deadline()
-	assert.True(t, ok, "positive timeout sets a deadline")
+	base := time.Unix(1_000_000_000, 0)
+	collectAt := func(offset time.Duration) {
+		c.now = func() time.Time { return base.Add(offset) }
+		_, _ = collecttest.CollectScalarSeries(c)
+	}
+
+	collectAt(0)
+	assert.Equal(t, 1, fake.getMetricDataCalls())
+	collectAt(time.Minute)
+	assert.Equal(t, 2, fake.getMetricDataCalls(), "the first retry waits one update_every")
+	collectAt(2 * time.Minute)
+	assert.Equal(t, 2, fake.getMetricDataCalls(), "the second retry delay doubles to two update_every intervals")
+	collectAt(3 * time.Minute)
+	assert.Equal(t, 3, fake.getMetricDataCalls())
+	collectAt(5 * time.Minute)
+	assert.Equal(t, 4, fake.getMetricDataCalls(), "a newly eligible window resets backoff and is immediately due")
+}
+
+func TestCollect_TransientRetryStartsAtAttemptCompletion(t *testing.T) {
+	base := time.Unix(1_000_000_000, 0)
+	finishAt := base.Add(2 * time.Minute)
+	var clock atomic.Int64
+	clock.Store(base.UnixNano())
+	fake := &finishingFailureCloudWatch{
+		clock: &clock, finishAt: finishAt,
+		list: map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}},
+	}
+	c := New()
+	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
+	useFakeClient(c, fake)
+	c.now = func() time.Time { return time.Unix(0, clock.Load()) }
+
+	err := c.collect(context.Background())
+	require.Error(t, err)
+	require.Len(t, c.queryPlan, 3)
+	for _, query := range c.queryPlan {
+		state := c.observations.queries[query.key]
+		assert.Equal(t, finishAt.Add(time.Minute), state.nextRetryAt, "retry delay starts when the transient attempt finishes")
+	}
+}
+
+func TestCollect_TransientResultWithCacheWarnsAndBacksOff(t *testing.T) {
+	c, fake := endToEndCollector(10)
+	var logs bytes.Buffer
+	c.Logger = logger.NewWithWriter(&logs)
+	base := time.Unix(1_000_000_000, 0)
+
+	c.now = func() time.Time { return base }
+	first, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	require.NotEmpty(t, first)
+
+	fake.setStatus(cwtypes.StatusCodeInternalError)
+	c.now = func() time.Time { return base.Add(5 * time.Minute) }
+	replayed, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	require.NotEmpty(t, replayed, "a transient result preserves the retained frame")
+	assert.Contains(t, logs.String(), "InternalError")
+
+	calls := fake.getMetricDataCalls()
+	c.now = func() time.Time { return base.Add(6 * time.Minute) }
+	_, err = collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, calls+1, fake.getMetricDataCalls(), "the first retry is due after one update_every")
+
+	c.now = func() time.Time { return base.Add(7 * time.Minute) }
+	_, err = collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, calls+1, fake.getMetricDataCalls(), "the second transient retry is backed off")
+}
+
+type cancelingCloudWatch struct {
+	cancel context.CancelFunc
+}
+
+func (f cancelingCloudWatch) ListMetrics(context.Context, *cloudwatch.ListMetricsInput, ...func(*cloudwatch.Options)) (*cloudwatch.ListMetricsOutput, error) {
+	return &cloudwatch.ListMetricsOutput{Metrics: []cwtypes.Metric{mkMetric("CPUUtilization", "InstanceId", "i-1")}}, nil
+}
+
+func (f cancelingCloudWatch) GetMetricData(_ context.Context, in *cloudwatch.GetMetricDataInput, _ ...func(*cloudwatch.Options)) (*cloudwatch.GetMetricDataOutput, error) {
+	f.cancel()
+	results := make([]cwtypes.MetricDataResult, 0, len(in.MetricDataQueries))
+	for _, query := range in.MetricDataQueries {
+		results = append(results, cwtypes.MetricDataResult{
+			Id: query.Id, StatusCode: cwtypes.StatusCodeComplete,
+			Values: []float64{1}, Timestamps: []time.Time{aws.ToTime(in.EndTime).Add(-5 * time.Minute)},
+		})
+	}
+	return &cloudwatch.GetMetricDataOutput{MetricDataResults: results}, nil
+}
+
+func TestCollect_ParentCancellationDoesNotAdvanceQueryState(t *testing.T) {
+	c := New()
+	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
+	ctx, cancel := context.WithCancel(context.Background())
+	useFakeClient(c, cancelingCloudWatch{cancel: cancel})
+	c.now = func() time.Time { return time.Unix(1_000_000_000, 0) }
+
+	err := c.collect(ctx)
+	assert.ErrorIs(t, err, context.Canceled)
+	assert.Empty(t, c.observations.queries)
+}
+
+func TestWithTimeout(t *testing.T) {
+	tests := map[string]struct {
+		timeout      time.Duration
+		wantDeadline bool
+	}{
+		"non-positive timeout": {},
+		"positive timeout":     {timeout: time.Second, wantDeadline: true},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := withTimeout(context.Background(), tc.timeout)
+			defer cancel()
+			_, got := ctx.Deadline()
+			assert.Equal(t, tc.wantDeadline, got)
+		})
+	}
 }
 
 func TestObserve_DailySeriesSurvivesEvictionWindow(t *testing.T) {
@@ -302,10 +445,8 @@ func TestObserve_DailySeriesSurvivesEvictionWindow(t *testing.T) {
 		gmdValue: 123,
 	}
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
-	c.applyDefaults()
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "s3", Config: dailyProfile}}
-	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
+	configureExactRule(c, []string{"us-east-1"}, []string{"s3"})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "s3", Config: dailyProfile}})
 	useFakeClient(c, fake)
 
 	base := time.Unix(1_000_000_000, 0)
@@ -344,10 +485,8 @@ func TestObserve_MultiPeriodScheduling(t *testing.T) {
 		gmdValue: 10,
 	}
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
-	c.applyDefaults()
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2}, {Name: "s3", Config: s3}}
-	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
+	configureExactRule(c, []string{"us-east-1"}, []string{"ec2", "s3"})
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2}, {Name: "s3", Config: s3}})
 	useFakeClient(c, fake)
 
 	base := time.Unix(1_000_000_000, 0)
@@ -406,20 +545,19 @@ func TestObserve_GapInQueriedPeriodNotReEmitted(t *testing.T) {
 
 func TestObserve_RateMetricNoDataZeroFilled(t *testing.T) {
 	c := New()
-	c.Config.Regions = []string{"us-east-1"}
-	c.applyDefaults()
-	c.profiles = []cwprofiles.ResolvedProfile{{Name: "lambda", Config: cwprofiles.Profile{
+	configureExactRule(c, []string{"us-east-1"}, []string{"lambda"})
+	profiles := []cwprofiles.ResolvedProfile{{Name: "lambda", Config: cwprofiles.Profile{
 		Namespace: "AWS/Lambda",
 		Period:    300,
 		Instance:  cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "FunctionName", Label: "function_name"}}},
 		Metrics:   []cwprofiles.Metric{{ID: "errors", MetricName: "Errors", Statistics: []string{"sum"}, Rate: true}},
 	}}}
+	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, profiles)
 
 	fake := &fullCloudWatch{
 		list:     map[string][]cwtypes.Metric{"AWS/Lambda": {mkMetric("Errors", "FunctionName", "fn-1")}},
 		gmdValue: 5,
 	}
-	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
 	useFakeClient(c, fake)
 	base := time.Unix(1_000_000_000, 0)
 
@@ -427,7 +565,7 @@ func TestObserve_RateMetricNoDataZeroFilled(t *testing.T) {
 	c.now = func() time.Time { return base }
 	s1, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	assert.Equal(t, metrix.SampleValue(5), seriesValue(t, s1, `lambda.errors_sum{`))
+	assert.Equal(t, metrix.SampleValue(5.0/300), seriesValue(t, s1, `lambda.errors_sum{`))
 
 	// Cycle 2 at +300s: due, no datapoint. A rate/count metric defaults to
 	// nil-as-zero, so "no activity" is recorded as 0 (not a gap, not the stale 5).
@@ -444,38 +582,44 @@ func TestObserve_RateMetricNoDataZeroFilled(t *testing.T) {
 	assert.Equal(t, metrix.SampleValue(0), seriesValue(t, s3, `lambda.errors_sum{`), "zero is re-emitted between queries")
 }
 
-func TestObserve_RateMetricNoUsableResultGaps(t *testing.T) {
+func TestObserve_RateMetricNonterminalAndForbiddenResultsGap(t *testing.T) {
 	// A nil-as-zero (rate) metric must GAP, not record a false 0, when the query
 	// yields no USABLE datapoint — a per-result error or an absent result. Zero-fill
 	// is reserved for a clean result that simply had no datapoint.
-	setups := map[string]func(*fullCloudWatch){
-		"InternalError": func(f *fullCloudWatch) { f.status = cwtypes.StatusCodeInternalError },
-		"Forbidden":     func(f *fullCloudWatch) { f.status = cwtypes.StatusCodeForbidden },
-		"absent result": func(f *fullCloudWatch) { f.omit = true },
+	setups := map[string]struct {
+		apply   func(*fullCloudWatch)
+		wantErr bool
+	}{
+		"InternalError": {apply: func(f *fullCloudWatch) { f.status = cwtypes.StatusCodeInternalError }, wantErr: true},
+		"Forbidden":     {apply: func(f *fullCloudWatch) { f.status = cwtypes.StatusCodeForbidden }},
+		"absent result": {apply: func(f *fullCloudWatch) { f.omit = true }, wantErr: true},
 	}
 	for name, setup := range setups {
 		t.Run(name, func(t *testing.T) {
 			c := New()
-			c.Config.Regions = []string{"us-east-1"}
-			c.applyDefaults()
-			c.profiles = []cwprofiles.ResolvedProfile{{Name: "lambda", Config: cwprofiles.Profile{
+			configureExactRule(c, []string{"us-east-1"}, []string{"lambda"})
+			profiles := []cwprofiles.ResolvedProfile{{Name: "lambda", Config: cwprofiles.Profile{
 				Namespace: "AWS/Lambda",
 				Period:    300,
 				Instance:  cwprofiles.InstanceSpec{Dimensions: []cwprofiles.InstanceDimension{{Name: "FunctionName", Label: "function_name"}}},
 				Metrics:   []cwprofiles.Metric{{ID: "errors", MetricName: "Errors", Statistics: []string{"sum"}, Rate: true}},
 			}}}
+			setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, profiles)
 
 			fake := &fullCloudWatch{
 				list:     map[string][]cwtypes.Metric{"AWS/Lambda": {mkMetric("Errors", "FunctionName", "fn-1")}},
 				gmdValue: 5,
 			}
-			setup(fake)
-			c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: "000000000000"} }
+			setup.apply(fake)
 			useFakeClient(c, fake)
 			c.now = func() time.Time { return time.Unix(1_000_000_000, 0) }
 
 			series, err := collecttest.CollectScalarSeries(c)
-			require.NoError(t, err)
+			if setup.wantErr {
+				require.Error(t, err)
+			} else {
+				require.NoError(t, err)
+			}
 			assert.Empty(t, series, "no usable result -> gap, not a false 0")
 		})
 	}
@@ -487,69 +631,49 @@ func TestCleanup_ResetsRuntimeState(t *testing.T) {
 
 	_, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	require.NotEmpty(t, c.accounts)
-	require.NotEmpty(t, c.observations.lastObserved)
-	require.NotEmpty(t, c.observations.nextQueryAt)
+	require.NotEmpty(t, c.resolvedByRef)
+	require.NotEmpty(t, c.observations.queries)
 
 	c.Cleanup(context.Background())
 
-	assert.Empty(t, c.accounts)
-	assert.Nil(t, c.profiles)
-	assert.Empty(t, c.observations.lastObserved)
-	assert.Empty(t, c.observations.nextQueryAt)
+	assert.Empty(t, c.resolvedByRef)
+	assert.Nil(t, c.plan)
+	assert.Empty(t, c.observations.queries)
 	assert.Empty(t, c.discovery.Instances)
 }
 
-func TestPruneObserved(t *testing.T) {
-	ecLabels := func(instance string) []metrix.Label {
-		return []metrix.Label{
-			{Key: "account_id", Value: "000000000000"},
-			{Key: "region", Value: "us-east-1"},
-			{Key: "instance_id", Value: instance},
-		}
+func TestReconcilePlan(t *testing.T) {
+	keepObservation, dropObservation := testStructuralID("keep"), testStructuralID("drop")
+	keepTarget, dropTarget := testStructuralID("first-target"), testStructuralID("second-target")
+	tests := map[string]struct {
+		initial map[structuralID]queryState
+		keep    structuralID
+		drop    structuralID
+	}{
+		"drops vanished observation": {
+			initial: map[structuralID]queryState{
+				keepObservation: {hasObservation: true, observation: 1},
+				dropObservation: {hasObservation: true, observation: 2},
+			},
+			keep: keepObservation, drop: dropObservation,
+		},
+		"drops vanished target query": {
+			initial: map[structuralID]queryState{
+				keepTarget: {lastCompletedEnd: time.Unix(1_000_000_300, 0)},
+				dropTarget: {lastCompletedEnd: time.Unix(1_000_000_300, 0)},
+			},
+			keep: keepTarget, drop: dropTarget,
+		},
 	}
-	groupKey := queryGroupKey{region: "us-east-1", period: 300}
-	keep := observedSeries{seriesName: "ec2.cpu_utilization_average", labels: ecLabels("i-1"), value: 1, groupKey: groupKey}
-	drop := observedSeries{seriesName: "ec2.cpu_utilization_average", labels: ecLabels("i-2"), value: 2, groupKey: groupKey}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			c := New()
+			c.observations.queries = tc.initial
+			c.observations.reconcilePlan([]plannedQuery{{key: tc.keep}})
 
-	c := New()
-	c.observations.lastObserved = map[string]observedSeries{
-		observedKey(keep.seriesName, keep.labels): keep,
-		observedKey(drop.seriesName, drop.labels): drop,
+			require.Len(t, c.observations.queries, 1)
+			assert.Contains(t, c.observations.queries, tc.keep)
+			assert.NotContains(t, c.observations.queries, tc.drop)
+		})
 	}
-
-	// Plan reflects discovery with only i-1 remaining.
-	c.observations.pruneObserved([]plannedQuery{{seriesName: keep.seriesName, labels: keep.labels}})
-
-	require.Len(t, c.observations.lastObserved, 1)
-	assert.Contains(t, c.observations.lastObserved, observedKey(keep.seriesName, keep.labels))
-	assert.NotContains(t, c.observations.lastObserved, observedKey(drop.seriesName, drop.labels))
-}
-
-func TestPruneObserved_DropsStaleScheduleForVanishedGroup(t *testing.T) {
-	// A group that leaves the plan must lose its schedule entry, so a later
-	// reappearance is unscheduled (immediately due) rather than blocked until a stale
-	// nextQueryAt expires. The two groups here differ ONLY by account, which pins that
-	// account is part of the (account, region, period) schedule key — a regression that
-	// dropped account from the key would keep the vanished group.
-	c := New()
-	inPlan := queryGroupKey{account: "111111111111", region: "us-east-1", period: 300}
-	vanished := queryGroupKey{account: "222222222222", region: "us-east-1", period: 300}
-	c.observations.nextQueryAt = map[queryGroupKey]time.Time{
-		inPlan:   time.Unix(1_000_000_300, 0),
-		vanished: time.Unix(1_000_000_300, 0),
-	}
-	labels := []metrix.Label{
-		{Key: "account_id", Value: "111111111111"},
-		{Key: "region", Value: "us-east-1"},
-		{Key: "instance_id", Value: "i-1"},
-	}
-
-	// Plan retains only account 111111111111's group; account 222222222222 is gone.
-	c.observations.pruneObserved([]plannedQuery{
-		{seriesName: "ec2.cpu_utilization_average", labels: labels, account: "111111111111", region: "us-east-1", period: 300},
-	})
-
-	assert.Contains(t, c.observations.nextQueryAt, inPlan, "a group still in the plan keeps its schedule")
-	assert.NotContains(t, c.observations.nextQueryAt, vanished, "a group that left the plan (differing only by account) loses its schedule")
 }

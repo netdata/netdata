@@ -145,8 +145,11 @@ static time_t mrg_metric_get_first_time_s_smart(MRG *mrg __maybe_unused, METRIC 
 
         if(first_time_s <= 0)
             first_time_s = 0;
-        else
-            __atomic_store_n(&metric->first_time_s, first_time_s, __ATOMIC_RELAXED);
+        else if(!set_metric_field_with_condition(metric->first_time_s, first_time_s, _current <= 0))
+            // lost the race to a concurrent writer publishing the real
+            // retention start (the collector, when the page gets its first
+            // real value) - never overwrite it
+            first_time_s = __atomic_load_n(&metric->first_time_s, __ATOMIC_RELAXED);
     }
 
     return first_time_s;

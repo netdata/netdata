@@ -646,6 +646,20 @@
 - Fix(database): guard null root index in rrdset_find_and_acquire ([#23056](https://github.com/netdata/netdata/issues/23056))
 - Build(deps): bump pydantic-settings from 2.14.1 to 2.14.2 in /packaging/tools/automation/mcp ([#23070](https://github.com/netdata/netdata/issues/23070))
 - Fix(database): keep rrdset indexes allocated while host is archived ([#23074](https://github.com/netdata/netdata/issues/23074))
+- Refactor(metrix): split source layout by ownership ([#23075](https://github.com/netdata/netdata/issues/23075))
+- Fix: freebsd plugin counters size mismatch ([#23044](https://github.com/netdata/netdata/issues/23044))
+- Netdata fixes part 53 ([#23055](https://github.com/netdata/netdata/issues/23055))
+- Chore(cloudwatch): use explicit AWS CloudWatch identifiers ([#23084](https://github.com/netdata/netdata/issues/23084))
+- Feat(go.d/cloudwatch): add explicit targets and collection rules ([#23086](https://github.com/netdata/netdata/issues/23086))
+- Bounded-cardinality process grouping (macOS) and hardware sensors summaries, histogram and function ([#23085](https://github.com/netdata/netdata/issues/23085))
+- Feat(go.d/chartengine): update mutable chart labels ([#23087](https://github.com/netdata/netdata/issues/23087))
+- Fix systemd-journal.plugin memory retention after queries and its apps.plugin accounting ([#23089](https://github.com/netdata/netdata/issues/23089))
+- Fix UDP socket fallback when inet_diag handlers are missing ([#23091](https://github.com/netdata/netdata/issues/23091))
+- Netdata fixes part 54 ([#23057](https://github.com/netdata/netdata/issues/23057))
+- Feat(go.d/cloudwatch): add resource tag filtering ([#23090](https://github.com/netdata/netdata/issues/23090))
+- Regenerate integrations docs ([#23088](https://github.com/netdata/netdata/issues/23088))
+- Feat(go.d/cloudwatch): add exact metric selection ([#23092](https://github.com/netdata/netdata/issues/23092))
+- Update vendored NetIPC SHM allocation ([#23093](https://github.com/netdata/netdata/issues/23093))
 
 ## [2.10.0] - 2026-04-09
 

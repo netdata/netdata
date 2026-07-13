@@ -1688,6 +1688,8 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/mem-pgfaults.h
         src/collectors/common-contexts/mem-available.h
         src/collectors/common-contexts/power-supply.h
+        src/collectors/common-contexts/hw-sensors.h
+        src/collectors/common-contexts/hw-sensors-function.h
 )
 
 set(INTERCOMMUNICATION_COLLECTORS_FILES
@@ -3386,6 +3388,14 @@ if(ENABLE_PLUGIN_LOCAL_LISTENERS)
         install(TARGETS local-listeners
                 COMPONENT netdata
                 DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
+if(OS_LINUX AND MNL_FOUND)
+        add_executable(local-sockets-mnl-test EXCLUDE_FROM_ALL
+                src/libnetdata/local-sockets/tests/test_local_sockets_mnl.c)
+        target_compile_options(local-sockets-mnl-test PRIVATE ${MNL_CFLAGS_OTHER})
+        target_include_directories(local-sockets-mnl-test PRIVATE ${MNL_INCLUDE_DIRS})
+        target_link_libraries(local-sockets-mnl-test libnetdata ${MNL_LIBRARIES})
 endif()
 
 if(ENABLE_PLUGIN_NETWORK_VIEWER)

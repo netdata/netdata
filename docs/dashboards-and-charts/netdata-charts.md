@@ -179,10 +179,16 @@ The **Group by** dropdown allows you to apply different grouping strategies on t
 
 | Grouping Option    | Description                                                |
 |--------------------|------------------------------------------------------------|
-| Group by Node      | Summarize data by node with one dimension per node         |
+| Group by Node      | Display each node (hostname) as a separate labeled dimension in the chart legend, with one entry per node |
 | Group by Instance  | Summarize data by instance with one dimension per instance |
 | Group by Dimension | Aggregate data across all nodes by dimension               |
 | Group by Label     | Summarize data based on label values                       |
+
+:::tip
+
+To see each node's hostname in the chart legend (the Dimensions Bar at the bottom of the chart), use **Group by Node**. Each node appears as a separate labeled dimension.
+
+:::
 
 :::tip
 

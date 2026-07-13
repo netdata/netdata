@@ -2,45 +2,135 @@
   "vnode": "ok",
   "update_every": 123,
   "autodetection_retry": 123,
-  "regions": [
-    "ok"
-  ],
-  "auth": {
-    "mode": "ok",
-    "mode_access_key": {
-      "access_key_id": "ok",
-      "secret_access_key": "ok",
-      "session_token": "ok"
+  "credentials": [
+    {
+      "name": "sdk_default",
+      "type": "default"
     },
-    "mode_assume_role": {
-      "roles": [
+    {
+      "name": "bootstrap",
+      "type": "static",
+      "type_static": {
+        "access_key_id": "${env:AWS_ACCESS_KEY_ID}",
+        "secret_access_key": "${env:AWS_SECRET_ACCESS_KEY}",
+        "session_token": "${env:AWS_SESSION_TOKEN}"
+      }
+    }
+  ],
+  "targets": [
+    {
+      "name": "base",
+      "credentials": "sdk_default"
+    },
+    {
+      "name": "production",
+      "credentials": "bootstrap",
+      "assume_role": {
+        "role_arn": "arn:aws:iam::000000000000:role/example",
+        "external_id": "${env:AWS_EXTERNAL_ID}"
+      }
+    }
+  ],
+  "rules": [
+    {
+      "name": "base-defaults",
+      "targets": [
+        "base"
+      ],
+      "regions": [
+        "us-east-1"
+      ]
+    },
+    {
+      "name": "production-services",
+      "targets": [
+        "production"
+      ],
+      "profiles": {
+        "defaults": false,
+        "include": [
+          "ec2",
+          "rds"
+        ],
+        "exclude": [
+          "cloudfront"
+        ]
+      },
+      "metrics": [
         {
-          "role_arn": "ok",
-          "external_id": "ok"
+          "profile": "ec2",
+          "statistics": [
+            "Average"
+          ],
+          "include": [
+            {
+              "name": "CPUUtilization"
+            }
+          ]
+        },
+        {
+          "profile": "rds",
+          "statistics": [
+            "Average"
+          ],
+          "include": [
+            {
+              "name": "DatabaseConnections"
+            }
+          ]
+        }
+      ],
+      "regions": [
+        "us-east-1",
+        "eu-west-1"
+      ],
+      "filters": {
+        "resource_tags": [
+          {
+            "key": "environment",
+            "values": [
+              "production",
+              "staging"
+            ]
+          }
+        ]
+      },
+      "query": {
+        "publication_delay": "0s"
+      }
+    }
+  ],
+  "rule_defaults": {
+    "query": {
+      "period": "5m",
+      "lookback": "30m"
+    },
+    "filters": {
+      "resource_tags": [
+        {
+          "key": "managed-by",
+          "values": [
+            "platform"
+          ]
         }
       ]
     }
   },
-  "profiles": {
-    "mode": "ok",
-    "mode_exact": {
-      "entries": [
-        {
-          "name": "ok"
-        }
-      ]
-    }
+  "labels": {
+    "resource_tags": [
+      {
+        "key": "owner",
+        "label": "resource_owner"
+      }
+    ]
+  },
+  "limits": {
+    "max_instances": 123,
+    "max_discovery_groups": 80
   },
   "discovery": {
     "refresh_every": 123,
     "recently_active_only": true
   },
-  "tags": [
-    {
-      "name": "ok",
-      "rename": "ok"
-    }
-  ],
-  "query_offset": 123,
   "timeout": 123.123
 }

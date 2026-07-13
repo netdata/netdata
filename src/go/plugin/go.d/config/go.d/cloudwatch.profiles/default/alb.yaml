@@ -90,7 +90,7 @@ metrics:
   # Narrow target-health collection at {LoadBalancer, TargetGroup} is collected by the default
   # alb_target_health profile. Broader per-target / target-group metrics (HealthyHostCount,
   # RequestCountPerTarget, TargetConnectionErrorCount, ...) are collected by the disabled alb_target
-  # profile -- enable it with profiles.mode: combined or exact.
+  # profile -- enable it explicitly with rules[].profiles.include.
   # Also at {LoadBalancer}: HTTPCode_ELB_500/502/503/504_Count (5xx detail), and the DDoS-protection,
   # auth (ELBAuth*), Target Optimizer (TargetControl*), and LCU-reservation (PeakLCUs/ReservedLCUs)
   # families. See: https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html
@@ -101,7 +101,7 @@ template:
     instances:
       by_labels: [account_id, region, load_balancer]
   charts:
-    - id: cw_alb_requests
+    - id: aws_cloudwatch_alb_requests
       context: request_count
       title: ALB Request Count
       family: Requests
@@ -110,7 +110,7 @@ template:
       dimensions:
         - selector: request_count_sum
           name: requests
-    - id: cw_alb_target_response_codes
+    - id: aws_cloudwatch_alb_target_response_codes
       context: target_response_codes
       title: ALB Target Response Codes
       family: Responses
@@ -125,7 +125,7 @@ template:
           name: 4xx
         - selector: http_code_target_5xx_sum
           name: 5xx
-    - id: cw_alb_elb_response_codes
+    - id: aws_cloudwatch_alb_elb_response_codes
       context: elb_response_codes
       title: ALB Load Balancer Response Codes
       family: Responses
@@ -138,7 +138,7 @@ template:
           name: 4xx
         - selector: http_code_elb_5xx_sum
           name: 5xx
-    - id: cw_alb_new_connections
+    - id: aws_cloudwatch_alb_new_connections
       context: connection_rate
       title: ALB Connection Rate
       family: Connections
@@ -149,7 +149,7 @@ template:
           name: new
         - selector: rejected_connection_count_sum
           name: rejected
-    - id: cw_alb_active_connections
+    - id: aws_cloudwatch_alb_active_connections
       context: active_connections
       title: ALB Active Connections
       family: Connections
@@ -158,7 +158,7 @@ template:
       dimensions:
         - selector: active_connection_count_sum
           name: active
-    - id: cw_alb_processed_traffic
+    - id: aws_cloudwatch_alb_processed_traffic
       context: processed_bytes
       title: ALB Processed Traffic
       family: Traffic
@@ -167,7 +167,7 @@ template:
       dimensions:
         - selector: processed_bytes_sum
           name: processed
-    - id: cw_alb_target_response_time
+    - id: aws_cloudwatch_alb_target_response_time
       context: target_response_time
       title: ALB Target Response Time
       family: Latency
@@ -176,7 +176,7 @@ template:
       dimensions:
         - selector: target_response_time_average
           name: response_time
-    - id: cw_alb_consumed_lcus
+    - id: aws_cloudwatch_alb_consumed_lcus
       context: consumed_lcus
       title: ALB Consumed LCUs
       family: Capacity
@@ -188,7 +188,7 @@ template:
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_alb_extra_requests
+    # - id: aws_cloudwatch_alb_extra_requests
     #   context: extra_request_counts
     #   title: ALB IPv6 and gRPC Requests
     #   family: Requests
@@ -199,7 +199,7 @@ template:
     #       name: ipv6
     #     - selector: grpc_request_count_sum
     #       name: grpc
-    # - id: cw_alb_rule_evaluations
+    # - id: aws_cloudwatch_alb_rule_evaluations
     #   context: rule_evaluations
     #   title: ALB Rule Evaluations
     #   family: Rules
@@ -208,7 +208,7 @@ template:
     #   dimensions:
     #     - selector: rule_evaluations_sum
     #       name: evaluations
-    # - id: cw_alb_tls_errors
+    # - id: aws_cloudwatch_alb_tls_errors
     #   context: client_tls_negotiation_errors
     #   title: ALB Client TLS Negotiation Errors
     #   family: TLS
@@ -217,7 +217,7 @@ template:
     #   dimensions:
     #     - selector: client_tls_negotiation_errors_sum
     #       name: errors
-    # - id: cw_alb_redirects
+    # - id: aws_cloudwatch_alb_redirects
     #   context: http_redirects
     #   title: ALB HTTP Redirects
     #   family: Requests
