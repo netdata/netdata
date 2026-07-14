@@ -95,7 +95,8 @@ metrics:
     statistics: [sum]
     rate: true
   # Also published at {InstanceId}: EBSIOBalance% / EBSByteBalance% (burst balances),
-  # GPUPowerUtilization (accelerated instances), MetadataNoToken*. Add them the same way. See:
+  # GPUPowerUtilization (accelerated instances), MetadataNoToken*. Collecting them requires
+  # corresponding metric and chart entries in a custom profile. See:
   # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/viewing_metrics_with_cloudwatch.html
 template:
   family: EC2

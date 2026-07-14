@@ -59,6 +59,7 @@
       "metrics": [
         {
           "profile": "ec2",
+          "defaults": false,
           "statistics": [
             "Average"
           ],
@@ -70,6 +71,7 @@
         },
         {
           "profile": "rds",
+          "defaults": false,
           "statistics": [
             "Average"
           ],

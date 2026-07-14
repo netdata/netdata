@@ -203,6 +203,8 @@ profiles without a group keep their defaults. The group includes defaults when
 `defaults` is omitted or `true`, so adding an opt-in metric is concise:
 
 ```yaml
+profiles:
+  include: [example]  # required because this example profile is disabled
 metrics:
   - profile: example
     include:
