@@ -2815,7 +2815,13 @@ static void metadata_event_loop(void *arg)
     // hosts that connected after the last scan cycle still have their
     // metadata pending - store it now, or they will not exist after the
     // restart and their database files will be orphaned
-    store_hosts_metadata(config, false, true);
+    // (skip if a worker scan outlived the callback wait above: it is still
+    // using db_meta and no new scan can start once the command loop exits)
+    if (!config->metadata_running)
+        store_hosts_metadata(config, false, true);
+    else
+        nd_log_daemon(NDLP_WARNING,
+                      "METADATA: skipping the final host metadata flush - a metadata scan is still running");
 
     if (pending_ctx_cleanup_list) {
         Word_t Index = 0;
