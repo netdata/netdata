@@ -579,6 +579,33 @@ timing is `period=5m`, `lookback=5m`, and `publication_delay=5m`. Exact
 metric/statistic rules can assign one-minute Average and six-hour Sum policies
 without either rule shadowing the other's series.
 
+### PrivateLink service grains
+
+`AWS/PrivateLinkServices` is the provider-side companion namespace. AWS
+publishes traffic metrics at five exact dimension sets, so the stock catalog
+uses five profiles rather than merging incompatible identities:
+
+- `privatelink_service` identifies the endpoint service by `service_id`. It is
+  default-enabled and is the only grain with `EndpointsCount`.
+- `privatelink_service_az` adds `availability_zone`.
+- `privatelink_service_load_balancer` adds `load_balancer_arn`.
+- `privatelink_service_az_load_balancer` adds both detail dimensions.
+- `privatelink_service_vpc_endpoint` adds the consumer `vpc_endpoint_id`.
+
+The four detailed profiles are opt-in because one service can fan out across
+Availability Zones, load balancers, and consumer endpoints. All five share one
+namespace discovery scan per target/region. They also share one RGTA association:
+`ec2:vpc-endpoint-service` joined by `Service Id`. Detailed instances therefore
+inherit the parent service's filter membership and mutable tag labels; endpoint
+or load-balancer tags are intentionally not consulted.
+
+Traffic profiles export raw `Average` gauges and per-second `Sum` siblings for
+bytes, new connections, and sent reset packets. Stock timing is 5m/5m/5m.
+`EndpointsCount` is a five-minute service-only gauge that records zero when AWS
+returns no datapoint; absent traffic gauges remain gaps. Exact rules can select
+one-minute traffic Average, five-minute endpoint count, and six-hour byte Sum as
+independent query policies.
+
 ## Credentials, Targets, And Account Identity
 
 `internal/awsauth` is collector-local. A named credential source is either the

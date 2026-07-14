@@ -115,6 +115,52 @@ func TestCollect_E2E(t *testing.T) {
 				`privatelink_endpoint.rst_packets_received_sum{account_id="000000000000",endpoint_type="Interface",region="us-east-1",service_name="service-1",vpc_endpoint_id="vpce-1",vpc_id="vpc-1"}`:   60.0 / 300,
 			},
 		},
+		"PrivateLink service exposes connections, endpoints, and normalized traffic": {
+			profiles: []string{"privatelink_service"},
+			listMetrics: map[string][]cwtypes.Metric{
+				"AWS/PrivateLinkServices": {
+					mkMetric("ActiveConnections", "Service Id", "vpce-svc-1"),
+					mkMetric("BytesProcessed", "Service Id", "vpce-svc-1"),
+					mkMetric("EndpointsCount", "Service Id", "vpce-svc-1"),
+					mkMetric("NewConnections", "Service Id", "vpce-svc-1"),
+					mkMetric("RstPacketsSent", "Service Id", "vpce-svc-1"),
+				},
+			},
+			gmd: map[string]float64{
+				e2eKey("AWS/PrivateLinkServices", "ActiveConnections", "Average", "Service Id", "vpce-svc-1"): 17,
+				e2eKey("AWS/PrivateLinkServices", "BytesProcessed", "Average", "Service Id", "vpce-svc-1"):    100,
+				e2eKey("AWS/PrivateLinkServices", "BytesProcessed", "Sum", "Service Id", "vpce-svc-1"):        1500,
+				e2eKey("AWS/PrivateLinkServices", "EndpointsCount", "Average", "Service Id", "vpce-svc-1"):    3,
+				e2eKey("AWS/PrivateLinkServices", "NewConnections", "Average", "Service Id", "vpce-svc-1"):    2,
+				e2eKey("AWS/PrivateLinkServices", "NewConnections", "Sum", "Service Id", "vpce-svc-1"):        600,
+				e2eKey("AWS/PrivateLinkServices", "RstPacketsSent", "Average", "Service Id", "vpce-svc-1"):    1,
+				e2eKey("AWS/PrivateLinkServices", "RstPacketsSent", "Sum", "Service Id", "vpce-svc-1"):        60,
+			},
+			wantSeries: map[string]metrix.SampleValue{
+				`privatelink_service.active_connections_average{account_id="000000000000",region="us-east-1",service_id="vpce-svc-1"}`: 17,
+				`privatelink_service.bytes_processed_average{account_id="000000000000",region="us-east-1",service_id="vpce-svc-1"}`:    100,
+				`privatelink_service.bytes_processed_sum{account_id="000000000000",region="us-east-1",service_id="vpce-svc-1"}`:        1500.0 / 300,
+				`privatelink_service.endpoints_count_average{account_id="000000000000",region="us-east-1",service_id="vpce-svc-1"}`:    3,
+				`privatelink_service.new_connections_average{account_id="000000000000",region="us-east-1",service_id="vpce-svc-1"}`:    2,
+				`privatelink_service.new_connections_sum{account_id="000000000000",region="us-east-1",service_id="vpce-svc-1"}`:        600.0 / 300,
+				`privatelink_service.rst_packets_sent_average{account_id="000000000000",region="us-east-1",service_id="vpce-svc-1"}`:   1,
+				`privatelink_service.rst_packets_sent_sum{account_id="000000000000",region="us-east-1",service_id="vpce-svc-1"}`:       60.0 / 300,
+			},
+		},
+		"PrivateLink service no-data keeps inactivity counters at zero": {
+			profiles: []string{"privatelink_service"},
+			listMetrics: map[string][]cwtypes.Metric{
+				"AWS/PrivateLinkServices": {
+					mkMetric("EndpointsCount", "Service Id", "vpce-svc-1"),
+				},
+			},
+			wantSeries: map[string]metrix.SampleValue{
+				`privatelink_service.bytes_processed_sum{account_id="000000000000",region="us-east-1",service_id="vpce-svc-1"}`:     0,
+				`privatelink_service.endpoints_count_average{account_id="000000000000",region="us-east-1",service_id="vpce-svc-1"}`: 0,
+				`privatelink_service.new_connections_sum{account_id="000000000000",region="us-east-1",service_id="vpce-svc-1"}`:     0,
+				`privatelink_service.rst_packets_sent_sum{account_id="000000000000",region="us-east-1",service_id="vpce-svc-1"}`:    0,
+			},
+		},
 		"s3 multi-dimension identity, daily period": {
 			profiles: []string{"s3"},
 			listMetrics: map[string][]cwtypes.Metric{

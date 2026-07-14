@@ -66,6 +66,9 @@ var tagJoins = map[string]tagJoin{
 	"privatelink_endpoint": {
 		namespace: "AWS/PrivateLinkEndpoints", resourceTypes: []string{"ec2:vpc-endpoint"}, joinDims: []string{"VPC Endpoint Id"},
 	},
+	"privatelink_service": {
+		namespace: "AWS/PrivateLinkServices", resourceTypes: []string{"ec2:vpc-endpoint-service"}, joinDims: []string{"Service Id"},
+	},
 
 	// Parent-resource joins: joinDims is the parent dimension only, so children
 	// (across storage_type / filter_id / operation) inherit the parent's tags.
@@ -74,6 +77,18 @@ var tagJoins = map[string]tagJoin{
 	"dynamodb_operation": {namespace: "AWS/DynamoDB", resourceTypes: []string{"dynamodb:table"}, joinDims: []string{"TableName"}},
 	"privatelink_endpoint_subnet": {
 		namespace: "AWS/PrivateLinkEndpoints", resourceTypes: []string{"ec2:vpc-endpoint"}, joinDims: []string{"VPC Endpoint Id"},
+	},
+	"privatelink_service_az": {
+		namespace: "AWS/PrivateLinkServices", resourceTypes: []string{"ec2:vpc-endpoint-service"}, joinDims: []string{"Service Id"},
+	},
+	"privatelink_service_load_balancer": {
+		namespace: "AWS/PrivateLinkServices", resourceTypes: []string{"ec2:vpc-endpoint-service"}, joinDims: []string{"Service Id"},
+	},
+	"privatelink_service_az_load_balancer": {
+		namespace: "AWS/PrivateLinkServices", resourceTypes: []string{"ec2:vpc-endpoint-service"}, joinDims: []string{"Service Id"},
+	},
+	"privatelink_service_vpc_endpoint": {
+		namespace: "AWS/PrivateLinkServices", resourceTypes: []string{"ec2:vpc-endpoint-service"}, joinDims: []string{"Service Id"},
 	},
 
 	// Overrides: shared/quirky ARN shapes.
