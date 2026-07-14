@@ -227,10 +227,10 @@ void simple_connector_worker(void *instance_p)
         struct stats *stats = &instance->stats;
         int send_stats = 0;
 
+        netdata_mutex_lock(&instance->mutex);
         if (instance->data_is_ready)
             send_stats = 1;
 
-        netdata_mutex_lock(&instance->mutex);
         if (!connector_specific_data->first_buffer->used || failures) {
             while (!instance->data_is_ready)
                 netdata_cond_wait(&instance->cond_var, &instance->mutex);

@@ -199,7 +199,11 @@ static bool rrdhost_load_kubernetes_labels(void) {
 static void rrdhost_load_auto_labels(void) {
     RRDLABELS *labels = localhost->rrdlabels;
 
-    rrdhost_system_info_to_rrdlabels(localhost->system_info, labels);
+    spinlock_lock(&localhost->rrdhost_update_lock);
+    struct rrdhost_system_info *system_info = rrdhost_system_info_dup(localhost->system_info);
+    spinlock_unlock(&localhost->rrdhost_update_lock);
+    rrdhost_system_info_to_rrdlabels(system_info, labels);
+    rrdhost_system_info_free(system_info);
     add_aclk_host_labels();
 
     // The source should be CONF, but when it is set, these labels are exported by default ('send configured labels' in exporting.conf).

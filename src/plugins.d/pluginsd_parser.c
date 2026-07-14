@@ -840,6 +840,7 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
     // parse the parameters
 
     time_t update_every = (time_t) str2ull_encoded(update_every_str);
+    time_t parsed_update_every = update_every;
     time_t end_time = (time_t) str2ull_encoded(end_time_str);
 
     time_t wall_clock_time;
@@ -848,8 +849,10 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
     else
         wall_clock_time = (time_t) str2ull_encoded(wall_clock_time_str);
 
-    if (unlikely(update_every != st->update_every))
+    if (unlikely(update_every != st->update_every)) {
         rrdset_set_update_every_s(st, update_every);
+        update_every = st->update_every;
+    }
 
     timing_step(TIMING_STEP_BEGIN2_PARSE);
 
@@ -897,7 +900,7 @@ static ALWAYS_INLINE PARSER_RC pluginsd_begin_v2(char **words, size_t num_words,
         buffer_fast_strcat(wb, rrdset_id(st), string_strlen(st->id));
         buffer_fast_strcat(wb, "' ", 2);
 
-        if(can_copy)
+        if(can_copy && update_every == parsed_update_every)
             buffer_strcat(wb, update_every_str);
         else
             buffer_print_uint64_encoded(wb, integer_encoding, update_every);
