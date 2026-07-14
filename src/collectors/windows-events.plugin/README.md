@@ -24,7 +24,7 @@ efficient.
 
 `windows-events.plugin` is a Netdata Function Plugin.
 
-To protect your privacy, as with all Netdata Functions, a free Netdata Cloud user account is required to access it.
+To protect your privacy, as with all Netdata Functions, you can access it through the Agent directly, a Parent, or Netdata Cloud. A Netdata Cloud account is only required when you choose to use Cloud access.
 For more information check [this discussion](https://github.com/netdata/netdata/discussions/16136).
 
 ## Events Sources
@@ -211,14 +211,11 @@ combine the events of multiple servers, as you see fit.
 Yes. When your nodes are connected to a Netdata parent, all their functions are available via the parent's UI.
 So, from the parent UI, you can access the functions of all your nodes.
 
-Keep in mind that to protect your privacy, in order to access Netdata functions, you need a free Netdata Cloud
-account.
+Keep in mind that to protect your privacy, you can access Netdata functions through the Agent directly, a Parent, or Netdata Cloud. A Netdata Cloud account is only required when you choose to use Cloud access.
 
 ### Is any of my data exposed to Netdata Cloud from this plugin?
 
-No. When you access the Agent directly, none of your data passes through Netdata Cloud. You need a free Netdata
-Cloud account only to verify your identity and enable the use of Netdata Functions. Once this is done, all the
-data flow directly from your Netdata Agent to your web browser.
+No. When you access the Agent directly, none of your data passes through Netdata Cloud. A Netdata Cloud account is only required when you use Cloud access. Once the request is authorized, all the data flows directly from your Netdata Agent to your web browser.
 
 When you access Netdata via https://app.netdata.cloud, your data travel via Netdata Cloud, but they are not stored
 in Netdata Cloud. This is to allow you access your Netdata Agents from anywhere. All communication from/to

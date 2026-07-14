@@ -54,6 +54,7 @@ See [Organize your infrastructure and invite your team](/docs/netdata-cloud/orga
 ## Next Steps
 
 - Compare current Cloud plans and entitlements on the [pricing page](https://www.netdata.cloud/pricing/).
+- Try the [Live Demo](/docs/live-demo.md) for sample nodes and dashboards before connecting your own infrastructure.
 - Review [standalone Agent deployments](/docs/deployment-guides/standalone-deployment.md).
 - Review [Netdata Parents](/docs/deployment-guides/deployment-with-centralization-points.md) before centralizing storage or streaming many Agents.
 - Explore [Netdata AI](/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md) for supported AI and MCP workflows.

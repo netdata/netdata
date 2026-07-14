@@ -35,6 +35,20 @@ Each Function declares its required access level. Depending on that declaration 
 
 Before sharing Function output, review it for secrets and identifying information.
 
+## Explore Functions by Domain
+
+Start with the domain pages below when you want a stable entry point instead of a mutable inventory:
+
+- [Processes](/docs/functions/processes.md)
+- [Database Queries](/docs/functions/databases.md)
+- [SQL collector Functions](/src/go/plugin/go.d/collector/sql/integrations/sql_databases_generic.md)
+- [systemd journal Functions](/src/collectors/systemd-journal.plugin/README.md)
+- [Windows Events Functions](/src/collectors/windows-events.plugin/README.md)
+- [macOS Logs Functions](/src/collectors/macos-logs.plugin/README.md)
+- [Live tab](/docs/dashboards-and-charts/live-tab.md)
+- [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md)
+- [Netdata MCP](/docs/netdata-ai/mcp/README.md)
+
 ## Function Guides
 
 - [Processes](/docs/functions/processes.md): attribute current resource usage to individual processes and application groups.

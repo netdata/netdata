@@ -26,7 +26,7 @@ The macOS Logs plugin by Netdata makes viewing, exploring, and analyzing macOS u
 
 - macOS with the OSLog framework available.
 - Access to the local unified log store. Apple's OSLog API requires elevated privileges for local system logs, so the installed `macos-logs.plugin` runs with the same root-owned setuid permission model used by Netdata's other privileged Function plugins.
-- A Netdata Cloud account to access sensitive Netdata Functions.
+- A Netdata Cloud account only when you use Netdata Cloud to access sensitive Netdata Functions.
 
 ## Log source
 

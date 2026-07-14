@@ -4,6 +4,8 @@ Database collectors can expose on-demand Functions for investigating expensive q
 
 Use the integration documentation linked below as the source of truth for database privileges, collector configuration, query semantics, filters, and result columns.
 
+SQL collectors can also expose user-defined Functions for interactive query views in the Live tab. See the [SQL databases integration page](/src/go/plugin/go.d/collector/sql/integrations/sql_databases_generic.md) for the supported `functions` configuration and Live-tab grouping.
+
 ## Supported Capabilities
 
 | Database                 | Top queries | Running queries | Deadlock info | Error info | Integration documentation                                                                        |

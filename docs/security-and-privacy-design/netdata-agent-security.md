@@ -47,6 +47,7 @@ Streaming receivers authenticate senders with an API key. Enable TLS when stream
 
 See [Secure your Netdata Agents](/docs/netdata-agent/securing-netdata-agents.md) for operational configuration.
 
+<a id="outbound-network-communication"></a>
 ## Netdata-Managed Outbound Connections
 
 A stock installation can use these Netdata-managed outbound paths:

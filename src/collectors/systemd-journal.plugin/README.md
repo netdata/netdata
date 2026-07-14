@@ -25,12 +25,12 @@ The `systemd` journal plugin provides an efficient way to view, explore, and ana
 | Requirement | Details |
 |-------------|---------|
 | Netdata Agent v1.44+ | This plugin requires Netdata version 1.44 or newer |
-| Netdata Cloud account | Required to use Netdata Functions, including this plugin |
+| Netdata Cloud account | Required only when using Netdata Cloud; direct Agent or Parent access does not require it |
 | **Not supported in**: | Static builds (use Debian-based containers instead) |
 
 :::tip
 
-This plugin is a Netdata Function Plugin. A free Netdata Cloud account is required. See the [Netdata Functions discussion](https://github.com/netdata/netdata/discussions/16136).
+This plugin is a Netdata Function Plugin. You can access it from the Agent directly, through a Parent, or through Netdata Cloud. A Netdata Cloud account is only required for Cloud access. See the [Netdata Functions discussion](https://github.com/netdata/netdata/discussions/16136).
 
 :::
 
@@ -362,7 +362,7 @@ The Netdata `systemd` journal plugin is designed to work **out of the box** with
 |------------|-------------|
 | Netdata Agent | Installed on the node or centralization server |
 | Journal files | Located in `/var/log/journal` (persistent) or `/run/log/journal` (volatile) |
-| Netdata Cloud account | Required to access Netdata Functions, including this plugin |
+| Netdata Cloud account | Required only when using Netdata Cloud; direct Agent or Parent access does not require it |
 
 :::tip
 
