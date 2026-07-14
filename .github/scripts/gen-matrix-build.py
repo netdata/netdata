@@ -21,14 +21,12 @@ for item in data.include:
     entry = {
         'artifact_key': item.distro + item.version.replace('.', ''),
         'base_image': item.base_image,
+        'distro': item.distro,
         'version': item.version,
     }
 
     if item.env_prep is not None:
         entry['env_prep'] = item.env_prep
-
-    if item.jsonc_removal is not None:
-        entry['jsonc_removal'] = item.jsonc_removal
 
     entries.append(entry)
 
