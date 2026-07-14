@@ -2142,8 +2142,13 @@ static void metadata_scan_host(struct meta_config_s *config, RRDHOST *host, bool
 
     rrdset_foreach_reentrant(st, host) {
 
-        if (!final && SHUTDOWN_REQUESTED(config))
+        // when a normal scan is interrupted by shutdown, re-mark the host
+        // as pending (the caller cleared its flag) so the final shutdown
+        // flush picks it up and completes the remaining charts
+        if (!final && SHUTDOWN_REQUESTED(config)) {
+            host_need_recheck = true;
             break;
+        }
 
         if(rrdset_flag_check(st, RRDSET_FLAG_METADATA_UPDATE)) {
 
