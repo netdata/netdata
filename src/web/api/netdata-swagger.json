@@ -1041,6 +1041,9 @@
             "$ref": "#/components/parameters/cardinalityLimit"
           },
           {
+            "$ref": "#/components/parameters/dataLimit"
+          },
+          {
             "$ref": "#/components/parameters/timeoutMS"
           },
           {
@@ -1230,6 +1233,9 @@
           },
           {
             "$ref": "#/components/parameters/cardinalityLimit"
+          },
+          {
+            "$ref": "#/components/parameters/dataLimit"
           },
           {
             "$ref": "#/components/parameters/timeoutMS"
@@ -7202,6 +7208,17 @@
         "required": false,
         "schema": {
           "type": "string"
+        }
+      },
+      "dataLimit": {
+        "name": "limit",
+        "in": "query",
+        "description": "Limits the number of dimensions returned by a data query to the top-N contributors: the query engine keeps the `limit` highest-contributing dimensions and folds the rest into one `remaining` aggregate dimension (equivalent to `cardinality_limit` = `limit` + 1; `cardinality_limit`, when given, takes precedence). Agents that predate this parameter ignore it and return all dimensions, so clients can use it without version gating.\n",
+        "required": false,
+        "schema": {
+          "type": "integer",
+          "format": "int64",
+          "minimum": 1
         }
       },
       "cardinalityLimit": {
