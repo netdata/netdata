@@ -234,9 +234,10 @@ OS_PROCESS_MEMORY os_process_memory(pid_t pid) {
     if (process_id == 0)
         process_id = GetCurrentProcessId();
     
-    // PROCESS_QUERY_LIMITED_INFORMATION is sufficient for GetProcessMemoryInfo
-    // on Vista+ and succeeds for protected processes that deny PROCESS_VM_READ.
-    hProcess = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, process_id);
+    // PROCESS_QUERY_INFORMATION (without PROCESS_VM_READ) is sufficient for
+    // GetProcessMemoryInfo on Vista+ and avoids the VM-read right that causes
+    // OpenProcess to fail for processes that deny PROCESS_VM_READ.
+    hProcess = OpenProcess(PROCESS_QUERY_INFORMATION, FALSE, process_id);
     if (hProcess) {
         // GetProcessMemoryInfo is a direct Windows API call to get memory info
         PROCESS_MEMORY_COUNTERS_EX pmc;
