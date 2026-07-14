@@ -185,7 +185,7 @@ On Windows Netdata queries Windows Event Logs (WEL), Event Tracing for Windows (
 
 ML is the simplest way to model system and application behavior. Done well, it detects anomalies, surfaces correlations, and identifies blast radius independently of configured alerts.
 
-Netdata makes ML automatic and universal, requiring no configuration. It trains 18k-means models per metric across different rolling time windows and requires unanimous agreement across all of them before flagging an anomaly, significantly reducing false positives versus a single model while staying sensitive to real issues:
+Netdata makes ML automatic and universal, requiring no configuration. It trains 18 k-means models per metric across different rolling time windows and requires unanimous agreement across all of them before flagging an anomaly, significantly reducing false positives versus a single model while staying sensitive to real issues:
 
 - **Continuous training**: Models train automatically as data arrives
 - **Real-time detection**: Anomaly detection runs instantly, not in batches
