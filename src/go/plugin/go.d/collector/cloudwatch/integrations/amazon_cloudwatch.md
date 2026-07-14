@@ -715,6 +715,10 @@ The following alerts are available:
 
 ## Metrics
 
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 Charts are generated at runtime from the **active service profiles**. Each static or discovered AWS instance becomes a chart instance identified by its `account_id`, `region`, and the profile's identifying dimensions (for example `instance_id` for EC2, or `bucket_name` and `storage_type` for S3); its contexts live under the `cloudwatch.` namespace. All CloudWatch metrics use the job's configured `vnode` when present, otherwise the node running the collector. Individual AWS resources are distinguished by labels, not generated as separate Netdata nodes. Because CloudWatch publishes with a delay, allow a few minutes for the first data points.
 
 Every job also emits three **Collector Activity** chart types in the same `cloudwatch.*` context namespace as the service metrics: `cloudwatch.collector_api_calls` with labeled operation instances and a `calls` dimension, `cloudwatch.collector_metric_requests` with a `requests` dimension, and `cloudwatch.collector_queries` with labeled profile instances and a `queries` dimension. These are absolute counts for the interval since the preceding successfully committed collector frame; they measure collector-issued work and are not an AWS invoice.
@@ -795,6 +799,60 @@ PrivateLink service metrics have five exact grains. The default `privatelink_ser
 At stock timing, every PrivateLink profile uses a five-minute period, lookback, and publication delay. An endpoint, subnet, or default service instance has five structural CloudWatch metrics, or 1,440 metric requests per day before retries. Each opted-in detailed service instance has four structural metrics, or 1,152 metric requests per day. A one-minute override runs its selected metrics five times as often; narrow profiles, metrics, regions, grains, and resource tags when that freshness is not required.
 
 These opt-in profiles include potentially high-cardinality data. **S3 Request Metrics** additionally require per-bucket request-metrics configuration in AWS and are billed at CloudWatch custom-metric rates; they collect nothing until enabled on the bucket. PrivateLink cardinality grows with endpoint subnets, service Availability Zones, load balancers, and consumer endpoints; the combined Availability Zone/load-balancer grain multiplies those dimensions. The Billing service/account grains grow with the payer's services and linked accounts; their cost guidance is described above.
+
+
+### Per AWS account, region, and operation
+
+Collector-issued CloudWatch API work attributed to one resolved AWS account, region, and API operation.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| account_id | Resolved AWS account ID. |
+| region | AWS region where the collector issued the operation. |
+| operation | Collector-issued CloudWatch API operation (`list_metrics` or `get_metric_data`). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cloudwatch.collector_api_calls | calls | calls |
+
+### Per AWS account and region
+
+Calculated CloudWatch metric-request billing units attributed to one resolved AWS account and region.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| account_id | Resolved AWS account ID. |
+| region | AWS region where the collector submitted the metric requests. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cloudwatch.collector_metric_requests | requests | requests |
+
+### Per AWS account, region, and profile
+
+Raw CloudWatch metric-data queries attributed to their source profile for collection-plan tuning.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| account_id | Resolved AWS account ID. |
+| region | AWS region where the collector submitted the queries. |
+| profile | CloudWatch profile that produced the submitted raw queries. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cloudwatch.collector_queries | queries | queries |
 
 
 

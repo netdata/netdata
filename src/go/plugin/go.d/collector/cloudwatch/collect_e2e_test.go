@@ -310,6 +310,72 @@ func TestCollect_E2E(t *testing.T) {
 	}
 }
 
+func TestCollect_ActivityAttributionAcrossProfiles(t *testing.T) {
+	const account = "000000000000"
+	fake := &e2eCloudWatch{list: map[string][]cwtypes.Metric{
+		"AWS/EC2":    {mkMetric("CPUUtilization", "InstanceId", "i-1")},
+		"AWS/Lambda": {mkMetric("Invocations", "FunctionName", "fn-1")},
+	}}
+	c := New()
+	configureExactRule(c, []string{"us-east-1"}, []string{"ec2", "lambda"})
+	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
+	useFakeClient(c, fake)
+	c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
+
+	series, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, 1, fake.getCalls, "matching policies from both profiles must share one GetMetricData batch")
+	assert.Equal(t, metrix.SampleValue(2), series[activityAPICallsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(1), series[activityAPICallsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(11), series[activityMetricRequestsMetric+`{account_id="000000000000",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(7), series[activityQueriesMetric+`{account_id="000000000000",profile="ec2",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(6), series[activityQueriesMetric+`{account_id="000000000000",profile="lambda",region="us-east-1"}`])
+}
+
+func TestCollect_ActivitySurvivesMetricStoreCommitFailure(t *testing.T) {
+	const account = "000000000000"
+	valueKey := e2eKey("AWS/Billing", "EstimatedCharges", "Maximum", "Currency", "USD")
+	fake := &e2eCloudWatch{values: map[string]float64{valueKey: 123.45}}
+	c := New()
+	configureExactRule(c, []string{"us-east-1"}, []string{"billing_total"})
+	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
+	useFakeClient(c, fake)
+	now := time.Unix(1_700_000_000, 0)
+	c.now = func() time.Time { return now }
+
+	managed, ok := metrix.AsCycleManagedStore(c.store)
+	require.True(t, ok)
+	cycle := managed.CycleController()
+	cycle.BeginCycle()
+	c.store.Write().SnapshotMeter("test").Gauge("conflict").Observe(1)
+	require.NoError(t, cycle.CommitCycleSuccess())
+
+	cycle.BeginCycle()
+	require.NoError(t, c.Collect(context.Background()))
+	c.store.Write().SnapshotMeter("test").Gauge("conflict").Observe(2)
+	c.store.Write().SnapshotMeter("test").Counter("conflict").ObserveTotal(3)
+	err := cycle.CommitCycleSuccess()
+	require.Error(t, err)
+	require.ErrorContains(t, err, "conflicting instrument kinds")
+
+	now = now.Add(10 * time.Minute)
+	cycle.BeginCycle()
+	require.NoError(t, c.Collect(context.Background()))
+	require.NoError(t, cycle.CommitCycleSuccess())
+
+	reader := c.store.Read()
+	assertActivityValue(t, reader, activityAPICallsMetric, metrix.Labels{
+		"account_id": account, "region": "us-east-1", "operation": activityOperationGetMetricData,
+	}, 2)
+	assertActivityValue(t, reader, activityMetricRequestsMetric, metrix.Labels{
+		"account_id": account, "region": "us-east-1",
+	}, 2)
+	assertActivityValue(t, reader, activityQueriesMetric, metrix.Labels{
+		"account_id": account, "region": "us-east-1", "profile": "billing_total",
+	}, 2)
+	assert.Equal(t, 2, fake.getCalls)
+}
+
 type e2eScenario struct {
 	profiles    []string
 	listMetrics map[string][]cwtypes.Metric

@@ -1056,5 +1056,54 @@ modules:
       availability: []
       dynamic_context_prefixes:
         - prefix: cloudwatch.
-          reason: CloudWatch chart contexts are generated at runtime from the active service profiles under the cloudwatch namespace.
-      scopes: []
+          reason: Service-profile chart contexts are generated at runtime under the cloudwatch namespace; the fixed collector-activity contexts sharing this prefix are listed below.
+      scopes:
+        - name: AWS account, region, and operation
+          description: Collector-issued CloudWatch API work attributed to one resolved AWS account, region, and API operation.
+          labels:
+            - name: account_id
+              description: Resolved AWS account ID.
+            - name: region
+              description: AWS region where the collector issued the operation.
+            - name: operation
+              description: Collector-issued CloudWatch API operation (`list_metrics` or `get_metric_data`).
+          metrics:
+            - name: cloudwatch.collector_api_calls
+              description: CloudWatch API calls issued in the interval since the preceding successfully committed collector frame.
+              unit: calls
+              chart_type: line
+              dimensions:
+                - name: calls
+                  description: Calls issued during the interval.
+        - name: AWS account and region
+          description: Calculated CloudWatch metric-request billing units attributed to one resolved AWS account and region.
+          labels:
+            - name: account_id
+              description: Resolved AWS account ID.
+            - name: region
+              description: AWS region where the collector submitted the metric requests.
+          metrics:
+            - name: cloudwatch.collector_metric_requests
+              description: Calculated `GetMetricData` metric-request billing units submitted in the interval since the preceding successfully committed collector frame.
+              unit: requests
+              chart_type: line
+              dimensions:
+                - name: requests
+                  description: Calculated metric-request billing units submitted during the interval.
+        - name: AWS account, region, and profile
+          description: Raw CloudWatch metric-data queries attributed to their source profile for collection-plan tuning.
+          labels:
+            - name: account_id
+              description: Resolved AWS account ID.
+            - name: region
+              description: AWS region where the collector submitted the queries.
+            - name: profile
+              description: CloudWatch profile that produced the submitted raw queries.
+          metrics:
+            - name: cloudwatch.collector_queries
+              description: Raw `MetricDataQuery` items submitted in the interval since the preceding successfully committed collector frame.
+              unit: queries
+              chart_type: line
+              dimensions:
+                - name: queries
+                  description: Raw metric-data queries submitted during the interval.
