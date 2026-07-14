@@ -303,11 +303,77 @@ func TestCollect_E2E(t *testing.T) {
 			series, err := collecttest.CollectScalarSeries(c)
 			require.NoError(t, err)
 
-			assert.Equal(t, tc.wantSeries, series)
+			assert.Equal(t, tc.wantSeries, workloadSeries(series))
 			collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 			collecttest.AssertChartTemplateSchema(t, c.ChartTemplateYAML())
 		})
 	}
+}
+
+func TestCollect_ActivityAttributionAcrossProfiles(t *testing.T) {
+	const account = "000000000000"
+	fake := &e2eCloudWatch{list: map[string][]cwtypes.Metric{
+		"AWS/EC2":    {mkMetric("CPUUtilization", "InstanceId", "i-1")},
+		"AWS/Lambda": {mkMetric("Invocations", "FunctionName", "fn-1")},
+	}}
+	c := New()
+	configureExactRule(c, []string{"us-east-1"}, []string{"ec2", "lambda"})
+	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
+	useFakeClient(c, fake)
+	c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
+
+	series, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, 1, fake.getCalls, "matching policies from both profiles must share one GetMetricData batch")
+	assert.Equal(t, metrix.SampleValue(2), series[activityAPICallsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(1), series[activityAPICallsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(11), series[activityMetricRequestsMetric+`{account_id="000000000000",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(7), series[activityQueriesMetric+`{account_id="000000000000",profile="ec2",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(6), series[activityQueriesMetric+`{account_id="000000000000",profile="lambda",region="us-east-1"}`])
+}
+
+func TestCollect_ActivitySurvivesMetricStoreCommitFailure(t *testing.T) {
+	const account = "000000000000"
+	valueKey := e2eKey("AWS/Billing", "EstimatedCharges", "Maximum", "Currency", "USD")
+	fake := &e2eCloudWatch{values: map[string]float64{valueKey: 123.45}}
+	c := New()
+	configureExactRule(c, []string{"us-east-1"}, []string{"billing_total"})
+	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
+	useFakeClient(c, fake)
+	now := time.Unix(1_700_000_000, 0)
+	c.now = func() time.Time { return now }
+
+	managed, ok := metrix.AsCycleManagedStore(c.store)
+	require.True(t, ok)
+	cycle := managed.CycleController()
+	cycle.BeginCycle()
+	c.store.Write().SnapshotMeter("test").Gauge("conflict").Observe(1)
+	require.NoError(t, cycle.CommitCycleSuccess())
+
+	cycle.BeginCycle()
+	require.NoError(t, c.Collect(context.Background()))
+	c.store.Write().SnapshotMeter("test").Gauge("conflict").Observe(2)
+	c.store.Write().SnapshotMeter("test").Counter("conflict").ObserveTotal(3)
+	err := cycle.CommitCycleSuccess()
+	require.Error(t, err)
+	require.ErrorContains(t, err, "conflicting instrument kinds")
+
+	now = now.Add(10 * time.Minute)
+	cycle.BeginCycle()
+	require.NoError(t, c.Collect(context.Background()))
+	require.NoError(t, cycle.CommitCycleSuccess())
+
+	reader := c.store.Read()
+	assertActivityValue(t, reader, activityAPICallsMetric, metrix.Labels{
+		"account_id": account, "region": "us-east-1", "operation": activityOperationGetMetricData,
+	}, 2)
+	assertActivityValue(t, reader, activityMetricRequestsMetric, metrix.Labels{
+		"account_id": account, "region": "us-east-1",
+	}, 2)
+	assertActivityValue(t, reader, activityQueriesMetric, metrix.Labels{
+		"account_id": account, "region": "us-east-1", "profile": "billing_total",
+	}, 2)
+	assert.Equal(t, 2, fake.getCalls)
 }
 
 type e2eScenario struct {
@@ -535,8 +601,19 @@ func TestCollect_OrderedRulesFirstTargetOwnsSameAccountSeries(t *testing.T) {
 	series, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
 	assert.Equal(t, metrix.SampleValue(5), series[`ec2.cpu_utilization_average{account_id="000000000000",instance_id="i-1",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(2), series[activityAPICallsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`],
+		"same-account targets aggregate into one account/region activity series")
+	assert.Equal(t, metrix.SampleValue(1), series[activityAPICallsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
 	assert.Equal(t, 1, first.getCalls)
 	assert.Zero(t, second.getCalls, "the later rule's duplicate final series must not be queried")
+
+	series, err = collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(0), series[activityAPICallsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(0), series[activityAPICallsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(0), series[activityMetricRequestsMetric+`{account_id="000000000000",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(0), series[activityQueriesMetric+`{account_id="000000000000",profile="ec2",region="us-east-1"}`])
+	assert.Equal(t, 1, first.getCalls, "a cached interval must publish zero activity without making another query")
 }
 
 // e2eKey builds the fixture key from (namespace, metric, statistic) plus dimension
@@ -630,7 +707,7 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 	require.NoError(t, err)
 
 	gotNames := make(map[string]struct{}, len(series))
-	for k := range series {
+	for k := range workloadSeries(series) {
 		gotNames[seriesName(k)] = struct{}{}
 	}
 	assert.Equal(t, wantNames, gotNames, "every stock profile's every active (metric, statistic) must produce a series")
@@ -668,7 +745,7 @@ func TestCollect_MultiRegion(t *testing.T) {
 		`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="eu-west-1"}`:       0,
 		`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:      0,
 		`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="eu-west-1"}`:      0,
-	}, series)
+	}, workloadSeries(series))
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 }
 
@@ -686,9 +763,25 @@ func TestCollect_DiscoveryFailSoft(t *testing.T) {
 
 	t.Run("total discovery failure on the first pass errors the collect", func(t *testing.T) {
 		c := newBase("us-east-1")
-		useFakeClient(c, &e2eCloudWatch{listErr: errors.New("AccessDenied")})
+		fake := &e2eCloudWatch{listErr: errors.New("AccessDenied")}
+		useFakeClient(c, fake)
 		_, err := collecttest.CollectScalarSeries(c)
 		require.Error(t, err)
+
+		fake.mu.Lock()
+		fake.listErr = nil
+		fake.list = map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}}
+		fake.values = map[string]float64{e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"): 7}
+		fake.mu.Unlock()
+		c.now = func() time.Time {
+			return time.Unix(1_700_000_000, 0).Add(time.Duration(c.Discovery.RefreshEvery) * time.Second)
+		}
+
+		series, err := collecttest.CollectScalarSeries(c)
+		require.NoError(t, err)
+		assert.Equal(t, metrix.SampleValue(2), series[activityAPICallsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`],
+			"the failed cycle's ListMetrics call must appear after recovery")
+		assert.Equal(t, metrix.SampleValue(1), series[activityAPICallsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
 	})
 
 	t.Run("partial region failure is tolerated", func(t *testing.T) {
@@ -714,6 +807,6 @@ func TestCollect_DiscoveryFailSoft(t *testing.T) {
 			`ec2.network_out_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:         0,
 			`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:       0,
 			`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:      0,
-		}, series, "the healthy region still produces its series (rate metrics with no data record 0)")
+		}, workloadSeries(series), "the healthy region still produces its series (rate metrics with no data record 0)")
 	})
 }

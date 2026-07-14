@@ -78,7 +78,7 @@ Replace `AWS/<Service>` with the service namespace (for example `AWS/AmazonMQ`) 
 :::
 
 
-The collector compiles named credential sources, monitored targets, and ordered collection rules into an immutable runtime plan. Profiles with identifying dimensions discover available metrics with one CloudWatch `ListMetrics` scan per target, region, and namespace, using the least restrictive recent-activity policy required by the participating selected series, then apply each profile's exact dimension matcher. A profile whose dimensions are all constants compiles a known static instance and skips `ListMetrics`. Optional resource-tag predicates are resolved with the Resource Groups Tagging API before query expansion. Each selected series has a resolved query policy: aggregation period, rolling lookback, and publication delay. `GetMetricData` searches the aligned rolling window for the newest complete finite datapoint, while Netdata receives the retained numeric value on every collection cycle. Each target resolves its AWS account id through `sts:GetCallerIdentity`; target names remain distinct execution identities even when they resolve to the same account. Rule order, then target order within each rule, resolves overlap: the first matching rule/target owns each overlapping exported metric/statistic series.
+The collector compiles named credential sources, monitored targets, and ordered collection rules into an immutable runtime plan. Profiles with identifying dimensions discover available metrics with one CloudWatch `ListMetrics` scan per target, region, and namespace, using the least restrictive recent-activity policy required by the participating selected series, then apply each profile's exact dimension matcher. A profile whose dimensions are all constants compiles a known static instance and skips `ListMetrics`. Optional resource-tag predicates are resolved with the Resource Groups Tagging API before query expansion. Each selected series has a resolved query policy: aggregation period, rolling lookback, and publication delay. `GetMetricData` searches the aligned rolling window for the newest complete finite datapoint, while Netdata receives the retained numeric value on every collection cycle. Each target resolves its AWS account id through `sts:GetCallerIdentity`; target names remain distinct execution identities even when they resolve to the same account. Rule order, then target order within each rule, resolves overlap: the first matching rule/target owns each overlapping exported metric/statistic series. Built-in collector-activity charts show CloudWatch API calls, calculated metric-request units, and raw queries so operators can tune the plan and relate collector work to AWS billing.
 
 
 This collector is supported on all platforms.
@@ -112,6 +112,8 @@ A rule that omits `profiles` selects all default-enabled profiles for its target
 #### Performance Impact
 
 AWS bills CloudWatch API usage. `GetMetricData` is the cost driver; `ListMetrics` discovery falls under the free tier and then costs a fraction as much. As a rough anchor, `GetMetricData` is billed at roughly $0.01 per 1,000 metrics requested -- confirm current [CloudWatch pricing](https://aws.amazon.com/cloudwatch/pricing/) for your region. The collector sends one query per selected metric/statistic series, but for AWS billing up to five statistics requested for the same metric count as one metric request. Point-aware batching keeps each such five-statistic billing unit in one request. In normal operation each series is queried once per newly eligible effective-period window, not once per Netdata collection cycle. A transient request or result failure retries that series after one `update_every`; subsequent delays double within the same eligible window and are capped at its effective period. Those retries are also billable, so `update_every` affects failure-time cost even though it does not set normal query cadence. Cost otherwise scales with selected targets, instances, metrics, statistics beyond AWS's grouping, periods, and lookback response work. Longer lookbacks increase requested datapoints and can disable CloudWatch's three-hour recently-active discovery filter. The collector minimizes work with curated profiles, exact metric and resource-tag selection, exact dimension matching, single-statistic defaults, completed-sibling isolation, bounded retry backoff, billing-group-preserving batches, shared compatible discovery scans, cached discovery/query plans, and `recently_active_only`. To reduce cost further, narrow `rules[].targets`, `rules[].profiles`, `rules[].metrics`, `rules[].regions`, or configure resource tag filters.
+
+Three collector-activity chart types expose the inputs behind that cost model. **CloudWatch API Calls** counts collector-issued `ListMetrics` and `GetMetricData` calls, including every pagination page; each account, region, and operation is a labeled chart instance with a `calls` dimension. **CloudWatch Metric Requests** counts the calculated `GetMetricData` billing units submitted on those pages, using AWS's up-to-five-statistics grouping; it is charted per account and region with a `requests` dimension. **CloudWatch Raw Queries** counts submitted `MetricDataQuery` items for tuning; each account, region, and profile is a labeled chart instance with a `queries` dimension. Calls and metric-request units deliberately have no profile attribution because one shared scan or request can serve multiple profiles; targets resolving to the same account aggregate. Each chart reports an absolute count for the interval since the preceding successfully committed collector frame; a successful cached interval with no real AWS work reports zero for known series. Activity from failed collection cycles or failed metric-store commits is carried into the next successful frame, while collector job replacement or process restart resets it. The gauges exclude SDK-internal retry attempts and are billing inputs, not an exact AWS invoice; AWS owns the billing and pagination rules.
 
 The opt-in Billing profiles use a 10-minute period, so each selected single-statistic Billing series normally produces 144 billable metric requests per day before retries. For example, 200 selected Billing series produce 28,800 metric requests per day. Their 24-hour lookback reserves 144 datapoint slots per query (28,800 slots when all 200 are due), but AWS charges `GetMetricData` by metrics requested, not by those reserved datapoint slots. The total profile is static and performs no `ListMetrics`; the three dynamic Billing grains share one namespace discovery stream per target and refresh interval before pagination and SDK retries. Billing cardinality grows with services, linked accounts, and observed account/service pairs, so select only the grains you need.
 
@@ -713,7 +715,13 @@ The following alerts are available:
 
 ## Metrics
 
+Metrics grouped by *scope*.
+
+The scope defines the instance that the metric belongs to. An instance is uniquely identified by a set of labels.
+
 Charts are generated at runtime from the **active service profiles**. Each static or discovered AWS instance becomes a chart instance identified by its `account_id`, `region`, and the profile's identifying dimensions (for example `instance_id` for EC2, or `bucket_name` and `storage_type` for S3); its contexts live under the `cloudwatch.` namespace. All CloudWatch metrics use the job's configured `vnode` when present, otherwise the node running the collector. Individual AWS resources are distinguished by labels, not generated as separate Netdata nodes. Because CloudWatch publishes with a delay, allow a few minutes for the first data points.
+
+Every job also emits three **Collector Activity** chart types in the same `cloudwatch.*` context namespace as the service metrics: `cloudwatch.collector_api_calls` with labeled operation instances and a `calls` dimension, `cloudwatch.collector_metric_requests` with a `requests` dimension, and `cloudwatch.collector_queries` with labeled profile instances and a `queries` dimension. These are absolute counts for the interval since the preceding successfully committed collector frame; they measure collector-issued work and are not an AWS invoice.
 
 Key terms:
 
@@ -791,6 +799,60 @@ PrivateLink service metrics have five exact grains. The default `privatelink_ser
 At stock timing, every PrivateLink profile uses a five-minute period, lookback, and publication delay. An endpoint, subnet, or default service instance has five structural CloudWatch metrics, or 1,440 metric requests per day before retries. Each opted-in detailed service instance has four structural metrics, or 1,152 metric requests per day. A one-minute override runs its selected metrics five times as often; narrow profiles, metrics, regions, grains, and resource tags when that freshness is not required.
 
 These opt-in profiles include potentially high-cardinality data. **S3 Request Metrics** additionally require per-bucket request-metrics configuration in AWS and are billed at CloudWatch custom-metric rates; they collect nothing until enabled on the bucket. PrivateLink cardinality grows with endpoint subnets, service Availability Zones, load balancers, and consumer endpoints; the combined Availability Zone/load-balancer grain multiplies those dimensions. The Billing service/account grains grow with the payer's services and linked accounts; their cost guidance is described above.
+
+
+### Per AWS account, region, and operation
+
+Collector-issued CloudWatch API work attributed to one resolved AWS account, region, and API operation.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| account_id | Resolved AWS account ID. |
+| region | AWS region where the collector issued the operation. |
+| operation | Collector-issued CloudWatch API operation (`list_metrics` or `get_metric_data`). |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cloudwatch.collector_api_calls | calls | calls |
+
+### Per AWS account and region
+
+Calculated CloudWatch metric-request billing units attributed to one resolved AWS account and region.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| account_id | Resolved AWS account ID. |
+| region | AWS region where the collector submitted the metric requests. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cloudwatch.collector_metric_requests | requests | requests |
+
+### Per AWS account, region, and profile
+
+Raw CloudWatch metric-data queries attributed to their source profile for collection-plan tuning.
+
+Labels:
+
+| Label      | Description     |
+|:-----------|:----------------|
+| account_id | Resolved AWS account ID. |
+| region | AWS region where the collector submitted the queries. |
+| profile | CloudWatch profile that produced the submitted raw queries. |
+
+Metrics:
+
+| Metric | Dimensions | Unit |
+|:------|:----------|:----|
+| cloudwatch.collector_queries | queries | queries |
 
 
 

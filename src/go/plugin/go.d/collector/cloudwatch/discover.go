@@ -40,6 +40,7 @@ func selectedSeriesUseRecentlyActive(series []compiledSeries, enabled bool) bool
 // consume the shared continuation-operation budget.
 type discoveryGroupScanner struct {
 	group              discoveryGroup
+	activity           *collectorActivity
 	matchers           map[string][]*discoveryMatcher
 	instances          map[string][]collectionInstance
 	nextToken          *string
@@ -51,9 +52,10 @@ type discoveryGroupScanner struct {
 	done               bool
 }
 
-func newDiscoveryGroupScanner(group discoveryGroup) *discoveryGroupScanner {
+func newDiscoveryGroupScanner(group discoveryGroup, activity *collectorActivity) *discoveryGroupScanner {
 	return &discoveryGroupScanner{
 		group:      group,
+		activity:   activity,
 		matchers:   newDiscoveryMatcherIndex(group.Profiles),
 		instances:  make(map[string][]collectionInstance, len(group.Profiles)),
 		seenTokens: make(map[string]struct{}),
@@ -72,6 +74,7 @@ func (s *discoveryGroupScanner) scanPage(ctx context.Context, client cloudwatchC
 	if s.group.RecentlyActive {
 		in.RecentlyActive = cwtypes.RecentlyActivePt3h
 	}
+	s.activity.recordListMetrics(s.group.AccountID, s.group.Region)
 	out, err := client.ListMetrics(ctx, in)
 	if err != nil {
 		return err
@@ -262,6 +265,7 @@ type discoveryKey struct {
 
 type discoveryGroup struct {
 	Target         string
+	AccountID      string
 	Region         string
 	Namespace      string
 	RecentlyActive bool
@@ -334,6 +338,7 @@ type discoveryGroupResult struct {
 func discoverAll(
 	ctx context.Context,
 	newClient func(context.Context, string, string) (cloudwatchClient, error),
+	activity *collectorActivity,
 	groups []discoveryGroup,
 	maxConcurrency int,
 	timeout time.Duration,
@@ -352,7 +357,7 @@ func discoverAll(
 	runs := make([]groupRun, len(groups))
 	for i, group := range groups {
 		results[i].Group = group
-		runs[i].scanner = newDiscoveryGroupScanner(group)
+		runs[i].scanner = newDiscoveryGroupScanner(group, activity)
 	}
 
 	// Complete the first-page phase before scheduling any continuation. Every
@@ -488,7 +493,7 @@ func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	newClient := func(callCtx context.Context, target, region string) (cloudwatchClient, error) {
 		return c.clients.forTargetRegion(callCtx, target, region)
 	}
-	results, aggregateErr := discoverAll(ctx, newClient, groups, apiConcurrency, c.Timeout.Duration())
+	results, aggregateErr := discoverAll(ctx, newClient, c.activity, groups, apiConcurrency, c.Timeout.Duration())
 	// If the parent context was canceled or timed out during the fan-out, abort before
 	// committing: buildDiscoverySnapshot would otherwise carry forward instances (or
 	// accept a partial first snapshot) and advance the TTL, so the next cycle would skip
@@ -581,7 +586,8 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 		if scope.StaticInstance != nil {
 			continue
 		}
-		if _, ok := c.resolvedByRef[scope.Target.Name]; !ok {
+		resolved, ok := c.resolvedByRef[scope.Target.Name]
+		if !ok {
 			continue
 		}
 		pk := profileKey{target: scope.Target.Name, profile: scope.Profile.Name, region: scope.Region}
@@ -600,7 +606,8 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 		}
 		index[key] = len(groups)
 		groups = append(groups, discoveryGroup{
-			Target: scope.Target.Name, Region: scope.Region, Namespace: scope.Profile.Config.Namespace,
+			Target: scope.Target.Name, AccountID: resolved.accountID,
+			Region: scope.Region, Namespace: scope.Profile.Config.Namespace,
 			RecentlyActive: recent, Profiles: []cwprofiles.ResolvedProfile{scope.Profile},
 		})
 		seenProfiles[pk] = struct{}{}

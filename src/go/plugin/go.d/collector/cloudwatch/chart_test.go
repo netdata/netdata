@@ -39,7 +39,7 @@ func TestBuildChartSpec_InjectsMetricsWithoutStaticRateDivisors(t *testing.T) {
 	c := chartTestCollector(t, "ec2")
 
 	spec := buildChartSpec(c.plan.Profiles)
-	require.Len(t, spec.Groups, 1)
+	require.Len(t, spec.Groups, 2)
 
 	group := spec.Groups[0]
 	assert.NotEmpty(t, group.Metrics, "template.metrics (visible series) is injected")
@@ -65,6 +65,62 @@ func TestBuildChartSpec_DoesNotMutateCatalog(t *testing.T) {
 		for _, d := range chart.Dimensions {
 			assert.Nilf(t, d.Options, "catalog profile dimension %q must not be mutated", d.Selector)
 		}
+	}
+}
+
+func TestActivityChartGroupContract(t *testing.T) {
+	spec := buildChartSpec(nil)
+	assert.Equal(t, "cloudwatch", spec.ContextNamespace)
+	require.Len(t, spec.Groups, 1)
+	group := spec.Groups[0]
+	assert.Equal(t, "Collector Activity", group.Family)
+	assert.ElementsMatch(t, []string{
+		activityAPICallsMetric,
+		activityMetricRequestsMetric,
+		activityQueriesMetric,
+	}, group.Metrics)
+
+	want := map[string]struct {
+		context   string
+		units     string
+		selector  string
+		name      string
+		instances []string
+	}{
+		"aws_cloudwatch_collector_api_calls": {
+			context: "collector_api_calls", units: "calls",
+			selector: activityAPICallsMetric, name: "calls",
+			instances: []string{"account_id", "region", "operation"},
+		},
+		"aws_cloudwatch_collector_metric_requests": {
+			context: "collector_metric_requests", units: "requests",
+			selector: activityMetricRequestsMetric, name: "requests",
+			instances: []string{"account_id", "region"},
+		},
+		"aws_cloudwatch_collector_queries": {
+			context: "collector_queries", units: "queries",
+			selector: activityQueriesMetric, name: "queries",
+			instances: []string{"account_id", "region", "profile"},
+		},
+	}
+	require.Len(t, group.Charts, len(want))
+	for _, chart := range group.Charts {
+		expected, ok := want[chart.ID]
+		require.True(t, ok, "unexpected chart %q", chart.ID)
+		assert.Equal(t, expected.context, chart.Context)
+		assert.Equal(t, "cloudwatch."+expected.context, spec.ContextNamespace+"."+chart.Context)
+		assert.Equal(t, expected.units, chart.Units)
+		assert.Equal(t, "absolute", chart.Algorithm)
+		instances := chart.Instances
+		if instances == nil {
+			instances = group.ChartDefaults.Instances
+		}
+		require.NotNil(t, instances)
+		assert.Equal(t, expected.instances, instances.ByLabels)
+		require.Len(t, chart.Dimensions, 1)
+		assert.Equal(t, expected.selector, chart.Dimensions[0].Selector)
+		assert.Equal(t, expected.name, chart.Dimensions[0].Name)
+		assert.Empty(t, chart.Dimensions[0].NameFromLabel)
 	}
 }
 

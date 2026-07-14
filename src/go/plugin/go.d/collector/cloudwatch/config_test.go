@@ -437,6 +437,77 @@ func TestMetadata_BillingOperatorContract(t *testing.T) {
 	}
 }
 
+func TestMetadata_CollectorActivityStructuredScopes(t *testing.T) {
+	data, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+
+	type metadataMetric struct {
+		Name       string `yaml:"name"`
+		Unit       string `yaml:"unit"`
+		ChartType  string `yaml:"chart_type"`
+		Dimensions []struct {
+			Name string `yaml:"name"`
+		} `yaml:"dimensions"`
+	}
+	var metadata struct {
+		Modules []struct {
+			Metrics struct {
+				DynamicContextPrefixes []struct {
+					Prefix string `yaml:"prefix"`
+					Reason string `yaml:"reason"`
+				} `yaml:"dynamic_context_prefixes"`
+				Scopes []struct {
+					Labels []struct {
+						Name string `yaml:"name"`
+					} `yaml:"labels"`
+					Metrics []metadataMetric `yaml:"metrics"`
+				} `yaml:"scopes"`
+			} `yaml:"metrics"`
+		} `yaml:"modules"`
+	}
+	require.NoError(t, yaml.Unmarshal(data, &metadata))
+	require.Len(t, metadata.Modules, 1)
+	require.Len(t, metadata.Modules[0].Metrics.DynamicContextPrefixes, 1)
+	assert.Equal(t, "cloudwatch.", metadata.Modules[0].Metrics.DynamicContextPrefixes[0].Prefix)
+	assert.Contains(t, metadata.Modules[0].Metrics.DynamicContextPrefixes[0].Reason, "fixed collector-activity contexts")
+
+	type metricContract struct {
+		labels    []string
+		unit      string
+		dimension string
+	}
+	want := map[string]metricContract{
+		"cloudwatch.collector_api_calls": {
+			labels: []string{"account_id", "region", "operation"}, unit: "calls", dimension: "calls",
+		},
+		"cloudwatch.collector_metric_requests": {
+			labels: []string{"account_id", "region"}, unit: "requests", dimension: "requests",
+		},
+		"cloudwatch.collector_queries": {
+			labels: []string{"account_id", "region", "profile"}, unit: "queries", dimension: "queries",
+		},
+	}
+	for _, scope := range metadata.Modules[0].Metrics.Scopes {
+		labels := make([]string, 0, len(scope.Labels))
+		for _, label := range scope.Labels {
+			labels = append(labels, label.Name)
+		}
+		for _, metric := range scope.Metrics {
+			contract, ok := want[metric.Name]
+			if !ok {
+				continue
+			}
+			assert.Equal(t, contract.labels, labels, "labels for %s", metric.Name)
+			assert.Equal(t, contract.unit, metric.Unit, "unit for %s", metric.Name)
+			assert.Equal(t, "line", metric.ChartType, "chart type for %s", metric.Name)
+			require.Len(t, metric.Dimensions, 1, "dimensions for %s", metric.Name)
+			assert.Equal(t, contract.dimension, metric.Dimensions[0].Name, "dimension for %s", metric.Name)
+			delete(want, metric.Name)
+		}
+	}
+	assert.Empty(t, want, "collector activity contexts missing from structured metadata")
+}
+
 func metadataExampleConfig(t *testing.T, exampleName string) Config {
 	t.Helper()
 	data, err := os.ReadFile("metadata.yaml")

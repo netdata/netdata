@@ -100,14 +100,7 @@ type billingUnitShape struct {
 // whole <=5-statistic billing units. Both work validation and execution use the
 // returned assignment, so their batch counts cannot drift.
 func packBillingUnitShapes(groups map[structuralID]int, width int) ([]billingUnitShape, int) {
-	var units []billingUnitShape
-	for key, count := range groups {
-		for part := 0; count > 0; part++ {
-			size := min(count, maxStatisticsPerMetricBillingUnit)
-			units = append(units, billingUnitShape{metricKey: key, part: part, size: size})
-			count -= size
-		}
-	}
+	units := billingUnitShapes(groups)
 	slices.SortFunc(units, func(a, b billingUnitShape) int {
 		if a.size != b.size {
 			return b.size - a.size
@@ -135,6 +128,26 @@ func packBillingUnitShapes(groups map[structuralID]int, width int) ([]billingUni
 		units[i].batch = batch
 	}
 	return units, len(remaining)
+}
+
+func billingUnitShapes(groups map[structuralID]int) []billingUnitShape {
+	var units []billingUnitShape
+	for key, count := range groups {
+		for part := 0; count > 0; part++ {
+			size := min(count, maxStatisticsPerMetricBillingUnit)
+			units = append(units, billingUnitShape{metricKey: key, part: part, size: size})
+			count -= size
+		}
+	}
+	return units
+}
+
+func queryMetricRequestUnits(queries []plannedQuery) int {
+	groups := make(map[structuralID]int)
+	for _, query := range queries {
+		groups[queryMetricBillingKey(query)]++
+	}
+	return len(billingUnitShapes(groups))
 }
 
 func packQueryGroup(queries []plannedQuery, width int) [][]plannedQuery {
