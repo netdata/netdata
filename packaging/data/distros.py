@@ -1,3 +1,4 @@
+#!/bin/sh
 '''Python module for handling of distros.yaml data.'''
 
 from collections import Counter
@@ -49,8 +50,15 @@ class DockerArch(StrEnum):
 
 @dataclass(kw_only=True, frozen=True, slots=True)
 class ArchDataEntry:
-    qemu: bool
-    runner: Annotated[str, Field(min_length=1)]
+    qemu: Annotated[bool, Field(
+        title='Use QEMU',
+        description='Whether or not to use QEMU userspace emulation for this architecture.',
+    )]
+    runner: Annotated[str, Field(
+        title='GitHub Actions Runner',
+        description='What GitHub Actions Runner tag to use for this architecture.',
+        min_length=1,
+    )]
 
 
 @dataclass(kw_only=True, frozen=True, slots=True)
@@ -279,3 +287,17 @@ def load_distro_data() -> DistroData:
         d = yaml.load(f)
 
     return DistroData.model_validate(d)
+
+
+if __name__ == '__main__':
+    import json
+    import sys
+
+    json.dump(
+        DistroData.model_json_schema(
+            by_alias=True,
+            union_format='any_of',
+        ),
+        sys.stdout,
+        indent=4,
+    )
