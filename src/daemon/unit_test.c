@@ -2,6 +2,10 @@
 
 #include "common.h"
 
+#ifdef OS_WINDOWS
+#include "win_system-info.h"
+#endif
+
 static bool cmd_arg_sanitization_test(const char *expected, const char *src, char *dst, size_t dst_size) {
     bool ok = sanitize_command_argument_string(dst, src, dst_size);
 
@@ -1678,3 +1682,169 @@ int test_sqlite(void) {
     (void) sqlite3_close_v2(db_mt);
     return 0;
 }
+
+#ifdef OS_WINDOWS
+int unit_test_windows_virt_normalize(void) {
+    static const struct {
+        const char *raw;
+        const char *expected;
+    } cases[] = {
+        {"VMware Virtual Platform",            "vmware"},
+        {"VMware7,1",                          "vmware"},
+        {"VirtualBox",                         "oracle"},
+        {"innotek GmbH VirtualBox",            "oracle"},
+        {"Oracle Corporation VirtualBox",      "oracle"},
+        {"Parallels Software International",   "parallels"},
+        {"QEMU",                               "qemu"},
+        {"QEMU Standard PC (i440FX + PIIX, 1995)", "qemu"},
+        {"KVM",                                "kvm"},
+        {"Standard PC (i440FX + PIIX, 1995)",  "unknown"},
+        {"HVM domU",                           "xen"},
+        {"Amazon EC2",                         "amazon"},
+        {"amazon ec2",                         "amazon"},
+        {"DigitalOcean Droplet",               "digitalocean"},
+        {"Microsoft Hv",                       "microsoft"},
+        {"Virtual Machine",                    "microsoft"},
+        {"Hyper-V",                            "microsoft"},
+        {"Microsoft Corporation",              "unknown"},
+        {"Surface Laptop 5",                   "unknown"},
+        {"HP ProLiant DL380 Gen10",            "unknown"},
+        {"Linode",                             "unknown"},
+        {"OpenStack",                          "unknown"},
+        {"",                                   "none"},
+        {NULL,                                 "none"},
+    };
+
+    int failures = 0;
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        const char *got = netdata_windows_normalize_virt_string(cases[i].raw);
+        if(strcmp(got, cases[i].expected) != 0) {
+            fprintf(stderr,
+                    "unit_test_windows_virt_normalize: case '%s' expected '%s' got '%s'\n",
+                    cases[i].raw ? cases[i].raw : "(NULL)",
+                    cases[i].expected,
+                    got);
+            failures++;
+        }
+    }
+
+    if(failures) {
+        fprintf(stderr, "unit_test_windows_virt_normalize: %d failure(s)\n", failures);
+        return 1;
+    }
+
+    fprintf(stderr, "unit_test_windows_virt_normalize: OK (%zu cases)\n",
+            sizeof(cases) / sizeof(cases[0]));
+    return 0;
+}
+
+int unit_test_windows_virt_resolution(void) {
+    static const struct {
+        const char *wmi;
+        const char *smbios;
+        const char *registry;
+        const char *expected;
+    } cases[] = {
+        {"vmware", "unknown", "oracle", "vmware"},
+        {NULL, "unknown", "vmware", "vmware"},
+        {NULL, "unknown", "oracle", "oracle"},
+        {NULL, "unknown", NULL, "unknown"},
+        {NULL, "kvm", "vmware", "kvm"},
+        {NULL, NULL, "parallels", "parallels"},
+        {NULL, NULL, NULL, "none"},
+    };
+
+    int failures = 0;
+    for(size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        const char *got = netdata_windows_resolve_virt_detection(
+            cases[i].wmi, cases[i].smbios, cases[i].registry);
+        if(strcmp(got, cases[i].expected) != 0) {
+            fprintf(stderr,
+                    "unit_test_windows_virt_resolution: case %zu expected '%s' got '%s'\n",
+                    i,
+                    cases[i].expected,
+                    got);
+            failures++;
+        }
+    }
+
+    if(failures) {
+        fprintf(stderr, "unit_test_windows_virt_resolution: %d failure(s)\n", failures);
+        return 1;
+    }
+
+    fprintf(stderr, "unit_test_windows_virt_resolution: OK (%zu cases)\n",
+            sizeof(cases) / sizeof(cases[0]));
+    return 0;
+}
+
+int unit_test_windows_container(void) {
+    int failures = 0;
+
+    // Kubernetes env-var probe. NULL expected means "not detected via env, fall back to WMI".
+    static const struct {
+        const char *host;
+        const char *port;
+        const char *expected;
+    } env_cases[] = {
+        {"10.0.0.1", "443",  NETDATA_WIN_CONTAINER_KUBERNETES},
+        {"10.0.0.1", "6443", NETDATA_WIN_CONTAINER_KUBERNETES},
+        {"10.0.0.1", "",     NULL},
+        {"",         "443",  NULL},
+        {"",         "",     NULL},
+        {NULL,       "443",  NULL},
+        {"10.0.0.1", NULL,   NULL},
+        {NULL,       NULL,   NULL},
+    };
+
+    for(size_t i = 0; i < sizeof(env_cases) / sizeof(env_cases[0]); i++) {
+        const char *got = netdata_windows_container_from_env(env_cases[i].host, env_cases[i].port);
+        bool ok = (got == NULL && env_cases[i].expected == NULL) ||
+                  (got != NULL && env_cases[i].expected != NULL && strcmp(got, env_cases[i].expected) == 0);
+        if(!ok) {
+            fprintf(stderr,
+                    "unit_test_windows_container: env case %zu (host='%s' port='%s') expected '%s' got '%s'\n",
+                    i,
+                    env_cases[i].host ? env_cases[i].host : "(NULL)",
+                    env_cases[i].port ? env_cases[i].port : "(NULL)",
+                    env_cases[i].expected ? env_cases[i].expected : "(NULL)",
+                    got ? got : "(NULL)");
+            failures++;
+        }
+    }
+
+    // Container classification -> detection-method mapping.
+    static const struct {
+        const char *container;
+        const char *expected;
+    } map_cases[] = {
+        {NETDATA_WIN_CONTAINER_KUBERNETES, NETDATA_WIN_CONTAINER_KUBERNETES_DETECT},
+        {NETDATA_WIN_CONTAINER_WINDOWS,    NETDATA_WIN_CONTAINER_WINDOWS_DETECT},
+        {NETDATA_WIN_CONTAINER_NONE,       NETDATA_WIN_CONTAINER_NONE},
+        {"unexpected-value",               NETDATA_WIN_CONTAINER_NONE},
+        {NULL,                             NETDATA_WIN_CONTAINER_NONE},
+    };
+
+    for(size_t i = 0; i < sizeof(map_cases) / sizeof(map_cases[0]); i++) {
+        const char *got = netdata_windows_container_detection_method(map_cases[i].container);
+        if(strcmp(got, map_cases[i].expected) != 0) {
+            fprintf(stderr,
+                    "unit_test_windows_container: map case '%s' expected '%s' got '%s'\n",
+                    map_cases[i].container ? map_cases[i].container : "(NULL)",
+                    map_cases[i].expected,
+                    got);
+            failures++;
+        }
+    }
+
+    if(failures) {
+        fprintf(stderr, "unit_test_windows_container: %d failure(s)\n", failures);
+        return 1;
+    }
+
+    fprintf(stderr, "unit_test_windows_container: OK (%zu env + %zu map cases)\n",
+            sizeof(env_cases) / sizeof(env_cases[0]),
+            sizeof(map_cases) / sizeof(map_cases[0]));
+    return 0;
+}
+#endif

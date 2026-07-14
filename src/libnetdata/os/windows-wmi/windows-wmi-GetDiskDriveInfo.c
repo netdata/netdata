@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+#include "windows-wmi.h"
 #include "windows-wmi-GetDiskDriveInfo.h"
 
 #if defined(OS_WINDOWS)
 
 size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
-    if (InitializeWMI() != S_OK) return 0;
+    HRESULT init_hr = InitializeWMI();
+    if (FAILED(init_hr) || !nd_wmi.pSvc) return 0;
 
     HRESULT hr;
     IEnumWbemClassObject* pEnumerator = NULL;
@@ -38,6 +40,7 @@ size_t GetDiskDriveInfo(DiskDriveInfoWMI *diskInfoArray, size_t array_size) {
         if (0 == uReturn) break;
 
         VARIANT vtProp;
+        VariantInit(&vtProp);
 
         // Extract DeviceID
         hr = pclsObj->lpVtbl->Get(pclsObj, L"DeviceID", 0, &vtProp, 0, 0);

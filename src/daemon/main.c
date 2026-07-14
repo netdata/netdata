@@ -425,6 +425,11 @@ int netdata_main(int argc, char **argv) {
                             if (unit_test_buffer()) return 1;
                             if (unit_test_str2ld()) return 1;
                             if (buffer_unittest()) return 1;
+#ifdef OS_WINDOWS
+                            if (unit_test_windows_virt_normalize()) return 1;
+                            if (unit_test_windows_virt_resolution()) return 1;
+                            if (unit_test_windows_container()) return 1;
+#endif
 
                             // No call to load the config file on this code-path
                             if (unittest_prepare_rrd(&user)) return 1;
