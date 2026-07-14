@@ -856,8 +856,15 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
         return false;
     }
 
-    if (unlikely(events & (ND_POLL_ERROR | ND_POLL_HUP | ND_POLL_INVALID))) {
-        // we have errors on this socket
+    // ND_POLL_HUP together with ND_POLL_READ means the peer disconnected,
+    // but data it already delivered is still pending in the socket buffer.
+    // Removing the receiver here would discard that data, so keep reading:
+    // polling is level-triggered, both flags stay set while data remains,
+    // and when the buffer is drained recv() returns 0 and the read path
+    // removes the receiver with the same disconnect reason.
+    if (unlikely((events & (ND_POLL_ERROR | ND_POLL_INVALID)) ||
+                 ((events & ND_POLL_HUP) && !(events & ND_POLL_READ)))) {
+        // we have errors on this socket, or EOF with nothing left to read
 
         worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_SOCKET_ERROR);
 
