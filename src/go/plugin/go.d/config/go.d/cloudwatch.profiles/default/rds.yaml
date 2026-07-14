@@ -51,23 +51,23 @@ metrics:
   - id: ebs_io_balance            # RDS storage I/O credits, percent
     metric_name: EBSIOBalance%
     statistics: [average]
+  - id: disk_queue_depth
+    metric_name: DiskQueueDepth
+    statistics: [average]
+  - id: network_receive_throughput
+    metric_name: NetworkReceiveThroughput
+    statistics: [average]
+  - id: network_transmit_throughput
+    metric_name: NetworkTransmitThroughput
+    statistics: [average]
+  - id: swap_usage
+    metric_name: SwapUsage
+    statistics: [average]
   # ----------------------------------------------------------------------------------------
   # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
   # matching chart in the charts: section below, then restart the go.d process. All are
   # published at the {DBInstanceIdentifier} grain, so no other change is needed.
   # ----------------------------------------------------------------------------------------
-  # - id: disk_queue_depth
-  #   metric_name: DiskQueueDepth
-  #   statistics: [average]
-  # - id: network_receive_throughput
-  #   metric_name: NetworkReceiveThroughput
-  #   statistics: [average]
-  # - id: network_transmit_throughput
-  #   metric_name: NetworkTransmitThroughput
-  #   statistics: [average]
-  # - id: swap_usage
-  #   metric_name: SwapUsage
-  #   statistics: [average]
   # - id: burst_balance             # gp2 storage burst credits, percent
   #   metric_name: BurstBalance
   #   statistics: [average]
@@ -187,38 +187,38 @@ template:
           name: byte
         - selector: ebs_io_balance_average
           name: io
+    - id: aws_cloudwatch_rds_queue_depth
+      context: disk_queue_depth
+      title: RDS Disk Queue Depth
+      family: Disk
+      units: operations
+      algorithm: absolute
+      dimensions:
+        - selector: disk_queue_depth_average
+          name: queued
+    - id: aws_cloudwatch_rds_network
+      context: network_throughput
+      title: RDS Network Throughput
+      family: Network
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: network_receive_throughput_average
+          name: received
+        - selector: network_transmit_throughput_average
+          name: sent
+    - id: aws_cloudwatch_rds_swap
+      context: swap_usage
+      title: RDS Swap Usage
+      family: Memory
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: swap_usage_average
+          name: swap
     # ----------------------------------------------------------------------------------------
     # Charts for the optional metrics above. Uncomment a chart together with its metric.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_rds_queue_depth
-    #   context: disk_queue_depth
-    #   title: RDS Disk Queue Depth
-    #   family: Disk
-    #   units: operations
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: disk_queue_depth_average
-    #       name: queued
-    # - id: aws_cloudwatch_rds_network
-    #   context: network_throughput
-    #   title: RDS Network Throughput
-    #   family: Network
-    #   units: bytes/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: network_receive_throughput_average
-    #       name: received
-    #     - selector: network_transmit_throughput_average
-    #       name: sent
-    # - id: aws_cloudwatch_rds_swap
-    #   context: swap_usage
-    #   title: RDS Swap Usage
-    #   family: Memory
-    #   units: bytes
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: swap_usage_average
-    #       name: swap
     # - id: aws_cloudwatch_rds_burst_balance
     #   context: burst_balance
     #   title: RDS Burst Balance

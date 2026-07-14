@@ -27,7 +27,7 @@ metrics:
     rate: true
   - id: approximate_age_of_oldest_message
     metric_name: ApproximateAgeOfOldestMessage
-    statistics: [average]
+    statistics: [maximum]
   - id: sent_message_size
     metric_name: SentMessageSize
     statistics: [average]
@@ -104,7 +104,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: approximate_age_of_oldest_message_average
+        - selector: approximate_age_of_oldest_message_maximum
           name: age
     - id: aws_cloudwatch_sqs_message_size
       context: message_size
