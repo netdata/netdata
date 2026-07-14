@@ -53,24 +53,23 @@ ${GITHUB_ACTIONS+echo "::group::Installing"}
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Staging plugin DLLs"}
-# Stage DLLs needed by executables in usr/bin (e.g. NetdataClaim.exe) to usr/bin.
+# Stage any additional DLLs needed by usr/bin executables (e.g. NetdataClaim.exe).
 for runtime_executable in /opt/netdata/usr/bin/*.exe; do
     if [ -f "${runtime_executable}" ]; then
         "${repo_root}/packaging/windows/stage-runtime-dlls.sh" "${runtime_executable}" "${runtime_dll_destination}"
     fi
 done
 
-# Stage DLLs for plugin executables co-located with the plugins themselves.
-# Windows loads DLLs from the executable's own directory first; the service
-# SYSTEM account does not have the usr/bin path in its DLL search list.
+# Copy the fully-staged DLL set from usr/bin into plugins.d.
+# Using ldd.exe per-plugin is unreliable: Go binaries (no lib*.dll imports)
+# and shell-script plugins cause the stage script to exit 0 after the first
+# pass, leaving subsequent plugins unprocessed.  Since all C plugin executables
+# use the same UCRT64 toolchain as netdata.exe, the lib*.dll set already in
+# usr/bin covers every plugin's runtime dependency.
 plugins_dll_destination="/opt/netdata/usr/libexec/netdata/plugins.d"
-for runtime_executable in \
-    /opt/netdata/usr/libexec/netdata/plugins.d/*.exe \
-    /opt/netdata/usr/libexec/netdata/plugins.d/*.plugin \
-    /opt/netdata/usr/libexec/netdata/plugins.d/*.plugin.exe; do
-    if [ -f "${runtime_executable}" ]; then
-        "${repo_root}/packaging/windows/stage-runtime-dlls.sh" "${runtime_executable}" "${plugins_dll_destination}"
-    fi
+for dll in "${runtime_dll_destination}"/lib*.dll "${runtime_dll_destination}"/zlib1.dll; do
+    [ -f "${dll}" ] || continue
+    cp "${dll}" "${plugins_dll_destination}/"
 done
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
