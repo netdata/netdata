@@ -44,9 +44,10 @@ is_ignored_dll() {
         api-ms-*|ext-ms-*)
             return 0
             ;;
+        *)
+            return 0
+            ;;
     esac
-
-    return 0
 }
 
 copy_missing_dlls_once() {
