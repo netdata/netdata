@@ -872,6 +872,10 @@ int main(int argc, char **argv) {
 
         netdata_mutex_lock(&apps_and_stdout_mutex);
 
+#ifndef OS_WINDOWS
+        // On Windows, poll() maps to WSAPoll() which only accepts sockets.
+        // Pipe handles return WSAENOTSOCK, so poll() fails with -1.
+        // Broken-pipe is detected naturally on the next fflush(stdout).
         struct pollfd pollfd = { .fd = fileno(stdout), .events = POLLERR };
         if (unlikely(poll(&pollfd, 1, 0) < 0)) {
             netdata_mutex_unlock(&apps_and_stdout_mutex);
@@ -881,6 +885,7 @@ int main(int argc, char **argv) {
             netdata_mutex_unlock(&apps_and_stdout_mutex);
             fatal("Received error on read pipe.");
         }
+#endif
 
         netdata_mutex_lock(&apps_pids_mutex);
 
