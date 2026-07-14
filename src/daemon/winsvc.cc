@@ -10,45 +10,6 @@ void nd_process_signals(void);
 
 }
 
-__attribute__((format(printf, 1, 2)))
-static void netdata_service_log(const char *fmt, ...)
-{
-    char path[FILENAME_MAX + 1];
-    snprintfz(path, FILENAME_MAX, "%s/service.log", LOG_DIR);
-
-    FILE *fp = fopen(path, "a");
-    if (fp == NULL) {
-        // LOG_DIR is a POSIX path compiled for the staging environment
-        // (e.g. /opt/netdata/var/log/netdata).  UCRT64 binaries use the
-        // native Windows CRT directly — there is no msys-2.0.dll POSIX path
-        // translation layer — so /opt/netdata/... resolves to
-        // C:\opt\netdata\... on the target machine, which never exists.
-        // Fall back to the Windows temp directory, which is always writable
-        // by the service account (SYSTEM writes to C:\Windows\Temp\).
-        char tmp_dir[FILENAME_MAX + 1];
-        DWORD tmp_len = GetTempPathA(FILENAME_MAX, tmp_dir);
-        if (tmp_len > 0 && tmp_len < FILENAME_MAX - 24) {
-            snprintfz(path, FILENAME_MAX, "%snetdata-service.log", tmp_dir);
-            fp = fopen(path, "a");
-        }
-        if (fp == NULL)
-            return;
-    }
-
-    SYSTEMTIME time;
-    GetSystemTime(&time);
-    fprintf(fp, "%d:%d:%d - ", time.wHour, time.wMinute, time.wSecond);
-
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(fp, fmt, args);
-    va_end(args);
-
-    fprintf(fp, "\n");
-
-    fflush(fp);
-    fclose(fp);
-}
 
 static SERVICE_STATUS_HANDLE svc_status_handle = nullptr;
 static SERVICE_STATUS svc_status = {};
@@ -78,27 +39,19 @@ static bool ReportSvcStatus(DWORD dwCurrentState, DWORD dwWin32ExitCode, DWORD d
         svc_status.dwCheckPoint = dwCheckPoint++;
     }
 
-    if (!SetServiceStatus(svc_status_handle, &svc_status)) {
-        netdata_service_log("@ReportSvcStatus: SetServiceStatusFailed (%d)", GetLastError());
+    if (!SetServiceStatus(svc_status_handle, &svc_status))
         return false;
-    }
 
     return true;
 }
 
-static HANDLE CreateEventHandle(const char *msg)
+static HANDLE CreateEventHandle(void)
 {
     HANDLE h = CreateEvent(NULL, TRUE, FALSE, NULL);
 
     if (!h)
     {
-        netdata_service_log("%s", msg);
-
-        if (!ReportSvcStatus(SERVICE_STOPPED, GetLastError(), 1000, 0))
-        {
-            netdata_service_log("Failed to set service status to stopped.");
-        }
-
+        ReportSvcStatus(SERVICE_STOPPED, GetLastError(), 1000, 0);
         return NULL;
     }
 
@@ -130,7 +83,6 @@ static void call_netdata_cleanup(void *arg)
     UNUSED(arg);
 
     // Wait until we have to stop the service
-    netdata_service_log("Cleanup thread waiting for stop event...");
     WaitForSingleObject(svc_stop_event_handle, INFINITE);
 
     // Keep the SCM informed while cleanup runs; without periodic
@@ -142,7 +94,6 @@ static void call_netdata_cleanup(void *arg)
         heartbeat = CreateThread(NULL, 0, stop_pending_heartbeat, NULL, 0, NULL);
 
     // Stop the agent
-    netdata_service_log("Running netdata cleanup...");
     EXIT_REASON reason;
     DWORD controlCode = __atomic_load_n(&svc_stop_control_code, __ATOMIC_ACQUIRE);
     switch(controlCode) {
@@ -179,11 +130,9 @@ static void call_netdata_cleanup(void *arg)
     }
 
     // Close event handle
-    netdata_service_log("Closing stop event handle...");
     CloseHandle(svc_stop_event_handle);
 
     // Set status to stopped
-    netdata_service_log("Reporting the service as stopped...");
     ReportSvcStatus(SERVICE_STOPPED, 0, 0, 0);
 
     // SERVICE_STOPPED closes the SCM context; terminate instead of returning to
@@ -202,20 +151,17 @@ static void WINAPI ServiceControlHandler(DWORD controlCode)
                 return;
 
             // Set service status to stop-pending
-            netdata_service_log("Setting service status to stop-pending...");
             if (!ReportSvcStatus(SERVICE_STOP_PENDING, 0, 5000, 0))
                 return;
 
             __atomic_store_n(&svc_stop_control_code, controlCode, __ATOMIC_RELEASE);
 
             // Create cleanup thread
-            netdata_service_log("Creating cleanup thread...");
             char tag[NETDATA_THREAD_TAG_MAX + 1];
             snprintfz(tag, NETDATA_THREAD_TAG_MAX, "%s", "CLEANUP");
             cleanup_thread = nd_thread_create(tag, NETDATA_THREAD_OPTION_DEFAULT, call_netdata_cleanup, NULL);
 
             // Signal the stop request
-            netdata_service_log("Signalling the cleanup thread...");
             SetEvent(svc_stop_event_handle);
             break;
         }
@@ -235,41 +181,27 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     UNUSED(argv);
 
     // Create service status handle
-    netdata_service_log("Creating service status handle...");
     svc_status_handle = RegisterServiceCtrlHandler("Netdata", ServiceControlHandler);
     if (!svc_status_handle)
-    {
-        netdata_service_log("@ServiceMain() - RegisterServiceCtrlHandler() failed...");
         return;
-    }
 
     // Set status to start-pending
-    netdata_service_log("Setting service status to start-pending...");
     svc_status.dwServiceType = SERVICE_WIN32_OWN_PROCESS;
     svc_status.dwServiceSpecificExitCode = 0;
     svc_status.dwCheckPoint = 0;
     if (!ReportSvcStatus(SERVICE_START_PENDING, 0, 5000, 0))
-    {
-        netdata_service_log("Failed to set service status to start pending.");
         return;
-    }
 
     // Create stop service event handle
-    netdata_service_log("Creating stop service event handle...");
-    svc_stop_event_handle = CreateEventHandle("Failed to create stop event handle");
+    svc_stop_event_handle = CreateEventHandle();
     if (!svc_stop_event_handle)
         return;
 
     // Set status to running
-    netdata_service_log("Setting service status to running...");
     if (!ReportSvcStatus(SERVICE_RUNNING, 0, 5000, SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN))
-    {
-        netdata_service_log("Failed to set service status to running.");
         return;
-    }
 
     // Run the agent
-    netdata_service_log("Running the agent...");
     int rc = netdata_main(argc, argv);
 
     if (rc != 10) {
@@ -277,13 +209,10 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
         // initialisation error.  Transition to STOPPED so the SCM records
         // the failure instead of leaving the service stuck in SERVICE_RUNNING
         // waiting for a stop event that will never be signalled internally.
-        netdata_service_log("Agent exited early with rc=%d, stopping service.", rc);
         svc_status.dwServiceSpecificExitCode = rc;
         ReportSvcStatus(SERVICE_STOPPED, ERROR_SERVICE_SPECIFIC_ERROR, 0, 0);
         return;
     }
-
-    netdata_service_log("Agent has been started...");
 
     // netdata_main() spawns background threads and returns once the agent is
     // running.  Without blocking here, ServiceMain would return, which causes
@@ -306,10 +235,8 @@ static bool update_path() {
     const char *old_path = getenv("PATH");
 
     if (!old_path) {
-        if (setenv("PATH", "/usr/bin", 1) != 0) {
-            netdata_service_log("Failed to set PATH to /usr/bin");
+        if (setenv("PATH", "/usr/bin", 1) != 0)
             return false;
-        }
 
         return true;
     }
@@ -319,7 +246,6 @@ static bool update_path() {
     snprintfz(new_path, new_path_length, "/usr/bin:%s", old_path);
 
     if (setenv("PATH", new_path, 1) != 0) {
-        netdata_service_log("Failed to add /usr/bin to PATH");
         freez(new_path);
         return false;
     }
@@ -368,7 +294,6 @@ int main(int argc, char *argv[])
             return 1;
         }
 
-        netdata_service_log("@main() - StartServiceCtrlDispatcher() failed (%lu)", (unsigned long)err);
         return 1;
     }
 
