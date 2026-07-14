@@ -125,7 +125,7 @@ The Cloud prefers:
 
 - The most distant (from the Child) Parent that is available when doing metrics visualization queries (since usually these Parents have been added for this purpose).
 
-- The closest (to the Child) Parent available for [Top Monitoring](/docs/top-monitoring-netdata-functions.md). The streaming protocol of Parents and Children is able to forward such requests to the leaf child, via the Parents, to respond with live and accurate data.
+- The closest (to the Child) Parent available for [Netdata Functions](/docs/top-monitoring-netdata-functions.md). The streaming protocol of Parents and Children is able to forward such requests to the leaf child, via the Parents, to respond with live and accurate data.
 
 You may connect Children to the Cloud for high-availability, in cases where their Parents become unreachable.
 

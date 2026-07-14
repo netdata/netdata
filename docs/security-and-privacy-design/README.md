@@ -1,214 +1,49 @@
 # Security and Privacy Design
 
-:::tip
+Netdata separates data collection and storage from the services used to access and visualize that data. Understanding that boundary is the starting point for securing a deployment.
 
-**Executive Summary**
+## Architecture at a Glance
 
-- Netdata is built with security-first principles to protect user data across all systems.
-- Observability data remains local, while minimal metadata travels securely to Netdata Cloud.
-- We follow best practices to support GDPR, CCPA, PCI DSS, SOC 2, and HIPAA compliance.
+- **Netdata Agents** collect metrics and operational data from monitored systems.
+- **Netdata Parents** can receive and store metrics streamed by Child Agents.
+- **Netdata Cloud** coordinates access and relays authorized queries to connected Agents and Parents.
+- **Browsers and API clients** receive the results requested by an authorized user.
+- **Exporters and external notification systems** receive data only when an operator configures those paths.
 
-:::
+By default, time-series metric storage remains on Agents and Parents. When a Cloud user requests charts, logs, or a Function, the relevant Agent or Parent returns the requested data through an encrypted connection. These responses transit Cloud services but are not turned into Cloud-hosted time-series storage.
 
-## Introduction
+Configured streaming, exporting, notifications, collectors, and integrations can copy or send data to other systems. Review those paths as part of your own deployment design.
 
-This page explains how Netdata designs and operates secure, privacy-respecting services across the Netdata Agent and Netdata Cloud.
+## Security Principles
 
-Netdata builds security into every layer. You retain control over your observability data while benefiting from powerful real-time monitoring and insights.
+### Minimize Privilege
 
-## Netdata's Security Principles
+The Agent normally runs as an unprivileged service account. Components that need additional operating-system access are isolated and should receive only the permissions required for their collection task.
 
-### Security by Design
+### Protect Sensitive Operational Data
 
-Netdata separates your system information into two categories:
+Metrics are often less sensitive than logs, process command lines, database queries, network connections, and configuration. Netdata Functions and log sources can expose this higher-risk data, so their access requirements are stricter than ordinary chart access.
 
-| **Type**               | **Description**                 | **Where It Lives**                                                |
-|:-----------------------|:--------------------------------|:------------------------------------------------------------------|
-| Observability Data     | Metrics and logs                | Stored locally, fully under your control                          |
-| Observability Metadata | Hostnames, metric names, alerts | Routed securely to Netdata Cloud for dashboards and notifications |
+### Authenticate at the Appropriate Boundary
 
-This ensures that your critical system insights remain private, and only minimal metadata flows to the cloud.
+Direct Agent access, Agent-to-Agent streaming, and Cloud access use different security controls:
 
-### Observability Data and Metadata Flow
+- Agent web APIs support network ACLs, TLS, reverse-proxy authentication, and [bearer token protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).
+- Streaming connections use an API key and can use TLS.
+- Netdata Cloud authenticates users and applies Space roles and permissions to connected infrastructure.
 
-Here is how your data flows through Netdata:
+### Encrypt Network Traffic
 
-```mermaid
-flowchart TD
-    A("Your System") -->|"Collect metrics and logs"| B("Netdata Agent")
-    B --> C("Observability Data<br/>Stored locally")
-    B --> D("Observability Metadata<br/>securely routed to Cloud")
-    D --> E("Cloud dashboards, routing<br/>& notifications")
+Cloud connections use TLS. Operators are responsible for enabling and validating TLS where Agents stream to one another or expose their web APIs over untrusted networks.
 
-    %% Style definitions
-    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
-    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
-    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
-    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+### Keep Security Information Current
 
-    %% Apply styles
-    class A alert
-    class B neutral
-    class C complete
-    class D,E database
-```
+Product architecture belongs in these documentation pages. Current attestations and security-control evidence belong in the [Netdata Trust Center](https://trust.netdata.cloud/). Legal and privacy terms belong in the [Netdata Privacy Policy](https://www.netdata.cloud/privacy/), and current commercial entitlements belong on the [pricing page](https://www.netdata.cloud/pricing/).
 
-:::tip
+## Documentation by Boundary
 
-Observability data (metrics and logs) never leaves your system. Only essential metadata flows securely to Netdata Cloud.
-
-:::
-
-### Compliance with Open Source Security Foundation (OSSF) Best Practices
-
-Netdata follows [OSSF best practices](https://bestpractices.coreinfrastructure.org/en/projects/2231), including:
-
-- Automated testing across the UI, backend, and Agent
-- Static and security code analysis with GitHub CodeQL, Dependabot, linters, and [Coverity](https://scan.coverity.com/projects/netdata-netdata?tab=overview)
-- Two senior engineer reviews per pull request
-- Continuous stress testing in production-like environments
-
-### Third-Party Testing and Isolation
-
-Netdata Agents undergo regular external security audits.  
-All reports are prioritized for quick investigation and resolution.
-
-Netdata Cloud operates in isolated environments with Infrastructure as Code (IaC). No manual production access exists, and monitoring is fully automated.
-
-### Security Vulnerability Response
-
-Netdata handles security vulnerabilities with a structured response process. See [Netdata’s GitHub Security Policy](https://github.com/netdata/netdata/security/policy) for details.
-
-## Compliance with Regulations
-
-Netdata complies with major data privacy laws, including GDPR and CCPA.
-
-### GDPR and CCPA Compliance
-
-Netdata conducts internal audits to ensure compliance and offers Data Processing Agreements (DPAs) upon request.
-
-:::tip
-
-Contact Netdata Support to request a DPA.
-
-:::
-
-### Data Transfers
-
-| **Type**               | **Handling**                                                                 |
-|:-----------------------|:-----------------------------------------------------------------------------|
-| Observability Data     | Remains on your infrastructure                                               |
-| Observability Metadata | Securely transferred and stored in US-based data centers (Google Cloud, AWS) |
-
-Data is tunneled securely in real-time without being stored on Netdata Cloud servers.
-
-Data processing complies with GDPR and CCPA requirements.
-
-### Privacy Rights
-
-You can manage your privacy rights easily:
-
-| **Right**                              | **How to Access**                                                                                |
-|:---------------------------------------|:-------------------------------------------------------------------------------------------------|
-| Access, correct, or delete your data   | Use the Netdata Cloud UI                                                                         |
-| Fully delete your account and all data | Log in to [app.netdata.cloud](https://app.netdata.cloud), go to Profile, and delete your account |
-
-:::tip
-
-Deleting your account removes all associated personal data, including email and activity records.
-
-:::
-
-### Regular Reviews and Updates
-
-Netdata continuously updates its policies and technical controls to stay aligned with evolving regulations.
-
-## Anonymous Statistics
-
-Netdata collects anonymous usage information from the Agent to guide product development and improve stability. Observability data (metrics and logs) is never collected, and metadata is anonymized before transmission. Netdata does not sell or share this data with third parties. See [Anonymous telemetry events](/docs/netdata-agent/configuration/anonymous-telemetry-events.md) for the full details and all opt-out methods.
-
-## Internal Security Measures
-
-Netdata enforces layered security controls:
-
-| **Area**                  | **Control**                                     |
-|:--------------------------|:------------------------------------------------|
-| Infrastructure Management | Infrastructure as Code (Terraform)              |
-| Authentication            | GitHub SSO, Google SSO, email validation        |
-| Data Handling             | TLS encryption, session tracking                |
-| Access Control            | Role-based access, multi-factor authentication  |
-| Threat Defense            | DDoS protection, vulnerability scanning         |
-| Developer Process         | Static analyzers, mandatory senior code reviews |
-| Production Isolation      | No direct access to production environments     |
-
-:::tip
-
-Need additional security configurations? Contact Netdata Support.
-
-:::
-
-## Standards Alignment
-
-:::tip
-
-View Netdata's security certifications, compliance reports, and audit documentation at our [Trust Center](https://trust.netdata.cloud/).
-
-:::
-
-### PCI DSS Alignment
-
-Netdata applies practices that align with PCI DSS security principles:
-
-- Secure infrastructure
-- Access control
-- Encryption practices
-
-However, Netdata is **not officially PCI DSS certified**.  
-Entities needing full PCI DSS compliance must perform additional assessments.
-
-:::tip
-
-Consult a PCI DSS compliance expert if you use Netdata as part of your PCI environment.
-
-:::
-
-### HIPAA Alignment
-
-Netdata aligns with HIPAA security practices:
-
-- Minimized data handling
-- Secure authentication and encryption
-
-Netdata provides **Business Associate Agreements (BAAs)** for healthcare organizations but is **not HIPAA-certified**.
-
-:::tip
-
-Request a BAA through Netdata Support if required.
-
-:::
-
-### SOC 2 Compliance
-
-<img src="https://netdata.cloud/img/SOC2 T2 - green - h.png" width="150" alt="SOC2 Badge"/>
-
-Netdata achieved SOC2 Type 2 compliance for these Service Criteria:
-
-| **Principle**        | **Practices**                            |
-|:---------------------|:-----------------------------------------|
-| Security             | TLS encryption, strict access controls   |
-| Availability         | Resilient systems, continuous monitoring |
-| Confidentiality      | Metadata isolation, role-based access    |
-
-## Conclusion
-
-Netdata gives you a secure and transparent way to monitor your systems.
-
-With clear separation of observability data and metadata, strong encryption, secure authentication, and compliance with international standards, you retain full ownership and control of your system insights.
-
-:::tip
-
-**You** are always in control of your data with Netdata.
-
-:::
-
-Netdata’s commitment to **security, privacy, and transparency** ensures that your monitoring environment stays **protected** and **trusted** at every step.
+- [Access Control and Feature Availability](/docs/netdata-oss-limitations.md): how public data, sensitive data, authentication, and product entitlements interact.
+- [Netdata Agent Security and Privacy Design](/docs/security-and-privacy-design/netdata-agent-security.md): local storage, collection privileges, communication paths, and Agent access controls.
+- [Netdata Cloud Security and Privacy Design](/docs/security-and-privacy-design/netdata-cloud-security.md): Cloud data flow, identity, authorization, and responsibility boundaries.
+- [Secure your Netdata Agents](/docs/netdata-agent/securing-netdata-agents.md): operational hardening guidance.
+- [GitHub Security Policy](https://github.com/netdata/netdata/security/policy): report a vulnerability privately and review the supported-version policy.

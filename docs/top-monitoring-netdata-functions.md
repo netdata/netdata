@@ -1,45 +1,52 @@
-# Live View
+# Netdata Functions
 
-Netdata Agent collectors provide on-demand, runtime executable functions on the host where they are deployed. Available since v1.37.1.
+Netdata Functions are on-demand routines exposed by collectors and other Agent components. They return live troubleshooting information or perform a supported action on the node where they run.
 
-## What is a function?
+Unlike charts, which visualize stored time-series metrics, a Function executes when requested and returns its current result. Depending on the Function, that result can include processes, database queries, network connections, logs, service state, streaming status, or other operational details.
 
-Beyond their primary roles of collecting metrics, collectors can execute specific routines when requested. These routines provide additional diagnostic information or trigger actions directly on the host node.
+## When to Use Functions
 
-## What functions are currently available?
+Use Functions when charts show that something changed and you need current, high-cardinality detail to investigate it. Common workflows include:
 
-| Function            | Description                                                                                                                                                                                                                                     | Alternative to CLI tools        | Require Cloud | plugin - module                                                                                                                                                                                                       |
-|:--------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------|:--------------|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Block-devices       | Disk I/O activity for all block devices, offering insights into both data transfer volume and operation performance.                                                                                                                            | `iostat`                        | no            | [proc](https://github.com/netdata/netdata/tree/master/src/collectors/proc.plugin#readme)                                                                                                                              |
-| Containers-vms      | Insights into the resource utilization of containers and QEMU virtual machines: CPU usage, memory consumption, disk I/O, and network traffic.                                                                                                   | `docker stats`, `systemd-cgtop` | no            | [cgroups](https://github.com/netdata/netdata/tree/master/src/collectors/cgroups.plugin#readme)                                                                                                                        |
-| Deadlock-info       | Most recent deadlock events detected in the database. Supported databases: Microsoft SQL Server, MySQL, MariaDB, Percona MySQL.                                                                                                                 |                                 | yes           | [go.d](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector#readme): mssql, mysql                                                                                                              |
-| Error-info          | Recent SQL errors from database error tracking. Supported databases: Microsoft SQL Server, MySQL, MariaDB, Percona MySQL.                                                                                                                       |                                 | yes           | [go.d](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector#readme): mssql, mysql                                                                                                              |
-| Ipmi-sensors        | Readings and status of IPMI sensors.                                                                                                                                                                                                            | `ipmi-sensors`                  | no            | [freeipmi](https://github.com/netdata/netdata/tree/master/src/collectors/freeipmi.plugin#readme)                                                                                                                      |
-| Mount-points        | Disk usage for each mount point, including used and available space, both in terms of percentage and actual bytes, as well as used and available inode counts.                                                                                  | `df`                            | no            | [diskspace](https://github.com/netdata/netdata/tree/master/src/collectors/diskspace.plugin#readme)                                                                                                                    |
-| Network-connections | Real-time monitoring of all network connections, showing established connections, ports, protocols, and connection states across TCP/UDP services.                                                                                              | `netstat`, `ss`                 | yes           | [network-viewer](https://github.com/netdata/netdata/tree/master/src/collectors/network-viewer.plugin)                                                                                                                 |
-| Network-interfaces  | Network traffic, packet drop rates, interface states, MTU, speed, and duplex mode for all network interfaces.                                                                                                                                   | `bmon`, `bwm-ng`                | no            | [proc](https://github.com/netdata/netdata/tree/master/src/collectors/proc.plugin#readme)                                                                                                                              |
-| Processes           | Real-time information about the system's resource usage, including CPU utilization, memory consumption, and disk IO for every running process.                                                                                                  | `top`, `htop`                   | yes           | [apps](/src/collectors/apps.plugin/README.md)                                                                                                                                                                         |
-| Running-queries     | Currently executing SQL statements. Supported databases: CockroachDB, Oracle DB, PostgreSQL, RethinkDB, YugabyteDB.                                                                                                                             |                                 | yes           | [go.d](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector#readme): cockroachdb, oracledb, postgres, rethinkdb, yugabytedb                                                                    |
-| SNMP-interfaces     | Network interface traffic and status metrics from SNMP-enabled devices, including bandwidth, errors, discards, and operational status.                                                                                                          | `snmpwalk`                      | no            | [snmp](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/snmp#readme)                                                                                                                       |
-| SNMP-bgp-peers      | Current BGP peer and peer-family state from SNMP-enabled devices, including routing instance, neighbor identity, peer state, prefix gauges, and diagnostic details such as last error, previous state, graceful restart state, and unavailability reason. | `show bgp summary`, `snmpwalk` | no            | [snmp](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector/snmp#readme)                                                                                                                       |
-| Systemd-list-units  | Information about all systemd units, including their active state, description, whether or not they are enabled, and more.                                                                                                                      | `systemctl list-units`          | yes           | [systemd-journal](https://github.com/netdata/netdata/tree/master/src/collectors/systemd-journal.plugin#readme)                                                                                                        |
-| Systemd-services    | System resource utilization for all running systemd services: CPU, memory, and disk IO.                                                                                                                                                         | `systemd-cgtop`                 | no            | [cgroups](https://github.com/netdata/netdata/tree/master/src/collectors/cgroups.plugin#readme)                                                                                                                        |
-| Top-queries         | Aggregated SQL query performance metrics. Supported databases: ClickHouse, CockroachDB, Couchbase, Elasticsearch, MongoDB, Microsoft SQL Server, MySQL, MariaDB, OpenSearch, Oracle DB, Percona MySQL, PostgreSQL, ProxySQL, Redis, YugabyteDB. |                                 | yes           | [go.d](https://github.com/netdata/netdata/tree/master/src/go/plugin/go.d/collector#readme): clickhouse, cockroachdb, couchbase, elasticsearch, mongodb, mssql, mysql, oracledb, postgres, proxysql, redis, yugabytedb |
-| Netdata-api-calls   | Real-time tracing of API calls made to the Netdata Agent. It provides information on query, source, status, elapsed time, and more.                                                                                                             |                                 | yes           |                                                                                                                                                                                                                       |
-| Netdata-streaming   | Comprehensive overview of all Netdata children instances, offering detailed information about their status, replication completion time, and many more.                                                                                         |                                 | yes           |                                                                                                                                                                                                                       |
+- Finding the processes responsible for CPU, memory, or I/O usage.
+- Inspecting expensive or currently running database queries.
+- Reviewing network connections, service state, or logs.
+- Examining the health and topology of a streaming deployment.
+- Retrieving collector-specific details that do not belong in time-series charts.
 
-## How do functions work with streaming?
+The Functions available on a node depend on its operating system, enabled collectors, Agent version, and the data sources those collectors can access. The dashboard and API report the set currently available on the selected node; this page intentionally does not maintain a duplicate inventory.
 
-When streaming is enabled, function definitions propagate from Child nodes to their Parent node. If this Parent node is connected to Netdata Cloud, it can trigger function execution on any of its connected Child nodes.
+## Access Functions
 
-## Why are some functions only available on Netdata Cloud?
+You can execute Functions through:
 
-Some functions are exclusively available through Netdata Cloud for security reasons. Since functions can execute node-level routines that may access sensitive information, we restrict their exposure through the Agent's API. This security concern is addressed by our [ACLK](/src/aclk/README.md) protocol, which provides secure communication between Netdata Agent and Netdata Cloud.
+- The [Live tab](/docs/dashboards-and-charts/live-tab.md) in Netdata Cloud.
+- The `f(x)` control for a node in the [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md).
+- A Netdata Agent or Parent API.
+- [Netdata MCP](/docs/netdata-ai/mcp/README.md), which can call supported Functions during an investigation.
 
-## Feedback
+A Function runs on the selected node. When the node streams to a Parent, its Function definitions propagate through the streaming path so an authorized request can be routed to that node. The target node must be online and reachable through the active streaming path.
 
-If you have ideas or requests for other functions:
+## Access and Sensitive Data
 
-- Participate in the relevant [GitHub discussion](https://github.com/netdata/netdata/discussions/14412)
-- Open a [feature request](https://github.com/netdata/netdata-cloud/issues/new?assignees=&labels=feature+request%2Cneeds+triage&template=FEAT_REQUEST.yml&title=%5BFeat%5D%3A+) on Netdata Cloud repo
-- Join the Netdata community on [Discord](https://discord.com/invite/2mEmfW735j) and let us know.
+Functions can expose data that is more sensitive than ordinary metrics. Process command lines, database queries, logs, and network connections can contain credentials, personal data, or internal infrastructure details.
+
+Each Function declares its required access level. Depending on that declaration and the access path, execution may require an authenticated user in the same Netdata Cloud Space, an additional permission, or direct-Agent authentication. Direct Agent and Parent access also respects configured network ACLs and [bearer token protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md).
+
+Before sharing Function output, review it for secrets and identifying information.
+
+## Function Guides
+
+- [Processes](/docs/functions/processes.md): attribute current resource usage to individual processes and application groups.
+- [Database Queries](/docs/functions/databases.md): investigate query performance, running queries, deadlocks, and errors across supported database collectors.
+- Collector and integration documentation describes any additional Functions supplied by that integration.
+
+## Troubleshooting Availability
+
+If a Function does not appear or cannot execute:
+
+1. Confirm that the target node is online.
+2. Confirm that the collector or plugin providing the Function is running.
+3. Check whether the Function is supported on that operating system and Agent version.
+4. Verify the current user's permissions and the Agent's access-control settings.
+5. For a Child node, verify that the streaming path to its Parent is active.

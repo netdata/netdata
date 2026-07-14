@@ -1,162 +1,72 @@
 # Netdata Cloud Security and Privacy Design
 
-:::tip
+Netdata Cloud provides identity, authorization, coordination, and a centralized interface for connected Agents and Parents. It does not replace the time-series database running on those nodes.
 
-**Executive Summary**
+## Data Flow and Storage Boundary
 
-- Netdata Cloud offers secure real-time monitoring without storing raw metrics.
-- Only minimal metadata passes securely through Netdata Cloud.  
-  Users retain full control of their data.
-- Infrastructure is protected with strong encryption, access control, and compliance with GDPR, CCPA, PCI DSS, SOC 2, and HIPAA standards.
-- Netdata Cloud continuously evolves its security and privacy practices to meet the highest industry standards.
+Agents and Parents retain metrics in their local databases according to their storage configuration. Netdata Cloud stores the account, organization, node, chart, alert, and integration metadata needed to operate the service.
 
-:::
+When a user requests a chart, log view, or Function result:
 
-:::info
+1. Cloud authorizes the user and identifies an eligible connected node.
+2. The request travels over the Agent-Cloud Link.
+3. The Agent or Parent queries its local data source or executes the Function.
+4. The response returns through encrypted Cloud services to the user's client.
 
-Netdata achieves SOC 2 [Type 1](https://www.netdata.cloud/blog/soc2-type1/) & [Type 2](https://www.netdata.cloud/blog/soc2-type-2-compliance/) attestations, reinforcing its dedication to robust security practices for user data.
+Metric, log, and Function responses therefore transit Cloud infrastructure. They are not ingested into Cloud-hosted persistent time-series storage merely because they are viewed through Cloud.
 
-:::
+Configured integrations can create additional storage or delivery paths. For example, notification providers receive alert content selected for that integration. Review each configured destination separately.
 
-## Introduction
+## Identity and Authorization
 
-Netdata Cloud enables secure real-time system insights without storing raw metrics.
+Netdata Cloud authenticates users and authorizes actions within a Space. Authorization considers:
 
-Data passes through Netdata Cloud securely but isn't retained. Metric views and alerts from multiple Agents display as a unified dashboard in your browser.
+- Space membership.
+- The user's assigned role and permissions.
+- The access level required by the requested API or Function.
+- Product entitlements that apply to the deployment.
 
-## User Identification and Authorization
+A user who can view charts does not automatically have access to sensitive Functions or configuration. Grant the minimum permissions required and remove access when a user no longer needs it.
 
-Netdata Cloud requires only an email address for accounts.
+Current role definitions and plan entitlements can change. Consult the Cloud UI, product documentation, and [pricing page](https://www.netdata.cloud/pricing/) rather than relying on a copied feature matrix.
 
-| **Method**     | **Details**                                        |
-|:---------------|:---------------------------------------------------|
-| Identification | Email via Google, GitHub, or short-lived tokens    |
-| Credentials    | No passwords stored                                |
-| Storage        | Secure AWS storage; used for product and marketing |
+## Transport Security
 
-Authentication uses third-party integrations or secure tokens. Netdata Cloud never stores credentials.
+Browser-to-Cloud and Agent-to-Cloud communication uses TLS. The Agent-Cloud Link is initiated by the Agent, so connecting a node to Cloud does not require exposing a new inbound Agent port to the internet.
 
-## Data Storage and Transfer
+Domain-based firewall rules are preferred because service addresses can change. See [Configure Netdata for cybersecurity platforms](/docs/netdata-agent/configure-netdata-for-cybersecurity-platforms.md) for the current endpoint and port requirements.
 
-Netdata Cloud stores no raw metrics, only essential metadata:
+## Sensitive Operational Data
 
-| **Metadata Stored**  | **Source**                  |
-|:---------------------|:----------------------------|
-| Hostname             | `/api/v1/info` endpoint     |
-| Metric Metadata      | `/api/v1/contexts` endpoint |
-| Alerts Configuration | `/api/v1/alarms` endpoint   |
+Cloud can relay data whose sensitivity is higher than ordinary metrics, including:
 
-All metadata is stored in AWS and copied to Google BigQuery for analytics.
+- Process details and command lines.
+- Database statements and errors.
+- System and application logs.
+- Network connections and topology.
+- Agent configuration.
 
-Metric data travels via secure Agent-Cloud Link (ACLK):
+The endpoint or Function declares the access required for that data. Users should still review output before sharing it because authorization does not redact secrets or personal information returned by the underlying system.
 
-- ACLK encrypts data and activates only for claimed nodes
-- All user-Cloud communication uses TLS encryption
+## Responsibility Boundaries
 
-### ACLK Secure Data Flow
+Netdata is responsible for the security of the Cloud service and its published controls. Deployment operators remain responsible for:
 
-```mermaid
-flowchart TD
-    A("Netdata Agent") -->|" Encrypts metrics<br/>and minimal metadata "| B("Agent-Cloud Link ACLK")
-    B -->|" TLS Encryption "| C("Netdata Cloud")
-    C -->|" Aggregates metadata<br/>for dashboards and alerts "| D("User Browser")
-%% Style definitions
-    classDef alert fill: #ffeb3b, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 14px
-    classDef neutral fill: #f9f9f9, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 14px
-    classDef complete fill: #4caf50, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 14px
-    classDef database fill: #2196F3, stroke: #000000, stroke-width: 3px, color: #000000, font-size: 14px
-%% Apply styles
-    class A alert
-    class B neutral
-    class C database
-    class D complete
-```
+- Securing monitored hosts, Agents, Parents, and their credentials.
+- Selecting appropriate Cloud roles and permissions.
+- Configuring streaming and direct Agent access securely.
+- Reviewing collectors, exporters, notifications, and external integrations.
+- Defining retention and deletion requirements for their organization.
+- Handling exported or copied Function and log results appropriately.
 
-## Data Retention and Erasure
+## Privacy, Retention, and Assurance
 
-| **Process**     | **Details**                                         |
-|:----------------|:----------------------------------------------------|
-| Retention       | Deleted content kept 90 days                        |
-| Self-Service    | Modify/delete personal data via Cloud UI            |
-| Manual Requests | Written deletion requests processed under data laws |
+Privacy terms, data-subject rights, subprocessors, international transfers, and retention commitments are policy and contractual matters. Use the [Netdata Privacy Policy](https://www.netdata.cloud/privacy/) as the current source.
 
-:::tip
+Current security attestations and control evidence are available through the [Netdata Trust Center](https://trust.netdata.cloud/). These sources supersede copied certification, vendor, or retention claims in product documentation.
 
-Users can delete accounts and data directly from their Netdata Cloud profile.
+For account and personal-data deletion procedures, follow the current Cloud UI and Privacy Policy. Do not assume a fixed retention period unless it appears in the applicable current policy or contract.
 
-:::
+## Vulnerability Reporting
 
-## Infrastructure and Authentication
-
-Netdata Cloud uses Infrastructure as Code (IaC).
-
-| **Feature**             | **Implementation**                   |
-|:------------------------|:-------------------------------------|
-| Infrastructure Changes  | Managed via Terraform                |
-| Authentication          | JWT tokens at TLS termination points |
-| Microservices Isolation | Complete environment separation      |
-
-Netdata Cloud never stores user credentials.
-
-## Security Features and Incident Response
-
-Built-in security protections include:
-
-| **Feature**               | **Details**                        |
-|:--------------------------|:-----------------------------------|
-| Infrastructure Dashboards | Centralized monitoring/alerting    |
-| Audit Logs                | Role-based access tracking         |
-| DDoS Protection           | Rate-limiting and blacklisting     |
-| Secure Development        | Static analyzers and secure coding |
-
-Security vulnerabilities follow a structured process:
-
-- Acknowledge within three business days
-- Analyze and fix promptly
-- Maintain communication with reporters
-
-:::tip
-
-See [Netdata's GitHub Security Policy](https://github.com/netdata/netdata/security/policy) for details.
-
-:::
-
-## User Customization
-
-Netdata Cloud uses maximum security defaults without out-of-box customization.
-
-Per-contract customization options include:
-
-- Custom SSO
-- Custom retention policies
-- Advanced access controls
-- Tailored audit logs
-- Third-party security tool integration
-
-Contact Netdata Sales for enterprise solutions.
-
-## Deleting Personal Data
-
-Users can delete personal data by:
-
-- Logging into Netdata Cloud
-- Accessing Profile settings
-- Initiating account deletion
-
-If self-service isn't available, submit written requests processed under applicable laws.
-
-## User Privacy and Data Protection
-
-Netdata Cloud prioritizes privacy and data protection, continuously reviewing and updating privacy and security practices.
-
-| **Category**              | **Details**                                                                                                                                                                                                               |
-|:--------------------------|:--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Data Collection**       | • Email Address (account, communication, analytics)<br/>• IP Address (web proxy access logs)                                                                                                                              |
-| **Data Usage**            | • Stored in AWS databases<br/>• Copied to BigQuery for analytics<br/>• Used for product improvement<br/>• With consent, tracking via Google Analytics, Posthog, and Gainsight PX<br/>• Stripe for secure payment handling |
-| **Data Sharing**          | • No selling or sharing of personal data<br/>• Third-party services: Google Cloud/AWS (infrastructure), Stripe (payments), Analytics services                                                                             |
-| **Data Protection**       | • Encrypted ACLK for all infrastructure data<br/>• TLS encryption for all user-Cloud communication                                                                                                                        |
-| **User Control**          | • Access personal data<br/>• Correct inaccuracies<br/>• Retrieve personal data<br/>• Delete accounts<br/>• Note: Temporary maintenance may limit access                                                                   |
-| **Compliance**            | • Full compliance with GDPR and CCPA                                                                                                                                                                                      |
-| **Data Transfer**         | • Secure, encrypted WebSocket (WSS) connections for all transfers                                                                                                                                                         |
-| **Tracking Technologies** | • With consent: analytical cookies tracked via Google Analytics, Posthog, and Gainsight PX                                                                                                                                |
-| **Data Breach Protocol**  | • Follows DPA guidelines and industry timelines<br/>• User notifications as required by data protection laws<br/>• Continuous review and updates to privacy and security practices                                        |
+Report suspected vulnerabilities through the [Netdata GitHub Security Policy](https://github.com/netdata/netdata/security/policy).

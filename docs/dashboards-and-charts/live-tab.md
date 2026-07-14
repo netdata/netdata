@@ -1,81 +1,35 @@
 # Live Tab
 
-The **Live tab** gives you real-time access to [Netdata Functions](/docs/top-monitoring-netdata-functions.md) that can be executed on any node running the Netdata Agent. These specialized routines, provided by various collectors, deliver live information from your monitored nodes—including database monitoring functions, network topology maps, process explorers, and more.
+The **Live tab** is the Netdata Cloud interface for selecting and executing [Netdata Functions](/docs/top-monitoring-netdata-functions.md) on monitored nodes. Functions provide current operational details that complement metrics and charts.
 
-You can **use these Functions to**:
+You can also execute a Function from the [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md) by selecting the `f(x)` control for a node.
 
-- **Retrieve** extra diagnostic **information**
-- Perform actions to support **troubleshooting directly on the node**
+## Execute a Function
 
-:::tip
+1. Open the **Live** tab.
+2. Select a Function from the Functions bar.
+3. Select the node where the Function should run.
+4. Apply any filters offered by that Function.
+5. Review the returned visualization and data table.
 
-You can also execute a Function from the [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md) by pressing the `f(x)` button next to the node.
+Available Functions and filters depend on the selected node and its enabled collectors.
 
-:::
+## Review Results
 
-:::note
+A Function can return:
 
-If you receive an error saying that your node can't execute Functions, check the [prerequisites](/docs/top-monitoring-netdata-functions.md) to ensure your node is configured properly.
+| Element           | Purpose                                                                   |
+|:------------------|:--------------------------------------------------------------------------|
+| **Visualization** | Summarizes the result when the Function supplies a visual representation. |
+| **Data table**    | Shows the detailed rows returned by the Function.                         |
 
-:::
+Use the controls in the upper-right corner to:
 
-## Live Tab Structure Overview
+- Refresh the result manually while the view is paused.
+- Select an update interval for repeated execution.
 
-```mermaid
-flowchart TD
-    A("Functions Bar")
-    A --> B("Function Execution")
-    B --> C("Visualization")
-    C --> D("Results Table")
+Some Function results may contain sensitive process, query, log, or network information. Follow your organization's handling rules before copying or sharing them.
 
-    %% Style definitions
-    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
-    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
-    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
-    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
+## Troubleshooting
 
-    %% Apply styles
-    class A alert
-    class B neutral
-    class C,D complete
-```
-
-:::tip
-
-The diagram above shows how Function selection and execution work in the Live tab, helping you visualize the flow from choosing a Function to viewing the results.
-
-:::
-
-## Live Tab View
-
-The main view of the Live tab provides two elements, depending on the selected Function:
-
-| Element           | Description                                                                                                                  |
-|-------------------|------------------------------------------------------------------------------------------------------------------------------|
-| **Visualization** | Located at the top of the page. The type of visualization depends on the selected Function and may allow user customization. |
-| **Data Table**    | Located below the visualization. Displays detailed results from the executed Function.                                       |
-
-### View Controls
-
-You can control the data refresh and update settings in the top right-hand corner of the view:
-
-| Control                 | Description                                                              |
-|-------------------------|--------------------------------------------------------------------------|
-| **Refresh results**     | Manually refresh results (works when the dashboard is in `Paused` mode). |
-| **Set update interval** | Configure how often the results should refresh.                          |
-
-## Functions Bar
-
-The **Functions bar**, located on the right-hand side of the Live tab, lets you select which Function to run, on which node, and apply filtering where available.
-
-| Option              | Description                                                                                                                                                                  |
-|---------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| **Select Function** | Choose the Function to run from the available routines.                                                                                                                      |
-| **Select Node**     | Select the node where the Function will execute.                                                                                                                             |
-| **Apply Filtering** | Narrow down results using the available filters.  <br/> Example for the `Block-devices` Function: <br/> - Device <br/> - Type <br/> - ID <br/> - Model <br/> - Serial number |
-
-:::tip
-
-The available filters depend on the Function you select. After choosing the Function, use the filters provided to narrow down the results and focus on the data you need.
-
-:::
+If a Function is missing or cannot execute, check the [Function availability troubleshooting steps](/docs/top-monitoring-netdata-functions.md#troubleshooting-availability). The target node must be online, the component providing the Function must be running, and the current user must have the required access.

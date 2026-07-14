@@ -53,7 +53,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Flood Protection**](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#benefits-of-centralized-notifications): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud doesn’t send notifications about this node
 
-- [**Functions** or **Netdata Functions**](/docs/top-monitoring-netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can bring additional information to support troubleshooting or trigger some action to happen on the node itself.
+- **Functions**: See [Netdata Functions](#n).
 
 ## G
 
@@ -98,7 +98,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Netdata Cloud** or **Cloud**](/docs/netdata-cloud/README.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
 
-- [**Netdata Functions** or **Functions**](/docs/top-monitoring-netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can bring additional information to support troubleshooting or trigger some action to happen on the node itself.
+- [**Netdata Functions**](/docs/top-monitoring-netdata-functions.md): On-demand routines that return live troubleshooting information or perform a supported action on a monitored node.
 
 - [**Node States**](/docs/netdata-cloud/node-states-and-transitions.md): The connection status of nodes in Netdata Cloud. Nodes can be Live (actively streaming), Stale (not streaming but historical data available via Parent), Offline (disconnected, no data available), or Unseen (claimed but never connected). See [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).
 

@@ -760,11 +760,12 @@ sidebar:
               edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/active_journal_centralization_guide_no_encryption.md
       - type: integration_placeholder
         integration_kind: logs
-  # Live
+  # Netdata Functions
   - meta:
-      label: Live View
+      label: Netdata Functions
       edit_url: https://github.com/netdata/netdata/edit/master/docs/top-monitoring-netdata-functions.md
-      description: Present the Netdata Functions what these are and why they should be used.
+      description: Run on-demand troubleshooting routines on monitored nodes for processes, databases, network connections, logs, and other live system data.
+      keywords: [functions, troubleshooting, processes, database queries, live data]
     items:
       - meta:
           label: Processes
@@ -772,7 +773,7 @@ sidebar:
       - meta:
           label: Database Queries
           edit_url: https://github.com/netdata/netdata/edit/master/docs/functions/databases.md
-          description: Top and running database queries with deadlock and error attribution for 13 databases.
+          description: Investigate expensive and running queries, deadlocks, and database errors.
   # Alerts & Notifications
   - meta:
       label: Alerts & Notifications
@@ -1025,7 +1026,7 @@ sidebar:
       - meta:
           label: Access Control and Feature Availability
           edit_url: https://github.com/netdata/netdata/edit/master/docs/netdata-oss-limitations.md
-          description: Feature availability across Anonymous access Netdata Cloud Community and Business tiers
+          description: Understand how network controls, authentication, permissions, data sensitivity, and product entitlements govern access.
       - meta:
           label: Netdata Agent
           edit_url: https://github.com/netdata/netdata/edit/master/docs/security-and-privacy-design/netdata-agent-security.md
