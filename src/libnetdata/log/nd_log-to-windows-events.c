@@ -302,11 +302,9 @@ static bool wel_run_silent(const wchar_t *exe, const wchar_t *params) {
 // then registers it via wevtutil. No external manifest file is required.
 static void wel_ensure_manifest_installed(void) {
     if (wel_manifest_is_current()) {
-        nd_win_trace("wel_ensure_manifest_installed: importChannel providers already registered");
         return;
     }
 
-    nd_win_trace("wel_ensure_manifest_installed: installing manifest...");
 
     wchar_t system32[MAX_PATH];
     if (!GetSystemDirectoryW(system32, _countof(system32))) return;
@@ -319,19 +317,12 @@ static void wel_ensure_manifest_installed(void) {
     {
         wchar_t dllSrc[MAX_PATH];
         if (GetModuleFileNameW(NULL, dllSrc, _countof(dllSrc)) &&
-            wel_replace_program_with_wevt_netdata_dll(dllSrc, _countof(dllSrc))) {
-            if (!CopyFileW(dllSrc, dllDst, FALSE))
-                nd_win_trace("wel_ensure_manifest_installed: CopyFile err=%lu (may already exist)",
-                             (unsigned long)GetLastError());
-            else
-                nd_win_trace("wel_ensure_manifest_installed: copied DLL to System32");
-        }
+            wel_replace_program_with_wevt_netdata_dll(dllSrc, _countof(dllSrc)))
+            CopyFileW(dllSrc, dllDst, FALSE);
     }
 
     // DLL must exist in System32 (either we just copied it or MSI put it there).
     if (GetFileAttributesW(dllDst) == INVALID_FILE_ATTRIBUTES) {
-        nd_win_trace("wel_ensure_manifest_installed: wevt_netdata.dll not in System32 err=%lu, skipping",
-                     (unsigned long)GetLastError());
         return;
     }
 
@@ -340,16 +331,13 @@ static void wel_ensure_manifest_installed(void) {
     swprintf(icaclsPath, _countof(icaclsPath), L"%ls\\icacls.exe", system32);
     wchar_t icaclsParams[MAX_PATH * 2];
     swprintf(icaclsParams, _countof(icaclsParams), L"\"%ls\" /grant \"NT SERVICE\\EventLog\":R", dllDst);
-    if (!wel_run_silent(icaclsPath, icaclsParams))
-        nd_win_trace("wel_ensure_manifest_installed: icacls err=%lu", (unsigned long)GetLastError());
+    (void)wel_run_silent(icaclsPath, icaclsParams);
 
     // Build manifest content from the embedded template. The manifest is generated
     // at runtime so it always matches this binary's channel layout, regardless of
     // what manifest file (if any) is on disk.
     char dllDstNarrow[MAX_PATH];
     if(!WideCharToMultiByte(CP_UTF8, 0, dllDst, -1, dllDstNarrow, _countof(dllDstNarrow), NULL, NULL)) {
-        nd_win_trace("wel_ensure_manifest_installed: WideCharToMultiByte failed err=%lu",
-                     (unsigned long)GetLastError());
         return;
     }
 
@@ -362,7 +350,6 @@ static void wel_ensure_manifest_installed(void) {
                         dllDstNarrow, dllDstNarrow,   // NetdataHealth
                         dllDstNarrow, dllDstNarrow);  // NetdataAclk
     if (mlen <= 0 || mlen >= (int)sizeof(manifest)) {
-        nd_win_trace("wel_ensure_manifest_installed: manifest buffer overflow");
         return;
     }
 
@@ -373,41 +360,30 @@ static void wel_ensure_manifest_installed(void) {
     HANDLE hFile = CreateFileW(manifestDst, GENERIC_WRITE, 0, NULL, CREATE_ALWAYS,
                                FILE_ATTRIBUTE_NORMAL, NULL);
     if (hFile == INVALID_HANDLE_VALUE) {
-        nd_win_trace("wel_ensure_manifest_installed: cannot create manifest err=%lu",
-                     (unsigned long)GetLastError());
         return;
     }
     DWORD written;
     BOOL fileOk = WriteFile(hFile, manifest, (DWORD)mlen, &written, NULL);
     CloseHandle(hFile);
     if (!fileOk || written != (DWORD)mlen) {
-        nd_win_trace("wel_ensure_manifest_installed: write failed err=%lu", (unsigned long)GetLastError());
         return;
     }
 
     wchar_t wevtutil[MAX_PATH];
     swprintf(wevtutil, _countof(wevtutil), L"%ls\\wevtutil.exe", system32);
 
-    nd_win_trace("wel_ensure_manifest_installed: manifest written to '%ls'", manifestDst);
 
     // Unregister any previously registered manifest (ignore errors — normal on first run).
     wchar_t umParams[MAX_PATH * 2];
     swprintf(umParams, _countof(umParams), L"um \"%ls\"", manifestDst);
-    if (wel_run_silent(wevtutil, umParams))
-        nd_win_trace("wel_ensure_manifest_installed: wevtutil um ok");
-    else
-        nd_win_trace("wel_ensure_manifest_installed: wevtutil um failed/skipped (ok if not previously installed)");
+    (void)wel_run_silent(wevtutil, umParams);
 
     // Register the new manifest. The /mf and /rf flags tell wevtutil where the DLL is,
     // overriding the resourceFileName/messageFileName attributes in the XML.
     wchar_t imParams[MAX_PATH * 4];
     swprintf(imParams, _countof(imParams), L"im \"%ls\" \"/mf:%ls\" \"/rf:%ls\"",
              manifestDst, dllDst, dllDst);
-    if (wel_run_silent(wevtutil, imParams))
-        nd_win_trace("wel_ensure_manifest_installed: manifest installed successfully");
-    else
-        nd_win_trace("wel_ensure_manifest_installed: wevtutil im failed err=%lu",
-                     (unsigned long)GetLastError());
+    (void)wel_run_silent(wevtutil, imParams);
 }
 #endif // !HAVE_ETW
 
@@ -477,9 +453,6 @@ static bool etw_register_provider(void) {
 static void wel_queue_init(void);
 
 bool nd_log_init_windows(void) {
-    nd_win_trace("nd_log_init_windows: entered etw=%d initialized=%d",
-                 (int)nd_log.eventlog.etw, (int)nd_log.eventlog.initialized);
-
     if(nd_log.eventlog.initialized)
         return true;
 
@@ -536,27 +509,15 @@ bool nd_log_init_windows(void) {
 
         if(!nd_log.eventlog.etw) {
             const wchar_t *wel_channel = wel_channel_per_source[i];
-            nd_win_trace("nd_log_init_windows: wel_add_to_registry channel=%ls source=%ls...",
-                         wel_channel, sub_channel);
             if(!wel_add_to_registry(wel_channel, sub_channel, defaultMaxSize)) {
-                nd_win_trace("nd_log_init_windows: wel_add_to_registry FAILED channel=%ls source=%ls err=%lu",
-                             wel_channel, sub_channel, (unsigned long)GetLastError());
                 return false;
             }
-            nd_win_trace("nd_log_init_windows: wel_add_to_registry ok channel=%ls source=%ls",
-                         wel_channel, sub_channel);
 
             // when not using a manifest, each source is a provider
-            nd_win_trace("nd_log_init_windows: RegisterEventSourceW source[%zu/%s]...",
-                         i, nd_log_id2source(i));
             nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, sub_channel);
             if (!nd_log.sources[i].hEventLog) {
-                nd_win_trace("nd_log_init_windows: RegisterEventSourceW FAILED source[%zu/%s] err=%lu",
-                             i, nd_log_id2source(i), (unsigned long)GetLastError());
                 return false;
             }
-            nd_win_trace("nd_log_init_windows: RegisterEventSourceW ok source[%zu/%s]",
-                         i, nd_log_id2source(i));
         }
     }
 
@@ -568,12 +529,7 @@ bool nd_log_init_windows(void) {
         wchar_t legacy_key[MAX_PATH];
         swprintf(legacy_key, MAX_PATH,
                  L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\NetdataWEL");
-        LSTATUS legacy_rc = RegDeleteTreeW(HKEY_LOCAL_MACHINE, legacy_key);
-        if(legacy_rc == ERROR_SUCCESS)
-            nd_win_trace("nd_log_init_windows: removed legacy EventLog\\NetdataWEL registry key");
-        else if(legacy_rc != ERROR_FILE_NOT_FOUND)
-            nd_win_trace("nd_log_init_windows: failed to remove legacy EventLog\\NetdataWEL rc=%ld",
-                         (long)legacy_rc);
+        RegDeleteTreeW(HKEY_LOCAL_MACHINE, legacy_key);
 
         // Map the unset ones to NDLS_DAEMON
         for (size_t i = 0; i < _NDLS_MAX; i++) {
@@ -583,10 +539,6 @@ bool nd_log_init_windows(void) {
     }
 
     nd_log.eventlog.initialized = true;
-    nd_win_trace("nd_log_init_windows: done initialized=true etw=%d; "
-                 "events go to Netdata/{Daemon,Collectors,Access,Health,Aclk}",
-                 (int)nd_log.eventlog.etw);
-
     wel_queue_init();
     return true;
 }
@@ -720,27 +672,9 @@ static void wel_entry_process(struct wel_queue_entry *e) {
         rc = ReportEventW(e->hEventLog, e->wType, 0, e->eventID, NULL, _NDF_MAX - 1, 0, msgs, NULL);
     }
 
-    if(!rc) {
-        static bool first_failure[_NDLS_MAX];
-        if(e->source_id < _NDLS_MAX &&
-           !__atomic_exchange_n(&first_failure[e->source_id], true, __ATOMIC_RELAXED)) {
-            DWORD err = GetLastError();
-            nd_win_trace("wel_async[%s]: write FAILED err=%lu eventID=0x%lx",
-                         nd_log_id2source(e->source_id),
-                         (unsigned long)err, (unsigned long)e->eventID);
-        }
-    } else {
-        static bool first_success[_NDLS_MAX];
-        if(e->source_id < _NDLS_MAX &&
-           !__atomic_exchange_n(&first_success[e->source_id], true, __ATOMIC_RELAXED)) {
-            nd_win_trace("wel_async[%s]: write ok eventID=0x%lx",
-                         nd_log_id2source(e->source_id), (unsigned long)e->eventID);
-        }
-    }
 }
 
 static void wel_async_writer(void *arg __maybe_unused) {
-    nd_win_trace("wel_async_writer: started depth=%d", WEL_QUEUE_DEPTH);
 
     for(;;) {
         netdata_mutex_lock(&wel_queue.mutex);
@@ -769,7 +703,6 @@ static void wel_async_writer(void *arg __maybe_unused) {
         netdata_mutex_unlock(&wel_queue.mutex);
     }
 
-    nd_win_trace("wel_async_writer: exiting (dropped total=%" PRIu64 ")", wel_queue.dropped);
     if(wel_queue.drain_ack)
         SetEvent(wel_queue.drain_ack);
 }
@@ -781,7 +714,6 @@ static void wel_queue_init(void) {
     wel_queue.thread = nd_thread_create("WEL-ASYNC", NETDATA_THREAD_OPTION_DEFAULT,
                                         wel_async_writer, NULL);
     wel_queue.initialized = true;
-    nd_win_trace("wel_queue_init: async writer thread created");
 }
 
 void nd_log_stop_windows_async(void) {
@@ -798,7 +730,6 @@ void nd_log_stop_windows_async(void) {
     if(wel_queue.drain_ack)
         WaitForSingleObject(wel_queue.drain_ack, 2000);
 
-    nd_win_trace("nd_log_stop_windows_async: done (dropped total=%" PRIu64 ")", wel_queue.dropped);
 }
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -921,7 +852,6 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
     static bool first_call[_NDLS_MAX];
     if(source->source < _NDLS_MAX &&
        !__atomic_exchange_n(&first_call[source->source], true, __ATOMIC_RELAXED))
-        nd_win_trace("nd_logger_windows: first call source=%s", nd_log_id2source(source->source));
 
     ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
     if (fields[NDF_PRIORITY].entry.set)
@@ -1023,7 +953,6 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
         // Only trace the first drop — the caller falls back to stderr for this entry.
         static bool first_drop = false;
         if(!__atomic_exchange_n(&first_drop, true, __ATOMIC_RELAXED))
-            nd_win_trace("nd_logger_windows: WEL queue full (depth=%d), dropping entries; "
                          "async writer may be blocked in ReportEventW",
                          WEL_QUEUE_DEPTH);
     }

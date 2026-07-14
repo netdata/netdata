@@ -866,7 +866,6 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.oom_protection = 0;
 #endif
     
-    nd_win_trace("daemon_status_file_refresh: os_process_memory");
     OS_PROCESS_MEMORY proc_mem = os_process_memory(0);
     if(OS_PROCESS_MEMORY_OK(proc_mem))
         session_status.netdata_max_rss = proc_mem.max_rss;
@@ -896,10 +895,8 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     if(status != DAEMON_STATUS_NONE)
         session_status.status = status;
 
-    nd_win_trace("daemon_status_file_refresh: os_system_memory");
     session_status.memory = os_system_memory(true);
 
-    nd_win_trace("daemon_status_file_refresh: os_disk_space");
     session_status.var_cache = os_disk_space(netdata_configured_cache_dir);
     session_status.system_cpus = os_get_system_cpus();
 
@@ -910,14 +907,12 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     // because line 897 above already updated session_status.status before this
     // guard runs, so checking session_status.status alone is insufficient.
     // Also skip when still initializing or during shutdown.
-    nd_win_trace("daemon_status_file_refresh: rrdstats_metadata_collect");
     if(status == DAEMON_STATUS_NONE && session_status.status != DAEMON_STATUS_INITIALIZING && !exit_initiated_get())
         session_status.metrics_metadata = rrdstats_metadata_collect();
 
     // Update disk footprint at most once every 10 minutes (600 seconds).
     // Skip entirely during shutdown — dir_size_multiple walks the filesystem
     // and can block long enough to trigger error 1053.
-    nd_win_trace("daemon_status_file_refresh: disk_footprint");
     if (!exit_initiated_get()) {
         if ((now_ut - session_status.disk_footprint.last_updated_ut) >= 600 * USEC_PER_SEC ||
             session_status.disk_footprint.last_updated_ut == 0) {
@@ -957,7 +952,6 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
         }
     }
 
-    nd_win_trace("daemon_status_file_refresh: dsf_release");
     dsf_release(session_status);
 }
 

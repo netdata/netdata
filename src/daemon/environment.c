@@ -2,7 +2,6 @@
 
 #include "common.h"
 
-// nd_win_trace() is declared in libnetdata/os/os.h (Windows) / macro no-op (non-Windows).
 
 // Normalize a directory path for Win32/UCRT64 API use.
 // Accepts both POSIX form (/c/...) and Windows-native form (C:\... or C:/...);
@@ -130,15 +129,11 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
 
             errno_clear();
             if (stat(path, &st) == -1) {
-                nd_win_trace("verify_required_directory FATAL: missing component '%s' of '%s' (env=%s)",
-                             path, dir, env?env:"");
                 fatal("Required directory: '%s' (%s) - Missing or inaccessible component: '%s'",
                       dir, env?env:"", path);
             }
 
             if (!S_ISDIR(st.st_mode)) {
-                nd_win_trace("verify_required_directory FATAL: component '%s' not a dir (env=%s)",
-                             path, env?env:"");
                 fatal("Required directory: '%s' (%s) - Component '%s' exists but is not a directory.",
                       dir, env?env:"", path);
             }
@@ -149,28 +144,20 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
     }
 
     if (stat(native_dir, &st) == -1) {
-        nd_win_trace("verify_required_directory FATAL: dir '%s' not found (env=%s, native='%s')",
-                     dir, env?env:"", native_dir);
         fatal("Required directory: '%s' (%s) - Missing or inaccessible: '%s'",
               dir, env?env:"", native_dir);
     }
 
     if (!S_ISDIR(st.st_mode)) {
-        nd_win_trace("verify_required_directory FATAL: '%s' not a dir (env=%s)",
-                     native_dir, env?env:"");
         fatal("Required directory: '%s' (%s) - '%s' exists but is not a directory.",
               dir, env?env:"", native_dir);
     }
 
     if (access(native_dir, R_OK | X_OK) == -1) {
-        nd_win_trace("verify_required_directory FATAL: '%s' no read/exec access (env=%s)",
-                     native_dir, env?env:"");
         fatal("Required directory: '%s' (%s) - Insufficient permissions for: '%s'",
               dir, env?env:"", native_dir);
     }
 
-    nd_win_trace("verify_required_directory FATAL: '%s' unknown failure (env=%s)",
-                 native_dir, env?env:"");
     fatal("Required directory: '%s' (%s) - Failed",
           dir, env?env:"");
 }
@@ -186,26 +173,16 @@ void set_environment_for_plugins_and_scripts(void) {
     nd_setenv("NETDATA_HOSTNAME", netdata_configured_hostname, 1);
     nd_setenv("NETDATA_HOST_PREFIX", netdata_configured_host_prefix, 1);
 
-    nd_win_trace("verify NETDATA_CONFIG_DIR / NETDATA_USER_CONFIG_DIR: '%s'", netdata_configured_user_config_dir);
     verify_required_directory("NETDATA_CONFIG_DIR", netdata_configured_user_config_dir, false, 0);
     nd_setenv("NETDATA_USER_CONFIG_DIR", netdata_configured_user_config_dir, 1);
-    nd_win_trace("verify NETDATA_STOCK_CONFIG_DIR: '%s'", netdata_configured_stock_config_dir);
     verify_required_directory("NETDATA_STOCK_CONFIG_DIR", netdata_configured_stock_config_dir, false, 0);
-    nd_win_trace("verify NETDATA_STOCK_DATA_DIR: '%s'", netdata_configured_stock_data_dir);
     verify_required_directory("NETDATA_STOCK_DATA_DIR", netdata_configured_stock_data_dir, false, 0);
-    nd_win_trace("verify NETDATA_PLUGINS_DIR: '%s'", netdata_configured_primary_plugins_dir);
     verify_required_directory("NETDATA_PLUGINS_DIR", netdata_configured_primary_plugins_dir, false, 0);
-    nd_win_trace("verify NETDATA_WEB_DIR: '%s'", netdata_configured_web_dir);
     verify_required_directory("NETDATA_WEB_DIR", netdata_configured_web_dir, false, 0);
-    nd_win_trace("verify NETDATA_CACHE_DIR: '%s'", netdata_configured_cache_dir);
     verify_required_directory("NETDATA_CACHE_DIR", netdata_configured_cache_dir, true, 0775);
-    nd_win_trace("verify NETDATA_LIB_DIR: '%s'", netdata_configured_varlib_dir);
     verify_required_directory("NETDATA_LIB_DIR", netdata_configured_varlib_dir, true, 0775);
-    nd_win_trace("verify NETDATA_LOG_DIR: '%s'", netdata_configured_log_dir);
     verify_required_directory("NETDATA_LOG_DIR", netdata_configured_log_dir, true, 0775);
-    nd_win_trace("verify CLAIMING_DIR: '%s'", netdata_configured_cloud_dir);
     verify_required_directory("CLAIMING_DIR", netdata_configured_cloud_dir, true, 0770);
-    nd_win_trace("all directory checks passed");
 
     {
         BUFFER *user_plugins_dirs = buffer_create(FILENAME_MAX, NULL);

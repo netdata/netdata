@@ -872,11 +872,6 @@ static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx,
     file_size = journalfile->unsafe.pos;
 
     max_id = 1;
-    nd_win_trace("journalfile_iterate_transactions: file_size=%" PRIu64 " chunks=%" PRIu64,
-                 file_size,
-                 file_size > sizeof(struct rrdeng_jf_sb)
-                     ? (file_size - sizeof(struct rrdeng_jf_sb) + READAHEAD_BYTES - 1) / READAHEAD_BYTES
-                     : (uint64_t)0);
     (void)posix_memalignz((void *)&buf, RRDFILE_ALIGNMENT, READAHEAD_BYTES);
 
     for (pos = sizeof(struct rrdeng_jf_sb); pos < file_size; pos += READAHEAD_BYTES) {
@@ -906,7 +901,6 @@ static uint64_t journalfile_iterate_transactions(struct rrdengine_instance *ctx,
         }
     }
 skip_file:
-    nd_win_trace("journalfile_iterate_transactions: done, max_id=%" PRIu64, max_id);
     posix_memalign_freez(buf);
     return max_id;
 }
@@ -1281,16 +1275,13 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         return 1;
     }
 
-    nd_win_trace("journalfile_v2_load: fileno=%u v1_size=%zu opening v2='%s'",
-                 datafile->fileno, journal_v1_file_size, path_v2);
     fd = open(path_v2, O_RDONLY | O_CLOEXEC);
     if (fd < 0) {
         int open_errno = errno;
-        nd_win_trace("journalfile_v2_load: fileno=%u open failed errno=%d (ENOENT=%d)", datafile->fileno, open_errno, ENOENT);
         if (open_errno == ENOENT)
             return 1;
         ctx_fs_error(ctx);
-        errno = open_errno; // nd_win_trace may have clobbered errno; netdata_log_error captures it
+        errno = open_errno;
         netdata_log_error("DBENGINE: failed to open \"%s\"", path_v2);
         return 1;
     }
@@ -1310,10 +1301,8 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
         return 1;
     }
 
-    nd_win_trace("journalfile_v2_load: fileno=%u size=%zu: nd_mmap...", datafile->fileno, journal_v2_file_size);
     usec_t mmap_start_ut = now_monotonic_usec();
     uint8_t *data_start = nd_mmap(NULL, journal_v2_file_size, PROT_READ, MAP_SHARED, fd, 0);
-    nd_win_trace("journalfile_v2_load: fileno=%u: nd_mmap done, data=%p", datafile->fileno, (void *)data_start);
     if (data_start == MAP_FAILED) {
         close(fd);
         return 1;
@@ -1327,7 +1316,6 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
 
     usec_t validation_start_ut = now_monotonic_usec();
 
-    nd_win_trace("journalfile_v2_load: fileno=%u size=%zu: validate...", datafile->fileno, journal_v2_file_size);
     int rc = 0;
     PROTECTED_ACCESS_SETUP(data_start, journal_v2_file_size, path_v2, "validate");
     if(no_signal_received) {
@@ -1336,7 +1324,6 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
     else {
         rc = 2;
     }
-    nd_win_trace("journalfile_v2_load: fileno=%u: validate done, rc=%d", datafile->fileno, rc);
 
     if (unlikely(rc)) {
         if (rc == 2)
@@ -1778,17 +1765,13 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
     char path[RRDENG_PATH_MAX];
     bool loaded_v2 = false;
 
-    nd_win_trace("journalfile_load: fileno=%u last_fileno=%u", datafile->fileno, ctx_last_fileno_get(ctx));
     // Do not try to load jv2 of the latest file
     if (datafile->fileno != ctx_last_fileno_get(ctx))
         loaded_v2 = journalfile_v2_load(ctx, journalfile, datafile) == 0;
-    nd_win_trace("journalfile_load: fileno=%u loaded_v2=%d", datafile->fileno, (int)loaded_v2);
 
     journalfile_v1_generate_path(datafile, path, sizeof(path));
 
-    nd_win_trace("journalfile_load: fileno=%u open v1='%s'...", datafile->fileno, path);
     fd = open_file_for_io(path, O_RDWR, &file, dbengine_use_direct_io);
-    nd_win_trace("journalfile_load: fileno=%u open v1 ret=%d", datafile->fileno, fd);
     if (fd < 0) {
         ctx_fs_error(ctx);
 
@@ -1840,7 +1823,6 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
         return 0;
     }
 
-    nd_win_trace("journalfile_load: fileno=%u is_last=%d pgc_open_cache_to_journal_v2...", datafile->fileno, (int)is_last_file);
     pgc_open_cache_to_journal_v2(
         open_cache,
         (Word_t)ctx,
@@ -1849,7 +1831,6 @@ int journalfile_load(struct rrdengine_instance *ctx, struct rrdengine_journalfil
         journalfile_migrate_to_v2_callback,
         (void *)datafile->journalfile,
         true);
-    nd_win_trace("journalfile_load: fileno=%u pgc_open_cache_to_journal_v2 done", datafile->fileno);
 
     if (is_last_file)
         ctx->loading.create_new_datafile_pair = true;

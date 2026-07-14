@@ -457,9 +457,7 @@ static int create_uv_thread(uv_thread_t *thread, uv_thread_cb thread_func, void 
     int err;
 
     do {
-        nd_win_trace("create_uv_thread: uv_thread_create (retry=%d)...", *retries);
         err = uv_thread_create(thread, thread_func, arg);
-        nd_win_trace("create_uv_thread: uv_thread_create done, err=%d", err);
         if (err == 0)
             break;
 
