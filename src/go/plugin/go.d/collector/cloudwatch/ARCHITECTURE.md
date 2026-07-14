@@ -44,11 +44,14 @@ flowchart LR
     tags("Resolve tags<br/>membership + labels")
     plan("Plan + state<br/>stable query + policy")
     query("Query<br/>GetMetricData<br/>billed — the cost driver")
+    activity("Collector activity<br/>calls · billing units · raw queries")
     store("metrix store<br/>gauges + labels")
     charts("Dynamic charts<br/>cloudwatch.*")
 
     cfg --> static --> plan
     cfg --> disc --> tags --> plan --> query --> store --> charts
+    disc --> activity --> store
+    query --> activity
 
     classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
     classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
@@ -75,7 +78,8 @@ Each collection cycle (`collect.go`), in order:
 6. apply explicit per-query outcomes to completion, retry, and source-observation state (`observe.go`);
 7. write retained observations or synthetic zero presentation as float gauges into `metrix`, stamped with
    `{account_id, region, <dimension labels>}`, and re-emit not-due series (`query_emit.go`);
-8. serve a chart template built once from the selected profiles (`chart.go`).
+8. publish cumulative collector activity retained across failed cycles (`activity.go`);
+9. serve a chart template built once from the selected profiles plus one collector-activity group (`chart.go`).
 
 ## Lifecycle
 
@@ -118,7 +122,8 @@ flowchart TD
   compiled; `ensureTargets` retries only unresolved targets.
 - **Cleanup** resets the collection plan, resolved targets, cached template,
   discovery/query snapshots, client caches, and per-query observation state so a framework
-  re-Init after failed autodetection starts clean. The `metrix` store is created
+  re-Init after failed autodetection starts clean. Job-lifetime collector-activity
+  totals are reset as well. The `metrix` store is created
   once in `New` and persists — it is not recreated.
 - **ChartTemplateYAML** returns the cached string; no work at call time.
 
@@ -135,8 +140,9 @@ flowchart TD
     E("dueQueries<br/>keep stable queries with a newer eligible window")
     F("executeQueries<br/>batched · concurrent GetMetricData")
     G("apply outcomes + emit<br/>write gauges · re-emit retained")
+    H("publish collector activity<br/>cumulative snapshot counters")
 
-    A --> B --> C --> D --> E --> F --> G
+    A --> B --> C --> D --> E --> F --> G --> H
 
     classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
     classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
@@ -146,7 +152,7 @@ flowchart TD
     class A input
     class B,C,D,E sched
     class F effect
-    class G commit
+    class G,H commit
 ```
 
 ## Configuration Compilation
@@ -680,6 +686,31 @@ Narrow the bill with focused rule target/profile/region selections or longer eff
 periods configured through rule/default query timing; nested profile query defaults are the fallback.
 Discovery frequency is a minor lever. (Rates are AWS's published model — verify current
 per-region prices on the CloudWatch pricing page.)
+
+### Collector activity and billing inputs
+
+`activity.go` keeps three job-lifetime cumulative counters and the chart template
+renders their incremental rates for every resolved `(account_id, region)`:
+
+- **CloudWatch API Calls** counts collector-issued `ListMetrics` and
+  `GetMetricData` method calls. Every requested continuation page is another call.
+- **CloudWatch Metric Requests** counts the calculated `GetMetricData` billing
+  units submitted by the collector. Up to five statistics for one structural AWS
+  metric in one request form one unit; a pagination page submits those units again.
+- **CloudWatch Raw Queries** counts submitted `MetricDataQuery` items, split by
+  profile. This is the profile-level tuning view, not AWS's billing unit.
+
+Physical calls and billing units are attributed only to account and region because
+one shared discovery stream or query batch can serve multiple profiles. Targets that
+resolve to the same account therefore aggregate. Raw queries keep their profile of
+origin because every planned series has exactly one.
+
+The totals live outside the staged `metrix` frame. Work done by a failed collection
+cycle is preserved and appears after the next successful commit; cleanup, job
+replacement, and process restart reset the totals. They count calls issued by the
+collector, not retry attempts performed internally by the AWS SDK. These metrics are
+cost inputs, not an AWS invoice: AWS owns the billing rules, may change them, and does
+not separately document pagination billing semantics.
 
 ## Key Invariants
 

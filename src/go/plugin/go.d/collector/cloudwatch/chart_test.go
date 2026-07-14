@@ -39,7 +39,7 @@ func TestBuildChartSpec_InjectsMetricsWithoutStaticRateDivisors(t *testing.T) {
 	c := chartTestCollector(t, "ec2")
 
 	spec := buildChartSpec(c.plan.Profiles)
-	require.Len(t, spec.Groups, 1)
+	require.Len(t, spec.Groups, 2)
 
 	group := spec.Groups[0]
 	assert.NotEmpty(t, group.Metrics, "template.metrics (visible series) is injected")
@@ -65,6 +65,52 @@ func TestBuildChartSpec_DoesNotMutateCatalog(t *testing.T) {
 		for _, d := range chart.Dimensions {
 			assert.Nilf(t, d.Options, "catalog profile dimension %q must not be mutated", d.Selector)
 		}
+	}
+}
+
+func TestActivityChartGroupContract(t *testing.T) {
+	group := activityChartGroup()
+	assert.Equal(t, "Collector Activity", group.Family)
+	require.NotNil(t, group.ChartDefaults)
+	require.NotNil(t, group.ChartDefaults.Instances)
+	assert.Equal(t, []string{"account_id", "region"}, group.ChartDefaults.Instances.ByLabels)
+	assert.ElementsMatch(t, []string{
+		activityAPICallsMetric,
+		activityMetricRequestsMetric,
+		activityQueriesMetric,
+	}, group.Metrics)
+
+	want := map[string]struct {
+		context       string
+		units         string
+		selector      string
+		name          string
+		nameFromLabel string
+	}{
+		"aws_cloudwatch_collector_api_calls": {
+			context: "collector_api_calls", units: "calls/s",
+			selector: activityAPICallsMetric, nameFromLabel: "operation",
+		},
+		"aws_cloudwatch_collector_metric_requests": {
+			context: "collector_metric_requests", units: "requests/s",
+			selector: activityMetricRequestsMetric, name: "requests",
+		},
+		"aws_cloudwatch_collector_queries": {
+			context: "collector_queries", units: "queries/s",
+			selector: activityQueriesMetric, nameFromLabel: "profile",
+		},
+	}
+	require.Len(t, group.Charts, len(want))
+	for _, chart := range group.Charts {
+		expected, ok := want[chart.ID]
+		require.True(t, ok, "unexpected chart %q", chart.ID)
+		assert.Equal(t, expected.context, chart.Context)
+		assert.Equal(t, expected.units, chart.Units)
+		assert.Equal(t, "incremental", chart.Algorithm)
+		require.Len(t, chart.Dimensions, 1)
+		assert.Equal(t, expected.selector, chart.Dimensions[0].Selector)
+		assert.Equal(t, expected.name, chart.Dimensions[0].Name)
+		assert.Equal(t, expected.nameFromLabel, chart.Dimensions[0].NameFromLabel)
 	}
 }
 

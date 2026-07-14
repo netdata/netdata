@@ -23,18 +23,55 @@ func buildChartTemplate(profiles []cwprofiles.ResolvedProfile) (string, error) {
 // (Group.Clone) before injection so the shared profile catalog is never mutated.
 // The assembled spec is validated when buildChartTemplate marshals it.
 func buildChartSpec(profiles []cwprofiles.ResolvedProfile) charttpl.Spec {
-	groups := make([]charttpl.Group, 0, len(profiles))
+	groups := make([]charttpl.Group, 0, len(profiles)+1)
 	for _, rp := range profiles {
 		group := rp.Config.Template.Clone()
 		series := profileSeries(rp.Name, rp.Config)
 		group.Metrics = slices.Sorted(maps.Keys(series))
 		groups = append(groups, group)
 	}
+	groups = append(groups, activityChartGroup())
 
 	return charttpl.Spec{
 		Version:          charttpl.VersionV1,
 		ContextNamespace: cwprofiles.ContextNamespace,
 		Groups:           groups,
+	}
+}
+
+func activityChartGroup() charttpl.Group {
+	instances := &charttpl.Instances{ByLabels: []string{"account_id", "region"}}
+	return charttpl.Group{
+		Family: "Collector Activity",
+		Metrics: []string{
+			activityAPICallsMetric,
+			activityMetricRequestsMetric,
+			activityQueriesMetric,
+		},
+		ChartDefaults: &charttpl.ChartDefaults{Instances: instances},
+		Charts: []charttpl.Chart{
+			{
+				ID: "aws_cloudwatch_collector_api_calls", Title: "CloudWatch API Calls",
+				Context: "collector_api_calls", Units: "calls/s", Algorithm: "incremental", Type: "line",
+				Dimensions: []charttpl.Dimension{{
+					Selector: activityAPICallsMetric, NameFromLabel: "operation",
+				}},
+			},
+			{
+				ID: "aws_cloudwatch_collector_metric_requests", Title: "CloudWatch Metric Requests",
+				Context: "collector_metric_requests", Units: "requests/s", Algorithm: "incremental", Type: "line",
+				Dimensions: []charttpl.Dimension{{
+					Selector: activityMetricRequestsMetric, Name: "requests",
+				}},
+			},
+			{
+				ID: "aws_cloudwatch_collector_queries", Title: "CloudWatch Raw Queries",
+				Context: "collector_queries", Units: "queries/s", Algorithm: "incremental", Type: "line",
+				Dimensions: []charttpl.Dimension{{
+					Selector: activityQueriesMetric, NameFromLabel: "profile",
+				}},
+			},
+		},
 	}
 }
 

@@ -303,7 +303,7 @@ func TestCollect_E2E(t *testing.T) {
 			series, err := collecttest.CollectScalarSeries(c)
 			require.NoError(t, err)
 
-			assert.Equal(t, tc.wantSeries, series)
+			assert.Equal(t, tc.wantSeries, workloadSeries(series))
 			collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 			collecttest.AssertChartTemplateSchema(t, c.ChartTemplateYAML())
 		})
@@ -535,6 +535,9 @@ func TestCollect_OrderedRulesFirstTargetOwnsSameAccountSeries(t *testing.T) {
 	series, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
 	assert.Equal(t, metrix.SampleValue(5), series[`ec2.cpu_utilization_average{account_id="000000000000",instance_id="i-1",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(2), series[activityAPICallsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`],
+		"same-account targets aggregate into one account/region activity series")
+	assert.Equal(t, metrix.SampleValue(1), series[activityAPICallsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
 	assert.Equal(t, 1, first.getCalls)
 	assert.Zero(t, second.getCalls, "the later rule's duplicate final series must not be queried")
 }
@@ -630,7 +633,7 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 	require.NoError(t, err)
 
 	gotNames := make(map[string]struct{}, len(series))
-	for k := range series {
+	for k := range workloadSeries(series) {
 		gotNames[seriesName(k)] = struct{}{}
 	}
 	assert.Equal(t, wantNames, gotNames, "every stock profile's every active (metric, statistic) must produce a series")
@@ -668,7 +671,7 @@ func TestCollect_MultiRegion(t *testing.T) {
 		`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="eu-west-1"}`:       0,
 		`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:      0,
 		`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="eu-west-1"}`:      0,
-	}, series)
+	}, workloadSeries(series))
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 }
 
@@ -686,9 +689,25 @@ func TestCollect_DiscoveryFailSoft(t *testing.T) {
 
 	t.Run("total discovery failure on the first pass errors the collect", func(t *testing.T) {
 		c := newBase("us-east-1")
-		useFakeClient(c, &e2eCloudWatch{listErr: errors.New("AccessDenied")})
+		fake := &e2eCloudWatch{listErr: errors.New("AccessDenied")}
+		useFakeClient(c, fake)
 		_, err := collecttest.CollectScalarSeries(c)
 		require.Error(t, err)
+
+		fake.mu.Lock()
+		fake.listErr = nil
+		fake.list = map[string][]cwtypes.Metric{"AWS/EC2": {mkMetric("CPUUtilization", "InstanceId", "i-1")}}
+		fake.values = map[string]float64{e2eKey("AWS/EC2", "CPUUtilization", "Average", "InstanceId", "i-1"): 7}
+		fake.mu.Unlock()
+		c.now = func() time.Time {
+			return time.Unix(1_700_000_000, 0).Add(time.Duration(c.Discovery.RefreshEvery) * time.Second)
+		}
+
+		series, err := collecttest.CollectScalarSeries(c)
+		require.NoError(t, err)
+		assert.Equal(t, metrix.SampleValue(2), series[activityAPICallsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`],
+			"the failed cycle's ListMetrics call must appear after recovery")
+		assert.Equal(t, metrix.SampleValue(1), series[activityAPICallsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
 	})
 
 	t.Run("partial region failure is tolerated", func(t *testing.T) {
@@ -714,6 +733,6 @@ func TestCollect_DiscoveryFailSoft(t *testing.T) {
 			`ec2.network_out_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:         0,
 			`ec2.disk_read_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:       0,
 			`ec2.disk_write_ops_sum{account_id="000000000000",instance_id="i-1",region="us-east-1"}`:      0,
-		}, series, "the healthy region still produces its series (rate metrics with no data record 0)")
+		}, workloadSeries(series), "the healthy region still produces its series (rate metrics with no data record 0)")
 	})
 }

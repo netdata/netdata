@@ -66,6 +66,7 @@ func New() *Collector {
 		newRGTAClient:       defaultNewRGTAClient,
 	}
 	c.observations = newObservationStore(c.store)
+	c.activity = newCollectorActivity(c.store)
 	c.clients = newClientCache(c.buildTargetRegionClient)
 	c.rgtaClients = newClientCache(c.buildTargetRegionRGTAClient)
 	return c
@@ -97,7 +98,8 @@ type Collector struct {
 
 	discoverySig string // last-logged discovered-resources summary; Info re-logs only when it changes
 
-	observations *observationStore // per-stable-query completion and retained values
+	observations *observationStore  // per-stable-query completion and retained values
+	activity     *collectorActivity // cumulative AWS calls and GetMetricData work
 
 	tags          tagSnapshot              // resource-tag membership and label cache, refreshed with discovery
 	tagLabelPlans map[string][]resolvedTag // per-profile resolved tag->label plans (nil until compiled)
@@ -134,6 +136,7 @@ func (c *Collector) Cleanup(context.Context) {
 	c.clients.reset()
 	c.rgtaClients.reset()
 	c.observations.reset()
+	c.activity.reset()
 	c.tags = tagSnapshot{}
 	c.tagLabelPlans = nil
 	c.tagFetchPlan = nil

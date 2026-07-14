@@ -179,7 +179,7 @@ func scanDiscoveryGroupForTest(ctx context.Context, client cloudwatchClient, gro
 	if len(group.Profiles) == 0 {
 		return nil, nil
 	}
-	scanner := newDiscoveryGroupScanner(group)
+	scanner := newDiscoveryGroupScanner(group, nil)
 	budget := testDiscoveryBudget(1)
 	for !scanner.done {
 		if err := scanner.scanPage(ctx, client, budget); err != nil {
@@ -196,7 +196,7 @@ func discoverAllForTest(
 	maxConcurrency int,
 ) []discoveryGroupResult {
 	t.Helper()
-	results, err := discoverAll(context.Background(), newClient, groups, maxConcurrency, time.Second)
+	results, err := discoverAll(context.Background(), newClient, nil, groups, maxConcurrency, time.Second)
 	require.NoError(t, err)
 	return results
 }
@@ -728,7 +728,7 @@ func TestDiscoverAll_ProtectsFirstOperationBeforeContinuations(t *testing.T) {
 
 	results, err := discoverAll(context.Background(), func(context.Context, string, string) (cloudwatchClient, error) {
 		return fake, nil
-	}, groups, 1, time.Second)
+	}, nil, groups, 1, time.Second)
 
 	assert.ErrorContains(t, err, "more than 100 ListMetrics SDK operations")
 	require.Len(t, results, 2)
@@ -751,7 +751,7 @@ func TestDiscoverAll_ClientFailureDoesNotConsumeListMetricsBudget(t *testing.T) 
 			return nil, errors.New("client build failed")
 		}
 		return fake, nil
-	}, groups, 1, time.Second)
+	}, nil, groups, 1, time.Second)
 
 	require.NoError(t, err)
 	require.Len(t, results, 2)
@@ -764,7 +764,7 @@ func TestDiscoverAll_SharedStageTimeout(t *testing.T) {
 	profile := resolved("blocked", dimProfile("AWS/Blocked", 300, "Id"))
 	results, err := discoverAll(context.Background(), func(context.Context, string, string) (cloudwatchClient, error) {
 		return blockingListMetrics{}, nil
-	}, []discoveryGroup{{
+	}, nil, []discoveryGroup{{
 		Target: "base", Region: "us-east-1", Namespace: "AWS/Blocked", Profiles: []cwprofiles.ResolvedProfile{profile},
 	}}, 1, 10*time.Millisecond)
 

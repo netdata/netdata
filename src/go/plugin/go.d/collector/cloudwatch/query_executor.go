@@ -11,11 +11,13 @@ import (
 )
 
 type queryBatch struct {
-	key     queryBatchKey
-	client  cloudwatchClient
-	queries []plannedQuery
-	start   time.Time
-	end     time.Time
+	key       queryBatchKey
+	client    cloudwatchClient
+	activity  *collectorActivity
+	accountID string
+	queries   []plannedQuery
+	start     time.Time
+	end       time.Time
 }
 
 type queryBatchResult struct {
@@ -141,7 +143,10 @@ func buildQueryBatches(queries []plannedQuery, clients map[clientKey]cloudwatchC
 		client := clients[clientKey{target: group.key.target, region: group.key.region}]
 		start, end := queryWindow(now, group.key.policy)
 		for _, chunk := range packQueryGroup(group.queries, queryBatchWidth(group.key.policy)) {
-			batches = append(batches, queryBatch{key: group.key, client: client, queries: chunk, start: start, end: end})
+			batches = append(batches, queryBatch{
+				key: group.key, client: client, accountID: chunk[0].accountID,
+				queries: chunk, start: start, end: end,
+			})
 		}
 	}
 	return batches
@@ -151,6 +156,7 @@ func (c *Collector) runQueryBatches(ctx context.Context, batches []queryBatch) [
 	p := pool.NewWithResults[queryBatchResult]().WithMaxGoroutines(apiConcurrency)
 	for _, batch := range batches {
 		p.Go(func() queryBatchResult {
+			batch.activity = c.activity
 			cctx, cancel := withTimeout(ctx, c.Timeout.Duration())
 			defer cancel()
 			outcomes, issues, err := runGetMetricData(cctx, batch)
