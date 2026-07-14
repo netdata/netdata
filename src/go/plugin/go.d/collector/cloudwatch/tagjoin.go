@@ -4,6 +4,7 @@ package cloudwatch
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
@@ -262,7 +263,7 @@ func (tj tagJoin) arnJoinKey(a arn.ARN) (string, bool) {
 // dimension values (ordered by dimNames = Profile.DimensionNames()).
 func (tj tagJoin) instanceJoinKey(dimNames, values []string) (string, bool) {
 	if len(tj.joinDims) == 1 {
-		idx := indexOfString(dimNames, tj.joinDims[0])
+		idx := slices.Index(dimNames, tj.joinDims[0])
 		if idx < 0 || idx >= len(values) {
 			return "", false
 		}
@@ -270,22 +271,13 @@ func (tj tagJoin) instanceJoinKey(dimNames, values []string) (string, bool) {
 	}
 	parts := make([]string, len(tj.joinDims))
 	for i, jd := range tj.joinDims {
-		idx := indexOfString(dimNames, jd)
+		idx := slices.Index(dimNames, jd)
 		if idx < 0 || idx >= len(values) {
 			return "", false
 		}
 		parts[i] = values[idx]
 	}
 	return strings.Join(parts, instanceKeySep), true
-}
-
-func indexOfString(ss []string, s string) int {
-	for i, v := range ss {
-		if v == s {
-			return i
-		}
-	}
-	return -1
 }
 
 // deriveResourceType maps an ARN to the "service[:type]" key used to look a profile
