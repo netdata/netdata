@@ -64,6 +64,7 @@ struct rrdengine_datafile {
         SPINLOCK spinlock;
         size_t running;
         size_t flushed_to_open_running;
+        bool failed; // a write to this datafile failed unrecoverably - report it full to force rotation
 #ifdef OS_WINDOWS
         time_t last_sync_time;
 #endif
