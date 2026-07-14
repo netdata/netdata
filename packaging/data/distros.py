@@ -1,5 +1,7 @@
-#!/bin/sh
-'''Python module for handling of distros.yaml data.'''
+#!/bin/env python3
+'''Python module for handling of distros.yaml data.
+
+   If run as a script on it’s own, this will dump the JSON schema for distros.yaml.'''
 
 from collections import Counter
 from dataclasses import dataclass
