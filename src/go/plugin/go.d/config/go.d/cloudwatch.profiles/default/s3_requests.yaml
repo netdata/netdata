@@ -58,22 +58,25 @@ metrics:
     statistics: [sum]
     rate: true
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. All are published at the
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the
   # {BucketName, FilterId} grain, so no other change is needed.
   # ----------------------------------------------------------------------------------------
-  # - id: list_requests
-  #   metric_name: ListRequests
-  #   statistics: [sum]
-  #   rate: true
-  # - id: post_requests
-  #   metric_name: PostRequests
-  #   statistics: [sum]
-  #   rate: true
-  # - id: select_requests
-  #   metric_name: SelectRequests
-  #   statistics: [sum]
-  #   rate: true
+  - id: list_requests
+    disabled: true
+    metric_name: ListRequests
+    statistics: [sum]
+    rate: true
+  - id: post_requests
+    disabled: true
+    metric_name: PostRequests
+    statistics: [sum]
+    rate: true
+  - id: select_requests
+    disabled: true
+    metric_name: SelectRequests
+    statistics: [sum]
+    rate: true
   # SelectBytesScanned / SelectBytesReturned are also published at this grain.
 template:
   family: S3 Requests
@@ -133,18 +136,18 @@ template:
         - selector: bytes_uploaded_sum
           name: uploaded
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_s3_extra_requests
-    #   context: extra_requests
-    #   title: S3 List, Post, and Select Requests
-    #   family: Requests
-    #   units: requests/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: list_requests_sum
-    #       name: list
-    #     - selector: post_requests_sum
-    #       name: post
-    #     - selector: select_requests_sum
-    #       name: select
+    - id: aws_cloudwatch_s3_extra_requests
+      context: extra_requests
+      title: S3 List, Post, and Select Requests
+      family: Requests
+      units: requests/s
+      algorithm: absolute
+      dimensions:
+        - selector: list_requests_sum
+          name: list
+        - selector: post_requests_sum
+          name: post
+        - selector: select_requests_sum
+          name: select

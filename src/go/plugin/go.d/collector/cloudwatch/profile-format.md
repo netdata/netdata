@@ -36,6 +36,7 @@ metrics:
     statistics: [sum]
     rate: true
   - id: latency
+    disabled: true               # opt-in; still declared and charted
     metric_name: Latency
     statistics: [average, p99]
     query:                      # optional field-by-field overrides
@@ -87,7 +88,7 @@ The filename without `.yaml` is the profile name. In the example, a file named
 | `disabled` | no | When `true`, collection rules do not select the profile through their default set. A rule can still name it explicitly in `profiles.include`. |
 | `query` | yes | Profile query defaults. `query.period` is required; `lookback` and `publication_delay` are optional. |
 | `instance` | yes | Exact dimension set that identifies one collected resource. |
-| `metrics` | yes | Metrics and statistics queried for every discovered instance. |
+| `metrics` | yes | Default-enabled and opt-in metrics available for every discovered instance. |
 | `template` | yes | Dynamic chart template populated from the exported series. |
 
 ### Supported regions
@@ -179,6 +180,7 @@ Every `metrics` entry supports:
 | Field | Required | Description |
 |:------|:--------:|:------------|
 | `id` | yes | Stable lowercase identifier used in exported series names and chart selectors. |
+| `disabled` | no | When `true`, the metric is opt-in. It remains available to `rules[].metrics` and its chart definitions remain part of the template, but it is not queried by default. |
 | `metric_name` | yes | CloudWatch metric name, matched verbatim. |
 | `statistics` | yes | One or more of `average`, `minimum`, `maximum`, `sum`, `sample_count`, or a percentile such as `p90` or `p99.9`. |
 | `rate` | no | Divide each per-period `sum` or `sample_count` sibling by the effective period and present it per second. Other statistics on the same metric, such as `average`, remain unchanged. Requires at least one total statistic. |
@@ -194,6 +196,22 @@ exported series name is:
 
 Chart selectors may use the shorthand `<metric_id>_<statistic>` shown in the
 example; the loader qualifies it with the profile name.
+
+Omitting `rules[].metrics` collects the default-enabled metrics from every
+selected profile. A metric group changes only its named profile; selected
+profiles without a group keep their defaults. The group includes defaults when
+`defaults` is omitted or `true`, so adding an opt-in metric is concise:
+
+```yaml
+metrics:
+  - profile: example
+    include:
+      - name: Latency
+```
+
+Set `defaults: false` when the profile must use only the listed MetricNames. If
+both the group and metric omit `statistics`, the collector uses every statistic
+declared for that metric in the profile.
 
 ## Chart template rules
 
@@ -221,8 +239,9 @@ and marks all emitted CloudWatch metric families as floating-point values.
    sets with `aws cloudwatch list-metrics`.
 2. Start from the closest stock profile and choose one resource grain.
 3. Keep the default metric set focused; CloudWatch bills `GetMetricData` per
-   requested metric. Leave expensive or high-cardinality additions commented
-   with matching chart definitions when appropriate.
+   requested metric. Declare expensive or specialized additions with
+   `disabled: true`, and keep their matching chart definitions active so an
+   operator can enable them only through job configuration.
 4. Run the collector tests and profile-catalog validation:
 
    ```bash

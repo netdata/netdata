@@ -252,7 +252,7 @@ func TestPrivateLinkServiceProfiles_ExactRulePoliciesRemainDisjoint(t *testing.T
 			Name: "one-minute-traffic", Targets: []string{"base"}, Regions: []string{"us-east-1"},
 			Profiles: &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"privatelink_service"}},
 			Metrics: []ProfileMetricSelectorConfig{{
-				Profile: "privatelink_service", Statistics: []string{"Average"},
+				Profile: "privatelink_service", Defaults: &defaults, Statistics: []string{"Average"},
 				Include: []MetricSelectionConfig{{Name: "ActiveConnections"}, {Name: "BytesProcessed"}, {Name: "NewConnections"}, {Name: "RstPacketsSent"}},
 			}},
 			Query: &cwquery.Config{Period: longDuration(time.Minute), Lookback: longDuration(5 * time.Minute), PublicationDelay: longDuration(5 * time.Minute)},
@@ -261,7 +261,7 @@ func TestPrivateLinkServiceProfiles_ExactRulePoliciesRemainDisjoint(t *testing.T
 			Name: "five-minute-endpoints", Targets: []string{"base"}, Regions: []string{"us-east-1"},
 			Profiles: &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"privatelink_service"}},
 			Metrics: []ProfileMetricSelectorConfig{{
-				Profile: "privatelink_service",
+				Profile: "privatelink_service", Defaults: &defaults,
 				Include: []MetricSelectionConfig{{Name: "EndpointsCount", Statistics: []string{"Average"}}},
 			}},
 			Query: &cwquery.Config{Period: longDuration(5 * time.Minute), Lookback: longDuration(5 * time.Minute), PublicationDelay: longDuration(5 * time.Minute)},
@@ -270,7 +270,7 @@ func TestPrivateLinkServiceProfiles_ExactRulePoliciesRemainDisjoint(t *testing.T
 			Name: "six-hour-bytes", Targets: []string{"base"}, Regions: []string{"us-east-1"},
 			Profiles: &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"privatelink_service"}},
 			Metrics: []ProfileMetricSelectorConfig{{
-				Profile: "privatelink_service",
+				Profile: "privatelink_service", Defaults: &defaults,
 				Include: []MetricSelectionConfig{{Name: "BytesProcessed", Statistics: []string{"Sum"}}},
 			}},
 			Query: &cwquery.Config{Period: longDuration(6 * time.Hour), Lookback: longDuration(6 * time.Hour), PublicationDelay: longDuration(5 * time.Minute)},

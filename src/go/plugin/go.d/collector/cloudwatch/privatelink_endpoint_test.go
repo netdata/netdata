@@ -216,7 +216,7 @@ func TestPrivateLinkEndpointProfiles_ExactRulePoliciesRemainDisjoint(t *testing.
 			Name: "one-minute-averages", Targets: []string{"base"}, Regions: []string{"us-east-1"},
 			Profiles: &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"privatelink_endpoint"}},
 			Metrics: []ProfileMetricSelectorConfig{{
-				Profile: "privatelink_endpoint", Statistics: []string{"Average"},
+				Profile: "privatelink_endpoint", Defaults: &defaults, Statistics: []string{"Average"},
 				Include: []MetricSelectionConfig{{Name: "ActiveConnections"}, {Name: "BytesProcessed"}, {Name: "NewConnections"}},
 			}},
 			Query: &cwquery.Config{Period: longDuration(time.Minute), Lookback: longDuration(5 * time.Minute), PublicationDelay: longDuration(5 * time.Minute)},
@@ -225,7 +225,7 @@ func TestPrivateLinkEndpointProfiles_ExactRulePoliciesRemainDisjoint(t *testing.
 			Name: "six-hour-bytes", Targets: []string{"base"}, Regions: []string{"us-east-1"},
 			Profiles: &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"privatelink_endpoint"}},
 			Metrics: []ProfileMetricSelectorConfig{{
-				Profile: "privatelink_endpoint",
+				Profile: "privatelink_endpoint", Defaults: &defaults,
 				Include: []MetricSelectionConfig{{Name: "BytesProcessed", Statistics: []string{"Sum"}}},
 			}},
 			Query: &cwquery.Config{Period: longDuration(6 * time.Hour), Lookback: longDuration(6 * time.Hour), PublicationDelay: longDuration(5 * time.Minute)},

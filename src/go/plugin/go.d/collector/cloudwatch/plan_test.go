@@ -42,7 +42,7 @@ func TestCompileConfig_ExactMetricSelection(t *testing.T) {
 	cfg := validBaseConfig()
 	cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
 	cfg.Rules[0].Metrics = []ProfileMetricSelectorConfig{{
-		Profile: "ec2", Statistics: []string{"sum"},
+		Profile: "ec2", Defaults: &defaults, Statistics: []string{"sum"},
 		Include: []MetricSelectionConfig{
 			{Name: "NetworkIn"},
 			{Name: "CPUUtilization", Statistics: []string{"AVERAGE"}},
@@ -55,6 +55,86 @@ func TestCompileConfig_ExactMetricSelection(t *testing.T) {
 	assert.Equal(t, []string{"ec2.cpu_utilization_average", "ec2.network_in_sum"}, compiledSeriesNames(plan.Scopes[0].SelectedSeries))
 }
 
+func TestResolveRuleMetrics_DefaultAndExplicitSelection(t *testing.T) {
+	falseValue := false
+	profiles := []cwprofiles.ResolvedProfile{
+		{
+			Name: "service_a",
+			Config: cwprofiles.Profile{Metrics: []cwprofiles.Metric{
+				{ID: "requests", MetricName: "Requests", Statistics: []string{"sum"}},
+				{ID: "latency", MetricName: "Latency", Statistics: []string{"average", "maximum"}},
+				{ID: "errors", MetricName: "Errors", Statistics: []string{"sum"}, Disabled: true},
+			}},
+		},
+		{
+			Name: "service_b",
+			Config: cwprofiles.Profile{Metrics: []cwprofiles.Metric{
+				{ID: "work", MetricName: "Work", Statistics: []string{"average"}},
+			}},
+		},
+	}
+	seriesByProfile := make(map[string][]profileSeriesSpec, len(profiles))
+	for _, profile := range profiles {
+		seriesByProfile[profile.Name] = compileProfileSeries(profile)
+	}
+
+	tests := map[string]struct {
+		selectors []ProfileMetricSelectorConfig
+		want      map[string][]string
+	}{
+		"omitted groups select default-enabled metrics": {
+			want: map[string][]string{
+				"service_a": {"service_a.requests_sum", "service_a.latency_average", "service_a.latency_maximum"},
+				"service_b": {"service_b.work_average"},
+			},
+		},
+		"group defaults add an optional metric and leave other profiles unchanged": {
+			selectors: []ProfileMetricSelectorConfig{{
+				Profile: "service_a",
+				Include: []MetricSelectionConfig{{Name: "Errors"}},
+			}},
+			want: map[string][]string{
+				"service_a": {"service_a.requests_sum", "service_a.latency_average", "service_a.latency_maximum", "service_a.errors_sum"},
+				"service_b": {"service_b.work_average"},
+			},
+		},
+		"defaults false selects only explicit metrics for that profile": {
+			selectors: []ProfileMetricSelectorConfig{{
+				Profile: "service_a", Defaults: &falseValue,
+				Include: []MetricSelectionConfig{{Name: "Errors"}},
+			}},
+			want: map[string][]string{
+				"service_a": {"service_a.errors_sum"},
+				"service_b": {"service_b.work_average"},
+			},
+		},
+		"explicit statistics narrow the profile statistics": {
+			selectors: []ProfileMetricSelectorConfig{{
+				Profile: "service_a", Defaults: &falseValue,
+				Include: []MetricSelectionConfig{{Name: "Latency", Statistics: []string{"Maximum"}}},
+			}},
+			want: map[string][]string{
+				"service_a": {"service_a.latency_maximum"},
+				"service_b": {"service_b.work_average"},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			selected, _, err := resolveRuleMetrics("rules[0]", tc.selectors, profiles, seriesByProfile)
+			require.NoError(t, err)
+			got := make(map[string][]string, len(selected))
+			for profile, series := range selected {
+				for _, item := range series {
+					got[profile] = append(got[profile], item.Name)
+				}
+			}
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
 func TestCompileConfig_SanitizedExistingProfileParity(t *testing.T) {
 	defaults := false
 	profile := func(name string) *ProfileSelectorConfig {
@@ -65,7 +145,7 @@ func TestCompileConfig_SanitizedExistingProfileParity(t *testing.T) {
 		for i, name := range names {
 			include[i] = MetricSelectionConfig{Name: name}
 		}
-		return []ProfileMetricSelectorConfig{{Profile: profile, Statistics: []string{statistic}, Include: include}}
+		return []ProfileMetricSelectorConfig{{Profile: profile, Defaults: &defaults, Statistics: []string{statistic}, Include: include}}
 	}
 	query := func(period, lookback, delay time.Duration) *cwquery.Config {
 		return &cwquery.Config{
@@ -125,7 +205,7 @@ func TestCompileConfig_SanitizedExistingProfileParity(t *testing.T) {
 		{
 			Name: "sqs", Targets: []string{"base"}, Profiles: profile("sqs"),
 			Metrics: []ProfileMetricSelectorConfig{{
-				Profile: "sqs", Statistics: []string{"Sum"},
+				Profile: "sqs", Defaults: &defaults, Statistics: []string{"Sum"},
 				Include: []MetricSelectionConfig{
 					{Name: "NumberOfMessagesSent"},
 					{Name: "NumberOfMessagesReceived"},
@@ -219,7 +299,7 @@ func TestCompileConfig_MetricSelectionExpandsMultipleStatistics(t *testing.T) {
 	cfg := validBaseConfig()
 	cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"lambda"}}
 	cfg.Rules[0].Metrics = []ProfileMetricSelectorConfig{{
-		Profile: "lambda",
+		Profile: "lambda", Defaults: &defaults,
 		Include: []MetricSelectionConfig{{
 			Name:       "Duration",
 			Statistics: []string{"Average", "Maximum", "p90"},
@@ -285,7 +365,7 @@ func TestCompileConfig_PartialMetricShadowingSharesTagMembership(t *testing.T) {
 	defaults := false
 	profileSelector := &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
 	metrics := func(entries ...MetricSelectionConfig) []ProfileMetricSelectorConfig {
-		return []ProfileMetricSelectorConfig{{Profile: "ec2", Include: entries}}
+		return []ProfileMetricSelectorConfig{{Profile: "ec2", Defaults: &defaults, Include: entries}}
 	}
 	cpu := MetricSelectionConfig{Name: "CPUUtilization", Statistics: []string{"Average"}}
 	network := MetricSelectionConfig{Name: "NetworkIn", Statistics: []string{"Sum"}}

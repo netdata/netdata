@@ -37,22 +37,25 @@ metrics:
     metric_name: ExecutionTime
     statistics: [average]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. All are published at the {StateMachineArn}
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {StateMachineArn}
   # grain (redrive metrics appear only when executions are redriven).
   # ----------------------------------------------------------------------------------------
-  # - id: executions_redriven
-  #   metric_name: ExecutionsRedriven
-  #   statistics: [sum]
-  #   rate: true
-  # - id: redriven_executions_succeeded
-  #   metric_name: RedrivenExecutionsSucceeded
-  #   statistics: [sum]
-  #   rate: true
-  # - id: redriven_executions_failed
-  #   metric_name: RedrivenExecutionsFailed
-  #   statistics: [sum]
-  #   rate: true
+  - id: executions_redriven
+    disabled: true
+    metric_name: ExecutionsRedriven
+    statistics: [sum]
+    rate: true
+  - id: redriven_executions_succeeded
+    disabled: true
+    metric_name: RedrivenExecutionsSucceeded
+    statistics: [sum]
+    rate: true
+  - id: redriven_executions_failed
+    disabled: true
+    metric_name: RedrivenExecutionsFailed
+    statistics: [sum]
+    rate: true
   # Express Workflows publish ExpressExecutionBilledDuration/Memory at {StateMachineArn}. Metrics at
   # other grains need their own profile: activities ({ActivityArn}), Lambda tasks ({LambdaFunctionArn}),
   # service integrations ({ServiceIntegrationResourceArn}), and account-level (OpenExecutionCount).
@@ -100,18 +103,18 @@ template:
         - selector: execution_time_average
           name: execution_time
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_sfn_redriven
-    #   context: executions_redriven
-    #   title: Step Functions Redriven Executions
-    #   family: Executions
-    #   units: executions/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: executions_redriven_sum
-    #       name: redriven
-    #     - selector: redriven_executions_succeeded_sum
-    #       name: succeeded
-    #     - selector: redriven_executions_failed_sum
-    #       name: failed
+    - id: aws_cloudwatch_sfn_redriven
+      context: executions_redriven
+      title: Step Functions Redriven Executions
+      family: Executions
+      units: executions/s
+      algorithm: absolute
+      dimensions:
+        - selector: executions_redriven_sum
+          name: redriven
+        - selector: redriven_executions_succeeded_sum
+          name: succeeded
+        - selector: redriven_executions_failed_sum
+          name: failed

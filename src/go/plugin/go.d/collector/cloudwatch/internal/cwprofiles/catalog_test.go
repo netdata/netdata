@@ -219,11 +219,16 @@ func TestLoadFromDefaultDirs_StockProfilesUseNestedQueryDefaults(t *testing.T) {
 
 func TestDecodeProfileBytes(t *testing.T) {
 	tests := map[string]struct {
-		data    string
-		wantErr bool
+		data         string
+		wantErr      bool
+		wantDisabled bool
 	}{
 		"valid": {
 			data: minimalProfileYAML,
+		},
+		"disabled metric": {
+			data:         strings.Replace(minimalProfileYAML, "    metric_name: M1\n", "    disabled: true\n    metric_name: M1\n", 1),
+			wantDisabled: true,
 		},
 		// The decoder is non-strict: unknown keys are ignored.
 		"unknown top-level key ignored": {
@@ -239,11 +244,13 @@ func TestDecodeProfileBytes(t *testing.T) {
 
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
-			_, err := decodeProfileBytes([]byte(tc.data), "test")
+			profile, err := decodeProfileBytes([]byte(tc.data), "test")
 			if tc.wantErr {
 				assert.Error(t, err)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
+				require.NotEmpty(t, profile.Metrics)
+				assert.Equal(t, tc.wantDisabled, profile.Metrics[0].Disabled)
 			}
 		})
 	}
