@@ -816,4 +816,18 @@ bool OS_FUNCTION(apps_os_read_global_cpu_utilization)(void);
 // return the total physical memory of the system, in bytes
 uint64_t OS_FUNCTION(apps_os_get_total_memory)(void);
 
+// optional: derive the name of a tree (fallback) target from OS-specific
+// process information (e.g. the executable path).
+// Returns an owned STRING, or NULL to use the default naming (name/comm).
+#if defined(OS_MACOS)
+STRING *apps_os_tree_target_name_macos(struct pid_stat *p);
+static inline STRING *apps_os_tree_target_name(struct pid_stat *p) {
+    return apps_os_tree_target_name_macos(p);
+}
+#else
+static inline STRING *apps_os_tree_target_name(struct pid_stat *p __maybe_unused) {
+    return NULL;
+}
+#endif
+
 #endif //NETDATA_APPS_PLUGIN_H
