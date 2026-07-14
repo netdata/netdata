@@ -4753,37 +4753,27 @@ if(OS_WINDOWS)
         # Make curl work with ssl
         install(DIRECTORY /usr/ssl DESTINATION usr)
 
-        # Stage UCRT64 runtime DLLs co-located with each plugin executable.
-        # Windows loads DLLs from the executable's own directory before the
-        # system PATH; the SYSTEM service account has no MSYS2/UCRT64 bin in
-        # PATH, so DLLs in usr/bin are invisible to plugins running from plugins.d.
-        # This runs after all plugin targets are installed so the executables exist.
+        # Install UCRT64 runtime DLLs to both usr/bin and plugins.d.
+        # compile-on-windows.sh stages all transitive lib*.dll and zlib1.dll
+        # for netdata.exe into the build root via stage-runtime-dlls.sh.
+        # Copying the same set to plugins.d covers plugin executables: they share
+        # the same UCRT64 toolchain and need their DLLs co-located because Windows
+        # loads DLLs from the executable's own directory first, and the SYSTEM
+        # service account has no MSYS2/UCRT64 bin in its search path.
+        # ${CMAKE_BINARY_DIR} is expanded at configure time to the build root path;
+        # file(GLOB ...) and file(COPY ...) run at cmake --install time.
         install(CODE "
-            set(_stage_script \"${CMAKE_SOURCE_DIR}/packaging/windows/stage-runtime-dlls.sh\")
-            set(_plugins_dir \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d\")
-            file(GLOB _plugin_exes
-                \"\${_plugins_dir}/*.exe\"
-                \"\${_plugins_dir}/*.plugin\"
+            file(GLOB _runtime_dlls
+                \"${CMAKE_BINARY_DIR}/lib*.dll\"
+                \"${CMAKE_BINARY_DIR}/zlib1.dll\"
             )
-            set(_bash_exe \"\")
-            foreach(_bash \"/usr/bin/bash\" \"/ucrt64/bin/bash\")
-                if(EXISTS \"\${_bash}\")
-                    set(_bash_exe \"\${_bash}\")
-                    break()
-                endif()
-            endforeach()
-            if(_bash_exe)
-                foreach(_plugin_exe \${_plugin_exes})
-                    execute_process(
-                        COMMAND \"\${_bash_exe}\" \"\${_stage_script}\" \"\${_plugin_exe}\" \"\${_plugins_dir}\"
-                        RESULT_VARIABLE _rc
-                    )
-                    if(NOT _rc EQUAL 0)
-                        message(WARNING \"Windows runtime DLL staging returned \${_rc} for \${_plugin_exe}\")
-                    endif()
-                endforeach()
+            if(_runtime_dlls)
+                file(COPY \${_runtime_dlls}
+                     DESTINATION \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/bin\")
+                file(COPY \${_runtime_dlls}
+                     DESTINATION \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d\")
             else()
-                message(WARNING \"bash not found; Windows runtime DLL staging for plugins.d skipped.\")
+                message(WARNING \"No UCRT64 runtime DLLs found in build root; run compile-on-windows.sh first.\")
             endif()
         " COMPONENT netdata)
 endif()
