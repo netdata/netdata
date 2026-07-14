@@ -32,7 +32,7 @@ jobs:
         id: prepare
         run: |
           sudo apt-get update || true
-          sudo apt-get install -y python3-ruamel.yaml
+          sudo apt-get install -y python3-ruamel.yaml python3-pydantic
       - name: Read build matrix
         id: set-matrix
         run: |
