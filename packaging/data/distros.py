@@ -6,7 +6,7 @@ from enum import StrEnum, unique
 from pathlib import Path
 from typing import Annotated, Final
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from ruamel.yaml import YAML
 
 yaml: Final = YAML(typ='safe')
@@ -53,118 +53,225 @@ class ArchDataEntry:
     runner: Annotated[str, Field(min_length=1)]
 
 
-def check_unique_list[T](value: list[T]) -> list[T]:
-    c = Counter(value)
-    if s := {k for k, v in c.items() if v > 1}:
-        ValueError(f'Found duplicate values in list: {s}')
-
-    return value
-
-
-def check_arch_list(value: list[Arch]) -> list[Arch]:
-    s1 = set(value)
-    s2 = set(Arch)
-
-    if s3 := s2 - s1:
-        ValueError(f'Missing values from arch_order list: {s3}')
-
-    return value
-
-
-def check_arch_data(value: dict[Arch, ArchDataEntry]) -> dict[Arch, ArchDataEntry]:
-    s1 = set(value.keys())
-    s2 = set(Arch)
-
-    if s3 := s2 - s1:
-        ValueError(f'Missing keys from arch_data mapping: {s3}')
-
-    return value
-
-
 @dataclass(kw_only=True, frozen=True, slots=True)
 class PackagingInfo:
     __pydantic_config__ = PYDANTIC_CONFIG
 
-    type: PackageType
-    repo_distro: Annotated[str, Field(min_length=1)]
-    builder_rev: Annotated[str, Field(min_length=1)]
-    arches: Annotated[list[Arch], Field(min_length=1)]
-    alt_links: Annotated[list[Annotated[str, Field(min_length=1)]], Field(default_factory=list)]
+    type: Annotated[PackageType, Field(
+        title='Package Type',
+        description='Specifies the type of packages to use for this platform.',
+    )]
+    repo_distro: Annotated[str, Field(
+        title='Repository Prefix',
+        description='Specifies the prefix within the repository path for this platform.',
+        min_length=1,
+    )]
+    builder_rev: Annotated[str, Field(
+        title='Builder Revision',
+        description='Specifies the package builder revision to be used for this platform.',
+        min_length=1,
+    )]
+    arches: Annotated[list[Arch], Field(
+        title='Package Architectures',
+        description='Specifies the list of architectures to build packages for this platform for.',
+        min_length=1,
+    )]
+    alt_links: Annotated[list[Annotated[str, Field(min_length=1)]], Field(
+        title='Repository Aliases',
+        description='An optional list of aliases for the repository prefix.',
+        default_factory=list,
+    )]
 
 
 @dataclass(kw_only=True, frozen=True, slots=True)
 class BasicPackagingInfo:
     __pydantic_config__ = PYDANTIC_CONFIG
 
-    arches: Annotated[list[Arch | DockerArch], Field(min_length=1)]
+    arches: Annotated[list[Arch | DockerArch], Field(
+        title='Package Architectures',
+        description='Specifies the list of architectures to build packages for this platform for.',
+        min_length=1,
+    )]
 
 
 @dataclass(kw_only=True, frozen=True, slots=True)
 class TestConfig:
     __pydantic_config__ = PYDANTIC_CONFIG
 
-    ebpf_core: Annotated[bool, Field(alias='ebpf-core')] = False
-    skip_local_build: Annotated[bool, Field(alias='skip-local-build')] = False
+    ebpf_core: Annotated[bool, Field(
+        title='eBPF CO-RE testing',
+        description='Whether or not to run eBPF CO-RE testing for this platform.',
+        alias='ebpf-core',
+    )] = False
+    skip_local_build: Annotated[bool, Field(
+        title='Skip local build checks',
+        description='When true, skip this platform for local build checks in CI.',
+        alias='skip-local-build',
+    )] = False
 
 
 @dataclass(kw_only=True, frozen=True, slots=True)
 class FullDistroEntry:
     __pydantic_config__ = PYDANTIC_CONFIG
 
-    distro: Annotated[str, Field(min_length=1)]
-    version: Annotated[str, Field(min_length=1)]
-    support_type: Annotated[str, Field(min_length=1)]
-    notes: str
-    bundle_sentry: dict[Arch, bool]
-    eol_check: str | bool = False
-    eol_lts: bool = False
-    base_image: Annotated[str, Field(default_factory=lambda data: f'{data.get('distro')}:{data.get('version')}')]
-    env_prep: Annotated[str, Field(min_length=1)] | None = None
-    jsonc_removal: Annotated[str, Field(min_length=1)] | None = None
-    packages: PackagingInfo | None = None
-    test: TestConfig = TestConfig()
-
-
-@dataclass(kw_only=True, frozen=True, slots=True)
-class LegacyDistroEntry:
-    __pydantic_config__ = PYDANTIC_CONFIG
-
-    distro: Annotated[str, Field(min_length=1)]
-    version: Annotated[str, Field(min_length=1)]
-    support_type: Annotated[str, Field(min_length=1)]
-    notes: str
-    bundle_sentry: dict[Arch, bool] | None = None
-    eol_check: str | bool = False
-    eol_lts: bool = False
-    base_image: Annotated[str, Field(default_factory=lambda data: f'{data.get('distro')}:{data.get('version')}')]
-    env_prep: Annotated[str, Field(min_length=1)] | None = None
-    jsonc_removal: Annotated[str, Field(min_length=1)] | None = None
-    packages: PackagingInfo | None = None
-    test: TestConfig = TestConfig()
+    distro: Annotated[str, Field(
+        title='Platform Name',
+        description='The name of the platform',
+        min_length=1,
+    )]
+    version: Annotated[str, Field(
+        title='Platform Version',
+        description='The version of the platform',
+        min_length=1,
+    )]
+    support_type: Annotated[str, Field(
+        title='Support Tier',
+        description='The support tier for this particular platform.',
+        min_length=1,
+    )]
+    notes: Annotated[str, Field(
+        title='Notes',
+        description='Any supplementary notes about the platform.',
+    )]
+    bundle_sentry: Annotated[dict[Arch, bool], Field(
+        title='Bundle Sentry',
+        description='Per-architecture Sentry configuration. If a given architecture’s key evaluates to true, then Sentry will be bundled in official builds for that architecture.',
+    )]
+    eol_check: Annotated[str | bool, Field(
+        title='End of Life Check',
+        description='Configures automatic generation of issues tracking platform EOL based on https://endoflife.date/. If False, EOL checking will be disabled. If True, EOL checking will be enabled and will use the value of the distro key for the lookup. If a non-empty string is specified, that will be used for EOL checking instead of the value of the distro key.',
+    )] = False
+    eol_lts: Annotated[bool, Field(
+        title='Check LTS for EOL checks',
+        description='When True, use the LTS release instead of the regular one when checking for platform EOL.',
+    )] = False
+    base_image: Annotated[str, Field(
+        title='Platform Base Image',
+        description='Specifies a Docker image to use as a base for builds for this platform. A sane default that works for most platforms is computed from the distro and version keys.',
+        default_factory=lambda data: f'{data.get('distro')}:{data.get('version')}',
+    )]
+    env_prep: Annotated[str, Field(
+        title='Environment Preparation Command',
+        description='Specifies any additional commands that need to be run before attempting builds in the environment.',
+        min_length=1,
+    )] | None = None
+    packages: Annotated[PackagingInfo | None, Field(
+        title='Packaging Configuration',
+        description='Controls packaging for the platform. If absent, packages will not be published.',
+    )] = None
+    test: Annotated[TestConfig, Field(
+        title='Test Configuration',
+        description='Controls automated test configuration for the platform.'
+    )] = TestConfig()
 
 
 @dataclass(kw_only=True, frozen=True, slots=True)
 class BasicDistroEntry:
     __pydantic_config__ = PYDANTIC_CONFIG
 
-    distro: Annotated[str, Field(min_length=1)]
-    version: Annotated[str, Field(min_length=1)]
-    support_type: Annotated[str, Field(min_length=1)]
-    notes: str
-    packages: BasicPackagingInfo | None = None
+    distro: Annotated[str, Field(
+        title='Platform Name',
+        description='The name of the platform',
+        min_length=1,
+    )]
+    version: Annotated[str, Field(
+        title='Platform Version',
+        description='The version of the platform',
+        min_length=1,
+    )]
+    support_type: Annotated[str, Field(
+        title='Support Tier',
+        description='The support tier for this particular platform.',
+        min_length=1,
+    )]
+    notes: Annotated[str, Field(
+        title='Notes',
+        description='Any supplementary notes about the platform.',
+    )]
+    packages: Annotated[BasicPackagingInfo | None, Field(
+        title='Packaging Configuration',
+        description='Describes published packages for the platform.',
+    )] = None
 
 
 class DistroData(BaseModel):
     model_config = PYDANTIC_CONFIG
 
-    platform_map: dict[Arch, DockerArch]
-    arch_order: Annotated[list[Arch], AfterValidator(check_arch_list)]
-    arch_data: Annotated[dict[Arch, ArchDataEntry], AfterValidator(check_arch_data)]
-    static_arches: Annotated[list[Arch], AfterValidator(check_unique_list)]
-    docker_arches: Annotated[list[Arch], AfterValidator(check_unique_list)]
-    include: Annotated[list[FullDistroEntry], Field(min_length=1)]
-    legacy: list[LegacyDistroEntry]
-    no_include: list[BasicDistroEntry]
+    platform_map: Annotated[dict[Arch, DockerArch], Field(
+        title='Docker Platform Mapping',
+        description='Mapping of internal architecture names to Docker platform strings.',
+    )]
+    arch_order: Annotated[list[Arch], Field(
+        title='Architecture Build Order',
+        description='Specifies the sort order for build architectures in CI. Must contain each supported architecture value exactly once.',
+    )]
+    arch_data: Annotated[dict[Arch, ArchDataEntry], Field(
+        title='Per-Architecture Build Environemnt Config',
+        description='Specifies GitHub Actions runner configuration for each build architecture in CI. Must contain an entry for each supported architecture value exactly once.',
+    )]
+    static_arches: Annotated[list[Arch], Field(
+        title='Static Build Architectures',
+        description='Specifies the architectures to create static builds for. Must be a subset of supported architectures without any duplicates.',
+    )]
+    docker_arches: Annotated[list[Arch], Field(
+        title='Docker Build Architectures',
+        description='Specifies the architectures to create Docker images for. Must be a subset of supported architectures without any duplicates.',
+    )]
+    include: Annotated[list[FullDistroEntry], Field(
+        title='Platforms Included in CI',
+        description='Contains platform configuration for each platform we run CI jobs for.',
+        min_length=1,
+    )]
+    legacy: Annotated[list[FullDistroEntry], Field(
+        title='Platforms Previously Included in CI',
+        description='Contains platform configurations for platforms we previously included in CI and published packages for.',
+    )]
+    no_include: Annotated[list[BasicDistroEntry], Field(
+        title='Platforms Not Included in CI',
+        description='Contains platform descriptions for platforms not included in CI',
+    )]
+
+    @field_validator('static_arches', 'docker_arches', mode='after')
+    @classmethod
+    def check_unique_list[T](cls: type[DistroData], value: list[T]) -> list[T]:
+        c = Counter(value)
+
+        if s := {k for k, v in c.items() if v > 1}:
+            ValueError(f'Found duplicate values in list: {s}')
+
+        return value
+
+    @field_validator('arch_order', mode='after')
+    @classmethod
+    def check_arch_list(cls: type[DistroData], value: list[Arch]) -> list[Arch]:
+        c = Counter(value)
+
+        if s := {k for k, v in c.items() if v > 1}:
+            ValueError(f'Found duplicate values in arch_order: {s}')
+
+        s1 = set(value)
+        s2 = set(Arch)
+
+        if s3 := s2 - s1:
+            ValueError(f'Missing values from arch_order list: {s3}')
+
+        return value
+
+    @field_validator('arch_data', mode='after')
+    @classmethod
+    def check_arch_data(cls: type[DistroData], value: dict[Arch, ArchDataEntry]) -> dict[Arch, ArchDataEntry]:
+        c = Counter(value.keys())
+
+        if s := {k for k, v in c.items() if v > 1}:
+            ValueError(f'Found duplicate keys in arch_data mapping: {s}')
+
+        s1 = set(value.keys())
+        s2 = set(Arch)
+
+        if s3 := s2 - s1:
+            ValueError(f'Missing keys from arch_data mapping: {s3}')
+
+        return value
 
 
 def load_distro_data() -> DistroData:
