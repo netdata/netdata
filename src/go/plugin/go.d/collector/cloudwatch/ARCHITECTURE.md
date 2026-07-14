@@ -44,11 +44,14 @@ flowchart LR
     tags("Resolve tags<br/>membership + labels")
     plan("Plan + state<br/>stable query + policy")
     query("Query<br/>GetMetricData<br/>billed — the cost driver")
+    activity("Collector activity<br/>calls · billing units · raw queries")
     store("metrix store<br/>gauges + labels")
     charts("Dynamic charts<br/>cloudwatch.*")
 
     cfg --> static --> plan
     cfg --> disc --> tags --> plan --> query --> store --> charts
+    disc --> activity --> store
+    query --> activity
 
     classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
     classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
@@ -75,7 +78,8 @@ Each collection cycle (`collect.go`), in order:
 6. apply explicit per-query outcomes to completion, retry, and source-observation state (`observe.go`);
 7. write retained observations or synthetic zero presentation as float gauges into `metrix`, stamped with
    `{account_id, region, <dimension labels>}`, and re-emit not-due series (`query_emit.go`);
-8. serve a chart template built once from the selected profiles (`chart.go`).
+8. publish absolute collector activity for the commit-acknowledged interval (`activity.go`);
+9. serve a chart template built once from the selected profiles plus one collector-activity group (`chart.go`).
 
 ## Lifecycle
 
@@ -118,7 +122,8 @@ flowchart TD
   compiled; `ensureTargets` retries only unresolved targets.
 - **Cleanup** resets the collection plan, resolved targets, cached template,
   discovery/query snapshots, client caches, and per-query observation state so a framework
-  re-Init after failed autodetection starts clean. The `metrix` store is created
+  re-Init after failed autodetection starts clean. Pending collector activity and
+  its known interval-gauge keys are reset as well. The `metrix` store is created
   once in `New` and persists — it is not recreated.
 - **ChartTemplateYAML** returns the cached string; no work at call time.
 
@@ -135,8 +140,9 @@ flowchart TD
     E("dueQueries<br/>keep stable queries with a newer eligible window")
     F("executeQueries<br/>batched · concurrent GetMetricData")
     G("apply outcomes + emit<br/>write gauges · re-emit retained")
+    H("publish collector activity<br/>absolute interval gauges")
 
-    A --> B --> C --> D --> E --> F --> G
+    A --> B --> C --> D --> E --> F --> G --> H
 
     classDef input fill:#eef1f4,stroke:#8b949e,color:#24292f;
     classDef sched fill:#ece2ff,stroke:#8250df,color:#3b1f6b;
@@ -146,7 +152,7 @@ flowchart TD
     class A input
     class B,C,D,E sched
     class F effect
-    class G commit
+    class G,H commit
 ```
 
 ## Configuration Compilation
@@ -159,11 +165,12 @@ compiler state, and installed execution plan:
   decides whether the resulting configuration is valid during `Init` / `Check`.
 - Named credential sources describe only credential acquisition. Named targets
   describe monitored identities and optional role assumption. Ordered rules bind
-  targets to profile selectors, optional exact metric/statistic allowlists,
-  regions, and effective resource-tag predicates. Omitting `metrics` selects every
-  exported series from the selected profiles. When present, `metrics` contains one
-  group per narrowed profile: group statistics are inherited by included exact
-  MetricNames unless an entry supplies a replacement statistics list.
+  targets to profile selectors, optional per-profile metric overrides, regions,
+  and effective resource-tag predicates. Omitting `metrics` selects each profile's
+  default-enabled series. Profiles without a metric group keep those defaults. A
+  group includes defaults unless `defaults: false`, then adds its exact included
+  MetricNames; statistics resolve from the metric entry, group, or profile in that
+  order.
 - `rule_defaults.filters.resource_tags` is inherited when a rule omits
   `filters.resource_tags`; a present list replaces the default and `[]` disables it.
   Predicates are canonicalized once: exact case-sensitive keys are ANDed and the
@@ -177,7 +184,9 @@ compiler state, and installed execution plan:
 - Ordered policy scopes and tag-membership identities are separate. Scopes with the
   same target/profile/region/predicate share one membership identity, and already-owned
   exported series are removed statically with one bounded aggregate diagnostic per
-  affected rule. A partially overlapping scope retains its unshadowed series.
+  affected rule. A fully overlapping later scope is removed, so one exported series
+  cannot acquire two competing query policies; a partially overlapping scope retains
+  its unshadowed series.
   Same-account cross-target overlap remains until discovery, where final instance
   identity can be evaluated correctly. Scopes with different predicates remain
   ordered policy scopes even when they share one discovery scan.
@@ -493,7 +502,7 @@ These details bound cost and memory, but do not change the query state machine:
 ```text
 for each selected profile:
   group := profile.Template.Clone()          # typed deep copy; never mutate the catalog
-  group.Metrics = sorted(visible series)     # collector-owned visible-series list
+  group.Metrics = sorted(declared series)    # includes default and opt-in metrics
 assemble charttpl.Spec{Version, ContextNamespace: "cloudwatch", Groups}
 return spec.MarshalTemplate()                # Validate + yaml.v2 marshal, then cached
 ```
@@ -503,6 +512,8 @@ return spec.MarshalTemplate()                # Validate + yaml.v2 marshal, then 
 - Rate divisors are not part of the chart template because rules can override
   nested profile query defaults. Rate normalization happens on the emitted
   numeric value using the effective period.
+- Opt-in metric charts stay in the template. They do not materialize until a
+  rule selects the metric and the collector emits its first sample.
 
 ## Profiles (`cwprofiles/`)
 
@@ -520,9 +531,10 @@ dimensions (the CloudWatch dimension names that identify one instance; each is
 either mapped to a Netdata `label`, or pinned to a `constant` value — a
 match-and-query-only dimension that is matched and queried but not emitted as a
 label, for a constant CloudWatch dimension such as CloudFront's `Region=Global`),
-`metrics` (with `statistics`, optional `rate`,
+`metrics` (with `statistics`, optional metric-level `disabled`, optional `rate`,
 optional per-metric nested `query` field overrides, and optional `nil_as_zero` —
-record 0 vs gap on a no-datapoint result, defaulting to `rate`), and a
+record 0 vs gap on a no-datapoint result; when unset, rate-normalized `sum` and
+`sample_count` series default to 0 while other statistics default to a gap), and a
 `charttpl.Group` `template`.
 
 Load and resolution (`catalog.go`):
@@ -542,6 +554,15 @@ Load and resolution (`catalog.go`):
   with `supported_regions`: an incompatible defaults-selected profile is skipped
   with a startup diagnostic, while an explicitly included incompatible profile
   fails configuration.
+- **Metric selection is rule-driven too.** Metrics without `disabled: true` are
+  the per-profile defaults. A disabled metric remains a fully declared series
+  with active chart definitions but contributes no selected-series horizon,
+  query, or billing work until named in that profile's `rules[].metrics` group.
+  Namespace discovery remains one metric-name-agnostic dimension-shape scan, so
+  the declaration adds no `ListMetrics` call or discovery group. Omitting a metric
+  group leaves a selected profile on its defaults; an omitted/true group `defaults`
+  value adds exact included MetricNames, while `defaults: false` creates an
+  exact-only selection for that profile.
 
 Profile validation invariants (`profile.go`) — these are load-bearing:
 
@@ -578,6 +599,33 @@ while `rate: true` normalizes only the `Sum` sibling to a per-second value. Stoc
 timing is `period=5m`, `lookback=5m`, and `publication_delay=5m`. Exact
 metric/statistic rules can assign one-minute Average and six-hour Sum policies
 without either rule shadowing the other's series.
+
+### PrivateLink service grains
+
+`AWS/PrivateLinkServices` is the provider-side companion namespace. AWS
+publishes traffic metrics at five exact dimension sets, so the stock catalog
+uses five profiles rather than merging incompatible identities:
+
+- `privatelink_service` identifies the endpoint service by `service_id`. It is
+  default-enabled and is the only grain with `EndpointsCount`.
+- `privatelink_service_az` adds `availability_zone`.
+- `privatelink_service_load_balancer` adds `load_balancer_arn`.
+- `privatelink_service_az_load_balancer` adds both detail dimensions.
+- `privatelink_service_vpc_endpoint` adds the consumer `vpc_endpoint_id`.
+
+The four detailed profiles are opt-in because one service can fan out across
+Availability Zones, load balancers, and consumer endpoints. All five share one
+namespace discovery scan per target/region. They also share one RGTA association:
+`ec2:vpc-endpoint-service` joined by `Service Id`. Detailed instances therefore
+inherit the parent service's filter membership and mutable tag labels; endpoint
+or load-balancer tags are intentionally not consulted.
+
+Traffic profiles export raw `Average` gauges and per-second `Sum` siblings for
+bytes, new connections, and sent reset packets. Stock timing is 5m/5m/5m.
+`EndpointsCount` is a five-minute service-only gauge that records zero when AWS
+returns no datapoint; absent traffic gauges remain gaps. Exact rules can select
+one-minute traffic Average, five-minute endpoint count, and six-hour byte Sum as
+independent query policies.
 
 ## Credentials, Targets, And Account Identity
 
@@ -650,6 +698,46 @@ Narrow the bill with focused rule target/profile/region selections or longer eff
 periods configured through rule/default query timing; nested profile query defaults are the fallback.
 Discovery frequency is a minor lever. (Rates are AWS's published model — verify current
 per-region prices on the CloudWatch pricing page.)
+
+### Collector activity and billing inputs
+
+`activity.go` keeps three bounded activity accumulators. Three chart templates
+under the public `cloudwatch.collector_*` contexts render their exact counts as
+absolute gauges for the interval since the preceding successfully committed
+collector frame:
+
+- **CloudWatch API Calls** counts collector-issued `ListMetrics` and
+  `GetMetricData` method calls. It materializes one chart per
+  `(account_id, region, operation)` with a fixed `calls` dimension. Every requested
+  continuation page is another call.
+- **CloudWatch Metric Requests** counts the calculated `GetMetricData` billing
+  units submitted by the collector. Up to five statistics for one structural AWS
+  metric in one request form one unit; a pagination page submits those units again.
+  It materializes per `(account_id, region)` with a fixed `requests` dimension.
+- **CloudWatch Raw Queries** counts submitted `MetricDataQuery` items, split by
+  profile. It materializes one chart per `(account_id, region, profile)` with a
+  fixed `queries` dimension. This is the profile-level tuning view, not AWS's
+  billing unit.
+
+Physical calls and billing units are attributed only to account and region because
+one shared discovery stream or query batch can serve multiple profiles. Targets that
+resolve to the same account therefore aggregate. Raw queries keep their profile of
+origin because every planned series has exactly one.
+
+`netdata.go.plugin.collector.cloudwatch.*` names the internal `metrix` selectors;
+it is not a chart-context prefix. The chart spec's `context_namespace: cloudwatch`
+keeps all three activity contexts beside the service-profile contexts in the UI.
+
+Pending activity lives outside the staged `metrix` frame. At the start of the next
+cycle, `activity.go` checks `CollectMeta.LastSuccessSeq` and clears the prior interval
+only when that sequence proves its frame committed. A failed collection or failed
+metric-store commit therefore carries its work into the next successful frame. Once
+a series is known, a successful cached interval with no real AWS work publishes zero.
+Cleanup, job replacement, and process restart reset the pending activity and known
+keys. The gauges count calls issued by the collector, not retry attempts performed
+internally by the AWS SDK. These metrics are cost inputs, not an AWS invoice: AWS owns
+the billing rules, may change them, and does not separately document pagination
+billing semantics.
 
 ## Key Invariants
 

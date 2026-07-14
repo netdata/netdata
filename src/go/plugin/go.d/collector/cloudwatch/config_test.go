@@ -225,9 +225,8 @@ func TestConfig_validateMetricSelector(t *testing.T) {
 			selectors: []ProfileMetricSelectorConfig{{Profile: "ec2", Statistics: []string{"Average"}, Include: []MetricSelectionConfig{{Name: " CPUUtilization"}}}},
 			wantErr:   "must not contain surrounding whitespace",
 		},
-		"missing effective statistics": {
+		"profile statistics inherited": {
 			selectors: []ProfileMetricSelectorConfig{{Profile: "ec2", Include: []MetricSelectionConfig{{Name: "CPUUtilization"}}}},
-			wantErr:   "must define statistics or inherit them",
 		},
 		"internal statistic spelling": {
 			selectors: []ProfileMetricSelectorConfig{{Profile: "ec2", Statistics: []string{"sample_count"}, Include: []MetricSelectionConfig{{Name: "CPUUtilization"}}}},
@@ -281,6 +280,8 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 	discoveryGroupLimit := schemaObjectAt(t, fullDoc, "jsonSchema", "properties", "limits", "properties", "max_discovery_groups")
 	assert.Equal(t, float64(defaultMaxDiscoveryGroups), discoveryGroupLimit["default"])
 	assert.Equal(t, float64(maxDiscoveryGroupsPerJob), discoveryGroupLimit["maximum"])
+	metricDefaults := schemaObjectAt(t, fullDoc, "jsonSchema", "properties", "rules", "items", "properties", "metrics", "items", "properties", "defaults")
+	assert.Equal(t, true, metricDefaults["default"])
 	for key, want := range map[string]string{
 		"credentials": `[{"name":"sdk_default","type":"default"}]`,
 		"targets":     `[{"name":"base","credentials":"sdk_default"}]`,
@@ -353,12 +354,22 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 	assert.Equal(t, "ec2", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "profiles", "include", "items")["ui:placeholder"])
 	profileIncludeHelp, ok := schemaObjectAt(t, doc, "uiSchema", "rules", "items", "profiles", "include")["ui:help"].(string)
 	require.True(t, ok)
-	for _, profile := range []string{"billing_total", "billing_service", "billing_linked_account", "billing_linked_account_service"} {
+	for _, profile := range []string{
+		"privatelink_endpoint_subnet",
+		"privatelink_service_az",
+		"privatelink_service_load_balancer",
+		"privatelink_service_az_load_balancer",
+		"privatelink_service_vpc_endpoint",
+		"billing_total",
+		"billing_service",
+		"billing_linked_account",
+		"billing_linked_account_service",
+	} {
 		assert.Contains(t, profileIncludeHelp, profile)
 	}
-	assert.Contains(t, profileIncludeHelp, "privatelink_endpoint_subnet")
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics")["ui:listFlavour"])
 	assert.Equal(t, "ec2", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "profile")["ui:placeholder"])
+	assert.NotEmpty(t, schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "defaults")["ui:help"])
 	assert.Equal(t, "Average", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "statistics", "items")["ui:placeholder"])
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "include")["ui:listFlavour"])
 	assert.Equal(t, "CPUUtilization", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "include", "items", "name")["ui:placeholder"])
@@ -428,6 +439,77 @@ func TestMetadata_BillingOperatorContract(t *testing.T) {
 	}
 }
 
+func TestMetadata_CollectorActivityStructuredScopes(t *testing.T) {
+	data, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+
+	type metadataMetric struct {
+		Name       string `yaml:"name"`
+		Unit       string `yaml:"unit"`
+		ChartType  string `yaml:"chart_type"`
+		Dimensions []struct {
+			Name string `yaml:"name"`
+		} `yaml:"dimensions"`
+	}
+	var metadata struct {
+		Modules []struct {
+			Metrics struct {
+				DynamicContextPrefixes []struct {
+					Prefix string `yaml:"prefix"`
+					Reason string `yaml:"reason"`
+				} `yaml:"dynamic_context_prefixes"`
+				Scopes []struct {
+					Labels []struct {
+						Name string `yaml:"name"`
+					} `yaml:"labels"`
+					Metrics []metadataMetric `yaml:"metrics"`
+				} `yaml:"scopes"`
+			} `yaml:"metrics"`
+		} `yaml:"modules"`
+	}
+	require.NoError(t, yaml.Unmarshal(data, &metadata))
+	require.Len(t, metadata.Modules, 1)
+	require.Len(t, metadata.Modules[0].Metrics.DynamicContextPrefixes, 1)
+	assert.Equal(t, "cloudwatch.", metadata.Modules[0].Metrics.DynamicContextPrefixes[0].Prefix)
+	assert.Contains(t, metadata.Modules[0].Metrics.DynamicContextPrefixes[0].Reason, "fixed collector-activity contexts")
+
+	type metricContract struct {
+		labels    []string
+		unit      string
+		dimension string
+	}
+	want := map[string]metricContract{
+		"cloudwatch.collector_api_calls": {
+			labels: []string{"account_id", "region", "operation"}, unit: "calls", dimension: "calls",
+		},
+		"cloudwatch.collector_metric_requests": {
+			labels: []string{"account_id", "region"}, unit: "requests", dimension: "requests",
+		},
+		"cloudwatch.collector_queries": {
+			labels: []string{"account_id", "region", "profile"}, unit: "queries", dimension: "queries",
+		},
+	}
+	for _, scope := range metadata.Modules[0].Metrics.Scopes {
+		labels := make([]string, 0, len(scope.Labels))
+		for _, label := range scope.Labels {
+			labels = append(labels, label.Name)
+		}
+		for _, metric := range scope.Metrics {
+			contract, ok := want[metric.Name]
+			if !ok {
+				continue
+			}
+			assert.Equal(t, contract.labels, labels, "labels for %s", metric.Name)
+			assert.Equal(t, contract.unit, metric.Unit, "unit for %s", metric.Name)
+			assert.Equal(t, "line", metric.ChartType, "chart type for %s", metric.Name)
+			require.Len(t, metric.Dimensions, 1, "dimensions for %s", metric.Name)
+			assert.Equal(t, contract.dimension, metric.Dimensions[0].Name, "dimension for %s", metric.Name)
+			delete(want, metric.Name)
+		}
+	}
+	assert.Empty(t, want, "collector activity contexts missing from structured metadata")
+}
+
 func metadataExampleConfig(t *testing.T, exampleName string) Config {
 	t.Helper()
 	data, err := os.ReadFile("metadata.yaml")
@@ -462,6 +544,19 @@ func metadataExampleConfig(t *testing.T, exampleName string) Config {
 	}
 	require.FailNowf(t, "metadata example not found", "name=%q", exampleName)
 	return Config{}
+}
+
+func TestMetadata_OptInMetricOperatorContract(t *testing.T) {
+	cfg := metadataExampleConfig(t, "Add an opt-in metric to a profile")
+	plan, diagnostics, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	require.Empty(t, diagnostics)
+	require.Len(t, plan.Scopes, 1)
+
+	series := compiledSeriesNames(plan.Scopes[0].SelectedSeries)
+	assert.Contains(t, series, "ec2.cpu_utilization_average", "profile defaults remain selected")
+	assert.Contains(t, series, "ec2.cpu_credit_balance_average", "the opt-in metric inherits its profile statistic")
+	assert.NotContains(t, series, "ec2.disk_read_bytes_sum", "unmentioned opt-in metrics remain disabled")
 }
 
 func TestMetadata_PrivateLinkEndpointOperatorContract(t *testing.T) {
@@ -535,6 +630,65 @@ func TestMetadata_PrivateLinkEndpointOperatorContract(t *testing.T) {
 		"subnet_id",
 		"seven additional metric/statistic queries",
 		"1,440 metric requests per day",
+	} {
+		assert.Contains(t, text, want)
+	}
+}
+
+func TestMetadata_PrivateLinkServiceOperatorContract(t *testing.T) {
+	data, err := os.ReadFile("metadata.yaml")
+	require.NoError(t, err)
+	text := string(data)
+
+	cfg := metadataExampleConfig(t, "AWS PrivateLink services with split timing")
+	plan, diagnostics, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	require.Empty(t, diagnostics)
+	require.Len(t, plan.Scopes, 3)
+	wantScopes := []struct {
+		profile string
+		series  []string
+		policy  cwquery.Policy
+	}{
+		{
+			profile: "privatelink_service",
+			series: []string{
+				"privatelink_service.active_connections_average",
+				"privatelink_service.bytes_processed_average",
+				"privatelink_service.new_connections_average",
+				"privatelink_service.rst_packets_sent_average",
+			},
+			policy: cwquery.Policy{Period: time.Minute, Lookback: 5 * time.Minute, PublicationDelay: 5 * time.Minute},
+		},
+		{
+			profile: "privatelink_service",
+			series:  []string{"privatelink_service.endpoints_count_average"},
+			policy:  cwquery.Policy{Period: 5 * time.Minute, Lookback: 5 * time.Minute, PublicationDelay: 5 * time.Minute},
+		},
+		{
+			profile: "privatelink_service",
+			series:  []string{"privatelink_service.bytes_processed_sum"},
+			policy:  cwquery.Policy{Period: 6 * time.Hour, Lookback: 6 * time.Hour, PublicationDelay: 5 * time.Minute},
+		},
+	}
+	for i, want := range wantScopes {
+		scope := plan.Scopes[i]
+		assert.Equal(t, want.profile, scope.Profile.Name)
+		assert.Equal(t, want.series, compiledSeriesNames(scope.SelectedSeries))
+		for _, series := range scope.SelectedSeries {
+			assert.Equal(t, want.policy, series.Policy, series.Name)
+		}
+	}
+
+	for _, want := range []string{
+		"privatelink_service",
+		"privatelink_service_az",
+		"privatelink_service_load_balancer",
+		"privatelink_service_az_load_balancer",
+		"privatelink_service_vpc_endpoint",
+		"AWS/PrivateLinkServices",
+		"ec2:vpc-endpoint-service",
+		"1,152 metric requests per day",
 	} {
 		assert.Contains(t, text, want)
 	}
@@ -915,10 +1069,11 @@ func TestConfig_ResourceTagLabelsDecode(t *testing.T) {
 
 func TestConfig_MetricSelectorDecode(t *testing.T) {
 	var cfg Config
-	require.NoError(t, yaml.Unmarshal([]byte("rules:\n  - metrics:\n      - profile: ec2\n        statistics: [Sum]\n        include:\n          - name: NetworkIn\n          - name: CPUUtilization\n            statistics: [Average]\n"), &cfg))
+	require.NoError(t, yaml.Unmarshal([]byte("rules:\n  - metrics:\n      - profile: ec2\n        defaults: false\n        statistics: [Sum]\n        include:\n          - name: NetworkIn\n          - name: CPUUtilization\n            statistics: [Average]\n"), &cfg))
 	require.Len(t, cfg.Rules, 1)
+	falseValue := false
 	assert.Equal(t, []ProfileMetricSelectorConfig{{
-		Profile: "ec2", Statistics: []string{"Sum"},
+		Profile: "ec2", Defaults: &falseValue, Statistics: []string{"Sum"},
 		Include: []MetricSelectionConfig{{Name: "NetworkIn"}, {Name: "CPUUtilization", Statistics: []string{"Average"}}},
 	}}, cfg.Rules[0].Metrics)
 }

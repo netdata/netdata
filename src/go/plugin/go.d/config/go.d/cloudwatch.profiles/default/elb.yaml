@@ -55,17 +55,18 @@ metrics:
     statistics: [sum]
     rate: true
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below, then restart the go.d process. Both are
-  # published at the {LoadBalancerName} grain, so no other change is needed.
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # Both are published at the {LoadBalancerName} grain, so no other change is needed.
   # ----------------------------------------------------------------------------------------
-  # - id: surge_queue_length
-  #   metric_name: SurgeQueueLength
-  #   statistics: [maximum]
-  # - id: desync_mitigation_noncompliant
-  #   metric_name: DesyncMitigationMode_NonCompliant_Request_Count
-  #   statistics: [sum]
-  #   rate: true
+  - id: surge_queue_length
+    disabled: true
+    metric_name: SurgeQueueLength
+    statistics: [maximum]
+  - id: desync_mitigation_noncompliant
+    disabled: true
+    metric_name: DesyncMitigationMode_NonCompliant_Request_Count
+    statistics: [sum]
+    rate: true
   # AWS also publishes EstimatedALB* metrics (ALB-migration sizing estimates, not operational). See:
   # https://docs.aws.amazon.com/elasticloadbalancing/latest/classic/elb-cloudwatch-metrics.html
 template:
@@ -149,23 +150,23 @@ template:
         - selector: spillover_count_sum
           name: spillover
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_elb_surge_queue
-    #   context: surge_queue_length
-    #   title: ELB Surge Queue Length
-    #   family: Queue
-    #   units: requests
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: surge_queue_length_maximum
-    #       name: queued
-    # - id: aws_cloudwatch_elb_desync
-    #   context: desync_mitigation
-    #   title: ELB Desync Mitigation Non-Compliant Requests
-    #   family: Requests
-    #   units: requests/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: desync_mitigation_noncompliant_sum
-    #       name: noncompliant
+    - id: aws_cloudwatch_elb_surge_queue
+      context: surge_queue_length
+      title: ELB Surge Queue Length
+      family: Queue
+      units: requests
+      algorithm: absolute
+      dimensions:
+        - selector: surge_queue_length_maximum
+          name: queued
+    - id: aws_cloudwatch_elb_desync
+      context: desync_mitigation
+      title: ELB Desync Mitigation Non-Compliant Requests
+      family: Requests
+      units: requests/s
+      algorithm: absolute
+      dimensions:
+        - selector: desync_mitigation_noncompliant_sum
+          name: noncompliant

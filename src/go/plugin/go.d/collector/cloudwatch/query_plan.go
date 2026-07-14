@@ -20,7 +20,9 @@ type plannedQuery struct {
 	key        structuralID
 	billingKey structuralID // structural metric identity without statistic; internal AWS cost grouping
 	target     string
+	accountID  string
 	region     string
+	profile    string
 	policy     cwquery.Policy
 	seriesName string
 	labels     []metrix.Label
@@ -40,6 +42,7 @@ type instancePresentation struct {
 
 type queryPlanCandidate struct {
 	targetRef    string
+	accountID    string
 	profile      cwprofiles.ResolvedProfile
 	region       string
 	series       []compiledSeries
@@ -198,7 +201,8 @@ func (c *Collector) buildQueryPlan() ([]plannedQuery, error) {
 				)
 			}
 			candidates = append(candidates, queryPlanCandidate{
-				targetRef: scope.Target.Name, profile: prof, region: scope.Region,
+				targetRef: scope.Target.Name, accountID: resolved.accountID,
+				profile: prof, region: scope.Region,
 				series: selected, billingKeys: billingKeys, presentation: presentation,
 			})
 		}
@@ -284,7 +288,9 @@ func buildSeriesQueries(candidate queryPlanCandidate) []plannedQuery {
 		m := candidate.profile.Config.Metrics[selected.MetricIndex]
 		pq := plannedQuery{
 			target:     candidate.targetRef,
+			accountID:  candidate.accountID,
 			region:     candidate.region,
+			profile:    candidate.profile.Name,
 			policy:     selected.Policy,
 			billingKey: candidate.billingKeys[i],
 			seriesName: selected.Name,

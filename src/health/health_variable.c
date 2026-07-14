@@ -5,6 +5,7 @@
 
 struct variable_lookup_score {
     RRDSET *st;
+    RRDSET_ACQUIRED *rsa;
     const char *source;
     NETDATA_DOUBLE value;
     size_t score;
@@ -36,6 +37,12 @@ struct variable_lookup_job {
 };
 
 static void variable_lookup_add_result_with_score(struct variable_lookup_job *vbd, NETDATA_DOUBLE n, RRDSET *st, const char *source __maybe_unused) {
+    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(st->rrdhost, rrdset_id(st), true);
+    if(!rsa)
+        return;
+
+    st = rrdset_acquired_to_rrdset(rsa);
+
     if(vbd->score.last_rrdset != st) {
         RRDSET *alert_st = rrdcalc_rrdset_read_lock(vbd->rc);
         if(alert_st) {
@@ -57,8 +64,19 @@ static void variable_lookup_add_result_with_score(struct variable_lookup_job *vb
         .value = n,
         .score = vbd->score.last_score,
         .st = st,
+        .rsa = rsa,
         .source = source,
     };
+}
+
+static void variable_lookup_results_free(struct variable_lookup_job *vbd) {
+    for(size_t i = 0; i < vbd->result.used; i++)
+        rrdset_acquired_release(vbd->result.array[i].rsa);
+
+    freez(vbd->result.array);
+    vbd->result.array = NULL;
+    vbd->result.used = 0;
+    vbd->result.size = 0;
 }
 
 static bool variable_lookup_in_chart(struct variable_lookup_job *vbd, RRDSET *st, bool stop_on_match) {
@@ -148,8 +166,14 @@ bool alert_variable_from_running_alerts(struct variable_lookup_job *vbd) {
     bool found = false;
     RRDCALC *rc;
     foreach_rrdcalc_in_rrdhost_read(vbd->host, rc) {
-        if(rc->config.name == vbd->variable && rc->rrdset) {
-            variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rc->value, rc->rrdset, "alarm value");
+        if(rc->config.name == vbd->variable) {
+            RRDSET *st = NULL;
+            RRDSET_ACQUIRED *rsa = rrdcalc_rrdset_acquire_linked(vbd->host, rc, &st);
+            if(!rsa)
+                continue;
+
+            variable_lookup_add_result_with_score(vbd, (NETDATA_DOUBLE)rc->value, st, "alarm value");
+            rrdset_acquired_release(rsa);
             found = true;
         }
     }
@@ -214,9 +238,16 @@ bool alert_variable_lookup_internal(STRING *variable, void *data, NETDATA_DOUBLE
     RRDSET *source_st = NULL;
 
     RRDCALC *rc = data;
-    RRDSET *st = rc->rrdset;
+    RRDSET *linked_st = rrdcalc_rrdset_read_lock(rc);
+    if(!linked_st)
+        return false;
 
-    if(!st)
+    RRDHOST *host = linked_st->rrdhost;
+    rrdcalc_rrdset_read_unlock(linked_st);
+
+    RRDSET *st = NULL;
+    RRDSET_ACQUIRED *rsa = rrdcalc_rrdset_acquire_linked(host, rc, &st);
+    if(!rsa)
         return false;
 
     if(unlikely(!last_collected_t_string)) {
@@ -415,7 +446,6 @@ find_best_scored:
         source = best->source;
         source_st = best->st;
         *result = best->value;
-        freez(vbd.result.array);
     }
     else {
         found = false;
@@ -430,9 +460,9 @@ log:
                "resolved with %s of chart '%s' and context '%s'",
                string2str(variable),
                string2str(rc->config.name),
-               string2str(rc->rrdset->id),
-               string2str(rc->rrdset->context),
-               string2str(rc->rrdset->rrdhost->hostname),
+               string2str(st->id),
+               string2str(st->context),
+               string2str(st->rrdhost->hostname),
                source,
                string2str(source_st->id),
                string2str(source_st->context)
@@ -444,9 +474,9 @@ log:
                "could not be resolved",
                string2str(variable),
                string2str(rc->config.name),
-               string2str(rc->rrdset->id),
-               string2str(rc->rrdset->context),
-               string2str(rc->rrdset->rrdhost->hostname)
+               string2str(st->id),
+               string2str(st->context),
+               string2str(st->rrdhost->hostname)
         );
     }
 #endif
@@ -470,7 +500,9 @@ log:
         }
     }
 
+    variable_lookup_results_free(&vbd);
     string_freez(vbd.dim);
+    rrdset_acquired_release(rsa);
 
     return found;
 }
@@ -487,6 +519,7 @@ int alert_variable_lookup_trace(RRDHOST *host __maybe_unused, RRDSET *st, const 
 
     STRING *v = string_strdupz(variable);
     RRDCALC rc = {
+        .chart = st->id,
         .rrdset = st,
     };
 

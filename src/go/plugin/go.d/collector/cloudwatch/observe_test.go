@@ -128,6 +128,16 @@ func seriesKeys(series map[string]metrix.SampleValue) []string {
 	return keys
 }
 
+func workloadSeries(series map[string]metrix.SampleValue) map[string]metrix.SampleValue {
+	out := make(map[string]metrix.SampleValue, len(series))
+	for key, value := range series {
+		if !strings.HasPrefix(key, activityMetricPrefix+".") {
+			out[key] = value
+		}
+	}
+	return out
+}
+
 func TestCheck_PopulatesChartTemplateBeforeCollect(t *testing.T) {
 	// The framework validates ChartTemplateYAML() in postCheck — after Check and
 	// before the first Collect — so Check must leave a non-empty, valid template.
@@ -153,7 +163,7 @@ func TestObserve_RetentionAndScheduling(t *testing.T) {
 	// Cycle 1: due -> queried, value 10.
 	s1, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	require.Len(t, s1, 3)
+	require.Len(t, workloadSeries(s1), 3)
 	assert.Equal(t, metrix.SampleValue(10), seriesValue(t, s1, `ec2.cpu_utilization_average{`))
 	callsAfterCycle1 := fake.getMetricDataCalls()
 
@@ -163,7 +173,7 @@ func TestObserve_RetentionAndScheduling(t *testing.T) {
 	c.now = func() time.Time { return base.Add(60 * time.Second) }
 	s2, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	require.Len(t, s2, 3, "not-due series stay visible via re-emit")
+	require.Len(t, workloadSeries(s2), 3, "not-due series stay visible via re-emit")
 	assert.Equal(t, metrix.SampleValue(10), seriesValue(t, s2, `ec2.cpu_utilization_average{`))
 	assert.Equal(t, callsAfterCycle1, fake.getMetricDataCalls(), "no GetMetricData when nothing is due")
 
@@ -296,7 +306,7 @@ func TestCollect_QueryFailureRetriesNextCycle(t *testing.T) {
 	c.now = func() time.Time { return base.Add(60 * time.Second) }
 	series, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	assert.NotEmpty(t, series, "a failed period is retried the next cycle, not skipped for a full period")
+	assert.NotEmpty(t, workloadSeries(series), "a failed period is retried the next cycle, not skipped for a full period")
 }
 
 func TestCollect_QueryFailureBacksOffWithinEligibleWindow(t *testing.T) {
@@ -525,7 +535,7 @@ func TestObserve_GapInQueriedPeriodNotReEmitted(t *testing.T) {
 	c.now = func() time.Time { return base.Add(300 * time.Second) }
 	s2, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	assert.Empty(t, s2, "due+gap series are genuine gaps, not re-emitted")
+	assert.Empty(t, workloadSeries(s2), "due+gap series are genuine gaps, not re-emitted")
 
 	// Cycle 3 at +360s: not due. The due gap cleared the cached value (cpu is a
 	// gauge = gap policy), so the stale value is NOT resurrected on a not-due
@@ -533,7 +543,7 @@ func TestObserve_GapInQueriedPeriodNotReEmitted(t *testing.T) {
 	c.now = func() time.Time { return base.Add(360 * time.Second) }
 	s3, err := collecttest.CollectScalarSeries(c)
 	require.NoError(t, err)
-	assert.Empty(t, s3, "after a due gap, a gap-policy series is not re-emitted from stale cache")
+	assert.Empty(t, workloadSeries(s3), "after a due gap, a gap-policy series is not re-emitted from stale cache")
 
 	// Cycle 4 at +600s: the 300s period is due again and returns data -> recovers.
 	fake.setGap(false)
@@ -621,7 +631,7 @@ func TestObserve_RateMetricNonterminalAndForbiddenResultsGap(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
-			assert.Empty(t, series, "no usable result -> gap, not a false 0")
+			assert.Empty(t, workloadSeries(series), "no usable result -> gap, not a false 0")
 		})
 	}
 }

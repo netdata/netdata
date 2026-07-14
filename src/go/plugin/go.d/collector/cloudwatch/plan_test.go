@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -40,7 +42,7 @@ func TestCompileConfig_ExactMetricSelection(t *testing.T) {
 	cfg := validBaseConfig()
 	cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
 	cfg.Rules[0].Metrics = []ProfileMetricSelectorConfig{{
-		Profile: "ec2", Statistics: []string{"sum"},
+		Profile: "ec2", Defaults: &defaults, Statistics: []string{"sum"},
 		Include: []MetricSelectionConfig{
 			{Name: "NetworkIn"},
 			{Name: "CPUUtilization", Statistics: []string{"AVERAGE"}},
@@ -53,12 +55,251 @@ func TestCompileConfig_ExactMetricSelection(t *testing.T) {
 	assert.Equal(t, []string{"ec2.cpu_utilization_average", "ec2.network_in_sum"}, compiledSeriesNames(plan.Scopes[0].SelectedSeries))
 }
 
+func TestResolveRuleMetrics_DefaultAndExplicitSelection(t *testing.T) {
+	falseValue := false
+	profiles := []cwprofiles.ResolvedProfile{
+		{
+			Name: "service_a",
+			Config: cwprofiles.Profile{Metrics: []cwprofiles.Metric{
+				{ID: "requests", MetricName: "Requests", Statistics: []string{"sum"}},
+				{ID: "latency", MetricName: "Latency", Statistics: []string{"average", "maximum"}},
+				{ID: "errors", MetricName: "Errors", Statistics: []string{"sum"}, Disabled: true},
+			}},
+		},
+		{
+			Name: "service_b",
+			Config: cwprofiles.Profile{Metrics: []cwprofiles.Metric{
+				{ID: "work", MetricName: "Work", Statistics: []string{"average"}},
+			}},
+		},
+	}
+	seriesByProfile := make(map[string][]profileSeriesSpec, len(profiles))
+	for _, profile := range profiles {
+		seriesByProfile[profile.Name] = compileProfileSeries(profile)
+	}
+
+	tests := map[string]struct {
+		selectors []ProfileMetricSelectorConfig
+		want      map[string][]string
+	}{
+		"omitted groups select default-enabled metrics": {
+			want: map[string][]string{
+				"service_a": {"service_a.requests_sum", "service_a.latency_average", "service_a.latency_maximum"},
+				"service_b": {"service_b.work_average"},
+			},
+		},
+		"group defaults add an optional metric and leave other profiles unchanged": {
+			selectors: []ProfileMetricSelectorConfig{{
+				Profile: "service_a",
+				Include: []MetricSelectionConfig{{Name: "Errors"}},
+			}},
+			want: map[string][]string{
+				"service_a": {"service_a.requests_sum", "service_a.latency_average", "service_a.latency_maximum", "service_a.errors_sum"},
+				"service_b": {"service_b.work_average"},
+			},
+		},
+		"defaults false selects only explicit metrics for that profile": {
+			selectors: []ProfileMetricSelectorConfig{{
+				Profile: "service_a", Defaults: &falseValue,
+				Include: []MetricSelectionConfig{{Name: "Errors"}},
+			}},
+			want: map[string][]string{
+				"service_a": {"service_a.errors_sum"},
+				"service_b": {"service_b.work_average"},
+			},
+		},
+		"explicit statistics narrow the profile statistics": {
+			selectors: []ProfileMetricSelectorConfig{{
+				Profile: "service_a", Defaults: &falseValue,
+				Include: []MetricSelectionConfig{{Name: "Latency", Statistics: []string{"Maximum"}}},
+			}},
+			want: map[string][]string{
+				"service_a": {"service_a.latency_maximum"},
+				"service_b": {"service_b.work_average"},
+			},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			selected, _, err := resolveRuleMetrics("rules[0]", tc.selectors, profiles, seriesByProfile)
+			require.NoError(t, err)
+			got := make(map[string][]string, len(selected))
+			for profile, series := range selected {
+				for _, item := range series {
+					got[profile] = append(got[profile], item.Name)
+				}
+			}
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestCompileConfig_SanitizedExistingProfileParity(t *testing.T) {
+	defaults := false
+	profile := func(name string) *ProfileSelectorConfig {
+		return &ProfileSelectorConfig{Defaults: &defaults, Include: []string{name}}
+	}
+	metrics := func(profile, statistic string, names ...string) []ProfileMetricSelectorConfig {
+		include := make([]MetricSelectionConfig, len(names))
+		for i, name := range names {
+			include[i] = MetricSelectionConfig{Name: name}
+		}
+		return []ProfileMetricSelectorConfig{{Profile: profile, Defaults: &defaults, Statistics: []string{statistic}, Include: include}}
+	}
+	query := func(period, lookback, delay time.Duration) *cwquery.Config {
+		return &cwquery.Config{
+			Period:           longDuration(period),
+			Lookback:         longDuration(lookback),
+			PublicationDelay: longDuration(delay),
+		}
+	}
+
+	rdsMetrics := metrics("rds", "Average",
+		"CPUUtilization",
+		"DatabaseConnections",
+		"DiskQueueDepth",
+		"FreeableMemory",
+		"FreeStorageSpace",
+		"NetworkReceiveThroughput",
+		"NetworkTransmitThroughput",
+		"ReadIOPS",
+		"ReplicaLag",
+		"SwapUsage",
+		"WriteIOPS",
+		"MaximumUsedTransactionIDs",
+	)
+	for i := range rdsMetrics[0].Include {
+		if rdsMetrics[0].Include[i].Name == "ReplicaLag" {
+			rdsMetrics[0].Include[i].Statistics = []string{"Maximum"}
+		}
+	}
+	nlbFilter := []ResourceTagFilterConfig{{Key: "created_by", Values: []string{"automation"}}}
+
+	cfg := validBaseConfig()
+	cfg.RuleDefaults.Filters.ResourceTags = []ResourceTagFilterConfig{{Key: "owner", Values: []string{"platform"}}}
+	cfg.Rules = []RuleConfig{
+		{
+			Name: "rds", Targets: []string{"base"}, Profiles: profile("rds"), Metrics: rdsMetrics,
+			Regions: []string{"us-east-1"}, Query: query(time.Minute, time.Minute, 5*time.Minute),
+		},
+		{
+			Name: "vpn", Targets: []string{"base"}, Profiles: profile("vpn"), Metrics: metrics("vpn", "Average", "TunnelState"),
+			Regions: []string{"us-east-1"}, Query: query(time.Minute, time.Minute, 5*time.Minute),
+		},
+		{
+			Name: "nlb", Targets: []string{"base"}, Profiles: profile("nlb"), Metrics: metrics("nlb", "Sum", "ProcessedBytes"),
+			Regions: []string{"us-east-1"}, Filters: &RuleFiltersConfig{ResourceTags: &nlbFilter},
+			Query: query(6*time.Hour, 6*time.Hour, 5*time.Minute),
+		},
+		{
+			Name: "lambda-sparse", Targets: []string{"base"}, Profiles: profile("lambda"),
+			Metrics: metrics("lambda", "Sum", "Invocations", "Errors"), Regions: []string{"us-east-1"},
+			Query: query(2*time.Hour, 6*time.Hour, cwquery.DefaultPublicationDelay),
+		},
+		{
+			Name: "lambda-daily", Targets: []string{"base"}, Profiles: profile("lambda"),
+			Metrics: metrics("lambda", "Sum", "Invocations", "Errors"), Regions: []string{"us-east-1"},
+			Query: query(time.Hour, 24*time.Hour, cwquery.DefaultPublicationDelay),
+		},
+		{
+			Name: "sqs", Targets: []string{"base"}, Profiles: profile("sqs"),
+			Metrics: []ProfileMetricSelectorConfig{{
+				Profile: "sqs", Defaults: &defaults, Statistics: []string{"Sum"},
+				Include: []MetricSelectionConfig{
+					{Name: "NumberOfMessagesSent"},
+					{Name: "NumberOfMessagesReceived"},
+					{Name: "NumberOfMessagesDeleted"},
+					{Name: "ApproximateAgeOfOldestMessage", Statistics: []string{"Maximum"}},
+				},
+			}},
+			Regions: []string{"us-east-1"}, Query: query(5*time.Minute, 5*time.Minute, cwquery.DefaultPublicationDelay),
+		},
+	}
+
+	plan, diagnostics, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	require.Len(t, plan.Scopes, 5)
+
+	wantScopes := []struct {
+		profile string
+		series  []string
+		policy  cwquery.Policy
+		rates   map[string]bool
+	}{
+		{
+			profile: "rds",
+			series: []string{
+				"rds.cpu_utilization_average",
+				"rds.database_connections_average",
+				"rds.freeable_memory_average",
+				"rds.free_storage_space_average",
+				"rds.read_iops_average",
+				"rds.write_iops_average",
+				"rds.replica_lag_maximum",
+				"rds.maximum_used_transaction_ids_average",
+				"rds.disk_queue_depth_average",
+				"rds.network_receive_throughput_average",
+				"rds.network_transmit_throughput_average",
+				"rds.swap_usage_average",
+			},
+			policy: cwquery.Policy{Period: time.Minute, Lookback: time.Minute, PublicationDelay: 5 * time.Minute},
+		},
+		{
+			profile: "vpn",
+			series:  []string{"vpn.tunnel_state_average"},
+			policy:  cwquery.Policy{Period: time.Minute, Lookback: time.Minute, PublicationDelay: 5 * time.Minute},
+		},
+		{
+			profile: "nlb",
+			series:  []string{"nlb.processed_bytes_sum"},
+			policy:  cwquery.Policy{Period: 6 * time.Hour, Lookback: 6 * time.Hour, PublicationDelay: 5 * time.Minute},
+			rates:   map[string]bool{"nlb.processed_bytes_sum": true},
+		},
+		{
+			profile: "lambda",
+			series:  []string{"lambda.invocations_sum", "lambda.errors_sum"},
+			policy:  cwquery.Policy{Period: 2 * time.Hour, Lookback: 6 * time.Hour, PublicationDelay: cwquery.DefaultPublicationDelay},
+			rates:   map[string]bool{"lambda.invocations_sum": true, "lambda.errors_sum": true},
+		},
+		{
+			profile: "sqs",
+			series: []string{
+				"sqs.number_of_messages_sent_sum",
+				"sqs.number_of_messages_received_sum",
+				"sqs.number_of_messages_deleted_sum",
+				"sqs.approximate_age_of_oldest_message_maximum",
+			},
+			policy: cwquery.Policy{Period: 5 * time.Minute, Lookback: 5 * time.Minute, PublicationDelay: cwquery.DefaultPublicationDelay},
+			rates: map[string]bool{
+				"sqs.number_of_messages_sent_sum":     true,
+				"sqs.number_of_messages_received_sum": true,
+				"sqs.number_of_messages_deleted_sum":  true,
+			},
+		},
+	}
+	for i, want := range wantScopes {
+		scope := plan.Scopes[i]
+		assert.Equal(t, want.profile, scope.Profile.Name)
+		assert.Equal(t, want.series, compiledSeriesNames(scope.SelectedSeries))
+		for _, series := range scope.SelectedSeries {
+			assert.Equal(t, want.policy, series.Policy, series.Name)
+			metric := scope.Profile.Config.Metrics[series.MetricIndex]
+			assert.Equal(t, want.rates[series.Name], metric.Rate, series.Name)
+		}
+	}
+
+	require.Len(t, diagnostics, 1)
+	assert.Contains(t, diagnostics[0], `rule "lambda-daily" has 2 metric selection(s) shadowed`)
+	assert.Contains(t, diagnostics[0], `rule "lambda-sparse" owns`)
+}
+
 func TestCompileConfig_MetricSelectionExpandsMultipleStatistics(t *testing.T) {
 	defaults := false
 	cfg := validBaseConfig()
 	cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"lambda"}}
 	cfg.Rules[0].Metrics = []ProfileMetricSelectorConfig{{
-		Profile: "lambda",
+		Profile: "lambda", Defaults: &defaults,
 		Include: []MetricSelectionConfig{{
 			Name:       "Duration",
 			Statistics: []string{"Average", "Maximum", "p90"},
@@ -124,7 +365,7 @@ func TestCompileConfig_PartialMetricShadowingSharesTagMembership(t *testing.T) {
 	defaults := false
 	profileSelector := &ProfileSelectorConfig{Defaults: &defaults, Include: []string{"ec2"}}
 	metrics := func(entries ...MetricSelectionConfig) []ProfileMetricSelectorConfig {
-		return []ProfileMetricSelectorConfig{{Profile: "ec2", Include: entries}}
+		return []ProfileMetricSelectorConfig{{Profile: "ec2", Defaults: &defaults, Include: entries}}
 	}
 	cpu := MetricSelectionConfig{Name: "CPUUtilization", Statistics: []string{"Average"}}
 	network := MetricSelectionConfig{Name: "NetworkIn", Statistics: []string{"Sum"}}

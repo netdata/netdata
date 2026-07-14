@@ -35,56 +35,68 @@ metrics:
     metric_name: StatusCheckFailed_AttachedEBS
     statistics: [maximum]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below, then restart the go.d process. All are
-  # published at the {InstanceId} grain, so no other change is needed.
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {InstanceId} grain, so no other change is needed.
   # ----------------------------------------------------------------------------------------
-  # - id: disk_read_bytes
-  #   metric_name: DiskReadBytes
-  #   statistics: [sum]
-  #   rate: true
-  # - id: disk_write_bytes
-  #   metric_name: DiskWriteBytes
-  #   statistics: [sum]
-  #   rate: true
-  # - id: network_packets_in
-  #   metric_name: NetworkPacketsIn
-  #   statistics: [sum]
-  #   rate: true
-  # - id: network_packets_out
-  #   metric_name: NetworkPacketsOut
-  #   statistics: [sum]
-  #   rate: true
-  # - id: status_check_failed_instance
-  #   metric_name: StatusCheckFailed_Instance
-  #   statistics: [maximum]
-  # - id: status_check_failed_system
-  #   metric_name: StatusCheckFailed_System
-  #   statistics: [maximum]
-  # - id: cpu_credit_usage           # burstable (T-family) instances only
-  #   metric_name: CPUCreditUsage
-  #   statistics: [average]
-  # - id: cpu_credit_balance         # burstable (T-family) instances only
-  #   metric_name: CPUCreditBalance
-  #   statistics: [average]
-  # - id: ebs_read_ops               # EBS-optimized (Nitro) instances only
-  #   metric_name: EBSReadOps
-  #   statistics: [sum]
-  #   rate: true
-  # - id: ebs_write_ops              # EBS-optimized (Nitro) instances only
-  #   metric_name: EBSWriteOps
-  #   statistics: [sum]
-  #   rate: true
-  # - id: ebs_read_bytes             # EBS-optimized (Nitro) instances only
-  #   metric_name: EBSReadBytes
-  #   statistics: [sum]
-  #   rate: true
-  # - id: ebs_write_bytes            # EBS-optimized (Nitro) instances only
-  #   metric_name: EBSWriteBytes
-  #   statistics: [sum]
-  #   rate: true
+  - id: disk_read_bytes
+    disabled: true
+    metric_name: DiskReadBytes
+    statistics: [sum]
+    rate: true
+  - id: disk_write_bytes
+    disabled: true
+    metric_name: DiskWriteBytes
+    statistics: [sum]
+    rate: true
+  - id: network_packets_in
+    disabled: true
+    metric_name: NetworkPacketsIn
+    statistics: [sum]
+    rate: true
+  - id: network_packets_out
+    disabled: true
+    metric_name: NetworkPacketsOut
+    statistics: [sum]
+    rate: true
+  - id: status_check_failed_instance
+    disabled: true
+    metric_name: StatusCheckFailed_Instance
+    statistics: [maximum]
+  - id: status_check_failed_system
+    disabled: true
+    metric_name: StatusCheckFailed_System
+    statistics: [maximum]
+  - id: cpu_credit_usage           # burstable (T-family) instances only
+    disabled: true
+    metric_name: CPUCreditUsage
+    statistics: [average]
+  - id: cpu_credit_balance         # burstable (T-family) instances only
+    disabled: true
+    metric_name: CPUCreditBalance
+    statistics: [average]
+  - id: ebs_read_ops               # EBS-optimized (Nitro) instances only
+    disabled: true
+    metric_name: EBSReadOps
+    statistics: [sum]
+    rate: true
+  - id: ebs_write_ops              # EBS-optimized (Nitro) instances only
+    disabled: true
+    metric_name: EBSWriteOps
+    statistics: [sum]
+    rate: true
+  - id: ebs_read_bytes             # EBS-optimized (Nitro) instances only
+    disabled: true
+    metric_name: EBSReadBytes
+    statistics: [sum]
+    rate: true
+  - id: ebs_write_bytes            # EBS-optimized (Nitro) instances only
+    disabled: true
+    metric_name: EBSWriteBytes
+    statistics: [sum]
+    rate: true
   # Also published at {InstanceId}: EBSIOBalance% / EBSByteBalance% (burst balances),
-  # GPUPowerUtilization (accelerated instances), MetadataNoToken*. Add them the same way. See:
+  # GPUPowerUtilization (accelerated instances), MetadataNoToken*. Collecting them requires
+  # corresponding metric and chart entries in a custom profile. See:
   # https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/viewing_metrics_with_cloudwatch.html
 template:
   family: EC2
@@ -136,71 +148,71 @@ template:
         - selector: status_check_failed_attached_ebs_maximum
           name: attached_ebs
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_ec2_disk_bandwidth
-    #   context: disk_bandwidth
-    #   title: EC2 Disk Bandwidth
-    #   family: Disk
-    #   units: bytes/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: disk_read_bytes_sum
-    #       name: read
-    #     - selector: disk_write_bytes_sum
-    #       name: write
-    # - id: aws_cloudwatch_ec2_network_packets
-    #   context: network_packets
-    #   title: EC2 Network Packets
-    #   family: Network
-    #   units: packets/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: network_packets_in_sum
-    #       name: in
-    #     - selector: network_packets_out_sum
-    #       name: out
-    # - id: aws_cloudwatch_ec2_status_check_detail
-    #   context: status_check_failed_detail
-    #   title: EC2 Status Check Failures by Type
-    #   family: Status
-    #   units: status
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: status_check_failed_instance_maximum
-    #       name: instance
-    #     - selector: status_check_failed_system_maximum
-    #       name: system
-    # - id: aws_cloudwatch_ec2_cpu_credits
-    #   context: cpu_credits
-    #   title: EC2 CPU Credits
-    #   family: CPU
-    #   units: credits
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: cpu_credit_usage_average
-    #       name: used
-    #     - selector: cpu_credit_balance_average
-    #       name: balance
-    # - id: aws_cloudwatch_ec2_ebs_iops
-    #   context: ebs_iops
-    #   title: EC2 EBS IOPS
-    #   family: EBS
-    #   units: ops/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: ebs_read_ops_sum
-    #       name: read
-    #     - selector: ebs_write_ops_sum
-    #       name: write
-    # - id: aws_cloudwatch_ec2_ebs_throughput
-    #   context: ebs_throughput
-    #   title: EC2 EBS Throughput
-    #   family: EBS
-    #   units: bytes/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: ebs_read_bytes_sum
-    #       name: read
-    #     - selector: ebs_write_bytes_sum
-    #       name: write
+    - id: aws_cloudwatch_ec2_disk_bandwidth
+      context: disk_bandwidth
+      title: EC2 Disk Bandwidth
+      family: Disk
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: disk_read_bytes_sum
+          name: read
+        - selector: disk_write_bytes_sum
+          name: write
+    - id: aws_cloudwatch_ec2_network_packets
+      context: network_packets
+      title: EC2 Network Packets
+      family: Network
+      units: packets/s
+      algorithm: absolute
+      dimensions:
+        - selector: network_packets_in_sum
+          name: in
+        - selector: network_packets_out_sum
+          name: out
+    - id: aws_cloudwatch_ec2_status_check_detail
+      context: status_check_failed_detail
+      title: EC2 Status Check Failures by Type
+      family: Status
+      units: status
+      algorithm: absolute
+      dimensions:
+        - selector: status_check_failed_instance_maximum
+          name: instance
+        - selector: status_check_failed_system_maximum
+          name: system
+    - id: aws_cloudwatch_ec2_cpu_credits
+      context: cpu_credits
+      title: EC2 CPU Credits
+      family: CPU
+      units: credits
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_credit_usage_average
+          name: used
+        - selector: cpu_credit_balance_average
+          name: balance
+    - id: aws_cloudwatch_ec2_ebs_iops
+      context: ebs_iops
+      title: EC2 EBS IOPS
+      family: EBS
+      units: ops/s
+      algorithm: absolute
+      dimensions:
+        - selector: ebs_read_ops_sum
+          name: read
+        - selector: ebs_write_ops_sum
+          name: write
+    - id: aws_cloudwatch_ec2_ebs_throughput
+      context: ebs_throughput
+      title: EC2 EBS Throughput
+      family: EBS
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: ebs_read_bytes_sum
+          name: read
+        - selector: ebs_write_bytes_sum
+          name: write

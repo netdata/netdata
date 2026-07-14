@@ -208,7 +208,7 @@
             },
             "profiles": {
               "title": "Profiles",
-              "description": "Omit to select default-enabled profiles. Include adds profiles; exclude removes profiles. The higher-cardinality PrivateLink subnet profile is opt-in as privatelink_endpoint_subnet. Billing profiles are also opt-in: billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
+              "description": "Omit to select default-enabled profiles. Include adds profiles; exclude removes profiles. Higher-cardinality PrivateLink endpoint/service grains are opt-in: privatelink_endpoint_subnet, privatelink_service_az, privatelink_service_load_balancer, privatelink_service_az_load_balancer, and privatelink_service_vpc_endpoint. Billing profiles are also opt-in: billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
               "type": "object",
               "properties": {
                 "defaults": {
@@ -217,7 +217,7 @@
                   "default": true
                 },
                 "include": {
-                  "description": "Additional profile basenames. PrivateLink subnet metrics use the opt-in privatelink_endpoint_subnet profile. Opt-in Billing choices are billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
+                  "description": "Additional profile basenames. PrivateLink detail choices are privatelink_endpoint_subnet, privatelink_service_az, privatelink_service_load_balancer, privatelink_service_az_load_balancer, and privatelink_service_vpc_endpoint. Opt-in Billing choices are billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
                   "type": "array",
                   "maxItems": 256,
                   "uniqueItems": true,
@@ -239,7 +239,7 @@
             },
             "metrics": {
               "title": "Metrics",
-              "description": "Optional per-profile exact metric/statistic allowlists that narrow the profiles selected by this rule. Omit metrics to collect every metric exported by those profiles.",
+              "description": "Optional per-profile metric overrides. Omit this list to collect each selected profile's default-enabled metrics. Profiles without a group keep their defaults. A group keeps its profile defaults unless defaults is false, then adds its included MetricNames.",
               "type": "array",
               "minItems": 1,
               "maxItems": 256,
@@ -249,13 +249,19 @@
                 "properties": {
                   "profile": {
                     "title": "Profile",
-                    "description": "Profile basename. It must already be selected by this rule's profiles option and may appear in only one metrics group.",
+                    "description": "Profile basename. It must already be selected by this rule's profiles option and may appear in only one metrics group. Other selected profiles keep their default-enabled metrics.",
                     "type": "string",
                     "pattern": "^[a-z][a-z0-9_]*$"
                   },
+                  "defaults": {
+                    "title": "Include profile defaults",
+                    "description": "Include the profile's default-enabled metrics before adding this group's explicit MetricNames. Set false for an exact-only selection.",
+                    "type": "boolean",
+                    "default": true
+                  },
                   "statistics": {
                     "title": "Default statistics",
-                    "description": "Default statistics inherited by included metrics that omit their own statistics. Named AWS statistics are case-insensitive.",
+                    "description": "Optional statistics inherited by included metrics that omit their own list. When both lists are omitted, the metric inherits every statistic declared by the profile. Named AWS statistics are case-insensitive.",
                     "type": "array",
                     "minItems": 1,
                     "maxItems": 256,
@@ -267,7 +273,7 @@
                   },
                   "include": {
                     "title": "Included metrics",
-                    "description": "Exact, case-sensitive AWS MetricNames. A metric-level statistics list replaces the group default.",
+                    "description": "Exact, case-sensitive AWS MetricNames added by this group. A metric-level statistics list replaces the group statistics; when neither is set, the profile-declared statistics are inherited.",
                     "type": "array",
                     "minItems": 1,
                     "maxItems": 256,
@@ -283,7 +289,7 @@
                         },
                         "statistics": {
                           "title": "Statistics",
-                          "description": "Optional replacement for the group default. Use Average, Minimum, Maximum, Sum, SampleCount, or p<N>; named statistics are case-insensitive.",
+                          "description": "Optional replacement for the group statistics. When both are omitted, inherit every statistic declared for this metric by the profile. Use Average, Minimum, Maximum, Sum, SampleCount, or p<N>; named statistics are case-insensitive.",
                           "type": "array",
                           "minItems": 1,
                           "maxItems": 256,
@@ -624,13 +630,13 @@
           }
         },
         "profiles": {
-          "ui:help": "Choose which stock or user CloudWatch profiles this rule collects. Omit this section to use all default-enabled profiles. PrivateLink subnet metrics are opt-in through privatelink_endpoint_subnet. Billing is opt-in through billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
+          "ui:help": "Choose which stock or user CloudWatch profiles this rule collects. Omit this section to use all default-enabled profiles. Detailed PrivateLink endpoint/service grains are opt-in. Billing is opt-in through billing_total, billing_service, billing_linked_account, and billing_linked_account_service.",
           "defaults": {
             "ui:help": "Include all default-enabled profiles before applying include and exclude lists."
           },
           "include": {
             "ui:listFlavour": "list",
-            "ui:help": "Additional profile basenames to include. Use privatelink_endpoint_subnet for the higher-cardinality per-subnet PrivateLink view. Billing choices are billing_total, billing_service, billing_linked_account, and billing_linked_account_service; use us-east-1 and disable inherited resource-tag filters for them.",
+            "ui:help": "Additional profile basenames to include. PrivateLink detail choices are privatelink_endpoint_subnet, privatelink_service_az, privatelink_service_load_balancer, privatelink_service_az_load_balancer, and privatelink_service_vpc_endpoint. Billing choices are billing_total, billing_service, billing_linked_account, and billing_linked_account_service; use us-east-1 and disable inherited resource-tag filters for them.",
             "items": {
               "ui:placeholder": "ec2"
             }
@@ -645,22 +651,25 @@
         },
         "metrics": {
           "ui:listFlavour": "list",
-          "ui:help": "Optional exact allowlists grouped by profile. Omit this list to collect every metric exported by the selected profiles.",
+          "ui:help": "Optional per-profile overrides. Omit this list to collect default-enabled metrics. Profiles without a group keep their defaults; each group can add opt-in metrics or switch to an exact-only set.",
           "items": {
             "profile": {
-              "ui:help": "Profile basename already selected by this rule. Add each profile at most once.",
+              "ui:help": "Profile basename already selected by this rule. Add each profile at most once; other selected profiles keep their default-enabled metrics.",
               "ui:placeholder": "ec2"
+            },
+            "defaults": {
+              "ui:help": "Keep this profile's default-enabled metrics before adding the MetricNames below. Disable for an exact-only selection."
             },
             "statistics": {
               "ui:listFlavour": "list",
-              "ui:help": "Default AWS statistics inherited by metrics that omit their own list.",
+              "ui:help": "Optional AWS statistics inherited by included metrics. If both statistics lists are omitted, the profile-declared statistics are used.",
               "items": {
                 "ui:placeholder": "Average"
               }
             },
             "include": {
               "ui:listFlavour": "list",
-              "ui:help": "Exact AWS MetricNames. A metric-level statistics list replaces the group default.",
+              "ui:help": "Exact AWS MetricNames to add. A metric-level statistics list replaces the group list; if both are omitted, the profile-declared statistics are used.",
               "items": {
                 "name": {
                   "ui:help": "Exact, case-sensitive AWS MetricName from the profile.",
@@ -668,7 +677,7 @@
                 },
                 "statistics": {
                   "ui:listFlavour": "list",
-                  "ui:help": "Optional replacement statistics for this metric.",
+                  "ui:help": "Optional replacement statistics for this metric. Leave empty with no group statistics to inherit the profile declaration.",
                   "items": {
                     "ui:placeholder": "Maximum"
                   }

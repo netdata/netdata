@@ -9,6 +9,7 @@ import (
 )
 
 func (c *Collector) collect(ctx context.Context) error {
+	c.activity.beginCycle()
 	if err := c.ensurePlan(); err != nil {
 		return err
 	}
@@ -45,5 +46,6 @@ func (c *Collector) collect(ctx context.Context) error {
 	if len(due) > 0 && execution.terminal == 0 && execution.transient == len(due) && written == 0 {
 		return errors.New("all due CloudWatch queries failed transiently and no retained observations are available")
 	}
+	c.activity.write()
 	return nil
 }

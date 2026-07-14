@@ -145,7 +145,11 @@ int function_netdata_streaming(BUFFER *wb, const char *function __maybe_unused, 
             buffer_json_add_array_item_string(wb, string2str(identity.prog_version));
 
             // System Info
-            rrdhost_system_info_to_streaming_function_array(wb, s.host->system_info);
+            spinlock_lock(&s.host->rrdhost_update_lock);
+            struct rrdhost_system_info *system_info = rrdhost_system_info_dup(s.host->system_info);
+            spinlock_unlock(&s.host->rrdhost_update_lock);
+            rrdhost_system_info_to_streaming_function_array(wb, system_info);
+            rrdhost_system_info_free(system_info);
 
             // retention
             buffer_json_add_array_item_uint64(wb, s.db.first_time_s * MSEC_PER_SEC); // dbFrom

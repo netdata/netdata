@@ -185,6 +185,8 @@ func (f *pagingGMD) GetMetricData(_ context.Context, in *cloudwatch.GetMetricDat
 }
 
 func TestExecuteQueries_PaginationAndDedup(t *testing.T) {
+	const accountID = "123456789012"
+
 	c := ec2QueryCollector([]string{"us-east-1"}, map[string][][]string{"us-east-1": {{"i-1"}}})
 	plan := requireBuildQueryPlan(t, c)
 	require.Len(t, plan, 3) // cpu_utilization_average, duration_average, duration_p90
@@ -201,6 +203,12 @@ func TestExecuteQueries_PaginationAndDedup(t *testing.T) {
 	execution := c.executeQueries(context.Background(), plan, time.Unix(1_000_000_000, 0))
 	require.Len(t, execution.outcomes, 3)
 	assert.Equal(t, 2, fake.calls, "followed NextToken to the second page")
+	activity := c.activity.snapshot()
+	assert.Equal(t, uint64(2), activityCallCount(activity, accountID, "us-east-1", activityOperationGetMetricData))
+	assert.Equal(t, uint64(4), activityMetricRequestCount(activity, accountID, "us-east-1"),
+		"each page resubmits one CPU and one Duration billing unit")
+	assert.Equal(t, uint64(6), activityQueryCount(activity, accountID, "us-east-1", "ec2"),
+		"each page resubmits all three raw queries")
 
 	byName := map[string]float64{}
 	for _, query := range plan {

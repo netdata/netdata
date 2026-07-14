@@ -35,24 +35,28 @@ metrics:
     metric_name: BurstBalance
     statistics: [average]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. All are published at the {VolumeId} grain.
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {VolumeId} grain.
   # ----------------------------------------------------------------------------------------
-  # - id: volume_total_read_time       # total seconds of read ops; divide by read ops for latency
-  #   metric_name: VolumeTotalReadTime
-  #   statistics: [sum]
-  #   rate: true
-  # - id: volume_total_write_time
-  #   metric_name: VolumeTotalWriteTime
-  #   statistics: [sum]
-  #   rate: true
-  # - id: volume_throughput_percentage  # Provisioned IOPS SSD (io1/io2) only
-  #   metric_name: VolumeThroughputPercentage
-  #   statistics: [average]
-  # - id: volume_consumed_read_write_ops  # Provisioned IOPS SSD (io1/io2) only
-  #   metric_name: VolumeConsumedReadWriteOps
-  #   statistics: [sum]
-  #   rate: true
+  - id: volume_total_read_time       # total seconds of read ops; divide by read ops for latency
+    disabled: true
+    metric_name: VolumeTotalReadTime
+    statistics: [sum]
+    rate: true
+  - id: volume_total_write_time
+    disabled: true
+    metric_name: VolumeTotalWriteTime
+    statistics: [sum]
+    rate: true
+  - id: volume_throughput_percentage  # Provisioned IOPS SSD (io1/io2) only
+    disabled: true
+    metric_name: VolumeThroughputPercentage
+    statistics: [average]
+  - id: volume_consumed_read_write_ops  # Provisioned IOPS SSD (io1/io2) only
+    disabled: true
+    metric_name: VolumeConsumedReadWriteOps
+    statistics: [sum]
+    rate: true
   # Nitro-only per-volume metrics (VolumeAvgIOPS, VolumeAvgReadLatency, VolumeIOPSExceededCheck, ...)
   # and instance-aggregate EBS (AWS/EC2 + InstanceId: EBSReadBytes/EBSWriteBytes/... -- see the ec2
   # profile) are separate. VolumeStalledIOCheck is available through the disabled ebs_stalled_io
@@ -116,34 +120,34 @@ template:
         - selector: burst_balance_average
           name: balance
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_ebs_io_time
-    #   context: io_time
-    #   title: EBS Volume I/O Time
-    #   family: Latency
-    #   units: seconds/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: volume_total_read_time_sum
-    #       name: read
-    #     - selector: volume_total_write_time_sum
-    #       name: write
-    # - id: aws_cloudwatch_ebs_throughput_percentage
-    #   context: throughput_percentage
-    #   title: EBS Volume Throughput Percentage
-    #   family: Throughput
-    #   units: percentage
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: volume_throughput_percentage_average
-    #       name: throughput
-    # - id: aws_cloudwatch_ebs_consumed_ops
-    #   context: consumed_ops
-    #   title: EBS Volume Consumed Read/Write Ops
-    #   family: Throughput
-    #   units: ops/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: volume_consumed_read_write_ops_sum
-    #       name: consumed
+    - id: aws_cloudwatch_ebs_io_time
+      context: io_time
+      title: EBS Volume I/O Time
+      family: Latency
+      units: seconds/s
+      algorithm: absolute
+      dimensions:
+        - selector: volume_total_read_time_sum
+          name: read
+        - selector: volume_total_write_time_sum
+          name: write
+    - id: aws_cloudwatch_ebs_throughput_percentage
+      context: throughput_percentage
+      title: EBS Volume Throughput Percentage
+      family: Throughput
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: volume_throughput_percentage_average
+          name: throughput
+    - id: aws_cloudwatch_ebs_consumed_ops
+      context: consumed_ops
+      title: EBS Volume Consumed Read/Write Ops
+      family: Throughput
+      units: ops/s
+      algorithm: absolute
+      dimensions:
+        - selector: volume_consumed_read_write_ops_sum
+          name: consumed

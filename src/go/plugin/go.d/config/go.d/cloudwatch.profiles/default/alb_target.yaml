@@ -46,20 +46,23 @@ metrics:
     statistics: [sum]
     rate: true
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. All are published at the
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the
   # {LoadBalancer, TargetGroup} grain, so no other change is needed.
   # ----------------------------------------------------------------------------------------
-  # - id: target_tls_negotiation_errors
-  #   metric_name: TargetTLSNegotiationErrorCount
-  #   statistics: [sum]
-  #   rate: true
-  # - id: anomalous_host_count
-  #   metric_name: AnomalousHostCount
-  #   statistics: [maximum]
-  # - id: mitigated_host_count
-  #   metric_name: MitigatedHostCount
-  #   statistics: [maximum]
+  - id: target_tls_negotiation_errors
+    disabled: true
+    metric_name: TargetTLSNegotiationErrorCount
+    statistics: [sum]
+    rate: true
+  - id: anomalous_host_count
+    disabled: true
+    metric_name: AnomalousHostCount
+    statistics: [maximum]
+  - id: mitigated_host_count
+    disabled: true
+    metric_name: MitigatedHostCount
+    statistics: [maximum]
   # Target-group health-state metrics (HealthyStateDNS/Routing, UnhealthyStateDNS/Routing,
   # UnhealthyRoutingRequestCount) are also published at this grain. See:
   # https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-cloudwatch-metrics.html
@@ -124,25 +127,25 @@ template:
         - selector: target_connection_error_count_sum
           name: errors
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_alb_target_group_tls_errors
-    #   context: target_tls_negotiation_errors
-    #   title: ALB Target TLS Negotiation Errors
-    #   family: TLS
-    #   units: errors/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: target_tls_negotiation_errors_sum
-    #       name: errors
-    # - id: aws_cloudwatch_alb_target_group_host_states
-    #   context: host_states
-    #   title: ALB Target Anomalous and Mitigated Hosts
-    #   family: Hosts
-    #   units: hosts
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: anomalous_host_count_maximum
-    #       name: anomalous
-    #     - selector: mitigated_host_count_maximum
-    #       name: mitigated
+    - id: aws_cloudwatch_alb_target_group_tls_errors
+      context: target_tls_negotiation_errors
+      title: ALB Target TLS Negotiation Errors
+      family: TLS
+      units: errors/s
+      algorithm: absolute
+      dimensions:
+        - selector: target_tls_negotiation_errors_sum
+          name: errors
+    - id: aws_cloudwatch_alb_target_group_host_states
+      context: host_states
+      title: ALB Target Anomalous and Mitigated Hosts
+      family: Hosts
+      units: hosts
+      algorithm: absolute
+      dimensions:
+        - selector: anomalous_host_count_maximum
+          name: anomalous
+        - selector: mitigated_host_count_maximum
+          name: mitigated

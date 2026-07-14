@@ -63,13 +63,14 @@ metrics:
     metric_name: ConnectionCount
     statistics: [average]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. All are published at the {Cluster Name, Broker ID}
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {Cluster Name, Broker ID}
   # grain (DEFAULT monitoring level).
   # ----------------------------------------------------------------------------------------
-  # - id: cpu_io_wait
-  #   metric_name: CpuIoWait
-  #   statistics: [average]
+  - id: cpu_io_wait
+    disabled: true
+    metric_name: CpuIoWait
+    statistics: [average]
   # ClientConnectionCount is DEFAULT-level but AWS publishes it at {Cluster Name, Broker ID, Client
   # Authentication} -- a third dimension -- so it does not match this {Cluster Name, Broker ID} grain
   # and needs its own profile.
@@ -179,14 +180,14 @@ template:
         - selector: connection_count_average
           name: connections
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_msk_cpu_io_wait
-    #   context: cpu_io_wait
-    #   title: MSK Broker CPU I/O Wait
-    #   family: CPU
-    #   units: percentage
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: cpu_io_wait_average
-    #       name: io_wait
+    - id: aws_cloudwatch_msk_cpu_io_wait
+      context: cpu_io_wait
+      title: MSK Broker CPU I/O Wait
+      family: CPU
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cpu_io_wait_average
+          name: io_wait

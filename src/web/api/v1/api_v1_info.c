@@ -121,7 +121,11 @@ static int web_client_api_request_v1_info_fill_buffer(RRDHOST *host, BUFFER *wb)
 
     web_client_api_request_v1_info_summary_alarm_statuses(host, wb, "alarms");
 
-    rrdhost_system_info_to_json_v1(wb, host->system_info);
+    spinlock_lock(&host->rrdhost_update_lock);
+    struct rrdhost_system_info *system_info = rrdhost_system_info_dup(host->system_info);
+    spinlock_unlock(&host->rrdhost_update_lock);
+    rrdhost_system_info_to_json_v1(wb, system_info);
+    rrdhost_system_info_free(system_info);
 
     host_labels2json(host, wb, "host_labels");
     host_functions2json(host, wb);

@@ -27,7 +27,7 @@ metrics:
     rate: true
   - id: approximate_age_of_oldest_message
     metric_name: ApproximateAgeOfOldestMessage
-    statistics: [average]
+    statistics: [maximum]
   - id: sent_message_size
     metric_name: SentMessageSize
     statistics: [average]
@@ -41,17 +41,18 @@ metrics:
     metric_name: ApproximateNumberOfMessagesDelayed
     statistics: [average]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below, then restart the go.d process. Both are
-  # published at the {QueueName} grain (FIFO queues only), so no other change is needed.
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # Both are published at the {QueueName} grain (FIFO queues only), so no other change is needed.
   # ----------------------------------------------------------------------------------------
-  # - id: number_of_deduplicated_sent_messages
-  #   metric_name: NumberOfDeduplicatedSentMessages
-  #   statistics: [sum]
-  #   rate: true
-  # - id: approximate_number_of_groups_with_inflight_messages
-  #   metric_name: ApproximateNumberOfGroupsWithInflightMessages
-  #   statistics: [average]
+  - id: number_of_deduplicated_sent_messages
+    disabled: true
+    metric_name: NumberOfDeduplicatedSentMessages
+    statistics: [sum]
+    rate: true
+  - id: approximate_number_of_groups_with_inflight_messages
+    disabled: true
+    metric_name: ApproximateNumberOfGroupsWithInflightMessages
+    statistics: [average]
   # Fair-queue metrics (ApproximateNumberOfNoisyGroups, *InQuietGroups) are also published at
   # {QueueName} when fair queues are used. See:
   # https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-available-cloudwatch-metrics.html
@@ -104,7 +105,7 @@ template:
       units: seconds
       algorithm: absolute
       dimensions:
-        - selector: approximate_age_of_oldest_message_average
+        - selector: approximate_age_of_oldest_message_maximum
           name: age
     - id: aws_cloudwatch_sqs_message_size
       context: message_size
@@ -116,23 +117,23 @@ template:
         - selector: sent_message_size_average
           name: size
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_sqs_deduplicated_messages
-    #   context: deduplicated_messages
-    #   title: SQS Deduplicated Sent Messages
-    #   family: Messages
-    #   units: messages/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: number_of_deduplicated_sent_messages_sum
-    #       name: deduplicated
-    # - id: aws_cloudwatch_sqs_inflight_groups
-    #   context: inflight_message_groups
-    #   title: SQS Message Groups With Inflight Messages
-    #   family: Queue
-    #   units: groups
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: approximate_number_of_groups_with_inflight_messages_average
-    #       name: groups
+    - id: aws_cloudwatch_sqs_deduplicated_messages
+      context: deduplicated_messages
+      title: SQS Deduplicated Sent Messages
+      family: Messages
+      units: messages/s
+      algorithm: absolute
+      dimensions:
+        - selector: number_of_deduplicated_sent_messages_sum
+          name: deduplicated
+    - id: aws_cloudwatch_sqs_inflight_groups
+      context: inflight_message_groups
+      title: SQS Message Groups With Inflight Messages
+      family: Queue
+      units: groups
+      algorithm: absolute
+      dimensions:
+        - selector: approximate_number_of_groups_with_inflight_messages_average
+          name: groups

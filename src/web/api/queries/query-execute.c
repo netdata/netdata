@@ -292,7 +292,7 @@ NOT_INLINE_HOT void rrd2rrdr_query_execute(RRDR *r, size_t dim_id_in_rrdr, QUERY
             if(likely(new_point.sp.end_time_s < now_end_time)) { // likely to favor tier0
                 // this db point ends before our now_end_time
 
-                if(likely(new_point.sp.end_time_s >= now_start_time)) { // likely to favor tier0
+                if(likely(new_point.sp.end_time_s > now_start_time)) { // likely to favor tier0
                     // this db point ends after our now_start time
 
                     query_add_point_to_group(r, new_point, ops, add_flush);
