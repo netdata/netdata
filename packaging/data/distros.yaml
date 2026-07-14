@@ -64,8 +64,6 @@ include:
     bundle_sentry: *default_sentry
     env_prep: |
       apk add -U bash
-    jsonc_removal: |
-      apk del json-c-dev
     test:
       ebpf-core: true
   - <<: *alpine
@@ -142,8 +140,6 @@ include:
     version: '10'
     support_type: 'Community'
     notes: ''
-    jsonc_removal: |
-      dnf remove -y json-c-devel
     eol_check: true
     bundle_sentry: *default_sentry
     packages: &cs_packages
@@ -175,8 +171,6 @@ include:
       amd64: true
     env_prep: |
       apt-get update
-    jsonc_removal: |
-      apt-get purge -y libjson-c-dev
     packages: &debian_packages
       type: deb
       repo_distro: debian/trixie
@@ -221,8 +215,6 @@ include:
     notes: ''
     eol_check: true
     bundle_sentry: *default_sentry
-    jsonc_removal: |
-      dnf remove -y json-c-devel
     packages: &fedora_packages
       type: rpm
       repo_distro: fedora/44
@@ -248,8 +240,6 @@ include:
     eol_check: false
     bundle_sentry: *default_sentry
     base_image: opensuse/tumbleweed
-    jsonc_removal: |
-      zypper rm -y libjson-c-devel
     packages: &opensuse_packages
       type: rpm
       repo_distro: opensuse/tumbleweed
@@ -274,8 +264,6 @@ include:
     notes: ''
     eol_check: true
     bundle_sentry: *default_sentry
-    jsonc_removal: |
-      dnf remove -y json-c-devel
     packages: &oracle_packages
       type: rpm
       repo_distro: ol/10
@@ -309,8 +297,6 @@ include:
     base_image: "quay.io/rockylinux/rockylinux:10"
     support_type: Core
     notes: ''
-    jsonc_removal: |
-      dnf remove -y json-c-devel
     eol_check: true
     bundle_sentry: *default_sentry
     packages: &rocky_packages
@@ -358,8 +344,6 @@ include:
       amd64: true
     env_prep: |
       rm -f /etc/apt/apt.conf.d/docker && apt-get update
-    jsonc_removal: |
-      apt-get remove -y libjson-c-dev
     packages: &ubuntu_packages
       type: deb
       repo_distro: ubuntu/resolute

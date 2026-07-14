@@ -1113,7 +1113,6 @@ jobs:
             build-args: |
               BASE=${{ matrix.distro }}
               PRE=${{ matrix.env_prep }}
-              RMJSONC=${{ matrix.jsonc_removal }}
             tags: test:${{ matrix.artifact_key }}
           attempt_limit: 3
           attempt_delay: 15000
