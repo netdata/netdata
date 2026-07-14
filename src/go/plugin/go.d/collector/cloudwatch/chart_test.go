@@ -69,7 +69,10 @@ func TestBuildChartSpec_DoesNotMutateCatalog(t *testing.T) {
 }
 
 func TestActivityChartGroupContract(t *testing.T) {
-	group := activityChartGroup()
+	spec := buildChartSpec(nil)
+	assert.Equal(t, "cloudwatch", spec.ContextNamespace)
+	require.Len(t, spec.Groups, 1)
+	group := spec.Groups[0]
 	assert.Equal(t, "Collector Activity", group.Family)
 	require.NotNil(t, group.ChartDefaults)
 	require.NotNil(t, group.ChartDefaults.Instances)
@@ -81,23 +84,26 @@ func TestActivityChartGroupContract(t *testing.T) {
 	}, group.Metrics)
 
 	want := map[string]struct {
-		context       string
-		units         string
-		selector      string
-		name          string
-		nameFromLabel string
+		context   string
+		units     string
+		selector  string
+		name      string
+		instances []string
 	}{
 		"aws_cloudwatch_collector_api_calls": {
 			context: "collector_api_calls", units: "calls/s",
-			selector: activityAPICallsMetric, nameFromLabel: "operation",
+			selector: activityAPICallsMetric, name: "calls",
+			instances: []string{"account_id", "region", "operation"},
 		},
 		"aws_cloudwatch_collector_metric_requests": {
 			context: "collector_metric_requests", units: "requests/s",
 			selector: activityMetricRequestsMetric, name: "requests",
+			instances: []string{"account_id", "region"},
 		},
 		"aws_cloudwatch_collector_queries": {
 			context: "collector_queries", units: "queries/s",
-			selector: activityQueriesMetric, nameFromLabel: "profile",
+			selector: activityQueriesMetric, name: "queries",
+			instances: []string{"account_id", "region", "profile"},
 		},
 	}
 	require.Len(t, group.Charts, len(want))
@@ -105,12 +111,19 @@ func TestActivityChartGroupContract(t *testing.T) {
 		expected, ok := want[chart.ID]
 		require.True(t, ok, "unexpected chart %q", chart.ID)
 		assert.Equal(t, expected.context, chart.Context)
+		assert.Equal(t, "cloudwatch."+expected.context, spec.ContextNamespace+"."+chart.Context)
 		assert.Equal(t, expected.units, chart.Units)
 		assert.Equal(t, "incremental", chart.Algorithm)
+		instances := chart.Instances
+		if instances == nil {
+			instances = group.ChartDefaults.Instances
+		}
+		require.NotNil(t, instances)
+		assert.Equal(t, expected.instances, instances.ByLabels)
 		require.Len(t, chart.Dimensions, 1)
 		assert.Equal(t, expected.selector, chart.Dimensions[0].Selector)
 		assert.Equal(t, expected.name, chart.Dimensions[0].Name)
-		assert.Equal(t, expected.nameFromLabel, chart.Dimensions[0].NameFromLabel)
+		assert.Empty(t, chart.Dimensions[0].NameFromLabel)
 	}
 }
 

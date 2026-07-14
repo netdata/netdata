@@ -689,21 +689,30 @@ per-region prices on the CloudWatch pricing page.)
 
 ### Collector activity and billing inputs
 
-`activity.go` keeps three job-lifetime cumulative counters and the chart template
-renders their incremental rates for every resolved `(account_id, region)`:
+`activity.go` keeps three job-lifetime cumulative counters. Three chart templates
+under the public `cloudwatch.collector_*` contexts render their incremental rates:
 
 - **CloudWatch API Calls** counts collector-issued `ListMetrics` and
-  `GetMetricData` method calls. Every requested continuation page is another call.
+  `GetMetricData` method calls. It materializes one chart per
+  `(account_id, region, operation)` with a fixed `calls` dimension. Every requested
+  continuation page is another call.
 - **CloudWatch Metric Requests** counts the calculated `GetMetricData` billing
   units submitted by the collector. Up to five statistics for one structural AWS
   metric in one request form one unit; a pagination page submits those units again.
+  It materializes per `(account_id, region)` with a fixed `requests` dimension.
 - **CloudWatch Raw Queries** counts submitted `MetricDataQuery` items, split by
-  profile. This is the profile-level tuning view, not AWS's billing unit.
+  profile. It materializes one chart per `(account_id, region, profile)` with a
+  fixed `queries` dimension. This is the profile-level tuning view, not AWS's
+  billing unit.
 
 Physical calls and billing units are attributed only to account and region because
 one shared discovery stream or query batch can serve multiple profiles. Targets that
 resolve to the same account therefore aggregate. Raw queries keep their profile of
 origin because every planned series has exactly one.
+
+`netdata.go.plugin.collector.cloudwatch.*` names the internal `metrix` selectors;
+it is not a chart-context prefix. The chart spec's `context_namespace: cloudwatch`
+keeps all three activity contexts beside the service-profile contexts in the UI.
 
 The totals live outside the staged `metrix` frame. Work done by a failed collection
 cycle is preserved and appears after the next successful commit; cleanup, job
