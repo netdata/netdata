@@ -78,7 +78,7 @@ Each collection cycle (`collect.go`), in order:
 6. apply explicit per-query outcomes to completion, retry, and source-observation state (`observe.go`);
 7. write retained observations or synthetic zero presentation as float gauges into `metrix`, stamped with
    `{account_id, region, <dimension labels>}`, and re-emit not-due series (`query_emit.go`);
-8. publish cumulative collector activity retained across failed cycles (`activity.go`);
+8. publish absolute collector activity for the commit-acknowledged interval (`activity.go`);
 9. serve a chart template built once from the selected profiles plus one collector-activity group (`chart.go`).
 
 ## Lifecycle
@@ -122,8 +122,8 @@ flowchart TD
   compiled; `ensureTargets` retries only unresolved targets.
 - **Cleanup** resets the collection plan, resolved targets, cached template,
   discovery/query snapshots, client caches, and per-query observation state so a framework
-  re-Init after failed autodetection starts clean. Job-lifetime collector-activity
-  totals are reset as well. The `metrix` store is created
+  re-Init after failed autodetection starts clean. Pending collector activity and
+  its known interval-gauge keys are reset as well. The `metrix` store is created
   once in `New` and persists — it is not recreated.
 - **ChartTemplateYAML** returns the cached string; no work at call time.
 
@@ -140,7 +140,7 @@ flowchart TD
     E("dueQueries<br/>keep stable queries with a newer eligible window")
     F("executeQueries<br/>batched · concurrent GetMetricData")
     G("apply outcomes + emit<br/>write gauges · re-emit retained")
-    H("publish collector activity<br/>cumulative snapshot counters")
+    H("publish collector activity<br/>absolute interval gauges")
 
     A --> B --> C --> D --> E --> F --> G --> H
 
@@ -689,8 +689,10 @@ per-region prices on the CloudWatch pricing page.)
 
 ### Collector activity and billing inputs
 
-`activity.go` keeps three job-lifetime cumulative counters. Three chart templates
-under the public `cloudwatch.collector_*` contexts render their incremental rates:
+`activity.go` keeps three bounded activity accumulators. Three chart templates
+under the public `cloudwatch.collector_*` contexts render their exact counts as
+absolute gauges for the interval since the preceding successfully committed
+collector frame:
 
 - **CloudWatch API Calls** counts collector-issued `ListMetrics` and
   `GetMetricData` method calls. It materializes one chart per
@@ -714,12 +716,16 @@ origin because every planned series has exactly one.
 it is not a chart-context prefix. The chart spec's `context_namespace: cloudwatch`
 keeps all three activity contexts beside the service-profile contexts in the UI.
 
-The totals live outside the staged `metrix` frame. Work done by a failed collection
-cycle is preserved and appears after the next successful commit; cleanup, job
-replacement, and process restart reset the totals. They count calls issued by the
-collector, not retry attempts performed internally by the AWS SDK. These metrics are
-cost inputs, not an AWS invoice: AWS owns the billing rules, may change them, and does
-not separately document pagination billing semantics.
+Pending activity lives outside the staged `metrix` frame. At the start of the next
+cycle, `activity.go` checks `CollectMeta.LastSuccessSeq` and clears the prior interval
+only when that sequence proves its frame committed. A failed collection or failed
+metric-store commit therefore carries its work into the next successful frame. Once
+a series is known, a successful cached interval with no real AWS work publishes zero.
+Cleanup, job replacement, and process restart reset the pending activity and known
+keys. The gauges count calls issued by the collector, not retry attempts performed
+internally by the AWS SDK. These metrics are cost inputs, not an AWS invoice: AWS owns
+the billing rules, may change them, and does not separately document pagination
+billing semantics.
 
 ## Key Invariants
 

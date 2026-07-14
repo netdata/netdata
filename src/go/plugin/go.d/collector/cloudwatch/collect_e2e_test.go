@@ -540,6 +540,14 @@ func TestCollect_OrderedRulesFirstTargetOwnsSameAccountSeries(t *testing.T) {
 	assert.Equal(t, metrix.SampleValue(1), series[activityAPICallsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
 	assert.Equal(t, 1, first.getCalls)
 	assert.Zero(t, second.getCalls, "the later rule's duplicate final series must not be queried")
+
+	series, err = collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
+	assert.Equal(t, metrix.SampleValue(0), series[activityAPICallsMetric+`{account_id="000000000000",operation="list_metrics",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(0), series[activityAPICallsMetric+`{account_id="000000000000",operation="get_metric_data",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(0), series[activityMetricRequestsMetric+`{account_id="000000000000",region="us-east-1"}`])
+	assert.Equal(t, metrix.SampleValue(0), series[activityQueriesMetric+`{account_id="000000000000",profile="ec2",region="us-east-1"}`])
+	assert.Equal(t, 1, first.getCalls, "a cached interval must publish zero activity without making another query")
 }
 
 // e2eKey builds the fixture key from (namespace, metric, statistic) plus dimension

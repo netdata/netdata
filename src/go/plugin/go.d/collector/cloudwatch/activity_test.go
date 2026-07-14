@@ -46,7 +46,7 @@ func TestQueryMetricRequestUnits(t *testing.T) {
 	}
 }
 
-func TestCollectorActivity_PreservesFailedCycleAndAggregatesByAccount(t *testing.T) {
+func TestCollectorActivity_PreservesAbortedCycleAndAggregatesByAccount(t *testing.T) {
 	const accountID = "000000000000"
 	store := metrix.NewCollectorStore()
 	activity := newCollectorActivity(store)
@@ -58,6 +58,7 @@ func TestCollectorActivity_PreservesFailedCycleAndAggregatesByAccount(t *testing
 	managed, ok := metrix.AsCycleManagedStore(store)
 	require.True(t, ok)
 	managed.CycleController().BeginCycle()
+	activity.beginCycle()
 	activity.write()
 	managed.CycleController().AbortCycle()
 
@@ -66,13 +67,14 @@ func TestCollectorActivity_PreservesFailedCycleAndAggregatesByAccount(t *testing
 	})
 	assert.False(t, found, "an aborted metrix frame must not publish partial activity")
 
-	// A second target resolving to the same account records into the same account/region totals.
+	// A second target resolving to the same account records into the same account/region interval.
 	activity.recordListMetrics(accountID, "us-east-1")
 	activity.recordGetMetricData(accountID, "us-east-1", queries)
 	activity.recordListMetrics(accountID, "eu-west-1")
 	activity.recordGetMetricData(accountID, "eu-west-1", queries[:1])
 
 	managed.CycleController().BeginCycle()
+	activity.beginCycle()
 	activity.write()
 	require.NoError(t, managed.CycleController().CommitCycleSuccess())
 
@@ -100,7 +102,61 @@ func TestCollectorActivity_PreservesFailedCycleAndAggregatesByAccount(t *testing
 	}, 1)
 }
 
-func TestCollectorActivity_ResetStartsNewTotals(t *testing.T) {
+func TestCollectorActivity_AcknowledgesOnlyCommittedFrames(t *testing.T) {
+	tests := map[string]struct {
+		failFirstActivityCommit bool
+		wantRecoveredCount      metrix.SampleValue
+	}{
+		"successful frame is zero in the next quiet interval": {
+			wantRecoveredCount: 0,
+		},
+		"failed commit carries activity into the next interval": {
+			failFirstActivityCommit: true,
+			wantRecoveredCount:      2,
+		},
+	}
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			const accountID = "000000000000"
+			store := metrix.NewCollectorStore()
+			activity := newCollectorActivity(store)
+			managed, ok := metrix.AsCycleManagedStore(store)
+			require.True(t, ok)
+
+			if tc.failFirstActivityCommit {
+				managed.CycleController().BeginCycle()
+				store.Write().SnapshotMeter("test").Gauge("conflict").Observe(1)
+				require.NoError(t, managed.CycleController().CommitCycleSuccess())
+			}
+
+			managed.CycleController().BeginCycle()
+			activity.beginCycle()
+			activity.recordListMetrics(accountID, "us-east-1")
+			activity.write()
+			if tc.failFirstActivityCommit {
+				store.Write().SnapshotMeter("test").Gauge("conflict").Observe(2)
+				store.Write().SnapshotMeter("test").Counter("conflict").ObserveTotal(3)
+				require.Error(t, managed.CycleController().CommitCycleSuccess())
+			} else {
+				require.NoError(t, managed.CycleController().CommitCycleSuccess())
+			}
+
+			managed.CycleController().BeginCycle()
+			activity.beginCycle()
+			if tc.failFirstActivityCommit {
+				activity.recordListMetrics(accountID, "us-east-1")
+			}
+			activity.write()
+			require.NoError(t, managed.CycleController().CommitCycleSuccess())
+
+			assertActivityValue(t, store.Read(), activityAPICallsMetric, metrix.Labels{
+				"account_id": accountID, "region": "us-east-1", "operation": activityOperationListMetrics,
+			}, tc.wantRecoveredCount)
+		})
+	}
+}
+
+func TestCollectorActivity_ResetDiscardsPriorActivity(t *testing.T) {
 	const accountID = "000000000000"
 	store := metrix.NewCollectorStore()
 	activity := newCollectorActivity(store)
@@ -159,7 +215,7 @@ func TestCollectorActivity_ListMetricsPagesAndFailures(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
-			assert.Equal(t, tc.calls, activityCallTotal(activity.snapshot(), accountID, "us-east-1", activityOperationListMetrics))
+			assert.Equal(t, tc.calls, activityCallCount(activity.snapshot(), accountID, "us-east-1", activityOperationListMetrics))
 		})
 	}
 }
@@ -184,6 +240,7 @@ func commitActivity(t *testing.T, store metrix.CollectorStore, activity *collect
 	managed, ok := metrix.AsCycleManagedStore(store)
 	require.True(t, ok)
 	managed.CycleController().BeginCycle()
+	activity.beginCycle()
 	activity.write()
 	require.NoError(t, managed.CycleController().CommitCycleSuccess())
 }
@@ -195,32 +252,32 @@ func assertActivityValue(t *testing.T, reader metrix.Reader, name string, labels
 	assert.Equal(t, want, got)
 }
 
-func activityCallTotal(snapshot activitySnapshot, accountID, region, operation string) uint64 {
+func activityCallCount(snapshot activitySnapshot, accountID, region, operation string) uint64 {
 	for _, item := range snapshot.apiCalls {
 		if item.key == (activityCallScope{
 			activityScope: activityScope{accountID: accountID, region: region}, operation: operation,
 		}) {
-			return item.total
+			return item.count
 		}
 	}
 	return 0
 }
 
-func activityMetricRequestTotal(snapshot activitySnapshot, accountID, region string) uint64 {
+func activityMetricRequestCount(snapshot activitySnapshot, accountID, region string) uint64 {
 	for _, item := range snapshot.metricRequests {
 		if item.key == (activityScope{accountID: accountID, region: region}) {
-			return item.total
+			return item.count
 		}
 	}
 	return 0
 }
 
-func activityQueryTotal(snapshot activitySnapshot, accountID, region, profile string) uint64 {
+func activityQueryCount(snapshot activitySnapshot, accountID, region, profile string) uint64 {
 	for _, item := range snapshot.queries {
 		if item.key == (activityProfileScope{
 			activityScope: activityScope{accountID: accountID, region: region}, profile: profile,
 		}) {
-			return item.total
+			return item.count
 		}
 	}
 	return 0

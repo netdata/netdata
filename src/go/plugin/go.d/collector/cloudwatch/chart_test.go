@@ -74,9 +74,6 @@ func TestActivityChartGroupContract(t *testing.T) {
 	require.Len(t, spec.Groups, 1)
 	group := spec.Groups[0]
 	assert.Equal(t, "Collector Activity", group.Family)
-	require.NotNil(t, group.ChartDefaults)
-	require.NotNil(t, group.ChartDefaults.Instances)
-	assert.Equal(t, []string{"account_id", "region"}, group.ChartDefaults.Instances.ByLabels)
 	assert.ElementsMatch(t, []string{
 		activityAPICallsMetric,
 		activityMetricRequestsMetric,
@@ -91,17 +88,17 @@ func TestActivityChartGroupContract(t *testing.T) {
 		instances []string
 	}{
 		"aws_cloudwatch_collector_api_calls": {
-			context: "collector_api_calls", units: "calls/s",
+			context: "collector_api_calls", units: "calls",
 			selector: activityAPICallsMetric, name: "calls",
 			instances: []string{"account_id", "region", "operation"},
 		},
 		"aws_cloudwatch_collector_metric_requests": {
-			context: "collector_metric_requests", units: "requests/s",
+			context: "collector_metric_requests", units: "requests",
 			selector: activityMetricRequestsMetric, name: "requests",
 			instances: []string{"account_id", "region"},
 		},
 		"aws_cloudwatch_collector_queries": {
-			context: "collector_queries", units: "queries/s",
+			context: "collector_queries", units: "queries",
 			selector: activityQueriesMetric, name: "queries",
 			instances: []string{"account_id", "region", "profile"},
 		},
@@ -113,7 +110,7 @@ func TestActivityChartGroupContract(t *testing.T) {
 		assert.Equal(t, expected.context, chart.Context)
 		assert.Equal(t, "cloudwatch."+expected.context, spec.ContextNamespace+"."+chart.Context)
 		assert.Equal(t, expected.units, chart.Units)
-		assert.Equal(t, "incremental", chart.Algorithm)
+		assert.Equal(t, "absolute", chart.Algorithm)
 		instances := chart.Instances
 		if instances == nil {
 			instances = group.ChartDefaults.Instances

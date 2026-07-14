@@ -50,7 +50,7 @@ func activityChartGroup() charttpl.Group {
 		Charts: []charttpl.Chart{
 			{
 				ID: "aws_cloudwatch_collector_api_calls", Title: "CloudWatch API Calls",
-				Context: "collector_api_calls", Units: "calls/s", Algorithm: "incremental", Type: "line",
+				Context: "collector_api_calls", Units: "calls", Algorithm: "absolute", Type: "line",
 				Instances: &charttpl.Instances{ByLabels: []string{"account_id", "region", "operation"}},
 				Dimensions: []charttpl.Dimension{{
 					Selector: activityAPICallsMetric, Name: "calls",
@@ -58,7 +58,7 @@ func activityChartGroup() charttpl.Group {
 			},
 			{
 				ID: "aws_cloudwatch_collector_metric_requests", Title: "CloudWatch Metric Requests",
-				Context: "collector_metric_requests", Units: "requests/s", Algorithm: "incremental", Type: "line",
+				Context: "collector_metric_requests", Units: "requests", Algorithm: "absolute", Type: "line",
 				Instances: &charttpl.Instances{ByLabels: []string{"account_id", "region"}},
 				Dimensions: []charttpl.Dimension{{
 					Selector: activityMetricRequestsMetric, Name: "requests",
@@ -66,7 +66,7 @@ func activityChartGroup() charttpl.Group {
 			},
 			{
 				ID: "aws_cloudwatch_collector_queries", Title: "CloudWatch Raw Queries",
-				Context: "collector_queries", Units: "queries/s", Algorithm: "incremental", Type: "line",
+				Context: "collector_queries", Units: "queries", Algorithm: "absolute", Type: "line",
 				Instances: &charttpl.Instances{ByLabels: []string{"account_id", "region", "profile"}},
 				Dimensions: []charttpl.Dimension{{
 					Selector: activityQueriesMetric, Name: "queries",

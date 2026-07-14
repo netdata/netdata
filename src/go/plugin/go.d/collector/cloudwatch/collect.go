@@ -9,6 +9,7 @@ import (
 )
 
 func (c *Collector) collect(ctx context.Context) error {
+	c.activity.beginCycle()
 	if err := c.ensurePlan(); err != nil {
 		return err
 	}

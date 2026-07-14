@@ -11,9 +11,9 @@ import (
 
 const (
 	activityMetricPrefix         = "netdata.go.plugin.collector.cloudwatch"
-	activityAPICallsMetric       = activityMetricPrefix + ".api_calls_total"
-	activityMetricRequestsMetric = activityMetricPrefix + ".get_metric_data_metric_requests_total"
-	activityQueriesMetric        = activityMetricPrefix + ".get_metric_data_queries_total"
+	activityAPICallsMetric       = activityMetricPrefix + ".api_calls"
+	activityMetricRequestsMetric = activityMetricPrefix + ".get_metric_data_metric_requests"
+	activityQueriesMetric        = activityMetricPrefix + ".get_metric_data_queries"
 
 	activityOperationListMetrics   = "list_metrics"
 	activityOperationGetMetricData = "get_metric_data"
@@ -34,37 +34,62 @@ type activityProfileScope struct {
 	profile string
 }
 
-// collectorActivity keeps AWS activity independently of the staged metrix
-// frame. Calls made by a failed collection cycle therefore remain visible when
-// a later cycle commits successfully.
+// collectorActivity retains AWS activity until metrix confirms that its staged
+// frame committed. Failed cycles therefore carry their work into the next
+// successfully committed interval.
 type collectorActivity struct {
 	mu sync.Mutex
+
+	store metrix.CollectorStore
 
 	apiCalls       map[activityCallScope]uint64
 	metricRequests map[activityScope]uint64
 	queries        map[activityProfileScope]uint64
 
-	apiCallsMetric       metrix.SnapshotCounterVec
-	metricRequestsMetric metrix.SnapshotCounterVec
-	queriesMetric        metrix.SnapshotCounterVec
+	frameStaged           bool
+	stagedAfterSuccessSeq uint64
+	apiCallsMetric        metrix.SnapshotGaugeVec
+	metricRequestsMetric  metrix.SnapshotGaugeVec
+	queriesMetric         metrix.SnapshotGaugeVec
 }
 
 func newCollectorActivity(store metrix.CollectorStore) *collectorActivity {
 	meter := store.Write().SnapshotMeter(activityMetricPrefix)
 	return &collectorActivity{
+		store:          store,
 		apiCalls:       make(map[activityCallScope]uint64),
 		metricRequests: make(map[activityScope]uint64),
 		queries:        make(map[activityProfileScope]uint64),
 		apiCallsMetric: meter.
 			Vec("account_id", "region", "operation").
-			Counter("api_calls_total"),
+			Gauge("api_calls"),
 		metricRequestsMetric: meter.
 			Vec("account_id", "region").
-			Counter("get_metric_data_metric_requests_total"),
+			Gauge("get_metric_data_metric_requests"),
 		queriesMetric: meter.
 			Vec("account_id", "region", "profile").
-			Counter("get_metric_data_queries_total"),
+			Gauge("get_metric_data_queries"),
 	}
+}
+
+// beginCycle acknowledges the previously staged interval only after metrix has
+// committed it. Keys remain allocated so quiet intervals publish zeroes.
+func (a *collectorActivity) beginCycle() {
+	if a == nil {
+		return
+	}
+	lastSuccessSeq := a.store.Read().CollectMeta().LastSuccessSeq
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	if !a.frameStaged || lastSuccessSeq <= a.stagedAfterSuccessSeq {
+		return
+	}
+	zeroValues(a.apiCalls)
+	zeroValues(a.metricRequests)
+	zeroValues(a.queries)
+	a.frameStaged = false
 }
 
 func (a *collectorActivity) recordListMetrics(accountID, region string) {
@@ -101,21 +126,21 @@ func (a *collectorActivity) write() {
 	if a == nil {
 		return
 	}
-	snapshot := a.snapshot()
+	snapshot := a.stage()
 	for _, item := range snapshot.apiCalls {
 		a.apiCallsMetric.
 			WithLabelValues(item.key.accountID, item.key.region, item.key.operation).
-			ObserveTotal(float64(item.total))
+			Observe(float64(item.count))
 	}
 	for _, item := range snapshot.metricRequests {
 		a.metricRequestsMetric.
 			WithLabelValues(item.key.accountID, item.key.region).
-			ObserveTotal(float64(item.total))
+			Observe(float64(item.count))
 	}
 	for _, item := range snapshot.queries {
 		a.queriesMetric.
 			WithLabelValues(item.key.accountID, item.key.region, item.key.profile).
-			ObserveTotal(float64(item.total))
+			Observe(float64(item.count))
 	}
 }
 
@@ -129,36 +154,52 @@ func (a *collectorActivity) reset() {
 	a.apiCalls = make(map[activityCallScope]uint64)
 	a.metricRequests = make(map[activityScope]uint64)
 	a.queries = make(map[activityProfileScope]uint64)
+	a.frameStaged = false
+	a.stagedAfterSuccessSeq = 0
 }
 
-type activityTotal[T any] struct {
+type activityCount[T any] struct {
 	key   T
-	total uint64
+	count uint64
 }
 
 type activitySnapshot struct {
-	apiCalls       []activityTotal[activityCallScope]
-	metricRequests []activityTotal[activityScope]
-	queries        []activityTotal[activityProfileScope]
+	apiCalls       []activityCount[activityCallScope]
+	metricRequests []activityCount[activityScope]
+	queries        []activityCount[activityProfileScope]
 }
 
 func (a *collectorActivity) snapshot() activitySnapshot {
 	a.mu.Lock()
 	defer a.mu.Unlock()
+	return a.snapshotLocked()
+}
 
+func (a *collectorActivity) stage() activitySnapshot {
+	lastSuccessSeq := a.store.Read().CollectMeta().LastSuccessSeq
+
+	a.mu.Lock()
+	defer a.mu.Unlock()
+
+	a.frameStaged = true
+	a.stagedAfterSuccessSeq = lastSuccessSeq
+	return a.snapshotLocked()
+}
+
+func (a *collectorActivity) snapshotLocked() activitySnapshot {
 	snapshot := activitySnapshot{
-		apiCalls:       make([]activityTotal[activityCallScope], 0, len(a.apiCalls)),
-		metricRequests: make([]activityTotal[activityScope], 0, len(a.metricRequests)),
-		queries:        make([]activityTotal[activityProfileScope], 0, len(a.queries)),
+		apiCalls:       make([]activityCount[activityCallScope], 0, len(a.apiCalls)),
+		metricRequests: make([]activityCount[activityScope], 0, len(a.metricRequests)),
+		queries:        make([]activityCount[activityProfileScope], 0, len(a.queries)),
 	}
-	for key, total := range a.apiCalls {
-		snapshot.apiCalls = append(snapshot.apiCalls, activityTotal[activityCallScope]{key: key, total: total})
+	for key, count := range a.apiCalls {
+		snapshot.apiCalls = append(snapshot.apiCalls, activityCount[activityCallScope]{key: key, count: count})
 	}
-	for key, total := range a.metricRequests {
-		snapshot.metricRequests = append(snapshot.metricRequests, activityTotal[activityScope]{key: key, total: total})
+	for key, count := range a.metricRequests {
+		snapshot.metricRequests = append(snapshot.metricRequests, activityCount[activityScope]{key: key, count: count})
 	}
-	for key, total := range a.queries {
-		snapshot.queries = append(snapshot.queries, activityTotal[activityProfileScope]{key: key, total: total})
+	for key, count := range a.queries {
+		snapshot.queries = append(snapshot.queries, activityCount[activityProfileScope]{key: key, count: count})
 	}
 	sort.Slice(snapshot.apiCalls, func(i, j int) bool {
 		a, b := snapshot.apiCalls[i].key, snapshot.apiCalls[j].key
@@ -177,4 +218,10 @@ func (a *collectorActivity) snapshot() activitySnapshot {
 			(a.accountID == b.accountID && a.region == b.region && a.profile < b.profile)
 	})
 	return snapshot
+}
+
+func zeroValues[K comparable](values map[K]uint64) {
+	for key := range values {
+		values[key] = 0
+	}
 }

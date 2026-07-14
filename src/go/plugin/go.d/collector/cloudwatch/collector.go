@@ -99,7 +99,7 @@ type Collector struct {
 	discoverySig string // last-logged discovered-resources summary; Info re-logs only when it changes
 
 	observations *observationStore  // per-stable-query completion and retained values
-	activity     *collectorActivity // cumulative AWS calls and GetMetricData work
+	activity     *collectorActivity // commit-acknowledged interval AWS activity
 
 	tags          tagSnapshot              // resource-tag membership and label cache, refreshed with discovery
 	tagLabelPlans map[string][]resolvedTag // per-profile resolved tag->label plans (nil until compiled)
