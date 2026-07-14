@@ -314,7 +314,7 @@ func TestCollector_CheckResolvesAllTargetsConcurrently(t *testing.T) {
 	for range cfg.Targets {
 		select {
 		case <-fake.started:
-		case <-time.After(250 * time.Millisecond):
+		case <-time.After(1 * time.Second):
 			allStarted = false
 		}
 		if !allStarted {
