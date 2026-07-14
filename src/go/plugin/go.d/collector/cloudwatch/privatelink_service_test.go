@@ -75,6 +75,7 @@ func TestPrivateLinkServiceProfiles_PublicContract(t *testing.T) {
 	require.NoError(t, err)
 
 	type metricContract struct {
+		id         string
 		statistics []string
 		rate       bool
 	}
@@ -125,10 +126,10 @@ func TestPrivateLinkServiceProfiles_PublicContract(t *testing.T) {
 	}
 
 	wantTraffic := map[string]metricContract{
-		"ActiveConnections": {statistics: []string{"average"}},
-		"BytesProcessed":    {statistics: []string{"average", "sum"}, rate: true},
-		"NewConnections":    {statistics: []string{"average", "sum"}, rate: true},
-		"RstPacketsSent":    {statistics: []string{"average", "sum"}, rate: true},
+		"ActiveConnections": {id: "active_connections", statistics: []string{"average"}},
+		"BytesProcessed":    {id: "bytes_processed", statistics: []string{"average", "sum"}, rate: true},
+		"NewConnections":    {id: "new_connections", statistics: []string{"average", "sum"}, rate: true},
+		"RstPacketsSent":    {id: "rst_packets_sent", statistics: []string{"average", "sum"}, rate: true},
 	}
 
 	for profileName, tc := range tests {
@@ -147,14 +148,14 @@ func TestPrivateLinkServiceProfiles_PublicContract(t *testing.T) {
 
 			gotMetrics := make(map[string]metricContract, len(profile.Metrics))
 			for _, metric := range profile.Metrics {
-				gotMetrics[metric.MetricName] = metricContract{statistics: metric.Statistics, rate: metric.Rate}
+				gotMetrics[metric.MetricName] = metricContract{id: metric.ID, statistics: metric.Statistics, rate: metric.Rate}
 			}
 			wantMetrics := make(map[string]metricContract, len(wantTraffic)+1)
 			for name, contract := range wantTraffic {
 				wantMetrics[name] = contract
 			}
 			if tc.includeEndpoints {
-				wantMetrics["EndpointsCount"] = metricContract{statistics: []string{"average"}}
+				wantMetrics["EndpointsCount"] = metricContract{id: "endpoints_count", statistics: []string{"average"}}
 			}
 			assert.Equal(t, wantMetrics, gotMetrics)
 
@@ -229,8 +230,6 @@ func TestPrivateLinkServiceProfiles_ShareDiscoveryAndMatchExactGrains(t *testing
 		mkMetric("BytesProcessed", "Load Balancer Arn", "net/lb/hash", "Service Id", "vpce-svc-1"),
 		mkMetric("NewConnections", "Az", "us-east-1a", "Load Balancer Arn", "net/lb/hash", "Service Id", "vpce-svc-1"),
 		mkMetric("RstPacketsSent", "Service Id", "vpce-svc-1", "VPC Endpoint Id", "vpce-1"),
-		mkMetric("EndpointsCount", "Az", "us-east-1a", "Service Id", "vpce-svc-1"),
-		mkMetric("PacketsDropped", "Service Id", "vpce-svc-1"),
 	}
 
 	instances, err := scanDiscoveryGroupForTest(context.Background(), &fakeCloudWatch{

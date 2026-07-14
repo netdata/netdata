@@ -522,7 +522,8 @@ match-and-query-only dimension that is matched and queried but not emitted as a
 label, for a constant CloudWatch dimension such as CloudFront's `Region=Global`),
 `metrics` (with `statistics`, optional `rate`,
 optional per-metric nested `query` field overrides, and optional `nil_as_zero` —
-record 0 vs gap on a no-datapoint result, defaulting to `rate`), and a
+record 0 vs gap on a no-datapoint result; when unset, rate-normalized `sum` and
+`sample_count` series default to 0 while other statistics default to a gap), and a
 `charttpl.Group` `template`.
 
 Load and resolution (`catalog.go`):

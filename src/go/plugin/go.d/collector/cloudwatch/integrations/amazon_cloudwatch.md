@@ -441,7 +441,7 @@ jobs:
 
 ###### AWS PrivateLink endpoints with split timing
 
-Collect endpoint-level Average statistics every minute, collect six-hour processed-byte totals independently, and opt into the higher-cardinality endpoint-by-subnet view. Both endpoint grains support the same VPC endpoint resource-tag filters and labels; subnet charts inherit their parent endpoint's tags.
+Collect endpoint-level Average statistics every minute, collect six-hour processed-byte Sum windows normalized to bytes/s independently, and opt into the higher-cardinality endpoint-by-subnet view. Both endpoint grains support the same VPC endpoint resource-tag filters and labels; subnet charts inherit their parent endpoint's tags.
 
 <details open><summary>Config</summary>
 
@@ -507,7 +507,7 @@ jobs:
 
 ###### AWS PrivateLink services with split timing
 
-Collect provider-side traffic averages every minute, connected-endpoint count every five minutes, and six-hour processed-byte totals independently. Every grain joins tags through its parent VPC endpoint service, including the service-by-consumer-endpoint view.
+Collect provider-side traffic averages every minute, connected-endpoint count every five minutes, and six-hour processed-byte Sum windows normalized to bytes/s independently. Every grain joins tags through its parent VPC endpoint service, including the service-by-consumer-endpoint view.
 
 <details open><summary>Config</summary>
 
