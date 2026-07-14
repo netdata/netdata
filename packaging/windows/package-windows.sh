@@ -39,38 +39,28 @@ case "${build}" in
     *)  build_abs="$(cd "${build}" && pwd -P)" ;;
 esac
 
-# compile-on-windows.sh already staged all transitive UCRT64 runtime DLLs
-# for netdata.exe into the build tree.  Copy them before cmake --install so
-# they land in the staging area regardless of cmake's exit status.
+# compile-on-windows.sh stages all transitive UCRT64 runtime DLLs for
+# netdata.exe into the build root via stage-runtime-dlls.sh.  Copy them to
+# both destinations BEFORE cmake --install so they are present when cmake
+# installs the executables alongside them.
+#
+# netdata.exe and other sbin executables need DLLs in usr/bin.
+# C plugin executables (apps.plugin.exe, windows-events.plugin.exe, etc.)
+# need DLLs co-located in plugins.d: Windows loads DLLs from the executable's
+# own directory first, and the SYSTEM service account has no MSYS2/UCRT64
+# bin directory in its DLL search path.
+plugins_dll_destination="/opt/netdata/usr/libexec/netdata/plugins.d"
+mkdir -p "${plugins_dll_destination}"
+
 for dll in "${build_abs}"/lib*.dll "${build_abs}"/zlib1.dll; do
     [ -f "${dll}" ] || continue
     cp "${dll}" "${runtime_dll_destination}/"
+    cp "${dll}" "${plugins_dll_destination}/"
 done
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Installing"}
 /ucrt64/bin/cmake --install "${build}"
-${GITHUB_ACTIONS+echo "::endgroup::"}
-
-${GITHUB_ACTIONS+echo "::group::Staging plugin DLLs"}
-# Stage any additional DLLs needed by usr/bin executables (e.g. NetdataClaim.exe).
-for runtime_executable in /opt/netdata/usr/bin/*.exe; do
-    if [ -f "${runtime_executable}" ]; then
-        "${repo_root}/packaging/windows/stage-runtime-dlls.sh" "${runtime_executable}" "${runtime_dll_destination}"
-    fi
-done
-
-# Copy the fully-staged DLL set from usr/bin into plugins.d.
-# Using ldd.exe per-plugin is unreliable: Go binaries (no lib*.dll imports)
-# and shell-script plugins cause the stage script to exit 0 after the first
-# pass, leaving subsequent plugins unprocessed.  Since all C plugin executables
-# use the same UCRT64 toolchain as netdata.exe, the lib*.dll set already in
-# usr/bin covers every plugin's runtime dependency.
-plugins_dll_destination="/opt/netdata/usr/libexec/netdata/plugins.d"
-for dll in "${runtime_dll_destination}"/lib*.dll "${runtime_dll_destination}"/zlib1.dll; do
-    [ -f "${dll}" ] || continue
-    cp "${dll}" "${plugins_dll_destination}/"
-done
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 if [ ! -f "/msys2-latest.tar.zst" ]; then
