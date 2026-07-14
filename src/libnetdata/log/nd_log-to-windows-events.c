@@ -848,11 +848,6 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
     if (!nd_log.eventlog.initialized || !wel_queue.initialized)
         return false;
 
-    // Trace first call per source before enqueue — confirms the logging path is exercised.
-    static bool first_call[_NDLS_MAX];
-    if(source->source < _NDLS_MAX &&
-       !__atomic_exchange_n(&first_call[source->source], true, __ATOMIC_RELAXED))
-
     ND_LOG_FIELD_PRIORITY priority = NDLP_INFO;
     if (fields[NDF_PRIORITY].entry.set)
         priority = (ND_LOG_FIELD_PRIORITY) fields[NDF_PRIORITY].entry.u64;
