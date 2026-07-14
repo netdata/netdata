@@ -262,9 +262,6 @@ func validateMetricSelectors(path string, selectors []ProfileMetricSelectorConfi
 				seenMetrics[metric.Name] = struct{}{}
 			}
 			errs = append(errs, validateMetricStatistics(metricPath+".statistics", metric.Statistics))
-			if metric.Statistics == nil && selector.Statistics == nil {
-				errs = append(errs, fmt.Errorf("%s must define statistics or inherit them from %s.statistics", metricPath, groupPath))
-			}
 		}
 	}
 	return errors.Join(errs...)

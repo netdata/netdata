@@ -102,7 +102,10 @@ func (d InstanceDimension) IsConstant() bool { return d.Constant != nil }
 
 // Metric is one CloudWatch MetricName queried at one or more statistics.
 type Metric struct {
-	ID         string   `yaml:"id" json:"id,omitempty"`
+	ID string `yaml:"id" json:"id,omitempty"`
+	// Disabled excludes the metric from default selection. A collection rule can
+	// still include it explicitly by MetricName. Omitted decodes to false.
+	Disabled   bool     `yaml:"disabled,omitempty" json:"disabled,omitempty"`
 	MetricName string   `yaml:"metric_name" json:"metric_name,omitempty"`
 	Statistics []string `yaml:"statistics" json:"statistics,omitempty"`
 	// Rate, when true, presents each per-period total as a per-second value using

@@ -79,8 +79,13 @@ func (c *ProfileSelectorConfig) includesDefaults() bool {
 
 type ProfileMetricSelectorConfig struct {
 	Profile    string                  `yaml:"profile" json:"profile"`
+	Defaults   *bool                   `yaml:"defaults,omitempty" json:"defaults,omitempty"`
 	Statistics []string                `yaml:"statistics,omitempty" json:"statistics,omitempty"`
 	Include    []MetricSelectionConfig `yaml:"include" json:"include"`
+}
+
+func (c ProfileMetricSelectorConfig) includesDefaults() bool {
+	return c.Defaults == nil || *c.Defaults
 }
 
 type MetricSelectionConfig struct {

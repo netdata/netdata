@@ -119,6 +119,60 @@ func TestBuildQueryPlan(t *testing.T) {
 	}
 }
 
+func TestBuildQueryPlan_OptInMetricsRequireExplicitSelection(t *testing.T) {
+	falseValue := false
+	tests := map[string]struct {
+		metrics    []ProfileMetricSelectorConfig
+		wantCPU    bool
+		wantCredit bool
+	}{
+		"profile defaults exclude opt-in metrics": {wantCPU: true},
+		"metric group adds one opt-in metric": {
+			metrics:    []ProfileMetricSelectorConfig{{Profile: "ec2", Include: []MetricSelectionConfig{{Name: "CPUCreditBalance"}}}},
+			wantCPU:    true,
+			wantCredit: true,
+		},
+		"defaults false selects only the opt-in metric": {
+			metrics:    []ProfileMetricSelectorConfig{{Profile: "ec2", Defaults: &falseValue, Include: []MetricSelectionConfig{{Name: "CPUCreditBalance"}}}},
+			wantCredit: true,
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg := validBaseConfig()
+			cfg.Rules[0].Profiles = &ProfileSelectorConfig{Defaults: &falseValue, Include: []string{"ec2"}}
+			cfg.Rules[0].Metrics = tc.metrics
+			plan, _, err := compileTestConfig(t, cfg)
+			require.NoError(t, err)
+			require.Len(t, plan.Scopes, 1)
+
+			c := New()
+			c.plan = plan
+			c.resolvedByRef = map[string]resolvedTarget{
+				"base": {target: plan.Targets[0], accountID: "123456789012"},
+			}
+			c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
+				{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
+			}}
+
+			queries := requireBuildQueryPlan(t, c)
+			series := make(map[string]struct{}, len(queries))
+			for _, query := range queries {
+				series[query.seriesName] = struct{}{}
+			}
+			assert.Equal(t, tc.wantCPU, containsSeries(series, "ec2.cpu_utilization_average"))
+			assert.Equal(t, tc.wantCredit, containsSeries(series, "ec2.cpu_credit_balance_average"))
+			assert.NotContains(t, series, "ec2.disk_read_bytes_sum", "unmentioned opt-in metrics never produce queries")
+		})
+	}
+}
+
+func containsSeries(series map[string]struct{}, name string) bool {
+	_, ok := series[name]
+	return ok
+}
+
 func TestBuildQueryPlan_ConstantDimension(t *testing.T) {
 	// A constant (match-and-query-only) dimension is sent in the GetMetricData
 	// query but is not emitted as an identity label.

@@ -165,12 +165,12 @@ func TestEnsurePlan_BuildsValidChartTemplate(t *testing.T) {
 	}
 }
 
-func TestProfileSeries_ContainsEveryExportedStatistic(t *testing.T) {
+func TestProfileSeries_ContainsEveryDeclaredStatisticIncludingDisabled(t *testing.T) {
 	prof := cwprofiles.Profile{
 		Query: cwquery.Config{Period: longDuration(5 * time.Minute)},
 		Metrics: []cwprofiles.Metric{
 			{ID: "req", Statistics: []string{"sum", "average"}, Rate: true},
-			{ID: "evt", Statistics: []string{"sample_count"}, Rate: true},
+			{ID: "evt", Statistics: []string{"sample_count"}, Disabled: true, Rate: true},
 		},
 	}
 

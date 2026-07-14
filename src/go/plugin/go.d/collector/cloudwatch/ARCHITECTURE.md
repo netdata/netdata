@@ -165,11 +165,12 @@ compiler state, and installed execution plan:
   decides whether the resulting configuration is valid during `Init` / `Check`.
 - Named credential sources describe only credential acquisition. Named targets
   describe monitored identities and optional role assumption. Ordered rules bind
-  targets to profile selectors, optional exact metric/statistic allowlists,
-  regions, and effective resource-tag predicates. Omitting `metrics` selects every
-  exported series from the selected profiles. When present, `metrics` contains one
-  group per narrowed profile: group statistics are inherited by included exact
-  MetricNames unless an entry supplies a replacement statistics list.
+  targets to profile selectors, optional per-profile metric overrides, regions,
+  and effective resource-tag predicates. Omitting `metrics` selects each profile's
+  default-enabled series. Profiles without a metric group keep those defaults. A
+  group includes defaults unless `defaults: false`, then adds its exact included
+  MetricNames; statistics resolve from the metric entry, group, or profile in that
+  order.
 - `rule_defaults.filters.resource_tags` is inherited when a rule omits
   `filters.resource_tags`; a present list replaces the default and `[]` disables it.
   Predicates are canonicalized once: exact case-sensitive keys are ANDed and the
@@ -501,7 +502,7 @@ These details bound cost and memory, but do not change the query state machine:
 ```text
 for each selected profile:
   group := profile.Template.Clone()          # typed deep copy; never mutate the catalog
-  group.Metrics = sorted(visible series)     # collector-owned visible-series list
+  group.Metrics = sorted(declared series)    # includes default and opt-in metrics
 assemble charttpl.Spec{Version, ContextNamespace: "cloudwatch", Groups}
 return spec.MarshalTemplate()                # Validate + yaml.v2 marshal, then cached
 ```
@@ -511,6 +512,8 @@ return spec.MarshalTemplate()                # Validate + yaml.v2 marshal, then 
 - Rate divisors are not part of the chart template because rules can override
   nested profile query defaults. Rate normalization happens on the emitted
   numeric value using the effective period.
+- Opt-in metric charts stay in the template. They do not materialize until a
+  rule selects the metric and the collector emits its first sample.
 
 ## Profiles (`cwprofiles/`)
 
@@ -528,7 +531,7 @@ dimensions (the CloudWatch dimension names that identify one instance; each is
 either mapped to a Netdata `label`, or pinned to a `constant` value — a
 match-and-query-only dimension that is matched and queried but not emitted as a
 label, for a constant CloudWatch dimension such as CloudFront's `Region=Global`),
-`metrics` (with `statistics`, optional `rate`,
+`metrics` (with `statistics`, optional metric-level `disabled`, optional `rate`,
 optional per-metric nested `query` field overrides, and optional `nil_as_zero` —
 record 0 vs gap on a no-datapoint result; when unset, rate-normalized `sum` and
 `sample_count` series default to 0 while other statistics default to a gap), and a
@@ -551,6 +554,15 @@ Load and resolution (`catalog.go`):
   with `supported_regions`: an incompatible defaults-selected profile is skipped
   with a startup diagnostic, while an explicitly included incompatible profile
   fails configuration.
+- **Metric selection is rule-driven too.** Metrics without `disabled: true` are
+  the per-profile defaults. A disabled metric remains a fully declared series
+  with active chart definitions but contributes no selected-series horizon,
+  query, or billing work until named in that profile's `rules[].metrics` group.
+  Namespace discovery remains one metric-name-agnostic dimension-shape scan, so
+  the declaration adds no `ListMetrics` call or discovery group. Omitting a metric
+  group leaves a selected profile on its defaults; an omitted/true group `defaults`
+  value adds exact included MetricNames, while `defaults: false` creates an
+  exact-only selection for that profile.
 
 Profile validation invariants (`profile.go`) — these are load-bearing:
 

@@ -512,12 +512,12 @@ func TestCollect_TwoRulesApplyIndependentQueryPolicies(t *testing.T) {
 	cfg.Rules = []RuleConfig{
 		{
 			Name: "lambda-fast", Targets: []string{"base"}, Profiles: selector, Regions: []string{"us-east-1"},
-			Metrics: []ProfileMetricSelectorConfig{{Profile: "lambda", Statistics: []string{"Sum"}, Include: []MetricSelectionConfig{{Name: "Invocations"}}}},
+			Metrics: []ProfileMetricSelectorConfig{{Profile: "lambda", Defaults: &defaults, Statistics: []string{"Sum"}, Include: []MetricSelectionConfig{{Name: "Invocations"}}}},
 			Query:   &cwquery.Config{Period: longDuration(time.Minute), Lookback: longDuration(5 * time.Minute), PublicationDelay: longDuration(0)},
 		},
 		{
 			Name: "lambda-sparse", Targets: []string{"base"}, Profiles: selector, Regions: []string{"us-east-1"},
-			Metrics: []ProfileMetricSelectorConfig{{Profile: "lambda", Statistics: []string{"Sum"}, Include: []MetricSelectionConfig{{Name: "Errors"}}}},
+			Metrics: []ProfileMetricSelectorConfig{{Profile: "lambda", Defaults: &defaults, Statistics: []string{"Sum"}, Include: []MetricSelectionConfig{{Name: "Errors"}}}},
 			Query:   &cwquery.Config{Period: longDuration(5 * time.Minute), Lookback: longDuration(15 * time.Minute), PublicationDelay: longDuration(0)},
 		},
 	}
@@ -647,8 +647,9 @@ func seriesName(key string) string {
 
 // TestAllStockProfiles_PipelineChartComplete is the full-catalog sweep: for EVERY
 // stock profile (including profiles disabled by default), it feeds a
-// synthetic instance with a datapoint for every (metric, statistic), runs the real
-// collect, and asserts (a) every profile's every active series is produced and
+// synthetic instance with a datapoint for every (metric, statistic), explicitly
+// selects all default and opt-in metrics, runs the real collect, and asserts
+// (a) every profile's every declared series is produced and
 // (b) every produced series flows into a chart (AssertChartCoverage). Profiles that
 // share a namespace (alb/alb_target, s3/s3_requests, dynamodb/dynamodb_operation)
 // get profile-unique dimension values so they never collide.
@@ -660,14 +661,11 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 	require.NoError(t, err)
 	profiles := cat.AllProfiles()
 	require.NotEmpty(t, profiles)
-	profileNames := make([]string, 0, len(profiles))
-
 	list := map[string][]cwtypes.Metric{}
 	values := map[string]float64{}
 	wantNames := map[string]struct{}{}
 
 	for _, rp := range profiles {
-		profileNames = append(profileNames, rp.Name)
 		prof := rp.Config
 		require.NotEmptyf(t, prof.Metrics, "%s has no metrics", rp.Name)
 		require.NotEmptyf(t, prof.Instance.Dimensions, "%s has no instance dimensions", rp.Name)
@@ -698,7 +696,35 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 	}
 
 	c := New()
-	configureExactRule(c, []string{region}, profileNames)
+	c.Config = validConfig()
+	c.Config.Rules = nil
+	defaults := false
+	rule := RuleConfig{Targets: []string{"base"}, Regions: []string{region}, Profiles: &ProfileSelectorConfig{Defaults: &defaults}}
+	selectedSeries := 0
+	flushRule := func() {
+		rule.Name = fmt.Sprintf("all-stock-%d", len(c.Config.Rules)+1)
+		c.Config.Rules = append(c.Config.Rules, rule)
+		rule = RuleConfig{Targets: []string{"base"}, Regions: []string{region}, Profiles: &ProfileSelectorConfig{Defaults: &defaults}}
+		selectedSeries = 0
+	}
+	for _, rp := range profiles {
+		profileSeries := 0
+		for _, metric := range rp.Config.Metrics {
+			profileSeries += len(metric.Statistics)
+		}
+		if selectedSeries > 0 && selectedSeries+profileSeries > maxReferencesPerRule {
+			flushRule()
+		}
+		rule.Profiles.Include = append(rule.Profiles.Include, rp.Name)
+		group := ProfileMetricSelectorConfig{Profile: rp.Name, Defaults: &defaults}
+		for _, metric := range rp.Config.Metrics {
+			group.Include = append(group.Include, MetricSelectionConfig{Name: metric.MetricName})
+		}
+		rule.Metrics = append(rule.Metrics, group)
+		selectedSeries += profileSeries
+	}
+	flushRule()
+	c.applyDefaults()
 	c.newSTSClient = func(aws.Config) stsClient { return &fakeSTS{account: account} }
 	useFakeClient(c, &e2eCloudWatch{list: list, values: values})
 	c.now = func() time.Time { return time.Unix(1_700_000_000, 0) }
@@ -710,7 +736,7 @@ func TestAllStockProfiles_PipelineChartComplete(t *testing.T) {
 	for k := range workloadSeries(series) {
 		gotNames[seriesName(k)] = struct{}{}
 	}
-	assert.Equal(t, wantNames, gotNames, "every stock profile's every active (metric, statistic) must produce a series")
+	assert.Equal(t, wantNames, gotNames, "every stock profile's every declared (metric, statistic) must produce a series")
 	collecttest.AssertChartCoverage(t, c, collecttest.ChartCoverageExpectation{})
 	collecttest.AssertChartTemplateSchema(t, c.ChartTemplateYAML())
 }

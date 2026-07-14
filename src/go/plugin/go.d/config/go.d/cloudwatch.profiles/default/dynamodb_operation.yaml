@@ -28,14 +28,15 @@ metrics:
     statistics: [sum]
     rate: true
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. All are published at the
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the
   # {TableName, Operation} grain, so no other change is needed.
   # ----------------------------------------------------------------------------------------
-  # - id: fault_injection_errors
-  #   metric_name: FaultInjectionServiceInducedErrors
-  #   statistics: [sum]
-  #   rate: true
+  - id: fault_injection_errors
+    disabled: true
+    metric_name: FaultInjectionServiceInducedErrors
+    statistics: [sum]
+    rate: true
   # See: https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/metrics-dimensions.html
 template:
   family: DynamoDB Operations
@@ -81,14 +82,14 @@ template:
         - selector: returned_item_count_sum
           name: returned
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_ddb_op_fault_injection
-    #   context: fault_injection_errors
-    #   title: DynamoDB Fault Injection Errors
-    #   family: Errors
-    #   units: errors/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: fault_injection_errors_sum
-    #       name: injected
+    - id: aws_cloudwatch_ddb_op_fault_injection
+      context: fault_injection_errors
+      title: DynamoDB Fault Injection Errors
+      family: Errors
+      units: errors/s
+      algorithm: absolute
+      dimensions:
+        - selector: fault_injection_errors_sum
+          name: injected

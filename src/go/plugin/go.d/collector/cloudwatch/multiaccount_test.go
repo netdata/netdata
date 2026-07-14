@@ -106,10 +106,7 @@ func TestBuildQueryPlan_FirstTargetOwnsSameAccountSeries(t *testing.T) {
 	}}
 	plan := requireBuildQueryPlan(t, c)
 	require.NotEmpty(t, plan)
-	perInstance := 0
-	for _, metric := range c.plan.Scopes[0].Profile.Config.Metrics {
-		perInstance += len(metric.Statistics)
-	}
+	perInstance := len(c.plan.Scopes[0].SelectedSeries)
 	assert.Len(t, plan, perInstance)
 	for _, query := range plan {
 		assert.Equal(t, "first", query.target)
@@ -128,10 +125,7 @@ func TestBuildQueryPlan_SameAccountDisjointResourcesSurvive(t *testing.T) {
 		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-2"}}},
 	}}
 	plan := requireBuildQueryPlan(t, c)
-	perInstance := 0
-	for _, metric := range c.plan.Scopes[0].Profile.Config.Metrics {
-		perInstance += len(metric.Statistics)
-	}
+	perInstance := len(c.plan.Scopes[0].SelectedSeries)
 	assert.Len(t, plan, perInstance*2)
 }
 

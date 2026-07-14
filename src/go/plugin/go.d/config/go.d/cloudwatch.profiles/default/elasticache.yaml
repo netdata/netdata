@@ -54,23 +54,27 @@ metrics:
     statistics: [sum]
     rate: true
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. All are published at the
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the
   # {CacheClusterId, CacheNodeId} grain (Redis/Valkey engines).
   # ----------------------------------------------------------------------------------------
-  # - id: swap_usage
-  #   metric_name: SwapUsage
-  #   statistics: [average]
-  # - id: replication_lag
-  #   metric_name: ReplicationLag
-  #   statistics: [average]
-  # - id: curr_items
-  #   metric_name: CurrItems
-  #   statistics: [average]
-  # - id: replication_bytes
-  #   metric_name: ReplicationBytes
-  #   statistics: [sum]
-  #   rate: true
+  - id: swap_usage
+    disabled: true
+    metric_name: SwapUsage
+    statistics: [average]
+  - id: replication_lag
+    disabled: true
+    metric_name: ReplicationLag
+    statistics: [average]
+  - id: curr_items
+    disabled: true
+    metric_name: CurrItems
+    statistics: [average]
+  - id: replication_bytes
+    disabled: true
+    metric_name: ReplicationBytes
+    statistics: [sum]
+    rate: true
   # Memcached clusters expose a different engine set (CmdGet/CmdSet, GetHits/GetMisses, ...); the
   # command-family counters (GetTypeCmds/SetTypeCmds/...), T-class CPUCredit* metrics, and data-tiering
   # (Tier dimension) are also available. Serverless caches use the `clusterId` dimension and a reduced
@@ -164,41 +168,41 @@ template:
         - selector: network_bytes_out_sum
           name: out
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_ec_replication
-    #   context: replication
-    #   title: ElastiCache Replication
-    #   family: Replication
-    #   units: bytes/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: replication_bytes_sum
-    #       name: bytes
-    # - id: aws_cloudwatch_ec_swap
-    #   context: swap_usage
-    #   title: ElastiCache Swap Usage
-    #   family: Memory
-    #   units: bytes
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: swap_usage_average
-    #       name: swap
-    # - id: aws_cloudwatch_ec_replication_lag
-    #   context: replication_lag
-    #   title: ElastiCache Replication Lag
-    #   family: Replication
-    #   units: seconds
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: replication_lag_average
-    #       name: lag
-    # - id: aws_cloudwatch_ec_items
-    #   context: items
-    #   title: ElastiCache Current Items
-    #   family: Keyspace
-    #   units: items
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: curr_items_average
-    #       name: items
+    - id: aws_cloudwatch_ec_replication
+      context: replication
+      title: ElastiCache Replication
+      family: Replication
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: replication_bytes_sum
+          name: bytes
+    - id: aws_cloudwatch_ec_swap
+      context: swap_usage
+      title: ElastiCache Swap Usage
+      family: Memory
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: swap_usage_average
+          name: swap
+    - id: aws_cloudwatch_ec_replication_lag
+      context: replication_lag
+      title: ElastiCache Replication Lag
+      family: Replication
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: replication_lag_average
+          name: lag
+    - id: aws_cloudwatch_ec_items
+      context: items
+      title: ElastiCache Current Items
+      family: Keyspace
+      units: items
+      algorithm: absolute
+      dimensions:
+        - selector: curr_items_average
+          name: items

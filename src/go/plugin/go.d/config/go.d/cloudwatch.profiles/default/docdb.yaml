@@ -47,24 +47,28 @@ metrics:
     statistics: [sum]
     rate: true
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. All are published at the {DBInstanceIdentifier}
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {DBInstanceIdentifier}
   # grain.
   # ----------------------------------------------------------------------------------------
-  # - id: swap_usage
-  #   metric_name: SwapUsage
-  #   statistics: [average]
-  # - id: disk_queue_depth
-  #   metric_name: DiskQueueDepth
-  #   statistics: [average]
-  # - id: documents_inserted
-  #   metric_name: DocumentsInserted
-  #   statistics: [sum]
-  #   rate: true
-  # - id: documents_deleted
-  #   metric_name: DocumentsDeleted
-  #   statistics: [sum]
-  #   rate: true
+  - id: swap_usage
+    disabled: true
+    metric_name: SwapUsage
+    statistics: [average]
+  - id: disk_queue_depth
+    disabled: true
+    metric_name: DiskQueueDepth
+    statistics: [average]
+  - id: documents_inserted
+    disabled: true
+    metric_name: DocumentsInserted
+    statistics: [sum]
+    rate: true
+  - id: documents_deleted
+    disabled: true
+    metric_name: DocumentsDeleted
+    statistics: [sum]
+    rate: true
   # Opcounters (OpcountersInsert/Query/Update/Delete), transactions, and network-throughput metrics are
   # also per-instance. Cluster-shared volume metrics use {DBClusterIdentifier} (VolumeBytesUsed,
   # VolumeReadIOPs, ...) -- a separate profile. See:
@@ -164,34 +168,34 @@ template:
         - selector: database_cursors_timed_out_sum
           name: timed_out
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_docdb_documents
-    #   context: documents
-    #   title: DocumentDB Document Operations
-    #   family: Operations
-    #   units: documents/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: documents_inserted_sum
-    #       name: inserted
-    #     - selector: documents_deleted_sum
-    #       name: deleted
-    # - id: aws_cloudwatch_docdb_swap
-    #   context: swap_usage
-    #   title: DocumentDB Swap Usage
-    #   family: Memory
-    #   units: bytes
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: swap_usage_average
-    #       name: swap
-    # - id: aws_cloudwatch_docdb_disk_queue
-    #   context: disk_queue_depth
-    #   title: DocumentDB Disk Queue Depth
-    #   family: Disk
-    #   units: operations
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: disk_queue_depth_average
-    #       name: queued
+    - id: aws_cloudwatch_docdb_documents
+      context: documents
+      title: DocumentDB Document Operations
+      family: Operations
+      units: documents/s
+      algorithm: absolute
+      dimensions:
+        - selector: documents_inserted_sum
+          name: inserted
+        - selector: documents_deleted_sum
+          name: deleted
+    - id: aws_cloudwatch_docdb_swap
+      context: swap_usage
+      title: DocumentDB Swap Usage
+      family: Memory
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: swap_usage_average
+          name: swap
+    - id: aws_cloudwatch_docdb_disk_queue
+      context: disk_queue_depth
+      title: DocumentDB Disk Queue Depth
+      family: Disk
+      units: operations
+      algorithm: absolute
+      dimensions:
+        - selector: disk_queue_depth_average
+          name: queued

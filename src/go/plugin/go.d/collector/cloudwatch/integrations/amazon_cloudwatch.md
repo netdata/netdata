@@ -92,7 +92,7 @@ Every target requires `cloudwatch:GetMetricData`. It also requires `cloudwatch:L
 
 #### Auto-Detection
 
-A rule that omits `profiles` selects all default-enabled profiles for its targets and regions. A rule that omits `metrics` collects every metric exported by those profiles. When present, `metrics` groups exact AWS MetricNames by profile; group statistics are inherited by included metrics unless a metric supplies a replacement list. The collector emits charts only for profiles with live metrics. Discovery and the query blueprint are cached; discovery refreshes every `discovery.refresh_every` seconds (default 300).
+A rule that omits `profiles` selects all default-enabled profiles for its targets and regions. A rule that omits `metrics` collects the default-enabled metrics from those profiles. A metric group changes only its named profile; other selected profiles retain their defaults. The group keeps profile defaults unless `defaults: false`, then adds exact AWS MetricNames. Statistics resolve from the metric entry, group, or profile declaration in that order. The collector emits charts only for profiles with live metrics. Discovery and the query blueprint are cached; discovery refreshes every `discovery.refresh_every` seconds (default 300).
 
 
 #### Limits
@@ -223,18 +223,19 @@ A user profile file with the same basename as a stock profile overrides it.
 |  | targets[].credentials | Name of the credential source used by this target. |  | yes |
 |  | targets[].assume_role.role_arn | Optional IAM role ARN to assume using the target's credential source. |  | no |
 |  | targets[].assume_role.external_id | Optional value supplied by the role owner when the role trust policy requires an external ID. It is not an AWS password or access key. |  | no |
-| **Rules** | rules | Ordered collection rules. Each rule selects targets, profiles, optional exact metrics, regions, and optional resource-tag filters. The earliest matching rule and target own each overlapping exported metric/statistic series. |  | yes |
+| **Rules** | rules | Ordered collection rules. Each rule selects targets, profiles, optional per-profile metric overrides, regions, and optional resource-tag filters. The earliest matching rule and target own each overlapping exported metric/statistic series. |  | yes |
 |  | rules[].name | Unique rule name used in diagnostics. |  | yes |
 |  | rules[].targets | Ordered names of monitored targets selected by this rule. Order breaks overlap ties within the rule. |  | yes |
 |  | rules[].profiles.defaults | Include all default-enabled profiles. Defaults to `true` when `profiles` or `defaults` is omitted. | yes | no |
 |  | rules[].profiles.include | Profile basenames to add explicitly. Set `defaults` to `false` to collect only this list, including profiles disabled by default. PrivateLink detail choices are `privatelink_endpoint_subnet`, `privatelink_service_az`, `privatelink_service_load_balancer`, `privatelink_service_az_load_balancer`, and `privatelink_service_vpc_endpoint`. Billing choices are `billing_total`, `billing_service`, `billing_linked_account`, and `billing_linked_account_service`. |  | no |
 |  | rules[].profiles.exclude | Profile basenames to remove from the selected set. A profile cannot be both included and excluded. |  | no |
-|  | rules[].metrics | Optional per-profile exact metric/statistic allowlists that narrow the profiles selected by this rule. Omit `metrics` to collect every metric exported by those profiles. The expanded rule supports at most 256 metric/statistic selections. |  | no |
-|  | rules[].metrics[].profile | Profile basename. It must already be selected by `rules[].profiles` and may appear in only one metrics group per rule. |  | yes |
-|  | rules[].metrics[].statistics | Optional non-empty default AWS statistics inherited by included metrics that omit their own list. Named statistics are case-insensitive. |  | no |
-|  | rules[].metrics[].include | Non-empty list of exact, case-sensitive AWS CloudWatch MetricNames exported by this profile. Duplicate names are rejected. |  | yes |
+|  | rules[].metrics | Optional per-profile metric overrides. Omit `metrics` to collect default-enabled metrics. Profiles without a group keep their defaults; a group can add opt-in metrics or switch to an exact-only set. Explicit selections expand to at most 256 metric/statistic pairs per rule. |  | no |
+|  | rules[].metrics[].profile | Profile basename. It must already be selected by `rules[].profiles` and may appear in only one metrics group per rule. Other selected profiles keep their default-enabled metrics. |  | yes |
+|  | rules[].metrics[].defaults | Include this profile's default-enabled metrics before adding the exact MetricNames below. Set `false` for an exact-only selection. | yes | no |
+|  | rules[].metrics[].statistics | Optional non-empty AWS statistics inherited by included metrics that omit their own list. When both lists are omitted, the profile-declared statistics are used. Named statistics are case-insensitive. |  | no |
+|  | rules[].metrics[].include | Non-empty list of exact, case-sensitive AWS CloudWatch MetricNames added by this group. Duplicate names are rejected. |  | yes |
 |  | rules[].metrics[].include[].name | Exact, case-sensitive AWS CloudWatch MetricName exported by the profile. |  | yes |
-|  | rules[].metrics[].include[].statistics | Optional non-empty replacement for the group statistics. Use `Average`, `Minimum`, `Maximum`, `Sum`, `SampleCount`, or `p<N>`; named statistics are case-insensitive. A metric with no replacement must inherit a group default. |  | no |
+|  | rules[].metrics[].include[].statistics | Optional non-empty replacement for the group statistics. When both are omitted, inherit every statistic declared for the metric by the profile. Use `Average`, `Minimum`, `Maximum`, `Sum`, `SampleCount`, or `p<N>`; named statistics are case-insensitive. |  | no |
 |  | rules[].regions | Canonical lowercase AWS region codes selected by this rule. The compiler intersects them with intrinsic profile restrictions; CloudFront and the Billing profiles support only `us-east-1`. |  | yes |
 | **Query Policy** | rule_defaults.query | Shared query timing inherited field-by-field by collection rules. Omitted fields continue to profile or built-in fallbacks. |  | no |
 |  | rule_defaults.query.period | Default CloudWatch aggregation period from `1m` through `1d`, as an exact multiple of `1m`. An omitted rule period inherits this value before nested metric and profile query defaults. |  | no |
@@ -357,6 +358,36 @@ jobs:
 ```
 </details>
 
+###### Add an opt-in metric to a profile
+
+Keep the default EC2 metrics and add CPU credit balance for burstable instances. Because the metric group omits `defaults`, it defaults to true; omitting statistics inherits the profile-declared Average statistic.
+
+<details open><summary>Config</summary>
+
+```yaml
+jobs:
+  - name: ec2_with_cpu_credits
+    credentials:
+      - name: sdk_default
+        type: default
+    targets:
+      - name: base
+        credentials: sdk_default
+    rules:
+      - name: ec2
+        targets: [base]
+        profiles:
+          defaults: false
+          include: [ec2]
+        metrics:
+          - profile: ec2
+            include:
+              - name: CPUCreditBalance
+        regions: [us-east-1]
+
+```
+</details>
+
 ###### Different timing for metrics in one profile
 
 Use disjoint exact metric selections when one service needs different query timing. Earlier rules own only the metric/statistic series they select, so these two Lambda rules do not shadow each other.
@@ -380,6 +411,7 @@ jobs:
           include: [lambda]
         metrics:
           - profile: lambda
+            defaults: false
             statistics: [Sum]
             include:
               - name: Invocations
@@ -395,6 +427,7 @@ jobs:
           include: [lambda]
         metrics:
           - profile: lambda
+            defaults: false
             statistics: [Average, p90]
             include:
               - name: Duration
@@ -469,6 +502,7 @@ jobs:
           include: [privatelink_endpoint]
         metrics:
           - profile: privatelink_endpoint
+            defaults: false
             statistics: [Average]
             include:
               - name: ActiveConnections
@@ -486,6 +520,7 @@ jobs:
           include: [privatelink_endpoint]
         metrics:
           - profile: privatelink_endpoint
+            defaults: false
             include:
               - name: BytesProcessed
                 statistics: [Sum]
@@ -535,6 +570,7 @@ jobs:
           include: [privatelink_service]
         metrics:
           - profile: privatelink_service
+            defaults: false
             statistics: [Average]
             include:
               - name: ActiveConnections
@@ -553,6 +589,7 @@ jobs:
           include: [privatelink_service]
         metrics:
           - profile: privatelink_service
+            defaults: false
             include:
               - name: EndpointsCount
                 statistics: [Average]
@@ -568,6 +605,7 @@ jobs:
           include: [privatelink_service]
         metrics:
           - profile: privatelink_service
+            defaults: false
             include:
               - name: BytesProcessed
                 statistics: [Sum]
@@ -770,7 +808,7 @@ The built-in profiles ship the following charts by default. Each service links t
 | [AWS Site-to-Site VPN](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/vpn.yaml) | `cloudwatch.vpn.*` | tunnel traffic (in/out) and tunnel state (fraction of tunnels up) |
 | [Amazon EKS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/eks.yaml) | `cloudwatch.eks.*` | control-plane health: API server request rate, errors, p99 latency, and in-flight requests; etcd database size; scheduler pending pods and scheduling attempts |
 
-Each profile also carries **optional metrics** that are commented out to keep cost and cardinality low; uncomment a metric and its matching chart, then **restart the Netdata Agent** (profiles are loaded once per go.d process and cached). Stock profiles are shipped at `/usr/lib/netdata/conf.d/go.d/cloudwatch.profiles/default/`. To customize a service, copy its profile into `/etc/netdata/go.d/cloudwatch.profiles/` (keep the same filename) and edit it -- a user profile fully replaces the stock one of the same name -- then restart the Agent.
+Stock profiles can also declare **opt-in metrics** with `disabled: true`. They are not queried or billed by default. Add one through that profile's `rules[].metrics[].include`; the metric's chart definition is already present and materializes after the selected series emits data. A metric group keeps the profile's default-enabled metrics unless `defaults: false`, and omitted statistics inherit the profile declaration. This avoids copying and editing a stock profile merely to enable a curated metric. Stock profiles are shipped at `/usr/lib/netdata/conf.d/go.d/cloudwatch.profiles/default/`; custom profile overrides still live under `/etc/netdata/go.d/cloudwatch.profiles/` and require a go.d restart because the catalog is cached process-wide.
 
 These disabled opt-in profiles are collected when a rule names them in `profiles.include`:
 
@@ -943,7 +981,7 @@ Check the following:
 ### Missing metrics for some services
 
 - **Profile selection** -- omit `rules[].profiles` to select defaults, or ensure the service basename appears under `rules[].profiles.include` and is not excluded.
-- **Metric selection** -- omit `rules[].metrics` to collect every metric exported by selected profiles. When configured, verify each profile group names a selected profile, every `include[].name` is an exact AWS MetricName, and every metric has effective statistics from either its replacement list or the group default.
+- **Metric selection** -- omit `rules[].metrics` to collect default-enabled metrics. A group changes only its named profile and keeps those defaults unless `defaults: false`; every `include[].name` must be an exact AWS MetricName. Statistics may come from the metric entry, group, or profile declaration.
 - **Daily metrics** -- AWS documents that S3 storage metrics are reported once per day, but does not state a publication-within-one-day guarantee. The stock profile therefore uses a conservative `1d` collector delay policy, and `recently_active_only` is automatically disabled for its long query horizon.
 - **Resource activity** -- some metrics only appear when the resource is actively processing data (for example, EventBridge and Bedrock publish a metric only when its value is non-zero).
 - **Auto Scaling group metrics** -- Auto Scaling group metrics (`cloudwatch.auto_scaling.*`) are not published until group-metrics collection is enabled on the group (`aws autoscaling enable-metrics-collection --granularity 1Minute`). Amazon EKS managed node groups have it enabled by default.

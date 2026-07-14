@@ -225,9 +225,8 @@ func TestConfig_validateMetricSelector(t *testing.T) {
 			selectors: []ProfileMetricSelectorConfig{{Profile: "ec2", Statistics: []string{"Average"}, Include: []MetricSelectionConfig{{Name: " CPUUtilization"}}}},
 			wantErr:   "must not contain surrounding whitespace",
 		},
-		"missing effective statistics": {
+		"profile statistics inherited": {
 			selectors: []ProfileMetricSelectorConfig{{Profile: "ec2", Include: []MetricSelectionConfig{{Name: "CPUUtilization"}}}},
-			wantErr:   "must define statistics or inherit them",
 		},
 		"internal statistic spelling": {
 			selectors: []ProfileMetricSelectorConfig{{Profile: "ec2", Statistics: []string{"sample_count"}, Include: []MetricSelectionConfig{{Name: "CPUUtilization"}}}},
@@ -281,6 +280,8 @@ func TestConfigSchema_RuntimeContract(t *testing.T) {
 	discoveryGroupLimit := schemaObjectAt(t, fullDoc, "jsonSchema", "properties", "limits", "properties", "max_discovery_groups")
 	assert.Equal(t, float64(defaultMaxDiscoveryGroups), discoveryGroupLimit["default"])
 	assert.Equal(t, float64(maxDiscoveryGroupsPerJob), discoveryGroupLimit["maximum"])
+	metricDefaults := schemaObjectAt(t, fullDoc, "jsonSchema", "properties", "rules", "items", "properties", "metrics", "items", "properties", "defaults")
+	assert.Equal(t, true, metricDefaults["default"])
 	for key, want := range map[string]string{
 		"credentials": `[{"name":"sdk_default","type":"default"}]`,
 		"targets":     `[{"name":"base","credentials":"sdk_default"}]`,
@@ -368,6 +369,7 @@ func TestConfigSchema_DynCfgUX(t *testing.T) {
 	}
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics")["ui:listFlavour"])
 	assert.Equal(t, "ec2", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "profile")["ui:placeholder"])
+	assert.NotEmpty(t, schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "defaults")["ui:help"])
 	assert.Equal(t, "Average", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "statistics", "items")["ui:placeholder"])
 	assert.Equal(t, "list", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "include")["ui:listFlavour"])
 	assert.Equal(t, "CPUUtilization", schemaObjectAt(t, doc, "uiSchema", "rules", "items", "metrics", "items", "include", "items", "name")["ui:placeholder"])
@@ -542,6 +544,19 @@ func metadataExampleConfig(t *testing.T, exampleName string) Config {
 	}
 	require.FailNowf(t, "metadata example not found", "name=%q", exampleName)
 	return Config{}
+}
+
+func TestMetadata_OptInMetricOperatorContract(t *testing.T) {
+	cfg := metadataExampleConfig(t, "Add an opt-in metric to a profile")
+	plan, diagnostics, err := compileTestConfig(t, cfg)
+	require.NoError(t, err)
+	require.Empty(t, diagnostics)
+	require.Len(t, plan.Scopes, 1)
+
+	series := compiledSeriesNames(plan.Scopes[0].SelectedSeries)
+	assert.Contains(t, series, "ec2.cpu_utilization_average", "profile defaults remain selected")
+	assert.Contains(t, series, "ec2.cpu_credit_balance_average", "the opt-in metric inherits its profile statistic")
+	assert.NotContains(t, series, "ec2.disk_read_bytes_sum", "unmentioned opt-in metrics remain disabled")
 }
 
 func TestMetadata_PrivateLinkEndpointOperatorContract(t *testing.T) {
@@ -1054,10 +1069,11 @@ func TestConfig_ResourceTagLabelsDecode(t *testing.T) {
 
 func TestConfig_MetricSelectorDecode(t *testing.T) {
 	var cfg Config
-	require.NoError(t, yaml.Unmarshal([]byte("rules:\n  - metrics:\n      - profile: ec2\n        statistics: [Sum]\n        include:\n          - name: NetworkIn\n          - name: CPUUtilization\n            statistics: [Average]\n"), &cfg))
+	require.NoError(t, yaml.Unmarshal([]byte("rules:\n  - metrics:\n      - profile: ec2\n        defaults: false\n        statistics: [Sum]\n        include:\n          - name: NetworkIn\n          - name: CPUUtilization\n            statistics: [Average]\n"), &cfg))
 	require.Len(t, cfg.Rules, 1)
+	falseValue := false
 	assert.Equal(t, []ProfileMetricSelectorConfig{{
-		Profile: "ec2", Statistics: []string{"Sum"},
+		Profile: "ec2", Defaults: &falseValue, Statistics: []string{"Sum"},
 		Include: []MetricSelectionConfig{{Name: "NetworkIn"}, {Name: "CPUUtilization", Statistics: []string{"Average"}}},
 	}}, cfg.Rules[0].Metrics)
 }
