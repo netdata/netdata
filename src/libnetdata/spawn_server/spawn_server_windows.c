@@ -161,19 +161,6 @@ static void spawn_server_release_stderr_fd(SPAWN_SERVER *server, SPAWN_INSTANCE 
     si->stderr_fd = -1;
 }
 
-//static void print_environment_block(char *env_block) {
-//    if (env_block == NULL) {
-//        fprintf(stderr, "Environment block is NULL\n");
-//        return;
-//    }
-//
-//    char *env = env_block;
-//    while (*env) {
-//        fprintf(stderr, "ENVIRONMENT: %s\n", env);
-//        // Move to the next string in the block
-//        env += strlen(env) + 1;
-//    }
-//}
 
 SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_unused, int custom_fd __maybe_unused, const char **argv, const void *data __maybe_unused, size_t data_size __maybe_unused, SPAWN_INSTANCE_TYPE type) {
     static SPINLOCK spinlock = SPINLOCK_INITIALIZER;
@@ -297,31 +284,27 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     si.StartupInfo.hStdError = stderr_write_handle;
     si.lpAttributeList = attr_list;
 
-    // Retrieve the current environment block
-    char* env_block = GetEnvironmentStrings();
-//    print_environment_block(env_block);
-
     nd_log(NDLS_COLLECTORS, NDLP_INFO,
            "SPAWN PARENT: Running request No %zu, command: '%s'",
            instance->request_id, command);
 
     // EXTENDED_STARTUPINFO_PRESENT tells CreateProcess to honour lpAttributeList,
     // which restricts handle inheritance to the three pipe ends listed above.
+    // Pass NULL for lpEnvironment to inherit the parent's environment directly;
+    // an explicit ANSI block (GetEnvironmentStrings) is capped at 32,767 chars
+    // and fails with ERROR_INSUFFICIENT_BUFFER on machines with a large PATH.
     errno_clear();
     if (!CreateProcess(NULL, command, NULL, NULL, TRUE, EXTENDED_STARTUPINFO_PRESENT,
-                       env_block, NULL, &si.StartupInfo, &pi)) {
+                       NULL, NULL, &si.StartupInfo, &pi)) {
         spinlock_unlock(&spinlock);
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "SPAWN PARENT: cannot CreateProcess() for request No %zu, command: %s",
                instance->request_id, command);
         DeleteProcThreadAttributeList(attr_list);
         HeapFree(GetProcessHeap(), 0, attr_list);
-        if(env_block)
-            FreeEnvironmentStrings(env_block);
         goto cleanup;
     }
 
-    FreeEnvironmentStrings(env_block);
     DeleteProcThreadAttributeList(attr_list);
     HeapFree(GetProcessHeap(), 0, attr_list);
 
