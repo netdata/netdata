@@ -47,6 +47,12 @@ func TestTagJoin_RoundTrip(t *testing.T) {
 			[]string{"Interface", "com.amazonaws.vpce.us-east-1.vpce-svc-example", "vpce-0123456789abcdef0", "vpc-0123456789abcdef0"},
 			"arn:aws:ec2:us-east-1:" + acct + ":vpc-endpoint/vpce-0123456789abcdef0",
 		},
+		"privatelink service": {
+			"privatelink_service",
+			[]string{"Service Id"},
+			[]string{"vpce-svc-0123456789abcdef0"},
+			"arn:aws:ec2:us-east-1:" + acct + ":vpc-endpoint-service/vpce-svc-0123456789abcdef0",
+		},
 
 		// Parent-resource: the child dimension (storage_type/filter_id/operation) is
 		// not in the ARN; the join key is the parent, so the child inherits its tags.
@@ -58,6 +64,30 @@ func TestTagJoin_RoundTrip(t *testing.T) {
 			[]string{"Endpoint Type", "Service Name", "Subnet Id", "VPC Endpoint Id", "VPC Id"},
 			[]string{"Interface", "com.amazonaws.vpce.us-east-1.vpce-svc-example", "subnet-0123456789abcdef0", "vpce-0123456789abcdef0", "vpc-0123456789abcdef0"},
 			"arn:aws:ec2:us-east-1:" + acct + ":vpc-endpoint/vpce-0123456789abcdef0",
+		},
+		"privatelink service AZ (parent service)": {
+			"privatelink_service_az",
+			[]string{"Az", "Service Id"},
+			[]string{"us-east-1a", "vpce-svc-0123456789abcdef0"},
+			"arn:aws:ec2:us-east-1:" + acct + ":vpc-endpoint-service/vpce-svc-0123456789abcdef0",
+		},
+		"privatelink service load balancer (parent service)": {
+			"privatelink_service_load_balancer",
+			[]string{"Load Balancer Arn", "Service Id"},
+			[]string{"net/my-nlb/50dc6c495c0c9188", "vpce-svc-0123456789abcdef0"},
+			"arn:aws:ec2:us-east-1:" + acct + ":vpc-endpoint-service/vpce-svc-0123456789abcdef0",
+		},
+		"privatelink service AZ and load balancer (parent service)": {
+			"privatelink_service_az_load_balancer",
+			[]string{"Az", "Load Balancer Arn", "Service Id"},
+			[]string{"us-east-1a", "net/my-nlb/50dc6c495c0c9188", "vpce-svc-0123456789abcdef0"},
+			"arn:aws:ec2:us-east-1:" + acct + ":vpc-endpoint-service/vpce-svc-0123456789abcdef0",
+		},
+		"privatelink service VPC endpoint (parent service)": {
+			"privatelink_service_vpc_endpoint",
+			[]string{"Service Id", "VPC Endpoint Id"},
+			[]string{"vpce-svc-0123456789abcdef0", "vpce-0123456789abcdef0"},
+			"arn:aws:ec2:us-east-1:" + acct + ":vpc-endpoint-service/vpce-svc-0123456789abcdef0",
 		},
 
 		// ELB family shares the loadbalancer resource type; each flavour extracts differently.
@@ -102,17 +132,18 @@ func TestTagJoin_ArnJoinKeyCases(t *testing.T) {
 		arn     string
 		wantKey string
 	}{
-		"classic elb accepts loadbalancer/<name>":     {"elb", "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/my-elb", "my-elb"},
-		"classic elb rejects an ALB arn":              {"elb", "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/my-alb/hash", ""},
-		"classic elb rejects an NLB arn":              {"elb", "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/my-nlb/hash", ""},
-		"alb rejects a classic elb arn":               {"alb", "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/my-elb", ""},
-		"alb rejects an NLB arn":                      {"alb", "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/my-nlb/hash", ""},
-		"nlb rejects an ALB arn":                      {"nlb", "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/my-alb/hash", ""},
-		"eventbridge accepts a default-bus rule":      {"eventbridge", "arn:aws:events:us-east-1:111122223333:rule/myrule", "myrule"},
-		"eventbridge rejects a custom-bus rule":       {"eventbridge", "arn:aws:events:us-east-1:111122223333:rule/mybus/myrule", ""},
-		"default extractor accepts instance/<id>":     {"ec2", "arn:aws:ec2:us-east-1:111122223333:instance/i-1", "i-1"},
-		"default extractor accepts vpc-endpoint/<id>": {"privatelink_endpoint", "arn:aws:ec2:us-east-1:111122223333:vpc-endpoint/vpce-1", "vpce-1"},
-		"default extractor rejects a sub-segment id":  {"ec2", "arn:aws:ec2:us-east-1:111122223333:instance/foo/i-1", ""},
+		"classic elb accepts loadbalancer/<name>":             {"elb", "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/my-elb", "my-elb"},
+		"classic elb rejects an ALB arn":                      {"elb", "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/my-alb/hash", ""},
+		"classic elb rejects an NLB arn":                      {"elb", "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/my-nlb/hash", ""},
+		"alb rejects a classic elb arn":                       {"alb", "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/my-elb", ""},
+		"alb rejects an NLB arn":                              {"alb", "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/net/my-nlb/hash", ""},
+		"nlb rejects an ALB arn":                              {"nlb", "arn:aws:elasticloadbalancing:us-east-1:111122223333:loadbalancer/app/my-alb/hash", ""},
+		"eventbridge accepts a default-bus rule":              {"eventbridge", "arn:aws:events:us-east-1:111122223333:rule/myrule", "myrule"},
+		"eventbridge rejects a custom-bus rule":               {"eventbridge", "arn:aws:events:us-east-1:111122223333:rule/mybus/myrule", ""},
+		"default extractor accepts instance/<id>":             {"ec2", "arn:aws:ec2:us-east-1:111122223333:instance/i-1", "i-1"},
+		"default extractor accepts vpc-endpoint/<id>":         {"privatelink_endpoint", "arn:aws:ec2:us-east-1:111122223333:vpc-endpoint/vpce-1", "vpce-1"},
+		"default extractor accepts vpc-endpoint-service/<id>": {"privatelink_service", "arn:aws:ec2:us-east-1:111122223333:vpc-endpoint-service/vpce-svc-1", "vpce-svc-1"},
+		"default extractor rejects a sub-segment id":          {"ec2", "arn:aws:ec2:us-east-1:111122223333:instance/foo/i-1", ""},
 	}
 	for name, tc := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -130,6 +161,7 @@ func TestTagJoin_ArnJoinKeyCases(t *testing.T) {
 func TestDeriveResourceType(t *testing.T) {
 	tests := map[string]string{
 		"arn:aws:ec2:us-east-1:111122223333:instance/i-0abc":                  "ec2:instance",
+		"arn:aws:ec2:us-east-1:111122223333:vpc-endpoint-service/vpce-svc-1":  "ec2:vpc-endpoint-service",
 		"arn:aws:rds:us-east-1:111122223333:db:mydb":                          "rds:db",
 		"arn:aws:sqs:us-east-1:111122223333:myqueue":                          "sqs",
 		"arn:aws:s3:::mybucket":                                               "s3",

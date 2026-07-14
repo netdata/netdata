@@ -81,6 +81,7 @@ modules:
           - AWS Step Functions (workflow orchestration)
           - NAT Gateway (VPC networking)
           - AWS PrivateLink endpoints (endpoint connections, traffic, and packet problems)
+          - AWS PrivateLink endpoint services (provider-side connections, endpoints, traffic, and reset packets)
           - Amazon Kinesis Data Streams (streaming ingestion)
           - Amazon Data Firehose (delivery streams)
           - Amazon SNS (pub/sub messaging)
@@ -312,7 +313,7 @@ modules:
               required: false
               group: Rules
             - name: rules[].profiles.include
-              description: Profile basenames to add explicitly. Set `defaults` to `false` to collect only this list, including profiles disabled by default. The higher-cardinality PrivateLink subnet view is `privatelink_endpoint_subnet`. Billing choices are `billing_total`, `billing_service`, `billing_linked_account`, and `billing_linked_account_service`.
+              description: Profile basenames to add explicitly. Set `defaults` to `false` to collect only this list, including profiles disabled by default. PrivateLink detail choices are `privatelink_endpoint_subnet`, `privatelink_service_az`, `privatelink_service_load_balancer`, `privatelink_service_az_load_balancer`, and `privatelink_service_vpc_endpoint`. Billing choices are `billing_total`, `billing_service`, `billing_linked_account`, and `billing_linked_account_service`.
               default_value: ""
               required: false
               group: Rules
@@ -581,7 +582,7 @@ modules:
                           # disables any inherited resource-tag filter.
                           resource_tags: []
             - name: AWS PrivateLink endpoints with split timing
-              description: Collect endpoint-level Average statistics every minute, collect six-hour processed-byte totals independently, and opt into the higher-cardinality endpoint-by-subnet view. Both endpoint grains support the same VPC endpoint resource-tag filters and labels; subnet charts inherit their parent endpoint's tags.
+              description: Collect endpoint-level Average statistics every minute, collect six-hour processed-byte Sum windows normalized to bytes/s independently, and opt into the higher-cardinality endpoint-by-subnet view. Both endpoint grains support the same VPC endpoint resource-tag filters and labels; subnet charts inherit their parent endpoint's tags.
               config: |
                 jobs:
                   - name: privatelink_endpoints
@@ -638,8 +639,76 @@ modules:
                     labels:
                       resource_tags:
                         - key: Name
+            - name: AWS PrivateLink services with split timing
+              description: Collect provider-side traffic averages every minute, connected-endpoint count every five minutes, and six-hour processed-byte Sum windows normalized to bytes/s independently. Every grain joins tags through its parent VPC endpoint service, including the service-by-consumer-endpoint view.
+              config: |
+                jobs:
+                  - name: privatelink_services
+                    credentials:
+                      - name: sdk_default
+                        type: default
+                    targets:
+                      - name: base
+                        credentials: sdk_default
+                    rule_defaults:
+                      filters:
+                        resource_tags:
+                          - key: environment
+                            values: [production]
+                    rules:
+                      - name: service-traffic-averages
+                        targets: [base]
+                        profiles:
+                          defaults: false
+                          include: [privatelink_service]
+                        metrics:
+                          - profile: privatelink_service
+                            statistics: [Average]
+                            include:
+                              - name: ActiveConnections
+                              - name: BytesProcessed
+                              - name: NewConnections
+                              - name: RstPacketsSent
+                        regions: [us-east-1]
+                        query:
+                          period: 1m
+                          lookback: 5m
+                          publication_delay: 5m
+                      - name: service-endpoint-count
+                        targets: [base]
+                        profiles:
+                          defaults: false
+                          include: [privatelink_service]
+                        metrics:
+                          - profile: privatelink_service
+                            include:
+                              - name: EndpointsCount
+                                statistics: [Average]
+                        regions: [us-east-1]
+                        query:
+                          period: 5m
+                          lookback: 5m
+                          publication_delay: 5m
+                      - name: service-six-hour-bytes
+                        targets: [base]
+                        profiles:
+                          defaults: false
+                          include: [privatelink_service]
+                        metrics:
+                          - profile: privatelink_service
+                            include:
+                              - name: BytesProcessed
+                                statistics: [Sum]
+                        regions: [us-east-1]
+                        query:
+                          period: 6h
+                          lookback: 6h
+                          publication_delay: 5m
+                    labels:
+                      resource_tags:
+                        - key: Name
             - name: All services including opt-in profiles
-              description: Select defaults and explicitly add every disabled opt-in profile, including the PrivateLink endpoint-by-subnet view and four Billing grains. Their cardinality, prerequisites, and cost guidance still apply.
+              description: Select defaults and explicitly add every disabled opt-in profile, including detailed PrivateLink endpoint/service grains and four Billing grains. Their cardinality, prerequisites, and cost guidance still apply.
               config: |
                 jobs:
                   - name: defaults_and_opt_in
@@ -660,6 +729,10 @@ modules:
                             - s3_requests
                             - ebs_stalled_io
                             - privatelink_endpoint_subnet
+                            - privatelink_service_az
+                            - privatelink_service_load_balancer
+                            - privatelink_service_az_load_balancer
+                            - privatelink_service_vpc_endpoint
                             - billing_total
                             - billing_service
                             - billing_linked_account
@@ -927,6 +1000,7 @@ modules:
         | [AWS Step Functions](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/step_functions.yaml) | `cloudwatch.step_functions.*` | executions, throttled events, execution time |
         | [NAT Gateway](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/nat_gateway.yaml) | `cloudwatch.nat_gateway.*` | traffic, active connections, connection rate, errors, idle timeouts |
         | [AWS PrivateLink endpoints](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_endpoint.yaml) | `cloudwatch.privatelink_endpoint.*` | endpoint-level active and new connections, processed bytes, dropped packets, and received reset packets |
+        | [AWS PrivateLink endpoint services](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_service.yaml) | `cloudwatch.privatelink_service.*` | provider-side active and new connections, connected endpoints, processed bytes, and sent reset packets |
         | [Amazon Kinesis Data Streams](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/kinesis.yaml) | `cloudwatch.kinesis.*` | data throughput, records, GetRecords iterator age, operation latency, throughput exceeded, PutRecords rejected |
         | [Amazon Data Firehose](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/firehose.yaml) | `cloudwatch.firehose.*` | records, throughput, put requests, throttled records, S3 delivery freshness and success |
         | [Amazon SNS](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/sns.yaml) | `cloudwatch.sns.*` | messages published, notifications, invalid notification filters, DLQ redrive, published message size |
@@ -957,6 +1031,10 @@ modules:
         | [EBS Stalled I/O](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/ebs_stalled_io.yaml) | `cloudwatch.ebs_stalled_io.*` | per-volume stalled I/O health check |
         | [S3 Request Metrics](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/s3_requests.yaml) | `cloudwatch.s3_requests.*` | requests, request errors, request latency, request data transfer |
         | [AWS PrivateLink endpoints by subnet](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_endpoint_subnet.yaml) | `cloudwatch.privatelink_endpoint_subnet.*` | the endpoint metrics split by `subnet_id`; one endpoint can produce several chart instances |
+        | [AWS PrivateLink services by Availability Zone](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_service_az.yaml) | `cloudwatch.privatelink_service_az.*` | provider-side traffic split by `availability_zone` and `service_id` |
+        | [AWS PrivateLink services by load balancer](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_service_load_balancer.yaml) | `cloudwatch.privatelink_service_load_balancer.*` | provider-side traffic split by `load_balancer_arn` and `service_id` |
+        | [AWS PrivateLink services by Availability Zone and load balancer](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_service_az_load_balancer.yaml) | `cloudwatch.privatelink_service_az_load_balancer.*` | provider-side traffic split by `availability_zone`, `load_balancer_arn`, and `service_id` |
+        | [AWS PrivateLink services by VPC endpoint](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/privatelink_service_vpc_endpoint.yaml) | `cloudwatch.privatelink_service_vpc_endpoint.*` | provider-side traffic split by `service_id` and consumer `vpc_endpoint_id` |
         | [AWS Billing total](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/billing_total.yaml) | `cloudwatch.billing_total.*` | latest worldwide estimated month-to-date charge; identity labels: `account_id`, `region` |
         | [AWS Billing by service](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/billing_service.yaml) | `cloudwatch.billing_service.*` | estimated charges by `service_name` |
         | [AWS Billing by linked account](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/config/go.d/cloudwatch.profiles/default/billing_linked_account.yaml) | `cloudwatch.billing_linked_account.*` | estimated charges by `linked_account_id` when the payer/management account publishes this grain |
@@ -964,11 +1042,13 @@ modules:
 
         The Billing profiles are exact grains rather than one wildcard: select only the views you need. All use `EstimatedCharges`, `Maximum`, USD, a 10-minute period, and a 24-hour retrieval window. AWS publishes the underlying estimate several times daily, so the collector normally re-emits the newest successful value between publications. Around the UTC month boundary, a prior-month value can remain visible until a successful query replaces or expires it, and transient AWS failures can retain it longer. `region=us-east-1` identifies the CloudWatch publication/query location; the charge itself is worldwide. Billing dimensions are not AWS Resource Groups Tagging API resources, so resource-tag filters and resource-tag-derived labels do not apply. A valid job can produce no Billing chart when AWS has not published the selected grain.
 
-        PrivateLink endpoint metrics have two exact grains. The default `privatelink_endpoint` profile identifies one endpoint with `endpoint_type`, `service_name`, `vpc_endpoint_id`, and `vpc_id`. The opt-in `privatelink_endpoint_subnet` profile adds `subnet_id`; enable it deliberately because every endpoint can produce several subnet chart instances and seven additional metric/statistic queries per instance. Both profiles use a five-minute period, lookback, and publication delay by default. They share one `AWS/PrivateLinkEndpoints` discovery scan and one VPC endpoint Resource Groups Tagging API association, so endpoint resource-tag filters and labels also apply to every subnet child. The stock surface exports Average and per-second Sum views where both are useful; exact metric/statistic rules can assign different timing without shadowing siblings. These profiles do not query the separate `AWS/PrivateLinkServices` namespace.
+        PrivateLink endpoint metrics have two exact grains. The default `privatelink_endpoint` profile identifies one endpoint with `endpoint_type`, `service_name`, `vpc_endpoint_id`, and `vpc_id`. The opt-in `privatelink_endpoint_subnet` profile adds `subnet_id`; enable it deliberately because every endpoint can produce several subnet chart instances and seven additional metric/statistic queries per instance. Both profiles use a five-minute period, lookback, and publication delay by default. They share one `AWS/PrivateLinkEndpoints` discovery scan and one VPC endpoint Resource Groups Tagging API association, so endpoint resource-tag filters and labels also apply to every subnet child. The stock surface exports Average and per-second Sum views where both are useful; exact metric/statistic rules can assign different timing without shadowing siblings.
 
-        At stock timing, each endpoint or opted-in subnet instance is queried once per five-minute window. Its seven selected series form five structural CloudWatch metrics for AWS billing grouping, or 1,440 metric requests per day before retries. A one-minute override runs its selected metrics five times as often; narrow profiles, metrics, regions, and resource tags when that freshness is not required.
+        PrivateLink service metrics have five exact grains. The default `privatelink_service` profile identifies the provider service by `service_id` and is the only grain that exports `EndpointsCount`. The opt-in profiles add `availability_zone`, `load_balancer_arn`, both dimensions, or consumer `vpc_endpoint_id`. All five share one `AWS/PrivateLinkServices` discovery scan and use the parent endpoint service's `ec2:vpc-endpoint-service` tags for filtering and labels. The collector deliberately does not attach endpoint or load-balancer tags to detailed children; the `vpc_endpoint_id` can identify a consumer endpoint outside the service-owning account. `EndpointsCount` is read on its documented five-minute cadence and records zero when no datapoint is published; traffic gauges remain gaps when absent.
 
-        These opt-in profiles include potentially high-cardinality data. **S3 Request Metrics** additionally require per-bucket request-metrics configuration in AWS and are billed at CloudWatch custom-metric rates; they collect nothing until enabled on the bucket. PrivateLink subnet cardinality grows with an endpoint's attached subnets. The Billing service/account grains grow with the payer's services and linked accounts; their cost guidance is described above.
+        At stock timing, every PrivateLink profile uses a five-minute period, lookback, and publication delay. An endpoint, subnet, or default service instance has five structural CloudWatch metrics, or 1,440 metric requests per day before retries. Each opted-in detailed service instance has four structural metrics, or 1,152 metric requests per day. A one-minute override runs its selected metrics five times as often; narrow profiles, metrics, regions, grains, and resource tags when that freshness is not required.
+
+        These opt-in profiles include potentially high-cardinality data. **S3 Request Metrics** additionally require per-bucket request-metrics configuration in AWS and are billed at CloudWatch custom-metric rates; they collect nothing until enabled on the bucket. PrivateLink cardinality grows with endpoint subnets, service Availability Zones, load balancers, and consumer endpoints; the combined Availability Zone/load-balancer grain multiplies those dimensions. The Billing service/account grains grow with the payer's services and linked accounts; their cost guidance is described above.
       availability: []
       dynamic_context_prefixes:
         - prefix: cloudwatch.

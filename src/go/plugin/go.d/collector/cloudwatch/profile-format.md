@@ -161,7 +161,11 @@ cannot merge, and mark a higher-cardinality grain `disabled: true` when it shoul
 be opt-in. `privatelink_endpoint.yaml` and
 `privatelink_endpoint_subnet.yaml` are the stock parent/child example: the child
 adds `Subnet Id`, while the collector's reviewed tag-association registry joins
-both profiles on their parent `VPC Endpoint Id`.
+both profiles on their parent `VPC Endpoint Id`. The five
+`privatelink_service*.yaml` profiles are the multi-child example: all detailed
+Availability Zone, load-balancer, and consumer-endpoint grains remain separate,
+but every one joins tags through the parent `Service Id` and
+`ec2:vpc-endpoint-service` resource.
 
 When every declared dimension is constant, the collector already knows the
 complete instance and queries it directly. Such profiles do not call
