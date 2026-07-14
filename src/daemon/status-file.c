@@ -904,12 +904,14 @@ static void daemon_status_file_refresh(DAEMON_STATUS status) {
     session_status.system_cpus = os_get_system_cpus();
 
     // rrd_rdlock() inside rrdstats_metadata_collect() can block while UV threads
-    // hold rrd_wrlock() loading metadata after rrd_init.  Skip during startup
-    // (DAEMON_STATUS_INITIALIZING) so the main thread is not blocked for minutes
-    // before startup completes.  Also skip during shutdown to avoid a deadlock
-    // with active collectors.
+    // hold rrd_wrlock() loading metadata after rrd_init.  Restrict to background
+    // refreshes only (status == DAEMON_STATUS_NONE): status transitions — including
+    // the RUNNING transition at the end of netdata_main() — must never block here
+    // because line 897 above already updated session_status.status before this
+    // guard runs, so checking session_status.status alone is insufficient.
+    // Also skip when still initializing or during shutdown.
     nd_win_trace("daemon_status_file_refresh: rrdstats_metadata_collect");
-    if(session_status.status != DAEMON_STATUS_INITIALIZING && !exit_initiated_get())
+    if(status == DAEMON_STATUS_NONE && session_status.status != DAEMON_STATUS_INITIALIZING && !exit_initiated_get())
         session_status.metrics_metadata = rrdstats_metadata_collect();
 
     // Update disk footprint at most once every 10 minutes (600 seconds).

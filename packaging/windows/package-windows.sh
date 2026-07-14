@@ -53,15 +53,23 @@ ${GITHUB_ACTIONS+echo "::group::Installing"}
 ${GITHUB_ACTIONS+echo "::endgroup::"}
 
 ${GITHUB_ACTIONS+echo "::group::Staging plugin DLLs"}
-# Stage DLLs for plugins, which may have additional dependencies
-# beyond what netdata.exe needs.
+# Stage DLLs needed by executables in usr/bin (e.g. NetdataClaim.exe) to usr/bin.
+for runtime_executable in /opt/netdata/usr/bin/*.exe; do
+    if [ -f "${runtime_executable}" ]; then
+        "${repo_root}/packaging/windows/stage-runtime-dlls.sh" "${runtime_executable}" "${runtime_dll_destination}"
+    fi
+done
+
+# Stage DLLs for plugin executables co-located with the plugins themselves.
+# Windows loads DLLs from the executable's own directory first; the service
+# SYSTEM account does not have the usr/bin path in its DLL search list.
+plugins_dll_destination="/opt/netdata/usr/libexec/netdata/plugins.d"
 for runtime_executable in \
-    /opt/netdata/usr/bin/*.exe \
     /opt/netdata/usr/libexec/netdata/plugins.d/*.exe \
     /opt/netdata/usr/libexec/netdata/plugins.d/*.plugin \
     /opt/netdata/usr/libexec/netdata/plugins.d/*.plugin.exe; do
     if [ -f "${runtime_executable}" ]; then
-        "${repo_root}/packaging/windows/stage-runtime-dlls.sh" "${runtime_executable}" "${runtime_dll_destination}"
+        "${repo_root}/packaging/windows/stage-runtime-dlls.sh" "${runtime_executable}" "${plugins_dll_destination}"
     fi
 done
 ${GITHUB_ACTIONS+echo "::endgroup::"}

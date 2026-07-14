@@ -4752,6 +4752,40 @@ if(OS_WINDOWS)
 
         # Make curl work with ssl
         install(DIRECTORY /usr/ssl DESTINATION usr)
+
+        # Stage UCRT64 runtime DLLs co-located with each plugin executable.
+        # Windows loads DLLs from the executable's own directory before the
+        # system PATH; the SYSTEM service account has no MSYS2/UCRT64 bin in
+        # PATH, so DLLs in usr/bin are invisible to plugins running from plugins.d.
+        # This runs after all plugin targets are installed so the executables exist.
+        install(CODE "
+            set(_stage_script \"${CMAKE_SOURCE_DIR}/packaging/windows/stage-runtime-dlls.sh\")
+            set(_plugins_dir \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/usr/libexec/netdata/plugins.d\")
+            file(GLOB _plugin_exes
+                \"\${_plugins_dir}/*.exe\"
+                \"\${_plugins_dir}/*.plugin\"
+            )
+            set(_bash_exe \"\")
+            foreach(_bash \"/usr/bin/bash\" \"/ucrt64/bin/bash\")
+                if(EXISTS \"\${_bash}\")
+                    set(_bash_exe \"\${_bash}\")
+                    break()
+                endif()
+            endforeach()
+            if(_bash_exe)
+                foreach(_plugin_exe \${_plugin_exes})
+                    execute_process(
+                        COMMAND \"\${_bash_exe}\" \"\${_stage_script}\" \"\${_plugin_exe}\" \"\${_plugins_dir}\"
+                        RESULT_VARIABLE _rc
+                    )
+                    if(NOT _rc EQUAL 0)
+                        message(WARNING \"Windows runtime DLL staging returned \${_rc} for \${_plugin_exe}\")
+                    endif()
+                endforeach()
+            else()
+                message(WARNING \"bash not found; Windows runtime DLL staging for plugins.d skipped.\")
+            endif()
+        " COMPONENT netdata)
 endif()
 
 #
