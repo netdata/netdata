@@ -177,7 +177,9 @@ compiler state, and installed execution plan:
 - Ordered policy scopes and tag-membership identities are separate. Scopes with the
   same target/profile/region/predicate share one membership identity, and already-owned
   exported series are removed statically with one bounded aggregate diagnostic per
-  affected rule. A partially overlapping scope retains its unshadowed series.
+  affected rule. A fully overlapping later scope is removed, so one exported series
+  cannot acquire two competing query policies; a partially overlapping scope retains
+  its unshadowed series.
   Same-account cross-target overlap remains until discovery, where final instance
   identity can be evaluated correctly. Scopes with different predicates remain
   ordered policy scopes even when they share one discovery scan.
