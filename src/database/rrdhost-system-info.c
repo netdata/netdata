@@ -16,7 +16,7 @@ void rrdhost_system_info_swap(struct rrdhost_system_info *a, struct rrdhost_syst
 // ----------------------------------------------------------------------------
 // RRDHOST - set system info from environment variables
 // system_info fields must be heap allocated or NULL
-int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, char *name, char *value) {
+int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, const char *name, const char *value) {
     int res = 0;
 
     if (unlikely(!name || !value))
