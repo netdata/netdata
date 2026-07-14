@@ -1216,7 +1216,6 @@ jobs:
           build-args: |
             BASE=${{ matrix.distro }}
             PRE=${{ matrix.env_prep }}
-            RMJSONC=${{ matrix.jsonc_removal }}
           tags: test:${{ matrix.artifact_key }}
       - name: netdata-installer on ${{ matrix.distro }}
         id: build-cloud
