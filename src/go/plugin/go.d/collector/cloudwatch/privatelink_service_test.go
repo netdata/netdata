@@ -4,6 +4,7 @@ package cloudwatch
 
 import (
 	"context"
+	"maps"
 	"testing"
 	"time"
 
@@ -151,9 +152,7 @@ func TestPrivateLinkServiceProfiles_PublicContract(t *testing.T) {
 				gotMetrics[metric.MetricName] = metricContract{id: metric.ID, statistics: metric.Statistics, rate: metric.Rate}
 			}
 			wantMetrics := make(map[string]metricContract, len(wantTraffic)+1)
-			for name, contract := range wantTraffic {
-				wantMetrics[name] = contract
-			}
+			maps.Copy(wantMetrics, wantTraffic)
 			if tc.includeEndpoints {
 				wantMetrics["EndpointsCount"] = metricContract{id: "endpoints_count", statistics: []string{"average"}}
 			}
