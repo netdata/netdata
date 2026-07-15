@@ -35,17 +35,15 @@ typedef struct {
     uint32_t anomalous_dimensions;
 } ml_context_anomaly_rate_t;
 
-typedef struct {
+typedef struct ml_host {
     RRDHOST *rh;
-
-    std::atomic<bool> ml_running;
 
     // Incremented at the END of every ml_host_stop, after all chart/dim resets
     // have committed. ml_host_detect_once samples this before and after its
-    // unlocked chart walk; a change means a stop completed during the walk
-    // (so detect raced with stop's chart->mls writes) or a stop+start cycle
-    // happened around the walk. In either case the accumulated snapshot must
-    // be discarded even if ml_running is back to true at the re-check.
+    // chart walk; a change means a stop completed during the walk or a
+    // stop+start cycle happened around the walk. In either case the
+    // accumulated snapshot must be discarded even if ml_running is back to true
+    // at the re-check.
     std::atomic<uint64_t> ml_stop_generation;
 
     ml_machine_learning_stats_t mls;
@@ -59,7 +57,7 @@ typedef struct {
     // cannot carry host->mutex into that walk), so a racing start cannot
     // re-enable ml_running while stop is mid-reset. Without it, a detect walk
     // could observe ml_running==true with an unchanged stop generation and
-    // publish a snapshot torn by stop's in-flight chart->mls resets.
+    // publish a snapshot spanning stop's in-flight resets.
     netdata_mutex_t start_stop_mutex;
 
     ml_queue_t *queue;
@@ -103,5 +101,81 @@ typedef struct {
 
     bool reset_pointers;
 } ml_host_t;
+
+static ALWAYS_INLINE bool ml_running_load(const RRDHOST *rh)
+{
+    return __atomic_load_n(&rh->ml_running, __ATOMIC_RELAXED);
+}
+
+static ALWAYS_INLINE void ml_running_store(RRDHOST *rh, bool running)
+{
+    __atomic_store_n(&rh->ml_running, running, __ATOMIC_RELAXED);
+}
+
+#ifdef __cplusplus
+class AcquiredMLHost {
+public:
+    explicit AcquiredMLHost(RRDHOST *rh) : RH(rh)
+    {
+        if (!RH)
+            return;
+
+        rw_spinlock_read_lock(&RH->ml_host_rwlock);
+        Host = __atomic_load_n(&RH->ml_host, __ATOMIC_ACQUIRE);
+        if (!Host)
+            release();
+    }
+
+    AcquiredMLHost(const AcquiredMLHost &) = delete;
+    AcquiredMLHost &operator=(const AcquiredMLHost &) = delete;
+
+    AcquiredMLHost(AcquiredMLHost &&other) noexcept : RH(other.RH), Host(other.Host)
+    {
+        other.RH = nullptr;
+        other.Host = nullptr;
+    }
+
+    AcquiredMLHost &operator=(AcquiredMLHost &&other) noexcept
+    {
+        if (this != &other) {
+            release();
+            RH = other.RH;
+            Host = other.Host;
+            other.RH = nullptr;
+            other.Host = nullptr;
+        }
+
+        return *this;
+    }
+
+    ~AcquiredMLHost()
+    {
+        release();
+    }
+
+    ml_host_t *get() const
+    {
+        return Host;
+    }
+
+    explicit operator bool() const
+    {
+        return Host != nullptr;
+    }
+
+    void release()
+    {
+        if (RH) {
+            rw_spinlock_read_unlock(&RH->ml_host_rwlock);
+            RH = nullptr;
+            Host = nullptr;
+        }
+    }
+
+private:
+    RRDHOST *RH;
+    ml_host_t *Host = nullptr;
+};
+#endif
 
 #endif /* NETDATA_ML_HOST_H */

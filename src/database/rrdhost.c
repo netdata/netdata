@@ -382,6 +382,8 @@ RRDHOST *rrdhost_create(
 
     spinlock_init(&host->receiver_lock);
     spinlock_init(&host->rrdhost_update_lock);
+    rw_spinlock_init(&host->ml_host_rwlock);
+    __atomic_store_n(&host->ml_running, false, __ATOMIC_RELAXED);
     spinlock_init(&host->aclk.spinlock);
 
     if (likely(!archived)) {
