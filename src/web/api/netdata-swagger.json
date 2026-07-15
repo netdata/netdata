@@ -4653,6 +4653,9 @@
               "application/json": {
                 "schema": {
                   "type": "object",
+                  "required": [
+                    "cloud"
+                  ],
                   "properties": {
                     "success": {
                       "type": "boolean",
@@ -4662,16 +4665,69 @@
                       "type": "string",
                       "description": "Result message. Present only for claim action responses.\n- Success: \"ok\"\n- Failure: Reason for failure (e.g., \"invalid key\", \"invalid parameters\", cloud connection error)\n"
                     },
-                    "cloud_status": {
-                      "type": "string",
-                      "enum": [
-                        "available",
-                        "offline",
-                        "indirect",
-                        "online",
-                        "banned"
+                    "cloud": {
+                      "type": "object",
+                      "description": "Current Netdata Cloud connection state.",
+                      "required": [
+                        "id",
+                        "status",
+                        "since",
+                        "age",
+                        "url",
+                        "reason"
                       ],
-                      "description": "Current cloud connection status of the agent.\n- available: Not claimed yet, can be claimed\n- offline: Claimed but currently disconnected\n- indirect: Connected through parent agent\n- online: Claimed and connected (cannot re-claim)\n- banned: Banned from cloud (cannot claim)\n"
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "description": "Cloud connection ID counter."
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "available",
+                            "offline",
+                            "indirect",
+                            "online",
+                            "banned"
+                          ],
+                          "description": "Current cloud connection status of the agent.\n- available: Not claimed yet, can be claimed\n- offline: Claimed but currently disconnected\n- indirect: Connected through parent agent\n- online: Claimed and connected (cannot re-claim)\n- banned: Banned from cloud (cannot claim)\n"
+                        },
+                        "since": {
+                          "type": "integer",
+                          "format": "int64",
+                          "description": "Unix timestamp of the latest cloud connection state change."
+                        },
+                        "age": {
+                          "type": "integer",
+                          "format": "int64",
+                          "description": "Signed difference in seconds between response generation time and `since`; may be negative after a backward system-clock adjustment."
+                        },
+                        "url": {
+                          "type": "string",
+                          "nullable": true,
+                          "description": "Netdata Cloud URL. Emitted for every status and may be null when the active ACLK URL is unavailable.\nFor banned status, the current runtime emits this member twice from two URL sources; OpenAPI represents it as one logical property.\n"
+                        },
+                        "reason": {
+                          "type": "string",
+                          "description": "Status explanation or connection error; an empty string when online."
+                        },
+                        "claim_id": {
+                          "type": "string",
+                          "description": "Present for banned, offline, online, and indirect statuses.\nContains the canonical claim UUID when one is available; it can be empty when no claim ID is available.\n"
+                        },
+                        "next_check": {
+                          "type": "integer",
+                          "format": "int64",
+                          "description": "Unix timestamp of the next connection attempt; present only for offline status when scheduled in the future."
+                        },
+                        "next_in": {
+                          "type": "integer",
+                          "format": "int64",
+                          "minimum": 1,
+                          "description": "Seconds until `next_check`; present only when `next_check` is present."
+                        }
+                      }
                     },
                     "can_be_claimed": {
                       "type": "boolean",
@@ -4701,7 +4757,14 @@
                 "examples": {
                   "info_response": {
                     "value": {
-                      "cloud_status": "available",
+                      "cloud": {
+                        "id": 0,
+                        "status": "available",
+                        "since": 1720000000,
+                        "age": 120,
+                        "url": "https://app.netdata.cloud",
+                        "reason": "Agent is not claimed yet"
+                      },
                       "can_be_claimed": true,
                       "key_filename": "/var/lib/netdata/netdata_random_session_id",
                       "cmd": "sudo cat /var/lib/netdata/netdata_random_session_id",
@@ -4719,7 +4782,15 @@
                     "value": {
                       "success": true,
                       "message": "ok",
-                      "cloud_status": "online",
+                      "cloud": {
+                        "id": 1,
+                        "status": "online",
+                        "since": 1720000120,
+                        "age": 0,
+                        "url": "https://app.netdata.cloud",
+                        "reason": "",
+                        "claim_id": "12345678-1234-1234-1234-123456789abc"
+                      },
                       "agents": [
                         {
                           "hostname": "my-server",
@@ -4734,7 +4805,14 @@
                     "value": {
                       "success": false,
                       "message": "invalid key",
-                      "cloud_status": "available",
+                      "cloud": {
+                        "id": 0,
+                        "status": "available",
+                        "since": 1720000000,
+                        "age": 120,
+                        "url": "https://app.netdata.cloud",
+                        "reason": "Agent is not claimed yet"
+                      },
                       "can_be_claimed": true,
                       "key_filename": "/var/lib/netdata/netdata_random_session_id",
                       "cmd": "sudo cat /var/lib/netdata/netdata_random_session_id",

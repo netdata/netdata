@@ -3099,10 +3099,10 @@ Per dimension:
 3. ✅ `cloud.id` - integer - Cloud connection ID counter
 4. ✅ `cloud.status` - string - Cloud connection status: "online", "offline", "available", "banned", "indirect"
 5. ✅ `cloud.since` - integer - Unix timestamp when status last changed
-6. ✅ `cloud.age` - integer - Seconds since last status change
-7. ✅ `cloud.url` - string - Netdata Cloud URL (present for AVAILABLE, BANNED, INDIRECT statuses)
+6. ✅ `cloud.age` - integer - Signed seconds from the last status change to response generation (may be negative after a backward system-clock adjustment)
+7. ✅ `cloud.url` - string or null - Netdata Cloud URL (present for every status; BANNED currently emits duplicate `url` members from two URL sources)
 8. ✅ `cloud.reason` - string - Status reason/error message (varies by status)
-9. ✅ `cloud.claim_id` - string - Claim ID when agent is claimed (present for BANNED, OFFLINE, ONLINE, INDIRECT statuses)
+9. ✅ `cloud.claim_id` - string - Claim ID (present for BANNED, OFFLINE, ONLINE, INDIRECT statuses; may be empty when no claim ID is available)
 10. ✅ `cloud.next_check` - integer - Unix timestamp of next connection attempt (only for OFFLINE status when scheduled)
 11. ✅ `cloud.next_in` - integer - Seconds until next connection attempt (only for OFFLINE status when scheduled)
 
