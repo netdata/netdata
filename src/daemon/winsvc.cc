@@ -78,7 +78,7 @@ static DWORD WINAPI stop_pending_heartbeat(LPVOID /*unused*/)
     return 0;
 }
 
-static void call_netdata_cleanup(void *arg)
+static NORETURN void call_netdata_cleanup(void *arg)
 {
     UNUSED(arg);
 
