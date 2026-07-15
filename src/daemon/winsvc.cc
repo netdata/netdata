@@ -227,7 +227,7 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     // calls exit(0) when done.  Loop here so that ServiceMain never returns
     // before that exit(0) fires; returning would let StartServiceCtrlDispatcher
     // → main() → ExitProcess race the cleanup thread and lose.
-    while(1)
+    while(true)
         Sleep(1000);
 }
 
