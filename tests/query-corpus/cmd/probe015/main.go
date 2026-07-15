@@ -62,7 +62,7 @@ func iteration(td *daemon.Daemon, i, points, chunk int, gap time.Duration) {
 	t0 := int64(1700000000)
 	firstT, lastT := t0, t0+int64(points)
 
-	conn, err := stream.Connect(td.Addr, daemon.APIKey,
+	conn, err := stream.Connect(td.Addr, daemon.StreamKey,
 		stream.HostInfo{Hostname: host, MachineGUID: guid}, stream.CapsReplication)
 	die(err)
 

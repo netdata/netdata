@@ -21,8 +21,10 @@ import (
 	"time"
 )
 
-// APIKey is the stream.conf API key fixtures connect with.
-const APIKey = "6c41aa90-b303-49a6-83c8-4859b042e4a0"
+// StreamKey is the stream.conf api key the fixture children connect
+// with — a fixed random UUID identifying the corpus child on a local
+// throwaway daemon, not a credential.
+const StreamKey = "6c41aa90-b303-49a6-83c8-4859b042e4a0"
 
 // Options configures the daemon under test.
 type Options struct {
@@ -30,6 +32,11 @@ type Options struct {
 	RunDir       string // scratch directory for etc/cache/lib/log
 	Port         int    // 0 picks a free port
 	StorageTiers int    // defaults to 3
+	// Tier0DiskSpaceMB, when non-zero, caps tier0's dbengine disk quota
+	// so old tier0 datafiles rotate out while higher tiers keep the full
+	// history — the layer-4 plan-switching scenario. Retention TIME knobs
+	// are unusable at the fixed 2023 fixture epoch (wall-clock enforced).
+	Tier0DiskSpaceMB int
 }
 
 // Daemon is one running netdata under test.
@@ -141,7 +148,7 @@ func Start(o Options) (*Daemon, error) {
 	if err := os.WriteFile(confPath, []byte(conf), 0o644); err != nil {
 		return nil, fmt.Errorf("daemon: write netdata.conf: %w", err)
 	}
-	streamConf := fmt.Sprintf(streamConfTemplate, APIKey)
+	streamConf := fmt.Sprintf(streamConfTemplate, StreamKey)
 	if err := os.WriteFile(filepath.Join(o.RunDir, "etc", "stream.conf"), []byte(streamConf), 0o644); err != nil {
 		return nil, fmt.Errorf("daemon: write stream.conf: %w", err)
 	}
@@ -181,10 +188,12 @@ func (d *Daemon) launch() error {
 		stdout.Close()
 	}()
 
-	// wait for the HTTP API
+	// wait for the HTTP API; the probe needs its own timeout so a daemon
+	// that accepts TCP but never answers cannot hang the readiness loop
+	client := &http.Client{Timeout: 5 * time.Second}
 	deadline := time.Now().Add(60 * time.Second)
 	for {
-		resp, err := http.Get(d.BaseURL + "/api/v1/info")
+		resp, err := client.Get(d.BaseURL + "/api/v1/info")
 		if err == nil {
 			_, _ = io.Copy(io.Discard, resp.Body)
 			resp.Body.Close()
@@ -194,6 +203,9 @@ func (d *Daemon) launch() error {
 		}
 		select {
 		case werr := <-d.waitCh:
+			// the process is already reaped; make a later Stop() a no-op
+			// instead of blocking forever on the drained wait channel
+			d.cmd = nil
 			return fmt.Errorf("daemon: exited during startup: %v (see %s/log/stdout.log)", werr, d.Opts.RunDir)
 		default:
 		}
