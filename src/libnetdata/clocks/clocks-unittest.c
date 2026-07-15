@@ -142,6 +142,29 @@ static int clocks_time_t_arithmetic_preserves_order(void) {
     return errors;
 }
 
+static int clocks_time_t_elapsed_saturates(void) {
+    int errors = 0;
+    const time_t maximum = nd_time_t_max();
+    const time_t minimum = nd_time_t_min();
+
+    CLOCKS_TEST(nd_time_t_elapsed_saturating(123, 100) == 23,
+                "representable elapsed time is preserved");
+    CLOCKS_TEST(nd_time_t_elapsed_saturating(100, 100) == 0,
+                "equal time_t samples have zero elapsed time");
+    CLOCKS_TEST(nd_time_t_elapsed_saturating(100, 123) == 0,
+                "backward time_t samples have zero elapsed time");
+    CLOCKS_TEST(nd_time_t_elapsed_saturating(maximum, 0) == maximum,
+                "maximum representable elapsed time is preserved");
+    CLOCKS_TEST(nd_time_t_elapsed_saturating(0, minimum + 1) == maximum,
+                "negative endpoint can produce the maximum representable elapsed time");
+    CLOCKS_TEST(nd_time_t_elapsed_saturating(maximum, minimum) == maximum,
+                "unrepresentable elapsed time saturates at the maximum");
+    CLOCKS_TEST(nd_time_t_elapsed_saturating(minimum, maximum) == 0,
+                "opposite backward endpoints have zero elapsed time");
+
+    return errors;
+}
+
 int clocks_unittest(void) {
     int errors = 0;
 
@@ -153,6 +176,7 @@ int clocks_unittest(void) {
     errors += clocks_retry_treats_backward_monotonic_sample_as_no_elapsed_time();
     errors += clocks_usec_delta_or_zero_saturates_backward_samples();
     errors += clocks_time_t_arithmetic_preserves_order();
+    errors += clocks_time_t_elapsed_saturates();
 
     if(errors)
         fprintf(stderr, "clocks unittest: %d ERROR(S)\n", errors);

@@ -593,14 +593,15 @@ static void stream_receiver_remove_internal(struct stream_thread *sth, struct re
     if(rpt->host && rpt->host->rrdlabels)
         rrdlabels_get_value_strcpyz(rpt->host->rrdlabels, iface, sizeof(iface), "_net_default_iface");
 
-    time_t connected_s = rpt->connected_since_s ? (now_realtime_sec() - rpt->connected_since_s) : 0;
+    time_t connected_s = rpt->connected_since_s ?
+        nd_time_t_elapsed_saturating(now_realtime_sec(), rpt->connected_since_s) : 0;
     long long idle_s = (long long)((now_monotonic_usec() - rpt->thread.last_traffic_ut) / USEC_PER_SEC);
     double repl_pct = rpt->host ? rpt->host->stream.rcv.status.replication.percent : 0.0;
 
     errno_clear();
     nd_log(NDLS_DAEMON, NDLP_ERR,
            "STREAM RCV[%zu] '%s' [from [%s]:%s]: receiver disconnected: "
-           "reason=\"%s\" msgs=%zu bytes_in=%zu bytes_out=%zu connected=%llds idle=%llds repl=%.0f%% iface=%s"
+           "reason=\"%s\" msgs=%zu bytes_in=%zu bytes_out=%zu connected=%" PRIdMAX "s idle=%llds repl=%.0f%% iface=%s"
            , sth->id
            , rpt->hostname ? rpt->hostname : "-"
            , rpt->remote_ip ? rpt->remote_ip : "-"
@@ -609,7 +610,7 @@ static void stream_receiver_remove_internal(struct stream_thread *sth, struct re
            , count
            , rpt->thread.bytes_received
            , bytes_out
-           , (long long)connected_s
+           , (intmax_t)connected_s
            , idle_s
            , repl_pct
            , iface[0] ? iface : "-");

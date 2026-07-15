@@ -283,7 +283,8 @@ inline void health_alarm_log_add_entry(RRDHOST *host, ALARM_ENTRY *ae, bool asyn
 
                 if((t->new_status == RRDCALC_STATUS_WARNING || t->new_status == RRDCALC_STATUS_CRITICAL) &&
                    (t->old_status == RRDCALC_STATUS_WARNING || t->old_status == RRDCALC_STATUS_CRITICAL))
-                    ae->non_clear_duration += t->non_clear_duration;
+                    ae->non_clear_duration =
+                        nd_time_t_add_saturating(ae->non_clear_duration, t->non_clear_duration);
 
                 update_ae = t;
             }

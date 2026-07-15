@@ -47,4 +47,16 @@ static inline time_t nd_time_t_add_saturating(time_t base, intmax_t offset) {
     return (time_t)sum;
 }
 
+// Preserve elapsed time, clamp backward samples to zero, and saturate unrepresentable durations.
+static inline time_t nd_time_t_elapsed_saturating(time_t now, time_t then) {
+    if(now <= then)
+        return 0;
+
+    time_t elapsed;
+    if(__builtin_sub_overflow(now, then, &elapsed))
+        return nd_time_t_max();
+
+    return elapsed;
+}
+
 #endif // NETDATA_TIME_T_ARITHMETIC_H
