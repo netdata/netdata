@@ -395,7 +395,9 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     Pvoid_t datafiles_JudyL = NULL;
     Pvoid_t journafile_JudyL = NULL;
     datafiles = callocz(MIN(ret, MAX_DATAFILES), sizeof(*datafiles));
+#ifndef OS_WINDOWS
     bool validate_files = true;
+#endif
     for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) && matched_files < MAX_DATAFILES ; ) {
         ret = sscanf(dent.name, DATAFILE_PREFIX RRDENG_FILE_NUMBER_SCAN_TMPL DATAFILE_EXTENSION, &tier, &fileno);
 
@@ -403,9 +405,11 @@ static int scan_data_files(struct rrdengine_instance *ctx)
         if (2 == ret) {
             datafile = datafile_alloc_and_init(ctx, tier, fileno);
             datafiles[matched_files++] = datafile;
+#ifndef OS_WINDOWS
             Pvoid_t *Pvalue = JudyLIns(&datafiles_JudyL, (Word_t)fileno, PJE0);
             if (!Pvalue || Pvalue == PJERR)
                 validate_files = false;
+#endif
             continue;
         }
 
