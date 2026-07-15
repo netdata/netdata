@@ -181,7 +181,6 @@ static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider,
     return true;
 }
 
-#if !defined(HAVE_ETW)
 // Registry key where WINEVT stores registered publishers (providers).
 #define WINEVT_PUBLISHERS_KEY L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Publishers\\"
 
@@ -385,7 +384,6 @@ static void wel_ensure_manifest_installed(void) {
              manifestDst, dllDst, dllDst);
     (void)wel_run_silent(wevtutil, imParams);
 }
-#endif // !HAVE_ETW
 
 #if defined(HAVE_ETW)
 static void etw_set_source_meta(struct nd_log_source *source, USHORT channelID, const EVENT_DESCRIPTOR *ed) {
@@ -470,14 +468,13 @@ bool nd_log_init_windows(void) {
         return false;
 #endif
 
-    if(!nd_log.eventlog.etw) {
-#if !defined(HAVE_ETW)
-        // Auto-install manifest with importChannel entries so classic ReportEventW events
-        // appear in the Netdata WINEVT channels without any manual setup by the user.
-        // Fast no-op when the manifest is already current (registry check only).
-        wel_ensure_manifest_installed();
-#endif
-    }
+    // Register WINEVT manifest channels when not already current — required for Event
+    // Viewer to show the Netdata tree hierarchy (Netdata → Daemon etc.) instead of flat
+    // "Netdata/Daemon" entries.  Previously gated on !HAVE_ETW, which meant ETW builds
+    // never auto-registered channels, producing the flat display.  The call is now
+    // unconditional: ETW dev builds and WEL builds both need channels; MSI-installed
+    // builds exit immediately via the registry check in wel_manifest_is_current().
+    wel_ensure_manifest_installed();
 
     // Loop through each source and add it to the registry
     for(size_t i = 0; i < _NDLS_MAX; i++) {
