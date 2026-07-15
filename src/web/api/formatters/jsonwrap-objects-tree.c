@@ -11,12 +11,14 @@ static void rrdset_rrdcalc_entries_v2(BUFFER *wb, RRDINSTANCE_ACQUIRED *ria) {
         if(st->alerts.base) {
             buffer_json_member_add_object(wb, "alerts");
             for(RRDCALC *rc = st->alerts.base; rc ;rc = rc->next) {
-                if(rc->status < RRDCALC_STATUS_CLEAR)
+                RRDCALC_RUNTIME_SNAPSHOT snapshot;
+                rrdcalc_runtime_snapshot_get(rc, &snapshot);
+                if(snapshot.status < RRDCALC_STATUS_CLEAR)
                     continue;
 
                 buffer_json_member_add_object(wb, string2str(rc->config.name));
-                buffer_json_member_add_string(wb, JSKEY(status), rrdcalc_status2string(rc->status));
-                buffer_json_member_add_double(wb, JSKEY(value), rc->value);
+                buffer_json_member_add_string(wb, JSKEY(status), rrdcalc_status2string(snapshot.status));
+                buffer_json_member_add_double(wb, JSKEY(value), snapshot.value);
                 buffer_json_member_add_string(wb, JSKEY(units), string2str(rc->config.units));
                 buffer_json_object_close(wb);
             }

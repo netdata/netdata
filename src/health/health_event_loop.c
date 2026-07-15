@@ -839,7 +839,7 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                     ae->flags |= HEALTH_ENTRY_RUN_ONCE;
                 }
                 rc->run_flags |= RRDCALC_FLAG_RUN_ONCE;
-                rrdcalc_runtime_snapshot_publish_run_flags(rc);
+                rrdcalc_runtime_snapshot_publish_repeat_state(rc);
                 health_send_notification(host, ae, hrm);
                 netdata_log_debug(D_HEALTH, "Notification sent for the repeating alarm %u.", ae->alarm_id);
                 health_alarm_wait_for_execution(ae);

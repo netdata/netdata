@@ -13,7 +13,8 @@ void health_string2json(BUFFER *wb, const char *prefix, const char *label, const
         buffer_sprintf(wb, "%s\"%s\":null%s", prefix, label, suffix);
 }
 
-static inline void health_rrdcalc_values2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC *rc) {
+static inline void health_rrdcalc_values2json_nolock(
+    RRDHOST *host, BUFFER *wb, RRDCALC *rc, const RRDCALC_RUNTIME_SNAPSHOT *snapshot) {
     (void)host;
     buffer_sprintf(wb,
                    "\t\t\"%s.%s\": {\n"
@@ -22,23 +23,24 @@ static inline void health_rrdcalc_values2json_nolock(RRDHOST *host, BUFFER *wb, 
                    , (unsigned long)rc->id);
 
     buffer_strcat(wb, "\t\t\t\"value\":");
-    buffer_print_netdata_double(wb, rc->value);
+    buffer_print_netdata_double(wb, snapshot->value);
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\t\t\"last_updated\":");
-    buffer_sprintf(wb, "%lu", (unsigned long)rc->last_updated);
+    buffer_sprintf(wb, "%lu", (unsigned long)snapshot->last_updated);
     buffer_strcat(wb, ",\n");
 
     buffer_sprintf(wb,
                    "\t\t\t\"status\": \"%s\"\n"
-                   , rrdcalc_status2string(rc->status));
+                   , rrdcalc_status2string(snapshot->status));
 
     buffer_strcat(wb, "\t\t}");
 }
 
-static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC *rc) {
+static inline void health_rrdcalc2json_nolock(
+    RRDHOST *host, BUFFER *wb, RRDCALC *rc, const RRDCALC_RUNTIME_SNAPSHOT *snapshot) {
     char value_string[100 + 1];
-    format_value_and_unit(value_string, 100, rc->value, rrdcalc_units(rc), -1);
+    format_value_and_unit(value_string, 100, snapshot->value, rrdcalc_units(rc), -1);
 
     char hash_id[GUID_LEN + 1];
     uuid_unparse_lower(rc->config.hash_id, hash_id);
@@ -86,30 +88,30 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                    , rc->config.component?rrdcalc_component(rc):"Unknown"
                    , rc->config.type?rrdcalc_type(rc):"Unknown"
                    , (rc->rrdset)?"true":"false"
-                   , (rc->run_flags & RRDCALC_FLAG_DISABLED)?"true":"false"
-                   , (rc->run_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
+                   , (snapshot->run_flags & RRDCALC_FLAG_DISABLED)?"true":"false"
+                   , (snapshot->run_flags & RRDCALC_FLAG_SILENCED)?"true":"false"
                    , rc->config.exec?rrdcalc_exec(rc):string2str(host->health.default_exec)
                    , rc->config.recipient?rrdcalc_recipient(rc):string2str(host->health.default_recipient)
                    , rrdcalc_source(rc)
                    , rrdcalc_units(rc)
                    , string2str(rc->summary)
                    , string2str(rc->info)
-                   , rrdcalc_status2string(rc->status)
-                   , (unsigned long)rc->last_status_change
-                   , (unsigned long)rc->last_updated
-                   , (unsigned long)rc->next_update
+                   , rrdcalc_status2string(snapshot->status)
+                   , (unsigned long)snapshot->last_status_change
+                   , (unsigned long)snapshot->last_updated
+                   , (unsigned long)snapshot->next_update
                    , rc->config.update_every
                    , rc->config.delay_up_duration
                    , rc->config.delay_down_duration
                    , rc->config.delay_max_duration
                    , rc->config.delay_multiplier
-                   , rc->delay_last
-                   , (unsigned long)rc->delay_up_to_timestamp
+                   , snapshot->delay_last
+                   , (unsigned long)snapshot->delay_up_to_timestamp
                    , rc->config.warn_repeat_every
                    , rc->config.crit_repeat_every
                    , value_string
-                   , (unsigned long)rc->last_repeat
-                   , (unsigned long)rc->times_repeat
+                   , (unsigned long)snapshot->last_repeat
+                   , (unsigned long)snapshot->times_repeat
     );
 
     if(unlikely(rc->config.alert_action_options & ALERT_ACTION_OPTION_NO_CLEAR_NOTIFICATION)) {
@@ -127,8 +129,8 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
                         "\t\t\t\"lookup_after\": %d,\n"
                         "\t\t\t\"lookup_before\": %d,\n"
                         "\t\t\t\"lookup_options\": \"",
-                       (unsigned long) rc->db_after,
-                       (unsigned long) rc->db_before,
+                       (unsigned long)snapshot->db_after,
+                       (unsigned long)snapshot->db_before,
                        time_grouping_id2txt(rc->config.time_group),
                        rc->config.after,
                        rc->config.before
@@ -161,7 +163,7 @@ static inline void health_rrdcalc2json_nolock(RRDHOST *host, BUFFER *wb, RRDCALC
     buffer_strcat(wb, ",\n");
 
     buffer_strcat(wb, "\t\t\t\"value\":");
-    buffer_print_netdata_double(wb, rc->value);
+    buffer_print_netdata_double(wb, snapshot->value);
     buffer_strcat(wb, "\n");
 
     buffer_strcat(wb, "\t\t}");
@@ -192,9 +194,13 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
                     rrdcalc_rrdset_read_unlock(st);
                     continue;
                 }
-                if(unlikely(st->context == tok_string
-                             && ((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status)))
-                    numberOfAlarms++;
+                if(unlikely(st->context == tok_string)) {
+                    RRDCALC_RUNTIME_SNAPSHOT snapshot;
+                    rrdcalc_runtime_snapshot_get(rc, &snapshot);
+                    if(unlikely((status == RRDCALC_STATUS_RAISED) ?
+                                    (snapshot.status >= RRDCALC_STATUS_WARNING) : snapshot.status == status))
+                        numberOfAlarms++;
+                }
                 rrdcalc_rrdset_read_unlock(st);
             }
             foreach_rrdcalc_in_rrdhost_done(rc);
@@ -215,7 +221,10 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
                 rrdcalc_rrdset_read_unlock(st);
                 continue;
             }
-            if(unlikely((status==RRDCALC_STATUS_RAISED)?(rc->status >= RRDCALC_STATUS_WARNING):rc->status == status))
+            RRDCALC_RUNTIME_SNAPSHOT snapshot;
+            rrdcalc_runtime_snapshot_get(rc, &snapshot);
+            if(unlikely((status == RRDCALC_STATUS_RAISED) ?
+                            (snapshot.status >= RRDCALC_STATUS_WARNING) : snapshot.status == status))
                 numberOfAlarms++;
             rrdcalc_rrdset_read_unlock(st);
         }
@@ -225,7 +234,11 @@ void health_aggregate_alarms(RRDHOST *host, BUFFER *wb, BUFFER* contexts, RRDCAL
     buffer_sprintf(wb, "%d", numberOfAlarms);
 }
 
-static void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, void (*fp)(RRDHOST *, BUFFER *, RRDCALC *)) {
+static void health_alarms2json_fill_alarms(
+    RRDHOST *host,
+    BUFFER *wb,
+    int all,
+    void (*fp)(RRDHOST *, BUFFER *, RRDCALC *, const RRDCALC_RUNTIME_SNAPSHOT *)) {
     RRDCALC *rc;
     int i = 0;
     foreach_rrdcalc_in_rrdhost_read(host, rc) {
@@ -242,13 +255,16 @@ static void health_alarms2json_fill_alarms(RRDHOST *host, BUFFER *wb, int all, v
             continue;
         }
 
-        if(likely(!all && !(rc->status == RRDCALC_STATUS_WARNING || rc->status == RRDCALC_STATUS_CRITICAL))) {
+        RRDCALC_RUNTIME_SNAPSHOT snapshot;
+        rrdcalc_runtime_snapshot_get(rc, &snapshot);
+
+        if(likely(!all && !(snapshot.status == RRDCALC_STATUS_WARNING || snapshot.status == RRDCALC_STATUS_CRITICAL))) {
             rrdcalc_rrdset_read_unlock(st);
             continue;
         }
 
         if(likely(i)) buffer_strcat(wb, ",\n");
-        fp(host, wb, rc);
+        fp(host, wb, rc, &snapshot);
         i++;
         rrdcalc_rrdset_read_unlock(st);
     }

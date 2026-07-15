@@ -51,6 +51,13 @@ typedef struct rrdcalc_runtime_snapshot {
     NETDATA_DOUBLE last_status_change_value;
     usec_t global_id;
     nd_uuid_t last_transition_id;
+    time_t next_update;
+    time_t db_after;
+    time_t db_before;
+    time_t delay_up_to_timestamp;
+    time_t last_repeat;
+    int delay_last;
+    uint32_t times_repeat;
 } RRDCALC_RUNTIME_SNAPSHOT;
 
 struct rrdcalc {
@@ -194,6 +201,7 @@ const char *rrdcalc_status2string(RRDCALC_STATUS status);
 
 void rrdcalc_runtime_snapshot_publish(RRDCALC *rc, usec_t global_id, const nd_uuid_t *transition_id);
 void rrdcalc_runtime_snapshot_publish_run_flags(RRDCALC *rc);
+void rrdcalc_runtime_snapshot_publish_repeat_state(RRDCALC *rc);
 void rrdcalc_runtime_snapshot_get(RRDCALC *rc, RRDCALC_RUNTIME_SNAPSHOT *snapshot);
 
 uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, nd_uuid_t *config_hash_id);

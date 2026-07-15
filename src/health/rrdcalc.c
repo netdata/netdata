@@ -42,6 +42,13 @@ void rrdcalc_runtime_snapshot_publish(RRDCALC *rc, usec_t global_id, const nd_uu
     state->last_updated = rc->last_updated;
     state->last_status_change = rc->last_status_change;
     state->last_status_change_value = rc->last_status_change_value;
+    state->next_update = rc->next_update;
+    state->db_after = rc->db_after;
+    state->db_before = rc->db_before;
+    state->delay_up_to_timestamp = rc->delay_up_to_timestamp;
+    state->last_repeat = rc->last_repeat;
+    state->delay_last = rc->delay_last;
+    state->times_repeat = rc->times_repeat;
 
     if(transition_id) {
         state->global_id = global_id;
@@ -54,6 +61,14 @@ void rrdcalc_runtime_snapshot_publish(RRDCALC *rc, usec_t global_id, const nd_uu
 void rrdcalc_runtime_snapshot_publish_run_flags(RRDCALC *rc) {
     rw_spinlock_write_lock(&rc->runtime_snapshot.spinlock);
     rc->runtime_snapshot.state.run_flags = rc->run_flags;
+    rw_spinlock_write_unlock(&rc->runtime_snapshot.spinlock);
+}
+
+void rrdcalc_runtime_snapshot_publish_repeat_state(RRDCALC *rc) {
+    rw_spinlock_write_lock(&rc->runtime_snapshot.spinlock);
+    rc->runtime_snapshot.state.run_flags = rc->run_flags;
+    rc->runtime_snapshot.state.last_repeat = rc->last_repeat;
+    rc->runtime_snapshot.state.times_repeat = rc->times_repeat;
     rw_spinlock_write_unlock(&rc->runtime_snapshot.spinlock);
 }
 

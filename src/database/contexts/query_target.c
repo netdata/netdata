@@ -642,7 +642,9 @@ static void query_target_eval_instance_rrdcalc(QUERY_TARGET_LOCALS *qtl __maybe_
     if (st) {
         rw_spinlock_read_lock(&st->alerts.spinlock);
         for (RRDCALC *rc = st->alerts.base; rc; rc = rc->next) {
-            switch(rc->status) {
+            RRDCALC_RUNTIME_SNAPSHOT snapshot;
+            rrdcalc_runtime_snapshot_get(rc, &snapshot);
+            switch(snapshot.status) {
                 case RRDCALC_STATUS_CLEAR:
                     qi->alerts.clear++;
                     qc->alerts.clear++;
@@ -708,7 +710,9 @@ static bool query_target_match_alert_pattern(RRDINSTANCE_ACQUIRED *ria, SIMPLE_P
 
             buffer_fast_strcat(wb, string2str(rc->config.name), string_strlen(rc->config.name));
             buffer_fast_strcat(wb, ":", 1);
-            buffer_strcat(wb, rrdcalc_status2string(rc->status));
+            RRDCALC_RUNTIME_SNAPSHOT snapshot;
+            rrdcalc_runtime_snapshot_get(rc, &snapshot);
+            buffer_strcat(wb, rrdcalc_status2string(snapshot.status));
 
             ret = simple_pattern_matches_buffer_extract(pattern, wb, NULL, 0);
 
