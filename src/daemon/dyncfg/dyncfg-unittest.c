@@ -529,6 +529,7 @@ static int dyncfg_unittest_run(const char *cmd, BUFFER *wb, const char *payload,
 }
 
 static void dyncfg_unittest_cleanup_files(void) {
+    CLEAN_CHAR_P *escaped_prefix = dyncfg_escape_id_for_filename("unittest:");
     char path[FILENAME_MAX];
     snprintfz(path, sizeof(path) - 1, "%s/%s", netdata_configured_varlib_dir, "config");
 
@@ -541,7 +542,9 @@ static void dyncfg_unittest_cleanup_files(void) {
     struct dirent *entry;
     char filename[FILENAME_MAX + sizeof(entry->d_name)];
     while ((entry = readdir(dir)) != NULL) {
-        if ((entry->d_type == DT_REG || entry->d_type == DT_LNK) && strstartswith(entry->d_name, "unittest:") && strendswith(entry->d_name, ".dyncfg")) {
+        if ((entry->d_type == DT_REG || entry->d_type == DT_LNK) &&
+            (strstartswith(entry->d_name, "unittest:") || strstartswith(entry->d_name, escaped_prefix)) &&
+            strendswith(entry->d_name, ".dyncfg")) {
             snprintf(filename, sizeof(filename), "%s/%s", path, entry->d_name);
             nd_log(NDLS_DAEMON, NDLP_INFO, "DYNCFG UNITTEST: deleting file '%s'", filename);
             unlink(filename);
@@ -624,6 +627,20 @@ static void dyncfg_file_unittest_load_text(const char *test, const char *d_name,
 
 static void dyncfg_file_unittest(void) {
     static const unsigned char payload[] = { '{', '}', '\0', 'x' };
+
+    const char *cleanup_id = "unittest:dyncfg-load:cleanup";
+    CLEAN_CHAR_P *escaped_cleanup_id = dyncfg_escape_id_for_filename(cleanup_id);
+    char cleanup_d_name[FILENAME_MAX];
+    snprintfz(cleanup_d_name, sizeof(cleanup_d_name), "%s.dyncfg", escaped_cleanup_id);
+    char cleanup_filename[PATH_MAX];
+    snprintfz(cleanup_filename, sizeof(cleanup_filename), "%s/%s", dyncfg_globals.dir, cleanup_d_name);
+    dyncfg_file_unittest_check(
+        dyncfg_file_unittest_write(cleanup_d_name, "", 0), "canonical cleanup artifact write");
+    dyncfg_unittest_cleanup_files();
+    dyncfg_file_unittest_check(
+        access(cleanup_filename, F_OK) != 0 && errno == ENOENT, "canonical cleanup artifact is removed");
+    dyncfg_file_unittest_unlink(cleanup_d_name);
+
     const char *writer_id = "unittest:dyncfg-load:writer";
 
     DYNCFG saved = {
