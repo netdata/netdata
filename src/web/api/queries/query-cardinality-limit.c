@@ -120,6 +120,13 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
     new_r->rows = r->rows;
     new_r->stats = r->stats;
 
+    // expose what the fold hid: the count of folded dimensions and the
+    // largest folded contribution (the ranking cut). Aggregators use the
+    // cut to prove whether a merged top-N is exact: any dimension an agent
+    // did not return contributes at most this much
+    new_r->cardinality.folded = queried_count - kept_dimensions;
+    new_r->cardinality.cut = sorted_dims[kept_dimensions].contribution;
+
     // Copy timestamps
     memcpy(new_r->t, r->t, r->n * sizeof(time_t));
 

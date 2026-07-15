@@ -445,6 +445,21 @@ void rrdr_json_wrapper_begin2(RRDR *r, BUFFER *wb) {
         query_target_functions(wb, "functions", r);
 }
 
+void rrdr_json_wrapper_cardinality_v2(BUFFER *wb, RRDR *r, RRDR_OPTIONS options __maybe_unused) {
+    if(!r->cardinality.folded)
+        return;
+
+    // emitted only when the cardinality fold ran: how many dimensions were
+    // folded into 'remaining' and the largest folded |sum| contribution (the
+    // ranking cut). Aggregators (Netdata Cloud) use the cut to prove whether
+    // a merged top-N is exact - a dimension this agent did not return can
+    // contribute at most the cut
+    buffer_json_member_add_object(wb, "cardinality");
+    buffer_json_member_add_uint64(wb, "folded", r->cardinality.folded);
+    buffer_json_member_add_double(wb, "cut", r->cardinality.cut);
+    buffer_json_object_close(wb);
+}
+
 void rrdr_json_wrapper_partial_data_trimming_v2(BUFFER *wb, RRDR *r, RRDR_OPTIONS options) {
     if(!(options & (RRDR_OPTION_DEBUG | RRDR_OPTION_RETURN_RAW)))
         return;
@@ -512,6 +527,7 @@ void rrdr_json_wrapper_end2(RRDR *r, BUFFER *wb) {
         }
 
         rrdr_json_wrapper_partial_data_trimming_v2(wb, r, options);
+        rrdr_json_wrapper_cardinality_v2(wb, r, options);
 
         if(options & RRDR_OPTION_RETURN_RAW)
             buffer_json_member_add_uint64(wb, "points", rrdr_rows(r));
