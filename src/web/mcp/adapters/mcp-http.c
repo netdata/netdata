@@ -136,8 +136,8 @@ int mcp_http_handle_request(struct rrdhost *host __maybe_unused, struct web_clie
     }
 
     enum json_tokener_error jerr = json_tokener_success;
-    struct json_object *root = json_tokener_parse_verbose(body, &jerr);
-    if (!root || jerr != json_tokener_success) {
+    struct json_object *root = mcp_jsonrpc_parse_request(body, body_len, &jerr);
+    if (jerr != json_tokener_success) {
         BUFFER *payload = mcp_jsonrpc_build_error_payload(NULL, -32700, json_tokener_error_desc(jerr), NULL, 0);
         if (root)
             json_object_put(root);
@@ -193,6 +193,9 @@ int mcp_http_handle_request(struct rrdhost *host __maybe_unused, struct web_clie
 
             if (responses_used) {
                 response_payload = mcp_jsonrpc_build_batch_response(responses, responses_used);
+                has_response = response_payload && buffer_strlen(response_payload);
+            } else if (!len) {
+                response_payload = mcp_jsonrpc_process_single_request(mcpc, NULL, NULL);
                 has_response = response_payload && buffer_strlen(response_payload);
             }
 

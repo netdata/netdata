@@ -74,7 +74,7 @@ static void mcp_sse_append_buffer_event(BUFFER *out, const char *event, BUFFER *
 }
 
 int mcp_sse_serialize_response(struct web_client *w, MCP_CLIENT *mcpc, struct json_object *root) {
-    if (!w || !mcpc || !root)
+    if (!w || !mcpc)
         return HTTP_RESP_INTERNAL_SERVER_ERROR;
 
     BUFFER **responses = NULL;
@@ -100,6 +100,14 @@ int mcp_sse_serialize_response(struct web_client *w, MCP_CLIENT *mcpc, struct js
                 responses_size = new_size;
             }
             responses[responses_used++] = resp_item;
+        }
+
+        if (!len) {
+            BUFFER *resp = mcp_jsonrpc_process_single_request(mcpc, NULL, NULL);
+            if (resp) {
+                responses = reallocz(responses, sizeof(*responses));
+                responses[responses_used++] = resp;
+            }
         }
     } else {
         BUFFER *resp = mcp_jsonrpc_process_single_request(mcpc, root, NULL);
@@ -186,8 +194,8 @@ int mcp_sse_handle_request(struct rrdhost *host __maybe_unused, struct web_clien
     }
 
     enum json_tokener_error jerr = json_tokener_success;
-    struct json_object *root = json_tokener_parse_verbose(body, &jerr);
-    if (!root || jerr != json_tokener_success) {
+    struct json_object *root = mcp_jsonrpc_parse_request(body, body_len, &jerr);
+    if (jerr != json_tokener_success) {
         BUFFER *payload = mcp_jsonrpc_build_error_payload(NULL, -32700, json_tokener_error_desc(jerr), NULL, 0);
         buffer_flush(w->response.data);
         w->response.data->content_type = CT_TEXT_EVENT_STREAM;
