@@ -188,10 +188,10 @@ static inline void json_jsonc_set_integer(JSON_ENTRY *e, char *key, int64_t valu
  * @param callback_function function used to create a silencer.
  */
 static inline void json_jsonc_parse_array(json_object *ptr, void *callback_data,int (*callback_function)(struct json_entry *)) {
-    int end = json_object_array_length(ptr);
+    size_t end = json_object_array_length(ptr);
 
     if(end) {
-        int i;
+        size_t i;
         i = 0;
 
         enum json_type type;
