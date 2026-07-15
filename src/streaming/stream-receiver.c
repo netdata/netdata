@@ -5,6 +5,8 @@
 #include "stream-receiver-internals.h"
 
 #ifdef NETDATA_LOG_STREAM_RECEIVER
+#include "stream-trace.h"
+
 void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload, STREAM_TRAFFIC_TYPE type __maybe_unused, bool inbound) {
     if (!rpt || type != STREAM_TRAFFIC_TYPE_REPLICATION) return; // not a streaming parser
 
@@ -26,23 +28,8 @@ void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload
         struct timespec now;
         clock_gettime(CLOCK_REALTIME, &now);
 
-        time_t elapsed_sec = now.tv_sec - rpt->log.first_call.tv_sec;
-        long elapsed_nsec = now.tv_nsec - rpt->log.first_call.tv_nsec;
-
-        if (elapsed_nsec < 0) {
-            elapsed_sec--;
-            elapsed_nsec += 1000000000;
-        }
-
-        uint16_t days = elapsed_sec / 86400;
-        uint8_t hours = (elapsed_sec % 86400) / 3600;
-        uint8_t minutes = (elapsed_sec % 3600) / 60;
-        uint8_t seconds = elapsed_sec % 60;
-        uint16_t milliseconds = elapsed_nsec / 1000000;
-
-        char prefix[30];
-        snprintf(prefix, sizeof(prefix), "%03ud.%02u:%02u:%02u.%03u ",
-                 days, hours, minutes, seconds, milliseconds);
+        char prefix[STREAM_TRACE_PREFIX_SIZE];
+        stream_trace_format_elapsed_prefix(prefix, now, rpt->log.first_call);
 
         const char *line_start = payload;
         const char *line_end;
