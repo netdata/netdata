@@ -47,7 +47,7 @@ void nd_env_normalize_dir_path(const char *src, char *dst, size_t dst_size) {
 // Walk every '/' separator and create each prefix, ignoring failures
 // (the parent may already exist).  The drive root "X:" is skipped
 // because mkdir on a bare drive letter always fails.
-void mkdir_recursive(const char *native_path, int perms) {
+void mkdir_recursive(const char *native_path) {
     char tmp[FILENAME_MAX + 1];
     strncpyz(tmp, native_path, FILENAME_MAX);
 
@@ -66,7 +66,7 @@ void mkdir_recursive(const char *native_path, int perms) {
         if (*p == '/') {
             char saved = *p;
             *p = '\0';
-            mkdir(tmp, perms);  // ignore failure — may already exist
+            mkdir(tmp, 0775);  // ignore failure — may already exist
             *p = saved;
         }
     }
@@ -105,7 +105,7 @@ void verify_required_directory(const char *env, const char *dir, bool create_it,
         // On Windows, the WiX installer only creates static content directories;
         // runtime directories like var/log/ may have no parent.  Create all
         // intermediate components before attempting the final mkdir.
-        mkdir_recursive(native_dir, perms);
+        mkdir_recursive(native_dir);
 #endif
         // Accept the case where mkdir_recursive already created the leaf.
         if (mkdir(native_dir, perms) == 0 || chdir(native_dir) == 0)
