@@ -944,14 +944,6 @@ static bool nd_logger_windows(struct nd_log_source *source, struct log_field *fi
 
     netdata_mutex_unlock(&wel_queue.mutex);
 
-    if(!enqueued) {
-        // Only trace the first drop — the caller falls back to stderr for this entry.
-        static bool first_drop = false;
-        if(!__atomic_exchange_n(&first_drop, true, __ATOMIC_RELAXED))
-                         "async writer may be blocked in ReportEventW",
-                         WEL_QUEUE_DEPTH);
-    }
-
     return enqueued;
 }
 
