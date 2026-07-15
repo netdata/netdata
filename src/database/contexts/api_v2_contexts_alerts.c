@@ -235,7 +235,7 @@ static void alerts_v2_insert_callback(const DICTIONARY_ITEM *item __maybe_unused
     struct alert_v2_entry *t = value;
     RRDCALC *rc = t->tmp;
     t->name = rc->config.name;
-    t->summary = rc->config.summary; // the original summary
+    t->summary = string_dup(rc->config.summary); // the original summary
     t->context = rrdlabels_create();
     t->recipient = rrdlabels_create();
     t->classification = rrdlabels_create();
@@ -279,6 +279,7 @@ static bool alerts_v2_conflict_callback(const DICTIONARY_ITEM *item __maybe_unus
 static void alerts_v2_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
     struct alert_v2_entry *t = value;
 
+    string_freez(t->summary);
     rrdlabels_destroy(t->context);
     rrdlabels_destroy(t->recipient);
     rrdlabels_destroy(t->classification);
