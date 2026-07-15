@@ -654,6 +654,12 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
 
     int nfd = accept4(fd, (struct sockaddr *)&sadr, &addrlen, flags | DEFAULT_SOCKET_FLAGS);
     if (likely(nfd >= 0)) {
+        if(unlikely(!client_ip || ipsize < 2 || !client_port || portsize < 2)) {
+            close(nfd);
+            errno = EINVAL;
+            return -1;
+        }
+
         if (getnameinfo((struct sockaddr *)&sadr, addrlen, client_ip, (socklen_t)ipsize,
                         client_port, (socklen_t)portsize, NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
 

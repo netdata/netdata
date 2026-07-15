@@ -232,6 +232,7 @@ int health_config_unittest(void);
 int utf8_sanitizer_unittest(void);
 int yaml_unittest(void);
 int json_c_parser_unittest(void);
+int stream_path_json_unittest(void);
 int query_plan_unittest(void);
 #ifdef ENABLE_ML
 int ml_unittest(void);
@@ -400,6 +401,8 @@ int netdata_main(int argc, char **argv) {
                         if(strcmp(optarg, "jsonctest") == 0) {
                             unittest_running = true;
                             if (json_c_parser_unittest()) return 1;
+                            if (stream_path_json_unittest())
+                                return 1;
                             fprintf(stderr, "\n\nJSON-C PARSER TESTS PASSED\n\n");
                             return 0;
                         }
@@ -478,6 +481,8 @@ int netdata_main(int argc, char **argv) {
                             if (health_config_unittest()) return 1;
                             if (yaml_unittest()) return 1;
                             if (json_c_parser_unittest()) return 1;
+                            if (stream_path_json_unittest())
+                                return 1;
                             if (unittest_waiting_queue()) return 1;
                             if (rw_spinlock_unittest()) return 1;
                             if (uuidmap_unittest()) return 1;

@@ -1267,7 +1267,7 @@ RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_
 
         if (rpt->config.health.enabled != CONFIG_BOOLEAN_NO) {
             if (rpt->config.health.delay > 0) {
-                host->health.delay_up_to = now_realtime_sec() + rpt->config.health.delay;
+                host->health.delay_up_to = nd_time_t_add_saturating(now_realtime_sec(), rpt->config.health.delay);
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
                        "STREAM RCV '%s' [from [%s]:%s]: "
                        "Postponing health checks for %" PRId64 " seconds, because it was just connected.",

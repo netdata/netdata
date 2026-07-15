@@ -6,6 +6,8 @@
 #include "stream-sender-internals.h"
 #include "plugins.d/pluginsd_internals.h"
 
+#define STREAM_PATH_MAX_ENTRIES UINT16_MAX
+
 typedef enum __attribute__((packed)) {
     STREAM_PATH_FLAG_NONE       = 0,
     STREAM_PATH_FLAG_ACLK       = (1 << 0),
@@ -328,17 +330,22 @@ void stream_path_node_id_updated(RRDHOST *host) {
 
 static bool parse_single_path(json_object *jobj, const char *path, STREAM_PATH *p, BUFFER *error) {
     uint32_t version = 0;
+    int64_t hops = 0;
+    uint64_t since = 0;
+    uint64_t first_time_t = 0;
+    int64_t start_time_ms = 0;
+    int64_t shutdown_time_ms = 0;
     JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "version", version, error, JSONC_OPTIONAL);
 
     JSONC_PARSE_TXT2STRING_OR_ERROR_AND_RETURN(jobj, path, "hostname", p->hostname, error, JSONC_REQUIRED);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "host_id", p->host_id.uuid, error, JSONC_REQUIRED);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "node_id", p->node_id.uuid, error, JSONC_REQUIRED);
     JSONC_PARSE_TXT2UUID_OR_ERROR_AND_RETURN(jobj, path, "claim_id", p->claim_id.uuid, error, JSONC_REQUIRED);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "hops", p->hops, error, JSONC_REQUIRED);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "since", p->since, error, JSONC_REQUIRED);
-    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "first_time_t", p->first_time_t, error, JSONC_REQUIRED);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "start_time", p->start_time_ms, error, JSONC_REQUIRED);
-    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "shutdown_time", p->shutdown_time_ms, error, JSONC_REQUIRED);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "hops", hops, error, JSONC_REQUIRED);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "since", since, error, JSONC_REQUIRED);
+    JSONC_PARSE_UINT64_OR_ERROR_AND_RETURN(jobj, path, "first_time_t", first_time_t, error, JSONC_REQUIRED);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "start_time", start_time_ms, error, JSONC_REQUIRED);
+    JSONC_PARSE_INT64_OR_ERROR_AND_RETURN(jobj, path, "shutdown_time", shutdown_time_ms, error, JSONC_REQUIRED);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "flags", STREAM_PATH_FLAGS_2id_one, p->flags, error, JSONC_OPTIONAL);
     JSONC_PARSE_ARRAY_OF_TXT2BITMAP_OR_ERROR_AND_RETURN(jobj, path, "capabilities", stream_capabilities_parse_one, p->capabilities, error, JSONC_OPTIONAL);
 
@@ -352,8 +359,13 @@ static bool parse_single_path(json_object *jobj, const char *path, STREAM_PATH *
         return false;
     }
 
-    if(p->hops < 0) {
+    if (hops < 0) {
         buffer_strcat(error, "hops cannot be negative (probably the child disconnected from the Netdata before us");
+        return false;
+    }
+
+    if (hops > INT16_MAX) {
+        buffer_sprintf(error, "hops cannot exceed %d", INT16_MAX);
         return false;
     }
 
@@ -362,10 +374,36 @@ static bool parse_single_path(json_object *jobj, const char *path, STREAM_PATH *
         return false;
     }
 
-    if(p->since <= 0) {
+    if (since == 0) {
         buffer_strcat(error, "since cannot be <= 0");
         return false;
     }
+
+    if (since > (uint64_t)nd_time_t_max()) {
+        buffer_sprintf(error, "since cannot exceed %" PRIdMAX, (intmax_t)nd_time_t_max());
+        return false;
+    }
+
+    if (first_time_t > (uint64_t)nd_time_t_max()) {
+        buffer_sprintf(error, "first_time_t cannot exceed %" PRIdMAX, (intmax_t)nd_time_t_max());
+        return false;
+    }
+
+    if (start_time_ms < 0 || start_time_ms > (int64_t)UINT32_MAX) {
+        buffer_sprintf(error, "start_time must be between 0 and %" PRIu32, UINT32_MAX);
+        return false;
+    }
+
+    if (shutdown_time_ms < 0 || shutdown_time_ms > (int64_t)UINT32_MAX) {
+        buffer_sprintf(error, "shutdown_time must be between 0 and %" PRIu32, UINT32_MAX);
+        return false;
+    }
+
+    p->hops = (int16_t)hops;
+    p->since = (time_t)since;
+    p->first_time_t = (time_t)first_time_t;
+    p->start_time_ms = (uint32_t)start_time_ms;
+    p->shutdown_time_ms = (uint32_t)shutdown_time_ms;
 
     return true;
 }
@@ -411,26 +449,44 @@ bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent
     if (json_object_object_get_ex(jobj, STREAM_PATH_JSON_MEMBER, &_jarray) &&
         json_object_is_type(_jarray, json_type_array)) {
         size_t items = json_object_array_length(_jarray);
-        host->stream.path.array = callocz(items, sizeof(*host->stream.path.array));
-        host->stream.path.size = items;
+        if (items > STREAM_PATH_MAX_ENTRIES) {
+            nd_log(
+                NDLS_DAEMON,
+                NDLP_ERR,
+                "STREAM PATH '%s': Array has %zu items, but the maximum is %u",
+                rrdhost_hostname(host),
+                items,
+                (unsigned int)STREAM_PATH_MAX_ENTRIES);
+        } else {
+            host->stream.path.array = callocz(items, sizeof(*host->stream.path.array));
+            host->stream.path.size = (uint16_t)items;
 
-        for (size_t i = 0; i < items; ++i) {
-            json_object *joption = json_object_array_get_idx(_jarray, i);
-            if (!json_object_is_type(joption, json_type_object)) {
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM PATH '%s': Array item No %zu is not an object: %s",
-                       rrdhost_hostname(host), i, json);
-                continue;
-            }
+            for (size_t i = 0; i < items; ++i) {
+                json_object *joption = json_object_array_get_idx(_jarray, i);
+                if (!json_object_is_type(joption, json_type_object)) {
+                    nd_log(
+                        NDLS_DAEMON,
+                        NDLP_ERR,
+                        "STREAM PATH '%s': Array item No %zu is not an object: %s",
+                        rrdhost_hostname(host),
+                        i,
+                        json);
+                    continue;
+                }
 
-            if(!parse_single_path(joption, "", &host->stream.path.array[host->stream.path.used], error)) {
-                stream_path_cleanup(&host->stream.path.array[host->stream.path.used]);
-                nd_log(NDLS_DAEMON, NDLP_ERR,
-                       "STREAM PATH '%s': Array item No %zu cannot be parsed: %s: %s",
-                       rrdhost_hostname(host), i, buffer_tostring(error), json);
+                if (!parse_single_path(joption, "", &host->stream.path.array[host->stream.path.used], error)) {
+                    stream_path_cleanup(&host->stream.path.array[host->stream.path.used]);
+                    nd_log(
+                        NDLS_DAEMON,
+                        NDLP_ERR,
+                        "STREAM PATH '%s': Array item No %zu cannot be parsed: %s: %s",
+                        rrdhost_hostname(host),
+                        i,
+                        buffer_tostring(error),
+                        json);
+                } else
+                    host->stream.path.used++;
             }
-            else
-                host->stream.path.used++;
         }
     }
 
@@ -457,4 +513,184 @@ bool stream_path_set_from_json(RRDHOST *host, const char *json, bool from_parent
 
 void rrdhost_stream_path_init(RRDHOST *host) {
     rw_spinlock_init(&host->stream.path.spinlock);
+}
+
+int stream_path_json_unittest(void)
+{
+    char time_t_max_str[32];
+    char after_time_t_max_str[32];
+    char after_time_t_max_quoted_str[34];
+    uint64_t time_t_max = (uint64_t)nd_time_t_max();
+    uint64_t after_time_t_max = time_t_max + 1;
+    snprintfz(time_t_max_str, sizeof(time_t_max_str), "%" PRIu64, time_t_max);
+    snprintfz(after_time_t_max_str, sizeof(after_time_t_max_str), "%" PRIu64, after_time_t_max);
+    snprintfz(after_time_t_max_quoted_str, sizeof(after_time_t_max_quoted_str), "\"%" PRIu64 "\"", after_time_t_max);
+
+    struct stream_path_json_test {
+        const char *name;
+        const char *hops;
+        const char *start_time;
+        const char *shutdown_time;
+        bool expected_ok;
+        int16_t expected_hops;
+        uint32_t expected_start_time;
+        uint32_t expected_shutdown_time;
+        const char *since;
+        const char *first_time_t;
+        bool check_timestamps;
+        time_t expected_since;
+        time_t expected_first_time_t;
+    } tests[] = {
+        {"exact endpoints", "32767", "4294967295", "4294967295", true, INT16_MAX, UINT32_MAX, UINT32_MAX},
+        {"lower endpoints", "0", "0", "0", true, 0, 0, 0, "1", "0", true, 1, 0},
+        {"boolean and null coercions", "true", "null", "false", true, 1, 0, 0, "true", "null", true, 1, 0},
+        {"double truncation", "1.9", "1.9", "1.9", true, 1, 1, 1, "1.9", "1.9", true, 1, 1},
+        {"fractional zero coercion", "0.9", "-0.5", "-0.5", true, 0, 0, 0, "1", "0.9", true, 1, 0},
+        {"hops below destination", "-65536", "1", "1", false, 0, 0, 0},
+        {"hops positive wrap", "65536", "1", "1", false, 0, 0, 0},
+        {"hops string wrap", "\"65536\"", "1", "1", false, 0, 0, 0},
+        {"negative start time", "1", "-1", "1", false, 0, 0, 0},
+        {"start time above endpoint", "1", "4294967296", "1", false, 0, 0, 0},
+        {"start time string wrap", "1", "\"4294967296\"", "1", false, 0, 0, 0},
+        {"negative shutdown time", "1", "1", "-1", false, 0, 0, 0},
+        {"shutdown time above endpoint", "1", "1", "4294967296", false, 0, 0, 0},
+        {"shutdown time string wrap", "1", "1", "\"4294967296\"", false, 0, 0, 0},
+        {"time_t upper endpoints",
+         "1",
+         "1",
+         "1",
+         true,
+         1,
+         1,
+         1,
+         time_t_max_str,
+         time_t_max_str,
+         true,
+         (time_t)time_t_max,
+         (time_t)time_t_max},
+        {"since above time_t", "1", "1", "1", false, 0, 0, 0, after_time_t_max_str, "1"},
+        {"since string above time_t", "1", "1", "1", false, 0, 0, 0, after_time_t_max_quoted_str, "1"},
+        {"first_time_t above time_t", "1", "1", "1", false, 0, 0, 0, "1", after_time_t_max_str},
+        {"first_time_t string above time_t", "1", "1", "1", false, 0, 0, 0, "1", after_time_t_max_quoted_str},
+        {"first_time_t negative integer coercion", "1", "1", "1", true, 1, 1, 1, "1", "-1", true, 1, 0},
+    };
+
+    int failed = 0;
+    BUFFER *wb = buffer_create(0, NULL);
+    BUFFER *error = buffer_create(0, NULL);
+
+    fprintf(stderr, "\nStream Path JSON Unit Tests\n===========================\n");
+
+    for (size_t i = 0; i < _countof(tests); i++) {
+        buffer_flush(wb);
+        buffer_flush(error);
+        buffer_sprintf(
+            wb,
+            "{\"hostname\":\"test-host\","
+            "\"host_id\":\"11111111-1111-1111-1111-111111111111\","
+            "\"node_id\":\"00000000-0000-0000-0000-000000000000\","
+            "\"claim_id\":\"00000000-0000-0000-0000-000000000000\","
+            "\"hops\":%s,\"since\":%s,\"first_time_t\":%s,"
+            "\"start_time\":%s,\"shutdown_time\":%s,"
+            "\"capabilities\":[\"V1\"]}",
+            tests[i].hops,
+            tests[i].since ? tests[i].since : "1",
+            tests[i].first_time_t ? tests[i].first_time_t : "1",
+            tests[i].start_time,
+            tests[i].shutdown_time);
+
+        json_object *jobj = json_tokener_parse(buffer_tostring(wb));
+        STREAM_PATH p = {
+            .hops = 123,
+            .since = 123,
+            .first_time_t = 123,
+            .start_time_ms = 123,
+            .shutdown_time_ms = 123,
+        };
+        bool ok = jobj && parse_single_path(jobj, "", &p, error);
+
+        time_t expected_since = tests[i].check_timestamps ? tests[i].expected_since : 1;
+        time_t expected_first_time_t = tests[i].check_timestamps ? tests[i].expected_first_time_t : 1;
+        bool values_ok = ok && p.hops == tests[i].expected_hops && p.since == expected_since &&
+                         p.first_time_t == expected_first_time_t && p.start_time_ms == tests[i].expected_start_time &&
+                         p.shutdown_time_ms == tests[i].expected_shutdown_time;
+        bool failure_unchanged = !ok && p.hops == 123 && p.since == 123 && p.first_time_t == 123 &&
+                                 p.start_time_ms == 123 && p.shutdown_time_ms == 123;
+
+        if (ok != tests[i].expected_ok || (ok && !values_ok) || (!ok && !failure_unchanged)) {
+            fprintf(
+                stderr,
+                "FAILED: %s (expected %s, got %s; hops=%d, since=%" PRId64 ", first_time_t=%" PRId64 ", start=%" PRIu32
+                ", shutdown=%" PRIu32 ", error='%s')\n",
+                tests[i].name,
+                tests[i].expected_ok ? "success" : "failure",
+                ok ? "success" : "failure",
+                p.hops,
+                (int64_t)p.since,
+                (int64_t)p.first_time_t,
+                p.start_time_ms,
+                p.shutdown_time_ms,
+                buffer_tostring(error));
+            failed++;
+        }
+
+        stream_path_cleanup(&p);
+        if (jobj)
+            json_object_put(jobj);
+    }
+
+    const char invalid_payload[] = "{\"streaming_path\":[{"
+                                   "\"hostname\":\"test-host\","
+                                   "\"host_id\":\"11111111-1111-1111-1111-111111111111\","
+                                   "\"node_id\":\"00000000-0000-0000-0000-000000000000\","
+                                   "\"claim_id\":\"00000000-0000-0000-0000-000000000000\","
+                                   "\"hops\":65536,\"since\":1,\"first_time_t\":1,"
+                                   "\"start_time\":1,\"shutdown_time\":1,"
+                                   "\"capabilities\":[\"V1\"]}]}";
+    RRDHOST host = {.hostname = string_strdupz("test-host")};
+    rrdhost_stream_path_init(&host);
+
+    for (size_t i = 0; i < 2; i++) {
+        bool from_parent = i != 0;
+        bool ok = stream_path_set_from_json(&host, invalid_payload, from_parent);
+        if (ok || host.stream.path.used != 0) {
+            fprintf(
+                stderr,
+                "FAILED: %s stream_path_set_from_json caller accepted or published an invalid item\n",
+                from_parent ? "parent" : "child");
+            failed++;
+        }
+        rrdhost_stream_path_clear(&host, true);
+    }
+
+    BUFFER *oversized = buffer_create(0, NULL);
+    buffer_strcat(oversized, "{\"streaming_path\":[");
+    for (size_t i = 0; i <= STREAM_PATH_MAX_ENTRIES; i++) {
+        if (i)
+            buffer_fast_strcat(oversized, ",", 1);
+        buffer_fast_strcat(oversized, "null", 4);
+    }
+    buffer_strcat(oversized, "]}");
+
+    for (size_t i = 0; i < 2; i++) {
+        bool from_parent = i != 0;
+        bool ok = stream_path_set_from_json(&host, buffer_tostring(oversized), from_parent);
+        if (ok || host.stream.path.array || host.stream.path.size || host.stream.path.used) {
+            fprintf(
+                stderr,
+                "FAILED: %s stream_path_set_from_json caller accepted an oversized array\n",
+                from_parent ? "parent" : "child");
+            failed++;
+        }
+    }
+    buffer_free(oversized);
+
+    string_freez(host.hostname);
+    buffer_free(error);
+    buffer_free(wb);
+
+    if (!failed)
+        fprintf(stderr, "All %zu stream path JSON scalar tests and cardinality checks passed.\n", _countof(tests));
+
+    return failed;
 }

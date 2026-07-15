@@ -980,6 +980,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/clocks/clocks.h
         src/libnetdata/clocks/clocks-internals.h
         src/libnetdata/clocks/clocks-unittest.c
+        src/libnetdata/clocks/time_t_arithmetic.h
         src/libnetdata/completion/completion.c
         src/libnetdata/completion/completion.h
         src/libnetdata/datetime/iso8601.c
@@ -3174,6 +3175,10 @@ if(OS_LINUX)
             src/collectors/apps.plugin/tests/test_apps_cgroups_lookup_client_abort.c)
     target_link_libraries(apps-cgroups-lookup-client-abort-test libnetdata)
 endif()
+
+add_executable(stream-receiver-hops-test EXCLUDE_FROM_ALL
+        src/streaming/tests/stream-handshake-hops-test.c)
+target_link_libraries(stream-receiver-hops-test libnetdata)
 
 if(ENABLE_CGROUPS_LOOKUP_SERVER)
     add_executable(cgroup-lookup-netipc-test EXCLUDE_FROM_ALL

@@ -330,7 +330,9 @@ struct rrdhost {
 
     // ------------------------------------------------------------------------
     // ML handle
+    RW_SPINLOCK ml_host_rwlock;
     rrd_ml_host_t *ml_host;
+    bool ml_running;                                      // atomic
 
     // ------------------------------------------------------------------------
     // Support for host-level labels

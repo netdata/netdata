@@ -756,11 +756,17 @@ ml_dimension_deserialize_kmeans(const char *json_str)
 
     // ml_host may have been unpublished by ml_host_delete() concurrently;
     // the acquired RRDHOST keeps RH alive but not RH->ml_host.
-    ml_host_t *host = AcqDim.host();
-    if (!host) {
-        pulse_ml_models_ignored();
-        json_object_put(root);
-        return true;
+    ml_queue_t *queue;
+    {
+        AcquiredMLHost acquired_host = AcqDim.host();
+        ml_host_t *host = acquired_host.get();
+        if (!host) {
+            pulse_ml_models_ignored();
+            json_object_put(root);
+            return true;
+        }
+
+        queue = host->queue;
     }
 
     ml_queue_item_t item;
@@ -768,7 +774,7 @@ ml_dimension_deserialize_kmeans(const char *json_str)
     item.add_existing_model = {
         DLI, inlined_km
     };
-    ml_queue_push(host->queue, item);
+    ml_queue_push(queue, item);
 
     json_object_put(root);
     return true;
@@ -859,10 +865,11 @@ static bool ml_dimension_update_models(ml_worker_t *worker, ml_dimension_t *dim,
 {
     worker_is_busy(WORKER_TRAIN_UPDATE_MODELS);
 
+    // Sample ml_running inside the same slock critical section as the
+    // reset_generation check, so a stop that starts first cancels this install.
     spinlock_lock(&dim->slock);
 
-    ml_host_t *host = (ml_host_t *) __atomic_load_n(&dim->rd->rrdset->rrdhost->ml_host, __ATOMIC_ACQUIRE);
-    if (!ml_should_publish_model_update(host && host->ml_running,
+    if (!ml_should_publish_model_update(ml_running_load(dim->rd->rrdset->rrdhost),
                                         dim->reset_generation,
                                         expected_generation,
                                         &dim->training_in_progress)) {
@@ -1173,6 +1180,40 @@ ml_chart_is_available_for_ml(ml_chart_t *chart)
     return rrdset_is_available_for_exporting_and_alarms(chart->rs);
 }
 
+static void ml_chart_stats_add(ml_machine_learning_stats_t *dst, const ml_machine_learning_stats_t &src)
+{
+    dst->num_machine_learning_status_enabled += src.num_machine_learning_status_enabled;
+    dst->num_machine_learning_status_disabled_sp += src.num_machine_learning_status_disabled_sp;
+
+    dst->num_metric_type_constant += src.num_metric_type_constant;
+    dst->num_metric_type_variable += src.num_metric_type_variable;
+
+    dst->num_training_status_untrained += src.num_training_status_untrained;
+    dst->num_training_status_pending_without_model += src.num_training_status_pending_without_model;
+    dst->num_training_status_trained += src.num_training_status_trained;
+    dst->num_training_status_pending_with_model += src.num_training_status_pending_with_model;
+    dst->num_training_status_silenced += src.num_training_status_silenced;
+
+    dst->num_anomalous_dimensions += src.num_anomalous_dimensions;
+    dst->num_normal_dimensions += src.num_normal_dimensions;
+}
+
+void ml_chart_reset_stats(ml_chart_t *chart)
+{
+    spinlock_lock(&chart->mls_spinlock);
+    chart->mls = {};
+    spinlock_unlock(&chart->mls_spinlock);
+}
+
+ml_machine_learning_stats_t ml_chart_get_stats(ml_chart_t *chart)
+{
+    spinlock_lock(&chart->mls_spinlock);
+    ml_machine_learning_stats_t mls = chart->mls;
+    spinlock_unlock(&chart->mls_spinlock);
+
+    return mls;
+}
+
 void
 ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomalous)
 {
@@ -1182,46 +1223,52 @@ ml_chart_update_dimension(ml_chart_t *chart, ml_dimension_t *dim, bool is_anomal
     enum ml_training_status ts = dim->ts;
     spinlock_unlock(&dim->slock);
 
+    ml_machine_learning_stats_t delta = {};
+
     switch (mls) {
         case MACHINE_LEARNING_STATUS_DISABLED_DUE_TO_EXCLUDED_CHART:
-            chart->mls.num_machine_learning_status_disabled_sp++;
-            return;
+            delta.num_machine_learning_status_disabled_sp++;
+            break;
         case MACHINE_LEARNING_STATUS_ENABLED: {
-            chart->mls.num_machine_learning_status_enabled++;
+            delta.num_machine_learning_status_enabled++;
 
             switch (mt) {
                 case METRIC_TYPE_CONSTANT:
-                    chart->mls.num_metric_type_constant++;
-                    chart->mls.num_training_status_trained++;
-                    chart->mls.num_normal_dimensions++;
-                    return;
+                    delta.num_metric_type_constant++;
+                    delta.num_training_status_trained++;
+                    delta.num_normal_dimensions++;
+                    break;
                 case METRIC_TYPE_VARIABLE:
-                    chart->mls.num_metric_type_variable++;
+                    delta.num_metric_type_variable++;
+
+                    switch (ts) {
+                        case TRAINING_STATUS_UNTRAINED:
+                            delta.num_training_status_untrained++;
+                            break;
+                        case TRAINING_STATUS_TRAINED:
+                            delta.num_training_status_trained++;
+
+                            delta.num_anomalous_dimensions += is_anomalous ? 1 : 0;
+                            delta.num_normal_dimensions += is_anomalous ? 0 : 1;
+                            break;
+                        case TRAINING_STATUS_SILENCED:
+                            delta.num_training_status_silenced++;
+                            delta.num_training_status_trained++;
+
+                            delta.num_anomalous_dimensions += is_anomalous ? 1 : 0;
+                            delta.num_normal_dimensions += is_anomalous ? 0 : 1;
+                            break;
+                    }
                     break;
             }
 
-            switch (ts) {
-                case TRAINING_STATUS_UNTRAINED:
-                    chart->mls.num_training_status_untrained++;
-                    return;
-                case TRAINING_STATUS_TRAINED:
-                    chart->mls.num_training_status_trained++;
-
-                    chart->mls.num_anomalous_dimensions += is_anomalous;
-                    chart->mls.num_normal_dimensions += !is_anomalous;
-                    return;
-                case TRAINING_STATUS_SILENCED:
-                    chart->mls.num_training_status_silenced++;
-                    chart->mls.num_training_status_trained++;
-
-                    chart->mls.num_anomalous_dimensions += is_anomalous;
-                    chart->mls.num_normal_dimensions += !is_anomalous;
-                    return;
-            }
-
-            return;
+            break;
         }
     }
+
+    spinlock_lock(&chart->mls_spinlock);
+    ml_chart_stats_add(&chart->mls, delta);
+    spinlock_unlock(&chart->mls_spinlock);
 }
 
 /*
@@ -1242,10 +1289,10 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
     ml_machine_learning_stats_t host_mls = {};
     calculated_number_t host_anomaly_rate = 0.0;
 
-    if (host->ml_running) {
-        // Snapshot the stop generation before the unlocked walk. If it changes
-        // by the time we publish, a stop ran while we were reading chart->mls
-        // and the accumulated snapshot must be discarded.
+    if (ml_running_load(host->rh)) {
+        // Snapshot the stop generation before the chart walk. If it changes by
+        // the time we publish, a stop overlapped the walk and the accumulated
+        // snapshot must be discarded.
         uint64_t stop_gen_before = host->ml_stop_generation.load();
 
         /*
@@ -1262,7 +1309,7 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
             if (!ml_chart_is_available_for_ml(chart))
                 continue;
 
-            ml_machine_learning_stats_t chart_mls = chart->mls;
+            ml_machine_learning_stats_t chart_mls = ml_chart_get_stats(chart);
 
             host_mls.num_machine_learning_status_enabled += chart_mls.num_machine_learning_status_enabled;
             host_mls.num_machine_learning_status_disabled_sp += chart_mls.num_machine_learning_status_disabled_sp;
@@ -1312,15 +1359,15 @@ ml_host_detect_once(ml_host_t *host, ONEWAYALLOC *owa)
         // Discard the snapshot if either (a) ml_running is now false, or
         // (b) the stop generation changed since the walk started — the
         // latter catches a stop+start that completed during the walk and
-        // would otherwise pass the boolean check. In either case our
-        // unlocked chart->mls reads may have raced ml_host_stop, so zero
-        // the snapshot and the per-context counts. The chart updates below
-        // run unconditionally: ml_update_dimensions_chart reads
-        // host->ml_running directly (so the ml_running chart records the
-        // stop), and the chart-update path resets and republishes the rest.
+        // would otherwise pass the boolean check. In either case the chart
+        // walk may have spanned stop's resets, so zero the snapshot and the
+        // per-context counts. The chart updates below run unconditionally:
+        // ml_update_dimensions_chart reads the host running state directly (so
+        // the ml_running chart records the stop), and the chart-update path resets
+        // and republishes the rest.
         netdata_mutex_lock(&host->mutex);
         uint64_t stop_gen_after = host->ml_stop_generation.load();
-        if (!host->ml_running || stop_gen_before != stop_gen_after) {
+        if (!ml_running_load(host->rh) || stop_gen_before != stop_gen_after) {
             host_mls = {};
             host_anomaly_rate = 0.0;
 
@@ -1373,7 +1420,8 @@ void ml_detect_main(void *arg)
         RRDHOST *rh;
         rrd_rdlock();
         rrdhost_foreach_read(rh) {
-            ml_host_t *host = (ml_host_t *) __atomic_load_n(&rh->ml_host, __ATOMIC_ACQUIRE);
+            AcquiredMLHost acquired_host(rh);
+            ml_host_t *host = acquired_host.get();
             if (!host)
                 continue;
 
@@ -1511,8 +1559,7 @@ static enum ml_worker_result ml_worker_add_existing_model(ml_worker_t *worker, m
         return ML_WORKER_RESULT_OK;
     }
 
-    ml_host_t *host = (ml_host_t *) __atomic_load_n(&Dim->rd->rrdset->rrdhost->ml_host, __ATOMIC_ACQUIRE);
-    if (!host || !host->ml_running) {
+    if (!ml_running_load(Dim->rd->rrdset->rrdhost)) {
         pulse_ml_models_ignored();
         return ML_WORKER_RESULT_OK;
     }

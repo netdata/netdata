@@ -245,7 +245,7 @@ static int wait_till_agent_claim_ready()
 static void msg_callback(const char *topic, const void *msg, size_t msglen, int qos)
 {
     UNUSED(qos);
-    aclk_rcvd_cloud_msgs++;
+    __atomic_add_fetch(&aclk_rcvd_cloud_msgs, 1, __ATOMIC_RELAXED);
 
     netdata_log_debug(D_ACLK, "Got Message From Broker Topic \"%s\" QOS %d", topic, qos);
 
@@ -282,8 +282,8 @@ static void msg_callback(const char *topic, const void *msg, size_t msglen, int 
 
 static void puback_callback(uint16_t packet_id)
 {
-    if (++aclk_pubacks_per_conn == ACLK_PUBACKS_CONN_STABLE) {
-        last_conn_time_appl = now_realtime_sec();
+    if (__atomic_add_fetch(&aclk_pubacks_per_conn, 1, __ATOMIC_RELAXED) == ACLK_PUBACKS_CONN_STABLE) {
+        __atomic_store_n(&last_conn_time_appl, now_realtime_sec(), __ATOMIC_RELAXED);
         aclk_tbeb_reset();
     }
 
@@ -388,9 +388,9 @@ static inline void mqtt_connected_actions(mqtt_wss_client client)
         mqtt_wss_subscribe(client, topic, 1);
 
     aclk_set_connected();
-    aclk_pubacks_per_conn = 0;
-    aclk_rcvd_cloud_msgs = 0;
-    aclk_connection_counter++;
+    __atomic_store_n(&aclk_pubacks_per_conn, 0, __ATOMIC_RELAXED);
+    __atomic_store_n(&aclk_rcvd_cloud_msgs, 0, __ATOMIC_RELAXED);
+    __atomic_add_fetch(&aclk_connection_counter, 1, __ATOMIC_RELAXED);
 
     size_t iter = 0;
     while ((topic = (char*)aclk_topic_cache_iterate(&iter)) != NULL)
@@ -422,7 +422,7 @@ void aclk_graceful_disconnect(mqtt_wss_client client)
     nd_log(NDLS_DAEMON, NDLP_WARNING, "ACLK link is down");
     nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK DISCONNECTED");
 
-    last_disconnect_time = now_realtime_sec();
+    __atomic_store_n(&last_disconnect_time, now_realtime_sec(), __ATOMIC_RELAXED);
     aclk_set_disconnected();
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
@@ -466,8 +466,11 @@ static unsigned long aclk_reconnect_delay() {
 static int aclk_block_till_recon_allowed() {
     unsigned long recon_delay = aclk_reconnect_delay();
 
-    next_connection_attempt = now_realtime_sec() + (recon_delay / MSEC_PER_SEC);
-    last_backoff_value = (float)recon_delay / MSEC_PER_SEC;
+    time_t next_attempt = now_realtime_sec() + (time_t)(recon_delay / MSEC_PER_SEC);
+    __atomic_store_n(&next_connection_attempt, next_attempt, __ATOMIC_RELAXED);
+
+    float backoff_value = (float)recon_delay / MSEC_PER_SEC;
+    __atomic_store(&last_backoff_value, &backoff_value, __ATOMIC_RELAXED);
 
     nd_log(NDLS_DAEMON, NDLP_DEBUG,
            "Wait before attempting to reconnect in %.3f seconds", recon_delay / (float)MSEC_PER_SEC);
@@ -774,7 +777,7 @@ static int aclk_attempt_to_connect(mqtt_wss_client client)
         aclk_sensitive_free(&proxy_password);
 
         if (!mqtt_rc) {
-            last_conn_time_mqtt = now_realtime_sec();
+            __atomic_store_n(&last_conn_time_mqtt, now_realtime_sec(), __ATOMIC_RELAXED);
             nd_log(NDLS_DAEMON, NDLP_INFO, "ACLK: connection successfully established");
             aclk_status_set(ACLK_STATUS_CONNECTED);
             nd_log(NDLS_ACCESS, NDLP_INFO, "ACLK CONNECTED");
@@ -889,7 +892,7 @@ void aclk_main(void *ptr)
         worker_is_busy(WORKER_ACLK_HANDLE_CONNECTION);
         if (handle_connection(mqttwss_client)) {
             worker_is_busy(WORKER_ACLK_DISCONNECTED);
-            last_disconnect_time = now_realtime_sec();
+            __atomic_store_n(&last_disconnect_time, now_realtime_sec(), __ATOMIC_RELAXED);
             aclk_set_disconnected();
             nd_log(NDLS_ACCESS, NDLP_WARNING, "ACLK DISCONNECTED");
         }
@@ -1105,31 +1108,41 @@ char *aclk_state(void)
     if (aclk_is_online)
         aclk_stats = aclk_statistics();
 
-    buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_is_online ? "Yes" : "No", aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0, aclk_disable_runtime ? "Yes" : "No");
-    if (last_conn_time_mqtt && ((tmptr = localtime_r(&last_conn_time_mqtt, &tmbuf))) ) {
+    int connection_counter = __atomic_load_n(&aclk_connection_counter, __ATOMIC_RELAXED);
+    time_t last_conn_time_mqtt_snapshot = __atomic_load_n(&last_conn_time_mqtt, __ATOMIC_RELAXED);
+    time_t last_conn_time_appl_snapshot = __atomic_load_n(&last_conn_time_appl, __ATOMIC_RELAXED);
+    time_t last_disconnect_time_snapshot = __atomic_load_n(&last_disconnect_time, __ATOMIC_RELAXED);
+    time_t next_connection_attempt_snapshot = __atomic_load_n(&next_connection_attempt, __ATOMIC_RELAXED);
+    float last_backoff_value_snapshot;
+    __atomic_load(&last_backoff_value, &last_backoff_value_snapshot, __ATOMIC_RELAXED);
+
+    buffer_sprintf(wb, "Online: %s\nReconnect count: %d\nBanned By Cloud: %s\n", aclk_is_online ? "Yes" : "No", connection_counter > 0 ? (connection_counter - 1) : 0, aclk_disable_runtime ? "Yes" : "No");
+    if (last_conn_time_mqtt_snapshot && ((tmptr = localtime_r(&last_conn_time_mqtt_snapshot, &tmbuf))) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
         buffer_sprintf(wb, "Last Connection Time: %s\n", timebuf);
     }
-    if (last_conn_time_appl && ((tmptr = localtime_r(&last_conn_time_appl, &tmbuf))) ) {
+    if (last_conn_time_appl_snapshot && ((tmptr = localtime_r(&last_conn_time_appl_snapshot, &tmbuf))) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
         buffer_sprintf(wb, "Last Connection Time + %d PUBACKs received: %s\n", ACLK_PUBACKS_CONN_STABLE, timebuf);
     }
-    if (last_disconnect_time && ((tmptr = localtime_r(&last_disconnect_time, &tmbuf))) ) {
+    if (last_disconnect_time_snapshot && ((tmptr = localtime_r(&last_disconnect_time_snapshot, &tmbuf))) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
         buffer_sprintf(wb, "Last Disconnect Time: %s\n", timebuf);
     }
-    if (!aclk_connected && next_connection_attempt && ((tmptr = localtime_r(&next_connection_attempt, &tmbuf))) ) {
+    if (!aclk_is_online && next_connection_attempt_snapshot && ((tmptr = localtime_r(&next_connection_attempt_snapshot, &tmbuf))) ) {
         char timebuf[26];
         strftime(timebuf, 26, "%Y-%m-%d %H:%M:%S", tmptr);
-        buffer_sprintf(wb, "Next Connection Attempt At: %s\nLast Backoff: %.3f", timebuf, last_backoff_value);
+        buffer_sprintf(wb, "Next Connection Attempt At: %s\nLast Backoff: %.3f", timebuf, last_backoff_value_snapshot);
     }
 
     if (aclk_is_online) {
+        int rcvd_cloud_msgs = __atomic_load_n(&aclk_rcvd_cloud_msgs, __ATOMIC_RELAXED);
+        int pubacks_per_conn = __atomic_load_n(&aclk_pubacks_per_conn, __ATOMIC_RELAXED);
         buffer_sprintf(wb, "Received Cloud MQTT Messages: %d\nMQTT Messages Confirmed by Remote Broker (PUBACKs): %d\nPending PUBACKS: %d\nServer Receive Maximum: %u\n",
-                       aclk_rcvd_cloud_msgs, aclk_pubacks_per_conn, aclk_stats.mqtt.packets_waiting_puback,
+                       rcvd_cloud_msgs, pubacks_per_conn, aclk_stats.mqtt.packets_waiting_puback,
                        (unsigned)aclk_stats.mqtt.rx_maximum);
 
         RRDHOST *host;
@@ -1261,10 +1274,10 @@ char *aclk_state_json(void)
     tmp = json_object_new_int(5);
     json_object_object_add(msg, "mqtt-version", tmp);
 
-    tmp = json_object_new_int(aclk_rcvd_cloud_msgs);
+    tmp = json_object_new_int(__atomic_load_n(&aclk_rcvd_cloud_msgs, __ATOMIC_RELAXED));
     json_object_object_add(msg, "received-app-layer-msgs", tmp);
 
-    tmp = json_object_new_int(aclk_pubacks_per_conn);
+    tmp = json_object_new_int(__atomic_load_n(&aclk_pubacks_per_conn, __ATOMIC_RELAXED));
     json_object_object_add(msg, "received-mqtt-pubacks", tmp);
 
     tmp = json_object_new_int((int32_t) aclk_stats.mqtt.packets_waiting_puback);
@@ -1273,16 +1286,23 @@ char *aclk_state_json(void)
     tmp = json_object_new_int((int32_t) aclk_stats.mqtt.rx_maximum);
     json_object_object_add(msg, "server-receive-maximum", tmp);
 
-    tmp = json_object_new_int(aclk_connection_counter > 0 ? (aclk_connection_counter - 1) : 0);
+    int connection_counter = __atomic_load_n(&aclk_connection_counter, __ATOMIC_RELAXED);
+    tmp = json_object_new_int(connection_counter > 0 ? (connection_counter - 1) : 0);
     json_object_object_add(msg, "reconnect-count", tmp);
 
-    json_object_object_add(msg, "last-connect-time-utc", timestamp_to_json(&last_conn_time_mqtt));
-    json_object_object_add(msg, "last-connect-time-puback-utc", timestamp_to_json(&last_conn_time_appl));
-    json_object_object_add(msg, "last-disconnect-time-utc", timestamp_to_json(&last_disconnect_time));
-    json_object_object_add(msg, "next-connection-attempt-utc", !aclk_is_online ? timestamp_to_json(&next_connection_attempt) : NULL);
+    time_t last_conn_time_mqtt_snapshot = __atomic_load_n(&last_conn_time_mqtt, __ATOMIC_RELAXED);
+    time_t last_conn_time_appl_snapshot = __atomic_load_n(&last_conn_time_appl, __ATOMIC_RELAXED);
+    time_t last_disconnect_time_snapshot = __atomic_load_n(&last_disconnect_time, __ATOMIC_RELAXED);
+    time_t next_connection_attempt_snapshot = __atomic_load_n(&next_connection_attempt, __ATOMIC_RELAXED);
+    json_object_object_add(msg, "last-connect-time-utc", timestamp_to_json(&last_conn_time_mqtt_snapshot));
+    json_object_object_add(msg, "last-connect-time-puback-utc", timestamp_to_json(&last_conn_time_appl_snapshot));
+    json_object_object_add(msg, "last-disconnect-time-utc", timestamp_to_json(&last_disconnect_time_snapshot));
+    json_object_object_add(msg, "next-connection-attempt-utc", !aclk_is_online ? timestamp_to_json(&next_connection_attempt_snapshot) : NULL);
     tmp = NULL;
-    if (!aclk_online() && last_backoff_value)
-        tmp = json_object_new_double(last_backoff_value);
+    float last_backoff_value_snapshot;
+    __atomic_load(&last_backoff_value, &last_backoff_value_snapshot, __ATOMIC_RELAXED);
+    if (!aclk_is_online && last_backoff_value_snapshot)
+        tmp = json_object_new_double(last_backoff_value_snapshot);
     json_object_object_add(msg, "last-backoff-value", tmp);
 
     tmp = json_object_new_boolean(aclk_disable_runtime);
