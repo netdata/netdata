@@ -158,7 +158,7 @@ class FullDistroEntry:
     base_image: Annotated[str, Field(
         title='Platform Base Image',
         description='Specifies a Docker image to use as a base for builds for this platform. A sane default that works for most platforms is computed from the distro and version keys.',
-        default_factory=lambda data: f'{data.get('distro')}:{data.get('version')}',
+        default_factory=lambda data: f'{data.get("distro")}:{data.get("version")}',
     )]
     env_prep: Annotated[str, Field(
         title='Environment Preparation Command',
@@ -247,7 +247,7 @@ class DistroData(BaseModel):
         c = Counter(value)
 
         if s := {k for k, v in c.items() if v > 1}:
-            ValueError(f'Found duplicate values in list: {s}')
+            raise ValueError(f'Found duplicate values in list: {s}')
 
         return value
 
@@ -257,13 +257,13 @@ class DistroData(BaseModel):
         c = Counter(value)
 
         if s := {k for k, v in c.items() if v > 1}:
-            ValueError(f'Found duplicate values in arch_order: {s}')
+            raise ValueError(f'Found duplicate values in arch_order: {s}')
 
         s1 = set(value)
         s2 = set(Arch)
 
         if s3 := s2 - s1:
-            ValueError(f'Missing values from arch_order list: {s3}')
+            raise ValueError(f'Missing values from arch_order list: {s3}')
 
         return value
 
@@ -273,13 +273,13 @@ class DistroData(BaseModel):
         c = Counter(value.keys())
 
         if s := {k for k, v in c.items() if v > 1}:
-            ValueError(f'Found duplicate keys in arch_data mapping: {s}')
+            raise ValueError(f'Found duplicate keys in arch_data mapping: {s}')
 
         s1 = set(value.keys())
         s2 = set(Arch)
 
         if s3 := s2 - s1:
-            ValueError(f'Missing keys from arch_data mapping: {s3}')
+            raise ValueError(f'Missing keys from arch_data mapping: {s3}')
 
         return value
 
