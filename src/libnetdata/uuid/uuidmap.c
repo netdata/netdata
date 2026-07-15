@@ -386,11 +386,10 @@ size_t uuidmap_destroy(void) {
 
     // Traverse all partitions
     for (size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++) {
-        Pvoid_t uuid_to_id = uuid_map.p[partition].uuid_to_id;
-        Pvoid_t id_to_uuid = uuid_map.p[partition].id_to_uuid;
-
         // Free all Judy arrays
 #ifndef OS_WINDOWS
+        Pvoid_t uuid_to_id = uuid_map.p[partition].uuid_to_id;
+        Pvoid_t id_to_uuid = uuid_map.p[partition].id_to_uuid;
         JudyHSFreeArray(&uuid_to_id, PJE0);
         JudyLFreeArray(&id_to_uuid, PJE0);
 #endif
