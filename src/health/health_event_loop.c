@@ -334,25 +334,37 @@ static void do_eval_expression(
         if (result)
             *result = NAN;
 
-        netdata_log_debug(D_HEALTH,
-                          "Health on host '%s', alarm '%s.%s': %s expression failed with error: %s",
-                          rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc), expression_type,
-                          expression_error_msg(expression)
-        );
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(unlikely(debug_flags & D_HEALTH)) {
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+            netdata_log_debug(D_HEALTH,
+                              "Health on host '%s', alarm '%s.%s': %s expression failed with error: %s",
+                              string2str(identity.hostname), rrdcalc_chart_name(rc), rrdcalc_name(rc), expression_type,
+                              expression_error_msg(expression)
+            );
+            rrdhost_identity_release(&identity);
+        }
+#endif
         return;
     }
 
     rc->run_flags &= ~error_type;
-    netdata_log_debug(D_HEALTH,
-                      "Health on host '%s', alarm '%s.%s': %s expression gave value "
-                      NETDATA_DOUBLE_FORMAT ": %s (source: %s)",
-                      rrdhost_hostname(host),
-                      rrdcalc_chart_name(rc),
-                      rrdcalc_name(rc),
-                      expression_type,
-                      expression_result(expression),
-                      expression_error_msg(expression),
-                      rrdcalc_source(rc));
+#ifdef NETDATA_INTERNAL_CHECKS
+    if(unlikely(debug_flags & D_HEALTH)) {
+        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+        netdata_log_debug(D_HEALTH,
+                          "Health on host '%s', alarm '%s.%s': %s expression gave value "
+                          NETDATA_DOUBLE_FORMAT ": %s (source: %s)",
+                          string2str(identity.hostname),
+                          rrdcalc_chart_name(rc),
+                          rrdcalc_name(rc),
+                          expression_type,
+                          expression_result(expression),
+                          expression_error_msg(expression),
+                          rrdcalc_source(rc));
+        rrdhost_identity_release(&identity);
+    }
+#endif
     if (calc_status)
         *calc_status = rrdcalc_value2status(expression_result(expression));
     else
@@ -575,9 +587,15 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                 rc->value = NAN;
                 rc->run_flags |= RRDCALC_FLAG_DB_ERROR;
 
-                netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup returned error %d",
-                                  rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc), ret
-                );
+#ifdef NETDATA_INTERNAL_CHECKS
+                if(unlikely(debug_flags & D_HEALTH)) {
+                    RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+                    netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup returned error %d",
+                                      string2str(identity.hostname), rrdcalc_chart_name(rc), rrdcalc_name(rc), ret
+                    );
+                    rrdhost_identity_release(&identity);
+                }
+#endif
             } else
                 rc->run_flags &= ~RRDCALC_FLAG_DB_ERROR;
 
@@ -586,16 +604,28 @@ static void health_event_loop_for_host(RRDHOST *host, bool apply_hibernation_del
                 rc->value = NAN;
                 rc->run_flags |= RRDCALC_FLAG_DB_NAN;
 
-                netdata_log_debug(D_HEALTH,
-                                  "Health on host '%s', alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)",
-                                  rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc)
-                );
+#ifdef NETDATA_INTERNAL_CHECKS
+                if(unlikely(debug_flags & D_HEALTH)) {
+                    RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+                    netdata_log_debug(D_HEALTH,
+                                      "Health on host '%s', alarm '%s.%s': database lookup returned empty value (possibly value is not collected yet)",
+                                      string2str(identity.hostname), rrdcalc_chart_name(rc), rrdcalc_name(rc)
+                    );
+                    rrdhost_identity_release(&identity);
+                }
+#endif
             } else
                 rc->run_flags &= ~RRDCALC_FLAG_DB_NAN;
 
-            netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup gave value " NETDATA_DOUBLE_FORMAT,
-                              rrdhost_hostname(host), rrdcalc_chart_name(rc), rrdcalc_name(rc), rc->value
-            );
+#ifdef NETDATA_INTERNAL_CHECKS
+            if(unlikely(debug_flags & D_HEALTH)) {
+                RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+                netdata_log_debug(D_HEALTH, "Health on host '%s', alarm '%s.%s': database lookup gave value " NETDATA_DOUBLE_FORMAT,
+                                  string2str(identity.hostname), rrdcalc_chart_name(rc), rrdcalc_name(rc), rc->value
+                );
+                rrdhost_identity_release(&identity);
+            }
+#endif
         }
 
         // ------------------------------------------------------------

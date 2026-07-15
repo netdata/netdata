@@ -23,9 +23,16 @@ static inline PARSER_RC pluginsd_set(char **words, size_t num_words, PARSER *par
 
     st->pluginsd.set = true;
 
-    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG)))
-        netdata_log_debug(D_PLUGINSD, "PLUGINSD: 'host:%s/chart:%s/dim:%s' SET is setting value to '%s'",
-              rrdhost_hostname(host), rrdset_id(st), dimension, value && *value ? value : "UNSET");
+    if (unlikely(rrdset_flag_check(st, RRDSET_FLAG_DEBUG))) {
+#ifdef NETDATA_INTERNAL_CHECKS
+        if(unlikely(debug_flags & D_PLUGINSD)) {
+            RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+            netdata_log_debug(D_PLUGINSD, "PLUGINSD: 'host:%s/chart:%s/dim:%s' SET is setting value to '%s'",
+                              string2str(identity.hostname), rrdset_id(st), dimension, value && *value ? value : "UNSET");
+            rrdhost_identity_release(&identity);
+        }
+#endif
+    }
 
     if (value && *value) {
         if(rrddim_is_float(rd))
