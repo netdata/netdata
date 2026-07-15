@@ -5715,10 +5715,14 @@ paths:
         Maximum settings file size: 20 MiB
 
         **Security & Access Control:**
-        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
-        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
-        - **No Authentication:** Cannot be restricted by any configuration
-        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: file
           in: query
@@ -5847,7 +5851,7 @@ paths:
         - MUST be valid JSON
         - MUST include `version` field with current file version
         - MAY include any additional fields
-        - Maximum size: 20 MiB
+        - Maximum size: 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large
 
         **Version Management:**
         - Client provides current version in payload
@@ -5860,6 +5864,16 @@ paths:
         - Update user preferences
         - Store UI state
         - Persist alert customizations
+
+        **Security & Access Control:**
+        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
+        - **Default Access:** Public (no authentication required)
+        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
+        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
+        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+      security:
+        - {}
+        - bearerAuth: []
       parameters:
         - name: file
           in: query
@@ -5896,7 +5910,7 @@ paths:
           - Any user-defined fields
 
           **Size Limit:**
-          Maximum 20 MiB
+          Maximum 20 MiB (20,971,520 bytes); larger payloads return 413 Payload Too Large
 
           **Version Rules:**
           - New file: version can be 0 or 1
@@ -5948,7 +5962,6 @@ paths:
             - Missing `version` field in payload
             - Invalid JSON payload
             - Empty payload
-            - Payload exceeds 20 MiB
             - Anonymous user trying to access non-default file
         "409":
           description: |
@@ -5968,6 +5981,8 @@ paths:
                   message:
                     type: string
                     example: "Payload version does not match the version of the stored object"
+        "413":
+          description: Payload too large. The PUT payload exceeds the 20 MiB (20,971,520-byte) maximum.
         "500":
           description: Internal server error during settings update.
   /api/v3/stream_info:

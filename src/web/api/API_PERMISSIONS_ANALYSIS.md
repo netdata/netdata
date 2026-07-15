@@ -76,6 +76,7 @@ These require only `HTTP_ACCESS_ANONYMOUS_DATA` - available to all users includi
 | `/api/v3/function` | `HTTP_ACL_FUNCTIONS` | `ANONYMOUS_DATA` | Execute function (permissions checked per-function) |
 | `/api/v3/functions` | `HTTP_ACL_FUNCTIONS` | `ANONYMOUS_DATA` | List functions |
 | `/api/v3/config` | `HTTP_ACL_DYNCFG` | `ANONYMOUS_DATA` | Dynamic configuration (read/write permissions checked per-action) |
+| `/api/v3/settings` | `HTTP_ACL_DASHBOARD` | `ANONYMOUS_DATA` | User settings (GET/PUT) |
 
 ### Public Info APIs (No authentication required)
 These have `HTTP_ACL_NOCHECK` and `HTTP_ACCESS_NONE`:
@@ -85,7 +86,6 @@ These have `HTTP_ACL_NOCHECK` and `HTTP_ACCESS_NONE`:
 | `/api/v3/info` | `HTTP_ACL_NOCHECK` | `NONE` | Agent information |
 | `/api/v3/versions` | `HTTP_ACL_NOCHECK` | `ANONYMOUS_DATA` | Version information |
 | `/api/v3/progress` | `HTTP_ACL_NOCHECK` | `ANONYMOUS_DATA` | Function progress tracking |
-| `/api/v3/settings` | `HTTP_ACL_NOCHECK` | `ANONYMOUS_DATA` | User settings (GET/PUT) |
 | `/api/v3/stream_info` | `HTTP_ACL_NOCHECK` | `NONE` | Streaming statistics |
 | `/api/v3/claim` | `HTTP_ACL_NOCHECK` | `NONE` | Agent claiming (security key required) |
 | `/api/v3/me` | `HTTP_ACL_NOCHECK` | `NONE` | Current user info |
@@ -199,7 +199,7 @@ These APIs are ONLY accessible through Netdata Cloud (ACLK connection):
 **Note:** WebRTC (`rtc_offer`) is an experimental feature and is not compiled by default. It requires special build configuration.
 
 ### 2. Optionally Protected Data APIs (Bearer Protection Configurable)
-**Count:** 47 APIs across all versions
+**Count:** 48 APIs across all versions
 
 These provide read access to metrics, alerts, and metadata with `HTTP_ACCESS_ANONYMOUS_DATA`.
 
@@ -226,14 +226,13 @@ These provide read access to metrics, alerts, and metadata with `HTTP_ACCESS_ANO
 **Note:** These respect bearer protection if enabled (they have `HTTP_ACCESS_ANONYMOUS_DATA`)
 
 ### 4. Always Public APIs (Cannot Be Restricted)
-**Count:** 12 APIs
+**Count:** 11 APIs
 
 These have `HTTP_ACL_NOCHECK` meaning they bypass ALL security:
 - Agent info
 - Version info
 - Progress tracking
 - Current user info
-- Settings (user preferences)
 - Claiming (protected by security key mechanism, not ACL/bearer)
 
 **Important:** These are ALWAYS accessible:
@@ -295,7 +294,7 @@ When enabled via `bearer_protection` API or netdata.conf, APIs with `HTTP_ACCESS
 
 **Effect:**
 - Changes security model from public/IP-based to token-based
-- Only affects APIs with `HTTP_ACCESS_ANONYMOUS_DATA` (47 APIs)
+- Only affects APIs with `HTTP_ACCESS_ANONYMOUS_DATA` (48 APIs)
 - Does NOT affect `HTTP_ACL_NOCHECK` APIs (always public)
 - Does NOT affect ACLK-only APIs (already require cloud authentication)
 
