@@ -8,7 +8,6 @@
 package corpus
 
 import (
-	"fmt"
 	"strconv"
 	"testing"
 	"time"
@@ -211,10 +210,9 @@ func TestLayer1Precision(t *testing.T) {
 	pushLiveBurst(t, "l1-prec", guid(32), ch)
 	settleAndVerify(t, "l1-prec", ch)
 
-	for i, v := range values {
+	for _, v := range values {
 		f, _ := strconv.ParseFloat(v, 64)
 		t.Logf("value %s → oracle %v", v, fixture.SNRoundTrip(f))
-		_ = i
 	}
 }
 
@@ -323,6 +321,4 @@ func TestLayer1ZGapStates(t *testing.T) {
 	} else {
 		t.Logf("state (c) NEXT ITERATION: ghost back with retention [%d,%d], %d rows, as ruled", retC.FirstEntry, retC.LastEntry, rowsC)
 	}
-
-	_ = fmt.Sprintf
 }
