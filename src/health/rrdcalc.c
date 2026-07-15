@@ -32,6 +32,37 @@ void rrdcalc_flags_to_json_array(BUFFER *wb, const char *key, RRDCALC_FLAGS flag
     buffer_json_array_close(wb);
 }
 
+void rrdcalc_runtime_snapshot_publish(RRDCALC *rc, usec_t global_id, const nd_uuid_t *transition_id) {
+    rw_spinlock_write_lock(&rc->runtime_snapshot.spinlock);
+
+    RRDCALC_RUNTIME_SNAPSHOT *state = &rc->runtime_snapshot.state;
+    state->status = rc->status;
+    state->run_flags = rc->run_flags;
+    state->value = rc->value;
+    state->last_updated = rc->last_updated;
+    state->last_status_change = rc->last_status_change;
+    state->last_status_change_value = rc->last_status_change_value;
+
+    if(transition_id) {
+        state->global_id = global_id;
+        uuid_copy(state->last_transition_id, *transition_id);
+    }
+
+    rw_spinlock_write_unlock(&rc->runtime_snapshot.spinlock);
+}
+
+void rrdcalc_runtime_snapshot_publish_run_flags(RRDCALC *rc) {
+    rw_spinlock_write_lock(&rc->runtime_snapshot.spinlock);
+    rc->runtime_snapshot.state.run_flags = rc->run_flags;
+    rw_spinlock_write_unlock(&rc->runtime_snapshot.spinlock);
+}
+
+void rrdcalc_runtime_snapshot_get(RRDCALC *rc, RRDCALC_RUNTIME_SNAPSHOT *snapshot) {
+    rw_spinlock_read_lock(&rc->runtime_snapshot.spinlock);
+    *snapshot = rc->runtime_snapshot.state;
+    rw_spinlock_read_unlock(&rc->runtime_snapshot.spinlock);
+}
+
 inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
     switch(status) {
         case RRDCALC_STATUS_REMOVED:
@@ -266,6 +297,7 @@ static void rrdcalc_link_to_rrdset(RRDCALC *rc) {
 
     health_alarm_log_add_entry(host, ae, true);
     health_log_alert(host, ae);
+    rrdcalc_runtime_snapshot_publish(rc, ae->global_id, &ae->transition_id);
     rrdset_flag_set(st, RRDSET_FLAG_HAS_RRDCALC_LINKED);
 }
 
@@ -340,6 +372,7 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
     rc->times_repeat = 0;
     rc->last_status_change_value = rc->value;
     rc->last_status_change = now_realtime_sec();
+    rw_spinlock_init(&rc->runtime_snapshot.spinlock);
 
     if(!rc->config.units)
         rc->config.units = string_dup(st->units);
@@ -364,6 +397,7 @@ static void rrdcalc_rrdhost_insert_callback(const DICTIONARY_ITEM *item __maybe_
     expression_set_variable_lookup_callback(rc->config.critical, alert_variable_lookup, rc);
 
     rrdcalc_update_info_using_rrdset_labels(rc);
+    rrdcalc_runtime_snapshot_publish(rc, 0, NULL);
 
     ctr->react_action = RRDCALC_REACT_NEW;
 }
