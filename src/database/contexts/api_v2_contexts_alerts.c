@@ -712,7 +712,7 @@ static void alert_instances_v2_insert_callback(const DICTIONARY_ITEM *item __may
     t->name = rc->config.name;
     t->source = rc->config.source;
     t->info = rc->config.info;
-    t->summary = rc->summary;
+    rrdcalc_runtime_strings_acquire(rc, &t->summary, NULL);
     t->host = rc->rrdset->rrdhost;
     t->alarm_id = rc->id;
     t->ni = ctl->nodes.ni;
@@ -725,8 +725,9 @@ static bool alert_instances_v2_conflict_callback(const DICTIONARY_ITEM *item __m
     return true;
 }
 
-static void alert_instances_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value __maybe_unused, void *data __maybe_unused) {
-    ;
+static void alert_instances_delete_callback(const DICTIONARY_ITEM *item __maybe_unused, void *value, void *data __maybe_unused) {
+    struct sql_alert_instance_v2_entry *t = value;
+    string_freez(t->summary);
 }
 
 static void rrdcontext_v2_set_transition_filter(const char *machine_guid, const char *context, time_t alarm_id, void *data) {

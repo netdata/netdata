@@ -203,6 +203,7 @@ void rrdcalc_runtime_snapshot_publish(RRDCALC *rc, usec_t global_id, const nd_uu
 void rrdcalc_runtime_snapshot_publish_run_flags(RRDCALC *rc);
 void rrdcalc_runtime_snapshot_publish_repeat_state(RRDCALC *rc);
 void rrdcalc_runtime_snapshot_get(RRDCALC *rc, RRDCALC_RUNTIME_SNAPSHOT *snapshot);
+void rrdcalc_runtime_strings_acquire(RRDCALC *rc, STRING **summary, STRING **info);
 
 uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint32_t *next_event_id, nd_uuid_t *config_hash_id);
 

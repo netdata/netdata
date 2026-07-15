@@ -39,6 +39,10 @@ static inline void health_rrdcalc_values2json_nolock(
 
 static inline void health_rrdcalc2json_nolock(
     RRDHOST *host, BUFFER *wb, RRDCALC *rc, const RRDCALC_RUNTIME_SNAPSHOT *snapshot) {
+    CLEAN_STRING *summary = NULL;
+    CLEAN_STRING *info = NULL;
+    rrdcalc_runtime_strings_acquire(rc, &summary, &info);
+
     char value_string[100 + 1];
     format_value_and_unit(value_string, 100, snapshot->value, rrdcalc_units(rc), -1);
 
@@ -94,8 +98,8 @@ static inline void health_rrdcalc2json_nolock(
                    , rc->config.recipient?rrdcalc_recipient(rc):string2str(host->health.default_recipient)
                    , rrdcalc_source(rc)
                    , rrdcalc_units(rc)
-                   , string2str(rc->summary)
-                   , string2str(rc->info)
+                   , string2str(summary)
+                   , string2str(info)
                    , rrdcalc_status2string(snapshot->status)
                    , (unsigned long)snapshot->last_status_change
                    , (unsigned long)snapshot->last_updated

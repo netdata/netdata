@@ -78,6 +78,17 @@ void rrdcalc_runtime_snapshot_get(RRDCALC *rc, RRDCALC_RUNTIME_SNAPSHOT *snapsho
     rw_spinlock_read_unlock(&rc->runtime_snapshot.spinlock);
 }
 
+void rrdcalc_runtime_strings_acquire(RRDCALC *rc, STRING **summary, STRING **info) {
+    rw_spinlock_read_lock(&rc->runtime_snapshot.spinlock);
+
+    if(summary)
+        *summary = string_dup(rc->summary);
+    if(info)
+        *info = string_dup(rc->info);
+
+    rw_spinlock_read_unlock(&rc->runtime_snapshot.spinlock);
+}
+
 inline const char *rrdcalc_status2string(RRDCALC_STATUS status) {
     switch(status) {
         case RRDCALC_STATUS_REMOVED:
@@ -160,6 +171,15 @@ uint32_t rrdcalc_get_unique_id(RRDHOST *host, STRING *chart, STRING *name, uint3
 // ----------------------------------------------------------------------------
 // RRDCALC replacing info/summary text variables with RRDSET labels
 
+static void rrdcalc_runtime_string_replace(RRDCALC *rc, STRING **field, STRING *replacement) {
+    rw_spinlock_write_lock(&rc->runtime_snapshot.spinlock);
+    STRING *old = *field;
+    *field = replacement;
+    rw_spinlock_write_unlock(&rc->runtime_snapshot.spinlock);
+
+    string_freez(old);
+}
+
 static STRING *rrdcalc_replace_variables_with_rrdset_labels(const char *line, RRDCALC *rc) {
     if (!line || !*line)
         return NULL;
@@ -218,25 +238,21 @@ void rrdcalc_update_info_using_rrdset_labels(RRDCALC *rc) {
     if(rc->rrdset && rc->rrdset->rrdlabels) {
         uint32_t labels_version = rrdlabels_version(rc->rrdset->rrdlabels);
         if (rc->labels_version != labels_version) {
-            STRING *old;
+            STRING *info = rrdcalc_replace_variables_with_rrdset_labels(string2str(rc->config.info), rc);
+            rrdcalc_runtime_string_replace(rc, &rc->info, info);
 
-            old = rc->info;
-            rc->info = rrdcalc_replace_variables_with_rrdset_labels(string2str(rc->config.info), rc);
-            string_freez(old);
-
-            old = rc->summary;
-            rc->summary = rrdcalc_replace_variables_with_rrdset_labels(string2str(rc->config.summary), rc);
-            string_freez(old);
+            STRING *summary = rrdcalc_replace_variables_with_rrdset_labels(string2str(rc->config.summary), rc);
+            rrdcalc_runtime_string_replace(rc, &rc->summary, summary);
 
             rc->labels_version = labels_version;
         }
     }
 
     if(!rc->summary)
-        rc->summary = string_dup(rc->config.summary);
+        rrdcalc_runtime_string_replace(rc, &rc->summary, string_dup(rc->config.summary));
 
     if(!rc->info)
-        rc->info = string_dup(rc->config.info);
+        rrdcalc_runtime_string_replace(rc, &rc->info, string_dup(rc->config.info));
 }
 
 // ----------------------------------------------------------------------------
