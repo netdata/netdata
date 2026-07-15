@@ -90,7 +90,9 @@ void query_target_detailed_objects_tree(BUFFER *wb, RRDR *r, RRDR_OPTIONS option
                         if(qn->node_id[0])
                             buffer_json_member_add_string(wb, JSKEY(node_id), qn->node_id);
                         buffer_json_member_add_uint64(wb, JSKEY(node_index), qn->slot);
-                        buffer_json_member_add_string(wb, JSKEY(hostname), rrdhost_hostname(host));
+                        RRDHOST_IDENTITY identity = rrdhost_identity_acquire(host);
+                        buffer_json_member_add_string(wb, JSKEY(hostname), string2str(identity.hostname));
+                        rrdhost_identity_release(&identity);
                         buffer_json_member_add_object(wb, "contexts");
 
                         last_host = host;

@@ -604,7 +604,7 @@ static inline const char *query_metric_name(QUERY_TARGET *qt, QUERY_METRIC *qm) 
 struct storage *query_metric_storage_engine(QUERY_TARGET *qt, QUERY_METRIC *qm, size_t tier);
 
 STRING *query_instance_id_fqdn(QUERY_INSTANCE *qi, size_t version);
-STRING *query_instance_name_fqdn(QUERY_INSTANCE *qi, size_t version);
+STRING *query_instance_name_fqdn(QUERY_INSTANCE *qi, size_t version, const STRING *host_hostname);
 
 void query_target_free(void);
 void query_target_release(QUERY_TARGET *qt);

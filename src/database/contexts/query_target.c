@@ -230,6 +230,7 @@ typedef struct query_target_locals {
     size_t metrics_skipped_due_to_not_matching_timeframe;
 
     char host_node_id_str[UUID_STR_LEN];
+    const STRING *host_hostname; // borrowed while query_node_add() traverses one host
     QUERY_NODE *qn; // temp to pass on callbacks, ignore otherwise - no need to free
 } QUERY_TARGET_LOCALS;
 
@@ -569,14 +570,14 @@ static inline STRING *rrdinstance_create_id_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
     return string_strdupz(buffer);
 }
 
-static inline STRING *rrdinstance_create_name_fqdn_v2(RRDINSTANCE_ACQUIRED *ria) {
+static inline STRING *rrdinstance_create_name_fqdn_v2(
+    RRDINSTANCE_ACQUIRED *ria, const STRING *host_hostname) {
     if(unlikely(!ria))
         return NULL;
 
     char buffer[RRD_ID_LENGTH_MAX + 1];
 
-    RRDHOST *host = rrdinstance_acquired_rrdhost(ria);
-    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_name(ria), rrdhost_hostname(host));
+    snprintfz(buffer, RRD_ID_LENGTH_MAX, "%s@%s", rrdinstance_acquired_name(ria), string2str(host_hostname));
     return string_strdupz(buffer);
 }
 
@@ -591,12 +592,13 @@ inline STRING *query_instance_id_fqdn(QUERY_INSTANCE *qi, size_t version) {
     return qi->id_fqdn;
 }
 
-inline STRING *query_instance_name_fqdn(QUERY_INSTANCE *qi, size_t version) {
+inline STRING *query_instance_name_fqdn(
+    QUERY_INSTANCE *qi, size_t version, const STRING *host_hostname) {
     if(!qi->name_fqdn) {
         if (version <= 1)
             qi->name_fqdn = rrdinstance_create_name_fqdn_v1(qi->ria);
         else
-            qi->name_fqdn = rrdinstance_create_name_fqdn_v2(qi->ria);
+            qi->name_fqdn = rrdinstance_create_name_fqdn_v2(qi->ria, host_hostname);
     }
 
     return qi->name_fqdn;
@@ -768,6 +770,7 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(QUERY_INSTANCE *qi,
                                              bool match_ids,
                                              bool match_names,
                                              size_t version,
+                                             const STRING *host_hostname,
                                              char *host_node_id_str) {
     SIMPLE_PATTERN_RESULT ret = SP_MATCHED_POSITIVE;
 
@@ -781,7 +784,7 @@ static inline SIMPLE_PATTERN_RESULT query_instance_matches(QUERY_INSTANCE *qi,
         if (ret == SP_NOT_MATCHED && match_ids)
             ret = simple_pattern_matches_string_extract(instances_sp, query_instance_id_fqdn(qi, version), NULL, 0);
         if (ret == SP_NOT_MATCHED && match_names)
-            ret = simple_pattern_matches_string_extract(instances_sp, query_instance_name_fqdn(qi, version), NULL, 0);
+            ret = simple_pattern_matches_string_extract(instances_sp, query_instance_name_fqdn(qi, version, host_hostname), NULL, 0);
 
         if (ret == SP_NOT_MATCHED && match_ids && host_node_id_str[0]) {
             char buffer[RRD_ID_LENGTH_MAX + 1];
@@ -820,7 +823,8 @@ static bool query_instance_add(QUERY_TARGET_LOCALS *qtl, QUERY_NODE *qn, QUERY_C
 
     if(queryable_instance && filter_instances)
         queryable_instance = (SP_MATCHED_POSITIVE == query_instance_matches(
-                qi, ri, qt->instances.pattern, qtl->match_ids, qtl->match_names, qt->request.version, qtl->host_node_id_str));
+                qi, ri, qt->instances.pattern, qtl->match_ids, qtl->match_names, qt->request.version,
+                qtl->host_hostname, qtl->host_node_id_str));
 
     if(queryable_instance)
         queryable_instance = query_instance_matches_labels(
@@ -911,7 +915,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
             QUERY_INSTANCE qi = { .ria = qt->request.ria };
             SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri,
                 qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
-                qt->request.version, qtl->host_node_id_str);
+                qt->request.version, qtl->host_hostname, qtl->host_node_id_str);
             query_instance_strings_free(&qi);
             if(ret != SP_MATCHED_POSITIVE)
                 return 0;
@@ -942,7 +946,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
             QUERY_INSTANCE qi = { .ria = ria };
             SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri,
                 qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
-                qt->request.version, qtl->host_node_id_str);
+                qt->request.version, qtl->host_hostname, qtl->host_node_id_str);
             query_instance_strings_free(&qi);
             if(ret != SP_MATCHED_POSITIVE) {
                 rrdinstance_release(ria);
@@ -979,7 +983,7 @@ static ssize_t query_scope_foreach_instance(QUERY_TARGET_LOCALS *qtl, QUERY_NODE
                 QUERY_INSTANCE qi = { .ria = ria };
                 SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri,
                     qt->instances.scope_pattern, qtl->match_ids, qtl->match_names, 
-                    qt->request.version, qtl->host_node_id_str);
+                    qt->request.version, qtl->host_hostname, qtl->host_node_id_str);
                 query_instance_strings_free(&qi);
                 if(ret != SP_MATCHED_POSITIVE)
                     continue;
@@ -1078,6 +1082,12 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
 
     qtl->qn = qn;
 
+    RRDHOST_IDENTITY host_identity = { 0 };
+    if(qt->request.version >= 2 && qtl->match_names &&
+       (qt->instances.scope_pattern || qt->instances.pattern))
+        host_identity = rrdhost_identity_acquire(host);
+    qtl->host_hostname = host_identity.hostname;
+
     ssize_t added = 0;
     if(unlikely(qt->request.rca)) {
         if(query_context_add(qtl, qt->request.rca, true))
@@ -1099,6 +1109,8 @@ static ssize_t query_node_add(void *data, RRDHOST *host, bool queryable_host) {
             added = 0;
     }
 
+    qtl->host_hostname = NULL;
+    rrdhost_identity_release(&host_identity);
     qtl->qn = NULL;
 
     if(!added) {
@@ -1122,9 +1134,21 @@ void query_target_generate_name(QUERY_TARGET *qt) {
     if(qt->request.options & RRDR_OPTION_SELECTED_TIER)
         snprintfz(tier_buffer, 20, "/tier:%zu", qt->request.tier);
 
+    RRDHOST *query_name_host = NULL;
+    if(qt->request.st)
+        query_name_host = qt->request.st->rrdhost;
+    else if(qt->request.host &&
+            (qt->request.version < 2 ||
+             (qt->request.rca && qt->request.ria && qt->request.rma)))
+        query_name_host = qt->request.host;
+
+    RRDHOST_IDENTITY query_name_identity = { 0 };
+    if(query_name_host)
+        query_name_identity = rrdhost_identity_acquire(query_name_host);
+
     if(qt->request.st)
         snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "chart://hosts:%s/instance:%s/dimensions:%s/after:%lld/before:%lld/points:%zu/group:%s%s/options:%s%s%s"
-                , rrdhost_hostname(qt->request.st->rrdhost)
+                , string2str(query_name_identity.hostname)
                 , rrdset_name(qt->request.st)
                 , (qt->request.dimensions) ? qt->request.dimensions : "*"
                 , (long long)qt->request.after
@@ -1138,7 +1162,7 @@ void query_target_generate_name(QUERY_TARGET *qt) {
         );
     else if(qt->request.host && qt->request.rca && qt->request.ria && qt->request.rma)
         snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "metric://hosts:%s/context:%s/instance:%s/dimension:%s/after:%lld/before:%lld/points:%zu/group:%s%s/options:%s%s%s"
-                , rrdhost_hostname(qt->request.host)
+                , string2str(query_name_identity.hostname)
                 , rrdcontext_acquired_id(qt->request.rca)
                 , rrdinstance_acquired_id(qt->request.ria)
                 , rrdmetric_acquired_id(qt->request.rma)
@@ -1174,7 +1198,7 @@ void query_target_generate_name(QUERY_TARGET *qt) {
         );
     else
         snprintfz(qt->id, MAX_QUERY_TARGET_ID_LENGTH, "context://hosts:%s/contexts:%s/instances:%s/dimensions:%s/after:%lld/before:%lld/points:%zu/group:%s%s/options:%s%s%s"
-                , (qt->request.host) ? rrdhost_hostname(qt->request.host) : ((qt->request.nodes) ? qt->request.nodes : "*")
+                , (qt->request.host) ? string2str(query_name_identity.hostname) : ((qt->request.nodes) ? qt->request.nodes : "*")
                 , (qt->request.contexts) ? qt->request.contexts : "*"
                 , (qt->request.instances) ? qt->request.instances : "*"
                 , (qt->request.dimensions) ? qt->request.dimensions : "*"
@@ -1187,6 +1211,8 @@ void query_target_generate_name(QUERY_TARGET *qt) {
                 , resampling_buffer
                 , tier_buffer
         );
+
+    rrdhost_identity_release(&query_name_identity);
 
     // Sanitize the query ID - safe because qt->id is ASCII-only (from snprintfz)
     char buf[MAX_QUERY_TARGET_ID_LENGTH + 1];
@@ -1297,8 +1323,12 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         }
         else if (unlikely(host != qtl.st->rrdhost)) {
             // Oops! A different host!
+            RRDHOST_IDENTITY host_identity = rrdhost_identity_acquire(host);
+            RRDHOST_IDENTITY chart_host_identity = rrdhost_identity_acquire(qtl.st->rrdhost);
             netdata_log_error("QUERY TARGET: RRDSET '%s' given does not belong to host '%s'. Switching query host to '%s'",
-                  rrdset_name(qtl.st), rrdhost_hostname(host), rrdhost_hostname(qtl.st->rrdhost));
+                  rrdset_name(qtl.st), string2str(host_identity.hostname), string2str(chart_host_identity.hostname));
+            rrdhost_identity_release(&chart_host_identity);
+            rrdhost_identity_release(&host_identity);
             host = qtl.st->rrdhost;
         }
     }
@@ -1315,7 +1345,6 @@ QUERY_TARGET *query_target_create(QUERY_TARGET_REQUEST *qtr) {
         qt->versions.alerts_hard_hash = dictionary_version(host->rrdcalc_root_index);
         qt->versions.alerts_soft_hash = __atomic_load_n(&host->health_transitions, __ATOMIC_RELAXED);
         query_node_add(&qtl, host, true);
-        qtl.nodes = rrdhost_hostname(host);
     }
     else
         query_scope_foreach_host(qt->nodes.scope_pattern, qt->nodes.pattern,
@@ -1352,6 +1381,10 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
 
     char host_node_id_str[UUID_STR_LEN] = "";
 
+    RRDHOST_IDENTITY host_identity = { 0 };
+    if(version >= 2 && match_names && (scope_instances_sp || instances_sp))
+        host_identity = rrdhost_identity_acquire(rc->rrdhost);
+
     bool proceed = true;
 
     ssize_t count = 0;
@@ -1365,7 +1398,9 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                 // Check scope_instances first - if it doesn't match, skip entirely
                 if(scope_instances_sp) {
                     QUERY_INSTANCE qi = { .ria = ria, };
-                    SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri, scope_instances_sp, match_ids, match_names, version, host_node_id_str);
+                    SIMPLE_PATTERN_RESULT ret = query_instance_matches(
+                        &qi, ri, scope_instances_sp, match_ids, match_names, version,
+                        host_identity.hostname, host_node_id_str);
                     query_instance_strings_free(&qi);
 
                     if (ret != SP_MATCHED_POSITIVE)
@@ -1380,7 +1415,9 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
 
                 if(instances_sp) {
                     QUERY_INSTANCE qi = { .ria = ria, };
-                    SIMPLE_PATTERN_RESULT ret = query_instance_matches(&qi, ri, instances_sp, match_ids, match_names, version, host_node_id_str);
+                    SIMPLE_PATTERN_RESULT ret = query_instance_matches(
+                        &qi, ri, instances_sp, match_ids, match_names, version,
+                        host_identity.hostname, host_node_id_str);
                     query_instance_strings_free(&qi);
 
                     if (ret != SP_MATCHED_POSITIVE)
@@ -1445,6 +1482,7 @@ ssize_t weights_foreach_rrdmetric_in_context(RRDCONTEXT_ACQUIRED *rca,
                     break;
             }
     dfe_done(ri);
-    
+
+    rrdhost_identity_release(&host_identity);
     return count;
 }
