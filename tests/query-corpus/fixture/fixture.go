@@ -167,10 +167,13 @@ func (d Dimension) Expected() []ExpectedPoint {
 		case strings.ContainsRune(flags, 'E'):
 			ep.PA = PAEmpty
 		default:
-			if v, err := strconv.ParseFloat(p.Collected, 64); err == nil {
-				q := SNRoundTrip(v)
-				ep.Value = &q
+			v, err := strconv.ParseFloat(p.Collected, 64)
+			if err != nil {
+				// a malformed fixture must fail loudly, not read as a gap
+				panic("fixture: unparsable collected value " + strconv.Quote(p.Collected) + " for dimension " + d.ID)
 			}
+			q := SNRoundTrip(v)
+			ep.Value = &q
 			if strings.ContainsRune(flags, 'R') {
 				ep.PA |= PAReset
 			}

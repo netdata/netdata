@@ -78,7 +78,7 @@ func guid(n int) string {
 // AFTER the settle barrier and assertions, per the CASE-015 discipline.
 func connect(t *testing.T, hostname, machineGUID string, caps uint32) *stream.Conn {
 	t.Helper()
-	conn, err := stream.Connect(td.Addr, daemon.APIKey, stream.HostInfo{Hostname: hostname, MachineGUID: machineGUID}, caps)
+	conn, err := stream.Connect(td.Addr, daemon.StreamKey, stream.HostInfo{Hostname: hostname, MachineGUID: machineGUID}, caps)
 	if err != nil {
 		t.Fatal(err)
 	}

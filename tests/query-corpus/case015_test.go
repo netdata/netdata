@@ -44,7 +44,7 @@ func case015Settled(t *testing.T, hostname string, ch fixture.Chart) bool {
 func TestCase015LiveDisconnectDiscard(t *testing.T) {
 	ch := fixture.FullPalette("fixture.c015live", "fixture.c015live", fixture.T0, case015Points)
 
-	conn, err := stream.Connect(td.Addr, daemon.APIKey,
+	conn, err := stream.Connect(td.Addr, daemon.StreamKey,
 		stream.HostInfo{Hostname: "c015-live", MachineGUID: guid(15)}, stream.CapsLive)
 	if err != nil {
 		t.Fatal(err)
@@ -69,7 +69,7 @@ func TestCase015LiveDisconnectDiscard(t *testing.T) {
 func TestCase015MidDialogueDisconnect(t *testing.T) {
 	ch := fixture.FullPalette("fixture.c015mid", "fixture.c015mid", fixture.T0, 60)
 
-	conn, err := stream.Connect(td.Addr, daemon.APIKey,
+	conn, err := stream.Connect(td.Addr, daemon.StreamKey,
 		stream.HostInfo{Hostname: "c015-mid", MachineGUID: guid(17)}, stream.CapsReplication)
 	if err != nil {
 		t.Fatal(err)
@@ -97,7 +97,7 @@ func TestCase015DisconnectSoak(t *testing.T) {
 	for i := 0; i < cycles; i++ {
 		host := fmt.Sprintf("c015-soak-%02d", i)
 		ch := fixture.FullPalette(fmt.Sprintf("fixture.c015s%02d", i), fmt.Sprintf("fixture.c015s%02d", i), fixture.T0, 500)
-		conn, err := stream.Connect(td.Addr, daemon.APIKey,
+		conn, err := stream.Connect(td.Addr, daemon.StreamKey,
 			stream.HostInfo{Hostname: host, MachineGUID: guid(100 + i)}, stream.CapsLive)
 		if err != nil {
 			t.Fatalf("cycle %d: %v", i, err)
@@ -119,7 +119,7 @@ func TestCase015DisconnectSoak(t *testing.T) {
 func TestCase015ReplicationDisconnectDiscard(t *testing.T) {
 	ch := fixture.FullPalette("fixture.c015repl", "fixture.c015repl", fixture.T0, case015Points)
 
-	conn, err := stream.Connect(td.Addr, daemon.APIKey,
+	conn, err := stream.Connect(td.Addr, daemon.StreamKey,
 		stream.HostInfo{Hostname: "c015-repl", MachineGUID: guid(16)}, stream.CapsReplication)
 	if err != nil {
 		t.Fatal(err)
