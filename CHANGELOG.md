@@ -685,6 +685,16 @@
 - Fix csvjsonarray emitting invalid JSON when label-quotes is passed ([#23115](https://github.com/netdata/netdata/issues/23115))
 - Make csvjsonarray timestamps always numeric ([#23117](https://github.com/netdata/netdata/issues/23117))
 - Windows hardware detection ([#22942](https://github.com/netdata/netdata/issues/22942))
+- Netdata fixes part 61 ([#23081](https://github.com/netdata/netdata/issues/23081))
+- Fix streaming receiver discarding delivered data on child disconnect ([#23118](https://github.com/netdata/netdata/issues/23118))
+- Fix(dbengine): rotate datafile and requeue extent on unrecoverable write errors ([#23048](https://github.com/netdata/netdata/issues/23048))
+- Feat(go.d/cloudwatch): add PrivateLink service profiles ([#23119](https://github.com/netdata/netdata/issues/23119))
+- Feat(go.d/cloudwatch): expand RDS metrics and use maximum SQS message age ([#23122](https://github.com/netdata/netdata/issues/23122))
+- Feat(go.d/cloudwatch): expose collector activity metrics ([#23123](https://github.com/netdata/netdata/issues/23123))
+- Feat(go.d/cloudwatch): add declarative opt-in metrics ([#23125](https://github.com/netdata/netdata/issues/23125))
+- Docs(go.d/cloudwatch): improve integration page and profile-format ([#23126](https://github.com/netdata/netdata/issues/23126))
+- Exclude the pre-window storage point from the first bucket of tier queries ([#23127](https://github.com/netdata/netdata/issues/23127))
+- Add limit parameter to data queries for top-N dimensions ([#23128](https://github.com/netdata/netdata/issues/23128))
 
 ## [2.10.0] - 2026-04-09
 
