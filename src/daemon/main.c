@@ -503,6 +503,7 @@ int netdata_main(int argc, char **argv) {
 #ifdef OS_WINDOWS
                             if (perflibnamestest_main()) return 1;
 #endif
+                            sqlite_close_databases();
                             sqlite_library_shutdown();
                             rrdlabels_aral_destroy(false);
                             fprintf(stderr, "\n\nALL TESTS PASSED\n\n");
