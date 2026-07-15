@@ -109,6 +109,7 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
 #if defined(OS_WINDOWS)
     // Windows has no /bin/sh. If the command starts with "exec ", strip it and
     // exec the plugin directly. Plugins on Windows carry a .plugin.exe suffix.
+    // Script plugins (e.g. python.d.plugin) are handled by finding their interpreter.
     if(strncmp(cmd, "exec ", 5) == 0) {
         size_t len = strlen(cmd);
         char cmd_copy[len + 1];
@@ -117,19 +118,46 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
         size_t num_words = quoted_strings_splitter(cmd_copy, words, 100, isspace_map_pluginsd);
         char *exec = get_word(words, num_words, 0);
         char *prog = get_word(words, num_words, 1);
-        if (strcmp(exec, "exec") == 0 &&
-            prog &&
-            strendswith(prog, ".plugin.exe") &&
-            !strendswith(prog, "charts.d.plugin.exe") &&
-            !strendswith(prog, "ioping.plugin.exe")) {
-            const char *argv[num_words]; // remove exec, add NULL terminator
+        if (strcmp(exec, "exec") == 0 && prog) {
+            if (strendswith(prog, ".plugin.exe") &&
+                !strendswith(prog, "charts.d.plugin.exe") &&
+                !strendswith(prog, "ioping.plugin.exe")) {
+                // Native .exe plugin — exec directly, no shell needed.
+                const char *argv[num_words]; // remove exec, add NULL terminator
 
-            size_t dst = 0;
-            for (size_t i = 1; i < num_words; i++)
-                argv[dst++] = get_word(words, num_words, i);
+                size_t dst = 0;
+                for (size_t i = 1; i < num_words; i++)
+                    argv[dst++] = get_word(words, num_words, i);
 
-            argv[dst] = NULL;
-            return spawn_popen_run_argv(argv);
+                argv[dst] = NULL;
+                return spawn_popen_run_argv(argv);
+            }
+
+            if (strendswith(prog, ".plugin") && !strendswith(prog, ".plugin.exe")) {
+                // Script plugin (e.g. python.d.plugin) — needs a Python interpreter.
+                // Search PATH for python3.exe then python.exe; skip if not installed.
+                static char python_path[MAX_PATH + 1];
+                static bool python_searched = false;
+                if (!python_searched) {
+                    python_searched = true;
+                    if (SearchPathA(NULL, "python3.exe", NULL, MAX_PATH, python_path, NULL) == 0 &&
+                        SearchPathA(NULL, "python.exe",  NULL, MAX_PATH, python_path, NULL) == 0)
+                        python_path[0] = '\0';
+                }
+                if (!python_path[0]) {
+                    nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                           "SPAWN: skipping '%s' — Python is not installed on this system", prog);
+                    return NULL;
+                }
+
+                // argv: [python, plugin_path, args..., NULL]
+                const char *argv[num_words + 1];
+                argv[0] = python_path;
+                for (size_t i = 1; i < num_words; i++)
+                    argv[i] = get_word(words, num_words, i);
+                argv[num_words] = NULL;
+                return spawn_popen_run_argv(argv);
+            }
         }
     }
 #endif
