@@ -272,7 +272,8 @@ static inline int compare_raised_alerts(const void *a, const void *b) {
     RRDCALC *rc1 = dictionary_acquired_item_value(item1);
     RRDCALC *rc2 = dictionary_acquired_item_value(item2);
 
-    return (int)(rc2->last_status_change - rc1->last_status_change);
+    return (rc1->last_status_change < rc2->last_status_change) -
+           (rc1->last_status_change > rc2->last_status_change);
 }
 
 static void health_raised_summary_add_alert(struct health_raised_summary *hrm, const DICTIONARY_ITEM  *item) {
