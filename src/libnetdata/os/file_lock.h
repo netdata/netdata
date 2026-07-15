@@ -7,6 +7,23 @@
 
 #if defined(OS_WINDOWS)
 #include <windows.h>
+
+// wincrypt.h (included via windows.h) defines macros that conflict with OpenSSL
+#ifdef X509_NAME
+#undef X509_NAME
+#endif
+#ifdef X509_EXTENSIONS
+#undef X509_EXTENSIONS
+#endif
+#ifdef PKCS7_SIGNER_INFO
+#undef PKCS7_SIGNER_INFO
+#endif
+#ifdef OCSP_REQUEST
+#undef OCSP_REQUEST
+#endif
+#ifdef OCSP_RESPONSE
+#undef OCSP_RESPONSE
+#endif
 #endif
 
 typedef struct file_lock {
