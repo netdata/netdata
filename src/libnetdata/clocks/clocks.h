@@ -5,6 +5,7 @@
 
 #include "../libnetdata.h"
 #include "libnetdata/os/random.h"
+#include "time_t_arithmetic.h"
 
 #ifndef HAVE_CLOCK_GETTIME
 struct timespec {

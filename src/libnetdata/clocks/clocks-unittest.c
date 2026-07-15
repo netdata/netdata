@@ -102,6 +102,46 @@ static int clocks_usec_delta_or_zero_saturates_backward_samples(void) {
     return errors;
 }
 
+static int clocks_time_t_arithmetic_preserves_order(void) {
+    int errors = 0;
+    const time_t maximum = nd_time_t_max();
+    const time_t minimum = nd_time_t_min();
+
+    CLOCKS_TEST(nd_time_t_add_saturating(100, 23) == 123,
+                "representable positive time_t addition is preserved");
+    CLOCKS_TEST(nd_time_t_add_saturating(100, -23) == 77,
+                "representable negative time_t addition is preserved");
+    CLOCKS_TEST(nd_time_t_add_saturating(maximum, 1) == maximum,
+                "positive time_t overflow saturates at the maximum");
+    CLOCKS_TEST(nd_time_t_add_saturating(minimum, -1) == minimum,
+                "negative time_t overflow saturates at the minimum");
+
+    CLOCKS_TEST(nd_time_t_add_compare(maximum, 1, maximum) > 0,
+                "an unrepresentable future sum remains after every time_t");
+    CLOCKS_TEST(nd_time_t_add_compare(minimum, -1, minimum) < 0,
+                "an unrepresentable past sum remains before every time_t");
+    CLOCKS_TEST(nd_time_t_add_compare(maximum, -1, maximum) < 0,
+                "a representable boundary subtraction preserves ordering");
+    CLOCKS_TEST(nd_time_t_add_compare(minimum, 1, minimum) > 0,
+                "a representable boundary addition preserves ordering");
+    CLOCKS_TEST(nd_time_t_add_compare(100, 23, 123) == 0,
+                "representable time_t addition preserves equality");
+
+    intmax_t combined_offset = (intmax_t)INT_MAX + (intmax_t)INT_MAX - (intmax_t)INT_MAX;
+    CLOCKS_TEST(nd_time_t_add_compare(maximum - INT_MAX, combined_offset, maximum) == 0,
+                "combined offsets are compared after mathematical cancellation");
+
+    if(sizeof(time_t) < sizeof(intmax_t)) {
+        intmax_t beyond_time_t = (intmax_t)maximum + 1;
+        CLOCKS_TEST(nd_time_t_add_saturating(0, beyond_time_t) == maximum,
+                    "wide positive offset saturates on narrower time_t");
+        CLOCKS_TEST(nd_time_t_add_compare(0, beyond_time_t, maximum) > 0,
+                    "wide positive offset compares beyond narrower time_t");
+    }
+
+    return errors;
+}
+
 int clocks_unittest(void) {
     int errors = 0;
 
@@ -112,6 +152,7 @@ int clocks_unittest(void) {
     errors += clocks_retry_stops_when_budget_is_exhausted();
     errors += clocks_retry_treats_backward_monotonic_sample_as_no_elapsed_time();
     errors += clocks_usec_delta_or_zero_saturates_backward_samples();
+    errors += clocks_time_t_arithmetic_preserves_order();
 
     if(errors)
         fprintf(stderr, "clocks unittest: %d ERROR(S)\n", errors);
