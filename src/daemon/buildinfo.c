@@ -1420,8 +1420,8 @@ static void populate_system_info(void) {
         free_system_info = true;
     }
     else {
-        bool started_spawn_server = false;
 #if !defined(OS_WINDOWS)
+        bool started_spawn_server = false;
         if(!netdata_main_spawn_server) {
             started_spawn_server = true;
             netdata_main_spawn_server_init(NULL, 0, NULL);
