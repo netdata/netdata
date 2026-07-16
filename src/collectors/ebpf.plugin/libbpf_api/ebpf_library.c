@@ -1167,13 +1167,16 @@ void ebpf_fill_ip_list_unsafe(
  *
  * Parse the IP ranges given and create Network Viewer IP Structure
  *
- * @param ptr  is a pointer with the text to parse.
+ * @param source  is a pointer with the text to parse.
  */
-void ebpf_parse_ips_unsafe(const char *ptr)
+void ebpf_parse_ips_unsafe(const char *source)
 {
     // No value
-    if (unlikely(!ptr))
+    if (unlikely(!source))
         return;
+
+    CLEAN_CHAR_P *input = strdupz(source);
+    char *ptr = input;
 
     while (likely(ptr)) {
         // Move forward until next valid character
@@ -1507,13 +1510,16 @@ fillenvpl:
  *
  * Parse the port ranges given and create Network Viewer Port Structure
  *
- * @param ptr  is a pointer with the text to parse.
+ * @param source  is a pointer with the text to parse.
  */
-void ebpf_parse_ports(const char *ptr)
+void ebpf_parse_ports(const char *source)
 {
     // No value
-    if (unlikely(!ptr))
+    if (unlikely(!source))
         return;
+
+    CLEAN_CHAR_P *input = strdupz(source);
+    char *ptr = input;
 
     while (likely(ptr)) {
         // Move forward until next valid character
