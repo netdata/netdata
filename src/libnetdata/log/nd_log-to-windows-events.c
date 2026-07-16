@@ -8,11 +8,32 @@
 // string is not null-terminated within `maxlen`. Callers use the result for
 // (len + 1) * sizeof(wchar_t) buffer-size calculations and get a deterministic
 // 0 instead of an out-of-bounds read on a malformed input.
+//
+// IMPORTANT: `maxlen` is the caller's claim about the maximum number of wide
+// chars the string could contain, not the size of a `const wchar_t *` pointer.
+// Do NOT pass `_countof(ptr_to_string)` for a `const wchar_t *ptr` argument —
+// that evaluates to `sizeof(const wchar_t *) / sizeof(wchar_t)` (2 on 64-bit
+// Windows, 1 on 32-bit), which is the size of the POINTER, not the size of
+// the pointed-to string. Use a literal cap (e.g. WEL_LABEL_MAX_CHARS) or
+// `_countof(arr)` only when `arr` is a true wide-char array.
 static inline size_t wel_wcslen_bounded(const wchar_t *s, size_t maxlen) {
     if (!s) return 0;
     size_t n = wcsnlen(s, maxlen);
     return (n == maxlen) ? 0 : n;
 }
+
+// Max wide-char length (excluding the null terminator) of any entry in
+// wel_channels[].label. Used as the bound argument to wel_wcslen_bounded()
+// when writing a label to the registry.
+//
+// IMPORTANT: this must be a literal cap, not `_countof(wel_channels[i].label)`.
+// The wel_channels[] members are `const wchar_t *`, so `_countof(...)` evaluates
+// to `sizeof(const wchar_t *) / sizeof(wchar_t)` (2 on 64-bit Windows, 1 on 32-bit) —
+// the size of the POINTER, not the size of the pointed-to string. Using that as
+// the wcsnlen bound silently clips every label to 2 wide chars and writes an
+// empty string to the registry. 64 wide chars is comfortably more than the
+// longest current label ("Collectors" = 10 wide chars incl. null).
+#define WEL_LABEL_MAX_CHARS 64
 
 // --------------------------------------------------------------------------------------------------------------------
 // construct an event id
@@ -475,7 +496,7 @@ static void wel_ensure_manifest_installed(void) {
             RegSetValueExW(hCh, L"DisplayName", 0, REG_SZ,
                            (LPBYTE)wel_channels[cl].label,
                            (DWORD)((wel_wcslen_bounded(wel_channels[cl].label,
-                                                       _countof(wel_channels[cl].label)) + 1) * sizeof(wchar_t)));
+                                                       WEL_LABEL_MAX_CHARS) + 1) * sizeof(wchar_t)));
             RegCloseKey(hCh);
         }
     }
