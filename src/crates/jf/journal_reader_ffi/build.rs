@@ -16,6 +16,5 @@ fn main() {
         .expect("Unable to generate bindings")
         .write_to_file("journal_reader_ffi.h");
 
-    println!("cargo:rerun-if-changed=cbindgen.toml");
-    println!("cargo:rerun-if-changed=src/");
+    println!("cargo:rerun-if-changed=src/lib.rs");
 }
