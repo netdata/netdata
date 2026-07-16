@@ -42,7 +42,7 @@ clap = { workspace = true, features = ["derive"] }
 flate2 = { workspace = true }
 futures = { workspace = true }
 opentelemetry-proto = { workspace = true }
-reqwest = { workspace = true }
+reqwest = { workspace = true, default-features = true, features = ["stream"] }
 rustls = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

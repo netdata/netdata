@@ -17,8 +17,8 @@ fn unhexchar(c: u8) -> Result<u8, i32> {
     }
 }
 
-#[no_mangle]
-unsafe extern "C" fn rsd_id128_from_string(s: *const c_char, ret: *mut RsdId128) -> i32 {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn rsd_id128_from_string(s: *const c_char, ret: *mut RsdId128) -> i32 { unsafe {
     debug_assert!(!s.is_null());
     debug_assert!(!ret.is_null());
 
@@ -80,9 +80,9 @@ unsafe extern "C" fn rsd_id128_from_string(s: *const c_char, ret: *mut RsdId128)
     }
 
     0
-}
+}}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub extern "C" fn rsd_id128_equal(a: RsdId128, b: RsdId128) -> i32 {
     (a.bytes == b.bytes) as i32
 }
@@ -102,12 +102,12 @@ struct RsdJournal<'a> {
     decompressed_payload: Vec<u8>,
 }
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_open_files(
     ret: *mut *mut RsdJournal,
     paths: *const *const c_char,
     _flags: c_int,
-) -> c_int {
+) -> c_int { unsafe {
     debug_assert!(!ret.is_null());
     debug_assert!(!paths.is_null());
 
@@ -149,40 +149,40 @@ unsafe extern "C" fn rsd_journal_open_files(
     *ret = Box::into_raw(journal);
 
     0
-}
+}}
 
-#[no_mangle]
-unsafe extern "C" fn rsd_journal_close(j: *mut RsdJournal) {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn rsd_journal_close(j: *mut RsdJournal) { unsafe {
     debug_assert!(!j.is_null());
     let _ = Box::from_raw(j);
-}
+}}
 
-#[no_mangle]
-unsafe extern "C" fn rsd_journal_seek_head(j: *mut RsdJournal) -> c_int {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn rsd_journal_seek_head(j: *mut RsdJournal) -> c_int { unsafe {
     debug_assert!(!j.is_null());
     let journal = &mut *j;
     journal.reader.set_location(Location::Head);
     0
-}
+}}
 
-#[no_mangle]
-unsafe extern "C" fn rsd_journal_seek_tail(j: *mut RsdJournal) -> c_int {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn rsd_journal_seek_tail(j: *mut RsdJournal) -> c_int { unsafe {
     debug_assert!(!j.is_null());
     let journal = &mut *j;
     journal.reader.set_location(Location::Tail);
     0
-}
+}}
 
-#[no_mangle]
-unsafe extern "C" fn rsd_journal_seek_realtime_usec(j: *mut RsdJournal, usec: u64) -> c_int {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn rsd_journal_seek_realtime_usec(j: *mut RsdJournal, usec: u64) -> c_int { unsafe {
     debug_assert!(!j.is_null());
     let journal = &mut *j;
     journal.reader.set_location(Location::Realtime(usec));
     0
-}
+}}
 
-#[no_mangle]
-unsafe extern "C" fn rsd_journal_next(j: *mut RsdJournal) -> c_int {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn rsd_journal_next(j: *mut RsdJournal) -> c_int { unsafe {
     debug_assert!(!j.is_null());
     let journal = &mut *j;
 
@@ -199,10 +199,10 @@ unsafe extern "C" fn rsd_journal_next(j: *mut RsdJournal) -> c_int {
         }
         Err(e) => e.to_error_code(),
     }
-}
+}}
 
-#[no_mangle]
-unsafe extern "C" fn rsd_journal_previous(j: *mut RsdJournal) -> c_int {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn rsd_journal_previous(j: *mut RsdJournal) -> c_int { unsafe {
     debug_assert!(!j.is_null());
     let journal = &mut *j;
 
@@ -219,14 +219,14 @@ unsafe extern "C" fn rsd_journal_previous(j: *mut RsdJournal) -> c_int {
         }
         Err(e) => e.to_error_code(),
     }
-}
+}}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_get_seqnum(
     j: *mut RsdJournal,
     ret_seqnum: *mut u64,
     ret_seqnum_id: *mut RsdId128,
-) -> c_int {
+) -> c_int { unsafe {
     debug_assert!(!j.is_null());
     debug_assert!(!ret_seqnum.is_null());
     debug_assert!(!ret_seqnum_id.is_null());
@@ -244,10 +244,10 @@ unsafe extern "C" fn rsd_journal_get_seqnum(
         }
         Err(e) => e.to_error_code(),
     }
-}
+}}
 
-#[no_mangle]
-unsafe extern "C" fn rsd_journal_get_realtime_usec(j: *mut RsdJournal, ret: *mut u64) -> c_int {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn rsd_journal_get_realtime_usec(j: *mut RsdJournal, ret: *mut u64) -> c_int { unsafe {
     debug_assert!(!j.is_null());
     debug_assert!(!ret.is_null());
 
@@ -260,22 +260,22 @@ unsafe extern "C" fn rsd_journal_get_realtime_usec(j: *mut RsdJournal, ret: *mut
         }
         Err(e) => e.to_error_code(),
     }
-}
+}}
 
-#[no_mangle]
-unsafe extern "C" fn rsd_journal_restart_data(j: *mut RsdJournal) {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn rsd_journal_restart_data(j: *mut RsdJournal) { unsafe {
     debug_assert!(!j.is_null());
 
     let journal = &mut *j;
     journal.reader.entry_data_restart();
-}
+}}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_enumerate_available_data(
     j: *mut RsdJournal,
     data: *mut *const c_void,
     l: *mut usize,
-) -> c_int {
+) -> c_int { unsafe {
     debug_assert!(!j.is_null());
     debug_assert!(!data.is_null());
     debug_assert!(!l.is_null());
@@ -303,21 +303,21 @@ unsafe extern "C" fn rsd_journal_enumerate_available_data(
         Ok(None) => 0,
         Err(e) => e.to_error_code(),
     }
-}
+}}
 
-#[no_mangle]
-unsafe extern "C" fn rsd_journal_restart_fields(j: *mut RsdJournal) {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn rsd_journal_restart_fields(j: *mut RsdJournal) { unsafe {
     debug_assert!(!j.is_null());
 
     let journal = &mut *j;
     journal.reader.fields_restart();
-}
+}}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_enumerate_fields(
     j: *mut RsdJournal,
     field: *mut *const c_char,
-) -> c_int {
+) -> c_int { unsafe {
     debug_assert!(!j.is_null());
     debug_assert!(!field.is_null());
 
@@ -337,10 +337,10 @@ unsafe extern "C" fn rsd_journal_enumerate_fields(
         Ok(None) => 0,
         Err(e) => e.to_error_code(),
     }
-}
+}}
 
-#[no_mangle]
-unsafe extern "C" fn rsd_journal_query_unique(j: *mut RsdJournal, field: *const c_char) -> c_int {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn rsd_journal_query_unique(j: *mut RsdJournal, field: *const c_char) -> c_int { unsafe {
     debug_assert!(!j.is_null());
     debug_assert!(!field.is_null());
 
@@ -355,21 +355,21 @@ unsafe extern "C" fn rsd_journal_query_unique(j: *mut RsdJournal, field: *const 
         Ok(_) => 0,
         Err(e) => e.to_error_code(),
     }
-}
+}}
 
-#[no_mangle]
-unsafe extern "C" fn rsd_journal_restart_unique(j: *mut RsdJournal) {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn rsd_journal_restart_unique(j: *mut RsdJournal) { unsafe {
     debug_assert!(!j.is_null());
     let journal = &mut *j;
     journal.reader.field_data_restart();
-}
+}}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_enumerate_available_unique(
     j: *mut RsdJournal,
     data: *mut *const c_void,
     l: *mut usize,
-) -> c_int {
+) -> c_int { unsafe {
     debug_assert!(!j.is_null());
     debug_assert!(!data.is_null());
     debug_assert!(!l.is_null());
@@ -398,14 +398,14 @@ unsafe extern "C" fn rsd_journal_enumerate_available_unique(
         Ok(None) => 0,
         Err(e) => e.to_error_code(),
     }
-}
+}}
 
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "C" fn rsd_journal_add_match(
     j: *mut RsdJournal,
     data: *const c_void,
     size: usize,
-) -> c_int {
+) -> c_int { unsafe {
     debug_assert!(!j.is_null());
     debug_assert!(!data.is_null());
 
@@ -424,20 +424,20 @@ unsafe extern "C" fn rsd_journal_add_match(
 
     journal.reader.add_match(data_slice);
     0
-}
+}}
 
-#[no_mangle]
-unsafe extern "C" fn rsd_journal_add_conjunction(j: *mut RsdJournal) -> c_int {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn rsd_journal_add_conjunction(j: *mut RsdJournal) -> c_int { unsafe {
     debug_assert!(!j.is_null());
     let journal = &mut *j;
     match journal.reader.add_conjunction(&journal.journal_file) {
         Ok(_) => 0,
         Err(e) => e.to_error_code(),
     }
-}
+}}
 
-#[no_mangle]
-unsafe extern "C" fn rsd_journal_add_disjunction(j: *mut RsdJournal) -> c_int {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn rsd_journal_add_disjunction(j: *mut RsdJournal) -> c_int { unsafe {
     debug_assert!(!j.is_null());
 
     let journal = &mut *j;
@@ -445,11 +445,11 @@ unsafe extern "C" fn rsd_journal_add_disjunction(j: *mut RsdJournal) -> c_int {
         Ok(_) => 0,
         Err(e) => e.to_error_code(),
     }
-}
+}}
 
-#[no_mangle]
-unsafe extern "C" fn rsd_journal_flush_matches(j: *mut RsdJournal) {
+#[unsafe(no_mangle)]
+unsafe extern "C" fn rsd_journal_flush_matches(j: *mut RsdJournal) { unsafe {
     debug_assert!(!j.is_null());
     let journal = &mut *j;
     journal.reader.flush_matches();
-}
+}}

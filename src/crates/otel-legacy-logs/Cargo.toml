@@ -10,12 +10,12 @@ workspace = true
 [dependencies]
 anyhow = { workspace = true }
 async-trait = { workspace = true }
-bridge = { path = "../netdata-plugin/bridge" }
+bridge = { workspace = true }
 ferryboat = { workspace = true }
-netdata-plugin-error = { path = "../netdata-plugin/error" }
-netdata-plugin-protocol = { path = "../netdata-plugin/protocol" }
-netdata-plugin-schema = { path = "../netdata-plugin/schema" }
-netdata-plugin-types = { path = "../netdata-plugin/types" }
+netdata-plugin-error = { workspace = true }
+netdata-plugin-protocol = { workspace = true }
+netdata-plugin-schema = { workspace = true }
+netdata-plugin-types = { workspace = true }
 journal-function = { workspace = true }
 journal-index = { workspace = true }
 serde_json = { workspace = true }
