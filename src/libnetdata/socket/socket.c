@@ -695,7 +695,11 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
                 break;
 
             case AF_INET6:
-                if (strncmp(client_ip, "::ffff:", 7) == 0) {
+                // SonarQube S3807: `client_ip` is the caller's buffer; the
+                // NULL check at the top of the function (line ~657) already
+                // early-returns when it is NULL, but Sonar's static analysis
+                // cannot see across the branch. Add the defensive guard.
+                if (client_ip && strncmp(client_ip, "::ffff:", 7) == 0) {
                     memmove(client_ip, &client_ip[7], strlen(&client_ip[7]) + 1);
                     // netdata_log_debug(D_LISTENER, "New IPv4 web client from %s port %s on socket %d.", client_ip, client_port, fd);
                 }
