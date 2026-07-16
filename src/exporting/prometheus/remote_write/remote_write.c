@@ -54,7 +54,7 @@ int process_prometheus_remote_write_response(BUFFER *buffer, struct instance *in
 
     // do nothing with HTTP responses 200 or 204
 
-    while (!isspace(*s) && len) {
+    while (!isspace((uint8_t)*s) && len) {
         s++;
         len--;
     }

@@ -266,9 +266,9 @@ static void http_header_sec_websocket_extensions(struct web_client *w, const cha
         while (token) {
             // Trim leading/trailing spaces
             char *ext = token;
-            while (*ext && isspace(*ext)) ext++;
+            while (*ext && isspace((uint8_t)*ext)) ext++;
             char *end = ext + strlen(ext) - 1;
-            while (end > ext && isspace(*end)) *end-- = '\0';
+            while (end > ext && isspace((uint8_t)*end)) *end-- = '\0';
 
             // Check if this is permessage-deflate extension
             if (strncmp(ext, "permessage-deflate", 18) == 0) {
@@ -284,9 +284,9 @@ static void http_header_sec_websocket_extensions(struct web_client *w, const cha
 
                     while (param) {
                         // Trim leading/trailing spaces
-                        while (*param && isspace(*param)) param++;
+                        while (*param && isspace((uint8_t)*param)) param++;
                         end = param + strlen(param) - 1;
-                        while (end > param && isspace(*end)) *end-- = '\0';
+                        while (end > param && isspace((uint8_t)*end)) *end-- = '\0';
 
                         // Client no context takeover
                         if (strcmp(param, "client_no_context_takeover") == 0)
