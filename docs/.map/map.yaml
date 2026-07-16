@@ -760,12 +760,12 @@ sidebar:
               edit_url: https://github.com/netdata/netdata/edit/master/src/collectors/systemd-journal.plugin/active_journal_centralization_guide_no_encryption.md
       - type: integration_placeholder
         integration_kind: logs
-  # Netdata Functions
+  # Live View
   - meta:
-      label: Netdata Functions
+      label: Live View
       edit_url: https://github.com/netdata/netdata/edit/master/docs/top-monitoring-netdata-functions.md
       description: Run on-demand troubleshooting routines on monitored nodes for processes, databases, network connections, logs, and other live system data.
-      keywords: [functions, troubleshooting, processes, database queries, live data]
+      keywords: [live view, troubleshooting, processes, database queries, live data]
     items:
       - meta:
           label: Processes
