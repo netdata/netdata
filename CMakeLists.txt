@@ -3154,6 +3154,10 @@ add_executable(stream-receiver-hops-test EXCLUDE_FROM_ALL
         src/streaming/tests/stream-handshake-hops-test.c)
 target_link_libraries(stream-receiver-hops-test libnetdata)
 
+add_executable(stream-replay-endpoints-test EXCLUDE_FROM_ALL
+        src/streaming/tests/stream-replay-endpoints-test.c)
+target_link_libraries(stream-replay-endpoints-test libnetdata)
+
 if(OS_LINUX)
         add_executable(http-auth-bearer-test EXCLUDE_FROM_ALL
                 src/web/api/tests/http-auth-bearer-test.c)
