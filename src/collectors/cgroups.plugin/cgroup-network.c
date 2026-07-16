@@ -587,26 +587,28 @@ static void read_from_spawned(SPAWN_INSTANCE *si, const char *name __maybe_unuse
     char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
     char *s;
     FILE *fp = fdopen(spawn_server_instance_read_fd(si), "r");
-    while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
-        trim(s);
+    if(fp) {
+        while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, fp))) {
+            trim(s);
 
-        if(*s && *s != '\n') {
-            char *t = s;
-            while(*t && *t != ' ') t++;
-            if(*t == ' ') {
-                *t = '\0';
-                t++;
+            if(*s && *s != '\n') {
+                char *t = s;
+                while(*t && *t != ' ') t++;
+                if(*t == ' ') {
+                    *t = '\0';
+                    t++;
+                }
+
+                if(strcmp(s, "EXIT") == 0)
+                    break;
+
+                if(!*s || !*t) continue;
+                add_device(s, t);
             }
-
-            if(strcmp(s, "EXIT") == 0)
-                break;
-
-            if(!*s || !*t) continue;
-            add_device(s, t);
         }
+        fclose(fp);
+        spawn_server_instance_read_fd_unset(si);
     }
-    fclose(fp);
-    spawn_server_instance_read_fd_unset(si);
     spawn_server_exec_kill(spawn_server, si, 0);
 }
 
