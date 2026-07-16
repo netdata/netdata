@@ -136,14 +136,20 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
             if (strendswith(prog, ".plugin") && !strendswith(prog, ".plugin.exe")) {
                 // Script plugin (e.g. python.d.plugin) — needs a Python interpreter.
                 // Search PATH for python3.exe then python.exe; skip if not installed.
+                // Guarded by a spinlock: each plugin spawns in its own thread, so two
+                // concurrent calls could race on the unsearched→searched transition and
+                // one would read python_path before SearchPathA had written it.
                 static char python_path[MAX_PATH + 1];
                 static bool python_searched = false;
+                static SPINLOCK python_lock = SPINLOCK_INITIALIZER;
+                spinlock_lock(&python_lock);
                 if (!python_searched) {
-                    python_searched = true;
                     if (SearchPathA(NULL, "python3.exe", NULL, MAX_PATH, python_path, NULL) == 0 &&
                         SearchPathA(NULL, "python.exe",  NULL, MAX_PATH, python_path, NULL) == 0)
                         python_path[0] = '\0';
+                    python_searched = true;
                 }
+                spinlock_unlock(&python_lock);
                 if (!python_path[0]) {
                     nd_log(NDLS_COLLECTORS, NDLP_WARNING,
                            "SPAWN: skipping '%s' — Python is not installed on this system", prog);
