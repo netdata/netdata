@@ -2,13 +2,15 @@
 
 #include "libnetdata/libnetdata.h"
 
-SPAWN_SERVER *spawn_server = NULL;
+extern char **environ;
 
-char env_netdata_host_prefix[FILENAME_MAX + 50] = "";
-char env_netdata_log_method[FILENAME_MAX + 50] = "";
-char env_netdata_log_format[FILENAME_MAX + 50] = "";
-char env_netdata_log_level[FILENAME_MAX + 50] = "";
-char *environment[] = {
+static SPAWN_SERVER *spawn_server = NULL;
+
+static char env_netdata_host_prefix[FILENAME_MAX + 50] = "";
+static char env_netdata_log_method[FILENAME_MAX + 50] = "";
+static char env_netdata_log_format[FILENAME_MAX + 50] = "";
+static char env_netdata_log_level[FILENAME_MAX + 50] = "";
+static char *environment[] = {
         "PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin",
         env_netdata_host_prefix,
         env_netdata_log_method,
@@ -793,8 +795,6 @@ int main(int argc, const char **argv) {
         collector_error("setresuid(0, 0, 0) failed.");
 
     nd_log_initialize_for_external_plugins("cgroup-network");
-    spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC | SPAWN_SERVER_OPTION_CALLBACK, NULL, spawn_callback, argc, argv);
-    nd_log_register_fatal_final_cb(cleanup_spawn_server_on_fatal);
 
     // since cgroup-network runs as root, prevent it from opening symbolic links
     procfile_open_flags = O_RDONLY|O_NOFOLLOW;
@@ -807,6 +807,10 @@ int main(int argc, const char **argv) {
 
     if(netdata_configured_host_prefix[0] != '\0' && verify_path(netdata_configured_host_prefix) == -1)
         fatal("invalid NETDATA_HOST_PREFIX '%s'", netdata_configured_host_prefix);
+
+    int helper = 1;
+    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
+        helper = 0;
 
     // ------------------------------------------------------------------------
     // build a safe environment for our script
@@ -829,6 +833,14 @@ int main(int argc, const char **argv) {
 
     // ------------------------------------------------------------------------
 
+    // This is a dedicated privileged process; no child may inherit its caller's environment.
+    environ = environment;
+
+    spawn_server = spawn_server_create(SPAWN_SERVER_OPTION_EXEC | SPAWN_SERVER_OPTION_CALLBACK, NULL, spawn_callback, argc, argv);
+    // Spawn initialization may publish its detected runtime directory; do not pass it to helper requests.
+    environ = environment;
+    nd_log_register_fatal_final_cb(cleanup_spawn_server_on_fatal);
+
     if(argc == 2 && (!strcmp(argv[1], "version") || !strcmp(argv[1], "-version") || !strcmp(argv[1], "--version") || !strcmp(argv[1], "-v") || !strcmp(argv[1], "-V"))) {
         fprintf(stderr, "cgroup-network %s\n", NETDATA_VERSION);
         exit(0);
@@ -838,9 +850,6 @@ int main(int argc, const char **argv) {
         usage();
 
     int arg = 1;
-    int helper = 1;
-    if (getenv("KUBERNETES_SERVICE_HOST") != NULL && getenv("KUBERNETES_SERVICE_PORT") != NULL)
-        helper = 0;
 
     if(!strcmp(argv[arg], "-p") || !strcmp(argv[arg], "--pid")) {
         pid = atoi(argv[arg+1]);
