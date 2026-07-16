@@ -259,10 +259,8 @@ func (d *Daemon) Restart() error {
 // instead of hanging it until the go test framework panics.
 var queryClient = &http.Client{Timeout: 30 * time.Second}
 
-// DataV3All queries /api/v3/data (all nodes of the agent) with the given
-// parameters — the multi-node query surface used by group-by layers.
-func (d *Daemon) DataV3All(params url.Values) (map[string]any, error) {
-	u := fmt.Sprintf("%s/api/v3/data?%s", d.BaseURL, params.Encode())
+// getJSON performs a bounded GET and parses the JSON response.
+func getJSON(u string) (map[string]any, error) {
 	resp, err := queryClient.Get(u)
 	if err != nil {
 		return nil, fmt.Errorf("daemon: GET %s: %w", u, err)
@@ -282,27 +280,16 @@ func (d *Daemon) DataV3All(params url.Values) (map[string]any, error) {
 	return doc, nil
 }
 
+// DataV3All queries /api/v3/data (all nodes of the agent) with the given
+// parameters — the multi-node query surface used by group-by layers.
+func (d *Daemon) DataV3All(params url.Values) (map[string]any, error) {
+	return getJSON(fmt.Sprintf("%s/api/v3/data?%s", d.BaseURL, params.Encode()))
+}
+
 // DataV3 queries /host/<host>/api/v3/data with the given parameters and
 // returns the parsed JSON document.
 func (d *Daemon) DataV3(host string, params url.Values) (map[string]any, error) {
-	u := fmt.Sprintf("%s/host/%s/api/v3/data?%s", d.BaseURL, url.PathEscape(host), params.Encode())
-	resp, err := queryClient.Get(u)
-	if err != nil {
-		return nil, fmt.Errorf("daemon: GET %s: %w", u, err)
-	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("daemon: read %s: %w", u, err)
-	}
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("daemon: GET %s: HTTP %d: %s", u, resp.StatusCode, body)
-	}
-	var doc map[string]any
-	if err := json.Unmarshal(body, &doc); err != nil {
-		return nil, fmt.Errorf("daemon: parse %s: %w (body %q)", u, err, truncate(body, 300))
-	}
-	return doc, nil
+	return getJSON(fmt.Sprintf("%s/host/%s/api/v3/data?%s", d.BaseURL, url.PathEscape(host), params.Encode()))
 }
 
 func truncate(b []byte, n int) string {
