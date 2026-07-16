@@ -107,7 +107,7 @@ impl ManagedServer {
         {
             let mut guard = self.listener_handle.lock().unwrap();
             if let Some(h) = guard.take() {
-                extern "system" {
+                unsafe extern "system" {
                     fn CloseHandle(h: isize) -> i32;
                 }
                 unsafe {
