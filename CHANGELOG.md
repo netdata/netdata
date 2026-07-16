@@ -695,6 +695,10 @@
 - Docs(go.d/cloudwatch): improve integration page and profile-format ([#23126](https://github.com/netdata/netdata/issues/23126))
 - Exclude the pre-window storage point from the first bucket of tier queries ([#23127](https://github.com/netdata/netdata/issues/23127))
 - Add limit parameter to data queries for top-N dimensions ([#23128](https://github.com/netdata/netdata/issues/23128))
+- Test(go.d/cloudwatch): remove metadata contract tests ([#23132](https://github.com/netdata/netdata/issues/23132))
+- Netdata fixes part 60 ([#23079](https://github.com/netdata/netdata/issues/23079))
+- Netdata fixes part 62 ([#23083](https://github.com/netdata/netdata/issues/23083))
+- Netdata fixes part 63 ([#23102](https://github.com/netdata/netdata/issues/23102))
 
 ## [2.10.0] - 2026-04-09
 
