@@ -174,7 +174,7 @@ base64 = "0.22"
 
 # Published systemd-journal-sdk crates (netflow-plugin). Keys use the
 # journal-sdk-* prefix because the plain journal-* names are taken by the
-# internal path crates above; in-code idents are journal_sdk_*.
+# internal path crates elsewhere in this file; in-code idents are journal_sdk_*.
 journal-sdk-common = { package = "systemd-journal-sdk-common", version = "0.7.8" }
 journal-sdk-core = { package = "systemd-journal-sdk-core", version = "0.7.8" }
 journal-sdk-engine = { package = "systemd-journal-sdk-engine", version = "0.7.8" }
@@ -263,6 +263,10 @@ opendal = { version = "0.57", default-features = false, features = [
   "auto-register-services",
 ] }
 
+# Cargo.lock pins aws-lc-rs 1.17.0 / aws-lc-sys 0.41.0 (pulled transitively via
+# rustls): the 0.42.0 build-script probe links without -fPIE and fails under the
+# hardened linker specs of RPM-family package builds. Re-check before letting
+# `cargo update` move these forward.
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
 url = "2"
