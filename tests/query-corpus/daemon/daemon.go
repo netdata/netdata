@@ -242,11 +242,16 @@ func (d *Daemon) Restart() error {
 	return d.launch()
 }
 
+// queryClient bounds every corpus query: no legitimate corpus query takes
+// more than a few seconds, so a stalled daemon fails the test crisply
+// instead of hanging it until the go test framework panics.
+var queryClient = &http.Client{Timeout: 30 * time.Second}
+
 // DataV3 queries /host/<host>/api/v3/data with the given parameters and
 // returns the parsed JSON document.
 func (d *Daemon) DataV3(host string, params url.Values) (map[string]any, error) {
 	u := fmt.Sprintf("%s/host/%s/api/v3/data?%s", d.BaseURL, url.PathEscape(host), params.Encode())
-	resp, err := http.Get(u)
+	resp, err := queryClient.Get(u)
 	if err != nil {
 		return nil, fmt.Errorf("daemon: GET %s: %w", u, err)
 	}
