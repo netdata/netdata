@@ -3,6 +3,8 @@
 
    If run as a script on it’s own, this will dump the JSON schema for distros.yaml.'''
 
+from __future__ import annotations
+
 from collections import Counter
 from dataclasses import dataclass
 from enum import StrEnum, unique
