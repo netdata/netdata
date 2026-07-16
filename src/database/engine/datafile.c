@@ -392,10 +392,10 @@ static int scan_data_files(struct rrdengine_instance *ctx)
     }
     netdata_log_info("DBENGINE: tier %d: found %d files in path %s", ctx->config.tier, ret, ctx->config.dbfiles_path);
 
-    Pvoid_t datafiles_JudyL = NULL;
-    Pvoid_t journafile_JudyL = NULL;
     datafiles = callocz(MIN(ret, MAX_DATAFILES), sizeof(*datafiles));
 #ifndef OS_WINDOWS
+    Pvoid_t datafiles_JudyL = NULL;
+    Pvoid_t journafile_JudyL = NULL;
     bool validate_files = true;
 #endif
     for (matched_files = 0 ; UV_EOF != uv_fs_scandir_next(&req, &dent) && matched_files < MAX_DATAFILES ; ) {

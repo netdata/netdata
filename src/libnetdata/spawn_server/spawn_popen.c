@@ -111,7 +111,13 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
     // exec the plugin directly. Plugins on Windows carry a .plugin.exe suffix.
     // Script plugins (e.g. python.d.plugin) are handled by finding their interpreter.
     if(strncmp(cmd, "exec ", 5) == 0) {
-        size_t len = strlen(cmd);
+        // cmd is built by netdata internally (max ~16 KiB), but bound the
+        // scan so a malformed input cannot request an unbounded VLA.
+        size_t len = strnlen(cmd, PATH_MAX);
+        if (len >= PATH_MAX) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "SPAWN: command too long");
+            return NULL;
+        }
         char cmd_copy[len + 1];
         memcpy(cmd_copy, cmd, len + 1);
         char *words[100];

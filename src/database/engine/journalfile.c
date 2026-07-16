@@ -1269,7 +1269,15 @@ int journalfile_v2_load(struct rrdengine_instance *ctx, struct rrdengine_journal
     // satisfies CWE-73 static analysis and guards against any future change
     // that might allow non-numeric components in path_v2.
     const char *dbpath = datafile_ctx(datafile)->config.dbfiles_path;
-    size_t dbpath_len = strlen(dbpath);
+    // dbfiles_path is a fixed-size buffer (FILENAME_MAX + 1) in the engine config;
+    // bound the scan and reject a path that is not null-terminated within the
+    // buffer or is empty.
+    size_t dbpath_len = strnlen(dbpath, sizeof(((struct rrdengine_instance *)0)->config.dbfiles_path));
+    if (dbpath_len == 0 ||
+        dbpath_len >= sizeof(((struct rrdengine_instance *)0)->config.dbfiles_path)) {
+        netdata_log_error("DBENGINE: dbfiles_path is empty or not null-terminated");
+        return 1;
+    }
     if (strncmp(path_v2, dbpath, dbpath_len) != 0 || path_v2[dbpath_len] != '/') {
         netdata_log_error("DBENGINE: journal path \"%s\" is outside database directory \"%s\"", path_v2, dbpath);
         return 1;

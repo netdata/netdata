@@ -679,8 +679,9 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             strncpyz(client_ip, "localhost", ipsize - 1);
 #endif
 
-        client_ip[ipsize - 1] = '\0';
-        client_port[portsize - 1] = '\0';
+        // strncpyz() already null-terminates, so no need to re-terminate here.
+        // (SonarQube S3807 + S2259: redundant manual null-termination after a
+        // bounded copy that already null-terminates.)
 
         switch (((struct sockaddr *)&sadr)->sa_family) {
             case AF_UNIX:

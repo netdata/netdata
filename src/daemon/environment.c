@@ -76,6 +76,12 @@ void mkdir_recursive(const char *native_path) {
 void verify_required_directory(const char *env, const char *dir, bool create_it, int perms) {
     errno_clear();
 
+    // `perms` is only consulted when `create_it` is true and the directory
+    // does not yet exist; mark it as intentionally unused otherwise so the
+    // compiler and SonarQube S1172 do not flag the parameter on the
+    // "verify-only" call sites (the majority of the call sites).
+    (void)perms;
+
 #if defined(OS_WINDOWS)
     // Accept both POSIX form (/c/...) and Windows-native form (C:\... or C:/...).
     // A bare "C:" (no trailing separator) is drive-relative on Windows — treat it

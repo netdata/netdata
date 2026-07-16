@@ -101,9 +101,8 @@ static NORETURN void call_netdata_cleanup(void *arg)
             reason = (EXIT_REASON)(EXIT_REASON_SERVICE_STOP|EXIT_REASON_SYSTEM_SHUTDOWN);
             break;
 
-        case SERVICE_CONTROL_STOP:
-            // fall-through
-
+        // SERVICE_CONTROL_STOP (and any other unrecognised code) fall through
+        // to the default case below.
         default:
             reason = EXIT_REASON_SERVICE_STOP;
             break;
@@ -209,6 +208,9 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
         // initialisation error.  Transition to STOPPED so the SCM records
         // the failure instead of leaving the service stuck in SERVICE_RUNNING
         // waiting for a stop event that will never be signalled internally.
+        // The same `if (rc != 10) return rc;` early-exit also appears in
+        // main() below for the CLI entry path; both are intentional because
+        // the SCM path must report SERVICE_STOPPED before returning.
         svc_status.dwServiceSpecificExitCode = rc;
         ReportSvcStatus(SERVICE_STOPPED, ERROR_SERVICE_SPECIFIC_ERROR, 0, 0);
         return;

@@ -4,6 +4,16 @@
 
 #if defined(OS_WINDOWS) && (defined(HAVE_ETW) || defined(HAVE_WEL))
 
+// Bounded wide-string length: like wcsnlen, but returns 0 (not maxlen) when the
+// string is not null-terminated within `maxlen`. Callers use the result for
+// (len + 1) * sizeof(wchar_t) buffer-size calculations and get a deterministic
+// 0 instead of an out-of-bounds read on a malformed input.
+static inline size_t wel_wcslen_bounded(const wchar_t *s, size_t maxlen) {
+    if (!s) return 0;
+    size_t n = wcsnlen(s, maxlen);
+    return (n == maxlen) ? 0 : n;
+}
+
 // --------------------------------------------------------------------------------------------------------------------
 // construct an event id
 
@@ -172,7 +182,8 @@ static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider,
     }
     if (dllFound) {
         RegSetValueExW(hRegKey, L"EventMessageFile", 0, REG_EXPAND_SZ,
-                       (LPBYTE)modulePath, (DWORD)((wcslen(modulePath) + 1) * sizeof(wchar_t)));
+                       (LPBYTE)modulePath,
+                       (DWORD)((wel_wcslen_bounded(modulePath, _countof(modulePath)) + 1) * sizeof(wchar_t)));
 
         DWORD types_supported = EVENTLOG_SUCCESS | EVENTLOG_ERROR_TYPE | EVENTLOG_WARNING_TYPE | EVENTLOG_INFORMATION_TYPE;
         RegSetValueExW(hRegKey, L"TypesSupported", 0, REG_DWORD, (LPBYTE)&types_supported, sizeof(DWORD));
@@ -463,7 +474,8 @@ static void wel_ensure_manifest_installed(void) {
         if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, chregkey, 0, KEY_SET_VALUE, &hCh) == ERROR_SUCCESS) {
             RegSetValueExW(hCh, L"DisplayName", 0, REG_SZ,
                            (LPBYTE)wel_channels[cl].label,
-                           (DWORD)((wcslen(wel_channels[cl].label) + 1) * sizeof(wchar_t)));
+                           (DWORD)((wel_wcslen_bounded(wel_channels[cl].label,
+                                                       _countof(wel_channels[cl].label)) + 1) * sizeof(wchar_t)));
             RegCloseKey(hCh);
         }
     }
@@ -654,6 +666,9 @@ bool nd_log_init_wel(void) {
 #define SMALL_WIDE_BUFFERS_SIZE 256
 #define MEDIUM_WIDE_BUFFERS_SIZE 2048
 #define BIG_WIDE_BUFFERS_SIZE 16384
+// Largest per-field wide-char buffer (incl. null terminator). Used by
+// wel_wcslen_bounded() to satisfy SonarQube S5813 at ETW write sites.
+#define NDF_FIELD_MAX_CHARS BIG_WIDE_BUFFERS_SIZE
 static wchar_t small_wide_buffers[_NDF_MAX][SMALL_WIDE_BUFFERS_SIZE];
 static wchar_t medium_wide_buffers[2][MEDIUM_WIDE_BUFFERS_SIZE];
 static wchar_t big_wide_buffers[2][BIG_WIDE_BUFFERS_SIZE];
@@ -741,7 +756,11 @@ static void wel_entry_process(struct wel_queue_entry *e) {
         EVENT_DATA_DESCRIPTOR desc[_NDF_MAX - 1];
         for(size_t i = 1; i < _NDF_MAX; i++) {
             const wchar_t *buf = wel_entry_field(e, i);
-            EventDataDescCreate(&desc[i - 1], buf, (ULONG)((wcslen(buf) + 1) * sizeof(WCHAR)));
+            // Field buffers are fixed-size (small/medium/big) and always null-terminated
+            // when populated; the bounded helper is only here to satisfy SonarQube S5813
+            // and to return 0 on a malformed buffer rather than overread it.
+            EventDataDescCreate(&desc[i - 1], buf,
+                                (ULONG)((wel_wcslen_bounded(buf, NDF_FIELD_MAX_CHARS) + 1) * sizeof(WCHAR)));
         }
         EVENT_DESCRIPTOR ed = {
             .Id      = e->eventID & EVENT_ID_CODE_MASK,
