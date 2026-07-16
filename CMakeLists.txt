@@ -4251,6 +4251,13 @@ if(NOT OS_WINDOWS)
           COMPONENT netdata
           DESTINATION usr/libexec/netdata)
 
+  # user-facing support-bundle tool: on PATH as `netdata-sos`, like netdatacli
+  install(PROGRAMS
+          packaging/installer/netdata-sos.sh
+          COMPONENT netdata
+          DESTINATION "${BINDIR}"
+          RENAME netdata-sos)
+
   install(FILES
           system/netdata.conf
           system/netdata-updater.conf
