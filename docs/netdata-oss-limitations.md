@@ -51,7 +51,7 @@ Roles and available permissions evolve independently of this architecture. Use t
 
 ## Functions
 
-[Netdata Functions](/docs/top-monitoring-netdata-functions.md) declare their own access requirements. Some return ordinary system information; others expose processes, query text, logs, network connections, or configuration and therefore require stronger access.
+Functions available through [Live View](/docs/top-monitoring-netdata-functions.md) declare their own access requirements. Some return ordinary system information; others expose processes, query text, logs, network connections, or configuration and therefore require stronger access.
 
 The set available to a user depends on:
 

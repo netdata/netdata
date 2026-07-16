@@ -47,16 +47,16 @@ Streaming receivers authenticate senders with an API key. Enable TLS when stream
 
 See [Secure your Netdata Agents](/docs/netdata-agent/securing-netdata-agents.md) for operational configuration.
 
-<a id="outbound-network-communication"></a>
-## Netdata-Managed Outbound Connections
+## Outbound Network Communication
 
 A stock installation can use these Netdata-managed outbound paths:
 
-| Path                     | When it is used                                                                   | Operator control                                 |
-|:-------------------------|:----------------------------------------------------------------------------------|:-------------------------------------------------|
-| Usage telemetry          | Agent lifecycle events and dashboard usage unless opted out.                      | Follow the documented telemetry opt-out methods. |
-| Agent-Cloud Link         | After the node is connected to a Netdata Cloud Space.                             | Disconnect or do not connect the node.           |
-| Installation and updates | During installation and when the separate updater checks configured repositories. | Use offline installation and update controls.    |
+| Path                                | When it is used                                                                                | Operator control                                 |
+|:------------------------------------|:-----------------------------------------------------------------------------------------------|:-------------------------------------------------|
+| Agent lifecycle telemetry           | The Agent daemon sends lifecycle events unless telemetry is opted out.                         | Follow the documented telemetry opt-out methods. |
+| Dashboard usage telemetry (browser) | Dashboard JavaScript sends usage events from the user's browser unless telemetry is opted out. | Follow the documented telemetry opt-out methods. |
+| Agent-Cloud Link                    | After the node is connected to a Netdata Cloud Space.                                          | Disconnect or do not connect the node.           |
+| Installation and updates            | During installation and when the separate updater checks configured repositories.              | Use offline installation and update controls.    |
 
 [Usage telemetry](/docs/netdata-agent/configuration/anonymous-telemetry-events.md) masks selected identifying fields, but uses a stable installation or machine identifier for event association. Treat it as pseudonymous usage telemetry, not as proof that no identifying data is processed. The canonical telemetry page lists the fields and opt-out methods.
 

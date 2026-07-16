@@ -22,7 +22,7 @@ The Agent normally runs as an unprivileged service account. Components that need
 
 ### Protect Sensitive Operational Data
 
-Metrics are often less sensitive than logs, process command lines, database queries, network connections, and configuration. Netdata Functions and log sources can expose this higher-risk data, so their access requirements are stricter than ordinary chart access.
+Metrics are often less sensitive than logs, process command lines, database queries, network connections, and configuration. Functions and log sources can expose this higher-risk data, so their access requirements are stricter than ordinary chart access.
 
 ### Authenticate at the Appropriate Boundary
 
