@@ -208,20 +208,32 @@ static bool wel_manifest_is_current(void) {
         RegCloseKey(hKey);
     }
 
-    // Verify the Daemon channel exists and is Admin type (EVT_CHANNEL_TYPE_ADMIN = 0).
-    // Operational channels (type=1) cannot receive ReportEventW events via importChannel;
-    // if the previous install used Operational, force a reinstall with Admin channels.
+    // Verify the Daemon channel exists, is Admin type (EVT_CHANNEL_TYPE_ADMIN = 0), and
+    // has a short display name ("Daemon") set.  Without the display name, Event Viewer
+    // labels the leaf node with the full channel name "Netdata/Daemon" instead of
+    // just "Daemon".  Operational type or a missing/wrong display name both force a
+    // reinstall so the manifest and display names are updated atomically.
     {
         wchar_t chkey[MAX_PATH];
         swprintf(chkey, _countof(chkey), L"%lsNetdata/Daemon", WINEVT_CHANNELS_KEY);
         HKEY hCh;
         if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, chkey, 0, KEY_READ, &hCh) != ERROR_SUCCESS)
             return false;
+
         DWORD chtype = 1;
         DWORD sz = sizeof(chtype);
         RegQueryValueExW(hCh, L"Type", NULL, NULL, (LPBYTE)&chtype, &sz);
+
+        wchar_t dispName[64] = {0};
+        DWORD dnSz = sizeof(dispName);
+        LONG dnRc = RegQueryValueExW(hCh, L"DisplayName", NULL, NULL, (LPBYTE)dispName, &dnSz);
+
         RegCloseKey(hCh);
+
         if (chtype != 0)  // 0 = Admin
+            return false;
+
+        if (dnRc != ERROR_SUCCESS || wcscmp(dispName, L"Daemon") != 0)
             return false;
     }
 
@@ -267,11 +279,11 @@ static bool wel_run_silent(const wchar_t *exe, const wchar_t *params) {
     "        messageFileName=\"%s\"\r\n" \
     "        symbol=\"NETDATA_ETW_PROVIDER\">\r\n" \
     "        <channels>\r\n" \
-    "          <channel chid=\"CHANNEL_DAEMON\" name=\"Netdata/Daemon\" symbol=\"CHANNEL_DAEMON\" type=\"Admin\" enabled=\"true\"/>\r\n" \
-    "          <channel chid=\"CHANNEL_COLLECTORS\" name=\"Netdata/Collectors\" symbol=\"CHANNEL_COLLECTORS\" type=\"Admin\" enabled=\"true\"/>\r\n" \
-    "          <channel chid=\"CHANNEL_ACCESS\" name=\"Netdata/Access\" symbol=\"CHANNEL_ACCESS\" type=\"Admin\" enabled=\"true\"/>\r\n" \
-    "          <channel chid=\"CHANNEL_HEALTH\" name=\"Netdata/Health\" symbol=\"CHANNEL_HEALTH\" type=\"Admin\" enabled=\"true\"/>\r\n" \
-    "          <channel chid=\"CHANNEL_ACLK\" name=\"Netdata/Aclk\" symbol=\"CHANNEL_ACLK\" type=\"Admin\" enabled=\"true\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_DAEMON\" name=\"Netdata/Daemon\" symbol=\"CHANNEL_DAEMON\" type=\"Admin\" enabled=\"true\" message=\"$(string.Channel.Daemon)\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_COLLECTORS\" name=\"Netdata/Collectors\" symbol=\"CHANNEL_COLLECTORS\" type=\"Admin\" enabled=\"true\" message=\"$(string.Channel.Collectors)\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_ACCESS\" name=\"Netdata/Access\" symbol=\"CHANNEL_ACCESS\" type=\"Admin\" enabled=\"true\" message=\"$(string.Channel.Access)\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_HEALTH\" name=\"Netdata/Health\" symbol=\"CHANNEL_HEALTH\" type=\"Admin\" enabled=\"true\" message=\"$(string.Channel.Health)\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_ACLK\" name=\"Netdata/Aclk\" symbol=\"CHANNEL_ACLK\" type=\"Admin\" enabled=\"true\" message=\"$(string.Channel.Aclk)\"/>\r\n" \
     "        </channels>\r\n" \
     "      </provider>\r\n" \
     "      <provider name=\"NetdataDaemon\"\r\n" \
@@ -420,6 +432,30 @@ static void wel_ensure_manifest_installed(void) {
     swprintf(imParams, _countof(imParams), L"im \"%ls\" \"/mf:%ls\" \"/rf:%ls\"",
              manifestDst, dllDst, dllDst);
     (void)wel_run_silent(wevtutil, imParams);
+
+    // Set short display names on every channel so Event Viewer shows "Daemon" (not the
+    // full channel name "Netdata/Daemon") as the leaf label inside the Netdata folder.
+    // wevtutil im does not derive these from $(string.*) references in the embedded
+    // manifest, so we set them explicitly after registration.
+    static const struct { const wchar_t *ch; const wchar_t *label; } channel_labels[] = {
+        { L"Netdata/Daemon",     L"Daemon"     },
+        { L"Netdata/Collectors", L"Collectors" },
+        { L"Netdata/Access",     L"Access"     },
+        { L"Netdata/Health",     L"Health"     },
+        { L"Netdata/Aclk",       L"Aclk"       },
+    };
+    for (size_t cl = 0; cl < _countof(channel_labels); cl++) {
+        wchar_t chregkey[MAX_PATH];
+        swprintf(chregkey, _countof(chregkey), L"%ls%ls",
+                 WINEVT_CHANNELS_KEY, channel_labels[cl].ch);
+        HKEY hCh;
+        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, chregkey, 0, KEY_SET_VALUE, &hCh) == ERROR_SUCCESS) {
+            RegSetValueExW(hCh, L"DisplayName", 0, REG_SZ,
+                           (LPBYTE)channel_labels[cl].label,
+                           (wcslen(channel_labels[cl].label) + 1) * sizeof(wchar_t));
+            RegCloseKey(hCh);
+        }
+    }
 }
 
 #if defined(HAVE_ETW)
