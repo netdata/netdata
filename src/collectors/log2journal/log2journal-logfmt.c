@@ -27,7 +27,7 @@ static inline void logfmt_skip_spaces(LOGFMT_STATE *lfs) {
     const char *s = logfmt_current_pos(lfs);
     const char *start = s;
 
-    while(isspace(*s)) s++;
+    while(isspace((uint8_t)*s)) s++;
 
     lfs->pos += s - start;
 }
