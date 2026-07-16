@@ -1,0 +1,18 @@
+[package]
+name = "treight"
+version = "0.1.0"
+edition = "2021"
+description = "Compressed bitmap using an 8-way bit-tree (as used by GNU idutils)"
+
+[features]
+allocative = ["dep:allocative"]
+roaring = ["dep:roaring"]
+serde = ["dep:serde"]
+
+[dependencies]
+allocative = { workspace = true, optional = true }
+roaring = { workspace = true, optional = true }
+serde = { version = "1", features = ["derive"], optional = true }
+
+[dev-dependencies]
+proptest = { workspace = true }

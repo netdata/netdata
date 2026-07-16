@@ -14,7 +14,8 @@
 version: v1
 display_name: Amazon EKS
 namespace: AWS/EKS
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: ClusterName
@@ -63,48 +64,60 @@ metrics:
     statistics: [sum]
     rate: true
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts section below. All are published at the {ClusterName} grain.
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {ClusterName} grain.
   # ----------------------------------------------------------------------------------------
-  # - id: apiserver_requests_429
-  #   metric_name: apiserver_request_total_429
-  #   statistics: [sum]
-  #   rate: true
-  # - id: apiserver_flowcontrol_seats
-  #   metric_name: apiserver_flowcontrol_current_executing_seats
-  #   statistics: [average]
-  # - id: apiserver_latency_post_p99
-  #   metric_name: apiserver_request_duration_seconds_POST_P99
-  #   statistics: [average]
-  # - id: apiserver_latency_put_p99
-  #   metric_name: apiserver_request_duration_seconds_PUT_P99
-  #   statistics: [average]
-  # - id: apiserver_latency_patch_p99
-  #   metric_name: apiserver_request_duration_seconds_PATCH_P99
-  #   statistics: [average]
-  # - id: apiserver_latency_delete_p99
-  #   metric_name: apiserver_request_duration_seconds_DELETE_P99
-  #   statistics: [average]
-  # - id: scheduler_pending_pods_active
-  #   metric_name: scheduler_pending_pods_ACTIVEQ
-  #   statistics: [average]
-  # - id: scheduler_pending_pods_backoff
-  #   metric_name: scheduler_pending_pods_BACKOFF
-  #   statistics: [average]
-  # - id: scheduler_pending_pods_unschedulable
-  #   metric_name: scheduler_pending_pods_UNSCHEDULABLE
-  #   statistics: [average]
-  # - id: scheduler_pending_pods_gated
-  #   metric_name: scheduler_pending_pods_GATED
-  #   statistics: [average]
-  # - id: admission_webhook_requests_admit
-  #   metric_name: apiserver_admission_webhook_request_total_ADMIT
-  #   statistics: [sum]
-  #   rate: true
-  # - id: admission_webhook_requests_validating
-  #   metric_name: apiserver_admission_webhook_request_total_VALIDATING
-  #   statistics: [sum]
-  #   rate: true
+  - id: apiserver_requests_429
+    disabled: true
+    metric_name: apiserver_request_total_429
+    statistics: [sum]
+    rate: true
+  - id: apiserver_flowcontrol_seats
+    disabled: true
+    metric_name: apiserver_flowcontrol_current_executing_seats
+    statistics: [average]
+  - id: apiserver_latency_post_p99
+    disabled: true
+    metric_name: apiserver_request_duration_seconds_POST_P99
+    statistics: [average]
+  - id: apiserver_latency_put_p99
+    disabled: true
+    metric_name: apiserver_request_duration_seconds_PUT_P99
+    statistics: [average]
+  - id: apiserver_latency_patch_p99
+    disabled: true
+    metric_name: apiserver_request_duration_seconds_PATCH_P99
+    statistics: [average]
+  - id: apiserver_latency_delete_p99
+    disabled: true
+    metric_name: apiserver_request_duration_seconds_DELETE_P99
+    statistics: [average]
+  - id: scheduler_pending_pods_active
+    disabled: true
+    metric_name: scheduler_pending_pods_ACTIVEQ
+    statistics: [average]
+  - id: scheduler_pending_pods_backoff
+    disabled: true
+    metric_name: scheduler_pending_pods_BACKOFF
+    statistics: [average]
+  - id: scheduler_pending_pods_unschedulable
+    disabled: true
+    metric_name: scheduler_pending_pods_UNSCHEDULABLE
+    statistics: [average]
+  - id: scheduler_pending_pods_gated
+    disabled: true
+    metric_name: scheduler_pending_pods_GATED
+    statistics: [average]
+  - id: admission_webhook_requests_admit
+    disabled: true
+    metric_name: apiserver_admission_webhook_request_total_ADMIT
+    statistics: [sum]
+    rate: true
+  - id: admission_webhook_requests_validating
+    disabled: true
+    metric_name: apiserver_admission_webhook_request_total_VALIDATING
+    statistics: [sum]
+    rate: true
 template:
   family: EKS
   context_namespace: eks
@@ -112,7 +125,7 @@ template:
     instances:
       by_labels: [account_id, region, cluster_name]
   charts:
-    - id: cw_eks_apiserver_requests
+    - id: aws_cloudwatch_eks_apiserver_requests
       context: apiserver_requests
       title: EKS API Server Request Rate
       family: API Server
@@ -121,7 +134,7 @@ template:
       dimensions:
         - selector: apiserver_requests_sum
           name: requests
-    - id: cw_eks_apiserver_request_errors
+    - id: aws_cloudwatch_eks_apiserver_request_errors
       context: apiserver_request_errors
       title: EKS API Server Request Errors
       family: API Server
@@ -132,7 +145,7 @@ template:
           name: 4xx
         - selector: apiserver_requests_5xx_sum
           name: 5xx
-    - id: cw_eks_apiserver_latency
+    - id: aws_cloudwatch_eks_apiserver_latency
       context: apiserver_latency
       title: EKS API Server Request Latency (p99)
       family: API Server
@@ -143,7 +156,7 @@ template:
           name: get
         - selector: apiserver_latency_list_p99_average
           name: list
-    - id: cw_eks_apiserver_inflight
+    - id: aws_cloudwatch_eks_apiserver_inflight
       context: apiserver_inflight
       title: EKS API Server In-Flight Requests
       family: API Server
@@ -154,7 +167,7 @@ template:
           name: read_only
         - selector: apiserver_inflight_mutating_average
           name: mutating
-    - id: cw_eks_etcd_db_size
+    - id: aws_cloudwatch_eks_etcd_db_size
       context: etcd_db_size
       title: EKS etcd Database Size In Use
       family: etcd
@@ -163,7 +176,7 @@ template:
       dimensions:
         - selector: etcd_db_size_in_use_maximum
           name: in_use
-    - id: cw_eks_scheduler_pending_pods
+    - id: aws_cloudwatch_eks_scheduler_pending_pods
       context: scheduler_pending_pods
       title: EKS Scheduler Pending Pods
       family: Scheduler
@@ -172,7 +185,7 @@ template:
       dimensions:
         - selector: scheduler_pending_pods_average
           name: pending
-    - id: cw_eks_scheduler_attempts
+    - id: aws_cloudwatch_eks_scheduler_attempts
       context: scheduler_attempts
       title: EKS Scheduler Attempts
       family: Scheduler
@@ -186,64 +199,64 @@ template:
         - selector: scheduler_attempts_error_sum
           name: error
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric(s).
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_eks_apiserver_throttling
-    #   context: apiserver_throttling
-    #   title: EKS API Server Priority-and-Fairness Throttling
-    #   family: API Server
-    #   units: requests/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: apiserver_requests_429_sum
-    #       name: throttled_429
-    # - id: cw_eks_apiserver_flowcontrol
-    #   context: apiserver_flowcontrol
-    #   title: EKS API Server Concurrency Seats In Use
-    #   family: API Server
-    #   units: seats
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: apiserver_flowcontrol_seats_average
-    #       name: executing
-    # - id: cw_eks_apiserver_write_latency
-    #   context: apiserver_write_latency
-    #   title: EKS API Server Write Latency (p99)
-    #   family: API Server
-    #   units: seconds
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: apiserver_latency_post_p99_average
-    #       name: post
-    #     - selector: apiserver_latency_put_p99_average
-    #       name: put
-    #     - selector: apiserver_latency_patch_p99_average
-    #       name: patch
-    #     - selector: apiserver_latency_delete_p99_average
-    #       name: delete
-    # - id: cw_eks_scheduler_pending_by_queue
-    #   context: scheduler_pending_by_queue
-    #   title: EKS Scheduler Pending Pods by Queue
-    #   family: Scheduler
-    #   units: pods
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: scheduler_pending_pods_active_average
-    #       name: active
-    #     - selector: scheduler_pending_pods_backoff_average
-    #       name: backoff
-    #     - selector: scheduler_pending_pods_unschedulable_average
-    #       name: unschedulable
-    #     - selector: scheduler_pending_pods_gated_average
-    #       name: gated
-    # - id: cw_eks_admission_webhooks
-    #   context: admission_webhooks
-    #   title: EKS Admission Webhook Requests
-    #   family: API Server
-    #   units: requests/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: admission_webhook_requests_admit_sum
-    #       name: admit
-    #     - selector: admission_webhook_requests_validating_sum
-    #       name: validating
+    - id: aws_cloudwatch_eks_apiserver_throttling
+      context: apiserver_throttling
+      title: EKS API Server Priority-and-Fairness Throttling
+      family: API Server
+      units: requests/s
+      algorithm: absolute
+      dimensions:
+        - selector: apiserver_requests_429_sum
+          name: throttled_429
+    - id: aws_cloudwatch_eks_apiserver_flowcontrol
+      context: apiserver_flowcontrol
+      title: EKS API Server Concurrency Seats In Use
+      family: API Server
+      units: seats
+      algorithm: absolute
+      dimensions:
+        - selector: apiserver_flowcontrol_seats_average
+          name: executing
+    - id: aws_cloudwatch_eks_apiserver_write_latency
+      context: apiserver_write_latency
+      title: EKS API Server Write Latency (p99)
+      family: API Server
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: apiserver_latency_post_p99_average
+          name: post
+        - selector: apiserver_latency_put_p99_average
+          name: put
+        - selector: apiserver_latency_patch_p99_average
+          name: patch
+        - selector: apiserver_latency_delete_p99_average
+          name: delete
+    - id: aws_cloudwatch_eks_scheduler_pending_by_queue
+      context: scheduler_pending_by_queue
+      title: EKS Scheduler Pending Pods by Queue
+      family: Scheduler
+      units: pods
+      algorithm: absolute
+      dimensions:
+        - selector: scheduler_pending_pods_active_average
+          name: active
+        - selector: scheduler_pending_pods_backoff_average
+          name: backoff
+        - selector: scheduler_pending_pods_unschedulable_average
+          name: unschedulable
+        - selector: scheduler_pending_pods_gated_average
+          name: gated
+    - id: aws_cloudwatch_eks_admission_webhooks
+      context: admission_webhooks
+      title: EKS Admission Webhook Requests
+      family: API Server
+      units: requests/s
+      algorithm: absolute
+      dimensions:
+        - selector: admission_webhook_requests_admit_sum
+          name: admit
+        - selector: admission_webhook_requests_validating_sum
+          name: validating

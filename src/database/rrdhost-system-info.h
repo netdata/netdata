@@ -61,6 +61,7 @@ struct rrdhost_system_info;
 // allocation and free
 
 struct rrdhost_system_info *rrdhost_system_info_create(void);
+struct rrdhost_system_info *rrdhost_system_info_dup(struct rrdhost_system_info *system_info);
 void rrdhost_system_info_free(struct rrdhost_system_info *system_info);
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -80,7 +81,7 @@ void rrdhost_system_info_ml_capable_set(struct rrdhost_system_info *system_info,
 void rrdhost_system_info_ml_enabled_set(struct rrdhost_system_info *system_info, bool enabled);
 void rrdhost_system_info_mc_version_set(struct rrdhost_system_info *system_info, int version);
 
-int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, char *name, char *value);
+int rrdhost_system_info_set_by_name(struct rrdhost_system_info *system_info, const char *name, const char *value);
 
 // --------------------------------------------------------------------------------------------------------------------
 // reading individual fields

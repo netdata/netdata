@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "cgroup-internals.h"
+#include "cgroup-name-config.h"
 #include "cgroup-netipc.h"
 #include "cgroup_ebpfgo_shared_memory.h"
 
@@ -25,6 +26,7 @@ bool cgroup_enable_cpuacct = true;
 bool cgroup_enable_cpuacct_cpu_shares = false;
 
 int cgroup_check_for_new_every = 10;
+int cgroup_name_timeout_ms = 120000;
 int cgroup_update_every = 1;
 char *cgroup_cpuacct_base = NULL;
 char *cgroup_cpuset_base = NULL;
@@ -376,8 +378,45 @@ void read_cgroup_plugin_configuration() {
                        " * "
             ), NULL, SIMPLE_PATTERN_EXACT, true);
 
-    snprintfz(filename, FILENAME_MAX, "%s/cgroup-name.sh", netdata_configured_primary_plugins_dir);
-    cgroups_rename_script = inicfg_get(&netdata_config, "plugin:cgroups", "script to get cgroup names", filename);
+    char legacy_cgroup_name[FILENAME_MAX];
+    snprintfz(legacy_cgroup_name, sizeof(legacy_cgroup_name),
+              "%s/cgroup-name.sh", netdata_configured_primary_plugins_dir);
+    snprintfz(filename, FILENAME_MAX, "%s/cgroup-name", netdata_configured_primary_plugins_dir);
+    const char *configured_cgroup_name =
+        inicfg_get(&netdata_config, "plugin:cgroups", "script to get cgroup names", filename);
+    if (cgroup_name_is_legacy_default_helper(configured_cgroup_name, legacy_cgroup_name)) {
+        collector_info("CGROUP: migrating legacy cgroup-name helper '%s' to '%s'.",
+                       configured_cgroup_name, filename);
+        configured_cgroup_name =
+            inicfg_set(&netdata_config, "plugin:cgroups", "script to get cgroup names", filename);
+    }
+    if (configured_cgroup_name && *configured_cgroup_name && access(configured_cgroup_name, X_OK) == 0)
+        cgroups_rename_script = configured_cgroup_name;
+    else {
+        cgroups_rename_script = NULL;
+        collector_error("CGROUP: cgroup-name helper '%s' is not executable; cgroup renaming is disabled.",
+                       configured_cgroup_name ? configured_cgroup_name : "");
+    }
+
+    // single operator knob for the whole cgroup-name invocation: the helper
+    // receives it and self-terminates by then; discovery waits this long plus a
+    // grace period before killing the helper. 0 means unbounded (legacy).
+    time_t cgroup_name_timeout_s = inicfg_get_duration_seconds(
+        &netdata_config, "plugin:cgroups", "cgroup-name timeout", 120);
+    if (cgroup_name_timeout_s <= 0)
+        cgroup_name_timeout_ms = 0;
+    else if ((uintmax_t)cgroup_name_timeout_s > (uintmax_t)INT_MAX / MSEC_PER_SEC)
+        cgroup_name_timeout_ms = INT_MAX;
+    else
+        cgroup_name_timeout_ms = (int)((uintmax_t)cgroup_name_timeout_s * MSEC_PER_SEC);
+
+    // the helper inherits this and self-terminates by then; discovery enforces
+    // the same budget plus a grace period on the parent side
+    {
+        char timeout_env[32];
+        snprintfz(timeout_env, sizeof(timeout_env), "%d", cgroup_name_timeout_ms);
+        nd_setenv("NETDATA_CGROUP_NAME_TIMEOUT_MS", timeout_env, 1);
+    }
 
     snprintfz(filename, FILENAME_MAX, "%s/cgroup-network", netdata_configured_primary_plugins_dir);
     cgroups_network_interface_script = inicfg_get(&netdata_config, "plugin:cgroups", "script to get cgroup network interfaces", filename);

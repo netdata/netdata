@@ -191,8 +191,7 @@ mark_as_advanced(ENABLE_DASHBOARD)
 option(ENABLE_PLUGIN_GO "Enable metric collectors written in Go" ${DEFAULT_FEATURE_STATE})
 cmake_dependent_option(ENABLE_ND_MCP "Build nd-mcp stdio-to-websocket bridge for MCP integration" ${DEFAULT_FEATURE_STATE} "ENABLE_PLUGIN_GO" False)
 option(ENABLE_PLUGIN_SCRIPTS "Enable the experimental scripts plugin (Nagios compatibility module)" ON)
-option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE})
-cmake_dependent_option(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER "Enable OTel signal viewer plugin" ${DEFAULT_FEATURE_STATE} "NOT OS_WINDOWS" False)
+cmake_dependent_option(ENABLE_PLUGIN_OTEL "Enable collection of OpenTelemetry metrics and logs" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_NETFLOW "Enable NetFlow/IPFIX/sFlow flow analysis plugin" False "NOT OS_WINDOWS" False)
 option(ENABLE_PLUGIN_PYTHON "Enable metric collectors written in Python" ${DEFAULT_FEATURE_STATE})
 
@@ -205,6 +204,7 @@ cmake_dependent_option(ENABLE_PLUGIN_FREEIPMI "Enable IPMI monitoring" ${DEFAULT
 cmake_dependent_option(ENABLE_PLUGIN_CGROUP_NETWORK "Enable Linux CGroup network usage monitoring" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_SERVER "Enable cgroups.plugin CGROUPS_LOOKUP netipc server" True "OS_LINUX" False)
 cmake_dependent_option(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT "Build cgroups.plugin CGROUPS_LOOKUP test client" False "ENABLE_CGROUPS_LOOKUP_SERVER" False)
+cmake_dependent_option(ENABLE_CGROUP_NAME "Build the cgroup-name helper" True "OS_LINUX;ENABLE_PLUGIN_GO" False)
 cmake_dependent_option(ENABLE_PLUGIN_DEBUGFS "Enable Linux DebugFS metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_PLUGIN_EBPF "Enable Linux eBPF metric collection" ${DEFAULT_FEATURE_STATE} "OS_LINUX" False)
 cmake_dependent_option(ENABLE_LEGACY_EBPF_PROGRAMS "Enable eBPF programs for kernels without BTF support" True "ENABLE_PLUGIN_EBPF" False)
@@ -251,7 +251,7 @@ mark_as_advanced(FORCE_LEGACY_LIBBPF)
 cmake_dependent_option(ENABLE_NETDATA_JOURNAL_FILE_READER "Enable netdata's journal file reader implementation" False "ENABLE_PLUGIN_SYSTEMD_JOURNAL" False)
 
 # Setup Rust/Corrosion for plugins that need it
-if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER OR ENABLE_PLUGIN_NETFLOW)
+if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_NETFLOW)
     include(FetchContent)
     FetchContent_Declare(
         Corrosion
@@ -276,9 +276,6 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
     if(ENABLE_PLUGIN_OTEL)
         list(APPEND _WORKSPACE_CRATES otel-plugin)
     endif()
-    if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
-        list(APPEND _WORKSPACE_CRATES otel-signal-viewer-plugin)
-    endif()
     if(ENABLE_PLUGIN_NETFLOW)
         list(APPEND _WORKSPACE_CRATES netflow-plugin)
     endif()
@@ -293,24 +290,24 @@ if(ENABLE_NETDATA_JOURNAL_FILE_READER OR ENABLE_PLUGIN_OTEL OR ENABLE_PLUGIN_OTE
       else()
         corrosion_add_target_rustflags(otel-plugin --cfg=tracing_unstable)
       endif()
-    endif()
 
-    if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
-      set(OTEL_SIGNAL_VIEWER_RUSTFLAGS --cfg=tracing_unstable)
-
-      # We depend (transitively) on the `io-uring` crate which doesn't provide
-      # prebuilt bindings for 32-bit arches. Considering this is a compile-time
-      # and not a runtime dependency (because we don't use foyer's io-uring
-      # engine), we can simply skip the check.
+      # The workspace release profile propagates fat LTO, single-codegen-unit,
+      # and debuginfo settings through the whole dependency graph. On 32-bit
+      # targets that makes rustc-LLVM exhaust the ~3 GB process address space
+      # during codegen ("rustc-LLVM ERROR: out of memory"). Override Cargo's
+      # release profile so the otel-plugin build stays within budget.
       if(CMAKE_SIZEOF_VOID_P EQUAL 4 AND CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        list(APPEND OTEL_SIGNAL_VIEWER_RUSTFLAGS --cfg=io_uring_skip_arch_check)
+        # We depend (transitively) on the `io-uring` crate which doesn't provide
+        # prebuilt bindings for 32-bit arches. Considering this is a compile-time
+        # and not a runtime dependency (because we don't use foyer's io-uring
+        # engine), we can simply skip the check.
+        corrosion_add_target_rustflags(otel-plugin --cfg=io_uring_skip_arch_check)
+        corrosion_set_env_vars(
+                otel-plugin
+                "CARGO_PROFILE_RELEASE_DEBUG=0"
+                "CARGO_PROFILE_RELEASE_LTO=off"
+                "CARGO_PROFILE_RELEASE_CODEGEN_UNITS=8")
       endif()
-
-      if(STATIC_BUILD)
-        list(APPEND OTEL_SIGNAL_VIEWER_RUSTFLAGS "-C" "target-feature=+crt-static")
-      endif()
-
-      corrosion_add_target_rustflags(otel-signal-viewer-plugin ${OTEL_SIGNAL_VIEWER_RUSTFLAGS})
     endif()
 
     if(ENABLE_PLUGIN_NETFLOW)
@@ -436,7 +433,7 @@ if(ENABLE_JEMALLOC)
 endif()
 
 set(ENABLE_PLUGIN_EBPF_GO OFF)
-if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_NETFLOW)
+if(ENABLE_PLUGIN_GO OR ENABLE_PLUGIN_EBPF OR ENABLE_PLUGIN_IBM OR ENABLE_PLUGIN_SCRIPTS OR ENABLE_PLUGIN_NETFLOW OR ENABLE_CGROUP_NAME)
     include(NetdataGoTools)
 
     find_min_go_version("${CMAKE_SOURCE_DIR}/src/go")
@@ -966,6 +963,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/aral/aral.h
         src/libnetdata/avl/avl.c
         src/libnetdata/avl/avl.h
+        src/libnetdata/avl/avl-types.h
         src/libnetdata/buffer/buffer.c
         src/libnetdata/buffer/buffer.h
         src/libnetdata/buffer/functions_fields.c
@@ -979,6 +977,7 @@ set(LIBNETDATA_FILES
         src/libnetdata/clocks/clocks.h
         src/libnetdata/clocks/clocks-internals.h
         src/libnetdata/clocks/clocks-unittest.c
+        src/libnetdata/clocks/time_t_arithmetic.h
         src/libnetdata/completion/completion.c
         src/libnetdata/completion/completion.h
         src/libnetdata/datetime/iso8601.c
@@ -1121,6 +1120,8 @@ set(LIBNETDATA_FILES
         src/libnetdata/os/windows-wmi/windows-wmi.h
         src/libnetdata/os/windows-wmi/windows-wmi-GetDiskDriveInfo.c
         src/libnetdata/os/windows-wmi/windows-wmi-GetDiskDriveInfo.h
+        src/libnetdata/os/windows-wmi/windows-wmi-GetSystemInfo.c
+        src/libnetdata/os/windows-wmi/windows-wmi-GetSystemInfo.h
         src/libnetdata/os/windows-perflib/perflib.c
         src/libnetdata/os/windows-perflib/perflib.h
         src/libnetdata/os/windows-perflib/perflib-names.c
@@ -1689,6 +1690,8 @@ set(INTERNAL_COLLECTORS_FILES
         src/collectors/common-contexts/mem-pgfaults.h
         src/collectors/common-contexts/mem-available.h
         src/collectors/common-contexts/power-supply.h
+        src/collectors/common-contexts/hw-sensors.h
+        src/collectors/common-contexts/hw-sensors-function.h
 )
 
 set(INTERCOMMUNICATION_COLLECTORS_FILES
@@ -2075,6 +2078,9 @@ set(CGROUPS_PLUGIN_FILES
         src/collectors/cgroups.plugin/sys_fs_cgroup.h
         src/collectors/cgroups.plugin/cgroup-internals.h
         src/collectors/cgroups.plugin/cgroup-discovery.c
+        src/collectors/cgroups.plugin/cgroup-name-config.c
+        src/collectors/cgroups.plugin/cgroup-name-config.h
+        src/collectors/cgroups.plugin/cgroup-name-labels.c
         src/collectors/cgroups.plugin/cgroup-orchestrator.c
         src/collectors/common-cgroups/cgroup-path.c
         src/collectors/common-cgroups/cgroup-path.h
@@ -3081,11 +3087,28 @@ if(ENABLE_CGROUPS_LOOKUP_TEST_CLIENT)
 endif()
 
 if(OS_LINUX)
+    add_executable(cgroup-name-config-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroup_name_config.c
+            src/collectors/cgroups.plugin/cgroup-name-config.c)
+
     add_executable(cgroup-orchestrator-test EXCLUDE_FROM_ALL
             src/collectors/cgroups.plugin/tests/test_cgroup_orchestrator.c
             src/collectors/cgroups.plugin/cgroup-orchestrator.c)
     target_compile_definitions(cgroup-orchestrator-test PRIVATE NETDATA_INTERNAL_CHECKS=1)
     target_link_libraries(cgroup-orchestrator-test libnetdata)
+
+    # The label-parser test links the real src/database/rrdlabels.c against a
+    # small set of stubs (test_cgroups_plugin_stubs.c) so it stays self-contained
+    # while still validating production parsing behavior. Plain C, no test
+    # framework; the target is EXCLUDE_FROM_ALL so it is built only on demand.
+    add_executable(cgroups-plugin-labels-test EXCLUDE_FROM_ALL
+            src/collectors/cgroups.plugin/tests/test_cgroups_plugin.c
+            src/collectors/cgroups.plugin/tests/test_cgroups_plugin_stubs.c
+            src/collectors/cgroups.plugin/cgroup-name-labels.c
+            src/database/rrdlabels.c
+            src/database/rrdlabels-aggregated.c
+            src/database/pattern-array.c)
+    target_link_libraries(cgroups-plugin-labels-test libnetdata)
 
     add_executable(apps-cgroups-path-test EXCLUDE_FROM_ALL
             src/collectors/apps.plugin/tests/test_apps_cgroups_path.c
@@ -3117,6 +3140,10 @@ if(OS_LINUX)
             src/collectors/apps.plugin/tests/test_apps_cgroups_lookup_client_abort.c)
     target_link_libraries(apps-cgroups-lookup-client-abort-test libnetdata)
 endif()
+
+add_executable(stream-receiver-hops-test EXCLUDE_FROM_ALL
+        src/streaming/tests/stream-handshake-hops-test.c)
+target_link_libraries(stream-receiver-hops-test libnetdata)
 
 if(ENABLE_CGROUPS_LOOKUP_SERVER)
     add_executable(cgroup-lookup-netipc-test EXCLUDE_FROM_ALL
@@ -3382,6 +3409,14 @@ if(ENABLE_PLUGIN_LOCAL_LISTENERS)
         install(TARGETS local-listeners
                 COMPONENT netdata
                 DESTINATION usr/libexec/netdata/plugins.d)
+endif()
+
+if(OS_LINUX AND MNL_FOUND)
+        add_executable(local-sockets-mnl-test EXCLUDE_FROM_ALL
+                src/libnetdata/local-sockets/tests/test_local_sockets_mnl.c)
+        target_compile_options(local-sockets-mnl-test PRIVATE ${MNL_CFLAGS_OTHER})
+        target_include_directories(local-sockets-mnl-test PRIVATE ${MNL_INCLUDE_DIRS})
+        target_link_libraries(local-sockets-mnl-test libnetdata ${MNL_LIBRARIES})
 endif()
 
 if(ENABLE_PLUGIN_NETWORK_VIEWER)
@@ -3813,23 +3848,13 @@ if(ENABLE_PLUGIN_OTEL)
                       RUNTIME DESTINATION usr/libexec/netdata/plugins.d
                       COMPONENT plugin-otel)
 
-    install(FILES src/crates/netdata-otel/otel-plugin/configs/otel.d/v1/metrics/hostmetrics-receiver.yaml
+    install(FILES src/crates/otel-ingestor/configs/otel.d/v1/metrics/hostmetrics-receiver.yaml
             COMPONENT plugin-otel
             DESTINATION usr/lib/netdata/conf.d/otel.d/v1/metrics)
 
     install(DIRECTORY COMPONENT plugin-otel DESTINATION etc/netdata/otel.d/v1/metrics)
 endif()
 
-#
-# otel-signal-viewer
-#
-# Handle OTel signal viewer plugin
-if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
-    corrosion_install(TARGETS otel-signal-viewer-plugin
-                      PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE
-                      RUNTIME DESTINATION usr/libexec/netdata/plugins.d
-                      COMPONENT plugin-otel-signal-viewer)
-endif()
 
 #
 # netflow-plugin
@@ -3996,38 +4021,28 @@ install(PROGRAMS
         COMPONENT netdata
         DESTINATION usr/libexec/netdata/plugins.d)
 
-configure_file(src/collectors/cgroups.plugin/cgroup-name.sh.in
-               src/collectors/cgroups.plugin/cgroup-name.sh @ONLY)
-install(PROGRAMS
-        ${CMAKE_BINARY_DIR}/src/collectors/cgroups.plugin/cgroup-name.sh
-        COMPONENT netdata
-        DESTINATION usr/libexec/netdata/plugins.d)
+if(ENABLE_CGROUP_NAME)
+    add_go_target(cgroup-name-target cgroup-name
+                  src/collectors/cgroups.plugin/cgroup-name .)
+    install(PROGRAMS
+            ${CMAKE_BINARY_DIR}/cgroup-name
+            COMPONENT netdata
+            DESTINATION usr/libexec/netdata/plugins.d)
+endif()
 
 #
 # otel config
 #
 if(ENABLE_PLUGIN_OTEL)
-    configure_file(src/crates/netdata-otel/otel-plugin/configs/otel.yaml.in
-                   src/crates/netdata-otel/otel-plugin/configs/otel.yaml
+    configure_file(src/crates/otel-plugin/configs/otel.yaml.in
+                   src/crates/otel-plugin/configs/otel.yaml
                    @ONLY)
 
-    install(FILES ${CMAKE_BINARY_DIR}/src/crates/netdata-otel/otel-plugin/configs/otel.yaml
+    install(FILES ${CMAKE_BINARY_DIR}/src/crates/otel-plugin/configs/otel.yaml
             COMPONENT plugin-otel
             DESTINATION usr/lib/netdata/conf.d)
 endif()
 
-#
-# otel-signal-viewer config
-#
-if(ENABLE_PLUGIN_OTEL_SIGNAL_VIEWER)
-    configure_file(src/crates/netdata-log-viewer/otel-signal-viewer-plugin/configs/otel-signal-viewer.yaml.in
-                   src/crates/netdata-log-viewer/otel-signal-viewer-plugin/configs/otel-signal-viewer.yaml
-                   @ONLY)
-
-    install(FILES ${CMAKE_BINARY_DIR}/src/crates/netdata-log-viewer/otel-signal-viewer-plugin/configs/otel-signal-viewer.yaml
-            COMPONENT plugin-otel-signal-viewer
-            DESTINATION usr/lib/netdata/conf.d)
-endif()
 
 #
 # statsd
@@ -4699,3 +4714,16 @@ include(NetdataRenderDocs)
 #
 
 include(Packaging)
+
+#
+# Optional convenience: wire the netdata-build MCP server (packaging/tools/
+# automation/mcp) into a local agent client. Explicit one-off — `ninja setup-mcp`
+# — not part of the build (no ALL). Mutates the USER's global opencode/Claude
+# config for this checkout; never touches the repo. See the tool's README.
+#
+add_custom_target(setup-mcp
+        COMMAND python3
+                "${CMAKE_SOURCE_DIR}/packaging/tools/automation/mcp/scripts/setup_mcp.py"
+                --tool all --source-dir "${CMAKE_SOURCE_DIR}"
+        USES_TERMINAL
+        COMMENT "Configuring netdata-build MCP server for opencode/Claude Code (global config)")

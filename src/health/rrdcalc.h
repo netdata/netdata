@@ -113,23 +113,57 @@ struct rrdcalc {
 #define foreach_rrdcalc_in_rrdhost_done(rc) \
     dfe_done(rc)
 
-static inline RRDSET *rrdcalc_rrdset_read_lock(RRDCALC *rc) {
-    RRDSET *st = rc->rrdset;
+RRDSET_ACQUIRED *rrdset_find_and_acquire(RRDHOST *host, const char *id, bool include_obsolete);
+void rrdset_acquired_release(RRDSET_ACQUIRED *rsa);
+RRDSET *rrdset_acquired_to_rrdset(RRDSET_ACQUIRED *rsa);
+
+static inline bool rrdcalc_rrdset_read_lock_if_matches(RRDCALC *rc, RRDSET *st) {
     if(unlikely(!st))
-        return NULL;
+        return false;
 
     rw_spinlock_read_lock(&st->alerts.spinlock);
     // cppcheck-suppress knownConditionTrueFalse
     if(unlikely(rc->rrdset != st)) {
         rw_spinlock_read_unlock(&st->alerts.spinlock);
-        return NULL;
+        return false;
     }
+
+    return true;
+}
+
+static inline RRDSET *rrdcalc_rrdset_read_lock(RRDCALC *rc) {
+    RRDSET *st = rc->rrdset;
+    if(unlikely(!rrdcalc_rrdset_read_lock_if_matches(rc, st)))
+        return NULL;
 
     return st;
 }
 
 static inline void rrdcalc_rrdset_read_unlock(RRDSET *st) {
     rw_spinlock_read_unlock(&st->alerts.spinlock);
+}
+
+static inline RRDSET_ACQUIRED *rrdcalc_rrdset_acquire_linked(RRDHOST *host, RRDCALC *rc, RRDSET **rrdset) {
+    *rrdset = NULL;
+
+    RRDSET_ACQUIRED *rsa = rrdset_find_and_acquire(host, rrdcalc_chart_name(rc), true);
+    if(unlikely(!rsa))
+        return NULL;
+
+    RRDSET *st = rrdset_acquired_to_rrdset(rsa);
+    if(unlikely(!st)) {
+        dictionary_acquired_item_release(host->rrdset_root_index, (const DICTIONARY_ITEM *)rsa);
+        return NULL;
+    }
+
+    if(unlikely(!rrdcalc_rrdset_read_lock_if_matches(rc, st))) {
+        rrdset_acquired_release(rsa);
+        return NULL;
+    }
+
+    rrdcalc_rrdset_read_unlock(st);
+    *rrdset = st;
+    return rsa;
 }
 
 #define RRDCALC_HAS_DB_LOOKUP(rc) ((rc)->config.after)

@@ -69,17 +69,22 @@ static short aclk_send_message_with_bin_payload(mqtt_wss_client client, json_obj
     str = json_object_to_json_string_ext(msg, JSON_C_TO_STRING_PLAIN);
     len = strlen(str);
 
+    const size_t sep_len = sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1;
     size_t full_msg_len = len;
-    if (payload_len)
-        full_msg_len += strlen(V2_BIN_PAYLOAD_SEPARATOR) + payload_len;
+    if (payload_len && unlikely(
+            aclk_size_add_overflow(&full_msg_len, sep_len) ||
+            aclk_size_add_overflow(&full_msg_len, payload_len))) {
+        json_object_put(msg);
+        return HTTP_RESP_CONTENT_TOO_LONG;
+    }
 
     full_msg = mallocz(full_msg_len);
     memcpy(full_msg, str, len);
     json_object_put(msg);
 
     if (payload_len) {
-        memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, sizeof(V2_BIN_PAYLOAD_SEPARATOR) - 1);
-        len += strlen(V2_BIN_PAYLOAD_SEPARATOR);
+        memcpy(&full_msg[len], V2_BIN_PAYLOAD_SEPARATOR, sep_len);
+        len += sep_len;
         memcpy(&full_msg[len], payload, payload_len);
     }
 

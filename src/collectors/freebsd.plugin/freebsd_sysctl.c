@@ -642,7 +642,7 @@ int do_hw_intcnt(int update_every, usec_t dt) {
 int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
     (void)dt;
     static int mib[4] = {0, 0, 0, 0};
-    u_int int_number;
+    uint64_t int_number;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.sys.v_intr", mib, int_number))) {
         collector_error("DISABLED: system.dev_intr chart");
@@ -683,7 +683,7 @@ int do_vm_stats_sys_v_intr(int update_every, usec_t dt) {
 int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
     (void)dt;
     static int mib[4] = {0, 0, 0, 0};
-    u_int soft_intr_number;
+    uint64_t soft_intr_number;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.sys.v_soft", mib, soft_intr_number))) {
         collector_error("DISABLED: system.dev_intr chart");
@@ -724,7 +724,7 @@ int do_vm_stats_sys_v_soft(int update_every, usec_t dt) {
 int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
     (void)dt;
     static int mib[4] = {0, 0, 0, 0};
-    u_int ctxt_number;
+    uint64_t ctxt_number;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.sys.v_swtch", mib, ctxt_number))) {
         collector_error("DISABLED: system.ctxt chart");
@@ -765,7 +765,7 @@ int do_vm_stats_sys_v_swtch(int update_every, usec_t dt) {
 int do_vm_stats_sys_v_forks(int update_every, usec_t dt) {
     (void)dt;
     static int mib[4] = {0, 0, 0, 0};
-    u_int forks_number;
+    uint64_t forks_number;
 
     if (unlikely(GETSYSCTL_SIMPLE("vm.stats.vm.v_forks", mib, forks_number))) {
         collector_error("DISABLED: system.forks chart");

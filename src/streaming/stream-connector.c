@@ -317,7 +317,11 @@ bool stream_connect(struct sender_state *s, uint16_t default_port, time_t timeou
     }
     buffer_sprintf(wb, "&hops=%d", s->hops);
     buffer_sprintf(wb, "&ver=%u", s->capabilities);
-    rrdhost_system_info_to_url_encode_stream(wb, host->system_info);
+    spinlock_lock(&host->rrdhost_update_lock);
+    struct rrdhost_system_info *system_info = rrdhost_system_info_dup(host->system_info);
+    spinlock_unlock(&host->rrdhost_update_lock);
+    rrdhost_system_info_to_url_encode_stream(wb, system_info);
+    rrdhost_system_info_free(system_info);
     buffer_key_value_urlencode(wb, "&NETDATA_PROTOCOL_VERSION", STREAMING_PROTOCOL_VERSION);
     buffer_strcat(wb, HTTP_1_1 HTTP_ENDL);
     buffer_sprintf(wb, "User-Agent: %s/%s" HTTP_ENDL, rrdhost_program_name(host), rrdhost_program_version(host));

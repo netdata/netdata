@@ -382,6 +382,8 @@ RRDHOST *rrdhost_create(
 
     spinlock_init(&host->receiver_lock);
     spinlock_init(&host->rrdhost_update_lock);
+    rw_spinlock_init(&host->ml_host_rwlock);
+    __atomic_store_n(&host->ml_running, false, __ATOMIC_RELAXED);
     spinlock_init(&host->aclk.spinlock);
 
     if (likely(!archived)) {
@@ -808,7 +810,12 @@ void rrdhost_cleanup_data_collection_and_health(RRDHOST *host) {
     rrdhost_pluginsd_receive_chart_slots_free(host);
 
     rrdcalc_delete_all(host);
-    rrdset_index_destroy(host);
+
+    // flush, not destroy: this runs when the host transitions to archived
+    // (service.c) while queries may still hold acquired charts; the indexes
+    // must stay allocated until rrdhost_free_unlinked() destroys them
+    rrdset_index_flush(host);
+
     rrdcalc_rrdhost_index_destroy(host);
     health_alarm_log_free(host);
 
@@ -841,6 +848,10 @@ static void rrdhost_unlink___while_having_rrd_wrlock(RRDHOST *host) {
 
 static void rrdhost_free_unlinked(RRDHOST *host) {
     rrdhost_cleanup_data_collection_and_health(host);
+
+    // the host is already unlinked, so no new queries can find it;
+    // now it is safe to destroy the chart indexes the archive path only flushed
+    rrdset_index_destroy(host);
 
     // ------------------------------------------------------------------------
     // free it

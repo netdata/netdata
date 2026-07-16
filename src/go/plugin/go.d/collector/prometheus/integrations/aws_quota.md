@@ -21,10 +21,17 @@ Module: prometheus
 
 ## Overview
 
-Monitor AWS service quotas for effective resource usage and cost management.
+Monitor AWS Service Quotas exposed by aws_quota_exporter.
+
+This integration complements the
+[Amazon CloudWatch](https://github.com/netdata/netdata/blob/master/src/go/plugin/go.d/collector/cloudwatch/integrations/amazon_cloudwatch.md) collector,
+which queries runtime metrics from CloudWatch. The integrations use different AWS data sources and do
+not replace one another.
 
 
-Metrics are gathered by periodically sending HTTP requests to [aws_quota_exporter](https://github.com/emylincon/aws_quota_exporter).
+Netdata periodically scrapes Prometheus metrics from
+[aws_quota_exporter](https://github.com/emylincon/aws_quota_exporter), which obtains quota information
+from AWS Service Quotas rather than CloudWatch.
 
 
 This collector is supported on all platforms.

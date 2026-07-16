@@ -129,6 +129,17 @@ struct mqtt_wss_client_struct {
 #endif
 };
 
+static void mqtt_wss_close_sockfd(mqtt_wss_client client)
+{
+    if (client->sockfd >= 0)
+        close(client->sockfd);
+
+    client->sockfd = -1;
+    client->poll_fds[POLLFD_SOCKET].fd = -1;
+    client->poll_fds[POLLFD_SOCKET].events = 0;
+    client->poll_fds[POLLFD_SOCKET].revents = 0;
+}
+
 static void mws_connack_callback_ng(void *user_ctx, int code)
 {
     mqtt_wss_client client = user_ctx;
@@ -164,6 +175,8 @@ mqtt_wss_client mqtt_wss_new(
     mqtt_wss_client client = callocz(1, sizeof(struct mqtt_wss_client_struct));
 
     spinlock_init(&client->stat_lock);
+    client->sockfd = -1;
+    client->poll_fds[POLLFD_SOCKET].fd = -1;
 
     client->msg_callback = msg_callback;
     client->puback_callback = puback_callback;
@@ -241,8 +254,7 @@ void mqtt_wss_destroy(mqtt_wss_client client)
     if (client->ssl_ctx)
         SSL_CTX_free(client->ssl_ctx);
 
-    if (client->sockfd > 0)
-        close(client->sockfd);
+    mqtt_wss_close_sockfd(client);
 
     freez(client);
 }
@@ -351,8 +363,7 @@ int mqtt_wss_connect(
 
     client->ssl_flags = ssl_flags;
 
-    if (client->sockfd > 0)
-        close(client->sockfd);
+    mqtt_wss_close_sockfd(client);
 
     char port_str[16];
     snprintf(port_str, sizeof(port_str) -1, "%d", client->port);
@@ -392,13 +403,16 @@ int mqtt_wss_connect(
 
     if (fcntl(client->sockfd, F_SETFL, fcntl(client->sockfd, F_GETFL, 0) | O_NONBLOCK) == -1) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Error setting O_NONBLOCK to TCP socket. \"%s\"", strerror(errno));
+        mqtt_wss_close_sockfd(client);
         return -8;
     }
 
     if (client->proxy_type != MQTT_WSS_DIRECT) {
         if (aclk_proxy_negotiation_connect(client->sockfd, client->proxy_type, client->proxy_uname, client->proxy_passwd,
-                                           client->target_host, client->target_port, 10000))
+                                           client->target_host, client->target_port, 10000)) {
+            mqtt_wss_close_sockfd(client);
             return -4;
+        }
 
         // Credentials are only needed for proxy negotiation; wipe them now.
         aclk_sensitive_free(&client->proxy_passwd);
@@ -413,6 +427,7 @@ int mqtt_wss_connect(
 #else
     if (OPENSSL_init_ssl(OPENSSL_INIT_LOAD_CONFIG, NULL) != 1) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to initialize SSL");
+        mqtt_wss_close_sockfd(client);
         return -1;
     };
 #endif
@@ -440,6 +455,7 @@ int mqtt_wss_connect(
     if (!(client->ssl_flags & MQTT_WSS_SSL_DONT_CHECK_CERTS)) {
         if (!SSL_set_ex_data(client->ssl, 0, client)) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "Could not SSL_set_ex_data");
+            mqtt_wss_close_sockfd(client);
             return -4;
         }
     }
@@ -448,6 +464,7 @@ int mqtt_wss_connect(
 
     if (!SSL_set_tlsext_host_name(client->ssl, client->target_host)) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Error setting TLS SNI host");
+        mqtt_wss_close_sockfd(client);
         return -7;
     }
 
@@ -462,6 +479,7 @@ int mqtt_wss_connect(
         if (!X509_VERIFY_PARAM_set1_ip_asc(param, client->target_host) &&
             !X509_VERIFY_PARAM_set1_host(param, client->target_host, 0)) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "Error setting TLS hostname verification host");
+            mqtt_wss_close_sockfd(client);
             return -7;
         }
     }
@@ -469,6 +487,7 @@ int mqtt_wss_connect(
     result = SSL_connect(client->ssl);
     if (result != -1 && result != 1) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "SSL could not connect");
+        mqtt_wss_close_sockfd(client);
         return -5;
     }
 
@@ -476,6 +495,7 @@ int mqtt_wss_connect(
         int ec = SSL_get_error(client->ssl, result);
         if (ec != SSL_ERROR_WANT_READ && ec != SSL_ERROR_WANT_WRITE) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "Failed to start SSL connection");
+            mqtt_wss_close_sockfd(client);
             return -6;
         }
     }
@@ -502,6 +522,7 @@ int mqtt_wss_connect(
     int ret = mqtt_ng_connect(client->mqtt, &auth, mqtt_params->will_msg ? &lwt : NULL, client->mqtt_keepalive);
     if (ret) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "Error generating MQTT connect");
+        mqtt_wss_close_sockfd(client);
         return 1;
     }
 
@@ -512,6 +533,7 @@ int mqtt_wss_connect(
         int rc = mqtt_wss_service(client, 60 * MSEC_PER_SEC);
         if(rc) {
             nd_log(NDLS_DAEMON, NDLP_ERR, "Error connecting to MQTT WSS server \"%s\", port %d. Code: %d", host, port, rc);
+            mqtt_wss_close_sockfd(client);
             return 2;
         }
     }
@@ -593,8 +615,7 @@ void mqtt_wss_disconnect(mqtt_wss_client client, int timeout_ms)
     // or timeout happens (unusual) in which case we close
     mqtt_wss_service_all(client, timeout_ms / 4);
 
-    close(client->sockfd);
-    client->sockfd = -1;
+    mqtt_wss_close_sockfd(client);
 }
 
 static void mqtt_wss_wakeup(mqtt_wss_client client)

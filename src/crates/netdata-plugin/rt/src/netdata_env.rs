@@ -3,7 +3,7 @@
 use std::env;
 use std::path::PathBuf;
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, serde::Serialize)]
 pub struct NetdataEnv {
     pub user_config_dir: Option<PathBuf>,
     pub stock_config_dir: Option<PathBuf>,
@@ -12,12 +12,17 @@ pub struct NetdataEnv {
     pub user_plugins_dirs: Option<Vec<PathBuf>>,
     pub web_dir: Option<PathBuf>,
     pub cache_dir: Option<PathBuf>,
+    pub run_dir: Option<PathBuf>,
     pub lib_dir: Option<PathBuf>,
     pub log_dir: Option<PathBuf>,
     pub host_prefix: Option<String>,
     pub debug_flags: Option<String>,
     pub update_every: Option<u64>,
     pub invocation_id: Option<String>,
+    /// Netdata machine GUID — the product's permanent node identity.
+    /// Exported by the agent as NETDATA_REGISTRY_UNIQUE_ID
+    /// (src/daemon/machine-guid.c). Survives log-volume wipes; defines "same node".
+    pub registry_unique_id: Option<String>,
     pub log_method: Option<LogMethod>,
     pub log_format: Option<LogFormat>,
     pub log_level: Option<LogLevel>,
@@ -27,7 +32,7 @@ pub struct NetdataEnv {
     pub systemd_journal_path: Option<PathBuf>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum LogMethod {
     Syslog,
     Journal,
@@ -35,14 +40,14 @@ pub enum LogMethod {
     None,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum LogFormat {
     Journal,
     Logfmt,
     Json,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum LogLevel {
     Emergency,
     Alert,
@@ -54,7 +59,7 @@ pub enum LogLevel {
     Debug,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize)]
 pub enum SyslogFacility {
     Auth,
     Authpriv,
@@ -90,6 +95,7 @@ impl NetdataEnv {
                 .map(|s| s.split(':').map(PathBuf::from).collect()),
             web_dir: env::var("NETDATA_WEB_DIR").ok().map(PathBuf::from),
             cache_dir: env::var("NETDATA_CACHE_DIR").ok().map(PathBuf::from),
+            run_dir: env::var("NETDATA_RUN_DIR").ok().map(PathBuf::from),
             lib_dir: env::var("NETDATA_LIB_DIR").ok().map(PathBuf::from),
             log_dir: env::var("NETDATA_LOG_DIR").ok().map(PathBuf::from),
             host_prefix: env::var("NETDATA_HOST_PREFIX").ok(),
@@ -98,6 +104,7 @@ impl NetdataEnv {
                 .ok()
                 .and_then(|s| s.parse().ok()),
             invocation_id: env::var("NETDATA_INVOCATION_ID").ok(),
+            registry_unique_id: env::var("NETDATA_REGISTRY_UNIQUE_ID").ok(),
             log_method: env::var("NETDATA_LOG_METHOD")
                 .ok()
                 .and_then(|s| s.parse().ok()),

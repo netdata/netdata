@@ -580,7 +580,7 @@ void health_alarm_log_process_to_send_notifications(RRDHOST *host, struct health
             ||
             ((ae->new_status == RRDCALC_STATUS_REMOVED) &&
              (ae->flags & HEALTH_ENTRY_FLAG_SAVED) &&
-             (ae->when + 86400 < now_realtime_sec())))
+             (nd_time_t_add_compare(ae->when, 86400, now_realtime_sec()) < 0)))
         {
             DOUBLE_LINKED_LIST_REMOVE_ITEM_UNSAFE(host->health_log.alarms, ae, prev, next);
             health_alarm_log_free_one_nochecks_nounlink(ae);

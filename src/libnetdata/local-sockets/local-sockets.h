@@ -964,6 +964,55 @@ static inline int local_sockets_libmnl_cb_data(const struct nlmsghdr *nlh, void 
     return MNL_CB_OK;
 }
 
+static inline int local_sockets_libmnl_cb_error(const struct nlmsghdr *nlh, void *data __maybe_unused) {
+    const struct nlmsgerr *err = mnl_nlmsg_get_payload(nlh);
+
+    if(mnl_nlmsg_get_payload_len(nlh) < sizeof(*err)) {
+        errno = EBADMSG;
+        return MNL_CB_ERROR;
+    }
+
+    errno = err->error < 0 ? -err->error : err->error;
+    return err->error == 0 ? MNL_CB_STOP : MNL_CB_ERROR;
+}
+
+static inline int local_sockets_libmnl_cb_done(const struct nlmsghdr *nlh, void *data __maybe_unused) {
+    int err;
+    size_t payload_len = mnl_nlmsg_get_payload_len(nlh);
+
+    // Dump errors are carried in NLMSG_DONE, which libmnl's default callback ignores.
+    if(!payload_len)
+        return MNL_CB_STOP;
+
+    if(payload_len < sizeof(err)) {
+        errno = EBADMSG;
+        return MNL_CB_ERROR;
+    }
+
+    memcpy(&err, mnl_nlmsg_get_payload(nlh), sizeof(err));
+    if(err >= 0)
+        return MNL_CB_STOP;
+
+    errno = -err;
+    return MNL_CB_ERROR;
+}
+
+static inline int local_sockets_libmnl_cb_run(
+    const void *buf,
+    size_t numbytes,
+    unsigned int seq,
+    unsigned int portid,
+    mnl_cb_t cb_data,
+    void *data) {
+    static const mnl_cb_t control_callbacks[NLMSG_DONE + 1] = {
+        [NLMSG_ERROR] = local_sockets_libmnl_cb_error,
+        [NLMSG_DONE] = local_sockets_libmnl_cb_done,
+    };
+
+    return mnl_cb_run2(
+        buf, numbytes, seq, portid, cb_data, data, control_callbacks, _countof(control_callbacks));
+}
+
 static inline bool local_sockets_libmnl_get_sockets(LS_STATE *ls, uint16_t family, uint16_t protocol) {
     ls->tmp_protocol = protocol;
 
@@ -1009,23 +1058,20 @@ static inline bool local_sockets_libmnl_get_sockets(LS_STATE *ls, uint16_t famil
     }
 
     bool rc = true;
-    size_t received = 0;
-    ssize_t ret;
-    while ((ret = mnl_socket_recvfrom(nl, buf, sizeof(buf))) > 0) {
-        ret = mnl_cb_run(buf, ret, 0, 0, local_sockets_libmnl_cb_data, ls);
+    ssize_t received;
+    while ((received = mnl_socket_recvfrom(nl, buf, sizeof(buf))) > 0) {
+        int ret = local_sockets_libmnl_cb_run(buf, received, 0, 0, local_sockets_libmnl_cb_data, ls);
         if (ret == MNL_CB_ERROR) {
-            local_sockets_log(ls, "mnl_cb_run() failed");
+            local_sockets_log(ls, "socket diagnostic netlink response failed");
             rc = false;
             break;
         }
         else if (ret <= MNL_CB_STOP)
             break;
-
-        received++;
     }
     mnl_socket_close(nl);
 
-    if (ret == -1) {
+    if (received == -1) {
         local_sockets_log(ls, "mnl_socket_recvfrom() failed");
         rc = false;
     }

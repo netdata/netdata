@@ -344,6 +344,7 @@ struct workload_stats {
 
 struct query_weights_data {
     QUERY_WEIGHTS_REQUEST *qwr;
+    struct query_weights_data *shared_qwd;
 
     SIMPLE_PATTERN *scope_nodes_sp;
     SIMPLE_PATTERN *scope_contexts_sp;
@@ -394,6 +395,25 @@ struct query_weights_thread_data {
     size_t thread_id;
 };
 
+static inline struct query_weights_data *query_weights_status_qwd(struct query_weights_data *qwd) {
+    return qwd->shared_qwd ? qwd->shared_qwd : qwd;
+}
+
+static inline bool query_weights_is_stopped(struct query_weights_data *qwd) {
+    struct query_weights_data *status_qwd = query_weights_status_qwd(qwd);
+
+    return __atomic_load_n(&status_qwd->timed_out, __ATOMIC_RELAXED) ||
+           __atomic_load_n(&status_qwd->interrupted, __ATOMIC_RELAXED);
+}
+
+static inline void query_weights_set_timed_out(struct query_weights_data *qwd) {
+    __atomic_store_n(&query_weights_status_qwd(qwd)->timed_out, true, __ATOMIC_RELAXED);
+}
+
+static inline void query_weights_set_interrupted(struct query_weights_data *qwd) {
+    __atomic_store_n(&query_weights_status_qwd(qwd)->interrupted, true, __ATOMIC_RELAXED);
+}
+
 // Worker thread function for parallel host processing
 void query_weights_worker_thread(void *arg)
 {
@@ -431,6 +451,7 @@ void query_weights_worker_thread(void *arg)
 
         // Create a local query_weights_data for this thread
         struct query_weights_data local_qwd = *main_qwd;
+        local_qwd.shared_qwd = main_qwd;
         local_qwd.results = thread_data->local_results;
         local_qwd.stats = thread_data->local_stats;
         local_qwd.examined_dimensions = thread_data->local_examined_dimensions;
@@ -1423,8 +1444,10 @@ static double kstwo(
         return NAN;
 
     // -1 in size, since the calculate_pairs_diffs() returns one less point
-    DIFFS_NUMBERS *baseline_diffs = onewayalloc_mallocz(owa, (size_t)(baseline_points - 1) * sizeof(*baseline_diffs));
-    DIFFS_NUMBERS *highlight_diffs = onewayalloc_mallocz(owa, (size_t)(highlight_points - 1) * sizeof(*highlight_diffs));
+    DIFFS_NUMBERS *baseline_diffs = onewayalloc_mallocz(
+        owa, onewayalloc_mul_or_fatal((size_t)(baseline_points - 1), sizeof(*baseline_diffs), "baseline diffs"));
+    DIFFS_NUMBERS *highlight_diffs = onewayalloc_mallocz(
+        owa, onewayalloc_mul_or_fatal((size_t)(highlight_points - 1), sizeof(*highlight_diffs), "highlight diffs"));
 
     int base_size = (int)calculate_pairs_diff(baseline_diffs, baseline, baseline_points);
     int high_size = (int)calculate_pairs_diff(highlight_diffs, highlight, highlight_points);
@@ -1507,7 +1530,8 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
         goto cleanup;
 
     *entries = rrdr_rows(r);
-    ret = onewayalloc_mallocz(owa, sizeof(NETDATA_DOUBLE) * rrdr_rows(r));
+    size_t ret_size = onewayalloc_mul_or_fatal(rrdr_rows(r), sizeof(*ret), "weight values");
+    ret = onewayalloc_mallocz(owa, ret_size);
 
     if(sp)
         *sp = r->internal.qt->query.array[0].query_points;
@@ -1515,7 +1539,7 @@ NETDATA_DOUBLE *rrd2rrdr_ks2(
     // copy the points of the dimension to a contiguous array
     // there is no need to check for empty values, since empty values are already zero
     // https://github.com/netdata/netdata/blob/6e3144683a73a2024d51425b20ecfd569034c858/web/api/queries/average/average.c#L41-L43
-    memcpy(ret, r->v, rrdr_rows(r) * sizeof(NETDATA_DOUBLE));
+    memcpy(ret, r->v, ret_size);
 
 cleanup:
     rrdr_free(owa, r);
@@ -2076,8 +2100,11 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
     struct query_weights_data *qwd = data;
     QUERY_WEIGHTS_REQUEST *qwr = qwd->qwr;
 
+    if(query_weights_is_stopped(qwd))
+        return -1;
+
     if(qwd->qwr->interrupt_callback && qwd->qwr->interrupt_callback(qwd->qwr->interrupt_callback_data)) {
-        __atomic_store_n(&qwd->interrupted, true, __ATOMIC_RELAXED);
+        query_weights_set_interrupted(qwd);
         return -1;
     }
 
@@ -2131,7 +2158,7 @@ static ssize_t weights_for_rrdmetric(void *data, RRDHOST *host, RRDCONTEXT_ACQUI
 
     qwd->timings.executed_ut = now_monotonic_usec();
     if(qwd->timings.executed_ut - qwd->timings.received_ut > qwd->timeout_us) {
-        qwd->timed_out = true;
+        query_weights_set_timed_out(qwd);
         return -1;
     }
 
@@ -2188,8 +2215,15 @@ static ssize_t weights_count_node_callback(void *data, RRDHOST *host, bool query
 
     struct query_weights_data *qwd = data;
     if (qwd->total_hosts >= qwd->hosts_array_capacity) {
-        qwd->hosts_array_capacity *= 2;
-        qwd->hosts_array = reallocz(qwd->hosts_array, sizeof(RRDHOST *) * qwd->hosts_array_capacity);
+        if(unlikely(qwd->hosts_array_capacity > SIZE_MAX / 2))
+            fatal("QUERY WEIGHTS: too many hosts to allocate");
+
+        size_t new_capacity = qwd->hosts_array_capacity ? qwd->hosts_array_capacity * 2 : 1;
+        if(unlikely(new_capacity > SIZE_MAX / sizeof(*qwd->hosts_array)))
+            fatal("QUERY WEIGHTS: too many hosts to allocate");
+
+        qwd->hosts_array = reallocz(qwd->hosts_array, new_capacity * sizeof(*qwd->hosts_array));
+        qwd->hosts_array_capacity = new_capacity;
     }
     qwd->hosts_array[qwd->total_hosts++] = host;
 
@@ -2236,6 +2270,9 @@ static ssize_t weights_do_context_callback(void *data, RRDCONTEXT_ACQUIRED *rca,
                                             qwd->dimensions_sp,
                                             true, true, qwd->qwr->version,
                                             weights_for_rrdmetric, qwd);
+    if(query_weights_is_stopped(qwd))
+        return -1;
+
     return ret;
 }
 
@@ -2250,8 +2287,11 @@ static ssize_t query_scope_foreach_host_parallel(SIMPLE_PATTERN *scope_hosts_sp,
 
 #else
     size_t host_count = dictionary_entries(rrdhost_root_index);
-    qwd->hosts_array = mallocz(sizeof(RRDHOST *) * host_count);
-    qwd->hosts_array_capacity = host_count;
+    qwd->hosts_array_capacity = host_count ? host_count : 1;
+    if(unlikely(qwd->hosts_array_capacity > SIZE_MAX / sizeof(*qwd->hosts_array)))
+        fatal("QUERY WEIGHTS: too many hosts to allocate");
+
+    qwd->hosts_array = mallocz(qwd->hosts_array_capacity * sizeof(*qwd->hosts_array));
     qwd->total_hosts = 0;
 
     (void) query_scope_foreach_host(scope_hosts_sp, hosts_sp, weights_count_node_callback, qwd, &qwd->versions, NULL);

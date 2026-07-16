@@ -12,6 +12,11 @@ typedef struct perflib_registry {
     char *help;
 } perfLibRegistryEntry;
 
+typedef struct perflib_retired_string {
+    char *value;
+    struct perflib_retired_string *next;
+} perfLibRetiredString;
+
 static inline bool compare_perfLibRegistryEntry(const char *k1, const char *k2) {
     return strcmp(k1, k2) == 0;
 }
@@ -35,6 +40,7 @@ static struct {
     struct simple_hashtable_PERFLIB hashtable;
     FILETIME lastWriteTime;
     PERFLIB_ENTRIES_JudyLSet registry_entries;
+    perfLibRetiredString *retired_strings;
 } names_globals = {
     .spinlock = SPINLOCK_INITIALIZER,
 };
@@ -61,6 +67,16 @@ static inline perfLibRegistryEntry* registry_ensure_entry(DWORD id) {
     }
     
     return entry;
+}
+
+static inline void RegistryRetireString_unsafe(char *value) {
+    if(!value)
+        return;
+
+    perfLibRetiredString *retired = mallocz(sizeof(*retired));
+    retired->value = value;
+    retired->next = names_globals.retired_strings;
+    names_globals.retired_strings = retired;
 }
 
 DWORD RegistryFindIDByName(const char *name) {
@@ -95,7 +111,7 @@ static void RegistrySetData_unsafe(DWORD id, const char *key, const char *help) 
         if(entry->key) {
             // Only if the key actually changes, we need to update hash
             if(strcmp(entry->key, key) != 0) {
-                freez(entry->key);
+                RegistryRetireString_unsafe(entry->key);
                 entry->key = strdupz(key);
                 add_to_hash = true;
             }
@@ -107,9 +123,14 @@ static void RegistrySetData_unsafe(DWORD id, const char *key, const char *help) 
     }
 
     if(help) {
-        if(entry->help)
-            freez(entry->help);
-        entry->help = strdupz(help);
+        if(entry->help) {
+            if(strcmp(entry->help, help) != 0) {
+                RegistryRetireString_unsafe(entry->help);
+                entry->help = strdupz(help);
+            }
+        }
+        else
+            entry->help = strdupz(help);
     }
 
     entry->id = id;
@@ -144,22 +165,34 @@ const char *RegistryFindHelpByID(DWORD id) {
 
 // ----------------------------------------------------------
 
+static inline bool registry_multi_sz_strlen(const char *ptr, const char *end, size_t *len) {
+    if(ptr >= end)
+        return false;
+
+    const char *nul = memchr(ptr, '\0', (size_t)(end - ptr));
+    if(!nul)
+        return false;
+
+    *len = (size_t)(nul - ptr);
+    return true;
+}
+
 static inline void readRegistryKeys_unsafe(BOOL helps) {
-    TCHAR *pData = NULL;
+    char *pData = NULL;
 
     HKEY hKey;
     DWORD dwType;
     DWORD dwSize = 0;
     LONG lStatus;
 
-    LPCSTR valueName;
+    const char *valueName;
     if(helps)
-        valueName = TEXT("help");
+        valueName = "help";
     else
-        valueName = TEXT("CounterDefinition");
+        valueName = "CounterDefinition";
 
     // Open the key for the English counters
-    lStatus = RegOpenKeyEx(HKEY_LOCAL_MACHINE, TEXT(REGISTRY_KEY), 0, KEY_READ, &hKey);
+    lStatus = RegOpenKeyExA(HKEY_LOCAL_MACHINE, REGISTRY_KEY, 0, KEY_READ, &hKey);
     if (lStatus != ERROR_SUCCESS) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Failed to open registry key HKEY_LOCAL_MACHINE, subkey '%s', error %ld\n", REGISTRY_KEY, (long)lStatus);
@@ -167,7 +200,7 @@ static inline void readRegistryKeys_unsafe(BOOL helps) {
     }
 
     // Get the size of the 'Counters' data
-    lStatus = RegQueryValueEx(hKey, valueName, NULL, &dwType, NULL, &dwSize);
+    lStatus = RegQueryValueExA(hKey, valueName, NULL, &dwType, NULL, &dwSize);
     if (lStatus != ERROR_SUCCESS) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Failed to get registry key HKEY_LOCAL_MACHINE, subkey '%s', value '%s', size of data, error %ld\n",
@@ -179,7 +212,7 @@ static inline void readRegistryKeys_unsafe(BOOL helps) {
     pData = mallocz(dwSize);
 
     // Read the 'Counters' data
-    lStatus = RegQueryValueEx(hKey, valueName, NULL, &dwType, (LPBYTE)pData, &dwSize);
+    lStatus = RegQueryValueExA(hKey, valueName, NULL, &dwType, (LPBYTE)pData, &dwSize);
     if (lStatus != ERROR_SUCCESS || dwType != REG_MULTI_SZ) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR,
                "Failed to get registry key HKEY_LOCAL_MACHINE, subkey '%s', value '%s', data, error %ld\n",
@@ -188,11 +221,15 @@ static inline void readRegistryKeys_unsafe(BOOL helps) {
     }
 
     // Process the counter data
-    TCHAR *ptr = pData;
-    TCHAR *end_ptr = pData + dwSize;
-    while (*ptr && ptr < end_ptr - 1) {
-        TCHAR *sid = ptr;  // First string is the ID
-        size_t sid_len = lstrlen(ptr);
+    char *ptr = pData;
+    char *end_ptr = pData + dwSize;
+    while (ptr < end_ptr && *ptr) {
+        char *sid = ptr;  // First string is the ID
+        size_t sid_len;
+        if(!registry_multi_sz_strlen(ptr, end_ptr, &sid_len)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Registry data truncated while reading ID, aborting");
+            break;
+        }
         
         // Check for valid ID string
         if (sid_len == 0) {
@@ -200,16 +237,19 @@ static inline void readRegistryKeys_unsafe(BOOL helps) {
             break;
         }
         
-        // Check for buffer overrun
-        if (ptr + sid_len + 1 >= end_ptr) {
+        ptr += sid_len + 1; // Move to the next string
+
+        if (ptr >= end_ptr) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR, "Registry data truncated after ID, aborting");
             break;
         }
-        
-        ptr += sid_len + 1; // Move to the next string
-        
-        TCHAR *name = ptr;  // Second string is the name
-        size_t name_len = lstrlen(ptr);
+
+        char *name = ptr;  // Second string is the name
+        size_t name_len;
+        if(!registry_multi_sz_strlen(ptr, end_ptr, &name_len)) {
+            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Registry data truncated while reading name, aborting");
+            break;
+        }
         
         // Check for empty name
         if (name_len == 0) {
@@ -218,13 +258,7 @@ static inline void readRegistryKeys_unsafe(BOOL helps) {
             ptr += 1;
             continue;
         }
-        
-        // Check for buffer overrun
-        if (ptr + name_len + 1 > end_ptr) {
-            nd_log(NDLS_COLLECTORS, NDLP_ERR, "Registry data truncated after name, aborting");
-            break;
-        }
-        
+
         ptr += name_len + 1; // Move to the next pair
         
         // Convert ID to number with validation
@@ -331,6 +365,15 @@ static void free_registry_entry(Word_t idx, perfLibRegistryEntry *entry, void *d
     }
 }
 
+static void free_retired_strings_unsafe(void) {
+    while(names_globals.retired_strings) {
+        perfLibRetiredString *retired = names_globals.retired_strings;
+        names_globals.retired_strings = retired->next;
+        freez(retired->value);
+        freez(retired);
+    }
+}
+
 // Cleanup function to be called during shutdown to free allocated resources
 void PerflibNamesRegistryCleanup(void) {
     spinlock_lock(&names_globals.spinlock);
@@ -340,6 +383,8 @@ void PerflibNamesRegistryCleanup(void) {
     
     // Free the hashtable
     simple_hashtable_destroy_PERFLIB(&names_globals.hashtable);
+
+    free_retired_strings_unsafe();
     
     spinlock_unlock(&names_globals.spinlock);
 }

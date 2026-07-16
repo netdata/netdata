@@ -1414,7 +1414,10 @@ static void populate_system_info(void) {
     bool free_system_info = false;
 
     if(localhost && localhost->system_info) {
-        system_info = localhost->system_info;
+        spinlock_lock(&localhost->rrdhost_update_lock);
+        system_info = rrdhost_system_info_dup(localhost->system_info);
+        spinlock_unlock(&localhost->rrdhost_update_lock);
+        free_system_info = true;
     }
     else {
         bool started_spawn_server = false;

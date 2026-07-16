@@ -219,8 +219,6 @@ USAGE: ${PROGRAM} [options]
   --internal-systemd-journal Enable the internal journal file reader instead of using libsystemd
   --enable-plugin-otel Enable the Netdata OpenTelemetry plugin. Default: disabled
   --disable-plugin-otel Explicitly disable the Netdata OpenTelemetry plugin.
-  --enable-plugin-otel-signal-viewer Enable the OTel signal viewer plugin. Default: disabled
-  --disable-plugin-otel-signal-viewer Explicitly disable the OTel signal viewer plugin.
   --enable-plugin-netflow    Enable the NetFlow/IPFIX/sFlow flow analysis plugin. Default: disabled.
   --disable-plugin-netflow   Explicitly disable the NetFlow/IPFIX/sFlow flow analysis plugin.
   --enable-plugin-ibm        Enable the IBM ecosystem monitoring plugin. Default: disabled
@@ -271,7 +269,6 @@ ENABLE_PYTHON=1
 ENABLE_CHARTS=1
 ENABLE_NETFLOW=0
 ENABLE_OTEL=0
-ENABLE_OTEL_SIGNAL_VIEWER=0
 ENABLE_IBM=0
 ENABLE_SCRIPTS=1
 FORCE_LEGACY_CXX=0
@@ -319,8 +316,6 @@ while [ -n "${1}" ]; do
     "--internal-systemd-journal") USE_RUST_JOURNAL_FILE=1 ;;
     "--enable-plugin-otel") ENABLE_OTEL=1 ;;
     "--disable-plugin-otel") ENABLE_OTEL=0 ;;
-    "--enable-plugin-otel-signal-viewer") ENABLE_OTEL_SIGNAL_VIEWER=1 ;;
-    "--disable-plugin-otel-signal-viewer") ENABLE_OTEL_SIGNAL_VIEWER=0 ;;
     "--enable-plugin-ibm") ENABLE_IBM=1 ;;
     "--disable-plugin-ibm") ENABLE_IBM=0 ;;
     "--enable-plugin-scripts") ENABLE_SCRIPTS=1 ;;
@@ -912,21 +907,6 @@ if [ "$(id -u)" -eq 0 ]; then
     run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/macos-logs.plugin"
   fi
 
-  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin" ]; then
-    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"
-    capabilities=0
-    if ! iscontainer && command -v setcap 1> /dev/null 2>&1; then
-      run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"
-      if run setcap cap_dac_read_search+ep "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"; then
-        capabilities=1
-      fi
-    fi
-
-    if [ $capabilities -eq 0 ]; then
-      run chmod 4750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/otel-signal-viewer-plugin"
-    fi
-  fi
-
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/perf.plugin"
     capabilities=0
@@ -995,6 +975,11 @@ if [ "$(id -u)" -eq 0 ]; then
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh" ]; then
     run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
     run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
+  fi
+
+  if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name" ]; then
+    run chown "root:${NETDATA_GROUP}" "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name"
+    run chmod 0750 "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/cgroup-name"
   fi
 
   if [ -f "${NETDATA_PREFIX}/usr/libexec/netdata/plugins.d/local-listeners" ]; then

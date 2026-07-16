@@ -419,9 +419,16 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Track AWS EC2 instances key metrics for optimized performance and cost management.
+          Monitor Amazon EC2 inventory and capacity information exposed by AWS EC2 Exporter.
+
+          This integration complements the
+          [Amazon CloudWatch](/src/go/plugin/go.d/collector/cloudwatch/integrations/amazon_cloudwatch.md) collector,
+          which queries runtime metrics from CloudWatch. The integrations use different AWS data sources and do
+          not replace one another.
         method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [AWS EC2 Exporter](https://github.com/O1ahmad/aws_ec2_exporter).
+          Netdata periodically scrapes Prometheus metrics from
+          [AWS EC2 Exporter](https://github.com/O1ahmad/aws_ec2_exporter), which obtains inventory and capacity
+          information from Amazon EC2 APIs rather than CloudWatch.
     setup:
       <<: *setup
       prerequisites:
@@ -534,35 +541,6 @@ modules:
           - title: Install Exporter
             description: |
               Install [Cilium Proxy](https://github.com/cilium/proxy) by following the instructions mentioned in the exporter README.
-  - <<: *module
-    meta:
-      id: collector-go.d.plugin-prometheus-aws_cloudwatch
-      <<: *meta
-      community: true
-      monitored_instance:
-        name: CloudWatch
-        link: https://github.com/prometheus/cloudwatch_exporter
-        icon_filename: aws-cloudwatch.png
-        categories:
-          - data-collection.cloud-and-devops
-      keywords:
-        - cloud services
-        - cloud computing
-        - scalability
-    overview:
-      <<: *overview
-      data_collection:
-        metrics_description: |
-          Monitor AWS CloudWatch metrics for comprehensive AWS resource management and performance optimization.
-        method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [CloudWatch exporter](https://github.com/prometheus/cloudwatch_exporter).
-    setup:
-      <<: *setup
-      prerequisites:
-        list:
-          - title: Install Exporter
-            description: |
-              Install [CloudWatch exporter](https://github.com/prometheus/cloudwatch_exporter) by following the instructions mentioned in the exporter README.
   - <<: *module
     meta:
       <<: *meta
@@ -2197,9 +2175,16 @@ modules:
       <<: *overview
       data_collection:
         metrics_description: |
-          Monitor AWS service quotas for effective resource usage and cost management.
+          Monitor AWS Service Quotas exposed by aws_quota_exporter.
+
+          This integration complements the
+          [Amazon CloudWatch](/src/go/plugin/go.d/collector/cloudwatch/integrations/amazon_cloudwatch.md) collector,
+          which queries runtime metrics from CloudWatch. The integrations use different AWS data sources and do
+          not replace one another.
         method_description: |
-          Metrics are gathered by periodically sending HTTP requests to [aws_quota_exporter](https://github.com/emylincon/aws_quota_exporter).
+          Netdata periodically scrapes Prometheus metrics from
+          [aws_quota_exporter](https://github.com/emylincon/aws_quota_exporter), which obtains quota information
+          from AWS Service Quotas rather than CloudWatch.
     setup:
       <<: *setup
       prerequisites:

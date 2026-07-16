@@ -862,6 +862,11 @@ bool stream_receiver_receive_data(struct stream_thread *sth, struct receiver_sta
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__ );
 
     PARSER *parser = __atomic_load_n(&rpt->thread.parser, __ATOMIC_RELAXED);
+    if(unlikely(!parser)) {
+        stream_receiver_remove(sth, rpt, STREAM_HANDSHAKE_RCV_DISCONNECT_PARSER_FAILED);
+        return false;
+    }
+
     ND_LOG_STACK lgs[] = {
         ND_LOG_FIELD_CB(NDF_REQUEST, line_splitter_reconstruct_line, &parser->line),
         ND_LOG_FIELD_CB(NDF_NIDL_NODE, parser_reconstruct_node, parser),
@@ -942,8 +947,15 @@ bool stream_receive_process_poll_events(struct stream_thread *sth, struct receiv
         return false;
     }
 
-    if (unlikely(events & (ND_POLL_ERROR | ND_POLL_HUP | ND_POLL_INVALID))) {
-        // we have errors on this socket
+    // ND_POLL_HUP together with ND_POLL_READ means the peer disconnected,
+    // but data it already delivered is still pending in the socket buffer.
+    // Removing the receiver here would discard that data, so keep reading:
+    // polling is level-triggered, both flags stay set while data remains,
+    // and when the buffer is drained recv() returns 0 and the read path
+    // removes the receiver with the same disconnect reason.
+    if (unlikely((events & (ND_POLL_ERROR | ND_POLL_INVALID)) ||
+                 ((events & ND_POLL_HUP) && !(events & ND_POLL_READ)))) {
+        // we have errors on this socket, or EOF with nothing left to read
 
         worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_SOCKET_ERROR);
 
@@ -1255,7 +1267,7 @@ RRDHOST_SET_RECEIVER_RESULT rrdhost_set_receiver(RRDHOST *host, struct receiver_
 
         if (rpt->config.health.enabled != CONFIG_BOOLEAN_NO) {
             if (rpt->config.health.delay > 0) {
-                host->health.delay_up_to = now_realtime_sec() + rpt->config.health.delay;
+                host->health.delay_up_to = nd_time_t_add_saturating(now_realtime_sec(), rpt->config.health.delay);
                 nd_log(NDLS_DAEMON, NDLP_DEBUG,
                        "STREAM RCV '%s' [from [%s]:%s]: "
                        "Postponing health checks for %" PRId64 " seconds, because it was just connected.",

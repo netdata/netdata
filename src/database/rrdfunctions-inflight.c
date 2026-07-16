@@ -5,8 +5,6 @@
 #include "rrdfunctions-inflight.h"
 
 struct rrd_function_inflight {
-    bool used;
-
     RRDHOST *host;
     nd_uuid_t transaction_uuid;
     const char *transaction;
@@ -104,6 +102,17 @@ static void rrd_functions_inflight_insert_cb(const DICTIONARY_ITEM *item __maybe
     spinlock_init(&r->callbacks.spinlock);
 }
 
+static bool rrd_functions_inflight_conflict_cb(const DICTIONARY_ITEM *item __maybe_unused,
+                                               void *old_value __maybe_unused,
+                                               void *new_value __maybe_unused,
+                                               void *data) {
+    bool *duplicate_transaction = data;
+    if(duplicate_transaction)
+        *duplicate_transaction = true;
+
+    return false;
+}
+
 void rrd_functions_inflight_init(void) {
     if(rrd_functions_inflight_requests)
         return;
@@ -112,6 +121,7 @@ void rrd_functions_inflight_init(void) {
 
     dictionary_register_insert_callback(rrd_functions_inflight_requests, rrd_functions_inflight_insert_cb, NULL);
     dictionary_register_delete_callback(rrd_functions_inflight_requests, rrd_functions_inflight_delete_cb, NULL);
+    dictionary_register_conflict_callback(rrd_functions_inflight_requests, rrd_functions_inflight_conflict_cb, NULL);
 }
 
 void rrd_functions_inflight_destroy(void) {
@@ -411,7 +421,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     const DICTIONARY_ITEM *host_function_acquired = NULL;
 
     const char *source_to_sanitize = source ? source : "";
-    size_t sanitized_source_size = strlen(source_to_sanitize) + 1;
+    size_t sanitized_source_size = rrd_functions_strlen_bounded(source_to_sanitize, PLUGINSD_LINE_MAX) + 1;
     CLEAN_CHAR_P *sanitized_source = mallocz(sanitized_source_size);
     rrd_functions_sanitize(sanitized_source, source_to_sanitize, sanitized_source_size);
 
@@ -518,7 +528,6 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     // put the function into the inflight requests
 
     struct rrd_function_inflight t = {
-        .used = false,
         .host = host,
         .cmd = strdupz(cmd),
         .sanitized_cmd = strdupz(sanitized_cmd),
@@ -549,7 +558,9 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
     sanitized_source = NULL;
     uuid_copy(t.transaction_uuid, uuid);
 
-    struct rrd_function_inflight *r = dictionary_set(rrd_functions_inflight_requests, transaction, &t, sizeof(t));
+    bool duplicate_transaction = false;
+    struct rrd_function_inflight *r = dictionary_set_advanced(
+        rrd_functions_inflight_requests, transaction, -1, &t, sizeof(t), &duplicate_transaction);
     if(!r) {
         // dictionary_set() returns NULL when the dictionary is destroyed (shutdown in progress)
         code = rrd_call_function_error(result_wb, "Service is shutting down.", HTTP_RESP_SERVICE_UNAVAILABLE);
@@ -563,7 +574,7 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         return code;
     }
 
-    if(r->used) {
+    if(duplicate_transaction) {
         nd_log(NDLS_DAEMON, NDLP_NOTICE,
                "FUNCTIONS: duplicate transaction '%s', function: '%s'",
                t.transaction, t.cmd);
@@ -571,14 +582,13 @@ int rrd_function_run(RRDHOST *host, BUFFER *result_wb, int timeout_s,
         code = rrd_call_function_error(result_wb, "Duplicate transaction.", HTTP_RESP_BAD_REQUEST);
 
         rrd_functions_inflight_cleanup(&t);
-        dictionary_acquired_item_release(r->host->functions, t.host_function_acquired);
+        dictionary_acquired_item_release(host->functions, t.host_function_acquired);
 
         if(result_cb)
             result_cb(result_wb, code, result_cb_data);
 
         return code;
     }
-    r->used = true;
     // internal_error(true, "FUNCTIONS: transaction '%s' started", r->transaction);
 
     if(r->rdcf->sync) {

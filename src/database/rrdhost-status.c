@@ -102,8 +102,13 @@ RRDHOST_INGEST_STATUS rrdhost_ingestion_status(RRDHOST *host) {
 
 int16_t rrdhost_ingestion_hops(RRDHOST *host) {
     if(host == localhost) return 0;
-    if(rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST) || !host->system_info) return 1;
-    return rrdhost_system_info_hops(host->system_info);
+    if(rrdhost_option_check(host, RRDHOST_OPTION_VIRTUAL_HOST)) return 1;
+
+    spinlock_lock(&host->rrdhost_update_lock);
+    int16_t hops = host->system_info ? rrdhost_system_info_hops(host->system_info) : 1;
+    spinlock_unlock(&host->rrdhost_update_lock);
+
+    return hops;
 }
 
 static inline RRDHOST_DB_STATUS rrdhost_status_db(RRDHOST *host, time_t now, RRDHOST_STATUS *s, RRDHOST_FLAGS flags, bool online) {

@@ -125,6 +125,12 @@ You don't need to restart your Netdata Agent when making changes to health confi
 sudo netdatacli reload-health
 ```
 
+**On Windows:**
+
+```powershell
+& "C:\Program Files\Netdata\usr\bin\netdatacli.exe" reload-health
+```
+
 **Alternative Method:**
 If `netdatacli` doesn't work on your system, you can send a `SIGUSR2` signal to the daemon, which reloads health configuration without restarting the entire process.
 
@@ -136,14 +142,18 @@ sudo killall -USR2 netdata
 
 **Configuration Locations:**
 
-**Configuration Locations:**
-
 | Location                          | Purpose                      | Common Tasks                                                                                             | How to Edit                              |
 |-----------------------------------|------------------------------|----------------------------------------------------------------------------------------------------------|------------------------------------------|
 | `netdata.conf` `[health]` section | Global health settings       | • Disable all monitoring (`enabled = no`)<br />• Disable specific alerts<br />• Change check frequencies | Edit directly or use `edit-config`       |
 | `health.d/*.conf` files           | Individual alert definitions | • Modify thresholds<br />• Change notification recipients<br />• Silence alerts (`to: silent`)           | Use `edit-config health.d/filename.conf` |
 
 Navigate to your [Netdata config directory](/docs/netdata-agent/configuration/README.md) and use `edit-config` to make changes to any of these files.
+
+:::note
+
+**On Windows:** the stock (default) alert templates ship at `C:\Program Files\Netdata\usr\lib\netdata\conf.d\health.d\` — browse them to see which alerts ship with Netdata. Place your overrides in `C:\Program Files\Netdata\etc\netdata\health.d\` instead, so they survive Agent updates. Edit files there using `edit-config` from the bundled MSYS2 shell — see [On Windows](/docs/netdata-agent/configuration/README.md#on-windows) in the Agent configuration guide.
+
+:::
 
 **Edit Individual Alerts:**
 

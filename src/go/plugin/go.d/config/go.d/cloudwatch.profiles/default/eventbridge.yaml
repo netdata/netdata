@@ -6,7 +6,8 @@
 version: v1
 display_name: Amazon EventBridge
 namespace: AWS/Events
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: RuleName
@@ -38,37 +39,44 @@ metrics:
     metric_name: IngestionToInvocationCompleteLatency
     statistics: [average]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts section below. All are published at the {RuleName} grain.
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {RuleName} grain.
   # ----------------------------------------------------------------------------------------
-  # - id: dead_letter_invocations
-  #   metric_name: DeadLetterInvocations
-  #   statistics: [sum]
-  #   rate: true
-  # - id: throttled_rules
-  #   metric_name: ThrottledRules
-  #   statistics: [sum]
-  #   rate: true
-  # - id: invocation_attempts
-  #   metric_name: InvocationAttempts
-  #   statistics: [sum]
-  #   rate: true
-  # - id: successful_invocation_attempts
-  #   metric_name: SuccessfulInvocationAttempts
-  #   statistics: [sum]
-  #   rate: true
-  # - id: retry_invocation_attempts
-  #   metric_name: RetryInvocationAttempts
-  #   statistics: [sum]
-  #   rate: true
-  # - id: invocations_sent_to_dlq
-  #   metric_name: InvocationsSentToDlq
-  #   statistics: [sum]
-  #   rate: true
-  # - id: invocations_failed_to_be_sent_to_dlq
-  #   metric_name: InvocationsFailedToBeSentToDlq
-  #   statistics: [sum]
-  #   rate: true
+  - id: dead_letter_invocations
+    disabled: true
+    metric_name: DeadLetterInvocations
+    statistics: [sum]
+    rate: true
+  - id: throttled_rules
+    disabled: true
+    metric_name: ThrottledRules
+    statistics: [sum]
+    rate: true
+  - id: invocation_attempts
+    disabled: true
+    metric_name: InvocationAttempts
+    statistics: [sum]
+    rate: true
+  - id: successful_invocation_attempts
+    disabled: true
+    metric_name: SuccessfulInvocationAttempts
+    statistics: [sum]
+    rate: true
+  - id: retry_invocation_attempts
+    disabled: true
+    metric_name: RetryInvocationAttempts
+    statistics: [sum]
+    rate: true
+  - id: invocations_sent_to_dlq
+    disabled: true
+    metric_name: InvocationsSentToDlq
+    statistics: [sum]
+    rate: true
+  - id: invocations_failed_to_be_sent_to_dlq
+    disabled: true
+    metric_name: InvocationsFailedToBeSentToDlq
+    statistics: [sum]
+    rate: true
 template:
   family: EventBridge
   context_namespace: eventbridge
@@ -76,7 +84,7 @@ template:
     instances:
       by_labels: [account_id, region, rule_name]
   charts:
-    - id: cw_eventbridge_invocations
+    - id: aws_cloudwatch_eventbridge_invocations
       context: invocations
       title: EventBridge Target Invocations
       family: Invocations
@@ -87,7 +95,7 @@ template:
           name: invocations
         - selector: failed_invocations_sum
           name: failed
-    - id: cw_eventbridge_rule_activity
+    - id: aws_cloudwatch_eventbridge_rule_activity
       context: rule_activity
       title: EventBridge Rule Activity
       family: Rules
@@ -98,7 +106,7 @@ template:
           name: matched_events
         - selector: triggered_rules_sum
           name: triggered_rules
-    - id: cw_eventbridge_latency
+    - id: aws_cloudwatch_eventbridge_latency
       context: latency
       title: EventBridge Ingestion-to-Invocation Latency
       family: Latency
@@ -112,40 +120,40 @@ template:
         - selector: ingestion_to_invocation_complete_latency_average
           name: complete
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric(s).
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_eventbridge_dlq
-    #   context: dlq
-    #   title: EventBridge Dead-Letter Invocations
-    #   family: Invocations
-    #   units: invocations/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: dead_letter_invocations_sum
-    #       name: dead_letter
-    #     - selector: invocations_sent_to_dlq_sum
-    #       name: sent_to_dlq
-    #     - selector: invocations_failed_to_be_sent_to_dlq_sum
-    #       name: failed_to_dlq
-    # - id: cw_eventbridge_throttled
-    #   context: throttled_rules
-    #   title: EventBridge Throttled Rules
-    #   family: Rules
-    #   units: events/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: throttled_rules_sum
-    #       name: throttled
-    # - id: cw_eventbridge_attempts
-    #   context: invocation_attempts
-    #   title: EventBridge Invocation Attempts
-    #   family: Invocations
-    #   units: invocations/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: invocation_attempts_sum
-    #       name: attempts
-    #     - selector: successful_invocation_attempts_sum
-    #       name: successful
-    #     - selector: retry_invocation_attempts_sum
-    #       name: retries
+    - id: aws_cloudwatch_eventbridge_dlq
+      context: dlq
+      title: EventBridge Dead-Letter Invocations
+      family: Invocations
+      units: invocations/s
+      algorithm: absolute
+      dimensions:
+        - selector: dead_letter_invocations_sum
+          name: dead_letter
+        - selector: invocations_sent_to_dlq_sum
+          name: sent_to_dlq
+        - selector: invocations_failed_to_be_sent_to_dlq_sum
+          name: failed_to_dlq
+    - id: aws_cloudwatch_eventbridge_throttled
+      context: throttled_rules
+      title: EventBridge Throttled Rules
+      family: Rules
+      units: events/s
+      algorithm: absolute
+      dimensions:
+        - selector: throttled_rules_sum
+          name: throttled
+    - id: aws_cloudwatch_eventbridge_attempts
+      context: invocation_attempts
+      title: EventBridge Invocation Attempts
+      family: Invocations
+      units: invocations/s
+      algorithm: absolute
+      dimensions:
+        - selector: invocation_attempts_sum
+          name: attempts
+        - selector: successful_invocation_attempts_sum
+          name: successful
+        - selector: retry_invocation_attempts_sum
+          name: retries

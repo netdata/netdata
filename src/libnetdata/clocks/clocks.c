@@ -7,6 +7,7 @@
 // call clocks_init() once, to optimize these default settings
 static clockid_t clock_boottime_to_use = CLOCK_MONOTONIC;
 static clockid_t clock_monotonic_to_use = CLOCK_MONOTONIC;
+static netdata_mutex_t uptime_msec_mutex;
 
 // the default clock resolution is 1ms
 #define DEFAULT_CLOCK_RESOLUTION_UT ((usec_t)0 * USEC_PER_SEC + (usec_t)1 * USEC_PER_MS)
@@ -85,6 +86,8 @@ static usec_t get_clock_resolution(clockid_t clock) {
 // perform any initializations required for clocks
 
 static __attribute__((constructor)) void clocks_init(void) {
+    fatal_assert(0 == netdata_mutex_init(&uptime_msec_mutex));
+
     os_get_system_HZ();
 
     // monotonic raw has to be tested before boottime
@@ -107,6 +110,7 @@ static __attribute__((destructor)) void clocks_fin(void) {
 #if defined(OS_WINDOWS)
     timeEndPeriod(1);
 #endif
+    netdata_mutex_destroy(&uptime_msec_mutex);
 }
 
 ALWAYS_INLINE time_t now_sec(clockid_t clk_id) {
@@ -401,10 +405,10 @@ usec_t heartbeat_next(heartbeat_t *hb) {
     spinlock_lock(&heartbeat_alignment_spinlock);
     now = now_realtime_usec();
 
-    dt = now - hb->realtime;
+    dt = clocks_usec_delta_or_zero(now, hb->realtime);
 
     if(hb->statistics_id < HEARTBEAT_ALIGNMENT_STATISTICS_SIZE) {
-        heartbeat_alignment_values[hb->statistics_id].dt += now - next;
+        heartbeat_alignment_values[hb->statistics_id].dt += clocks_usec_delta_or_zero(now, next);
         heartbeat_alignment_values[hb->statistics_id].sequence++;
     }
     spinlock_unlock(&heartbeat_alignment_spinlock);
@@ -522,6 +526,9 @@ static inline collected_number read_proc_uptime(const char *filename) {
 
 inline collected_number uptime_msec(const char *filename){
     static int use_boottime = -1;
+    collected_number uptime = 1;
+
+    netdata_mutex_lock(&uptime_msec_mutex);
 
     if(unlikely(use_boottime == -1)) {
         collected_number uptime_boottime = uptime_from_boottime();
@@ -532,6 +539,7 @@ inline collected_number uptime_msec(const char *filename){
 
         if(delta <= 1000 && uptime_boottime != 0) {
             procfile_close(read_proc_uptime_ff);
+            read_proc_uptime_ff = NULL;
             netdata_log_info("Using now_boottime_usec() for uptime (dt is %lld ms)", delta);
             use_boottime = 1;
         }
@@ -541,15 +549,16 @@ inline collected_number uptime_msec(const char *filename){
         }
         else {
             netdata_log_error("Cannot find any way to read uptime on this system.");
-            return 1;
+            goto done;
         }
     }
 
-    collected_number uptime;
     if(use_boottime)
         uptime = uptime_from_boottime();
     else
         uptime = read_proc_uptime(filename);
 
+done:
+    netdata_mutex_unlock(&uptime_msec_mutex);
     return uptime;
 }

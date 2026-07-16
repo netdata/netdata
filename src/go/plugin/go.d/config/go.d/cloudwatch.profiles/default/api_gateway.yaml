@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS API Gateway
 namespace: AWS/ApiGateway
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: ApiName
@@ -29,18 +30,20 @@ metrics:
     metric_name: IntegrationLatency
     statistics: [average]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. Both are published at the {ApiName} grain and
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # Both are published at the {ApiName} grain and
   # appear only when API caching is enabled on a stage.
   # ----------------------------------------------------------------------------------------
-  # - id: cache_hit_count
-  #   metric_name: CacheHitCount
-  #   statistics: [sum]
-  #   rate: true
-  # - id: cache_miss_count
-  #   metric_name: CacheMissCount
-  #   statistics: [sum]
-  #   rate: true
+  - id: cache_hit_count
+    disabled: true
+    metric_name: CacheHitCount
+    statistics: [sum]
+    rate: true
+  - id: cache_miss_count
+    disabled: true
+    metric_name: CacheMissCount
+    statistics: [sum]
+    rate: true
   # Metrics at other grains need their own profile: per-stage {ApiName, Stage} and per-method
   # {ApiName, Method, Resource, Stage} (the latter requires detailed metrics, opt-in + paid).
   # HTTP APIs (v2) use the {ApiId} dimension and 4xx/5xx metric names -- a separate profile. See:
@@ -52,7 +55,7 @@ template:
     instances:
       by_labels: [account_id, region, api_name]
   charts:
-    - id: cw_apigw_requests
+    - id: aws_cloudwatch_apigw_requests
       context: requests
       title: API Gateway Requests
       family: Requests
@@ -61,7 +64,7 @@ template:
       dimensions:
         - selector: count_sum
           name: requests
-    - id: cw_apigw_errors
+    - id: aws_cloudwatch_apigw_errors
       context: errors
       title: API Gateway Errors
       family: Errors
@@ -72,7 +75,7 @@ template:
           name: 4xx
         - selector: error_5xx_sum
           name: 5xx
-    - id: cw_apigw_latency
+    - id: aws_cloudwatch_apigw_latency
       context: latency
       title: API Gateway Latency
       family: Latency
@@ -84,16 +87,16 @@ template:
         - selector: integration_latency_average
           name: integration
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: cw_apigw_cache
-    #   context: cache
-    #   title: API Gateway Cache
-    #   family: Cache
-    #   units: events/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: cache_hit_count_sum
-    #       name: hit
-    #     - selector: cache_miss_count_sum
-    #       name: miss
+    - id: aws_cloudwatch_apigw_cache
+      context: cache
+      title: API Gateway Cache
+      family: Cache
+      units: events/s
+      algorithm: absolute
+      dimensions:
+        - selector: cache_hit_count_sum
+          name: hit
+        - selector: cache_miss_count_sum
+          name: miss

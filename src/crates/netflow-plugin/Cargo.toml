@@ -17,6 +17,7 @@ allocative = { workspace = true }
 async-trait = { workspace = true }
 bitflags = { workspace = true }
 bitvec = { workspace = true }
+bumpalo = { workspace = true }
 bytesize = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive"] }

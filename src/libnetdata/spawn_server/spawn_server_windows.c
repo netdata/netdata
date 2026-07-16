@@ -25,7 +25,11 @@ static void update_cygpath_env(void) {
     char win_path[MAX_PATH];
 
     // Convert Cygwin root path to Windows path
-    cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path));
+    errno_clear();
+    if(cygwin_conv_path(CCP_POSIX_TO_WIN_A, "/", win_path, sizeof(win_path)) != 0) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot convert Cygwin/MSYS2 base path to Windows path: %s", strerror(errno));
+        return;
+    }
 
     nd_setenv("NETDATA_CYGWIN_BASE_PATH", win_path, 1);
 
@@ -133,6 +137,24 @@ int set_fd_blocking(int fd) {
     }
 
     return 0;
+}
+
+static void spawn_server_release_stderr_fd(SPAWN_SERVER *server, SPAWN_INSTANCE *si) {
+    if(si->stderr_fd == -1)
+        return;
+
+    if(si->stderr_log_token != LOG_FORWARDER_TOKEN_NONE) {
+        // a valid token means the forwarder adopted the fd and closes it on
+        // every path (worker delete, or thread-exit cleanup); a false return
+        // means it is already closed or about to be - raw-closing the number
+        // here could close an unrelated, recycled descriptor
+        log_forwarder_del_and_close_token(server->log_forwarder, si->stderr_log_token);
+        si->stderr_log_token = LOG_FORWARDER_TOKEN_NONE;
+    }
+    else
+        close(si->stderr_fd);
+
+    si->stderr_fd = -1;
 }
 
 //static void print_environment_block(char *env_block) {
@@ -294,9 +316,9 @@ SPAWN_INSTANCE* spawn_server_exec(SPAWN_SERVER *server, int stderr_fd __maybe_un
     instance->stderr_fd = pipe_stderr[PIPE_READ];
 
     // Add stderr_fd to the log forwarder
-    log_forwarder_add_fd(server->log_forwarder, instance->stderr_fd);
-    log_forwarder_annotate_fd_name(server->log_forwarder, instance->stderr_fd, command);
-    log_forwarder_annotate_fd_pid(server->log_forwarder, instance->stderr_fd, spawn_server_instance_pid(instance));
+    instance->stderr_log_token = log_forwarder_add_fd(server->log_forwarder, instance->stderr_fd);
+    log_forwarder_annotate_token_name(server->log_forwarder, instance->stderr_log_token, command);
+    log_forwarder_annotate_token_pid(server->log_forwarder, instance->stderr_log_token, spawn_server_instance_pid(instance));
 
     errno_clear();
     nd_log(NDLS_COLLECTORS, NDLP_INFO,
@@ -435,12 +457,7 @@ int spawn_server_exec_kill(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     errno_clear();
     TerminateChildProcesses(si);
 
-    if(si->stderr_fd != -1) {
-        if(!log_forwarder_del_and_close_fd(server->log_forwarder, si->stderr_fd))
-            close(si->stderr_fd);
-
-        si->stderr_fd = -1;
-    }
+    spawn_server_release_stderr_fd(server, si);
 
     return spawn_server_exec_wait(server, si);
 }
@@ -497,12 +514,7 @@ int spawn_server_exec_wait(SPAWN_SERVER *server __maybe_unused, SPAWN_INSTANCE *
     if(err)
         LocalFree(err);
 
-    if(si->stderr_fd != -1) {
-        if(!log_forwarder_del_and_close_fd(server->log_forwarder, si->stderr_fd))
-            close(si->stderr_fd);
-
-        si->stderr_fd = -1;
-    }
+    spawn_server_release_stderr_fd(server, si);
 
     freez(si);
     return map_status_code_to_signal(exit_code);
