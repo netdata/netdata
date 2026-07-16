@@ -462,8 +462,10 @@ void health_send_notification(RRDHOST *host, ALARM_ENTRY *ae, struct health_rais
                               ae->new_value,
                               ae->old_value,
                               ae->source?ae_source(ae):"UNKNOWN",
-                              (uint32_t)ae->duration,
-                              (ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING && ae->new_status >= RRDCALC_STATUS_WARNING) ? (uint32_t)ae->duration : (uint32_t)ae->non_clear_duration,
+                              nd_duration_to_uint32_saturating(ae->duration),
+                              nd_duration_to_uint32_saturating(
+                                  (ae->flags & HEALTH_ENTRY_FLAG_IS_REPEATING && ae->new_status >= RRDCALC_STATUS_WARNING) ?
+                                      ae->duration : ae->non_clear_duration),
                               ae_units(ae),
                               ae_info(ae),
                               ae_new_value_string(ae),

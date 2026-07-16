@@ -23,6 +23,17 @@ static inline time_t nd_time_t_min(void) {
     return -nd_time_t_max() - 1;
 }
 
+// Preserve non-negative durations while respecting unsigned 32-bit output contracts.
+static inline uint32_t nd_duration_to_uint32_saturating(intmax_t duration) {
+    if(duration <= 0)
+        return 0;
+
+    if(duration > (intmax_t)UINT32_MAX)
+        return UINT32_MAX;
+
+    return (uint32_t)duration;
+}
+
 // Compare the mathematical sum to a time_t without first narrowing the sum.
 static inline int nd_time_t_add_compare(time_t base, intmax_t offset, time_t value) {
     intmax_t sum;

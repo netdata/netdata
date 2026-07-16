@@ -159,6 +159,25 @@ static int clocks_time_t_arithmetic_preserves_order(void) {
     return errors;
 }
 
+static int clocks_duration_to_uint32_saturates(void) {
+    int errors = 0;
+
+    CLOCKS_TEST(nd_duration_to_uint32_saturating(-1) == 0,
+                "negative duration saturates to zero");
+    CLOCKS_TEST(nd_duration_to_uint32_saturating(0) == 0,
+                "zero duration is preserved");
+    CLOCKS_TEST(nd_duration_to_uint32_saturating(1) == 1,
+                "positive duration is preserved");
+    CLOCKS_TEST(nd_duration_to_uint32_saturating(UINT32_MAX) == UINT32_MAX,
+                "maximum uint32 duration is preserved");
+    CLOCKS_TEST(nd_duration_to_uint32_saturating((intmax_t)UINT32_MAX + 1) == UINT32_MAX,
+                "duration above uint32 saturates at the maximum");
+    CLOCKS_TEST(nd_duration_to_uint32_saturating(INTMAX_MAX) == UINT32_MAX,
+                "maximum signed duration saturates at the uint32 maximum");
+
+    return errors;
+}
+
 static int clocks_time_t_elapsed_saturates(void) {
     int errors = 0;
     const time_t maximum = nd_time_t_max();
@@ -193,6 +212,7 @@ int clocks_unittest(void) {
     errors += clocks_retry_treats_backward_monotonic_sample_as_no_elapsed_time();
     errors += clocks_usec_delta_or_zero_saturates_backward_samples();
     errors += clocks_time_t_arithmetic_preserves_order();
+    errors += clocks_duration_to_uint32_saturates();
     errors += clocks_time_t_elapsed_saturates();
 
     if(errors)
