@@ -1050,6 +1050,8 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
         memcpy(last.addr8, first.addr8, sizeof(first.addr8));
     }
 
+    freez(clean_end);
+
     ebpf_network_viewer_ip_list_t *store;
 
 storethisip:
