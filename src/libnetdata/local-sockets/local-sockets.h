@@ -617,7 +617,7 @@ static inline bool local_sockets_is_path_a_pid(const char *s) {
     if(!s || !*s) return false;
 
     while(*s) {
-        if(!isdigit(*s++))
+        if(!isdigit((uint8_t)*s++))
             return false;
     }
 
