@@ -727,7 +727,7 @@ static inline in_addr_t ebpf_netmask(int prefix)
     if (prefix == 0)
         return (~((in_addr_t)-1));
     else
-        return (in_addr_t)(~((1 << (32 - prefix)) - 1));
+        return (in_addr_t)(~((1U << (32 - prefix)) - 1));
 }
 
 /**
