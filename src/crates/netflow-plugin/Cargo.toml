@@ -21,10 +21,11 @@ bumpalo = { workspace = true }
 bytesize = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive"] }
-# Journal I/O migrated to the published systemd-journal-sdk (was vendored path
-# crates). Aliased to the historical names so call sites keep `use journal_*`.
-# Scope: netflow-plugin only; log-viewer/otel still use the vendored workspace
-# crates (tracked as a follow-up). One source of journal-core in this binary.
+# Journal I/O uses the published systemd-journal-sdk crates (was vendored path
+# crates), inherited via the workspace journal-sdk-* keys; in-code idents are
+# journal_sdk_*. Scope: netflow-plugin only; log-viewer/otel still use the
+# vendored workspace crates (tracked as a follow-up). One source of journal
+# code in this binary.
 journal-sdk-common = { workspace = true }
 journal-sdk-core = { workspace = true }
 journal-sdk-engine = { workspace = true }
