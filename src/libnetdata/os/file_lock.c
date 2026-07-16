@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 #include "file_lock.h"
+#include "os.h"
+#include "../memory/nd-mallocz.h"
+
+#include <errno.h>
+#include <stdbool.h>
 
 #if defined(OS_LINUX) || defined(OS_FREEBSD) || defined(OS_MACOS)
 #include <sys/file.h>
@@ -10,54 +15,9 @@
 
 #if defined(OS_WINDOWS)
 #include <windows.h>
-#include <stdlib.h>
-
-#if defined(__CYGWIN__) || defined(__MSYS__)
-#include <sys/types.h>
-#include <sys/cygwin.h>
 #endif
 
-static wchar_t *file_lock_utf8_to_utf16(const char *filename) {
-    int wpath_size = MultiByteToWideChar(CP_UTF8, 0, filename, -1, NULL, 0);
-    if(wpath_size <= 0)
-        return NULL;
-
-    wchar_t *wpath = malloc((size_t)wpath_size * sizeof(*wpath));
-    if(!wpath)
-        return NULL;
-
-    if(MultiByteToWideChar(CP_UTF8, 0, filename, -1, wpath, wpath_size) <= 0) {
-        free(wpath);
-        return NULL;
-    }
-
-    return wpath;
-}
-
-static wchar_t *file_lock_windows_path(const char *filename) {
-#if defined(__CYGWIN__) || defined(__MSYS__)
-    ssize_t wpath_size = cygwin_conv_path(CCP_POSIX_TO_WIN_W, filename, NULL, 0);
-    if(wpath_size > 0) {
-        wchar_t *wpath = malloc((size_t)wpath_size);
-        if(!wpath)
-            return NULL;
-
-        if(cygwin_conv_path(CCP_POSIX_TO_WIN_W, filename, wpath, wpath_size) == 0)
-            return wpath;
-
-        free(wpath);
-    }
-
-    // Absolute POSIX-style paths require runtime translation before Win32 APIs can use them.
-    if(filename[0] == '/')
-        return NULL;
-#endif
-
-    return file_lock_utf8_to_utf16(filename);
-}
-#endif
-
-FILE_LOCK file_lock_get(const char *filename) {
+static FILE_LOCK file_lock_get_internal(const char *filename, bool wait) {
     if(!filename || !*filename)
         return FILE_LOCK_INVALID;
 
@@ -67,16 +27,22 @@ FILE_LOCK file_lock_get(const char *filename) {
     if(fd == -1)
         return FILE_LOCK_INVALID;
 
-    // LOCK_NB makes flock() non-blocking
-    if(flock(fd, LOCK_EX | LOCK_NB) == -1) {
+    int rc;
+    do {
+        rc = flock(fd, LOCK_EX | (wait ? 0 : LOCK_NB));
+    } while(wait && rc == -1 && errno == EINTR);
+
+    if(rc == -1) {
+        int saved_errno = errno;
         close(fd);
+        errno = saved_errno;
         return FILE_LOCK_INVALID;
     }
 
     return (FILE_LOCK){ .fd = fd };
 
 #elif defined(OS_WINDOWS)
-    wchar_t *wpath = file_lock_windows_path(filename);
+    wchar_t *wpath = os_translate_msys_to_windows_pathW(filename);
     if(!wpath)
         return FILE_LOCK_INVALID;
 
@@ -91,7 +57,7 @@ FILE_LOCK file_lock_get(const char *filename) {
         NULL
     );
 
-    free(wpath);
+    freez(wpath);
 
     if(hFile == INVALID_HANDLE_VALUE)
         return FILE_LOCK_INVALID;
@@ -114,9 +80,13 @@ FILE_LOCK file_lock_get(const char *filename) {
 
     // Try to lock the entire file
     OVERLAPPED overlapped = {0};
+    DWORD flags = LOCKFILE_EXCLUSIVE_LOCK;
+    if(!wait)
+        flags |= LOCKFILE_FAIL_IMMEDIATELY;
+
     if(!LockFileEx(
             hFile,
-            LOCKFILE_EXCLUSIVE_LOCK | LOCKFILE_FAIL_IMMEDIATELY,
+            flags,
             0,
             MAXDWORD,
             MAXDWORD,
@@ -130,6 +100,14 @@ FILE_LOCK file_lock_get(const char *filename) {
 #else
 #error "Unsupported operating system"
 #endif
+}
+
+FILE_LOCK file_lock_get(const char *filename) {
+    return file_lock_get_internal(filename, false);
+}
+
+FILE_LOCK file_lock_get_wait(const char *filename) {
+    return file_lock_get_internal(filename, true);
 }
 
 void file_lock_release(FILE_LOCK lock) {

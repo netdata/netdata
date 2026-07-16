@@ -601,14 +601,17 @@ static int read_txt_file(const char *filename, char *buffer, size_t size) {
 
 ALWAYS_INLINE
 static bool read_txt_file_to_buffer(const char *filename, BUFFER *wb, size_t max_size) {
-    // Open the file
-    int fd = open(filename, O_RDONLY | O_CLOEXEC);
+    struct stat st;
+    if (stat(filename, &st) == -1 || !S_ISREG(st.st_mode))
+        return false;
+
+    // O_NONBLOCK prevents a replacement FIFO from waiting during open().
+    int fd = open(filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK);
     if (fd == -1)
         return false;
 
     // Get the file size
-    struct stat st;
-    if (fstat(fd, &st) == -1) {
+    if (fstat(fd, &st) == -1 || !S_ISREG(st.st_mode)) {
         close(fd);
         return false;
     }
