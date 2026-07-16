@@ -4710,11 +4710,6 @@ paths:
            /api/v3/function?function=network-connections
            ```
 
-        4. **Execute with custom timeout for slow operations:**
-           ```
-           /api/v3/function?function=docker-containers&timeout=60
-           ```
-
         **Function Response Formats:**
         - Most functions return JSON data
         - Some may return plain text or formatted output
@@ -4722,10 +4717,9 @@ paths:
         - Long operations may return transaction ID for `/api/v3/progress` polling
 
         **Security Considerations:**
-        - Functions respect user authentication and authorization
-        - Some functions may require elevated permissions
-        - Function execution is subject to ACL checks and bearer-protection settings
-        - Sensitive operations may be restricted by configuration
+        - Network ACLs and bearer-protection settings govern access to the endpoint
+        - Each Function also enforces its declared access permissions
+        - Sensitive Functions can require a signed identity, same-Space membership, and sensitive-data permission even through direct Agent or Parent API access
       security:
         - {}
         - bearerAuth: []
@@ -4963,10 +4957,9 @@ paths:
         Use `/api/v3/functions` to discover available Functions and `/api/v3/function?function=<name>` to execute one on a selected node.
 
         **Security Considerations:**
-        - Functions respect user authentication and authorization
-        - Some functions may require elevated permissions
-        - Function execution is subject to ACL checks and bearer-protection settings
-        - Sensitive operations may be restricted by configuration
+        - Network ACLs and bearer-protection settings govern access to the endpoint
+        - Each Function also declares access permissions that are enforced when it is executed
+        - Sensitive Functions can require a signed identity, same-Space membership, and sensitive-data permission even through direct Agent or Parent API access
       security:
         - {}
         - bearerAuth: []
