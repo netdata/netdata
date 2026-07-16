@@ -172,7 +172,7 @@ static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider,
     }
     if (dllFound) {
         RegSetValueExW(hRegKey, L"EventMessageFile", 0, REG_EXPAND_SZ,
-                       (LPBYTE)modulePath, (wcslen(modulePath) + 1) * sizeof(wchar_t));
+                       (LPBYTE)modulePath, (DWORD)((wcslen(modulePath) + 1) * sizeof(wchar_t)));
 
         DWORD types_supported = EVENTLOG_SUCCESS | EVENTLOG_ERROR_TYPE | EVENTLOG_WARNING_TYPE | EVENTLOG_INFORMATION_TYPE;
         RegSetValueExW(hRegKey, L"TypesSupported", 0, REG_DWORD, (LPBYTE)&types_supported, sizeof(DWORD));
@@ -187,6 +187,17 @@ static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider,
 
 // WINEVT Channels registry path prefix
 #define WINEVT_CHANNELS_KEY L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Channels\\"
+
+// Canonical channel-to-label table used by both wel_manifest_is_current() and
+// wel_ensure_manifest_installed().  A single definition prevents the two functions
+// from drifting out of sync and ensures every channel is validated and configured.
+static const struct { const wchar_t *ch; const wchar_t *label; } wel_channels[] = {
+    { L"Netdata/Daemon",     L"Daemon"     },
+    { L"Netdata/Collectors", L"Collectors" },
+    { L"Netdata/Access",     L"Access"     },
+    { L"Netdata/Health",     L"Health"     },
+    { L"Netdata/Aclk",       L"Aclk"       },
+};
 
 static bool wel_manifest_is_current(void) {
     // All five importChannel provider GUIDs must be present; a partial registration
@@ -208,14 +219,13 @@ static bool wel_manifest_is_current(void) {
         RegCloseKey(hKey);
     }
 
-    // Verify the Daemon channel exists, is Admin type (EVT_CHANNEL_TYPE_ADMIN = 0), and
-    // has a short display name ("Daemon") set.  Without the display name, Event Viewer
-    // labels the leaf node with the full channel name "Netdata/Daemon" instead of
-    // just "Daemon".  Operational type or a missing/wrong display name both force a
-    // reinstall so the manifest and display names are updated atomically.
-    {
+    // Verify every channel: must exist, be Admin type (EVT_CHANNEL_TYPE_ADMIN = 0),
+    // and carry the correct short display name.  Checking all channels — not just
+    // Daemon — catches a partial registration where later label writes failed, which
+    // would otherwise be silently accepted as current and never repaired.
+    for (size_t i = 0; i < _countof(wel_channels); i++) {
         wchar_t chkey[MAX_PATH];
-        swprintf(chkey, _countof(chkey), L"%lsNetdata/Daemon", WINEVT_CHANNELS_KEY);
+        swprintf(chkey, _countof(chkey), L"%ls%ls", WINEVT_CHANNELS_KEY, wel_channels[i].ch);
         HKEY hCh;
         if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, chkey, 0, KEY_READ, &hCh) != ERROR_SUCCESS)
             return false;
@@ -233,7 +243,7 @@ static bool wel_manifest_is_current(void) {
         if (chtype != 0)  // 0 = Admin
             return false;
 
-        if (dnRc != ERROR_SUCCESS || wcscmp(dispName, L"Daemon") != 0)
+        if (dnRc != ERROR_SUCCESS || wcscmp(dispName, wel_channels[i].label) != 0)
             return false;
     }
 
@@ -445,22 +455,15 @@ static void wel_ensure_manifest_installed(void) {
     // full channel name "Netdata/Daemon") as the leaf label inside the Netdata folder.
     // wevtutil im does not derive these from $(string.*) references in the embedded
     // manifest, so we set them explicitly after registration.
-    static const struct { const wchar_t *ch; const wchar_t *label; } channel_labels[] = {
-        { L"Netdata/Daemon",     L"Daemon"     },
-        { L"Netdata/Collectors", L"Collectors" },
-        { L"Netdata/Access",     L"Access"     },
-        { L"Netdata/Health",     L"Health"     },
-        { L"Netdata/Aclk",       L"Aclk"       },
-    };
-    for (size_t cl = 0; cl < _countof(channel_labels); cl++) {
+    for (size_t cl = 0; cl < _countof(wel_channels); cl++) {
         wchar_t chregkey[MAX_PATH];
         swprintf(chregkey, _countof(chregkey), L"%ls%ls",
-                 WINEVT_CHANNELS_KEY, channel_labels[cl].ch);
+                 WINEVT_CHANNELS_KEY, wel_channels[cl].ch);
         HKEY hCh;
         if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, chregkey, 0, KEY_SET_VALUE, &hCh) == ERROR_SUCCESS) {
             RegSetValueExW(hCh, L"DisplayName", 0, REG_SZ,
-                           (LPBYTE)channel_labels[cl].label,
-                           (wcslen(channel_labels[cl].label) + 1) * sizeof(wchar_t));
+                           (LPBYTE)wel_channels[cl].label,
+                           (DWORD)((wcslen(wel_channels[cl].label) + 1) * sizeof(wchar_t)));
             RegCloseKey(hCh);
         }
     }
@@ -738,7 +741,7 @@ static void wel_entry_process(struct wel_queue_entry *e) {
         EVENT_DATA_DESCRIPTOR desc[_NDF_MAX - 1];
         for(size_t i = 1; i < _NDF_MAX; i++) {
             const wchar_t *buf = wel_entry_field(e, i);
-            EventDataDescCreate(&desc[i - 1], buf, (wcslen(buf) + 1) * sizeof(WCHAR));
+            EventDataDescCreate(&desc[i - 1], buf, (ULONG)((wcslen(buf) + 1) * sizeof(WCHAR)));
         }
         EVENT_DESCRIPTOR ed = {
             .Id      = e->eventID & EVENT_ID_CODE_MASK,
