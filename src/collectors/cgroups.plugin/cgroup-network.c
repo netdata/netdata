@@ -704,7 +704,7 @@ int verify_path(const char *path) {
 
     const char *s = path;
     while(*s != '\0') {
-        if (isalnum(*s) || is_valid_path_symbol(*s))
+        if (isalnum((uint8_t)*s) || is_valid_path_symbol(*s))
             s += 1;
         else if (*s == '\\' && is_valid_hex_escape(s))
             s += 4;

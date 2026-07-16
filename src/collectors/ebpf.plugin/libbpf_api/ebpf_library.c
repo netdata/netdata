@@ -651,7 +651,7 @@ static void ebpf_link_hostnames(const char *parse)
     char *clean = move;
     while (likely(move)) {
         // Find the first valid value
-        while (isspace(*move))
+        while (isspace((uint8_t)*move))
             move++;
 
         // No valid value found
@@ -1177,7 +1177,7 @@ void ebpf_parse_ips_unsafe(const char *ptr)
 
     while (likely(ptr)) {
         // Move forward until next valid character
-        while (isspace(*ptr))
+        while (isspace((uint8_t)*ptr))
             ptr++;
 
         // No valid value found
@@ -1517,7 +1517,7 @@ void ebpf_parse_ports(const char *ptr)
 
     while (likely(ptr)) {
         // Move forward until next valid character
-        while (isspace(*ptr))
+        while (isspace((uint8_t)*ptr))
             ptr++;
 
         // No valid value found
@@ -1536,10 +1536,10 @@ void ebpf_parse_ports(const char *ptr)
             ptr++;
         }
 
-        if (isdigit(*ptr)) { // Parse port
+        if (isdigit((uint8_t)*ptr)) { // Parse port
             ebpf_parse_port_list(
                 neg ? (void **)&network_viewer_opt.excluded_port : (void **)&network_viewer_opt.included_port, ptr);
-        } else if (isalpha(*ptr)) { // Parse service
+        } else if (isalpha((uint8_t)*ptr)) { // Parse service
             ebpf_parse_service_list(
                 neg ? (void **)&network_viewer_opt.excluded_port : (void **)&network_viewer_opt.included_port, ptr);
         } else if (*ptr == '*') { // All
