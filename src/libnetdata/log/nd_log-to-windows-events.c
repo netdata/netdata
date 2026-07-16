@@ -410,11 +410,26 @@ static void wel_ensure_manifest_installed(void) {
     swprintf(umParams, _countof(umParams), L"um \"%ls\"", manifestDst);
     (void)wel_run_silent(wevtutil, umParams);
 
+    // Register the new manifest. The /mf and /rf flags tell wevtutil where the DLL is,
+    // overriding the resourceFileName/messageFileName attributes in the XML.
+    wchar_t imParams[MAX_PATH * 4];
+    swprintf(imParams, _countof(imParams), L"im \"%ls\" \"/mf:%ls\" \"/rf:%ls\"",
+             manifestDst, dllDst, dllDst);
+    bool imOk = wel_run_silent(wevtutil, imParams);
+
+    // Only proceed with post-registration cleanup and display-name setting when
+    // wevtutil im succeeded.  Deleting stale keys before confirming the new
+    // registration is complete would leave the agent with no WEL routing if
+    // wevtutil im fails (locked channels, manifest validation error, etc.).
+    if (!imOk)
+        return;
+
     // Remove flat classic WEL log entries that pre-manifest builds created directly.
     // wevtutil um removes WINEVT publisher entries but leaves behind any EventLog\*
     // keys our code created before the manifest approach; those flat logs appear as
     // duplicate "Netdata/Daemon" entries in Event Viewer alongside the tree hierarchy.
-    // Delete them here, after um, so wevtutil im creates clean channel-linked entries.
+    // Safe to delete now because wevtutil im has already created the correct
+    // channel-linked entries that replace them.
     static const wchar_t *const flat_stale_keys[] = {
         L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Daemon",
         L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Collectors",
@@ -425,13 +440,6 @@ static void wel_ensure_manifest_installed(void) {
     };
     for (size_t j = 0; j < _countof(flat_stale_keys); j++)
         RegDeleteTreeW(HKEY_LOCAL_MACHINE, flat_stale_keys[j]);
-
-    // Register the new manifest. The /mf and /rf flags tell wevtutil where the DLL is,
-    // overriding the resourceFileName/messageFileName attributes in the XML.
-    wchar_t imParams[MAX_PATH * 4];
-    swprintf(imParams, _countof(imParams), L"im \"%ls\" \"/mf:%ls\" \"/rf:%ls\"",
-             manifestDst, dllDst, dllDst);
-    (void)wel_run_silent(wevtutil, imParams);
 
     // Set short display names on every channel so Event Viewer shows "Daemon" (not the
     // full channel name "Netdata/Daemon") as the leaf label inside the Netdata folder.
