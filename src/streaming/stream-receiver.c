@@ -582,7 +582,9 @@ static void stream_receiver_remove_internal(struct stream_thread *sth, struct re
 
     time_t connected_s = rpt->connected_since_s ?
         nd_time_t_elapsed_saturating(now_realtime_sec(), rpt->connected_since_s) : 0;
-    long long idle_s = (long long)((now_monotonic_usec() - rpt->thread.last_traffic_ut) / USEC_PER_SEC);
+    usec_t idle_ut = rpt->thread.last_traffic_ut ?
+        clocks_usec_delta_or_zero(now_monotonic_usec(), rpt->thread.last_traffic_ut) : 0;
+    long long idle_s = (long long)(idle_ut / USEC_PER_SEC);
     double repl_pct = rpt->host ? rpt->host->stream.rcv.status.replication.percent : 0.0;
 
     errno_clear();
@@ -1045,7 +1047,11 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             overall_buffer_ratio = stats.buffer_ratio;
 
         time_t timeout_s = 600;
-        if(unlikely(rpt->thread.last_traffic_ut + timeout_s * USEC_PER_SEC < now_ut &&
+        if(unlikely(!rpt->thread.last_traffic_ut) && now_ut)
+            rpt->thread.last_traffic_ut = now_ut;
+        usec_t idle_ut = clocks_usec_delta_or_zero_with_rebase(now_ut, &rpt->thread.last_traffic_ut);
+
+        if(unlikely(idle_ut > (usec_t)timeout_s * USEC_PER_SEC &&
                      !rrdhost_receiver_replicating_charts(rpt->host))) {
 
             ND_LOG_STACK lgs[] = {
@@ -1061,7 +1067,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
             worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_TIMEOUT);
 
             char duration[RFC3339_MAX_LENGTH];
-            duration_snprintf(duration, sizeof(duration), (int64_t)(now_monotonic_usec() - rpt->thread.last_traffic_ut), "us", true);
+            duration_snprintf(duration, sizeof(duration), (int64_t)MIN(idle_ut, (usec_t)INT64_MAX), "us", true);
 
             char pending[64] = "0";
             if(stats.bytes_outstanding)
@@ -1093,7 +1099,7 @@ void stream_receiver_check_all_nodes_from_poll(struct stream_thread *sth, usec_t
     }
 }
 
-static bool stream_receiver_did_replication_progress(struct receiver_state *rpt) {
+static bool stream_receiver_did_replication_progress(struct receiver_state *rpt, usec_t now_ut) {
     RRDHOST *host = rpt->host;
 
     size_t host_counter_sum =
@@ -1103,7 +1109,7 @@ static bool stream_receiver_did_replication_progress(struct receiver_state *rpt)
     if(rpt->replication.last_counter_sum != host_counter_sum) {
         // there has been some progress
         rpt->replication.last_counter_sum = host_counter_sum;
-        rpt->replication.last_progress_ut = now_monotonic_usec();
+        rpt->replication.last_progress_ut = now_ut;
         return true;
     }
 
@@ -1115,10 +1121,16 @@ static bool stream_receiver_did_replication_progress(struct receiver_state *rpt)
         // we still have requests to execute
         return true;
 
-    return (now_monotonic_usec() - rpt->replication.last_progress_ut < 10ULL * 60 * USEC_PER_SEC);
+    if(unlikely(!rpt->replication.last_progress_ut)) {
+        rpt->replication.last_progress_ut = now_ut;
+        return true;
+    }
+
+    return clocks_usec_delta_or_zero_with_rebase(now_ut, &rpt->replication.last_progress_ut) <
+           10ULL * 60 * USEC_PER_SEC;
 }
 
-void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut __maybe_unused) {
+void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
 
     Word_t idx = 0;
@@ -1130,7 +1142,7 @@ void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec
         RRDHOST *host = rpt->host;
 
 
-        if(stream_receiver_did_replication_progress(rpt)) {
+        if(stream_receiver_did_replication_progress(rpt, now_ut)) {
             rpt->replication.last_checked_ut = 0;
             continue;
         }
@@ -1160,7 +1172,7 @@ void stream_receiver_replication_check_from_poll(struct stream_thread *sth, usec
         }
         rrdset_foreach_done(st);
 
-        if(stalled && !stream_receiver_did_replication_progress(rpt)) {
+        if(stalled && !stream_receiver_did_replication_progress(rpt, now_ut)) {
             nd_log(NDLS_DAEMON, NDLP_WARNING,
                    "STREAM RCV[%zu] '%s' [from %s]: REPLICATION EXCEPTIONS SUMMARY: node has %zu stalled replication requests (%zu finished). "
                    "We have requested %u and got replies for %u replication commands. "

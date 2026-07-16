@@ -516,8 +516,12 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
         if (stats.buffer_ratio > overall_buffer_ratio)
             overall_buffer_ratio = stats.buffer_ratio;
 
+        if(unlikely(!s->thread.last_traffic_ut) && now_ut)
+            s->thread.last_traffic_ut = now_ut;
+        usec_t idle_ut = clocks_usec_delta_or_zero_with_rebase(now_ut, &s->thread.last_traffic_ut);
+
         if(unlikely(stats.bytes_outstanding &&
-                     s->thread.last_traffic_ut + stream_send.parents.timeout_s * USEC_PER_SEC < now_ut &&
+                     idle_ut > (usec_t)stream_send.parents.timeout_s * USEC_PER_SEC &&
                      !stream_sender_pending_replication_requests(s) &&
                      !stream_sender_replicating_charts(s))) {
 
@@ -534,7 +538,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
             worker_is_busy(WORKER_STREAM_JOB_DISCONNECT_TIMEOUT);
 
             char duration[RFC3339_MAX_LENGTH];
-            duration_snprintf(duration, sizeof(duration), (int64_t)(now_monotonic_usec() - s->thread.last_traffic_ut), "us", true);
+            duration_snprintf(duration, sizeof(duration), (int64_t)MIN(idle_ut, (usec_t)INT64_MAX), "us", true);
 
             char pending[64] = "0";
             if(stats.bytes_outstanding)
@@ -579,7 +583,7 @@ void stream_sender_check_all_nodes_from_poll(struct stream_thread *sth, usec_t n
     worker_set_metric(WORKER_SENDER_JOB_BUFFER_RATIO, overall_buffer_ratio);
 }
 
-static bool stream_sender_did_replication_progress(struct sender_state *s) {
+static bool stream_sender_did_replication_progress(struct sender_state *s, usec_t now_ut) {
     RRDHOST *host = s->host;
 
     size_t host_counter_sum =
@@ -589,7 +593,7 @@ static bool stream_sender_did_replication_progress(struct sender_state *s) {
     if(s->replication.last_counter_sum != host_counter_sum) {
         // there has been some progress
         s->replication.last_counter_sum = host_counter_sum;
-        s->replication.last_progress_ut = now_monotonic_usec();
+        s->replication.last_progress_ut = now_ut;
         return true;
     }
 
@@ -601,10 +605,16 @@ static bool stream_sender_did_replication_progress(struct sender_state *s) {
         // we still have requests to execute
         return true;
 
-    return (now_monotonic_usec() - s->replication.last_progress_ut < 10ULL * 60 * USEC_PER_SEC);
+    if(unlikely(!s->replication.last_progress_ut)) {
+        s->replication.last_progress_ut = now_ut;
+        return true;
+    }
+
+    return clocks_usec_delta_or_zero_with_rebase(now_ut, &s->replication.last_progress_ut) <
+           10ULL * 60 * USEC_PER_SEC;
 }
 
-void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut __maybe_unused) {
+void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t now_ut) {
     internal_fatal(sth->tid != gettid_cached(), "Function %s() should only be used by the dispatcher thread", __FUNCTION__);
 
     Word_t idx = 0;
@@ -615,7 +625,7 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
         struct sender_state *s = m->s;
         RRDHOST *host = s->host;
 
-        if(stream_sender_did_replication_progress(s)) {
+        if(stream_sender_did_replication_progress(s, now_ut)) {
             s->replication.last_checked_ut = 0;
             continue;
         }
@@ -655,7 +665,7 @@ void stream_sender_replication_check_from_poll(struct stream_thread *sth, usec_t
         }
         rrdset_foreach_done(st);
 
-        if(stalled && !stream_sender_did_replication_progress(s)) {
+        if(stalled && !stream_sender_did_replication_progress(s, now_ut)) {
             nd_log(NDLS_DAEMON, NDLP_ERR,
                    "STREAM SND[%zu] '%s' [to %s]: REPLICATION EXCEPTIONS SUMMARY: node has %zu stalled replication requests (%zu completed)."
                    "We have received %u and sent %u replication commands. "

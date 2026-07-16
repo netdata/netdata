@@ -705,7 +705,7 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
      */
 
     {
-        time_t age = 0;
+        usec_t age_s = 0;
         bool receiver_stale = false;
         bool receiver_working = false;
 
@@ -717,9 +717,11 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
         if (host) {
             rrdhost_receiver_lock(host);
             if (host->receiver) {
-                age =(time_t)((now_monotonic_usec() - host->receiver->thread.last_traffic_ut) / USEC_PER_SEC);
+                usec_t last_traffic_ut = host->receiver->thread.last_traffic_ut;
+                age_s = last_traffic_ut ?
+                    clocks_usec_delta_or_zero(now_monotonic_usec(), last_traffic_ut) / USEC_PER_SEC : 0;
 
-                if (age < 30)
+                if (age_s < 30)
                     receiver_working = true;
                 else
                     receiver_stale = true;
@@ -757,8 +759,8 @@ int stream_receiver_accept_connection(struct web_client *w, char *decoded_query_
             char msg[200 + 1];
             snprintfz(msg, sizeof(msg) - 1,
                       "rejecting streaming connection; multiple connections for the same host, "
-                      "old connection was last used %ld secs ago%s",
-                      age, receiver_stale ? " (signaled old receiver to stop)" : " (new connection not accepted)");
+                      "old connection was last used %" PRIu64 " secs ago%s",
+                      age_s, receiver_stale ? " (signaled old receiver to stop)" : " (new connection not accepted)");
 
             stream_receiver_log_status(rpt, msg, STREAM_HANDSHAKE_PARENT_NODE_ALREADY_CONNECTED, NDLP_WARNING);
 

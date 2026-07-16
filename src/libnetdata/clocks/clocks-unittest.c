@@ -98,6 +98,23 @@ static int clocks_usec_delta_or_zero_saturates_backward_samples(void) {
                 "equal unsigned microsecond samples produce zero delta");
     CLOCKS_TEST(clocks_usec_delta_or_zero(100 * USEC_PER_MS, 250 * USEC_PER_MS) == 0,
                 "backward unsigned microsecond sample saturates to zero");
+    CLOCKS_TEST(clocks_usec_delta_or_zero(UINT64_MAX, UINT64_MAX - 1) == 1,
+                "maximum unsigned microsecond samples preserve ordered deltas");
+    CLOCKS_TEST(clocks_usec_delta_or_zero(0, UINT64_MAX) == 0,
+                "maximum backward unsigned microsecond sample saturates to zero");
+
+    usec_t old_ut = 250 * USEC_PER_MS;
+    CLOCKS_TEST(clocks_usec_delta_or_zero_with_rebase(100 * USEC_PER_MS, &old_ut) == 0 &&
+                    old_ut == 100 * USEC_PER_MS,
+                "valid backward sample rebases a relative timer");
+
+    old_ut = 250 * USEC_PER_MS;
+    CLOCKS_TEST(clocks_usec_delta_or_zero_with_rebase(0, &old_ut) == 0 &&
+                    old_ut == 250 * USEC_PER_MS,
+                "failed zero sample does not erase a valid relative timer baseline");
+    CLOCKS_TEST(clocks_usec_delta_or_zero_with_rebase(400 * USEC_PER_MS, &old_ut) == 150 * USEC_PER_MS &&
+                    old_ut == 250 * USEC_PER_MS,
+                "ordered relative timer sample preserves its baseline and elapsed time");
 
     return errors;
 }
