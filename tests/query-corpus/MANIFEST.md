@@ -15,7 +15,7 @@ a fix lands, demanding the flip to `green` with the fixing PR.
 | L0/restart | fixtures survive daemon restart byte-identical (journal-v2 read path) | green | n/a | |
 | CASE-015/live-disconnect-discard | receiver drains delivered live data before honoring HUP — immediate close loses nothing | green | n/a | #23118 |
 | CASE-015/replication-disconnect-discard | same drain guarantee on the replication path | green | n/a | #23118 |
-| CASE-015 (robustness) mid-dialogue disconnect + soak | teardown with queued replies to a dead child stays crash-free | green | n/a | |
+| CASE-015/robustness | teardown with queued replies to a dead child stays crash-free (mid-dialogue disconnect + 30-cycle soak) | green | n/a | |
 | L1/palette | tier0 ingestion identity for the edge-data palette (gaps, resets, anomaly runs, negatives, zeros, ue=5) | green | n/a | |
 | L1/single-point | single-point exact through a wide window; pins 1-point-window view expansion (layer-9 seed) | green | n/a | |
 | L1/trailing-window | beyond-retention reads return nulls at the fixed epoch | green | n/a | |
@@ -40,8 +40,9 @@ a fix lands, demanding the flip to `green` with the fixing PR.
 
 ## Corpus-wide pusher discipline
 
-- CASE-015 forces the harness rule: pusher connections close only AFTER the
-  settle barrier confirms retention. Deliberate immediate closes exist only
-  inside the CASE-015 red cases.
+- CASE-015 established the harness rule: pusher connections close only AFTER
+  the settle barrier confirms retention. Deliberate immediate closes exist
+  only inside the CASE-015 cases — green since #23118, where they prove the
+  drain guarantee (an immediate close loses nothing).
 - The historical spike-3 discipline (first point alone, wait, then burst)
   is NOT needed since #23096 — pinned by L0/live-burst.
