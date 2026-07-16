@@ -1369,8 +1369,11 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_ne
                     cmp_last);
                 freez(move->value);
                 move->value = in->value;
+                move->hash = in->hash;
                 move->first = in->first;
                 move->last = in->last;
+                move->cmp_first = in->cmp_first;
+                move->cmp_last = in->cmp_last;
                 freez(in);
                 return;
             }
@@ -1389,8 +1392,8 @@ static inline void fill_port_list(ebpf_network_viewer_port_list_t **out, ebpf_ne
     netdata_log_info(
         "Adding values %s( %u, %u) to %s port list used on network viewer",
         in->value,
-        in->first,
-        in->last,
+        ntohs(in->first),
+        ntohs(in->last),
         (*out == network_viewer_opt.included_port) ? "included" : "excluded");
 #endif
 }
@@ -1418,6 +1421,7 @@ static void ebpf_parse_service_list(void **out, const char *service)
     w->hash = simple_hash(service);
 
     w->first = w->last = (uint16_t)serv->s_port;
+    w->cmp_first = w->cmp_last = ntohs((uint16_t)serv->s_port);
 
     fill_port_list(list, w);
 }
@@ -1498,8 +1502,8 @@ fillenvpl:
     w = callocz(1, sizeof(ebpf_network_viewer_port_list_t));
     w->value = copied;
     w->hash = simple_hash(copied);
-    w->first = (uint16_t)first;
-    w->last = (uint16_t)last;
+    w->first = htons((uint16_t)first);
+    w->last = htons((uint16_t)last);
     w->cmp_first = (uint16_t)first;
     w->cmp_last = (uint16_t)last;
 
@@ -1825,7 +1829,7 @@ void read_local_ports(char *filename, uint8_t proto)
 
         // Read local port
         uint16_t port = (uint16_t)strtol(procfile_lineword(ff, l, 2), NULL, 16);
-        update_listen_table(htons(port), proto, &values);
+        update_listen_table(port, proto, &values);
     }
 
     procfile_close(ff);

@@ -1528,7 +1528,7 @@ static int ebpf_is_specific_ip_inside_range(union netdata_ip_t *cmp, int family)
  * Is port inside range
  *
  * Verify if the cmp port is inside the range [first, last].
- * This function expects only the last parameter as big endian.
+ * The destination port is provided in network byte order and converted before comparison.
  *
  * @param cmp    the value to compare
  *
@@ -1539,6 +1539,8 @@ static int ebpf_is_port_inside_range(uint16_t cmp)
     // We do not have restrictions for ports.
     if (!network_viewer_opt.excluded_port && !network_viewer_opt.included_port)
         return 1;
+
+    cmp = ntohs(cmp);
 
     // Test if port is excluded
     ebpf_network_viewer_port_list_t *move = network_viewer_opt.excluded_port;
@@ -2069,7 +2071,7 @@ void ebpf_read_socket_thread(void *ptr)
  * Fill the structure with values read from /proc or hash table.
  *
  * @param out   the structure where we will store data.
- * @param value the ports we are listen to.
+ * @param value the network-order port to store.
  * @param proto the protocol used for this connection.
  * @param in    the structure with values read form different sources.
  */
@@ -2088,12 +2090,14 @@ fill_nv_port_list(ebpf_network_viewer_port_list_t *out, uint16_t value, uint16_t
  *
  * Update link list when it is necessary.
  *
- * @param value the ports we are listen to.
+ * @param value the host-order port we are listening to.
  * @param proto the protocol used with port connection.
  * @param in    the structure with values read form different sources.
  */
 void update_listen_table(uint16_t value, uint16_t proto, netdata_passive_connection_t *in)
 {
+    value = htons(value);
+
     ebpf_network_viewer_port_list_t *w;
     if (likely(listen_ports)) {
         ebpf_network_viewer_port_list_t *move = listen_ports, *store = listen_ports;
