@@ -1465,7 +1465,11 @@
               "type": "string",
               "enum": [
                 "yes",
-                "no"
+                "no",
+                "1",
+                "0",
+                "true",
+                "false"
               ],
               "default": "no"
             }
@@ -1479,7 +1483,11 @@
               "type": "string",
               "enum": [
                 "yes",
-                "no"
+                "no",
+                "1",
+                "0",
+                "true",
+                "false"
               ],
               "default": "yes"
             }
@@ -1493,7 +1501,11 @@
               "type": "string",
               "enum": [
                 "yes",
-                "no"
+                "no",
+                "1",
+                "0",
+                "true",
+                "false"
               ],
               "default": "yes"
             }
@@ -1507,7 +1519,11 @@
               "type": "string",
               "enum": [
                 "yes",
-                "no"
+                "no",
+                "1",
+                "0",
+                "true",
+                "false"
               ],
               "default": "yes"
             }
@@ -1521,7 +1537,11 @@
               "type": "string",
               "enum": [
                 "yes",
-                "no"
+                "no",
+                "1",
+                "0",
+                "true",
+                "false"
               ],
               "default": "yes"
             }
