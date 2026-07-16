@@ -136,7 +136,7 @@ static bool machine_guid_write_to_file(const char *filename, ND_MACHINE_GUID *ho
     char tmp_filename[FILENAME_MAX];
     snprintf(tmp_filename, sizeof(tmp_filename), "%s.%zu", filename, __atomic_add_fetch(&save_id, 1, __ATOMIC_RELAXED));
 
-    int fd = open(tmp_filename, O_WRONLY | O_CREAT | O_TRUNC, 0444);
+    int fd = open(tmp_filename, O_WRONLY | O_CREAT | O_TRUNC, 0640);
     if (fd == -1) {
         nd_log(NDLS_DAEMON, NDLP_ERR, "MACHINE_GUID: cannot create the temporary GUID file '%s'", tmp_filename);
         return false;

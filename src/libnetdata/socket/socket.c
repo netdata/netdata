@@ -669,7 +669,7 @@ int accept_socket(int fd, int flags, char *client_ip, size_t ipsize, char *clien
             strncpyz(client_ip, "UNKNOWN", ipsize - 1);
             strncpyz(client_port, "UNKNOWN", portsize - 1);
         }
-        if (!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1")) {
+        if (client_ip && (!strcmp(client_ip, "127.0.0.1") || !strcmp(client_ip, "::1"))) {
             strncpyz(client_ip, "localhost", ipsize - 1);
         }
         sock_setcloexec(nfd, true);

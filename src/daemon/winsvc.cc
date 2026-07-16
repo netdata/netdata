@@ -66,6 +66,22 @@ static void svc_report_stopped_before_abort(void)
     ReportSvcStatus(SERVICE_STOPPED, 0, 0, 0);
 }
 
+// Map a Windows Service Control Manager control code to a netdata EXIT_REASON.
+// Extracted so the call site can use a C++17 init-statement and keep the
+// controlCode variable scoped tight (SonarQube S6004 init-statement rule).
+static EXIT_REASON svc_control_code_to_exit_reason(DWORD controlCode)
+{
+    switch(controlCode) {
+        case SERVICE_CONTROL_SHUTDOWN:
+            return (EXIT_REASON)(EXIT_REASON_SERVICE_STOP|EXIT_REASON_SYSTEM_SHUTDOWN);
+
+        // SERVICE_CONTROL_STOP (and any other unrecognised code) fall through
+        // to the default case below.
+        default:
+            return EXIT_REASON_SERVICE_STOP;
+    }
+}
+
 // Heartbeat thread: keeps re-sending SERVICE_STOP_PENDING every 2 s so the
 // SCM does not fire error 1053 while netdata_exit_gracefully() runs.
 // Exits when svc_heartbeat_done_event is signalled.
@@ -94,19 +110,12 @@ static NORETURN void call_netdata_cleanup(void *arg)
         heartbeat = CreateThread(NULL, 0, stop_pending_heartbeat, NULL, 0, NULL);
 
     // Stop the agent
-    EXIT_REASON reason;
-    DWORD controlCode = __atomic_load_n(&svc_stop_control_code, __ATOMIC_ACQUIRE);
-    switch(controlCode) {
-        case SERVICE_CONTROL_SHUTDOWN:
-            reason = (EXIT_REASON)(EXIT_REASON_SERVICE_STOP|EXIT_REASON_SYSTEM_SHUTDOWN);
-            break;
-
-        // SERVICE_CONTROL_STOP (and any other unrecognised code) fall through
-        // to the default case below.
-        default:
-            reason = EXIT_REASON_SERVICE_STOP;
-            break;
-    }
+    // C++17 init-statement scopes the loaded `controlCode` to the helper
+    // call so the variable does not leak into the rest of the function
+    // (SonarQube S6004 init-statement rule). The switch that maps control
+    // codes to EXIT_REASON values lives inside the helper.
+    EXIT_REASON reason = svc_control_code_to_exit_reason(
+        __atomic_load_n(&svc_stop_control_code, __ATOMIC_ACQUIRE));
 
     // If the shutdown watcher times out and calls abort(), report SERVICE_STOPPED
     // to the SCM first so the service is not recorded as crashed.
@@ -200,10 +209,10 @@ void WINAPI ServiceMain(DWORD argc, LPSTR* argv)
     if (!ReportSvcStatus(SERVICE_RUNNING, 0, 5000, SERVICE_ACCEPT_STOP | SERVICE_ACCEPT_SHUTDOWN))
         return;
 
-    // Run the agent
-    int rc = netdata_main(argc, argv);
-
-    if (rc != 10) {
+    // Run the agent. C++17 init-statement scopes `rc` to the if body
+    // (SonarQube S6004 init-statement rule); `rc` is not used after the
+    // early-exit block.
+    if (int rc = netdata_main(argc, argv); rc != 10) {
         // netdata_main() exited early — bad arguments, --help, or an
         // initialisation error.  Transition to STOPPED so the SCM records
         // the failure instead of leaving the service stuck in SERVICE_RUNNING
