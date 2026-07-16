@@ -11,9 +11,17 @@ members = [
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-rust-version = "1.85"
+rust-version = "1.91"
 
 [workspace.dependencies]
+# Internal workspace crates
+error = { path = "error" }
+journal_file = { path = "journal_file" }
+sigbus = { path = "sigbus" }
+window_manager = { path = "window_manager" }
+
+cbindgen = "0.28.0"
+
 memmap2 = "0.9"
 zerocopy = { version = "0.9.0-alpha.0", features = ["derive"] }
 thiserror = "2"

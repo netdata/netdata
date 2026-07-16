@@ -508,13 +508,13 @@ fn run_writer_only_resource_envelope(
     measurement_secs: u64,
 ) -> ResourceEnvelopeReport {
     let (record_batches, protocol_name) = build_record_batches(profile);
-    let (_tmp, mut log, journal_host) = new_disk_benchmark_raw_log();
+    let (_tmp, mut log, journal_sdk_host) = new_disk_benchmark_raw_log();
     let mut encode_buf = JournalEncodeBuffer::new();
 
     run_paced_writer_loop(
         &mut log,
         &mut encode_buf,
-        journal_host.as_ref(),
+        journal_sdk_host.as_ref(),
         &record_batches,
         flows_per_sec,
         Duration::from_secs(warmup_secs),
@@ -525,7 +525,7 @@ fn run_writer_only_resource_envelope(
     let measurement_result = run_paced_writer_loop(
         &mut log,
         &mut encode_buf,
-        journal_host.as_ref(),
+        journal_sdk_host.as_ref(),
         &record_batches,
         flows_per_sec,
         Duration::from_secs(measurement_secs),
@@ -1026,7 +1026,7 @@ fn paced_record_cursor_splits_batches_when_tick_budget_is_smaller_than_batch() {
 fn run_paced_writer_loop(
     log: &mut Log,
     encode_buf: &mut JournalEncodeBuffer,
-    journal_host: &LocalJournalProvider,
+    journal_sdk_host: &LocalJournalProvider,
     record_batches: &[Vec<crate::flow::FlowRecord>],
     flows_per_sec: u64,
     duration: Duration,
@@ -1063,7 +1063,7 @@ fn run_paced_writer_loop(
                     .with_source_realtime_usec(tick_receive_time_usec)
                     .with_entry_realtime_usec(tick_receive_time_usec)
                     .with_entry_monotonic_usec(
-                        journal_host
+                        journal_sdk_host
                             .monotonic_usec()
                             .expect("benchmark monotonic timestamp"),
                     );

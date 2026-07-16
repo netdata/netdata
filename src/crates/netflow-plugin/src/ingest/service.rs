@@ -1,5 +1,5 @@
 use super::*;
-use journal_log_writer::{LogLifecycleEvent, LogLifecycleObserver};
+use journal_sdk_log_writer::{LogLifecycleEvent, LogLifecycleObserver};
 
 mod init;
 mod runtime;
@@ -62,7 +62,7 @@ impl MaterializedTierWriters {
         tier_flow_indexes: &Arc<RwLock<TierFlowIndexStore>>,
         facet_runtime: &Arc<crate::facet_runtime::FacetRuntime>,
         metrics: &Arc<IngestMetrics>,
-        journal_host: &Arc<LocalJournalProvider>,
+        journal_sdk_host: &Arc<LocalJournalProvider>,
     ) -> Vec<super::tier_commit::TierWorker> {
         [
             (TierKind::Minute1, self.minute_1),
@@ -78,7 +78,7 @@ impl MaterializedTierWriters {
             tier_flow_indexes: Arc::clone(tier_flow_indexes),
             facet_runtime: Arc::clone(facet_runtime),
             metrics: Arc::clone(metrics),
-            journal_host: Arc::clone(journal_host),
+            journal_sdk_host: Arc::clone(journal_sdk_host),
             consecutive_sync_failures: 0,
         })
         .collect()
@@ -92,7 +92,7 @@ pub(crate) struct IngestService {
     pub(super) decoder_state_dir: PathBuf,
     pub(super) last_decoder_state_persist_usec: u64,
     pub(super) raw_journal: Log,
-    pub(super) journal_host: Arc<LocalJournalProvider>,
+    pub(super) journal_sdk_host: Arc<LocalJournalProvider>,
     /// `Some` until the commit workers spawn (the rebuild's inline flush path
     /// uses it); the workers own the tier `Log`s afterwards.
     tier_writers: Option<MaterializedTierWriters>,

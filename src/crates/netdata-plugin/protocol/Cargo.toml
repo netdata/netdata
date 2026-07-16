@@ -7,8 +7,8 @@ edition.workspace = true
 workspace = true
 
 [dependencies]
-netdata-plugin-error = { path = "../error" }
-netdata-plugin-types = { path = "../types" }
+netdata-plugin-error = { workspace = true }
+netdata-plugin-types = { workspace = true }
 
 phf = { workspace = true }
 atoi = { workspace = true }

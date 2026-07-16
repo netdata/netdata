@@ -7,7 +7,7 @@ edition = "2021"
 path = "src/lib.rs"
 
 [dependencies]
-libc = "0.2"
+libc = { workspace = true }
 
 [dev-dependencies]
-proptest = "1"
+proptest = { workspace = true }
