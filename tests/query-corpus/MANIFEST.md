@@ -38,6 +38,8 @@ a fix lands, demanding the flip to `green` with the fixing PR.
 | L5/group-by-matrix | level-1 (first-pass) group-by, BOTH contracts: 7 keys x 5 aggregations vs member-enumeration oracle (non-raw converts; raw defers with counts on the wire; PARTIAL on gap rows; naming) | green | n/a | |
 | L5/percentage | aggregation=percentage: non-raw n*100/(n+h); raw defers (sums + hidden on wire); dimension key degenerate (flat 100); percentage-of-instance converts even raw (no hidden — per-instance groups never span agents) | green | n/a | |
 | L5/statistics | per-group view sts: non-average = row means + row extremes; AVERAGE = weighted pair; raw = untouched (sum, count) — D-B SETTLED | green | n/a | #23097 |
+| L6/two-pass-matrix | two-pass chains whose pass-1 accumulator IS the group value (sum/min/max/extremes chains + sum→average) match the mechanics oracle; PARTIAL propagates | green | n/a | |
+| CASE-018/multipass-average | AVERAGE at pass 1 feeds pass 2 the group SUMS — final value inflated ~members-per-group (item 3 family; fix owned by the rollup-correctness SOW) | **red** | n/a | |
 | CASE-017/tier-boundary-absorption | tier>0 first bucket keeps out the tier point ending exactly at `after` (was: absorbed pre-window data); tier0 control clean | green | n/a | #23127 |
 
 ## Corpus-wide pusher discipline
