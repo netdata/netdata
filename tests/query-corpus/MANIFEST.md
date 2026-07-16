@@ -35,7 +35,9 @@ a fix lands, demanding the flip to `green` with the fixing PR.
 | L4/auto-tier-selection | auto tier = coarsest with acceptable density (>= half the wanted points, wanted floored at 10); tier2 unreachable under 5h windows with full coverage; per_tier points exclusive; values match the serving tier's oracle | green | n/a | |
 | L4/minmax-absolute-semantics | min = closest to zero, max = furthest from zero (fabs comparisons) — RULING PENDING | green | n/a | |
 | L4/plan-switching | tier0 quota rotation (dedicated daemon) + straddling query served by tier1 head + tier0 tail (per-side oracles); head-only from tier1 alone | green | n/a | |
-| L5/group-by-matrix | level-1 (first-pass) group-by non-raw: 7 keys x 5 aggregations vs member-enumeration oracle (values, ar/gbc, PARTIAL on gap rows, naming) | green | n/a | |
+| L5/group-by-matrix | level-1 (first-pass) group-by, BOTH contracts: 7 keys x 5 aggregations vs member-enumeration oracle (non-raw converts; raw defers with counts on the wire; PARTIAL on gap rows; naming) | green | n/a | |
+| L5/percentage | aggregation=percentage: non-raw n*100/(n+h); raw defers (sums + hidden on wire); dimension key degenerate (flat 100); percentage-of-instance converts even raw (no hidden — per-instance groups never span agents) | green | n/a | |
+| L5/statistics | per-group view sts: non-average = row means + row extremes; AVERAGE = weighted pair; raw = untouched (sum, count) — D-B SETTLED | green | n/a | #23097 |
 | CASE-017/tier-boundary-absorption | tier>0 first bucket keeps out the tier point ending exactly at `after` (was: absorbed pre-window data); tier0 control clean | green | n/a | #23127 |
 
 ## Corpus-wide pusher discipline

@@ -122,8 +122,16 @@ var manifest = map[string]ManifestCase{
 		Agent:  Green,
 	},
 	"L5/group-by-matrix": {
-		Proves: "level-1 group-by, non-raw: every key (selected, dimension, instance, node, label, context, units) x every aggregation (average, min, max, sum, extremes) over a 2-node x 2-instance x 3-dim palette equals the member-enumeration oracle — values, anomaly rates (ar/gbc), PARTIAL stamping on gap-member rows, and group naming (instance = id@guid, node = machine guid, label = value)",
+		Proves: "level-1 group-by, BOTH contracts: every key (selected, dimension, instance, node, label, context, units) x every aggregation (average, min, max, sum, extremes) over a 2-node x 2-instance x 3-dim palette equals the member-enumeration oracle — non-raw converts (average divides, ar/gbc), raw defers (sums undivided, ar accumulated, per-point counts on the wire); PARTIAL stamping and group naming pinned (instance = id@guid, node = machine guid, label = value)",
 		Agent:  Green,
+	},
+	"L5/percentage": {
+		Proves: "aggregation=percentage with a dimensions selector: non-raw converts n*100/(n+h) per group; raw defers (selected sums + hidden denominator on the wire); group_by=dimension is degenerate (hidden dims group separately — flat 100). percentage-of-instance (the exclusive single-key shorthand) converts EVEN IN RAW mode with no hidden — safe, per-instance groups never span agents",
+		Agent:  Green,
+	},
+	"L5/statistics": {
+		Proves: "per-group view statistics (D-B SETTLED, #23097 verified numerically): non-average aggregations average over view ROWS (mean plotted value, row-extreme min/max); AVERAGE keeps the weighted (pre-division sum, contributions) pair; raw keeps (sum, count) untouched for the cloud",
+		Agent:  Green, FixedBy: "#23097",
 	},
 	"CASE-017/tier-boundary-absorption": {
 		Proves: "a tier>0 query whose after equals a stored tier point end keeps that point out of the first bucket (was: absorbed, leaking pre-window data into (after, before] — the backward-expanded storage scan met the inclusive bucket-start check); tier0 control stays clean",

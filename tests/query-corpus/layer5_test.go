@@ -140,14 +140,10 @@ func pushLayer5(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, m := range members {
-		if _, err := td.WaitRetention(m.Host, l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
-			t.Fatalf("%s: %v", m.Host, err)
+	for _, host := range []string{"l5-a", "l5-b"} {
+		if _, err := td.WaitRetention(host, l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
+			t.Fatalf("%s: %v", host, err)
 		}
-		break // context retention settles per host; check both below
-	}
-	if _, err := td.WaitRetention("l5-b", l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
-		t.Fatal(err)
 	}
 }
 
@@ -159,7 +155,7 @@ func l5GroupKey(groupBy string, m l5Member) string {
 		return "selected"
 	case "dimension":
 		return m.Dim
-	case "instance":
+	case "instance", "percentage-of-instance":
 		return m.Inst + "@" + m.GUID
 	case "node":
 		// node groups are keyed by machine GUID (query-group-by-init.c
@@ -175,9 +171,12 @@ func l5GroupKey(groupBy string, m l5Member) string {
 	panic("unknown group_by " + groupBy)
 }
 
-// l5Expected computes the non-raw oracle for one group's row i (1-based):
-// aggregated value, anomaly rate, partial flag, contribution count.
-func l5Expected(agg string, group []l5Member, i int) (val, arp float64, partial, empty bool) {
+// l5Expected computes the group-by oracle for one group's row i (1-based):
+// aggregated value, anomaly rate, contribution count, partial flag. In raw
+// (aggregatable) mode the finalize conversions are skipped: AVERAGE keeps
+// the accumulated SUM (the cloud divides after merging) and the anomaly
+// rate stays the accumulated member total (not the mean).
+func l5Expected(agg string, group []l5Member, i int, raw bool) (val, arp float64, gbc int, partial, empty bool) {
 	var sum, minV, maxV, ext, ar float64
 	count := 0
 	for _, m := range group {
@@ -201,11 +200,15 @@ func l5Expected(agg string, group []l5Member, i int) (val, arp float64, partial,
 		count++
 	}
 	if count == 0 {
-		return 0, 0, false, true
+		return 0, 0, 0, false, true
 	}
 	switch agg {
 	case "avg", "average":
-		val = sum / float64(count)
+		if raw {
+			val = sum
+		} else {
+			val = sum / float64(count)
+		}
 	case "sum":
 		val = sum
 	case "min":
@@ -215,11 +218,17 @@ func l5Expected(agg string, group []l5Member, i int) (val, arp float64, partial,
 	case "extremes":
 		val = ext
 	}
-	return val, ar / float64(count), count < len(group), false
+	if !raw {
+		ar /= float64(count)
+	}
+	return val, ar, count, count < len(group), false
 }
 
 // TestLayer5GroupByMatrix drives every single group_by key with every
-// non-percentage aggregation over the multi-node palette.
+// non-percentage aggregation over the multi-node palette, in BOTH
+// contracts: non-raw (finalize converts) and raw (the cloud-facing
+// aggregatable mode — sums stay undivided, anomaly rates accumulated,
+// per-point contribution counts on the wire).
 func TestLayer5GroupByMatrix(t *testing.T) {
 	pushLayer5(t)
 	members := l5Members()
@@ -227,21 +236,136 @@ func TestLayer5GroupByMatrix(t *testing.T) {
 	keys := []string{"selected", "dimension", "instance", "node", "label", "context", "units"}
 	aggs := []string{"average", "min", "max", "sum", "extremes"}
 
-	for _, key := range keys {
-		groups := map[string][]l5Member{}
-		for _, m := range members {
-			k := l5GroupKey(key, m)
-			groups[k] = append(groups[k], m)
+	for _, raw := range []bool{false, true} {
+		mode := "non-raw"
+		if raw {
+			mode = "raw"
 		}
+		for _, key := range keys {
+			groups := map[string][]l5Member{}
+			for _, m := range members {
+				k := l5GroupKey(key, m)
+				groups[k] = append(groups[k], m)
+			}
 
-		for _, agg := range aggs {
-			t.Run(key+"/"+agg, func(t *testing.T) {
+			for _, agg := range aggs {
+				t.Run(mode+"/"+key+"/"+agg, func(t *testing.T) {
+					params := daemon.DataParams(l5Context, fixture.T0, fixture.T0+l5Rows, l5Rows)
+					params.Set("group_by", key)
+					if key == "label" {
+						params.Set("group_by_label", "team")
+					}
+					params.Set("aggregation", agg)
+					if raw {
+						params.Set("options", "jsonwrap|raw")
+					}
+					doc, err := td.DataV3All(params)
+					if err != nil {
+						t.Fatal(err)
+					}
+					cols, err := canon.Columns(doc)
+					if err != nil {
+						t.Fatal(err)
+					}
+
+					if len(cols) != len(groups) {
+						t.Fatalf("got %d groups %v, want %d %v", len(cols), keys2(cols), len(groups), keys2(groups))
+					}
+					for gname, group := range groups {
+						col, ok := cols[gname]
+						if !ok {
+							t.Errorf("group %q missing (have %v)", gname, keys2(cols))
+							continue
+						}
+						if len(col) != l5Rows {
+							t.Errorf("group %q: %d rows, want %d", gname, len(col), l5Rows)
+							continue
+						}
+						for _, pt := range col {
+							i := int(pt.T - fixture.T0)
+							wantV, wantAR, wantGBC, wantPartial, wantEmpty := l5Expected(agg, group, i, raw)
+							switch {
+							case wantEmpty && pt.Value != nil:
+								t.Errorf("%q row %d: value %v, want null", gname, i, *pt.Value)
+							case !wantEmpty && pt.Value == nil:
+								t.Errorf("%q row %d: null, want %v", gname, i, wantV)
+							case !wantEmpty && !tierValueMatch(*pt.Value, wantV, 0):
+								t.Errorf("%q row %d: value %v, want %v", gname, i, *pt.Value, wantV)
+							}
+							if !tierValueMatch(pt.ARP, wantAR, 0) {
+								t.Errorf("%q row %d: arp %v, want %v", gname, i, pt.ARP, wantAR)
+							}
+							gotPartial := pt.PA&canon.AnnotationPartial != 0
+							if gotPartial != wantPartial {
+								t.Errorf("%q row %d: partial %v, want %v (pa %d)", gname, i, gotPartial, wantPartial, pt.PA)
+							}
+							if raw {
+								switch {
+								case pt.Count == nil:
+									t.Errorf("%q row %d: raw response carries no count", gname, i)
+								case !wantEmpty && *pt.Count != int64(wantGBC):
+									t.Errorf("%q row %d: count %d, want %d", gname, i, *pt.Count, wantGBC)
+								}
+							} else if pt.Count != nil {
+								t.Errorf("%q row %d: non-raw response carries a count (%d)", gname, i, *pt.Count)
+							}
+						}
+					}
+				})
+			}
+		}
+	}
+}
+
+// TestLayer5Percentage pins aggregation=percentage with a dimensions=da
+// selector: the selected members are the numerator, the unselected (db,
+// dc) become the hidden denominator routed to the SAME group key.
+//
+//   - non-raw: value = n*100/(n+h) per row (n NaN → 0, h NaN → 100,
+//     total 0 → 0) — query-group-by-finalize.c
+//     rrdr2rrdr_group_by_calculate_percentage_of_group;
+//   - raw: the conversion is DEFERRED for the cloud — value stays the
+//     selected SUM, the hidden accumulator rides the wire per point;
+//   - group_by=dimension is DEGENERATE by construction: hidden dims group
+//     separately and are filtered, so the selected column reads flat 100%.
+func TestLayer5Percentage(t *testing.T) {
+	members := l5Members()
+	if _, err := td.WaitRetention("l5-a", l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
+		t.Skip("layer-5 palette not available (TestLayer5GroupByMatrix failed?)")
+	}
+
+	// percentage-of-instance is the exclusive single-key shorthand for the
+	// same machinery (query-group-by.c drops all other groupings for it) —
+	// it must behave exactly like instance + aggregation=percentage
+	keys := []string{"selected", "node", "instance", "dimension", "percentage-of-instance"}
+	for _, raw := range []bool{false, true} {
+		mode := "non-raw"
+		if raw {
+			mode = "raw"
+		}
+		for _, key := range keys {
+			// selected (numerator) groups and their hidden complements
+			selGroups := map[string][]l5Member{}
+			hidGroups := map[string][]l5Member{}
+			for _, m := range members {
+				k := l5GroupKey(key, m)
+				if m.Dim == "da" {
+					selGroups[k] = append(selGroups[k], m)
+				} else if key != "dimension" {
+					// under group_by=dimension the hidden dims form their
+					// own (filtered) groups — nothing maps to "da"
+					hidGroups[k] = append(hidGroups[k], m)
+				}
+			}
+
+			t.Run(mode+"/"+key, func(t *testing.T) {
 				params := daemon.DataParams(l5Context, fixture.T0, fixture.T0+l5Rows, l5Rows)
 				params.Set("group_by", key)
-				if key == "label" {
-					params.Set("group_by_label", "team")
+				params.Set("dimensions", "da")
+				params.Set("aggregation", "percentage")
+				if raw {
+					params.Set("options", "jsonwrap|raw")
 				}
-				params.Set("aggregation", agg)
 				doc, err := td.DataV3All(params)
 				if err != nil {
 					t.Fatal(err)
@@ -250,38 +374,204 @@ func TestLayer5GroupByMatrix(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-
-				if len(cols) != len(groups) {
-					t.Fatalf("got %d groups %v, want %d %v", len(cols), keys2(cols), len(groups), keys2(groups))
+				if len(cols) != len(selGroups) {
+					t.Fatalf("got %d groups %v, want %d %v", len(cols), keys2(cols), len(selGroups), keys2(selGroups))
 				}
-				for gname, group := range groups {
+
+				for gname, sel := range selGroups {
 					col, ok := cols[gname]
 					if !ok {
 						t.Errorf("group %q missing (have %v)", gname, keys2(cols))
 						continue
 					}
-					if len(col) != l5Rows {
-						t.Errorf("group %q: %d rows, want %d", gname, len(col), l5Rows)
-						continue
-					}
 					for _, pt := range col {
 						i := int(pt.T - fixture.T0)
-						wantV, wantAR, wantPartial, wantEmpty := l5Expected(agg, group, i)
+						var n, h float64
+						nCount, hCount := 0, 0
+						for _, m := range sel {
+							if !m.gap(i) {
+								n += m.value(i)
+								nCount++
+							}
+						}
+						for _, m := range hidGroups[gname] {
+							if !m.gap(i) {
+								h += m.value(i)
+								hCount++
+							}
+						}
+
+						if raw && key != "percentage-of-instance" {
+							// deferred: value = selected sum, hidden on the wire
+							switch {
+							case nCount == 0:
+								if pt.Value != nil {
+									t.Errorf("%q row %d: value %v, want null", gname, i, *pt.Value)
+								}
+							case pt.Value == nil:
+								t.Errorf("%q row %d: raw value null, want selected sum %v", gname, i, n)
+							case !tierValueMatch(*pt.Value, n, 0):
+								t.Errorf("%q row %d: raw value %v, want selected sum %v", gname, i, *pt.Value, n)
+							}
+							if hCount > 0 {
+								if pt.Hidden == nil || !tierValueMatch(*pt.Hidden, h, 0) {
+									t.Errorf("%q row %d: raw hidden %v, want %v", gname, i, pt.Hidden, h)
+								}
+							}
+							continue
+						}
+						// percentage-of-instance converts EVEN IN RAW MODE
+						// (no hidden on the wire): per-instance groups never
+						// span agents, so the cloud merge is a passthrough
+						// and early conversion is safe — pinned contract
+						if raw && key == "percentage-of-instance" && pt.Hidden != nil {
+							t.Errorf("%q row %d: raw percentage-of-instance carries hidden %v, expected none", gname, i, *pt.Hidden)
+						}
+
+						var want float64
 						switch {
-						case wantEmpty && pt.Value != nil:
-							t.Errorf("%q row %d: value %v, want null", gname, i, *pt.Value)
-						case !wantEmpty && pt.Value == nil:
-							t.Errorf("%q row %d: null, want %v", gname, i, wantV)
-						case !wantEmpty && !tierValueMatch(*pt.Value, wantV, 0):
-							t.Errorf("%q row %d: value %v, want %v", gname, i, *pt.Value, wantV)
+						case nCount == 0:
+							want = 0.0
+						case hCount == 0:
+							want = 100.0
+						case n+h != 0:
+							want = n * 100.0 / (n + h)
 						}
-						if !tierValueMatch(pt.ARP, wantAR, 0) {
-							t.Errorf("%q row %d: arp %v, want %v", gname, i, pt.ARP, wantAR)
+						if nCount == 0 {
+							// no selected contributions: the point stays EMPTY
+							if pt.Value != nil {
+								t.Errorf("%q row %d: value %v, want null", gname, i, *pt.Value)
+							}
+							continue
 						}
-						gotPartial := pt.PA&canon.AnnotationPartial != 0
-						if gotPartial != wantPartial {
-							t.Errorf("%q row %d: partial %v, want %v (pa %d)", gname, i, gotPartial, wantPartial, pt.PA)
+						if pt.Value == nil || !tierValueMatch(*pt.Value, want, 1e-9) {
+							t.Errorf("%q row %d: value %v, want %v (n=%v h=%v)", gname, i, pt.Value, want, n, h)
 						}
+					}
+				}
+			})
+		}
+	}
+}
+
+// viewSts decodes view.dimensions {ids, sts{min,max,avg,sum,cnt}} into
+// per-group arrays keyed by id.
+func viewSts(doc map[string]any) map[string]map[string]float64 {
+	view, _ := doc["view"].(map[string]any)
+	dims, _ := view["dimensions"].(map[string]any)
+	idsAny, _ := dims["ids"].([]any)
+	sts, _ := dims["sts"].(map[string]any)
+	out := map[string]map[string]float64{}
+	for idx, idAny := range idsAny {
+		id, _ := idAny.(string)
+		vals := map[string]float64{}
+		for field, arrAny := range sts {
+			arr, _ := arrAny.([]any)
+			if idx < len(arr) {
+				if v, ok := arr[idx].(float64); ok {
+					vals[field] = v
+				}
+			}
+		}
+		out[id] = vals
+	}
+	return out
+}
+
+// TestLayer5Statistics pins the per-group view statistics (the D-B / SUM-sts
+// question): for every aggregation EXCEPT average the sts pair averages
+// over the view ROWS (mean plotted value, consistent with the row-extreme
+// min/max); AVERAGE keeps the (pre-division sum, contribution) pair — a
+// correct weighted mean. In raw mode the (sum, count) pair rides the wire
+// untouched for the cloud.
+func TestLayer5Statistics(t *testing.T) {
+	members := l5Members()
+	if _, err := td.WaitRetention("l5-a", l5Context, fixture.T0+1, fixture.T0+l5Rows, 15*time.Second); err != nil {
+		t.Skip("layer-5 palette not available (TestLayer5GroupByMatrix failed?)")
+	}
+
+	groups := map[string][]l5Member{}
+	for _, m := range members {
+		groups[m.Dim] = append(groups[m.Dim], m)
+	}
+
+	for _, raw := range []bool{false, true} {
+		mode := "non-raw"
+		if raw {
+			mode = "raw"
+		}
+		for _, agg := range []string{"average", "min", "max", "sum", "extremes"} {
+			t.Run(mode+"/"+agg, func(t *testing.T) {
+				params := daemon.DataParams(l5Context, fixture.T0, fixture.T0+l5Rows, l5Rows)
+				params.Set("group_by", "dimension")
+				params.Set("aggregation", agg)
+				if raw {
+					params.Set("options", "jsonwrap|raw")
+				}
+				doc, err := td.DataV3All(params)
+				if err != nil {
+					t.Fatal(err)
+				}
+				sts := viewSts(doc)
+
+				for gname, group := range groups {
+					got, ok := sts[gname]
+					if !ok {
+						t.Errorf("group %q missing from view sts (have %v)", gname, keys2(sts))
+						continue
+					}
+
+					// derive the expected sts from the per-row oracle
+					var rowSum, preDivSum, minV, maxV float64
+					rows, contributions := 0, 0
+					for i := 1; i <= l5Rows; i++ {
+						v, _, gbc, _, empty := l5Expected(agg, group, i, raw)
+						if empty {
+							continue
+						}
+						sumV, _, _, _, _ := l5Expected("sum", group, i, false)
+						preDivSum += sumV
+						rowSum += v
+						if rows == 0 {
+							minV, maxV = v, v
+						} else {
+							minV = math.Min(minV, v)
+							maxV = math.Max(maxV, v)
+						}
+						rows++
+						contributions += gbc
+					}
+
+					if raw {
+						// raw keeps the accumulated (sum, count) pair
+						wantSum, wantCnt := rowSum, contributions
+						if agg != "average" && agg != "sum" {
+							// min/max/extremes rows carry the champion values
+							wantSum = rowSum
+						}
+						if !tierValueMatch(got["sum"], wantSum, 1e-9) {
+							t.Errorf("%q: raw sts sum %v, want %v", gname, got["sum"], wantSum)
+						}
+						if cnt, ok := got["cnt"]; ok && int(cnt) != wantCnt {
+							t.Errorf("%q: raw sts count %v, want %d", gname, cnt, wantCnt)
+						}
+						continue
+					}
+
+					var wantAvg float64
+					if agg == "average" {
+						wantAvg = preDivSum / float64(contributions)
+					} else {
+						wantAvg = rowSum / float64(rows)
+					}
+					if !tierValueMatch(got["avg"], wantAvg, 1e-9) {
+						t.Errorf("%q: sts avg %v, want %v (agg %s)", gname, got["avg"], wantAvg, agg)
+					}
+					if !tierValueMatch(got["min"], minV, 1e-9) {
+						t.Errorf("%q: sts min %v, want %v", gname, got["min"], minV)
+					}
+					if !tierValueMatch(got["max"], maxV, 1e-9) {
+						t.Errorf("%q: sts max %v, want %v", gname, got["max"], maxV)
 					}
 				}
 			})
