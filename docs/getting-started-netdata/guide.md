@@ -32,7 +32,7 @@ Collection frequency and available charts depend on the collector and its config
 Use [Dashboards and Charts](/docs/dashboards-and-charts/README.md) to move from an infrastructure overview to individual metrics. During an investigation, you can also use:
 
 - [Metric Correlations](/docs/metric-correlations.md) to find metrics that changed during a selected period.
-- [Netdata Functions](/docs/top-monitoring-netdata-functions.md) for on-demand process, database, network, log, and system information.
+- [Live View](/docs/top-monitoring-netdata-functions.md) for on-demand process, database, network, log, and system information.
 - [Machine learning and assisted troubleshooting](/docs/category-overview-pages/machine-learning-and-assisted-troubleshooting.md) for anomaly detection and AI-assisted workflows.
 
 ## 4. Review and Configure Alerts
@@ -43,7 +43,7 @@ Netdata ships with alert definitions for common infrastructure problems. Review 
 - Use the [alert configuration reference](/src/health/REFERENCE.md) for file-based configuration.
 - Configure [alert notifications](/docs/alerts-and-notifications/notifications/README.md) for the services your team uses.
 
-Before disabling a stock alert, identify which stock definition provides it and use the supported override mechanism. Editing or deleting packaged definitions can be lost during upgrades.
+Before disabling a stock alert, identify which stock definition provides it and use the supported override mechanism. Upgrades can overwrite direct edits and restore deleted packaged definitions.
 
 ## 5. Organize Nodes and Team Access
 

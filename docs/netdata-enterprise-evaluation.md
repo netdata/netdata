@@ -22,17 +22,21 @@ When deploying Netdata, organizations have the flexibility to:
 
 Most organizations use a mixed approach: independent Netdata Parent clusters per data center, service, department, or geography, unified into one view through Netdata Cloud:
 
-```
-┌─── Datacenter A ───┐  ┌─── Datacenter B ───┐  ┌─── Cloud Region ───┐
-│     500 Agents     │  │     700 Agents     │  │     400 Agents     │
-│         ↓          │  │         ↓          │  │         ↓          │
-│  Parent Cluster A  │  │  Parent Cluster B  │  │  Parent Cluster C  │
-└────────────────────┘  └────────────────────┘  └────────────────────┘
-           ↓                      ↓                        ↓
-┌────────────────────────────────────────────────────────────────────┐
-│                 Netdata Cloud (On-Prem or SaaS)                    │
-│                  Unified View & Access Control                     │
-└────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TB
+    subgraph datacenter_a["Datacenter A"]
+        agents_a["500 Agents"] --> parents_a["Parent Cluster A"]
+    end
+    subgraph datacenter_b["Datacenter B"]
+        agents_b["700 Agents"] --> parents_b["Parent Cluster B"]
+    end
+    subgraph cloud_region["Cloud Region"]
+        agents_c["400 Agents"] --> parents_c["Parent Cluster C"]
+    end
+
+    parents_a --> cloud["Netdata Cloud: On-Prem or SaaS<br/>Unified View and Access Control"]
+    parents_b --> cloud
+    parents_c --> cloud
 ```
 
 For more information see [Deployment Strategies](/docs/deployment-guides/deployment-with-centralization-points.md).
@@ -174,7 +178,7 @@ For AI and Large Language Models, Netdata supports Model Context Protocol (MCP),
 
 **Compliance:** Netdata maintains SOC 2 Type 2 certification and complies with GDPR and CCPA. It is not officially PCI DSS or HIPAA certified, but aligns with their security practices and offers BAAs for healthcare organizations. See [Security and Privacy Design](/docs/security-and-privacy-design/README.md) for the full picture.
 
-**Data Sovereignty:** All metrics and logs stay on customer infrastructure; only metadata (node names, chart titles, alert configs) syncs to Netdata Cloud, over TLS. Air-gapped deployment is available for maximum isolation.
+**Data Sovereignty:** Metrics and logs remain on customer infrastructure as persistent storage. When an authorized user views charts, logs, or Function results through Netdata Cloud, the response transits encrypted Cloud services but is not ingested into Cloud-hosted time-series storage. Account, node, chart, alert, and integration metadata syncs to Cloud. Air-gapped deployment is available for maximum isolation.
 
 **Enterprise Authentication:** SSO with LDAP/AD group mapping via SCIM 2.0, plus multi-factor authentication, IP whitelisting, role-based access control, and audit logging.
 
@@ -202,7 +206,7 @@ Netdata's dashboards, alerts, and collectors are all customizable.
 
 ## Cost and Licensing
 
-The open-source Agent provides full functionality with unlimited metrics. Netdata Cloud ranges from a free Community plan to paid plans with enterprise SSO and a self-hosted Enterprise On-Prem option. See [Netdata Cloud Pricing](https://www.netdata.cloud/pricing/) for current plan details.
+The open-source Agent does not enforce a metric-volume license limit. Netdata Cloud ranges from a free Community plan to paid plans with enterprise SSO and a self-hosted Enterprise On-Prem option. See [Netdata Cloud Pricing](https://www.netdata.cloud/pricing/) for current plan details.
 
 Minimal infrastructure requirements, low bandwidth, efficient storage, and energy efficiency keep total cost of ownership down, alongside automated, self-maintaining deployment. Organizations typically see immediate ROI from zero-configuration visibility and automatic discovery, with long-term value from faster MTTR, prevented outages, and reduced tool sprawl.
 

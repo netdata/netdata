@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-Netdata defines what real-time monitoring truly means:  **1-second data collection and 1-second latency from collection to visualization**, providing a worst-case latency of less that 2 seconds from event to insight, at any scale. While most monitoring systems operate on 10–60-second intervals, Netdata provides  _true_  sub-2-second visibility without overhead. This difference is critical: most operational anomalies last under 10 seconds, which means traditional monitoring misses them completely.
+Netdata focuses on low-latency infrastructure monitoring. Core system metrics default to one-second collection, and a local dashboard polling every second adds less than two seconds from tick alignment. Actual end-to-end latency and overhead depend on the collector, monitored source, infrastructure, and access path.
 
 With Netdata, organizations gain:
 
@@ -91,44 +91,39 @@ Coarse averages let every team point at someone else. Netdata shows the whole si
 
 ## The Anatomy of Netdata’s Latency
 
-Netdata is designed to keep the **sum of all three latencies at about 1 second**. with the worst case scenario at 2 seconds:
+For a metric collected every second and a local dashboard refreshing every second, tick alignment usually contributes about one second of latency and at most just under two seconds:
 
 1. **Data latency:** up to 1 second from event
 2. **Analysis latency:** microseconds (negligible, CPU-speed dependent)
 3. **Action latency:** up to 1 second from collection
 
-This means:
+This simplified model means:
 
-- **Best case:** ~1 millisecond from event to visualization
-- **Worst case:** ~1999 milliseconds if collection and visualization ticks are maximally misaligned
+- **Best case:** the event is collected and displayed almost immediately when the ticks align
+- **Worst case:** tick alignment alone contributes just under 2 seconds
+
+Collector execution time, network transit, query execution, and browser rendering can add latency.
 
 Graphically:
 
-```
-Data Collection Pace
+```mermaid
+flowchart LR
+    event["Event starts just after a collection tick"]
+    collected["Next collection tick<br/>Event collected"]
+    missed["UI refresh narrowly misses the new result"]
+    displayed["Next UI refresh<br/>Event displayed"]
 
-   the interesting event started
-   ↓         event collected
-   ↓         ↓
-──┬██████████┬──────────┬──────────┬──────────┬   ← data collection pace
-  │ ── 1s ── │ ── 1s ── │ ── 1s ── │ ── 1s ── │
-
-Visualization Pace (a few ms misaligned to collection - worst case)
-
-                      UI fetches everything collected
-                      ↓
-┬──────────┬──────────┬██████████┬──────────┬──   ← visualization pace
-│ ── 1s ── │ ── 1s ── │ ── 1s ── │ ── 1s ── │
-                      ↑
-                      event visualized
+    event -->|"less than 1 second"| collected
+    collected --> missed
+    missed -->|"less than 1 second"| displayed
 ```
 
-The shaded boxes show the slices where an event may fall. Because both collection and visualization run on 1-second ticks, the event is guaranteed to be visible within 2 seconds.
+The two waits show the worst-case alignment of 1-second collection and visualization ticks. Together they contribute less than 2 seconds; the complete end-to-end latency also depends on the collector and access path.
 
 ### Why One Second is the Ideal Standard
 
 - **The Universal Baseline:** 1-second is the native rhythm of console tools like `top`, `vmstat`, and `iostat`.
-- **The Performance Sweet Spot:** Sub-second intervals (e.g. 500ms) often double overhead for diminishing returns; one second is efficient and universally safe.
+- **The Performance Sweet Spot:** Sub-second intervals increase collection overhead; one second is a practical default for many dynamic system metrics.
 - **Sufficient Resolution:** Most operational anomalies last multiple seconds, so 1-second granularity captures them without loss of fidelity.
 - **Negligible Overhead:** A few thousand metrics per second is a trivial fraction of a single CPU core's billions of cycles.
 
@@ -145,11 +140,11 @@ In these cases, Netdata chooses a responsible interval that balances fidelity wi
 
 Netdata operates with the precision of a heartbeat: metrics must be collected at their configured frequency, unlike solutions that treat missed collections as a normal network condition.
 
-A gap in the Netdata dashboard is a **persisted gap in the database**, not a visualization trick: a definitive signal that the system was too stressed to service Netdata's lightweight collection. If Netdata is missing samples, your application is almost certainly missing its SLOs too, making Netdata a canary for system health itself.
+A gap in a Netdata chart represents samples that are unavailable for that time range, not a visualization trick. Collection failures, Agent downtime, or an interruption that exceeds the available replication retention can all create gaps, so investigate the collector and data path before attributing the cause.
 
 ## Netdata's Real-Time Performance at Scale
 
-Netdata is a distributed-by-design platform. It scales horizontally by adding more Agents and streaming Parents. This architecture is key to its real-time capability: **adding more nodes does not increase the latency or impair the performance of existing ones.** Each node operates independently at its own 1-second rhythm, collaborating in real-time. A fleet of 10 nodes and a fleet of 10,000 nodes exhibit the same per-node, sub-2-second latency.
+Netdata is a distributed-by-design platform that scales horizontally by adding Agents and streaming Parents. Collection and storage remain distributed, so adding nodes does not inherently lengthen collection intervals on existing nodes. End-to-end latency still depends on each collector, the infrastructure, and the query path.
 
 ## How Netdata Compares to Other Monitoring Solutions
 
@@ -189,7 +184,7 @@ Our [stress test](https://www.netdata.cloud/blog/netdata-vs-prometheus-2025/) ag
 The agent defaults to 15-second intervals, batches data before sending to the cloud, and cloud processing adds another 5-30 seconds. **Verdict**: powerful analytics, but architecturally not real-time.
 
 **Q: Datadog claims "real-time" features. How is Netdata different?**<br/>
-A: Datadog's "real-time" usually means live-tail for logs or near-live infra views, with 20-90 second metric pipeline latency. Netdata provides true 1-2 second latency for all metrics, everywhere.
+A: Datadog's "real-time" usually means live-tail for logs or near-live infrastructure views, with 20-90 second metric pipeline latency. Netdata collects core system metrics every second by default and provides low-latency local visualization; actual latency varies by collector and access path.
 
 **Q: Couldn't Datadog just collect faster?**<br/>
 A: Their business and architectural model prevents it: 1-second collection would increase metric volume 15-60x (cost-prohibitive under their pricing), the agent-to-cloud-to-UI journey adds immutable latency, and bandwidth costs would be enormous. Netdata's edge-native architecture avoids these bottlenecks by collecting, storing, and serving locally.
@@ -206,8 +201,8 @@ A: Absolutely not. They hide the most critical performance patterns. A 5-second 
 We believe real-time monitoring is a right, not a premium feature. Our principles are:
 
 1. **Every Second Matters:** Problems lasting 3 seconds are primary incidents, not statistical noise.
-2. **Gaps Are Failures:** Missing data is a symptom of system distress, not an acceptable network condition.
-3. **Fidelity Over Approximation:** No sampling, no averaging, no estimation - only ground truth.
+2. **Gaps Stay Visible:** Missing samples are preserved as gaps and should be investigated, not silently interpolated.
+3. **Fidelity with Transparency:** Netdata preserves source-resolution data where practical and documents when a collector estimates, samples, or aggregates values.
 4. **Edge-Native Collection:** Intelligence and storage belong at the source of the data.
 5. **Push-Based Streaming:** Data flows outward as it happens; systems shouldn't wait to be polled.
 6. **Truly Horizontal Scaling:** Adding monitoring capacity must not degrade existing performance.
@@ -217,11 +212,11 @@ We believe real-time monitoring is a right, not a premium feature. Our principle
 
 ### Per-Node Performance
 
-- **Granularity:** 1-second for all metrics, without exception.
+- **Granularity:** Core system metrics default to 1-second collection; collectors for slower or polling-sensitive sources can use longer configurable intervals.
 - **Volume:** 3,000-20,000+ metrics collected per second per node.
 - **CPU Overhead:** Less than 5% of a single core, typical for 3,000 metrics/s.
 - **RAM Footprint:** Less than 200 MB, typical for 3,000 metrics/s.
-- **Fault Tolerance:** Zero data loss during network issues (local buffering + replay).
+- **Fault Tolerance:** Retained tier-0 samples can be replayed after network interruptions; sufficient local retention is required to avoid gaps.
 - **Storage Efficiency:** ~0.6 bytes per sample on disk, enabling years of retention for gigabytes, not terabytes.
 
 For default-settings sizing guidance (CPU, RAM, disk, and bandwidth) across different workloads, see [Resource utilization](/docs/netdata-agent/sizing-netdata-agents/README.md).
@@ -230,7 +225,7 @@ For default-settings sizing guidance (CPU, RAM, disk, and bandwidth) across diff
 
 - **Billions of Metrics:** Processes over 4.5 billion metrics per second across all installations.
 - **100% Sampling Rate:** No statistical sampling - every data point is captured.
-- **Unlimited Metrics:** No artificial limits or pricing tiers based on volume.
+- **Metric-Volume Licensing:** The open-source Agent does not impose a metric-volume license limit; consult the [pricing page](https://www.netdata.cloud/pricing/) for current Cloud entitlements.
 - **Proven at Scale:** Monitors infrastructures with 100,000+ nodes seamlessly.
 
 ### Enterprise-Grade Reliability
@@ -245,7 +240,7 @@ It is common for large Netdata deployments to process millions of metrics per se
 ## Real-Time Monitoring FAQ
 
 **Q: Is Netdata truly real-time?**<br/>
-A: Yes. 1-second granularity with 1-2 second total latency from event to visualization, 10-60x faster than typical "near real-time" solutions.
+A: For metrics collected every second, Netdata provides per-second granularity and low-latency visualization. Actual end-to-end latency depends on the collector and access path.
 
 **Q: Why is 1-second resolution critical compared to 10 or 30-second?**<br/>
 A: Most operational anomalies last 2-10 seconds. 30-second monitoring is blind to over 90% of incidents; 10-second monitoring still misses roughly 50%.
@@ -254,7 +249,7 @@ A: Most operational anomalies last 2-10 seconds. 30-second monitoring is blind t
 A: No. Netdata typically uses less than 5% of a single CPU core (see [CPU requirements](/docs/netdata-agent/sizing-netdata-agents/cpu-requirements.md)), and the [University of Amsterdam study](https://www.ivanomalavolta.com/files/papers/ICSOC_2023.pdf) found it the most energy-efficient tool tested for Docker-based systems.
 
 **Q: How does Netdata handle network outages?**<br/>
-A: Agents buffer metrics locally and replay them once the connection is restored, for zero data loss. Gaps appear only if the local system itself is too stressed to collect data, which is itself a critical alert; each Agent/Parent also has its own dashboard for troubleshooting during the outage.
+A: Agents retain tier-0 metrics locally and replay available samples after reconnection. Gaps can occur when an outage exceeds local retention or collection stops while a node is unavailable; each Agent or Parent also has its own dashboard for troubleshooting during the outage.
 
 **Q: Can Netdata handle cloud and container environments?**<br/>
 A: Yes, natively. Automatic discovery and per-second monitoring for Kubernetes, Docker, and major cloud platforms, collecting cgroups metrics directly from the kernel.
@@ -277,10 +272,10 @@ Real-time monitoring is not a luxury - it is a fundamental requirement for opera
 
 Netdata doesn't just claim to be real-time; it defines the category through engineering excellence:
 
-- **Bounded Latency:** Guaranteed under 2 seconds from event to insight.
-- **Universal 1-Second Granularity:** For all metrics, across your entire stack.
-- **100% Fidelity:** No averages, no samples, no approximations - only truth.
-- **Distributed Scale:** Provides real-time performance at any scale, from one node to one million.
-- **Production-Safe:** Engineered for efficiency that ensures it never becomes the problem it is designed to solve.
+- **Low Latency:** Per-second collectors and local dashboards minimize collection-to-visualization delay; actual latency depends on the collector and access path.
+- **High Granularity:** Core system metrics default to one-second collection, with configurable intervals for other sources.
+- **Visible Data Quality:** Missing samples remain gaps, and collector-specific estimates or aggregations are documented.
+- **Distributed Scale:** Agents and Parents distribute collection, storage, and query work across the infrastructure.
+- **Production-Safe:** Configurable collection intervals balance fidelity with source and host overhead.
 
 When you need to see what's actually happening right now, not a smoothed-over report of a minute ago, this is real-time monitoring. This is The Netdata Standard.

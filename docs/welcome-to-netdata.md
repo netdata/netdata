@@ -2,11 +2,11 @@
 
 ## Who we are
 
-Netdata is a distributed, real-time observability platform for metrics and logs, with a foundation designed to extend to distributed tracing. It collects data at per-second granularity, stores it at (or close to) the edge where it's generated, and provides automated dashboards, ML anomaly detection, and AI-powered analysis with zero configuration.
+Netdata is a distributed, real-time observability platform for metrics and logs, with a foundation designed to extend to distributed tracing. Core system metrics default to per-second collection, data is stored at or close to the edge where it is generated, and automated dashboards and ML anomaly detection work with minimal initial configuration.
 
 Instead of centralizing data, Netdata **distributes the monitoring code** to each system, **keeping data local** while providing **unified access**. This enables **linear scaling** to millions of metrics per second, **automated root cause analysis**, and a significantly **lower total cost of ownership**.
 
-Built for operations teams, sysadmins, DevOps engineers, and SREs who need real-time, low-latency infrastructure visibility, Netdata is opinionated: it collects and visualizes everything, and runs ML anomaly detection on everything, without requiring specialized skills.
+Built for operations teams, sysadmins, DevOps engineers, and SREs who need real-time, low-latency infrastructure visibility, Netdata automatically discovers and visualizes many supported sources and runs ML anomaly detection across collected metrics without requiring a specialized query language.
 
 The system consists of three components:
 
@@ -52,19 +52,19 @@ flowchart TB
 |                      Aspect |                 Netdata                  |     Industry Standard     |
 |----------------------------:|:----------------------------------------:|:-------------------------:|
 |    **Real-Time Monitoring** |                                          |                           |
-|            Data granularity |                 1 second                 |       10-60 seconds       |
-| Collection to visualization |                 1 second                 |        30+ seconds        |
+|            Data granularity |    1 second by default; configurable     |       10-60 seconds       |
+| Collection to visualization |       Low latency; path-dependent        |        30+ seconds        |
 |     Time to first dashboard |                10 seconds                |       Hours to days       |
 |              **Automation** |                                          |                           |
 |      Configuration required |             Minimal to none              |         Extensive         |
-|        ML anomaly detection |        All metrics automatically         | Selected metrics manually |
+|        ML anomaly detection |     Collected metrics automatically      | Selected metrics manually |
 |       Pre-configured alerts |           400+ out of the box            |    Build from scratch     |
 |              **Efficiency** |                                          |                           |
 |          Storage per metric |             0.6 bytes/sample             |     2-16 bytes/sample     |
 |             Agent CPU usage |              5% single core              |    10-30% single core     |
-|                 Scalability |            Linear, unlimited             |  Exponential complexity   |
+|                 Scalability |        Horizontal and distributed        |  Exponential complexity   |
 |                **Coverage** |                                          |                           |
-|           Metrics collected |           Everything available           |     Manually selected     |
+|           Metrics collected |        Supported, enabled sources        |     Manually selected     |
 |         Built-in collectors |            800+ integrations             |   Basic system metrics    |
 |         Hardware monitoring |              Comprehensive               |      Limited or none      |
 |             Live monitoring | processes, network connections, and more |      Limited or none      |
@@ -81,16 +81,16 @@ Netdata keeps the observability data at the edge (Netdata Agents), or as close t
 
 :::tip
 
-Keeping data at the edge eliminates egress charges, ensures compliance by default, and transforms observability from an unpredictable cost center into a fixed operational expense while delivering sub-second query performance.
+Keeping persistent metric storage at the edge can reduce data-transfer costs and support data-locality requirements. Costs and query latency still depend on the deployment and access path.
 
 :::
 
 **Implementation**: Each Netdata Agent is a complete monitoring system: collection, storage, query engine, visualization, ML, and alerting, not just an agent that ships data elsewhere. This provides:
 
-- **Data sovereignty**: Data stays on-premises and only leaves when viewed, supporting GDPR, HIPAA, and data-residency requirements.
+- **Data sovereignty**: Persistent metric storage remains on-premises, supporting organizational data-residency requirements.
 - **Linear scalability**: Adding Agents and Parents doesn't affect existing ones.
 - **Isolated operation**: Monitoring keeps working even without internet connectivity.
-- **Universal capture**: All observability data exposed by systems and applications is collected.
+- **Broad capture**: Enabled collectors gather supported metrics and logs exposed by systems and applications.
 - **High-fidelity insights**: Per-second data captures cascading effects other resolutions miss.
 
 ### Complete Coverage
@@ -101,12 +101,12 @@ Most observability solutions are selective to control cost and setup complexity,
 
 :::
 
-Netdata captures everything exposed by systems and applications: every metric, every log entry, every piece of telemetry available.
+Netdata automatically discovers many supported sources and enables their collectors. Sources that require credentials, carry additional overhead, or need explicit selection must be configured by an operator.
 
-- **No blind spots**: The metric you didn't know to monitor is already collected and visualized.
+- **Fewer blind spots**: Automatic discovery and broad collector coverage reduce the metrics operators must select manually.
 - **Skill-independent quality**: Junior and senior engineers get the same comprehensive visibility.
-- **Crisis-ready coverage**: When incidents occur, all relevant data is available.
-- **Full context for AI**: Machine learning and AI assistants have complete data to identify patterns and correlations.
+- **Crisis-ready coverage**: High-resolution history from enabled collectors is available when incidents occur.
+- **Broad context for AI**: Machine learning and AI assistants can use the collected data to identify patterns and correlations.
 
 ### Real-Time, Low-Latency Visibility
 
@@ -118,11 +118,11 @@ Most observability solutions collect data every 10-60 seconds with additional pi
 
 See [Real-Time Monitoring: The Netdata Standard](/docs/realtime-monitoring.md) for the full latency breakdown and how Netdata compares to other monitoring solutions.
 
-Netdata collects everything per-second with a fixed one-second collection-to-visualization latency. Every sample must be collected on time; a delay means the monitored component is under stress, and Netdata shows a gap on the chart rather than hiding it. This delivers:
+Core system metrics default to one-second collection, while other collectors can use intervals appropriate to their sources. Local dashboards can display newly collected data with low latency, but the complete end-to-end latency depends on the collector and access path. Netdata preserves missing samples as chart gaps instead of fabricating values. This delivers:
 
 - **True real-time visibility**: See what's happening now, not what happened 30 seconds ago.
 - **Console-quality precision**: No need to SSH into servers for real-time data during incidents.
-- **Stress detection**: Gaps in charts immediately reveal when systems and applications are under stress.
+- **Collection visibility**: Chart gaps expose missing samples so operators can investigate the collector, node, and data path.
 - **Accurate sequencing**: Understand the exact order of cascading failures across systems.
 - **Live troubleshooting**: Watch the immediate impact of your changes as you make them.
 - **Tools consolidation**: Use a single uniform and universal dashboard for all systems and applications.
@@ -201,7 +201,7 @@ For more information see [Netdata's ML Accuracy, Reliability and Sensitivity](/d
 
 Netdata's unsupervised, real-time anomaly detection powers the "Anomaly Advisor," which transforms troubleshooting:
 
-- **Automatic scoring**: Ranks all metrics by anomaly severity within any time window
+- **Automatic scoring**: Ranks collected metrics by anomaly severity within a selected time window
 - **Root cause prioritization**: Surfaces the most likely culprits in the first 30-50 metrics
 - **Sequence analysis**: Reveals the order of cascading failures across systems
 - **Blast radius mapping**: Determines the full impact scope of incidents
@@ -237,7 +237,7 @@ See [Scalability: Monitoring at Any Scale](/docs/scalability.md) for the full ar
 
 - **Independent operation**: Each Agent and Parent operates autonomously without affecting others.
 - **Horizontal scaling**: Add more Parents to handle more Agents without redesigning architecture.
-- **Consistent performance**: Query response times remain the same whether you have 10 or 10,000 nodes.
+- **Distributed query work**: Agents and Parents execute queries near the data; response time still depends on the requested scope and the aggregation path.
 - **Resource predictability**: Resource usage scales linearly with infrastructure size.
 - **High availability**: Streaming and replication provide high-availability to Netdata deployments.
 - **Clustering**: Netdata Parents can be clustered to replicate all their data locally, or cross region for disaster recovery.
@@ -273,7 +273,7 @@ Netdata will automatically provide:
 1. **Complete coverage** of hardware, operating system and application metrics
 2. Real-time, low-latency **Metrics and Logs Dashboards**
 3. Live and interactive exploration of running **processes**, **network connections**, **systemd units**, **systemd services**, **IMPI sensors**, and more
-4. Unsupervised **machine-learning based anomaly detection** for all metrics
+4. Unsupervised **machine-learning based anomaly detection** for collected metrics
 5. Hundreds of **pre-configured alerts** for systems and applications
 6. **AI insights** (reports) and **AI-assistant** (chat) connections via MCP (Cloud MCP for infrastructure-wide access, Agent/Parent MCP for local access)
 
@@ -333,9 +333,9 @@ Without dedicated monitoring staff, teams need systems that work without constan
 At scale, traditional monitoring becomes expensive and complex. Netdata's architecture enables organizations to:
 
 - Gain predictable costs based on node count, not data volume
-- Ensure consistent performance from 10 to 10,000 systems
+- Scale collection and storage from small fleets to thousands of systems by adding Agents and Parents
 - Match monitoring architecture to organizational structure
-- Satisfy data locality requirements (GDPR, HIPAA) by design
+- Support data-locality requirements by retaining persistent metric storage on Agents and Parents
 
 ### For Dynamic Environments
 
@@ -392,16 +392,16 @@ The "thousands of databases" concern misunderstands the architecture: these are 
 </details>
 
 <details>
-<summary>Isn't collecting 'everything' fundamentally wasteful?</summary>
+<summary>Isn't broad collection fundamentally wasteful?</summary>
 
-**The opposite is true: Netdata is the most energy-efficient monitoring solution available.** The University of Amsterdam study confirmed Netdata uses significantly fewer resources than selective solutions, despite collecting everything per-second, thanks to its optimized design.
+In a University of Amsterdam study of monitoring tools for Docker-based systems, Netdata was the most energy-efficient tool tested. Its defaults balance broad collection with resource use by selecting intervals appropriate to each source.
 
 The real question is: **what's the business impact when critical troubleshooting data isn't available during a crisis?** Crises happen when things break unexpectedly. If the failure mode were predictable, you'd already have mitigations, and engineers can't predict what data they'll need for a problem they didn't anticipate.
 
 The business case for complete coverage:
 
-- **Reduced MTTD/MTTR**: All data is available immediately when investigating issues
-- **No blind spots**: The metric you didn't think to collect often holds the key
+- **Reduced MTTD/MTTR**: Data retained by enabled collectors is available when investigating issues
+- **Fewer blind spots**: Broad automatic collection reduces the chance that a useful metric was omitted
 - **ML/AI effectiveness**: Algorithms can find correlations in "insignificant" metrics that humans miss
 - **Lower environmental impact**: More efficient than selective solutions despite broader coverage
 
@@ -442,10 +442,10 @@ The philosophy isn't "more data is better"; it's "the right data should always b
 **Netdata was designed as a unified console replacement**, the evolution of `top`, `iostat`, `netstat`, and hundreds of other console tools, but with:
 
 - The same per-second granularity engineers expect
-- Complete coverage across all subsystems
+- Broad coverage across supported subsystems
 - Historical data to trace issues backward
 - Visual representation of complex relationships
-- Machine Learning analyzing everything
+- Machine Learning analyzing collected metrics
 
 This is true tools consolidation: instead of jumping between dozens of console commands during an incident, engineers get one unified view at the resolution that matters: the exact second a service started degrading, not a minute-average that obscures the trigger.
 
@@ -460,9 +460,9 @@ This instant feedback loop accelerates problem resolution, letting engineers ite
 </details>
 
 <details>
-<summary>What about the observer effect? How do you guarantee per-second collection isn't impacting application performance?</summary>
+<summary>What about the observer effect? How does Netdata limit collection overhead?</summary>
 
-**Netdata's default collection frequencies are carefully configured to avoid impacting monitored applications.** The goal: collect every metric at the maximum frequency that doesn't affect performance.
+**Netdata's default collection frequencies are configured to minimize impact on monitored applications.** The goal is to collect each enabled metric at the highest practical frequency for its source and workload.
 
 **Thoughtfully configured defaults:**
 
@@ -509,8 +509,8 @@ This isn't blind per-second collection regardless of impact. It's collecting eac
 
 - **Security features**: Forward Secure Sealing (FSS) for tamper detection, not even available in most commercial solutions
 - **Native access control**: Uses filesystem permissions for isolation, with no additional security layer to breach
-- **Extreme performance**: Outperforms everything else in single-node ingestion throughput while being lightweight
-- **No query server**: All queries run in parallel, lockless, directly on files, for infinitely scalable read performance
+- **High single-node throughput**: Reads and queries local journal files without a separate indexing service
+- **Direct journal queries**: Queries run in parallel against local journal files without a separate centralized query service
 - **OS-level optimization**: Naturally cached by the kernel, providing blazing-fast repeated queries
 - **Built-in distribution**: Native tools for log centralization within infrastructure, no additional software needed
 - **Edge-native**: Distributed by design, perfectly aligned with Netdata's architecture
@@ -531,6 +531,6 @@ Instead of copying logs to expensive centralized systems, Netdata builds better 
 
 Netdata represents a fundamental rethink of monitoring architecture. By processing data at the edge, automating configuration, maintaining real-time resolution, applying ML universally, and making data accessible to everyone, it solves core monitoring challenges that have persisted for decades.
 
-The result is a monitoring system that deploys in minutes, scales to any size, adapts automatically to change, and delivers insights traditional tools can’t, all while staying open source and community-driven.
+The result is a monitoring system that deploys in minutes, scales from individual nodes to large distributed environments, adapts automatically to change, and delivers insights traditional tools can’t, all while staying open source and community-driven.
 
 Whether you're monitoring a single server or a global infrastructure, Netdata's design philosophy creates a monitoring system that works with you rather than demanding constant attention.
