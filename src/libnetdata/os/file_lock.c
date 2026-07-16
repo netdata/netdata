@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#include "file_lock.h"
 #include "os.h"
+#include "file_lock.h"
 #include "../memory/nd-mallocz.h"
 
 #include <errno.h>
