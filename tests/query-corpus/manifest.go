@@ -153,6 +153,18 @@ var manifest = map[string]ManifestCase{
 		Proves: "options=percentage (v2/v3 FORCE absolute with it — and with any non-dimension group-by: shares computed over |values|), options=absolute (|v| at fetch), nonzero (drops all-zero dims; self-neutralizes when everything is zero), null2zero (gap cells become 0), cardinality_limit (top N-1 by |view sum| + 'remaining X dimensions' fold of per-row sums)",
 		Agent:  Green,
 	},
+	"L1/incremental-rates": {
+		Proves: "the db stores PER-SECOND rates regardless of update_every: a v1 child's raw counters through the parent's rrdset_done yield K*(mul/div)/UE per second (incremental at ue 1/2/5 incl. mul/div scaling; absolute control unscaled)",
+		Agent:  Green,
+	},
+	"L3/sum-over-time-volume": {
+		Proves: "time_group=sum has two modes: RATE-stored metrics (incremental) multiply each point by its duration — the sum is the VOLUME at any update_every; non-rate metrics sum plainly",
+		Agent:  Green,
+	},
+	"CASE-020/sum-over-time-units": {
+		Proves: "summing a rate over time produces a volume, but the response units keep the rate form — 'units/s' should become 'units' when time_group=sum integrates a rate",
+		Agent:  Red,
+	},
 	"CASE-017/tier-boundary-absorption": {
 		Proves: "a tier>0 query whose after equals a stored tier point end keeps that point out of the first bucket (was: absorbed, leaking pre-window data into (after, before] — the backward-expanded storage scan met the inclusive bucket-start check); tier0 control stays clean",
 		Agent:  Green, FixedBy: "#23127",
