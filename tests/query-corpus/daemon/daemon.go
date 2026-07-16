@@ -280,6 +280,26 @@ func getJSON(u string) (map[string]any, error) {
 	return doc, nil
 }
 
+// DataV1Raw queries /host/<host>/api/v1/data and returns the raw response
+// body — the classic formatter surface (csv, tsv, ssv, html, arrays…)
+// asserted byte-level by the formatter layer.
+func (d *Daemon) DataV1Raw(host string, params url.Values) (string, error) {
+	u := fmt.Sprintf("%s/host/%s/api/v1/data?%s", d.BaseURL, url.PathEscape(host), params.Encode())
+	resp, err := queryClient.Get(u)
+	if err != nil {
+		return "", fmt.Errorf("daemon: GET %s: %w", u, err)
+	}
+	defer resp.Body.Close()
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", fmt.Errorf("daemon: read %s: %w", u, err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("daemon: GET %s: HTTP %d: %s", u, resp.StatusCode, body)
+	}
+	return string(body), nil
+}
+
 // DataV3All queries /api/v3/data (all nodes of the agent) with the given
 // parameters — the multi-node query surface used by group-by layers.
 func (d *Daemon) DataV3All(params url.Values) (map[string]any, error) {
