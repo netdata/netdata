@@ -149,6 +149,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "v1 JSON-family formatters (json, jsonp, csvjsonarray, datatable) emit dimension names UNESCAPED between quotes (json.c header loop) — a double-quote in a name (or a label value via group_by=label) produces invalid JSON; the v3 json2 path escapes properly",
 		Agent:  Red,
 	},
+	"L8/post-processing": {
+		Proves: "options=percentage (v2/v3 FORCE absolute with it — and with any non-dimension group-by: shares computed over |values|), options=absolute (|v| at fetch), nonzero (drops all-zero dims; self-neutralizes when everything is zero), null2zero (gap cells become 0), cardinality_limit (top N-1 by |view sum| + 'remaining X dimensions' fold of per-row sums)",
+		Agent:  Green,
+	},
 	"CASE-017/tier-boundary-absorption": {
 		Proves: "a tier>0 query whose after equals a stored tier point end keeps that point out of the first bucket (was: absorbed, leaking pre-window data into (after, before] — the backward-expanded storage scan met the inclusive bucket-start check); tier0 control stays clean",
 		Agent:  Green, FixedBy: "#23127",

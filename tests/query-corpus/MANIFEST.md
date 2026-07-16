@@ -42,6 +42,7 @@ a fix lands, demanding the flip to `green` with the fixing PR.
 | CASE-018/multipass-average | AVERAGE at pass 1 feeds pass 2 the group SUMS — final value inflated ~members-per-group (item 3 family; fix owned by the rollup-correctness SOW) | **red** | n/a | |
 | L7/formatters | classic v1 formats byte/structure-pinned: csv/tsv CRLF endings, literal "null" gap cells, newest-first default + options=flip, unquoted header cells (current contract), csvjsonarray valid JSON + numeric timestamps (#23115/#23117), ssv/ssvcomma/markdown/html/array/json/datatable/jsonp | green | n/a | |
 | CASE-019/v1-json-name-escaping | v1 json/jsonp/csvjsonarray/datatable emit dimension names unescaped — a double-quote in a name (or label value via group_by=label) breaks the JSON; json2 escapes properly | **red** | n/a | |
+| L8/post-processing | percentage (implies absolute on v2/v3 — as does any non-dimension group-by), absolute, nonzero (+ self-neutralizing all-zero), null2zero, cardinality_limit fold | green | n/a | |
 | CASE-017/tier-boundary-absorption | tier>0 first bucket keeps out the tier point ending exactly at `after` (was: absorbed pre-window data); tier0 control clean | green | n/a | #23127 |
 
 ## Corpus-wide pusher discipline
