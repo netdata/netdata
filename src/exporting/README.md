@@ -54,14 +54,15 @@ Netdata provides three data export modes:
 
 ## How Metric Names Are Constructed
 
-The connector type determines how Netdata metric names appear in your external database. Connectors fall into two naming families.
+OpenTSDB and Graphite export dotted metric names. Prometheus scrape and remote write export context-based metric names with labels.
 
 ### Flat-name connectors: OpenTSDB and Graphite
 
-These connectors join the prefix, chart, and dimension with dots, so the chart and dimension are visible directly in the metric name:
+These connectors join their name components with dots, so the chart and dimension are visible directly in the metric name:
 
 ```text
-prefix.chart.dimension
+OpenTSDB: prefix.chart.dimension
+Graphite: prefix.hostname.chart.dimension
 ```
 
 - **OpenTSDB** sends the host as a separate tag (`host=...`).
@@ -69,32 +70,41 @@ prefix.chart.dimension
 
 Example (OpenTSDB): `netdata.system.cpu.user` with a `host=myhost` tag.
 
-### Prometheus-based connectors: scrape and remote write
+OpenTSDB and Graphite preserve dots in chart and dimension names. They replace other non-alphanumeric characters with underscores.
 
-These connectors join the prefix and the chart **context** with underscores, and carry the chart, family, and dimension as labels:
+### Prometheus exports: scrape and remote write
+
+For homogeneous charts, both methods join the prefix and the chart **context** with underscores, and carry the chart, family, and dimension as labels:
 
 ```text
 prefix_context{chart="...", family="...", dimension="..."}
 ```
 
 - The chart **context** — the template shared by all charts of the same kind — is part of the metric name, not the individual chart ID or name.
-- For `average` and `sum` data sources, the chart **units** and a `_average`/`_sum` suffix are appended to the name; counters get a `_total` suffix.
+- `average` appends the chart units and `_average`. The scrape endpoint can omit the units with `hideunits=yes`.
+- `sum` appends `_sum` without the chart units.
+- In `as-collected` mode, incremental and percentage-over-difference counters append `_total`. For charts produced by the Prometheus collector, Netdata does not append `_total`.
+- For heterogeneous `as-collected` charts, the dimension moves into the metric name (`prefix_context_dimension`) and is omitted from the labels.
+- Netdata sanitizes the context, units, and any dimension embedded in a Prometheus metric name, so dots and other unsupported characters become underscores. Chart, family, and dimension labels retain their label values. The configured prefix is used as provided.
 
-Example (remote write): `netdata_system_cpu_percentage_average{chart="system.cpu", family="cpu", dimension="user"}`.
+Example (remote write): `netdata_system_cpu_percentage_average{chart="system.cpu", dimension="user", family="cpu", instance="myhost"}`.
 
 For the complete naming rules — contexts, units, suffixes, and how to preview the exact metric names via the `allmetrics` endpoint — see the [Prometheus reference](/src/exporting/prometheus/README.md).
 
 ### Quick comparison
 
-| Aspect                       | OpenTSDB / Graphite            | Prometheus scrape / remote write      |
-|:-----------------------------|:-------------------------------|:--------------------------------------|
-| Separator                    | Dots (`.`)                     | Underscores (`_`)                     |
-| In the metric name           | Prefix, chart, dimension       | Prefix, chart **context** (+ units/suffix for stored data) |
-| Chart & dimension            | Part of the name               | Provided as labels                    |
-| Host                         | Tag (OpenTSDB) or in path (Graphite) | Label                          |
-| Default prefix               | `netdata`                      | `netdata`                             |
+| Aspect             | OpenTSDB / Graphite                  | Prometheus scrape / remote write                                                   |
+|:-------------------|:-------------------------------------|:-----------------------------------------------------------------------------------|
+| OpenTSDB base      | `prefix.chart.dimension`             | `prefix_context`                                                                   |
+| Graphite base      | `prefix.hostname.chart.dimension`    | `prefix_context`                                                                   |
+| Dimension          | In the metric name                   | Label; in the metric name for heterogeneous `as-collected` charts                  |
+| Data-source suffix | None                                 | `_total`, `_average`, or `_sum` when applicable                                    |
+| Units in name      | No                                   | `average` only                                                                     |
+| Host               | Tag (OpenTSDB) or path (Graphite)    | `instance` label for remote write and all-host scrape; otherwise the scrape target |
+| Sanitization       | Chart/dimension preserve dots        | Context/units/embedded dimensions replace dots                                     |
+| Default prefix     | `netdata`                            | `netdata`                                                                          |
 
-Both families respect the `send names instead of ids` setting: when enabled, Netdata uses human-friendly chart and dimension names; when disabled, it uses the raw system IDs. See the [OpenTSDB connector options](/src/exporting/opentsdb/README.md) for the prefix and name settings.
+Both approaches respect the `send names instead of ids` setting: when enabled, Netdata uses human-friendly chart and dimension names; when disabled, it uses the raw system IDs. See the [OpenTSDB connector options](/src/exporting/opentsdb/README.md) for the prefix and name settings.
 
 ## Configuration Structure
 
