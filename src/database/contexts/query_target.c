@@ -93,6 +93,9 @@ void query_target_release(QUERY_TARGET *qt) {
     simple_pattern_free(qt->instances.scope_labels_pattern);
     qt->instances.scope_labels_pattern = NULL;
 
+    simple_pattern_free(qt->instances.alerts_pattern);
+    qt->instances.alerts_pattern = NULL;
+
     pattern_array_free(qt->instances.labels_pa);
     qt->instances.labels_pa = NULL;
 

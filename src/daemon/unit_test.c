@@ -2219,6 +2219,7 @@ static int test_query_window_resampling_boundaries(void) {
             .before = 1000000600,
             .points = 2,
             .resampling_time = maximum,
+            .alerts = "unittest-alert:*",
             .time_group_method = RRDR_GROUPING_AVERAGE,
             .options = RRDR_OPTION_NOT_ALIGNED,
             .query_source = QUERY_SOURCE_UNITTEST,
