@@ -156,12 +156,29 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
                     return NULL;
                 }
 
-                // argv: [python, plugin_path, args..., NULL]
-                const char *argv[num_words + 1];
-                argv[0] = python_path;
-                for (size_t i = 1; i < num_words; i++)
-                    argv[i] = get_word(words, num_words, i);
-                argv[num_words] = NULL;
+                // Honor -p<interpreter> in command options (mirrors the bash wrapper on
+                // Linux which strips it before exec'ing Python). Without this, -p... would
+                // reach parse_command_line() as an unknown module name and abort the plugin.
+                const char *interp = python_path;
+                size_t filt_count = 0;
+                const char *filt_args[num_words]; // worst case: all args fit
+
+                // words[0]="exec", words[1]=plugin_path; real args start at [2]
+                for (size_t i = 2; i < num_words; i++) {
+                    const char *w = get_word(words, num_words, i);
+                    if (w && w[0] == '-' && w[1] == 'p' && w[2] != '\0')
+                        interp = w + 2;  // use the specified interpreter
+                    else
+                        filt_args[filt_count++] = w;
+                }
+
+                // argv: [interpreter, plugin_path, filtered_args..., NULL]
+                const char *argv[2 + filt_count + 1];
+                argv[0] = interp;
+                argv[1] = prog;
+                for (size_t i = 0; i < filt_count; i++)
+                    argv[2 + i] = filt_args[i];
+                argv[2 + filt_count] = NULL;
                 return spawn_popen_run_argv(argv);
             }
         }
