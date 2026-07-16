@@ -1,13 +1,13 @@
-# Live Tab
+# Using the Live tab
 
-The **Live tab** is the Netdata Cloud interface for selecting and executing [Netdata Functions](/docs/top-monitoring-netdata-functions.md) on monitored nodes. Functions provide current operational details that complement metrics and charts.
+The **Live** tab is the Netdata Cloud interface for selecting and executing Functions on monitored nodes. See [Live View](/docs/top-monitoring-netdata-functions.md) for the feature overview and task-specific guides.
 
-You can also execute a Function from the [Nodes tab](/docs/dashboards-and-charts/nodes-tab.md) by selecting the `f(x)` control for a node.
+You can also open the same view from a node dropdown by selecting **Live, on-demand infrastructure insights** (the `f(x)` icon).
 
 ## Execute a Function
 
 1. Open the **Live** tab.
-2. Select a Function from the Functions bar.
+2. Select a Function using the **Function** selector.
 3. Select the node where the Function should run.
 4. Apply any filters offered by that Function.
 5. Review the returned visualization and data table.
@@ -32,4 +32,10 @@ Some Function results may contain sensitive process, query, log, or network info
 
 ## Troubleshooting
 
-If a Function is missing or cannot execute, check the [Function availability troubleshooting steps](/docs/top-monitoring-netdata-functions.md#troubleshooting-availability). The target node must be online, the component providing the Function must be running, and the current user must have the required access.
+If a Function does not appear or cannot execute:
+
+1. Confirm that the target node is online.
+2. Confirm that the collector or plugin providing the Function is running.
+3. Check whether the Function is supported on that operating system and Agent version.
+4. Verify the current user's permissions and the Agent's access-control settings.
+5. For a Child node, verify that the streaming path to its Parent is active.

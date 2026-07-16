@@ -12,7 +12,7 @@ Command-line arguments require the additional **View Agent Config** permission, 
 
 ## Investigate a Resource Problem
 
-1. Open the Function from the [Live tab](/docs/dashboards-and-charts/live-tab.md) or the node's `f(x)` control.
+1. Open the Function from the [Live tab](/docs/dashboards-and-charts/live-tab.md).
 2. Select the affected node.
 3. Sort by the resource implicated by the charts, such as CPU, memory, reads, writes, file descriptors, or threads.
 4. Filter or group by application category, user, group, parent process, or another available dimension.
@@ -64,6 +64,5 @@ Filter by user, command, parent, network-related descriptors, or application cat
 
 ## Related Documentation
 
-- [Netdata Functions](/docs/top-monitoring-netdata-functions.md)
+- [Live View](/docs/top-monitoring-netdata-functions.md)
 - [Apps plugin](/src/collectors/apps.plugin/README.md)
-- [Live tab](/docs/dashboards-and-charts/live-tab.md)

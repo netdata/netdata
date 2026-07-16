@@ -764,8 +764,8 @@ sidebar:
   - meta:
       label: Live View
       edit_url: https://github.com/netdata/netdata/edit/master/docs/top-monitoring-netdata-functions.md
-      description: Run on-demand troubleshooting routines on monitored nodes for processes, databases, network connections, logs, and other live system data.
-      keywords: [live view, troubleshooting, processes, database queries, live data]
+      description: Explore live, on-demand troubleshooting for processes, databases, network connections, logs, and other system data.
+      keywords: [live view, functions, troubleshooting, processes, database queries, live data]
     items:
       - meta:
           label: Processes
@@ -996,7 +996,7 @@ sidebar:
           - meta:
               label: Live
               edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/live-tab.md
-              description: Access live information from monitored nodes through Netdata Functions
+              description: Select and run Functions on monitored nodes.
       - meta:
           label: Theme
           edit_url: https://github.com/netdata/netdata/edit/master/docs/dashboards-and-charts/themes.md

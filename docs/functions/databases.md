@@ -61,12 +61,11 @@ Database Function results can contain statement text, object names, user names, 
 
 1. Configure the database collector and any required database permissions.
 2. Confirm that its regular metrics are being collected.
-3. Open the [Live tab](/docs/dashboards-and-charts/live-tab.md) or the node's `f(x)` control.
+3. Open the [Live tab](/docs/dashboards-and-charts/live-tab.md).
 4. Select an available database Function and the target node.
 5. Apply the filters and ranking options documented for that integration.
 6. Correlate the result with database charts, logs, and application traces.
 
 ## Related Documentation
 
-- [Netdata Functions](/docs/top-monitoring-netdata-functions.md)
-- [Live tab](/docs/dashboards-and-charts/live-tab.md)
+- [Live View](/docs/top-monitoring-netdata-functions.md)
