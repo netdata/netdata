@@ -884,7 +884,7 @@ static inline void discovery_find_all_cgroups_v2() {
 
 static int is_digits_only(const char *s) {
     do {
-        if (!isdigit(*s++)) {
+        if (!isdigit((uint8_t)*s++)) {
             return 0;
         }
     } while (*s);

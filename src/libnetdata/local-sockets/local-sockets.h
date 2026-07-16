@@ -576,7 +576,7 @@ static inline void local_sockets_fix_cmdline(char* str) {
 
     // map invalid characters to underscores
     while(*s) {
-        if(*s == '|' || iscntrl(*s)) *s = '_';
+        if(*s == '|' || iscntrl((uint8_t)*s)) *s = '_';
         s++;
     }
 }
@@ -599,7 +599,7 @@ local_sockets_read_proc_inode_link(LS_STATE *ls, const char *filename, uint64_t 
     link_target[len] = '\0';
 
     len = strlen(type);
-    if(strncmp(link_target, type, len) == 0 && link_target[len] == ':' && link_target[len + 1] == '[' && isdigit(link_target[len + 2])) {
+    if(strncmp(link_target, type, len) == 0 && link_target[len] == ':' && link_target[len + 1] == '[' && isdigit((uint8_t)link_target[len + 2])) {
         *inode = strtoull(&link_target[len + 2], NULL, 10);
         // ll_log(ls, "read link of type '%s' '%s' from '%s', inode = %"PRIu64, type, link_target, filename, *inode);
         return true;

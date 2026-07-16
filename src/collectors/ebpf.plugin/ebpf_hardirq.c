@@ -330,7 +330,7 @@ static int hardirq_parse_interrupts(char *irq_name, int irq)
         if (unlikely(!words))
             continue;
         const char *id = procfile_lineword(ff, l, 0);
-        if (!isdigit(id[0]))
+        if (!isdigit((uint8_t)id[0]))
             continue;
 
         int cmp = str2i(id);
