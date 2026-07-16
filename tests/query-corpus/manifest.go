@@ -117,6 +117,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "time_group=min returns the value CLOSEST to zero and max the value FURTHEST from zero (min.h/max.h fabs comparisons) — visible only on negative/mixed data; pinned green in L3 sign-semantics + L4 matrix; RULING PENDING (arithmetic min/max would be a behavior change; extremes already provides champion-by-abs)",
 		Agent:  Green,
 	},
+	"L4/plan-switching": {
+		Proves: "queries spanning tiers with DIFFERENT retention are served by multiple plans: a dedicated daemon with tier0 at the 25MB quota floor rotates its head out (boundary DISCOVERED from db.per_tier, ~19h evicted at 10M samples), a straddling query reads tier1 (head) + tier0 (tail) with per-side oracle values, and a head-only query is served by tier1 alone",
+		Agent:  Green,
+	},
 	"CASE-017/tier-boundary-absorption": {
 		Proves: "a tier>0 query whose after equals a stored tier point end keeps that point out of the first bucket (was: absorbed, leaking pre-window data into (after, before] — the backward-expanded storage scan met the inclusive bucket-start check); tier0 control stays clean",
 		Agent:  Green, FixedBy: "#23127",
