@@ -141,6 +141,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "same drain guarantee on the replication path: a child disconnecting after its final REND loses nothing",
 		Agent:  Green, FixedBy: "#23118",
 	},
+	"CASE-015/robustness": {
+		Proves: "receiver teardown with queued replies to a dead child stays crash-free: mid-dialogue disconnect and a 30-cycle disconnect soak",
+		Agent:  Green,
+	},
 }
 
 // expectAgentStatus applies the manifest contract: a Green case must have
