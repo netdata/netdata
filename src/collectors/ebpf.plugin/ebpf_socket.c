@@ -1607,6 +1607,9 @@ int hostname_matches_pattern(char *cmp)
 int ebpf_is_socket_allowed(netdata_socket_idx_t *key, netdata_socket_t *data)
 {
     int ret = 0;
+
+    rw_spinlock_read_lock(&network_viewer_opt.rw_spinlock);
+
     // If family is not AF_UNSPEC and it is different of specified
     if (network_viewer_opt.family && network_viewer_opt.family != data->family)
         goto endsocketallowed;
@@ -1617,6 +1620,7 @@ int ebpf_is_socket_allowed(netdata_socket_idx_t *key, netdata_socket_t *data)
     ret = ebpf_is_specific_ip_inside_range(&key->daddr, data->family);
 
 endsocketallowed:
+    rw_spinlock_read_unlock(&network_viewer_opt.rw_spinlock);
     return ret;
 }
 
