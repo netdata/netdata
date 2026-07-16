@@ -1111,7 +1111,7 @@ jobs:
             load: true
             file: .github/dockerfiles/Dockerfile.build_test
             build-args: |
-              BASE=${{ matrix.distro }}
+              BASE=${{ matrix.base_image }}
               PRE=${{ matrix.env_prep }}
             tags: test:${{ matrix.artifact_key }}
           attempt_limit: 3
