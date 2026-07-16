@@ -428,8 +428,11 @@ static int scan_data_files(struct rrdengine_instance *ctx)
                 unknown_file = (strcmp(dent.name, expected_name) != 0);
             }
 
-            if (!unknown_file)
+            if (!unknown_file) {
+#ifndef OS_WINDOWS
                 (void) JudyLIns(&journafile_JudyL, (Word_t)fileno, PJE0);
+#endif
+            }
         }
 
         if (unknown_file)
