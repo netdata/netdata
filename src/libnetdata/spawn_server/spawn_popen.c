@@ -135,41 +135,48 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
 
             if (strendswith(prog, ".plugin") && !strendswith(prog, ".plugin.exe")) {
                 // Script plugin (e.g. python.d.plugin) — needs a Python interpreter.
-                // Search PATH for python3.exe then python.exe; skip if not installed.
+                // Parse args first: a -p<interpreter> option works even when Python is
+                // absent from PATH, matching the Linux bash wrapper that strips -p before
+                // exec'ing Python.  The PATH search (and its early-return guard) is only
+                // needed when no explicit interpreter was provided.
                 // Guarded by a spinlock: each plugin spawns in its own thread, so two
                 // concurrent calls could race on the unsearched→searched transition and
                 // one would read python_path before SearchPathA had written it.
                 static char python_path[MAX_PATH + 1];
                 static bool python_searched = false;
                 static SPINLOCK python_lock = SPINLOCK_INITIALIZER;
-                spinlock_lock(&python_lock);
-                if (!python_searched) {
-                    if (SearchPathA(NULL, "python3.exe", NULL, MAX_PATH, python_path, NULL) == 0 &&
-                        SearchPathA(NULL, "python.exe",  NULL, MAX_PATH, python_path, NULL) == 0)
-                        python_path[0] = '\0';
-                    python_searched = true;
-                }
-                spinlock_unlock(&python_lock);
-                if (!python_path[0]) {
-                    nd_log(NDLS_COLLECTORS, NDLP_WARNING,
-                           "SPAWN: skipping '%s' — Python is not installed on this system", prog);
-                    return NULL;
-                }
 
-                // Honor -p<interpreter> in command options (mirrors the bash wrapper on
-                // Linux which strips it before exec'ing Python). Without this, -p... would
-                // reach parse_command_line() as an unknown module name and abort the plugin.
-                const char *interp = python_path;
+                // words[0]="exec", words[1]=plugin_path; real args start at [2]
+                const char *interp_override = NULL;
                 size_t filt_count = 0;
                 const char *filt_args[num_words]; // worst case: all args fit
 
-                // words[0]="exec", words[1]=plugin_path; real args start at [2]
                 for (size_t i = 2; i < num_words; i++) {
                     const char *w = get_word(words, num_words, i);
                     if (w && w[0] == '-' && w[1] == 'p' && w[2] != '\0')
-                        interp = w + 2;  // use the specified interpreter
+                        interp_override = w + 2;
                     else
                         filt_args[filt_count++] = w;
+                }
+
+                const char *interp;
+                if (interp_override) {
+                    interp = interp_override;
+                } else {
+                    spinlock_lock(&python_lock);
+                    if (!python_searched) {
+                        if (SearchPathA(NULL, "python3.exe", NULL, MAX_PATH, python_path, NULL) == 0 &&
+                            SearchPathA(NULL, "python.exe",  NULL, MAX_PATH, python_path, NULL) == 0)
+                            python_path[0] = '\0';
+                        python_searched = true;
+                    }
+                    spinlock_unlock(&python_lock);
+                    if (!python_path[0]) {
+                        nd_log(NDLS_COLLECTORS, NDLP_WARNING,
+                               "SPAWN: skipping '%s' — Python is not installed on this system", prog);
+                        return NULL;
+                    }
+                    interp = python_path;
                 }
 
                 // argv: [interpreter, plugin_path, filtered_args..., NULL]
