@@ -121,6 +121,10 @@ var manifest = map[string]ManifestCase{
 		Proves: "queries spanning tiers with DIFFERENT retention are served by multiple plans: a dedicated daemon with tier0 at the 25MB quota floor rotates its head out (boundary DISCOVERED from db.per_tier, ~19h evicted at 10M samples), a straddling query reads tier1 (head) + tier0 (tail) with per-side oracle values, and a head-only query is served by tier1 alone",
 		Agent:  Green,
 	},
+	"L5/group-by-matrix": {
+		Proves: "level-1 group-by, non-raw: every key (selected, dimension, instance, node, label, context, units) x every aggregation (average, min, max, sum, extremes) over a 2-node x 2-instance x 3-dim palette equals the member-enumeration oracle — values, anomaly rates (ar/gbc), PARTIAL stamping on gap-member rows, and group naming (instance = id@guid, node = machine guid, label = value)",
+		Agent:  Green,
+	},
 	"CASE-017/tier-boundary-absorption": {
 		Proves: "a tier>0 query whose after equals a stored tier point end keeps that point out of the first bucket (was: absorbed, leaking pre-window data into (after, before] — the backward-expanded storage scan met the inclusive bucket-start check); tier0 control stays clean",
 		Agent:  Green, FixedBy: "#23127",
