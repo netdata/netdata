@@ -1477,6 +1477,13 @@ void ebpf_socket_create_apps_charts(struct ebpf_module *em, void *ptr)
  *
  *****************************************************************/
 
+static inline bool ebpf_ip_entry_matches_family(const ebpf_network_viewer_ip_list_t *entry, int family)
+{
+    // The parser tags "*" as AF_INET6, but its policy contract is dual-stack.
+    return entry->ver == family ||
+           (entry->value && entry->value[0] == '*' && entry->value[1] == '\0');
+}
+
 /**
  * Is specific ip inside the range
  *
@@ -1495,13 +1502,15 @@ static int ebpf_is_specific_ip_inside_range(union netdata_ip_t *cmp, int family)
     uint32_t ipv4_test = htonl(cmp->addr32[0]);
     ebpf_network_viewer_ip_list_t *move = network_viewer_opt.excluded_ips;
     while (move) {
-        if (family == AF_INET) {
-            if (move->first.addr32[0] <= ipv4_test && ipv4_test <= move->last.addr32[0])
-                return 0;
-        } else {
-            if (memcmp(move->first.addr8, cmp->addr8, sizeof(union netdata_ip_t)) <= 0 &&
-                memcmp(move->last.addr8, cmp->addr8, sizeof(union netdata_ip_t)) >= 0) {
-                return 0;
+        if (ebpf_ip_entry_matches_family(move, family)) {
+            if (family == AF_INET) {
+                if (move->first.addr32[0] <= ipv4_test && ipv4_test <= move->last.addr32[0])
+                    return 0;
+            } else {
+                if (memcmp(move->first.addr8, cmp->addr8, sizeof(union netdata_ip_t)) <= 0 &&
+                    memcmp(move->last.addr8, cmp->addr8, sizeof(union netdata_ip_t)) >= 0) {
+                    return 0;
+                }
             }
         }
         move = move->next;
@@ -1509,13 +1518,15 @@ static int ebpf_is_specific_ip_inside_range(union netdata_ip_t *cmp, int family)
 
     move = network_viewer_opt.included_ips;
     while (move) {
-        if (family == AF_INET && move->ver == AF_INET) {
-            if (move->first.addr32[0] <= ipv4_test && move->last.addr32[0] >= ipv4_test)
-                return 1;
-        } else {
-            if (move->ver == AF_INET6 && memcmp(move->first.addr8, cmp->addr8, sizeof(union netdata_ip_t)) <= 0 &&
-                memcmp(move->last.addr8, cmp->addr8, sizeof(union netdata_ip_t)) >= 0) {
-                return 1;
+        if (ebpf_ip_entry_matches_family(move, family)) {
+            if (family == AF_INET) {
+                if (move->first.addr32[0] <= ipv4_test && move->last.addr32[0] >= ipv4_test)
+                    return 1;
+            } else {
+                if (memcmp(move->first.addr8, cmp->addr8, sizeof(union netdata_ip_t)) <= 0 &&
+                    memcmp(move->last.addr8, cmp->addr8, sizeof(union netdata_ip_t)) >= 0) {
+                    return 1;
+                }
             }
         }
         move = move->next;
