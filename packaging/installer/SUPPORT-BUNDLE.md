@@ -35,7 +35,7 @@ document.**
 
 | guarantee | implementation |
 |---|---|
-| Zero system impact | self-demotion to idle CPU/IO priority (`nice -n 19` + `ionice -c 3` / `PriorityClass = Idle`); per-command timeout (10 s default); global deadline (240 s); size caps (5 MiB per log, 1 MiB per file, 2 MiB per API response); strictly read-only — never writes outside its staging dir, never restarts anything, never calls destructive `netdatacli` commands |
+| Zero system impact | self-demotion to idle CPU/IO priority (`nice -n 19` + `ionice -c 3` / `PriorityClass = Idle`); per-command timeout (10 s default, enforced by `timeout` where available and a portable watchdog where not); global deadline (240 s); size caps (5 MiB per log, 1 MiB per file, 2 MiB per command/API output, directory listings capped); strictly read-only — never writes outside its staging dir, never restarts anything, never calls destructive `netdatacli` commands; outputs are published with `O_EXCL` so pre-existing files or symlinks in shared tmp dirs are never followed |
 | Works when the agent is dead | no hard dependency on a running agent; the most valuable crash artifacts (status file, logs, buildinfo via the binary) are collected from disk; a `07-runtime/AGENT-WAS-DOWN.txt` marker is written instead of API captures |
 | Secrets always redacted | non-optional single-pass sanitizer; see "Sanitization" below |
 | PII pseudonymized by default | IPs/MACs/emails/hostnames replaced with **stable** pseudonyms (`ip-1`, `private-host-1`) so cross-file correlation still works; map saved **next to** the bundle, never inside it; `--no-obfuscate` / `-NoObfuscate` opts out |
@@ -196,10 +196,12 @@ Two passes, one sweep, applied to **every** collected file:
      proxy pass, username, dsn, private key, access key, session, recipient,
      account sid, priv key` — in ini (`k = v`), yaml (`k: v`), env (`K=V`) and
      JSON (`"k": "v"`) forms. Keys must look like real config keys (≤64 chars,
-     no sentence punctuation) so prose containing "token" is not mangled, and
-     values on a harmless-literal allowlist (`yes no true false on off auto
-     none enabled disabled` and absolute paths) are kept — `bearer token
-     protection = no` and `api key file = /path` stay readable;
+     no sentence punctuation) so prose containing "token" is not mangled.
+     Exemptions are decided by the KEY, never the value: keys ending in
+     `file path dir directory protection support mode level port timeout
+     cookies secure log size options` describe secrets rather than being
+     secrets, so `bearer token protection = no` and `api key file = /path`
+     stay readable while `TOKEN=false` and `PASSWORD=/x` are redacted;
    - argv/env-style secrets mid-line (`-token=X`, `CLAIM_TOKEN=X`,
      `api key = X` inside captured process command lines);
    - URL-embedded credentials (`scheme://user:pass@`) and Go DSN credentials
@@ -208,20 +210,24 @@ Two passes, one sweep, applied to **every** collected file:
      English prose after the word "bearer" does not) and `Basic <value>`;
    - secrets in URL query parameters (`?token=`, `&api_key=`, ... — request
      lines in access logs);
-   - private-key PEM blocks;
+   - private-key PEM blocks — the WHOLE multi-line block is withheld from the
+     BEGIN marker through the END marker (fail closed if END never arrives);
    - `stream.conf` parent-side `[<UUID>]` section headers (they ARE the API
      keys);
    - `bearer_tokens/` directory listings show a file COUNT only — the
      filenames are the tokens.
 2. **PII — on by default, `--no-obfuscate` / `-NoObfuscate` to disable:**
    - non-loopback IPv4 addresses → `ip-N` and IPv6 → `ip6-N` (stable per
-     bundle; validated so timestamps, `file.c:123` refs and `::1` are left
-     alone);
+     bundle; compressed, lettered, and numeric-only uncompressed forms;
+     validated so timestamps, `file.c:123` refs and `::1` are left alone);
    - MAC addresses → `[MAC]`; email addresses → `[EMAIL]`;
    - this host's hostname/FQDN → `redacted-host`; the invoking user's name →
      `redacted-user`;
    - FQDNs under clearly-private TLDs (`.internal .local .lan .corp .intranet
      .localdomain`) → `private-host-N`;
+   - child/mirrored node hostnames (pre-seeded from the local API before
+     collection, so they pseudonymize consistently in every file) and
+     `stream.conf` `destination` hosts regardless of TLD → `private-host-N`;
    - resolv.conf `search`/`domain` values → `[SEARCH-DOMAINS-WITHHELD]`
      (corporate search domains are rarely under private TLDs).
 
@@ -251,9 +257,11 @@ by these scripts.
    in **both** scripts and add the pattern to the Sanitization section above.
 5. Mirror the change in the other script (`.sh` ↔ `.ps1`) or record explicitly
    in your PR why it is platform-specific.
-6. Test the redaction: plant a sentinel secret in the source you collect, run
-   the script, and `grep -r` the extracted bundle for the sentinel. Zero hits
-   or it does not ship.
+6. Test the redaction: add a vector to the built-in regression suite and run
+   `netdata-sos --selftest` (`netdata-sos.ps1 -SelfTest` on Windows) — it must
+   pass on GNU awk, mawk, and BusyBox awk. For new collection sources also
+   plant a sentinel secret in the source, run a collection, and `grep -r` the
+   extracted bundle. Zero hits or it does not ship.
 7. Never add anything from the "What is NEVER collected" list, and never make
    the tool write, restart, reconfigure, or otherwise mutate the system.
 
@@ -262,7 +270,8 @@ by these scripts.
 - Schema id: `netdata-sos-bundle/v1` (in `MANIFEST.json`). Bump the suffix on
   breaking layout changes; downstream ticket tooling may parse it.
 - Command captures are `.txt` files starting with a
-  `# netdata-sos v<version> | command: ... | captured: <utc>` header and
-  ending with `# exit: N`.
+  `# netdata-sos v<version> | command: ... | captured: <utc>` header; on POSIX
+  they also end with an `# exit: N | duration: Ns` trailer (PowerShell jobs do
+  not expose a meaningful exit code, so Windows captures carry the header only).
 - Copied files and API responses are pristine (parseable as-is); their
   provenance lives in `MANIFEST.json`, not in the files.

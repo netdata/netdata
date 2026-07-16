@@ -1,6 +1,9 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-3.0-or-later
 #
+# shellcheck disable=SC2016  # the sh -c and awk mini-programs in the collectors
+# are intentionally single-quoted: they must reach the child shell/awk unexpanded.
+#
 # netdata-sos - collect a sanitized diagnostic bundle for Netdata support tickets.
 #
 # What is collected and WHY each item is included is documented in
@@ -22,6 +25,7 @@
 #   --timeout SECONDS    per-command timeout (default: 10)
 #   --no-obfuscate       disable PII pseudonymization (secrets STILL redacted)
 #   --keep-staging       keep staging dir for inspection
+#   --selftest           run the sanitizer regression vectors and exit
 #   -v, --version        print version
 #   -h, --help           this help
 
@@ -43,6 +47,7 @@ SINCE_HOURS=24
 CMD_TIMEOUT=10
 OBFUSCATE=1
 KEEP_STAGING=0
+SELFTEST=0
 GLOBAL_DEADLINE=240
 LOG_CAP=5242880          # 5 MiB per log file
 FILE_CAP=1048576         # 1 MiB per config/state file
@@ -55,14 +60,15 @@ while [ $# -gt 0 ]; do
     --timeout) CMD_TIMEOUT="$2"; shift 2 ;;
     --no-obfuscate) OBFUSCATE=0; shift ;;
     --keep-staging) KEEP_STAGING=1; shift ;;
+    --selftest) SELFTEST=1; shift ;;
     -v|--version) echo "netdata-sos $VERSION"; exit 0 ;;
-    -h|--help) sed -n '4,27p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '7,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 1 ;;
   esac
 done
 
-case "$SINCE_HOURS" in *[!0-9]*|'') echo "--since must be a positive integer (hours)" >&2; exit 1 ;; esac
-case "$CMD_TIMEOUT" in *[!0-9]*|'') echo "--timeout must be a positive integer (seconds)" >&2; exit 1 ;; esac
+case "$SINCE_HOURS" in *[!0-9]*|''|0) echo "--since must be a positive integer (hours)" >&2; exit 1 ;; *) : ;; esac
+case "$CMD_TIMEOUT" in *[!0-9]*|''|0) echo "--timeout must be a positive integer (seconds)" >&2; exit 1 ;; *) : ;; esac
 
 umask 077
 START_TS=$(date +%s)
@@ -76,7 +82,8 @@ MANIFEST_ROWS="$STAGING/manifest.rows"; : > "$MANIFEST_ROWS"
 ERRORS="$STAGING/errors.txt"; : > "$ERRORS"
 
 cleanup() { [ "$KEEP_STAGING" = "1" ] || rm -rf "$STAGING"; }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+trap 'cleanup; trap - EXIT; exit 130' INT TERM
 
 info() { printf ' [*] %s\n' "$*" >&2; }
 now_s() { date +%s; }
@@ -94,7 +101,27 @@ run_capped() { # run_capped <seconds> <cmd...>
   case "$have_timeout" in
     2) timeout -k 2 "$_t" "$@" ;;
     1) timeout "$_t" "$@" ;;
-    *) "$@" ;;
+    *)
+      # no timeout binary (macOS): portable watchdog so a stuck collector
+      # cannot hang the whole run
+      "$@" &
+      _cmdpid=$!
+      (
+        _i=0
+        while [ "$_i" -lt "$_t" ]; do
+          sleep 1
+          kill -0 "$_cmdpid" 2>/dev/null || exit 0
+          _i=$((_i + 1))
+        done
+        kill -9 "$_cmdpid" 2>/dev/null
+      ) &
+      _wdpid=$!
+      wait "$_cmdpid"
+      _rc=$?
+      kill "$_wdpid" 2>/dev/null
+      wait "$_wdpid" 2>/dev/null
+      return "$_rc"
+      ;;
   esac
 }
 
@@ -108,7 +135,7 @@ HOST_FQDN=$(hostname -f 2>/dev/null || echo "")
 [ ${#HOST_SHORT} -lt 4 ] && HOST_SHORT=""
 # the invoking user's name is PII too (ps USER column, /home/<name> paths)
 RUN_USER=$(id -un 2>/dev/null || echo "")
-case "$RUN_USER" in root|netdata|"") RUN_USER="" ;; esac
+case "$RUN_USER" in root|netdata|"") RUN_USER="" ;; *) : ;; esac
 [ ${#RUN_USER} -lt 3 ] && RUN_USER=""
 
 sanitize_file() {
@@ -130,13 +157,12 @@ sanitize_file() {
     }
     close(mapfile);
   }
-  function harmless_value(v) {
-    # boolean/mode literals and absolute paths are never secrets; keeping them
-    # preserves diagnostics like "bearer token protection = no" or
-    # "netdata management api key file = /var/lib/..."
-    gsub(/^[ \t]+|[ \t]+$/, "", v);
-    if (v ~ /^(yes|no|true|false|on|off|auto|none|enabled|disabled)$/) return 1;
-    if (v ~ /^\//) return 1;
+  function diagnostic_key(lk) {
+    # exemptions are decided by the KEY, never the value (a secret can be any
+    # string, incl. "false" or a path). Keys ENDING in these words describe
+    # secrets or toggles rather than being secrets: "bearer token protection",
+    # "netdata management api key file", "TCP SYN cookies".
+    if (lk ~ /(^| )(file|path|dir|directory|protection|support|mode|level|port|timeout|cookies|secure|log|size|options)$/) return 1;
     return 0;
   }
   function redact_kv(line,   i, k, pos, posc, pose, key, lk) {
@@ -152,14 +178,13 @@ sanitize_file() {
       gsub(/^[ \t#]+|[ \t]+$/, "", key);
       # only plausible config keys: short, no sentence/shell punctuation
       # (prevents prose like "token and ... not collected: X" matching as a key)
-      if (length(key) > 64 || key ~ /["`;|()]/) return line;
+      if (length(key) > 64 || key !~ /^[A-Za-z0-9]/ || key ~ /["`;|()\/]/) return line;
       lk = tolower(key);
       gsub(/[-_]/, " ", lk);
+      if (diagnostic_key(lk)) return line;
       for (i = 1; i <= nsec; i++) {
-        if (index(lk, SK[i]) > 0 && length(substr(line, pos + 1)) > 1) {
-          if (harmless_value(substr(line, pos + 1))) return line;
+        if (index(lk, SK[i]) > 0 && length(substr(line, pos + 1)) > 1)
           return substr(line, 1, pos) " [REDACTED]";
-        }
       }
     }
     return line;
@@ -170,12 +195,13 @@ sanitize_file() {
     while (match(rest, /"[^"]+"[ \t]*:[ \t]*"[^"]*"/)) {
       m = substr(rest, RSTART, RLENGTH);
       key = m; sub(/^"/, "", key); sub(/".*/, "", key);
-      v = m; sub(/^"[^"]+"[ \t]*:[ \t]*"/, "", v); sub(/"$/, "", v);
       lk = tolower(key); gsub(/[-_]/, " ", lk);
-      for (i = 1; i <= nsec; i++) {
-        if (index(lk, SK[i]) > 0 && !harmless_value(v)) {
-          sub(/:[ \t]*"[^"]*"/, ": \"[REDACTED]\"", m);
-          break;
+      if (!diagnostic_key(lk)) {
+        for (i = 1; i <= nsec; i++) {
+          if (index(lk, SK[i]) > 0) {
+            sub(/:[ \t]*"[^"]*"/, ": \"[REDACTED]\"", m);
+            break;
+          }
         }
       }
       out = out substr(rest, 1, RSTART - 1) m;
@@ -214,7 +240,7 @@ sanitize_file() {
       t = cand; nc = gsub(/:/, ":", t);
       if (index(cand, ":") == 0 || pre ~ /[A-Za-z0-9._-]/ || length(cand) < 5 ||
           (nc < 3 && index(cand, "::") == 0) ||
-          (cand !~ /[A-Fa-f]/ && index(cand, "::") == 0) ||
+          (cand !~ /[A-Fa-f]/ && index(cand, "::") == 0 && nc < 6) ||
           cand == "::1") {
         out = out substr(rest, 1, RSTART + RLENGTH - 1);
         rest = substr(rest, RSTART + RLENGTH);
@@ -229,6 +255,66 @@ sanitize_file() {
     }
     return out rest;
   }
+  function pseudo_fqdn(h) {
+    if (!(h in fqmap)) {
+      nfq++; fqmap[h] = "private-host-" nfq;
+      print "fqdn\t" h "\t" fqmap[h] >> mapfile;
+    }
+    return fqmap[h];
+  }
+  function replace_mapped_fqdns(line,   h, out, idx, pre, nxt) {
+    # replace every known (pre-seeded or discovered) hostname, with word
+    # boundaries so "host1" never corrupts "host10"
+    for (h in fqmap) {
+      if (length(h) < 4) continue;
+      out = "";
+      while ((idx = index(line, h)) > 0) {
+        pre = (idx > 1) ? substr(line, idx - 1, 1) : "";
+        nxt = substr(line, idx + length(h), 1);
+        if (pre ~ /[A-Za-z0-9.\/-]/ || nxt ~ /[A-Za-z0-9.\/-]/) {
+          out = out substr(line, 1, idx + length(h) - 1);
+          line = substr(line, idx + length(h));
+          continue;
+        }
+        out = out substr(line, 1, idx - 1) fqmap[h];
+        line = substr(line, idx + length(h));
+      }
+      line = out line;
+    }
+    return line;
+  }
+  function redact_destination(line,   pos, head, valpart, n, parts, i, tok, hostp, rest2, cpos, proto) {
+    # stream.conf destination/proxy destination values are user infrastructure
+    # hostnames regardless of TLD. Token syntax: [PROTOCOL:]HOST[%IFACE][:PORT][:SSL]
+    pos = index(line, "=");
+    if (pos == 0) return line;
+    head = substr(line, 1, pos);
+    valpart = substr(line, pos + 1);
+    n = split(valpart, parts, /[ \t]+/);
+    valpart = "";
+    for (i = 1; i <= n; i++) {
+      tok = parts[i];
+      if (tok == "") continue;
+      proto = "";
+      if (tok ~ /^(tcp|udp|unix):/) {
+        cpos = index(tok, ":");
+        proto = substr(tok, 1, cpos);
+        tok = substr(tok, cpos + 1);
+      }
+      cpos = index(tok, ":");
+      if (cpos > 1) { hostp = substr(tok, 1, cpos - 1); rest2 = substr(tok, cpos); }
+      else { hostp = tok; rest2 = ""; }
+      cpos = index(hostp, "%");
+      if (cpos > 1) { rest2 = substr(hostp, cpos) rest2; hostp = substr(hostp, 1, cpos - 1); }
+      # leave IPs to the IP rules, and never map an existing pseudonym
+      if (hostp != "" && length(hostp) >= 4 && \
+          hostp !~ /^[0-9.]+$/ && hostp !~ /^[0-9A-Fa-f:]+$/ && \
+          hostp !~ /^(ip|ip6|private-host)-[0-9]+$/)
+        hostp = pseudo_fqdn(hostp);
+      valpart = valpart " " proto hostp rest2;
+    }
+    return head valpart;
+  }
   function replace_private_fqdns(line,   out, rest, fq, nxt) {
     # hostnames under clearly-private TLDs are user infrastructure -> pseudonymize
     out = ""; rest = line;
@@ -240,11 +326,7 @@ sanitize_file() {
         rest = substr(rest, RSTART + RLENGTH);
         continue;
       }
-      if (!(fq in fqmap)) {
-        nfq++; fqmap[fq] = "private-host-" nfq;
-        print "fqdn\t" fq "\t" fqmap[fq] >> mapfile;
-      }
-      out = out substr(rest, 1, RSTART - 1) fqmap[fq];
+      out = out substr(rest, 1, RSTART - 1) pseudo_fqdn(fq);
       rest = substr(rest, RSTART + RLENGTH);
     }
     return out rest;
@@ -278,6 +360,17 @@ sanitize_file() {
   {
     # NOTE: no {n,m} regex intervals anywhere in this program - older BSD awks
     # treat them as literal braces, which would silently disable redaction.
+    # PEM private keys are multi-line: withhold the WHOLE block, fail closed
+    # if the END marker never arrives.
+    if (inpem) {
+      if ($0 ~ /-----END [A-Z ]*PRIVATE KEY/) inpem = 0;
+      next;
+    }
+    if ($0 ~ /-----BEGIN [A-Z ]*PRIVATE KEY/) {
+      print "[REDACTED PRIVATE KEY BLOCK]";
+      inpem = 1;
+      next;
+    }
     line = $0;
     # stream.conf parent side: [<API_KEY>] / [<MACHINE_GUID>] section headers ARE secrets
     if (line ~ /^[ \t]*\[[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]\][ \t]*$/) {
@@ -288,8 +381,10 @@ sanitize_file() {
     # URL creds: scheme://user:pass@  and Go DSN: user:pass@tcp(
     while (match(line, /:\/\/[^:\/@ \t]+:[^@ \t]+@/))
       line = substr(line, 1, RSTART - 1) "://[REDACTED]@" substr(line, RSTART + RLENGTH);
-    while (match(line, /[A-Za-z0-9_]+:[^@ \t]+@(tcp|unix)\(/))
-      line = substr(line, 1, RSTART - 1) "[REDACTED]@" substr(line, RSTART + RLENGTH - 4);
+    while (match(line, /[A-Za-z0-9_]+:[^@ \t]+@(tcp|unix)\(/)) {
+      m = substr(line, RSTART, RLENGTH);
+      line = substr(line, 1, RSTART - 1) "[REDACTED]" substr(m, index(m, "@")) substr(line, RSTART + RLENGTH);
+    }
     # JWTs (the eyJ prefix is base64 for double-quote-brace)
     while (match(line, /eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/))
       line = substr(line, 1, RSTART - 1) "[REDACTED-JWT]" substr(line, RSTART + RLENGTH);
@@ -312,9 +407,9 @@ sanitize_file() {
     out = ""; rest = line;
     while (match(rest, /[A-Za-z0-9_.-]*(token|TOKEN|Token|password|PASSWORD|Password|passwd|PASSWD|secret|SECRET|Secret|apikey|APIKEY|ApiKey|api_key|API_KEY|community|COMMUNITY|bearer|BEARER)[ ]?=[ ]?[^&" \t[]+/)) {
       m = substr(rest, RSTART, RLENGTH);
-      v = m; sub(/^[^=]*=[ ]?/, "", v);
       sub(/[ ]?=.*/, "", m);
-      if (harmless_value(v))
+      lk = tolower(m); gsub(/[-_]/, " ", lk);
+      if (diagnostic_key(lk))
         out = out substr(rest, 1, RSTART + RLENGTH - 1);
       else
         out = out substr(rest, 1, RSTART - 1) m "=[REDACTED]";
@@ -325,16 +420,15 @@ sanitize_file() {
     out = ""; rest = line;
     while (match(rest, /([Aa][Pp][Ii]|[Ll][Ii][Cc][Ee][Nn][Ss][Ee]|[Aa][Uu][Tt][Hh]|[Aa][Cc][Cc][Ee][Ss][Ss])[ ][Kk][Ee][Yy][ ]?=[ ]?[^&" \t[]+|[Pp][Rr][Oo][Xx][Yy][ ]([Uu][Ss][Ee][Rr]|[Pp][Aa][Ss][Ss]([Ww][Oo][Rr][Dd])?)[ ]?=[ ]?[^&" \t[]+/)) {
       m = substr(rest, RSTART, RLENGTH);
-      v = m; sub(/^[^=]*=[ ]?/, "", v);
       sub(/[ ]?=.*/, "", m);
-      if (harmless_value(v))
+      lk = tolower(m); gsub(/[-_]/, " ", lk);
+      if (diagnostic_key(lk))
         out = out substr(rest, 1, RSTART + RLENGTH - 1);
       else
         out = out substr(rest, 1, RSTART - 1) m " = [REDACTED]";
       rest = substr(rest, RSTART + RLENGTH);
     }
     line = out rest;
-    if (line ~ /-----BEGIN .*PRIVATE KEY/) line = "[REDACTED PRIVATE KEY]";
     if (obf == 1) {
       # emails
       while (match(line, /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z][A-Za-z]+/))
@@ -342,9 +436,11 @@ sanitize_file() {
       # MACs
       while (match(line, /[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]:[0-9A-Fa-f][0-9A-Fa-f]/))
         line = substr(line, 1, RSTART - 1) "[MAC]" substr(line, RSTART + RLENGTH);
+      if (line ~ /^[ \t]*(proxy )?destination[ \t]*=/) line = redact_destination(line);
       line = replace_ips(line);
       line = replace_ip6(line);
       line = replace_private_fqdns(line);
+      line = replace_mapped_fqdns(line);
       if (host_fqdn != "") line = replace_host(line, host_fqdn);
       if (host_short != "") line = replace_host(line, host_short);
       if (run_user != "") line = replace_user(line, run_user);
@@ -362,13 +458,14 @@ sanitize_file() {
 # --- manifest ----------------------------------------------------------------
 # manifest_add <rel-path> <kind:cmd|file|api> <origin> <title>
 json_str() { # collapse newlines/tabs, escape backslashes and quotes
-  printf '%s' "$1" | tr '\n\t' '  ' | sed 's/\\/\\\\/g; s/"/\\"/g'
+  _js="$1"
+  printf '%s' "$_js" | tr '\n\t' '  ' | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 manifest_add() {
   _rel="$1"; _kind="$2"; _origin="$3"; _title="$4"
   _bytes=0; [ -f "$WORK/$_rel" ] && _bytes=$(wc -c < "$WORK/$_rel" | tr -d ' ')
   printf '{"path":"%s","kind":"%s","origin":"%s","title":"%s","bytes":%s,"pii_obfuscated":%s}\n' \
-    "$_rel" "$_kind" "$(json_str "$_origin")" "$(json_str "$_title")" "$_bytes" \
+    "$(json_str "$_rel")" "$_kind" "$(json_str "$_origin")" "$(json_str "$_title")" "$_bytes" \
     "$([ "$OBFUSCATE" = "1" ] && echo true || echo false)" >> "$MANIFEST_ROWS"
 }
 
@@ -377,16 +474,26 @@ manifest_add() {
 collect_cmd() {
   _rel="$1"; _title="$2"; shift 2
   _out="$WORK/$_rel"
-  if deadline_exceeded; then echo "SKIPPED: global deadline reached" > "$_out"; return 0; fi
   mkdir -p "$(dirname "$_out")"
+  if deadline_exceeded; then
+    echo "SKIPPED: global deadline reached" > "$_out"
+    manifest_add "$_rel" "cmd" "skipped" "$_title (skipped: deadline)"
+    return 0
+  fi
   _t0=$(now_s)
   # header must stay a single line even for multi-line sh -c scripts
+  # shellcheck disable=SC1003  # literal backslash deletion, not a quote escape
   _cmdline=$(printf '%s' "$*" | tr -d '\\' | tr '\n\t' '  ' | tr -s ' ')
+  run_capped "$CMD_TIMEOUT" "$@" > "$_out.raw" 2>&1
+  _rc=$?
+  _raw_size=$(wc -c < "$_out.raw" | tr -d ' ')
   {
     printf '# netdata-sos v%s | command: %s | captured: %s\n' "$VERSION" "$_cmdline" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-    run_capped "$CMD_TIMEOUT" "$@" 2>&1
-    printf '# exit: %s | duration: %ss\n' "$?" "$(( $(now_s) - _t0 ))"
-  } > "$_out" 2>&1
+    head -c "$API_CAP" "$_out.raw"
+    [ "$_raw_size" -gt "$API_CAP" ] && printf '\n### TRUNCATED: output was %s bytes, first %s kept ###\n' "$_raw_size" "$API_CAP"
+    printf '# exit: %s | duration: %ss\n' "$_rc" "$(( $(now_s) - _t0 ))"
+  } > "$_out"
+  rm -f "$_out.raw"
   sanitize_file "$_out"
   manifest_add "$_rel" "cmd" "$_cmdline" "$_title"
 }
@@ -417,6 +524,7 @@ collect_cmd_raw() {
   _out="$WORK/$_rel"
   deadline_exceeded && return 0
   mkdir -p "$(dirname "$_out")"
+  # shellcheck disable=SC1003  # literal backslash deletion, not a quote escape
   _cmdline=$(printf '%s' "$*" | tr -d '\\' | tr '\n\t' '  ' | tr -s ' ')
   run_capped "$CMD_TIMEOUT" "$@" > "$_out" 2>>"$ERRORS"
   if [ -s "$_out" ]; then
@@ -431,7 +539,7 @@ collect_cmd_raw() {
 NDPORT=19999
 api_ok=0
 collect_api() {
-  _rel="$1"; _title="$2"; _url="http://127.0.0.1:${NDPORT}$3"
+  _rel="$1"; _title="$2"; _upath="$3"; _url="http://127.0.0.1:${NDPORT}${_upath}"
   deadline_exceeded && return 0
   _out="$WORK/$_rel"; mkdir -p "$(dirname "$_out")"
   if command -v curl >/dev/null 2>&1; then
@@ -441,11 +549,83 @@ collect_api() {
   fi
   if [ -s "$_out" ]; then
     sanitize_file "$_out"
-    manifest_add "$_rel" "api" "$3" "$_title"
+    manifest_add "$_rel" "api" "$_upath" "$_title"
   else
     rm -f "$_out"
   fi
 }
+
+# --- sanitizer regression vectors (run with --selftest; extend when adding
+# --- redaction rules; a vector that fails here must never ship) -------------
+run_selftest() {
+  _tf="$STAGING/selftest.txt"
+  _fails=0
+  cat > "$_tf" <<'VECTORS'
+api key = SENTINEL-1
+Authorization: Bearer SENTINEL-2abc
+password: SENTINEL-3
+"claim_token": "SENTINEL-4"
+url: https://admin:SENTINEL-5@app.example.com/x
+dsn: user:SENTINEL-6@tcp(10.1.2.3:3306)/db
+dsn2: user:SENTINEL-7@unix(/run/mysql.sock)/db
+TELEGRAM_BOT_TOKEN="SENTINEL-8"
+TOKEN=false
+PASSWORD=/etc/SENTINEL-9
+GET /api/v1/data?chart=x&token=SENTINEL-10&after=-60
+/usr/sbin/netdata-claim.sh -token=SENTINEL-11 -rooms=abc
+cmdline: /usr/sbin/agent -token=SENTINEL-14 --verbose
+cmdline: claim.sh api key = SENTINEL-12 end
+[11111111-2222-3333-4444-555555555555]
+-----BEGIN RSA PRIVATE KEY-----
+U0VOVElORUwtMTMtUEVNLUJPRFk=
+-----END RSA PRIVATE KEY-----
+bearer token protection = no
+netdata management api key file = /var/lib/netdata/netdata.api.key
+TCP SYN cookies = auto
+destination = parent.bigcorp.example:19999
+destination = tcp:protoparent.example.com:19999
+destination = 10.7.7.7:19999
+tcp LISTEN 0 4096 later-line
+server at 10.1.2.3 and 2606:4700:10::ac42:aad8 and 2001:470:26:307:0:0:0:1
+mail ops@example.com mac aa:bb:cc:dd:ee:ff at 2026-07-16T13:38:34Z
+VECTORS
+  _obf_save="$OBFUSCATE"; OBFUSCATE=1
+  sanitize_file "$_tf"
+  OBFUSCATE="$_obf_save"
+  t_absent() {
+    if grep -q "$1" "$_tf"; then echo "FAIL (leak): $2"; _fails=$((_fails + 1)); fi
+  }
+  t_present() {
+    [ "$1" = "--" ] && shift
+    if ! grep -qF -- "$1" "$_tf"; then echo "FAIL (over-redaction): $2"; _fails=$((_fails + 1)); fi
+  }
+  t_absent  "SENTINEL-"                  "a planted secret survived"
+  t_absent  "U0VOVElORUw"                "PEM body survived"
+  t_absent  "TOKEN=false"                "TOKEN=false survived (values are never exempt)"
+  t_absent  "2606:4700"                  "compressed IPv6 survived"
+  t_absent  "2001:470:26:307:0:0:0:1"    "uncompressed numeric IPv6 survived"
+  t_absent  "10\.1\.2\.3"             "IPv4 survived"
+  t_absent  "parent.bigcorp.example"     "stream destination hostname survived"
+  t_absent  "protoparent.example.com"     "protocol-prefixed destination hostname survived"
+  t_absent  "10\.7\.7\.7"              "IP destination not pseudonymized as an IP"
+  t_present "tcp LISTEN 0 4096 later-line" "literal tcp corrupted by fqmap pollution"
+  t_present "destination = tcp:"          "destination protocol prefix lost"
+  t_absent  "ops@example.com"            "email survived"
+  t_absent  "aa:bb:cc:dd:ee:ff"          "MAC survived"
+  t_present "bearer token protection = no"  "diagnostic option lost (key-based exemption broken)"
+  t_present "api key file = /var/lib/netdata/netdata.api.key" "key-file path lost"
+  t_present "TCP SYN cookies = auto"     "SYN cookies value lost"
+  t_present "[REDACTED PRIVATE KEY BLOCK]" "PEM block marker missing"
+  t_present "2026-07-16T13:38:34Z"       "timestamp mangled by IPv6 rule"
+  t_present -- "--verbose"               "path-bearing argv line was eaten by the kv rule"
+  if [ "$_fails" -eq 0 ]; then
+    echo "netdata-sos selftest: ALL PASS"
+    exit 0
+  fi
+  echo "netdata-sos selftest: $_fails FAILURE(S)" >&2
+  exit 1
+}
+[ "$SELFTEST" = "1" ] && run_selftest
 
 # --- environment detection ------------------------------------------------------
 NETDATA_PID=$(pidof netdata 2>/dev/null | awk '{print $1}')
@@ -479,6 +659,21 @@ if command -v curl >/dev/null 2>&1 && curl -sf --max-time 3 "http://127.0.0.1:${
   api_ok=1
 elif command -v wget >/dev/null 2>&1 && wget -q -T 3 -O /dev/null "http://127.0.0.1:${NDPORT}/api/v1/info" 2>/dev/null; then
   api_ok=1
+fi
+
+# pre-seed child/mirrored node hostnames so they pseudonymize consistently in
+# EVERY file (node_instances, stream configs, logs). Their real names stay in
+# the local map for the user to decode.
+if [ "$api_ok" = "1" ]; then
+  _seed_n=0
+  for _h in $( { curl -sf --max-time 5 "http://127.0.0.1:${NDPORT}/api/v2/node_instances" 2>/dev/null || wget -q -T 5 -O - "http://127.0.0.1:${NDPORT}/api/v2/node_instances" 2>/dev/null; }       | tr ',{' '\n' | sed -nE 's/.*"(nm|hostname)" *: *"([^"]*)".*/\2/p' | sort -u); do
+    [ "$_h" = "$HOST_SHORT" ] && continue
+    [ "$_h" = "$HOST_FQDN" ] && continue
+    [ "$_h" = "localhost" ] && continue
+    [ ${#_h} -lt 4 ] && continue
+    _seed_n=$((_seed_n + 1))
+    printf 'fqdn\t%s\tprivate-host-%s\n' "$_h" "$_seed_n" >> "$MAP_FILE"
+  done
 fi
 
 IS_CONTAINER=0
@@ -594,26 +789,19 @@ if [ "$api_ok" = "1" ]; then
   collect_api 04-config/effective-netdata.conf "EFFECTIVE running config (merged, annotated) - authoritative over on-disk file" /netdata.conf
 fi
 if [ -n "$CONFDIR" ]; then
-  collect_cmd 04-config/config-tree.txt "User config dir tree (files here = user-customized)" ls -laR "$CONFDIR"
+  collect_cmd 04-config/config-tree.txt "User config dir tree (files here = user-customized)" sh -c 'ls -laR '"$CONFDIR"' 2>/dev/null | head -2000'
   collect_file 04-config/netdata.conf "On-disk main config" "$CONFDIR/netdata.conf"
   collect_file 04-config/stream.conf "Streaming config (parent/child; api key redacted)" "$CONFDIR/stream.conf"
   collect_file 04-config/exporting.conf "Exporting engine config (credentials redacted)" "$CONFDIR/exporting.conf"
   collect_file 04-config/go.d.conf "go.d orchestrator config (module enable/disable)" "$CONFDIR/go.d.conf"
-  # every user-customized collector/health config (these are the copies users made with edit-config)
-  for sub in go.d health.d python.d charts.d statsd.d; do
-    if [ -d "$CONFDIR/$sub" ]; then
-      for f in "$CONFDIR/$sub"/*.conf "$CONFDIR/$sub"/*.yml "$CONFDIR/$sub"/*.yaml; do
-        [ -f "$f" ] || continue
-        collect_file "04-config/$sub/$(basename "$f")" "User-customized $sub config (secrets redacted)" "$f" 262144
-      done
-    fi
-  done
-  for f in "$CONFDIR"/*.conf; do
-    [ -f "$f" ] || continue
-    case "$(basename "$f")" in
-      netdata.conf|stream.conf|exporting.conf|go.d.conf) ;;
-      *) collect_file "04-config/$(basename "$f")" "Additional user config" "$f" 262144 ;;
-    esac
+  # every user-customized config, nested dirs included (go.d/sd/, go.d/ss/,
+  # otel.d/, vnodes/, ...), relative paths preserved; ssl and key material
+  # excluded; capped at 200 files
+  find "$CONFDIR" -type f \( -name '*.conf' -o -name '*.yml' -o -name '*.yaml' \) 2>/dev/null | head -200 | while IFS= read -r f; do
+    case "$f" in */ssl/*|*.pem|*.key) continue ;; *) : ;; esac
+    _relc=${f#"$CONFDIR"/}
+    case "$_relc" in netdata.conf|stream.conf|exporting.conf|go.d.conf) continue ;; *) : ;; esac
+    collect_file "04-config/$_relc" "User config (secrets redacted)" "$f" 262144
   done
 fi
 if [ -n "$LIBDIR" ] && [ -f "$LIBDIR/cloud.d/cloud.conf" ]; then
@@ -639,7 +827,8 @@ if [ -n "$LOGDIR" ]; then
   DOCKER_LOGS_NEEDED=0
   if [ -L "$LOGDIR/daemon.log" ] || [ -L "$LOGDIR/error.log" ]; then
     _lt=$(readlink "$LOGDIR/daemon.log" 2>/dev/null || readlink "$LOGDIR/error.log" 2>/dev/null)
-    case "$_lt" in /dev/std*)
+    case "$_lt" in
+    /dev/std*)
       DOCKER_LOGS_NEEDED=1
       mkdir -p "$WORK/05-logs"
       cat > "$WORK/05-logs/LOGS-ARE-IN-DOCKER.txt" <<'EOF'
@@ -651,6 +840,7 @@ the docker host and attach the output:
 EOF
       manifest_add 05-logs/LOGS-ARE-IN-DOCKER.txt file generated "Instruction: agent logs live in 'docker logs' on the host"
       ;;
+    *) : ;;
     esac
   fi
 fi
@@ -667,6 +857,7 @@ collect_cmd 05-logs/coredumps.txt "Recent coredump METADATA for netdata (not the
 info "collecting: state"
 # status file: agent writes to first writable of these; newest mtime wins (status-file-io.c)
 NEWEST_STATUS=""
+# shellcheck disable=SC3013  # -nt is supported by dash, ash/busybox, bash and FreeBSD sh
 for sf in "$LIBDIR/status-netdata.json" "$CACHEDIR/status-netdata.json" /tmp/status-netdata.json /run/status-netdata.json /var/run/status-netdata.json; do
   [ -f "$sf" ] || continue
   if [ -z "$NEWEST_STATUS" ] || [ "$sf" -nt "$NEWEST_STATUS" ]; then NEWEST_STATUS="$sf"; fi
@@ -675,7 +866,7 @@ done
 if [ -n "$LIBDIR" ]; then
   # bearer_tokens/ FILENAMES are live API tokens - withhold them from the listing
   collect_cmd 06-state/state-tree.txt "State dir listing (bearer token filenames withheld - they are live tokens)" \
-    sh -c 'ls -laR '"$LIBDIR"' 2>/dev/null | awk "
+    sh -c 'ls -laR '"$LIBDIR"' 2>/dev/null | head -2000 | awk "
       /\/bearer_tokens:\$/ { print; skip=1; n=0; next }
       skip && /^\$/         { print \"  [\" n \" token file(s) - names withheld, they ARE the tokens]\"; print; skip=0; next }
       skip && /^total/      { next }
@@ -881,16 +1072,21 @@ manifest_add README.md file generated "Bundle documentation"
 # =============================================================================
 mkdir -p "$OUTDIR"
 TARBALL="$OUTDIR/$BUNDLE.tar.gz"
-# never write through a pre-existing path (symlink attack on shared tmp dirs)
-if [ -e "$TARBALL" ] || [ -L "$TARBALL" ]; then
-  echo "refusing to overwrite existing $TARBALL" >&2
+# build inside the 0700 staging dir, then publish with O_EXCL (set -C) so a
+# pre-existing file OR symlink planted in a shared tmp dir can never be
+# followed or overwritten (no check/open TOCTOU window)
+( cd "$STAGING" && tar czf "$STAGING/bundle.tar.gz" "$BUNDLE" ) || { echo "failed to create tarball" >&2; exit 1; }
+if ! ( set -C; cat "$STAGING/bundle.tar.gz" > "$TARBALL" ) 2>/dev/null; then
+  echo "refusing to write $TARBALL (a file or symlink already exists there)" >&2
   exit 1
 fi
-( cd "$STAGING" && tar czf "$TARBALL" "$BUNDLE" ) || { echo "failed to create tarball" >&2; exit 1; }
-chmod 600 "$TARBALL" 2>/dev/null
 
 if [ "$OBFUSCATE" = "1" ] && [ -s "$MAP_FILE" ]; then
-  cp "$MAP_FILE" "$OUTDIR/$BUNDLE.pseudonym-map.tsv" 2>/dev/null && chmod 600 "$OUTDIR/$BUNDLE.pseudonym-map.tsv"
+  MAP_OUT="$OUTDIR/$BUNDLE.pseudonym-map.tsv"
+  if ! ( set -C; cat "$MAP_FILE" > "$MAP_OUT" ) 2>/dev/null; then
+    info "could not write pseudonym map to $MAP_OUT (already exists) - kept in staging only"
+    MAP_OUT=""
+  fi
 fi
 
 TOTAL_S=$(( $(now_s) - START_TS ))
@@ -898,7 +1094,7 @@ SIZE=$(du -h "$TARBALL" 2>/dev/null | cut -f1)
 echo >&2
 info "done in ${TOTAL_S}s"
 info "bundle:  $TARBALL ($SIZE)"
-[ "$OBFUSCATE" = "1" ] && [ -s "$MAP_FILE" ] && info "pseudonym map (KEEP PRIVATE, do not send): $OUTDIR/$BUNDLE.pseudonym-map.tsv"
+[ "$OBFUSCATE" = "1" ] && [ -n "${MAP_OUT:-}" ] && info "pseudonym map (KEEP PRIVATE, do not send): $MAP_OUT"
 info "review it:  tar -tzf $TARBALL"
 if [ "${DOCKER_LOGS_NEEDED:-0}" = "1" ]; then
   info "IMPORTANT: this agent logs to the container's stdout - its log history is NOT in this bundle."

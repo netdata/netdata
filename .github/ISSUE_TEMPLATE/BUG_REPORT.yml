@@ -105,7 +105,7 @@ body:
         ```shell
         # Linux/macOS/BSD (also inside docker containers):
         sudo netdata-sos || \
-          { wget -O /tmp/netdata-sos.sh https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-sos.sh && sudo sh /tmp/netdata-sos.sh; }
+          { t=$(mktemp) && wget -O "$t" https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-sos.sh && sudo sh "$t"; }
         # Windows (elevated PowerShell):
         powershell -ExecutionPolicy Bypass -File "C:\Program Files\Netdata\usr\libexec\netdata\netdata-sos.ps1"
         ```

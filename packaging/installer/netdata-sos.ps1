@@ -10,7 +10,7 @@
 #
 # Usage (run in an elevated PowerShell):
 #   powershell -ExecutionPolicy Bypass -File netdata-sos.ps1 [-Output DIR]
-#              [-SinceHours 24] [-NoObfuscate] [-KeepStaging]
+#              [-SinceHours 24] [-NoObfuscate] [-KeepStaging] [-SelfTest]
 #
 # Requires Windows PowerShell 5.1+ (ships with Windows Server 2016+) or
 # PowerShell 7. Output: netdata-sos-<timestamp>.zip
@@ -22,6 +22,7 @@ param(
     [int]$TimeoutSeconds = 10,
     [switch]$NoObfuscate,
     [switch]$KeepStaging,
+    [switch]$SelfTest,
     [switch]$Version
 )
 
@@ -40,7 +41,7 @@ $GlobalDeadline = (Get-Date).AddSeconds(240)
 try {
     $proc = Get-Process -Id $PID
     $proc.PriorityClass = [System.Diagnostics.ProcessPriorityClass]::Idle
-} catch { }
+} catch { Write-Verbose "could not lower process priority: $_" }
 
 $StartTime = Get-Date
 $Stamp = (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss')
@@ -51,9 +52,11 @@ New-Item -ItemType Directory -Path $Work -Force | Out-Null
 $script:ManifestRows = New-Object System.Collections.ArrayList
 $script:PseudoMap = @{}   # original -> pseudonym
 $script:IpCount = 0
+$script:Ip6Count = 0
 $script:FqdnCount = 0
+$script:SeededHosts = @() # child/mirrored hostnames pre-seeded from the local API
 
-function Write-Info([string]$msg) { Write-Host " [*] $msg" }
+function Show-Info([string]$msg) { Write-Host " [*] $msg" }
 
 function Test-Deadline { return ((Get-Date) -gt $GlobalDeadline) }
 
@@ -69,7 +72,7 @@ $SecretKeyWords = @(
     'session','recipient','account sid','priv key'
 )
 $HostShort = $env:COMPUTERNAME
-$HostFqdn = try { [System.Net.Dns]::GetHostEntry('').HostName } catch { '' }
+$HostFqdn = try { [System.Net.Dns]::GetHostEntry('').HostName } catch { Write-Verbose "no FQDN: $_"; '' }
 $RunUser = $env:USERNAME
 if ($RunUser -in @('SYSTEM', 'Administrator') -or -not $RunUser -or $RunUser.Length -lt 3) { $RunUser = '' }
 
@@ -79,41 +82,48 @@ function Test-SecretKey([string]$key) {
     return $false
 }
 
-function Test-HarmlessValue([string]$v) {
-    # boolean/mode literals and paths are never secrets; keeping them preserves
-    # diagnostics like "bearer token protection = no"
-    $v = $v.Trim()
-    if ($v -match '^(yes|no|true|false|on|off|auto|none|enabled|disabled)$') { return $true }
-    if ($v -match '^([A-Za-z]:\\|/)') { return $true }
+function Test-DiagnosticKey([string]$key) {
+    # keys that DESCRIBE secrets rather than hold them ("bearer token protection",
+    # "netdata management api key file") end in a diagnostic noun; their values are
+    # settings, not credentials. Exemption is KEY-based on purpose: a value like
+    # "false" or "/root/x" attached to a real secret key must still be redacted.
+    $k = ($key -replace '[-_]', ' ').ToLower().Trim(' ', '#', "`t")
+    foreach ($w in @('file', 'path', 'dir', 'directory', 'protection', 'support', 'mode',
+                     'level', 'port', 'timeout', 'cookies', 'secure', 'log', 'size', 'options')) {
+        if ($k -eq $w -or $k.EndsWith(" $w")) { return $true }
+    }
     return $false
 }
 
 function Get-Pseudonym([string]$orig, [string]$prefix) {
     if (-not $script:PseudoMap.ContainsKey($orig)) {
         if ($prefix -eq 'ip') { $script:IpCount++; $script:PseudoMap[$orig] = "ip-$($script:IpCount)" }
+        elseif ($prefix -eq 'ip6') { $script:Ip6Count++; $script:PseudoMap[$orig] = "ip6-$($script:Ip6Count)" }
         elseif ($prefix -eq 'fqdn') { $script:FqdnCount++; $script:PseudoMap[$orig] = "private-host-$($script:FqdnCount)" }
         else { $script:PseudoMap[$orig] = 'redacted-host' }
     }
     return $script:PseudoMap[$orig]
 }
 
-function Invoke-SanitizeLine([string]$line) {
+function Invoke-RedactSecretLine([string]$line) {
+    # pass 1 (always on): credential redaction
     # stream.conf-style [<uuid>] section headers are api keys
     if ($line -match '^\s*\[[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\]\s*$') {
         return '[REDACTED-KEY-SECTION]'
     }
     # ini/yaml/env key = value | key: value
     # (JSON-shaped lines are owned by the json rule below, which preserves quoting)
-    # only plausible config keys: short, no sentence/shell punctuation
-    if ($line -notmatch '^\s*"' -and $line -match '^([^=:]{1,64})([=:])(.+)$' -and $Matches[1] -notmatch '["`;|()]') {
-        if ((Test-SecretKey $Matches[1]) -and $Matches[3].Trim().Length -gt 1 -and -not (Test-HarmlessValue $Matches[3])) {
+    # only plausible config keys: short, no sentence/shell punctuation, no path
+    # separators (command lines with paths belong to the argv rule below)
+    if ($line -notmatch '^\s*"' -and $line -match '^([^=:]{1,64})([=:])(.+)$' -and $Matches[1] -notmatch '["`;|()/]') {
+        if ((Test-SecretKey $Matches[1]) -and $Matches[3].Trim().Length -gt 1 -and -not (Test-DiagnosticKey $Matches[1])) {
             $line = $Matches[1] + $Matches[2] + ' [REDACTED]'
         }
     }
     # json "key": "value" pairs (possibly several per line)
     $line = [regex]::Replace($line, '"([^"]+)"\s*:\s*"([^"]*)"', {
         param($m)
-        if ((Test-SecretKey $m.Groups[1].Value) -and -not (Test-HarmlessValue $m.Groups[2].Value)) { '"' + $m.Groups[1].Value + '": "[REDACTED]"' }
+        if ((Test-SecretKey $m.Groups[1].Value) -and -not (Test-DiagnosticKey $m.Groups[1].Value)) { '"' + $m.Groups[1].Value + '": "[REDACTED]"' }
         else { $m.Value }
     })
     # URL creds and Go-style DSN creds
@@ -127,54 +137,175 @@ function Invoke-SanitizeLine([string]$line) {
     # secrets passed as URL query parameters (access-log request lines etc.)
     $line = $line -replace '([?&](token|apikey|api_key|password|passwd|secret|bearer|claim_token|claim_rooms|key|auth)=)[^&"\s]+', '$1[REDACTED]'
     # argv/env-style secrets mid-line (process command lines: -token=X, CLAIM_TOKEN=X),
-    # incl. two-word keys ("api key = X"); harmless literal values are kept
+    # incl. two-word keys ("api key = X"); diagnostic-noun keys are kept
     $line = [regex]::Replace($line, '(?i)(([\w.-]*(token|password|passwd|secret|apikey|api_key|community|bearer)|(api|license|auth|access) key|proxy (user|pass|password)) ?= ?)([^&"\s\[]+)', {
         param($m)
-        if (Test-HarmlessValue $m.Groups[6].Value) { $m.Value } else { $m.Groups[1].Value + '[REDACTED]' }
+        if (Test-DiagnosticKey $m.Groups[2].Value) { $m.Value } else { $m.Groups[1].Value + '[REDACTED]' }
     })
-    if ($line -match '-----BEGIN .*PRIVATE KEY') { return '[REDACTED PRIVATE KEY]' }
+    # NOTE: multiline PEM private-key blocks are handled by Invoke-SanitizeFile,
+    # which tracks BEGIN/END state across lines and withholds the whole block.
+    return $line
+}
 
-    if ($Obfuscate) {
-        $line = $line -replace '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', '[EMAIL]'
-        $line = $line -replace '\b([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b', '[MAC]'
-        # IPv4 (keep loopback/wildcard/broadcast)
-        $line = [regex]::Replace($line, '\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', {
-            param($m)
-            $ip = $m.Value
-            if ($ip -like '127.*' -or $ip -eq '0.0.0.0' -or $ip -like '255.*') { return $ip }
-            return (Get-Pseudonym $ip 'ip')
-        })
-        # IPv6: hex-and-colon runs, validated to skip timestamps/:: tokens/loopback
-        $line = [regex]::Replace($line, '(?<![\w.-])[0-9A-Fa-f:]{5,}', {
-            param($m)
-            $c = $m.Value
-            $nc = ($c.ToCharArray() | Where-Object { $_ -eq ':' }).Count
-            if ($nc -eq 0 -or $c -eq '::1' -or
-                ($nc -lt 3 -and $c -notmatch '::') -or
-                ($c -notmatch '[A-Fa-f]' -and $c -notmatch '::')) { return $c }
-            return (Get-Pseudonym $c 'ip')
-        })
-        # clearly-private FQDNs
-        $line = [regex]::Replace($line, '\b[A-Za-z0-9][A-Za-z0-9.-]*\.(internal|local|lan|corp|intranet|localdomain)\b', {
-            param($m); return (Get-Pseudonym $m.Value 'fqdn')
-        })
-        # this host's names
-        if ($HostFqdn -and $HostFqdn.Length -ge 4) { $line = $line.Replace($HostFqdn, (Get-Pseudonym $HostFqdn 'host')) }
-        if ($HostShort -and $HostShort.Length -ge 4 -and $HostShort -ne $HostFqdn) {
-            $line = $line -ireplace [regex]::Escape($HostShort), (Get-Pseudonym $HostShort 'host')
+function Invoke-ObfuscatePiiLine([string]$line) {
+    # pass 2 (default on): PII pseudonymization
+    # stream.conf destination hosts are user infrastructure regardless of TLD.
+    # Token syntax: [PROTOCOL:]HOST[%IFACE][:PORT][:SSL]. Runs BEFORE the IP
+    # rules (pure-IP tokens are skipped and left to them).
+    if ($line -match '^\s*(proxy )?destination\s*=') {
+        $eq = $line.IndexOf('=')
+        $head = $line.Substring(0, $eq + 1)
+        $rebuilt = foreach ($tok in ($line.Substring($eq + 1) -split '\s+')) {
+            if (-not $tok) { continue }
+            $work = $tok; $prefix = ''; $suffix = ''
+            if ($work -match '^(tcp:|udp:|unix:)(.*)$') { $prefix = $Matches[1]; $work = $Matches[2] }
+            if (-not $work.StartsWith('[') -and -not $work.StartsWith('/')) {
+                $cut = $work.IndexOfAny([char[]]('%', ':'))
+                if ($cut -ge 0) { $suffix = $work.Substring($cut); $work = $work.Substring(0, $cut) }
+                if ($work.Length -ge 4 -and
+                    $work -notmatch '^(ip6?-\d+|private-host-\d+)$' -and
+                    $work -notmatch '^\d{1,3}(\.\d{1,3}){3}$' -and
+                    $work -notmatch '^[0-9A-Fa-f:]+$') {
+                    $work = Get-Pseudonym $work 'fqdn'
+                }
+            }
+            $prefix + $work + $suffix
         }
-        if ($RunUser) { $line = $line -ireplace [regex]::Escape($RunUser), 'redacted-user' }
+        $line = $head + ' ' + ($rebuilt -join ' ')
     }
+    $line = $line -replace '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', '[EMAIL]'
+    $line = $line -replace '\b([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b', '[MAC]'
+    # IPv4 (keep loopback/wildcard/broadcast)
+    $line = [regex]::Replace($line, '\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', {
+        param($m)
+        $ip = $m.Value
+        if ($ip -like '127.*' -or $ip -eq '0.0.0.0' -or $ip -like '255.*') { return $ip }
+        return (Get-Pseudonym $ip 'ip')
+    })
+    # IPv6: hex-and-colon runs, validated to skip timestamps/:: tokens/loopback.
+    # 6+ colons is always accepted: numeric-only uncompressed IPv6 has 7,
+    # timestamps never have more than 2.
+    $line = [regex]::Replace($line, '(?<![\w.-])[0-9A-Fa-f:]{5,}', {
+        param($m)
+        $c = $m.Value
+        $nc = [regex]::Matches($c, ':').Count
+        if ($nc -eq 0 -or $c -eq '::1' -or
+            ($nc -lt 3 -and $c -notmatch '::') -or
+            ($nc -lt 6 -and $c -notmatch '[A-Fa-f]' -and $c -notmatch '::')) { return $c }
+        return (Get-Pseudonym $c 'ip6')
+    })
+    # clearly-private FQDNs
+    $line = [regex]::Replace($line, '\b[A-Za-z0-9][A-Za-z0-9.-]*\.(internal|local|lan|corp|intranet|localdomain)\b', {
+        param($m); return (Get-Pseudonym $m.Value 'fqdn')
+    })
+    # child/mirrored hostnames pre-seeded from the local API (longest first,
+    # word-boundary guarded so "host1" never corrupts "host10")
+    foreach ($k in $script:SeededHosts) {
+        if ($line.IndexOf($k, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+            $line = [regex]::Replace($line, "(?<![\w.-])$([regex]::Escape($k))(?![\w.-])",
+                $script:PseudoMap[$k], [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        }
+    }
+    # this host's names
+    if ($HostFqdn -and $HostFqdn.Length -ge 4) { $line = $line.Replace($HostFqdn, (Get-Pseudonym $HostFqdn 'host')) }
+    if ($HostShort -and $HostShort.Length -ge 4 -and $HostShort -ne $HostFqdn) {
+        $line = $line -ireplace [regex]::Escape($HostShort), (Get-Pseudonym $HostShort 'host')
+    }
+    if ($RunUser) {
+        if (-not $script:PseudoMap.ContainsKey($RunUser)) { $script:PseudoMap[$RunUser] = 'redacted-user' }
+        $line = $line -ireplace [regex]::Escape($RunUser), 'redacted-user'
+    }
+    return $line
+}
+
+function Invoke-SanitizeLine([string]$line) {
+    $line = Invoke-RedactSecretLine $line
+    if ($Obfuscate) { $line = Invoke-ObfuscatePiiLine $line }
     return $line
 }
 
 function Invoke-SanitizeFile([string]$path) {
     if (-not (Test-Path $path)) { return }
     $out = New-Object System.Collections.ArrayList
+    $inPem = $false
     foreach ($l in [System.IO.File]::ReadAllLines($path)) {
+        # multiline PEM private keys: withhold the WHOLE block, BEGIN through END;
+        # if the file ends before END, everything after BEGIN stays withheld (fail closed)
+        if ($inPem) {
+            if ($l -match '-----END [A-Z0-9 ]*PRIVATE KEY') { $inPem = $false }
+            continue
+        }
+        if ($l -match '-----BEGIN [A-Z0-9 ]*PRIVATE KEY') {
+            $inPem = $true
+            [void]$out.Add('[REDACTED PRIVATE KEY BLOCK]')
+            continue
+        }
         [void]$out.Add((Invoke-SanitizeLine $l))
     }
     [System.IO.File]::WriteAllLines($path, $out)
+}
+
+# --- sanitizer self-test (-SelfTest) ----------------------------------------------
+# Table-driven regression suite for the redaction rules. Run it after ANY change
+# to the sanitizer, and keep it in parity with the POSIX script's --selftest.
+if ($SelfTest) {
+    $HostShort = 'testhost99'
+    $HostFqdn = 'testhost99.example.com'
+    $RunUser = 'testuser9'
+    $vectors = @(
+        @{ in = 'api key = SENTINEL-1';                                            mustNot = @('SENTINEL');            must = @('[REDACTED]') }
+        @{ in = '    Authorization: Bearer SENTINEL-2abc123';                      mustNot = @('SENTINEL');            must = @('[REDACTED]') }
+        @{ in = 'password: SENTINEL-3';                                            mustNot = @('SENTINEL');            must = @('[REDACTED]') }
+        @{ in = '"claim_token": "SENTINEL-4"';                                     mustNot = @('SENTINEL');            must = @('[REDACTED]') }
+        @{ in = 'url: https://admin:SENTINEL-5@app.example.com/x';                 mustNot = @('SENTINEL');            must = @('[REDACTED]@') }
+        @{ in = 'dsn: user:SENTINEL-6@tcp(10.1.2.3:3306)/db';                      mustNot = @('SENTINEL');            must = @('[REDACTED]') }
+        @{ in = 'TELEGRAM_BOT_TOKEN="SENTINEL-7"';                                 mustNot = @('SENTINEL');            must = @('[REDACTED]') }
+        @{ in = 'DEFAULT_RECIPIENT_SLACK="SENTINEL-8"';                            mustNot = @('SENTINEL');            must = @('[REDACTED]') }
+        @{ in = '[11111111-2222-3333-4444-555555555555]';                          mustNot = @('11111111');            must = @('[REDACTED-KEY-SECTION]') }
+        @{ in = 'destination = parent.example.internal:19999';                     mustNot = @('parent.example');      must = @('private-host') }
+        @{ in = 'server at 10.1.2.3 talked to 192.168.5.7 then 10.1.2.3 again';    mustNot = @('10.1.2.3', '192.168'); must = @('ip-') }
+        @{ in = 'admin email is ops@customer-corp.com on host testhost99';         mustNot = @('customer-corp', 'testhost99'); must = @('[EMAIL]', 'redacted-host') }
+        @{ in = 'GET /api/v1/data?chart=x&token=SENTINEL-9&after=-60';             mustNot = @('SENTINEL');            must = @('[REDACTED]', 'after=-60') }
+        @{ in = 'netdata 1234 /usr/sbin/netdata-claim.sh -token=SENTINEL-10 -rooms=abc'; mustNot = @('SENTINEL');      must = @('[REDACTED]', '-rooms=abc') }
+        @{ in = 'Environment: NETDATA_CLAIM_TOKEN=SENTINEL-11 PATH=/usr/bin';      mustNot = @('SENTINEL');            must = @('[REDACTED]') }
+        @{ in = 'IPv6: 2606:4700:10::ac42:aad8 and fe80::1ff:fe23:4567:890a';      mustNot = @('2606:4700', 'fe80::1ff'); must = @('ip6-') }
+        @{ in = 'peer 2001:470:26:307:0:0:0:1 connected';                          mustNot = @('2001:470');            must = @('ip6-') }
+        @{ in = 'captured: 2026-07-16T13:38:34Z listening on ::1 and file.c:123';  mustNot = @();                      must = @('13:38:34Z', '::1', 'file.c:123') }
+        @{ in = '# bearer token protection = no';                                  mustNot = @('[REDACTED]');          must = @('bearer token protection = no') }
+        @{ in = '# TCP SYN cookies = auto';                                        mustNot = @('[REDACTED]');          must = @('auto') }
+        @{ in = '# netdata management api key file = /var/lib/netdata/netdata.api.key'; mustNot = @('[REDACTED]');     must = @('/var/lib/netdata/netdata.api.key') }
+        @{ in = 'cmdline: /x/claim.sh api key = SENTINEL-12 end';                  mustNot = @('SENTINEL');            must = @('[REDACTED]', 'end') }
+        @{ in = 'TOKEN=false';                                                     mustNot = @('false');               must = @('[REDACTED]') }
+        @{ in = 'PASSWORD=/root/x';                                                mustNot = @('/root/x');             must = @('[REDACTED]') }
+        @{ in = 'destination = tcp:parent.example.com:19999';                      mustNot = @('parent.example.com');  must = @('tcp:', 'private-host', ':19999') }
+        @{ in = 'tcp LISTEN 0 4096 *:19999';                                       mustNot = @('private-host');        must = @('tcp LISTEN') }
+    )
+    $fails = 0
+    foreach ($v in $vectors) {
+        $result = Invoke-SanitizeLine $v.in
+        $ok = $true
+        foreach ($p in $v.mustNot) { if ($result.IndexOf($p, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) { $ok = $false } }
+        foreach ($p in $v.must) { if ($result.IndexOf($p, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) { $ok = $false } }
+        if ($ok) { Write-Output "ok:   $result" } else { Write-Output "FAIL: '$($v.in)' -> '$result'"; $fails++ }
+    }
+    # multiline PEM block must be withheld end-to-end by the file-level sanitizer
+    $pemTmp = Join-Path $Staging 'pem-test.txt'
+    @('before line',
+      '-----BEGIN RSA PRIVATE KEY-----',
+      'MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQ',
+      'aGVsbG8gd29ybGQgdGhpcyBpcyBrZXkgbWF0ZXJpYWw=',
+      '-----END RSA PRIVATE KEY-----',
+      'after line') | Set-Content $pemTmp
+    Invoke-SanitizeFile $pemTmp
+    $pem = Get-Content $pemTmp -Raw
+    if ($pem -match 'MIIEvQ' -or $pem -match 'aGVsbG8' -or $pem -notmatch '\[REDACTED PRIVATE KEY BLOCK\]' -or
+        $pem -notmatch 'before line' -or $pem -notmatch 'after line') {
+        Write-Output 'FAIL: PEM block not fully withheld'; $fails++
+    } else { Write-Output 'ok:   PEM block withheld (begin/body/end gone, surrounding lines kept)' }
+    Remove-Item $Staging -Recurse -Force
+    if ($fails -gt 0) { Write-Output "SELF TEST: $fails FAILURES"; exit 1 }
+    Write-Output 'SELF TEST: ALL PASS'
+    exit 0
 }
 
 # --- manifest -------------------------------------------------------------------
@@ -200,9 +331,34 @@ function Collect-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$o
         if ($done) { $result = Receive-Job $job 2>&1 | Out-String } else { $result = "TIMEOUT after ${TimeoutSeconds}s" }
         Remove-Job $job -Force
     } catch { $result = "ERROR: $_" }
+    if ($result.Length -gt 2MB) { $result = $result.Substring(0, 2MB) + "`r`n### TRUNCATED at 2MB ###" }
     Set-Content -Path $full -Value ($header + "`r`n" + $result)
     Invoke-SanitizeFile $full
     Add-Manifest $rel 'cmd' $originText $title
+}
+
+function Collect-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$originText) {
+    # like Collect-Cmd but with NO header/trailer, for commands whose output must
+    # stay parseable (JSON). Provenance lives in MANIFEST.json only. The file is
+    # removed if the command produced nothing.
+    if (Test-Deadline) { return }
+    $full = Join-Path $Work $rel
+    New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
+    $result = ''
+    try {
+        $job = Start-Job -ScriptBlock $cmd
+        $done = Wait-Job $job -Timeout $TimeoutSeconds
+        if ($done) { $result = Receive-Job $job 2>&1 | Out-String }
+        Remove-Job $job -Force
+    } catch { Write-Verbose "collector failed: $_" }
+    if ($result -and $result.Trim().Length -gt 0) {
+        if ($result.Length -gt 2MB) { $result = $result.Substring(0, 2MB) }
+        Set-Content -Path $full -Value $result
+        Invoke-SanitizeFile $full
+        Add-Manifest $rel 'cmd' $originText $title
+    } elseif (Test-Path $full) {
+        Remove-Item $full -Force
+    }
 }
 
 function Collect-File([string]$rel, [string]$title, [string]$src, [long]$cap = 0) {
@@ -231,13 +387,16 @@ function Collect-File([string]$rel, [string]$title, [string]$src, [long]$cap = 0
 }
 
 $NdPort = 19999
+$CloudHost = 'app.netdata.cloud'   # reachability probe target
 function Collect-Api([string]$rel, [string]$title, [string]$urlPath) {
     if (Test-Deadline) { return }
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
     try {
         $resp = Invoke-WebRequest -Uri "http://127.0.0.1:$NdPort$urlPath" -UseBasicParsing -TimeoutSec $TimeoutSeconds
-        Set-Content -Path $full -Value $resp.Content
+        $content = $resp.Content
+        if ($content.Length -gt 2MB) { $content = $content.Substring(0, 2MB) }
+        Set-Content -Path $full -Value $content
         Invoke-SanitizeFile $full
         Add-Manifest $rel 'api' $urlPath $title
     } catch {
@@ -260,10 +419,33 @@ $ApiOk = $false
 try {
     Invoke-WebRequest -Uri "http://127.0.0.1:$NdPort/api/v1/info" -UseBasicParsing -TimeoutSec 3 | Out-Null
     $ApiOk = $true
-} catch { }
+} catch { Write-Verbose "agent API not reachable: $_" }
 
-Write-Info "netdata-sos $SosVersion (Windows)"
-Write-Info ("service: {0} | process: {1} | api: {2}" -f `
+# pre-seed pseudonyms for child/mirrored hostnames, so a parent's children are
+# obfuscated consistently in every file (node_instances, stream configs, logs)
+if ($ApiOk -and $Obfuscate) {
+    try {
+        $names = @()
+        $ni = (Invoke-WebRequest -Uri "http://127.0.0.1:$NdPort/api/v2/node_instances" -UseBasicParsing -TimeoutSec $TimeoutSeconds).Content | ConvertFrom-Json
+        if ($ni -and $ni.PSObject.Properties['nodes']) { $names += @($ni.nodes | ForEach-Object { $_.nm }) }
+        $v1 = (Invoke-WebRequest -Uri "http://127.0.0.1:$NdPort/api/v1/info" -UseBasicParsing -TimeoutSec $TimeoutSeconds).Content | ConvertFrom-Json
+        if ($v1 -and $v1.PSObject.Properties['mirrored_hosts']) { $names += @($v1.mirrored_hosts) }
+        foreach ($n in ($names | Sort-Object -Unique)) {
+            if (-not $n -or $n.Length -lt 4 -or $n -eq 'localhost' -or $n -eq $HostShort -or $n -eq $HostFqdn) { continue }
+            if (-not $script:PseudoMap.ContainsKey($n)) {
+                $script:FqdnCount++
+                $script:PseudoMap[$n] = "private-host-$($script:FqdnCount)"
+            }
+        }
+        # longest first so overlapping names (host, host-2) replace correctly
+        $script:SeededHosts = @($script:PseudoMap.Keys |
+            Where-Object { $script:PseudoMap[$_] -like 'private-host*' } |
+            Sort-Object { $_.Length } -Descending)
+    } catch { Write-Verbose "child hostname pre-seed failed: $_" }
+}
+
+Show-Info "netdata-sos $SosVersion (Windows)"
+Show-Info ("service: {0} | process: {1} | api: {2}" -f `
     $(if ($NetdataSvc) { $NetdataSvc.Status } else { 'not installed' }), `
     $(if ($NetdataProc) { "pid $($NetdataProc.Id)" } else { 'not running' }), `
     $(if ($ApiOk) { 'up' } else { 'unreachable' }))
@@ -271,7 +453,7 @@ Write-Info ("service: {0} | process: {1} | api: {2}" -f `
 # ============================================================================
 # 01-system
 # ============================================================================
-Write-Info 'collecting: system'
+Show-Info 'collecting: system'
 Collect-Cmd '01-system\os-version.txt' 'OS version and build' { Get-CimInstance Win32_OperatingSystem | Format-List Caption, Version, BuildNumber, OSArchitecture, LastBootUpTime, TotalVisibleMemorySize, FreePhysicalMemory } 'Get-CimInstance Win32_OperatingSystem'
 Collect-Cmd '01-system\computer-info.txt' 'Hardware, domain role, virtualization' { Get-CimInstance Win32_ComputerSystem | Format-List Manufacturer, Model, SystemType, NumberOfProcessors, NumberOfLogicalProcessors, TotalPhysicalMemory, DomainRole, HypervisorPresent } 'Get-CimInstance Win32_ComputerSystem'
 Collect-Cmd '01-system\disk-usage.txt' 'Volume usage' { Get-CimInstance Win32_LogicalDisk | Format-Table DeviceID, @{n='SizeGB';e={[math]::Round($_.Size/1GB,1)}}, @{n='FreeGB';e={[math]::Round($_.FreeSpace/1GB,1)}}, FileSystem -AutoSize } 'Get-CimInstance Win32_LogicalDisk'
@@ -281,7 +463,7 @@ Collect-Cmd '01-system\uptime.txt' 'System uptime' { (Get-Date) - (Get-CimInstan
 # ============================================================================
 # 02-install
 # ============================================================================
-Write-Info 'collecting: install'
+Show-Info 'collecting: install'
 # NOTE: never use Win32_Product here - querying it triggers MSI reconfiguration
 # of every installed package. The uninstall registry keys are the safe source.
 Collect-Cmd '02-install\msi-info.txt' 'Installed Netdata MSI package info (from uninstall registry)' {
@@ -292,7 +474,7 @@ Collect-Cmd '02-install\msi-info.txt' 'Installed Netdata MSI package info (from 
             Format-List DisplayName, DisplayVersion, InstallDate, InstallLocation, Publisher
     }
 } 'registry uninstall keys (Netdata)'
-Collect-Cmd '02-install\install-tree.txt' 'Install dir layout (top levels)' { Get-ChildItem 'C:\Program Files\Netdata' -Depth 1 | Format-Table Mode, LastWriteTime, Length, Name -AutoSize } 'Get-ChildItem C:\Program Files\Netdata -Depth 1'
+Collect-Cmd '02-install\install-tree.txt' 'Install dir layout (top levels)' { Get-ChildItem $using:NetdataPrefix -Depth 1 | Format-Table Mode, LastWriteTime, Length, Name -AutoSize } "Get-ChildItem $NetdataPrefix -Depth 1"
 if (Test-Path (Join-Path $ConfDir '.install-type')) {
     Collect-File '02-install\install-type.file.txt' 'Install type marker' (Join-Path $ConfDir '.install-type')
 }
@@ -300,44 +482,52 @@ if (Test-Path (Join-Path $ConfDir '.install-type')) {
 # ============================================================================
 # 03-process
 # ============================================================================
-Write-Info 'collecting: process'
+Show-Info 'collecting: process'
 Collect-Cmd '03-process\netdata-processes.txt' 'Netdata process tree with CPU/memory' { Get-Process | Where-Object { $_.ProcessName -match 'netdata|go.d|ebpf|windows.plugin' } | Format-Table Id, ProcessName, CPU, WorkingSet64, HandleCount, Threads -AutoSize } 'Get-Process (netdata family)'
 Collect-Cmd '03-process\service-status.txt' 'Netdata service state and config' { Get-Service Netdata | Format-List *; (Get-CimInstance Win32_Service -Filter "Name='Netdata'") | Format-List StartMode, StartName, PathName, State, ExitCode } 'Get-Service Netdata + Win32_Service'
 
 # ============================================================================
 # 04-config
 # ============================================================================
-Write-Info 'collecting: config'
+Show-Info 'collecting: config'
 if ($ApiOk) {
     Collect-Api '04-config\effective-netdata.conf' 'EFFECTIVE running config (merged, annotated) - authoritative over on-disk file' '/netdata.conf'
 }
 if (Test-Path $ConfDir) {
-    Collect-Cmd '04-config\config-tree.txt' 'User config dir tree (files here = user-customized)' { Get-ChildItem 'C:\Program Files\Netdata\etc\netdata' -Recurse | Format-Table Mode, LastWriteTime, Length, FullName -AutoSize } "Get-ChildItem $ConfDir -Recurse"
+    Collect-Cmd '04-config\config-tree.txt' 'User config dir tree (files here = user-customized)' { Get-ChildItem $using:ConfDir -Recurse -ErrorAction SilentlyContinue | Select-Object -First 2000 | Format-Table Mode, LastWriteTime, Length, FullName -AutoSize } "Get-ChildItem $ConfDir -Recurse"
     Collect-File '04-config\netdata.conf' 'On-disk main config' (Join-Path $ConfDir 'netdata.conf')
     Collect-File '04-config\stream.conf' 'Streaming config (parent/child; api key redacted)' (Join-Path $ConfDir 'stream.conf')
     Collect-File '04-config\claim.conf' 'Cloud claim config (token redacted)' (Join-Path $ConfDir 'claim.conf')
     Collect-File '04-config\go.d.conf' 'go.d orchestrator config' (Join-Path $ConfDir 'go.d.conf')
-    foreach ($sub in @('go.d', 'health.d')) {
+    # every user-customized collector/health config, keeping subdirectory
+    # structure (go.d\sd\*.conf must not collide with go.d\*.conf); ssl dirs
+    # and key material are never collected. Capped at 200 files.
+    $script:ConfCollected = 0
+    foreach ($sub in @('go.d', 'health.d', 'python.d', 'charts.d', 'statsd.d')) {
         $subDir = Join-Path $ConfDir $sub
-        if (Test-Path $subDir) {
-            Get-ChildItem $subDir -File -Include '*.conf', '*.yml', '*.yaml' -Recurse | ForEach-Object {
-                Collect-File "04-config\$sub\$($_.Name)" "User-customized $sub config (secrets redacted)" $_.FullName 256KB
+        if (-not (Test-Path $subDir)) { continue }
+        Get-ChildItem $subDir -File -Recurse -Include '*.conf', '*.yml', '*.yaml' -ErrorAction SilentlyContinue |
+            Where-Object { $_.FullName -notmatch '\\ssl\\' -and $_.Extension -notin @('.pem', '.key') } |
+            ForEach-Object {
+                if ($script:ConfCollected -ge 200) { return }
+                $relSub = $_.FullName.Substring($subDir.Length).TrimStart('\')
+                Collect-File "04-config\$sub\$relSub" "User-customized $sub config (secrets redacted)" $_.FullName 256KB
+                $script:ConfCollected++
             }
-        }
     }
 }
 
 # ============================================================================
 # 05-logs (Windows: Event Log is the primary destination)
 # ============================================================================
-Write-Info "collecting: logs (last ${SinceHours}h, Event Log + files)"
-$SinceTime = (Get-Date).AddHours(-$SinceHours)
+Show-Info "collecting: logs (last ${SinceHours}h, Event Log + files)"
 Collect-Cmd '05-logs\eventlog-netdata.txt' 'Netdata events from Windows Event Log (NetdataWEL + Application)' {
-    $since = (Get-Date).AddHours(-24)
+    $since = (Get-Date).AddHours(-[int]$using:SinceHours)
     foreach ($logName in @('NetdataWEL', 'Application')) {
         Get-WinEvent -FilterHashtable @{ LogName = $logName; StartTime = $since } -MaxEvents 2000 -ErrorAction SilentlyContinue |
             Where-Object { $_.ProviderName -match 'Netdata' } |
-            Select-Object TimeCreated, ProviderName, LevelDisplayName, Message | Format-List
+            Select-Object TimeCreated, ProviderName, LevelDisplayName, Message |
+            Format-List
     }
 } "Get-WinEvent NetdataWEL/Application (Netdata providers, last ${SinceHours}h)"
 if (Test-Path $LogDir) {
@@ -349,68 +539,78 @@ if (Test-Path $LogDir) {
 # ============================================================================
 # 06-state
 # ============================================================================
-Write-Info 'collecting: state'
+Show-Info 'collecting: state'
 $StatusFile = Join-Path $LibDir 'status-netdata.json'
 if (Test-Path $StatusFile) {
     Collect-File '06-state\status-file.json' 'Daemon status file: LAST EXIT/CRASH RECORD incl. fatal stack trace (read this first for crashes)' $StatusFile
 }
 if (Test-Path $LibDir) {
-    Collect-Cmd '06-state\state-tree.txt' 'State dir listing (secret files listed by name only, never read)' { Get-ChildItem 'C:\Program Files\Netdata\var\lib\netdata' -Recurse | Format-Table Mode, LastWriteTime, Length, FullName -AutoSize } "Get-ChildItem $LibDir -Recurse"
+    # bearer_tokens FILENAMES are live API tokens - list only their count
+    Collect-Cmd '06-state\state-tree.txt' 'State dir listing (bearer token filenames withheld - they are live tokens)' {
+        $items = Get-ChildItem $using:LibDir -Recurse -ErrorAction SilentlyContinue | Select-Object -First 2000
+        $tokenCount = @($items | Where-Object { $_.FullName -match '\\bearer_tokens\\' }).Count
+        $items | Where-Object { $_.FullName -notmatch '\\bearer_tokens\\' } |
+            Format-Table Mode, LastWriteTime, Length, FullName -AutoSize
+        "[$tokenCount token file(s) - names withheld, they ARE the tokens]"
+    } "Get-ChildItem $LibDir -Recurse (bearer_tokens contents withheld)"
     $CloudDir = Join-Path $LibDir 'cloud.d'
     if (Test-Path (Join-Path $CloudDir 'claimed_id')) {
         Collect-File '06-state\claimed-id.txt' 'Cloud claim id (safe identifier; token/private.pem never collected)' (Join-Path $CloudDir 'claimed_id')
     }
 }
 if (Test-Path $CacheDir) {
-    Collect-Cmd '06-state\db-disk-usage.txt' 'Database disk usage per tier + sqlite sizes' { Get-ChildItem 'C:\Program Files\Netdata\var\cache\netdata' -Directory | ForEach-Object { $s = (Get-ChildItem $_.FullName -Recurse -File | Measure-Object Length -Sum).Sum; '{0}  {1:N1} MB' -f $_.Name, ($s/1MB) }; Get-ChildItem 'C:\Program Files\Netdata\var\cache\netdata' -File -Filter '*.db*' | Format-Table Name, Length -AutoSize } "du of $CacheDir"
+    Collect-Cmd '06-state\db-disk-usage.txt' 'Database disk usage per tier + sqlite sizes' { Get-ChildItem $using:CacheDir -Directory | ForEach-Object { $s = (Get-ChildItem $_.FullName -Recurse -File | Measure-Object Length -Sum).Sum; '{0}  {1:N1} MB' -f $_.Name, ($s/1MB) }; Get-ChildItem $using:CacheDir -File -Filter '*.db*' | Format-Table Name, Length -AutoSize } "du of $CacheDir"
 }
 
 # ============================================================================
 # 07-runtime
 # ============================================================================
 if ($ApiOk) {
-    Write-Info 'collecting: runtime (agent is up)'
+    Show-Info 'collecting: runtime (agent is up)'
     Collect-Api '07-runtime\info-v3.json' 'BEST SINGLE CALL: buildinfo, features, cloud status, per-tier retention' '/api/v3/info'
     Collect-Api '07-runtime\info-v1.json' 'Agent info v1' '/api/v1/info'
     Collect-Api '07-runtime\node-instances.json' 'Node instances: children, streaming state, db_size, metric counts' '/api/v2/node_instances'
     Collect-Api '07-runtime\stream-info.json' 'Streaming diagnostics' '/api/v3/stream_info'
     Collect-Api '07-runtime\aclk.json' 'Cloud/ACLK connection state' '/api/v1/aclk'
     Collect-Api '07-runtime\alerts-active.json' 'Currently raised alerts' '/api/v3/alerts?options=active'
+    Collect-Api '07-runtime\alerts-all.json' 'All alert instances (summary)' '/api/v1/alarms?all'
     Collect-Api '07-runtime\functions.json' 'Registered functions' '/api/v1/functions'
+    Collect-Api '07-runtime\ml-info.json' 'Machine learning status' '/api/v1/ml_info'
     Collect-Api '07-runtime\self-cpu.csv' 'Netdata CPU last 10min (csv)' '/api/v1/data?chart=netdata.server_cpu&after=-600&points=60&format=csv'
     Collect-Api '07-runtime\self-memory.csv' 'Netdata memory last 10min (csv)' '/api/v1/data?chart=netdata.memory&after=-600&points=60&format=csv'
+    Collect-Api '07-runtime\self-api-clients.csv' 'Netdata API clients last 10min (csv)' '/api/v1/data?chart=netdata.clients&after=-600&points=60&format=csv'
 } else {
-    Write-Info 'agent API unreachable - skipping runtime section'
+    Show-Info 'agent API unreachable - skipping runtime section'
     $marker = Join-Path $Work '07-runtime'
     New-Item -ItemType Directory -Path $marker -Force | Out-Null
     Set-Content -Path (Join-Path $marker 'AGENT-WAS-DOWN.txt') -Value "Agent API at 127.0.0.1:$NdPort was unreachable when this bundle was created. See 05-logs and 06-state\status-file.json for why."
     Add-Manifest '07-runtime\AGENT-WAS-DOWN.txt' 'file' 'generated' 'Marker: agent was not running'
 }
 if (Test-Path $NetdataExe) {
-    Collect-Cmd '07-runtime\buildinfo.txt' 'netdata -W buildinfo (verbatim; works with daemon down)' { & 'C:\Program Files\Netdata\usr\bin\netdata.exe' -W buildinfo 2>&1 } 'netdata.exe -W buildinfo'
-    Collect-Cmd '07-runtime\buildinfo.json' 'netdata -W buildinfojson (machine-readable)' { & 'C:\Program Files\Netdata\usr\bin\netdata.exe' -W buildinfojson 2>&1 } 'netdata.exe -W buildinfojson'
+    Collect-Cmd '07-runtime\buildinfo.txt' 'netdata -W buildinfo (verbatim; works with daemon down)' { & $using:NetdataExe -W buildinfo 2>&1 } 'netdata.exe -W buildinfo'
+    Collect-CmdRaw '07-runtime\buildinfo.json' 'netdata -W buildinfojson (machine-readable; no header so it parses as JSON)' { & $using:NetdataExe -W buildinfojson 2>&1 } 'netdata.exe -W buildinfojson'
 }
 if ((Test-Path $NetdataCli) -and $NetdataProc) {
-    Collect-Cmd '07-runtime\aclk-state.json' 'Cloud connectivity state (netdatacli aclk-state json)' { & 'C:\Program Files\Netdata\usr\bin\netdatacli.exe' aclk-state json 2>&1 } 'netdatacli.exe aclk-state json'
+    Collect-CmdRaw '07-runtime\aclk-state.json' 'Cloud connectivity state (netdatacli aclk-state json; no header so it parses as JSON)' { & $using:NetdataCli aclk-state json 2>&1 } 'netdatacli.exe aclk-state json'
 }
 
 # ============================================================================
 # 08-network
 # ============================================================================
-Write-Info 'collecting: network'
-Collect-Cmd '08-network\listening-sockets.txt' 'Listening sockets (netdata-related)' { Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -eq 19999 -or (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName -match 'netdata' } | Format-Table LocalAddress, LocalPort, OwningProcess -AutoSize } 'Get-NetTCPConnection -State Listen (netdata)'
+Show-Info 'collecting: network'
+Collect-Cmd '08-network\listening-sockets.txt' 'Listening sockets (netdata-related)' { Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -eq $using:NdPort -or (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName -match 'netdata' } | Format-Table LocalAddress, LocalPort, OwningProcess -AutoSize } 'Get-NetTCPConnection -State Listen (netdata)'
 Collect-Cmd '08-network\dns-config.txt' 'DNS resolver config' { Get-DnsClientServerAddress | Where-Object { $_.ServerAddresses } | Format-Table InterfaceAlias, ServerAddresses -AutoSize } 'Get-DnsClientServerAddress'
 Collect-Cmd '08-network\proxy-config.txt' 'System proxy configuration' { netsh winhttp show proxy 2>&1; Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' | Format-List ProxyEnable, ProxyServer, AutoConfigURL } 'netsh winhttp show proxy + registry'
-Collect-Cmd '08-network\cloud-connectivity.txt' 'Reachability of Netdata Cloud (TCP/TLS only, no data sent)' { Test-NetConnection -ComputerName 'app.netdata.cloud' -Port 443 -WarningAction SilentlyContinue | Format-List ComputerName, RemotePort, TcpTestSucceeded, PingSucceeded } 'Test-NetConnection app.netdata.cloud:443'
+Collect-Cmd '08-network\cloud-connectivity.txt' 'Reachability of Netdata Cloud (TCP/TLS only, no data sent)' { Test-NetConnection -ComputerName $using:CloudHost -Port 443 -WarningAction SilentlyContinue | Format-List ComputerName, RemotePort, TcpTestSucceeded, PingSucceeded } "Test-NetConnection ${CloudHost}:443"
 
 # ============================================================================
 # summary + manifest + README
 # ============================================================================
-Write-Info 'writing summary and manifest'
+Show-Info 'writing summary and manifest'
 $AgentVersion = ''
 $infoV1 = Join-Path $Work '07-runtime\info-v1.json'
 if (Test-Path $infoV1) {
-    try { $AgentVersion = (Get-Content $infoV1 -Raw | ConvertFrom-Json).version } catch { }
+    try { $AgentVersion = (Get-Content $infoV1 -Raw | ConvertFrom-Json).version } catch { Write-Verbose "info-v1.json unparsable: $_" }
 }
 $CrashHint = ''
 $sfPath = Join-Path $Work '06-state\status-file.json'
@@ -418,7 +618,7 @@ if (Test-Path $sfPath) {
     try {
         $sf = Get-Content $sfPath -Raw | ConvertFrom-Json
         if ($sf.agent -and $sf.agent.exit_reason) { $CrashHint = ($sf.agent.exit_reason -join ',') }
-    } catch { }
+    } catch { Write-Verbose "status-file.json unparsable: $_" }
 }
 $RuntimeSecs = [int]((Get-Date) - $StartTime).TotalSeconds
 
@@ -482,20 +682,38 @@ Set-Content -Path (Join-Path $Work 'MANIFEST.json') -Value ($manifest | ConvertT
 # ============================================================================
 New-Item -ItemType Directory -Path $Output -Force | Out-Null
 $ZipPath = Join-Path $Output "$BundleName.zip"
-if (Test-Path $ZipPath) { Write-Error "refusing to overwrite existing $ZipPath"; exit 1 }
-Compress-Archive -Path $Work -DestinationPath $ZipPath
+# build the zip inside the owner-only staging dir, then publish without
+# overwrite: Move-Item without -Force fails if the destination exists
+$StagingZip = Join-Path $Staging "$BundleName.zip"
+Compress-Archive -Path $Work -DestinationPath $StagingZip
+try {
+    Move-Item -Path $StagingZip -Destination $ZipPath -ErrorAction Stop
+} catch {
+    # Write-Error would be swallowed by $ErrorActionPreference='SilentlyContinue'
+    Write-Host " [!] refusing to overwrite existing $ZipPath ($_)"
+    exit 1
+}
 
-$MapPath = Join-Path $Output "$BundleName.pseudonym-map.txt"
+$MapPath = Join-Path $Output "$BundleName.pseudonym-map.tsv"
 if ($Obfuscate -and $script:PseudoMap.Count -gt 0) {
-    $script:PseudoMap.GetEnumerator() | ForEach-Object { "$($_.Value)`t$($_.Key)" } | Set-Content $MapPath
+    # same format as the POSIX script: type<TAB>original<TAB>pseudonym
+    $script:PseudoMap.GetEnumerator() | ForEach-Object {
+        $type = 'other'
+        if ($_.Value -match '^ip6-\d+$') { $type = 'ip6' }
+        elseif ($_.Value -match '^ip-\d+$') { $type = 'ip' }
+        elseif ($_.Value -match '^private-host-\d+$') { $type = 'fqdn' }
+        elseif ($_.Value -eq 'redacted-host') { $type = 'host' }
+        elseif ($_.Value -eq 'redacted-user') { $type = 'user' }
+        "$type`t$($_.Key)`t$($_.Value)"
+    } | Set-Content $MapPath
 }
 
 if (-not $KeepStaging) { Remove-Item $Staging -Recurse -Force }
 
 Write-Host ''
-Write-Info ("done in {0}s" -f [int]((Get-Date) - $StartTime).TotalSeconds)
-Write-Info "bundle:  $ZipPath"
+Show-Info ("done in {0}s" -f [int]((Get-Date) - $StartTime).TotalSeconds)
+Show-Info "bundle:  $ZipPath"
 if ($Obfuscate -and $script:PseudoMap.Count -gt 0) {
-    Write-Info "pseudonym map (KEEP PRIVATE, do not send): $MapPath"
+    Show-Info "pseudonym map (KEEP PRIVATE, do not send): $MapPath"
 }
-Write-Info 'attach the bundle to your support ticket.'
+Show-Info 'attach the bundle to your support ticket.'
