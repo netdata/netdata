@@ -3560,10 +3560,10 @@ paths:
         Returns JSON with agent information grouped by node, including complete details about each agent's capabilities, configuration, and current status.
 
         **Security & Access Control:**
-        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
-        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
-        - **No Authentication:** Cannot be restricted by any configuration
-        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
+        - **Route ACL:** `HTTP_ACL_NOCHECK` skips only this endpoint's route-table ACL comparison
+        - **Bearer Protection:** `HTTP_ACCESS_NONE` means the generic access gate does not require a bearer token
+        - **Connection/IP Admission:** Direct HTTP remains subject to `allow connections from`, listener/port ACLs, and coarse API admission
+        - **Callback:** No additional authorization check is applied after the route gates
       parameters:
         - name: scope_nodes
           in: query
@@ -4347,10 +4347,10 @@ paths:
         - Feature flags and capabilities
 
         **Security & Access Control:**
-        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
-        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
-        - **No Authentication:** Cannot be restricted by any configuration
-        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
+        - **Route ACL:** `HTTP_ACL_NOCHECK` skips only this endpoint's route-table ACL comparison
+        - **Bearer Protection:** This route requires `HTTP_ACCESS_ANONYMOUS_DATA`; when bearer protection is enabled, an unauthenticated request is rejected
+        - **Connection/IP Admission:** Direct HTTP remains subject to `allow connections from`, listener/port ACLs, and coarse API admission
+        - **Callback:** No additional authorization check is applied after the route gates
       parameters:
         - name: scope_nodes
           in: query
@@ -4565,10 +4565,10 @@ paths:
         - Expires after completion or timeout
 
         **Security & Access Control:**
-        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
-        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
-        - **No Authentication:** Cannot be restricted by any configuration
-        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
+        - **Route ACL:** `HTTP_ACL_NOCHECK` skips only this endpoint's route-table ACL comparison
+        - **Bearer Protection:** This route requires `HTTP_ACCESS_ANONYMOUS_DATA`; when bearer protection is enabled, an unauthenticated request is rejected
+        - **Connection/IP Admission:** Direct HTTP remains subject to `allow connections from`, listener/port ACLs, and coarse API admission
+        - **Callback:** No additional authorization check is applied after the route gates
       parameters:
         - name: transaction
           in: query
@@ -6052,10 +6052,10 @@ paths:
         - `replication_lag_seconds` - Data replication delay
 
         **Security & Access Control:**
-        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
-        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
-        - **No Authentication:** Cannot be restricted by any configuration
-        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
+        - **Route ACL:** `HTTP_ACL_NOCHECK` skips only this endpoint's route-table ACL comparison
+        - **Bearer Protection:** `HTTP_ACCESS_NONE` means the generic access gate does not require a bearer token
+        - **Connection/IP Admission:** Direct HTTP remains subject to `allow connections from`, listener/port ACLs, and coarse API admission
+        - **Callback:** No additional authorization check is applied after the route gates
       parameters:
         - name: machine_guid
           in: query
@@ -6436,11 +6436,10 @@ paths:
         ```
 
         **Security & Access Control:**
-        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
-        - **Security Model:** Protected by random session key verification (not ACL/bearer token)
-        - **Verification Required:** Must provide verification key from agent's file system to claim
-        - **Server Access:** Only users with server file system access can obtain the verification key
-        - **No ACL Restrictions:** Not subject to IP-based ACL or bearer protection
+        - **Route ACL:** `HTTP_ACL_NOCHECK` skips only this endpoint's route-table ACL comparison
+        - **Bearer Protection:** `HTTP_ACCESS_NONE` means the generic access gate does not require a bearer token
+        - **Connection/IP Admission:** Direct HTTP remains subject to `allow connections from`, listener/port ACLs, and coarse API admission
+        - **Claim Mutation:** Reading status needs no callback-local credential; changing claim state requires the current rotating random session key and valid claim parameters
       parameters:
         - name: key
           in: query
@@ -6733,11 +6732,11 @@ paths:
         - **Remote Management:** Netdata Cloud can enable protection when claiming agents
 
         **How It Works:**
-        1. When bearer protection is enabled, all API requests must include: `Authorization: Bearer <token>`
+        1. When bearer protection is enabled, routes requiring `HTTP_ACCESS_ANONYMOUS_DATA` reject unauthenticated requests
         2. Tokens are obtained via `/api/v3/bearer_get_token` endpoint
         3. Tokens have expiration times and must be renewed periodically
-        4. Invalid or missing tokens result in HTTP 401 Unauthorized
-        5. Some endpoints (like claiming) may bypass bearer protection
+        4. Invalid or missing tokens fail routes whose required access is not granted
+        5. Routes requiring `HTTP_ACCESS_NONE`, including claim, do not acquire a generic bearer requirement; their other route and callback gates still apply
 
         **Security Verification:**
         - **claim_id:** Must match the agent's current claim ID (prevents requests to wrong agent)
@@ -7149,7 +7148,7 @@ paths:
         - May be empty for anonymous/local access
 
         **Important Notes:**
-        - This endpoint always succeeds (returns HTTP 200) even without authentication
+        - After request admission, this endpoint succeeds (returns HTTP 200) even without authentication
         - For unauthenticated requests, auth="none" and minimal permissions returned
         - The response reflects the current session's authentication state
         - Access permissions are cumulative (multiple permissions can be granted)
@@ -7198,10 +7197,10 @@ paths:
         ```
 
         **Security & Access Control:**
-        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
-        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
-        - **No Authentication:** Cannot be restricted by any configuration
-        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
+        - **Route ACL:** `HTTP_ACL_NOCHECK` skips only this endpoint's route-table ACL comparison
+        - **Bearer Protection:** `HTTP_ACCESS_NONE` means the generic access gate does not require a bearer token
+        - **Connection/IP Admission:** Direct HTTP remains subject to `allow connections from`, listener/port ACLs, and coarse API admission
+        - **Callback:** No additional authorization check is applied after the route gates
       responses:
         "200":
           description: Current user information successfully retrieved.
@@ -7550,10 +7549,10 @@ paths:
         and configuration. Essential for discovering agent capabilities before querying metrics.
 
         **Security & Access Control:**
-        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
-        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
-        - **No Authentication:** Cannot be restricted by any configuration
-        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
+        - **Route ACL:** `HTTP_ACL_NOCHECK` skips only this endpoint's route-table ACL comparison
+        - **Bearer Protection:** This route requires `HTTP_ACCESS_ANONYMOUS_DATA`; when bearer protection is enabled, an unauthenticated request is rejected
+        - **Connection/IP Admission:** Direct HTTP remains subject to `allow connections from`, listener/port ACLs, and coarse API admission
+        - **Callback:** No additional authorization check is applied after the route gates
       parameters:
         - $ref: '#/components/parameters/scopeNodes'
         - $ref: '#/components/parameters/filterNodes'
@@ -7660,10 +7659,10 @@ paths:
         Used for polling function execution status and completion percentage.
 
         **Security & Access Control:**
-        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
-        - **No Restrictions:** Not subject to bearer protection or IP-based ACL restrictions
-        - **No Authentication:** Cannot be restricted by any configuration
-        - **Access:** Available to anyone who can reach the agent's HTTP endpoint
+        - **Route ACL:** `HTTP_ACL_NOCHECK` skips only this endpoint's route-table ACL comparison
+        - **Bearer Protection:** This route requires `HTTP_ACCESS_ANONYMOUS_DATA`; when bearer protection is enabled, an unauthenticated request is rejected
+        - **Connection/IP Admission:** Direct HTTP remains subject to `allow connections from`, listener/port ACLs, and coarse API admission
+        - **Callback:** No additional authorization check is applied after the route gates
       parameters:
         - name: transaction
           in: query
@@ -7768,11 +7767,10 @@ paths:
         Enables centralized monitoring and team collaboration features.
 
         **Security & Access Control:**
-        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
-        - **Security Model:** Protected by random session key verification (not ACL/bearer token)
-        - **Verification Required:** Must provide verification key from agent's file system to claim
-        - **Server Access:** Only users with server file system access can obtain the verification key
-        - **No ACL Restrictions:** Not subject to IP-based ACL or bearer protection
+        - **Route ACL:** `HTTP_ACL_NOCHECK` skips only this endpoint's route-table ACL comparison
+        - **Bearer Protection:** `HTTP_ACCESS_NONE` means the generic access gate does not require a bearer token
+        - **Connection/IP Admission:** Direct HTTP remains subject to `allow connections from`, listener/port ACLs, and coarse API admission
+        - **Claim Mutation:** Reading status needs no callback-local credential; changing claim state requires the current rotating random session key and valid claim parameters
       parameters:
         - name: key
           in: query
@@ -8553,15 +8551,16 @@ paths:
         - Registry stores dashboard-agent relationships
         - person_guid is stored in browser cookies
         - machine_guid identifies Netdata agents
-        - No authentication required (deprecated functionality)
+        - Cookie or bearer identity may supply person_guid; authorization is enforced by the callback ACL checks below
 
         **Deprecation:**
         Registry functionality is being phased out. Modern deployments should use Netdata Cloud for multi-agent management.
 
         **Security & Access Control:**
-        - 🔓 **Always Public API** - This endpoint is always accessible without authentication
-        - **Internal ACL:** Manages its own access control internally (not via standard ACL)
-        - **No External Restrictions:** Not subject to bearer protection or IP-based ACL
+        - **Route Gates:** The route table requires `HTTP_ACL_NONE` and `HTTP_ACCESS_NONE`; the generic bearer gate therefore does not require a token
+        - **Connection/IP Admission:** Direct HTTP remains subject to `allow connections from`, listener/port ACLs, and coarse API admission
+        - **Callback ACL:** `hello` requires dashboard ACL; every other action requires registry ACL
+        - **Identity:** Cookie or bearer data identifies person_guid but does not replace callback authorization
       parameters:
         - name: action
           in: query
@@ -8865,7 +8864,8 @@ components:
         **When required:**
         - When bearer protection is enabled on the agent (via `/api/v3/bearer_protection`)
         - Applies to all APIs with `HTTP_ACCESS_ANONYMOUS_DATA` permission
-        - Does not apply to APIs with `HTTP_ACL_NOCHECK` (always public)
+        - Applies independently of route ACL, including APIs with `HTTP_ACL_NOCHECK` when they require `HTTP_ACCESS_ANONYMOUS_DATA`
+        - APIs requiring `HTTP_ACCESS_NONE` do not acquire a generic bearer-token requirement
         - Does not apply to ACLK-only APIs (use cloud authentication)
 
         **Token expiration:**
@@ -8907,6 +8907,7 @@ components:
 
         ```conf
         [web]
+            allow connections from = *
             allow dashboard from = *
             allow badges from = *
             allow management from = localhost
@@ -8923,7 +8924,8 @@ components:
         - Can be customized per deployment
 
         **Note:** This is not a standard authentication mechanism but rather IP filtering.
-        APIs with `HTTP_ACL_NOCHECK` bypass all IP restrictions.
+        `HTTP_ACL_NOCHECK` skips only the endpoint's route-table ACL comparison.
+        Direct HTTP still passes global connection allowlisting, listener/port ACLs, and coarse API admission.
 
   parameters:
     scopeNodes:
