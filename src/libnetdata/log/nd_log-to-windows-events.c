@@ -88,6 +88,17 @@ static const wchar_t *wel_provider_per_source[_NDLS_MAX] = {
         [NDLS_DEBUG]        = NULL,                              // used, linked to NDLS_DAEMON
 };
 
+// Map each source to its WINEVT channel name (only when not using ETW)
+static const wchar_t *wel_channel_per_source[_NDLS_MAX] = {
+        [NDLS_UNSET]        = NULL,
+        [NDLS_ACCESS]       = NETDATA_WEL_CHANNEL_ACCESS_W,
+        [NDLS_ACLK]         = NETDATA_WEL_CHANNEL_ACLK_W,
+        [NDLS_COLLECTORS]   = NETDATA_WEL_CHANNEL_COLLECTORS_W,
+        [NDLS_DAEMON]       = NETDATA_WEL_CHANNEL_DAEMON_W,
+        [NDLS_HEALTH]       = NETDATA_WEL_CHANNEL_HEALTH_W,
+        [NDLS_DEBUG]        = NULL,
+};
+
 
 bool wel_replace_program_with_wevt_netdata_dll(wchar_t *str, size_t size) {
     const wchar_t *replacement = L"\\wevt_netdata.dll";
@@ -387,6 +398,22 @@ static void wel_ensure_manifest_installed(void) {
     swprintf(umParams, _countof(umParams), L"um \"%ls\"", manifestDst);
     (void)wel_run_silent(wevtutil, umParams);
 
+    // Remove flat classic WEL log entries that pre-manifest builds created directly.
+    // wevtutil um removes WINEVT publisher entries but leaves behind any EventLog\*
+    // keys our code created before the manifest approach; those flat logs appear as
+    // duplicate "Netdata/Daemon" entries in Event Viewer alongside the tree hierarchy.
+    // Delete them here, after um, so wevtutil im creates clean channel-linked entries.
+    static const wchar_t *const flat_stale_keys[] = {
+        L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Daemon",
+        L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Collectors",
+        L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Access",
+        L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Health",
+        L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Aclk",
+        L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\NetdataWEL",
+    };
+    for (size_t j = 0; j < _countof(flat_stale_keys); j++)
+        RegDeleteTreeW(HKEY_LOCAL_MACHINE, flat_stale_keys[j]);
+
     // Register the new manifest. The /mf and /rf flags tell wevtutil where the DLL is,
     // overriding the resourceFileName/messageFileName attributes in the XML.
     wchar_t imParams[MAX_PATH * 4];
@@ -487,22 +514,20 @@ bool nd_log_init_windows(void) {
     wel_ensure_manifest_installed();
 
     if(!nd_log.eventlog.etw) {
-        // Delete stale per-channel and legacy WEL log keys BEFORE creating new
-        // registrations.  These keys create flat "Netdata/Daemon" entries that appear
-        // inside the Netdata WINEVT tree node, producing duplicate, wrongly-named items.
-        // Sources are now registered under Application so importChannel (Admin channels)
-        // routes ReportEventW events to the correct WINEVT channel.  Errors here are
-        // normal on a fresh install where the keys have never existed.
-        static const wchar_t *const stale_keys[] = {
-            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Daemon",
-            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Collectors",
-            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Access",
-            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Health",
-            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Aclk",
-            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\NetdataWEL",
+        // Remove Application-log source entries left by a prior broken installation that
+        // registered sources under Application instead of their Netdata/* channel.  These
+        // entries redirect sources away from the WINEVT channels and cause message
+        // descriptions to fail because the Application log's DLL resolution path differs.
+        // Only leaf keys are deleted here (RegDeleteKeyW, no subtree needed).
+        static const wchar_t *const app_stale_keys[] = {
+            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\NetdataDaemon",
+            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\NetdataCollectors",
+            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\NetdataAccess",
+            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\NetdataHealth",
+            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Application\\NetdataAclk",
         };
-        for (size_t j = 0; j < _countof(stale_keys); j++)
-            RegDeleteTreeW(HKEY_LOCAL_MACHINE, stale_keys[j]);
+        for (size_t j = 0; j < _countof(app_stale_keys); j++)
+            RegDeleteKeyW(HKEY_LOCAL_MACHINE, app_stale_keys[j]);
     }
 
     // Loop through each source and add it to the registry
@@ -534,12 +559,11 @@ bool nd_log_init_windows(void) {
         }
 
         if(!nd_log.eventlog.etw) {
-            // Register the event source under the Application log rather than a custom
-            // per-channel log ("Netdata/Daemon" etc.).  The importChannel declaration in
-            // the manifest routes events from these sources to the correct Admin WINEVT
-            // channel; classic per-channel keys would create duplicate flat entries in
-            // Event Viewer alongside the Netdata tree.
-            if(!wel_add_to_registry(L"Application", sub_channel, defaultMaxSize)) {
+            // Register the source under its own WINEVT channel log ("Netdata/Daemon" etc.).
+            // wevtutil im creates EventLog\Netdata/Daemon\NetdataDaemon via importChannel;
+            // this call is idempotent and ensures MaxSize is set even when wevtutil fails.
+            const wchar_t *wel_channel = wel_channel_per_source[i];
+            if(!wel_add_to_registry(wel_channel, sub_channel, defaultMaxSize)) {
                 return false;
             }
 
