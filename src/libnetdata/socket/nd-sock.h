@@ -128,7 +128,7 @@ static ssize_t nd_sock_write_persist(ND_SOCK *s, const void *buf, const size_t n
 #define MSG_DONTWAIT 0
 #endif
 
-ALWAYS_INLINE
+ALWAYS_INLINE __attribute__((nonnull(1, 2)))
 static ssize_t nd_sock_revc_nowait(ND_SOCK *s, void *buf, size_t num) {
     if (nd_sock_is_ssl(s))
         return netdata_ssl_read(&s->ssl, buf, num);
@@ -136,7 +136,7 @@ static ssize_t nd_sock_revc_nowait(ND_SOCK *s, void *buf, size_t num) {
         return recv(s->fd, (char *)buf, num, MSG_DONTWAIT);
 }
 
-ALWAYS_INLINE
+ALWAYS_INLINE __attribute__((nonnull(1, 2)))
 static ssize_t nd_sock_peek_nowait(ND_SOCK *s, void *buf, size_t num) {
     if (nd_sock_is_ssl(s))
         return netdata_ssl_peek(&s->ssl, buf, num);
@@ -144,7 +144,7 @@ static ssize_t nd_sock_peek_nowait(ND_SOCK *s, void *buf, size_t num) {
         return recv(s->fd, (char *)buf, num, MSG_PEEK | MSG_DONTWAIT);
 }
 
-ALWAYS_INLINE
+ALWAYS_INLINE __attribute__((nonnull(1, 2)))
 static ssize_t nd_sock_send_nowait(ND_SOCK *s, void *buf, size_t num) {
     if (nd_sock_is_ssl(s))
         return netdata_ssl_write(&s->ssl, buf, num);
