@@ -855,6 +855,18 @@ static inline int ebpf_ip2nl(uint8_t *dst, const char *ip, int domain, char *sou
     return 0;
 }
 
+static bool ebpf_parse_cidr_prefix(const char *text, int minimum, int maximum, int *prefix)
+{
+    char *end;
+    long value = strtol(text, &end, 10);
+
+    if (end == text || *end || value < minimum || value > maximum)
+        return false;
+
+    *prefix = (int)value;
+    return true;
+}
+
 /**
  * Clean IP structure
  *
@@ -939,12 +951,12 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
         }
 
         if (!select) { // CIDR
-            select = ebpf_ip2nl(first.addr8, ip, AF_INET, ipdup);
+            select = ebpf_ip2nl(first.addr8, clean_end, AF_INET, ipdup);
             if (select)
                 goto cleanipdup;
 
-            select = (int)str2i(end);
-            if (select < NETDATA_MINIMUM_IPV4_CIDR || select > NETDATA_MAXIMUM_IPV4_CIDR) {
+            if (!ebpf_parse_cidr_prefix(
+                    end, NETDATA_MINIMUM_IPV4_CIDR, NETDATA_MAXIMUM_IPV4_CIDR, &select)) {
                 netdata_log_info("The specified CIDR %s is not valid, the IP %s will be ignored.", end, ip);
                 goto cleanipdup;
             }
@@ -961,7 +973,7 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
 
             last.addr32[0] = htonl(ebpf_broadcast(ntohl(first.addr32[0]), select));
         } else { // Range
-            select = ebpf_ip2nl(first.addr8, ip, AF_INET, ipdup);
+            select = ebpf_ip2nl(first.addr8, clean_end, AF_INET, ipdup);
             if (select)
                 goto cleanipdup;
 
@@ -991,7 +1003,7 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
                 goto cleanipdup;
             }
 
-            select = ebpf_ip2nl(first.addr8, ip, AF_INET6, ipdup);
+            select = ebpf_ip2nl(first.addr8, clean_end, AF_INET6, ipdup);
             if (select)
                 goto cleanipdup;
 
@@ -1006,14 +1018,13 @@ static void ebpf_parse_ip_list_unsafe(void **out, const char *ip)
                 goto cleanipdup;
             }
 
-            select = str2i(end);
-            if (select < 0 || select > 128) {
+            if (!ebpf_parse_cidr_prefix(end, 0, 128, &select)) {
                 netdata_log_info("The CIDR %s is not valid, the address %s will be ignored.", end, ip);
                 goto cleanipdup;
             }
 
             uint64_t prefix = (uint64_t)select;
-            select = ebpf_ip2nl(first.addr8, ip, AF_INET6, ipdup);
+            select = ebpf_ip2nl(first.addr8, clean_end, AF_INET6, ipdup);
             if (select)
                 goto cleanipdup;
 
