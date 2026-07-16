@@ -19,7 +19,7 @@ size_t exporting_name_copy(char *dst, const char *src, size_t max_len)
     for (n = 0; *src && n < max_len; dst++, src++, n++) {
         char c = *src;
 
-        if (c != '.' && !isalnum(c))
+        if (c != '.' && !isalnum((uint8_t)c))
             *dst = '_';
         else
             *dst = c;
