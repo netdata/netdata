@@ -133,6 +133,14 @@ var manifest = map[string]ManifestCase{
 		Proves: "per-group view statistics (D-B SETTLED, #23097 verified numerically): non-average aggregations average over view ROWS (mean plotted value, row-extreme min/max); AVERAGE keeps the weighted (pre-division sum, contributions) pair; raw keeps (sum, count) untouched for the cloud",
 		Agent:  Green, FixedBy: "#23097",
 	},
+	"L6/two-pass-matrix": {
+		Proves: "two-pass group-by chains whose pass-1 accumulator IS the group value (sum→sum, min→min, max→max, extremes→extremes, sum→average) match the mechanics oracle, incl. PARTIAL propagation through both passes",
+		Agent:  Green,
+	},
+	"CASE-018/multipass-average": {
+		Proves: "AVERAGE at pass 1 of a two-pass group-by feeds pass 2 the group SUMS (the per-group division never happens) — the final value is inflated by ~members-per-group (bug-list item 3 family; fix owned by SOW-20260701-query-rollup-hierarchical-correctness, in planning)",
+		Agent:  Red,
+	},
 	"CASE-017/tier-boundary-absorption": {
 		Proves: "a tier>0 query whose after equals a stored tier point end keeps that point out of the first bucket (was: absorbed, leaking pre-window data into (after, before] — the backward-expanded storage scan met the inclusive bucket-start check); tier0 control stays clean",
 		Agent:  Green, FixedBy: "#23127",
