@@ -141,7 +141,6 @@ The program has the following modes of logging:
         The name of a configured and running systemd-journald namespace.
         The program will produce the socket path based on its internal
         defaults, to send the messages to the systemd journal namespace.
-        Use this option to send logs to a dedicated journal namespace, keeping them separate from the default system journal.
 
   * Log as Netdata, enabled with --log-as-netdata or -N
 
