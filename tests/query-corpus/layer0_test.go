@@ -28,6 +28,10 @@ import (
 
 var td *daemon.Daemon
 
+// netdataBinary is the resolved stock binary path, for tests that boot
+// their own dedicated daemon (layer 4 plan switching).
+var netdataBinary string
+
 // roundTripOK gates the restart verification on the round-trip tests having
 // actually stored their fixtures (t.Failed() cannot see other tests).
 var roundTripOK bool
@@ -45,6 +49,8 @@ func TestMain(m *testing.M) {
 		fmt.Fprintf(os.Stderr, "netdata binary not usable (%v)\nbuild it or set QUERY_CORPUS_NETDATA\n", err)
 		os.Exit(1)
 	}
+
+	netdataBinary = abs
 
 	runDir, err := os.MkdirTemp("", "query-corpus-")
 	if err != nil {

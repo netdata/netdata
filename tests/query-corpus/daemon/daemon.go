@@ -37,6 +37,10 @@ type Options struct {
 	// history — the layer-4 plan-switching scenario. Retention TIME knobs
 	// are unusable at the fixed 2023 fixture epoch (wall-clock enforced).
 	Tier0DiskSpaceMB int
+	// ReplicationStepSeconds, when non-zero, bounds the parent's per-request
+	// replication window, so a streaming fixture can generate rows per
+	// request instead of materializing millions of points.
+	ReplicationStepSeconds int
 }
 
 // Daemon is one running netdata under test.
@@ -66,11 +70,11 @@ const netdataConfTemplate = `[global]
     update every = 1
     storage tiers = %[3]d
     replication period = 3650d
-    replication step = 3650d
+    replication step = %[4]s
     dbengine tier 0 retention time = 0
     dbengine tier 1 retention time = 0
     dbengine tier 2 retention time = 0
-
+%[5]s
 [ml]
     enabled = no
 
@@ -143,7 +147,15 @@ func Start(o Options) (*Daemon, error) {
 		}
 	}
 
-	conf := fmt.Sprintf(netdataConfTemplate, o.RunDir, o.Port, o.StorageTiers)
+	step := "3650d"
+	if o.ReplicationStepSeconds > 0 {
+		step = fmt.Sprintf("%ds", o.ReplicationStepSeconds)
+	}
+	extraDB := ""
+	if o.Tier0DiskSpaceMB > 0 {
+		extraDB = fmt.Sprintf("    dbengine tier 0 retention size = %dMiB\n", o.Tier0DiskSpaceMB)
+	}
+	conf := fmt.Sprintf(netdataConfTemplate, o.RunDir, o.Port, o.StorageTiers, step, extraDB)
 	confPath := filepath.Join(o.RunDir, "etc", "netdata.conf")
 	if err := os.WriteFile(confPath, []byte(conf), 0o644); err != nil {
 		return nil, fmt.Errorf("daemon: write netdata.conf: %w", err)
