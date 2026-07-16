@@ -88,16 +88,6 @@ static const wchar_t *wel_provider_per_source[_NDLS_MAX] = {
         [NDLS_DEBUG]        = NULL,                              // used, linked to NDLS_DAEMON
 };
 
-// Classic WEL channel names per source — match ETW channel names so events appear in the same channels
-static const wchar_t *wel_channel_per_source[_NDLS_MAX] = {
-        [NDLS_UNSET]        = NULL,                              // linked to NDLS_DAEMON
-        [NDLS_ACCESS]       = NETDATA_WEL_CHANNEL_ACCESS_W,
-        [NDLS_ACLK]         = NETDATA_WEL_CHANNEL_ACLK_W,
-        [NDLS_COLLECTORS]   = NETDATA_WEL_CHANNEL_COLLECTORS_W,
-        [NDLS_DAEMON]       = NETDATA_WEL_CHANNEL_DAEMON_W,
-        [NDLS_HEALTH]       = NETDATA_WEL_CHANNEL_HEALTH_W,
-        [NDLS_DEBUG]        = NULL,                              // linked to NDLS_DAEMON
-};
 
 bool wel_replace_program_with_wevt_netdata_dll(wchar_t *str, size_t size) {
     const wchar_t *replacement = L"\\wevt_netdata.dll";
@@ -184,6 +174,9 @@ static bool wel_add_to_registry(const wchar_t *channel, const wchar_t *provider,
 // Registry key where WINEVT stores registered publishers (providers).
 #define WINEVT_PUBLISHERS_KEY L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Publishers\\"
 
+// WINEVT Channels registry path prefix
+#define WINEVT_CHANNELS_KEY L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\WINEVT\\Channels\\"
+
 static bool wel_manifest_is_current(void) {
     // All five importChannel provider GUIDs must be present; a partial registration
     // (e.g. only Daemon from an older version) must also trigger re-installation.
@@ -202,6 +195,23 @@ static bool wel_manifest_is_current(void) {
         if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, key, 0, KEY_READ, &hKey) != ERROR_SUCCESS)
             return false;
         RegCloseKey(hKey);
+    }
+
+    // Verify the Daemon channel exists and is Admin type (EVT_CHANNEL_TYPE_ADMIN = 0).
+    // Operational channels (type=1) cannot receive ReportEventW events via importChannel;
+    // if the previous install used Operational, force a reinstall with Admin channels.
+    {
+        wchar_t chkey[MAX_PATH];
+        swprintf(chkey, _countof(chkey), L"%lsNetdata/Daemon", WINEVT_CHANNELS_KEY);
+        HKEY hCh;
+        if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, chkey, 0, KEY_READ, &hCh) != ERROR_SUCCESS)
+            return false;
+        DWORD chtype = 1;
+        DWORD sz = sizeof(chtype);
+        RegQueryValueExW(hCh, L"Type", NULL, NULL, (LPBYTE)&chtype, &sz);
+        RegCloseKey(hCh);
+        if (chtype != 0)  // 0 = Admin
+            return false;
     }
 
     return true;
@@ -246,11 +256,11 @@ static bool wel_run_silent(const wchar_t *exe, const wchar_t *params) {
     "        messageFileName=\"%s\"\r\n" \
     "        symbol=\"NETDATA_ETW_PROVIDER\">\r\n" \
     "        <channels>\r\n" \
-    "          <channel chid=\"CHANNEL_DAEMON\" name=\"Netdata/Daemon\" symbol=\"CHANNEL_DAEMON\" type=\"Operational\" enabled=\"true\"/>\r\n" \
-    "          <channel chid=\"CHANNEL_COLLECTORS\" name=\"Netdata/Collectors\" symbol=\"CHANNEL_COLLECTORS\" type=\"Operational\" enabled=\"true\"/>\r\n" \
-    "          <channel chid=\"CHANNEL_ACCESS\" name=\"Netdata/Access\" symbol=\"CHANNEL_ACCESS\" type=\"Operational\" enabled=\"true\"/>\r\n" \
-    "          <channel chid=\"CHANNEL_HEALTH\" name=\"Netdata/Health\" symbol=\"CHANNEL_HEALTH\" type=\"Operational\" enabled=\"true\"/>\r\n" \
-    "          <channel chid=\"CHANNEL_ACLK\" name=\"Netdata/Aclk\" symbol=\"CHANNEL_ACLK\" type=\"Operational\" enabled=\"true\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_DAEMON\" name=\"Netdata/Daemon\" symbol=\"CHANNEL_DAEMON\" type=\"Admin\" enabled=\"true\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_COLLECTORS\" name=\"Netdata/Collectors\" symbol=\"CHANNEL_COLLECTORS\" type=\"Admin\" enabled=\"true\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_ACCESS\" name=\"Netdata/Access\" symbol=\"CHANNEL_ACCESS\" type=\"Admin\" enabled=\"true\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_HEALTH\" name=\"Netdata/Health\" symbol=\"CHANNEL_HEALTH\" type=\"Admin\" enabled=\"true\"/>\r\n" \
+    "          <channel chid=\"CHANNEL_ACLK\" name=\"Netdata/Aclk\" symbol=\"CHANNEL_ACLK\" type=\"Admin\" enabled=\"true\"/>\r\n" \
     "        </channels>\r\n" \
     "      </provider>\r\n" \
     "      <provider name=\"NetdataDaemon\"\r\n" \
@@ -476,6 +486,25 @@ bool nd_log_init_windows(void) {
     // builds exit immediately via the registry check in wel_manifest_is_current().
     wel_ensure_manifest_installed();
 
+    if(!nd_log.eventlog.etw) {
+        // Delete stale per-channel and legacy WEL log keys BEFORE creating new
+        // registrations.  These keys create flat "Netdata/Daemon" entries that appear
+        // inside the Netdata WINEVT tree node, producing duplicate, wrongly-named items.
+        // Sources are now registered under Application so importChannel (Admin channels)
+        // routes ReportEventW events to the correct WINEVT channel.  Errors here are
+        // normal on a fresh install where the keys have never existed.
+        static const wchar_t *const stale_keys[] = {
+            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Daemon",
+            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Collectors",
+            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Access",
+            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Health",
+            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\Netdata/Aclk",
+            L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\NetdataWEL",
+        };
+        for (size_t j = 0; j < _countof(stale_keys); j++)
+            RegDeleteTreeW(HKEY_LOCAL_MACHINE, stale_keys[j]);
+    }
+
     // Loop through each source and add it to the registry
     for(size_t i = 0; i < _NDLS_MAX; i++) {
         nd_log.sources[i].source = i;
@@ -505,12 +534,15 @@ bool nd_log_init_windows(void) {
         }
 
         if(!nd_log.eventlog.etw) {
-            const wchar_t *wel_channel = wel_channel_per_source[i];
-            if(!wel_add_to_registry(wel_channel, sub_channel, defaultMaxSize)) {
+            // Register the event source under the Application log rather than a custom
+            // per-channel log ("Netdata/Daemon" etc.).  The importChannel declaration in
+            // the manifest routes events from these sources to the correct Admin WINEVT
+            // channel; classic per-channel keys would create duplicate flat entries in
+            // Event Viewer alongside the Netdata tree.
+            if(!wel_add_to_registry(L"Application", sub_channel, defaultMaxSize)) {
                 return false;
             }
 
-            // when not using a manifest, each source is a provider
             nd_log.sources[i].hEventLog = RegisterEventSourceW(NULL, sub_channel);
             if (!nd_log.sources[i].hEventLog) {
                 return false;
@@ -519,15 +551,6 @@ bool nd_log_init_windows(void) {
     }
 
     if(!nd_log.eventlog.etw) {
-        // Remove legacy NetdataWEL registry entries only after new per-channel sources are
-        // confirmed installed. Deleting first risks leaving neither old nor new routing
-        // working if registration subsequently fails. ERROR_FILE_NOT_FOUND is normal on a
-        // fresh install (key never existed) and is not logged.
-        wchar_t legacy_key[MAX_PATH];
-        swprintf(legacy_key, MAX_PATH,
-                 L"SYSTEM\\CurrentControlSet\\Services\\EventLog\\NetdataWEL");
-        RegDeleteTreeW(HKEY_LOCAL_MACHINE, legacy_key);
-
         // Map the unset ones to NDLS_DAEMON
         for (size_t i = 0; i < _NDLS_MAX; i++) {
             if (!nd_log.sources[i].hEventLog)
