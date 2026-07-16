@@ -2,7 +2,44 @@
 
 #include "../cgroup-name-config.h"
 
+#include <limits.h>
 #include <stdio.h>
+
+static int test_timeout_conversion(void)
+{
+    struct timeout_case {
+        const char *name;
+        time_t seconds;
+        int expected_ms;
+    };
+    static const struct timeout_case cases[] = {
+        { .name = "negative timeout is unbounded", .seconds = -1, .expected_ms = 0 },
+        { .name = "zero timeout is unbounded", .seconds = 0, .expected_ms = 0 },
+        { .name = "one second", .seconds = 1, .expected_ms = 1000 },
+        { .name = "default timeout", .seconds = 120, .expected_ms = 120000 },
+        {
+            .name = "largest whole-second timeout",
+            .seconds = INT_MAX / 1000,
+            .expected_ms = (INT_MAX / 1000) * 1000,
+        },
+        {
+            .name = "overflow clamps to int max",
+            .seconds = (time_t)(INT_MAX / 1000) + 1,
+            .expected_ms = INT_MAX,
+        },
+    };
+
+    int failures = 0;
+    for (size_t i = 0; i < sizeof(cases) / sizeof(cases[0]); i++) {
+        int actual = cgroup_name_timeout_ms_from_seconds(cases[i].seconds);
+        if (actual != cases[i].expected_ms) {
+            fprintf(stderr, "%s: expected %d, got %d\n", cases[i].name, cases[i].expected_ms, actual);
+            failures++;
+        }
+    }
+
+    return failures;
+}
 
 int main(void)
 {
@@ -60,6 +97,8 @@ int main(void)
             failures++;
         }
     }
+
+    failures += test_timeout_conversion();
 
     return failures ? 1 : 0;
 }

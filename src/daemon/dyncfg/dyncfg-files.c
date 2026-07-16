@@ -261,12 +261,15 @@ void dyncfg_load_all(void) {
 // schemas loading
 
 static bool dyncfg_read_file_to_buffer(const char *filename, BUFFER *dst) {
-    int fd = open(filename, O_RDONLY | O_CLOEXEC, 0666);
+    struct stat st = { 0 };
+    if(stat(filename, &st) != 0 || !S_ISREG(st.st_mode))
+        return false;
+
+    int fd = open(filename, O_RDONLY | O_CLOEXEC | O_NONBLOCK, 0666);
     if(unlikely(fd == -1))
         return false;
 
-    struct stat st = { 0 };
-    if(fstat(fd, &st) != 0) {
+    if(fstat(fd, &st) != 0 || !S_ISREG(st.st_mode)) {
         close(fd);
         return false;
     }

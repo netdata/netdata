@@ -96,6 +96,39 @@ char *os_translate_msys_to_windows_path(const char *src) {
     return converted_path;
 }
 
+wchar_t *os_translate_msys_to_windows_pathW(const char *src) {
+    if (!src)
+        return NULL;
+
+#if defined(__CYGWIN__) || defined(__MSYS__)
+    ssize_t cygwin_size = cygwin_conv_path(CCP_POSIX_TO_WIN_W, src, NULL, 0);
+    if (cygwin_size > 0) {
+        wchar_t *converted_path = mallocz((size_t)cygwin_size);
+        if (cygwin_conv_path(CCP_POSIX_TO_WIN_W, src, converted_path, (size_t)cygwin_size) == 0)
+            return converted_path;
+
+        freez(converted_path);
+    }
+
+    // Absolute POSIX paths require the MSYS/Cygwin runtime's mount translation.
+    if (src[0] == '/')
+        return NULL;
+#endif
+
+    CLEAN_CHAR_P *translated = os_translate_msys_to_windows_path(src);
+    int converted_size = MultiByteToWideChar(CP_UTF8, 0, translated, -1, NULL, 0);
+    if (converted_size <= 0)
+        return NULL;
+
+    wchar_t *converted_path = mallocz((size_t)converted_size * sizeof(*converted_path));
+    if (MultiByteToWideChar(CP_UTF8, 0, translated, -1, converted_path, converted_size) <= 0) {
+        freez(converted_path);
+        return NULL;
+    }
+
+    return converted_path;
+}
+
 char *os_translate_path(char *dst, const char *src, size_t dst_size) {
     if (!dst || !dst_size)
         return dst;

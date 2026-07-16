@@ -65,7 +65,9 @@ equal to the installed legacy `plugins.d/cgroup-name.sh` path is migrated to
 the new binary; all custom helper paths remain unchanged.
 
 `NETDATA_CGROUP_NAME_TIMEOUT_MS` carries the operator budget X (from the
-`[plugin:cgroups]` `cgroup-name timeout` option, default 120s). The helper sets
+`[plugin:cgroups]` `cgroup-name timeout` option, default 120s). The Agent exports
+it from the cgroups static-thread initializer, before worker threads start; it
+must not mutate the process environment from the cgroups worker. The helper sets
 `expires_at = start + X` and shares one deadline `context.Context` across every
 external command and HTTP call, so each call gets the remaining budget and
 calls after expiry are not attempted. HTTP response bodies are capped (16 MiB

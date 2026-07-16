@@ -800,11 +800,11 @@ pub fn cleanup_stale(run_dir: &str, service_name: &str) {
         }
 
         let owner = unsafe { (*hdr).owner_pid };
-        let gen = unsafe { (*hdr).owner_generation };
+        let generation = unsafe { (*hdr).owner_generation };
         unsafe { libc::munmap(map, HEADER_LEN as usize) };
 
         // If owner is dead (or generation is zero / legacy), unlink
-        if !pid_alive(owner) || gen == 0 {
+        if !pid_alive(owner) || generation == 0 {
             let _ = unlink_stale_path(&c_path);
         }
     }
@@ -900,14 +900,16 @@ unsafe fn map_region(fd: i32, region_size: usize) -> *mut libc::c_void {
     #[cfg(test)]
     record_mmap_call();
 
-    libc::mmap(
-        ptr::null_mut(),
-        region_size,
-        libc::PROT_READ | libc::PROT_WRITE,
-        libc::MAP_SHARED,
-        fd,
-        0,
-    )
+    unsafe {
+        libc::mmap(
+            ptr::null_mut(),
+            region_size,
+            libc::PROT_READ | libc::PROT_WRITE,
+            libc::MAP_SHARED,
+            fd,
+            0,
+        )
+    }
 }
 
 #[cfg(test)]
@@ -1141,10 +1143,10 @@ fn check_shm_stale(path: &Path) -> StaleResult {
     }
 
     let owner = unsafe { (*hdr).owner_pid };
-    let gen = unsafe { (*hdr).owner_generation };
+    let generation = unsafe { (*hdr).owner_generation };
     unsafe { libc::munmap(map, HEADER_LEN as usize) };
 
-    if pid_alive(owner) && gen != 0 {
+    if pid_alive(owner) && generation != 0 {
         return StaleResult::LiveServer;
     }
 
