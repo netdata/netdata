@@ -714,9 +714,9 @@ int verify_path(const char *path) {
         }
     }
 
-    if(strstr(path, "/../")) {
+    if(strstr(path, "/../") || strendswith(path, "/..")) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "invalid parent path sequence detected in '%s'", path);
-        return 1;
+        return -1;
     }
 
     if(path[0] != '/') {
