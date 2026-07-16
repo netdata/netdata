@@ -99,20 +99,29 @@ static void test_popen_echo_loop(POPEN_INSTANCE *pi, const char *msg, size_t ite
     size_t buffer_size = len * 2;
     CLEAN_CHAR_P *buffer = mallocz(buffer_size);
 
+    FILE *child_stdin = spawn_popen_stdin(pi);
+    FILE *child_stdout = child_stdin ? spawn_popen_stdout(pi) : NULL;
+    if(!child_stdin || !child_stdout) {
+        nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot open popen child streams");
+        spawn_popen_kill(pi, 0);
+        netdata_main_spawn_server_cleanup();
+        exit(1);
+    }
+
     for(size_t j = 0; j < iterations; j++) {
         fprintf(stderr, "-");
         memset(buffer, 0, buffer_size);
 
-        size_t rc = fwrite(msg, 1, len, spawn_popen_stdin(pi));
+        size_t rc = fwrite(msg, 1, len, child_stdin);
         if (rc != len) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                    "Cannot write to plugin. Expected to write %zu bytes, wrote %zu bytes",
                    len, rc);
             exit(1);
         }
-        fflush(spawn_popen_stdin(pi));
+        fflush(child_stdin);
 
-        char *s = fgets(buffer, (int)buffer_size, spawn_popen_stdout(pi));
+        char *s = fgets(buffer, (int)buffer_size, child_stdout);
         if (!s || strlen(s) != len) {
             nd_log(NDLS_COLLECTORS, NDLP_ERR,
                    "Cannot read from plugin. Expected to read %zu bytes, read %zu bytes",
@@ -347,12 +356,19 @@ void test_popen_plugin_echo_and_exit(const char *argv0) {
     }
 
     char buffer[1024];
+    FILE *child_stdout = spawn_popen_stdout(pi);
+    if(!child_stdout) {
+        spawn_popen_kill(pi, 0);
+        netdata_main_spawn_server_cleanup();
+        exit(1);
+    }
+
     size_t reads = 0;
     for(size_t j = 0; j < 30 ;j++) {
         fprintf(stderr, "-");
         memset(buffer, 0, sizeof(buffer));
 
-        char *s = fgets(buffer, sizeof(buffer), spawn_popen_stdout(pi));
+        char *s = fgets(buffer, sizeof(buffer), child_stdout);
         if(!s) break;
         reads++;
         if (strlen(s) != strlen(ECHO_AND_EXIT_MSG)) {

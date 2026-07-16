@@ -161,9 +161,16 @@ BUFFER *run_command_and_get_output_to_buffer(const char *command, int max_line_l
 
     POPEN_INSTANCE *pi = spawn_popen_run(command);
     if(pi) {
+        FILE *child_stdout = spawn_popen_stdout(pi);
+        if(unlikely(!child_stdout)) {
+            spawn_popen_kill(pi, 0);
+            buffer_free(wb);
+            return NULL;
+        }
+
         size_t buffer_size = (size_t)max_line_length + 1;
         CLEAN_CHAR_P *buffer = mallocz(buffer_size);
-        while (fgets(buffer, max_line_length, spawn_popen_stdout(pi))) {
+        while (fgets(buffer, max_line_length, child_stdout)) {
             buffer[max_line_length] = '\0';
             buffer_strcat(wb, buffer);
         }
@@ -184,10 +191,16 @@ bool run_command_and_copy_output_to_stdout(const char *command, int max_line_len
 
     POPEN_INSTANCE *pi = spawn_popen_run(command);
     if(pi) {
+        FILE *child_stdout = spawn_popen_stdout(pi);
+        if(unlikely(!child_stdout)) {
+            spawn_popen_kill(pi, 0);
+            return false;
+        }
+
         size_t buffer_size = (size_t)max_line_length + 1;
         CLEAN_CHAR_P *buffer = mallocz(buffer_size);
 
-        while (fgets(buffer, max_line_length, spawn_popen_stdout(pi)))
+        while (fgets(buffer, max_line_length, child_stdout))
             fprintf(stdout, "%s", buffer);
 
         spawn_popen_kill(pi, 0);

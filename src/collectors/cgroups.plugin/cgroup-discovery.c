@@ -1053,9 +1053,15 @@ static inline void read_cgroup_network_interfaces(struct cgroup *cg) {
         return;
     }
 
+    FILE *child_stdout = spawn_popen_stdout(instance);
+    if(unlikely(!child_stdout)) {
+        spawn_popen_kill(instance, 0);
+        return;
+    }
+
     char *s;
     char buffer[CGROUP_NETWORK_INTERFACE_MAX_LINE + 1];
-    while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, spawn_popen_stdout(instance)))) {
+    while((s = fgets(buffer, CGROUP_NETWORK_INTERFACE_MAX_LINE, child_stdout))) {
         trim(s);
 
         if(*s && *s != '\n') {
