@@ -194,7 +194,7 @@ pub(super) struct TierWorker {
     pub(super) tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
     pub(super) facet_runtime: Arc<crate::facet_runtime::FacetRuntime>,
     pub(super) metrics: Arc<IngestMetrics>,
-    pub(super) journal_sdk_host: Arc<LocalJournalProvider>,
+    pub(super) journal_host: Arc<LocalJournalProvider>,
     pub(super) consecutive_sync_failures: u32,
 }
 
@@ -336,7 +336,7 @@ fn commit_and_return(
         encode_buf,
         &worker.facet_runtime,
         &worker.metrics,
-        &worker.journal_sdk_host,
+        &worker.journal_host,
     );
     sync_with_failure_policy(worker);
     let duration_usec = started.elapsed().as_micros() as u64;
@@ -419,7 +419,7 @@ fn drain_and_exit(
             encode_buf,
             &worker.facet_runtime,
             &worker.metrics,
-            &worker.journal_sdk_host,
+            &worker.journal_host,
         );
     }
     worker
@@ -485,7 +485,7 @@ pub(super) fn commit_batch(
     encode_buf: &mut JournalEncodeBuffer,
     facet_runtime: &crate::facet_runtime::FacetRuntime,
     metrics: &IngestMetrics,
-    journal_sdk_host: &LocalJournalProvider,
+    journal_host: &LocalJournalProvider,
 ) {
     for (bucket_start, bucket) in batch {
         let row_timestamp_usec = bucket_start.saturating_add(bucket_usec).saturating_sub(1);
@@ -506,7 +506,7 @@ pub(super) fn commit_batch(
                 continue;
             };
             let logical_bytes = encode_buf.encoded_len();
-            let entry_monotonic_usec = match journal_sdk_host.monotonic_usec() {
+            let entry_monotonic_usec = match journal_host.monotonic_usec() {
                 Ok(value) => value,
                 Err(err) => {
                     metrics.tier_write_errors.fetch_add(1, Ordering::Relaxed);
@@ -639,10 +639,10 @@ mod tests {
         let tmp = tempfile::tempdir().expect("tempdir");
         let mut cfg = PluginConfig::default();
         cfg._netdata_env.lib_dir = Some(tmp.path().join("varlib"));
-        let journal_sdk_host = crate::local_journal_host::load_local_journal_provider(&cfg)
+        let journal_host = crate::local_journal_host::load_local_journal_provider(&cfg)
             .expect("load local journal host for tier writer test");
         let origin = Origin {
-            machine_id: Some(journal_sdk_host.machine_id()),
+            machine_id: Some(journal_host.machine_id()),
             namespace: None,
             source: Source::System,
         };
@@ -653,7 +653,7 @@ mod tests {
             Config::new(origin, rotation, retention)
                 .with_compact(true)
                 .with_compression(Compression::None)
-                .with_boot_id(journal_sdk_host.boot_id())
+                .with_boot_id(journal_host.boot_id())
                 .with_live_publish_every_entries(0),
         )
         .expect("create tier writer");
@@ -703,7 +703,7 @@ mod tests {
             &mut encode_buf,
             &facet_runtime,
             &metrics,
-            &journal_sdk_host,
+            &journal_host,
         );
 
         assert_eq!(

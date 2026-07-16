@@ -241,7 +241,7 @@ impl IngestService {
         let timestamps = EntryTimestamps::default()
             .with_source_realtime_usec(source_realtime_usec)
             .with_entry_realtime_usec(receive_time_usec)
-            .with_entry_monotonic_usec(match self.journal_sdk_host.monotonic_usec() {
+            .with_entry_monotonic_usec(match self.journal_host.monotonic_usec() {
                 Ok(value) => value,
                 Err(err) => {
                     self.metrics
@@ -326,7 +326,7 @@ impl IngestService {
             &self.tier_flow_indexes,
             &self.facet_runtime,
             &self.metrics,
-            &self.journal_sdk_host,
+            &self.journal_host,
         );
         self.tier_worker_handles =
             super::tier_commit::spawn_tier_workers(&self.tier_handoff, workers);

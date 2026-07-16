@@ -23,11 +23,11 @@ impl IngestService {
         tier_flow_indexes: Arc<RwLock<TierFlowIndexStore>>,
         facet_runtime: Arc<crate::facet_runtime::FacetRuntime>,
     ) -> Result<Self> {
-        let journal_sdk_host = Arc::new(
+        let journal_host = Arc::new(
             load_local_journal_provider(&cfg).context("failed to load local journal host")?,
         );
-        let machine_id = journal_sdk_host.machine_id();
-        let boot_id = journal_sdk_host.boot_id();
+        let machine_id = journal_host.machine_id();
+        let boot_id = journal_host.boot_id();
         let lifecycle_observer: Arc<dyn journal_sdk_log_writer::LogLifecycleObserver> =
             Arc::new(FacetLifecycleObserver {
                 runtime: Arc::clone(&facet_runtime),
@@ -90,7 +90,7 @@ impl IngestService {
             decoder_state_dir,
             last_decoder_state_persist_usec: now_usec(),
             raw_journal,
-            journal_sdk_host,
+            journal_host,
             tier_writers: Some(tier_writers),
             tier_handoff: Arc::new(super::super::tier_commit::TierHandoffShared::new()),
             tier_worker_handles: Vec::new(),

@@ -103,11 +103,11 @@ pub(super) fn new_disk_benchmark_raw_log() -> (TempDir, Log, Arc<LocalJournalPro
     std::fs::create_dir_all(&raw_dir)
         .unwrap_or_else(|e| panic!("create raw tier directory {}: {e}", raw_dir.display()));
 
-    let journal_sdk_host = Arc::new(
+    let journal_host = Arc::new(
         load_local_journal_provider(&cfg).expect("load local journal host for raw benchmark log"),
     );
     let origin = Origin {
-        machine_id: Some(journal_sdk_host.machine_id()),
+        machine_id: Some(journal_host.machine_id()),
         namespace: None,
         source: Source::System,
     };
@@ -132,12 +132,12 @@ pub(super) fn new_disk_benchmark_raw_log() -> (TempDir, Log, Arc<LocalJournalPro
         Config::new(origin, rotation_policy, retention_policy)
             .with_compact(true)
             .with_compression(Compression::None)
-            .with_boot_id(journal_sdk_host.boot_id())
+            .with_boot_id(journal_host.boot_id())
             .with_live_publish_every_entries(0),
     )
     .unwrap_or_else(|e| panic!("create raw benchmark log in {}: {e}", raw_dir.display()));
 
-    (tmp, log, journal_sdk_host)
+    (tmp, log, journal_host)
 }
 
 pub(super) fn new_test_ingest_service_in_dir(
