@@ -33,6 +33,12 @@ const (
 // CapsLive is the minimal capability set for live BEGIN2/SET2 ingestion.
 const CapsLive = CapVCaps | CapHLabels | CapCLabels | CapInterpolated
 
+// CapsLiveV1 announces a v1 (non-interpolated) child: samples travel as
+// raw collected values (BEGIN/SET/END) and the PARENT runs the full
+// rrdset_done math — algorithms, per-second rate conversion, counter
+// wraps — exactly like a local plugin.
+const CapsLiveV1 = CapVCaps | CapHLabels | CapCLabels
+
 // CapsReplication additionally announces child retention so the parent
 // requests history through the replication dialogue.
 const CapsReplication = CapsLive | CapReplication
@@ -254,6 +260,24 @@ func (c *Conn) Set2(dimID, collected, flags string) {
 // End2 closes the sample opened by Begin2.
 func (c *Conn) End2() {
 	c.Linef("END2")
+}
+
+// Begin starts a v1 sample block: the parent clocks the sample itself,
+// advancing the chart's collection time by usecSinceLast (0 on the first
+// sample = "now").
+func (c *Conn) Begin(chartID string, usecSinceLast int64) {
+	c.Linef("BEGIN '%s' %d", chartID, usecSinceLast)
+}
+
+// Set buffers one v1 collected value — the RAW counter/gauge reading; the
+// parent applies the dimension's algorithm (rates, wraps, mul/div).
+func (c *Conn) Set(dimID, collected string) {
+	c.Linef("SET '%s' = %s", dimID, collected)
+}
+
+// End closes a v1 sample block, triggering rrdset_done on the parent.
+func (c *Conn) End() {
+	c.Linef("END")
 }
 
 // ChartDefinitionEnd declares the current chart's retention, prompting the

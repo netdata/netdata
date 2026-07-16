@@ -43,6 +43,9 @@ a fix lands, demanding the flip to `green` with the fixing PR.
 | L7/formatters | classic v1 formats byte/structure-pinned: csv/tsv CRLF endings, literal "null" gap cells, newest-first default + options=flip, unquoted header cells (current contract), csvjsonarray valid JSON + numeric timestamps (#23115/#23117), ssv/ssvcomma/markdown/html/array/json/datatable/jsonp | green | n/a | |
 | CASE-019/v1-json-name-escaping | v1 json/jsonp/csvjsonarray/datatable emit dimension names unescaped — a double-quote in a name (or label value via group_by=label) breaks the JSON; json2 escapes properly | **red** | n/a | |
 | L8/post-processing | percentage (implies absolute on v2/v3 — as does any non-dimension group-by), absolute, nonzero (+ self-neutralizing all-zero), null2zero, cardinality_limit fold | green | n/a | |
+| L1/incremental-rates | db stores PER-SECOND rates at any update_every (v1 child counters through parent rrdset_done: K*(mul/div)/UE; absolute control unscaled) | green | n/a | |
+| L3/sum-over-time-volume | time_group=sum: rate-stored metrics integrate (value x duration = VOLUME at any ue); non-rate metrics sum plainly | green | n/a | |
+| CASE-020/sum-over-time-units | volume integration keeps the rate units — "units/s" should become "units" when sum integrates a rate | **red** | n/a | |
 | CASE-017/tier-boundary-absorption | tier>0 first bucket keeps out the tier point ending exactly at `after` (was: absorbed pre-window data); tier0 control clean | green | n/a | #23127 |
 
 ## Corpus-wide pusher discipline
