@@ -373,6 +373,7 @@ pid_t read_pid_from_cgroup_file(const char *filename) {
     FILE *fp = fdopen(fd, "r");
     if(!fp) {
         nd_log(NDLS_COLLECTORS, NDLP_ERR, "Cannot upgrade fd to fp for file '%s'.", filename);
+        close(fd);
         return 0;
     }
 
