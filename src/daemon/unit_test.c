@@ -2,6 +2,8 @@
 
 #include "common.h"
 #include "web/api/formatters/rrd2json.h"
+#include "web/api/queries/max/max.h"
+#include "web/api/queries/min/min.h"
 #include "database/contexts/rrdcontext-internal.h"
 #ifdef OS_WINDOWS
 #include "win_system-info.h"
@@ -1584,6 +1586,31 @@ static int test_incremental_sum_lookup_respects_update_every(void) {
     return rc;
 }
 
+static int test_min_max_grouping_with_negative_values(void) {
+    static const NETDATA_DOUBLE values[] = { 1, 1, 1, -2 };
+    struct tg_max max_state = { 0 };
+    struct tg_min min_state = { 0 };
+    RRDR r = { 0 };
+
+    for(size_t i = 0; i < _countof(values); i++) {
+        r.time_grouping.data = &max_state;
+        tg_max_add(&r, values[i]);
+
+        r.time_grouping.data = &min_state;
+        tg_min_add(&r, values[i]);
+    }
+
+    if(max_state.max != 1 || min_state.min != -2) {
+        fprintf(stderr,
+                "min/max grouping with negative values failed: expected max 1 and min -2, got max "
+                NETDATA_DOUBLE_FORMAT " and min " NETDATA_DOUBLE_FORMAT "\n",
+                max_state.max, min_state.min);
+        return 1;
+    }
+
+    return 0;
+}
+
 static int test_rrdmetric_algorithm_follows_rrddim(void) {
     fprintf(stderr, "%s() running...\n", __FUNCTION__);
 
@@ -1695,6 +1722,9 @@ int run_all_mockup_tests(void)
         return 1;
 #endif
     if(test_incremental_sum_lookup_respects_update_every())
+        return 1;
+
+    if(test_min_max_grouping_with_negative_values())
         return 1;
 
     if(test_rrdmetric_algorithm_follows_rrddim())
