@@ -635,10 +635,13 @@ func (kernel *CommandKernel) MutateFunctions(ctx context.Context, mutation Funct
 	select {
 	case completed := <-result:
 		return completed.version, completed.err
-	case <-ctx.Done():
-		return 0, ctx.Err()
 	case <-kernel.done:
-		return 0, ErrStopped
+		select {
+		case completed := <-result:
+			return completed.version, completed.err
+		default:
+			return 0, errors.Join(ErrStopped, kernel.doneErr)
+		}
 	}
 }
 

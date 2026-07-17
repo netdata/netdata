@@ -135,7 +135,7 @@ func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 		ID: "method", Generation: newGeneration,
 		PublicName: "direct", Lane: functionadapter.RouteLane(),
 	}
-	mutation, err := functionadapter.NewMutation(catalog.Census().Version, []functionadapter.RouteChange{{
+	mutation, err := catalog.NewMutation(catalog.Census().Version, []functionadapter.RouteChange{{
 		PublicName: "direct", Declaration: &replacement,
 	}})
 	if err != nil {
@@ -175,6 +175,155 @@ func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	closeExternalUIDLedger(t, uids)
+}
+
+func TestFunctionCatalogMutationCancellationAfterHandoffWaitsForDisposition(t *testing.T) {
+	catalog := &handoffMutationCatalog{
+		begun: make(chan struct{}),
+		allow: make(chan struct{}),
+	}
+	kernel, run, admission, uids := newExternalKernel(t, catalog)
+	ctx, cancel := context.WithCancel(context.Background())
+	type mutationResult struct {
+		version uint64
+		err     error
+	}
+	done := make(chan mutationResult, 1)
+	go func() {
+		version, err := kernel.MutateFunctions(ctx, handoffMutation{})
+		done <- mutationResult{version: version, err: err}
+	}()
+	select {
+	case <-catalog.begun:
+	case <-time.After(time.Second):
+		t.Fatal("Function mutation did not reach catalog admission")
+	}
+	cancel()
+
+	var early *mutationResult
+	select {
+	case result := <-done:
+		early = &result
+	case <-time.After(100 * time.Millisecond):
+	}
+	close(catalog.allow)
+	kernel.NotifyControlReady()
+	var result mutationResult
+	if early != nil {
+		result = *early
+	} else {
+		select {
+		case result = <-done:
+		case <-time.After(time.Second):
+			t.Fatal("accepted Function mutation did not complete")
+		}
+	}
+
+	kernel.Stop()
+	if err := kernel.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeExternalUIDLedger(t, uids)
+
+	if early != nil {
+		t.Fatalf(
+			"accepted Function mutation returned before disposition: version=%d err=%v",
+			result.version,
+			result.err,
+		)
+	}
+	if result.version != 2 || result.err != nil {
+		t.Fatalf("Function mutation disposition=%+v, want committed version 2", result)
+	}
+}
+
+type handoffMutation struct{}
+
+func (handoffMutation) FunctionCatalogMutation() {}
+
+type handoffMutationCatalog struct {
+	begun  chan struct{}
+	allow  chan struct{}
+	active atomic.Bool
+	closed atomic.Bool
+}
+
+func (*handoffMutationCatalog) ResolveAndAcquire(
+	jobmgr.FunctionLookup,
+) (jobmgr.FunctionCatalogDecision, error) {
+	return jobmgr.FunctionCatalogDecision{}, nil
+}
+
+func (*handoffMutationCatalog) ReleaseInvocation(
+	jobmgr.FunctionInvocationRef,
+) (jobmgr.FunctionCleanupPlan, error) {
+	return jobmgr.FunctionCleanupPlan{}, nil
+}
+
+func (*handoffMutationCatalog) CompleteCleanup(
+	jobmgr.FunctionCleanupRef,
+	error,
+) error {
+	return nil
+}
+
+func (catalog *handoffMutationCatalog) BeginMutation(
+	jobmgr.FunctionCatalogMutation,
+) error {
+	catalog.active.Store(true)
+	close(catalog.begun)
+	return nil
+}
+
+func (catalog *handoffMutationCatalog) AdvanceMutation(
+	int,
+	*[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan,
+) (jobmgr.FunctionCatalogMutationProgress, int, error) {
+	select {
+	case <-catalog.allow:
+		catalog.active.Store(false)
+		return jobmgr.FunctionCatalogMutationProgress{
+			CompletedNodes: 1,
+			TotalNodes:     1,
+			Version:        2,
+			Done:           true,
+		}, 0, nil
+	default:
+		return jobmgr.FunctionCatalogMutationProgress{
+			TotalNodes: 1,
+			Version:    1,
+		}, 0, nil
+	}
+}
+
+func (catalog *handoffMutationCatalog) AbortMutation(
+	*[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan,
+) (int, error) {
+	catalog.active.Store(false)
+	return 0, nil
+}
+
+func (catalog *handoffMutationCatalog) BeginClose() error {
+	catalog.closed.Store(true)
+	return nil
+}
+
+func (*handoffMutationCatalog) CloseStep(
+	int,
+	*[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan,
+) (int, bool, error) {
+	return 0, false, nil
+}
+
+func (catalog *handoffMutationCatalog) LifecycleCensus() jobmgr.FunctionCatalogCensus {
+	return jobmgr.FunctionCatalogCensus{
+		Version:        2,
+		MutationActive: catalog.active.Load(),
+		Closed:         catalog.closed.Load(),
+	}
 }
 
 func newExternalKernel(t *testing.T, catalog jobmgr.FunctionCatalogPort) (*jobmgr.CommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger) {

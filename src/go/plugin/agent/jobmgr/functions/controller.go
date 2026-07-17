@@ -663,16 +663,22 @@ func (controller *Controller) reconcileModuleLocked(
 		controller.refreshModuleAvailabilityLocked(module)
 		return nil, nil
 	}
-	mutation, err := NewMutation(controller.version, routeChanges)
+	mutation, err := controller.catalog.NewMutation(
+		controller.version,
+		routeChanges,
+	)
 	if err != nil {
 		return nil, err
 	}
+	defer func() {
+		_ = mutation.Discard()
+	}()
 	retired := retiredMethodGenerations(controller.groups, nextGroups)
 	publicationChanges := controllerPublicationChanges(controller.routes, nextRoutes)
 	records := controller.publicationRecordsLocked(nextRoutes)
 	digest, err := DigestSortedPublications(records)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(err, mutation.Discard())
 	}
 	expectedVersion := controller.version + 1
 	err = controller.publication.ApplyTransition(
@@ -698,6 +704,7 @@ func (controller *Controller) reconcileModuleLocked(
 			return nil
 		},
 	)
+	err = errors.Join(err, mutation.Discard())
 	if err != nil {
 		controller.dirty = errors.Join(controller.dirty, err)
 		return nil, err

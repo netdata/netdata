@@ -5,6 +5,7 @@ package functions
 import (
 	"errors"
 	"math"
+	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 )
@@ -43,11 +44,11 @@ type preparedRouteChange struct {
 
 	namePath     []*catalogNode
 	nameBranches []uint8
-	nameCopies   [2][]catalogNode
+	nameCopies   [2][]*catalogNode
 
 	prefixPath     []*prefixNode
 	prefixBranches []uint8
-	prefixCopies   [2][]prefixNode
+	prefixCopies   [2][]*prefixNode
 }
 
 // Mutation is an off-loop-owned, fully allocated mutation request. NewMutation
@@ -58,7 +59,9 @@ type Mutation struct {
 	changes         []preparedRouteChange
 	generations     []preparedGeneration
 	totalNodes      int
-	claimed         bool
+	storage         *catalogStorage
+	storageBytes    int64
+	storageState    atomic.Uint32
 	builder         MutationBuilder
 	transitions     []routeTransition
 	removals        []generationRemoval
@@ -68,8 +71,14 @@ type Mutation struct {
 func (*Mutation) FunctionCatalogMutation() {}
 
 // NewMutation validates and owns one bounded route-change batch. The returned
-// value may be admitted to exactly one Catalog.
-func NewMutation(expectedVersion uint64, changes []RouteChange) (*Mutation, error) {
+// value may be admitted to exactly this Catalog.
+func (catalog *Catalog) NewMutation(
+	expectedVersion uint64,
+	changes []RouteChange,
+) (*Mutation, error) {
+	if catalog == nil {
+		return nil, errors.New("jobmgr Function catalog: nil mutation catalog")
+	}
 	if expectedVersion == 0 || len(changes) == 0 || len(changes) > MaximumMutationChanges {
 		return nil, errors.New("jobmgr Function catalog: invalid mutation")
 	}
@@ -135,18 +144,6 @@ func NewMutation(expectedVersion uint64, changes []RouteChange) (*Mutation, erro
 
 		nameBits := len(change.PublicName) * 8
 		prefixBits := len(change.Prefix) * 8
-		prepared.namePath = make([]*catalogNode, nameBits+1)
-		prepared.nameBranches = make([]uint8, nameBits)
-		for phase := range prepared.nameCopies {
-			prepared.nameCopies[phase] = make([]catalogNode, nameBits+1)
-		}
-		if change.Prefix != "" {
-			prepared.prefixPath = make([]*prefixNode, prefixBits+1)
-			prepared.prefixBranches = make([]uint8, prefixBits)
-			for phase := range prepared.prefixCopies {
-				prepared.prefixCopies[phase] = make([]prefixNode, prefixBits+1)
-			}
-		}
 		perPhase := 2*nameBits + 4
 		if change.Prefix != "" {
 			perPhase += 2*prefixBits + 2
@@ -154,7 +151,105 @@ func NewMutation(expectedVersion uint64, changes []RouteChange) (*Mutation, erro
 		mutation.totalNodes += 2 * perPhase
 	}
 	mutation.totalNodes += len(mutation.generations)
+	storageBytes, err := mutationPathStorageBound(changes)
+	if err != nil {
+		return nil, err
+	}
+	if err := catalog.storage.reservePreparation(storageBytes); err != nil {
+		return nil, err
+	}
+	mutation.storage = &catalog.storage
+	mutation.storageBytes = storageBytes
+	mutation.storageState.Store(mutationStorageReserved)
+	for index := range mutation.changes {
+		prepared := &mutation.changes[index]
+		nameBits := len(prepared.publicName) * 8
+		prepared.namePath = make([]*catalogNode, nameBits+1)
+		prepared.nameBranches = make([]uint8, nameBits)
+		for phase := range prepared.nameCopies {
+			prepared.nameCopies[phase] = make(
+				[]*catalogNode,
+				len(prepared.namePath),
+			)
+			for node := range prepared.nameCopies[phase] {
+				prepared.nameCopies[phase][node] = &catalogNode{}
+			}
+		}
+		if prepared.prefix != "" {
+			prefixBits := len(prepared.prefix) * 8
+			prepared.prefixPath = make([]*prefixNode, prefixBits+1)
+			prepared.prefixBranches = make([]uint8, prefixBits)
+		}
+		for phase := range prepared.prefixCopies {
+			if len(prepared.prefixPath) == 0 {
+				continue
+			}
+			prepared.prefixCopies[phase] = make(
+				[]*prefixNode,
+				len(prepared.prefixPath),
+			)
+			for node := range prepared.prefixCopies[phase] {
+				prepared.prefixCopies[phase][node] = &prefixNode{}
+			}
+		}
+	}
 	return mutation, nil
+}
+
+const (
+	mutationStorageReserved uint32 = iota + 1
+	mutationStorageClaimed
+	mutationStorageReleased
+)
+
+// Discard releases a prepared mutation that was not accepted by the catalog.
+func (mutation *Mutation) Discard() error {
+	if mutation == nil {
+		return nil
+	}
+	if !mutation.storageState.CompareAndSwap(
+		mutationStorageReserved,
+		mutationStorageReleased,
+	) {
+		return nil
+	}
+	return mutation.storage.discardPreparation(mutation.storageBytes)
+}
+
+func (mutation *Mutation) claim(storage *catalogStorage) error {
+	if mutation == nil || mutation.storage != storage ||
+		!mutation.storageState.CompareAndSwap(
+			mutationStorageReserved,
+			mutationStorageClaimed,
+		) {
+		return errors.New("jobmgr Function catalog: stale mutation storage")
+	}
+	return nil
+}
+
+func (mutation *Mutation) abortStorage() error {
+	if mutation == nil ||
+		!mutation.storageState.CompareAndSwap(
+			mutationStorageClaimed,
+			mutationStorageReleased,
+		) {
+		return errors.New("jobmgr Function catalog: stale mutation abort")
+	}
+	return mutation.storage.discardPreparation(mutation.storageBytes)
+}
+
+func (mutation *Mutation) publishStorage(published int64) error {
+	if mutation == nil ||
+		!mutation.storageState.CompareAndSwap(
+			mutationStorageClaimed,
+			mutationStorageReleased,
+		) {
+		return errors.New("jobmgr Function catalog: stale mutation publication")
+	}
+	return mutation.storage.publishPreparation(
+		mutation.storageBytes,
+		published,
+	)
 }
 
 type routeChangeKey struct {
@@ -207,6 +302,7 @@ type routeMutationStep struct {
 	replacement   *route
 	updatedPrefix *prefixNode
 	updatedName   *catalogNode
+	pathByteDelta int64
 }
 
 type MutationProgress struct {
@@ -233,20 +329,25 @@ type MutationBuilder struct {
 	completed    int
 	lastStep     int
 	postimage    *MutationPostimage
+	pathBytes    int64
 	failed       bool
 	finished     bool
 }
 
 type MutationPostimage struct {
-	builder  *MutationBuilder
-	root     *catalogNode
-	finished bool
+	builder   *MutationBuilder
+	root      *catalogNode
+	pathBytes int64
+	finished  bool
 }
 
 // BeginMutation transfers one prepared mutation to the loop-owned catalog.
 func (catalog *Catalog) startMutation(mutation *Mutation) (*MutationBuilder, error) {
-	if catalog == nil || catalog.closed || mutation == nil || mutation.claimed ||
+	if catalog == nil || catalog.closed || mutation == nil ||
 		catalog.mutation != nil || mutation.expectedVersion != catalog.version {
+		if mutation != nil {
+			_ = mutation.Discard()
+		}
 		return nil, errors.New("jobmgr Function catalog: invalid mutation admission")
 	}
 	additions := 0
@@ -257,14 +358,18 @@ func (catalog *Catalog) startMutation(mutation *Mutation) (*MutationBuilder, err
 	}
 	if uint64(additions) > math.MaxUint64-catalog.nextRouteID ||
 		uint64(len(mutation.generations)) > uint64(math.MaxUint32-catalog.nextGenerationID) {
+		_ = mutation.Discard()
 		return nil, errors.New("jobmgr Function catalog: mutation identity exhausted")
 	}
-	mutation.claimed = true
+	if err := mutation.claim(&catalog.storage); err != nil {
+		return nil, err
+	}
 	builder := &mutation.builder
 	*builder = MutationBuilder{
 		catalog: catalog, mutation: mutation, phase: mutationTopology,
 		root: catalog.routes, transitions: mutation.transitions,
 		removals: mutation.removals, removalIndex: mutation.removalIndex,
+		pathBytes: catalog.storage.published.Load(),
 	}
 	catalog.mutation = builder
 	return builder, nil
@@ -295,7 +400,11 @@ func (builder *MutationBuilder) PrepareStep(quantum int) (*MutationPostimage, bo
 			builder.failed = true
 			return nil, false, errors.New("jobmgr Function catalog: mutation work accounting differs")
 		}
-		builder.postimage = &MutationPostimage{builder: builder, root: builder.root}
+		builder.postimage = &MutationPostimage{
+			builder:   builder,
+			root:      builder.root,
+			pathBytes: builder.pathBytes,
+		}
 		return builder.postimage, true, nil
 	}
 	return nil, false, nil
@@ -341,6 +450,15 @@ func (builder *MutationBuilder) advanceOne() (bool, error) {
 					return false, errors.New("jobmgr Function catalog: validated mutation topology changed")
 				}
 				builder.root = builder.step.updatedName
+				if builder.phase == mutationMaterialize {
+					builder.pathBytes += builder.step.pathByteDelta
+					if builder.pathBytes < 0 ||
+						builder.pathBytes > MaximumCatalogStorageBytes {
+						return false, errors.New(
+							"jobmgr Function catalog: mutation postimage storage exceeds process bound",
+						)
+					}
+				}
 				builder.step = routeMutationStep{}
 				builder.change++
 			}
@@ -487,7 +605,7 @@ func (step *routeMutationStep) advancePrefixTerminal() (bool, error) {
 		(original.child[0] != nil || original.child[1] != nil) {
 		return false, errors.New("jobmgr Function catalog: prefix overlaps a longer prefix")
 	}
-	copyNode := &step.change.prefixCopies[step.phaseIndex][step.prefixDepth]
+	copyNode := step.change.prefixCopies[step.phaseIndex][step.prefixDepth]
 	*copyNode = prefixNode{}
 	if original != nil {
 		*copyNode = *original
@@ -498,6 +616,11 @@ func (step *routeMutationStep) advancePrefixTerminal() (bool, error) {
 	} else {
 		step.updatedPrefix = copyNode
 	}
+	step.updatePathStorage(
+		original != nil,
+		step.updatedPrefix != nil,
+		prefixNodeStorageBytes,
+	)
 	if step.oldRoute == nil && step.replacement != nil {
 		step.set.prefixCount++
 	}
@@ -516,7 +639,7 @@ func (step *routeMutationStep) advancePrefixUnwind() (bool, error) {
 	}
 	step.prefixDepth--
 	original := step.change.prefixPath[step.prefixDepth]
-	copyNode := &step.change.prefixCopies[step.phaseIndex][step.prefixDepth]
+	copyNode := step.change.prefixCopies[step.phaseIndex][step.prefixDepth]
 	*copyNode = prefixNode{}
 	if original != nil {
 		*copyNode = *original
@@ -527,12 +650,17 @@ func (step *routeMutationStep) advancePrefixUnwind() (bool, error) {
 	} else {
 		step.updatedPrefix = copyNode
 	}
+	step.updatePathStorage(
+		original != nil,
+		step.updatedPrefix != nil,
+		prefixNodeStorageBytes,
+	)
 	return false, nil
 }
 
 func (step *routeMutationStep) advanceNameLeaf() (bool, error) {
 	original := step.change.namePath[step.nameDepth]
-	copyNode := &step.change.nameCopies[step.phaseIndex][step.nameDepth]
+	copyNode := step.change.nameCopies[step.phaseIndex][step.nameDepth]
 	*copyNode = catalogNode{}
 	if original != nil {
 		*copyNode = *original
@@ -544,6 +672,11 @@ func (step *routeMutationStep) advanceNameLeaf() (bool, error) {
 	} else {
 		step.updatedName = copyNode
 	}
+	step.updatePathStorage(
+		original != nil,
+		step.updatedName != nil,
+		catalogNodeStorageBytes,
+	)
 	step.state = routeStepNameUnwind
 	return false, nil
 }
@@ -555,7 +688,7 @@ func (step *routeMutationStep) advanceNameUnwind() (bool, error) {
 	}
 	step.nameDepth--
 	original := step.change.namePath[step.nameDepth]
-	copyNode := &step.change.nameCopies[step.phaseIndex][step.nameDepth]
+	copyNode := step.change.nameCopies[step.phaseIndex][step.nameDepth]
 	*copyNode = catalogNode{}
 	if original != nil {
 		*copyNode = *original
@@ -566,7 +699,28 @@ func (step *routeMutationStep) advanceNameUnwind() (bool, error) {
 	} else {
 		step.updatedName = copyNode
 	}
+	step.updatePathStorage(
+		original != nil,
+		step.updatedName != nil,
+		catalogNodeStorageBytes,
+	)
 	return false, nil
+}
+
+func (step *routeMutationStep) updatePathStorage(
+	hadOriginal bool,
+	hasReplacement bool,
+	bytes int64,
+) {
+	if step.phaseIndex != 1 {
+		return
+	}
+	if hadOriginal {
+		step.pathByteDelta -= bytes
+	}
+	if hasReplacement {
+		step.pathByteDelta += bytes
+	}
 }
 
 func keyBit(key string, depth int) uint8 {
@@ -608,6 +762,9 @@ func (catalog *Catalog) commitMutation(postimage *MutationPostimage, cleanups *[
 			prepared.generation.cleanupRef.Slot != catalog.nextGenerationID+uint32(index)+1 {
 			return 0, errors.New("jobmgr Function catalog: invalid prepared handler generation")
 		}
+	}
+	if err := builder.mutation.publishStorage(postimage.pathBytes); err != nil {
+		return 0, err
 	}
 
 	for index := range builder.mutation.generations {
@@ -682,7 +839,7 @@ func (builder *MutationBuilder) Abort(cleanups *[jobmgr.MaximumFunctionCleanupBa
 	if builder.postimage != nil {
 		builder.postimage.finished = true
 	}
-	return count, nil
+	return count, builder.mutation.abortStorage()
 }
 
 func (catalog *Catalog) BeginMutation(mutation jobmgr.FunctionCatalogMutation) error {

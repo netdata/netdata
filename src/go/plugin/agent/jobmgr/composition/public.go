@@ -303,11 +303,14 @@ func (process *Process) send(
 	case err := <-result:
 		return err
 	case <-process.done:
+		select {
+		case err := <-result:
+			return err
+		default:
+		}
 		process.mu.Lock()
 		defer process.mu.Unlock()
 		return process.result
-	case <-ctx.Done():
-		return ctx.Err()
 	}
 }
 

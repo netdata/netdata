@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/ticker"
@@ -25,6 +26,11 @@ const (
 type processControl struct {
 	command processCommand
 	result  chan error
+}
+
+type processInputCompletion struct {
+	err  error
+	quit bool
 }
 
 type processCoreConfig struct {
@@ -49,8 +55,7 @@ type processCore struct {
 	uids      *lifecycle.UIDLedger
 	frames    *lifecycle.FrameOwner
 	ingress   *functionadapter.ProcessIngress
-	quit      chan struct{}
-	quitOnce  sync.Once
+	quit      atomic.Bool
 
 	mu      sync.Mutex
 	started bool
@@ -75,18 +80,32 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		config.Clock = lifecycle.RealClock{}
 	}
 	admission := lifecycle.NewAdmissionLedger()
+	if err := admission.ReserveProcessBytes(
+		functionadapter.MaximumCatalogStorageBytes,
+	); err != nil {
+		return nil, err
+	}
 	frames, err := lifecycle.NewFrameOwner(config.Output)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(
+			err,
+			admission.ReleaseProcessBytes(
+				functionadapter.MaximumCatalogStorageBytes,
+			),
+		)
 	}
 	ingress, err := functionadapter.NewProcessIngress(config.Input, admission)
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(
+			err,
+			admission.ReleaseProcessBytes(
+				functionadapter.MaximumCatalogStorageBytes,
+			),
+		)
 	}
 	return &processCore{
 		config: config, admission: admission,
 		uids: lifecycle.NewUIDLedger(), frames: frames, ingress: ingress,
-		quit: make(chan struct{}, 1),
 	}, nil
 }
 
@@ -120,22 +139,28 @@ func (process *processCore) run(
 	if err := process.ingress.Adopt(ctx, binding); err != nil {
 		return process.finalize(generation, generationID, err)
 	}
-	inputDone := make(chan error, 1)
+	inputDone := make(chan processInputCompletion, 1)
 	go func() {
-		inputDone <- process.ingress.Run(ctx)
+		inputDone <- processInputCompletion{
+			err:  process.ingress.Run(ctx),
+			quit: process.quit.Load(),
+		}
 	}()
 	ticks := ticker.New(time.Second)
 	defer ticks.Stop()
 
 	for {
 		select {
-		case inputErr := <-inputDone:
+		case input := <-inputDone:
+			if input.quit {
+				return process.finalize(generation, generationID, input.err)
+			}
 			return process.finalize(
 				generation,
 				generationID,
 				errors.Join(
 					errors.New("jobmgr composition: Function input stopped"),
-					inputErr,
+					input.err,
 				),
 			)
 		case <-generation.kernel.Done():
@@ -149,8 +174,6 @@ func (process *processCore) run(
 			)
 		case <-ctx.Done():
 			return process.finalize(generation, generationID, ctx.Err())
-		case <-process.quit:
-			return process.finalize(generation, generationID, nil)
 		case clock := <-ticks.C:
 			if err := generation.scheduler.Tick(ctx, clock); err != nil {
 				_ = generation.run.Dirty(err)
@@ -254,12 +277,7 @@ func (process *processCore) binding(
 		generation.inputBodyGrants,
 		process.config.Clock,
 		func() {
-			process.quitOnce.Do(func() {
-				select {
-				case process.quit <- struct{}{}:
-				default:
-				}
-			})
+			process.quit.Store(true)
 		},
 	)
 }
@@ -385,6 +403,11 @@ func (process *processCore) finalize(
 		if err := finishRun.FinishShutdown(); err != nil {
 			finalErr = errors.Join(finalErr, err)
 		}
+	}
+	if err := process.admission.ReleaseProcessBytes(
+		functionadapter.MaximumCatalogStorageBytes,
+	); err != nil {
+		finalErr = errors.Join(finalErr, err)
 	}
 	if process.ingress.Census().State != functionadapter.ProcessIngressContained {
 		finalErr = errors.Join(

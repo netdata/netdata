@@ -424,7 +424,7 @@ func TestFunctionCatalogAtomicMutation(t *testing.T) {
 
 	short := testDeclarationForGeneration(testGeneration("short"), "config", "collector:", ArgumentLane(0))
 	long := testDeclarationForGeneration(testGeneration("long"), "config", "collector:job:", ArgumentLane(0))
-	invalid, err := NewMutation(oldVersion, []RouteChange{
+	invalid, err := catalog.NewMutation(oldVersion, []RouteChange{
 		{PublicName: short.PublicName, Prefix: short.Prefix, Declaration: &short},
 		{PublicName: long.PublicName, Prefix: long.Prefix, Declaration: &long},
 	})
@@ -456,7 +456,7 @@ func TestFunctionCatalogAtomicMutation(t *testing.T) {
 		return nil
 	}
 	replacement := testDeclarationForGeneration(replacementGeneration, "work", "", RouteLane())
-	mutation, err := NewMutation(oldVersion, []RouteChange{{
+	mutation, err := catalog.NewMutation(oldVersion, []RouteChange{{
 		PublicName: "work", Declaration: &replacement,
 	}})
 	if err != nil {
@@ -521,7 +521,7 @@ func TestFunctionCatalogBoundedMutationTurns(t *testing.T) {
 		}
 		prefix := strings.Repeat("p", 128)
 		declaration := testDeclaration("config", prefix, ArgumentLane(0))
-		mutation, err := NewMutation(catalog.Census().Version, []RouteChange{{
+		mutation, err := catalog.NewMutation(catalog.Census().Version, []RouteChange{{
 			PublicName: declaration.PublicName, Prefix: declaration.Prefix, Declaration: &declaration,
 		}})
 		if err != nil {
@@ -595,6 +595,148 @@ func TestCatalogRejectsInvalidDeclarations(t *testing.T) {
 				t.Fatal("invalid declaration was accepted")
 			}
 		})
+	}
+}
+
+func TestCatalogRejectsPathStorageBeyondProcessBudgetBeforePublication(t *testing.T) {
+	prefix := strings.Repeat("p", maximumDeclarationMetadataBytes)
+	tests := map[string]func() error{
+		"initial catalog": func() error {
+			var declarations []Declaration
+			for index := 0; index < 5; index++ {
+				name := fmt.Sprintf(
+					"%d%s",
+					index,
+					strings.Repeat(
+						"n",
+						maximumDeclarationMetadataBytes-1,
+					),
+				)
+				declarations = append(
+					declarations,
+					testDeclaration(name, prefix, ArgumentLane(0)),
+				)
+			}
+			_, err := NewCatalog(declarations)
+			return err
+		},
+		"mutation postimage": func() error {
+			catalog, err := NewCatalog(nil)
+			if err != nil {
+				return err
+			}
+			var changes []RouteChange
+			for index := 0; index < 3; index++ {
+				name := fmt.Sprintf(
+					"%d%s",
+					index,
+					strings.Repeat(
+						"n",
+						maximumDeclarationMetadataBytes-1,
+					),
+				)
+				declaration := testDeclaration(
+					name,
+					prefix,
+					ArgumentLane(0),
+				)
+				changes = append(changes, RouteChange{
+					PublicName:  name,
+					Prefix:      prefix,
+					Declaration: &declaration,
+				})
+			}
+			_, err = catalog.NewMutation(1, changes)
+			return err
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			if err := run(); err == nil {
+				t.Fatal("path storage beyond the process budget was accepted")
+			}
+		})
+	}
+}
+
+func TestCatalogPathStorageReturnsToPublishedPostimageAcrossChurn(t *testing.T) {
+	catalog, err := NewCatalog(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	publicName := strings.Repeat("n", 1_024)
+	prefix := strings.Repeat("p", 1_024)
+	apply := func(change RouteChange) {
+		t.Helper()
+		mutation, err := catalog.NewMutation(
+			catalog.Census().Version,
+			[]RouteChange{change},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		builder, err := catalog.startMutation(mutation)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var postimage *MutationPostimage
+		for {
+			var done bool
+			postimage, done, err = builder.PrepareStep(
+				MaximumMutationQuantum,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if done {
+				break
+			}
+		}
+		var cleanups [MaximumMutationChanges]jobmgr.FunctionCleanupPlan
+		count, err := catalog.commitMutation(postimage, &cleanups)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for index := 0; index < count; index++ {
+			runCleanupPlan(t, catalog, cleanups[index])
+		}
+	}
+
+	for iteration := 0; iteration < 8; iteration++ {
+		declaration := testDeclaration(
+			publicName,
+			prefix,
+			ArgumentLane(0),
+		)
+		apply(RouteChange{
+			PublicName:  publicName,
+			Prefix:      prefix,
+			Declaration: &declaration,
+		})
+		apply(RouteChange{
+			PublicName: publicName,
+			Prefix:     prefix,
+		})
+		if published := catalog.storage.published.Load(); published != 0 {
+			t.Fatalf(
+				"iteration %d retained published path bytes: %d",
+				iteration,
+				published,
+			)
+		}
+		if total := catalog.storage.total.Load(); total != 0 {
+			t.Fatalf(
+				"iteration %d retained total path bytes: %d",
+				iteration,
+				total,
+			)
+		}
+		if catalog.storage.preparation.Load() {
+			t.Fatalf(
+				"iteration %d retained a mutation reservation",
+				iteration,
+			)
+		}
 	}
 }
 

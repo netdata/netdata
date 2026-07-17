@@ -411,6 +411,7 @@ type Catalog struct {
 	routes      *catalogNode
 	generations map[jobmgr.FunctionCleanupRef]*handlerGeneration
 	mutation    *MutationBuilder
+	storage     catalogStorage
 
 	invocations [lifecycle.MaximumAdmissionRecords + 1]invocationSlot
 	freeLease   uint32
@@ -434,14 +435,19 @@ func NewCatalog(declarations []Declaration) (*Catalog, error) {
 		declaration Declaration
 		generation  *handlerGeneration
 	}
+	for _, declaration := range declarations {
+		if err := validateDeclaration(declaration); err != nil {
+			return nil, err
+		}
+	}
+	if _, err := initialPathStorageBound(declarations); err != nil {
+		return nil, err
+	}
 	checked := make([]initialRoute, 0, len(declarations))
 	checkedSets := make(map[string]routeSet, len(declarations))
 	generationByDeclaration := make(map[*HandlerGenerationDeclaration]*handlerGeneration)
 	generationIDOwner := make(map[string]*HandlerGenerationDeclaration)
 	for _, declaration := range declarations {
-		if err := validateDeclaration(declaration); err != nil {
-			return nil, err
-		}
 		declaration = cloneDeclaration(declaration)
 		if owner := generationIDOwner[declaration.Generation.ID]; owner != nil && owner != declaration.Generation {
 			return nil, errors.New("jobmgr Function catalog: duplicate handler generation identity")
@@ -472,7 +478,6 @@ func NewCatalog(declarations []Declaration) (*Catalog, error) {
 		checkedSets[declaration.PublicName] = set
 		checked = append(checked, initialRoute{declaration: declaration, generation: generation})
 	}
-
 	catalog := &Catalog{
 		generations: make(map[jobmgr.FunctionCleanupRef]*handlerGeneration, len(declarations)),
 		nextRouteID: 1,
@@ -488,6 +493,11 @@ func NewCatalog(declarations []Declaration) (*Catalog, error) {
 		if err := catalog.addInitial(checkedRoute.declaration, checkedRoute.generation); err != nil {
 			return nil, err
 		}
+	}
+	if err := catalog.storage.initialize(
+		catalogPathStorage(catalog.routes),
+	); err != nil {
+		return nil, err
 	}
 	return catalog, nil
 }
@@ -819,6 +829,9 @@ func (catalog *Catalog) CloseStep(quantum int, cleanups *[jobmgr.MaximumFunction
 	more := catalog.closeHead != nil
 	if !more {
 		catalog.routes = nil
+		if err := catalog.storage.releasePublished(); err != nil {
+			return count, false, err
+		}
 	}
 	return count, more, nil
 }

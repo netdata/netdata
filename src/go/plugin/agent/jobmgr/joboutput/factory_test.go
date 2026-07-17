@@ -35,6 +35,16 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				return nil
 			},
 		},
+		"autodetection panic": {
+			configure: func(state *factoryTestState, creator *collectorapi.Creator) JobHooks {
+				creator.Create = func() collectorapi.CollectorV1 {
+					return state.module(func(context.Context) error {
+						panic("check failed")
+					}, false)
+				}
+				return nil
+			},
+		},
 		"collector cleanup panic": {
 			configure: func(state *factoryTestState, creator *collectorapi.Creator) JobHooks {
 				creator.Create = func() collectorapi.CollectorV1 {

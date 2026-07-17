@@ -366,7 +366,22 @@ func (supervisor *TaskSupervisor) start(parent context.Context, plan TaskPlan, i
 			}
 			permitWork := plan.permitWork
 			permitOwner := plan.permitOwner
-			plan.Work = func(ctx context.Context) (TaskOutcome, error) {
+			plan.Work = func(
+				ctx context.Context,
+			) (outcome TaskOutcome, resultErr error) {
+				defer func() {
+					if recovered := recover(); recovered != nil {
+						outcome = TaskOutcome{}
+						resultErr = errors.Join(
+							fmt.Errorf(
+								"%w in prepared-resource work: %v",
+								ErrTaskPanic,
+								recovered,
+							),
+							permit.AbortUnused(),
+						)
+					}
+				}()
 				resource, workErr := permitWork(ctx, permit)
 				if resource == nil {
 					return TaskOutcome{}, errors.Join(workErr, permit.AbortUnused())
@@ -392,7 +407,22 @@ func (supervisor *TaskSupervisor) start(parent context.Context, plan TaskPlan, i
 			}
 			permitWork := plan.capabilityPermitWork
 			permitOwner := plan.permitOwner
-			plan.Work = func(ctx context.Context) (TaskOutcome, error) {
+			plan.Work = func(
+				ctx context.Context,
+			) (outcome TaskOutcome, resultErr error) {
+				defer func() {
+					if recovered := recover(); recovered != nil {
+						outcome = TaskOutcome{}
+						resultErr = errors.Join(
+							fmt.Errorf(
+								"%w in prepared-capability work: %v",
+								ErrTaskPanic,
+								recovered,
+							),
+							permit.AbortUnused(),
+						)
+					}
+				}()
 				capability, workErr := permitWork(ctx, permit)
 				if capability == nil {
 					return TaskOutcome{}, errors.Join(workErr, permit.AbortUnused())
@@ -443,7 +473,33 @@ func (supervisor *TaskSupervisor) start(parent context.Context, plan TaskPlan, i
 			}
 			work := plan.transactionWork
 			scope := plan.transactionScope
-			plan.Work = func(ctx context.Context) (TaskOutcome, error) {
+			plan.Work = func(
+				ctx context.Context,
+			) (outcome TaskOutcome, resultErr error) {
+				defer func() {
+					if recovered := recover(); recovered != nil {
+						var abortErr error
+						if permit.Valid() {
+							abortErr = permit.AbortUnused()
+						}
+						var outcomeErr error
+						if current != nil {
+							outcome, outcomeErr = readyResourceOutcome(
+								current,
+								scope.Current,
+							)
+						}
+						resultErr = errors.Join(
+							fmt.Errorf(
+								"%w in resource-transaction work: %v",
+								ErrTaskPanic,
+								recovered,
+							),
+							abortErr,
+							outcomeErr,
+						)
+					}
+				}()
 				transaction, workErr := work(ctx, current, scope, permit)
 				if transaction == nil {
 					var abortErr error
