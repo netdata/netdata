@@ -307,11 +307,11 @@ modules:
       configuration:
         file:
           name: "ebpf.d.conf"
-          description: "Primary configuration file for ebpf-go.plugin. Enable the socket module in the `[ebpf programs]` section. The module also accepts the legacy `ebpf.d/network.conf` overlay for per-module overrides."
+          description: "Primary configuration file for ebpf-go.plugin. Enable the socket module in the `[ebpf programs]` section. Per-module overrides belong in `ebpf.d/socket.conf`."
         options:
           description: |
             The `socket` option in section `[ebpf programs]` controls whether the module is loaded.
-            Per-module overrides (`update every`, `maps per core`, `btf path`, `ebpf object flavor`) belong in `ebpf.d/network.conf`.
+            Per-module overrides (`update every`, `maps per core`, `btf path`, `ebpf object flavor`) belong in `ebpf.d/socket.conf`.
           folding:
             title: "Config options"
             enabled: true

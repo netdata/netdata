@@ -3366,12 +3366,13 @@ if(ENABLE_PLUGIN_EBPF)
             src/collectors/ebpf.plugin/ebpf.d/fd.conf
             src/collectors/ebpf.plugin/ebpf.d/filesystem.conf
             src/collectors/ebpf.plugin/ebpf.d/hardirq.conf
+            src/collectors/ebpf.plugin/ebpf.d/dns.conf
             src/collectors/ebpf.plugin/ebpf.d/mdflush.conf
             src/collectors/ebpf.plugin/ebpf.d/mount.conf
-            src/collectors/ebpf.plugin/ebpf.d/network.conf
             src/collectors/ebpf.plugin/ebpf.d/oomkill.conf
             src/collectors/ebpf.plugin/ebpf.d/process.conf
             src/collectors/ebpf.plugin/ebpf.d/shm.conf
+            src/collectors/ebpf.plugin/ebpf.d/socket.conf
             src/collectors/ebpf.plugin/ebpf.d/softirq.conf
             src/collectors/ebpf.plugin/ebpf.d/swap.conf
             src/collectors/ebpf.plugin/ebpf.d/sync.conf
