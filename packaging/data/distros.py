@@ -1,7 +1,7 @@
-#!/bin/env python3
+#!/usr/bin/env python3
 '''Python module for handling of distros.yaml data.
 
-   If run as a script on it’s own, this will dump the JSON schema for distros.yaml.'''
+   If run as a script on its own, this will dump the JSON schema for distros.yaml.'''
 
 from __future__ import annotations
 
@@ -218,7 +218,7 @@ class DistroData(BaseModel):
         description='Specifies the sort order for build architectures in CI. Must contain each supported architecture value exactly once.',
     )]
     arch_data: Annotated[dict[Arch, ArchDataEntry], Field(
-        title='Per-Architecture Build Environemnt Config',
+        title='Per-Architecture Build Environment Config',
         description='Specifies GitHub Actions runner configuration for each build architecture in CI. Must contain an entry for each supported architecture value exactly once.',
     )]
     static_arches: Annotated[list[Arch], Field(
