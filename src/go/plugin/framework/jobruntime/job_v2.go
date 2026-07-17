@@ -297,13 +297,22 @@ func (j *JobV2) applyVnodeSnapshot(snapshot VnodeSnapshot) {
 }
 
 func (j *JobV2) Cleanup() {
+	j.cleanup(true)
+}
+
+// CleanupRejected releases a constructed job without emitting cleanup output.
+func (j *JobV2) CleanupRejected() {
+	j.cleanup(false)
+}
+
+func (j *JobV2) cleanup(emit bool) {
 	j.buf.Reset()
 	snapshots := j.captureScopeCleanupSnapshots()
 	j.unregisterRuntimeComponent()
 	if j.module != nil {
 		j.module.Cleanup(context.Background())
 	}
-	if !collectorapi.ShouldObsoleteCharts() {
+	if !emit || !collectorapi.ShouldObsoleteCharts() {
 		j.releaseAllScopeRegistryOwners()
 		j.clearAllScopeStateAfterCleanup()
 		return
@@ -331,7 +340,9 @@ func (j *JobV2) Cleanup() {
 			j.buf.Reset()
 			continue
 		}
-		_, _ = io.Copy(j.out, j.buf)
+		if err := commitJobOutput(j.out, j.buf.Bytes()); err != nil {
+			j.Warningf("cleanup output failed for host scope %q: %v", snapshot.scopeKey, err)
+		}
 		j.buf.Reset()
 	}
 	j.releaseAllScopeRegistryOwners()
@@ -341,6 +352,15 @@ func (j *JobV2) Cleanup() {
 // AutoDetection invokes init, check and postCheck. It handles panic.
 // ctx flows into the module's Init/Check calls and must be non-nil.
 func (j *JobV2) AutoDetection(ctx context.Context) (err error) {
+	return j.autoDetection(ctx, true)
+}
+
+// AutoDetectionManaged leaves failure cleanup with the Job Manager factory.
+func (j *JobV2) AutoDetectionManaged(ctx context.Context) (err error) {
+	return j.autoDetection(ctx, false)
+}
+
+func (j *JobV2) autoDetection(ctx context.Context, cleanupOnFailure bool) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = fmt.Errorf("panic %v", r)
@@ -351,7 +371,7 @@ func (j *JobV2) AutoDetection(ctx context.Context) (err error) {
 				j.Errorf("STACK: %s", debug.Stack())
 			}
 		}
-		if err != nil {
+		if err != nil && cleanupOnFailure {
 			j.Cleanup()
 		}
 	}()
@@ -383,6 +403,17 @@ func (j *JobV2) AutoDetection(ctx context.Context) (err error) {
 }
 
 func (j *JobV2) Start() {
+	j.run(true, nil)
+}
+
+// StartManaged starts the collector loop while leaving Cleanup ownership with
+// the caller. It acknowledges readiness only after the loop and optional
+// runner have published their active state.
+func (j *JobV2) StartManaged(ready chan<- struct{}) {
+	j.run(false, ready)
+}
+
+func (j *JobV2) run(cleanup bool, ready chan<- struct{}) {
 	j.stopCtrl.markStarted()
 	j.running.Store(true)
 	runCtx, cancel := context.WithCancel(context.Background())
@@ -390,6 +421,9 @@ func (j *JobV2) Start() {
 	var runnerDone <-chan error
 	if !j.stopCtrl.stopRequested() {
 		runnerDone = j.startCollectorRunner(runCtx)
+	}
+	if ready != nil {
+		close(ready)
 	}
 	if j.functionOnly {
 		j.Info("started in function-only mode")
@@ -424,7 +458,9 @@ LOOP:
 	// Mark not-running before cleanup so external function dispatch can reject requests
 	// while module resources are being torn down.
 	j.running.Store(false)
-	j.Cleanup()
+	if cleanup {
+		j.Cleanup()
+	}
 }
 
 func (j *JobV2) startCollectorRunner(ctx context.Context) <-chan error {
@@ -668,8 +704,12 @@ func (j *JobV2) finishPreparedEmission(prepared jobV2PreparedEmission) error {
 			j.Warningf("finalize emission for host scope %q failed: %v", scope.scope.scopeKey, err)
 			continue
 		}
-		if len(scope.output) > 0 {
-			_, _ = j.out.Write(scope.output)
+		if err := commitJobOutput(j.out, scope.output); err != nil {
+			j.rollbackVnodeRegistryEmission(scope.decision)
+			failures++
+			finalErr = errors.Join(finalErr, err)
+			j.Warningf("write emission for host scope %q failed: %v", scope.scope.scopeKey, err)
+			continue
 		}
 		j.commitScopeEmission(scope)
 		successes++

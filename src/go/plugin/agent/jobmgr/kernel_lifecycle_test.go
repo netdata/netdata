@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -33,11 +34,16 @@ func TestKernelCompletionBroadcastsToAllCallers(t *testing.T) {
 
 	t.Run("submit after stop", func(t *testing.T) {
 		kernel := newStoppedKernel(t)
+		catalog := testFunctionCatalogFor(t, kernel)
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
-		err := kernel.Submit(ctx, Request{UID: "after-stop", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route"})
+		err := kernel.Submit(ctx, Request{UID: "after-stop", Source: lifecycle.SourceFunction, Route: "route"})
 		if err == nil || errors.Is(err, context.DeadlineExceeded) || !strings.Contains(err.Error(), "stopped") {
 			t.Fatalf("post-stop submit differs: %v", err)
+		}
+		if catalog.next != 0 || catalog.release != 0 || len(catalog.leases) != 0 {
+			t.Fatalf("post-stop submit touched Function catalog: resolves=%d releases=%d active=%d",
+				catalog.next, catalog.release, len(catalog.leases))
 		}
 	})
 
@@ -271,6 +277,206 @@ func TestKernelPlanningRunsOutsideLoop(t *testing.T) {
 	closeUIDLedger(t, uids)
 }
 
+func TestFunctionCatalogPlanningWaitsForKernelLoop(t *testing.T) {
+	planned := make(chan struct{}, 1)
+	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
+		planned <- struct{}{}
+		return WorkPlan{
+			Work: lifecycle.FrameTaskWork(plannerPlanWork),
+		}, nil
+	})
+	kernel, run, admission, uids, _ := newKernelWithPlanner(t, planner)
+	catalog := testFunctionCatalogFor(t, kernel)
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+
+	submitted := make(chan error, 1)
+	go func() {
+		submitted <- kernel.Submit(context.Background(), Request{
+			UID:    "function-loop-planning",
+			Source: lifecycle.SourceFunction, Route: "route",
+		})
+	}()
+
+	calledBeforeStart := false
+	select {
+	case <-planned:
+		calledBeforeStart = true
+	case <-time.After(25 * time.Millisecond):
+	}
+
+	startKernelLoop(t, kernel)
+	select {
+	case err := <-submitted:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Function submission did not complete")
+	}
+	kernel.Stop()
+	if err := kernel.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
+	if calledBeforeStart {
+		t.Fatal("Function catalog planning ran before KernelLoop")
+	}
+	if catalog.next != 1 || catalog.release != 1 || len(catalog.leases) != 0 {
+		t.Fatalf("Function lease lifecycle differs: resolves=%d releases=%d active=%d",
+			catalog.next, catalog.release, len(catalog.leases))
+	}
+}
+
+func TestFunctionCatalogDecisionOwnsExactLease(t *testing.T) {
+	work := WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)}
+	tests := map[string]struct {
+		decision     FunctionCatalogDecision
+		wantErr      bool
+		wantReleases int
+		wantStatus   string
+	}{
+		"resolved terminal": {
+			decision: FunctionCatalogDecision{
+				Lane: FunctionLane{Route: 1}, Plan: work,
+				Lease: FunctionInvocationRef{Slot: 1, Generation: 1},
+			},
+			wantReleases: 1,
+			wantStatus:   " 200 ",
+		},
+		"closed rejection owns no lease": {
+			decision:   FunctionCatalogDecision{Lane: FunctionLane{Route: 1}, Rejected: lifecycle.ControlNotFound},
+			wantStatus: " 404 ",
+		},
+		"invalid resolved decision releases returned lease": {
+			decision: FunctionCatalogDecision{
+				Plan: work, Lease: FunctionInvocationRef{Slot: 1, Generation: 1},
+			},
+			wantErr:      true,
+			wantReleases: 1,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var resolves int
+			var releases int
+			catalog := functionCatalogPortStub{
+				resolve: func(FunctionLookup) (FunctionCatalogDecision, error) {
+					resolves++
+					return test.decision, nil
+				},
+				release: func(ref FunctionInvocationRef) (FunctionCleanupPlan, error) {
+					releases++
+					if ref != test.decision.Lease {
+						return FunctionCleanupPlan{}, errors.New("released Function lease differs")
+					}
+					return FunctionCleanupPlan{}, nil
+				},
+			}
+			var output bytes.Buffer
+			planner := stoppedKernelPlanner{}
+			kernel, run, admission, uids, _ := newKernelWithClockFinalizerCatalogAndTimeout(
+				t, planner, catalog, &output, lifecycle.RealClock{}, newNoopRunFinalizer(), time.Second,
+			)
+			if err := run.OpenAdmission(); err != nil {
+				t.Fatal(err)
+			}
+			startKernelLoop(t, kernel)
+			err := kernel.SubmitAndWait(context.Background(), Request{
+				UID: "catalog-decision", Source: lifecycle.SourceFunction, Route: "route",
+			})
+			if gotErr := err != nil; gotErr != test.wantErr {
+				t.Fatalf("SubmitAndWait error=%v, want error=%v", err, test.wantErr)
+			}
+			kernel.Stop()
+			if err := kernel.Wait(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			if resolves != 1 || releases != test.wantReleases {
+				t.Fatalf("catalog transitions: resolves=%d releases=%d, want 1/%d",
+					resolves, releases, test.wantReleases)
+			}
+			if test.wantStatus != "" && !bytes.Contains(output.Bytes(), []byte(test.wantStatus)) {
+				t.Fatalf("Function result status differs: %q", output.Bytes())
+			}
+			if err := admission.CloseDrained(run.Generation()); err != nil {
+				t.Fatal(err)
+			}
+			closeUIDLedger(t, uids)
+		})
+	}
+}
+
+func TestFunctionHandlerCleanupRunsOffKernelLoop(t *testing.T) {
+	cleanupCompleted := make(chan error, 1)
+	var kernel *CommandKernel
+	catalog := functionCatalogPortStub{
+		resolve: func(FunctionLookup) (FunctionCatalogDecision, error) {
+			return FunctionCatalogDecision{
+				Lane:  FunctionLane{Route: 1},
+				Plan:  WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)},
+				Lease: FunctionInvocationRef{Slot: 1, Generation: 1},
+			}, nil
+		},
+		release: func(FunctionInvocationRef) (FunctionCleanupPlan, error) {
+			return FunctionCleanupPlan{
+				Ref: FunctionCleanupRef{Slot: 1, Generation: 1},
+				Work: func(ctx context.Context) (lifecycle.TaskOutcome, error) {
+					if err := kernel.Cancel(ctx, "cleanup-loop-barrier"); err != nil {
+						return lifecycle.NoValueOutcome(), err
+					}
+					return lifecycle.NoValueOutcome(), nil
+				},
+			}, nil
+		},
+		complete: func(_ FunctionCleanupRef, err error) error {
+			cleanupCompleted <- err
+			return nil
+		},
+	}
+	planner := stoppedKernelPlanner{}
+	var run *lifecycle.RunSupervisor
+	var admission *lifecycle.AdmissionLedger
+	var uids *lifecycle.UIDLedger
+	kernel, run, admission, uids, _ = newKernelWithClockFinalizerCatalogAndTimeout(
+		t, planner, catalog, io.Discard, lifecycle.RealClock{}, newNoopRunFinalizer(), time.Second,
+	)
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	startKernelLoop(t, kernel)
+	if err := kernel.SubmitAndWait(context.Background(), Request{
+		UID: "cleanup-off-loop", Source: lifecycle.SourceFunction, Route: "route",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case err := <-cleanupCompleted:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("Function cleanup did not complete through TaskSupervisor")
+	}
+	kernel.Stop()
+	if err := kernel.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if len(kernel.functionCleanupRequests) != 0 || len(kernel.functionCleanupTasks) != 0 {
+		t.Fatalf("Function cleanup retained kernel state: requests=%d tasks=%d",
+			len(kernel.functionCleanupRequests), len(kernel.functionCleanupTasks))
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
+}
+
 func TestWorkPlanRejectsUnboundedClaims(t *testing.T) {
 	valid := WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)}
 	tests := map[string]struct {
@@ -317,9 +523,9 @@ func TestKernelSubmitWaitsForOrdinaryAdmissionGrant(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := Request{
-		UID: "grant-boundary", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route",
+		UID: "grant-boundary", Source: lifecycle.SourceFunction, Route: "route",
 	}
-	plan, err := kernel.preparePlan(request)
+	plan, err := kernel.prepareSubmissionPlanForTest(request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -353,6 +559,7 @@ func TestKernelSubmitWaitsForOrdinaryAdmissionGrant(t *testing.T) {
 
 func TestKernelCancelledSubmitReleasesUngrantableAdmission(t *testing.T) {
 	kernel, run, admission, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	catalog := testFunctionCatalogFor(t, kernel)
 	gate := make(chan struct{})
 	kernel.admissionServiceGate = gate
 	if err := run.OpenAdmission(); err != nil {
@@ -364,7 +571,7 @@ func TestKernelCancelledSubmitReleasesUngrantableAdmission(t *testing.T) {
 	submitted := make(chan error, 1)
 	go func() {
 		submitted <- kernel.Submit(ctx, Request{
-			UID: "cancel-before-grant", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route",
+			UID: "cancel-before-grant", Source: lifecycle.SourceFunction, Route: "route",
 		})
 	}()
 	deadline := time.Now().Add(time.Second)
@@ -392,6 +599,10 @@ func TestKernelCancelledSubmitReleasesUngrantableAdmission(t *testing.T) {
 	defer waitCancel()
 	if err := kernel.Wait(waitCtx); err != nil {
 		t.Fatal(err)
+	}
+	if catalog.next != 1 || catalog.release != 1 || len(catalog.leases) != 0 {
+		t.Fatalf("pre-start cancellation Function lease differs: resolves=%d releases=%d active=%d",
+			catalog.next, catalog.release, len(catalog.leases))
 	}
 	if err := admission.CloseDrained(run.Generation()); err != nil {
 		t.Fatal(err)
@@ -435,6 +646,322 @@ func TestKernelAbsentResourceStopSettlesWithoutAdmission(t *testing.T) {
 	defer cancel()
 	if err := kernel.Wait(ctx); err != nil {
 		t.Fatal(err)
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
+}
+
+func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
+	tests := map[string]struct {
+		prepareErr       error
+		wantSuccessor    bool
+		wantEvents       []string
+		wantResponseText string
+	}{
+		"replacement commits response and successor": {
+			wantSuccessor:    true,
+			wantEvents:       []string{"prepare", "apply", "cleanup"},
+			wantResponseText: "replace-success",
+		},
+		"preparation failure restores exact current": {
+			prepareErr:       errors.New("validation rejected"),
+			wantEvents:       []string{"prepare"},
+			wantResponseText: "replace-rejected",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			events := []string{}
+			current := newKernelTestReadyResource("resource", nil, nil)
+			successor := newKernelTestReadyResource("resource", nil, nil)
+			permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
+			if err != nil {
+				t.Fatal(err)
+			}
+			planner := kernelTestTransactionPlanner{
+				permitPlan: permitPlan,
+				current:    current,
+				successor:  successor,
+				prepareErr: test.prepareErr,
+				events:     &events,
+			}
+			var output bytes.Buffer
+			kernel, run, admission, uids, tasks :=
+				newKernelWithPlannerAndWriter(t, planner, &output)
+			if err := run.OpenAdmission(); err != nil {
+				t.Fatal(err)
+			}
+			startKernelLoop(t, kernel)
+
+			if err := kernel.SubmitAndWait(
+				context.Background(),
+				Request{
+					UID:     "install-current",
+					LaneKey: "resource",
+					Source:  lifecycle.SourceJobManager,
+					Route:   "install",
+				},
+			); err != nil {
+				t.Fatal(err)
+			}
+			originalIdentity := current.identity
+			uid := "replace-rejected"
+			if test.wantSuccessor {
+				uid = "replace-success"
+			}
+			if err := kernel.SubmitAndWait(
+				context.Background(),
+				Request{
+					UID:     uid,
+					LaneKey: "resource",
+					Source:  lifecycle.SourceJobManager,
+					Route:   "replace",
+				},
+			); err != nil {
+				t.Fatal(err)
+			}
+
+			lane := kernel.lanes[commandLaneKey{
+				source: lifecycle.SourceJobManager,
+				key:    "resource",
+			}]
+			if lane == nil {
+				t.Fatal("transaction released the live resource lane")
+			}
+			if test.wantSuccessor {
+				if lane.current != successor ||
+					lane.currentIdentity != successor.identity ||
+					lane.currentIdentity == originalIdentity {
+					t.Fatalf(
+						"replacement current=%T identity=%#v, successor=%T identity=%#v",
+						lane.current,
+						lane.currentIdentity,
+						successor,
+						successor.identity,
+					)
+				}
+			} else if lane.current != current ||
+				lane.currentIdentity != originalIdentity {
+				t.Fatalf(
+					"rejected replacement current=%T identity=%#v, want exact original %#v",
+					lane.current,
+					lane.currentIdentity,
+					originalIdentity,
+				)
+			}
+			if lane.currentStopping ||
+				lane.retiringIdentity.Valid() ||
+				lane.transactionPlanned != 0 {
+				t.Fatalf("transaction retained lane state: %#v", lane)
+			}
+			if !reflect.DeepEqual(events, test.wantEvents) {
+				t.Fatalf("events=%v, want %v", events, test.wantEvents)
+			}
+			if !strings.Contains(output.String(), test.wantResponseText) {
+				t.Fatalf(
+					"response does not contain UID %q: %q",
+					test.wantResponseText,
+					output.String(),
+				)
+			}
+
+			kernel.Stop()
+			waitCtx, cancel := context.WithTimeout(
+				context.Background(),
+				time.Second,
+			)
+			defer cancel()
+			if err := kernel.Wait(waitCtx); err != nil {
+				t.Fatal(err)
+			}
+			if tasks.Active() != 0 || tasks.Pending() != 0 {
+				t.Fatalf(
+					"transaction retained tasks: active=%d pending=%d",
+					tasks.Active(),
+					tasks.Pending(),
+				)
+			}
+			if err := admission.CloseDrained(run.Generation()); err != nil {
+				t.Fatal(err)
+			}
+			closeUIDLedger(t, uids)
+		})
+	}
+}
+
+func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
+	events := []string{}
+	current := newKernelTestReadyResource("resource", nil, nil)
+	successor := newKernelTestReadyResource("resource", nil, nil)
+	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	planner := kernelTestTransactionPlanner{
+		permitPlan:          permitPlan,
+		current:             current,
+		successor:           successor,
+		waitForCancellation: true,
+		events:              &events,
+	}
+	var output bytes.Buffer
+	kernel, run, admission, uids, tasks :=
+		newKernelWithPlannerAndWriter(t, planner, &output)
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	startKernelLoop(t, kernel)
+	if err := kernel.SubmitAndWait(
+		context.Background(),
+		Request{
+			UID:     "install-before-cancel",
+			LaneKey: "resource",
+			Source:  lifecycle.SourceJobManager,
+			Route:   "install",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	originalIdentity := current.identity
+	if err := kernel.SubmitAndWait(
+		context.Background(),
+		Request{
+			UID:      "replace-deadline",
+			LaneKey:  "resource",
+			Source:   lifecycle.SourceJobManager,
+			Route:    "replace",
+			Deadline: time.Now().Add(10 * time.Millisecond),
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	lane := kernel.lanes[commandLaneKey{
+		source: lifecycle.SourceJobManager,
+		key:    "resource",
+	}]
+	if lane == nil ||
+		lane.current != current ||
+		lane.currentIdentity != originalIdentity ||
+		lane.currentStopping ||
+		lane.transactionPlanned != 0 {
+		t.Fatalf("cancelled transaction did not restore exact current: %#v", lane)
+	}
+	if want := []string{"prepare", "dispose"}; !reflect.DeepEqual(
+		events,
+		want,
+	) {
+		t.Fatalf("events=%v, want %v", events, want)
+	}
+	if !strings.Contains(output.String(), "replace-deadline") {
+		t.Fatalf("deadline response missing: %q", output.String())
+	}
+
+	kernel.Stop()
+	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := kernel.Wait(waitCtx); err != nil {
+		t.Fatal(err)
+	}
+	if tasks.Active() != 0 || tasks.Pending() != 0 {
+		t.Fatalf(
+			"cancelled transaction retained tasks: active=%d pending=%d",
+			tasks.Active(),
+			tasks.Pending(),
+		)
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
+}
+
+func TestKernelPreparedInternalTransactionAppliesWithoutResponse(t *testing.T) {
+	events := []string{}
+	current := newKernelTestReadyResource("resource", nil, nil)
+	successor := newKernelTestReadyResource("resource", nil, nil)
+	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	planner := kernelTestTransactionPlanner{
+		permitPlan: permitPlan,
+		current:    current,
+		successor:  successor,
+		events:     &events,
+	}
+	var output bytes.Buffer
+	kernel, run, admission, uids, tasks :=
+		newKernelWithPlannerAndWriter(t, planner, &output)
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	startKernelLoop(t, kernel)
+	if err := kernel.SubmitAndWait(
+		context.Background(),
+		Request{
+			UID:     "prepared-install",
+			LaneKey: "resource",
+			Source:  lifecycle.SourceJobManager,
+			Route:   "install",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	request := Request{
+		UID:     "prepared-replace",
+		LaneKey: "resource",
+		Source:  lifecycle.SourceJobManager,
+		Route:   "typed/reconcile",
+	}
+	plan, err := planner.Plan(Request{
+		LaneKey: request.LaneKey,
+		Route:   "replace",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan.NoResponse = true
+	if err := kernel.SubmitPreparedAndWait(
+		context.Background(),
+		request,
+		plan,
+	); err != nil {
+		t.Fatal(err)
+	}
+	lane := kernel.lanes[commandLaneKey{
+		source: lifecycle.SourceJobManager,
+		key:    "resource",
+	}]
+	if lane == nil ||
+		lane.current != successor ||
+		lane.currentIdentity != successor.identity ||
+		lane.currentStopping ||
+		lane.transactionPlanned != 0 {
+		t.Fatalf("prepared transaction lane=%#v", lane)
+	}
+	if want := []string{"prepare", "apply", "cleanup"}; !reflect.DeepEqual(
+		events,
+		want,
+	) {
+		t.Fatalf("events=%v want=%v", events, want)
+	}
+	if strings.Contains(output.String(), request.UID) {
+		t.Fatalf("internal transaction emitted a response: %q", output.String())
+	}
+
+	kernel.Stop()
+	if err := kernel.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if tasks.Active() != 0 || tasks.Pending() != 0 {
+		t.Fatalf(
+			"prepared transaction retained tasks: active=%d pending=%d",
+			tasks.Active(),
+			tasks.Pending(),
+		)
 	}
 	if err := admission.CloseDrained(run.Generation()); err != nil {
 		t.Fatal(err)
@@ -740,7 +1267,7 @@ func TestKernelKeepsUnchangedDeadlineTimerAcrossUnrelatedEvents(t *testing.T) {
 	done := make(chan error, 1)
 	go func() {
 		done <- kernel.SubmitAndWait(context.Background(), Request{
-			UID: "one-deadline-timer", LaneKey: "timer", Source: lifecycle.SourceFunction, Route: "timer",
+			UID: "one-deadline-timer", Source: lifecycle.SourceFunction, Route: "timer",
 			Deadline: clock.Now().Add(time.Hour),
 		})
 	}()
@@ -900,6 +1427,7 @@ func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 	})
 	var output bytes.Buffer
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
+	setTestFunctionLane(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -907,7 +1435,7 @@ func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 	future := clock.Now().Add(time.Minute)
 	for index := 0; index < lifecycle.TransientTaskSlots; index++ {
 		if err := kernel.Submit(context.Background(), Request{
-			UID: fmt.Sprintf("blocker-%d", index), LaneKey: fmt.Sprintf("blocker-%d", index), Source: lifecycle.SourceFunction,
+			UID: fmt.Sprintf("blocker-%d", index), Source: lifecycle.SourceFunction,
 			Route: "blocker", Deadline: future,
 		}); err != nil {
 			t.Fatal(err)
@@ -922,7 +1450,7 @@ func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 	}
 	due := clock.Now()
 	if err := kernel.Submit(context.Background(), Request{
-		UID: "queued-deadline", LaneKey: "queued-deadline", Source: lifecycle.SourceFunction,
+		UID: "queued-deadline", Source: lifecycle.SourceFunction,
 		Route: "deadline", Deadline: due,
 	}); err != nil {
 		t.Fatal(err)
@@ -997,6 +1525,7 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 	})
 	var output bytes.Buffer
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
+	setTestFunctionLane(t, kernel, func(FunctionLookup) string { return "same-lane" })
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -1004,7 +1533,7 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 	predecessorResult := make(chan error, 1)
 	go func() {
 		predecessorResult <- kernel.SubmitAndWait(context.Background(), Request{
-			UID: "same-lane-predecessor", LaneKey: "same-lane", Source: lifecycle.SourceFunction, Route: "predecessor",
+			UID: "same-lane-predecessor", Source: lifecycle.SourceFunction, Route: "predecessor",
 		})
 	}()
 	select {
@@ -1016,7 +1545,7 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 	deadlineResult := make(chan error, 1)
 	go func() {
 		deadlineResult <- kernel.SubmitAndWait(context.Background(), Request{
-			UID: "same-lane-deadline", LaneKey: "same-lane", Source: lifecycle.SourceFunction,
+			UID: "same-lane-deadline", Source: lifecycle.SourceFunction,
 			Route: "deadline", Deadline: due,
 		})
 	}()
@@ -1110,13 +1639,14 @@ func TestKernelDisposesQueuedNoResponseCapabilityAfterItsDeadline(t *testing.T) 
 		})}, nil
 	})
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
+	setTestFunctionLane(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
 	startKernelLoop(t, kernel)
 	for index := 0; index < lifecycle.TransientTaskSlots; index++ {
 		if err := kernel.Submit(context.Background(), Request{
-			UID: fmt.Sprintf("queued-capability-blocker-%d", index), LaneKey: fmt.Sprintf("queued-capability-blocker-%d", index),
+			UID:    fmt.Sprintf("queued-capability-blocker-%d", index),
 			Source: lifecycle.SourceFunction, Route: "blocker",
 		}); err != nil {
 			t.Fatal(err)
@@ -1199,13 +1729,14 @@ func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 	})
 	var output bytes.Buffer
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
+	setTestFunctionLane(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
 	startKernelLoop(t, kernel)
 	for index := 0; index < lifecycle.TransientTaskSlots; index++ {
 		if err := kernel.Submit(context.Background(), Request{
-			UID: fmt.Sprintf("noncooperative-blocker-%d", index), LaneKey: fmt.Sprintf("noncooperative-blocker-%d", index),
+			UID:    fmt.Sprintf("noncooperative-blocker-%d", index),
 			Source: lifecycle.SourceFunction, Route: "blocker",
 		}); err != nil {
 			t.Fatal(err)
@@ -1221,7 +1752,7 @@ func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 	terminal := make(chan error, 1)
 	go func() {
 		terminal <- kernel.SubmitAndWait(context.Background(), Request{
-			UID: "queued-noncooperative-deadline", LaneKey: "queued-noncooperative-deadline", Source: lifecycle.SourceFunction,
+			UID: "queued-noncooperative-deadline", Source: lifecycle.SourceFunction,
 			Route: "noncooperative", Deadline: clock.Now(),
 		})
 	}()
@@ -1281,7 +1812,7 @@ func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) 
 	for index := 0; index < lifecycle.TransientTaskSlots; index++ {
 		terminals[index] = make(chan error, 1)
 		request := Request{
-			UID: fmt.Sprintf("mixed-retained-%d", index), LaneKey: fmt.Sprintf("mixed-retained-%d", index),
+			UID:    fmt.Sprintf("mixed-retained-%d", index),
 			Source: lifecycle.SourceFunction, Route: fmt.Sprintf("work-%d", index),
 		}
 		if index == 0 {
@@ -1754,9 +2285,13 @@ func TestKernelRejectsMissingRunFinalizer(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := NewCommandKernel(run, admission, uids, tasks, frames, lifecycle.RealClock{}, make(chan lifecycle.AdmissionGrant, 1), nil, nil, map[lifecycle.Source]Planner{
-		lifecycle.SourceJobManager: stoppedKernelPlanner{}, lifecycle.SourceFunction: stoppedKernelPlanner{},
-	}); err == nil {
+	planner := stoppedKernelPlanner{}
+	if _, err := NewCommandKernel(
+		run, admission, uids, tasks, frames, lifecycle.RealClock{},
+		make(chan lifecycle.AdmissionGrant, 1), nil,
+		newNoopRunShutdownBarrier(), nil,
+		planner, newTestFunctionCatalog(planner),
+	); err == nil {
 		t.Fatal("Kernel accepted missing run finalizer")
 	}
 }
@@ -1816,12 +2351,13 @@ func TestKernelStopDrainsCooperativeTask(t *testing.T) {
 		}, nil
 	})
 	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, planner)
+	setTestFunctionLane(t, kernel, func(FunctionLookup) string { return "lane" })
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
 	startKernelLoop(t, kernel)
 	if err := kernel.Submit(context.Background(), Request{
-		UID: "cooperative-stop", LaneKey: "lane", Source: lifecycle.SourceFunction,
+		UID: "cooperative-stop", Source: lifecycle.SourceFunction,
 		Route: "route", Deadline: time.Now().Add(time.Minute),
 	}); err != nil {
 		t.Fatal(err)
@@ -1866,10 +2402,12 @@ func TestKernelShutdownSettlesPendingInputBodyGrowthBeforeCleanupOnly(t *testing
 		t.Fatal(err)
 	}
 	grants := make(chan lifecycle.AdmissionGrant, 1)
-	kernel, err := NewCommandKernel(run, admission, uids, tasks, frames, lifecycle.RealClock{}, grants, nil, newNoopRunFinalizer(), map[lifecycle.Source]Planner{
-		lifecycle.SourceJobManager: stoppedKernelPlanner{},
-		lifecycle.SourceFunction:   stoppedKernelPlanner{},
-	})
+	planner := stoppedKernelPlanner{}
+	kernel, err := NewCommandKernel(
+		run, admission, uids, tasks, frames, lifecycle.RealClock{}, grants, nil,
+		newNoopRunShutdownBarrier(), newNoopRunFinalizer(),
+		planner, newTestFunctionCatalog(planner),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1980,12 +2518,14 @@ func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 		}
 	})
 	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, planner)
+	setTestFunctionLane(t, kernel, func(FunctionLookup) string { return "lane" })
+	catalog := testFunctionCatalogFor(t, kernel)
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
 	startKernelLoop(t, kernel)
 	deadline := time.Now().Add(time.Minute)
-	if err := kernel.Submit(context.Background(), Request{UID: "blocking", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "blocking", Deadline: deadline}); err != nil {
+	if err := kernel.Submit(context.Background(), Request{UID: "blocking", Source: lifecycle.SourceFunction, Route: "blocking", Deadline: deadline}); err != nil {
 		t.Fatal(err)
 	}
 	select {
@@ -1995,7 +2535,7 @@ func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 	}
 	queuedResult := make(chan error, 1)
 	if err := kernel.submit(context.Background(), Request{
-		UID: "queued", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "queued", Deadline: deadline,
+		UID: "queued", Source: lifecycle.SourceFunction, Route: "queued", Deadline: deadline,
 	}, queuedResult); err != nil {
 		t.Fatal(err)
 	}
@@ -2010,6 +2550,10 @@ func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("queued cancellation did not reach terminal disposal")
 	}
+	if catalog.next != 2 || catalog.release != 1 || len(catalog.leases) != 1 {
+		t.Fatalf("queued cancellation Function lease differs: resolves=%d releases=%d active=%d",
+			catalog.next, catalog.release, len(catalog.leases))
+	}
 
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -2019,6 +2563,10 @@ func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 	}
 	if tasks.Active() != 0 || tasks.Pending() != 0 {
 		t.Fatalf("task census differs: active=%d pending=%d", tasks.Active(), tasks.Pending())
+	}
+	if catalog.next != 2 || catalog.release != 2 || len(catalog.leases) != 0 {
+		t.Fatalf("shutdown Function lease differs: resolves=%d releases=%d active=%d",
+			catalog.next, catalog.release, len(catalog.leases))
 	}
 	if err := admission.CloseDrained(run.Generation()); err != nil {
 		t.Fatal(err)
@@ -2052,7 +2600,7 @@ func TestKernelReservesExactPlanAndFrameBytesBeforeWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	startKernelLoop(t, kernel)
-	request := Request{UID: "self-fit", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route"}
+	request := Request{UID: "self-fit", Source: lifecycle.SourceFunction, Route: "route"}
 	if err := kernel.Submit(context.Background(), request); err != nil {
 		t.Fatal(err)
 	}
@@ -2062,7 +2610,9 @@ func TestKernelReservesExactPlanAndFrameBytesBeforeWrite(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("result did not reach held Write")
 	}
-	base, err := operationAdmissionBytes(request, WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)})
+	chargedRequest := request
+	chargedRequest.LaneKey = request.Route
+	base, err := operationAdmissionBytes(chargedRequest, WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2086,7 +2636,7 @@ func TestKernelReservesExactPlanAndFrameBytesBeforeWrite(t *testing.T) {
 
 func TestOperationAdmissionBytesIncludesSealedRequestMetadata(t *testing.T) {
 	baseRequest := Request{
-		UID: "metadata", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route",
+		UID: "metadata", Source: lifecycle.SourceFunction, Route: "route",
 	}
 	plan := WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)}
 	base, err := operationAdmissionBytes(baseRequest, plan)
@@ -2174,7 +2724,7 @@ func TestKernelCancelsResultWaitingForAdmissionGrowth(t *testing.T) {
 		t.Fatal(err)
 	}
 	startKernelLoop(t, kernel)
-	if err := kernel.Submit(context.Background(), Request{UID: "growth-cancel", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route"}); err != nil {
+	if err := kernel.Submit(context.Background(), Request{UID: "growth-cancel", Source: lifecycle.SourceFunction, Route: "route"}); err != nil {
 		t.Fatal(err)
 	}
 	deadline := time.Now().Add(time.Second)
@@ -2250,12 +2800,12 @@ func TestKernelExternalSubmissionServiceRotatesSources(t *testing.T) {
 	requests := []Request{
 		{UID: "j1", LaneKey: "j1", Source: lifecycle.SourceJobManager, Route: "route"},
 		{UID: "j2", LaneKey: "j2", Source: lifecycle.SourceJobManager, Route: "route"},
-		{UID: "f1", LaneKey: "f1", Source: lifecycle.SourceFunction, Route: "route"},
-		{UID: "f2", LaneKey: "f2", Source: lifecycle.SourceFunction, Route: "route"},
+		{UID: "f1", Source: lifecycle.SourceFunction, Route: "route"},
+		{UID: "f2", Source: lifecycle.SourceFunction, Route: "route"},
 	}
 	results := make([]chan error, len(requests))
 	for index, request := range requests {
-		plan, err := kernel.preparePlan(request)
+		plan, err := kernel.prepareSubmissionPlanForTest(request)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2284,12 +2834,11 @@ func TestKernelShutdownDrainsMoreThanTwoSubmissionQuantaWithoutAnotherWake(t *te
 	for index := range results {
 		results[index] = make(chan error, 1)
 		request := Request{
-			UID:     fmt.Sprintf("queued-%d", index),
-			LaneKey: "lane",
-			Source:  lifecycle.SourceFunction,
-			Route:   "route",
+			UID:    fmt.Sprintf("queued-%d", index),
+			Source: lifecycle.SourceFunction,
+			Route:  "route",
 		}
-		plan, err := kernel.preparePlan(request)
+		plan, err := kernel.prepareSubmissionPlanForTest(request)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2328,7 +2877,7 @@ func TestKernelClosedAdmissionDoesNotRearmFrameBlockedControl(t *testing.T) {
 		t.Fatal("frame-blocked control was reported as immediately runnable")
 	}
 	kernel.blockedSubmissions[source] = submission{
-		request: Request{UID: "ordinary", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route"},
+		request: Request{UID: "ordinary", Source: lifecycle.SourceFunction, Route: "route"},
 	}
 	if !kernel.hasRunnableSubmissions() {
 		t.Fatal("admission-blocked request was not exposed after admission closed")
@@ -2343,17 +2892,17 @@ func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
 		}, nil
 	})
 	kernel, run, _, _, tasks := newKernelWithPlanner(t, planner)
+	setTestFunctionLane(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
 	for index := 0; index < 9; index++ {
 		request := Request{
-			UID:     fmt.Sprintf("claim-%d", index),
-			LaneKey: fmt.Sprintf("lane-%d", index),
-			Source:  lifecycle.SourceFunction,
-			Route:   "route",
+			UID:    fmt.Sprintf("claim-%d", index),
+			Source: lifecycle.SourceFunction,
+			Route:  "route",
 		}
-		plan, err := kernel.preparePlan(request)
+		plan, err := kernel.prepareSubmissionPlanForTest(request)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2385,10 +2934,10 @@ func TestKernelSubmissionBacklogCannotStarveStop(t *testing.T) {
 	}
 	for index := 0; index < externalSourceQueueDepth; index++ {
 		request := Request{
-			UID: fmt.Sprintf("backlog-%d", index), LaneKey: "lane",
+			UID:    fmt.Sprintf("backlog-%d", index),
 			Source: lifecycle.SourceFunction, Route: "route",
 		}
-		plan, err := kernel.preparePlan(request)
+		plan, err := kernel.prepareSubmissionPlanForTest(request)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2419,10 +2968,10 @@ func TestKernelSubmissionBacklogCannotStarveDueDeadline(t *testing.T) {
 		t.Fatal(err)
 	}
 	request := Request{
-		UID: "deadline-probe", LaneKey: "deadline-lane", Source: lifecycle.SourceFunction, Route: "route",
+		UID: "deadline-probe", Source: lifecycle.SourceFunction, Route: "route",
 		Deadline: time.Now().Add(-time.Second),
 	}
-	plan, err := kernel.preparePlan(request)
+	plan, err := kernel.prepareSubmissionPlanForTest(request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2431,10 +2980,10 @@ func TestKernelSubmissionBacklogCannotStarveDueDeadline(t *testing.T) {
 	}
 	for index := 0; index < externalSourceQueueDepth; index++ {
 		request := Request{
-			UID: fmt.Sprintf("backlog-%d", index), LaneKey: "lane",
+			UID:    fmt.Sprintf("backlog-%d", index),
 			Source: lifecycle.SourceFunction, Route: "route",
 		}
-		plan, err := kernel.preparePlan(request)
+		plan, err := kernel.prepareSubmissionPlanForTest(request)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -2460,6 +3009,7 @@ func TestKernelSubmissionBacklogCannotStarveDueDeadline(t *testing.T) {
 
 func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T) {
 	kernel, run, admission, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	catalog := testFunctionCatalogFor(t, kernel)
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -2467,8 +3017,8 @@ func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T
 	firstResult := make(chan error, 1)
 	secondResult := make(chan error, 1)
 	source := sourceIndex(lifecycle.SourceFunction)
-	firstRequest := Request{UID: "first", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route"}
-	firstPlan, err := kernel.preparePlan(firstRequest)
+	firstRequest := Request{UID: "first", Source: lifecycle.SourceFunction, Route: "route"}
+	firstPlan, err := kernel.prepareSubmissionPlanForTest(firstRequest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2477,8 +3027,8 @@ func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T
 		plan:    firstPlan,
 		result:  firstResult,
 	}
-	secondRequest := Request{UID: "second", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route"}
-	secondPlan, err := kernel.preparePlan(secondRequest)
+	secondRequest := Request{UID: "second", Source: lifecycle.SourceFunction, Route: "route"}
+	secondPlan, err := kernel.prepareSubmissionPlanForTest(secondRequest)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2491,6 +3041,10 @@ func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T
 	kernel.serviceSubmissions(1)
 	if !kernel.blockedSubmission[source] || len(kernel.submissions[source]) != 1 {
 		t.Fatalf("capacity block did not retain exactly the source head: blocked=%v queued=%d", kernel.blockedSubmission[source], len(kernel.submissions[source]))
+	}
+	if catalog.next != 1 || catalog.release != 1 || len(catalog.leases) != 0 || catalog.peak != 1 {
+		t.Fatalf("capacity retry retained Function lease: resolves=%d releases=%d active=%d peak=%d",
+			catalog.next, catalog.release, len(catalog.leases), catalog.peak)
 	}
 	select {
 	case err := <-firstResult:
@@ -2509,6 +3063,10 @@ func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T
 	}
 	if kernel.blockedSubmission[source] || len(kernel.submissions[source]) != 1 {
 		t.Fatalf("first retry did not preserve the later source item: blocked=%v queued=%d", kernel.blockedSubmission[source], len(kernel.submissions[source]))
+	}
+	if catalog.next != 2 || catalog.release != 1 || len(catalog.leases) != 1 || catalog.peak != 1 {
+		t.Fatalf("successful retry Function lease differs: resolves=%d releases=%d active=%d peak=%d",
+			catalog.next, catalog.release, len(catalog.leases), catalog.peak)
 	}
 	select {
 	case err := <-secondResult:
@@ -2530,6 +3088,10 @@ func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T
 	if first == nil || second == nil || first.ID >= second.ID {
 		t.Fatalf("source FIFO operation order differs: first=%#v second=%#v", first, second)
 	}
+	if catalog.next != 3 || catalog.release != 1 || len(catalog.leases) != 2 || catalog.peak != 2 {
+		t.Fatalf("accepted Function lease census differs: resolves=%d releases=%d active=%d peak=%d",
+			catalog.next, catalog.release, len(catalog.leases), catalog.peak)
+	}
 }
 
 func TestKernelExternalSubmissionCapacityBlockFlushesAfterAdmissionClose(t *testing.T) {
@@ -2540,8 +3102,8 @@ func TestKernelExternalSubmissionCapacityBlockFlushesAfterAdmissionClose(t *test
 	fillAdmissionRecordCapacity(t, admission, run.Generation())
 	result := make(chan error, 1)
 	source := sourceIndex(lifecycle.SourceFunction)
-	request := Request{UID: "closing", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route"}
-	plan, err := kernel.preparePlan(request)
+	request := Request{UID: "closing", Source: lifecycle.SourceFunction, Route: "route"}
+	plan, err := kernel.prepareSubmissionPlanForTest(request)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2681,6 +3243,12 @@ func newKernelWithPlannerWriterFinalizerAndTimeout(t *testing.T, planner Planner
 }
 
 func newKernelWithClockFinalizerAndTimeout(t *testing.T, planner Planner, writer io.Writer, clock lifecycle.Clock, finalizer RunFinalizer, timeout time.Duration) (*CommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
+	return newKernelWithClockFinalizerCatalogAndTimeout(
+		t, planner, newTestFunctionCatalog(planner), writer, clock, finalizer, timeout,
+	)
+}
+
+func newKernelWithClockFinalizerCatalogAndTimeout(t *testing.T, planner Planner, functionCatalog FunctionCatalogPort, writer io.Writer, clock lifecycle.Clock, finalizer RunFinalizer, timeout time.Duration) (*CommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	t.Helper()
 	run, err := lifecycle.NewRunSupervisor(1, clock, timeout)
 	if err != nil {
@@ -2697,10 +3265,12 @@ func newKernelWithClockFinalizerAndTimeout(t *testing.T, planner Planner, writer
 	if err != nil {
 		t.Fatal(err)
 	}
-	kernel, err := NewCommandKernel(run, admission, uids, tasks, frames, clock, make(chan lifecycle.AdmissionGrant, 1), nil, finalizer, map[lifecycle.Source]Planner{
-		lifecycle.SourceJobManager: planner,
-		lifecycle.SourceFunction:   planner,
-	})
+	kernel, err := NewCommandKernel(
+		run, admission, uids, tasks, frames, clock,
+		make(chan lifecycle.AdmissionGrant, 1), nil,
+		newNoopRunShutdownBarrier(), finalizer,
+		planner, functionCatalog,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2796,6 +3366,151 @@ func (fn plannerFunc) Plan(request Request) (WorkPlan, error) {
 	return fn(context.Background(), request.Route, request.Args)
 }
 
+func (kernel *CommandKernel) prepareSubmissionPlanForTest(request Request) (WorkPlan, error) {
+	if request.Source == lifecycle.SourceFunction {
+		return WorkPlan{}, nil
+	}
+	return kernel.prepareJobPlan(request)
+}
+
+type testFunctionCatalog struct {
+	planner Planner
+	lane    func(FunctionLookup) FunctionLane
+	next    uint64
+	release uint64
+	peak    int
+	leases  map[FunctionInvocationRef]struct{}
+	routes  map[string]uint64
+}
+
+type functionCatalogPortStub struct {
+	resolve  func(FunctionLookup) (FunctionCatalogDecision, error)
+	release  func(FunctionInvocationRef) (FunctionCleanupPlan, error)
+	complete func(FunctionCleanupRef, error) error
+}
+
+func (catalog functionCatalogPortStub) ResolveAndAcquire(lookup FunctionLookup) (FunctionCatalogDecision, error) {
+	return catalog.resolve(lookup)
+}
+
+func (catalog functionCatalogPortStub) ReleaseInvocation(ref FunctionInvocationRef) (FunctionCleanupPlan, error) {
+	return catalog.release(ref)
+}
+
+func (catalog functionCatalogPortStub) CompleteCleanup(ref FunctionCleanupRef, err error) error {
+	if catalog.complete == nil {
+		return nil
+	}
+	return catalog.complete(ref, err)
+}
+
+func (functionCatalogPortStub) BeginMutation(FunctionCatalogMutation) error {
+	return errors.New("test Function catalog: mutations unsupported")
+}
+
+func (functionCatalogPortStub) AdvanceMutation(int, *[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (FunctionCatalogMutationProgress, int, error) {
+	return FunctionCatalogMutationProgress{}, 0, errors.New("test Function catalog: no active mutation")
+}
+
+func (functionCatalogPortStub) AbortMutation(*[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (int, error) {
+	return 0, errors.New("test Function catalog: no active mutation")
+}
+
+func (functionCatalogPortStub) BeginClose() error { return nil }
+
+func (functionCatalogPortStub) CloseStep(int, *[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (int, bool, error) {
+	return 0, false, nil
+}
+
+func (functionCatalogPortStub) LifecycleCensus() FunctionCatalogCensus {
+	return FunctionCatalogCensus{Closed: true}
+}
+
+func newTestFunctionCatalog(planner Planner) *testFunctionCatalog {
+	return &testFunctionCatalog{
+		planner: planner,
+		leases:  make(map[FunctionInvocationRef]struct{}),
+		routes:  make(map[string]uint64),
+	}
+}
+
+func (catalog *testFunctionCatalog) ResolveAndAcquire(lookup FunctionLookup) (FunctionCatalogDecision, error) {
+	plan, err := catalog.planner.Plan(Request{
+		UID: lookup.UID, Source: lifecycle.SourceFunction, Route: lookup.Route,
+		Args: lookup.Args, Payload: lookup.Payload, ContentType: lookup.ContentType,
+		Permissions: lookup.Permissions, CallerSource: lookup.CallerSource,
+		Timeout: lookup.Timeout, HasPayload: lookup.HasPayload,
+	})
+	if err != nil {
+		return FunctionCatalogDecision{}, err
+	}
+	catalog.next++
+	routeID := catalog.routes[lookup.Route]
+	if routeID == 0 {
+		routeID = uint64(len(catalog.routes) + 1)
+		catalog.routes[lookup.Route] = routeID
+	}
+	ref := FunctionInvocationRef{Slot: 1, Generation: catalog.next}
+	catalog.leases[ref] = struct{}{}
+	if len(catalog.leases) > catalog.peak {
+		catalog.peak = len(catalog.leases)
+	}
+	lane := FunctionLane{Route: routeID, Scope: lookup.Route}
+	if catalog.lane != nil {
+		lane = catalog.lane(lookup)
+	}
+	return FunctionCatalogDecision{Lane: lane, Plan: plan, Lease: ref}, nil
+}
+
+func (catalog *testFunctionCatalog) ReleaseInvocation(ref FunctionInvocationRef) (FunctionCleanupPlan, error) {
+	if _, ok := catalog.leases[ref]; !ok {
+		return FunctionCleanupPlan{}, errors.New("test Function catalog: unknown invocation lease")
+	}
+	delete(catalog.leases, ref)
+	catalog.release++
+	return FunctionCleanupPlan{}, nil
+}
+
+func (*testFunctionCatalog) CompleteCleanup(FunctionCleanupRef, error) error { return nil }
+
+func (*testFunctionCatalog) BeginMutation(FunctionCatalogMutation) error {
+	return errors.New("test Function catalog: mutations unsupported")
+}
+
+func (*testFunctionCatalog) AdvanceMutation(int, *[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (FunctionCatalogMutationProgress, int, error) {
+	return FunctionCatalogMutationProgress{}, 0, errors.New("test Function catalog: no active mutation")
+}
+
+func (*testFunctionCatalog) AbortMutation(*[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (int, error) {
+	return 0, errors.New("test Function catalog: no active mutation")
+}
+
+func (*testFunctionCatalog) BeginClose() error { return nil }
+
+func (*testFunctionCatalog) CloseStep(int, *[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (int, bool, error) {
+	return 0, false, nil
+}
+
+func (*testFunctionCatalog) LifecycleCensus() FunctionCatalogCensus {
+	return FunctionCatalogCensus{Closed: true}
+}
+
+func setTestFunctionLane(t *testing.T, kernel *CommandKernel, lane func(FunctionLookup) string) {
+	t.Helper()
+	testFunctionCatalogFor(t, kernel).lane = func(lookup FunctionLookup) FunctionLane {
+		return FunctionLane{Route: 1, Scope: lane(lookup)}
+	}
+}
+
+func testFunctionCatalogFor(t *testing.T, kernel *CommandKernel) *testFunctionCatalog {
+	t.Helper()
+	catalog, ok := kernel.functionCatalog.(*testFunctionCatalog)
+	if !ok {
+		t.Fatal("kernel does not use the test Function catalog")
+	}
+	return catalog
+}
+
 func kernelResourcePlanner(t *testing.T, resource *kernelTestReadyResource, workEntered chan<- struct{}, workRelease <-chan struct{}) Planner {
 	t.Helper()
 	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
@@ -2815,6 +3530,146 @@ type kernelTestResourcePlanner struct {
 	resource    *kernelTestReadyResource
 	workEntered chan<- struct{}
 	workRelease <-chan struct{}
+}
+
+type kernelTestTransactionPlanner struct {
+	permitPlan          lifecycle.LongLivedPlan
+	current             *kernelTestReadyResource
+	successor           *kernelTestReadyResource
+	prepareErr          error
+	waitForCancellation bool
+	events              *[]string
+}
+
+func (planner kernelTestTransactionPlanner) Plan(
+	request Request,
+) (WorkPlan, error) {
+	switch request.Route {
+	case "install":
+		return WorkPlan{
+			NoResponse: true,
+			Resource: &ResourcePlan{
+				Action: ResourceInstall,
+				ID:     request.LaneKey,
+				Permit: planner.permitPlan,
+				Prepare: func(
+					_ context.Context,
+					generation uint64,
+					permit lifecycle.LongLivedPermit,
+				) (lifecycle.PreparedResource, error) {
+					identity := lifecycle.ResourceIdentity{
+						ID:         request.LaneKey,
+						Generation: generation,
+					}
+					planner.current.identity = identity
+					return &kernelTestPreparedResource{
+						identity: identity,
+						permit:   permit,
+						ready:    planner.current,
+					}, nil
+				},
+			},
+		}, nil
+	case "replace":
+		return WorkPlan{
+			Transaction: &ResourceTransactionPlan{
+				ID:                request.LaneKey,
+				AllocateSuccessor: true,
+				Permit:            planner.permitPlan,
+				Prepare: func(
+					ctx context.Context,
+					current lifecycle.ReadyResource,
+					scope lifecycle.ResourceTransactionScope,
+					permit lifecycle.LongLivedPermit,
+				) (lifecycle.PreparedResourceTransaction, error) {
+					*planner.events = append(*planner.events, "prepare")
+					if current != planner.current ||
+						scope.Current != planner.current.identity ||
+						!scope.Successor.Valid() {
+						return nil, errors.New(
+							"kernel test transaction scope differs",
+						)
+					}
+					if planner.waitForCancellation {
+						<-ctx.Done()
+					}
+					if planner.prepareErr != nil {
+						return nil, planner.prepareErr
+					}
+					return &kernelTestPreparedResourceTransaction{
+						scope:     scope,
+						current:   planner.current,
+						successor: planner.successor,
+						permit:    permit,
+						events:    planner.events,
+					}, nil
+				},
+			},
+		}, nil
+	default:
+		return WorkPlan{}, errors.New(
+			"unexpected kernel transaction route",
+		)
+	}
+}
+
+type kernelTestPreparedResourceTransaction struct {
+	scope     lifecycle.ResourceTransactionScope
+	current   *kernelTestReadyResource
+	successor *kernelTestReadyResource
+	permit    lifecycle.LongLivedPermit
+	events    *[]string
+}
+
+func (transaction *kernelTestPreparedResourceTransaction) Scope() lifecycle.ResourceTransactionScope {
+	return transaction.scope
+}
+
+func (transaction *kernelTestPreparedResourceTransaction) Apply(
+	ctx context.Context,
+) (lifecycle.AppliedResourceTransaction, error) {
+	*transaction.events = append(*transaction.events, "apply")
+	if err := transaction.current.Stop(ctx); err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	if err := transaction.current.Finalize(); err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	if err := transaction.permit.ActivateExternal(
+		lifecycle.LongLivedEJobResources,
+	); err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	transaction.successor.identity = transaction.scope.Successor
+	transaction.successor.permit = transaction.permit
+	if err := transaction.successor.Publish(); err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	result, err := lifecycle.NewSealedResult(
+		200,
+		"application/json",
+		[]byte(`{"accepted":true}`),
+	)
+	if err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	return lifecycle.NewAppliedResourceTransaction(
+		transaction.scope,
+		lifecycle.ResourceTransactionReplaced,
+		transaction.successor,
+		result,
+		func() error {
+			*transaction.events = append(*transaction.events, "cleanup")
+			return nil
+		},
+	)
+}
+
+func (transaction *kernelTestPreparedResourceTransaction) Dispose(
+	context.Context,
+) (lifecycle.ReadyResource, error) {
+	*transaction.events = append(*transaction.events, "dispose")
+	return transaction.current, transaction.permit.AbortUnused()
 }
 
 func (planner kernelTestResourcePlanner) Plan(request Request) (WorkPlan, error) {

@@ -17,9 +17,10 @@ const (
 	maximumRequestMetadataBytes = maximumRequestArgumentBytes
 )
 
-// Request is one immutable command admission value. The submitting adapter
-// transfers ownership of Args and Payload until the request reaches terminal
-// disposal.
+// Request is one immutable command admission value. LaneKey is supplied only
+// for Job Manager commands; the Function catalog selects Function lanes. The
+// submitting adapter transfers ownership of Args and Payload until the request
+// reaches terminal disposal.
 type Request struct {
 	UID             string
 	LaneKey         string
@@ -28,6 +29,9 @@ type Request struct {
 	Args            []string
 	Payload         []byte
 	ContentType     string
+	Permissions     string
+	CallerSource    string
+	Timeout         time.Duration
 	HasPayload      bool
 	InputBodyToken  uint64
 	PayloadCapacity int64
@@ -38,14 +42,20 @@ type Request struct {
 // orchestration state.
 func (request Request) Validate() error {
 	if lifecycle.ValidateUID(request.UID) != nil ||
-		request.LaneKey == "" ||
 		request.Route == "" ||
 		!request.Source.Valid() {
+		return errors.New("jobmgr: invalid request")
+	}
+	if (request.Source == lifecycle.SourceJobManager && request.LaneKey == "") ||
+		(request.Source == lifecycle.SourceFunction && request.LaneKey != "") {
 		return errors.New("jobmgr: invalid request")
 	}
 	if len(request.LaneKey) > maximumRequestMetadataBytes ||
 		len(request.Route) > maximumRequestMetadataBytes ||
 		len(request.ContentType) > maximumRequestMetadataBytes ||
+		len(request.Permissions) > maximumRequestMetadataBytes ||
+		len(request.CallerSource) > maximumRequestMetadataBytes ||
+		request.Timeout < 0 ||
 		len(request.Args) > maximumRequestArguments {
 		return errors.New("jobmgr: request metadata exceeds bounds")
 	}
@@ -85,4 +95,12 @@ type AdmissionCommandPort interface {
 	CommandPort
 	NotifyControlReady()
 	Done() <-chan struct{}
+}
+
+// PreparedCommandPort accepts one already prepared Job Manager plan. It is
+// used by typed in-process adapters whose immutable values cannot be
+// represented by the wire-oriented Request fields without an object registry.
+type PreparedCommandPort interface {
+	SubmitPrepared(context.Context, Request, WorkPlan) error
+	SubmitPreparedAndWait(context.Context, Request, WorkPlan) error
 }

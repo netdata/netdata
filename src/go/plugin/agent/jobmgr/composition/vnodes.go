@@ -1,0 +1,920 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package composition
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"strings"
+	"sync"
+
+	"github.com/google/uuid"
+	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/discovery"
+	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	frameworkfunctions "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
+	"gopkg.in/yaml.v2"
+)
+
+const vnodeBootResourceID = "\x00jobmgr-vnode-boot"
+
+type vnodeBinding struct {
+	epoch      uint64
+	pluginName string
+	frames     *lifecycle.FrameOwner
+	config     *agentdiscovery.VNodeConfiguration
+	graph      *dyncfg.Graph
+}
+
+func newVNodeBinding(
+	epoch uint64,
+	pluginName string,
+	frames *lifecycle.FrameOwner,
+	config *agentdiscovery.VNodeConfiguration,
+	graph *dyncfg.Graph,
+) (*vnodeBinding, error) {
+	if epoch == 0 || pluginName == "" || frames == nil ||
+		config == nil || graph == nil {
+		return nil, errors.New("jobmgr composition: invalid vnode binding")
+	}
+	binding := &vnodeBinding{
+		epoch: epoch, pluginName: pluginName, frames: frames,
+		config: config, graph: graph,
+	}
+	if err := binding.validateInitial(); err != nil {
+		return nil, err
+	}
+	return binding, nil
+}
+
+func (binding *vnodeBinding) prefix() string {
+	return binding.pluginName + ":vnode"
+}
+
+func (binding *vnodeBinding) path() string {
+	return fmt.Sprintf("/collectors/%s/Vnodes", binding.pluginName)
+}
+
+func (binding *vnodeBinding) handle(
+	_ context.Context,
+	input functionadapter.HandlerInput,
+) (lifecycle.SealedResult, error) {
+	command := vnodeCommand(input)
+	switch command {
+	case dyncfg.CommandSchema:
+		return lifecycle.NewSealedResult(
+			200,
+			"application/json",
+			[]byte(vnodes.ConfigSchema),
+		)
+	case dyncfg.CommandUserconfig:
+		return binding.userConfig(input)
+	case dyncfg.CommandGet:
+		return binding.get(input)
+	case dyncfg.CommandTest:
+		return binding.test(input)
+	default:
+		return vnodeMessage(
+			501,
+			fmt.Sprintf(
+				"Function '%s' command '%s' is not implemented.",
+				input.Method,
+				command,
+			),
+		)
+	}
+}
+
+func (binding *vnodeBinding) prepare(
+	_ context.Context,
+	input functionadapter.HandlerInput,
+	current lifecycle.ReadyResource,
+	scope lifecycle.ResourceTransactionScope,
+	permit lifecycle.LongLivedPermit,
+) (lifecycle.PreparedResourceTransaction, error) {
+	if binding == nil || current != nil || scope.Current.Valid() ||
+		scope.Successor.Valid() || permit.Valid() ||
+		!scope.Valid() ||
+		!strings.HasPrefix(scope.ID, "vnode:") {
+		return nil, errors.New(
+			"jobmgr composition: invalid vnode transaction scope",
+		)
+	}
+	switch vnodeCommand(input) {
+	case dyncfg.CommandAdd:
+		return binding.prepareAdd(input, scope)
+	case dyncfg.CommandUpdate:
+		return binding.prepareUpdate(input, scope)
+	case dyncfg.CommandRemove:
+		return binding.prepareRemove(input, scope)
+	default:
+		return binding.noop(
+			scope,
+			mustVNodeMessage(501, "Vnode command is not implemented."),
+			nil,
+		)
+	}
+}
+
+func newVNodeInitialRoute(
+	epoch uint64,
+	binding *vnodeBinding,
+) (functionadapter.InitialRoute, error) {
+	if epoch == 0 || binding == nil {
+		return functionadapter.InitialRoute{},
+			errors.New("jobmgr composition: invalid vnode route")
+	}
+	return functionadapter.InitialRoute{
+		Declaration: functionadapter.Declaration{
+			ID: "dyncfg/vnodes",
+			Generation: &functionadapter.HandlerGenerationDeclaration{
+				ID:      fmt.Sprintf("dyncfg/vnodes/%d", epoch),
+				Handler: binding.handle,
+			},
+			Transaction: &functionadapter.ResourceTransactionDeclaration{
+				Prepare:         binding.prepare,
+				CommandArgument: 1,
+				GlobalClaim:     joboutput.DynCfgJobGraphClaim,
+				Commands: []functionadapter.ResourceTransactionCommand{
+					{Name: string(dyncfg.CommandAdd)},
+					{Name: string(dyncfg.CommandUpdate)},
+					{Name: string(dyncfg.CommandRemove)},
+				},
+			},
+			PublicName: joboutput.DynCfgFunctionName,
+			Prefix:     binding.prefix(),
+			Lane: functionadapter.ScopedDynCfgJobLane(
+				0,
+				binding.prefix(),
+				"vnode:",
+			),
+			CooperativeCancel:   true,
+			CooperativeDeadline: true,
+			RawPayload:          true,
+		},
+		Publication: dynCfgPublication(epoch),
+	}, nil
+}
+
+func (binding *vnodeBinding) prepareAdd(
+	input functionadapter.HandlerInput,
+	scope lifecycle.ResourceTransactionScope,
+) (lifecycle.PreparedResourceTransaction, error) {
+	if len(input.Args) < 3 {
+		return binding.noop(
+			scope,
+			mustVNodeMessage(
+				400,
+				fmt.Sprintf(
+					"missing required arguments: need 3, got %d",
+					len(input.Args),
+				),
+			),
+			nil,
+		)
+	}
+	name := vnodeJobName(input.Args[2])
+	if name == "" {
+		return binding.noop(
+			scope,
+			mustVNodeMessage(400, "Missing vnode name."),
+			nil,
+		)
+	}
+	if err := dyncfg.JobNameRuleAllowDots(name); err != nil {
+		return binding.noop(
+			scope,
+			mustVNodeMessage(
+				400,
+				fmt.Sprintf("Unacceptable vnode name '%s': %v.", name, err),
+			),
+			nil,
+		)
+	}
+	next, failure := binding.parseVNode(input, name)
+	if failure != nil {
+		return binding.noop(scope, *failure, nil)
+	}
+	current, exists := binding.config.Lookup(name)
+	expected := uint64(0)
+	if exists {
+		expected = current.Revision
+	}
+	prepared, err := binding.config.PrepareUpsert(
+		name,
+		expected,
+		next,
+	)
+	if errors.Is(err, agentdiscovery.ErrVNodeNoChange) {
+		return binding.noop(
+			scope,
+			mustVNodeMessage(202, ""),
+			binding.configCreateCleanup(next),
+		)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return newPreparedVNodeTransaction(
+		scope,
+		prepared,
+		mustVNodeMessage(202, ""),
+		binding.configCreateCleanup(next),
+	)
+}
+
+func (binding *vnodeBinding) prepareUpdate(
+	input functionadapter.HandlerInput,
+	scope lifecycle.ResourceTransactionScope,
+) (lifecycle.PreparedResourceTransaction, error) {
+	name, ok := binding.configName(input)
+	if !ok {
+		return binding.noop(
+			scope,
+			mustVNodeMessage(400, "invalid config ID format."),
+			nil,
+		)
+	}
+	current, exists := binding.config.Lookup(name)
+	if !exists {
+		return binding.noop(
+			scope,
+			mustVNodeMessage(
+				404,
+				fmt.Sprintf("The specified vnode '%s' is not registered.", name),
+			),
+			nil,
+		)
+	}
+	next, failure := binding.parseVNode(input, name)
+	if failure != nil {
+		return binding.noop(scope, *failure, nil)
+	}
+	prepared, err := binding.config.PrepareUpsert(
+		name,
+		current.Revision,
+		next,
+	)
+	if errors.Is(err, agentdiscovery.ErrVNodeNoChange) {
+		return binding.noop(
+			scope,
+			mustVNodeMessage(202, ""),
+			nil,
+		)
+	}
+	if err != nil {
+		return nil, err
+	}
+	return newPreparedVNodeTransaction(
+		scope,
+		prepared,
+		mustVNodeMessage(202, ""),
+		binding.configCreateCleanup(next),
+	)
+}
+
+func (binding *vnodeBinding) prepareRemove(
+	input functionadapter.HandlerInput,
+	scope lifecycle.ResourceTransactionScope,
+) (lifecycle.PreparedResourceTransaction, error) {
+	name, ok := binding.configName(input)
+	if !ok {
+		return binding.noop(
+			scope,
+			mustVNodeMessage(400, "invalid config ID format."),
+			nil,
+		)
+	}
+	current, exists := binding.config.Lookup(name)
+	if !exists {
+		return binding.noop(
+			scope,
+			mustVNodeMessage(
+				404,
+				fmt.Sprintf("The specified vnode '%s' is not registered.", name),
+			),
+			nil,
+		)
+	}
+	if current.Vnode.SourceType != confgroup.TypeDyncfg {
+		return binding.noop(
+			scope,
+			mustVNodeMessage(
+				405,
+				fmt.Sprintf(
+					"Removing vnode of type '%s' is not supported. Only 'dyncfg' vnodes can be removed.",
+					current.Vnode.SourceType,
+				),
+			),
+			nil,
+		)
+	}
+	if affected := binding.affectedJobs(name); len(affected) != 0 {
+		return binding.noop(
+			scope,
+			mustVNodeMessage(
+				409,
+				fmt.Sprintf(
+					"The specified vnode '%s' is referenced by configs (%s).",
+					name,
+					strings.Join(affected, ", "),
+				),
+			),
+			nil,
+		)
+	}
+	prepared, err := binding.config.PrepareRemove(
+		name,
+		current.Revision,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return newPreparedVNodeTransaction(
+		scope,
+		prepared,
+		mustVNodeMessage(200, ""),
+		binding.configDeleteCleanup(name),
+	)
+}
+
+func (binding *vnodeBinding) get(
+	input functionadapter.HandlerInput,
+) (lifecycle.SealedResult, error) {
+	name, ok := binding.configName(input)
+	if !ok {
+		return vnodeMessage(400, "invalid config ID format.")
+	}
+	snapshot, exists := binding.config.Lookup(name)
+	if !exists {
+		return vnodeMessage(
+			404,
+			fmt.Sprintf("The specified vnode '%s' is not registered.", name),
+		)
+	}
+	payload, err := json.Marshal(snapshot.Vnode)
+	if err != nil {
+		return lifecycle.SealedResult{}, err
+	}
+	return lifecycle.NewSealedResult(200, "application/json", payload)
+}
+
+func (binding *vnodeBinding) userConfig(
+	input functionadapter.HandlerInput,
+) (lifecycle.SealedResult, error) {
+	var config vnodes.VirtualNode
+	if err := unmarshalVNodePayload(input, &config); err != nil {
+		return vnodeMessage(
+			400,
+			fmt.Sprintf(
+				"Invalid configuration format. Failed to create configuration from payload: %v.",
+				err,
+			),
+		)
+	}
+	name := "test"
+	if len(input.Args) >= 3 {
+		if requested := vnodeJobName(input.Args[2]); requested != "" {
+			name = requested
+		}
+	}
+	normalizeVNode(&config, name, input.CallerSource)
+	payload, err := yaml.Marshal([]any{config})
+	if err != nil {
+		return lifecycle.SealedResult{}, err
+	}
+	return lifecycle.NewSealedResult(200, "application/yaml", payload)
+}
+
+func (binding *vnodeBinding) test(
+	input functionadapter.HandlerInput,
+) (lifecycle.SealedResult, error) {
+	if len(input.Args) < 3 {
+		return vnodeMessage(
+			400,
+			fmt.Sprintf(
+				"missing required arguments: need 3, got %d",
+				len(input.Args),
+			),
+		)
+	}
+	name := vnodeJobName(input.Args[2])
+	next, failure := binding.parseVNode(input, name)
+	if failure != nil {
+		return *failure, nil
+	}
+	affected := binding.affectedJobs(next.Name)
+	if len(affected) != 0 {
+		return vnodeMessage(
+			202,
+			"Updated configuration will affect configs: "+
+				strings.Join(affected, ", ")+".",
+		)
+	}
+	return vnodeMessage(
+		202,
+		"No configs will be affected by this change.",
+	)
+}
+
+func (binding *vnodeBinding) parseVNode(
+	input functionadapter.HandlerInput,
+	name string,
+) (*vnodes.VirtualNode, *lifecycle.SealedResult) {
+	if !input.HasPayload || len(input.Payload) == 0 {
+		result := mustVNodeMessage(400, "Missing configuration payload.")
+		return nil, &result
+	}
+	var config vnodes.VirtualNode
+	if err := unmarshalVNodePayload(input, &config); err != nil {
+		result := mustVNodeMessage(
+			400,
+			fmt.Sprintf(
+				"Failed to create configuration from payload. Invalid configuration format: %v.",
+				err,
+			),
+		)
+		return nil, &result
+	}
+	if err := uuid.Validate(config.GUID); err != nil {
+		result := mustVNodeMessage(
+			400,
+			fmt.Sprintf(
+				"Failed to create configuration from payload. Invalid guid format: %v.",
+				err,
+			),
+		)
+		return nil, &result
+	}
+	if !validVNodeQuotedProtocolField(input.CallerSource) {
+		result := mustVNodeMessage(
+			400,
+			"Failed to create configuration from payload. Invalid Function source.",
+		)
+		return nil, &result
+	}
+	normalizeVNode(&config, name, input.CallerSource)
+	if err := binding.validateUnique(&config); err != nil {
+		result := mustVNodeMessage(
+			400,
+			fmt.Sprintf(
+				"Failed to create configuration from payload: %v.",
+				err,
+			),
+		)
+		return nil, &result
+	}
+	return &config, nil
+}
+
+func (binding *vnodeBinding) configName(
+	input functionadapter.HandlerInput,
+) (string, bool) {
+	if len(input.Args) == 0 {
+		return "", false
+	}
+	name, ok := strings.CutPrefix(
+		input.Args[0],
+		binding.prefix()+":",
+	)
+	return name, ok && name != ""
+}
+
+func (binding *vnodeBinding) validateUnique(
+	next *vnodes.VirtualNode,
+) error {
+	for _, entry := range binding.config.Entries() {
+		current := entry.Snapshot.Vnode
+		if entry.ID == next.Name {
+			continue
+		}
+		if current.Hostname == next.Hostname {
+			return fmt.Errorf(
+				"duplicate virtual node hostname detected (job '%s')",
+				entry.ID,
+			)
+		}
+		if current.GUID == next.GUID {
+			return fmt.Errorf(
+				"duplicate virtual node guid detected (job '%s')",
+				entry.ID,
+			)
+		}
+	}
+	return nil
+}
+
+func (binding *vnodeBinding) validateInitial() error {
+	seenHostnames := make(map[string]string)
+	seenGUIDs := make(map[string]string)
+	for _, entry := range binding.config.Entries() {
+		vnode := entry.Snapshot.Vnode
+		if vnode == nil || vnode.Name != entry.ID ||
+			vnode.Hostname == "" ||
+			uuid.Validate(vnode.GUID) != nil ||
+			dyncfg.JobNameRuleAllowDots(entry.ID) != nil ||
+			!validVNodeTokenProtocolField(vnode.SourceType) ||
+			!validVNodeQuotedProtocolField(vnode.Source) {
+			return errors.New(
+				"jobmgr composition: invalid initial vnode configuration",
+			)
+		}
+		if other := seenHostnames[vnode.Hostname]; other != "" {
+			return fmt.Errorf(
+				"jobmgr composition: duplicate vnode hostname %q (%s and %s)",
+				vnode.Hostname,
+				other,
+				entry.ID,
+			)
+		}
+		if other := seenGUIDs[vnode.GUID]; other != "" {
+			return fmt.Errorf(
+				"jobmgr composition: duplicate vnode GUID (%s and %s)",
+				other,
+				entry.ID,
+			)
+		}
+		seenHostnames[vnode.Hostname] = entry.ID
+		seenGUIDs[vnode.GUID] = entry.ID
+	}
+	return nil
+}
+
+func (binding *vnodeBinding) affectedJobs(name string) []string {
+	var affected []string
+	for _, id := range binding.graph.IDs() {
+		record, ok := binding.graph.Lookup(id)
+		if !ok {
+			continue
+		}
+		var config confgroup.Config
+		if yaml.Unmarshal([]byte(record.Payload()), &config) != nil ||
+			config == nil ||
+			config.Vnode() != name {
+			continue
+		}
+		affected = append(
+			affected,
+			fmt.Sprintf("%s:%s", config.Module(), config.Name()),
+		)
+	}
+	return affected
+}
+
+func (binding *vnodeBinding) noop(
+	scope lifecycle.ResourceTransactionScope,
+	result lifecycle.SealedResult,
+	cleanup lifecycle.TaskCleanup,
+) (lifecycle.PreparedResourceTransaction, error) {
+	if cleanup == nil {
+		cleanup = func() error { return nil }
+	}
+	return joboutput.PrepareNoopResourceTransaction(
+		scope,
+		nil,
+		lifecycle.LongLivedPermit{},
+		result,
+		cleanup,
+	)
+}
+
+func (binding *vnodeBinding) configCreateCleanup(
+	vnode *vnodes.VirtualNode,
+) lifecycle.TaskCleanup {
+	return binding.protocolCleanup(func(api *netdataapi.API) {
+		commands := dyncfg.JoinCommands(
+			dyncfg.CommandUserconfig,
+			dyncfg.CommandSchema,
+			dyncfg.CommandGet,
+			dyncfg.CommandUpdate,
+			dyncfg.CommandTest,
+		)
+		if vnode.SourceType == confgroup.TypeDyncfg {
+			commands += " " + string(dyncfg.CommandRemove)
+		}
+		api.CONFIGCREATE(netdataapi.ConfigOpts{
+			ID:         binding.prefix() + ":" + vnode.Name,
+			Status:     dyncfg.StatusRunning.String(),
+			ConfigType: dyncfg.ConfigTypeJob.String(),
+			Path:       binding.path(), SourceType: vnode.SourceType,
+			Source: vnode.Source, SupportedCommands: commands,
+		})
+	})
+}
+
+func (binding *vnodeBinding) configDeleteCleanup(
+	name string,
+) lifecycle.TaskCleanup {
+	return binding.protocolCleanup(func(api *netdataapi.API) {
+		api.CONFIGDELETE(binding.prefix() + ":" + name)
+	})
+}
+
+func (binding *vnodeBinding) initialCleanup() lifecycle.TaskCleanup {
+	return binding.protocolCleanup(func(api *netdataapi.API) {
+		api.CONFIGCREATE(netdataapi.ConfigOpts{
+			ID:         binding.prefix(),
+			Status:     dyncfg.StatusAccepted.String(),
+			ConfigType: dyncfg.ConfigTypeTemplate.String(),
+			Path:       binding.path(), SourceType: "internal",
+			Source: "internal",
+			SupportedCommands: dyncfg.JoinCommands(
+				dyncfg.CommandAdd,
+				dyncfg.CommandSchema,
+				dyncfg.CommandUserconfig,
+				dyncfg.CommandTest,
+			),
+		})
+		for _, entry := range binding.config.Entries() {
+			vnode := entry.Snapshot.Vnode
+			commands := dyncfg.JoinCommands(
+				dyncfg.CommandUserconfig,
+				dyncfg.CommandSchema,
+				dyncfg.CommandGet,
+				dyncfg.CommandUpdate,
+				dyncfg.CommandTest,
+			)
+			if vnode.SourceType == confgroup.TypeDyncfg {
+				commands += " " + string(dyncfg.CommandRemove)
+			}
+			api.CONFIGCREATE(netdataapi.ConfigOpts{
+				ID:         binding.prefix() + ":" + vnode.Name,
+				Status:     dyncfg.StatusRunning.String(),
+				ConfigType: dyncfg.ConfigTypeJob.String(),
+				Path:       binding.path(), SourceType: vnode.SourceType,
+				Source: vnode.Source, SupportedCommands: commands,
+			})
+		}
+	})
+}
+
+func (binding *vnodeBinding) protocolCleanup(
+	build func(*netdataapi.API),
+) lifecycle.TaskCleanup {
+	var payload bytes.Buffer
+	build(netdataapi.New(&payload))
+	prepared, err := lifecycle.PrepareProtocolFrame(payload.Bytes())
+	if err != nil {
+		return func() error { return err }
+	}
+	return func() error {
+		return binding.frames.CommitPreparedProtocolFrame(prepared)
+	}
+}
+
+func (binding *vnodeBinding) publishInitial(
+	ctx context.Context,
+	commands jobmgr.PreparedCommandPort,
+) error {
+	if binding == nil || ctx == nil || commands == nil {
+		return errors.New(
+			"jobmgr composition: invalid vnode initial publication",
+		)
+	}
+	result, err := lifecycle.NewSealedResult(
+		204,
+		"application/json",
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+	plan := jobmgr.WorkPlan{
+		Claims:     []string{joboutput.DynCfgJobGraphClaim},
+		NoResponse: true,
+		Transaction: &jobmgr.ResourceTransactionPlan{
+			ID: vnodeBootResourceID,
+			Prepare: func(
+				_ context.Context,
+				current lifecycle.ReadyResource,
+				scope lifecycle.ResourceTransactionScope,
+				permit lifecycle.LongLivedPermit,
+			) (lifecycle.PreparedResourceTransaction, error) {
+				if current != nil ||
+					scope.ID != vnodeBootResourceID ||
+					scope.Current.Valid() ||
+					scope.Successor.Valid() ||
+					permit.Valid() {
+					return nil, errors.New(
+						"jobmgr composition: invalid vnode boot scope",
+					)
+				}
+				return joboutput.PrepareNoopResourceTransaction(
+					scope,
+					nil,
+					lifecycle.LongLivedPermit{},
+					result,
+					binding.initialCleanup(),
+				)
+			},
+		},
+	}
+	return commands.SubmitPreparedAndWait(
+		ctx,
+		jobmgr.Request{
+			UID: fmt.Sprintf(
+				"jobmgr-vnodes-%d",
+				binding.epoch,
+			),
+			LaneKey: vnodeBootResourceID,
+			Source:  lifecycle.SourceJobManager,
+			Route:   "internal/vnodes/publish",
+		},
+		plan,
+	)
+}
+
+type preparedVNodeTransaction struct {
+	mu sync.Mutex
+
+	consumed bool
+	scope    lifecycle.ResourceTransactionScope
+	prepared agentdiscovery.PreparedVNode
+	result   lifecycle.SealedResult
+	cleanup  lifecycle.TaskCleanup
+}
+
+func newPreparedVNodeTransaction(
+	scope lifecycle.ResourceTransactionScope,
+	prepared agentdiscovery.PreparedVNode,
+	result lifecycle.SealedResult,
+	cleanup lifecycle.TaskCleanup,
+) (*preparedVNodeTransaction, error) {
+	if cleanup == nil {
+		return nil, errors.New(
+			"jobmgr composition: vnode transaction has no cleanup",
+		)
+	}
+	if _, err := lifecycle.NewAppliedResourceTransaction(
+		scope,
+		lifecycle.ResourceTransactionUnchanged,
+		nil,
+		result,
+		cleanup,
+	); err != nil {
+		return nil, err
+	}
+	return &preparedVNodeTransaction{
+		scope: scope, prepared: prepared,
+		result: result, cleanup: cleanup,
+	}, nil
+}
+
+func (transaction *preparedVNodeTransaction) Scope() lifecycle.ResourceTransactionScope {
+	if transaction == nil {
+		return lifecycle.ResourceTransactionScope{}
+	}
+	transaction.mu.Lock()
+	defer transaction.mu.Unlock()
+	if transaction.consumed {
+		return lifecycle.ResourceTransactionScope{}
+	}
+	return transaction.scope
+}
+
+func (transaction *preparedVNodeTransaction) Apply(
+	context.Context,
+) (lifecycle.AppliedResourceTransaction, error) {
+	scope, prepared, result, cleanup, err := transaction.take()
+	if err != nil {
+		return lifecycle.AppliedResourceTransaction{}, err
+	}
+	if _, err := prepared.Commit(); err != nil {
+		return lifecycle.AppliedResourceTransaction{},
+			errors.Join(err, prepared.Abort())
+	}
+	return lifecycle.NewAppliedResourceTransaction(
+		scope,
+		lifecycle.ResourceTransactionUnchanged,
+		nil,
+		result,
+		cleanup,
+	)
+}
+
+func (transaction *preparedVNodeTransaction) Dispose(
+	context.Context,
+) (lifecycle.ReadyResource, error) {
+	_, prepared, _, _, err := transaction.take()
+	if err != nil {
+		return nil, err
+	}
+	return nil, prepared.Abort()
+}
+
+func (transaction *preparedVNodeTransaction) take() (
+	lifecycle.ResourceTransactionScope,
+	agentdiscovery.PreparedVNode,
+	lifecycle.SealedResult,
+	lifecycle.TaskCleanup,
+	error,
+) {
+	if transaction == nil {
+		return lifecycle.ResourceTransactionScope{},
+			agentdiscovery.PreparedVNode{},
+			lifecycle.SealedResult{},
+			nil,
+			errors.New("jobmgr composition: nil vnode transaction")
+	}
+	transaction.mu.Lock()
+	defer transaction.mu.Unlock()
+	if transaction.consumed {
+		return lifecycle.ResourceTransactionScope{},
+			agentdiscovery.PreparedVNode{},
+			lifecycle.SealedResult{},
+			nil,
+			errors.New("jobmgr composition: vnode transaction consumed")
+	}
+	transaction.consumed = true
+	return transaction.scope,
+		transaction.prepared,
+		transaction.result,
+		transaction.cleanup,
+		nil
+}
+
+func vnodeCommand(input functionadapter.HandlerInput) dyncfg.Command {
+	if len(input.Args) < 2 {
+		return ""
+	}
+	return dyncfg.Command(strings.ToLower(input.Args[1]))
+}
+
+func vnodeJobName(value string) string {
+	return strings.NewReplacer(" ", "_", ":", "_").Replace(value)
+}
+
+func validVNodeTokenProtocolField(value string) bool {
+	if value == "" {
+		return false
+	}
+	for _, char := range value {
+		if char <= ' ' || char == 0x7f || char == '\'' {
+			return false
+		}
+	}
+	return true
+}
+
+func validVNodeQuotedProtocolField(value string) bool {
+	for _, char := range value {
+		if char < ' ' || char == 0x7f || char == '\'' {
+			return false
+		}
+	}
+	return true
+}
+
+func normalizeVNode(
+	vnode *vnodes.VirtualNode,
+	name string,
+	source string,
+) {
+	vnode.Name = name
+	if vnode.Hostname == "" {
+		vnode.Hostname = name
+	}
+	vnode.Source = source
+	vnode.SourceType = confgroup.TypeDyncfg
+}
+
+func unmarshalVNodePayload(
+	input functionadapter.HandlerInput,
+	target *vnodes.VirtualNode,
+) error {
+	if input.ContentType == "application/json" {
+		return json.Unmarshal(input.Payload, target)
+	}
+	return yaml.Unmarshal(input.Payload, target)
+}
+
+func vnodeMessage(
+	code int,
+	message string,
+) (lifecycle.SealedResult, error) {
+	return lifecycle.NewSealedResult(
+		code,
+		"application/json",
+		frameworkfunctions.BuildJSONPayload(code, message),
+	)
+}
+
+func mustVNodeMessage(
+	code int,
+	message string,
+) lifecycle.SealedResult {
+	result, err := vnodeMessage(code, message)
+	if err != nil {
+		panic(err)
+	}
+	return result
+}

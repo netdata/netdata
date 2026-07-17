@@ -33,13 +33,25 @@ func (r *Resolver) resolveCmd(ctx context.Context, cmdLine, original string) (st
 	defer cancel()
 
 	cmd := exec.CommandContext(ctx, parts[0], parts[1:]...)
+	configureCommandProcessTree(cmd)
 	cmd.Stderr = io.Discard
-	out, err := cmd.Output()
+	stdout, err := cmd.StdoutPipe()
 	if err != nil {
+		return "", fmt.Errorf("resolving secret '%s': command stdout: %w", original, err)
+	}
+	if err := cmd.Start(); err != nil {
+		return "", fmt.Errorf("resolving secret '%s': command failed: %w", original, err)
+	}
+	out, readErr := readBoundedSecret(stdout, MaximumAtomicResolvedBytes)
+	if readErr != nil && cmd.Cancel != nil {
+		_ = cmd.Cancel()
+	}
+	waitErr := cmd.Wait()
+	if readErr != nil || waitErr != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 			return "", fmt.Errorf("resolving secret '%s': command timed out after %s", original, timeout)
 		}
-		return "", fmt.Errorf("resolving secret '%s': command failed: %w", original, err)
+		return "", fmt.Errorf("resolving secret '%s': command failed: %w", original, errors.Join(readErr, waitErr))
 	}
 
 	value := strings.TrimSpace(string(out))

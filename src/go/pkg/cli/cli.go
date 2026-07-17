@@ -12,17 +12,13 @@ import (
 
 // Option defines command line options.
 type Option struct {
-	UpdateEvery     int
-	Module          string   `short:"m" long:"modules" description:"module name to run" default:"all"`
-	Job             []string `short:"j" long:"job" description:"job name to run"`
-	ConfDir         []string `short:"c" long:"config-dir" description:"config dir to read"`
-	WatchPath       []string `short:"w" long:"watch-path" description:"config path to watch"`
-	Debug           bool     `short:"d" long:"debug" description:"debug mode"`
-	Version         bool     `short:"v" long:"version" description:"display the version and exit"`
-	Function        string   `long:"function" description:"execute function once (module name)"`
-	FunctionArgs    []string `long:"function-args" description:"function args (repeatable, e.g. info)"`
-	FunctionPayload string   `long:"function-payload" description:"function payload JSON or @file.json"`
-	FunctionTimeout string   `long:"function-timeout" description:"function timeout (e.g. 60s)"`
+	UpdateEvery int
+	Module      string   `short:"m" long:"modules" description:"module name to run" default:"all"`
+	Job         []string `short:"j" long:"job" description:"job name to run"`
+	ConfDir     []string `short:"c" long:"config-dir" description:"config dir to read"`
+	WatchPath   []string `short:"w" long:"watch-path" description:"config path to watch"`
+	Debug       bool     `short:"d" long:"debug" description:"debug mode"`
+	Version     bool     `short:"v" long:"version" description:"display the version and exit"`
 }
 
 // Parse returns parsed command-line flags in Option struct

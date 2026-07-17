@@ -28,7 +28,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -46,9 +45,6 @@ type Config struct {
 	Vnodes             map[string]*vnodes.VirtualNode
 	SecretStores       []secretstore.Config
 	SecretStoreService secretstore.Service
-	AuditMode          bool
-	AuditAnalyzer      metricsaudit.Analyzer
-	AuditDataDir       string
 	FunctionJSONWriter func(payload []byte, code int)
 	RuntimeService     runtimecomp.Service
 	VnodeRegistry      *vnoderegistry.Registry
@@ -107,10 +103,6 @@ func New(cfg Config) *Manager {
 		varLibDir:           cfg.VarLibDir,
 		fnReg:               fnReg,
 		initialSecretStores: append([]secretstore.Config(nil), cfg.SecretStores...),
-
-		auditMode:     cfg.AuditMode,
-		auditAnalyzer: cfg.AuditAnalyzer,
-		auditDataDir:  cfg.AuditDataDir,
 
 		discoveredConfigs: newDiscoveredConfigsCache(),
 		collectorSeen:     seen,
@@ -209,11 +201,6 @@ type Manager struct {
 	varLibDir           string
 	fnReg               FunctionRegistry
 	initialSecretStores []secretstore.Config
-
-	// Metrics-audit mode.
-	auditMode     bool
-	auditAnalyzer metricsaudit.Analyzer
-	auditDataDir  string
 
 	// Persistent caches and runtime state.
 	fileStatus        *fileStatus

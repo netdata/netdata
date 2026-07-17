@@ -12,6 +12,8 @@ import (
 
 var ErrTaskPanic = errors.New("jobmgr task child: panic")
 
+const maximumConcurrentDrainDependentTasks = TransientTaskSlots - 1
+
 type TaskRef struct {
 	Slot       uint8
 	Generation uint64
@@ -29,6 +31,7 @@ func (ref TaskRequestRef) Valid() bool {
 type TaskStart struct {
 	Request TaskRequestRef
 	Task    TaskRef
+	Outcome TaskOutcome
 	Err     error
 }
 
@@ -52,6 +55,7 @@ const (
 	TaskActionCommitCapability
 	TaskActionStopResource
 	TaskActionFinalizeResource
+	TaskActionApplyResourceTransaction
 	TaskActionDispose
 	TaskActionCleanup
 	TaskActionTerminate
@@ -86,6 +90,7 @@ type taskSlot struct {
 	cleanup                TaskCleanup
 	preserveDisposeContext bool
 	retainedTimeout        bool
+	drainDependent         bool
 	action                 chan TaskAction
 }
 
@@ -107,19 +112,20 @@ type taskRequestQueue struct {
 }
 
 type TaskSupervisor struct {
-	frame       *FrameOwner
-	inherited   inheritedTaskRegistry
-	longLived   longLivedRegistry
-	slots       [TransientTaskSlots]taskSlot
-	requests    [MaximumAdmissionRecords + 1]taskRequest
-	pending     [2]taskRequestQueue
-	freeRequest uint16
-	nextSource  Source
-	completions chan TaskCompletion
-	acks        chan TaskAcknowledgement
-	active      int
-	retained    int
-	saturated   bool
+	frame                *FrameOwner
+	inherited            inheritedTaskRegistry
+	longLived            longLivedRegistry
+	slots                [TransientTaskSlots]taskSlot
+	requests             [MaximumAdmissionRecords + 1]taskRequest
+	pending              [2]taskRequestQueue
+	freeRequest          uint16
+	nextSource           Source
+	completions          chan TaskCompletion
+	acks                 chan TaskAcknowledgement
+	active               int
+	activeDrainDependent int
+	retained             int
+	saturated            bool
 
 	admissionReadyMu      sync.Mutex
 	onAdmissionReady      func()
@@ -272,8 +278,11 @@ func (supervisor *TaskSupervisor) Dispatch(parent context.Context, quantum int, 
 		if supervisor.pending[selected].head == 0 {
 			selected = second
 		}
+		if !supervisor.canDispatchQueue(selected) {
+			selected = second
+		}
 		queue := &supervisor.pending[selected]
-		if queue.head == 0 {
+		if queue.head == 0 || !supervisor.canDispatchQueue(selected) {
 			break
 		}
 		record := &supervisor.requests[queue.head]
@@ -281,8 +290,14 @@ func (supervisor *TaskSupervisor) Dispatch(parent context.Context, quantum int, 
 		taskRef, err := supervisor.start(parent, record.plan, record.initial)
 		if err != nil {
 			if errors.Is(err, ErrLongLivedRecordCapacity) {
+				outcome := record.initial
+				record.initial = TaskOutcome{}
 				supervisor.removeRequest(record)
-				started[count] = TaskStart{Request: requestRef, Err: err}
+				started[count] = TaskStart{
+					Request: requestRef,
+					Outcome: outcome,
+					Err:     err,
+				}
 				count++
 				supervisor.nextSource = otherTaskSource(sourceForTaskIndex(selected))
 				continue
@@ -297,12 +312,39 @@ func (supervisor *TaskSupervisor) Dispatch(parent context.Context, quantum int, 
 	return count, supervisor.Pending() > 0, nil
 }
 
+func (supervisor *TaskSupervisor) canDispatchQueue(index int) bool {
+	if index < 0 || index >= len(supervisor.pending) {
+		return false
+	}
+	head := supervisor.pending[index].head
+	if head == 0 {
+		return false
+	}
+	return !supervisor.requests[head].plan.drainDependent ||
+		supervisor.activeDrainDependent < maximumConcurrentDrainDependentTasks
+}
+
 func (supervisor *TaskSupervisor) Pending() int {
 	return supervisor.pending[0].count + supervisor.pending[1].count
 }
 
 func (supervisor *TaskSupervisor) start(parent context.Context, plan TaskPlan, initial TaskOutcome) (TaskRef, error) {
-	if ((plan.Work == nil && plan.permitWork == nil && plan.capabilityPermitWork == nil) == initial.empty()) || plan.initialReady != nil || plan.initialIdentity.Valid() {
+	hasDirectWork := plan.Work != nil ||
+		plan.Runner != nil ||
+		plan.permitWork != nil ||
+		plan.capabilityPermitWork != nil
+	if plan.transactionWork == nil {
+		if (hasDirectWork != initial.empty()) ||
+			plan.initialReady != nil ||
+			plan.initialIdentity.Valid() {
+			return TaskRef{}, errors.New("jobmgr task supervisor: invalid sealed task request")
+		}
+	} else if hasDirectWork ||
+		plan.initialReady != nil ||
+		plan.initialIdentity.Valid() ||
+		!plan.transactionScopeSet ||
+		!plan.transactionScope.Valid() ||
+		(initial.empty() == plan.transactionScope.Current.Valid()) {
 		return TaskRef{}, errors.New("jobmgr task supervisor: invalid sealed task request")
 	}
 	for index := range supervisor.slots {
@@ -369,6 +411,86 @@ func (supervisor *TaskSupervisor) start(parent context.Context, plan TaskPlan, i
 			plan.permitPlan = LongLivedPlan{}
 			plan.capabilityPermitWork = nil
 		}
+		if plan.transactionWork != nil {
+			var current ReadyResource
+			if plan.transactionScope.Current.Valid() {
+				var ok bool
+				current, ok = initial.ReadyResource()
+				identity, identityOK := initial.ResourceIdentity()
+				if !ok || !identityOK || identity != plan.transactionScope.Current {
+					return TaskRef{}, errors.New(
+						"jobmgr task supervisor: transaction current differs from sealed scope",
+					)
+				}
+			} else if !initial.empty() {
+				return TaskRef{}, errors.New(
+					"jobmgr task supervisor: graph-only transaction has a current resource",
+				)
+			}
+			initial = TaskOutcome{}
+			var permit LongLivedPermit
+			if plan.transactionScope.Successor.Valid() {
+				issued, err := supervisor.IssueLongLivedPermit(
+					plan.permitAdmission,
+					plan.permitAdmissionRef,
+					plan.permitOwner,
+					plan.permitPlan,
+				)
+				if err != nil {
+					return TaskRef{}, err
+				}
+				permit = issued
+			}
+			work := plan.transactionWork
+			scope := plan.transactionScope
+			plan.Work = func(ctx context.Context) (TaskOutcome, error) {
+				transaction, workErr := work(ctx, current, scope, permit)
+				if transaction == nil {
+					var abortErr error
+					if permit.Valid() {
+						abortErr = permit.AbortUnused()
+					}
+					if current != nil {
+						outcome, outcomeErr := readyResourceOutcome(current, scope.Current)
+						return outcome, errors.Join(workErr, abortErr, outcomeErr)
+					}
+					return TaskOutcome{}, errors.Join(workErr, abortErr)
+				}
+				transactionScope, scopeErr := preparedResourceTransactionScope(transaction)
+				if workErr != nil || scopeErr != nil || transactionScope != scope {
+					restored, disposeErr := runPreparedResourceTransactionDispose(
+						context.WithoutCancel(ctx),
+						transaction,
+					)
+					current = nil
+					permit = LongLivedPermit{}
+					if restored != nil {
+						outcome, outcomeErr := readyResourceOutcome(restored, scope.Current)
+						return outcome, errors.Join(
+							workErr,
+							scopeErr,
+							disposeErr,
+							outcomeErr,
+						)
+					}
+					return TaskOutcome{}, errors.Join(
+						workErr,
+						scopeErr,
+						disposeErr,
+					)
+				}
+				current = nil
+				permit = LongLivedPermit{}
+				return preparedResourceTransactionOutcome(transaction, scope)
+			}
+			plan.transactionWork = nil
+			plan.transactionScope = ResourceTransactionScope{}
+			plan.transactionScopeSet = false
+			plan.permitAdmission = nil
+			plan.permitAdmissionRef = AdmissionRef{}
+			plan.permitOwner = ResourceIdentity{}
+			plan.permitPlan = LongLivedPlan{}
+		}
 		var parentCtx context.Context
 		if plan.taskContext != nil {
 			parentCtx = plan.taskContext
@@ -383,9 +505,13 @@ func (supervisor *TaskSupervisor) start(parent context.Context, plan TaskPlan, i
 		slot.cancel = cancel
 		slot.cleanup = plan.Cleanup
 		slot.preserveDisposeContext = plan.preserveDisposeContext
+		slot.drainDependent = plan.drainDependent
 		slot.maxPhaseTransitions = plan.phaseLimit()
 		ref := TaskRef{Slot: uint8(index), Generation: slot.generation}
 		supervisor.active++
+		if plan.drainDependent {
+			supervisor.activeDrainDependent++
+		}
 		go supervisor.runChild(ctx, ref, plan, initial)
 		return ref, nil
 	}
@@ -444,10 +570,15 @@ func (supervisor *TaskSupervisor) SendAction(action TaskAction) error {
 	if action.Kind == TaskActionEncodeWrite && (action.UID == "" || action.Expiry <= 0 || action.ExpectedGeneration != 0) {
 		return errors.New("jobmgr task supervisor: invalid encode/write action")
 	}
-	if (action.Kind == TaskActionAcceptStart || action.Kind == TaskActionCommitCapability) && (action.ExpectedGeneration == 0 || action.UID != "" || action.Expiry != 0) {
+	if (action.Kind == TaskActionAcceptStart ||
+		action.Kind == TaskActionCommitCapability) &&
+		(action.ExpectedGeneration == 0 || action.UID != "" || action.Expiry != 0) {
 		return errors.New("jobmgr task supervisor: invalid generation-bound action")
 	}
-	if action.Kind != TaskActionEncodeWrite && action.Kind != TaskActionAcceptStart && action.Kind != TaskActionCommitCapability && (action.UID != "" || action.Expiry != 0 || action.ExpectedGeneration != 0) {
+	if action.Kind != TaskActionEncodeWrite &&
+		action.Kind != TaskActionAcceptStart &&
+		action.Kind != TaskActionCommitCapability &&
+		(action.UID != "" || action.Expiry != 0 || action.ExpectedGeneration != 0) {
 		return errors.New("jobmgr task supervisor: unexpected action payload")
 	}
 	slot.actionPending = true
@@ -484,6 +615,9 @@ func (supervisor *TaskSupervisor) Release(ref TaskRef) error {
 	if !slot.joined || slot.actionPending || len(slot.action) != 0 || !slot.outcome.empty() || slot.retainedTimeout {
 		return errors.New("jobmgr task supervisor: release before empty joined acknowledgement")
 	}
+	if slot.drainDependent && supervisor.activeDrainDependent <= 0 {
+		return errors.New("jobmgr task supervisor: drain-dependent count underflow")
+	}
 	slot.cancel(context.Canceled)
 	slot.active = false
 	slot.cancel = nil
@@ -491,6 +625,10 @@ func (supervisor *TaskSupervisor) Release(ref TaskRef) error {
 	slot.joined = false
 	slot.sequence = 0
 	slot.maxPhaseTransitions = 0
+	if slot.drainDependent {
+		supervisor.activeDrainDependent--
+		slot.drainDependent = false
+	}
 	supervisor.active--
 	return nil
 }
@@ -579,10 +717,74 @@ func (supervisor *TaskSupervisor) TakePublishedReadyResource(ref TaskRef, sequen
 	return resource, nil
 }
 
+func (supervisor *TaskSupervisor) TakeAppliedResourceTransaction(
+	ref TaskRef,
+	sequence uint8,
+	expected ResourceTransactionScope,
+) (ResourceTransactionDisposition, ReadyResource, error) {
+	slot, err := supervisor.slot(ref)
+	if err != nil {
+		return 0, nil, err
+	}
+	outcome := slot.outcome
+	if slot.actionPending ||
+		slot.sequence != sequence ||
+		outcome.kind != TaskOutcomeAppliedResourceTransaction ||
+		!outcome.scopeSet ||
+		outcome.scope != expected {
+		return 0, nil, errors.New(
+			"jobmgr task supervisor: applied resource transaction is unavailable",
+		)
+	}
+	if err := outcome.validate(); err != nil {
+		return 0, nil, err
+	}
+	slot.outcome = TaskOutcome{kind: TaskOutcomeFrame, frame: outcome.frame}
+	return outcome.disposition, outcome.ready, nil
+}
+
+func (supervisor *TaskSupervisor) TakeDisposedResourceTransaction(
+	ref TaskRef,
+	sequence uint8,
+	expected ResourceTransactionScope,
+) (ReadyResource, error) {
+	slot, err := supervisor.slot(ref)
+	if err != nil {
+		return nil, err
+	}
+	if slot.actionPending || slot.sequence != sequence {
+		return nil, errors.New(
+			"jobmgr task supervisor: disposed resource transaction is unavailable",
+		)
+	}
+	if expected.Current.Valid() {
+		if slot.outcome.kind != TaskOutcomeReadyResource ||
+			slot.outcome.ready == nil ||
+			slot.outcome.identity != expected.Current {
+			return nil, errors.New(
+				"jobmgr task supervisor: disposed transaction lost current resource",
+			)
+		}
+		current := slot.outcome.ready
+		slot.outcome = TaskOutcome{}
+		return current, nil
+	}
+	if !slot.outcome.empty() {
+		return nil, errors.New(
+			"jobmgr task supervisor: empty disposed transaction retained an outcome",
+		)
+	}
+	return nil, nil
+}
+
 func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, plan TaskPlan, outcome TaskOutcome) {
 	var err error
 	if outcome.empty() {
-		outcome, err = runTaskWork(ctx, plan.Work)
+		if plan.Runner != nil {
+			outcome, err = runTaskRunner(ctx, plan.Runner)
+		} else {
+			outcome, err = runTaskWork(ctx, plan.Work)
+		}
 	}
 	slot := &supervisor.slots[ref.Slot]
 	if publishErr := outcome.validate(); publishErr != nil {
@@ -684,10 +886,77 @@ func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, pla
 					slot.outcome = TaskOutcome{}
 				}
 			}
+		case TaskActionApplyResourceTransaction:
+			if slot.outcome.kind != TaskOutcomePreparedResourceTransaction ||
+				slot.outcome.transaction == nil ||
+				!slot.outcome.scopeSet {
+				ack.Err = errors.New(
+					"jobmgr task child: apply without prepared resource transaction",
+				)
+			} else {
+				transaction := slot.outcome.transaction
+				scope := slot.outcome.scope
+				applied, applyErr := runPreparedResourceTransactionApply(
+					ctx,
+					transaction,
+				)
+				if applyErr != nil {
+					ack.Err = applyErr
+				} else if applied.scope != scope {
+					ack.Err = errors.New(
+						"jobmgr task child: applied resource transaction changed scope",
+					)
+				} else {
+					next, outcomeErr := appliedResourceTransactionOutcome(applied)
+					ack.Err = outcomeErr
+					if outcomeErr == nil {
+						slot.outcome = next
+						slot.cleanup = applied.cleanup
+					}
+				}
+			}
+			slot.sequence = action.Sequence
+			slot.actionPending = false
+			supervisor.completions <- TaskCompletion{
+				Ref:      ref,
+				Sequence: action.Sequence,
+				Kind:     slot.outcome.kind,
+				Err:      ack.Err,
+			}
+			continue
 		case TaskActionDispose:
-			ack.Err = disposeTaskOutcome(ctx, slot.outcome, slot.preserveDisposeContext)
-			if ack.Err == nil {
-				slot.outcome = TaskOutcome{}
+			if slot.outcome.kind == TaskOutcomePreparedResourceTransaction &&
+				slot.outcome.transaction != nil {
+				transaction := slot.outcome.transaction
+				scope := slot.outcome.scope
+				current, disposeErr := runPreparedResourceTransactionDispose(
+					disposeContext(ctx, slot.preserveDisposeContext),
+					transaction,
+				)
+				ack.Err = disposeErr
+				if disposeErr == nil {
+					if scope.Current.Valid() {
+						slot.outcome, ack.Err = readyResourceOutcome(
+							current,
+							scope.Current,
+						)
+					} else if current != nil {
+						ack.Err = errors.New(
+							"jobmgr task child: graph-only transaction disposal returned a resource",
+						)
+					} else {
+						slot.outcome = TaskOutcome{}
+					}
+				}
+			} else {
+				ack.Err = disposeTaskOutcome(
+					ctx,
+					slot.outcome,
+					slot.preserveDisposeContext,
+				)
+				if ack.Err == nil {
+					slot.outcome = TaskOutcome{}
+				}
 			}
 		case TaskActionCleanup:
 			if !slot.outcome.empty() {
@@ -726,6 +995,16 @@ func runTaskWork(ctx context.Context, work TaskWork) (result TaskOutcome, err er
 	return work(ctx)
 }
 
+func runTaskRunner(ctx context.Context, runner TaskRunner) (result TaskOutcome, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			result = TaskOutcome{}
+			err = fmt.Errorf("%w: %v", ErrTaskPanic, recovered)
+		}
+	}()
+	return runner.RunTask(ctx)
+}
+
 func runPreparedAcceptStart(ctx context.Context, prepared PreparedResource, expected uint64) (ready ReadyResource, err error, panicked bool) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
@@ -750,11 +1029,49 @@ func runPreparedCapabilityCommit(ctx context.Context, capability PreparedCapabil
 	return disposition, err, false
 }
 
-func disposeTaskOutcome(ctx context.Context, outcome TaskOutcome, preserveContext bool) error {
-	cleanupCtx := ctx
-	if !preserveContext {
-		cleanupCtx = context.WithoutCancel(ctx)
+func runPreparedResourceTransactionApply(
+	ctx context.Context,
+	transaction PreparedResourceTransaction,
+) (applied AppliedResourceTransaction, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			applied = AppliedResourceTransaction{}
+			err = fmt.Errorf(
+				"%w in prepared resource transaction apply: %v",
+				ErrTaskPanic,
+				recovered,
+			)
+		}
+	}()
+	return transaction.Apply(ctx)
+}
+
+func runPreparedResourceTransactionDispose(
+	ctx context.Context,
+	transaction PreparedResourceTransaction,
+) (current ReadyResource, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			current = nil
+			err = fmt.Errorf(
+				"%w in prepared resource transaction dispose: %v",
+				ErrTaskPanic,
+				recovered,
+			)
+		}
+	}()
+	return transaction.Dispose(ctx)
+}
+
+func disposeContext(ctx context.Context, preserve bool) context.Context {
+	if preserve {
+		return ctx
 	}
+	return context.WithoutCancel(ctx)
+}
+
+func disposeTaskOutcome(ctx context.Context, outcome TaskOutcome, preserveContext bool) error {
+	cleanupCtx := disposeContext(ctx, preserveContext)
 	switch outcome.kind {
 	case TaskOutcomeNone, TaskOutcomeFrame:
 		return nil
@@ -764,6 +1081,14 @@ func disposeTaskOutcome(ctx context.Context, outcome TaskOutcome, preserveContex
 		return callReadyResource("abort ready", func() error { return outcome.ready.AbortReady(cleanupCtx) })
 	case TaskOutcomePreparedCapability:
 		return callReadyResource("dispose prepared capability", func() error { return outcome.capability.Dispose(cleanupCtx) })
+	case TaskOutcomePreparedResourceTransaction:
+		return errors.New(
+			"jobmgr task child: resource transaction requires transfer-aware disposal",
+		)
+	case TaskOutcomeAppliedResourceTransaction:
+		return errors.New(
+			"jobmgr task child: applied resource transaction requires kernel transfer",
+		)
 	default:
 		return errors.New("jobmgr task child: cannot dispose unknown outcome")
 	}

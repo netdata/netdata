@@ -106,6 +106,19 @@ func (operation *OperationGeneration) ResultReady(ref TaskRef, sequence uint8) e
 	return nil
 }
 
+func (operation *OperationGeneration) PhaseResultReady(
+	ref TaskRef,
+	sequence uint8,
+) error {
+	if operation.Child != ChildActionPending ||
+		operation.Task != ref ||
+		sequence != operation.childPhase {
+		return errors.New("jobmgr operation: stale child phase result")
+	}
+	operation.Child = ChildResultReady
+	return nil
+}
+
 func (operation *OperationGeneration) ActionPending(ref TaskRef, sequence uint8) error {
 	if (operation.Child != ChildResultReady && operation.Child != ChildActionAcknowledged) || operation.Task != ref || sequence != operation.childPhase+1 {
 		return errors.New("jobmgr operation: action without result")

@@ -1,0 +1,124 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package lifecycle
+
+import (
+	"context"
+	"errors"
+)
+
+// ResourceTransactionScope seals the exact current and optional successor
+// generations that one operation may transition.
+type ResourceTransactionScope struct {
+	ID        string
+	Current   ResourceIdentity
+	Successor ResourceIdentity
+}
+
+func (scope ResourceTransactionScope) Valid() bool {
+	if scope.ID == "" ||
+		!scope.Current.Valid() && scope.Current != (ResourceIdentity{}) {
+		return false
+	}
+	if !scope.Successor.Valid() && scope.Successor != (ResourceIdentity{}) {
+		return false
+	}
+	if scope.Current.Valid() && scope.Current.ID != scope.ID {
+		return false
+	}
+	if scope.Successor.Valid() && scope.Successor.ID != scope.ID {
+		return false
+	}
+	return true
+}
+
+type ResourceTransactionDisposition uint8
+
+const (
+	ResourceTransactionUnchanged ResourceTransactionDisposition = iota + 1
+	ResourceTransactionRemoved
+	ResourceTransactionInstalled
+	ResourceTransactionReplaced
+)
+
+func (disposition ResourceTransactionDisposition) Valid() bool {
+	switch disposition {
+	case ResourceTransactionUnchanged,
+		ResourceTransactionRemoved,
+		ResourceTransactionInstalled,
+		ResourceTransactionReplaced:
+		return true
+	default:
+		return false
+	}
+}
+
+// PreparedResourceTransaction owns an unpublished graph/resource postimage.
+// Dispose must return the exact untouched current resource, if one existed.
+type PreparedResourceTransaction interface {
+	Scope() ResourceTransactionScope
+	Apply(context.Context) (AppliedResourceTransaction, error)
+	Dispose(context.Context) (ReadyResource, error)
+}
+
+type AppliedResourceTransaction struct {
+	scope       ResourceTransactionScope
+	disposition ResourceTransactionDisposition
+	current     ReadyResource
+	result      SealedResult
+	cleanup     TaskCleanup
+}
+
+func NewAppliedResourceTransaction(
+	scope ResourceTransactionScope,
+	disposition ResourceTransactionDisposition,
+	current ReadyResource,
+	result SealedResult,
+	cleanup TaskCleanup,
+) (AppliedResourceTransaction, error) {
+	applied := AppliedResourceTransaction{
+		scope:       scope,
+		disposition: disposition,
+		current:     current,
+		result:      result,
+		cleanup:     cleanup,
+	}
+	if !scope.Valid() || !disposition.Valid() || cleanup == nil {
+		return AppliedResourceTransaction{}, errors.New(
+			"jobmgr lifecycle: invalid applied resource transaction",
+		)
+	}
+	outcome, err := appliedResourceTransactionOutcome(applied)
+	if err != nil {
+		return AppliedResourceTransaction{}, err
+	}
+	if outcome.kind != TaskOutcomeAppliedResourceTransaction {
+		return AppliedResourceTransaction{}, errors.New(
+			"jobmgr lifecycle: applied resource transaction did not seal",
+		)
+	}
+	return applied, nil
+}
+
+func preparedResourceTransactionScope(
+	transaction PreparedResourceTransaction,
+) (scope ResourceTransactionScope, err error) {
+	if transaction == nil {
+		return ResourceTransactionScope{}, errors.New(
+			"jobmgr lifecycle: nil prepared resource transaction",
+		)
+	}
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			scope = ResourceTransactionScope{}
+			err = errors.New("jobmgr lifecycle: prepared resource transaction scope panic")
+		}
+	}()
+	scope = transaction.Scope()
+	if !scope.Valid() {
+		return ResourceTransactionScope{}, errors.New(
+			"jobmgr lifecycle: invalid prepared resource transaction scope",
+		)
+	}
+	return scope, nil
+}

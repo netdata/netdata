@@ -6,18 +6,14 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
-	"path/filepath"
 
 	"github.com/netdata/netdata/go/plugins/logger"
-	"github.com/netdata/netdata/go/plugins/plugin/agent/internal/naming"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/vnodectl"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/metricsaudit"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 )
@@ -47,10 +43,6 @@ type jobFactory struct {
 
 	validationOnly bool
 
-	auditMode     bool
-	auditAnalyzer metricsaudit.Analyzer
-	auditDataDir  string
-
 	runtimeService runtimecomp.Service
 	vnodeRegistry  *vnoderegistry.Registry
 
@@ -79,10 +71,6 @@ func newJobFactory(m *Manager) *jobFactory {
 		out:               m.out,
 		gates:             m.emissionGates,
 		onSuppressedWrite: m.observeSuppressedWrite,
-
-		auditMode:     m.auditMode,
-		auditAnalyzer: m.auditAnalyzer,
-		auditDataDir:  m.auditDataDir,
 
 		runtimeService: m.runtimeService,
 		vnodeRegistry:  m.vnodeRegistry,
@@ -219,11 +207,6 @@ func (f *jobFactory) createV1(cfg confgroup.Config, creator collectorapi.Creator
 		return nil, fmt.Errorf("module %s has no compatible creator", cfg.Module())
 	}
 
-	jobCaptureDir, err := f.createV1CaptureDir(cfg)
-	if err != nil {
-		return nil, err
-	}
-
 	mod := creator.Create()
 	if named, ok := mod.(jobNameSetter); ok {
 		named.SetJobName(cfg.Name())
@@ -233,15 +216,6 @@ func (f *jobFactory) createV1(cfg confgroup.Config, creator collectorapi.Creator
 	if err := applyConfig(resolveCtx, cfg, mod, f.secretResolver, f.secretStoreSvc, storeSnapshot); err != nil {
 		f.logApplyConfigError(cfg, err)
 		return nil, err
-	}
-
-	if f.auditAnalyzer != nil && jobCaptureDir != "" {
-		f.auditAnalyzer.RegisterJob(cfg.Name(), cfg.Module(), jobCaptureDir)
-	}
-	if jobCaptureDir != "" {
-		if captureAware, ok := mod.(metricsaudit.Capturable); ok {
-			captureAware.EnableCaptureArtifacts(jobCaptureDir)
-		}
 	}
 
 	jobCfg := jobruntime.JobConfig{
@@ -257,8 +231,6 @@ func (f *jobFactory) createV1(cfg confgroup.Config, creator collectorapi.Creator
 		IsStock:         cfg.SourceType() == "stock",
 		Module:          mod,
 		Out:             f.out,
-		AuditMode:       f.auditMode,
-		AuditAnalyzer:   f.auditAnalyzer,
 		FunctionOnly:    functionOnly,
 	}
 	if vnode.Vnode != nil {
@@ -270,18 +242,4 @@ func (f *jobFactory) createV1(cfg confgroup.Config, creator collectorapi.Creator
 	}
 
 	return jobruntime.NewJob(jobCfg), nil
-}
-
-func (f *jobFactory) createV1CaptureDir(cfg confgroup.Config) (string, error) {
-	if f.validationOnly {
-		return "", nil
-	}
-	if f.auditDataDir == "" {
-		return "", nil
-	}
-	jobCaptureDir := filepath.Join(f.auditDataDir, naming.Sanitize(cfg.Module()), naming.Sanitize(cfg.Name()))
-	if err := os.MkdirAll(jobCaptureDir, 0o755); err != nil {
-		return "", fmt.Errorf("creating audit directory: %w", err)
-	}
-	return jobCaptureDir, nil
 }

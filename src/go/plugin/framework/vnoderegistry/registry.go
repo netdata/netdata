@@ -50,21 +50,42 @@ type Registration struct {
 }
 
 type Registry struct {
-	mu      sync.Mutex
-	entries map[string]*entry
+	mu              sync.Mutex
+	entries         map[string]*entry
+	reservations    map[string]uint64
+	leaseOwners     map[string]map[Owner]uint64
+	metadataHistory map[metadataHistoryKey]uint64
+	nextToken       uint64
+}
+
+type ownerFacet uint8
+
+const (
+	ownerFacetLegacy ownerFacet = 1 << iota
+	ownerFacetMetadata
+)
+
+type metadataHistoryKey struct {
+	guid  string
+	owner Owner
 }
 
 type entry struct {
 	info           netdataapi.HostInfo
 	revision       uint64
-	owners         map[Owner]struct{}
+	owners         map[Owner]ownerFacet
 	reportedStates map[string]struct{}
 	reportedOrder  []string
 }
 
 // New returns an empty concurrency-safe vnode registry.
 func New() *Registry {
-	return &Registry{entries: make(map[string]*entry)}
+	return &Registry{
+		entries:         make(map[string]*entry),
+		reservations:    make(map[string]uint64),
+		leaseOwners:     make(map[string]map[Owner]uint64),
+		metadataHistory: make(map[metadataHistoryKey]uint64),
+	}
 }
 
 // Register records that owner emits metrics under info.GUID.
@@ -91,13 +112,19 @@ func (r *Registry) Register(owner Owner, info netdataapi.HostInfo) (Registration
 	if r.entries == nil {
 		r.entries = make(map[string]*entry)
 	}
+	if r.reservations == nil {
+		r.reservations = make(map[string]uint64)
+	}
+	if r.leaseOwners == nil {
+		r.leaseOwners = make(map[string]map[Owner]uint64)
+	}
 
 	ent, ok := r.entries[info.GUID]
 	if !ok {
 		ent = &entry{
 			info:           cloneHostInfo(info),
 			revision:       1,
-			owners:         map[Owner]struct{}{owner: {}},
+			owners:         map[Owner]ownerFacet{owner: ownerFacetLegacy},
 			reportedStates: make(map[string]struct{}),
 		}
 		r.entries[info.GUID] = ent
@@ -109,8 +136,8 @@ func (r *Registry) Register(owner Owner, info netdataapi.HostInfo) (Registration
 		}, nil
 	}
 
-	_, hadOwner := ent.owners[owner]
-	ent.owners[owner] = struct{}{}
+	hadOwner := ent.owners[owner]&ownerFacetLegacy != 0
+	ent.owners[owner] |= ownerFacetLegacy
 
 	result := Registration{
 		Info:       cloneHostInfo(ent.info),
@@ -161,7 +188,7 @@ func (r *Registry) Rollback(owner Owner, reg Registration) {
 		return
 	}
 	if reg.OwnerAdded {
-		delete(ent.owners, owner)
+		ent.removeOwnerFacet(owner, ownerFacetLegacy)
 	}
 	if reg.MetadataUpdated && ent.revision == reg.revision && hostInfoEqual(ent.info, reg.Info) {
 		ent.info = cloneHostInfo(reg.Previous)
@@ -191,12 +218,21 @@ func (r *Registry) Release(owner Owner, guid string) bool {
 	if !ok {
 		return false
 	}
-	delete(ent.owners, owner)
+	ent.removeOwnerFacet(owner, ownerFacetLegacy)
 	if len(ent.owners) > 0 {
 		return false
 	}
 	delete(r.entries, guid)
 	return true
+}
+
+func (ent *entry) removeOwnerFacet(owner Owner, facet ownerFacet) {
+	remaining := ent.owners[owner] &^ facet
+	if remaining == 0 {
+		delete(ent.owners, owner)
+		return
+	}
+	ent.owners[owner] = remaining
 }
 
 // Lookup returns the retained metadata for guid.

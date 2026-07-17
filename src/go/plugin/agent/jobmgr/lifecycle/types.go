@@ -113,6 +113,12 @@ func (result SealedResult) appendPayload(dst []byte) ([]byte, error) {
 
 type TaskWork func(context.Context) (TaskOutcome, error)
 
+// TaskRunner permits a supervisor-owned reusable record to provide work
+// without allocating a per-dispatch closure.
+type TaskRunner interface {
+	RunTask(context.Context) (TaskOutcome, error)
+}
+
 func FrameTaskWork(work func(context.Context) (SealedResult, error)) TaskWork {
 	return func(ctx context.Context) (TaskOutcome, error) {
 		result, err := work(ctx)
@@ -151,12 +157,20 @@ type PreparedResourcePermitWork func(context.Context, LongLivedPermit) (Prepared
 
 type PreparedCapabilityPermitWork func(context.Context, LongLivedPermit) (PreparedCapability, error)
 
+type PreparedResourceTransactionWork func(
+	context.Context,
+	ReadyResource,
+	ResourceTransactionScope,
+	LongLivedPermit,
+) (PreparedResourceTransaction, error)
+
 type TaskPlan struct {
 	Source                 Source
 	Deadline               time.Time
 	InitialCancellation    error
 	MaxPhaseTransitions    uint8
 	Work                   TaskWork
+	Runner                 TaskRunner
 	Cleanup                TaskCleanup
 	permitAdmission        *AdmissionLedger
 	permitAdmissionRef     AdmissionRef
@@ -164,10 +178,69 @@ type TaskPlan struct {
 	permitPlan             LongLivedPlan
 	permitWork             PreparedResourcePermitWork
 	capabilityPermitWork   PreparedCapabilityPermitWork
+	transactionWork        PreparedResourceTransactionWork
+	transactionScope       ResourceTransactionScope
+	transactionScopeSet    bool
 	initialReady           ReadyResource
 	initialIdentity        ResourceIdentity
 	taskContext            context.Context
 	preserveDisposeContext bool
+	drainDependent         bool
+}
+
+func NewResourceTransactionTaskPlan(
+	source Source,
+	deadline time.Time,
+	maxPhaseTransitions uint8,
+	current ReadyResource,
+	scope ResourceTransactionScope,
+	work PreparedResourceTransactionWork,
+) (TaskPlan, error) {
+	plan := TaskPlan{
+		Source:              source,
+		Deadline:            deadline,
+		MaxPhaseTransitions: maxPhaseTransitions,
+		transactionWork:     work,
+		transactionScope:    scope,
+		transactionScopeSet: true,
+		initialReady:        current,
+		initialIdentity:     scope.Current,
+	}
+	if err := plan.Validate(); err != nil {
+		return TaskPlan{}, err
+	}
+	return plan, nil
+}
+
+func NewResourceTransactionPermitTaskPlan(
+	source Source,
+	deadline time.Time,
+	maxPhaseTransitions uint8,
+	admission *AdmissionLedger,
+	admissionRef AdmissionRef,
+	current ReadyResource,
+	scope ResourceTransactionScope,
+	permitPlan LongLivedPlan,
+	work PreparedResourceTransactionWork,
+) (TaskPlan, error) {
+	plan := TaskPlan{
+		Source:              source,
+		Deadline:            deadline,
+		MaxPhaseTransitions: maxPhaseTransitions,
+		permitAdmission:     admission,
+		permitAdmissionRef:  admissionRef,
+		permitOwner:         scope.Successor,
+		permitPlan:          permitPlan,
+		transactionWork:     work,
+		transactionScope:    scope,
+		transactionScopeSet: true,
+		initialReady:        current,
+		initialIdentity:     scope.Current,
+	}
+	if err := plan.Validate(); err != nil {
+		return TaskPlan{}, err
+	}
+	return plan, nil
 }
 
 func NewShutdownReadyResourceTaskPlan(source Source, budget *ShutdownBudget, maxPhaseTransitions uint8, resource ReadyResource, identity ResourceIdentity) (TaskPlan, error) {
@@ -178,6 +251,7 @@ func NewShutdownReadyResourceTaskPlan(source Source, budget *ShutdownBudget, max
 		Source: source, MaxPhaseTransitions: maxPhaseTransitions,
 		initialReady: resource, initialIdentity: identity,
 		taskContext: budget.Context(), preserveDisposeContext: true,
+		drainDependent: true,
 	}
 	if err := plan.Validate(); err != nil {
 		return TaskPlan{}, err
@@ -225,6 +299,7 @@ func NewReadyResourceTaskPlan(source Source, deadline time.Time, maxPhaseTransit
 	plan := TaskPlan{
 		Source: source, Deadline: deadline, MaxPhaseTransitions: maxPhaseTransitions,
 		initialReady: resource, initialIdentity: identity,
+		drainDependent: true,
 	}
 	if err := plan.Validate(); err != nil {
 		return TaskPlan{}, err
@@ -236,8 +311,14 @@ func (plan TaskPlan) Validate() error {
 	if !plan.Source.Valid() {
 		return errors.New("jobmgr lifecycle: invalid task source")
 	}
+	if plan.drainDependent && plan.initialReady == nil {
+		return errors.New("jobmgr lifecycle: drain-dependent task has no ready resource")
+	}
 	workSources := 0
 	if plan.Work != nil {
+		workSources++
+	}
+	if plan.Runner != nil {
 		workSources++
 	}
 	if plan.permitWork != nil {
@@ -246,7 +327,9 @@ func (plan TaskPlan) Validate() error {
 	if plan.capabilityPermitWork != nil {
 		workSources++
 	}
-	if plan.initialReady != nil {
+	if plan.transactionWork != nil {
+		workSources++
+	} else if plan.initialReady != nil {
 		workSources++
 	}
 	if workSources != 1 {
@@ -263,8 +346,23 @@ func (plan TaskPlan) Validate() error {
 	if plan.initialReady != nil && !plan.initialIdentity.Valid() {
 		return errors.New("jobmgr lifecycle: initial ready resource has invalid identity")
 	}
-	if (plan.Work != nil || plan.permitWork != nil || plan.capabilityPermitWork != nil) && plan.initialIdentity.Valid() {
+	if (plan.Work != nil ||
+		plan.Runner != nil ||
+		plan.permitWork != nil ||
+		plan.capabilityPermitWork != nil) &&
+		plan.initialIdentity.Valid() {
 		return errors.New("jobmgr lifecycle: work task has an unexpected resource identity")
+	}
+	if plan.transactionWork != nil {
+		if !plan.transactionScopeSet ||
+			!plan.transactionScope.Valid() ||
+			(plan.initialReady == nil) != !plan.transactionScope.Current.Valid() ||
+			plan.initialIdentity != plan.transactionScope.Current {
+			return errors.New("jobmgr lifecycle: invalid resource transaction scope")
+		}
+	} else if plan.transactionScopeSet ||
+		plan.transactionScope != (ResourceTransactionScope{}) {
+		return errors.New("jobmgr lifecycle: unexpected resource transaction scope")
 	}
 	if plan.taskContext != nil {
 		if !plan.Deadline.IsZero() || plan.InitialCancellation != nil || (plan.initialReady == nil) == plan.preserveDisposeContext {
@@ -273,12 +371,18 @@ func (plan TaskPlan) Validate() error {
 	} else if plan.preserveDisposeContext {
 		return errors.New("jobmgr lifecycle: unexpected preserved disposal context")
 	}
-	if plan.permitWork != nil || plan.capabilityPermitWork != nil {
+	if plan.permitWork != nil ||
+		plan.capabilityPermitWork != nil ||
+		(plan.transactionWork != nil && plan.transactionScope.Successor.Valid()) {
 		if plan.permitAdmission == nil || !plan.permitAdmissionRef.Valid() || !plan.permitOwner.Valid() {
 			return errors.New("jobmgr lifecycle: incomplete prepared-resource permit work")
 		}
 		if err := plan.permitPlan.Validate(); err != nil {
 			return err
+		}
+		if plan.transactionWork != nil &&
+			plan.permitOwner != plan.transactionScope.Successor {
+			return errors.New("jobmgr lifecycle: transaction permit owner differs from successor")
 		}
 	} else if plan.permitAdmission != nil || plan.permitAdmissionRef.Valid() || plan.permitOwner.Valid() || plan.permitPlan.class != 0 {
 		return errors.New("jobmgr lifecycle: unexpected prepared-resource permit terms")

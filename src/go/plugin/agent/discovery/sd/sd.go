@@ -54,6 +54,7 @@ func NewServiceDiscovery(cfg Config) (*ServiceDiscovery, error) {
 		seen:           dyncfg.NewSeenCache[sdConfig](),
 		exposed:        dyncfg.NewExposedCache[sdConfig](),
 		dyncfgCh:       make(chan dyncfg.Function, 1),
+		dyncfgPending:  make(map[string]pendingDyncfgFunction),
 	}
 	if provider, ok := cfg.FnReg.(interface {
 		TerminalFinalizer() functions.TerminalFinalizer
@@ -107,6 +108,8 @@ type (
 		handler        *dyncfg.Handler[sdConfig]
 		sdCb           *sdCallbacks
 		dyncfgCh       chan dyncfg.Function
+		dyncfgMu       sync.Mutex
+		dyncfgPending  map[string]pendingDyncfgFunction
 		newPipeline    func(config pipeline.Config) (sdPipeline, error)
 
 		ctx context.Context
@@ -170,6 +173,7 @@ func (d *ServiceDiscovery) Run(ctx context.Context, in chan<- []*confgroup.Group
 }
 
 func (d *ServiceDiscovery) run(ctx context.Context) {
+	defer d.failPendingDyncfg()
 	for {
 		if d.handler.WaitingForDecision() {
 			step, ok := d.handler.NextWaitDecisionStep(ctx, d.dyncfgCh)
@@ -178,6 +182,7 @@ func (d *ServiceDiscovery) run(ctx context.Context) {
 			}
 			if step.HasCommand {
 				d.dyncfgSeqExec(step.Command)
+				d.completeDyncfg(step.Command)
 				continue
 			}
 		} else {
@@ -195,6 +200,7 @@ func (d *ServiceDiscovery) run(ctx context.Context) {
 				}
 			case fn := <-d.dyncfgCh:
 				d.dyncfgSeqExec(fn)
+				d.completeDyncfg(fn)
 			}
 		}
 	}

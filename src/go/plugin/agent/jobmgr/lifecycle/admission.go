@@ -599,7 +599,9 @@ func (ledger *AdmissionLedger) ResizeOrdinary(ref AdmissionRef, totalBytes int64
 	if err != nil {
 		return false, false, err
 	}
-	if record.state != admissionOrdinaryGranted || !record.ordinaryHeld || record.longLivedBytes != 0 {
+	if record.state != admissionOrdinaryGranted ||
+		!record.ordinaryHeld ||
+		totalBytes <= record.longLivedBytes {
 		return false, false, errors.New("jobmgr admission: ordinary resize requires a granted record")
 	}
 	if totalBytes <= record.heldBytes {

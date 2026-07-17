@@ -7,7 +7,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -950,31 +949,6 @@ func TestCollectorCallbacks_ExtractKeySingleInstancePolicy(t *testing.T) {
 	}
 }
 
-func TestCollectorCallbacks_ParseAndValidate_SuppressesAuditSideEffects(t *testing.T) {
-	tempDir := t.TempDir()
-	analyzer := &auditAnalyzerSpy{}
-	mgr := newCollectorTestManager()
-	mgr.auditAnalyzer = analyzer
-	mgr.auditDataDir = tempDir
-	cb := &collectorCallbacks{mgr: mgr}
-
-	cfg := prepareDyncfgCfg("success", "payload-name").Set("option_str", "one").Set("option_int", 2)
-	fn := dyncfg.NewFunction(functions.Function{
-		UID:         "validation-audit-side-effects",
-		ContentType: "application/json",
-		Payload:     mustMarshalCollectorConfigPayload(t, cfg),
-		Args:        collectorTestArgs(mgr, "success", string(dyncfg.CommandAdd), "validated"),
-	})
-
-	_, err := cb.ParseAndValidate(context.Background(), fn, "validated")
-	require.NoError(t, err)
-
-	entries, err := os.ReadDir(tempDir)
-	require.NoError(t, err)
-	assert.Empty(t, entries)
-	assert.Empty(t, analyzer.registered)
-}
-
 func TestCollectorCallbacks_ApplyConfigLoggingHonorsValidationMode(t *testing.T) {
 	tests := map[string]struct {
 		run            func(t *testing.T, mgr *Manager, logBuf *bytes.Buffer)
@@ -1899,15 +1873,3 @@ func (j *collectorProbeJob) IsRunning() bool                           { return 
 func (j *collectorProbeJob) Panicked() bool                            { return false }
 func (j *collectorProbeJob) Vnode() vnodes.VirtualNode                 { return vnodes.VirtualNode{} }
 func (j *collectorProbeJob) SetVnodeSnapshot(jobruntime.VnodeSnapshot) {}
-
-type auditAnalyzerSpy struct {
-	registered []string
-}
-
-func (a *auditAnalyzerSpy) RegisterJob(jobName, moduleName, dir string) {
-	a.registered = append(a.registered, moduleName+":"+jobName+":"+dir)
-}
-
-func (*auditAnalyzerSpy) RecordJobStructure(string, string, *collectorapi.Charts) {}
-func (*auditAnalyzerSpy) UpdateJobStructure(string, string, *collectorapi.Charts) {}
-func (*auditAnalyzerSpy) RecordCollection(string, string, map[string]int64)       {}

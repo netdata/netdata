@@ -196,31 +196,54 @@ func checkActiveImport(
 	}
 }
 
-func TestCompositionIsPrivateBeforeAtomicCut(t *testing.T) {
+func TestCompositionIsPublishedOnlyThroughAgent(t *testing.T) {
 	root := filepath.Clean(filepath.Join(jobmgrSourceRoot(t), "../../.."))
-	paths := map[string]string{
-		"godplugin":      "cmd/godplugin/main.go",
-		"ibmdplugin":     "cmd/ibmdplugin/main.go",
-		"scriptsdplugin": "cmd/scriptsdplugin/main.go",
-		"agent":          "plugin/agent/agent.go",
-		"agent host":     "cmd/internal/agenthost/host.go",
+	paths := map[string]struct {
+		path        string
+		wantCompose bool
+	}{
+		"godplugin": {
+			path: "cmd/godplugin/main.go",
+		},
+		"ibmdplugin": {
+			path: "cmd/ibmdplugin/main.go",
+		},
+		"scriptsdplugin": {
+			path: "cmd/scriptsdplugin/main.go",
+		},
+		"agent": {
+			path: "plugin/agent/agent.go", wantCompose: true,
+		},
+		"agent host": {
+			path: "cmd/internal/agenthost/host.go",
+		},
 	}
 
-	for name, path := range paths {
+	for name, test := range paths {
 		t.Run(name, func(t *testing.T) {
 			fset := token.NewFileSet()
-			file, err := parser.ParseFile(fset, filepath.Join(root, path), nil, parser.ImportsOnly)
+			path := filepath.Join(root, test.path)
+			file, err := parser.ParseFile(fset, path, nil, parser.ImportsOnly)
 			if err != nil {
 				t.Fatal(err)
 			}
+			found := false
 			for _, imported := range file.Imports {
 				importPath, err := strconv.Unquote(imported.Path.Value)
 				if err != nil {
 					t.Fatal(err)
 				}
 				if importPath == jobmgrImportPath+"/composition" {
-					t.Fatalf("%s publishes composition before the atomic cut", path)
+					found = true
 				}
+			}
+			if found != test.wantCompose {
+				t.Fatalf(
+					"%s composition import=%v want=%v",
+					test.path,
+					found,
+					test.wantCompose,
+				)
 			}
 		})
 	}
@@ -229,6 +252,37 @@ func TestCompositionIsPrivateBeforeAtomicCut(t *testing.T) {
 func TestWorkPlanCannotCarryKernelLoopAbandonCallback(t *testing.T) {
 	if _, found := reflect.TypeOf(jobmgr.WorkPlan{}).FieldByName("Abandon"); found {
 		t.Fatal("WorkPlan exposes an opaque abandonment callback to KernelLoop")
+	}
+}
+
+func TestCommandKernelUsesSourceSpecificPlanningPorts(t *testing.T) {
+	constructor := reflect.TypeOf(jobmgr.NewCommandKernel)
+	planner := reflect.TypeOf((*jobmgr.Planner)(nil)).Elem()
+	functionCatalog := reflect.TypeOf((*jobmgr.FunctionCatalogPort)(nil)).Elem()
+	if constructor.NumIn() < 2 ||
+		constructor.In(constructor.NumIn()-2) != planner ||
+		constructor.In(constructor.NumIn()-1) != functionCatalog {
+		t.Fatalf("CommandKernel constructor does not end in Planner, FunctionCatalogPort: %v", constructor)
+	}
+	for index := 0; index < constructor.NumIn(); index++ {
+		if constructor.In(index).Kind() == reflect.Map {
+			t.Fatalf("CommandKernel constructor accepts generic source-indexed port map at argument %d", index)
+		}
+	}
+
+	data, err := os.ReadFile(filepath.Join(jobmgrSourceRoot(t), "kernel.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := string(data)
+	for _, forbidden := range []string{
+		"map[lifecycle.Source]Planner",
+		"planners[request.Source]",
+		"preparePlan(request Request)",
+	} {
+		if strings.Contains(source, forbidden) {
+			t.Fatalf("CommandKernel retains generic Function planner carrier %q", forbidden)
+		}
 	}
 }
 

@@ -65,6 +65,8 @@ type FrameOwner struct {
 	retained       []byte
 	commits        uint64
 	onControlReady func()
+	onPoisoned     func(error)
+	runBinding     uint64
 	controlBuffer  [ControlFrameBytes]byte
 }
 
@@ -92,6 +94,74 @@ func (owner *FrameOwner) BindControlReady(notify func()) error {
 	if pending {
 		notify()
 	}
+	return nil
+}
+
+func (owner *FrameOwner) BindPoisoned(notify func(error)) error {
+	if owner == nil || notify == nil {
+		return errors.New("jobmgr frame owner: invalid poison binding")
+	}
+	owner.stateMu.Lock()
+	if owner.onPoisoned != nil {
+		owner.stateMu.Unlock()
+		return errors.New("jobmgr frame owner: poison notifier already bound")
+	}
+	owner.onPoisoned = notify
+	poisoned := owner.poisoned
+	owner.stateMu.Unlock()
+	if poisoned {
+		notify(ErrFrameOwnerPoisoned)
+	}
+	return nil
+}
+
+// BindRunNotifications installs one generation-scoped notification lease.
+// Process composition releases the retired generation before binding its
+// successor to this process-global FrameOwner.
+func (owner *FrameOwner) BindRunNotifications(
+	generation uint64,
+	controlReady func(),
+	poisoned func(error),
+) error {
+	if owner == nil || generation == 0 || controlReady == nil || poisoned == nil {
+		return errors.New("jobmgr frame owner: invalid run notification binding")
+	}
+	owner.stateMu.Lock()
+	if owner.runBinding != 0 ||
+		owner.onControlReady != nil ||
+		owner.onPoisoned != nil {
+		owner.stateMu.Unlock()
+		return errors.New("jobmgr frame owner: notifications already bound")
+	}
+	owner.runBinding = generation
+	owner.onControlReady = controlReady
+	owner.onPoisoned = poisoned
+	pending := owner.pendingControl && !owner.busy
+	isPoisoned := owner.poisoned
+	owner.stateMu.Unlock()
+	if pending {
+		controlReady()
+	}
+	if isPoisoned {
+		poisoned(ErrFrameOwnerPoisoned)
+	}
+	return nil
+}
+
+func (owner *FrameOwner) ReleaseRunNotifications(generation uint64) error {
+	if owner == nil || generation == 0 {
+		return errors.New("jobmgr frame owner: invalid run notification release")
+	}
+	owner.stateMu.Lock()
+	defer owner.stateMu.Unlock()
+	if owner.runBinding != generation ||
+		owner.onControlReady == nil ||
+		owner.onPoisoned == nil {
+		return errors.New("jobmgr frame owner: stale run notification release")
+	}
+	owner.runBinding = 0
+	owner.onControlReady = nil
+	owner.onPoisoned = nil
 	return nil
 }
 
@@ -210,6 +280,15 @@ func (owner *FrameOwner) CommitProtocolFrame(payload []byte) error {
 	return owner.CommitPreparedProtocolFrame(frame)
 }
 
+// CommitBorrowedProtocolFrame commits a complete caller-owned frame without a
+// success-path copy. A failed write retains its own copy before returning.
+func (owner *FrameOwner) CommitBorrowedProtocolFrame(payload []byte) error {
+	if len(payload) == 0 || len(payload) > MaximumOtherFrameBytes {
+		return errors.New("jobmgr frame owner: invalid borrowed protocol frame size")
+	}
+	return owner.commitOrdinaryTransaction(payload, nil, nil, true)
+}
+
 func (owner *FrameOwner) CommitPreparedProtocolFrame(frame PreparedProtocolFrame) error {
 	payload, err := frame.take()
 	if err != nil {
@@ -218,18 +297,42 @@ func (owner *FrameOwner) CommitPreparedProtocolFrame(frame PreparedProtocolFrame
 	return owner.commitOrdinary(payload)
 }
 
+func (owner *FrameOwner) CommitPreparedProtocolTransaction(
+	frame PreparedProtocolFrame,
+	commit func() error,
+	abort func() error,
+) error {
+	if commit == nil || abort == nil {
+		return errors.New("jobmgr frame owner: invalid protocol transaction")
+	}
+	payload, err := frame.take()
+	if err != nil {
+		return err
+	}
+	return owner.commitOrdinaryTransaction(payload, commit, abort, false)
+}
+
 func (owner *FrameOwner) commitOrdinary(payload []byte) error {
+	return owner.commitOrdinaryTransaction(payload, nil, nil, false)
+}
+
+func (owner *FrameOwner) commitOrdinaryTransaction(
+	payload []byte,
+	commit func() error,
+	abort func() error,
+	borrowed bool,
+) error {
 	owner.stateMu.Lock()
 	for (owner.busy || owner.pendingControl) && !owner.poisoned {
 		owner.available.Wait()
 	}
 	if owner.poisoned {
 		owner.stateMu.Unlock()
-		return ErrFrameOwnerPoisoned
+		return errors.Join(ErrFrameOwnerPoisoned, callFrameTransition("abort", abort))
 	}
 	owner.busy = true
 	owner.stateMu.Unlock()
-	return owner.writeAndRelease(payload, false)
+	return owner.writeAndRelease(payload, false, borrowed, commit, abort)
 }
 
 func (owner *FrameOwner) TryCommitControl(plan ControlFramePlan) error {
@@ -253,10 +356,10 @@ func (owner *FrameOwner) TryCommitControl(plan ControlFramePlan) error {
 	payload := controlPayload(plan.Status)
 	encoded, err := encodeResult(owner.controlBuffer[:0], plan.UID, int(plan.Status), "application/json", plan.Expiry, payload, ControlFrameBytes, 0, 0)
 	if err != nil {
-		owner.poison(encoded)
+		owner.poison(encoded, err)
 		return err
 	}
-	return owner.writeAndRelease(encoded, true)
+	return owner.writeAndRelease(encoded, true, false, nil, nil)
 }
 
 func (owner *FrameOwner) Census() FrameCensus {
@@ -265,14 +368,34 @@ func (owner *FrameOwner) Census() FrameCensus {
 	return FrameCensus{Poisoned: owner.poisoned, Busy: owner.busy, PendingControl: owner.pendingControl, RetainedBytes: len(owner.retained), Commits: owner.commits}
 }
 
-func (owner *FrameOwner) writeAndRelease(payload []byte, control bool) error {
+func (owner *FrameOwner) Poison(cause error) {
+	if owner == nil {
+		return
+	}
+	owner.poison(nil, cause)
+}
+
+func (owner *FrameOwner) writeAndRelease(
+	payload []byte,
+	control bool,
+	borrowed bool,
+	commit func() error,
+	abort func() error,
+) error {
 	count, err := owner.writer.Write(payload)
 	if err != nil || count != len(payload) {
 		if err == nil {
 			err = io.ErrShortWrite
 		}
-		owner.poison(payload)
-		return fmt.Errorf("jobmgr frame owner: commit: %w", err)
+		owner.poison(retainedFramePayload(payload, borrowed), err)
+		return errors.Join(
+			fmt.Errorf("jobmgr frame owner: commit: %w", err),
+			callFrameTransition("abort", abort),
+		)
+	}
+	if err := callFrameTransition("commit", commit); err != nil {
+		owner.poison(retainedFramePayload(payload, borrowed), err)
+		return err
 	}
 	owner.stateMu.Lock()
 	owner.busy = false
@@ -288,13 +411,39 @@ func (owner *FrameOwner) writeAndRelease(payload []byte, control bool) error {
 	return nil
 }
 
-func (owner *FrameOwner) poison(payload []byte) {
+func retainedFramePayload(payload []byte, borrowed bool) []byte {
+	if borrowed {
+		return append([]byte(nil), payload...)
+	}
+	return payload
+}
+
+func callFrameTransition(name string, transition func() error) (err error) {
+	if transition == nil {
+		return nil
+	}
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf("jobmgr frame owner: protocol %s panic: %v", name, recovered)
+		}
+	}()
+	return transition()
+}
+
+func (owner *FrameOwner) poison(payload []byte, cause error) {
 	owner.stateMu.Lock()
+	notify := owner.onPoisoned
+	first := !owner.poisoned
 	owner.poisoned = true
 	owner.busy = false
-	owner.retained = payload
+	if first {
+		owner.retained = payload
+	}
 	owner.available.Broadcast()
 	owner.stateMu.Unlock()
+	if first && notify != nil {
+		notify(errors.Join(ErrFrameOwnerPoisoned, cause))
+	}
 }
 
 func encodeResult(dst []byte, uid string, status int, contentType string, expiry int64, payload []byte, frameLimit, envelopeLimit, payloadLimit int) ([]byte, error) {

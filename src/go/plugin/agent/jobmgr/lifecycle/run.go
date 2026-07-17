@@ -29,6 +29,7 @@ type RunCensus struct {
 	TransientPending     int
 	Inherited            InheritedTaskCensus
 	LongLived            LongLivedCensus
+	Frame                FrameCensus
 	RunFinalizerComplete bool
 }
 
@@ -126,7 +127,12 @@ func (supervisor *RunSupervisor) Terminal(census RunCensus) error {
 	if supervisor.admission {
 		return errors.New("jobmgr run supervisor: terminal while admitting")
 	}
-	quiescent := census.AdmissionRunDrained && census.TransientActive == 0 && census.TransientPending == 0 && census.Inherited.Active == 0 && census.LongLived == (LongLivedCensus{}) && census.RunFinalizerComplete
+	frameDrained := !census.Frame.Poisoned && !census.Frame.Busy &&
+		!census.Frame.PendingControl && census.Frame.RetainedBytes == 0
+	quiescent := census.AdmissionRunDrained && census.TransientActive == 0 &&
+		census.TransientPending == 0 && census.Inherited.Active == 0 &&
+		census.LongLived == (LongLivedCensus{}) && frameDrained &&
+		census.RunFinalizerComplete
 	if !quiescent {
 		if supervisor.dirty == nil {
 			supervisor.dirty = errors.New("jobmgr run supervisor: terminal with nonzero process census")

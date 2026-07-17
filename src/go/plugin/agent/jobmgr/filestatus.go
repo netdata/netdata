@@ -12,7 +12,6 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/filepersister"
 )
 
 func statusFileName(dir, pluginName string) string {
@@ -22,28 +21,9 @@ func statusFileName(dir, pluginName string) string {
 
 func (m *Manager) loadFileStatus() {
 	m.fileStatus = newFileStatus()
-
-	if !m.runModePolicy.UseFileStatusPersistence || m.varLibDir == "" {
-		return
-	}
-
-	s, err := loadFileStatus(statusFileName(m.varLibDir, m.pluginName))
-	if err != nil {
-		m.Warningf("failed to load state file: %v", err)
-		return
-	}
-	m.fileStatus = s
 }
 
-func (m *Manager) runFileStatusPersistence() {
-	if !m.runModePolicy.UseFileStatusPersistence || m.varLibDir == "" {
-		return
-	}
-
-	p := filepersister.New(statusFileName(m.varLibDir, m.pluginName))
-
-	p.Run(m.ctx, m.fileStatus)
-}
+func (*Manager) runFileStatusPersistence() {}
 
 func loadFileStatus(path string) (*fileStatus, error) {
 	f, err := os.Open(path)

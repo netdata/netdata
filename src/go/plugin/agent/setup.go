@@ -11,7 +11,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
 	"gopkg.in/yaml.v2"
 )
@@ -71,7 +70,7 @@ func (a *Agent) loadEnabledModules(cfg config) collectorapi.Registry {
 	return enabled
 }
 
-func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg functions.Registry) discovery.Config {
+func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry) discovery.Config {
 	a.Info("building discovery config")
 
 	reg := confgroup.Registry{}
@@ -113,7 +112,6 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry, fnReg function
 			Registry:   reg,
 			ReadPaths:  readPaths,
 			DummyNames: dummyPaths,
-			FnReg:      fnReg,
 		},
 		Providers: append([]discovery.ProviderFactory(nil), a.DiscoveryProviders...),
 	}

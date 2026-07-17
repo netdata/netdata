@@ -688,6 +688,69 @@ func TestAdmissionLongLivedRecordDetachesFromCompletedLaneGeneration(t *testing.
 	}
 }
 
+func TestAdmissionResizesOrdinaryRemainderWithLongLivedTransfer(t *testing.T) {
+	tests := map[string]struct {
+		resized int64
+	}{
+		"grow response bytes":   {resized: 120},
+		"shrink response bytes": {resized: 80},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			ledger := NewAdmissionLedger()
+			request := ledger.RequestOrdinary(
+				1,
+				AdmissionLaneRef{Slot: 1, Generation: 1},
+				100,
+			)
+			if request.Rejected != nil {
+				t.Fatal(request.Rejected)
+			}
+			var grants [4]AdmissionGrant
+			if count, _, err := ledger.TakeGrants(
+				1,
+				&grants,
+			); err != nil || count != 1 {
+				t.Fatalf("grant count=%d err=%v", count, err)
+			}
+			if err := ledger.TransferLongLived(
+				request.Ref,
+				40,
+				false,
+			); err != nil {
+				t.Fatal(err)
+			}
+			ready, _, err := ledger.ResizeOrdinary(
+				request.Ref,
+				test.resized,
+			)
+			if err != nil || !ready {
+				t.Fatalf("resize ready=%v err=%v", ready, err)
+			}
+			if census := ledger.Census(); census.OrdinaryBytes != test.resized ||
+				census.LongLivedBytes != 40 ||
+				census.LongLivedRecords != 1 {
+				t.Fatalf("resized census=%+v", census)
+			}
+			if _, err := ledger.ReleaseOrdinary(request.Ref); err != nil {
+				t.Fatal(err)
+			}
+			if _, err := ledger.ReleaseLongLived(
+				request.Ref,
+				40,
+			); err != nil {
+				t.Fatal(err)
+			}
+			if census := ledger.Census(); census.ActiveRecords != 0 ||
+				census.OrdinaryBytes != 0 ||
+				census.LongLivedBytes != 0 {
+				t.Fatalf("released census=%+v", census)
+			}
+		})
+	}
+}
+
 func TestAdmissionInputBodyAbortReleasesWaitingAndGrantedCapacity(t *testing.T) {
 	for _, afterGrant := range []bool{false, true} {
 		t.Run(fmt.Sprintf("after-grant-%t", afterGrant), func(t *testing.T) {
@@ -875,44 +938,64 @@ func TestTaskSupervisorRetainedTimeoutCountAndSaturationLatch(t *testing.T) {
 }
 
 func TestTaskSupervisorContainsPanicAndReleasesSlot(t *testing.T) {
-	frame, err := NewFrameOwner(io.Discard)
-	if err != nil {
-		t.Fatal(err)
+	tests := map[string]TaskPlan{
+		"function work": {
+			Source: SourceFunction,
+			Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+				panic("fixture panic")
+			}),
+		},
+		"reusable runner": {
+			Source: SourceFunction,
+			Runner: taskRunnerFunc(func(context.Context) (TaskOutcome, error) {
+				panic("fixture panic")
+			}),
+		},
 	}
-	supervisor, err := NewTaskSupervisor(frame)
-	if err != nil {
-		t.Fatal(err)
+	for name, plan := range tests {
+		t.Run(name, func(t *testing.T) {
+			frame, err := NewFrameOwner(io.Discard)
+			if err != nil {
+				t.Fatal(err)
+			}
+			supervisor, err := NewTaskSupervisor(frame)
+			if err != nil {
+				t.Fatal(err)
+			}
+			_, ref := enqueueAndDispatchTask(t, supervisor, plan)
+			completion := <-supervisor.CompletionCh()
+			if completion.Ref != ref || !errors.Is(completion.Err, ErrTaskPanic) ||
+				!strings.Contains(completion.Err.Error(), "fixture panic") {
+				t.Fatalf("panic completion differs: %#v", completion)
+			}
+			if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
+				t.Fatal(err)
+			}
+			ack := <-supervisor.AcknowledgementCh()
+			if ack.Ref != ref || ack.Sequence != 2 || ack.Kind != TaskActionDispose || ack.Err != nil {
+				t.Fatalf("panic disposal acknowledgement differs: %#v", ack)
+			}
+			if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
+				t.Fatal(err)
+			}
+			ack = <-supervisor.AcknowledgementCh()
+			if ack.Ref != ref || ack.Sequence != 3 || ack.Kind != TaskActionTerminate || ack.Err != nil {
+				t.Fatalf("panic termination acknowledgement differs: %#v", ack)
+			}
+			if err := supervisor.Release(ref); err != nil {
+				t.Fatal(err)
+			}
+			if supervisor.Active() != 0 {
+				t.Fatalf("panic task retained active slot: %d", supervisor.Active())
+			}
+		})
 	}
-	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
-		Source: SourceFunction,
-		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
-			panic("fixture panic")
-		}),
-	})
-	completion := <-supervisor.CompletionCh()
-	if completion.Ref != ref || !errors.Is(completion.Err, ErrTaskPanic) || !strings.Contains(completion.Err.Error(), "fixture panic") {
-		t.Fatalf("panic completion differs: %#v", completion)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
-		t.Fatal(err)
-	}
-	ack := <-supervisor.AcknowledgementCh()
-	if ack.Ref != ref || ack.Sequence != 2 || ack.Kind != TaskActionDispose || ack.Err != nil {
-		t.Fatalf("panic disposal acknowledgement differs: %#v", ack)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
-		t.Fatal(err)
-	}
-	ack = <-supervisor.AcknowledgementCh()
-	if ack.Ref != ref || ack.Sequence != 3 || ack.Kind != TaskActionTerminate || ack.Err != nil {
-		t.Fatalf("panic termination acknowledgement differs: %#v", ack)
-	}
-	if err := supervisor.Release(ref); err != nil {
-		t.Fatal(err)
-	}
-	if supervisor.Active() != 0 {
-		t.Fatalf("panic task retained active slot: %d", supervisor.Active())
-	}
+}
+
+type taskRunnerFunc func(context.Context) (TaskOutcome, error)
+
+func (fn taskRunnerFunc) RunTask(ctx context.Context) (TaskOutcome, error) {
+	return fn(ctx)
 }
 
 func TestTaskSupervisorPreservesAuthoritativeCancellationCause(t *testing.T) {
@@ -1339,6 +1422,10 @@ func TestFrameOwnerShortWritePoisonsAndRetains(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	poisoned := make(chan error, 1)
+	if err := owner.BindPoisoned(func(err error) { poisoned <- err }); err != nil {
+		t.Fatal(err)
+	}
 	result, err := NewSealedResult(200, "application/json", []byte(`{}`))
 	if err != nil {
 		t.Fatal(err)
@@ -1350,12 +1437,66 @@ func TestFrameOwnerShortWritePoisonsAndRetains(t *testing.T) {
 	if err := owner.Commit(frame); !errors.Is(err, io.ErrShortWrite) {
 		t.Fatalf("short write result differs: %v", err)
 	}
+	select {
+	case err := <-poisoned:
+		if !errors.Is(err, ErrFrameOwnerPoisoned) || !errors.Is(err, io.ErrShortWrite) {
+			t.Fatalf("poison notification differs: %v", err)
+		}
+	default:
+		t.Fatal("short write did not publish poison")
+	}
 	census := owner.Census()
 	if !census.Poisoned || census.RetainedBytes == 0 {
 		t.Fatalf("poison census differs: %#v", census)
 	}
-	if err := owner.Commit(frame); !errors.Is(err, ErrPreparedFrameConsumed) {
+	next, err := PrepareFrame("next", result, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := owner.Commit(next); !errors.Is(err, ErrFrameOwnerPoisoned) {
 		t.Fatalf("post-poison commit differs: %v", err)
+	}
+}
+
+func TestFrameOwnerRunNotificationLeaseCanMoveAfterExactRelease(t *testing.T) {
+	owner, err := NewFrameOwner(io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	notify := func() {}
+	poison := func(error) {}
+	if err := owner.BindRunNotifications(1, notify, poison); err != nil {
+		t.Fatal(err)
+	}
+	tests := map[string]struct {
+		run func() error
+	}{
+		"duplicate live bind": {
+			run: func() error {
+				return owner.BindRunNotifications(2, notify, poison)
+			},
+		},
+		"stale release": {
+			run: func() error {
+				return owner.ReleaseRunNotifications(2)
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if err := test.run(); err == nil {
+				t.Fatal("invalid notification lease transition succeeded")
+			}
+		})
+	}
+	if err := owner.ReleaseRunNotifications(1); err != nil {
+		t.Fatal(err)
+	}
+	if err := owner.BindRunNotifications(2, notify, poison); err != nil {
+		t.Fatal(err)
+	}
+	if err := owner.ReleaseRunNotifications(2); err != nil {
+		t.Fatal(err)
 	}
 }
 

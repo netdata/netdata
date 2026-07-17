@@ -25,6 +25,11 @@ func TestRequestValidate(t *testing.T) {
 		"no payload": {
 			request: valid,
 		},
+		"Function lane comes from catalog": {
+			request: Request{
+				UID: "function-1", Source: lifecycle.SourceFunction, Route: "function",
+			},
+		},
 		"explicit empty payload": {
 			request: func() Request {
 				request := valid
@@ -48,6 +53,20 @@ func TestRequestValidate(t *testing.T) {
 				request.UID = ""
 				return request
 			}(),
+			wantErr: true,
+		},
+		"missing Job Manager lane": {
+			request: func() Request {
+				request := valid
+				request.LaneKey = ""
+				return request
+			}(),
+			wantErr: true,
+		},
+		"Function ingress lane": {
+			request: Request{
+				UID: "function-1", LaneKey: "ingress", Source: lifecycle.SourceFunction, Route: "function",
+			},
 			wantErr: true,
 		},
 		"payload without reservation": {
