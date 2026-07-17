@@ -161,7 +161,7 @@ sanitize_file() {
   if awk -v obf="$OBFUSCATE" -v mapfile="$MAP_FILE" \
       -v host_short="$HOST_SHORT" -v host_fqdn="$HOST_FQDN" -v run_user="$RUN_USER" '
   BEGIN {
-    nsec = split("api key,apikey,token,password,passwd,secret,community,bearer,webhook,license key,auth,credential,cookie,passphrase,proxy user,proxy pass,username,dsn,private key,access key,session,recipient,account sid,priv key", SK, ",");
+    nsec = split("api key,apikey,token,password,passwd,pwd,secret,community,bearer,webhook,license key,auth,credential,cookie,passphrase,proxy user,proxy pass,username,dsn,private key,access key,session,recipient,account sid,priv key", SK, ",");
     for (i = 1; i <= nsec; i++) gsub(/[-_]/, " ", SK[i]);
     nip = 0;
     while ((getline line < mapfile) > 0) {
@@ -729,6 +729,7 @@ tcp LISTEN 0 4096 later-line
 server at 10.1.2.3 and 2606:4700:10::ac42:aad8 and 2001:470:26:307:0:0:0:1
 mail ops@example.com mac aa:bb:cc:dd:ee:ff at 2026-07-16T13:38:34Z
 "password_escq": "ab\"SENTINEL-ESCQ"
+PWD=SENTINEL-PWD
 "api_token": -98765
 "access_key": ["SENTINEL-ARR"]
 tabbed_secret_block: |
@@ -772,6 +773,7 @@ VECTORS
   t_absent  "aa:bb:cc:dd:ee:ff"          "MAC survived"
   t_present "after_block = ok"           "YAML block withholding ate following content"
   t_absent  "SENTINEL-ESCQ"              "escaped-quote JSON value leaked its suffix"
+  t_absent  "SENTINEL-PWD"               "PWD= secret alias survived"
   t_absent  "98765"                      "negative-number JSON scalar survived"
   t_absent  "SENTINEL-ARR"               "structured (array) JSON secret value survived"
   t_absent  "SENTINEL-TAB"              "tab-indented YAML block-scalar secret survived"
