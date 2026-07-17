@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034
 # We use lots of computed variable names in here, so we need to disable shellcheck 2034
+# shellcheck disable=SC2329
+# The install_*/validate_* functions are invoked indirectly through the
+# ${package_installer} variable, which shellcheck cannot see
 
 export PATH="${PATH}:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 export LC_ALL=C
@@ -1246,11 +1249,14 @@ version_covers() {
 }
 
 rust_toolchain_ok() {
-  # succeeds when a cargo/rustc on PATH satisfies NETDATA_RUST_MSRV
+  # Succeeds when a cargo/rustc satisfies NETDATA_RUST_MSRV. Probes the
+  # rustup and Homebrew locations too, as they may not be on PATH yet.
   [ "${IGNORE_INSTALLED}" -eq 1 ] && return 1
-  command -v cargo > /dev/null 2>&1 || return 1
-  local v
-  v="$(rustc --version 2> /dev/null | cut -d ' ' -f 2)"
+  local rustc_cmd v
+  PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:${PATH}" command -v cargo > /dev/null 2>&1 || return 1
+  rustc_cmd="$(PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:${PATH}" command -v rustc 2> /dev/null)"
+  [ -n "${rustc_cmd}" ] || return 1
+  v="$("${rustc_cmd}" --version 2> /dev/null | cut -d ' ' -f 2)"
   [ -z "${v}" ] && return 1
   version_covers "${NETDATA_RUST_MSRV}" "${v}"
 }
@@ -1353,10 +1359,13 @@ packages() {
     suitable_package flex
     suitable_package libcurl-dev
 
-    # Rust toolchain for the otel-plugin (macOS only, see pkg_rust). Prefer
-    # an existing toolchain covering the MSRV, then rustup (handled after
-    # package installation by ensure_rustup_toolchain), then Homebrew rust.
-    rust_toolchain_ok || require_cmd rustup || suitable_package rust
+    # Rust toolchain for the otel-plugin (macOS only; other platforms
+    # provide Rust outside this script). Prefer an existing toolchain
+    # covering the MSRV, then rustup (handled after package installation by
+    # ensure_rustup_toolchain), then Homebrew rust.
+    if [ "${tree}" = "macos" ]; then
+      rust_toolchain_ok || require_cmd rustup || suitable_package rust
+    fi
   fi
 
   # -------------------------------------------------------------------------

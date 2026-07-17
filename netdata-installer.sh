@@ -606,51 +606,67 @@ fi
 # The otel-plugin needs a Rust toolchain covering the workspace MSRV. On macOS
 # it is enabled automatically when one is present (the dependency script,
 # packaging/installer/install-required-packages.sh, provisions one via rustup
-# or Homebrew); everywhere else it stays opt-in. Toolchain provisioning cannot
-# happen here: on macOS this script runs as root, where Homebrew refuses to
-# operate.
+# or Homebrew), and an explicit --enable-plugin-otel without a usable
+# toolchain fails fast. Toolchain provisioning cannot happen here: on macOS
+# this script runs as root, where Homebrew refuses to operate. These checks
+# are macOS-only by design — on every other platform the plugin stays opt-in
+# and toolchain resolution is left to CMake/Corrosion, exactly as before.
 
-required_rust_version() {
-  grep '^rust-version' "${NETDATA_SOURCE_DIR}/src/crates/Cargo.toml" 2>/dev/null | head -n 1 | sed -e 's/.*"\([0-9.]*\)".*/\1/'
-}
+if [ "$(uname -s)" = "Darwin" ]; then
+  required_rust_version() {
+    grep '^rust-version' "${NETDATA_SOURCE_DIR}/src/crates/Cargo.toml" 2>/dev/null | head -n 1 | sed -e 's/.*"\([0-9.]*\)".*/\1/'
+  }
 
-# Succeeds when version ${2} >= version ${1}; components compared numerically,
-# missing components count as 0. Twin of the check in
-# packaging/installer/install-required-packages.sh (which is also used
-# standalone and cannot source this file).
-version_covers() {
-  _vc_i=1
-  while [ "${_vc_i}" -le 3 ]; do
-    _vc_r="$(echo "${1}." | cut -d . -f "${_vc_i}" | sed -e 's/[^0-9].*//')"
-    _vc_a="$(echo "${2}." | cut -d . -f "${_vc_i}" | sed -e 's/[^0-9].*//')"
-    [ "${_vc_a:-0}" -gt "${_vc_r:-0}" ] && return 0
-    [ "${_vc_a:-0}" -lt "${_vc_r:-0}" ] && return 1
-    _vc_i=$((_vc_i + 1))
-  done
-  return 0
-}
+  # Succeeds when version ${2} >= version ${1}; components compared
+  # numerically, missing components count as 0. Twin of the check in
+  # packaging/installer/install-required-packages.sh (which is also used
+  # standalone and cannot source this file).
+  version_covers() {
+    _vc_i=1
+    while [ "${_vc_i}" -le 3 ]; do
+      _vc_r="$(echo "${1}." | cut -d . -f "${_vc_i}" | sed -e 's/[^0-9].*//')"
+      _vc_a="$(echo "${2}." | cut -d . -f "${_vc_i}" | sed -e 's/[^0-9].*//')"
+      [ "${_vc_a:-0}" -gt "${_vc_r:-0}" ] && return 0
+      [ "${_vc_a:-0}" -lt "${_vc_r:-0}" ] && return 1
+      _vc_i=$((_vc_i + 1))
+    done
+    return 0
+  }
 
-rust_covers_required_version() {
-  command -v cargo >/dev/null 2>&1 || return 1
-  rust_version_min="$(required_rust_version)"
-  [ -z "${rust_version_min}" ] && return 0
-  rust_version_have="$(rustc --version 2>/dev/null | cut -d ' ' -f 2)"
-  [ -z "${rust_version_have}" ] && return 1
-  version_covers "${rust_version_min}" "${rust_version_have}"
-}
+  rust_covers_required_version() {
+    # Sourcing /etc/profile above ran path_helper, which may have reset PATH
+    # and hidden the toolchain; probe the locations Corrosion's FindRust
+    # considers, plus Homebrew's Apple Silicon prefix.
+    rustc_cmd="$(PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:${PATH}" command -v rustc 2>/dev/null)"
+    cargo_cmd="$(PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:${PATH}" command -v cargo 2>/dev/null)"
+    { [ -n "${rustc_cmd}" ] && [ -n "${cargo_cmd}" ]; } || return 1
+    rust_version_min="$(required_rust_version)"
+    if [ -n "${rust_version_min}" ]; then
+      rust_version_have="$("${rustc_cmd}" --version 2>/dev/null | cut -d ' ' -f 2)"
+      [ -z "${rust_version_have}" ] && return 1
+      version_covers "${rust_version_min}" "${rust_version_have}" || return 1
+    fi
+    # Make the approved toolchain visible to CMake/Corrosion as well.
+    cargo_bin_dir="$(dirname "${cargo_cmd}")"
+    export PATH="${cargo_bin_dir}:${PATH}"
+  }
 
-if [ -z "${ENABLE_OTEL}" ]; then
-  ENABLE_OTEL=0
-  if [ "$(uname -s)" = "Darwin" ]; then
+  if [ -z "${ENABLE_OTEL}" ]; then
+    ENABLE_OTEL=0
     if rust_covers_required_version; then
-      progress "Found Rust toolchain ($(rustc --version 2>/dev/null)), the otel-plugin will be built."
+      progress "Found Rust toolchain (${rustc_cmd}), the otel-plugin will be built."
       ENABLE_OTEL=1
     else
       warning "Building without the otel-plugin: no Rust toolchain covering version $(required_rust_version) found. Run packaging/installer/install-required-packages.sh (or install Rust via rustup or 'brew install rust') and re-run the installer to enable it."
     fi
+  elif [ "${ENABLE_OTEL}" -eq 1 ] && ! rust_covers_required_version; then
+    fatal "The otel-plugin was explicitly enabled, but no Rust toolchain covering version $(required_rust_version) was found. Install one (via rustup or 'brew install rust') and re-run the installer." I0015
   fi
-elif [ "${ENABLE_OTEL}" -eq 1 ] && ! rust_covers_required_version; then
-  fatal "The otel-plugin was explicitly enabled, but no Rust toolchain covering version $(required_rust_version) was found. Install one (via rustup or 'brew install rust') and re-run the installer." I0015
+else
+  # otel-plugin remains opt-in on non-macOS platforms; empty means default-off.
+  if [ -z "${ENABLE_OTEL}" ]; then
+    ENABLE_OTEL=0
+  fi
 fi
 
 # -----------------------------------------------------------------------------
