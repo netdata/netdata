@@ -25,6 +25,8 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 ## C
 
+- [**Chart ID**](/docs/dashboards-and-charts/netdata-charts.md#how-charts-are-identified): A chart identifier that is unique on a node, in the form `[type].[id]`, such as `disk_util.sda`.
+
 - [**Child**](/docs/observability-centralization-points/metrics-centralization-points/README.md): A node, running Netdata, that streams metric data to one or more Parents.
 
 - [**Cloud** or **Netdata Cloud**](/docs/netdata-cloud/README.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
@@ -33,7 +35,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Community**](https://community.netdata.cloud/): As a company with a passion and genesis in open-source, we are not just very proud of our community, but we consider our users, fans, and chatters to be an imperative part of the Netdata experience and culture.
 
-- [**Context**](/docs/dashboards-and-charts/netdata-charts.md#contexts): A way of grouping charts by the types of metrics collected and dimensions displayed. It's kind of like a machine-readable naming and organization scheme.
+- [**Context**](/docs/dashboards-and-charts/netdata-charts.md#contexts): The metric type shared by equivalent charts across chart instances, such as `disk.util`.
 
 ## D
 

@@ -60,9 +60,19 @@ A **dimension** is a value shown on a chart. Dimensions can represent:
 
 Each chart’s legend lists its dimensions. You can hide or show specific dimensions to focus on what matters most.
 
-### Chart IDs
+### How Charts Are Identified
 
-Each chart has an underlying ID in the form `[type].[id]`. The type groups related charts, while the ID identifies a particular chart or resource. This ID type is different from the visualization **Chart type**, which controls whether a chart appears as a line, area, bar, or another visual style.
+Netdata identifies and organizes charts in several ways, with each identifier serving a different purpose.
+
+| Term                  | Purpose                                          | Example         |
+|-----------------------|--------------------------------------------------|-----------------|
+| Context (metric type) | Groups equivalent metrics across chart instances | `disk.util`     |
+| Chart ID              | Identifies one chart on a node                   | `disk_util.sda` |
+| Chart ID type         | Forms the first part of a chart ID               | `disk_util`     |
+| Family                | Groups related charts for navigation             | `utilization`   |
+| Visualization type    | Controls how the chart is displayed              | `area`          |
+
+A context is the metric type shared by equivalent charts. A chart ID identifies one specific chart on a node and uses the form `[type].[id]`. These identifiers are related but serve different purposes and do not always use the same spelling. For example, the chart `disk_util.sda` belongs to the `disk.util` context and the `utilization` family.
 
 Some common chart ID types and patterns are:
 
@@ -75,15 +85,17 @@ Some common chart ID types and patterns are:
 
 :::note
 
-`netdata.*` chart IDs identify metrics about the Netdata Agent itself. Most do not measure network traffic, but charts such as `netdata.network_api`, `netdata.network_statsd`, and `netdata.network_streaming` measure Agent-specific network I/O for its API, StatsD, and streaming connections. They do not represent host-wide network-interface traffic.
+In chart IDs, the `netdata` type identifies charts that monitor the Netdata Agent itself. Their contexts also commonly use the `netdata` namespace, although the complete chart ID and context can differ. For example, chart ID `netdata.clients` belongs to context `netdata.http_api_clients`.
 
-For network-interface traffic, use `system.net` for aggregated physical-interface bandwidth, `net.<interface>` for bandwidth on an individual interface, and `net_packets.<interface>` for its packet rate. Virtual interfaces are excluded from `system.net`; when collected, they appear in their individual charts.
+Most `netdata.*` charts do not measure network traffic, but charts such as `netdata.network_api`, `netdata.network_statsd`, and `netdata.network_streaming` measure Agent-specific network I/O for its web/API, StatsD, and streaming connections. They do not represent host-wide network-interface traffic.
+
+For network-interface traffic, use `system.net` for the aggregate bandwidth of interfaces that Netdata classifies as physical, `net.<interface>` for bandwidth on an individual interface, and `net_packets.<interface>` for its packet rate. Interfaces classified as virtual are generally excluded from the `system.net` aggregate; when collected, they appear in individual charts.
 
 :::
 
 ### Contexts
 
-A **context** groups charts by metric type and displayed dimensions. Contexts define how charts are organized and where they appear in the Netdata menu.
+A **context** identifies a metric type shared by equivalent charts. Contexts define how charts are organized and where they appear in the Netdata menu.
 
 **Examples:**
 
@@ -91,7 +103,7 @@ A **context** groups charts by metric type and displayed dimensions. Contexts de
 - `disk.io` for disk I/O bandwidth
 - `net.net` for network-interface bandwidth
 
-A context is separate from a chart ID. For example, the `disk.util` context groups charts with IDs such as `disk_util.sda` and `disk_util.sdb`. The part before the dot in a context is its namespace, not necessarily the chart ID type.
+The part before the dot in a context is its namespace. It identifies a group of related metric types and does not have to match a chart ID type.
 
 Contexts are also used for alert configurations.
 
