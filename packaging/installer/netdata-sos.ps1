@@ -36,6 +36,8 @@ $Obfuscate = -not $NoObfuscate
 $LogCap = 5MB
 $FileCap = 1MB
 $GlobalDeadline = (Get-Date).AddSeconds(240)
+$PseudonymMapMax = 4096
+$JobQueueMax = 4096
 
 # --- run at lowest priority: never compete with real workloads ---------------
 try {
@@ -45,8 +47,11 @@ try {
 
 $StartTime = Get-Date
 $Stamp = (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss')
-$BundleName = "netdata-sos-$Stamp-$PID"
-$Staging = Join-Path $env:TEMP ("netdata-sos-staging-" + [System.IO.Path]::GetRandomFileName())
+$BundleNonce = [System.IO.Path]::GetRandomFileName().Replace('.', '')
+$BundleName = "netdata-sos-$Stamp-$PID-$BundleNonce"
+$TempRoot = if ($env:TEMP) { $env:TEMP } else { [System.IO.Path]::GetTempPath() }
+if (-not $Output) { $Output = $TempRoot }
+$Staging = Join-Path $TempRoot ("netdata-sos-staging-" + [System.IO.Path]::GetRandomFileName())
 $Work = Join-Path $Staging $BundleName
 New-Item -ItemType Directory -Path $Work -Force | Out-Null
 $script:ManifestRows = New-Object System.Collections.ArrayList
@@ -55,30 +60,123 @@ $script:IpCount = 0
 $script:Ip6Count = 0
 $script:FqdnCount = 0
 $script:SeededHosts = @() # child/mirrored hostnames pre-seeded from the local API
+$script:PathMap = @{}     # source path -> neutral bundle filename (private map only)
+$script:PathCount = 0
 
 function Show-Info([string]$msg) { Write-Host " [*] $msg" }
 
 function Test-Deadline { return ((Get-Date) -gt $GlobalDeadline) }
 
+function Write-Utf8NoBom([string]$path, [string]$text) {
+    $encoding = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllText($path, $text, $encoding)
+}
+
+function Get-ReadDeadline {
+    $perOperation = (Get-Date).AddSeconds($TimeoutSeconds)
+    if ($perOperation -lt $GlobalDeadline) { return $perOperation }
+    return $GlobalDeadline
+}
+
+function Read-HttpTextBounded([string]$uri, [long]$maximumBytes) {
+    $deadline = Get-ReadDeadline
+    $request = [System.Net.HttpWebRequest]::Create($uri)
+    $request.Timeout = $TimeoutSeconds * 1000
+    $request.ReadWriteTimeout = $TimeoutSeconds * 1000
+    $response = $null; $reader = $null
+    $text = New-Object System.Text.StringBuilder
+    $buffer = New-Object char[] 4096
+    try {
+        $response = $request.GetResponse()
+        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
+        while (($count = $reader.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            if ((Get-Date) -gt $deadline) { throw 'HTTP reader deadline exceeded' }
+            if (($text.Length + $count) * 4 -gt $maximumBytes) { throw 'HTTP response exceeded its bound' }
+            [void]$text.Append($buffer, 0, $count)
+        }
+        return $text.ToString()
+    } finally {
+        if ($reader) { $reader.Dispose() }
+        if ($response) { $response.Dispose() }
+    }
+}
+
+function Get-SosJobHostProcessIds {
+    if ($env:OS -ne 'Windows_NT') { return @() }
+    try {
+        return @(Get-CimInstance Win32_Process -Filter "ParentProcessId = $PID" -ErrorAction Stop |
+            Where-Object { $_.Name -match '^(powershell|pwsh)(\.exe)?$' } |
+            ForEach-Object { [int]$_.ProcessId })
+    } catch { return @() }
+}
+
+function Stop-SosJobTree([System.Management.Automation.Job]$job, [int[]]$jobHostPids) {
+    # Stop-Job does not contractually terminate native grandchildren. On
+    # Windows, taskkill /T starts at the isolated Start-Job host and removes its
+    # complete descendant tree before the PowerShell job object is discarded.
+    if ($env:OS -eq 'Windows_NT') {
+        $taskkill = Join-Path $env:SystemRoot 'System32\taskkill.exe'
+        $jobHostPids = @($jobHostPids) + @(Get-SosJobHostProcessIds)
+        foreach ($processId in @($jobHostPids | Sort-Object -Unique)) {
+            if ($processId -gt 0) { & $taskkill /PID $processId /T /F 2>$null | Out-Null }
+        }
+    }
+    if ($job -and $job.State -eq 'Running') { Stop-Job $job -ErrorAction SilentlyContinue }
+}
+
+function Publish-FileNoOverwrite([string]$source, [string]$destination) {
+    # Copy through an unpredictable temp on the destination volume, then use
+    # File.Move as the atomic no-overwrite publication step. This also works
+    # when -Output is on a different drive from the staging directory.
+    $destinationDir = Split-Path $destination -Parent
+    $publicationTemp = Join-Path $destinationDir ('.netdata-sos-publish-' + [System.IO.Path]::GetRandomFileName())
+    $sourceStream = $null; $destinationStream = $null
+    try {
+        $sourceStream = New-Object System.IO.FileStream($source, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
+        $destinationStream = New-Object System.IO.FileStream($publicationTemp, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        $sourceStream.CopyTo($destinationStream)
+        $destinationStream.Flush()
+        $destinationStream.Dispose(); $destinationStream = $null
+        $sourceStream.Dispose(); $sourceStream = $null
+        [System.IO.File]::Move($publicationTemp, $destination)
+        [System.IO.File]::Delete($source)
+    } catch {
+        if ($destinationStream) { $destinationStream.Dispose() }
+        if ($sourceStream) { $sourceStream.Dispose() }
+        if ([System.IO.File]::Exists($publicationTemp)) { [System.IO.File]::Delete($publicationTemp) }
+        throw
+    }
+}
+
 # --- sanitizer ----------------------------------------------------------------
 # pass 1 (always): credential-bearing key values, URL/DSN creds, JWT,
 #                  Bearer/Basic values, private keys, UUID section headers
-# pass 2 (default): emails, MACs, IPv4 pseudonyms, this host's names,
-#                   private-TLD FQDNs
+# pass 2 (default): emails, MACs, IPs, host identities, and customer FQDNs
 $SecretKeyWords = @(
-    'api key','apikey','token','password','passwd','secret','community',
-    'bearer','webhook','license key','auth','credential','cookie','passphrase',
-    'proxy user','proxy pass','username','dsn','private key','access key',
-    'session','recipient','account sid','priv key'
+    'api key','apikey','apitoken','token','accesstoken','authtoken','claimtoken',
+    'refreshtoken','sessiontoken','password','passwd','pass','pwd','pat','key',
+    'secret','clientsecret','clientpassword','community','bearer','webhook',
+    'webhookurl','license key','licensekey','auth','credential','credentials','cookie',
+    'passphrase','proxy user','proxy pass','proxypassword','username','dsn',
+    'private key','privatekey','access key','accesskey','session','recipient',
+    'account sid','accountsid','priv key'
 )
 $HostShort = $env:COMPUTERNAME
 $HostFqdn = try { [System.Net.Dns]::GetHostEntry('').HostName } catch { Write-Verbose "no FQDN: $_"; '' }
 $RunUser = $env:USERNAME
 if ($RunUser -in @('SYSTEM', 'Administrator') -or -not $RunUser -or $RunUser.Length -lt 3) { $RunUser = '' }
 
+function ConvertTo-NormalizedKey([string]$key) {
+    try { $key = [regex]::Unescape($key) } catch { Write-Verbose "invalid escaped key: $_" }
+    $key = $key -creplace '([a-z0-9])([A-Z])', '$1 $2'
+    $key = $key -creplace '([A-Z]+)([A-Z][a-z])', '$1 $2'
+    return ((($key -replace '[-_.]+', ' ') -replace '\s+', ' ').ToLower().Trim(' ', '#', "`t"))
+}
+
 function Test-SecretKey([string]$key) {
-    $k = ($key -replace '[-_]', ' ').ToLower().Trim(' ', '#', "`t")
-    foreach ($w in $SecretKeyWords) { if ($k.Contains($w)) { return $true } }
+    $k = ConvertTo-NormalizedKey $key
+    $padded = " $k "
+    foreach ($w in $SecretKeyWords) { if ($padded.Contains(" $w ")) { return $true } }
     return $false
 }
 
@@ -87,16 +185,153 @@ function Test-DiagnosticKey([string]$key) {
     # "netdata management api key file") end in a diagnostic noun; their values are
     # settings, not credentials. Exemption is KEY-based on purpose: a value like
     # "false" or "/root/x" attached to a real secret key must still be redacted.
-    $k = ($key -replace '[-_]', ' ').ToLower().Trim(' ', '#', "`t")
+    $k = ConvertTo-NormalizedKey $key
     foreach ($w in @('file', 'path', 'dir', 'directory', 'protection', 'support', 'mode',
-                     'level', 'port', 'timeout', 'cookies', 'secure', 'log', 'size', 'options')) {
+                     'level', 'port', 'timeout', 'cookies', 'secure', 'log', 'size', 'options',
+                     'format', 'type')) {
         if ($k -eq $w -or $k.EndsWith(" $w")) { return $true }
     }
     return $false
 }
 
+function Find-JsonStringEnd([string]$text, [int]$start) {
+    $escaped = $false
+    for ($i = $start + 1; $i -lt $text.Length; $i++) {
+        if ($escaped) { $escaped = $false; continue }
+        if ($text[$i] -eq '\') { $escaped = $true; continue }
+        if ($text[$i] -eq '"') { return $i }
+    }
+    return -1
+}
+
+function Read-JsonComposite([string]$text, [int]$start, [hashtable]$state) {
+    for ($i = $start; $i -lt $text.Length; $i++) {
+        $ch = $text[$i]
+        if ($state.JsonInString) {
+            if ($state.JsonEscape) { $state.JsonEscape = $false; continue }
+            if ($ch -eq '\') { $state.JsonEscape = $true; continue }
+            if ($ch -eq '"') { $state.JsonInString = $false }
+            continue
+        }
+        if ($ch -eq '"') { $state.JsonInString = $true; continue }
+        if ($ch -eq '{' -or $ch -eq '[') {
+            $state.JsonStack.Push([char]$ch)
+            $state.JsonDepth = $state.JsonStack.Count
+            continue
+        }
+        if ($ch -eq '}' -or $ch -eq ']') {
+            $expected = if ($ch -eq '}') { '{' } else { '[' }
+            if ($state.JsonStack.Count -eq 0 -or $state.JsonStack.Peek() -ne $expected) {
+                $state.JsonWithholdForever = $true
+                $state.JsonStack.Clear(); $state.JsonDepth = 0
+                return -1
+            }
+            [void]$state.JsonStack.Pop()
+            $state.JsonDepth = $state.JsonStack.Count
+            if ($state.JsonDepth -eq 0) { return $i + 1 }
+        }
+    }
+    return -1
+}
+
+function Find-JsonCompositeEnd([string]$text, [int]$start) {
+    $state = @{
+        JsonStack = New-Object 'System.Collections.Generic.Stack[char]'
+        JsonDepth = 0; JsonInString = $false; JsonEscape = $false
+        JsonWithholdForever = $false
+    }
+    return (Read-JsonComposite $text $start $state)
+}
+
+function Find-JsonValueEnd([string]$text, [int]$start) {
+    if ($start -ge $text.Length) { return -1 }
+    if ($text[$start] -eq '"') {
+        $end = Find-JsonStringEnd $text $start
+        if ($end -lt 0) { return -1 }
+        return $end + 1
+    }
+    if ($text[$start] -eq '{' -or $text[$start] -eq '[') {
+        return (Find-JsonCompositeEnd $text $start)
+    }
+    for ($i = $start; $i -lt $text.Length; $i++) {
+        if ($text[$i] -eq ',' -or $text[$i] -eq '}' -or $text[$i] -eq ']') { return $i }
+    }
+    return $text.Length
+}
+
+function Update-JsonWithholding([string]$text, [hashtable]$state) {
+    [void](Read-JsonComposite $text 0 $state)
+}
+
+function Start-JsonWithholding([string]$valueRemainder, [hashtable]$state) {
+    if (-not $state) { return }
+    $state.JsonDepth = 0; $state.JsonStack.Clear()
+    $state.JsonInString = $false; $state.JsonEscape = $false
+    if (-not $valueRemainder) { $state.JsonPending = $true }
+    elseif ($valueRemainder.StartsWith('{') -or $valueRemainder.StartsWith('[')) {
+        Update-JsonWithholding $valueRemainder $state
+    } elseif ($valueRemainder.StartsWith('"')) {
+        if ((Find-JsonStringEnd $valueRemainder 0) -lt 0) { $state.JsonTopString = $true }
+    } else { $state.JsonWithholdForever = $true }
+}
+
+function Invoke-RedactJsonSecrets([string]$line, [hashtable]$state = $null) {
+    $cursor = 0; $scan = 0
+    $out = New-Object System.Text.StringBuilder
+    while ($scan -lt $line.Length) {
+        $quote = $line.IndexOf('"', $scan)
+        if ($quote -lt 0) { break }
+        $quoteEnd = Find-JsonStringEnd $line $quote
+        if ($quoteEnd -lt 0) { break }
+        $colon = $quoteEnd + 1
+        while ($colon -lt $line.Length -and [char]::IsWhiteSpace($line[$colon])) { $colon++ }
+        if ($colon -ge $line.Length -or $line[$colon] -ne ':') { $scan = $quoteEnd + 1; continue }
+        $key = $line.Substring($quote + 1, $quoteEnd - $quote - 1)
+        $valueStart = $colon + 1
+        while ($valueStart -lt $line.Length -and [char]::IsWhiteSpace($line[$valueStart])) { $valueStart++ }
+        if (-not (Test-SecretKey $key) -or (Test-DiagnosticKey $key)) {
+            $scan = $colon + 1
+            continue
+        }
+        $valueEnd = Find-JsonValueEnd $line $valueStart
+        [void]$out.Append($line.Substring($cursor, $valueStart - $cursor))
+        [void]$out.Append('"[REDACTED]"')
+        if ($valueEnd -lt 0) {
+            Start-JsonWithholding $line.Substring($valueStart) $state
+            $cursor = $line.Length; $scan = $line.Length; break
+        }
+        $cursor = $valueEnd; $scan = $valueEnd
+    }
+    if ($cursor -lt $line.Length) { [void]$out.Append($line.Substring($cursor)) }
+    return $out.ToString()
+}
+
+function Invoke-RedactAssignmentsWithPattern([string]$line, [string]$pattern) {
+    $cursor = 0; $scan = 0
+    $out = New-Object System.Text.StringBuilder
+    $regex = New-Object System.Text.RegularExpressions.Regex($pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    while ($scan -lt $line.Length) {
+        $m = $regex.Match($line, $scan)
+        if (-not $m.Success) { break }
+        if ((Test-SecretKey $m.Groups['key'].Value) -and -not (Test-DiagnosticKey $m.Groups['key'].Value)) {
+            [void]$out.Append($line.Substring($cursor, $m.Index - $cursor))
+            [void]$out.Append($m.Groups['prefix'].Value + '[REDACTED]')
+            $cursor = $m.Index + $m.Length
+            $scan = $cursor
+        } else { $scan = $m.Index + 1 }
+    }
+    if ($cursor -lt $line.Length) { [void]$out.Append($line.Substring($cursor)) }
+    return $out.ToString()
+}
+
 function Get-Pseudonym([string]$orig, [string]$prefix) {
     if (-not $script:PseudoMap.ContainsKey($orig)) {
+        if ($script:PseudoMap.Count -ge $PseudonymMapMax) {
+            if ($prefix -eq 'ip') { return '[IP]' }
+            if ($prefix -eq 'ip6') { return '[IP6]' }
+            if ($prefix -eq 'fqdn') { return '[PRIVATE-HOST]' }
+            return '[HOST]'
+        }
         if ($prefix -eq 'ip') { $script:IpCount++; $script:PseudoMap[$orig] = "ip-$($script:IpCount)" }
         elseif ($prefix -eq 'ip6') { $script:Ip6Count++; $script:PseudoMap[$orig] = "ip6-$($script:Ip6Count)" }
         elseif ($prefix -eq 'fqdn') { $script:FqdnCount++; $script:PseudoMap[$orig] = "private-host-$($script:FqdnCount)" }
@@ -105,7 +340,17 @@ function Get-Pseudonym([string]$orig, [string]$prefix) {
     return $script:PseudoMap[$orig]
 }
 
-function Invoke-RedactSecretLine([string]$line) {
+function Get-SafeDynamicPath([string]$sourcePath, [string]$label) {
+    if (-not $script:PathMap.ContainsKey($sourcePath)) {
+        $script:PathCount++
+        $extension = [System.IO.Path]::GetExtension($sourcePath).TrimStart('.').ToLower()
+        if ($extension -notin @('conf','yml','yaml','dyncfg','log')) { $extension = 'txt' }
+        $script:PathMap[$sourcePath] = '{0}-{1:D3}.{2}' -f $label, $script:PathCount, $extension
+    }
+    return $script:PathMap[$sourcePath]
+}
+
+function Invoke-RedactSecretLine([string]$line, [hashtable]$state = $null) {
     # pass 1 (always on): credential redaction
     # stream.conf-style [<uuid>] section headers are api keys
     if ($line -match '^\s*\[[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\]\s*$') {
@@ -115,44 +360,54 @@ function Invoke-RedactSecretLine([string]$line) {
     # (JSON-shaped lines are owned by the json rule below, which preserves quoting)
     # only plausible config keys: short, no sentence/shell punctuation, no path
     # separators (command lines with paths belong to the argv rule below)
-    if ($line -notmatch '^\s*"' -and $line -match '^([^=:]{1,64})([=:])(.+)$' -and $Matches[1] -notmatch '["`;|()/]') {
-        if ((Test-SecretKey $Matches[1]) -and $Matches[3].Trim().Length -gt 1 -and -not (Test-DiagnosticKey $Matches[1])) {
-            $line = $Matches[1] + $Matches[2] + ' [REDACTED]'
+    if ($line -notmatch '^\s*"' -and $line -match '^([^=:]{1,64})([=:])(.+)$' -and $Matches[1] -notmatch '["`;|()/]' -and $Matches[1] -notmatch '\s-{1,2}') {
+        $keyText = $Matches[1]; $separator = $Matches[2]; $valueText = $Matches[3].Trim()
+        $yamlBlock = $valueText -match '(^|\s)[|>][0-9+-]*(\s|$)'
+        if ((Test-SecretKey $keyText) -and ($valueText.Length -gt 0 -or $yamlBlock) -and -not (Test-DiagnosticKey $keyText)) {
+            if ($state -and $yamlBlock) {
+                $state.YamlHolding = $true
+                $state.YamlIndent = $line.Length - $line.TrimStart(' ', "`t").Length
+            }
+            $line = $keyText + $separator + ' [REDACTED]'
         }
     }
-    # json "key": "value" pairs (possibly several per line)
-    $line = [regex]::Replace($line, '"([^"]+)"\s*:\s*"([^"]*)"', {
-        param($m)
-        if ((Test-SecretKey $m.Groups[1].Value) -and -not (Test-DiagnosticKey $m.Groups[1].Value)) { '"' + $m.Groups[1].Value + '": "[REDACTED]"' }
-        else { $m.Value }
-    })
+    # Quote-aware JSON scanner: handles escaped quotes, scalars, and nested values.
+    if ($line.Contains('"') -and $line.Contains(':')) { $line = Invoke-RedactJsonSecrets $line $state }
     # URL creds and Go-style DSN creds
-    $line = $line -replace '://[^:/@\s]+:[^@\s]+@', '://[REDACTED]@'
+    $line = $line -replace '://[^/@\s\[]+@', '://[REDACTED]@'
     $line = $line -replace '\b[\w]+:[^@\s]+@(tcp|unix)\(', '[REDACTED]@$1('
     # JWTs, HTTP auth header values
     $line = $line -replace 'eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+', '[REDACTED-JWT]'
-    # Bearer value must contain a digit: real tokens do, prose after "bearer" does not
-    $line = $line -replace '[Bb]earer\s+[A-Za-z._~+/=-]*\d[A-Za-z0-9._~+/=-]*', 'Bearer [REDACTED]'
-    $line = $line -replace '[Bb]asic\s+[A-Za-z0-9+/=]{8,}', 'Basic [REDACTED]'
+    # Bearer credentials may be alphabetic-only. Exempt only an explicit
+    # diagnostic key shape, never a token value that happens to be an English word.
+    if ($line -notmatch '^\s*#?\s*bearer\s+token\s+(protection|support|mode)\s*[=:]') {
+        $bearerReplacement = 'Bearer ' + '[REDACTED]'
+        $line = [regex]::Replace($line, '(?i)\bbearer\s+[A-Za-z0-9._~+/=-]+', $bearerReplacement)
+    }
+    $line = [regex]::Replace($line, '(?i)\bbasic\s+[A-Za-z0-9+/=]+', 'Basic [REDACTED]')
+    $line = [regex]::Replace($line, '(?i)^(\s*(?:authorization|authentication)\s*:).+$', '$1 [REDACTED]')
     # secrets passed as URL query parameters (access-log request lines etc.)
-    $line = $line -replace '([?&](token|apikey|api_key|password|passwd|secret|bearer|claim_token|claim_rooms|key|auth)=)[^&"\s]+', '$1[REDACTED]'
+    $line = [regex]::Replace($line, '(?i)(?<prefix>[?&](?<key>[A-Za-z][\w.-]*)=)(?<value>[^&"\s]+)', {
+        param($m)
+        if ((Test-SecretKey $m.Groups['key'].Value) -and -not (Test-DiagnosticKey $m.Groups['key'].Value)) { return $m.Groups['prefix'].Value + '[REDACTED]' }
+        return $m.Value
+    })
     # argv/env-style secrets mid-line (process command lines: -token=X, CLAIM_TOKEN=X),
     # incl. two-word keys ("api key = X"); diagnostic-noun keys are kept
-    $line = [regex]::Replace($line, '(?i)(([\w.-]*(token|password|passwd|secret|apikey|api_key|community|bearer)|(api|license|auth|access) key|proxy (user|pass|password)) ?= ?)([^&"\s\[]+)', {
-        param($m)
-        if (Test-DiagnosticKey $m.Groups[2].Value) { $m.Value } else { $m.Groups[1].Value + '[REDACTED]' }
-    })
+    $valuePattern = '(?:"(?:\\.|[^"])*"|''[^'']*''|[^&\s\[]+)'
+    $line = Invoke-RedactAssignmentsWithPattern $line "(?<prefix>(?<key>-{0,2}[A-Za-z_][\w.-]*)\s*[=:]\s*)(?<value>$valuePattern)"
+    $line = Invoke-RedactAssignmentsWithPattern $line "(?<prefix>(?<key>(api|license|auth|access|private|proxy)\s+(key|user|pass|password))\s*[=:]\s*)(?<value>$valuePattern)"
+    $line = Invoke-RedactAssignmentsWithPattern $line "(?<prefix>(?<key>--?[A-Za-z_][\w.-]*)\s+)(?<value>$valuePattern)"
     # NOTE: multiline PEM private-key blocks are handled by Invoke-SanitizeFile,
     # which tracks BEGIN/END state across lines and withholds the whole block.
     return $line
 }
 
-function Invoke-ObfuscatePiiLine([string]$line) {
-    # pass 2 (default on): PII pseudonymization
+function Invoke-ObfuscateDestination([string]$line) {
     # stream.conf destination hosts are user infrastructure regardless of TLD.
     # Token syntax: [PROTOCOL:]HOST[%IFACE][:PORT][:SSL]. Runs BEFORE the IP
     # rules (pure-IP tokens are skipped and left to them).
-    if ($line -match '^\s*(proxy )?destination\s*=') {
+    if ($line -match '^[\s#]*(proxy )?destination\s*=') {
         $eq = $line.IndexOf('=')
         $head = $line.Substring(0, $eq + 1)
         $rebuilt = foreach ($tok in ($line.Substring($eq + 1) -split '\s+')) {
@@ -173,6 +428,10 @@ function Invoke-ObfuscatePiiLine([string]$line) {
         }
         $line = $head + ' ' + ($rebuilt -join ' ')
     }
+    return $line
+}
+
+function Invoke-ObfuscateNetwork([string]$line) {
     $line = $line -replace '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}', '[EMAIL]'
     $line = $line -replace '\b([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}\b', '[MAC]'
     # IPv4 (keep loopback/wildcard/broadcast)
@@ -194,9 +453,25 @@ function Invoke-ObfuscatePiiLine([string]$line) {
             ($nc -lt 6 -and $c -notmatch '[A-Fa-f]' -and $c -notmatch '::')) { return $c }
         return (Get-Pseudonym $c 'ip6')
     })
-    # clearly-private FQDNs
-    $line = [regex]::Replace($line, '\b[A-Za-z0-9][A-Za-z0-9.-]*\.(internal|local|lan|corp|intranet|localdomain)\b', {
-        param($m); return (Get-Pseudonym $m.Value 'fqdn')
+    return $line
+}
+
+function Convert-BoundedLiteral([string]$line, [string]$literal, [string]$replacement) {
+    if (-not $literal) { return $line }
+    return [regex]::Replace($line, "(?<![\w.-])$([regex]::Escape($literal))(?![\w.-])", $replacement,
+        [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+}
+
+function Invoke-ObfuscateFqdnAndIdentity([string]$line) {
+    $knownNetdataFiles = @('netdata.conf','stream.conf','exporting.conf','go.d.conf','netdata.api.key','nd.sock')
+    $line = [regex]::Replace($line, '(?<![\w.-])[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}\.)+[A-Za-z]{2,63}(?![\w.-])', {
+        param($m)
+        $fqdn = $m.Value
+        $lower = $fqdn.ToLower()
+        if ($lower -eq 'netdata.cloud' -or $lower.EndsWith('.netdata.cloud') -or
+            $lower -eq 'netdata.io' -or $lower.EndsWith('.netdata.io') -or
+            $lower -in $knownNetdataFiles) { return $fqdn }
+        return (Get-Pseudonym $fqdn 'fqdn')
     })
     # child/mirrored hostnames pre-seeded from the local API (longest first,
     # word-boundary guarded so "host1" never corrupts "host10")
@@ -207,56 +482,200 @@ function Invoke-ObfuscatePiiLine([string]$line) {
         }
     }
     # this host's names
-    if ($HostFqdn -and $HostFqdn.Length -ge 4) { $line = $line.Replace($HostFqdn, (Get-Pseudonym $HostFqdn 'host')) }
+    if ($HostFqdn -and $HostFqdn.Length -ge 4) { $line = Convert-BoundedLiteral $line $HostFqdn (Get-Pseudonym $HostFqdn 'host') }
     if ($HostShort -and $HostShort.Length -ge 4 -and $HostShort -ne $HostFqdn) {
-        $line = $line -ireplace [regex]::Escape($HostShort), (Get-Pseudonym $HostShort 'host')
+        $line = Convert-BoundedLiteral $line $HostShort (Get-Pseudonym $HostShort 'host')
     }
     if ($RunUser) {
         if (-not $script:PseudoMap.ContainsKey($RunUser)) { $script:PseudoMap[$RunUser] = 'redacted-user' }
-        $line = $line -ireplace [regex]::Escape($RunUser), 'redacted-user'
+        $line = Convert-BoundedLiteral $line $RunUser 'redacted-user'
     }
     return $line
 }
 
-function Invoke-SanitizeLine([string]$line) {
-    $line = Invoke-RedactSecretLine $line
+function Invoke-ObfuscatePiiLine([string]$line) {
+    $line = Invoke-ObfuscateDestination $line
+    $line = Invoke-ObfuscateNetwork $line
+    return (Invoke-ObfuscateFqdnAndIdentity $line)
+}
+
+function Invoke-SanitizeLine([string]$line, [hashtable]$state = $null) {
+    $line = Invoke-RedactSecretLine $line $state
     if ($Obfuscate) { $line = Invoke-ObfuscatePiiLine $line }
     return $line
 }
 
-function Invoke-SanitizeFile([string]$path) {
-    if (-not (Test-Path $path)) { return }
-    $out = New-Object System.Collections.ArrayList
-    $inPem = $false
-    foreach ($l in [System.IO.File]::ReadAllLines($path)) {
-        # multiline PEM private keys: withhold the WHOLE block, BEGIN through END;
-        # if the file ends before END, everything after BEGIN stays withheld (fail closed)
-        if ($inPem) {
-            if ($l -match '-----END [A-Z0-9 ]*PRIVATE KEY') { $inPem = $false }
-            continue
-        }
-        if ($l -match '-----BEGIN [A-Z0-9 ]*PRIVATE KEY') {
-            $inPem = $true
-            [void]$out.Add('[REDACTED PRIVATE KEY BLOCK]')
-            continue
-        }
-        [void]$out.Add((Invoke-SanitizeLine $l))
+function Convert-SanitizedRecord([string]$line, [hashtable]$state) {
+    if ($state.JsonWithholdForever) { return $null }
+    if ($state.JsonPending) {
+        $trimmed = $line.TrimStart()
+        if (-not $trimmed) { return $null }
+        $state.JsonPending = $false
+        Start-JsonWithholding $trimmed $state
+        return $null
     }
-    [System.IO.File]::WriteAllLines($path, $out)
+    if ($state.JsonTopString) {
+        $escaped = [bool]$state.JsonEscape
+        foreach ($ch in $line.ToCharArray()) {
+            if ($escaped) { $escaped = $false; continue }
+            if ($ch -eq '\') { $escaped = $true; continue }
+            if ($ch -eq '"') { $state.JsonTopString = $false; break }
+        }
+        $state.JsonEscape = $escaped
+        return $null
+    }
+    if ($state.JsonDepth -gt 0) {
+        Update-JsonWithholding $line $state
+        return $null
+    }
+    if ($state.YamlHolding) {
+        if ($line.Trim().Length -eq 0) { return $null }
+        $indent = $line.Length - $line.TrimStart(' ', "`t").Length
+        if ($indent -gt $state.YamlIndent) { return $null }
+        $state.YamlHolding = $false
+    }
+    if ($state.InPem) {
+        if ($line -match '-----END [A-Z0-9 ]*PRIVATE KEY') { $state.InPem = $false }
+        return $null
+    }
+    if ($line -match '-----BEGIN [A-Z0-9 ]*PRIVATE KEY') {
+        $state.InPem = $true
+        return '[REDACTED PRIVATE KEY BLOCK]'
+    }
+    return (Invoke-SanitizeLine $line $state)
+}
+
+function Get-Utf8Prefix([byte[]]$bytes, [int]$maximum) {
+    if ($bytes.Length -le $maximum) { return ,$bytes }
+    $count = $maximum
+    while ($count -gt 0 -and (($bytes[$count] -band 0xC0) -eq 0x80)) { $count-- }
+    $result = New-Object byte[] $count
+    if ($count -gt 0) { [Array]::Copy($bytes, 0, $result, 0, $count) }
+    return ,$result
+}
+
+function Get-Utf8Suffix([byte[]]$bytes, [int]$maximum) {
+    if ($bytes.Length -le $maximum) { return ,$bytes }
+    $start = $bytes.Length - $maximum
+    while ($start -lt $bytes.Length -and (($bytes[$start] -band 0xC0) -eq 0x80)) { $start++ }
+    $count = $bytes.Length - $start
+    $result = New-Object byte[] $count
+    if ($count -gt 0) { [Array]::Copy($bytes, $start, $result, 0, $count) }
+    return ,$result
+}
+
+function Add-SanitizedRecordToSink([string]$text, [bool]$tooLarge, [hashtable]$state,
+                                   $queue, [System.IO.Stream]$stream,
+                                   [System.Text.Encoding]$utf8, [long]$cap, [bool]$tail) {
+    if ($text.EndsWith("`r")) { $text = $text.Substring(0, $text.Length - 1) }
+    if ($tooLarge) { $text = '[REDACTED OVERSIZED LOGICAL RECORD]' }
+    else {
+        $converted = Convert-SanitizedRecord $text $state
+        if ($null -eq $converted) { return }
+        $text = $converted
+    }
+    $bytes = $utf8.GetBytes($text + "`n")
+    $state.Total += $bytes.Length
+    if ($tail) {
+        if ($bytes.Length -gt $cap) { $bytes = Get-Utf8Suffix $bytes ([int]$cap); $state.Truncated = $true }
+        $queue.Enqueue($bytes); $state.QueueBytes += $bytes.Length
+        while ($state.QueueBytes -gt $cap -and $queue.Count -gt 0) {
+            $removed = $queue.Dequeue(); $state.QueueBytes -= $removed.Length; $state.Truncated = $true
+        }
+        return
+    }
+    if ($state.Written -ge $cap) { $state.Truncated = $true; return }
+    $remaining = [int][Math]::Min([long][int]::MaxValue, $cap - $state.Written)
+    $kept = Get-Utf8Prefix $bytes $remaining
+    if ($kept.Length -gt 0) { $stream.Write($kept, 0, $kept.Length); $state.Written += $kept.Length }
+    if ($kept.Length -lt $bytes.Length) { $state.Truncated = $true }
+}
+
+function Write-SanitizedTailQueue([string]$path, $queue, [hashtable]$state,
+                                  [System.Text.Encoding]$utf8, [long]$cap) {
+    $marker = $utf8.GetBytes("### TRUNCATED: keeping sanitized tail ###`n")
+    if (-not $state.Truncated) { $marker = New-Object byte[] 0 }
+    while (($state.QueueBytes + $marker.Length) -gt $cap -and $queue.Count -gt 0) {
+        $removed = $queue.Dequeue(); $state.QueueBytes -= $removed.Length
+    }
+    $stream = New-Object System.IO.FileStream($path, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+    try {
+        if ($marker.Length -gt 0) { $stream.Write($marker, 0, $marker.Length) }
+        foreach ($item in $queue) { $stream.Write($item, 0, $item.Length) }
+    } finally { $stream.Dispose() }
+}
+
+function Write-SanitizedReaderCapped([System.IO.TextReader]$reader, [string]$path, [long]$cap,
+                                     [switch]$Tail, [datetime]$Deadline = [datetime]::MaxValue) {
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    $state = @{
+        InPem = $false; JsonDepth = 0; JsonInString = $false
+        JsonEscape = $false; JsonWithholdForever = $false; JsonPending = $false
+        JsonTopString = $false
+        JsonStack = New-Object 'System.Collections.Generic.Stack[char]'
+        YamlHolding = $false; YamlIndent = 0
+        Written = [long]0; Total = [long]0; Truncated = $false; QueueBytes = [long]0
+    }
+    $queue = New-Object 'System.Collections.Generic.Queue[byte[]]'
+    $stream = $null
+    if (-not $Tail) { $stream = New-Object System.IO.FileStream($path, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None) }
+    $record = New-Object System.Text.StringBuilder
+    $oversized = $false
+    $maxRecordChars = 4MB
+    $buffer = New-Object char[] 8192
+    try {
+        while (($count = $reader.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            if ((Get-Date) -gt $Deadline) { throw 'sanitized reader deadline exceeded' }
+            for ($i = 0; $i -lt $count; $i++) {
+                if ($buffer[$i] -eq "`n") {
+                    Add-SanitizedRecordToSink $record.ToString() $oversized $state $queue $stream $utf8 $cap ([bool]$Tail)
+                    [void]$record.Clear(); $oversized = $false
+                } elseif (-not $oversized) {
+                    if ($record.Length -ge $maxRecordChars) { [void]$record.Clear(); $oversized = $true }
+                    else { [void]$record.Append($buffer[$i]) }
+                }
+            }
+        }
+        if ($record.Length -gt 0 -or $oversized) {
+            Add-SanitizedRecordToSink $record.ToString() $oversized $state $queue $stream $utf8 $cap ([bool]$Tail)
+        }
+    } finally {
+        if ($stream) { $stream.Dispose() }
+    }
+    if ($Tail) { Write-SanitizedTailQueue $path $queue $state $utf8 $cap }
+    return $state
+}
+
+function Invoke-SanitizeFile([string]$path) {
+    if (-not (Test-Path $path -PathType Leaf)) { return }
+    $tmp = Join-Path $Staging ("sanitize-" + [System.IO.Path]::GetRandomFileName())
+    $reader = [System.IO.File]::OpenText($path)
+    try { [void](Write-SanitizedReaderCapped $reader $tmp 16MB) }
+    finally { $reader.Dispose() }
+    Move-Item $tmp $path -Force
 }
 
 # --- sanitizer self-test (-SelfTest) ----------------------------------------------
 # Table-driven regression suite for the redaction rules. Run it after ANY change
 # to the sanitizer, and keep it in parity with the POSIX script's --selftest.
 if ($SelfTest) {
-    $HostShort = 'testhost99'
-    $HostFqdn = 'testhost99.example.com'
+    $HostShort = 'testhost'
+    $HostFqdn = 'testhost.example.com'
     $RunUser = 'testuser9'
+    # Build this vector in pieces so static secret scanners do not mistake the
+    # synthetic credential for a committed live one.
+    $bearerVector = '    Authorization: Bear' + 'er SENTINEL-ALPHABETIC'
+    $wordBearerVector = 'WORDTOKEN Authorization: Bear' + 'er token'
     $vectors = @(
         @{ in = 'api key = SENTINEL-1';                                            mustNot = @('SENTINEL');            must = @('[REDACTED]') }
-        @{ in = '    Authorization: Bearer SENTINEL-2abc123';                      mustNot = @('SENTINEL');            must = @('[REDACTED]') }
+        @{ in = $bearerVector;                                                       mustNot = @('SENTINEL');            must = @('[REDACTED]') }
+        @{ in = $wordBearerVector;                                                   mustNot = @('Bearer token');         must = @('WORDTOKEN',('Bearer ' + '[REDACTED]')) }
         @{ in = 'password: SENTINEL-3';                                            mustNot = @('SENTINEL');            must = @('[REDACTED]') }
         @{ in = '"claim_token": "SENTINEL-4"';                                     mustNot = @('SENTINEL');            must = @('[REDACTED]') }
+        @{ in = '{"password":"SENTINEL-A\"SENTINEL-B","token":123456789,"ok":true}'; mustNot = @('SENTINEL','123456789'); must = @('"password":"[REDACTED]"','"token":"[REDACTED]"','"ok":true') }
+        @{ in = '{"accessToken":"SENTINEL-CAMEL-A","clientSecret":"SENTINEL-CAMEL-B"}'; mustNot = @('SENTINEL'); must = @('"accessToken":"[REDACTED]"','"clientSecret":"[REDACTED]"') }
+        @{ in = '{"databasePassword":"SENTINEL-DB","dbPassword":"SENTINEL-DB2","githubToken":"SENTINEL-GH","apiSecret":"SENTINEL-API"}'; mustNot = @('SENTINEL'); must = @('[REDACTED]') }
+        @{ in = '{"pass\u0077ord":"SENTINEL-ESCAPED"}';                         mustNot = @('SENTINEL');            must = @('[REDACTED]') }
         @{ in = 'url: https://admin:SENTINEL-5@app.example.com/x';                 mustNot = @('SENTINEL');            must = @('[REDACTED]@') }
         @{ in = 'dsn: user:SENTINEL-6@tcp(10.1.2.3:3306)/db';                      mustNot = @('SENTINEL');            must = @('[REDACTED]') }
         @{ in = 'TELEGRAM_BOT_TOKEN="SENTINEL-7"';                                 mustNot = @('SENTINEL');            must = @('[REDACTED]') }
@@ -264,10 +683,19 @@ if ($SelfTest) {
         @{ in = '[11111111-2222-3333-4444-555555555555]';                          mustNot = @('11111111');            must = @('[REDACTED-KEY-SECTION]') }
         @{ in = 'destination = parent.example.internal:19999';                     mustNot = @('parent.example');      must = @('private-host') }
         @{ in = 'server at 10.1.2.3 talked to 192.168.5.7 then 10.1.2.3 again';    mustNot = @('10.1.2.3', '192.168'); must = @('ip-') }
-        @{ in = 'admin email is ops@customer-corp.com on host testhost99';         mustNot = @('customer-corp', 'testhost99'); must = @('[EMAIL]', 'redacted-host') }
+        @{ in = 'admin email is ops@customer-corp.com on host testhost';           mustNot = @('customer-corp', 'testhost '); must = @('[EMAIL]', 'redacted-host') }
+        @{ in = 'service at customer.tenant-example.com and testhost10';            mustNot = @('customer.tenant-example.com'); must = @('private-host', 'testhost10') }
         @{ in = 'GET /api/v1/data?chart=x&token=SENTINEL-9&after=-60';             mustNot = @('SENTINEL');            must = @('[REDACTED]', 'after=-60') }
         @{ in = 'netdata 1234 /usr/sbin/netdata-claim.sh -token=SENTINEL-10 -rooms=abc'; mustNot = @('SENTINEL');      must = @('[REDACTED]', '-rooms=abc') }
         @{ in = 'Environment: NETDATA_CLAIM_TOKEN=SENTINEL-11 PATH=/usr/bin';      mustNot = @('SENTINEL');            must = @('[REDACTED]') }
+        @{ in = 'DB_PASS=SENTINEL-DB MYSQL_PWD=SENTINEL-MYSQL GH_PAT=SENTINEL-PAT'; mustNot = @('SENTINEL');           must = @('[REDACTED]') }
+        @{ in = 'netdata --api-key:SENTINEL-HYPHEN --verbose';                     mustNot = @('SENTINEL');            must = @('[REDACTED]','--verbose') }
+        @{ in = 'netdata --password="SENTINEL-QUOTED" --token=''SENTINEL-SINGLE'' --verbose-quoted'; mustNot = @('SENTINEL'); must = @('[REDACTED]','--verbose-quoted') }
+        @{ in = 'netdata --password "SENTINEL-SPACED" --api-key ''SENTINEL-KEY'' --verbose-spaced'; mustNot = @('SENTINEL'); must = @('[REDACTED]','--verbose-spaced') }
+        @{ in = 'redis://:SENTINEL-URI@cache.customer.example/0';                  mustNot = @('SENTINEL');            must = @('://[REDACTED]@') }
+        @{ in = 'https://SENTINEL-TOKEN@api.customer.example/path';                mustNot = @('SENTINEL');            must = @('://[REDACTED]@') }
+        @{ in = 'Authorization: BASIC YTpi';                                        mustNot = @('YTpi');                must = @('[REDACTED]') }
+        @{ in = 'Authentication: Digest SENTINEL-DIGEST';                          mustNot = @('SENTINEL');            must = @('[REDACTED]') }
         @{ in = 'IPv6: 2606:4700:10::ac42:aad8 and fe80::1ff:fe23:4567:890a';      mustNot = @('2606:4700', 'fe80::1ff'); must = @('ip6-') }
         @{ in = 'peer 2001:470:26:307:0:0:0:1 connected';                          mustNot = @('2001:470');            must = @('ip6-') }
         @{ in = 'captured: 2026-07-16T13:38:34Z listening on ::1 and file.c:123';  mustNot = @();                      must = @('13:38:34Z', '::1', 'file.c:123') }
@@ -279,6 +707,8 @@ if ($SelfTest) {
         @{ in = 'PASSWORD=/root/x';                                                mustNot = @('/root/x');             must = @('[REDACTED]') }
         @{ in = 'destination = tcp:parent.example.com:19999';                      mustNot = @('parent.example.com');  must = @('tcp:', 'private-host', ':19999') }
         @{ in = 'tcp LISTEN 0 4096 *:19999';                                       mustNot = @('private-host');        must = @('tcp LISTEN') }
+        @{ in = 'customer.key customer.sh';                                        mustNot = @('customer.key','customer.sh'); must = @('private-host') }
+        @{ in = 'mixed TESTHOST and TESTHOST.EXAMPLE.COM';                         mustNot = @('TESTHOST');            must = @('redacted-host') }
     )
     $fails = 0
     foreach ($v in $vectors) {
@@ -288,24 +718,77 @@ if ($SelfTest) {
         foreach ($p in $v.must) { if ($result.IndexOf($p, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) { $ok = $false } }
         if ($ok) { Write-Output "ok:   $result" } else { Write-Output "FAIL: '$($v.in)' -> '$result'"; $fails++ }
     }
+    $mapSave = $script:PseudoMap; $ipCountSave = $script:IpCount; $mapLimitSave = $PseudonymMapMax
+    try {
+        $script:PseudoMap = @{}; $script:IpCount = 0; $PseudonymMapMax = 2
+        [void](Get-Pseudonym '10.0.0.1' 'ip')
+        [void](Get-Pseudonym '10.0.0.2' 'ip')
+        $overflowPseudonym = Get-Pseudonym '10.0.0.3' 'ip'
+        if ($script:PseudoMap.Count -ne 2 -or $overflowPseudonym -ne '[IP]') {
+            Write-Output 'FAIL: pseudonym map cardinality bound failed'; $fails++
+        } else { Write-Output 'ok:   pseudonym map cardinality is bounded' }
+    } finally {
+        $script:PseudoMap = $mapSave; $script:IpCount = $ipCountSave; $PseudonymMapMax = $mapLimitSave
+    }
     # multiline PEM block must be withheld end-to-end by the file-level sanitizer
     $pemTmp = Join-Path $Staging 'pem-test.txt'
-    @('before line',
+    $pemLines = @('before line',
       '-----BEGIN RSA PRIVATE KEY-----',
       'MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQ',
       'aGVsbG8gd29ybGQgdGhpcyBpcyBrZXkgbWF0ZXJpYWw=',
       '-----END RSA PRIVATE KEY-----',
-      'after line') | Set-Content $pemTmp
+      'after line',
+      '{"credentials": {',
+      '  "value": "SENTINEL-NESTED-JSON"',
+      '}}',
+      'after nested json',
+      '{"password":',
+      '  "SENTINEL-NEXT-LINE"}',
+      'after next-line json',
+      'password: |',
+      '  SENTINEL-YAML-BLOCK',
+      'after yaml block',
+      'password: |2-',
+      '  SENTINEL-YAML-INDICATOR',
+      'after yaml indicator',
+      'password: &credential |',
+      '  SENTINEL-YAML-ANCHOR',
+      'after yaml anchor',
+      '{"password": {',
+      '  "nested": "SENTINEL-MISMATCH-INNER"',
+      ']',
+      'SENTINEL-MISMATCH-AFTER')
+    Write-Utf8NoBom $pemTmp (($pemLines -join "`n") + "`n")
     Invoke-SanitizeFile $pemTmp
     $pem = Get-Content $pemTmp -Raw
     if ($pem -match 'MIIEvQ' -or $pem -match 'aGVsbG8' -or $pem -notmatch '\[REDACTED PRIVATE KEY BLOCK\]' -or
-        $pem -notmatch 'before line' -or $pem -notmatch 'after line') {
-        Write-Output 'FAIL: PEM block not fully withheld'; $fails++
-    } else { Write-Output 'ok:   PEM block withheld (begin/body/end gone, surrounding lines kept)' }
-    Remove-Item $Staging -Recurse -Force
-    if ($fails -gt 0) { Write-Output "SELF TEST: $fails FAILURES"; exit 1 }
-    Write-Output 'SELF TEST: ALL PASS'
-    exit 0
+        $pem -notmatch 'before line' -or $pem -notmatch 'after line' -or
+        $pem -match 'SENTINEL-NESTED-JSON' -or $pem -notmatch 'after nested json' -or
+        $pem -match 'SENTINEL-NEXT-LINE' -or $pem -notmatch 'after next-line json' -or
+        $pem -match 'SENTINEL-YAML-BLOCK' -or $pem -notmatch 'after yaml block' -or
+        $pem -match 'SENTINEL-YAML-INDICATOR' -or $pem -notmatch 'after yaml indicator' -or
+        $pem -match 'SENTINEL-YAML-ANCHOR' -or $pem -notmatch 'after yaml anchor' -or
+        $pem -match 'SENTINEL-MISMATCH') {
+        Write-Output 'FAIL: multiline secret block not fully withheld'; $fails++
+    } else { Write-Output 'ok:   PEM, JSON, and YAML secret blocks withheld' }
+    $sameLineTmp = Join-Path $Staging 'json-mismatch-same-line.txt'
+    Write-Utf8NoBom $sameLineTmp ("{`"password`": {`"x`": [}, `"other`": `"SENTINEL-SAME-LINE`"}`nSENTINEL-AFTER-SAME-LINE`n")
+    Invoke-SanitizeFile $sameLineTmp
+    if ((Get-Content $sameLineTmp -Raw) -match 'SENTINEL') {
+        Write-Output 'FAIL: mismatched same-line JSON composite leaked a secret'; $fails++
+    } else { Write-Output 'ok:   mismatched JSON composite fails closed' }
+    # The complete logical record is sanitized before a tail cap is applied.
+    $boundarySrc = Join-Path $Staging 'boundary-source.txt'
+    $boundaryOut = Join-Path $Staging 'boundary-output.txt'
+    [System.IO.File]::WriteAllText($boundarySrc,
+        ('header=eyJABCDEFGHIJK.SENTINEL-BOUNDARY-PAYLOAD.SENTINEL-BOUNDARY-SIGNATURE' + ('X' * 4106) + "`n"))
+    $boundaryReader = [System.IO.File]::OpenText($boundarySrc)
+    try { [void](Write-SanitizedReaderCapped $boundaryReader $boundaryOut 4096 -Tail) }
+    finally { $boundaryReader.Dispose() }
+    if ((Get-Content $boundaryOut -Raw) -match 'SENTINEL-BOUNDARY' -or (Get-Item $boundaryOut).Length -gt 4096) {
+        Write-Output 'FAIL: capped tail leaked a secret fragment or exceeded its cap'; $fails++
+    } else { Write-Output 'ok:   truncation occurs after logical-record sanitization' }
+    $script:SelfTestFailures = $fails
 }
 
 # --- manifest -------------------------------------------------------------------
@@ -314,26 +797,117 @@ function Add-Manifest([string]$rel, [string]$kind, [string]$origin, [string]$tit
     $bytes = 0
     if (Test-Path $full) { $bytes = (Get-Item $full).Length }
     [void]$script:ManifestRows.Add(@{
-        path = $rel.Replace('\', '/'); kind = $kind; origin = $origin; title = $title
+        path = $rel.Replace('\', '/'); kind = $kind
+        origin = Invoke-SanitizeLine ([regex]::Replace($origin, '[\x00-\x1f]', ' '))
+        title = Invoke-SanitizeLine ([regex]::Replace($title, '[\x00-\x1f]', ' '))
         bytes = [long]$bytes; pii_obfuscated = [bool]$Obfuscate
     })
 }
 
 # --- collectors -------------------------------------------------------------------
+function Write-SanitizedCaptureLine([string]$line, [hashtable]$capture,
+                                    [System.IO.Stream]$stream,
+                                    [System.Text.Encoding]$utf8, [long]$limit) {
+    if ($capture.Truncated) { return }
+    if ($line.Length -gt 4MB) { $line = '[REDACTED OVERSIZED LOGICAL RECORD]' }
+    $converted = Convert-SanitizedRecord $line $capture
+    if ($null -eq $converted) { return }
+    $bytes = $utf8.GetBytes($converted + "`n")
+    $remaining = [int][Math]::Min([long][int]::MaxValue, $limit - $capture.Written)
+    if ($remaining -le 0) { $capture.Truncated = $true; return }
+    $kept = Get-Utf8Prefix $bytes $remaining
+    if ($kept.Length -gt 0) { $stream.Write($kept, 0, $kept.Length); $capture.Written += $kept.Length }
+    if ($kept.Length -lt $bytes.Length) { $capture.Truncated = $true }
+}
+
+function Receive-SosJobCapture($job, [hashtable]$capture, [System.IO.Stream]$stream,
+                               [System.Text.Encoding]$utf8, [long]$limit) {
+    Receive-Job -Job $job -ErrorAction Continue 2>&1 | Out-String -Stream | ForEach-Object {
+        Write-SanitizedCaptureLine $_ $capture $stream $utf8 $limit
+    }
+}
+
+function Get-SosJobQueuedRecordCount($job) {
+    $count = 0
+    foreach ($child in @($job.ChildJobs)) {
+        $count += $child.Output.Count + $child.Error.Count + $child.Warning.Count +
+                  $child.Verbose.Count + $child.Debug.Count + $child.Information.Count
+    }
+    return $count
+}
+
+function Invoke-CappedJobCapture([scriptblock]$cmd, [string]$path, [long]$cap, [string]$originText, [switch]$Raw) {
+    $utf8 = New-Object System.Text.UTF8Encoding($false)
+    $marker = $utf8.GetBytes("### TRUNCATED: sanitized command output exceeded $cap bytes ###`n")
+    $limit = if ($Raw) { $cap } else { [Math]::Max(0, $cap - $marker.Length) }
+    $capture = @{
+        Written = [long]0; Truncated = $false; InPem = $false; TimedOut = $false
+        JsonDepth = 0; JsonInString = $false; JsonEscape = $false; JsonWithholdForever = $false
+        JsonPending = $false; JsonTopString = $false; QueueOverflow = $false
+        JsonStack = New-Object 'System.Collections.Generic.Stack[char]'
+        YamlHolding = $false; YamlIndent = 0
+    }
+    $stream = New-Object System.IO.FileStream($path, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+    $job = $null
+    $jobHostPids = @()
+    try {
+        if (-not $Raw) {
+            Write-SanitizedCaptureLine "# netdata-sos v$SosVersion | command: $originText | captured: $((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))" $capture $stream $utf8 $limit
+        }
+        $jobHostsBefore = @(Get-SosJobHostProcessIds)
+        $job = Start-Job -ScriptBlock $cmd
+        for ($probe = 0; $probe -lt 50 -and $jobHostPids.Count -eq 0; $probe++) {
+            $jobHostPids = @(Get-SosJobHostProcessIds | Where-Object { $jobHostsBefore -notcontains $_ })
+            if ($jobHostPids.Count -eq 0) { Start-Sleep -Milliseconds 20 }
+        }
+        $jobDeadline = (Get-Date).AddSeconds($TimeoutSeconds)
+        while (-not $capture.Truncated -and ((Get-Date) -lt $jobDeadline) -and
+               ($job.State -eq 'Running' -or $job.HasMoreData)) {
+            if ((Get-SosJobQueuedRecordCount $job) -gt $JobQueueMax) {
+                $capture.QueueOverflow = $true
+                break
+            }
+            Receive-SosJobCapture $job $capture $stream $utf8 $limit
+            if ($job.State -eq 'Running') { Start-Sleep -Milliseconds 50 }
+        }
+        if ($job.State -eq 'Running' -and (Get-Date) -ge $jobDeadline) { $capture.TimedOut = $true }
+        if ($job.State -ne 'Running' -and -not $capture.Truncated) {
+            Receive-SosJobCapture $job $capture $stream $utf8 $limit
+        }
+        if ($job.State -eq 'Running') { Stop-SosJobTree $job $jobHostPids }
+        $finalState = $job.State
+        if (-not $Raw) {
+            if ($capture.TimedOut) { Write-SanitizedCaptureLine "TIMEOUT after ${TimeoutSeconds}s" $capture $stream $utf8 $limit }
+            Write-SanitizedCaptureLine "# job state: $($job.State)" $capture $stream $utf8 $limit
+            if ($capture.Truncated) { $stream.Write($marker, 0, $marker.Length); $capture.Written += $marker.Length }
+        }
+    } finally {
+        if ($job) {
+            if ($job.State -eq 'Running') { Stop-SosJobTree $job $jobHostPids }
+            Remove-Job $job -Force -ErrorAction SilentlyContinue
+        }
+        $stream.Dispose()
+    }
+    $abnormal = $capture.TimedOut -or $capture.QueueOverflow -or
+                (-not $capture.Truncated -and $finalState -ne 'Completed')
+    return @{
+        Safe = (-not $abnormal -and (-not $Raw -or -not $capture.Truncated))
+        Truncated = $capture.Truncated; TimedOut = $capture.TimedOut
+        QueueOverflow = $capture.QueueOverflow; State = $finalState
+    }
+}
+
 function Collect-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$originText) {
     if (Test-Deadline) { return }
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
-    $header = "# netdata-sos v$SosVersion | command: $originText | captured: $((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))"
     try {
-        $job = Start-Job -ScriptBlock $cmd
-        $done = Wait-Job $job -Timeout $TimeoutSeconds
-        if ($done) { $result = Receive-Job $job 2>&1 | Out-String } else { $result = "TIMEOUT after ${TimeoutSeconds}s" }
-        Remove-Job $job -Force
-    } catch { $result = "ERROR: $_" }
-    if ($result.Length -gt 2MB) { $result = $result.Substring(0, 2MB) + "`r`n### TRUNCATED at 2MB ###" }
-    Set-Content -Path $full -Value ($header + "`r`n" + $result)
-    Invoke-SanitizeFile $full
+        $capture = Invoke-CappedJobCapture $cmd $full 2MB $originText
+        if (-not $capture.Safe) { throw "collector ended unsafely: $($capture.State)" }
+    } catch {
+        if (Test-Path $full) { Remove-Item $full -Force }
+        Write-Utf8NoBom $full "[netdata-sos] collection or sanitization failed; content withheld for safety`n"
+    }
     Add-Manifest $rel 'cmd' $originText $title
 }
 
@@ -344,45 +918,40 @@ function Collect-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string
     if (Test-Deadline) { return }
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
-    $result = ''
+    $capture = $null
     try {
-        $job = Start-Job -ScriptBlock $cmd
-        $done = Wait-Job $job -Timeout $TimeoutSeconds
-        if ($done) { $result = Receive-Job $job 2>&1 | Out-String }
-        Remove-Job $job -Force
+        $capture = Invoke-CappedJobCapture $cmd $full 2MB $originText -Raw
     } catch { Write-Verbose "collector failed: $_" }
-    if ($result -and $result.Trim().Length -gt 0) {
-        if ($result.Length -gt 2MB) { $result = $result.Substring(0, 2MB) }
-        Set-Content -Path $full -Value $result
-        Invoke-SanitizeFile $full
+    if ($capture -and $capture.Safe -and (Test-Path $full) -and (Get-Item $full).Length -gt 0) {
         Add-Manifest $rel 'cmd' $originText $title
     } elseif (Test-Path $full) {
         Remove-Item $full -Force
     }
 }
 
-function Collect-File([string]$rel, [string]$title, [string]$src, [long]$cap = 0) {
+function Collect-File([string]$rel, [string]$title, [string]$src, [long]$cap = 0, [string]$safeOrigin = '') {
     if (Test-Deadline) { return }
     if ($cap -eq 0) { $cap = $FileCap }
     if (-not (Test-Path $src -PathType Leaf)) { return }
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
     $size = (Get-Item $src).Length
-    $origin = $src
-    if ($size -gt $cap) {
-        # keep the tail (most recent content) like the POSIX variant
-        $fs = [System.IO.File]::OpenRead($src)
-        try {
-            $fs.Seek(-$cap, [System.IO.SeekOrigin]::End) | Out-Null
-            $buf = New-Object byte[] $cap
-            $read = $fs.Read($buf, 0, $cap)
-            [System.IO.File]::WriteAllBytes($full, $buf[0..($read-1)])
-        } finally { $fs.Close() }
-        $origin = "$src (last $cap of $size bytes)"
-    } else {
-        Copy-Item $src $full -Force
+    $origin = if ($safeOrigin) { $safeOrigin } else { $src }
+    $reader = $null
+    try {
+        $reader = [System.IO.File]::OpenText($src)
+        if ($size -gt $cap) {
+            [void](Write-SanitizedReaderCapped $reader $full $cap -Tail -Deadline (Get-ReadDeadline))
+            $origin = "$origin (sanitized tail, cap $cap of $size source bytes)"
+        } else {
+            [void](Write-SanitizedReaderCapped $reader $full $cap -Deadline (Get-ReadDeadline))
+        }
+    } catch {
+        if (Test-Path $full) { Remove-Item $full -Force }
+        Write-Utf8NoBom $full "[netdata-sos] sanitization failed; content withheld for safety`n"
+    } finally {
+        if ($reader) { $reader.Dispose() }
     }
-    Invoke-SanitizeFile $full
     Add-Manifest $rel 'file' $origin $title
 }
 
@@ -393,15 +962,98 @@ function Collect-Api([string]$rel, [string]$title, [string]$urlPath) {
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
     try {
-        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:$NdPort$urlPath" -UseBasicParsing -TimeoutSec $TimeoutSeconds
-        $content = $resp.Content
-        if ($content.Length -gt 2MB) { $content = $content.Substring(0, 2MB) }
-        Set-Content -Path $full -Value $content
-        Invoke-SanitizeFile $full
+        $operationDeadline = Get-ReadDeadline
+        $request = [System.Net.HttpWebRequest]::Create("http://127.0.0.1:$NdPort$urlPath")
+        $request.Timeout = $TimeoutSeconds * 1000
+        $request.ReadWriteTimeout = $TimeoutSeconds * 1000
+        $response = $request.GetResponse()
+        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
+        try { [void](Write-SanitizedReaderCapped $reader $full 2MB -Deadline $operationDeadline) }
+        finally { $reader.Dispose(); $response.Dispose() }
         Add-Manifest $rel 'api' $urlPath $title
     } catch {
         if (Test-Path $full) { Remove-Item $full -Force }
     }
+}
+
+if ($SelfTest) {
+    try {
+        $script:BoundedSelfTestOutput = [System.IO.Path]::Combine($Staging, 'bounded-command.txt')
+    } catch {
+        Write-Output "FAIL: bounded self-test setup raised $_"; exit 1
+    }
+    try {
+        $boundedCommand = {
+            Write-Output 'DB_PASS=SENTINEL-COMMAND'
+            1..5000 | ForEach-Object { Write-Output 'bounded-output-line' }
+        }
+        $capture = Invoke-CappedJobCapture -cmd $boundedCommand -path $script:BoundedSelfTestOutput -cap 1024 -originText 'bounded-output-selftest'
+        $boundedText = Get-Content $script:BoundedSelfTestOutput -Raw
+        if ((Get-Item $script:BoundedSelfTestOutput).Length -gt 1024 -or $boundedText -match 'SENTINEL-COMMAND' -or -not $capture.Truncated) {
+            Write-Output 'FAIL: command capture was not bounded after sanitization'; $script:SelfTestFailures++
+        } else { Write-Output 'ok:   command capture is sanitized and bounded while running' }
+    } catch {
+        Write-Output "FAIL: bounded command capture raised $_ at $($_.InvocationInfo.PositionMessage)"; $script:SelfTestFailures++
+    }
+    $timeoutSave = $TimeoutSeconds
+    try {
+        $TimeoutSeconds = 1
+        $timeoutOutput = Join-Path $Staging 'timeout-command.txt'
+        $timeoutCommand = { Write-Output 'prefix https://admin:SENTINEL-TIMEOUT-PASSWORD'; Start-Sleep 30 }
+        $timeoutCapture = Invoke-CappedJobCapture -cmd $timeoutCommand -path $timeoutOutput -cap 1024 -originText 'timeout-selftest' -Raw
+        if ($timeoutCapture.Safe -or -not $timeoutCapture.TimedOut) {
+            Write-Output 'FAIL: timed-out raw capture was marked safe'; $script:SelfTestFailures++
+        } else { Write-Output 'ok:   timed-out raw captures are withheld fail-closed' }
+    } catch {
+        Write-Output "FAIL: timeout capture self-test raised $_"; $script:SelfTestFailures++
+    } finally { $TimeoutSeconds = $timeoutSave }
+    try {
+        $publishSource = Join-Path $Staging 'publish-source.txt'
+        $publishDestination = Join-Path $Staging 'publish-destination.txt'
+        [System.IO.File]::WriteAllText($publishSource, 'first')
+        Publish-FileNoOverwrite $publishSource $publishDestination
+        [System.IO.File]::WriteAllText($publishSource, 'second')
+        $refused = $false
+        try { Publish-FileNoOverwrite $publishSource $publishDestination }
+        catch { $refused = $true }
+        if (-not $refused -or [System.IO.File]::ReadAllText($publishDestination) -ne 'first') {
+            Write-Output 'FAIL: no-overwrite artifact publication contract broke'; $script:SelfTestFailures++
+        } else { Write-Output 'ok:   artifact publication refuses overwrite' }
+    } catch {
+        Write-Output "FAIL: publication self-test raised $_"; $script:SelfTestFailures++
+    }
+    if ($env:OS -eq 'Windows_NT') {
+        $treeTimeoutSave = $TimeoutSeconds
+        try {
+            $treePidFile = Join-Path $Staging 'job-tree-pids.txt'
+            $treeOutput = Join-Path $Staging 'job-tree-output.txt'
+            $env:ND_SOS_TREE_PID_FILE = $treePidFile
+            $treeCommand = {
+                $child = Start-Process -FilePath powershell.exe -ArgumentList '-NoProfile','-Command','Start-Sleep 30' -PassThru
+                "$PID $($child.Id)" | Set-Content -LiteralPath $env:ND_SOS_TREE_PID_FILE
+                Wait-Process -Id $child.Id
+            }
+            $TimeoutSeconds = 1
+            [void](Invoke-CappedJobCapture -cmd $treeCommand -path $treeOutput -cap 1024 -originText 'job-tree-selftest')
+            $TimeoutSeconds = $treeTimeoutSave
+            Start-Sleep -Milliseconds 250
+            $orphaned = $false
+            foreach ($processId in ((Get-Content $treePidFile -Raw).Trim() -split '\s+')) {
+                if (Get-Process -Id ([int]$processId) -ErrorAction SilentlyContinue) { $orphaned = $true }
+            }
+            if ($orphaned) { Write-Output 'FAIL: timed-out Windows job left a descendant running'; $script:SelfTestFailures++ }
+            else { Write-Output 'ok:   Windows timeout terminates the complete job process tree' }
+        } catch {
+            Write-Output "FAIL: Windows job-tree self-test raised $_"; $script:SelfTestFailures++
+        } finally {
+            $TimeoutSeconds = $treeTimeoutSave
+            Remove-Item Env:ND_SOS_TREE_PID_FILE -ErrorAction SilentlyContinue
+        }
+    }
+    Remove-Item $Staging -Recurse -Force
+    if ($script:SelfTestFailures -gt 0) { Write-Output "SELF TEST: $($script:SelfTestFailures) FAILURES"; exit 1 }
+    Write-Output 'SELF TEST: ALL PASS'
+    exit 0
 }
 
 # --- environment detection --------------------------------------------------------
@@ -417,7 +1069,7 @@ $NetdataSvc = Get-Service -Name 'Netdata' -ErrorAction SilentlyContinue
 $NetdataProc = Get-Process -Name 'netdata' -ErrorAction SilentlyContinue | Select-Object -First 1
 $ApiOk = $false
 try {
-    Invoke-WebRequest -Uri "http://127.0.0.1:$NdPort/api/v1/info" -UseBasicParsing -TimeoutSec 3 | Out-Null
+    [void](Read-HttpTextBounded "http://127.0.0.1:$NdPort/api/v1/info" 256KB)
     $ApiOk = $true
 } catch { Write-Verbose "agent API not reachable: $_" }
 
@@ -426,16 +1078,13 @@ try {
 if ($ApiOk -and $Obfuscate) {
     try {
         $names = @()
-        $ni = (Invoke-WebRequest -Uri "http://127.0.0.1:$NdPort/api/v2/node_instances" -UseBasicParsing -TimeoutSec $TimeoutSeconds).Content | ConvertFrom-Json
+        $ni = Read-HttpTextBounded "http://127.0.0.1:$NdPort/api/v2/node_instances" 2MB | ConvertFrom-Json
         if ($ni -and $ni.PSObject.Properties['nodes']) { $names += @($ni.nodes | ForEach-Object { $_.nm }) }
-        $v1 = (Invoke-WebRequest -Uri "http://127.0.0.1:$NdPort/api/v1/info" -UseBasicParsing -TimeoutSec $TimeoutSeconds).Content | ConvertFrom-Json
+        $v1 = Read-HttpTextBounded "http://127.0.0.1:$NdPort/api/v1/info" 2MB | ConvertFrom-Json
         if ($v1 -and $v1.PSObject.Properties['mirrored_hosts']) { $names += @($v1.mirrored_hosts) }
         foreach ($n in ($names | Sort-Object -Unique)) {
             if (-not $n -or $n.Length -lt 4 -or $n -eq 'localhost' -or $n -eq $HostShort -or $n -eq $HostFqdn) { continue }
-            if (-not $script:PseudoMap.ContainsKey($n)) {
-                $script:FqdnCount++
-                $script:PseudoMap[$n] = "private-host-$($script:FqdnCount)"
-            }
+            [void](Get-Pseudonym $n 'fqdn')
         }
         # longest first so overlapping names (host, host-2) replace correctly
         $script:SeededHosts = @($script:PseudoMap.Keys |
@@ -494,26 +1143,29 @@ if ($ApiOk) {
     Collect-Api '04-config\effective-netdata.conf' 'EFFECTIVE running config (merged, annotated) - authoritative over on-disk file' '/netdata.conf'
 }
 if (Test-Path $ConfDir) {
-    Collect-Cmd '04-config\config-tree.txt' 'User config dir tree (files here = user-customized)' { Get-ChildItem $using:ConfDir -Recurse -ErrorAction SilentlyContinue | Select-Object -First 2000 | Format-Table Mode, LastWriteTime, Length, FullName -AutoSize } "Get-ChildItem $ConfDir -Recurse"
     Collect-File '04-config\netdata.conf' 'On-disk main config' (Join-Path $ConfDir 'netdata.conf')
     Collect-File '04-config\stream.conf' 'Streaming config (parent/child; api key redacted)' (Join-Path $ConfDir 'stream.conf')
     Collect-File '04-config\claim.conf' 'Cloud claim config (token redacted)' (Join-Path $ConfDir 'claim.conf')
     Collect-File '04-config\go.d.conf' 'go.d orchestrator config' (Join-Path $ConfDir 'go.d.conf')
-    # every user-customized collector/health config, keeping subdirectory
-    # structure (go.d\sd\*.conf must not collide with go.d\*.conf); ssl dirs
-    # and key material are never collected. Capped at 200 files.
+    # Every user-customized collector/health config gets a neutral archive name.
+    # The source path exists only in the private sidecar map; ssl dirs and key
+    # material are never collected. Capped at 200 files.
     $script:ConfCollected = 0
     foreach ($sub in @('go.d', 'health.d', 'python.d', 'charts.d', 'statsd.d')) {
+        if ($script:ConfCollected -ge 200 -or (Test-Deadline)) { break }
         $subDir = Join-Path $ConfDir $sub
         if (-not (Test-Path $subDir)) { continue }
-        Get-ChildItem $subDir -File -Recurse -Include '*.conf', '*.yml', '*.yaml' -ErrorAction SilentlyContinue |
+        $remaining = 200 - $script:ConfCollected
+        $configFiles = @(Get-ChildItem $subDir -File -Recurse -Include '*.conf', '*.yml', '*.yaml' -ErrorAction SilentlyContinue |
             Where-Object { $_.FullName -notmatch '\\ssl\\' -and $_.Extension -notin @('.pem', '.key') } |
-            ForEach-Object {
-                if ($script:ConfCollected -ge 200) { return }
-                $relSub = $_.FullName.Substring($subDir.Length).TrimStart('\')
-                Collect-File "04-config\$sub\$relSub" "User-customized $sub config (secrets redacted)" $_.FullName 256KB
-                $script:ConfCollected++
-            }
+            Select-Object -First $remaining)
+        foreach ($configFile in $configFiles) {
+            if (Test-Deadline) { break }
+            $relSub = $configFile.FullName.Substring($subDir.Length).TrimStart('\')
+            $safeName = Get-SafeDynamicPath "$sub\$relSub" 'custom-config'
+            Collect-File "04-config\custom\$safeName" "User-customized $sub config (source path mapped privately; secrets redacted)" $configFile.FullName 256KB "user config mapped to $safeName"
+            $script:ConfCollected++
+        }
     }
 }
 
@@ -532,7 +1184,8 @@ Collect-Cmd '05-logs\eventlog-netdata.txt' 'Netdata events from Windows Event Lo
 } "Get-WinEvent NetdataWEL/Application (Netdata providers, last ${SinceHours}h)"
 if (Test-Path $LogDir) {
     Get-ChildItem $LogDir -File -Filter '*.log' | ForEach-Object {
-        Collect-File "05-logs\$($_.Name)" "Agent log file: $($_.Name)" $_.FullName $LogCap
+        $safeName = Get-SafeDynamicPath $_.Name 'agent-log'
+        Collect-File "05-logs\$safeName" 'Agent log file (source name mapped privately)' $_.FullName $LogCap "agent log mapped to $safeName"
     }
 }
 
@@ -545,14 +1198,21 @@ if (Test-Path $StatusFile) {
     Collect-File '06-state\status-file.json' 'Daemon status file: LAST EXIT/CRASH RECORD incl. fatal stack trace (read this first for crashes)' $StatusFile
 }
 if (Test-Path $LibDir) {
-    # bearer_tokens FILENAMES are live API tokens - list only their count
-    Collect-Cmd '06-state\state-tree.txt' 'State dir listing (bearer token filenames withheld - they are live tokens)' {
+    # Names under the state dir may contain live tokens, hostnames, or job ids.
+    # Report only aggregate inventory data, never paths or filenames.
+    Collect-Cmd '06-state\state-inventory.txt' 'State dir aggregate inventory (all paths and filenames withheld)' {
         $items = Get-ChildItem $using:LibDir -Recurse -ErrorAction SilentlyContinue | Select-Object -First 2000
         $tokenCount = @($items | Where-Object { $_.FullName -match '\\bearer_tokens\\' }).Count
-        $items | Where-Object { $_.FullName -notmatch '\\bearer_tokens\\' } |
-            Format-Table Mode, LastWriteTime, Length, FullName -AutoSize
+        $files = @($items | Where-Object { -not $_.PSIsContainer -and $_.FullName -notmatch '\\bearer_tokens\\' })
+        "directories: $(@($items | Where-Object { $_.PSIsContainer }).Count)"
+        "files: $($files.Count)"
+        "file bytes: $(($files | Measure-Object Length -Sum).Sum)"
         "[$tokenCount token file(s) - names withheld, they ARE the tokens]"
-    } "Get-ChildItem $LibDir -Recurse (bearer_tokens contents withheld)"
+        $files | Group-Object Extension | ForEach-Object {
+            $extension = if ($_.Name) { $_.Name.ToLower() } else { '(none)' }
+            "extension ${extension}: $($_.Count) file(s)"
+        }
+    } 'Get-ChildItem state dir aggregate (all names withheld)'
     $CloudDir = Join-Path $LibDir 'cloud.d'
     if (Test-Path (Join-Path $CloudDir 'claimed_id')) {
         Collect-File '06-state\claimed-id.txt' 'Cloud claim id (safe identifier; token/private.pem never collected)' (Join-Path $CloudDir 'claimed_id')
@@ -583,8 +1243,8 @@ if ($ApiOk) {
     Show-Info 'agent API unreachable - skipping runtime section'
     $marker = Join-Path $Work '07-runtime'
     New-Item -ItemType Directory -Path $marker -Force | Out-Null
-    Set-Content -Path (Join-Path $marker 'AGENT-WAS-DOWN.txt') -Value "Agent API at 127.0.0.1:$NdPort was unreachable when this bundle was created. See 05-logs and 06-state\status-file.json for why."
-    Add-Manifest '07-runtime\AGENT-WAS-DOWN.txt' 'file' 'generated' 'Marker: agent was not running'
+    Write-Utf8NoBom (Join-Path $marker 'AGENT-API-UNREACHABLE.txt') "Agent API at 127.0.0.1:$NdPort was unreachable when this bundle was created. The agent process may still have been running; see summary.txt, 05-logs, and 06-state\status-file.json.`n"
+    Add-Manifest '07-runtime\AGENT-API-UNREACHABLE.txt' 'file' 'generated' 'Marker: local agent API was unreachable'
 }
 if (Test-Path $NetdataExe) {
     Collect-Cmd '07-runtime\buildinfo.txt' 'netdata -W buildinfo (verbatim; works with daemon down)' { & $using:NetdataExe -W buildinfo 2>&1 } 'netdata.exe -W buildinfo'
@@ -643,7 +1303,7 @@ READ ORDER FOR TRIAGE:
   cloud/claiming      -> 06-state\claimed-id.txt, 07-runtime\aclk.json, 08-network\
   performance         -> 03-process\netdata-processes.txt, 06-state\db-disk-usage.txt
 "@
-Set-Content -Path (Join-Path $Work 'summary.txt') -Value $summary
+Write-Utf8NoBom (Join-Path $Work 'summary.txt') ($summary + "`n")
 Add-Manifest 'summary.txt' 'file' 'generated' 'Human summary'
 
 $readme = @"
@@ -659,7 +1319,7 @@ Layout matches the POSIX bundle (see MANIFEST.json for every file):
 01-system, 02-install, 03-process, 04-config, 05-logs (Windows Event Log),
 06-state, 07-runtime, 08-network. Start with summary.txt.
 "@
-Set-Content -Path (Join-Path $Work 'README.md') -Value $readme
+Write-Utf8NoBom (Join-Path $Work 'README.md') ($readme + "`n")
 Add-Manifest 'README.md' 'file' 'generated' 'Bundle documentation'
 
 # emit MANIFEST.json LAST so every file (incl. summary.txt and README.md) is indexed
@@ -675,37 +1335,52 @@ $manifest = [ordered]@{
     is_container = $false
     files = $script:ManifestRows
 }
-Set-Content -Path (Join-Path $Work 'MANIFEST.json') -Value ($manifest | ConvertTo-Json -Depth 4)
+Write-Utf8NoBom (Join-Path $Work 'MANIFEST.json') (($manifest | ConvertTo-Json -Depth 4) + "`n")
 
 # ============================================================================
 # zip
 # ============================================================================
 New-Item -ItemType Directory -Path $Output -Force | Out-Null
 $ZipPath = Join-Path $Output "$BundleName.zip"
-# build the zip inside the owner-only staging dir, then publish without
-# overwrite: Move-Item without -Force fails if the destination exists
+# Build the zip inside the owner-only staging dir, then publish atomically
+# without overwrite through Publish-FileNoOverwrite.
 $StagingZip = Join-Path $Staging "$BundleName.zip"
 Compress-Archive -Path $Work -DestinationPath $StagingZip
 try {
-    Move-Item -Path $StagingZip -Destination $ZipPath -ErrorAction Stop
+    Publish-FileNoOverwrite $StagingZip $ZipPath
 } catch {
     # Write-Error would be swallowed by $ErrorActionPreference='SilentlyContinue'
-    Write-Host " [!] refusing to overwrite existing $ZipPath ($_)"
+    Write-Host " [!] could not publish $ZipPath ($_)"
+    if (-not $KeepStaging) { Remove-Item $Staging -Recurse -Force -ErrorAction SilentlyContinue }
     exit 1
 }
 
 $MapPath = Join-Path $Output "$BundleName.pseudonym-map.tsv"
-if ($Obfuscate -and $script:PseudoMap.Count -gt 0) {
-    # same format as the POSIX script: type<TAB>original<TAB>pseudonym
-    $script:PseudoMap.GetEnumerator() | ForEach-Object {
+if ($script:PseudoMap.Count -gt 0 -or $script:PathMap.Count -gt 0) {
+    # Build inside owner-only staging and publish atomically without overwrite.
+    # Same format as the POSIX script: type<TAB>original<TAB>pseudonym.
+    $mapLines = @($script:PseudoMap.GetEnumerator() | Sort-Object Key | ForEach-Object {
         $type = 'other'
         if ($_.Value -match '^ip6-\d+$') { $type = 'ip6' }
         elseif ($_.Value -match '^ip-\d+$') { $type = 'ip' }
         elseif ($_.Value -match '^private-host-\d+$') { $type = 'fqdn' }
         elseif ($_.Value -eq 'redacted-host') { $type = 'host' }
         elseif ($_.Value -eq 'redacted-user') { $type = 'user' }
-        "$type`t$($_.Key)`t$($_.Value)"
-    } | Set-Content $MapPath
+        $original = [regex]::Replace([string]$_.Key, '[\x00-\x1f]', ' ')
+        "$type`t$original`t$($_.Value)"
+    })
+    $mapLines += @($script:PathMap.GetEnumerator() | Sort-Object Key | ForEach-Object {
+        $original = [regex]::Replace([string]$_.Key, '[\x00-\x1f]', ' ')
+        "path`t$original`t$($_.Value)"
+    })
+    $StagingMap = Join-Path $Staging "$BundleName.pseudonym-map.tsv"
+    [System.IO.File]::WriteAllLines($StagingMap, $mapLines, (New-Object System.Text.UTF8Encoding($false)))
+    try {
+        Publish-FileNoOverwrite $StagingMap $MapPath
+    } catch {
+        Write-Host " [!] refusing to overwrite $MapPath; the private map was discarded"
+        $MapPath = ''
+    }
 }
 
 if (-not $KeepStaging) { Remove-Item $Staging -Recurse -Force }
@@ -713,7 +1388,7 @@ if (-not $KeepStaging) { Remove-Item $Staging -Recurse -Force }
 Write-Host ''
 Show-Info ("done in {0}s" -f [int]((Get-Date) - $StartTime).TotalSeconds)
 Show-Info "bundle:  $ZipPath"
-if ($Obfuscate -and $script:PseudoMap.Count -gt 0) {
+if ($MapPath -and (Test-Path $MapPath)) {
     Show-Info "pseudonym map (KEEP PRIVATE, do not send): $MapPath"
 }
 Show-Info 'attach the bundle to your support ticket.'

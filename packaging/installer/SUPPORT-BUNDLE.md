@@ -16,9 +16,14 @@ sudo netdata-sos
 # static installs:
 sudo /opt/netdata/usr/sbin/netdata-sos
 
-# or without an installed copy (any install, any version):
-wget -O /tmp/netdata-sos.sh https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-sos.sh
-sudo sh /tmp/netdata-sos.sh
+# or without an installed copy (any install, any version; curl first - macOS
+# ships curl but not wget):
+t=$(mktemp)
+trap 'rm -f "$t"' EXIT HUP INT TERM
+if curl -fsSL -o "$t" https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-sos.sh \
+  || wget -qO "$t" https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-sos.sh; then
+  sudo sh "$t"
+fi
 ```
 
 ```powershell
@@ -35,23 +40,24 @@ document.**
 
 | guarantee | implementation |
 |---|---|
-| Zero system impact | self-demotion to idle CPU/IO priority (`nice -n 19` + `ionice -c 3` / `PriorityClass = Idle`); per-command timeout (10 s default, enforced by `timeout` where available and a portable watchdog where not); global deadline (240 s); size caps (5 MiB per log, 1 MiB per file, 2 MiB per command/API output, directory listings capped); strictly read-only — never writes outside its staging dir, never restarts anything, never calls destructive `netdatacli` commands; outputs are published with `O_EXCL` so pre-existing files or symlinks in shared tmp dirs are never followed |
-| Works when the agent is dead | no hard dependency on a running agent; the most valuable crash artifacts (status file, logs, buildinfo via the binary) are collected from disk; a `07-runtime/AGENT-WAS-DOWN.txt` marker is written instead of API captures |
+| Zero system impact | self-demotion to idle CPU/IO priority (`nice -n 19` + usable `ionice -c 3` / `PriorityClass = Idle`); per-command timeout (10 s default) with process-tree termination; global deadline (240 s); size caps (5 MiB per log, 1 MiB per file, 2 MiB per command/API output); read-only collection that writes only private staging data and the requested final artifacts, never restarts anything, and never calls destructive `netdatacli` commands; final artifacts use no-overwrite publication so pre-existing files or symlinks in shared tmp dirs are never followed |
+| Works when the agent is dead | no hard dependency on a running agent; the most valuable crash artifacts (status file, logs, buildinfo via the binary) are collected from disk; a `07-runtime/AGENT-API-UNREACHABLE.txt` marker is written instead of API captures without falsely claiming the process was down |
 | Secrets always redacted | non-optional single-pass sanitizer; see "Sanitization" below |
-| PII pseudonymized by default | IPs/MACs/emails/hostnames replaced with **stable** pseudonyms (`ip-1`, `private-host-1`) so cross-file correlation still works; map saved **next to** the bundle, never inside it; `--no-obfuscate` / `-NoObfuscate` opts out |
-| Legible to humans AND AI agents | triage-ordered numbered directories; pristine file copies (no injected headers in configs/logs/JSON); provenance headers only on command captures; `MANIFEST.json` indexes every file with origin + sanitization state; `summary.txt` opens with a triage read-order |
+| PII pseudonymized by default | IPs/MACs/emails/hostnames and ordinary customer FQDNs are replaced with **stable** pseudonyms (`ip-1`, `private-host-1`) so cross-file correlation still works; the mapping table is bounded and falls back to non-correlating placeholders after its limit; dynamic source paths get neutral archive names; the private map is saved **next to** the bundle, never inside it; `--no-obfuscate` / `-NoObfuscate` opts out of content pseudonymization |
+| Caps cannot expose secrets | complete logical records are sanitized before any head/tail cap is applied; command output is drained through the sanitizer into a bounded sink while the producer runs; oversized records and sanitizer failures are withheld fail-closed |
+| Legible to humans AND AI agents | triage-ordered numbered directories; sanitized file copies have no injected provenance headers; provenance headers only on command captures; `MANIFEST.json` indexes every file with safe origin + sanitization state; `summary.txt` opens with a triage read-order |
 
 ## Platform support
 
 | platform | status | notes |
 |---|---|---|
 | Linux (glibc, systemd) | tested | full collection incl. journal namespace |
-| Linux (musl/BusyBox, e.g. Alpine) | tested | BusyBox `timeout` has no `-k` (auto-detected); file logs instead of journal |
-| Docker (official image) | tested | agent logs live in `docker logs` on the host — bundle includes a marker with the exact command; `/proc/1/environ` needs `CAP_SYS_PTRACE` (fallback to exec env) |
+| Linux (musl/BusyBox, e.g. Alpine) | tested | portable process-tree watchdog; file logs instead of journal |
+| Docker (official image) | tested | agent logs live in `docker logs` on the host — bundle includes a marker explaining the private local-review workflow because raw logs are unsafe to attach; `/proc/1/environ` needs `CAP_SYS_PTRACE` (fallback to exec env) |
 | Static builds (`/opt/netdata`) | tested paths | all paths resolved under the prefix |
 | FreeBSD | best effort | `/usr/local/etc/netdata` + `/var/db/netdata` paths, `sockstat` fallback, `ps -H` threads; no `/proc` items |
-| macOS (Homebrew) | best effort | `/usr/local` and `/opt/homebrew` prefixes, `sysctl`/`vm_stat` fallbacks, `ps -M` threads; no coreutils `timeout` (global deadline still applies) |
-| Windows | MVP, parse+logic validated | `netdata-sos.ps1`; needs a real-Windows validation run before release |
+| macOS (Homebrew) | best effort | `/usr/local` and `/opt/homebrew` prefixes, `sysctl`/`vm_stat` fallbacks, `ps -M` threads |
+| Windows | tested in CI | Windows PowerShell 5.1 runs the adversarial suite and builds/opens a complete fixture zip; PowerShell 7 runs the same sanitizer suite |
 
 Portability rules the POSIX script obeys (keep them when editing):
 
@@ -59,8 +65,8 @@ Portability rules the POSIX script obeys (keep them when editing):
 - **No `{n,m}` regex intervals inside the awk sanitizer** — older BSD awks
   treat them as literal braces, which would silently disable redaction.
   Character classes are written out explicitly instead.
-- Feature-detect, never assume: `timeout` (and its `-k` flag), `ionice`,
-  `journalctl`, `coredumpctl`, `curl`/`wget`, `ss`/`sockstat`/`netstat`,
+- Feature-detect, never assume: usable `ionice`, `journalctl`, `coredumpctl`,
+  `curl`/`wget`, `ss`/`sockstat`/`netstat`,
   `free`/`sysctl`, `/proc` availability are all probed before use.
 - Every external command is optional: a missing tool degrades that one file,
   never the run.
@@ -125,8 +131,7 @@ Every item collected maps to a recurring support ask. That mapping is the
 | item | why |
 |---|---|
 | **effective running config** (`GET /netdata.conf`) | the #1 GitHub maintainer ask; shows the merged config the agent actually uses and annotates unrecognized options — resolves "my config is ignored" outright; authoritative over on-disk files |
-| on-disk `netdata.conf`, `stream.conf`, cloud/claim conf, `go.d.conf`, go.d/health.d/python.d/charts.d/statsd.d user files, `exporting.conf` | the files users were asked to paste, ticket after ticket (child stream.conf + parent `[web]`/`[stream]` sections is a canned Freshdesk ask); **all pass the sanitizer** |
-| config dir tree listing | files in the user config dir are exactly the ones the user customized (edit-config copies) — shows the delta from stock at a glance |
+| on-disk `netdata.conf`, `stream.conf`, cloud/claim conf, `go.d.conf`, go.d/health.d/python.d/charts.d/statsd.d user files, `exporting.conf` | the files users were asked to paste, ticket after ticket (child stream.conf + parent `[web]`/`[stream]` sections is a canned Freshdesk ask); **all pass the sanitizer**; arbitrary config paths are replaced by neutral names and recorded only in the private sidecar map |
 
 ### `05-logs/` — history
 
@@ -137,14 +142,14 @@ Every item collected maps to a recurring support ask. That mapping is the
 | Windows Event Log (`NetdataWEL` + Application, Netdata providers) | Windows agents log to the Event Log; Windows is a top-3 support theme |
 | updater service journal | update failures; the updater keeps no persistent log file |
 | **coredump metadata** (`coredumpctl list`, never the dumps) | tells support a dump exists and matches the crash time — the dump itself is fetched later only if needed |
-| docker marker file | in containers the log "files" are symlinks to stdout — history only exists in `docker logs` on the host; the bundle says so and gives the exact command |
+| docker marker file | in containers the log "files" are symlinks to stdout — history only exists in `docker logs` on the host; the bundle says raw logs must not be attached and gives a private capture/review/redaction workflow using the requested time window |
 
 ### `06-state/` — persistent state
 
 | item | why |
 |---|---|
 | **`status-netdata.json`** (all fallback locations, newest wins) | the single most valuable crash artifact: last exit reason, fatal line/file/function, signal, **stack trace** — same data that feeds agent-events crash telemetry; support gets crash forensics with zero extra round trips |
-| state dir listing (names/sizes only) | corruption sentinels (`*.bad`, `*.recover`), unexpected sizes; **contents of secret files are never read** (see exclusions) |
+| state dir aggregate inventory | unexpected file counts/sizes without exposing filenames that may themselves be live tokens, hostnames, or job identifiers; **contents of secret files are never read** (see exclusions) |
 | claim state (`claimed_id` only) | claim id is the identifier support needs to find the node in Cloud; a non-persisted `cloud.d` across restarts is a known Freshdesk root cause |
 | db disk usage per tier + sqlite sizes | retention questions ("why do I only have N days") are answered by tier sizes vs configured limits |
 | dyncfg files (sanitized) | jobs created via UI live here, not in `/etc/netdata` — invisible in classic config collection |
@@ -190,24 +195,33 @@ These are excluded by design. **Do not add them.**
 Two passes, one sweep, applied to **every** collected file:
 
 1. **Secrets — always on, not configurable:**
-   - values of any key whose (hyphen/underscore-normalized) name contains:
-     `api key, apikey, token, password, passwd, secret, community, bearer,
+   - values of any key whose punctuation-normalized name contains a complete
+     secret word or phrase:
+     `api key, apikey, token, access token, auth token, claim token, refresh
+     token, session token, password, passwd, pass, pwd, pat, key, secret,
+     client secret, client password, community, bearer,
      webhook, license key, auth, credential, cookie, passphrase, proxy user,
      proxy pass, username, dsn, private key, access key, session, recipient,
-     account sid, priv key` — in ini (`k = v`), yaml (`k: v`), env (`K=V`) and
-     JSON (`"k": "v"`) forms. Keys must look like real config keys (≤64 chars,
+     account sid, priv key` (including common compact/camelCase spellings) — in
+     ini (`k = v`), yaml (`k: v`), env (`K=V`) and
+     JSON (`"k": "v"`) forms, including escaped strings, numeric/scalar
+     values, and nested values. Keys must look like real config keys (≤64 chars,
      no sentence punctuation) so prose containing "token" is not mangled.
+     Multi-line JSON objects/arrays and YAML block-scalar secret values are
+     withheld through their closing boundary (or to EOF if malformed).
      Exemptions are decided by the KEY, never the value: keys ending in
      `file path dir directory protection support mode level port timeout
-     cookies secure log size options` describe secrets rather than being
+     cookies secure log size options format type` describe secrets rather than being
      secrets, so `bearer token protection = no` and `api key file = /path`
      stay readable while `TOKEN=false` and `PASSWORD=/x` are redacted;
-   - argv/env-style secrets mid-line (`-token=X`, `CLAIM_TOKEN=X`,
-     `api key = X` inside captured process command lines);
+   - argv/env-style secrets mid-line (`-token=X`, `--password "X"`,
+     `CLAIM_TOKEN=X`, `api key = X` inside captured process command lines),
+     including single- and double-quoted values;
    - URL-embedded credentials (`scheme://user:pass@`) and Go DSN credentials
      (`user:pass@tcp(...)`);
-   - JWTs; `Bearer <value>` (value must contain a digit — real tokens do,
-     English prose after the word "bearer" does not) and `Basic <value>`;
+   - JWTs; `Bearer <value>` (including alphabetic-only credentials, with only
+     an explicit diagnostic-key shape exempted), `Basic <value>`, and complete
+     `Authorization` / `Authentication` header values;
    - secrets in URL query parameters (`?token=`, `&api_key=`, ... — request
      lines in access logs);
    - private-key PEM blocks — the WHOLE multi-line block is withheld from the
@@ -223,17 +237,22 @@ Two passes, one sweep, applied to **every** collected file:
    - MAC addresses → `[MAC]`; email addresses → `[EMAIL]`;
    - this host's hostname/FQDN → `redacted-host`; the invoking user's name →
      `redacted-user`;
-   - FQDNs under clearly-private TLDs (`.internal .local .lan .corp .intranet
-     .localdomain`) → `private-host-N`;
+   - ordinary FQDNs → `private-host-N`; only public Netdata service domains and
+     a small exact allowlist of known Netdata filenames are preserved (a broad
+     suffix exemption would leak names such as `customer.key`);
    - child/mirrored node hostnames (pre-seeded from the local API before
      collection, so they pseudonymize consistently in every file) and
      `stream.conf` `destination` hosts regardless of TLD → `private-host-N`;
    - resolv.conf `search`/`domain` values → `[SEARCH-DOMAINS-WITHHELD]`
      (corporate search domains are rarely under private TLDs).
 
-The pseudonym map is written next to the bundle (`*.pseudonym-map.*`) so the
+The private map is written next to the bundle (`*.pseudonym-map.*`) so the
 **user** can decode references if support asks "what is private-host-2?" — it
-is never included in the bundle itself.
+is never included in the bundle itself. It also maps neutral archive filenames
+back to arbitrary config/log source paths, including when content PII
+obfuscation is disabled. Correlating content mappings are capped at 4096
+entries; additional values use generic placeholders so hostile high-cardinality
+input cannot grow memory or the private map without bound.
 
 Redaction here is defense in depth, not a substitute for exclusion: files that
 are pure secrets (see exclusion list) are never read at all.
@@ -259,7 +278,8 @@ by these scripts.
    in your PR why it is platform-specific.
 6. Test the redaction: add a vector to the built-in regression suite and run
    `netdata-sos --selftest` (`netdata-sos.ps1 -SelfTest` on Windows) — it must
-   pass on GNU awk, mawk, and BusyBox awk. For new collection sources also
+   pass on GNU awk, mawk, BusyBox awk, and PowerShell. CI executes both suites.
+   For new collection sources also
    plant a sentinel secret in the source, run a collection, and `grep -r` the
    extracted bundle. Zero hits or it does not ship.
 7. Never add anything from the "What is NEVER collected" list, and never make
@@ -271,7 +291,8 @@ by these scripts.
   breaking layout changes; downstream ticket tooling may parse it.
 - Command captures are `.txt` files starting with a
   `# netdata-sos v<version> | command: ... | captured: <utc>` header; on POSIX
-  they also end with an `# exit: N | duration: Ns` trailer (PowerShell jobs do
-  not expose a meaningful exit code, so Windows captures carry the header only).
-- Copied files and API responses are pristine (parseable as-is); their
+  they also end with an `# exit: N | duration: Ns` trailer; PowerShell jobs
+  record their terminal job state instead of an exit code.
+- Copied files and API responses are sanitized without provenance headers
+  (and remain parseable when they fit their cap); their
   provenance lives in `MANIFEST.json`, not in the files.
