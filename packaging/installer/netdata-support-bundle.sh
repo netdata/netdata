@@ -35,7 +35,9 @@ set -u
 # --- with real workloads
 if [ -z "${ND_SUPPORT_BUNDLE_DEMOTED:-}" ]; then
   ND_SUPPORT_BUNDLE_DEMOTED=1; export ND_SUPPORT_BUNDLE_DEMOTED
-  if command -v ionice >/dev/null 2>&1; then
+  # ionice may exist but be denied (e.g. no CAP_SYS_NICE): probe idle class
+  # once, and only route through it if it actually works; else just nice
+  if command -v ionice >/dev/null 2>&1 && ionice -c 3 true >/dev/null 2>&1; then
     exec nice -n 19 ionice -c 3 sh "$0" "$@"
   fi
   exec nice -n 19 sh "$0" "$@"
@@ -598,8 +600,8 @@ collect_cmd_raw() {
   mkdir -p "$(dirname "$_out")"
   # shellcheck disable=SC1003  # literal backslash deletion, not a quote escape
   _cmdline=$(printf '%s' "$*" | tr -d '\\' | tr '\n\t' '  ' | tr -s ' ')
-  run_capped "$CMD_TIMEOUT" "$@" 2>>"$ERRORS" | head -c "$API_CAP" > "$_out"
-  if [ "$(wc -c < "$_out" | tr -d ' ')" -ge "$API_CAP" ]; then
+  run_capped "$CMD_TIMEOUT" "$@" 2>>"$ERRORS" | head -c "$((API_CAP + 1))" > "$_out"
+  if [ "$(wc -c < "$_out" | tr -d ' ')" -gt "$API_CAP" ]; then
     # a truncated JSON document is worse than none: fail closed
     echo '{"error":"output exceeded the cap and was withheld"}' > "$_out"
   fi
