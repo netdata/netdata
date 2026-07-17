@@ -1,141 +1,71 @@
 # Database Query Functions
 
-## Overview
+Database collectors can expose on-demand Functions for investigating expensive queries, currently running work, deadlocks, and recent errors. The available Functions and returned fields depend on the database and collector version.
 
-Database query functions provide deep visibility into SQL and NoSQL database performance through Netdata's Live tab. They help you identify problematic queries, detect deadlocks, and understand error patterns—all from the Netdata dashboard.
+Use the integration documentation linked below as the source of truth for database privileges, collector configuration, query semantics, filters, and result columns.
 
-| Capability             | Description                                                                                  |
-|------------------------|----------------------------------------------------------------------------------------------|
-| **Top Queries**        | Identify the most expensive queries by execution time, I/O, rows processed, or other metrics |
-| **Running Queries**    | See currently executing queries in real-time                                                 |
-| **Deadlock Detection** | View the latest detected deadlock with full transaction details                              |
-| **Error Attribution**  | Correlate SQL errors with the queries that caused them                                       |
+SQL collectors can also expose user-defined Functions for interactive query views in the Live tab. See the [SQL databases integration page](/src/go/plugin/go.d/collector/sql/integrations/sql_databases_generic.md) for the supported `functions` configuration and Live-tab grouping.
 
-## Supported Databases
+## Supported Capabilities
 
-| Database             | Top Queries | Running Queries | Deadlock Info | Error Info | Integration Docs                                                                           |
-|----------------------|:-----------:|:---------------:|:-------------:|:----------:|--------------------------------------------------------------------------------------------|
-| ClickHouse           |      ✅      |        -        |       -       |     -      | [ClickHouse](/src/go/plugin/go.d/collector/clickhouse/integrations/clickhouse.md)          |
-| CockroachDB          |      ✅      |        ✅        |       -       |     -      | [CockroachDB](/src/go/plugin/go.d/collector/cockroachdb/integrations/cockroachdb.md)       |
-| Couchbase            |      ✅      |        -        |       -       |     -      | [Couchbase](/src/go/plugin/go.d/collector/couchbase/integrations/couchbase.md)             |
-| Elasticsearch        |      ✅      |        -        |       -       |     -      | [Elasticsearch](/src/go/plugin/go.d/collector/elasticsearch/integrations/elasticsearch.md) |
-| MongoDB              |      ✅      |        -        |       -       |     -      | [MongoDB](/src/go/plugin/go.d/collector/mongodb/integrations/mongodb.md)                   |
-| Microsoft SQL Server |      ✅      |        -        |       ✅       |     ✅*     | [MSSQL](/src/go/plugin/go.d/collector/mssql/integrations/microsoft_sql_server.md)          |
-| MySQL                |      ✅      |        -        |       ✅       |     ✅*     | [MySQL](/src/go/plugin/go.d/collector/mysql/integrations/mysql.md)                         |
-| MariaDB              |      ✅      |        -        |       ✅       |     ✅*     | [MariaDB](/src/go/plugin/go.d/collector/mysql/integrations/mariadb.md)                     |
-| Percona Server       |      ✅      |        -        |       ✅       |     ✅*     | [Percona](/src/go/plugin/go.d/collector/mysql/integrations/percona_mysql.md)               |
-| Oracle Database      |      ✅      |        ✅        |       -       |     -      | [Oracle](/src/go/plugin/go.d/collector/oracledb/integrations/oracle_db.md)                 |
-| PostgreSQL           |      ✅      |        ✅        |       -       |    ✅**     | [PostgreSQL](/src/go/plugin/go.d/collector/postgres/integrations/postgresql.md)            |
-| ProxySQL             |      ✅      |        -        |       -       |     -      | [ProxySQL](/src/go/plugin/go.d/collector/proxysql/integrations/proxysql.md)                |
-| Redis                |      ✅      |        -        |       -       |     -      | [Redis](/src/go/plugin/go.d/collector/redis/integrations/redis.md)                         |
-| RethinkDB            |      -      |        ✅        |       -       |     -      | [RethinkDB](/src/go/plugin/go.d/collector/rethinkdb/integrations/rethinkdb.md)             |
-| YugabyteDB           |      ✅      |        ✅        |       -       |     -      | [YugabyteDB](/src/go/plugin/go.d/collector/yugabytedb/integrations/yugabytedb.md)          |
+| Database                 | Top queries | Running queries | Deadlock info | Error info | Integration documentation                                                                        |
+|:-------------------------|:-----------:|:---------------:|:-------------:|:----------:|:-------------------------------------------------------------------------------------------------|
+| ClickHouse               |      ✓      |                 |               |            | [ClickHouse](/src/go/plugin/go.d/collector/clickhouse/integrations/clickhouse.md)                |
+| CockroachDB              |      ✓      |        ✓        |               |            | [CockroachDB](/src/go/plugin/go.d/collector/cockroachdb/integrations/cockroachdb.md)             |
+| Couchbase                |      ✓      |                 |               |            | [Couchbase](/src/go/plugin/go.d/collector/couchbase/integrations/couchbase.md)                   |
+| Elasticsearch            |      ✓      |                 |               |            | [Elasticsearch](/src/go/plugin/go.d/collector/elasticsearch/integrations/elasticsearch.md)       |
+| OpenSearch               |      ✓      |                 |               |            | [OpenSearch](/src/go/plugin/go.d/collector/elasticsearch/integrations/opensearch.md)             |
+| MongoDB                  |      ✓      |                 |               |            | [MongoDB](/src/go/plugin/go.d/collector/mongodb/integrations/mongodb.md)                         |
+| Microsoft SQL Server     |      ✓      |                 |       ✓       |     ✓      | [Microsoft SQL Server](/src/go/plugin/go.d/collector/mssql/integrations/microsoft_sql_server.md) |
+| MySQL                    |      ✓      |                 |       ✓       |     ✓      | [MySQL](/src/go/plugin/go.d/collector/mysql/integrations/mysql.md)                               |
+| MariaDB                  |      ✓      |                 |       ✓       |     ✓      | [MariaDB](/src/go/plugin/go.d/collector/mysql/integrations/mariadb.md)                           |
+| Percona Server for MySQL |      ✓      |                 |       ✓       |     ✓      | [Percona Server for MySQL](/src/go/plugin/go.d/collector/mysql/integrations/percona_mysql.md)    |
+| Oracle Database          |      ✓      |        ✓        |               |            | [Oracle Database](/src/go/plugin/go.d/collector/oracledb/integrations/oracle_db.md)              |
+| PostgreSQL               |      ✓      |        ✓        |               |            | [PostgreSQL](/src/go/plugin/go.d/collector/postgres/integrations/postgresql.md)                  |
+| ProxySQL                 |      ✓      |                 |               |            | [ProxySQL](/src/go/plugin/go.d/collector/proxysql/integrations/proxysql.md)                      |
+| Redis                    |      ✓      |                 |               |            | [Redis](/src/go/plugin/go.d/collector/redis/integrations/redis.md)                               |
+| RethinkDB                |             |        ✓        |               |            | [RethinkDB](/src/go/plugin/go.d/collector/rethinkdb/integrations/rethinkdb.md)                   |
+| YugabyteDB               |      ✓      |        ✓        |               |            | [YugabyteDB](/src/go/plugin/go.d/collector/yugabytedb/integrations/yugabytedb.md)                |
 
-*\* Error Info is integrated directly into Top Queries results—each query row shows its associated errors.*
-
-*\*\* PostgreSQL error info requires [pg_stat_monitor](https://docs.percona.com/pg-stat-monitor/) (Percona). The collector auto-detects and uses it when available.*
-
-## Function Types
+## Function Families
 
 ### Top Queries
 
-Retrieves **accumulated query statistics** over a time window. These are aggregated metrics (total calls, total time, average time, etc.) from the database's query statistics infrastructure—not real-time snapshots.
+Ranks accumulated query or command statistics using information exposed by the database. Ranking dimensions, time windows, normalization, and reset behavior vary by database. Treat the selected integration's description as authoritative.
 
-**Filter options** vary by database but typically include:
-
-- Execution time (total, average)
-- Call count
-- Rows processed (read, written, returned)
-- I/O metrics (logical reads, physical reads)
-- Resource usage (CPU, memory, locks)
-
-The number of queries returned is configurable (default: 500). This is a two-stage process:
-
-1. **Server-side**: Database returns the top N queries ranked by your chosen metric
-2. **Client-side**: UI can further sort, filter, and explore the returned data
+Use this Function to identify workload that contributes disproportionately to latency, executions, I/O, rows, CPU, or another database-specific measure.
 
 ### Running Queries
 
-Shows **currently executing queries** at the moment of request. Essential for diagnosing stuck queries, long-running transactions, or unexpected load.
-
-**Supported**: CockroachDB, Oracle, PostgreSQL, RethinkDB, YugabyteDB
+Returns work executing when the Function is called. Use it to investigate long-running statements, blocked work, unexpected load, or active transactions. This is a live snapshot, not query history.
 
 ### Deadlock Info
 
-Displays the **most recently detected deadlock**—not a historical list. When a new deadlock occurs, it replaces the previous one.
-
-**Supported**: MySQL/MariaDB/Percona, Microsoft SQL Server
-
-Information provided:
-
-- Deadlock timestamp and ID
-- Participating transactions
-- Victim transaction (rolled back)
-- Query text and lock details
-- Wait resource
+Returns the deadlock detail retained by the database or collector. Retention and replacement behavior are database-specific; do not treat the result as a complete deadlock archive.
 
 ### Error Info
 
-Shows **recent SQL errors** from the database's error history. Error attribution is embedded directly in Top Queries results—each query row includes error details when available.
+Returns recent error information exposed by supported MySQL-family and Microsoft SQL Server collectors. Some collectors can associate those errors with entries in top-query results. The integration documentation describes the required database features and privileges.
 
-**Supported**: MySQL/MariaDB/Percona, Microsoft SQL Server, PostgreSQL (with pg_stat_monitor)
+## Access and Data Handling
 
-Attribution status values:
+Database Function results can contain statement text, object names, user names, client addresses, error messages, or literal values. These may expose secrets, personal data, or business data.
 
-- `enabled` — Error details available for this query
-- `no_data` — No recent errors for this query
-- `not_enabled` — Error tracking not configured
-- `not_supported` — Database version lacks required features
+- Grant the collector only the database permissions documented by its integration.
+- Restrict Function access to users who need query-level visibility.
+- Review and redact results before sharing them.
+- Configure database-side query normalization or obfuscation where supported.
+- Do not assume Netdata can remove sensitive literals that the database returns.
 
-## Security Considerations
+## Use a Database Function
 
-### Query Text Exposure
-
-Some databases normalize queries (replacing literals with placeholders), while others show actual values that may contain sensitive data:
-
-| Database              |                 Query Text                  |
-|-----------------------|:-------------------------------------------:|
-| ClickHouse            |                 Normalized                  |
-| CockroachDB           |                   ⚠️ Raw                    |
-| Couchbase             |                   ⚠️ Raw                    |
-| Elasticsearch         |                   ⚠️ Raw                    |
-| MongoDB               |                   ⚠️ Raw                    |
-| Microsoft SQL Server  |                   ⚠️ Raw                    |
-| MySQL/MariaDB/Percona | Normalized (Top Queries), ⚠️ Raw (Deadlock) |
-| Oracle                |                   ⚠️ Raw                    |
-| PostgreSQL            |                 Normalized                  |
-| ProxySQL              |                 Normalized                  |
-| Redis                 |                   ⚠️ Raw                    |
-| RethinkDB             |                   ⚠️ Raw                    |
-| YugabyteDB            |                   ⚠️ Raw                    |
-
-**Legend**:
-
-- **Normalized**: Literals replaced with placeholders (`SELECT * FROM users WHERE id = ?`)
-- **⚠️ Raw**: May contain actual values (`SELECT * FROM users WHERE id = 12345`)
-
-:::caution
-
-Error messages may contain sensitive values regardless of query normalization. Ensure appropriate access controls are in place.
-
-:::
-
-### Recommendations
-
-1. **Disable unneeded functions** — Each integration supports configuration options to disable specific functions
-2. **Use Netdata Cloud access controls** — Assign users to appropriate Rooms and Roles
-3. **Use dedicated database users** — Grant only the permissions required for monitoring
-
-## Getting Started
-
-Each database requires specific setup. Click the integration link in the table above for:
-
-- Prerequisites and permissions required
-- Configuration options
-- Available metrics and columns
-- Database-specific notes
+1. Configure the database collector and any required database permissions.
+2. Confirm that its regular metrics are being collected.
+3. Open the [Live tab](/docs/dashboards-and-charts/live-tab.md).
+4. Select an available database Function and the target node.
+5. Apply the filters and ranking options documented for that integration.
+6. Correlate the result with database charts, logs, and application traces.
 
 ## Related Documentation
 
 - [Live View](/docs/top-monitoring-netdata-functions.md)
-- [Processes Function](/docs/functions/processes.md)

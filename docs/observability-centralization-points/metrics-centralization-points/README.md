@@ -79,7 +79,7 @@ Copies **recent past samples** (replication) and **real-time new samples** (stre
 | **Alerts & Notifications** | Can be disabled (default: enabled).               | Monitors health and sends alerts for all systems.     |
 | **API & Dashboard**        | Can be disabled (default: enabled).               | Hosts the dashboard using its own retention settings. |
 | **Exporting Metrics**      | Optional (default: enabled).                      | Exports all collected metrics.                        |
-| **Netdata Functions**      | Child must be online to function.                 | Forwards function requests to connected Children.     |
+| **Functions**              | Child must be online to execute a Function.       | Forwards Function requests to connected Children.     |
 | **Netdata Cloud**          | Not required.                                     | Registers all connected systems to Netdata Cloud.     |
 
 ## **Supported Configurations**
@@ -87,20 +87,20 @@ Copies **recent past samples** (replication) and **real-time new samples** (stre
 ### **For Netdata Children**
 
 - **Full Mode (Default)**:
-    - All Netdata features are enabled (machine learning, alerts, notifications, dashboard, etc.).
+  - All Netdata features are enabled (machine learning, alerts, notifications, dashboard, etc.).
 - **Thin Mode**:
-    - Only collects and forwards metrics to a Parent.
-    - Some local retention is kept to handle network issues, but all other features are disabled.
+  - Only collects and forwards metrics to a Parent.
+  - Some local retention is kept to handle network issues, but all other features are disabled.
 
 ### **For Netdata Parents**
 
 - **Standalone**:
-    - A single Parent in the infrastructure or the top-most Parent in a hierarchy.
+  - A single Parent in the infrastructure or the top-most Parent in a hierarchy.
 - **Cluster**:
-    - A group of Parents that share the same data from the same Children.
-    - Provides **high availability**.
+  - A group of Parents that share the same data from the same Children.
+  - Provides **high availability**.
 - **Proxy**:
-    - Stores received metrics locally and **forwards them** to a higher-level Parent (Grand Parent).
+  - Stores received metrics locally and **forwards them** to a higher-level Parent (Grand Parent).
 
 ### **Cluster Configuration**
 

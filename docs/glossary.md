@@ -53,7 +53,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Flood Protection**](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#benefits-of-centralized-notifications): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud doesn’t send notifications about this node
 
-- [**Functions** or **Netdata Functions**](/docs/top-monitoring-netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can bring additional information to support troubleshooting or trigger some action to happen on the node itself.
+- [**Function**](/docs/top-monitoring-netdata-functions.md): An on-demand routine that returns current troubleshooting information or performs a supported action on a monitored node. Users select Functions through Live View.
 
 ## G
 
@@ -77,6 +77,8 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 - [**Live** (node state)](/docs/netdata-cloud/node-states-and-transitions.md): A node state in Netdata Cloud indicating the node is actively streaming metrics. Also referred to as "Online" or "Reachable" in code.
 
+- [**Live View**](/docs/top-monitoring-netdata-functions.md): The user-facing surface for selecting and executing Functions on monitored nodes.
+
 ## M
 
 - [**Metrics Collection**](/src/collectors/README.md): With zero configuration, Netdata auto-detects thousands of data sources upon starting and immediately collects per-second metrics. Netdata can immediately collect metrics from these endpoints thanks to 300+ collectors, which all come pre-installed when you install Netdata.
@@ -97,8 +99,6 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 - [**Netdata Agent** or **Agent**](/packaging/installer/README.md): Netdata's distributed monitoring Agent collects thousands of metrics from systems, hardware, and applications with zero configuration. It runs permanently on all your physical/virtual servers, containers, cloud deployments, and edge/IoT devices.
 
 - [**Netdata Cloud** or **Cloud**](/docs/netdata-cloud/README.md): Netdata Cloud is a web application that gives you real-time visibility for your entire infrastructure. With Netdata Cloud, you can view key metrics, insightful charts, and active alerts from all your nodes in a single web interface.
-
-- [**Netdata Functions** or **Functions**](/docs/top-monitoring-netdata-functions.md): Routines exposed by a collector on the Netdata Agent that can bring additional information to support troubleshooting or trigger some action to happen on the node itself.
 
 - [**Node States**](/docs/netdata-cloud/node-states-and-transitions.md): The connection status of nodes in Netdata Cloud. Nodes can be Live (actively streaming), Stale (not streaming but historical data available via Parent), Offline (disconnected, no data available), or Unseen (claimed but never connected). See [Node States and Transitions](/docs/netdata-cloud/node-states-and-transitions.md).
 

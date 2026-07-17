@@ -4680,23 +4680,7 @@ paths:
         Functions are plugin-provided operations that can query system state, collect real-time data,
         or perform administrative tasks.
 
-        **What are Netdata Functions?**
-        Functions extend Netdata beyond passive metric collection by allowing:
-        - **Live data queries**: Get current system state (processes, connections, services)
-        - **Interactive diagnostics**: Run on-demand checks and analysis
-        - **Administrative operations**: Trigger actions like cache clearing or config reloading
-        - **Plugin-specific features**: Access specialized capabilities provided by plugins
-
-        **Common Functions Include:**
-        - `systemd-list-units` - List systemd services and their status
-        - `processes` - List currently running processes with resource usage
-        - `network-connections` - Show active network connections
-        - `mount-points` - Display mounted filesystems
-        - `docker-containers` - List Docker containers (if Docker plugin enabled)
-        - Many more plugin-specific functions
-
-        **Function Discovery:**
-        Use `/api/v3/functions` to discover available functions on each node.
+        Functions extend Netdata beyond passive metric collection by returning live node-specific output or triggering a supported action. Function names are collector-defined and vary by node. Use `/api/v3/functions` or the Live tab to discover what a node exposes.
 
         **Execution Model:**
         - Functions execute on the target node's agent
@@ -4728,11 +4712,6 @@ paths:
            /api/v3/function?function=network-connections
            ```
 
-        4. **Execute with custom timeout for slow operations:**
-           ```
-           /api/v3/function?function=docker-containers&timeout=60
-           ```
-
         **Function Response Formats:**
         - Most functions return JSON data
         - Some may return plain text or formatted output
@@ -4740,17 +4719,9 @@ paths:
         - Long operations may return transaction ID for `/api/v3/progress` polling
 
         **Security Considerations:**
-        - Functions respect user authentication and authorization
-        - Some functions may require elevated permissions
-        - Function execution is subject to ACL checks
-        - Sensitive operations may be restricted by configuration
-
-        **Security & Access Control:**
-        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
-        - **Default Access:** Public (no authentication required)
-        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
-        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
-        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+        - Network ACLs and bearer-protection settings govern access to the endpoint
+        - Each Function also enforces its declared access permissions
+        - Sensitive Functions can require a signed identity, same-Space membership, and sensitive-data permission even through direct Agent or Parent API access
       security:
         - {}
         - bearerAuth: []
@@ -4762,24 +4733,7 @@ paths:
             Name of the function to execute. Each Netdata plugin can provide multiple functions
             with different capabilities.
 
-            **Function Names:**
-            - Kebab-case naming: `function-name-here`
-            - Provided by plugins: different plugins provide different functions
-            - Discoverable via `/api/v3/functions` endpoint
-            - Case-sensitive
-
-            **Common Built-in Functions:**
-            - `systemd-list-units` - List systemd services
-            - `processes` - Running processes with CPU/memory usage
-            - `network-connections` - Active network connections and sockets
-            - `mount-points` - Mounted filesystems and usage
-            - `ipmi-sensors` - IPMI hardware sensors (if available)
-
-            **Plugin-Specific Functions:**
-            - Docker plugin: `docker-containers`, `docker-images`
-            - Apps plugin: `apps-processes`
-            - Logs plugin: `logs-query`
-            - And many more depending on enabled plugins
+            Function names are collector-defined and case-sensitive. Discover them via `/api/v3/functions` or the Live tab.
 
             **Invalid Function Names:**
             - Missing function: Returns 400 Bad Request
@@ -5000,67 +4954,14 @@ paths:
         Functions are plugin-provided operations that extend Netdata's capabilities beyond
         passive metric collection, allowing live queries, diagnostics, and administrative actions.
 
-        **What This Endpoint Returns:**
-        - **Function inventory**: All functions available across your nodes
-        - **Per-node availability**: Which functions each node supports
-        - **Function metadata**: Descriptions, parameters, requirements
-        - **Plugin information**: Which plugin provides each function
+        This endpoint lists the Functions available on the selected nodes and groups them by node and provider. Function names and capabilities vary by node.
 
-        **Function Categories:**
-        - **System queries**: processes, mount-points, network-connections
-        - **Service management**: systemd-list-units, docker-containers
-        - **Hardware**: ipmi-sensors, smart-disk-info
-        - **Application-specific**: mysql-queries, redis-info, nginx-status
-        - **Diagnostics**: performance-analysis, log-queries
-        - **Administrative**: config-reload, cache-clear
+        Use `/api/v3/functions` to discover available Functions and `/api/v3/function?function=<name>` to execute one on a selected node.
 
-        **Use Cases:**
-        - **Capability discovery**: Determine what operations are available
-        - **Multi-node comparison**: See which nodes support which functions
-        - **Plugin verification**: Confirm plugins are loaded and functional
-        - **UI generation**: Build dynamic interfaces based on available functions
-        - **Documentation**: Generate function reference for your infrastructure
-
-        **Common Usage Patterns:**
-
-        1. **List all functions across all nodes:**
-           ```
-           /api/v3/functions
-           ```
-
-        2. **Functions for specific nodes:**
-           ```
-           /api/v3/functions?nodes=web-*
-           ```
-
-        3. **Scope to production infrastructure:**
-           ```
-           /api/v3/functions?scope_nodes=prod-*
-           ```
-
-        4. **Get detailed function information:**
-           ```
-           /api/v3/functions?options=debug
-           ```
-
-        **Response Organization:**
-        Results grouped by:
-        - **Node**: Functions available on each node
-        - **Function name**: Unique identifier
-        - **Plugin**: Source plugin providing the function
-        - **Capabilities**: What the function can do
-
-        **Integration with /api/v3/function:**
-        1. Use `/api/v3/functions` to discover available functions
-        2. Use `/api/v3/function?function=<name>` to execute specific functions
-        3. Results tell you which nodes support which operations
-
-        **Security & Access Control:**
-        - 📊 **Public Data API** - Bearer token optional, IP-based ACL restrictions apply
-        - **Default Access:** Public (no authentication required)
-        - **Bearer Protection:** When enabled via `/api/v3/bearer_protection`, requires bearer token
-        - **IP Restrictions:** Subject to `allow dashboard from` in netdata.conf
-        - **Access Methods:** Direct HTTP/HTTPS, Netdata Cloud, external tools
+        **Security Considerations:**
+        - Network ACLs and bearer-protection settings govern access to the endpoint
+        - Each Function also declares access permissions that are enforced when it is executed
+        - Sensitive Functions can require a signed identity, same-Space membership, and sensitive-data permission even through direct Agent or Parent API access
       security:
         - {}
         - bearerAuth: []

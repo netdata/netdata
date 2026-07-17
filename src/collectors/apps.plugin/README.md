@@ -272,9 +272,9 @@ When configuring `apps_groups.conf` on Windows systems:
 
 ### Verifying your configuration
 
-You can use the Netdata `processes` function to verify that your `apps_groups.conf` configuration is working correctly:
+You can use the Netdata `processes` Function to verify that your `apps_groups.conf` configuration is working correctly:
 
-1. **Access the processes function** through Netdata Cloud (required for security reasons)
+1. **Access the processes Function** through the [Live tab](/docs/dashboards-and-charts/live-tab.md).
 2. **Review the output** to see:
     - Current running processes with their `comm`, `cmdline`, and (on Windows) `name` fields
     - The **Category** column shows which group from `apps_groups.conf` each process has been assigned to

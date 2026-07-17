@@ -1,217 +1,83 @@
 # Netdata Agent Security and Privacy Design
 
-:::tip
+The Netdata Agent collects, stores, and serves observability data close to the systems it monitors. Operators control where that data is stored, streamed, exported, and exposed.
 
-**Executive Summary**
+## Data Collection and Storage
 
-- Netdata Agent is designed with a security-first approach to protect system data.
-- Raw data never leaves the system where Netdata is installed.
-- Only processed metrics and minimal metadata are stored, streamed, or archived.
-- Communications are secured with TLS, authentication uses API keys and cryptographic validation, and Agent architecture enforces isolation and resilience.
-- Netdata Agent follows best practices supporting PCI DSS, HIPAA, GDPR, and CCPA compliance, and is continuously audited and improved for security.
+Collectors read operating-system and application sources and submit metrics to the Netdata daemon. Most collectors run without elevated privileges; collectors that need additional access should receive only the capabilities or helper permissions required for their task.
 
-:::
+The Agent database stores time-series metrics and related metadata locally. When streaming is configured, a Child can also send metrics to one or more Parents. When exporting is configured, the Agent can send selected metrics to an external backend.
 
-## Introduction
+Collectors and plugins can also provide on-demand Functions. Function results may include logs, processes, database queries, network connections, or other non-metric data. These results are produced for a request and are not equivalent to the time-series data stored in the Agent database.
 
-Netdata Agent uses a security-first design.  
-It protects data by exposing only chart metadata and metric values, never raw system or application data.
+## Data Paths
 
-This design allows Netdata to operate in high-security environments, including PCI Level 1 compliance.
+| Path                        | Data behavior                                                                      | Protection                                                 |
+|:----------------------------|:-----------------------------------------------------------------------------------|:-----------------------------------------------------------|
+| Collector to daemon         | Metrics and metadata pass through local plugin protocols or in-process interfaces. | Local process permissions and plugin isolation.            |
+| Agent database              | Metrics and metadata are retained according to local configuration.                | Host filesystem and operating-system controls.             |
+| Child to Parent streaming   | Configured metrics and metadata are copied to the Parent.                          | API-key authentication; TLS when configured.               |
+| Direct web API              | The Agent returns requested metrics, metadata, or Function results.                | Network ACLs, optional TLS, and configured authentication. |
+| Agent-Cloud Link            | Metadata and authorized query or Function responses transit to Cloud users.        | Agent-initiated TLS connection and Cloud authorization.    |
+| Exporting and notifications | Configured data is sent to operator-selected destinations.                         | Destination-specific configuration and transport security. |
 
-When plugins collect data from databases or logs, only **processed metrics** are:
+The statement that data “stays local” is true only when streaming, exporting, Cloud access, notifications, and other outbound integrations are not configured. Review the complete deployment rather than treating the Agent database location as the only data boundary.
 
-- Stored in Netdata databases
-- Sent to upstream Netdata servers
-- Archived to external time-series databases
+## Privilege Boundaries
 
-Raw data remains local and is never transmitted.
+The main Agent and most collectors run as the Netdata service account. Platform-specific helpers or collectors may need capabilities, group membership, device access, or elevated helper binaries.
 
-## User Data Protection
+- Grant only the permissions documented for the collector.
+- Protect Netdata configuration and credential files with filesystem permissions.
+- Review Function output separately from chart data.
+- Keep the Agent and its dependencies updated.
 
-Netdata Agent safeguards your data at every stage.
+## Network Access and Authentication
 
-| **Aspect**        | **Protection Mechanism**                                                              |
-|:------------------|:--------------------------------------------------------------------------------------|
-| Raw Data          | Stays on your system                                                                  |
-| Plugins           | Hard-coded for collection only, reject external commands                              |
-| Functions Feature | Predefined plugin functions, UI only calls these                                      |
-| Privileges        | Most plugins run without escalated privileges; the main process does not require them |
+Direct Agent access can be intentionally open inside a trusted network. It should not be exposed to an untrusted network without additional controls.
 
-Plugins needing escalated privileges are isolated:
+Available controls include:
 
-- Perform only predefined collection tasks
-- Keep raw data inside the local process
-- Never save, transfer, or expose raw data to the Netdata daemon
+- Global and endpoint-specific network ACLs.
+- TLS for the web server.
+- An authenticating reverse proxy.
+- [Bearer token protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md) tied to Netdata Cloud identities and permissions.
 
-:::tip
+Streaming receivers authenticate senders with an API key. Enable TLS when streaming crosses an untrusted network, and protect streaming API keys as secrets.
 
-Netdata's decentralized design keeps all data local.  
-**You are responsible for backing up and managing your system data.**
-
-:::
-
-## Communication and Data Encryption
-
-Netdata secures all internal and external communications:
-
-| **Communication** | **Protection**                                                      |
-|:------------------|:--------------------------------------------------------------------|
-| Plugins to Daemon | Ephemeral in-memory pipes, isolated from other processes            |
-| Streaming Metrics | Requires API keys, optional TLS encryption                          |
-| Web API           | Supports TLS if configured                                          |
-| Cloud Connection  | MQTT over WebSockets over TLS with public/private key authorization |
-
-Public and private keys are exchanged securely during Cloud provisioning.
-
-### Netdata Agent Security Flow
-
-```mermaid
-flowchart TD
-    A("Netdata Plugin") -->|"Collects raw data"| B("In-memory Processing")
-    B -->|"Processes into metrics"| C("Netdata Daemon")
-    C -->|"Stores metrics locally"| D("Netdata Database")
-    C -->|"Optionally streams metrics"| E("Another Netdata Agent")
-    C -->|"Optionally sends metadata"| F("Netdata Cloud")
-    F --> G("Dashboards<br/>& Notifications")
-
-    %% Style definitions
-    classDef alert fill:#ffeb3b,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
-    classDef neutral fill:#f9f9f9,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
-    classDef complete fill:#4caf50,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
-    classDef database fill:#2196F3,stroke:#000000,stroke-width:3px,color:#000000,font-size:14px
-
-    %% Apply styles
-    class A alert
-    class B,C neutral
-    class D,E complete
-    class F,G database
-```
+See [Secure your Netdata Agents](/docs/netdata-agent/securing-netdata-agents.md) for operational configuration.
 
 ## Outbound Network Communication
 
-A Netdata Agent initiates outbound network connections only through a small number of well-defined paths. For Cloud communication the Agent is never an inbound server — all Cloud traffic is **outbound and initiated by the Agent**.
+A stock installation can use these Netdata-managed outbound paths:
 
-Understanding each path, its default state, and how to disable it is essential when deploying the Agent in restricted or air-gapped networks. The paths below are the only default outbound connections a stock Agent makes.
+| Path                                | When it is used                                                                                | Operator control                                 |
+|:------------------------------------|:-----------------------------------------------------------------------------------------------|:-------------------------------------------------|
+| Agent lifecycle telemetry           | The Agent daemon sends lifecycle events unless telemetry is opted out.                         | Follow the documented telemetry opt-out methods. |
+| Dashboard usage telemetry (browser) | Dashboard JavaScript sends usage events from the user's browser unless telemetry is opted out. | Follow the documented telemetry opt-out methods. |
+| Agent-Cloud Link                    | After the node is connected to a Netdata Cloud Space.                                          | Disconnect or do not connect the node.           |
+| Installation and updates            | During installation and when the separate updater checks configured repositories.              | Use offline installation and update controls.    |
 
-### Summary
+[Usage telemetry](/docs/netdata-agent/configuration/anonymous-telemetry-events.md) masks selected identifying fields, but uses a stable installation or machine identifier for event association. Treat it as pseudonymous usage telemetry, not as proof that no identifying data is processed. The canonical telemetry page lists the fields and opt-out methods.
 
-| **Communication Path**              | **Default State**      | **Trigger**                       | **Destination**                                                           | **How to Disable**                                                                                                             |
-|:------------------------------------|:-----------------------|:----------------------------------|:--------------------------------------------------------------------------|:-------------------------------------------------------------------------------------------------------------------------------|
-| Anonymous telemetry (backend)       | On                     | Agent start, stop, or fatal crash | Netdata telemetry cloud function (GCP) over HTTPS                         | Create `.opt-out-from-anonymous-statistics`, set `DISABLE_TELEMETRY=1`/`DO_NOT_TRACK=1`, or install with `--disable-telemetry` |
-| Anonymous telemetry (dashboard)     | On                     | Viewing the local Agent dashboard | PostHog (anonymized page-view events)                                     | Same as above (shared opt-out controls)                                                                                        |
-| Agent-Cloud Link (ACLK)             | Off until connected    | Connecting a node to a Space      | `app.netdata.cloud`, `api.netdata.cloud`, `mqtt.netdata.cloud` (WSS, 443) | Do not connect the Agent to Netdata Cloud                                                                                      |
-| Installer script download           | n/a (install time)     | Running `kickstart.sh`            | `get.netdata.cloud`                                                       | Pre-download the script for an offline install                                                                                 |
-| Package download / automatic update | On for online installs | Install, or scheduled auto-update | `repository.netdata.cloud`                                                | `--no-updates` at install, or disable `netdata-updater.sh`                                                                     |
+The Agent-Cloud Link is outbound and uses TLS. It can carry node metadata, alerts, and responses to authorized metric, log, or Function requests. Those responses may contain operational data even though Netdata Cloud does not act as the Agent's persistent time-series database.
 
-### Anonymous telemetry
+Installer and updater traffic is separate from the running daemon. For disconnected deployments, see [Install Netdata on offline systems](/packaging/installer/methods/offline.md).
 
-By default, Netdata collects anonymous usage information through two channels:
+User-configured collectors, exporters, streaming destinations, notification methods, service discovery, and proxies can add other network connections. They are not covered by the stock-path table.
 
-- **Agent backend**: On start, clean stop, and fatal crash, the `netdata` daemon executes the `anonymous-statistics.sh` script, which sends anonymized system and version information to a Netdata telemetry cloud function hosted in GCP over HTTPS.
-- **Agent dashboard**: When you view the local dashboard (`http://NODE:19999`), PostHog JavaScript sends anonymized page-view events. Sensitive attributes (such as IP and hostname) are overwritten with constant values before any event is sent.
+## Air-Gapped Operation
 
-Telemetry is **on by default** and carries only anonymized metadata — never raw metrics. See [Anonymous telemetry events](/docs/netdata-agent/configuration/anonymous-telemetry-events.md) for exactly what is collected and the opt-out methods.
+For a deployment with no Netdata-managed internet traffic:
 
-### Agent-Cloud Link (ACLK)
+1. Do not connect the Agent to Netdata Cloud.
+2. Disable usage telemetry.
+3. Disable online updates and use the offline installation workflow.
+4. Audit configured collectors, streaming, exporters, notifications, and service discovery for external destinations.
+5. Restrict direct web access to approved networks.
 
-The [ACLK](/src/aclk/README.md) is the channel the Agent uses to communicate with Netdata Cloud. It:
+The Agent can continue collecting, storing, and serving data locally under these conditions.
 
-- Uses an **outgoing** secure WebSocket (WSS) connection on port `443`.
-- Activates **only after you connect a node** to a Netdata Cloud Space.
-- Requires outbound access to `app.netdata.cloud`, `api.netdata.cloud`, and `mqtt.netdata.cloud`.
-- Transmits only the metadata needed for coordination and access control — **raw metrics never leave your infrastructure**.
+## Vulnerability Reporting
 
-IP addresses can change without notice and vary based on your geographic location due to CDN-edge servers, so **always prefer domain-based allowlisting**. For the complete firewall allowlist with ports, see [Configure Netdata for cybersecurity platforms](/docs/netdata-agent/configure-netdata-for-cybersecurity-platforms.md#required-endpoints-and-ports). If your Agent requires a proxy to reach the internet, see [proxy configuration](/src/claim/README.md#proxy-configuration).
-
-ACLK is **off until you connect the Agent**. An unconnected Agent never opens this connection.
-
-### Installation and updates
-
-These connections occur at install or update time, not as continuous Agent runtime traffic:
-
-- The `kickstart.sh` installer script is downloaded from `get.netdata.cloud`.
-- Packages are fetched from `repository.netdata.cloud/repos/stable` (stable channel) or `repository.netdata.cloud/repos/edge` (nightly channel).
-- **Automatic updates are enabled by default for online installations** (they are disabled automatically for offline installations). When enabled, the separate `netdata-updater.sh` script runs on a schedule (systemd timer, cron, or interval) and connects to the package repository to check for and install newer versions.
-
-Disable automatic updates with the `--no-updates` flag at install time, or by disabling the updater on an existing install. For a fully disconnected deployment, see [Install Netdata on Offline Systems](/packaging/installer/methods/offline.md).
-
-### Fully autonomous operation
-
-When all three of the following are true, the running Agent daemon makes **no outbound internet connections** and operates fully autonomously:
-
-1. The Agent is **not connected** to Netdata Cloud (ACLK stays inactive).
-2. **Anonymous telemetry is disabled**.
-3. **Automatic updates are disabled** (or the host has no route to the package repository).
-
-In this state the Agent continues to collect, store, and serve metrics locally. User-configured collectors (for example, an HTTP-based collector pointed at an external endpoint) may open their own outbound connections — those are driven by your configuration, not by default Agent behavior.
-
-:::tip
-
-For air-gapped or strictly firewalled environments, the recommended baseline is: disable telemetry, do not connect the Agent to Netdata Cloud, and disable automatic updates. With those three in place the Agent runs with no outbound internet dependencies. See [Install Netdata on Offline Systems](/packaging/installer/methods/offline.md) for a fully disconnected installation procedure.
-
-:::
-
-## Authentication
-
-Netdata supports multiple authentication methods depending on the connection type:
-
-| **Connection**           | **Authentication Method**                                               |
-|:-------------------------|:------------------------------------------------------------------------|
-| Direct Agent Access      | Typically unauthenticated, relies on LAN isolation or firewall policies |
-| Streaming Between Agents | Requires API key authentication, optional TLS                           |
-| Agent-to-Cloud           | Public/private key cryptography with mandatory TLS                      |
-
-:::tip
-
-For additional access control, place Netdata Agents behind an authenticating web proxy.
-
-:::
-
-## Security Vulnerability Response
-
-Netdata follows a structured vulnerability response process:
-
-- Acknowledges reports within three business days
-- Initiates a Security Release Process for verified issues
-- Releases patches promptly
-- Handles vulnerability information confidentially
-- Keeps reporters updated throughout the process
-
-:::tip
-
-Learn more in [Netdata's GitHub Security Policy](https://github.com/netdata/netdata/security/policy).
-
-:::
-
-## Protection Against Common Security Threats
-
-Netdata Agent is resilient against major security threats:
-
-| **Threat**                 | **Defense Mechanism**                                                      |
-|:---------------------------|:---------------------------------------------------------------------------|
-| DDoS Attacks               | Fixed thread counts, automatic memory management, resource prioritization  |
-| SQL Injections             | No UI data passed back to database-accessing plugins                       |
-| System Resource Starvation | Nice priority protects production apps, early termination in OS-OOM events |
-
-Additional protections include:
-
-- Running as an unprivileged user by default
-- Isolating escalated privileges to specific collectors
-- Proactive CPU and memory management
-
-## User-Customizable Security Settings
-
-You can tailor the Agent's security settings:
-
-| **Setting**                 | **Options Available**                            |
-|:----------------------------|:-------------------------------------------------|
-| TLS Encryption              | Configurable for web API and streaming           |
-| Access Control Lists (ACLs) | Limit endpoint access by IP address              |
-| CPU/Memory Priority         | Adjust scheduling priority and memory thresholds |
-
-:::tip
-
-Use Netdata configuration files to apply custom security settings.
-
-:::
+Report suspected vulnerabilities through the [Netdata GitHub Security Policy](https://github.com/netdata/netdata/security/policy). Do not disclose a suspected vulnerability in a public issue before following that process.

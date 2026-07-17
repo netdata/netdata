@@ -1,19 +1,19 @@
 # Reporting
 
-Extract infrastructure insights for stakeholders, leadership, and external tools. Netdata provides four ways to create reports—from asking a simple question to exporting raw metrics into your existing business intelligence stack.
+Netdata provides four ways to extract infrastructure insights for stakeholders and external tools, from asking a simple question to exporting raw metrics into your BI stack.
 
 ## Methods overview
 
-| Method | Effort | Best for |
-|--------|--------|----------|
-| **[AI Insights](#ai-insights)** | Easiest | Executive summaries, recurring reports, natural language queries |
-| **[AI Assistants (MCP)](#ai-assistants-mcp)** | Easy | Ad-hoc analysis, deep investigation, developer workflows |
-| **[Grafana](#grafana-integration)** | Medium | Custom dashboards, teams already using Grafana |
-| **[Export to BI](#export-to-business-intelligence-tools)** | Advanced | Power BI, Tableau, Looker, custom analytics pipelines |
+| Method                                                     | Effort   | Best for                                                         |
+|------------------------------------------------------------|----------|------------------------------------------------------------------|
+| **[AI Insights](#ai-insights)**                            | Easiest  | Executive summaries, recurring reports, natural language queries |
+| **[AI Assistants (MCP)](#ai-assistants-mcp)**              | Easy     | Ad-hoc analysis, deep investigation, developer workflows         |
+| **[Grafana](#grafana-integration)**                        | Medium   | Custom dashboards, teams already using Grafana                   |
+| **[Export to BI](#export-to-business-intelligence-tools)** | Advanced | Power BI, Tableau, Looker, custom analytics pipelines            |
 
 ## AI Insights
 
-Ask Netdata anything about your infrastructure in plain language and receive an executive-ready report. No configuration required—just describe what you need.
+Ask Netdata anything about your infrastructure in plain language and get an executive-ready report, no configuration required.
 
 ### When to use it
 
@@ -46,18 +46,21 @@ Scheduled reports run automatically and deliver results to your email and the In
 ### Example prompts
 
 **Weekly infrastructure health:**
+
 ```
 Generate a weekly infrastructure summary for services A, B, and C.
 Include major incidents, anomalies, capacity risks, and recommended follow-ups.
 ```
 
 **Cost optimization:**
+
 ```
 Identify underutilized nodes for cost savings. Monthly compute is ~$12K
 with mixed workloads. Goal: save $2–3K/month without reliability impact.
 ```
 
 **SLO conformance:**
+
 ```
 Generate an SLO conformance report for 'user-auth' (99.9% uptime,
 p95 latency <200ms) for the last 7 days. Include breaches, contributing
@@ -66,7 +69,7 @@ factors, and remediation recommendations.
 
 ### Availability
 
-- Available to Business and Free Trial plans
+- Available on Paid plans and Free Trial (see [Netdata Cloud Pricing](https://www.netdata.cloud/pricing/) for current plan details)
 - Each report consumes 1 AI credit (10 free per month on eligible plans)
 - Data privacy: metrics are summarized into structured context; your data is not used to train foundation models
 
@@ -76,22 +79,22 @@ Connect your AI assistant directly to Netdata using the Model Context Protocol (
 
 MCP is available in two ways:
 
-- **Netdata Cloud MCP** at `app.netdata.cloud/api/v1/mcp` — infrastructure-wide access to all your nodes (Paid plan)
-- **Agent/Parent MCP** on every Netdata Agent and Parent (v2.6.0+) — direct local access (free, open-source)
+- **Netdata Cloud MCP** at `app.netdata.cloud/api/v1/mcp`: infrastructure-wide access to all your nodes (Paid plan)
+- **Agent/Parent MCP** on every Netdata Agent and Parent (v2.6.0+): direct local access (free, open-source)
 
 AI assistants can query metrics, alerts, logs, and live system information across your entire infrastructure.
 
 ### Supported AI clients
 
-| Client | Description |
-|--------|-------------|
-| Claude Desktop | Anthropic's desktop AI assistant |
-| Claude Code | Anthropic's CLI for development workflows |
-| Cursor | AI-powered code editor |
-| VS Code | Visual Studio Code with MCP support |
-| JetBrains IDEs | IntelliJ, PyCharm, WebStorm, and others |
-| Gemini CLI | Google's Gemini CLI |
-| OpenAI Codex CLI | OpenAI's development tools |
+| Client           | Description                               |
+|------------------|-------------------------------------------|
+| Claude Desktop   | Anthropic's desktop AI assistant          |
+| Claude Code      | Anthropic's CLI for development workflows |
+| Cursor           | AI-powered code editor                    |
+| VS Code          | Visual Studio Code with MCP support       |
+| JetBrains IDEs   | IntelliJ, PyCharm, WebStorm, and others   |
+| Gemini CLI       | Google's Gemini CLI                       |
+| OpenAI Codex CLI | OpenAI's development tools                |
 
 ### How to connect
 
@@ -117,8 +120,8 @@ Once connected, ask natural language questions:
 
 ### Availability
 
-- **Cloud MCP**: Available on Paid plans — infrastructure-wide access, zero local setup
-- **Agent/Parent MCP**: Available on all plans (v2.6.0+) — free, open-source, direct local access
+- **Cloud MCP**: Available on Paid plans, with infrastructure-wide access and zero local setup
+- **Agent/Parent MCP**: Available on all plans (v2.6.0+), free and open-source, with direct local access
 - Unlimited queries with no per-query charges
 - Requires API key (Cloud token or local API key) for access
 
@@ -126,7 +129,7 @@ See [Netdata MCP](/docs/netdata-ai/mcp/README.md) for detailed setup instruction
 
 ## Grafana integration
 
-Connect Grafana to Netdata Cloud for infrastructure-wide dashboards. Use Grafana's visualization capabilities with Netdata's real-time metrics.
+Connect Grafana to Netdata Cloud for infrastructure-wide dashboards, combining Grafana's visualization with Netdata's real-time metrics.
 
 ### When to use it
 
@@ -154,23 +157,23 @@ Generate API tokens from Netdata Cloud under **User Settings** → **API Tokens*
 
 ## Export to business intelligence tools
 
-Export metrics from Netdata to external databases and business intelligence platforms. You can query data from individual Agents or use Netdata Cloud to aggregate metrics from your entire infrastructure.
+Export metrics to external databases and BI platforms, either from individual Agents or aggregated across your infrastructure via Netdata Cloud.
 
 ### Supported BI platforms
 
 Netdata integrates with popular business intelligence tools through several pathways:
 
-| BI Platform | Integration Options |
-|-------------|---------------------|
-| **Power BI** | Netdata Cloud API, Prometheus endpoint, or database export |
-| **Tableau** | Netdata Cloud API, PostgreSQL, or Prometheus |
-| **Looker / Looker Studio** | Netdata Cloud API, BigQuery, or Prometheus |
-| **Qlik** | Netdata Cloud API, PostgreSQL, or InfluxDB |
-| **SAP Analytics Cloud** | Netdata Cloud API or PostgreSQL |
-| **Metabase** | Netdata Cloud API, PostgreSQL, or TimescaleDB |
-| **Apache Superset** | Netdata Cloud API, PostgreSQL, or Prometheus |
-| **Domo** | Netdata Cloud API or database connectors |
-| **ThoughtSpot** | Netdata Cloud API or PostgreSQL |
+| BI Platform                | Integration Options                                        |
+|----------------------------|------------------------------------------------------------|
+| **Power BI**               | Netdata Cloud API, Prometheus endpoint, or database export |
+| **Tableau**                | Netdata Cloud API, PostgreSQL, or Prometheus               |
+| **Looker / Looker Studio** | Netdata Cloud API, BigQuery, or Prometheus                 |
+| **Qlik**                   | Netdata Cloud API, PostgreSQL, or InfluxDB                 |
+| **SAP Analytics Cloud**    | Netdata Cloud API or PostgreSQL                            |
+| **Metabase**               | Netdata Cloud API, PostgreSQL, or TimescaleDB              |
+| **Apache Superset**        | Netdata Cloud API, PostgreSQL, or Prometheus               |
+| **Domo**                   | Netdata Cloud API or database connectors                   |
+| **ThoughtSpot**            | Netdata Cloud API or PostgreSQL                            |
 
 ### Query options
 
@@ -204,6 +207,7 @@ http://NODE_IP:19999/api/v3/allmetrics?format=prometheus
 ```
 
 Replace `NODE_IP` with your Netdata Agent or Parent IP address:
+
 - **Agent IP**: Returns metrics from that single node
 - **Parent IP**: Returns aggregated metrics from all child agents connected to that Parent
 
@@ -228,13 +232,13 @@ curl 'http://NODE_IP:19999/api/v3/data?contexts=system.cpu&after=-86400&points=2
 
 **Key parameters for BI workflows:**
 
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `contexts` | Metric context to query | `system.cpu`, `system.ram`, `disk.io` |
-| `after` / `before` | Timeframe (seconds or Unix timestamp) | `-2592000` = last 30 days |
-| `points` | Number of output points | `30` = daily for monthly view |
-| `time_group` | Aggregation function | `avg`, `sum`, `min`, `max` |
-| `group_by` | How to group results | `node`, `context`, `label:LABEL_NAME` |
+| Parameter          | Description                           | Example                               |
+|--------------------|---------------------------------------|---------------------------------------|
+| `contexts`         | Metric context to query               | `system.cpu`, `system.ram`, `disk.io` |
+| `after` / `before` | Timeframe (seconds or Unix timestamp) | `-2592000` = last 30 days             |
+| `points`           | Number of output points               | `30` = daily for monthly view         |
+| `time_group`       | Aggregation function                  | `avg`, `sum`, `min`, `max`            |
+| `group_by`         | How to group results                  | `node`, `context`, `label:LABEL_NAME` |
 
 Power BI, Tableau, and similar tools can consume this JSON through their data transformation features (Power Query, etc.).
 
@@ -242,15 +246,15 @@ Power BI, Tableau, and similar tools can consume this JSON through their data tr
 
 For persistent storage and historical analysis, export metrics to a database:
 
-| Database | Connector |
-|----------|-----------|
-| PostgreSQL | Prometheus remote write adapter |
-| TimescaleDB | Prometheus remote write or netdata-timescale-relay |
-| InfluxDB | Graphite or Prometheus remote write |
-| Elasticsearch | Graphite or Prometheus remote write |
-| Google BigQuery | Prometheus remote write |
-| AWS services | AWS Kinesis Data Streams |
-| Azure services | Prometheus remote write |
+| Database        | Connector                                          |
+|-----------------|----------------------------------------------------|
+| PostgreSQL      | Prometheus remote write adapter                    |
+| TimescaleDB     | Prometheus remote write or netdata-timescale-relay |
+| InfluxDB        | Graphite or Prometheus remote write                |
+| Elasticsearch   | Graphite or Prometheus remote write                |
+| Google BigQuery | Prometheus remote write                            |
+| AWS services    | AWS Kinesis Data Streams                           |
+| Azure services  | Prometheus remote write                            |
 
 See [Export Metrics to External Time-Series Databases](/docs/exporting-metrics/README.md) for full connector documentation.
 
@@ -264,28 +268,28 @@ See [Export Metrics to External Time-Series Databases](/docs/exporting-metrics/R
 
 ## Choosing the right method
 
-### Start with AI Insights if you:
+### Start with AI Insights if you
 
 - Need reports quickly without setup
 - Want executive-ready summaries
 - Prefer natural language over configuration
 - Need recurring automated reports
 
-### Use AI Assistants (MCP) if you:
+### Use AI Assistants (MCP) if you
 
 - Want real-time answers to ad-hoc questions
 - Already use Claude, Cursor, or similar AI tools
 - Need deep investigation capabilities
 - Prefer conversational interaction with your data
 
-### Use Grafana if you:
+### Use Grafana if you
 
 - Already have Grafana deployed
 - Need highly customized dashboards
 - Want to combine Netdata with other data sources in one view
 - Have team expertise in Grafana
 
-### Export to BI tools if you:
+### Export to BI tools if you
 
 - Have established Power BI, Tableau, or Looker workflows
 - Need to combine infrastructure metrics with business data

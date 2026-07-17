@@ -24,7 +24,7 @@ efficient.
 
 `windows-events.plugin` is a Netdata Function Plugin.
 
-To protect your privacy, as with all Netdata Functions, a free Netdata Cloud user account is required to access it.
+You can access this Function through the Agent directly, a Parent, or Netdata Cloud. Every access path requires a signed-in Netdata Cloud user in the same Space as the node with permission to view sensitive data.
 For more information check [this discussion](https://github.com/netdata/netdata/discussions/16136).
 
 ## Events Sources
@@ -38,7 +38,7 @@ By default, it aggregates events from all event channels, providing a unified vi
 
 In the list of events channels, several shortcuts are added, aggregating events according to various attributes:
 
-- `All`, aggregates events from all available channels. This provides a holistic view of all events in the system. 
+- `All`, aggregates events from all available channels. This provides a holistic view of all events in the system.
 - `All-Admin`, `All-Operational`, `All-Analytic` and `All-Debug` aggregates events from channels marked `Admin`, `Operational`, `Analytic` and `Debug`, respectively.
 - `All-Windows`, aggregates events from `Application`, `Security`, `System` and `Setup`.
 - `All-Enabled` and `All-Disabled` aggregates events from channels depending on their status.
@@ -55,7 +55,7 @@ Windows Events are structured with both system-defined fields and user-defined f
 The Windows Events plugin primarily works with the system-defined fields, which are consistently available
 across all event types.
 
-### System-defined fields 
+### System-defined fields
 
 The system-defined fields are:
 
@@ -75,14 +75,14 @@ The system-defined fields are:
    - 3: Warning
    - 4: Informational
    - 5: Verbose
-   
+
    Additionally, applications may define their own levels.
 
    Netdata provides 2 fields: `Level` and `LevelID` for the text and numeric representation of it.
 
 4. **Opcode**  
    The action or state within a provider when the event was logged.
-   
+
    Netdata provides 2 fields: `Opcode` and `OpcodeID` for the text and numeric representation of it.
 
 5. **EventID**  
@@ -133,6 +133,7 @@ The system-defined fields are:
     Netdata provides 3 fields: `UserAccount`, `UserDomain` and `UserSID`.
 
 ### User-defined fields
+
 Each event log entry can include up to 100 user-defined fields (per event-id).
 
 Unfortunately, accessing these fields is significantly slower, to a level that is not practical to do so
@@ -186,7 +187,7 @@ To achieve this level of efficiency, the plugin:
 
 For Full Text Search:
 
-- requests only the Message and the values of the user-fields from the system, avoiding the "expensive" XML call (which is still lazy-loaded). 
+- requests only the Message and the values of the user-fields from the system, avoiding the "expensive" XML call (which is still lazy-loaded).
 
 The result is a system that is highly efficient for working with moderate volumes (hundreds of thousands) of events.
 
@@ -211,16 +212,13 @@ combine the events of multiple servers, as you see fit.
 Yes. When your nodes are connected to a Netdata parent, all their functions are available via the parent's UI.
 So, from the parent UI, you can access the functions of all your nodes.
 
-Keep in mind that to protect your privacy, in order to access Netdata functions, you need a free Netdata Cloud
-account.
+The same signed-in user, same-Space, and sensitive-data permission requirements apply when you access the Function through a Parent.
 
 ### Is any of my data exposed to Netdata Cloud from this plugin?
 
-No. When you access the Agent directly, none of your data passes through Netdata Cloud. You need a free Netdata
-Cloud account only to verify your identity and enable the use of Netdata Functions. Once this is done, all the
-data flow directly from your Netdata Agent to your web browser.
+No Function result passes through Netdata Cloud when you access the Agent directly. Netdata Cloud authenticates and authorizes the user, then the result flows directly from the Netdata Agent to the web browser.
 
-When you access Netdata via https://app.netdata.cloud, your data travel via Netdata Cloud, but they are not stored
+When you access Netdata via <https://app.netdata.cloud>, your data travel via Netdata Cloud, but they are not stored
 in Netdata Cloud. This is to allow you access your Netdata Agents from anywhere. All communication from/to
 Netdata Cloud is encrypted.
 

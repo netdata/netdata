@@ -14,15 +14,11 @@ When scale breaks the model, teams face two options - and both are wrong:
 
 ### Option 1: Reduce the Workload
 
-Lower granularity. Drop cardinality. Filter. Sample.
-
-**This is a trap and a paradox.** If you knew which data you'd need during a crisis, you could predict the crisis and prevent it. By definition, an unpredictable event is the one that will be invisible in your downsampled dataset. You're betting your incident response on being able to predict the unpredictable.
+Lower granularity, drop cardinality, filter, sample. **This is a trap and a paradox**: if you knew which data you'd need during a crisis, you could predict the crisis and prevent it. An unpredictable event is, by definition, the one invisible in your downsampled dataset.
 
 ### Option 2: Scale the Database
 
-Build giant, expensive clusters. Add more cores. More RAM. More everything.
-
-**This is a money pit.** In many organizations today, observability costs more than the services being monitored. We routinely encounter companies where 40-50% of infrastructure budget goes to monitoring pipelines, plus teams of specialists to keep them alive.
+Build giant, expensive clusters: more cores, more RAM, more everything. **This is a money pit**: many organizations spend more on observability than on the services being monitored, with 40-50% of infrastructure budget going to monitoring pipelines plus the specialists to keep them alive.
 
 ## The Netdata Way: Process and Store at the Edge
 
@@ -36,9 +32,7 @@ Every Netdata Agent is a full observability engine:
 - Runs health checks and triggers alerts
 - Serves dashboards and APIs independently
 
-When you need high availability, persistent storage for ephemeral nodes, reduced load on production systems, or on-premises dashboards, Parents aggregate streams without becoming bottlenecks - because the heavy lifting already happened at the edge.
-
-This distributed architecture delivers results that speak for themselves:
+When you need high availability, persistent storage for ephemeral nodes, reduced production load, or on-premises dashboards, Parents aggregate streams without becoming bottlenecks, since the heavy lifting already happened at the edge. This delivers:
 
 - **No loss of fidelity** - every metric, every second, always visible
 - **No blind spots** - no sampling, no cherry-picking
@@ -270,14 +264,14 @@ This isn't just optimization. It's a fundamentally different architecture that r
 <details>
 <summary><strong>How many nodes can a single Netdata Parent handle?</strong></summary><br/>
 
-We recommend running Parents with up to 500 Agents — see [Parent Sizing Guidelines](#parent-sizing-guidelines) above for the metrics/s and resource breakdown by scale. We have customers running larger Parents, but resources increase and performance decreases non-linearly.
+We recommend running Parents with up to 500 Agents. See [Parent Sizing Guidelines](#parent-sizing-guidelines) above for the metrics/s and resource breakdown by scale. We have customers running larger Parents, but resources increase and performance decreases non-linearly.
 
 </details>
 
 <details>
 <summary><strong>What happens if a Parent goes down?</strong></summary><br/>
 
-If the Parent was clustered, agents will connect to the other Parent and replicate to it any metrics collected during the transition. If there is no other Parent to connect to, Agents keep collecting and storing data locally, which will be replicated to the Parent when it becomes available. Note that the replication of past metrics uses only tier-0 (high-res data), so Agents must have enough retention in tier-0 to avoid gaps in the charts.
+If clustered, Agents connect to the other Parent and replicate any metrics collected during the transition. Otherwise, Agents keep collecting locally and replicate once the Parent returns, using tier-0 (high-res) data only, so Agents need enough tier-0 retention to avoid chart gaps.
 
 </details>
 
@@ -333,7 +327,7 @@ Yes. Even Netdata Cloud SaaS itself (our commercial service) is such a single in
 <details>
 <summary><strong>Do you promote per-second collection and unlimited metrics because your revenue depends on volume?</strong></summary><br/>
 
-No. Our commercial offerings are priced per node, with volume discounts (smaller price as the number of nodes increases). Our revenue is not related to the number of metrics or the volume of observability data collected or viewed. We designed Netdata for maximum performance at scale and volume for your benefit. Not ours.
+No. Commercial plans are priced per node with volume discounts, unrelated to metrics count or data volume. Netdata is designed for maximum performance at scale for your benefit, not ours.
 
 </details>
 
@@ -347,7 +341,7 @@ Think of Netdata Cloud as the headend of a distributed database. Each Netdata Pa
 <details>
 <summary><strong>Is querying 100 remote systems in parallel slower than querying a bigger one locally?</strong></summary><br/>
 
-There is some extra network latency involved, but this is usually small (a few ms), because the data transferred are tiny (your web browser will receive 500-1000 points max, even if the query is 10 days of per-second data). However, the aggregate horse power and parallelism of 100 totally independent systems is orders of magnitude more, compared to any single local system. The queries are actually quite faster.
+Extra network latency exists but is usually small (a few ms), since transferred data is tiny (your browser gets 500-1000 points max, even for 10 days of per-second data). The combined horsepower of 100 independent systems querying in parallel far exceeds any single local system, so queries actually end up faster.
 
 </details>
 

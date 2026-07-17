@@ -22,15 +22,15 @@ The `systemd` journal plugin provides an efficient way to view, explore, and ana
 
 ## Prerequisites
 
-| Requirement | Details |
-|-------------|---------|
-| Netdata Agent v1.44+ | This plugin requires Netdata version 1.44 or newer |
-| Netdata Cloud account | Required to use Netdata Functions, including this plugin |
-| **Not supported in**: | Static builds (use Debian-based containers instead) |
+| Requirement           | Details                                                                                                  |
+|-----------------------|----------------------------------------------------------------------------------------------------------|
+| Netdata Agent v1.44+  | This plugin requires Netdata version 1.44 or newer                                                       |
+| Netdata Cloud account | Required to authenticate and authorize this sensitive Function, including direct Agent and Parent access |
+| **Not supported in**: | Static builds (use Debian-based containers instead)                                                      |
 
 :::tip
 
-This plugin is a Netdata Function Plugin. A free Netdata Cloud account is required. See the [Netdata Functions discussion](https://github.com/netdata/netdata/discussions/16136).
+This plugin is a Netdata Function Plugin. You can access it from the Agent directly, through a Parent, or through Netdata Cloud. Every path requires a signed-in user in the same Netdata Cloud Space as the node with permission to view sensitive data. See the [Netdata Functions discussion](https://github.com/netdata/netdata/discussions/16136).
 
 :::
 
@@ -112,16 +112,16 @@ Default journals on all `systemd`-based systems. Includes:
 
 Fields are enriched for readability:
 
-| Field | Enrichment applied |
-|-------|-------------------|
-| `_BOOT_ID` | Timestamp of first message for boot |
-| `PRIORITY` | Human-readable priority name |
-| `SYSLOG_FACILITY` | Named facility |
-| `ERRNO` | Error name |
-| UID and GID fields | Resolved to user and group names |
-| `_CAP_EFFECTIVE` | Human-readable capabilities |
-| `_SOURCE_REALTIME_TIMESTAMP` | UTC timestamp |
-| `MESSAGE_ID` | Well-known event name if known |
+| Field                        | Enrichment applied                  |
+|------------------------------|-------------------------------------|
+| `_BOOT_ID`                   | Timestamp of first message for boot |
+| `PRIORITY`                   | Human-readable priority name        |
+| `SYSLOG_FACILITY`            | Named facility                      |
+| `ERRNO`                      | Error name                          |
+| UID and GID fields           | Resolved to user and group names    |
+| `_CAP_EFFECTIVE`             | Human-readable capabilities         |
+| `_SOURCE_REALTIME_TIMESTAMP` | UTC timestamp                       |
+| `MESSAGE_ID`                 | Well-known event name if known      |
 
 :::tip
 
@@ -136,6 +136,7 @@ Use the ⚙️ icon above the table to select fields to display as columns.
 ![Table field customization interface](https://github.com/netdata/netdata/assets/2662304/cd75fb55-6821-43d4-a2aa-033792c7f7ac)
 
 The table view provides a powerful way to analyze logs with:
+
 - Scrollable list of log entries with customizable columns
 - Color-coded PRIORITY levels for quick identification of issues
 - Clickable entries for detailed viewing
@@ -149,6 +150,7 @@ Click a log entry to open the right-hand info panel showing all fields for that 
 ![Sidebar field display](https://github.com/netdata/netdata/assets/2662304/3207794c-a61b-444c-8ffe-6c07cbc90ae2)
 
 The sidebar shows:
+
 - Every field present in the selected journal entry
 - Raw and enriched field values
 - Copyable text for sharing or further analysis
@@ -167,6 +169,7 @@ The plugin offers select fields as filters with counters. Field allowlists and b
 ![Field filtering interface](https://github.com/netdata/netdata/assets/2662304/ac710d46-07c2-487b-8ce3-e7f767b9ae0f)
 
 Key filter features:
+
 - Real-time counters showing matching entry counts
 - Multi-select capability for each field
 - Toggleable inclusion/exclusion mode
@@ -189,6 +192,7 @@ The plugin offers several visualization features to help you understand and navi
 ### Timeline view
 
 The timeline at the top of the interface shows:
+
 - Log frequency distribution over time
 - Interactive zoom and pan controls
 - Time selection capabilities
@@ -197,6 +201,7 @@ The timeline at the top of the interface shows:
 ### Histograms
 
 Field-specific histograms provide:
+
 - Visual breakdown of log entries by field value
 - Color-coded frequency indicators
 - Click-to-filter capability
@@ -205,6 +210,7 @@ Field-specific histograms provide:
 ### Color coding
 
 The plugin uses color to enhance readability:
+
 - Priority levels (emergency, alert, critical, etc.) have distinct colors
 - Selected filters are highlighted
 - Active elements use consistent color indicators
@@ -213,6 +219,7 @@ The plugin uses color to enhance readability:
 ### UI navigation
 
 The interface offers several ways to navigate logs:
+
 - Scroll through paginated results
 - Jump to specific timeframes
 - Click on histogram bars to focus on specific values
@@ -236,12 +243,12 @@ The plugin supports PLAY mode for real-time log streaming. Click the ▶️ butt
 
 The plugin supports full-text search using flexible pattern matching:
 
-| Feature | Description |
-|---------|-------------|
-| Contains match | Default pattern style (e.g., `error` matches `error`, `error_count`) |
-| Wildcards | `*` matches any characters (e.g., `a*b` matches `acb`, `a_long_b`) |
+| Feature           | Description                                                                                                   |
+|-------------------|---------------------------------------------------------------------------------------------------------------|
+| Contains match    | Default pattern style (e.g., `error` matches `error`, `error_count`)                                          |
+| Wildcards         | `*` matches any characters (e.g., `a*b` matches `acb`, `a_long_b`)                                            |
 | Multiple patterns | Separate with `\|` for OR logic (e.g., `error\|warning` matches lines containing either "error" OR "warning") |
-| Negation | Prefix with `!` to exclude (e.g., `!systemd\|*` excludes lines with `systemd`) |
+| Negation          | Prefix with `!` to exclude (e.g., `!systemd\|*` excludes lines with `systemd`)                                |
 
 :::tip
 
@@ -255,14 +262,15 @@ The plugin reads journal files directly using `libsystemd`, supporting concurren
 
 Query performance depends on several factors:
 
-| Factor | Impact on Performance |
-|--------|----------------------|
-| Number of journal files queried | Fewer files lead to faster queries |
-| Disk speed | Faster disks improve query times |
-| Available memory | More memory allows better caching |
-| Filters applied | Using fewer filters speeds up the query |
+| Factor                          | Impact on Performance                   |
+|---------------------------------|-----------------------------------------|
+| Number of journal files queried | Fewer files lead to faster queries      |
+| Disk speed                      | Faster disks improve query times        |
+| Available memory                | More memory allows better caching       |
+| Filters applied                 | Using fewer filters speeds up the query |
 
 For best performance:
+
 - Keep the visible **timeframe short**
 - **Limit the number of rows** displayed
 - **Apply filters** to reduce the dataset
@@ -274,14 +282,14 @@ The plugin handles large datasets efficiently using a sampling algorithm, ensuri
 
 ### How sampling works
 
-| Step | Description |
-|------|-------------|
-| 1 | **Fully evaluates the latest 500,000 log entries** |
-| 2 | **Distributes evaluation** across journal files for **up to 1 million entries** |
-| 3 | **Marks additional entries** as `[unsampled]` beyond the evaluation budget |
-| 4 | **Estimates counts** as `[estimated]` once unsampled limits are hit |
-| 5 | Uses sequence numbers (if available) for **precise estimation** |
-| 6 | **Continues responsive histogram generation** while managing performance |
+| Step | Description                                                                     |
+|------|---------------------------------------------------------------------------------|
+| 1    | **Fully evaluates the latest 500,000 log entries**                              |
+| 2    | **Distributes evaluation** across journal files for **up to 1 million entries** |
+| 3    | **Marks additional entries** as `[unsampled]` beyond the evaluation budget      |
+| 4    | **Estimates counts** as `[estimated]` once unsampled limits are hit             |
+| 5    | Uses sequence numbers (if available) for **precise estimation**                 |
+| 6    | **Continues responsive histogram generation** while managing performance        |
 
 The plugin uses a sophisticated algorithm that prioritizes newer logs while maintaining reasonable estimates for historical data. This approach ensures that even with terabytes of journal data, the interface remains responsive and usable.
 
@@ -323,18 +331,18 @@ The result is that even at extreme scale, mainly because Netdata samples 200x mo
 
 ### Filesystem and storage recommendations
 
-| Recommendation | Benefit |
-|---------------|---------|
-| Use compressed filesystems (`ext4`, `btrfs`, `zfs`) | Reduces disk I/O by minimizing file size |
-| Use SSD or NVMe storage | Speeds up journal file reads |
-| Avoid small fragmented journal files | Prevents query slowdowns on busy centralization servers |
+| Recommendation                                      | Benefit                                                 |
+|-----------------------------------------------------|---------------------------------------------------------|
+| Use compressed filesystems (`ext4`, `btrfs`, `zfs`) | Reduces disk I/O by minimizing file size                |
+| Use SSD or NVMe storage                             | Speeds up journal file reads                            |
+| Avoid small fragmented journal files                | Prevents query slowdowns on busy centralization servers |
 
 ### Memory and caching
 
-| Recommendation | Benefit |
-|---------------|---------|
-| Allocate more RAM for the system | Improves OS caching of journal files |
-| Query the same timeframe repeatedly | Benefits from cached journal data |
+| Recommendation                           | Benefit                                    |
+|------------------------------------------|--------------------------------------------|
+| Allocate more RAM for the system         | Improves OS caching of journal files       |
+| Query the same timeframe repeatedly      | Benefits from cached journal data          |
 | Limit query timeframes on large datasets | Reduces memory overhead and improves speed |
 
 :::tip
@@ -345,12 +353,12 @@ Journal data is cached by the operating system. The more RAM available for cachi
 
 ### Query strategies
 
-| Strategy | Why it helps |
-|----------|-------------|
-| Narrow the timeframe of your queries | Minimizes data scanned per request |
-| Use specific filters and source selections | Limits the scope of journal files being queried |
-| Limit the number of rows returned in the UI | Keeps response times fast and manageable |
-| Enable PLAY mode only when necessary | Reduces continuous query load on the system |
+| Strategy                                    | Why it helps                                    |
+|---------------------------------------------|-------------------------------------------------|
+| Narrow the timeframe of your queries        | Minimizes data scanned per request              |
+| Use specific filters and source selections  | Limits the scope of journal files being queried |
+| Limit the number of rows returned in the UI | Keeps response times fast and manageable        |
+| Enable PLAY mode only when necessary        | Reduces continuous query load on the system     |
 
 ## Configuration and maintenance
 
@@ -358,11 +366,11 @@ The Netdata `systemd` journal plugin is designed to work **out of the box** with
 
 ### Requirements
 
-| Requirement | Description |
-|------------|-------------|
-| Netdata Agent | Installed on the node or centralization server |
-| Journal files | Located in `/var/log/journal` (persistent) or `/run/log/journal` (volatile) |
-| Netdata Cloud account | Required to access Netdata Functions, including this plugin |
+| Requirement           | Description                                                                                              |
+|-----------------------|----------------------------------------------------------------------------------------------------------|
+| Netdata Agent         | Installed on the node or centralization server                                                           |
+| Journal files         | Located in `/var/log/journal` (persistent) or `/run/log/journal` (volatile)                              |
+| Netdata Cloud account | Required to authenticate and authorize this sensitive Function, including direct Agent and Parent access |
 
 :::tip
 
@@ -372,12 +380,12 @@ No additional configuration is required for this plugin to operate on supported 
 
 ### Maintenance considerations
 
-| Task | Purpose |
-|------|---------|
-| **Keep Netdata up to date** | Ensures plugin compatibility and performance optimizations |
-| **Monitor disk usage** of journal files | Prevents performance issues caused by excessive log volume |
-| **Verify** journal file **locations** | Confirms the plugin can access the intended sources |
-| **Review** source selections **periodically** | Adjusts scope as infrastructure changes |
+| Task                                          | Purpose                                                    |
+|-----------------------------------------------|------------------------------------------------------------|
+| **Keep Netdata up to date**                   | Ensures plugin compatibility and performance optimizations |
+| **Monitor disk usage** of journal files       | Prevents performance issues caused by excessive log volume |
+| **Verify** journal file **locations**         | Confirms the plugin can access the intended sources        |
+| **Review** source selections **periodically** | Adjusts scope as infrastructure changes                    |
 
 ## FAQ
 
@@ -401,13 +409,14 @@ For details on configuring a journal centralization server, see the [journal cen
 Yes — if your nodes are connected to a Netdata parent, all their functions are accessible via the parent's UI.  
 This includes access to the `systemd` journal plugin for each child node.
 
+The same signed-in user, same-Space, and sensitive-data permission requirements apply through the Parent.
+
 </details>
 
 <details>
 <summary><strong>Does this plugin expose any data to Netdata Cloud?</strong></summary>
 
-No — when accessing the Agent directly, **no data is exposed to Netdata Cloud**.  
-The Cloud account is only used for authentication. Data flows directly from your Netdata Agent to your web browser.
+When accessing the Agent directly, Netdata Cloud authenticates and authorizes the user, but the Function result does not transit Netdata Cloud. It flows directly from the Netdata Agent to the web browser.
 
 :::tip
 
@@ -440,11 +449,11 @@ When sending logs to Loki, you must predefine which fields to include, reducing 
 
 Netdata reads journals directly, providing:
 
-| Feature | Netdata journal plugin | Loki |
-|---------|----------------------|------|
-| **Indexed on all fields** | ✔️ Yes | ❌ Only selected labels |
-| Supports **dynamic fields** | ✔️ Yes | ❌ Assumes fixed schema |
-| Requires **configuration** | ❌ No | ✔️ Yes (relabel rules, label selection) |
+| Feature                     | Netdata journal plugin | Loki                                    |
+|-----------------------------|------------------------|-----------------------------------------|
+| **Indexed on all fields**   | ✔️ Yes                 | ❌ Only selected labels                 |
+| Supports **dynamic fields** | ✔️ Yes                 | ❌ Assumes fixed schema                 |
+| Requires **configuration**  | ❌ No                  | ✔️ Yes (relabel rules, label selection) |
 
 :::tip
 
@@ -467,10 +476,10 @@ Centralized logs provide high visibility with minimal overhead.
 
 Two main strategies:
 
-| Strategy | Description |
-|----------|------------|
-| **Active sources** | Central server **fetches logs** from each node |
-| **Passive sources** | Nodes **push logs** to the central server |
+| Strategy            | Description                                    |
+|---------------------|------------------------------------------------|
+| **Active sources**  | Central server **fetches logs** from each node |
+| **Passive sources** | Nodes **push logs** to the central server      |
 
 :::tip
 
@@ -484,10 +493,10 @@ or the [encrypted setup guide](https://github.com/netdata/netdata/blob/master/do
 <details>
 <summary><strong>What are the limitations when using centralization?</strong></summary>
 
-| Limitation | Notes |
-|------------|-------|
-| Namespaces not supported by Docker | [Related issue](https://github.com/moby/moby/issues/41879) |
-| `systemd-journal-upload` does not handle namespaces automatically | Requires manual configuration per namespace |
+| Limitation                                                        | Notes                                                      |
+|-------------------------------------------------------------------|------------------------------------------------------------|
+| Namespaces not supported by Docker                                | [Related issue](https://github.com/moby/moby/issues/41879) |
+| `systemd-journal-upload` does not handle namespaces automatically | Requires manual configuration per namespace                |
 
 </details>
 
@@ -496,7 +505,7 @@ or the [encrypted setup guide](https://github.com/netdata/netdata/blob/master/do
 
 If you encounter issues or have ideas for improvements:
 
-1. Check the [existing GitHub issues](https://github.com/netdata/netdata/issues) 
+1. Check the [existing GitHub issues](https://github.com/netdata/netdata/issues)
 2. Submit a new issue with detailed reproduction steps
 3. For feature requests, describe your use case clearly
 
@@ -508,6 +517,7 @@ The plugin is actively maintained, and feedback helps improve it for everyone.
 <summary><strong>Can I customize the plugin's appearance or behavior?</strong></summary>
 
 Currently, customization options are limited to:
+
 - Column selection in the table view
 - Filter configurations
 - Time range selection
@@ -523,21 +533,21 @@ Use the following solutions to resolve common issues with the systemd journal pl
 
 ### How to resolve plugin availability problems
 
-| Possible Cause | Solution |
-|---------------|----------|
-| Running an older Netdata version (pre-1.44) | Update Netdata to version **1.44 or later** |
-| Using Alpine-based Docker container | Use the **Debian-based Netdata container** (from 1.44+) |
-| Using a static build of Netdata (`/opt/netdata`) | Switch to a package-based installation or source build |
-| Missing `libsystemd` or required dependencies | Make sure `libsystemd` is installed on the host |
+| Possible Cause                                   | Solution                                                |
+|--------------------------------------------------|---------------------------------------------------------|
+| Running an older Netdata version (pre-1.44)      | Update Netdata to version **1.44 or later**             |
+| Using Alpine-based Docker container              | Use the **Debian-based Netdata container** (from 1.44+) |
+| Using a static build of Netdata (`/opt/netdata`) | Switch to a package-based installation or source build  |
+| Missing `libsystemd` or required dependencies    | Make sure `libsystemd` is installed on the host         |
 
 ### How to fix slow or timing out queries
 
-| Possible Cause | Solution |
-|---------------|----------|
-| Querying too many journal files at once | Select specific **sources** before running your query |
-| Long timeframes selected | Narrow the **timeframe** to improve performance |
-| Low disk speed or insufficient RAM | Use faster disks and increase memory for better caching |
-| Too many active filters | Reduce the number of **filters** applied |
+| Possible Cause                          | Solution                                                |
+|-----------------------------------------|---------------------------------------------------------|
+| Querying too many journal files at once | Select specific **sources** before running your query   |
+| Long timeframes selected                | Narrow the **timeframe** to improve performance         |
+| Low disk speed or insufficient RAM      | Use faster disks and increase memory for better caching |
+| Too many active filters                 | Reduce the number of **filters** applied                |
 
 :::tip
 
@@ -547,37 +557,37 @@ Sampling ensures responsiveness at scale, but selecting sources and filters rema
 
 ### How to solve missing journal sources
 
-| Possible Cause | Solution |
-|---------------|----------|
-| Journals stored outside default paths | Create a **symlink** to `/var/log/journal` or `/run/log/journal` |
+| Possible Cause                         | Solution                                                                                                             |
+|----------------------------------------|----------------------------------------------------------------------------------------------------------------------|
+| Journals stored outside default paths  | Create a **symlink** to `/var/log/journal` or `/run/log/journal`                                                     |
 | Journals not persistent across reboots | Configure `systemd-journald` to enable **persistent logs** with `Storage=persistent` in `/etc/systemd/journald.conf` |
 
 ### How to address missing or incomplete logs
 
-| Possible Cause | Solution |
-|---------------|----------|
-| Journals rotated or deleted | Ensure **persistent storage** is enabled |
+| Possible Cause                       | Solution                                                             |
+|--------------------------------------|----------------------------------------------------------------------|
+| Journals rotated or deleted          | Ensure **persistent storage** is enabled                             |
 | Misconfigured journal centralization | Check `systemd-journal-remote` and `systemd-journal-upload` settings |
-| Namespace logs not forwarded | Manually configure forwarding for **each namespace** |
+| Namespace logs not forwarded         | Manually configure forwarding for **each namespace**                 |
 
 ### How to fix UI rendering issues
 
-| Possible Cause | Solution |
-|---------------|----------|
-| Outdated browser | Update to the latest version of Chrome, Firefox, Safari, or Edge |
-| Zoom level affecting layout | Reset browser zoom to 100% |
-| Ad blockers or script blockers | Temporarily disable to test if they're interfering |
-| Network connectivity issues | Check network connections to Netdata server |
+| Possible Cause                 | Solution                                                         |
+|--------------------------------|------------------------------------------------------------------|
+| Outdated browser               | Update to the latest version of Chrome, Firefox, Safari, or Edge |
+| Zoom level affecting layout    | Reset browser zoom to 100%                                       |
+| Ad blockers or script blockers | Temporarily disable to test if they're interfering               |
+| Network connectivity issues    | Check network connections to Netdata server                      |
 
 ### How to understand error messages
 
-| Error Message | Meaning | Solution |
-|--------------|---------|----------|
-| "Plugin not available" | The systemd-journal plugin isn't loaded | Check your Netdata installation type (must not be Alpine or static) |
-| "Unable to open journal" | Permission issues accessing journal files | Ensure Netdata has proper permissions for journal directories |
-| "Timeout while querying" | Query is taking too long to complete | Reduce the query scope with filters or shorter timeframes |
-| "No sources detected" | Cannot find valid journal files | Check journal file locations and setup |
-| "Source selection failed" | Selected source cannot be accessed | Verify the source exists and permissions are correct |
+| Error Message             | Meaning                                   | Solution                                                            |
+|---------------------------|-------------------------------------------|---------------------------------------------------------------------|
+| "Plugin not available"    | The systemd-journal plugin isn't loaded   | Check your Netdata installation type (must not be Alpine or static) |
+| "Unable to open journal"  | Permission issues accessing journal files | Ensure Netdata has proper permissions for journal directories       |
+| "Timeout while querying"  | Query is taking too long to complete      | Reduce the query scope with filters or shorter timeframes           |
+| "No sources detected"     | Cannot find valid journal files           | Check journal file locations and setup                              |
+| "Source selection failed" | Selected source cannot be accessed        | Verify the source exists and permissions are correct                |
 
 ## How to verify setup
 

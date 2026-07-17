@@ -1,175 +1,87 @@
-# Netdata Access Control and Feature Availability
+# Access Control and Feature Availability
 
-This document explains the access control policies that govern feature availability in Netdata, and how these change based on your authentication and subscription status.
+Netdata uses several independent controls to decide whether a request is allowed. Authentication, the data sensitivity declared by an endpoint, network configuration, user permissions, and commercial entitlements are separate concerns.
 
-## Overview
+This page explains the durable access model. For current plan limits and feature entitlements, see the [pricing page](https://www.netdata.cloud/pricing/).
 
-Netdata implements a layered access control system to protect sensitive information while keeping core monitoring capabilities freely available. The system distinguishes between three access levels:
+## Access Layers
 
-| Access Level                | Description                                                              |
-|-----------------------------|--------------------------------------------------------------------------|
-| **Anonymous**               | Using the Netdata dashboard without signing in                           |
-| **Netdata Cloud Community** | Signed in to Netdata Cloud (free tier)                                   |
-| **Netdata Cloud paid plan** | Signed in with a paid plan (Homelab, Business, or Enterprise On-Premise) |
+| Layer                         | What it controls                                                                              |
+|:------------------------------|:----------------------------------------------------------------------------------------------|
+| Network reachability and ACLs | Which clients can connect to an Agent or Parent endpoint.                                     |
+| Authentication                | Which identity is making the request.                                                         |
+| Endpoint permissions          | Whether that identity can access anonymous, sensitive, configuration, or administrative data. |
+| Space membership and role     | What an authenticated Cloud user can do in a particular Space.                                |
+| Product entitlement           | Whether a Cloud or commercial feature is enabled for the account or deployment.               |
 
-## Why Access Controls Exist
+Passing one layer does not bypass the others. For example, a plan may include a feature while the current user still lacks the permission required to use it.
 
-Netdata functions can expose sensitive system information:
+## Metrics and Sensitive Data
 
-- **Process details** reveal running applications, command-line arguments (which may contain passwords or tokens), and resource consumption patterns
-- **Network connections** expose active services, connected clients, and internal network topology
-- **System logs** may contain application errors, security events, and debugging information with sensitive context
-- **Database queries** can reveal query patterns, table structures, and potentially sensitive data in error messages
+Ordinary metrics and chart metadata use the anonymous-data access class in the Agent API. They may be reachable without a signed-in identity when the Agent is exposed directly and bearer protection is disabled.
 
-Without authentication, anyone who can reach the Netdata dashboard could access this information. The access control system ensures that sensitive data is only available to authenticated users who belong to the same Netdata Cloud Space as the monitored infrastructure.
+More detailed operational data can be sensitive:
 
-## Feature Availability by Access Level
+- Process command lines may contain credentials or tokens.
+- Database queries and errors may contain literal or business data.
+- Logs and event records may contain personal or security information.
+- Network connections can reveal internal services and topology.
+- Agent configuration can reveal infrastructure details and secrets.
 
-### Metrics and Visualization
+Endpoints and Functions declare the access level they require. Sensitive operations can require a signed identity, same-Space membership, sensitive-data access, or a specific configuration permission.
 
-| Feature                            |  Anonymous  | Community  |   Paid    |
-|------------------------------------|:-----------:|:----------:|:---------:|
-| Real-time metrics (all collectors) |      ✓      |     ✓      |     ✓     |
-| Historical data and retention      |      ✓      |     ✓      |     ✓     |
-| Charts and dashboards              |      ✓      |     ✓      |     ✓     |
-| Anomaly detection (ML)             |      ✓      |     ✓      |     ✓     |
-| Alert notifications                |      ✓      |     ✓      |     ✓     |
-| Node dashboard access              |   5 nodes   |  5 nodes   | Unlimited |
-| Custom dashboards                  | 1 per agent | 1 per room | Unlimited |
+## Direct Agent and Parent Access
 
-:::note
+A default direct deployment commonly relies on network isolation and Agent ACLs. Before exposing an Agent or Parent beyond a trusted network, configure an authentication boundary.
 
-**Windows standalone Agents:** On Windows, standalone Agents on the free Community tier collect metrics but the local dashboard at `http://localhost:19999` is locked. To view monitoring data, connect the node to [Netdata Cloud](https://app.netdata.cloud) (free Community tier). Paid plans unlock the local dashboard. Air-gapped free standalone Windows installations cannot reach Netdata Cloud, so monitoring data cannot be viewed in that setup. When a Windows Child Agent streams to a Linux-based Netdata parent, the parent dashboard shows the Windows child's metrics normally — the Windows standalone local-dashboard lock does not apply, because the dashboard is served by the Linux parent rather than the Windows Agent. Sensitive functions on the Windows child still follow the standard access-control rules described in this document. For Windows installation details, see [Install Netdata on Windows](/packaging/windows/WINDOWS_INSTALLER.md).
+Supported controls include:
 
-:::
+- [Bearer token protection](/docs/netdata-agent/configuration/secure-your-netdata-agent-with-bearer-token.md) integrated with Netdata Cloud identities.
+- An authenticating reverse proxy.
+- TLS for the Agent web server.
+- Endpoint-specific and global network ACLs.
 
-### Functions (Live Tab)
+Bearer protection changes how otherwise anonymous-data APIs are handled. Review the linked configuration page before enabling it, especially for direct API and MCP clients.
 
-Functions provide on-demand, detailed information beyond standard metrics.
+## Netdata Cloud Access
 
-| Function                | Description                                 | Anonymous | Community | Paid |
-|-------------------------|---------------------------------------------|:---------:|:---------:|:----:|
-| **Block Devices**       | Disk I/O activity                           |     ✓     |     ✓     |  ✓   |
-| **Containers/VMs**      | Container and VM resource usage             |     ✓     |     ✓     |  ✓   |
-| **IPMI Sensors**        | Hardware sensor readings                    |     ✓     |     ✓     |  ✓   |
-| **Mount Points**        | Disk usage per mount                        |     ✓     |     ✓     |  ✓   |
-| **Network Interfaces**  | Interface traffic and status                |     ✓     |     ✓     |  ✓   |
-| **Systemd Services**    | Service resource usage                      |     ✓     |     ✓     |  ✓   |
-| **Processes**           | Running processes, command lines, resources |     ✗     |     ✓     |  ✓   |
-| **Network Connections** | Active TCP/UDP connections                  |     ✗     |     ✓     |  ✓   |
-| **Systemd Journal**     | System and application logs                 |     ✗     |     ✓     |  ✓   |
-| **Windows Events**      | Windows event logs                          |     ✗     |     ✓     |  ✓   |
-| **Systemd Units**       | Unit status and configuration               |     ✗     |     ✓     |  ✓   |
-| **Database Queries**    | Top queries, deadlocks, errors              |     ✗     |     ✓     |  ✓   |
-| **Streaming Status**    | Netdata streaming topology                  |     ✗     |     ✓     |  ✓   |
-| **API Call Tracing**    | Netdata API request tracing                 |     ✗     |     ✓     |  ✓   |
+A Cloud user must be authenticated, belong to the relevant Space, and have the permissions required by the requested endpoint. Sensitive Function output is retrieved from the selected Agent or Parent only after those checks succeed.
 
-### Configuration and Management
+Roles and available permissions evolve independently of this architecture. Use the role descriptions shown in Netdata Cloud and the current product documentation instead of relying on a copied entitlement matrix.
 
-| Feature                            | Anonymous | Community | Paid |
-|------------------------------------|:---------:|:---------:|:----:|
-| View agent configuration           |     ✗     |     ✗     |  ✓   |
-| Dynamic Configuration (collectors) |     ✗     |     ✗     |  ✓   |
-| Dynamic Configuration (alerts)     |     ✗     |     ✗     |  ✓   |
-| Alert silencing rules              |     ✗     |     ✓     |  ✓   |
-| Notification configuration         |     ✗     |     ✗     |  ✓   |
+## Functions
 
-### AI-Powered Features
+Functions available through [Live View](/docs/top-monitoring-netdata-functions.md) declare their own access requirements. Some return ordinary system information; others expose processes, query text, logs, network connections, or configuration and therefore require stronger access.
 
-| Feature                         | Anonymous | Community | Paid |
-|---------------------------------|:---------:|:---------:|:----:|
-| Alert explanations              |     ✗     |     ✓     |  ✓   |
-| Alert configuration suggestions |     ✗     |     ✓     |  ✓   |
-| AI-powered insights             |     ✗     |     ✓     |  ✓   |
+The set available to a user depends on:
 
-### Organization Features
+- Functions registered by the selected node.
+- Node and streaming-path availability.
+- Agent network and bearer-protection settings.
+- The Function's declared access requirements.
+- The current user's identity and permissions.
 
-| Feature                          | Anonymous | Community | Paid |
-|----------------------------------|:---------:|:---------:|:----:|
-| Role-based access control (RBAC) |    N/A    |     ✗     |  ✓   |
-| Single Sign-On (SSO)             |    N/A    |     ✗     |  ✓   |
-| Team management                  |    N/A    |  Limited  | Full |
+## Configuration and Management
 
-## MCP (Model Context Protocol)
+Reading or changing configuration is distinct from reading metrics. Dynamic Configuration, notification settings, alert silencing, and Agent configuration use separate permissions. Do not infer configuration access from dashboard access.
 
-Netdata provides MCP in two ways:
+Commercial availability for configuration interfaces can change. Check the [pricing page](https://www.netdata.cloud/pricing/) and the documentation for the specific configuration feature.
 
-- **Netdata Cloud MCP** at `app.netdata.cloud/api/v1/mcp` — infrastructure-wide access to all your nodes (requires a Paid plan)
-- **Agent/Parent MCP** — available directly at Netdata Agents and Parents, free and open-source
+## MCP Access
 
-When accessing Netdata via Agent/Parent MCP:
+Netdata supports MCP through Agents or Parents and through Netdata Cloud.
 
-- **Without Cloud connection**: MCP can access public functions and metrics, but sensitive functions follow the same restrictions as the dashboard
-- **With Cloud connection**: MCP inherits the user's Cloud permissions, enabling access to sensitive functions for authenticated users
-- **With `[web].bearer token protection = yes`**: local MCP requires the local MCP API key on all transports (HTTP, SSE, WebSocket); anonymous MCP requests are rejected
-- **Network ACL**: local MCP exposure is controlled by `[web].allow mcp from` (in addition to the global `[web].allow connections from`)
+- Direct Agent and Parent MCP follows the local MCP API-key, bearer-protection, network ACL, and endpoint permission model.
+- Cloud MCP follows Cloud identity, Space, permission, and entitlement checks.
+- Tools that execute Functions inherit the access requirements of those Functions.
 
-For MCP setup and configuration, see the [MCP documentation](/docs/netdata-ai/mcp/README.md).
+See the [Netdata MCP documentation](/docs/netdata-ai/mcp/README.md) for current setup and authentication behavior.
 
-## How to Enable Features
+## Deployment Checklist
 
-### Enable Sensitive Functions
-
-1. **Sign in to Netdata Cloud** at [app.netdata.cloud](https://app.netdata.cloud)
-2. **Connect your nodes** to your Netdata Cloud Space
-3. **Access the dashboard** through Netdata Cloud
-
-Once signed in, you'll have access to all sensitive functions (processes, logs, network connections, etc.) on nodes within your Space.
-
-### Enable Dynamic Configuration
-
-Dynamic Configuration requires a paid plan:
-
-1. **Sign in to Netdata Cloud**
-2. **Upgrade to a paid plan** from the billing settings
-3. **Access Dynamic Configuration** from the settings menu on any connected node
-
-### Increase Node Limits
-
-The 5-node limit on Netdata Cloud dashboards applies to both **Anonymous** and **Community** users. You can:
-
-1. **Upgrade to a paid plan** for unlimited nodes on Netdata Cloud dashboards
-2. **Select preferred nodes** in **Space Settings > Nodes** to choose which 5 nodes you can access on Netdata Cloud
-
-This limit is a **Netdata Cloud plan entitlement**, not a streaming or connection limit. You can stream any number of nodes to a parent and chain parents across multiple levels — both are fully supported, and every node continues collecting and storing its data regardless of this limit. On Netdata Cloud, however, a node outside your 5-node quota shows as **Locked**: every per-node feature — its single-node dashboard, Functions, Configuration, silencing rules, Anomaly Advisor, and alert details — becomes inaccessible, and it is excluded from the combined Metrics tab, until you either select it as one of your preferred nodes or upgrade to a paid plan.
-
-```mermaid
-flowchart LR
-    subgraph S["Streaming — unlimited nodes"]
-        C1["Child 1"] --> P["Parent"]
-        CN["Child 2..N"] --> P
-    end
-    P --> D["Netdata Cloud dashboards<br/>(single-node & Metrics tab)"]
-    D --> Q{"Node in your<br/>5-node quota?"}
-    Q -->|Yes| V["Dashboard & per-node<br/>features accessible"]
-    Q -->|No| L["Locked — select as preferred<br/>node or upgrade plan"]
-    classDef parent fill:#f3e8ff,stroke:#9b59b6,stroke-width:2px
-    classDef dash fill:#e8f4f8,stroke:#2196F3,stroke-width:2px
-    classDef locked fill:#fdecea,stroke:#e74c3c,stroke-width:2px
-    class P parent
-    class D,V dash
-    class L locked
-```
-
-:::note
-
-Preferred node selection only affects Netdata Cloud dashboards. On the local Agent dashboard (accessed directly at `http://<agent-ip>:19999`), the nodes shown in multi-node views are determined by the Agent's streaming configuration and cannot be changed via preferred node settings.
-
-:::
-
-## Summary
-
-| What You Get              | Anonymous   | Community     | Paid        |
-|---------------------------|-------------|---------------|-------------|
-| **Metrics & Charts**      | Full access | Full access   | Full access |
-| **Anomaly Detection**     | Full access | Full access   | Full access |
-| **Alert Notifications**   | Full access | Full access   | Full access |
-| **Public Functions**      | Full access | Full access   | Full access |
-| **Sensitive Functions**   | Blocked     | Full access   | Full access |
-| **AI Features**           | Blocked     | Full access   | Full access |
-| **Dynamic Configuration** | Blocked     | Blocked       | Full access |
-| **Node Dashboard Access** | 5 nodes     | 5 nodes       | Unlimited   |
-| **Custom Dashboards**     | 1 per agent | 1 per room    | Unlimited   |
-| **RBAC & SSO**            | N/A         | Not available | Full access |
-
-Netdata's access control model ensures that sensitive system information is protected while keeping powerful monitoring capabilities freely available. Sign in to Netdata Cloud to unlock sensitive functions, or upgrade to a paid plan for full configuration control and unlimited scale.
+1. Decide which interfaces must be reachable and from which networks.
+2. Enable TLS and an authentication boundary for untrusted networks.
+3. Grant users only the roles and endpoint permissions they need.
+4. Treat Functions, logs, queries, and configuration as potentially sensitive.
+5. Re-check current plan entitlements before depending on a commercial feature.
+6. Test access with both an intended user and an identity that should be denied.
