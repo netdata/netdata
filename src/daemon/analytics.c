@@ -790,10 +790,13 @@ static int map_windows_tz_to_iana(char *out, char *win_id, char *geo_name) {
 
         strncpyz(out, s, strlen(s));
 
-        //Escape:" Region="
-        char *cmpregion = end+ 10;
-        if (!strncmp(cmpregion, geo_name, 2))
-            break;
+        //Escape:" Region=
+        char *region = strstr(end + 1, "Region=\"");
+        if (region) {
+            char *cmpregion = region + 8; // skip past "Region="
+            if (!strncmp(cmpregion, geo_name, 2))
+                break;
+        }
 
         copied = 1;
     }
