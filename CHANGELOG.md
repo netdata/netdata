@@ -699,6 +699,14 @@
 - Netdata fixes part 60 ([#23079](https://github.com/netdata/netdata/issues/23079))
 - Netdata fixes part 62 ([#23083](https://github.com/netdata/netdata/issues/23083))
 - Netdata fixes part 63 ([#23102](https://github.com/netdata/netdata/issues/23102))
+- Netdata fixes part 64 ([#23103](https://github.com/netdata/netdata/issues/23103))
+- Fix(x509check): fix misleading error message on PEM decode failure ([#23134](https://github.com/netdata/netdata/issues/23134))
+- Flush pending host metadata on graceful shutdown ([#23120](https://github.com/netdata/netdata/issues/23120))
+- Netdata fixes part 81 ([#23135](https://github.com/netdata/netdata/issues/23135))
+- Make cardinality_limit deterministic on ties and partial on mixed folds ([#23129](https://github.com/netdata/netdata/issues/23129))
+- Expose the cardinality fold cut in jsonwrap v2 ([#23131](https://github.com/netdata/netdata/issues/23131))
+- Rust: fix warnings, centralize workspace deps, edition 2024, MSRV 1.91, dep refresh ([#23148](https://github.com/netdata/netdata/issues/23148))
+- Fix cgroup-name timeout environment race ([#23156](https://github.com/netdata/netdata/issues/23156))
 
 ## [2.10.0] - 2026-04-09
 
