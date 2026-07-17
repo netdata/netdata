@@ -84,7 +84,7 @@ Netdata tracks each Prometheus server's last access time to calculate averages f
 
 Like `average` but sums values instead of averaging them.
 
-**Format:** `CONTEXT_UNITS_sum{chart="CHART",family="FAMILY",dimension="DIMENSION"}`
+**Format:** `CONTEXT_sum{chart="CHART",family="FAMILY",dimension="DIMENSION"}`
 
 To change the data source, add the `source` parameter to the URL:
 
@@ -254,11 +254,11 @@ Or append `&prefix=netdata` to the URL.
 
 ### Metric Units
 
-| Source              | Unit Behavior                             | Control                             |
-|:--------------------|:------------------------------------------|:------------------------------------|
-| `average` (default) | Adds units to names (e.g., `_KiB_persec`) | `&hideunits=yes` to hide            |
-| `as-collected`      | No units in names                         | N/A                                 |
-| All sources         | v1.12+ standardized units                 | `&oldunits=yes` for pre-v1.12 names |
+| Source              | Unit Behavior                             | Control                                                       |
+|:--------------------|:------------------------------------------|:--------------------------------------------------------------|
+| `average` (default) | Adds units to names (e.g., `_KiB_persec`) | `&hideunits=yes` to hide; `&oldunits=yes` for pre-v1.12 names |
+| `as-collected`      | No units in names                         | N/A                                                           |
+| `sum`               | No units in names                         | N/A                                                           |
 
 ### Accuracy of Average and Sum Data Sources
 

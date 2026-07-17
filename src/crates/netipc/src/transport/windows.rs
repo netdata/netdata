@@ -47,7 +47,7 @@ mod ffi {
     pub const ERROR_ACCESS_DENIED: DWORD = 5;
     pub const ERROR_PIPE_BUSY: DWORD = 231;
 
-    extern "system" {
+    unsafe extern "system" {
         pub fn CreateNamedPipeW(
             lpName: LPCWSTR,
             dwOpenMode: DWORD,

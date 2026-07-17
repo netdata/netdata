@@ -10136,6 +10136,21 @@ components:
               description: |
                 The newest unix epoch timestamp of the data returned in the `result`.
               type: integer
+            cardinality:
+              description: |
+                Present only when the query's `cardinality_limit` (or `limit`) folded dimensions into the `remaining` aggregate.
+                Aggregators merging limited responses from many agents use `cut` to prove whether their merged top-N is exact: a dimension this agent did not return contributes at most `cut`, so when the N-th ranked merged candidate exceeds the sum of all agents' cuts, no hidden dimension can outrank it.
+              type: object
+              required:
+                - folded
+                - cut
+              properties:
+                folded:
+                  description: The number of dimensions folded into the `remaining` aggregate.
+                  type: integer
+                cut:
+                  description: The largest folded absolute sum contribution - the ranking cut.
+                  type: number
             partial_data_trimming:
               description: |
                 Information related to trimming of the last few points of the `result`, that was required to remove (increasing) partial data.

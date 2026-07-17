@@ -121,6 +121,11 @@ typedef struct rrdresult {
     } partial_data_trimming;
 
     struct {
+        size_t folded;              // dimensions folded into 'remaining'
+        NETDATA_DOUBLE cut;         // the largest folded |sum| contribution
+    } cardinality;
+
+    struct {
         ONEWAYALLOC *owa;           // the allocator used
         struct query_target *qt;    // the QUERY_TARGET
         size_t contexts;            // temp needed between json_wrapper_begin2() and json_wrapper_end2()

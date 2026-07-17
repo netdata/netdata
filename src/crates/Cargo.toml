@@ -64,7 +64,7 @@ members = [
 [workspace.package]
 version = "0.1.3"
 edition = "2024"
-rust-version = "1.85"
+rust-version = "1.91"
 
 [workspace.lints.clippy]
 collapsible_if = "allow"
@@ -81,7 +81,7 @@ hdrhistogram = { version = "7.5" }
 hyper-util = "0.1"
 indexmap = "2.9"
 journal-log-writer = { path = "journal-log-writer" }
-netdata-plugin-bridge = { path = "netdata-plugin/bridge" }
+bridge = { path = "netdata-plugin/bridge" }
 netdata-plugin-charts-derive = { path = "netdata-plugin/charts-derive" }
 netdata-plugin-rt = { path = "netdata-plugin/rt" }
 netdata-plugin-types = { path = "netdata-plugin/types" }
@@ -149,6 +149,11 @@ prost = "0.14"
 # Netdata plugin
 schemars = "1.0"
 
+# Proc-macro toolkit (charts-derive)
+syn = "2.0"
+quote = "1.0"
+proc-macro2 = "1.0"
+
 # Journal histogram dependencies
 atoi = "2.0"
 bitflags = "2.9"
@@ -166,6 +171,17 @@ rayon = "1.11.0"
 itoa = "1.0"
 
 base64 = "0.22"
+
+# Published systemd-journal-sdk crates (netflow-plugin). Keys use the
+# journal-sdk-* prefix because the plain journal-* names are taken by the
+# internal path crates elsewhere in this file; in-code idents are journal_sdk_*.
+journal-sdk-common = { package = "systemd-journal-sdk-common", version = "0.7.8" }
+journal-sdk-core = { package = "systemd-journal-sdk-core", version = "0.7.8" }
+journal-sdk-engine = { package = "systemd-journal-sdk-engine", version = "0.7.8" }
+journal-sdk-host = { package = "systemd-journal-sdk-host", version = "0.7.8" }
+journal-sdk-index = { package = "systemd-journal-sdk-index", version = "0.7.8" }
+journal-sdk-log-writer = { package = "systemd-journal-sdk-log-writer", version = "0.7.8" }
+journal-sdk-registry = { package = "systemd-journal-sdk-registry", version = "0.7.8" }
 
 # NetFlow-specific dependencies
 jaq-core = "3.0.0"
@@ -222,6 +238,7 @@ flatten_otel = { path = "flatten-otel" }
 otel-ledger = { path = "otel-ledger" }
 file-lifecycle = { path = "file-lifecycle" }
 otel-ingestor = { path = "otel-ingestor" }
+otel-legacy-logs = { path = "otel-legacy-logs" }
 otel-catalog = { path = "otel-catalog" }
 file-cache = { path = "file-cache" }
 
@@ -246,6 +263,10 @@ opendal = { version = "0.57", default-features = false, features = [
   "auto-register-services",
 ] }
 
+# Cargo.lock pins aws-lc-rs 1.17.0 / aws-lc-sys 0.41.0 (pulled transitively via
+# rustls): the 0.42.0 build-script probe links without -fPIE and fails under the
+# hardened linker specs of RPM-family package builds. Re-check before letting
+# `cargo update` move these forward.
 rustls = { version = "0.23", default-features = false, features = ["ring"] }
 tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
 url = "2"
@@ -258,7 +279,7 @@ zstd = "0.13"
 fsst-rs = "0.5"
 futures-util = { version = "0.3", features = ["sink"] }
 flate2 = "1"
-reqwest = { version = "0.13.2", features = ["stream"] }
+reqwest = { version = "0.13.2", default-features = false }
 
 
 [profile.dev]

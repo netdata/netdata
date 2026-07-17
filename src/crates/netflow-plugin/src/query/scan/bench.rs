@@ -1,6 +1,6 @@
 use super::super::planner::grouped_query_can_use_projected_scan;
 use super::*;
-use journal_core::file::EntryItemsType;
+use journal_sdk_core::file::EntryItemsType;
 
 impl FlowQueryService {
     #[cfg(test)]
