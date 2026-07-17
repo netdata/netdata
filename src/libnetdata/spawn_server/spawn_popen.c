@@ -185,6 +185,10 @@ POPEN_INSTANCE *spawn_popen_run(const char *cmd) {
                     interp = python_path;
                 }
 
+                nd_log(NDLS_COLLECTORS, NDLP_DEBUG,
+                       "SPAWN: python.d.plugin using interpreter '%s' (selected via %s)",
+                       interp, interp_override ? "-p option" : "PATH search");
+
                 // argv: [interpreter, plugin_path, filtered_args..., NULL]
                 const char *argv[2 + filt_count + 1];
                 argv[0] = interp;
