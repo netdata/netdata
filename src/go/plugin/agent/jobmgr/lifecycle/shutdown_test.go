@@ -151,13 +151,72 @@ func TestFinishShutdownPublishesDueClockWithoutTimerBridge(t *testing.T) {
 	}
 }
 
+func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
+	census := RunCensus{
+		AdmissionRunDrained:  true,
+		RunFinalizerComplete: true,
+	}
+	tests := map[string]struct {
+		run func(*testing.T, *RunSupervisor)
+	}{
+		"late dirty": {
+			run: func(t *testing.T, run *RunSupervisor) {
+				if err := run.Terminal(census); err != nil {
+					t.Fatal(err)
+				}
+				reporter, ok := any(run).(interface{ Dirty(error) error })
+				if !ok {
+					t.Fatal("Dirty does not report a rejected terminal mutation")
+				}
+				if err := reporter.Dirty(errors.New("late dirty")); !errors.Is(err, ErrRunTerminalReached) {
+					t.Fatalf("late dirty rejection differs: %v", err)
+				}
+				if state := run.TerminalState(); !state.Reached || !state.Quiescent || state.Dirty != nil {
+					t.Fatalf("late dirty rewrote terminal truth: %+v", state)
+				}
+				if cause := run.DirtyCause(); cause != nil {
+					t.Fatalf("late dirty rewrote dirty cause: %v", cause)
+				}
+			},
+		},
+		"duplicate terminal": {
+			run: func(t *testing.T, run *RunSupervisor) {
+				if err := run.Terminal(census); err != nil {
+					t.Fatal(err)
+				}
+				nonzero := census
+				nonzero.TransientActive = 1
+				if err := run.Terminal(nonzero); !errors.Is(err, ErrRunTerminalReached) {
+					t.Fatalf("duplicate terminal rejection differs: %v", err)
+				}
+				if state := run.TerminalState(); !state.Reached || !state.Quiescent || state.Dirty != nil {
+					t.Fatalf("duplicate terminal rewrote terminal truth: %+v", state)
+				}
+				if cause := run.DirtyCause(); cause != nil {
+					t.Fatalf("duplicate terminal rewrote dirty cause: %v", cause)
+				}
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			run, err := NewRunSupervisor(1, RealClock{}, time.Second)
+			if err != nil {
+				t.Fatal(err)
+			}
+			test.run(t, run)
+		})
+	}
+}
+
 func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 	populations := map[string]int{
 		"one": 1, "thirty-two": 32, "two-hundred-fifty-six": 256,
 	}
 	for name, population := range populations {
 		t.Run(name, func(t *testing.T) {
-			frame, err := NewFrameOwner(io.Discard, nil)
+			frame, err := NewFrameOwner(io.Discard)
 			if err != nil {
 				t.Fatal(err)
 			}

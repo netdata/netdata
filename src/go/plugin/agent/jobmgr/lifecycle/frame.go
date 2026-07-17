@@ -68,13 +68,31 @@ type FrameOwner struct {
 	controlBuffer  [ControlFrameBytes]byte
 }
 
-func NewFrameOwner(writer io.Writer, onControlReady func()) (*FrameOwner, error) {
+func NewFrameOwner(writer io.Writer) (*FrameOwner, error) {
 	if writer == nil {
 		return nil, errors.New("jobmgr frame owner: nil writer")
 	}
-	owner := &FrameOwner{writer: writer, onControlReady: onControlReady}
+	owner := &FrameOwner{writer: writer}
 	owner.available = sync.NewCond(&owner.stateMu)
 	return owner, nil
+}
+
+func (owner *FrameOwner) BindControlReady(notify func()) error {
+	if owner == nil || notify == nil {
+		return errors.New("jobmgr frame owner: invalid control-ready binding")
+	}
+	owner.stateMu.Lock()
+	if owner.onControlReady != nil {
+		owner.stateMu.Unlock()
+		return errors.New("jobmgr frame owner: control-ready notifier already bound")
+	}
+	owner.onControlReady = notify
+	pending := owner.pendingControl && !owner.busy
+	owner.stateMu.Unlock()
+	if pending {
+		notify()
+	}
+	return nil
 }
 
 func PrepareFrame(uid string, result SealedResult, expiry int64) (PreparedFrame, error) {
@@ -260,10 +278,11 @@ func (owner *FrameOwner) writeAndRelease(payload []byte, control bool) error {
 	owner.busy = false
 	owner.commits++
 	pending := owner.pendingControl
+	notify := owner.onControlReady
 	owner.available.Broadcast()
 	owner.stateMu.Unlock()
-	if pending && owner.onControlReady != nil {
-		owner.onControlReady()
+	if pending && notify != nil {
+		notify()
 	}
 	_ = control
 	return nil

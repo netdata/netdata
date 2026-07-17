@@ -202,9 +202,71 @@ func grantLongLivedTestAdmission(t *testing.T, ledger *AdmissionLedger, byteCoun
 	return requested.Ref
 }
 
+func TestLongLivedByteReleaseSignalsNewAdmissionCapacity(t *testing.T) {
+	supervisor := newLongLivedTestSupervisor(t)
+	ready := make(chan struct{}, 1)
+	if err := supervisor.BindAdmissionReady(func() { ready <- struct{}{} }); err != nil {
+		t.Fatal(err)
+	}
+	if err := supervisor.BindAdmissionReady(func() {}); err == nil {
+		t.Fatal("duplicate admission-ready binding succeeded")
+	}
+	admission := NewAdmissionLedger()
+	ownerRef := grantLongLivedTestAdmission(t, admission, 100)
+	plan, err := NewJobLongLivedPlan(40)
+	if err != nil {
+		t.Fatal(err)
+	}
+	permit, err := supervisor.IssueLongLivedPermit(
+		admission, ownerRef, ResourceIdentity{ID: "owner", Generation: 1}, plan,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admission.ReleaseOrdinary(ownerRef); err != nil {
+		t.Fatal(err)
+	}
+	blocker := admission.RequestOrdinary(
+		1, AdmissionLaneRef{Slot: 2, Generation: 1}, OrdinaryBudgetBytes-40,
+	)
+	waiter := admission.RequestOrdinary(1, AdmissionLaneRef{Slot: 3, Generation: 1}, 1)
+	if blocker.Rejected != nil || waiter.Rejected != nil {
+		t.Fatalf("saturation setup differs: blocker=%v waiter=%v", blocker.Rejected, waiter.Rejected)
+	}
+	var grants [4]AdmissionGrant
+	count, _, err := admission.TakeGrants(2, &grants)
+	if err != nil || count != 1 || grants[0].Ref != blocker.Ref {
+		t.Fatalf("saturation grant differs: count=%d grant=%#v err=%v", count, grants[0], err)
+	}
+	if err := permit.ReleaseExternal(LongLivedEJobResources); err != nil {
+		t.Fatal(err)
+	}
+	if err := permit.ReleaseBytes(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-ready:
+	default:
+		t.Fatal("long-lived byte release lost admission wake")
+	}
+	if err := permit.Return(); err != nil {
+		t.Fatal(err)
+	}
+	count, _, err = admission.TakeGrants(1, &grants)
+	if err != nil || count != 1 || grants[0].Ref != waiter.Ref {
+		t.Fatalf("released-capacity grant differs: count=%d grant=%#v err=%v", count, grants[0], err)
+	}
+	if _, err := admission.ReleaseOrdinary(waiter.Ref); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admission.ReleaseOrdinary(blocker.Ref); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func newLongLivedTestSupervisor(t *testing.T) *TaskSupervisor {
 	t.Helper()
-	frame, err := NewFrameOwner(&bytes.Buffer{}, nil)
+	frame, err := NewFrameOwner(&bytes.Buffer{})
 	if err != nil {
 		t.Fatal(err)
 	}

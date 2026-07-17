@@ -118,6 +118,34 @@ func TestRepeatedStringValuePreflightsExactDeferredBoundary(t *testing.T) {
 	}
 }
 
+func TestRepeatedStringValueAppendGrowsDestination(t *testing.T) {
+	pad, err := RepeatedStringValue(4*1024, 'A')
+	if err != nil {
+		t.Fatal(err)
+	}
+	body, err := ObjectValue(ObjectField{Key: "pad", Value: pad})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := NewTableResult(200, body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := map[string][]byte{
+		"nil destination": nil,
+		"small capacity":  make([]byte, 0, 8),
+	}
+	for name, seed := range tests {
+		t.Run(name, func(t *testing.T) {
+			appended := result.Append(seed)
+			if len(appended) != result.Size() || !bytes.HasPrefix(appended, []byte(`{"pad":"`)) ||
+				!bytes.HasSuffix(appended, []byte(`"}`)) {
+				t.Fatalf("grown repeated value differs: size=%d want=%d", len(appended), result.Size())
+			}
+		})
+	}
+}
+
 func TestReviewedRawEnvelopeCopiesAndValidatesBody(t *testing.T) {
 	body := []byte(`{"status":200}`)
 	result, err := NewCompleteRawEnvelope(200, ReviewedPerformanceJSON, body)

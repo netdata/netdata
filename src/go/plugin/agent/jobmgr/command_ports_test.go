@@ -82,6 +82,46 @@ func TestRequestValidate(t *testing.T) {
 			}(),
 			wantErr: true,
 		},
+		"too many arguments": {
+			request: func() Request {
+				request := valid
+				request.Args = make([]string, maximumRequestArguments+1)
+				return request
+			}(),
+			wantErr: true,
+		},
+		"oversized arguments": {
+			request: func() Request {
+				request := valid
+				request.Args = []string{strings.Repeat("a", maximumRequestArgumentBytes+1)}
+				return request
+			}(),
+			wantErr: true,
+		},
+		"oversized lane": {
+			request: func() Request {
+				request := valid
+				request.LaneKey = strings.Repeat("l", maximumRequestMetadataBytes+1)
+				return request
+			}(),
+			wantErr: true,
+		},
+		"oversized route": {
+			request: func() Request {
+				request := valid
+				request.Route = strings.Repeat("r", maximumRequestMetadataBytes+1)
+				return request
+			}(),
+			wantErr: true,
+		},
+		"oversized content type": {
+			request: func() Request {
+				request := valid
+				request.ContentType = strings.Repeat("c", maximumRequestMetadataBytes+1)
+				return request
+			}(),
+			wantErr: true,
+		},
 		"reservation capacity mismatch": {
 			request: func() Request {
 				request := valid

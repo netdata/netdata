@@ -35,17 +35,23 @@ func TestTaskSupervisorAcceptsStartsPublishesAndTransfersPreparedResource(t *tes
 	if err := supervisor.Release(ref); err == nil {
 		t.Fatal("slot released while ready resource was present")
 	}
-	taken, err := supervisor.PublishAndTakeReadyResource(ref, 2, ready.identity)
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionPublishResource}); err != nil {
+		t.Fatal(err)
+	}
+	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil || ack.Kind != TaskActionPublishResource {
+		t.Fatalf("publish acknowledgement=%#v", ack)
+	}
+	taken, err := supervisor.TakePublishedReadyResource(ref, 3, ready.identity)
 	if err != nil {
 		t.Fatal(err)
 	}
 	if taken != ready {
 		t.Fatalf("transferred resource=%T %p, want %p", taken, taken, ready)
 	}
-	if _, err := supervisor.PublishAndTakeReadyResource(ref, 2, ready.identity); err == nil {
+	if _, err := supervisor.TakePublishedReadyResource(ref, 3, ready.identity); err == nil {
 		t.Fatal("duplicate ready-resource transfer succeeded")
 	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}); err != nil {
 		t.Fatal(err)
 	}
 	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
@@ -115,16 +121,19 @@ func TestTaskSupervisorRetainsReadyResourceAfterPublishFailureUntilAbort(t *test
 		t.Fatal(err)
 	}
 	<-supervisor.AcknowledgementCh()
-	if _, err := supervisor.PublishAndTakeReadyResource(ref, 2, ready.identity); !errors.Is(err, wantFailure) {
-		t.Fatalf("publish error=%v want=%v", err, wantFailure)
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionPublishResource}); err != nil {
+		t.Fatal(err)
 	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionDispose}); err != nil {
+	if ack := <-supervisor.AcknowledgementCh(); !errors.Is(ack.Err, wantFailure) {
+		t.Fatalf("publish acknowledgement=%#v want=%v", ack, wantFailure)
+	}
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionDispose}); err != nil {
 		t.Fatal(err)
 	}
 	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
 		t.Fatal(ack.Err)
 	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}); err != nil {
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 5, Kind: TaskActionTerminate}); err != nil {
 		t.Fatal(err)
 	}
 	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
@@ -450,7 +459,7 @@ func TestTaskSupervisorRetainsReadyResourceWhenAbortFails(t *testing.T) {
 
 func newResourceTaskSupervisor(t *testing.T) *TaskSupervisor {
 	t.Helper()
-	frame, err := NewFrameOwner(io.Discard, nil)
+	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}

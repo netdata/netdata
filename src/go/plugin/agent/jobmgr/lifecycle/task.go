@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"time"
 )
 
@@ -47,6 +48,7 @@ type TaskActionKind uint8
 const (
 	TaskActionEncodeWrite TaskActionKind = iota + 1
 	TaskActionAcceptStart
+	TaskActionPublishResource
 	TaskActionCommitCapability
 	TaskActionStopResource
 	TaskActionFinalizeResource
@@ -118,6 +120,10 @@ type TaskSupervisor struct {
 	active      int
 	retained    int
 	saturated   bool
+
+	admissionReadyMu      sync.Mutex
+	onAdmissionReady      func()
+	admissionReadyPending bool
 }
 
 func NewTaskSupervisor(frame *FrameOwner) (*TaskSupervisor, error) {
@@ -138,6 +144,37 @@ func NewTaskSupervisor(frame *FrameOwner) (*TaskSupervisor, error) {
 	supervisor.freeRequest = 1
 	supervisor.nextSource = SourceJobManager
 	return supervisor, nil
+}
+
+func (supervisor *TaskSupervisor) BindAdmissionReady(notify func()) error {
+	if supervisor == nil || notify == nil {
+		return errors.New("jobmgr task supervisor: invalid admission-ready binding")
+	}
+	supervisor.admissionReadyMu.Lock()
+	if supervisor.onAdmissionReady != nil {
+		supervisor.admissionReadyMu.Unlock()
+		return errors.New("jobmgr task supervisor: admission-ready notifier already bound")
+	}
+	supervisor.onAdmissionReady = notify
+	pending := supervisor.admissionReadyPending
+	supervisor.admissionReadyPending = false
+	supervisor.admissionReadyMu.Unlock()
+	if pending {
+		notify()
+	}
+	return nil
+}
+
+func (supervisor *TaskSupervisor) notifyAdmissionReady() {
+	supervisor.admissionReadyMu.Lock()
+	notify := supervisor.onAdmissionReady
+	if notify == nil {
+		supervisor.admissionReadyPending = true
+	}
+	supervisor.admissionReadyMu.Unlock()
+	if notify != nil {
+		notify()
+	}
 }
 
 func (supervisor *TaskSupervisor) Enqueue(plan TaskPlan) (TaskRequestRef, error) {
@@ -526,7 +563,7 @@ func (supervisor *TaskSupervisor) PreflightResult(ref TaskRef, uid string, expir
 	return ResultPreflight{PlanBytes: slot.outcome.frame.planBytes, FrameBytes: int64(encodedBytes)}, nil
 }
 
-func (supervisor *TaskSupervisor) PublishAndTakeReadyResource(ref TaskRef, sequence uint8, expected ResourceIdentity) (ReadyResource, error) {
+func (supervisor *TaskSupervisor) TakePublishedReadyResource(ref TaskRef, sequence uint8, expected ResourceIdentity) (ReadyResource, error) {
 	slot, err := supervisor.slot(ref)
 	if err != nil {
 		return nil, err
@@ -537,9 +574,6 @@ func (supervisor *TaskSupervisor) PublishAndTakeReadyResource(ref TaskRef, seque
 	resource := slot.outcome.ready
 	if !expected.Valid() || slot.outcome.identity != expected {
 		return nil, errors.New("jobmgr task supervisor: ready resource identity differs")
-	}
-	if err := callReadyResource("publish", resource.Publish); err != nil {
-		return nil, err
 	}
 	slot.outcome = TaskOutcome{}
 	return resource, nil
@@ -601,6 +635,12 @@ func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, pla
 					slot.outcome = TaskOutcome{}
 					slot.outcome, ack.Err = readyResourceOutcome(ready, identity)
 				}
+			}
+		case TaskActionPublishResource:
+			if slot.outcome.kind != TaskOutcomeReadyResource || slot.outcome.ready == nil {
+				ack.Err = errors.New("jobmgr task child: publish without ready resource")
+			} else {
+				ack.Err = callReadyResource("publish", slot.outcome.ready.Publish)
 			}
 		case TaskActionCommitCapability:
 			if slot.outcome.kind != TaskOutcomePreparedCapability || slot.outcome.capability == nil {

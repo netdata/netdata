@@ -8,6 +8,8 @@ import (
 	"time"
 )
 
+var ErrRunTerminalReached = errors.New("jobmgr run supervisor: terminal already reached")
+
 type RunSupervisor struct {
 	mu         sync.Mutex
 	generation uint64
@@ -93,16 +95,20 @@ func (supervisor *RunSupervisor) Admitting() bool {
 	return supervisor.admission && supervisor.dirty == nil && !supervisor.terminal
 }
 
-func (supervisor *RunSupervisor) Dirty(cause error) {
+func (supervisor *RunSupervisor) Dirty(cause error) error {
 	if cause == nil {
 		cause = errors.New("jobmgr run supervisor: unspecified dirty cause")
 	}
 	supervisor.mu.Lock()
+	defer supervisor.mu.Unlock()
+	if supervisor.terminal {
+		return errors.Join(ErrRunTerminalReached, cause)
+	}
 	if supervisor.dirty == nil {
 		supervisor.dirty = cause
 	}
 	supervisor.admission = false
-	supervisor.mu.Unlock()
+	return nil
 }
 
 func (supervisor *RunSupervisor) DirtyCause() error {
@@ -114,6 +120,9 @@ func (supervisor *RunSupervisor) DirtyCause() error {
 func (supervisor *RunSupervisor) Terminal(census RunCensus) error {
 	supervisor.mu.Lock()
 	defer supervisor.mu.Unlock()
+	if supervisor.terminal {
+		return errors.Join(ErrRunTerminalReached, supervisor.state.Dirty)
+	}
 	if supervisor.admission {
 		return errors.New("jobmgr run supervisor: terminal while admitting")
 	}

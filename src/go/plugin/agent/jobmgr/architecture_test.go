@@ -8,9 +8,12 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
+
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 )
 
 const (
@@ -88,13 +91,6 @@ func checkActiveFile(
 	if err != nil {
 		t.Fatal(err)
 	}
-	lower := strings.ToLower(string(data))
-	for _, forbidden := range []string{"candidate", "jobmgrpoc", "b-o-"} {
-		if strings.Contains(lower, forbidden) {
-			t.Errorf("%s contains experimental identity %q", path, forbidden)
-		}
-	}
-
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, path, data, 0)
 	if err != nil {
@@ -137,6 +133,38 @@ func checkActiveFile(
 			t.Errorf("%s imports cgo", path)
 		}
 		checkActiveImport(t, packageName, rule, importPath, path)
+	}
+}
+
+func TestNoExperimentalIdentity(t *testing.T) {
+	root := jobmgrSourceRoot(t)
+	forbidden := []string{
+		"jobmgr" + "poc",
+		"jobmgr" + "eval",
+		"candidate" + "-b",
+		"b-" + "o-",
+	}
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		lower := strings.ToLower(string(data))
+		for _, token := range forbidden {
+			if strings.Contains(lower, token) {
+				t.Errorf("%s contains experimental identity %q", path, token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -195,6 +223,12 @@ func TestCompositionIsPrivateBeforeAtomicCut(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestWorkPlanCannotCarryKernelLoopAbandonCallback(t *testing.T) {
+	if _, found := reflect.TypeOf(jobmgr.WorkPlan{}).FieldByName("Abandon"); found {
+		t.Fatal("WorkPlan exposes an opaque abandonment callback to KernelLoop")
 	}
 }
 

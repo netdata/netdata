@@ -15,6 +15,12 @@ import (
 
 const externalSourceQueueDepth = lifecycle.MaximumLaneDepth
 
+const (
+	maximumPlanClaims     = 1_024
+	maximumClaimKeyBytes  = maximumRequestArgumentBytes
+	maximumPlanClaimBytes = lifecycle.ControlFrameBytes
+)
+
 var ErrStopped = errors.New("jobmgr kernel: stopped")
 
 type WorkPlan struct {
@@ -26,7 +32,6 @@ type WorkPlan struct {
 	Capability          *CapabilityPlan
 	NoResponse          bool
 	Cleanup             lifecycle.TaskCleanup
-	Abandon             lifecycle.TaskCleanup
 	CooperativeCancel   bool
 	CooperativeDeadline bool
 }
@@ -55,14 +60,17 @@ func (plan WorkPlan) validate() error {
 	if plan.OwnedBytes < 0 {
 		return errors.New("jobmgr kernel: negative plan-owned bytes")
 	}
-	for _, key := range plan.Claims {
-		if key == "" {
-			return errors.New("jobmgr kernel: empty claim key")
-		}
+	if len(plan.Claims) > maximumPlanClaims-len(plan.ReadClaims) {
+		return errors.New("jobmgr kernel: too many plan claims")
 	}
-	for _, key := range plan.ReadClaims {
-		if key == "" {
-			return errors.New("jobmgr kernel: empty claim key")
+	claimBytes := 0
+	for _, claims := range [][]string{plan.Claims, plan.ReadClaims} {
+		for _, key := range claims {
+			if key == "" || len(key) > maximumClaimKeyBytes ||
+				len(key) > maximumPlanClaimBytes-claimBytes {
+				return errors.New("jobmgr kernel: invalid or oversized claim key")
+			}
+			claimBytes += len(key)
 		}
 	}
 	workKinds := 0
@@ -138,10 +146,12 @@ type noopRunFinalizer struct{}
 
 func (noopRunFinalizer) FinalizeRun(context.Context, uint64) error { return nil }
 
-func NoopRunFinalizer() RunFinalizer { return noopRunFinalizer{} }
+func newNoopRunFinalizer() RunFinalizer { return noopRunFinalizer{} }
 
 type submission struct {
 	request       Request
+	plan          WorkPlan
+	context       context.Context
 	controlStatus lifecycle.ControlStatus
 	result        chan error
 	terminal      chan error
@@ -175,6 +185,8 @@ type commandOperation struct {
 	resultGrowthWaiting bool
 	resultExpiry        int64
 	taskRequest         lifecycle.TaskRequestRef
+	submissionContext   context.Context
+	submissionResult    chan error
 	terminalResult      chan error
 	terminalErr         error
 }
@@ -300,8 +312,12 @@ type CommandKernel struct {
 	tasks                  *lifecycle.TaskSupervisor
 	frames                 *lifecycle.FrameOwner
 	clock                  lifecycle.Clock
-	claims                 *ClaimAuthority
+	claims                 *claimAuthority
 	submissions            [2]chan submission
+	submissionSpace        [2]chan struct{}
+	submissionStopped      chan struct{}
+	submissionMu           sync.Mutex
+	submissionClosed       bool
 	blockedSubmissions     [2]submission
 	blockedSubmission      [2]bool
 	cancel                 chan string
@@ -309,6 +325,7 @@ type CommandKernel struct {
 	stop                   chan struct{}
 	done                   chan struct{}
 	doneErr                error
+	startOnce              sync.Once
 	stopOnce               sync.Once
 	shutdownStarted        chan struct{}
 	shutdownStartOnce      sync.Once
@@ -350,9 +367,10 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 		return nil, errors.New("jobmgr kernel: incomplete planner ports")
 	}
 	kernel := &CommandKernel{
-		run: run, admission: admission, uids: uids, tasks: tasks, frames: frames, clock: clock, claims: NewClaimAuthority(),
+		run: run, admission: admission, uids: uids, tasks: tasks, frames: frames, clock: clock, claims: newClaimAuthority(),
 		cancel: make(chan string), wake: make(chan struct{}, 1), stop: make(chan struct{}), done: make(chan struct{}), shutdownStarted: make(chan struct{}),
-		operations: make(map[string]*commandOperation), tasksByRef: make(map[lifecycle.TaskRef]*commandOperation),
+		submissionStopped: make(chan struct{}),
+		operations:        make(map[string]*commandOperation), tasksByRef: make(map[lifecycle.TaskRef]*commandOperation),
 		tasksByRequest: make(map[lifecycle.TaskRequestRef]*commandOperation),
 		byAdmission:    make(map[lifecycle.AdmissionRef]*commandOperation), lanes: make(map[string]*commandLane),
 		nextSource: lifecycle.SourceJobManager, nextExternalSource: lifecycle.SourceJobManager,
@@ -364,6 +382,7 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 	}
 	for index := range kernel.submissions {
 		kernel.submissions[index] = make(chan submission, externalSourceQueueDepth)
+		kernel.submissionSpace[index] = make(chan struct{}, 1)
 	}
 	for index := 1; index <= lifecycle.MaximumAdmissionRecords; index++ {
 		kernel.laneSlots[index].freeNext = uint16(index + 1)
@@ -371,12 +390,17 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 	kernel.laneSlots[lifecycle.MaximumAdmissionRecords].freeNext = 0
 	kernel.freeLane = 1
 	heap.Init(&kernel.deadlines)
+	if err := frames.BindControlReady(kernel.NotifyControlReady); err != nil {
+		return nil, err
+	}
+	if err := tasks.BindAdmissionReady(kernel.NotifyControlReady); err != nil {
+		return nil, err
+	}
 	return kernel, nil
 }
 
 type KernelLoop struct {
 	kernel *CommandKernel
-	start  sync.Once
 }
 
 func NewKernelLoop(kernel *CommandKernel) (*KernelLoop, error) {
@@ -391,7 +415,7 @@ func (loop *KernelLoop) Start(ctx context.Context) error {
 		return errors.New("jobmgr kernel loop: invalid start")
 	}
 	started := false
-	loop.start.Do(func() {
+	loop.kernel.startOnce.Do(func() {
 		started = true
 		go loop.kernel.runLoop(ctx)
 	})
@@ -421,30 +445,98 @@ func (kernel *CommandKernel) SubmitAndWait(ctx context.Context, request Request)
 }
 
 func (kernel *CommandKernel) submit(ctx context.Context, request Request, terminal chan error) error {
+	if ctx == nil {
+		return errors.Join(errors.New("jobmgr kernel: nil submission context"), kernel.abortRequestInputBody(request))
+	}
+	if err := ctx.Err(); err != nil {
+		return errors.Join(err, kernel.abortRequestInputBody(request))
+	}
 	if err := request.Validate(); err != nil {
 		return errors.Join(err, kernel.abortRequestInputBody(request))
 	}
+	plan, err := kernel.preparePlan(request)
+	if err != nil {
+		return errors.Join(err, kernel.abortRequestInputBody(request))
+	}
+	request.Args = append([]string(nil), request.Args...)
 	result := make(chan error, 1)
-	queue := kernel.submissions[sourceIndex(request.Source)]
-	select {
-	case queue <- submission{request: request, result: result, terminal: terminal}:
-		kernel.NotifyControlReady()
-	case <-ctx.Done():
-		return errors.Join(ctx.Err(), kernel.abortRequestInputBody(request))
-	case <-kernel.done:
-		return errors.Join(ErrStopped, kernel.abortRequestInputBody(request))
+	if err := kernel.enqueueSubmission(ctx, request.Source, submission{
+		request:  request,
+		plan:     plan,
+		context:  ctx,
+		result:   result,
+		terminal: terminal,
+	}); err != nil {
+		return errors.Join(err, kernel.abortRequestInputBody(request))
 	}
 	select {
 	case err := <-result:
 		return err
 	case <-ctx.Done():
-		return ctx.Err()
+		select {
+		case kernel.cancel <- request.UID:
+		case err := <-result:
+			return err
+		case <-kernel.done:
+			return ErrStopped
+		}
+		select {
+		case err := <-result:
+			return err
+		case <-kernel.done:
+			return ErrStopped
+		}
 	case <-kernel.done:
 		return ErrStopped
 	}
 }
 
+func (kernel *CommandKernel) enqueueSubmission(ctx context.Context, source lifecycle.Source, submitted submission) error {
+	index := sourceIndex(source)
+	for {
+		kernel.submissionMu.Lock()
+		if kernel.submissionClosed {
+			kernel.submissionMu.Unlock()
+			return ErrStopped
+		}
+		select {
+		case kernel.submissions[index] <- submitted:
+			kernel.submissionMu.Unlock()
+			kernel.NotifyControlReady()
+			return nil
+		default:
+			kernel.submissionMu.Unlock()
+		}
+		select {
+		case <-kernel.submissionSpace[index]:
+		case <-kernel.submissionStopped:
+			return ErrStopped
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+}
+
+func (kernel *CommandKernel) closeSubmissionIngress() {
+	kernel.submissionMu.Lock()
+	if !kernel.submissionClosed {
+		kernel.submissionClosed = true
+		close(kernel.submissionStopped)
+	}
+	kernel.submissionMu.Unlock()
+}
+
+func (kernel *CommandKernel) notifySubmissionSpace(source int) {
+	select {
+	case kernel.submissionSpace[source] <- struct{}{}:
+	default:
+	}
+}
+
 func (kernel *CommandKernel) Reject(ctx context.Context, uid string, status lifecycle.ControlStatus) error {
+	if ctx == nil {
+		return errors.New("jobmgr kernel: nil submission context")
+	}
 	if err := (lifecycle.ControlFramePlan{UID: uid, Status: status, Expiry: 1}).Validate(); err != nil {
 		return err
 	}
@@ -452,14 +544,12 @@ func (kernel *CommandKernel) Reject(ctx context.Context, uid string, status life
 		return errors.New("jobmgr kernel: invalid pre-admission control status")
 	}
 	result := make(chan error, 1)
-	queue := kernel.submissions[sourceIndex(lifecycle.SourceFunction)]
-	select {
-	case queue <- submission{controlStatus: status, request: Request{UID: uid, Source: lifecycle.SourceFunction}, result: result}:
-		kernel.NotifyControlReady()
-	case <-ctx.Done():
-		return ctx.Err()
-	case <-kernel.done:
-		return ErrStopped
+	if err := kernel.enqueueSubmission(ctx, lifecycle.SourceFunction, submission{
+		controlStatus: status,
+		request:       Request{UID: uid, Source: lifecycle.SourceFunction},
+		result:        result,
+	}); err != nil {
+		return err
 	}
 	select {
 	case err := <-result:
@@ -490,7 +580,10 @@ func (kernel *CommandKernel) NotifyControlReady() {
 }
 
 func (kernel *CommandKernel) Stop() {
-	kernel.stopOnce.Do(func() { close(kernel.stop) })
+	kernel.stopOnce.Do(func() {
+		kernel.closeSubmissionIngress()
+		close(kernel.stop)
+	})
 }
 
 func (kernel *CommandKernel) Done() <-chan struct{} {
@@ -576,6 +669,7 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 			terminal = errors.Join(terminal, cause)
 			return
 		}
+		kernel.closeSubmissionIngress()
 		shuttingDown = true
 		stopDeadline()
 		terminal = errors.Join(terminal, cause)
@@ -635,6 +729,9 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 			}
 		} else {
 			if err := kernel.advanceShutdownAdmission(); err != nil {
+				kernel.run.Dirty(err)
+			}
+			if err := kernel.enqueueShutdownStops(); err != nil {
 				kernel.run.Dirty(err)
 			}
 			if err := kernel.advanceRunFinalizer(); err != nil {
@@ -743,6 +840,7 @@ func (kernel *CommandKernel) serviceSubmissions(quantum int) bool {
 		var submitted submission
 		selected := -1
 		wasBlocked := false
+		dequeued := false
 		if kernel.blockedSubmission[first] {
 			submitted = kernel.blockedSubmissions[first]
 			selected = first
@@ -751,6 +849,7 @@ func (kernel *CommandKernel) serviceSubmissions(quantum int) bool {
 			select {
 			case submitted = <-kernel.submissions[first]:
 				selected = first
+				dequeued = true
 			default:
 			}
 		}
@@ -763,10 +862,14 @@ func (kernel *CommandKernel) serviceSubmissions(quantum int) bool {
 				select {
 				case submitted = <-kernel.submissions[second]:
 					selected = second
+					dequeued = true
 				default:
 					return kernel.hasRunnableSubmissions()
 				}
 			}
+		}
+		if dequeued {
+			kernel.notifySubmissionSpace(selected)
 		}
 		var err error
 		if submitted.controlStatus != 0 {
@@ -777,7 +880,11 @@ func (kernel *CommandKernel) serviceSubmissions(quantum int) bool {
 				kernel.run.Dirty(err)
 			}
 		} else {
-			err = kernel.admit(submitted.request, submitted.terminal)
+			if submitted.context != nil && submitted.context.Err() != nil {
+				err = errors.Join(context.Cause(submitted.context), kernel.abortRequestInputBody(submitted.request))
+			} else {
+				err = kernel.admit(submitted.request, submitted.plan, submitted.context, submitted.result, submitted.terminal)
+			}
 		}
 		if errors.Is(err, lifecycle.ErrAdmissionRecordCapacity) || errors.Is(err, lifecycle.ErrFrameOwnerBusy) {
 			if !wasBlocked {
@@ -789,7 +896,9 @@ func (kernel *CommandKernel) serviceSubmissions(quantum int) bool {
 				kernel.blockedSubmissions[selected] = submission{}
 				kernel.blockedSubmission[selected] = false
 			}
-			submitted.result <- err
+			if submitted.controlStatus != 0 || err != nil {
+				submitted.result <- err
+			}
 		}
 		kernel.nextExternalSource = otherSource(sourceForIndex(selected))
 		quantum--
@@ -814,22 +923,13 @@ func (kernel *CommandKernel) hasRunnableSubmissions() bool {
 	return false
 }
 
-func (kernel *CommandKernel) admit(request Request, terminalResult chan error) error {
-	if !kernel.run.Admitting() {
-		return kernel.rejectClosedAdmission(request)
-	}
-	now := kernel.clock.Now()
-	if err := kernel.uids.Admit(request.UID, now); err != nil {
-		return errors.Join(err, kernel.abortRequestInputBody(request))
-	}
-	planRequest := request
-	planRequest.Args = append([]string(nil), request.Args...)
-	plan, err := kernel.planners[request.Source].Plan(planRequest)
+func (kernel *CommandKernel) preparePlan(request Request) (WorkPlan, error) {
+	plan, err := kernel.planners[request.Source].Plan(request)
 	if err != nil {
-		_ = kernel.uids.Complete(request.UID, false, now)
-		_ = kernel.abortRequestInputBody(request)
-		return errors.Join(err, abandonPlan(plan))
+		return WorkPlan{}, err
 	}
+	plan.Claims = append([]string(nil), plan.Claims...)
+	plan.ReadClaims = append([]string(nil), plan.ReadClaims...)
 	if plan.Resource != nil {
 		resource := *plan.Resource
 		plan.Resource = &resource
@@ -839,25 +939,30 @@ func (kernel *CommandKernel) admit(request Request, terminalResult chan error) e
 		plan.Capability = &capability
 	}
 	if err := plan.validate(); err != nil {
-		_ = kernel.uids.Complete(request.UID, false, now)
-		_ = kernel.abortRequestInputBody(request)
-		return errors.Join(err, abandonPlan(plan))
+		return WorkPlan{}, err
 	}
 	if plan.Resource != nil && plan.Resource.ID != request.LaneKey {
-		_ = kernel.uids.Complete(request.UID, false, now)
-		_ = kernel.abortRequestInputBody(request)
-		return errors.Join(errors.New("jobmgr kernel: resource identity differs from lane"), abandonPlan(plan))
+		return WorkPlan{}, errors.New("jobmgr kernel: resource identity differs from lane")
 	}
 	if plan.Capability != nil && plan.Capability.ID != request.LaneKey {
-		_ = kernel.uids.Complete(request.UID, false, now)
-		_ = kernel.abortRequestInputBody(request)
-		return errors.Join(errors.New("jobmgr kernel: capability identity differs from lane"), abandonPlan(plan))
+		return WorkPlan{}, errors.New("jobmgr kernel: capability identity differs from lane")
+	}
+	return plan, nil
+}
+
+func (kernel *CommandKernel) admit(request Request, plan WorkPlan, submissionContext context.Context, submissionResult, terminalResult chan error) error {
+	if !kernel.run.Admitting() {
+		return kernel.rejectClosedAdmission(request)
+	}
+	now := kernel.clock.Now()
+	if err := kernel.uids.Admit(request.UID, now); err != nil {
+		return errors.Join(err, kernel.abortRequestInputBody(request))
 	}
 	claims, err := normalizeAuthorityClaimModes(plan.Claims, plan.ReadClaims)
 	if err != nil {
 		_ = kernel.uids.Complete(request.UID, false, now)
 		_ = kernel.abortRequestInputBody(request)
-		return errors.Join(err, abandonPlan(plan))
+		return err
 	}
 	laneID := fmt.Sprintf("%d:%s", request.Source, request.LaneKey)
 	lane := kernel.lanes[laneID]
@@ -867,12 +972,21 @@ func (kernel *CommandKernel) admit(request Request, terminalResult chan error) e
 			if lane != nil && (lane.installPlanned || ((lane.current != nil || lane.currentIdentity.Valid()) && !lane.stopPlanned && !lane.currentStopping && !lane.retiringIdentity.Valid())) {
 				_ = kernel.uids.Complete(request.UID, false, now)
 				_ = kernel.abortRequestInputBody(request)
-				return errors.Join(errors.New("jobmgr kernel: install is not sequenced after an exact stop"), abandonPlan(plan))
+				return errors.New("jobmgr kernel: install is not sequenced after an exact stop")
 			}
 		case ResourceStop:
 			if lane == nil || lane.stopPlanned || lane.currentStopping || lane.retiringIdentity.Valid() ||
 				(lane.current == nil && !lane.currentIdentity.Valid() && !lane.installPlanned) {
-				return errors.Join(kernel.uids.Complete(request.UID, false, now), kernel.abortRequestInputBody(request), abandonPlan(plan))
+				err := errors.Join(kernel.uids.Complete(request.UID, false, now), kernel.abortRequestInputBody(request))
+				if err == nil {
+					if submissionResult != nil {
+						submissionResult <- nil
+					}
+					if terminalResult != nil {
+						terminalResult <- nil
+					}
+				}
+				return err
 			}
 		}
 	}
@@ -881,13 +995,13 @@ func (kernel *CommandKernel) admit(request Request, terminalResult chan error) e
 		if err != nil {
 			_ = kernel.uids.Complete(request.UID, false, now)
 			_ = kernel.abortRequestInputBody(request)
-			return errors.Join(err, abandonPlan(plan))
+			return err
 		}
 	}
 	if lane.owners >= lifecycle.MaximumLaneDepth {
 		_ = kernel.uids.Complete(request.UID, false, now)
 		_ = kernel.abortRequestInputBody(request)
-		return errors.Join(errors.New("jobmgr kernel: lane depth exhausted"), abandonPlan(plan))
+		return errors.New("jobmgr kernel: lane depth exhausted")
 	}
 	kernel.nextID++
 	operationGeneration, err := lifecycle.NewOperation(kernel.nextID, request.UID, request.Source, request.LaneKey, !plan.NoResponse)
@@ -895,14 +1009,14 @@ func (kernel *CommandKernel) admit(request Request, terminalResult chan error) e
 		_ = kernel.uids.Complete(request.UID, false, now)
 		kernel.releaseUnusedLane(lane)
 		_ = kernel.abortRequestInputBody(request)
-		return errors.Join(err, abandonPlan(plan))
+		return err
 	}
 	charge, err := operationAdmissionBytes(request, plan)
 	if err != nil {
 		_ = kernel.uids.Complete(request.UID, false, now)
 		kernel.releaseUnusedLane(lane)
 		_ = kernel.abortRequestInputBody(request)
-		return errors.Join(err, abandonPlan(plan))
+		return err
 	}
 	admissionLane := lifecycle.AdmissionLaneRef{Slot: lane.slot, Generation: lane.generation}
 	requested := lifecycle.AdmissionRequestResult{}
@@ -917,20 +1031,20 @@ func (kernel *CommandKernel) admit(request Request, terminalResult chan error) e
 		if !errors.Is(requested.Rejected, lifecycle.ErrAdmissionRecordCapacity) {
 			_ = kernel.abortRequestInputBody(request)
 		}
-		return errors.Join(requested.Rejected, abandonPlan(plan))
+		return requested.Rejected
 	}
 	request.InputBodyToken = 0
 	operation := &commandOperation{
 		OperationGeneration: operationGeneration, request: request, plan: plan, claims: claims,
 		admission: requested.Ref, admissionBase: charge, deadline: deadlineEntry{index: -1},
-		terminalResult: terminalResult,
+		submissionContext: submissionContext, submissionResult: submissionResult, terminalResult: terminalResult,
 	}
 	prepareClaimEdges(operation, claims)
 	if err := kernel.claims.Register(operation); err != nil {
 		_ = kernel.admission.CancelWaiting(requested.Ref)
 		_ = kernel.uids.Complete(request.UID, false, now)
 		kernel.releaseUnusedLane(lane)
-		return errors.Join(err, abandonPlan(plan))
+		return err
 	}
 	operation.lane = lane
 	lane.owners++
@@ -1012,6 +1126,7 @@ func (kernel *CommandKernel) serviceAdmissions(quantum int) bool {
 				return false
 			}
 			operation.admitted = true
+			kernel.settleSubmission(operation, nil)
 			if operation.lane.active == nil && operation.lane.head == operation {
 				kernel.markReady(operation.lane)
 			}
@@ -1031,6 +1146,15 @@ func (kernel *CommandKernel) serviceAdmissions(quantum int) bool {
 		}
 	}
 	return more
+}
+
+func (kernel *CommandKernel) settleSubmission(operation *commandOperation, err error) {
+	if operation == nil || operation.submissionResult == nil {
+		return
+	}
+	operation.submissionResult <- err
+	operation.submissionResult = nil
+	operation.submissionContext = nil
 }
 
 func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
@@ -1225,7 +1349,7 @@ func (kernel *CommandKernel) rejectTaskStart(start lifecycle.TaskStart) {
 	delete(kernel.tasksByRequest, start.Request)
 	operation.taskRequest = lifecycle.TaskRequestRef{}
 	operation.terminalErr = errors.Join(operation.terminalErr, start.Err)
-	kernel.unlinkQueued(operation)
+	kernel.unlinkQueued(operation, start.Err)
 	kernel.tryDispose(operation)
 }
 
@@ -1614,7 +1738,7 @@ func (kernel *CommandKernel) acknowledgeResourceTask(operation *commandOperation
 		if ack.Kind == lifecycle.TaskActionStopResource || ack.Kind == lifecycle.TaskActionFinalizeResource || ack.Kind == lifecycle.TaskActionDispose {
 			return
 		}
-		if ack.Kind == lifecycle.TaskActionAcceptStart {
+		if ack.Kind == lifecycle.TaskActionAcceptStart || ack.Kind == lifecycle.TaskActionPublishResource {
 			action := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionDispose}
 			if err := operation.ActionPending(action.Ref, action.Sequence); err != nil {
 				kernel.run.Dirty(err)
@@ -1646,8 +1770,21 @@ func (kernel *CommandKernel) acknowledgeResourceTask(operation *commandOperation
 			kernel.run.Dirty(errors.New("jobmgr kernel: resource publication found a nonempty current slot"))
 			return
 		}
+		action := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionPublishResource}
+		if err := operation.ActionPending(action.Ref, action.Sequence); err != nil {
+			kernel.run.Dirty(err)
+			return
+		}
+		if err := kernel.tasks.SendAction(action); err != nil {
+			kernel.run.Dirty(err)
+		}
+	case lifecycle.TaskActionPublishResource:
+		if lane.current != nil || lane.currentIdentity.Valid() || lane.currentStopping || lane.retiringIdentity.Valid() {
+			kernel.run.Dirty(errors.New("jobmgr kernel: resource publication found a nonempty current slot"))
+			return
+		}
 		expected := lifecycle.ResourceIdentity{ID: operation.plan.Resource.ID, Generation: operation.resourceGeneration}
-		resource, err := kernel.tasks.PublishAndTakeReadyResource(ack.Ref, ack.Sequence, expected)
+		resource, err := kernel.tasks.TakePublishedReadyResource(ack.Ref, ack.Sequence, expected)
 		if err != nil {
 			kernel.run.Dirty(err)
 			action := lifecycle.TaskAction{Ref: ack.Ref, Sequence: ack.Sequence + 1, Kind: lifecycle.TaskActionDispose}
@@ -1728,7 +1865,14 @@ func (kernel *CommandKernel) cancelOperation(uid string) {
 		return
 	}
 	if operation.Child == lifecycle.ChildNotStarted {
-		kernel.unlinkQueued(operation)
+		var cause error
+		if operation.submissionContext != nil {
+			cause = context.Cause(operation.submissionContext)
+		}
+		if cause == nil {
+			cause = context.Canceled
+		}
+		kernel.unlinkQueued(operation, cause)
 		if operation.Response != lifecycle.ResponseNotRequired {
 			kernel.enqueueControl(operation, lifecycle.ControlCancelled)
 		} else {
@@ -1798,7 +1942,7 @@ func (kernel *CommandKernel) serviceDeadlines(now time.Time, quantum int) bool {
 					}
 				}
 			} else {
-				kernel.unlinkQueued(operation)
+				kernel.unlinkQueued(operation, context.DeadlineExceeded)
 				if operation.Response == lifecycle.ResponseNotRequired {
 					kernel.tryDispose(operation)
 				}
@@ -1919,13 +2063,6 @@ func (kernel *CommandKernel) tryDispose(operation *commandOperation) {
 		kernel.run.Dirty(errors.New("jobmgr kernel: terminal operation retained a pending task request"))
 		return
 	}
-	if (operation.Child == lifecycle.ChildNotStarted || operation.Child == lifecycle.ChildAbandonedBeforeStart) && operation.plan.Abandon != nil {
-		if err := operation.plan.Abandon(); err != nil {
-			kernel.run.Dirty(err)
-			return
-		}
-		operation.plan.Abandon = nil
-	}
 	if operation.State < lifecycle.OperationDisposing {
 		_ = operation.Advance(lifecycle.OperationDisposing)
 	}
@@ -2006,14 +2143,7 @@ func (kernel *CommandKernel) completeOperationUID(operation *commandOperation, t
 	return nil
 }
 
-func abandonPlan(plan WorkPlan) error {
-	if plan.Abandon == nil {
-		return nil
-	}
-	return plan.Abandon()
-}
-
-func (kernel *CommandKernel) unlinkQueued(operation *commandOperation) {
+func (kernel *CommandKernel) unlinkQueued(operation *commandOperation, submissionErr error) {
 	if operation.Child == lifecycle.ChildDeadlineStartPending {
 		kernel.run.Dirty(errors.New("jobmgr kernel: required deadline start was unlinked without abandonment"))
 		return
@@ -2028,6 +2158,15 @@ func (kernel *CommandKernel) unlinkQueued(operation *commandOperation) {
 		} else {
 			delete(kernel.byAdmission, operation.admission)
 			operation.admission = lifecycle.AdmissionRef{}
+			operation.request.Args = nil
+			operation.request.Payload = nil
+			operation.plan.Claims = nil
+			operation.plan.ReadClaims = nil
+			operation.plan.Work = nil
+			operation.plan.Cleanup = nil
+			operation.claims = nil
+			operation.authorityClaimEdges = nil
+			kernel.settleSubmission(operation, submissionErr)
 		}
 	}
 	if operation.taskRequest.Valid() {
@@ -2174,7 +2313,7 @@ func (kernel *CommandKernel) beginShutdown(deadline time.Time) error {
 				kernel.enqueueControl(operation, cancellationControl(operation))
 			}
 		case lifecycle.ChildNotStarted:
-			kernel.unlinkQueued(operation)
+			kernel.unlinkQueued(operation, ErrStopped)
 			if operation.Response != lifecycle.ResponseNotRequired {
 				kernel.enqueueControl(operation, cancellationControl(operation))
 			} else {
@@ -2185,7 +2324,7 @@ func (kernel *CommandKernel) beginShutdown(deadline time.Time) error {
 				if err := operation.AbandonDeadlineStart(); err != nil {
 					return err
 				}
-				kernel.unlinkQueued(operation)
+				kernel.unlinkQueued(operation, ErrStopped)
 				if operation.Response == lifecycle.ResponseOpen {
 					kernel.enqueueControl(operation, lifecycle.ControlDeadline)
 				} else {
@@ -2261,6 +2400,12 @@ func (kernel *CommandKernel) enqueueShutdownStops() error {
 				return errors.New("jobmgr kernel: shutdown found a detached current identity")
 			}
 			continue
+		}
+		if lane.owners != 0 {
+			continue
+		}
+		if lane.head != nil || lane.tail != nil || lane.active != nil || lane.ready {
+			return errors.New("jobmgr kernel: owner-free resource lane retains operation state")
 		}
 		identity := lane.currentIdentity
 		if !identity.Valid() || identity.ID != lane.key {
@@ -2467,7 +2612,7 @@ func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
 		}
 		bytes += persistent
 	}
-	fields := []string{request.UID, request.LaneKey, request.Route}
+	fields := []string{request.UID, request.LaneKey, request.Route, request.ContentType}
 	fields = append(fields, request.Args...)
 	fields = append(fields, plan.Claims...)
 	fields = append(fields, plan.ReadClaims...)
@@ -2477,6 +2622,12 @@ func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
 		}
 		bytes += int64(len(field))
 	}
+	const requestArgumentAdmissionBytes = int64(16)
+	arguments := int64(len(request.Args))
+	if arguments > (lifecycle.OrdinaryBudgetBytes-bytes)/requestArgumentAdmissionBytes {
+		return 0, errors.New("jobmgr kernel: request arguments do not self-fit admission")
+	}
+	bytes += arguments * requestArgumentAdmissionBytes
 	const authorityClaimEdgeAdmissionBytes = int64(96)
 	authorityClaimEdges := int64(len(plan.Claims) + len(plan.ReadClaims))
 	if authorityClaimEdges > (lifecycle.OrdinaryBudgetBytes-bytes)/authorityClaimEdgeAdmissionBytes {

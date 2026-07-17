@@ -41,7 +41,7 @@ type authorityClaimEdge struct {
 	next      *authorityClaimEdge
 }
 
-type ClaimAuthority struct {
+type claimAuthority struct {
 	keys          map[string]*authorityClaimKey
 	nextTicket    uint64
 	waiterCount   int
@@ -53,8 +53,8 @@ type ClaimAuthority struct {
 	radixCounts   [256]uint16
 }
 
-func NewClaimAuthority() *ClaimAuthority {
-	return &ClaimAuthority{keys: make(map[string]*authorityClaimKey)}
+func newClaimAuthority() *claimAuthority {
+	return &claimAuthority{keys: make(map[string]*authorityClaimKey)}
 }
 
 func normalizeAuthorityClaims(writeClaims []string) ([]authorityClaim, error) {
@@ -93,7 +93,7 @@ func prepareClaimEdges(operation *commandOperation, claims []authorityClaim) {
 	operation.claimPrepared = true
 }
 
-func (authority *ClaimAuthority) Register(operation *commandOperation) error {
+func (authority *claimAuthority) Register(operation *commandOperation) error {
 	if operation == nil || !operation.claimPrepared || operation.claimRegistered {
 		return errors.New("jobmgr claims: invalid operation registration")
 	}
@@ -106,7 +106,7 @@ func (authority *ClaimAuthority) Register(operation *commandOperation) error {
 	return nil
 }
 
-func (authority *ClaimAuthority) Acquire(operation *commandOperation) (bool, error) {
+func (authority *claimAuthority) Acquire(operation *commandOperation) (bool, error) {
 	if operation == nil || !operation.claimRegistered || operation.claimWaiting || operation.claimsHeld || operation.claimCursor != 0 {
 		return false, errors.New("jobmgr claims: invalid acquire")
 	}
@@ -118,7 +118,7 @@ func (authority *ClaimAuthority) Acquire(operation *commandOperation) (bool, err
 	return authority.acquireFromCursor(operation)
 }
 
-func (authority *ClaimAuthority) Cancel(operation *commandOperation) ([]*commandOperation, error) {
+func (authority *claimAuthority) Cancel(operation *commandOperation) ([]*commandOperation, error) {
 	if operation == nil || !operation.claimRegistered || !operation.claimWaiting || operation.claimsHeld {
 		return nil, errors.New("jobmgr claims: operation is not waiting")
 	}
@@ -140,7 +140,7 @@ func (authority *ClaimAuthority) Cancel(operation *commandOperation) ([]*command
 	return granted, err
 }
 
-func (authority *ClaimAuthority) Release(operation *commandOperation) ([]*commandOperation, error) {
+func (authority *claimAuthority) Release(operation *commandOperation) ([]*commandOperation, error) {
 	if operation == nil || !operation.claimRegistered || !operation.claimsHeld || operation.claimWaiting || operation.claimCursor != len(operation.authorityClaimEdges) {
 		return nil, errors.New("jobmgr claims: release without complete held claims")
 	}
@@ -158,20 +158,20 @@ func (authority *ClaimAuthority) Release(operation *commandOperation) ([]*comman
 	return granted, err
 }
 
-func (authority *ClaimAuthority) Abandon(operation *commandOperation) error {
+func (authority *claimAuthority) Abandon(operation *commandOperation) error {
 	if operation == nil || !operation.claimRegistered || operation.claimWaiting || operation.claimsHeld || operation.claimCursor != 0 {
 		return errors.New("jobmgr claims: abandon outside idle prepared state")
 	}
 	return authority.forget(operation)
 }
 
-func (authority *ClaimAuthority) Waiting(operation *commandOperation) bool {
+func (authority *claimAuthority) Waiting(operation *commandOperation) bool {
 	return operation != nil && operation.claimWaiting
 }
 
-func (authority *ClaimAuthority) WaitingCount() int { return authority.waiterCount }
+func (authority *claimAuthority) WaitingCount() int { return authority.waiterCount }
 
-func (authority *ClaimAuthority) acquireFromCursor(operation *commandOperation) (bool, error) {
+func (authority *claimAuthority) acquireFromCursor(operation *commandOperation) (bool, error) {
 	for operation.claimCursor < len(operation.authorityClaimEdges) {
 		edge := &operation.authorityClaimEdges[operation.claimCursor]
 		if edge.held || edge.waiting || edge.key == nil {
@@ -211,7 +211,7 @@ func holdEdge(edge *authorityClaimEdge) {
 	edge.key.readerTail = edge
 }
 
-func (authority *ClaimAuthority) releaseEdge(edge *authorityClaimEdge) error {
+func (authority *claimAuthority) releaseEdge(edge *authorityClaimEdge) error {
 	if edge == nil || !edge.held || edge.waiting || edge.key == nil {
 		return errors.New("jobmgr claims: release of unheld edge")
 	}
@@ -242,7 +242,7 @@ func (authority *ClaimAuthority) releaseEdge(edge *authorityClaimEdge) error {
 	return nil
 }
 
-func (authority *ClaimAuthority) enqueueWaiter(edge *authorityClaimEdge) {
+func (authority *claimAuthority) enqueueWaiter(edge *authorityClaimEdge) {
 	edge.waiting = true
 	edge.prev = edge.key.waiterTail
 	if edge.key.waiterTail != nil {
@@ -254,7 +254,7 @@ func (authority *ClaimAuthority) enqueueWaiter(edge *authorityClaimEdge) {
 	authority.waiterCount++
 }
 
-func (authority *ClaimAuthority) removeWaiter(edge *authorityClaimEdge) error {
+func (authority *claimAuthority) removeWaiter(edge *authorityClaimEdge) error {
 	if edge == nil || !edge.waiting || edge.held || edge.key == nil {
 		return errors.New("jobmgr claims: remove of non-waiter edge")
 	}
@@ -279,7 +279,7 @@ func (authority *ClaimAuthority) removeWaiter(edge *authorityClaimEdge) error {
 	return nil
 }
 
-func (authority *ClaimAuthority) settle(released *commandOperation) ([]*commandOperation, error) {
+func (authority *claimAuthority) settle(released *commandOperation) ([]*commandOperation, error) {
 	authority.eligibleCount = 0
 	for index := 0; index < authority.grantCount; index++ {
 		authority.grants[index] = nil
@@ -322,7 +322,7 @@ func (authority *ClaimAuthority) settle(released *commandOperation) ([]*commandO
 	return authority.grants[:authority.grantCount:authority.grantCount], nil
 }
 
-func (authority *ClaimAuthority) collectEligible(key *authorityClaimKey) error {
+func (authority *claimAuthority) collectEligible(key *authorityClaimKey) error {
 	if key == nil || key.writer != nil || key.waiterHead == nil {
 		return nil
 	}
@@ -342,7 +342,7 @@ func (authority *ClaimAuthority) collectEligible(key *authorityClaimKey) error {
 	return nil
 }
 
-func (authority *ClaimAuthority) addCandidate(operation *commandOperation) error {
+func (authority *claimAuthority) addCandidate(operation *commandOperation) error {
 	if authority.eligibleCount >= len(authority.eligible) {
 		return errors.New("jobmgr claims: wake jobmgr capacity exceeded")
 	}
@@ -351,7 +351,7 @@ func (authority *ClaimAuthority) addCandidate(operation *commandOperation) error
 	return nil
 }
 
-func (authority *ClaimAuthority) sortCandidates() {
+func (authority *claimAuthority) sortCandidates() {
 	if authority.eligibleCount < 2 {
 		return
 	}
@@ -378,7 +378,7 @@ func (authority *ClaimAuthority) sortCandidates() {
 	}
 }
 
-func (authority *ClaimAuthority) forget(operation *commandOperation) error {
+func (authority *claimAuthority) forget(operation *commandOperation) error {
 	if operation == nil || !operation.claimRegistered || operation.claimWaiting || operation.claimsHeld || operation.claimCursor != 0 {
 		return errors.New("jobmgr claims: forget outside terminal claim state")
 	}
@@ -397,7 +397,7 @@ func (authority *ClaimAuthority) forget(operation *commandOperation) error {
 	return nil
 }
 
-func (authority *ClaimAuthority) key(name string) *authorityClaimKey {
+func (authority *claimAuthority) key(name string) *authorityClaimKey {
 	state := authority.keys[name]
 	if state == nil {
 		state = &authorityClaimKey{}

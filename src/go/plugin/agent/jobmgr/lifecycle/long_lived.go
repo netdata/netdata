@@ -230,7 +230,7 @@ func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedge
 	registry.mu.Lock()
 	if _, exists := registry.owners[owner]; registry.sealed || exists || registry.freeHead == 0 {
 		registry.mu.Unlock()
-		_, releaseErr := admission.ReleaseLongLived(admissionRef, plan.bytes)
+		releaseErr := supervisor.releaseLongLivedAdmission(admission, admissionRef, plan.bytes)
 		return LongLivedPermit{}, errors.Join(errors.New("jobmgr long-lived permit: activation sealed, duplicate owner, or capacity exhausted"), releaseErr)
 	}
 	index := int(registry.freeHead - 1)
@@ -238,7 +238,7 @@ func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedge
 	generation := slot.generation + 1
 	if generation == 0 {
 		registry.mu.Unlock()
-		_, releaseErr := admission.ReleaseLongLived(admissionRef, plan.bytes)
+		releaseErr := supervisor.releaseLongLivedAdmission(admission, admissionRef, plan.bytes)
 		return LongLivedPermit{}, errors.Join(errors.New("jobmgr long-lived permit: generation wrapped"), releaseErr)
 	}
 	registry.freeHead = slot.freeNext
@@ -337,7 +337,7 @@ func (supervisor *TaskSupervisor) releaseLongLivedBytes(ref LongLivedPermitRef, 
 	admission, admissionRef, byteCount := slot.admission, slot.admissionRef, slot.bytes
 	registry.mu.Unlock()
 
-	_, releaseErr := admission.ReleaseLongLived(admissionRef, byteCount)
+	releaseErr := supervisor.releaseLongLivedAdmission(admission, admissionRef, byteCount)
 
 	registry.mu.Lock()
 	slot, lookupErr := registry.slot(ref, owner)
@@ -359,6 +359,14 @@ func (supervisor *TaskSupervisor) releaseLongLivedBytes(ref LongLivedPermitRef, 
 	}
 	registry.mu.Unlock()
 	return nil
+}
+
+func (supervisor *TaskSupervisor) releaseLongLivedAdmission(admission *AdmissionLedger, ref AdmissionRef, bytes int64) error {
+	wake, err := admission.ReleaseLongLived(ref, bytes)
+	if wake {
+		supervisor.notifyAdmissionReady()
+	}
+	return err
 }
 
 func (supervisor *TaskSupervisor) returnLongLivedPermit(ref LongLivedPermitRef, owner ResourceIdentity) error {

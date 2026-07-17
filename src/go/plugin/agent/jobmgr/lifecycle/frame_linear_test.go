@@ -19,7 +19,7 @@ func TestPreparedFunctionFrameTransfersExactlyOnce(t *testing.T) {
 	}
 	alias := frame
 	var output bytes.Buffer
-	owner, err := NewFrameOwner(&output, nil)
+	owner, err := NewFrameOwner(&output)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -52,7 +52,7 @@ func TestPreparedProtocolFrameCommitOrAbortIsLinear(t *testing.T) {
 				if err := frame.Abort(); err != nil {
 					t.Fatal(err)
 				}
-				owner, err := NewFrameOwner(&bytes.Buffer{}, nil)
+				owner, err := NewFrameOwner(&bytes.Buffer{})
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -63,7 +63,7 @@ func TestPreparedProtocolFrameCommitOrAbortIsLinear(t *testing.T) {
 			}
 
 			var output bytes.Buffer
-			owner, err := NewFrameOwner(&output, nil)
+			owner, err := NewFrameOwner(&output)
 			if err != nil {
 				t.Fatal(err)
 			}

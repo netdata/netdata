@@ -625,6 +625,35 @@ func TestAdmissionInputBodyGrowthTransfersIntoOperationRecord(t *testing.T) {
 	}
 }
 
+func TestAdmissionCancelTransferredInputBodyWaitingReleasesHeldBytes(t *testing.T) {
+	ledger := NewAdmissionLedger()
+	const capacity = int64(64 * 1024)
+	token, err := ledger.RequestInputBodyGrowth(1, 0, capacity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var grants [4]AdmissionGrant
+	count, _, err := ledger.TakeGrants(1, &grants)
+	if err != nil || count != 1 {
+		t.Fatalf("input grant differs: count=%d err=%v", count, err)
+	}
+	if _, err := ledger.CommitInputBodyGrowth(token, capacity); err != nil {
+		t.Fatal(err)
+	}
+	transferred := ledger.TransferInputBody(
+		1, token, AdmissionLaneRef{Slot: 1, Generation: 1}, capacity+512, capacity,
+	)
+	if transferred.Rejected != nil {
+		t.Fatal(transferred.Rejected)
+	}
+	if err := ledger.CancelWaiting(transferred.Ref); err != nil {
+		t.Fatal(err)
+	}
+	if census := ledger.Census(); census.ActiveRecords != 0 || census.OrdinaryBytes != 0 || census.InputBodyActive {
+		t.Fatalf("cancelled transfer retained state: %#v", census)
+	}
+}
+
 func TestAdmissionLongLivedRecordDetachesFromCompletedLaneGeneration(t *testing.T) {
 	ledger := NewAdmissionLedger()
 	first := ledger.RequestOrdinary(1, AdmissionLaneRef{Slot: 1, Generation: 1}, 100)
@@ -684,7 +713,7 @@ func TestAdmissionInputBodyAbortReleasesWaitingAndGrantedCapacity(t *testing.T) 
 }
 
 func TestTaskSupervisorFourSlotsAndGenerationCheckedReuse(t *testing.T) {
-	frame, err := NewFrameOwner(io.Discard, nil)
+	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -770,7 +799,7 @@ func TestTaskSupervisorFourSlotsAndGenerationCheckedReuse(t *testing.T) {
 }
 
 func TestTaskSupervisorRetainedTimeoutCountAndSaturationLatch(t *testing.T) {
-	frame, err := NewFrameOwner(io.Discard, nil)
+	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -846,7 +875,7 @@ func TestTaskSupervisorRetainedTimeoutCountAndSaturationLatch(t *testing.T) {
 }
 
 func TestTaskSupervisorContainsPanicAndReleasesSlot(t *testing.T) {
-	frame, err := NewFrameOwner(io.Discard, nil)
+	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -887,7 +916,7 @@ func TestTaskSupervisorContainsPanicAndReleasesSlot(t *testing.T) {
 }
 
 func TestTaskSupervisorPreservesAuthoritativeCancellationCause(t *testing.T) {
-	frame, err := NewFrameOwner(io.Discard, nil)
+	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -944,7 +973,7 @@ func TestTaskSupervisorPreservesAuthoritativeCancellationCause(t *testing.T) {
 
 func TestTaskSupervisorChecksPhaseSequenceAndPublishesOwnedResult(t *testing.T) {
 	var output bytes.Buffer
-	frame, err := NewFrameOwner(&output, nil)
+	frame, err := NewFrameOwner(&output)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -997,7 +1026,7 @@ func TestTaskSupervisorChecksPhaseSequenceAndPublishesOwnedResult(t *testing.T) 
 }
 
 func TestTaskSupervisorPreflightsResultEnvelopeBeforeAction(t *testing.T) {
-	frame, err := NewFrameOwner(io.Discard, nil)
+	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1045,7 +1074,7 @@ func TestTaskSupervisorPreflightsResultEnvelopeBeforeAction(t *testing.T) {
 }
 
 func TestTaskSupervisorRunsCleanupBeforeExplicitTermination(t *testing.T) {
-	frame, err := NewFrameOwner(io.Discard, nil)
+	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1094,7 +1123,7 @@ func TestTaskSupervisorRunsCleanupBeforeExplicitTermination(t *testing.T) {
 }
 
 func TestTaskSupervisorDispatchRotatesPendingSources(t *testing.T) {
-	frame, err := NewFrameOwner(io.Discard, nil)
+	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1142,7 +1171,7 @@ func TestTaskSupervisorDispatchRotatesPendingSources(t *testing.T) {
 }
 
 func TestTaskSupervisorDirectlyCancelsPendingRequest(t *testing.T) {
-	frame, err := NewFrameOwner(io.Discard, nil)
+	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1205,8 +1234,11 @@ func enqueueAndDispatchTask(t *testing.T, supervisor *TaskSupervisor, plan TaskP
 func TestFrameOwnerControlReservationPrecedesLaterOrdinaryFrame(t *testing.T) {
 	writer := newStepWriter()
 	controlReady := make(chan struct{}, 1)
-	owner, err := NewFrameOwner(writer, func() { controlReady <- struct{}{} })
+	owner, err := NewFrameOwner(writer)
 	if err != nil {
+		t.Fatal(err)
+	}
+	if err := owner.BindControlReady(func() { controlReady <- struct{}{} }); err != nil {
 		t.Fatal(err)
 	}
 	result, err := NewSealedResult(200, "application/json", []byte(`{"status":200}`))
@@ -1261,8 +1293,49 @@ func TestFrameOwnerControlReservationPrecedesLaterOrdinaryFrame(t *testing.T) {
 	}
 }
 
+func TestFrameOwnerLateControlReadyBindingReplaysPendingWake(t *testing.T) {
+	writer := newStepWriter()
+	owner, err := NewFrameOwner(writer)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := NewSealedResult(200, "application/json", []byte(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	frame, err := PrepareFrame("ordinary", result, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	committed := make(chan error, 1)
+	go func() { committed <- owner.Commit(frame) }()
+	<-writer.offered
+	if err := owner.TryCommitControl(ControlFramePlan{
+		UID: "control", Status: ControlDeadline, Expiry: 1,
+	}); !errors.Is(err, ErrFrameOwnerBusy) {
+		t.Fatalf("busy control result differs: %v", err)
+	}
+	writer.release <- struct{}{}
+	if err := <-committed; err != nil {
+		t.Fatal(err)
+	}
+
+	ready := make(chan struct{}, 1)
+	if err := owner.BindControlReady(func() { ready <- struct{}{} }); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-ready:
+	default:
+		t.Fatal("late binding lost pending control wake")
+	}
+	if err := owner.BindControlReady(func() {}); err == nil {
+		t.Fatal("duplicate control-ready binding succeeded")
+	}
+}
+
 func TestFrameOwnerShortWritePoisonsAndRetains(t *testing.T) {
-	owner, err := NewFrameOwner(shortWriter{}, nil)
+	owner, err := NewFrameOwner(shortWriter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1328,7 +1401,7 @@ func TestFunctionPayloadAndFrameCapacityAreSeparateFromControlReserve(t *testing
 	if err != nil {
 		t.Fatalf("1 MiB Function result was limited by the control reserve: %v", err)
 	}
-	owner, err := NewFrameOwner(io.Discard, nil)
+	owner, err := NewFrameOwner(io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}

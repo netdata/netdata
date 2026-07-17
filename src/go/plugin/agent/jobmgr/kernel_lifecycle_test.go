@@ -11,6 +11,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -93,10 +94,74 @@ func TestKernelLoopStartsExactlyOnce(t *testing.T) {
 				}
 			},
 		},
+		"duplicate wrappers": {
+			run: func(t *testing.T) {
+				kernel, _ := newKernel(t)
+				first, err := NewKernelLoop(kernel)
+				if err != nil {
+					t.Fatal(err)
+				}
+				second, err := NewKernelLoop(kernel)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if err := first.Start(context.Background()); err != nil {
+					t.Fatal(err)
+				}
+				if err := second.Start(context.Background()); err == nil {
+					kernel.Stop()
+					_ = kernel.Wait(context.Background())
+					t.Fatal("second wrapper start was accepted")
+				}
+				kernel.Stop()
+				if err := kernel.Wait(context.Background()); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, test.run)
+	}
+}
+
+func TestKernelTerminalRejectsWithoutRetainingSubmissions(t *testing.T) {
+	tests := map[string]struct {
+		source lifecycle.Source
+		call   func(context.Context, *CommandKernel, int) error
+	}{
+		"command": {
+			source: lifecycle.SourceJobManager,
+			call: func(ctx context.Context, kernel *CommandKernel, index int) error {
+				return kernel.Submit(ctx, Request{
+					UID:     fmt.Sprintf("terminal-command-%d", index),
+					LaneKey: "lane",
+					Source:  lifecycle.SourceJobManager,
+					Route:   "route",
+				})
+			},
+		},
+		"control": {
+			source: lifecycle.SourceFunction,
+			call: func(ctx context.Context, kernel *CommandKernel, index int) error {
+				return kernel.Reject(ctx, fmt.Sprintf("terminal-control-%d", index), lifecycle.ControlBadRequest)
+			},
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			kernel := newStoppedKernel(t)
+			for index := 0; index < externalSourceQueueDepth*4; index++ {
+				if err := test.call(context.Background(), kernel, index); !errors.Is(err, ErrStopped) {
+					t.Fatalf("terminal submission %d differs: %v", index, err)
+				}
+			}
+			if retained := len(kernel.submissions[sourceIndex(test.source)]); retained != 0 {
+				t.Fatalf("terminal submissions retained=%d", retained)
+			}
+		})
 	}
 }
 
@@ -114,6 +179,331 @@ func TestKernelDirtyStateTriggersFailStop(t *testing.T) {
 	if err := kernel.Wait(ctx); !errors.Is(err, want) {
 		t.Fatalf("repeated dirty terminal cause differs: %v", err)
 	}
+}
+
+func TestKernelResourcePublicationRunsOffLoop(t *testing.T) {
+	publishRelease := make(chan struct{})
+	resource := newKernelTestReadyResource("resource", publishRelease, nil)
+	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, kernelResourcePlanner(t, resource, nil, nil))
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	startKernelLoop(t, kernel)
+	if err := kernel.Submit(context.Background(), Request{
+		UID: "publish-off-loop", LaneKey: "resource", Source: lifecycle.SourceJobManager, Route: "install",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-resource.publishEntered:
+	case <-time.After(time.Second):
+		t.Fatal("resource publication did not start")
+	}
+	kernel.Stop()
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	shutdownErr := kernel.WaitShutdownStarted(ctx)
+	cancel()
+	close(publishRelease)
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
+	defer waitCancel()
+	if err := kernel.Wait(waitCtx); err != nil {
+		t.Fatal(err)
+	}
+	if shutdownErr != nil {
+		t.Fatalf("resource publication blocked KernelLoop shutdown: %v", shutdownErr)
+	}
+	if tasks.Active() != 0 || tasks.Pending() != 0 {
+		t.Fatalf("resource publication retained tasks: active=%d pending=%d", tasks.Active(), tasks.Pending())
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
+}
+
+func TestKernelPlanningRunsOutsideLoop(t *testing.T) {
+	planEntered := make(chan struct{})
+	planRelease := make(chan struct{})
+	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
+		close(planEntered)
+		<-planRelease
+		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+			return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
+		})}, nil
+	})
+	kernel, run, admission, uids, _ := newKernelWithPlanner(t, planner)
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	startKernelLoop(t, kernel)
+	submitResult := make(chan error, 1)
+	go func() {
+		submitResult <- kernel.Submit(context.Background(), Request{
+			UID: "blocked-planning", LaneKey: "lane", Source: lifecycle.SourceJobManager, Route: "route",
+		})
+	}()
+	select {
+	case <-planEntered:
+	case <-time.After(time.Second):
+		t.Fatal("planning did not start")
+	}
+	kernel.Stop()
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	shutdownErr := kernel.WaitShutdownStarted(ctx)
+	cancel()
+	close(planRelease)
+	select {
+	case <-submitResult:
+	case <-time.After(time.Second):
+		t.Fatal("blocked planning caller did not return")
+	}
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
+	defer waitCancel()
+	if err := kernel.Wait(waitCtx); err != nil {
+		t.Fatal(err)
+	}
+	if shutdownErr != nil {
+		t.Fatalf("plan preparation blocked KernelLoop shutdown: %v", shutdownErr)
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
+}
+
+func TestWorkPlanRejectsUnboundedClaims(t *testing.T) {
+	valid := WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)}
+	tests := map[string]struct {
+		mutate func(*WorkPlan)
+	}{
+		"too many claims": {
+			mutate: func(plan *WorkPlan) {
+				plan.Claims = make([]string, maximumPlanClaims+1)
+				for index := range plan.Claims {
+					plan.Claims[index] = "claim"
+				}
+			},
+		},
+		"oversized claim key": {
+			mutate: func(plan *WorkPlan) {
+				plan.Claims = []string{strings.Repeat("c", maximumClaimKeyBytes+1)}
+			},
+		},
+		"oversized aggregate claims": {
+			mutate: func(plan *WorkPlan) {
+				plan.ReadClaims = []string{
+					strings.Repeat("a", maximumPlanClaimBytes/2),
+					strings.Repeat("b", maximumPlanClaimBytes/2+1),
+				}
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			plan := valid
+			test.mutate(&plan)
+			if err := plan.validate(); err == nil {
+				t.Fatal("unbounded plan passed validation")
+			}
+		})
+	}
+}
+
+func TestKernelSubmitWaitsForOrdinaryAdmissionGrant(t *testing.T) {
+	kernel, run, admission, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	gate := make(chan struct{})
+	kernel.admissionServiceGate = gate
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	request := Request{
+		UID: "grant-boundary", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route",
+	}
+	plan, err := kernel.preparePlan(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	submitted := make(chan error, 1)
+	kernel.submissions[sourceIndex(request.Source)] <- submission{
+		request: request,
+		plan:    plan,
+		result:  submitted,
+	}
+	kernel.serviceSubmissions(1)
+	if census := admission.Census(); census.OrdinaryWaiting != 1 || census.OrdinaryGranted != 0 {
+		t.Fatalf("pre-grant admission differs: %#v", census)
+	}
+	select {
+	case err := <-submitted:
+		t.Fatalf("submission returned before ordinary grant: %v", err)
+	default:
+	}
+
+	close(gate)
+	kernel.serviceAdmissions(1)
+	select {
+	case err := <-submitted:
+		if err != nil {
+			t.Fatal(err)
+		}
+	default:
+		t.Fatal("submission did not return after ordinary grant")
+	}
+}
+
+func TestKernelCancelledSubmitReleasesUngrantableAdmission(t *testing.T) {
+	kernel, run, admission, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
+	gate := make(chan struct{})
+	kernel.admissionServiceGate = gate
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	startKernelLoop(t, kernel)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	submitted := make(chan error, 1)
+	go func() {
+		submitted <- kernel.Submit(ctx, Request{
+			UID: "cancel-before-grant", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route",
+		})
+	}()
+	deadline := time.Now().Add(time.Second)
+	for admission.Census().OrdinaryWaiting != 1 {
+		if time.Now().After(deadline) {
+			t.Fatal("submission did not reach ordinary admission")
+		}
+		runtime.Gosched()
+	}
+	cancel()
+	select {
+	case err := <-submitted:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("cancelled submission result differs: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("cancelled submission did not return")
+	}
+	if census := admission.Census(); census.ActiveRecords != 0 || census.OrdinaryWaiting != 0 {
+		t.Fatalf("cancelled submission retained admission: %#v", census)
+	}
+
+	kernel.Stop()
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
+	defer waitCancel()
+	if err := kernel.Wait(waitCtx); err != nil {
+		t.Fatal(err)
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
+}
+
+func TestKernelAbsentResourceStopSettlesWithoutAdmission(t *testing.T) {
+	planner := plannerFunc(func(_ context.Context, route string, _ []string) (WorkPlan, error) {
+		return WorkPlan{
+			Resource:   &ResourcePlan{Action: ResourceStop, ID: route},
+			NoResponse: true,
+		}, nil
+	})
+	kernel, run, admission, uids, _ := newKernelWithPlanner(t, planner)
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	startKernelLoop(t, kernel)
+
+	result := make(chan error, 1)
+	go func() {
+		result <- kernel.SubmitAndWait(context.Background(), Request{
+			UID: "absent-stop", LaneKey: "resource", Source: lifecycle.SourceJobManager, Route: "resource",
+		})
+	}()
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("absent resource stop did not settle")
+	}
+	if census := admission.Census(); census.ActiveRecords != 0 || census.OrdinaryWaiting != 0 || census.OrdinaryGranted != 0 {
+		t.Fatalf("absent stop consumed admission: %#v", census)
+	}
+
+	kernel.Stop()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	if err := kernel.Wait(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
+}
+
+func TestKernelShutdownStopsResourceAfterActiveUserDrains(t *testing.T) {
+	stopRelease := make(chan struct{})
+	workEntered := make(chan struct{})
+	workRelease := make(chan struct{})
+	resource := newKernelTestReadyResource("resource", nil, stopRelease)
+	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, kernelResourcePlanner(t, resource, workEntered, workRelease))
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	startKernelLoop(t, kernel)
+	if err := kernel.SubmitAndWait(context.Background(), Request{
+		UID: "install-before-use", LaneKey: "resource", Source: lifecycle.SourceJobManager, Route: "install",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	useResult := make(chan error, 1)
+	go func() {
+		useResult <- kernel.SubmitAndWait(context.Background(), Request{
+			UID: "active-resource-user", LaneKey: "resource", Source: lifecycle.SourceJobManager, Route: "use",
+		})
+	}()
+	select {
+	case <-workEntered:
+	case err := <-useResult:
+		t.Fatalf("resource user reached terminal before starting: %v", err)
+	case <-time.After(time.Second):
+		t.Fatal("resource user did not start")
+	}
+	kernel.Stop()
+	var overlap bool
+	select {
+	case <-resource.stopEntered:
+		overlap = true
+	case <-time.After(50 * time.Millisecond):
+	}
+	close(workRelease)
+	select {
+	case <-resource.stopEntered:
+	case <-time.After(time.Second):
+		t.Fatal("resource stop did not begin after its user drained")
+	}
+	close(stopRelease)
+	select {
+	case <-useResult:
+	case <-time.After(time.Second):
+		t.Fatal("resource user did not reach terminal disposal")
+	}
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
+	defer waitCancel()
+	if err := kernel.Wait(waitCtx); err != nil {
+		t.Fatal(err)
+	}
+	if overlap {
+		t.Fatal("resource stop overlapped an active same-lane user")
+	}
+	if tasks.Active() != 0 || tasks.Pending() != 0 {
+		t.Fatalf("resource shutdown retained tasks: active=%d pending=%d", tasks.Active(), tasks.Pending())
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
 }
 
 func TestKernelRunFinalizerUsesSharedBudgetExactlyOnce(t *testing.T) {
@@ -163,7 +553,7 @@ func TestKernelRunFinalizerUsesSharedBudgetExactlyOnce(t *testing.T) {
 }
 
 func TestKernelShutdownDeadlineWinsFinalizerCompletion(t *testing.T) {
-	const helperEnv = "NETDATA_JOBMGRPOC_FINALIZER_DEADLINE_HELPER"
+	const helperEnv = "NETDATA_JOBMGR_FINALIZER_DEADLINE_HELPER"
 	if os.Getenv(helperEnv) != "1" {
 		executable, err := os.Executable()
 		if err != nil {
@@ -205,7 +595,7 @@ func TestKernelShutdownDeadlineWinsFinalizerCompletion(t *testing.T) {
 }
 
 func TestKernelDueClockWinsIndependentFinalizerCompletion(t *testing.T) {
-	const helperEnv = "NETDATA_JOBMGRPOC_FINALIZER_DUE_CLOCK_HELPER"
+	const helperEnv = "NETDATA_JOBMGR_FINALIZER_DUE_CLOCK_HELPER"
 	if os.Getenv(helperEnv) != "1" {
 		executable, err := os.Executable()
 		if err != nil {
@@ -277,7 +667,7 @@ func TestKernelDueClockDisposesLatePreparedCapabilityWithoutTimerDelivery(t *tes
 			},
 		}, nil
 	})
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, NoopRunFinalizer(), time.Second)
+	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -342,7 +732,7 @@ func TestKernelKeepsUnchangedDeadlineTimerAcrossUnrelatedEvents(t *testing.T) {
 			return plannerPlanWork(ctx)
 		})}, nil
 	})
-	kernel, run, admission, uids, _ := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, NoopRunFinalizer(), time.Second)
+	kernel, run, admission, uids, _ := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -421,7 +811,7 @@ func TestKernelDeadlineCancelsPendingCapabilityCommit(t *testing.T) {
 			},
 		}, nil
 	})
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, NoopRunFinalizer(), time.Second)
+	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -509,7 +899,7 @@ func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 		})}, nil
 	})
 	var output bytes.Buffer
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, NoopRunFinalizer(), time.Second)
+	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -606,7 +996,7 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 		})}, nil
 	})
 	var output bytes.Buffer
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, NoopRunFinalizer(), time.Second)
+	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -699,16 +1089,11 @@ func TestKernelDisposesQueuedNoResponseCapabilityAfterItsDeadline(t *testing.T) 
 		t.Fatal(err)
 	}
 	var prepareCalls atomic.Int32
-	var abandonCalls atomic.Int32
 	const capabilityID = "secret-store:queued-deadline"
 	planner := plannerFunc(func(_ context.Context, route string, _ []string) (WorkPlan, error) {
 		if route == "capability" {
 			return WorkPlan{
 				NoResponse: true,
-				Abandon: func() error {
-					abandonCalls.Add(1)
-					return nil
-				},
 				Capability: &CapabilityPlan{
 					ID: capabilityID, Permit: permitPlan,
 					Prepare: func(context.Context, uint64, lifecycle.LongLivedPermit) (lifecycle.PreparedCapability, error) {
@@ -724,7 +1109,7 @@ func TestKernelDisposesQueuedNoResponseCapabilityAfterItsDeadline(t *testing.T) 
 			return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
 		})}, nil
 	})
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, NoopRunFinalizer(), time.Second)
+	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -775,8 +1160,8 @@ func TestKernelDisposesQueuedNoResponseCapabilityAfterItsDeadline(t *testing.T) 
 		_ = kernel.Wait(cleanupCtx)
 		t.Fatal("queued no-response capability did not reach terminal disposal")
 	}
-	if prepareCalls.Load() != 0 || abandonCalls.Load() != 1 {
-		t.Fatalf("queued no-response capability prepare=%d abandon=%d, want 0/1", prepareCalls.Load(), abandonCalls.Load())
+	if prepareCalls.Load() != 0 {
+		t.Fatalf("queued no-response capability prepare=%d, want 0", prepareCalls.Load())
 	}
 	close(releaseBlockers)
 	kernel.Stop()
@@ -797,7 +1182,6 @@ func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 	releaseBlockers := make(chan struct{})
 	blockerEntered := make(chan struct{}, lifecycle.TransientTaskSlots)
 	var workCalls atomic.Int32
-	var abandonCalls atomic.Int32
 	planner := plannerFunc(func(_ context.Context, route string, _ []string) (WorkPlan, error) {
 		if route == "noncooperative" {
 			return WorkPlan{
@@ -805,10 +1189,6 @@ func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 					workCalls.Add(1)
 					return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
 				}),
-				Abandon: func() error {
-					abandonCalls.Add(1)
-					return nil
-				},
 			}, nil
 		}
 		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
@@ -818,7 +1198,7 @@ func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 		})}, nil
 	})
 	var output bytes.Buffer
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, NoopRunFinalizer(), time.Second)
+	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -859,8 +1239,8 @@ func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("queued noncooperative deadline did not reach terminal disposal")
 	}
-	if workCalls.Load() != 0 || abandonCalls.Load() != 1 {
-		t.Fatalf("queued noncooperative work calls=%d abandon=%d, want 0/1", workCalls.Load(), abandonCalls.Load())
+	if workCalls.Load() != 0 {
+		t.Fatalf("queued noncooperative work calls=%d, want 0", workCalls.Load())
 	}
 	if !bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN queued-noncooperative-deadline 504 application/json ")) {
 		t.Fatalf("queued noncooperative deadline response differs: %q", output.Bytes())
@@ -891,7 +1271,7 @@ func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) 
 		})}, nil
 	})
 	writer := &firstHoldingFrameWriter{offered: make(chan []byte, 1), release: make(chan struct{})}
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, writer, clock, NoopRunFinalizer(), time.Second)
+	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, writer, clock, newNoopRunFinalizer(), time.Second)
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -993,7 +1373,7 @@ func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T)
 		}, nil
 	})
 	var output bytes.Buffer
-	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, NoopRunFinalizer(), time.Second)
+	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -1366,7 +1746,7 @@ func TestKernelRejectsMissingRunFinalizer(t *testing.T) {
 	}
 	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
-	frames, err := lifecycle.NewFrameOwner(io.Discard, nil)
+	frames, err := lifecycle.NewFrameOwner(io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1477,7 +1857,7 @@ func TestKernelShutdownSettlesPendingInputBodyGrowthBeforeCleanupOnly(t *testing
 	t.Cleanup(func() { _ = run.FinishShutdown() })
 	uids := lifecycle.NewUIDLedger()
 	admission := lifecycle.NewAdmissionLedger()
-	frames, err := lifecycle.NewFrameOwner(io.Discard, nil)
+	frames, err := lifecycle.NewFrameOwner(io.Discard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1486,7 +1866,7 @@ func TestKernelShutdownSettlesPendingInputBodyGrowthBeforeCleanupOnly(t *testing
 		t.Fatal(err)
 	}
 	grants := make(chan lifecycle.AdmissionGrant, 1)
-	kernel, err := NewCommandKernel(run, admission, uids, tasks, frames, lifecycle.RealClock{}, grants, nil, NoopRunFinalizer(), map[lifecycle.Source]Planner{
+	kernel, err := NewCommandKernel(run, admission, uids, tasks, frames, lifecycle.RealClock{}, grants, nil, newNoopRunFinalizer(), map[lifecycle.Source]Planner{
 		lifecycle.SourceJobManager: stoppedKernelPlanner{},
 		lifecycle.SourceFunction:   stoppedKernelPlanner{},
 	})
@@ -1575,10 +1955,8 @@ func TestKernelRunsTaskCleanupBeforeSlotRelease(t *testing.T) {
 	closeUIDLedger(t, uids)
 }
 
-func TestKernelAbandonsAcquiredPlanWhenQueuedOperationIsCancelled(t *testing.T) {
+func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 	started := make(chan struct{})
-	abandoned := make(chan struct{}, 2)
-	var abandonCount atomic.Int32
 	planner := plannerFunc(func(_ context.Context, route string, _ []string) (WorkPlan, error) {
 		switch route {
 		case "blocking":
@@ -1596,11 +1974,6 @@ func TestKernelAbandonsAcquiredPlanWhenQueuedOperationIsCancelled(t *testing.T) 
 					t.Fatal("cancelled queued operation entered TaskChild")
 					return lifecycle.NewControlResult(lifecycle.ControlInternal)
 				}),
-				Abandon: func() error {
-					abandonCount.Add(1)
-					abandoned <- struct{}{}
-					return nil
-				},
 			}, nil
 		default:
 			return WorkPlan{}, errors.New("unexpected route")
@@ -1620,19 +1993,22 @@ func TestKernelAbandonsAcquiredPlanWhenQueuedOperationIsCancelled(t *testing.T) 
 	case <-time.After(time.Second):
 		t.Fatal("blocking operation did not start")
 	}
-	if err := kernel.Submit(context.Background(), Request{UID: "queued", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "queued", Deadline: deadline}); err != nil {
+	queuedResult := make(chan error, 1)
+	if err := kernel.submit(context.Background(), Request{
+		UID: "queued", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "queued", Deadline: deadline,
+	}, queuedResult); err != nil {
 		t.Fatal(err)
 	}
 	if err := kernel.Cancel(context.Background(), "queued"); err != nil {
 		t.Fatal(err)
 	}
 	select {
-	case <-abandoned:
+	case err := <-queuedResult:
+		if err != nil {
+			t.Fatalf("queued cancellation result differs: %v", err)
+		}
 	case <-time.After(time.Second):
-		t.Fatal("queued plan lease was not abandoned")
-	}
-	if got := abandonCount.Load(); got != 1 {
-		t.Fatalf("queued plan abandon count=%d, want 1", got)
+		t.Fatal("queued cancellation did not reach terminal disposal")
 	}
 
 	kernel.Stop()
@@ -1706,6 +2082,43 @@ func TestKernelReservesExactPlanAndFrameBytesBeforeWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	closeUIDLedger(t, uids)
+}
+
+func TestOperationAdmissionBytesIncludesSealedRequestMetadata(t *testing.T) {
+	baseRequest := Request{
+		UID: "metadata", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route",
+	}
+	plan := WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)}
+	base, err := operationAdmissionBytes(baseRequest, plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tests := map[string]struct {
+		mutate func(*Request)
+		delta  int64
+	}{
+		"content type": {
+			mutate: func(request *Request) { request.ContentType = "application/json" },
+			delta:  int64(len("application/json")),
+		},
+		"argument storage": {
+			mutate: func(request *Request) { request.Args = []string{"a", "bc"} },
+			delta:  int64(len("a") + len("bc") + 2*16),
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			request := baseRequest
+			test.mutate(&request)
+			got, err := operationAdmissionBytes(request, plan)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != base+test.delta {
+				t.Fatalf("admission metadata delta differs: got=%d want=%d", got-base, test.delta)
+			}
+		})
+	}
 }
 
 func TestOperationResultAdmissionBytesBoundaries(t *testing.T) {
@@ -1842,10 +2255,15 @@ func TestKernelExternalSubmissionServiceRotatesSources(t *testing.T) {
 	}
 	results := make([]chan error, len(requests))
 	for index, request := range requests {
+		plan, err := kernel.preparePlan(request)
+		if err != nil {
+			t.Fatal(err)
+		}
 		results[index] = make(chan error, 1)
-		kernel.submissions[sourceIndex(request.Source)] <- submission{request: request, result: results[index]}
+		kernel.submissions[sourceIndex(request.Source)] <- submission{request: request, plan: plan, result: results[index]}
 	}
 	kernel.serviceSubmissions(4)
+	kernel.serviceAdmissions(4)
 	for _, result := range results {
 		if err := <-result; err != nil {
 			t.Fatal(err)
@@ -1865,14 +2283,20 @@ func TestKernelShutdownDrainsMoreThanTwoSubmissionQuantaWithoutAnotherWake(t *te
 	results := make([]chan error, count)
 	for index := range results {
 		results[index] = make(chan error, 1)
+		request := Request{
+			UID:     fmt.Sprintf("queued-%d", index),
+			LaneKey: "lane",
+			Source:  lifecycle.SourceFunction,
+			Route:   "route",
+		}
+		plan, err := kernel.preparePlan(request)
+		if err != nil {
+			t.Fatal(err)
+		}
 		kernel.submissions[sourceIndex(lifecycle.SourceFunction)] <- submission{
-			request: Request{
-				UID:     fmt.Sprintf("queued-%d", index),
-				LaneKey: "lane",
-				Source:  lifecycle.SourceFunction,
-				Route:   "route",
-			},
-			result: results[index],
+			request: request,
+			plan:    plan,
+			result:  results[index],
 		}
 	}
 
@@ -1929,7 +2353,11 @@ func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
 			Source:  lifecycle.SourceFunction,
 			Route:   "route",
 		}
-		if err := kernel.admit(request, nil); err != nil {
+		plan, err := kernel.preparePlan(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := kernel.admit(request, plan, nil, nil, nil); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -1950,14 +2378,24 @@ func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
 	}
 }
 
-func TestKernelSustainedSubmissionRefillCannotStarveStop(t *testing.T) {
-	planner := &refillingRejectPlanner{remaining: 100}
-	kernel, run, _, _, _ := newKernelWithPlanner(t, planner)
-	planner.kernel = kernel
+func TestKernelSubmissionBacklogCannotStarveStop(t *testing.T) {
+	kernel, run, admission, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
-	planner.enqueue("refill-0")
+	for index := 0; index < externalSourceQueueDepth; index++ {
+		request := Request{
+			UID: fmt.Sprintf("backlog-%d", index), LaneKey: "lane",
+			Source: lifecycle.SourceFunction, Route: "route",
+		}
+		plan, err := kernel.preparePlan(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		kernel.submissions[sourceIndex(request.Source)] <- submission{
+			request: request, plan: plan, result: make(chan error, 1),
+		}
+	}
 	kernel.Stop()
 	startKernelLoop(t, kernel)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -1965,29 +2403,45 @@ func TestKernelSustainedSubmissionRefillCannotStarveStop(t *testing.T) {
 	if err := kernel.WaitShutdownStarted(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if planner.calls != 4 {
-		t.Fatalf("stop was not serviced after one bounded submission turn: planner calls=%d", planner.calls)
-	}
 	if err := kernel.Wait(ctx); err != nil {
 		t.Fatal(err)
 	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
 }
 
-func TestKernelSustainedSubmissionRefillCannotStarveDueDeadline(t *testing.T) {
+func TestKernelSubmissionBacklogCannotStarveDueDeadline(t *testing.T) {
 	var output bytes.Buffer
-	planner := &refillingRejectPlanner{remaining: 100, validUID: "deadline-probe"}
-	kernel, run, _, _, _ := newKernelWithPlannerAndWriter(t, planner, &output)
-	planner.kernel = kernel
+	kernel, run, admission, uids, _ := newKernelWithPlannerAndWriter(t, stoppedKernelPlanner{}, &output)
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
-	if err := kernel.admit(Request{
+	request := Request{
 		UID: "deadline-probe", LaneKey: "deadline-lane", Source: lifecycle.SourceFunction, Route: "route",
 		Deadline: time.Now().Add(-time.Second),
-	}, nil); err != nil {
+	}
+	plan, err := kernel.preparePlan(request)
+	if err != nil {
 		t.Fatal(err)
 	}
-	planner.enqueue("refill-0")
+	if err := kernel.admit(request, plan, nil, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	for index := 0; index < externalSourceQueueDepth; index++ {
+		request := Request{
+			UID: fmt.Sprintf("backlog-%d", index), LaneKey: "lane",
+			Source: lifecycle.SourceFunction, Route: "route",
+		}
+		plan, err := kernel.preparePlan(request)
+		if err != nil {
+			t.Fatal(err)
+		}
+		kernel.submissions[sourceIndex(request.Source)] <- submission{
+			request: request, plan: plan, result: make(chan error, 1),
+		}
+	}
 	kernel.Stop()
 	startKernelLoop(t, kernel)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
@@ -1995,12 +2449,13 @@ func TestKernelSustainedSubmissionRefillCannotStarveDueDeadline(t *testing.T) {
 	if err := kernel.Wait(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if planner.calls != 4 {
-		t.Fatalf("deadline/stop event turn exceeded one submission quantum: planner calls=%d", planner.calls)
-	}
 	if !bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN deadline-probe 504 application/json ")) {
 		t.Fatalf("due deadline was starved or overwritten by shutdown: %q", output.Bytes())
 	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
 }
 
 func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T) {
@@ -2012,12 +2467,24 @@ func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T
 	firstResult := make(chan error, 1)
 	secondResult := make(chan error, 1)
 	source := sourceIndex(lifecycle.SourceFunction)
-	kernel.submissions[source] <- submission{
-		request: Request{UID: "first", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route"},
-		result:  firstResult,
+	firstRequest := Request{UID: "first", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route"}
+	firstPlan, err := kernel.preparePlan(firstRequest)
+	if err != nil {
+		t.Fatal(err)
 	}
 	kernel.submissions[source] <- submission{
-		request: Request{UID: "second", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route"},
+		request: firstRequest,
+		plan:    firstPlan,
+		result:  firstResult,
+	}
+	secondRequest := Request{UID: "second", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route"}
+	secondPlan, err := kernel.preparePlan(secondRequest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kernel.submissions[source] <- submission{
+		request: secondRequest,
+		plan:    secondPlan,
 		result:  secondResult,
 	}
 
@@ -2035,8 +2502,10 @@ func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T
 		t.Fatal(err)
 	}
 	kernel.serviceSubmissions(1)
-	if err := <-firstResult; err != nil {
-		t.Fatal(err)
+	select {
+	case err := <-firstResult:
+		t.Fatalf("record allocation was mistaken for B admission: %v", err)
+	default:
 	}
 	if kernel.blockedSubmission[source] || len(kernel.submissions[source]) != 1 {
 		t.Fatalf("first retry did not preserve the later source item: blocked=%v queued=%d", kernel.blockedSubmission[source], len(kernel.submissions[source]))
@@ -2051,8 +2520,10 @@ func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T
 		t.Fatal(err)
 	}
 	kernel.serviceSubmissions(1)
-	if err := <-secondResult; err != nil {
-		t.Fatal(err)
+	select {
+	case err := <-secondResult:
+		t.Fatalf("record allocation was mistaken for B admission: %v", err)
+	default:
 	}
 	first := kernel.operations["first"]
 	second := kernel.operations["second"]
@@ -2069,8 +2540,14 @@ func TestKernelExternalSubmissionCapacityBlockFlushesAfterAdmissionClose(t *test
 	fillAdmissionRecordCapacity(t, admission, run.Generation())
 	result := make(chan error, 1)
 	source := sourceIndex(lifecycle.SourceFunction)
+	request := Request{UID: "closing", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route"}
+	plan, err := kernel.preparePlan(request)
+	if err != nil {
+		t.Fatal(err)
+	}
 	kernel.submissions[source] <- submission{
-		request: Request{UID: "closing", LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route"},
+		request: request,
+		plan:    plan,
 		result:  result,
 	}
 	kernel.serviceSubmissions(1)
@@ -2196,7 +2673,7 @@ func newKernelWithPlannerAndWriter(t *testing.T, planner Planner, writer io.Writ
 }
 
 func newKernelWithPlannerWriterAndTimeout(t *testing.T, planner Planner, writer io.Writer, timeout time.Duration) (*CommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
-	return newKernelWithPlannerWriterFinalizerAndTimeout(t, planner, writer, NoopRunFinalizer(), timeout)
+	return newKernelWithPlannerWriterFinalizerAndTimeout(t, planner, writer, newNoopRunFinalizer(), timeout)
 }
 
 func newKernelWithPlannerWriterFinalizerAndTimeout(t *testing.T, planner Planner, writer io.Writer, finalizer RunFinalizer, timeout time.Duration) (*CommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
@@ -2212,7 +2689,7 @@ func newKernelWithClockFinalizerAndTimeout(t *testing.T, planner Planner, writer
 	t.Cleanup(func() { _ = run.FinishShutdown() })
 	uids := lifecycle.NewUIDLedger()
 	admission := lifecycle.NewAdmissionLedger()
-	frames, err := lifecycle.NewFrameOwner(writer, nil)
+	frames, err := lifecycle.NewFrameOwner(writer)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2319,40 +2796,148 @@ func (fn plannerFunc) Plan(request Request) (WorkPlan, error) {
 	return fn(context.Background(), request.Route, request.Args)
 }
 
+func kernelResourcePlanner(t *testing.T, resource *kernelTestReadyResource, workEntered chan<- struct{}, workRelease <-chan struct{}) Planner {
+	t.Helper()
+	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return kernelTestResourcePlanner{
+		permitPlan:  permitPlan,
+		resource:    resource,
+		workEntered: workEntered,
+		workRelease: workRelease,
+	}
+}
+
+type kernelTestResourcePlanner struct {
+	permitPlan  lifecycle.LongLivedPlan
+	resource    *kernelTestReadyResource
+	workEntered chan<- struct{}
+	workRelease <-chan struct{}
+}
+
+func (planner kernelTestResourcePlanner) Plan(request Request) (WorkPlan, error) {
+	switch request.Route {
+	case "install":
+		return WorkPlan{
+			NoResponse: true,
+			Resource: &ResourcePlan{
+				Action: ResourceInstall,
+				ID:     request.LaneKey,
+				Permit: planner.permitPlan,
+				Prepare: func(_ context.Context, generation uint64, permit lifecycle.LongLivedPermit) (lifecycle.PreparedResource, error) {
+					identity := lifecycle.ResourceIdentity{ID: request.LaneKey, Generation: generation}
+					planner.resource.identity = identity
+					return &kernelTestPreparedResource{
+						identity: identity,
+						permit:   permit,
+						ready:    planner.resource,
+					}, nil
+				},
+			},
+		}, nil
+	case "use":
+		return WorkPlan{
+			Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
+				if planner.workEntered != nil {
+					close(planner.workEntered)
+				}
+				if planner.workRelease != nil {
+					<-planner.workRelease
+				}
+				return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
+			}),
+		}, nil
+	default:
+		return WorkPlan{}, errors.New("unexpected kernel resource route")
+	}
+}
+
+func newKernelTestReadyResource(id string, publishRelease, stopRelease <-chan struct{}) *kernelTestReadyResource {
+	return &kernelTestReadyResource{
+		identity:       lifecycle.ResourceIdentity{ID: id, Generation: 1},
+		publishEntered: make(chan struct{}),
+		publishRelease: publishRelease,
+		stopEntered:    make(chan struct{}),
+		stopRelease:    stopRelease,
+	}
+}
+
+type kernelTestPreparedResource struct {
+	identity lifecycle.ResourceIdentity
+	permit   lifecycle.LongLivedPermit
+	ready    *kernelTestReadyResource
+}
+
+func (resource *kernelTestPreparedResource) Identity() lifecycle.ResourceIdentity {
+	return resource.identity
+}
+
+func (resource *kernelTestPreparedResource) AcceptStart(_ context.Context, expected uint64) (lifecycle.ReadyResource, error) {
+	if expected != resource.identity.Generation {
+		return nil, errors.New("kernel test resource generation differs")
+	}
+	if err := resource.permit.ActivateExternal(lifecycle.LongLivedEJobResources); err != nil {
+		return nil, err
+	}
+	resource.ready.permit = resource.permit
+	return resource.ready, nil
+}
+
+func (resource *kernelTestPreparedResource) Dispose(context.Context) error {
+	return resource.permit.AbortUnused()
+}
+
+type kernelTestReadyResource struct {
+	identity       lifecycle.ResourceIdentity
+	permit         lifecycle.LongLivedPermit
+	publishEntered chan struct{}
+	publishRelease <-chan struct{}
+	stopEntered    chan struct{}
+	stopRelease    <-chan struct{}
+	publishOnce    sync.Once
+	stopOnce       sync.Once
+}
+
+func (resource *kernelTestReadyResource) Identity() lifecycle.ResourceIdentity {
+	return resource.identity
+}
+
+func (resource *kernelTestReadyResource) Publish() error {
+	resource.publishOnce.Do(func() { close(resource.publishEntered) })
+	if resource.publishRelease != nil {
+		<-resource.publishRelease
+	}
+	return nil
+}
+
+func (resource *kernelTestReadyResource) AbortReady(context.Context) error {
+	return errors.Join(
+		resource.permit.ReleaseExternal(lifecycle.LongLivedEJobResources),
+		resource.permit.ReleaseBytes(),
+		resource.permit.Return(),
+	)
+}
+
+func (resource *kernelTestReadyResource) Stop(context.Context) error {
+	resource.stopOnce.Do(func() { close(resource.stopEntered) })
+	if resource.stopRelease != nil {
+		<-resource.stopRelease
+	}
+	return resource.permit.ReleaseExternal(lifecycle.LongLivedEJobResources)
+}
+
+func (resource *kernelTestReadyResource) Finalize() error {
+	return errors.Join(resource.permit.ReleaseBytes(), resource.permit.Return())
+}
+
 type stoppedKernelPlanner struct{}
 
 func (stoppedKernelPlanner) Plan(Request) (WorkPlan, error) {
 	return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
 		return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
 	})}, nil
-}
-
-type refillingRejectPlanner struct {
-	kernel    *CommandKernel
-	remaining int
-	next      int
-	calls     int
-	validUID  string
-}
-
-func (planner *refillingRejectPlanner) Plan(request Request) (WorkPlan, error) {
-	if request.UID == planner.validUID && planner.validUID != "" {
-		return WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)}, nil
-	}
-	planner.calls++
-	if planner.remaining > 0 {
-		planner.remaining--
-		planner.next++
-		planner.enqueue(fmt.Sprintf("refill-%d", planner.next))
-	}
-	return WorkPlan{}, errors.New("test rejection")
-}
-
-func (planner *refillingRejectPlanner) enqueue(uid string) {
-	planner.kernel.submissions[sourceIndex(lifecycle.SourceFunction)] <- submission{
-		request: Request{UID: uid, LaneKey: "lane", Source: lifecycle.SourceFunction, Route: "route"},
-		result:  make(chan error, 1),
-	}
 }
 
 func startKernelLoop(t *testing.T, kernel *CommandKernel) {

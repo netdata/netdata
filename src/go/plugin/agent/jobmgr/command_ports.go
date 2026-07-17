@@ -10,6 +10,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
+const (
+	// These match the existing plugins.d command-line and parameter ceilings.
+	maximumRequestArgumentBytes = 15_487
+	maximumRequestArguments     = 1_024
+	maximumRequestMetadataBytes = maximumRequestArgumentBytes
+)
+
 // Request is one immutable command admission value. The submitting adapter
 // transfers ownership of Args and Payload until the request reaches terminal
 // disposal.
@@ -35,6 +42,19 @@ func (request Request) Validate() error {
 		request.Route == "" ||
 		!request.Source.Valid() {
 		return errors.New("jobmgr: invalid request")
+	}
+	if len(request.LaneKey) > maximumRequestMetadataBytes ||
+		len(request.Route) > maximumRequestMetadataBytes ||
+		len(request.ContentType) > maximumRequestMetadataBytes ||
+		len(request.Args) > maximumRequestArguments {
+		return errors.New("jobmgr: request metadata exceeds bounds")
+	}
+	argumentBytes := 0
+	for _, argument := range request.Args {
+		if len(argument) > maximumRequestArgumentBytes-argumentBytes {
+			return errors.New("jobmgr: request arguments exceed bounds")
+		}
+		argumentBytes += len(argument)
 	}
 	if request.InputBodyToken == 0 {
 		if request.PayloadCapacity != 0 || cap(request.Payload) != 0 {

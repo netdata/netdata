@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"math"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -256,6 +257,7 @@ func appendValueJSON(dst []byte, value Value, depth int) ([]byte, error) {
 	case valueString:
 		if value.repeated {
 			dst = append(dst, '"')
+			dst = slices.Grow(dst, value.repeatLength)
 			start := len(dst)
 			dst = dst[:start+value.repeatLength]
 			for index := start; index < len(dst); index++ {

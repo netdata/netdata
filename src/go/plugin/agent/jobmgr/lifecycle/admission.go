@@ -485,8 +485,12 @@ func (ledger *AdmissionLedger) CancelWaiting(ref AdmissionRef) error {
 	}
 	switch record.state {
 	case admissionOrdinaryWaiting:
+		if record.heldBytes < 0 || record.heldBytes > ledger.ordinaryBytes {
+			return errors.New("jobmgr admission: invalid held bytes on waiting request")
+		}
 		ledger.removeOrdinary(ref.Slot)
 		ledger.ordinaryWaiting--
+		ledger.ordinaryBytes -= record.heldBytes
 		ledger.freeRecord(ref.Slot)
 		return nil
 	case admissionOrdinaryGrowing:

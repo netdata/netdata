@@ -10,7 +10,7 @@ import (
 )
 
 func TestClaimAuthorityFIFOAndDirectCancellation(t *testing.T) {
-	authority := NewClaimAuthority()
+	authority := newClaimAuthority()
 	first := claimTestOperation(t, authority, 1, "first", []string{"b"}, nil)
 	second := claimTestOperation(t, authority, 2, "second", []string{"a", "b"}, nil)
 	third := claimTestOperation(t, authority, 3, "third", []string{"a"}, nil)
@@ -61,7 +61,7 @@ func TestClaimAuthorityFIFOAndDirectCancellation(t *testing.T) {
 }
 
 func TestClaimAuthorityLexicographicOrderRetainsAndReleasesPrefix(t *testing.T) {
-	authority := NewClaimAuthority()
+	authority := newClaimAuthority()
 	holder := claimTestOperation(t, authority, 1, "holder", []string{"b"}, nil)
 	parked := claimTestOperation(t, authority, 2, "parked", []string{"b", "a", "a"}, nil)
 	probe := claimTestOperation(t, authority, 3, "probe", []string{"a"}, nil)
@@ -90,7 +90,7 @@ func TestClaimAuthorityLexicographicOrderRetainsAndReleasesPrefix(t *testing.T) 
 }
 
 func TestClaimAuthorityFIFOReadersWriters(t *testing.T) {
-	authority := NewClaimAuthority()
+	authority := newClaimAuthority()
 	reader1 := claimTestOperation(t, authority, 1, "reader-1", nil, []string{"shared"})
 	writer := claimTestOperation(t, authority, 2, "writer", []string{"shared"}, nil)
 	reader2 := claimTestOperation(t, authority, 3, "reader-2", nil, []string{"shared"})
@@ -147,13 +147,13 @@ func TestClaimAuthorityCancelAndReleaseAllocateNothing(t *testing.T) {
 }
 
 type claimAllocationFixture struct {
-	authority *ClaimAuthority
+	authority *claimAuthority
 	target    *commandOperation
 }
 
 func newClaimAllocationFixture(tb testing.TB, cancel bool, base lifecycle.OperationID) claimAllocationFixture {
 	tb.Helper()
-	authority := NewClaimAuthority()
+	authority := newClaimAuthority()
 	target := claimTestOperation(tb, authority, base, fmt.Sprintf("target-%d", base), []string{"a", "b", "c", "d"}, nil)
 	if cancel {
 		blocker := claimTestOperation(tb, authority, base+1, fmt.Sprintf("blocker-%d", base), []string{"d"}, nil)
@@ -173,19 +173,18 @@ func BenchmarkClaimAuthorityAcquireCancel(b *testing.B) {
 	for _, keys := range []int{1, 4, 16} {
 		b.Run(fmt.Sprintf("keys-%d", keys), func(b *testing.B) {
 			b.ReportAllocs()
-			for iteration := 0; iteration < b.N; iteration++ {
-				b.StopTimer()
-				authority := NewClaimAuthority()
-				claims := make([]string, keys)
-				for index := range claims {
-					claims[index] = fmt.Sprintf("claim-%02d", index)
-				}
+			claims := make([]string, keys)
+			for index := range claims {
+				claims[index] = fmt.Sprintf("claim-%02d", index)
+			}
+			b.ResetTimer()
+			for b.Loop() {
+				authority := newClaimAuthority()
 				blocker := claimTestOperation(b, authority, 1, "blocker", []string{claims[keys-1]}, nil)
 				target := claimTestOperation(b, authority, 2, "target", claims, nil)
 				if granted, err := authority.Acquire(blocker); err != nil || !granted {
 					b.Fatal(err)
 				}
-				b.StartTimer()
 				granted, err := authority.Acquire(target)
 				if err != nil || granted {
 					b.Fatal(err)
@@ -198,7 +197,7 @@ func BenchmarkClaimAuthorityAcquireCancel(b *testing.B) {
 	}
 }
 
-func claimTestOperation(tb testing.TB, authority *ClaimAuthority, id lifecycle.OperationID, uid string, writes, reads []string) *commandOperation {
+func claimTestOperation(tb testing.TB, authority *claimAuthority, id lifecycle.OperationID, uid string, writes, reads []string) *commandOperation {
 	tb.Helper()
 	generation, err := lifecycle.NewOperation(id, uid, lifecycle.SourceJobManager, uid, true)
 	if err != nil {
