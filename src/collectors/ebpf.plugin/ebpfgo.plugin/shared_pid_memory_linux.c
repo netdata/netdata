@@ -103,6 +103,7 @@ struct shared_pid_memory *shared_pid_memory_open(size_t total, uint32_t update_e
     ctx->header  = (struct ebpfgo_shm_header *)ctx->mapping;
     ctx->entries = (struct ebpf_pid_stat *)((char *)ctx->mapping + sizeof(*ctx->header));
 
+    (void)sem_unlink(NETDATA_EBPFGO_SHM_INTEGRATION_NAME);
     ctx->sem = sem_open(NETDATA_EBPFGO_SHM_INTEGRATION_NAME, O_CREAT, 0660, 1);
     if (ctx->sem == SEM_FAILED)
         goto fail;

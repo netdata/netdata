@@ -69,6 +69,7 @@ struct shared_dns_memory *shared_dns_memory_open(uint32_t update_every_s)
         goto fail;
     }
 
+    (void)sem_unlink(NETDATA_EBPFGO_DNS_SEM_NAME);
     ctx->sem = sem_open(NETDATA_EBPFGO_DNS_SEM_NAME, O_CREAT, 0660, 1);
     if (ctx->sem == SEM_FAILED)
         goto fail;
