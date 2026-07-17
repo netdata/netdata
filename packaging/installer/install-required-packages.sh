@@ -1085,6 +1085,13 @@ declare -A pkg_python3=(
   ['centos-6']="WARNING|"
 )
 
+# Rust toolchain for the otel-plugin. Only macOS provisions it here; on Linux
+# it comes from the CI builder images or the user's own toolchain.
+declare -A pkg_rust=(
+  ['macos']="rust"
+  ['default']="NOTREQUIRED"
+)
+
 declare -A pkg_screen=(
   ['gentoo']="app-misc/screen"
   ['sabayon']="app-misc/screen"
@@ -1219,6 +1226,49 @@ suitable_package() {
   fi
 }
 
+# Minimum Rust version needed to build Netdata's Rust components
+# (otel-plugin). Keep in sync with `rust-version` in src/crates/Cargo.toml.
+NETDATA_RUST_MSRV="1.91"
+
+# Succeeds when version ${2} >= version ${1}; components compared numerically,
+# missing components count as 0. Twin of the check in netdata-installer.sh
+# (this script is also used standalone and cannot source it).
+version_covers() {
+  local i=1 r a
+  while [ "${i}" -le 3 ]; do
+    r="$(echo "${1}." | cut -d . -f "${i}" | sed -e 's/[^0-9].*//')"
+    a="$(echo "${2}." | cut -d . -f "${i}" | sed -e 's/[^0-9].*//')"
+    [ "${a:-0}" -gt "${r:-0}" ] && return 0
+    [ "${a:-0}" -lt "${r:-0}" ] && return 1
+    i=$((i + 1))
+  done
+  return 0
+}
+
+rust_toolchain_ok() {
+  # succeeds when a cargo/rustc on PATH satisfies NETDATA_RUST_MSRV
+  [ "${IGNORE_INSTALLED}" -eq 1 ] && return 1
+  command -v cargo > /dev/null 2>&1 || return 1
+  local v
+  v="$(rustc --version 2> /dev/null | cut -d ' ' -f 2)"
+  [ -z "${v}" ] && return 1
+  version_covers "${NETDATA_RUST_MSRV}" "${v}"
+}
+
+ensure_rustup_toolchain() {
+  # When rustup manages the toolchain, install one covering the MSRV instead
+  # of layering a Homebrew rust next to it. Sets a default only when none is
+  # configured; an existing too-old default is the user's to switch.
+  command -v rustup > /dev/null 2>&1 || return 0
+  rust_toolchain_ok && return 0
+  run rustup toolchain install stable || return 1
+  rustup default > /dev/null 2>&1 || run rustup default stable
+  if ! rust_toolchain_ok; then
+    echo >&2 "WARNING: the default rustup toolchain does not satisfy Rust >= ${NETDATA_RUST_MSRV},"
+    echo >&2 "         which Netdata's otel-plugin needs. Run: rustup default stable"
+  fi
+}
+
 packages() {
   # detect the packages we need to install on this system
 
@@ -1302,6 +1352,11 @@ packages() {
     suitable_package pcre2
     suitable_package flex
     suitable_package libcurl-dev
+
+    # Rust toolchain for the otel-plugin (macOS only, see pkg_rust). Prefer
+    # an existing toolchain covering the MSRV, then rustup (handled after
+    # package installation by ensure_rustup_toolchain), then Homebrew rust.
+    rust_toolchain_ok || require_cmd rustup || suitable_package rust
   fi
 
   # -------------------------------------------------------------------------
@@ -2098,6 +2153,10 @@ else
   echo >&2
   echo >&2 "All required packages are already installed. Now proceed to the next step."
   echo >&2
+fi
+
+if [ "${tree}" = "macos" ] && [ "${PACKAGES_NETDATA}" -ne 0 ] && [ "${IGNORE_INSTALLED}" -eq 0 ]; then
+  ensure_rustup_toolchain
 fi
 
 remote_log "OK"

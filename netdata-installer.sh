@@ -2,7 +2,7 @@
 
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-# Next unused error code: I0012
+# Next unused error code: I0016
 
 export PATH="${PATH}:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 uniquepath() {
@@ -217,7 +217,7 @@ USAGE: ${PROGRAM} [options]
   --enable-plugin-systemd-journal Enable the systemd journal plugin. Default: enable it when libsystemd is available.
   --disable-plugin-systemd-journal Explicitly disable the systemd journal plugin.
   --internal-systemd-journal Enable the internal journal file reader instead of using libsystemd
-  --enable-plugin-otel Enable the Netdata OpenTelemetry plugin. Default: disabled
+  --enable-plugin-otel Enable the Netdata OpenTelemetry plugin. Default: disabled, except on macOS where it is enabled when a suitable Rust toolchain is found
   --disable-plugin-otel Explicitly disable the Netdata OpenTelemetry plugin.
   --enable-plugin-netflow    Enable the NetFlow/IPFIX/sFlow flow analysis plugin. Default: disabled.
   --disable-plugin-netflow   Explicitly disable the NetFlow/IPFIX/sFlow flow analysis plugin.
@@ -268,7 +268,7 @@ ENABLE_GO=1
 ENABLE_PYTHON=1
 ENABLE_CHARTS=1
 ENABLE_NETFLOW=0
-ENABLE_OTEL=0
+ENABLE_OTEL=""
 ENABLE_IBM=0
 ENABLE_SCRIPTS=1
 FORCE_LEGACY_CXX=0
@@ -600,6 +600,57 @@ if [ "${ENABLE_IBM}" -eq 1 ]; then
       ENABLE_IBM=0
     fi
   fi
+fi
+
+# -----------------------------------------------------------------------------
+# The otel-plugin needs a Rust toolchain covering the workspace MSRV. On macOS
+# it is enabled automatically when one is present (the dependency script,
+# packaging/installer/install-required-packages.sh, provisions one via rustup
+# or Homebrew); everywhere else it stays opt-in. Toolchain provisioning cannot
+# happen here: on macOS this script runs as root, where Homebrew refuses to
+# operate.
+
+required_rust_version() {
+  grep '^rust-version' "${NETDATA_SOURCE_DIR}/src/crates/Cargo.toml" 2>/dev/null | head -n 1 | sed -e 's/.*"\([0-9.]*\)".*/\1/'
+}
+
+# Succeeds when version ${2} >= version ${1}; components compared numerically,
+# missing components count as 0. Twin of the check in
+# packaging/installer/install-required-packages.sh (which is also used
+# standalone and cannot source this file).
+version_covers() {
+  _vc_i=1
+  while [ "${_vc_i}" -le 3 ]; do
+    _vc_r="$(echo "${1}." | cut -d . -f "${_vc_i}" | sed -e 's/[^0-9].*//')"
+    _vc_a="$(echo "${2}." | cut -d . -f "${_vc_i}" | sed -e 's/[^0-9].*//')"
+    [ "${_vc_a:-0}" -gt "${_vc_r:-0}" ] && return 0
+    [ "${_vc_a:-0}" -lt "${_vc_r:-0}" ] && return 1
+    _vc_i=$((_vc_i + 1))
+  done
+  return 0
+}
+
+rust_covers_required_version() {
+  command -v cargo >/dev/null 2>&1 || return 1
+  rust_version_min="$(required_rust_version)"
+  [ -z "${rust_version_min}" ] && return 0
+  rust_version_have="$(rustc --version 2>/dev/null | cut -d ' ' -f 2)"
+  [ -z "${rust_version_have}" ] && return 1
+  version_covers "${rust_version_min}" "${rust_version_have}"
+}
+
+if [ -z "${ENABLE_OTEL}" ]; then
+  ENABLE_OTEL=0
+  if [ "$(uname -s)" = "Darwin" ]; then
+    if rust_covers_required_version; then
+      progress "Found Rust toolchain ($(rustc --version 2>/dev/null)), the otel-plugin will be built."
+      ENABLE_OTEL=1
+    else
+      warning "Building without the otel-plugin: no Rust toolchain covering version $(required_rust_version) found. Run packaging/installer/install-required-packages.sh (or install Rust via rustup or 'brew install rust') and re-run the installer to enable it."
+    fi
+  fi
+elif [ "${ENABLE_OTEL}" -eq 1 ] && ! rust_covers_required_version; then
+  fatal "The otel-plugin was explicitly enabled, but no Rust toolchain covering version $(required_rust_version) was found. Install one (via rustup or 'brew install rust') and re-run the installer." I0015
 fi
 
 # -----------------------------------------------------------------------------

@@ -114,9 +114,9 @@ Platforms in the community support tier are those which are primarily supported 
 | Fedora      | Rawhide   | No                       |                                                                                                           |
 | FreeBSD     | 13-STABLE | No                       | Netdata is included in the FreeBSD Ports Tree, and this is the recommended installation method on FreeBSD |
 | Gentoo      | Latest    | No                       |                                                                                                           |
-| macOS       | 13        | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies                         |
-| macOS       | 12        | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies                         |
-| macOS       | 11        | No                       | Currently only works for Intel-based hardware. Requires Homebrew for dependencies.                        |
+| macOS       | 26        | No                       | Apple Silicon builds are validated in CI. Requires Homebrew for dependencies                              |
+| macOS       | 15        | No                       | Apple Silicon builds are validated in CI. Requires Homebrew for dependencies                              |
+| macOS       | 14        | No                       | Apple Silicon builds are validated in CI. Requires Homebrew for dependencies                              |
 
 ## Binary Distribution Packages
 
@@ -144,7 +144,7 @@ Source builds are expected to work for all platforms in the Core tier because th
 |  **FreeBSD and derivatives**   |     13-STABLE     |
 |   **Gentoo and derivatives**   |      Latest       |
 | **Arch Linux and derivatives** |  Latest from AUR  |
-|           **macOS**            |    11, 12, 13     |
+|           **macOS**            |    14, 15, 26     |
 
 ## Third-party supported platforms
 
