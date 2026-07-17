@@ -55,11 +55,21 @@ API_CAP=2097152          # 2 MiB per API response
 SANITIZE_INPUT_CAP=16777216 # 16 MiB raw window/stream guard before fail-closed withholding
 PSEUDONYM_MAP_MAX=4096     # bound global correlation state and private sidecar size
 
+require_option_value() {
+  [ "$#" -ge 2 ] || { echo "$1 requires a value" >&2; exit 2; }
+}
+
 while [ $# -gt 0 ]; do
   case "$1" in
-    -o|--output) OUTDIR="$2"; shift 2 ;;
-    --since) SINCE_HOURS="$2"; shift 2 ;;
-    --timeout) CMD_TIMEOUT="$2"; shift 2 ;;
+    -o|--output)
+      require_option_value "$@"
+      OUTDIR="$2"; shift 2 ;;
+    --since)
+      require_option_value "$@"
+      SINCE_HOURS="$2"; shift 2 ;;
+    --timeout)
+      require_option_value "$@"
+      CMD_TIMEOUT="$2"; shift 2 ;;
     --no-obfuscate) OBFUSCATE=0; shift ;;
     --keep-staging) KEEP_STAGING=1; shift ;;
     --selftest) SELFTEST=1; shift ;;
@@ -576,7 +586,20 @@ sanitize_stream() {
     }
     return line;
   }
-  function redact_destination(line,   pos, head, valpart, n, parts, i, tok, hostp, rest2, cpos, proto) {
+  function ipv4_literal(value,   fields, count, j) {
+    count = split(value, fields, ".");
+    if (count != 4) return 0;
+    for (j = 1; j <= count; j++)
+      if (fields[j] !~ /^[0-9]+$/ || fields[j] + 0 > 255) return 0;
+    return 1;
+  }
+  function ipv6_candidate(value,   copy, colons) {
+    if (value !~ /^[0-9A-Fa-f:]+$/) return 0;
+    copy = value;
+    colons = gsub(/:/, ":", copy);
+    return index(value, "::") > 0 || colons >= 6;
+  }
+  function redact_destination(line,   pos, head, valpart, n, parts, i, tok, hostp, rest2, cpos, proto, ip6part) {
     # stream.conf destination/proxy destination values are user infrastructure
     # hostnames regardless of TLD. Token syntax: [PROTOCOL:]HOST[%IFACE][:PORT][:SSL]
     pos = index(line, "=");
@@ -596,14 +619,19 @@ sanitize_stream() {
       }
       # bracketed IPv6 belongs to the IP rules; unix socket paths are not hostnames
       if (tok ~ /^\[/ || tok ~ /^\//) { valpart = valpart " " proto tok; continue; }
+      # An unbracketed IPv6 literal has no unambiguous host/port split. Keep the
+      # whole address intact so the following IPv6 pass maps it coherently.
+      cpos = index(tok, "%");
+      ip6part = (cpos > 1) ? substr(tok, 1, cpos - 1) : tok;
+      if (ipv6_candidate(ip6part)) { valpart = valpart " " proto tok; continue; }
       cpos = index(tok, ":");
       if (cpos > 1) { hostp = substr(tok, 1, cpos - 1); rest2 = substr(tok, cpos); }
       else { hostp = tok; rest2 = ""; }
       cpos = index(hostp, "%");
       if (cpos > 1) { rest2 = substr(hostp, cpos) rest2; hostp = substr(hostp, 1, cpos - 1); }
       # leave IPs to the IP rules, and never map an existing pseudonym
-      if (hostp != "" && length(hostp) >= 4 && \
-          hostp !~ /^[0-9.]+$/ && hostp !~ /^[0-9A-Fa-f:]+$/ && \
+      if (hostp != "" && hostp != "*" && hostp != "localhost" && \
+          !ipv4_literal(hostp) && \
           hostp !~ /^(ip|ip6|private-host)-[0-9]+$/)
         hostp = pseudo_fqdn(hostp);
       valpart = valpart " " proto hostp rest2;
@@ -1189,6 +1217,7 @@ redis://:SENTINEL-URI-PASSWORD@cache.customer.example/0
 https://SENTINEL-URI-TOKEN@api.customer.example/path
 /etc/netdata/claim_token: SENTINEL-16
 destination = [2001:db8::77]:19999 unix:/run/nd.sock
+destination = 2001:db8::88
 cmdline: claim.sh api key = SENTINEL-12 end
 [11111111-2222-3333-4444-555555555555]
 -----BEGIN RSA PRIVATE KEY-----
@@ -1199,6 +1228,7 @@ netdata management api key file = /var/lib/netdata/netdata.api.key
 TCP SYN cookies = auto
 destination = parent.bigcorp.example:19999
 destination = tcp:protoparent.example.com:19999
+destination = db1:19999 deadbeef:19999
 destination = 10.7.7.7:19999
 url: https://service.tenant-example.com/metrics
 {"password":"SENTINEL-JSON-A\\\"SENTINEL-JSON-B","token":123456789}
@@ -1265,6 +1295,8 @@ MALFORMED_JSON
   t_absent  "10\.1\.2\.3"             "IPv4 survived"
   t_absent  "parent.bigcorp.example"     "stream destination hostname survived"
   t_absent  "protoparent.example.com"     "protocol-prefixed destination hostname survived"
+  t_absent  "db1:"                        "short destination hostname survived"
+  t_absent  "deadbeef:"                   "hex-only destination hostname survived"
   t_absent  "service.tenant-example.com"  "ordinary customer FQDN survived"
   t_absent  "customer.key"                "filename-like customer FQDN survived"
   t_absent  "customer.sh"                 "script-like customer FQDN survived"
@@ -1294,7 +1326,19 @@ MALFORMED_JSON
   t_present "@unix(/run/x)/db ok"        "mid-line unix( DSN rule broke the tail"
   t_present "unix:/run/nd.sock"          "socket-path destination was mangled"
   t_absent  "2001:db8::77"               "bracketed IPv6 destination leaked"
+  t_absent  "db8::88"                     "unbracketed IPv6 destination fragment leaked"
+  t_present "destination = ip6-"          "unbracketed IPv6 destination was not mapped coherently"
   t_present "testhost10"                  "short hostname corrupted a longer word"
+
+  for _missing_value_option in --output --since --timeout; do
+    _missing_value_output=$(sh "$0" "$_missing_value_option" 2>&1)
+    _missing_value_status=$?
+    if [ "$_missing_value_status" -ne 2 ] ||
+       ! printf '%s\n' "$_missing_value_output" | grep -qF -- "$_missing_value_option requires a value"; then
+      echo "FAIL: $_missing_value_option missing-value error is unclear"
+      _fails=$((_fails + 1))
+    fi
+  done
 
   _same_line_file="$STAGING/json-mismatch-same-line.txt"
   printf '%s\n%s\n' \
@@ -1761,7 +1805,7 @@ if [ -n "$LIBDIR" ]; then
       -exec sh "$PATH_FILTER" {} + 2>/dev/null | head -1 |
       while IFS= read -r gjs; do
         deadline_exceeded && break
-        collect_file 06-state/go.d-job-statuses.json "go.d collector job states (which jobs run/fail)" "$gjs"
+        collect_file 06-state/go.d-job-statuses.json "go.d collector job states (which jobs run/fail)" "$gjs" "$FILE_CAP" "go.d job status discovered in state directory"
       done
   fi
   if [ -d "$LIBDIR/config" ]; then
@@ -1840,7 +1884,7 @@ elif [ -n "$RESOLV_SOURCE" ]; then
 fi
 collect_cmd 08-network/proxy-env.txt "Proxy environment (this shell; see 03-process/process-environ.txt for the agent view)" \
   sh -c 'env | grep -iE "^(https?_proxy|no_proxy|all_proxy)=" || echo "(no proxy variables set)"'
-collect_cmd 08-network/cloud-connectivity.txt "Reachability of Netdata Cloud (DNS + TLS + response code, no data sent)" sh -c '
+collect_cmd 08-network/cloud-connectivity.txt "Reachability of Netdata Cloud (DNS + TLS + response code; no bundle data sent)" sh -c '
   if command -v curl >/dev/null; then
     curl -sv --max-time 8 -o /dev/null https://app.netdata.cloud/ 2>&1 \
       | grep -E "^\*|^< HTTP|^> " \

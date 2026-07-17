@@ -179,7 +179,7 @@ Every item collected maps to a recurring support ask. That mapping is the
 |---|---|
 | listening sockets (netdata-related) | "dashboard unreachable" and port-conflict tickets |
 | DNS config, proxy env/config (sanitized) | claiming-behind-proxy is a recurring theme; DNS misconfiguration breaks cloud connectivity |
-| Netdata Cloud reachability (TCP/TLS handshake only, no data sent) | separates network problems from agent problems in one step |
+| Netdata Cloud reachability (TCP plus certificate-validating HTTPS/TLS probe; no bundle data sent) | separates network problems from agent problems in one step |
 
 ## What is NEVER collected
 
@@ -273,7 +273,9 @@ directory writable by any other identity. Each run uses a newly created,
 unpredictable staging directory and never reuses a pre-existing path. POSIX
 staging is created under `umask 077`; Windows staging disables ACL inheritance
 as part of the atomic directory-creation call, before the path is observable,
-and grants access only to the current identity, SYSTEM, and Administrators.
+and grants access only to the current identity, SYSTEM, and Administrators. The
+Windows pseudonym map retains that protected ACL when it is published, even if
+the selected output directory is shared.
 
 **The agent itself provides no redaction anywhere** — `GET /netdata.conf` and
 `netdatacli dumpconfig` print secrets verbatim. Everything must be sanitized

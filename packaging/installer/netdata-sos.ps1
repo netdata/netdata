@@ -54,17 +54,25 @@ if (-not $Output) { $Output = $TempRoot }
 $Staging = Join-Path $TempRoot ("netdata-sos-staging-" + [System.IO.Path]::GetRandomFileName())
 $Work = Join-Path $Staging $BundleName
 
-function New-PrivateStagingDirectory([string]$path) {
+function New-PrivateAclPolicy([switch]$Directory) {
     $current = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
     $system = New-Object System.Security.Principal.SecurityIdentifier(
         [System.Security.Principal.WellKnownSidType]::LocalSystemSid, $null)
     $administrators = New-Object System.Security.Principal.SecurityIdentifier(
         [System.Security.Principal.WellKnownSidType]::BuiltinAdministratorsSid, $null)
-    $acl = New-Object System.Security.AccessControl.DirectorySecurity
+    $acl = if ($Directory) {
+        New-Object System.Security.AccessControl.DirectorySecurity
+    } else {
+        New-Object System.Security.AccessControl.FileSecurity
+    }
     $acl.SetOwner($current)
     $acl.SetAccessRuleProtection($true, $false)
-    $inheritance = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor
-                   [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+    $inheritance = if ($Directory) {
+        [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor
+        [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+    } else {
+        [System.Security.AccessControl.InheritanceFlags]::None
+    }
     $seen = @{}
     foreach ($sid in @($current, $system, $administrators)) {
         if ($seen.ContainsKey($sid.Value)) { continue }
@@ -75,25 +83,45 @@ function New-PrivateStagingDirectory([string]$path) {
             [System.Security.AccessControl.AccessControlType]::Allow)
         [void]$acl.AddAccessRule($rule)
     }
+    return @{ Acl = $acl; Owner = $current; Allowed = $seen }
+}
+
+function Assert-PrivateAcl($acl, $policy, [string]$label) {
+    if (-not $acl.AreAccessRulesProtected) { throw "$label ACL inheritance remains enabled" }
+    $owner = $acl.GetOwner([System.Security.Principal.SecurityIdentifier])
+    if ($owner.Value -ne $policy.Owner.Value) { throw "$label owner is unexpected: $($owner.Value)" }
+    $granted = @{}
+    foreach ($rule in $acl.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])) {
+        if ($rule.AccessControlType -eq [System.Security.AccessControl.AccessControlType]::Allow) {
+            $sid = $rule.IdentityReference.Value
+            if (-not $policy.Allowed.ContainsKey($sid)) {
+                throw "$label ACL grants access to unexpected identity $sid"
+            }
+            $granted[$sid] = [int]$rule.FileSystemRights -bor [int]$granted[$sid]
+        }
+    }
+    foreach ($sid in $policy.Allowed.Keys) {
+        if (-not $granted.ContainsKey($sid) -or
+            ($granted[$sid] -band [int][System.Security.AccessControl.FileSystemRights]::FullControl) -ne
+             [int][System.Security.AccessControl.FileSystemRights]::FullControl) {
+            throw "$label ACL does not grant full control to required identity $sid"
+        }
+    }
+}
+
+function New-PrivateStagingDirectory([string]$path) {
+    $policy = New-PrivateAclPolicy -Directory
     $directory = New-Object System.IO.DirectoryInfo($path)
     # Windows PowerShell exposes the atomic ACL overload directly; PowerShell
     # 7 exposes the same operation through FileSystemAclExtensions.
     if ($PSVersionTable.PSEdition -eq 'Desktop') {
-        $directory.Create($acl)
+        $directory.Create($policy.Acl)
         $applied = [System.IO.Directory]::GetAccessControl($path)
     } else {
-        [System.IO.FileSystemAclExtensions]::Create($directory, $acl)
+        [System.IO.FileSystemAclExtensions]::Create($directory, $policy.Acl)
         $applied = [System.IO.FileSystemAclExtensions]::GetAccessControl($directory)
     }
-    if (-not $applied.AreAccessRulesProtected) { throw 'staging ACL inheritance remains enabled' }
-    $owner = $applied.GetOwner([System.Security.Principal.SecurityIdentifier])
-    if ($owner.Value -ne $current.Value) { throw "staging owner is unexpected: $($owner.Value)" }
-    foreach ($rule in $applied.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])) {
-        if ($rule.AccessControlType -eq [System.Security.AccessControl.AccessControlType]::Allow -and
-            -not $seen.ContainsKey($rule.IdentityReference.Value)) {
-            throw "staging ACL grants access to unexpected identity $($rule.IdentityReference.Value)"
-        }
-    }
+    Assert-PrivateAcl $applied $policy 'staging'
 }
 
 if ($env:OS -eq 'Windows_NT') {
@@ -199,7 +227,7 @@ function Stop-SosJobTree([System.Management.Automation.Job]$job, [int[]]$jobHost
     if ($job -and $job.State -eq 'Running') { Stop-Job $job -ErrorAction SilentlyContinue }
 }
 
-function Publish-FileNoOverwrite([string]$source, [string]$destination) {
+function Publish-FileNoOverwrite([string]$source, [string]$destination, [switch]$Private) {
     # Copy through an unpredictable temp on the destination volume, then use
     # File.Move as the atomic no-overwrite publication step. This also works
     # when -Output is on a different drive from the staging directory.
@@ -208,11 +236,33 @@ function Publish-FileNoOverwrite([string]$source, [string]$destination) {
     $sourceStream = $null; $destinationStream = $null
     try {
         $sourceStream = New-Object System.IO.FileStream($source, [System.IO.FileMode]::Open, [System.IO.FileAccess]::Read, [System.IO.FileShare]::Read)
-        $destinationStream = New-Object System.IO.FileStream($publicationTemp, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        if ($Private -and $env:OS -eq 'Windows_NT') {
+            $policy = New-PrivateAclPolicy
+            $fileInfo = New-Object System.IO.FileInfo($publicationTemp)
+            if ($PSVersionTable.PSEdition -eq 'Desktop') {
+                $destinationStream = New-Object System.IO.FileStream($publicationTemp,
+                    [System.IO.FileMode]::CreateNew, [System.Security.AccessControl.FileSystemRights]::FullControl,
+                    [System.IO.FileShare]::None, 4096, [System.IO.FileOptions]::None, $policy.Acl)
+            } else {
+                $destinationStream = [System.IO.FileSystemAclExtensions]::Create($fileInfo,
+                    [System.IO.FileMode]::CreateNew, [System.Security.AccessControl.FileSystemRights]::FullControl,
+                    [System.IO.FileShare]::None, 4096, [System.IO.FileOptions]::None, $policy.Acl)
+            }
+        } else {
+            $destinationStream = New-Object System.IO.FileStream($publicationTemp, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+        }
         $sourceStream.CopyTo($destinationStream)
         $destinationStream.Flush()
         $destinationStream.Dispose(); $destinationStream = $null
         $sourceStream.Dispose(); $sourceStream = $null
+        if ($Private -and $env:OS -eq 'Windows_NT') {
+            $applied = if ($PSVersionTable.PSEdition -eq 'Desktop') {
+                [System.IO.File]::GetAccessControl($publicationTemp)
+            } else {
+                [System.IO.FileSystemAclExtensions]::GetAccessControl($fileInfo)
+            }
+            Assert-PrivateAcl $applied $policy 'private artifact'
+        }
         [System.IO.File]::Move($publicationTemp, $destination)
         [System.IO.File]::Delete($source)
     } catch {
@@ -522,12 +572,21 @@ function Convert-DestinationToken([string]$token) {
     $work = $token; $prefix = ''; $suffix = ''
     if ($work -match '^(tcp:|udp:|unix:)(.*)$') { $prefix = $Matches[1]; $work = $Matches[2] }
     if ($work.StartsWith('[') -or $work.StartsWith('/')) { return $prefix + $work }
+    $parsed = $null
+    if ($work.Contains(':') -and
+        [System.Net.IPAddress]::TryParse($work, [ref]$parsed) -and
+        $parsed.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetworkV6) {
+        return $prefix + $work
+    }
     $cut = $work.IndexOfAny([char[]]('%', ':'))
     if ($cut -ge 0) { $suffix = $work.Substring($cut); $work = $work.Substring(0, $cut) }
-    $alreadySafe = $work -match '^(ip6?-\d+|private-host-\d+)$' -or
-                   $work -match '^\d{1,3}(\.\d{1,3}){3}$' -or
-                   $work -match '^[0-9A-Fa-f:]+$'
-    if ($work.Length -ge 4 -and -not $alreadySafe) { $work = Get-Pseudonym $work 'fqdn' }
+    $parsed = $null
+    $isIpv4 = $work -match '^\d{1,3}(\.\d{1,3}){3}$' -and
+              [System.Net.IPAddress]::TryParse($work, [ref]$parsed) -and
+              $parsed.AddressFamily -eq [System.Net.Sockets.AddressFamily]::InterNetwork
+    $alreadySafe = -not $work -or $work -in @('*', 'localhost') -or $isIpv4 -or
+                   $work -match '^(ip6?-\d+|private-host-\d+)$'
+    if (-not $alreadySafe) { $work = Get-Pseudonym $work 'fqdn' }
     return $prefix + $work + $suffix
 }
 
@@ -831,6 +890,8 @@ if ($SelfTest) {
         @{ in = 'DEFAULT_RECIPIENT_SLACK="SENTINEL-8"';                            mustNot = @('SENTINEL');            must = @('[REDACTED]') }
         @{ in = '[11111111-2222-3333-4444-555555555555]';                          mustNot = @('11111111');            must = @('[REDACTED-KEY-SECTION]') }
         @{ in = 'destination = parent.example.internal:19999';                     mustNot = @('parent.example');      must = @('private-host') }
+        @{ in = 'destination = db1:19999 deadbeef:19999';                          mustNot = @('db1:', 'deadbeef:');   must = @('private-host') }
+        @{ in = 'destination = 2001:db8::88';                                      mustNot = @('db8::88');             must = @('ip6-') }
         @{ in = 'server at 10.1.2.3 talked to 192.168.5.7 then 10.1.2.3 again';    mustNot = @('10.1.2.3', '192.168'); must = @('ip-') }
         @{ in = 'admin email is ops@customer-corp.com on host testhost';           mustNot = @('customer-corp', 'testhost '); must = @('[EMAIL]', 'redacted-host') }
         @{ in = 'service at customer.tenant-example.com and testhost10';            mustNot = @('customer.tenant-example.com'); must = @('private-host', 'testhost10') }
@@ -1021,6 +1082,7 @@ $SosCaptureWorker = {
         if ($Header) {
             Write-RawTextBounded $Header $encoding $stream $RawLimit ([ref]$written) ([ref]$overflow)
         }
+        $global:LASTEXITCODE = 0
         & $command 2>&1 | ForEach-Object {
             $item = $_
             if ($item -is [string]) {
@@ -1031,6 +1093,9 @@ $SosCaptureWorker = {
                 Write-RawTextBounded ([string]$_) $encoding $stream $RawLimit ([ref]$written) ([ref]$overflow)
             }
         } | Out-Null
+        if ($global:LASTEXITCODE -ne 0) {
+            throw "native collector exited with status $global:LASTEXITCODE"
+        }
     } catch {
         if (-not $overflow) { $failed = $true }
     } finally {
@@ -1237,6 +1302,21 @@ if ($SelfTest) {
     } catch {
         Write-Output "FAIL: bounded command capture raised $_ at $($_.InvocationInfo.PositionMessage)"; $script:SelfTestFailures++
     }
+    try {
+        $nativeFailureOutput = Join-Path $Staging 'native-failure-command.txt'
+        $nativeFailureCommand = if ($env:OS -eq 'Windows_NT') {
+            { & "$env:SystemRoot\System32\cmd.exe" /c exit 7 }
+        } else {
+            { & /bin/sh -c 'exit 7' }
+        }
+        $nativeFailureCapture = Invoke-CappedJobCapture -Cmd $nativeFailureCommand -Path $nativeFailureOutput -Cap 1024 -OriginText 'native-failure-selftest' -Raw
+        if ($nativeFailureCapture.Safe -or [System.IO.File]::Exists($nativeFailureOutput)) {
+            throw 'non-zero native exit was published as successful output'
+        }
+        Write-Output 'ok:   non-zero native collector exits fail closed'
+    } catch {
+        Write-Output "FAIL: native-exit command self-test raised $_"; $script:SelfTestFailures++
+    }
     $rawCapSave = $CommandRawCap
     try {
         $CommandRawCap = 4096
@@ -1274,6 +1354,20 @@ if ($SelfTest) {
         if (-not $refused -or [System.IO.File]::ReadAllText($publishDestination) -ne 'first') {
             Write-Output 'FAIL: no-overwrite artifact publication contract broke'; $script:SelfTestFailures++
         } else { Write-Output 'ok:   artifact publication refuses overwrite' }
+        if ($env:OS -eq 'Windows_NT') {
+            $privateSource = Join-Path $Staging 'private-publish-source.txt'
+            $privateDestination = Join-Path $Staging 'private-publish-destination.txt'
+            [System.IO.File]::WriteAllText($privateSource, 'private')
+            Publish-FileNoOverwrite $privateSource $privateDestination -Private
+            $privateInfo = New-Object System.IO.FileInfo($privateDestination)
+            $privateAcl = if ($PSVersionTable.PSEdition -eq 'Desktop') {
+                [System.IO.File]::GetAccessControl($privateDestination)
+            } else {
+                [System.IO.FileSystemAclExtensions]::GetAccessControl($privateInfo)
+            }
+            Assert-PrivateAcl $privateAcl (New-PrivateAclPolicy) 'private publication self-test'
+            Write-Output 'ok:   private artifact publication preserves its protected ACL'
+        }
     } catch {
         Write-Output "FAIL: publication self-test raised $_"; $script:SelfTestFailures++
     }
@@ -1327,6 +1421,7 @@ $env:ND_SOS_NETDATACLI_EXE = $NetdataCli
 $env:ND_SOS_SINCE_HOURS = [string]$SinceHours
 $env:ND_SOS_PORT = [string]$NdPort
 $env:ND_SOS_CLOUD_HOST = $CloudHost
+$env:ND_SOS_TIMEOUT_MS = [string]($TimeoutSeconds * 1000)
 
 $NetdataSvc = Get-Service -Name 'Netdata' -ErrorAction SilentlyContinue
 $NetdataProc = Get-Process -Name 'netdata' -ErrorAction SilentlyContinue | Select-Object -First 1
@@ -1525,7 +1620,34 @@ Show-Info 'collecting: network'
 Collect-Cmd '08-network\listening-sockets.txt' 'Listening sockets (netdata-related)' { Get-NetTCPConnection -State Listen | Where-Object { $_.LocalPort -eq [int]$env:ND_SOS_PORT -or (Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName -match 'netdata' } | Format-Table LocalAddress, LocalPort, OwningProcess -AutoSize } 'Get-NetTCPConnection -State Listen (netdata)'
 Collect-Cmd '08-network\dns-config.txt' 'DNS resolver config' { Get-DnsClientServerAddress | Where-Object { $_.ServerAddresses } | Format-Table InterfaceAlias, ServerAddresses -AutoSize } 'Get-DnsClientServerAddress'
 Collect-Cmd '08-network\proxy-config.txt' 'System proxy configuration' { netsh winhttp show proxy 2>&1; Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Internet Settings' | Format-List ProxyEnable, ProxyServer, AutoConfigURL } 'netsh winhttp show proxy + registry'
-Collect-Cmd '08-network\cloud-connectivity.txt' 'Reachability of Netdata Cloud (TCP/TLS only, no data sent)' { Test-NetConnection -ComputerName $env:ND_SOS_CLOUD_HOST -Port 443 -WarningAction SilentlyContinue | Format-List ComputerName, RemotePort, TcpTestSucceeded, PingSucceeded } "Test-NetConnection ${CloudHost}:443"
+Collect-Cmd '08-network\cloud-connectivity.txt' 'Reachability of Netdata Cloud (TCP plus certificate-validating HTTPS/TLS HEAD probe)' {
+    Test-NetConnection -ComputerName $env:ND_SOS_CLOUD_HOST -Port 443 -WarningAction SilentlyContinue |
+        Format-List ComputerName, RemotePort, TcpTestSucceeded, PingSucceeded
+    $request = [System.Net.HttpWebRequest]::Create("https://$($env:ND_SOS_CLOUD_HOST)/")
+    $request.Method = 'HEAD'
+    $request.AllowAutoRedirect = $false
+    $request.Timeout = [int]$env:ND_SOS_TIMEOUT_MS
+    $request.ReadWriteTimeout = [int]$env:ND_SOS_TIMEOUT_MS
+    $response = $null
+    $tlsSucceeded = $false
+    $result = ''
+    try {
+        $response = $request.GetResponse()
+        $tlsSucceeded = $true
+        $result = "HTTP $([int]$response.StatusCode) $($response.StatusDescription)"
+    } catch [System.Net.WebException] {
+        if ($_.Exception.Response) {
+            $response = $_.Exception.Response
+            $tlsSucceeded = $true
+            $result = "HTTP $([int]$response.StatusCode) $($response.StatusDescription)"
+        } else {
+            $result = [string]$_.Exception.Status
+        }
+    } finally {
+        if ($response) { $response.Dispose() }
+    }
+    [pscustomobject]@{ HttpsTlsSucceeded = $tlsSucceeded; Result = $result } | Format-List
+} "Test-NetConnection ${CloudHost}:443 + HTTPS HEAD https://${CloudHost}/"
 
 # ============================================================================
 # summary + manifest + README
@@ -1640,7 +1762,7 @@ if ($script:PseudoMap.Count -gt 0 -or $script:PathMap.Count -gt 0) {
     $StagingMap = Join-Path $Staging "$BundleName.pseudonym-map.tsv"
     [System.IO.File]::WriteAllLines($StagingMap, $mapLines, (New-Object System.Text.UTF8Encoding($false)))
     try {
-        Publish-FileNoOverwrite $StagingMap $MapPath
+        Publish-FileNoOverwrite $StagingMap $MapPath -Private
     } catch {
         Write-Host " [!] refusing to overwrite $MapPath; the private map was discarded"
         $MapPath = ''
