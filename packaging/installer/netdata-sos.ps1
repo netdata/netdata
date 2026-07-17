@@ -970,9 +970,7 @@ $SosCaptureWorker = {
         $stream = New-Object System.IO.FileStream($RawPath, [System.IO.FileMode]::CreateNew,
             [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
         if ($Header) {
-            $headerBytes = $encoding.GetBytes($Header + "`n")
-            $stream.Write($headerBytes, 0, $headerBytes.Length)
-            $written += $headerBytes.Length
+            Write-RawTextBounded $Header $encoding $stream $RawLimit ([ref]$written) ([ref]$overflow)
         }
         & $command 2>&1 | ForEach-Object {
             $item = $_
@@ -1005,6 +1003,9 @@ function Invoke-CappedJobCapture([scriptblock]$cmd, [string]$path, [long]$cap, [
     $utf8 = New-Object System.Text.UTF8Encoding($false)
     $marker = $utf8.GetBytes("### TRUNCATED: sanitized command output exceeded $cap bytes ###`n")
     $limit = if ($Raw) { $cap } else { [Math]::Max(0, $cap - $marker.Length) }
+    $footer = if ($Raw) { '' } else { "# job state: Completed`n" }
+    $footerBytes = $utf8.GetBytes($footer)
+    $workerRawLimit = [Math]::Max(0, $CommandRawCap - $footerBytes.Length)
     $rawPath = Join-Path $Staging ('command-raw-' + [System.IO.Path]::GetRandomFileName())
     $header = if ($Raw) { '' } else { "# netdata-sos v$SosVersion | command: $originText | captured: $((Get-Date).ToUniversalTime().ToString('yyyy-MM-ddTHH:mm:ssZ'))" }
     $job = $null
@@ -1013,9 +1014,10 @@ function Invoke-CappedJobCapture([scriptblock]$cmd, [string]$path, [long]$cap, [
     $finalState = 'NotStarted'
     $jobResult = $null
     $sanitized = $null
+    $rawBytes = [long]0
     try {
         $jobHostsBefore = @(Get-SosJobHostProcessIds)
-        $job = Start-Job -ScriptBlock $SosCaptureWorker -ArgumentList $cmd.ToString(), $rawPath, $CommandRawCap, $header
+        $job = Start-Job -ScriptBlock $SosCaptureWorker -ArgumentList $cmd.ToString(), $rawPath, $workerRawLimit, $header
         $jobHostPids = @(Get-NewSosJobHostProcessIds $jobHostsBefore)
         $jobDeadline = (Get-Date).AddSeconds($TimeoutSeconds)
         while ($job.State -eq 'Running' -and (Get-Date) -lt $jobDeadline) {
@@ -1028,7 +1030,8 @@ function Invoke-CappedJobCapture([scriptblock]$cmd, [string]$path, [long]$cap, [
         $finalState = $job.State
         if (-not $timedOut) { $jobResult = @(Receive-Job -Job $job -ErrorAction SilentlyContinue | Select-Object -Last 1)[0] }
         if ($finalState -eq 'Completed' -and $jobResult -and $jobResult.Success) {
-            if (-not $Raw) { [System.IO.File]::AppendAllText($rawPath, "# job state: Completed`n", $utf8) }
+            if ($footer) { [System.IO.File]::AppendAllText($rawPath, $footer, $utf8) }
+            $rawBytes = [long]$jobResult.Bytes + $footerBytes.Length
             $reader = [System.IO.File]::OpenText($rawPath)
             # The producer keeps its per-command timeout. Sanitizing its already
             # local, 16 MiB-bounded spool may use the remaining global budget so
@@ -1053,7 +1056,8 @@ function Invoke-CappedJobCapture([scriptblock]$cmd, [string]$path, [long]$cap, [
             $sanitized -and (-not $Raw -or -not $sanitized.Truncated)
     return @{
         Safe = [bool]$safe; Truncated = [bool]($sanitized -and $sanitized.Truncated)
-        TimedOut = $timedOut; RawOverflow = [bool]($jobResult -and $jobResult.Overflow); State = $finalState
+        TimedOut = $timedOut; RawOverflow = [bool]($jobResult -and $jobResult.Overflow)
+        RawBytes = $rawBytes; State = $finalState
     }
 }
 
@@ -1176,7 +1180,9 @@ if ($SelfTest) {
         }
         $capture = Invoke-CappedJobCapture -Cmd $boundedCommand -Path $script:BoundedSelfTestOutput -Cap 1024 -OriginText 'bounded-output-selftest'
         $boundedText = Get-Content $script:BoundedSelfTestOutput -Raw
-        if ((Get-Item $script:BoundedSelfTestOutput).Length -gt 1024 -or $boundedText -match 'SENTINEL-COMMAND' -or -not $capture.Truncated) {
+        if ((Get-Item $script:BoundedSelfTestOutput).Length -gt 1024 -or
+            $capture.RawBytes -gt $CommandRawCap -or $boundedText -match 'SENTINEL-COMMAND' -or
+            -not $capture.Truncated) {
             Write-Output 'FAIL: command capture was not bounded after sanitization'; $script:SelfTestFailures++
         } else { Write-Output 'ok:   command capture transport and sanitized output are bounded' }
     } catch {
