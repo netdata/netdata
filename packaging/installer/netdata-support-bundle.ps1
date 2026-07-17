@@ -522,7 +522,7 @@ if ($ApiOk) {
     Save-Api '04-config\effective-netdata.conf' 'EFFECTIVE running config (merged, annotated) - authoritative over on-disk file' '/netdata.conf'
 }
 if (Test-Path $ConfDir) {
-    Save-Cmd '04-config\config-tree.txt' 'User config dir tree (files here = user-customized)' { Get-ChildItem $using:ConfDir -Recurse -ErrorAction SilentlyContinue | Select-Object -First 2000 | Format-Table Mode, LastWriteTime, Length, FullName -AutoSize } "Get-ChildItem $ConfDir -Recurse"
+    Save-Cmd '04-config\config-tree.txt' 'User config dir tree (files here = user-customized; ssl and key material excluded)' { Get-ChildItem $using:ConfDir -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.FullName -notmatch '[\\/]ssl([\\/]|$)' -and $_.Extension -notin @('.pem', '.key') } | Select-Object -First 2000 | Format-Table Mode, LastWriteTime, Length, FullName -AutoSize } "Get-ChildItem $ConfDir -Recurse (ssl/key material excluded)"
     Save-File '04-config\netdata.conf' 'On-disk main config' (Join-Path $ConfDir 'netdata.conf')
     Save-File '04-config\stream.conf' 'Streaming config (parent/child; api key redacted)' (Join-Path $ConfDir 'stream.conf')
     Save-File '04-config\claim.conf' 'Cloud claim config (token redacted)' (Join-Path $ConfDir 'claim.conf')

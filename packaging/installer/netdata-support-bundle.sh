@@ -480,7 +480,8 @@ collect_cmd() {
   # optional: --cap BYTES overrides the default output cap (journal captures
   # are documented at 5 MiB while command output defaults to 2 MiB)
   _ccap="$API_CAP"
-  if [ "$1" = "--cap" ]; then _ccap="$2"; shift 2; fi
+  _first="${1:-}"
+  if [ "$_first" = "--cap" ]; then _ccap="$2"; shift 2; fi
   _rel="$1"; _title="$2"; shift 2
   _out="$WORK/$_rel"
   mkdir -p "$(dirname "$_out")"
@@ -623,8 +624,8 @@ VECTORS
     if grep -q "$_pat" "$_tf"; then echo "FAIL (leak): $_msg" >&2; _fails=$((_fails + 1)); fi
   }
   t_present() {
-    [ "$1" = "--" ] && shift
     _pat="$1"; _msg="$2"
+    if [ "$_pat" = "--" ]; then _pat="$2"; _msg="$3"; fi
     if ! grep -qF -- "$_pat" "$_tf"; then echo "FAIL (over-redaction): $_msg" >&2; _fails=$((_fails + 1)); fi
   }
   t_absent  "SENTINEL-"                  "a planted secret survived"
@@ -827,7 +828,13 @@ if [ "$api_ok" = "1" ]; then
   collect_api 04-config/effective-netdata.conf "EFFECTIVE running config (merged, annotated) - authoritative over on-disk file" /netdata.conf
 fi
 if [ -n "$CONFDIR" ]; then
-  collect_cmd 04-config/config-tree.txt "User config dir tree (files here = user-customized)" sh -c 'ls -laR '"$CONFDIR"' 2>/dev/null | head -2000'
+  collect_cmd 04-config/config-tree.txt "User config dir tree (files here = user-customized; ssl/ and key material excluded)" sh -c '
+    ls -laR '"$CONFDIR"' 2>/dev/null | head -2000 | awk "
+      /\/ssl:\$/ { print; skip = 1; print \"  [ssl directory contents withheld]\"; next }
+      skip && /^\$/ { skip = 0; print; next }
+      skip { next }
+      /\.(pem|key)\$/ { next }
+      { print }"'
   collect_file 04-config/netdata.conf "On-disk main config" "$CONFDIR/netdata.conf"
   collect_file 04-config/stream.conf "Streaming config (parent/child; api key redacted)" "$CONFDIR/stream.conf"
   collect_file 04-config/exporting.conf "Exporting engine config (credentials redacted)" "$CONFDIR/exporting.conf"
@@ -852,9 +859,9 @@ fi
 info "collecting: logs (last ${SINCE_HOURS}h, capped)"
 if command -v journalctl >/dev/null 2>&1; then
   collect_cmd --cap "$LOG_CAP" 05-logs/journal-netdata.txt "systemd journal for netdata unit" \
-    sh -c "journalctl -u netdata --no-pager -o short-iso --since '-${SINCE_HOURS} hours' 2>/dev/null | tail -c $LOG_CAP; true"
+    sh -c "journalctl -u netdata --no-pager -o short-iso --since '-${SINCE_HOURS} hours' 2>/dev/null | tail -n 20000; true"
   collect_cmd --cap "$LOG_CAP" 05-logs/journal-namespace-netdata.txt "netdata journal namespace (some installs log here)" \
-    sh -c "journalctl --namespace=netdata --no-pager -o short-iso --since '-${SINCE_HOURS} hours' 2>/dev/null | tail -c $LOG_CAP; true"
+    sh -c "journalctl --namespace=netdata --no-pager -o short-iso --since '-${SINCE_HOURS} hours' 2>/dev/null | tail -n 20000; true"
 fi
 if [ -n "$LOGDIR" ]; then
   for lf in error.log daemon.log collector.log health.log aclk.log debug.log; do
