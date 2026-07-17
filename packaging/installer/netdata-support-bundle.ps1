@@ -150,6 +150,12 @@ function Invoke-RedactSecretLine([string]$line) {
         if ((Test-SecretKey $m.Groups[1].Value) -and -not (Test-DiagnosticKey $m.Groups[1].Value)) { '"' + $m.Groups[1].Value + '": "[REDACTED]"' }
         else { $m.Value }
     })
+    # structured (array/object) JSON values under secret keys (single-line)
+    $line = [regex]::Replace($line, '"([^"]+)"\s*:\s*(\[[^\]]*\]|\{[^}]*\})', {
+        param($m)
+        if ((Test-SecretKey $m.Groups[1].Value) -and -not (Test-DiagnosticKey $m.Groups[1].Value)) { '"' + $m.Groups[1].Value + '": "[REDACTED]"' }
+        else { $m.Value }
+    })
     # URL creds and Go-style DSN creds
     $line = $line -replace '://[^:/@\s]+:[^@\s]+@', '://[REDACTED]@'
     $line = $line -replace '\b[\w]+:[^@\s]+@(tcp|unix)\(', '[REDACTED]@$1('
@@ -262,7 +268,7 @@ function Test-FileHasNul([string]$path) {
     # be byte-unsafe, so the caller withholds the file
     $fs = [System.IO.File]::OpenRead($path)
     try {
-        $want = [Math]::Min(1MB, $fs.Length)
+        $want = $fs.Length   # staged file is already size-capped before sanitize
         $probe = New-Object byte[] $want
         $read = 0
         while ($read -lt $want) {
@@ -279,7 +285,7 @@ function Get-SecretBlockIndent([string]$line) {
     # a YAML block scalar under a secret key (e.g. "password: |") opens a
     # multiline value; return its indent length so the caller withholds the
     # whole block, or -1 when the line is not such a header
-    if ($line -match '^(\s*)([\w. -]+):\s*[|>][+-]?\s*$') {
+    if ($line -match '^(\s*)([\w. -]+):\s*[|>][0-9]?[+-]?\s*$') {
         $k = $Matches[2]
         if ((Test-SecretKey $k) -and -not (Test-DiagnosticKey $k)) { return $Matches[1].Length }
     }
@@ -300,7 +306,7 @@ function Convert-SanitizedText([string[]]$lines) {
             continue
         }
         # inside a YAML secret block: skip blank or deeper-indented lines
-        if ($inYaml -and ($l -match '^\s*$' -or ([regex]::Match($l, '^ *')).Length -gt $yamlIndent)) { continue }
+        if ($inYaml -and ($l -match '^\s*$' -or ([regex]::Match($l, '^\s*')).Length -gt $yamlIndent)) { continue }
         $inYaml = $false
         $bi = Get-SecretBlockIndent $l
         if ($bi -ge 0) {
@@ -341,6 +347,8 @@ if ($SelfTest) {
         @{ in = ('    Authorization: ' + ('Bea' + 'rer') + ' SENTINEL-2abc123');    mustNot = @('SENTINEL');            must = @('[REDACTED]') }
         @{ in = 'password: SENTINEL-3';                                            mustNot = @('SENTINEL');            must = @('[REDACTED]') }
         @{ in = '"claim_token": "SENTINEL-4"';                                     mustNot = @('SENTINEL');            must = @('[REDACTED]') }
+        @{ in = '"access_key": ["SENTINEL-ARR"]';                                  mustNot = @('SENTINEL');            must = @('[REDACTED]') }
+        @{ in = '"api_token": -98765';                                            mustNot = @('98765');               must = @('[REDACTED]') }
         @{ in = 'url: https://admin:SENTINEL-5@app.example.com/x';                 mustNot = @('SENTINEL');            must = @('[REDACTED]@') }
         @{ in = 'dsn: user:SENTINEL-6@tcp(10.1.2.3:3306)/db';                      mustNot = @('SENTINEL');            must = @('[REDACTED]') }
         @{ in = 'TELEGRAM_BOT_TOKEN="SENTINEL-7"';                                 mustNot = @('SENTINEL');            must = @('[REDACTED]') }
@@ -432,6 +440,7 @@ function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$orig
         $job = Start-Job -ScriptBlock $cmd
         $done = Wait-Job $job -Timeout $TimeoutSeconds
         if ($done) { $result = Receive-Job $job 2>&1 | Select-Object -First 50000 | Out-String } else { $result = "TIMEOUT after ${TimeoutSeconds}s" }
+        Stop-Job $job -ErrorAction SilentlyContinue
         Remove-Job $job -Force
     } catch { $result = "ERROR: $_" }
     if ($result.Length -gt 2MB) {
@@ -457,6 +466,7 @@ function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$o
         $job = Start-Job -ScriptBlock $cmd
         $done = Wait-Job $job -Timeout $TimeoutSeconds
         if ($done) { $result = Receive-Job $job 2>&1 | Select-Object -First 50000 | Out-String }
+        Stop-Job $job -ErrorAction SilentlyContinue
         Remove-Job $job -Force
     } catch { Write-Verbose "collector failed: $_" }
     if ($result -and $result.Trim().Length -gt 0) {

@@ -57,11 +57,12 @@ LOG_CAP=5242880          # 5 MiB per log file
 FILE_CAP=1048576         # 1 MiB per config/state file
 API_CAP=2097152          # 2 MiB per API response
 
+need_val() { [ $# -ge 2 ] || { echo "option $1 needs a value" >&2; exit 1; }; }
 while [ $# -gt 0 ]; do
   case "$1" in
-    -o|--output) OUTDIR="$2"; shift 2 ;;
-    --since) SINCE_HOURS="$2"; shift 2 ;;
-    --timeout) CMD_TIMEOUT="$2"; shift 2 ;;
+    -o|--output) need_val "$@"; OUTDIR="$2"; shift 2 ;;
+    --since) need_val "$@"; SINCE_HOURS="$2"; shift 2 ;;
+    --timeout) need_val "$@"; CMD_TIMEOUT="$2"; shift 2 ;;
     --no-obfuscate) OBFUSCATE=0; shift ;;
     --keep-staging) KEEP_STAGING=1; shift ;;
     --selftest) SELFTEST=1; shift ;;
@@ -151,8 +152,8 @@ sanitize_file() {
   _f="$1"
   [ -f "$_f" ] || return 0
   # binary/UTF-16 input would make line-based redaction byte-unsafe: withhold
-  _b_all=$(head -c 1048576 "$_f" | wc -c)
-  _b_txt=$(head -c 1048576 "$_f" | LC_ALL=C tr -d '\000' | wc -c)
+  _b_all=$(wc -c < "$_f")
+  _b_txt=$(LC_ALL=C tr -d '\000' < "$_f" | wc -c)
   if [ "$_b_all" -ne "$_b_txt" ]; then
     echo "[content withheld: file contains NUL bytes (binary or UTF-16?)]" > "$_f"
     return 0
@@ -205,7 +206,7 @@ sanitize_file() {
     }
     return line;
   }
-  function redact_json(line,   out, rest, key, lk, i, k, m, v) {
+  function redact_json(line,   out, rest, key, lk, i, k, m, v, pre, keypart, after, hit) {
     # "key": "value" pairs, possibly many per line
     out = ""; rest = line;
     while (match(rest, /"[^"]+"[ \t]*:[ \t]*"([^"\\]|\\.)*"/)) {
@@ -215,7 +216,7 @@ sanitize_file() {
       if (!diagnostic_key(lk)) {
         for (i = 1; i <= nsec; i++) {
           if (index(lk, SK[i]) > 0) {
-            sub(/:[ \t]*"[^"]*"/, ": \"[REDACTED]\"", m);
+            sub(/:[ \t]*"([^"\\]|\\.)*"/, ": \"[REDACTED]\"", m);
             break;
           }
         }
@@ -226,15 +227,35 @@ sanitize_file() {
     line = out rest;
     # scalar (unquoted) JSON values under secret keys: "key": 12345
     out = ""; rest = line;
-    while (match(rest, /"[^"]+"[ \t]*:[ \t]*[0-9truefalsnu][0-9truefalsnul.eE+-]*/)) {
+    while (match(rest, /"[^"]+"[ \t]*:[ \t]*[-0-9truefalsnu][0-9truefalsnul.eE+-]*/)) {
       m = substr(rest, RSTART, RLENGTH);
       key = m; sub(/^"/, "", key); sub(/".*/, "", key);
       lk = tolower(key); gsub(/[-_]/, " ", lk);
       hit = 0;
       for (i = 1; i <= nsec; i++) if (index(lk, SK[i]) > 0) hit = 1;
-      if (hit && !diagnostic_key(lk)) sub(/:[ \t]*[0-9truefalsnu][0-9truefalsnul.eE+-]*$/, ": \"[REDACTED]\"", m);
+      if (hit && !diagnostic_key(lk)) sub(/:[ \t]*[-0-9truefalsnu][0-9truefalsnul.eE+-]*$/, ": \"[REDACTED]\"", m);
       out = out substr(rest, 1, RSTART - 1) m;
       rest = substr(rest, RSTART + RLENGTH);
+    }
+    line = out rest;
+    # structured (array/object) values under secret keys: "key": [..] / {..}
+    # (single-line; agent-API JSON is compact). Withhold the whole value.
+    out = ""; rest = line;
+    while (match(rest, /"[^"]+"[ \t]*:[ \t]*[[{]/)) {
+      m = substr(rest, RSTART, RLENGTH);
+      key = m; sub(/^"/, "", key); sub(/".*/, "", key);
+      lk = tolower(key); gsub(/[-_]/, " ", lk);
+      pre = substr(rest, 1, RSTART - 1);
+      keypart = substr(m, 1, length(m) - 1);          # "key": (without the bracket)
+      after = substr(rest, RSTART + RLENGTH - 1);      # from the [ or { onward
+      hit = 0; for (i = 1; i <= nsec; i++) if (index(lk, SK[i]) > 0) hit = 1;
+      if (hit && !diagnostic_key(lk) && (match(after, /^\[[^]]*\]/) || match(after, /^\{[^}]*\}/))) {
+        out = out pre keypart " \"[REDACTED]\"";
+        rest = substr(after, RLENGTH + 1);
+      } else {
+        out = out pre keypart;
+        rest = after;
+      }
     }
     return out rest;
   }
@@ -378,6 +399,34 @@ sanitize_file() {
     }
     return out line;
   }
+  function gensub_home_one(line, pfx,   out, rest, seg, plen, i) {
+    # <pfx><name> -> <pfx><pseudonym>, e.g. /home/alice -> /home/user-1
+    out = ""; rest = line; plen = length(pfx);
+    while (index(rest, pfx) > 0) {
+      i = index(rest, pfx);
+      out = out substr(rest, 1, i - 1) pfx;
+      rest = substr(rest, i + plen);
+      if (match(rest, /^[A-Za-z0-9._-]+/)) {
+        seg = substr(rest, 1, RLENGTH);
+        out = out pseudo_user_name(seg);
+        rest = substr(rest, RLENGTH + 1);
+      }
+    }
+    return out rest;
+  }
+  function gensub_home(line) {
+    line = gensub_home_one(line, "/home/");
+    line = gensub_home_one(line, "/Users/");
+    return line;
+  }
+  function pseudo_user_name(u,   p) {
+    if (u == "" || u == "root") return u;
+    if (!(u in usermap)) {
+      nusr++; usermap[u] = "user-" nusr;
+      print "user\t" u "\t" usermap[u] >> mapfile;
+    }
+    return usermap[u];
+  }
   function replace_user(line, u,   out, idx) {
     if (u == "") return line;
     if (!(u in usermap)) {
@@ -409,17 +458,17 @@ sanitize_file() {
     # withhold until indentation returns to the key level or shallower
     if (inyaml) {
       if ($0 ~ /^[ \t]*$/) next;
-      match($0, /^[ ]*/);
+      match($0, /^[ \t]*/);
       if (RLENGTH > yamlindent) next;
       inyaml = 0;
     }
-    if (match($0, /^[ ]*[A-Za-z0-9_. -]+:[ \t]*[|>][+-]?[ \t]*$/)) {
-      key = $0; sub(/:.*/, "", key); gsub(/^[ ]*/, "", key);
+    if (match($0, /^[ \t]*[A-Za-z0-9_. -]+:[ \t]*[|>][0-9]?[+-]?[ \t]*$/)) {
+      key = $0; sub(/:.*/, "", key); gsub(/^[ \t]*/, "", key);
       lk = tolower(key); gsub(/[-_]/, " ", lk);
       hit = 0;
       for (i = 1; i <= nsec; i++) if (index(lk, SK[i]) > 0) hit = 1;
       if (hit && !diagnostic_key(lk)) {
-        match($0, /^[ ]*/); yamlindent = RLENGTH;
+        match($0, /^[ \t]*/); yamlindent = RLENGTH;
         sub(/:.*/, ": [REDACTED BLOCK]");
         print; inyaml = 1; next;
       }
@@ -497,6 +546,8 @@ sanitize_file() {
       if (host_fqdn != "") line = replace_host(line, host_fqdn);
       if (host_short != "") line = replace_host(line, host_short);
       if (run_user != "") line = replace_user(line, run_user);
+      # other local users appear in mount tables / paths when run as root
+      line = gensub_home(line);
     }
     print line;
   }' "$_f" > "$_f.san" 2>>"$ERRORS"; then
@@ -677,6 +728,16 @@ destination = [2001:db8::77]:19999 unix:/run/nd.sock 10.7.7.7:19999
 tcp LISTEN 0 4096 later-line
 server at 10.1.2.3 and 2606:4700:10::ac42:aad8 and 2001:470:26:307:0:0:0:1
 mail ops@example.com mac aa:bb:cc:dd:ee:ff at 2026-07-16T13:38:34Z
+"password_escq": "ab\"SENTINEL-ESCQ"
+"api_token": -98765
+"access_key": ["SENTINEL-ARR"]
+tabbed_secret_block: |
+	SENTINEL-TAB-LINE
+after_tab = ok
+password_ind: |2
+  SENTINEL-IND2
+after_ind = ok
+home /home/alice/x and /Users/bob/y
 VECTORS
   # assembled at runtime so secret scanners do not flag the source as a
   # committed credential; the sanitized bytes are identical
@@ -710,6 +771,15 @@ VECTORS
   t_absent  "ops@example.com"            "email survived"
   t_absent  "aa:bb:cc:dd:ee:ff"          "MAC survived"
   t_present "after_block = ok"           "YAML block withholding ate following content"
+  t_absent  "SENTINEL-ESCQ"              "escaped-quote JSON value leaked its suffix"
+  t_absent  "98765"                      "negative-number JSON scalar survived"
+  t_absent  "SENTINEL-ARR"               "structured (array) JSON secret value survived"
+  t_absent  "SENTINEL-TAB"              "tab-indented YAML block-scalar secret survived"
+  t_present "after_tab = ok"             "tab YAML block withholding overran"
+  t_absent  "SENTINEL-IND2"              "explicit-indent YAML block scalar (|2) secret survived"
+  t_present "after_ind = ok"             "|2 YAML block withholding overran"
+  t_absent  "/home/alice"                "other user home path not pseudonymized"
+  t_absent  "/Users/bob"                 "other user Users path not pseudonymized"
   t_present "destination = tcp:"         "destination protocol prefix lost"
   t_present "unix:/run/nd.sock"          "socket-path destination was mangled"
   t_present "tcp LISTEN 0 4096 later-line" "literal tcp corrupted by fqmap pollution"
@@ -1204,11 +1274,17 @@ TARBALL="$OUTDIR/$BUNDLE.$_ext"
 # build inside the 0700 staging dir, then publish with O_EXCL (set -C) so a
 # pre-existing file OR symlink planted in a shared tmp dir can never be
 # followed or overwritten (no check/open TOCTOU window)
+# anonymize archive owner/group so a non-root user's account isn't in tar headers
+_towner=""
+if tar --owner=0 --group=0 -cf /dev/null -T /dev/null 2>/dev/null; then
+  _towner="--owner=0 --group=0 --numeric-owner"
+fi
 _tarok=0
+# shellcheck disable=SC2086  # $_towner intentionally splits into separate tar flags
 case "$_mode" in
-  tar-zstd)  ( cd "$STAGING" && tar --zstd -cf "$STAGING/bundle.$_ext" "$BUNDLE" ) && _tarok=1 ;;
-  zstd-pipe) ( cd "$STAGING" && tar -cf - "$BUNDLE" | zstd -q -o "$STAGING/bundle.$_ext" ) && _tarok=1 ;;
-  gzip)      ( cd "$STAGING" && tar -czf "$STAGING/bundle.$_ext" "$BUNDLE" ) && _tarok=1 ;;
+  tar-zstd)  ( cd "$STAGING" && tar $_towner --zstd -cf "$STAGING/bundle.$_ext" "$BUNDLE" ) && _tarok=1 ;;
+  zstd-pipe) ( cd "$STAGING" && tar $_towner -cf - "$BUNDLE" | zstd -q -o "$STAGING/bundle.$_ext" ) && _tarok=1 ;;
+  gzip)      ( cd "$STAGING" && tar $_towner -czf "$STAGING/bundle.$_ext" "$BUNDLE" ) && _tarok=1 ;;
   *) : ;;
 esac
 if [ "$_tarok" != "1" ]; then
@@ -1236,7 +1312,11 @@ echo >&2
 info "done in ${TOTAL_S}s"
 info "bundle:  $TARBALL ($SIZE)"
 [ "$OBFUSCATE" = "1" ] && [ -n "${MAP_OUT:-}" ] && info "pseudonym map (KEEP PRIVATE, do not send): $MAP_OUT"
-info "review it:  tar -tzf $TARBALL"
+if [ "$_ext" = "tar.zst" ]; then
+  info "review it:  tar --zstd -tf $TARBALL   (or: zstd -dc $TARBALL | tar -tf -)"
+else
+  info "review it:  tar -tzf $TARBALL"
+fi
 if [ "${DOCKER_LOGS_NEEDED:-0}" = "1" ]; then
   info "IMPORTANT: this agent logs to the container's stdout - its log history is NOT in this bundle."
   info "on the docker HOST also run:  docker logs --since 24h <netdata-container> > netdata-docker.log 2>&1"
