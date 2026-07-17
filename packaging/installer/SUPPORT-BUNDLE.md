@@ -270,7 +270,10 @@ claimed as an atomic no-follow open. The root/Administrator and Netdata service
 identities are trusted not to adversarially replace source entries or mutate
 source-directory contents while the tool runs. Do not extend collection to a
 directory writable by any other identity. Each run uses a newly created,
-unpredictable staging directory and never reuses a pre-existing path.
+unpredictable staging directory and never reuses a pre-existing path. POSIX
+staging is created under `umask 077`; Windows staging disables ACL inheritance
+as part of the atomic directory-creation call, before the path is observable,
+and grants access only to the current identity, SYSTEM, and Administrators.
 
 **The agent itself provides no redaction anywhere** — `GET /netdata.conf` and
 `netdatacli dumpconfig` print secrets verbatim. Everything must be sanitized

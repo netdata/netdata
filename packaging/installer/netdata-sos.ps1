@@ -53,8 +53,57 @@ $TempRoot = if ($env:TEMP) { $env:TEMP } else { [System.IO.Path]::GetTempPath() 
 if (-not $Output) { $Output = $TempRoot }
 $Staging = Join-Path $TempRoot ("netdata-sos-staging-" + [System.IO.Path]::GetRandomFileName())
 $Work = Join-Path $Staging $BundleName
-New-Item -ItemType Directory -Path $Staging -ErrorAction Stop | Out-Null
+
+function New-PrivateStagingDirectory([string]$path) {
+    $current = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+    $system = New-Object System.Security.Principal.SecurityIdentifier(
+        [System.Security.Principal.WellKnownSidType]::LocalSystemSid, $null)
+    $administrators = New-Object System.Security.Principal.SecurityIdentifier(
+        [System.Security.Principal.WellKnownSidType]::BuiltinAdministratorsSid, $null)
+    $acl = New-Object System.Security.AccessControl.DirectorySecurity
+    $acl.SetOwner($current)
+    $acl.SetAccessRuleProtection($true, $false)
+    $inheritance = [System.Security.AccessControl.InheritanceFlags]::ContainerInherit -bor
+                   [System.Security.AccessControl.InheritanceFlags]::ObjectInherit
+    $seen = @{}
+    foreach ($sid in @($current, $system, $administrators)) {
+        if ($seen.ContainsKey($sid.Value)) { continue }
+        $seen[$sid.Value] = $true
+        $rule = New-Object System.Security.AccessControl.FileSystemAccessRule(
+            $sid, [System.Security.AccessControl.FileSystemRights]::FullControl, $inheritance,
+            [System.Security.AccessControl.PropagationFlags]::None,
+            [System.Security.AccessControl.AccessControlType]::Allow)
+        [void]$acl.AddAccessRule($rule)
+    }
+    $directory = New-Object System.IO.DirectoryInfo($path)
+    # Windows PowerShell exposes the atomic ACL overload directly; PowerShell
+    # 7 exposes the same operation through FileSystemAclExtensions.
+    if ($PSVersionTable.PSEdition -eq 'Desktop') {
+        $directory.Create($acl)
+        $applied = [System.IO.Directory]::GetAccessControl($path)
+    } else {
+        [System.IO.FileSystemAclExtensions]::Create($directory, $acl)
+        $applied = [System.IO.FileSystemAclExtensions]::GetAccessControl($directory)
+    }
+    if (-not $applied.AreAccessRulesProtected) { throw 'staging ACL inheritance remains enabled' }
+    $owner = $applied.GetOwner([System.Security.Principal.SecurityIdentifier])
+    if ($owner.Value -ne $current.Value) { throw "staging owner is unexpected: $($owner.Value)" }
+    foreach ($rule in $applied.GetAccessRules($true, $true, [System.Security.Principal.SecurityIdentifier])) {
+        if ($rule.AccessControlType -eq [System.Security.AccessControl.AccessControlType]::Allow -and
+            -not $seen.ContainsKey($rule.IdentityReference.Value)) {
+            throw "staging ACL grants access to unexpected identity $($rule.IdentityReference.Value)"
+        }
+    }
+}
+
+if ($env:OS -eq 'Windows_NT') {
+    try { New-PrivateStagingDirectory $Staging }
+    catch { throw "cannot atomically create private staging directory: $_" }
+} else {
+    New-Item -ItemType Directory -Path $Staging -ErrorAction Stop | Out-Null
+}
 New-Item -ItemType Directory -Path $Work -ErrorAction Stop | Out-Null
+if ($SelfTest -and $env:OS -eq 'Windows_NT') { Write-Output 'ok:   staging ACL is private and inheritance-free' }
 $script:ManifestRows = New-Object System.Collections.ArrayList
 $script:PseudoMap = @{}   # original -> pseudonym
 $script:IpCount = 0
