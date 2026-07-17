@@ -1192,22 +1192,26 @@ manifest_add README.md file generated "Bundle documentation"
 # =============================================================================
 mkdir -p "$OUTDIR"
 # zstd compresses faster and smaller than gzip on this kind of text-heavy data;
-# use it when available (tar --zstd, or a zstd pipe), else fall back to gzip
+# use it when the tar build supports --zstd, else a zstd pipe, else gzip
 if command -v zstd >/dev/null 2>&1 && tar --zstd -cf /dev/null -T /dev/null 2>/dev/null; then
-  _ext="tar.zst"; _tarflag="--zstd"
+  _ext="tar.zst"; _mode="tar-zstd"
 elif command -v zstd >/dev/null 2>&1; then
-  _ext="tar.zst"; _tarflag="zstd-pipe"
+  _ext="tar.zst"; _mode="zstd-pipe"
 else
-  _ext="tar.gz"; _tarflag="z"
+  _ext="tar.gz"; _mode="gzip"
 fi
 TARBALL="$OUTDIR/$BUNDLE.$_ext"
 # build inside the 0700 staging dir, then publish with O_EXCL (set -C) so a
 # pre-existing file OR symlink planted in a shared tmp dir can never be
 # followed or overwritten (no check/open TOCTOU window)
-if [ "$_tarflag" = "zstd-pipe" ]; then
-  ( cd "$STAGING" && tar cf - "$BUNDLE" | zstd -q -o "$STAGING/bundle.$_ext" ) || { echo "failed to create tarball" >&2; exit 1; }
-else
-  ( cd "$STAGING" && tar -c$_tarflag -f "$STAGING/bundle.$_ext" "$BUNDLE" ) || { echo "failed to create tarball" >&2; exit 1; }
+_tarok=0
+case "$_mode" in
+  tar-zstd)  ( cd "$STAGING" && tar --zstd -cf "$STAGING/bundle.$_ext" "$BUNDLE" ) && _tarok=1 ;;
+  zstd-pipe) ( cd "$STAGING" && tar -cf - "$BUNDLE" | zstd -q -o "$STAGING/bundle.$_ext" ) && _tarok=1 ;;
+  gzip)      ( cd "$STAGING" && tar -czf "$STAGING/bundle.$_ext" "$BUNDLE" ) && _tarok=1 ;;
+esac
+if [ "$_tarok" != "1" ]; then
+  echo "failed to create tarball" >&2; exit 1
 fi
 if ! ( set -C; cat "$STAGING/bundle.$_ext" > "$TARBALL" ) 2>/dev/null; then
   echo "refusing to write $TARBALL (a file or symlink already exists there)" >&2
