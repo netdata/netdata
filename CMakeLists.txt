@@ -4703,6 +4703,11 @@ if(OS_WINDOWS)
                       /usr/bin/msys-uv-1.dll
                       DESTINATION "${BINDIR}")
 
+        # user-facing support-bundle tool (Windows PowerShell implementation)
+        install(PROGRAMS packaging/installer/netdata-support-bundle.ps1
+                COMPONENT netdata
+                DESTINATION usr/libexec/netdata)
+
         # Make bash & netdata happy
         install(DIRECTORY DESTINATION tmp)
 

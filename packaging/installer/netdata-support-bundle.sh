@@ -208,7 +208,7 @@ sanitize_file() {
   function redact_json(line,   out, rest, key, lk, i, k, m, v) {
     # "key": "value" pairs, possibly many per line
     out = ""; rest = line;
-    while (match(rest, /"[^"]+"[ \t]*:[ \t]*"[^"]*"/)) {
+    while (match(rest, /"[^"]+"[ \t]*:[ \t]*"([^"\\]|\\.)*"/)) {
       m = substr(rest, RSTART, RLENGTH);
       key = m; sub(/^"/, "", key); sub(/".*/, "", key);
       lk = tolower(key); gsub(/[-_]/, " ", lk);
@@ -450,7 +450,7 @@ sanitize_file() {
       line = substr(line, 1, RSTART - 1) "Basic [REDACTED]" substr(line, RSTART + RLENGTH);
     # secrets passed as URL query parameters (access.log request lines etc.)
     out = ""; rest = line;
-    while (match(rest, /[?&](token|apikey|api_key|password|passwd|secret|bearer|claim_token|claim_rooms|key|auth)=/)) {
+    while (match(rest, /[?&][A-Za-z0-9_.-]*(token|apikey|api_key|access_key|private_key|secret_key|password|passwd|secret|bearer|claim_token|claim_rooms|key|auth)=/)) {
       out = out substr(rest, 1, RSTART + RLENGTH - 1) "[REDACTED]";
       rest = substr(rest, RSTART + RLENGTH);
       sub(/^[^&" \t]+/, "", rest);
@@ -795,7 +795,10 @@ info "agent pid: ${NETDATA_PID:-not running} | api: $([ $api_ok = 1 ] && echo up
 # =============================================================================
 info "collecting: system"
 collect_cmd 01-system/uname.txt            "Kernel and architecture" uname -a
-collect_file 01-system/os-release.txt      "OS distribution" /etc/os-release
+collect_cmd 01-system/os-release.txt      "OS distribution (first of os-release/lsb-release)" sh -c '
+  for f in /etc/os-release /usr/lib/os-release /etc/lsb-release; do
+    [ -r "$f" ] && { echo "# source: $f"; cat "$f"; break; }
+  done' 
 collect_cmd 01-system/uptime-load.txt      "Uptime and load" uptime
 collect_cmd 01-system/cpu-count.txt        "CPU count" sh -c 'nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null'
 collect_cmd 01-system/memory.txt           "Memory overview" sh -c '
@@ -971,7 +974,11 @@ info "collecting: state"
 # status file: agent writes to first writable of these; newest mtime wins (status-file-io.c)
 NEWEST_STATUS=""
 # shellcheck disable=SC3013  # -nt is supported by dash, ash/busybox, bash and FreeBSD sh
-for sf in "$LIBDIR/status-netdata.json" "$CACHEDIR/status-netdata.json" /tmp/status-netdata.json /run/status-netdata.json /var/run/status-netdata.json; do
+_status_candidates=""
+[ -n "$LIBDIR" ] && _status_candidates="$_status_candidates $LIBDIR/status-netdata.json"
+[ -n "$CACHEDIR" ] && _status_candidates="$_status_candidates $CACHEDIR/status-netdata.json"
+_status_candidates="$_status_candidates /tmp/status-netdata.json /run/status-netdata.json /var/run/status-netdata.json"
+for sf in $_status_candidates; do
   [ -f "$sf" ] || continue
   if [ -z "$NEWEST_STATUS" ] || [ "$sf" -nt "$NEWEST_STATUS" ]; then NEWEST_STATUS="$sf"; fi
 done
@@ -1184,12 +1191,25 @@ manifest_add README.md file generated "Bundle documentation"
 # tarball
 # =============================================================================
 mkdir -p "$OUTDIR"
-TARBALL="$OUTDIR/$BUNDLE.tar.gz"
+# zstd compresses faster and smaller than gzip on this kind of text-heavy data;
+# use it when available (tar --zstd, or a zstd pipe), else fall back to gzip
+if command -v zstd >/dev/null 2>&1 && tar --zstd -cf /dev/null -T /dev/null 2>/dev/null; then
+  _ext="tar.zst"; _tarflag="--zstd"
+elif command -v zstd >/dev/null 2>&1; then
+  _ext="tar.zst"; _tarflag="zstd-pipe"
+else
+  _ext="tar.gz"; _tarflag="z"
+fi
+TARBALL="$OUTDIR/$BUNDLE.$_ext"
 # build inside the 0700 staging dir, then publish with O_EXCL (set -C) so a
 # pre-existing file OR symlink planted in a shared tmp dir can never be
 # followed or overwritten (no check/open TOCTOU window)
-( cd "$STAGING" && tar czf "$STAGING/bundle.tar.gz" "$BUNDLE" ) || { echo "failed to create tarball" >&2; exit 1; }
-if ! ( set -C; cat "$STAGING/bundle.tar.gz" > "$TARBALL" ) 2>/dev/null; then
+if [ "$_tarflag" = "zstd-pipe" ]; then
+  ( cd "$STAGING" && tar cf - "$BUNDLE" | zstd -q -o "$STAGING/bundle.$_ext" ) || { echo "failed to create tarball" >&2; exit 1; }
+else
+  ( cd "$STAGING" && tar -c$_tarflag -f "$STAGING/bundle.$_ext" "$BUNDLE" ) || { echo "failed to create tarball" >&2; exit 1; }
+fi
+if ! ( set -C; cat "$STAGING/bundle.$_ext" > "$TARBALL" ) 2>/dev/null; then
   echo "refusing to write $TARBALL (a file or symlink already exists there)" >&2
   exit 1
 fi

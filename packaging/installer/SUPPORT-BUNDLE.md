@@ -227,9 +227,9 @@ Two passes, one sweep, applied to **every** collected file:
      including single- and double-quoted values;
    - URL-embedded credentials (`scheme://user:pass@`) and Go DSN credentials
      (`user:pass@tcp(...)`);
-   - JWTs; `Bearer <value>` (including alphabetic-only credentials, with only
-     an explicit diagnostic-key shape exempted), `Basic <value>`, and complete
-     `Authorization` / `Authentication` header values;
+   - JWTs; `Bearer <value>` where the value contains a digit (real tokens do;
+     this avoids mangling config prose like `bearer token protection = no`),
+     `Basic <value>`, and `Authorization:` header values;
    - secrets in URL query parameters (`?token=`, `&api_key=`, ... — request
      lines in access logs);
    - private-key PEM blocks — the WHOLE multi-line block is withheld from the
@@ -283,7 +283,7 @@ by these scripts.
 1. Map the new item to a real support ask (link the ticket/issue class) and
    add it to the right section table above **with its why**.
 2. Use the existing helpers — `collect_cmd` / `collect_file` / `collect_api`
-   (`Collect-Cmd` / `Collect-File` / `Collect-Api` on Windows). They enforce
+   (`Save-Cmd` / `Save-File` / `Save-Api` / `Save-CmdRaw` on Windows). They enforce
    timeouts, size caps, sanitization, and manifest registration. Never write
    into the bundle directly.
 3. Respect the cost budget: nothing unbounded, nothing that queries metric

@@ -73,10 +73,10 @@ function Test-Deadline { return ((Get-Date) -gt $GlobalDeadline) }
 # pass 2 (default): emails, MACs, IPv4 pseudonyms, this host's names,
 #                   private-TLD FQDNs
 $SecretKeyWords = @(
-    'api key','apikey','token','password','passwd','secret','community',
-    'bearer','webhook','license key','auth','credential','cookie','passphrase',
-    'proxy user','proxy pass','username','dsn','private key','access key',
-    'session','recipient','account sid','priv key'
+    'api key','apikey','token','password','passwd','pwd','pass','secret','community',
+    'bearer','webhook','license key','auth','credential','cred','cookie','passphrase',
+    'proxy user','proxy pass','username','dsn','private key','access key','secret key',
+    'session','recipient','account sid','priv key','pat','client secret','sas'
 )
 $HostShort = $env:COMPUTERNAME
 $HostFqdn = try { [System.Net.Dns]::GetHostEntry('').HostName } catch { Write-Verbose "no FQDN: $_"; '' }
@@ -130,7 +130,7 @@ function Invoke-RedactSecretLine([string]$line) {
         }
     }
     # json "key": "value" pairs (possibly several per line)
-    $line = [regex]::Replace($line, '"([^"]+)"\s*:\s*"([^"]*)"', {
+    $line = [regex]::Replace($line, '"([^"]+)"\s*:\s*"(?:[^"\\]|\\.)*"', {
         param($m)
         if ((Test-SecretKey $m.Groups[1].Value) -and -not (Test-DiagnosticKey $m.Groups[1].Value)) { '"' + $m.Groups[1].Value + '": "[REDACTED]"' }
         else { $m.Value }
@@ -150,7 +150,7 @@ function Invoke-RedactSecretLine([string]$line) {
     $line = $line -replace '[Bb]earer\s+[A-Za-z._~+/=-]*\d[A-Za-z0-9._~+/=-]*', 'Bearer [REDACTED]'
     $line = $line -replace '[Bb]asic\s+[A-Za-z0-9+/=]{8,}', 'Basic [REDACTED]'
     # secrets passed as URL query parameters (access-log request lines etc.)
-    $line = $line -replace '([?&](token|apikey|api_key|password|passwd|secret|bearer|claim_token|claim_rooms|key|auth)=)[^&"\s]+', '$1[REDACTED]'
+    $line = $line -replace '([?&][\w.-]*(token|apikey|api_key|access_key|private_key|secret_key|password|passwd|secret|bearer|claim_token|claim_rooms|key|auth)=)[^&"\s]+', '$1[REDACTED]'
     # argv/env-style secrets mid-line (process command lines: -token=X, CLAIM_TOKEN=X),
     # incl. two-word keys ("api key = X"); diagnostic-noun keys are kept
     $line = [regex]::Replace($line, '(?i)(([\w.-]*(token|password|passwd|secret|apikey|api_key|community|bearer)|(api|license|auth|access) key|proxy (user|pass|password)) ?[=:] ?)([^&"\s\[]+)', {
@@ -547,6 +547,7 @@ if ($ApiOk -and $Obfuscate) {
         foreach ($n in ($names | Sort-Object -Unique)) {
             if (-not $n -or $n.Length -lt 4 -or $n -eq 'localhost' -or $n -eq $HostShort -or $n -eq $HostFqdn) { continue }
             if (-not $script:PseudoMap.ContainsKey($n)) {
+                if ($script:PseudoMap.Count -ge 4096) { break }  # honor the map cap
                 $script:FqdnCount++
                 $script:PseudoMap[$n] = "private-host-$($script:FqdnCount)"
             }
@@ -588,7 +589,7 @@ Save-Cmd '02-install\msi-info.txt' 'Installed Netdata MSI package info (from uni
             Format-List DisplayName, DisplayVersion, InstallDate, InstallLocation, Publisher
     }
 } 'registry uninstall keys (Netdata)'
-Save-Cmd '02-install\install-tree.txt' 'Install dir layout (top levels)' { Get-ChildItem $using:NetdataPrefix -Depth 1 | Format-Table Mode, LastWriteTime, Length, Name -AutoSize } "Get-ChildItem $NetdataPrefix -Depth 1"
+Save-Cmd '02-install\install-tree.txt' 'Install dir layout (top level)' { Get-ChildItem $using:NetdataPrefix | Format-Table Mode, LastWriteTime, Length, Name -AutoSize } "Get-ChildItem $NetdataPrefix (top level; -Depth is PS6+)"
 if (Test-Path (Join-Path $ConfDir '.install-type')) {
     Save-File '02-install\install-type.file.txt' 'Install type marker' (Join-Path $ConfDir '.install-type')
 }
