@@ -57,6 +57,11 @@ jobs:
           source ./venv/bin/activate
           cd netdata && python3 -m unittest integrations.tests.test_taxonomy
 
+      - name: Test Integrations Templates
+        run: |
+          source ./venv/bin/activate
+          cd netdata && python3 -m unittest integrations.tests.test_templates
+
       - name: Generate Integrations Documentation
         run: |
           source ./venv/bin/activate

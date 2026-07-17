@@ -66,6 +66,11 @@ jobs:
         run: |
           source ./virtualenv/bin/activate
           python3 -m unittest integrations.tests.test_taxonomy
+      - name: Test Integrations Templates
+        id: test-templates
+        run: |
+          source ./virtualenv/bin/activate
+          python3 -m unittest integrations.tests.test_templates
       - name: Generate Integrations Documentation
         id: generate-integrations-documentation
         run: |
@@ -111,6 +116,7 @@ jobs:
               Generate Integrations: ${{ steps.generate.outcome }}
               Generate Collector Taxonomy: ${{ steps.generate-taxonomy.outcome }}
               Test Collector Taxonomy Tooling: ${{ steps.test-taxonomy.outcome }}
+              Test Integrations Templates: ${{ steps.test-templates.outcome }}
               Generate Integrations Documentation: ${{ steps.generate-integrations-documentation.outcome }}
               Generate src/collectors/COLLECTORS.md: ${{ steps.generate-collectors-md.outcome }}
               Generate src/collectors/SECRETS.md: ${{ steps.generate-secrets-md.outcome }}

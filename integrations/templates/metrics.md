@@ -1,4 +1,5 @@
 [% if entry.metrics.scopes %]
+
 ## Metrics
 
 [% if entry.metrics.folding.enabled and not clean %]
@@ -11,6 +12,7 @@ The scope defines the instance that the metric belongs to. An instance is unique
 [[ entry.metrics.description ]]
 
 [% for scope in entry.metrics.scopes %]
+
 ### Per [[ scope.name ]]
 
 [[ scope.description ]]
@@ -29,12 +31,12 @@ This scope has no labels.
 
 Metrics:
 
-| Metric | Dimensions | Unit |[% for a in entry.metrics.availability %] [[ a ]] |[% endfor %]
+| Metric | Description | Dimensions | Unit |[% for a in entry.metrics.availability %] [[ a ]] |[% endfor %]
 
-|:------|:----------|:----|[% for a in entry.metrics.availability %]:---:|[% endfor %]
+|:------|:------------|:----------|:----|[% for a in entry.metrics.availability %]:---:|[% endfor %]
 
 [% for metric in scope.metrics %]
-| [[ strfy(metric.name) ]] | [% for d in metric.dimensions %][[ strfy(d.name) ]][% if not loop.last %], [% endif %][% endfor %] | [[ strfy(metric.unit) ]] |[% for a in entry.metrics.availability %] [% if not metric.availability|length or a in metric.availability %]•[% else %] [% endif %] |[% endfor %]
+| [[ strfy(metric.name) ]] | [[ strfy(metric.description)|e ]] | [% for d in metric.dimensions %][[ strfy(d.name) ]][% if not loop.last %], [% endif %][% endfor %] | [[ strfy(metric.unit) ]] |[% for a in entry.metrics.availability %] [% if not metric.availability|length or a in metric.availability %]•[% else %] [% endif %] |[% endfor %]
 
 [% endfor %]
 
@@ -43,6 +45,7 @@ Metrics:
 {% /details %}
 [% endif %]
 [% else %]
+
 ## Metrics
 
 [[ entry.metrics.description ]]
