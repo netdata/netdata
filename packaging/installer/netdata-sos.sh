@@ -109,7 +109,8 @@ proc_process_table() {
     _tree_after_comm=${_tree_row##*) }
     # shellcheck disable=SC2086  # split the documented stat fields
     set -- $_tree_after_comm
-    [ "${2:-}" ] && printf '%s %s\n' "$_tree_pid" "$2"
+    _tree_parent=${2:-}
+    [ -n "$_tree_parent" ] && printf '%s %s\n' "$_tree_pid" "$_tree_parent"
   done
 }
 
@@ -149,6 +150,35 @@ path_has_symlink() { # <path>; true when the file or any parent is a symlink
     _link_parent=$(dirname "$_link_path")
     [ "$_link_parent" = "$_link_path" ] && break
     _link_path="$_link_parent"
+  done
+  return 1
+}
+
+# Select a regular source directly, or resolve a link only when its target is
+# one of the caller's fixed canonical paths. The returned path is checked too,
+# so callers never open the arbitrary source link itself.
+select_known_source() { # <source> [allowed-canonical-target...]
+  _known_source="$1"; shift
+  if [ -f "$_known_source" ] && [ -r "$_known_source" ] && ! path_has_symlink "$_known_source"; then
+    printf '%s\n' "$_known_source"
+    return 0
+  fi
+  [ -L "$_known_source" ] || return 1
+  _known_link=$(readlink "$_known_source" 2>/dev/null) || return 1
+  case "$_known_link" in
+    /*) _known_target="$_known_link" ;;
+    *) _known_target="$(dirname "$_known_source")/$_known_link" ;;
+  esac
+  _known_dir=$(CDPATH='' cd -P "$(dirname "$_known_target")" 2>/dev/null && pwd -P) || return 1
+  _known_resolved="$_known_dir/$(basename "$_known_target")"
+  for _known_allowed in "$@"; do
+    _known_allowed_dir=$(CDPATH='' cd -P "$(dirname "$_known_allowed")" 2>/dev/null && pwd -P) || continue
+    _known_allowed_resolved="$_known_allowed_dir/$(basename "$_known_allowed")"
+    if [ "$_known_resolved" = "$_known_allowed_resolved" ] && [ -f "$_known_allowed_resolved" ] &&
+       [ -r "$_known_allowed_resolved" ] && ! path_has_symlink "$_known_allowed_resolved"; then
+      printf '%s\n' "$_known_allowed_resolved"
+      return 0
+    fi
   done
   return 1
 }
@@ -1344,6 +1374,26 @@ MALFORMED_JSON
     fi
   fi
 
+  # A known system link is usable only through an explicitly allowed canonical
+  # target; a different target must remain rejected.
+  _known_real_dir="$STAGING/known-real"
+  _known_alias_dir="$STAGING/known-alias"
+  mkdir -p "$_known_real_dir"
+  ln -s "$_known_real_dir" "$_known_alias_dir" 2>/dev/null || true
+  _known_target="$_known_alias_dir/known-target.txt"
+  _known_expected_dir=$(CDPATH='' cd -P "$_known_real_dir" 2>/dev/null && pwd -P)
+  _known_expected="$_known_expected_dir/known-target.txt"
+  _known_link="$STAGING/known-link.txt"
+  printf 'known source\n' > "$_known_expected"
+  if ln -s "$_known_target" "$_known_link" 2>/dev/null; then
+    _known_selected=$(select_known_source "$_known_link" "$_known_target" 2>/dev/null || true)
+    if [ "$_known_selected" != "$_known_expected" ] ||
+       select_known_source "$_known_link" "$STAGING/not-allowed.txt" >/dev/null 2>&1; then
+      echo "FAIL: known source allowlist was not enforced (selected=$_known_selected expected=$_known_expected)"
+      _fails=$((_fails + 1))
+    fi
+  fi
+
   # Validate the Linux process-table fallback independently of ps availability.
   if [ -d /proc ] && ! proc_process_table | awk -v pid="$$" '$1 == pid { found = 1 } END { exit !found }'; then
     echo "FAIL: /proc process-table fallback omitted the current process"
@@ -1493,7 +1543,9 @@ info "agent pid: ${NETDATA_PID:-not running} | api: $([ $api_ok = 1 ] && echo up
 # =============================================================================
 info "collecting: system"
 collect_cmd 01-system/uname.txt            "Kernel and architecture" uname -a
-collect_file 01-system/os-release.txt      "OS distribution" /etc/os-release
+# /etc/os-release is commonly linked to the vendor-owned canonical file.
+OS_RELEASE_SOURCE=$(select_known_source /etc/os-release /usr/lib/os-release 2>/dev/null || true)
+[ -n "$OS_RELEASE_SOURCE" ] && collect_file 01-system/os-release.txt "OS distribution" "$OS_RELEASE_SOURCE"
 collect_cmd 01-system/uptime-load.txt      "Uptime and load" uptime
 collect_cmd 01-system/cpu-count.txt        "CPU count" sh -c 'nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null'
 collect_cmd 01-system/memory.txt           "Memory overview" sh -c '
@@ -1520,10 +1572,16 @@ collect_cmd 01-system/kernel-messages.txt  "Kernel messages: OOM/segfault/netdat
 # =============================================================================
 info "collecting: install"
 for envf in "$CONFDIR/.environment" /etc/netdata/.environment /opt/netdata/etc/netdata/.environment; do
-  [ -f "$envf" ] && { collect_file 02-install/environment-file.txt "Install-time environment (method, flags, channel; contains no secrets)" "$envf"; break; }
+  [ -f "$envf" ] && ! path_has_symlink "$envf" && {
+    collect_file 02-install/environment-file.txt "Install-time environment (method, flags, channel; contains no secrets)" "$envf"
+    break
+  }
 done
 for itf in "$CONFDIR/.install-type" /etc/netdata/.install-type /opt/netdata/etc/netdata/.install-type; do
-  [ -f "$itf" ] && { collect_file 02-install/install-type.file.txt "Install type marker (kickstart-build|kickstart-static|oci|custom|binpkg-*)" "$itf"; break; }
+  [ -f "$itf" ] && ! path_has_symlink "$itf" && {
+    collect_file 02-install/install-type.file.txt "Install type marker (kickstart-build|kickstart-static|oci|custom|binpkg-*)" "$itf"
+    break
+  }
 done
 collect_cmd 02-install/package-info.txt "Netdata packages installed (name/version/status)" sh -c '
   found=0;
@@ -1670,11 +1728,13 @@ collect_cmd 05-logs/coredumps.txt "Recent coredump METADATA for netdata (not the
 # 06-state
 # =============================================================================
 info "collecting: state"
-# status file: agent writes to first writable of these; newest mtime wins (status-file-io.c)
+# The agent writes to the first writable candidate. Exclude /tmp because it is
+# writable outside the approved root/Netdata source trust boundary.
 NEWEST_STATUS=""
 # shellcheck disable=SC3013  # -nt is supported by dash, ash/busybox, bash and FreeBSD sh
-for sf in "$LIBDIR/status-netdata.json" "$CACHEDIR/status-netdata.json" /tmp/status-netdata.json /run/status-netdata.json /var/run/status-netdata.json; do
+for sf in "$LIBDIR/status-netdata.json" "$CACHEDIR/status-netdata.json" /run/status-netdata.json /var/run/status-netdata.json; do
   [ -f "$sf" ] || continue
+  path_has_symlink "$sf" && continue
   if [ -z "$NEWEST_STATUS" ] || [ "$sf" -nt "$NEWEST_STATUS" ]; then NEWEST_STATUS="$sf"; fi
 done
 [ -n "$NEWEST_STATUS" ] && collect_file 06-state/status-file.json "Daemon status file: LAST EXIT/CRASH RECORD incl. fatal stack trace (read this first for crashes)" "$NEWEST_STATUS"
@@ -1689,11 +1749,10 @@ if [ -n "$LIBDIR" ]; then
       printf "bearer token files (names withheld): "; find "$root" -type f -path "*/bearer_tokens/*" 2>/dev/null | wc -l
       printf "total KiB: "; du -sk "$root" 2>/dev/null | awk "{ print \$1 }"
     ' sh "$LIBDIR"
-  collect_cmd 06-state/cloud-state.txt "Cloud claim state (claimed_id is safe; token/private.pem are never collected)" sh -c '
+  collect_cmd 06-state/cloud-state.txt "Cloud state inventory (filenames, token, and private.pem withheld)" sh -c '
     printf "cloud.d file count (names withheld): "; find '"$LIBDIR"'/cloud.d -maxdepth 1 -type f 2>/dev/null | wc -l;
-    echo "== claimed_id ==";
-    cat '"$LIBDIR"'/cloud.d/claimed_id 2>/dev/null || echo "(no claimed_id file - agent not claimed)"; echo;
     echo "(token and private.pem intentionally NOT collected)"; true'
+  collect_file 06-state/claimed-id.txt "Cloud claim identifier (token/private.pem are never collected)" "$LIBDIR/cloud.d/claimed_id"
   collect_file 06-state/health-silencers.json "Persisted alert silencers" "$LIBDIR/health.silencers.json"
   if [ -f "$LIBDIR/god-jobs-statuses.json" ]; then
     collect_file 06-state/go.d-job-statuses.json "go.d collector job states (which jobs run/fail)" "$LIBDIR/god-jobs-statuses.json"
@@ -1764,12 +1823,20 @@ collect_cmd 08-network/listening-sockets.txt "Listening sockets (netdata-related
   sh -c 'if command -v ss >/dev/null; then ss -tlnp 2>/dev/null | awk "NR==1 || /19999|netdata/";
   elif command -v sockstat >/dev/null; then sockstat -l 2>/dev/null | awk "NR==1 || /19999|netdata/";
   else netstat -an 2>/dev/null | grep -i listen | grep 19999; fi; true'
-if [ "$OBFUSCATE" = "1" ]; then
+RESOLV_SOURCE=$(select_known_source /etc/resolv.conf \
+  /run/systemd/resolve/stub-resolv.conf \
+  /run/systemd/resolve/resolv.conf \
+  /run/NetworkManager/resolv.conf \
+  /run/NetworkManager/no-stub-resolv.conf \
+  /run/resolvconf/resolv.conf \
+  /run/connman/resolv.conf \
+  /private/var/run/resolv.conf 2>/dev/null || true)
+if [ -n "$RESOLV_SOURCE" ] && [ "$OBFUSCATE" = "1" ]; then
   # search/domain values are often corporate-internal names outside private TLDs
   collect_cmd 08-network/resolv-conf.txt "DNS resolver config (search domains withheld)" \
-    sh -c 'sed -E "s/^((search|domain)[ \t]).*/\1[SEARCH-DOMAINS-WITHHELD]/" /etc/resolv.conf 2>/dev/null; true'
-else
-  collect_file 08-network/resolv-conf.txt "DNS resolver config" /etc/resolv.conf
+    sed -E 's/^((search|domain)[ 	]).*/\1[SEARCH-DOMAINS-WITHHELD]/' "$RESOLV_SOURCE"
+elif [ -n "$RESOLV_SOURCE" ]; then
+  collect_file 08-network/resolv-conf.txt "DNS resolver config" "$RESOLV_SOURCE"
 fi
 collect_cmd 08-network/proxy-env.txt "Proxy environment (this shell; see 03-process/process-environ.txt for the agent view)" \
   sh -c 'env | grep -iE "^(https?_proxy|no_proxy|all_proxy)=" || echo "(no proxy variables set)"'
@@ -1797,8 +1864,8 @@ for _aclkf in "$WORK/07-runtime/aclk-state.json" "$WORK/07-runtime/aclk.json"; d
   if grep -q '"agent-claimed":true' "$_aclkf" 2>/dev/null; then CLAIMED="yes"; break; fi
   if grep -q '"agent-claimed":false' "$_aclkf" 2>/dev/null; then CLAIMED="no"; break; fi
 done
-[ "$CLAIMED" = "unknown" ] && [ -f "$WORK/06-state/cloud-state.txt" ] && \
-  grep -qE '^[0-9a-f-]{36}' "$WORK/06-state/cloud-state.txt" && CLAIMED="yes"
+[ "$CLAIMED" = "unknown" ] && [ -f "$WORK/06-state/claimed-id.txt" ] && \
+  grep -qE '^[0-9a-f-]{36}' "$WORK/06-state/claimed-id.txt" && CLAIMED="yes"
 ERRCOUNT=""
 [ -f "$WORK/05-logs/error.log" ] && ERRCOUNT=$(grep -ci error "$WORK/05-logs/error.log" 2>/dev/null)
 CRASH_HINT=""
@@ -1836,7 +1903,7 @@ CRASH_HINT=""
   echo "  crashes/won't start -> 06-state/status-file.json, 05-logs/, 01-system/kernel-messages.txt"
   echo "  collector issues    -> 04-config/go.d*, 05-logs/collector.log"
   echo "  streaming issues    -> 04-config/stream.conf, 07-runtime/node-instances.json, 01-system/clock-timesync.txt"
-  echo "  cloud/claiming      -> 06-state/cloud-state.txt, 07-runtime/aclk-state.json, 08-network/"
+  echo "  cloud/claiming      -> 06-state/claimed-id.txt, 06-state/cloud-state.txt, 07-runtime/aclk-state.json, 08-network/"
   echo "  performance         -> 03-process/threads-cpu.txt, 06-state/db-disk-usage.txt, 07-runtime/node-instances.json"
 } > "$WORK/summary.txt"
 manifest_add summary.txt file generated "Human summary"

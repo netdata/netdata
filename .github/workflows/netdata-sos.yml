@@ -76,7 +76,12 @@ jobs:
           test -n "$bundle"
           tar -xzf "$bundle" -C "$extract"
           root=$(find "$extract" -mindepth 1 -maxdepth 1 -type d -print -quit)
-          test -s "$root/01-system/os-release.txt"
+          if ! test -s "$root/01-system/os-release.txt"; then
+            echo 'OS release fixture is missing or empty' >&2
+            find "$root" -maxdepth 2 -type f -print >&2
+            exit 1
+          fi
+          test -s "$root/08-network/resolv-conf.txt"
           grep -qF 'KEEP-NONSECRET-CONTENT' "$root/04-config/netdata.conf"
           if grep -R -q 'SENTINEL-E2E-PASSWORD' "$root"; then
             echo 'planted secret survived in bundle' >&2

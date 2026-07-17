@@ -1122,14 +1122,13 @@ function Collect-Api([string]$rel, [string]$title, [string]$urlPath) {
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
     try {
-        $operationDeadline = Get-ReadDeadline
-        $request = [System.Net.HttpWebRequest]::Create("http://127.0.0.1:$NdPort$urlPath")
-        $request.Timeout = $TimeoutSeconds * 1000
-        $request.ReadWriteTimeout = $TimeoutSeconds * 1000
-        $response = $request.GetResponse()
-        $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
-        try { [void](Write-SanitizedReaderCapped $reader $full 2MB -Deadline $operationDeadline) }
-        finally { $reader.Dispose(); $response.Dispose() }
+        # Bound the transport before sanitization as well as bounding the
+        # published output. A misbehaving endpoint must not keep this process
+        # reading an arbitrary response until the global deadline.
+        $text = Read-HttpTextBounded "http://127.0.0.1:$NdPort$urlPath" $CommandRawCap
+        $reader = New-Object System.IO.StringReader($text)
+        try { [void](Write-SanitizedReaderCapped $reader $full 2MB -Deadline (Get-ReadDeadline)) }
+        finally { $reader.Dispose() }
         Add-Manifest $rel 'api' $urlPath $title
     } catch {
         if (Test-Path $full) { Remove-Item $full -Force }
