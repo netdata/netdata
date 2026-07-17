@@ -67,6 +67,15 @@ function Write-Utf8([string]$path, [string]$text) {
 
 function Test-Deadline { return ((Get-Date) -gt $GlobalDeadline) }
 
+# Invoke-WebRequest wrapper: -UseBasicParsing is needed on Windows PowerShell 5.1
+# (avoids the IE-engine dependency) but is a deprecated no-op on PowerShell 7+;
+# gate it on the major version so the same call works everywhere.
+function Invoke-LocalApi([string]$url, [int]$timeoutSec) {
+    $iwrArgs = @{ Uri = $url; TimeoutSec = $timeoutSec }
+    if ($PSVersionTable.PSVersion.Major -lt 6) { $iwrArgs["UseBasicParsing"] = $true }
+    return Invoke-WebRequest @iwrArgs
+}
+
 # --- sanitizer ----------------------------------------------------------------
 # pass 1 (always): credential-bearing key values, URL/DSN creds, JWT,
 #                  Bearer/Basic values, private keys, UUID section headers
@@ -253,10 +262,17 @@ function Test-FileHasNul([string]$path) {
     # be byte-unsafe, so the caller withholds the file
     $fs = [System.IO.File]::OpenRead($path)
     try {
-        $probe = New-Object byte[] ([Math]::Min(1MB, $fs.Length))
-        $null = $fs.Read($probe, 0, $probe.Length)
+        $want = [Math]::Min(1MB, $fs.Length)
+        $probe = New-Object byte[] $want
+        $read = 0
+        while ($read -lt $want) {
+            $n = $fs.Read($probe, $read, $want - $read)
+            if ($n -le 0) { break }
+            $read += $n
+        }
     } finally { $fs.Close() }
-    return ($probe -contains 0)
+    for ($i = 0; $i -lt $read; $i++) { if ($probe[$i] -eq 0) { return $true } }
+    return $false
 }
 
 function Get-SecretBlockIndent([string]$line) {
@@ -506,7 +522,7 @@ function Save-Api([string]$rel, [string]$title, [string]$urlPath) {
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
     try {
-        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:$NdPort$urlPath" -UseBasicParsing -TimeoutSec $TimeoutSeconds
+        $resp = Invoke-LocalApi "http://127.0.0.1:$NdPort$urlPath" $TimeoutSeconds
         $content = $resp.Content
         # a JSON body cut at any point is malformed, so overflow is withheld whole
         if ($content.Length -gt 2MB) { $content = '{"error":"response exceeded the cap and was withheld"}' }
@@ -531,7 +547,7 @@ $NetdataSvc = Get-Service -Name 'Netdata' -ErrorAction SilentlyContinue
 $NetdataProc = Get-Process -Name 'netdata' -ErrorAction SilentlyContinue | Select-Object -First 1
 $ApiOk = $false
 try {
-    Invoke-WebRequest -Uri "http://127.0.0.1:$NdPort/api/v1/info" -UseBasicParsing -TimeoutSec 3 | Out-Null
+    Invoke-LocalApi "http://127.0.0.1:$NdPort/api/v1/info" 3 | Out-Null
     $ApiOk = $true
 } catch { Write-Verbose "agent API not reachable: $_" }
 
@@ -540,9 +556,9 @@ try {
 if ($ApiOk -and $Obfuscate) {
     try {
         $names = @()
-        $ni = (Invoke-WebRequest -Uri "http://127.0.0.1:$NdPort/api/v2/node_instances" -UseBasicParsing -TimeoutSec $TimeoutSeconds).Content | ConvertFrom-Json
+        $ni = (Invoke-LocalApi "http://127.0.0.1:$NdPort/api/v2/node_instances" $TimeoutSeconds).Content | ConvertFrom-Json
         if ($ni -and $ni.PSObject.Properties['nodes']) { $names += @($ni.nodes | ForEach-Object { $_.nm }) }
-        $v1 = (Invoke-WebRequest -Uri "http://127.0.0.1:$NdPort/api/v1/info" -UseBasicParsing -TimeoutSec $TimeoutSeconds).Content | ConvertFrom-Json
+        $v1 = (Invoke-LocalApi "http://127.0.0.1:$NdPort/api/v1/info" $TimeoutSeconds).Content | ConvertFrom-Json
         if ($v1 -and $v1.PSObject.Properties['mirrored_hosts']) { $names += @($v1.mirrored_hosts) }
         foreach ($n in ($names | Sort-Object -Unique)) {
             if (-not $n -or $n.Length -lt 4 -or $n -eq 'localhost' -or $n -eq $HostShort -or $n -eq $HostFqdn) { continue }

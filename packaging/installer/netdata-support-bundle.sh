@@ -1209,6 +1209,7 @@ case "$_mode" in
   tar-zstd)  ( cd "$STAGING" && tar --zstd -cf "$STAGING/bundle.$_ext" "$BUNDLE" ) && _tarok=1 ;;
   zstd-pipe) ( cd "$STAGING" && tar -cf - "$BUNDLE" | zstd -q -o "$STAGING/bundle.$_ext" ) && _tarok=1 ;;
   gzip)      ( cd "$STAGING" && tar -czf "$STAGING/bundle.$_ext" "$BUNDLE" ) && _tarok=1 ;;
+  *) : ;;
 esac
 if [ "$_tarok" != "1" ]; then
   echo "failed to create tarball" >&2; exit 1
