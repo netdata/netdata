@@ -104,11 +104,11 @@ body:
         TIP: `netdata-sos` collects everything above (and more) into a single sanitized bundle you can attach here:
         ```shell
         # Linux/macOS/BSD (also inside docker containers):
-        sudo netdata-sos || \
-          { t=$(mktemp) && { curl -fsSL -o "$t" https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-sos.sh || wget -qO "$t" https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-sos.sh; } && sudo sh "$t"; rm -f "$t"; }
+        sudo netdata-sos
         # Windows (elevated PowerShell):
         powershell -ExecutionPolicy Bypass -File "C:\Program Files\Netdata\usr\libexec\netdata\netdata-sos.ps1"
         ```
+        If `netdata-sos` is not installed, provide the manual information above.
         Secrets are always redacted; IPs/hostnames are pseudonymized by default. Review the tarball before attaching.
     validations:
       required: false

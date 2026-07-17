@@ -16,14 +16,19 @@ sudo netdata-sos
 # static installs:
 sudo /opt/netdata/usr/sbin/netdata-sos
 
-# or without an installed copy (any install, any version; curl first - macOS
-# ships curl but not wget):
+# For an older agent, download from an immutable release tag that contains the
+# tool. Never pipe a URL into a root shell and never use the mutable master ref.
+tag='<TRUSTED_NETDATA_RELEASE_TAG>'
 t=$(mktemp)
 trap 'rm -f "$t"' EXIT HUP INT TERM
-if curl -fsSL -o "$t" https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-sos.sh \
-  || wget -qO "$t" https://raw.githubusercontent.com/netdata/netdata/master/packaging/installer/netdata-sos.sh; then
-  sudo sh "$t"
-fi
+curl -fsSL -o "$t" "https://raw.githubusercontent.com/netdata/netdata/$tag/packaging/installer/netdata-sos.sh" \
+  || wget -qO "$t" "https://raw.githubusercontent.com/netdata/netdata/$tag/packaging/installer/netdata-sos.sh"
+```
+
+Inspect the downloaded script. Only after that separate review, run:
+
+```sh
+sudo sh "$t"
 ```
 
 ```powershell
@@ -44,7 +49,7 @@ document.**
 | Works when the agent is dead | no hard dependency on a running agent; the most valuable crash artifacts (status file, logs, buildinfo via the binary) are collected from disk; a `07-runtime/AGENT-API-UNREACHABLE.txt` marker is written instead of API captures without falsely claiming the process was down |
 | Secrets always redacted | non-optional single-pass sanitizer; see "Sanitization" below |
 | PII pseudonymized by default | IPs/MACs/emails/hostnames and ordinary customer FQDNs are replaced with **stable** pseudonyms (`ip-1`, `private-host-1`) so cross-file correlation still works; the mapping table is bounded and falls back to non-correlating placeholders after its limit; dynamic source paths get neutral archive names; the private map is saved **next to** the bundle, never inside it; `--no-obfuscate` / `-NoObfuscate` opts out of content pseudonymization |
-| Caps cannot expose secrets | complete logical records are sanitized before any head/tail cap is applied; command output is drained through the sanitizer into a bounded sink while the producer runs; oversized records and sanitizer failures are withheld fail-closed |
+| Caps cannot expose secrets | complete logical records are sanitized before any head/tail cap is applied; POSIX command output streams through a raw-input guard, while PowerShell jobs write a child-owned 16 MiB raw spool so command objects never accumulate in the parent queue; tail retention uses a fixed circular byte buffer; overflow, oversized records, and sanitizer failures are withheld fail-closed |
 | Legible to humans AND AI agents | triage-ordered numbered directories; sanitized file copies have no injected provenance headers; provenance headers only on command captures; `MANIFEST.json` indexes every file with safe origin + sanitization state; `summary.txt` opens with a triage read-order |
 
 ## Platform support
@@ -256,6 +261,16 @@ input cannot grow memory or the private map without bound.
 
 Redaction here is defense in depth, not a substitute for exclusion: files that
 are pure secrets (see exclusion list) are never read at all.
+
+Source collection skips files reached through a symbolic link or reparse point,
+and withholds text containing embedded NUL characters (for example, BOM-less
+UTF-16 or binary input) instead of applying byte-unsafe redaction. The link
+check protects against links planted before collection; it is deliberately not
+claimed as an atomic no-follow open. The root/Administrator and Netdata service
+identities are trusted not to adversarially replace source entries or mutate
+source-directory contents while the tool runs. Do not extend collection to a
+directory writable by any other identity. Each run uses a newly created,
+unpredictable staging directory and never reuses a pre-existing path.
 
 **The agent itself provides no redaction anywhere** — `GET /netdata.conf` and
 `netdatacli dumpconfig` print secrets verbatim. Everything must be sanitized

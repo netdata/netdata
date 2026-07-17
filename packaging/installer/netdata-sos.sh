@@ -83,6 +83,16 @@ mkdir -p "$WORK"
 MAP_FILE="$STAGING/map.tsv"; : > "$MAP_FILE"
 MANIFEST_ROWS="$STAGING/manifest.rows"; : > "$MANIFEST_ROWS"
 ERRORS="$STAGING/errors.txt"; : > "$ERRORS"
+PATH_FILTER="$STAGING/print-safe-paths.sh"
+cat > "$PATH_FILTER" <<'EOF'
+#!/bin/sh
+newline='
+'
+for path do
+  case "$path" in *"$newline"*) continue ;; esac
+  printf '%s\n' "$path"
+done
+EOF
 
 cleanup() { [ "$KEEP_STAGING" = "1" ] || rm -rf "$STAGING"; }
 trap cleanup EXIT
@@ -91,14 +101,28 @@ info() { printf ' [*] %s\n' "$*" >&2; }
 now_s() { date +%s; }
 deadline_exceeded() { [ $(( $(now_s) - START_TS )) -ge "$GLOBAL_DEADLINE" ]; }
 
+proc_process_table() {
+  for _tree_stat in /proc/[0-9]*/stat; do
+    [ -r "$_tree_stat" ] || continue
+    IFS= read -r _tree_row < "$_tree_stat" || continue
+    _tree_pid=${_tree_stat%/stat}; _tree_pid=${_tree_pid##*/}
+    _tree_after_comm=${_tree_row##*) }
+    # shellcheck disable=SC2086  # split the documented stat fields
+    set -- $_tree_after_comm
+    [ "${2:-}" ] && printf '%s %s\n' "$_tree_pid" "$2"
+  done
+}
+
 # Return every descendant of a process. This works with procps, BSD/macOS ps,
-# and BusyBox ps.
+# BusyBox ps, and Linux /proc when ps cannot expose parent PIDs.
 descendant_pids() {
   _tree_root="$1"
   if ps -eo pid=,ppid= >/dev/null 2>&1; then
     ps -eo pid=,ppid=
   elif ps -axo pid=,ppid= >/dev/null 2>&1; then
     ps -axo pid=,ppid=
+  elif [ -d /proc ]; then
+    proc_process_table
   else
     return 0
   fi | awk -v root="$_tree_root" '
@@ -111,6 +135,22 @@ descendant_pids() {
       for (i = 1; i <= NR; i++)
         if (pid[i] != root && wanted[pid[i]]) print pid[i]
     }'
+}
+
+# Reject links already present in a source path. The root/Administrator and
+# Netdata service identities are trusted not to mutate source entries
+# adversarially during collection; portable POSIX sh has no openat(2)-style,
+# no-follow path walk. Keep that boundary explicit rather than presenting this
+# snapshot check as an atomic open.
+path_has_symlink() { # <path>; true when the file or any parent is a symlink
+  _link_path="$1"
+  while [ "$_link_path" != "/" ] && [ "$_link_path" != "." ]; do
+    [ -L "$_link_path" ] && return 0
+    _link_parent=$(dirname "$_link_path")
+    [ "$_link_parent" = "$_link_path" ] && break
+    _link_path="$_link_parent"
+  done
+  return 1
 }
 
 terminate_tree() { # <root-pid> <isolated-process-group:0|1>
@@ -888,27 +928,42 @@ sanitize_source_capped() { # <source> <dest> <cap> <head|tail>
   _src="$1"; _dest="$2"; _cap="$3"; _cap_mode="$4"
   PIPE_SEQ=$((PIPE_SEQ + 1))
   _pipe="$STAGING/sanitize.$$.${PIPE_SEQ}.fifo"
+  _raw_detect="$STAGING/sanitize.$$.${PIPE_SEQ}.detect.fifo"
+  _raw_sanitize="$STAGING/sanitize.$$.${PIPE_SEQ}.text.fifo"
+  _od_pipe="$STAGING/sanitize.$$.${PIPE_SEQ}.od.fifo"
   _capped="$_dest.capped"
   _meta="$_dest.capmeta"
-  rm -f "$_pipe" "$_capped" "$_meta"
-  mkfifo "$_pipe" || return 1
+  _nul_probe="$_dest.nulprobe"
+  rm -f "$_pipe" "$_raw_detect" "$_raw_sanitize" "$_od_pipe" "$_capped" "$_meta" "$_nul_probe"
+  mkfifo "$_pipe" "$_raw_detect" "$_raw_sanitize" "$_od_pipe" || return 1
   if [ "$_cap_mode" = "tail" ]; then
     tail -c "$_cap" < "$_pipe" > "$_capped" &
   else
     cap_head_stream "$_cap" "$_meta" < "$_pipe" > "$_capped" &
   fi
   _sinkpid=$!
-  # Stream from the beginning so multiline sanitizer state is never lost at a
-  # raw byte boundary. The watchdog bounds reader time and the sink bounds disk.
-  run_capped_input "$CMD_TIMEOUT" "$_src" sanitize_stream > "$_pipe" 2>>"$ERRORS"
-  _sanrc=$?
+  sanitize_stream < "$_raw_sanitize" > "$_pipe" 2>>"$ERRORS" & _sanpid=$!
+  od -An -v -t u1 < "$_raw_detect" > "$_od_pipe" 2>>"$ERRORS" & _odpid=$!
+  awk '{ for (i = 1; i <= NF; i++) if ($i == 0) found = 1 } END { if (found) print "nul" }' \
+    < "$_od_pipe" > "$_nul_probe" 2>>"$ERRORS" & _probepid=$!
+  # Open the live source once. tee fans that one byte stream to the byte-level
+  # encoding detector and text sanitizer; nothing is published unless every
+  # consumer succeeds. The watchdog bounds the source read and the sink bounds
+  # retained disk.
+  run_capped_input "$CMD_TIMEOUT" "$_src" tee "$_raw_detect" "$_raw_sanitize" > /dev/null 2>>"$ERRORS"
+  _readrc=$?
+  wait "$_sanpid"; _sanrc=$?
+  wait "$_odpid"; _odrc=$?
+  wait "$_probepid"; _proberc=$?
   wait "$_sinkpid"; _sinkrc=$?
-  rm -f "$_pipe"
-  if [ "$_sanrc" -ne 0 ] || [ "$_sinkrc" -ne 0 ]; then
-    rm -f "$_capped" "$_meta"
+  rm -f "$_pipe" "$_raw_detect" "$_raw_sanitize" "$_od_pipe"
+  if [ "$_readrc" -ne 0 ] || [ "$_sanrc" -ne 0 ] || [ "$_odrc" -ne 0 ] ||
+     [ "$_proberc" -ne 0 ] || [ "$_sinkrc" -ne 0 ] || [ -s "$_nul_probe" ]; then
+    rm -f "$_capped" "$_meta" "$_nul_probe"
     echo "[netdata-sos] sanitization failed or timed out - content withheld for safety" > "$_dest"
     return 1
   fi
+  rm -f "$_nul_probe"
   if [ "$_cap_mode" = "tail" ]; then
     mv "$_capped" "$_dest"
   else
@@ -1020,6 +1075,7 @@ collect_file() {
   _rel="$1"; _title="$2"; _src="$3"; _cap="${4:-$FILE_CAP}"; _origin_override="${5:-}"
   deadline_exceeded && return 0
   [ -f "$_src" ] && [ -r "$_src" ] || return 0
+  path_has_symlink "$_src" && return 0
   _out="$WORK/$_rel"; mkdir -p "$(dirname "$_out")"
   _size=$(wc -c < "$_src" 2>/dev/null | tr -d ' ')
   if [ "${_size:-0}" -gt "$_cap" ]; then
@@ -1257,6 +1313,43 @@ MALFORMED_JSON
     _fails=$((_fails + 1))
   fi
 
+  _nul_source="$STAGING/nul-source.txt"
+  _nul_output="$STAGING/nul-output.txt"
+  printf 'password=' > "$_nul_source"
+  printf '\000SENTINEL-NUL\n' >> "$_nul_source"
+  sanitize_source_capped "$_nul_source" "$_nul_output" 4096 head || true
+  if grep -q 'SENTINEL-NUL' "$_nul_output" || ! grep -q 'withheld for safety' "$_nul_output"; then
+    echo "FAIL: embedded-NUL source was not withheld fail-closed"
+    _fails=$((_fails + 1))
+  fi
+
+  _newline_root="$STAGING/newline-path-root"
+  _newline_dir="$_newline_root/unsafe
+"
+  mkdir -p "$_newline_dir"
+  : > "$_newline_dir/absolute-looking.conf"
+  if find "$_newline_root" -type f -exec sh "$PATH_FILTER" {} + | grep -q .; then
+    echo "FAIL: newline-bearing discovery path entered line transport"
+    _fails=$((_fails + 1))
+  fi
+
+  # A source symlink present before collection must be rejected.
+  _link_target="$STAGING/symlink-target.txt"
+  _link_source="$STAGING/symlink-source.txt"
+  printf 'SENTINEL-SYMLINK\n' > "$_link_target"
+  if ln -s "$_link_target" "$_link_source" 2>/dev/null; then
+    if ! path_has_symlink "$_link_source"; then
+      echo "FAIL: source symlink was accepted"
+      _fails=$((_fails + 1))
+    fi
+  fi
+
+  # Validate the Linux process-table fallback independently of ps availability.
+  if [ -d /proc ] && ! proc_process_table | awk -v pid="$$" '$1 == pid { found = 1 } END { exit !found }'; then
+    echo "FAIL: /proc process-table fallback omitted the current process"
+    _fails=$((_fails + 1))
+  fi
+
   # A noisy command is streamed through the sanitizer into a bounded sink.
   _bounded_out="$STAGING/bounded-command.txt"
   capture_command_output "$_bounded_out" 1024 raw "bounded-output-selftest" \
@@ -1371,17 +1464,21 @@ fi
 # EVERY file (node_instances, stream configs, logs). Their real names stay in
 # the local map for the user to decode.
 if [ "$api_ok" = "1" ]; then
-  _seed_n=0
-  set -f
-  for _h in $( { curl -sf --max-time 5 "http://127.0.0.1:${NDPORT}/api/v2/node_instances" 2>/dev/null || wget -q -T 5 -O - "http://127.0.0.1:${NDPORT}/api/v2/node_instances" 2>/dev/null; }       | tr ',{' '\n' | sed -nE 's/.*"(nm|hostname)" *: *"([^"]*)".*/\2/p' | sort -u); do
-    [ "$_h" = "$HOST_SHORT" ] && continue
-    [ "$_h" = "$HOST_FQDN" ] && continue
-    [ "$_h" = "localhost" ] && continue
-    [ ${#_h} -lt 4 ] && continue
-    _seed_n=$((_seed_n + 1))
-    printf 'fqdn\t%s\tprivate-host-%s\n' "$_h" "$_seed_n" >> "$MAP_FILE"
-  done
-  set +f
+  { curl -sf --max-time 5 "http://127.0.0.1:${NDPORT}/api/v2/node_instances" 2>/dev/null ||
+    wget -q -T 5 -O - "http://127.0.0.1:${NDPORT}/api/v2/node_instances" 2>/dev/null; } |
+    tr ',{' '\n' | sed -nE 's/.*"(nm|hostname)" *: *"([^"]*)".*/\2/p' |
+    awk '!seen[$0]++ { print; if (++count >= 4096) exit }' |
+    {
+      _seed_n=0
+      while IFS= read -r _h; do
+        [ "$_h" = "$HOST_SHORT" ] && continue
+        [ "$_h" = "$HOST_FQDN" ] && continue
+        [ "$_h" = "localhost" ] && continue
+        [ ${#_h} -lt 4 ] && continue
+        _seed_n=$((_seed_n + 1))
+        printf 'fqdn\t%s\tprivate-host-%s\n' "$_h" "$_seed_n" >> "$MAP_FILE"
+      done
+    }
 fi
 
 IS_CONTAINER=0
@@ -1504,7 +1601,8 @@ if [ -n "$CONFDIR" ]; then
   # Every user-customized config, including nested directories. Source paths can
   # contain customer identifiers, so bundle entry names are neutral and the
   # original-to-neutral mapping stays only in the private pseudonym map.
-  find "$CONFDIR" -type f \( -name '*.conf' -o -name '*.yml' -o -name '*.yaml' \) 2>/dev/null | head -200 | while IFS= read -r f; do
+  run_capped "$CMD_TIMEOUT" find "$CONFDIR" -type f \( -name '*.conf' -o -name '*.yml' -o -name '*.yaml' \) \
+    -exec sh "$PATH_FILTER" {} + 2>/dev/null | head -200 | while IFS= read -r f; do
     case "$f" in */ssl/*|*.pem|*.key) continue ;; *) : ;; esac
     _relc=${f#"$CONFDIR"/}
     case "$_relc" in netdata.conf|stream.conf|exporting.conf|go.d.conf) continue ;; *) : ;; esac
@@ -1597,15 +1695,24 @@ if [ -n "$LIBDIR" ]; then
     cat '"$LIBDIR"'/cloud.d/claimed_id 2>/dev/null || echo "(no claimed_id file - agent not claimed)"; echo;
     echo "(token and private.pem intentionally NOT collected)"; true'
   collect_file 06-state/health-silencers.json "Persisted alert silencers" "$LIBDIR/health.silencers.json"
-  for gjs in "$LIBDIR"/god-jobs-statuses.json "$LIBDIR"/*jobs-statuses*.json; do
-    [ -f "$gjs" ] && { collect_file 06-state/go.d-job-statuses.json "go.d collector job states (which jobs run/fail)" "$gjs"; break; }
-  done
+  if [ -f "$LIBDIR/god-jobs-statuses.json" ]; then
+    collect_file 06-state/go.d-job-statuses.json "go.d collector job states (which jobs run/fail)" "$LIBDIR/god-jobs-statuses.json"
+  else
+    run_capped "$CMD_TIMEOUT" find "$LIBDIR"/. ! -name . -prune -type f -name '*jobs-statuses*.json' \
+      -exec sh "$PATH_FILTER" {} + 2>/dev/null | head -1 |
+      while IFS= read -r gjs; do
+        deadline_exceeded && break
+        collect_file 06-state/go.d-job-statuses.json "go.d collector job states (which jobs run/fail)" "$gjs"
+      done
+  fi
   if [ -d "$LIBDIR/config" ]; then
-    for dc in "$LIBDIR/config"/*.dyncfg; do
-      [ -f "$dc" ] || continue
-      map_dynamic_path "$(basename "$dc")" dynamic-config
-      collect_file "06-state/dyncfg/$SAFE_DYNAMIC_PATH" "Dynamic config created via UI/API (source path mapped privately; secrets redacted)" "$dc" 262144 "dynamic config mapped to $SAFE_DYNAMIC_PATH"
-    done
+    run_capped "$CMD_TIMEOUT" find "$LIBDIR/config"/. ! -name . -prune -type f -name '*.dyncfg' \
+      -exec sh "$PATH_FILTER" {} + 2>/dev/null | head -100 |
+      while IFS= read -r dc; do
+        deadline_exceeded && break
+        map_dynamic_path "$(basename "$dc")" dynamic-config
+        collect_file "06-state/dyncfg/$SAFE_DYNAMIC_PATH" "Dynamic config created via UI/API (source path mapped privately; secrets redacted)" "$dc" 262144 "dynamic config mapped to $SAFE_DYNAMIC_PATH"
+      done
   fi
 fi
 if [ -n "$CACHEDIR$LIBDIR" ]; then

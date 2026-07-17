@@ -66,8 +66,9 @@ jobs:
       - name: Build and validate a fixture bundle
         run: |
           set -eu
-          sudo install -d -m 700 /etc/netdata
+          sudo install -d -m 755 /etc/netdata
           sudo sh -c 'printf "%s\n" "KEEP-NONSECRET-CONTENT" "password=SENTINEL-E2E-PASSWORD" > /etc/netdata/netdata.conf'
+          sudo chmod 644 /etc/netdata/netdata.conf
           output=$(mktemp -d)
           extract=$(mktemp -d)
           sh packaging/installer/netdata-sos.sh --timeout 3 --since 1 -o "$output"
@@ -131,16 +132,19 @@ jobs:
           Add-Type -AssemblyName System.IO.Compression.FileSystem
           $archive = [System.IO.Compression.ZipFile]::OpenRead($zip.FullName)
           try {
-              $manifestEntry = $archive.Entries | Where-Object { $_.FullName -match '/MANIFEST.json$' } | Select-Object -First 1
-              $configEntry = $archive.Entries | Where-Object { $_.FullName -match '/04-config/netdata.conf$' } | Select-Object -First 1
+              $manifestEntry = $archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])MANIFEST.json$' } | Select-Object -First 1
+              $configEntry = $archive.Entries | Where-Object { $_.FullName -match '(^|[\\/])04-config[\\/]netdata.conf$' } | Select-Object -First 1
               if (-not $manifestEntry -or -not $configEntry -or $configEntry.Length -eq 0) { throw 'required non-empty entries are missing' }
               $reader = New-Object System.IO.StreamReader($configEntry.Open(), $utf8, $true)
               try { $config = $reader.ReadToEnd() } finally { $reader.Dispose() }
               if ($config -notmatch 'KEEP-NONSECRET-CONTENT' -or $config -match 'SENTINEL-E2E-PASSWORD') { throw 'config survival/redaction contract failed' }
               $manifestStream = $manifestEntry.Open()
               try {
-                  $bytes = New-Object byte[] $manifestEntry.Length
-                  [void]$manifestStream.Read($bytes, 0, $bytes.Length)
+                  $memory = New-Object System.IO.MemoryStream
+                  try {
+                      $manifestStream.CopyTo($memory)
+                      $bytes = $memory.ToArray()
+                  } finally { $memory.Dispose() }
               } finally { $manifestStream.Dispose() }
               if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xff -and $bytes[1] -eq 0xfe) { throw 'MANIFEST.json is UTF-16LE' }
               $manifest = $utf8.GetString($bytes) | ConvertFrom-Json
