@@ -1,29 +1,29 @@
 ---
-name: Netdata SOS
+name: Netdata support bundle
 
 on:
   push:
     branches:
       - master
     paths:
-      - '.github/workflows/netdata-sos.yml'
+      - '.github/workflows/netdata-support-bundle.yml'
       - '.github/ISSUE_TEMPLATE/BUG_REPORT.yml'
-      - 'packaging/installer/netdata-sos.sh'
-      - 'packaging/installer/netdata-sos.ps1'
+      - 'packaging/installer/netdata-support-bundle.sh'
+      - 'packaging/installer/netdata-support-bundle.ps1'
       - 'packaging/installer/SUPPORT-BUNDLE.md'
   pull_request:
     paths:
-      - '.github/workflows/netdata-sos.yml'
+      - '.github/workflows/netdata-support-bundle.yml'
       - '.github/ISSUE_TEMPLATE/BUG_REPORT.yml'
-      - 'packaging/installer/netdata-sos.sh'
-      - 'packaging/installer/netdata-sos.ps1'
+      - 'packaging/installer/netdata-support-bundle.sh'
+      - 'packaging/installer/netdata-support-bundle.ps1'
       - 'packaging/installer/SUPPORT-BUNDLE.md'
 
 permissions:
   contents: read
 
 concurrency:
-  group: netdata-sos-${{ github.ref }}
+  group: netdata-support-bundle-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -50,11 +50,11 @@ jobs:
         run: |
           set -eu
           if [ "$TEST_SHELL" = busybox ]; then
-            busybox sh -n packaging/installer/netdata-sos.sh
-            busybox sh packaging/installer/netdata-sos.sh --selftest
+            busybox sh -n packaging/installer/netdata-support-bundle.sh
+            busybox sh packaging/installer/netdata-support-bundle.sh --selftest
           else
-            "$TEST_SHELL" -n packaging/installer/netdata-sos.sh
-            "$TEST_SHELL" packaging/installer/netdata-sos.sh --selftest
+            "$TEST_SHELL" -n packaging/installer/netdata-support-bundle.sh
+            "$TEST_SHELL" packaging/installer/netdata-support-bundle.sh --selftest
           fi
 
   posix-e2e:
@@ -71,7 +71,7 @@ jobs:
           sudo chmod 644 /etc/netdata/netdata.conf
           output=$(mktemp -d)
           extract=$(mktemp -d)
-          sh packaging/installer/netdata-sos.sh --timeout 3 --since 1 -o "$output"
+          sh packaging/installer/netdata-support-bundle.sh --timeout 3 --since 1 -o "$output"
           bundle=$(find "$output" -maxdepth 1 -name '*.tar.gz' -print -quit)
           test -n "$bundle"
           tar -xzf "$bundle" -C "$extract"
@@ -87,7 +87,7 @@ jobs:
             echo 'planted secret survived in bundle' >&2
             exit 1
           fi
-          jq -e '.schema == "netdata-sos-bundle/v1" and (.files | length > 0)' "$root/MANIFEST.json"
+          jq -e '.schema == "netdata-support-bundle/v1" and (.files | length > 0)' "$root/MANIFEST.json"
           jq -e '.files[] | select(.path == "04-config/netdata.conf" and .bytes > 0)' "$root/MANIFEST.json"
 
   macos-posix:
@@ -98,8 +98,8 @@ jobs:
       - name: Parse and run adversarial self-test
         run: |
           set -eu
-          sh -n packaging/installer/netdata-sos.sh
-          sh packaging/installer/netdata-sos.sh --selftest
+          sh -n packaging/installer/netdata-support-bundle.sh
+          sh packaging/installer/netdata-support-bundle.sh --selftest
 
   powershell-core:
     name: PowerShell 7 sanitization
@@ -108,7 +108,7 @@ jobs:
       - uses: actions/checkout@v7
       - name: Run adversarial self-test
         shell: pwsh
-        run: ./packaging/installer/netdata-sos.ps1 -SelfTest
+        run: ./packaging/installer/netdata-support-bundle.ps1 -SelfTest
 
   windows-powershell:
     name: Windows PowerShell 5.1 sanitization
@@ -117,7 +117,7 @@ jobs:
       - uses: actions/checkout@v7
       - name: Run adversarial self-test
         shell: powershell
-        run: .\packaging\installer\netdata-sos.ps1 -SelfTest
+        run: .\packaging\installer\netdata-support-bundle.ps1 -SelfTest
 
       - name: Build and validate a fixture bundle
         shell: powershell
@@ -130,8 +130,8 @@ jobs:
               (Join-Path $confDir 'netdata.conf'),
               "KEEP-NONSECRET-CONTENT`npassword=SENTINEL-E2E-PASSWORD`n",
               $utf8)
-          $output = Join-Path $env:RUNNER_TEMP ('netdata-sos-e2e-' + [guid]::NewGuid())
-          .\packaging\installer\netdata-sos.ps1 -Output $output -TimeoutSeconds 3 -SinceHours 1
+          $output = Join-Path $env:RUNNER_TEMP ('netdata-support-bundle-e2e-' + [guid]::NewGuid())
+          .\packaging\installer\netdata-support-bundle.ps1 -Output $output -TimeoutSeconds 3 -SinceHours 1
           $zip = Get-ChildItem $output -Filter '*.zip' | Select-Object -First 1
           if (-not $zip) { throw 'bundle zip was not created' }
           Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -153,5 +153,5 @@ jobs:
               } finally { $manifestStream.Dispose() }
               if ($bytes.Length -ge 2 -and $bytes[0] -eq 0xff -and $bytes[1] -eq 0xfe) { throw 'MANIFEST.json is UTF-16LE' }
               $manifest = $utf8.GetString($bytes) | ConvertFrom-Json
-              if ($manifest.schema -ne 'netdata-sos-bundle/v1' -or $manifest.files.Count -eq 0) { throw 'manifest contract failed' }
+              if ($manifest.schema -ne 'netdata-support-bundle/v1' -or $manifest.files.Count -eq 0) { throw 'manifest contract failed' }
           } finally { $archive.Dispose() }

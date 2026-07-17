@@ -1,28 +1,28 @@
-# netdata-sos — the Netdata support bundle
+# netdata-support-bundle — the Netdata support bundle
 
-`netdata-sos` collects a **sanitized diagnostic bundle** (tarball on POSIX
+`netdata-support-bundle` collects a **sanitized diagnostic bundle** (tarball on POSIX
 systems, zip on Windows) that users attach to support tickets, so support gets
 everything it needs on first contact instead of asking for it over multiple
 round trips.
 
 - POSIX systems (Linux, Docker, static installs, macOS/BSD best-effort):
-  [`netdata-sos.sh`](netdata-sos.sh)
-- Windows: [`netdata-sos.ps1`](netdata-sos.ps1)
+  [`netdata-support-bundle.sh`](netdata-support-bundle.sh)
+- Windows: [`netdata-support-bundle.ps1`](netdata-support-bundle.ps1)
 
 ```sh
 # installed with the agent (in PATH, like netdatacli):
-sudo netdata-sos
+sudo netdata-support-bundle
 
 # static installs:
-sudo /opt/netdata/usr/sbin/netdata-sos
+sudo /opt/netdata/usr/sbin/netdata-support-bundle
 
 # For an older agent, download from an immutable release tag that contains the
 # tool. Never pipe a URL into a root shell and never use the mutable master ref.
 tag='<TRUSTED_NETDATA_RELEASE_TAG>'
-t=$(mktemp "${TMPDIR:-/tmp}/netdata-sos.XXXXXX")
+t=$(mktemp "${TMPDIR:-/tmp}/netdata-support-bundle.XXXXXX")
 trap 'rm -f "$t"' EXIT HUP INT TERM
-curl -fsSL -o "$t" "https://raw.githubusercontent.com/netdata/netdata/$tag/packaging/installer/netdata-sos.sh" \
-  || wget -qO "$t" "https://raw.githubusercontent.com/netdata/netdata/$tag/packaging/installer/netdata-sos.sh"
+curl -fsSL -o "$t" "https://raw.githubusercontent.com/netdata/netdata/$tag/packaging/installer/netdata-support-bundle.sh" \
+  || wget -qO "$t" "https://raw.githubusercontent.com/netdata/netdata/$tag/packaging/installer/netdata-support-bundle.sh"
 ```
 
 Inspect the downloaded script. Only after that separate review, run:
@@ -33,11 +33,11 @@ sudo sh "$t"
 
 ```powershell
 # Windows (elevated PowerShell):
-powershell -ExecutionPolicy Bypass -File "C:\Program Files\Netdata\usr\libexec\netdata\netdata-sos.ps1"
+powershell -ExecutionPolicy Bypass -File "C:\Program Files\Netdata\usr\libexec\netdata\netdata-support-bundle.ps1"
 ```
 
 Both scripts implement the same bundle contract: same directory layout, same
-`MANIFEST.json` schema (`netdata-sos-bundle/v1`), same sanitization rules.
+`MANIFEST.json` schema (`netdata-support-bundle/v1`), same sanitization rules.
 **If you change one script, mirror the change in the other and update this
 document.**
 
@@ -45,11 +45,11 @@ document.**
 
 | guarantee | implementation |
 |---|---|
-| Zero system impact | self-demotion to idle CPU/IO priority (`nice -n 19` + usable `ionice -c 3` / `PriorityClass = Idle`); per-command timeout (10 s default) with process-tree termination; global deadline (240 s); size caps (5 MiB per log, 1 MiB per file, 2 MiB per command/API output); read-only collection that writes only private staging data and the requested final artifacts, never restarts anything, and never calls destructive `netdatacli` commands; final artifacts use no-overwrite publication so pre-existing files or symlinks in shared tmp dirs are never followed |
-| Works when the agent is dead | no hard dependency on a running agent; the most valuable crash artifacts (status file, logs, buildinfo via the binary) are collected from disk; a `07-runtime/AGENT-API-UNREACHABLE.txt` marker is written instead of API captures without falsely claiming the process was down |
+| Zero system impact | self-demotion to idle CPU/IO priority (`nice -n 19` + `ionice -c 3` / `PriorityClass = Idle`); per-command timeout (10 s default, via `timeout` or a portable watchdog — the watchdog kills the direct child only, a documented limitation); global deadline checked before each collector, so the hard runtime bound is deadline + one command timeout; size caps (5 MiB per log, 1 MiB per file, 2 MiB per command/API output); read-only — writes only its private staging dir and the final artifacts, never restarts or reconfigures anything; artifacts are published with `O_EXCL` so pre-existing files or symlinks in shared tmp dirs are never followed |
+| Works when the agent is dead | no hard dependency on a running agent; the most valuable crash artifacts (status file, logs, buildinfo via the binary) are collected from disk; a `07-runtime/AGENT-WAS-DOWN.txt` marker is written instead of API captures |
 | Secrets always redacted | non-optional single-pass sanitizer; see "Sanitization" below |
-| PII pseudonymized by default | IPs/MACs/emails/hostnames and ordinary customer FQDNs are replaced with **stable** pseudonyms (`ip-1`, `private-host-1`) so cross-file correlation still works; the mapping table is bounded and falls back to non-correlating placeholders after its limit; dynamic source paths get neutral archive names; the private map is saved **next to** the bundle, never inside it; `--no-obfuscate` / `-NoObfuscate` opts out of content pseudonymization |
-| Caps cannot expose secrets | complete logical records are sanitized before any head/tail cap is applied; POSIX command output streams through a raw-input guard, while PowerShell jobs write a child-owned 16 MiB raw spool so command objects never accumulate in the parent queue; tail retention uses a fixed circular byte buffer; overflow, oversized records, and sanitizer failures are withheld fail-closed |
+| PII pseudonymized by default | IPs (v4+v6), MACs, emails, this host's names, the invoking user, child/mirrored node hostnames and stream destinations are replaced with **stable** pseudonyms (`ip-1`, `private-host-1`) so cross-file correlation still works; the private map is saved **next to** the bundle, never inside it; `--no-obfuscate` / `-NoObfuscate` opts out |
+| Caps cannot expose secrets | all caps cut at LINE boundaries, so a secret can never straddle the cut and dodge the line-based sanitizer; a capped tail with no line break at all is withheld entirely; sanitizer failures withhold the file content (fail closed) |
 | Legible to humans AND AI agents | triage-ordered numbered directories; sanitized file copies have no injected provenance headers; provenance headers only on command captures; `MANIFEST.json` indexes every file with safe origin + sanitization state; `summary.txt` opens with a triage read-order |
 
 ## Platform support
@@ -57,8 +57,8 @@ document.**
 | platform | status | notes |
 |---|---|---|
 | Linux (glibc, systemd) | tested | full collection incl. journal namespace |
-| Linux (musl/BusyBox, e.g. Alpine) | tested | portable process-tree watchdog; file logs instead of journal |
-| Docker (official image) | tested | agent logs live in `docker logs` on the host — bundle includes a marker explaining the private local-review workflow because raw logs are unsafe to attach; `/proc/1/environ` needs `CAP_SYS_PTRACE` (fallback to exec env) |
+| Linux (musl/BusyBox, e.g. Alpine) | tested | BusyBox `timeout` has no `-k` (auto-detected); file logs instead of journal |
+| Docker (official image) | tested | agent logs live in `docker logs` on the host — bundle includes a marker with the exact command to run and attach; `/proc/1/environ` needs `CAP_SYS_PTRACE` (fallback to exec env) |
 | Static builds (`/opt/netdata`) | tested paths | all paths resolved under the prefix |
 | FreeBSD | best effort | `/usr/local/etc/netdata` + `/var/db/netdata` paths, `sockstat` fallback, `ps -H` threads; no `/proc` items |
 | macOS (Homebrew) | best effort | `/usr/local` and `/opt/homebrew` prefixes, `sysctl`/`vm_stat` fallbacks, `ps -M` threads |
@@ -301,7 +301,7 @@ by these scripts.
 5. Mirror the change in the other script (`.sh` ↔ `.ps1`) or record explicitly
    in your PR why it is platform-specific.
 6. Test the redaction: add a vector to the built-in regression suite and run
-   `netdata-sos --selftest` (`netdata-sos.ps1 -SelfTest` on Windows) — it must
+   `netdata-support-bundle --selftest` (`netdata-support-bundle.ps1 -SelfTest` on Windows) — it must
    pass on GNU awk, mawk, BusyBox awk, and PowerShell. CI executes both suites.
    For new collection sources also
    plant a sentinel secret in the source, run a collection, and `grep -r` the
@@ -311,10 +311,10 @@ by these scripts.
 
 ## Bundle format contract
 
-- Schema id: `netdata-sos-bundle/v1` (in `MANIFEST.json`). Bump the suffix on
+- Schema id: `netdata-support-bundle/v1` (in `MANIFEST.json`). Bump the suffix on
   breaking layout changes; downstream ticket tooling may parse it.
 - Command captures are `.txt` files starting with a
-  `# netdata-sos v<version> | command: ... | captured: <utc>` header; on POSIX
+  `# netdata-support-bundle v<version> | command: ... | captured: <utc>` header; on POSIX
   they also end with an `# exit: N | duration: Ns` trailer; PowerShell jobs
   record their terminal job state instead of an exit code.
 - Copied files and API responses are sanitized without provenance headers

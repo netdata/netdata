@@ -101,14 +101,14 @@ body:
       description: |
         Any additional information related to the issue (ex. logs).
 
-        TIP: `netdata-sos` collects everything above (and more) into a single sanitized bundle you can attach here:
+        TIP: `netdata-support-bundle` collects everything above (and more) into a single sanitized bundle you can attach here:
         ```shell
         # Linux/macOS/BSD (also inside docker containers):
-        sudo netdata-sos
+        sudo netdata-support-bundle
         # Windows (elevated PowerShell):
-        powershell -ExecutionPolicy Bypass -File "C:\Program Files\Netdata\usr\libexec\netdata\netdata-sos.ps1"
+        powershell -ExecutionPolicy Bypass -File "C:\Program Files\Netdata\usr\libexec\netdata\netdata-support-bundle.ps1"
         ```
-        If `netdata-sos` is not installed, provide the manual information above.
+        If `netdata-support-bundle` is not installed, provide the manual information above.
         Secrets are always redacted; IPs/hostnames are pseudonymized by default. Review the bundle archive before attaching.
     validations:
       required: false
