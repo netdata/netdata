@@ -109,6 +109,6 @@ body:
         powershell -ExecutionPolicy Bypass -File "C:\Program Files\Netdata\usr\libexec\netdata\netdata-sos.ps1"
         ```
         If `netdata-sos` is not installed, provide the manual information above.
-        Secrets are always redacted; IPs/hostnames are pseudonymized by default. Review the tarball before attaching.
+        Secrets are always redacted; IPs/hostnames are pseudonymized by default. Review the bundle archive before attaching.
     validations:
       required: false
