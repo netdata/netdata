@@ -696,6 +696,13 @@ static void destroy_timeout_monitor_list(struct mqtt_ng_client *client)
 {
     spinlock_lock(&client->pending_packets.spinlock);
     (void) JudyLFreeArray(&client->pending_packets.JudyL, PJE0);
+#ifdef OS_WINDOWS
+    // JudyLFreeArray returns JERR (without nulling the pointer) when it
+    // detects internal corruption — a real risk on Windows LLP64 due to the
+    // JU_BITPOSMASKL shift-of-long UB that corrupts bitmap leaves. Null
+    // explicitly so a subsequent reconnect always starts with a clean slot.
+    client->pending_packets.JudyL = NULL;
+#endif
     spinlock_unlock(&client->pending_packets.spinlock);
     __atomic_store_n(&client->stats.packets_waiting_puback, 0, __ATOMIC_RELAXED);
 }
