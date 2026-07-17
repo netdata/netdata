@@ -465,7 +465,7 @@ struct rlimit {
 #define RLIMIT_NOFILE  7
 #define RLIMIT_MEMLOCK 8
 #define RLIMIT_AS      9
-static inline int getrlimit(int resource __maybe_unused, struct rlimit *rlim __maybe_unused) { errno = ENOSYS; return -1; }
+static inline int getrlimit(int resource __maybe_unused, struct rlimit *rlim) { if(rlim) { rlim->rlim_cur = 1024; rlim->rlim_max = 1024; } return 0; }
 static inline int setrlimit(int resource __maybe_unused, const struct rlimit *rlim __maybe_unused) { return 0; }
 #endif // RLIM_INFINITY
 
