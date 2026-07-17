@@ -14,16 +14,24 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 )
 
 const (
-	functionResultLineLimit = 101 * 1024 * 1024
-	functionPermissions     = "0xFFFF"
-	functionSource          = "method=api,role=admin"
-	functionUID             = "functions-validation"
+	functionResultPayloadLimit = 100 * 1024 * 1024
+	functionResultLineLimit    = functionResultPayloadLimit + 64*1024
+	functionResultGrace        = time.Second
+	functionPermissions        = "0xFFFF"
+	functionSource             = "method=api,role=admin"
+	functionUID                = "functions-validation"
 )
 
-var errFunctionNotPublished = errors.New("Function was not published")
+var (
+	errFunctionNotPublished   = errors.New("Function was not published")
+	errFunctionResultTooLarge = errors.New(
+		"Function result exceeds aggregate payload limit",
+	)
+)
 
 type callConfig struct {
 	pluginPath      string
@@ -94,45 +102,100 @@ func callAgent(ctx context.Context, cfg callConfig) (functionResult, error) {
 	select {
 	case <-events.published:
 	case err := <-events.readErr:
-		stopAndWait(stopProcess, waitCh, cfg.shutdownTimeout)
-		return functionResult{}, fmt.Errorf("read Agent protocol before publication: %w", err)
-	case err := <-waitCh:
-		return functionResult{}, fmt.Errorf("Agent exited before Function publication: %w", err)
+		cause := fmt.Errorf("read Agent protocol before publication: %w", err)
+		return functionResult{}, stopAndJoin(
+			stopProcess,
+			waitCh,
+			cfg.shutdownTimeout,
+			cause,
+		)
 	case <-startupTimer.C:
-		stopAndWait(stopProcess, waitCh, cfg.shutdownTimeout)
-		return functionResult{}, fmt.Errorf("%w after %s: %s", errFunctionNotPublished, cfg.startupTimeout, cfg.function)
+		cause := fmt.Errorf(
+			"%w after %s: %s",
+			errFunctionNotPublished,
+			cfg.startupTimeout,
+			cfg.function,
+		)
+		return functionResult{}, stopAndJoin(
+			stopProcess,
+			waitCh,
+			cfg.shutdownTimeout,
+			cause,
+		)
 	case <-ctx.Done():
-		stopAndWait(stopProcess, waitCh, cfg.shutdownTimeout)
-		return functionResult{}, ctx.Err()
+		return functionResult{}, stopAndJoin(
+			stopProcess,
+			waitCh,
+			cfg.shutdownTimeout,
+			ctx.Err(),
+		)
 	}
 
 	request, err := encodeFunctionRequest(functionUID, cfg.function, cfg.args, cfg.functionTimeout)
 	if err != nil {
-		stopAndWait(stopProcess, waitCh, cfg.shutdownTimeout)
-		return functionResult{}, err
+		return functionResult{}, stopAndJoin(
+			stopProcess,
+			waitCh,
+			cfg.shutdownTimeout,
+			err,
+		)
 	}
 	if _, err := io.WriteString(stdin, request); err != nil {
-		stopAndWait(stopProcess, waitCh, cfg.shutdownTimeout)
-		return functionResult{}, fmt.Errorf("write Function request: %w", err)
+		cause := fmt.Errorf("write Function request: %w", err)
+		return functionResult{}, stopAndJoin(
+			stopProcess,
+			waitCh,
+			cfg.shutdownTimeout,
+			cause,
+		)
 	}
 
-	functionTimer := time.NewTimer(cfg.functionTimeout)
+	resultWait := protocolFunctionTimeout(cfg.functionTimeout) + functionResultGrace
+	functionTimer := time.NewTimer(resultWait)
 	defer functionTimer.Stop()
 
 	var result functionResult
-	select {
-	case result = <-events.result:
-	case err := <-events.readErr:
-		stopAndWait(stopProcess, waitCh, cfg.shutdownTimeout)
-		return functionResult{}, fmt.Errorf("read Agent protocol before result: %w", err)
-	case err := <-waitCh:
-		return functionResult{}, fmt.Errorf("Agent exited before Function result: %w", err)
-	case <-functionTimer.C:
-		stopAndWait(stopProcess, waitCh, cfg.shutdownTimeout)
-		return functionResult{}, fmt.Errorf("Function result timed out after %s", cfg.functionTimeout)
-	case <-ctx.Done():
-		stopAndWait(stopProcess, waitCh, cfg.shutdownTimeout)
-		return functionResult{}, ctx.Err()
+resultLoop:
+	for {
+		select {
+		case result = <-events.result:
+			break resultLoop
+		case err := <-events.readErr:
+			if buffered, ok := receiveBufferedResult(events.result); ok {
+				result = buffered
+				break resultLoop
+			}
+			cause := fmt.Errorf("read Agent protocol before result: %w", err)
+			return functionResult{}, stopAndJoin(
+				stopProcess,
+				waitCh,
+				cfg.shutdownTimeout,
+				cause,
+			)
+		case <-functionTimer.C:
+			if buffered, ok := receiveBufferedResult(events.result); ok {
+				result = buffered
+				break resultLoop
+			}
+			cause := fmt.Errorf("Function result timed out after %s", resultWait)
+			return functionResult{}, stopAndJoin(
+				stopProcess,
+				waitCh,
+				cfg.shutdownTimeout,
+				cause,
+			)
+		case <-ctx.Done():
+			if buffered, ok := receiveBufferedResult(events.result); ok {
+				result = buffered
+				break resultLoop
+			}
+			return functionResult{}, stopAndJoin(
+				stopProcess,
+				waitCh,
+				cfg.shutdownTimeout,
+				ctx.Err(),
+			)
+		}
 	}
 
 	_, _ = io.WriteString(stdin, "QUIT\n")
@@ -146,11 +209,23 @@ func callAgent(ctx context.Context, cfg callConfig) (functionResult, error) {
 			return functionResult{}, fmt.Errorf("Agent shutdown: %w", err)
 		}
 	case <-shutdownTimer.C:
-		stopAndWait(stopProcess, waitCh, cfg.shutdownTimeout)
-		return functionResult{}, fmt.Errorf("Agent shutdown timed out after %s", cfg.shutdownTimeout)
+		cause := fmt.Errorf(
+			"Agent shutdown timed out after %s",
+			cfg.shutdownTimeout,
+		)
+		return functionResult{}, stopAndJoin(
+			stopProcess,
+			waitCh,
+			cfg.shutdownTimeout,
+			cause,
+		)
 	case <-ctx.Done():
-		stopAndWait(stopProcess, waitCh, cfg.shutdownTimeout)
-		return functionResult{}, ctx.Err()
+		return functionResult{}, stopAndJoin(
+			stopProcess,
+			waitCh,
+			cfg.shutdownTimeout,
+			ctx.Err(),
+		)
 	}
 
 	return result, nil
@@ -166,6 +241,8 @@ func (cfg callConfig) validate() error {
 		return errors.New("missing --module")
 	case cfg.function == "":
 		return errors.New("missing --function")
+	case !validFunctionToken(cfg.function):
+		return errors.New("invalid --function token")
 	case cfg.startupTimeout <= 0:
 		return errors.New("startup timeout must be positive")
 	case cfg.functionTimeout <= 0:
@@ -173,26 +250,56 @@ func (cfg callConfig) validate() error {
 	case cfg.shutdownTimeout <= 0:
 		return errors.New("shutdown timeout must be positive")
 	default:
+		for _, arg := range cfg.args {
+			if !validFunctionToken(arg) {
+				return errors.New("invalid --arg token")
+			}
+		}
 		return nil
 	}
 }
 
-func stopAndWait(stop context.CancelFunc, waitCh <-chan error, timeout time.Duration) {
+func stopAndJoin(
+	stop context.CancelFunc,
+	waitCh <-chan error,
+	timeout time.Duration,
+	cause error,
+) error {
+	if err := stopAndWait(stop, waitCh, timeout); err != nil {
+		return errors.Join(cause, err)
+	}
+	return cause
+}
+
+func stopAndWait(
+	stop context.CancelFunc,
+	waitCh <-chan error,
+	timeout time.Duration,
+) error {
 	stop()
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	select {
 	case <-waitCh:
+		return nil
 	case <-timer.C:
+		return errors.New("Agent did not exit after forced termination")
 	}
 }
 
 func encodeFunctionRequest(uid, function string, args []string, timeout time.Duration) (string, error) {
-	if uid == "" || function == "" || timeout <= 0 {
+	if !validFunctionToken(uid) ||
+		!validFunctionToken(function) ||
+		timeout <= 0 {
 		return "", errors.New("invalid Function request")
 	}
+	for _, arg := range args {
+		if !validFunctionToken(arg) {
+			return "", errors.New("invalid Function argument token")
+		}
+	}
 
-	timeoutSeconds := int64((timeout + time.Second - 1) / time.Second)
+	timeoutSeconds := int64(protocolFunctionTimeout(timeout) / time.Second)
 	nameAndArgs := strings.Join(append([]string{function}, args...), " ")
 
 	var buf bytes.Buffer
@@ -215,7 +322,55 @@ func encodeFunctionRequest(uid, function string, args []string, timeout time.Dur
 	return buf.String(), nil
 }
 
+func protocolFunctionTimeout(timeout time.Duration) time.Duration {
+	seconds := timeout / time.Second
+	if timeout%time.Second != 0 {
+		seconds++
+	}
+	if seconds <= 0 {
+		seconds = 1
+	}
+	return seconds * time.Second
+}
+
+func validFunctionToken(value string) bool {
+	return value != "" &&
+		strings.IndexFunc(value, func(r rune) bool {
+			return unicode.IsSpace(r) || unicode.IsControl(r)
+		}) == -1
+}
+
+func receiveBufferedResult(ch <-chan functionResult) (functionResult, bool) {
+	select {
+	case result := <-ch:
+		return result, true
+	default:
+		return functionResult{}, false
+	}
+}
+
 func readAgentProtocol(reader io.Reader, function, uid string, events protocolEvents) {
+	readAgentProtocolWithLimit(
+		reader,
+		function,
+		uid,
+		functionResultPayloadLimit,
+		events,
+	)
+}
+
+func readAgentProtocolWithLimit(
+	reader io.Reader,
+	function string,
+	uid string,
+	payloadLimit int,
+	events protocolEvents,
+) {
+	if payloadLimit < 0 {
+		sendReadError(events.readErr, errFunctionResultTooLarge)
+		return
+	}
+
 	scanner := bufio.NewScanner(reader)
 	scanner.Buffer(make([]byte, 64*1024), functionResultLineLimit)
 
@@ -232,7 +387,7 @@ func readAgentProtocol(reader io.Reader, function, uid string, events protocolEv
 		if collecting || skipping {
 			if line == "FUNCTION_RESULT_END" {
 				if collecting {
-					result.payload = append([]byte(nil), payload.Bytes()...)
+					result.payload = payload.Bytes()
 					select {
 					case events.result <- result:
 					default:
@@ -241,10 +396,21 @@ func readAgentProtocol(reader io.Reader, function, uid string, events protocolEv
 				collecting = false
 				skipping = false
 				result = functionResult{}
-				payload.Reset()
+				payload = bytes.Buffer{}
 				continue
 			}
 			if collecting {
+				additional := len(line)
+				if payload.Len() > 0 {
+					additional++
+				}
+				if additional > payloadLimit-payload.Len() {
+					sendReadError(
+						events.readErr,
+						errFunctionResultTooLarge,
+					)
+					return
+				}
 				if payload.Len() > 0 {
 					payload.WriteByte('\n')
 				}
@@ -279,6 +445,10 @@ func readAgentProtocol(reader io.Reader, function, uid string, events protocolEv
 
 	if err := scanner.Err(); err != nil {
 		sendReadError(events.readErr, err)
+		return
+	}
+	if collecting || skipping {
+		sendReadError(events.readErr, io.ErrUnexpectedEOF)
 		return
 	}
 	sendReadError(events.readErr, io.EOF)

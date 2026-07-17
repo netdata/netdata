@@ -30,11 +30,14 @@ type Request struct {
 // Validate checks the bounded admission invariants independent of mutable
 // orchestration state.
 func (request Request) Validate() error {
-	if request.UID == "" || request.LaneKey == "" || request.Route == "" || !request.Source.Valid() {
+	if lifecycle.ValidateUID(request.UID) != nil ||
+		request.LaneKey == "" ||
+		request.Route == "" ||
+		!request.Source.Valid() {
 		return errors.New("jobmgr: invalid request")
 	}
 	if request.InputBodyToken == 0 {
-		if request.PayloadCapacity != 0 || len(request.Payload) != 0 {
+		if request.PayloadCapacity != 0 || cap(request.Payload) != 0 {
 			return errors.New("jobmgr: unreserved input payload")
 		}
 		return nil

@@ -4,6 +4,7 @@ package main
 
 import (
 	"encoding/csv"
+	"errors"
 	"io"
 	"strings"
 	"testing"
@@ -29,6 +30,37 @@ func TestEncodeFunctionRequest(t *testing.T) {
 		functionPermissions,
 		functionSource,
 	}, fields)
+}
+
+func TestEncodeFunctionRequestRejectsInvalidTokens(t *testing.T) {
+	tests := map[string]struct {
+		function string
+		args     []string
+	}{
+		"function whitespace": {
+			function: "mysql:top queries",
+		},
+		"argument whitespace": {
+			function: "mysql:top-queries",
+			args:     []string{"two words"},
+		},
+		"argument line injection": {
+			function: "mysql:top-queries",
+			args:     []string{"info\nQUIT"},
+		},
+	}
+
+	for name, tc := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := encodeFunctionRequest(
+				"uid-1",
+				tc.function,
+				tc.args,
+				time.Second,
+			)
+			assert.Error(t, err)
+		})
+	}
 }
 
 func TestReadAgentProtocol(t *testing.T) {
@@ -68,6 +100,68 @@ FUNCTION_RESULT_END
 		t.Fatal("expected Function result")
 	}
 	assert.ErrorIs(t, <-events.readErr, io.EOF)
+}
+
+func TestReadAgentProtocolPayloadLimit(t *testing.T) {
+	t.Run("exact multiline payload", func(t *testing.T) {
+		events := readProtocolWithLimit(
+			"FUNCTION_RESULT_BEGIN functions-validation 200 application/json 1\n"+
+				"abc\n"+
+				"d\n"+
+				"FUNCTION_RESULT_END\n",
+			5,
+		)
+
+		result := <-events.result
+		assert.Equal(t, "abc\nd", string(result.payload))
+		assert.ErrorIs(t, <-events.readErr, io.EOF)
+	})
+
+	for name, input := range map[string]string{
+		"single line over limit":    "abcdef\n",
+		"multiple lines over limit": "abc\nde\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			events := readProtocolWithLimit(
+				"FUNCTION_RESULT_BEGIN functions-validation 200 application/json 1\n"+
+					input+
+					"FUNCTION_RESULT_END\n",
+				5,
+			)
+
+			select {
+			case <-events.result:
+				t.Fatal("oversized payload produced a result")
+			default:
+			}
+			assert.ErrorIs(t, <-events.readErr, errFunctionResultTooLarge)
+		})
+	}
+
+	t.Run("truncated frame", func(t *testing.T) {
+		events := readProtocolWithLimit(
+			"FUNCTION_RESULT_BEGIN functions-validation 200 application/json 1\n"+
+				"abc\n",
+			5,
+		)
+		assert.True(t, errors.Is(<-events.readErr, io.ErrUnexpectedEOF))
+	})
+}
+
+func readProtocolWithLimit(input string, limit int) protocolEvents {
+	events := protocolEvents{
+		published: make(chan struct{}, 1),
+		result:    make(chan functionResult, 1),
+		readErr:   make(chan error, 1),
+	}
+	readAgentProtocolWithLimit(
+		strings.NewReader(input),
+		"mysql:top-queries",
+		functionUID,
+		limit,
+		events,
+	)
+	return events
 }
 
 func TestParseFunctionResultHeader(t *testing.T) {

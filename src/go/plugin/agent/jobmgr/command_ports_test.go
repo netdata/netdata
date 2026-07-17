@@ -3,6 +3,7 @@
 package jobmgr
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -23,6 +24,13 @@ func TestRequestValidate(t *testing.T) {
 	}{
 		"no payload": {
 			request: valid,
+		},
+		"explicit empty payload": {
+			request: func() Request {
+				request := valid
+				request.HasPayload = true
+				return request
+			}(),
 		},
 		"reserved payload": {
 			request: func() Request {
@@ -46,6 +54,30 @@ func TestRequestValidate(t *testing.T) {
 			request: func() Request {
 				request := valid
 				request.Payload = []byte("{}")
+				return request
+			}(),
+			wantErr: true,
+		},
+		"retained payload capacity without reservation": {
+			request: func() Request {
+				request := valid
+				request.Payload = make([]byte, 0, 8)
+				return request
+			}(),
+			wantErr: true,
+		},
+		"unsafe UID": {
+			request: func() Request {
+				request := valid
+				request.UID = "request\nQUIT"
+				return request
+			}(),
+			wantErr: true,
+		},
+		"overlong UID": {
+			request: func() Request {
+				request := valid
+				request.UID = strings.Repeat("u", lifecycle.MaximumUIDBytes+1)
 				return request
 			}(),
 			wantErr: true,

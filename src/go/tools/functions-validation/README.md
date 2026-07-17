@@ -25,6 +25,9 @@ go run ./tools/functions-validation/call \
   --arg info
 ```
 
+Each `--arg` supplies one whitespace-free Function argument token. Repeat the
+flag when a Function takes multiple arguments.
+
 ## Validate output
 
 ```

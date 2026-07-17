@@ -33,7 +33,7 @@ func main() {
 	flag.StringVar(&cfg.configDir, "config-dir", "", "plugin configuration directory")
 	flag.StringVar(&cfg.module, "module", "", "collector module to run")
 	flag.StringVar(&cfg.function, "function", "", "published Function name")
-	flag.Var(&args, "arg", "Function argument (repeatable)")
+	flag.Var(&args, "arg", "Function argument token (repeatable)")
 	flag.DurationVar(&cfg.startupTimeout, "startup-timeout", 10*time.Second, "maximum wait for Function publication")
 	flag.DurationVar(&cfg.functionTimeout, "timeout", time.Minute, "Function request timeout")
 	flag.DurationVar(&cfg.shutdownTimeout, "shutdown-timeout", 15*time.Second, "maximum wait for Agent shutdown")
@@ -41,7 +41,11 @@ func main() {
 	cfg.args = args
 	cfg.stderr = os.Stderr
 
-	overall := cfg.startupTimeout + cfg.functionTimeout + cfg.shutdownTimeout + time.Second
+	overall := cfg.startupTimeout +
+		protocolFunctionTimeout(cfg.functionTimeout) +
+		functionResultGrace +
+		cfg.shutdownTimeout +
+		time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), overall)
 	defer cancel()
 

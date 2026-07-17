@@ -9,6 +9,18 @@ import (
 	"time"
 )
 
+// MaximumUIDBytes is the maximum encoded Function transaction UID.
+const MaximumUIDBytes = 128
+
+// ValidateUID checks whether uid is safe for line-oriented Function framing.
+func ValidateUID(uid string) error {
+	if uid == "" || len(uid) > MaximumUIDBytes ||
+		strings.ContainsAny(uid, " \t\r\n\x00") {
+		return errors.New("jobmgr lifecycle: invalid UID")
+	}
+	return nil
+}
+
 // Source identifies the scheduling source of an operation.
 type Source uint8
 
@@ -116,7 +128,7 @@ type ControlFramePlan struct {
 // Validate checks that a control frame can be encoded without consulting
 // domain state.
 func (plan ControlFramePlan) Validate() error {
-	if plan.UID == "" || strings.ContainsAny(plan.UID, " \t\r\n\x00") {
+	if ValidateUID(plan.UID) != nil {
 		return errors.New("jobmgr lifecycle: invalid control UID")
 	}
 	if !plan.Status.Valid() {

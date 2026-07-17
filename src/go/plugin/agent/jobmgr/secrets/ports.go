@@ -11,4 +11,5 @@ import (
 // CommandPort is the secret adapter's command submission capability.
 type CommandPort interface {
 	Submit(context.Context, jobmgr.Request) error
+	SubmitAndWait(context.Context, jobmgr.Request) error
 }
