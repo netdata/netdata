@@ -55,6 +55,38 @@ Use the chart arrangement at the start of each section to quickly identify patte
 
 :::
 
+## Gauge Colors
+
+The gauges and easy-pie charts at the top of each dashboard section — such as CPU, RAM, disk, and network — summarize the current value of a resource. Each one displays a **single fixed color** (the color assigned to that metric's dimension) and the arc or pie **fills in proportion to the current value** relative to the chart's range.
+
+Gauges do **not** change color based on the value, on thresholds, or on health alarm status. A CPU gauge at 90% uses exactly the same color as the same gauge at 10%; only the length of the filled arc changes.
+
+There is no built-in setting that makes a dashboard gauge switch color when a metric crosses a threshold (for example, turning red at 90%).
+
+### Getting threshold-based alerts
+
+Netdata uses **health alarms** for threshold-based alerting. When an alarm fires it appears in the **Raised Alerts** tab with a **Warning** or **Critical** status, alert details, and a chart snapshot of the moment it triggered. See the [Alerts tab documentation](/docs/dashboards-and-charts/alerts-tab.md).
+
+To monitor a specific threshold — for example, to be alerted when CPU reaches 90% — create or tune a health alarm. The warning and critical levels come from the alarm's `warn:` and `crit:` expressions (for example, `crit: $this > 90`). You can configure alarms through:
+
+- The **Alerts Configuration Manager** (visual UI)
+- **Alerts Automation** (describe the alert in plain English)
+- **Manual configuration** by editing `health.d/*.conf` files
+
+The Alerts Configuration Manager and Alerts Automation require a paid plan; manual configuration is available on every plan. See [feature availability](/docs/netdata-oss-limitations.md). For the full configuration reference, see [Configure Health Alerts](/src/health/REFERENCE.md).
+
+:::note
+
+Configuring a health alarm does **not** change the color of a dashboard gauge. Gauges always use the metric's fixed dimension color; alarms surface separately in the Alerts tab and through notifications.
+
+:::
+
+:::note
+
+If you need an embeddable, color-changing value visual outside the dashboard, Netdata's [badge API](/src/web/api/v1/api_v1_badge/README.md) (`/api/v1/badge.svg`) renders a badge whose color can follow a chart's alarm status (critical = red, warning = orange, clear = green) or explicit value thresholds. Badges are a separate feature from dashboard gauges.
+
+:::
+
 ## Chart Navigation Menu
 
 The **Chart Navigation Menu**, located on the right-hand side of the dashboard, helps you navigate through sections, filter charts, and view active alerts.
