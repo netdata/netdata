@@ -259,6 +259,17 @@ function Test-FileHasNul([string]$path) {
     return ($probe -contains 0)
 }
 
+function Get-SecretBlockIndent([string]$line) {
+    # a YAML block scalar under a secret key (e.g. "password: |") opens a
+    # multiline value; return its indent length so the caller withholds the
+    # whole block, or -1 when the line is not such a header
+    if ($line -match '^(\s*)([\w. -]+):\s*[|>][+-]?\s*$') {
+        $k = $Matches[2]
+        if ((Test-SecretKey $k) -and -not (Test-DiagnosticKey $k)) { return $Matches[1].Length }
+    }
+    return -1
+}
+
 function Convert-SanitizedText([string[]]$lines) {
     # per-line redaction plus whole-block withholding for multiline secrets
     # (PEM private keys, YAML block scalars under a secret key)
@@ -267,27 +278,19 @@ function Convert-SanitizedText([string[]]$lines) {
     $inYaml = $false
     $yamlIndent = 0
     foreach ($l in $lines) {
-        # multiline PEM private keys: withhold the WHOLE block, BEGIN through END;
-        # if the file ends before END, everything after BEGIN stays withheld (fail closed)
+        # PEM private key: withhold BEGIN..END; fail closed if END never comes
         if ($inPem) {
             if ($l -match '-----END [A-Z0-9 ]*PRIVATE KEY') { $inPem = $false }
             continue
         }
-        # YAML block scalars under secret keys (password: | ...) span lines:
-        # withhold until indentation returns to the key level or shallower
-        if ($inYaml) {
-            if ($l -match '^\s*$') { continue }
-            if (([regex]::Match($l, '^ *')).Length -gt $yamlIndent) { continue }
-            $inYaml = $false
-        }
-        if ($l -match '^(\s*)([\w. -]+):\s*[|>][+-]?\s*$') {
-            $yInd = $Matches[1]; $yKey = $Matches[2]
-            if ((Test-SecretKey $yKey) -and -not (Test-DiagnosticKey $yKey)) {
-                [void]$out.Add($yInd + $yKey + ': [REDACTED BLOCK]')
-                $inYaml = $true
-                $yamlIndent = $yInd.Length
-                continue
-            }
+        # inside a YAML secret block: skip blank or deeper-indented lines
+        if ($inYaml -and ($l -match '^\s*$' -or ([regex]::Match($l, '^ *')).Length -gt $yamlIndent)) { continue }
+        $inYaml = $false
+        $bi = Get-SecretBlockIndent $l
+        if ($bi -ge 0) {
+            [void]$out.Add(($l -replace ':.*', ': [REDACTED BLOCK]'))
+            $inYaml = $true; $yamlIndent = $bi
+            continue
         }
         if ($l -match '-----BEGIN [A-Z0-9 ]*PRIVATE KEY') {
             $inPem = $true
