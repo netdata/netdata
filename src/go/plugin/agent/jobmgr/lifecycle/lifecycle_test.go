@@ -1,0 +1,1401 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package lifecycle
+
+import (
+	"bytes"
+	"context"
+	"errors"
+	"fmt"
+	"io"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+)
+
+func TestAdmissionAndUIDExactRelease(t *testing.T) {
+	ledger := NewAdmissionLedger()
+	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
+	ordinary := ledger.RequestOrdinary(1, lane, OrdinaryBudgetBytes)
+	if ordinary.Rejected != nil {
+		t.Fatal(ordinary.Rejected)
+	}
+	cleanup := ledger.RequestCleanup(1, lane, CleanupBudgetBytes)
+	if cleanup.Rejected != nil {
+		t.Fatal(cleanup.Rejected)
+	}
+	var grants [4]AdmissionGrant
+	count, _, err := ledger.TakeGrants(len(grants), &grants)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 || grants[0].Ref != cleanup.Ref || grants[1].Ref != ordinary.Ref {
+		t.Fatalf("admission grant order differs: %#v", grants[:count])
+	}
+	if err := ledger.CloseDrained(1); err == nil {
+		t.Fatal("ledger closed with retained grants")
+	}
+	if _, err := ledger.ReleaseCleanup(cleanup.Ref, FrameOutcomeCommitted); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ledger.ReleaseOrdinary(ordinary.Ref); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.BeginCleanupOnly(1); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.CloseDrained(1); err != nil {
+		t.Fatal(err)
+	}
+
+	now := time.Unix(1_000, 0)
+	uids := NewUIDLedger()
+	if err := uids.Admit("a", now); err != nil {
+		t.Fatal(err)
+	}
+	if err := uids.Admit("a", now); err == nil {
+		t.Fatal("duplicate UID admitted")
+	}
+	if err := uids.Complete("a", true, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := uids.Admit("a", now.Add(UIDTombstoneLifetime-time.Nanosecond)); err == nil {
+		t.Fatal("tombstoned UID admitted")
+	}
+	if err := uids.Admit("a", now.Add(UIDTombstoneLifetime)); err != nil {
+		t.Fatalf("exact-expiry UID was not reclaimed: %v", err)
+	}
+	if err := uids.Complete("a", false, now.Add(UIDTombstoneLifetime)); err != nil {
+		t.Fatal(err)
+	}
+	more, err := uids.CloseBatch(UIDReturnBatch)
+	if err != nil || more {
+		t.Fatalf("UID close differs: more=%v err=%v", more, err)
+	}
+	if active, tombstones, closed := uids.Census(); active != 0 || tombstones != 0 || !closed {
+		t.Fatalf("UID final census differs: active=%d tombstones=%d closed=%v", active, tombstones, closed)
+	}
+}
+
+func TestAdmissionProcessBytesReduceOrdinaryCapacityUntilFinalClose(t *testing.T) {
+	ledger := NewAdmissionLedger()
+	const processBytes int64 = 4096
+	if err := ledger.ReserveProcessBytes(processBytes); err != nil {
+		t.Fatal(err)
+	}
+	if result := ledger.RequestOrdinary(1, AdmissionLaneRef{Slot: 1, Generation: 1}, OrdinaryBudgetBytes-processBytes+1); result.Rejected == nil {
+		t.Fatal("ordinary request exceeded process-adjusted capacity")
+	}
+	result := ledger.RequestOrdinary(1, AdmissionLaneRef{Slot: 1, Generation: 1}, OrdinaryBudgetBytes-processBytes)
+	if result.Rejected != nil {
+		t.Fatal(result.Rejected)
+	}
+	var grants [4]AdmissionGrant
+	count, _, err := ledger.TakeGrants(1, &grants)
+	if err != nil || count != 1 || grants[0].Ref != result.Ref {
+		t.Fatalf("process-adjusted grant differs: count=%d grant=%+v err=%v", count, grants[0], err)
+	}
+	if err := ledger.ReleaseProcessBytes(processBytes); err == nil {
+		t.Fatal("process bytes released before final Admission close")
+	}
+	if _, err := ledger.ReleaseOrdinary(result.Ref); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.BeginCleanupOnly(1); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.CloseDrained(1); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.ReleaseProcessBytes(processBytes); err != nil {
+		t.Fatal(err)
+	}
+	if census := ledger.Census(); census.ProcessBytes != 0 || census.OrdinaryBytes != 0 || census.Phase != "closed" {
+		t.Fatalf("released process reservation differs: %+v", census)
+	}
+}
+
+func TestAdmissionProcessBytesCanUnwindPristineConstruction(t *testing.T) {
+	ledger := NewAdmissionLedger()
+	const processBytes = int64(4096)
+	if err := ledger.ReserveProcessBytes(processBytes); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.ReleaseProcessBytes(processBytes); err != nil {
+		t.Fatalf("pristine construction reservation did not unwind: %v", err)
+	}
+	if census := ledger.Census(); census.ProcessBytes != 0 || census.ActiveRecords != 0 || census.Phase != "ordinary-open" || census.RunGeneration != 0 {
+		t.Fatalf("pristine construction unwind left state: %+v", census)
+	}
+	if err := ledger.ReserveProcessBytes(processBytes); err != nil {
+		t.Fatalf("unwound construction reservation was not reusable: %v", err)
+	}
+	if err := ledger.ReleaseProcessBytes(processBytes); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAdmissionLongLivedTransferPreservesTransientRecordHeadroom(t *testing.T) {
+	ledger := NewAdmissionLedger()
+	longLived := make([]AdmissionRef, 0, MaximumSteadyLongLivedRecords)
+	for index := 0; index < MaximumSteadyLongLivedRecords; index++ {
+		lane := AdmissionLaneRef{Slot: uint16(index + 1), Generation: 1}
+		request := ledger.RequestOrdinary(1, lane, 2)
+		if request.Rejected != nil {
+			t.Fatal(request.Rejected)
+		}
+		var grants [4]AdmissionGrant
+		count, _, err := ledger.TakeGrants(1, &grants)
+		if err != nil || count != 1 || grants[0].Ref != request.Ref {
+			t.Fatalf("long-lived grant %d differs: count=%d grant=%+v err=%v", index, count, grants[0], err)
+		}
+		if err := ledger.TransferLongLived(request.Ref, 1, false); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := ledger.ReleaseOrdinary(request.Ref); err != nil {
+			t.Fatal(err)
+		}
+		longLived = append(longLived, request.Ref)
+	}
+	last := ledger.RequestOrdinary(1, AdmissionLaneRef{Slot: MaximumSteadyLongLivedRecords + 1, Generation: 1}, 2)
+	if last.Rejected != nil {
+		t.Fatal(last.Rejected)
+	}
+	var grants [4]AdmissionGrant
+	count, _, err := ledger.TakeGrants(1, &grants)
+	if err != nil || count != 1 || grants[0].Ref != last.Ref {
+		t.Fatalf("headroom grant differs: count=%d grant=%+v err=%v", count, grants[0], err)
+	}
+	before := ledger.Census()
+	if err := ledger.TransferLongLived(last.Ref, 1, false); !errors.Is(err, ErrLongLivedRecordCapacity) {
+		t.Fatal("long-lived transfer consumed transient record headroom")
+	}
+	if after := ledger.Census(); after != before {
+		t.Fatalf("rejected long-lived transfer mutated census: before=%+v after=%+v", before, after)
+	}
+	if err := ledger.TransferLongLived(last.Ref, 1, true); err != nil {
+		t.Fatalf("replacement overlap could not use its active transient record: %v", err)
+	}
+	if _, err := ledger.ReleaseOrdinary(last.Ref); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ledger.ReleaseLongLived(last.Ref, 1); err != nil {
+		t.Fatal(err)
+	}
+	for _, ref := range longLived {
+		if _, err := ledger.ReleaseLongLived(ref, 1); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := ledger.BeginCleanupOnly(1); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.CloseDrained(1); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAdmissionReopensOnlyFromAnExactlyDrainedRun(t *testing.T) {
+	ledger := NewAdmissionLedger()
+	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
+	request := ledger.RequestOrdinary(1, lane, 1)
+	if request.Rejected != nil {
+		t.Fatal(request.Rejected)
+	}
+	var grants [4]AdmissionGrant
+	count, _, err := ledger.TakeGrants(1, &grants)
+	if err != nil || count != 1 || grants[0].Ref != request.Ref {
+		t.Fatalf("grant differs: count=%d grant=%+v err=%v", count, grants[0], err)
+	}
+	if err := ledger.BeginCleanupOnly(1); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.ReopenDrained(1, 2); err == nil {
+		t.Fatal("admission reopened with retained run state")
+	}
+	if _, err := ledger.ReleaseOrdinary(request.Ref); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.ReopenDrained(1, 1); err == nil {
+		t.Fatal("admission reopened without a fresh generation")
+	}
+	if err := ledger.ReopenDrained(1, 2); err != nil {
+		t.Fatal(err)
+	}
+	if result := ledger.RequestOrdinary(1, lane, 1); result.Rejected == nil {
+		t.Fatal("stale run generation admitted after reopen")
+	}
+	second := ledger.RequestOrdinary(2, AdmissionLaneRef{Slot: 1, Generation: 2}, 1)
+	if second.Rejected != nil {
+		t.Fatal(second.Rejected)
+	}
+	if err := ledger.CancelWaiting(second.Ref); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.BeginCleanupOnly(2); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.CloseDrained(2); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAdmissionCarriesOneStableInputBodyAcrossRunRotation(t *testing.T) {
+	ledger := NewAdmissionLedger()
+	const capacity = int64(64 * 1024)
+	token, err := ledger.RequestInputBodyGrowth(1, 0, capacity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var grants [4]AdmissionGrant
+	count, _, err := ledger.TakeGrants(1, &grants)
+	if err != nil || count != 1 || grants[0].InputBodyToken != token {
+		t.Fatalf("input grant differs: count=%d grant=%+v err=%v", count, grants[0], err)
+	}
+	if _, err := ledger.CommitInputBodyGrowth(token, capacity); err != nil {
+		t.Fatal(err)
+	}
+	if ledger.RunDrained(1) {
+		t.Fatal("uncarried input body counted as a drained run")
+	}
+	if err := ledger.SuspendInputBody(1, 2, token); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.BeginCleanupOnly(1); err != nil {
+		t.Fatal(err)
+	}
+	if !ledger.RunDrained(1) {
+		t.Fatal("stable carried input body did not permit old-run quiescence")
+	}
+	if err := ledger.CloseDrained(1); err == nil {
+		t.Fatal("final close accepted a carried input body")
+	}
+	if err := ledger.ReopenDrained(1, 2); err != nil {
+		t.Fatal(err)
+	}
+	if census := ledger.Census(); census.RunGeneration != 2 || !census.InputBodyCarried || census.InputBodyBytes != capacity {
+		t.Fatalf("reopened carried body census differs: %+v", census)
+	}
+	if err := ledger.AdoptInputBody(2, token); err != nil {
+		t.Fatal(err)
+	}
+	if census := ledger.Census(); census.InputBodyCarried {
+		t.Fatalf("adopted input body remained carried: %+v", census)
+	}
+	if _, err := ledger.AbortInputBody(token); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.BeginCleanupOnly(2); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.CloseDrained(2); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAdmissionShutdownSettlesOnlyPendingInputBodyGrowth(t *testing.T) {
+	ledger := NewAdmissionLedger()
+	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
+	ordinary := ledger.RequestOrdinary(1, lane, 1)
+	if ordinary.Rejected != nil {
+		t.Fatal(ordinary.Rejected)
+	}
+	const capacity = int64(64 * 1024)
+	token, err := ledger.RequestInputBodyGrowth(1, 0, capacity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	grant, waiting, err := ledger.TakeShutdownInputBodyGrant(1)
+	if err != nil || waiting {
+		t.Fatalf("shutdown input grant differs: waiting=%v err=%v", waiting, err)
+	}
+	if grant.Kind != ReservationInputBodyGrowth || grant.InputBodyToken != token || grant.Bytes != capacity {
+		t.Fatalf("shutdown input grant differs: %+v", grant)
+	}
+	if census := ledger.Census(); census.OrdinaryWaiting != 1 || !census.InputBodyActive || census.InputBodyWaiting {
+		t.Fatalf("shutdown input grant affected unrelated ordinary work: %+v", census)
+	}
+	if err := ledger.BeginCleanupOnly(1); err == nil {
+		t.Fatal("cleanup-only transition ignored unrelated ordinary waiter")
+	}
+	if err := ledger.CancelWaiting(ordinary.Ref); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.BeginCleanupOnly(1); err != nil {
+		t.Fatal(err)
+	}
+	if repeated, stillWaiting, err := ledger.TakeShutdownInputBodyGrant(1); err != nil || stillWaiting || repeated.Kind != 0 {
+		t.Fatalf("repeated shutdown input service differs: grant=%+v waiting=%v err=%v", repeated, stillWaiting, err)
+	}
+	if _, err := ledger.CommitInputBodyGrowth(token, capacity); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ledger.AbortInputBody(token); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.CloseDrained(1); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUIDLedgerAdmissionAndCloseWorkAreBatched(t *testing.T) {
+	now := time.Unix(2_000, 0)
+	uids := NewUIDLedger()
+	for index := 0; index < UIDReturnBatch+1; index++ {
+		uid := fmt.Sprintf("u-%d", index)
+		if err := uids.Admit(uid, now); err != nil {
+			t.Fatal(err)
+		}
+		if err := uids.Complete(uid, true, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := uids.Admit("u-64", now.Add(UIDTombstoneLifetime)); err != nil {
+		t.Fatal(err)
+	}
+	if active, tombstones, _ := uids.Census(); active != 1 || tombstones != 1 {
+		t.Fatalf("direct-expiry admission batch differs: active=%d tombstones=%d", active, tombstones)
+	}
+	if err := uids.Complete("u-64", true, now.Add(UIDTombstoneLifetime)); err != nil {
+		t.Fatal(err)
+	}
+	more, err := uids.CloseBatch(1)
+	if err != nil || !more {
+		t.Fatalf("first UID close batch differs: more=%v err=%v", more, err)
+	}
+	more, err = uids.CloseBatch(UIDReturnBatch)
+	if err != nil || more {
+		t.Fatalf("final UID close batch differs: more=%v err=%v", more, err)
+	}
+	if _, _, closed := uids.Census(); !closed {
+		t.Fatal("UID ledger did not close")
+	}
+	if err := uids.Admit("after-close", now); err == nil {
+		t.Fatal("UID admitted after close")
+	}
+	if _, err := uids.CloseBatch(UIDReturnBatch); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestUIDLedgerHasExactFixedCapacity(t *testing.T) {
+	now := time.Unix(3_000, 0)
+	uids := NewUIDLedger()
+	for index := 0; index < MaximumUIDRecords; index++ {
+		if err := uids.Admit(fmt.Sprintf("active-%d", index), now); err != nil {
+			t.Fatalf("admit %d: %v", index, err)
+		}
+	}
+	if err := uids.Admit("over-capacity", now); err == nil {
+		t.Fatal("UID ledger admitted beyond fixed capacity")
+	}
+	for index := 0; index < MaximumUIDRecords; index++ {
+		if err := uids.Complete(fmt.Sprintf("active-%d", index), true, now); err != nil {
+			t.Fatalf("complete %d: %v", index, err)
+		}
+	}
+	for batch := 1; batch <= MaximumUIDRecords/UIDReturnBatch; batch++ {
+		more, err := uids.CloseBatch(UIDReturnBatch)
+		if err != nil {
+			t.Fatalf("close batch %d: %v", batch, err)
+		}
+		if more != (batch < MaximumUIDRecords/UIDReturnBatch) {
+			t.Fatalf("close batch %d returned more=%v", batch, more)
+		}
+	}
+	if active, tombstones, closed := uids.Census(); active != 0 || tombstones != 0 || !closed {
+		t.Fatalf("capacity release census differs: active=%d tombstones=%d closed=%v", active, tombstones, closed)
+	}
+}
+
+func TestAdmissionRadixDomainAndOldestFitting(t *testing.T) {
+	ledger := NewAdmissionLedger()
+	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
+	for _, bytes := range []int64{0, OrdinaryBudgetBytes + 1, 268_435_455} {
+		if result := ledger.RequestOrdinary(1, lane, bytes); result.Rejected == nil || result.Ref.Valid() {
+			t.Fatalf("out-of-domain request %d was retained: %#v", bytes, result)
+		}
+	}
+	for _, bytes := range []int64{1, 134_217_727, 134_217_728, OrdinaryBudgetBytes} {
+		result := ledger.RequestOrdinary(1, lane, bytes)
+		if result.Rejected != nil {
+			t.Fatalf("boundary request %d: %v", bytes, result.Rejected)
+		}
+		if err := ledger.CancelWaiting(result.Ref); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	blocker := ledger.RequestOrdinary(1, lane, OrdinaryBudgetBytes-10)
+	oldLarge := ledger.RequestOrdinary(1, lane, 11)
+	firstSmall := ledger.RequestOrdinary(1, lane, 5)
+	laterSmall := ledger.RequestOrdinary(1, lane, 4)
+	for _, result := range []AdmissionRequestResult{blocker, oldLarge, firstSmall, laterSmall} {
+		if result.Rejected != nil {
+			t.Fatal(result.Rejected)
+		}
+	}
+	var grants [4]AdmissionGrant
+	count, more, err := ledger.TakeGrants(1, &grants)
+	if err != nil || count != 1 || !more || grants[0].Ref != blocker.Ref {
+		t.Fatalf("blocker grant differs: count=%d more=%v grant=%#v err=%v", count, more, grants[0], err)
+	}
+	count, _, err = ledger.TakeGrants(1, &grants)
+	if err != nil || count != 1 || grants[0].Ref != firstSmall.Ref {
+		t.Fatalf("oldest fitting grant differs: count=%d grant=%#v err=%v", count, grants[0], err)
+	}
+	if _, err := ledger.ReleaseOrdinary(blocker.Ref); err != nil {
+		t.Fatal(err)
+	}
+	count, _, err = ledger.TakeGrants(1, &grants)
+	if err != nil || count != 1 || grants[0].Ref != oldLarge.Ref {
+		t.Fatalf("newly fitting old request was bypassed: count=%d grant=%#v err=%v", count, grants[0], err)
+	}
+	count, _, err = ledger.TakeGrants(1, &grants)
+	if err != nil || count != 1 || grants[0].Ref != laterSmall.Ref {
+		t.Fatalf("remaining small grant differs: count=%d grant=%#v err=%v", count, grants[0], err)
+	}
+	for _, ref := range []AdmissionRef{firstSmall.Ref, oldLarge.Ref, laterSmall.Ref} {
+		if _, err := ledger.ReleaseOrdinary(ref); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestAdmissionMoreReportsOnlyImmediatelyGrantableWork(t *testing.T) {
+	ledger := NewAdmissionLedger()
+	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
+	full := ledger.RequestOrdinary(1, lane, OrdinaryBudgetBytes)
+	waiting := ledger.RequestOrdinary(1, lane, 1)
+	if full.Rejected != nil || waiting.Rejected != nil {
+		t.Fatalf("requests differ: full=%v waiting=%v", full.Rejected, waiting.Rejected)
+	}
+	var grants [4]AdmissionGrant
+	count, more, err := ledger.TakeGrants(1, &grants)
+	if err != nil || count != 1 || grants[0].Ref != full.Ref || more {
+		t.Fatalf("saturated grant differs: count=%d more=%v grant=%#v err=%v", count, more, grants[0], err)
+	}
+	wake, err := ledger.ReleaseOrdinary(full.Ref)
+	if err != nil || !wake {
+		t.Fatalf("release did not expose the waiter: wake=%v err=%v", wake, err)
+	}
+	count, more, err = ledger.TakeGrants(1, &grants)
+	if err != nil || count != 1 || grants[0].Ref != waiting.Ref || more {
+		t.Fatalf("waiter grant differs: count=%d more=%v grant=%#v err=%v", count, more, grants[0], err)
+	}
+	if _, err := ledger.ReleaseOrdinary(waiting.Ref); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAdmissionCleanupFIFOAndDirectCancellation(t *testing.T) {
+	ledger := NewAdmissionLedger()
+	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
+	firstCleanup := ledger.RequestCleanup(1, lane, CleanupBudgetBytes)
+	secondCleanup := ledger.RequestCleanup(1, lane, 1)
+	ordinary := ledger.RequestOrdinary(1, lane, 1)
+	cancelled := ledger.RequestOrdinary(1, lane, 2)
+	for _, result := range []AdmissionRequestResult{firstCleanup, secondCleanup, ordinary, cancelled} {
+		if result.Rejected != nil {
+			t.Fatal(result.Rejected)
+		}
+	}
+	if err := ledger.CancelWaiting(cancelled.Ref); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.CancelWaiting(cancelled.Ref); err == nil {
+		t.Fatal("stale direct cancellation succeeded")
+	}
+	var grants [4]AdmissionGrant
+	count, _, err := ledger.TakeGrants(len(grants), &grants)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 2 || grants[0].Ref != firstCleanup.Ref || grants[1].Ref != ordinary.Ref {
+		t.Fatalf("cleanup priority/single grant differs: %#v", grants[:count])
+	}
+	if _, err := ledger.ReleaseCleanup(firstCleanup.Ref, FrameOutcomeCommitted); err != nil {
+		t.Fatal(err)
+	}
+	count, _, err = ledger.TakeGrants(len(grants), &grants)
+	if err != nil || count != 1 || grants[0].Ref != secondCleanup.Ref {
+		t.Fatalf("cleanup FIFO successor differs: count=%d grant=%#v err=%v", count, grants[0], err)
+	}
+	if _, err := ledger.ReleaseCleanup(secondCleanup.Ref, FrameOutcomeSafeAbort); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ledger.ReleaseOrdinary(ordinary.Ref); err != nil {
+		t.Fatal(err)
+	}
+	if err := ledger.BeginCleanupOnly(1); err != nil {
+		t.Fatal(err)
+	}
+	if result := ledger.RequestOrdinary(1, lane, 1); result.Rejected == nil {
+		t.Fatal("ordinary request entered cleanup-only phase")
+	}
+	if err := ledger.CloseDrained(1); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAdmissionOrdinaryGrowthRetainsOneRecordAndWaitsByDelta(t *testing.T) {
+	ledger := NewAdmissionLedger()
+	first := ledger.RequestOrdinary(1, AdmissionLaneRef{Slot: 1, Generation: 1}, 100)
+	second := ledger.RequestOrdinary(1, AdmissionLaneRef{Slot: 2, Generation: 1}, OrdinaryBudgetBytes-100)
+	if first.Rejected != nil || second.Rejected != nil {
+		t.Fatalf("initial admission differs: first=%v second=%v", first.Rejected, second.Rejected)
+	}
+	var grants [4]AdmissionGrant
+	count, _, err := ledger.TakeGrants(2, &grants)
+	if err != nil || count != 2 {
+		t.Fatalf("initial grants differ: count=%d err=%v", count, err)
+	}
+	ready, _, err := ledger.ResizeOrdinary(first.Ref, 101)
+	if err != nil || ready {
+		t.Fatalf("saturated growth did not wait: ready=%v err=%v", ready, err)
+	}
+	if census := ledger.Census(); census.ActiveRecords != 2 || census.OrdinaryGranted != 2 || census.OrdinaryWaiting != 1 || census.OrdinaryBytes != OrdinaryBudgetBytes {
+		t.Fatalf("growth-wait census differs: %#v", census)
+	}
+	ready, wake, err := ledger.ResizeOrdinary(second.Ref, OrdinaryBudgetBytes-101)
+	if err != nil || !ready || !wake {
+		t.Fatalf("shrink did not expose growth: ready=%v wake=%v err=%v", ready, wake, err)
+	}
+	count, _, err = ledger.TakeGrants(1, &grants)
+	if err != nil || count != 1 || grants[0].Ref != first.Ref || grants[0].Kind != ReservationOrdinaryGrowth || grants[0].Bytes != 101 {
+		t.Fatalf("growth grant differs: count=%d grant=%#v err=%v", count, grants[0], err)
+	}
+	if _, err := ledger.ReleaseOrdinary(first.Ref); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ledger.ReleaseOrdinary(second.Ref); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAdmissionInputBodyGrowthTransfersIntoOperationRecord(t *testing.T) {
+	ledger := NewAdmissionLedger()
+	const initial = int64(64 * 1024)
+	token, err := ledger.RequestInputBodyGrowth(1, 0, initial)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var grants [4]AdmissionGrant
+	count, _, err := ledger.TakeGrants(4, &grants)
+	if err != nil || count != 1 || grants[0].Kind != ReservationInputBodyGrowth || grants[0].InputBodyToken != token || grants[0].Bytes != initial {
+		t.Fatalf("initial input grant differs: count=%d grant=%+v err=%v", count, grants[0], err)
+	}
+	if _, err := ledger.CommitInputBodyGrowth(token, initial); err != nil {
+		t.Fatal(err)
+	}
+
+	const grown = int64(128 * 1024)
+	if next, err := ledger.RequestInputBodyGrowth(1, token, grown); err != nil || next != token {
+		t.Fatalf("growth request differs: token=%d err=%v", next, err)
+	}
+	count, _, err = ledger.TakeGrants(4, &grants)
+	if err != nil || count != 1 || grants[0].Kind != ReservationInputBodyGrowth || grants[0].Bytes != initial+grown {
+		t.Fatalf("replacement grant differs: count=%d grant=%+v err=%v", count, grants[0], err)
+	}
+	if census := ledger.Census(); census.OrdinaryBytes != initial+grown || census.InputBodyBytes != initial+grown {
+		t.Fatalf("replacement census differs before copy commit: %+v", census)
+	}
+	if _, err := ledger.CommitInputBodyGrowth(token, grown); err != nil {
+		t.Fatal(err)
+	}
+
+	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
+	transferred := ledger.TransferInputBody(1, token, lane, grown+512, grown)
+	if transferred.Rejected != nil || !transferred.Ref.Valid() {
+		t.Fatalf("input transfer rejected: %+v", transferred)
+	}
+	if census := ledger.Census(); census.InputBodyActive || census.InputBodyBytes != 0 || census.ActiveRecords != 1 || census.OrdinaryBytes != grown {
+		t.Fatalf("transfer census differs before operation grant: %+v", census)
+	}
+	count, _, err = ledger.TakeGrants(4, &grants)
+	if err != nil || count != 1 || grants[0].Kind != ReservationOrdinary || grants[0].Ref != transferred.Ref || grants[0].Bytes != grown+512 {
+		t.Fatalf("operation grant differs: count=%d grant=%+v err=%v", count, grants[0], err)
+	}
+	if _, err := ledger.ReleaseOrdinary(transferred.Ref); err != nil {
+		t.Fatal(err)
+	}
+	if census := ledger.Census(); census.ActiveRecords != 0 || census.OrdinaryBytes != 0 || census.InputBodyActive {
+		t.Fatalf("released transfer retained state: %+v", census)
+	}
+}
+
+func TestAdmissionLongLivedRecordDetachesFromCompletedLaneGeneration(t *testing.T) {
+	ledger := NewAdmissionLedger()
+	first := ledger.RequestOrdinary(1, AdmissionLaneRef{Slot: 1, Generation: 1}, 100)
+	if first.Rejected != nil {
+		t.Fatal(first.Rejected)
+	}
+	var grants [4]AdmissionGrant
+	if count, _, err := ledger.TakeGrants(1, &grants); err != nil || count != 1 || grants[0].Ref != first.Ref {
+		t.Fatalf("first grant differs: count=%d grant=%+v err=%v", count, grants[0], err)
+	}
+	if err := ledger.TransferLongLived(first.Ref, 40, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ledger.ReleaseOrdinary(first.Ref); err != nil {
+		t.Fatal(err)
+	}
+	second := ledger.RequestOrdinary(1, AdmissionLaneRef{Slot: 1, Generation: 2}, 60)
+	if second.Rejected != nil {
+		t.Fatalf("next lane generation was blocked by detached long-lived ownership: %v", second.Rejected)
+	}
+	if count, _, err := ledger.TakeGrants(1, &grants); err != nil || count != 1 || grants[0].Ref != second.Ref {
+		t.Fatalf("second grant differs: count=%d grant=%+v err=%v", count, grants[0], err)
+	}
+	if _, err := ledger.ReleaseOrdinary(second.Ref); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := ledger.ReleaseLongLived(first.Ref, 40); err != nil {
+		t.Fatal(err)
+	}
+	if census := ledger.Census(); census.ActiveRecords != 0 || census.OrdinaryGranted != 0 || census.OrdinaryBytes != 0 || census.LongLivedRecords != 0 || census.LongLivedBytes != 0 {
+		t.Fatalf("detached long-lived release census=%+v", census)
+	}
+}
+
+func TestAdmissionInputBodyAbortReleasesWaitingAndGrantedCapacity(t *testing.T) {
+	for _, afterGrant := range []bool{false, true} {
+		t.Run(fmt.Sprintf("after-grant-%t", afterGrant), func(t *testing.T) {
+			ledger := NewAdmissionLedger()
+			token, err := ledger.RequestInputBodyGrowth(1, 0, 64*1024)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if afterGrant {
+				var grants [4]AdmissionGrant
+				if count, _, err := ledger.TakeGrants(4, &grants); err != nil || count != 1 {
+					t.Fatalf("grant differs: count=%d err=%v", count, err)
+				}
+			}
+			if _, err := ledger.AbortInputBody(token); err != nil {
+				t.Fatal(err)
+			}
+			if census := ledger.Census(); census.InputBodyActive || census.OrdinaryWaiting != 0 || census.OrdinaryBytes != 0 {
+				t.Fatalf("aborted body retained state: %+v", census)
+			}
+		})
+	}
+}
+
+func TestTaskSupervisorFourSlotsAndGenerationCheckedReuse(t *testing.T) {
+	frame, err := NewFrameOwner(io.Discard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	supervisor, err := NewTaskSupervisor(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := make(chan struct{})
+	refs := make([]TaskRef, 0, TransientTaskSlots)
+	for range TransientTaskSlots {
+		_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
+			Source: SourceFunction,
+			Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+				<-release
+				return NewSealedResult(200, "application/json", []byte(`{}`))
+			}),
+		})
+		refs = append(refs, ref)
+	}
+	pending, err := supervisor.Enqueue(TaskPlan{Source: SourceFunction, Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+		return NewSealedResult(200, "application/json", []byte(`{}`))
+	})})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var blocked [TransientTaskSlots]TaskStart
+	if count, more, err := supervisor.Dispatch(context.Background(), 1, &blocked); err != nil || count != 0 || !more {
+		t.Fatalf("fifth transient task dispatch differs: count=%d more=%v err=%v", count, more, err)
+	}
+	close(release)
+	for range refs {
+		completion := <-supervisor.CompletionCh()
+		if completion.Sequence != 1 {
+			t.Fatalf("initial phase sequence differs: %#v", completion)
+		}
+		if err := supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	acknowledged := make([]TaskRef, 0, len(refs))
+	for range refs {
+		ack := <-supervisor.AcknowledgementCh()
+		if ack.Sequence != 2 || ack.Err != nil {
+			t.Fatalf("disposal acknowledgement differs: %#v", ack)
+		}
+		acknowledged = append(acknowledged, ack.Ref)
+	}
+	for _, ref := range acknowledged {
+		if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for range refs {
+		ack := <-supervisor.AcknowledgementCh()
+		if ack.Sequence != 3 || ack.Kind != TaskActionTerminate || ack.Err != nil {
+			t.Fatalf("termination acknowledgement differs: %#v", ack)
+		}
+		if err := supervisor.Release(ack.Ref); err != nil {
+			t.Fatal(err)
+		}
+	}
+	var started [TransientTaskSlots]TaskStart
+	count, more, err := supervisor.Dispatch(context.Background(), 1, &started)
+	if err != nil || count != 1 || more || started[0].Request != pending {
+		t.Fatalf("pending task dispatch differs: started=%#v count=%d more=%v err=%v", started[0], count, more, err)
+	}
+	ref := started[0].Task
+	if ref.Slot != refs[0].Slot || ref.Generation != refs[0].Generation+1 {
+		t.Fatalf("slot reuse differs: old=%#v new=%#v", refs[0], ref)
+	}
+	completion := <-supervisor.CompletionCh()
+	if err := supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
+		t.Fatal(err)
+	}
+	ack := <-supervisor.AcknowledgementCh()
+	if err := supervisor.SendAction(TaskAction{Ref: ack.Ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
+		t.Fatal(err)
+	}
+	ack = <-supervisor.AcknowledgementCh()
+	if err := supervisor.Release(ack.Ref); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTaskSupervisorRetainedTimeoutCountAndSaturationLatch(t *testing.T) {
+	frame, err := NewFrameOwner(io.Discard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	supervisor, err := NewTaskSupervisor(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := make(chan struct{})
+	refs := make([]TaskRef, 0, TransientTaskSlots)
+	for range TransientTaskSlots {
+		_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
+			Source: SourceFunction,
+			Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+				<-release
+				return NewSealedResult(200, "application/json", []byte(`{}`))
+			}),
+		})
+		refs = append(refs, ref)
+	}
+	for index, ref := range refs {
+		saturated, err := supervisor.MarkRetainedTimeout(ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		wantSaturated := index == TransientTaskSlots-1
+		if saturated != wantSaturated {
+			t.Fatalf("retained timeout %d saturation=%v, want %v", index+1, saturated, wantSaturated)
+		}
+		count, latched := supervisor.RetainedTimeouts()
+		if count != index+1 || latched != wantSaturated {
+			t.Fatalf("retained timeout %d census=(%d,%v), want (%d,%v)", index+1, count, latched, index+1, wantSaturated)
+		}
+	}
+	for index, ref := range refs {
+		cleared, err := supervisor.ClearRetainedTimeout(ref)
+		if err != nil || !cleared {
+			t.Fatalf("clear retained timeout %d: cleared=%v err=%v", index+1, cleared, err)
+		}
+		count, latched := supervisor.RetainedTimeouts()
+		if count != len(refs)-index-1 || !latched {
+			t.Fatalf("cleared timeout %d census=(%d,%v), want (%d,true)", index+1, count, latched, len(refs)-index-1)
+		}
+	}
+	close(release)
+	for range refs {
+		completion := <-supervisor.CompletionCh()
+		if err := supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	acknowledged := make([]TaskRef, 0, len(refs))
+	for range refs {
+		ack := <-supervisor.AcknowledgementCh()
+		if ack.Sequence != 2 || ack.Kind != TaskActionDispose || ack.Err != nil {
+			t.Fatalf("retained-timeout disposal acknowledgement differs: %#v", ack)
+		}
+		acknowledged = append(acknowledged, ack.Ref)
+	}
+	for _, ref := range acknowledged {
+		if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for range refs {
+		ack := <-supervisor.AcknowledgementCh()
+		if err := supervisor.Release(ack.Ref); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if supervisor.Active() != 0 {
+		t.Fatalf("retained-timeout test left %d active tasks", supervisor.Active())
+	}
+}
+
+func TestTaskSupervisorContainsPanicAndReleasesSlot(t *testing.T) {
+	frame, err := NewFrameOwner(io.Discard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	supervisor, err := NewTaskSupervisor(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
+		Source: SourceFunction,
+		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+			panic("fixture panic")
+		}),
+	})
+	completion := <-supervisor.CompletionCh()
+	if completion.Ref != ref || !errors.Is(completion.Err, ErrTaskPanic) || !strings.Contains(completion.Err.Error(), "fixture panic") {
+		t.Fatalf("panic completion differs: %#v", completion)
+	}
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
+		t.Fatal(err)
+	}
+	ack := <-supervisor.AcknowledgementCh()
+	if ack.Ref != ref || ack.Sequence != 2 || ack.Kind != TaskActionDispose || ack.Err != nil {
+		t.Fatalf("panic disposal acknowledgement differs: %#v", ack)
+	}
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
+		t.Fatal(err)
+	}
+	ack = <-supervisor.AcknowledgementCh()
+	if ack.Ref != ref || ack.Sequence != 3 || ack.Kind != TaskActionTerminate || ack.Err != nil {
+		t.Fatalf("panic termination acknowledgement differs: %#v", ack)
+	}
+	if err := supervisor.Release(ref); err != nil {
+		t.Fatal(err)
+	}
+	if supervisor.Active() != 0 {
+		t.Fatalf("panic task retained active slot: %d", supervisor.Active())
+	}
+}
+
+func TestTaskSupervisorPreservesAuthoritativeCancellationCause(t *testing.T) {
+	frame, err := NewFrameOwner(io.Discard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	supervisor, err := NewTaskSupervisor(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Unix(100, 0)
+	type cancellationObservation struct {
+		deadline time.Time
+		ok       bool
+		err      error
+		cause    error
+	}
+	observed := make(chan cancellationObservation, 1)
+	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
+		Source: SourceFunction, Deadline: deadline,
+		Work: func(ctx context.Context) (TaskOutcome, error) {
+			observedDeadline, ok := ctx.Deadline()
+			<-ctx.Done()
+			cause := context.Cause(ctx)
+			observed <- cancellationObservation{deadline: observedDeadline, ok: ok, err: ctx.Err(), cause: cause}
+			return TaskOutcome{}, cause
+		},
+	})
+	if err := supervisor.CancelWithCause(ref, context.DeadlineExceeded); err != nil {
+		t.Fatal(err)
+	}
+	if got := <-observed; !got.ok || !got.deadline.Equal(deadline) || !errors.Is(got.err, context.DeadlineExceeded) || !errors.Is(got.cause, context.DeadlineExceeded) {
+		t.Fatalf("TaskChild cancellation context deadline=%s ok=%v err=%v cause=%v", got.deadline, got.ok, got.err, got.cause)
+	}
+	completion := <-supervisor.CompletionCh()
+	if completion.Ref != ref || !errors.Is(completion.Err, context.DeadlineExceeded) {
+		t.Fatalf("deadline completion differs: %#v", completion)
+	}
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
+		t.Fatal(err)
+	}
+	ack := <-supervisor.AcknowledgementCh()
+	if ack.Err != nil {
+		t.Fatal(ack.Err)
+	}
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
+		t.Fatal(err)
+	}
+	ack = <-supervisor.AcknowledgementCh()
+	if ack.Err != nil {
+		t.Fatal(ack.Err)
+	}
+	if err := supervisor.Release(ref); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTaskSupervisorChecksPhaseSequenceAndPublishesOwnedResult(t *testing.T) {
+	var output bytes.Buffer
+	frame, err := NewFrameOwner(&output, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	supervisor, err := NewTaskSupervisor(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	payload := []byte(`{"value":"original"}`)
+	sealed, err := NewSealedResult(200, "application/json", payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
+		Source: SourceFunction, MaxPhaseTransitions: 4,
+		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+			return sealed, nil
+		}),
+	})
+	completion := <-supervisor.CompletionCh()
+	if completion.Ref != ref || completion.Sequence != 1 || completion.Err != nil {
+		t.Fatalf("initial publication differs: %#v", completion)
+	}
+	payload[10] = 'X'
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionEncodeWrite, UID: "u1", Expiry: 1}); err == nil {
+		t.Fatal("wrong phase sequence was accepted")
+	}
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionEncodeWrite, UID: "u1", Expiry: 1}); err != nil {
+		t.Fatal(err)
+	}
+	ack := <-supervisor.AcknowledgementCh()
+	if ack.Ref != ref || ack.Sequence != 2 || ack.Kind != TaskActionEncodeWrite || ack.Err != nil {
+		t.Fatalf("encode/write acknowledgement differs: %#v", ack)
+	}
+	if !bytes.Contains(output.Bytes(), []byte(`{"value":"original"}`)) || bytes.Contains(output.Bytes(), []byte(`{"value":"Xriginal"}`)) {
+		t.Fatalf("published result retained callback alias: %q", output.Bytes())
+	}
+	if err := supervisor.Release(ref); err == nil {
+		t.Fatal("slot released before explicit termination")
+	}
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
+		t.Fatal(err)
+	}
+	ack = <-supervisor.AcknowledgementCh()
+	if ack.Ref != ref || ack.Sequence != 3 || ack.Kind != TaskActionTerminate || ack.Err != nil {
+		t.Fatalf("termination acknowledgement differs: %#v", ack)
+	}
+	if err := supervisor.Release(ref); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTaskSupervisorPreflightsResultEnvelopeBeforeAction(t *testing.T) {
+	frame, err := NewFrameOwner(io.Discard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	supervisor, err := NewTaskSupervisor(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := NewSealedResult(200, "application/json", []byte(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
+		Source: SourceFunction,
+		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+			return result, nil
+		}),
+	})
+	completion := <-supervisor.CompletionCh()
+	if completion.Err != nil {
+		t.Fatal(completion.Err)
+	}
+	_, baseEnvelope, err := functionFrameSize("u", 200, "application/json", 1, result.payloadBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	oversizedUID := strings.Repeat("u", 2+FunctionEnvelopeBytes-baseEnvelope)
+	if _, err := supervisor.PreflightResult(ref, oversizedUID, 1); !errors.Is(err, ErrFunctionResultTooLarge) {
+		t.Fatalf("oversized result envelope preflight differs: %v", err)
+	}
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
+		t.Fatal(err)
+	}
+	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
+		t.Fatal(ack.Err)
+	}
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
+		t.Fatal(err)
+	}
+	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
+		t.Fatal(ack.Err)
+	}
+	if err := supervisor.Release(ref); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTaskSupervisorRunsCleanupBeforeExplicitTermination(t *testing.T) {
+	frame, err := NewFrameOwner(io.Discard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	supervisor, err := NewTaskSupervisor(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cleaned := make(chan struct{}, 1)
+	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
+		Source: SourceJobManager, MaxPhaseTransitions: 4,
+		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+			return NewSealedResult(200, "application/json", []byte(`{}`))
+		}),
+		Cleanup: func() error {
+			cleaned <- struct{}{}
+			return nil
+		},
+	})
+	completion := <-supervisor.CompletionCh()
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
+		t.Fatal(err)
+	}
+	if ack := <-supervisor.AcknowledgementCh(); ack.Sequence != 2 || ack.Err != nil {
+		t.Fatalf("disposal acknowledgement differs: %#v", ack)
+	}
+	if err := supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 3, Kind: TaskActionCleanup}); err != nil {
+		t.Fatal(err)
+	}
+	if ack := <-supervisor.AcknowledgementCh(); ack.Sequence != 3 || ack.Kind != TaskActionCleanup || ack.Err != nil {
+		t.Fatalf("cleanup acknowledgement differs: %#v", ack)
+	}
+	select {
+	case <-cleaned:
+	default:
+		t.Fatal("cleanup phase did not execute")
+	}
+	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}); err != nil {
+		t.Fatal(err)
+	}
+	if ack := <-supervisor.AcknowledgementCh(); ack.Sequence != 4 || ack.Kind != TaskActionTerminate || ack.Err != nil {
+		t.Fatalf("termination acknowledgement differs: %#v", ack)
+	}
+	if err := supervisor.Release(ref); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestTaskSupervisorDispatchRotatesPendingSources(t *testing.T) {
+	frame, err := NewFrameOwner(io.Discard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	supervisor, err := NewTaskSupervisor(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := make(chan struct{})
+	plan := func(source Source) TaskPlan {
+		return TaskPlan{Source: source, Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+			<-release
+			return NewSealedResult(200, "application/json", []byte(`{}`))
+		})}
+	}
+	j1, _ := supervisor.Enqueue(plan(SourceJobManager))
+	j2, _ := supervisor.Enqueue(plan(SourceJobManager))
+	f1, _ := supervisor.Enqueue(plan(SourceFunction))
+	f2, _ := supervisor.Enqueue(plan(SourceFunction))
+	var started [TransientTaskSlots]TaskStart
+	count, more, err := supervisor.Dispatch(context.Background(), TransientTaskSlots, &started)
+	if err != nil || count != TransientTaskSlots || more {
+		t.Fatalf("source-fair dispatch differs: count=%d more=%v err=%v", count, more, err)
+	}
+	want := []TaskRequestRef{j1, f1, j2, f2}
+	for index, ref := range want {
+		if started[index].Request != ref {
+			t.Fatalf("source-fair dispatch order differs at %d: got=%#v want=%#v", index, started[index].Request, ref)
+		}
+	}
+	close(release)
+	for range TransientTaskSlots {
+		completion := <-supervisor.CompletionCh()
+		if err := supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
+			t.Fatal(err)
+		}
+		ack := <-supervisor.AcknowledgementCh()
+		if err := supervisor.SendAction(TaskAction{Ref: ack.Ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
+			t.Fatal(err)
+		}
+		ack = <-supervisor.AcknowledgementCh()
+		if err := supervisor.Release(ack.Ref); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestTaskSupervisorDirectlyCancelsPendingRequest(t *testing.T) {
+	frame, err := NewFrameOwner(io.Discard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	supervisor, err := NewTaskSupervisor(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := func(source Source) TaskPlan {
+		return TaskPlan{Source: source, Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+			return NewSealedResult(200, "application/json", []byte(`{}`))
+		})}
+	}
+	cancelled, err := supervisor.Enqueue(plan(SourceJobManager))
+	if err != nil {
+		t.Fatal(err)
+	}
+	survivor, err := supervisor.Enqueue(plan(SourceFunction))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := supervisor.CancelPending(cancelled); err != nil {
+		t.Fatal(err)
+	}
+	if err := supervisor.CancelPending(cancelled); err == nil {
+		t.Fatal("stale pending-task cancellation was accepted")
+	}
+	var started [TransientTaskSlots]TaskStart
+	count, more, err := supervisor.Dispatch(context.Background(), 1, &started)
+	if err != nil || count != 1 || more || started[0].Request != survivor {
+		t.Fatalf("pending cancellation survivor differs: started=%#v count=%d more=%v err=%v", started[0], count, more, err)
+	}
+	completion := <-supervisor.CompletionCh()
+	if err := supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
+		t.Fatal(err)
+	}
+	ack := <-supervisor.AcknowledgementCh()
+	if err := supervisor.SendAction(TaskAction{Ref: ack.Ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
+		t.Fatal(err)
+	}
+	ack = <-supervisor.AcknowledgementCh()
+	if err := supervisor.Release(ack.Ref); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func enqueueAndDispatchTask(t *testing.T, supervisor *TaskSupervisor, plan TaskPlan) (TaskRequestRef, TaskRef) {
+	t.Helper()
+	request, err := supervisor.Enqueue(plan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var started [TransientTaskSlots]TaskStart
+	count, _, err := supervisor.Dispatch(context.Background(), 1, &started)
+	if err != nil || count != 1 || started[0].Request != request {
+		t.Fatalf("task dispatch differs: started=%#v count=%d err=%v", started[0], count, err)
+	}
+	return request, started[0].Task
+}
+
+func TestFrameOwnerControlReservationPrecedesLaterOrdinaryFrame(t *testing.T) {
+	writer := newStepWriter()
+	controlReady := make(chan struct{}, 1)
+	owner, err := NewFrameOwner(writer, func() { controlReady <- struct{}{} })
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := NewSealedResult(200, "application/json", []byte(`{"status":200}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := PrepareFrame("u1", result, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := PrepareFrame("u2", result, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstDone := make(chan error, 1)
+	go func() { firstDone <- owner.Commit(first) }()
+	if got := <-writer.offered; !bytes.Contains(got, []byte("FUNCTION_RESULT_BEGIN u1 ")) {
+		t.Fatalf("first frame differs: %q", got)
+	}
+	if err := owner.TryCommitControl(ControlFramePlan{UID: "uc", Status: ControlDeadline, Expiry: 1}); !errors.Is(err, ErrFrameOwnerBusy) {
+		t.Fatalf("busy control result differs: %v", err)
+	}
+	secondDone := make(chan error, 1)
+	go func() { secondDone <- owner.Commit(second) }()
+	select {
+	case got := <-writer.offered:
+		t.Fatalf("later ordinary frame bypassed pending control: %q", got)
+	case <-time.After(20 * time.Millisecond):
+	}
+	writer.release <- struct{}{}
+	if err := <-firstDone; err != nil {
+		t.Fatal(err)
+	}
+	<-controlReady
+	controlDone := make(chan error, 1)
+	go func() {
+		controlDone <- owner.TryCommitControl(ControlFramePlan{UID: "uc", Status: ControlDeadline, Expiry: 1})
+	}()
+	if got := <-writer.offered; !bytes.Contains(got, []byte("FUNCTION_RESULT_BEGIN uc 504 ")) {
+		t.Fatalf("control frame differs: %q", got)
+	}
+	writer.release <- struct{}{}
+	if err := <-controlDone; err != nil {
+		t.Fatal(err)
+	}
+	if got := <-writer.offered; !bytes.Contains(got, []byte("FUNCTION_RESULT_BEGIN u2 ")) {
+		t.Fatalf("second frame differs: %q", got)
+	}
+	writer.release <- struct{}{}
+	if err := <-secondDone; err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestFrameOwnerShortWritePoisonsAndRetains(t *testing.T) {
+	owner, err := NewFrameOwner(shortWriter{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := NewSealedResult(200, "application/json", []byte(`{}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	frame, err := PrepareFrame("u", result, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := owner.Commit(frame); !errors.Is(err, io.ErrShortWrite) {
+		t.Fatalf("short write result differs: %v", err)
+	}
+	census := owner.Census()
+	if !census.Poisoned || census.RetainedBytes == 0 {
+		t.Fatalf("poison census differs: %#v", census)
+	}
+	if err := owner.Commit(frame); !errors.Is(err, ErrPreparedFrameConsumed) {
+		t.Fatalf("post-poison commit differs: %v", err)
+	}
+}
+
+func TestClosedControlResults(t *testing.T) {
+	for status, payload := range map[ControlStatus]string{
+		ControlBadRequest:      `{"errorMessage":"Bad request.","status":400}`,
+		ControlNotFound:        `{"errorMessage":"Not found.","status":404}`,
+		ControlPayloadTooLarge: `{"errorMessage":"Payload too large.","status":413}`,
+		ControlCancelled:       `{"errorMessage":"Request cancelled.","status":499}`,
+		ControlInternal:        `{"errorMessage":"Internal error.","status":500}`,
+		ControlUnavailable:     `{"errorMessage":"Service unavailable.","status":503}`,
+		ControlDeadline:        `{"errorMessage":"Deadline exceeded.","status":504}`,
+	} {
+		result, err := NewControlResult(status)
+		if err != nil || result.status != int(status) || result.contentType != "application/json" || string(result.payload) != payload {
+			t.Fatalf("control result differs for %d: result=%#v err=%v", status, result, err)
+		}
+	}
+	if _, err := NewControlResult(418); err == nil {
+		t.Fatal("unknown control result was accepted")
+	}
+}
+
+func TestFunctionPayloadAndFrameCapacityAreSeparateFromControlReserve(t *testing.T) {
+	tests := map[string]struct {
+		length int
+		valid  bool
+	}{
+		"below deferred boundary": {FunctionPayloadBytes - 2, true},
+		"at deferred boundary":    {FunctionPayloadBytes - 1, true},
+		"over deferred boundary":  {FunctionPayloadBytes, false},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			err := validateFunctionPayloadSize(test.length)
+			if (err == nil) != test.valid {
+				t.Fatalf("Function payload boundary differs for %d: %v", test.length, err)
+			}
+		})
+	}
+	payload := bytes.Repeat([]byte{'x'}, 1024*1024)
+	result, err := NewSealedResult(200, "application/json", payload)
+	if err != nil {
+		t.Fatalf("1 MiB Function result was limited by the control reserve: %v", err)
+	}
+	owner, err := NewFrameOwner(io.Discard, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frame, err := PrepareFrame("u-large", result, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := owner.Commit(frame); err != nil {
+		t.Fatal(err)
+	}
+	if census := owner.Census(); census.Commits != 1 || census.RetainedBytes != 0 {
+		t.Fatalf("large Function frame census differs: %#v", census)
+	}
+}
+
+func TestFunctionFrameSizePreflightsBeforeAppend(t *testing.T) {
+	baseFrame, baseEnvelope, err := functionFrameSize("u", 200, "application/json", 1, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	exactUID := strings.Repeat("u", 1+FunctionEnvelopeBytes-baseEnvelope)
+	exactFrame, exactEnvelope, err := functionFrameSize(exactUID, 200, "application/json", 1, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if exactEnvelope != FunctionEnvelopeBytes || exactFrame != baseFrame+len(exactUID)-1 {
+		t.Fatalf("exact envelope sizing differs: frame=%d envelope=%d", exactFrame, exactEnvelope)
+	}
+	seed := []byte("unchanged")
+	encoded, err := encodeResult(seed, exactUID+"u", 200, "application/json", 1, nil, MaximumFunctionFrameBytes, FunctionEnvelopeBytes, FunctionPayloadBytes)
+	if !errors.Is(err, ErrFunctionResultTooLarge) || !bytes.Equal(encoded, seed) {
+		t.Fatalf("oversized envelope appended a partial prefix: bytes=%q err=%v", encoded, err)
+	}
+
+	payload := []byte(`{"status":200}`)
+	wantSize, _, err := functionFrameSize("u-size", 200, "application/json", 1, len(payload))
+	if err != nil {
+		t.Fatal(err)
+	}
+	encoded, err = encodeResult(nil, "u-size", 200, "application/json", 1, payload, MaximumFunctionFrameBytes, FunctionEnvelopeBytes, FunctionPayloadBytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(encoded) != wantSize {
+		t.Fatalf("Size/Append identity differs: size=%d appended=%d", wantSize, len(encoded))
+	}
+}
+
+type stepWriter struct {
+	offered chan []byte
+	release chan struct{}
+	mu      sync.Mutex
+}
+
+func newStepWriter() *stepWriter {
+	return &stepWriter{offered: make(chan []byte), release: make(chan struct{})}
+}
+
+func (writer *stepWriter) Write(payload []byte) (int, error) {
+	copy := append([]byte(nil), payload...)
+	writer.offered <- copy
+	<-writer.release
+	return len(payload), nil
+}
+
+type shortWriter struct{}
+
+func (shortWriter) Write(payload []byte) (int, error) {
+	return len(payload) - 1, nil
+}
