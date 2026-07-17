@@ -557,8 +557,11 @@ $NetdataSvc = Get-Service -Name 'Netdata' -ErrorAction SilentlyContinue
 $NetdataProc = Get-Process -Name 'netdata' -ErrorAction SilentlyContinue | Select-Object -First 1
 $ApiOk = $false
 try {
-    Invoke-LocalApi "http://127.0.0.1:$NdPort/api/v1/info" 3 | Out-Null
-    $ApiOk = $true
+    # /api/v3/info stays reachable under bearer protection (v1 is locked)
+    foreach ($probe in @('/api/v3/info', '/api/v1/info')) {
+        try { Invoke-LocalApi "http://127.0.0.1:$NdPort$probe" 3 | Out-Null; $ApiOk = $true; break }
+        catch { Write-Verbose "probe $probe failed: $_" }
+    }
 } catch { Write-Verbose "agent API not reachable: $_" }
 
 # pre-seed pseudonyms for child/mirrored hostnames, so a parent's children are

@@ -832,11 +832,15 @@ NETDATA_BIN=$(command -v netdata 2>/dev/null)
   NETDATA_BIN=$(readlink -f "/proc/$NETDATA_PID/exe" 2>/dev/null)
 [ -z "${NETDATA_BIN:-}" ] && [ -x /opt/netdata/usr/sbin/netdata ] && NETDATA_BIN=/opt/netdata/usr/sbin/netdata
 
-if command -v curl >/dev/null 2>&1 && curl -sf --max-time 3 "http://127.0.0.1:${NDPORT}/api/v1/info" >/dev/null 2>&1; then
-  api_ok=1
-elif command -v wget >/dev/null 2>&1 && wget -q -T 3 -O /dev/null "http://127.0.0.1:${NDPORT}/api/v1/info" 2>/dev/null; then
-  api_ok=1
-fi
+# probe /api/v3/info first: it stays reachable even under bearer protection,
+# where /api/v1/* is locked (so a protected-but-running agent isn't mis-flagged)
+for _probe in /api/v3/info /api/v1/info; do
+  if command -v curl >/dev/null 2>&1 && curl -sf --max-time 3 "http://127.0.0.1:${NDPORT}${_probe}" >/dev/null 2>&1; then
+    api_ok=1; break
+  elif command -v wget >/dev/null 2>&1 && wget -q -T 3 -O /dev/null "http://127.0.0.1:${NDPORT}${_probe}" 2>/dev/null; then
+    api_ok=1; break
+  fi
+done
 
 # pre-seed child/mirrored node hostnames so they pseudonymize consistently in
 # EVERY file (node_instances, stream configs, logs). Their real names stay in
@@ -1049,7 +1053,11 @@ NEWEST_STATUS=""
 _status_candidates=""
 [ -n "$LIBDIR" ] && _status_candidates="$_status_candidates $LIBDIR/status-netdata.json"
 [ -n "$CACHEDIR" ] && _status_candidates="$_status_candidates $CACHEDIR/status-netdata.json"
-_status_candidates="$_status_candidates /tmp/status-netdata.json /run/status-netdata.json /var/run/status-netdata.json"
+# transient fallback locations only when netdata is actually on this host, so a
+# no-agent run can't package an unrelated /tmp/status-netdata.json as crash state
+if [ -n "$CONFDIR$LIBDIR" ] || [ -n "${NETDATA_PID:-}" ]; then
+  _status_candidates="$_status_candidates /tmp/status-netdata.json /run/status-netdata.json /var/run/status-netdata.json"
+fi
 for sf in $_status_candidates; do
   [ -f "$sf" ] || continue
   if [ -z "$NEWEST_STATUS" ] || [ "$sf" -nt "$NEWEST_STATUS" ]; then NEWEST_STATUS="$sf"; fi
@@ -1237,7 +1245,8 @@ next to the tarball - it is NOT in this bundle.
   provenance header and end with `# exit: N`.
 - Copied files (configs, logs, json) are pristine (no injected headers);
   their origin is recorded in `MANIFEST.json`.
-- `07-runtime/AGENT-WAS-DOWN.txt` exists only when the agent was not running.
+- `07-runtime/AGENT-WAS-DOWN.txt` exists when the local API probe failed (the
+  agent may be down, or its API bound away from 127.0.0.1 / bearer-protected).
 EOF
 manifest_add README.md file generated "Bundle documentation"
 
