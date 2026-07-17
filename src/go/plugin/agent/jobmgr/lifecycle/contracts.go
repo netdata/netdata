@@ -1,0 +1,147 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+
+package lifecycle
+
+import (
+	"context"
+	"errors"
+	"strings"
+	"time"
+)
+
+// Source identifies the scheduling source of an operation.
+type Source uint8
+
+const (
+	SourceJobManager Source = iota + 1
+	SourceFunction
+)
+
+// Valid reports whether source is a known scheduling source.
+func (source Source) Valid() bool {
+	return source == SourceJobManager || source == SourceFunction
+}
+
+// OperationID uniquely identifies an operation within one run generation.
+type OperationID uint64
+
+// ResourceIdentity identifies one acknowledged resource generation.
+type ResourceIdentity struct {
+	ID         string
+	Generation uint64
+}
+
+// Valid reports whether identity names a concrete resource generation.
+func (identity ResourceIdentity) Valid() bool {
+	return identity.ID != "" && identity.Generation != 0
+}
+
+// PreparedResource owns an unpublished resource until it is accepted or
+// disposed.
+type PreparedResource interface {
+	Identity() ResourceIdentity
+	AcceptStart(context.Context, uint64) (ReadyResource, error)
+	Dispose(context.Context) error
+}
+
+// ReadyResource owns an accepted but not necessarily published resource.
+type ReadyResource interface {
+	Identity() ResourceIdentity
+	Publish() error
+	AbortReady(context.Context) error
+	Stop(context.Context) error
+	Finalize() error
+}
+
+// CapabilityDisposition describes the terminal result of capability commit.
+type CapabilityDisposition uint8
+
+const (
+	CapabilityApplied CapabilityDisposition = iota + 1
+	CapabilityDisposed
+	CapabilityRetained
+)
+
+// Valid reports whether disposition is a terminal capability disposition.
+func (disposition CapabilityDisposition) Valid() bool {
+	switch disposition {
+	case CapabilityApplied, CapabilityDisposed, CapabilityRetained:
+		return true
+	default:
+		return false
+	}
+}
+
+// PreparedCapability owns an unpublished capability until it is committed or
+// disposed.
+type PreparedCapability interface {
+	Identity() ResourceIdentity
+	Commit(context.Context, uint64) (CapabilityDisposition, error)
+	Dispose(context.Context) error
+}
+
+// ControlStatus is the closed set of statuses the orchestration loop may emit
+// without invoking a domain handler.
+type ControlStatus uint16
+
+const (
+	ControlBadRequest      ControlStatus = 400
+	ControlNotFound        ControlStatus = 404
+	ControlPayloadTooLarge ControlStatus = 413
+	ControlCancelled       ControlStatus = 499
+	ControlInternal        ControlStatus = 500
+	ControlUnavailable     ControlStatus = 503
+	ControlDeadline        ControlStatus = 504
+)
+
+// Valid reports whether status belongs to the closed control-status set.
+func (status ControlStatus) Valid() bool {
+	switch status {
+	case ControlBadRequest, ControlNotFound, ControlPayloadTooLarge,
+		ControlCancelled, ControlInternal, ControlUnavailable, ControlDeadline:
+		return true
+	default:
+		return false
+	}
+}
+
+// ControlFramePlan is the bounded value accepted by the serialized frame
+// writer for a control response.
+type ControlFramePlan struct {
+	UID    string
+	Status ControlStatus
+	Expiry int64
+}
+
+// Validate checks that a control frame can be encoded without consulting
+// domain state.
+func (plan ControlFramePlan) Validate() error {
+	if plan.UID == "" || strings.ContainsAny(plan.UID, " \t\r\n\x00") {
+		return errors.New("jobmgr lifecycle: invalid control UID")
+	}
+	if !plan.Status.Valid() {
+		return errors.New("jobmgr lifecycle: invalid control status")
+	}
+	if plan.Expiry <= 0 {
+		return errors.New("jobmgr lifecycle: invalid control expiry")
+	}
+	return nil
+}
+
+// Clock supplies orchestration time and cancellable one-shot timers.
+type Clock interface {
+	Now() time.Time
+	Arm(kind string, delay time.Duration) (<-chan time.Time, func())
+}
+
+// ReusableTimer is a reusable timer owned by one orchestration loop.
+type ReusableTimer interface {
+	Arm(delay time.Duration) <-chan time.Time
+	Stop()
+}
+
+// ReusableTimerClock optionally supplies reusable timers to avoid per-arm
+// allocation on hot paths.
+type ReusableTimerClock interface {
+	NewTimer(kind string) ReusableTimer
+}

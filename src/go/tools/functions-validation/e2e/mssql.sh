@@ -78,11 +78,7 @@ run_mssql_info_with_retry() {
   local attempt=1
 
   while true; do
-    if run "$WORKDIR/go.d.plugin" \
-      --config-dir "$WORKDIR/config" \
-      --function "mssql:top-queries" \
-      --function-args info \
-      > "$output"; then
+    if run_agent_function mssql top-queries "$output" info; then
       validate "$output"
       return 0
     fi
@@ -108,11 +104,7 @@ run_mssql_top_queries_with_retry() {
   local attempt=1
 
   while true; do
-    if run "$WORKDIR/go.d.plugin" \
-      --config-dir "$WORKDIR/config" \
-      --function "mssql:top-queries" \
-      --function-args __job:local \
-      > "$output"; then
+    if run_agent_function mssql top-queries "$output" __job:local; then
       validate "$output" --min-rows 1
       return 0
     fi
@@ -141,11 +133,7 @@ run_mssql_function_with_retry() {
   local attempt=1
 
   while true; do
-    if run "$WORKDIR/go.d.plugin" \
-      --config-dir "$WORKDIR/config" \
-      --function "mssql:${method}" \
-      --function-args "$args" \
-      > "$output"; then
+    if run_agent_function mssql "$method" "$output" "$args"; then
       if [ "$require_rows" = "true" ]; then
         validate "$output" --min-rows 1
       else

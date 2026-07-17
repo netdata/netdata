@@ -1,8 +1,9 @@
-# Functions Validation (CLI + Containers)
+# Functions Validation (Agent Protocol + Containers)
 
 ## TL;DR
 - Bring up databases with Docker Compose.
-- Use `go.d.plugin --function` with the configs in `./config`.
+- Run `go.d.plugin` as an Agent and invoke Functions through its stdin/result
+  protocol with the configs in `./config`.
 - Config files live under `./config/go.d`.
 - Validate output against the embedded schema.
 - Use `./e2e.sh` for automated end-to-end checks in `/tmp` (runs per-DB scripts).
@@ -12,13 +13,16 @@
 docker compose up -d
 ```
 
-## Example CLI run (Postgres)
+## Example Agent-protocol run (Postgres)
 ```
-cd ../../../
-src/go/go.d.plugin \
-  --config-dir src/go/tools/functions-validation/config \
+cd ../../../src/go
+go build -o /tmp/go.d.plugin ./cmd/godplugin
+go run ./tools/functions-validation/call \
+  --plugin /tmp/go.d.plugin \
+  --config-dir ./tools/functions-validation/config \
+  --module postgres \
   --function postgres:top-queries \
-  --function-args info
+  --arg info
 ```
 
 ## Validate output
@@ -45,13 +49,15 @@ columns.
 
 ## Validate output (require rows)
 ```
-src/go/go.d.plugin \
-  --config-dir src/go/tools/functions-validation/config \
+go run ./tools/functions-validation/call \
+  --plugin /tmp/go.d.plugin \
+  --config-dir ./tools/functions-validation/config \
+  --module postgres \
   --function postgres:top-queries \
-  --function-args __job:local \
+  --arg __job:local \
   > /tmp/pg.json
 
-(cd src/go && go run ./tools/functions-validation/validate --input /tmp/pg.json --min-rows 1)
+go run ./tools/functions-validation/validate --input /tmp/pg.json --min-rows 1
 ```
 
 ## E2E runner (recommended)
@@ -76,7 +82,10 @@ src/go/go.d.plugin \
 ### Behavior
 - Each DB script creates a workspace under `/tmp` and runs Docker Compose there.
 - Ports are auto-selected per run to avoid collisions.
-- Builds `go.d.plugin` into the `/tmp` workspace.
+- Builds `go.d.plugin` and the Agent-protocol Function caller into the `/tmp`
+  workspace.
+- Waits for the requested Function publication, writes a real `FUNCTION` record
+  to Agent stdin, and validates the matching `FUNCTION_RESULT_BEGIN/END` frame.
 - Validates schema **and** that data rows are returned for top-queries.
 - Cleans up the `/tmp` workspace on success; keeps it on failure for debugging.
 

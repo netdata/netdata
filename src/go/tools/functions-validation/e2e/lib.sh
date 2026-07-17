@@ -181,6 +181,7 @@ replace_in_file() {
 
 build_plugin() {
   run bash -c "cd \"$REPO_ROOT/src/go\" && go build -o \"$WORKDIR/go.d.plugin\" ./cmd/godplugin"
+  run bash -c "cd \"$REPO_ROOT/src/go\" && go build -o \"$WORKDIR/function-call\" ./tools/functions-validation/call"
 }
 
 validate() {
@@ -193,11 +194,7 @@ run_info_method() {
   local module="$1"
   local method="$2"
   local output="$WORKDIR/${module}-${method}-info.json"
-  run "$WORKDIR/go.d.plugin" \
-    --config-dir "$WORKDIR/config" \
-    --function "${module}:${method}" \
-    --function-args info \
-    > "$output"
+  run_agent_function "$module" "$method" "$output" info
   validate "$output"
 }
 
@@ -213,11 +210,7 @@ run_function() {
   local require_rows="${4:-true}"
   local output="$WORKDIR/${module}-${method}.json"
 
-  run "$WORKDIR/go.d.plugin" \
-    --config-dir "$WORKDIR/config" \
-    --function "${module}:${method}" \
-    --function-args "$args" \
-    > "$output"
+  run_agent_function "$module" "$method" "$output" "$args"
 
   if [ "$require_rows" = "true" ]; then
     validate "$output" --min-rows 1
@@ -231,11 +224,7 @@ run_function() {
 run_top_queries() {
   local module="$1"
   local output="$WORKDIR/${module}-top-queries.json"
-  run "$WORKDIR/go.d.plugin" \
-    --config-dir "$WORKDIR/config" \
-    --function "${module}:top-queries" \
-    --function-args __job:local \
-    > "$output"
+  run_agent_function "$module" top-queries "$output" __job:local
   validate "$output" --min-rows 1
 }
 
@@ -243,12 +232,30 @@ run_running_queries() {
   local module="$1"
   local min_rows="${2:-1}"
   local output="$WORKDIR/${module}-running-queries.json"
-  run "$WORKDIR/go.d.plugin" \
-    --config-dir "$WORKDIR/config" \
-    --function "${module}:running-queries" \
-    --function-args __job:local \
-    > "$output"
+  run_agent_function "$module" running-queries "$output" __job:local
   validate "$output" --min-rows "$min_rows"
+}
+
+run_agent_function() {
+  local module="$1"
+  local method="$2"
+  local output="$3"
+  shift 3
+
+  local command=(
+    "$WORKDIR/function-call"
+    --plugin "$WORKDIR/go.d.plugin"
+    --config-dir "$WORKDIR/config"
+    --module "$module"
+    --function "${module}:${method}"
+  )
+  local arg
+  for arg in "$@"; do
+    if [ -n "$arg" ]; then
+      command+=(--arg "$arg")
+    fi
+  done
+  run "${command[@]}" > "$output"
 }
 
 has_min_rows() {
