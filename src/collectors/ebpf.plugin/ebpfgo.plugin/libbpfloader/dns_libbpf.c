@@ -72,11 +72,12 @@ static const uint16_t dns_monitored_ports[] = {53, 5353};
  * is not always in the CGo include path. Uses a unique prefix to prevent
  * collisions if a kernel header defining struct sock_filter is in scope. */
 struct netdata_sock_filter { uint16_t code; uint8_t jt; uint8_t jf; uint32_t k; };
-/* sock_fprog on 64-bit Linux: uint16_t len + 6-byte padding + 8-byte pointer.
- * We mirror that layout explicitly so setsockopt receives the right bytes. */
+/* Mirror the kernel's sock_fprog layout without importing <linux/filter.h>.
+ * Natural alignment produces the correct padding on every architecture:
+ *   64-bit: 2-byte len + 6-byte pad + 8-byte ptr = 16 bytes
+ *   32-bit: 2-byte len + 2-byte pad + 4-byte ptr =  8 bytes */
 struct netdata_sock_fprog {
     uint16_t                   len;
-    uint8_t                    _pad[6];
     struct netdata_sock_filter *filter;
 };
 
