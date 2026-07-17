@@ -248,23 +248,25 @@ function Invoke-SanitizeLine([string]$line) {
     return $line
 }
 
-function Invoke-SanitizeFile([string]$path) {
-    if (-not (Test-Path $path)) { return }
-    # binary/UTF-16 input would make line-based redaction byte-unsafe: withhold
+function Test-FileHasNul([string]$path) {
+    # a NUL in the first 1 MiB means binary/UTF-16: line-based redaction would
+    # be byte-unsafe, so the caller withholds the file
     $fs = [System.IO.File]::OpenRead($path)
     try {
         $probe = New-Object byte[] ([Math]::Min(1MB, $fs.Length))
         $null = $fs.Read($probe, 0, $probe.Length)
     } finally { $fs.Close() }
-    if ($probe -contains 0) {
-        Write-Utf8 $path '[content withheld: file contains NUL bytes (binary or UTF-16?)]'
-        return
-    }
+    return ($probe -contains 0)
+}
+
+function Convert-SanitizedText([string[]]$lines) {
+    # per-line redaction plus whole-block withholding for multiline secrets
+    # (PEM private keys, YAML block scalars under a secret key)
     $out = New-Object System.Collections.ArrayList
     $inPem = $false
     $inYaml = $false
     $yamlIndent = 0
-    foreach ($l in [System.IO.File]::ReadAllLines($path)) {
+    foreach ($l in $lines) {
         # multiline PEM private keys: withhold the WHOLE block, BEGIN through END;
         # if the file ends before END, everything after BEGIN stays withheld (fail closed)
         if ($inPem) {
@@ -294,6 +296,16 @@ function Invoke-SanitizeFile([string]$path) {
         }
         [void]$out.Add((Invoke-SanitizeLine $l))
     }
+    return $out
+}
+
+function Invoke-SanitizeFile([string]$path) {
+    if (-not (Test-Path $path)) { return }
+    if (Test-FileHasNul $path) {
+        Write-Utf8 $path '[content withheld: file contains NUL bytes (binary or UTF-16?)]'
+        return
+    }
+    $out = Convert-SanitizedText ([System.IO.File]::ReadAllLines($path))
     [System.IO.File]::WriteAllLines($path, $out, $script:Utf8NoBom)
 }
 
