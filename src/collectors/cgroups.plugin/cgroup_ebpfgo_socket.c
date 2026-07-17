@@ -32,7 +32,7 @@ static void cgroup_ebpfgo_socket_sum_pids(struct cgroup *cg)
 
     procfile *ff = cgroup_ebpfgo_open_nonempty_procs_file(path_buf, sizeof(path_buf), cg->id);
     if (!ff)
-        return;
+        goto done;
 
     /* cgroup_ebpfgo_open_nonempty_procs_file() returns a procfile that has
      * already been procfile_readall()'d while selecting the best mount. */
@@ -47,19 +47,32 @@ static void cgroup_ebpfgo_socket_sum_pids(struct cgroup *cg)
             continue;
 
         const struct ebpf_socket_publish_apps *s = &item->socket;
-        cg->net.current.bytes_sent          += s->bytes_sent;
-        cg->net.current.bytes_received      += s->bytes_received;
-        cg->net.current.call_tcp_sent       += s->call_tcp_sent;
-        cg->net.current.call_tcp_received   += s->call_tcp_received;
-        cg->net.current.retransmit          += s->retransmit;
-        cg->net.current.call_udp_sent       += s->call_udp_sent;
-        cg->net.current.call_udp_received   += s->call_udp_received;
-        cg->net.current.call_close          += s->call_close;
+        cg->net.current.bytes_sent             += s->bytes_sent;
+        cg->net.current.bytes_received         += s->bytes_received;
+        cg->net.current.call_tcp_sent          += s->call_tcp_sent;
+        cg->net.current.call_tcp_received      += s->call_tcp_received;
+        cg->net.current.retransmit             += s->retransmit;
+        cg->net.current.call_udp_sent          += s->call_udp_sent;
+        cg->net.current.call_udp_received      += s->call_udp_received;
+        cg->net.current.call_close             += s->call_close;
         cg->net.current.call_tcp_v4_connection += s->call_tcp_v4_connection;
         cg->net.current.call_tcp_v6_connection += s->call_tcp_v6_connection;
     }
 
     procfile_close(ff);
+
+done:
+    /* On the first sample, after a plugin restart, or after container
+     * re-discovery, prev is all zeros while current holds the full
+     * cumulative eBPF counters.  Setting prev = current here makes every
+     * delta zero for this cycle, preventing the spike that would otherwise
+     * occur.  Mirrors the guard in cgroup_ebpfgo_cachestat.c:244. */
+    if (!cg->net.prev.bytes_sent && !cg->net.prev.bytes_received &&
+        !cg->net.prev.call_tcp_sent && !cg->net.prev.call_tcp_received &&
+        !cg->net.prev.retransmit && !cg->net.prev.call_udp_sent &&
+        !cg->net.prev.call_udp_received && !cg->net.prev.call_close &&
+        !cg->net.prev.call_tcp_v4_connection && !cg->net.prev.call_tcp_v6_connection)
+        cg->net.prev = cg->net.current;
 }
 
 static void cgroup_ebpfgo_socket_update_single_chart(
