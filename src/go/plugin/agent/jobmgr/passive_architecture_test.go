@@ -21,13 +21,13 @@ const (
 	lifecycleImportPath = jobmgrImportPath + "/lifecycle"
 )
 
-var passivePackages = []string{
-	"lifecycle",
-	"functions",
-	"joboutput",
-	"secrets",
-	"discovery",
-	"composition",
+var passivePackages = map[string]struct{}{
+	"lifecycle":   {},
+	"functions":   {},
+	"joboutput":   {},
+	"secrets":     {},
+	"discovery":   {},
+	"composition": {},
 }
 
 var futureOwnerTypes = map[string]struct{}{
@@ -59,7 +59,7 @@ var passiveFreeFunctions = map[string]map[string]struct{}{
 func TestPassiveArchitecturePackages(t *testing.T) {
 	root := jobmgrSourceRoot(t)
 
-	for _, name := range passivePackages {
+	for name := range passivePackages {
 		t.Run(name, func(t *testing.T) {
 			dir := filepath.Join(root, name)
 			entries, err := os.ReadDir(dir)
