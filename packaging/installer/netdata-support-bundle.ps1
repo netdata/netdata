@@ -17,7 +17,7 @@
 
 [CmdletBinding()]
 param(
-    [string]$Output = $env:TEMP,
+    [string]$Output = $(if ($env:TEMP) { $env:TEMP } elseif ($env:TMPDIR) { $env:TMPDIR } else { [System.IO.Path]::GetTempPath() }),
     [int]$SinceHours = 24,
     [int]$TimeoutSeconds = 10,
     [switch]$NoObfuscate,
@@ -46,7 +46,8 @@ try {
 $StartTime = Get-Date
 $Stamp = (Get-Date).ToUniversalTime().ToString('yyyyMMdd-HHmmss')
 $BundleName = "netdata-support-bundle-$Stamp-$PID"
-$Staging = Join-Path $env:TEMP ("netdata-support-bundle-staging-" + [System.IO.Path]::GetRandomFileName())
+$TempBase = if ($env:TEMP) { $env:TEMP } elseif ($env:TMPDIR) { $env:TMPDIR } else { [System.IO.Path]::GetTempPath() }
+$Staging = Join-Path $TempBase ("netdata-support-bundle-staging-" + [System.IO.Path]::GetRandomFileName())
 $Work = Join-Path $Staging $BundleName
 New-Item -ItemType Directory -Path $Work -Force | Out-Null
 $script:ManifestRows = New-Object System.Collections.ArrayList
@@ -103,6 +104,8 @@ function Test-DiagnosticKey([string]$key) {
 
 function Get-Pseudonym([string]$orig, [string]$prefix) {
     if (-not $script:PseudoMap.ContainsKey($orig)) {
+        # cap: past 4096 mappings, use a constant non-correlating placeholder
+        if ($script:PseudoMap.Count -ge 4096) { return "redacted-$prefix" }
         if ($prefix -eq 'ip') { $script:IpCount++; $script:PseudoMap[$orig] = "ip-$($script:IpCount)" }
         elseif ($prefix -eq 'ip6') { $script:Ip6Count++; $script:PseudoMap[$orig] = "ip6-$($script:Ip6Count)" }
         elseif ($prefix -eq 'fqdn') { $script:FqdnCount++; $script:PseudoMap[$orig] = "private-host-$($script:FqdnCount)" }
@@ -122,12 +125,18 @@ function Invoke-RedactSecretLine([string]$line) {
     # only plausible config keys: short, no sentence/shell punctuation, no path
     # separators (command lines with paths belong to the argv rule below)
     if ($line -notmatch '^\s*"' -and $line -match '^([^=:]{1,64})([=:])(.+)$' -and $Matches[1] -notmatch '["`;|()/]') {
-        if ((Test-SecretKey $Matches[1]) -and $Matches[3].Trim().Length -gt 1 -and -not (Test-DiagnosticKey $Matches[1])) {
+        if ((Test-SecretKey $Matches[1]) -and $Matches[3].Trim() -ne '' -and -not (Test-DiagnosticKey $Matches[1])) {
             $line = $Matches[1] + $Matches[2] + ' [REDACTED]'
         }
     }
     # json "key": "value" pairs (possibly several per line)
     $line = [regex]::Replace($line, '"([^"]+)"\s*:\s*"([^"]*)"', {
+        param($m)
+        if ((Test-SecretKey $m.Groups[1].Value) -and -not (Test-DiagnosticKey $m.Groups[1].Value)) { '"' + $m.Groups[1].Value + '": "[REDACTED]"' }
+        else { $m.Value }
+    })
+    # scalar (unquoted) JSON values under secret keys: "key": 12345 / true / null
+    $line = [regex]::Replace($line, '"([^"]+)"\s*:\s*(-?\d[\d.eE+-]*|true|false|null)', {
         param($m)
         if ((Test-SecretKey $m.Groups[1].Value) -and -not (Test-DiagnosticKey $m.Groups[1].Value)) { '"' + $m.Groups[1].Value + '": "[REDACTED]"' }
         else { $m.Value }
@@ -198,6 +207,7 @@ function Invoke-ReplaceAddressText([string]$line) {
         $nc = [regex]::Matches($c, ':').Count
         if ($nc -eq 0 -or $c -eq '::1' -or
             ($nc -lt 3 -and $c -notmatch '::') -or
+            $c.EndsWith(':') -or
             ($nc -lt 6 -and $c -notmatch '[A-Fa-f]' -and $c -notmatch '::')) { return $c }
         return (Get-Pseudonym $c 'ip6')
     })
@@ -240,14 +250,42 @@ function Invoke-SanitizeLine([string]$line) {
 
 function Invoke-SanitizeFile([string]$path) {
     if (-not (Test-Path $path)) { return }
+    # binary/UTF-16 input would make line-based redaction byte-unsafe: withhold
+    $fs = [System.IO.File]::OpenRead($path)
+    try {
+        $probe = New-Object byte[] ([Math]::Min(1MB, $fs.Length))
+        $null = $fs.Read($probe, 0, $probe.Length)
+    } finally { $fs.Close() }
+    if ($probe -contains 0) {
+        Write-Utf8 $path '[content withheld: file contains NUL bytes (binary or UTF-16?)]'
+        return
+    }
     $out = New-Object System.Collections.ArrayList
     $inPem = $false
+    $inYaml = $false
+    $yamlIndent = 0
     foreach ($l in [System.IO.File]::ReadAllLines($path)) {
         # multiline PEM private keys: withhold the WHOLE block, BEGIN through END;
         # if the file ends before END, everything after BEGIN stays withheld (fail closed)
         if ($inPem) {
             if ($l -match '-----END [A-Z0-9 ]*PRIVATE KEY') { $inPem = $false }
             continue
+        }
+        # YAML block scalars under secret keys (password: | ...) span lines:
+        # withhold until indentation returns to the key level or shallower
+        if ($inYaml) {
+            if ($l -match '^\s*$') { continue }
+            if (([regex]::Match($l, '^ *')).Length -gt $yamlIndent) { continue }
+            $inYaml = $false
+        }
+        if ($l -match '^(\s*)([\w. -]+):\s*[|>][+-]?\s*$') {
+            $yInd = $Matches[1]; $yKey = $Matches[2]
+            if ((Test-SecretKey $yKey) -and -not (Test-DiagnosticKey $yKey)) {
+                [void]$out.Add($yInd + $yKey + ': [REDACTED BLOCK]')
+                $inYaml = $true
+                $yamlIndent = $yInd.Length
+                continue
+            }
         }
         if ($l -match '-----BEGIN [A-Z0-9 ]*PRIVATE KEY') {
             $inPem = $true
@@ -298,6 +336,8 @@ if ($SelfTest) {
         @{ in = 'connect user:SENTINEL-13@unix(/run/x)/db ok';                     mustNot = @('SENTINEL');            must = @('[REDACTED]@unix(/run/x)/db', 'ok') }
         @{ in = '/etc/netdata/claim_token: SENTINEL-14';                           mustNot = @('SENTINEL');            must = @('[REDACTED]') }
         @{ in = 'destination = [2001:db8::77]:19999 unix:/run/nd.sock';            mustNot = @('2001:db8::77');        must = @('ip6-', ']:19999', 'unix:/run/nd.sock') }
+        @{ in = 'password: q';                                                     mustNot = @(': q');                 must = @('[REDACTED]') }
+        @{ in = '"api_token": 731942';                                             mustNot = @('731942');              must = @('[REDACTED]') }
     )
     $fails = 0
     foreach ($v in $vectors) {
@@ -321,6 +361,19 @@ if ($SelfTest) {
         $pem -notmatch 'before line' -or $pem -notmatch 'after line') {
         Write-Output 'FAIL: PEM block not fully withheld'; $fails++
     } else { Write-Output 'ok:   PEM block withheld (begin/body/end gone, surrounding lines kept)' }
+    # YAML block scalar under a secret key must be withheld end-to-end
+    $yamlTmp = Join-Path $Staging 'yaml-test.txt'
+    @('jobs:',
+      '  - name: x',
+      '    private_key: |',
+      '      SENTINEL-YAML-LINE1',
+      '      SENTINEL-YAML-LINE2',
+      '    after: ok') | Out-String | ForEach-Object { Write-Utf8 $yamlTmp $_ }
+    Invoke-SanitizeFile $yamlTmp
+    $yaml = Get-Content $yamlTmp -Raw
+    if ($yaml -match 'SENTINEL-YAML' -or $yaml -notmatch '\[REDACTED BLOCK\]' -or $yaml -notmatch 'after: ok') {
+        Write-Output 'FAIL: YAML block scalar not withheld correctly'; $fails++
+    } else { Write-Output 'ok:   YAML block scalar withheld (body gone, dedented content kept)' }
     Remove-Item $Staging -Recurse -Force
     if ($fails -gt 0) { Write-Output "SELF TEST: $fails FAILURES"; exit 1 }
     Write-Output 'SELF TEST: ALL PASS'
@@ -347,10 +400,15 @@ function Save-Cmd([string]$rel, [string]$title, [scriptblock]$cmd, [string]$orig
     try {
         $job = Start-Job -ScriptBlock $cmd
         $done = Wait-Job $job -Timeout $TimeoutSeconds
-        if ($done) { $result = Receive-Job $job 2>&1 | Out-String } else { $result = "TIMEOUT after ${TimeoutSeconds}s" }
+        if ($done) { $result = Receive-Job $job 2>&1 | Select-Object -First 50000 | Out-String } else { $result = "TIMEOUT after ${TimeoutSeconds}s" }
         Remove-Job $job -Force
     } catch { $result = "ERROR: $_" }
-    if ($result.Length -gt 2MB) { $result = $result.Substring(0, 2MB) + "`r`n### TRUNCATED at 2MB ###" }
+    if ($result.Length -gt 2MB) {
+        # truncate at a LINE boundary so a secret cannot straddle the cut
+        $cut = $result.LastIndexOf("`n", 2MB)
+        if ($cut -lt 0) { $result = '[content withheld: output exceeds the cap without a line break]' }
+        else { $result = $result.Substring(0, $cut + 1) + '### TRUNCATED at 2MB (line-aligned) ###' }
+    }
     Write-Utf8 $full ($header + "`r`n" + $result)
     Invoke-SanitizeFile $full
     Add-Manifest $rel 'cmd' $originText $title
@@ -367,11 +425,12 @@ function Save-CmdRaw([string]$rel, [string]$title, [scriptblock]$cmd, [string]$o
     try {
         $job = Start-Job -ScriptBlock $cmd
         $done = Wait-Job $job -Timeout $TimeoutSeconds
-        if ($done) { $result = Receive-Job $job 2>&1 | Out-String }
+        if ($done) { $result = Receive-Job $job 2>&1 | Select-Object -First 50000 | Out-String }
         Remove-Job $job -Force
     } catch { Write-Verbose "collector failed: $_" }
     if ($result -and $result.Trim().Length -gt 0) {
-        if ($result.Length -gt 2MB) { $result = $result.Substring(0, 2MB) }
+        # a truncated JSON document is worse than none: fail closed
+        if ($result.Length -gt 2MB) { $result = '{"error":"output exceeded the cap and was withheld"}' }
         Write-Utf8 $full $result
         Invoke-SanitizeFile $full
         Add-Manifest $rel 'cmd' $originText $title
@@ -386,7 +445,14 @@ function Save-File([string]$rel, [string]$title, [string]$src, [long]$cap = 0) {
     if (-not (Test-Path $src -PathType Leaf)) { return }
     $full = Join-Path $Work $rel
     New-Item -ItemType Directory -Path (Split-Path $full) -Force | Out-Null
-    $size = (Get-Item $src).Length
+    $item = Get-Item $src -Force
+    if ($item.Attributes -band [System.IO.FileAttributes]::ReparsePoint) {
+        # reparse points can silently retarget: fail closed rather than follow
+        Write-Utf8 $full '[content withheld: source is a symlink/reparse point]'
+        Add-Manifest $rel 'file' "$src (reparse point - withheld)" $title
+        return
+    }
+    $size = $item.Length
     $origin = $src
     if ($size -gt $cap) {
         # keep the tail at a LINE boundary (drop the first, possibly partial,
@@ -423,7 +489,11 @@ function Save-Api([string]$rel, [string]$title, [string]$urlPath) {
     try {
         $resp = Invoke-WebRequest -Uri "http://127.0.0.1:$NdPort$urlPath" -UseBasicParsing -TimeoutSec $TimeoutSeconds
         $content = $resp.Content
-        if ($content.Length -gt 2MB) { $content = $content.Substring(0, 2MB) }
+        if ($content.Length -gt 2MB) {
+            $cut = $content.LastIndexOf("`n", 2MB)
+            if ($cut -lt 0) { $content = '{"error":"response exceeded the cap and was withheld"}' }
+            else { $content = $content.Substring(0, $cut + 1) }
+        }
         Write-Utf8 $full $content
         Invoke-SanitizeFile $full
         Add-Manifest $rel 'api' $urlPath $title

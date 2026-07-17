@@ -144,6 +144,13 @@ case "$RUN_USER" in root|netdata|"") RUN_USER="" ;; *) : ;; esac
 sanitize_file() {
   _f="$1"
   [ -f "$_f" ] || return 0
+  # binary/UTF-16 input would make line-based redaction byte-unsafe: withhold
+  _b_all=$(head -c 1048576 "$_f" | wc -c)
+  _b_txt=$(head -c 1048576 "$_f" | LC_ALL=C tr -d '\000' | wc -c)
+  if [ "$_b_all" -ne "$_b_txt" ]; then
+    echo "[content withheld: file contains NUL bytes (binary or UTF-16?)]" > "$_f"
+    return 0
+  fi
   if awk -v obf="$OBFUSCATE" -v mapfile="$MAP_FILE" \
       -v host_short="$HOST_SHORT" -v host_fqdn="$HOST_FQDN" -v run_user="$RUN_USER" '
   BEGIN {
@@ -186,7 +193,7 @@ sanitize_file() {
       gsub(/[-_]/, " ", lk);
       if (diagnostic_key(lk)) return line;
       for (i = 1; i <= nsec; i++) {
-        if (index(lk, SK[i]) > 0 && length(substr(line, pos + 1)) > 1)
+        if (index(lk, SK[i]) > 0 && substr(line, pos + 1) ~ /[^ \t]/)
           return substr(line, 1, pos) " [REDACTED]";
       }
     }
@@ -210,11 +217,25 @@ sanitize_file() {
       out = out substr(rest, 1, RSTART - 1) m;
       rest = substr(rest, RSTART + RLENGTH);
     }
+    line = out rest;
+    # scalar (unquoted) JSON values under secret keys: "key": 12345
+    out = ""; rest = line;
+    while (match(rest, /"[^"]+"[ \t]*:[ \t]*[0-9truefalsnu][0-9truefalsnul.eE+-]*/)) {
+      m = substr(rest, RSTART, RLENGTH);
+      key = m; sub(/^"/, "", key); sub(/".*/, "", key);
+      lk = tolower(key); gsub(/[-_]/, " ", lk);
+      hit = 0;
+      for (i = 1; i <= nsec; i++) if (index(lk, SK[i]) > 0) hit = 1;
+      if (hit && !diagnostic_key(lk)) sub(/:[ \t]*[0-9truefalsnu][0-9truefalsnul.eE+-]*$/, ": \"[REDACTED]\"", m);
+      out = out substr(rest, 1, RSTART - 1) m;
+      rest = substr(rest, RSTART + RLENGTH);
+    }
     return out rest;
   }
   function pseudo_ip(ip,   p) {
     if (ip ~ /^127\./ || ip == "0.0.0.0" || ip ~ /^255\./) return ip;
     if (!(ip in ipmap)) {
+      if (nip >= 4096) return "redacted-ip";  # cap: non-correlating past 4096
       nip++; ipmap[ip] = "ip-" nip;
       print "ip\t" ip "\t" ipmap[ip] >> mapfile;
     }
@@ -241,7 +262,7 @@ sanitize_file() {
       cand = substr(rest, RSTART, RLENGTH);
       pre = (RSTART > 1) ? substr(rest, RSTART - 1, 1) : "";
       t = cand; nc = gsub(/:/, ":", t);
-      if (index(cand, ":") == 0 || pre ~ /[A-Za-z0-9._-]/ || length(cand) < 5 ||
+      if (index(cand, ":") == 0 || pre ~ /[A-Za-z0-9._-]/ || length(cand) < 5 || cand ~ /:$/ ||
           (nc < 3 && index(cand, "::") == 0) ||
           (cand !~ /[A-Fa-f]/ && index(cand, "::") == 0 && nc < 6) ||
           cand == "::1") {
@@ -250,6 +271,7 @@ sanitize_file() {
         continue;
       }
       if (!(cand in ip6map)) {
+        if (nip6 >= 4096) { out = out substr(rest, 1, RSTART - 1) "redacted-ip6"; rest = substr(rest, RSTART + RLENGTH); continue; }
         nip6++; ip6map[cand] = "ip6-" nip6;
         print "ip6\t" cand "\t" ip6map[cand] >> mapfile;
       }
@@ -260,6 +282,7 @@ sanitize_file() {
   }
   function pseudo_fqdn(h) {
     if (!(h in fqmap)) {
+      if (nfq >= 4096) return "redacted-host-overflow";  # cap: non-correlating
       nfq++; fqmap[h] = "private-host-" nfq;
       print "fqdn\t" h "\t" fqmap[h] >> mapfile;
     }
@@ -376,13 +399,32 @@ sanitize_file() {
       inpem = 1;
       next;
     }
+    # YAML block scalars under secret keys (password: | ... ) span lines:
+    # withhold until indentation returns to the key level or shallower
+    if (inyaml) {
+      if ($0 ~ /^[ \t]*$/) next;
+      match($0, /^[ ]*/);
+      if (RLENGTH > yamlindent) next;
+      inyaml = 0;
+    }
+    if (match($0, /^[ ]*[A-Za-z0-9_. -]+:[ \t]*[|>][+-]?[ \t]*$/)) {
+      key = $0; sub(/:.*/, "", key); gsub(/^[ ]*/, "", key);
+      lk = tolower(key); gsub(/[-_]/, " ", lk);
+      hit = 0;
+      for (i = 1; i <= nsec; i++) if (index(lk, SK[i]) > 0) hit = 1;
+      if (hit && !diagnostic_key(lk)) {
+        match($0, /^[ ]*/); yamlindent = RLENGTH;
+        sub(/:.*/, ": [REDACTED BLOCK]");
+        print; inyaml = 1; next;
+      }
+    }
     line = $0;
     # stream.conf parent side: [<API_KEY>] / [<MACHINE_GUID>] section headers ARE secrets
     if (line ~ /^[ \t]*\[[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]\][ \t]*$/) {
       print "[REDACTED-KEY-SECTION]"; next;
     }
     line = redact_kv(line);
-    if (line ~ /"[^"]+"[ \t]*:[ \t]*"/) line = redact_json(line);
+    if (line ~ /"[^"]+"[ \t]*:[ \t]*/) line = redact_json(line);
     # URL creds: scheme://user:pass@  and Go DSN: user:pass@tcp(
     while (match(line, /:\/\/[^:\/@ \t]+:[^@ \t]+@/))
       line = substr(line, 1, RSTART - 1) "://[REDACTED]@" substr(line, RSTART + RLENGTH);
@@ -494,7 +536,7 @@ collect_cmd() {
   # header must stay a single line even for multi-line sh -c scripts
   # shellcheck disable=SC1003  # literal backslash deletion, not a quote escape
   _cmdline=$(printf '%s' "$*" | tr -d '\\' | tr '\n\t' '  ' | tr -s ' ')
-  run_capped "$CMD_TIMEOUT" "$@" > "$_out.raw" 2>&1
+  run_capped "$CMD_TIMEOUT" "$@" 2>&1 | head -c "$((_ccap * 4))" > "$_out.raw"
   _rc=$?
   _raw_size=$(wc -c < "$_out.raw" | tr -d ' ')
   {
@@ -513,12 +555,21 @@ collect_file() {
   _rel="$1"; _title="$2"; _src="$3"; _cap="${4:-$FILE_CAP}"
   deadline_exceeded && return 0
   [ -f "$_src" ] && [ -r "$_src" ] || return 0
+  # a symlinked final component is not a real config/log file we chose to
+  # collect; refuse it so a swapped link cannot redirect us to another target
+  # (symlinked parent DIRECTORIES resolve normally - only the leaf is checked)
+  if [ -h "$_src" ]; then
+    _out="$WORK/$_rel"; mkdir -p "$(dirname "$_out")"
+    echo "[content withheld: source is a symlink]" > "$_out"
+    manifest_add "$_rel" "file" "$_src (symlink, withheld)" "$_title"
+    return 0
+  fi
   _out="$WORK/$_rel"; mkdir -p "$(dirname "$_out")"
   _size=$(wc -c < "$_src" 2>/dev/null | tr -d ' ')
   if [ "${_size:-0}" -gt "$_cap" ]; then
     # cap at a LINE boundary (drop the first, possibly partial, line) so a
     # secret can never straddle the cut and dodge the line-based sanitizer
-    tail -c "$((_cap + 4096))" "$_src" 2>>"$ERRORS" | tail -n +2 > "$_out"
+    tail -c "$_cap" "$_src" 2>>"$ERRORS" | tail -n +2 > "$_out"
     if [ ! -s "$_out" ]; then
       # the whole tail was one giant line: withhold rather than risk a
       # mid-token cut hiding a secret from the line-based sanitizer
@@ -543,7 +594,11 @@ collect_cmd_raw() {
   mkdir -p "$(dirname "$_out")"
   # shellcheck disable=SC1003  # literal backslash deletion, not a quote escape
   _cmdline=$(printf '%s' "$*" | tr -d '\\' | tr '\n\t' '  ' | tr -s ' ')
-  run_capped "$CMD_TIMEOUT" "$@" > "$_out" 2>>"$ERRORS"
+  run_capped "$CMD_TIMEOUT" "$@" 2>>"$ERRORS" | head -c "$API_CAP" > "$_out"
+  if [ "$(wc -c < "$_out" | tr -d ' ')" -ge "$API_CAP" ]; then
+    # a truncated JSON document is worse than none: fail closed
+    echo '{"error":"output exceeded the cap and was withheld"}' > "$_out"
+  fi
   if [ -s "$_out" ]; then
     sanitize_file "$_out"
     manifest_add "$_rel" "cmd" "$_cmdline" "$_title"
@@ -595,6 +650,12 @@ connect user:SENTINEL-15@unix(/run/x)/db ok
 destination = tcp:protoparent.example.com:19999
 # destination = old-parent.example.org:19999
 destination = [2001:db8::77]:19999 unix:/run/nd.sock 10.7.7.7:19999
+password: q
+"api_token": 731942
+private_key: |
+  SENTINEL-YAML-LINE1
+  SENTINEL-YAML-LINE2
+after_block = ok
 tcp LISTEN 0 4096 later-line
 cmdline: /usr/sbin/agent -token=SENTINEL-14 --verbose
 cmdline: claim.sh api key = SENTINEL-12 end
@@ -638,6 +699,10 @@ VECTORS
   t_absent  "protoparent.example.com"     "protocol-prefixed destination hostname survived"
   t_absent  "10\.7\.7\.7"              "IP destination not pseudonymized as an IP"
   t_present "tcp LISTEN 0 4096 later-line" "literal tcp corrupted by fqmap pollution"
+  t_absent  "password: q"                "one-character secret survived"
+  t_absent  "731942"                     "scalar JSON secret survived"
+  t_absent  "SENTINEL-YAML"              "YAML block-scalar secret survived"
+  t_present "after_block = ok"           "YAML block withholding ate following content"
   t_present "destination = tcp:"          "destination protocol prefix lost"
   t_absent  "ops@example.com"            "email survived"
   t_absent  "aa:bb:cc:dd:ee:ff"          "MAC survived"
@@ -654,7 +719,14 @@ VECTORS
   t_absent  "2001:db8::77"               "bracketed IPv6 destination leaked"
   t_absent  "10\.7\.7\.7"             "IP destination not pseudonymized"
   t_present "tcp LISTEN 0 4096 later-line" "literal tcp corrupted by fqmap pollution"
+  t_absent  "password: q"                "one-character secret survived"
+  t_absent  "731942"                     "scalar JSON secret survived"
+  t_absent  "SENTINEL-YAML"              "YAML block-scalar secret survived"
+  t_present "after_block = ok"           "YAML block withholding ate following content"
   t_present -- "--verbose"               "path-bearing argv line was eaten by the kv rule"
+  printf 'nul-test \000 password=SENTINEL-NUL\n' > "$_tf.nul"
+  sanitize_file "$_tf.nul"
+  grep -q "content withheld" "$_tf.nul" || { echo "FAIL: NUL-bearing file was not withheld" >&2; _fails=$((_fails + 1)); }
   if [ "$_fails" -eq 0 ]; then
     echo "netdata-support-bundle selftest: ALL PASS"
     exit 0
@@ -704,7 +776,7 @@ fi
 if [ "$api_ok" = "1" ]; then
   _seed_n=0
   set -f
-  for _h in $( { curl -sf --max-time 5 "http://127.0.0.1:${NDPORT}/api/v2/node_instances" 2>/dev/null || wget -q -T 5 -O - "http://127.0.0.1:${NDPORT}/api/v2/node_instances" 2>/dev/null; }       | tr ',{' '\n' | sed -nE 's/.*"(nm|hostname)" *: *"([^"]*)".*/\2/p' | sort -u); do
+  for _h in $( { curl -sf --max-time 5 "http://127.0.0.1:${NDPORT}/api/v2/node_instances" 2>/dev/null || wget -q -T 5 -O - "http://127.0.0.1:${NDPORT}/api/v2/node_instances" 2>/dev/null; }       | tr ',{' '\n' | awk 'match($0, /"(nm|hostname)" *: *"/) { _v = substr($0, RSTART + RLENGTH); sub(/".*/, "", _v); if (_v != "") print _v }' | sort -u); do
     [ "$_h" = "$HOST_SHORT" ] && continue
     [ "$_h" = "$HOST_FQDN" ] && continue
     [ "$_h" = "localhost" ] && continue

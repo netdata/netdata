@@ -136,7 +136,7 @@ Every item collected maps to a recurring support ask. That mapping is the
 | item | why |
 |---|---|
 | **effective running config** (`GET /netdata.conf`) | the #1 GitHub maintainer ask; shows the merged config the agent actually uses and annotates unrecognized options — resolves "my config is ignored" outright; authoritative over on-disk files |
-| on-disk `netdata.conf`, `stream.conf`, cloud/claim conf, `go.d.conf`, go.d/health.d/python.d/charts.d/statsd.d user files, `exporting.conf` | the files users were asked to paste, ticket after ticket (child stream.conf + parent `[web]`/`[stream]` sections is a canned Freshdesk ask); **all pass the sanitizer**; arbitrary config paths are replaced by neutral names and recorded only in the private sidecar map |
+| on-disk `netdata.conf`, `stream.conf`, cloud/claim conf, `go.d.conf`, go.d/health.d/python.d/charts.d/statsd.d user files, `exporting.conf` | the files users were asked to paste, ticket after ticket (child stream.conf + parent `[web]`/`[stream]` sections is a canned Freshdesk ask); **all pass the sanitizer**, and their bundle paths mirror their paths relative to the config directory |
 
 ### `05-logs/` — history
 
@@ -255,24 +255,19 @@ Two passes, one sweep, applied to **every** collected file:
    - resolv.conf `search`/`domain` values → `[SEARCH-DOMAINS-WITHHELD]`
      (corporate search domains are rarely under private TLDs).
 
-The private map is written next to the bundle (`*.pseudonym-map.*`) so the
+The private map is written next to the bundle (`*.pseudonym-map.tsv`) so the
 **user** can decode references if support asks "what is private-host-2?" — it
-is never included in the bundle itself. It also maps neutral archive filenames
-back to arbitrary config/log source paths, including when content PII
-obfuscation is disabled. Correlating content mappings are capped at 4096
-entries; additional values use generic placeholders so hostile high-cardinality
-input cannot grow memory or the private map without bound.
+is never included in the bundle itself. Pseudonym mappings are capped at 4096
+entries; past the cap, values get a non-correlating placeholder so hostile
+high-cardinality input cannot grow memory or the private map without bound.
 
 Redaction here is defense in depth, not a substitute for exclusion: files that
-are pure secrets (see exclusion list) are never read at all.
-
-Source collection skips files reached through a symbolic link or reparse point,
-and withholds text containing embedded NUL characters (for example, BOM-less
-UTF-16 or binary input) instead of applying byte-unsafe redaction. The link
-check protects against links planted before collection; it is deliberately not
-claimed as an atomic no-follow open. The root/Administrator and Netdata service
-identities are trusted not to adversarially replace source entries or mutate
-source-directory contents while the tool runs. Do not extend collection to a
+are pure secrets (see exclusion list) are never read at all. Files containing
+NUL bytes (binary or BOM-less UTF-16 input) are withheld rather than run
+through byte-unsafe line redaction. A source file whose leaf is itself a
+symlink is withheld (a swapped link must not redirect collection to another
+target); symlinked parent directories resolve normally. Do not extend
+collection to a
 directory writable by any other identity. Each run uses a newly created,
 unpredictable staging directory and never reuses a pre-existing path. POSIX
 staging is created under `umask 077`; Windows staging disables ACL inheritance
