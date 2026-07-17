@@ -49,7 +49,7 @@ Missing a term? Let us know or submit a request to expand our glossary. Together
 
 ## F
 
-- [**Family**](/docs/dashboards-and-charts/netdata-charts.md#families): 1. What we consider our Netdata community of users and engineers. 2. A single instance of a hardware or software resource that needs to be displayed separately from similar instances.
+- [**Family**](/docs/dashboards-and-charts/netdata-charts.md#families): 1. What we consider our Netdata community of users and engineers. 2. Chart metadata that groups related charts for navigation and presentation.
 
 - [**Flood Protection**](/docs/alerts-and-notifications/notifications/centralized-cloud-notifications/centralized-cloud-notifications-reference.md#benefits-of-centralized-notifications): If a node has too many state changes like firing too many alerts or going from reachable to unreachable, Netdata Cloud enables flood protection. As long as a node is in flood protection mode, Netdata Cloud doesn’t send notifications about this node
 
