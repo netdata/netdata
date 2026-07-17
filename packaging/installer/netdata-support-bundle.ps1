@@ -489,11 +489,8 @@ function Save-Api([string]$rel, [string]$title, [string]$urlPath) {
     try {
         $resp = Invoke-WebRequest -Uri "http://127.0.0.1:$NdPort$urlPath" -UseBasicParsing -TimeoutSec $TimeoutSeconds
         $content = $resp.Content
-        if ($content.Length -gt 2MB) {
-            $cut = $content.LastIndexOf("`n", 2MB)
-            if ($cut -lt 0) { $content = '{"error":"response exceeded the cap and was withheld"}' }
-            else { $content = $content.Substring(0, $cut + 1) }
-        }
+        # a JSON body cut at any point is malformed, so overflow is withheld whole
+        if ($content.Length -gt 2MB) { $content = '{"error":"response exceeded the cap and was withheld"}' }
         Write-Utf8 $full $content
         Invoke-SanitizeFile $full
         Add-Manifest $rel 'api' $urlPath $title

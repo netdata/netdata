@@ -105,8 +105,11 @@ run_capped() { # run_capped <seconds> <cmd...>
     1) timeout "$_t" "$@" ;;
     *)
       # no timeout binary (macOS): portable watchdog so a stuck collector
-      # cannot hang the whole run. Limitation: kills the direct child only -
-      # sh -c grandchildren may be orphaned (GNU timeout kills the group).
+      # cannot hang the whole run. KNOWN WEAKER GUARANTEE than GNU/BSD
+      # timeout (which kills the whole process group): this best-effort path
+      # SIGKILLs the direct child and, where pkill exists, its children;
+      # deeper sh -c grandchildren may briefly orphan. Total runtime is still
+      # bounded by GLOBAL_DEADLINE. Only reached on hosts lacking timeout.
       "$@" &
       _cmdpid=$!
       (
@@ -116,6 +119,7 @@ run_capped() { # run_capped <seconds> <cmd...>
           kill -0 "$_cmdpid" 2>/dev/null || exit 0
           _i=$((_i + 1))
         done
+        command -v pkill >/dev/null 2>&1 && pkill -9 -P "$_cmdpid" 2>/dev/null
         kill -9 "$_cmdpid" 2>/dev/null
       ) &
       _wdpid=$!
@@ -615,9 +619,13 @@ collect_api() {
   deadline_exceeded && return 0
   _out="$WORK/$_rel"; mkdir -p "$(dirname "$_out")"
   if command -v curl >/dev/null 2>&1; then
-    curl -sf --max-time "$CMD_TIMEOUT" "$_url" 2>>"$ERRORS" | awk -v cap="$API_CAP" 'BEGIN { b = 0 } { b += length($0) + 1; if (b > cap) exit; print }' > "$_out"
+    curl -sf --max-time "$CMD_TIMEOUT" "$_url" 2>>"$ERRORS" | head -c "$((API_CAP + 1))" > "$_out"
   elif command -v wget >/dev/null 2>&1; then
-    wget -q -T "$CMD_TIMEOUT" -O - "$_url" 2>>"$ERRORS" | awk -v cap="$API_CAP" 'BEGIN { b = 0 } { b += length($0) + 1; if (b > cap) exit; print }' > "$_out"
+    wget -q -T "$CMD_TIMEOUT" -O - "$_url" 2>>"$ERRORS" | head -c "$((API_CAP + 1))" > "$_out"
+  fi
+  # a JSON body cut at any point is malformed, so overflow is withheld whole
+  if [ "$(wc -c < "$_out" 2>/dev/null | tr -d ' ')" -gt "$API_CAP" ]; then
+    echo '{"error":"response exceeded the cap and was withheld"}' > "$_out"
   fi
   if [ -s "$_out" ]; then
     sanitize_file "$_out"
