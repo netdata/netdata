@@ -131,6 +131,7 @@ func (c *socketClient) getStatus() (*status, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error on getting data from socket '%s': %v", c.socket, err)
 	}
+	defer resp.Body.Close()
 
 	content, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -186,6 +187,7 @@ func (c *tcpClient) getStatus() (*status, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error on getting data from address '%s': %v", c.address, err)
 	}
+	defer resp.Body.Close()
 
 	content, err := io.ReadAll(resp.Body)
 	if err != nil {
