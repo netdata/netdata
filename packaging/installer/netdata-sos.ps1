@@ -181,9 +181,12 @@ function Get-ReadDeadline {
     return $GlobalDeadline
 }
 
-function Read-HttpTextBounded([string]$uri, [long]$maximumBytes) {
+function Read-LocalHttpTextBounded([string]$uri, [long]$maximumBytes) {
     $deadline = Get-ReadDeadline
     $request = [System.Net.HttpWebRequest]::Create($uri)
+    # Local Agent API traffic must never inherit a configured system proxy.
+    $request.Proxy = $null
+    $request.AllowAutoRedirect = $false
     $request.Timeout = $TimeoutSeconds * 1000
     $request.ReadWriteTimeout = $TimeoutSeconds * 1000
     $response = $null; $reader = $null
@@ -191,6 +194,8 @@ function Read-HttpTextBounded([string]$uri, [long]$maximumBytes) {
     $buffer = New-Object char[] 4096
     try {
         $response = $request.GetResponse()
+        $status = [int]$response.StatusCode
+        if ($status -lt 200 -or $status -ge 300) { throw "local API returned HTTP $status" }
         $reader = New-Object System.IO.StreamReader($response.GetResponseStream())
         while (($count = $reader.Read($buffer, 0, $buffer.Length)) -gt 0) {
             if ((Get-Date) -gt $deadline) { throw 'HTTP reader deadline exceeded' }
@@ -1234,6 +1239,7 @@ function Collect-File([string]$rel, [string]$title, [string]$src, [long]$cap = 0
 }
 
 $NdPort = 19999
+$LocalApiBase = ''
 $CloudHost = 'app.netdata.cloud'   # reachability probe target
 function Collect-Api([string]$rel, [string]$title, [string]$urlPath) {
     if (Test-Deadline) { return }
@@ -1243,7 +1249,7 @@ function Collect-Api([string]$rel, [string]$title, [string]$urlPath) {
         # Bound the transport before sanitization as well as bounding the
         # published output. A misbehaving endpoint must not keep this process
         # reading an arbitrary response until the global deadline.
-        $text = Read-HttpTextBounded "http://127.0.0.1:$NdPort$urlPath" $CommandRawCap
+        $text = Read-LocalHttpTextBounded "$LocalApiBase$urlPath" $CommandRawCap
         $reader = New-Object System.IO.StringReader($text)
         try { [void](Write-SanitizedReaderCapped $reader $full 2MB -Deadline (Get-ReadDeadline)) }
         finally { $reader.Dispose() }
@@ -1426,19 +1432,23 @@ $env:ND_SOS_TIMEOUT_MS = [string]($TimeoutSeconds * 1000)
 $NetdataSvc = Get-Service -Name 'Netdata' -ErrorAction SilentlyContinue
 $NetdataProc = Get-Process -Name 'netdata' -ErrorAction SilentlyContinue | Select-Object -First 1
 $ApiOk = $false
-try {
-    [void](Read-HttpTextBounded "http://127.0.0.1:$NdPort/api/v1/info" 256KB)
-    $ApiOk = $true
-} catch { Write-Verbose "agent API not reachable: $_" }
+foreach ($candidate in @("http://127.0.0.1:$NdPort", "http://[::1]:$NdPort")) {
+    try {
+        [void](Read-LocalHttpTextBounded "$candidate/api/v1/info" 256KB)
+        $LocalApiBase = $candidate
+        $ApiOk = $true
+        break
+    } catch { Write-Verbose "agent API not reachable at $candidate`: $_" }
+}
 
 # pre-seed pseudonyms for child/mirrored hostnames, so a parent's children are
 # obfuscated consistently in every file (node_instances, stream configs, logs)
 if ($ApiOk -and $Obfuscate) {
     try {
         $names = @()
-        $ni = Read-HttpTextBounded "http://127.0.0.1:$NdPort/api/v2/node_instances" 2MB | ConvertFrom-Json
+        $ni = Read-LocalHttpTextBounded "$LocalApiBase/api/v2/node_instances" 2MB | ConvertFrom-Json
         if ($ni -and $ni.PSObject.Properties['nodes']) { $names += @($ni.nodes | ForEach-Object { $_.nm }) }
-        $v1 = Read-HttpTextBounded "http://127.0.0.1:$NdPort/api/v1/info" 2MB | ConvertFrom-Json
+        $v1 = Read-LocalHttpTextBounded "$LocalApiBase/api/v1/info" 2MB | ConvertFrom-Json
         if ($v1 -and $v1.PSObject.Properties['mirrored_hosts']) { $names += @($v1.mirrored_hosts) }
         foreach ($n in ($names | Sort-Object -Unique)) {
             if (-not $n -or $n.Length -lt 4 -or $n -eq 'localhost' -or $n -eq $HostShort -or $n -eq $HostFqdn) { continue }
@@ -1602,7 +1612,7 @@ if ($ApiOk) {
     Show-Info 'agent API unreachable - skipping runtime section'
     $marker = Join-Path $Work '07-runtime'
     New-Item -ItemType Directory -Path $marker -Force | Out-Null
-    Write-Utf8NoBom (Join-Path $marker 'AGENT-API-UNREACHABLE.txt') "Agent API at 127.0.0.1:$NdPort was unreachable when this bundle was created. The agent process may still have been running; see summary.txt, 05-logs, and 06-state\status-file.json.`n"
+    Write-Utf8NoBom (Join-Path $marker 'AGENT-API-UNREACHABLE.txt') "Agent API on the local IPv4/IPv6 loopbacks at port $NdPort was unreachable when this bundle was created. The agent process may still have been running; see summary.txt, 05-logs, and 06-state\status-file.json.`n"
     Add-Manifest '07-runtime\AGENT-API-UNREACHABLE.txt' 'file' 'generated' 'Marker: local agent API was unreachable'
 }
 if (Test-Path $NetdataExe) {

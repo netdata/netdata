@@ -103,6 +103,76 @@ for path do
   printf '%s\n' "$path"
 done
 EOF
+LOCAL_API_FETCH="$STAGING/fetch-local-api.sh"
+cat > "$LOCAL_API_FETCH" <<'EOF'
+#!/bin/sh
+client=$1
+url=$2
+timeout=$3
+tempdir=$4
+maximum=$5
+if [ "$client" = curl ] && command -v curl >/dev/null 2>&1; then
+  exec env http_proxy= HTTP_PROXY= https_proxy= HTTPS_PROXY= all_proxy= ALL_PROXY= \
+    no_proxy='*' NO_PROXY='*' curl --noproxy '*' --location --max-redirs 0 \
+    -sf --max-time "$timeout" "$url"
+fi
+if [ "$client" = wget ] && command -v wget >/dev/null 2>&1 &&
+   wget --help 2>&1 | grep -q -- '--max-redirect'; then
+  exec env http_proxy= HTTP_PROXY= https_proxy= HTTPS_PROXY= all_proxy= ALL_PROXY= \
+    no_proxy='*' NO_PROXY='*' wget -Y off --max-redirect=0 -q -T "$timeout" -O - "$url"
+fi
+if [ "$client" = nc ]; then
+  if command -v nc >/dev/null 2>&1; then
+    local_nc() { nc "$@"; }
+  elif command -v busybox >/dev/null 2>&1 && busybox --list | grep -qx nc; then
+    local_nc() { busybox nc "$@"; }
+  else
+    exit 127
+  fi
+  authority_and_path=${url#http://}
+  authority=${authority_and_path%%/*}
+  path=/${authority_and_path#*/}
+  port=${authority##*:}
+  case "$authority" in
+    127.0.0.1:*) host=127.0.0.1 ;;
+    \[::1\]:*) host=::1 ;;
+    *) exit 126 ;;
+  esac
+  raw=$(mktemp "$tempdir/local-api-response.XXXXXX") || exit 1
+  body="$raw.body"
+  trap 'rm -f "$raw" "$body"' EXIT
+  trap 'exit 1' HUP INT TERM
+  blocks=$(( (maximum + 65535 + 511) / 512 ))
+  (
+    ulimit -f "$blocks" 2>/dev/null || exit 1
+    printf 'GET %s HTTP/1.0\r\nHost: %s\r\nConnection: close\r\n\r\n' "$path" "$authority" |
+      local_nc -w "$timeout" "$host" "$port" > "$raw" 2>/dev/null
+  ) || exit 22
+  status=$(sed -n '1{s/\r$//;p;q;}' "$raw")
+  printf '%s\n' "$status" | grep -Eq '^HTTP/1[.][01] 2[0-9][0-9]( |$)' || exit 22
+  header_end=$(awk '{ line=$0; sub(/\r$/, "", line); if (line == "") { print NR; exit } }' "$raw")
+  [ -n "$header_end" ] || exit 22
+  content_length=$(awk -v end="$header_end" '
+    NR >= end { exit }
+    { line=tolower($0); sub(/\r$/, "", line) }
+    line ~ /^content-length:[ \t]*[0-9]+$/ {
+      sub(/^content-length:[ \t]*/, "", line)
+      print line
+    }
+  ' "$raw")
+  case "$content_length" in *[!0-9]*|'') exit 22 ;; *) : ;; esac
+  [ "$content_length" -le "$maximum" ] || exit 22
+  if awk -v end="$header_end" 'NR < end && tolower($0) ~ /^transfer-encoding:/ { found=1 } END { exit !found }' "$raw"; then
+    exit 22
+  fi
+  tail -n "+$((header_end + 1))" "$raw" > "$body"
+  actual=$(wc -c < "$body" | tr -d ' ')
+  [ "$actual" -eq "$content_length" ] || exit 22
+  cat "$body"
+  exit 0
+fi
+exit 127
+EOF
 
 cleanup() { [ "$KEEP_STAGING" = "1" ] || rm -rf "$STAGING"; }
 trap cleanup EXIT
@@ -1167,16 +1237,21 @@ collect_cmd_raw() {
 # collect_api <rel-path> <title> <url-path>
 NDPORT=19999
 api_ok=0
+LOCAL_API_BASE=""
+LOCAL_API_CLIENT=""
+
+local_api_get() {
+  run_capped "$3" sh "$LOCAL_API_FETCH" "$1" "$2" "$3" "$STAGING" "$4"
+}
+
 collect_api() {
-  _rel="$1"; _title="$2"; _upath="$3"; _url="http://127.0.0.1:${NDPORT}${_upath}"
+  _rel="$1"; _title="$2"; _upath="$3"; _url="${LOCAL_API_BASE}${_upath}"
   deadline_exceeded && return 0
   _out="$WORK/$_rel"; mkdir -p "$(dirname "$_out")"
-  if command -v curl >/dev/null 2>&1; then
-    capture_command_output "$_out" "$API_CAP" raw "curl $_upath" \
-      curl -sf --max-time "$CMD_TIMEOUT" "$_url" || true
-  elif command -v wget >/dev/null 2>&1; then
-    capture_command_output "$_out" "$API_CAP" raw "wget $_upath" \
-      wget -q -T "$CMD_TIMEOUT" -O - "$_url" || true
+  if [ -n "$LOCAL_API_CLIENT" ]; then
+    capture_command_output "$_out" "$API_CAP" raw "local API $_upath" \
+      sh "$LOCAL_API_FETCH" "$LOCAL_API_CLIENT" "$_url" "$CMD_TIMEOUT" \
+      "$STAGING" "$API_CAP" || true
   else
     CAPTURE_SAFE=0
   fi
@@ -1548,18 +1623,22 @@ NETDATA_BIN=$(command -v netdata 2>/dev/null)
   NETDATA_BIN=$(readlink -f "/proc/$NETDATA_PID/exe" 2>/dev/null)
 [ -z "${NETDATA_BIN:-}" ] && [ -x /opt/netdata/usr/sbin/netdata ] && NETDATA_BIN=/opt/netdata/usr/sbin/netdata
 
-if command -v curl >/dev/null 2>&1 && curl -sf --max-time 3 "http://127.0.0.1:${NDPORT}/api/v1/info" >/dev/null 2>&1; then
-  api_ok=1
-elif command -v wget >/dev/null 2>&1 && wget -q -T 3 -O /dev/null "http://127.0.0.1:${NDPORT}/api/v1/info" 2>/dev/null; then
-  api_ok=1
-fi
+for _api_base in "http://127.0.0.1:${NDPORT}" "http://[::1]:${NDPORT}"; do
+  for _api_client in curl wget nc; do
+    if local_api_get "$_api_client" "${_api_base}/api/v1/info" 3 262144 >/dev/null 2>&1; then
+      LOCAL_API_BASE=$_api_base
+      LOCAL_API_CLIENT=$_api_client
+      api_ok=1
+      break 2
+    fi
+  done
+done
 
 # pre-seed child/mirrored node hostnames so they pseudonymize consistently in
 # EVERY file (node_instances, stream configs, logs). Their real names stay in
 # the local map for the user to decode.
 if [ "$api_ok" = "1" ]; then
-  { curl -sf --max-time 5 "http://127.0.0.1:${NDPORT}/api/v2/node_instances" 2>/dev/null ||
-    wget -q -T 5 -O - "http://127.0.0.1:${NDPORT}/api/v2/node_instances" 2>/dev/null; } |
+  local_api_get "$LOCAL_API_CLIENT" "${LOCAL_API_BASE}/api/v2/node_instances" 5 "$API_CAP" 2>/dev/null |
     tr ',{' '\n' | sed -nE 's/.*"(nm|hostname)" *: *"([^"]*)".*/\2/p' |
     awk '!seen[$0]++ { print; if (++count >= 4096) exit }' |
     {
@@ -1848,7 +1927,7 @@ if [ "$api_ok" = "1" ]; then
 else
   info "agent API unreachable - skipping runtime section"
   mkdir -p "$WORK/07-runtime"
-  echo "The local Agent API at 127.0.0.1:$NDPORT was unreachable when this bundle was created. The process may still have been running; see summary.txt, 05-logs, and 06-state/status-file.json." > "$WORK/07-runtime/AGENT-API-UNREACHABLE.txt"
+  echo "The Agent API on the local IPv4/IPv6 loopbacks at port $NDPORT was unreachable when this bundle was created. The process may still have been running; see summary.txt, 05-logs, and 06-state/status-file.json." > "$WORK/07-runtime/AGENT-API-UNREACHABLE.txt"
   manifest_add 07-runtime/AGENT-API-UNREACHABLE.txt "file" "generated" "Marker: local Agent API unreachable at collection time"
 fi
 if [ -n "${NETDATA_BIN:-}" ]; then

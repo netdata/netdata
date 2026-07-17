@@ -173,6 +173,10 @@ Every item collected maps to a recurring support ask. That mapping is the
 | `netdatacli aclk-state json` | canned Freshdesk ask for cloud issues |
 | netdata self CPU/memory/clients CSVs (10 min, bounded) | replaces the "please send a screenshot of the Netdata memory charts" round trip |
 
+Local API discovery tries IPv4 and IPv6 loopback, then reuses the first working
+base for every API read. These requests explicitly bypass configured proxies so
+diagnostic data cannot leave the host through a forced proxy.
+
 ### `08-network/` — connectivity
 
 | item | why |
