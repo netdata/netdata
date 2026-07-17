@@ -725,6 +725,10 @@ sidebar:
       label: Logs
     items:
       - meta:
+          label: Working with Logs
+          edit_url: https://github.com/netdata/netdata/edit/master/docs/category-overview-pages/working-with-logs.md
+          description: Choose a native or ingested log source and decide whether to keep logs local or centralize them.
+      - meta:
           label: Systemd Journal Logs
         items:
           - meta:
