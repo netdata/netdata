@@ -13,7 +13,11 @@ run_top_queries_retry() {
   local i=1
 
   while [ "$i" -le "$attempts" ]; do
-    run_agent_function "$module" top-queries "$output" __job:local
+    run "$WORKDIR/go.d.plugin" \
+      --config-dir "$WORKDIR/config" \
+      --function "${module}:top-queries" \
+      --function-args __job:local \
+      > "$output"
     validate "$output"
     if has_min_rows "$output" 1; then
       return 0

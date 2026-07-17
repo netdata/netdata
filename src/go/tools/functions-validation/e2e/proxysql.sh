@@ -34,12 +34,10 @@ run_info_proxysql() {
     -v "$WORKDIR:/work" \
     -w /work \
     debian:bookworm-slim \
-    /work/function-call \
-    --plugin /work/go.d.plugin \
+    /work/go.d.plugin \
     --config-dir /work/config \
-    --module proxysql \
     --function proxysql:top-queries \
-    --arg info \
+    --function-args info \
     > "$output"
   validate "$output"
 }
@@ -51,12 +49,10 @@ run_top_queries_proxysql() {
     -v "$WORKDIR:/work" \
     -w /work \
     debian:bookworm-slim \
-    /work/function-call \
-    --plugin /work/go.d.plugin \
+    /work/go.d.plugin \
     --config-dir /work/config \
-    --module proxysql \
     --function proxysql:top-queries \
-    --arg __job:local \
+    --function-args __job:local \
     > "$output"
   validate "$output" --min-rows 1
 }

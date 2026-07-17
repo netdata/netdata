@@ -1,9 +1,8 @@
-# Functions Validation (Agent Protocol + Containers)
+# Functions Validation (CLI + Containers)
 
 ## TL;DR
 - Bring up databases with Docker Compose.
-- Run `go.d.plugin` as an Agent and invoke Functions through its stdin/result
-  protocol with the configs in `./config`.
+- Use `go.d.plugin --function` with the configs in `./config`.
 - Config files live under `./config/go.d`.
 - Validate output against the embedded schema.
 - Use `./e2e.sh` for automated end-to-end checks in `/tmp` (runs per-DB scripts).
@@ -13,20 +12,14 @@
 docker compose up -d
 ```
 
-## Example Agent-protocol run (Postgres)
+## Example CLI run (Postgres)
 ```
-cd ../../../src/go
-go build -o /tmp/go.d.plugin ./cmd/godplugin
-go run ./tools/functions-validation/call \
-  --plugin /tmp/go.d.plugin \
-  --config-dir ./tools/functions-validation/config \
-  --module postgres \
+cd ../../../
+src/go/go.d.plugin \
+  --config-dir src/go/tools/functions-validation/config \
   --function postgres:top-queries \
-  --arg info
+  --function-args info
 ```
-
-Each `--arg` supplies one whitespace-free Function argument token. Repeat the
-flag when a Function takes multiple arguments.
 
 ## Validate output
 
@@ -52,15 +45,13 @@ columns.
 
 ## Validate output (require rows)
 ```
-go run ./tools/functions-validation/call \
-  --plugin /tmp/go.d.plugin \
-  --config-dir ./tools/functions-validation/config \
-  --module postgres \
+src/go/go.d.plugin \
+  --config-dir src/go/tools/functions-validation/config \
   --function postgres:top-queries \
-  --arg __job:local \
+  --function-args __job:local \
   > /tmp/pg.json
 
-go run ./tools/functions-validation/validate --input /tmp/pg.json --min-rows 1
+(cd src/go && go run ./tools/functions-validation/validate --input /tmp/pg.json --min-rows 1)
 ```
 
 ## E2E runner (recommended)
@@ -85,10 +76,7 @@ go run ./tools/functions-validation/validate --input /tmp/pg.json --min-rows 1
 ### Behavior
 - Each DB script creates a workspace under `/tmp` and runs Docker Compose there.
 - Ports are auto-selected per run to avoid collisions.
-- Builds `go.d.plugin` and the Agent-protocol Function caller into the `/tmp`
-  workspace.
-- Waits for the requested Function publication, writes a real `FUNCTION` record
-  to Agent stdin, and validates the matching `FUNCTION_RESULT_BEGIN/END` frame.
+- Builds `go.d.plugin` into the `/tmp` workspace.
 - Validates schema **and** that data rows are returned for top-queries.
 - Cleans up the `/tmp` workspace on success; keeps it on failure for debugging.
 
