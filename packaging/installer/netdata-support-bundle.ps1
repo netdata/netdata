@@ -474,7 +474,11 @@ function Save-File([string]$rel, [string]$title, [string]$src, [long]$cap = 0) {
         } finally { $fs.Close() }
         $origin = "$src (last ~$cap of $size bytes, line-aligned)"
     } else {
-        Copy-Item $src $full -Force
+        try { Copy-Item $src $full -Force -ErrorAction Stop }
+        catch {
+            Write-Utf8 $full "[content withheld: could not read source ($_)]"
+            $origin = "$src (unreadable - withheld)"
+        }
     }
     Invoke-SanitizeFile $full
     Add-Manifest $rel 'file' $origin $title
@@ -793,7 +797,7 @@ try {
 $MapPath = Join-Path $Output "$BundleName.pseudonym-map.tsv"
 if ($Obfuscate -and $script:PseudoMap.Count -gt 0) {
     # same format as the POSIX script: type<TAB>original<TAB>pseudonym
-    $script:PseudoMap.GetEnumerator() | ForEach-Object {
+    $mapText = ($script:PseudoMap.GetEnumerator() | ForEach-Object {
         $type = 'other'
         if ($_.Value -match '^ip6-\d+$') { $type = 'ip6' }
         elseif ($_.Value -match '^ip-\d+$') { $type = 'ip' }
@@ -801,7 +805,13 @@ if ($Obfuscate -and $script:PseudoMap.Count -gt 0) {
         elseif ($_.Value -eq 'redacted-host') { $type = 'host' }
         elseif ($_.Value -eq 'redacted-user') { $type = 'user' }
         "$type`t$($_.Key)`t$($_.Value)"
-    } | Out-String | ForEach-Object { Write-Utf8 $MapPath $_ }
+    }) -join "`n"
+    # build in the private staging dir, then move without -Force so a
+    # pre-existing file or symlink in a shared output dir is never followed
+    $mapStaged = Join-Path $Staging 'pseudonym-map.tsv'
+    Write-Utf8 $mapStaged ($mapText + "`n")
+    try { Move-Item -Path $mapStaged -Destination $MapPath -ErrorAction Stop }
+    catch { Show-Info "could not publish pseudonym map to $MapPath ($_) - left in staging"; $MapPath = $mapStaged; $KeepStaging = $true }
 }
 
 if (-not $KeepStaging) { Remove-Item $Staging -Recurse -Force }

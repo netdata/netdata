@@ -173,9 +173,8 @@ Every item collected maps to a recurring support ask. That mapping is the
 | `netdatacli aclk-state json` | canned Freshdesk ask for cloud issues |
 | netdata self CPU/memory/clients CSVs (10 min, bounded) | replaces the "please send a screenshot of the Netdata memory charts" round trip |
 
-Local API discovery tries IPv4 and IPv6 loopback, then reuses the first working
-base for every API read. These requests explicitly bypass configured proxies so
-diagnostic data cannot leave the host through a forced proxy.
+Local API reads target `127.0.0.1:19999` directly and bypass any configured
+proxy, so diagnostic data cannot leave the host through a forced proxy.
 
 ### `08-network/` — connectivity
 
@@ -270,11 +269,10 @@ target); symlinked parent directories resolve normally. Do not extend
 collection to a
 directory writable by any other identity. Each run uses a newly created,
 unpredictable staging directory and never reuses a pre-existing path. POSIX
-staging is created under `umask 077`; Windows staging disables ACL inheritance
-as part of the atomic directory-creation call, before the path is observable,
-and grants access only to the current identity, SYSTEM, and Administrators. The
-Windows pseudonym map retains that protected ACL when it is published, even if
-the selected output directory is shared.
+staging is created under `umask 077` on POSIX and under the per-user `%TEMP%`
+tree on Windows, with an unpredictable random name. Final artifacts (tarball,
+zip, pseudonym map) are published with a no-overwrite move so a pre-existing
+file or symlink at the target is never followed or clobbered.
 
 **The agent itself provides no redaction anywhere** — `GET /netdata.conf` and
 `netdatacli dumpconfig` print secrets verbatim. Everything must be sanitized
@@ -310,8 +308,9 @@ by these scripts.
   breaking layout changes; downstream ticket tooling may parse it.
 - Command captures are `.txt` files starting with a
   `# netdata-support-bundle v<version> | command: ... | captured: <utc>` header; on POSIX
-  they also end with an `# exit: N | duration: Ns` trailer; PowerShell jobs
-  record their terminal job state instead of an exit code.
+  they also end with an `# exit: N | duration: Ns` trailer. PowerShell command
+  captures carry the provenance header only (background jobs do not surface a
+  meaningful process exit code).
 - Copied files and API responses are sanitized without provenance headers
   (and remain parseable when they fit their cap); their
   provenance lives in `MANIFEST.json`, not in the files.

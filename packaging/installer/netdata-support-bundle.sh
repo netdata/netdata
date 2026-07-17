@@ -540,8 +540,8 @@ collect_cmd() {
   # header must stay a single line even for multi-line sh -c scripts
   # shellcheck disable=SC1003  # literal backslash deletion, not a quote escape
   _cmdline=$(printf '%s' "$*" | tr -d '\\' | tr '\n\t' '  ' | tr -s ' ')
-  run_capped "$CMD_TIMEOUT" "$@" 2>&1 | head -c "$((_ccap * 4))" > "$_out.raw"
-  _rc=$?
+  { run_capped "$CMD_TIMEOUT" "$@" 2>&1; echo "$?" > "$_out.rc"; } | head -c "$((_ccap * 4))" > "$_out.raw"
+  _rc=$(cat "$_out.rc" 2>/dev/null || echo '?'); rm -f "$_out.rc"
   _raw_size=$(wc -c < "$_out.raw" | tr -d ' ')
   {
     printf '# netdata-support-bundle v%s | command: %s | captured: %s\n' "$VERSION" "$_cmdline" "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -646,7 +646,6 @@ password: SENTINEL-3
 "claim_token": "SENTINEL-4"
 url: https://admin:SENTINEL-5@app.example.com/x
 dsn: user:SENTINEL-6@tcp(10.1.2.3:3306)/db
-dsn2: user:SENTINEL-7@unix(/run/mysql.sock)/db
 TELEGRAM_BOT_TOKEN="SENTINEL-8"
 TOKEN=false
 PASSWORD=/etc/SENTINEL-9
@@ -655,18 +654,13 @@ GET /api/v1/data?chart=x&token=SENTINEL-10&after=-60
 cmdline: /usr/sbin/agent -token=SENTINEL-14 --verbose
 connect user:SENTINEL-15@unix(/run/x)/db ok
 /etc/netdata/claim_token: SENTINEL-16
-destination = tcp:protoparent.example.com:19999
-# destination = old-parent.example.org:19999
-destination = [2001:db8::77]:19999 unix:/run/nd.sock 10.7.7.7:19999
+cmdline: claim.sh api key = SENTINEL-12 end
 password: q
 "api_token": 731942
 private_key: |
   SENTINEL-YAML-LINE1
   SENTINEL-YAML-LINE2
 after_block = ok
-tcp LISTEN 0 4096 later-line
-cmdline: /usr/sbin/agent -token=SENTINEL-14 --verbose
-cmdline: claim.sh api key = SENTINEL-12 end
 [11111111-2222-3333-4444-555555555555]
 -----BEGIN RSA PRIVATE KEY-----
 U0VOVElORUwtMTMtUEVNLUJPRFk=
@@ -676,7 +670,8 @@ netdata management api key file = /var/lib/netdata/netdata.api.key
 TCP SYN cookies = auto
 destination = parent.bigcorp.example:19999
 destination = tcp:protoparent.example.com:19999
-destination = 10.7.7.7:19999
+# destination = old-parent.example.org:19999
+destination = [2001:db8::77]:19999 unix:/run/nd.sock 10.7.7.7:19999
 tcp LISTEN 0 4096 later-line
 server at 10.1.2.3 and 2606:4700:10::ac42:aad8 and 2001:470:26:307:0:0:0:1
 mail ops@example.com mac aa:bb:cc:dd:ee:ff at 2026-07-16T13:38:34Z
@@ -700,20 +695,22 @@ VECTORS
   t_absent  "SENTINEL-"                  "a planted secret survived"
   t_absent  "U0VOVElORUw"                "PEM body survived"
   t_absent  "TOKEN=false"                "TOKEN=false survived (values are never exempt)"
+  t_absent  "731942"                     "scalar JSON secret survived"
+  t_absent  "password: q"                "one-character secret survived"
   t_absent  "2606:4700"                  "compressed IPv6 survived"
   t_absent  "2001:470:26:307:0:0:0:1"    "uncompressed numeric IPv6 survived"
-  t_absent  "10\.1\.2\.3"             "IPv4 survived"
+  t_absent  "10\.1\.2\.3"                "IPv4 survived"
+  t_absent  "10\.7\.7\.7"                "IP destination not pseudonymized as an IP"
   t_absent  "parent.bigcorp.example"     "stream destination hostname survived"
-  t_absent  "protoparent.example.com"     "protocol-prefixed destination hostname survived"
-  t_absent  "10\.7\.7\.7"              "IP destination not pseudonymized as an IP"
-  t_present "tcp LISTEN 0 4096 later-line" "literal tcp corrupted by fqmap pollution"
-  t_absent  "password: q"                "one-character secret survived"
-  t_absent  "731942"                     "scalar JSON secret survived"
-  t_absent  "SENTINEL-YAML"              "YAML block-scalar secret survived"
-  t_present "after_block = ok"           "YAML block withholding ate following content"
-  t_present "destination = tcp:"          "destination protocol prefix lost"
+  t_absent  "protoparent.example.com"    "protocol-prefixed destination hostname survived"
+  t_absent  "old-parent.example.org"     "commented-out destination hostname survived"
+  t_absent  "2001:db8::77"               "bracketed IPv6 destination leaked"
   t_absent  "ops@example.com"            "email survived"
   t_absent  "aa:bb:cc:dd:ee:ff"          "MAC survived"
+  t_present "after_block = ok"           "YAML block withholding ate following content"
+  t_present "destination = tcp:"         "destination protocol prefix lost"
+  t_present "unix:/run/nd.sock"          "socket-path destination was mangled"
+  t_present "tcp LISTEN 0 4096 later-line" "literal tcp corrupted by fqmap pollution"
   t_present "bearer token protection = no"  "diagnostic option lost (key-based exemption broken)"
   t_present "api key file = /var/lib/netdata/netdata.api.key" "key-file path lost"
   t_present "TCP SYN cookies = auto"     "SYN cookies value lost"
@@ -721,17 +718,6 @@ VECTORS
   t_present "2026-07-16T13:38:34Z"       "timestamp mangled by IPv6 rule"
   t_present -- "--verbose"               "path-bearing argv line was eaten by the kv rule"
   t_present "@unix(/run/x)/db ok"        "mid-line unix( DSN rule broke the tail"
-  t_absent  "protoparent.example.com"    "protocol-prefixed destination hostname survived"
-  t_absent  "old-parent.example.org"     "commented-out destination hostname survived"
-  t_present "unix:/run/nd.sock"          "socket-path destination was mangled"
-  t_absent  "2001:db8::77"               "bracketed IPv6 destination leaked"
-  t_absent  "10\.7\.7\.7"             "IP destination not pseudonymized"
-  t_present "tcp LISTEN 0 4096 later-line" "literal tcp corrupted by fqmap pollution"
-  t_absent  "password: q"                "one-character secret survived"
-  t_absent  "731942"                     "scalar JSON secret survived"
-  t_absent  "SENTINEL-YAML"              "YAML block-scalar secret survived"
-  t_present "after_block = ok"           "YAML block withholding ate following content"
-  t_present -- "--verbose"               "path-bearing argv line was eaten by the kv rule"
   printf 'nul-test \000 password=SENTINEL-NUL\n' > "$_tf.nul"
   sanitize_file "$_tf.nul"
   grep -q "content withheld" "$_tf.nul" || { echo "FAIL: NUL-bearing file was not withheld" >&2; _fails=$((_fails + 1)); }
