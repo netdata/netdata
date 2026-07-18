@@ -212,7 +212,7 @@ func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
 
 func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 	populations := map[string]int{
-		"one": 1, "thirty-two": 32, "two-hundred-fifty-six": 256,
+		"one": 1, "thirty-two": 32, "two-hundred-fifty-seven": 257,
 	}
 	for name, population := range populations {
 		t.Run(name, func(t *testing.T) {
@@ -240,12 +240,41 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			census, err := supervisor.SealAndCancelInherited()
-			if err != nil {
+			if err := supervisor.SealInherited(); err != nil {
 				t.Fatal(err)
 			}
-			if census.Visited != population || census.Signalled != population || census.AlreadyCancelled != 0 {
-				t.Fatalf("shutdown cancellation census differs: %+v", census)
+			var total ShutdownCancellationCensus
+			for {
+				census, more, cancelErr := supervisor.CancelInheritedBatch(
+					TransientTaskSlots,
+				)
+				if cancelErr != nil {
+					t.Fatal(cancelErr)
+				}
+				if census.Visited > TransientTaskSlots {
+					t.Fatalf(
+						"one cancellation turn visited %d tasks, want at most %d",
+						census.Visited,
+						TransientTaskSlots,
+					)
+				}
+				total.Visited += census.Visited
+				total.Signalled += census.Signalled
+				total.AlreadyCancelled += census.AlreadyCancelled
+				if more != supervisor.InheritedCancellationPending() {
+					t.Fatalf(
+						"cancellation continuation differs: returned=%v pending=%v",
+						more,
+						supervisor.InheritedCancellationPending(),
+					)
+				}
+				if !more {
+					break
+				}
+			}
+			if total.Visited != population || total.Signalled != population ||
+				total.AlreadyCancelled != 0 {
+				t.Fatalf("shutdown cancellation census differs: %+v", total)
 			}
 			for range population {
 				select {

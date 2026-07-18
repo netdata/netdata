@@ -321,6 +321,10 @@ type commandOperation struct {
 	lane                *commandLane
 	previous            *commandOperation
 	next                *commandOperation
+	allPrevious         *commandOperation
+	allNext             *commandOperation
+	allListed           bool
+	shutdownVisited     bool
 	control             lifecycle.ControlStatus
 	controlQueued       bool
 	cleanupDone         bool
@@ -358,6 +362,10 @@ type commandLane struct {
 	ready              bool
 	readyPrev          *commandLane
 	readyNext          *commandLane
+	allPrevious        *commandLane
+	allNext            *commandLane
+	allListed          bool
+	shutdownVisited    bool
 	resourceGeneration uint64
 	resourceSource     lifecycle.Source
 	currentIdentity    lifecycle.ResourceIdentity
@@ -525,6 +533,15 @@ type CommandKernel struct {
 	nextAsyncEvent           uint8
 	deadlines                deadlineHeap
 	controls                 []*commandOperation
+	operationHead            *commandOperation
+	operationTail            *commandOperation
+	laneHead                 *commandLane
+	laneTail                 *commandLane
+	shutdownActive           bool
+	shutdownOperationCursor  *commandOperation
+	shutdownOperationsDone   bool
+	shutdownLaneCursor       *commandLane
+	shutdownLanesDone        bool
 	jobPlanner               Planner
 	functionCatalog          FunctionCatalogPort
 	inputBodyGrants          chan<- lifecycle.AdmissionGrant
@@ -1053,8 +1070,14 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 			moreFunctionClose = kernel.serviceFunctionCatalogClose(MaximumFunctionCloseQuantum)
 		}
 		moreFunctionCleanups = moreFunctionCleanups || kernel.functionCleanupBacklog.count != 0
+		moreClaimSettlements := kernel.serviceClaimSettlements(
+			maximumClaimSettlementQuantum,
+		)
 		moreAdmissions := false
 		moreTasks := false
+		moreShutdownOperations := false
+		moreInheritedCancellations := false
+		moreShutdownLanes := false
 		if !shuttingDown {
 			moreAdmissions = kernel.serviceAdmissions(4)
 			moreTasks = kernel.scheduleTasks(4)
@@ -1066,12 +1089,25 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 			if err := kernel.advanceShutdownAdmission(); err != nil {
 				kernel.run.Dirty(err)
 			}
+			var shutdownErr error
+			moreShutdownOperations, shutdownErr =
+				kernel.serviceShutdownOperations(4)
+			if shutdownErr != nil {
+				kernel.run.Dirty(shutdownErr)
+			}
+			_, moreInheritedCancellations, shutdownErr =
+				kernel.tasks.CancelInheritedBatch(4)
+			if shutdownErr != nil {
+				kernel.run.Dirty(shutdownErr)
+			}
 			if err := kernel.advanceShutdownBarrier(); err != nil {
 				kernel.run.Dirty(err)
 			}
 			if kernel.shutdownBarrierDone {
-				if err := kernel.enqueueShutdownStops(); err != nil {
-					kernel.run.Dirty(err)
+				moreShutdownLanes, shutdownErr =
+					kernel.serviceShutdownStops(4)
+				if shutdownErr != nil {
+					kernel.run.Dirty(shutdownErr)
 				}
 			}
 			if err := kernel.advanceRunFinalizer(); err != nil {
@@ -1092,7 +1128,10 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 			}
 		}
 		if moreDeadlines || moreControls || moreSubmissions || moreFunctionCleanups ||
-			moreFunctionMutation || moreFunctionClose || moreAdmissions || moreTasks ||
+			moreFunctionMutation || moreFunctionClose || moreClaimSettlements ||
+			moreAdmissions || moreTasks || moreShutdownOperations ||
+			moreInheritedCancellations || moreShutdownLanes ||
+			kernel.claims.PendingSettlements() ||
 			kernel.hasRunnableSubmissions() {
 			if !shuttingDown {
 				select {
@@ -1147,6 +1186,18 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 			return
 		}
 	}
+}
+
+func (kernel *CommandKernel) serviceClaimSettlements(quantum int) bool {
+	granted, more, err := kernel.claims.ServiceSettlements(quantum)
+	if err != nil {
+		kernel.run.Dirty(err)
+		return false
+	}
+	for _, operation := range granted {
+		kernel.markReady(operation.lane)
+	}
+	return more
 }
 
 func (kernel *CommandKernel) serviceOneAsyncEvent() bool {
@@ -1516,6 +1567,7 @@ func (kernel *CommandKernel) admit(request Request, plan WorkPlan, submissionCon
 	lane.tail = operation
 	_ = operation.Advance(lifecycle.OperationQueued)
 	kernel.operations[request.UID] = operation
+	kernel.appendOperation(operation)
 	kernel.byAdmission[requested.Ref] = operation
 	releaseFunctionInvocation = false
 	if resource := plan.Resource; resource != nil {
@@ -3226,8 +3278,18 @@ func (kernel *CommandKernel) tryDispose(operation *commandOperation) {
 		kernel.run.Dirty(errors.New("jobmgr kernel: negative lane ownership"))
 		return
 	}
+	if kernel.shutdownActive && kernel.shutdownBarrierDone &&
+		lane.shutdownVisited && lane.owners == 0 {
+		if err := kernel.enqueueShutdownStop(lane); err != nil {
+			kernel.run.Dirty(err)
+			return
+		}
+	}
 	_ = operation.Advance(lifecycle.OperationDisposedTerminal)
 	delete(kernel.operations, operation.UID)
+	if !kernel.shutdownActive || operation.shutdownVisited {
+		kernel.unlinkOperation(operation)
+	}
 	if operation.terminalResult != nil {
 		operation.terminalResult <- operation.terminalErr
 		operation.terminalResult = nil
@@ -3236,6 +3298,41 @@ func (kernel *CommandKernel) tryDispose(operation *commandOperation) {
 		kernel.markReady(lane)
 	}
 	kernel.releaseUnusedLane(lane)
+}
+
+func (kernel *CommandKernel) appendOperation(operation *commandOperation) {
+	if operation == nil || operation.allListed {
+		kernel.run.Dirty(errors.New("jobmgr kernel: invalid operation-list append"))
+		return
+	}
+	operation.allPrevious = kernel.operationTail
+	if kernel.operationTail != nil {
+		kernel.operationTail.allNext = operation
+	} else {
+		kernel.operationHead = operation
+	}
+	kernel.operationTail = operation
+	operation.allListed = true
+}
+
+func (kernel *CommandKernel) unlinkOperation(operation *commandOperation) {
+	if operation == nil || !operation.allListed {
+		kernel.run.Dirty(errors.New("jobmgr kernel: invalid operation-list removal"))
+		return
+	}
+	if operation.allPrevious != nil {
+		operation.allPrevious.allNext = operation.allNext
+	} else {
+		kernel.operationHead = operation.allNext
+	}
+	if operation.allNext != nil {
+		operation.allNext.allPrevious = operation.allPrevious
+	} else {
+		kernel.operationTail = operation.allPrevious
+	}
+	operation.allPrevious = nil
+	operation.allNext = nil
+	operation.allListed = false
 }
 
 func (kernel *CommandKernel) completeOperationUID(operation *commandOperation, tombstone bool) error {
@@ -3434,58 +3531,99 @@ func (kernel *CommandKernel) beginShutdown(deadline time.Time) error {
 			return errors.Join(abortErr, pushErr)
 		}
 	}
-	if _, err := kernel.tasks.SealAndCancelInherited(); err != nil {
+	kernel.shutdownActive = true
+	kernel.shutdownOperationCursor = kernel.operationHead
+	kernel.shutdownOperationsDone = kernel.shutdownOperationCursor == nil
+	kernel.shutdownLaneCursor = kernel.laneHead
+	kernel.shutdownLanesDone = kernel.shutdownLaneCursor == nil
+	if err := kernel.tasks.SealInherited(); err != nil {
 		return err
-	}
-	for _, operation := range kernel.operations {
-		operation.cancelled = true
-		switch operation.Child {
-		case lifecycle.ChildExecuting:
-			if operation.plan.Resource == nil || operation.plan.Resource.Action != ResourceStop {
-				_ = kernel.tasks.Cancel(operation.Task)
-			}
-			if operation.Response != lifecycle.ResponseNotRequired && !operation.plan.CooperativeCancel &&
-				!(operation.TimedOut() && requiresCooperativeDeadlineStart(operation)) {
-				kernel.enqueueControl(operation, cancellationControl(operation))
-			}
-		case lifecycle.ChildNotStarted:
-			kernel.unlinkQueued(operation, ErrStopped)
-			if operation.Response != lifecycle.ResponseNotRequired {
-				kernel.enqueueControl(operation, cancellationControl(operation))
-			} else {
-				kernel.tryDispose(operation)
-			}
-		case lifecycle.ChildDeadlineStartPending:
-			if !operation.taskRequest.Valid() {
-				if err := operation.AbandonDeadlineStart(); err != nil {
-					return err
-				}
-				kernel.unlinkQueued(operation, ErrStopped)
-				if operation.Response == lifecycle.ResponseOpen {
-					kernel.enqueueControl(operation, lifecycle.ControlDeadline)
-				} else {
-					kernel.tryDispose(operation)
-				}
-			}
-		case lifecycle.ChildResultReady:
-			if operation.resultGrowthWaiting {
-				if err := kernel.admission.CancelWaiting(operation.admission); err != nil {
-					return err
-				}
-				operation.resultGrowthWaiting = false
-				kernel.sendDisposeAction(operation)
-				kernel.enqueueControl(operation, cancellationControl(operation))
-			}
-		case lifecycle.ChildActionPending:
-			if shutdownCancellablePendingAction(operation) {
-				_ = kernel.tasks.Cancel(operation.Task)
-			}
-		}
 	}
 	if err := kernel.advanceShutdownAdmission(); err != nil {
 		return err
 	}
-	return kernel.advanceShutdownBarrier()
+	return nil
+}
+
+func (kernel *CommandKernel) serviceShutdownOperations(
+	quantum int,
+) (bool, error) {
+	if !kernel.shutdownActive || quantum <= 0 {
+		return false, errors.New("jobmgr kernel: invalid shutdown operation service")
+	}
+	for visited := 0; visited < quantum &&
+		kernel.shutdownOperationCursor != nil; visited++ {
+		operation := kernel.shutdownOperationCursor
+		kernel.shutdownOperationCursor = operation.allNext
+		operation.shutdownVisited = true
+		if operation.State == lifecycle.OperationDisposedTerminal {
+			kernel.unlinkOperation(operation)
+			continue
+		}
+		if err := kernel.cancelOperationForShutdown(operation); err != nil {
+			return false, err
+		}
+	}
+	kernel.shutdownOperationsDone = kernel.shutdownOperationCursor == nil
+	return !kernel.shutdownOperationsDone, nil
+}
+
+func (kernel *CommandKernel) cancelOperationForShutdown(
+	operation *commandOperation,
+) error {
+	if operation == nil ||
+		operation.State == lifecycle.OperationDisposedTerminal {
+		return errors.New("jobmgr kernel: invalid shutdown operation")
+	}
+	operation.cancelled = true
+	switch operation.Child {
+	case lifecycle.ChildExecuting:
+		if operation.plan.Resource == nil ||
+			operation.plan.Resource.Action != ResourceStop {
+			_ = kernel.tasks.Cancel(operation.Task)
+		}
+		if operation.Response != lifecycle.ResponseNotRequired &&
+			!operation.plan.CooperativeCancel &&
+			!(operation.TimedOut() &&
+				requiresCooperativeDeadlineStart(operation)) {
+			kernel.enqueueControl(operation, cancellationControl(operation))
+		}
+	case lifecycle.ChildNotStarted:
+		kernel.unlinkQueued(operation, ErrStopped)
+		if operation.Response != lifecycle.ResponseNotRequired {
+			kernel.enqueueControl(operation, cancellationControl(operation))
+		} else {
+			kernel.tryDispose(operation)
+		}
+	case lifecycle.ChildDeadlineStartPending:
+		if !operation.taskRequest.Valid() {
+			if err := operation.AbandonDeadlineStart(); err != nil {
+				return err
+			}
+			kernel.unlinkQueued(operation, ErrStopped)
+			if operation.Response == lifecycle.ResponseOpen {
+				kernel.enqueueControl(operation, lifecycle.ControlDeadline)
+			} else {
+				kernel.tryDispose(operation)
+			}
+		}
+	case lifecycle.ChildResultReady:
+		if operation.resultGrowthWaiting {
+			if err := kernel.admission.CancelWaiting(
+				operation.admission,
+			); err != nil {
+				return err
+			}
+			operation.resultGrowthWaiting = false
+			kernel.sendDisposeAction(operation)
+			kernel.enqueueControl(operation, cancellationControl(operation))
+		}
+	case lifecycle.ChildActionPending:
+		if shutdownCancellablePendingAction(operation) {
+			_ = kernel.tasks.Cancel(operation.Task)
+		}
+	}
+	return nil
 }
 
 func shutdownCancellablePendingAction(operation *commandOperation) bool {
@@ -3518,73 +3656,114 @@ func (kernel *CommandKernel) advanceShutdownAdmission() error {
 	if waiting {
 		return nil
 	}
+	if !kernel.shutdownOperationsDone {
+		return nil
+	}
 	return kernel.admission.BeginCleanupOnly(kernel.run.Generation())
 }
 
-func (kernel *CommandKernel) enqueueShutdownStops() error {
-	for _, lane := range kernel.lanes {
-		if lane.currentStopping {
-			if lane.current != nil || !lane.currentIdentity.Valid() || lane.retiringIdentity.Valid() {
-				return errors.New("jobmgr kernel: shutdown found an invalid stopping resource")
-			}
-			continue
+func (kernel *CommandKernel) serviceShutdownStops(
+	quantum int,
+) (bool, error) {
+	if !kernel.shutdownActive || !kernel.shutdownBarrierDone || quantum <= 0 {
+		return false, errors.New("jobmgr kernel: invalid shutdown lane service")
+	}
+	for visited := 0; visited < quantum &&
+		kernel.shutdownLaneCursor != nil; visited++ {
+		lane := kernel.shutdownLaneCursor
+		kernel.shutdownLaneCursor = lane.allNext
+		lane.shutdownVisited = true
+		if err := kernel.enqueueShutdownStop(lane); err != nil {
+			return false, err
 		}
-		if lane.retiringIdentity.Valid() {
-			if lane.current != nil || lane.currentIdentity.Valid() {
-				return errors.New("jobmgr kernel: shutdown found an invalid retiring resource")
-			}
-			continue
-		}
-		if lane.current == nil {
-			if lane.currentIdentity.Valid() {
-				return errors.New("jobmgr kernel: shutdown found a detached current identity")
-			}
-			continue
-		}
-		if lane.owners != 0 {
-			continue
-		}
-		if lane.head != nil || lane.tail != nil || lane.active != nil || lane.ready {
-			return errors.New("jobmgr kernel: owner-free resource lane retains operation state")
-		}
-		identity := lane.currentIdentity
-		if !identity.Valid() || identity.ID != lane.key {
-			return errors.New("jobmgr kernel: shutdown found an invalid current resource")
-		}
-		budget, err := kernel.run.BeginShutdown()
-		if err != nil {
-			return err
-		}
-		if !lane.resourceSource.Valid() {
+		kernel.releaseUnusedLane(lane)
+	}
+	kernel.shutdownLanesDone = kernel.shutdownLaneCursor == nil
+	return !kernel.shutdownLanesDone, nil
+}
+
+func (kernel *CommandKernel) enqueueShutdownStop(lane *commandLane) error {
+	if lane == nil || !lane.allListed {
+		return errors.New("jobmgr kernel: invalid shutdown resource lane")
+	}
+	if lane.currentStopping {
+		if lane.current != nil || !lane.currentIdentity.Valid() ||
+			lane.retiringIdentity.Valid() {
 			return errors.New(
-				"jobmgr kernel: shutdown resource has no scheduling source",
+				"jobmgr kernel: shutdown found an invalid stopping resource",
 			)
 		}
-		plan, err := lifecycle.NewShutdownReadyResourceTaskPlan(
-			lane.resourceSource, budget, lifecycle.TransactionTaskPhases, lane.current, identity,
-		)
-		if err != nil {
-			return err
-		}
-		request, err := kernel.tasks.Enqueue(plan)
-		if err != nil {
-			return err
-		}
-		if owner := kernel.shutdownRequests[request]; owner != nil {
-			outcome, cancelErr := kernel.tasks.CancelPendingOutcome(request)
-			_, ok := outcome.ReadyResource()
-			returnedIdentity, identityOK := outcome.ResourceIdentity()
-			if cancelErr != nil || !ok || !identityOK || returnedIdentity != identity {
-				return errors.Join(errors.New("jobmgr kernel: occupied shutdown request owner"), cancelErr)
-			}
-			return errors.New("jobmgr kernel: occupied shutdown request owner")
-		}
-		lane.current = nil
-		lane.currentStopping = true
-		lane.shutdownRequest = request
-		kernel.shutdownRequests[request] = lane
-		kernel.shutdownRequestCount++
+		return nil
 	}
+	if lane.retiringIdentity.Valid() {
+		if lane.current != nil || lane.currentIdentity.Valid() {
+			return errors.New(
+				"jobmgr kernel: shutdown found an invalid retiring resource",
+			)
+		}
+		return nil
+	}
+	if lane.current == nil {
+		if lane.currentIdentity.Valid() {
+			return errors.New(
+				"jobmgr kernel: shutdown found a detached current identity",
+			)
+		}
+		return nil
+	}
+	if lane.owners != 0 {
+		return nil
+	}
+	if lane.head != nil || lane.tail != nil || lane.active != nil || lane.ready {
+		return errors.New(
+			"jobmgr kernel: owner-free resource lane retains operation state",
+		)
+	}
+	identity := lane.currentIdentity
+	if !identity.Valid() || identity.ID != lane.key {
+		return errors.New("jobmgr kernel: shutdown found an invalid current resource")
+	}
+	budget, err := kernel.run.BeginShutdown()
+	if err != nil {
+		return err
+	}
+	if !lane.resourceSource.Valid() {
+		return errors.New(
+			"jobmgr kernel: shutdown resource has no scheduling source",
+		)
+	}
+	plan, err := lifecycle.NewShutdownReadyResourceTaskPlan(
+		lane.resourceSource,
+		budget,
+		lifecycle.TransactionTaskPhases,
+		lane.current,
+		identity,
+	)
+	if err != nil {
+		return err
+	}
+	request, err := kernel.tasks.Enqueue(plan)
+	if err != nil {
+		return err
+	}
+	if owner := kernel.shutdownRequests[request]; owner != nil {
+		outcome, cancelErr := kernel.tasks.CancelPendingOutcome(request)
+		_, ok := outcome.ReadyResource()
+		returnedIdentity, identityOK := outcome.ResourceIdentity()
+		if cancelErr != nil || !ok || !identityOK ||
+			returnedIdentity != identity {
+			return errors.Join(
+				errors.New("jobmgr kernel: occupied shutdown request owner"),
+				cancelErr,
+			)
+		}
+		return errors.New("jobmgr kernel: occupied shutdown request owner")
+	}
+	lane.current = nil
+	lane.currentStopping = true
+	lane.shutdownRequest = request
+	kernel.shutdownRequests[request] = lane
+	kernel.shutdownRequestCount++
 	return nil
 }
 
@@ -3594,6 +3773,10 @@ func (kernel *CommandKernel) advanceShutdownBarrier() error {
 		kernel.shutdownBarrierFailed ||
 		kernel.shutdownBarrierRequest.Valid() ||
 		kernel.shutdownBarrierTask.Valid() {
+		return nil
+	}
+	if !kernel.shutdownOperationsDone ||
+		kernel.tasks.InheritedCancellationPending() {
 		return nil
 	}
 	budget, err := kernel.run.BeginShutdown()
@@ -3721,7 +3904,12 @@ func (kernel *CommandKernel) shutdownReadyForFinalizer() bool {
 	}
 	inherited := kernel.tasks.InheritedCensus()
 	longLived := kernel.tasks.LongLivedCensus()
-	if len(kernel.operations) != 0 || len(kernel.tasksByRef) != 0 || len(kernel.tasksByRequest) != 0 ||
+	if !kernel.shutdownOperationsDone || !kernel.shutdownLanesDone ||
+		kernel.tasks.InheritedCancellationPending() ||
+		len(kernel.operations) != 0 || len(kernel.tasksByRef) != 0 ||
+		len(kernel.tasksByRequest) != 0 ||
+		kernel.operationHead != nil || kernel.operationTail != nil ||
+		kernel.laneHead != nil || kernel.laneTail != nil ||
 		len(kernel.functionCleanupTasks) != 0 || len(kernel.functionCleanupRequests) != 0 ||
 		kernel.functionCleanupBacklog.count != 0 ||
 		kernel.functionMutationActive || kernel.functionMutationPaused ||
@@ -3796,7 +3984,12 @@ func (kernel *CommandKernel) shutdownQuiescent() bool {
 	inherited := kernel.tasks.InheritedCensus()
 	longLived := kernel.tasks.LongLivedCensus()
 	frame := kernel.frames.Census()
-	if len(kernel.operations) != 0 || len(kernel.tasksByRef) != 0 || len(kernel.tasksByRequest) != 0 ||
+	if !kernel.shutdownOperationsDone || !kernel.shutdownLanesDone ||
+		kernel.tasks.InheritedCancellationPending() ||
+		len(kernel.operations) != 0 || len(kernel.tasksByRef) != 0 ||
+		len(kernel.tasksByRequest) != 0 ||
+		kernel.operationHead != nil || kernel.operationTail != nil ||
+		kernel.laneHead != nil || kernel.laneTail != nil ||
 		len(kernel.functionCleanupTasks) != 0 || len(kernel.functionCleanupRequests) != 0 ||
 		kernel.functionCleanupBacklog.count != 0 ||
 		kernel.functionMutationActive || kernel.functionMutationPaused ||
@@ -4094,6 +4287,7 @@ func (kernel *CommandKernel) allocateLane(mapKey commandLaneKey, request Request
 		key: request.LaneKey, source: request.Source,
 	}
 	kernel.lanes[mapKey] = lane
+	kernel.appendLane(lane)
 	return lane, nil
 }
 
@@ -4108,11 +4302,50 @@ func (kernel *CommandKernel) releaseUnusedLane(lane *commandLane) {
 		lane.shutdownRequest.Valid() || lane.shutdownTask.Valid() || lane.shutdownAction != 0 {
 		return
 	}
+	if kernel.shutdownActive && !lane.shutdownVisited {
+		return
+	}
 	delete(kernel.lanes, lane.mapKey)
+	kernel.unlinkLane(lane)
 	slot := lane.slot
 	generation := lane.generation
 	*lane = commandLane{slot: slot, generation: generation, freeNext: kernel.freeLane}
 	kernel.freeLane = slot
+}
+
+func (kernel *CommandKernel) appendLane(lane *commandLane) {
+	if lane == nil || lane.allListed {
+		kernel.run.Dirty(errors.New("jobmgr kernel: invalid lane-list append"))
+		return
+	}
+	lane.allPrevious = kernel.laneTail
+	if kernel.laneTail != nil {
+		kernel.laneTail.allNext = lane
+	} else {
+		kernel.laneHead = lane
+	}
+	kernel.laneTail = lane
+	lane.allListed = true
+}
+
+func (kernel *CommandKernel) unlinkLane(lane *commandLane) {
+	if lane == nil || !lane.allListed {
+		kernel.run.Dirty(errors.New("jobmgr kernel: invalid lane-list removal"))
+		return
+	}
+	if lane.allPrevious != nil {
+		lane.allPrevious.allNext = lane.allNext
+	} else {
+		kernel.laneHead = lane.allNext
+	}
+	if lane.allNext != nil {
+		lane.allNext.allPrevious = lane.allPrevious
+	} else {
+		kernel.laneTail = lane.allPrevious
+	}
+	lane.allPrevious = nil
+	lane.allNext = nil
+	lane.allListed = false
 }
 
 func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {

@@ -13,7 +13,7 @@ import (
 const formerFixedPopulation = 256
 const formerFixedUIDPopulation = 16_384
 
-func TestDynamicPopulationGrowsBeyondFormerLimits(t *testing.T) {
+func TestAdmissionPopulationGrowsBeyondFormerLimits(t *testing.T) {
 	tests := map[string]struct {
 		run func(*testing.T)
 	}{
@@ -23,19 +23,22 @@ func TestDynamicPopulationGrowsBeyondFormerLimits(t *testing.T) {
 		"same admission lane": {
 			run: testAdmissionLaneGrowth,
 		},
-		"pending task requests": {
-			run: testTaskRequestGrowth,
-		},
-		"long-lived jobs": {
-			run: testLongLivedJobGrowth,
-		},
-		"active Function UIDs": {
-			run: testUIDGrowth,
-		},
 	}
 	for name, test := range tests {
 		t.Run(name, test.run)
 	}
+}
+
+func TestPendingTaskRequestPopulationGrowsBeyondFormerLimit(t *testing.T) {
+	testTaskRequestGrowth(t)
+}
+
+func TestLongLivedJobPermitPopulationGrowsBeyondFormerLimit(t *testing.T) {
+	testLongLivedJobGrowth(t)
+}
+
+func TestActiveFunctionUIDPopulationGrowsBeyondFormerLimit(t *testing.T) {
+	testUIDGrowth(t)
 }
 
 func testAdmissionRecordGrowth(t *testing.T) {

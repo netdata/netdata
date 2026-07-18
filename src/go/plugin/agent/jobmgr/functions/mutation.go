@@ -616,7 +616,7 @@ func (step *routeMutationStep) advanceNameDescend() (bool, error) {
 func (step *routeMutationStep) advanceDirectRoute() (bool, error) {
 	step.oldRoute = step.set.direct
 	step.hadRoute = step.oldRoute != nil
-	if step.oldRoute != nil && step.oldRoute.retiringDrained {
+	if step.oldRoute != nil && step.oldRoute.retiring {
 		step.oldRoute = nil
 	}
 	if step.replacement == nil && step.oldRoute == nil {
@@ -652,7 +652,7 @@ func (step *routeMutationStep) advancePrefixTerminal() (bool, error) {
 		step.oldRoute = original.resolved
 	}
 	step.hadRoute = step.oldRoute != nil
-	if step.oldRoute != nil && step.oldRoute.retiringDrained {
+	if step.oldRoute != nil && step.oldRoute.retiring {
 		step.oldRoute = nil
 	}
 	if step.replacement == nil && step.oldRoute == nil {

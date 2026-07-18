@@ -2708,6 +2708,140 @@ func TestKernelShutdownSettlesPendingInputBodyGrowthBeforeCleanupOnly(t *testing
 	}
 }
 
+func TestKernelShutdownCancelsOperationsInBoundedTurns(t *testing.T) {
+	const (
+		population = 257
+		quantum    = 4
+	)
+	kernel, run := newKernel(t)
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	plan := WorkPlan{
+		Work:       lifecycle.FrameTaskWork(plannerPlanWork),
+		NoResponse: true,
+	}
+	for index := range population {
+		request := Request{
+			UID:     fmt.Sprintf("shutdown-operation-%d", index),
+			Source:  lifecycle.SourceJobManager,
+			LaneKey: "shared",
+		}
+		if err := kernel.admit(request, plan, nil, nil, nil); err != nil {
+			t.Fatalf("admit operation %d: %v", index, err)
+		}
+	}
+	if err := kernel.beginShutdown(time.Now().Add(time.Second)); err != nil {
+		t.Fatal(err)
+	}
+	for {
+		before := len(kernel.operations)
+		more, err := kernel.serviceShutdownOperations(quantum)
+		if err != nil {
+			t.Fatal(err)
+		}
+		visited := before - len(kernel.operations)
+		if visited < 0 || visited > quantum {
+			t.Fatalf(
+				"one shutdown turn disposed %d operations, want 0..%d",
+				visited,
+				quantum,
+			)
+		}
+		if !more {
+			break
+		}
+	}
+	if len(kernel.operations) != 0 || kernel.operationHead != nil ||
+		kernel.operationTail != nil {
+		t.Fatalf(
+			"shutdown retained operations=%d head=%p tail=%p",
+			len(kernel.operations),
+			kernel.operationHead,
+			kernel.operationTail,
+		)
+	}
+	if err := kernel.advanceShutdownAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := kernel.serviceShutdownStops(quantum); err != nil {
+		t.Fatal(err)
+	}
+	if len(kernel.lanes) != 0 || kernel.laneHead != nil ||
+		kernel.laneTail != nil {
+		t.Fatalf(
+			"shutdown retained lanes=%d head=%p tail=%p",
+			len(kernel.lanes),
+			kernel.laneHead,
+			kernel.laneTail,
+		)
+	}
+}
+
+func TestKernelShutdownVisitsLiveLanesOnceInBoundedTurns(t *testing.T) {
+	populations := map[string]int{
+		"one":                     1,
+		"thirty-two":              32,
+		"two-hundred-fifty-seven": 257,
+	}
+	const quantum = 4
+	for name, population := range populations {
+		t.Run(name, func(t *testing.T) {
+			kernel, run := newKernel(t)
+			if err := run.OpenAdmission(); err != nil {
+				t.Fatal(err)
+			}
+			for index := range population {
+				key := fmt.Sprintf("shutdown-lane-%d", index)
+				if _, err := kernel.allocateLane(
+					commandLaneKey{
+						source: lifecycle.SourceJobManager,
+						key:    key,
+					},
+					Request{
+						Source:  lifecycle.SourceJobManager,
+						LaneKey: key,
+					},
+				); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := kernel.beginShutdown(
+				time.Now().Add(time.Second),
+			); err != nil {
+				t.Fatal(err)
+			}
+			for {
+				before := len(kernel.lanes)
+				more, err := kernel.serviceShutdownStops(quantum)
+				if err != nil {
+					t.Fatal(err)
+				}
+				visited := before - len(kernel.lanes)
+				if visited < 0 || visited > quantum {
+					t.Fatalf(
+						"one shutdown turn visited %d lanes, want 0..%d",
+						visited,
+						quantum,
+					)
+				}
+				if !more {
+					break
+				}
+			}
+			if len(kernel.lanes) != 0 || kernel.laneHead != nil ||
+				kernel.laneTail != nil {
+				t.Fatalf(
+					"shutdown retained lanes=%d head=%p tail=%p",
+					len(kernel.lanes),
+					kernel.laneHead,
+					kernel.laneTail,
+				)
+			}
+		})
+	}
+}
+
 func TestKernelRunsTaskCleanupBeforeSlotRelease(t *testing.T) {
 	cleaned := make(chan struct{}, 2)
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {

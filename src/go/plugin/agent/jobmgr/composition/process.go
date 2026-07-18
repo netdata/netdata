@@ -379,7 +379,7 @@ func (process *processCore) finalize(
 			errors.New("jobmgr composition: invalid final Function ingress state"),
 		)
 	}
-	if err := closeProcessUIDs(process.uids); err != nil {
+	if err := closeProcessUIDs(shutdownCtx, process.uids); err != nil {
 		finalErr = errors.Join(finalErr, err)
 	}
 	switch census := process.admission.Census(); census.Phase {
@@ -448,17 +448,20 @@ func (process *processCore) retireRun(
 	return waitErr
 }
 
-func closeProcessUIDs(uids *lifecycle.UIDLedger) error {
-	if uids == nil {
-		return errors.New("jobmgr composition: nil UID ledger")
+func closeProcessUIDs(ctx context.Context, uids *lifecycle.UIDLedger) error {
+	if ctx == nil || uids == nil {
+		return errors.New("jobmgr composition: invalid UID close")
 	}
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		more, err := uids.CloseBatch(lifecycle.UIDReturnBatch)
 		if err != nil {
 			return err
 		}
 		if !more {
-			return nil
+			return ctx.Err()
 		}
 	}
 }

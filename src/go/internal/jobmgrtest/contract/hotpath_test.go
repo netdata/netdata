@@ -47,6 +47,29 @@ func TestBMM002HotpathContractIsExact(t *testing.T) {
 			}
 		}
 	}
+	expectedOwners := map[string]struct{}{
+		"B-O-00001": {}, "B-O-00002": {}, "B-O-00003": {},
+		"B-O-00004": {}, "B-O-00005": {}, "B-O-00006": {},
+		"B-O-00007": {}, "B-O-00008": {}, "B-O-00009": {},
+		"B-O-00010": {}, "B-O-00011": {}, "B-O-00012": {},
+		"B-O-00013": {}, "B-O-00014": {}, "B-O-00015": {},
+		"B-O-00016": {}, "B-O-00017": {}, "B-O-00018": {},
+		"B-O-00019": {}, "B-O-00020": {}, "B-O-00021": {},
+		"B-O-00022": {}, "B-O-00023": {}, "B-O-00024": {},
+		"B-O-00025": {}, "B-O-00026": {}, "B-O-00031": {},
+		"B-O-00034": {}, "B-O-00035": {}, "B-O-00036": {},
+		"B-O-00037": {},
+	}
+	for owner := range owners {
+		if _, ok := expectedOwners[owner]; !ok {
+			t.Fatalf("unexpected hot-path owner %s", owner)
+		}
+	}
+	for owner := range expectedOwners {
+		if _, ok := owners[owner]; !ok {
+			t.Fatalf("approved hot-path owner %s is absent", owner)
+		}
+	}
 	for _, futureOwner := range []string{
 		"B-O-00027",
 		"B-O-00028",

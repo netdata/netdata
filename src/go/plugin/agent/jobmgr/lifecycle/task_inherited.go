@@ -34,14 +34,15 @@ func (ref InheritedTaskRef) valid() bool {
 type InheritedTaskWork func(context.Context) error
 
 type inheritedTaskRegistry struct {
-	mu         sync.Mutex
-	slots      []*inheritedTaskSlot
-	owners     map[inheritedOwnerRole]InheritedTaskRef
-	freeHead   uint32
-	census     InheritedTaskCensus
-	sealed     bool
-	activeHead uint32
-	activeTail uint32
+	mu             sync.Mutex
+	slots          []*inheritedTaskSlot
+	owners         map[inheritedOwnerRole]InheritedTaskRef
+	freeHead       uint32
+	census         InheritedTaskCensus
+	sealed         bool
+	activeHead     uint32
+	activeTail     uint32
+	shutdownCursor uint32
 }
 
 type inheritedTaskSlot struct {
@@ -274,6 +275,10 @@ func (supervisor *TaskSupervisor) ReleaseInherited(ref InheritedTaskRef, owner R
 	}
 	key := inheritedOwnerRole{owner: slot.owner, role: slot.role}
 	previous, next := slot.activePrevious, slot.activeNext
+	handle := ref.Slot + 1
+	if registry.shutdownCursor == handle {
+		registry.shutdownCursor = next
+	}
 	if previous != 0 {
 		registry.slots[previous-1].activeNext = next
 	} else {
@@ -296,20 +301,48 @@ func (supervisor *TaskSupervisor) ReleaseInherited(ref InheritedTaskRef, owner R
 	return nil
 }
 
-func (supervisor *TaskSupervisor) SealAndCancelInherited() (ShutdownCancellationCensus, error) {
+func (supervisor *TaskSupervisor) SealInherited() error {
 	if supervisor == nil {
-		return ShutdownCancellationCensus{}, errors.New("jobmgr task supervisor: nil shutdown seal")
+		return errors.New("jobmgr task supervisor: nil shutdown seal")
 	}
 	longLived := &supervisor.longLived
 	registry := &supervisor.inherited
 	longLived.mu.Lock()
 	registry.mu.Lock()
+	if longLived.sealed || registry.sealed {
+		registry.mu.Unlock()
+		longLived.mu.Unlock()
+		return errors.New("jobmgr task supervisor: shutdown sealed twice")
+	}
 	longLived.sealed = true
 	registry.sealed = true
+	registry.shutdownCursor = registry.activeHead
+	registry.mu.Unlock()
+	longLived.mu.Unlock()
+	return nil
+}
+
+func (supervisor *TaskSupervisor) CancelInheritedBatch(
+	quantum int,
+) (ShutdownCancellationCensus, bool, error) {
+	if supervisor == nil || quantum <= 0 || quantum > TransientTaskSlots {
+		return ShutdownCancellationCensus{}, false,
+			errors.New("jobmgr task supervisor: invalid inherited cancellation batch")
+	}
+	registry := &supervisor.inherited
+	var cancels [TransientTaskSlots]context.CancelFunc
+	cancelCount := 0
 	var census ShutdownCancellationCensus
-	cancels := make([]context.CancelFunc, 0, registry.census.Active)
-	for handle := registry.activeHead; handle != 0; handle = registry.slots[handle-1].activeNext {
+	registry.mu.Lock()
+	if !registry.sealed {
+		registry.mu.Unlock()
+		return ShutdownCancellationCensus{}, false,
+			errors.New("jobmgr task supervisor: inherited cancellation before seal")
+	}
+	for census.Visited < quantum && registry.shutdownCursor != 0 {
+		handle := registry.shutdownCursor
 		slot := registry.slots[handle-1]
+		registry.shutdownCursor = slot.activeNext
 		census.Visited++
 		if slot.cancelled {
 			census.AlreadyCancelled++
@@ -317,15 +350,26 @@ func (supervisor *TaskSupervisor) SealAndCancelInherited() (ShutdownCancellation
 		}
 		slot.cancelled = true
 		registry.census.Cancelled++
-		cancels = append(cancels, slot.cancel)
+		cancels[cancelCount] = slot.cancel
+		cancelCount++
 		census.Signalled++
 	}
+	more := registry.shutdownCursor != 0
 	registry.mu.Unlock()
-	longLived.mu.Unlock()
-	for _, cancel := range cancels {
-		cancel()
+	for index := 0; index < cancelCount; index++ {
+		cancels[index]()
 	}
-	return census, nil
+	return census, more, nil
+}
+
+func (supervisor *TaskSupervisor) InheritedCancellationPending() bool {
+	if supervisor == nil {
+		return false
+	}
+	registry := &supervisor.inherited
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	return registry.shutdownCursor != 0
 }
 
 func (registry *inheritedTaskRegistry) initialize() {

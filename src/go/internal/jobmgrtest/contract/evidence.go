@@ -375,6 +375,9 @@ var componentProofByCase = map[string][]ComponentProof{
 	},
 	"F24.16-b-shutdown-complexity": {
 		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestTaskSupervisorSealsAndCancelsEveryInheritedContext"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestKernelShutdownCancelsOperationsInBoundedTurns"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestKernelShutdownVisitsLiveLanesOnceInBoundedTurns"},
+		{Package: "./plugin/agent/jobmgr/composition", Test: "TestCloseProcessUIDsObservesShutdownContextBetweenBatches"},
 	},
 	"F24.18-b-ready-lane-fairness": {
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelReadyLaneFairnessAtBoundaries"},

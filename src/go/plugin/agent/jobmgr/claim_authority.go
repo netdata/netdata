@@ -3,6 +3,7 @@
 package jobmgr
 
 import (
+	"container/heap"
 	"errors"
 	"slices"
 	"sort"
@@ -15,18 +16,21 @@ const (
 	authorityClaimWrite
 )
 
+const maximumClaimSettlementQuantum = 4
+
 type authorityClaim struct {
 	key  string
 	mode authorityClaimMode
 }
 
 type authorityClaimKey struct {
-	references int
-	writer     *authorityClaimEdge
-	readerHead *authorityClaimEdge
-	readerTail *authorityClaimEdge
-	waiterHead *authorityClaimEdge
-	waiterTail *authorityClaimEdge
+	references      int
+	writer          *authorityClaimEdge
+	readerHead      *authorityClaimEdge
+	readerTail      *authorityClaimEdge
+	waiterHead      *authorityClaimEdge
+	waiterTail      *authorityClaimEdge
+	settlementIndex int
 }
 
 type authorityClaimEdge struct {
@@ -39,18 +43,49 @@ type authorityClaimEdge struct {
 	next      *authorityClaimEdge
 }
 
+type authorityClaimHeap []*authorityClaimKey
+
+func (states authorityClaimHeap) Len() int { return len(states) }
+
+func (states authorityClaimHeap) Less(left, right int) bool {
+	return states[left].waiterHead.operation.claimTicket <
+		states[right].waiterHead.operation.claimTicket
+}
+
+func (states authorityClaimHeap) Swap(left, right int) {
+	states[left], states[right] = states[right], states[left]
+	states[left].settlementIndex = left
+	states[right].settlementIndex = right
+}
+
+func (states *authorityClaimHeap) Push(value any) {
+	state := value.(*authorityClaimKey)
+	state.settlementIndex = len(*states)
+	*states = append(*states, state)
+}
+
+func (states *authorityClaimHeap) Pop() any {
+	old := *states
+	last := old[len(old)-1]
+	old[len(old)-1] = nil
+	last.settlementIndex = -1
+	*states = old[:len(old)-1]
+	return last
+}
+
 type claimAuthority struct {
-	keys        map[string]*authorityClaimKey
-	nextTicket  uint64
-	waiterCount int
-	eligible    []*commandOperation
-	ordered     []*commandOperation
-	grants      []*commandOperation
-	radixCounts [256]int
+	keys             map[string]*authorityClaimKey
+	nextTicket       uint64
+	waiterCount      int
+	settlements      authorityClaimHeap
+	settlementGrants [maximumClaimSettlementQuantum]*commandOperation
 }
 
 func newClaimAuthority() *claimAuthority {
-	return &claimAuthority{keys: make(map[string]*authorityClaimKey)}
+	return &claimAuthority{
+		keys:        make(map[string]*authorityClaimKey),
+		settlements: make(authorityClaimHeap, 0, maximumPlanClaims),
+	}
 }
 
 func normalizeAuthorityClaims(writeClaims []string) ([]authorityClaim, error) {
@@ -129,10 +164,12 @@ func (authority *claimAuthority) Cancel(operation *commandOperation) ([]*command
 		}
 	}
 	operation.claimCursor = 0
-	granted, err := authority.settle(operation)
-	if err == nil {
-		err = authority.forget(operation)
+	if err := authority.forget(operation); err != nil {
+		return nil, err
 	}
+	granted, _, err := authority.ServiceSettlements(
+		maximumClaimSettlementQuantum,
+	)
 	return granted, err
 }
 
@@ -147,10 +184,12 @@ func (authority *claimAuthority) Release(operation *commandOperation) ([]*comman
 	}
 	operation.claimsHeld = false
 	operation.claimCursor = 0
-	granted, err := authority.settle(operation)
-	if err == nil {
-		err = authority.forget(operation)
+	if err := authority.forget(operation); err != nil {
+		return nil, err
 	}
+	granted, _, err := authority.ServiceSettlements(
+		maximumClaimSettlementQuantum,
+	)
 	return granted, err
 }
 
@@ -167,6 +206,10 @@ func (authority *claimAuthority) Waiting(operation *commandOperation) bool {
 
 func (authority *claimAuthority) WaitingCount() int { return authority.waiterCount }
 
+func (authority *claimAuthority) PendingSettlements() bool {
+	return authority != nil && len(authority.settlements) != 0
+}
+
 func (authority *claimAuthority) acquireFromCursor(operation *commandOperation) (bool, error) {
 	for operation.claimCursor < len(operation.authorityClaimEdges) {
 		edge := &operation.authorityClaimEdges[operation.claimCursor]
@@ -179,6 +222,7 @@ func (authority *claimAuthority) acquireFromCursor(operation *commandOperation) 
 			return false, nil
 		}
 		holdEdge(edge)
+		authority.refreshSettlement(edge.key)
 		operation.claimCursor++
 	}
 	operation.claimsHeld = true
@@ -235,6 +279,7 @@ func (authority *claimAuthority) releaseEdge(edge *authorityClaimEdge) error {
 	edge.held = false
 	edge.prev = nil
 	edge.next = nil
+	authority.refreshSettlement(edge.key)
 	return nil
 }
 
@@ -248,6 +293,7 @@ func (authority *claimAuthority) enqueueWaiter(edge *authorityClaimEdge) {
 	}
 	edge.key.waiterTail = edge
 	authority.waiterCount++
+	authority.refreshSettlement(edge.key)
 }
 
 func (authority *claimAuthority) removeWaiter(edge *authorityClaimEdge) error {
@@ -272,102 +318,77 @@ func (authority *claimAuthority) removeWaiter(edge *authorityClaimEdge) error {
 	edge.prev = nil
 	edge.next = nil
 	authority.waiterCount--
+	authority.refreshSettlement(edge.key)
 	return nil
 }
 
-func (authority *claimAuthority) settle(released *commandOperation) ([]*commandOperation, error) {
-	clear(authority.eligible)
-	authority.eligible = authority.eligible[:0]
-	clear(authority.grants)
-	authority.grants = authority.grants[:0]
-	for index := range released.authorityClaimEdges {
-		if err := authority.collectEligible(released.authorityClaimEdges[index].key); err != nil {
-			return nil, err
-		}
+func (authority *claimAuthority) ServiceSettlements(
+	quantum int,
+) ([]*commandOperation, bool, error) {
+	if authority == nil || quantum <= 0 ||
+		quantum > len(authority.settlementGrants) {
+		return nil, false, errors.New("jobmgr claims: invalid settlement quantum")
 	}
-	authority.sortCandidates()
-	for _, operation := range authority.eligible {
+	clear(authority.settlementGrants[:])
+	grantCount := 0
+	for visited := 0; visited < quantum && len(authority.settlements) != 0; visited++ {
+		key := heap.Pop(&authority.settlements).(*authorityClaimKey)
+		if !claimSettlementEligible(key) {
+			return nil, false, errors.New("jobmgr claims: ineligible settlement key")
+		}
+		operation := key.waiterHead.operation
 		if operation == nil || !operation.claimWaiting || operation.claimCursor >= len(operation.authorityClaimEdges) {
-			return nil, errors.New("jobmgr claims: invalid wake jobmgr")
+			return nil, false, errors.New("jobmgr claims: invalid wake operation")
 		}
 		edge := &operation.authorityClaimEdges[operation.claimCursor]
-		if edge.key.waiterHead != edge || !canHold(edge.key, edge.claim.mode) {
-			continue
+		if edge.key != key || key.waiterHead != edge ||
+			!canHold(key, edge.claim.mode) {
+			return nil, false, errors.New("jobmgr claims: settlement head differs")
 		}
 		if err := authority.removeWaiter(edge); err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		operation.claimWaiting = false
 		holdEdge(edge)
+		authority.refreshSettlement(key)
 		operation.claimCursor++
 		granted, err := authority.acquireFromCursor(operation)
 		if err != nil {
-			return nil, err
+			return nil, false, err
 		}
 		if granted {
-			authority.grants = append(authority.grants, operation)
+			authority.settlementGrants[grantCount] = operation
+			grantCount++
 		}
 	}
-	clear(authority.eligible)
-	clear(authority.ordered)
-	return authority.grants[:len(authority.grants):len(authority.grants)], nil
+	return authority.settlementGrants[:grantCount:grantCount],
+		len(authority.settlements) != 0,
+		nil
 }
 
-func (authority *claimAuthority) collectEligible(key *authorityClaimKey) error {
-	if key == nil || key.writer != nil || key.waiterHead == nil {
-		return nil
-	}
-	edge := key.waiterHead
-	if edge.claim.mode == authorityClaimWrite {
-		if key.readerHead == nil {
-			return authority.addCandidate(edge.operation)
-		}
-		return nil
-	}
-	for edge != nil && edge.claim.mode == authorityClaimRead {
-		if err := authority.addCandidate(edge.operation); err != nil {
-			return err
-		}
-		edge = edge.next
-	}
-	return nil
-}
-
-func (authority *claimAuthority) addCandidate(operation *commandOperation) error {
-	authority.eligible = append(authority.eligible, operation)
-	return nil
-}
-
-func (authority *claimAuthority) sortCandidates() {
-	if len(authority.eligible) < 2 {
+func (authority *claimAuthority) refreshSettlement(key *authorityClaimKey) {
+	if key == nil {
 		return
 	}
-	if cap(authority.ordered) < len(authority.eligible) {
-		authority.ordered = make([]*commandOperation, len(authority.eligible))
-	} else {
-		authority.ordered = authority.ordered[:len(authority.eligible)]
+	eligible := claimSettlementEligible(key)
+	switch {
+	case eligible && key.settlementIndex < 0:
+		heap.Push(&authority.settlements, key)
+	case eligible:
+		heap.Fix(&authority.settlements, key.settlementIndex)
+	case key.settlementIndex >= 0:
+		heap.Remove(&authority.settlements, key.settlementIndex)
 	}
-	source := authority.eligible
-	destination := authority.ordered
-	for shift := uint(0); shift < 64; shift += 8 {
-		for index := range authority.radixCounts {
-			authority.radixCounts[index] = 0
-		}
-		for _, operation := range source {
-			authority.radixCounts[byte(operation.claimTicket>>shift)]++
-		}
-		offset := 0
-		for index, count := range authority.radixCounts {
-			authority.radixCounts[index] = offset
-			offset += count
-		}
-		for _, operation := range source {
-			bucket := byte(operation.claimTicket >> shift)
-			destination[authority.radixCounts[bucket]] = operation
-			authority.radixCounts[bucket]++
-		}
-		source, destination = destination, source
+}
+
+func claimSettlementEligible(key *authorityClaimKey) bool {
+	if key == nil || key.writer != nil || key.waiterHead == nil {
+		return false
 	}
+	if key.waiterHead.claim.mode == authorityClaimWrite {
+		return key.readerHead == nil
+	}
+	return true
 }
 
 func (authority *claimAuthority) forget(operation *commandOperation) error {
@@ -381,6 +402,9 @@ func (authority *claimAuthority) forget(operation *commandOperation) error {
 		}
 		edge.key.references--
 		if edge.key.references == 0 && edge.key.writer == nil && edge.key.readerHead == nil && edge.key.waiterHead == nil {
+			if edge.key.settlementIndex >= 0 {
+				return errors.New("jobmgr claims: terminal key remains settlement-eligible")
+			}
 			delete(authority.keys, edge.claim.key)
 		}
 		edge.key = nil
@@ -392,7 +416,7 @@ func (authority *claimAuthority) forget(operation *commandOperation) error {
 func (authority *claimAuthority) key(name string) *authorityClaimKey {
 	state := authority.keys[name]
 	if state == nil {
-		state = &authorityClaimKey{}
+		state = &authorityClaimKey{settlementIndex: -1}
 		authority.keys[name] = state
 	}
 	return state

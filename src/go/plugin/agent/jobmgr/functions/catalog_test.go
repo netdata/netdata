@@ -692,6 +692,143 @@ func TestFunctionCatalogSharedGenerationUsesRouteLocalLeaseDrain(t *testing.T) {
 	}
 }
 
+func TestFunctionCatalogReaddsRouteBeforeRetiredLeaseDrains(t *testing.T) {
+	tests := map[string]struct {
+		prefix string
+		args   []string
+		lane   LanePolicy
+	}{
+		"direct route": {
+			lane: RouteLane(),
+		},
+		"prefix route": {
+			prefix: "job:",
+			args:   []string{"job:one"},
+			lane:   ArgumentLane(0),
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			oldGeneration := testGeneration("old-shared")
+			target := testDeclarationForGeneration(
+				oldGeneration,
+				"work",
+				test.prefix,
+				test.lane,
+			)
+			sibling := testDeclarationForGeneration(
+				oldGeneration,
+				"sibling",
+				"",
+				RouteLane(),
+			)
+			catalog, err := NewCatalog([]Declaration{target, sibling})
+			if err != nil {
+				t.Fatal(err)
+			}
+			var oldRef jobmgr.FunctionCleanupRef
+			for ref, generation := range catalog.generations {
+				if generation.id == "old-shared" {
+					oldRef = ref
+					break
+				}
+			}
+			if !oldRef.Valid() {
+				t.Fatal("old shared generation is absent")
+			}
+			held, err := catalog.ResolveAndAcquire(
+				jobmgr.FunctionLookup{
+					UID:   "held-old",
+					Route: "work",
+					Args:  test.args,
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			commit := func(change RouteChange) {
+				t.Helper()
+				mutation, mutationErr := catalog.NewMutation(
+					catalog.Census().Version,
+					[]RouteChange{change},
+				)
+				if mutationErr != nil {
+					t.Fatal(mutationErr)
+				}
+				builder, mutationErr := catalog.startMutation(mutation)
+				if mutationErr != nil {
+					t.Fatal(mutationErr)
+				}
+				var postimage *MutationPostimage
+				for {
+					var done bool
+					postimage, done, mutationErr = builder.PrepareStep(
+						MaximumMutationQuantum,
+					)
+					if mutationErr != nil {
+						t.Fatal(mutationErr)
+					}
+					if done {
+						break
+					}
+				}
+				var cleanups [MaximumMutationChanges]jobmgr.FunctionCleanupPlan
+				if count, commitErr := catalog.commitMutation(
+					postimage,
+					&cleanups,
+				); commitErr != nil || count != 0 {
+					t.Fatalf(
+						"mutation cleanup count=%d error=%v",
+						count,
+						commitErr,
+					)
+				}
+			}
+			commit(RouteChange{
+				PublicName: "work",
+				Prefix:     test.prefix,
+			})
+			replacement := testDeclaration(
+				"work",
+				test.prefix,
+				test.lane,
+			)
+			commit(RouteChange{
+				PublicName:  "work",
+				Prefix:      test.prefix,
+				Declaration: &replacement,
+			})
+			if census := catalog.Census(); census.Routes != 2 {
+				t.Fatalf(
+					"re-add route census=%+v, want two published routes",
+					census,
+				)
+			}
+			if resolvedMethod(catalog, "sibling", nil) == "" ||
+				resolvedMethod(catalog, "work", test.args) == "" {
+				t.Fatal("re-add lost sibling or replacement route")
+			}
+			cleanup, err := catalog.ReleaseInvocation(held.Lease)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cleanup.Ref.Valid() {
+				t.Fatal(
+					"shared generation cleaned while sibling route remained",
+				)
+			}
+			if census := catalog.HandlerCensus(oldRef); census.RouteReferences != 1 ||
+				census.InvocationLeases != 0 ||
+				census.AdmissionClosed {
+				t.Fatalf(
+					"old shared generation census=%+v",
+					census,
+				)
+			}
+		})
+	}
+}
+
 func TestFunctionCatalogQuiesceAbortRestoresAdmission(t *testing.T) {
 	tests := map[string]struct {
 		prefix string

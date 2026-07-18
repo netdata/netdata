@@ -146,6 +146,104 @@ func TestClaimAuthorityCancelAndReleaseAllocateNothing(t *testing.T) {
 	}
 }
 
+func TestClaimAuthoritySettlementUsesBoundedTurns(t *testing.T) {
+	const (
+		population = 257
+		quantum    = 4
+	)
+	authority := newClaimAuthority()
+	holder := claimTestOperation(
+		t,
+		authority,
+		1,
+		"holder",
+		[]string{"shared"},
+		nil,
+	)
+	if granted, err := authority.Acquire(holder); err != nil || !granted {
+		t.Fatalf("holder acquire: granted=%v err=%v", granted, err)
+	}
+	for index := range population {
+		waiter := claimTestOperation(
+			t,
+			authority,
+			lifecycle.OperationID(index+2),
+			fmt.Sprintf("waiter-%d", index),
+			nil,
+			[]string{"shared"},
+		)
+		if granted, err := authority.Acquire(waiter); err != nil || granted {
+			t.Fatalf(
+				"waiter %d acquire: granted=%v err=%v",
+				index,
+				granted,
+				err,
+			)
+		}
+	}
+	granted, err := authority.Release(holder)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(granted) > quantum {
+		t.Fatalf(
+			"one settlement turn granted %d operations, want at most %d",
+			len(granted),
+			quantum,
+		)
+	}
+	allGranted := append([]*commandOperation(nil), granted...)
+	for authority.PendingSettlements() {
+		batch, more, serviceErr := authority.ServiceSettlements(quantum)
+		if serviceErr != nil {
+			t.Fatal(serviceErr)
+		}
+		if len(batch) > quantum {
+			t.Fatalf(
+				"continuation settlement granted %d operations, want at most %d",
+				len(batch),
+				quantum,
+			)
+		}
+		allGranted = append(allGranted, batch...)
+		if more != authority.PendingSettlements() {
+			t.Fatalf(
+				"settlement continuation differs: returned=%v pending=%v",
+				more,
+				authority.PendingSettlements(),
+			)
+		}
+	}
+	if len(allGranted) != population {
+		t.Fatalf(
+			"settlement granted %d operations, want %d",
+			len(allGranted),
+			population,
+		)
+	}
+	for index, operation := range allGranted {
+		want := fmt.Sprintf("waiter-%d", index)
+		if operation.UID != want {
+			t.Fatalf(
+				"settlement order[%d]=%q, want %q",
+				index,
+				operation.UID,
+				want,
+			)
+		}
+		if _, err := authority.Release(operation); err != nil {
+			t.Fatalf("release %q: %v", operation.UID, err)
+		}
+	}
+	if authority.WaitingCount() != 0 || len(authority.keys) != 0 {
+		t.Fatalf(
+			"settlement retained waiters=%d keys=%d",
+			authority.WaitingCount(),
+			len(authority.keys),
+		)
+	}
+}
+
 type claimAllocationFixture struct {
 	authority *claimAuthority
 	target    *commandOperation

@@ -29,6 +29,8 @@ import (
 
 const requiredComparisonGates = 171
 
+const phaseModulePath = "github.com/netdata/netdata/go/plugins"
+
 type options struct {
 	goRoot              string
 	baselineBundle      string
@@ -41,6 +43,8 @@ type phaseArtifacts struct {
 	godplugin      string
 	ibmdplugin     string
 	scriptsdplugin string
+	goRoot         string
+	goExecutable   string
 	source         buildidentity.Source
 }
 
@@ -117,13 +121,28 @@ func run(arguments []string) error {
 	}
 	defer cleanup()
 
-	if err := verifyNamedGates(ctx, opts.goRoot, gates); err != nil {
+	if err := verifyNamedGates(
+		ctx,
+		artifacts.goExecutable,
+		artifacts.goRoot,
+		gates,
+	); err != nil {
 		return err
 	}
-	if err := runDeterministicGates(ctx, opts.goRoot, gates); err != nil {
+	if err := runDeterministicGates(
+		ctx,
+		artifacts.goExecutable,
+		artifacts.goRoot,
+		gates,
+	); err != nil {
 		return err
 	}
-	if err := runHotpathBenchmarks(ctx, opts.goRoot, gates); err != nil {
+	if err := runHotpathBenchmarks(
+		ctx,
+		artifacts.goExecutable,
+		artifacts.goRoot,
+		gates,
+	); err != nil {
 		return err
 	}
 	if err := runProductionSuites(ctx, opts, artifacts); err != nil {
@@ -285,6 +304,10 @@ func buildPhaseArtifacts(
 	if err != nil {
 		return phaseArtifacts{}, func() {}, err
 	}
+	goTool, err := buildidentity.CurrentGoTool(ctx)
+	if err != nil {
+		return phaseArtifacts{}, func() {}, err
+	}
 	directory, err := os.MkdirTemp("", "jobmgrtest-phase-build-")
 	if err != nil {
 		return phaseArtifacts{}, func() {}, err
@@ -295,7 +318,17 @@ func buildPhaseArtifacts(
 		godplugin:      filepath.Join(directory, "go.d.plugin"),
 		ibmdplugin:     filepath.Join(directory, "ibm.d.plugin"),
 		scriptsdplugin: filepath.Join(directory, "scripts.d.plugin"),
+		goRoot:         filepath.Join(directory, "source"),
+		goExecutable:   goTool.Path,
 		source:         source,
+	}
+	if err := buildidentity.ExportCommittedGoTree(
+		ctx,
+		opts.goRoot,
+		artifacts.goRoot,
+	); err != nil {
+		cleanup()
+		return phaseArtifacts{}, func() {}, err
 	}
 	targets := phaseBuildTargets(artifacts)
 	names := make([]string, 0, len(targets))
@@ -318,8 +351,12 @@ func buildPhaseArtifacts(
 			target.path,
 			target.importPath,
 		)
-		command := exec.CommandContext(ctx, "go", arguments...)
-		command.Dir = opts.goRoot
+		command := exec.CommandContext(
+			ctx,
+			artifacts.goExecutable,
+			arguments...,
+		)
+		command.Dir = artifacts.goRoot
 		command.Env = phaseGoEnvironment(
 			map[string]string{"CGO_ENABLED": target.cgo},
 		)
@@ -336,6 +373,22 @@ func buildPhaseArtifacts(
 		if err := validateExecutable(name, target.path); err != nil {
 			cleanup()
 			return phaseArtifacts{}, func() {}, err
+		}
+		if err := buildidentity.VerifyExecutable(
+			target.path,
+			buildidentity.ExecutableExpectation{
+				Package: phaseModulePath + "/" +
+					strings.TrimPrefix(target.importPath, "./"),
+				CGO:  target.cgo,
+				Tags: target.tags,
+			},
+		); err != nil {
+			cleanup()
+			return phaseArtifacts{}, func() {}, fmt.Errorf(
+				"jobmgr phase: verify %s: %w",
+				name,
+				err,
+			)
 		}
 	}
 	same, err := sameExecutableContent(
@@ -507,13 +560,14 @@ func collectPackageGates(
 
 func verifyNamedGates(
 	ctx context.Context,
+	goExecutable string,
 	goRoot string,
 	gates map[string]*packageGates,
 ) error {
 	for _, packageName := range sortedPackages(gates) {
 		command := exec.CommandContext(
 			ctx,
-			"go",
+			goExecutable,
 			"test",
 			"-list",
 			".",
@@ -572,6 +626,7 @@ func parseGoTestList(output string) map[string]struct{} {
 
 func runDeterministicGates(
 	ctx context.Context,
+	goExecutable string,
 	goRoot string,
 	gates map[string]*packageGates,
 ) error {
@@ -582,6 +637,7 @@ func runDeterministicGates(
 		}
 		if err := runGoTest(
 			ctx,
+			goExecutable,
 			goRoot,
 			nil,
 			"-count=1",
@@ -601,6 +657,7 @@ func runDeterministicGates(
 
 func runHotpathBenchmarks(
 	ctx context.Context,
+	goExecutable string,
 	goRoot string,
 	gates map[string]*packageGates,
 ) error {
@@ -611,6 +668,7 @@ func runHotpathBenchmarks(
 		}
 		if err := runGoTest(
 			ctx,
+			goExecutable,
 			goRoot,
 			nil,
 			"-count=1",
@@ -646,7 +704,8 @@ func runProductionSuites(
 	}
 	return runGoTest(
 		ctx,
-		opts.goRoot,
+		artifacts.goExecutable,
+		artifacts.goRoot,
 		environment,
 		"-count=1",
 		"./plugin/agent/jobmgr",
@@ -669,11 +728,12 @@ func productionSuiteTests() []string {
 
 func runGoTest(
 	ctx context.Context,
+	goExecutable string,
 	goRoot string,
 	environment map[string]string,
 	arguments ...string,
 ) error {
-	command := exec.CommandContext(ctx, "go", append(
+	command := exec.CommandContext(ctx, goExecutable, append(
 		[]string{"test"},
 		arguments...,
 	)...)

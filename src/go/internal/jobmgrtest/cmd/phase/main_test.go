@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/internal/jobmgrtest/buildidentity"
 	"github.com/netdata/netdata/go/plugins/internal/jobmgrtest/contract"
 )
 
@@ -179,7 +180,16 @@ func TestPackageGateNamesExist(t *testing.T) {
 		2*time.Minute,
 	)
 	defer cancel()
-	if err := verifyNamedGates(ctx, goRoot, gates); err != nil {
+	goTool, err := buildidentity.CurrentGoTool(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyNamedGates(
+		ctx,
+		goTool.Path,
+		goRoot,
+		gates,
+	); err != nil {
 		t.Fatal(err)
 	}
 }

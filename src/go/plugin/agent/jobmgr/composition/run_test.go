@@ -5,6 +5,7 @@ package composition
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -456,15 +457,63 @@ func (runRejectingPlanner) Plan(jobmgr.Request) (jobmgr.WorkPlan, error) {
 	return jobmgr.RejectionPlan(lifecycle.ControlBadRequest), nil
 }
 
+func TestCloseProcessUIDsObservesShutdownContextBetweenBatches(t *testing.T) {
+	tests := map[string]struct {
+		cancelled      bool
+		wantErr        error
+		wantTombstones int
+		wantClosed     bool
+	}{
+		"live shutdown drains every batch": {
+			wantTombstones: 0,
+			wantClosed:     true,
+		},
+		"expired shutdown leaves process-exit containment": {
+			cancelled:      true,
+			wantErr:        context.Canceled,
+			wantTombstones: 257,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			uids := lifecycle.NewUIDLedger()
+			now := time.Now()
+			for index := range 257 {
+				uid := fmt.Sprintf("close-uid-%d", index)
+				if err := uids.Admit(uid, now); err != nil {
+					t.Fatal(err)
+				}
+				if err := uids.Complete(uid, true, now); err != nil {
+					t.Fatal(err)
+				}
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			if test.cancelled {
+				cancel()
+			} else {
+				defer cancel()
+			}
+			err := closeProcessUIDs(ctx, uids)
+			if !errors.Is(err, test.wantErr) {
+				t.Fatalf("UID close error=%v, want %v", err, test.wantErr)
+			}
+			active, tombstones, closed := uids.Census()
+			if active != 0 || tombstones != test.wantTombstones ||
+				closed != test.wantClosed {
+				t.Fatalf(
+					"UID close census active=%d tombstones=%d closed=%v",
+					active,
+					tombstones,
+					closed,
+				)
+			}
+		})
+	}
+}
+
 func closeRunTestUIDs(t *testing.T, uids *lifecycle.UIDLedger) {
 	t.Helper()
-	for {
-		more, err := uids.CloseBatch(lifecycle.UIDReturnBatch)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if !more {
-			return
-		}
+	if err := closeProcessUIDs(context.Background(), uids); err != nil {
+		t.Fatal(err)
 	}
 }
