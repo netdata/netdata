@@ -82,10 +82,12 @@ function Invoke-LocalApi([string]$url, [int]$timeoutSec) {
 # pass 2 (default): emails, MACs, IPv4 pseudonyms, this host's names,
 #                   private-TLD FQDNs
 $SecretKeyWords = @(
-    'api key','apikey','token','password','passwd','pwd','pass','secret','community',
-    'bearer','webhook','license key','auth','credential','cred','cookie','passphrase',
-    'proxy user','proxy pass','username','dsn','private key','access key','secret key',
-    'session','recipient','account sid','priv key','pat','client secret','sas'
+    # substring-matched, so only unambiguous secret tokens belong here:
+    # e.g. 'pat' is excluded because it matches 'path' (kept in sync with the .sh list)
+    'api key','apikey','token','password','passwd','pwd','secret','community',
+    'bearer','webhook','license key','auth','credential','cookie','passphrase',
+    'proxy user','proxy pass','username','dsn','private key','access key',
+    'session','recipient','account sid','priv key'
 )
 $HostShort = $env:COMPUTERNAME
 $HostFqdn = try { [System.Net.Dns]::GetHostEntry('').HostName } catch { Write-Verbose "no FQDN: $_"; '' }
