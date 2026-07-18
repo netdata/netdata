@@ -330,6 +330,14 @@ func (j *Job) applyVnodeSnapshot(snapshot VnodeSnapshot) bool {
 	if snapshot.Vnode == nil {
 		return false
 	}
+	if snapshot.Revision != 0 {
+		j.vnodeMu.Lock()
+		stale := snapshot.Revision <= j.vnodeRevision
+		j.vnodeMu.Unlock()
+		if stale {
+			return false
+		}
+	}
 	next := snapshot.Vnode.Copy()
 
 	j.vnodeMu.Lock()

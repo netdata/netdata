@@ -5,6 +5,7 @@ package composition
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -22,6 +23,106 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"gopkg.in/yaml.v2"
 )
+
+func TestRunGenerationPreservesFullJobCapacityWithDiscoveryPipeline(
+	t *testing.T,
+) {
+	tests := map[string]struct {
+		jobs int
+	}{
+		"one pipeline plus the full job population": {
+			jobs: lifecycle.MaximumActiveJobs,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var cleanupCalls atomic.Int32
+			modules := collectorapi.Registry{
+				"module": {
+					Create: func() collectorapi.CollectorV1 {
+						return &collectorapi.MockCollectorV1{
+							ChartsFunc: func() *collectorapi.Charts {
+								return &collectorapi.Charts{
+									&collectorapi.Chart{
+										ID: "chart", Title: "chart",
+										Units: "value",
+										Dims: collectorapi.Dims{
+											&collectorapi.Dim{ID: "value"},
+										},
+									},
+								}
+							},
+							CollectFunc: func(context.Context) map[string]int64 {
+								return map[string]int64{"value": 1}
+							},
+							CleanupFunc: func(context.Context) {
+								cleanupCalls.Add(1)
+							},
+						}
+					},
+					Config: func() any {
+						return &collectorapi.MockConfiguration{}
+					},
+				},
+			}
+			jobs := testRunJobServices(t)
+			jobs.Defaults = confgroup.Registry{
+				"module": {UpdateEvery: 1},
+			}
+			jobs.Graph = fullCapacityInitialJobs(t, test.jobs)
+
+			frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			admission := lifecycle.NewAdmissionLedger()
+			uids := lifecycle.NewUIDLedger()
+			generation, err := newRunGeneration(runGenerationConfig{
+				Generation: 1, ShutdownTimeout: 10 * time.Second,
+				Clock: lifecycle.RealClock{}, Admission: admission, UIDs: uids,
+				Frames: frames, Modules: modules, Jobs: jobs,
+				Discovery: testRunDiscoveryServices(t),
+				Planner: func(
+					runPlannerCapabilities,
+				) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
+					return runRejectingPlanner{},
+						jobmgr.RunFinalizerFunc(
+							func(context.Context, uint64) error { return nil },
+						),
+						nil
+				},
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := generation.Start(context.Background()); err != nil {
+				waitErr := generation.Wait(context.Background())
+				t.Fatalf("full-capacity generation start: %v; shutdown: %v", err, waitErr)
+			}
+			if got := generation.scheduler.Census(); got != test.jobs {
+				t.Fatalf("scheduler jobs=%d want=%d", got, test.jobs)
+			}
+			if got := len(generation.graph.IDs()); got != test.jobs {
+				t.Fatalf("graph jobs=%d want=%d", got, test.jobs)
+			}
+			if got := generation.tasks.LongLivedCensus().Active; got != test.jobs+1 {
+				t.Fatalf("long-lived resources=%d want=%d", got, test.jobs+1)
+			}
+
+			generation.Stop()
+			if err := generation.Wait(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+			if got := cleanupCalls.Load(); got != int32(test.jobs) {
+				t.Fatalf("collector cleanups=%d want=%d", got, test.jobs)
+			}
+			if err := admission.CloseDrained(1); err != nil {
+				t.Fatal(err)
+			}
+			closeRunTestUIDs(t, uids)
+		})
+	}
+}
 
 func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 	var eventsMu sync.Mutex
@@ -231,6 +332,37 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 		t.Fatal(err)
 	}
 	closeRunTestUIDs(t, uids)
+}
+
+func fullCapacityInitialJobs(
+	t testing.TB,
+	count int,
+) []dyncfg.GraphConfig {
+	t.Helper()
+	records := make([]dyncfg.GraphConfig, count)
+	for ordinal := range count {
+		name := fmt.Sprintf("job-%03d", ordinal)
+		config := confgroup.Config{
+			"module":       "module",
+			"name":         name,
+			"update_every": 1,
+			"option_str":   "work",
+			"option_int":   1,
+		}
+		config.SetProvider(confgroup.TypeDyncfg)
+		config.SetSourceType(confgroup.TypeDyncfg)
+		config.SetSource("test")
+		payload, err := yaml.Marshal(config)
+		if err != nil {
+			t.Fatal(err)
+		}
+		records[ordinal] = dyncfg.GraphConfig{
+			ID: config.FullName(), Module: config.Module(),
+			Name: config.Name(), Status: dyncfg.StatusRunning.String(),
+			Payload: payload,
+		}
+	}
+	return records
 }
 
 func testRunJobServices(t testing.TB) runJobServices {

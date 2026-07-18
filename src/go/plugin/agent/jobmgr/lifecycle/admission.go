@@ -14,10 +14,12 @@ var (
 
 const (
 	MaximumAdmissionRecords = 256
-	MaximumLaneDepth        = 32
-	admissionRadixBits      = 28
-	inputBodyRecordSlot     = MaximumAdmissionRecords + 1
-	maximumAdmissionNodes   = 1 + (MaximumAdmissionRecords+1)*admissionRadixBits
+	MaximumAdmissionLanes   = MaximumAdmissionRecords +
+		MaximumActiveJobs + MaximumFixedLongLivedServices
+	MaximumLaneDepth      = 32
+	admissionRadixBits    = 28
+	inputBodyRecordSlot   = MaximumAdmissionRecords + 1
+	maximumAdmissionNodes = 1 + (MaximumAdmissionRecords+1)*admissionRadixBits
 )
 
 type ReservationKind uint8
@@ -43,7 +45,7 @@ type AdmissionLaneRef struct {
 }
 
 func (ref AdmissionLaneRef) Valid() bool {
-	return ref.Slot > 0 && ref.Slot <= MaximumAdmissionRecords && ref.Generation > 0
+	return ref.Slot > 0 && ref.Slot <= MaximumAdmissionLanes && ref.Generation > 0
 }
 
 type AdmissionRef struct {
@@ -152,8 +154,8 @@ type AdmissionLedger struct {
 	freeRecords    int
 	activeRecords  int
 
-	laneGenerations [MaximumAdmissionRecords + 1]uint32
-	laneCounts      [MaximumAdmissionRecords + 1]uint8
+	laneGenerations [MaximumAdmissionLanes + 1]uint32
+	laneCounts      [MaximumAdmissionLanes + 1]uint8
 
 	nodes        [maximumAdmissionNodes + 1]admissionRadixNode
 	freeNodeHead uint16

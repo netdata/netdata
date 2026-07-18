@@ -94,7 +94,10 @@ func main() {
 	a.Infof("directories → config: %s | collectors: %s | sd: %s | varlib: %s",
 		a.ConfigDir, a.CollectorsConfDir, a.ServiceDiscoveryConfigDir, a.VarLibDir)
 
-	agenthost.Run(a)
+	if err := agenthost.Run(a); err != nil {
+		a.Errorf("plugin exiting after Agent failure: %v", err)
+		os.Exit(1)
+	}
 }
 
 func parseCLI() *cli.Option {

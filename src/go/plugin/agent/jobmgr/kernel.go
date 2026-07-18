@@ -13,7 +13,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
-const externalSourceQueueDepth = lifecycle.MaximumLaneDepth
+const (
+	externalSourceQueueDepth = lifecycle.MaximumLaneDepth
+	maximumCommandLanes      = lifecycle.MaximumAdmissionLanes
+)
 
 const maximumFunctionCleanupBacklog = lifecycle.MaximumAdmissionRecords + MaximumFunctionMutationChanges
 
@@ -473,7 +476,7 @@ type CommandKernel struct {
 	functionMutationActive   bool
 	functionCatalogClosing   bool
 	functionCatalogCloseMore bool
-	shutdownRequests         [lifecycle.MaximumAdmissionRecords + 1]*commandLane
+	shutdownRequests         [maximumCommandLanes + 1]*commandLane
 	shutdownTasks            [lifecycle.TransientTaskSlots]*commandLane
 	shutdownRequestCount     int
 	shutdownTaskCount        int
@@ -491,7 +494,7 @@ type CommandKernel struct {
 	finalizerFailed          bool
 	byAdmission              map[lifecycle.AdmissionRef]*commandOperation
 	lanes                    map[commandLaneKey]*commandLane
-	laneSlots                [lifecycle.MaximumAdmissionRecords + 1]commandLane
+	laneSlots                [maximumCommandLanes + 1]commandLane
 	freeLane                 uint16
 	ready                    [2]readyRing
 	nextID                   lifecycle.OperationID
@@ -538,10 +541,10 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 		kernel.submissions[index] = make(chan submission, externalSourceQueueDepth)
 		kernel.submissionSpace[index] = make(chan struct{}, 1)
 	}
-	for index := 1; index <= lifecycle.MaximumAdmissionRecords; index++ {
+	for index := 1; index <= maximumCommandLanes; index++ {
 		kernel.laneSlots[index].freeNext = uint16(index + 1)
 	}
-	kernel.laneSlots[lifecycle.MaximumAdmissionRecords].freeNext = 0
+	kernel.laneSlots[maximumCommandLanes].freeNext = 0
 	kernel.freeLane = 1
 	heap.Init(&kernel.deadlines)
 	return kernel, nil
@@ -2965,7 +2968,9 @@ func cancellablePendingAction(operation *commandOperation) bool {
 }
 
 func requiresCooperativeDeadlineStart(operation *commandOperation) bool {
-	return operation != nil && operation.plan.Work != nil && operation.plan.CooperativeDeadline
+	return operation != nil &&
+		(operation.plan.Work != nil || operation.plan.Runner != nil) &&
+		operation.plan.CooperativeDeadline
 }
 
 func (kernel *CommandKernel) markOperationDeadlineIfDue(operation *commandOperation) {
@@ -3452,6 +3457,9 @@ func (kernel *CommandKernel) enqueueShutdownStops() error {
 		identity := lane.currentIdentity
 		if !identity.Valid() || identity.ID != lane.key {
 			return errors.New("jobmgr kernel: shutdown found an invalid current resource")
+		}
+		if kernel.tasks.Pending() >= lifecycle.MaximumAdmissionRecords {
+			return nil
 		}
 		budget, err := kernel.run.BeginShutdown()
 		if err != nil {

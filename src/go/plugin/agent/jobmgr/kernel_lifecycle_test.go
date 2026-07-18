@@ -1493,6 +1493,146 @@ func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 	closeUIDLedger(t, uids)
 }
 
+func TestKernelStartsDueCooperativeRunner(t *testing.T) {
+	clock := newKernelFinalizerClock()
+	release := make(chan struct{})
+	blockerEntered := make(chan struct{}, lifecycle.TransientTaskSlots)
+	observed := make(chan error, 1)
+	runner := kernelDeadlineRunner{observed: observed}
+	planner := plannerFunc(func(
+		_ context.Context,
+		route string,
+		_ []string,
+	) (WorkPlan, error) {
+		if route == "runner" {
+			return WorkPlan{
+				Runner:              runner,
+				CooperativeDeadline: true,
+			}, nil
+		}
+		return WorkPlan{
+			Work: lifecycle.FrameTaskWork(func(
+				context.Context,
+			) (lifecycle.SealedResult, error) {
+				blockerEntered <- struct{}{}
+				<-release
+				return lifecycle.NewSealedResult(
+					200,
+					"application/json",
+					[]byte(`{}`),
+				)
+			}),
+		}, nil
+	})
+	var output bytes.Buffer
+	kernel, run, admission, uids, tasks :=
+		newKernelWithClockFinalizerAndTimeout(
+			t,
+			planner,
+			&output,
+			clock,
+			newNoopRunFinalizer(),
+			time.Second,
+		)
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	setTestFunctionLane(t, kernel, func(lookup FunctionLookup) string {
+		return lookup.UID
+	})
+	startKernelLoop(t, kernel)
+	for index := range lifecycle.TransientTaskSlots {
+		if err := kernel.Submit(
+			context.Background(),
+			Request{
+				UID:      fmt.Sprintf("runner-blocker-%d", index),
+				Source:   lifecycle.SourceFunction,
+				Route:    "blocker",
+				Deadline: clock.Now().Add(time.Minute),
+			},
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for range lifecycle.TransientTaskSlots {
+		select {
+		case <-blockerEntered:
+		case <-time.After(time.Second):
+			t.Fatal("blocking runner test task did not occupy its slot")
+		}
+	}
+	result := make(chan error, 1)
+	go func() {
+		result <- kernel.SubmitAndWait(
+			context.Background(),
+			Request{
+				UID:      "due-runner",
+				Source:   lifecycle.SourceFunction,
+				Route:    "runner",
+				Deadline: clock.Now(),
+			},
+		)
+	}()
+	select {
+	case cause := <-observed:
+		t.Fatalf("due cooperative runner bypassed task capacity: %v", cause)
+	case <-time.After(20 * time.Millisecond):
+	}
+	close(release)
+	select {
+	case cause := <-observed:
+		if !errors.Is(cause, context.DeadlineExceeded) {
+			t.Fatalf("runner cancellation cause=%v", cause)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("due cooperative runner was terminalized without execution")
+	}
+	select {
+	case err := <-result:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("due cooperative runner did not reach terminal disposition")
+	}
+	if !bytes.Contains(
+		output.Bytes(),
+		[]byte("FUNCTION_RESULT_BEGIN due-runner 504 application/json "),
+	) {
+		t.Fatalf("due cooperative runner response differs: %q", output.Bytes())
+	}
+	kernel.Stop()
+	if err := kernel.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if tasks.Active() != 0 || tasks.Pending() != 0 {
+		t.Fatalf(
+			"due cooperative runner retained tasks: active=%d pending=%d",
+			tasks.Active(),
+			tasks.Pending(),
+		)
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
+}
+
+type kernelDeadlineRunner struct {
+	observed chan<- error
+}
+
+func (runner kernelDeadlineRunner) RunTask(
+	ctx context.Context,
+) (lifecycle.TaskOutcome, error) {
+	runner.observed <- context.Cause(ctx)
+	result, err := lifecycle.NewControlResult(lifecycle.ControlDeadline)
+	if err != nil {
+		return lifecycle.TaskOutcome{}, err
+	}
+	return lifecycle.NewFrameOutcome(result)
+}
+
 func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *testing.T) {
 	clock := newKernelFinalizerClock()
 	releasePredecessor := make(chan struct{})
