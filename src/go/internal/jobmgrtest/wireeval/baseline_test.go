@@ -8,6 +8,39 @@ import (
 	"testing"
 )
 
+func TestStep0BaselineIdentityPinsApprovedPlatforms(t *testing.T) {
+	expected := map[baselinePlatform]string{
+		{
+			GOOS: "darwin", GOARCH: "arm64", GoVersion: "go1.26.5",
+		}: "6d359989e417809e85182d6764d356e70b709242c15ece107a114096cb70825e",
+		{
+			GOOS: "linux", GOARCH: "amd64", GoVersion: "go1.26.5",
+		}: "7eafaa2bf9a3a5b186250a9a90273eb04e490c740a188fa44f14b38590f085a0",
+		{
+			GOOS: "linux", GOARCH: "arm64", GoVersion: "go1.26.5",
+		}: "40be5dafebc3c93d6ac35a0183228c2f39a223ec6a382903eeeabef1c014dde8",
+	}
+	if len(step0BaselineIdentity.Executables) != len(expected) {
+		t.Fatalf(
+			"approved baseline platforms=%d, want %d",
+			len(step0BaselineIdentity.Executables),
+			len(expected),
+		)
+	}
+	for platform, want := range expected {
+		if got := step0BaselineIdentity.Executables[platform]; got != want {
+			t.Fatalf(
+				"baseline %s/%s %s digest=%q, want %q",
+				platform.GOOS,
+				platform.GOARCH,
+				platform.GoVersion,
+				got,
+				want,
+			)
+		}
+	}
+}
+
 func TestBaselineBundleVerifiesExactFilesAndPlatform(t *testing.T) {
 	directory := t.TempDir()
 	if err := os.Mkdir(filepath.Join(directory, "fixture"), 0o750); err != nil {

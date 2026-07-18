@@ -54,6 +54,9 @@ var step0BaselineIdentity = baselineIdentityContract{
 	FixtureSHA256:           "46189fd9f245e945c91ab16709c200511767ca2a97bfc04cb37c32224c6fa5fc",
 	Executables: map[baselinePlatform]string{
 		{
+			GOOS: "darwin", GOARCH: "arm64", GoVersion: "go1.26.5",
+		}: "6d359989e417809e85182d6764d356e70b709242c15ece107a114096cb70825e",
+		{
 			GOOS: "linux", GOARCH: "amd64", GoVersion: "go1.26.5",
 		}: "7eafaa2bf9a3a5b186250a9a90273eb04e490c740a188fa44f14b38590f085a0",
 		{
