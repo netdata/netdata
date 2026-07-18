@@ -636,10 +636,13 @@ if [ "$(uname -s)" = "Darwin" ]; then
   rust_covers_required_version() {
     # Sourcing /etc/profile above ran path_helper, which may have reset PATH
     # and hidden the toolchain; probe the locations Corrosion's FindRust
-    # considers, plus Homebrew's Apple Silicon prefix.
-    rustc_cmd="$(PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:${PATH}" command -v rustc 2>/dev/null)"
+    # considers, plus Homebrew's Apple Silicon prefix. Validate the rustc
+    # that ships next to the selected cargo, so a mixed installation cannot
+    # pass the check with a different compiler.
     cargo_cmd="$(PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:${PATH}" command -v cargo 2>/dev/null)"
-    { [ -n "${rustc_cmd}" ] && [ -n "${cargo_cmd}" ]; } || return 1
+    [ -n "${cargo_cmd}" ] || return 1
+    rustc_cmd="${cargo_cmd%/*}/rustc"
+    [ -x "${rustc_cmd}" ] || return 1
     rust_version_min="$(required_rust_version)"
     if [ -n "${rust_version_min}" ]; then
       rust_version_have="$("${rustc_cmd}" --version 2>/dev/null | cut -d ' ' -f 2)"
@@ -647,8 +650,7 @@ if [ "$(uname -s)" = "Darwin" ]; then
       version_covers "${rust_version_min}" "${rust_version_have}" || return 1
     fi
     # Make the approved toolchain visible to CMake/Corrosion as well.
-    cargo_bin_dir="$(dirname "${cargo_cmd}")"
-    export PATH="${cargo_bin_dir}:${PATH}"
+    export PATH="${cargo_cmd%/*}:${PATH}"
   }
 
   if [ -z "${ENABLE_OTEL}" ]; then

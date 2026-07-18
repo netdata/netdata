@@ -1249,13 +1249,16 @@ version_covers() {
 }
 
 rust_toolchain_ok() {
-  # Succeeds when a cargo/rustc satisfies NETDATA_RUST_MSRV. Probes the
-  # rustup and Homebrew locations too, as they may not be on PATH yet.
+  # Succeeds when a matched cargo/rustc pair satisfies NETDATA_RUST_MSRV.
+  # Probes the rustup and Homebrew locations too, as they may not be on PATH
+  # yet, and validates the rustc that ships next to the selected cargo so a
+  # mixed installation cannot pass the check with a different compiler.
   [ "${IGNORE_INSTALLED}" -eq 1 ] && return 1
-  local rustc_cmd v
-  PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:${PATH}" command -v cargo > /dev/null 2>&1 || return 1
-  rustc_cmd="$(PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:${PATH}" command -v rustc 2> /dev/null)"
-  [ -n "${rustc_cmd}" ] || return 1
+  local cargo_cmd rustc_cmd v
+  cargo_cmd="$(PATH="${HOME}/.cargo/bin:/opt/homebrew/bin:${PATH}" command -v cargo 2> /dev/null)"
+  [ -n "${cargo_cmd}" ] || return 1
+  rustc_cmd="${cargo_cmd%/*}/rustc"
+  [ -x "${rustc_cmd}" ] || return 1
   v="$("${rustc_cmd}" --version 2> /dev/null | cut -d ' ' -f 2)"
   [ -z "${v}" ] && return 1
   version_covers "${NETDATA_RUST_MSRV}" "${v}"
@@ -1264,15 +1267,13 @@ rust_toolchain_ok() {
 ensure_rustup_toolchain() {
   # When rustup manages the toolchain, install one covering the MSRV instead
   # of layering a Homebrew rust next to it. Sets a default only when none is
-  # configured; an existing too-old default is the user's to switch.
+  # configured; an existing too-old default is the user's to switch (the
+  # final verification below reports it).
   command -v rustup > /dev/null 2>&1 || return 0
   rust_toolchain_ok && return 0
   run rustup toolchain install stable || return 1
   rustup default > /dev/null 2>&1 || run rustup default stable
-  if ! rust_toolchain_ok; then
-    echo >&2 "WARNING: the default rustup toolchain does not satisfy Rust >= ${NETDATA_RUST_MSRV},"
-    echo >&2 "         which Netdata's otel-plugin needs. Run: rustup default stable"
-  fi
+  return 0
 }
 
 packages() {
@@ -2165,7 +2166,17 @@ else
 fi
 
 if [ "${tree}" = "macos" ] && [ "${PACKAGES_NETDATA}" -ne 0 ] && [ "${IGNORE_INSTALLED}" -eq 0 ]; then
-  ensure_rustup_toolchain
+  # The otel-plugin is enabled by default on macOS and needs a Rust
+  # toolchain covering the MSRV; fail loudly when one could not be set up.
+  if ! ensure_rustup_toolchain || ! rust_toolchain_ok; then
+    echo >&2
+    echo >&2 "Failed to set up a Rust toolchain covering version ${NETDATA_RUST_MSRV}, which"
+    echo >&2 "the Netdata otel-plugin (enabled by default on macOS) requires."
+    echo >&2 "Install one with 'rustup default stable' or 'brew install rust' and run this script again,"
+    echo >&2 "or build Netdata with --disable-plugin-otel."
+    remote_log "FAILED" "rust-toolchain"
+    exit 1
+  fi
 fi
 
 remote_log "OK"
