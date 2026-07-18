@@ -5,15 +5,15 @@ edition.workspace = true
 rust-version.workspace = true
 
 [dependencies]
-error = { path = "../error" }
+error = { workspace = true }
 # journal_reader integrated into journal_file
-journal_file = { path = "../journal_file" }
+journal_file = { workspace = true }
 memmap2 = { workspace = true }
 serde_json = { workspace = true }
-sigbus = { path = "../sigbus" }
+sigbus = { workspace = true }
 
 [build-dependencies]
-cbindgen = "0.28.0"
+cbindgen = { workspace = true }
 
 [lib]
 crate-type = ["staticlib"]

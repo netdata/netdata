@@ -28,7 +28,7 @@ impl IngestService {
         );
         let machine_id = journal_host.machine_id();
         let boot_id = journal_host.boot_id();
-        let lifecycle_observer: Arc<dyn journal_log_writer::LogLifecycleObserver> =
+        let lifecycle_observer: Arc<dyn journal_sdk_log_writer::LogLifecycleObserver> =
             Arc::new(FacetLifecycleObserver {
                 runtime: Arc::clone(&facet_runtime),
             });
@@ -115,7 +115,7 @@ impl IngestService {
     fn build_raw_journal(
         cfg: &PluginConfig,
         build_journal_cfg: &impl Fn(TierKind) -> Config,
-        lifecycle_observer: Arc<dyn journal_log_writer::LogLifecycleObserver>,
+        lifecycle_observer: Arc<dyn journal_sdk_log_writer::LogLifecycleObserver>,
     ) -> Result<Log> {
         let raw_dir = cfg.journal.raw_tier_dir();
         Log::new(&raw_dir, build_journal_cfg(TierKind::Raw))
@@ -131,7 +131,7 @@ impl IngestService {
     fn build_materialized_tier_writers(
         cfg: &PluginConfig,
         build_journal_cfg: &impl Fn(TierKind) -> Config,
-        lifecycle_observer: Arc<dyn journal_log_writer::LogLifecycleObserver>,
+        lifecycle_observer: Arc<dyn journal_sdk_log_writer::LogLifecycleObserver>,
     ) -> Result<MaterializedTierWriters> {
         let minute_1_dir = cfg.journal.minute_1_tier_dir();
         let minute_5_dir = cfg.journal.minute_5_tier_dir();

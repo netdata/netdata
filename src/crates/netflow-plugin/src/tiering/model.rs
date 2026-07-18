@@ -74,6 +74,7 @@ pub(crate) struct TierFlowRef {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[allow(dead_code)]
 pub(crate) struct OpenTierRow {
     pub(crate) timestamp_usec: u64,
     pub(crate) flow_ref: TierFlowRef,

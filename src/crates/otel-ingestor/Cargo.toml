@@ -12,11 +12,11 @@ name = "otel_ingestor"
 path = "src/lib.rs"
 
 [dependencies]
-bridge = { path = "../netdata-plugin/bridge" }
+bridge = { workspace = true }
 ferryboat = { workspace = true }
 flatten_otel = { workspace = true }
 ng-flatten = { workspace = true }
-netdata-plugin-types = { path = "../netdata-plugin/types" }
+netdata-plugin-types = { workspace = true }
 
 # WAL writing
 file-registry = { workspace = true }

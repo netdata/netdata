@@ -3,12 +3,17 @@
 #include "query-internal.h"
 
 static int compare_contributions(const void *a, const void *b) {
-    const struct { size_t dim_idx; NETDATA_DOUBLE contribution; } *da = a;
-    const struct { size_t dim_idx; NETDATA_DOUBLE contribution; } *db = b;
+    const struct { size_t dim_idx; NETDATA_DOUBLE contribution; const char *id; } *da = a;
+    const struct { size_t dim_idx; NETDATA_DOUBLE contribution; const char *id; } *db = b;
 
     if (da->contribution > db->contribution) return -1;
     if (da->contribution < db->contribution) return 1;
-    return 0;
+
+    // deterministic tie-break by dimension id: qsort() is not stable, and
+    // aggregators (Netdata Cloud) break equal-contribution ties by name -
+    // without this, which of two tied dimensions survives the fold would be
+    // unspecified and could differ from the merger's own choice
+    return strcmp(da->id, db->id);
 }
 
 // merge the group-by labels of a folded dimension into the labels
@@ -77,6 +82,7 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
     struct {
         size_t dim_idx;
         NETDATA_DOUBLE contribution;
+        const char *id;
     } *sorted_dims = onewayalloc_mallocz(
         owa, onewayalloc_mul_or_fatal(queried_count, sizeof(*sorted_dims), "RRDR cardinality dimensions"));
 
@@ -85,6 +91,7 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
         if (r->od[d] & RRDR_DIMENSION_QUERIED) {
             sorted_dims[sorted_idx].dim_idx = d;
             sorted_dims[sorted_idx].contribution = contributions[d];
+            sorted_dims[sorted_idx].id = string2str(r->di[d]);
             sorted_idx++;
         }
     }
@@ -112,6 +119,13 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
     new_r->partial_data_trimming = r->partial_data_trimming;
     new_r->rows = r->rows;
     new_r->stats = r->stats;
+
+    // expose what the fold hid: the count of folded dimensions and the
+    // largest folded contribution (the ranking cut). Aggregators use the
+    // cut to prove whether a merged top-N is exact: any dimension an agent
+    // did not return contributes at most this much
+    new_r->cardinality.folded = queried_count - kept_dimensions;
+    new_r->cardinality.cut = sorted_dims[kept_dimensions].contribution;
 
     // Copy timestamps
     memcpy(new_r->t, r->t, r->n * sizeof(time_t));
@@ -270,6 +284,7 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
             uint32_t aggregated_gbc = 0;
             RRDR_VALUE_FLAGS aggregated_flags = RRDR_VALUE_NOTHING;
             bool has_values = false;
+            bool has_empty = false;
 
             for (size_t i = kept_dimensions; i < queried_count; i++) {
                 size_t src_d = sorted_dims[i].dim_idx;
@@ -297,8 +312,19 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
 
                         has_values = true;
                     }
+                    else
+                        has_empty = true;
                 }
+                else
+                    has_empty = true;
             }
+
+            // folding an empty point together with values makes the
+            // aggregate partial - the same rule the mergers apply when they
+            // fold dimensions themselves; without it the bucket looks
+            // complete and live-edge trimming keeps incomplete rows
+            if(has_values && has_empty)
+                aggregated_flags |= RRDR_VALUE_PARTIAL;
 
             if(new_r->vh)
                 new_r->vh[dst_idx] = aggregated_hidden;

@@ -244,6 +244,18 @@ static void cgroup_find_v1_mount(struct mountinfo *root, char *filename,
     *base = strdupz(filename);
 }
 
+void cgroups_init(void) {
+    time_t timeout_s = inicfg_get_duration_seconds(
+        &netdata_config, "plugin:cgroups", "cgroup-name timeout", 120);
+    cgroup_name_timeout_ms = cgroup_name_timeout_ms_from_seconds(timeout_s);
+
+    char timeout_env[32];
+    snprintfz(timeout_env, sizeof(timeout_env), "%d", cgroup_name_timeout_ms);
+
+    // The process environment must be finalized before worker threads start.
+    nd_setenv("NETDATA_CGROUP_NAME_TIMEOUT_MS", timeout_env, 1);
+}
+
 void read_cgroup_plugin_configuration() {
     system_page_size = sysconf(_SC_PAGESIZE);
 
@@ -396,26 +408,6 @@ void read_cgroup_plugin_configuration() {
         cgroups_rename_script = NULL;
         collector_error("CGROUP: cgroup-name helper '%s' is not executable; cgroup renaming is disabled.",
                        configured_cgroup_name ? configured_cgroup_name : "");
-    }
-
-    // single operator knob for the whole cgroup-name invocation: the helper
-    // receives it and self-terminates by then; discovery waits this long plus a
-    // grace period before killing the helper. 0 means unbounded (legacy).
-    time_t cgroup_name_timeout_s = inicfg_get_duration_seconds(
-        &netdata_config, "plugin:cgroups", "cgroup-name timeout", 120);
-    if (cgroup_name_timeout_s <= 0)
-        cgroup_name_timeout_ms = 0;
-    else if ((uintmax_t)cgroup_name_timeout_s > (uintmax_t)INT_MAX / MSEC_PER_SEC)
-        cgroup_name_timeout_ms = INT_MAX;
-    else
-        cgroup_name_timeout_ms = (int)((uintmax_t)cgroup_name_timeout_s * MSEC_PER_SEC);
-
-    // the helper inherits this and self-terminates by then; discovery enforces
-    // the same budget plus a grace period on the parent side
-    {
-        char timeout_env[32];
-        snprintfz(timeout_env, sizeof(timeout_env), "%d", cgroup_name_timeout_ms);
-        nd_setenv("NETDATA_CGROUP_NAME_TIMEOUT_MS", timeout_env, 1);
     }
 
     snprintfz(filename, FILENAME_MAX, "%s/cgroup-network", netdata_configured_primary_plugins_dir);
