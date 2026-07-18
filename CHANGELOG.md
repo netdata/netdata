@@ -707,6 +707,10 @@
 - Expose the cardinality fold cut in jsonwrap v2 ([#23131](https://github.com/netdata/netdata/issues/23131))
 - Rust: fix warnings, centralize workspace deps, edition 2024, MSRV 1.91, dep refresh ([#23148](https://github.com/netdata/netdata/issues/23148))
 - Fix cgroup-name timeout environment race ([#23156](https://github.com/netdata/netdata/issues/23156))
+- Docs: Add Ollama and DeepSeek to supported web chat LLM providers ([#22945](https://github.com/netdata/netdata/issues/22945))
+- Build(deps): bump mcp from 1.27.2 to 1.28.1 in /packaging/tools/automation/mcp ([#23158](https://github.com/netdata/netdata/issues/23158))
+- Docs: Add Windows host label creation and reload guidance ([#23006](https://github.com/netdata/netdata/issues/23006))
+- Docs: Add metric naming comparison for OpenTSDB vs Prometheus exporters ([#23034](https://github.com/netdata/netdata/issues/23034))
 
 ## [2.10.0] - 2026-04-09
 
