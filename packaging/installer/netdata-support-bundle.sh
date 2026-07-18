@@ -182,7 +182,7 @@ sanitize_file() {
       split(line, a, "\t");
       if (a[1] == "ip") { ipmap[a[2]] = a[3]; nip++; }
       else if (a[1] == "host") hostmap[a[2]] = a[3];
-      else if (a[1] == "user") usermap[a[2]] = a[3];
+      else if (a[1] == "user") { usermap[a[2]] = a[3]; if (a[3] ~ /^user-[0-9]+$/) { un = a[3]; sub(/user-/, "", un); if (un + 0 > nusr) nusr = un + 0 } }
       else if (a[1] == "ip6") { ip6map[a[2]] = a[3]; nip6++; }
       else if (a[1] == "fqdn") { fqmap[a[2]] = a[3]; nfq++; }
     }
@@ -766,6 +766,14 @@ VECTORS
   t_present "2026-07-16T13:38:34Z"       "timestamp mangled by IPv6 rule"
   t_present -- "--verbose"               "path-bearing argv line was eaten by the kv rule"
   t_present "@unix(/run/x)/db ok"        "mid-line unix( DSN rule broke the tail"
+  # cross-file pseudonym stability: a NEW user in a second file must not reuse
+  # a pseudonym already assigned in the first (counter restored from the map)
+  _obf_save2="$OBFUSCATE"; OBFUSCATE=1
+  printf 'home /home/seconduser/data\n' > "$_tf.u2"
+  sanitize_file "$_tf.u2"
+  OBFUSCATE="$_obf_save2"
+  if grep -q "/home/seconduser" "$_tf.u2"; then echo "FAIL (leak): second-file home user not pseudonymized" >&2; _fails=$((_fails + 1)); fi
+  if grep -q "user-1" "$_tf.u2"; then echo "FAIL: cross-file pseudonym collision (reused user-1)" >&2; _fails=$((_fails + 1)); fi
   printf 'nul-test \000 password=SENTINEL-NUL\n' > "$_tf.nul"
   sanitize_file "$_tf.nul"
   grep -q "content withheld" "$_tf.nul" || { echo "FAIL: NUL-bearing file was not withheld" >&2; _fails=$((_fails + 1)); }
