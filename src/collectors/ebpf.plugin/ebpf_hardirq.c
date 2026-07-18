@@ -195,7 +195,7 @@ void ebpf_hardirq_release(int irq)
  *
  * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_obsolete_hardirq_global(ebpf_module_t *em)
+void ebpf_obsolete_hardirq_global(ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(
         NETDATA_EBPF_SYSTEM_GROUP,
@@ -283,7 +283,7 @@ static void hardirq_cleanup(void *pptr)
  *
  * @return It returns 0 on success and -1 otherwise
  */
-static int hardirq_parse_interrupts(char *irq_name, int irq)
+int hardirq_parse_interrupts(char *irq_name, int irq)
 {
     static procfile *ff = NULL;
     static int cpus = -1;

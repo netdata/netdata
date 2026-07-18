@@ -802,7 +802,7 @@ void ebpf_filesystem_cleanup_ebpf_data(void)
  *
  * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
+void ebpf_obsolete_filesystem_global(ebpf_module_t *em)
 {
     int i;
     for (i = 0; localfs[i].filesystem; i++) {

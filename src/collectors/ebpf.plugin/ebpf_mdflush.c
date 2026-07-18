@@ -130,7 +130,7 @@ static inline int ebpf_mdflush_load_and_attach(struct mdflush_bpf *obj, ebpf_mod
  *
  * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_obsolete_mdflush_global(ebpf_module_t *em)
+void ebpf_obsolete_mdflush_global(ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(
         "mdstat",

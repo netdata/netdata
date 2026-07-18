@@ -215,7 +215,7 @@ void ebpf_sync_cleanup_objects()
  *
  * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_obsolete_sync_global(ebpf_module_t *em)
+void ebpf_obsolete_sync_global(ebpf_module_t *em)
 {
     if (local_syscalls[NETDATA_SYNC_FSYNC_IDX].enabled && local_syscalls[NETDATA_SYNC_FDATASYNC_IDX].enabled)
         ebpf_write_chart_obsolete(

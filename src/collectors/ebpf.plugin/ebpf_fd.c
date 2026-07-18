@@ -561,7 +561,7 @@ void ebpf_obsolete_fd_apps_charts(struct ebpf_module *em)
  *
  * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_obsolete_fd_global(ebpf_module_t *em)
+void ebpf_obsolete_fd_global(ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(
         NETDATA_FILESYSTEM_FAMILY,

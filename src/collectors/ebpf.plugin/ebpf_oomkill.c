@@ -90,7 +90,7 @@ static inline void ebpf_obsolete_oomkill_cgroup_charts(ebpf_module_t *em)
  *
  * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_obsolete_oomkill_apps(ebpf_module_t *em)
+void ebpf_obsolete_oomkill_apps(ebpf_module_t *em)
 {
     struct ebpf_target *w;
     int update_every = em->update_every;

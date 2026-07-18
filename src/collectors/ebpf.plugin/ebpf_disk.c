@@ -447,7 +447,7 @@ static void ebpf_cleanup_disk_list(void)
  *
  * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_obsolete_disk_global(ebpf_module_t *em)
+void ebpf_obsolete_disk_global(ebpf_module_t *em)
 {
     netdata_ebpf_disks_t *move = disk_list;
     while (move) {

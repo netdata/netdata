@@ -986,7 +986,7 @@ static uint64_t topology_starttime_cache_get_or_load(DICTIONARY *pid_starttime_c
     return cached ? cached->starttime : tmp.starttime;
 }
 
-static NV_ENDPOINT_OWNER *topology_find_process_parent_actor(
+NV_ENDPOINT_OWNER *topology_find_process_parent_actor(
     uint64_t ppid,
     uint64_t net_ns_inode,
     DICTIONARY *process_parent_ns_lookup,

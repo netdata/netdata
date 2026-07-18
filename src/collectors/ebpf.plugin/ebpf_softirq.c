@@ -52,7 +52,7 @@ static bool softirq_safe_clean = false;
  *
  * @param em a pointer to `struct ebpf_module`
  */
-static void ebpf_obsolete_softirq_global(ebpf_module_t *em)
+void ebpf_obsolete_softirq_global(ebpf_module_t *em)
 {
     ebpf_write_chart_obsolete(
         NETDATA_EBPF_SYSTEM_GROUP,
