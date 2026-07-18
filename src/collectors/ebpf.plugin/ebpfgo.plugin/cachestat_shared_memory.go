@@ -60,12 +60,11 @@ const (
 )
 
 // Publish writes the current entries to the shared-memory segment and stamps
-// the per-module validity flags accumulated since the previous Publish call.
-// The flags reflect which modules wrote data during the current cycle:
-// activeModules is reset to 0 at the start of each Publish and re-OR'd by
-// the subsequent UpdateApps/UpdateSocketApps before the next cycle, so a
-// module that stops publishing has its bit cleared on the consumer's next
-// read. The C-side publisher stores this complete bitmask directly.
+// the per-module validity flags.  Only the CACHESTAT bit is cleared after
+// each publish; the SOCKET bit persists across cachestat cycles so the C
+// consumer does not see socket_ok flap when socket runs at a slower cadence
+// than cachestat.  The SOCKET bit is cleared by MarkSocketInactive when the
+// socket goroutine exits.
 //
 // The lock is held for the duration of the C memcpy because
 // applySocketDataLocked writes s.entries[i].socket in place on the same
@@ -77,12 +76,21 @@ func (s *cachestatSharedMemoryStore) Publish(publisher *SharedPidMemoryPublisher
 	defer s.mu.Unlock()
 
 	flags := s.activeModules
-	s.activeModules = 0
+	s.activeModules &^= ebpfgoSHMFlagCachestat // socket bit persists until MarkSocketInactive
 
 	if publisher == nil {
 		return nil
 	}
 	return publisher.Publish(s.entries, flags)
+}
+
+// MarkSocketInactive clears the SOCKET flag from activeModules.  Called via
+// defer when the socket goroutine exits so the C consumer stops gating on
+// socket_ok after the module shuts down.
+func (s *cachestatSharedMemoryStore) MarkSocketInactive() {
+	s.mu.Lock()
+	s.activeModules &^= ebpfgoSHMFlagSocket
+	s.mu.Unlock()
 }
 
 func buildCachestatPublish(current, previous netdataCachestat, ct uint64, hasPrevious bool) netdataPublishCachestat {

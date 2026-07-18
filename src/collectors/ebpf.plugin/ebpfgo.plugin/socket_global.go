@@ -119,6 +119,12 @@ func runSocketGlobalCollector(handle *SocketLegacyHandle, stop <-chan struct{}, 
 		updateEvery = socketDefaultUpdateEvery
 	}
 
+	if store != nil {
+		// Clear the SOCKET SHM flag when this goroutine exits so the C consumer
+		// stops gating on socket_ok after the module shuts down.
+		defer store.MarkSocketInactive()
+	}
+
 	state := &socketGlobalState{}
 
 	// Lazily-opened SHM publisher, used only when socket is the designated
