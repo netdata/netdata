@@ -347,7 +347,10 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			requestRef, err := supervisor.Enqueue(plan)
+			requestRef, err := supervisor.Enqueue(
+				TaskClassFrameworkControl,
+				plan,
+			)
 			if err != nil {
 				t.Fatal(err)
 			}

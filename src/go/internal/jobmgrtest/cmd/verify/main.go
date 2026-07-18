@@ -41,7 +41,24 @@ func run(arguments []string) error {
 	if err != nil {
 		return err
 	}
-	if err := json.NewEncoder(os.Stdout).Encode(result); err != nil {
+	candidate, hasCandidate, err := wireeval.EvidenceCandidateProvenance(
+		evidenceDirectory,
+	)
+	if err != nil {
+		return err
+	}
+	report := struct {
+		Gates     any                           `json:"Gates"`
+		Pass      bool                          `json:"Pass"`
+		Candidate *wireeval.CandidateProvenance `json:"Candidate,omitempty"`
+	}{
+		Gates: result.Gates,
+		Pass:  result.Pass,
+	}
+	if hasCandidate {
+		report.Candidate = &candidate
+	}
+	if err := json.NewEncoder(os.Stdout).Encode(report); err != nil {
 		return err
 	}
 	if !result.Pass {

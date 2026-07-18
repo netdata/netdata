@@ -341,7 +341,10 @@ func TestTaskSupervisorReturnsPendingInitialResourceOnTransferAwareCancellation(
 	supervisor := newResourceTaskSupervisor(t)
 	events := []string{}
 	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 9}, events: &events}
-	request, err := supervisor.Enqueue(readyTaskPlan(t, SourceJobManager, time.Time{}, ready))
+	request, err := supervisor.Enqueue(
+		TaskClassFrameworkControl,
+		readyTaskPlan(t, SourceJobManager, time.Time{}, ready),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

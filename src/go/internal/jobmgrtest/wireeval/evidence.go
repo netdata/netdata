@@ -36,13 +36,14 @@ type evidenceRun struct {
 }
 
 type evidenceManifest struct {
-	Version           int           `json:"version"`
-	EnvironmentSHA256 string        `json:"environment_sha256"`
-	Runs              []evidenceRun `json:"runs"`
-	SummariesFile     string        `json:"summaries_file"`
-	SummariesSHA256   string        `json:"summaries_sha256"`
-	GatesFile         string        `json:"gates_file"`
-	GatesSHA256       string        `json:"gates_sha256"`
+	Version           int                  `json:"version"`
+	EnvironmentSHA256 string               `json:"environment_sha256"`
+	Candidate         *CandidateProvenance `json:"candidate,omitempty"`
+	Runs              []evidenceRun        `json:"runs"`
+	SummariesFile     string               `json:"summaries_file"`
+	SummariesSHA256   string               `json:"summaries_sha256"`
+	GatesFile         string               `json:"gates_file"`
+	GatesSHA256       string               `json:"gates_sha256"`
 }
 
 type runEvidence struct {
@@ -115,6 +116,7 @@ func (bundle *EvidenceBundle) Finalize(
 	environmentSHA256 string,
 	summaries []oracle.RunSummary,
 	result oracle.ExperimentResult,
+	candidate *CandidateProvenance,
 ) error {
 	if bundle == nil || bundle.finalized {
 		return errors.New("wire evaluator: evidence bundle is unavailable")
@@ -149,9 +151,15 @@ func (bundle *EvidenceBundle) Finalize(
 	if err != nil {
 		return err
 	}
+	var recordedCandidate *CandidateProvenance
+	if candidate != nil {
+		copied := *candidate
+		recordedCandidate = &copied
+	}
 	manifest := evidenceManifest{
 		Version:           evidenceVersion,
 		EnvironmentSHA256: environmentSHA256,
+		Candidate:         recordedCandidate,
 		Runs:              append([]evidenceRun(nil), bundle.runs...),
 		SummariesFile:     summariesFile,
 		SummariesSHA256:   summariesSHA256,
@@ -174,24 +182,11 @@ func VerifyEvidenceBundle(directory string) (oracle.ExperimentResult, error) {
 			"wire evaluator: evidence directory must be absolute",
 		)
 	}
-	var manifest evidenceManifest
-	manifestPath, err := evidenceRegularFile(
-		directory,
-		"manifest.json",
-		maximumManifestBytes,
-	)
+	manifest, err := readEvidenceManifest(directory)
 	if err != nil {
 		return oracle.ExperimentResult{}, err
 	}
-	if err := readJSONFileBounded(
-		manifestPath,
-		&manifest,
-		maximumManifestBytes,
-	); err != nil {
-		return oracle.ExperimentResult{}, err
-	}
-	if manifest.Version != evidenceVersion ||
-		len(manifest.Runs) != expectedExperimentRunCount {
+	if len(manifest.Runs) != expectedExperimentRunCount {
 		return oracle.ExperimentResult{}, errors.New("wire evaluator: invalid evidence manifest")
 	}
 	seenFiles := map[string]struct{}{"manifest.json": {}}
@@ -305,6 +300,54 @@ func VerifyEvidenceBundle(directory string) (oracle.ExperimentResult, error) {
 		return oracle.ExperimentResult{}, errors.New("wire evaluator: replay differs from recorded summaries or gates")
 	}
 	return replayed, nil
+}
+
+func EvidenceCandidateProvenance(
+	directory string,
+) (CandidateProvenance, bool, error) {
+	if !filepath.IsAbs(directory) {
+		return CandidateProvenance{}, false, errors.New(
+			"wire evaluator: evidence directory must be absolute",
+		)
+	}
+	manifest, err := readEvidenceManifest(directory)
+	if err != nil {
+		return CandidateProvenance{}, false, err
+	}
+	if manifest.Candidate == nil {
+		return CandidateProvenance{}, false, nil
+	}
+	return *manifest.Candidate, true, nil
+}
+
+func readEvidenceManifest(directory string) (evidenceManifest, error) {
+	var manifest evidenceManifest
+	manifestPath, err := evidenceRegularFile(
+		directory,
+		"manifest.json",
+		maximumManifestBytes,
+	)
+	if err != nil {
+		return evidenceManifest{}, err
+	}
+	if err := readJSONFileBounded(
+		manifestPath,
+		&manifest,
+		maximumManifestBytes,
+	); err != nil {
+		return evidenceManifest{}, err
+	}
+	if manifest.Version != evidenceVersion {
+		return evidenceManifest{}, errors.New(
+			"wire evaluator: invalid evidence manifest",
+		)
+	}
+	if manifest.Candidate != nil {
+		if err := manifest.Candidate.validate(); err != nil {
+			return evidenceManifest{}, err
+		}
+	}
+	return manifest, nil
 }
 
 func readRunEvidence(path string) (runEvidence, error) {

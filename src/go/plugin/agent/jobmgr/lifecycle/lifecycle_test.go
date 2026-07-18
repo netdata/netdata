@@ -790,9 +790,12 @@ func TestTaskSupervisorFourSlotsAndGenerationCheckedReuse(t *testing.T) {
 		})
 		refs = append(refs, ref)
 	}
-	pending, err := supervisor.Enqueue(TaskPlan{Source: SourceFunction, Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
-		return NewSealedResult(200, "application/json", []byte(`{}`))
-	})})
+	pending, err := supervisor.Enqueue(
+		TaskClassGenericFunction,
+		TaskPlan{Source: SourceFunction, Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+			return NewSealedResult(200, "application/json", []byte(`{}`))
+		})},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1199,7 +1202,7 @@ func TestTaskSupervisorRunsCleanupBeforeExplicitTermination(t *testing.T) {
 	}
 }
 
-func TestTaskSupervisorDispatchRotatesPendingSources(t *testing.T) {
+func TestTaskSupervisorDispatchRotatesPendingClasses(t *testing.T) {
 	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
 		t.Fatal(err)
@@ -1215,19 +1218,19 @@ func TestTaskSupervisorDispatchRotatesPendingSources(t *testing.T) {
 			return NewSealedResult(200, "application/json", []byte(`{}`))
 		})}
 	}
-	j1, _ := supervisor.Enqueue(plan(SourceJobManager))
-	j2, _ := supervisor.Enqueue(plan(SourceJobManager))
-	f1, _ := supervisor.Enqueue(plan(SourceFunction))
-	f2, _ := supervisor.Enqueue(plan(SourceFunction))
+	j1, _ := supervisor.Enqueue(TaskClassFrameworkControl, plan(SourceJobManager))
+	j2, _ := supervisor.Enqueue(TaskClassFrameworkControl, plan(SourceJobManager))
+	f1, _ := supervisor.Enqueue(TaskClassGenericFunction, plan(SourceFunction))
+	f2, _ := supervisor.Enqueue(TaskClassGenericFunction, plan(SourceFunction))
 	var started [TransientTaskSlots]TaskStart
 	count, more, err := supervisor.Dispatch(context.Background(), TransientTaskSlots, &started)
 	if err != nil || count != TransientTaskSlots || more {
-		t.Fatalf("source-fair dispatch differs: count=%d more=%v err=%v", count, more, err)
+		t.Fatalf("class-fair dispatch differs: count=%d more=%v err=%v", count, more, err)
 	}
 	want := []TaskRequestRef{j1, f1, j2, f2}
 	for index, ref := range want {
 		if started[index].Request != ref {
-			t.Fatalf("source-fair dispatch order differs at %d: got=%#v want=%#v", index, started[index].Request, ref)
+			t.Fatalf("class-fair dispatch order differs at %d: got=%#v want=%#v", index, started[index].Request, ref)
 		}
 	}
 	close(release)
@@ -1247,6 +1250,148 @@ func TestTaskSupervisorDispatchRotatesPendingSources(t *testing.T) {
 	}
 }
 
+func TestTaskSupervisorRejectsInvalidSchedulingClass(t *testing.T) {
+	frame, err := NewFrameOwner(io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	supervisor, err := NewTaskSupervisor(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan := TaskPlan{
+		Source: SourceFunction,
+		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+			return NewSealedResult(200, "application/json", []byte(`{}`))
+		}),
+	}
+	tests := map[string]TaskClass{
+		"zero":    0,
+		"unknown": 3,
+	}
+	for name, class := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, err := supervisor.Enqueue(class, plan); err == nil {
+				t.Fatal("invalid scheduling class was accepted")
+			}
+			if supervisor.Pending() != 0 {
+				t.Fatalf(
+					"invalid class retained %d pending tasks",
+					supervisor.Pending(),
+				)
+			}
+		})
+	}
+}
+
+func TestTaskSupervisorFrameworkControlBypassesPendingGenericAtCapacity(t *testing.T) {
+	frame, err := NewFrameOwner(io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	supervisor, err := NewTaskSupervisor(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	release := make(chan struct{})
+	blockingPlan := TaskPlan{
+		Source: SourceFunction,
+		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+			<-release
+			return NewSealedResult(200, "application/json", []byte(`{}`))
+		}),
+	}
+	for range TransientTaskSlots {
+		request, err := supervisor.Enqueue(
+			TaskClassGenericFunction,
+			blockingPlan,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var started [TransientTaskSlots]TaskStart
+		count, _, err := supervisor.Dispatch(
+			context.Background(),
+			1,
+			&started,
+		)
+		if err != nil || count != 1 || started[0].Request != request {
+			t.Fatalf(
+				"blocking dispatch differs: count=%d start=%+v err=%v",
+				count,
+				started[0],
+				err,
+			)
+		}
+	}
+	readyPlan := TaskPlan{
+		Source: SourceFunction,
+		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+			return NewSealedResult(200, "application/json", []byte(`{}`))
+		}),
+	}
+	generic, err := supervisor.Enqueue(TaskClassGenericFunction, readyPlan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	control, err := supervisor.Enqueue(TaskClassFrameworkControl, readyPlan)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var saturated [TransientTaskSlots]TaskStart
+	if count, more, err := supervisor.Dispatch(
+		context.Background(),
+		1,
+		&saturated,
+	); err != nil || count != 0 || !more {
+		t.Fatalf(
+			"saturated dispatch differs: count=%d more=%v err=%v",
+			count,
+			more,
+			err,
+		)
+	}
+	close(release)
+	completion := <-supervisor.CompletionCh()
+	if err := supervisor.SendAction(TaskAction{
+		Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	ack := <-supervisor.AcknowledgementCh()
+	if err := supervisor.SendAction(TaskAction{
+		Ref: ack.Ref, Sequence: 3, Kind: TaskActionTerminate,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	ack = <-supervisor.AcknowledgementCh()
+	if err := supervisor.Release(ack.Ref); err != nil {
+		t.Fatal(err)
+	}
+	var started [TransientTaskSlots]TaskStart
+	count, more, err := supervisor.Dispatch(
+		context.Background(),
+		1,
+		&started,
+	)
+	if err != nil || count != 1 || !more {
+		t.Fatalf(
+			"post-capacity dispatch differs: count=%d more=%v err=%v",
+			count,
+			more,
+			err,
+		)
+	}
+	if started[0].Request != control {
+		t.Fatalf(
+			"post-capacity request=%+v, want control=%+v before generic=%+v",
+			started[0].Request,
+			control,
+			generic,
+		)
+	}
+}
+
 func TestTaskSupervisorDirectlyCancelsPendingRequest(t *testing.T) {
 	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
@@ -1261,11 +1406,17 @@ func TestTaskSupervisorDirectlyCancelsPendingRequest(t *testing.T) {
 			return NewSealedResult(200, "application/json", []byte(`{}`))
 		})}
 	}
-	cancelled, err := supervisor.Enqueue(plan(SourceJobManager))
+	cancelled, err := supervisor.Enqueue(
+		TaskClassFrameworkControl,
+		plan(SourceJobManager),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	survivor, err := supervisor.Enqueue(plan(SourceFunction))
+	survivor, err := supervisor.Enqueue(
+		TaskClassGenericFunction,
+		plan(SourceFunction),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1296,7 +1447,11 @@ func TestTaskSupervisorDirectlyCancelsPendingRequest(t *testing.T) {
 
 func enqueueAndDispatchTask(t *testing.T, supervisor *TaskSupervisor, plan TaskPlan) (TaskRequestRef, TaskRef) {
 	t.Helper()
-	request, err := supervisor.Enqueue(plan)
+	class := TaskClassFrameworkControl
+	if plan.Source == SourceFunction {
+		class = TaskClassGenericFunction
+	}
+	request, err := supervisor.Enqueue(class, plan)
 	if err != nil {
 		t.Fatal(err)
 	}

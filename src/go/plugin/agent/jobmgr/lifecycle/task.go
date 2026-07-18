@@ -101,6 +101,7 @@ type taskRequest struct {
 	previous   uint32
 	next       uint32
 	active     bool
+	class      TaskClass
 	plan       TaskPlan
 	initial    TaskOutcome
 }
@@ -119,7 +120,7 @@ type TaskSupervisor struct {
 	requests             []*taskRequest
 	pending              [2]taskRequestQueue
 	freeRequest          uint32
-	nextSource           Source
+	nextClass            TaskClass
 	completions          chan TaskCompletion
 	acks                 chan TaskAcknowledgement
 	active               int
@@ -147,7 +148,7 @@ func NewTaskSupervisor(frame *FrameOwner) (*TaskSupervisor, error) {
 	for index := range supervisor.slots {
 		supervisor.slots[index].action = make(chan TaskAction, 1)
 	}
-	supervisor.nextSource = SourceJobManager
+	supervisor.nextClass = TaskClassFrameworkControl
 	return supervisor, nil
 }
 
@@ -182,7 +183,10 @@ func (supervisor *TaskSupervisor) notifyAdmissionReady() {
 	}
 }
 
-func (supervisor *TaskSupervisor) Enqueue(plan TaskPlan) (TaskRequestRef, error) {
+func (supervisor *TaskSupervisor) Enqueue(class TaskClass, plan TaskPlan) (TaskRequestRef, error) {
+	if !class.Valid() {
+		return TaskRequestRef{}, errors.New("jobmgr task supervisor: invalid scheduling class")
+	}
 	if err := plan.Validate(); err != nil {
 		return TaskRequestRef{}, err
 	}
@@ -215,8 +219,11 @@ func (supervisor *TaskSupervisor) Enqueue(plan TaskPlan) (TaskRequestRef, error)
 		supervisor.freeRequest = slot
 		return TaskRequestRef{}, errors.New("jobmgr task supervisor: request generation wrapped")
 	}
-	*record = taskRequest{slot: slot, generation: generation, active: true, plan: plan, initial: initial}
-	queue := &supervisor.pending[taskSourceIndex(plan.Source)]
+	*record = taskRequest{
+		slot: slot, generation: generation, active: true,
+		class: class, plan: plan, initial: initial,
+	}
+	queue := &supervisor.pending[taskClassIndex(class)]
 	record.previous = queue.tail
 	if queue.tail != 0 {
 		supervisor.requests[queue.tail].next = slot
@@ -278,7 +285,7 @@ func (supervisor *TaskSupervisor) Dispatch(parent context.Context, quantum int, 
 	}
 	count := 0
 	for count < quantum && supervisor.active < TransientTaskSlots {
-		first := taskSourceIndex(supervisor.nextSource)
+		first := taskClassIndex(supervisor.nextClass)
 		second := 1 - first
 		selected := first
 		if supervisor.pending[selected].head == 0 {
@@ -305,7 +312,7 @@ func (supervisor *TaskSupervisor) Dispatch(parent context.Context, quantum int, 
 					Err:     err,
 				}
 				count++
-				supervisor.nextSource = otherTaskSource(sourceForTaskIndex(selected))
+				supervisor.nextClass = otherTaskClass(classForTaskIndex(selected))
 				continue
 			}
 			return count, true, err
@@ -313,7 +320,7 @@ func (supervisor *TaskSupervisor) Dispatch(parent context.Context, quantum int, 
 		supervisor.removeRequest(record)
 		started[count] = TaskStart{Request: requestRef, Task: taskRef}
 		count++
-		supervisor.nextSource = otherTaskSource(sourceForTaskIndex(selected))
+		supervisor.nextClass = otherTaskClass(classForTaskIndex(selected))
 	}
 	return count, supervisor.Pending() > 0, nil
 }
@@ -1201,7 +1208,7 @@ func (supervisor *TaskSupervisor) request(ref TaskRequestRef) (*taskRequest, err
 }
 
 func (supervisor *TaskSupervisor) removeRequest(record *taskRequest) {
-	queue := &supervisor.pending[taskSourceIndex(record.plan.Source)]
+	queue := &supervisor.pending[taskClassIndex(record.class)]
 	if record.previous != 0 {
 		supervisor.requests[record.previous].next = record.next
 	} else {
@@ -1219,25 +1226,25 @@ func (supervisor *TaskSupervisor) removeRequest(record *taskRequest) {
 	supervisor.freeRequest = slot
 }
 
-func taskSourceIndex(source Source) int {
-	if source == SourceJobManager {
+func taskClassIndex(class TaskClass) int {
+	if class == TaskClassFrameworkControl {
 		return 0
 	}
 	return 1
 }
 
-func sourceForTaskIndex(index int) Source {
+func classForTaskIndex(index int) TaskClass {
 	if index == 0 {
-		return SourceJobManager
+		return TaskClassFrameworkControl
 	}
-	return SourceFunction
+	return TaskClassGenericFunction
 }
 
-func otherTaskSource(source Source) Source {
-	if source == SourceJobManager {
-		return SourceFunction
+func otherTaskClass(class TaskClass) TaskClass {
+	if class == TaskClassFrameworkControl {
+		return TaskClassGenericFunction
 	}
-	return SourceJobManager
+	return TaskClassFrameworkControl
 }
 
 func emptySealedResult(result SealedResult) bool {

@@ -67,7 +67,8 @@ var bmM002HotpathRows = [...]HotpathGate{
 		Package: "./plugin/agent/jobmgr/lifecycle",
 		Tests: []string{
 			"TestTaskSupervisorFourSlotsAndGenerationCheckedReuse",
-			"TestTaskSupervisorDispatchRotatesPendingSources",
+			"TestTaskSupervisorDispatchRotatesPendingClasses",
+			"TestTaskSupervisorFrameworkControlBypassesPendingGenericAtCapacity",
 			"TestTaskSupervisorRetainedTimeoutCountAndSaturationLatch",
 			"TestPendingTaskRequestPopulationGrowsBeyondFormerLimit",
 			"TestLongLivedJobPermitPopulationGrowsBeyondFormerLimit",

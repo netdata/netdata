@@ -206,7 +206,7 @@ func TestTaskSupervisorDisposesPreparedCapabilityAfterIdentityPanic(t *testing.T
 
 func dispatchCapabilityTask(t *testing.T, supervisor *TaskSupervisor, plan TaskPlan) TaskRef {
 	t.Helper()
-	request, err := supervisor.Enqueue(plan)
+	request, err := supervisor.Enqueue(TaskClassFrameworkControl, plan)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,7 +3,6 @@ package buildidentity
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"runtime"
 	"runtime/debug"
@@ -106,29 +105,25 @@ func TestExecutableBuildIdentityAcceptsPinnedToolArtifact(t *testing.T) {
 		}
 	}
 	executable := filepath.Join(t.TempDir(), "identity")
-	command := exec.Command(
-		tool.Path,
-		"build",
-		"-trimpath",
-		"-tags=phase",
-		"-o",
+	checksum, err := BuildExecutable(
+		context.Background(),
+		tool,
+		module,
 		executable,
-		".",
+		BuildTarget{
+			ImportPath: "./",
+			Expectation: ExecutableExpectation{
+				Package: "example.test/identity",
+				CGO:     "0",
+				Tags:    "phase",
+			},
+		},
 	)
-	command.Dir = module
-	command.Env = []string{
-		"PATH=" + os.Getenv("PATH"),
-		"HOME=" + os.Getenv("HOME"),
-		"TMPDIR=" + os.TempDir(),
-		"LANG=C",
-		"LC_ALL=C",
-		"CGO_ENABLED=0",
-		"GOFLAGS=-mod=readonly",
-		"GOTOOLCHAIN=local",
-		"GOWORK=off",
+	if err != nil {
+		t.Fatal(err)
 	}
-	if output, err := command.CombinedOutput(); err != nil {
-		t.Fatalf("build pinned artifact: %v: %s", err, output)
+	if len(checksum) != 64 {
+		t.Fatalf("executable checksum=%q", checksum)
 	}
 	if err := VerifyExecutable(
 		executable,

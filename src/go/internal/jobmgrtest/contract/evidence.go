@@ -357,8 +357,10 @@ var componentProofByCase = map[string][]ComponentProof{
 	"F24.10-b-kernel-source-rotation": {
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelExternalSubmissionServiceRotatesSources"},
 	},
-	"F24.11-b-task-source-fairness": {
-		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestTaskSupervisorDispatchRotatesPendingSources"},
+	"F24.11-b-task-class-fairness": {
+		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestTaskSupervisorDispatchRotatesPendingClasses"},
+		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestTaskSupervisorFrameworkControlBypassesPendingGenericAtCapacity"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestKernelResourceScopedFunctionHasIndependentTaskSchedulingClass"},
 	},
 	"F24.12-b-catalog-loop-lookup": {
 		{Package: "./plugin/agent/jobmgr/functions", Test: "TestFunctionCatalogLookupLeaseSameTurn"},

@@ -354,7 +354,10 @@ func startDynCfgJobTestTask(
 	plan lifecycle.TaskPlan,
 ) lifecycle.TaskRef {
 	t.Helper()
-	request, err := supervisor.Enqueue(plan)
+	request, err := supervisor.Enqueue(
+		lifecycle.TaskClassFrameworkControl,
+		plan,
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

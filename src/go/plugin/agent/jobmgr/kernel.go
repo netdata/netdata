@@ -1675,6 +1675,16 @@ func (kernel *CommandKernel) settleSubmission(operation *commandOperation, err e
 	operation.submissionContext = nil
 }
 
+func taskClassForOperation(
+	operation *commandOperation,
+	lane *commandLane,
+) lifecycle.TaskClass {
+	if operation.Source == lifecycle.SourceJobManager || lane.mapKey.resource {
+		return lifecycle.TaskClassFrameworkControl
+	}
+	return lifecycle.TaskClassGenericFunction
+}
+
 func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
 	for quantum > 0 {
 		lane := kernel.nextReadyLane()
@@ -1846,7 +1856,10 @@ func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
 			}
 			taskPlan = capabilityPlan
 		}
-		requestRef, err := kernel.tasks.Enqueue(taskPlan)
+		requestRef, err := kernel.tasks.Enqueue(
+			taskClassForOperation(operation, lane),
+			taskPlan,
+		)
 		if err != nil {
 			for _, grantedOperation := range kernel.releaseClaims(operation) {
 				kernel.markReady(grantedOperation.lane)
@@ -3745,7 +3758,10 @@ func (kernel *CommandKernel) enqueueShutdownStop(lane *commandLane) error {
 	if err != nil {
 		return err
 	}
-	request, err := kernel.tasks.Enqueue(plan)
+	request, err := kernel.tasks.Enqueue(
+		lifecycle.TaskClassFrameworkControl,
+		plan,
+	)
 	if err != nil {
 		return err
 	}
@@ -3801,7 +3817,10 @@ func (kernel *CommandKernel) advanceShutdownBarrier() error {
 	if err != nil {
 		return err
 	}
-	request, err := kernel.tasks.Enqueue(plan)
+	request, err := kernel.tasks.Enqueue(
+		lifecycle.TaskClassFrameworkControl,
+		plan,
+	)
 	if err != nil {
 		return err
 	}
@@ -3890,7 +3909,10 @@ func (kernel *CommandKernel) advanceRunFinalizer() error {
 	if err != nil {
 		return err
 	}
-	request, err := kernel.tasks.Enqueue(plan)
+	request, err := kernel.tasks.Enqueue(
+		lifecycle.TaskClassFrameworkControl,
+		plan,
+	)
 	if err != nil {
 		return err
 	}
@@ -4053,9 +4075,14 @@ func (kernel *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
 	}
 	for quantum > 0 && kernel.functionCleanupBacklog.count != 0 {
 		cleanup := kernel.functionCleanupBacklog.front()
-		request, err := kernel.tasks.Enqueue(lifecycle.TaskPlan{
-			Source: lifecycle.SourceFunction, Work: cleanup.Work, Runner: cleanup.Runner,
-		})
+		request, err := kernel.tasks.Enqueue(
+			lifecycle.TaskClassFrameworkControl,
+			lifecycle.TaskPlan{
+				Source: lifecycle.SourceFunction,
+				Work:   cleanup.Work,
+				Runner: cleanup.Runner,
+			},
+		)
 		if err != nil {
 			kernel.run.Dirty(err)
 			return true

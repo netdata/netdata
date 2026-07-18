@@ -21,7 +21,7 @@ func TestDrainDependentTasksReserveOneProgressSlot(t *testing.T) {
 			events: &events,
 		}
 		plan := readyTaskPlan(t, SourceJobManager, time.Time{}, resource)
-		request, err := supervisor.Enqueue(plan)
+		request, err := supervisor.Enqueue(TaskClassFrameworkControl, plan)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -39,12 +39,15 @@ func TestDrainDependentTasksReserveOneProgressSlot(t *testing.T) {
 		<-supervisor.CompletionCh()
 	}
 
-	progressRequest, err := supervisor.Enqueue(TaskPlan{
-		Source: SourceFunction,
-		Work: func(context.Context) (TaskOutcome, error) {
-			return NoValueOutcome(), nil
+	progressRequest, err := supervisor.Enqueue(
+		TaskClassGenericFunction,
+		TaskPlan{
+			Source: SourceFunction,
+			Work: func(context.Context) (TaskOutcome, error) {
+				return NoValueOutcome(), nil
+			},
 		},
-	})
+	)
 	if err != nil {
 		t.Fatal(err)
 	}

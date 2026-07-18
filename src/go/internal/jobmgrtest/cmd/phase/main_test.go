@@ -246,17 +246,6 @@ func TestExactNamePatternAndListParser(t *testing.T) {
 	}
 }
 
-func TestWithEnvironmentReplacesAndSortsOverrides(t *testing.T) {
-	got := withEnvironment(
-		[]string{"A=old", "B=kept", "A=duplicate"},
-		map[string]string{"A": "new", "C": "added"},
-	)
-	want := []string{"B=kept", "A=new", "C=added"}
-	if !reflect.DeepEqual(got, want) {
-		t.Fatalf("environment=%v, want %v", got, want)
-	}
-}
-
 func TestPhaseGoEnvironmentIsFixedAndOverrideable(t *testing.T) {
 	got := phaseGoEnvironment(
 		map[string]string{

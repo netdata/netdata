@@ -100,7 +100,10 @@ func testTaskRequestGrowth(t *testing.T) {
 	}
 	refs := make([]TaskRequestRef, 0, formerFixedPopulation+1)
 	for index := 0; index <= formerFixedPopulation; index++ {
-		ref, enqueueErr := supervisor.Enqueue(plan)
+		ref, enqueueErr := supervisor.Enqueue(
+			TaskClassFrameworkControl,
+			plan,
+		)
 		if enqueueErr != nil {
 			t.Fatalf("enqueue request %d: %v", index, enqueueErr)
 		}

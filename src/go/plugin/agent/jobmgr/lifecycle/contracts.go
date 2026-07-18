@@ -21,7 +21,7 @@ func ValidateUID(uid string) error {
 	return nil
 }
 
-// Source identifies the scheduling source of an operation.
+// Source identifies the ingress and lifecycle origin of an operation.
 type Source uint8
 
 const (
@@ -32,6 +32,20 @@ const (
 // Valid reports whether source is a known scheduling source.
 func (source Source) Valid() bool {
 	return source == SourceJobManager || source == SourceFunction
+}
+
+// TaskClass identifies an independent TaskSupervisor pending queue.
+type TaskClass uint8
+
+const (
+	TaskClassFrameworkControl TaskClass = iota + 1
+	TaskClassGenericFunction
+)
+
+// Valid reports whether class is a known task scheduling class.
+func (class TaskClass) Valid() bool {
+	return class == TaskClassFrameworkControl ||
+		class == TaskClassGenericFunction
 }
 
 // OperationID uniquely identifies an operation within one run generation.

@@ -93,7 +93,7 @@ func BenchmarkBTaskSupervisorDispatch(b *testing.B) {
 	}
 	b.ReportAllocs()
 	for b.Loop() {
-		ref, err := supervisor.Enqueue(plan)
+		ref, err := supervisor.Enqueue(TaskClassGenericFunction, plan)
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -127,7 +127,10 @@ func BenchmarkBTaskChildLaunchCompletion(b *testing.B) {
 	var started [TransientTaskSlots]TaskStart
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := supervisor.Enqueue(plan); err != nil {
+		if _, err := supervisor.Enqueue(
+			TaskClassGenericFunction,
+			plan,
+		); err != nil {
 			b.Fatal(err)
 		}
 		count, _, err := supervisor.Dispatch(

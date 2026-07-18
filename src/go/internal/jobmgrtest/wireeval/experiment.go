@@ -18,6 +18,7 @@ type ExperimentSpec struct {
 	Baseline          ChildSpec
 	Production        ChildSpec
 	EvidenceDirectory string
+	Candidate         *CandidateProvenance
 	Progress          func(completed, total int)
 }
 
@@ -55,6 +56,14 @@ func runExperiment(ctx context.Context, spec ExperimentSpec, deps experimentDeps
 	}
 	if deps.readFull == nil || deps.deriveEnvironment == nil || deps.run == nil {
 		return Experiment{}, errors.New("wire evaluator: incomplete experiment dependencies")
+	}
+	if spec.Candidate != nil {
+		if err := validateCandidateExecutable(
+			*spec.Candidate,
+			spec.Production.Executable,
+		); err != nil {
+			return Experiment{}, err
+		}
 	}
 	environmentSHA256, err := deps.deriveEnvironment(spec.Baseline, spec.Production)
 	if err != nil {
@@ -135,7 +144,12 @@ func runExperiment(ctx context.Context, spec ExperimentSpec, deps experimentDeps
 		return Experiment{}, err
 	}
 	if evidence != nil {
-		if err := evidence.Finalize(environmentSHA256, summaries, result); err != nil {
+		if err := evidence.Finalize(
+			environmentSHA256,
+			summaries,
+			result,
+			spec.Candidate,
+		); err != nil {
 			return Experiment{}, err
 		}
 	}

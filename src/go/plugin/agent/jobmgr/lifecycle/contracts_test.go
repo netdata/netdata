@@ -102,6 +102,10 @@ func TestClosedValues(t *testing.T) {
 	assert.True(t, SourceFunction.Valid())
 	assert.False(t, Source(0).Valid())
 
+	assert.True(t, TaskClassFrameworkControl.Valid())
+	assert.True(t, TaskClassGenericFunction.Valid())
+	assert.False(t, TaskClass(0).Valid())
+
 	assert.True(t, CapabilityApplied.Valid())
 	assert.True(t, CapabilityDisposed.Valid())
 	assert.True(t, CapabilityRetained.Valid())

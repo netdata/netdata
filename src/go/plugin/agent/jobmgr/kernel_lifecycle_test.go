@@ -3320,6 +3320,60 @@ func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
 	}
 }
 
+func TestKernelResourceScopedFunctionHasIndependentTaskSchedulingClass(t *testing.T) {
+	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
+		return WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)}, nil
+	})
+	kernel, run, _, _, tasks := newKernelWithPlanner(t, planner)
+	setTestFunctionResource(t, kernel, func(lookup FunctionLookup) string {
+		if lookup.Route == "dyncfg" {
+			return "dyncfg-resource"
+		}
+		return ""
+	})
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	requests := []Request{
+		{UID: "generic-first", Source: lifecycle.SourceFunction, Route: "generic"},
+		{UID: "dyncfg-second", Source: lifecycle.SourceFunction, Route: "dyncfg"},
+	}
+	for _, request := range requests {
+		if err := kernel.admit(request, WorkPlan{}, nil, nil, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+	kernel.serviceAdmissions(len(requests))
+	if more := kernel.scheduleTasks(len(requests)); more {
+		t.Fatal("task scheduling retained an unexpected ready lane")
+	}
+	if tasks.Pending() != len(requests) {
+		t.Fatalf("pending tasks=%d, want %d", tasks.Pending(), len(requests))
+	}
+	var started [lifecycle.TransientTaskSlots]lifecycle.TaskStart
+	count, _, err := tasks.Dispatch(context.Background(), 1, &started)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != 1 {
+		t.Fatalf("started tasks=%d, want 1", count)
+	}
+	operation := kernel.tasksByRequest[started[0].Request]
+	if operation == nil {
+		t.Fatal("started task has no kernel operation")
+	}
+	if operation.Source != lifecycle.SourceFunction {
+		t.Fatalf("resource-scoped Function source=%v, want Function", operation.Source)
+	}
+	if operation.request.UID != "dyncfg-second" {
+		t.Fatalf(
+			"first dispatched Function=%q, want resource-scoped %q",
+			operation.request.UID,
+			"dyncfg-second",
+		)
+	}
+}
+
 func TestKernelSubmissionBacklogCannotStarveStop(t *testing.T) {
 	kernel, run, admission, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	if err := run.OpenAdmission(); err != nil {

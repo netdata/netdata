@@ -78,7 +78,7 @@ func TestBMM002CaseClosureDigestIsStable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const want = "4ca4cfcfa3ffc725811e94ed3f03b200699ff7d8a39ad937b693b6c69ffc829f"
+	const want = "fe1971cb4088c6854e512e860cc271fc7463bf2e5f668cf4fdb52d4a9b559950"
 	if digest != want {
 		t.Fatalf("B-M-002 case digest=%s", digest)
 	}

@@ -103,7 +103,7 @@ var bmM002CaseRows = [...]ProductionCase{
 	{ID: "F24.8-b-claim-revalidation-fifo", Suite: SuiteAgent, Proof: ProofComponent},
 	{ID: "F24.9-b-kernel-priority", Suite: SuiteAgent, Proof: ProofComponent},
 	{ID: "F24.10-b-kernel-source-rotation", Suite: SuiteAgent, Proof: ProofComponent},
-	{ID: "F24.11-b-task-source-fairness", Suite: SuiteAgent, Proof: ProofComponent},
+	{ID: "F24.11-b-task-class-fairness", Suite: SuiteAgent, Proof: ProofComponent},
 	{ID: "F24.12-b-catalog-loop-lookup", Suite: SuiteAgent, Proof: ProofComponent},
 	{ID: "F24.13-b-catalog-atomic-mutation", Suite: SuiteAgent, Proof: ProofComponent},
 	{ID: "F24.14-b-hotpath-envelope", Suite: SuiteAgent, Proof: ProofComponent},

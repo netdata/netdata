@@ -39,13 +39,14 @@ type options struct {
 }
 
 type phaseArtifacts struct {
-	production     string
-	godplugin      string
-	ibmdplugin     string
-	scriptsdplugin string
-	goRoot         string
-	goExecutable   string
-	source         buildidentity.Source
+	production       string
+	godplugin        string
+	ibmdplugin       string
+	scriptsdplugin   string
+	goRoot           string
+	goExecutable     string
+	productionSHA256 string
+	source           buildidentity.Source
 }
 
 type phaseBuildTarget struct {
@@ -70,6 +71,7 @@ type phaseSummary struct {
 	EnvironmentSHA256    string `json:"environment_sha256"`
 	SourceRevision       string `json:"source_revision"`
 	SourceTree           string `json:"source_tree"`
+	CandidateSHA256      string `json:"candidate_sha256"`
 	Pass                 bool   `json:"pass"`
 }
 
@@ -153,6 +155,17 @@ func run(arguments []string) error {
 		"--mode=wire/agent",
 		"--fixture-config-dir=" + baseline.FixtureDir,
 	}
+	candidate := wireeval.CandidateProvenance{
+		SourceRevision:   artifacts.source.Revision,
+		SourceTree:       artifacts.source.GoTree,
+		GoModSHA256:      artifacts.source.GoModSHA256,
+		GoSumSHA256:      artifacts.source.GoSumSHA256,
+		ExecutableSHA256: artifacts.productionSHA256,
+		GoVersion:        runtime.Version(),
+		Package: phaseModulePath +
+			"/internal/jobmgrtest/cmd/agent",
+		CGO: "0",
+	}
 	experiment, err := wireeval.RunExperiment(
 		ctx,
 		wireeval.ExperimentSpec{
@@ -165,6 +178,7 @@ func run(arguments []string) error {
 				Arguments:  append([]string(nil), childArguments...),
 			},
 			EvidenceDirectory: opts.evidenceDirectory,
+			Candidate:         &candidate,
 			Progress: func(completed, total int) {
 				if completed%10 == 0 || completed == total {
 					_, _ = fmt.Fprintf(
@@ -196,6 +210,17 @@ func run(arguments []string) error {
 			"jobmgr phase: one or more comparison gates failed",
 		)
 	}
+	recordedCandidate, ok, err := wireeval.EvidenceCandidateProvenance(
+		opts.evidenceDirectory,
+	)
+	if err != nil {
+		return err
+	}
+	if !ok || recordedCandidate != candidate {
+		return errors.New(
+			"jobmgr phase: replayed Candidate provenance differs",
+		)
+	}
 
 	summary := phaseSummary{
 		Cases:                len(cases),
@@ -207,6 +232,7 @@ func run(arguments []string) error {
 		EnvironmentSHA256:    experiment.EnvironmentSHA256,
 		SourceRevision:       artifacts.source.Revision,
 		SourceTree:           artifacts.source.GoTree,
+		CandidateSHA256:      artifacts.productionSHA256,
 		Pass:                 true,
 	}
 	return json.NewEncoder(os.Stdout).Encode(summary)
@@ -282,14 +308,6 @@ func validateInputs(opts options) error {
 	return nil
 }
 
-func validateExecutable(name, path string) error {
-	info, err := os.Stat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Mode()&0o111 == 0 {
-		return fmt.Errorf("jobmgr phase: %s is unavailable", name)
-	}
-	return nil
-}
-
 func buildPhaseArtifacts(
 	ctx context.Context,
 	opts options,
@@ -338,31 +356,22 @@ func buildPhaseArtifacts(
 	sort.Strings(names)
 	for _, name := range names {
 		target := targets[name]
-		arguments := []string{
-			"build",
-			"-trimpath",
-		}
-		if target.tags != "" {
-			arguments = append(arguments, "-tags="+target.tags)
-		}
-		arguments = append(
-			arguments,
-			"-o",
-			target.path,
-			target.importPath,
-		)
-		command := exec.CommandContext(
+		checksum, err := buildidentity.BuildExecutable(
 			ctx,
-			artifacts.goExecutable,
-			arguments...,
+			goTool,
+			artifacts.goRoot,
+			target.path,
+			buildidentity.BuildTarget{
+				ImportPath: target.importPath,
+				Expectation: buildidentity.ExecutableExpectation{
+					Package: phaseModulePath + "/" +
+						strings.TrimPrefix(target.importPath, "./"),
+					CGO:  target.cgo,
+					Tags: target.tags,
+				},
+			},
 		)
-		command.Dir = artifacts.goRoot
-		command.Env = phaseGoEnvironment(
-			map[string]string{"CGO_ENABLED": target.cgo},
-		)
-		command.Stdout = os.Stderr
-		command.Stderr = os.Stderr
-		if err := command.Run(); err != nil {
+		if err != nil {
 			cleanup()
 			return phaseArtifacts{}, func() {}, fmt.Errorf(
 				"jobmgr phase: build %s: %w",
@@ -370,26 +379,15 @@ func buildPhaseArtifacts(
 				err,
 			)
 		}
-		if err := validateExecutable(name, target.path); err != nil {
-			cleanup()
-			return phaseArtifacts{}, func() {}, err
+		if name == "production Agent driver" {
+			artifacts.productionSHA256 = checksum
 		}
-		if err := buildidentity.VerifyExecutable(
-			target.path,
-			buildidentity.ExecutableExpectation{
-				Package: phaseModulePath + "/" +
-					strings.TrimPrefix(target.importPath, "./"),
-				CGO:  target.cgo,
-				Tags: target.tags,
-			},
-		); err != nil {
-			cleanup()
-			return phaseArtifacts{}, func() {}, fmt.Errorf(
-				"jobmgr phase: verify %s: %w",
-				name,
-				err,
-			)
-		}
+	}
+	if artifacts.productionSHA256 == "" {
+		cleanup()
+		return phaseArtifacts{}, func() {}, errors.New(
+			"jobmgr phase: production executable identity is absent",
+		)
 	}
 	same, err := sameExecutableContent(
 		baselineExecutable,
@@ -744,48 +742,10 @@ func runGoTest(
 	return command.Run()
 }
 
-func withEnvironment(
-	base []string,
-	overrides map[string]string,
-) []string {
-	environment := make([]string, 0, len(base)+len(overrides))
-	for _, entry := range base {
-		name, _, ok := strings.Cut(entry, "=")
-		if _, replace := overrides[name]; ok && replace {
-			continue
-		}
-		environment = append(environment, entry)
-	}
-	names := make([]string, 0, len(overrides))
-	for name := range overrides {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		environment = append(
-			environment,
-			name+"="+overrides[name],
-		)
-	}
-	return environment
-}
-
 func phaseGoEnvironment(
 	overrides map[string]string,
 ) []string {
-	base := []string{
-		"PATH=" + os.Getenv("PATH"),
-		"HOME=" + os.Getenv("HOME"),
-		"TMPDIR=" + os.TempDir(),
-		"LANG=C",
-		"LC_ALL=C",
-		"TZ=UTC",
-		"GOMAXPROCS=4",
-		"GOFLAGS=-mod=readonly",
-		"GOTOOLCHAIN=local",
-		"GOWORK=off",
-	}
-	return withEnvironment(base, overrides)
+	return buildidentity.GoEnvironment(overrides)
 }
 
 func exactNamePattern(names []string) string {
