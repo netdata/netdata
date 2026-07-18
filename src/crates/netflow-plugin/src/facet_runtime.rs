@@ -929,6 +929,10 @@ impl FacetValueSink for ActiveContributionSink<'_> {
         if value == 0 {
             return;
         }
+        self.insert_u8_present_static(field, value);
+    }
+
+    fn insert_u8_present_static(&mut self, field: &'static str, value: u8) {
         self.changed |= apply_active_value(
             self.state,
             self.path_str,
@@ -1851,6 +1855,46 @@ mod tests {
         assert!(
             results.iter().any(|value| value == "AS110 EXAMPLE"),
             "expected promoted sidecar autocomplete to return archived values"
+        );
+    }
+
+    #[test]
+    fn runtime_preserves_zero_protocol_from_active_record_through_rotation() {
+        let tmp = tempfile::tempdir().expect("create temp dir");
+        let runtime = FacetRuntime::new(tmp.path());
+        let archived_path = tmp.path().join("flows-protocol-zero.journal");
+        let active_path = tmp.path().join("flows-protocol-zero-next.journal");
+        let record = FlowRecord {
+            protocol: 0,
+            ..FlowRecord::default()
+        };
+
+        runtime
+            .observe_active_record(&archived_path, &record)
+            .expect("observe protocol zero");
+        assert_eq!(
+            runtime
+                .snapshot()
+                .fields
+                .get("PROTOCOL")
+                .expect("active protocol field")
+                .values,
+            vec!["0".to_string()]
+        );
+
+        runtime
+            .observe_rotation(&archived_path, &active_path)
+            .expect("rotate protocol-zero journal");
+
+        let reloaded = FacetRuntime::new(tmp.path());
+        assert_eq!(
+            reloaded
+                .snapshot()
+                .fields
+                .get("PROTOCOL")
+                .expect("archived protocol field")
+                .values,
+            vec!["0".to_string()]
         );
     }
 

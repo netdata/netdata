@@ -305,7 +305,7 @@ Column legend:
 | `OUT_IF_PROVIDER` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | Static metadata or interface classifier provider tag |
 | `OUT_IF_SPEED` | uint64 | — | — | — | — | — | enrichment | all | facet, group-by, filter | `metadata_static.exporters.<ip>.if_indexes.<idx>.speed` (bps) |
 | `PACKETS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | metric, filter | Counter; scaled by `SAMPLING_RATE` at ingest. sFlow always 1 per sample |
-| `PROTOCOL` | uint8 | ✓ | ✓ | ✓ | ✓ | ◐ | decoder | all | facet, group-by, filter | v5/v7 protocol_number; v9 IE 4; IPFIX IE 4 `ProtocolIdentifier`. sFlow from `SampledIPv4`/`SampledIPv6` or parsed L3 |
+| `PROTOCOL` | uint8 | ✓ | ✓ | ✓ | ✓ | ◐ | decoder | all | facet, group-by, filter | IP protocol number: v5/v7 protocol_number; v9 IE 4; IPFIX IE 4 `ProtocolIdentifier`. sFlow from `SampledIPv4`/`SampledIPv6` or parsed L3. Zero (`HOPOPT`) is retained explicitly |
 | `RAW_BYTES` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | raw | metric | Pre-sampling byte count from the exporter |
 | `RAW_PACKETS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | raw | metric | Pre-sampling packet count from the exporter |
 | `SAMPLING_RATE` | uint64 | ✓ (header) | — | ◐ | ◐ | ✓ | decoder | raw | metric | v5 from header `sampling_interval`. v7 has no rate (treated as unsampled). v9/IPFIX from IE 34/305/306 or Sampling Options template. sFlow per-sample rate |

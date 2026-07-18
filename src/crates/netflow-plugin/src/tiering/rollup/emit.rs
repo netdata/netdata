@@ -667,6 +667,41 @@ mod tests {
         );
     }
 
+    #[test]
+    fn direct_emit_preserves_protocol_zero_in_payload_and_facet_contribution() {
+        let mut store = TierFlowIndexStore::default();
+        let record = FlowRecord {
+            protocol: 0,
+            bytes: 123,
+            packets: 4,
+            ..FlowRecord::default()
+        };
+        let flow_ref = store
+            .get_or_insert_record_flow(120_000_000, &record)
+            .expect("intern protocol-zero tier flow");
+        let mut encode_buf = JournalEncodeBuffer::new();
+
+        let contribution = emit_rollup_row(
+            store.index_for_test(flow_ref).expect("rollup index"),
+            flow_ref.flow_id,
+            FlowMetrics::from_record(&record),
+            &mut encode_buf,
+        )
+        .expect("emit protocol-zero tier row");
+
+        assert!(
+            encode_buf
+                .debug_field_slices()
+                .contains(&b"PROTOCOL=0".as_slice()),
+            "tier journal payload must retain canonical protocol zero"
+        );
+        assert_eq!(
+            contribution.debug_string_map().get("PROTOCOL"),
+            Some(&vec!["0".to_string()]),
+            "tier facet contribution must retain canonical protocol zero"
+        );
+    }
+
     fn sorted_payloads(buf: &JournalEncodeBuffer) -> Vec<Vec<u8>> {
         let mut payloads = buf
             .debug_field_slices()
