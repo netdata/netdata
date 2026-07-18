@@ -107,7 +107,6 @@ typedef enum __attribute__((packed)) {
     BIB_PLUGIN_XEN,
     BIB_PLUGIN_XEN_VBD_ERROR,
     BIB_EXPORT_AWS_KINESIS,
-    BIB_EXPORT_GCP_PUBSUB,
     BIB_EXPORT_MONGOC,
     BIB_EXPORT_PROMETHEUS_EXPORTER,
     BIB_EXPORT_PROMETHEUS_REMOTE_WRITE,
@@ -1050,14 +1049,6 @@ static struct {
                 .json = "kinesis",
                 .value = NULL,
         },
-        [BIB_EXPORT_GCP_PUBSUB] = {
-                .category = BIC_EXPORTERS,
-                .type = BIT_BOOLEAN,
-                .analytics = "GCP PubSub",
-                .print = "GCP PubSub",
-                .json = "pubsub",
-                .value = NULL,
-        },
         [BIB_DEVEL_TRACE_ALLOCATIONS] = {
                 .category = BIC_DEBUG_DEVEL,
                 .type = BIT_BOOLEAN,
@@ -1384,9 +1375,6 @@ __attribute__((constructor)) void initialize_build_info(void) {
 
 #ifdef HAVE_KINESIS
     build_info_set_status(BIB_EXPORT_AWS_KINESIS, true);
-#endif
-#ifdef ENABLE_EXPORTING_PUBSUB
-    build_info_set_status(BIB_EXPORT_GCP_PUBSUB, true);
 #endif
 #ifdef HAVE_MONGOC
     build_info_set_status(BIB_EXPORT_MONGOC, true);

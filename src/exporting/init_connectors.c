@@ -13,10 +13,6 @@
 #include "aws_kinesis/aws_kinesis.h"
 #endif
 
-#ifdef ENABLE_EXPORTING_PUBSUB
-#include "pubsub/pubsub.h"
-#endif
-
 #ifdef HAVE_MONGOC
 #include "mongodb/mongodb.h"
 #endif
@@ -78,13 +74,6 @@ int init_connectors(struct engine *engine)
                 instance->config.thread_tag = "EXPKINS";
 #if HAVE_KINESIS
                 if (init_aws_kinesis_instance(instance) != 0)
-                    return 1;
-#endif
-                break;
-            case EXPORTING_CONNECTOR_TYPE_PUBSUB:
-                instance->config.thread_tag = "EXPPUBS";
-#if ENABLE_EXPORTING_PUBSUB
-                if (init_pubsub_instance(instance) != 0)
                     return 1;
 #endif
                 break;

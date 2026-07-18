@@ -44,7 +44,7 @@ The following options can be defined for this exporter.
 | Option | Description | Default | Required |
 |:-----|:------------|:--------|:---------:|
 | enabled | Enables or disables an exporting connector instance (yes/no). | no | yes |
-| [destination](#option-destination) | Accepts a space separated list of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the first available to send the metrics. | pubsub.googleapis.com | yes |
+| [destination](#option-destination) | Accepts a space separated list of hostnames, IPs (IPv4 and IPv6) and ports to connect to. Netdata will use the first available to send the metrics. | localhost | yes |
 | username | Username for HTTP authentication | my_username | no |
 | password | Password for HTTP authentication | my_password | no |
 | data source | Selects the kind of data that will be sent to the external database. (as collected/average/sum) |  | no |

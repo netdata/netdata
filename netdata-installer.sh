@@ -233,9 +233,6 @@ USAGE: ${PROGRAM} [options]
   --disable-exporting-prometheus-remote-write Explicitly disable Prometheus remote write exporting connector.
   --enable-exporting-mongodb Enable MongoDB exporting connector. Default: enable it when libmongoc is available.
   --disable-exporting-mongodb Explicitly disable MongoDB exporting connector.
-  --enable-exporting-pubsub  Enable Google Cloud PubSub exporting connector. Default: enable it when
-                             libgoogle_cloud_cpp_pubsub_protos and its dependencies are available.
-  --disable-exporting-pubsub Explicitly disable Google Cloud PubSub exporting connector.
   --enable-lto               Enable link-time optimization. Default: disabled.
   --disable-lto              Explicitly disable link-time optimization.
   --enable-ml                Enable anomaly detection with machine learning. Default: autodetect.
@@ -330,12 +327,6 @@ while [ -n "${1}" ]; do
     "--disable-exporting-prometheus-remote-write" | "--disable-backend-prometheus-remote-write") EXPORTER_PROMETHEUS=0 ;;
     "--enable-exporting-mongodb" | "--enable-backend-mongodb") EXPORTER_MONGODB=1 ;;
     "--disable-exporting-mongodb" | "--disable-backend-mongodb") EXPORTER_MONGODB=0 ;;
-    "--enable-exporting-pubsub")
-      # TODO: Needs CMake support
-      ;;
-    "--disable-exporting-pubsub")
-      # TODO: Needs CMake support
-      ;;
     "--enable-ml") NETDATA_ENABLE_ML=1 ;;
     "--disable-ml") NETDATA_ENABLE_ML=0 ;;
     "--enable-lto") NETDATA_ENABLE_LTO=1 ;;

@@ -2076,7 +2076,7 @@ Per dimension:
 104. ✅ `application.plugins.xen` - boolean
 105. ✅ `application.plugins.xen-vbd-error` - boolean
 
-**Application.exporters (14 fields):**
+**Application.exporters (12 fields):**
 106. ✅ `application.exporters.mongodb` - boolean
 107. ✅ `application.exporters.graphite` - boolean
 108. ✅ `application.exporters.graphite:http` - boolean
@@ -2089,62 +2089,61 @@ Per dimension:
 115. ✅ `application.exporters.openmetrics` - boolean
 116. ✅ `application.exporters.prom-remote-write` - boolean
 117. ✅ `application.exporters.kinesis` - boolean
-118. ✅ `application.exporters.pubsub` - boolean
 
 **Application.debug-n-devel (2 fields):**
-119. ✅ `application.debug-n-devel.trace-allocations` - boolean
-120. ✅ `application.debug-n-devel.dev-mode` - boolean
+118. ✅ `application.debug-n-devel.trace-allocations` - boolean
+119. ✅ `application.debug-n-devel.dev-mode` - boolean
 
 **Application.runtime (5 fields):**
-121. ✅ `application.runtime.profile` - string
-122. ✅ `application.runtime.parent` - boolean
-123. ✅ `application.runtime.child` - boolean
-124. ✅ `application.runtime.mem-total` - string
-125. ✅ `application.runtime.mem-available` - string
+120. ✅ `application.runtime.profile` - string
+121. ✅ `application.runtime.parent` - boolean
+122. ✅ `application.runtime.child` - boolean
+123. ✅ `application.runtime.mem-total` - string
+124. ✅ `application.runtime.mem-available` - string
 
 **Agent Metrics (11 fields):**
-126. ✅ `nodes` - object
-127. ✅ `nodes.total` - number
-128. ✅ `nodes.receiving` - number
-129. ✅ `nodes.sending` - number
-130. ✅ `nodes.archived` - number
-131. ✅ `metrics.collected` - number
-132. ✅ `metrics.available` - number
-133. ✅ `instances.collected` - number
-134. ✅ `instances.available` - number
-135. ✅ `contexts.collected` - number
-136. ✅ `contexts.available` - number
-137. ✅ `contexts.unique` - number
+125. ✅ `nodes` - object
+126. ✅ `nodes.total` - number
+127. ✅ `nodes.receiving` - number
+128. ✅ `nodes.sending` - number
+129. ✅ `nodes.archived` - number
+130. ✅ `metrics.collected` - number
+131. ✅ `metrics.available` - number
+132. ✅ `instances.collected` - number
+133. ✅ `instances.available` - number
+134. ✅ `contexts.collected` - number
+135. ✅ `contexts.available` - number
+136. ✅ `contexts.unique` - number
 
 **Agent Capabilities & API (3+ fields):**
-138. ✅ `capabilities` - array of capability objects
-139. ✅ `api.version` - number
-140. ✅ `api.bearer_protection` - boolean
+137. ✅ `capabilities` - array of capability objects
+138. ✅ `api.version` - number
+139. ✅ `api.bearer_protection` - boolean
 
 **Database Size Array (per tier, 13 fields each):**
-141. ✅ `db_size[n].tier` - number
-142. ✅ `db_size[n].granularity` - string
-143. ✅ `db_size[n].metrics` - number
-144. ✅ `db_size[n].samples` - number
-145. ✅ `db_size[n].disk_used` - number
-146. ✅ `db_size[n].disk_max` - number
-147. ✅ `db_size[n].disk_percent` - number
-148. ✅ `db_size[n].from` - number/string
-149. ✅ `db_size[n].to` - number/string
-150. ✅ `db_size[n].retention` - number
-151. ✅ `db_size[n].retention_human` - string
-152. ✅ `db_size[n].requested_retention` - number
-153. ✅ `db_size[n].requested_retention_human` - string
-154. ✅ `db_size[n].expected_retention` - number
-155. ✅ `db_size[n].expected_retention_human` - string
+140. ✅ `db_size[n].tier` - number
+141. ✅ `db_size[n].granularity` - string
+142. ✅ `db_size[n].metrics` - number
+143. ✅ `db_size[n].samples` - number
+144. ✅ `db_size[n].disk_used` - number
+145. ✅ `db_size[n].disk_max` - number
+146. ✅ `db_size[n].disk_percent` - number
+147. ✅ `db_size[n].from` - number/string
+148. ✅ `db_size[n].to` - number/string
+149. ✅ `db_size[n].retention` - number
+150. ✅ `db_size[n].retention_human` - string
+151. ✅ `db_size[n].requested_retention` - number
+152. ✅ `db_size[n].requested_retention_human` - string
+153. ✅ `db_size[n].expected_retention` - number
+154. ✅ `db_size[n].expected_retention_human` - string
 
 **Cloud Status (conditional):**
-156. ✅ `cloud` - object (status and connection info)
+155. ✅ `cloud` - object (status and connection info)
 
 ### HTTP RESPONSE CODES
-157. ✅ 200 OK - Successful response
-158. ✅ 499 Client Closed Request - Query interrupted
-159. ✅ 504 Gateway Timeout - Query timeout exceeded
+156. ✅ 200 OK - Successful response
+157. ✅ 499 Client Closed Request - Query interrupted
+158. ✅ 504 Gateway Timeout - Query timeout exceeded
 
 ### VERIFICATION SUMMARY
 **Parameters Verified:** 9 (all optional)

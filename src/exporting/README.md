@@ -43,7 +43,6 @@ Netdata provides three data export modes:
 | Connector                                                                   | Protocol/Format            | Metric Format                      |
 |:----------------------------------------------------------------------------|:---------------------------|:-----------------------------------|
 | [AWS Kinesis](/src/exporting/aws_kinesis/README.md)                         | JSON                       | Stream-based                       |
-| [Google Pub/Sub](/src/exporting/pubsub/README.md)                           | JSON                       | Message-based                      |
 | [Graphite](/src/exporting/graphite/README.md)                               | Plaintext                  | `prefix.hostname.chart.dimension`  |
 | [JSON Databases](/src/exporting/json/README.md)                             | JSON                       | Document-based                     |
 | [OpenTSDB](/src/exporting/opentsdb/README.md)                               | Plaintext/HTTP             | `prefix.chart.dimension` with tags |
@@ -152,13 +151,6 @@ Your `exporting.conf` file contains these configuration blocks:
     aws_access_key_id = my_access_key_id
     aws_secret_access_key = my_aws_secret_access_key
 
-[pubsub:my_pubsub_instance]
-    enabled = yes
-    destination = pubsub.googleapis.com
-    credentials file = /etc/netdata/pubsub_credentials.json
-    project id = my_project
-    topic id = my_topic
-
 [mongodb:my_mongodb_instance]
     enabled = yes
     destination = localhost
@@ -200,7 +192,7 @@ Available connector types with optional modifiers:
 - `opentsdb:telnet` | `opentsdb:http` | `opentsdb:https`
 - `prometheus_remote_write` | `prometheus_remote_write:http` | `prometheus_remote_write:https`
 - `json` | `json:http` | `json:https`
-- `kinesis` | `pubsub` | `mongodb`
+- `kinesis` | `mongodb`
 
 ## Configuration Options
 
@@ -240,7 +232,6 @@ Special destinations:
 
 - **Kinesis**: AWS region (e.g., `us-east-1`)
 - **MongoDB**: [MongoDB URI](https://docs.mongodb.com/manual/reference/connection-string/)
-- **Pub/Sub**: Service endpoint
 
 ### Filtering Options
 

@@ -31,7 +31,6 @@ Netdata exports metrics to the following databases through various [connectors](
 |    **ElasticSearch**     |                          [Graphite](/src/exporting/graphite/README.md), [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                           |
 |       **Gnocchi**        |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
 |   **Google BigQuery**    |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |
-| **Google Cloud Pub/Sub** |                                                        [Google Cloud Pub/Sub Service](/src/exporting/pubsub/README.md)                                                        |
 |       **Graphite**       |                          [Graphite](/src/exporting/graphite/README.md), [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                           |
 |       **InfluxDB**       |                          [Graphite](/src/exporting/graphite/README.md), [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                           |
 |        **IRONdb**        |                                                  [Prometheus remote write](/src/exporting/prometheus/remote_write/README.md)                                                  |

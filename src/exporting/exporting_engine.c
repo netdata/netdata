@@ -58,11 +58,6 @@ void analytics_exporting_connectors(BUFFER *b)
                 buffer_strcat(b, "Kinesis");
 #endif
                 break;
-            case EXPORTING_CONNECTOR_TYPE_PUBSUB:
-#if ENABLE_EXPORTING_PUBSUB
-                buffer_strcat(b, "Pubsub");
-#endif
-                break;
             case EXPORTING_CONNECTOR_TYPE_MONGODB:
 #ifdef HAVE_MONGOC
                 buffer_strcat(b, "MongoDB");

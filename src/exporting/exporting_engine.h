@@ -56,7 +56,6 @@ typedef enum exporting_connector_types {
     EXPORTING_CONNECTOR_TYPE_OPENTSDB_HTTP,           // Send data to OpenTSDB using HTTP API
     EXPORTING_CONNECTOR_TYPE_PROMETHEUS_REMOTE_WRITE, // Send data using Prometheus remote write protocol
     EXPORTING_CONNECTOR_TYPE_KINESIS,                 // Send message to AWS Kinesis
-    EXPORTING_CONNECTOR_TYPE_PUBSUB,                  // Send message to Google Cloud Pub/Sub
     EXPORTING_CONNECTOR_TYPE_MONGODB,                 // Send data to MongoDB collection
     EXPORTING_CONNECTOR_TYPE_NUM                      // Number of exporting connector types
 } EXPORTING_CONNECTOR_TYPE;
@@ -137,12 +136,6 @@ struct aws_kinesis_specific_config {
     char *stream_name;
     char *auth_key_id;
     char *secure_key;
-};
-
-struct pubsub_specific_config {
-    char *credentials_file;
-    char *project_id;
-    char *topic_id;
 };
 
 struct mongodb_specific_config {
