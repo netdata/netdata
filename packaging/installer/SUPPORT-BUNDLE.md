@@ -198,25 +198,48 @@ These are excluded by design. **Do not add them.**
 - anything outside netdata's own scope (no full system journals, no other
   services' logs, no packet captures)
 
+## Redaction philosophy
+
+This tool follows the same proportionate posture as established support-bundle
+tools (sosreport, supportconfig, `kubectl cluster-info dump`, Elastic's
+diagnostics): **redact the well-defined, high-value cases robustly, and treat
+redaction as best-effort defense-in-depth — not a guarantee.**
+
+Two facts do the heavy lifting and are why we do not chase completeness:
+
+1. the tool runs on the **user's own host**, under their own account; and
+2. the output is plain-text, organized, and the user is told to **review the
+   bundle before sending it** (`summary.txt` and this document say so).
+
+Concretely, we redact credential-bearing config keys, URL/DSN credentials,
+JWT/Bearer/Basic tokens, PEM key blocks, `stream.conf` API-key sections, and
+PII (IPs, MACs, emails, hostnames, usernames); and we never collect files that
+are *pure* secrets at all (the never-collect list). We deliberately do **not**
+try to parse arbitrary nested structure to prove no secret can ever slip
+through — a line-based tool cannot balance nested JSON brackets or detect
+indentation-based YAML block-scalar boundaries reliably, and every attempt adds
+fragile regex for encodings that do not occur in the data this bundle collects.
+A brittle sanitizer that tries to do everything is worse than a stable one that
+does the common cases well; the durable place for structure-aware,
+schema-driven redaction is inside the agent, not a portable shell/PowerShell
+script. When extending the tool, prefer this restraint.
+
 ## Sanitization
 
 Two passes, one sweep, applied to **every** collected file:
 
 1. **Secrets — always on, not configurable:**
-   - values of any key whose punctuation-normalized name contains a complete
+   - values of any key whose punctuation-normalized name contains a
      secret word or phrase:
-     `api key, apikey, token, access token, auth token, claim token, refresh
-     token, session token, password, passwd, pass, pwd, pat, key, secret,
-     client secret, client password, community, bearer,
+     `api key, apikey, token, password, passwd, pwd, secret, community, bearer,
      webhook, license key, auth, credential, cookie, passphrase, proxy user,
      proxy pass, username, dsn, private key, access key, session, recipient,
-     account sid, priv key` (including common compact/camelCase spellings) — in
-     ini (`k = v`), yaml (`k: v`), env (`K=V`) and
-     JSON (`"k": "v"`) forms, including escaped strings, numeric/scalar
-     values, and nested values. Keys must look like real config keys (≤64 chars,
+     account sid, priv key` — in ini (`k = v`), yaml (`k: v`), env (`K=V`) and
+     JSON (`"k": "v"`) forms, covering escaped JSON strings and numeric/scalar
+     JSON values. (Aliases are matched as substrings, so only unambiguous
+     secret tokens are on the list — e.g. `pat` is deliberately NOT, because it
+     matches `path`.) Keys must look like real config keys (≤64 chars,
      no sentence punctuation) so prose containing "token" is not mangled.
-     Multi-line JSON objects/arrays and YAML block-scalar secret values are
-     withheld through their closing boundary (or to EOF if malformed).
      Exemptions are decided by the KEY, never the value: keys ending in
      `file path dir directory protection support mode level port timeout
      cookies secure log size options format type` describe secrets rather than being

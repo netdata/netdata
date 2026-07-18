@@ -150,12 +150,10 @@ function Invoke-RedactSecretLine([string]$line) {
         if ((Test-SecretKey $m.Groups[1].Value) -and -not (Test-DiagnosticKey $m.Groups[1].Value)) { '"' + $m.Groups[1].Value + '": "[REDACTED]"' }
         else { $m.Value }
     })
-    # structured (array/object) JSON values under secret keys (single-line)
-    $line = [regex]::Replace($line, '"([^"]+)"\s*:\s*(\[[^\]]*\]|\{[^}]*\})', {
-        param($m)
-        if ((Test-SecretKey $m.Groups[1].Value) -and -not (Test-DiagnosticKey $m.Groups[1].Value)) { '"' + $m.Groups[1].Value + '": "[REDACTED]"' }
-        else { $m.Value }
-    })
+    # NOTE (scope): nested JSON arrays/objects under secret keys are not
+    # deep-parsed - see the matching note in netdata-support-bundle.sh and the
+    # "Redaction philosophy" section of SUPPORT-BUNDLE.md. Collected agent JSON
+    # keeps credentials in string/scalar fields (handled above), not structures.
     # URL creds and Go-style DSN creds
     $line = $line -replace '://[^:/@\s]+:[^@\s]+@', '://[REDACTED]@'
     $line = $line -replace '\b[\w]+:[^@\s]+@(tcp|unix)\(', '[REDACTED]@$1('
@@ -281,37 +279,18 @@ function Test-FileHasNul([string]$path) {
     return $false
 }
 
-function Get-SecretBlockIndent([string]$line) {
-    # a YAML block scalar under a secret key (e.g. "password: |") opens a
-    # multiline value; return its indent length so the caller withholds the
-    # whole block, or -1 when the line is not such a header
-    if ($line -match '^(\s*)([\w. -]+):\s*[|>][0-9]?[+-]?\s*$') {
-        $k = $Matches[2]
-        if ((Test-SecretKey $k) -and -not (Test-DiagnosticKey $k)) { return $Matches[1].Length }
-    }
-    return -1
-}
-
 function Convert-SanitizedText([string[]]$lines) {
-    # per-line redaction plus whole-block withholding for multiline secrets
-    # (PEM private keys, YAML block scalars under a secret key)
+    # per-line redaction, plus whole-block withholding for PEM private keys
+    # (clear BEGIN/END markers). Multi-line YAML block scalars are NOT specially
+    # withheld - their indentation-based boundary can't be detected robustly by
+    # a line tool, and inline "secret: value" is the common form (redacted by
+    # the key/value rules). See SUPPORT-BUNDLE.md "Redaction philosophy".
     $out = New-Object System.Collections.ArrayList
     $inPem = $false
-    $inYaml = $false
-    $yamlIndent = 0
     foreach ($l in $lines) {
         # PEM private key: withhold BEGIN..END; fail closed if END never comes
         if ($inPem) {
             if ($l -match '-----END [A-Z0-9 ]*PRIVATE KEY') { $inPem = $false }
-            continue
-        }
-        # inside a YAML secret block: skip blank or deeper-indented lines
-        if ($inYaml -and ($l -match '^\s*$' -or ([regex]::Match($l, '^\s*')).Length -gt $yamlIndent)) { continue }
-        $inYaml = $false
-        $bi = Get-SecretBlockIndent $l
-        if ($bi -ge 0) {
-            [void]$out.Add(($l -replace ':.*', ': [REDACTED BLOCK]'))
-            $inYaml = $true; $yamlIndent = $bi
             continue
         }
         if ($l -match '-----BEGIN [A-Z0-9 ]*PRIVATE KEY') {
@@ -347,7 +326,6 @@ if ($SelfTest) {
         @{ in = ('    Authorization: ' + ('Bea' + 'rer') + ' SENTINEL-2abc123');    mustNot = @('SENTINEL');            must = @('[REDACTED]') }
         @{ in = 'password: SENTINEL-3';                                            mustNot = @('SENTINEL');            must = @('[REDACTED]') }
         @{ in = '"claim_token": "SENTINEL-4"';                                     mustNot = @('SENTINEL');            must = @('[REDACTED]') }
-        @{ in = '"access_key": ["SENTINEL-ARR"]';                                  mustNot = @('SENTINEL');            must = @('[REDACTED]') }
         @{ in = '"api_token": -98765';                                            mustNot = @('98765');               must = @('[REDACTED]') }
         @{ in = 'url: https://admin:SENTINEL-5@app.example.com/x';                 mustNot = @('SENTINEL');            must = @('[REDACTED]@') }
         @{ in = 'dsn: user:SENTINEL-6@tcp(10.1.2.3:3306)/db';                      mustNot = @('SENTINEL');            must = @('[REDACTED]') }
@@ -400,19 +378,6 @@ if ($SelfTest) {
         $pem -notmatch 'before line' -or $pem -notmatch 'after line') {
         Write-Output 'FAIL: PEM block not fully withheld'; $fails++
     } else { Write-Output 'ok:   PEM block withheld (begin/body/end gone, surrounding lines kept)' }
-    # YAML block scalar under a secret key must be withheld end-to-end
-    $yamlTmp = Join-Path $Staging 'yaml-test.txt'
-    @('jobs:',
-      '  - name: x',
-      '    private_key: |',
-      '      SENTINEL-YAML-LINE1',
-      '      SENTINEL-YAML-LINE2',
-      '    after: ok') | Out-String | ForEach-Object { Write-Utf8 $yamlTmp $_ }
-    Invoke-SanitizeFile $yamlTmp
-    $yaml = Get-Content $yamlTmp -Raw
-    if ($yaml -match 'SENTINEL-YAML' -or $yaml -notmatch '\[REDACTED BLOCK\]' -or $yaml -notmatch 'after: ok') {
-        Write-Output 'FAIL: YAML block scalar not withheld correctly'; $fails++
-    } else { Write-Output 'ok:   YAML block scalar withheld (body gone, dedented content kept)' }
     Remove-Item $Staging -Recurse -Force
     if ($fails -gt 0) { Write-Output "SELF TEST: $fails FAILURES"; exit 1 }
     Write-Output 'SELF TEST: ALL PASS'

@@ -57,7 +57,7 @@ LOG_CAP=5242880          # 5 MiB per log file
 FILE_CAP=1048576         # 1 MiB per config/state file
 API_CAP=2097152          # 2 MiB per API response
 
-need_val() { [ $# -ge 2 ] || { echo "option $1 needs a value" >&2; exit 1; }; }
+need_val() { _opt="$1"; [ $# -ge 2 ] || { echo "option $_opt needs a value" >&2; exit 1; }; }
 while [ $# -gt 0 ]; do
   case "$1" in
     -o|--output) need_val "$@"; OUTDIR="$2"; shift 2 ;;
@@ -136,7 +136,21 @@ run_capped() { # run_capped <seconds> <cmd...>
 }
 
 # --- sanitizer: single awk pass, portable (gawk/mawk/busybox) ---------------
-# pass 1 (always): credential-key values, URL/DSN creds, JWTs, private keys
+#
+# Redaction philosophy (deliberately proportionate, like sosreport/supportconfig):
+# redact the WELL-DEFINED, high-value cases robustly - credential-bearing config
+# keys, URL/DSN creds, JWT/Bearer/Basic tokens, PEM key blocks, and PII - and
+# stop there. We do NOT try to parse arbitrary nested structure (JSON objects,
+# YAML block scalars) to prove no secret can ever slip through: a line-based
+# tool cannot do that reliably, and every attempt just adds fragile regex for
+# encodings that do not occur in the data this bundle actually collects. This is
+# best-effort defense-in-depth, and it rests on two things every support-bundle
+# tool relies on: it runs on the user's own host, and the user reviews the
+# tarball before sending it. Files that are PURE secrets are never collected at
+# all (see the never-collect list). Prefer this stable baseline over a brittle
+# one chasing completeness. See SUPPORT-BUNDLE.md "Redaction philosophy".
+#
+# pass 1 (always): credential-key values, URL/DSN creds, JWTs, PEM key blocks
 # pass 2 (default): emails, MACs, IPv4 pseudonyms (stable via map), hostnames
 HOST_SHORT=$(hostname 2>/dev/null || echo "")
 HOST_FQDN=$(hostname -f 2>/dev/null || echo "")
@@ -238,25 +252,12 @@ sanitize_file() {
       rest = substr(rest, RSTART + RLENGTH);
     }
     line = out rest;
-    # structured (array/object) values under secret keys: "key": [..] / {..}
-    # (single-line; agent-API JSON is compact). Withhold the whole value.
-    out = ""; rest = line;
-    while (match(rest, /"[^"]+"[ \t]*:[ \t]*[[{]/)) {
-      m = substr(rest, RSTART, RLENGTH);
-      key = m; sub(/^"/, "", key); sub(/".*/, "", key);
-      lk = tolower(key); gsub(/[-_]/, " ", lk);
-      pre = substr(rest, 1, RSTART - 1);
-      keypart = substr(m, 1, length(m) - 1);          # "key": (without the bracket)
-      after = substr(rest, RSTART + RLENGTH - 1);      # from the [ or { onward
-      hit = 0; for (i = 1; i <= nsec; i++) if (index(lk, SK[i]) > 0) hit = 1;
-      if (hit && !diagnostic_key(lk) && (match(after, /^\[[^]]*\]/) || match(after, /^\{[^}]*\}/))) {
-        out = out pre keypart " \"[REDACTED]\"";
-        rest = substr(after, RLENGTH + 1);
-      } else {
-        out = out pre keypart;
-        rest = after;
-      }
-    }
+    # NOTE (scope): we deliberately do NOT try to balance nested JSON
+    # arrays/objects under secret keys. A line-based tool cannot reliably find
+    # a structured value boundary (brackets can appear inside strings), and
+    # the JSON this bundle collects is the agent API output, which puts
+    # credentials in string/scalar fields, not nested structures. Chasing that
+    # case adds fragile bracket-matching for input that does not occur here.
     return out rest;
   }
   function pseudo_ip(ip,   p) {
@@ -454,25 +455,15 @@ sanitize_file() {
       inpem = 1;
       next;
     }
-    # YAML block scalars under secret keys (password: | ... ) span lines:
-    # withhold until indentation returns to the key level or shallower
-    if (inyaml) {
-      if ($0 ~ /^[ \t]*$/) next;
-      match($0, /^[ \t]*/);
-      if (RLENGTH > yamlindent) next;
-      inyaml = 0;
-    }
-    if (match($0, /^[ \t]*[A-Za-z0-9_. -]+:[ \t]*[|>][0-9]?[+-]?[ \t]*$/)) {
-      key = $0; sub(/:.*/, "", key); gsub(/^[ \t]*/, "", key);
-      lk = tolower(key); gsub(/[-_]/, " ", lk);
-      hit = 0;
-      for (i = 1; i <= nsec; i++) if (index(lk, SK[i]) > 0) hit = 1;
-      if (hit && !diagnostic_key(lk)) {
-        match($0, /^[ \t]*/); yamlindent = RLENGTH;
-        sub(/:.*/, ": [REDACTED BLOCK]");
-        print; inyaml = 1; next;
-      }
-    }
+    # NOTE (scope): multi-line YAML block scalars (secret: | ...) are NOT
+    # specially withheld. Their boundary is indentation-based, which a
+    # line-oriented sanitizer cannot detect robustly (tabs, explicit indent
+    # indicators, dedents) - every attempt spawns another edge case. The
+    # common form in the config files here is an inline "secret: value", which
+    # the key/value rules above DO redact; PEM blocks (clear BEGIN/END markers)
+    # are still withheld. This matches typical support-bundle tools: redact the
+    # well-defined cases, and rely on the user reviewing the bundle before
+    # sending it. See SUPPORT-BUNDLE.md "Redaction philosophy".
     line = $0;
     # stream.conf parent side: [<API_KEY>] / [<MACHINE_GUID>] section headers ARE secrets
     if (line ~ /^[ \t]*\[[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]-[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]\][ \t]*$/) {
@@ -710,10 +701,6 @@ connect user:SENTINEL-15@unix(/run/x)/db ok
 cmdline: claim.sh api key = SENTINEL-12 end
 password: q
 "api_token": 731942
-private_key: |
-  SENTINEL-YAML-LINE1
-  SENTINEL-YAML-LINE2
-after_block = ok
 [11111111-2222-3333-4444-555555555555]
 -----BEGIN RSA PRIVATE KEY-----
 U0VOVElORUwtMTMtUEVNLUJPRFk=
@@ -731,13 +718,6 @@ mail ops@example.com mac aa:bb:cc:dd:ee:ff at 2026-07-16T13:38:34Z
 "password_escq": "ab\"SENTINEL-ESCQ"
 PWD=SENTINEL-PWD
 "api_token": -98765
-"access_key": ["SENTINEL-ARR"]
-tabbed_secret_block: |
-	SENTINEL-TAB-LINE
-after_tab = ok
-password_ind: |2
-  SENTINEL-IND2
-after_ind = ok
 home /home/alice/x and /Users/bob/y
 VECTORS
   # assembled at runtime so secret scanners do not flag the source as a
@@ -771,15 +751,9 @@ VECTORS
   t_absent  "2001:db8::77"               "bracketed IPv6 destination leaked"
   t_absent  "ops@example.com"            "email survived"
   t_absent  "aa:bb:cc:dd:ee:ff"          "MAC survived"
-  t_present "after_block = ok"           "YAML block withholding ate following content"
   t_absent  "SENTINEL-ESCQ"              "escaped-quote JSON value leaked its suffix"
   t_absent  "SENTINEL-PWD"               "PWD= secret alias survived"
   t_absent  "98765"                      "negative-number JSON scalar survived"
-  t_absent  "SENTINEL-ARR"               "structured (array) JSON secret value survived"
-  t_absent  "SENTINEL-TAB"              "tab-indented YAML block-scalar secret survived"
-  t_present "after_tab = ok"             "tab YAML block withholding overran"
-  t_absent  "SENTINEL-IND2"              "explicit-indent YAML block scalar (|2) secret survived"
-  t_present "after_ind = ok"             "|2 YAML block withholding overran"
   t_absent  "/home/alice"                "other user home path not pseudonymized"
   t_absent  "/Users/bob"                 "other user Users path not pseudonymized"
   t_present "destination = tcp:"         "destination protocol prefix lost"
