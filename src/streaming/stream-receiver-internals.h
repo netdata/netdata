@@ -19,6 +19,21 @@ void stream_receiver_log_payload(struct receiver_state *rpt, const char *payload
 #include "database/rrd.h"
 #include "plugins.d/plugins_d.h"
 
+static inline bool stream_receiver_parse_hops(const char *value, int16_t *hops) {
+    if(!value || !hops)
+        return false;
+
+    char *endptr;
+    errno = 0;
+    long parsed = strtol(value, &endptr, 0);
+
+    if(errno != 0 || endptr == value || *endptr != '\0' || parsed < 1 || parsed > INT16_MAX)
+        return false;
+
+    *hops = (int16_t)parsed;
+    return true;
+}
+
 struct parser;
 
 struct receiver_state {

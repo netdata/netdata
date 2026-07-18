@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS Network Load Balancer
 namespace: AWS/NetworkELB
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: LoadBalancer
@@ -39,18 +40,19 @@ metrics:
     statistics: [sum]
     rate: true
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below, then restart the go.d process. All are
-  # published at the {LoadBalancer} grain, so no other change is needed.
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {LoadBalancer} grain, so no other change is needed.
   # ----------------------------------------------------------------------------------------
-  # - id: client_tls_negotiation_errors
-  #   metric_name: ClientTLSNegotiationErrorCount
-  #   statistics: [sum]
-  #   rate: true
-  # - id: port_allocation_errors     # NLB with SNAT (private-IP targets)
-  #   metric_name: PortAllocationErrorCount
-  #   statistics: [sum]
-  #   rate: true
+  - id: client_tls_negotiation_errors
+    disabled: true
+    metric_name: ClientTLSNegotiationErrorCount
+    statistics: [sum]
+    rate: true
+  - id: port_allocation_errors     # NLB with SNAT (private-IP targets)
+    disabled: true
+    metric_name: PortAllocationErrorCount
+    statistics: [sum]
+    rate: true
   # Also published at {LoadBalancer}: per-protocol variants (ActiveFlowCount_TCP/_UDP/_TLS,
   # NewFlowCount_*, ProcessedBytes_*, ConsumedLCUs_*) and TargetTLSNegotiationErrorCount. Narrow
   # target health at {LoadBalancer, TargetGroup} is collected by the default nlb_target_health
@@ -122,23 +124,23 @@ template:
         - selector: tcp_target_reset_count_sum
           name: target
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_nlb_tls_errors
-    #   context: client_tls_negotiation_errors
-    #   title: NLB Client TLS Negotiation Errors
-    #   family: TLS
-    #   units: errors/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: client_tls_negotiation_errors_sum
-    #       name: errors
-    # - id: aws_cloudwatch_nlb_port_allocation_errors
-    #   context: port_allocation_errors
-    #   title: NLB Port Allocation Errors
-    #   family: Errors
-    #   units: errors/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: port_allocation_errors_sum
-    #       name: errors
+    - id: aws_cloudwatch_nlb_tls_errors
+      context: client_tls_negotiation_errors
+      title: NLB Client TLS Negotiation Errors
+      family: TLS
+      units: errors/s
+      algorithm: absolute
+      dimensions:
+        - selector: client_tls_negotiation_errors_sum
+          name: errors
+    - id: aws_cloudwatch_nlb_port_allocation_errors
+      context: port_allocation_errors
+      title: NLB Port Allocation Errors
+      family: Errors
+      units: errors/s
+      algorithm: absolute
+      dimensions:
+        - selector: port_allocation_errors_sum
+          name: errors

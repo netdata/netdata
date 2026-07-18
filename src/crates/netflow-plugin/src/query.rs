@@ -11,12 +11,12 @@ use crate::tiering::{OpenTierRow, TierFlowIndexStore};
 use anyhow::{Context, Result};
 use chrono::Utc;
 use hashbrown::HashMap as FastHashMap;
-use journal_common::Seconds;
-use journal_core::file::{JournalFileMap, Mmap};
-use journal_core::{
+use journal_sdk_common::Seconds;
+use journal_sdk_core::file::{JournalFileMap, Mmap};
+use journal_sdk_core::{
     Direction as JournalDirection, JournalCursor, JournalFile, JournalReader, Location,
 };
-use journal_registry::{FileInfo, Monitor, Registry, repository::File as RegistryFile};
+use journal_sdk_registry::{FileInfo, Monitor, Registry, repository::File as RegistryFile};
 use notify::Event;
 use regex::Regex;
 use serde::de::Error as _;

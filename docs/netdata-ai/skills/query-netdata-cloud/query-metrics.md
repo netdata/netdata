@@ -460,6 +460,8 @@ Query timeout in milliseconds. Default: `10000` (10 seconds). Set higher for que
 
 Optional integer. Limits the number of dimensions returned. Cannot be negative. Useful when querying high-cardinality contexts.
 
+The result keeps the top contributing dimensions and folds the rest into one `remaining N dimensions` aggregate, so the total number of returned dimensions equals the limit. The `summary` metadata (nodes, instances, dimensions, labels) stays complete so filter menus can still be built; add the `cardinality-limit-all` option to also truncate the summary.
+
 ---
 
 ## Response Structure

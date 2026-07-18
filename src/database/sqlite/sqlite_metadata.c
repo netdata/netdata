@@ -1159,12 +1159,18 @@ bind_fail:
 
 static bool store_host_systeminfo(RRDHOST *host)
 {
-    struct rrdhost_system_info *system_info = host->system_info;
+    spinlock_lock(&host->rrdhost_update_lock);
+    struct rrdhost_system_info *system_info = rrdhost_system_info_dup(host->system_info);
+    spinlock_unlock(&host->rrdhost_update_lock);
 
     if (unlikely(!system_info))
         return false;
 
-    return (RRDHOST_SYSTEM_INFO_KEY_COUNT != rrdhost_system_info_foreach(system_info, add_host_sysinfo_key_value, &host->host_id.uuid));
+    bool ret =
+        (RRDHOST_SYSTEM_INFO_KEY_COUNT != rrdhost_system_info_foreach(system_info, add_host_sysinfo_key_value, &host->host_id.uuid));
+    rrdhost_system_info_free(system_info);
+
+    return ret;
 }
 
 
@@ -2119,7 +2125,7 @@ size_t populate_metrics_from_database(void *mrg, void (*populate_cb)(void *mrg, 
 }
 #endif
 
-static void metadata_scan_host(struct meta_config_s *config, RRDHOST *host, bool is_worker, BUFFER *work_buffer)
+static void metadata_scan_host(struct meta_config_s *config, RRDHOST *host, bool is_worker, bool final, BUFFER *work_buffer)
 {
     static bool skip_models = false;
     RRDSET *st;
@@ -2136,8 +2142,13 @@ static void metadata_scan_host(struct meta_config_s *config, RRDHOST *host, bool
 
     rrdset_foreach_reentrant(st, host) {
 
-        if (SHUTDOWN_REQUESTED(config))
+        // when a normal scan is interrupted by shutdown, re-mark the host
+        // as pending (the caller cleared its flag) so the final shutdown
+        // flush picks it up and completes the remaining charts
+        if (!final && SHUTDOWN_REQUESTED(config)) {
+            host_need_recheck = true;
             break;
+        }
 
         if(rrdset_flag_check(st, RRDSET_FLAG_METADATA_UPDATE)) {
 
@@ -2467,7 +2478,7 @@ void store_host_info_and_metadata(RRDHOST *host)
     store_host_info_and_metadata_with_buffer(host, NULL);
 }
 
-static void store_hosts_metadata(struct meta_config_s *config, bool is_worker)
+static void store_hosts_metadata(struct meta_config_s *config, bool is_worker, bool final)
 {
     RRDHOST *host;
     size_t host_count = 0;
@@ -2491,10 +2502,12 @@ static void store_hosts_metadata(struct meta_config_s *config, bool is_worker)
         if (rrdhost_flag_check(host, RRDHOST_FLAG_ARCHIVED) || !rrdhost_flag_check(host, RRDHOST_FLAG_METADATA_UPDATE))
             continue;
 
-        rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_UPDATE);
-
-        if (SHUTDOWN_REQUESTED(config))
+        // check the shutdown BEFORE clearing the pending flag, so a host
+        // interrupted by shutdown keeps its pending status for the final scan
+        if (!final && SHUTDOWN_REQUESTED(config))
             break;
+
+        rrdhost_flag_clear(host, RRDHOST_FLAG_METADATA_UPDATE);
 
         if (is_worker)
             worker_is_busy(UV_EVENT_STORE_HOST);
@@ -2505,7 +2518,7 @@ static void store_hosts_metadata(struct meta_config_s *config, bool is_worker)
         if (is_worker)
             worker_is_idle();
 
-        metadata_scan_host(config, host, is_worker, work_buffer);
+        metadata_scan_host(config, host, is_worker, final, work_buffer);
 
         if (!is_worker)
             nd_log_daemon(NDLP_INFO, "METADATA: Progress of metadata storage: %6.2f%% completed", (100.0 * count / host_count));
@@ -2554,7 +2567,7 @@ static void start_metadata_hosts(uv_work_t *req)
 
     worker_is_busy(UV_EVENT_METADATA_STORE);
 
-    store_hosts_metadata(config, true);
+    store_hosts_metadata(config, true, false);
 
     COMPUTE_DURATION(report_duration, "us", all_started_ut, now_monotonic_usec());
     nd_log_daemon(NDLP_DEBUG, "Checking all hosts completed in %s", report_duration);
@@ -2798,6 +2811,17 @@ static void metadata_event_loop(void *arg)
 
     store_alert_transitions(pending_alert_list, false, true);
     store_sql_statements(pending_sql_statement, false, true);
+
+    // hosts that connected after the last scan cycle still have their
+    // metadata pending - store it now, or they will not exist after the
+    // restart and their database files will be orphaned
+    // (skip if a worker scan outlived the callback wait above: it is still
+    // using db_meta and no new scan can start once the command loop exits)
+    if (!config->metadata_running)
+        store_hosts_metadata(config, false, true);
+    else
+        nd_log_daemon(NDLP_WARNING,
+                      "METADATA: skipping the final host metadata flush - a metadata scan is still running");
 
     if (pending_ctx_cleanup_list) {
         Word_t Index = 0;

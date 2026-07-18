@@ -29,7 +29,7 @@ static int cardinality_item_compare(const void *a, const void *b) {
 void query_target_summary_nodes_v2(BUFFER *wb, QUERY_TARGET *qt, const char *key, struct summary_total_counts *totals) {
     buffer_json_member_add_array(wb, key);
     size_t count = qt->nodes.used;
-    size_t cardinality_limit = qt->request.cardinality_limit;
+    size_t cardinality_limit = query_target_summary_cardinality_limit(qt);
 
     bool show_node_status = !(qt->request.options & RRDR_OPTION_MINIMAL_STATS);
 

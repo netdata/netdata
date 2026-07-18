@@ -23,13 +23,13 @@ path = "src/lib.rs"
 # in `tests/` backstops it.
 [dependencies]
 anyhow = { workspace = true }
-bridge = { path = "../netdata-plugin/bridge" }
+bridge = { workspace = true }
 chrono = { workspace = true }
 ferryboat = { workspace = true }
 file-registry = { workspace = true }
 futures = { workspace = true }
 moka = { workspace = true }
-netdata-plugin-protocol = { path = "../netdata-plugin/protocol" }
+netdata-plugin-protocol = { workspace = true }
 opendal = { workspace = true }
 otel-catalog = { workspace = true }
 sfst = { workspace = true }
@@ -50,5 +50,5 @@ chunk-file = { workspace = true }
 tokio = { workspace = true, features = ["test-util"] }
 # Deliberately NO tls feature here: the TLS backend must arrive via feature
 # unification from opendal's `reqwest-rustls-tls` (see tests/tls_capability.rs).
-reqwest = { version = "0.13", default-features = false }
+reqwest = { workspace = true }
 tempfile = { workspace = true }

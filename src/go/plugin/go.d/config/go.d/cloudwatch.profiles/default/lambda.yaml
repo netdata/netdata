@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS Lambda
 namespace: AWS/Lambda
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: FunctionName
@@ -24,20 +25,22 @@ metrics:
     metric_name: Duration
     statistics: [average, maximum, p90]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below, then restart the go.d process. All are
-  # published at the {FunctionName} grain, so no other change is needed.
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {FunctionName} grain, so no other change is needed.
   # ----------------------------------------------------------------------------------------
-  # - id: concurrent_executions
-  #   metric_name: ConcurrentExecutions
-  #   statistics: [maximum]
-  # - id: dead_letter_errors
-  #   metric_name: DeadLetterErrors
-  #   statistics: [sum]
-  #   rate: true
-  # - id: iterator_age              # stream event-source (Kinesis / DynamoDB Streams) functions
-  #   metric_name: IteratorAge
-  #   statistics: [maximum]
+  - id: concurrent_executions
+    disabled: true
+    metric_name: ConcurrentExecutions
+    statistics: [maximum]
+  - id: dead_letter_errors
+    disabled: true
+    metric_name: DeadLetterErrors
+    statistics: [sum]
+    rate: true
+  - id: iterator_age              # stream event-source (Kinesis / DynamoDB Streams) functions
+    disabled: true
+    metric_name: IteratorAge
+    statistics: [maximum]
   # Also published at {FunctionName}: the provisioned-concurrency family (ProvisionedConcurrent-
   # Executions, ProvisionedConcurrencyUtilization, ...), async metrics (AsyncEventAge,
   # AsyncEventsDropped), DestinationDeliveryFailures, RecursiveInvocationsDropped. Event-source-
@@ -84,32 +87,32 @@ template:
         - selector: duration_p90
           name: p90
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_lambda_concurrency
-    #   context: concurrent_executions
-    #   title: Lambda Concurrent Executions
-    #   family: Concurrency
-    #   units: executions
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: concurrent_executions_maximum
-    #       name: concurrent
-    # - id: aws_cloudwatch_lambda_dead_letter_errors
-    #   context: dead_letter_errors
-    #   title: Lambda Dead Letter Errors
-    #   family: Errors
-    #   units: errors/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: dead_letter_errors_sum
-    #       name: dead_letter
-    # - id: aws_cloudwatch_lambda_iterator_age
-    #   context: iterator_age
-    #   title: Lambda Iterator Age
-    #   family: Streams
-    #   units: milliseconds
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: iterator_age_maximum
-    #       name: age
+    - id: aws_cloudwatch_lambda_concurrency
+      context: concurrent_executions
+      title: Lambda Concurrent Executions
+      family: Concurrency
+      units: executions
+      algorithm: absolute
+      dimensions:
+        - selector: concurrent_executions_maximum
+          name: concurrent
+    - id: aws_cloudwatch_lambda_dead_letter_errors
+      context: dead_letter_errors
+      title: Lambda Dead Letter Errors
+      family: Errors
+      units: errors/s
+      algorithm: absolute
+      dimensions:
+        - selector: dead_letter_errors_sum
+          name: dead_letter
+    - id: aws_cloudwatch_lambda_iterator_age
+      context: iterator_age
+      title: Lambda Iterator Age
+      family: Streams
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: iterator_age_maximum
+          name: age

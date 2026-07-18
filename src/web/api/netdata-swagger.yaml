@@ -877,6 +877,7 @@ paths:
         - $ref: '#/components/parameters/dataTimeResampling2'
         - $ref: '#/components/parameters/dataFormat2'
         - $ref: '#/components/parameters/cardinalityLimit'
+        - $ref: '#/components/parameters/dataLimit'
         - $ref: '#/components/parameters/timeoutMS'
         - $ref: '#/components/parameters/callback'
         - $ref: '#/components/parameters/filename'
@@ -1000,6 +1001,7 @@ paths:
         - $ref: '#/components/parameters/dataTimeResampling2'
         - $ref: '#/components/parameters/dataFormat2'
         - $ref: '#/components/parameters/cardinalityLimit'
+        - $ref: '#/components/parameters/dataLimit'
         - $ref: '#/components/parameters/timeoutMS'
         - $ref: '#/components/parameters/callback'
         - $ref: '#/components/parameters/filename'
@@ -9039,6 +9041,7 @@ components:
         * `long-json-keys` or `long-keys` - Use descriptive key names in JSON output instead of abbreviated ones.
         * `mcp-info` - Include additional metadata useful for the Model Context Protocol (MCP) integration.
         * `rfc3339` - Return timestamps in RFC3339 format (e.g., "2023-01-01T00:00:00Z") instead of Unix timestamps.
+        * `cardinality-limit-all` - Apply the `cardinality_limit` parameter to the `jsonwrap` summary metadata (nodes, instances, dimensions, labels) too. Without this option `cardinality_limit` reduces only the result dataset (the top contributing dimensions plus one `remaining` aggregate), keeping the summary complete so dashboards can still build their filtering menus.
       required: false
       allowEmptyValue: false
       schema:
@@ -9082,6 +9085,7 @@ components:
             - long-keys
             - mcp-info
             - rfc3339
+            - cardinality-limit-all
         default:
           - seconds
           - jsonwrap
@@ -9205,11 +9209,21 @@ components:
       required: false
       schema:
         type: string
+    dataLimit:
+      name: limit
+      in: query
+      description: |
+        Limits the number of dimensions returned by a data query to the top-N contributors: the query engine keeps the `limit` highest-contributing dimensions and folds the rest into one `remaining` aggregate dimension (equivalent to `cardinality_limit` = `limit` + 1; `cardinality_limit`, when given, takes precedence). Agents that predate this parameter ignore it and return all dimensions, so clients can use it without version gating.
+      required: false
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
     cardinalityLimit:
       name: cardinality_limit
       in: query
       description: |
-        Limits the number of unique items (contexts, instances, dimensions) returned in the query result. This is useful for preventing excessive memory usage and response sizes when queries match a large number of metrics. The query engine will return the most relevant items up to this limit.
+        Limits the number of unique items returned, to prevent excessive memory usage and response sizes when a request matches a large number of items. For data queries, the query engine keeps the top contributing dimensions and folds the rest into one `remaining` aggregate dimension, so the total number of returned dimensions equals this limit; the `jsonwrap` summary metadata (nodes, instances, dimensions, labels) stays complete unless the `cardinality-limit-all` option is also given. Other endpoints (weights, alerts, contexts) apply this limit to their own result items.
       required: false
       schema:
         type: integer
@@ -9567,19 +9581,19 @@ components:
           example: x86_64
         virtualization:
           type: string
-          description: Virtualization Type.
+          description: Virtualization Type. Linux/macOS values follow the systemd-detect-virt taxonomy (kvm, qemu, vmware, xen, microsoft, oracle, amazon, ...). Windows agents emit the same canonical values when the windows-api probe chain can identify the hypervisor (for example microsoft for Hyper-V guests including Microsoft Hv markers, vmware for VMware guests, oracle for VirtualBox, kvm/qemu for KVM/QEMU guests, none for bare metal) and emit unknown when Windows confirms virtualization but cannot safely name the platform.
           example: kvm
         virt_detection:
           type: string
-          description: Virtualization detection method.
+          description: Virtualization detection method. systemd-detect-virt on Linux, lscpu/dmidecode/sysctl fallbacks on Linux, windows-api on Windows.
           example: systemd-detect-virt
         container:
           type: string
-          description: Container technology.
+          description: Container technology. Linux values follow the systemd-detect-virt -c taxonomy (docker, lxc, systemd-nspawn, ...) plus heuristics (container, docker, jail); Windows agents emit container for Kubernetes pods or windows-container for Windows Server containers.
           example: docker
         container_detection:
           type: string
-          description: Container technology detection method.
+          description: Container technology detection method. Linux values include systemd-detect-virt, dockerenv, containerenv, kubernetes, process, /bin/running-in-container, sysctl; Windows values include kubernetes (env-var probe) and windows-api (WMI container marker).
           example: dockerenv
         stream_compression:
           type: boolean
@@ -10122,6 +10136,21 @@ components:
               description: |
                 The newest unix epoch timestamp of the data returned in the `result`.
               type: integer
+            cardinality:
+              description: |
+                Present only when the query's `cardinality_limit` (or `limit`) folded dimensions into the `remaining` aggregate.
+                Aggregators merging limited responses from many agents use `cut` to prove whether their merged top-N is exact: a dimension this agent did not return contributes at most `cut`, so when the N-th ranked merged candidate exceeds the sum of all agents' cuts, no hidden dimension can outrank it.
+              type: object
+              required:
+                - folded
+                - cut
+              properties:
+                folded:
+                  description: The number of dimensions folded into the `remaining` aggregate.
+                  type: integer
+                cut:
+                  description: The largest folded absolute sum contribution - the ranking cut.
+                  type: number
             partial_data_trimming:
               description: |
                 Information related to trimming of the last few points of the `result`, that was required to remove (increasing) partial data.

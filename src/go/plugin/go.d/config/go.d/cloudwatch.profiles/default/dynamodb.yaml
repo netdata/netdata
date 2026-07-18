@@ -2,7 +2,8 @@
 version: v1
 display_name: AWS DynamoDB
 namespace: AWS/DynamoDB
-period: 60
+query:
+  period: 1m
 instance:
   dimensions:
     - name: TableName
@@ -19,11 +20,13 @@ metrics:
   - id: provisioned_read_capacity_units
     metric_name: ProvisionedReadCapacityUnits
     statistics: [average]
-    period: 300
+    query:
+      period: 5m
   - id: provisioned_write_capacity_units
     metric_name: ProvisionedWriteCapacityUnits
     statistics: [average]
-    period: 300
+    query:
+      period: 5m
   - id: read_throttle_events
     metric_name: ReadThrottleEvents
     statistics: [sum]
@@ -33,22 +36,24 @@ metrics:
     statistics: [sum]
     rate: true
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below, then restart the go.d process. All are
-  # published at the {TableName} grain, so no other change is needed.
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {TableName} grain, so no other change is needed.
   # ----------------------------------------------------------------------------------------
-  # - id: conditional_check_failed_requests
-  #   metric_name: ConditionalCheckFailedRequests
-  #   statistics: [sum]
-  #   rate: true
-  # - id: transaction_conflict
-  #   metric_name: TransactionConflict
-  #   statistics: [sum]
-  #   rate: true
-  # - id: time_to_live_deleted_item_count
-  #   metric_name: TimeToLiveDeletedItemCount
-  #   statistics: [sum]
-  #   rate: true
+  - id: conditional_check_failed_requests
+    disabled: true
+    metric_name: ConditionalCheckFailedRequests
+    statistics: [sum]
+    rate: true
+  - id: transaction_conflict
+    disabled: true
+    metric_name: TransactionConflict
+    statistics: [sum]
+    rate: true
+  - id: time_to_live_deleted_item_count
+    disabled: true
+    metric_name: TimeToLiveDeletedItemCount
+    statistics: [sum]
+    rate: true
   # Per-operation metrics {TableName, Operation} (SystemErrors, ThrottledRequests, ReturnedItemCount,
   # SuccessfulRequestLatency) are collected by the dynamodb_operation profile -- enable it with
   # rules[].profiles.include. Metrics at still other grains need their own profile:
@@ -97,32 +102,32 @@ template:
         - selector: write_throttle_events_sum
           name: write
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_dynamodb_conditional_check_failed
-    #   context: conditional_check_failed_requests
-    #   title: DynamoDB Conditional Check Failures
-    #   family: Errors
-    #   units: requests/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: conditional_check_failed_requests_sum
-    #       name: failed
-    # - id: aws_cloudwatch_dynamodb_transaction_conflicts
-    #   context: transaction_conflict
-    #   title: DynamoDB Transaction Conflicts
-    #   family: Errors
-    #   units: conflicts/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: transaction_conflict_sum
-    #       name: conflicts
-    # - id: aws_cloudwatch_dynamodb_ttl_deleted
-    #   context: ttl_deleted_items
-    #   title: DynamoDB TTL Deleted Items
-    #   family: Items
-    #   units: items/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: time_to_live_deleted_item_count_sum
-    #       name: deleted
+    - id: aws_cloudwatch_dynamodb_conditional_check_failed
+      context: conditional_check_failed_requests
+      title: DynamoDB Conditional Check Failures
+      family: Errors
+      units: requests/s
+      algorithm: absolute
+      dimensions:
+        - selector: conditional_check_failed_requests_sum
+          name: failed
+    - id: aws_cloudwatch_dynamodb_transaction_conflicts
+      context: transaction_conflict
+      title: DynamoDB Transaction Conflicts
+      family: Errors
+      units: conflicts/s
+      algorithm: absolute
+      dimensions:
+        - selector: transaction_conflict_sum
+          name: conflicts
+    - id: aws_cloudwatch_dynamodb_ttl_deleted
+      context: ttl_deleted_items
+      title: DynamoDB TTL Deleted Items
+      family: Items
+      units: items/s
+      algorithm: absolute
+      dimensions:
+        - selector: time_to_live_deleted_item_count_sum
+          name: deleted

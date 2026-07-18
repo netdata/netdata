@@ -7,7 +7,8 @@
 version: v1
 display_name: Amazon Bedrock
 namespace: AWS/Bedrock
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: ModelId
@@ -44,23 +45,26 @@ metrics:
     metric_name: TimeToFirstToken
     statistics: [average]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts section below. All are published at the {ModelId} grain.
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {ModelId} grain.
   # EstimatedTPMQuotaUsage is an AWS approximation ("do not use as the sole indicator for quota
   # use"); the cache metrics apply only when prompt caching is used.
   # ----------------------------------------------------------------------------------------
-  # - id: estimated_tpm_quota_usage
-  #   metric_name: EstimatedTPMQuotaUsage
-  #   statistics: [sum]
-  #   rate: true
-  # - id: cache_read_input_tokens
-  #   metric_name: CacheReadInputTokens
-  #   statistics: [sum]
-  #   rate: true
-  # - id: cache_write_input_tokens
-  #   metric_name: CacheWriteInputTokens
-  #   statistics: [sum]
-  #   rate: true
+  - id: estimated_tpm_quota_usage
+    disabled: true
+    metric_name: EstimatedTPMQuotaUsage
+    statistics: [sum]
+    rate: true
+  - id: cache_read_input_tokens
+    disabled: true
+    metric_name: CacheReadInputTokens
+    statistics: [sum]
+    rate: true
+  - id: cache_write_input_tokens
+    disabled: true
+    metric_name: CacheWriteInputTokens
+    statistics: [sum]
+    rate: true
 template:
   family: Bedrock
   context_namespace: bedrock
@@ -113,25 +117,25 @@ template:
         - selector: time_to_first_token_average
           name: time_to_first_token
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric(s).
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_bedrock_quota_usage
-    #   context: quota_usage
-    #   title: Bedrock Estimated TPM Quota Usage
-    #   family: Tokens
-    #   units: tokens/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: estimated_tpm_quota_usage_sum
-    #       name: estimated
-    # - id: aws_cloudwatch_bedrock_cache_tokens
-    #   context: cache_tokens
-    #   title: Bedrock Prompt Cache Tokens
-    #   family: Tokens
-    #   units: tokens/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: cache_read_input_tokens_sum
-    #       name: read
-    #     - selector: cache_write_input_tokens_sum
-    #       name: write
+    - id: aws_cloudwatch_bedrock_quota_usage
+      context: quota_usage
+      title: Bedrock Estimated TPM Quota Usage
+      family: Tokens
+      units: tokens/s
+      algorithm: absolute
+      dimensions:
+        - selector: estimated_tpm_quota_usage_sum
+          name: estimated
+    - id: aws_cloudwatch_bedrock_cache_tokens
+      context: cache_tokens
+      title: Bedrock Prompt Cache Tokens
+      family: Tokens
+      units: tokens/s
+      algorithm: absolute
+      dimensions:
+        - selector: cache_read_input_tokens_sum
+          name: read
+        - selector: cache_write_input_tokens_sum
+          name: write

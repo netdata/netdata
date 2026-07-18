@@ -751,6 +751,12 @@ static bool datafile_is_full(struct rrdengine_instance *ctx, struct rrdengine_da
 
     spinlock_lock(&datafile->writers.spinlock);
 
+    if(unlikely(datafile->writers.failed)) {
+        // this datafile cannot accept any more extents
+        spinlock_unlock(&datafile->writers.spinlock);
+        return true;
+    }
+
 #ifdef OS_WINDOWS
     time_t now = now_realtime_sec();
     if (now - datafile->writers.last_sync_time > 60) {
@@ -985,9 +991,9 @@ datafile_extent_build(struct rrdengine_instance *ctx, struct page_descr_with_dat
 
     // compress the payload
     size_t compressed_size =
-        (int)dbengine_compress(xt_io_descr->buf + payload_offset,
-                               uncompressed_payload_length,
-                               compression_algorithm);
+        dbengine_compress(xt_io_descr->buf + payload_offset,
+                          uncompressed_payload_length,
+                          compression_algorithm);
 
     internal_fatal(compressed_size > max_compressed_size, "DBENGINE: compression returned more data than the max allowed");
     internal_fatal(compressed_size > uncompressed_payload_length, "DBENGINE: compression returned more data than the uncompressed extent");
@@ -1061,6 +1067,65 @@ static void after_extent_write(struct rrdengine_instance *ctx __maybe_unused, vo
     check_and_schedule_db_rotation(ctx);
 }
 
+static void datafile_mark_failed(struct rrdengine_datafile *datafile) {
+    spinlock_lock(&datafile->writers.spinlock);
+    datafile->writers.failed = true;
+    spinlock_unlock(&datafile->writers.spinlock);
+}
+
+// The extent buffer is position independent - only its WAL transaction references
+// the reserved datafile offset. So, an extent that failed to be written can be
+// retargeted to another datafile by reserving space on it and rebuilding the WAL.
+// The caller must have marked the current datafile failed, so that rotation is forced.
+static bool extent_move_to_new_datafile(struct rrdengine_instance *ctx, struct extent_io_descriptor *xt_io_descr) {
+    struct rrdengine_datafile *old_datafile = xt_io_descr->datafile;
+
+    // the WAL references the offset reserved on the failed datafile
+    wal_release(xt_io_descr->wal);
+    xt_io_descr->wal = NULL;
+
+    // release our writer slot on the failed datafile
+    spinlock_lock(&old_datafile->writers.spinlock);
+    old_datafile->writers.running--;
+    spinlock_unlock(&old_datafile->writers.spinlock);
+
+    // the failed datafile is reported full, so this rotates to a new datafile pair
+    struct rrdengine_datafile *datafile = get_datafile_to_write_extent(ctx, xt_io_descr->real_io_size);
+    xt_io_descr->datafile = datafile;
+
+    if(datafile == old_datafile)
+        // rotation failed - a new datafile pair could not be created
+        return false;
+
+    spinlock_lock(&datafile->writers.spinlock);
+    xt_io_descr->pos = datafile->pos;
+    datafile->pos += xt_io_descr->real_io_size;
+    spinlock_unlock(&datafile->writers.spinlock);
+
+    journalfile_extent_build(ctx, xt_io_descr);
+    ctx_last_flush_fileno_set(ctx, datafile->fileno);
+
+    return true;
+}
+
+static int extent_write_to_datafile(struct rrdengine_datafile *datafile, uv_buf_t *iov, uint64_t pos) {
+    uv_fs_t request;
+
+    int retries = 10;
+    int ret = -1;
+    while (ret < 0 && --retries) {
+        ret = uv_fs_write(NULL, &request, datafile->file, iov, 1, (int64_t)pos, NULL);
+        uv_fs_req_cleanup(&request);
+        if (ret < 0) {
+            if (ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
+                break;
+            sleep_usec(300 * USEC_PER_MS);
+        }
+    }
+
+    return ret;
+}
+
 static void *extent_write_tp_worker(
     struct rrdengine_instance *ctx,
     void *data,
@@ -1075,34 +1140,55 @@ static void *extent_write_tp_worker(
     if (!xt_io_descr)
         goto done;
 
-    struct rrdengine_datafile *datafile = xt_io_descr->datafile;
-    uv_fs_t request;
-
-    int retries = 10;
     int ret = -1;
-    while (ret < 0 && --retries) {
-        ret = uv_fs_write(NULL, &request, datafile->file, &iov, 1, (int64_t)xt_io_descr->pos, NULL);
-        uv_fs_req_cleanup(&request);
-        if (ret < 0) {
-            if (ret == -ENOSPC || ret == -EBADF || ret == -EACCES || ret == -EROFS || ret == -EINVAL)
+    for (size_t attempt = 0; attempt < 2 ; attempt++) {
+        worker_is_busy(UV_EVENT_DBENGINE_EXTENT_WRITE);
+        struct rrdengine_datafile *datafile = xt_io_descr->datafile;
+
+        ret = extent_write_to_datafile(datafile, &iov, xt_io_descr->pos);
+        if (likely(ret >= 0)) {
+            ctx_current_disk_space_increase(ctx, xt_io_descr->real_io_size);
+            ctx_io_write_op_bytes(ctx, xt_io_descr->real_io_size);
+
+            // journalfile_v1_extent_write() always releases the WAL
+            ret = journalfile_v1_extent_write(ctx, datafile, xt_io_descr->wal);
+            xt_io_descr->wal = NULL;
+
+            if (likely(ret >= 0))
                 break;
-            sleep_usec(300 * USEC_PER_MS);
         }
-    }
 
-    if (unlikely(ret < 0))
         ctx_io_error(ctx);
-    else {
-        ctx_current_disk_space_increase(ctx, xt_io_descr->real_io_size);
-        ctx_io_write_op_bytes(ctx, xt_io_descr->real_io_size);
-        ret = journalfile_v1_extent_write(ctx, datafile, xt_io_descr->wal);
+
+        // this datafile pair dropped a write - no more extents should be directed to it
+        datafile_mark_failed(datafile);
+
+        if (attempt == 0) {
+            nd_log_limit_static_global_var(dbengine_rotate_erl, 10, 0);
+            nd_log_limit(&dbengine_rotate_erl, NDLS_DAEMON, NDLP_ERR,
+                         "DBENGINE: tier %d datafile %u write failed (%s) - "
+                         "rotating to a new datafile and retrying the extent, to prevent data loss",
+                         ctx->config.tier, datafile->fileno, uv_strerror(ret));
+
+            if (extent_move_to_new_datafile(ctx, xt_io_descr))
+                continue;
+        }
+
+        break;
     }
 
-    if (ret < 0) {
+    if (unlikely(ret < 0)) {
+        // recovery failed - the pages of this extent are lost
+        wal_release(xt_io_descr->wal);
+        xt_io_descr->wal = NULL;
+
         nd_log_limit_static_global_var(dbengine_erl, 10, 0);
-        nd_log_limit(&dbengine_erl, NDLS_DAEMON, NDLP_ERR, "DBENGINE: Tier %d, %s", ctx->config.tier, uv_strerror(ret));
+        nd_log_limit(&dbengine_erl, NDLS_DAEMON, NDLP_ERR,
+                     "DBENGINE: tier %d datafile %u write failed (%s) - the extent is lost",
+                     ctx->config.tier, xt_io_descr->datafile->fileno, uv_strerror(ret));
     }
 
+    struct rrdengine_datafile *datafile = xt_io_descr->datafile;
     spinlock_lock(&datafile->writers.spinlock);
     datafile->writers.running--;
     datafile->writers.flushed_to_open_running++;
@@ -1616,14 +1702,14 @@ void datafile_delete(
     if(worker)
         worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
-    bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile, false);
+    bool datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
     size_t attempts = 0;
 
     while (!datafile_got_for_deletion) {
         if(worker)
             worker_is_busy(UV_EVENT_DBENGINE_DATAFILE_DELETE_WAIT);
 
-        datafile_got_for_deletion = datafile_acquire_for_deletion(datafile, false);
+        datafile_got_for_deletion = datafile_acquire_for_deletion(datafile);
 
         if (!datafile_got_for_deletion) {
             if(++attempts >= 30) {

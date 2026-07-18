@@ -305,18 +305,30 @@ static inline void dict_item_shared_set_deleted(DICTIONARY *dict, DICTIONARY_ITE
 static inline bool dict_item_set_deleted(DICTIONARY *dict, DICTIONARY_ITEM *item) {
     ITEM_FLAGS expected, desired;
 
+    if(likely(!is_dictionary_single_threaded(dict)))
+        spinlock_lock(&dict->items.pending_deletion_spinlock);
+
     expected = __atomic_load_n(&item->flags, __ATOMIC_RELAXED);
 
     do {
 
-        if (expected & ITEM_FLAG_DELETED)
+        if (expected & ITEM_FLAG_DELETED) {
+            if(likely(!is_dictionary_single_threaded(dict)))
+                spinlock_unlock(&dict->items.pending_deletion_spinlock);
             return false;
+        }
 
         desired = expected | ITEM_FLAG_DELETED;
 
     } while(!__atomic_compare_exchange_n(&item->flags, &expected, desired, false, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED));
 
     DICTIONARY_ENTRIES_MINUS1(dict);
+
+    if(DICTIONARY_ITEM_REFCOUNT_GET(dict, item) == 0)
+        item_pending_deletion_set_unsafe(dict, item);
+
+    if(likely(!is_dictionary_single_threaded(dict)))
+        spinlock_unlock(&dict->items.pending_deletion_spinlock);
     return true;
 }
 
@@ -362,7 +374,7 @@ static inline void dict_item_release_and_check_if_it_is_deleted_and_can_be_remov
         if(should_be_deleted && item_is_not_referenced_and_can_be_removed(dict, item)) {
             // this has to be before removing from the linked list,
             // otherwise the garbage collector will also kick in!
-            DICTIONARY_PENDING_DELETES_MINUS1(dict);
+            item_pending_deletion_clear(dict, item);
 
             item_linked_list_remove(dict, item);
             dict_item_free_with_hooks(dict, item);

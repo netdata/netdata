@@ -10,7 +10,8 @@ version: v1
 display_name: AWS CloudFront
 namespace: AWS/CloudFront
 supported_regions: [us-east-1]
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: DistributionId
@@ -40,35 +41,43 @@ metrics:
     metric_name: 5xxErrorRate
     statistics: [average]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts section below. These are CloudFront "additional metrics"
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # These are CloudFront "additional metrics"
   # that must be enabled per distribution in AWS (they return no data until then). All are
   # published at the {DistributionId, Region=Global} grain.
   # ----------------------------------------------------------------------------------------
-  # - id: cache_hit_rate
-  #   metric_name: CacheHitRate
-  #   statistics: [average]
-  # - id: error_rate_401
-  #   metric_name: 401ErrorRate
-  #   statistics: [average]
-  # - id: error_rate_403
-  #   metric_name: 403ErrorRate
-  #   statistics: [average]
-  # - id: error_rate_404
-  #   metric_name: 404ErrorRate
-  #   statistics: [average]
-  # - id: error_rate_502
-  #   metric_name: 502ErrorRate
-  #   statistics: [average]
-  # - id: error_rate_503
-  #   metric_name: 503ErrorRate
-  #   statistics: [average]
-  # - id: error_rate_504
-  #   metric_name: 504ErrorRate
-  #   statistics: [average]
-  # - id: origin_latency                 # OriginLatency's only valid statistic is a percentile (ms gauge)
-  #   metric_name: OriginLatency
-  #   statistics: [p50, p99]
+  - id: cache_hit_rate
+    disabled: true
+    metric_name: CacheHitRate
+    statistics: [average]
+  - id: error_rate_401
+    disabled: true
+    metric_name: 401ErrorRate
+    statistics: [average]
+  - id: error_rate_403
+    disabled: true
+    metric_name: 403ErrorRate
+    statistics: [average]
+  - id: error_rate_404
+    disabled: true
+    metric_name: 404ErrorRate
+    statistics: [average]
+  - id: error_rate_502
+    disabled: true
+    metric_name: 502ErrorRate
+    statistics: [average]
+  - id: error_rate_503
+    disabled: true
+    metric_name: 503ErrorRate
+    statistics: [average]
+  - id: error_rate_504
+    disabled: true
+    metric_name: 504ErrorRate
+    statistics: [average]
+  - id: origin_latency                 # OriginLatency's only valid statistic is a percentile (ms gauge)
+    disabled: true
+    metric_name: OriginLatency
+    statistics: [p50, p99]
 template:
   family: CloudFront
   context_namespace: cloudfront
@@ -110,44 +119,44 @@ template:
         - selector: error_rate_5xx_average
           name: 5xx
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric(s).
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_cloudfront_cache_hit_rate
-    #   context: cache_hit_rate
-    #   title: CloudFront Cache Hit Rate
-    #   family: Cache
-    #   units: percentage
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: cache_hit_rate_average
-    #       name: hit_rate
-    # - id: aws_cloudwatch_cloudfront_status_error_rate
-    #   context: status_error_rate
-    #   title: CloudFront Error Rate by Status Code
-    #   family: Errors
-    #   units: percentage
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: error_rate_401_average
-    #       name: "401"
-    #     - selector: error_rate_403_average
-    #       name: "403"
-    #     - selector: error_rate_404_average
-    #       name: "404"
-    #     - selector: error_rate_502_average
-    #       name: "502"
-    #     - selector: error_rate_503_average
-    #       name: "503"
-    #     - selector: error_rate_504_average
-    #       name: "504"
-    # - id: aws_cloudwatch_cloudfront_origin_latency
-    #   context: origin_latency
-    #   title: CloudFront Origin Latency
-    #   family: Latency
-    #   units: milliseconds
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: origin_latency_p50
-    #       name: p50
-    #     - selector: origin_latency_p99
-    #       name: p99
+    - id: aws_cloudwatch_cloudfront_cache_hit_rate
+      context: cache_hit_rate
+      title: CloudFront Cache Hit Rate
+      family: Cache
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: cache_hit_rate_average
+          name: hit_rate
+    - id: aws_cloudwatch_cloudfront_status_error_rate
+      context: status_error_rate
+      title: CloudFront Error Rate by Status Code
+      family: Errors
+      units: percentage
+      algorithm: absolute
+      dimensions:
+        - selector: error_rate_401_average
+          name: "401"
+        - selector: error_rate_403_average
+          name: "403"
+        - selector: error_rate_404_average
+          name: "404"
+        - selector: error_rate_502_average
+          name: "502"
+        - selector: error_rate_503_average
+          name: "503"
+        - selector: error_rate_504_average
+          name: "504"
+    - id: aws_cloudwatch_cloudfront_origin_latency
+      context: origin_latency
+      title: CloudFront Origin Latency
+      family: Latency
+      units: milliseconds
+      algorithm: absolute
+      dimensions:
+        - selector: origin_latency_p50
+          name: p50
+        - selector: origin_latency_p99
+          name: p99

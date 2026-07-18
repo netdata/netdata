@@ -266,7 +266,8 @@ func TestCollect_ResourceTagFilteringFromPublicConfig(t *testing.T) {
 	c.now = func() time.Time { return time.Unix(1_000_000_000, 0) }
 
 	require.NoError(t, c.Init(context.Background()))
-	require.NoError(t, c.Collect(context.Background()))
+	_, err := collecttest.CollectScalarSeries(c)
+	require.NoError(t, err)
 	require.Len(t, c.plan.Scopes, 3)
 	assert.Equal(t, "environment", c.plan.Scopes[0].TagFilter[0].key, "omitted rule filter inherits the job default")
 	assert.Equal(t, "owner", c.plan.Scopes[1].TagFilter[0].key, "present rule filter replaces the job default")
@@ -364,7 +365,7 @@ func TestRefreshTags_FirstFailureNoneThenSuccessThenCarryForward(t *testing.T) {
 	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
 	c.Config.Labels.ResourceTags = []ResourceTagLabelConfig{{Key: "owner"}}
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 	}}
 	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
@@ -407,7 +408,7 @@ func TestRefreshTags_FilterMembershipFailureLifecycle(t *testing.T) {
 	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 	c.plan.Scopes[0].TagFilter = []resourceTagFilter{{key: "environment", values: []string{"production"}}}
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 	}}
 	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
@@ -447,7 +448,7 @@ func TestRefreshTags_FailedGroupRetriesWithoutRefetchingHealthyGroup(t *testing.
 	for i := range c.plan.Scopes {
 		c.plan.Scopes[i].TagFilter = []resourceTagFilter{{key: "environment", values: []string{"production"}}}
 	}
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-east"}}},
 		{Target: "base", Profile: "ec2", Region: "us-west-2"}: {{DimensionValues: []string{"i-west"}}},
 	}}
@@ -486,7 +487,7 @@ func TestRefreshTags_FirstSuccessfulEmptySnapshotInvalidatesImplicitUnknown(t *t
 	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 	c.plan.Scopes[0].TagFilter = []resourceTagFilter{{key: "environment", values: []string{"production"}}}
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 	}}
 	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
@@ -509,7 +510,7 @@ func TestRefreshTags_LaterPageFailureIsAtomic(t *testing.T) {
 	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
 	c.plan.Scopes[0].TagFilter = []resourceTagFilter{{key: "environment", values: []string{"production"}}}
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "base", Profile: "ec2", Region: "us-east-1"}: {
 			{DimensionValues: []string{"i-1"}}, {DimensionValues: []string{"i-2"}},
 		},
@@ -568,7 +569,7 @@ func TestTagFetchGroups_SeparateFetchIdentityFromPolicyScopes(t *testing.T) {
 		c := New()
 		c.plan = plan
 		c.resolvedByRef = map[string]resolvedTarget{"base": {target: plan.Targets[0], accountID: "000000000000"}}
-		c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+		c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 			{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 			{Target: "base", Profile: "ebs", Region: "us-east-1"}: {{DimensionValues: []string{"vol-1"}}},
 		}}
@@ -588,7 +589,7 @@ func TestTagFetchGroups_SeparateFetchIdentityFromPolicyScopes(t *testing.T) {
 		c := New()
 		c.plan = plan
 		c.resolvedByRef = map[string]resolvedTarget{"base": {target: plan.Targets[0], accountID: "000000000000"}}
-		c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+		c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 			{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 		}}
 		c.tagLabelPlans = map[string][]resolvedTag{}
@@ -612,7 +613,7 @@ func tagUnitCollector(t *testing.T, rgta rgtaClient) *Collector {
 	configureExactRule(c, []string{"us-east-1"}, []string{"ec2"})
 	c.Config.Labels.ResourceTags = []ResourceTagLabelConfig{{Key: "owner"}}
 	setSingleTargetPlan(c, "000000000000", []string{"us-east-1"}, []cwprofiles.ResolvedProfile{{Name: "ec2", Config: ec2QueryProfile()}})
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "base", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 	}}
 	c.newAWSConfig = func(context.Context, awsauth.Identity, string) (aws.Config, error) { return aws.Config{}, nil }
@@ -681,7 +682,7 @@ func TestRefreshTags_ReportsIndependentTargetFailures(t *testing.T) {
 		resolved := resolvedTarget{target: target, accountID: "000000000000"}
 		c.resolvedByRef[target.Name] = resolved
 	}
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
 		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 	}}
@@ -862,10 +863,10 @@ func BenchmarkRefreshTagsPolicyCount(b *testing.B) {
 				b.Fatal(err)
 			}
 			mappings := make([]rgtatypes.ResourceTagMapping, resources)
-			instances := make([]discoveredInstance, resources)
+			instances := make([]collectionInstance, resources)
 			for i := range resources {
 				id := fmt.Sprintf("i-%d", i)
-				instances[i] = discoveredInstance{DimensionValues: []string{id}}
+				instances[i] = collectionInstance{DimensionValues: []string{id}}
 				mappings[i] = rgtaResource(
 					"arn:aws:ec2:us-east-1:000000000000:instance/"+id,
 					"policy", strconv.Itoa(i%policies),
@@ -877,7 +878,7 @@ func BenchmarkRefreshTagsPolicyCount(b *testing.B) {
 			c.resolvedByRef = map[string]resolvedTarget{
 				"base": {target: plan.Targets[0], accountID: "000000000000"},
 			}
-			c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+			c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 				{Target: "base", Profile: "ec2", Region: "us-east-1"}: instances,
 			}}
 			client := staticRGTA{resources: mappings}
@@ -911,11 +912,11 @@ func BenchmarkRefreshTagsFailedGroupRetry(b *testing.B) {
 			for i := range c.plan.Scopes {
 				c.plan.Scopes[i].TagFilter = []resourceTagFilter{{key: "environment", values: []string{"production"}}}
 			}
-			instances := make([]discoveredInstance, candidates)
+			instances := make([]collectionInstance, candidates)
 			for i := range instances {
-				instances[i] = discoveredInstance{DimensionValues: []string{fmt.Sprintf("i-%d", i)}}
+				instances[i] = collectionInstance{DimensionValues: []string{fmt.Sprintf("i-%d", i)}}
 			}
-			c.discovery = discoverySnapshot{Instances: make(map[discoveryKey][]discoveredInstance)}
+			c.discovery = discoverySnapshot{Instances: make(map[discoveryKey][]collectionInstance)}
 			clients := make(map[string]*fakeRGTA, len(regions))
 			for _, region := range regions {
 				c.discovery.Instances[discoveryKey{Target: "base", Profile: "ec2", Region: region}] = instances

@@ -1,0 +1,107 @@
+---
+# Optional endpoint+subnet grain. It is disabled by default because one endpoint
+# can create several chart instances. VPC endpoint tags are inherited by every
+# subnet child through the parent VPC Endpoint Id association.
+version: v1
+display_name: AWS PrivateLink Endpoint by Subnet
+namespace: AWS/PrivateLinkEndpoints
+disabled: true
+query:
+  period: 5m
+  lookback: 5m
+  publication_delay: 5m
+instance:
+  dimensions:
+    - name: Endpoint Type
+      label: endpoint_type
+    - name: Service Name
+      label: service_name
+    - name: Subnet Id
+      label: subnet_id
+    - name: VPC Endpoint Id
+      label: vpc_endpoint_id
+    - name: VPC Id
+      label: vpc_id
+metrics:
+  - id: active_connections
+    metric_name: ActiveConnections
+    statistics: [average]
+  - id: bytes_processed
+    metric_name: BytesProcessed
+    statistics: [average, sum]
+    rate: true
+  - id: new_connections
+    metric_name: NewConnections
+    statistics: [average, sum]
+    rate: true
+  - id: packets_dropped
+    metric_name: PacketsDropped
+    statistics: [sum]
+    rate: true
+  - id: rst_packets_received
+    metric_name: RstPacketsReceived
+    statistics: [sum]
+    rate: true
+template:
+  family: PrivateLink
+  context_namespace: privatelink_endpoint_subnet
+  chart_defaults:
+    instances:
+      by_labels: [account_id, region, endpoint_type, service_name, subnet_id, vpc_endpoint_id, vpc_id]
+  charts:
+    - id: aws_cloudwatch_privatelink_endpoint_subnet_active_connections
+      context: active_connections
+      title: PrivateLink Active Connections
+      family: Connections
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: active_connections_average
+          name: active
+    - id: aws_cloudwatch_privatelink_endpoint_subnet_average_processed_bytes
+      context: average_processed_bytes
+      title: PrivateLink Average Processed Bytes
+      family: Traffic
+      units: bytes
+      algorithm: absolute
+      dimensions:
+        - selector: bytes_processed_average
+          name: average
+    - id: aws_cloudwatch_privatelink_endpoint_subnet_processed_bytes
+      context: processed_bytes
+      title: PrivateLink Processed Bytes
+      family: Traffic
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: bytes_processed_sum
+          name: processed
+    - id: aws_cloudwatch_privatelink_endpoint_subnet_average_new_connections
+      context: average_new_connections
+      title: PrivateLink Average New Connections
+      family: Connections
+      units: connections
+      algorithm: absolute
+      dimensions:
+        - selector: new_connections_average
+          name: average
+    - id: aws_cloudwatch_privatelink_endpoint_subnet_new_connections
+      context: new_connections
+      title: PrivateLink New Connections
+      family: Connections
+      units: connections/s
+      algorithm: absolute
+      dimensions:
+        - selector: new_connections_sum
+          name: new
+    - id: aws_cloudwatch_privatelink_endpoint_subnet_packet_problems
+      context: packet_problems
+      title: PrivateLink Packet Problems
+      family: Packets
+      units: packets/s
+      algorithm: absolute
+      dimensions:
+        - selector: packets_dropped_sum
+          name: dropped
+        - selector: rst_packets_received_sum
+          name: reset_received

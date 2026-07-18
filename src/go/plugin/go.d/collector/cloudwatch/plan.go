@@ -108,36 +108,37 @@ func normalizedUniqueProfileNames(path string, values []string, known map[string
 	return out, nil
 }
 
-func compileProfileSeries(profile cwprofiles.ResolvedProfile) []compiledSeries {
-	var series []compiledSeries
+func compileProfileSeries(profile cwprofiles.ResolvedProfile) []profileSeriesSpec {
+	var series []profileSeriesSpec
 	for metricIndex, metric := range profile.Config.Metrics {
-		period := profile.Config.EffectivePeriod(metric)
 		for _, statistic := range metric.Statistics {
 			token := cwprofiles.NormalizeStatistic(statistic)
-			series = append(series, compiledSeries{
+			series = append(series, profileSeriesSpec{
 				Ordinal: len(series), MetricIndex: metricIndex, Statistic: token,
-				Name: cwprofiles.ExportedSeriesName(profile.Name, metric.ID, token), Period: period,
+				Name: cwprofiles.ExportedSeriesName(profile.Name, metric.ID, token),
 			})
 		}
 	}
 	return series
 }
 
-func resolveRuleMetrics(path string, selectors []ProfileMetricSelectorConfig, profiles []cwprofiles.ResolvedProfile, seriesByProfile map[string][]compiledSeries) (map[string][]compiledSeries, map[string]struct{}, error) {
-	selected := make(map[string][]compiledSeries, len(profiles))
+func resolveRuleMetrics(path string, selectors []ProfileMetricSelectorConfig, profiles []cwprofiles.ResolvedProfile, seriesByProfile map[string][]profileSeriesSpec) (map[string][]profileSeriesSpec, map[string]struct{}, error) {
+	selected := make(map[string][]profileSeriesSpec, len(profiles))
 	explicitProfiles := make(map[string]struct{})
-	if selectors == nil {
-		for _, profile := range profiles {
-			selected[profile.Name] = seriesByProfile[profile.Name]
-		}
-		return selected, explicitProfiles, nil
-	}
-
 	profilesByName := make(map[string]cwprofiles.ResolvedProfile, len(profiles))
+	selectedOrdinals := make(map[string]map[int]struct{}, len(profiles))
 	for _, profile := range profiles {
 		profilesByName[profile.Name] = profile
+		ordinals := make(map[int]struct{})
+		for _, series := range seriesByProfile[profile.Name] {
+			if !profile.Config.Metrics[series.MetricIndex].Disabled {
+				ordinals[series.Ordinal] = struct{}{}
+			}
+		}
+		selectedOrdinals[profile.Name] = ordinals
 	}
-	selectedOrdinals := make(map[string]map[int]struct{}, len(selectors))
+
+	explicitSelections := 0
 	for i, selector := range selectors {
 		groupPath := fmt.Sprintf("%s.metrics[%d]", path, i)
 		profile, ok := profilesByName[selector.Profile]
@@ -146,12 +147,17 @@ func resolveRuleMetrics(path string, selectors []ProfileMetricSelectorConfig, pr
 		}
 		explicitProfiles[profile.Name] = struct{}{}
 		ordinals := selectedOrdinals[profile.Name]
-		if ordinals == nil {
+		if !selector.includesDefaults() {
 			ordinals = make(map[int]struct{})
 			selectedOrdinals[profile.Name] = ordinals
 		}
-		if err := resolveMetricGroup(groupPath, selector, profile, seriesByProfile[profile.Name], ordinals); err != nil {
+		count, err := resolveMetricGroup(groupPath, selector, profile, seriesByProfile[profile.Name], ordinals)
+		if err != nil {
 			return nil, nil, err
+		}
+		explicitSelections += count
+		if explicitSelections > maxReferencesPerRule {
+			return nil, nil, fmt.Errorf("%s.metrics expands to more than %d metric/statistic selections", path, maxReferencesPerRule)
 		}
 	}
 
@@ -163,20 +169,18 @@ func resolveRuleMetrics(path string, selectors []ProfileMetricSelectorConfig, pr
 			}
 		}
 	}
-	if len(explicitProfiles) == 0 {
-		return nil, nil, fmt.Errorf("%s.metrics selects no metrics", path)
-	}
 	return selected, explicitProfiles, nil
 }
 
-func resolveMetricGroup(path string, selector ProfileMetricSelectorConfig, profile cwprofiles.ResolvedProfile, available []compiledSeries, selected map[int]struct{}) error {
+func resolveMetricGroup(path string, selector ProfileMetricSelectorConfig, profile cwprofiles.ResolvedProfile, available []profileSeriesSpec, selected map[int]struct{}) (int, error) {
+	expanded := 0
 	for i, entry := range selector.Include {
 		metricPath := fmt.Sprintf("%s.include[%d]", path, i)
 		metricIndex := slices.IndexFunc(profile.Config.Metrics, func(metric cwprofiles.Metric) bool {
 			return metric.MetricName == entry.Name
 		})
 		if metricIndex < 0 {
-			return fmt.Errorf("%s.name references unknown MetricName %q in profile %q", metricPath, entry.Name, profile.Name)
+			return 0, fmt.Errorf("%s.name references unknown MetricName %q in profile %q", metricPath, entry.Name, profile.Name)
 		}
 		statistics := entry.Statistics
 		statisticsPath := metricPath + ".statistics"
@@ -184,25 +188,35 @@ func resolveMetricGroup(path string, selector ProfileMetricSelectorConfig, profi
 			statistics = selector.Statistics
 			statisticsPath = path + ".statistics"
 		}
+		if statistics == nil {
+			for _, series := range available {
+				if series.MetricIndex == metricIndex {
+					selected[series.Ordinal] = struct{}{}
+					expanded++
+				}
+			}
+			continue
+		}
 		for j, raw := range statistics {
 			statistic := normalizeMetricStatistic(raw)
-			series, ok := findCompiledSeries(available, metricIndex, statistic)
+			series, ok := findProfileSeries(available, metricIndex, statistic)
 			if !ok {
-				return fmt.Errorf("%s[%d] %q is not exported for MetricName %q in profile %q", statisticsPath, j, raw, entry.Name, profile.Name)
+				return 0, fmt.Errorf("%s[%d] %q is not exported for MetricName %q in profile %q", statisticsPath, j, raw, entry.Name, profile.Name)
 			}
 			selected[series.Ordinal] = struct{}{}
+			expanded++
 		}
 	}
-	return nil
+	return expanded, nil
 }
 
-func findCompiledSeries(series []compiledSeries, metricIndex int, statistic string) (compiledSeries, bool) {
+func findProfileSeries(series []profileSeriesSpec, metricIndex int, statistic string) (profileSeriesSpec, bool) {
 	for _, candidate := range series {
 		if candidate.MetricIndex == metricIndex && candidate.Statistic == statistic {
 			return candidate, true
 		}
 	}
-	return compiledSeries{}, false
+	return profileSeriesSpec{}, false
 }
 
 func normalizeMetricStatistic(raw string) string {

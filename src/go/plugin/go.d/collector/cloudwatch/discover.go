@@ -17,22 +17,9 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
 )
 
-// recentlyActiveMaxPeriod is the upper bound (seconds) for using ListMetrics
-// RecentlyActive=PT3H. PT3H is the only value CloudWatch accepts and it hides
-// metrics whose last datapoint is older than ~3h, so it MUST NOT be used for
-// profiles with longer periods (e.g. S3 daily), or they would vanish ~21h/day.
-const recentlyActiveMaxPeriod = 3 * 60 * 60
-
 // instanceKeySep separates dimension values in an instance dedup key. It is the
 // ASCII unit separator, which cannot appear in CloudWatch dimension values.
 const instanceKeySep = "\x1f"
-
-// discoveredInstance is one instance of a profile: the CloudWatch dimension
-// values for the profile's exact instance dimension-set, ordered to match
-// Profile.DimensionNames().
-type discoveredInstance struct {
-	DimensionValues []string
-}
 
 // selectedSeriesUseRecentlyActive reports whether ListMetrics may safely use
 // RecentlyActive=PT3H for the selected series.
@@ -41,108 +28,232 @@ func selectedSeriesUseRecentlyActive(series []compiledSeries, enabled bool) bool
 		return false
 	}
 	for _, item := range series {
-		if item.Period > recentlyActiveMaxPeriod {
+		if item.Policy.Period == 0 || !queryPolicyUsesRecentlyActive(item.Policy) {
 			return false
 		}
 	}
 	return true
 }
 
-// discoverProfileGroup scans one namespace once and applies each participating
-// profile's exact dimension matcher while streaming pages.
-func discoverProfileGroup(ctx context.Context, client cloudwatchClient, group discoveryGroup) (map[string][]discoveredInstance, error) {
-	profiles := group.Profiles
-	if len(profiles) == 0 {
-		return nil, nil
+// discoveryGroupScanner owns the pagination and matching state for one group.
+// discoverAll runs every scanner's first page before allowing any scanner to
+// consume the shared continuation-operation budget.
+type discoveryGroupScanner struct {
+	group              discoveryGroup
+	activity           *collectorActivity
+	matchers           map[string][]*discoveryMatcher
+	instances          map[string][]collectionInstance
+	nextToken          *string
+	seenTokens         map[string]struct{}
+	pages              int
+	scannedMetrics     int
+	candidateInstances int
+	matcherEvaluations int
+	done               bool
+}
+
+func newDiscoveryGroupScanner(group discoveryGroup, activity *collectorActivity) *discoveryGroupScanner {
+	return &discoveryGroupScanner{
+		group:      group,
+		activity:   activity,
+		matchers:   newDiscoveryMatcherIndex(group.Profiles),
+		instances:  make(map[string][]collectionInstance, len(group.Profiles)),
+		seenTokens: make(map[string]struct{}),
 	}
-	type matcher struct {
-		profile cwprofiles.ResolvedProfile
-		dims    []string
-		seen    map[string]struct{}
+}
+
+func (s *discoveryGroupScanner) scanPage(ctx context.Context, client cloudwatchClient, budget *discoveryBudget) error {
+	if s.done {
+		return nil
 	}
-	matchers := make([]matcher, len(profiles))
-	for i, profile := range profiles {
-		matchers[i] = matcher{profile: profile, dims: profile.Config.DimensionNames(), seen: make(map[string]struct{})}
+	if err := budget.reserveListMetricsOperation(); err != nil {
+		return err
 	}
 
-	instances := make(map[string][]discoveredInstance, len(profiles))
-	var nextToken *string
-	for {
-		in := &cloudwatch.ListMetricsInput{Namespace: aws.String(group.Namespace), NextToken: nextToken}
-		if group.RecentlyActive {
-			in.RecentlyActive = cwtypes.RecentlyActivePt3h
+	in := &cloudwatch.ListMetricsInput{Namespace: aws.String(s.group.Namespace), NextToken: s.nextToken}
+	if s.group.RecentlyActive {
+		in.RecentlyActive = cwtypes.RecentlyActivePt3h
+	}
+	s.activity.recordListMetrics(s.group.AccountID, s.group.Region)
+	out, err := client.ListMetrics(ctx, in)
+	if err != nil {
+		return err
+	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	s.pages++
+	s.scannedMetrics += len(out.Metrics)
+	if s.scannedMetrics > maxScannedMetricsPerGroup {
+		return safeCollectorErrorf("ListMetrics scanned more than %d metrics for one discovery group", maxScannedMetricsPerGroup)
+	}
+	if err := budget.reserveScannedMetrics(len(out.Metrics)); err != nil {
+		return err
+	}
+	for _, metric := range out.Metrics {
+		if err := ctx.Err(); err != nil {
+			return err
 		}
-		out, err := client.ListMetrics(ctx, in)
-		if err != nil {
-			return nil, err
+		signature, values, ok := canonicalMetricDimensions(metric.Dimensions)
+		if !ok {
+			continue
 		}
-		for _, metric := range out.Metrics {
-			for i := range matchers {
-				m := &matchers[i]
-				values, ok := matchInstanceDimensions(metric.Dimensions, m.dims)
-				if !ok || !constantDimensionsHold(m.profile.Config.Instance.Dimensions, values) {
-					continue
+		matching := s.matchers[signature]
+		if len(matching) > maxDiscoveryMatcherEvaluationsPerGroup-s.matcherEvaluations {
+			return safeCollectorErrorf(
+				"ListMetrics requires more than %d residual profile matches for one discovery group",
+				maxDiscoveryMatcherEvaluationsPerGroup,
+			)
+		}
+		s.matcherEvaluations += len(matching)
+		if err := budget.reserveMatcherEvaluations(len(matching)); err != nil {
+			return err
+		}
+		for i, m := range matching {
+			if i%256 == 0 {
+				if err := ctx.Err(); err != nil {
+					return err
 				}
-				key := strings.Join(values, instanceKeySep)
-				if _, ok := m.seen[key]; ok {
-					continue
-				}
-				m.seen[key] = struct{}{}
-				instances[m.profile.Name] = append(instances[m.profile.Name], discoveredInstance{DimensionValues: values})
+			}
+			if !m.constantsHold(values) {
+				continue
+			}
+			key := m.packedValues(values)
+			if _, ok := m.seen[key]; ok {
+				continue
+			}
+			if s.candidateInstances == maxCandidateInstancesPerGroup {
+				return safeCollectorErrorf("ListMetrics found more than %d candidate instances for one discovery group", maxCandidateInstancesPerGroup)
+			}
+			if err := budget.reserveCandidate(retainedCandidateBytes(key, len(m.outputOrder))); err != nil {
+				return err
+			}
+			s.candidateInstances++
+			m.seen[key] = struct{}{}
+			s.instances[m.profileName] = append(s.instances[m.profileName], collectionInstance{DimensionValues: strings.Split(key, instanceKeySep)})
+		}
+	}
+
+	if out.NextToken == nil || *out.NextToken == "" {
+		s.done = true
+		return nil
+	}
+	if s.pages == maxListMetricsPages {
+		return safeCollectorErrorf("ListMetrics requires more than %d pages for one discovery group", maxListMetricsPages)
+	}
+	if _, ok := s.seenTokens[*out.NextToken]; ok {
+		return safeCollectorError("ListMetrics returned a repeated pagination token")
+	}
+	s.seenTokens[*out.NextToken] = struct{}{}
+	s.nextToken = out.NextToken
+	return nil
+}
+
+type discoveryDimension struct {
+	name  string
+	value string
+}
+
+type discoveryConstant struct {
+	index int
+	value string
+}
+
+type discoveryMatcher struct {
+	profileName string
+	outputOrder []int
+	constants   []discoveryConstant
+	seen        map[string]struct{}
+}
+
+// newDiscoveryMatcherIndex groups profiles by their exact dimension-name set.
+// ListMetrics dimensions are canonicalized once per metric, so profiles with a
+// different shape are rejected by one map lookup instead of a full scan.
+func newDiscoveryMatcherIndex(profiles []cwprofiles.ResolvedProfile) map[string][]*discoveryMatcher {
+	index := make(map[string][]*discoveryMatcher)
+	for _, profile := range profiles {
+		dims := profile.Config.Instance.Dimensions
+		names := make([]string, len(dims))
+		for i, dim := range dims {
+			names[i] = dim.Name
+		}
+		sort.Strings(names)
+
+		m := &discoveryMatcher{
+			profileName: profile.Name,
+			outputOrder: make([]int, len(dims)),
+			seen:        make(map[string]struct{}),
+		}
+		for i, dim := range dims {
+			canonicalIndex := sort.SearchStrings(names, dim.Name)
+			m.outputOrder[i] = canonicalIndex
+			if dim.Constant != nil {
+				m.constants = append(m.constants, discoveryConstant{index: canonicalIndex, value: *dim.Constant})
 			}
 		}
-		if out.NextToken == nil || *out.NextToken == "" {
-			break
-		}
-		nextToken = out.NextToken
+		signature := dimensionNameSignature(names)
+		index[signature] = append(index[signature], m)
 	}
-	return instances, nil
+	return index
 }
 
-// matchInstanceDimensions returns the metric's dimension values ordered by
-// dimNames, but only if the metric's dimension-NAME set EXACTLY equals dimNames
-// (same cardinality, same names). A metric with extra or missing dimensions does
-// not match, so e.g. an ALB metric under {LoadBalancer,TargetGroup} is rejected
-// by a {LoadBalancer}-only profile.
-func matchInstanceDimensions(dims []cwtypes.Dimension, dimNames []string) ([]string, bool) {
-	if len(dims) != len(dimNames) {
-		return nil, false
-	}
-
-	byName := make(map[string]string, len(dims))
-	for _, d := range dims {
-		if d.Name == nil || d.Value == nil {
-			return nil, false
+// canonicalMetricDimensions returns a collision-safe signature and values in
+// canonical name order. Nil components and repeated names fail closed.
+func canonicalMetricDimensions(dims []cwtypes.Dimension) (string, []string, bool) {
+	canonical := make([]discoveryDimension, len(dims))
+	for i, dim := range dims {
+		if dim.Name == nil || dim.Value == nil {
+			return "", nil, false
 		}
-		byName[*d.Name] = *d.Value
+		canonical[i] = discoveryDimension{name: *dim.Name, value: *dim.Value}
 	}
-	if len(byName) != len(dimNames) {
-		return nil, false // duplicate dimension names in the metric
-	}
+	sort.Slice(canonical, func(i, j int) bool { return canonical[i].name < canonical[j].name })
 
-	values := make([]string, len(dimNames))
-	for i, name := range dimNames {
-		v, ok := byName[name]
-		if !ok {
-			return nil, false
+	names := make([]string, len(canonical))
+	values := make([]string, len(canonical))
+	for i, dim := range canonical {
+		if i > 0 && canonical[i-1].name == dim.name {
+			return "", nil, false
 		}
-		values[i] = v
+		names[i] = dim.name
+		values[i] = dim.value
 	}
-	return values, true
+	return dimensionNameSignature(names), values, true
 }
 
-// constantDimensionsHold reports whether every match-and-query-only (constant)
-// dimension in the profile has its pinned value in this metric's dimension values
-// (ordered to match the profile's declared dimensions). A mismatch fails the match
-// closed: a constant dimension is not emitted as a label, so admitting a differing
-// value would collapse distinct instances onto one unlabeled series.
-func constantDimensionsHold(dims []cwprofiles.InstanceDimension, values []string) bool {
-	for i, d := range dims {
-		if d.Constant != nil && values[i] != *d.Constant {
+func dimensionNameSignature(names []string) string {
+	var b strings.Builder
+	for _, name := range names {
+		writeLengthPrefixed(&b, name)
+	}
+	return b.String()
+}
+
+func (m *discoveryMatcher) constantsHold(canonicalValues []string) bool {
+	for _, constant := range m.constants {
+		if canonicalValues[constant.index] != constant.value {
 			return false
 		}
 	}
 	return true
+}
+
+func (m *discoveryMatcher) packedValues(canonicalValues []string) string {
+	var size int
+	for _, canonicalIndex := range m.outputOrder {
+		size += len(canonicalValues[canonicalIndex])
+	}
+	size += max(0, len(m.outputOrder)-1) * len(instanceKeySep)
+	var b strings.Builder
+	b.Grow(size)
+	for i, canonicalIndex := range m.outputOrder {
+		if i > 0 {
+			b.WriteString(instanceKeySep)
+		}
+		b.WriteString(canonicalValues[canonicalIndex])
+	}
+	return b.String()
 }
 
 // discoveryKey identifies a discovered instance set by target, profile, and region.
@@ -154,6 +265,7 @@ type discoveryKey struct {
 
 type discoveryGroup struct {
 	Target         string
+	AccountID      string
 	Region         string
 	Namespace      string
 	RecentlyActive bool
@@ -163,15 +275,18 @@ type discoveryGroup struct {
 // discoverySnapshot is the cached result of one discovery pass across all
 // candidate profiles and regions.
 type discoverySnapshot struct {
-	Instances map[discoveryKey][]discoveredInstance
+	Instances map[discoveryKey][]collectionInstance
 	FetchedAt time.Time
 	ExpiresAt time.Time
 }
 
-// expired reports whether the snapshot must be refreshed at now (never fetched,
-// or past its TTL).
+// expired reports whether the snapshot must be refreshed at now. A failed first
+// pass can have no FetchedAt but a future ExpiresAt that schedules its retry.
 func (s discoverySnapshot) expired(now time.Time) bool {
-	return s.FetchedAt.IsZero() || !now.Before(s.ExpiresAt)
+	if s.FetchedAt.IsZero() {
+		return s.ExpiresAt.IsZero() || !now.Before(s.ExpiresAt)
+	}
+	return !now.Before(s.ExpiresAt)
 }
 
 // totalInstances is the instance count across all (target, profile, region) keys.
@@ -183,12 +298,37 @@ func (s discoverySnapshot) totalInstances() int {
 	return n
 }
 
+func (s discoverySnapshot) validateRetainedBounds() error {
+	instances := 0
+	retainedBytes := 0
+	for _, discovered := range s.Instances {
+		if len(discovered) > maxCandidateInstancesPerRefresh-instances {
+			return safeCollectorErrorf(
+				"CloudWatch discovery merged snapshot retains more than %d candidate instances",
+				maxCandidateInstancesPerRefresh,
+			)
+		}
+		instances += len(discovered)
+		for _, instance := range discovered {
+			weight := retainedDiscoveredInstanceBytes(instance)
+			if weight > maxRetainedCandidateBytesPerRefresh-retainedBytes {
+				return safeCollectorErrorf(
+					"CloudWatch discovery merged snapshot retains more than %d MiB of candidate instance data",
+					maxRetainedCandidateBytesPerRefresh>>20,
+				)
+			}
+			retainedBytes += weight
+		}
+	}
+	return nil
+}
+
 // discoveryGroupResult is one shared ListMetrics scan. Keeping failures at the
 // group boundary prevents one upstream error from expanding into one warning per
 // participating profile.
 type discoveryGroupResult struct {
 	Group     discoveryGroup
-	Instances map[string][]discoveredInstance
+	Instances map[string][]collectionInstance
 	Err       error
 }
 
@@ -197,36 +337,96 @@ type discoveryGroupResult struct {
 // the least restrictive RecentlyActive policy required by its selected series.
 func discoverAll(
 	ctx context.Context,
-	newClient func(target, region string) (cloudwatchClient, error),
+	newClient func(context.Context, string, string) (cloudwatchClient, error),
+	activity *collectorActivity,
 	groups []discoveryGroup,
 	maxConcurrency int,
 	timeout time.Duration,
-) []discoveryGroupResult {
+) ([]discoveryGroupResult, error) {
+	controller, err := newDiscoveryController(ctx, groups, timeout)
+	if err != nil {
+		return nil, err
+	}
+	defer controller.close()
+
 	results := make([]discoveryGroupResult, len(groups))
+	type groupRun struct {
+		scanner *discoveryGroupScanner
+		client  cloudwatchClient
+	}
+	runs := make([]groupRun, len(groups))
+	for i, group := range groups {
+		results[i].Group = group
+		runs[i].scanner = newDiscoveryGroupScanner(group, activity)
+	}
+
+	// Complete the first-page phase before scheduling any continuation. Every
+	// group that reaches ListMetrics gets its first admitted operation before a
+	// fast, deep namespace can consume the remaining operation budget.
 	p := pool.New().WithMaxGoroutines(max(1, maxConcurrency))
 	for i, group := range groups {
 		p.Go(func() {
-			result := discoveryGroupResult{Group: group}
-			client, err := newClient(group.Target, group.Region)
-			if err == nil {
-				cctx, cancel := withTimeout(ctx, timeout)
-				defer cancel()
-				result.Instances, err = discoverProfileGroup(cctx, client, group)
+			lane := controller.lane(group)
+			if err := context.Cause(lane.ctx); err != nil {
+				results[i].Err = err
+				return
 			}
-			result.Err = err
-			results[i] = result
+			client, err := newClient(lane.ctx, group.Target, group.Region)
+			if err == nil {
+				runs[i].client = client
+				err = runs[i].scanner.scanPage(lane.ctx, client, controller.budget)
+			}
+			if isAWSAuthorizationError(err) {
+				controller.denyLane(group, err)
+			}
+			results[i].Err = err
+			if err == nil && runs[i].scanner.done {
+				results[i].Instances = runs[i].scanner.instances
+			}
 		})
 	}
 	p.Wait()
-	return results
+	if err := controller.failure(); err != nil {
+		return results, err
+	}
+
+	// Continuations share only the operation budget left after every non-skipped,
+	// successfully client-resolved group has attempted its first operation.
+	p = pool.New().WithMaxGoroutines(max(1, maxConcurrency))
+	for i, group := range groups {
+		if results[i].Err != nil || runs[i].scanner.done {
+			continue
+		}
+		p.Go(func() {
+			lane := controller.lane(group)
+			if err := context.Cause(lane.ctx); err != nil {
+				results[i].Err = err
+				return
+			}
+			for !runs[i].scanner.done {
+				err := runs[i].scanner.scanPage(lane.ctx, runs[i].client, controller.budget)
+				if err != nil {
+					if isAWSAuthorizationError(err) {
+						controller.denyLane(group, err)
+					}
+					results[i].Err = err
+					return
+				}
+			}
+			results[i].Instances = runs[i].scanner.instances
+		})
+	}
+	p.Wait()
+	return results, controller.failure()
 }
 
 // buildDiscoverySnapshot assembles a snapshot from namespace-group results and
 // returns the number of failed groups. Failed groups retain their previous
-// profile instances; successful groups replace theirs.
-func buildDiscoverySnapshot(results []discoveryGroupResult, prev map[discoveryKey][]discoveredInstance, now time.Time, refreshEvery int) (discoverySnapshot, int) {
+// profile instances; successful groups replace theirs. The merged effective
+// snapshot must fit the same retained-state bounds as a fresh scan.
+func buildDiscoverySnapshot(results []discoveryGroupResult, prev map[discoveryKey][]collectionInstance, now time.Time, refreshEvery int) (discoverySnapshot, int, error) {
 	snap := discoverySnapshot{
-		Instances: make(map[discoveryKey][]discoveredInstance),
+		Instances: make(map[discoveryKey][]collectionInstance),
 		FetchedAt: now,
 		ExpiresAt: now.Add(time.Duration(refreshEvery) * time.Second),
 	}
@@ -250,7 +450,10 @@ func buildDiscoverySnapshot(results []discoveryGroupResult, prev map[discoveryKe
 			}
 		}
 	}
-	return snap, failures
+	if err := snap.validateRetainedBounds(); err != nil {
+		return discoverySnapshot{}, failures, err
+	}
+	return snap, failures, nil
 }
 
 // highInstanceCountWarn is the discovered-instance count at or above which the
@@ -274,92 +477,87 @@ func (c *Collector) markDiscoveryStale() {
 }
 
 // refreshDiscovery refreshes the discovery snapshot when its TTL has expired.
-// Per-target failures are logged and tolerated; a total failure keeps the
-// previous snapshot, or errors on the very first pass when there is none.
+// Per-group failures are logged and tolerated. Aggregate and total failures
+// retain prior dynamic state when the cycle can continue; otherwise a first-pass
+// failure is returned.
 func (c *Collector) refreshDiscovery(ctx context.Context) error {
 	now := c.now()
 	if !c.discovery.expired(now) {
 		return nil
 	}
-
-	newClient := func(target, region string) (cloudwatchClient, error) {
-		return c.clients.forTargetRegion(ctx, target, region)
+	groups := c.discoveryGroups()
+	if len(groups) == 0 {
+		return ctx.Err()
 	}
-	results := discoverAll(ctx, newClient, c.discoveryGroups(), apiConcurrency, c.Timeout.Duration())
+
+	newClient := func(callCtx context.Context, target, region string) (cloudwatchClient, error) {
+		return c.clients.forTargetRegion(callCtx, target, region)
+	}
+	results, aggregateErr := discoverAll(ctx, newClient, c.activity, groups, apiConcurrency, c.Timeout.Duration())
 	// If the parent context was canceled or timed out during the fan-out, abort before
 	// committing: buildDiscoverySnapshot would otherwise carry forward instances (or
 	// accept a partial first snapshot) and advance the TTL, so the next cycle would skip
-	// discovery. A per-call GetMetricData/ListMetrics timeout uses a derived context and
-	// does not trip this, so it stays fail-soft.
+	// discovery. ListMetrics errors and the discovery stage's derived timeout do
+	// not cancel the parent context, so they stay fail-soft.
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	// Failed targets carry forward their previous instances, so a transient
-	// per-region/namespace failure does not drop series (spec: keep last snapshot).
-	snap, failedGroups := buildDiscoverySnapshot(results, c.discovery.Instances, now, c.Discovery.RefreshEvery)
+	var (
+		disposition discoveryDisposition
+		diagnostics discoveryDiagnostics
+	)
+	if aggregateErr != nil {
+		diagnostics.aggregateFailure = aggregateErr
+		disposition = c.aggregateFailureDisposition(aggregateErr, c.hasExecutableStaticScopes())
+	} else {
+		// Failed discovery groups carry forward their previous instances, so a
+		// transient target/region/namespace failure does not drop series.
+		snap, failedGroups, err := buildDiscoverySnapshot(results, c.discovery.Instances, now, c.Discovery.RefreshEvery)
+		// Snapshot merging and retained-bound validation happen after fan-out. This
+		// early check avoids diagnostics work; applyDiscoveryDisposition remains the
+		// correctness boundary for every terminal outcome.
+		if ctxErr := ctx.Err(); ctxErr != nil {
+			return ctxErr
+		}
+		if err != nil {
+			diagnostics.aggregateFailure = err
+			disposition = c.aggregateFailureDisposition(err, c.hasExecutableStaticScopes())
+		} else {
+			for _, result := range results {
+				if result.Err != nil {
+					diagnostics.groupFailures = append(diagnostics.groupFailures, operationFailure{
+						Target: result.Group.Target, Region: result.Group.Region,
+						Scope: fmt.Sprintf("namespace %q", result.Group.Namespace), Err: result.Err,
+					})
+				}
+			}
 
-	var failures []operationFailure
-	for _, result := range results {
-		if result.Err != nil {
-			failures = append(failures, operationFailure{
-				Target: result.Group.Target, Region: result.Group.Region,
-				Scope: fmt.Sprintf("namespace %q", result.Group.Namespace), Err: result.Err,
-			})
+			// An empty successful group is not a failure; with shared regions across
+			// many targets, empty successes are expected.
+			if len(results) > 0 && failedGroups == len(results) {
+				if !c.discovery.FetchedAt.IsZero() || c.hasExecutableStaticScopes() {
+					disposition = discoveryDisposition{
+						kind:    discoveryDispositionRetry,
+						retryAt: now.Add(time.Duration(c.Discovery.RefreshEvery) * time.Second),
+					}
+				} else {
+					disposition = discoveryDisposition{
+						kind: discoveryDispositionFail,
+						err:  fmt.Errorf("CloudWatch discovery failed for all %d target/region/namespace groups", len(results)),
+					}
+				}
+			} else {
+				report := newDiscoveryReport(snap, c.discoverySig)
+				diagnostics.report = &report
+				disposition = discoveryDisposition{
+					kind: discoveryDispositionInstall, snapshot: snap, discoverySig: report.sig,
+				}
+			}
 		}
 	}
-	c.warnOperationFailures(logKeyDiscoveryTargetFailed, "discovery", " (using last-known instances)", failures)
 
-	// Only a first-ever pass where EVERY target errored is fatal. An empty but
-	// successful target (a resource-free target/region/profile) is not a failure —
-	// with shared regions across many targets, empty successes are expected — and
-	// any carried-forward snapshot keeps the collector running.
-	if c.discovery.FetchedAt.IsZero() && len(results) > 0 && failedGroups == len(results) {
-		return fmt.Errorf("CloudWatch discovery failed for all %d target/region/namespace groups", len(results))
-	}
-
-	c.discovery = snap
-	c.invalidateTagFetchPlan()
-	c.markTagsStale()
-	c.invalidateQueryPlan()
-	c.logDiscovery(snap)
-
-	if n := snap.totalInstances(); n >= highInstanceCountWarn {
-		c.Limit(logKeyHighInstanceCount, 1, recurringLogEvery).
-			Warningf("CloudWatch discovered %d instances; this scales GetMetricData cost — narrow collection rules if this is unexpected", n)
-	}
-	return nil
-}
-
-// logDiscovery reports the discovered-resources summary: at Info when it changes
-// (first discovery, or a per-service count change) so operators can see what the
-// collector found, and the full per-(target, profile, region) breakdown at Debug every refresh.
-func (c *Collector) logDiscovery(snap discoverySnapshot) {
-	byProfile := make(map[string]int)
-	for k, insts := range snap.Instances {
-		byProfile[k.Profile] += len(insts)
-	}
-	names := make([]string, 0, len(byProfile))
-	for name := range byProfile {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-
-	var b strings.Builder
-	for i, name := range names {
-		if i > 0 {
-			b.WriteString(", ")
-		}
-		fmt.Fprintf(&b, "%s=%d", name, byProfile[name])
-	}
-	summary := b.String()
-
-	c.Debugf("CloudWatch discovery: %d instance(s) across %d (target, profile, region) scope(s): %s",
-		snap.totalInstances(), len(snap.Instances), summary)
-
-	if sig := fmt.Sprintf("%d|%s", snap.totalInstances(), summary); sig != c.discoverySig {
-		c.discoverySig = sig
-		c.Infof("CloudWatch discovered %d instance(s): %s", snap.totalInstances(), summary)
-	}
+	c.emitDiscoveryDiagnostics(diagnostics)
+	return c.applyDiscoveryDisposition(ctx, disposition)
 }
 
 func (c *Collector) discoveryGroups() []discoveryGroup {
@@ -367,30 +565,34 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 		return nil
 	}
 
-	type groupKey struct {
-		target, region, namespace string
-	}
 	type profileKey struct {
 		target, profile, region string
 	}
 	recentlyActive := make(map[profileKey]bool)
 	for _, scope := range c.plan.Scopes {
+		if scope.StaticInstance != nil {
+			continue
+		}
 		key := profileKey{target: scope.Target.Name, profile: scope.Profile.Name, region: scope.Region}
 		recent := selectedSeriesUseRecentlyActive(scope.SelectedSeries, c.recentlyActiveOnly())
 		if previous, ok := recentlyActive[key]; !ok || (previous && !recent) {
 			recentlyActive[key] = recent
 		}
 	}
-	index := make(map[groupKey]int)
+	index := make(map[discoveryGroupKey]int)
 	seenProfiles := make(map[profileKey]struct{})
 	var groups []discoveryGroup
 	for _, scope := range c.plan.Scopes {
-		if _, ok := c.resolvedByRef[scope.Target.Name]; !ok {
+		if scope.StaticInstance != nil {
+			continue
+		}
+		resolved, ok := c.resolvedByRef[scope.Target.Name]
+		if !ok {
 			continue
 		}
 		pk := profileKey{target: scope.Target.Name, profile: scope.Profile.Name, region: scope.Region}
 		recent := recentlyActive[pk]
-		key := groupKey{
+		key := discoveryGroupKey{
 			target: scope.Target.Name, region: scope.Region,
 			namespace: scope.Profile.Config.Namespace,
 		}
@@ -404,10 +606,26 @@ func (c *Collector) discoveryGroups() []discoveryGroup {
 		}
 		index[key] = len(groups)
 		groups = append(groups, discoveryGroup{
-			Target: scope.Target.Name, Region: scope.Region, Namespace: scope.Profile.Config.Namespace,
+			Target: scope.Target.Name, AccountID: resolved.accountID,
+			Region: scope.Region, Namespace: scope.Profile.Config.Namespace,
 			RecentlyActive: recent, Profiles: []cwprofiles.ResolvedProfile{scope.Profile},
 		})
 		seenProfiles[pk] = struct{}{}
 	}
 	return groups
+}
+
+func (c *Collector) hasExecutableStaticScopes() bool {
+	if c.plan == nil {
+		return false
+	}
+	for _, scope := range c.plan.Scopes {
+		if scope.StaticInstance == nil {
+			continue
+		}
+		if _, ok := c.resolvedTargetByRef(scope.Target.Name); ok {
+			return true
+		}
+	}
+	return false
 }

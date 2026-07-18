@@ -7,11 +7,11 @@ import (
 	"errors"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/sts"
 
-	"github.com/netdata/netdata/go/plugins/pkg/metrix"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 
 	"github.com/stretchr/testify/assert"
@@ -55,9 +55,13 @@ func twoTargetConfig() Config {
 }
 
 func multiTargetCollector(t *testing.T, clients map[string]stsClient) *Collector {
+	return multiTargetCollectorWithConfig(t, twoTargetConfig(), clients)
+}
+
+func multiTargetCollectorWithConfig(t *testing.T, cfg Config, clients map[string]stsClient) *Collector {
 	t.Helper()
 	c := New()
-	c.Config = twoTargetConfig()
+	c.Config = cfg
 	c.newAWSConfig = func(_ context.Context, identity awsauth.Identity, _ string) (aws.Config, error) {
 		return aws.Config{Region: identity.Ref}, nil
 	}
@@ -96,16 +100,13 @@ func TestBuildQueryPlan_FirstTargetOwnsSameAccountSeries(t *testing.T) {
 		"second": &seqSTS{accounts: []string{"111111111111"}},
 	})
 	require.NoError(t, c.ensureTargets(context.Background()))
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
 		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 	}}
 	plan := requireBuildQueryPlan(t, c)
 	require.NotEmpty(t, plan)
-	perInstance := 0
-	for _, metric := range c.plan.Scopes[0].Profile.Config.Metrics {
-		perInstance += len(metric.Statistics)
-	}
+	perInstance := len(c.plan.Scopes[0].SelectedSeries)
 	assert.Len(t, plan, perInstance)
 	for _, query := range plan {
 		assert.Equal(t, "first", query.target)
@@ -119,25 +120,22 @@ func TestBuildQueryPlan_SameAccountDisjointResourcesSurvive(t *testing.T) {
 		"second": &seqSTS{accounts: []string{"111111111111"}},
 	})
 	require.NoError(t, c.ensureTargets(context.Background()))
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
 		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-2"}}},
 	}}
 	plan := requireBuildQueryPlan(t, c)
-	perInstance := 0
-	for _, metric := range c.plan.Scopes[0].Profile.Config.Metrics {
-		perInstance += len(metric.Statistics)
-	}
+	perInstance := len(c.plan.Scopes[0].SelectedSeries)
 	assert.Len(t, plan, perInstance*2)
 }
 
-func TestCurrentQueryPlan_RebindsRetainedSeriesWhenEarlierTargetTakesOwnership(t *testing.T) {
+func TestCurrentQueryPlan_ClearsRetainedSeriesWhenTargetOwnershipChanges(t *testing.T) {
 	c := multiTargetCollector(t, map[string]stsClient{
 		"first":  &seqSTS{accounts: []string{"", "111111111111"}, failAt: map[int]bool{0: true}},
 		"second": &seqSTS{accounts: []string{"111111111111"}},
 	})
 	require.NoError(t, c.ensureTargets(context.Background()))
-	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]discoveredInstance{
+	c.discovery = discoverySnapshot{Instances: map[discoveryKey][]collectionInstance{
 		{Target: "first", Profile: "ec2", Region: "us-east-1"}:  {{DimensionValues: []string{"i-1"}}},
 		{Target: "second", Profile: "ec2", Region: "us-east-1"}: {{DimensionValues: []string{"i-1"}}},
 	}}
@@ -146,33 +144,14 @@ func TestCurrentQueryPlan_RebindsRetainedSeriesWhenEarlierTargetTakesOwnership(t
 	require.NotEmpty(t, oldPlan)
 	oldQuery := oldPlan[0]
 	require.Equal(t, "second", oldQuery.target)
-	managed, ok := metrix.AsCycleManagedStore(c.store)
-	require.True(t, ok)
-	cycle := managed.CycleController()
-	cycle.BeginCycle()
-	c.observations.observe(
-		[]plannedQuery{oldQuery},
-		[]querySample{{
-			seriesName: oldQuery.seriesName,
-			labels:     oldQuery.labels,
-			value:      42,
-			target:     oldQuery.target,
-			region:     oldQuery.region,
-			period:     oldQuery.period,
-		}},
-		nil,
-		map[queryGroupKey]bool{oldQuery.groupKey(): true},
-	)
-	require.NoError(t, cycle.CommitCycleSuccess())
+	c.observations.queries[oldQuery.key] = queryState{hasObservation: true, observation: 42, observationAt: time.Unix(1, 0), lastCompletedEnd: time.Unix(2, 0)}
 
 	require.NoError(t, c.ensureTargets(context.Background()))
 	newPlan := requireCurrentQueryPlan(t, c)
 	require.NotEmpty(t, newPlan)
 	newQuery := newPlan[0]
 	require.Equal(t, "first", newQuery.target)
-
-	key := observedKey(newQuery.seriesName, newQuery.labels)
-	retained, ok := c.observations.lastObserved[key]
-	require.True(t, ok, "same final series identity retains its sample-and-hold value")
-	assert.Equal(t, newQuery.groupKey(), retained.groupKey, "retained value follows its current scheduling owner")
+	assert.NotEqual(t, oldQuery.key, newQuery.key)
+	assert.NotContains(t, c.observations.queries, oldQuery.key)
+	assert.NotContains(t, c.observations.queries, newQuery.key, "a target ownership change starts with no retained value")
 }

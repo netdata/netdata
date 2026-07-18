@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon OpenSearch Service
 namespace: AWS/ES
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: ClientId
@@ -53,22 +54,26 @@ metrics:
     metric_name: AutomatedSnapshotFailure
     statistics: [maximum]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. All are published at the {ClientId, DomainName}
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {ClientId, DomainName}
   # grain. Dot-suffix metric names (Shards.active, ClusterStatus.*) are exact CloudWatch names.
   # ----------------------------------------------------------------------------------------
-  # - id: searchable_documents
-  #   metric_name: SearchableDocuments
-  #   statistics: [maximum]
-  # - id: deleted_documents
-  #   metric_name: DeletedDocuments
-  #   statistics: [maximum]
-  # - id: shards_active
-  #   metric_name: Shards.active
-  #   statistics: [maximum]
-  # - id: shards_unassigned
-  #   metric_name: Shards.unassigned
-  #   statistics: [maximum]
+  - id: searchable_documents
+    disabled: true
+    metric_name: SearchableDocuments
+    statistics: [maximum]
+  - id: deleted_documents
+    disabled: true
+    metric_name: DeletedDocuments
+    statistics: [maximum]
+  - id: shards_active
+    disabled: true
+    metric_name: Shards.active
+    statistics: [maximum]
+  - id: shards_unassigned
+    disabled: true
+    metric_name: Shards.unassigned
+    statistics: [maximum]
   # Thread-pool queues/rejections (ThreadpoolSearchQueue/Rejected, ...), EBS I/O metrics (ReadLatency,
   # WriteThroughput, ...), and dedicated-master (Master*), UltraWarm (Warm*), cold-storage (Cold*) and
   # per-node (NodeId) families are also available. See:
@@ -181,27 +186,27 @@ template:
         - selector: automated_snapshot_failure_maximum
           name: failure
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_os_documents
-    #   context: documents
-    #   title: OpenSearch Documents
-    #   family: Documents
-    #   units: documents
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: searchable_documents_maximum
-    #       name: searchable
-    #     - selector: deleted_documents_maximum
-    #       name: deleted
-    # - id: aws_cloudwatch_os_shards
-    #   context: shards
-    #   title: OpenSearch Shards
-    #   family: Shards
-    #   units: shards
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: shards_active_maximum
-    #       name: active
-    #     - selector: shards_unassigned_maximum
-    #       name: unassigned
+    - id: aws_cloudwatch_os_documents
+      context: documents
+      title: OpenSearch Documents
+      family: Documents
+      units: documents
+      algorithm: absolute
+      dimensions:
+        - selector: searchable_documents_maximum
+          name: searchable
+        - selector: deleted_documents_maximum
+          name: deleted
+    - id: aws_cloudwatch_os_shards
+      context: shards
+      title: OpenSearch Shards
+      family: Shards
+      units: shards
+      algorithm: absolute
+      dimensions:
+        - selector: shards_active_maximum
+          name: active
+        - selector: shards_unassigned_maximum
+          name: unassigned

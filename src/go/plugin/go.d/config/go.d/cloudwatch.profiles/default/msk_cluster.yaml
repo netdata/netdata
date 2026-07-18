@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon MSK Cluster
 namespace: AWS/Kafka
-period: 300
+query:
+  period: 5m
 # Cluster-grain DEFAULT-level MSK health metrics. Broker-grain metrics live in msk.yaml.
 instance:
   dimensions:

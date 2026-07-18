@@ -7,6 +7,45 @@ struct aral_statistics mrg_aral_statistics;
 // ----------------------------------------------------------------------------
 // private helpers
 
+static void mrg_lock_all_partitions(MRG *mrg) {
+    for(size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++)
+        mrg_index_write_lock(mrg, partition);
+}
+
+static void mrg_unlock_all_partitions(MRG *mrg) {
+    for(size_t partition = UUIDMAP_PARTITIONS; partition > 0; partition--)
+        mrg_index_write_unlock(mrg, partition - 1);
+}
+
+static void mrg_destroy_restore_claimed_metrics(METRIC **claimed, size_t used) {
+    for(size_t i = 0; i < used ;i++) {
+        REFCOUNT expected = REFCOUNT_DELETED;
+        bool restored = __atomic_compare_exchange_n(&claimed[i]->refcount, &expected, 0,
+                                                    false, __ATOMIC_RELEASE, __ATOMIC_RELAXED);
+        internal_fatal(!restored, "DBENGINE METRIC: cannot restore destroy-claimed metric refcount");
+    }
+}
+
+static bool mrg_destroy_claim_metric(METRIC *metric, METRIC ***claimed, size_t *used, size_t *size) {
+    if(!refcount_acquire_for_deletion(&metric->refcount))
+        return false;
+
+    if(*used == *size) {
+        internal_fatal(*size > SIZE_MAX / 2,
+                       "DBENGINE METRIC: too many metrics to claim during destroy");
+
+        size_t new_size = *size ? *size * 2 : 1024;
+        internal_fatal(new_size > SIZE_MAX / sizeof(**claimed),
+                       "DBENGINE METRIC: too many metrics to claim during destroy");
+
+        *claimed = reallocz(*claimed, new_size * sizeof(**claimed));
+        *size = new_size;
+    }
+
+    (*claimed)[(*used)++] = metric;
+    return true;
+}
+
 static MRG *mrg_create_internal(bool load_from_db) {
     MRG *mrg = callocz(1, sizeof(MRG));
 
@@ -49,12 +88,13 @@ size_t mrg_destroy(MRG *mrg) {
         return 0;
 
     size_t referenced = 0;
+    size_t claimed_used = 0, claimed_size = 0;
+    METRIC **claimed = NULL;
+
+    mrg_lock_all_partitions(mrg);
 
     // Traverse all partitions
     for (size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++) {
-        // Lock the partition to prevent new entries while we're cleaning up
-        mrg_index_write_lock(mrg, partition);
-
         Word_t uuid_index = 0;
         Pvoid_t *uuid_pvalue;
 
@@ -82,25 +122,49 @@ size_t mrg_destroy(MRG *mrg) {
                 METRIC *metric = *section_pvalue;
 
                 // Try to acquire metric for deletion
-                if (!refcount_acquire_for_deletion(&metric->refcount))
+                if (!mrg_destroy_claim_metric(metric, &claimed, &claimed_used, &claimed_size))
                     referenced++;
-
-                uuidmap_free(metric->uuid);
-                MRG_STATS_DELETED_METRIC(mrg, partition, metric->section);
-                aral_freez(mrg->index[partition].aral, metric);
             }
+        }
+    }
 
-            JudyLFreeArray(&sections_judy, PJE0);
+    if(referenced) {
+        mrg_destroy_restore_claimed_metrics(claimed, claimed_used);
+        freez(claimed);
+        mrg_unlock_all_partitions(mrg);
+        return referenced;
+    }
+
+    for(size_t i = 0; i < claimed_used ;i++) {
+        METRIC *metric = claimed[i];
+        uuidmap_free(metric->uuid);
+        MRG_STATS_DELETED_METRIC(mrg, metric->partition, metric->section);
+        aral_freez(mrg->index[metric->partition].aral, metric);
+    }
+    freez(claimed);
+
+    for (size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++) {
+        Word_t uuid_index = 0;
+        Pvoid_t *uuid_pvalue;
+
+        for (uuid_pvalue = JudyLFirst(mrg->index[partition].uuid_judy, &uuid_index, PJE0);
+             uuid_pvalue != NULL && uuid_pvalue != PJERR;
+             uuid_pvalue = JudyLNext(mrg->index[partition].uuid_judy, &uuid_index, PJE0)) {
+
+            if(*uuid_pvalue)
+                JudyLFreeArray(uuid_pvalue, PJE0);
         }
 
         JudyLFreeArray(&mrg->index[partition].uuid_judy, PJE0);
-
-        // Unlock the partition
-        mrg_index_write_unlock(mrg, partition);
-
-        // Destroy the aral for this partition
-        aral_destroy(mrg->index[partition].aral);
     }
+
+    // destroy the ARALs while still holding all partition locks:
+    // metric_add_and_acquire() allocates from them under a partition lock,
+    // so it cannot race with this teardown
+    for (size_t partition = 0; partition < UUIDMAP_PARTITIONS; partition++)
+        aral_destroy(mrg->index[partition].aral);
+
+    mrg_unlock_all_partitions(mrg);
 
     // Unregister the aral statistics
     pulse_aral_unregister_statistics(&mrg_aral_statistics);

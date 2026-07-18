@@ -2,15 +2,47 @@
 
 #include "query-internal.h"
 
-static void query_group_by_make_dimension_key(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm, bool query_has_percentage_of_group) {
+// how hidden dimensions are grouped at each group-by pass:
+//
+// - GROUP_BY_HIDDEN_NORMAL: hidden dimensions group together with the
+//   selected ones; used at the pass that computes percentage-of-group (the
+//   value router splits them to the hidden values array vh using the
+//   per-metric RRDR_DIMENSION_HIDDEN flag) and at any pass after it.
+//
+// - GROUP_BY_HIDDEN_GLOBAL: all hidden dimensions collapse into a single
+//   query-wide bucket; used when the query has no percentage-of-group
+//   (they are only needed as a total, e.g. for options=percentage).
+//
+// - GROUP_BY_HIDDEN_SHADOW: hidden dimensions group per-group into shadow
+//   buckets that keep RRDR_DIMENSION_HIDDEN; used at passes BEFORE the
+//   percentage-of-group pass, so that the hidden (denominator) values are
+//   aggregated with the same grouping as the selected (numerator) values
+//   and reach the percentage pass separated from them.
+typedef enum {
+    GROUP_BY_HIDDEN_NORMAL = 0,
+    GROUP_BY_HIDDEN_GLOBAL,
+    GROUP_BY_HIDDEN_SHADOW,
+} GROUP_BY_HIDDEN_MODE;
+
+static inline bool query_metric_hidden_bucket(QUERY_METRIC *qm, GROUP_BY_HIDDEN_MODE hidden_mode) {
+    return (qm->status & RRDR_DIMENSION_HIDDEN) && hidden_mode != GROUP_BY_HIDDEN_NORMAL;
+}
+
+static void query_group_by_make_dimension_key(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm, GROUP_BY_HIDDEN_MODE hidden_mode) {
     buffer_flush(key);
-    if(unlikely(!query_has_percentage_of_group && qm->status & RRDR_DIMENSION_HIDDEN)) {
+    if(unlikely(query_metric_hidden_bucket(qm, hidden_mode) && hidden_mode == GROUP_BY_HIDDEN_GLOBAL)) {
         buffer_strcat(key, "__hidden_dimensions__");
     }
     else if(unlikely(group_by & RRDR_GROUP_BY_SELECTED)) {
         buffer_strcat(key, "selected");
     }
     else {
+        if (unlikely(query_metric_hidden_bucket(qm, hidden_mode)))
+            // GROUP_BY_HIDDEN_SHADOW: prefix the normal group key, so
+            // hidden dimensions land in a per-group shadow bucket,
+            // separate from the selected dimensions of the same group
+            buffer_strcat(key, "__hidden_dimensions__");
+
         if (group_by & RRDR_GROUP_BY_DIMENSION) {
             buffer_fast_strcat(key, "|", 1);
             buffer_strcat(key, query_metric_name(qt, qm));
@@ -46,16 +78,24 @@ static void query_group_by_make_dimension_key(BUFFER *key, RRDR_GROUP_BY group_b
     }
 }
 
-static void query_group_by_make_dimension_id(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm, bool query_has_percentage_of_group) {
+static void query_group_by_make_dimension_id(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm, GROUP_BY_HIDDEN_MODE hidden_mode) {
     buffer_flush(key);
-    if(unlikely(!query_has_percentage_of_group && qm->status & RRDR_DIMENSION_HIDDEN)) {
+    if(unlikely(query_metric_hidden_bucket(qm, hidden_mode) && hidden_mode == GROUP_BY_HIDDEN_GLOBAL)) {
         buffer_strcat(key, "__hidden_dimensions__");
     }
     else if(unlikely(group_by & RRDR_GROUP_BY_SELECTED)) {
         buffer_strcat(key, "selected");
     }
     else {
+        if (unlikely(query_metric_hidden_bucket(qm, hidden_mode)))
+            // GROUP_BY_HIDDEN_SHADOW: shadow buckets exist only in
+            // intermediate RRDRs; their ids are never exposed
+            buffer_strcat(key, "__hidden_dimensions__");
+
         if (group_by & RRDR_GROUP_BY_DIMENSION) {
+            if (buffer_strlen(key) != 0)
+                buffer_fast_strcat(key, ",", 1);
+
             buffer_strcat(key, query_metric_name(qt, qm));
         }
 
@@ -101,16 +141,24 @@ static void query_group_by_make_dimension_id(BUFFER *key, RRDR_GROUP_BY group_by
     }
 }
 
-static void query_group_by_make_dimension_name(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm, bool query_has_percentage_of_group) {
+static void query_group_by_make_dimension_name(BUFFER *key, RRDR_GROUP_BY group_by, size_t group_by_id, QUERY_TARGET *qt, QUERY_NODE *qn, QUERY_CONTEXT *qc, QUERY_INSTANCE *qi, QUERY_DIMENSION *qd __maybe_unused, QUERY_METRIC *qm, GROUP_BY_HIDDEN_MODE hidden_mode) {
     buffer_flush(key);
-    if(unlikely(!query_has_percentage_of_group && qm->status & RRDR_DIMENSION_HIDDEN)) {
+    if(unlikely(query_metric_hidden_bucket(qm, hidden_mode) && hidden_mode == GROUP_BY_HIDDEN_GLOBAL)) {
         buffer_strcat(key, "__hidden_dimensions__");
     }
     else if(unlikely(group_by & RRDR_GROUP_BY_SELECTED)) {
         buffer_strcat(key, "selected");
     }
     else {
+        if (unlikely(query_metric_hidden_bucket(qm, hidden_mode)))
+            // GROUP_BY_HIDDEN_SHADOW: shadow buckets exist only in
+            // intermediate RRDRs; their names are never exposed
+            buffer_strcat(key, "__hidden_dimensions__");
+
         if (group_by & RRDR_GROUP_BY_DIMENSION) {
+            if (buffer_strlen(key) != 0)
+                buffer_fast_strcat(key, ",", 1);
+
             buffer_strcat(key, query_metric_name(qt, qm));
         }
 
@@ -253,6 +301,27 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
         }
     }
 
+    // find the pass that consumes the hidden dimensions to compute
+    // percentage-of-group; passes before it must keep the hidden
+    // dimensions grouped separately from the selected ones (shadow
+    // buckets), or their values would be merged and the percentage
+    // pass could not split numerator from denominator;
+    // unlike query_target_has_percentage_of_group() this scan stops at
+    // the first RRDR_GROUP_BY_NONE pass (the main loop below does too),
+    // so a percentage aggregation on a NONE pass resolves to NORMAL mode
+    // everywhere - the same behavior such a query had before this scan
+    ssize_t percentage_of_group_pass = -1;
+    for(size_t g = 0; g < MAX_QUERY_GROUP_BY_PASSES ;g++) {
+        if(qt->request.group_by[g].group_by == RRDR_GROUP_BY_NONE)
+            break;
+
+        if((qt->request.group_by[g].group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) ||
+            qt->request.group_by[g].aggregation == RRDR_GROUP_BY_FUNCTION_PERCENTAGE) {
+            percentage_of_group_pass = (ssize_t)g;
+            break;
+        }
+    }
+
     size_t added = 0;
     RRDR *first_r = NULL, *last_r = NULL;
     BUFFER *key = buffer_create(0, NULL);
@@ -275,6 +344,11 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
 
         size_t hidden_dimensions = 0;
         bool final_grouping = (g == MAX_QUERY_GROUP_BY_PASSES - 1 || qt->request.group_by[g + 1].group_by == RRDR_GROUP_BY_NONE) ? true : false;
+
+        GROUP_BY_HIDDEN_MODE hidden_mode =
+            (!query_has_percentage_of_group)                 ? GROUP_BY_HIDDEN_GLOBAL :
+            ((ssize_t)g < percentage_of_group_pass)          ? GROUP_BY_HIDDEN_SHADOW :
+                                                               GROUP_BY_HIDDEN_NORMAL;
 
         if (final_grouping && (options & RRDR_OPTION_GROUP_BY_LABELS))
             label_keys = dictionary_create_advanced(DICT_OPTION_SINGLE_THREADED | DICT_OPTION_DONT_OVERWRITE_VALUE, NULL, 0);
@@ -305,7 +379,7 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             // --------------------------------------------------------------------
             // generate the group by key
 
-            query_group_by_make_dimension_key(key, group_by, g, qt, qn, qc, qi, qd, qm, query_has_percentage_of_group);
+            query_group_by_make_dimension_key(key, group_by, g, qt, qn, qc, qi, qd, qm, hidden_mode);
 
             // lookup the key in the dictionary
 
@@ -319,13 +393,13 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 // ----------------------------------------------------------------
                 // generate the dimension id
 
-                query_group_by_make_dimension_id(key, group_by, g, qt, qn, qc, qi, qd, qm, query_has_percentage_of_group);
+                query_group_by_make_dimension_id(key, group_by, g, qt, qn, qc, qi, qd, qm, hidden_mode);
                 entries[pos].id = string_strdupz(buffer_tostring(key));
 
                 // ----------------------------------------------------------------
                 // generate the dimension name
 
-                query_group_by_make_dimension_name(key, group_by, g, qt, qn, qc, qi, qd, qm, query_has_percentage_of_group);
+                query_group_by_make_dimension_name(key, group_by, g, qt, qn, qc, qi, qd, qm, hidden_mode);
                 entries[pos].name = string_strdupz(buffer_tostring(key));
 
                 // add the rest of the info
@@ -364,10 +438,13 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
             // the query target adds to it the non-zero flag
             qm->status |= RRDR_DIMENSION_GROUPED;
 
-            if(query_has_percentage_of_group)
+            if(query_has_percentage_of_group && !query_metric_hidden_bucket(qm, hidden_mode))
                 // when the query has percentage of group
                 // there will be no hidden dimensions in the final query,
-                // so we have to remove the hidden flag from all dimensions
+                // so we have to remove the hidden flag from all dimensions;
+                // hidden (shadow/global) buckets keep the flag - it is what
+                // routes their values to the percentage denominator (vh)
+                // at the percentage-of-group pass
                 entries[pos].od |= qm->status & ~RRDR_DIMENSION_HIDDEN;
             else
                 entries[pos].od |= qm->status;
@@ -418,10 +495,17 @@ RRDR *rrd2rrdr_group_by_initialize(ONEWAYALLOC *owa, QUERY_TARGET *qt) {
                 r->gbc = onewayalloc_callocz(
                     owa, onewayalloc_mul_or_fatal(r->n, r->d, "RRDR group-by counts"), sizeof(*r->gbc));
 
-                if(hidden_dimensions && ((group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) || (aggregation_method == RRDR_GROUP_BY_FUNCTION_PERCENTAGE)))
+                if(hidden_dimensions && ((group_by & RRDR_GROUP_BY_PERCENTAGE_OF_INSTANCE) || (aggregation_method == RRDR_GROUP_BY_FUNCTION_PERCENTAGE))) {
                     // this is where we are going to group the hidden dimensions
                     r->vh = onewayalloc_mallocz(
                         owa, onewayalloc_mul3_or_fatal(r->n, r->d, sizeof(*r->vh), "RRDR hidden values"));
+
+                    // to know when the hidden (denominator) side of a point is
+                    // incomplete, its contributions are counted like gbc counts
+                    // the visible ones
+                    r->hgbc = onewayalloc_callocz(
+                        owa, onewayalloc_mul_or_fatal(r->n, r->d, "RRDR hidden group-by counts"), sizeof(*r->hgbc));
+                }
             }
         }
 

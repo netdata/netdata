@@ -30,10 +30,12 @@ rules:
       exclude: [cloudfront]
     metrics:
       - profile: ec2
+        defaults: false
         statistics: [Average]
         include:
           - name: CPUUtilization
       - profile: rds
+        defaults: false
         statistics: [Average]
         include:
           - name: DatabaseConnections
@@ -42,7 +44,12 @@ rules:
       resource_tags:
         - key: environment
           values: [production, staging]
+    query:
+      publication_delay: 0s
 rule_defaults:
+  query:
+    period: 5m
+    lookback: 30m
   filters:
     resource_tags:
       - key: managed-by
@@ -53,8 +60,8 @@ labels:
       label: resource_owner
 limits:
   max_instances: 123
+  max_discovery_groups: 80
 discovery:
   refresh_every: 123
   recently_active_only: true
-query_offset: 123
 timeout: 123.123

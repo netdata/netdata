@@ -83,9 +83,13 @@ static void build_node_info(RRDHOST *host, struct aclk_sync_completion *sync_com
     node_info.node_capabilities = (struct capability *)aclk_get_agent_capas();
     node_info.data.host_labels_ptr = host->rrdlabels;
 
-    rrdhost_system_info_to_node_info(host->system_info, &node_info);
+    spinlock_lock(&host->rrdhost_update_lock);
+    struct rrdhost_system_info *system_info = rrdhost_system_info_dup(host->system_info);
+    spinlock_unlock(&host->rrdhost_update_lock);
+    rrdhost_system_info_to_node_info(system_info, &node_info);
 
     aclk_update_node_info(&node_info, sync_completion);
+    rrdhost_system_info_free(system_info);
     nd_log(
         NDLS_ACCESS,
         NDLP_DEBUG,

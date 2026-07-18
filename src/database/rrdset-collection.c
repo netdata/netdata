@@ -4,6 +4,14 @@
 #include "rrddim-collection.h"
 
 time_t rrdset_set_update_every_s(RRDSET *st, time_t update_every_s) {
+    if(unlikely(update_every_s <= 0 || update_every_s > INT32_MAX)) {
+        internal_error(
+            true,
+            "RRDSET '%s' ignoring invalid update every %lld; keeping %d",
+            rrdset_id(st), (long long)update_every_s, (int)st->update_every);
+        return st->update_every;
+    }
+
     if(unlikely(update_every_s == st->update_every))
         return st->update_every;
 
@@ -326,11 +334,14 @@ static inline size_t rrdset_done_interpolate(
 
     ssize_t iterations = (ssize_t)((now_collect_ut - last_stored_ut) / (update_every_ut));
     if((now_collect_ut % (update_every_ut)) == 0) iterations++;
+    usec_t loop_iterations = (next_store_ut <= now_collect_ut) ?
+        (now_collect_ut - next_store_ut) / update_every_ut + 1 : 0;
 
     size_t counter = st->counter;
     long current_entry = st->db.current_entry;
 
-    for( ; next_store_ut <= now_collect_ut ; last_collect_ut = next_store_ut, next_store_ut += update_every_ut, iterations-- ) {
+    for( ; loop_iterations && next_store_ut <= now_collect_ut ;
+         last_collect_ut = next_store_ut, next_store_ut += update_every_ut, iterations--, loop_iterations-- ) {
 
         internal_error(iterations < 0,
                        "RRDSET: '%s': iterations calculation wrapped! "
@@ -531,6 +542,8 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
         last_stored_ut = 0,     // the timestamp in microseconds, of the last stored entry in the db
         next_store_ut = 0,      // the timestamp in microseconds, of the next entry to store in the db
         update_every_ut = st->update_every * USEC_PER_SEC; // st->update_every in microseconds
+    size_t max_update_gap_iterations = (size_t)MAX(st->db.entries, 60);
+    usec_t max_update_gap_ut = max_update_gap_iterations * update_every_ut;
 
     RRDSET_FLAGS rrdset_flags = rrdset_flag_check(st, ~0);
     if(unlikely(rrdset_flags & RRDSET_FLAG_COLLECTION_FINISHED)) {
@@ -548,7 +561,7 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     }
 
     // check if the chart has a long time to be updated
-    if(unlikely(st->usec_since_last_update > MAX(st->db.entries, 60) * update_every_ut)) {
+    if(unlikely(st->usec_since_last_update > max_update_gap_ut)) {
         nd_log_daemon(NDLP_DEBUG, "host '%s', chart '%s': took too long to be updated (counter #%u, update #%u, %0.3" NETDATA_DOUBLE_MODIFIER
                                   " secs). Resetting it.", rrdhost_hostname(st->rrdhost), rrdset_id(st), st->counter, st->counter_done,
                       (NETDATA_DOUBLE)st->usec_since_last_update / USEC_PER_SEC);
@@ -589,8 +602,11 @@ void rrdset_timed_done(RRDSET *st, struct timeval now, bool pending_rrdset_next)
     }
 
     // check if we will re-write the entire data set
-    if(unlikely(dt_usec(&st->last_collected_time, &st->last_updated) > st->db.entries * update_every_ut &&
-                 st->rrd_memory_mode != RRD_DB_MODE_DBENGINE)) {
+    size_t max_stored_gap_iterations =
+        (st->rrd_memory_mode == RRD_DB_MODE_DBENGINE) ? max_update_gap_iterations : (size_t)st->db.entries;
+
+    if(unlikely(dt_usec(&st->last_collected_time, &st->last_updated) >
+                max_stored_gap_iterations * update_every_ut)) {
         nd_log_daemon(NDLP_DEBUG, "'%s': too old data (last updated at %" PRId64 ".%" PRId64 ", last collected at %" PRId64 ".%" PRId64 "). "
                                   "Resetting it. Will not store the next entry.",
                       rrdset_id(st),

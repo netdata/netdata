@@ -105,17 +105,32 @@ Renaming is configured with the following options:
 ```text
 [plugin:cgroups]
  run script to rename cgroups matching =  !/  !*.mount  !*.socket  !*.partition  /machine.slice/*.service  !*.service  !*.slice  !*.swap  !*.user  !init.scope  !*.scope/vcpu*  !*.scope/emulator  *.scope  *docker*  *lxc*  *qemu*  */kubepods/pod*/*  */kubepods/*/pod*/*  */*-kubepods-pod*/*  */*-kubepods-*-pod*/*  !*kubepods*  !*kubelet*  *.libvirt-qemu  *
- script to get cgroup names = /usr/libexec/netdata/plugins.d/cgroup-name.sh
+ script to get cgroup names = /usr/libexec/netdata/plugins.d/cgroup-name
+ cgroup-name timeout = 120
 ```
 
-The additional pattern list serves to limit the number of times the script will be called. Without it, the script
+The additional pattern list serves to limit the number of times the resolver will be called. Without it, the resolver
 might be called thousands of times, depending on the number of cgroups available in the system.
 
+The `cgroup-name timeout` option (default `120` seconds; `0` disables the
+timeout) bounds how long Netdata waits for the helper to resolve a single
+cgroup. If the helper exceeds it, Netdata stops waiting for that cgroup; if a
+helper call simply cannot resolve a name yet (for example, while the Kubernetes
+API is still populating a new pod's metadata), it is retried on a later
+discovery cycle.
+
 The above pattern list is matched against the path of the cgroup. For matched
-cgroups, Netdata calls the
-script [cgroup-name.sh.in](https://github.com/netdata/netdata/blob/master/src/collectors/cgroups.plugin/cgroup-name.sh.in)
-to get its name. This script queries `docker`, `kubectl`, `podman`, or applies
-heuristics to find a name for the cgroup.
+cgroups, Netdata calls the configured executable to get its name. If it is
+missing or is not executable, cgroup renaming is disabled without repeated
+spawn attempts. On upgrade, a value equal to the installed legacy
+`plugins.d/cgroup-name.sh` path is migrated to the new binary; custom helper
+paths are preserved. The default `cgroup-name` helper
+queries `docker`, `kubectl`, `podman`, or applies heuristics to find a name for
+the cgroup.
+
+A custom helper must emit one newline-terminated record containing at most 8190
+bytes before the newline. Netdata rejects oversized or incomplete records
+rather than applying a truncated name or label set.
 
 #### Note on Podman container names
 
@@ -131,6 +146,28 @@ will have to adjust the configuration).
 or [CetusGuard](https://github.com/hectorm/cetusguard)
 can also be used to give Netdata restricted access to the socket. Note that `PODMAN_HOST` in Netdata's environment
 should be set to the proxy's URL in this case.
+
+#### Note on Kubernetes API access
+
+Inside a Kubernetes cluster, the `cgroup-name` helper resolves pod and container
+names by querying the kubelet and the Kubernetes API server, using the pod's
+mounted service-account token and CA certificate.
+
+Resolved Kubernetes metadata is cached in a private
+`${NETDATA_LIB_DIR}/cgroup-name` directory. The helper rejects cache directories
+or files with unsafe ownership, permissions, links, or sizes.
+
+By default the helper verifies the API server's TLS certificate against the
+mounted cluster CA (`/var/run/secrets/kubernetes.io/serviceaccount/ca.crt`),
+which is correct for standard in-cluster deployments. If your API endpoint
+presents a certificate that does not chain to that CA — for example a custom
+PKI, an intercepting proxy, or an external load balancer with its own
+certificate — the lookups fail and the affected pods keep a generic `k8s_<id>`
+name. In that case set the environment variable `K8S_TLS_INSECURE=true` for the
+Netdata service to skip API-server certificate verification (matching the
+behavior of the previous shell helper). The kubelet connection is always made
+without certificate verification, because kubelet serving certificates are
+commonly self-signed.
 
 ### Customizing cgroup names
 

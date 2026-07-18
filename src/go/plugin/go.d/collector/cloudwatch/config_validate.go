@@ -8,6 +8,8 @@ import (
 	"regexp"
 	"strings"
 
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
+
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsregion"
 )
 
@@ -32,6 +34,7 @@ func validateConfigStructure(cfg Config) error {
 		credentialErr,
 		targetErr,
 		validateResourceTagFilters("rule_defaults.filters.resource_tags", cfg.RuleDefaults.Filters.ResourceTags),
+		cwquery.Validate("rule_defaults.query", cfg.RuleDefaults.Query),
 		validateResourceTagLabels("labels.resource_tags", cfg.Labels.ResourceTags),
 		validateRules(cfg, targetNames),
 	)
@@ -218,6 +221,7 @@ func validateRules(cfg Config, targetNames map[string]struct{}) error {
 		if rule.Metrics != nil {
 			errs = append(errs, validateMetricSelectors(path+".metrics", rule.Metrics))
 		}
+		errs = append(errs, cwquery.Validate(path+".query", rule.Query))
 	}
 	return errors.Join(errs...)
 }
@@ -258,9 +262,6 @@ func validateMetricSelectors(path string, selectors []ProfileMetricSelectorConfi
 				seenMetrics[metric.Name] = struct{}{}
 			}
 			errs = append(errs, validateMetricStatistics(metricPath+".statistics", metric.Statistics))
-			if metric.Statistics == nil && selector.Statistics == nil {
-				errs = append(errs, fmt.Errorf("%s must define statistics or inherit them from %s.statistics", metricPath, groupPath))
-			}
 		}
 	}
 	return errors.Join(errs...)

@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon Kinesis Data Streams
 namespace: AWS/Kinesis
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: StreamName
@@ -51,17 +52,19 @@ metrics:
     statistics: [sum]
     rate: true
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. All are published at the {StreamName} grain.
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {StreamName} grain.
   # ----------------------------------------------------------------------------------------
-  # - id: put_record_bytes
-  #   metric_name: PutRecord.Bytes
-  #   statistics: [sum]
-  #   rate: true
-  # - id: put_records_bytes
-  #   metric_name: PutRecords.Bytes
-  #   statistics: [sum]
-  #   rate: true
+  - id: put_record_bytes
+    disabled: true
+    metric_name: PutRecord.Bytes
+    statistics: [sum]
+    rate: true
+  - id: put_records_bytes
+    disabled: true
+    metric_name: PutRecords.Bytes
+    statistics: [sum]
+    rate: true
   # Enhanced SHARD-level metrics use the {StreamName, ShardId} grain (opt-in via
   # EnableEnhancedMonitoring, billed as custom metrics); enhanced fan-out consumers use
   # {StreamName, ConsumerName}. Both need their own profile. See:
@@ -140,16 +143,16 @@ template:
         - selector: put_records_throttled_sum
           name: throttled
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_kinesis_put_bytes
-    #   context: put_bytes
-    #   title: Kinesis Put Bytes
-    #   family: Throughput
-    #   units: bytes/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: put_record_bytes_sum
-    #       name: put_record
-    #     - selector: put_records_bytes_sum
-    #       name: put_records
+    - id: aws_cloudwatch_kinesis_put_bytes
+      context: put_bytes
+      title: Kinesis Put Bytes
+      family: Throughput
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: put_record_bytes_sum
+          name: put_record
+        - selector: put_records_bytes_sum
+          name: put_records

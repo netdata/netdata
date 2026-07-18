@@ -20,11 +20,12 @@ import (
 const recurringLogEvery = time.Hour
 
 const (
-	logKeyDiscoveryTargetFailed  = "discovery_target_failed"
+	logKeyDiscoveryGroupFailed   = "discovery_group_failed"
 	logKeyHighInstanceCount      = "high_instance_count"
 	logKeyQueryClientFailed      = "query_client_failed"
 	logKeyGetMetricDataFailed    = "getmetricdata_failed"
 	logKeyGetMetricDataForbidden = "getmetricdata_forbidden"
+	logKeyGetMetricDataTransient = "getmetricdata_transient"
 	logKeyAccountResolveFailed   = "account_resolve_failed"
 	logKeyTagRefreshFailed       = "tag_refresh_failed"
 	logKeyRuleShadowed           = "rule_shadowed"
@@ -51,9 +52,11 @@ func New() *Collector {
 			UpdateEvery:        defaultUpdateEvery,
 			AutoDetectionRetry: defaultAutoDetectRetry,
 			Discovery:          DiscoveryConfig{RefreshEvery: defaultDiscoveryRefresh},
-			QueryOffset:        defaultQueryOffset,
-			Limits:             LimitsConfig{MaxInstances: defaultMaxInstances},
-			Timeout:            defaultTimeout,
+			Limits: LimitsConfig{
+				MaxInstances:       defaultMaxInstances,
+				MaxDiscoveryGroups: defaultMaxDiscoveryGroups,
+			},
+			Timeout: defaultTimeout,
 		},
 		store:               metrix.NewCollectorStore(),
 		now:                 time.Now,
@@ -63,6 +66,7 @@ func New() *Collector {
 		newRGTAClient:       defaultNewRGTAClient,
 	}
 	c.observations = newObservationStore(c.store)
+	c.activity = newCollectorActivity(c.store)
 	c.clients = newClientCache(c.buildTargetRegionClient)
 	c.rgtaClients = newClientCache(c.buildTargetRegionRGTAClient)
 	return c
@@ -86,17 +90,16 @@ type Collector struct {
 	resolvedByRef     map[string]resolvedTarget
 	chartTemplateYAML string
 
-	clients        *clientCache[cloudwatchClient] // one per (target, region)
-	rgtaClients    *clientCache[rgtaClient]       // one per (target, region)
-	discovery      discoverySnapshot
-	queryPlan      []plannedQuery
-	queryGroups    []queryGroupKey
-	queriesByGroup map[queryGroupKey][]plannedQuery
-	planDirty      bool
+	clients     *clientCache[cloudwatchClient] // one per (target, region)
+	rgtaClients *clientCache[rgtaClient]       // one per (target, region)
+	discovery   discoverySnapshot
+	queryPlan   []plannedQuery
+	planDirty   bool
 
 	discoverySig string // last-logged discovered-resources summary; Info re-logs only when it changes
 
-	observations *observationStore // retention cache + per-(target, region, period) query schedule
+	observations *observationStore  // per-stable-query completion and retained values
+	activity     *collectorActivity // commit-acknowledged interval AWS activity
 
 	tags          tagSnapshot              // resource-tag membership and label cache, refreshed with discovery
 	tagLabelPlans map[string][]resolvedTag // per-profile resolved tag->label plans (nil until compiled)
@@ -128,13 +131,12 @@ func (c *Collector) Cleanup(context.Context) {
 	c.chartTemplateYAML = ""
 	c.discovery = discoverySnapshot{}
 	c.queryPlan = nil
-	c.queryGroups = nil
-	c.queriesByGroup = nil
 	c.planDirty = true
 	c.discoverySig = ""
 	c.clients.reset()
 	c.rgtaClients.reset()
 	c.observations.reset()
+	c.activity.reset()
 	c.tags = tagSnapshot{}
 	c.tagLabelPlans = nil
 	c.tagFetchPlan = nil

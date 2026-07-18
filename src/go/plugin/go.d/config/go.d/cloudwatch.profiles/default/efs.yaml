@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon EFS
 namespace: AWS/EFS
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: FileSystemId
@@ -42,20 +43,23 @@ metrics:
   - id: client_connections
     metric_name: ClientConnections
     statistics: [sum]
-    period: 60
+    query:
+      period: 1m
     nil_as_zero: true   # Sum count; a quiet period is 0 client connections, not a gap
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. Both are published at the {FileSystemId} grain.
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # Both are published at the {FileSystemId} grain.
   # ----------------------------------------------------------------------------------------
-  # - id: metadata_read_io_bytes
-  #   metric_name: MetadataReadIOBytes
-  #   statistics: [sum]
-  #   rate: true
-  # - id: metadata_write_io_bytes
-  #   metric_name: MetadataWriteIOBytes
-  #   statistics: [sum]
-  #   rate: true
+  - id: metadata_read_io_bytes
+    disabled: true
+    metric_name: MetadataReadIOBytes
+    statistics: [sum]
+    rate: true
+  - id: metadata_write_io_bytes
+    disabled: true
+    metric_name: MetadataWriteIOBytes
+    statistics: [sum]
+    rate: true
   # StorageBytes uses the {FileSystemId, StorageClass} grain (15-min cadence) and TimeSinceLastSync the
   # {FileSystemId, DestinationFileSystemId} replication grain -- each needs its own profile. See:
   # https://docs.aws.amazon.com/efs/latest/ug/efs-metrics.html
@@ -120,16 +124,16 @@ template:
         - selector: client_connections_sum
           name: connections
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_efs_metadata_io
-    #   context: metadata_io
-    #   title: EFS Metadata I/O
-    #   family: Throughput
-    #   units: bytes/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: metadata_read_io_bytes_sum
-    #       name: read
-    #     - selector: metadata_write_io_bytes_sum
-    #       name: write
+    - id: aws_cloudwatch_efs_metadata_io
+      context: metadata_io
+      title: EFS Metadata I/O
+      family: Throughput
+      units: bytes/s
+      algorithm: absolute
+      dimensions:
+        - selector: metadata_read_io_bytes_sum
+          name: read
+        - selector: metadata_write_io_bytes_sum
+          name: write

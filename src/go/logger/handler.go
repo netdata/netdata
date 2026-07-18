@@ -33,7 +33,7 @@ func newTextHandler(w io.Writer) slog.Handler {
 }
 
 func newTerminalHandler(w io.Writer) slog.Handler {
-	return tint.NewHandler(w, &tint.Options{
+	return tint.NewTextHandler(w, &tint.Options{
 		NoColor:   runtime.GOOS == "windows",
 		AddSource: true,
 		Level:     Level.lvl,
@@ -52,8 +52,7 @@ func newTerminalHandler(w io.Writer) slog.Handler {
 				}
 			}
 			return a
-		},
-	})
+		}})
 }
 
 func withCallDepth(depth int, sh slog.Handler) slog.Handler {

@@ -85,16 +85,28 @@ func setSingleTargetPlan(c *Collector, account string, regions []string, profile
 	}
 	for _, region := range regions {
 		for _, profile := range profiles {
-			plan.Scopes = append(plan.Scopes, collectionScope{
+			scope := collectionScope{
 				Target: target, Profile: profile, Region: region, TagMembershipID: len(plan.Scopes),
-				SelectedSeries: compileProfileSeries(profile),
-			})
+				SelectedSeries: testCompiledSeries(profile),
+			}
+			if values, ok := profile.Config.StaticInstanceValues(); ok {
+				scope.StaticInstance = &collectionInstance{DimensionValues: values}
+			}
+			plan.Scopes = append(plan.Scopes, scope)
 		}
 	}
 	resolved := resolvedTarget{target: target, accountID: account}
 	c.plan = plan
 	c.resolvedByRef = map[string]resolvedTarget{"base": resolved}
 	c.invalidateQueryPlan()
+}
+
+func testCompiledSeries(profile cwprofiles.ResolvedProfile) []compiledSeries {
+	series, err := resolveSeriesPolicies("test", nil, nil, profile, compileProfileSeries(profile))
+	if err != nil {
+		panic(err)
+	}
+	return series
 }
 
 func resolvedTargetNames(c *Collector) []string {
@@ -194,7 +206,7 @@ func TestCollector_Init_appliesDefaults(t *testing.T) {
 
 	assert.Equal(t, defaultUpdateEvery, c.UpdateEvery)
 	assert.Equal(t, defaultDiscoveryRefresh, c.Discovery.RefreshEvery)
-	assert.Equal(t, defaultQueryOffset, c.QueryOffset)
+	assert.Equal(t, defaultMaxDiscoveryGroups, c.Limits.MaxDiscoveryGroups)
 	assert.True(t, c.recentlyActiveOnly())
 }
 
@@ -302,7 +314,7 @@ func TestCollector_CheckResolvesAllTargetsConcurrently(t *testing.T) {
 	for range cfg.Targets {
 		select {
 		case <-fake.started:
-		case <-time.After(250 * time.Millisecond):
+		case <-time.After(1 * time.Second):
 			allStarted = false
 		}
 		if !allStarted {

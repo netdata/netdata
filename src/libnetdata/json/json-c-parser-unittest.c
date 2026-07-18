@@ -1529,6 +1529,12 @@ static int test_format_rfc3339(void) {
     parsed_ok = rfc3339_parse_ut("1970-01-01T00:00:00.1234567890Z", &parsed, NULL);
     T(!parsed_ok && parsed == 999, "parse_rfc3339: more than 9 fractional digits fail without overwriting output");
 
+#if defined(HAVE_TIMEGM)
+    parsed = 999;
+    parsed_ok = rfc3339_parse_ut("1969-12-31T23:59:59Z", &parsed, NULL);
+    T(parsed_ok, "parse_rfc3339: valid timegm -1 timestamp succeeds");
+#endif
+
     parsed = 999;
     parsed_ok = rfc3339_parse_ut("1970-01-01T00:00:00. 123Z", &parsed, NULL);
     T(!parsed_ok && parsed == 999, "parse_rfc3339: fractional whitespace fails without overwriting output");

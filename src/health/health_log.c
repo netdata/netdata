@@ -248,7 +248,7 @@ inline ALARM_ENTRY* health_create_alarm_entry(
     ae->new_status = new_status;
     ae->duration = duration;
     ae->delay = delay;
-    ae->delay_up_to_timestamp = when + delay;
+    ae->delay_up_to_timestamp = nd_time_t_add_saturating(when, delay);
     ae->flags |= flags;
 
     ae->last_repeat = 0;
@@ -366,7 +366,7 @@ void health_alarm_log_cleanup(RRDHOST *host) {
     ALARM_ENTRY *ae = host->health_log.alarms;
     while(ae) {
         // Check if entry is old enough to be deleted
-        if(ae->when < now - retention && 
+        if(nd_time_t_add_compare(now, -(intmax_t)retention, ae->when) > 0 &&
            (ae->flags & HEALTH_ENTRY_FLAG_UPDATED) && // Only remove entries that have been processed/updated
            __atomic_load_n(&ae->pending_save_count, __ATOMIC_RELAXED) == 0) { // Only remove entries not pending save
             

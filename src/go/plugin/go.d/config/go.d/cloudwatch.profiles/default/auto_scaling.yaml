@@ -11,7 +11,8 @@
 version: v1
 display_name: AWS Auto Scaling
 namespace: AWS/AutoScaling
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: AutoScalingGroupName
@@ -42,44 +43,55 @@ metrics:
     metric_name: GroupTerminatingInstances
     statistics: [average]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts section below. All are published at the {AutoScalingGroupName}
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {AutoScalingGroupName}
   # grain. The capacity-unit metrics matter only for mixed-instances groups with per-type weights;
   # the warm-pool metrics are emitted only when the group has a warm pool.
   # ----------------------------------------------------------------------------------------
-  # - id: group_total_capacity
-  #   metric_name: GroupTotalCapacity
-  #   statistics: [average]
-  # - id: group_in_service_capacity
-  #   metric_name: GroupInServiceCapacity
-  #   statistics: [average]
-  # - id: group_pending_capacity
-  #   metric_name: GroupPendingCapacity
-  #   statistics: [average]
-  # - id: group_standby_capacity
-  #   metric_name: GroupStandbyCapacity
-  #   statistics: [average]
-  # - id: group_terminating_capacity
-  #   metric_name: GroupTerminatingCapacity
-  #   statistics: [average]
-  # - id: warm_pool_min_size
-  #   metric_name: WarmPoolMinSize
-  #   statistics: [average]
-  # - id: warm_pool_desired_capacity
-  #   metric_name: WarmPoolDesiredCapacity
-  #   statistics: [average]
-  # - id: warm_pool_warmed_capacity
-  #   metric_name: WarmPoolWarmedCapacity
-  #   statistics: [average]
-  # - id: warm_pool_pending_capacity
-  #   metric_name: WarmPoolPendingCapacity
-  #   statistics: [average]
-  # - id: warm_pool_terminating_capacity
-  #   metric_name: WarmPoolTerminatingCapacity
-  #   statistics: [average]
-  # - id: warm_pool_total_capacity
-  #   metric_name: WarmPoolTotalCapacity
-  #   statistics: [average]
+  - id: group_total_capacity
+    disabled: true
+    metric_name: GroupTotalCapacity
+    statistics: [average]
+  - id: group_in_service_capacity
+    disabled: true
+    metric_name: GroupInServiceCapacity
+    statistics: [average]
+  - id: group_pending_capacity
+    disabled: true
+    metric_name: GroupPendingCapacity
+    statistics: [average]
+  - id: group_standby_capacity
+    disabled: true
+    metric_name: GroupStandbyCapacity
+    statistics: [average]
+  - id: group_terminating_capacity
+    disabled: true
+    metric_name: GroupTerminatingCapacity
+    statistics: [average]
+  - id: warm_pool_min_size
+    disabled: true
+    metric_name: WarmPoolMinSize
+    statistics: [average]
+  - id: warm_pool_desired_capacity
+    disabled: true
+    metric_name: WarmPoolDesiredCapacity
+    statistics: [average]
+  - id: warm_pool_warmed_capacity
+    disabled: true
+    metric_name: WarmPoolWarmedCapacity
+    statistics: [average]
+  - id: warm_pool_pending_capacity
+    disabled: true
+    metric_name: WarmPoolPendingCapacity
+    statistics: [average]
+  - id: warm_pool_terminating_capacity
+    disabled: true
+    metric_name: WarmPoolTerminatingCapacity
+    statistics: [average]
+  - id: warm_pool_total_capacity
+    disabled: true
+    metric_name: WarmPoolTotalCapacity
+    statistics: [average]
 template:
   family: Auto Scaling
   context_namespace: auto_scaling
@@ -118,41 +130,41 @@ template:
         - selector: group_terminating_instances_average
           name: terminating
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric(s).
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_autoscaling_capacity_units
-    #   context: capacity_units
-    #   title: Auto Scaling Group Capacity Units by State
-    #   family: Capacity
-    #   units: units
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: group_total_capacity_average
-    #       name: total
-    #     - selector: group_in_service_capacity_average
-    #       name: in_service
-    #     - selector: group_pending_capacity_average
-    #       name: pending
-    #     - selector: group_standby_capacity_average
-    #       name: standby
-    #     - selector: group_terminating_capacity_average
-    #       name: terminating
-    # - id: aws_cloudwatch_autoscaling_warm_pool
-    #   context: warm_pool
-    #   title: Auto Scaling Warm Pool Capacity
-    #   family: Warm Pool
-    #   units: units
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: warm_pool_min_size_average
-    #       name: min
-    #     - selector: warm_pool_desired_capacity_average
-    #       name: desired
-    #     - selector: warm_pool_warmed_capacity_average
-    #       name: warmed
-    #     - selector: warm_pool_pending_capacity_average
-    #       name: pending
-    #     - selector: warm_pool_terminating_capacity_average
-    #       name: terminating
-    #     - selector: warm_pool_total_capacity_average
-    #       name: total
+    - id: aws_cloudwatch_autoscaling_capacity_units
+      context: capacity_units
+      title: Auto Scaling Group Capacity Units by State
+      family: Capacity
+      units: units
+      algorithm: absolute
+      dimensions:
+        - selector: group_total_capacity_average
+          name: total
+        - selector: group_in_service_capacity_average
+          name: in_service
+        - selector: group_pending_capacity_average
+          name: pending
+        - selector: group_standby_capacity_average
+          name: standby
+        - selector: group_terminating_capacity_average
+          name: terminating
+    - id: aws_cloudwatch_autoscaling_warm_pool
+      context: warm_pool
+      title: Auto Scaling Warm Pool Capacity
+      family: Warm Pool
+      units: units
+      algorithm: absolute
+      dimensions:
+        - selector: warm_pool_min_size_average
+          name: min
+        - selector: warm_pool_desired_capacity_average
+          name: desired
+        - selector: warm_pool_warmed_capacity_average
+          name: warmed
+        - selector: warm_pool_pending_capacity_average
+          name: pending
+        - selector: warm_pool_terminating_capacity_average
+          name: terminating
+        - selector: warm_pool_total_capacity_average
+          name: total

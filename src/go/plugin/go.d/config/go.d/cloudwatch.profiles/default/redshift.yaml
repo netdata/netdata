@@ -2,7 +2,8 @@
 version: v1
 display_name: Amazon Redshift
 namespace: AWS/Redshift
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: ClusterIdentifier
@@ -42,23 +43,27 @@ metrics:
     metric_name: NetworkTransmitThroughput
     statistics: [average]
   # ----------------------------------------------------------------------------------------
-  # Optional metrics (disabled by default). To enable one, uncomment its block here AND the
-  # matching chart in the charts: section below. All are published at the {ClusterIdentifier}
+  # Opt-in metrics (disabled by default). Select them through rules[].metrics.
+  # All are published at the {ClusterIdentifier}
   # grain.
   # ----------------------------------------------------------------------------------------
-  # - id: read_latency
-  #   metric_name: ReadLatency
-  #   statistics: [average]
-  # - id: write_latency
-  #   metric_name: WriteLatency
-  #   statistics: [average]
-  # - id: total_table_count
-  #   metric_name: TotalTableCount
-  #   statistics: [average]
-  # - id: concurrency_scaling_seconds
-  #   metric_name: ConcurrencyScalingSeconds
-  #   statistics: [sum]
-  #   rate: true
+  - id: read_latency
+    disabled: true
+    metric_name: ReadLatency
+    statistics: [average]
+  - id: write_latency
+    disabled: true
+    metric_name: WriteLatency
+    statistics: [average]
+  - id: total_table_count
+    disabled: true
+    metric_name: TotalTableCount
+    statistics: [average]
+  - id: concurrency_scaling_seconds
+    disabled: true
+    metric_name: ConcurrencyScalingSeconds
+    statistics: [sum]
+    rate: true
   # Redshift is heavily faceted; metrics at other grains need their own profile: per-node {NodeID},
   # per-WLM-queue {wlmid / service class / QueryPriority}, per-query-latency-class {latency},
   # per-query-stage {stage}, per-schema {Database, Schema}, per-usage-limit {FeatureType, UsageLimitId}.
@@ -142,34 +147,34 @@ template:
         - selector: network_transmit_throughput_average
           name: transmitted
     # ----------------------------------------------------------------------------------------
-    # Charts for the optional metrics above. Uncomment a chart together with its metric.
+    # Charts for the opt-in metrics above.
     # ----------------------------------------------------------------------------------------
-    # - id: aws_cloudwatch_redshift_latency
-    #   context: latency
-    #   title: Redshift Disk Latency
-    #   family: Latency
-    #   units: seconds
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: read_latency_average
-    #       name: read
-    #     - selector: write_latency_average
-    #       name: write
-    # - id: aws_cloudwatch_redshift_tables
-    #   context: total_table_count
-    #   title: Redshift Total Table Count
-    #   family: Tables
-    #   units: tables
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: total_table_count_average
-    #       name: tables
-    # - id: aws_cloudwatch_redshift_concurrency_scaling
-    #   context: concurrency_scaling
-    #   title: Redshift Concurrency Scaling Usage
-    #   family: Concurrency Scaling
-    #   units: seconds/s
-    #   algorithm: absolute
-    #   dimensions:
-    #     - selector: concurrency_scaling_seconds_sum
-    #       name: usage
+    - id: aws_cloudwatch_redshift_latency
+      context: latency
+      title: Redshift Disk Latency
+      family: Latency
+      units: seconds
+      algorithm: absolute
+      dimensions:
+        - selector: read_latency_average
+          name: read
+        - selector: write_latency_average
+          name: write
+    - id: aws_cloudwatch_redshift_tables
+      context: total_table_count
+      title: Redshift Total Table Count
+      family: Tables
+      units: tables
+      algorithm: absolute
+      dimensions:
+        - selector: total_table_count_average
+          name: tables
+    - id: aws_cloudwatch_redshift_concurrency_scaling
+      context: concurrency_scaling
+      title: Redshift Concurrency Scaling Usage
+      family: Concurrency Scaling
+      units: seconds/s
+      algorithm: absolute
+      dimensions:
+        - selector: concurrency_scaling_seconds_sum
+          name: usage

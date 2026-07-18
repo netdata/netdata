@@ -7,7 +7,15 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwprofiles"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 )
+
+// collectionInstance contains one profile instance's dimension values in the
+// same order as the profile's exact dimension set. It is used by both static
+// plan instances and dynamically discovered instances.
+type collectionInstance struct {
+	DimensionValues []string
+}
 
 type collectionPlan struct {
 	Targets  []*collectionTarget
@@ -29,16 +37,33 @@ type collectionScope struct {
 	TagFilter       []resourceTagFilter
 	TagMembershipID int
 	SelectedSeries  []compiledSeries
+	StaticInstance  *collectionInstance
 }
 
 func (s collectionScope) hasTagFilter() bool { return len(s.TagFilter) > 0 }
+
+func (s collectionScope) instances(snapshot discoverySnapshot) []collectionInstance {
+	if s.StaticInstance != nil {
+		return []collectionInstance{*s.StaticInstance}
+	}
+	return snapshot.Instances[discoveryKey{Target: s.Target.Name, Profile: s.Profile.Name, Region: s.Region}]
+}
+
+// profileSeriesSpec is the profile-defined series shape before rule query policy
+// inheritance is resolved.
+type profileSeriesSpec struct {
+	Ordinal     int
+	MetricIndex int
+	Statistic   string
+	Name        string
+}
 
 type compiledSeries struct {
 	Ordinal     int
 	MetricIndex int
 	Statistic   string
 	Name        string
-	Period      int
+	Policy      cwquery.Policy
 }
 
 func (c *Collector) ensurePlan() error {
@@ -65,7 +90,7 @@ func (c *Collector) ensurePlan() error {
 	c.chartTemplateYAML = template
 	c.Infof("CloudWatch: compiled %d collection scope(s) across %d target(s) and %d profile(s)",
 		len(plan.Scopes), len(plan.Targets), len(plan.Profiles))
-	c.Debugf("CloudWatch tuning: update_every=%ds, discovery.refresh_every=%ds, query_offset=%ds, recently_active_only=%v",
-		c.UpdateEvery, c.Discovery.RefreshEvery, c.QueryOffset, c.recentlyActiveOnly())
+	c.Debugf("CloudWatch tuning: update_every=%ds, discovery.refresh_every=%ds, recently_active_only=%v, limits.max_discovery_groups=%d",
+		c.UpdateEvery, c.Discovery.RefreshEvery, c.recentlyActiveOnly(), c.Limits.maxDiscoveryGroups())
 	return nil
 }

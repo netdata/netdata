@@ -9,7 +9,8 @@
 version: v1
 display_name: AWS Site-to-Site VPN
 namespace: AWS/VPN
-period: 300
+query:
+  period: 5m
 instance:
   dimensions:
     - name: VpnId

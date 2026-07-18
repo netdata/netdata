@@ -12,6 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/charttpl"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsregion"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 )
 
 // VersionV1 is the supported profile schema version.
@@ -22,16 +23,6 @@ const VersionV1 = "v1"
 // assembly so the two cannot drift. Each profile Group additionally carries its
 // own context_namespace (e.g. ec2).
 const ContextNamespace = "cloudwatch"
-
-// minPeriod is the smallest CloudWatch Period the collector supports, maxPeriod
-// the largest. CloudWatch standard-resolution metrics use a Period that is a
-// positive multiple of 60s, up to one day; every curated profile uses such a
-// Period (60, 300, 86400). Bounding it catches typos, keeps GetMetricData
-// windows aligned to published buckets, and prevents int32 Period overflow.
-const (
-	minPeriod = 60
-	maxPeriod = 86400
-)
 
 // reservedLabels are identity labels the collector provides on every series; a
 // profile dimension MUST NOT reuse them or the label set would collide.
@@ -53,12 +44,8 @@ var statStrings = map[string]string{
 	"sample_count": "SampleCount",
 }
 
-// Profile is one CloudWatch namespace's curated metric+chart definition. The
-// schema is additive-only across phases; the YAML decoder is non-strict, so an
-// older binary tolerates unknown fields a newer profile carries — but only when
-// old validation still passes. A profile that depends on a newer field to
-// validate (e.g. a dimension using Constant in place of Label) is rejected by an
-// older binary; see InstanceDimension.
+// Profile defines one exact CloudWatch namespace/dimension grain and its
+// curated metrics and charts. Multiple profiles may share a namespace.
 type Profile struct {
 	Version     string `yaml:"version" json:"version,omitempty"`
 	DisplayName string `yaml:"display_name" json:"display_name,omitempty"`
@@ -66,7 +53,7 @@ type Profile struct {
 	// SupportedRegions restricts profiles for services whose CloudWatch metrics
 	// are published only in specific regions. Nil means unrestricted.
 	SupportedRegions []string       `yaml:"supported_regions,omitempty" json:"supported_regions,omitempty"`
-	Period           int            `yaml:"period" json:"period,omitempty"`
+	Query            cwquery.Config `yaml:"query" json:"query"`
 	Instance         InstanceSpec   `yaml:"instance" json:"instance"`
 	Metrics          []Metric       `yaml:"metrics" json:"metrics,omitempty"`
 	Template         charttpl.Group `yaml:"template" json:"template"`
@@ -103,10 +90,6 @@ type InstanceSpec struct {
 // Use Constant for a dimension that is constant across instances and so carries no
 // Netdata identity (e.g. CloudFront's Region="Global"). Exactly one of Label or
 // Constant must be set.
-//
-// Forward-compat caveat: a profile that uses Constant (omitting Label) is rejected
-// by an OLDER collector binary, whose validation still requires Label. This is
-// benign for stock profiles, which ship with their binary.
 type InstanceDimension struct {
 	Name     string  `yaml:"name" json:"name,omitempty"`
 	Label    string  `yaml:"label" json:"label,omitempty"`
@@ -119,15 +102,17 @@ func (d InstanceDimension) IsConstant() bool { return d.Constant != nil }
 
 // Metric is one CloudWatch MetricName queried at one or more statistics.
 type Metric struct {
-	ID         string   `yaml:"id" json:"id,omitempty"`
+	ID string `yaml:"id" json:"id,omitempty"`
+	// Disabled excludes the metric from default selection. A collection rule can
+	// still include it explicitly by MetricName. Omitted decodes to false.
+	Disabled   bool     `yaml:"disabled,omitempty" json:"disabled,omitempty"`
 	MetricName string   `yaml:"metric_name" json:"metric_name,omitempty"`
 	Statistics []string `yaml:"statistics" json:"statistics,omitempty"`
-	// Rate, when true, presents the value as per-second (value / period). The
-	// collector injects divisor=period + float on the chart dimension. It
-	// requires a sum statistic.
+	// Rate, when true, presents each per-period total as a per-second value using
+	// the effective query period. It requires a sum or sample_count statistic.
 	Rate bool `yaml:"rate,omitempty" json:"rate,omitempty"`
-	// Period optionally overrides the profile-level Period for this metric.
-	Period int `yaml:"period,omitempty" json:"period,omitempty"`
+	// Query optionally overrides profile query defaults for this metric.
+	Query *cwquery.Config `yaml:"query,omitempty" json:"query,omitempty"`
 	// NilAsZero controls how a query that returns no datapoint is recorded: as 0
 	// (true) or as a gap (false). Unset defaults to Rate — sum/count metrics read
 	// no-data as 0 ("no activity"), gauges gap — and an explicit value overrides
@@ -201,9 +186,9 @@ func (p Profile) Validate(prefix, baseName string) error {
 			seen[region] = struct{}{}
 		}
 	}
-	if !isValidPeriod(p.Period) {
-		errs = append(errs, fmt.Errorf("%s: 'period' must be a positive multiple of %d seconds", prefix, minPeriod))
-	}
+	profileQueryPath := prefix + ".query"
+	profileQueryErr := cwquery.ValidateProfile(profileQueryPath, p.Query)
+	errs = append(errs, profileQueryErr)
 
 	errs = append(errs, validateInstanceDimensions(prefix, p.Instance.Dimensions))
 
@@ -220,8 +205,21 @@ func (p Profile) Validate(prefix, baseName string) error {
 	seenMetricIDs := map[string]struct{}{}
 	seenMetricNames := map[string]struct{}{}
 	for i, metric := range p.Metrics {
-		if err := metric.validate(prefix, i); err != nil {
+		metricPath := fmt.Sprintf("%s.metrics[%d]", prefix, i)
+		if err := metric.validate(metricPath); err != nil {
 			errs = append(errs, err)
+		}
+		metricQueryPath := metricPath + ".query"
+		metricQueryErr := cwquery.Validate(metricQueryPath, metric.Query)
+		errs = append(errs, metricQueryErr)
+		if profileQueryErr == nil && metricQueryErr == nil {
+			if _, err := cwquery.Resolve(cwquery.Resolution{
+				Path:    metricPath,
+				Profile: cwquery.Source{Config: &p.Query, Path: profileQueryPath},
+				Metric:  cwquery.Source{Config: metric.Query, Path: metricQueryPath},
+			}); err != nil {
+				errs = append(errs, err)
+			}
 		}
 
 		id := strings.ToLower(strings.TrimSpace(metric.ID))
@@ -251,8 +249,7 @@ func (p Profile) Validate(prefix, baseName string) error {
 	return errors.Join(errs...)
 }
 
-func (m Metric) validate(profilePrefix string, idx int) error {
-	prefix := fmt.Sprintf("%s.metrics[%d]", profilePrefix, idx)
+func (m Metric) validate(prefix string) error {
 	var errs []error
 
 	if !IsValidIdentityID(m.ID) {
@@ -262,9 +259,6 @@ func (m Metric) validate(profilePrefix string, idx int) error {
 		errs = append(errs, fmt.Errorf("%s: 'metric_name' is required", prefix))
 	} else if m.MetricName != strings.TrimSpace(m.MetricName) {
 		errs = append(errs, fmt.Errorf("%s: 'metric_name' must not have surrounding whitespace", prefix))
-	}
-	if m.Period != 0 && !isValidPeriod(m.Period) {
-		errs = append(errs, fmt.Errorf("%s: 'period' override must be a positive multiple of %d seconds", prefix, minPeriod))
 	}
 	if len(m.Statistics) == 0 {
 		errs = append(errs, fmt.Errorf("%s: 'statistics' must contain at least one statistic", prefix))
@@ -479,15 +473,6 @@ func StatString(token string) string {
 	return token // percentile tokens (p<N>) are used verbatim
 }
 
-// EffectivePeriod returns the metric's per-metric period override when set,
-// else the profile-level period.
-func (p Profile) EffectivePeriod(m Metric) int {
-	if m.Period > 0 {
-		return m.Period
-	}
-	return p.Period
-}
-
 // DimensionNames returns the profile's instance dimension CloudWatch names in
 // declared order. This order is the canonical ordering for an instance's
 // dimension values.
@@ -497,6 +482,23 @@ func (p Profile) DimensionNames() []string {
 		names[i] = d.Name
 	}
 	return names
+}
+
+// StaticInstanceValues returns the profile's declared dimension values when
+// every instance dimension is constant. Such a profile has exactly one known
+// instance per target and region and does not require ListMetrics discovery.
+func (p Profile) StaticInstanceValues() ([]string, bool) {
+	if len(p.Instance.Dimensions) == 0 {
+		return nil, false
+	}
+	values := make([]string, len(p.Instance.Dimensions))
+	for i, dimension := range p.Instance.Dimensions {
+		if dimension.Constant == nil {
+			return nil, false
+		}
+		values[i] = *dimension.Constant
+	}
+	return values, true
 }
 
 func IsValidIdentityID(v string) bool {
@@ -512,10 +514,6 @@ func IsValidProfileName(v string) bool {
 // validation as a typo rather than pass here and then silently match nothing.
 func IsValidNamespace(v string) bool {
 	return reNamespace.MatchString(v)
-}
-
-func isValidPeriod(p int) bool {
-	return p >= minPeriod && p <= maxPeriod && p%minPeriod == 0
 }
 
 func validateTemplate(prefix, baseName string, profile Profile) error {

@@ -7,7 +7,7 @@ edition.workspace = true
 workspace = true
 
 [dependencies]
-netdata-plugin-error = { path = "../error" }
+netdata-plugin-error = { workspace = true }
 bitflags = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }

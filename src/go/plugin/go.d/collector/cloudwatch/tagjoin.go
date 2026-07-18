@@ -4,6 +4,7 @@ package cloudwatch
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws/arn"
@@ -63,12 +64,33 @@ var tagJoins = map[string]tagJoin{
 	"firehose": {namespace: "AWS/Firehose", resourceTypes: []string{"firehose:deliverystream"}, joinDims: []string{"DeliveryStreamName"}},
 	"redshift": {namespace: "AWS/Redshift", resourceTypes: []string{"redshift:cluster"}, joinDims: []string{"ClusterIdentifier"}},
 	"dynamodb": {namespace: "AWS/DynamoDB", resourceTypes: []string{"dynamodb:table"}, joinDims: []string{"TableName"}},
+	"privatelink_endpoint": {
+		namespace: "AWS/PrivateLinkEndpoints", resourceTypes: []string{"ec2:vpc-endpoint"}, joinDims: []string{"VPC Endpoint Id"},
+	},
+	"privatelink_service": {
+		namespace: "AWS/PrivateLinkServices", resourceTypes: []string{"ec2:vpc-endpoint-service"}, joinDims: []string{"Service Id"},
+	},
 
 	// Parent-resource joins: joinDims is the parent dimension only, so children
 	// (across storage_type / filter_id / operation) inherit the parent's tags.
 	"s3":                 {namespace: "AWS/S3", resourceTypes: []string{"s3"}, joinDims: []string{"BucketName"}},
 	"s3_requests":        {namespace: "AWS/S3", resourceTypes: []string{"s3"}, joinDims: []string{"BucketName"}},
 	"dynamodb_operation": {namespace: "AWS/DynamoDB", resourceTypes: []string{"dynamodb:table"}, joinDims: []string{"TableName"}},
+	"privatelink_endpoint_subnet": {
+		namespace: "AWS/PrivateLinkEndpoints", resourceTypes: []string{"ec2:vpc-endpoint"}, joinDims: []string{"VPC Endpoint Id"},
+	},
+	"privatelink_service_az": {
+		namespace: "AWS/PrivateLinkServices", resourceTypes: []string{"ec2:vpc-endpoint-service"}, joinDims: []string{"Service Id"},
+	},
+	"privatelink_service_load_balancer": {
+		namespace: "AWS/PrivateLinkServices", resourceTypes: []string{"ec2:vpc-endpoint-service"}, joinDims: []string{"Service Id"},
+	},
+	"privatelink_service_az_load_balancer": {
+		namespace: "AWS/PrivateLinkServices", resourceTypes: []string{"ec2:vpc-endpoint-service"}, joinDims: []string{"Service Id"},
+	},
+	"privatelink_service_vpc_endpoint": {
+		namespace: "AWS/PrivateLinkServices", resourceTypes: []string{"ec2:vpc-endpoint-service"}, joinDims: []string{"Service Id"},
+	},
 
 	// Overrides: shared/quirky ARN shapes.
 	"elb":            {namespace: "AWS/ELB", resourceTypes: []string{"elasticloadbalancing:loadbalancer"}, joinDims: []string{"LoadBalancerName"}, arnValues: elbClassicARNValues},
@@ -241,7 +263,7 @@ func (tj tagJoin) arnJoinKey(a arn.ARN) (string, bool) {
 // dimension values (ordered by dimNames = Profile.DimensionNames()).
 func (tj tagJoin) instanceJoinKey(dimNames, values []string) (string, bool) {
 	if len(tj.joinDims) == 1 {
-		idx := indexOfString(dimNames, tj.joinDims[0])
+		idx := slices.Index(dimNames, tj.joinDims[0])
 		if idx < 0 || idx >= len(values) {
 			return "", false
 		}
@@ -249,22 +271,13 @@ func (tj tagJoin) instanceJoinKey(dimNames, values []string) (string, bool) {
 	}
 	parts := make([]string, len(tj.joinDims))
 	for i, jd := range tj.joinDims {
-		idx := indexOfString(dimNames, jd)
+		idx := slices.Index(dimNames, jd)
 		if idx < 0 || idx >= len(values) {
 			return "", false
 		}
 		parts[i] = values[idx]
 	}
 	return strings.Join(parts, instanceKeySep), true
-}
-
-func indexOfString(ss []string, s string) int {
-	for i, v := range ss {
-		if v == s {
-			return i
-		}
-	}
-	return -1
 }
 
 // deriveResourceType maps an ARN to the "service[:type]" key used to look a profile

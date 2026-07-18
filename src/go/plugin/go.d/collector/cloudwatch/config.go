@@ -4,29 +4,31 @@ package cloudwatch
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/pkg/confopt"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsauth"
 	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/awsregion"
+	"github.com/netdata/netdata/go/plugins/plugin/go.d/collector/cloudwatch/internal/cwquery"
 )
 
 const (
-	defaultUpdateEvery      = 60
-	defaultAutoDetectRetry  = 0
-	defaultDiscoveryRefresh = 300
-	defaultQueryOffset      = 600
-	defaultMaxInstances     = 1000
-	defaultTimeout          = confopt.Duration(30 * time.Second)
+	defaultUpdateEvery        = 60
+	defaultAutoDetectRetry    = 0
+	defaultDiscoveryRefresh   = 300
+	defaultMaxInstances       = 1000
+	defaultMaxDiscoveryGroups = 64
+	defaultTimeout            = confopt.Duration(30 * time.Second)
 )
 
 // apiConcurrency bounds concurrent AWS API calls (ListMetrics discovery,
-// resource-tag lookup, and GetMetricData query chunks). metricsPerQuery is the
-// GetMetricData batch size; 500 is the AWS hard maximum per call. Neither is an
-// operator decision, so both are fixed constants rather than config.
+// resource-tag lookup, and GetMetricData query chunks). maxQueriesPerRequest is
+// the AWS ceiling; the datapoint budget may reduce the actual batch width.
+// Neither is an operator decision, so both are fixed constants rather than config.
 const (
-	apiConcurrency  = 5
-	metricsPerQuery = 500
+	apiConcurrency       = 5
+	maxQueriesPerRequest = 500
 )
 
 type Config struct {
@@ -40,7 +42,6 @@ type Config struct {
 	Labels             LabelsConfig             `yaml:"labels,omitempty" json:"labels"`
 	Limits             LimitsConfig             `yaml:"limits,omitempty" json:"limits"`
 	Discovery          DiscoveryConfig          `yaml:"discovery" json:"discovery"`
-	QueryOffset        int                      `yaml:"query_offset,omitempty" json:"query_offset"`
 	Timeout            confopt.Duration         `yaml:"timeout,omitempty" json:"timeout"`
 }
 
@@ -63,6 +64,7 @@ type RuleConfig struct {
 	Metrics  []ProfileMetricSelectorConfig `yaml:"metrics,omitempty" json:"metrics,omitempty"`
 	Regions  []string                      `yaml:"regions" json:"regions"`
 	Filters  *RuleFiltersConfig            `yaml:"filters,omitempty" json:"filters,omitempty"`
+	Query    *cwquery.Config               `yaml:"query,omitempty" json:"query,omitempty"`
 }
 
 type ProfileSelectorConfig struct {
@@ -77,8 +79,13 @@ func (c *ProfileSelectorConfig) includesDefaults() bool {
 
 type ProfileMetricSelectorConfig struct {
 	Profile    string                  `yaml:"profile" json:"profile"`
+	Defaults   *bool                   `yaml:"defaults,omitempty" json:"defaults,omitempty"`
 	Statistics []string                `yaml:"statistics,omitempty" json:"statistics,omitempty"`
 	Include    []MetricSelectionConfig `yaml:"include" json:"include"`
+}
+
+func (c ProfileMetricSelectorConfig) includesDefaults() bool {
+	return c.Defaults == nil || *c.Defaults
 }
 
 type MetricSelectionConfig struct {
@@ -88,6 +95,7 @@ type MetricSelectionConfig struct {
 
 type RuleDefaultsConfig struct {
 	Filters RuleDefaultFiltersConfig `yaml:"filters,omitempty" json:"filters"`
+	Query   *cwquery.Config          `yaml:"query,omitempty" json:"query,omitempty"`
 }
 
 type RuleDefaultFiltersConfig struct {
@@ -117,14 +125,22 @@ type ResourceTagLabelConfig struct {
 }
 
 type LimitsConfig struct {
-	MaxInstances int `yaml:"max_instances,omitempty" json:"max_instances"`
+	MaxInstances       int `yaml:"max_instances,omitempty" json:"max_instances"`
+	MaxDiscoveryGroups int `yaml:"max_discovery_groups,omitempty" json:"max_discovery_groups"`
+}
+
+func (c LimitsConfig) maxDiscoveryGroups() int {
+	if c.MaxDiscoveryGroups == 0 {
+		return defaultMaxDiscoveryGroups
+	}
+	return c.MaxDiscoveryGroups
 }
 
 type DiscoveryConfig struct {
 	RefreshEvery int `yaml:"refresh_every,omitempty" json:"refresh_every"`
-	// RecentlyActiveOnly is period-aware: when enabled, ListMetrics uses
-	// RecentlyActive=PT3H only when every series selected for one profile matcher
-	// has a period <= 3h. It is a pointer so the (true) default can be
+	// RecentlyActiveOnly is horizon-aware: when enabled, ListMetrics uses
+	// RecentlyActive=PT3H only when every selected series has publication delay,
+	// lookback, and period totaling no more than 3h. It is a pointer so the true default can be
 	// distinguished from an explicit false.
 	RecentlyActiveOnly *bool `yaml:"recently_active_only,omitempty" json:"recently_active_only,omitempty"`
 }
@@ -140,14 +156,13 @@ func (c *Config) applyDefaults() {
 		c.Discovery.RefreshEvery = defaultDiscoveryRefresh
 	}
 	if c.Discovery.RecentlyActiveOnly == nil {
-		v := true
-		c.Discovery.RecentlyActiveOnly = &v
-	}
-	if c.QueryOffset <= 0 {
-		c.QueryOffset = defaultQueryOffset
+		c.Discovery.RecentlyActiveOnly = new(true)
 	}
 	if c.Limits.MaxInstances == 0 {
 		c.Limits.MaxInstances = defaultMaxInstances
+	}
+	if c.Limits.MaxDiscoveryGroups == 0 {
+		c.Limits.MaxDiscoveryGroups = defaultMaxDiscoveryGroups
 	}
 	if c.Timeout.Duration() == 0 {
 		c.Timeout = defaultTimeout
@@ -163,14 +178,14 @@ func (c Config) validate() error {
 	if c.Discovery.RefreshEvery < 60 {
 		errs = append(errs, errors.New("'discovery.refresh_every' must be >= 60 seconds"))
 	}
-	if c.QueryOffset < 0 {
-		errs = append(errs, errors.New("'query_offset' cannot be negative"))
-	}
 	if c.Timeout.Duration() < 0 {
 		errs = append(errs, errors.New("'timeout' cannot be negative"))
 	}
 	if c.Limits.MaxInstances < 0 {
 		errs = append(errs, errors.New("'limits.max_instances' must be >= 1"))
+	}
+	if value := c.Limits.maxDiscoveryGroups(); value < 1 || value > maxDiscoveryGroupsPerJob {
+		errs = append(errs, fmt.Errorf("'limits.max_discovery_groups' must be between 1 and %d", maxDiscoveryGroupsPerJob))
 	}
 	if err := validateConfigStructure(c); err != nil {
 		errs = append(errs, err)
