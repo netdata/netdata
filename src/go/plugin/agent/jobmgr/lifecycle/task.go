@@ -12,10 +12,8 @@ import (
 
 var ErrTaskPanic = errors.New("jobmgr task child: panic")
 
-const maximumConcurrentDrainDependentTasks = TransientTaskSlots - 1
-
 type TaskRef struct {
-	Slot       uint8
+	Slot       uint32
 	Generation uint64
 }
 
@@ -36,7 +34,7 @@ type TaskStart struct {
 }
 
 func (ref TaskRef) Valid() bool {
-	return int(ref.Slot) < TransientTaskSlots && ref.Generation > 0
+	return ref.Generation > 0
 }
 
 type TaskCompletion struct {
@@ -80,6 +78,7 @@ type TaskAcknowledgement struct {
 
 type taskSlot struct {
 	generation             uint64
+	freeNext               uint32
 	active                 bool
 	joined                 bool
 	actionPending          bool
@@ -90,7 +89,6 @@ type taskSlot struct {
 	cleanup                TaskCleanup
 	preserveDisposeContext bool
 	retainedTimeout        bool
-	drainDependent         bool
 	action                 chan TaskAction
 }
 
@@ -113,20 +111,20 @@ type taskRequestQueue struct {
 }
 
 type TaskSupervisor struct {
-	frame                *FrameOwner
-	inherited            inheritedTaskRegistry
-	longLived            longLivedRegistry
-	slots                [TransientTaskSlots]taskSlot
-	requests             []*taskRequest
-	pending              [2]taskRequestQueue
-	freeRequest          uint32
-	nextClass            TaskClass
-	completions          chan TaskCompletion
-	acks                 chan TaskAcknowledgement
-	active               int
-	activeDrainDependent int
-	retained             int
-	saturated            bool
+	frame       *FrameOwner
+	inherited   inheritedTaskRegistry
+	longLived   longLivedRegistry
+	slots       []*taskSlot
+	freeSlot    uint32
+	requests    []*taskRequest
+	pending     [2]taskRequestQueue
+	freeRequest uint32
+	nextClass   TaskClass
+	completions chan TaskCompletion
+	acks        chan TaskAcknowledgement
+	active      int
+	retained    int
+	saturated   bool
 
 	admissionReadyMu      sync.Mutex
 	onAdmissionReady      func()
@@ -140,14 +138,11 @@ func NewTaskSupervisor(frame *FrameOwner) (*TaskSupervisor, error) {
 	supervisor := &TaskSupervisor{
 		frame:       frame,
 		requests:    []*taskRequest{nil},
-		completions: make(chan TaskCompletion, TransientTaskSlots),
-		acks:        make(chan TaskAcknowledgement, TransientTaskSlots),
+		completions: make(chan TaskCompletion, TaskStartServiceQuantum),
+		acks:        make(chan TaskAcknowledgement, TaskStartServiceQuantum),
 	}
 	supervisor.inherited.initialize()
 	supervisor.longLived.initialize()
-	for index := range supervisor.slots {
-		supervisor.slots[index].action = make(chan TaskAction, 1)
-	}
 	supervisor.nextClass = TaskClassFrameworkControl
 	return supervisor, nil
 }
@@ -279,23 +274,20 @@ func (supervisor *TaskSupervisor) CancelPendingOutcome(ref TaskRequestRef) (Task
 	return outcome, nil
 }
 
-func (supervisor *TaskSupervisor) Dispatch(parent context.Context, quantum int, started *[TransientTaskSlots]TaskStart) (int, bool, error) {
+func (supervisor *TaskSupervisor) Dispatch(parent context.Context, quantum int, started *[TaskStartServiceQuantum]TaskStart) (int, bool, error) {
 	if parent == nil || started == nil || quantum < 0 || quantum > len(started) {
 		return 0, supervisor.Pending() > 0, errors.New("jobmgr task supervisor: invalid dispatch")
 	}
 	count := 0
-	for count < quantum && supervisor.active < TransientTaskSlots {
+	for count < quantum {
 		first := taskClassIndex(supervisor.nextClass)
 		second := 1 - first
 		selected := first
 		if supervisor.pending[selected].head == 0 {
 			selected = second
 		}
-		if !supervisor.canDispatchQueue(selected) {
-			selected = second
-		}
 		queue := &supervisor.pending[selected]
-		if queue.head == 0 || !supervisor.canDispatchQueue(selected) {
+		if queue.head == 0 {
 			break
 		}
 		record := supervisor.requests[queue.head]
@@ -325,18 +317,6 @@ func (supervisor *TaskSupervisor) Dispatch(parent context.Context, quantum int, 
 	return count, supervisor.Pending() > 0, nil
 }
 
-func (supervisor *TaskSupervisor) canDispatchQueue(index int) bool {
-	if index < 0 || index >= len(supervisor.pending) {
-		return false
-	}
-	head := supervisor.pending[index].head
-	if head == 0 {
-		return false
-	}
-	return !supervisor.requests[head].plan.drainDependent ||
-		supervisor.activeDrainDependent < maximumConcurrentDrainDependentTasks
-}
-
 func (supervisor *TaskSupervisor) Pending() int {
 	return supervisor.pending[0].count + supervisor.pending[1].count
 }
@@ -360,231 +340,265 @@ func (supervisor *TaskSupervisor) start(parent context.Context, plan TaskPlan, i
 		(initial.empty() == plan.transactionScope.Current.Valid()) {
 		return TaskRef{}, errors.New("jobmgr task supervisor: invalid sealed task request")
 	}
-	for index := range supervisor.slots {
-		slot := &supervisor.slots[index]
-		if slot.active {
-			continue
+	index, slot, err := supervisor.allocateSlot()
+	if err != nil {
+		return TaskRef{}, err
+	}
+	launched := false
+	defer func() {
+		if !launched {
+			supervisor.recycleUnusedSlot(index, slot)
 		}
-		if len(slot.action) != 0 || slot.actionPending || !slot.outcome.empty() || slot.sequence != 0 || slot.joined || slot.retainedTimeout {
-			return TaskRef{}, errors.New("jobmgr task supervisor: dirty reusable slot")
+	}()
+	if plan.permitWork != nil {
+		permit, err := supervisor.IssueLongLivedPermit(plan.permitAdmission, plan.permitAdmissionRef, plan.permitOwner, plan.permitPlan)
+		if err != nil {
+			return TaskRef{}, err
 		}
-		slot.generation++
-		if slot.generation == 0 {
-			return TaskRef{}, errors.New("jobmgr task supervisor: slot generation wrapped")
-		}
-		if plan.permitWork != nil {
-			permit, err := supervisor.IssueLongLivedPermit(plan.permitAdmission, plan.permitAdmissionRef, plan.permitOwner, plan.permitPlan)
-			if err != nil {
-				return TaskRef{}, err
-			}
-			permitWork := plan.permitWork
-			permitOwner := plan.permitOwner
-			plan.Work = func(
-				ctx context.Context,
-			) (outcome TaskOutcome, resultErr error) {
-				defer func() {
-					if recovered := recover(); recovered != nil {
-						outcome = TaskOutcome{}
-						resultErr = errors.Join(
-							fmt.Errorf(
-								"%w in prepared-resource work: %v",
-								ErrTaskPanic,
-								recovered,
-							),
-							permit.AbortUnused(),
-						)
-					}
-				}()
-				resource, workErr := permitWork(ctx, permit)
-				if resource == nil {
-					return TaskOutcome{}, errors.Join(workErr, permit.AbortUnused())
-				}
-				identity, identityErr := preparedResourceIdentity(resource)
-				if identityErr != nil || identity != permitOwner {
-					outcome, outcomeErr := preparedResourceOutcome(resource, permitOwner)
-					return outcome, errors.Join(workErr, identityErr, outcomeErr, errors.New("jobmgr task supervisor: prepared resource identity differs from permit owner"))
-				}
-				outcome, outcomeErr := preparedResourceOutcome(resource, identity)
-				return outcome, errors.Join(workErr, outcomeErr)
-			}
-			plan.permitAdmission = nil
-			plan.permitAdmissionRef = AdmissionRef{}
-			plan.permitOwner = ResourceIdentity{}
-			plan.permitPlan = LongLivedPlan{}
-			plan.permitWork = nil
-		}
-		if plan.capabilityPermitWork != nil {
-			permit, err := supervisor.IssueLongLivedPermit(plan.permitAdmission, plan.permitAdmissionRef, plan.permitOwner, plan.permitPlan)
-			if err != nil {
-				return TaskRef{}, err
-			}
-			permitWork := plan.capabilityPermitWork
-			permitOwner := plan.permitOwner
-			plan.Work = func(
-				ctx context.Context,
-			) (outcome TaskOutcome, resultErr error) {
-				defer func() {
-					if recovered := recover(); recovered != nil {
-						outcome = TaskOutcome{}
-						resultErr = errors.Join(
-							fmt.Errorf(
-								"%w in prepared-capability work: %v",
-								ErrTaskPanic,
-								recovered,
-							),
-							permit.AbortUnused(),
-						)
-					}
-				}()
-				capability, workErr := permitWork(ctx, permit)
-				if capability == nil {
-					return TaskOutcome{}, errors.Join(workErr, permit.AbortUnused())
-				}
-				identity, identityErr := preparedCapabilityIdentity(capability)
-				if identityErr != nil || identity != permitOwner {
-					outcome, outcomeErr := preparedCapabilityOutcome(capability, permitOwner)
-					return outcome, errors.Join(workErr, identityErr, outcomeErr, errors.New("jobmgr task supervisor: prepared capability identity differs from permit owner"))
-				}
-				outcome, outcomeErr := preparedCapabilityOutcome(capability, identity)
-				return outcome, errors.Join(workErr, outcomeErr)
-			}
-			plan.permitAdmission = nil
-			plan.permitAdmissionRef = AdmissionRef{}
-			plan.permitOwner = ResourceIdentity{}
-			plan.permitPlan = LongLivedPlan{}
-			plan.capabilityPermitWork = nil
-		}
-		if plan.transactionWork != nil {
-			var current ReadyResource
-			if plan.transactionScope.Current.Valid() {
-				var ok bool
-				current, ok = initial.ReadyResource()
-				identity, identityOK := initial.ResourceIdentity()
-				if !ok || !identityOK || identity != plan.transactionScope.Current {
-					return TaskRef{}, errors.New(
-						"jobmgr task supervisor: transaction current differs from sealed scope",
+		permitWork := plan.permitWork
+		permitOwner := plan.permitOwner
+		plan.Work = func(
+			ctx context.Context,
+		) (outcome TaskOutcome, resultErr error) {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					outcome = TaskOutcome{}
+					resultErr = errors.Join(
+						fmt.Errorf(
+							"%w in prepared-resource work: %v",
+							ErrTaskPanic,
+							recovered,
+						),
+						permit.AbortUnused(),
 					)
 				}
-			} else if !initial.empty() {
-				return TaskRef{}, errors.New(
-					"jobmgr task supervisor: graph-only transaction has a current resource",
-				)
+			}()
+			resource, workErr := permitWork(ctx, permit)
+			if resource == nil {
+				return TaskOutcome{}, errors.Join(workErr, permit.AbortUnused())
 			}
-			initial = TaskOutcome{}
-			var permit LongLivedPermit
-			if plan.transactionScope.Successor.Valid() {
-				issued, err := supervisor.IssueLongLivedPermit(
-					plan.permitAdmission,
-					plan.permitAdmissionRef,
-					plan.permitOwner,
-					plan.permitPlan,
-				)
-				if err != nil {
-					return TaskRef{}, err
+			identity, identityErr := preparedResourceIdentity(resource)
+			if identityErr != nil || identity != permitOwner {
+				outcome, outcomeErr := preparedResourceOutcome(resource, permitOwner)
+				return outcome, errors.Join(workErr, identityErr, outcomeErr, errors.New("jobmgr task supervisor: prepared resource identity differs from permit owner"))
+			}
+			outcome, outcomeErr := preparedResourceOutcome(resource, identity)
+			return outcome, errors.Join(workErr, outcomeErr)
+		}
+		plan.permitAdmission = nil
+		plan.permitAdmissionRef = AdmissionRef{}
+		plan.permitOwner = ResourceIdentity{}
+		plan.permitPlan = LongLivedPlan{}
+		plan.permitWork = nil
+	}
+	if plan.capabilityPermitWork != nil {
+		permit, err := supervisor.IssueLongLivedPermit(plan.permitAdmission, plan.permitAdmissionRef, plan.permitOwner, plan.permitPlan)
+		if err != nil {
+			return TaskRef{}, err
+		}
+		permitWork := plan.capabilityPermitWork
+		permitOwner := plan.permitOwner
+		plan.Work = func(
+			ctx context.Context,
+		) (outcome TaskOutcome, resultErr error) {
+			defer func() {
+				if recovered := recover(); recovered != nil {
+					outcome = TaskOutcome{}
+					resultErr = errors.Join(
+						fmt.Errorf(
+							"%w in prepared-capability work: %v",
+							ErrTaskPanic,
+							recovered,
+						),
+						permit.AbortUnused(),
+					)
 				}
-				permit = issued
+			}()
+			capability, workErr := permitWork(ctx, permit)
+			if capability == nil {
+				return TaskOutcome{}, errors.Join(workErr, permit.AbortUnused())
 			}
-			work := plan.transactionWork
-			scope := plan.transactionScope
-			plan.Work = func(
-				ctx context.Context,
-			) (outcome TaskOutcome, resultErr error) {
-				defer func() {
-					if recovered := recover(); recovered != nil {
-						var abortErr error
-						if permit.Valid() {
-							abortErr = permit.AbortUnused()
-						}
-						var outcomeErr error
-						if current != nil {
-							outcome, outcomeErr = readyResourceOutcome(
-								current,
-								scope.Current,
-							)
-						}
-						resultErr = errors.Join(
-							fmt.Errorf(
-								"%w in resource-transaction work: %v",
-								ErrTaskPanic,
-								recovered,
-							),
-							abortErr,
-							outcomeErr,
-						)
-					}
-				}()
-				transaction, workErr := work(ctx, current, scope, permit)
-				if transaction == nil {
+			identity, identityErr := preparedCapabilityIdentity(capability)
+			if identityErr != nil || identity != permitOwner {
+				outcome, outcomeErr := preparedCapabilityOutcome(capability, permitOwner)
+				return outcome, errors.Join(workErr, identityErr, outcomeErr, errors.New("jobmgr task supervisor: prepared capability identity differs from permit owner"))
+			}
+			outcome, outcomeErr := preparedCapabilityOutcome(capability, identity)
+			return outcome, errors.Join(workErr, outcomeErr)
+		}
+		plan.permitAdmission = nil
+		plan.permitAdmissionRef = AdmissionRef{}
+		plan.permitOwner = ResourceIdentity{}
+		plan.permitPlan = LongLivedPlan{}
+		plan.capabilityPermitWork = nil
+	}
+	if plan.transactionWork != nil {
+		var current ReadyResource
+		if plan.transactionScope.Current.Valid() {
+			var ok bool
+			current, ok = initial.ReadyResource()
+			identity, identityOK := initial.ResourceIdentity()
+			if !ok || !identityOK || identity != plan.transactionScope.Current {
+				return TaskRef{}, errors.New(
+					"jobmgr task supervisor: transaction current differs from sealed scope",
+				)
+			}
+		} else if !initial.empty() {
+			return TaskRef{}, errors.New(
+				"jobmgr task supervisor: graph-only transaction has a current resource",
+			)
+		}
+		initial = TaskOutcome{}
+		var permit LongLivedPermit
+		if plan.transactionScope.Successor.Valid() {
+			issued, err := supervisor.IssueLongLivedPermit(
+				plan.permitAdmission,
+				plan.permitAdmissionRef,
+				plan.permitOwner,
+				plan.permitPlan,
+			)
+			if err != nil {
+				return TaskRef{}, err
+			}
+			permit = issued
+		}
+		work := plan.transactionWork
+		scope := plan.transactionScope
+		plan.Work = func(
+			ctx context.Context,
+		) (outcome TaskOutcome, resultErr error) {
+			defer func() {
+				if recovered := recover(); recovered != nil {
 					var abortErr error
 					if permit.Valid() {
 						abortErr = permit.AbortUnused()
 					}
+					var outcomeErr error
 					if current != nil {
-						outcome, outcomeErr := readyResourceOutcome(current, scope.Current)
-						return outcome, errors.Join(workErr, abortErr, outcomeErr)
-					}
-					return TaskOutcome{}, errors.Join(workErr, abortErr)
-				}
-				transactionScope, scopeErr := preparedResourceTransactionScope(transaction)
-				if workErr != nil || scopeErr != nil || transactionScope != scope {
-					restored, disposeErr := runPreparedResourceTransactionDispose(
-						context.WithoutCancel(ctx),
-						transaction,
-					)
-					current = nil
-					permit = LongLivedPermit{}
-					if restored != nil {
-						outcome, outcomeErr := readyResourceOutcome(restored, scope.Current)
-						return outcome, errors.Join(
-							workErr,
-							scopeErr,
-							disposeErr,
-							outcomeErr,
+						outcome, outcomeErr = readyResourceOutcome(
+							current,
+							scope.Current,
 						)
 					}
-					return TaskOutcome{}, errors.Join(
+					resultErr = errors.Join(
+						fmt.Errorf(
+							"%w in resource-transaction work: %v",
+							ErrTaskPanic,
+							recovered,
+						),
+						abortErr,
+						outcomeErr,
+					)
+				}
+			}()
+			transaction, workErr := work(ctx, current, scope, permit)
+			if transaction == nil {
+				var abortErr error
+				if permit.Valid() {
+					abortErr = permit.AbortUnused()
+				}
+				if current != nil {
+					outcome, outcomeErr := readyResourceOutcome(current, scope.Current)
+					return outcome, errors.Join(workErr, abortErr, outcomeErr)
+				}
+				return TaskOutcome{}, errors.Join(workErr, abortErr)
+			}
+			transactionScope, scopeErr := preparedResourceTransactionScope(transaction)
+			if workErr != nil || scopeErr != nil || transactionScope != scope {
+				restored, disposeErr := runPreparedResourceTransactionDispose(
+					context.WithoutCancel(ctx),
+					transaction,
+				)
+				current = nil
+				permit = LongLivedPermit{}
+				if restored != nil {
+					outcome, outcomeErr := readyResourceOutcome(restored, scope.Current)
+					return outcome, errors.Join(
 						workErr,
 						scopeErr,
 						disposeErr,
+						outcomeErr,
 					)
 				}
-				current = nil
-				permit = LongLivedPermit{}
-				return preparedResourceTransactionOutcome(transaction, scope)
+				return TaskOutcome{}, errors.Join(
+					workErr,
+					scopeErr,
+					disposeErr,
+				)
 			}
-			plan.transactionWork = nil
-			plan.transactionScope = ResourceTransactionScope{}
-			plan.transactionScopeSet = false
-			plan.permitAdmission = nil
-			plan.permitAdmissionRef = AdmissionRef{}
-			plan.permitOwner = ResourceIdentity{}
-			plan.permitPlan = LongLivedPlan{}
+			current = nil
+			permit = LongLivedPermit{}
+			return preparedResourceTransactionOutcome(transaction, scope)
 		}
-		var parentCtx context.Context
-		if plan.taskContext != nil {
-			parentCtx = plan.taskContext
-		} else {
-			parentCtx = parent
-		}
-		ctx, cancel := newTaskChildContext(parentCtx, plan.Deadline)
-		if plan.InitialCancellation != nil {
-			cancel(plan.InitialCancellation)
-		}
-		slot.active = true
-		slot.cancel = cancel
-		slot.cleanup = plan.Cleanup
-		slot.preserveDisposeContext = plan.preserveDisposeContext
-		slot.drainDependent = plan.drainDependent
-		slot.maxPhaseTransitions = plan.phaseLimit()
-		ref := TaskRef{Slot: uint8(index), Generation: slot.generation}
-		supervisor.active++
-		if plan.drainDependent {
-			supervisor.activeDrainDependent++
-		}
-		go supervisor.runChild(ctx, ref, plan, initial)
-		return ref, nil
+		plan.transactionWork = nil
+		plan.transactionScope = ResourceTransactionScope{}
+		plan.transactionScopeSet = false
+		plan.permitAdmission = nil
+		plan.permitAdmissionRef = AdmissionRef{}
+		plan.permitOwner = ResourceIdentity{}
+		plan.permitPlan = LongLivedPlan{}
 	}
-	return TaskRef{}, errors.New("jobmgr task supervisor: no transient slot")
+	var parentCtx context.Context
+	if plan.taskContext != nil {
+		parentCtx = plan.taskContext
+	} else {
+		parentCtx = parent
+	}
+	ctx, cancel := newTaskChildContext(parentCtx, plan.Deadline)
+	if plan.InitialCancellation != nil {
+		cancel(plan.InitialCancellation)
+	}
+	slot.active = true
+	slot.cancel = cancel
+	slot.cleanup = plan.Cleanup
+	slot.preserveDisposeContext = plan.preserveDisposeContext
+	slot.maxPhaseTransitions = plan.phaseLimit()
+	ref := TaskRef{Slot: index, Generation: slot.generation}
+	supervisor.active++
+	launched = true
+	go supervisor.runChild(ctx, ref, slot, plan, initial)
+	return ref, nil
+}
+
+func (supervisor *TaskSupervisor) allocateSlot() (uint32, *taskSlot, error) {
+	var index uint32
+	var slot *taskSlot
+	if supervisor.freeSlot == 0 {
+		if uint64(len(supervisor.slots)) > uint64(^uint32(0)) {
+			return 0, nil, errors.New("jobmgr task supervisor: reference space exhausted")
+		}
+		index = uint32(len(supervisor.slots))
+		slot = &taskSlot{action: make(chan TaskAction, 1)}
+		supervisor.slots = append(supervisor.slots, slot)
+	} else {
+		index = supervisor.freeSlot - 1
+		slot = supervisor.slots[index]
+		if slot == nil {
+			return 0, nil, errors.New("jobmgr task supervisor: nil reusable slot")
+		}
+		supervisor.freeSlot = slot.freeNext
+		slot.freeNext = 0
+	}
+	if slot.active || slot.cancel != nil || slot.cleanup != nil ||
+		len(slot.action) != 0 || slot.actionPending || !slot.outcome.empty() ||
+		slot.sequence != 0 || slot.maxPhaseTransitions != 0 || slot.joined ||
+		slot.preserveDisposeContext || slot.retainedTimeout {
+		return 0, nil, errors.New("jobmgr task supervisor: dirty reusable slot")
+	}
+	slot.generation++
+	if slot.generation == 0 {
+		return 0, nil, errors.New("jobmgr task supervisor: slot generation wrapped")
+	}
+	return index, slot, nil
+}
+
+func (supervisor *TaskSupervisor) recycleUnusedSlot(index uint32, slot *taskSlot) {
+	if slot == nil || slot.active || uint64(index) >= uint64(len(supervisor.slots)) ||
+		supervisor.slots[index] != slot {
+		panic("jobmgr task supervisor: invalid unused slot recycle")
+	}
+	slot.freeNext = supervisor.freeSlot
+	supervisor.freeSlot = index + 1
 }
 
 type taskChildContext struct {
@@ -684,20 +698,15 @@ func (supervisor *TaskSupervisor) Release(ref TaskRef) error {
 	if !slot.joined || slot.actionPending || len(slot.action) != 0 || !slot.outcome.empty() || slot.retainedTimeout {
 		return errors.New("jobmgr task supervisor: release before empty joined acknowledgement")
 	}
-	if slot.drainDependent && supervisor.activeDrainDependent <= 0 {
-		return errors.New("jobmgr task supervisor: drain-dependent count underflow")
-	}
 	slot.cancel(context.Canceled)
-	slot.active = false
-	slot.cancel = nil
-	slot.cleanup = nil
-	slot.joined = false
-	slot.sequence = 0
-	slot.maxPhaseTransitions = 0
-	if slot.drainDependent {
-		supervisor.activeDrainDependent--
-		slot.drainDependent = false
+	generation := slot.generation
+	action := slot.action
+	*slot = taskSlot{
+		generation: generation,
+		freeNext:   supervisor.freeSlot,
+		action:     action,
 	}
+	supervisor.freeSlot = ref.Slot + 1
 	supervisor.active--
 	return nil
 }
@@ -716,10 +725,7 @@ func (supervisor *TaskSupervisor) MarkRetainedTimeout(ref TaskRef) (bool, error)
 	}
 	slot.retainedTimeout = true
 	supervisor.retained++
-	if supervisor.retained > TransientTaskSlots {
-		return false, errors.New("jobmgr task supervisor: retained-timeout count exceeded task slots")
-	}
-	justSaturated := supervisor.retained == TransientTaskSlots && !supervisor.saturated
+	justSaturated := supervisor.retained == RetainedTimeoutFailStopThreshold && !supervisor.saturated
 	if justSaturated {
 		supervisor.saturated = true
 	}
@@ -846,7 +852,7 @@ func (supervisor *TaskSupervisor) TakeDisposedResourceTransaction(
 	return nil, nil
 }
 
-func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, plan TaskPlan, outcome TaskOutcome) {
+func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskSlot, plan TaskPlan, outcome TaskOutcome) {
 	var err error
 	if outcome.empty() {
 		if plan.Runner != nil {
@@ -855,7 +861,6 @@ func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, pla
 			outcome, err = runTaskWork(ctx, plan.Work)
 		}
 	}
-	slot := &supervisor.slots[ref.Slot]
 	if publishErr := outcome.validate(); publishErr != nil {
 		err = errors.Join(err, publishErr)
 	} else if !outcome.empty() {
@@ -1185,7 +1190,11 @@ func (supervisor *TaskSupervisor) slot(ref TaskRef) (*taskSlot, error) {
 	if !ref.Valid() {
 		return nil, errors.New("jobmgr task supervisor: invalid task reference")
 	}
-	slot := &supervisor.slots[ref.Slot]
+	if uint64(ref.Slot) >= uint64(len(supervisor.slots)) ||
+		supervisor.slots[ref.Slot] == nil {
+		return nil, errors.New("jobmgr task supervisor: stale task reference")
+	}
+	slot := supervisor.slots[ref.Slot]
 	if !slot.active || slot.generation != ref.Generation {
 		return nil, errors.New("jobmgr task supervisor: stale task reference")
 	}

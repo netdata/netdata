@@ -5,7 +5,6 @@ package lifecycle
 import (
 	"context"
 	"errors"
-	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -217,103 +216,57 @@ func TestTaskSupervisorDisposesPreparedTransactionAndRestoresCurrent(t *testing.
 	}
 }
 
-func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
+func TestTaskSupervisorRejectsSecondSteadyServiceTransaction(t *testing.T) {
 	tests := map[string]struct {
-		scope         ResourceTransactionScope
-		current       ReadyResource
-		seededPermits int
-		replacementAt int
+		permitPlan func(int64) (LongLivedPlan, error)
 	}{
-		"replacement current": {
-			scope: ResourceTransactionScope{
-				ID:      "job",
-				Current: ResourceIdentity{ID: "job", Generation: 1},
-				Successor: ResourceIdentity{
-					ID: "job", Generation: 2,
-				},
-			},
-			current: &recordingReadyResource{
-				identity: ResourceIdentity{ID: "job", Generation: 1},
-				events:   new([]string),
-			},
-			seededPermits: 1 + MaximumReplacementOverlaps,
-			replacementAt: 1,
-		},
-		"installation has no current": {
-			scope: ResourceTransactionScope{
-				ID:        "job",
-				Successor: ResourceIdentity{ID: "job", Generation: 1},
-			},
-			seededPermits: 1,
-		},
+		"pipeline":    {permitPlan: NewPipelineLongLivedPlan},
+		"SecretStore": {permitPlan: NewSecretStoreLongLivedPlan},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			admission := NewAdmissionLedger()
 			supervisor := newResourceTaskSupervisor(t)
-			longLived := make([]LongLivedPermit, 0, test.seededPermits)
-			var grants [TransientTaskSlots]AdmissionGrant
-			for index := 0; index < test.seededPermits; index++ {
-				request := admission.RequestOrdinary(
-					1,
-					AdmissionLaneRef{
-						Slot:       uint32(index + 1),
-						Generation: 1,
-					},
-					2,
-				)
-				if request.Rejected != nil {
-					t.Fatal(request.Rejected)
-				}
-				count, _, err := admission.TakeGrants(1, &grants)
-				if err != nil || count != 1 {
-					t.Fatalf(
-						"long-lived grant %d count=%d err=%v",
-						index,
-						count,
-						err,
-					)
-				}
-				permitPlan, err := NewSecretStoreLongLivedPlan(1)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if index >= test.replacementAt && test.replacementAt != 0 {
-					permitPlan.replacementOverlap = true
-				}
-				permit, err := supervisor.IssueLongLivedPermit(
-					admission,
-					request.Ref,
-					ResourceIdentity{
-						ID:         fmt.Sprintf("seed-%03d", index),
-						Generation: 1,
-					},
-					permitPlan,
-				)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if _, err := admission.ReleaseOrdinary(
-					request.Ref,
-				); err != nil {
-					t.Fatal(err)
-				}
-				longLived = append(longLived, permit)
+			var grants [4]AdmissionGrant
+			seedAdmission := admission.RequestOrdinary(
+				1,
+				AdmissionLaneRef{Slot: 1, Generation: 1},
+				2,
+			)
+			if seedAdmission.Rejected != nil {
+				t.Fatal(seedAdmission.Rejected)
+			}
+			count, _, err := admission.TakeGrants(1, &grants)
+			if err != nil || count != 1 {
+				t.Fatalf("long-lived grant count=%d err=%v", count, err)
+			}
+			seedPlan, err := test.permitPlan(1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			seed, err := supervisor.IssueLongLivedPermit(
+				admission,
+				seedAdmission.Ref,
+				ResourceIdentity{ID: "seed", Generation: 1},
+				seedPlan,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if _, err := admission.ReleaseOrdinary(seedAdmission.Ref); err != nil {
+				t.Fatal(err)
 			}
 
 			transactionAdmission := admission.RequestOrdinary(
 				1,
-				AdmissionLaneRef{
-					Slot:       1,
-					Generation: 2,
-				},
+				AdmissionLaneRef{Slot: 2, Generation: 1},
 				2,
 			)
 			if transactionAdmission.Rejected != nil {
 				t.Fatal(transactionAdmission.Rejected)
 			}
-			count, _, err := admission.TakeGrants(1, &grants)
+			count, _, err = admission.TakeGrants(1, &grants)
 			if err != nil || count != 1 {
 				t.Fatalf(
 					"transaction grant count=%d err=%v",
@@ -321,9 +274,13 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 					err,
 				)
 			}
-			permitPlan, err := NewSecretStoreLongLivedPlan(1)
+			permitPlan, err := test.permitPlan(1)
 			if err != nil {
 				t.Fatal(err)
+			}
+			scope := ResourceTransactionScope{
+				ID:        "successor",
+				Successor: ResourceIdentity{ID: "successor", Generation: 1},
 			}
 			plan, err := NewResourceTransactionPermitTaskPlan(
 				SourceJobManager,
@@ -331,8 +288,8 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 				TransactionTaskPhases,
 				admission,
 				transactionAdmission.Ref,
-				test.current,
-				test.scope,
+				nil,
+				scope,
 				permitPlan,
 				func(
 					context.Context,
@@ -354,7 +311,7 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			var started [TransientTaskSlots]TaskStart
+			var started [TaskStartServiceQuantum]TaskStart
 			count, _, err = supervisor.Dispatch(
 				context.Background(),
 				1,
@@ -374,21 +331,7 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 					err,
 				)
 			}
-			if test.current != nil {
-				current, ok := started[0].Outcome.ReadyResource()
-				identity, identityOK :=
-					started[0].Outcome.ResourceIdentity()
-				if !ok ||
-					!identityOK ||
-					current != test.current ||
-					identity != test.scope.Current {
-					t.Fatalf(
-						"returned current=%T identity=%#v",
-						current,
-						identity,
-					)
-				}
-			} else if started[0].Outcome.Kind() != TaskOutcomeNone {
+			if started[0].Outcome.Kind() != TaskOutcomeNone {
 				t.Fatalf(
 					"graph-only rejected outcome=%v",
 					started[0].Outcome.Kind(),
@@ -406,10 +349,8 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 			); err != nil {
 				t.Fatal(err)
 			}
-			for _, permit := range longLived {
-				if err := permit.AbortUnused(); err != nil {
-					t.Fatal(err)
-				}
+			if err := seed.AbortUnused(); err != nil {
+				t.Fatal(err)
 			}
 			if census := admission.Census(); census.ActiveRecords != 0 ||
 				census.OrdinaryBytes != 0 ||

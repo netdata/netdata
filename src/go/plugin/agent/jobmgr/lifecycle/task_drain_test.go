@@ -8,12 +8,11 @@ import (
 	"time"
 )
 
-func TestDrainDependentTasksReserveOneProgressSlot(t *testing.T) {
+func TestDrainDependentTasksDoNotConsumeGlobalExecutionCapacity(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	var events []string
-	var starts [TransientTaskSlots]TaskStart
-	var drainRequests [TransientTaskSlots]TaskRequestRef
-	for index := range drainRequests {
+	drainRequests := make(map[TaskRequestRef]struct{}, TaskStartServiceQuantum+1)
+	for index := 0; index < TaskStartServiceQuantum+1; index++ {
 		resource := &recordingReadyResource{
 			identity: ResourceIdentity{
 				ID: "job", Generation: uint64(index + 1),
@@ -25,20 +24,8 @@ func TestDrainDependentTasksReserveOneProgressSlot(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		drainRequests[index] = request
+		drainRequests[request] = struct{}{}
 	}
-	count, more, err := supervisor.Dispatch(context.Background(), len(starts), &starts)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if count != maximumConcurrentDrainDependentTasks || !more {
-		t.Fatalf("started=%d more=%v", count, more)
-	}
-	activeDrains := append([]TaskStart(nil), starts[:count]...)
-	for range count {
-		<-supervisor.CompletionCh()
-	}
-
 	progressRequest, err := supervisor.Enqueue(
 		TaskClassGenericFunction,
 		TaskPlan{
@@ -51,47 +38,64 @@ func TestDrainDependentTasksReserveOneProgressSlot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	starts = [TransientTaskSlots]TaskStart{}
-	count, _, err = supervisor.Dispatch(context.Background(), 1, &starts)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if count != 1 || starts[0].Request != progressRequest {
-		t.Fatalf("progress start=%+v", starts[0])
-	}
-	<-supervisor.CompletionCh()
-	terminateAndReleaseTask(t, supervisor, starts[0].Task, 2)
 
-	for _, started := range activeDrains {
+	started := make([]TaskStart, 0, len(drainRequests)+1)
+	for {
+		var starts [TaskStartServiceQuantum]TaskStart
+		count, more, err := supervisor.Dispatch(
+			context.Background(),
+			TaskStartServiceQuantum,
+			&starts,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if count > TaskStartServiceQuantum {
+			t.Fatalf("one dispatch started %d tasks", count)
+		}
+		started = append(started, starts[:count]...)
+		if !more {
+			break
+		}
+	}
+	if len(started) != len(drainRequests)+1 {
+		t.Fatalf("started=%d want=%d", len(started), len(drainRequests)+1)
+	}
+	if supervisor.Active() != len(started) {
+		t.Fatalf("active=%d want=%d", supervisor.Active(), len(started))
+	}
+
+	byTask := make(map[TaskRef]TaskRequestRef, len(started))
+	for _, start := range started {
+		byTask[start.Task] = start.Request
+	}
+	for range started {
+		completion := <-supervisor.CompletionCh()
+		request := byTask[completion.Ref]
+		if request == progressRequest {
+			terminateAndReleaseTask(t, supervisor, completion.Ref, 2)
+			continue
+		}
+		if _, ok := drainRequests[request]; !ok {
+			t.Fatalf("completion for unknown request=%+v", request)
+		}
 		if err := supervisor.SendAction(TaskAction{
-			Ref: started.Task, Sequence: 2, Kind: TaskActionDispose,
+			Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose,
 		}); err != nil {
 			t.Fatal(err)
 		}
 		if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
 			t.Fatal(ack.Err)
 		}
-		terminateAndReleaseTask(t, supervisor, started.Task, 3)
+		terminateAndReleaseTask(t, supervisor, completion.Ref, 3)
 	}
-
-	starts = [TransientTaskSlots]TaskStart{}
-	count, more, err = supervisor.Dispatch(context.Background(), 1, &starts)
-	if err != nil {
-		t.Fatal(err)
+	if supervisor.Active() != 0 || supervisor.Pending() != 0 {
+		t.Fatalf(
+			"terminal task census active=%d pending=%d",
+			supervisor.Active(),
+			supervisor.Pending(),
+		)
 	}
-	if count != 1 || more || starts[0].Request != drainRequests[len(drainRequests)-1] {
-		t.Fatalf("final drain start=%+v count=%d more=%v", starts[0], count, more)
-	}
-	<-supervisor.CompletionCh()
-	if err := supervisor.SendAction(TaskAction{
-		Ref: starts[0].Task, Sequence: 2, Kind: TaskActionDispose,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	terminateAndReleaseTask(t, supervisor, starts[0].Task, 3)
 }
 
 func terminateAndReleaseTask(

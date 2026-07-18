@@ -215,6 +215,78 @@ func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 	}
 }
 
+func TestSecretStoreReplacementPermitsGrowBeyondFormerOverlapLimit(t *testing.T) {
+	const replacements = 9
+
+	admission := NewAdmissionLedger()
+	supervisor := newLongLivedTestSupervisor(t)
+	steadyPlan, err := NewSecretStoreLongLivedPlan(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacementPlan, err := NewSecretStoreReplacementLongLivedPlan(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	permits := make([]LongLivedPermit, 0, replacements+1)
+	issue := func(owner ResourceIdentity, plan LongLivedPlan) {
+		t.Helper()
+		ref := grantLongLivedTestAdmission(t, admission, 2)
+		permit, issueErr := supervisor.IssueLongLivedPermit(
+			admission,
+			ref,
+			owner,
+			plan,
+		)
+		if issueErr != nil {
+			t.Fatal(issueErr)
+		}
+		if _, releaseErr := admission.ReleaseOrdinary(ref); releaseErr != nil {
+			t.Fatal(releaseErr)
+		}
+		permits = append(permits, permit)
+	}
+
+	issue(
+		ResourceIdentity{ID: "secret-store", Generation: 1},
+		steadyPlan,
+	)
+	for index := 0; index < replacements; index++ {
+		issue(
+			ResourceIdentity{
+				ID:         fmt.Sprintf("secret-store-replacement-%02d", index),
+				Generation: 1,
+			},
+			replacementPlan,
+		)
+	}
+
+	if census := supervisor.LongLivedCensus(); census.Active != replacements+1 ||
+		census.SecretStores != replacements+1 ||
+		census.Bytes != replacements+1 {
+		t.Fatalf("replacement overlap census=%+v", census)
+	}
+	if census := admission.Census(); census.ActiveRecords != 0 ||
+		census.LongLivedRecords != replacements+1 ||
+		census.OrdinaryBytes != replacements+1 {
+		t.Fatalf("replacement overlap admission=%+v", census)
+	}
+	for _, permit := range permits {
+		if err := permit.AbortUnused(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if census := admission.Census(); census.ActiveRecords != 0 ||
+		census.LongLivedRecords != 0 ||
+		census.OrdinaryBytes != 0 {
+		t.Fatalf("final replacement admission=%+v", census)
+	}
+	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{}) {
+		t.Fatalf("final replacement census=%+v", census)
+	}
+}
+
 func TestLongLivedSecretStorePermitRejectsByteReleaseBeforeExternalRelease(t *testing.T) {
 	admission := NewAdmissionLedger()
 	ref := grantLongLivedTestAdmission(t, admission, 100)

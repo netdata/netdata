@@ -359,7 +359,7 @@ var componentProofByCase = map[string][]ComponentProof{
 	},
 	"F24.11-b-task-class-fairness": {
 		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestTaskSupervisorDispatchRotatesPendingClasses"},
-		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestTaskSupervisorFrameworkControlBypassesPendingGenericAtCapacity"},
+		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestTaskSupervisorFrameworkControlStartsWithManyActiveGenericTasks"},
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelResourceScopedFunctionHasIndependentTaskSchedulingClass"},
 	},
 	"F24.12-b-catalog-loop-lookup": {

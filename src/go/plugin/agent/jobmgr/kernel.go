@@ -506,9 +506,7 @@ type CommandKernel struct {
 	functionCatalogClosing   bool
 	functionCatalogCloseMore bool
 	shutdownRequests         map[lifecycle.TaskRequestRef]*commandLane
-	shutdownTasks            [lifecycle.TransientTaskSlots]*commandLane
-	shutdownRequestCount     int
-	shutdownTaskCount        int
+	shutdownTasks            map[lifecycle.TaskRef]*commandLane
 	shutdownBarrier          RunShutdownBarrier
 	shutdownBarrierRequest   lifecycle.TaskRequestRef
 	shutdownBarrierTask      lifecycle.TaskRef
@@ -564,6 +562,7 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 		functionCleanupTasks:    make(map[lifecycle.TaskRef]functionCleanupTask),
 		functionCleanupRequests: make(map[lifecycle.TaskRequestRef]FunctionCleanupRef),
 		shutdownRequests:        make(map[lifecycle.TaskRequestRef]*commandLane),
+		shutdownTasks:           make(map[lifecycle.TaskRef]*commandLane),
 		functionMutations:       make(chan functionMutationSubmission),
 		byAdmission:             make(map[lifecycle.AdmissionRef]*commandOperation), lanes: make(map[commandLaneKey]*commandLane),
 		nextSource: lifecycle.SourceJobManager, nextExternalSource: lifecycle.SourceJobManager,
@@ -1081,7 +1080,7 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 		if !shuttingDown {
 			moreAdmissions = kernel.serviceAdmissions(4)
 			moreTasks = kernel.scheduleTasks(4)
-			kernel.serviceTaskStarts(4)
+			kernel.serviceTaskStarts(lifecycle.TaskStartServiceQuantum)
 			if cause := kernel.run.DirtyCause(); cause != nil {
 				beginShutdown(cause)
 			}
@@ -1096,7 +1095,9 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 				kernel.run.Dirty(shutdownErr)
 			}
 			_, moreInheritedCancellations, shutdownErr =
-				kernel.tasks.CancelInheritedBatch(4)
+				kernel.tasks.CancelInheritedBatch(
+					lifecycle.InheritedCancellationServiceQuantum,
+				)
 			if shutdownErr != nil {
 				kernel.run.Dirty(shutdownErr)
 			}
@@ -1113,7 +1114,7 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 			if err := kernel.advanceRunFinalizer(); err != nil {
 				kernel.run.Dirty(err)
 			}
-			kernel.serviceTaskStarts(4)
+			kernel.serviceTaskStarts(lifecycle.TaskStartServiceQuantum)
 		}
 		if shuttingDown {
 			if shutdownBudget.ExpireIfDue() {
@@ -1883,7 +1884,7 @@ func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
 }
 
 func (kernel *CommandKernel) serviceTaskStarts(quantum int) {
-	var started [lifecycle.TransientTaskSlots]lifecycle.TaskStart
+	var started [lifecycle.TaskStartServiceQuantum]lifecycle.TaskStart
 	count, _, dispatchErr := kernel.tasks.Dispatch(context.Background(), quantum, &started)
 	for _, start := range started[:count] {
 		if start.Err != nil {
@@ -1923,16 +1924,15 @@ func (kernel *CommandKernel) serviceTaskStarts(quantum int) {
 		operation := kernel.tasksByRequest[start.Request]
 		if operation == nil {
 			lane := kernel.shutdownRequests[start.Request]
-			if lane == nil || lane.shutdownRequest != start.Request || lane.shutdownTask.Valid() || kernel.shutdownTasks[start.Task.Slot] != nil {
+			if lane == nil || lane.shutdownRequest != start.Request ||
+				lane.shutdownTask.Valid() || kernel.shutdownTasks[start.Task] != nil {
 				kernel.run.Dirty(errors.New("jobmgr kernel: invalid shutdown task start acknowledgement"))
 				return
 			}
 			delete(kernel.shutdownRequests, start.Request)
-			kernel.shutdownRequestCount--
 			lane.shutdownRequest = lifecycle.TaskRequestRef{}
 			lane.shutdownTask = start.Task
-			kernel.shutdownTasks[start.Task.Slot] = lane
-			kernel.shutdownTaskCount++
+			kernel.shutdownTasks[start.Task] = lane
 			continue
 		}
 		if operation == nil || operation.taskRequest != start.Request ||
@@ -2502,7 +2502,7 @@ func (kernel *CommandKernel) completeShutdownTask(completion lifecycle.TaskCompl
 		kernel.run.Dirty(errors.New("jobmgr kernel: invalid shutdown task completion"))
 		return
 	}
-	lane := kernel.shutdownTasks[completion.Ref.Slot]
+	lane := kernel.shutdownTasks[completion.Ref]
 	if lane == nil || lane.shutdownTask != completion.Ref || lane.shutdownAction != 0 || completion.Sequence != 1 ||
 		!lane.currentStopping || lane.current != nil || !lane.currentIdentity.Valid() || lane.retiringIdentity.Valid() {
 		kernel.run.Dirty(errors.New("jobmgr kernel: completion for unknown or invalid shutdown task"))
@@ -2524,7 +2524,7 @@ func (kernel *CommandKernel) acknowledgeShutdownTask(ack lifecycle.TaskAcknowled
 		kernel.run.Dirty(errors.New("jobmgr kernel: invalid shutdown task acknowledgement"))
 		return
 	}
-	lane := kernel.shutdownTasks[ack.Ref.Slot]
+	lane := kernel.shutdownTasks[ack.Ref]
 	if lane == nil || lane.shutdownTask != ack.Ref || lane.shutdownAction != ack.Kind {
 		kernel.run.Dirty(errors.New("jobmgr kernel: acknowledgement for unknown or invalid shutdown task"))
 		return
@@ -2577,8 +2577,7 @@ func (kernel *CommandKernel) acknowledgeShutdownTask(ack lifecycle.TaskAcknowled
 			kernel.run.Dirty(err)
 			return
 		}
-		kernel.shutdownTasks[ack.Ref.Slot] = nil
-		kernel.shutdownTaskCount--
+		delete(kernel.shutdownTasks, ack.Ref)
 		lane.shutdownTask = lifecycle.TaskRef{}
 		lane.shutdownAction = 0
 		kernel.releaseUnusedLane(lane)
@@ -3203,10 +3202,10 @@ func (kernel *CommandKernel) markRetainedTimeout(operation *commandOperation, ba
 		return err
 	}
 	if saturated && background {
-		return errors.New("jobmgr kernel: fourth background timeout saturated all task slots")
+		return errors.New("jobmgr kernel: fourth background timeout reached the retained-timeout fail-stop threshold")
 	}
 	if saturated {
-		return errors.New("jobmgr kernel: fourth retained timeout saturated all task slots")
+		return errors.New("jobmgr kernel: fourth retained timeout reached the fail-stop threshold")
 	}
 	return nil
 }
@@ -3782,7 +3781,6 @@ func (kernel *CommandKernel) enqueueShutdownStop(lane *commandLane) error {
 	lane.currentStopping = true
 	lane.shutdownRequest = request
 	kernel.shutdownRequests[request] = lane
-	kernel.shutdownRequestCount++
 	return nil
 }
 
@@ -3940,7 +3938,7 @@ func (kernel *CommandKernel) shutdownReadyForFinalizer() bool {
 		kernel.functionMutationActive || kernel.functionMutationPaused ||
 		len(kernel.byAdmission) != 0 || len(kernel.lanes) != 0 ||
 		kernel.tasks.Active() != 0 || kernel.tasks.Pending() != 0 || inherited.Active != 0 ||
-		kernel.shutdownRequestCount != 0 || kernel.shutdownTaskCount != 0 || len(kernel.controls) != 0 || kernel.deadlines.Len() != 0 ||
+		len(kernel.shutdownRequests) != 0 || len(kernel.shutdownTasks) != 0 || len(kernel.controls) != 0 || kernel.deadlines.Len() != 0 ||
 		len(kernel.submissions[0]) != 0 || len(kernel.submissions[1]) != 0 || kernel.blockedSubmission[0] || kernel.blockedSubmission[1] ||
 		kernel.ready[0].len != 0 || kernel.ready[1].len != 0 || kernel.claims.WaitingCount() != 0 || len(kernel.claims.keys) != 0 {
 		return false
@@ -4019,7 +4017,7 @@ func (kernel *CommandKernel) shutdownQuiescent() bool {
 		kernel.functionCleanupBacklog.count != 0 ||
 		kernel.functionMutationActive || kernel.functionMutationPaused ||
 		len(kernel.byAdmission) != 0 || len(kernel.lanes) != 0 ||
-		kernel.tasks.Active() != 0 || kernel.tasks.Pending() != 0 || kernel.shutdownRequestCount != 0 || kernel.shutdownTaskCount != 0 || len(kernel.controls) != 0 || kernel.deadlines.Len() != 0 ||
+		kernel.tasks.Active() != 0 || kernel.tasks.Pending() != 0 || len(kernel.shutdownRequests) != 0 || len(kernel.shutdownTasks) != 0 || len(kernel.controls) != 0 || kernel.deadlines.Len() != 0 ||
 		len(kernel.submissions[0]) != 0 || len(kernel.submissions[1]) != 0 || kernel.blockedSubmission[0] || kernel.blockedSubmission[1] ||
 		kernel.ready[0].len != 0 || kernel.ready[1].len != 0 || kernel.claims.WaitingCount() != 0 || len(kernel.claims.keys) != 0 {
 		return false
@@ -4378,8 +4376,13 @@ func (kernel *CommandKernel) unlinkLane(lane *commandLane) {
 	lane.allListed = false
 }
 
+const (
+	operationRecordAdmissionBytes    = int64(512)
+	taskChildExecutionAdmissionBytes = int64(4 * 1024)
+)
+
 func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
-	bytes := int64(512)
+	bytes := operationRecordAdmissionBytes + taskChildExecutionAdmissionBytes
 	if request.PayloadCapacity < 0 || request.PayloadCapacity > lifecycle.MaximumInputBodyBytes || request.PayloadCapacity > lifecycle.OrdinaryBudgetBytes-bytes {
 		return 0, errors.New("jobmgr kernel: input body does not self-fit admission")
 	}

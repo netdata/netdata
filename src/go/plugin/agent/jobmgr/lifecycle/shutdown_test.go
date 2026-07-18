@@ -273,16 +273,16 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 			var total ShutdownCancellationCensus
 			for {
 				census, more, cancelErr := supervisor.CancelInheritedBatch(
-					TransientTaskSlots,
+					InheritedCancellationServiceQuantum,
 				)
 				if cancelErr != nil {
 					t.Fatal(cancelErr)
 				}
-				if census.Visited > TransientTaskSlots {
+				if census.Visited > InheritedCancellationServiceQuantum {
 					t.Fatalf(
 						"one cancellation turn visited %d tasks, want at most %d",
 						census.Visited,
-						TransientTaskSlots,
+						InheritedCancellationServiceQuantum,
 					)
 				}
 				total.Visited += census.Visited

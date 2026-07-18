@@ -10,11 +10,6 @@ import (
 
 var ErrLongLivedRecordCapacity = errors.New("jobmgr long-lived permit: capacity exhausted")
 
-const (
-	MaximumFixedLongLivedServices = 2
-	MaximumReplacementOverlaps    = TransientTaskSlots
-)
-
 type LongLivedClass uint8
 
 const (
@@ -466,19 +461,19 @@ func (supervisor *TaskSupervisor) returnLongLivedPermit(ref LongLivedPermitRef, 
 }
 
 func longLivedClassFull(count int, plan LongLivedPlan) bool {
-	limit := -1
+	if plan.replacementOverlap {
+		return false
+	}
 	switch plan.class {
 	case LongLivedPipeline:
-		limit = 1
+		return count >= 1
 	case LongLivedJob:
 		return false
 	case LongLivedSecretStore:
-		limit = 1
+		return count >= 1
+	default:
+		return true
 	}
-	if plan.replacementOverlap {
-		limit += MaximumReplacementOverlaps
-	}
-	return limit < 0 || count >= limit
 }
 
 func (registry *longLivedRegistry) incrementClassCensus(class LongLivedClass) {

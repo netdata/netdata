@@ -210,7 +210,7 @@ func dispatchCapabilityTask(t *testing.T, supervisor *TaskSupervisor, plan TaskP
 	if err != nil {
 		t.Fatal(err)
 	}
-	var starts [TransientTaskSlots]TaskStart
+	var starts [TaskStartServiceQuantum]TaskStart
 	count, _, err := supervisor.Dispatch(context.Background(), 1, &starts)
 	if err != nil || count != 1 || starts[0].Request != request {
 		t.Fatalf("capability dispatch differs: count=%d start=%+v err=%v", count, starts[0], err)

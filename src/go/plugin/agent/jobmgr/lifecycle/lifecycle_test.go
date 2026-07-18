@@ -769,7 +769,7 @@ func TestAdmissionInputBodyAbortReleasesWaitingAndGrantedCapacity(t *testing.T) 
 	}
 }
 
-func TestTaskSupervisorFourSlotsAndGenerationCheckedReuse(t *testing.T) {
+func TestTaskSupervisorDynamicPopulationAndGenerationCheckedReuse(t *testing.T) {
 	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
 		t.Fatal(err)
@@ -779,29 +779,47 @@ func TestTaskSupervisorFourSlotsAndGenerationCheckedReuse(t *testing.T) {
 		t.Fatal(err)
 	}
 	release := make(chan struct{})
-	refs := make([]TaskRef, 0, TransientTaskSlots)
-	for range TransientTaskSlots {
-		_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
+	const population = TaskStartServiceQuantum*2 + 1
+	for range population {
+		_, err := supervisor.Enqueue(TaskClassGenericFunction, TaskPlan{
 			Source: SourceFunction,
 			Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
 				<-release
 				return NewSealedResult(200, "application/json", []byte(`{}`))
 			}),
 		})
-		refs = append(refs, ref)
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
-	pending, err := supervisor.Enqueue(
-		TaskClassGenericFunction,
-		TaskPlan{Source: SourceFunction, Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
-			return NewSealedResult(200, "application/json", []byte(`{}`))
-		})},
-	)
-	if err != nil {
-		t.Fatal(err)
+	refs := make([]TaskRef, 0, population)
+	for {
+		var started [TaskStartServiceQuantum]TaskStart
+		count, more, err := supervisor.Dispatch(
+			context.Background(),
+			TaskStartServiceQuantum,
+			&started,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if count > TaskStartServiceQuantum {
+			t.Fatalf("one dispatch started %d tasks", count)
+		}
+		for _, start := range started[:count] {
+			refs = append(refs, start.Task)
+		}
+		if !more {
+			break
+		}
 	}
-	var blocked [TransientTaskSlots]TaskStart
-	if count, more, err := supervisor.Dispatch(context.Background(), 1, &blocked); err != nil || count != 0 || !more {
-		t.Fatalf("fifth transient task dispatch differs: count=%d more=%v err=%v", count, more, err)
+	if len(refs) != population || supervisor.Active() != population {
+		t.Fatalf(
+			"dynamic population refs=%d active=%d want=%d",
+			len(refs),
+			supervisor.Active(),
+			population,
+		)
 	}
 	close(release)
 	for range refs {
@@ -812,22 +830,14 @@ func TestTaskSupervisorFourSlotsAndGenerationCheckedReuse(t *testing.T) {
 		if err := supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
 			t.Fatal(err)
 		}
-	}
-	acknowledged := make([]TaskRef, 0, len(refs))
-	for range refs {
 		ack := <-supervisor.AcknowledgementCh()
 		if ack.Sequence != 2 || ack.Err != nil {
 			t.Fatalf("disposal acknowledgement differs: %#v", ack)
 		}
-		acknowledged = append(acknowledged, ack.Ref)
-	}
-	for _, ref := range acknowledged {
-		if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
+		if err := supervisor.SendAction(TaskAction{Ref: ack.Ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
 			t.Fatal(err)
 		}
-	}
-	for range refs {
-		ack := <-supervisor.AcknowledgementCh()
+		ack = <-supervisor.AcknowledgementCh()
 		if ack.Sequence != 3 || ack.Kind != TaskActionTerminate || ack.Err != nil {
 			t.Fatalf("termination acknowledgement differs: %#v", ack)
 		}
@@ -835,13 +845,26 @@ func TestTaskSupervisorFourSlotsAndGenerationCheckedReuse(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	var started [TransientTaskSlots]TaskStart
+	previous := make(map[uint32]uint64, len(refs))
+	for _, ref := range refs {
+		previous[ref.Slot] = ref.Generation
+	}
+	pending, err := supervisor.Enqueue(
+		TaskClassGenericFunction,
+		TaskPlan{Source: SourceFunction, Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
+			return NewSealedResult(200, "application/json", []byte(`{}`))
+		})},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var started [TaskStartServiceQuantum]TaskStart
 	count, more, err := supervisor.Dispatch(context.Background(), 1, &started)
 	if err != nil || count != 1 || more || started[0].Request != pending {
 		t.Fatalf("pending task dispatch differs: started=%#v count=%d more=%v err=%v", started[0], count, more, err)
 	}
 	ref := started[0].Task
-	if ref.Slot != refs[0].Slot || ref.Generation != refs[0].Generation+1 {
+	if generation, ok := previous[ref.Slot]; !ok || ref.Generation != generation+1 {
 		t.Fatalf("slot reuse differs: old=%#v new=%#v", refs[0], ref)
 	}
 	completion := <-supervisor.CompletionCh()
@@ -868,8 +891,8 @@ func TestTaskSupervisorRetainedTimeoutCountAndSaturationLatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	release := make(chan struct{})
-	refs := make([]TaskRef, 0, TransientTaskSlots)
-	for range TransientTaskSlots {
+	refs := make([]TaskRef, 0, RetainedTimeoutFailStopThreshold+1)
+	for range RetainedTimeoutFailStopThreshold + 1 {
 		_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
 			Source: SourceFunction,
 			Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
@@ -884,13 +907,14 @@ func TestTaskSupervisorRetainedTimeoutCountAndSaturationLatch(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		wantSaturated := index == TransientTaskSlots-1
+		wantSaturated := index == RetainedTimeoutFailStopThreshold-1
 		if saturated != wantSaturated {
 			t.Fatalf("retained timeout %d saturation=%v, want %v", index+1, saturated, wantSaturated)
 		}
 		count, latched := supervisor.RetainedTimeouts()
-		if count != index+1 || latched != wantSaturated {
-			t.Fatalf("retained timeout %d census=(%d,%v), want (%d,%v)", index+1, count, latched, index+1, wantSaturated)
+		wantLatched := index >= RetainedTimeoutFailStopThreshold-1
+		if count != index+1 || latched != wantLatched {
+			t.Fatalf("retained timeout %d census=(%d,%v), want (%d,%v)", index+1, count, latched, index+1, wantLatched)
 		}
 	}
 	for index, ref := range refs {
@@ -1222,9 +1246,9 @@ func TestTaskSupervisorDispatchRotatesPendingClasses(t *testing.T) {
 	j2, _ := supervisor.Enqueue(TaskClassFrameworkControl, plan(SourceJobManager))
 	f1, _ := supervisor.Enqueue(TaskClassGenericFunction, plan(SourceFunction))
 	f2, _ := supervisor.Enqueue(TaskClassGenericFunction, plan(SourceFunction))
-	var started [TransientTaskSlots]TaskStart
-	count, more, err := supervisor.Dispatch(context.Background(), TransientTaskSlots, &started)
-	if err != nil || count != TransientTaskSlots || more {
+	var started [TaskStartServiceQuantum]TaskStart
+	count, more, err := supervisor.Dispatch(context.Background(), TaskStartServiceQuantum, &started)
+	if err != nil || count != TaskStartServiceQuantum || more {
 		t.Fatalf("class-fair dispatch differs: count=%d more=%v err=%v", count, more, err)
 	}
 	want := []TaskRequestRef{j1, f1, j2, f2}
@@ -1234,7 +1258,7 @@ func TestTaskSupervisorDispatchRotatesPendingClasses(t *testing.T) {
 		}
 	}
 	close(release)
-	for range TransientTaskSlots {
+	for range TaskStartServiceQuantum {
 		completion := <-supervisor.CompletionCh()
 		if err := supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
 			t.Fatal(err)
@@ -1284,7 +1308,7 @@ func TestTaskSupervisorRejectsInvalidSchedulingClass(t *testing.T) {
 	}
 }
 
-func TestTaskSupervisorFrameworkControlBypassesPendingGenericAtCapacity(t *testing.T) {
+func TestTaskSupervisorFrameworkControlStartsWithManyActiveGenericTasks(t *testing.T) {
 	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
 		t.Fatal(err)
@@ -1301,7 +1325,8 @@ func TestTaskSupervisorFrameworkControlBypassesPendingGenericAtCapacity(t *testi
 			return NewSealedResult(200, "application/json", []byte(`{}`))
 		}),
 	}
-	for range TransientTaskSlots {
+	const activeGeneric = TaskStartServiceQuantum * 2
+	for range activeGeneric {
 		request, err := supervisor.Enqueue(
 			TaskClassGenericFunction,
 			blockingPlan,
@@ -1309,7 +1334,7 @@ func TestTaskSupervisorFrameworkControlBypassesPendingGenericAtCapacity(t *testi
 		if err != nil {
 			t.Fatal(err)
 		}
-		var started [TransientTaskSlots]TaskStart
+		var started [TaskStartServiceQuantum]TaskStart
 		count, _, err := supervisor.Dispatch(
 			context.Background(),
 			1,
@@ -1338,37 +1363,7 @@ func TestTaskSupervisorFrameworkControlBypassesPendingGenericAtCapacity(t *testi
 	if err != nil {
 		t.Fatal(err)
 	}
-	var saturated [TransientTaskSlots]TaskStart
-	if count, more, err := supervisor.Dispatch(
-		context.Background(),
-		1,
-		&saturated,
-	); err != nil || count != 0 || !more {
-		t.Fatalf(
-			"saturated dispatch differs: count=%d more=%v err=%v",
-			count,
-			more,
-			err,
-		)
-	}
-	close(release)
-	completion := <-supervisor.CompletionCh()
-	if err := supervisor.SendAction(TaskAction{
-		Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	ack := <-supervisor.AcknowledgementCh()
-	if err := supervisor.SendAction(TaskAction{
-		Ref: ack.Ref, Sequence: 3, Kind: TaskActionTerminate,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	ack = <-supervisor.AcknowledgementCh()
-	if err := supervisor.Release(ack.Ref); err != nil {
-		t.Fatal(err)
-	}
-	var started [TransientTaskSlots]TaskStart
+	var started [TaskStartServiceQuantum]TaskStart
 	count, more, err := supervisor.Dispatch(
 		context.Background(),
 		1,
@@ -1376,7 +1371,7 @@ func TestTaskSupervisorFrameworkControlBypassesPendingGenericAtCapacity(t *testi
 	)
 	if err != nil || count != 1 || !more {
 		t.Fatalf(
-			"post-capacity dispatch differs: count=%d more=%v err=%v",
+			"control dispatch differs: count=%d more=%v err=%v",
 			count,
 			more,
 			err,
@@ -1384,10 +1379,50 @@ func TestTaskSupervisorFrameworkControlBypassesPendingGenericAtCapacity(t *testi
 	}
 	if started[0].Request != control {
 		t.Fatalf(
-			"post-capacity request=%+v, want control=%+v before generic=%+v",
+			"started request=%+v, want control=%+v before generic=%+v",
 			started[0].Request,
 			control,
 			generic,
+		)
+	}
+	if supervisor.Active() != activeGeneric+1 {
+		t.Fatalf("active=%d want=%d", supervisor.Active(), activeGeneric+1)
+	}
+
+	close(release)
+	started = [TaskStartServiceQuantum]TaskStart{}
+	count, more, err = supervisor.Dispatch(
+		context.Background(),
+		1,
+		&started,
+	)
+	if err != nil || count != 1 || more || started[0].Request != generic {
+		t.Fatalf(
+			"remaining generic dispatch differs: count=%d more=%v start=%+v err=%v",
+			count,
+			more,
+			started[0],
+			err,
+		)
+	}
+	for range activeGeneric + 2 {
+		completion := <-supervisor.CompletionCh()
+		if err := supervisor.SendAction(TaskAction{
+			Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		ack := <-supervisor.AcknowledgementCh()
+		if ack.Err != nil {
+			t.Fatal(ack.Err)
+		}
+		terminateAndReleaseTask(t, supervisor, ack.Ref, 3)
+	}
+	if supervisor.Active() != 0 || supervisor.Pending() != 0 {
+		t.Fatalf(
+			"terminal task census active=%d pending=%d",
+			supervisor.Active(),
+			supervisor.Pending(),
 		)
 	}
 }
@@ -1426,7 +1461,7 @@ func TestTaskSupervisorDirectlyCancelsPendingRequest(t *testing.T) {
 	if err := supervisor.CancelPending(cancelled); err == nil {
 		t.Fatal("stale pending-task cancellation was accepted")
 	}
-	var started [TransientTaskSlots]TaskStart
+	var started [TaskStartServiceQuantum]TaskStart
 	count, more, err := supervisor.Dispatch(context.Background(), 1, &started)
 	if err != nil || count != 1 || more || started[0].Request != survivor {
 		t.Fatalf("pending cancellation survivor differs: started=%#v count=%d more=%v err=%v", started[0], count, more, err)
@@ -1455,7 +1490,7 @@ func enqueueAndDispatchTask(t *testing.T, supervisor *TaskSupervisor, plan TaskP
 	if err != nil {
 		t.Fatal(err)
 	}
-	var started [TransientTaskSlots]TaskStart
+	var started [TaskStartServiceQuantum]TaskStart
 	count, _, err := supervisor.Dispatch(context.Background(), 1, &started)
 	if err != nil || count != 1 || started[0].Request != request {
 		t.Fatalf("task dispatch differs: started=%#v count=%d err=%v", started[0], count, err)

@@ -1144,6 +1144,68 @@ func TestKernelShutdownStopsResourceAfterActiveUserDrains(t *testing.T) {
 	closeUIDLedger(t, uids)
 }
 
+func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
+	const population = 9
+
+	stopRelease := make(chan struct{})
+	resources := make(map[string]*kernelTestReadyResource, population)
+	for index := 0; index < population; index++ {
+		id := fmt.Sprintf("resource-%02d", index)
+		resources[id] = newKernelTestReadyResource(id, nil, stopRelease)
+	}
+	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, kernelTestResourceSetPlanner{
+		permitPlan: permitPlan,
+		resources:  resources,
+	})
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	startKernelLoop(t, kernel)
+	for id := range resources {
+		if err := kernel.SubmitAndWait(context.Background(), Request{
+			UID:     "install-" + id,
+			LaneKey: id,
+			Source:  lifecycle.SourceJobManager,
+			Route:   "install",
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	kernel.Stop()
+	for id, resource := range resources {
+		select {
+		case <-resource.stopEntered:
+		case <-time.After(time.Second):
+			t.Fatalf("resource %q did not begin shutdown", id)
+		}
+	}
+	if active := tasks.Active(); active != population {
+		t.Fatalf("active shutdown tasks=%d, want %d", active, population)
+	}
+	close(stopRelease)
+
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer waitCancel()
+	if err := kernel.Wait(waitCtx); err != nil {
+		t.Fatal(err)
+	}
+	if tasks.Active() != 0 || tasks.Pending() != 0 {
+		t.Fatalf("resource shutdown retained tasks: active=%d pending=%d", tasks.Active(), tasks.Pending())
+	}
+	if census := tasks.LongLivedCensus(); census != (lifecycle.LongLivedCensus{}) {
+		t.Fatalf("resource shutdown retained long-lived ownership: %+v", census)
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
+}
+
 func TestKernelRunFinalizerUsesSharedBudgetExactlyOnce(t *testing.T) {
 	called := make(chan struct {
 		generation uint64
@@ -1509,7 +1571,7 @@ func TestKernelDeadlineCancelsPendingCapabilityCommit(t *testing.T) {
 func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 	clock := newKernelFinalizerClock()
 	release := make(chan struct{})
-	blockerEntered := make(chan struct{}, lifecycle.TransientTaskSlots)
+	blockerEntered := make(chan struct{}, 1)
 	type deadlineObservation struct {
 		deadline time.Time
 		ok       bool
@@ -1538,26 +1600,24 @@ func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 	})
 	var output bytes.Buffer
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
-	setTestFunctionResource(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
+	setTestFunctionResource(t, kernel, func(FunctionLookup) string {
+		return "queued-deadline"
+	})
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
 	startKernelLoop(t, kernel)
 	future := clock.Now().Add(time.Minute)
-	for index := 0; index < lifecycle.TransientTaskSlots; index++ {
-		if err := kernel.Submit(context.Background(), Request{
-			UID: fmt.Sprintf("blocker-%d", index), Source: lifecycle.SourceFunction,
-			Route: "blocker", Deadline: future,
-		}); err != nil {
-			t.Fatal(err)
-		}
+	if err := kernel.Submit(context.Background(), Request{
+		UID: "blocker", Source: lifecycle.SourceFunction,
+		Route: "blocker", Deadline: future,
+	}); err != nil {
+		t.Fatal(err)
 	}
-	for index := 0; index < lifecycle.TransientTaskSlots; index++ {
-		select {
-		case <-blockerEntered:
-		case <-time.After(time.Second):
-			t.Fatal("blocking TaskChild did not occupy its slot")
-		}
+	select {
+	case <-blockerEntered:
+	case <-time.After(time.Second):
+		t.Fatal("same-lane blocker did not start")
 	}
 	due := clock.Now()
 	if err := kernel.Submit(context.Background(), Request{
@@ -1568,7 +1628,7 @@ func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 	}
 	select {
 	case observed := <-deadlineEntered:
-		t.Fatalf("queued deadline handler exceeded the four-slot bound: %+v", observed)
+		t.Fatalf("queued deadline handler bypassed its active lane: %+v", observed)
 	case <-time.After(20 * time.Millisecond):
 	}
 	close(release)
@@ -1607,7 +1667,7 @@ func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 func TestKernelStartsDueCooperativeRunner(t *testing.T) {
 	clock := newKernelFinalizerClock()
 	release := make(chan struct{})
-	blockerEntered := make(chan struct{}, lifecycle.TransientTaskSlots)
+	blockerEntered := make(chan struct{}, 1)
 	observed := make(chan error, 1)
 	runner := kernelDeadlineRunner{observed: observed}
 	planner := plannerFunc(func(
@@ -1649,28 +1709,24 @@ func TestKernelStartsDueCooperativeRunner(t *testing.T) {
 		t.Fatal(err)
 	}
 	setTestFunctionResource(t, kernel, func(lookup FunctionLookup) string {
-		return lookup.UID
+		return "due-runner"
 	})
 	startKernelLoop(t, kernel)
-	for index := range lifecycle.TransientTaskSlots {
-		if err := kernel.Submit(
-			context.Background(),
-			Request{
-				UID:      fmt.Sprintf("runner-blocker-%d", index),
-				Source:   lifecycle.SourceFunction,
-				Route:    "blocker",
-				Deadline: clock.Now().Add(time.Minute),
-			},
-		); err != nil {
-			t.Fatal(err)
-		}
+	if err := kernel.Submit(
+		context.Background(),
+		Request{
+			UID:      "runner-blocker",
+			Source:   lifecycle.SourceFunction,
+			Route:    "blocker",
+			Deadline: clock.Now().Add(time.Minute),
+		},
+	); err != nil {
+		t.Fatal(err)
 	}
-	for range lifecycle.TransientTaskSlots {
-		select {
-		case <-blockerEntered:
-		case <-time.After(time.Second):
-			t.Fatal("blocking runner test task did not occupy its slot")
-		}
+	select {
+	case <-blockerEntered:
+	case <-time.After(time.Second):
+		t.Fatal("same-lane runner blocker did not start")
 	}
 	result := make(chan error, 1)
 	go func() {
@@ -1686,7 +1742,7 @@ func TestKernelStartsDueCooperativeRunner(t *testing.T) {
 	}()
 	select {
 	case cause := <-observed:
-		t.Fatalf("due cooperative runner bypassed task capacity: %v", cause)
+		t.Fatalf("due cooperative runner bypassed its active lane: %v", cause)
 	case <-time.After(20 * time.Millisecond):
 	}
 	close(release)
@@ -1863,7 +1919,7 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 func TestKernelDisposesQueuedNoResponseCapabilityAfterItsDeadline(t *testing.T) {
 	clock := newKernelFinalizerClock()
 	releaseBlockers := make(chan struct{})
-	blockerEntered := make(chan struct{}, lifecycle.TransientTaskSlots)
+	blockerEntered := make(chan struct{}, 1)
 	permitPlan, err := lifecycle.NewSecretStoreLongLivedPlan(4096)
 	if err != nil {
 		t.Fatal(err)
@@ -1890,25 +1946,20 @@ func TestKernelDisposesQueuedNoResponseCapabilityAfterItsDeadline(t *testing.T) 
 		})}, nil
 	})
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
-	setTestFunctionResource(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
 	startKernelLoop(t, kernel)
-	for index := 0; index < lifecycle.TransientTaskSlots; index++ {
-		if err := kernel.Submit(context.Background(), Request{
-			UID:    fmt.Sprintf("queued-capability-blocker-%d", index),
-			Source: lifecycle.SourceFunction, Route: "blocker",
-		}); err != nil {
-			t.Fatal(err)
-		}
+	if err := kernel.Submit(context.Background(), Request{
+		UID: "queued-capability-blocker", LaneKey: capabilityID,
+		Source: lifecycle.SourceJobManager, Route: "blocker",
+	}); err != nil {
+		t.Fatal(err)
 	}
-	for index := 0; index < lifecycle.TransientTaskSlots; index++ {
-		select {
-		case <-blockerEntered:
-		case <-time.After(time.Second):
-			t.Fatal("blocking TaskChild did not occupy its slot")
-		}
+	select {
+	case <-blockerEntered:
+	case <-time.After(time.Second):
+		t.Fatal("same-lane capability blocker did not start")
 	}
 	terminal := make(chan error, 1)
 	go func() {
@@ -1961,7 +2012,7 @@ func TestKernelDisposesQueuedNoResponseCapabilityAfterItsDeadline(t *testing.T) 
 func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 	clock := newKernelFinalizerClock()
 	releaseBlockers := make(chan struct{})
-	blockerEntered := make(chan struct{}, lifecycle.TransientTaskSlots)
+	blockerEntered := make(chan struct{}, 1)
 	var workCalls atomic.Int32
 	planner := plannerFunc(func(_ context.Context, route string, _ []string) (WorkPlan, error) {
 		if route == "noncooperative" {
@@ -1980,25 +2031,23 @@ func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 	})
 	var output bytes.Buffer
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
-	setTestFunctionResource(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
+	setTestFunctionResource(t, kernel, func(FunctionLookup) string {
+		return "queued-noncooperative"
+	})
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
 	startKernelLoop(t, kernel)
-	for index := 0; index < lifecycle.TransientTaskSlots; index++ {
-		if err := kernel.Submit(context.Background(), Request{
-			UID:    fmt.Sprintf("noncooperative-blocker-%d", index),
-			Source: lifecycle.SourceFunction, Route: "blocker",
-		}); err != nil {
-			t.Fatal(err)
-		}
+	if err := kernel.Submit(context.Background(), Request{
+		UID:    "noncooperative-blocker",
+		Source: lifecycle.SourceFunction, Route: "blocker",
+	}); err != nil {
+		t.Fatal(err)
 	}
-	for index := 0; index < lifecycle.TransientTaskSlots; index++ {
-		select {
-		case <-blockerEntered:
-		case <-time.After(time.Second):
-			t.Fatal("blocking TaskChild did not occupy its slot")
-		}
+	select {
+	case <-blockerEntered:
+	case <-time.After(time.Second):
+		t.Fatal("same-lane noncooperative blocker did not start")
 	}
 	terminal := make(chan error, 1)
 	go func() {
@@ -2043,7 +2092,7 @@ func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 
 func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) {
 	clock := newKernelFinalizerClock()
-	entered := make(chan string, lifecycle.TransientTaskSlots)
+	entered := make(chan string, lifecycle.RetainedTimeoutFailStopThreshold)
 	releaseWork := make(chan struct{})
 	planner := plannerFunc(func(_ context.Context, route string, _ []string) (WorkPlan, error) {
 		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
@@ -2059,8 +2108,8 @@ func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) 
 	}
 	startKernelLoop(t, kernel)
 	deadline := clock.Now().Add(time.Second)
-	terminals := make([]chan error, lifecycle.TransientTaskSlots)
-	for index := 0; index < lifecycle.TransientTaskSlots; index++ {
+	terminals := make([]chan error, lifecycle.RetainedTimeoutFailStopThreshold)
+	for index := 0; index < lifecycle.RetainedTimeoutFailStopThreshold; index++ {
 		terminals[index] = make(chan error, 1)
 		request := Request{
 			UID:    fmt.Sprintf("mixed-retained-%d", index),
@@ -2073,7 +2122,7 @@ func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) 
 			t.Fatal(err)
 		}
 	}
-	for index := 0; index < lifecycle.TransientTaskSlots; index++ {
+	for index := 0; index < lifecycle.RetainedTimeoutFailStopThreshold; index++ {
 		select {
 		case <-entered:
 		case <-time.After(time.Second):
@@ -2132,7 +2181,7 @@ func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) 
 func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T) {
 	clock := newKernelFinalizerClock()
 	release := make(chan struct{})
-	entered := make(chan string, lifecycle.TransientTaskSlots)
+	entered := make(chan string, lifecycle.RetainedTimeoutFailStopThreshold)
 	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
 	if err != nil {
 		t.Fatal(err)
@@ -2161,8 +2210,8 @@ func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T)
 	}
 	startKernelLoop(t, kernel)
 	deadline := clock.Now().Add(time.Second)
-	terminals := make([]chan error, lifecycle.TransientTaskSlots)
-	for index := 0; index < lifecycle.TransientTaskSlots; index++ {
+	terminals := make([]chan error, lifecycle.RetainedTimeoutFailStopThreshold)
+	for index := 0; index < lifecycle.RetainedTimeoutFailStopThreshold; index++ {
 		id := fmt.Sprintf("job:background-%d", index)
 		terminals[index] = make(chan error, 1)
 		if err := kernel.submit(context.Background(), Request{
@@ -2172,7 +2221,7 @@ func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T)
 			t.Fatal(err)
 		}
 	}
-	for index := 0; index < lifecycle.TransientTaskSlots; index++ {
+	for index := 0; index < lifecycle.RetainedTimeoutFailStopThreshold; index++ {
 		select {
 		case <-entered:
 		case <-time.After(time.Second):
@@ -2186,11 +2235,11 @@ func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T)
 	if err := kernel.WaitShutdownStarted(shutdownCtx); err != nil {
 		t.Fatalf("fourth background timeout did not start dirty shutdown: %v", err)
 	}
-	if cause := run.DirtyCause(); cause == nil || !strings.Contains(cause.Error(), "fourth background timeout saturated all task slots") {
+	if cause := run.DirtyCause(); cause == nil || !strings.Contains(cause.Error(), "fourth background timeout reached the retained-timeout fail-stop threshold") {
 		t.Fatalf("fourth background timeout dirty cause differs: %v", cause)
 	}
-	if count, saturated := tasks.RetainedTimeouts(); count != lifecycle.TransientTaskSlots || !saturated {
-		t.Fatalf("background timeout census=(%d,%v), want (%d,true)", count, saturated, lifecycle.TransientTaskSlots)
+	if count, saturated := tasks.RetainedTimeouts(); count != lifecycle.RetainedTimeoutFailStopThreshold || !saturated {
+		t.Fatalf("background timeout census=(%d,%v), want (%d,true)", count, saturated, lifecycle.RetainedTimeoutFailStopThreshold)
 	}
 	close(release)
 	for index, terminal := range terminals {
@@ -2204,7 +2253,7 @@ func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T)
 		}
 	}
 	terminalErr := kernel.Wait(context.Background())
-	if terminalErr == nil || !strings.Contains(terminalErr.Error(), "fourth background timeout saturated all task slots") {
+	if terminalErr == nil || !strings.Contains(terminalErr.Error(), "fourth background timeout reached the retained-timeout fail-stop threshold") {
 		t.Fatalf("background timeout terminal error differs: %v", terminalErr)
 	}
 	if output.Len() != 0 {
@@ -3070,6 +3119,17 @@ func TestOperationAdmissionBytesIncludesSealedRequestMetadata(t *testing.T) {
 	}
 }
 
+func TestOperationAdmissionBytesIncludesTaskChildExecutionAllowance(t *testing.T) {
+	got, err := operationAdmissionBytes(Request{}, WorkPlan{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := operationRecordAdmissionBytes + taskChildExecutionAdmissionBytes
+	if got != want {
+		t.Fatalf("empty operation admission=%d, want %d", got, want)
+	}
+}
+
 func TestOperationResultAdmissionBytesBoundaries(t *testing.T) {
 	base := int64(512)
 	tests := map[string]struct {
@@ -3350,7 +3410,7 @@ func TestKernelResourceScopedFunctionHasIndependentTaskSchedulingClass(t *testin
 	if tasks.Pending() != len(requests) {
 		t.Fatalf("pending tasks=%d, want %d", tasks.Pending(), len(requests))
 	}
-	var started [lifecycle.TransientTaskSlots]lifecycle.TaskStart
+	var started [lifecycle.TaskStartServiceQuantum]lifecycle.TaskStart
 	count, _, err := tasks.Dispatch(context.Background(), 1, &started)
 	if err != nil {
 		t.Fatal(err)
@@ -3498,7 +3558,7 @@ func TestKernelDeadlineServiceHasFixedQuantum(t *testing.T) {
 				t.Fatal(err)
 			}
 		}
-		if err := generation.StartChild(lifecycle.TaskRef{Slot: uint8(index % lifecycle.TransientTaskSlots), Generation: uint64(index + 1)}); err != nil {
+		if err := generation.StartChild(lifecycle.TaskRef{Slot: uint32(index), Generation: uint64(index + 1)}); err != nil {
 			t.Fatal(err)
 		}
 		operation := &commandOperation{OperationGeneration: generation, deadline: deadlineEntry{when: now.Add(-time.Second), index: -1}}
@@ -3855,6 +3915,45 @@ type kernelTestResourcePlanner struct {
 	resource    *kernelTestReadyResource
 	workEntered chan<- struct{}
 	workRelease <-chan struct{}
+}
+
+type kernelTestResourceSetPlanner struct {
+	permitPlan lifecycle.LongLivedPlan
+	resources  map[string]*kernelTestReadyResource
+}
+
+func (planner kernelTestResourceSetPlanner) Plan(request Request) (WorkPlan, error) {
+	if request.Route != "install" {
+		return WorkPlan{}, errors.New("unexpected kernel resource-set route")
+	}
+	resource := planner.resources[request.LaneKey]
+	if resource == nil {
+		return WorkPlan{}, errors.New("unexpected kernel resource-set identity")
+	}
+	return WorkPlan{
+		NoResponse: true,
+		Resource: &ResourcePlan{
+			Action: ResourceInstall,
+			ID:     request.LaneKey,
+			Permit: planner.permitPlan,
+			Prepare: func(
+				_ context.Context,
+				generation uint64,
+				permit lifecycle.LongLivedPermit,
+			) (lifecycle.PreparedResource, error) {
+				identity := lifecycle.ResourceIdentity{
+					ID:         request.LaneKey,
+					Generation: generation,
+				}
+				resource.identity = identity
+				return &kernelTestPreparedResource{
+					identity: identity,
+					permit:   permit,
+					ready:    resource,
+				}, nil
+			},
+		},
+	}, nil
 }
 
 type kernelTestTransactionPlanner struct {

@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 )
 
@@ -652,17 +651,13 @@ func runAgentHeldFunctionPopulation(
 			return err
 		}
 	}
-	wantConcurrent := admitted
-	if wantConcurrent > lifecycle.TransientTaskSlots {
-		wantConcurrent = lifecycle.TransientTaskSlots
-	}
 	if err := waitUntil(ctx, func() bool {
-		return state.count("raw:echo:entered") >= wantConcurrent
+		return state.count("raw:echo:entered") >= admitted
 	}); err != nil {
 		return fmt.Errorf(
 			"same-route handlers entered=%d, want at least %d before release: %w",
 			state.count("raw:echo:entered"),
-			wantConcurrent,
+			admitted,
 			err,
 		)
 	}

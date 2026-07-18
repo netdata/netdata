@@ -124,7 +124,7 @@ func BenchmarkBTaskChildLaunchCompletion(b *testing.B) {
 			},
 		),
 	}
-	var started [TransientTaskSlots]TaskStart
+	var started [TaskStartServiceQuantum]TaskStart
 	b.ReportAllocs()
 	for b.Loop() {
 		if _, err := supervisor.Enqueue(

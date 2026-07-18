@@ -13,18 +13,20 @@ import (
 var ErrFunctionResultTooLarge = errors.New("jobmgr lifecycle: Function result exceeds bound")
 
 const (
-	ProcessBudgetBytes        = 256 * 1024 * 1024
-	CleanupBudgetBytes        = 100 * 1024 * 1024
-	OrdinaryBudgetBytes       = ProcessBudgetBytes - CleanupBudgetBytes
-	TransientTaskSlots        = 4
-	ControlFrameBytes         = 64 * 1024
-	FunctionPayloadBytes      = 100 * 1024 * 1024
-	FunctionEnvelopeBytes     = 64 * 1024
-	MaximumFunctionFrameBytes = FunctionPayloadBytes + FunctionEnvelopeBytes
-	MaximumOtherFrameBytes    = 100 * 1024 * 1024
-	MaximumInputBodyBytes     = 20 * 1024 * 1024
-	FunctionTaskPhases        = 4
-	TransactionTaskPhases     = 6
+	ProcessBudgetBytes                  = 256 * 1024 * 1024
+	CleanupBudgetBytes                  = 100 * 1024 * 1024
+	OrdinaryBudgetBytes                 = ProcessBudgetBytes - CleanupBudgetBytes
+	TaskStartServiceQuantum             = 4
+	RetainedTimeoutFailStopThreshold    = 4
+	InheritedCancellationServiceQuantum = 4
+	ControlFrameBytes                   = 64 * 1024
+	FunctionPayloadBytes                = 100 * 1024 * 1024
+	FunctionEnvelopeBytes               = 64 * 1024
+	MaximumFunctionFrameBytes           = FunctionPayloadBytes + FunctionEnvelopeBytes
+	MaximumOtherFrameBytes              = 100 * 1024 * 1024
+	MaximumInputBodyBytes               = 20 * 1024 * 1024
+	FunctionTaskPhases                  = 4
+	TransactionTaskPhases               = 6
 )
 
 type SealedResult struct {

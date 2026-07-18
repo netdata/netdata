@@ -97,7 +97,7 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 }
 
 func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T) {
-	const calls = lifecycle.TransientTaskSlots + 1
+	const calls = 9
 
 	entered := make(chan string, calls)
 	release := make(chan struct{})
@@ -141,7 +141,7 @@ func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T
 
 	seen := make(map[string]struct{}, calls)
 	timer := time.NewTimer(time.Second)
-	for len(seen) < lifecycle.TransientTaskSlots {
+	for len(seen) < calls {
 		select {
 		case uid := <-entered:
 			seen[uid] = struct{}{}
@@ -152,24 +152,12 @@ func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T
 			t.Fatalf(
 				"same-route handlers entered=%d, want %d concurrent entries",
 				len(seen),
-				lifecycle.TransientTaskSlots,
+				calls,
 			)
 		}
 	}
 	if !timer.Stop() {
 		<-timer.C
-	}
-	select {
-	case uid := <-entered:
-		close(release)
-		kernel.Stop()
-		_ = kernel.Wait(context.Background())
-		t.Fatalf(
-			"handler %q bypassed the %d-slot execution bound",
-			uid,
-			lifecycle.TransientTaskSlots,
-		)
-	case <-time.After(25 * time.Millisecond):
 	}
 	if cleanupCalls.Load() != 0 {
 		close(release)
@@ -179,14 +167,6 @@ func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T
 	}
 
 	close(release)
-	select {
-	case uid := <-entered:
-		seen[uid] = struct{}{}
-	case <-time.After(time.Second):
-		kernel.Stop()
-		_ = kernel.Wait(context.Background())
-		t.Fatal("fifth same-route invocation did not run after a slot released")
-	}
 	kernel.Stop()
 	if err := kernel.Wait(context.Background()); err != nil {
 		t.Fatal(err)

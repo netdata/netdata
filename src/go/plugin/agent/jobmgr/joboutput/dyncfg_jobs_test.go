@@ -361,7 +361,7 @@ func startDynCfgJobTestTask(
 	if err != nil {
 		t.Fatal(err)
 	}
-	var starts [lifecycle.TransientTaskSlots]lifecycle.TaskStart
+	var starts [lifecycle.TaskStartServiceQuantum]lifecycle.TaskStart
 	count, _, err := supervisor.Dispatch(
 		context.Background(),
 		1,

@@ -325,12 +325,12 @@ func (supervisor *TaskSupervisor) SealInherited() error {
 func (supervisor *TaskSupervisor) CancelInheritedBatch(
 	quantum int,
 ) (ShutdownCancellationCensus, bool, error) {
-	if supervisor == nil || quantum <= 0 || quantum > TransientTaskSlots {
+	if supervisor == nil || quantum <= 0 || quantum > InheritedCancellationServiceQuantum {
 		return ShutdownCancellationCensus{}, false,
 			errors.New("jobmgr task supervisor: invalid inherited cancellation batch")
 	}
 	registry := &supervisor.inherited
-	var cancels [TransientTaskSlots]context.CancelFunc
+	var cancels [InheritedCancellationServiceQuantum]context.CancelFunc
 	cancelCount := 0
 	var census ShutdownCancellationCensus
 	registry.mu.Lock()

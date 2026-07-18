@@ -66,9 +66,9 @@ var bmM002HotpathRows = [...]HotpathGate{
 		OwnerID: "B-O-00006",
 		Package: "./plugin/agent/jobmgr/lifecycle",
 		Tests: []string{
-			"TestTaskSupervisorFourSlotsAndGenerationCheckedReuse",
+			"TestTaskSupervisorDynamicPopulationAndGenerationCheckedReuse",
 			"TestTaskSupervisorDispatchRotatesPendingClasses",
-			"TestTaskSupervisorFrameworkControlBypassesPendingGenericAtCapacity",
+			"TestTaskSupervisorFrameworkControlStartsWithManyActiveGenericTasks",
 			"TestTaskSupervisorRetainedTimeoutCountAndSaturationLatch",
 			"TestPendingTaskRequestPopulationGrowsBeyondFormerLimit",
 			"TestLongLivedJobPermitPopulationGrowsBeyondFormerLimit",
