@@ -24,7 +24,7 @@ type Scheduler struct {
 	jobTail    *scheduledJob
 	moduleHead *scheduledModule
 	moduleTail *scheduledModule
-	moduleTick [lifecycle.MaximumSteadyLongLivedRecords]string
+	moduleTick [lifecycle.MaximumActiveJobs]string
 }
 
 type scheduledJob struct {
@@ -49,11 +49,11 @@ func NewScheduler(reconciler ModuleReconciler) (*Scheduler, error) {
 		reconciler: reconciler,
 		jobs: make(
 			map[lifecycle.ResourceIdentity]*scheduledJob,
-			lifecycle.MaximumSteadyLongLivedRecords,
+			lifecycle.MaximumActiveJobs,
 		),
 		modules: make(
 			map[string]*scheduledModule,
-			lifecycle.MaximumSteadyLongLivedRecords,
+			lifecycle.MaximumActiveJobs,
 		),
 	}, nil
 }
@@ -68,7 +68,7 @@ func (scheduler *Scheduler) Register(
 	}
 	scheduler.mu.Lock()
 	defer scheduler.mu.Unlock()
-	if len(scheduler.jobs) == lifecycle.MaximumSteadyLongLivedRecords {
+	if len(scheduler.jobs) == lifecycle.MaximumActiveJobs {
 		return errors.New("job output: scheduler capacity exhausted")
 	}
 	if scheduler.jobs[identity] != nil {

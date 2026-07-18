@@ -8,7 +8,16 @@ import (
 	"sync"
 )
 
-const MaximumLongLivedPermits = MaximumLongLivedRecords
+var ErrLongLivedRecordCapacity = errors.New("jobmgr long-lived permit: capacity exhausted")
+
+const (
+	MaximumActiveJobs             = MaximumAdmissionRecords
+	MaximumFixedLongLivedServices = 2
+	MaximumReplacementOverlaps    = TransientTaskSlots
+	MaximumLongLivedPermits       = MaximumActiveJobs +
+		MaximumFixedLongLivedServices +
+		MaximumReplacementOverlaps
+)
 
 type LongLivedClass uint8
 
@@ -76,7 +85,7 @@ func (plan LongLivedPlan) Validate() error {
 			return errors.New("jobmgr long-lived permit: invalid pipeline facets")
 		}
 	case LongLivedJob:
-		if plan.replacementOverlap || plan.g != 0 || plan.e != LongLivedEJobResources {
+		if plan.g != 0 || plan.e != LongLivedEJobResources {
 			return errors.New("jobmgr long-lived permit: invalid job facets")
 		}
 	case LongLivedSecretStore:
@@ -87,6 +96,17 @@ func (plan LongLivedPlan) Validate() error {
 		return errors.New("jobmgr long-lived permit: invalid class")
 	}
 	return nil
+}
+
+func (plan LongLivedPlan) forReplacement() (LongLivedPlan, error) {
+	switch plan.class {
+	case LongLivedJob, LongLivedSecretStore:
+		plan.replacementOverlap = true
+	default:
+		return LongLivedPlan{},
+			errors.New("jobmgr long-lived permit: class has no replacement overlap")
+	}
+	return plan, plan.Validate()
 }
 
 func (plan LongLivedPlan) Class() LongLivedClass { return plan.class }
@@ -173,6 +193,7 @@ type longLivedRegistry struct {
 	mu       sync.Mutex
 	slots    [MaximumLongLivedPermits]longLivedSlot
 	owners   map[ResourceIdentity]LongLivedPermitRef
+	classes  [LongLivedSecretStore + 1]int
 	freeHead uint16
 	census   LongLivedCensus
 	sealed   bool
@@ -196,6 +217,9 @@ type longLivedSlot struct {
 
 type LongLivedCensus struct {
 	Active                int
+	Pipelines             int
+	Jobs                  int
+	SecretStores          int
 	Bytes                 int64
 	GReserved             int
 	GActive               int
@@ -222,16 +246,36 @@ func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedge
 	if err := plan.Validate(); err != nil {
 		return LongLivedPermit{}, err
 	}
-	if err := admission.TransferLongLived(admissionRef, plan.bytes, plan.replacementOverlap); err != nil {
+	if err := admission.transferLongLived(admissionRef, plan.bytes); err != nil {
 		return LongLivedPermit{}, err
 	}
 
 	registry := &supervisor.longLived
 	registry.mu.Lock()
-	if _, exists := registry.owners[owner]; registry.sealed || exists || registry.freeHead == 0 {
+	classLimit := longLivedClassLimit(plan)
+	if _, exists := registry.owners[owner]; registry.sealed || exists {
 		registry.mu.Unlock()
 		releaseErr := supervisor.releaseLongLivedAdmission(admission, admissionRef, plan.bytes)
-		return LongLivedPermit{}, errors.Join(errors.New("jobmgr long-lived permit: activation sealed, duplicate owner, or capacity exhausted"), releaseErr)
+		return LongLivedPermit{}, errors.Join(
+			errors.New(
+				"jobmgr long-lived permit: activation sealed or duplicate owner",
+			),
+			releaseErr,
+		)
+	}
+	if registry.freeHead == 0 ||
+		classLimit == 0 ||
+		registry.classes[plan.class] >= classLimit {
+		registry.mu.Unlock()
+		releaseErr := supervisor.releaseLongLivedAdmission(
+			admission,
+			admissionRef,
+			plan.bytes,
+		)
+		return LongLivedPermit{}, errors.Join(
+			ErrLongLivedRecordCapacity,
+			releaseErr,
+		)
 	}
 	index := int(registry.freeHead - 1)
 	slot := &registry.slots[index]
@@ -249,7 +293,9 @@ func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedge
 	}
 	ref := LongLivedPermitRef{Slot: uint16(index), Generation: generation}
 	registry.owners[owner] = ref
+	registry.classes[plan.class]++
 	registry.census.Active++
+	registry.incrementClassCensus(plan.class)
 	registry.census.Bytes += plan.bytes
 	registry.census.GReserved += bits.OnesCount8(uint8(plan.g))
 	registry.census.ExternalReserved += bits.OnesCount8(uint8(plan.e))
@@ -362,7 +408,7 @@ func (supervisor *TaskSupervisor) releaseLongLivedBytes(ref LongLivedPermitRef, 
 }
 
 func (supervisor *TaskSupervisor) releaseLongLivedAdmission(admission *AdmissionLedger, ref AdmissionRef, bytes int64) error {
-	wake, err := admission.ReleaseLongLived(ref, bytes)
+	wake, err := admission.releaseLongLived(ref, bytes)
 	if wake {
 		supervisor.notifyAdmissionReady()
 	}
@@ -385,11 +431,51 @@ func (supervisor *TaskSupervisor) returnLongLivedPermit(ref LongLivedPermitRef, 
 	class := slot.class
 	*slot = longLivedSlot{generation: generation, freeNext: registry.freeHead}
 	registry.freeHead = ref.Slot + 1
+	registry.classes[class]--
 	registry.census.Active--
+	registry.decrementClassCensus(class)
 	if class == LongLivedSecretStore {
 		registry.census.FinalizerOwnedActive--
 	}
 	return nil
+}
+
+func longLivedClassLimit(plan LongLivedPlan) int {
+	limit := 0
+	switch plan.class {
+	case LongLivedPipeline:
+		limit = 1
+	case LongLivedJob:
+		limit = MaximumActiveJobs
+	case LongLivedSecretStore:
+		limit = 1
+	}
+	if plan.replacementOverlap {
+		limit += MaximumReplacementOverlaps
+	}
+	return limit
+}
+
+func (registry *longLivedRegistry) incrementClassCensus(class LongLivedClass) {
+	switch class {
+	case LongLivedPipeline:
+		registry.census.Pipelines++
+	case LongLivedJob:
+		registry.census.Jobs++
+	case LongLivedSecretStore:
+		registry.census.SecretStores++
+	}
+}
+
+func (registry *longLivedRegistry) decrementClassCensus(class LongLivedClass) {
+	switch class {
+	case LongLivedPipeline:
+		registry.census.Pipelines--
+	case LongLivedJob:
+		registry.census.Jobs--
+	case LongLivedSecretStore:
+		registry.census.SecretStores--
+	}
 }
 
 func (supervisor *TaskSupervisor) releaseReservedLongLivedFacets(ref LongLivedPermitRef, owner ResourceIdentity) error {

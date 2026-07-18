@@ -223,6 +223,13 @@ func NewResourceTransactionPermitTaskPlan(
 	permitPlan LongLivedPlan,
 	work PreparedResourceTransactionWork,
 ) (TaskPlan, error) {
+	if scope.Current.Valid() {
+		var err error
+		permitPlan, err = permitPlan.forReplacement()
+		if err != nil {
+			return TaskPlan{}, err
+		}
+	}
 	plan := TaskPlan{
 		Source:              source,
 		Deadline:            deadline,

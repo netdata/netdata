@@ -4,6 +4,7 @@ package functions
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 )
 
@@ -73,7 +74,7 @@ func TestFunctionPublicationDiff(t *testing.T) {
 	}
 	a := publicationRecord("a", 1)
 	b := publicationRecord("b", 1)
-	if err := publication.Apply(1, 1, publicationDigest(t, a, b), []PublicationChange{
+	if err := publication.ApplyInitialSnapshot(1, 1, publicationDigest(t, a, b), 2, []PublicationChange{
 		{Name: "a", Record: &a}, {Name: "b", Record: &b},
 	}); err != nil {
 		t.Fatal(err)
@@ -89,9 +90,9 @@ func TestFunctionPublicationDiff(t *testing.T) {
 	}
 
 	a2 := publicationRecord("a", 2)
-	if err := publication.Apply(1, 2, publicationDigest(t, a2), []PublicationChange{
+	if err := publication.ApplyTransition(1, 2, publicationDigest(t, a2), []PublicationChange{
 		{Name: "a", Record: &a2}, {Name: "b"},
-	}); err != nil {
+	}, func() error { return nil }); err != nil {
 		t.Fatal(err)
 	}
 	if len(port.published) != 3 || len(port.withdrawn) != 2 || len(port.active) != 1 {
@@ -143,7 +144,7 @@ func TestFunctionPublicationNoRearm(t *testing.T) {
 	}
 	record := publicationRecord("work", 1)
 	digest := publicationDigest(t, record)
-	if err := publication.Apply(1, 1, digest, []PublicationChange{{
+	if err := publication.ApplyInitialSnapshot(1, 1, digest, 1, []PublicationChange{{
 		Name: record.Name, Record: &record,
 	}}); err != nil {
 		t.Fatal(err)
@@ -151,9 +152,9 @@ func TestFunctionPublicationNoRearm(t *testing.T) {
 	if err := publication.Stop(1); err != nil {
 		t.Fatal(err)
 	}
-	if err := publication.Apply(1, 2, digest, []PublicationChange{{
+	if err := publication.ApplyTransition(1, 2, digest, []PublicationChange{{
 		Name: record.Name, Record: &record,
-	}}); err == nil {
+	}}, func() error { return nil }); err == nil {
 		t.Fatal("publication rearmed after stop")
 	}
 	if err := publication.Poll(1, 1, digest); err == nil {
@@ -164,6 +165,96 @@ func TestFunctionPublicationNoRearm(t *testing.T) {
 	}
 }
 
+func TestFunctionPublicationInitialSnapshotExceedsMutationQuantum(t *testing.T) {
+	port := newRecordingPublicationPort()
+	publication, err := NewPublication(1, port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	records := make(
+		[]PublicationRecord,
+		0,
+		MaximumMutationPublicationChanges+3,
+	)
+	changes := make(
+		[]PublicationChange,
+		0,
+		MaximumMutationPublicationChanges+3,
+	)
+	for index := 0; index < MaximumMutationPublicationChanges+3; index++ {
+		record := publicationRecord(fmt.Sprintf("work-%03d", index), 1)
+		records = append(records, record)
+		changes = append(
+			changes,
+			PublicationChange{Name: record.Name, Record: &records[index]},
+		)
+	}
+	if err := publication.ApplyInitialSnapshot(
+		1,
+		1,
+		publicationDigest(t, records...),
+		int64(len(records)),
+		changes,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if census := publication.Census(); census.Published != len(records) ||
+		census.Version != 1 ||
+		census.Dirty {
+		t.Fatalf("initial snapshot census=%+v", census)
+	}
+}
+
+func TestFunctionPublicationMutationCannotExceedQuantum(t *testing.T) {
+	port := newRecordingPublicationPort()
+	publication, err := NewPublication(1, port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := publication.ApplyInitialSnapshot(
+		1,
+		1,
+		publicationDigest(t),
+		0,
+		nil,
+	); err != nil {
+		t.Fatal(err)
+	}
+	changes := make(
+		[]PublicationChange,
+		0,
+		MaximumMutationPublicationChanges+1,
+	)
+	for index := 0; index < MaximumMutationPublicationChanges+1; index++ {
+		record := publicationRecord(fmt.Sprintf("work-%03d", index), 1)
+		changes = append(
+			changes,
+			PublicationChange{Name: record.Name, Record: &record},
+		)
+	}
+	committed := false
+	if err := publication.ApplyTransition(
+		1,
+		2,
+		[32]byte{},
+		changes,
+		func() error {
+			committed = true
+			return nil
+		},
+	); err == nil {
+		t.Fatal("oversized steady mutation was accepted")
+	}
+	if committed || len(port.published) != 0 || len(port.active) != 0 {
+		t.Fatalf(
+			"oversized steady mutation changed state: committed=%v published=%d active=%d",
+			committed,
+			len(port.published),
+			len(port.active),
+		)
+	}
+}
+
 func TestFunctionPublicationTransitionOrdersCatalogBetweenFrames(t *testing.T) {
 	port := newRecordingPublicationPort()
 	publication, err := NewPublication(1, port)
@@ -171,10 +262,11 @@ func TestFunctionPublicationTransitionOrdersCatalogBetweenFrames(t *testing.T) {
 		t.Fatal(err)
 	}
 	current := publicationRecord("work", 1)
-	if err := publication.Apply(
+	if err := publication.ApplyInitialSnapshot(
 		1,
 		1,
 		publicationDigest(t, current),
+		1,
 		[]PublicationChange{{Name: current.Name, Record: &current}},
 	); err != nil {
 		t.Fatal(err)
@@ -210,7 +302,7 @@ func TestFunctionPublicationMismatchedAcknowledgementPoisonsAndRetainsHandle(t *
 		t.Fatal(err)
 	}
 	record := publicationRecord("work", 1)
-	if err := publication.Apply(1, 1, publicationDigest(t, record), []PublicationChange{{
+	if err := publication.ApplyInitialSnapshot(1, 1, publicationDigest(t, record), 1, []PublicationChange{{
 		Name: record.Name, Record: &record,
 	}}); err == nil {
 		t.Fatal("mismatched acknowledgement was accepted")
@@ -235,7 +327,7 @@ func BenchmarkBFunctionPublication(b *testing.B) {
 	}
 	record := publicationRecord("work", 1)
 	digest := publicationDigest(b, record)
-	if err := publication.Apply(1, 1, digest, []PublicationChange{{
+	if err := publication.ApplyInitialSnapshot(1, 1, digest, 1, []PublicationChange{{
 		Name: record.Name, Record: &record,
 	}}); err != nil {
 		b.Fatal(err)

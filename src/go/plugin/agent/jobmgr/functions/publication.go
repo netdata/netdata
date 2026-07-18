@@ -11,7 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 )
 
-const MaximumPublicationChanges = jobmgr.MaximumFunctionMutationChanges
+const MaximumMutationPublicationChanges = jobmgr.MaximumFunctionMutationChanges
 
 type PublicationRecord struct {
 	Name               string
@@ -81,10 +81,39 @@ func NewPublication(epoch uint64, port PublicationPort) (*Publication, error) {
 	return &Publication{epoch: epoch, port: port, published: make(map[string]publishedRoute)}, nil
 }
 
-// Apply reconciles one prevalidated changed-route batch. Callers must serialize
-// Apply, Poll, and Stop through the same TaskChild-owned lane.
-func (publication *Publication) Apply(epoch, version uint64, digest [32]byte, changes []PublicationChange) error {
-	return publication.ApplyTransition(epoch, version, digest, changes, func() error {
+// ApplyInitialSnapshot installs one complete catalog-backed snapshot before
+// Function ingress is published. Catalog storage, rather than the steady
+// mutation quantum, bounds the snapshot.
+func (publication *Publication) ApplyInitialSnapshot(
+	epoch, version uint64,
+	digest [32]byte,
+	catalogStorageBytes int64,
+	changes []PublicationChange,
+) error {
+	if publication == nil {
+		return errors.New("jobmgr Function publication: invalid initial snapshot")
+	}
+	if publication.version != 0 ||
+		len(publication.published) != 0 ||
+		catalogStorageBytes < 0 ||
+		catalogStorageBytes > MaximumCatalogStorageBytes ||
+		int64(len(changes)) > catalogStorageBytes {
+		return publication.poison(
+			errors.New(
+				"jobmgr Function publication: invalid initial snapshot",
+			),
+		)
+	}
+	for _, change := range changes {
+		if change.Record == nil {
+			return publication.poison(
+				errors.New(
+					"jobmgr Function publication: initial snapshot contains a withdrawal",
+				),
+			)
+		}
+	}
+	return publication.applyTransition(epoch, version, digest, changes, 0, func() error {
 		return nil
 	})
 }
@@ -98,10 +127,32 @@ func (publication *Publication) ApplyTransition(
 	changes []PublicationChange,
 	commit func() error,
 ) error {
+	return publication.applyTransition(
+		epoch,
+		version,
+		digest,
+		changes,
+		MaximumMutationPublicationChanges,
+		commit,
+	)
+}
+
+func (publication *Publication) applyTransition(
+	epoch, version uint64,
+	digest [32]byte,
+	changes []PublicationChange,
+	maximumChanges int,
+	commit func() error,
+) error {
 	if commit == nil {
 		return errors.New("jobmgr Function publication: nil transition commit")
 	}
-	if err := publication.validateTransition(epoch, version, changes); err != nil {
+	if err := publication.validateTransition(
+		epoch,
+		version,
+		changes,
+		maximumChanges,
+	); err != nil {
 		return err
 	}
 	for _, change := range changes {
@@ -143,7 +194,11 @@ func (publication *Publication) ApplyTransition(
 	return nil
 }
 
-func (publication *Publication) validateTransition(epoch, version uint64, changes []PublicationChange) error {
+func (publication *Publication) validateTransition(
+	epoch, version uint64,
+	changes []PublicationChange,
+	maximumChanges int,
+) error {
 	if publication == nil || publication.port == nil {
 		return errors.New("jobmgr Function publication: invalid state")
 	}
@@ -153,8 +208,11 @@ func (publication *Publication) validateTransition(epoch, version uint64, change
 	if publication.stopped {
 		return errors.New("jobmgr Function publication: apply after stop")
 	}
-	if epoch != publication.epoch || version == 0 || version != publication.version+1 ||
-		len(changes) > MaximumPublicationChanges {
+	if epoch != publication.epoch ||
+		version == 0 ||
+		version != publication.version+1 ||
+		maximumChanges < 0 ||
+		maximumChanges != 0 && len(changes) > maximumChanges {
 		return publication.poison(errors.New("jobmgr Function publication: stale or invalid transition"))
 	}
 	seen := make(map[string]struct{}, len(changes))

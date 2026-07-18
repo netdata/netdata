@@ -4,6 +4,7 @@ package joboutput
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 
@@ -102,6 +103,47 @@ func TestSchedulerWarmTickDoesNotAllocate(t *testing.T) {
 	}
 	if err := scheduler.Unregister(identity, job); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSchedulerAcceptsFullActiveJobCapacity(t *testing.T) {
+	scheduler, err := NewScheduler(testModuleReconciler{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs := make([]*schedulerTestJob, 0, lifecycle.MaximumAdmissionRecords)
+	for index := 0; index < lifecycle.MaximumAdmissionRecords; index++ {
+		id := fmt.Sprintf("job-%03d", index)
+		job := &schedulerTestJob{id: id, module: "module"}
+		if err := scheduler.Register(
+			lifecycle.ResourceIdentity{ID: id, Generation: 1},
+			job,
+		); err != nil {
+			t.Fatalf("register job %d: %v", index, err)
+		}
+		jobs = append(jobs, job)
+	}
+	if census := scheduler.Census(); census != lifecycle.MaximumAdmissionRecords {
+		t.Fatalf(
+			"scheduler census=%d want=%d",
+			census,
+			lifecycle.MaximumAdmissionRecords,
+		)
+	}
+	overflow := &schedulerTestJob{id: "overflow", module: "module"}
+	if err := scheduler.Register(
+		lifecycle.ResourceIdentity{ID: overflow.id, Generation: 1},
+		overflow,
+	); err == nil {
+		t.Fatal("scheduler accepted a job beyond the active-job bound")
+	}
+	for _, job := range jobs {
+		if err := scheduler.Unregister(
+			lifecycle.ResourceIdentity{ID: job.id, Generation: 1},
+			job,
+		); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

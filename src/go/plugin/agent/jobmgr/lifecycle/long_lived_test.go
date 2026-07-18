@@ -5,6 +5,7 @@ package lifecycle
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"testing"
 )
 
@@ -25,7 +26,8 @@ func TestLongLivedPermitConservesAdmittedBGEFacets(t *testing.T) {
 		t.Fatalf("admission after transfer=%+v", census)
 	}
 	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{
-		Active: 1, Bytes: 40, GReserved: 2, ExternalReserved: 1,
+		Active: 1, Pipelines: 1, Bytes: 40,
+		GReserved: 2, ExternalReserved: 1,
 	}) {
 		t.Fatalf("permit after transfer=%+v", census)
 	}
@@ -115,7 +117,11 @@ func TestLongLivedPermitSurvivesOperationAdmissionRelease(t *testing.T) {
 	if _, err := admission.ReleaseOrdinary(ref); err != nil {
 		t.Fatal(err)
 	}
-	if census := admission.Census(); census.ActiveRecords != 1 || census.OrdinaryGranted != 0 || census.OrdinaryBytes != 40 || census.LongLivedBytes != 40 {
+	if census := admission.Census(); census.ActiveRecords != 0 ||
+		census.FreeRecords != MaximumAdmissionRecords ||
+		census.OrdinaryGranted != 0 ||
+		census.OrdinaryBytes != 40 ||
+		census.LongLivedBytes != 40 {
 		t.Fatalf("persistent-only admission=%+v", census)
 	}
 	if err := permit.ReleaseExternal(LongLivedEJobResources); err != nil {
@@ -129,6 +135,83 @@ func TestLongLivedPermitSurvivesOperationAdmissionRelease(t *testing.T) {
 	}
 	if census := admission.Census(); census.ActiveRecords != 0 || census.OrdinaryBytes != 0 || census.LongLivedRecords != 0 {
 		t.Fatalf("final admission=%+v", census)
+	}
+}
+
+func TestLongLivedPermitDomainsPreserveFullJobCapacity(t *testing.T) {
+	admission := NewAdmissionLedger()
+	supervisor := newLongLivedTestSupervisor(t)
+	pipelinePlan, err := NewPipelineLongLivedPlan(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobPlan, err := NewJobLongLivedPlan(1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	permits := make([]LongLivedPermit, 0, MaximumAdmissionRecords+1)
+	issue := func(owner ResourceIdentity, plan LongLivedPlan) {
+		t.Helper()
+		ref := grantLongLivedTestAdmission(t, admission, 2)
+		permit, issueErr := supervisor.IssueLongLivedPermit(
+			admission,
+			ref,
+			owner,
+			plan,
+		)
+		if issueErr != nil {
+			t.Fatal(issueErr)
+		}
+		if _, releaseErr := admission.ReleaseOrdinary(ref); releaseErr != nil {
+			t.Fatal(releaseErr)
+		}
+		if census := admission.Census(); census.ActiveRecords != 0 ||
+			census.FreeRecords != MaximumAdmissionRecords {
+			t.Fatalf(
+				"persistent resource retained operation admission: %+v",
+				census,
+			)
+		}
+		permits = append(permits, permit)
+	}
+
+	issue(
+		ResourceIdentity{ID: "discovery", Generation: 1},
+		pipelinePlan,
+	)
+	for index := 0; index < MaximumAdmissionRecords; index++ {
+		issue(
+			ResourceIdentity{
+				ID:         fmt.Sprintf("job-%03d", index),
+				Generation: 1,
+			},
+			jobPlan,
+		)
+	}
+
+	if census := admission.Census(); census.ActiveRecords != 0 ||
+		census.LongLivedRecords != MaximumAdmissionRecords+1 ||
+		census.OrdinaryBytes != MaximumAdmissionRecords+1 {
+		t.Fatalf("separated admission census=%+v", census)
+	}
+	if census := supervisor.LongLivedCensus(); census.Active !=
+		MaximumAdmissionRecords+1 {
+		t.Fatalf("separated permit census=%+v", census)
+	}
+
+	for _, permit := range permits {
+		if err := permit.AbortUnused(); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if census := admission.Census(); census.ActiveRecords != 0 ||
+		census.LongLivedRecords != 0 ||
+		census.OrdinaryBytes != 0 {
+		t.Fatalf("final separated admission census=%+v", census)
+	}
+	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{}) {
+		t.Fatalf("final separated permit census=%+v", census)
 	}
 }
 

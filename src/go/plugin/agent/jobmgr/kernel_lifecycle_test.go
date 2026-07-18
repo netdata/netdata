@@ -1882,7 +1882,7 @@ func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T)
 	clock := newKernelFinalizerClock()
 	release := make(chan struct{})
 	entered := make(chan string, lifecycle.TransientTaskSlots)
-	permitPlan, err := lifecycle.NewSecretStoreLongLivedPlan(4096)
+	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1912,7 +1912,7 @@ func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T)
 	deadline := clock.Now().Add(time.Second)
 	terminals := make([]chan error, lifecycle.TransientTaskSlots)
 	for index := 0; index < lifecycle.TransientTaskSlots; index++ {
-		id := fmt.Sprintf("secret-store:background-%d", index)
+		id := fmt.Sprintf("job:background-%d", index)
 		terminals[index] = make(chan error, 1)
 		if err := kernel.submit(context.Background(), Request{
 			UID: fmt.Sprintf("background-timeout-%d", index), LaneKey: id, Source: lifecycle.SourceJobManager,
@@ -2119,28 +2119,38 @@ func TestKernelLongLivedBoundaryAllowsReplacementAndRejectsSteadyAddition(t *tes
 		}, nil
 	})
 	kernel, run, admission, uids, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, planner, io.Discard, finalizer, time.Second)
-	seeded = make([]lifecycle.LongLivedPermit, 0, lifecycle.MaximumSteadyLongLivedRecords)
-	for index := 0; index < lifecycle.MaximumSteadyLongLivedRecords; index++ {
-		requested := admission.RequestOrdinary(run.Generation(), lifecycle.AdmissionLaneRef{Slot: uint16(index + 1), Generation: 1}, 2)
-		if requested.Rejected != nil {
-			t.Fatalf("seed admission %d: %v", index, requested.Rejected)
-		}
-		var grants [4]lifecycle.AdmissionGrant
-		count, _, err := admission.TakeGrants(1, &grants)
-		if err != nil || count != 1 || grants[0].Ref != requested.Ref {
-			t.Fatalf("seed grant %d differs: count=%d grant=%+v err=%v", index, count, grants[0], err)
-		}
-		permit, err := tasks.IssueLongLivedPermit(
-			admission, requested.Ref, lifecycle.ResourceIdentity{ID: fmt.Sprintf("seed:%d", index), Generation: 1}, steadyPlan,
-		)
-		if err != nil {
-			t.Fatalf("seed permit %d: %v", index, err)
-		}
-		if _, err := admission.ReleaseOrdinary(requested.Ref); err != nil {
-			t.Fatalf("seed ordinary release %d: %v", index, err)
-		}
-		seeded = append(seeded, permit)
+	seeded = make([]lifecycle.LongLivedPermit, 0, 1)
+	requested := admission.RequestOrdinary(
+		run.Generation(),
+		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
+		2,
+	)
+	if requested.Rejected != nil {
+		t.Fatalf("seed admission: %v", requested.Rejected)
 	}
+	var grants [4]lifecycle.AdmissionGrant
+	count, _, err := admission.TakeGrants(1, &grants)
+	if err != nil || count != 1 || grants[0].Ref != requested.Ref {
+		t.Fatalf(
+			"seed grant differs: count=%d grant=%+v err=%v",
+			count,
+			grants[0],
+			err,
+		)
+	}
+	permit, err := tasks.IssueLongLivedPermit(
+		admission,
+		requested.Ref,
+		lifecycle.ResourceIdentity{ID: "seed", Generation: 1},
+		steadyPlan,
+	)
+	if err != nil {
+		t.Fatalf("seed permit: %v", err)
+	}
+	if _, err := admission.ReleaseOrdinary(requested.Ref); err != nil {
+		t.Fatalf("seed ordinary release: %v", err)
+	}
+	seeded = append(seeded, permit)
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -2167,10 +2177,14 @@ func TestKernelLongLivedBoundaryAllowsReplacementAndRejectsSteadyAddition(t *tes
 	if !run.Admitting() || run.DirtyCause() != nil {
 		t.Fatalf("steady capacity rejection poisoned Kernel: admitting=%v dirty=%v", run.Admitting(), run.DirtyCause())
 	}
-	if census := admission.Census(); census.ActiveRecords != lifecycle.MaximumSteadyLongLivedRecords || census.LongLivedRecords != lifecycle.MaximumSteadyLongLivedRecords || census.OrdinaryGranted != 0 {
+	if census := admission.Census(); census.ActiveRecords != 0 ||
+		census.LongLivedRecords != 1 ||
+		census.OrdinaryGranted != 0 {
 		t.Fatalf("boundary operations left Admission ownership: %+v", census)
 	}
-	if census := tasks.LongLivedCensus(); census.Active != lifecycle.MaximumSteadyLongLivedRecords || census.Bytes != lifecycle.MaximumSteadyLongLivedRecords {
+	if census := tasks.LongLivedCensus(); census.Active != 1 ||
+		census.SecretStores != 1 ||
+		census.Bytes != 1 {
 		t.Fatalf("boundary operations left long-lived ownership: %+v", census)
 	}
 	kernel.Stop()

@@ -376,7 +376,13 @@ func (controller *Controller) Activate() error {
 		record := records[index]
 		changes = append(changes, PublicationChange{Name: record.Name, Record: &record})
 	}
-	if err := controller.publication.Apply(controller.epoch, controller.version, digest, changes); err != nil {
+	if err := controller.publication.ApplyInitialSnapshot(
+		controller.epoch,
+		controller.version,
+		digest,
+		controller.catalog.storage.published.Load(),
+		changes,
+	); err != nil {
 		controller.dirty = errors.Join(controller.dirty, err)
 		return err
 	}

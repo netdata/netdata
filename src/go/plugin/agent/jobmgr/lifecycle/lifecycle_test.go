@@ -136,10 +136,10 @@ func TestAdmissionProcessBytesCanUnwindPristineConstruction(t *testing.T) {
 	}
 }
 
-func TestAdmissionLongLivedTransferPreservesTransientRecordHeadroom(t *testing.T) {
+func TestAdmissionLongLivedTransferDetachesOperationRecords(t *testing.T) {
 	ledger := NewAdmissionLedger()
-	longLived := make([]AdmissionRef, 0, MaximumSteadyLongLivedRecords)
-	for index := 0; index < MaximumSteadyLongLivedRecords; index++ {
+	longLived := make([]AdmissionRef, 0, MaximumAdmissionRecords)
+	for index := 0; index < MaximumAdmissionRecords; index++ {
 		lane := AdmissionLaneRef{Slot: uint16(index + 1), Generation: 1}
 		request := ledger.RequestOrdinary(1, lane, 2)
 		if request.Rejected != nil {
@@ -150,7 +150,7 @@ func TestAdmissionLongLivedTransferPreservesTransientRecordHeadroom(t *testing.T
 		if err != nil || count != 1 || grants[0].Ref != request.Ref {
 			t.Fatalf("long-lived grant %d differs: count=%d grant=%+v err=%v", index, count, grants[0], err)
 		}
-		if err := ledger.TransferLongLived(request.Ref, 1, false); err != nil {
+		if err := ledger.transferLongLived(request.Ref, 1); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := ledger.ReleaseOrdinary(request.Ref); err != nil {
@@ -158,7 +158,16 @@ func TestAdmissionLongLivedTransferPreservesTransientRecordHeadroom(t *testing.T
 		}
 		longLived = append(longLived, request.Ref)
 	}
-	last := ledger.RequestOrdinary(1, AdmissionLaneRef{Slot: MaximumSteadyLongLivedRecords + 1, Generation: 1}, 2)
+	if census := ledger.Census(); census.ActiveRecords != 0 ||
+		census.FreeRecords != MaximumAdmissionRecords ||
+		census.LongLivedRecords != MaximumAdmissionRecords {
+		t.Fatalf("detached long-lived census=%+v", census)
+	}
+	last := ledger.RequestOrdinary(
+		1,
+		AdmissionLaneRef{Slot: 1, Generation: 2},
+		2,
+	)
 	if last.Rejected != nil {
 		t.Fatal(last.Rejected)
 	}
@@ -167,24 +176,11 @@ func TestAdmissionLongLivedTransferPreservesTransientRecordHeadroom(t *testing.T
 	if err != nil || count != 1 || grants[0].Ref != last.Ref {
 		t.Fatalf("headroom grant differs: count=%d grant=%+v err=%v", count, grants[0], err)
 	}
-	before := ledger.Census()
-	if err := ledger.TransferLongLived(last.Ref, 1, false); !errors.Is(err, ErrLongLivedRecordCapacity) {
-		t.Fatal("long-lived transfer consumed transient record headroom")
-	}
-	if after := ledger.Census(); after != before {
-		t.Fatalf("rejected long-lived transfer mutated census: before=%+v after=%+v", before, after)
-	}
-	if err := ledger.TransferLongLived(last.Ref, 1, true); err != nil {
-		t.Fatalf("replacement overlap could not use its active transient record: %v", err)
-	}
 	if _, err := ledger.ReleaseOrdinary(last.Ref); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ledger.ReleaseLongLived(last.Ref, 1); err != nil {
-		t.Fatal(err)
-	}
 	for _, ref := range longLived {
-		if _, err := ledger.ReleaseLongLived(ref, 1); err != nil {
+		if _, err := ledger.releaseLongLived(ref, 1); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -664,7 +660,7 @@ func TestAdmissionLongLivedRecordDetachesFromCompletedLaneGeneration(t *testing.
 	if count, _, err := ledger.TakeGrants(1, &grants); err != nil || count != 1 || grants[0].Ref != first.Ref {
 		t.Fatalf("first grant differs: count=%d grant=%+v err=%v", count, grants[0], err)
 	}
-	if err := ledger.TransferLongLived(first.Ref, 40, false); err != nil {
+	if err := ledger.transferLongLived(first.Ref, 40); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := ledger.ReleaseOrdinary(first.Ref); err != nil {
@@ -680,7 +676,7 @@ func TestAdmissionLongLivedRecordDetachesFromCompletedLaneGeneration(t *testing.
 	if _, err := ledger.ReleaseOrdinary(second.Ref); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := ledger.ReleaseLongLived(first.Ref, 40); err != nil {
+	if _, err := ledger.releaseLongLived(first.Ref, 40); err != nil {
 		t.Fatal(err)
 	}
 	if census := ledger.Census(); census.ActiveRecords != 0 || census.OrdinaryGranted != 0 || census.OrdinaryBytes != 0 || census.LongLivedRecords != 0 || census.LongLivedBytes != 0 {
@@ -714,10 +710,9 @@ func TestAdmissionResizesOrdinaryRemainderWithLongLivedTransfer(t *testing.T) {
 			); err != nil || count != 1 {
 				t.Fatalf("grant count=%d err=%v", count, err)
 			}
-			if err := ledger.TransferLongLived(
+			if err := ledger.transferLongLived(
 				request.Ref,
 				40,
-				false,
 			); err != nil {
 				t.Fatal(err)
 			}
@@ -736,7 +731,7 @@ func TestAdmissionResizesOrdinaryRemainderWithLongLivedTransfer(t *testing.T) {
 			if _, err := ledger.ReleaseOrdinary(request.Ref); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := ledger.ReleaseLongLived(
+			if _, err := ledger.releaseLongLived(
 				request.Ref,
 				40,
 			); err != nil {

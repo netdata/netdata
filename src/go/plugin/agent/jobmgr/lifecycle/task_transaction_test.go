@@ -5,6 +5,7 @@ package lifecycle
 import (
 	"context"
 	"errors"
+	"fmt"
 	"reflect"
 	"testing"
 	"time"
@@ -218,8 +219,10 @@ func TestTaskSupervisorDisposesPreparedTransactionAndRestoresCurrent(t *testing.
 
 func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 	tests := map[string]struct {
-		scope   ResourceTransactionScope
-		current ReadyResource
+		scope         ResourceTransactionScope
+		current       ReadyResource
+		seededPermits int
+		replacementAt int
 	}{
 		"replacement current": {
 			scope: ResourceTransactionScope{
@@ -233,30 +236,30 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 				identity: ResourceIdentity{ID: "job", Generation: 1},
 				events:   new([]string),
 			},
+			seededPermits: MaximumActiveJobs + MaximumReplacementOverlaps,
+			replacementAt: MaximumActiveJobs,
 		},
 		"installation has no current": {
 			scope: ResourceTransactionScope{
 				ID:        "job",
 				Successor: ResourceIdentity{ID: "job", Generation: 1},
 			},
+			seededPermits: MaximumActiveJobs,
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			admission := NewAdmissionLedger()
-			longLived := make(
-				[]AdmissionRef,
-				0,
-				MaximumSteadyLongLivedRecords,
-			)
+			supervisor := newResourceTaskSupervisor(t)
+			longLived := make([]LongLivedPermit, 0, test.seededPermits)
 			var grants [TransientTaskSlots]AdmissionGrant
-			for index := 0; index < MaximumSteadyLongLivedRecords; index++ {
+			for index := 0; index < test.seededPermits; index++ {
 				request := admission.RequestOrdinary(
 					1,
 					AdmissionLaneRef{
-						Slot:       uint16(index + 1),
-						Generation: 1,
+						Slot:       uint16(index%MaximumAdmissionRecords + 1),
+						Generation: uint32(index/MaximumAdmissionRecords + 1),
 					},
 					2,
 				)
@@ -272,11 +275,23 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 						err,
 					)
 				}
-				if err := admission.TransferLongLived(
+				permitPlan, err := NewJobLongLivedPlan(1)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if index >= test.replacementAt && test.replacementAt != 0 {
+					permitPlan.replacementOverlap = true
+				}
+				permit, err := supervisor.IssueLongLivedPermit(
+					admission,
 					request.Ref,
-					1,
-					false,
-				); err != nil {
+					ResourceIdentity{
+						ID:         fmt.Sprintf("seed-%03d", index),
+						Generation: 1,
+					},
+					permitPlan,
+				)
+				if err != nil {
 					t.Fatal(err)
 				}
 				if _, err := admission.ReleaseOrdinary(
@@ -284,14 +299,14 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 				); err != nil {
 					t.Fatal(err)
 				}
-				longLived = append(longLived, request.Ref)
+				longLived = append(longLived, permit)
 			}
 
 			transactionAdmission := admission.RequestOrdinary(
 				1,
 				AdmissionLaneRef{
-					Slot:       MaximumSteadyLongLivedRecords + 1,
-					Generation: 1,
+					Slot:       1,
+					Generation: uint32(test.seededPermits/MaximumAdmissionRecords + 2),
 				},
 				2,
 			)
@@ -332,7 +347,6 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			supervisor := newResourceTaskSupervisor(t)
 			requestRef, err := supervisor.Enqueue(plan)
 			if err != nil {
 				t.Fatal(err)
@@ -389,11 +403,8 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 			); err != nil {
 				t.Fatal(err)
 			}
-			for _, ref := range longLived {
-				if _, err := admission.ReleaseLongLived(
-					ref,
-					1,
-				); err != nil {
+			for _, permit := range longLived {
+				if err := permit.AbortUnused(); err != nil {
 					t.Fatal(err)
 				}
 			}

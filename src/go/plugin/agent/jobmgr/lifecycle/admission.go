@@ -10,17 +10,14 @@ import (
 
 var (
 	ErrAdmissionRecordCapacity = errors.New("jobmgr admission: record capacity exhausted")
-	ErrLongLivedRecordCapacity = errors.New("jobmgr admission: long-lived record capacity exhausted")
 )
 
 const (
-	MaximumAdmissionRecords       = 256
-	MaximumSteadyLongLivedRecords = MaximumAdmissionRecords - TransientTaskSlots
-	MaximumLongLivedRecords       = MaximumAdmissionRecords
-	MaximumLaneDepth              = 32
-	admissionRadixBits            = 28
-	inputBodyRecordSlot           = MaximumAdmissionRecords + 1
-	maximumAdmissionNodes         = 1 + (MaximumAdmissionRecords+1)*admissionRadixBits
+	MaximumAdmissionRecords = 256
+	MaximumLaneDepth        = 32
+	admissionRadixBits      = 28
+	inputBodyRecordSlot     = MaximumAdmissionRecords + 1
+	maximumAdmissionNodes   = 1 + (MaximumAdmissionRecords+1)*admissionRadixBits
 )
 
 type ReservationKind uint8
@@ -425,10 +422,10 @@ func (ledger *AdmissionLedger) RunFinalizerReady(runGeneration uint64, allowedLo
 	ledger.mu.Lock()
 	defer ledger.mu.Unlock()
 	if ledger.phase != admissionCleanupOnly || runGeneration == 0 || ledger.runGeneration != runGeneration || allowedLongLivedRecords < 0 || allowedLongLivedBytes < 0 ||
-		ledger.activeRecords != allowedLongLivedRecords || ledger.ordinaryWaiting != 0 || ledger.ordinaryGranted != 0 ||
+		ledger.activeRecords != 0 || ledger.ordinaryWaiting != 0 || ledger.ordinaryGranted != 0 ||
 		ledger.longLivedRecords != allowedLongLivedRecords || ledger.longLivedBytes != allowedLongLivedBytes ||
 		ledger.cleanupWaiting != 0 || ledger.cleanupGrant != 0 || ledger.cleanupRetained || ledger.cleanupHead != 0 || ledger.cleanupTail != 0 ||
-		ledger.oldestInNode(1) != 0 || ledger.freeRecords != MaximumAdmissionRecords-allowedLongLivedRecords || ledger.freeNodes != maximumAdmissionNodes-1 {
+		ledger.oldestInNode(1) != 0 || ledger.freeRecords != MaximumAdmissionRecords || ledger.freeNodes != maximumAdmissionNodes-1 {
 		return false
 	}
 	if !ledger.inputBodyCarried {
@@ -655,13 +652,7 @@ func (ledger *AdmissionLedger) ReleaseOrdinary(ref AdmissionRef) (bool, error) {
 	}
 	ledger.ordinaryBytes -= ordinaryBytes
 	ledger.ordinaryGranted--
-	record.heldBytes -= ordinaryBytes
-	record.ordinaryHeld = false
-	if record.longLivedBytes == 0 {
-		ledger.freeRecord(ref.Slot)
-	} else {
-		ledger.detachRecordLane(record)
-	}
+	ledger.freeRecord(ref.Slot)
 	wake := ledger.hasGrantableWork()
 	ledger.mu.Unlock()
 	return wake, nil
@@ -674,16 +665,7 @@ func (ledger *AdmissionLedger) validateRecordLane(record *admissionRecord) error
 	return nil
 }
 
-func (ledger *AdmissionLedger) detachRecordLane(record *admissionRecord) {
-	lane := record.lane
-	ledger.laneCounts[lane.Slot]--
-	if ledger.laneCounts[lane.Slot] == 0 {
-		ledger.laneGenerations[lane.Slot] = 0
-	}
-	record.lane = AdmissionLaneRef{}
-}
-
-func (ledger *AdmissionLedger) TransferLongLived(ref AdmissionRef, bytes int64, replacementOverlap bool) error {
+func (ledger *AdmissionLedger) transferLongLived(ref AdmissionRef, bytes int64) error {
 	if ledger == nil || bytes <= 0 || bytes >= OrdinaryBudgetBytes {
 		return errors.New("jobmgr admission: invalid long-lived transfer")
 	}
@@ -696,41 +678,36 @@ func (ledger *AdmissionLedger) TransferLongLived(ref AdmissionRef, bytes int64, 
 	if record.state != admissionOrdinaryGranted || !record.ordinaryHeld || record.longLivedBytes != 0 || bytes >= record.heldBytes {
 		return errors.New("jobmgr admission: long-lived transfer requires an untransferred granted record with an ordinary remainder")
 	}
-	limit := MaximumSteadyLongLivedRecords
-	if replacementOverlap {
-		limit = MaximumLongLivedRecords
-	}
-	if ledger.longLivedRecords >= limit {
-		return ErrLongLivedRecordCapacity
-	}
 	record.longLivedBytes = bytes
 	ledger.longLivedRecords++
 	ledger.longLivedBytes += bytes
 	return nil
 }
 
-func (ledger *AdmissionLedger) ReleaseLongLived(ref AdmissionRef, bytes int64) (bool, error) {
-	if ledger == nil || bytes <= 0 {
+func (ledger *AdmissionLedger) releaseLongLived(ref AdmissionRef, bytes int64) (bool, error) {
+	if ledger == nil || !ref.Valid() || bytes <= 0 {
 		return false, errors.New("jobmgr admission: invalid long-lived release")
 	}
 	ledger.mu.Lock()
-	record, err := ledger.record(ref)
-	if err != nil {
+	record, recordErr := ledger.record(ref)
+	if recordErr == nil {
+		if record.state != admissionOrdinaryGranted ||
+			record.longLivedBytes != bytes ||
+			record.heldBytes < bytes {
+			ledger.mu.Unlock()
+			return false, errors.New("jobmgr admission: stale or mismatched long-lived release")
+		}
+		record.heldBytes -= bytes
+		record.longLivedBytes = 0
+	} else if ledger.longLivedRecords <= 0 ||
+		ledger.longLivedBytes < bytes ||
+		ledger.ordinaryBytes < bytes {
 		ledger.mu.Unlock()
-		return false, err
+		return false, errors.New("jobmgr admission: stale or mismatched detached long-lived release")
 	}
-	if record.state != admissionOrdinaryGranted || record.longLivedBytes != bytes || record.heldBytes < bytes {
-		ledger.mu.Unlock()
-		return false, errors.New("jobmgr admission: stale or mismatched long-lived release")
-	}
-	record.heldBytes -= bytes
-	record.longLivedBytes = 0
 	ledger.ordinaryBytes -= bytes
 	ledger.longLivedRecords--
 	ledger.longLivedBytes -= bytes
-	if !record.ordinaryHeld {
-		ledger.freeRecord(ref.Slot)
-	}
 	wake := ledger.hasGrantableWork()
 	ledger.mu.Unlock()
 	return wake, nil
