@@ -433,6 +433,7 @@ func (process *processCore) retireRun(
 	if !terminal.Reached || !terminal.Quiescent {
 		return errors.Join(
 			waitErr,
+			generation.run.DirtyCause(),
 			errors.New("jobmgr composition: run did not quiesce"),
 		)
 	}

@@ -328,9 +328,11 @@ func (resource *readyDiscovery) Stop(ctx context.Context) error {
 	managerRef, reconRef := resource.managerRef, resource.reconRef
 	resource.mu.Unlock()
 
-	cancelErr := errors.Join(
-		resource.tasks.CancelInherited(managerRef, resource.identity),
-		resource.tasks.CancelInherited(reconRef, resource.identity),
+	cancelErr := cancelDiscoveryTasks(
+		resource.tasks.CancelInherited,
+		resource.identity,
+		managerRef,
+		reconRef,
 	)
 	managerJoined, managerErr := resource.tasks.JoinInherited(
 		ctx,
@@ -361,6 +363,23 @@ func (resource *readyDiscovery) Stop(ctx context.Context) error {
 	resource.stopped = true
 	resource.mu.Unlock()
 	return nil
+}
+
+func cancelDiscoveryTasks(
+	cancel func(
+		lifecycle.InheritedTaskRef,
+		lifecycle.ResourceIdentity,
+	) error,
+	identity lifecycle.ResourceIdentity,
+	managerRef lifecycle.InheritedTaskRef,
+	reconRef lifecycle.InheritedTaskRef,
+) error {
+	if cancel == nil {
+		return errors.New("jobmgr composition: nil discovery cancellation")
+	}
+	reconErr := cancel(reconRef, identity)
+	managerErr := cancel(managerRef, identity)
+	return errors.Join(reconErr, managerErr)
 }
 
 func (resource *readyDiscovery) Finalize() error {

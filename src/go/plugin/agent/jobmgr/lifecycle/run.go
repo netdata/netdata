@@ -4,6 +4,7 @@ package lifecycle
 
 import (
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 )
@@ -134,9 +135,13 @@ func (supervisor *RunSupervisor) Terminal(census RunCensus) error {
 		census.LongLived == (LongLivedCensus{}) && frameDrained &&
 		census.RunFinalizerComplete
 	if !quiescent {
-		if supervisor.dirty == nil {
-			supervisor.dirty = errors.New("jobmgr run supervisor: terminal with nonzero process census")
-		}
+		supervisor.dirty = errors.Join(
+			supervisor.dirty,
+			fmt.Errorf(
+				"jobmgr run supervisor: terminal with nonzero process census: %+v",
+				census,
+			),
+		)
 	}
 	supervisor.terminal = true
 	supervisor.state = RunTerminalState{Reached: true, Quiescent: quiescent, Dirty: supervisor.dirty}

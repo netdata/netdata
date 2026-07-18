@@ -369,6 +369,29 @@ func TestProcessCoreContainsConstructionFailures(t *testing.T) {
 	}
 }
 
+func TestProcessRetirementPreservesRunDirtyCause(t *testing.T) {
+	run, err := lifecycle.NewRunSupervisor(
+		1,
+		lifecycle.RealClock{},
+		time.Second,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cause := errors.New("discovery shutdown failed")
+	if err := run.Dirty(cause); err != nil {
+		t.Fatal(err)
+	}
+	err = (&processCore{}).retireRun(
+		context.Background(),
+		&runGeneration{run: run},
+	)
+	if !errors.Is(err, cause) ||
+		!strings.Contains(err.Error(), "run did not quiesce") {
+		t.Fatalf("retirement lost run failure: %v", err)
+	}
+}
+
 var errProcessPlannerConstruction = errors.New("process planner construction failed")
 
 type processRecordingWriter struct {

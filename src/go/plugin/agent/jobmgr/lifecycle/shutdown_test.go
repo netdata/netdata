@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -194,6 +195,32 @@ func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
 				}
 				if cause := run.DirtyCause(); cause != nil {
 					t.Fatalf("duplicate terminal rewrote dirty cause: %v", cause)
+				}
+			},
+		},
+		"nonquiescent terminal preserves cause and census": {
+			run: func(t *testing.T, run *RunSupervisor) {
+				cause := errors.New("discovery shutdown failed")
+				if err := run.Dirty(cause); err != nil {
+					t.Fatal(err)
+				}
+				nonzero := census
+				nonzero.TransientActive = 1
+				err := run.Terminal(nonzero)
+				if !errors.Is(err, cause) {
+					t.Fatalf("terminal lost prior dirty cause: %v", err)
+				}
+				if !strings.Contains(err.Error(), "TransientActive:1") {
+					t.Fatalf("terminal lost nonzero census: %v", err)
+				}
+				state := run.TerminalState()
+				if !state.Reached || state.Quiescent ||
+					!errors.Is(state.Dirty, cause) ||
+					!strings.Contains(
+						state.Dirty.Error(),
+						"TransientActive:1",
+					) {
+					t.Fatalf("terminal state differs: %+v", state)
 				}
 			},
 		},
