@@ -209,7 +209,12 @@ func (j *runtimeMetricsJob) runOnce(clock int) {
 	}
 
 	if j.buf.Len() > 0 {
-		_, _ = io.Copy(j.out, j.buf)
+		if _, err := io.Copy(j.out, j.buf); err != nil {
+			commit.abort()
+			j.Warningf("runtime metrics output failed: %v", err)
+			j.buf.Reset()
+			return
+		}
 	}
 	if err := commit.commit(); err != nil {
 		j.Warningf("runtime metrics commit failed: %v", err)

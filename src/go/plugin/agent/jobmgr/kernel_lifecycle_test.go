@@ -387,7 +387,9 @@ func TestFunctionCatalogDecisionOwnsExactLease(t *testing.T) {
 				t.Fatal(err)
 			}
 			startKernelLoop(t, kernel)
-			err := kernel.SubmitAndWait(context.Background(), Request{
+			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+			defer cancel()
+			err := kernel.SubmitAndWait(ctx, Request{
 				UID: "catalog-decision", Source: lifecycle.SourceFunction, Route: "route",
 			})
 			if gotErr := err != nil; gotErr != test.wantErr {
@@ -724,10 +726,7 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			lane := kernel.lanes[commandLaneKey{
-				source: lifecycle.SourceJobManager,
-				key:    "resource",
-			}]
+			lane := kernel.lanes[resourceCommandLaneKey("resource")]
 			if lane == nil {
 				t.Fatal("transaction released the live resource lane")
 			}
@@ -792,6 +791,120 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 	}
 }
 
+func TestKernelSharesResourceAuthorityAcrossSchedulingSources(t *testing.T) {
+	events := []string{}
+	current := newKernelTestReadyResource("resource", nil, nil)
+	successor := newKernelTestReadyResource("resource", nil, nil)
+	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resourcePlanner := kernelTestTransactionPlanner{
+		permitPlan: permitPlan,
+		current:    current,
+		successor:  successor,
+		events:     &events,
+	}
+	planner := plannerFunc(func(
+		_ context.Context,
+		route string,
+		_ []string,
+	) (WorkPlan, error) {
+		return resourcePlanner.Plan(Request{
+			Route:   route,
+			LaneKey: "resource",
+		})
+	})
+	var output bytes.Buffer
+	kernel, run, admission, uids, tasks :=
+		newKernelWithPlannerAndWriter(t, planner, &output)
+	setTestFunctionLane(t, kernel, func(FunctionLookup) string {
+		return "resource"
+	})
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	startKernelLoop(t, kernel)
+
+	if err := kernel.SubmitAndWait(
+		context.Background(),
+		Request{
+			UID:     "install-from-job-manager",
+			LaneKey: "resource",
+			Source:  lifecycle.SourceJobManager,
+			Route:   "install",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := kernel.SubmitAndWait(
+		context.Background(),
+		Request{
+			UID:    "replace-from-function",
+			Source: lifecycle.SourceFunction,
+			Route:  "replace",
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+
+	lane := kernel.lanes[resourceCommandLaneKey("resource")]
+	if lane == nil ||
+		lane.current != successor ||
+		lane.currentIdentity != successor.identity ||
+		lane.resourceSource != lifecycle.SourceFunction {
+		t.Fatalf(
+			"cross-source replacement did not retain one exact resource authority: %#v",
+			lane,
+		)
+	}
+	resourceLanes := 0
+	for key := range kernel.lanes {
+		if key.resource && key.key == "resource" {
+			resourceLanes++
+		}
+	}
+	if resourceLanes != 1 {
+		t.Fatalf(
+			"cross-source replacement created %d resource authorities, want 1",
+			resourceLanes,
+		)
+	}
+	if want := []string{"prepare", "apply", "cleanup"}; !reflect.DeepEqual(events, want) {
+		t.Fatalf("events=%v, want %v", events, want)
+	}
+	if !strings.Contains(
+		output.String(),
+		"FUNCTION_RESULT_BEGIN replace-from-function 200 ",
+	) {
+		t.Fatalf(
+			"cross-source transaction response missing: %q",
+			output.String(),
+		)
+	}
+
+	kernel.Stop()
+	waitCtx, cancel := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancel()
+	if err := kernel.Wait(waitCtx); err != nil {
+		t.Fatal(err)
+	}
+	if tasks.Active() != 0 || tasks.Pending() != 0 {
+		t.Fatalf(
+			"cross-source transaction retained tasks: active=%d pending=%d",
+			tasks.Active(),
+			tasks.Pending(),
+		)
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
+}
+
 func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
 	events := []string{}
 	current := newKernelTestReadyResource("resource", nil, nil)
@@ -838,10 +951,7 @@ func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	lane := kernel.lanes[commandLaneKey{
-		source: lifecycle.SourceJobManager,
-		key:    "resource",
-	}]
+	lane := kernel.lanes[resourceCommandLaneKey("resource")]
 	if lane == nil ||
 		lane.current != current ||
 		lane.currentIdentity != originalIdentity ||
@@ -931,10 +1041,7 @@ func TestKernelPreparedInternalTransactionAppliesWithoutResponse(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	lane := kernel.lanes[commandLaneKey{
-		source: lifecycle.SourceJobManager,
-		key:    "resource",
-	}]
+	lane := kernel.lanes[resourceCommandLaneKey("resource")]
 	if lane == nil ||
 		lane.current != successor ||
 		lane.currentIdentity != successor.identity ||
@@ -975,6 +1082,9 @@ func TestKernelShutdownStopsResourceAfterActiveUserDrains(t *testing.T) {
 	workRelease := make(chan struct{})
 	resource := newKernelTestReadyResource("resource", nil, stopRelease)
 	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, kernelResourcePlanner(t, resource, workEntered, workRelease))
+	testFunctionCatalogFor(t, kernel).lane = func(FunctionLookup) FunctionLane {
+		return FunctionLane{Route: 1, Scope: "resource", Resource: true}
+	}
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -987,7 +1097,7 @@ func TestKernelShutdownStopsResourceAfterActiveUserDrains(t *testing.T) {
 	useResult := make(chan error, 1)
 	go func() {
 		useResult <- kernel.SubmitAndWait(context.Background(), Request{
-			UID: "active-resource-user", LaneKey: "resource", Source: lifecycle.SourceJobManager, Route: "use",
+			UID: "active-resource-user", Source: lifecycle.SourceFunction, Route: "use",
 		})
 	}()
 	select {
@@ -3163,15 +3273,16 @@ func TestKernelSubmissionBacklogCannotStarveDueDeadline(t *testing.T) {
 
 func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T) {
 	kernel, run, admission, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-	catalog := testFunctionCatalogFor(t, kernel)
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
 	fillers := fillAdmissionRecordCapacity(t, admission, run.Generation())
 	firstResult := make(chan error, 1)
 	secondResult := make(chan error, 1)
-	source := sourceIndex(lifecycle.SourceFunction)
-	firstRequest := Request{UID: "first", Source: lifecycle.SourceFunction, Route: "route"}
+	source := sourceIndex(lifecycle.SourceJobManager)
+	firstRequest := Request{
+		UID: "first", LaneKey: "lane", Source: lifecycle.SourceJobManager, Route: "route",
+	}
 	firstPlan, err := kernel.prepareSubmissionPlanForTest(firstRequest)
 	if err != nil {
 		t.Fatal(err)
@@ -3181,7 +3292,9 @@ func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T
 		plan:    firstPlan,
 		result:  firstResult,
 	}
-	secondRequest := Request{UID: "second", Source: lifecycle.SourceFunction, Route: "route"}
+	secondRequest := Request{
+		UID: "second", LaneKey: "lane", Source: lifecycle.SourceJobManager, Route: "route",
+	}
 	secondPlan, err := kernel.prepareSubmissionPlanForTest(secondRequest)
 	if err != nil {
 		t.Fatal(err)
@@ -3195,10 +3308,6 @@ func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T
 	kernel.serviceSubmissions(1)
 	if !kernel.blockedSubmission[source] || len(kernel.submissions[source]) != 1 {
 		t.Fatalf("capacity block did not retain exactly the source head: blocked=%v queued=%d", kernel.blockedSubmission[source], len(kernel.submissions[source]))
-	}
-	if catalog.next != 1 || catalog.release != 1 || len(catalog.leases) != 0 || catalog.peak != 1 {
-		t.Fatalf("capacity retry retained Function lease: resolves=%d releases=%d active=%d peak=%d",
-			catalog.next, catalog.release, len(catalog.leases), catalog.peak)
 	}
 	select {
 	case err := <-firstResult:
@@ -3217,10 +3326,6 @@ func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T
 	}
 	if kernel.blockedSubmission[source] || len(kernel.submissions[source]) != 1 {
 		t.Fatalf("first retry did not preserve the later source item: blocked=%v queued=%d", kernel.blockedSubmission[source], len(kernel.submissions[source]))
-	}
-	if catalog.next != 2 || catalog.release != 1 || len(catalog.leases) != 1 || catalog.peak != 1 {
-		t.Fatalf("successful retry Function lease differs: resolves=%d releases=%d active=%d peak=%d",
-			catalog.next, catalog.release, len(catalog.leases), catalog.peak)
 	}
 	select {
 	case err := <-secondResult:
@@ -3242,10 +3347,6 @@ func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T
 	if first == nil || second == nil || first.ID >= second.ID {
 		t.Fatalf("source FIFO operation order differs: first=%#v second=%#v", first, second)
 	}
-	if catalog.next != 3 || catalog.release != 1 || len(catalog.leases) != 2 || catalog.peak != 2 {
-		t.Fatalf("accepted Function lease census differs: resolves=%d releases=%d active=%d peak=%d",
-			catalog.next, catalog.release, len(catalog.leases), catalog.peak)
-	}
 }
 
 func TestKernelExternalSubmissionCapacityBlockFlushesAfterAdmissionClose(t *testing.T) {
@@ -3255,8 +3356,10 @@ func TestKernelExternalSubmissionCapacityBlockFlushesAfterAdmissionClose(t *test
 	}
 	fillAdmissionRecordCapacity(t, admission, run.Generation())
 	result := make(chan error, 1)
-	source := sourceIndex(lifecycle.SourceFunction)
-	request := Request{UID: "closing", Source: lifecycle.SourceFunction, Route: "route"}
+	source := sourceIndex(lifecycle.SourceJobManager)
+	request := Request{
+		UID: "closing", LaneKey: "lane", Source: lifecycle.SourceJobManager, Route: "route",
+	}
 	plan, err := kernel.prepareSubmissionPlanForTest(request)
 	if err != nil {
 		t.Fatal(err)
@@ -3562,6 +3665,16 @@ func (functionCatalogPortStub) BeginMutation(FunctionCatalogMutation) error {
 	return errors.New("test Function catalog: mutations unsupported")
 }
 
+func (functionCatalogPortStub) AdvanceMutationQuiesce(int) (FunctionCatalogMutationProgress, error) {
+	return FunctionCatalogMutationProgress{}, errors.New(
+		"test Function catalog: no active mutation",
+	)
+}
+
+func (functionCatalogPortStub) ResumeMutation(FunctionCatalogMutation) error {
+	return errors.New("test Function catalog: no active mutation")
+}
+
 func (functionCatalogPortStub) AdvanceMutation(int, *[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (FunctionCatalogMutationProgress, int, error) {
 	return FunctionCatalogMutationProgress{}, 0, errors.New("test Function catalog: no active mutation")
 }
@@ -3629,6 +3742,16 @@ func (*testFunctionCatalog) CompleteCleanup(FunctionCleanupRef, error) error { r
 
 func (*testFunctionCatalog) BeginMutation(FunctionCatalogMutation) error {
 	return errors.New("test Function catalog: mutations unsupported")
+}
+
+func (*testFunctionCatalog) AdvanceMutationQuiesce(int) (FunctionCatalogMutationProgress, error) {
+	return FunctionCatalogMutationProgress{}, errors.New(
+		"test Function catalog: no active mutation",
+	)
+}
+
+func (*testFunctionCatalog) ResumeMutation(FunctionCatalogMutation) error {
+	return errors.New("test Function catalog: no active mutation")
 }
 
 func (*testFunctionCatalog) AdvanceMutation(int, *[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (FunctionCatalogMutationProgress, int, error) {

@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 )
 
@@ -111,6 +112,80 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 	}
 	if decision.Rejected == 0 {
 		t.Fatal("closed job route still resolved")
+	}
+}
+
+func TestFunctionControllerClosesAdmissionBeforeExternalWithdrawal(t *testing.T) {
+	handler := &controllerTestHandler{}
+	controller, catalog, err := NewController(1, collectorapi.Registry{
+		"module": {
+			SharedFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "method"}}
+			},
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return handler
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	mutations := controllerTestMutationPort{catalog: catalog}
+	publicationPort := &blockingWithdrawPublicationPort{
+		recordingPublicationPort: newRecordingPublicationPort(),
+		entered:                  make(chan struct{}),
+		release:                  make(chan struct{}),
+	}
+	publication, err := NewPublication(1, publicationPort)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := controller.Bind(&mutations, publication); err != nil {
+		t.Fatal(err)
+	}
+	if err := controller.Activate(); err != nil {
+		t.Fatal(err)
+	}
+	job := &controllerTestJob{
+		fullName: "module_job", module: "module", name: "job", running: true,
+	}
+	handle, err := controller.PrepareJob(
+		JobIdentity{ID: job.FullName(), Generation: 1},
+		job,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := handle.Publish(); err != nil {
+		t.Fatal(err)
+	}
+
+	closed := make(chan error, 1)
+	go func() {
+		closed <- handle.CloseAndDrain(context.Background())
+	}()
+	<-publicationPort.entered
+	decision, resolveErr := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID: "during-withdraw", Route: "module:method",
+	})
+	if decision.Lease.Valid() {
+		_, _ = catalog.ReleaseInvocation(decision.Lease)
+	}
+	close(publicationPort.release)
+	closeErr := <-closed
+
+	if resolveErr != nil {
+		t.Fatal(resolveErr)
+	}
+	if decision.Rejected != lifecycle.ControlUnavailable {
+		t.Fatalf(
+			"route admission during withdrawal=%v want=%v",
+			decision.Rejected,
+			lifecycle.ControlUnavailable,
+		)
+	}
+	if closeErr != nil {
+		t.Fatal(closeErr)
 	}
 }
 
@@ -295,14 +370,37 @@ type controllerTestMutationPort struct {
 	catalog *Catalog
 }
 
-func (port *controllerTestMutationPort) MutateFunctions(
+func (port *controllerTestMutationPort) QuiesceFunctions(
+	_ context.Context,
+	mutation jobmgr.FunctionCatalogMutation,
+) error {
+	if port == nil || port.catalog == nil {
+		return errors.New("nil mutation port")
+	}
+	if err := port.catalog.BeginMutation(mutation); err != nil {
+		return err
+	}
+	for {
+		progress, err := port.catalog.AdvanceMutationQuiesce(
+			jobmgr.MaximumFunctionMutationQuantum,
+		)
+		if err != nil {
+			return err
+		}
+		if progress.Quiesced {
+			return nil
+		}
+	}
+}
+
+func (port *controllerTestMutationPort) CommitFunctions(
 	_ context.Context,
 	mutation jobmgr.FunctionCatalogMutation,
 ) (uint64, error) {
 	if port == nil || port.catalog == nil {
 		return 0, errors.New("nil mutation port")
 	}
-	if err := port.catalog.BeginMutation(mutation); err != nil {
+	if err := port.catalog.ResumeMutation(mutation); err != nil {
 		return 0, err
 	}
 	for {
@@ -327,6 +425,34 @@ func (port *controllerTestMutationPort) MutateFunctions(
 	}
 }
 
+func (port *controllerTestMutationPort) AbortFunctions(
+	_ context.Context,
+	mutation jobmgr.FunctionCatalogMutation,
+) error {
+	if port == nil || port.catalog == nil {
+		return errors.New("nil mutation port")
+	}
+	if err := port.catalog.ResumeMutation(mutation); err != nil {
+		return err
+	}
+	var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
+	count, err := port.catalog.AbortMutation(&cleanups)
+	if err != nil {
+		return err
+	}
+	for index := 0; index < count; index++ {
+		cleanup := cleanups[index]
+		_, cleanupErr := cleanup.Runner.RunTask(context.Background())
+		if err := port.catalog.CompleteCleanup(
+			cleanup.Ref,
+			cleanupErr,
+		); err != nil {
+			return errors.Join(cleanupErr, err)
+		}
+	}
+	return nil
+}
+
 type controllerTestJob struct {
 	fullName  string
 	module    string
@@ -345,6 +471,20 @@ type controllerTestHandler struct {
 	mu       sync.Mutex
 	raw      funcapi.RawMethodRequest
 	cleanups int
+}
+
+type blockingWithdrawPublicationPort struct {
+	*recordingPublicationPort
+	entered chan struct{}
+	release chan struct{}
+}
+
+func (port *blockingWithdrawPublicationPort) Withdraw(
+	handle PublicationHandle,
+) error {
+	close(port.entered)
+	<-port.release
+	return port.recordingPublicationPort.Withdraw(handle)
 }
 
 func (handler *controllerTestHandler) MethodParams(

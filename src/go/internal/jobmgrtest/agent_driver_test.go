@@ -4,50 +4,50 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/netdata/netdata/go/plugins/internal/jobmgrtest/contract"
 )
 
-func TestAgentDriverUsesPublicLifecycle(t *testing.T) {
+func TestAgentPredicateRegistryMatchesContract(t *testing.T) {
+	cases, err := contract.BMM002Cases()
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := make(map[string]struct{})
+	for _, productionCase := range cases {
+		if productionCase.Suite == contract.SuiteAgent &&
+			productionCase.Proof != contract.ProofComponent {
+			want[productionCase.ID] = struct{}{}
+		}
+	}
+	if len(agentRuntimePredicates) != len(want) {
+		t.Fatalf(
+			"Agent predicates=%d, want %d",
+			len(agentRuntimePredicates),
+			len(want),
+		)
+	}
+	for predicate := range want {
+		if agentRuntimePredicates[predicate] == nil {
+			t.Fatalf("Agent predicate %s is absent", predicate)
+		}
+	}
+	for predicate := range agentRuntimePredicates {
+		if _, exists := want[predicate]; !exists {
+			t.Fatalf("unexpected Agent predicate %s", predicate)
+		}
+	}
+}
+
+func TestAgentDriverUsesCaseExactPublicLifecycle(t *testing.T) {
 	tests := map[string]struct {
-		scenario string
+		predicate string
 	}{
-		"collector generation": {
-			scenario: "collector-generation",
-		},
-		"collector acquired abort": {
-			scenario: "collector-acquired-abort",
-		},
-		"Function publication abort": {
-			scenario: "function-publication-abort",
-		},
-		"bounded shutdown": {
-			scenario: "bounded-shutdown",
-		},
-		"atomic output": {
-			scenario: "atomic-output",
-		},
-		"Function result smoke": {
-			scenario: "function-result-smoke",
-		},
-		"Function header boundaries": {
-			scenario: "function-header-boundaries",
-		},
-		"Function body boundaries": {
-			scenario: "function-body-boundaries",
-		},
-		"Function raw payload": {
-			scenario: "function-raw-payload",
-		},
-		"Function timeout boundaries": {
-			scenario: "function-timeout-boundaries",
+		"held Start acknowledgement": {
+			predicate: "F01.1",
 		},
 		"Function invalid JSON": {
-			scenario: "function-invalid-json",
-		},
-		"Function result boundaries": {
-			scenario: "function-result-boundaries",
-		},
-		"bounded Function flow": {
-			scenario: "bounded-function-flow",
+			predicate: "F14.5",
 		},
 	}
 	driver := &AgentDriver{}
@@ -55,10 +55,35 @@ func TestAgentDriverUsesPublicLifecycle(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(
 				context.Background(),
-				60*time.Second,
+				10*time.Second,
 			)
 			defer cancel()
-			if err := driver.Run(ctx, test.scenario); err != nil {
+			if err := driver.Run(ctx, test.predicate); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestAgentRuntimeOutputFaultModes(t *testing.T) {
+	tests := map[string]injectedWriteMode{
+		"short nil":      injectedShortNil,
+		"short error":    injectedShortError,
+		"pre-byte error": injectedPreByteError,
+		"EPIPE":          injectedEPIPE,
+	}
+	for name, mode := range tests {
+		t.Run(name, func(t *testing.T) {
+			ctx, cancel := context.WithTimeout(
+				context.Background(),
+				3*time.Second,
+			)
+			defer cancel()
+			if err := runAgentOutputFaultMode(
+				ctx,
+				outputFaultRuntime,
+				mode,
+			); err != nil {
 				t.Fatal(err)
 			}
 		})

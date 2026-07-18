@@ -92,7 +92,9 @@ func TestFunctionPublicationDiff(t *testing.T) {
 	a2 := publicationRecord("a", 2)
 	if err := publication.ApplyTransition(1, 2, publicationDigest(t, a2), []PublicationChange{
 		{Name: "a", Record: &a2}, {Name: "b"},
-	}, func() error { return nil }); err != nil {
+	}, func() error { return nil }, func() error { return nil }, func() error {
+		return nil
+	}); err != nil {
 		t.Fatal(err)
 	}
 	if len(port.published) != 3 || len(port.withdrawn) != 2 || len(port.active) != 1 {
@@ -154,7 +156,9 @@ func TestFunctionPublicationNoRearm(t *testing.T) {
 	}
 	if err := publication.ApplyTransition(1, 2, digest, []PublicationChange{{
 		Name: record.Name, Record: &record,
-	}}, func() error { return nil }); err == nil {
+	}}, func() error { return nil }, func() error { return nil }, func() error {
+		return nil
+	}); err == nil {
 		t.Fatal("publication rearmed after stop")
 	}
 	if err := publication.Poll(1, 1, digest); err == nil {
@@ -242,6 +246,14 @@ func TestFunctionPublicationMutationCannotExceedQuantum(t *testing.T) {
 			committed = true
 			return nil
 		},
+		func() error {
+			committed = true
+			return nil
+		},
+		func() error {
+			committed = true
+			return nil
+		},
 	); err == nil {
 		t.Fatal("oversized steady mutation was accepted")
 	}
@@ -278,7 +290,15 @@ func TestFunctionPublicationTransitionOrdersCatalogBetweenFrames(t *testing.T) {
 		publicationDigest(t, next),
 		[]PublicationChange{{Name: next.Name, Record: &next}},
 		func() error {
+			port.events = append(port.events, "catalog:quiesce")
+			return nil
+		},
+		func() error {
 			port.events = append(port.events, "catalog:commit")
+			return nil
+		},
+		func() error {
+			port.events = append(port.events, "catalog:abort")
 			return nil
 		},
 	); err != nil {
@@ -286,11 +306,66 @@ func TestFunctionPublicationTransitionOrdersCatalogBetweenFrames(t *testing.T) {
 	}
 	if got := port.events; !equalPublicationEvents(got, []string{
 		"publish:work",
+		"catalog:quiesce",
 		"withdraw:work",
 		"catalog:commit",
 		"publish:work",
 	}) {
 		t.Fatalf("transition order=%v", got)
+	}
+}
+
+func TestFunctionPublicationWithdrawalFailureAbortsQuiescedCatalog(t *testing.T) {
+	port := newRecordingPublicationPort()
+	publication, err := NewPublication(1, port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	current := publicationRecord("work", 1)
+	if err := publication.ApplyInitialSnapshot(
+		1,
+		1,
+		publicationDigest(t, current),
+		1,
+		[]PublicationChange{{Name: current.Name, Record: &current}},
+	); err != nil {
+		t.Fatal(err)
+	}
+	port.withdrawErr = errors.New("withdraw failed")
+	var quiesced, committed, aborted bool
+	next := publicationRecord("work", 2)
+	err = publication.ApplyTransition(
+		1,
+		2,
+		publicationDigest(t, next),
+		[]PublicationChange{{Name: next.Name, Record: &next}},
+		func() error {
+			quiesced = true
+			return nil
+		},
+		func() error {
+			committed = true
+			return nil
+		},
+		func() error {
+			aborted = true
+			return nil
+		},
+	)
+	if err == nil {
+		t.Fatal("withdrawal failure was accepted")
+	}
+	if !quiesced || committed || !aborted {
+		t.Fatalf(
+			"transition callbacks: quiesced=%v committed=%v aborted=%v",
+			quiesced,
+			committed,
+			aborted,
+		)
+	}
+	if census := publication.Census(); census.Version != 1 ||
+		census.Published != 1 || !census.Dirty {
+		t.Fatalf("failed transition census=%+v", census)
 	}
 }
 

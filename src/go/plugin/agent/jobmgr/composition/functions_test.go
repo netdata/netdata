@@ -158,14 +158,37 @@ type assemblyMutationPort struct {
 	catalog *functionadapter.Catalog
 }
 
-func (port *assemblyMutationPort) MutateFunctions(
+func (port *assemblyMutationPort) QuiesceFunctions(
+	_ context.Context,
+	mutation jobmgr.FunctionCatalogMutation,
+) error {
+	if port == nil || port.catalog == nil {
+		return errors.New("nil mutation port")
+	}
+	if err := port.catalog.BeginMutation(mutation); err != nil {
+		return err
+	}
+	for {
+		progress, err := port.catalog.AdvanceMutationQuiesce(
+			jobmgr.MaximumFunctionMutationQuantum,
+		)
+		if err != nil {
+			return err
+		}
+		if progress.Quiesced {
+			return nil
+		}
+	}
+}
+
+func (port *assemblyMutationPort) CommitFunctions(
 	_ context.Context,
 	mutation jobmgr.FunctionCatalogMutation,
 ) (uint64, error) {
 	if port == nil || port.catalog == nil {
 		return 0, errors.New("nil mutation port")
 	}
-	if err := port.catalog.BeginMutation(mutation); err != nil {
+	if err := port.catalog.ResumeMutation(mutation); err != nil {
 		return 0, err
 	}
 	for {
@@ -188,6 +211,34 @@ func (port *assemblyMutationPort) MutateFunctions(
 			return progress.Version, nil
 		}
 	}
+}
+
+func (port *assemblyMutationPort) AbortFunctions(
+	_ context.Context,
+	mutation jobmgr.FunctionCatalogMutation,
+) error {
+	if port == nil || port.catalog == nil {
+		return errors.New("nil mutation port")
+	}
+	if err := port.catalog.ResumeMutation(mutation); err != nil {
+		return err
+	}
+	var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
+	count, err := port.catalog.AbortMutation(&cleanups)
+	if err != nil {
+		return err
+	}
+	for index := 0; index < count; index++ {
+		cleanup := cleanups[index]
+		_, cleanupErr := cleanup.Runner.RunTask(context.Background())
+		if err := port.catalog.CompleteCleanup(
+			cleanup.Ref,
+			cleanupErr,
+		); err != nil {
+			return errors.Join(cleanupErr, err)
+		}
+	}
+	return nil
 }
 
 type assemblyTestHandler struct{}

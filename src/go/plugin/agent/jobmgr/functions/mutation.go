@@ -258,8 +258,10 @@ type routeChangeKey struct {
 }
 
 type routeTransition struct {
-	oldRoute *route
-	newRoute *route
+	oldRoute           *route
+	newRoute           *route
+	oldAdmissionClosed bool
+	tombstone          bool
 }
 
 type generationRemoval struct {
@@ -299,6 +301,7 @@ type routeMutationStep struct {
 	prefixNode    *prefixNode
 	set           routeSet
 	oldRoute      *route
+	hadRoute      bool
 	replacement   *route
 	updatedPrefix *prefixNode
 	updatedName   *catalogNode
@@ -330,6 +333,7 @@ type MutationBuilder struct {
 	lastStep     int
 	postimage    *MutationPostimage
 	pathBytes    int64
+	quiesced     bool
 	failed       bool
 	finished     bool
 }
@@ -410,16 +414,38 @@ func (builder *MutationBuilder) PrepareStep(quantum int) (*MutationPostimage, bo
 	return nil, false, nil
 }
 
+// PrepareQuiesceStep validates route topology and closes predecessor admission
+// without making the private postimage visible.
+func (builder *MutationBuilder) PrepareQuiesceStep(quantum int) (bool, error) {
+	if builder == nil || builder.catalog == nil || builder.mutation == nil ||
+		builder.finished || builder.failed || builder.postimage != nil ||
+		builder.phase != mutationTopology ||
+		quantum <= 0 || quantum > MaximumMutationQuantum {
+		return false, errors.New("jobmgr Function catalog: invalid mutation quiesce step")
+	}
+	builder.lastStep = 0
+	for builder.lastStep < quantum && builder.phase == mutationTopology {
+		progressed, err := builder.advanceOne()
+		if err != nil {
+			builder.failed = true
+			return false, err
+		}
+		if progressed {
+			builder.lastStep++
+			builder.completed++
+		}
+	}
+	return builder.phase == mutationGenerations, nil
+}
+
 func (builder *MutationBuilder) advanceOne() (bool, error) {
 	for {
 		switch builder.phase {
 		case mutationTopology, mutationMaterialize:
 			if builder.change == len(builder.mutation.changes) {
 				if builder.phase == mutationTopology {
-					builder.phase = mutationGenerations
-					builder.change = 0
-					builder.root = builder.catalog.routes
-					continue
+					builder.finishTopology()
+					return false, nil
 				}
 				builder.phase = mutationReady
 				return false, nil
@@ -486,6 +512,21 @@ func (builder *MutationBuilder) advanceOne() (bool, error) {
 	}
 }
 
+func (builder *MutationBuilder) finishTopology() {
+	for index := range builder.transitions {
+		transition := &builder.transitions[index]
+		if transition.oldRoute == nil {
+			continue
+		}
+		transition.oldAdmissionClosed = transition.oldRoute.admissionClosed
+		transition.oldRoute.admissionClosed = true
+	}
+	builder.phase = mutationGenerations
+	builder.change = 0
+	builder.root = builder.catalog.routes
+	builder.quiesced = true
+}
+
 func (builder *MutationBuilder) startRouteStep() {
 	change := &builder.mutation.changes[builder.change]
 	phaseIndex := 0
@@ -493,11 +534,13 @@ func (builder *MutationBuilder) startRouteStep() {
 	if builder.phase == mutationMaterialize {
 		phaseIndex = 1
 		replacement = nil
+		transition := &builder.transitions[builder.change]
 		if change.declaration != nil {
 			preparedGeneration := &builder.mutation.generations[change.generation-1]
 			builder.routeOrdinal++
 			*change.resolved = route{
-				id:     builder.catalog.nextRouteID + builder.routeOrdinal,
+				id:         builder.catalog.nextRouteID + builder.routeOrdinal,
+				publicName: change.publicName, prefix: change.prefix,
 				method: change.declaration.ID, handler: preparedGeneration.generation,
 				lane:                change.declaration.Lane,
 				cooperativeCancel:   change.declaration.CooperativeCancel,
@@ -508,7 +551,13 @@ func (builder *MutationBuilder) startRouteStep() {
 				),
 			}
 			replacement = change.resolved
-			builder.transitions[builder.change].newRoute = replacement
+			transition.newRoute = replacement
+		} else if transition.oldRoute != nil &&
+			transition.oldRoute.handler.invocationLeases != 0 {
+			replacement = transition.oldRoute
+			transition.tombstone = true
+			replacement.retiringNamePath = change.namePath
+			replacement.retiringPrefixPath = change.prefixPath
 		}
 	}
 	builder.step = routeMutationStep{
@@ -566,6 +615,10 @@ func (step *routeMutationStep) advanceNameDescend() (bool, error) {
 
 func (step *routeMutationStep) advanceDirectRoute() (bool, error) {
 	step.oldRoute = step.set.direct
+	step.hadRoute = step.oldRoute != nil
+	if step.oldRoute != nil && step.oldRoute.retiringDrained {
+		step.oldRoute = nil
+	}
 	if step.replacement == nil && step.oldRoute == nil {
 		return false, errors.New("jobmgr Function catalog: mutation removes missing direct route")
 	}
@@ -598,6 +651,10 @@ func (step *routeMutationStep) advancePrefixTerminal() (bool, error) {
 	if original != nil {
 		step.oldRoute = original.resolved
 	}
+	step.hadRoute = step.oldRoute != nil
+	if step.oldRoute != nil && step.oldRoute.retiringDrained {
+		step.oldRoute = nil
+	}
 	if step.replacement == nil && step.oldRoute == nil {
 		return false, errors.New("jobmgr Function catalog: mutation removes missing prefix route")
 	}
@@ -621,10 +678,10 @@ func (step *routeMutationStep) advancePrefixTerminal() (bool, error) {
 		step.updatedPrefix != nil,
 		prefixNodeStorageBytes,
 	)
-	if step.oldRoute == nil && step.replacement != nil {
+	if !step.hadRoute && step.replacement != nil {
 		step.set.prefixCount++
 	}
-	if step.oldRoute != nil && step.replacement == nil {
+	if step.hadRoute && step.replacement == nil {
 		step.set.prefixCount--
 	}
 	step.state = routeStepPrefixUnwind
@@ -782,7 +839,23 @@ func (catalog *Catalog) commitMutation(postimage *MutationPostimage, cleanups *[
 			catalog.appendCloseRoute(transition.newRoute)
 			catalog.routeCount++
 		}
+		if transition.tombstone {
+			retired := transition.oldRoute
+			if retired.handler.invocationLeases == 0 {
+				retired.retiringDrained = true
+				retired.retiringNext = catalog.deferredPrune
+				catalog.deferredPrune = retired
+			} else {
+				retired.retiringNext =
+					retired.handler.retiringHead
+				retired.handler.retiringHead = retired
+			}
+		}
 	}
+	catalog.routes = postimage.root
+	deferred := catalog.deferredPrune
+	catalog.deferredPrune = nil
+	catalog.pruneRetiringRoutes(deferred)
 	cleanupCount := 0
 	for index := 0; index < builder.removalCount; index++ {
 		generation := builder.removals[index].generation
@@ -799,7 +872,6 @@ func (catalog *Catalog) commitMutation(postimage *MutationPostimage, cleanups *[
 			cleanupCount++
 		}
 	}
-	catalog.routes = postimage.root
 	catalog.nextRouteID += postimage.builder.routeOrdinal
 	catalog.nextGenerationID += uint32(len(builder.mutation.generations))
 	catalog.version++
@@ -835,6 +907,18 @@ func (builder *MutationBuilder) Abort(cleanups *[jobmgr.MaximumFunctionCleanupBa
 	if builder.catalog.mutation == builder {
 		builder.catalog.mutation = nil
 	}
+	if builder.quiesced {
+		for index := range builder.transitions {
+			transition := &builder.transitions[index]
+			if transition.oldRoute != nil {
+				transition.oldRoute.admissionClosed =
+					transition.oldAdmissionClosed
+			}
+		}
+	}
+	deferred := builder.catalog.deferredPrune
+	builder.catalog.deferredPrune = nil
+	builder.catalog.pruneRetiringRoutes(deferred)
 	builder.finished = true
 	if builder.postimage != nil {
 		builder.postimage.finished = true
@@ -849,6 +933,33 @@ func (catalog *Catalog) BeginMutation(mutation jobmgr.FunctionCatalogMutation) e
 	}
 	_, err := catalog.startMutation(prepared)
 	return err
+}
+
+func (catalog *Catalog) AdvanceMutationQuiesce(quantum int) (jobmgr.FunctionCatalogMutationProgress, error) {
+	if catalog == nil || catalog.mutation == nil {
+		return jobmgr.FunctionCatalogMutationProgress{}, errors.New("jobmgr Function catalog: no active mutation")
+	}
+	builder := catalog.mutation
+	quiesced, err := builder.PrepareQuiesceStep(quantum)
+	progress := builder.Progress()
+	result := jobmgr.FunctionCatalogMutationProgress{
+		CompletedNodes: progress.CompletedNodes,
+		TotalNodes:     progress.TotalNodes,
+		Version:        catalog.version,
+		Quiesced:       quiesced,
+	}
+	return result, err
+}
+
+func (catalog *Catalog) ResumeMutation(mutation jobmgr.FunctionCatalogMutation) error {
+	prepared, ok := mutation.(*Mutation)
+	if catalog == nil || !ok || catalog.mutation == nil ||
+		catalog.mutation != &prepared.builder ||
+		catalog.mutation.phase != mutationGenerations ||
+		catalog.mutation.failed || catalog.mutation.finished {
+		return errors.New("jobmgr Function catalog: invalid mutation resume")
+	}
+	return nil
 }
 
 func (catalog *Catalog) AdvanceMutation(quantum int, cleanups *[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan) (jobmgr.FunctionCatalogMutationProgress, int, error) {

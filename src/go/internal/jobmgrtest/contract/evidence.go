@@ -13,11 +13,11 @@ type ComponentProof struct {
 	Test    string
 }
 
-// CaseEvidence binds one required case to its black-box runtime scenario and
-// any component-level proof needed to close the case honestly.
+// CaseEvidence binds one required case to its exact black-box predicate and any
+// component-level proof needed to close the case honestly.
 type CaseEvidence struct {
-	RuntimeScenario string
-	Components      []ComponentProof
+	RuntimePredicate string
+	Components       []ComponentProof
 }
 
 var componentProofByCase = map[string][]ComponentProof{
@@ -43,6 +43,10 @@ var componentProofByCase = map[string][]ComponentProof{
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit"},
 	},
 	"F05.2": {
+		{Package: "./plugin/agent/jobmgr/functions", Test: "TestProcessIngressKeepsOneReaderAndLinearizesPauseAdoptFence"},
+		{Package: "./plugin/agent/jobmgr/composition", Test: "TestProcessCoreRestartsOneInputAndMovesFrameAuthority"},
+	},
+	"F06.1": {
 		{Package: "./plugin/agent/jobmgr/functions", Test: "TestProcessIngressKeepsOneReaderAndLinearizesPauseAdoptFence"},
 		{Package: "./plugin/agent/jobmgr/composition", Test: "TestProcessCoreRestartsOneInputAndMovesFrameAuthority"},
 	},
@@ -228,12 +232,12 @@ var componentProofByCase = map[string][]ComponentProof{
 }
 
 func EvidenceFor(productionCase ProductionCase) (CaseEvidence, error) {
-	runtimeScenario := ""
+	runtimePredicate := ""
 	if productionCase.Proof != ProofComponent {
-		runtimeScenario = runtimeScenarioFor(productionCase)
-		if runtimeScenario == "" {
+		runtimePredicate = runtimePredicateFor(productionCase)
+		if runtimePredicate == "" {
 			return CaseEvidence{}, fmt.Errorf(
-				"B-M-002 evidence: case %s has no runtime scenario",
+				"B-M-002 evidence: case %s has no runtime predicate",
 				productionCase.ID,
 			)
 		}
@@ -242,6 +246,9 @@ func EvidenceFor(productionCase ProductionCase) (CaseEvidence, error) {
 		[]ComponentProof(nil),
 		componentProofByCase[productionCase.ID]...,
 	)
+	if productionCase.ID == "F24.14-b-hotpath-envelope" {
+		components = append(components, BMM002HotpathProofs()...)
+	}
 	if productionCase.Proof != ProofRuntime && len(components) == 0 {
 		return CaseEvidence{}, fmt.Errorf(
 			"B-M-002 evidence: case %s has no component proof",
@@ -249,7 +256,7 @@ func EvidenceFor(productionCase ProductionCase) (CaseEvidence, error) {
 		)
 	}
 	for _, proof := range components {
-		if !strings.HasPrefix(proof.Package, "./plugin/agent/jobmgr") ||
+		if !strings.HasPrefix(proof.Package, "./plugin/") ||
 			proof.Test == "" ||
 			!strings.HasPrefix(proof.Test, "Test") {
 			return CaseEvidence{}, errors.New(
@@ -258,70 +265,16 @@ func EvidenceFor(productionCase ProductionCase) (CaseEvidence, error) {
 		}
 	}
 	return CaseEvidence{
-		RuntimeScenario: runtimeScenario,
-		Components:      components,
+		RuntimePredicate: runtimePredicate,
+		Components:       components,
 	}, nil
 }
 
-func runtimeScenarioFor(productionCase ProductionCase) string {
+func runtimePredicateFor(productionCase ProductionCase) string {
 	switch productionCase.Suite {
-	case SuiteAgent:
-		switch {
-		case productionCase.ID == "F14.1":
-			return "function-header-boundaries"
-		case productionCase.ID == "F14.2":
-			return "function-body-boundaries"
-		case productionCase.ID == "F14.3":
-			return "function-raw-payload"
-		case productionCase.ID == "F14.4":
-			return "function-timeout-boundaries"
-		case productionCase.ID == "F14.5":
-			return "function-invalid-json"
-		case productionCase.ID == "F14.13":
-			return "function-result-boundaries"
-		case productionCase.ID == "F04.2":
-			return "collector-acquired-abort"
-		case productionCase.ID == "F04.3":
-			return "function-publication-abort"
-		case strings.HasPrefix(productionCase.ID, "F01."),
-			strings.HasPrefix(productionCase.ID, "F02."),
-			strings.HasPrefix(productionCase.ID, "F04."):
-			return "collector-generation"
-		case strings.HasPrefix(productionCase.ID, "F05."),
-			strings.HasPrefix(productionCase.ID, "F07."),
-			strings.HasPrefix(productionCase.ID, "F10."),
-			strings.HasPrefix(productionCase.ID, "F21."):
-			return "bounded-shutdown"
-		case strings.HasPrefix(productionCase.ID, "F11."),
-			strings.HasPrefix(productionCase.ID, "F12."):
-			return "atomic-output"
-		case strings.HasPrefix(productionCase.ID, "F14."):
-			return "function-result-smoke"
-		default:
-			return "bounded-function-flow"
-		}
-	case SuiteProcess:
-		switch productionCase.ID {
-		case "F05.2":
-			return "restart"
-		case "F05.3":
-			return "noncooperative-shutdown"
-		case "F06.2", "F22.1-agent":
-			return "input-fence"
-		default:
-			return ""
-		}
-	case SuiteShippedRoot:
+	case SuiteAgent, SuiteProcess, SuiteShippedRoot,
+		SuiteCollectorBoundary, SuiteResolver:
 		return productionCase.ID
-	case SuiteCollectorBoundary:
-		switch productionCase.ID {
-		case "F10.7", "F18.5":
-			return "retained-cleanup"
-		case "F18.1", "F18.4":
-			return "cleanup-once"
-		}
-	case SuiteResolver:
-		return "process-group-containment"
 	}
 	return ""
 }

@@ -15,14 +15,11 @@ import (
 
 func TestParseOptionsRequiresAbsolutePaths(t *testing.T) {
 	required := map[string]string{
-		"-go-root":               "/go",
-		"-baseline-bundle":       "/baseline",
-		"-production-executable": "/agent",
-		"-evidence-directory":    "/evidence",
-		"-root-config-dir":       "/config",
-		"-godplugin":             "/go.d.plugin",
-		"-ibmdplugin":            "/ibm.d.plugin",
-		"-scriptsdplugin":        "/scripts.d.plugin",
+		"-go-root":            "/go",
+		"-baseline-bundle":    "/baseline",
+		"-evidence-directory": "/evidence",
+		"-root-config-dir":    "/config",
+		"-ibm-build-manifest": "/ibm-build-manifest.json",
 	}
 	base := make([]string, 0, len(required)*2)
 	for name, value := range required {
@@ -248,6 +245,67 @@ func TestWithEnvironmentReplacesAndSortsOverrides(t *testing.T) {
 	want := []string{"B=kept", "A=new", "C=added"}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("environment=%v, want %v", got, want)
+	}
+}
+
+func TestPhaseGoEnvironmentIsFixedAndOverrideable(t *testing.T) {
+	got := phaseGoEnvironment(
+		map[string]string{
+			"CGO_ENABLED": "0",
+			"GOMAXPROCS":  "99",
+		},
+	)
+	joined := strings.Join(got, "\n")
+	for _, required := range []string{
+		"LANG=C",
+		"LC_ALL=C",
+		"TZ=UTC",
+		"GOFLAGS=-mod=readonly",
+		"GOTOOLCHAIN=local",
+		"GOWORK=off",
+		"CGO_ENABLED=0",
+		"GOMAXPROCS=99",
+	} {
+		if !strings.Contains(joined, required) {
+			t.Fatalf("environment lacks %q: %v", required, got)
+		}
+	}
+	if strings.Count(joined, "GOMAXPROCS=") != 1 {
+		t.Fatalf("GOMAXPROCS override is duplicated: %v", got)
+	}
+}
+
+func TestExecutableIdentityRejectsEqualContent(t *testing.T) {
+	directory := t.TempDir()
+	paths := map[string]string{
+		"left":  filepath.Join(directory, "left"),
+		"right": filepath.Join(directory, "right"),
+	}
+	for _, path := range paths {
+		if err := os.WriteFile(path, []byte("same"), 0o700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	same, err := sameExecutableContent(paths["left"], paths["right"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !same {
+		t.Fatal("equal executable content was not detected")
+	}
+	if err := os.WriteFile(
+		paths["right"],
+		[]byte("different"),
+		0o700,
+	); err != nil {
+		t.Fatal(err)
+	}
+	same, err = sameExecutableContent(paths["left"], paths["right"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if same {
+		t.Fatal("different executable content was reported equal")
 	}
 }
 

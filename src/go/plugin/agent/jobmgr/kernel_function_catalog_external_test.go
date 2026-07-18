@@ -141,7 +141,27 @@ func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	version, err := kernel.MutateFunctions(context.Background(), mutation)
+	if err := kernel.QuiesceFunctions(
+		context.Background(),
+		mutation,
+	); err != nil {
+		t.Fatal(err)
+	}
+	rejected, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
+		UID: "during-mutation", Route: "direct",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rejected.Rejected != lifecycle.ControlUnavailable ||
+		catalog.Census().Version != 1 {
+		t.Fatalf(
+			"quiesced catalog decision=%+v census=%+v",
+			rejected,
+			catalog.Census(),
+		)
+	}
+	version, err := kernel.CommitFunctions(context.Background(), mutation)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,8 +209,17 @@ func TestFunctionCatalogMutationCancellationAfterHandoffWaitsForDisposition(t *t
 		err     error
 	}
 	done := make(chan mutationResult, 1)
+	mutation := handoffMutation{}
 	go func() {
-		version, err := kernel.MutateFunctions(ctx, handoffMutation{})
+		err := kernel.QuiesceFunctions(ctx, mutation)
+		if err != nil {
+			done <- mutationResult{err: err}
+			return
+		}
+		version, err := kernel.CommitFunctions(
+			context.Background(),
+			mutation,
+		)
 		done <- mutationResult{version: version, err: err}
 	}()
 	select {
@@ -240,6 +269,47 @@ func TestFunctionCatalogMutationCancellationAfterHandoffWaitsForDisposition(t *t
 	}
 }
 
+func TestFunctionCatalogPausedMutationAbortsDuringShutdown(t *testing.T) {
+	catalog := &handoffMutationCatalog{
+		begun: make(chan struct{}),
+		allow: make(chan struct{}),
+	}
+	close(catalog.allow)
+	kernel, run, admission, uids := newExternalKernel(t, catalog)
+	mutation := handoffMutation{}
+	if err := kernel.QuiesceFunctions(
+		context.Background(),
+		mutation,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if !catalog.active.Load() {
+		t.Fatal("quiesced mutation did not remain catalog-owned")
+	}
+
+	kernel.Stop()
+	if err := kernel.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if catalog.active.Load() || !catalog.closed.Load() {
+		t.Fatalf(
+			"shutdown catalog state: active=%v closed=%v",
+			catalog.active.Load(),
+			catalog.closed.Load(),
+		)
+	}
+	if _, err := kernel.CommitFunctions(
+		context.Background(),
+		mutation,
+	); err == nil {
+		t.Fatal("shutdown accepted a paused mutation commit")
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeExternalUIDLedger(t, uids)
+}
+
 type handoffMutation struct{}
 
 func (handoffMutation) FunctionCatalogMutation() {}
@@ -278,25 +348,42 @@ func (catalog *handoffMutationCatalog) BeginMutation(
 	return nil
 }
 
-func (catalog *handoffMutationCatalog) AdvanceMutation(
+func (catalog *handoffMutationCatalog) AdvanceMutationQuiesce(
 	int,
-	*[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan,
-) (jobmgr.FunctionCatalogMutationProgress, int, error) {
+) (jobmgr.FunctionCatalogMutationProgress, error) {
 	select {
 	case <-catalog.allow:
-		catalog.active.Store(false)
 		return jobmgr.FunctionCatalogMutationProgress{
 			CompletedNodes: 1,
 			TotalNodes:     1,
-			Version:        2,
-			Done:           true,
-		}, 0, nil
+			Version:        1,
+			Quiesced:       true,
+		}, nil
 	default:
 		return jobmgr.FunctionCatalogMutationProgress{
 			TotalNodes: 1,
 			Version:    1,
-		}, 0, nil
+		}, nil
 	}
+}
+
+func (*handoffMutationCatalog) ResumeMutation(
+	jobmgr.FunctionCatalogMutation,
+) error {
+	return nil
+}
+
+func (catalog *handoffMutationCatalog) AdvanceMutation(
+	int,
+	*[jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan,
+) (jobmgr.FunctionCatalogMutationProgress, int, error) {
+	catalog.active.Store(false)
+	return jobmgr.FunctionCatalogMutationProgress{
+		CompletedNodes: 1,
+		TotalNodes:     1,
+		Version:        2,
+		Done:           true,
+	}, 0, nil
 }
 
 func (catalog *handoffMutationCatalog) AbortMutation(

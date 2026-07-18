@@ -20,10 +20,10 @@ type ResolverDriver struct {
 
 func (driver ResolverDriver) Run(
 	ctx context.Context,
-	scenario string,
+	predicate string,
 ) error {
 	if ctx == nil ||
-		scenario != "process-group-containment" ||
+		predicate != "F10.6" ||
 		driver.Helper == "" ||
 		driver.PIDFile == "" {
 		return errors.New("jobmgr test: invalid Resolver driver")

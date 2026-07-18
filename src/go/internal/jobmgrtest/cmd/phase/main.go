@@ -3,10 +3,12 @@ package main
 import (
 	"bytes"
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -18,7 +20,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/internal/jobmgrtest/buildidentity"
 	"github.com/netdata/netdata/go/plugins/internal/jobmgrtest/contract"
+	"github.com/netdata/netdata/go/plugins/internal/jobmgrtest/runner"
 	"github.com/netdata/netdata/go/plugins/internal/jobmgrtest/wireeval"
 	"gopkg.in/yaml.v2"
 )
@@ -26,14 +30,19 @@ import (
 const requiredComparisonGates = 171
 
 type options struct {
-	goRoot               string
-	baselineBundle       string
-	productionExecutable string
-	evidenceDirectory    string
-	rootConfigDirectory  string
-	godplugin            string
-	ibmdplugin           string
-	scriptsdplugin       string
+	goRoot              string
+	baselineBundle      string
+	evidenceDirectory   string
+	rootConfigDirectory string
+	ibmBuildManifest    string
+}
+
+type phaseArtifacts struct {
+	production     string
+	godplugin      string
+	ibmdplugin     string
+	scriptsdplugin string
+	source         buildidentity.Source
 }
 
 type packageGates struct {
@@ -42,14 +51,16 @@ type packageGates struct {
 }
 
 type phaseSummary struct {
-	Cases             int    `json:"cases"`
-	ComponentTests    int    `json:"component_tests"`
-	HotpathOwners     int    `json:"hotpath_owners"`
-	HotpathBenchmarks int    `json:"hotpath_benchmarks"`
-	RuntimeSuites     int    `json:"runtime_suites"`
-	ComparisonGates   int    `json:"comparison_gates"`
-	EnvironmentSHA256 string `json:"environment_sha256"`
-	Pass              bool   `json:"pass"`
+	Cases                int    `json:"cases"`
+	ComponentTests       int    `json:"component_tests"`
+	HotpathOwners        int    `json:"hotpath_owners"`
+	DiagnosticBenchmarks int    `json:"diagnostic_benchmarks"`
+	RuntimeSuites        int    `json:"runtime_suites"`
+	ComparisonGates      int    `json:"comparison_gates"`
+	EnvironmentSHA256    string `json:"environment_sha256"`
+	SourceRevision       string `json:"source_revision"`
+	SourceTree           string `json:"source_tree"`
+	Pass                 bool   `json:"pass"`
 }
 
 func main() {
@@ -87,6 +98,15 @@ func run(arguments []string) error {
 		syscall.SIGTERM,
 	)
 	defer stop()
+	artifacts, cleanup, err := buildPhaseArtifacts(
+		ctx,
+		opts,
+		baseline.Executable,
+	)
+	if err != nil {
+		return err
+	}
+	defer cleanup()
 
 	if err := verifyNamedGates(ctx, opts.goRoot, gates); err != nil {
 		return err
@@ -97,7 +117,7 @@ func run(arguments []string) error {
 	if err := runHotpathBenchmarks(ctx, opts.goRoot, gates); err != nil {
 		return err
 	}
-	if err := runProductionSuites(ctx, opts); err != nil {
+	if err := runProductionSuites(ctx, opts, artifacts); err != nil {
 		return err
 	}
 
@@ -113,7 +133,7 @@ func run(arguments []string) error {
 				Arguments:  append([]string(nil), childArguments...),
 			},
 			Production: wireeval.ChildSpec{
-				Executable: opts.productionExecutable,
+				Executable: artifacts.production,
 				Arguments:  append([]string(nil), childArguments...),
 			},
 			EvidenceDirectory: opts.evidenceDirectory,
@@ -150,14 +170,16 @@ func run(arguments []string) error {
 	}
 
 	summary := phaseSummary{
-		Cases:             len(cases),
-		ComponentTests:    countTests(gates),
-		HotpathOwners:     len(contract.BMM002HotpathGates()),
-		HotpathBenchmarks: countBenchmarks(gates),
-		RuntimeSuites:     len(productionSuiteTests()),
-		ComparisonGates:   len(replayed.Gates),
-		EnvironmentSHA256: experiment.EnvironmentSHA256,
-		Pass:              true,
+		Cases:                len(cases),
+		ComponentTests:       countTests(gates),
+		HotpathOwners:        len(contract.BMM002HotpathGates()),
+		DiagnosticBenchmarks: countBenchmarks(gates),
+		RuntimeSuites:        len(productionSuiteTests()),
+		ComparisonGates:      len(replayed.Gates),
+		EnvironmentSHA256:    experiment.EnvironmentSHA256,
+		SourceRevision:       artifacts.source.Revision,
+		SourceTree:           artifacts.source.GoTree,
+		Pass:                 true,
 	}
 	return json.NewEncoder(os.Stdout).Encode(summary)
 }
@@ -174,12 +196,6 @@ func parseOptions(arguments []string) (options, error) {
 		"absolute sealed B-M-001 baseline bundle",
 	)
 	flags.StringVar(
-		&opts.productionExecutable,
-		"production-executable",
-		"",
-		"absolute permanent Agent-driver executable",
-	)
-	flags.StringVar(
 		&opts.evidenceDirectory,
 		"evidence-directory",
 		"",
@@ -192,22 +208,10 @@ func parseOptions(arguments []string) (options, error) {
 		"absolute isolated root config directory with empty jobs",
 	)
 	flags.StringVar(
-		&opts.godplugin,
-		"godplugin",
+		&opts.ibmBuildManifest,
+		"ibm-build-manifest",
 		"",
-		"absolute prebuilt go.d.plugin",
-	)
-	flags.StringVar(
-		&opts.ibmdplugin,
-		"ibmdplugin",
-		"",
-		"absolute prebuilt IBM-enabled ibm.d.plugin",
-	)
-	flags.StringVar(
-		&opts.scriptsdplugin,
-		"scriptsdplugin",
-		"",
-		"absolute prebuilt scripts.d.plugin",
+		"absolute exact-tree IBM build manifest",
 	)
 	if err := flags.Parse(arguments); err != nil {
 		return options{}, err
@@ -220,12 +224,9 @@ func parseOptions(arguments []string) (options, error) {
 	paths := map[string]string{
 		"Go root":               opts.goRoot,
 		"baseline bundle":       opts.baselineBundle,
-		"production executable": opts.productionExecutable,
 		"evidence directory":    opts.evidenceDirectory,
 		"root config directory": opts.rootConfigDirectory,
-		"go.d.plugin":           opts.godplugin,
-		"ibm.d.plugin":          opts.ibmdplugin,
-		"scripts.d.plugin":      opts.scriptsdplugin,
+		"IBM build manifest":    opts.ibmBuildManifest,
 	}
 	for name, value := range paths {
 		if !filepath.IsAbs(value) {
@@ -249,15 +250,11 @@ func validateInputs(opts options) error {
 		!info.Mode().IsRegular() {
 		return errors.New("jobmgr phase: Go module root is unavailable")
 	}
-	for name, path := range map[string]string{
-		"production executable": opts.productionExecutable,
-		"go.d.plugin":           opts.godplugin,
-		"ibm.d.plugin":          opts.ibmdplugin,
-		"scripts.d.plugin":      opts.scriptsdplugin,
-	} {
-		if err := validateExecutable(name, path); err != nil {
-			return err
-		}
+	if info, err := os.Lstat(opts.ibmBuildManifest); err != nil ||
+		!info.Mode().IsRegular() {
+		return errors.New(
+			"jobmgr phase: IBM build manifest is unavailable",
+		)
 	}
 	if _, err := os.Stat(opts.evidenceDirectory); !os.IsNotExist(err) {
 		return errors.New(
@@ -266,16 +263,6 @@ func validateInputs(opts options) error {
 	}
 	if err := validateRootConfigs(opts.rootConfigDirectory); err != nil {
 		return err
-	}
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	command := exec.CommandContext(ctx, opts.ibmdplugin, "--version")
-	command.Stdout = os.Stderr
-	command.Stderr = os.Stderr
-	if err := command.Run(); err != nil {
-		return errors.New(
-			"jobmgr phase: ibm.d.plugin is not a genuine IBM-enabled binary",
-		)
 	}
 	return nil
 }
@@ -286,6 +273,155 @@ func validateExecutable(name, path string) error {
 		return fmt.Errorf("jobmgr phase: %s is unavailable", name)
 	}
 	return nil
+}
+
+func buildPhaseArtifacts(
+	ctx context.Context,
+	opts options,
+	baselineExecutable string,
+) (phaseArtifacts, func(), error) {
+	if ctx == nil {
+		return phaseArtifacts{}, func() {}, errors.New(
+			"jobmgr phase: build context is nil",
+		)
+	}
+	source, err := buildidentity.CurrentSource(ctx, opts.goRoot)
+	if err != nil {
+		return phaseArtifacts{}, func() {}, err
+	}
+	ibmdplugin, err := buildidentity.VerifyIBMManifest(
+		ctx,
+		opts.goRoot,
+		opts.ibmBuildManifest,
+	)
+	if err != nil {
+		return phaseArtifacts{}, func() {}, err
+	}
+	directory, err := os.MkdirTemp("", "jobmgrtest-phase-build-")
+	if err != nil {
+		return phaseArtifacts{}, func() {}, err
+	}
+	cleanup := func() { _ = os.RemoveAll(directory) }
+	artifacts := phaseArtifacts{
+		production:     filepath.Join(directory, "jobmgrtest-agent"),
+		godplugin:      filepath.Join(directory, "go.d.plugin"),
+		ibmdplugin:     ibmdplugin,
+		scriptsdplugin: filepath.Join(directory, "scripts.d.plugin"),
+		source:         source,
+	}
+	targets := map[string]struct {
+		path       string
+		importPath string
+	}{
+		"production Agent driver": {
+			path:       artifacts.production,
+			importPath: "./internal/jobmgrtest/cmd/agent",
+		},
+		"go.d.plugin": {
+			path:       artifacts.godplugin,
+			importPath: "./cmd/godplugin",
+		},
+		"scripts.d.plugin": {
+			path:       artifacts.scriptsdplugin,
+			importPath: "./cmd/scriptsdplugin",
+		},
+	}
+	names := make([]string, 0, len(targets))
+	for name := range targets {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		target := targets[name]
+		command := exec.CommandContext(
+			ctx,
+			"go",
+			"build",
+			"-trimpath",
+			"-o",
+			target.path,
+			target.importPath,
+		)
+		command.Dir = opts.goRoot
+		command.Env = phaseGoEnvironment(
+			map[string]string{"CGO_ENABLED": "0"},
+		)
+		command.Stdout = os.Stderr
+		command.Stderr = os.Stderr
+		if err := command.Run(); err != nil {
+			cleanup()
+			return phaseArtifacts{}, func() {}, fmt.Errorf(
+				"jobmgr phase: build %s: %w",
+				name,
+				err,
+			)
+		}
+		if err := validateExecutable(name, target.path); err != nil {
+			cleanup()
+			return phaseArtifacts{}, func() {}, err
+		}
+	}
+	if err := validateExecutable("ibm.d.plugin", artifacts.ibmdplugin); err != nil {
+		cleanup()
+		return phaseArtifacts{}, func() {}, err
+	}
+	same, err := sameExecutableContent(
+		baselineExecutable,
+		artifacts.production,
+	)
+	if err != nil {
+		cleanup()
+		return phaseArtifacts{}, func() {}, err
+	}
+	if same {
+		cleanup()
+		return phaseArtifacts{}, func() {}, errors.New(
+			"jobmgr phase: baseline and production executable identities are equal",
+		)
+	}
+	versionCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+	command := exec.CommandContext(
+		versionCtx,
+		artifacts.ibmdplugin,
+		"--version",
+	)
+	command.Env = runner.ChildEnvironment()
+	command.Stdout = os.Stderr
+	command.Stderr = os.Stderr
+	if err := command.Run(); err != nil {
+		cleanup()
+		return phaseArtifacts{}, func() {}, errors.New(
+			"jobmgr phase: ibm.d.plugin is not a runnable IBM-enabled binary",
+		)
+	}
+	return artifacts, cleanup, nil
+}
+
+func sameExecutableContent(left, right string) (bool, error) {
+	digest := func(path string) ([sha256.Size]byte, error) {
+		file, err := os.Open(path)
+		if err != nil {
+			return [sha256.Size]byte{}, err
+		}
+		defer file.Close()
+		hash := sha256.New()
+		if _, err := io.Copy(hash, file); err != nil {
+			return [sha256.Size]byte{}, err
+		}
+		var result [sha256.Size]byte
+		copy(result[:], hash.Sum(nil))
+		return result, nil
+	}
+	leftDigest, err := digest(left)
+	if err != nil {
+		return false, err
+	}
+	rightDigest, err := digest(right)
+	if err != nil {
+		return false, err
+	}
+	return leftDigest == rightDigest, nil
 }
 
 func validateRootConfigs(directory string) error {
@@ -383,6 +519,7 @@ func verifyNamedGates(
 			packageName,
 		)
 		command.Dir = goRoot
+		command.Env = phaseGoEnvironment(nil)
 		var stdout bytes.Buffer
 		command.Stdout = &stdout
 		command.Stderr = os.Stderr
@@ -485,7 +622,7 @@ func runHotpathBenchmarks(
 			"-benchmem",
 		); err != nil {
 			return fmt.Errorf(
-				"jobmgr phase: hotpath gates for %s: %w",
+				"jobmgr phase: diagnostic hotpath benchmarks for %s: %w",
 				packageName,
 				err,
 			)
@@ -494,12 +631,16 @@ func runHotpathBenchmarks(
 	return nil
 }
 
-func runProductionSuites(ctx context.Context, opts options) error {
+func runProductionSuites(
+	ctx context.Context,
+	opts options,
+	artifacts phaseArtifacts,
+) error {
 	environment := map[string]string{
 		"JOBMGRTEST_ROOT_CONFIG_DIR":    opts.rootConfigDirectory,
-		"JOBMGRTEST_GODPLUGIN_BIN":      opts.godplugin,
-		"JOBMGRTEST_IBMDPLUGIN_BIN":     opts.ibmdplugin,
-		"JOBMGRTEST_SCRIPTSDPLUGIN_BIN": opts.scriptsdplugin,
+		"JOBMGRTEST_GODPLUGIN_BIN":      artifacts.godplugin,
+		"JOBMGRTEST_IBMDPLUGIN_BIN":     artifacts.ibmdplugin,
+		"JOBMGRTEST_SCRIPTSDPLUGIN_BIN": artifacts.scriptsdplugin,
 		"JOBMGRTEST_REQUIRE_ALL_ROOTS":  "1",
 	}
 	return runGoTest(
@@ -535,7 +676,7 @@ func runGoTest(
 		arguments...,
 	)...)
 	command.Dir = goRoot
-	command.Env = withEnvironment(os.Environ(), environment)
+	command.Env = phaseGoEnvironment(environment)
 	command.Stdout = os.Stderr
 	command.Stderr = os.Stderr
 	return command.Run()
@@ -565,6 +706,24 @@ func withEnvironment(
 		)
 	}
 	return environment
+}
+
+func phaseGoEnvironment(
+	overrides map[string]string,
+) []string {
+	base := []string{
+		"PATH=" + os.Getenv("PATH"),
+		"HOME=" + os.Getenv("HOME"),
+		"TMPDIR=" + os.TempDir(),
+		"LANG=C",
+		"LC_ALL=C",
+		"TZ=UTC",
+		"GOMAXPROCS=4",
+		"GOFLAGS=-mod=readonly",
+		"GOTOOLCHAIN=local",
+		"GOWORK=off",
+	}
+	return withEnvironment(base, overrides)
 }
 
 func exactNamePattern(names []string) string {

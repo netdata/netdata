@@ -30,6 +30,13 @@ func TestFunctionCatalogDecisionValidate(t *testing.T) {
 			decision: FunctionCatalogDecision{Plan: validPlan, Lease: validLease},
 			wantErr:  true,
 		},
+		"resource lane without scope": {
+			decision: FunctionCatalogDecision{
+				Lane: FunctionLane{Route: 1, Resource: true},
+				Plan: validPlan, Lease: validLease,
+			},
+			wantErr: true,
+		},
 		"resolved without lease": {
 			decision: FunctionCatalogDecision{Lane: FunctionLane{Route: 1}, Plan: validPlan},
 			wantErr:  true,

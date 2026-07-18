@@ -225,6 +225,7 @@ type commandLaneKey struct {
 	source        lifecycle.Source
 	functionRoute uint64
 	key           string
+	resource      bool
 }
 
 type functionCleanupTask struct {
@@ -280,11 +281,33 @@ func (queue *functionCleanupQueue) pop() {
 type functionMutationSubmission struct {
 	mutation FunctionCatalogMutation
 	result   chan functionMutationResult
+	action   functionMutationAction
 }
 
 type functionMutationResult struct {
 	version uint64
 	err     error
+}
+
+type functionMutationAction uint8
+
+const (
+	functionMutationQuiesce functionMutationAction = iota + 1
+	functionMutationCommit
+	functionMutationAbort
+)
+
+type preAdmissionControl struct {
+	status lifecycle.ControlStatus
+	cause  error
+}
+
+func (control preAdmissionControl) Error() string {
+	return control.cause.Error()
+}
+
+func (control preAdmissionControl) Unwrap() error {
+	return control.cause
 }
 
 type commandOperation struct {
@@ -340,6 +363,7 @@ type commandLane struct {
 	readyPrev          *commandLane
 	readyNext          *commandLane
 	resourceGeneration uint64
+	resourceSource     lifecycle.Source
 	currentIdentity    lifecycle.ResourceIdentity
 	current            lifecycle.ReadyResource
 	currentStopping    bool
@@ -474,6 +498,7 @@ type CommandKernel struct {
 	functionMutations        chan functionMutationSubmission
 	functionMutation         functionMutationSubmission
 	functionMutationActive   bool
+	functionMutationPaused   bool
 	functionCatalogClosing   bool
 	functionCatalogCloseMore bool
 	shutdownRequests         [maximumCommandLanes + 1]*commandLane
@@ -619,12 +644,48 @@ func (kernel *CommandKernel) SubmitAndWait(ctx context.Context, request Request)
 	}
 }
 
-func (kernel *CommandKernel) MutateFunctions(ctx context.Context, mutation FunctionCatalogMutation) (uint64, error) {
-	if ctx == nil || mutation == nil {
+func (kernel *CommandKernel) QuiesceFunctions(
+	ctx context.Context,
+	mutation FunctionCatalogMutation,
+) error {
+	_, err := kernel.submitFunctionMutation(
+		ctx,
+		functionMutationQuiesce,
+		mutation,
+	)
+	return err
+}
+
+func (kernel *CommandKernel) CommitFunctions(
+	ctx context.Context,
+	mutation FunctionCatalogMutation,
+) (uint64, error) {
+	return kernel.submitFunctionMutation(ctx, functionMutationCommit, mutation)
+}
+
+func (kernel *CommandKernel) AbortFunctions(
+	ctx context.Context,
+	mutation FunctionCatalogMutation,
+) error {
+	_, err := kernel.submitFunctionMutation(ctx, functionMutationAbort, mutation)
+	return err
+}
+
+func (kernel *CommandKernel) submitFunctionMutation(
+	ctx context.Context,
+	action functionMutationAction,
+	mutation FunctionCatalogMutation,
+) (uint64, error) {
+	if ctx == nil || mutation == nil ||
+		action < functionMutationQuiesce || action > functionMutationAbort {
 		return 0, errors.New("jobmgr kernel: invalid Function mutation")
 	}
 	result := make(chan functionMutationResult, 1)
-	submission := functionMutationSubmission{mutation: mutation, result: result}
+	submission := functionMutationSubmission{
+		mutation: mutation,
+		result:   result,
+		action:   action,
+	}
 	select {
 	case kernel.functionMutations <- submission:
 		kernel.NotifyControlReady()
@@ -1193,6 +1254,18 @@ func (kernel *CommandKernel) serviceSubmissions(quantum int) bool {
 				err = kernel.admit(submitted.request, submitted.plan, submitted.context, submitted.result, submitted.terminal)
 			}
 		}
+		var control preAdmissionControl
+		if errors.As(err, &control) {
+			submitted.controlStatus = control.status
+			err = kernel.frames.TryCommitControl(lifecycle.ControlFramePlan{
+				UID:    submitted.request.UID,
+				Status: control.status,
+				Expiry: lifecycle.ExpiryAt(kernel.clock.Now()),
+			})
+			if err != nil && !errors.Is(err, lifecycle.ErrFrameOwnerBusy) {
+				kernel.run.Dirty(err)
+			}
+		}
 		if errors.Is(err, lifecycle.ErrAdmissionRecordCapacity) || errors.Is(err, lifecycle.ErrFrameOwnerBusy) {
 			if !wasBlocked {
 				kernel.blockedSubmissions[selected] = submitted
@@ -1205,6 +1278,9 @@ func (kernel *CommandKernel) serviceSubmissions(quantum int) bool {
 			}
 			if submitted.controlStatus != 0 || err != nil {
 				submitted.result <- err
+				if submitted.controlStatus != 0 && submitted.terminal != nil {
+					submitted.terminal <- err
+				}
 			}
 		}
 		kernel.nextExternalSource = otherSource(sourceForIndex(selected))
@@ -1305,8 +1381,23 @@ func (kernel *CommandKernel) admit(request Request, plan WorkPlan, submissionCon
 		laneID = commandLaneKey{
 			source: request.Source, functionRoute: decision.Lane.Route, key: decision.Lane.Scope,
 		}
+		if decision.Lane.Resource {
+			laneID = resourceCommandLaneKey(request.LaneKey)
+		}
 		if decision.Rejected != 0 {
-			plan = RejectionPlan(decision.Rejected, "function:"+request.Route)
+			if err := errors.Join(
+				kernel.uids.Complete(request.UID, false, now),
+				kernel.abortRequestInputBody(request),
+			); err != nil {
+				return err
+			}
+			return preAdmissionControl{
+				status: decision.Rejected,
+				cause: fmt.Errorf(
+					"jobmgr kernel: Function catalog rejected route %q",
+					request.Route,
+				),
+			}
 		} else {
 			plan = decision.Plan
 			plan.Claims = append([]string(nil), plan.Claims...)
@@ -1330,6 +1421,9 @@ func (kernel *CommandKernel) admit(request Request, plan WorkPlan, submissionCon
 	}
 	if request.Source == lifecycle.SourceJobManager {
 		laneID = commandLaneKey{source: request.Source, key: request.LaneKey}
+	}
+	if plan.Resource != nil || plan.Transaction != nil {
+		laneID = resourceCommandLaneKey(request.LaneKey)
 	}
 	lane := kernel.lanes[laneID]
 	if resource := plan.Resource; resource != nil {
@@ -1383,9 +1477,11 @@ func (kernel *CommandKernel) admit(request Request, plan WorkPlan, submissionCon
 		}
 	}
 	if lane.owners >= lifecycle.MaximumLaneDepth {
-		_ = kernel.uids.Complete(request.UID, false, now)
-		_ = kernel.abortRequestInputBody(request)
-		return errors.New("jobmgr kernel: lane depth exhausted")
+		return kernel.rejectFunctionCapacity(
+			request,
+			now,
+			errors.New("jobmgr kernel: lane depth exhausted"),
+		)
 	}
 	kernel.nextID++
 	operationGeneration, err := lifecycle.NewOperation(kernel.nextID, request.UID, request.Source, request.LaneKey, !plan.NoResponse)
@@ -1410,12 +1506,22 @@ func (kernel *CommandKernel) admit(request Request, plan WorkPlan, submissionCon
 		requested = kernel.admission.RequestOrdinary(kernel.run.Generation(), admissionLane, charge)
 	}
 	if requested.Rejected != nil {
-		_ = kernel.uids.Complete(request.UID, false, now)
 		kernel.releaseUnusedLane(lane)
-		if !errors.Is(requested.Rejected, lifecycle.ErrAdmissionRecordCapacity) {
-			_ = kernel.abortRequestInputBody(request)
+		if errors.Is(
+			requested.Rejected,
+			lifecycle.ErrAdmissionRecordCapacity,
+		) {
+			return kernel.rejectFunctionCapacity(
+				request,
+				now,
+				requested.Rejected,
+			)
 		}
-		return requested.Rejected
+		return errors.Join(
+			requested.Rejected,
+			kernel.uids.Complete(request.UID, false, now),
+			kernel.abortRequestInputBody(request),
+		)
 	}
 	request.InputBodyToken = 0
 	operation := &commandOperation{
@@ -1463,6 +1569,30 @@ func (kernel *CommandKernel) admit(request Request, plan WorkPlan, submissionCon
 		kernel.markReady(lane)
 	}
 	return nil
+}
+
+func (kernel *CommandKernel) rejectFunctionCapacity(
+	request Request,
+	now time.Time,
+	cause error,
+) error {
+	if request.Source != lifecycle.SourceFunction {
+		return errors.Join(
+			cause,
+			kernel.uids.Complete(request.UID, false, now),
+			kernel.abortRequestInputBody(request),
+		)
+	}
+	if err := errors.Join(
+		kernel.uids.Complete(request.UID, false, now),
+		kernel.abortRequestInputBody(request),
+	); err != nil {
+		return errors.Join(cause, err)
+	}
+	return preAdmissionControl{
+		status: lifecycle.ControlUnavailable,
+		cause:  cause,
+	}
 }
 
 func (kernel *CommandKernel) rejectClosedAdmission(request Request) error {
@@ -1923,6 +2053,14 @@ func (kernel *CommandKernel) completeTask(completion lifecycle.TaskCompletion) {
 		kernel.completeCapabilityTask(operation, completion)
 		return
 	}
+	if operation.cancelled &&
+		operation.Response == lifecycle.ResponseOpen &&
+		!operation.controlQueued {
+		kernel.enqueueControl(
+			operation,
+			cancellationControl(operation),
+		)
+	}
 	action := lifecycle.TaskAction{Ref: completion.Ref, Sequence: completion.Sequence + 1, Kind: lifecycle.TaskActionDispose}
 	if completion.Err == nil && operation.Response == lifecycle.ResponseOpen && !operation.controlQueued {
 		expiry := lifecycle.ExpiryAt(kernel.clock.Now())
@@ -2321,6 +2459,7 @@ func (kernel *CommandKernel) applyTransactionDisposition(
 				"jobmgr kernel: removed transaction returned a resource",
 			)
 		}
+		lane.resourceSource = 0
 	case lifecycle.ResourceTransactionInstalled,
 		lifecycle.ResourceTransactionReplaced:
 		identity = scope.Successor
@@ -2329,6 +2468,7 @@ func (kernel *CommandKernel) applyTransactionDisposition(
 				"jobmgr kernel: installed transaction lost its successor",
 			)
 		}
+		lane.resourceSource = operation.Source
 	default:
 		return errors.New(
 			"jobmgr kernel: unknown resource transaction disposition",
@@ -2415,6 +2555,7 @@ func (kernel *CommandKernel) acknowledgeShutdownTask(ack lifecycle.TaskAcknowled
 			return
 		}
 		lane.retiringIdentity = lifecycle.ResourceIdentity{}
+		lane.resourceSource = 0
 		kernel.sendShutdownAction(lane, lifecycle.TaskActionTerminate, 4)
 	case lifecycle.TaskActionTerminate:
 		if ack.Err != nil {
@@ -2789,6 +2930,7 @@ func (kernel *CommandKernel) acknowledgeResourceTask(operation *commandOperation
 		lane.current = resource
 		lane.currentIdentity = identity
 		lane.resourceGeneration = identity.Generation
+		lane.resourceSource = operation.Source
 		kernel.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
 	case lifecycle.TaskActionStopResource:
 		identity := lane.currentIdentity
@@ -2814,6 +2956,7 @@ func (kernel *CommandKernel) acknowledgeResourceTask(operation *commandOperation
 			return
 		}
 		lane.retiringIdentity = lifecycle.ResourceIdentity{}
+		lane.resourceSource = 0
 		kernel.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
 	case lifecycle.TaskActionDispose:
 		kernel.sendResourceTermination(operation, ack.Ref, ack.Sequence+1)
@@ -3300,6 +3443,7 @@ func (kernel *CommandKernel) markReady(lane *commandLane) {
 	if lane == nil || lane.active != nil || lane.head == nil || !lane.head.admitted {
 		return
 	}
+	lane.source = lane.head.Source
 	index := sourceIndex(lane.source)
 	kernel.ready[index].push(lane)
 }
@@ -3329,14 +3473,19 @@ func (kernel *CommandKernel) beginShutdown(deadline time.Time) error {
 	if deadline.IsZero() {
 		return errors.New("jobmgr kernel: zero shutdown deadline")
 	}
-	if kernel.functionMutationActive {
+	if kernel.functionMutationActive || kernel.functionMutationPaused {
 		var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
 		count, abortErr := kernel.functionCatalog.AbortMutation(&cleanups)
 		pushErr := kernel.pushFunctionCleanupBatch(&cleanups, count)
 		terminalErr := errors.Join(ErrStopped, abortErr, pushErr)
-		kernel.functionMutation.result <- functionMutationResult{err: terminalErr}
+		if kernel.functionMutation.result != nil {
+			kernel.functionMutation.result <- functionMutationResult{
+				err: terminalErr,
+			}
+		}
 		kernel.functionMutation = functionMutationSubmission{}
 		kernel.functionMutationActive = false
+		kernel.functionMutationPaused = false
 		if abortErr != nil || pushErr != nil {
 			return errors.Join(abortErr, pushErr)
 		}
@@ -3465,8 +3614,13 @@ func (kernel *CommandKernel) enqueueShutdownStops() error {
 		if err != nil {
 			return err
 		}
+		if !lane.resourceSource.Valid() {
+			return errors.New(
+				"jobmgr kernel: shutdown resource has no scheduling source",
+			)
+		}
 		plan, err := lifecycle.NewShutdownReadyResourceTaskPlan(
-			lane.source, budget, lifecycle.TransactionTaskPhases, lane.current, identity,
+			lane.resourceSource, budget, lifecycle.TransactionTaskPhases, lane.current, identity,
 		)
 		if err != nil {
 			return err
@@ -3628,7 +3782,8 @@ func (kernel *CommandKernel) shutdownReadyForFinalizer() bool {
 	longLived := kernel.tasks.LongLivedCensus()
 	if len(kernel.operations) != 0 || len(kernel.tasksByRef) != 0 || len(kernel.tasksByRequest) != 0 ||
 		len(kernel.functionCleanupTasks) != 0 || len(kernel.functionCleanupRequests) != 0 ||
-		kernel.functionCleanupBacklog.count != 0 || kernel.functionMutationActive ||
+		kernel.functionCleanupBacklog.count != 0 ||
+		kernel.functionMutationActive || kernel.functionMutationPaused ||
 		len(kernel.byAdmission) != 0 || len(kernel.lanes) != 0 ||
 		kernel.tasks.Active() != 0 || kernel.tasks.Pending() != 0 || inherited.Active != 0 ||
 		kernel.shutdownRequestCount != 0 || kernel.shutdownTaskCount != 0 || len(kernel.controls) != 0 || kernel.deadlines.Len() != 0 ||
@@ -3702,7 +3857,8 @@ func (kernel *CommandKernel) shutdownQuiescent() bool {
 	frame := kernel.frames.Census()
 	if len(kernel.operations) != 0 || len(kernel.tasksByRef) != 0 || len(kernel.tasksByRequest) != 0 ||
 		len(kernel.functionCleanupTasks) != 0 || len(kernel.functionCleanupRequests) != 0 ||
-		kernel.functionCleanupBacklog.count != 0 || kernel.functionMutationActive ||
+		kernel.functionCleanupBacklog.count != 0 ||
+		kernel.functionMutationActive || kernel.functionMutationPaused ||
 		len(kernel.byAdmission) != 0 || len(kernel.lanes) != 0 ||
 		kernel.tasks.Active() != 0 || kernel.tasks.Pending() != 0 || kernel.shutdownRequestCount != 0 || kernel.shutdownTaskCount != 0 || len(kernel.controls) != 0 || kernel.deadlines.Len() != 0 ||
 		len(kernel.submissions[0]) != 0 || len(kernel.submissions[1]) != 0 || kernel.blockedSubmission[0] || kernel.blockedSubmission[1] ||
@@ -3783,15 +3939,74 @@ func (kernel *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
 }
 
 func (kernel *CommandKernel) beginFunctionMutation(submitted functionMutationSubmission) {
-	if submitted.mutation == nil || submitted.result == nil || kernel.functionMutationActive ||
-		kernel.functionCatalogClosing || !kernel.run.Admitting() {
+	if submitted.mutation == nil || submitted.result == nil ||
+		submitted.action < functionMutationQuiesce ||
+		submitted.action > functionMutationAbort ||
+		kernel.functionMutationActive || kernel.functionCatalogClosing ||
+		!kernel.run.Admitting() {
 		if submitted.result != nil {
 			submitted.result <- functionMutationResult{err: errors.New("jobmgr kernel: Function mutation admission closed")}
 		}
 		return
 	}
-	if err := kernel.functionCatalog.BeginMutation(submitted.mutation); err != nil {
-		submitted.result <- functionMutationResult{err: err}
+	switch submitted.action {
+	case functionMutationQuiesce:
+		if kernel.functionMutationPaused {
+			submitted.result <- functionMutationResult{
+				err: errors.New(
+					"jobmgr kernel: Function mutation already quiesced",
+				),
+			}
+			return
+		}
+		if err := kernel.functionCatalog.BeginMutation(
+			submitted.mutation,
+		); err != nil {
+			submitted.result <- functionMutationResult{err: err}
+			return
+		}
+	case functionMutationCommit:
+		if !kernel.functionMutationPaused {
+			submitted.result <- functionMutationResult{
+				err: errors.New(
+					"jobmgr kernel: Function mutation is not quiesced",
+				),
+			}
+			return
+		}
+		if err := kernel.functionCatalog.ResumeMutation(
+			submitted.mutation,
+		); err != nil {
+			submitted.result <- functionMutationResult{err: err}
+			return
+		}
+		kernel.functionMutationPaused = false
+	case functionMutationAbort:
+		if !kernel.functionMutationPaused {
+			submitted.result <- functionMutationResult{
+				err: errors.New(
+					"jobmgr kernel: Function mutation is not quiesced",
+				),
+			}
+			return
+		}
+		if err := kernel.functionCatalog.ResumeMutation(
+			submitted.mutation,
+		); err != nil {
+			submitted.result <- functionMutationResult{err: err}
+			return
+		}
+		var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
+		count, abortErr := kernel.functionCatalog.AbortMutation(&cleanups)
+		pushErr := kernel.pushFunctionCleanupBatch(&cleanups, count)
+		submitted.result <- functionMutationResult{
+			err: errors.Join(abortErr, pushErr),
+		}
+		kernel.functionMutation = functionMutationSubmission{}
+		kernel.functionMutationPaused = false
+		if abortErr != nil || pushErr != nil {
+			kernel.run.Dirty(errors.Join(abortErr, pushErr))
+		}
 		return
 	}
 	kernel.functionMutation = submitted
@@ -3800,6 +4015,62 @@ func (kernel *CommandKernel) beginFunctionMutation(submitted functionMutationSub
 
 func (kernel *CommandKernel) serviceFunctionMutation(quantum int) bool {
 	if !kernel.functionMutationActive {
+		return false
+	}
+	if kernel.functionMutation.action == functionMutationQuiesce {
+		progress, err := kernel.functionCatalog.AdvanceMutationQuiesce(
+			quantum,
+		)
+		if err != nil {
+			var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
+			abortCount, abortErr := kernel.functionCatalog.AbortMutation(
+				&cleanups,
+			)
+			if pushErr := kernel.pushFunctionCleanupBatch(
+				&cleanups,
+				abortCount,
+			); pushErr != nil {
+				abortErr = errors.Join(abortErr, pushErr)
+			}
+			kernel.functionMutation.result <- functionMutationResult{
+				err: errors.Join(err, abortErr),
+			}
+			kernel.functionMutation = functionMutationSubmission{}
+			kernel.functionMutationActive = false
+			if abortErr != nil {
+				kernel.run.Dirty(abortErr)
+			}
+			return false
+		}
+		if !progress.Quiesced {
+			return true
+		}
+		kernel.functionMutation.result <- functionMutationResult{
+			version: progress.Version,
+		}
+		kernel.functionMutation.result = nil
+		kernel.functionMutationActive = false
+		kernel.functionMutationPaused = true
+		return false
+	}
+	if kernel.functionMutation.action != functionMutationCommit {
+		invariantErr := errors.New(
+			"jobmgr kernel: invalid active Function mutation",
+		)
+		var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
+		abortCount, abortErr := kernel.functionCatalog.AbortMutation(&cleanups)
+		if pushErr := kernel.pushFunctionCleanupBatch(
+			&cleanups,
+			abortCount,
+		); pushErr != nil {
+			abortErr = errors.Join(abortErr, pushErr)
+		}
+		kernel.functionMutation.result <- functionMutationResult{
+			err: errors.Join(invariantErr, abortErr),
+		}
+		kernel.functionMutation = functionMutationSubmission{}
+		kernel.functionMutationActive = false
+		kernel.run.Dirty(errors.Join(invariantErr, abortErr))
 		return false
 	}
 	if kernel.functionCleanupBacklog.free() < MaximumFunctionMutationChanges {
@@ -3887,6 +4158,10 @@ func (kernel *CommandKernel) allocateLane(mapKey commandLaneKey, request Request
 	}
 	kernel.lanes[mapKey] = lane
 	return lane, nil
+}
+
+func resourceCommandLaneKey(id string) commandLaneKey {
+	return commandLaneKey{key: id, resource: true}
 }
 
 func (kernel *CommandKernel) releaseUnusedLane(lane *commandLane) {

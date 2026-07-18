@@ -47,7 +47,7 @@ var bmM002CaseRows = [...]ProductionCase{
 	{ID: "F05.1", Suite: SuiteAgent, Proof: ProofRuntime},
 	{ID: "F05.2", Suite: SuiteProcess, Proof: ProofCombined},
 	{ID: "F05.3", Suite: SuiteProcess, Proof: ProofRuntime},
-	{ID: "F06.1", Suite: SuiteShippedRoot, Proof: ProofRuntime},
+	{ID: "F06.1", Suite: SuiteShippedRoot, Proof: ProofCombined},
 	{ID: "F06.2", Suite: SuiteProcess, Proof: ProofCombined},
 	{ID: "F07.1", Suite: SuiteAgent, Proof: ProofCombined},
 	{ID: "F07.2", Suite: SuiteAgent, Proof: ProofCombined},

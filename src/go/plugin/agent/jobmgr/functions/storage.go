@@ -109,6 +109,14 @@ func (storage *catalogStorage) releasePublished() error {
 	return nil
 }
 
+func (storage *catalogStorage) releasePublishedPaths(bytes int64) {
+	if storage == nil || bytes <= 0 {
+		return
+	}
+	storage.published.Add(-bytes)
+	storage.total.Add(-bytes)
+}
+
 func initialPathStorageBound(declarations []Declaration) (int64, error) {
 	var total int64
 	for _, declaration := range declarations {

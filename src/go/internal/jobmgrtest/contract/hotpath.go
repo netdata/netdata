@@ -1,9 +1,8 @@
 package contract
 
-// HotpathGate binds one B-M-002 owner to executable deterministic and measured
-// production gates. The measured benchmark reports the owner path; the
-// deterministic tests enforce its bounded complexity, allocation, fairness,
-// and resource invariants.
+// HotpathGate binds one B-M-002 owner to enforceable deterministic production
+// gates and one supplementary diagnostic benchmark. Only Tests close the
+// owner-specific operation, allocation, fairness, and resource envelope.
 type HotpathGate struct {
 	OwnerID   string
 	Package   string
@@ -299,6 +298,25 @@ func BMM002HotpathGates() []HotpathGate {
 		gates[index] = row
 	}
 	return gates
+}
+
+func BMM002HotpathProofs() []ComponentProof {
+	seen := make(map[ComponentProof]struct{})
+	var proofs []ComponentProof
+	for _, gate := range bmM002HotpathRows {
+		for _, test := range gate.Tests {
+			proof := ComponentProof{
+				Package: gate.Package,
+				Test:    test,
+			}
+			if _, exists := seen[proof]; exists {
+				continue
+			}
+			seen[proof] = struct{}{}
+			proofs = append(proofs, proof)
+		}
+	}
+	return proofs
 }
 
 func BMM001StructuralProofs() []ComponentProof {

@@ -105,15 +105,27 @@ func TestKernelReadyLaneFairnessAtBoundaries(t *testing.T) {
 				lifecycle.SourceFunction,
 			} {
 				for index := 0; index < population; index++ {
+					uid := fmt.Sprintf(
+						"%d-%03d",
+						sourceIndex,
+						index,
+					)
+					generation, err := lifecycle.NewOperation(
+						lifecycle.OperationID(index+1),
+						uid,
+						source,
+						uid,
+						false,
+					)
+					if err != nil {
+						t.Fatal(err)
+					}
 					operation := &commandOperation{
-						admitted: true,
+						OperationGeneration: generation,
+						admitted:            true,
 					}
 					lane := &commandLane{
-						key: fmt.Sprintf(
-							"%d-%03d",
-							sourceIndex,
-							index,
-						),
+						key:    uid,
 						source: source,
 						head:   operation,
 					}

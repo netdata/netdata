@@ -63,3 +63,36 @@ func TestBMM002HotpathContractIsExact(t *testing.T) {
 		}
 	}
 }
+
+func TestBMM002HotpathEnvelopeIsClosedByEveryOwnerTest(t *testing.T) {
+	cases, err := BMM002Cases()
+	if err != nil {
+		t.Fatal(err)
+	}
+	var target ProductionCase
+	for _, productionCase := range cases {
+		if productionCase.ID == "F24.14-b-hotpath-envelope" {
+			target = productionCase
+			break
+		}
+	}
+	if target.ID == "" {
+		t.Fatal("hot-path envelope case is absent")
+	}
+	evidence, err := EvidenceFor(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	observed := make(map[ComponentProof]struct{}, len(evidence.Components))
+	for _, proof := range evidence.Components {
+		observed[proof] = struct{}{}
+	}
+	for _, proof := range BMM002HotpathProofs() {
+		if _, exists := observed[proof]; !exists {
+			t.Fatalf(
+				"hot-path envelope lacks deterministic proof %+v",
+				proof,
+			)
+		}
+	}
+}

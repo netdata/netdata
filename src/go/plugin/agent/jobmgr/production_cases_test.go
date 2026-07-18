@@ -20,7 +20,7 @@ func TestProductionAgentCases(t *testing.T) {
 	driver := &jobmgrtest.AgentDriver{}
 	for caseID, test := range productionCases(t, contract.SuiteAgent) {
 		t.Run(caseID, func(t *testing.T) {
-			if test.evidence.RuntimeScenario == "" {
+			if test.evidence.RuntimePredicate == "" {
 				return
 			}
 			ctx, cancel := context.WithTimeout(
@@ -30,7 +30,7 @@ func TestProductionAgentCases(t *testing.T) {
 			defer cancel()
 			if err := driver.Run(
 				ctx,
-				test.evidence.RuntimeScenario,
+				test.evidence.RuntimePredicate,
 			); err != nil {
 				t.Fatal(err)
 			}
@@ -42,7 +42,7 @@ func TestProductionProcessCases(t *testing.T) {
 	driver := &jobmgrtest.ProcessDriver{}
 	for caseID, test := range productionCases(t, contract.SuiteProcess) {
 		t.Run(caseID, func(t *testing.T) {
-			if test.evidence.RuntimeScenario == "" {
+			if test.evidence.RuntimePredicate == "" {
 				return
 			}
 			ctx, cancel := context.WithTimeout(
@@ -52,7 +52,7 @@ func TestProductionProcessCases(t *testing.T) {
 			defer cancel()
 			if err := driver.Run(
 				ctx,
-				test.evidence.RuntimeScenario,
+				test.evidence.RuntimePredicate,
 			); err != nil {
 				t.Fatal(err)
 			}
@@ -93,7 +93,7 @@ func TestProductionShippedRootCases(t *testing.T) {
 			defer cancel()
 			missing, err := driver.RunAvailable(
 				ctx,
-				test.evidence.RuntimeScenario,
+				test.evidence.RuntimePredicate,
 			)
 			if err != nil {
 				t.Fatal(err)
@@ -130,7 +130,7 @@ func TestProductionCollectorBoundaryCases(t *testing.T) {
 			defer cancel()
 			if err := driver.Run(
 				ctx,
-				test.evidence.RuntimeScenario,
+				test.evidence.RuntimePredicate,
 			); err != nil {
 				t.Fatal(err)
 			}
@@ -168,7 +168,7 @@ func TestProductionResolverCases(t *testing.T) {
 			defer cancel()
 			if err := driver.Run(
 				ctx,
-				test.evidence.RuntimeScenario,
+				test.evidence.RuntimePredicate,
 			); err != nil {
 				t.Fatal(err)
 			}

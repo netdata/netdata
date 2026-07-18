@@ -1,6 +1,7 @@
 package wireeval
 
 import (
+	"bufio"
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
@@ -19,6 +20,7 @@ const (
 	evidenceVersion            = 1
 	maximumRunEvidenceBytes    = 48 * 1024 * 1024
 	maximumCompressedRunBytes  = 64 * 1024 * 1024
+	maximumManifestBytes       = 1024 * 1024
 	expectedExperimentRunCount = 270
 )
 
@@ -167,27 +169,88 @@ func (bundle *EvidenceBundle) Finalize(
 }
 
 func VerifyEvidenceBundle(directory string) (oracle.ExperimentResult, error) {
+	if !filepath.IsAbs(directory) {
+		return oracle.ExperimentResult{}, errors.New(
+			"wire evaluator: evidence directory must be absolute",
+		)
+	}
 	var manifest evidenceManifest
-	if err := readJSONFile(filepath.Join(directory, "manifest.json"), &manifest); err != nil {
+	manifestPath, err := evidenceRegularFile(
+		directory,
+		"manifest.json",
+		maximumManifestBytes,
+	)
+	if err != nil {
+		return oracle.ExperimentResult{}, err
+	}
+	if err := readJSONFileBounded(
+		manifestPath,
+		&manifest,
+		maximumManifestBytes,
+	); err != nil {
 		return oracle.ExperimentResult{}, err
 	}
 	if manifest.Version != evidenceVersion ||
 		len(manifest.Runs) != expectedExperimentRunCount {
 		return oracle.ExperimentResult{}, errors.New("wire evaluator: invalid evidence manifest")
 	}
-	for _, file := range []struct {
+	seenFiles := map[string]struct{}{"manifest.json": {}}
+	artifacts := []struct {
 		name, checksum string
+		maximum        int64
 	}{
-		{name: manifest.SummariesFile, checksum: manifest.SummariesSHA256},
-		{name: manifest.GatesFile, checksum: manifest.GatesSHA256},
-	} {
-		if err := verifyFileSHA256(filepath.Join(directory, file.name), file.checksum); err != nil {
+		{
+			name: manifest.SummariesFile, checksum: manifest.SummariesSHA256,
+			maximum: maximumCompressedRunBytes,
+		},
+		{
+			name: manifest.GatesFile, checksum: manifest.GatesSHA256,
+			maximum: maximumRunEvidenceBytes,
+		},
+	}
+	artifactPaths := make(map[string]string, len(artifacts))
+	for _, file := range artifacts {
+		path, err := evidenceRegularFile(
+			directory,
+			file.name,
+			file.maximum,
+		)
+		if err != nil {
 			return oracle.ExperimentResult{}, err
 		}
+		if _, exists := seenFiles[file.name]; exists {
+			return oracle.ExperimentResult{}, errors.New(
+				"wire evaluator: duplicate evidence path",
+			)
+		}
+		seenFiles[file.name] = struct{}{}
+		if err := verifyFileSHA256(path, file.checksum); err != nil {
+			return oracle.ExperimentResult{}, err
+		}
+		artifactPaths[file.name] = path
 	}
 	summaries := make([]oracle.RunSummary, 0, len(manifest.Runs))
 	for _, run := range manifest.Runs {
-		path := filepath.Join(directory, filepath.FromSlash(run.File))
+		if !strings.HasPrefix(run.File, "runs/") ||
+			!strings.HasSuffix(run.File, ".json.gz") {
+			return oracle.ExperimentResult{}, errors.New(
+				"wire evaluator: invalid run evidence path",
+			)
+		}
+		path, err := evidenceRegularFile(
+			directory,
+			run.File,
+			maximumCompressedRunBytes,
+		)
+		if err != nil {
+			return oracle.ExperimentResult{}, err
+		}
+		if _, exists := seenFiles[run.File]; exists {
+			return oracle.ExperimentResult{}, errors.New(
+				"wire evaluator: duplicate evidence path",
+			)
+		}
+		seenFiles[run.File] = struct{}{}
 		if err := verifyFileSHA256(path, run.SHA256); err != nil {
 			return oracle.ExperimentResult{}, err
 		}
@@ -211,15 +274,16 @@ func VerifyEvidenceBundle(directory string) (oracle.ExperimentResult, error) {
 	}
 	var recordedSummaries []oracle.RunSummary
 	if err := readCompressedJSON(
-		filepath.Join(directory, manifest.SummariesFile),
+		artifactPaths[manifest.SummariesFile],
 		&recordedSummaries,
 	); err != nil {
 		return oracle.ExperimentResult{}, err
 	}
 	var recordedResult oracle.ExperimentResult
-	if err := readJSONFile(
-		filepath.Join(directory, manifest.GatesFile),
+	if err := readJSONFileBounded(
+		artifactPaths[manifest.GatesFile],
 		&recordedResult,
+		maximumRunEvidenceBytes,
 	); err != nil {
 		return oracle.ExperimentResult{}, err
 	}
@@ -252,22 +316,45 @@ func readRunEvidence(path string) (runEvidence, error) {
 }
 
 func readCompressedJSON(path string, value any) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return errors.New("wire evaluator: evidence file is not regular")
+	}
+	if info.Size() > maximumCompressedRunBytes {
+		return errors.New("wire evaluator: compressed evidence exceeds bound")
+	}
 	file, err := os.Open(path)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-	zipper, err := gzip.NewReader(io.LimitReader(file, maximumCompressedRunBytes+1))
+	buffered := bufio.NewReader(file)
+	zipper, err := gzip.NewReader(buffered)
 	if err != nil {
 		return err
 	}
+	zipper.Multistream(false)
 	defer zipper.Close()
 	limited := &io.LimitedReader{R: zipper, N: maximumRunEvidenceBytes + 1}
-	if err := json.NewDecoder(limited).Decode(value); err != nil {
+	if err := decodeExactJSON(limited, value); err != nil {
 		return err
 	}
 	if limited.N <= 0 {
 		return errors.New("wire evaluator: uncompressed evidence exceeds bound")
+	}
+	if err := zipper.Close(); err != nil {
+		return err
+	}
+	if _, err := buffered.ReadByte(); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New(
+				"wire evaluator: compressed evidence has trailing data",
+			)
+		}
+		return err
 	}
 	return nil
 }
@@ -300,12 +387,79 @@ func writeExclusiveJSON(path string, value any) error {
 }
 
 func readJSONFile(path string, value any) error {
+	return readJSONFileBounded(path, value, maximumRunEvidenceBytes)
+}
+
+func readJSONFileBounded(
+	path string,
+	value any,
+	maximum int64,
+) error {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return errors.New("wire evaluator: evidence file is not regular")
+	}
+	if info.Size() > maximum {
+		return errors.New("wire evaluator: JSON evidence exceeds bound")
+	}
 	file, err := os.Open(path)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
-	return json.NewDecoder(io.LimitReader(file, maximumRunEvidenceBytes+1)).Decode(value)
+	return decodeExactJSON(io.LimitReader(file, maximum+1), value)
+}
+
+func decodeExactJSON(reader io.Reader, value any) error {
+	decoder := json.NewDecoder(reader)
+	if err := decoder.Decode(value); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("wire evaluator: JSON evidence has trailing value")
+		}
+		return err
+	}
+	return nil
+}
+
+func evidenceRegularFile(
+	directory string,
+	name string,
+	maximum int64,
+) (string, error) {
+	if name == "" ||
+		strings.Contains(name, "\\") ||
+		filepath.IsAbs(name) ||
+		filepath.Clean(name) == "." ||
+		filepath.Clean(name) == ".." ||
+		strings.HasPrefix(filepath.Clean(name), ".."+string(filepath.Separator)) ||
+		filepath.ToSlash(filepath.Clean(name)) != name {
+		return "", errors.New("wire evaluator: unsafe evidence path")
+	}
+	path := filepath.Join(directory, filepath.FromSlash(name))
+	relative, err := filepath.Rel(directory, path)
+	if err != nil ||
+		relative == ".." ||
+		strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+		return "", errors.New("wire evaluator: evidence path escapes bundle")
+	}
+	info, err := os.Lstat(path)
+	if err != nil {
+		return "", err
+	}
+	if !info.Mode().IsRegular() {
+		return "", errors.New("wire evaluator: evidence path is not a regular file")
+	}
+	if info.Size() > maximum {
+		return "", errors.New("wire evaluator: evidence file exceeds bound")
+	}
+	return path, nil
 }
 
 func verifyFileSHA256(path, want string) error {

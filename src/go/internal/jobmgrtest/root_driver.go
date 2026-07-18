@@ -137,9 +137,9 @@ type shippedRootRun struct {
 func shippedRootRuns(caseID string) ([]shippedRootRun, error) {
 	if caseID == "F06.1" {
 		return []shippedRootRun{
-			{root: "godplugin", scenario: "shutdown"},
-			{root: "ibmdplugin", scenario: "shutdown"},
-			{root: "scriptsdplugin", scenario: "shutdown"},
+			{root: "godplugin", scenario: "repeated-hup"},
+			{root: "ibmdplugin", scenario: "repeated-hup"},
+			{root: "scriptsdplugin", scenario: "repeated-hup"},
 		}, nil
 	}
 	runs := map[string]shippedRootRun{
@@ -234,14 +234,32 @@ func runShippedRoot(
 	}()
 
 	if err := observer.wait(ctx, func(
-		publications, _ int,
+		publications, _, _ int,
 	) bool {
 		return publications >= 1
 	}); err != nil {
 		return err
 	}
 	switch scenario {
-	case "terminal", "all-pipe":
+	case "terminal":
+		if _, err := process.WriteContext(
+			ctx,
+			[]byte("QUIT\n"),
+		); err != nil {
+			return err
+		}
+	case "all-pipe":
+		_, _, keepalives := observer.snapshot()
+		if err := observer.wait(ctx, func(
+			_, _, observedKeepalives int,
+		) bool {
+			return observedKeepalives > keepalives
+		}); err != nil {
+			return fmt.Errorf(
+				"nonterminal root emitted no process keepalive: %w",
+				err,
+			)
+		}
 		if _, err := process.WriteContext(
 			ctx,
 			[]byte("QUIT\n"),
@@ -261,7 +279,7 @@ func runShippedRoot(
 			}
 			if err := observer.wait(
 				ctx,
-				func(publications, withdrawals int) bool {
+				func(publications, withdrawals, _ int) bool {
 					return publications >= index+2 &&
 						withdrawals >= index+1
 				},
@@ -285,7 +303,7 @@ func runShippedRoot(
 	defer cancel()
 	result, err := process.Wait(waitCtx)
 	if err != nil {
-		publications, withdrawals := observer.snapshot()
+		publications, withdrawals, _ := observer.snapshot()
 		return errors.Join(
 			err,
 			fmt.Errorf(
@@ -296,7 +314,7 @@ func runShippedRoot(
 			),
 		)
 	}
-	publications, withdrawals := observer.snapshot()
+	publications, withdrawals, _ := observer.snapshot()
 	want := 1
 	if scenario == "repeated-hup" {
 		want = 4
@@ -310,6 +328,11 @@ func runShippedRoot(
 			want,
 		)
 	}
+	if scenario == "repeated-hup" {
+		if err := observer.validateAlternatingLifecycle(); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 
@@ -320,6 +343,8 @@ type rootProtocolObservation struct {
 	pending      []byte
 	publications int
 	withdrawals  int
+	keepalives   int
+	lifecycle    []byte
 	changed      chan struct{}
 }
 
@@ -347,16 +372,26 @@ func (observation *rootProtocolObservation) observe(
 		line := observation.pending[:newline]
 		observation.pending = observation.pending[newline+1:]
 		switch {
+		case len(line) == 0:
+			observation.keepalives++
 		case bytes.HasPrefix(
 			line,
 			[]byte(`FUNCTION GLOBAL "config"`),
 		):
 			observation.publications++
+			observation.lifecycle = append(
+				observation.lifecycle,
+				'P',
+			)
 		case bytes.Equal(
 			line,
 			[]byte(`FUNCTION_DEL GLOBAL "config"`),
 		):
 			observation.withdrawals++
+			observation.lifecycle = append(
+				observation.lifecycle,
+				'D',
+			)
 		default:
 			continue
 		}
@@ -368,20 +403,22 @@ func (observation *rootProtocolObservation) observe(
 }
 
 func (observation *rootProtocolObservation) snapshot() (
-	publications, withdrawals int,
+	publications, withdrawals, keepalives int,
 ) {
 	observation.mu.Lock()
 	defer observation.mu.Unlock()
-	return observation.publications, observation.withdrawals
+	return observation.publications,
+		observation.withdrawals,
+		observation.keepalives
 }
 
 func (observation *rootProtocolObservation) wait(
 	ctx context.Context,
-	predicate func(publications, withdrawals int) bool,
+	predicate func(publications, withdrawals, keepalives int) bool,
 ) error {
 	for {
-		publications, withdrawals := observation.snapshot()
-		if predicate(publications, withdrawals) {
+		publications, withdrawals, keepalives := observation.snapshot()
+		if predicate(publications, withdrawals, keepalives) {
 			return nil
 		}
 		select {
@@ -395,4 +432,17 @@ func (observation *rootProtocolObservation) wait(
 		case <-observation.changed:
 		}
 	}
+}
+
+func (observation *rootProtocolObservation) validateAlternatingLifecycle() error {
+	observation.mu.Lock()
+	defer observation.mu.Unlock()
+	if string(observation.lifecycle) != "PDPDPDPD" {
+		return fmt.Errorf(
+			"jobmgr test: shipped-root HUP lifecycle order=%q, want %q",
+			observation.lifecycle,
+			"PDPDPDPD",
+		)
+	}
+	return nil
 }

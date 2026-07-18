@@ -16,11 +16,12 @@ import (
 
 func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 	tests := map[string]struct {
-		declaration Declaration
-		lookup      jobmgr.FunctionLookup
-		wantStatus  lifecycle.ControlStatus
-		wantScope   string
-		wantMethod  string
+		declaration  Declaration
+		lookup       jobmgr.FunctionLookup
+		wantStatus   lifecycle.ControlStatus
+		wantScope    string
+		wantMethod   string
+		wantResource bool
 	}{
 		"direct route": {
 			declaration: testDeclaration("direct", "", RouteLane()),
@@ -48,8 +49,9 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 					"update",
 				},
 			},
-			wantScope:  "mysql_production",
-			wantMethod: "method",
+			wantScope:    "mysql_production",
+			wantMethod:   "method",
+			wantResource: true,
 		},
 		"DynCfg add job lane": {
 			declaration: testDeclaration(
@@ -65,8 +67,9 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 					"production",
 				},
 			},
-			wantScope:  "mysql_production",
-			wantMethod: "method",
+			wantScope:    "mysql_production",
+			wantMethod:   "method",
+			wantResource: true,
 		},
 		"scoped DynCfg existing resource lane": {
 			declaration: testDeclaration(
@@ -85,8 +88,9 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 					"update",
 				},
 			},
-			wantScope:  "secretstore:vault_production",
-			wantMethod: "method",
+			wantScope:    "secretstore:vault_production",
+			wantMethod:   "method",
+			wantResource: true,
 		},
 		"scoped DynCfg add resource lane": {
 			declaration: testDeclaration(
@@ -98,8 +102,9 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 				UID: "dyncfg-vnode-add", Route: "config",
 				Args: []string{"go.d:vnode", "add", "production"},
 			},
-			wantScope:  "vnode:production",
-			wantMethod: "method",
+			wantScope:    "vnode:production",
+			wantMethod:   "method",
+			wantResource: true,
 		},
 		"prefix missing argument": {
 			declaration: testDeclaration("config", "job:", ArgumentLane(0)),
@@ -138,7 +143,9 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 				return
 			}
 			if !decision.Lease.Valid() || decision.Plan.Runner == nil ||
-				decision.Lane.Route == 0 || decision.Lane.Scope != test.wantScope {
+				decision.Lane.Route == 0 ||
+				decision.Lane.Scope != test.wantScope ||
+				decision.Lane.Resource != test.wantResource {
 				t.Fatalf("resolved decision differs: %+v", decision)
 			}
 			if census := catalog.Census(); census.InvocationLeases != 1 {
@@ -353,6 +360,420 @@ func TestHandlerLeaseLifecycle(t *testing.T) {
 	if census := catalog.Census(); census.PendingCleanups != 0 ||
 		census.CompletedCleanups != 1 || census.FailedCleanups != 0 {
 		t.Fatalf("cleanup census differs: %+v", census)
+	}
+}
+
+func TestRetiredRouteRejectsDuringLeaseDrainThenDisappears(t *testing.T) {
+	tests := map[string]struct {
+		prefix string
+		args   []string
+		lane   LanePolicy
+	}{
+		"direct route": {
+			lane: RouteLane(),
+		},
+		"prefix route": {
+			prefix: "job:",
+			args:   []string{"job:one"},
+			lane:   ArgumentLane(0),
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var cleanupCalls atomic.Int32
+			declaration := testDeclaration(
+				"work",
+				test.prefix,
+				test.lane,
+			)
+			declaration.Generation.Cleanup = func(
+				context.Context,
+			) error {
+				cleanupCalls.Add(1)
+				return nil
+			}
+			catalog, err := NewCatalog([]Declaration{declaration})
+			if err != nil {
+				t.Fatal(err)
+			}
+			held, err := catalog.ResolveAndAcquire(
+				jobmgr.FunctionLookup{
+					UID:   "held",
+					Route: "work",
+					Args:  test.args,
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			mutation, err := catalog.NewMutation(
+				catalog.Census().Version,
+				[]RouteChange{{
+					PublicName: "work",
+					Prefix:     test.prefix,
+				}},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			builder, err := catalog.startMutation(mutation)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var postimage *MutationPostimage
+			for {
+				var done bool
+				postimage, done, err = builder.PrepareStep(
+					MaximumMutationQuantum,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if done {
+					break
+				}
+			}
+			var cleanups [MaximumMutationChanges]jobmgr.FunctionCleanupPlan
+			count, err := catalog.commitMutation(
+				postimage,
+				&cleanups,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if count != 0 {
+				t.Fatal(
+					"retired generation cleaned before its lease drained",
+				)
+			}
+
+			rejected, err := catalog.ResolveAndAcquire(
+				jobmgr.FunctionLookup{
+					UID:   "during-drain",
+					Route: "work",
+					Args:  test.args,
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if rejected.Rejected != lifecycle.ControlUnavailable ||
+				rejected.Lease.Valid() {
+				t.Fatalf(
+					"retired route decision=%+v, want unavailable without lease",
+					rejected,
+				)
+			}
+			unknown, err := catalog.ResolveAndAcquire(
+				jobmgr.FunctionLookup{
+					UID:   "unknown",
+					Route: "other",
+					Args:  test.args,
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if unknown.Rejected != lifecycle.ControlNotFound {
+				t.Fatalf(
+					"unrelated route decision=%+v, want not found",
+					unknown,
+				)
+			}
+
+			cleanup, err := catalog.ReleaseInvocation(held.Lease)
+			if err != nil {
+				t.Fatal(err)
+			}
+			afterDrain, err := catalog.ResolveAndAcquire(
+				jobmgr.FunctionLookup{
+					UID:   "after-drain",
+					Route: "work",
+					Args:  test.args,
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if afterDrain.Rejected != lifecycle.ControlNotFound {
+				t.Fatalf(
+					"drained route decision=%+v, want not found",
+					afterDrain,
+				)
+			}
+			if published := catalog.storage.published.Load(); published != 0 {
+				t.Fatalf(
+					"drained tombstone retained %d path bytes",
+					published,
+				)
+			}
+			runCleanupPlan(t, catalog, cleanup)
+			if cleanupCalls.Load() != 1 {
+				t.Fatalf(
+					"cleanup calls=%d, want 1",
+					cleanupCalls.Load(),
+				)
+			}
+		})
+	}
+}
+
+func TestFunctionCatalogQuiesceAbortRestoresAdmission(t *testing.T) {
+	tests := map[string]struct {
+		prefix string
+		args   []string
+		lane   LanePolicy
+	}{
+		"direct route": {
+			lane: RouteLane(),
+		},
+		"prefix route": {
+			prefix: "job:",
+			args:   []string{"job:one"},
+			lane:   ArgumentLane(0),
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			catalog, err := NewCatalog([]Declaration{
+				testDeclaration("work", test.prefix, test.lane),
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			mutation, err := catalog.NewMutation(
+				catalog.Census().Version,
+				[]RouteChange{{
+					PublicName: "work",
+					Prefix:     test.prefix,
+				}},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := catalog.BeginMutation(mutation); err != nil {
+				t.Fatal(err)
+			}
+			for {
+				progress, err := catalog.AdvanceMutationQuiesce(
+					MaximumMutationQuantum,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if progress.Quiesced {
+					break
+				}
+			}
+			rejected, err := catalog.ResolveAndAcquire(
+				jobmgr.FunctionLookup{
+					UID: "quiesced", Route: "work", Args: test.args,
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if rejected.Rejected != lifecycle.ControlUnavailable ||
+				rejected.Lease.Valid() ||
+				catalog.Census().Version != 1 {
+				t.Fatalf(
+					"quiesced decision=%+v census=%+v",
+					rejected,
+					catalog.Census(),
+				)
+			}
+			if err := catalog.ResumeMutation(mutation); err != nil {
+				t.Fatal(err)
+			}
+			var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
+			if count, err := catalog.AbortMutation(
+				&cleanups,
+			); err != nil || count != 0 {
+				t.Fatalf("abort count=%d err=%v", count, err)
+			}
+			restored, err := catalog.ResolveAndAcquire(
+				jobmgr.FunctionLookup{
+					UID: "restored", Route: "work", Args: test.args,
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if restored.Rejected != 0 || !restored.Lease.Valid() ||
+				catalog.Census().Version != 1 ||
+				catalog.Census().MutationActive {
+				t.Fatalf(
+					"restored decision=%+v census=%+v",
+					restored,
+					catalog.Census(),
+				)
+			}
+			if _, err := catalog.ReleaseInvocation(
+				restored.Lease,
+			); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestRetiredRouteDrainDuringUnrelatedMutationDefersPhysicalPrune(t *testing.T) {
+	var cleanupCalls atomic.Int32
+	heldDeclaration := testDeclaration(
+		"held",
+		"",
+		RouteLane(),
+	)
+	heldDeclaration.Generation.Cleanup = func(
+		context.Context,
+	) error {
+		cleanupCalls.Add(1)
+		return nil
+	}
+	otherDeclaration := testDeclaration(
+		"other",
+		"",
+		RouteLane(),
+	)
+	catalog, err := NewCatalog(
+		[]Declaration{heldDeclaration, otherDeclaration},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	held, err := catalog.ResolveAndAcquire(
+		jobmgr.FunctionLookup{UID: "held", Route: "held"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	remove, err := catalog.NewMutation(
+		catalog.Census().Version,
+		[]RouteChange{{PublicName: "held"}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	removeBuilder, err := catalog.startMutation(remove)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var removePostimage *MutationPostimage
+	for {
+		var done bool
+		removePostimage, done, err = removeBuilder.PrepareStep(
+			MaximumMutationQuantum,
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if done {
+			break
+		}
+	}
+	var cleanups [MaximumMutationChanges]jobmgr.FunctionCleanupPlan
+	if count, err := catalog.commitMutation(
+		removePostimage,
+		&cleanups,
+	); err != nil || count != 0 {
+		t.Fatalf(
+			"held-route retirement count=%d err=%v",
+			count,
+			err,
+		)
+	}
+
+	replacement := testDeclaration(
+		"other",
+		"",
+		RouteLane(),
+	)
+	unrelated, err := catalog.NewMutation(
+		catalog.Census().Version,
+		[]RouteChange{{
+			PublicName:  "other",
+			Declaration: &replacement,
+		}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	unrelatedBuilder, err := catalog.startMutation(unrelated)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for unrelatedBuilder.phase == mutationTopology {
+		if _, _, err := unrelatedBuilder.PrepareStep(1); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	cleanup, err := catalog.ReleaseInvocation(held.Lease)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if catalog.deferredPrune == nil {
+		t.Fatal(
+			"lease drain physically pruned a route during another mutation",
+		)
+	}
+	afterDrain, err := catalog.ResolveAndAcquire(
+		jobmgr.FunctionLookup{
+			UID:   "after-drain",
+			Route: "held",
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if afterDrain.Rejected != lifecycle.ControlNotFound {
+		t.Fatalf(
+			"semantically drained route decision=%+v, want not found",
+			afterDrain,
+		)
+	}
+
+	var unrelatedPostimage *MutationPostimage
+	for {
+		var done bool
+		unrelatedPostimage, done, err =
+			unrelatedBuilder.PrepareStep(
+				MaximumMutationQuantum,
+			)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if done {
+			break
+		}
+	}
+	count, err := catalog.commitMutation(
+		unrelatedPostimage,
+		&cleanups,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for index := 0; index < count; index++ {
+		runCleanupPlan(t, catalog, cleanups[index])
+	}
+	if catalog.deferredPrune != nil {
+		t.Fatal("unrelated mutation retained deferred route pruning")
+	}
+	published := catalog.storage.published.Load()
+	if want := catalogPathStorage(catalog.routes); published != want {
+		t.Fatalf(
+			"published storage=%d, live trie=%d",
+			published,
+			want,
+		)
+	}
+	runCleanupPlan(t, catalog, cleanup)
+	if cleanupCalls.Load() != 1 {
+		t.Fatalf(
+			"cleanup calls=%d, want 1",
+			cleanupCalls.Load(),
+		)
 	}
 }
 

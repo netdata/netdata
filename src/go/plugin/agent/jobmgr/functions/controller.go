@@ -687,13 +687,20 @@ func (controller *Controller) reconcileModuleLocked(
 		return nil, errors.Join(err, mutation.Discard())
 	}
 	expectedVersion := controller.version + 1
+	transitionCtx := context.WithoutCancel(ctx)
 	err = controller.publication.ApplyTransition(
 		controller.epoch,
 		expectedVersion,
 		digest,
 		publicationChanges,
 		func() error {
-			version, mutationErr := controller.mutations.MutateFunctions(ctx, mutation)
+			return controller.mutations.QuiesceFunctions(ctx, mutation)
+		},
+		func() error {
+			version, mutationErr := controller.mutations.CommitFunctions(
+				transitionCtx,
+				mutation,
+			)
 			if mutationErr != nil {
 				return mutationErr
 			}
@@ -708,6 +715,12 @@ func (controller *Controller) reconcileModuleLocked(
 				return errors.New("jobmgr Function controller: mutation version mismatch")
 			}
 			return nil
+		},
+		func() error {
+			return controller.mutations.AbortFunctions(
+				transitionCtx,
+				mutation,
+			)
 		},
 	)
 	err = errors.Join(err, mutation.Discard())

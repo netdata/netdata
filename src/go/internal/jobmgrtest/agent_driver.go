@@ -29,79 +29,25 @@ import (
 
 const productionFixtureModule = "jobmgrtest"
 
-// AgentDriver exercises the shipped Agent API. Scenario results are cached so
-// every manifest row keeps an explicit proof edge without repeating an
-// identical process lifecycle dozens of times.
-type AgentDriver struct {
-	mu      sync.Mutex
-	results map[string]error
-}
+// AgentDriver exercises one exact immutable production predicate through the
+// shipped Agent API. Predicates are never cached or credited by family name.
+type AgentDriver struct{}
 
 func (driver *AgentDriver) Run(
 	ctx context.Context,
-	scenario string,
+	predicate string,
 ) error {
 	if driver == nil || ctx == nil {
 		return errors.New("jobmgr test: invalid Agent driver")
 	}
-	driver.mu.Lock()
-	if result, ok := driver.results[scenario]; ok {
-		driver.mu.Unlock()
-		return result
-	}
-	if driver.results == nil {
-		driver.results = make(map[string]error)
-	}
-	driver.mu.Unlock()
-
-	var result error
-	switch scenario {
-	case "collector-generation":
-		result = errors.Join(
-			prefixError(
-				"V1 collector generation",
-				runAgentCollectorLifecycle(ctx, false, true),
-			),
-			prefixError(
-				"V2 collector generation",
-				runAgentCollectorLifecycle(ctx, true, true),
-			),
-		)
-	case "collector-acquired-abort":
-		result = runAgentAcquiredAbort(ctx, true, false)
-	case "function-publication-abort":
-		result = runAgentAcquiredAbort(ctx, false, true)
-	case "bounded-shutdown":
-		result = runAgentCollectorLifecycle(ctx, false, false)
-	case "atomic-output":
-		result = runAgentFunctionFlow(ctx, false)
-	case "function-result-smoke":
-		result = runAgentFunctionFlow(ctx, true)
-	case "function-header-boundaries":
-		result = runAgentFunctionHeaderBoundaries(ctx)
-	case "function-body-boundaries":
-		result = runAgentFunctionBodyBoundaries(ctx)
-	case "function-raw-payload":
-		result = runAgentFunctionRawPayload(ctx)
-	case "function-timeout-boundaries":
-		result = runAgentFunctionTimeoutBoundaries(ctx)
-	case "function-invalid-json":
-		result = runAgentFunctionInvalidJSON(ctx)
-	case "function-result-boundaries":
-		result = runAgentFunctionResultBoundaries(ctx)
-	case "bounded-function-flow":
-		result = runAgentFunctionBurst(ctx)
-	default:
-		result = fmt.Errorf(
-			"jobmgr test: unknown Agent scenario %q",
-			scenario,
+	run := agentRuntimePredicates[predicate]
+	if run == nil {
+		return fmt.Errorf(
+			"jobmgr test: unknown Agent predicate %q",
+			predicate,
 		)
 	}
-
-	driver.mu.Lock()
-	driver.results[scenario] = result
-	driver.mu.Unlock()
-	return result
+	return run(ctx)
 }
 
 func prefixError(prefix string, err error) error {
@@ -112,12 +58,20 @@ func prefixError(prefix string, err error) error {
 }
 
 type agentFixtureState struct {
-	mu             sync.Mutex
-	events         []string
-	cleanupGate    <-chan struct{}
-	cleanupEntered chan struct{}
-	cleanupOnce    sync.Once
-	checkErr       error
+	mu                  sync.Mutex
+	events              []string
+	checkGate           <-chan struct{}
+	checkEntered        chan struct{}
+	checkOnce           sync.Once
+	cleanupGate         <-chan struct{}
+	cleanupEntered      chan struct{}
+	cleanupOnce         sync.Once
+	handleGate          <-chan struct{}
+	handleEntered       chan struct{}
+	handleOnce          sync.Once
+	handleCancelReturns bool
+	emitCharts          bool
+	checkErr            error
 }
 
 func (state *agentFixtureState) cleanup() {
@@ -128,6 +82,40 @@ func (state *agentFixtureState) cleanup() {
 	if state.cleanupGate != nil {
 		<-state.cleanupGate
 	}
+}
+
+func (state *agentFixtureState) check() error {
+	state.record("check")
+	if state.checkEntered != nil {
+		state.checkOnce.Do(func() { close(state.checkEntered) })
+	}
+	if state.checkGate != nil {
+		<-state.checkGate
+	}
+	return state.checkErr
+}
+
+func (state *agentFixtureState) handle(
+	ctx context.Context,
+	event string,
+) {
+	state.record(event)
+	state.record(event + ":entered")
+	if state.handleEntered != nil {
+		state.handleOnce.Do(func() { close(state.handleEntered) })
+	}
+	if state.handleGate != nil {
+		if state.handleCancelReturns {
+			select {
+			case <-state.handleGate:
+			case <-ctx.Done():
+				state.record(event + ":cancelled")
+			}
+		} else {
+			<-state.handleGate
+		}
+	}
+	state.record(event + ":returned")
 }
 
 func (state *agentFixtureState) record(event string) {
@@ -169,6 +157,18 @@ func (buffer *synchronizedBuffer) contains(fragment string) bool {
 	buffer.mu.Lock()
 	defer buffer.mu.Unlock()
 	return bytes.Contains(buffer.data.Bytes(), []byte(fragment))
+}
+
+func (buffer *synchronizedBuffer) count(fragment string) int {
+	buffer.mu.Lock()
+	defer buffer.mu.Unlock()
+	return bytes.Count(buffer.data.Bytes(), []byte(fragment))
+}
+
+func (buffer *synchronizedBuffer) snapshot() []byte {
+	buffer.mu.Lock()
+	defer buffer.mu.Unlock()
+	return append([]byte(nil), buffer.data.Bytes()...)
 }
 
 func (buffer *synchronizedBuffer) String() string {
@@ -281,15 +281,79 @@ func startAgentFixtureWithState(
 	v2 bool,
 	state *agentFixtureState,
 ) (*agentFixture, error) {
+	return startAgentFixtureConfiguredWithRegistry(
+		ctx,
+		state,
+		fixtureRegistry(state, v2),
+		nil,
+		policy.Agent(true),
+	)
+}
+
+func startAgentInstanceFixtureWithState(
+	ctx context.Context,
+	v2 bool,
+	state *agentFixtureState,
+) (*agentFixture, error) {
+	return startAgentFixtureConfiguredWithRegistry(
+		ctx,
+		state,
+		fixtureInstanceRegistry(state, v2),
+		nil,
+		policy.Agent(true),
+	)
+}
+
+func startAgentCapacityFixtureWithState(
+	ctx context.Context,
+	state *agentFixtureState,
+) (*agentFixture, error) {
+	return startAgentFixtureConfiguredWithRegistry(
+		ctx,
+		state,
+		fixtureCapacityRegistry(state),
+		nil,
+		policy.Agent(true),
+	)
+}
+
+func startAgentFixtureConfigured(
+	ctx context.Context,
+	v2 bool,
+	state *agentFixtureState,
+	wrapOutput func(*synchronizedBuffer) io.Writer,
+	runPolicy policy.RunModePolicy,
+) (*agentFixture, error) {
+	return startAgentFixtureConfiguredWithRegistry(
+		ctx,
+		state,
+		fixtureRegistry(state, v2),
+		wrapOutput,
+		runPolicy,
+	)
+}
+
+func startAgentFixtureConfiguredWithRegistry(
+	ctx context.Context,
+	state *agentFixtureState,
+	registry collectorapi.Registry,
+	wrapOutput func(*synchronizedBuffer) io.Writer,
+	runPolicy policy.RunModePolicy,
+) (*agentFixture, error) {
 	logger.Level.SetByName("critical")
 	reader, writer := io.Pipe()
 	output := &synchronizedBuffer{}
+	var agentOutput io.Writer = output
+	if wrapOutput != nil {
+		agentOutput = wrapOutput(output)
+	}
 	instance := agent.New(agent.Config{
-		Name:           "jobmgrtest",
-		ModuleRegistry: fixtureRegistry(state, v2),
-		RunModule:      productionFixtureModule,
-		MinUpdateEvery: 1,
-		RunModePolicy:  policy.Agent(true),
+		Name:            "jobmgrtest",
+		ModuleRegistry:  registry,
+		RunModule:       productionFixtureModule,
+		MinUpdateEvery:  1,
+		ShutdownTimeout: 250 * time.Millisecond,
+		RunModePolicy:   runPolicy,
 		DiscoveryProviders: []discovery.ProviderFactory{
 			discovery.NewProviderFactory(
 				"dummy",
@@ -309,7 +373,7 @@ func startAgentFixtureWithState(
 		DisableServiceDiscovery: true,
 	})
 	instance.In = reader
-	instance.Out = output
+	instance.Out = agentOutput
 	done := make(chan error, 1)
 	go func() {
 		done <- instance.RunContext(ctx)
@@ -1184,24 +1248,61 @@ func fixtureRegistry(
 	state *agentFixtureState,
 	v2 bool,
 ) collectorapi.Registry {
+	return fixtureRegistryWithFunctions(state, v2, false, 2)
+}
+
+func fixtureInstanceRegistry(
+	state *agentFixtureState,
+	v2 bool,
+) collectorapi.Registry {
+	return fixtureRegistryWithFunctions(state, v2, true, 2)
+}
+
+func fixtureCapacityRegistry(
+	state *agentFixtureState,
+) collectorapi.Registry {
+	return fixtureRegistryWithFunctions(
+		state,
+		false,
+		false,
+		lifecycle.MaximumUIDRecords/lifecycle.MaximumLaneDepth,
+	)
+}
+
+func fixtureOutputRegistry(
+	state *agentFixtureState,
+	v2 bool,
+) collectorapi.Registry {
+	registry := fixtureRegistry(state, v2)
+	creator := registry[productionFixtureModule]
+	creator.FunctionOnly = false
+	registry[productionFixtureModule] = creator
+	return registry
+}
+
+func fixtureRegistryWithFunctions(
+	state *agentFixtureState,
+	v2 bool,
+	instanceFunctions bool,
+	functionCount int,
+) collectorapi.Registry {
 	creator := collectorapi.Creator{
-		Defaults:     collectorapi.Defaults{UpdateEvery: 1},
-		FunctionOnly: true,
-		AgentFunctions: func() []funcapi.FunctionConfig {
-			return []funcapi.FunctionConfig{
-				{
-					ID: "echo", FunctionName: "jobmgrtest:echo",
-					Name: "jobmgrtest:echo", RawRequest: true,
-				},
-				{
-					ID: "json", FunctionName: "jobmgrtest:json",
-					Name: "jobmgrtest:json",
-				},
-			}
-		},
+		Defaults:       collectorapi.Defaults{UpdateEvery: 1},
+		FunctionOnly:   true,
+		InstancePolicy: collectorapi.InstancePolicySingle,
 		MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
 			return fixtureFunctionHandler{state: state}
 		},
+	}
+	functions := func() []funcapi.FunctionConfig {
+		return fixtureFunctionConfigs(functionCount)
+	}
+	if instanceFunctions {
+		creator.InstanceFunctions = func(collectorapi.RuntimeJob) []funcapi.FunctionConfig {
+			return functions()
+		}
+	} else {
+		creator.AgentFunctions = functions
 	}
 	if v2 {
 		creator.CreateV2 = func() collectorapi.CollectorV2 {
@@ -1218,12 +1319,27 @@ func fixtureRegistry(
 					return nil
 				},
 				CheckFunc: func(context.Context) error {
-					state.record("check")
-					return state.checkErr
+					return state.check()
 				},
 				CollectFunc: func(context.Context) map[string]int64 {
 					state.record("collect")
+					if state.emitCharts {
+						return map[string]int64{"value": 1}
+					}
 					return nil
+				},
+				ChartsFunc: func() *collectorapi.Charts {
+					if !state.emitCharts {
+						return nil
+					}
+					return &collectorapi.Charts{
+						&collectorapi.Chart{
+							ID: "value", Title: "Value", Units: "value",
+							Dims: collectorapi.Dims{
+								&collectorapi.Dim{ID: "value"},
+							},
+						},
+					}
 				},
 				CleanupFunc: func(context.Context) {
 					state.cleanup()
@@ -1232,6 +1348,27 @@ func fixtureRegistry(
 		}
 	}
 	return collectorapi.Registry{productionFixtureModule: creator}
+}
+
+func fixtureFunctionConfigs(count int) []funcapi.FunctionConfig {
+	functions := []funcapi.FunctionConfig{
+		{
+			ID: "echo", FunctionName: "jobmgrtest:echo",
+			Name: "jobmgrtest:echo", RawRequest: true,
+		},
+		{
+			ID: "json", FunctionName: "jobmgrtest:json",
+			Name: "jobmgrtest:json",
+		},
+	}
+	for ordinal := 0; len(functions) < count; ordinal++ {
+		id := fmt.Sprintf("work-%03d", ordinal)
+		functions = append(functions, funcapi.FunctionConfig{
+			ID: id, FunctionName: "jobmgrtest:" + id,
+			Name: "jobmgrtest:" + id, RawRequest: true,
+		})
+	}
+	return functions[:count]
 }
 
 type fixtureCollectorV2 struct {
@@ -1246,12 +1383,17 @@ func (collector *fixtureCollectorV2) Init(context.Context) error {
 }
 
 func (collector *fixtureCollectorV2) Check(context.Context) error {
-	collector.state.record("check")
-	return collector.state.checkErr
+	return collector.state.check()
 }
 
 func (collector *fixtureCollectorV2) Collect(context.Context) error {
 	collector.state.record("collect")
+	if collector.state.emitCharts {
+		collector.store.Write().
+			SnapshotMeter("jobmgrtest").
+			Gauge("value").
+			Observe(1)
+	}
 	return nil
 }
 
@@ -1272,7 +1414,19 @@ func (collector *fixtureCollectorV2) MetricStore() metrix.CollectorStore {
 }
 
 func (*fixtureCollectorV2) ChartTemplateYAML() string {
-	return ""
+	return `
+version: "v1"
+groups:
+  - family: "jobmgrtest"
+    metrics: ["jobmgrtest.value"]
+    charts:
+      - context: "value"
+        title: "Value"
+        units: "value"
+        dimensions:
+          - selector: "jobmgrtest.value"
+            name: "value"
+`
 }
 
 type fixtureFunctionHandler struct {
@@ -1287,11 +1441,11 @@ func (fixtureFunctionHandler) MethodParams(
 }
 
 func (handler fixtureFunctionHandler) Handle(
-	_ context.Context,
+	ctx context.Context,
 	method string,
 	_ funcapi.ResolvedParams,
 ) *funcapi.FunctionResponse {
-	handler.state.record("handle:" + method)
+	handler.state.handle(ctx, "handle:"+method)
 	return funcapi.RawResponse(map[string]any{
 		"method": method,
 		"status": 200,
@@ -1299,10 +1453,10 @@ func (handler fixtureFunctionHandler) Handle(
 }
 
 func (handler fixtureFunctionHandler) HandleRaw(
-	_ context.Context,
+	ctx context.Context,
 	request funcapi.RawMethodRequest,
 ) *funcapi.FunctionResponse {
-	handler.state.record("raw:" + request.Method)
+	handler.state.handle(ctx, "raw:"+request.Method)
 	if deferred, ok := requestedDeferredBytes(request.Args); ok {
 		const fixedBytes = len(`{"pad":""}`)
 		if deferred <= fixedBytes {

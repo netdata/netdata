@@ -69,6 +69,7 @@ type FunctionCatalogMutationProgress struct {
 	CompletedNodes int
 	TotalNodes     int
 	Version        uint64
+	Quiesced       bool
 	Done           bool
 }
 
@@ -86,14 +87,18 @@ type FunctionCatalogCensus struct {
 
 // FunctionLane is a structured catalog-owned lane identity. Route is a
 // monotonic route identity; Scope optionally narrows that route without
-// constructing a concatenated key.
+// constructing a concatenated key. Resource makes Scope the process-wide
+// resource identity shared with discovery and lifecycle work.
 type FunctionLane struct {
-	Route uint64
-	Scope string
+	Route    uint64
+	Scope    string
+	Resource bool
 }
 
 func (lane FunctionLane) validate() error {
-	if lane.Route == 0 || len(lane.Scope) > maximumRequestMetadataBytes {
+	if lane.Route == 0 ||
+		len(lane.Scope) > maximumRequestMetadataBytes ||
+		lane.Resource && lane.Scope == "" {
 		return errors.New("jobmgr kernel: invalid Function lane")
 	}
 	return nil
@@ -162,6 +167,8 @@ type FunctionCatalogPort interface {
 	ReleaseInvocation(FunctionInvocationRef) (FunctionCleanupPlan, error)
 	CompleteCleanup(FunctionCleanupRef, error) error
 	BeginMutation(FunctionCatalogMutation) error
+	AdvanceMutationQuiesce(int) (FunctionCatalogMutationProgress, error)
+	ResumeMutation(FunctionCatalogMutation) error
 	AdvanceMutation(int, *[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (FunctionCatalogMutationProgress, int, error)
 	AbortMutation(*[MaximumFunctionCleanupBatch]FunctionCleanupPlan) (int, error)
 	BeginClose() error
@@ -170,7 +177,11 @@ type FunctionCatalogPort interface {
 }
 
 // FunctionMutationPort is the composition-facing capability for submitting an
-// already prepared catalog mutation to KernelLoop.
+// already prepared catalog mutation to KernelLoop. A successful quiesce closes
+// predecessor admission and transfers the paused mutation to KernelLoop; the
+// caller must consume it exactly once with commit or abort.
 type FunctionMutationPort interface {
-	MutateFunctions(context.Context, FunctionCatalogMutation) (uint64, error)
+	QuiesceFunctions(context.Context, FunctionCatalogMutation) error
+	CommitFunctions(context.Context, FunctionCatalogMutation) (uint64, error)
+	AbortFunctions(context.Context, FunctionCatalogMutation) error
 }

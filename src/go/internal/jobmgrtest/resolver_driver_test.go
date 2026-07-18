@@ -28,7 +28,7 @@ func TestResolverDriverContainsCommandProcessGroup(t *testing.T) {
 	)
 	defer cancel()
 	driver := ResolverDriver{Helper: helper, PIDFile: pidFile}
-	if err := driver.Run(ctx, "process-group-containment"); err != nil {
+	if err := driver.Run(ctx, "F10.6"); err != nil {
 		t.Fatal(err)
 	}
 }

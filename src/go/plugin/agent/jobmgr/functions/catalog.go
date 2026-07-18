@@ -139,6 +139,7 @@ func (policy LanePolicy) resolve(routeID uint64, arguments []string) jobmgr.Func
 		if lane.Scope != "" {
 			lane.Scope = policy.ScopePrefix + lane.Scope
 		}
+		lane.Resource = true
 	}
 	return lane
 }
@@ -218,6 +219,7 @@ type handlerGeneration struct {
 	cleanupPending   bool
 	cleaned          bool
 	cleanupFailed    bool
+	retiringHead     *route
 }
 
 func (generation *handlerGeneration) RunTask(ctx context.Context) (lifecycle.TaskOutcome, error) {
@@ -241,6 +243,8 @@ func (generation *handlerGeneration) census() HandlerGenerationCensus {
 
 type route struct {
 	id                  uint64
+	publicName          string
+	prefix              string
 	method              string
 	handler             *handlerGeneration
 	lane                LanePolicy
@@ -248,6 +252,11 @@ type route struct {
 	cooperativeDeadline bool
 	rawPayload          bool
 	transaction         *ResourceTransactionDeclaration
+	admissionClosed     bool
+	retiringDrained     bool
+	retiringNamePath    []*catalogNode
+	retiringPrefixPath  []*prefixNode
+	retiringNext        *route
 	closePrevious       *route
 	closeNext           *route
 }
@@ -419,6 +428,8 @@ type Catalog struct {
 	closeHead *route
 	closeTail *route
 
+	deferredPrune *route
+
 	nextRouteID      uint64
 	nextGenerationID uint32
 	version          uint64
@@ -517,7 +528,9 @@ func (catalog *Catalog) addInitial(declaration Declaration, generation *handlerG
 		return errors.New("jobmgr Function catalog: route identity wrapped")
 	}
 	resolved := &route{
-		id: catalog.nextRouteID, method: declaration.ID, handler: generation, lane: declaration.Lane,
+		id: catalog.nextRouteID, publicName: declaration.PublicName,
+		prefix: declaration.Prefix, method: declaration.ID,
+		handler: generation, lane: declaration.Lane,
 		cooperativeCancel:   declaration.CooperativeCancel,
 		cooperativeDeadline: declaration.CooperativeDeadline,
 		rawPayload:          declaration.RawPayload,
@@ -665,7 +678,7 @@ func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.
 		}, nil
 	}
 	resolved := set.resolve(lookup.Args)
-	if resolved == nil {
+	if resolved == nil || resolved.retiringDrained {
 		return jobmgr.FunctionCatalogDecision{
 			Lane:     jobmgr.FunctionLane{Route: 1, Scope: lookup.Route},
 			Rejected: lifecycle.ControlNotFound,
@@ -673,7 +686,9 @@ func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.
 	}
 	lane := resolved.lane.resolve(resolved.id, lookup.Args)
 	generation := resolved.handler
-	if generation.admissionClosed || catalog.freeLease == 0 {
+	if resolved.admissionClosed ||
+		generation.admissionClosed ||
+		catalog.freeLease == 0 {
 		return jobmgr.FunctionCatalogDecision{Lane: lane, Rejected: lifecycle.ControlUnavailable}, nil
 	}
 
@@ -755,7 +770,132 @@ func (catalog *Catalog) maybeCleanup(generation *handlerGeneration) (jobmgr.Func
 		generation.invocationLeases != 0 || generation.cleanupPending || generation.cleaned {
 		return jobmgr.FunctionCleanupPlan{}, nil
 	}
+	catalog.retireDrainedRoutes(generation)
 	return catalog.cleanupDrainedGeneration(generation), nil
+}
+
+func (catalog *Catalog) retireDrainedRoutes(
+	generation *handlerGeneration,
+) {
+	if catalog == nil || generation == nil ||
+		generation.retiringHead == nil {
+		return
+	}
+	routes := generation.retiringHead
+	generation.retiringHead = nil
+	if catalog.mutation != nil {
+		for route := routes; route != nil; {
+			next := route.retiringNext
+			route.retiringDrained = true
+			route.retiringNext = catalog.deferredPrune
+			catalog.deferredPrune = route
+			route = next
+		}
+		return
+	}
+	catalog.pruneRetiringRoutes(routes)
+}
+
+func (catalog *Catalog) pruneRetiringRoutes(routes *route) {
+	var released int64
+	for route := routes; route != nil; {
+		next := route.retiringNext
+		route.retiringNext = nil
+		route.retiringDrained = true
+		released += pruneRetiringRoute(&catalog.routes, route)
+		route = next
+	}
+	catalog.storage.releasePublishedPaths(released)
+}
+
+func pruneRetiringRoute(
+	root **catalogNode,
+	retired *route,
+) int64 {
+	if root == nil || retired == nil || *root == nil {
+		return 0
+	}
+	defer func() {
+		retired.retiringNamePath = nil
+		retired.retiringPrefixPath = nil
+	}()
+
+	nameBits := len(retired.publicName) * 8
+	if len(retired.retiringNamePath) != nameBits+1 {
+		return 0
+	}
+	node := *root
+	for depth := 0; depth <= nameBits; depth++ {
+		if node == nil {
+			return 0
+		}
+		retired.retiringNamePath[depth] = node
+		if depth != nameBits {
+			node = node.child[keyBit(retired.publicName, depth)]
+		}
+	}
+	leaf := retired.retiringNamePath[nameBits]
+	var released int64
+	if retired.prefix == "" {
+		if leaf.routes.direct != retired {
+			return 0
+		}
+		leaf.routes.direct = nil
+	} else {
+		prefixBits := len(retired.prefix) * 8
+		if len(retired.retiringPrefixPath) != prefixBits+1 ||
+			leaf.routes.prefixCount <= 0 {
+			return 0
+		}
+		prefix := leaf.routes.prefixes
+		for depth := 0; depth <= prefixBits; depth++ {
+			if prefix == nil {
+				return 0
+			}
+			retired.retiringPrefixPath[depth] = prefix
+			if depth != prefixBits {
+				prefix = prefix.child[keyBit(retired.prefix, depth)]
+			}
+		}
+		if retired.retiringPrefixPath[prefixBits].resolved != retired {
+			return 0
+		}
+		retired.retiringPrefixPath[prefixBits].resolved = nil
+		leaf.routes.prefixCount--
+		for depth := prefixBits; depth >= 0; depth-- {
+			current := retired.retiringPrefixPath[depth]
+			if current.resolved != nil ||
+				current.child[0] != nil ||
+				current.child[1] != nil {
+				break
+			}
+			if depth == 0 {
+				leaf.routes.prefixes = nil
+			} else {
+				parent := retired.retiringPrefixPath[depth-1]
+				parent.child[keyBit(retired.prefix, depth-1)] = nil
+			}
+			released += prefixNodeStorageBytes
+		}
+	}
+
+	leaf.present = !leaf.routes.empty()
+	for depth := nameBits; depth >= 0; depth-- {
+		current := retired.retiringNamePath[depth]
+		if current.present ||
+			current.child[0] != nil ||
+			current.child[1] != nil {
+			break
+		}
+		if depth == 0 {
+			*root = nil
+		} else {
+			parent := retired.retiringNamePath[depth-1]
+			parent.child[keyBit(retired.publicName, depth-1)] = nil
+		}
+		released += catalogNodeStorageBytes
+	}
+	return released
 }
 
 func (catalog *Catalog) cleanupDrainedGeneration(generation *handlerGeneration) jobmgr.FunctionCleanupPlan {

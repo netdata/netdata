@@ -78,7 +78,7 @@ func TestBMM002CaseClosureDigestIsStable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const want = "037983e4e77dce8209b1964b33908f51aef0f73ed9250648da9cd2b6cc166bf1"
+	const want = "1d60e00d2bc172381fe4d869fe2517c163de6b1daf41afd93f23368abc18fca1"
 	if digest != want {
 		t.Fatalf("B-M-002 case digest=%s", digest)
 	}
@@ -95,11 +95,11 @@ func TestBMM002CaseEvidenceIsComplete(t *testing.T) {
 			t.Fatalf("case %s: %v", productionCase.ID, err)
 		}
 		if productionCase.Proof == ProofComponent &&
-			evidence.RuntimeScenario != "" {
+			evidence.RuntimePredicate != "" {
 			t.Fatalf(
-				"component-only case %s has runtime scenario %q",
+				"component-only case %s has runtime predicate %q",
 				productionCase.ID,
-				evidence.RuntimeScenario,
+				evidence.RuntimePredicate,
 			)
 		}
 		if productionCase.Proof == ProofRuntime &&
@@ -112,66 +112,37 @@ func TestBMM002CaseEvidenceIsComplete(t *testing.T) {
 	}
 }
 
-func TestBMM002PublicBoundaryCasesHaveDistinctRuntimeScenarios(t *testing.T) {
+func TestBMM002PublicBoundaryCasesHaveCaseExactRuntimePredicates(t *testing.T) {
 	cases, err := BMM002Cases()
 	if err != nil {
 		t.Fatal(err)
 	}
-	scenarios := make(map[string]string, len(cases))
+	predicates := make(map[string]string, len(cases))
 	for _, productionCase := range cases {
 		evidence, err := EvidenceFor(productionCase)
 		if err != nil {
 			t.Fatal(err)
 		}
-		scenarios[productionCase.ID] = evidence.RuntimeScenario
+		predicates[productionCase.ID] = evidence.RuntimePredicate
 	}
-	tests := map[string]struct {
-		caseID string
-		want   string
-	}{
-		"acquired collector abort": {
-			caseID: "F04.2",
-			want:   "collector-acquired-abort",
-		},
-		"published Function abort": {
-			caseID: "F04.3",
-			want:   "function-publication-abort",
-		},
-		"header": {
-			caseID: "F14.1",
-			want:   "function-header-boundaries",
-		},
-		"body": {
-			caseID: "F14.2",
-			want:   "function-body-boundaries",
-		},
-		"raw payload": {
-			caseID: "F14.3",
-			want:   "function-raw-payload",
-		},
-		"timeout": {
-			caseID: "F14.4",
-			want:   "function-timeout-boundaries",
-		},
-		"invalid JSON": {
-			caseID: "F14.5",
-			want:   "function-invalid-json",
-		},
-		"large result": {
-			caseID: "F14.13",
-			want:   "function-result-boundaries",
-		},
-	}
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			if got := scenarios[test.caseID]; got != test.want {
+	for _, productionCase := range cases {
+		predicate := predicates[productionCase.ID]
+		if productionCase.Proof == ProofComponent {
+			if predicate != "" {
 				t.Fatalf(
-					"case %s scenario=%q, want %q",
-					test.caseID,
-					got,
-					test.want,
+					"component-only case %s has predicate %q",
+					productionCase.ID,
+					predicate,
 				)
 			}
-		})
+			continue
+		}
+		if predicate != productionCase.ID {
+			t.Fatalf(
+				"case %s predicate=%q; runtime credit must be case-exact",
+				productionCase.ID,
+				predicate,
+			)
+		}
 	}
 }

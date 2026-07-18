@@ -8,16 +8,16 @@ import (
 
 func TestProcessDriverUsesPublicComposition(t *testing.T) {
 	tests := map[string]struct {
-		scenario string
+		predicate string
 	}{
 		"restart": {
-			scenario: "restart",
+			predicate: "F05.2",
 		},
 		"input fence": {
-			scenario: "input-fence",
+			predicate: "F06.2",
 		},
 		"noncooperative shutdown": {
-			scenario: "noncooperative-shutdown",
+			predicate: "F05.3",
 		},
 	}
 	driver := &ProcessDriver{}
@@ -28,7 +28,7 @@ func TestProcessDriverUsesPublicComposition(t *testing.T) {
 				5*time.Second,
 			)
 			defer cancel()
-			if err := driver.Run(ctx, test.scenario); err != nil {
+			if err := driver.Run(ctx, test.predicate); err != nil {
 				t.Fatal(err)
 			}
 		})
@@ -37,13 +37,16 @@ func TestProcessDriverUsesPublicComposition(t *testing.T) {
 
 func TestCollectorBoundaryDriverTreatsCleanupAsOpaque(t *testing.T) {
 	tests := map[string]struct {
-		scenario string
+		predicate string
 	}{
 		"cleanup once": {
-			scenario: "cleanup-once",
+			predicate: "F18.4",
 		},
 		"retained cleanup": {
-			scenario: "retained-cleanup",
+			predicate: "F18.5",
+		},
+		"repeated held stop": {
+			predicate: "F18.1",
 		},
 	}
 	driver := &CollectorBoundaryDriver{}
@@ -54,7 +57,7 @@ func TestCollectorBoundaryDriverTreatsCleanupAsOpaque(t *testing.T) {
 				5*time.Second,
 			)
 			defer cancel()
-			if err := driver.Run(ctx, test.scenario); err != nil {
+			if err := driver.Run(ctx, test.predicate); err != nil {
 				t.Fatal(err)
 			}
 		})

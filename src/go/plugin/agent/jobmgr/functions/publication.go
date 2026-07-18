@@ -115,17 +115,20 @@ func (publication *Publication) ApplyInitialSnapshot(
 	}
 	return publication.applyTransition(epoch, version, digest, changes, 0, func() error {
 		return nil
-	})
+	}, nil, nil)
 }
 
-// ApplyTransition withdraws changed predecessors, commits the private catalog
-// transition, and only then publishes successors. The caller must serialize
-// this method with all other publication and catalog mutations.
+// ApplyTransition closes predecessor admission, withdraws changed predecessors,
+// commits the private catalog transition, and only then publishes successors.
+// The caller must serialize this method with all other publication and catalog
+// mutations.
 func (publication *Publication) ApplyTransition(
 	epoch, version uint64,
 	digest [32]byte,
 	changes []PublicationChange,
+	quiesce func() error,
 	commit func() error,
+	abort func() error,
 ) error {
 	return publication.applyTransition(
 		epoch,
@@ -134,6 +137,8 @@ func (publication *Publication) ApplyTransition(
 		changes,
 		MaximumMutationPublicationChanges,
 		commit,
+		quiesce,
+		abort,
 	)
 }
 
@@ -143,9 +148,14 @@ func (publication *Publication) applyTransition(
 	changes []PublicationChange,
 	maximumChanges int,
 	commit func() error,
+	quiesce func() error,
+	abort func() error,
 ) error {
 	if commit == nil {
 		return errors.New("jobmgr Function publication: nil transition commit")
+	}
+	if maximumChanges != 0 && (quiesce == nil || abort == nil) {
+		return errors.New("jobmgr Function publication: incomplete transition boundary")
 	}
 	if err := publication.validateTransition(
 		epoch,
@@ -155,13 +165,18 @@ func (publication *Publication) applyTransition(
 	); err != nil {
 		return err
 	}
+	if quiesce != nil {
+		if err := quiesce(); err != nil {
+			return publication.poison(err)
+		}
+	}
 	for _, change := range changes {
 		current, exists := publication.published[change.Name]
 		if !exists || (change.Record != nil && current.record == *change.Record) {
 			continue
 		}
 		if err := publication.port.Withdraw(current.handle); err != nil {
-			return publication.poison(err)
+			return publication.poison(errors.Join(err, abort()))
 		}
 		delete(publication.published, change.Name)
 	}

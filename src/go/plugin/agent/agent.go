@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
 	"github.com/netdata/netdata/go/plugins/pkg/multipath"
@@ -33,10 +34,11 @@ type Config struct {
 	ServiceDiscoveryConfigDir []string
 	VarLibDir                 string
 
-	ModuleRegistry collectorapi.Registry
-	RunModule      string
-	RunJob         []string
-	MinUpdateEvery int
+	ModuleRegistry  collectorapi.Registry
+	RunModule       string
+	RunJob          []string
+	MinUpdateEvery  int
+	ShutdownTimeout time.Duration
 
 	DisableServiceDiscovery bool
 
@@ -60,9 +62,10 @@ type Agent struct {
 
 	VarLibDir string
 
-	RunModule      string
-	RunJob         []string
-	MinUpdateEvery int
+	RunModule       string
+	RunJob          []string
+	MinUpdateEvery  int
+	ShutdownTimeout time.Duration
 
 	DisableServiceDiscovery bool
 
@@ -97,6 +100,7 @@ func New(cfg Config) *Agent {
 		RunModule:                 cfg.RunModule,
 		RunJob:                    cfg.RunJob,
 		MinUpdateEvery:            cfg.MinUpdateEvery,
+		ShutdownTimeout:           cfg.ShutdownTimeout,
 		IsInsideK8s:               cfg.IsInsideK8s,
 		runModePolicy:             cfg.RunModePolicy,
 		ModuleRegistry:            cfg.ModuleRegistry,
@@ -170,6 +174,7 @@ func (a *Agent) run(ctx context.Context) error {
 		InitialVnodes:         a.setupVnodeRegistry(),
 		Runtime:               a.setupRuntimeService(),
 		KeepAlive:             !a.runModePolicy.IsTerminal,
+		ShutdownTimeout:       a.ShutdownTimeout,
 	})
 	if err != nil {
 		return err

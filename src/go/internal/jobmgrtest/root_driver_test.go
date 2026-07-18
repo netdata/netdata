@@ -12,7 +12,7 @@ func TestShippedRootCaseMapContainsTwelveScenarios(t *testing.T) {
 		caseID string
 		want   int
 	}{
-		"shutdown runs every root": {
+		"blocked-reader HUP runs every root": {
 			caseID: "F06.1",
 			want:   3,
 		},
@@ -52,18 +52,18 @@ func TestShippedRootClosureHasExactRootScenarioProduct(t *testing.T) {
 		"F24.27-b-scriptsdplugin-nonterminal",
 		"F24.28-b-scriptsdplugin-hup",
 	}
-	observed := make(map[shippedRootRun]struct{}, 12)
+	var observed []shippedRootRun
 	for _, caseID := range caseIDs {
 		runs, err := shippedRootRuns(caseID)
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, run := range runs {
-			if _, ok := observed[run]; ok {
-				t.Fatalf("duplicate shipped-root scenario: %+v", run)
-			}
-			observed[run] = struct{}{}
+			observed = append(observed, run)
 		}
+	}
+	if len(observed) != 12 {
+		t.Fatalf("shipped-root executions=%d, want 12", len(observed))
 	}
 	for _, root := range []string{
 		"godplugin",
@@ -74,12 +74,18 @@ func TestShippedRootClosureHasExactRootScenarioProduct(t *testing.T) {
 			"terminal",
 			"all-pipe",
 			"repeated-hup",
-			"shutdown",
 		} {
 			run := shippedRootRun{
 				root: root, scenario: scenario,
 			}
-			if _, ok := observed[run]; !ok {
+			found := false
+			for _, candidate := range observed {
+				if candidate == run {
+					found = true
+					break
+				}
+			}
+			if !found {
 				t.Fatalf("missing shipped-root scenario: %+v", run)
 			}
 		}
@@ -120,7 +126,7 @@ func TestRootProtocolObservationPreservesChunkBoundaries(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			published, withdrawn := observation.snapshot()
+			published, withdrawn, _ := observation.snapshot()
 			if published != test.wantPublished ||
 				withdrawn != test.wantWithdrawals {
 				t.Fatalf(
@@ -133,7 +139,7 @@ func TestRootProtocolObservationPreservesChunkBoundaries(t *testing.T) {
 			}
 			if err := observation.wait(
 				context.Background(),
-				func(publications, withdrawals int) bool {
+				func(publications, withdrawals, _ int) bool {
 					return publications == test.wantPublished &&
 						withdrawals == test.wantWithdrawals
 				},

@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"sync"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/logger"
@@ -16,91 +15,59 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 )
 
-// ProcessDriver exercises process-fixed input ownership and acknowledged
-// restart/termination through composition.NewProcess.
-type ProcessDriver struct {
-	mu      sync.Mutex
-	results map[string]error
-}
+// ProcessDriver exercises one exact process-fixed predicate through
+// composition.NewProcess.
+type ProcessDriver struct{}
 
 func (driver *ProcessDriver) Run(
 	ctx context.Context,
-	scenario string,
+	predicate string,
 ) error {
 	if driver == nil || ctx == nil {
 		return errors.New("jobmgr test: invalid Process driver")
 	}
-	driver.mu.Lock()
-	if result, ok := driver.results[scenario]; ok {
-		driver.mu.Unlock()
-		return result
-	}
-	if driver.results == nil {
-		driver.results = make(map[string]error)
-	}
-	driver.mu.Unlock()
-
 	var result error
-	switch scenario {
-	case "restart":
+	switch predicate {
+	case "F05.2":
 		result = runProcessRestart(ctx)
-	case "input-fence":
-		result = runProcessInputFence(ctx)
-	case "noncooperative-shutdown":
+	case "F05.3":
 		result = runProcessNoncooperativeShutdown(ctx)
+	case "F06.2", "F22.1-agent":
+		result = runProcessInputFence(ctx)
 	default:
 		result = fmt.Errorf(
-			"jobmgr test: unknown Process scenario %q",
-			scenario,
+			"jobmgr test: unknown Process predicate %q",
+			predicate,
 		)
 	}
-
-	driver.mu.Lock()
-	driver.results[scenario] = result
-	driver.mu.Unlock()
 	return result
 }
 
 // CollectorBoundaryDriver treats collectors as opaque V1/V2/Cleanup
 // implementations and observes only the public composition disposition.
-type CollectorBoundaryDriver struct {
-	mu      sync.Mutex
-	results map[string]error
-}
+type CollectorBoundaryDriver struct{}
 
 func (driver *CollectorBoundaryDriver) Run(
 	ctx context.Context,
-	scenario string,
+	predicate string,
 ) error {
 	if driver == nil || ctx == nil {
 		return errors.New("jobmgr test: invalid collector-boundary driver")
 	}
-	driver.mu.Lock()
-	if result, ok := driver.results[scenario]; ok {
-		driver.mu.Unlock()
-		return result
-	}
-	if driver.results == nil {
-		driver.results = make(map[string]error)
-	}
-	driver.mu.Unlock()
-
 	var result error
-	switch scenario {
-	case "cleanup-once":
+	switch predicate {
+	case "F18.1":
+		result = runCollectorRepeatedStop(ctx)
+	case "F18.4":
 		result = runProcessInputFence(ctx)
-	case "retained-cleanup":
+	case "F10.7", "F18.5":
 		result = runProcessNoncooperativeShutdown(ctx)
 	default:
 		result = fmt.Errorf(
-			"jobmgr test: unknown collector-boundary scenario %q",
-			scenario,
+			"jobmgr test: unknown collector-boundary predicate %q",
+			predicate,
 		)
 	}
-
-	driver.mu.Lock()
-	driver.results[scenario] = result
-	driver.mu.Unlock()
 	return result
 }
 
@@ -356,4 +323,102 @@ func runProcessNoncooperativeShutdown(ctx context.Context) error {
 		)
 	}
 	return closeErr
+}
+
+func runCollectorRepeatedStop(ctx context.Context) error {
+	release := make(chan struct{})
+	entered := make(chan struct{})
+	state := &agentFixtureState{
+		cleanupGate:    release,
+		cleanupEntered: entered,
+	}
+	fixture, err := startProcessFixture(
+		context.Background(),
+		state,
+		time.Second,
+	)
+	if err != nil {
+		return err
+	}
+	released := false
+	defer func() {
+		if !released {
+			close(release)
+		}
+		_ = fixture.input.Close()
+	}()
+	if err := waitUntil(ctx, func() bool {
+		return state.count("check") == 1
+	}); err != nil {
+		return err
+	}
+	results := []chan error{
+		make(chan error, 1),
+		make(chan error, 1),
+	}
+	go func() {
+		results[0] <- fixture.process.Terminate(ctx)
+	}()
+	select {
+	case <-entered:
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+	go func() {
+		results[1] <- fixture.process.Terminate(ctx)
+	}()
+	secondConsumed := false
+	var secondErr error
+	select {
+	case secondErr = <-results[1]:
+		secondConsumed = true
+		if secondErr == nil {
+			return errors.New(
+				"repeated stop returned success while Cleanup was held",
+			)
+		}
+	case <-time.After(50 * time.Millisecond):
+	}
+	if got := state.count("cleanup"); got != 1 {
+		return fmt.Errorf(
+			"held repeated stop Cleanup count=%d, want 1",
+			got,
+		)
+	}
+	close(release)
+	released = true
+	var terminalErr error
+	for index, result := range results {
+		if index == 1 && secondConsumed {
+			continue
+		}
+		select {
+		case err := <-result:
+			if index == 1 &&
+				errors.Is(err, composition.ErrProcessStopped) {
+				continue
+			}
+			terminalErr = errors.Join(terminalErr, err)
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	if terminalErr != nil {
+		return terminalErr
+	}
+	if got := state.count("cleanup"); got != 1 {
+		return fmt.Errorf(
+			"repeated stop invoked Cleanup %d times, want 1",
+			got,
+		)
+	}
+	if err := fixture.input.Close(); err != nil {
+		return err
+	}
+	select {
+	case err := <-fixture.done:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
