@@ -13,6 +13,7 @@ import (
 
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
@@ -89,7 +90,9 @@ func TestProductionProcessChargesCatalogStorageUntilFinalClose(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if census := process.core.admission.Census(); census.ProcessBytes != functionadapter.MaximumCatalogStorageBytes {
+	wantProcessBytes := functionadapter.MaximumCatalogStorageBytes +
+		lifecycle.TaskChildExecutionBytes
+	if census := process.core.admission.Census(); census.ProcessBytes != wantProcessBytes {
 		t.Fatalf("construction admission census=%+v", census)
 	}
 	if err := process.Run(context.Background()); err != nil {

@@ -867,6 +867,21 @@ func TestTaskSupervisorDynamicPopulationAndGenerationCheckedReuse(t *testing.T) 
 	if generation, ok := previous[ref.Slot]; !ok || ref.Generation != generation+1 {
 		t.Fatalf("slot reuse differs: old=%#v new=%#v", refs[0], ref)
 	}
+	stale := TaskRef{
+		Slot:       ref.Slot,
+		Generation: previous[ref.Slot],
+	}
+	if err := supervisor.Cancel(stale); err == nil {
+		t.Fatal("stale task reference cancelled a reused slot")
+	}
+	if err := supervisor.SendAction(TaskAction{
+		Ref: stale, Sequence: 2, Kind: TaskActionDispose,
+	}); err == nil {
+		t.Fatal("stale task reference sent an action to a reused slot")
+	}
+	if err := supervisor.Release(stale); err == nil {
+		t.Fatal("stale task reference released a reused slot")
+	}
 	completion := <-supervisor.CompletionCh()
 	if err := supervisor.SendAction(TaskAction{Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
 		t.Fatal(err)

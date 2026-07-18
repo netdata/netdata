@@ -13,10 +13,14 @@ import (
 var ErrFunctionResultTooLarge = errors.New("jobmgr lifecycle: Function result exceeds bound")
 
 const (
-	ProcessBudgetBytes                  = 256 * 1024 * 1024
-	CleanupBudgetBytes                  = 100 * 1024 * 1024
-	OrdinaryBudgetBytes                 = ProcessBudgetBytes - CleanupBudgetBytes
-	TaskStartServiceQuantum             = 4
+	ProcessBudgetBytes      = 256 * 1024 * 1024
+	CleanupBudgetBytes      = 100 * 1024 * 1024
+	OrdinaryBudgetBytes     = ProcessBudgetBytes - CleanupBudgetBytes
+	TaskStartServiceQuantum = 4
+	// TaskChildExecutionBytes is the conservative admission charge for one
+	// live task child. It accounts for the initial goroutine stack and the
+	// task's runtime/heap bookkeeping; it does not limit concurrency.
+	TaskChildExecutionBytes             = int64(4 * 1024)
 	RetainedTimeoutFailStopThreshold    = 4
 	InheritedCancellationServiceQuantum = 4
 	ControlFrameBytes                   = 64 * 1024

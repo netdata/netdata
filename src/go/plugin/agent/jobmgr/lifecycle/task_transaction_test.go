@@ -229,10 +229,14 @@ func TestTaskSupervisorRejectsSecondSteadyServiceTransaction(t *testing.T) {
 			admission := NewAdmissionLedger()
 			supervisor := newResourceTaskSupervisor(t)
 			var grants [4]AdmissionGrant
+			seedPlan, err := test.permitPlan(1)
+			if err != nil {
+				t.Fatal(err)
+			}
 			seedAdmission := admission.RequestOrdinary(
 				1,
 				AdmissionLaneRef{Slot: 1, Generation: 1},
-				2,
+				seedPlan.Bytes()+1,
 			)
 			if seedAdmission.Rejected != nil {
 				t.Fatal(seedAdmission.Rejected)
@@ -240,10 +244,6 @@ func TestTaskSupervisorRejectsSecondSteadyServiceTransaction(t *testing.T) {
 			count, _, err := admission.TakeGrants(1, &grants)
 			if err != nil || count != 1 {
 				t.Fatalf("long-lived grant count=%d err=%v", count, err)
-			}
-			seedPlan, err := test.permitPlan(1)
-			if err != nil {
-				t.Fatal(err)
 			}
 			seed, err := supervisor.IssueLongLivedPermit(
 				admission,
@@ -258,10 +258,14 @@ func TestTaskSupervisorRejectsSecondSteadyServiceTransaction(t *testing.T) {
 				t.Fatal(err)
 			}
 
+			permitPlan, err := test.permitPlan(1)
+			if err != nil {
+				t.Fatal(err)
+			}
 			transactionAdmission := admission.RequestOrdinary(
 				1,
 				AdmissionLaneRef{Slot: 2, Generation: 1},
-				2,
+				permitPlan.Bytes()+1,
 			)
 			if transactionAdmission.Rejected != nil {
 				t.Fatal(transactionAdmission.Rejected)
@@ -273,10 +277,6 @@ func TestTaskSupervisorRejectsSecondSteadyServiceTransaction(t *testing.T) {
 					count,
 					err,
 				)
-			}
-			permitPlan, err := test.permitPlan(1)
-			if err != nil {
-				t.Fatal(err)
 			}
 			scope := ResourceTransactionScope{
 				ID:        "successor",

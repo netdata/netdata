@@ -70,7 +70,7 @@ func BenchmarkBOperationTransition(b *testing.B) {
 	}
 }
 
-func BenchmarkBTaskSupervisorDispatch(b *testing.B) {
+func BenchmarkBTaskSupervisorEnqueueCancel(b *testing.B) {
 	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
 		b.Fatal(err)
@@ -100,6 +100,83 @@ func BenchmarkBTaskSupervisorDispatch(b *testing.B) {
 		if err := supervisor.CancelPending(ref); err != nil {
 			b.Fatal(err)
 		}
+	}
+}
+
+func BenchmarkBTaskSupervisorDispatch(b *testing.B) {
+	frame, err := NewFrameOwner(io.Discard)
+	if err != nil {
+		b.Fatal(err)
+	}
+	supervisor, err := NewTaskSupervisor(frame)
+	if err != nil {
+		b.Fatal(err)
+	}
+	plan := TaskPlan{
+		Source: SourceFunction,
+		Work: func(context.Context) (TaskOutcome, error) {
+			return TaskOutcome{}, nil
+		},
+	}
+	var started [TaskStartServiceQuantum]TaskStart
+	pending, err := supervisor.Enqueue(TaskClassGenericFunction, plan)
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	for b.Loop() {
+		count, more, err := supervisor.Dispatch(
+			context.Background(),
+			1,
+			&started,
+		)
+		b.StopTimer()
+		if err != nil || count != 1 || more {
+			b.Fatalf(
+				"dispatch count=%d more=%t err=%v",
+				count,
+				more,
+				err,
+			)
+		}
+		if started[0].Request != pending {
+			b.Fatalf(
+				"started request=%+v, want %+v",
+				started[0].Request,
+				pending,
+			)
+		}
+		completion := <-supervisor.CompletionCh()
+		if err := supervisor.SendAction(TaskAction{
+			Ref: completion.Ref, Sequence: 2,
+			Kind: TaskActionDispose,
+		}); err != nil {
+			b.Fatal(err)
+		}
+		ack := <-supervisor.AcknowledgementCh()
+		if err := supervisor.SendAction(TaskAction{
+			Ref: ack.Ref, Sequence: 3,
+			Kind: TaskActionTerminate,
+		}); err != nil {
+			b.Fatal(err)
+		}
+		ack = <-supervisor.AcknowledgementCh()
+		if err := supervisor.Release(ack.Ref); err != nil {
+			b.Fatal(err)
+		}
+		started[0] = TaskStart{}
+		pending, err = supervisor.Enqueue(
+			TaskClassGenericFunction,
+			plan,
+		)
+		if err != nil {
+			b.Fatal(err)
+		}
+		b.StartTimer()
+	}
+	b.StopTimer()
+	if err := supervisor.CancelPending(pending); err != nil {
+		b.Fatal(err)
 	}
 }
 

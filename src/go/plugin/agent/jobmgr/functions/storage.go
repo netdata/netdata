@@ -23,15 +23,20 @@ const (
 
 type catalogStorage struct {
 	published   atomic.Int64
+	cleanup     atomic.Int64
 	total       atomic.Int64
 	preparation atomic.Bool
 }
 
-func (storage *catalogStorage) initialize(published int64) error {
-	if storage == nil || published < 0 ||
-		published > MaximumCatalogStorageBytes ||
+func (storage *catalogStorage) initialize(
+	published int64,
+	cleanup int64,
+) error {
+	if storage == nil || published < 0 || cleanup < 0 ||
+		published > MaximumCatalogStorageBytes-cleanup ||
 		!storage.published.CompareAndSwap(0, published) ||
-		!storage.total.CompareAndSwap(0, published) {
+		!storage.cleanup.CompareAndSwap(0, cleanup) ||
+		!storage.total.CompareAndSwap(0, published+cleanup) {
 		return errors.New("jobmgr Function catalog: invalid initial path storage")
 	}
 	return nil
@@ -58,12 +63,13 @@ func (storage *catalogStorage) reservePreparation(bytes int64) error {
 
 func (storage *catalogStorage) discardPreparation(bytes int64) error {
 	if storage == nil || bytes <= 0 ||
-		!storage.preparation.CompareAndSwap(true, false) {
+		!storage.preparation.Load() {
 		return errors.New(
 			"jobmgr Function catalog: invalid mutation storage discard",
 		)
 	}
-	if total := storage.total.Add(-bytes); total != storage.published.Load() {
+	if !subtractStorage(&storage.total, bytes) ||
+		!storage.preparation.CompareAndSwap(true, false) {
 		return errors.New(
 			"jobmgr Function catalog: mutation storage accounting differs",
 		)
@@ -72,23 +78,63 @@ func (storage *catalogStorage) discardPreparation(bytes int64) error {
 }
 
 func (storage *catalogStorage) publishPreparation(
-	preparedBytes int64,
+	preparedPathBytes int64,
+	preparedCleanupBytes int64,
 	publishedBytes int64,
 ) error {
-	if storage == nil || preparedBytes <= 0 ||
+	if storage == nil || preparedPathBytes <= 0 ||
+		preparedCleanupBytes < 0 ||
 		publishedBytes < 0 ||
-		publishedBytes > MaximumCatalogStorageBytes ||
-		!storage.preparation.CompareAndSwap(true, false) {
+		publishedBytes > MaximumCatalogStorageBytes-
+			storage.cleanup.Load()-preparedCleanupBytes ||
+		!storage.preparation.Load() {
 		return errors.New(
 			"jobmgr Function catalog: invalid mutation storage publication",
 		)
 	}
-	previous := storage.published.Swap(publishedBytes)
-	if total := storage.total.Add(
-		publishedBytes - previous - preparedBytes,
-	); total != publishedBytes {
+	previous := storage.published.Load()
+	if !adjustStorage(
+		&storage.total,
+		publishedBytes-previous-preparedPathBytes,
+	) {
 		return errors.New(
 			"jobmgr Function catalog: published storage accounting differs",
+		)
+	}
+	storage.cleanup.Add(preparedCleanupBytes)
+	storage.published.Store(publishedBytes)
+	if !storage.preparation.CompareAndSwap(true, false) {
+		return errors.New(
+			"jobmgr Function catalog: mutation storage publication lost ownership",
+		)
+	}
+	return nil
+}
+
+func (storage *catalogStorage) abortPreparation(
+	preparedBytes int64,
+	retainedCleanupBytes int64,
+) error {
+	if storage == nil || preparedBytes <= 0 ||
+		retainedCleanupBytes < 0 ||
+		retainedCleanupBytes > preparedBytes ||
+		!storage.preparation.Load() {
+		return errors.New(
+			"jobmgr Function catalog: invalid mutation storage abort",
+		)
+	}
+	if !subtractStorage(
+		&storage.total,
+		preparedBytes-retainedCleanupBytes,
+	) {
+		return errors.New(
+			"jobmgr Function catalog: aborted storage accounting differs",
+		)
+	}
+	storage.cleanup.Add(retainedCleanupBytes)
+	if !storage.preparation.CompareAndSwap(true, false) {
+		return errors.New(
+			"jobmgr Function catalog: mutation storage abort lost ownership",
 		)
 	}
 	return nil
@@ -101,7 +147,7 @@ func (storage *catalogStorage) releasePublished() error {
 		)
 	}
 	published := storage.published.Swap(0)
-	if total := storage.total.Add(-published); total != 0 {
+	if !subtractStorage(&storage.total, published) {
 		return errors.New(
 			"jobmgr Function catalog: final path storage accounting differs",
 		)
@@ -115,6 +161,62 @@ func (storage *catalogStorage) releasePublishedPaths(bytes int64) {
 	}
 	storage.published.Add(-bytes)
 	storage.total.Add(-bytes)
+}
+
+func (storage *catalogStorage) releaseCleanup(bytes int64) error {
+	if storage == nil || bytes <= 0 {
+		return errors.New(
+			"jobmgr Function catalog: invalid cleanup storage release",
+		)
+	}
+	if cleanup := storage.cleanup.Add(-bytes); cleanup < 0 {
+		storage.cleanup.Add(bytes)
+		return errors.New(
+			"jobmgr Function catalog: cleanup storage underflow",
+		)
+	}
+	if !subtractStorage(&storage.total, bytes) {
+		storage.cleanup.Add(bytes)
+		return errors.New(
+			"jobmgr Function catalog: cleanup storage accounting differs",
+		)
+	}
+	return nil
+}
+
+func adjustStorage(storage *atomic.Int64, delta int64) bool {
+	if storage == nil {
+		return false
+	}
+	if delta < 0 {
+		return subtractStorage(storage, -delta)
+	}
+	if delta == 0 {
+		return true
+	}
+	if total := storage.Add(delta); total > MaximumCatalogStorageBytes {
+		storage.Add(-delta)
+		return false
+	}
+	return true
+}
+
+func subtractStorage(storage *atomic.Int64, bytes int64) bool {
+	if storage == nil || bytes < 0 {
+		return false
+	}
+	if bytes == 0 {
+		return true
+	}
+	for {
+		current := storage.Load()
+		if current < bytes {
+			return false
+		}
+		if storage.CompareAndSwap(current, current-bytes) {
+			return true
+		}
+	}
 }
 
 func initialPathStorageBound(declarations []Declaration) (int64, error) {

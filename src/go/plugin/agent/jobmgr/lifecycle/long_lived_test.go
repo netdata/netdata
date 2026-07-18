@@ -22,11 +22,13 @@ func TestLongLivedPermitConservesAdmittedBGEFacets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if census := admission.Census(); census.OrdinaryBytes != 100 || census.LongLivedRecords != 1 || census.LongLivedBytes != 40 {
+	if census := admission.Census(); census.OrdinaryBytes != 100+TaskChildExecutionBytes ||
+		census.LongLivedRecords != 1 ||
+		census.LongLivedBytes != plan.Bytes() {
 		t.Fatalf("admission after transfer=%+v", census)
 	}
 	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{
-		Active: 1, Pipelines: 1, Bytes: 40,
+		Active: 1, Pipelines: 1, Bytes: plan.Bytes(),
 		GReserved: 2, ExternalReserved: 1,
 	}) {
 		t.Fatalf("permit after transfer=%+v", census)
@@ -120,8 +122,8 @@ func TestLongLivedPermitSurvivesOperationAdmissionRelease(t *testing.T) {
 	if census := admission.Census(); census.ActiveRecords != 0 ||
 		census.FreeRecords == 0 ||
 		census.OrdinaryGranted != 0 ||
-		census.OrdinaryBytes != 40 ||
-		census.LongLivedBytes != 40 {
+		census.OrdinaryBytes != plan.Bytes() ||
+		census.LongLivedBytes != plan.Bytes() {
 		t.Fatalf("persistent-only admission=%+v", census)
 	}
 	if err := permit.ReleaseExternal(LongLivedEJobResources); err != nil {
@@ -193,7 +195,7 @@ func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 
 	if census := admission.Census(); census.ActiveRecords != 0 ||
 		census.LongLivedRecords != jobs+1 ||
-		census.OrdinaryBytes != jobs+1 {
+		census.OrdinaryBytes != int64(jobs+1)*jobPlan.Bytes() {
 		t.Fatalf("separated admission census=%+v", census)
 	}
 	if census := supervisor.LongLivedCensus(); census.Active != jobs+1 {
@@ -264,12 +266,12 @@ func TestSecretStoreReplacementPermitsGrowBeyondFormerOverlapLimit(t *testing.T)
 
 	if census := supervisor.LongLivedCensus(); census.Active != replacements+1 ||
 		census.SecretStores != replacements+1 ||
-		census.Bytes != replacements+1 {
+		census.Bytes != int64(replacements+1)*steadyPlan.Bytes() {
 		t.Fatalf("replacement overlap census=%+v", census)
 	}
 	if census := admission.Census(); census.ActiveRecords != 0 ||
 		census.LongLivedRecords != replacements+1 ||
-		census.OrdinaryBytes != replacements+1 {
+		census.OrdinaryBytes != int64(replacements+1)*steadyPlan.Bytes() {
 		t.Fatalf("replacement overlap admission=%+v", census)
 	}
 	for _, permit := range permits {
@@ -345,7 +347,11 @@ func TestLongLivedSecretStorePermitRejectsByteReleaseBeforeExternalRelease(t *te
 
 func grantLongLivedTestAdmission(t *testing.T, ledger *AdmissionLedger, byteCount int64) AdmissionRef {
 	t.Helper()
-	requested := ledger.RequestOrdinary(1, AdmissionLaneRef{Slot: 1, Generation: 1}, byteCount)
+	requested := ledger.RequestOrdinary(
+		1,
+		AdmissionLaneRef{Slot: 1, Generation: 1},
+		byteCount+TaskChildExecutionBytes,
+	)
 	if requested.Rejected != nil {
 		t.Fatal(requested.Rejected)
 	}
@@ -382,7 +388,9 @@ func TestLongLivedByteReleaseSignalsNewAdmissionCapacity(t *testing.T) {
 		t.Fatal(err)
 	}
 	blocker := admission.RequestOrdinary(
-		1, AdmissionLaneRef{Slot: 2, Generation: 1}, OrdinaryBudgetBytes-40,
+		1,
+		AdmissionLaneRef{Slot: 2, Generation: 1},
+		OrdinaryBudgetBytes-plan.Bytes(),
 	)
 	waiter := admission.RequestOrdinary(1, AdmissionLaneRef{Slot: 3, Generation: 1}, 1)
 	if blocker.Rejected != nil || waiter.Rejected != nil {

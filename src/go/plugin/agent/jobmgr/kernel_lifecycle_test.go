@@ -1153,7 +1153,7 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 		id := fmt.Sprintf("resource-%02d", index)
 		resources[id] = newKernelTestReadyResource(id, nil, stopRelease)
 	}
-	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
+	permitPlan, err := lifecycle.NewJobLongLivedPlan(512)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1187,6 +1187,24 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 	if active := tasks.Active(); active != population {
 		t.Fatalf("active shutdown tasks=%d, want %d", active, population)
 	}
+	wantLongLivedBytes := int64(population) *
+		(512 + lifecycle.TaskChildExecutionBytes)
+	if census := tasks.LongLivedCensus(); census.Active != population ||
+		census.Bytes != wantLongLivedBytes {
+		t.Fatalf(
+			"active shutdown long-lived census=%+v, want bytes=%d",
+			census,
+			wantLongLivedBytes,
+		)
+	}
+	if census := admission.Census(); census.LongLivedRecords != population ||
+		census.LongLivedBytes != wantLongLivedBytes {
+		t.Fatalf(
+			"active shutdown admission census=%+v, want bytes=%d",
+			census,
+			wantLongLivedBytes,
+		)
+	}
 	close(stopRelease)
 
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -1199,6 +1217,217 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 	}
 	if census := tasks.LongLivedCensus(); census != (lifecycle.LongLivedCensus{}) {
 		t.Fatalf("resource shutdown retained long-lived ownership: %+v", census)
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
+}
+
+func TestKernelLoopContinuesPendingTaskStartsAcrossServiceQuanta(t *testing.T) {
+	const genericPopulation = lifecycle.TaskStartServiceQuantum * 2
+
+	kernel, run, admission, uids, tasks := newKernelWithPlanner(
+		t,
+		stoppedKernelPlanner{},
+	)
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	t.Cleanup(func() {
+		releaseOnce.Do(func() { close(release) })
+		kernel.Stop()
+		waitCtx, waitCancel := context.WithTimeout(
+			context.Background(),
+			time.Second,
+		)
+		defer waitCancel()
+		_ = kernel.Wait(waitCtx)
+	})
+	genericEntered := make(chan struct{}, genericPopulation)
+	enqueueCleanup := func(slot uint32) {
+		t.Helper()
+		request, err := tasks.Enqueue(
+			lifecycle.TaskClassGenericFunction,
+			lifecycle.TaskPlan{
+				Source: lifecycle.SourceFunction,
+				Work: func(context.Context) (lifecycle.TaskOutcome, error) {
+					genericEntered <- struct{}{}
+					<-release
+					return lifecycle.NoValueOutcome(), nil
+				},
+			},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+		kernel.functionCleanupRequests[request] = FunctionCleanupRef{
+			Slot: slot, Generation: 1,
+		}
+	}
+	for index := 0; index < genericPopulation; index++ {
+		enqueueCleanup(uint32(index + 1))
+	}
+
+	startKernelLoop(t, kernel)
+	for index := 0; index < genericPopulation; index++ {
+		select {
+		case <-genericEntered:
+		case <-time.After(time.Second):
+			t.Fatalf(
+				"generic task %d remained pending after a service quantum",
+				index+1,
+			)
+		}
+	}
+
+	controlEntered := make(chan struct{}, 1)
+	if err := kernel.SubmitPrepared(
+		context.Background(),
+		Request{
+			UID:     "continued-framework-control",
+			LaneKey: "framework-control",
+			Source:  lifecycle.SourceJobManager,
+			Route:   "control",
+		},
+		WorkPlan{
+			Work: lifecycle.FrameTaskWork(
+				func(context.Context) (lifecycle.SealedResult, error) {
+					controlEntered <- struct{}{}
+					<-release
+					return lifecycle.NewSealedResult(
+						200,
+						"application/json",
+						[]byte(`{}`),
+					)
+				},
+			),
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-controlEntered:
+	case <-time.After(time.Second):
+		t.Fatal("newly runnable framework-control task did not start")
+	}
+
+	releaseOnce.Do(func() { close(release) })
+	kernel.Stop()
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer waitCancel()
+	if err := kernel.Wait(waitCtx); err != nil {
+		t.Fatal(err)
+	}
+	if tasks.Active() != 0 || tasks.Pending() != 0 {
+		t.Fatalf(
+			"continued task service retained work: active=%d pending=%d",
+			tasks.Active(),
+			tasks.Pending(),
+		)
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeUIDLedger(t, uids)
+}
+
+func TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch(
+	t *testing.T,
+) {
+	const population = lifecycle.TaskStartServiceQuantum * 2
+
+	kernel, run, admission, uids, tasks := newKernelWithPlanner(
+		t,
+		stoppedKernelPlanner{},
+	)
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+	release := make(chan struct{})
+	var releaseOnce sync.Once
+	t.Cleanup(func() {
+		releaseOnce.Do(func() { close(release) })
+		kernel.Stop()
+		waitCtx, waitCancel := context.WithTimeout(
+			context.Background(),
+			time.Second,
+		)
+		defer waitCancel()
+		_ = kernel.Wait(waitCtx)
+	})
+	entered := make(chan string, population)
+	for index := 0; index < population; index++ {
+		uid := fmt.Sprintf("shutdown-fence-%02d", index)
+		plan := WorkPlan{
+			NoResponse: true,
+			Work: lifecycle.FrameTaskWork(
+				func(context.Context) (lifecycle.SealedResult, error) {
+					entered <- uid
+					<-release
+					return lifecycle.NewSealedResult(
+						200,
+						"application/json",
+						[]byte(`{}`),
+					)
+				},
+			),
+		}
+		if err := kernel.admit(
+			Request{
+				UID: uid, LaneKey: uid,
+				Source: lifecycle.SourceJobManager,
+			},
+			plan,
+			context.Background(),
+			nil,
+			nil,
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for kernel.serviceAdmissions(lifecycle.TaskStartServiceQuantum) {
+	}
+	for kernel.scheduleTasks(lifecycle.TaskStartServiceQuantum) {
+	}
+	if tasks.Pending() != population {
+		t.Fatalf(
+			"shutdown-fence setup pending tasks=%d, want %d",
+			tasks.Pending(),
+			population,
+		)
+	}
+
+	kernel.Stop()
+	startKernelLoop(t, kernel)
+	for index := 0; index < lifecycle.TaskStartServiceQuantum; index++ {
+		select {
+		case <-entered:
+		case <-time.After(time.Second):
+			t.Fatalf("initial task %d did not start", index+1)
+		}
+	}
+	select {
+	case uid := <-entered:
+		t.Fatalf("pending operation %q started after shutdown began", uid)
+	case <-time.After(100 * time.Millisecond):
+	}
+
+	releaseOnce.Do(func() { close(release) })
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer waitCancel()
+	if err := kernel.Wait(waitCtx); err != nil {
+		t.Fatal(err)
+	}
+	if tasks.Active() != 0 || tasks.Pending() != 0 {
+		t.Fatalf(
+			"shutdown fence retained tasks: active=%d pending=%d",
+			tasks.Active(),
+			tasks.Pending(),
+		)
 	}
 	if err := admission.CloseDrained(run.Generation()); err != nil {
 		t.Fatal(err)
@@ -2330,7 +2559,15 @@ func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
 		return permit.Return()
 	})
 	kernel, run, admission, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
-	requested := admission.RequestOrdinary(run.Generation(), lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1}, 1024)
+	plan, err := lifecycle.NewSecretStoreLongLivedPlan(512)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requested := admission.RequestOrdinary(
+		run.Generation(),
+		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
+		plan.Bytes()+512,
+	)
 	if requested.Rejected != nil {
 		t.Fatal(requested.Rejected)
 	}
@@ -2338,10 +2575,6 @@ func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
 	count, _, err := admission.TakeGrants(1, &grants)
 	if err != nil || count != 1 || grants[0].Ref != requested.Ref {
 		t.Fatalf("grant differs: count=%d grant=%+v err=%v", count, grants[0], err)
-	}
-	plan, err := lifecycle.NewSecretStoreLongLivedPlan(512)
-	if err != nil {
-		t.Fatal(err)
 	}
 	permit, err = tasks.IssueLongLivedPermit(admission, requested.Ref, lifecycle.ResourceIdentity{ID: "secret-store", Generation: 1}, plan)
 	if err != nil {
@@ -2423,7 +2656,7 @@ func TestKernelLongLivedBoundaryAllowsReplacementAndRejectsSteadyAddition(t *tes
 	requested := admission.RequestOrdinary(
 		run.Generation(),
 		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
-		2,
+		steadyPlan.Bytes()+1,
 	)
 	if requested.Rejected != nil {
 		t.Fatalf("seed admission: %v", requested.Rejected)
@@ -2484,7 +2717,7 @@ func TestKernelLongLivedBoundaryAllowsReplacementAndRejectsSteadyAddition(t *tes
 	}
 	if census := tasks.LongLivedCensus(); census.Active != 1 ||
 		census.SecretStores != 1 ||
-		census.Bytes != 1 {
+		census.Bytes != steadyPlan.Bytes() {
 		t.Fatalf("boundary operations left long-lived ownership: %+v", census)
 	}
 	kernel.Stop()
@@ -2548,7 +2781,15 @@ func TestKernelRunFinalizerRejectsUnrelatedLongLivedPermit(t *testing.T) {
 		return nil
 	})
 	kernel, run, admission, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, 10*time.Millisecond)
-	requested := admission.RequestOrdinary(run.Generation(), lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1}, 1024)
+	plan, err := lifecycle.NewJobLongLivedPlan(512)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requested := admission.RequestOrdinary(
+		run.Generation(),
+		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
+		plan.Bytes()+512,
+	)
 	if requested.Rejected != nil {
 		t.Fatal(requested.Rejected)
 	}
@@ -2556,10 +2797,6 @@ func TestKernelRunFinalizerRejectsUnrelatedLongLivedPermit(t *testing.T) {
 	count, _, err := admission.TakeGrants(1, &grants)
 	if err != nil || count != 1 || grants[0].Ref != requested.Ref {
 		t.Fatalf("grant differs: count=%d grant=%+v err=%v", count, grants[0], err)
-	}
-	plan, err := lifecycle.NewJobLongLivedPlan(512)
-	if err != nil {
-		t.Fatal(err)
 	}
 	permit, err := tasks.IssueLongLivedPermit(admission, requested.Ref, lifecycle.ResourceIdentity{ID: "job", Generation: 1}, plan)
 	if err != nil {
@@ -2612,7 +2849,15 @@ func TestKernelRejectsMissingRunFinalizer(t *testing.T) {
 
 func TestKernelCannotReportQuiescentWithRetainedLongLivedPermit(t *testing.T) {
 	kernel, run, admission, _, tasks := newKernelWithPlannerAndTimeout(t, stoppedKernelPlanner{}, time.Millisecond)
-	requested := admission.RequestOrdinary(run.Generation(), lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1}, 1024)
+	permitPlan, err := lifecycle.NewJobLongLivedPlan(512)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requested := admission.RequestOrdinary(
+		run.Generation(),
+		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
+		permitPlan.Bytes()+512,
+	)
 	if requested.Rejected != nil {
 		t.Fatal(requested.Rejected)
 	}
@@ -2620,10 +2865,6 @@ func TestKernelCannotReportQuiescentWithRetainedLongLivedPermit(t *testing.T) {
 	count, _, err := admission.TakeGrants(1, &grants)
 	if err != nil || count != 1 || grants[0].Ref != requested.Ref {
 		t.Fatalf("grant count=%d grant=%+v err=%v", count, grants[0], err)
-	}
-	permitPlan, err := lifecycle.NewJobLongLivedPlan(512)
-	if err != nil {
-		t.Fatal(err)
 	}
 	permit, err := tasks.IssueLongLivedPermit(
 		admission, requested.Ref, lifecycle.ResourceIdentity{ID: "retained", Generation: 1}, permitPlan,
@@ -2641,7 +2882,9 @@ func TestKernelCannotReportQuiescentWithRetainedLongLivedPermit(t *testing.T) {
 	if err := kernel.Wait(ctx); err == nil || !strings.Contains(err.Error(), "shutdown deadline exceeded") || !strings.Contains(err.Error(), "nonzero process census") {
 		t.Fatalf("retained permit terminal error=%v", err)
 	}
-	if census := tasks.LongLivedCensus(); census.Active != 1 || census.Bytes != 512 || census.ExternalReserved != 1 {
+	if census := tasks.LongLivedCensus(); census.Active != 1 ||
+		census.Bytes != permitPlan.Bytes() ||
+		census.ExternalReserved != 1 {
 		t.Fatalf("retained permit census=%+v", census)
 	}
 	if err := permit.AbortUnused(); err != nil {
@@ -3124,7 +3367,7 @@ func TestOperationAdmissionBytesIncludesTaskChildExecutionAllowance(t *testing.T
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := operationRecordAdmissionBytes + taskChildExecutionAdmissionBytes
+	want := operationRecordAdmissionBytes + lifecycle.TaskChildExecutionBytes
 	if got != want {
 		t.Fatalf("empty operation admission=%d, want %d", got, want)
 	}

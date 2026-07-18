@@ -61,6 +61,9 @@ type processCore struct {
 	started bool
 }
 
+const processAdmissionBytes = functionadapter.MaximumCatalogStorageBytes +
+	lifecycle.TaskChildExecutionBytes
+
 func newProcessCore(config processCoreConfig) (*processCore, error) {
 	if config.Input == nil ||
 		config.Output == nil ||
@@ -81,7 +84,7 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 	}
 	admission := lifecycle.NewAdmissionLedger()
 	if err := admission.ReserveProcessBytes(
-		functionadapter.MaximumCatalogStorageBytes,
+		processAdmissionBytes,
 	); err != nil {
 		return nil, err
 	}
@@ -90,7 +93,7 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		return nil, errors.Join(
 			err,
 			admission.ReleaseProcessBytes(
-				functionadapter.MaximumCatalogStorageBytes,
+				processAdmissionBytes,
 			),
 		)
 	}
@@ -99,7 +102,7 @@ func newProcessCore(config processCoreConfig) (*processCore, error) {
 		return nil, errors.Join(
 			err,
 			admission.ReleaseProcessBytes(
-				functionadapter.MaximumCatalogStorageBytes,
+				processAdmissionBytes,
 			),
 		)
 	}
@@ -405,7 +408,7 @@ func (process *processCore) finalize(
 		}
 	}
 	if err := process.admission.ReleaseProcessBytes(
-		functionadapter.MaximumCatalogStorageBytes,
+		processAdmissionBytes,
 	); err != nil {
 		finalErr = errors.Join(finalErr, err)
 	}

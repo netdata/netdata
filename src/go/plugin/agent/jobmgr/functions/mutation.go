@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
 const (
@@ -55,17 +56,19 @@ type preparedRouteChange struct {
 // performs payload-relative validation and allocates every path-copy record so
 // KernelLoop preparation can be node-bounded and allocation-free.
 type Mutation struct {
-	expectedVersion uint64
-	changes         []preparedRouteChange
-	generations     []preparedGeneration
-	totalNodes      int
-	storage         *catalogStorage
-	storageBytes    int64
-	storageState    atomic.Uint32
-	builder         MutationBuilder
-	transitions     []routeTransition
-	removals        []generationRemoval
-	removalIndex    map[*handlerGeneration]int
+	expectedVersion     uint64
+	changes             []preparedRouteChange
+	generations         []preparedGeneration
+	totalNodes          int
+	storage             *catalogStorage
+	storageBytes        int64
+	pathStorageBytes    int64
+	cleanupStorageBytes int64
+	storageState        atomic.Uint32
+	builder             MutationBuilder
+	transitions         []routeTransition
+	removals            []generationRemoval
+	removalIndex        map[*handlerGeneration]int
 }
 
 func (*Mutation) FunctionCatalogMutation() {}
@@ -155,11 +158,32 @@ func (catalog *Catalog) NewMutation(
 	if err != nil {
 		return nil, err
 	}
-	if err := catalog.storage.reservePreparation(storageBytes); err != nil {
+	cleanupStorageBytes := int64(0)
+	for index := range mutation.generations {
+		if mutation.generations[index].declaration.Cleanup == nil {
+			continue
+		}
+		if err := addStorageProduct(
+			&cleanupStorageBytes,
+			1,
+			lifecycle.TaskChildExecutionBytes,
+		); err != nil {
+			return nil, err
+		}
+	}
+	if storageBytes > MaximumCatalogStorageBytes-cleanupStorageBytes {
+		return nil, errors.New(
+			"jobmgr Function catalog: mutation storage exceeds process bound",
+		)
+	}
+	totalStorageBytes := storageBytes + cleanupStorageBytes
+	if err := catalog.storage.reservePreparation(totalStorageBytes); err != nil {
 		return nil, err
 	}
 	mutation.storage = &catalog.storage
-	mutation.storageBytes = storageBytes
+	mutation.storageBytes = totalStorageBytes
+	mutation.pathStorageBytes = storageBytes
+	mutation.cleanupStorageBytes = cleanupStorageBytes
 	mutation.storageState.Store(mutationStorageReserved)
 	for index := range mutation.changes {
 		prepared := &mutation.changes[index]
@@ -227,15 +251,20 @@ func (mutation *Mutation) claim(storage *catalogStorage) error {
 	return nil
 }
 
-func (mutation *Mutation) abortStorage() error {
+func (mutation *Mutation) abortStorage(retainedCleanupBytes int64) error {
 	if mutation == nil ||
+		retainedCleanupBytes < 0 ||
+		retainedCleanupBytes > mutation.cleanupStorageBytes ||
 		!mutation.storageState.CompareAndSwap(
 			mutationStorageClaimed,
 			mutationStorageReleased,
 		) {
 		return errors.New("jobmgr Function catalog: stale mutation abort")
 	}
-	return mutation.storage.discardPreparation(mutation.storageBytes)
+	return mutation.storage.abortPreparation(
+		mutation.storageBytes,
+		retainedCleanupBytes,
+	)
 }
 
 func (mutation *Mutation) publishStorage(published int64) error {
@@ -247,7 +276,8 @@ func (mutation *Mutation) publishStorage(published int64) error {
 		return errors.New("jobmgr Function catalog: stale mutation publication")
 	}
 	return mutation.storage.publishPreparation(
-		mutation.storageBytes,
+		mutation.pathStorageBytes,
+		mutation.cleanupStorageBytes,
 		published,
 	)
 }
@@ -501,7 +531,8 @@ func (builder *MutationBuilder) advanceOne() (bool, error) {
 			*prepared.generation = handlerGeneration{
 				cleanupRef: jobmgr.FunctionCleanupRef{Slot: refSlot, Generation: 1},
 				id:         prepared.declaration.ID, handler: prepared.declaration.Handler,
-				cleanup: prepared.declaration.Cleanup,
+				cleanup:          prepared.declaration.Cleanup,
+				executionCharged: prepared.declaration.Cleanup != nil,
 			}
 			prepared.initialized = true
 			builder.generation++
@@ -881,12 +912,16 @@ func (builder *MutationBuilder) Abort(cleanups *[jobmgr.MaximumFunctionCleanupBa
 		return 0, errors.New("jobmgr Function catalog: invalid mutation abort")
 	}
 	count := 0
+	retainedCleanupBytes := int64(0)
 	for index := range builder.mutation.generations {
 		prepared := &builder.mutation.generations[index]
 		if !prepared.initialized {
 			continue
 		}
 		generation := prepared.generation
+		if generation.executionCharged {
+			retainedCleanupBytes += lifecycle.TaskChildExecutionBytes
+		}
 		if generation.cleanupRef.Valid() {
 			builder.catalog.generations[generation.cleanupRef] = generation
 		}
@@ -916,7 +951,7 @@ func (builder *MutationBuilder) Abort(cleanups *[jobmgr.MaximumFunctionCleanupBa
 	if builder.postimage != nil {
 		builder.postimage.finished = true
 	}
-	return count, builder.mutation.abortStorage()
+	return count, builder.mutation.abortStorage(retainedCleanupBytes)
 }
 
 func (catalog *Catalog) BeginMutation(mutation jobmgr.FunctionCatalogMutation) error {

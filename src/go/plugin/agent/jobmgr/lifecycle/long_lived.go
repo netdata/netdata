@@ -44,30 +44,54 @@ type LongLivedPlan struct {
 func NewPipelineLongLivedPlan(bytes int64) (LongLivedPlan, error) {
 	plan := LongLivedPlan{
 		class: LongLivedPipeline,
-		bytes: bytes,
 		g:     LongLivedGPipelineSupervisor | LongLivedGPipelineProvider,
 		e:     LongLivedEProvider,
+	}
+	if err := plan.setResourceBytes(bytes); err != nil {
+		return LongLivedPlan{}, err
 	}
 	return plan, plan.Validate()
 }
 
 func NewJobLongLivedPlan(bytes int64) (LongLivedPlan, error) {
-	plan := LongLivedPlan{class: LongLivedJob, bytes: bytes, e: LongLivedEJobResources}
+	plan := LongLivedPlan{class: LongLivedJob, e: LongLivedEJobResources}
+	if err := plan.setResourceBytes(bytes); err != nil {
+		return LongLivedPlan{}, err
+	}
 	return plan, plan.Validate()
 }
 
 func NewSecretStoreLongLivedPlan(bytes int64) (LongLivedPlan, error) {
-	plan := LongLivedPlan{class: LongLivedSecretStore, bytes: bytes, e: LongLivedESecretStore}
+	plan := LongLivedPlan{class: LongLivedSecretStore, e: LongLivedESecretStore}
+	if err := plan.setResourceBytes(bytes); err != nil {
+		return LongLivedPlan{}, err
+	}
 	return plan, plan.Validate()
 }
 
 func NewSecretStoreReplacementLongLivedPlan(bytes int64) (LongLivedPlan, error) {
-	plan := LongLivedPlan{class: LongLivedSecretStore, bytes: bytes, replacementOverlap: true, e: LongLivedESecretStore}
+	plan := LongLivedPlan{
+		class: LongLivedSecretStore, replacementOverlap: true,
+		e: LongLivedESecretStore,
+	}
+	if err := plan.setResourceBytes(bytes); err != nil {
+		return LongLivedPlan{}, err
+	}
 	return plan, plan.Validate()
 }
 
+func (plan *LongLivedPlan) setResourceBytes(bytes int64) error {
+	if plan == nil || bytes <= 0 ||
+		bytes >= OrdinaryBudgetBytes-TaskChildExecutionBytes {
+		return errors.New("jobmgr long-lived permit: invalid byte entitlement")
+	}
+	plan.bytes = bytes + TaskChildExecutionBytes
+	return nil
+}
+
 func (plan LongLivedPlan) Validate() error {
-	if plan.bytes <= 0 || plan.bytes >= OrdinaryBudgetBytes {
+	if plan.bytes <= TaskChildExecutionBytes ||
+		plan.bytes >= OrdinaryBudgetBytes {
 		return errors.New("jobmgr long-lived permit: invalid byte entitlement")
 	}
 	switch plan.class {

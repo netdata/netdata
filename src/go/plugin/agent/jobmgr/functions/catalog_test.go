@@ -1127,6 +1127,189 @@ func TestHandlerCleanupOnce(t *testing.T) {
 	}
 }
 
+func TestFunctionCatalogRetainsCleanupExecutionStorageUntilCompletion(
+	t *testing.T,
+) {
+	const population = 9
+
+	tests := map[string]struct {
+		newCatalog func(*testing.T, []Declaration) *Catalog
+	}{
+		"initial generations": {
+			newCatalog: func(t *testing.T, declarations []Declaration) *Catalog {
+				t.Helper()
+				catalog, err := NewCatalog(declarations)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return catalog
+			},
+		},
+		"committed mutation generations": {
+			newCatalog: func(t *testing.T, declarations []Declaration) *Catalog {
+				t.Helper()
+				catalog, err := NewCatalog(nil)
+				if err != nil {
+					t.Fatal(err)
+				}
+				changes := make([]RouteChange, 0, len(declarations))
+				for index := range declarations {
+					declaration := &declarations[index]
+					changes = append(changes, RouteChange{
+						PublicName:  declaration.PublicName,
+						Declaration: declaration,
+					})
+				}
+				mutation, err := catalog.NewMutation(
+					catalog.Census().Version,
+					changes,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				builder, err := catalog.startMutation(mutation)
+				if err != nil {
+					t.Fatal(err)
+				}
+				var postimage *MutationPostimage
+				for {
+					var done bool
+					postimage, done, err = builder.PrepareStep(
+						MaximumMutationQuantum,
+					)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if done {
+						break
+					}
+				}
+				var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
+				if count, err := catalog.commitMutation(
+					postimage,
+					&cleanups,
+				); err != nil || count != 0 {
+					t.Fatalf(
+						"new-generation mutation cleanup count=%d err=%v",
+						count,
+						err,
+					)
+				}
+				return catalog
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			catalog := test.newCatalog(
+				t,
+				testCleanupDeclarations(population),
+			)
+			if err := catalog.BeginClose(); err != nil {
+				t.Fatal(err)
+			}
+			var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
+			count, more, err := catalog.CloseStep(
+				MaximumCloseQuantum,
+				&cleanups,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if count != population || more {
+				t.Fatalf(
+					"catalog close cleanup count=%d more=%v, want %d,false",
+					count,
+					more,
+					population,
+				)
+			}
+			wantExecutionBytes := int64(population) *
+				lifecycle.TaskChildExecutionBytes
+			if published := catalog.storage.published.Load(); published != 0 {
+				t.Fatalf("closed catalog retained %d published path bytes", published)
+			}
+			if total := catalog.storage.total.Load(); total != wantExecutionBytes {
+				t.Fatalf(
+					"pending cleanup storage=%d, want %d",
+					total,
+					wantExecutionBytes,
+				)
+			}
+			for _, cleanup := range cleanups[:count] {
+				runCleanupPlan(t, catalog, cleanup)
+			}
+			if total := catalog.storage.total.Load(); total != 0 {
+				t.Fatalf("completed cleanup retained %d storage bytes", total)
+			}
+		})
+	}
+}
+
+func TestFunctionCatalogAbortRetainsInitializedCleanupExecutionStorage(
+	t *testing.T,
+) {
+	const (
+		population  = 9
+		initialized = 3
+	)
+
+	catalog, err := NewCatalog(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	declarations := testCleanupDeclarations(population)
+	changes := make([]RouteChange, 0, population)
+	for index := range declarations {
+		declaration := &declarations[index]
+		changes = append(changes, RouteChange{
+			PublicName:  declaration.PublicName,
+			Declaration: declaration,
+		})
+	}
+	mutation, err := catalog.NewMutation(catalog.Census().Version, changes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	builder, err := catalog.startMutation(mutation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for builder.phase == mutationTopology {
+		if _, err := builder.PrepareQuiesceStep(
+			MaximumMutationQuantum,
+		); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, _, err := builder.PrepareStep(initialized); err != nil {
+		t.Fatal(err)
+	}
+	var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
+	count, err := builder.Abort(&cleanups)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if count != initialized {
+		t.Fatalf("aborted initialized cleanup count=%d, want %d", count, initialized)
+	}
+	wantExecutionBytes := int64(initialized) *
+		lifecycle.TaskChildExecutionBytes
+	if total := catalog.storage.total.Load(); total != wantExecutionBytes {
+		t.Fatalf(
+			"aborted cleanup storage=%d, want %d",
+			total,
+			wantExecutionBytes,
+		)
+	}
+	for _, cleanup := range cleanups[:count] {
+		runCleanupPlan(t, catalog, cleanup)
+	}
+	if total := catalog.storage.total.Load(); total != 0 {
+		t.Fatalf("completed aborted cleanup retained %d storage bytes", total)
+	}
+}
+
 func TestFunctionCatalogAtomicMutation(t *testing.T) {
 	var oldCleanups atomic.Int32
 	old := testGeneration("old-generation")
@@ -1546,6 +1729,24 @@ func testDeclaration(publicName, prefix string, resource ResourcePolicy) Declara
 
 func testGeneration(id string) *HandlerGenerationDeclaration {
 	return &HandlerGenerationDeclaration{ID: id, Handler: testHandler}
+}
+
+func testCleanupDeclarations(population int) []Declaration {
+	declarations := make([]Declaration, 0, population)
+	for index := 0; index < population; index++ {
+		generation := testGeneration(fmt.Sprintf("cleanup-%02d", index))
+		generation.Cleanup = func(context.Context) error { return nil }
+		declarations = append(
+			declarations,
+			testDeclarationForGeneration(
+				generation,
+				fmt.Sprintf("route-%02d", index),
+				"",
+				ResourcePolicy{},
+			),
+		)
+	}
+	return declarations
 }
 
 func testDeclarationForGeneration(generation *HandlerGenerationDeclaration, publicName, prefix string, resource ResourcePolicy) Declaration {

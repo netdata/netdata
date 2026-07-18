@@ -344,6 +344,8 @@ var componentProofByCase = map[string][]ComponentProof{
 	},
 	"F24.6-b-lane-release-order": {
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelShutdownStopsResourceAfterActiveUserDrains"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestKernelShutdownTracksDynamicTaskPopulation"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch"},
 	},
 	"F24.7-b-claim-direct-cancel": {
 		{Package: "./plugin/agent/jobmgr", Test: "TestClaimAuthorityFIFOAndDirectCancellation"},
@@ -361,6 +363,7 @@ var componentProofByCase = map[string][]ComponentProof{
 		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestTaskSupervisorDispatchRotatesPendingClasses"},
 		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestTaskSupervisorFrameworkControlStartsWithManyActiveGenericTasks"},
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelResourceScopedFunctionHasIndependentTaskSchedulingClass"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestKernelLoopContinuesPendingTaskStartsAcrossServiceQuanta"},
 	},
 	"F24.12-b-catalog-loop-lookup": {
 		{Package: "./plugin/agent/jobmgr/functions", Test: "TestFunctionCatalogLookupLeaseSameTurn"},
@@ -375,11 +378,18 @@ var componentProofByCase = map[string][]ComponentProof{
 	},
 	"F24.15-b-cleanup-capacity-execution": {
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelRunsTaskCleanupBeforeSlotRelease"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestOperationAdmissionBytesIncludesTaskChildExecutionAllowance"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestKernelShutdownTracksDynamicTaskPopulation"},
+		{Package: "./plugin/agent/jobmgr/functions", Test: "TestFunctionCatalogRetainsCleanupExecutionStorageUntilCompletion"},
+		{Package: "./plugin/agent/jobmgr/functions", Test: "TestFunctionCatalogAbortRetainsInitializedCleanupExecutionStorage"},
+		{Package: "./plugin/agent/jobmgr/composition", Test: "TestProductionProcessChargesCatalogStorageUntilFinalClose"},
 	},
 	"F24.16-b-shutdown-complexity": {
 		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestTaskSupervisorSealsAndCancelsEveryInheritedContext"},
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelShutdownCancelsOperationsInBoundedTurns"},
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelShutdownVisitsLiveLanesOnceInBoundedTurns"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestKernelShutdownTracksDynamicTaskPopulation"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch"},
 		{Package: "./plugin/agent/jobmgr/composition", Test: "TestCloseProcessUIDsObservesShutdownContextBetweenBatches"},
 	},
 	"F24.18-b-ready-lane-fairness": {

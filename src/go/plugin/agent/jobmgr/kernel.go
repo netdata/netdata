@@ -1074,13 +1074,16 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 		)
 		moreAdmissions := false
 		moreTasks := false
+		moreTaskStarts := false
 		moreShutdownOperations := false
 		moreInheritedCancellations := false
 		moreShutdownLanes := false
 		if !shuttingDown {
 			moreAdmissions = kernel.serviceAdmissions(4)
 			moreTasks = kernel.scheduleTasks(4)
-			kernel.serviceTaskStarts(lifecycle.TaskStartServiceQuantum)
+			moreTaskStarts = kernel.serviceTaskStarts(
+				lifecycle.TaskStartServiceQuantum,
+			)
 			if cause := kernel.run.DirtyCause(); cause != nil {
 				beginShutdown(cause)
 			}
@@ -1114,7 +1117,11 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 			if err := kernel.advanceRunFinalizer(); err != nil {
 				kernel.run.Dirty(err)
 			}
-			kernel.serviceTaskStarts(lifecycle.TaskStartServiceQuantum)
+			if kernel.shutdownOperationsDone {
+				moreTaskStarts = kernel.serviceTaskStarts(
+					lifecycle.TaskStartServiceQuantum,
+				)
+			}
 		}
 		if shuttingDown {
 			if shutdownBudget.ExpireIfDue() {
@@ -1130,7 +1137,8 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 		}
 		if moreDeadlines || moreControls || moreSubmissions || moreFunctionCleanups ||
 			moreFunctionMutation || moreFunctionClose || moreClaimSettlements ||
-			moreAdmissions || moreTasks || moreShutdownOperations ||
+			moreAdmissions || moreTasks || moreTaskStarts ||
+			moreShutdownOperations ||
 			moreInheritedCancellations || moreShutdownLanes ||
 			kernel.claims.PendingSettlements() ||
 			kernel.hasRunnableSubmissions() {
@@ -1883,9 +1891,13 @@ func (kernel *CommandKernel) scheduleTasks(quantum int) bool {
 	return kernel.ready[0].len != 0 || kernel.ready[1].len != 0
 }
 
-func (kernel *CommandKernel) serviceTaskStarts(quantum int) {
+func (kernel *CommandKernel) serviceTaskStarts(quantum int) bool {
 	var started [lifecycle.TaskStartServiceQuantum]lifecycle.TaskStart
-	count, _, dispatchErr := kernel.tasks.Dispatch(context.Background(), quantum, &started)
+	count, more, dispatchErr := kernel.tasks.Dispatch(
+		context.Background(),
+		quantum,
+		&started,
+	)
 	for _, start := range started[:count] {
 		if start.Err != nil {
 			kernel.rejectTaskStart(start)
@@ -1894,7 +1906,7 @@ func (kernel *CommandKernel) serviceTaskStarts(quantum int) {
 		if cleanupRef, ok := kernel.functionCleanupRequests[start.Request]; ok {
 			if _, exists := kernel.functionCleanupTasks[start.Task]; exists {
 				kernel.run.Dirty(errors.New("jobmgr kernel: duplicate Function cleanup task slot"))
-				return
+				return more
 			}
 			delete(kernel.functionCleanupRequests, start.Request)
 			kernel.functionCleanupTasks[start.Task] = functionCleanupTask{ref: cleanupRef}
@@ -1906,7 +1918,7 @@ func (kernel *CommandKernel) serviceTaskStarts(quantum int) {
 				kernel.shutdownBarrierDone ||
 				kernel.shutdownBarrierFailed {
 				kernel.run.Dirty(errors.New("jobmgr kernel: invalid shutdown barrier start acknowledgement"))
-				return
+				return more
 			}
 			kernel.shutdownBarrierRequest = lifecycle.TaskRequestRef{}
 			kernel.shutdownBarrierTask = start.Task
@@ -1915,7 +1927,7 @@ func (kernel *CommandKernel) serviceTaskStarts(quantum int) {
 		if kernel.finalizerRequest.Valid() && start.Request == kernel.finalizerRequest {
 			if kernel.finalizerTask.Valid() || kernel.finalizerDone || kernel.finalizerFailed {
 				kernel.run.Dirty(errors.New("jobmgr kernel: invalid run finalizer start acknowledgement"))
-				return
+				return more
 			}
 			kernel.finalizerRequest = lifecycle.TaskRequestRef{}
 			kernel.finalizerTask = start.Task
@@ -1927,7 +1939,7 @@ func (kernel *CommandKernel) serviceTaskStarts(quantum int) {
 			if lane == nil || lane.shutdownRequest != start.Request ||
 				lane.shutdownTask.Valid() || kernel.shutdownTasks[start.Task] != nil {
 				kernel.run.Dirty(errors.New("jobmgr kernel: invalid shutdown task start acknowledgement"))
-				return
+				return more
 			}
 			delete(kernel.shutdownRequests, start.Request)
 			lane.shutdownRequest = lifecycle.TaskRequestRef{}
@@ -1938,23 +1950,24 @@ func (kernel *CommandKernel) serviceTaskStarts(quantum int) {
 		if operation == nil || operation.taskRequest != start.Request ||
 			(operation.Child != lifecycle.ChildNotStarted && operation.Child != lifecycle.ChildDeadlineStartPending) {
 			kernel.run.Dirty(errors.New("jobmgr kernel: invalid task start acknowledgement"))
-			return
+			return more
 		}
 		delete(kernel.tasksByRequest, start.Request)
 		operation.taskRequest = lifecycle.TaskRequestRef{}
 		if err := operation.Advance(lifecycle.OperationRunning); err != nil {
 			kernel.run.Dirty(err)
-			return
+			return more
 		}
 		if err := operation.StartChild(start.Task); err != nil {
 			kernel.run.Dirty(err)
-			return
+			return more
 		}
 		kernel.tasksByRef[start.Task] = operation
 	}
 	if dispatchErr != nil {
 		kernel.run.Dirty(dispatchErr)
 	}
+	return more
 }
 
 func (kernel *CommandKernel) rejectTaskStart(start lifecycle.TaskStart) {
@@ -4377,12 +4390,11 @@ func (kernel *CommandKernel) unlinkLane(lane *commandLane) {
 }
 
 const (
-	operationRecordAdmissionBytes    = int64(512)
-	taskChildExecutionAdmissionBytes = int64(4 * 1024)
+	operationRecordAdmissionBytes = int64(512)
 )
 
 func operationAdmissionBytes(request Request, plan WorkPlan) (int64, error) {
-	bytes := operationRecordAdmissionBytes + taskChildExecutionAdmissionBytes
+	bytes := operationRecordAdmissionBytes + lifecycle.TaskChildExecutionBytes
 	if request.PayloadCapacity < 0 || request.PayloadCapacity > lifecycle.MaximumInputBodyBytes || request.PayloadCapacity > lifecycle.OrdinaryBudgetBytes-bytes {
 		return 0, errors.New("jobmgr kernel: input body does not self-fit admission")
 	}
