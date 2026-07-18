@@ -10,7 +10,6 @@ import (
 )
 
 const (
-	MaximumUIDRecords    = 16_384
 	UIDReturnBatch       = 64
 	UIDTombstoneLifetime = 60 * time.Second
 )
@@ -28,36 +27,27 @@ type uidRecord struct {
 	key   string
 
 	expires time.Time
-	prev    uint16
-	next    uint16
+	prev    *uidRecord
+	next    *uidRecord
 
-	freeNext uint16
+	freeNext *uidRecord
 }
 
 type UIDLedger struct {
 	mu     sync.Mutex
 	closed bool
 
-	records [MaximumUIDRecords + 1]uidRecord
-	free    uint16
-	index   map[string]uint16
+	free  *uidRecord
+	index map[string]*uidRecord
 
-	tombstoneHead uint16
-	tombstoneTail uint16
+	tombstoneHead *uidRecord
+	tombstoneTail *uidRecord
 	active        int
 	tombstones    int
 }
 
 func NewUIDLedger() *UIDLedger {
-	ledger := &UIDLedger{
-		free:  1,
-		index: make(map[string]uint16, MaximumUIDRecords),
-	}
-	for slot := uint16(1); slot <= MaximumUIDRecords; slot++ {
-		ledger.records[slot].freeNext = slot + 1
-	}
-	ledger.records[MaximumUIDRecords].freeNext = 0
-	return ledger
+	return &UIDLedger{index: make(map[string]*uidRecord)}
 }
 
 func (ledger *UIDLedger) Admit(uid string, now time.Time) error {
@@ -75,23 +65,23 @@ func (ledger *UIDLedger) Admit(uid string, now time.Time) error {
 	}
 
 	ledger.expireForAdmission(uid, now)
-	if slot := ledger.index[uid]; slot != 0 {
-		if ledger.records[slot].state == uidStateActive {
+	if record := ledger.index[uid]; record != nil {
+		if record.state == uidStateActive {
 			return errors.New("jobmgr UID ledger: duplicate active UID")
 		}
 		return errors.New("jobmgr UID ledger: tombstoned UID")
 	}
-	if ledger.free == 0 {
-		return errors.New("jobmgr UID ledger: capacity exhausted")
+	record := ledger.free
+	if record == nil {
+		record = &uidRecord{}
+	} else {
+		ledger.free = record.freeNext
 	}
-
-	slot := ledger.free
-	ledger.free = ledger.records[slot].freeNext
-	ledger.records[slot] = uidRecord{
+	*record = uidRecord{
 		state: uidStateActive,
 		key:   strings.Clone(uid),
 	}
-	ledger.index[ledger.records[slot].key] = slot
+	ledger.index[record.key] = record
 	ledger.active++
 	return nil
 }
@@ -103,28 +93,27 @@ func (ledger *UIDLedger) Complete(uid string, tombstone bool, now time.Time) err
 
 	ledger.mu.Lock()
 	defer ledger.mu.Unlock()
-	slot := ledger.index[uid]
-	if slot == 0 || ledger.records[slot].state != uidStateActive {
+	record := ledger.index[uid]
+	if record == nil || record.state != uidStateActive {
 		return errors.New("jobmgr UID ledger: completion for inactive UID")
 	}
 
 	ledger.active--
 	if !tombstone {
-		ledger.removeRecord(slot)
+		ledger.removeRecord(record)
 		return nil
 	}
 
-	record := &ledger.records[slot]
 	record.state = uidStateTombstone
 	record.expires = now.Add(UIDTombstoneLifetime)
 	record.prev = ledger.tombstoneTail
-	record.next = 0
-	if ledger.tombstoneTail == 0 {
-		ledger.tombstoneHead = slot
+	record.next = nil
+	if ledger.tombstoneTail == nil {
+		ledger.tombstoneHead = record
 	} else {
-		ledger.records[ledger.tombstoneTail].next = slot
+		ledger.tombstoneTail.next = record
 	}
-	ledger.tombstoneTail = slot
+	ledger.tombstoneTail = record
 	ledger.tombstones++
 	return nil
 }
@@ -140,10 +129,10 @@ func (ledger *UIDLedger) CloseBatch(max int) (more bool, err error) {
 	if ledger.active != 0 {
 		return true, errors.New("jobmgr UID ledger: close with active UIDs")
 	}
-	for count := 0; count < max && ledger.tombstoneHead != 0; count++ {
+	for count := 0; count < max && ledger.tombstoneHead != nil; count++ {
 		ledger.removeRecord(ledger.tombstoneHead)
 	}
-	return ledger.tombstoneHead != 0, nil
+	return ledger.tombstoneHead != nil, nil
 }
 
 func (ledger *UIDLedger) Census() (active, tombstones int, closed bool) {
@@ -154,15 +143,14 @@ func (ledger *UIDLedger) Census() (active, tombstones int, closed bool) {
 
 func (ledger *UIDLedger) expireForAdmission(uid string, now time.Time) {
 	remaining := UIDReturnBatch
-	if slot := ledger.index[uid]; slot != 0 {
-		record := &ledger.records[slot]
+	if record := ledger.index[uid]; record != nil {
 		if record.state == uidStateTombstone && !record.expires.After(now) {
-			ledger.removeRecord(slot)
+			ledger.removeRecord(record)
 			remaining--
 		}
 	}
-	for remaining > 0 && ledger.tombstoneHead != 0 {
-		record := &ledger.records[ledger.tombstoneHead]
+	for remaining > 0 && ledger.tombstoneHead != nil {
+		record := ledger.tombstoneHead
 		if record.expires.After(now) {
 			break
 		}
@@ -171,22 +159,24 @@ func (ledger *UIDLedger) expireForAdmission(uid string, now time.Time) {
 	}
 }
 
-func (ledger *UIDLedger) removeRecord(slot uint16) {
-	record := &ledger.records[slot]
+func (ledger *UIDLedger) removeRecord(record *uidRecord) {
+	if record == nil {
+		return
+	}
 	if record.state == uidStateTombstone {
-		if record.prev == 0 {
+		if record.prev == nil {
 			ledger.tombstoneHead = record.next
 		} else {
-			ledger.records[record.prev].next = record.next
+			record.prev.next = record.next
 		}
-		if record.next == 0 {
+		if record.next == nil {
 			ledger.tombstoneTail = record.prev
 		} else {
-			ledger.records[record.next].prev = record.prev
+			record.next.prev = record.prev
 		}
 		ledger.tombstones--
 	}
 	delete(ledger.index, record.key)
-	ledger.records[slot] = uidRecord{state: uidStateFree, freeNext: ledger.free}
-	ledger.free = slot
+	*record = uidRecord{state: uidStateFree, freeNext: ledger.free}
+	ledger.free = record
 }

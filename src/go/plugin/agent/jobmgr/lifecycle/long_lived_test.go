@@ -118,7 +118,7 @@ func TestLongLivedPermitSurvivesOperationAdmissionRelease(t *testing.T) {
 		t.Fatal(err)
 	}
 	if census := admission.Census(); census.ActiveRecords != 0 ||
-		census.FreeRecords != MaximumAdmissionRecords ||
+		census.FreeRecords == 0 ||
 		census.OrdinaryGranted != 0 ||
 		census.OrdinaryBytes != 40 ||
 		census.LongLivedBytes != 40 {
@@ -138,7 +138,7 @@ func TestLongLivedPermitSurvivesOperationAdmissionRelease(t *testing.T) {
 	}
 }
 
-func TestLongLivedPermitDomainsPreserveFullJobCapacity(t *testing.T) {
+func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 	admission := NewAdmissionLedger()
 	supervisor := newLongLivedTestSupervisor(t)
 	pipelinePlan, err := NewPipelineLongLivedPlan(1)
@@ -150,7 +150,8 @@ func TestLongLivedPermitDomainsPreserveFullJobCapacity(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	permits := make([]LongLivedPermit, 0, MaximumAdmissionRecords+1)
+	const jobs = formerFixedPopulation + 1
+	permits := make([]LongLivedPermit, 0, jobs+1)
 	issue := func(owner ResourceIdentity, plan LongLivedPlan) {
 		t.Helper()
 		ref := grantLongLivedTestAdmission(t, admission, 2)
@@ -167,7 +168,7 @@ func TestLongLivedPermitDomainsPreserveFullJobCapacity(t *testing.T) {
 			t.Fatal(releaseErr)
 		}
 		if census := admission.Census(); census.ActiveRecords != 0 ||
-			census.FreeRecords != MaximumAdmissionRecords {
+			census.FreeRecords == 0 {
 			t.Fatalf(
 				"persistent resource retained operation admission: %+v",
 				census,
@@ -180,7 +181,7 @@ func TestLongLivedPermitDomainsPreserveFullJobCapacity(t *testing.T) {
 		ResourceIdentity{ID: "discovery", Generation: 1},
 		pipelinePlan,
 	)
-	for index := 0; index < MaximumAdmissionRecords; index++ {
+	for index := 0; index < jobs; index++ {
 		issue(
 			ResourceIdentity{
 				ID:         fmt.Sprintf("job-%03d", index),
@@ -191,12 +192,11 @@ func TestLongLivedPermitDomainsPreserveFullJobCapacity(t *testing.T) {
 	}
 
 	if census := admission.Census(); census.ActiveRecords != 0 ||
-		census.LongLivedRecords != MaximumAdmissionRecords+1 ||
-		census.OrdinaryBytes != MaximumAdmissionRecords+1 {
+		census.LongLivedRecords != jobs+1 ||
+		census.OrdinaryBytes != jobs+1 {
 		t.Fatalf("separated admission census=%+v", census)
 	}
-	if census := supervisor.LongLivedCensus(); census.Active !=
-		MaximumAdmissionRecords+1 {
+	if census := supervisor.LongLivedCensus(); census.Active != jobs+1 {
 		t.Fatalf("separated permit census=%+v", census)
 	}
 

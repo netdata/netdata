@@ -29,6 +29,28 @@ func TestDiscoveryProviderCatalog(t *testing.T) {
 	}
 }
 
+func TestDiscoveryProviderCatalogLookupAllocatesNothing(t *testing.T) {
+	catalog, err := NewProviderCatalog([]ProviderFactory{
+		NewProviderFactory(
+			"file",
+			func(BuildContext) (Discoverer, bool, error) {
+				return catalogTestDiscoverer{}, true, nil
+			},
+		),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	allocations := testing.AllocsPerRun(1_000, func() {
+		if _, ok := catalog.Lookup("file"); !ok {
+			panic("provider disappeared")
+		}
+	})
+	if allocations != 0 {
+		t.Fatalf("provider lookup allocations=%f, want 0", allocations)
+	}
+}
+
 func BenchmarkBDiscoveryFactoryLookup(b *testing.B) {
 	catalog, err := NewProviderCatalog([]ProviderFactory{
 		NewProviderFactory("file", func(BuildContext) (Discoverer, bool, error) {

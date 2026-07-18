@@ -452,7 +452,7 @@ func closeProcessUIDs(uids *lifecycle.UIDLedger) error {
 	if uids == nil {
 		return errors.New("jobmgr composition: nil UID ledger")
 	}
-	for batch := 0; batch <= lifecycle.MaximumUIDRecords/lifecycle.UIDReturnBatch; batch++ {
+	for {
 		more, err := uids.CloseBatch(lifecycle.UIDReturnBatch)
 		if err != nil {
 			return err
@@ -461,5 +461,4 @@ func closeProcessUIDs(uids *lifecycle.UIDLedger) error {
 			return nil
 		}
 	}
-	return errors.New("jobmgr composition: UID close exceeded bounded batches")
 }

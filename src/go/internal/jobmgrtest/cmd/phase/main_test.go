@@ -19,7 +19,6 @@ func TestParseOptionsRequiresAbsolutePaths(t *testing.T) {
 		"-baseline-bundle":    "/baseline",
 		"-evidence-directory": "/evidence",
 		"-root-config-dir":    "/config",
-		"-ibm-build-manifest": "/ibm-build-manifest.json",
 	}
 	base := make([]string, 0, len(required)*2)
 	for name, value := range required {
@@ -272,6 +271,38 @@ func TestPhaseGoEnvironmentIsFixedAndOverrideable(t *testing.T) {
 	}
 	if strings.Count(joined, "GOMAXPROCS=") != 1 {
 		t.Fatalf("GOMAXPROCS override is duplicated: %v", got)
+	}
+}
+
+func TestPhaseBuildTargetsOwnEverySupportedRoot(t *testing.T) {
+	artifacts := phaseArtifacts{
+		production:     "/build/agent",
+		godplugin:      "/build/go.d.plugin",
+		ibmdplugin:     "/build/ibm.d.plugin",
+		scriptsdplugin: "/build/scripts.d.plugin",
+	}
+	targets := phaseBuildTargets(artifacts)
+	tests := map[string]phaseBuildTarget{
+		"production Agent driver": {
+			path: "/build/agent", importPath: "./internal/jobmgrtest/cmd/agent",
+			cgo: "0",
+		},
+		"go.d.plugin": {
+			path: "/build/go.d.plugin", importPath: "./cmd/godplugin",
+			cgo: "0",
+		},
+		"ibm.d.plugin": {
+			path: "/build/ibm.d.plugin", importPath: "./cmd/ibmdplugin",
+			tags: "ibm_mq", cgo: "1",
+		},
+		"scripts.d.plugin": {
+			path:       "/build/scripts.d.plugin",
+			importPath: "./cmd/scriptsdplugin",
+			cgo:        "0",
+		},
+	}
+	if !reflect.DeepEqual(targets, tests) {
+		t.Fatalf("phase build targets=%v, want %v", targets, tests)
 	}
 }
 

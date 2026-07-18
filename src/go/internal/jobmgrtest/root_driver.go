@@ -106,6 +106,26 @@ func (driver ShippedRootDriver) RunAvailable(
 	if err != nil {
 		return nil, err
 	}
+	return driver.runAvailable(ctx, runs)
+}
+
+// RunMatrixAvailable executes the mandatory root/scenario product independently
+// of the frozen predicate closure.
+func (driver ShippedRootDriver) RunMatrixAvailable(
+	ctx context.Context,
+) ([]string, error) {
+	if ctx == nil {
+		return nil, errors.New(
+			"jobmgr test: nil shipped-root matrix context",
+		)
+	}
+	return driver.runAvailable(ctx, shippedRootMatrixRuns())
+}
+
+func (driver ShippedRootDriver) runAvailable(
+	ctx context.Context,
+	runs []shippedRootRun,
+) ([]string, error) {
 	var missing []string
 	for _, run := range runs {
 		root, ok := driver.Roots[run.root]
@@ -132,6 +152,29 @@ func (driver ShippedRootDriver) RunAvailable(
 type shippedRootRun struct {
 	root     string
 	scenario string
+}
+
+func shippedRootMatrixRuns() []shippedRootRun {
+	roots := [...]string{
+		"godplugin",
+		"ibmdplugin",
+		"scriptsdplugin",
+	}
+	scenarios := [...]string{
+		"terminal",
+		"all-pipe",
+		"repeated-hup",
+		"shutdown",
+	}
+	runs := make([]shippedRootRun, 0, len(roots)*len(scenarios))
+	for _, root := range roots {
+		for _, scenario := range scenarios {
+			runs = append(runs, shippedRootRun{
+				root: root, scenario: scenario,
+			})
+		}
+	}
+	return runs
 }
 
 func shippedRootRuns(caseID string) ([]shippedRootRun, error) {

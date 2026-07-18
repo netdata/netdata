@@ -138,9 +138,9 @@ func TestAdmissionProcessBytesCanUnwindPristineConstruction(t *testing.T) {
 
 func TestAdmissionLongLivedTransferDetachesOperationRecords(t *testing.T) {
 	ledger := NewAdmissionLedger()
-	longLived := make([]AdmissionRef, 0, MaximumAdmissionRecords)
-	for index := 0; index < MaximumAdmissionRecords; index++ {
-		lane := AdmissionLaneRef{Slot: uint16(index + 1), Generation: 1}
+	longLived := make([]AdmissionRef, 0, formerFixedPopulation)
+	for index := 0; index < formerFixedPopulation; index++ {
+		lane := AdmissionLaneRef{Slot: uint32(index + 1), Generation: 1}
 		request := ledger.RequestOrdinary(1, lane, 2)
 		if request.Rejected != nil {
 			t.Fatal(request.Rejected)
@@ -159,8 +159,8 @@ func TestAdmissionLongLivedTransferDetachesOperationRecords(t *testing.T) {
 		longLived = append(longLived, request.Ref)
 	}
 	if census := ledger.Census(); census.ActiveRecords != 0 ||
-		census.FreeRecords != MaximumAdmissionRecords ||
-		census.LongLivedRecords != MaximumAdmissionRecords {
+		census.FreeRecords == 0 ||
+		census.LongLivedRecords != formerFixedPopulation {
 		t.Fatalf("detached long-lived census=%+v", census)
 	}
 	last := ledger.RequestOrdinary(
@@ -375,28 +375,27 @@ func TestUIDLedgerAdmissionAndCloseWorkAreBatched(t *testing.T) {
 	}
 }
 
-func TestUIDLedgerHasExactFixedCapacity(t *testing.T) {
+func TestUIDLedgerGrowsAndCloseWorkRemainsBatched(t *testing.T) {
 	now := time.Unix(3_000, 0)
 	uids := NewUIDLedger()
-	for index := 0; index < MaximumUIDRecords; index++ {
+	const population = formerFixedUIDPopulation + 1
+	for index := 0; index < population; index++ {
 		if err := uids.Admit(fmt.Sprintf("active-%d", index), now); err != nil {
 			t.Fatalf("admit %d: %v", index, err)
 		}
 	}
-	if err := uids.Admit("over-capacity", now); err == nil {
-		t.Fatal("UID ledger admitted beyond fixed capacity")
-	}
-	for index := 0; index < MaximumUIDRecords; index++ {
+	for index := 0; index < population; index++ {
 		if err := uids.Complete(fmt.Sprintf("active-%d", index), true, now); err != nil {
 			t.Fatalf("complete %d: %v", index, err)
 		}
 	}
-	for batch := 1; batch <= MaximumUIDRecords/UIDReturnBatch; batch++ {
+	wantBatches := (population + UIDReturnBatch - 1) / UIDReturnBatch
+	for batch := 1; batch <= wantBatches; batch++ {
 		more, err := uids.CloseBatch(UIDReturnBatch)
 		if err != nil {
 			t.Fatalf("close batch %d: %v", batch, err)
 		}
-		if more != (batch < MaximumUIDRecords/UIDReturnBatch) {
+		if more != (batch < wantBatches) {
 			t.Fatalf("close batch %d returned more=%v", batch, more)
 		}
 	}

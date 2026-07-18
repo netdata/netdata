@@ -20,12 +20,12 @@ type TaskRef struct {
 }
 
 type TaskRequestRef struct {
-	Slot       uint16
+	Slot       uint32
 	Generation uint32
 }
 
 func (ref TaskRequestRef) Valid() bool {
-	return ref.Slot > 0 && ref.Slot <= MaximumAdmissionRecords && ref.Generation > 0
+	return ref.Slot > 0 && ref.Generation > 0
 }
 
 type TaskStart struct {
@@ -95,19 +95,19 @@ type taskSlot struct {
 }
 
 type taskRequest struct {
-	slot       uint16
+	slot       uint32
 	generation uint32
-	freeNext   uint16
-	previous   uint16
-	next       uint16
+	freeNext   uint32
+	previous   uint32
+	next       uint32
 	active     bool
 	plan       TaskPlan
 	initial    TaskOutcome
 }
 
 type taskRequestQueue struct {
-	head  uint16
-	tail  uint16
+	head  uint32
+	tail  uint32
 	count int
 }
 
@@ -116,9 +116,9 @@ type TaskSupervisor struct {
 	inherited            inheritedTaskRegistry
 	longLived            longLivedRegistry
 	slots                [TransientTaskSlots]taskSlot
-	requests             [MaximumAdmissionRecords + 1]taskRequest
+	requests             []*taskRequest
 	pending              [2]taskRequestQueue
-	freeRequest          uint16
+	freeRequest          uint32
 	nextSource           Source
 	completions          chan TaskCompletion
 	acks                 chan TaskAcknowledgement
@@ -136,18 +136,17 @@ func NewTaskSupervisor(frame *FrameOwner) (*TaskSupervisor, error) {
 	if frame == nil {
 		return nil, errors.New("jobmgr task supervisor: nil FrameOwner")
 	}
-	supervisor := &TaskSupervisor{frame: frame, completions: make(chan TaskCompletion, TransientTaskSlots), acks: make(chan TaskAcknowledgement, TransientTaskSlots)}
+	supervisor := &TaskSupervisor{
+		frame:       frame,
+		requests:    []*taskRequest{nil},
+		completions: make(chan TaskCompletion, TransientTaskSlots),
+		acks:        make(chan TaskAcknowledgement, TransientTaskSlots),
+	}
 	supervisor.inherited.initialize()
 	supervisor.longLived.initialize()
 	for index := range supervisor.slots {
 		supervisor.slots[index].action = make(chan TaskAction, 1)
 	}
-	for index := 1; index <= MaximumAdmissionRecords; index++ {
-		supervisor.requests[index].slot = uint16(index)
-		supervisor.requests[index].freeNext = uint16(index + 1)
-	}
-	supervisor.requests[MaximumAdmissionRecords].freeNext = 0
-	supervisor.freeRequest = 1
 	supervisor.nextSource = SourceJobManager
 	return supervisor, nil
 }
@@ -198,11 +197,18 @@ func (supervisor *TaskSupervisor) Enqueue(plan TaskPlan) (TaskRequestRef, error)
 		plan.initialIdentity = ResourceIdentity{}
 	}
 	slot := supervisor.freeRequest
+	reused := slot != 0
 	if slot == 0 {
-		return TaskRequestRef{}, errors.New("jobmgr task supervisor: pending request capacity exhausted")
+		if uint64(len(supervisor.requests)) > uint64(^uint32(0)) {
+			return TaskRequestRef{}, errors.New("jobmgr task supervisor: request reference space exhausted")
+		}
+		slot = uint32(len(supervisor.requests))
+		supervisor.requests = append(supervisor.requests, &taskRequest{slot: slot})
 	}
-	record := &supervisor.requests[slot]
-	supervisor.freeRequest = record.freeNext
+	record := supervisor.requests[slot]
+	if reused {
+		supervisor.freeRequest = record.freeNext
+	}
 	generation := record.generation + 1
 	if generation == 0 {
 		record.freeNext = supervisor.freeRequest
@@ -285,7 +291,7 @@ func (supervisor *TaskSupervisor) Dispatch(parent context.Context, quantum int, 
 		if queue.head == 0 || !supervisor.canDispatchQueue(selected) {
 			break
 		}
-		record := &supervisor.requests[queue.head]
+		record := supervisor.requests[queue.head]
 		requestRef := TaskRequestRef{Slot: record.slot, Generation: record.generation}
 		taskRef, err := supervisor.start(parent, record.plan, record.initial)
 		if err != nil {
@@ -1183,7 +1189,11 @@ func (supervisor *TaskSupervisor) request(ref TaskRequestRef) (*taskRequest, err
 	if !ref.Valid() {
 		return nil, errors.New("jobmgr task supervisor: invalid request reference")
 	}
-	record := &supervisor.requests[ref.Slot]
+	if uint64(ref.Slot) >= uint64(len(supervisor.requests)) ||
+		supervisor.requests[ref.Slot] == nil {
+		return nil, errors.New("jobmgr task supervisor: stale request reference")
+	}
+	record := supervisor.requests[ref.Slot]
 	if !record.active || record.generation != ref.Generation {
 		return nil, errors.New("jobmgr task supervisor: stale request reference")
 	}

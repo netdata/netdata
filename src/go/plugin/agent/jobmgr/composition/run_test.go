@@ -24,14 +24,14 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-func TestRunGenerationPreservesFullJobCapacityWithDiscoveryPipeline(
+func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveryPipeline(
 	t *testing.T,
 ) {
 	tests := map[string]struct {
 		jobs int
 	}{
-		"one pipeline plus the full job population": {
-			jobs: lifecycle.MaximumActiveJobs,
+		"one pipeline plus the former limit and one job": {
+			jobs: 257,
 		},
 	}
 	for name, test := range tests {

@@ -78,13 +78,16 @@ func TestBMM002CaseClosureDigestIsStable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	const want = "1d60e00d2bc172381fe4d869fe2517c163de6b1daf41afd93f23368abc18fca1"
+	const want = "4ca4cfcfa3ffc725811e94ed3f03b200699ff7d8a39ad937b693b6c69ffc829f"
 	if digest != want {
 		t.Fatalf("B-M-002 case digest=%s", digest)
 	}
 }
 
 func TestBMM002CaseEvidenceIsComplete(t *testing.T) {
+	if err := ValidateEvidenceContract(); err != nil {
+		t.Fatal(err)
+	}
 	cases, err := BMM002Cases()
 	if err != nil {
 		t.Fatal(err)
@@ -144,5 +147,54 @@ func TestBMM002PublicBoundaryCasesHaveCaseExactRuntimePredicates(t *testing.T) {
 				predicate,
 			)
 		}
+	}
+}
+
+func TestEvidenceContractRejectsImplicitOrAliasedRuntimeCredit(
+	t *testing.T,
+) {
+	tests := map[string]struct {
+		mutate func() func()
+	}{
+		"missing declaration has no case-label fallback": {
+			mutate: func() func() {
+				original := runtimePredicateByCase["F01.1"]
+				delete(runtimePredicateByCase, "F01.1")
+				return func() {
+					runtimePredicateByCase["F01.1"] = original
+				}
+			},
+		},
+		"two cases cannot alias one runtime predicate": {
+			mutate: func() func() {
+				original := runtimePredicateByCase["F01.2"]
+				runtimePredicateByCase["F01.2"] =
+					runtimePredicateByCase["F01.1"]
+				return func() {
+					runtimePredicateByCase["F01.2"] = original
+				}
+			},
+		},
+		"component case cannot gain runtime credit": {
+			mutate: func() func() {
+				runtimePredicateByCase["F03.1"] =
+					runtimePredicateDeclaration{
+						Suite:     SuiteAgent,
+						Predicate: "F03.1",
+					}
+				return func() {
+					delete(runtimePredicateByCase, "F03.1")
+				}
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			restore := test.mutate()
+			defer restore()
+			if err := ValidateEvidenceContract(); err == nil {
+				t.Fatal("invalid runtime evidence contract was accepted")
+			}
+		})
 	}
 }

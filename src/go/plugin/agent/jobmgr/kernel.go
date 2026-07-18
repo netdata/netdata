@@ -13,12 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
-const (
-	externalSourceQueueDepth = lifecycle.MaximumLaneDepth
-	maximumCommandLanes      = lifecycle.MaximumAdmissionLanes
-)
-
-const maximumFunctionCleanupBacklog = lifecycle.MaximumAdmissionRecords + MaximumFunctionMutationChanges
+const externalSourceQueueDepth = 32
 
 const (
 	maximumPlanClaims     = 1_024
@@ -234,13 +229,9 @@ type functionCleanupTask struct {
 }
 
 type functionCleanupQueue struct {
-	plans [maximumFunctionCleanupBacklog]FunctionCleanupPlan
+	plans []FunctionCleanupPlan
 	head  int
 	count int
-}
-
-func (queue *functionCleanupQueue) free() int {
-	return len(queue.plans) - queue.count
 }
 
 func (queue *functionCleanupQueue) push(plan FunctionCleanupPlan) error {
@@ -250,11 +241,15 @@ func (queue *functionCleanupQueue) push(plan FunctionCleanupPlan) error {
 	if !plan.Ref.Valid() {
 		return nil
 	}
-	if queue.count == len(queue.plans) {
-		return errors.New("jobmgr kernel: Function cleanup backlog exhausted")
+	if queue.head > 0 &&
+		queue.head >= 64 &&
+		queue.head >= queue.count {
+		copy(queue.plans, queue.plans[queue.head:queue.head+queue.count])
+		clear(queue.plans[queue.count:])
+		queue.plans = queue.plans[:queue.count]
+		queue.head = 0
 	}
-	index := (queue.head + queue.count) % len(queue.plans)
-	queue.plans[index] = plan
+	queue.plans = append(queue.plans, plan)
 	queue.count++
 	return nil
 }
@@ -271,9 +266,10 @@ func (queue *functionCleanupQueue) pop() {
 		return
 	}
 	queue.plans[queue.head] = FunctionCleanupPlan{}
-	queue.head = (queue.head + 1) % len(queue.plans)
+	queue.head++
 	queue.count--
 	if queue.count == 0 {
+		queue.plans = queue.plans[:0]
 		queue.head = 0
 	}
 }
@@ -349,11 +345,11 @@ type commandOperation struct {
 }
 
 type commandLane struct {
-	slot               uint16
+	slot               uint32
 	generation         uint32
 	mapKey             commandLaneKey
 	owners             int
-	freeNext           uint16
+	freeNext           uint32
 	key                string
 	source             lifecycle.Source
 	head               *commandOperation
@@ -501,7 +497,7 @@ type CommandKernel struct {
 	functionMutationPaused   bool
 	functionCatalogClosing   bool
 	functionCatalogCloseMore bool
-	shutdownRequests         [maximumCommandLanes + 1]*commandLane
+	shutdownRequests         map[lifecycle.TaskRequestRef]*commandLane
 	shutdownTasks            [lifecycle.TransientTaskSlots]*commandLane
 	shutdownRequestCount     int
 	shutdownTaskCount        int
@@ -519,8 +515,8 @@ type CommandKernel struct {
 	finalizerFailed          bool
 	byAdmission              map[lifecycle.AdmissionRef]*commandOperation
 	lanes                    map[commandLaneKey]*commandLane
-	laneSlots                [maximumCommandLanes + 1]commandLane
-	freeLane                 uint16
+	laneSlots                []*commandLane
+	freeLane                 uint32
 	ready                    [2]readyRing
 	nextID                   lifecycle.OperationID
 	nextResourceGeneration   uint64
@@ -550,6 +546,7 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 		tasksByRequest:          make(map[lifecycle.TaskRequestRef]*commandOperation),
 		functionCleanupTasks:    make(map[lifecycle.TaskRef]functionCleanupTask),
 		functionCleanupRequests: make(map[lifecycle.TaskRequestRef]FunctionCleanupRef),
+		shutdownRequests:        make(map[lifecycle.TaskRequestRef]*commandLane),
 		functionMutations:       make(chan functionMutationSubmission),
 		byAdmission:             make(map[lifecycle.AdmissionRef]*commandOperation), lanes: make(map[commandLaneKey]*commandLane),
 		nextSource: lifecycle.SourceJobManager, nextExternalSource: lifecycle.SourceJobManager,
@@ -561,16 +558,12 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 		finalizerDone:        isNoopRunFinalizer(finalizer),
 		jobPlanner:           jobPlanner,
 		functionCatalog:      functionCatalog,
+		laneSlots:            []*commandLane{nil},
 	}
 	for index := range kernel.submissions {
 		kernel.submissions[index] = make(chan submission, externalSourceQueueDepth)
 		kernel.submissionSpace[index] = make(chan struct{}, 1)
 	}
-	for index := 1; index <= maximumCommandLanes; index++ {
-		kernel.laneSlots[index].freeNext = uint16(index + 1)
-	}
-	kernel.laneSlots[maximumCommandLanes].freeNext = 0
-	kernel.freeLane = 1
 	heap.Init(&kernel.deadlines)
 	return kernel, nil
 }
@@ -1266,7 +1259,7 @@ func (kernel *CommandKernel) serviceSubmissions(quantum int) bool {
 				kernel.run.Dirty(err)
 			}
 		}
-		if errors.Is(err, lifecycle.ErrAdmissionRecordCapacity) || errors.Is(err, lifecycle.ErrFrameOwnerBusy) {
+		if errors.Is(err, lifecycle.ErrFrameOwnerBusy) {
 			if !wasBlocked {
 				kernel.blockedSubmissions[selected] = submitted
 				kernel.blockedSubmission[selected] = true
@@ -1292,14 +1285,6 @@ func (kernel *CommandKernel) serviceSubmissions(quantum int) bool {
 func (kernel *CommandKernel) hasRunnableSubmissions() bool {
 	for source := range kernel.submissions {
 		if !kernel.blockedSubmission[source] && len(kernel.submissions[source]) != 0 {
-			return true
-		}
-	}
-	if kernel.run.Admitting() {
-		return false
-	}
-	for source := range kernel.blockedSubmission {
-		if kernel.blockedSubmission[source] && kernel.blockedSubmissions[source].controlStatus == 0 {
 			return true
 		}
 	}
@@ -1476,13 +1461,6 @@ func (kernel *CommandKernel) admit(request Request, plan WorkPlan, submissionCon
 			return err
 		}
 	}
-	if lane.owners >= lifecycle.MaximumLaneDepth {
-		return kernel.rejectFunctionCapacity(
-			request,
-			now,
-			errors.New("jobmgr kernel: lane depth exhausted"),
-		)
-	}
 	kernel.nextID++
 	operationGeneration, err := lifecycle.NewOperation(kernel.nextID, request.UID, request.Source, request.LaneKey, !plan.NoResponse)
 	if err != nil {
@@ -1507,16 +1485,6 @@ func (kernel *CommandKernel) admit(request Request, plan WorkPlan, submissionCon
 	}
 	if requested.Rejected != nil {
 		kernel.releaseUnusedLane(lane)
-		if errors.Is(
-			requested.Rejected,
-			lifecycle.ErrAdmissionRecordCapacity,
-		) {
-			return kernel.rejectFunctionCapacity(
-				request,
-				now,
-				requested.Rejected,
-			)
-		}
 		return errors.Join(
 			requested.Rejected,
 			kernel.uids.Complete(request.UID, false, now),
@@ -1569,30 +1537,6 @@ func (kernel *CommandKernel) admit(request Request, plan WorkPlan, submissionCon
 		kernel.markReady(lane)
 	}
 	return nil
-}
-
-func (kernel *CommandKernel) rejectFunctionCapacity(
-	request Request,
-	now time.Time,
-	cause error,
-) error {
-	if request.Source != lifecycle.SourceFunction {
-		return errors.Join(
-			cause,
-			kernel.uids.Complete(request.UID, false, now),
-			kernel.abortRequestInputBody(request),
-		)
-	}
-	if err := errors.Join(
-		kernel.uids.Complete(request.UID, false, now),
-		kernel.abortRequestInputBody(request),
-	); err != nil {
-		return errors.Join(cause, err)
-	}
-	return preAdmissionControl{
-		status: lifecycle.ControlUnavailable,
-		cause:  cause,
-	}
 }
 
 func (kernel *CommandKernel) rejectClosedAdmission(request Request) error {
@@ -1910,12 +1854,12 @@ func (kernel *CommandKernel) serviceTaskStarts(quantum int) {
 		}
 		operation := kernel.tasksByRequest[start.Request]
 		if operation == nil {
-			lane := kernel.shutdownRequests[start.Request.Slot]
+			lane := kernel.shutdownRequests[start.Request]
 			if lane == nil || lane.shutdownRequest != start.Request || lane.shutdownTask.Valid() || kernel.shutdownTasks[start.Task.Slot] != nil {
 				kernel.run.Dirty(errors.New("jobmgr kernel: invalid shutdown task start acknowledgement"))
 				return
 			}
-			kernel.shutdownRequests[start.Request.Slot] = nil
+			delete(kernel.shutdownRequests, start.Request)
 			kernel.shutdownRequestCount--
 			lane.shutdownRequest = lifecycle.TaskRequestRef{}
 			lane.shutdownTask = start.Task
@@ -3607,9 +3551,6 @@ func (kernel *CommandKernel) enqueueShutdownStops() error {
 		if !identity.Valid() || identity.ID != lane.key {
 			return errors.New("jobmgr kernel: shutdown found an invalid current resource")
 		}
-		if kernel.tasks.Pending() >= lifecycle.MaximumAdmissionRecords {
-			return nil
-		}
 		budget, err := kernel.run.BeginShutdown()
 		if err != nil {
 			return err
@@ -3629,7 +3570,7 @@ func (kernel *CommandKernel) enqueueShutdownStops() error {
 		if err != nil {
 			return err
 		}
-		if owner := kernel.shutdownRequests[request.Slot]; owner != nil {
+		if owner := kernel.shutdownRequests[request]; owner != nil {
 			outcome, cancelErr := kernel.tasks.CancelPendingOutcome(request)
 			_, ok := outcome.ReadyResource()
 			returnedIdentity, identityOK := outcome.ResourceIdentity()
@@ -3641,7 +3582,7 @@ func (kernel *CommandKernel) enqueueShutdownStops() error {
 		lane.current = nil
 		lane.currentStopping = true
 		lane.shutdownRequest = request
-		kernel.shutdownRequests[request.Slot] = lane
+		kernel.shutdownRequests[request] = lane
 		kernel.shutdownRequestCount++
 	}
 	return nil
@@ -3898,8 +3839,7 @@ func (kernel *CommandKernel) releaseFunctionInvocation(ref FunctionInvocationRef
 }
 
 func (kernel *CommandKernel) pushFunctionCleanupBatch(cleanups *[MaximumFunctionCleanupBatch]FunctionCleanupPlan, count int) error {
-	if cleanups == nil || count < 0 || count > len(cleanups) ||
-		count > kernel.functionCleanupBacklog.free() {
+	if cleanups == nil || count < 0 || count > len(cleanups) {
 		return errors.New("jobmgr kernel: invalid Function cleanup batch")
 	}
 	for index := 0; index < count; index++ {
@@ -3916,9 +3856,6 @@ func (kernel *CommandKernel) serviceFunctionCleanupBacklog(quantum int) bool {
 		return kernel.functionCleanupBacklog.count != 0
 	}
 	for quantum > 0 && kernel.functionCleanupBacklog.count != 0 {
-		if kernel.tasks.Pending() >= lifecycle.MaximumAdmissionRecords {
-			return true
-		}
 		cleanup := kernel.functionCleanupBacklog.front()
 		request, err := kernel.tasks.Enqueue(lifecycle.TaskPlan{
 			Source: lifecycle.SourceFunction, Work: cleanup.Work, Runner: cleanup.Runner,
@@ -4073,9 +4010,6 @@ func (kernel *CommandKernel) serviceFunctionMutation(quantum int) bool {
 		kernel.run.Dirty(errors.Join(invariantErr, abortErr))
 		return false
 	}
-	if kernel.functionCleanupBacklog.free() < MaximumFunctionMutationChanges {
-		return true
-	}
 	var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
 	progress, count, err := kernel.functionCatalog.AdvanceMutation(quantum, &cleanups)
 	if err != nil {
@@ -4122,9 +4056,6 @@ func (kernel *CommandKernel) serviceFunctionCatalogClose(quantum int) bool {
 	if !kernel.functionCatalogCloseMore {
 		return false
 	}
-	if kernel.functionCleanupBacklog.free() < MaximumFunctionCloseQuantum {
-		return true
-	}
 	var cleanups [MaximumFunctionCleanupBatch]FunctionCleanupPlan
 	count, more, err := kernel.functionCatalog.CloseStep(quantum, &cleanups)
 	if err != nil {
@@ -4142,10 +4073,16 @@ func (kernel *CommandKernel) serviceFunctionCatalogClose(quantum int) bool {
 func (kernel *CommandKernel) allocateLane(mapKey commandLaneKey, request Request) (*commandLane, error) {
 	slot := kernel.freeLane
 	if slot == 0 {
-		return nil, errors.New("jobmgr kernel: lane capacity exhausted")
+		if uint64(len(kernel.laneSlots)) > uint64(^uint32(0)) {
+			return nil, errors.New("jobmgr kernel: lane reference space exhausted")
+		}
+		slot = uint32(len(kernel.laneSlots))
+		kernel.laneSlots = append(kernel.laneSlots, &commandLane{slot: slot})
 	}
-	lane := &kernel.laneSlots[slot]
-	kernel.freeLane = lane.freeNext
+	lane := kernel.laneSlots[slot]
+	if kernel.freeLane != 0 {
+		kernel.freeLane = lane.freeNext
+	}
 	generation := lane.generation + 1
 	if generation == 0 {
 		lane.freeNext = kernel.freeLane

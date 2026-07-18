@@ -106,44 +106,57 @@ func TestSchedulerWarmTickDoesNotAllocate(t *testing.T) {
 	}
 }
 
-func TestSchedulerAcceptsFullActiveJobCapacity(t *testing.T) {
-	scheduler, err := NewScheduler(testModuleReconciler{})
-	if err != nil {
-		t.Fatal(err)
+func TestSchedulerGrowsBeyondFormerActiveJobLimit(t *testing.T) {
+	tests := map[string]struct {
+		population int
+	}{
+		"former limit": {
+			population: 256,
+		},
+		"former limit plus one": {
+			population: 257,
+		},
 	}
-	jobs := make([]*schedulerTestJob, 0, lifecycle.MaximumAdmissionRecords)
-	for index := 0; index < lifecycle.MaximumAdmissionRecords; index++ {
-		id := fmt.Sprintf("job-%03d", index)
-		job := &schedulerTestJob{id: id, module: "module"}
-		if err := scheduler.Register(
-			lifecycle.ResourceIdentity{ID: id, Generation: 1},
-			job,
-		); err != nil {
-			t.Fatalf("register job %d: %v", index, err)
-		}
-		jobs = append(jobs, job)
-	}
-	if census := scheduler.Census(); census != lifecycle.MaximumAdmissionRecords {
-		t.Fatalf(
-			"scheduler census=%d want=%d",
-			census,
-			lifecycle.MaximumAdmissionRecords,
-		)
-	}
-	overflow := &schedulerTestJob{id: "overflow", module: "module"}
-	if err := scheduler.Register(
-		lifecycle.ResourceIdentity{ID: overflow.id, Generation: 1},
-		overflow,
-	); err == nil {
-		t.Fatal("scheduler accepted a job beyond the active-job bound")
-	}
-	for _, job := range jobs {
-		if err := scheduler.Unregister(
-			lifecycle.ResourceIdentity{ID: job.id, Generation: 1},
-			job,
-		); err != nil {
-			t.Fatal(err)
-		}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			scheduler, err := NewScheduler(testModuleReconciler{})
+			if err != nil {
+				t.Fatal(err)
+			}
+			jobs := make([]*schedulerTestJob, 0, test.population)
+			for index := 0; index < test.population; index++ {
+				id := fmt.Sprintf("dynamic-job-%03d", index)
+				job := &schedulerTestJob{id: id, module: "module"}
+				if err := scheduler.Register(
+					lifecycle.ResourceIdentity{
+						ID:         id,
+						Generation: 1,
+					},
+					job,
+				); err != nil {
+					t.Fatalf("register job %d: %v", index, err)
+				}
+				jobs = append(jobs, job)
+			}
+			if scheduler.Census() != test.population {
+				t.Fatalf(
+					"scheduler census=%d want=%d",
+					scheduler.Census(),
+					test.population,
+				)
+			}
+			for _, job := range jobs {
+				if err := scheduler.Unregister(
+					lifecycle.ResourceIdentity{
+						ID:         job.id,
+						Generation: 1,
+					},
+					job,
+				); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
 	}
 }
 

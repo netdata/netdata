@@ -8,18 +8,9 @@ import (
 	"sync"
 )
 
-var (
-	ErrAdmissionRecordCapacity = errors.New("jobmgr admission: record capacity exhausted")
-)
-
 const (
-	MaximumAdmissionRecords = 256
-	MaximumAdmissionLanes   = MaximumAdmissionRecords +
-		MaximumActiveJobs + MaximumFixedLongLivedServices
-	MaximumLaneDepth      = 32
-	admissionRadixBits    = 28
-	inputBodyRecordSlot   = MaximumAdmissionRecords + 1
-	maximumAdmissionNodes = 1 + (MaximumAdmissionRecords+1)*admissionRadixBits
+	admissionRadixBits  = 28
+	inputBodyRecordSlot = 1
 )
 
 type ReservationKind uint8
@@ -40,21 +31,21 @@ const (
 )
 
 type AdmissionLaneRef struct {
-	Slot       uint16
+	Slot       uint32
 	Generation uint32
 }
 
 func (ref AdmissionLaneRef) Valid() bool {
-	return ref.Slot > 0 && ref.Slot <= MaximumAdmissionLanes && ref.Generation > 0
+	return ref.Slot > 0 && ref.Generation > 0
 }
 
 type AdmissionRef struct {
-	Slot       uint16
+	Slot       uint32
 	Generation uint32
 }
 
 func (ref AdmissionRef) Valid() bool {
-	return ref.Slot > 0 && ref.Slot <= MaximumAdmissionRecords && ref.Generation > 0
+	return ref.Slot > inputBodyRecordSlot && ref.Generation > 0
 }
 
 type AdmissionRequestResult struct {
@@ -126,20 +117,25 @@ type admissionRecord struct {
 	ordinaryHeld   bool
 	growthBytes    int64
 	ticket         uint64
-	previous       uint16
-	next           uint16
-	leaf           uint16
+	previous       uint32
+	next           uint32
+	leaf           uint32
 }
 
 type admissionRadixNode struct {
-	parent    uint16
-	children  [2]uint16
-	oldest    [2]uint16
-	head      uint16
-	tail      uint16
-	freeNext  uint16
+	parent    uint32
+	children  [2]uint32
+	oldest    [2]uint32
+	head      uint32
+	tail      uint32
+	freeNext  uint32
 	depth     uint8
 	parentBit uint8
+}
+
+type admissionLaneUse struct {
+	generation uint32
+	count      int
 }
 
 type AdmissionLedger struct {
@@ -149,16 +145,15 @@ type AdmissionLedger struct {
 	runGeneration uint64
 	nextTicket    uint64
 
-	records        [MaximumAdmissionRecords + 2]admissionRecord
-	freeRecordHead uint16
+	records        []admissionRecord
+	freeRecordHead uint32
 	freeRecords    int
 	activeRecords  int
 
-	laneGenerations [MaximumAdmissionLanes + 1]uint32
-	laneCounts      [MaximumAdmissionLanes + 1]uint8
+	lanes map[uint32]admissionLaneUse
 
-	nodes        [maximumAdmissionNodes + 1]admissionRadixNode
-	freeNodeHead uint16
+	nodes        []admissionRadixNode
+	freeNodeHead uint32
 	freeNodes    int
 
 	ordinaryWaiting  int
@@ -169,10 +164,10 @@ type AdmissionLedger struct {
 	longLivedRecords int
 	longLivedBytes   int64
 
-	cleanupHead     uint16
-	cleanupTail     uint16
+	cleanupHead     uint32
+	cleanupTail     uint32
 	cleanupWaiting  int
-	cleanupGrant    uint16
+	cleanupGrant    uint32
 	cleanupRetained bool
 
 	inputBodyCarried        bool
@@ -180,18 +175,13 @@ type AdmissionLedger struct {
 }
 
 func NewAdmissionLedger() *AdmissionLedger {
-	ledger := &AdmissionLedger{phase: admissionOrdinaryOpen, freeRecords: MaximumAdmissionRecords, freeNodes: maximumAdmissionNodes - 1}
-	for index := 1; index <= MaximumAdmissionRecords; index++ {
-		ledger.records[index].next = uint16(index + 1)
+	ledger := &AdmissionLedger{
+		phase:   admissionOrdinaryOpen,
+		records: make([]admissionRecord, inputBodyRecordSlot+1),
+		lanes:   make(map[uint32]admissionLaneUse),
+		nodes:   make([]admissionRadixNode, 2),
 	}
-	ledger.records[MaximumAdmissionRecords].next = 0
-	ledger.freeRecordHead = 1
 	ledger.nodes[1].depth = 0
-	for index := 2; index <= maximumAdmissionNodes; index++ {
-		ledger.nodes[index].freeNext = uint16(index + 1)
-	}
-	ledger.nodes[maximumAdmissionNodes].freeNext = 0
-	ledger.freeNodeHead = 2
 	return ledger
 }
 
@@ -427,7 +417,8 @@ func (ledger *AdmissionLedger) RunFinalizerReady(runGeneration uint64, allowedLo
 		ledger.activeRecords != 0 || ledger.ordinaryWaiting != 0 || ledger.ordinaryGranted != 0 ||
 		ledger.longLivedRecords != allowedLongLivedRecords || ledger.longLivedBytes != allowedLongLivedBytes ||
 		ledger.cleanupWaiting != 0 || ledger.cleanupGrant != 0 || ledger.cleanupRetained || ledger.cleanupHead != 0 || ledger.cleanupTail != 0 ||
-		ledger.oldestInNode(1) != 0 || ledger.freeRecords != MaximumAdmissionRecords || ledger.freeNodes != maximumAdmissionNodes-1 {
+		ledger.oldestInNode(1) != 0 || !ledger.allOperationRecordsFree() ||
+		!ledger.allRadixNodesFree() {
 		return false
 	}
 	if !ledger.inputBodyCarried {
@@ -661,7 +652,11 @@ func (ledger *AdmissionLedger) ReleaseOrdinary(ref AdmissionRef) (bool, error) {
 }
 
 func (ledger *AdmissionLedger) validateRecordLane(record *admissionRecord) error {
-	if record == nil || !record.lane.Valid() || ledger.laneCounts[record.lane.Slot] == 0 || ledger.laneGenerations[record.lane.Slot] != record.lane.Generation {
+	if record == nil || !record.lane.Valid() {
+		return errors.New("jobmgr admission: invalid record lane ownership")
+	}
+	use := ledger.lanes[record.lane.Slot]
+	if use.count == 0 || use.generation != record.lane.Generation {
 		return errors.New("jobmgr admission: invalid record lane ownership")
 	}
 	return nil
@@ -800,14 +795,16 @@ func (ledger *AdmissionLedger) drained() bool {
 	return ledger.activeRecords == 0 && ledger.ordinaryWaiting == 0 && ledger.ordinaryGranted == 0 && ledger.ordinaryBytes == 0 &&
 		ledger.longLivedRecords == 0 && ledger.longLivedBytes == 0 &&
 		ledger.cleanupWaiting == 0 && ledger.cleanupGrant == 0 && !ledger.cleanupRetained && ledger.cleanupHead == 0 && ledger.cleanupTail == 0 &&
-		ledger.oldestInNode(1) == 0 && ledger.freeRecords == MaximumAdmissionRecords && ledger.freeNodes == maximumAdmissionNodes-1 &&
+		ledger.oldestInNode(1) == 0 && ledger.allOperationRecordsFree() &&
+		ledger.allRadixNodesFree() &&
 		ledger.records[inputBodyRecordSlot].state == admissionRecordFree && !ledger.inputBodyCarried && ledger.inputBodyNextGeneration == 0
 }
 
 func (ledger *AdmissionLedger) runDrained(runGeneration uint64) bool {
 	if ledger.phase != admissionCleanupOnly || runGeneration == 0 || ledger.runGeneration != runGeneration || ledger.activeRecords != 0 || ledger.ordinaryWaiting != 0 || ledger.ordinaryGranted != 0 ||
 		ledger.longLivedRecords != 0 || ledger.longLivedBytes != 0 || ledger.cleanupWaiting != 0 || ledger.cleanupGrant != 0 || ledger.cleanupRetained ||
-		ledger.cleanupHead != 0 || ledger.cleanupTail != 0 || ledger.oldestInNode(1) != 0 || ledger.freeRecords != MaximumAdmissionRecords || ledger.freeNodes != maximumAdmissionNodes-1 {
+		ledger.cleanupHead != 0 || ledger.cleanupTail != 0 || ledger.oldestInNode(1) != 0 ||
+		!ledger.allOperationRecordsFree() || !ledger.allRadixNodesFree() {
 		return false
 	}
 	if !ledger.inputBodyCarried {
@@ -830,9 +827,20 @@ func (ledger *AdmissionLedger) Census() AdmissionCensus {
 		InputBodyWaiting: ledger.records[inputBodyRecordSlot].state == admissionInputBodyWaiting || ledger.records[inputBodyRecordSlot].state == admissionInputBodyGrowing,
 		InputBodyCarried: ledger.inputBodyCarried,
 		InputBodyBytes:   ledger.records[inputBodyRecordSlot].heldBytes,
-		AllocatedRadix:   maximumAdmissionNodes - 1 - ledger.freeNodes, FreeRecords: ledger.freeRecords, FreeRadixNodes: ledger.freeNodes,
-		RunGeneration: ledger.runGeneration,
+		AllocatedRadix:   len(ledger.nodes) - 2 - ledger.freeNodes,
+		FreeRecords:      ledger.freeRecords,
+		FreeRadixNodes:   ledger.freeNodes,
+		RunGeneration:    ledger.runGeneration,
 	}
+}
+
+func (ledger *AdmissionLedger) allOperationRecordsFree() bool {
+	return ledger.activeRecords == 0 &&
+		ledger.freeRecords == len(ledger.records)-inputBodyRecordSlot-1
+}
+
+func (ledger *AdmissionLedger) allRadixNodesFree() bool {
+	return ledger.freeNodes == len(ledger.nodes)-2
 }
 
 func (phase admissionPhase) String() string {
@@ -858,13 +866,9 @@ func (ledger *AdmissionLedger) validateRequest(runGeneration uint64, lane Admiss
 	if ledger.runGeneration != 0 && ledger.runGeneration != runGeneration {
 		return errors.New("jobmgr admission: stale run generation")
 	}
-	if ledger.freeRecordHead == 0 || ledger.activeRecords == MaximumAdmissionRecords {
-		return ErrAdmissionRecordCapacity
-	}
-	if count := ledger.laneCounts[lane.Slot]; count != 0 && ledger.laneGenerations[lane.Slot] != lane.Generation {
+	if use := ledger.lanes[lane.Slot]; use.count != 0 &&
+		use.generation != lane.Generation {
 		return errors.New("jobmgr admission: stale lane generation")
-	} else if count >= MaximumLaneDepth {
-		return errors.New("jobmgr admission: lane depth exhausted")
 	}
 	ledger.bindRunGeneration(runGeneration)
 	return nil
@@ -879,39 +883,66 @@ func (ledger *AdmissionLedger) bindRunGeneration(runGeneration uint64) {
 func (ledger *AdmissionLedger) allocateRecord(runGeneration uint64, lane AdmissionLaneRef, bytes int64, state admissionRecordState) (AdmissionRef, error) {
 	slot := ledger.freeRecordHead
 	if slot == 0 {
-		return AdmissionRef{}, ErrAdmissionRecordCapacity
+		if uint64(len(ledger.records)) > uint64(^uint32(0)) {
+			return AdmissionRef{}, errors.New(
+				"jobmgr admission: record reference space exhausted",
+			)
+		}
+		slot = uint32(len(ledger.records))
+		ledger.records = append(ledger.records, admissionRecord{})
+	} else {
+		ledger.freeRecordHead = ledger.records[slot].next
+		ledger.freeRecords--
 	}
 	record := &ledger.records[slot]
-	ledger.freeRecordHead = record.next
-	ledger.freeRecords--
-	record.generation++
-	if record.generation == 0 {
+	generation := record.generation + 1
+	if generation == 0 {
+		*record = admissionRecord{
+			generation: record.generation,
+			next:       ledger.freeRecordHead,
+		}
+		ledger.freeRecordHead = slot
+		ledger.freeRecords++
 		return AdmissionRef{}, errors.New("jobmgr admission: record generation wrapped")
 	}
 	ledger.nextTicket++
 	if ledger.nextTicket == 0 {
+		*record = admissionRecord{
+			generation: record.generation,
+			next:       ledger.freeRecordHead,
+		}
+		ledger.freeRecordHead = slot
+		ledger.freeRecords++
 		return AdmissionRef{}, errors.New("jobmgr admission: ticket sequence wrapped")
 	}
 	*record = admissionRecord{
-		generation: record.generation, state: state, runGeneration: runGeneration,
+		generation: generation, state: state, runGeneration: runGeneration,
 		lane: lane, bytes: bytes, ticket: ledger.nextTicket,
 	}
-	if ledger.laneCounts[lane.Slot] == 0 {
-		ledger.laneGenerations[lane.Slot] = lane.Generation
+	use := ledger.lanes[lane.Slot]
+	if use.count == 0 {
+		use.generation = lane.Generation
 	}
-	ledger.laneCounts[lane.Slot]++
+	use.count++
+	ledger.lanes[lane.Slot] = use
 	ledger.activeRecords++
-	return AdmissionRef{Slot: slot, Generation: record.generation}, nil
+	return AdmissionRef{Slot: slot, Generation: generation}, nil
 }
 
-func (ledger *AdmissionLedger) freeRecord(slot uint16) {
+func (ledger *AdmissionLedger) freeRecord(slot uint32) {
 	record := &ledger.records[slot]
 	generation := record.generation
 	lane := record.lane
 	if lane.Valid() {
-		ledger.laneCounts[lane.Slot]--
-		if ledger.laneCounts[lane.Slot] == 0 {
-			ledger.laneGenerations[lane.Slot] = 0
+		use := ledger.lanes[lane.Slot]
+		if use.count <= 0 || use.generation != lane.Generation {
+			panic("jobmgr admission: invalid lane record release")
+		}
+		use.count--
+		if use.count == 0 {
+			delete(ledger.lanes, lane.Slot)
+		} else {
+			ledger.lanes[lane.Slot] = use
 		}
 	}
 	*record = admissionRecord{generation: generation, next: ledger.freeRecordHead}
@@ -921,7 +952,7 @@ func (ledger *AdmissionLedger) freeRecord(slot uint16) {
 }
 
 func (ledger *AdmissionLedger) record(ref AdmissionRef) (*admissionRecord, error) {
-	if !ref.Valid() {
+	if !ref.Valid() || uint64(ref.Slot) >= uint64(len(ledger.records)) {
 		return nil, errors.New("jobmgr admission: invalid request reference")
 	}
 	record := &ledger.records[ref.Slot]
@@ -947,7 +978,7 @@ func (ledger *AdmissionLedger) resetInputBodyRecord() {
 	ledger.inputBodyNextGeneration = 0
 }
 
-func (ledger *AdmissionLedger) appendCleanup(slot uint16) {
+func (ledger *AdmissionLedger) appendCleanup(slot uint32) {
 	record := &ledger.records[slot]
 	record.previous = ledger.cleanupTail
 	if ledger.cleanupTail == 0 {
@@ -958,7 +989,7 @@ func (ledger *AdmissionLedger) appendCleanup(slot uint16) {
 	ledger.cleanupTail = slot
 }
 
-func (ledger *AdmissionLedger) removeCleanup(slot uint16) {
+func (ledger *AdmissionLedger) removeCleanup(slot uint32) {
 	record := &ledger.records[slot]
 	if record.previous == 0 {
 		ledger.cleanupHead = record.next
@@ -974,9 +1005,9 @@ func (ledger *AdmissionLedger) removeCleanup(slot uint16) {
 	record.next = 0
 }
 
-func (ledger *AdmissionLedger) insertOrdinary(slot uint16) error {
+func (ledger *AdmissionLedger) insertOrdinary(slot uint32) error {
 	record := &ledger.records[slot]
-	nodeIndex := uint16(1)
+	nodeIndex := uint32(1)
 	value := uint32(record.bytes)
 	for depth := 0; depth < admissionRadixBits; depth++ {
 		bit := uint8((value >> uint(admissionRadixBits-1-depth)) & 1)
@@ -988,7 +1019,7 @@ func (ledger *AdmissionLedger) insertOrdinary(slot uint16) error {
 			if err != nil {
 				return err
 			}
-			node.children[bit] = child
+			ledger.nodes[nodeIndex].children[bit] = child
 		}
 		nodeIndex = child
 	}
@@ -1005,7 +1036,7 @@ func (ledger *AdmissionLedger) insertOrdinary(slot uint16) error {
 	return nil
 }
 
-func (ledger *AdmissionLedger) removeOrdinary(slot uint16) {
+func (ledger *AdmissionLedger) removeOrdinary(slot uint32) {
 	record := &ledger.records[slot]
 	leafIndex := record.leaf
 	leaf := &ledger.nodes[leafIndex]
@@ -1038,29 +1069,36 @@ func (ledger *AdmissionLedger) removeOrdinary(slot uint16) {
 	ledger.refreshAncestors(current)
 }
 
-func (ledger *AdmissionLedger) allocateNode(parent uint16, parentBit, depth uint8) (uint16, error) {
+func (ledger *AdmissionLedger) allocateNode(parent uint32, parentBit, depth uint8) (uint32, error) {
 	index := ledger.freeNodeHead
 	if index == 0 {
-		return 0, errors.New("jobmgr admission: radix node capacity exhausted")
+		if uint64(len(ledger.nodes)) > uint64(^uint32(0)) {
+			return 0, errors.New(
+				"jobmgr admission: radix reference space exhausted",
+			)
+		}
+		index = uint32(len(ledger.nodes))
+		ledger.nodes = append(ledger.nodes, admissionRadixNode{})
+	} else {
+		ledger.freeNodeHead = ledger.nodes[index].freeNext
+		ledger.freeNodes--
 	}
-	ledger.freeNodeHead = ledger.nodes[index].freeNext
-	ledger.freeNodes--
 	ledger.nodes[index] = admissionRadixNode{parent: parent, parentBit: parentBit, depth: depth}
 	return index, nil
 }
 
-func (ledger *AdmissionLedger) freeNode(index uint16) {
+func (ledger *AdmissionLedger) freeNode(index uint32) {
 	ledger.nodes[index] = admissionRadixNode{freeNext: ledger.freeNodeHead}
 	ledger.freeNodeHead = index
 	ledger.freeNodes++
 }
 
-func (ledger *AdmissionLedger) nodeEmpty(index uint16) bool {
+func (ledger *AdmissionLedger) nodeEmpty(index uint32) bool {
 	node := ledger.nodes[index]
 	return node.head == 0 && node.children[0] == 0 && node.children[1] == 0
 }
 
-func (ledger *AdmissionLedger) refreshAncestors(childIndex uint16) {
+func (ledger *AdmissionLedger) refreshAncestors(childIndex uint32) {
 	for childIndex != 1 {
 		child := &ledger.nodes[childIndex]
 		parent := &ledger.nodes[child.parent]
@@ -1069,7 +1107,7 @@ func (ledger *AdmissionLedger) refreshAncestors(childIndex uint16) {
 	}
 }
 
-func (ledger *AdmissionLedger) oldestInNode(index uint16) uint16 {
+func (ledger *AdmissionLedger) oldestInNode(index uint32) uint32 {
 	if index == 0 {
 		return 0
 	}
@@ -1080,7 +1118,7 @@ func (ledger *AdmissionLedger) oldestInNode(index uint16) uint16 {
 	return ledger.older(node.oldest[0], node.oldest[1])
 }
 
-func (ledger *AdmissionLedger) older(first, second uint16) uint16 {
+func (ledger *AdmissionLedger) older(first, second uint32) uint32 {
 	if first == 0 {
 		return second
 	}
@@ -1090,7 +1128,7 @@ func (ledger *AdmissionLedger) older(first, second uint16) uint16 {
 	return second
 }
 
-func (ledger *AdmissionLedger) oldestFitting(available int64) (slot uint16, visited int) {
+func (ledger *AdmissionLedger) oldestFitting(available int64) (slot uint32, visited int) {
 	if available <= 0 || ledger.ordinaryWaiting == 0 {
 		return 0, 0
 	}
@@ -1098,7 +1136,7 @@ func (ledger *AdmissionLedger) oldestFitting(available int64) (slot uint16, visi
 		available = OrdinaryBudgetBytes
 	}
 	value := uint32(available)
-	nodeIndex := uint16(1)
+	nodeIndex := uint32(1)
 	visited = 1
 	for depth := 0; depth < admissionRadixBits; depth++ {
 		node := &ledger.nodes[nodeIndex]
@@ -1117,7 +1155,7 @@ func (ledger *AdmissionLedger) oldestFitting(available int64) (slot uint16, visi
 	return slot, visited
 }
 
-func (ledger *AdmissionLedger) grant(slot uint16, kind ReservationKind) AdmissionGrant {
+func (ledger *AdmissionLedger) grant(slot uint32, kind ReservationKind) AdmissionGrant {
 	record := ledger.records[slot]
 	if kind == ReservationInputBodyGrowth {
 		return AdmissionGrant{InputBodyToken: uint64(record.generation), Kind: kind, Bytes: record.heldBytes}

@@ -12,7 +12,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 )
 
@@ -593,21 +592,24 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 	return fixture.terminate(ctx)
 }
 
-func runAgentUIDCapacity(ctx context.Context) error {
+const (
+	formerOperationPopulation = 256
+	formerLanePopulation      = 32
+)
+
+func runAgentUIDGrowthBeyondFormerLimit(ctx context.Context) error {
 	return runAgentHeldFunctionPopulation(
 		ctx,
-		lifecycle.MaximumAdmissionRecords,
-		capacityRoute,
-		"jobmgrtest:echo overflow",
+		formerOperationPopulation+1,
+		func(int) string { return "jobmgrtest:echo held" },
 	)
 }
 
-func runAgentFunctionLaneCapacity(ctx context.Context) error {
+func runAgentFunctionLaneGrowthBeyondFormerLimit(ctx context.Context) error {
 	return runAgentHeldFunctionPopulation(
 		ctx,
-		lifecycle.MaximumLaneDepth,
+		formerLanePopulation+1,
 		func(int) string { return "jobmgrtest:echo held" },
-		"jobmgrtest:echo overflow",
 	)
 }
 
@@ -615,7 +617,6 @@ func runAgentHeldFunctionPopulation(
 	ctx context.Context,
 	admitted int,
 	route func(int) string,
-	overflowRoute string,
 ) error {
 	release := make(chan struct{})
 	entered := make(chan struct{})
@@ -636,7 +637,7 @@ func runAgentHeldFunctionPopulation(
 	}()
 	if err := waitUntil(ctx, func() bool {
 		return fixture.output.contains(
-			`FUNCTION GLOBAL "jobmgrtest:work-005"`,
+			`FUNCTION GLOBAL "jobmgrtest:echo"`,
 		)
 	}); err != nil {
 		return err
@@ -650,34 +651,12 @@ func runAgentHeldFunctionPopulation(
 			return err
 		}
 	}
-	const overflowUID = "jobmgrtest-held-overflow"
-	if err := writeFunctionCall(
-		fixture.input,
-		overflowUID,
-		overflowRoute,
-	); err != nil {
-		return err
-	}
-	overflow, err := waitFunctionResult(
-		ctx,
-		fixture.output,
-		overflowUID,
-	)
-	if err != nil {
-		return err
-	}
-	if overflow.status != 503 {
-		return fmt.Errorf(
-			"overflow Function status=%d, want 503",
-			overflow.status,
-		)
-	}
 	close(release)
 	released = true
 	if err := waitUntil(ctx, func() bool {
 		return fixture.output.count(
 			"FUNCTION_RESULT_BEGIN jobmgrtest-held-",
-		) >= admitted+1
+		) >= admitted
 	}); err != nil {
 		return err
 	}
@@ -720,7 +699,7 @@ func heldFunctionStatuses(output []byte) (map[string]int, error) {
 	return statuses, nil
 }
 
-func runAgentControlAtOrdinaryCapacity(ctx context.Context) error {
+func runAgentControlWithLargeOrdinaryPopulation(ctx context.Context) error {
 	release := make(chan struct{})
 	state := &agentFixtureState{
 		handleGate:          release,
@@ -733,41 +712,19 @@ func runAgentControlAtOrdinaryCapacity(ctx context.Context) error {
 	defer fixture.input.Close()
 	if err := waitUntil(ctx, func() bool {
 		return fixture.output.contains(
-			`FUNCTION GLOBAL "jobmgrtest:work-005"`,
+			`FUNCTION GLOBAL "jobmgrtest:echo"`,
 		)
 	}); err != nil {
 		return err
 	}
-	for index := 0; index < lifecycle.MaximumAdmissionRecords; index++ {
+	for index := 0; index <= formerOperationPopulation; index++ {
 		if err := writeFunctionCall(
 			fixture.input,
 			fmt.Sprintf("jobmgrtest-control-%03d", index),
-			capacityRoute(index),
+			"jobmgrtest:echo held",
 		); err != nil {
 			return err
 		}
-	}
-	const overflowUID = "jobmgrtest-control-overflow"
-	if err := writeFunctionCall(
-		fixture.input,
-		overflowUID,
-		"jobmgrtest:echo overflow",
-	); err != nil {
-		return err
-	}
-	overflow, err := waitFunctionResult(
-		ctx,
-		fixture.output,
-		overflowUID,
-	)
-	if err != nil {
-		return err
-	}
-	if overflow.status != 503 {
-		return fmt.Errorf(
-			"ordinary-capacity probe status=%d, want 503",
-			overflow.status,
-		)
 	}
 	if _, err := io.WriteString(
 		fixture.input,
@@ -782,7 +739,7 @@ func runAgentControlAtOrdinaryCapacity(ctx context.Context) error {
 		}
 	case <-ctx.Done():
 		return errors.New(
-			"CANCEL and QUIT did not progress at ordinary capacity",
+			"CANCEL and QUIT did not progress with a large ordinary population",
 		)
 	}
 	if state.count("raw:echo:cancelled") == 0 {
@@ -791,20 +748,6 @@ func runAgentControlAtOrdinaryCapacity(ctx context.Context) error {
 		)
 	}
 	return nil
-}
-
-func capacityRoute(index int) string {
-	switch index / lifecycle.MaximumLaneDepth {
-	case 0:
-		return "jobmgrtest:echo held"
-	case 1:
-		return "jobmgrtest:json"
-	default:
-		return fmt.Sprintf(
-			"jobmgrtest:work-%03d",
-			index/lifecycle.MaximumLaneDepth-2,
-		)
-	}
 }
 
 func runAgentFunctionTerminalVariants(ctx context.Context) error {
@@ -828,10 +771,6 @@ func runAgentAwaitingTerminalBound(ctx context.Context) error {
 			)
 		},
 	)
-}
-
-func runAgentBoundedShutdown(ctx context.Context) error {
-	return runAgentCollectorLifecycle(ctx, false, false)
 }
 
 type outputFaultCut uint8
@@ -1063,132 +1002,4 @@ func writeFunctionCall(
 		),
 	)
 	return err
-}
-
-func runAgentCleanupCapacity(ctx context.Context) error {
-	return runAgentCollectorLifecycle(ctx, false, true)
-}
-
-func runAgentVnodePrepareVisibility(ctx context.Context) error {
-	return runAgentCollectorLifecycle(ctx, true, false)
-}
-
-func runAgentVnodeCommit(ctx context.Context) error {
-	return runAgentCollectorLifecycle(ctx, true, true)
-}
-
-func runAgentVnodeAbort(ctx context.Context) error {
-	return runAgentAcquiredAbort(ctx, true, false)
-}
-
-func runAgentVnodeAuthorityTransitions(ctx context.Context) error {
-	return runAgentCollectorLifecycle(ctx, true, true)
-}
-
-func runAgentDeferredPayloadBoundary(ctx context.Context) error {
-	return runAgentFunctionResultBoundaries(ctx)
-}
-
-func runAgentFunctionEnvelopeBoundary(ctx context.Context) error {
-	return runAgentFunctionFlow(ctx, false)
-}
-
-func runAgentClosedResultVariants(ctx context.Context) error {
-	return runAgentFunctionFlow(ctx, true)
-}
-
-func runAgentResultCodecGoldens(ctx context.Context) error {
-	return runAgentFunctionFlow(ctx, false)
-}
-
-func runAgentResultGraphValidation(ctx context.Context) error {
-	return runAgentFunctionInvalidJSON(ctx)
-}
-
-func runAgentTransferredPreparationFailure(ctx context.Context) error {
-	return runAgentAcquiredAbort(ctx, true, false)
-}
-
-func runAgentFinalPermitOrdering(ctx context.Context) error {
-	return runAgentCollectorLifecycle(ctx, false, true)
-}
-
-func runAgentRetainedFailedCleanup(ctx context.Context) error {
-	return runAgentBlockingStop(ctx)
-}
-
-func runAgentRetainedSlotProgress(ctx context.Context) error {
-	return runAgentFunctionLaneCapacity(ctx)
-}
-
-func runAgentFourthSlotFailStop(ctx context.Context) error {
-	return runAgentHeldHandlerShutdown(ctx)
-}
-
-func runAgentBackgroundSaturation(ctx context.Context) error {
-	return runAgentBlockingStop(ctx)
-}
-
-func runAgentResponseBeforeDisposal(ctx context.Context) error {
-	return runAgentAwaitingTerminalBound(ctx)
-}
-
-func runAgentLateResultDisposal(ctx context.Context) error {
-	return runAgentLateHandlerQuarantine(ctx)
-}
-
-func runAgentLaneReleaseOrdering(ctx context.Context) error {
-	return runAgentFunctionLaneCapacity(ctx)
-}
-
-func runAgentClaimCancellation(ctx context.Context) error {
-	return runAgentFunctionBurst(ctx)
-}
-
-func runAgentClaimRevalidation(ctx context.Context) error {
-	return runAgentFunctionBurst(ctx)
-}
-
-func runAgentKernelPriority(ctx context.Context) error {
-	return runAgentFunctionBurst(ctx)
-}
-
-func runAgentSourceRotation(ctx context.Context) error {
-	return runAgentFunctionBurst(ctx)
-}
-
-func runAgentTaskSourceFairness(ctx context.Context) error {
-	return runAgentFunctionBurst(ctx)
-}
-
-func runAgentCatalogLookup(ctx context.Context) error {
-	return runAgentFunctionFlow(ctx, false)
-}
-
-func runAgentCatalogMutation(ctx context.Context) error {
-	return runAgentCollectorLifecycle(ctx, false, true)
-}
-
-func runAgentCleanupCapacityExecution(ctx context.Context) error {
-	return runAgentCleanupCapacity(ctx)
-}
-
-func runAgentReadyLaneFairness(ctx context.Context) error {
-	return runAgentFunctionBurst(ctx)
-}
-
-func runAgentOldestFittingAdmission(ctx context.Context) error {
-	return runAgentFunctionResultBoundaries(ctx)
-}
-
-func runAgentTaskPhaseHandshake(ctx context.Context) error {
-	return runAgentFunctionFlow(ctx, false)
-}
-
-func runAgentTaskPhaseCancel(ctx context.Context) error {
-	return runAgentHeldHandlerShutdown(ctx)
-}
-
-func runAgentTimeoutControlFrame(ctx context.Context) error {
-	return runAgentAwaitingTerminalBound(ctx)
 }

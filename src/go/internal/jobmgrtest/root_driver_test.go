@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestShippedRootCaseMapContainsTwelveScenarios(t *testing.T) {
+func TestShippedRootCaseMapIsPredicateExact(t *testing.T) {
 	tests := map[string]struct {
 		caseID string
 		want   int
@@ -39,31 +39,17 @@ func TestShippedRootCaseMapContainsTwelveScenarios(t *testing.T) {
 	}
 }
 
-func TestShippedRootClosureHasExactRootScenarioProduct(t *testing.T) {
-	caseIDs := []string{
-		"F06.1",
-		"F24.20-b-godplugin-terminal",
-		"F24.21-b-godplugin-nonterminal",
-		"F24.22-b-godplugin-hup",
-		"F24.23-b-ibmdplugin-terminal",
-		"F24.24-b-ibmdplugin-nonterminal",
-		"F24.25-b-ibmdplugin-hup",
-		"F24.26-b-scriptsdplugin-terminal",
-		"F24.27-b-scriptsdplugin-nonterminal",
-		"F24.28-b-scriptsdplugin-hup",
-	}
-	var observed []shippedRootRun
-	for _, caseID := range caseIDs {
-		runs, err := shippedRootRuns(caseID)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for _, run := range runs {
-			observed = append(observed, run)
-		}
-	}
+func TestShippedRootScenarioMatrixHasExactRootScenarioProduct(t *testing.T) {
+	observed := shippedRootMatrixRuns()
 	if len(observed) != 12 {
 		t.Fatalf("shipped-root executions=%d, want 12", len(observed))
+	}
+	seen := make(map[shippedRootRun]struct{}, len(observed))
+	for _, run := range observed {
+		if _, exists := seen[run]; exists {
+			t.Fatalf("duplicate shipped-root scenario: %+v", run)
+		}
+		seen[run] = struct{}{}
 	}
 	for _, root := range []string{
 		"godplugin",
@@ -74,18 +60,12 @@ func TestShippedRootClosureHasExactRootScenarioProduct(t *testing.T) {
 			"terminal",
 			"all-pipe",
 			"repeated-hup",
+			"shutdown",
 		} {
 			run := shippedRootRun{
 				root: root, scenario: scenario,
 			}
-			found := false
-			for _, candidate := range observed {
-				if candidate == run {
-					found = true
-					break
-				}
-			}
-			if !found {
+			if _, exists := seen[run]; !exists {
 				t.Fatalf("missing shipped-root scenario: %+v", run)
 			}
 		}

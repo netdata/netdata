@@ -2976,7 +2976,7 @@ func TestKernelCancelsResultWaitingForAdmissionGrowth(t *testing.T) {
 		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) { return sealed, nil })}, nil
 	})
 	kernel, run, admission, uids, _ := newKernelWithPlanner(t, planner)
-	blocker := admission.RequestOrdinary(run.Generation(), lifecycle.AdmissionLaneRef{Slot: lifecycle.MaximumAdmissionRecords, Generation: 1}, lifecycle.OrdinaryBudgetBytes-1024*1024)
+	blocker := admission.RequestOrdinary(run.Generation(), lifecycle.AdmissionLaneRef{Slot: ^uint32(0), Generation: 1}, lifecycle.OrdinaryBudgetBytes-1024*1024)
 	if blocker.Rejected != nil {
 		t.Fatal(blocker.Rejected)
 	}
@@ -3140,12 +3140,6 @@ func TestKernelClosedAdmissionDoesNotRearmFrameBlockedControl(t *testing.T) {
 	if kernel.hasRunnableSubmissions() {
 		t.Fatal("frame-blocked control was reported as immediately runnable")
 	}
-	kernel.blockedSubmissions[source] = submission{
-		request: Request{UID: "ordinary", Source: lifecycle.SourceFunction, Route: "route"},
-	}
-	if !kernel.hasRunnableSubmissions() {
-		t.Fatal("admission-blocked request was not exposed after admission closed")
-	}
 }
 
 func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
@@ -3271,119 +3265,6 @@ func TestKernelSubmissionBacklogCannotStarveDueDeadline(t *testing.T) {
 	closeUIDLedger(t, uids)
 }
 
-func TestKernelExternalSubmissionWaitsForRecordCapacityInSourceFIFO(t *testing.T) {
-	kernel, run, admission, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
-	fillers := fillAdmissionRecordCapacity(t, admission, run.Generation())
-	firstResult := make(chan error, 1)
-	secondResult := make(chan error, 1)
-	source := sourceIndex(lifecycle.SourceJobManager)
-	firstRequest := Request{
-		UID: "first", LaneKey: "lane", Source: lifecycle.SourceJobManager, Route: "route",
-	}
-	firstPlan, err := kernel.prepareSubmissionPlanForTest(firstRequest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	kernel.submissions[source] <- submission{
-		request: firstRequest,
-		plan:    firstPlan,
-		result:  firstResult,
-	}
-	secondRequest := Request{
-		UID: "second", LaneKey: "lane", Source: lifecycle.SourceJobManager, Route: "route",
-	}
-	secondPlan, err := kernel.prepareSubmissionPlanForTest(secondRequest)
-	if err != nil {
-		t.Fatal(err)
-	}
-	kernel.submissions[source] <- submission{
-		request: secondRequest,
-		plan:    secondPlan,
-		result:  secondResult,
-	}
-
-	kernel.serviceSubmissions(1)
-	if !kernel.blockedSubmission[source] || len(kernel.submissions[source]) != 1 {
-		t.Fatalf("capacity block did not retain exactly the source head: blocked=%v queued=%d", kernel.blockedSubmission[source], len(kernel.submissions[source]))
-	}
-	select {
-	case err := <-firstResult:
-		t.Fatalf("capacity-blocked submission completed early: %v", err)
-	default:
-	}
-
-	if err := admission.CancelWaiting(fillers[0]); err != nil {
-		t.Fatal(err)
-	}
-	kernel.serviceSubmissions(1)
-	select {
-	case err := <-firstResult:
-		t.Fatalf("record allocation was mistaken for B admission: %v", err)
-	default:
-	}
-	if kernel.blockedSubmission[source] || len(kernel.submissions[source]) != 1 {
-		t.Fatalf("first retry did not preserve the later source item: blocked=%v queued=%d", kernel.blockedSubmission[source], len(kernel.submissions[source]))
-	}
-	select {
-	case err := <-secondResult:
-		t.Fatalf("later source submission completed before service: %v", err)
-	default:
-	}
-
-	if err := admission.CancelWaiting(fillers[1]); err != nil {
-		t.Fatal(err)
-	}
-	kernel.serviceSubmissions(1)
-	select {
-	case err := <-secondResult:
-		t.Fatalf("record allocation was mistaken for B admission: %v", err)
-	default:
-	}
-	first := kernel.operations["first"]
-	second := kernel.operations["second"]
-	if first == nil || second == nil || first.ID >= second.ID {
-		t.Fatalf("source FIFO operation order differs: first=%#v second=%#v", first, second)
-	}
-}
-
-func TestKernelExternalSubmissionCapacityBlockFlushesAfterAdmissionClose(t *testing.T) {
-	kernel, run, admission, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
-	fillAdmissionRecordCapacity(t, admission, run.Generation())
-	result := make(chan error, 1)
-	source := sourceIndex(lifecycle.SourceJobManager)
-	request := Request{
-		UID: "closing", LaneKey: "lane", Source: lifecycle.SourceJobManager, Route: "route",
-	}
-	plan, err := kernel.prepareSubmissionPlanForTest(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	kernel.submissions[source] <- submission{
-		request: request,
-		plan:    plan,
-		result:  result,
-	}
-	kernel.serviceSubmissions(1)
-	if !kernel.blockedSubmission[source] {
-		t.Fatal("submission did not block at record capacity")
-	}
-
-	run.CloseAdmission()
-	kernel.serviceSubmissions(1)
-	if err := <-result; err == nil || !strings.Contains(err.Error(), "admission closed") {
-		t.Fatalf("closed admission result differs: %v", err)
-	}
-	if kernel.blockedSubmission[source] {
-		t.Fatal("closed admission retained blocked submission")
-	}
-}
-
 func TestKernelPreAdmissionRejectionCommitsWithoutUIDOrAdmissionRecord(t *testing.T) {
 	var output bytes.Buffer
 	kernel, run, admission, uids, _ := newKernelWithPlannerAndWriter(t, stoppedKernelPlanner{}, &output)
@@ -3410,22 +3291,6 @@ func TestKernelPreAdmissionRejectionCommitsWithoutUIDOrAdmissionRecord(t *testin
 		t.Fatal(err)
 	}
 	closeUIDLedger(t, uids)
-}
-
-func fillAdmissionRecordCapacity(t *testing.T, admission *lifecycle.AdmissionLedger, runGeneration uint64) []lifecycle.AdmissionRef {
-	t.Helper()
-	refs := make([]lifecycle.AdmissionRef, 0, lifecycle.MaximumAdmissionRecords)
-	for slot := 1; slot <= lifecycle.MaximumAdmissionRecords; slot++ {
-		requested := admission.RequestOrdinary(runGeneration, lifecycle.AdmissionLaneRef{Slot: uint16(slot), Generation: 1}, 1)
-		if requested.Rejected != nil {
-			t.Fatalf("fill admission record %d: %v", slot, requested.Rejected)
-		}
-		refs = append(refs, requested.Ref)
-	}
-	if census := admission.Census(); census.ActiveRecords != lifecycle.MaximumAdmissionRecords || census.FreeRecords != 0 {
-		t.Fatalf("record-capacity census differs: %#v", census)
-	}
-	return refs
 }
 
 func TestKernelDeadlineServiceHasFixedQuantum(t *testing.T) {
@@ -3605,7 +3470,7 @@ func (clock *kernelFinalizerClock) advance(delay time.Duration) {
 
 func closeUIDLedger(t *testing.T, ledger *lifecycle.UIDLedger) {
 	t.Helper()
-	for batch := 0; batch < lifecycle.MaximumUIDRecords/lifecycle.UIDReturnBatch; batch++ {
+	for {
 		more, err := ledger.CloseBatch(lifecycle.UIDReturnBatch)
 		if err != nil {
 			t.Fatal(err)
@@ -3614,7 +3479,6 @@ func closeUIDLedger(t *testing.T, ledger *lifecycle.UIDLedger) {
 			return
 		}
 	}
-	t.Fatal("UID close exceeded fixed batch bound")
 }
 
 type plannerFunc func(context.Context, string, []string) (WorkPlan, error)

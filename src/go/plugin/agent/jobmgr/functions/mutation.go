@@ -553,7 +553,7 @@ func (builder *MutationBuilder) startRouteStep() {
 			replacement = change.resolved
 			transition.newRoute = replacement
 		} else if transition.oldRoute != nil &&
-			transition.oldRoute.handler.invocationLeases != 0 {
+			transition.oldRoute.invocationLeases != 0 {
 			replacement = transition.oldRoute
 			transition.tombstone = true
 			replacement.retiringNamePath = change.namePath
@@ -841,15 +841,8 @@ func (catalog *Catalog) commitMutation(postimage *MutationPostimage, cleanups *[
 		}
 		if transition.tombstone {
 			retired := transition.oldRoute
-			if retired.handler.invocationLeases == 0 {
-				retired.retiringDrained = true
-				retired.retiringNext = catalog.deferredPrune
-				catalog.deferredPrune = retired
-			} else {
-				retired.retiringNext =
-					retired.handler.retiringHead
-				retired.handler.retiringHead = retired
-			}
+			retired.retiring = true
+			catalog.retireDrainedRoute(retired)
 		}
 	}
 	catalog.routes = postimage.root

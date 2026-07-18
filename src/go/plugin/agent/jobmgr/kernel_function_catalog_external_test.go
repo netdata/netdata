@@ -466,7 +466,7 @@ func (externalPlanner) Plan(jobmgr.Request) (jobmgr.WorkPlan, error) {
 
 func closeExternalUIDLedger(t *testing.T, ledger *lifecycle.UIDLedger) {
 	t.Helper()
-	for batch := 0; batch < lifecycle.MaximumUIDRecords/lifecycle.UIDReturnBatch; batch++ {
+	for {
 		more, err := ledger.CloseBatch(lifecycle.UIDReturnBatch)
 		if err != nil {
 			t.Fatal(err)
@@ -475,5 +475,4 @@ func closeExternalUIDLedger(t *testing.T, ledger *lifecycle.UIDLedger) {
 			return
 		}
 	}
-	t.Fatal("UID close exceeded fixed batch bound")
 }

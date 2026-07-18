@@ -34,7 +34,6 @@ type options struct {
 	baselineBundle      string
 	evidenceDirectory   string
 	rootConfigDirectory string
-	ibmBuildManifest    string
 }
 
 type phaseArtifacts struct {
@@ -43,6 +42,13 @@ type phaseArtifacts struct {
 	ibmdplugin     string
 	scriptsdplugin string
 	source         buildidentity.Source
+}
+
+type phaseBuildTarget struct {
+	path       string
+	importPath string
+	tags       string
+	cgo        string
 }
 
 type packageGates struct {
@@ -85,6 +91,9 @@ func run(arguments []string) error {
 	}
 	cases, err := contract.BMM002Cases()
 	if err != nil {
+		return err
+	}
+	if err := contract.ValidateEvidenceContract(); err != nil {
 		return err
 	}
 	gates, err := collectPackageGates(cases)
@@ -207,12 +216,6 @@ func parseOptions(arguments []string) (options, error) {
 		"",
 		"absolute isolated root config directory with empty jobs",
 	)
-	flags.StringVar(
-		&opts.ibmBuildManifest,
-		"ibm-build-manifest",
-		"",
-		"absolute exact-tree IBM build manifest",
-	)
 	if err := flags.Parse(arguments); err != nil {
 		return options{}, err
 	}
@@ -226,7 +229,6 @@ func parseOptions(arguments []string) (options, error) {
 		"baseline bundle":       opts.baselineBundle,
 		"evidence directory":    opts.evidenceDirectory,
 		"root config directory": opts.rootConfigDirectory,
-		"IBM build manifest":    opts.ibmBuildManifest,
 	}
 	for name, value := range paths {
 		if !filepath.IsAbs(value) {
@@ -249,12 +251,6 @@ func validateInputs(opts options) error {
 	if info, err := os.Stat(filepath.Join(opts.goRoot, "go.mod")); err != nil ||
 		!info.Mode().IsRegular() {
 		return errors.New("jobmgr phase: Go module root is unavailable")
-	}
-	if info, err := os.Lstat(opts.ibmBuildManifest); err != nil ||
-		!info.Mode().IsRegular() {
-		return errors.New(
-			"jobmgr phase: IBM build manifest is unavailable",
-		)
 	}
 	if _, err := os.Stat(opts.evidenceDirectory); !os.IsNotExist(err) {
 		return errors.New(
@@ -289,14 +285,6 @@ func buildPhaseArtifacts(
 	if err != nil {
 		return phaseArtifacts{}, func() {}, err
 	}
-	ibmdplugin, err := buildidentity.VerifyIBMManifest(
-		ctx,
-		opts.goRoot,
-		opts.ibmBuildManifest,
-	)
-	if err != nil {
-		return phaseArtifacts{}, func() {}, err
-	}
 	directory, err := os.MkdirTemp("", "jobmgrtest-phase-build-")
 	if err != nil {
 		return phaseArtifacts{}, func() {}, err
@@ -305,27 +293,11 @@ func buildPhaseArtifacts(
 	artifacts := phaseArtifacts{
 		production:     filepath.Join(directory, "jobmgrtest-agent"),
 		godplugin:      filepath.Join(directory, "go.d.plugin"),
-		ibmdplugin:     ibmdplugin,
+		ibmdplugin:     filepath.Join(directory, "ibm.d.plugin"),
 		scriptsdplugin: filepath.Join(directory, "scripts.d.plugin"),
 		source:         source,
 	}
-	targets := map[string]struct {
-		path       string
-		importPath string
-	}{
-		"production Agent driver": {
-			path:       artifacts.production,
-			importPath: "./internal/jobmgrtest/cmd/agent",
-		},
-		"go.d.plugin": {
-			path:       artifacts.godplugin,
-			importPath: "./cmd/godplugin",
-		},
-		"scripts.d.plugin": {
-			path:       artifacts.scriptsdplugin,
-			importPath: "./cmd/scriptsdplugin",
-		},
-	}
+	targets := phaseBuildTargets(artifacts)
 	names := make([]string, 0, len(targets))
 	for name := range targets {
 		names = append(names, name)
@@ -333,18 +305,23 @@ func buildPhaseArtifacts(
 	sort.Strings(names)
 	for _, name := range names {
 		target := targets[name]
-		command := exec.CommandContext(
-			ctx,
-			"go",
+		arguments := []string{
 			"build",
 			"-trimpath",
+		}
+		if target.tags != "" {
+			arguments = append(arguments, "-tags="+target.tags)
+		}
+		arguments = append(
+			arguments,
 			"-o",
 			target.path,
 			target.importPath,
 		)
+		command := exec.CommandContext(ctx, "go", arguments...)
 		command.Dir = opts.goRoot
 		command.Env = phaseGoEnvironment(
-			map[string]string{"CGO_ENABLED": "0"},
+			map[string]string{"CGO_ENABLED": target.cgo},
 		)
 		command.Stdout = os.Stderr
 		command.Stderr = os.Stderr
@@ -360,10 +337,6 @@ func buildPhaseArtifacts(
 			cleanup()
 			return phaseArtifacts{}, func() {}, err
 		}
-	}
-	if err := validateExecutable("ibm.d.plugin", artifacts.ibmdplugin); err != nil {
-		cleanup()
-		return phaseArtifacts{}, func() {}, err
 	}
 	same, err := sameExecutableContent(
 		baselineExecutable,
@@ -396,6 +369,34 @@ func buildPhaseArtifacts(
 		)
 	}
 	return artifacts, cleanup, nil
+}
+
+func phaseBuildTargets(
+	artifacts phaseArtifacts,
+) map[string]phaseBuildTarget {
+	return map[string]phaseBuildTarget{
+		"production Agent driver": {
+			path:       artifacts.production,
+			importPath: "./internal/jobmgrtest/cmd/agent",
+			cgo:        "0",
+		},
+		"go.d.plugin": {
+			path:       artifacts.godplugin,
+			importPath: "./cmd/godplugin",
+			cgo:        "0",
+		},
+		"ibm.d.plugin": {
+			path:       artifacts.ibmdplugin,
+			importPath: "./cmd/ibmdplugin",
+			tags:       "ibm_mq",
+			cgo:        "1",
+		},
+		"scripts.d.plugin": {
+			path:       artifacts.scriptsdplugin,
+			importPath: "./cmd/scriptsdplugin",
+			cgo:        "0",
+		},
+	}
 }
 
 func sameExecutableContent(left, right string) (bool, error) {
@@ -660,6 +661,7 @@ func productionSuiteTests() []string {
 		"TestProductionAgentCases",
 		"TestProductionProcessCases",
 		"TestProductionShippedRootCases",
+		"TestProductionShippedRootScenarioMatrix",
 		"TestProductionCollectorBoundaryCases",
 		"TestProductionResolverCases",
 	}

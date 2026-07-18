@@ -219,7 +219,6 @@ type handlerGeneration struct {
 	cleanupPending   bool
 	cleaned          bool
 	cleanupFailed    bool
-	retiringHead     *route
 }
 
 func (generation *handlerGeneration) RunTask(ctx context.Context) (lifecycle.TaskOutcome, error) {
@@ -253,6 +252,8 @@ type route struct {
 	rawPayload          bool
 	transaction         *ResourceTransactionDeclaration
 	admissionClosed     bool
+	invocationLeases    int
+	retiring            bool
 	retiringDrained     bool
 	retiringNamePath    []*catalogNode
 	retiringPrefixPath  []*prefixNode
@@ -422,7 +423,7 @@ type Catalog struct {
 	mutation    *MutationBuilder
 	storage     catalogStorage
 
-	invocations [lifecycle.MaximumAdmissionRecords + 1]invocationSlot
+	invocations []*invocationSlot
 	freeLease   uint32
 
 	closeHead *route
@@ -491,14 +492,10 @@ func NewCatalog(declarations []Declaration) (*Catalog, error) {
 	}
 	catalog := &Catalog{
 		generations: make(map[jobmgr.FunctionCleanupRef]*handlerGeneration, len(declarations)),
+		invocations: make([]*invocationSlot, 1),
 		nextRouteID: 1,
 		version:     1,
 	}
-	for index := 1; index <= lifecycle.MaximumAdmissionRecords; index++ {
-		catalog.invocations[index].freeNext = uint32(index + 1)
-	}
-	catalog.invocations[lifecycle.MaximumAdmissionRecords].freeNext = 0
-	catalog.freeLease = 1
 
 	for _, checkedRoute := range checked {
 		if err := catalog.addInitial(checkedRoute.declaration, checkedRoute.generation); err != nil {
@@ -686,15 +683,28 @@ func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.
 	}
 	lane := resolved.lane.resolve(resolved.id, lookup.Args)
 	generation := resolved.handler
-	if resolved.admissionClosed ||
-		generation.admissionClosed ||
-		catalog.freeLease == 0 {
+	if resolved.admissionClosed || generation.admissionClosed {
 		return jobmgr.FunctionCatalogDecision{Lane: lane, Rejected: lifecycle.ControlUnavailable}, nil
 	}
 
 	slotIndex := catalog.freeLease
-	slot := &catalog.invocations[slotIndex]
-	catalog.freeLease = slot.freeNext
+	var slot *invocationSlot
+	if slotIndex == 0 {
+		if uint64(len(catalog.invocations)) > uint64(^uint32(0)) {
+			return jobmgr.FunctionCatalogDecision{},
+				errors.New("jobmgr Function catalog: invocation reference exhausted")
+		}
+		slotIndex = uint32(len(catalog.invocations))
+		slot = &invocationSlot{}
+		catalog.invocations = append(catalog.invocations, slot)
+	} else {
+		slot = catalog.invocations[slotIndex]
+		if slot == nil {
+			return jobmgr.FunctionCatalogDecision{},
+				errors.New("jobmgr Function catalog: invalid free invocation slot")
+		}
+		catalog.freeLease = slot.freeNext
+	}
 	nextGeneration := slot.generation + 1
 	if nextGeneration == 0 {
 		slot.freeNext = catalog.freeLease
@@ -710,6 +720,7 @@ func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.
 			Timeout: lookup.Timeout, HasPayload: lookup.HasPayload,
 		},
 	}
+	resolved.invocationLeases++
 	generation.invocationLeases++
 	catalog.invocationCount++
 	plan := jobmgr.WorkPlan{
@@ -743,22 +754,30 @@ func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.
 }
 
 func (catalog *Catalog) ReleaseInvocation(ref jobmgr.FunctionInvocationRef) (jobmgr.FunctionCleanupPlan, error) {
-	if catalog == nil || !ref.Valid() || ref.Slot > lifecycle.MaximumAdmissionRecords {
+	if catalog == nil || !ref.Valid() || uint64(ref.Slot) >= uint64(len(catalog.invocations)) {
 		return jobmgr.FunctionCleanupPlan{}, errors.New("jobmgr Function catalog: invalid invocation release")
 	}
-	slot := &catalog.invocations[ref.Slot]
+	slot := catalog.invocations[ref.Slot]
+	if slot == nil {
+		return jobmgr.FunctionCleanupPlan{}, errors.New("jobmgr Function catalog: invalid invocation release")
+	}
 	if slot.generation != ref.Generation || slot.resolved == nil || slot.resolved.handler == nil {
 		return jobmgr.FunctionCleanupPlan{}, errors.New("jobmgr Function catalog: stale invocation release")
 	}
 	generation := slot.resolved.handler
-	if generation.invocationLeases <= 0 || catalog.invocationCount <= 0 {
+	if slot.resolved.invocationLeases <= 0 ||
+		generation.invocationLeases <= 0 ||
+		catalog.invocationCount <= 0 {
 		return jobmgr.FunctionCleanupPlan{}, errors.New("jobmgr Function catalog: invocation lease underflow")
 	}
+	resolved := slot.resolved
+	resolved.invocationLeases--
 	generation.invocationLeases--
 	catalog.invocationCount--
 	slotGeneration := slot.generation
 	*slot = invocationSlot{generation: slotGeneration, freeNext: catalog.freeLease}
 	catalog.freeLease = ref.Slot
+	catalog.retireDrainedRoute(resolved)
 	return catalog.maybeCleanup(generation)
 }
 
@@ -770,30 +789,21 @@ func (catalog *Catalog) maybeCleanup(generation *handlerGeneration) (jobmgr.Func
 		generation.invocationLeases != 0 || generation.cleanupPending || generation.cleaned {
 		return jobmgr.FunctionCleanupPlan{}, nil
 	}
-	catalog.retireDrainedRoutes(generation)
 	return catalog.cleanupDrainedGeneration(generation), nil
 }
 
-func (catalog *Catalog) retireDrainedRoutes(
-	generation *handlerGeneration,
-) {
-	if catalog == nil || generation == nil ||
-		generation.retiringHead == nil {
+func (catalog *Catalog) retireDrainedRoute(retired *route) {
+	if catalog == nil || retired == nil || !retired.retiring ||
+		retired.retiringDrained || retired.invocationLeases != 0 {
 		return
 	}
-	routes := generation.retiringHead
-	generation.retiringHead = nil
+	retired.retiringDrained = true
 	if catalog.mutation != nil {
-		for route := routes; route != nil; {
-			next := route.retiringNext
-			route.retiringDrained = true
-			route.retiringNext = catalog.deferredPrune
-			catalog.deferredPrune = route
-			route = next
-		}
+		retired.retiringNext = catalog.deferredPrune
+		catalog.deferredPrune = retired
 		return
 	}
-	catalog.pruneRetiringRoutes(routes)
+	catalog.pruneRetiringRoutes(retired)
 }
 
 func (catalog *Catalog) pruneRetiringRoutes(routes *route) {

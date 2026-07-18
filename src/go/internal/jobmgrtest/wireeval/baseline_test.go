@@ -30,10 +30,13 @@ func TestBaselineBundleVerifiesExactFilesAndPlatform(t *testing.T) {
 		t.Fatal(err)
 	}
 	metadata := baselineMetadata{
-		Schema:              "jobmgr-bm001-baseline-metadata-v1",
-		CurrentBinarySHA256: executableSHA256,
-		FixtureSHA256:       fixtureSHA256,
+		Schema:                  "jobmgr-bm001-baseline-metadata-v1",
+		CurrentBinarySHA256:     executableSHA256,
+		FixtureSHA256:           fixtureSHA256,
+		PerformanceDriverSHA256: "driver",
 	}
+	metadata.Source.HeadCommit = "revision"
+	metadata.Source.HeadTree = "tree"
 	metadata.Environment.GoVersion = runtime.Version()
 	metadata.Environment.GOOS = runtime.GOOS
 	metadata.Environment.GOARCH = runtime.GOARCH
@@ -67,7 +70,20 @@ func TestBaselineBundleVerifiesExactFilesAndPlatform(t *testing.T) {
 	); err != nil {
 		t.Fatal(err)
 	}
-	bundle, err := VerifyBaselineBundle(directory)
+	identity := baselineIdentityContract{
+		SourceRevision:          metadata.Source.HeadCommit,
+		SourceTree:              metadata.Source.HeadTree,
+		PerformanceDriverSHA256: metadata.PerformanceDriverSHA256,
+		FixtureSHA256:           fixtureSHA256,
+		Executables: map[baselinePlatform]string{
+			{
+				GOOS:      runtime.GOOS,
+				GOARCH:    runtime.GOARCH,
+				GoVersion: runtime.Version(),
+			}: executableSHA256,
+		},
+	}
+	bundle, err := verifyBaselineBundle(directory, identity)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -76,10 +92,15 @@ func TestBaselineBundleVerifiesExactFilesAndPlatform(t *testing.T) {
 		bundle.MetadataSHA256 != metadataSHA256 {
 		t.Fatalf("verified bundle differs: %#v", bundle)
 	}
+	if _, err := VerifyBaselineBundle(directory); err == nil {
+		t.Fatal(
+			"caller-consistent bundle passed the compiled Step-0 identity",
+		)
+	}
 	if err := os.WriteFile(fixture, []byte("changed"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := VerifyBaselineBundle(directory); err == nil {
+	if _, err := verifyBaselineBundle(directory, identity); err == nil {
 		t.Fatal("mutated fixture passed baseline verification")
 	}
 }

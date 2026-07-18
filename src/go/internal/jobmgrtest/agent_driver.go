@@ -1261,12 +1261,7 @@ func fixtureInstanceRegistry(
 func fixtureCapacityRegistry(
 	state *agentFixtureState,
 ) collectorapi.Registry {
-	return fixtureRegistryWithFunctions(
-		state,
-		false,
-		false,
-		lifecycle.MaximumUIDRecords/lifecycle.MaximumLaneDepth,
-	)
+	return fixtureRegistryWithFunctions(state, false, false, 2)
 }
 
 func fixtureOutputRegistry(

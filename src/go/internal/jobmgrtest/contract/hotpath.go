@@ -33,7 +33,7 @@ var bmM002HotpathRows = [...]HotpathGate{
 		OwnerID: "B-O-00003",
 		Package: "./plugin/agent/jobmgr",
 		Tests: []string{
-			"TestKernelFunctionLaneDepthPreservesCrossLaneProgress",
+			"TestKernelFunctionLaneGrowsAndPreservesCrossLaneProgress",
 			"TestKernelReadyLaneFairnessAtBoundaries",
 		},
 		Benchmark: "BenchmarkBCommandKernelLaneOps",
@@ -99,7 +99,7 @@ var bmM002HotpathRows = [...]HotpathGate{
 		OwnerID: "B-O-00010",
 		Package: "./plugin/agent/jobmgr/lifecycle",
 		Tests: []string{
-			"TestUIDLedgerTombstoneCardinalityBoundaries",
+			"TestUIDLedgerTombstonePopulationGrowsBeyondFormerBoundary",
 			"TestUIDLedgerAdmissionReapsOneBoundedExpiredPrefix",
 			"TestUIDLedgerCloseUsesBoundedAcknowledgedBatches",
 		},
@@ -121,6 +121,7 @@ var bmM002HotpathRows = [...]HotpathGate{
 			"TestFunctionCatalogLookupLeaseSameTurn",
 			"TestFunctionCatalogAtomicMutation",
 			"TestFunctionCatalogBoundedMutationTurns",
+			"TestFunctionCatalogLookupAndHandlerLeaseAllocateNothing",
 		},
 		Benchmark: "BenchmarkBFunctionCatalogLookup",
 	},
@@ -130,6 +131,8 @@ var bmM002HotpathRows = [...]HotpathGate{
 		Tests: []string{
 			"TestHandlerLeaseLifecycle",
 			"TestHandlerCleanupOnce",
+			"TestFunctionCatalogSharedGenerationUsesRouteLocalLeaseDrain",
+			"TestFunctionCatalogLookupAndHandlerLeaseAllocateNothing",
 		},
 		Benchmark: "BenchmarkBHandlerLease",
 	},
@@ -137,8 +140,8 @@ var bmM002HotpathRows = [...]HotpathGate{
 		OwnerID: "B-O-00014",
 		Package: "./plugin/agent/jobmgr/functions",
 		Tests: []string{
-			"TestFunctionPublicationDiff",
-			"TestFunctionPublicationNoRearm",
+			"TestFunctionPublicationSteadyPollAllocatesNothing",
+			"TestFunctionPublicationMismatchedAcknowledgementPoisonsAndRetainsHandle",
 		},
 		Benchmark: "BenchmarkBFunctionPublication",
 	},
@@ -174,6 +177,8 @@ var bmM002HotpathRows = [...]HotpathGate{
 		Tests: []string{
 			"TestJobGenerationV1V2",
 			"TestJobGenerationPermitReturnLast",
+			"TestSchedulerWarmTickDoesNotAllocate",
+			"TestSchedulerGrowsBeyondFormerActiveJobLimit",
 		},
 		Benchmark: "BenchmarkBJobGenerationLookup",
 	},
@@ -242,7 +247,7 @@ var bmM002HotpathRows = [...]HotpathGate{
 		OwnerID: "B-O-00026",
 		Package: "./plugin/agent/secrets/secretstore",
 		Tests: []string{
-			"TestSecretCreatorCatalog",
+			"TestSecretCreatorCatalogLookupAllocatesNothing",
 		},
 		Benchmark: "BenchmarkBSecretCreatorLookup",
 	},
@@ -250,7 +255,7 @@ var bmM002HotpathRows = [...]HotpathGate{
 		OwnerID: "B-O-00031",
 		Package: "./plugin/agent/discovery",
 		Tests: []string{
-			"TestDiscoveryProviderCatalog",
+			"TestDiscoveryProviderCatalogLookupAllocatesNothing",
 		},
 		Benchmark: "BenchmarkBDiscoveryFactoryLookup",
 	},
@@ -277,7 +282,7 @@ var bmM002HotpathRows = [...]HotpathGate{
 		Package: "./plugin/agent/jobmgr/composition",
 		Tests: []string{
 			"TestProcessCoreRestartsOneInputAndMovesFrameAuthority",
-			"TestRunGenerationPreservesFullJobCapacityWithDiscoveryPipeline",
+			"TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveryPipeline",
 		},
 		Benchmark: "BenchmarkBProcessRestart",
 	},
@@ -285,7 +290,7 @@ var bmM002HotpathRows = [...]HotpathGate{
 		OwnerID: "B-O-00037",
 		Package: "./plugin/agent/jobmgr/composition",
 		Tests: []string{
-			"TestModuleCatalogPolicyIsFrozenAtProcessConstruction",
+			"TestModuleCatalogLookupAllocatesNothing",
 		},
 		Benchmark: "BenchmarkBModuleLookup",
 	},

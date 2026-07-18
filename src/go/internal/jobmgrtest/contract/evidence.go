@@ -20,6 +20,168 @@ type CaseEvidence struct {
 	Components       []ComponentProof
 }
 
+type runtimePredicateDeclaration struct {
+	Suite     RuntimeSuite
+	Predicate string
+}
+
+// runtimePredicateByCase is the closed executable runtime contract. Entries
+// are explicit so adding or reclassifying a case cannot silently inherit its
+// case label as runtime credit.
+var runtimePredicateByCase = map[string]runtimePredicateDeclaration{
+	"F01.1": {
+		Suite: SuiteAgent, Predicate: "F01.1",
+	},
+	"F01.2": {
+		Suite: SuiteAgent, Predicate: "F01.2",
+	},
+	"F02.1-v1-synthetic": {
+		Suite: SuiteAgent, Predicate: "F02.1-v1-synthetic",
+	},
+	"F02.1-v2-synthetic": {
+		Suite: SuiteAgent, Predicate: "F02.1-v2-synthetic",
+	},
+	"F02.1-v2-nested-cleanup-boundary": {
+		Suite:     SuiteAgent,
+		Predicate: "F02.1-v2-nested-cleanup-boundary",
+	},
+	"F02.2": {
+		Suite: SuiteAgent, Predicate: "F02.2",
+	},
+	"F02.3": {
+		Suite: SuiteAgent, Predicate: "F02.3",
+	},
+	"F04.2": {
+		Suite: SuiteAgent, Predicate: "F04.2",
+	},
+	"F04.3": {
+		Suite: SuiteAgent, Predicate: "F04.3",
+	},
+	"F05.1": {
+		Suite: SuiteAgent, Predicate: "F05.1",
+	},
+	"F05.2": {
+		Suite: SuiteProcess, Predicate: "F05.2",
+	},
+	"F05.3": {
+		Suite: SuiteProcess, Predicate: "F05.3",
+	},
+	"F06.1": {
+		Suite: SuiteShippedRoot, Predicate: "F06.1",
+	},
+	"F06.2": {
+		Suite: SuiteProcess, Predicate: "F06.2",
+	},
+	"F07.1": {
+		Suite: SuiteAgent, Predicate: "F07.1",
+	},
+	"F07.2": {
+		Suite: SuiteAgent, Predicate: "F07.2",
+	},
+	"F08.1": {
+		Suite: SuiteAgent, Predicate: "F08.1",
+	},
+	"F08.2": {
+		Suite: SuiteAgent, Predicate: "F08.2",
+	},
+	"F08.3": {
+		Suite: SuiteAgent, Predicate: "F08.3",
+	},
+	"F08.4": {
+		Suite: SuiteAgent, Predicate: "F08.4",
+	},
+	"F08.5": {
+		Suite: SuiteAgent, Predicate: "F08.5",
+	},
+	"F10.6": {
+		Suite: SuiteResolver, Predicate: "F10.6",
+	},
+	"F10.7": {
+		Suite: SuiteCollectorBoundary, Predicate: "F10.7",
+	},
+	"F11.1": {
+		Suite: SuiteAgent, Predicate: "F11.1",
+	},
+	"F11.2": {
+		Suite: SuiteAgent, Predicate: "F11.2",
+	},
+	"F11.3": {
+		Suite: SuiteAgent, Predicate: "F11.3",
+	},
+	"F11.4": {
+		Suite: SuiteAgent, Predicate: "F11.4",
+	},
+	"F11.5": {
+		Suite: SuiteAgent, Predicate: "F11.5",
+	},
+	"F11.6": {
+		Suite: SuiteAgent, Predicate: "F11.6",
+	},
+	"F14.1": {
+		Suite: SuiteAgent, Predicate: "F14.1",
+	},
+	"F14.2": {
+		Suite: SuiteAgent, Predicate: "F14.2",
+	},
+	"F14.3": {
+		Suite: SuiteAgent, Predicate: "F14.3",
+	},
+	"F14.4": {
+		Suite: SuiteAgent, Predicate: "F14.4",
+	},
+	"F14.5": {
+		Suite: SuiteAgent, Predicate: "F14.5",
+	},
+	"F14.13": {
+		Suite: SuiteAgent, Predicate: "F14.13",
+	},
+	"F18.1": {
+		Suite: SuiteCollectorBoundary, Predicate: "F18.1",
+	},
+	"F18.5": {
+		Suite: SuiteCollectorBoundary, Predicate: "F18.5",
+	},
+	"F22.1-agent": {
+		Suite: SuiteProcess, Predicate: "F22.1-agent",
+	},
+	"F24.20-b-godplugin-terminal": {
+		Suite:     SuiteShippedRoot,
+		Predicate: "F24.20-b-godplugin-terminal",
+	},
+	"F24.21-b-godplugin-nonterminal": {
+		Suite:     SuiteShippedRoot,
+		Predicate: "F24.21-b-godplugin-nonterminal",
+	},
+	"F24.22-b-godplugin-hup": {
+		Suite:     SuiteShippedRoot,
+		Predicate: "F24.22-b-godplugin-hup",
+	},
+	"F24.23-b-ibmdplugin-terminal": {
+		Suite:     SuiteShippedRoot,
+		Predicate: "F24.23-b-ibmdplugin-terminal",
+	},
+	"F24.24-b-ibmdplugin-nonterminal": {
+		Suite:     SuiteShippedRoot,
+		Predicate: "F24.24-b-ibmdplugin-nonterminal",
+	},
+	"F24.25-b-ibmdplugin-hup": {
+		Suite:     SuiteShippedRoot,
+		Predicate: "F24.25-b-ibmdplugin-hup",
+	},
+	"F24.26-b-scriptsdplugin-terminal": {
+		Suite:     SuiteShippedRoot,
+		Predicate: "F24.26-b-scriptsdplugin-terminal",
+	},
+	"F24.27-b-scriptsdplugin-nonterminal": {
+		Suite:     SuiteShippedRoot,
+		Predicate: "F24.27-b-scriptsdplugin-nonterminal",
+	},
+	"F24.28-b-scriptsdplugin-hup": {
+		Suite:     SuiteShippedRoot,
+		Predicate: "F24.28-b-scriptsdplugin-hup",
+	},
+}
+
 var componentProofByCase = map[string][]ComponentProof{
 	"F02.1-v1-synthetic": {
 		{Package: "./plugin/agent/jobmgr/joboutput", Test: "TestManagedJobV1V2JoinBeforeCleanup"},
@@ -60,10 +222,10 @@ var componentProofByCase = map[string][]ComponentProof{
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelDisposesQueuedNoResponseCapabilityAfterItsDeadline"},
 	},
 	"F08.1": {
-		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestUIDLedgerHasExactFixedCapacity"},
+		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestUIDLedgerGrowsAndCloseWorkRemainsBatched"},
 	},
 	"F08.2": {
-		{Package: "./plugin/agent/jobmgr", Test: "TestKernelFunctionLaneDepthPreservesCrossLaneProgress"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestKernelFunctionLaneGrowsAndPreservesCrossLaneProgress"},
 	},
 	"F08.3": {
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelSubmissionBacklogCannotStarveStop"},
@@ -75,7 +237,7 @@ var componentProofByCase = map[string][]ComponentProof{
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline"},
 	},
 	"F08.6": {
-		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestUIDLedgerTombstoneCardinalityBoundaries"},
+		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestUIDLedgerTombstonePopulationGrowsBeyondFormerBoundary"},
 	},
 	"F08.7": {
 		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestUIDLedgerAdmissionReapsOneBoundedExpiredPrefix"},
@@ -147,7 +309,7 @@ var componentProofByCase = map[string][]ComponentProof{
 		{Package: "./plugin/agent/jobmgr/joboutput", Test: "TestManagedJobV1V2JoinBeforeCleanup"},
 	},
 	"F18.4": {
-		{Package: "./plugin/agent/jobmgr/composition", Test: "TestRunGenerationPreservesFullJobCapacityWithDiscoveryPipeline"},
+		{Package: "./plugin/agent/jobmgr/composition", Test: "TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveryPipeline"},
 	},
 	"F18.5": {
 		{Package: "./plugin/agent/jobmgr/joboutput", Test: "TestJobGenerationRetainsAfterIrrecoverableFailure"},
@@ -206,7 +368,7 @@ var componentProofByCase = map[string][]ComponentProof{
 		{Package: "./plugin/agent/jobmgr", Test: "TestFunctionCatalogMutationUsesKernelLoop"},
 	},
 	"F24.14-b-hotpath-envelope": {
-		{Package: "./plugin/agent/jobmgr/functions", Test: "TestFunctionCatalogLookupAllocations"},
+		{Package: "./plugin/agent/jobmgr/functions", Test: "TestFunctionCatalogLookupAndHandlerLeaseAllocateNothing"},
 	},
 	"F24.15-b-cleanup-capacity-execution": {
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelRunsTaskCleanupBeforeSlotRelease"},
@@ -271,10 +433,70 @@ func EvidenceFor(productionCase ProductionCase) (CaseEvidence, error) {
 }
 
 func runtimePredicateFor(productionCase ProductionCase) string {
-	switch productionCase.Suite {
-	case SuiteAgent, SuiteProcess, SuiteShippedRoot,
-		SuiteCollectorBoundary, SuiteResolver:
-		return productionCase.ID
+	declaration, exists := runtimePredicateByCase[productionCase.ID]
+	if !exists || declaration.Suite != productionCase.Suite {
+		return ""
 	}
-	return ""
+	return declaration.Predicate
+}
+
+func ValidateEvidenceContract() error {
+	cases, err := BMM002Cases()
+	if err != nil {
+		return err
+	}
+	byID := make(map[string]ProductionCase, len(cases))
+	runtimeKeys := make(map[string]string)
+	for _, productionCase := range cases {
+		byID[productionCase.ID] = productionCase
+		declaration, hasRuntime := runtimePredicateByCase[productionCase.ID]
+		if productionCase.Proof == ProofComponent {
+			if hasRuntime {
+				return fmt.Errorf(
+					"B-M-002 evidence: component case %s declares runtime credit",
+					productionCase.ID,
+				)
+			}
+		} else if !hasRuntime ||
+			declaration.Suite != productionCase.Suite ||
+			declaration.Predicate == "" {
+			return fmt.Errorf(
+				"B-M-002 evidence: case %s lacks an exact runtime declaration",
+				productionCase.ID,
+			)
+		}
+		if hasRuntime {
+			key := string(declaration.Suite) + "\x00" +
+				declaration.Predicate
+			if previous, exists := runtimeKeys[key]; exists {
+				return fmt.Errorf(
+					"B-M-002 evidence: cases %s and %s alias runtime predicate %s",
+					previous,
+					productionCase.ID,
+					declaration.Predicate,
+				)
+			}
+			runtimeKeys[key] = productionCase.ID
+		}
+		if _, err := EvidenceFor(productionCase); err != nil {
+			return err
+		}
+	}
+	for caseID := range runtimePredicateByCase {
+		if _, exists := byID[caseID]; !exists {
+			return fmt.Errorf(
+				"B-M-002 evidence: undeclared runtime case %s",
+				caseID,
+			)
+		}
+	}
+	for caseID := range componentProofByCase {
+		if _, exists := byID[caseID]; !exists {
+			return fmt.Errorf(
+				"B-M-002 evidence: undeclared component case %s",
+				caseID,
+			)
+		}
+	}
+	return nil
 }

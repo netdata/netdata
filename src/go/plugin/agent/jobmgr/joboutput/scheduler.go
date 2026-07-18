@@ -15,7 +15,8 @@ type ModuleReconciler interface {
 }
 
 type Scheduler struct {
-	mu sync.Mutex
+	mu     sync.Mutex
+	tickMu sync.Mutex
 
 	reconciler ModuleReconciler
 	jobs       map[lifecycle.ResourceIdentity]*scheduledJob
@@ -24,7 +25,7 @@ type Scheduler struct {
 	jobTail    *scheduledJob
 	moduleHead *scheduledModule
 	moduleTail *scheduledModule
-	moduleTick [lifecycle.MaximumActiveJobs]string
+	moduleTick []string
 }
 
 type scheduledJob struct {
@@ -47,14 +48,8 @@ func NewScheduler(reconciler ModuleReconciler) (*Scheduler, error) {
 	}
 	return &Scheduler{
 		reconciler: reconciler,
-		jobs: make(
-			map[lifecycle.ResourceIdentity]*scheduledJob,
-			lifecycle.MaximumActiveJobs,
-		),
-		modules: make(
-			map[string]*scheduledModule,
-			lifecycle.MaximumActiveJobs,
-		),
+		jobs:       make(map[lifecycle.ResourceIdentity]*scheduledJob),
+		modules:    make(map[string]*scheduledModule),
 	}, nil
 }
 
@@ -68,9 +63,6 @@ func (scheduler *Scheduler) Register(
 	}
 	scheduler.mu.Lock()
 	defer scheduler.mu.Unlock()
-	if len(scheduler.jobs) == lifecycle.MaximumActiveJobs {
-		return errors.New("job output: scheduler capacity exhausted")
-	}
 	if scheduler.jobs[identity] != nil {
 		return errors.New("job output: duplicate scheduler registration")
 	}
@@ -155,25 +147,26 @@ func (scheduler *Scheduler) Tick(ctx context.Context, clock int) error {
 	if scheduler == nil || ctx == nil {
 		return errors.New("job output: invalid scheduler tick")
 	}
+	scheduler.tickMu.Lock()
+	defer scheduler.tickMu.Unlock()
 	scheduler.mu.Lock()
 	for record := scheduler.jobHead; record != nil; record = record.next {
 		record.job.Tick(clock)
 	}
-	count := 0
+	scheduler.moduleTick = scheduler.moduleTick[:0]
 	for module := scheduler.moduleHead; module != nil; module = module.next {
-		scheduler.moduleTick[count] = module.name
-		count++
+		scheduler.moduleTick = append(scheduler.moduleTick, module.name)
 	}
 	scheduler.mu.Unlock()
 
 	var result error
-	for index := 0; index < count; index++ {
-		module := scheduler.moduleTick[index]
+	for index, module := range scheduler.moduleTick {
 		scheduler.moduleTick[index] = ""
 		if err := scheduler.reconciler.ReconcileModule(ctx, module); err != nil {
 			result = errors.Join(result, err)
 		}
 	}
+	scheduler.moduleTick = scheduler.moduleTick[:0]
 	return result
 }
 

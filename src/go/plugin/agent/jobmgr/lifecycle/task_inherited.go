@@ -9,8 +9,6 @@ import (
 	"sync"
 )
 
-const MaximumInheritedTasks = 2 * MaximumAdmissionRecords
-
 type InheritedTaskRole uint8
 
 const (
@@ -25,30 +23,30 @@ func (role InheritedTaskRole) valid() bool {
 }
 
 type InheritedTaskRef struct {
-	Slot       uint16
+	Slot       uint32
 	Generation uint32
 }
 
 func (ref InheritedTaskRef) valid() bool {
-	return int(ref.Slot) < MaximumInheritedTasks && ref.Generation != 0
+	return ref.Generation != 0
 }
 
 type InheritedTaskWork func(context.Context) error
 
 type inheritedTaskRegistry struct {
 	mu         sync.Mutex
-	slots      [MaximumInheritedTasks]inheritedTaskSlot
+	slots      []*inheritedTaskSlot
 	owners     map[inheritedOwnerRole]InheritedTaskRef
-	freeHead   uint16
+	freeHead   uint32
 	census     InheritedTaskCensus
 	sealed     bool
-	activeHead uint16
-	activeTail uint16
+	activeHead uint32
+	activeTail uint32
 }
 
 type inheritedTaskSlot struct {
 	generation     uint32
-	freeNext       uint16
+	freeNext       uint32
 	active         bool
 	owner          ResourceIdentity
 	role           InheritedTaskRole
@@ -61,8 +59,8 @@ type inheritedTaskSlot struct {
 	permit         LongLivedPermitRef
 	permitG        LongLivedGFacet
 	err            error
-	activePrevious uint16
-	activeNext     uint16
+	activePrevious uint32
+	activeNext     uint32
 }
 
 type inheritedOwnerRole struct {
@@ -120,18 +118,29 @@ func (supervisor *TaskSupervisor) startInherited(parent context.Context, owner R
 		registry.mu.Unlock()
 		return InheritedTaskRef{}, errors.New("jobmgr task supervisor: duplicate inherited owner role")
 	}
-	if registry.freeHead == 0 {
-		registry.mu.Unlock()
-		return InheritedTaskRef{}, errors.New("jobmgr task supervisor: inherited task capacity exhausted")
+	var index uint32
+	var slot *inheritedTaskSlot
+	if registry.freeHead != 0 {
+		handle := registry.freeHead
+		index = handle - 1
+		slot = registry.slots[index]
+		registry.freeHead = slot.freeNext
+	} else {
+		if uint64(len(registry.slots)) > uint64(^uint32(0)) {
+			registry.mu.Unlock()
+			return InheritedTaskRef{}, errors.New("jobmgr task supervisor: inherited reference space exhausted")
+		}
+		index = uint32(len(registry.slots))
+		slot = &inheritedTaskSlot{}
+		registry.slots = append(registry.slots, slot)
 	}
-	index := int(registry.freeHead - 1)
-	slot := &registry.slots[index]
 	generation := slot.generation + 1
 	if generation == 0 {
+		*slot = inheritedTaskSlot{generation: slot.generation, freeNext: registry.freeHead}
+		registry.freeHead = index + 1
 		registry.mu.Unlock()
 		return InheritedTaskRef{}, errors.New("jobmgr task supervisor: inherited task generation wrapped")
 	}
-	registry.freeHead = slot.freeNext
 	ctx, cancel := context.WithCancel(parent)
 	done := make(chan struct{})
 	started := make(chan struct{})
@@ -140,9 +149,9 @@ func (supervisor *TaskSupervisor) startInherited(parent context.Context, owner R
 		cancel: cancel, done: done, permit: permit, permitG: permitG,
 	}
 	registry.census.Active++
-	ref := InheritedTaskRef{Slot: uint16(index), Generation: generation}
+	ref := InheritedTaskRef{Slot: index, Generation: generation}
 	registry.owners[key] = ref
-	handle := uint16(index + 1)
+	handle := index + 1
 	slot.activePrevious = registry.activeTail
 	if registry.activeTail != 0 {
 		registry.slots[registry.activeTail-1].activeNext = handle
@@ -298,10 +307,9 @@ func (supervisor *TaskSupervisor) SealAndCancelInherited() (ShutdownCancellation
 	longLived.sealed = true
 	registry.sealed = true
 	var census ShutdownCancellationCensus
-	var cancels [MaximumInheritedTasks]context.CancelFunc
-	cancelCount := 0
+	cancels := make([]context.CancelFunc, 0, registry.census.Active)
 	for handle := registry.activeHead; handle != 0; handle = registry.slots[handle-1].activeNext {
-		slot := &registry.slots[handle-1]
+		slot := registry.slots[handle-1]
 		census.Visited++
 		if slot.cancelled {
 			census.AlreadyCancelled++
@@ -309,25 +317,19 @@ func (supervisor *TaskSupervisor) SealAndCancelInherited() (ShutdownCancellation
 		}
 		slot.cancelled = true
 		registry.census.Cancelled++
-		cancels[cancelCount] = slot.cancel
-		cancelCount++
+		cancels = append(cancels, slot.cancel)
 		census.Signalled++
 	}
 	registry.mu.Unlock()
 	longLived.mu.Unlock()
-	for index := 0; index < cancelCount; index++ {
-		cancels[index]()
+	for _, cancel := range cancels {
+		cancel()
 	}
 	return census, nil
 }
 
 func (registry *inheritedTaskRegistry) initialize() {
 	registry.owners = make(map[inheritedOwnerRole]InheritedTaskRef)
-	registry.freeHead = 1
-	for index := range registry.slots {
-		registry.slots[index].freeNext = uint16(index + 2)
-	}
-	registry.slots[len(registry.slots)-1].freeNext = 0
 }
 
 func (supervisor *TaskSupervisor) InheritedActive() int {
@@ -348,7 +350,11 @@ func (registry *inheritedTaskRegistry) slot(ref InheritedTaskRef, owner Resource
 	if !ref.valid() || !owner.Valid() {
 		return nil, errors.New("jobmgr task supervisor: invalid inherited reference")
 	}
-	slot := &registry.slots[ref.Slot]
+	if uint64(ref.Slot) >= uint64(len(registry.slots)) ||
+		registry.slots[ref.Slot] == nil {
+		return nil, errors.New("jobmgr task supervisor: stale or cross-owner inherited reference")
+	}
+	slot := registry.slots[ref.Slot]
 	if !slot.active || slot.generation != ref.Generation || slot.owner != owner {
 		return nil, errors.New("jobmgr task supervisor: stale or cross-owner inherited reference")
 	}
@@ -361,7 +367,11 @@ func (registry *inheritedTaskRegistry) complete(ref InheritedTaskRef, taskErr er
 	if !ref.valid() {
 		return
 	}
-	slot := &registry.slots[ref.Slot]
+	if uint64(ref.Slot) >= uint64(len(registry.slots)) ||
+		registry.slots[ref.Slot] == nil {
+		return
+	}
+	slot := registry.slots[ref.Slot]
 	if !slot.active || slot.generation != ref.Generation || slot.finished {
 		return
 	}

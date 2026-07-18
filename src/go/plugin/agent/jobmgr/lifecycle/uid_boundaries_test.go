@@ -6,18 +6,18 @@ import (
 	"time"
 )
 
-func TestUIDLedgerTombstoneCardinalityBoundaries(t *testing.T) {
+func TestUIDLedgerTombstonePopulationGrowsBeyondFormerBoundary(t *testing.T) {
 	tests := map[string]struct {
 		population int
-		wantAdmit  bool
 	}{
-		"one below capacity": {
-			population: MaximumUIDRecords - 1,
-			wantAdmit:  true,
+		"one below former limit": {
+			population: formerFixedUIDPopulation - 1,
 		},
-		"at capacity": {
-			population: MaximumUIDRecords,
-			wantAdmit:  false,
+		"at former limit": {
+			population: formerFixedUIDPopulation,
+		},
+		"one above former limit": {
+			population: formerFixedUIDPopulation + 1,
 		},
 	}
 	now := time.Unix(100, 0)
@@ -30,13 +30,8 @@ func TestUIDLedgerTombstoneCardinalityBoundaries(t *testing.T) {
 				test.population,
 				now,
 			)
-			err := ledger.Admit("fresh", now)
-			if (err == nil) != test.wantAdmit {
-				t.Fatalf(
-					"fresh admission err=%v wantAdmit=%v",
-					err,
-					test.wantAdmit,
-				)
+			if err := ledger.Admit("fresh", now); err != nil {
+				t.Fatalf("fresh admission: %v", err)
 			}
 		})
 	}
@@ -127,7 +122,7 @@ func TestUIDLedgerCloseUsesBoundedAcknowledgedBatches(t *testing.T) {
 		"one":                   1,
 		"one full batch":        UIDReturnBatch,
 		"one batch plus one":    UIDReturnBatch + 1,
-		"maximum tombstone set": MaximumUIDRecords,
+		"former limit plus one": formerFixedUIDPopulation + 1,
 	}
 	now := time.Unix(100, 0)
 	for name, population := range populations {
@@ -149,8 +144,7 @@ func TestUIDLedgerCloseUsesBoundedAcknowledgedBatches(t *testing.T) {
 				1,
 				(population+UIDReturnBatch-1)/UIDReturnBatch,
 			)
-			if turns != wantTurns ||
-				turns > MaximumUIDRecords/UIDReturnBatch {
+			if turns != wantTurns {
 				t.Fatalf(
 					"close turns=%d, want %d within bound",
 					turns,

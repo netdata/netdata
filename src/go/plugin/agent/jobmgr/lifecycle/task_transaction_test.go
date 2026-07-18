@@ -236,15 +236,15 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 				identity: ResourceIdentity{ID: "job", Generation: 1},
 				events:   new([]string),
 			},
-			seededPermits: MaximumActiveJobs + MaximumReplacementOverlaps,
-			replacementAt: MaximumActiveJobs,
+			seededPermits: 1 + MaximumReplacementOverlaps,
+			replacementAt: 1,
 		},
 		"installation has no current": {
 			scope: ResourceTransactionScope{
 				ID:        "job",
 				Successor: ResourceIdentity{ID: "job", Generation: 1},
 			},
-			seededPermits: MaximumActiveJobs,
+			seededPermits: 1,
 		},
 	}
 
@@ -258,8 +258,8 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 				request := admission.RequestOrdinary(
 					1,
 					AdmissionLaneRef{
-						Slot:       uint16(index%MaximumAdmissionRecords + 1),
-						Generation: uint32(index/MaximumAdmissionRecords + 1),
+						Slot:       uint32(index + 1),
+						Generation: 1,
 					},
 					2,
 				)
@@ -275,7 +275,7 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 						err,
 					)
 				}
-				permitPlan, err := NewJobLongLivedPlan(1)
+				permitPlan, err := NewSecretStoreLongLivedPlan(1)
 				if err != nil {
 					t.Fatal(err)
 				}
@@ -306,7 +306,7 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 				1,
 				AdmissionLaneRef{
 					Slot:       1,
-					Generation: uint32(test.seededPermits/MaximumAdmissionRecords + 2),
+					Generation: 2,
 				},
 				2,
 			)
@@ -321,7 +321,7 @@ func TestTaskSupervisorRejectedTransactionStartReturnsCurrent(t *testing.T) {
 					err,
 				)
 			}
-			permitPlan, err := NewJobLongLivedPlan(1)
+			permitPlan, err := NewSecretStoreLongLivedPlan(1)
 			if err != nil {
 				t.Fatal(err)
 			}

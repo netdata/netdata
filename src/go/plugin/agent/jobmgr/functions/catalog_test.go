@@ -176,6 +176,65 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 	}
 }
 
+func TestFunctionCatalogInvocationPopulationGrowsBeyondFormerLimit(t *testing.T) {
+	tests := map[string]struct {
+		declaration Declaration
+		lookup      func(int) jobmgr.FunctionLookup
+	}{
+		"direct route": {
+			declaration: testDeclaration("direct", "", RouteLane()),
+			lookup: func(index int) jobmgr.FunctionLookup {
+				return jobmgr.FunctionLookup{
+					UID:   fmt.Sprintf("direct-%03d", index),
+					Route: "direct",
+				}
+			},
+		},
+		"prefix route": {
+			declaration: testDeclaration("config", "job:", RouteLane()),
+			lookup: func(index int) jobmgr.FunctionLookup {
+				return jobmgr.FunctionLookup{
+					UID:   fmt.Sprintf("prefix-%03d", index),
+					Route: "config",
+					Args:  []string{"job:instance"},
+				}
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			catalog, err := NewCatalog([]Declaration{test.declaration})
+			if err != nil {
+				t.Fatal(err)
+			}
+			const population = 257
+			leases := make([]jobmgr.FunctionInvocationRef, 0, population)
+			for index := 0; index < population; index++ {
+				decision, resolveErr := catalog.ResolveAndAcquire(
+					test.lookup(index),
+				)
+				if resolveErr != nil {
+					t.Fatalf("resolve invocation %d: %v", index, resolveErr)
+				}
+				if decision.Rejected != 0 || !decision.Lease.Valid() {
+					t.Fatalf(
+						"invocation %d rejected=%d lease=%+v",
+						index,
+						decision.Rejected,
+						decision.Lease,
+					)
+				}
+				leases = append(leases, decision.Lease)
+			}
+			for _, lease := range leases {
+				if _, err := catalog.ReleaseInvocation(lease); err != nil {
+					t.Fatal(err)
+				}
+			}
+		})
+	}
+}
+
 func TestFunctionPayloadValidationRunsInTaskChild(t *testing.T) {
 	var calls atomic.Int32
 	declaration := testDeclaration("direct", "", RouteLane())
@@ -513,6 +572,121 @@ func TestRetiredRouteRejectsDuringLeaseDrainThenDisappears(t *testing.T) {
 					"cleanup calls=%d, want 1",
 					cleanupCalls.Load(),
 				)
+			}
+		})
+	}
+}
+
+func TestFunctionCatalogSharedGenerationUsesRouteLocalLeaseDrain(t *testing.T) {
+	tests := map[string]struct {
+		prefix string
+		args   []string
+		lane   LanePolicy
+	}{
+		"direct route": {
+			lane: RouteLane(),
+		},
+		"prefix route": {
+			prefix: "job:",
+			args:   []string{"job:one"},
+			lane:   ArgumentLane(0),
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			generation := testGeneration("shared")
+			target := testDeclarationForGeneration(
+				generation,
+				"work",
+				test.prefix,
+				test.lane,
+			)
+			sibling := testDeclarationForGeneration(
+				generation,
+				"sibling",
+				"",
+				RouteLane(),
+			)
+			catalog, err := NewCatalog([]Declaration{target, sibling})
+			if err != nil {
+				t.Fatal(err)
+			}
+			held, err := catalog.ResolveAndAcquire(
+				jobmgr.FunctionLookup{
+					UID:   "held-sibling",
+					Route: "sibling",
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			before := catalog.storage.published.Load()
+			mutation, err := catalog.NewMutation(
+				catalog.Census().Version,
+				[]RouteChange{{
+					PublicName: "work",
+					Prefix:     test.prefix,
+				}},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			builder, err := catalog.startMutation(mutation)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var postimage *MutationPostimage
+			for {
+				var done bool
+				postimage, done, err = builder.PrepareStep(
+					MaximumMutationQuantum,
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if done {
+					break
+				}
+			}
+			var cleanups [MaximumMutationChanges]jobmgr.FunctionCleanupPlan
+			count, err := catalog.commitMutation(
+				postimage,
+				&cleanups,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if count != 0 {
+				t.Fatal("shared generation cleaned with one live route")
+			}
+			removed, err := catalog.ResolveAndAcquire(
+				jobmgr.FunctionLookup{
+					UID:   "removed",
+					Route: "work",
+					Args:  test.args,
+				},
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if removed.Rejected != lifecycle.ControlNotFound ||
+				removed.Lease.Valid() {
+				t.Fatalf(
+					"lease-free retired route decision=%+v, want not found",
+					removed,
+				)
+			}
+			if published := catalog.storage.published.Load(); published >= before {
+				t.Fatalf(
+					"lease-free retired route retained path storage: before=%d after=%d",
+					before,
+					published,
+				)
+			}
+			if cleanup, err := catalog.ReleaseInvocation(held.Lease); err != nil {
+				t.Fatal(err)
+			} else if cleanup.Ref.Valid() {
+				t.Fatal("shared generation cleaned before sibling route retired")
 			}
 		})
 	}
@@ -1197,7 +1371,7 @@ func BenchmarkBHandlerLease(b *testing.B) {
 	}
 }
 
-func TestFunctionCatalogLookupAllocations(t *testing.T) {
+func TestFunctionCatalogLookupAndHandlerLeaseAllocateNothing(t *testing.T) {
 	catalog, err := NewCatalog([]Declaration{testDeclaration("direct", "", RouteLane())})
 	if err != nil {
 		t.Fatal(err)

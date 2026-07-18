@@ -100,10 +100,11 @@ func TestInheritedTaskMissedJoinRetainsRecord(t *testing.T) {
 	<-finished
 }
 
-func TestInheritedTaskCapacityIsDerivedFromGenerationLanes(t *testing.T) {
+func TestInheritedTasksGrowBeyondFormerDerivedLimit(t *testing.T) {
+	const population = 2*formerFixedPopulation + 1
 	supervisor := newResourceTaskSupervisor(t)
-	refs := make([]InheritedTaskRef, 0, MaximumInheritedTasks)
-	for index := 0; index < MaximumInheritedTasks; index++ {
+	refs := make([]InheritedTaskRef, 0, population)
+	for index := 0; index < population; index++ {
 		owner := ResourceIdentity{ID: "pipeline", Generation: uint64(index + 1)}
 		ref, err := supervisor.StartInherited(context.Background(), owner, InheritedPipelineProvider, func(ctx context.Context) error {
 			<-ctx.Done()
@@ -113,9 +114,6 @@ func TestInheritedTaskCapacityIsDerivedFromGenerationLanes(t *testing.T) {
 			t.Fatalf("start %d: %v", index, err)
 		}
 		refs = append(refs, ref)
-	}
-	if _, err := supervisor.StartInherited(context.Background(), ResourceIdentity{ID: "overflow", Generation: 1}, InheritedPipelineProvider, func(context.Context) error { return nil }); err == nil {
-		t.Fatal("inherited capacity admitted one extra child")
 	}
 	for index, ref := range refs {
 		owner := ResourceIdentity{ID: "pipeline", Generation: uint64(index + 1)}

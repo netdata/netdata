@@ -17,18 +17,59 @@ type BaselineBundle struct {
 }
 
 type baselineMetadata struct {
-	Schema      string `json:"schema"`
+	Schema string `json:"schema"`
+	Source struct {
+		HeadCommit string `json:"head_commit"`
+		HeadTree   string `json:"head_tree"`
+	} `json:"source"`
 	Environment struct {
 		GoVersion  string `json:"go_version"`
 		GOOS       string `json:"goos"`
 		GOARCH     string `json:"goarch"`
 		GOMAXPROCS int    `json:"gomaxprocs"`
 	} `json:"environment"`
-	CurrentBinarySHA256 string `json:"current_binary_sha256"`
-	FixtureSHA256       string `json:"fixture_sha256"`
+	CurrentBinarySHA256     string `json:"current_binary_sha256"`
+	PerformanceDriverSHA256 string `json:"performance_driver_sha256"`
+	FixtureSHA256           string `json:"fixture_sha256"`
+}
+
+type baselinePlatform struct {
+	GOOS      string
+	GOARCH    string
+	GoVersion string
+}
+
+type baselineIdentityContract struct {
+	SourceRevision          string
+	SourceTree              string
+	PerformanceDriverSHA256 string
+	FixtureSHA256           string
+	Executables             map[baselinePlatform]string
+}
+
+var step0BaselineIdentity = baselineIdentityContract{
+	SourceRevision:          "8f01d7ec33055303fc6b02f76871bede18fe3d68",
+	SourceTree:              "c197c98936bb525f3e6d1d32ffe389badbabae4f",
+	PerformanceDriverSHA256: "4c2473e33e3f1299438869d42ba72d5bfdc6e61473c27685b5ccffcb89ef8a4e",
+	FixtureSHA256:           "46189fd9f245e945c91ab16709c200511767ca2a97bfc04cb37c32224c6fa5fc",
+	Executables: map[baselinePlatform]string{
+		{
+			GOOS: "linux", GOARCH: "amd64", GoVersion: "go1.26.5",
+		}: "7eafaa2bf9a3a5b186250a9a90273eb04e490c740a188fa44f14b38590f085a0",
+		{
+			GOOS: "linux", GOARCH: "arm64", GoVersion: "go1.26.5",
+		}: "40be5dafebc3c93d6ac35a0183228c2f39a223ec6a382903eeeabef1c014dde8",
+	},
 }
 
 func VerifyBaselineBundle(directory string) (BaselineBundle, error) {
+	return verifyBaselineBundle(directory, step0BaselineIdentity)
+}
+
+func verifyBaselineBundle(
+	directory string,
+	identity baselineIdentityContract,
+) (BaselineBundle, error) {
 	if !filepath.IsAbs(directory) {
 		return BaselineBundle{}, errors.New("wire evaluator: baseline directory must be absolute")
 	}
@@ -77,6 +118,30 @@ func VerifyBaselineBundle(directory string) (BaselineBundle, error) {
 	if metadata.CurrentBinarySHA256 != checksums["currentreal"] ||
 		metadata.FixtureSHA256 != checksums["fixture/perf.conf"] {
 		return BaselineBundle{}, errors.New("wire evaluator: baseline metadata digest differs")
+	}
+	platform := baselinePlatform{
+		GOOS:      metadata.Environment.GOOS,
+		GOARCH:    metadata.Environment.GOARCH,
+		GoVersion: metadata.Environment.GoVersion,
+	}
+	executableSHA256 := identity.Executables[platform]
+	if executableSHA256 == "" {
+		return BaselineBundle{}, fmt.Errorf(
+			"wire evaluator: baseline platform identity is not pinned: %s/%s %s",
+			platform.GOOS,
+			platform.GOARCH,
+			platform.GoVersion,
+		)
+	}
+	if metadata.Source.HeadCommit != identity.SourceRevision ||
+		metadata.Source.HeadTree != identity.SourceTree ||
+		metadata.PerformanceDriverSHA256 !=
+			identity.PerformanceDriverSHA256 ||
+		metadata.FixtureSHA256 != identity.FixtureSHA256 ||
+		metadata.CurrentBinarySHA256 != executableSHA256 {
+		return BaselineBundle{}, errors.New(
+			"wire evaluator: baseline identity differs from compiled Step-0 contract",
+		)
 	}
 	executable := filepath.Join(directory, "currentreal")
 	info, err := os.Stat(executable)

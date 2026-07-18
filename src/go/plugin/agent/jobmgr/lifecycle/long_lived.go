@@ -11,12 +11,8 @@ import (
 var ErrLongLivedRecordCapacity = errors.New("jobmgr long-lived permit: capacity exhausted")
 
 const (
-	MaximumActiveJobs             = MaximumAdmissionRecords
 	MaximumFixedLongLivedServices = 2
 	MaximumReplacementOverlaps    = TransientTaskSlots
-	MaximumLongLivedPermits       = MaximumActiveJobs +
-		MaximumFixedLongLivedServices +
-		MaximumReplacementOverlaps
 )
 
 type LongLivedClass uint8
@@ -124,12 +120,12 @@ type LongLivedCarrier interface {
 }
 
 type LongLivedPermitRef struct {
-	Slot       uint16
+	Slot       uint32
 	Generation uint32
 }
 
 func (ref LongLivedPermitRef) valid() bool {
-	return int(ref.Slot) < MaximumLongLivedPermits && ref.Generation != 0
+	return ref.Generation != 0
 }
 
 type LongLivedPermit struct {
@@ -191,17 +187,17 @@ func (permit LongLivedPermit) AbortUnused() error {
 
 type longLivedRegistry struct {
 	mu       sync.Mutex
-	slots    [MaximumLongLivedPermits]longLivedSlot
+	slots    []*longLivedSlot
 	owners   map[ResourceIdentity]LongLivedPermitRef
 	classes  [LongLivedSecretStore + 1]int
-	freeHead uint16
+	freeHead uint32
 	census   LongLivedCensus
 	sealed   bool
 }
 
 type longLivedSlot struct {
 	generation     uint32
-	freeNext       uint16
+	freeNext       uint32
 	active         bool
 	owner          ResourceIdentity
 	class          LongLivedClass
@@ -232,11 +228,6 @@ type LongLivedCensus struct {
 
 func (registry *longLivedRegistry) initialize() {
 	registry.owners = make(map[ResourceIdentity]LongLivedPermitRef)
-	registry.freeHead = 1
-	for index := range registry.slots {
-		registry.slots[index].freeNext = uint16(index + 2)
-	}
-	registry.slots[len(registry.slots)-1].freeNext = 0
 }
 
 func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedger, admissionRef AdmissionRef, owner ResourceIdentity, plan LongLivedPlan) (LongLivedPermit, error) {
@@ -252,7 +243,6 @@ func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedge
 
 	registry := &supervisor.longLived
 	registry.mu.Lock()
-	classLimit := longLivedClassLimit(plan)
 	if _, exists := registry.owners[owner]; registry.sealed || exists {
 		registry.mu.Unlock()
 		releaseErr := supervisor.releaseLongLivedAdmission(admission, admissionRef, plan.bytes)
@@ -263,9 +253,7 @@ func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedge
 			releaseErr,
 		)
 	}
-	if registry.freeHead == 0 ||
-		classLimit == 0 ||
-		registry.classes[plan.class] >= classLimit {
+	if longLivedClassFull(registry.classes[plan.class], plan) {
 		registry.mu.Unlock()
 		releaseErr := supervisor.releaseLongLivedAdmission(
 			admission,
@@ -277,21 +265,58 @@ func (supervisor *TaskSupervisor) IssueLongLivedPermit(admission *AdmissionLedge
 			releaseErr,
 		)
 	}
-	index := int(registry.freeHead - 1)
-	slot := &registry.slots[index]
+	index := 0
+	var slot *longLivedSlot
+	if registry.freeHead == 0 {
+		if uint64(len(registry.slots)) > uint64(^uint32(0)) {
+			registry.mu.Unlock()
+			releaseErr := supervisor.releaseLongLivedAdmission(
+				admission,
+				admissionRef,
+				plan.bytes,
+			)
+			return LongLivedPermit{}, errors.Join(
+				errors.New("jobmgr long-lived permit: reference space exhausted"),
+				releaseErr,
+			)
+		}
+		index = len(registry.slots)
+		slot = &longLivedSlot{}
+		registry.slots = append(registry.slots, slot)
+	} else {
+		index = int(registry.freeHead - 1)
+		slot = registry.slots[index]
+		if slot == nil {
+			registry.mu.Unlock()
+			releaseErr := supervisor.releaseLongLivedAdmission(
+				admission,
+				admissionRef,
+				plan.bytes,
+			)
+			return LongLivedPermit{}, errors.Join(
+				errors.New("jobmgr long-lived permit: invalid free slot"),
+				releaseErr,
+			)
+		}
+		registry.freeHead = slot.freeNext
+	}
 	generation := slot.generation + 1
 	if generation == 0 {
+		*slot = longLivedSlot{
+			generation: slot.generation,
+			freeNext:   registry.freeHead,
+		}
+		registry.freeHead = uint32(index + 1)
 		registry.mu.Unlock()
 		releaseErr := supervisor.releaseLongLivedAdmission(admission, admissionRef, plan.bytes)
 		return LongLivedPermit{}, errors.Join(errors.New("jobmgr long-lived permit: generation wrapped"), releaseErr)
 	}
-	registry.freeHead = slot.freeNext
 	*slot = longLivedSlot{
 		generation: generation, active: true, owner: owner, class: plan.class,
 		admission: admission, admissionRef: admissionRef, bytes: plan.bytes,
 		gReserved: plan.g, eReserved: plan.e,
 	}
-	ref := LongLivedPermitRef{Slot: uint16(index), Generation: generation}
+	ref := LongLivedPermitRef{Slot: uint32(index), Generation: generation}
 	registry.owners[owner] = ref
 	registry.classes[plan.class]++
 	registry.census.Active++
@@ -440,20 +465,20 @@ func (supervisor *TaskSupervisor) returnLongLivedPermit(ref LongLivedPermitRef, 
 	return nil
 }
 
-func longLivedClassLimit(plan LongLivedPlan) int {
-	limit := 0
+func longLivedClassFull(count int, plan LongLivedPlan) bool {
+	limit := -1
 	switch plan.class {
 	case LongLivedPipeline:
 		limit = 1
 	case LongLivedJob:
-		limit = MaximumActiveJobs
+		return false
 	case LongLivedSecretStore:
 		limit = 1
 	}
 	if plan.replacementOverlap {
 		limit += MaximumReplacementOverlaps
 	}
-	return limit
+	return limit < 0 || count >= limit
 }
 
 func (registry *longLivedRegistry) incrementClassCensus(class LongLivedClass) {
@@ -500,7 +525,13 @@ func (registry *longLivedRegistry) slot(ref LongLivedPermitRef, owner ResourceId
 	if !ref.valid() || !owner.Valid() {
 		return nil, errors.New("jobmgr long-lived permit: invalid reference")
 	}
-	slot := &registry.slots[ref.Slot]
+	if uint64(ref.Slot) >= uint64(len(registry.slots)) {
+		return nil, errors.New("jobmgr long-lived permit: invalid reference")
+	}
+	slot := registry.slots[ref.Slot]
+	if slot == nil {
+		return nil, errors.New("jobmgr long-lived permit: invalid reference")
+	}
 	if !slot.active || slot.generation != ref.Generation || slot.owner != owner {
 		return nil, errors.New("jobmgr long-lived permit: stale or cross-owner reference")
 	}

@@ -30,6 +30,26 @@ func TestSecretCreatorCatalog(t *testing.T) {
 	}
 }
 
+func TestSecretCreatorCatalogLookupAllocatesNothing(t *testing.T) {
+	catalog, err := NewCreatorCatalog([]Creator{{
+		Kind: KindVault,
+		Create: func() Store {
+			return catalogTestStore{}
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	allocations := testing.AllocsPerRun(1_000, func() {
+		if _, ok := catalog.Lookup(KindVault); !ok {
+			panic("creator disappeared")
+		}
+	})
+	if allocations != 0 {
+		t.Fatalf("creator lookup allocations=%f, want 0", allocations)
+	}
+}
+
 func BenchmarkBSecretCreatorLookup(b *testing.B) {
 	catalog, err := NewCreatorCatalog([]Creator{{
 		Kind: KindVault,

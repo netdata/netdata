@@ -6,8 +6,6 @@ import (
 	"errors"
 	"slices"
 	"sort"
-
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
 type authorityClaimMode uint8
@@ -42,15 +40,13 @@ type authorityClaimEdge struct {
 }
 
 type claimAuthority struct {
-	keys          map[string]*authorityClaimKey
-	nextTicket    uint64
-	waiterCount   int
-	eligibleCount int
-	grantCount    int
-	eligible      [lifecycle.MaximumAdmissionRecords]*commandOperation
-	ordered       [lifecycle.MaximumAdmissionRecords]*commandOperation
-	grants        [lifecycle.MaximumAdmissionRecords]*commandOperation
-	radixCounts   [256]uint16
+	keys        map[string]*authorityClaimKey
+	nextTicket  uint64
+	waiterCount int
+	eligible    []*commandOperation
+	ordered     []*commandOperation
+	grants      []*commandOperation
+	radixCounts [256]int
 }
 
 func newClaimAuthority() *claimAuthority {
@@ -280,19 +276,17 @@ func (authority *claimAuthority) removeWaiter(edge *authorityClaimEdge) error {
 }
 
 func (authority *claimAuthority) settle(released *commandOperation) ([]*commandOperation, error) {
-	authority.eligibleCount = 0
-	for index := 0; index < authority.grantCount; index++ {
-		authority.grants[index] = nil
-	}
-	authority.grantCount = 0
+	clear(authority.eligible)
+	authority.eligible = authority.eligible[:0]
+	clear(authority.grants)
+	authority.grants = authority.grants[:0]
 	for index := range released.authorityClaimEdges {
 		if err := authority.collectEligible(released.authorityClaimEdges[index].key); err != nil {
 			return nil, err
 		}
 	}
 	authority.sortCandidates()
-	for index := 0; index < authority.eligibleCount; index++ {
-		operation := authority.eligible[index]
+	for _, operation := range authority.eligible {
 		if operation == nil || !operation.claimWaiting || operation.claimCursor >= len(operation.authorityClaimEdges) {
 			return nil, errors.New("jobmgr claims: invalid wake jobmgr")
 		}
@@ -311,15 +305,12 @@ func (authority *claimAuthority) settle(released *commandOperation) ([]*commandO
 			return nil, err
 		}
 		if granted {
-			authority.grants[authority.grantCount] = operation
-			authority.grantCount++
+			authority.grants = append(authority.grants, operation)
 		}
 	}
-	for index := 0; index < authority.eligibleCount; index++ {
-		authority.eligible[index] = nil
-		authority.ordered[index] = nil
-	}
-	return authority.grants[:authority.grantCount:authority.grantCount], nil
+	clear(authority.eligible)
+	clear(authority.ordered)
+	return authority.grants[:len(authority.grants):len(authority.grants)], nil
 }
 
 func (authority *claimAuthority) collectEligible(key *authorityClaimKey) error {
@@ -343,20 +334,21 @@ func (authority *claimAuthority) collectEligible(key *authorityClaimKey) error {
 }
 
 func (authority *claimAuthority) addCandidate(operation *commandOperation) error {
-	if authority.eligibleCount >= len(authority.eligible) {
-		return errors.New("jobmgr claims: wake jobmgr capacity exceeded")
-	}
-	authority.eligible[authority.eligibleCount] = operation
-	authority.eligibleCount++
+	authority.eligible = append(authority.eligible, operation)
 	return nil
 }
 
 func (authority *claimAuthority) sortCandidates() {
-	if authority.eligibleCount < 2 {
+	if len(authority.eligible) < 2 {
 		return
 	}
-	source := authority.eligible[:authority.eligibleCount]
-	destination := authority.ordered[:authority.eligibleCount]
+	if cap(authority.ordered) < len(authority.eligible) {
+		authority.ordered = make([]*commandOperation, len(authority.eligible))
+	} else {
+		authority.ordered = authority.ordered[:len(authority.eligible)]
+	}
+	source := authority.eligible
+	destination := authority.ordered
 	for shift := uint(0); shift < 64; shift += 8 {
 		for index := range authority.radixCounts {
 			authority.radixCounts[index] = 0
@@ -364,7 +356,7 @@ func (authority *claimAuthority) sortCandidates() {
 		for _, operation := range source {
 			authority.radixCounts[byte(operation.claimTicket>>shift)]++
 		}
-		var offset uint16
+		offset := 0
 		for index, count := range authority.radixCounts {
 			authority.radixCounts[index] = offset
 			offset += count

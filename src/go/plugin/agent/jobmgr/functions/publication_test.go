@@ -394,6 +394,35 @@ func TestFunctionPublicationMismatchedAcknowledgementPoisonsAndRetainsHandle(t *
 	}
 }
 
+func TestFunctionPublicationSteadyPollAllocatesNothing(t *testing.T) {
+	port := newRecordingPublicationPort()
+	publication, err := NewPublication(1, port)
+	if err != nil {
+		t.Fatal(err)
+	}
+	record := publicationRecord("work", 1)
+	digest := publicationDigest(t, record)
+	if err := publication.ApplyInitialSnapshot(
+		1,
+		1,
+		digest,
+		1,
+		[]PublicationChange{{
+			Name: record.Name, Record: &record,
+		}},
+	); err != nil {
+		t.Fatal(err)
+	}
+	allocations := testing.AllocsPerRun(1_000, func() {
+		if pollErr := publication.Poll(1, 1, digest); pollErr != nil {
+			panic(pollErr)
+		}
+	})
+	if allocations != 0 {
+		t.Fatalf("steady publication poll allocations=%f, want 0", allocations)
+	}
+}
+
 func BenchmarkBFunctionPublication(b *testing.B) {
 	port := newRecordingPublicationPort()
 	publication, err := NewPublication(1, port)

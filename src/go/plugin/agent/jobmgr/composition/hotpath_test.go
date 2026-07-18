@@ -80,6 +80,24 @@ func TestModuleCatalogPolicyIsFrozenAtProcessConstruction(t *testing.T) {
 	}
 }
 
+func TestModuleCatalogLookupAllocatesNothing(t *testing.T) {
+	modules := collectorapi.Registry{
+		"module": {
+			Defaults: collectorapi.Defaults{
+				UpdateEvery: 1,
+			},
+		},
+	}
+	allocations := testing.AllocsPerRun(1_000, func() {
+		if _, ok := modules.Lookup("module"); !ok {
+			panic("module disappeared")
+		}
+	})
+	if allocations != 0 {
+		t.Fatalf("module lookup allocations=%f, want 0", allocations)
+	}
+}
+
 func BenchmarkBProcessRestart(b *testing.B) {
 	started := make(chan struct{})
 	close(started)

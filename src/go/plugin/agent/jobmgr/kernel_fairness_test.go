@@ -8,9 +8,10 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
-func TestKernelFunctionLaneDepthPreservesCrossLaneProgress(
+func TestKernelFunctionLaneGrowsAndPreservesCrossLaneProgress(
 	t *testing.T,
 ) {
+	const hotLanePopulation = 33
 	kernel, run, _, _, _ := newKernelWithPlanner(
 		t,
 		stoppedKernelPlanner{},
@@ -28,7 +29,7 @@ func TestKernelFunctionLaneDepthPreservesCrossLaneProgress(
 			return "cold"
 		},
 	)
-	for index := 0; index < lifecycle.MaximumLaneDepth; index++ {
+	for index := 0; index < hotLanePopulation; index++ {
 		request := Request{
 			UID:    fmt.Sprintf("hot-%02d", index),
 			Source: lifecycle.SourceFunction,
@@ -48,31 +49,12 @@ func TestKernelFunctionLaneDepthPreservesCrossLaneProgress(
 			t.Fatalf("hot lane admission %d: %v", index, err)
 		}
 	}
-	overflow := Request{
-		UID:    "hot-overflow",
-		Source: lifecycle.SourceFunction,
-		Route:  "route",
-	}
-	plan, err := kernel.prepareSubmissionPlanForTest(overflow)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := kernel.admit(
-		overflow,
-		plan,
-		nil,
-		nil,
-		nil,
-	); err == nil ||
-		!strings.Contains(err.Error(), "lane depth exhausted") {
-		t.Fatalf("33rd hot-lane admission error=%v", err)
-	}
 	cold := Request{
 		UID:    "cold-progress",
 		Source: lifecycle.SourceFunction,
 		Route:  "route",
 	}
-	plan, err = kernel.prepareSubmissionPlanForTest(cold)
+	plan, err := kernel.prepareSubmissionPlanForTest(cold)
 	if err != nil {
 		t.Fatal(err)
 	}

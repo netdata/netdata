@@ -23,3 +23,24 @@ func (ShippedRootDriver) Available(string) bool {
 func (ShippedRootDriver) Run(context.Context, string) error {
 	return context.Canceled
 }
+
+func (ShippedRootDriver) RunAvailable(
+	context.Context,
+	string,
+) ([]string, error) {
+	return []string{
+		"godplugin",
+		"ibmdplugin",
+		"scriptsdplugin",
+	}, nil
+}
+
+func (ShippedRootDriver) RunMatrixAvailable(
+	context.Context,
+) ([]string, error) {
+	return []string{
+		"godplugin",
+		"ibmdplugin",
+		"scriptsdplugin",
+	}, nil
+}
