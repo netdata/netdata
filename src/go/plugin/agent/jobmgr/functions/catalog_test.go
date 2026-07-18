@@ -19,28 +19,26 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 		declaration  Declaration
 		lookup       jobmgr.FunctionLookup
 		wantStatus   lifecycle.ControlStatus
-		wantScope    string
+		wantResource string
 		wantMethod   string
-		wantResource bool
 	}{
 		"direct route": {
-			declaration: testDeclaration("direct", "", RouteLane()),
+			declaration: testDeclaration("direct", "", ResourcePolicy{}),
 			lookup:      jobmgr.FunctionLookup{UID: "direct-uid", Route: "direct"},
 			wantMethod:  "method",
 		},
-		"prefix argument lane": {
-			declaration: testDeclaration("config", "job:", ArgumentLane(0)),
+		"prefix route": {
+			declaration: testDeclaration("config", "job:", ResourcePolicy{}),
 			lookup: jobmgr.FunctionLookup{
 				UID: "prefix-uid", Route: "config", Args: []string{"job:mysql"},
 			},
-			wantScope:  "job:mysql",
 			wantMethod: "method",
 		},
-		"DynCfg existing job lane": {
+		"DynCfg existing job resource": {
 			declaration: testDeclaration(
 				"config",
 				"go.d:collector:",
-				DynCfgJobLane(0, "go.d:collector:"),
+				DynCfgJobResource(0, "go.d:collector:"),
 			),
 			lookup: jobmgr.FunctionLookup{
 				UID: "dyncfg-update", Route: "config",
@@ -49,15 +47,14 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 					"update",
 				},
 			},
-			wantScope:    "mysql_production",
+			wantResource: "mysql_production",
 			wantMethod:   "method",
-			wantResource: true,
 		},
-		"DynCfg add job lane": {
+		"DynCfg add job resource": {
 			declaration: testDeclaration(
 				"config",
 				"go.d:collector:",
-				DynCfgJobLane(0, "go.d:collector:"),
+				DynCfgJobResource(0, "go.d:collector:"),
 			),
 			lookup: jobmgr.FunctionLookup{
 				UID: "dyncfg-add", Route: "config",
@@ -67,15 +64,14 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 					"production",
 				},
 			},
-			wantScope:    "mysql_production",
+			wantResource: "mysql_production",
 			wantMethod:   "method",
-			wantResource: true,
 		},
-		"scoped DynCfg existing resource lane": {
+		"scoped DynCfg existing resource identity": {
 			declaration: testDeclaration(
 				"config",
 				"go.d:secretstore:",
-				ScopedDynCfgJobLane(
+				ScopedDynCfgJobResource(
 					0,
 					"go.d:secretstore:",
 					"secretstore:",
@@ -88,31 +84,29 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 					"update",
 				},
 			},
-			wantScope:    "secretstore:vault_production",
+			wantResource: "secretstore:vault_production",
 			wantMethod:   "method",
-			wantResource: true,
 		},
-		"scoped DynCfg add resource lane": {
+		"scoped DynCfg add resource identity": {
 			declaration: testDeclaration(
 				"config",
 				"go.d:vnode",
-				ScopedDynCfgJobLane(0, "go.d:vnode", "vnode:"),
+				ScopedDynCfgJobResource(0, "go.d:vnode", "vnode:"),
 			),
 			lookup: jobmgr.FunctionLookup{
 				UID: "dyncfg-vnode-add", Route: "config",
 				Args: []string{"go.d:vnode", "add", "production"},
 			},
-			wantScope:    "vnode:production",
+			wantResource: "vnode:production",
 			wantMethod:   "method",
-			wantResource: true,
 		},
 		"prefix missing argument": {
-			declaration: testDeclaration("config", "job:", ArgumentLane(0)),
+			declaration: testDeclaration("config", "job:", ResourcePolicy{}),
 			lookup:      jobmgr.FunctionLookup{UID: "missing-argument", Route: "config"},
 			wantStatus:  lifecycle.ControlNotFound,
 		},
 		"unknown public route": {
-			declaration: testDeclaration("direct", "", RouteLane()),
+			declaration: testDeclaration("direct", "", ResourcePolicy{}),
 			lookup:      jobmgr.FunctionLookup{UID: "missing-route", Route: "missing"},
 			wantStatus:  lifecycle.ControlNotFound,
 		},
@@ -143,9 +137,7 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 				return
 			}
 			if !decision.Lease.Valid() || decision.Plan.Runner == nil ||
-				decision.Lane.Route == 0 ||
-				decision.Lane.Scope != test.wantScope ||
-				decision.Lane.Resource != test.wantResource {
+				decision.ResourceID != test.wantResource {
 				t.Fatalf("resolved decision differs: %+v", decision)
 			}
 			if census := catalog.Census(); census.InvocationLeases != 1 {
@@ -182,7 +174,7 @@ func TestFunctionCatalogInvocationPopulationGrowsBeyondFormerLimit(t *testing.T)
 		lookup      func(int) jobmgr.FunctionLookup
 	}{
 		"direct route": {
-			declaration: testDeclaration("direct", "", RouteLane()),
+			declaration: testDeclaration("direct", "", ResourcePolicy{}),
 			lookup: func(index int) jobmgr.FunctionLookup {
 				return jobmgr.FunctionLookup{
 					UID:   fmt.Sprintf("direct-%03d", index),
@@ -191,7 +183,7 @@ func TestFunctionCatalogInvocationPopulationGrowsBeyondFormerLimit(t *testing.T)
 			},
 		},
 		"prefix route": {
-			declaration: testDeclaration("config", "job:", RouteLane()),
+			declaration: testDeclaration("config", "job:", ResourcePolicy{}),
 			lookup: func(index int) jobmgr.FunctionLookup {
 				return jobmgr.FunctionLookup{
 					UID:   fmt.Sprintf("prefix-%03d", index),
@@ -237,7 +229,7 @@ func TestFunctionCatalogInvocationPopulationGrowsBeyondFormerLimit(t *testing.T)
 
 func TestFunctionPayloadValidationRunsInTaskChild(t *testing.T) {
 	var calls atomic.Int32
-	declaration := testDeclaration("direct", "", RouteLane())
+	declaration := testDeclaration("direct", "", ResourcePolicy{})
 	declaration.Generation.Handler = func(context.Context, HandlerInput) (lifecycle.SealedResult, error) {
 		calls.Add(1)
 		return lifecycle.NewControlResult(lifecycle.ControlInternal)
@@ -290,7 +282,7 @@ func TestFunctionCatalogReturnsSealedResourceTransactionPlan(t *testing.T) {
 			declaration := testDeclaration(
 				"config",
 				"job:",
-				ArgumentLane(0),
+				DynCfgJobResource(0, "job:"),
 			)
 			var preparedInput HandlerInput
 			declaration.Transaction = &ResourceTransactionDeclaration{
@@ -330,7 +322,7 @@ func TestFunctionCatalogReturnsSealedResourceTransactionPlan(t *testing.T) {
 			plan := decision.Plan.Transaction
 			if plan == nil ||
 				decision.Plan.Runner != nil ||
-				plan.ID != "job:mysql" ||
+				plan.ID != "mysql" ||
 				plan.AllocateSuccessor != test.allocateSuccessor ||
 				len(decision.Plan.Claims) != 1 ||
 				decision.Plan.Claims[0] != "dyncfg:graph" {
@@ -366,7 +358,7 @@ func TestFunctionCatalogReturnsSealedResourceTransactionPlan(t *testing.T) {
 
 func TestHandlerLeaseLifecycle(t *testing.T) {
 	var cleanupCalls atomic.Int32
-	declaration := testDeclaration("direct", "", RouteLane())
+	declaration := testDeclaration("direct", "", ResourcePolicy{})
 	declaration.Generation.Cleanup = func(context.Context) error {
 		cleanupCalls.Add(1)
 		return nil
@@ -424,17 +416,17 @@ func TestHandlerLeaseLifecycle(t *testing.T) {
 
 func TestRetiredRouteRejectsDuringLeaseDrainThenDisappears(t *testing.T) {
 	tests := map[string]struct {
-		prefix string
-		args   []string
-		lane   LanePolicy
+		prefix   string
+		args     []string
+		resource ResourcePolicy
 	}{
 		"direct route": {
-			lane: RouteLane(),
+			resource: ResourcePolicy{},
 		},
 		"prefix route": {
-			prefix: "job:",
-			args:   []string{"job:one"},
-			lane:   ArgumentLane(0),
+			prefix:   "job:",
+			args:     []string{"job:one"},
+			resource: ResourcePolicy{},
 		},
 	}
 	for name, test := range tests {
@@ -443,7 +435,7 @@ func TestRetiredRouteRejectsDuringLeaseDrainThenDisappears(t *testing.T) {
 			declaration := testDeclaration(
 				"work",
 				test.prefix,
-				test.lane,
+				test.resource,
 			)
 			declaration.Generation.Cleanup = func(
 				context.Context,
@@ -579,17 +571,17 @@ func TestRetiredRouteRejectsDuringLeaseDrainThenDisappears(t *testing.T) {
 
 func TestFunctionCatalogSharedGenerationUsesRouteLocalLeaseDrain(t *testing.T) {
 	tests := map[string]struct {
-		prefix string
-		args   []string
-		lane   LanePolicy
+		prefix   string
+		args     []string
+		resource ResourcePolicy
 	}{
 		"direct route": {
-			lane: RouteLane(),
+			resource: ResourcePolicy{},
 		},
 		"prefix route": {
-			prefix: "job:",
-			args:   []string{"job:one"},
-			lane:   ArgumentLane(0),
+			prefix:   "job:",
+			args:     []string{"job:one"},
+			resource: ResourcePolicy{},
 		},
 	}
 	for name, test := range tests {
@@ -599,13 +591,13 @@ func TestFunctionCatalogSharedGenerationUsesRouteLocalLeaseDrain(t *testing.T) {
 				generation,
 				"work",
 				test.prefix,
-				test.lane,
+				test.resource,
 			)
 			sibling := testDeclarationForGeneration(
 				generation,
 				"sibling",
 				"",
-				RouteLane(),
+				ResourcePolicy{},
 			)
 			catalog, err := NewCatalog([]Declaration{target, sibling})
 			if err != nil {
@@ -694,17 +686,17 @@ func TestFunctionCatalogSharedGenerationUsesRouteLocalLeaseDrain(t *testing.T) {
 
 func TestFunctionCatalogReaddsRouteBeforeRetiredLeaseDrains(t *testing.T) {
 	tests := map[string]struct {
-		prefix string
-		args   []string
-		lane   LanePolicy
+		prefix   string
+		args     []string
+		resource ResourcePolicy
 	}{
 		"direct route": {
-			lane: RouteLane(),
+			resource: ResourcePolicy{},
 		},
 		"prefix route": {
-			prefix: "job:",
-			args:   []string{"job:one"},
-			lane:   ArgumentLane(0),
+			prefix:   "job:",
+			args:     []string{"job:one"},
+			resource: ResourcePolicy{},
 		},
 	}
 	for name, test := range tests {
@@ -714,13 +706,13 @@ func TestFunctionCatalogReaddsRouteBeforeRetiredLeaseDrains(t *testing.T) {
 				oldGeneration,
 				"work",
 				test.prefix,
-				test.lane,
+				test.resource,
 			)
 			sibling := testDeclarationForGeneration(
 				oldGeneration,
 				"sibling",
 				"",
-				RouteLane(),
+				ResourcePolicy{},
 			)
 			catalog, err := NewCatalog([]Declaration{target, sibling})
 			if err != nil {
@@ -791,7 +783,7 @@ func TestFunctionCatalogReaddsRouteBeforeRetiredLeaseDrains(t *testing.T) {
 			replacement := testDeclaration(
 				"work",
 				test.prefix,
-				test.lane,
+				test.resource,
 			)
 			commit(RouteChange{
 				PublicName:  "work",
@@ -831,23 +823,23 @@ func TestFunctionCatalogReaddsRouteBeforeRetiredLeaseDrains(t *testing.T) {
 
 func TestFunctionCatalogQuiesceAbortRestoresAdmission(t *testing.T) {
 	tests := map[string]struct {
-		prefix string
-		args   []string
-		lane   LanePolicy
+		prefix   string
+		args     []string
+		resource ResourcePolicy
 	}{
 		"direct route": {
-			lane: RouteLane(),
+			resource: ResourcePolicy{},
 		},
 		"prefix route": {
-			prefix: "job:",
-			args:   []string{"job:one"},
-			lane:   ArgumentLane(0),
+			prefix:   "job:",
+			args:     []string{"job:one"},
+			resource: ResourcePolicy{},
 		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			catalog, err := NewCatalog([]Declaration{
-				testDeclaration("work", test.prefix, test.lane),
+				testDeclaration("work", test.prefix, test.resource),
 			})
 			if err != nil {
 				t.Fatal(err)
@@ -933,7 +925,7 @@ func TestRetiredRouteDrainDuringUnrelatedMutationDefersPhysicalPrune(t *testing.
 	heldDeclaration := testDeclaration(
 		"held",
 		"",
-		RouteLane(),
+		ResourcePolicy{},
 	)
 	heldDeclaration.Generation.Cleanup = func(
 		context.Context,
@@ -944,7 +936,7 @@ func TestRetiredRouteDrainDuringUnrelatedMutationDefersPhysicalPrune(t *testing.
 	otherDeclaration := testDeclaration(
 		"other",
 		"",
-		RouteLane(),
+		ResourcePolicy{},
 	)
 	catalog, err := NewCatalog(
 		[]Declaration{heldDeclaration, otherDeclaration},
@@ -997,7 +989,7 @@ func TestRetiredRouteDrainDuringUnrelatedMutationDefersPhysicalPrune(t *testing.
 	replacement := testDeclaration(
 		"other",
 		"",
-		RouteLane(),
+		ResourcePolicy{},
 	)
 	unrelated, err := catalog.NewMutation(
 		catalog.Census().Version,
@@ -1096,8 +1088,8 @@ func TestHandlerCleanupOnce(t *testing.T) {
 		return nil
 	}
 	declarations := []Declaration{
-		testDeclarationForGeneration(generation, "config", "job:", ArgumentLane(0)),
-		testDeclarationForGeneration(generation, "config", "store:", ArgumentLane(0)),
+		testDeclarationForGeneration(generation, "config", "job:", ResourcePolicy{}),
+		testDeclarationForGeneration(generation, "config", "store:", ResourcePolicy{}),
 	}
 	catalog, err := NewCatalog(declarations)
 	if err != nil {
@@ -1143,7 +1135,7 @@ func TestFunctionCatalogAtomicMutation(t *testing.T) {
 		return nil
 	}
 	catalog, err := NewCatalog([]Declaration{
-		testDeclarationForGeneration(old, "work", "", RouteLane()),
+		testDeclarationForGeneration(old, "work", "", ResourcePolicy{}),
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -1154,8 +1146,8 @@ func TestFunctionCatalogAtomicMutation(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	short := testDeclarationForGeneration(testGeneration("short"), "config", "collector:", ArgumentLane(0))
-	long := testDeclarationForGeneration(testGeneration("long"), "config", "collector:job:", ArgumentLane(0))
+	short := testDeclarationForGeneration(testGeneration("short"), "config", "collector:", ResourcePolicy{})
+	long := testDeclarationForGeneration(testGeneration("long"), "config", "collector:job:", ResourcePolicy{})
 	invalid, err := catalog.NewMutation(oldVersion, []RouteChange{
 		{PublicName: short.PublicName, Prefix: short.Prefix, Declaration: &short},
 		{PublicName: long.PublicName, Prefix: long.Prefix, Declaration: &long},
@@ -1187,7 +1179,7 @@ func TestFunctionCatalogAtomicMutation(t *testing.T) {
 		newCleanups.Add(1)
 		return nil
 	}
-	replacement := testDeclarationForGeneration(replacementGeneration, "work", "", RouteLane())
+	replacement := testDeclarationForGeneration(replacementGeneration, "work", "", ResourcePolicy{})
 	mutation, err := catalog.NewMutation(oldVersion, []RouteChange{{
 		PublicName: "work", Declaration: &replacement,
 	}})
@@ -1245,14 +1237,14 @@ func TestFunctionCatalogBoundedMutationTurns(t *testing.T) {
 		declarations := make([]Declaration, 0, population)
 		for index := 0; index < population; index++ {
 			name := fmt.Sprintf("unrelated-%03d", index)
-			declarations = append(declarations, testDeclaration(name, "", RouteLane()))
+			declarations = append(declarations, testDeclaration(name, "", ResourcePolicy{}))
 		}
 		catalog, err := NewCatalog(declarations)
 		if err != nil {
 			t.Fatal(err)
 		}
 		prefix := strings.Repeat("p", 128)
-		declaration := testDeclaration("config", prefix, ArgumentLane(0))
+		declaration := testDeclaration("config", prefix, ResourcePolicy{})
 		mutation, err := catalog.NewMutation(catalog.Census().Version, []RouteChange{{
 			PublicName: declaration.PublicName, Prefix: declaration.Prefix, Declaration: &declaration,
 		}})
@@ -1305,17 +1297,37 @@ func TestCatalogRejectsInvalidDeclarations(t *testing.T) {
 	tests := map[string]Declaration{
 		"missing handler": {
 			ID: "method", Generation: &HandlerGenerationDeclaration{ID: "generation"},
-			PublicName: "direct", Lane: RouteLane(),
+			PublicName: "direct", Resource: ResourcePolicy{},
 		},
-		"unknown lane": {
+		"invalid resource policy": {
+			ID: "method", Generation: testGeneration("generation"),
+			PublicName: "direct", Resource: ResourcePolicy{ScopePrefix: "resource:"},
+		},
+		"resource argument out of range": {
 			ID: "method", Generation: testGeneration("generation"),
 			PublicName: "direct",
+			Resource:   ResourcePolicy{Argument: 1_024, Prefix: "job:"},
 		},
-		"direct argument lane": {
-			ID: "method", Generation: testGeneration("generation"),
-			PublicName: "direct", Lane: ArgumentLane(0),
+		"transaction without resource policy": {
+			ID:         "method",
+			Generation: testGeneration("generation"),
+			PublicName: "config",
+			Prefix:     "job:",
+			Transaction: &ResourceTransactionDeclaration{
+				Prepare: func(
+					context.Context,
+					HandlerInput,
+					lifecycle.ReadyResource,
+					lifecycle.ResourceTransactionScope,
+					lifecycle.LongLivedPermit,
+				) (lifecycle.PreparedResourceTransaction, error) {
+					return nil, nil
+				},
+				GlobalClaim: "claim",
+				Commands:    []ResourceTransactionCommand{{Name: "get"}},
+			},
 		},
-		"duplicate direct": testDeclaration("direct", "", RouteLane()),
+		"duplicate direct": testDeclaration("direct", "", ResourcePolicy{}),
 	}
 	for name, declaration := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -1346,7 +1358,7 @@ func TestCatalogRejectsPathStorageBeyondProcessBudgetBeforePublication(t *testin
 				)
 				declarations = append(
 					declarations,
-					testDeclaration(name, prefix, ArgumentLane(0)),
+					testDeclaration(name, prefix, ResourcePolicy{}),
 				)
 			}
 			_, err := NewCatalog(declarations)
@@ -1370,7 +1382,7 @@ func TestCatalogRejectsPathStorageBeyondProcessBudgetBeforePublication(t *testin
 				declaration := testDeclaration(
 					name,
 					prefix,
-					ArgumentLane(0),
+					ResourcePolicy{},
 				)
 				changes = append(changes, RouteChange{
 					PublicName:  name,
@@ -1438,7 +1450,7 @@ func TestCatalogPathStorageReturnsToPublishedPostimageAcrossChurn(t *testing.T) 
 		declaration := testDeclaration(
 			publicName,
 			prefix,
-			ArgumentLane(0),
+			ResourcePolicy{},
 		)
 		apply(RouteChange{
 			PublicName:  publicName,
@@ -1473,7 +1485,7 @@ func TestCatalogPathStorageReturnsToPublishedPostimageAcrossChurn(t *testing.T) 
 }
 
 func BenchmarkBFunctionCatalogLookup(b *testing.B) {
-	catalog, err := NewCatalog([]Declaration{testDeclaration("direct", "", RouteLane())})
+	catalog, err := NewCatalog([]Declaration{testDeclaration("direct", "", ResourcePolicy{})})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -1491,7 +1503,7 @@ func BenchmarkBFunctionCatalogLookup(b *testing.B) {
 }
 
 func BenchmarkBHandlerLease(b *testing.B) {
-	catalog, err := NewCatalog([]Declaration{testDeclaration("direct", "", RouteLane())})
+	catalog, err := NewCatalog([]Declaration{testDeclaration("direct", "", ResourcePolicy{})})
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -1509,7 +1521,7 @@ func BenchmarkBHandlerLease(b *testing.B) {
 }
 
 func TestFunctionCatalogLookupAndHandlerLeaseAllocateNothing(t *testing.T) {
-	catalog, err := NewCatalog([]Declaration{testDeclaration("direct", "", RouteLane())})
+	catalog, err := NewCatalog([]Declaration{testDeclaration("direct", "", ResourcePolicy{})})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -1528,17 +1540,17 @@ func TestFunctionCatalogLookupAndHandlerLeaseAllocateNothing(t *testing.T) {
 	}
 }
 
-func testDeclaration(publicName, prefix string, lane LanePolicy) Declaration {
-	return testDeclarationForGeneration(testGeneration(publicName), publicName, prefix, lane)
+func testDeclaration(publicName, prefix string, resource ResourcePolicy) Declaration {
+	return testDeclarationForGeneration(testGeneration(publicName), publicName, prefix, resource)
 }
 
 func testGeneration(id string) *HandlerGenerationDeclaration {
 	return &HandlerGenerationDeclaration{ID: id, Handler: testHandler}
 }
 
-func testDeclarationForGeneration(generation *HandlerGenerationDeclaration, publicName, prefix string, lane LanePolicy) Declaration {
+func testDeclarationForGeneration(generation *HandlerGenerationDeclaration, publicName, prefix string, resource ResourcePolicy) Declaration {
 	return Declaration{
-		ID: "method", Generation: generation, PublicName: publicName, Prefix: prefix, Lane: lane,
+		ID: "method", Generation: generation, PublicName: publicName, Prefix: prefix, Resource: resource,
 		CooperativeCancel: true, CooperativeDeadline: true,
 	}
 }

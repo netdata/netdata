@@ -217,10 +217,10 @@ type submission struct {
 }
 
 type commandLaneKey struct {
-	source        lifecycle.Source
-	functionRoute uint64
-	key           string
-	resource      bool
+	source             lifecycle.Source
+	functionInvocation FunctionInvocationRef
+	key                string
+	resource           bool
 }
 
 type functionCleanupTask struct {
@@ -1389,6 +1389,7 @@ func (kernel *CommandKernel) admit(request Request, plan WorkPlan, submissionCon
 		return errors.Join(err, kernel.abortRequestInputBody(request))
 	}
 	var functionInvocation FunctionInvocationRef
+	var functionResourceID string
 	var laneID commandLaneKey
 	if request.Source == lifecycle.SourceFunction {
 		decision, err := kernel.functionCatalog.ResolveAndAcquire(FunctionLookup{
@@ -1410,16 +1411,6 @@ func (kernel *CommandKernel) admit(request Request, plan WorkPlan, submissionCon
 			_ = kernel.abortRequestInputBody(request)
 			return err
 		}
-		request.LaneKey = decision.Lane.Scope
-		if request.LaneKey == "" {
-			request.LaneKey = request.Route
-		}
-		laneID = commandLaneKey{
-			source: request.Source, functionRoute: decision.Lane.Route, key: decision.Lane.Scope,
-		}
-		if decision.Lane.Resource {
-			laneID = resourceCommandLaneKey(request.LaneKey)
-		}
 		if decision.Rejected != 0 {
 			if err := errors.Join(
 				kernel.uids.Complete(request.UID, false, now),
@@ -1439,6 +1430,11 @@ func (kernel *CommandKernel) admit(request Request, plan WorkPlan, submissionCon
 			plan.Claims = append([]string(nil), plan.Claims...)
 			plan.ReadClaims = append([]string(nil), plan.ReadClaims...)
 			functionInvocation = decision.Lease
+			functionResourceID = decision.ResourceID
+			request.LaneKey = request.Route
+			if functionResourceID != "" {
+				request.LaneKey = functionResourceID
+			}
 		}
 	}
 	releaseFunctionInvocation := functionInvocation.Valid()
@@ -1457,6 +1453,13 @@ func (kernel *CommandKernel) admit(request Request, plan WorkPlan, submissionCon
 	}
 	if request.Source == lifecycle.SourceJobManager {
 		laneID = commandLaneKey{source: request.Source, key: request.LaneKey}
+	} else if functionResourceID != "" {
+		laneID = resourceCommandLaneKey(functionResourceID)
+	} else {
+		laneID = commandLaneKey{
+			source:             request.Source,
+			functionInvocation: functionInvocation,
+		}
 	}
 	if plan.Resource != nil || plan.Transaction != nil {
 		laneID = resourceCommandLaneKey(request.LaneKey)

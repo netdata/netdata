@@ -192,7 +192,7 @@ func newSecretInitialRoute(
 			},
 			PublicName: joboutput.DynCfgFunctionName,
 			Prefix:     binding.prefix(),
-			Lane: functionadapter.ScopedDynCfgJobLane(
+			Resource: functionadapter.ScopedDynCfgJobResource(
 				0,
 				binding.prefix(),
 				"secretstore:",

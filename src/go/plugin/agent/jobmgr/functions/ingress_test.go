@@ -12,7 +12,7 @@ import (
 	functionwire "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 )
 
-func TestFunctionIngressLeavesAllFunctionLaneSelectionToCatalog(t *testing.T) {
+func TestFunctionIngressLeavesResourceSelectionToCatalog(t *testing.T) {
 	tests := map[string]struct {
 		call functionwire.Call
 	}{
@@ -56,7 +56,7 @@ func TestFunctionIngressLeavesAllFunctionLaneSelectionToCatalog(t *testing.T) {
 			}
 			if request.LaneKey != "" {
 				t.Fatalf(
-					"ingress preselected catalog lane %q",
+					"ingress preselected catalog resource %q",
 					request.LaneKey,
 				)
 			}

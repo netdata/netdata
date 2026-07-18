@@ -129,7 +129,7 @@ func newDynCfgJobInitialRoute(
 			},
 			PublicName:          joboutput.DynCfgFunctionName,
 			Prefix:              prefix,
-			Lane:                functionadapter.DynCfgJobLane(0, prefix),
+			Resource:            functionadapter.DynCfgJobResource(0, prefix),
 			CooperativeCancel:   true,
 			CooperativeDeadline: true,
 			RawPayload:          true,

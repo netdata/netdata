@@ -49,6 +49,9 @@ func TestAgentDriverUsesCaseExactPublicLifecycle(t *testing.T) {
 		"Function invalid JSON": {
 			predicate: "F14.5",
 		},
+		"concurrent same-route Functions": {
+			predicate: "F08.2",
+		},
 	}
 	driver := &AgentDriver{}
 	for name, test := range tests {

@@ -542,7 +542,7 @@ func (builder *MutationBuilder) startRouteStep() {
 				id:         builder.catalog.nextRouteID + builder.routeOrdinal,
 				publicName: change.publicName, prefix: change.prefix,
 				method: change.declaration.ID, handler: preparedGeneration.generation,
-				lane:                change.declaration.Lane,
+				resource:            change.declaration.Resource,
 				cooperativeCancel:   change.declaration.CooperativeCancel,
 				cooperativeDeadline: change.declaration.CooperativeDeadline,
 				rawPayload:          change.declaration.RawPayload,

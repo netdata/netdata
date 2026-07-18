@@ -18,9 +18,10 @@ const (
 )
 
 // Request is one immutable command admission value. LaneKey is supplied only
-// for Job Manager commands; the Function catalog selects Function lanes. The
-// submitting adapter transfers ownership of Args and Payload until the request
-// reaches terminal disposal.
+// for Job Manager commands. Generic Function calls receive independent
+// invocation lanes; the Function catalog selects a shared lane only for
+// resource-scoped commands. The submitting adapter transfers ownership of Args
+// and Payload until the request reaches terminal disposal.
 type Request struct {
 	UID             string
 	LaneKey         string

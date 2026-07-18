@@ -152,7 +152,7 @@ func newVNodeInitialRoute(
 			},
 			PublicName: joboutput.DynCfgFunctionName,
 			Prefix:     binding.prefix(),
-			Lane: functionadapter.ScopedDynCfgJobLane(
+			Resource: functionadapter.ScopedDynCfgJobResource(
 				0,
 				binding.prefix(),
 				"vnode:",

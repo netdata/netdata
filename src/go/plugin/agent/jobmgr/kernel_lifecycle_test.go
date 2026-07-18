@@ -342,19 +342,21 @@ func TestFunctionCatalogDecisionOwnsExactLease(t *testing.T) {
 	}{
 		"resolved terminal": {
 			decision: FunctionCatalogDecision{
-				Lane: FunctionLane{Route: 1}, Plan: work,
+				Plan:  work,
 				Lease: FunctionInvocationRef{Slot: 1, Generation: 1},
 			},
 			wantReleases: 1,
 			wantStatus:   " 200 ",
 		},
 		"closed rejection owns no lease": {
-			decision:   FunctionCatalogDecision{Lane: FunctionLane{Route: 1}, Rejected: lifecycle.ControlNotFound},
+			decision:   FunctionCatalogDecision{Rejected: lifecycle.ControlNotFound},
 			wantStatus: " 404 ",
 		},
 		"invalid resolved decision releases returned lease": {
 			decision: FunctionCatalogDecision{
-				Plan: work, Lease: FunctionInvocationRef{Slot: 1, Generation: 1},
+				ResourceID: strings.Repeat("r", maximumRequestMetadataBytes+1),
+				Plan:       work,
+				Lease:      FunctionInvocationRef{Slot: 1, Generation: 1},
 			},
 			wantErr:      true,
 			wantReleases: 1,
@@ -420,7 +422,6 @@ func TestFunctionHandlerCleanupRunsOffKernelLoop(t *testing.T) {
 	catalog := functionCatalogPortStub{
 		resolve: func(FunctionLookup) (FunctionCatalogDecision, error) {
 			return FunctionCatalogDecision{
-				Lane:  FunctionLane{Route: 1},
 				Plan:  WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)},
 				Lease: FunctionInvocationRef{Slot: 1, Generation: 1},
 			}, nil
@@ -818,7 +819,7 @@ func TestKernelSharesResourceAuthorityAcrossSchedulingSources(t *testing.T) {
 	var output bytes.Buffer
 	kernel, run, admission, uids, tasks :=
 		newKernelWithPlannerAndWriter(t, planner, &output)
-	setTestFunctionLane(t, kernel, func(FunctionLookup) string {
+	setTestFunctionResource(t, kernel, func(FunctionLookup) string {
 		return "resource"
 	})
 	if err := run.OpenAdmission(); err != nil {
@@ -1082,9 +1083,9 @@ func TestKernelShutdownStopsResourceAfterActiveUserDrains(t *testing.T) {
 	workRelease := make(chan struct{})
 	resource := newKernelTestReadyResource("resource", nil, stopRelease)
 	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, kernelResourcePlanner(t, resource, workEntered, workRelease))
-	testFunctionCatalogFor(t, kernel).lane = func(FunctionLookup) FunctionLane {
-		return FunctionLane{Route: 1, Scope: "resource", Resource: true}
-	}
+	setTestFunctionResource(t, kernel, func(FunctionLookup) string {
+		return "resource"
+	})
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -1537,7 +1538,7 @@ func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 	})
 	var output bytes.Buffer
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
-	setTestFunctionLane(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
+	setTestFunctionResource(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -1647,7 +1648,7 @@ func TestKernelStartsDueCooperativeRunner(t *testing.T) {
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
-	setTestFunctionLane(t, kernel, func(lookup FunctionLookup) string {
+	setTestFunctionResource(t, kernel, func(lookup FunctionLookup) string {
 		return lookup.UID
 	})
 	startKernelLoop(t, kernel)
@@ -1775,7 +1776,7 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 	})
 	var output bytes.Buffer
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
-	setTestFunctionLane(t, kernel, func(FunctionLookup) string { return "same-lane" })
+	setTestFunctionResource(t, kernel, func(FunctionLookup) string { return "same-lane" })
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -1889,7 +1890,7 @@ func TestKernelDisposesQueuedNoResponseCapabilityAfterItsDeadline(t *testing.T) 
 		})}, nil
 	})
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
-	setTestFunctionLane(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
+	setTestFunctionResource(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -1979,7 +1980,7 @@ func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 	})
 	var output bytes.Buffer
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
-	setTestFunctionLane(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
+	setTestFunctionResource(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -2615,7 +2616,7 @@ func TestKernelStopDrainsCooperativeTask(t *testing.T) {
 		}, nil
 	})
 	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, planner)
-	setTestFunctionLane(t, kernel, func(FunctionLookup) string { return "lane" })
+	setTestFunctionResource(t, kernel, func(FunctionLookup) string { return "lane" })
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -2916,7 +2917,7 @@ func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 		}
 	})
 	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, planner)
-	setTestFunctionLane(t, kernel, func(FunctionLookup) string { return "lane" })
+	setTestFunctionResource(t, kernel, func(FunctionLookup) string { return "lane" })
 	catalog := testFunctionCatalogFor(t, kernel)
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
@@ -3284,7 +3285,7 @@ func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
 		}, nil
 	})
 	kernel, run, _, _, tasks := newKernelWithPlanner(t, planner)
-	setTestFunctionLane(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
+	setTestFunctionResource(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
@@ -3629,13 +3630,12 @@ func (kernel *CommandKernel) prepareSubmissionPlanForTest(request Request) (Work
 }
 
 type testFunctionCatalog struct {
-	planner Planner
-	lane    func(FunctionLookup) FunctionLane
-	next    uint64
-	release uint64
-	peak    int
-	leases  map[FunctionInvocationRef]struct{}
-	routes  map[string]uint64
+	planner  Planner
+	resource func(FunctionLookup) string
+	next     uint64
+	release  uint64
+	peak     int
+	leases   map[FunctionInvocationRef]struct{}
 }
 
 type functionCatalogPortStub struct {
@@ -3695,7 +3695,6 @@ func newTestFunctionCatalog(planner Planner) *testFunctionCatalog {
 	return &testFunctionCatalog{
 		planner: planner,
 		leases:  make(map[FunctionInvocationRef]struct{}),
-		routes:  make(map[string]uint64),
 	}
 }
 
@@ -3710,21 +3709,20 @@ func (catalog *testFunctionCatalog) ResolveAndAcquire(lookup FunctionLookup) (Fu
 		return FunctionCatalogDecision{}, err
 	}
 	catalog.next++
-	routeID := catalog.routes[lookup.Route]
-	if routeID == 0 {
-		routeID = uint64(len(catalog.routes) + 1)
-		catalog.routes[lookup.Route] = routeID
-	}
 	ref := FunctionInvocationRef{Slot: 1, Generation: catalog.next}
 	catalog.leases[ref] = struct{}{}
 	if len(catalog.leases) > catalog.peak {
 		catalog.peak = len(catalog.leases)
 	}
-	lane := FunctionLane{Route: routeID, Scope: lookup.Route}
-	if catalog.lane != nil {
-		lane = catalog.lane(lookup)
+	resourceID := ""
+	if catalog.resource != nil {
+		resourceID = catalog.resource(lookup)
 	}
-	return FunctionCatalogDecision{Lane: lane, Plan: plan, Lease: ref}, nil
+	return FunctionCatalogDecision{
+		ResourceID: resourceID,
+		Plan:       plan,
+		Lease:      ref,
+	}, nil
 }
 
 func (catalog *testFunctionCatalog) ReleaseInvocation(ref FunctionInvocationRef) (FunctionCleanupPlan, error) {
@@ -3770,11 +3768,9 @@ func (*testFunctionCatalog) LifecycleCensus() FunctionCatalogCensus {
 	return FunctionCatalogCensus{Closed: true}
 }
 
-func setTestFunctionLane(t *testing.T, kernel *CommandKernel, lane func(FunctionLookup) string) {
+func setTestFunctionResource(t *testing.T, kernel *CommandKernel, resource func(FunctionLookup) string) {
 	t.Helper()
-	testFunctionCatalogFor(t, kernel).lane = func(lookup FunctionLookup) FunctionLane {
-		return FunctionLane{Route: 1, Scope: lane(lookup)}
-	}
+	testFunctionCatalogFor(t, kernel).resource = resource
 }
 
 func testFunctionCatalogFor(t *testing.T, kernel *CommandKernel) *testFunctionCatalog {

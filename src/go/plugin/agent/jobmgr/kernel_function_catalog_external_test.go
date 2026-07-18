@@ -5,6 +5,7 @@ package jobmgr_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -18,7 +19,7 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 	var cleanupCalls atomic.Int32
 	catalog, err := functionadapter.NewCatalog([]functionadapter.Declaration{
 		{
-			ID: "method", PublicName: "direct", Lane: functionadapter.RouteLane(),
+			ID: "method", PublicName: "direct",
 			Generation: &functionadapter.HandlerGenerationDeclaration{
 				ID: "external-test",
 				Handler: func(context.Context, functionadapter.HandlerInput) (lifecycle.SealedResult, error) {
@@ -95,6 +96,219 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 	closeExternalUIDLedger(t, uids)
 }
 
+func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T) {
+	const calls = lifecycle.TransientTaskSlots + 1
+
+	entered := make(chan string, calls)
+	release := make(chan struct{})
+	var cleanupCalls atomic.Int32
+	catalog, err := functionadapter.NewCatalog([]functionadapter.Declaration{
+		{
+			ID:         "method",
+			PublicName: "direct",
+			Generation: &functionadapter.HandlerGenerationDeclaration{
+				ID: "concurrent-external-test",
+				Handler: func(
+					_ context.Context,
+					input functionadapter.HandlerInput,
+				) (lifecycle.SealedResult, error) {
+					entered <- input.UID
+					<-release
+					return lifecycle.NewControlResult(
+						lifecycle.ControlInternal,
+					)
+				},
+				Cleanup: func(context.Context) error {
+					cleanupCalls.Add(1)
+					return nil
+				},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kernel, run, admission, uids := newExternalKernel(t, catalog)
+	for index := 0; index < calls; index++ {
+		if err := kernel.Submit(context.Background(), jobmgr.Request{
+			UID: fmt.Sprintf("same-route-%d", index), Source: lifecycle.SourceFunction,
+			Route: "direct",
+		}); err != nil {
+			close(release)
+			t.Fatal(err)
+		}
+	}
+
+	seen := make(map[string]struct{}, calls)
+	timer := time.NewTimer(time.Second)
+	for len(seen) < lifecycle.TransientTaskSlots {
+		select {
+		case uid := <-entered:
+			seen[uid] = struct{}{}
+		case <-timer.C:
+			close(release)
+			kernel.Stop()
+			_ = kernel.Wait(context.Background())
+			t.Fatalf(
+				"same-route handlers entered=%d, want %d concurrent entries",
+				len(seen),
+				lifecycle.TransientTaskSlots,
+			)
+		}
+	}
+	if !timer.Stop() {
+		<-timer.C
+	}
+	select {
+	case uid := <-entered:
+		close(release)
+		kernel.Stop()
+		_ = kernel.Wait(context.Background())
+		t.Fatalf(
+			"handler %q bypassed the %d-slot execution bound",
+			uid,
+			lifecycle.TransientTaskSlots,
+		)
+	case <-time.After(25 * time.Millisecond):
+	}
+	if cleanupCalls.Load() != 0 {
+		close(release)
+		kernel.Stop()
+		_ = kernel.Wait(context.Background())
+		t.Fatal("handler generation cleaned while invocations were active")
+	}
+
+	close(release)
+	select {
+	case uid := <-entered:
+		seen[uid] = struct{}{}
+	case <-time.After(time.Second):
+		kernel.Stop()
+		_ = kernel.Wait(context.Background())
+		t.Fatal("fifth same-route invocation did not run after a slot released")
+	}
+	kernel.Stop()
+	if err := kernel.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if census := catalog.Census(); census.InvocationLeases != 0 ||
+		census.CompletedCleanups != 1 || cleanupCalls.Load() != 1 {
+		t.Fatalf(
+			"same-route invocation cleanup differs: census=%+v calls=%d",
+			census,
+			cleanupCalls.Load(),
+		)
+	}
+	if len(seen) != calls {
+		t.Fatalf("same-route handlers entered=%d, want %d", len(seen), calls)
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeExternalUIDLedger(t, uids)
+}
+
+func TestKernelSameRouteFunctionCancellationIsInvocationLocal(t *testing.T) {
+	entered := make(chan string, 2)
+	releaseBlocked := make(chan struct{})
+	catalog, err := functionadapter.NewCatalog([]functionadapter.Declaration{
+		{
+			ID:         "method",
+			PublicName: "direct",
+			Generation: &functionadapter.HandlerGenerationDeclaration{
+				ID: "cancellation-external-test",
+				Handler: func(
+					ctx context.Context,
+					input functionadapter.HandlerInput,
+				) (lifecycle.SealedResult, error) {
+					entered <- input.UID
+					if input.UID == "blocked" {
+						<-releaseBlocked
+					} else {
+						<-ctx.Done()
+					}
+					return lifecycle.NewControlResult(
+						lifecycle.ControlInternal,
+					)
+				},
+			},
+			CooperativeCancel: true,
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	kernel, run, admission, uids := newExternalKernel(t, catalog)
+	results := map[string]chan error{
+		"blocked":   make(chan error, 1),
+		"cancelled": make(chan error, 1),
+	}
+	for uid, result := range results {
+		go func() {
+			result <- kernel.SubmitAndWait(
+				context.Background(),
+				jobmgr.Request{
+					UID: uid, Source: lifecycle.SourceFunction,
+					Route: "direct",
+				},
+			)
+		}()
+	}
+	seen := make(map[string]struct{}, len(results))
+	for len(seen) < len(results) {
+		select {
+		case uid := <-entered:
+			seen[uid] = struct{}{}
+		case <-time.After(time.Second):
+			close(releaseBlocked)
+			kernel.Stop()
+			_ = kernel.Wait(context.Background())
+			t.Fatalf("same-route handlers entered=%v, want both", seen)
+		}
+	}
+	if err := kernel.Cancel(context.Background(), "cancelled"); err != nil {
+		close(releaseBlocked)
+		t.Fatal(err)
+	}
+	select {
+	case err := <-results["cancelled"]:
+		if err != nil {
+			close(releaseBlocked)
+			t.Fatalf("cancelled invocation terminal error: %v", err)
+		}
+	case <-time.After(time.Second):
+		close(releaseBlocked)
+		t.Fatal("cancelled invocation did not reach terminal")
+	}
+	select {
+	case err := <-results["blocked"]:
+		close(releaseBlocked)
+		t.Fatalf(
+			"cancelling one same-route invocation completed its peer: %v",
+			err,
+		)
+	case <-time.After(25 * time.Millisecond):
+	}
+	close(releaseBlocked)
+	select {
+	case err := <-results["blocked"]:
+		if err != nil {
+			t.Fatalf("blocked invocation terminal error: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("blocked invocation did not complete after release")
+	}
+
+	kernel.Stop()
+	if err := kernel.Wait(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := admission.CloseDrained(run.Generation()); err != nil {
+		t.Fatal(err)
+	}
+	closeExternalUIDLedger(t, uids)
+}
+
 func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 	var oldCalls atomic.Int32
 	var newCalls atomic.Int32
@@ -113,7 +327,7 @@ func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 	}
 	catalog, err := functionadapter.NewCatalog([]functionadapter.Declaration{{
 		ID: "method", Generation: oldGeneration,
-		PublicName: "direct", Lane: functionadapter.RouteLane(),
+		PublicName: "direct",
 	}})
 	if err != nil {
 		t.Fatal(err)
@@ -133,7 +347,7 @@ func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 	}
 	replacement := functionadapter.Declaration{
 		ID: "method", Generation: newGeneration,
-		PublicName: "direct", Lane: functionadapter.RouteLane(),
+		PublicName: "direct",
 	}
 	mutation, err := catalog.NewMutation(catalog.Census().Version, []functionadapter.RouteChange{{
 		PublicName: "direct", Declaration: &replacement,

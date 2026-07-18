@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/policy"
 )
 
@@ -594,7 +595,7 @@ func runAgentFunctionReplacementOrdering(ctx context.Context) error {
 
 const (
 	formerOperationPopulation = 256
-	formerLanePopulation      = 32
+	formerSameRoutePopulation = 32
 )
 
 func runAgentUIDGrowthBeyondFormerLimit(ctx context.Context) error {
@@ -605,10 +606,10 @@ func runAgentUIDGrowthBeyondFormerLimit(ctx context.Context) error {
 	)
 }
 
-func runAgentFunctionLaneGrowthBeyondFormerLimit(ctx context.Context) error {
+func runAgentConcurrentSameRouteFunctionPopulation(ctx context.Context) error {
 	return runAgentHeldFunctionPopulation(
 		ctx,
-		formerLanePopulation+1,
+		formerSameRoutePopulation+1,
 		func(int) string { return "jobmgrtest:echo held" },
 	)
 }
@@ -650,6 +651,20 @@ func runAgentHeldFunctionPopulation(
 		); err != nil {
 			return err
 		}
+	}
+	wantConcurrent := admitted
+	if wantConcurrent > lifecycle.TransientTaskSlots {
+		wantConcurrent = lifecycle.TransientTaskSlots
+	}
+	if err := waitUntil(ctx, func() bool {
+		return state.count("raw:echo:entered") >= wantConcurrent
+	}); err != nil {
+		return fmt.Errorf(
+			"same-route handlers entered=%d, want at least %d before release: %w",
+			state.count("raw:echo:entered"),
+			wantConcurrent,
+			err,
+		)
 	}
 	close(release)
 	released = true

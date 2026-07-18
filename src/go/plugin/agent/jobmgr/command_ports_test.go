@@ -25,7 +25,7 @@ func TestRequestValidate(t *testing.T) {
 		"no payload": {
 			request: valid,
 		},
-		"Function lane comes from catalog": {
+		"Function scheduling comes after ingress": {
 			request: Request{
 				UID: "function-1", Source: lifecycle.SourceFunction, Route: "function",
 			},

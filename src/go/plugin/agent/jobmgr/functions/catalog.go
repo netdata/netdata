@@ -16,7 +16,7 @@ import (
 const (
 	maximumDeclarationMetadataBytes = 15_487
 	MaximumCloseQuantum             = jobmgr.MaximumFunctionCloseQuantum
-	invalidDynCfgLaneScope          = "\x00dyncfg-invalid"
+	invalidDynCfgResourceID         = "\x00dyncfg-invalid"
 )
 
 var dynCfgJobNameReplacer = strings.NewReplacer(" ", "_", ":", "_")
@@ -65,91 +65,63 @@ type HandlerGenerationDeclaration struct {
 	Cleanup func(context.Context) error
 }
 
-type LanePolicyKind uint8
-
-const (
-	LaneByRoute LanePolicyKind = iota + 1
-	LaneByArgument
-	LaneByDynCfgJob
-)
-
-type LanePolicy struct {
-	Kind        LanePolicyKind
+// ResourcePolicy derives the shared Job Manager resource identity for a
+// resource-scoped Function. Its zero value schedules each invocation
+// independently.
+type ResourcePolicy struct {
 	Argument    uint16
 	Prefix      string
 	ScopePrefix string
 }
 
-func RouteLane() LanePolicy {
-	return LanePolicy{Kind: LaneByRoute}
-}
-
-func ArgumentLane(index uint16) LanePolicy {
-	return LanePolicy{Kind: LaneByArgument, Argument: index}
-}
-
-func DynCfgJobLane(index uint16, prefix string) LanePolicy {
-	return LanePolicy{
-		Kind: LaneByDynCfgJob, Argument: index, Prefix: prefix,
+// DynCfgJobResource derives a collector job resource from DynCfg arguments.
+func DynCfgJobResource(index uint16, prefix string) ResourcePolicy {
+	return ResourcePolicy{
+		Argument: index, Prefix: prefix,
 	}
 }
 
-func ScopedDynCfgJobLane(index uint16, prefix, scopePrefix string) LanePolicy {
-	return LanePolicy{
-		Kind: LaneByDynCfgJob, Argument: index, Prefix: prefix,
+// ScopedDynCfgJobResource additionally namespaces the derived resource.
+func ScopedDynCfgJobResource(index uint16, prefix, scopePrefix string) ResourcePolicy {
+	return ResourcePolicy{
+		Argument: index, Prefix: prefix,
 		ScopePrefix: scopePrefix,
 	}
 }
 
-func (policy LanePolicy) validate() error {
-	switch policy.Kind {
-	case LaneByRoute:
-		if policy.Argument != 0 || policy.Prefix != "" ||
-			policy.ScopePrefix != "" {
-			return errors.New("jobmgr Function catalog: route lane has an argument")
-		}
-	case LaneByArgument:
-		if policy.Argument >= 1_024 || policy.Prefix != "" ||
-			policy.ScopePrefix != "" {
-			return errors.New("jobmgr Function catalog: lane argument exceeds request bound")
-		}
-	case LaneByDynCfgJob:
-		if policy.Argument >= 1_024 ||
-			policy.Prefix == "" ||
-			len(policy.Prefix)+len(policy.ScopePrefix) >
-				maximumDeclarationMetadataBytes ||
-			strings.TrimSpace(policy.ScopePrefix) != policy.ScopePrefix {
-			return errors.New(
-				"jobmgr Function catalog: invalid DynCfg job lane policy",
-			)
-		}
-	default:
-		return errors.New("jobmgr Function catalog: unknown lane policy")
+func (policy ResourcePolicy) validate() error {
+	if policy == (ResourcePolicy{}) {
+		return nil
+	}
+	if policy.Argument >= 1_024 ||
+		policy.Prefix == "" ||
+		len(policy.Prefix)+len(policy.ScopePrefix) >
+			maximumDeclarationMetadataBytes ||
+		strings.TrimSpace(policy.ScopePrefix) != policy.ScopePrefix {
+		return errors.New(
+			"jobmgr Function catalog: invalid resource policy",
+		)
 	}
 	return nil
 }
 
-func (policy LanePolicy) resolve(routeID uint64, arguments []string) jobmgr.FunctionLane {
-	lane := jobmgr.FunctionLane{Route: routeID}
-	if policy.Kind == LaneByArgument &&
-		int(policy.Argument) < len(arguments) {
-		lane.Scope = arguments[policy.Argument]
-	} else if policy.Kind == LaneByDynCfgJob {
-		lane.Scope = resolveDynCfgJobLane(policy, arguments)
-		if lane.Scope != "" {
-			lane.Scope = policy.ScopePrefix + lane.Scope
-		}
-		lane.Resource = true
+func (policy ResourcePolicy) resolve(arguments []string) string {
+	if policy == (ResourcePolicy{}) {
+		return ""
 	}
-	return lane
+	resourceID := resolveDynCfgJobResource(policy, arguments)
+	if resourceID != "" {
+		resourceID = policy.ScopePrefix + resourceID
+	}
+	return resourceID
 }
 
-func resolveDynCfgJobLane(
-	policy LanePolicy,
+func resolveDynCfgJobResource(
+	policy ResourcePolicy,
 	arguments []string,
 ) string {
 	if int(policy.Argument) >= len(arguments) {
-		return invalidDynCfgLaneScope
+		return invalidDynCfgResourceID
 	}
 	target := strings.TrimPrefix(
 		arguments[policy.Argument],
@@ -165,11 +137,11 @@ func resolveDynCfgJobLane(
 				return name
 			}
 		}
-		return invalidDynCfgLaneScope
+		return invalidDynCfgResourceID
 	}
 	module, name, hasName := strings.Cut(target, ":")
 	if module == "" {
-		return invalidDynCfgLaneScope
+		return invalidDynCfgResourceID
 	}
 	if len(arguments) > 2 &&
 		len(arguments) > 1 &&
@@ -189,7 +161,7 @@ type Declaration struct {
 	Transaction         *ResourceTransactionDeclaration
 	PublicName          string
 	Prefix              string
-	Lane                LanePolicy
+	Resource            ResourcePolicy
 	CooperativeCancel   bool
 	CooperativeDeadline bool
 	RawPayload          bool
@@ -246,7 +218,7 @@ type route struct {
 	prefix              string
 	method              string
 	handler             *handlerGeneration
-	lane                LanePolicy
+	resource            ResourcePolicy
 	cooperativeCancel   bool
 	cooperativeDeadline bool
 	rawPayload          bool
@@ -527,7 +499,7 @@ func (catalog *Catalog) addInitial(declaration Declaration, generation *handlerG
 	resolved := &route{
 		id: catalog.nextRouteID, publicName: declaration.PublicName,
 		prefix: declaration.Prefix, method: declaration.ID,
-		handler: generation, lane: declaration.Lane,
+		handler: generation, resource: declaration.Resource,
 		cooperativeCancel:   declaration.CooperativeCancel,
 		cooperativeDeadline: declaration.CooperativeDeadline,
 		rawPayload:          declaration.RawPayload,
@@ -560,17 +532,18 @@ func validateDeclaration(declaration Declaration) error {
 		len(declaration.Prefix) > maximumDeclarationMetadataBytes {
 		return errors.New("jobmgr Function catalog: invalid declaration")
 	}
-	if declaration.Prefix == "" &&
-		(declaration.Lane.Kind == LaneByArgument ||
-			declaration.Lane.Kind == LaneByDynCfgJob) {
-		return errors.New("jobmgr Function catalog: direct route has argument lane policy")
-	}
 	if err := validateResourceTransactionDeclaration(
 		declaration.Transaction,
 	); err != nil {
 		return err
 	}
-	return declaration.Lane.validate()
+	if declaration.Transaction != nil &&
+		declaration.Resource == (ResourcePolicy{}) {
+		return errors.New(
+			"jobmgr Function catalog: transaction has no resource policy",
+		)
+	}
+	return declaration.Resource.validate()
 }
 
 func validateResourceTransactionDeclaration(
@@ -663,28 +636,25 @@ func resourceTransactionCommand(
 func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.FunctionCatalogDecision, error) {
 	if catalog == nil || catalog.closed {
 		return jobmgr.FunctionCatalogDecision{
-			Lane:     jobmgr.FunctionLane{Route: 1, Scope: lookup.Route},
 			Rejected: lifecycle.ControlUnavailable,
 		}, nil
 	}
 	set, ok := catalogRouteSet(catalog.routes, lookup.Route)
 	if !ok {
 		return jobmgr.FunctionCatalogDecision{
-			Lane:     jobmgr.FunctionLane{Route: 1, Scope: lookup.Route},
 			Rejected: lifecycle.ControlNotFound,
 		}, nil
 	}
 	resolved := set.resolve(lookup.Args)
 	if resolved == nil || resolved.retiringDrained {
 		return jobmgr.FunctionCatalogDecision{
-			Lane:     jobmgr.FunctionLane{Route: 1, Scope: lookup.Route},
 			Rejected: lifecycle.ControlNotFound,
 		}, nil
 	}
-	lane := resolved.lane.resolve(resolved.id, lookup.Args)
+	resourceID := resolved.resource.resolve(lookup.Args)
 	generation := resolved.handler
 	if resolved.admissionClosed || generation.admissionClosed {
-		return jobmgr.FunctionCatalogDecision{Lane: lane, Rejected: lifecycle.ControlUnavailable}, nil
+		return jobmgr.FunctionCatalogDecision{Rejected: lifecycle.ControlUnavailable}, nil
 	}
 
 	slotIndex := catalog.freeLease
@@ -734,7 +704,7 @@ func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.
 	); ok {
 		slot.claims[0] = resolved.transaction.GlobalClaim
 		slot.transactionPlan = jobmgr.ResourceTransactionPlan{
-			ID:                lane.Scope,
+			ID:                resourceID,
 			AllocateSuccessor: command.AllocateSuccessor,
 			Prepare:           slot.prepareResourceTransaction,
 		}
@@ -747,9 +717,9 @@ func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.
 		}
 	}
 	return jobmgr.FunctionCatalogDecision{
-		Lane:  lane,
-		Plan:  plan,
-		Lease: jobmgr.FunctionInvocationRef{Slot: slotIndex, Generation: nextGeneration},
+		ResourceID: resourceID,
+		Plan:       plan,
+		Lease:      jobmgr.FunctionInvocationRef{Slot: slotIndex, Generation: nextGeneration},
 	}, nil
 }
 

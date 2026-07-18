@@ -225,7 +225,8 @@ var componentProofByCase = map[string][]ComponentProof{
 		{Package: "./plugin/agent/jobmgr/lifecycle", Test: "TestUIDLedgerGrowsAndCloseWorkRemainsBatched"},
 	},
 	"F08.2": {
-		{Package: "./plugin/agent/jobmgr", Test: "TestKernelFunctionLaneGrowsAndPreservesCrossLaneProgress"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestKernelFunctionResourceLanesGrowAndPreserveCrossLaneProgress"},
 	},
 	"F08.3": {
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelSubmissionBacklogCannotStarveStop"},

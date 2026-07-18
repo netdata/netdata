@@ -85,25 +85,6 @@ type FunctionCatalogCensus struct {
 	MutationActive     bool
 }
 
-// FunctionLane is a structured catalog-owned lane identity. Route is a
-// monotonic route identity; Scope optionally narrows that route without
-// constructing a concatenated key. Resource makes Scope the process-wide
-// resource identity shared with discovery and lifecycle work.
-type FunctionLane struct {
-	Route    uint64
-	Scope    string
-	Resource bool
-}
-
-func (lane FunctionLane) validate() error {
-	if lane.Route == 0 ||
-		len(lane.Scope) > maximumRequestMetadataBytes ||
-		lane.Resource && lane.Scope == "" {
-		return errors.New("jobmgr kernel: invalid Function lane")
-	}
-	return nil
-}
-
 func (plan FunctionCleanupPlan) validate() error {
 	workKinds := 0
 	if plan.Work != nil {
@@ -124,20 +105,23 @@ func (ref FunctionInvocationRef) Valid() bool {
 }
 
 // FunctionCatalogDecision is the closed result of one Function catalog
-// transition. A rejection owns no invocation lease or executable plan.
+// transition. ResourceID is empty for an independently scheduled generic
+// invocation and identifies the shared process resource for a scoped command.
+// A rejection owns no resource identity, invocation lease, or executable plan.
 type FunctionCatalogDecision struct {
-	Lane     FunctionLane
-	Plan     WorkPlan
-	Lease    FunctionInvocationRef
-	Rejected lifecycle.ControlStatus
+	ResourceID string
+	Plan       WorkPlan
+	Lease      FunctionInvocationRef
+	Rejected   lifecycle.ControlStatus
 }
 
 func (decision FunctionCatalogDecision) validate() error {
-	if err := decision.Lane.validate(); err != nil {
-		return err
+	if len(decision.ResourceID) > maximumRequestMetadataBytes {
+		return errors.New("jobmgr kernel: invalid Function resource identity")
 	}
 	if decision.Rejected != 0 {
 		if !decision.Rejected.Valid() || decision.Lease.Valid() ||
+			decision.ResourceID != "" ||
 			decision.Plan.Work != nil || decision.Plan.Runner != nil || decision.Plan.Resource != nil ||
 			decision.Plan.Transaction != nil || decision.Plan.Capability != nil ||
 			len(decision.Plan.Claims) != 0 ||
@@ -155,6 +139,10 @@ func (decision FunctionCatalogDecision) validate() error {
 		decision.Plan.Capability != nil ||
 		decision.Plan.NoResponse {
 		return errors.New("jobmgr kernel: Function catalog returned internal work")
+	}
+	if decision.Plan.Transaction != nil &&
+		decision.Plan.Transaction.ID != decision.ResourceID {
+		return errors.New("jobmgr kernel: Function transaction resource identity differs")
 	}
 	return decision.Plan.validate()
 }

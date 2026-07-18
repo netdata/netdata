@@ -26,7 +26,7 @@ var agentRuntimePredicates = map[string]func(context.Context) error{
 	"F07.1": runAgentHeldHandlerShutdown,
 	"F07.2": runAgentLateHandlerQuarantine,
 	"F08.1": runAgentUIDGrowthBeyondFormerLimit,
-	"F08.2": runAgentFunctionLaneGrowthBeyondFormerLimit,
+	"F08.2": runAgentConcurrentSameRouteFunctionPopulation,
 	"F08.3": runAgentControlWithLargeOrdinaryPopulation,
 	"F08.4": runAgentFunctionTerminalVariants,
 	"F08.5": runAgentAwaitingTerminalBound,

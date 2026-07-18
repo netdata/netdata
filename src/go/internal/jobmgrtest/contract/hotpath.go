@@ -34,7 +34,9 @@ var bmM002HotpathRows = [...]HotpathGate{
 		OwnerID: "B-O-00003",
 		Package: "./plugin/agent/jobmgr",
 		Tests: []string{
-			"TestKernelFunctionLaneGrowsAndPreservesCrossLaneProgress",
+			"TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently",
+			"TestKernelSameRouteFunctionCancellationIsInvocationLocal",
+			"TestKernelFunctionResourceLanesGrowAndPreserveCrossLaneProgress",
 			"TestKernelReadyLaneFairnessAtBoundaries",
 		},
 		Benchmark: "BenchmarkBCommandKernelLaneOps",

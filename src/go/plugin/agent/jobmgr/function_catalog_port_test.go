@@ -4,6 +4,7 @@ package jobmgr
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
@@ -21,47 +22,65 @@ func TestFunctionCatalogDecisionValidate(t *testing.T) {
 		wantErr  bool
 	}{
 		"resolved": {
-			decision: FunctionCatalogDecision{Lane: FunctionLane{Route: 1}, Plan: validPlan, Lease: validLease},
+			decision: FunctionCatalogDecision{Plan: validPlan, Lease: validLease},
+		},
+		"resource scoped": {
+			decision: FunctionCatalogDecision{
+				ResourceID: "resource", Plan: validPlan, Lease: validLease,
+			},
 		},
 		"rejected": {
-			decision: FunctionCatalogDecision{Lane: FunctionLane{Route: 1}, Rejected: lifecycle.ControlNotFound},
+			decision: FunctionCatalogDecision{Rejected: lifecycle.ControlNotFound},
 		},
-		"missing lane": {
-			decision: FunctionCatalogDecision{Plan: validPlan, Lease: validLease},
-			wantErr:  true,
-		},
-		"resource lane without scope": {
+		"resource identity exceeds bound": {
 			decision: FunctionCatalogDecision{
-				Lane: FunctionLane{Route: 1, Resource: true},
-				Plan: validPlan, Lease: validLease,
+				ResourceID: strings.Repeat("r", maximumRequestMetadataBytes+1),
+				Plan:       validPlan,
+				Lease:      validLease,
+			},
+			wantErr: true,
+		},
+		"transaction resource differs": {
+			decision: FunctionCatalogDecision{
+				ResourceID: "resource",
+				Plan: WorkPlan{
+					Transaction: &ResourceTransactionPlan{ID: "other"},
+				},
+				Lease: validLease,
 			},
 			wantErr: true,
 		},
 		"resolved without lease": {
-			decision: FunctionCatalogDecision{Lane: FunctionLane{Route: 1}, Plan: validPlan},
+			decision: FunctionCatalogDecision{Plan: validPlan},
 			wantErr:  true,
 		},
 		"resolved internal work": {
 			decision: FunctionCatalogDecision{
-				Lane: FunctionLane{Route: 1}, Lease: validLease,
-				Plan: WorkPlan{NoResponse: true, Resource: &ResourcePlan{Action: ResourceStop, ID: "lane"}},
+				Lease: validLease,
+				Plan:  WorkPlan{NoResponse: true, Resource: &ResourcePlan{Action: ResourceStop, ID: "lane"}},
 			},
 			wantErr: true,
 		},
 		"rejection with lease": {
 			decision: FunctionCatalogDecision{
-				Lane: FunctionLane{Route: 1}, Lease: validLease, Rejected: lifecycle.ControlUnavailable,
+				Lease: validLease, Rejected: lifecycle.ControlUnavailable,
+			},
+			wantErr: true,
+		},
+		"rejection with resource": {
+			decision: FunctionCatalogDecision{
+				ResourceID: "resource", Rejected: lifecycle.ControlUnavailable,
 			},
 			wantErr: true,
 		},
 		"rejection with plan": {
 			decision: FunctionCatalogDecision{
-				Lane: FunctionLane{Route: 1}, Plan: validPlan, Rejected: lifecycle.ControlNotFound,
+				Plan: validPlan, Rejected: lifecycle.ControlNotFound,
 			},
 			wantErr: true,
 		},
 		"unknown rejection": {
-			decision: FunctionCatalogDecision{Lane: FunctionLane{Route: 1}, Rejected: 418},
+			decision: FunctionCatalogDecision{Rejected: 418},
 			wantErr:  true,
 		},
 	}

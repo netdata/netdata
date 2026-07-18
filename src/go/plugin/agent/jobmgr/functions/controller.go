@@ -953,7 +953,7 @@ func (controller *Controller) buildGroup(
 				module: module,
 				declaration: Declaration{
 					ID: method.ID, Generation: declaration,
-					PublicName: name, Lane: RouteLane(), RawPayload: method.RawRequest,
+					PublicName: name, RawPayload: method.RawRequest,
 					CooperativeCancel: true, CooperativeDeadline: true,
 				},
 				publication: methodPublicationRecord(

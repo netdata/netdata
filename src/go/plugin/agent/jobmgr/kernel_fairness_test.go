@@ -8,7 +8,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 )
 
-func TestKernelFunctionLaneGrowsAndPreservesCrossLaneProgress(
+func TestKernelFunctionResourceLanesGrowAndPreserveCrossLaneProgress(
 	t *testing.T,
 ) {
 	const hotLanePopulation = 33
@@ -19,7 +19,7 @@ func TestKernelFunctionLaneGrowsAndPreservesCrossLaneProgress(
 	if err := run.OpenAdmission(); err != nil {
 		t.Fatal(err)
 	}
-	setTestFunctionLane(
+	setTestFunctionResource(
 		t,
 		kernel,
 		func(lookup FunctionLookup) string {
