@@ -1,7 +1,7 @@
 //! Worker lifecycle handshake tests: the worker must report `Disabled` and
-//! exit when there is nothing to serve, and must serve (then shut down
-//! gracefully) when the journal directory exists — even an empty one, whose
-//! watcher picks up files restored later.
+//! exit when there is nothing to serve (absent journal dir, handler init
+//! failure), and must serve (then shut down gracefully) when the journal
+//! directory exists — even an empty one.
 
 use std::time::Duration;
 
@@ -59,6 +59,27 @@ async fn reports_disabled_and_exits_when_journal_dir_absent() {
         dir.path().join("does-not-exist"),
         dir.path().join("cache"),
     );
+    conn.send(LegacyLogsRequest::Configure(config)).await.unwrap();
+
+    match recv(&mut conn).await {
+        LegacyLogsResponse::Disabled => {}
+        other => panic!("expected Disabled, got {other:?}"),
+    }
+    assert_exits(worker).await;
+}
+
+#[tokio::test]
+async fn reports_disabled_and_exits_when_handler_init_fails() {
+    let dir = tempfile::tempdir().unwrap();
+    let sock = dir.path().join("legacy.sock");
+    let journal_dir = dir.path().join("journal");
+    std::fs::create_dir_all(&journal_dir).unwrap();
+    // A cache path nested under a regular file makes the disk-cache init fail.
+    let blocker = dir.path().join("blocker");
+    std::fs::write(&blocker, b"not a directory").unwrap();
+    let (mut conn, worker) = start(sock.to_str().unwrap()).await;
+
+    let config = LegacyLogsConfig::new(journal_dir, blocker.join("cache"));
     conn.send(LegacyLogsRequest::Configure(config)).await.unwrap();
 
     match recv(&mut conn).await {
