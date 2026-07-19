@@ -29,7 +29,7 @@ type inputBodyBudget struct {
 
 func NewIngress(kernel jobmgr.AdmissionCommandPort, clock lifecycle.Clock, quit func()) (*Ingress, error) {
 	if kernel == nil || clock == nil || quit == nil {
-		return nil, errors.New("Function ingress adapter: incomplete ports")
+		return nil, errors.New("jobmgr Function ingress adapter: incomplete ports")
 	}
 	return &Ingress{kernel: kernel, clock: clock, quit: quit}, nil
 }
@@ -44,7 +44,7 @@ func (ibb *inputBodyBudget) GrowInputBody(ctx context.Context, token uint64, nex
 	case grant := <-ibb.grants:
 		if grant.Kind != lifecycle.ReservationInputBodyGrowth || grant.InputBodyToken != token {
 			_, _ = ibb.admission.AbortInputBody(token)
-			return 0, errors.New("Function ingress adapter: mismatched input body grant")
+			return 0, errors.New("jobmgr Function ingress adapter: mismatched input body grant")
 		}
 		return token, nil
 	case <-ctx.Done():

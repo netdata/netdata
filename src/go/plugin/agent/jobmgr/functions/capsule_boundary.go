@@ -10,7 +10,7 @@ import (
 	functionwire "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 )
 
-var errProcessInputContained = errors.New("Function process ingress: input capsule contained")
+var errProcessInputContained = errors.New("jobmgr Function process ingress: input capsule contained")
 
 type capsuleBoundary struct {
 	mu          sync.Mutex
@@ -38,7 +38,7 @@ type capsuleBoundaryCensus struct {
 
 func newCapsuleBoundary(target *ProcessIngress) (*capsuleBoundary, error) {
 	if target == nil {
-		return nil, errors.New("Function process ingress: nil capsule target")
+		return nil, errors.New("jobmgr Function process ingress: nil capsule target")
 	}
 	return &capsuleBoundary{
 		target: target,
@@ -74,22 +74,22 @@ func (cb *capsuleBoundary) waitLocked(ctx context.Context) error {
 	return err
 }
 
-func (cb *capsuleBoundary) SealPause() error {
+func (cb *capsuleBoundary) sealPause() error {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
 	if cb.state != ProcessIngressLive || cb.contained {
-		return errors.New("Function process ingress: capsule pause outside live state")
+		return errors.New("jobmgr Function process ingress: capsule pause outside live state")
 	}
 	cb.state = ProcessIngressPaused
 	cb.signalLocked()
 	return nil
 }
 
-func (cb *capsuleBoundary) DrainPause(ctx context.Context) error {
+func (cb *capsuleBoundary) drainPause(ctx context.Context) error {
 	cb.mu.Lock()
 	if cb.state != ProcessIngressPaused || cb.contained || cb.adopting {
 		cb.mu.Unlock()
-		return errors.New("Function process ingress: capsule drain outside sealed pause")
+		return errors.New("jobmgr Function process ingress: capsule drain outside sealed pause")
 	}
 	for cb.active != 0 || cb.parsing {
 		if err := cb.waitLocked(ctx); err != nil {
@@ -101,22 +101,22 @@ func (cb *capsuleBoundary) DrainPause(ctx context.Context) error {
 	return nil
 }
 
-func (cb *capsuleBoundary) RollbackPause() error {
+func (cb *capsuleBoundary) rollbackPause() error {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
 	if cb.state != ProcessIngressPaused || cb.contained || cb.adopting {
-		return errors.New("Function process ingress: capsule pause rollback outside pause")
+		return errors.New("jobmgr Function process ingress: capsule pause rollback outside pause")
 	}
 	cb.state = ProcessIngressLive
 	cb.signalLocked()
 	return nil
 }
 
-func (cb *capsuleBoundary) PrepareAdopt(ctx context.Context) error {
+func (cb *capsuleBoundary) prepareAdopt(ctx context.Context) error {
 	cb.mu.Lock()
 	if cb.state != ProcessIngressPaused || cb.contained || cb.adopting {
 		cb.mu.Unlock()
-		return errors.New("Function process ingress: capsule adopt preparation outside pause")
+		return errors.New("jobmgr Function process ingress: capsule adopt preparation outside pause")
 	}
 	cb.adopting = true
 	cb.signalLocked()
@@ -132,7 +132,7 @@ func (cb *capsuleBoundary) PrepareAdopt(ctx context.Context) error {
 	return nil
 }
 
-func (cb *capsuleBoundary) CommitAdopt() {
+func (cb *capsuleBoundary) commitAdopt() {
 	cb.mu.Lock()
 	cb.adopting = false
 	cb.state = ProcessIngressLive
@@ -140,7 +140,7 @@ func (cb *capsuleBoundary) CommitAdopt() {
 	cb.mu.Unlock()
 }
 
-func (cb *capsuleBoundary) AbortAdopt() {
+func (cb *capsuleBoundary) abortAdopt() {
 	cb.mu.Lock()
 	if cb.state == ProcessIngressPaused && cb.adopting && !cb.contained {
 		cb.adopting = false
@@ -149,26 +149,11 @@ func (cb *capsuleBoundary) AbortAdopt() {
 	cb.mu.Unlock()
 }
 
-func (cb *capsuleBoundary) Resume() error {
-	cb.mu.Lock()
-	defer cb.mu.Unlock()
-	if cb.state != ProcessIngressPaused ||
-		cb.contained ||
-		cb.adopting ||
-		cb.active != 0 ||
-		cb.parsing {
-		return errors.New("Function process ingress: capsule resume outside drained pause")
-	}
-	cb.state = ProcessIngressLive
-	cb.signalLocked()
-	return nil
-}
-
-func (cb *capsuleBoundary) Fence(ctx context.Context) error {
+func (cb *capsuleBoundary) fence(ctx context.Context) error {
 	cb.mu.Lock()
 	if cb.state != ProcessIngressPaused || cb.contained || cb.adopting {
 		cb.mu.Unlock()
-		return errors.New("Function process ingress: capsule fence outside drained pause")
+		return errors.New("jobmgr Function process ingress: capsule fence outside drained pause")
 	}
 	for cb.active != 0 || cb.parsing {
 		if err := cb.waitLocked(ctx); err != nil {
@@ -202,7 +187,7 @@ func (cb *capsuleBoundary) acquire() (*ProcessIngress, bool) {
 	return cb.target, true
 }
 
-func (cb *capsuleBoundary) AcquireInputRead(ctx context.Context, bufferFull bool) (bool, error) {
+func (cb *capsuleBoundary) AcquireInputRead(ctx context.Context, _ bool) (bool, error) {
 	cb.mu.Lock()
 	cb.readReturns++
 	if cb.contained || cb.target == nil {
@@ -214,29 +199,6 @@ func (cb *capsuleBoundary) AcquireInputRead(ctx context.Context, bufferFull bool
 	if waiting {
 		cb.waitingReads++
 	}
-	if (waiting || bufferFull) && !cb.adopting {
-		target := cb.target
-		cb.active++
-		cb.mu.Unlock()
-		observeErr := target.observeReadReturn()
-		cb.mu.Lock()
-		cb.active--
-		cb.signalLocked()
-		cb.mu.Unlock()
-		if observeErr != nil {
-			cb.mu.Lock()
-			if waiting {
-				cb.waitingReads--
-			}
-			cb.signalLocked()
-			cb.mu.Unlock()
-			return false, observeErr
-		}
-	} else {
-		cb.mu.Unlock()
-	}
-
-	cb.mu.Lock()
 	for {
 		if cb.contained {
 			if waiting {
@@ -258,7 +220,7 @@ func (cb *capsuleBoundary) AcquireInputRead(ctx context.Context, bufferFull bool
 		}
 		if cb.state != ProcessIngressPaused || cb.parsing {
 			cb.mu.Unlock()
-			return false, errors.New("Function process ingress: invalid read-return gate state")
+			return false, errors.New("jobmgr Function process ingress: invalid read-return gate state")
 		}
 		if !waiting {
 			waiting = true
@@ -276,7 +238,7 @@ func (cb *capsuleBoundary) AcquireInputRead(ctx context.Context, bufferFull bool
 	}
 }
 
-func (cb *capsuleBoundary) Census() capsuleBoundaryCensus {
+func (cb *capsuleBoundary) census() capsuleBoundaryCensus {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
 	return capsuleBoundaryCensus{

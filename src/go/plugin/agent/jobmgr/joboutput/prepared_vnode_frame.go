@@ -19,7 +19,6 @@ type preparedVNodeFrameState struct {
 	mu         sync.Mutex
 	consumed   bool
 	generation uint64
-	revision   uint64
 	frame      lifecycle.PreparedProtocolFrame
 	commit     func() error
 	abort      func() error
@@ -40,8 +39,8 @@ func PrepareVNodeFrame(
 		return PreparedVNodeFrame{}, err
 	}
 	return PreparedVNodeFrame{state: &preparedVNodeFrameState{
-		generation: generation, revision: revision,
-		frame: frame, commit: commit, abort: abort,
+		generation: generation,
+		frame:      frame, commit: commit, abort: abort,
 	}}, nil
 }
 
@@ -73,13 +72,6 @@ func (pvf PreparedVNodeFrame) Generation() uint64 {
 		return 0
 	}
 	return pvf.state.generation
-}
-
-func (pvf PreparedVNodeFrame) Revision() uint64 {
-	if pvf.state == nil {
-		return 0
-	}
-	return pvf.state.revision
 }
 
 func (pvf PreparedVNodeFrame) take() (*preparedVNodeFrameState, error) {

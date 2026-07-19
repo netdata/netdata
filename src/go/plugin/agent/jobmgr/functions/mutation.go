@@ -321,20 +321,20 @@ const (
 )
 
 type routeMutationStep struct {
+	oldRoute      *route
+	updatedName   *catalogNode
+	updatedPrefix *prefixNode
 	change        *preparedRouteChange
-	phaseIndex    int
-	state         routeStepPhase
-	nameDepth     int
-	prefixDepth   int
+	replacement   *route
 	nameNode      *catalogNode
 	prefixNode    *prefixNode
 	set           routeSet
-	oldRoute      *route
-	hadRoute      bool
-	replacement   *route
-	updatedPrefix *prefixNode
-	updatedName   *catalogNode
+	nameDepth     int
+	prefixDepth   int
+	phaseIndex    int
 	pathByteDelta int64
+	hadRoute      bool
+	state         routeStepPhase
 }
 
 type MutationProgress struct {

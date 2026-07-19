@@ -308,7 +308,7 @@ func TestUIDLedgerGrowsAndCloseWorkRemainsBatched(t *testing.T) {
 	for batch := 1; batch <= wantBatches; batch++ {
 		more, err := uids.CloseBatch(UIDReturnBatch)
 		require.NoError(t, err)
-		require.EqualValues(t, (batch < wantBatches), more)
+		require.EqualValues(t, batch < wantBatches, more)
 	}
 
 	active, tombstones, closed := uids.Census()
@@ -318,12 +318,12 @@ func TestUIDLedgerGrowsAndCloseWorkRemainsBatched(t *testing.T) {
 func TestAdmissionRadixDomainAndOldestFitting(t *testing.T) {
 	ledger := NewAdmissionLedger()
 	lane := AdmissionLaneRef{Slot: 1, Generation: 1}
-	for _, bytes := range []int64{0, OrdinaryBudgetBytes + 1, 268_435_455} {
-		result := ledger.RequestOrdinary(1, lane, bytes)
+	for _, size := range []int64{0, OrdinaryBudgetBytes + 1, 268_435_455} {
+		result := ledger.RequestOrdinary(1, lane, size)
 		require.False(t, result.Rejected == nil || result.Ref.Valid())
 	}
-	for _, bytes := range []int64{1, 134_217_727, 134_217_728, OrdinaryBudgetBytes} {
-		result := ledger.RequestOrdinary(1, lane, bytes)
+	for _, size := range []int64{1, 134_217_727, 134_217_728, OrdinaryBudgetBytes} {
+		result := ledger.RequestOrdinary(1, lane, size)
 		require.Nil(t, result.Rejected)
 
 		require.NoError(t, ledger.CancelWaiting(result.Ref))
@@ -830,10 +830,14 @@ func TestTaskSupervisorPreservesAuthoritativeCancellationCause(t *testing.T) {
 		},
 	})
 
-	require.NoError(t, supervisor.CancelWithCause(ref, context.DeadlineExceeded))
+	require.NoError(t, supervisor.CancelWithCause(
+		ref,
+		fmt.Errorf("wrapped deadline: %w", context.DeadlineExceeded),
+	))
 
 	got := <-observed
 	require.False(t, !got.ok || !got.deadline.Equal(deadline) || !errors.Is(got.err, context.DeadlineExceeded) || !errors.Is(got.cause, context.DeadlineExceeded))
+	require.Equal(t, context.DeadlineExceeded, got.cause)
 
 	completion := <-supervisor.CompletionCh()
 	require.False(t, completion.Ref != ref || !errors.Is(completion.Err, context.DeadlineExceeded))
@@ -849,6 +853,121 @@ func TestTaskSupervisorPreservesAuthoritativeCancellationCause(t *testing.T) {
 	require.Nil(t, ack.Err)
 
 	require.NoError(t, supervisor.Release(ref))
+}
+
+func TestTaskSupervisorDeliversCanonicalPendingCancellation(t *testing.T) {
+	deadline := time.Unix(4102444800, 0)
+	tests := map[string]struct {
+		cause           error
+		want            error
+		deadline        time.Time
+		setAfterEnqueue bool
+	}{
+		"initial wrapped cancellation": {
+			cause: fmt.Errorf("wrapped cancellation: %w", context.Canceled),
+			want:  context.Canceled,
+		},
+		"initial wrapped deadline": {
+			cause:    fmt.Errorf("wrapped deadline: %w", context.DeadlineExceeded),
+			want:     context.DeadlineExceeded,
+			deadline: deadline,
+		},
+		"pending wrapped cancellation": {
+			cause:           fmt.Errorf("wrapped cancellation: %w", context.Canceled),
+			want:            context.Canceled,
+			setAfterEnqueue: true,
+		},
+		"pending wrapped deadline": {
+			cause:           fmt.Errorf("wrapped deadline: %w", context.DeadlineExceeded),
+			want:            context.DeadlineExceeded,
+			deadline:        deadline,
+			setAfterEnqueue: true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			frame, err := NewFrameOwner(io.Discard)
+			require.NoError(t, err)
+			supervisor, err := NewTaskSupervisor(frame)
+			require.NoError(t, err)
+			observed := make(chan error, 1)
+			plan := TaskPlan{
+				Source:   SourceFunction,
+				Deadline: test.deadline,
+				Work: func(ctx context.Context) (TaskOutcome, error) {
+					<-ctx.Done()
+					cause := context.Cause(ctx)
+					observed <- cause
+					return TaskOutcome{}, cause
+				},
+			}
+			if !test.setAfterEnqueue {
+				plan.InitialCancellation = test.cause
+			}
+			ref, err := supervisor.Enqueue(TaskClassGenericFunction, plan)
+			require.NoError(t, err)
+			if test.setAfterEnqueue {
+				require.NoError(t, supervisor.SetPendingCancellation(ref, test.cause))
+			}
+			var started [TaskStartServiceQuantum]TaskStart
+			count, more, err := supervisor.Dispatch(context.Background(), 1, &started)
+			require.NoError(t, err)
+			require.Equal(t, 1, count)
+			require.False(t, more)
+			require.Equal(t, ref, started[0].Request)
+
+			require.Equal(t, test.want, <-observed)
+			completion := <-supervisor.CompletionCh()
+			require.Equal(t, started[0].Task, completion.Ref)
+			require.ErrorIs(t, completion.Err, test.want)
+
+			require.NoError(t, supervisor.SendAction(TaskAction{
+				Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose,
+			}))
+			ack := <-supervisor.AcknowledgementCh()
+			require.NoError(t, ack.Err)
+
+			require.NoError(t, supervisor.SendAction(TaskAction{
+				Ref: completion.Ref, Sequence: 3, Kind: TaskActionTerminate,
+			}))
+			ack = <-supervisor.AcknowledgementCh()
+			require.NoError(t, ack.Err)
+			require.NoError(t, supervisor.Release(completion.Ref))
+		})
+	}
+}
+
+func TestTaskSupervisorRejectsAmbiguousPendingCancellation(t *testing.T) {
+	tests := map[string]error{
+		"joined cancellation causes": errors.Join(
+			context.Canceled,
+			context.DeadlineExceeded,
+		),
+		"unrecognized cancellation cause": errors.New("test cancellation"),
+	}
+	for name, cause := range tests {
+		t.Run(name, func(t *testing.T) {
+			frame, err := NewFrameOwner(io.Discard)
+			require.NoError(t, err)
+			supervisor, err := NewTaskSupervisor(frame)
+			require.NoError(t, err)
+			plan := TaskPlan{
+				Source:              SourceFunction,
+				InitialCancellation: cause,
+				Work: func(context.Context) (TaskOutcome, error) {
+					return NoValueOutcome(), nil
+				},
+			}
+			_, err = supervisor.Enqueue(TaskClassGenericFunction, plan)
+			require.Error(t, err)
+
+			plan.InitialCancellation = nil
+			ref, err := supervisor.Enqueue(TaskClassGenericFunction, plan)
+			require.NoError(t, err)
+			require.Error(t, supervisor.SetPendingCancellation(ref, cause))
+			require.NoError(t, supervisor.CancelPending(ref))
+		})
+	}
 }
 
 func TestTaskSupervisorChecksPhaseSequenceAndPublishesOwnedResult(t *testing.T) {
@@ -1309,7 +1428,7 @@ func TestFunctionPayloadAndFrameCapacityAreSeparateFromControlReserve(t *testing
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			err := validateFunctionPayloadSize(test.length)
-			require.EqualValues(t, test.valid, (err == nil))
+			require.EqualValues(t, test.valid, err == nil)
 		})
 	}
 	payload := bytes.Repeat([]byte{'x'}, 1024*1024)
@@ -1356,8 +1475,8 @@ func newStepWriter() *stepWriter {
 }
 
 func (sw *stepWriter) Write(payload []byte) (int, error) {
-	copy := append([]byte(nil), payload...)
-	sw.offered <- copy
+	payloadCopy := append([]byte(nil), payload...)
+	sw.offered <- payloadCopy
 	<-sw.release
 	return len(payload), nil
 }

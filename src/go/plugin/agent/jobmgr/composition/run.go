@@ -395,7 +395,7 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	}, nil
 }
 
-func (rg *runGeneration) Start(ctx context.Context) error {
+func (rg *runGeneration) start(ctx context.Context) error {
 	if rg == nil || ctx == nil {
 		return errors.New("jobmgr composition: invalid run start")
 	}
@@ -450,7 +450,7 @@ func (rg *runGeneration) Start(ctx context.Context) error {
 	return nil
 }
 
-func (rg *runGeneration) Started() bool {
+func (rg *runGeneration) isStarted() bool {
 	if rg == nil {
 		return false
 	}

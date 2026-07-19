@@ -129,7 +129,7 @@ func TestTaskSupervisorDisposesPreparedCapabilityWithWrongPermitOwner(t *testing
 	require.NoError(t, releaseOrdinaryErr)
 
 	census := supervisor.LongLivedCensus()
-	require.EqualValues(t, (LongLivedCensus{}), census)
+	require.EqualValues(t, LongLivedCensus{}, census)
 }
 
 func TestTaskSupervisorDisposesPreparedCapabilityAfterIdentityPanic(t *testing.T) {
@@ -166,7 +166,7 @@ func TestTaskSupervisorDisposesPreparedCapabilityAfterIdentityPanic(t *testing.T
 	require.NoError(t, releaseOrdinaryErr)
 
 	census := supervisor.LongLivedCensus()
-	require.EqualValues(t, (LongLivedCensus{}), census)
+	require.EqualValues(t, LongLivedCensus{}, census)
 }
 
 func dispatchCapabilityTask(t *testing.T, supervisor *TaskSupervisor, plan TaskPlan) TaskRef {

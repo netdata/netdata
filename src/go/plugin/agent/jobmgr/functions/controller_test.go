@@ -302,6 +302,87 @@ func TestFunctionControllerRejectsInvalidDeclarations(t *testing.T) {
 	}
 }
 
+func TestFunctionControllerReportsInitialRouteCleanupFailure(t *testing.T) {
+	cleanupErr := errors.New("test cleanup")
+	tests := map[string]struct {
+		cleanup func(context.Context) error
+		assert  func(*testing.T, error)
+	}{
+		"returned error": {
+			cleanup: func(context.Context) error { return cleanupErr },
+			assert: func(t *testing.T, err error) {
+				require.ErrorIs(t, err, cleanupErr)
+			},
+		},
+		"panic": {
+			cleanup: func(context.Context) error {
+				panic("test cleanup panic")
+			},
+			assert: func(t *testing.T, err error) {
+				require.ErrorContains(t, err, "initial route cleanup panic: test cleanup panic")
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			generation := &HandlerGenerationDeclaration{
+				ID: "initial",
+				Handler: func(context.Context, HandlerInput) (lifecycle.SealedResult, error) {
+					return lifecycle.SealedResult{}, nil
+				},
+				Cleanup: test.cleanup,
+			}
+			valid := InitialRoute{
+				Declaration: Declaration{
+					ID:         "initial",
+					Generation: generation,
+					PublicName: "initial",
+				},
+				Publication: PublicationRecord{
+					Name:       "initial",
+					Generation: 1,
+					Access:     "signed-id",
+				},
+			}
+			invalid := valid
+			invalid.Publication.Access = ""
+
+			_, _, err := NewController(
+				1,
+				collectorapi.Registry{},
+				valid,
+				invalid,
+			)
+			require.ErrorContains(t, err, "invalid initial publication")
+			test.assert(t, err)
+		})
+	}
+}
+
+func TestFunctionControllerReportsUnpublishedGroupCleanupFailure(t *testing.T) {
+	_, _, err := NewController(1, collectorapi.Registry{
+		"a": {
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "method"}}
+			},
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return &controllerPanickingCleanupHandler{}
+			},
+		},
+		"z": {
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "method"}}
+			},
+			MethodHandler: func(collectorapi.RuntimeJob) funcapi.MethodHandler {
+				return nil
+			},
+		},
+	})
+	require.ErrorContains(t, err, "nil agent handler")
+	require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
+	require.ErrorContains(t, err, "test handler cleanup panic")
+}
+
 type controllerTestMutationPort struct {
 	catalog *Catalog
 }
@@ -399,6 +480,14 @@ type controllerTestHandler struct {
 	mu       sync.Mutex
 	raw      funcapi.RawMethodRequest
 	cleanups int
+}
+
+type controllerPanickingCleanupHandler struct {
+	controllerTestHandler
+}
+
+func (*controllerPanickingCleanupHandler) Cleanup(context.Context) {
+	panic("test handler cleanup panic")
 }
 
 type blockingWithdrawPublicationPort struct {

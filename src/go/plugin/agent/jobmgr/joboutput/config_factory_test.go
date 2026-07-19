@@ -75,7 +75,7 @@ func TestConfigModuleFactoryCleansEveryAttemptAndPrefersV2(t *testing.T) {
 			default:
 				require.FailNowf(t, "test failed", "unknown operation %q", test.operation)
 			}
-			require.EqualValues(t, test.wantErr, (err != nil))
+			require.EqualValues(t, test.wantErr, err != nil)
 			require.False(t, v1Creates != 0 || v2Creates != test.wantCreates || state.collectorCleanup != test.wantCreates)
 		})
 	}

@@ -32,14 +32,6 @@ type TaskOutcome struct {
 	identity    ResourceIdentity
 }
 
-func PreparedCapabilityOutcome(capability PreparedCapability) (TaskOutcome, error) {
-	identity, err := preparedCapabilityIdentity(capability)
-	if err != nil {
-		return TaskOutcome{}, err
-	}
-	return preparedCapabilityOutcome(capability, identity)
-}
-
 func NoValueOutcome() TaskOutcome {
 	return TaskOutcome{}
 }
@@ -67,14 +59,6 @@ func preparedResourceOutcome(resource PreparedResource, identity ResourceIdentit
 func preparedCapabilityOutcome(capability PreparedCapability, identity ResourceIdentity) (TaskOutcome, error) {
 	outcome := TaskOutcome{kind: TaskOutcomePreparedCapability, capability: capability, identity: identity}
 	return outcome, outcome.validate()
-}
-
-func ReadyResourceOutcome(resource ReadyResource) (TaskOutcome, error) {
-	identity, err := readyResourceIdentity(resource)
-	if err != nil {
-		return TaskOutcome{}, err
-	}
-	return readyResourceOutcome(resource, identity)
 }
 
 func preparedResourceTransactionOutcome(

@@ -191,7 +191,7 @@ func TestRunMetricsRegistration(t *testing.T) {
 			}
 			metrics := newRunMetrics()
 			err := metrics.register(service)
-			require.EqualValues(t, test.wantErr, (err != nil))
+			require.EqualValues(t, test.wantErr, err != nil)
 			components, removals, producers, _ := service.snapshot()
 			require.False(t, len(components) != test.wantComponents ||
 				len(removals) != test.wantUnregistered ||
@@ -232,7 +232,7 @@ func TestRunGenerationRuntimeMetricsLifecycle(t *testing.T) {
 		service.snapshot()
 	require.False(t, len(components) != 1 || len(removals) != 0 || len(producers) != 1 || len(producerRemovals) != 0)
 
-	require.NoError(t, generation.Start(context.Background()))
+	require.NoError(t, generation.start(context.Background()))
 
 	generation.metrics.AddRuntimeCounter(lifecycle.RuntimeCounterDirtyRuns, 1)
 	generation.Stop()

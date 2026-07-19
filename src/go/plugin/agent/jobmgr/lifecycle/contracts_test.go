@@ -9,6 +9,12 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+var _ interface {
+	Validate() error
+	Class() LongLivedClass
+	Bytes() int64
+} = LongLivedPlan{}
+
 func TestControlFramePlanValidate(t *testing.T) {
 	tests := map[string]struct {
 		plan    ControlFramePlan

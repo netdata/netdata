@@ -289,25 +289,6 @@ func (vc *VNodeConfiguration) Entries() []ConfiguredVNode {
 	return entries
 }
 
-type VNodeConfigurationCensus struct {
-	Records      int
-	Pending      int
-	Bytes        int
-	PendingBytes int
-}
-
-func (vc *VNodeConfiguration) Census() VNodeConfigurationCensus {
-	if vc == nil {
-		return VNodeConfigurationCensus{}
-	}
-	vc.mu.Lock()
-	defer vc.mu.Unlock()
-	return VNodeConfigurationCensus{
-		Records: len(vc.records), Pending: len(vc.pending),
-		Bytes: vc.bytes, PendingBytes: vc.pendingBytes,
-	}
-}
-
 func vnodeConfigurationBytes(id string, vnode *vnodes.VirtualNode) (int, error) {
 	size := vnodeRecordOverheadBytes + len(id) + len(vnode.Name) +
 		len(vnode.Hostname) + len(vnode.GUID) + len(vnode.Source) +

@@ -146,7 +146,7 @@ func TestProcessCoreVnodeDynCfgUsesCandidateTransaction(t *testing.T) {
 
 func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 	reader, writer := io.Pipe()
-	defer writer.Close()
+	defer func() { require.NoError(t, writer.Close()) }()
 	events := make(chan string, 16)
 	var cleanupsMu sync.Mutex
 	cleanups := 0
@@ -218,7 +218,7 @@ func TestProcessCoreRejectsSuccessorAfterUnquiescedPredecessor(
 	t *testing.T,
 ) {
 	reader, writer := io.Pipe()
-	defer writer.Close()
+	defer func() { require.NoError(t, writer.Close()) }()
 	events := make(chan string, 8)
 	output := processRecordingWriter{
 		record: func(payload []byte) {
@@ -360,9 +360,9 @@ func TestProcessCoreRejectsSuccessorAfterUnquiescedPredecessor(
 
 	retained = nil
 
-	require.EqualValues(t, (secretstore.SecretStoreCensus{
+	require.EqualValues(t, secretstore.SecretStoreCensus{
 		Closing: true,
-	}), storeCensus(),
+	}, storeCensus(),
 	)
 }
 
@@ -370,7 +370,7 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(
 	t *testing.T,
 ) {
 	reader, writer := io.Pipe()
-	defer writer.Close()
+	defer func() { require.NoError(t, writer.Close()) }()
 	started := make(chan struct{})
 	release := make(chan struct{})
 	defer close(release)

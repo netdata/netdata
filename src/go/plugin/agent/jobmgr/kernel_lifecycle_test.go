@@ -617,7 +617,7 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			events := []string{}
+			var events []string
 			current := newKernelTestReadyResource("resource", nil, nil)
 			successor := newKernelTestReadyResource("resource", nil, nil)
 			permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
@@ -694,7 +694,7 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 }
 
 func TestKernelSharesResourceAuthorityAcrossSchedulingSources(t *testing.T) {
-	events := []string{}
+	var events []string
 	current := newKernelTestReadyResource("resource", nil, nil)
 	successor := newKernelTestReadyResource("resource", nil, nil)
 	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
@@ -779,7 +779,7 @@ func TestKernelSharesResourceAuthorityAcrossSchedulingSources(t *testing.T) {
 }
 
 func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
-	events := []string{}
+	var events []string
 	current := newKernelTestReadyResource("resource", nil, nil)
 	successor := newKernelTestReadyResource("resource", nil, nil)
 	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
@@ -850,7 +850,7 @@ func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
 }
 
 func TestKernelPreparedInternalTransactionAppliesWithoutResponse(t *testing.T) {
-	events := []string{}
+	var events []string
 	current := newKernelTestReadyResource("resource", nil, nil)
 	successor := newKernelTestReadyResource("resource", nil, nil)
 	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
@@ -1042,7 +1042,7 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 
-	require.EqualValues(t, (lifecycle.LongLivedCensus{}), tasks.LongLivedCensus())
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 
 	require.NoError(t, admission.CloseDrained(run.Generation()))
 
@@ -1434,7 +1434,7 @@ func TestKernelDueClockDisposesLatePreparedCapabilityWithoutTimerDelivery(t *tes
 	require.False(t, capability.committed.Load() || !capability.disposed.Load())
 
 	census := tasks.LongLivedCensus()
-	require.EqualValues(t, (lifecycle.LongLivedCensus{}), census)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, census)
 
 	kernel.Stop()
 
@@ -1576,7 +1576,7 @@ func TestKernelDeadlineCancelsPendingCapabilityCommit(t *testing.T) {
 	require.False(t, waitErr == nil || !errors.Is(waitErr, context.DeadlineExceeded))
 
 	census := tasks.LongLivedCensus()
-	require.EqualValues(t, (lifecycle.LongLivedCensus{}), census)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, census)
 
 	require.NoError(t, admission.CloseDrained(run.Generation()))
 
@@ -2318,7 +2318,7 @@ func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
 	}
 
 	census := tasks.LongLivedCensus()
-	require.EqualValues(t, (lifecycle.LongLivedCensus{}), census)
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, census)
 
 	terminal := run.TerminalState()
 	require.False(t, !terminal.Quiescent || terminal.Dirty != nil)
@@ -2419,7 +2419,7 @@ func TestKernelLongLivedBoundaryAllowsReplacementAndSteadyAddition(t *testing.T)
 
 	require.NoError(t, kernel.Wait(context.Background()))
 
-	require.EqualValues(t, (lifecycle.LongLivedCensus{}), tasks.LongLivedCensus())
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 
 	require.NoError(t, admission.CloseDrained(run.Generation()))
 
@@ -3207,13 +3207,13 @@ func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
 	require.EqualValues(t, 9, got)
 
 	require.False(t, !kernel.scheduleTasks(4) ||
-		tasks.Pending() != 1 || kernel.claims.WaitingCount() != 3 || kernel.ready[0].len+kernel.ready[1].len != 5)
+		tasks.Pending() != 1 || kernel.claims.waitingCount() != 3 || kernel.ready[0].len+kernel.ready[1].len != 5)
 
 	require.False(t, !kernel.scheduleTasks(4) ||
-		tasks.Pending() != 1 || kernel.claims.WaitingCount() != 7 || kernel.ready[0].len+kernel.ready[1].len != 1)
+		tasks.Pending() != 1 || kernel.claims.waitingCount() != 7 || kernel.ready[0].len+kernel.ready[1].len != 1)
 
 	require.False(t, kernel.scheduleTasks(4) ||
-		tasks.Pending() != 1 || kernel.claims.WaitingCount() != 8 || kernel.ready[0].len+kernel.ready[1].len != 0)
+		tasks.Pending() != 1 || kernel.claims.waitingCount() != 8 || kernel.ready[0].len+kernel.ready[1].len != 0)
 }
 
 func TestKernelResourceScopedFunctionHasIndependentTaskSchedulingClass(t *testing.T) {
@@ -3457,7 +3457,7 @@ func (kfc *kernelFinalizerClock) Now() time.Time {
 	return kfc.now
 }
 
-func (kfc *kernelFinalizerClock) Arm(kind string, delay time.Duration) (<-chan time.Time, func()) {
+func (kfc *kernelFinalizerClock) Arm(kind string, _ time.Duration) (<-chan time.Time, func()) {
 	ready := make(chan time.Time, 1)
 	kfc.mu.Lock()
 	if kind == lifecycle.TimerKindShutdown {

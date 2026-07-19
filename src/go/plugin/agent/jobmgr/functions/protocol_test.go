@@ -24,9 +24,9 @@ func TestFunctionPublicationFrame(t *testing.T) {
 	}
 	handle, err := port.Publish(record)
 	require.NoError(t, err)
-	require.EqualValues(t, (PublicationHandle{
+	require.EqualValues(t, PublicationHandle{
 		ID: 1, Epoch: 7, Generation: 3, Name: "module:method",
-	}), handle)
+	}, handle)
 
 	require.NoError(t, port.Withdraw(handle))
 
@@ -106,6 +106,6 @@ type failingFunctionFrameWriter struct {
 	err error
 }
 
-func (fffw *failingFunctionFrameWriter) Write(payload []byte) (int, error) {
+func (fffw *failingFunctionFrameWriter) Write(_ []byte) (int, error) {
 	return 0, fffw.err
 }

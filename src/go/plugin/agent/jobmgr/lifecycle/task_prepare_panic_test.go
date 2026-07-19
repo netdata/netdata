@@ -167,7 +167,7 @@ func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T)
 
 			require.NoError(t, supervisor.Release(ref))
 
-			require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
+			require.EqualValues(t, LongLivedCensus{}, supervisor.LongLivedCensus())
 
 			_, err := admission.ReleaseOrdinary(admissionRef)
 			require.NoError(t, err)

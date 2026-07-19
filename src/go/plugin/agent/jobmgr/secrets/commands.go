@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -711,11 +712,9 @@ func formatBoundedSecretNames(
 			if builder.Len() != 0 {
 				builder.WriteString(", ")
 			}
-			fmt.Fprintf(
-				&builder,
-				"... and %d more",
-				count-index,
-			)
+			builder.WriteString("... and ")
+			builder.WriteString(strconv.Itoa(count - index))
+			builder.WriteString(" more")
 			break
 		}
 		if separatorBytes != 0 {

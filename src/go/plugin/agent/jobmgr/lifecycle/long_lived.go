@@ -29,10 +29,10 @@ const (
 )
 
 type LongLivedPlan struct {
-	class              LongLivedClass
-	bytes              int64
-	replacementOverlap bool
 	providerKeys       []string
+	bytes              int64
+	class              LongLivedClass
+	replacementOverlap bool
 	e                  LongLivedExternalFacet
 }
 
@@ -59,38 +59,49 @@ func NewPipelineLongLivedPlan(providerKeys []string) (LongLivedPlan, error) {
 }
 
 func NewJobLongLivedPlan(bytes int64) (LongLivedPlan, error) {
-	plan := LongLivedPlan{class: LongLivedJob, e: LongLivedEJobResources}
-	if err := plan.setResourceBytes(bytes); err != nil {
-		return LongLivedPlan{}, err
-	}
-	return plan, plan.Validate()
+	return newResourceLongLivedPlan(
+		LongLivedJob,
+		LongLivedEJobResources,
+		bytes,
+		false,
+	)
 }
 
 func NewSecretStoreLongLivedPlan(bytes int64) (LongLivedPlan, error) {
-	plan := LongLivedPlan{class: LongLivedSecretStore, e: LongLivedESecretStore}
-	if err := plan.setResourceBytes(bytes); err != nil {
-		return LongLivedPlan{}, err
-	}
-	return plan, plan.Validate()
+	return newResourceLongLivedPlan(
+		LongLivedSecretStore,
+		LongLivedESecretStore,
+		bytes,
+		false,
+	)
 }
 
 func NewSecretStoreReplacementLongLivedPlan(bytes int64) (LongLivedPlan, error) {
-	plan := LongLivedPlan{
-		class: LongLivedSecretStore, replacementOverlap: true,
-		e: LongLivedESecretStore,
-	}
-	if err := plan.setResourceBytes(bytes); err != nil {
-		return LongLivedPlan{}, err
-	}
-	return plan, plan.Validate()
+	return newResourceLongLivedPlan(
+		LongLivedSecretStore,
+		LongLivedESecretStore,
+		bytes,
+		true,
+	)
 }
 
-func (llp *LongLivedPlan) setResourceBytes(bytes int64) error {
-	if llp == nil || bytes <= 0 || bytes >= OrdinaryBudgetBytes {
-		return errors.New("jobmgr long-lived permit: invalid retained byte charge")
+func newResourceLongLivedPlan(
+	class LongLivedClass,
+	e LongLivedExternalFacet,
+	bytes int64,
+	replacementOverlap bool,
+) (LongLivedPlan, error) {
+	if bytes <= 0 || bytes >= OrdinaryBudgetBytes {
+		return LongLivedPlan{},
+			errors.New("jobmgr long-lived permit: invalid retained byte charge")
 	}
-	llp.bytes = bytes
-	return nil
+	plan := LongLivedPlan{
+		class:              class,
+		bytes:              bytes,
+		replacementOverlap: replacementOverlap,
+		e:                  e,
+	}
+	return plan, plan.Validate()
 }
 
 func (llp LongLivedPlan) Validate() error {

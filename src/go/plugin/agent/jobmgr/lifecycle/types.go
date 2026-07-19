@@ -142,17 +142,6 @@ func PreparedResourceTaskWork(work func(context.Context) (PreparedResource, erro
 	}
 }
 
-func PreparedCapabilityTaskWork(work func(context.Context) (PreparedCapability, error)) TaskWork {
-	return func(ctx context.Context) (TaskOutcome, error) {
-		capability, err := work(ctx)
-		if capability == nil {
-			return TaskOutcome{}, err
-		}
-		outcome, outcomeErr := PreparedCapabilityOutcome(capability)
-		return outcome, errors.Join(err, outcomeErr)
-	}
-}
-
 type TaskCleanup func() error
 
 type PreparedResourcePermitWork func(context.Context, LongLivedPermit) (PreparedResource, error)
@@ -165,6 +154,18 @@ type PreparedResourceTransactionWork func(
 	ResourceTransactionScope,
 	LongLivedPermit,
 ) (PreparedResourceTransaction, error)
+
+func canonicalCancellationCause(cause error) (error, bool, bool) {
+	cancelled := errors.Is(cause, context.Canceled)
+	deadline := errors.Is(cause, context.DeadlineExceeded)
+	if cancelled == deadline {
+		return nil, false, false
+	}
+	if deadline {
+		return context.DeadlineExceeded, true, true
+	}
+	return context.Canceled, false, true
+}
 
 type TaskPlan struct {
 	Source                 Source
@@ -345,10 +346,11 @@ func (tp TaskPlan) Validate() error {
 		return errors.New("jobmgr lifecycle: task must have exactly one work source")
 	}
 	if tp.InitialCancellation != nil {
-		if tp.InitialCancellation != context.Canceled && tp.InitialCancellation != context.DeadlineExceeded {
+		_, deadline, ok := canonicalCancellationCause(tp.InitialCancellation)
+		if !ok {
 			return errors.New("jobmgr lifecycle: invalid initial task cancellation")
 		}
-		if tp.InitialCancellation == context.DeadlineExceeded && tp.Deadline.IsZero() {
+		if deadline && tp.Deadline.IsZero() {
 			return errors.New("jobmgr lifecycle: initial deadline cancellation has no deadline")
 		}
 	}

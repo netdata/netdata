@@ -26,10 +26,10 @@ func TestPipelinePermitConservesLifecycleFacetsWithoutAdmissionCharge(t *testing
 	census := admission.Census()
 	require.False(t, census.OrdinaryBytes != 1 || census.LongLivedRecords != 0 || census.LongLivedBytes != 0)
 
-	require.EqualValues(t, (LongLivedCensus{
+	require.EqualValues(t, LongLivedCensus{
 		Active: 1, Pipelines: 1,
 		GReserved: 3, ExternalReserved: 1,
-	}), supervisor.LongLivedCensus(),
+	}, supervisor.LongLivedCensus(),
 	)
 
 	slot := supervisor.longLived.slots[permit.ref.Slot]
@@ -125,7 +125,7 @@ func TestPipelinePermitConservesLifecycleFacetsWithoutAdmissionCharge(t *testing
 
 	require.Error(t, permit.Return())
 
-	require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
+	require.EqualValues(t, LongLivedCensus{}, supervisor.LongLivedCensus())
 
 	_, releaseOrdinaryErr := admission.ReleaseOrdinary(ref)
 	require.NoError(t, releaseOrdinaryErr)
@@ -293,7 +293,7 @@ func TestZeroChargePipelinePermitRequiresLiveAdmissionAuthority(t *testing.T) {
 				test.cleanup(t, admission, ref)
 			}
 
-			require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
+			require.EqualValues(t, LongLivedCensus{}, supervisor.LongLivedCensus())
 
 			census := admission.Census()
 			require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
@@ -327,7 +327,7 @@ func TestPipelinePermitReleasesDisabledProviderClaim(t *testing.T) {
 	_, releaseOrdinaryErr := admission.ReleaseOrdinary(admissionRef)
 	require.NoError(t, releaseOrdinaryErr)
 
-	require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
+	require.EqualValues(t, LongLivedCensus{}, supervisor.LongLivedCensus())
 
 	census := admission.Census()
 	require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
@@ -423,7 +423,7 @@ func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 		admissionCensus.LongLivedRecords != 0 ||
 		admissionCensus.OrdinaryBytes != 0)
 
-	require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
+	require.EqualValues(t, LongLivedCensus{}, supervisor.LongLivedCensus())
 }
 
 func TestSecretStoreReplacementPermitsGrowBeyondFormerOverlapLimit(t *testing.T) {
@@ -487,7 +487,7 @@ func TestSecretStoreReplacementPermitsGrowBeyondFormerOverlapLimit(t *testing.T)
 		admissionCensus2.LongLivedRecords != 0 ||
 		admissionCensus2.OrdinaryBytes != 0)
 
-	require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
+	require.EqualValues(t, LongLivedCensus{}, supervisor.LongLivedCensus())
 }
 
 func TestSecretStoreSteadyPermitsHaveNoConfiguredStoreCountLimit(t *testing.T) {
@@ -524,7 +524,7 @@ func TestSecretStoreSteadyPermitsHaveNoConfiguredStoreCountLimit(t *testing.T) {
 		require.NoError(t, permit.AbortUnused())
 	}
 
-	require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
+	require.EqualValues(t, LongLivedCensus{}, supervisor.LongLivedCensus())
 }
 
 func TestLongLivedSecretStorePermitRejectsByteReleaseBeforeExternalRelease(t *testing.T) {
@@ -570,7 +570,7 @@ func TestLongLivedSecretStorePermitRejectsByteReleaseBeforeExternalRelease(t *te
 	census := admission.Census()
 	require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
 
-	require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
+	require.EqualValues(t, LongLivedCensus{}, supervisor.LongLivedCensus())
 }
 
 func grantLongLivedTestAdmission(t *testing.T, ledger *AdmissionLedger, byteCount int64) AdmissionRef {

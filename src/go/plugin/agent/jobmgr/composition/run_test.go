@@ -92,7 +92,7 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveryPipeline(
 				},
 			})
 			require.NoError(t, err)
-			if err := generation.Start(context.Background()); err != nil {
+			if err := generation.start(context.Background()); err != nil {
 				waitErr := generation.Wait(context.Background())
 				require.FailNowf(t, "test failed", "full-capacity generation start: %v; shutdown: %v", err, waitErr)
 			}
@@ -170,7 +170,7 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.NoError(t, generation.Start(context.Background()))
+	require.NoError(t, generation.start(context.Background()))
 
 	require.NoError(t, generation.kernel.SubmitAndWait(context.Background(), jobmgr.Request{
 		UID: "function-flow", Source: lifecycle.SourceFunction, Route: "module:method",
@@ -259,7 +259,7 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.NoError(t, generation.Start(context.Background()))
+	require.NoError(t, generation.start(context.Background()))
 
 	require.NoError(t, generation.kernel.SubmitAndWait(
 		context.Background(),

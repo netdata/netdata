@@ -30,7 +30,7 @@ func TestPreparedResourceTransactionCommitsOrRestoresWholePostimage(t *testing.T
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			events := []string{}
+			var events []string
 			currentIdentity := lifecycle.ResourceIdentity{
 				ID: "job", Generation: 1,
 			}

@@ -63,7 +63,7 @@ func TestUIDLedgerTombstonePopulationGrowsBeyondFormerBoundary(t *testing.T) {
 			require.NoError(t, ledger.Complete("same", true, now))
 
 			err := ledger.Admit("same", now.Add(test.offset))
-			require.EqualValues(t, test.wantAdmit, (err == nil))
+			require.EqualValues(t, test.wantAdmit, err == nil)
 		})
 	}
 }

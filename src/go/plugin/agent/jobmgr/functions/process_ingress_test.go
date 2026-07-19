@@ -87,7 +87,7 @@ func TestProcessIngressKeepsOneReaderAndLinearizesPauseAdoptFence(t *testing.T) 
 
 func TestProcessIngressTimedOutPauseCanBeRetriedWithoutSplitState(t *testing.T) {
 	reader, writer := io.Pipe()
-	defer writer.Close()
+	defer func() { require.NoError(t, writer.Close()) }()
 	ingress, err := NewProcessIngress(reader, lifecycle.NewAdmissionLedger())
 	require.NoError(t, err)
 	input := newTestProcessInput(1)

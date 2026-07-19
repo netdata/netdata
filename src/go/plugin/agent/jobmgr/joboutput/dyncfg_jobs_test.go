@@ -156,7 +156,7 @@ func TestDynCfgAddCommitsOrDisposesOneGraphTransaction(t *testing.T) {
 }
 
 func TestResourceOnlyTransactionReplacesWithoutGraphMutation(t *testing.T) {
-	events := []string{}
+	var events []string
 	currentIdentity := lifecycle.ResourceIdentity{
 		ID: "job", Generation: 1,
 	}

@@ -23,20 +23,20 @@ const (
 // resource-scoped commands. The submitting adapter transfers ownership of Args
 // and Payload until the request reaches terminal disposal.
 type Request struct {
-	UID             string
-	LaneKey         string
-	Source          lifecycle.Source
-	Route           string
-	Args            []string
-	Payload         []byte
+	Deadline        time.Time
 	ContentType     string
+	Route           string
+	UID             string
 	Permissions     string
 	CallerSource    string
+	LaneKey         string
+	Args            []string
+	Payload         []byte
 	Timeout         time.Duration
-	HasPayload      bool
 	InputBodyToken  uint64
 	PayloadCapacity int64
-	Deadline        time.Time
+	Source          lifecycle.Source
+	HasPayload      bool
 }
 
 // Validate checks the bounded admission invariants independent of mutable

@@ -104,12 +104,6 @@ func (rs *RunSupervisor) FinishShutdown() error {
 	return budget.close()
 }
 
-func (rs *RunSupervisor) CloseAdmission() {
-	rs.mu.Lock()
-	rs.admission = false
-	rs.mu.Unlock()
-}
-
 func (rs *RunSupervisor) Admitting() bool {
 	rs.mu.Lock()
 	defer rs.mu.Unlock()

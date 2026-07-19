@@ -91,7 +91,7 @@ func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 	require.False(t, catalog.storage.preparation.Load())
 	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 
-	require.EqualValues(t, (lifecycle.LongLivedCensus{}), tasks.LongLivedCensus())
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, tasks.LongLivedCensus())
 
 	require.NoError(t, admission.CloseDrained(run.Generation()))
 

@@ -48,17 +48,17 @@ type authorityClaimEdge struct {
 
 type authorityClaimHeap []*authorityClaimKey
 
-func (ach authorityClaimHeap) Len() int { return len(ach) }
+func (ach *authorityClaimHeap) Len() int { return len(*ach) }
 
-func (ach authorityClaimHeap) Less(left, right int) bool {
-	return ach[left].waiterHead.operation.claimTicket <
-		ach[right].waiterHead.operation.claimTicket
+func (ach *authorityClaimHeap) Less(left, right int) bool {
+	return (*ach)[left].waiterHead.operation.claimTicket <
+		(*ach)[right].waiterHead.operation.claimTicket
 }
 
-func (ach authorityClaimHeap) Swap(left, right int) {
-	ach[left], ach[right] = ach[right], ach[left]
-	ach[left].settlementIndex = left
-	ach[right].settlementIndex = right
+func (ach *authorityClaimHeap) Swap(left, right int) {
+	(*ach)[left], (*ach)[right] = (*ach)[right], (*ach)[left]
+	(*ach)[left].settlementIndex = left
+	(*ach)[right].settlementIndex = right
 }
 
 func (ach *authorityClaimHeap) Push(value any) {
@@ -95,7 +95,7 @@ func newClaimAuthority() *claimAuthority {
 	}
 }
 
-func (ca *claimAuthority) BindRuntimeObserver(
+func (ca *claimAuthority) bindRuntimeObserver(
 	observer lifecycle.RuntimeObserver,
 	now func() time.Time,
 ) error {
@@ -110,10 +110,6 @@ func (ca *claimAuthority) BindRuntimeObserver(
 	ca.now = now
 	ca.observeRuntime()
 	return nil
-}
-
-func normalizeAuthorityClaims(writeClaims []string) ([]authorityClaim, error) {
-	return normalizeAuthorityClaimModes(writeClaims, nil)
 }
 
 func normalizeAuthorityClaimModes(writeClaims, readClaims []string) ([]authorityClaim, error) {
@@ -148,7 +144,7 @@ func prepareClaimEdges(operation *commandOperation, claims []authorityClaim) {
 	operation.claimPrepared = true
 }
 
-func (ca *claimAuthority) Register(operation *commandOperation) error {
+func (ca *claimAuthority) register(operation *commandOperation) error {
 	if operation == nil || !operation.claimPrepared || operation.claimRegistered {
 		return errors.New("jobmgr claims: invalid operation registration")
 	}
@@ -162,7 +158,7 @@ func (ca *claimAuthority) Register(operation *commandOperation) error {
 	return nil
 }
 
-func (ca *claimAuthority) Acquire(operation *commandOperation) (bool, error) {
+func (ca *claimAuthority) acquire(operation *commandOperation) (bool, error) {
 	if operation == nil || !operation.claimRegistered || operation.claimWaiting || operation.claimsHeld || operation.claimCursor != 0 {
 		return false, errors.New("jobmgr claims: invalid acquire")
 	}
@@ -179,7 +175,7 @@ func (ca *claimAuthority) Acquire(operation *commandOperation) (bool, error) {
 	return granted, err
 }
 
-func (ca *claimAuthority) Cancel(operation *commandOperation) ([]*commandOperation, error) {
+func (ca *claimAuthority) cancel(operation *commandOperation) ([]*commandOperation, error) {
 	if operation == nil || !operation.claimRegistered || !operation.claimWaiting || operation.claimsHeld {
 		return nil, errors.New("jobmgr claims: operation is not waiting")
 	}
@@ -198,14 +194,14 @@ func (ca *claimAuthority) Cancel(operation *commandOperation) ([]*commandOperati
 		return nil, err
 	}
 	ca.endRuntimeWait(operation)
-	granted, _, err := ca.ServiceSettlements(
+	granted, _, err := ca.serviceSettlements(
 		maximumClaimSettlementQuantum,
 	)
 	ca.observeRuntime()
 	return granted, err
 }
 
-func (ca *claimAuthority) Release(operation *commandOperation) ([]*commandOperation, error) {
+func (ca *claimAuthority) release(operation *commandOperation) ([]*commandOperation, error) {
 	if operation == nil || !operation.claimRegistered || !operation.claimsHeld || operation.claimWaiting || operation.claimCursor != len(operation.authorityClaimEdges) {
 		return nil, errors.New("jobmgr claims: release without complete held claims")
 	}
@@ -219,14 +215,14 @@ func (ca *claimAuthority) Release(operation *commandOperation) ([]*commandOperat
 	if err := ca.forget(operation); err != nil {
 		return nil, err
 	}
-	granted, _, err := ca.ServiceSettlements(
+	granted, _, err := ca.serviceSettlements(
 		maximumClaimSettlementQuantum,
 	)
 	ca.observeRuntime()
 	return granted, err
 }
 
-func (ca *claimAuthority) Abandon(operation *commandOperation) error {
+func (ca *claimAuthority) abandon(operation *commandOperation) error {
 	if operation == nil || !operation.claimRegistered || operation.claimWaiting || operation.claimsHeld || operation.claimCursor != 0 {
 		return errors.New("jobmgr claims: abandon outside idle prepared state")
 	}
@@ -235,13 +231,13 @@ func (ca *claimAuthority) Abandon(operation *commandOperation) error {
 	return err
 }
 
-func (ca *claimAuthority) Waiting(operation *commandOperation) bool {
+func (ca *claimAuthority) waiting(operation *commandOperation) bool {
 	return operation != nil && operation.claimWaiting
 }
 
-func (ca *claimAuthority) WaitingCount() int { return ca.waiterCount }
+func (ca *claimAuthority) waitingCount() int { return ca.waiterCount }
 
-func (ca *claimAuthority) PendingSettlements() bool {
+func (ca *claimAuthority) pendingSettlements() bool {
 	return ca != nil && len(ca.settlements) != 0
 }
 
@@ -357,7 +353,7 @@ func (ca *claimAuthority) removeWaiter(edge *authorityClaimEdge) error {
 	return nil
 }
 
-func (ca *claimAuthority) ServiceSettlements(
+func (ca *claimAuthority) serviceSettlements(
 	quantum int,
 ) ([]*commandOperation, bool, error) {
 	if ca == nil || quantum <= 0 ||

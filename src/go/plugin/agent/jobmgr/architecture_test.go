@@ -503,7 +503,7 @@ func checkActiveFile(
 		importPath, err := strconv.Unquote(imported.Path.Value)
 		require.NoError(t, err)
 		assert.NotEqualValues(t, "C", importPath)
-		checkActiveImport(t, packageName, rule, importPath, path)
+		checkActiveImport(t, rule, importPath)
 	}
 }
 
@@ -531,8 +531,8 @@ func TestNoExperimentalIdentity(t *testing.T) {
 					return err
 				}
 				lower := strings.ToLower(string(data))
-				for _, token := range forbidden {
-					assert.NotContains(t, lower, token)
+				for _, forbiddenToken := range forbidden {
+					assert.NotContains(t, lower, forbiddenToken)
 				}
 				return nil
 			},
@@ -543,10 +543,8 @@ func TestNoExperimentalIdentity(t *testing.T) {
 
 func checkActiveImport(
 	t *testing.T,
-	packageName string,
 	rule packageRule,
 	importPath string,
-	path string,
 ) {
 	t.Helper()
 
@@ -1308,7 +1306,7 @@ func validateConstructionContract(
 		result = errors.Join(result, errors.New("agent.New result does not reach agenthost.Run from main"))
 	}
 	if want.processNew != 0 && !counts.agentProcessRun {
-		result = errors.Join(result, errors.New("Agent.run does not run its composition.NewProcess result"))
+		result = errors.Join(result, errors.New("jobmgr architecture: Agent.run does not run its composition.NewProcess result"))
 	}
 	if want.commandKernel != 0 &&
 		counts.compositionRunPath != completeCompositionRunPath {

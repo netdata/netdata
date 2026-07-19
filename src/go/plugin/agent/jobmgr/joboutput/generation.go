@@ -56,16 +56,16 @@ const (
 )
 
 type ConstructedJob struct {
-	Variant          JobVariant
 	Runtime          jobruntime.Runtime
-	FrameOwner       *lifecycle.FrameOwner
-	PrepareCleanup   func(uint64) (PreparedVNodeFrame, error)
-	SuppressCleanup  bool
 	Handlers         HandlerLifecycle
-	ReleaseVNode     func() error
-	CollectorCleanup func(context.Context) error
 	Carrier          lifecycle.LongLivedCarrier
 	Observer         lifecycle.RuntimeObserver
+	FrameOwner       *lifecycle.FrameOwner
+	PrepareCleanup   func(uint64) (PreparedVNodeFrame, error)
+	ReleaseVNode     func() error
+	CollectorCleanup func(context.Context) error
+	Variant          JobVariant
+	SuppressCleanup  bool
 }
 
 func (cj ConstructedJob) validate() error {
@@ -226,18 +226,17 @@ func (pj PreparedJob) take() (*preparedJobState, error) {
 }
 
 type JobGeneration struct {
-	ID         string
-	Generation uint64
-	Variant    JobVariant
-
-	mu             sync.Mutex
 	resources      ConstructedJob
-	state          JobState
-	terminalErr    error
-	done           chan struct{}
-	finished       bool
-	stopDone       chan struct{}
 	stopErr        error
+	terminalErr    error
+	stopDone       chan struct{}
+	done           chan struct{}
+	ID             string
+	Generation     uint64
+	mu             sync.Mutex
+	state          JobState
+	Variant        JobVariant
+	finished       bool
 	stopFinished   bool
 	observedActive bool
 }

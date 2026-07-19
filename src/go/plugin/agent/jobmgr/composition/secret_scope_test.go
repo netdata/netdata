@@ -33,7 +33,7 @@ func (reas releaseErrorAtomicScope) Release(
 func TestRunOwnedAtomicScopeDirtiesRunOnReleaseFailure(
 	t *testing.T,
 ) {
-	releaseErr := errors.New("Store scope release failed")
+	releaseErr := errors.New("store scope release failed")
 	run, err := lifecycle.NewRunSupervisor(
 		1,
 		lifecycle.RealClock{},

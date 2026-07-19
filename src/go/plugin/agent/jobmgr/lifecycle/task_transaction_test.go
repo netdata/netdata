@@ -39,7 +39,7 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			supervisor := newResourceTaskSupervisor(t)
-			events := []string{}
+			var events []string
 			result, err := NewSealedResult(200, "application/json", []byte(`{"ok":true}`))
 			require.NoError(t, err)
 			applied, err := NewAppliedResourceTransaction(
@@ -127,7 +127,7 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 
 func TestTaskSupervisorDisposesPreparedTransactionAndRestoresCurrent(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
-	events := []string{}
+	var events []string
 	current := &recordingReadyResource{
 		identity: ResourceIdentity{ID: "job", Generation: 7},
 		events:   &events,

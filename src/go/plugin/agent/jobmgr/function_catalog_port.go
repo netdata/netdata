@@ -80,8 +80,8 @@ type FunctionCatalogCensus struct {
 	PendingCleanups    int
 	CompletedCleanups  int
 	FailedCleanups     int
-	Closed             bool
 	CloseRoutesPending int
+	Closed             bool
 	MutationActive     bool
 }
 

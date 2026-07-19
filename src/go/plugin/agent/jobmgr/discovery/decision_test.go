@@ -60,9 +60,9 @@ func TestDecisionIndexAcknowledgesSelectionAndFallback(t *testing.T) {
 		!changes[3].Remove)
 
 	census := index.Census()
-	require.EqualValues(t, (DecisionCensus{
+	require.EqualValues(t, DecisionCensus{
 		Revision: 4,
-	}), census)
+	}, census)
 }
 
 func TestDecisionIndexFailureKeepsLastAcknowledgedSelection(t *testing.T) {
@@ -95,9 +95,9 @@ func TestDecisionIndexFailureKeepsLastAcknowledgedSelection(t *testing.T) {
 	require.False(t, acknowledged.config.UID() != stock.UID() || acknowledged.revision != 1)
 
 	census := index.Census()
-	require.EqualValues(t, (DecisionCensus{
+	require.EqualValues(t, DecisionCensus{
 		Sources: 2, Candidates: 2, Acknowledged: 1, Revision: 1,
-	}), census)
+	}, census)
 }
 
 func TestDecisionIndexConfigurationPolicy(t *testing.T) {
@@ -201,12 +201,12 @@ func TestDecisionIndexReconcilesOnlyChangedSourceRecords(t *testing.T) {
 	require.EqualValues(t, population+1, len(commands.requests))
 
 	census := index.Census()
-	require.EqualValues(t, (DecisionCensus{
+	require.EqualValues(t, DecisionCensus{
 		Sources:      population,
 		Candidates:   population,
 		Acknowledged: population,
 		Revision:     population + 1,
-	}), census)
+	}, census)
 }
 
 func TestDecisionIndexHasNoFixedPopulationCeiling(t *testing.T) {
@@ -259,12 +259,12 @@ func TestDecisionIndexHasNoFixedPopulationCeiling(t *testing.T) {
 			require.NoError(t, index.Apply(context.Background(), test.batch()))
 
 			census := index.Census()
-			require.EqualValues(t, (DecisionCensus{
+			require.EqualValues(t, DecisionCensus{
 				Sources:      test.wantSources,
 				Candidates:   population,
 				Acknowledged: population,
 				Revision:     population,
-			}), census)
+			}, census)
 
 			require.EqualValues(t, population, len(commands.requests))
 		})

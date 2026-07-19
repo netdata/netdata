@@ -131,7 +131,7 @@ func (pc *processCore) run(
 	if err != nil {
 		return pc.finalize(nil, generationID, err)
 	}
-	if err := generation.Start(ctx); err != nil {
+	if err := generation.start(ctx); err != nil {
 		return pc.finalize(generation, generationID, err)
 	}
 	binding, err := pc.binding(generation)
@@ -315,7 +315,7 @@ func (pc *processCore) rotate(
 	if err != nil {
 		return nil, nextID, err
 	}
-	if err := next.Start(ctx); err != nil {
+	if err := next.start(ctx); err != nil {
 		return next, nextID, err
 	}
 	binding, err := pc.binding(next)
@@ -340,7 +340,7 @@ func (pc *processCore) finalize(
 	)
 	defer cancel()
 	var finishRun *lifecycle.RunSupervisor
-	if current != nil && current.Started() {
+	if current != nil && current.isStarted() {
 		if pc.ingress.Census().State == functionadapter.ProcessIngressLive {
 			if err := pc.ingress.SealPause(); err != nil {
 				finalErr = errors.Join(finalErr, err)

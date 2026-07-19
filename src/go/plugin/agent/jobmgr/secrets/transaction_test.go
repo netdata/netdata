@@ -70,7 +70,7 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(
 	require.True(t, carrier.released)
 
 	census := store.Census()
-	require.EqualValues(t, (secretstore.SecretStoreCensus{}), census)
+	require.EqualValues(t, secretstore.SecretStoreCensus{}, census)
 
 	require.NoError(t, store.Close(t.Context()))
 }

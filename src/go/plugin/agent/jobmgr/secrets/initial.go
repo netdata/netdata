@@ -199,10 +199,3 @@ func (c *Controller) Close(ctx context.Context) error {
 	c.mu.Unlock()
 	return c.store.Close(ctx)
 }
-
-func (c *Controller) ConfigStatus(
-	key string,
-) (secretstore.Config, dyncfg.Status, bool) {
-	entry, ok := c.entry(key)
-	return entry.config, entry.status, ok
-}

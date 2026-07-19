@@ -202,6 +202,11 @@ func (ts *TaskSupervisor) Enqueue(class TaskClass, plan TaskPlan) (TaskRequestRe
 	if err := plan.Validate(); err != nil {
 		return TaskRequestRef{}, err
 	}
+	if plan.InitialCancellation != nil {
+		plan.InitialCancellation, _, _ = canonicalCancellationCause(
+			plan.InitialCancellation,
+		)
+	}
 	var initial TaskOutcome
 	if plan.initialReady != nil {
 		var err error
@@ -266,13 +271,14 @@ func (ts *TaskSupervisor) SetPendingCancellation(ref TaskRequestRef, cause error
 	if err != nil {
 		return err
 	}
-	if cause != context.Canceled && cause != context.DeadlineExceeded {
+	cause, deadline, ok := canonicalCancellationCause(cause)
+	if !ok {
 		return errors.New("jobmgr task supervisor: invalid pending cancellation")
 	}
 	if record.plan.InitialCancellation != nil {
 		return errors.New("jobmgr task supervisor: pending cancellation already set")
 	}
-	if cause == context.DeadlineExceeded && record.plan.Deadline.IsZero() {
+	if deadline && record.plan.Deadline.IsZero() {
 		return errors.New("jobmgr task supervisor: pending deadline cancellation has no deadline")
 	}
 	record.plan.InitialCancellation = cause
@@ -699,8 +705,9 @@ func (ts *TaskSupervisor) Cancel(ref TaskRef) error {
 }
 
 func (ts *TaskSupervisor) CancelWithCause(ref TaskRef, cause error) error {
-	if cause == nil {
-		return errors.New("jobmgr task supervisor: nil cancellation cause")
+	cause, _, ok := canonicalCancellationCause(cause)
+	if !ok {
+		return errors.New("jobmgr task supervisor: invalid cancellation cause")
 	}
 	slot, err := ts.slot(ref)
 	if err != nil {

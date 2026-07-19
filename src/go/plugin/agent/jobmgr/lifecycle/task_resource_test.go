@@ -14,7 +14,7 @@ import (
 
 func TestTaskSupervisorAcceptsStartsPublishesAndTransfersPreparedResource(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
-	events := []string{}
+	var events []string
 	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 7}, events: &events}
 	prepared := &recordingPreparedResource{identity: ready.identity, ready: ready, events: &events}
 	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
@@ -61,7 +61,7 @@ func TestTaskSupervisorRetainsPreparedResourceReturnedWithPrepareError(t *testin
 
 	require.NoError(t, supervisor.BindRuntimeObserver(observer))
 
-	events := []string{}
+	var events []string
 	wantFailure := errors.New("construction cleanup failed")
 	prepared := &recordingPreparedResource{
 		identity: ResourceIdentity{ID: "pipeline", Generation: 1}, events: &events,
@@ -93,7 +93,7 @@ func TestTaskSupervisorRetainsPreparedResourceReturnedWithPrepareError(t *testin
 
 func TestTaskSupervisorRetainsReadyResourceAfterPublishFailureUntilAbort(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
-	events := []string{}
+	var events []string
 	wantFailure := errors.New("publish failed")
 	ready := &recordingReadyResource{
 		identity: ResourceIdentity{ID: "job", Generation: 1}, events: &events, publishErr: wantFailure,
@@ -131,7 +131,7 @@ func TestTaskSupervisorRetainsReadyResourceAfterPublishFailureUntilAbort(t *test
 
 func TestTaskSupervisorStopsAndFinalizesInitialReadyResource(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
-	events := []string{}
+	var events []string
 	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 3}, events: &events, panicAfterIdentity: true}
 	_, ref := enqueueAndDispatchTask(t, supervisor, readyTaskPlan(t, SourceJobManager, time.Time{}, ready))
 	completion := <-supervisor.CompletionCh()
@@ -157,7 +157,7 @@ func TestTaskSupervisorStopsAndFinalizesInitialReadyResource(t *testing.T) {
 
 func TestTaskSupervisorFinalizesResourceOffLoop(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
-	events := []string{}
+	var events []string
 	finalizeEntered := make(chan struct{})
 	finalizeRelease := make(chan struct{})
 	ready := &recordingReadyResource{
@@ -235,7 +235,7 @@ func TestTaskSupervisorDisposesResourcesWithoutExpiredWorkContext(t *testing.T) 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			supervisor := newResourceTaskSupervisor(t)
-			events := []string{}
+			var events []string
 			plan, contextErr := test.plan(&events)
 			_, ref := enqueueAndDispatchTask(t, supervisor, plan)
 
@@ -264,7 +264,7 @@ func TestTaskSupervisorPreservesShutdownBudgetForResourceDisposal(t *testing.T) 
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = run.FinishShutdown() })
 	supervisor := newResourceTaskSupervisor(t)
-	events := []string{}
+	var events []string
 	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: &events}
 	plan, err := NewShutdownReadyResourceTaskPlan(SourceJobManager, budget, TransactionTaskPhases, ready, ready.identity)
 	require.NoError(t, err)
@@ -288,7 +288,7 @@ func TestTaskSupervisorPreservesShutdownBudgetForResourceDisposal(t *testing.T) 
 
 func TestTaskSupervisorReturnsPendingInitialResourceOnTransferAwareCancellation(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
-	events := []string{}
+	var events []string
 	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 9}, events: &events}
 	request, err := supervisor.Enqueue(
 		TaskClassFrameworkControl,
@@ -311,7 +311,7 @@ func TestTaskSupervisorReturnsPendingInitialResourceOnTransferAwareCancellation(
 
 func TestTaskSupervisorRetainsPreparedResourceWhenAcceptStartPanics(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
-	events := []string{}
+	var events []string
 	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: &events}
 	prepared := &recordingPreparedResource{identity: ready.identity, ready: ready, events: &events, panicAccept: true}
 	_, ref := enqueueAndDispatchTask(t, supervisor, TaskPlan{
@@ -333,7 +333,7 @@ func TestTaskSupervisorRetainsPreparedResourceWhenAcceptStartPanics(t *testing.T
 
 func TestTaskSupervisorRetainsReadyResourceReturnedWithAcceptError(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
-	events := []string{}
+	var events []string
 	wantFailure := errors.New("start cleanup failed")
 	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: &events}
 	prepared := &recordingPreparedResource{identity: ready.identity, ready: ready, events: &events, acceptErr: wantFailure}
@@ -367,7 +367,7 @@ func TestTaskSupervisorRetainsReadyResourceReturnedWithAcceptError(t *testing.T)
 
 func TestTaskSupervisorRetainsReadyResourceWhenAbortFails(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
-	events := []string{}
+	var events []string
 	wantFailure := errors.New("abort failed")
 	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: &events, abortErr: wantFailure}
 	_, ref := enqueueAndDispatchTask(t, supervisor, readyTaskPlan(t, SourceJobManager, time.Time{}, ready))

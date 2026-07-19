@@ -100,7 +100,7 @@ type shutdownContext struct {
 
 func (ctx *shutdownContext) Deadline() (time.Time, bool) { return ctx.deadline, true }
 func (ctx *shutdownContext) Done() <-chan struct{}       { return ctx.done }
-func (ctx *shutdownContext) Value(any) any               { return nil }
+func (ctx *shutdownContext) Value(_ any) any             { return nil }
 
 func (ctx *shutdownContext) Err() error {
 	ctx.mu.Lock()

@@ -28,16 +28,16 @@ const (
 var ErrStopped = errors.New("jobmgr kernel: stopped")
 
 type WorkPlan struct {
-	Claims              []string
-	ReadClaims          []string
-	OwnedBytes          int64
-	Work                lifecycle.TaskWork
 	Runner              lifecycle.TaskRunner
+	Work                lifecycle.TaskWork
 	Resource            *ResourcePlan
 	Transaction         *ResourceTransactionPlan
 	Capability          *CapabilityPlan
-	NoResponse          bool
 	Cleanup             lifecycle.TaskCleanup
+	Claims              []string
+	ReadClaims          []string
+	OwnedBytes          int64
+	NoResponse          bool
 	CooperativeCancel   bool
 	CooperativeDeadline bool
 }
@@ -226,9 +226,9 @@ type submission struct {
 }
 
 type commandLaneKey struct {
-	source             lifecycle.Source
-	functionInvocation FunctionInvocationRef
 	key                string
+	functionInvocation FunctionInvocationRef
+	source             lifecycle.Source
 	resource           bool
 }
 
@@ -492,12 +492,12 @@ type deadlineEntry struct {
 
 type deadlineHeap []*deadlineEntry
 
-func (dh deadlineHeap) Len() int           { return len(dh) }
-func (dh deadlineHeap) Less(i, j int) bool { return dh[i].when.Before(dh[j].when) }
-func (dh deadlineHeap) Swap(i, j int) {
-	dh[i], dh[j] = dh[j], dh[i]
-	dh[i].index = i
-	dh[j].index = j
+func (dh *deadlineHeap) Len() int           { return len(*dh) }
+func (dh *deadlineHeap) Less(i, j int) bool { return (*dh)[i].when.Before((*dh)[j].when) }
+func (dh *deadlineHeap) Swap(i, j int) {
+	(*dh)[i], (*dh)[j] = (*dh)[j], (*dh)[i]
+	(*dh)[i].index = i
+	(*dh)[j].index = j
 }
 func (dh *deadlineHeap) Push(value any) {
 	entry := value.(*deadlineEntry)
@@ -660,7 +660,7 @@ func (ck *CommandKernel) BindRuntimeObserver(
 	if err := ck.tasks.BindRuntimeObserver(observer); err != nil {
 		return err
 	}
-	if err := ck.claims.BindRuntimeObserver(
+	if err := ck.claims.bindRuntimeObserver(
 		observer,
 		ck.clock.Now,
 	); err != nil {
@@ -1252,7 +1252,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 			moreTasks || moreTaskStarts ||
 			servicedAsyncEvents > 0 || moreShutdownOperations ||
 			moreInheritedCancellations || moreShutdownLanes ||
-			ck.claims.PendingSettlements() ||
+			ck.claims.pendingSettlements() ||
 			ck.hasRunnableSubmissions() {
 			if !shuttingDown {
 				select {
@@ -1309,7 +1309,7 @@ func (ck *CommandKernel) runLoop(ctx context.Context) {
 }
 
 func (ck *CommandKernel) serviceClaimSettlements(quantum int) bool {
-	granted, more, err := ck.claims.ServiceSettlements(quantum)
+	granted, more, err := ck.claims.serviceSettlements(quantum)
 	if err != nil {
 		ck.run.Dirty(err)
 		return false
@@ -1629,16 +1629,15 @@ func (ck *CommandKernel) admitSubmission(
 					request.Route,
 				),
 			}
-		} else {
-			plan = decision.Plan
-			plan.Claims = append([]string(nil), plan.Claims...)
-			plan.ReadClaims = append([]string(nil), plan.ReadClaims...)
-			functionInvocation = decision.Lease
-			functionResourceID = decision.ResourceID
-			request.LaneKey = request.Route
-			if functionResourceID != "" {
-				request.LaneKey = functionResourceID
-			}
+		}
+		plan = decision.Plan
+		plan.Claims = append([]string(nil), plan.Claims...)
+		plan.ReadClaims = append([]string(nil), plan.ReadClaims...)
+		functionInvocation = decision.Lease
+		functionResourceID = decision.ResourceID
+		request.LaneKey = request.Route
+		if functionResourceID != "" {
+			request.LaneKey = functionResourceID
 		}
 	}
 	releaseFunctionInvocation := functionInvocation.Valid()
@@ -1787,7 +1786,7 @@ func (ck *CommandKernel) admitSubmission(
 	}
 	if parent == nil {
 		prepareClaimEdges(operation, claims)
-		if err := ck.claims.Register(operation); err != nil {
+		if err := ck.claims.register(operation); err != nil {
 			_ = ck.admission.CancelWaiting(requested.Ref)
 			_ = ck.uids.Complete(request.UID, false, now)
 			ck.releaseUnusedLane(lane)
@@ -1997,7 +1996,7 @@ func (ck *CommandKernel) scheduleTasks(quantum int) bool {
 				if operation.State < lifecycle.OperationAcquiringClaims {
 					_ = operation.Advance(lifecycle.OperationAcquiringClaims)
 				}
-				granted, err := ck.claims.Acquire(operation)
+				granted, err := ck.claims.acquire(operation)
 				if err != nil {
 					ck.run.Dirty(err)
 					return false
@@ -2931,6 +2930,8 @@ func (ck *CommandKernel) acknowledgeShutdownTask(ack lifecycle.TaskAcknowledgeme
 		lane.shutdownTask = lifecycle.TaskRef{}
 		lane.shutdownAction = 0
 		ck.releaseUnusedLane(lane)
+	default:
+		ck.run.Dirty(errors.New("jobmgr kernel: unexpected shutdown task action"))
 	}
 }
 
@@ -3906,8 +3907,8 @@ func (ck *CommandKernel) unlinkQueued(operation *commandOperation, submissionErr
 		for _, granted := range ck.releaseClaims(operation) {
 			ck.markReady(granted.lane)
 		}
-	} else if ck.claims.Waiting(operation) {
-		granted, err := ck.claims.Cancel(operation)
+	} else if ck.claims.waiting(operation) {
+		granted, err := ck.claims.cancel(operation)
 		if err != nil {
 			ck.run.Dirty(err)
 		}
@@ -3915,7 +3916,7 @@ func (ck *CommandKernel) unlinkQueued(operation *commandOperation, submissionErr
 			ck.markReady(grantedOperation.lane)
 		}
 	} else if operation.claimRegistered {
-		if err := ck.claims.Abandon(operation); err != nil {
+		if err := ck.claims.abandon(operation); err != nil {
 			ck.run.Dirty(err)
 		}
 	}
@@ -3940,7 +3941,7 @@ func (ck *CommandKernel) releaseClaims(operation *commandOperation) []*commandOp
 	if !operation.claimsHeld {
 		return nil
 	}
-	granted, err := ck.claims.Release(operation)
+	granted, err := ck.claims.release(operation)
 	if err != nil {
 		ck.run.Dirty(err)
 		return nil
@@ -4000,7 +4001,7 @@ func (ck *CommandKernel) markReady(lane *commandLane) {
 		lane.active != nil ||
 		lane.head == nil ||
 		!lane.head.admitted ||
-		ck.claims.Waiting(lane.head) {
+		ck.claims.waiting(lane.head) {
 		return
 	}
 	lane.source = lane.head.Source
@@ -4146,6 +4147,12 @@ func (ck *CommandKernel) cancelOperationForShutdown(
 		if shutdownCancellablePendingAction(operation) {
 			_ = ck.tasks.Cancel(operation.Task)
 		}
+	case lifecycle.ChildAbandonedBeforeStart,
+		lifecycle.ChildActionAcknowledged,
+		lifecycle.ChildTerminationPending,
+		lifecycle.ChildExitAcknowledged:
+	default:
+		return errors.New("jobmgr kernel: invalid shutdown child state")
 	}
 	return nil
 }
@@ -4456,7 +4463,7 @@ func (ck *CommandKernel) shutdownReadyForFinalizer() bool {
 		ck.tasks.Active() != 0 || ck.tasks.Pending() != 0 || inherited.Active != 0 ||
 		len(ck.shutdownRequests) != 0 || len(ck.shutdownTasks) != 0 || len(ck.controls) != 0 || ck.deadlines.Len() != 0 ||
 		len(ck.submissions[0]) != 0 || len(ck.submissions[1]) != 0 || ck.blockedSubmission[0] || ck.blockedSubmission[1] ||
-		ck.ready[0].len != 0 || ck.ready[1].len != 0 || ck.claims.WaitingCount() != 0 || len(ck.claims.keys) != 0 {
+		ck.ready[0].len != 0 || ck.ready[1].len != 0 || ck.claims.waitingCount() != 0 || len(ck.claims.keys) != 0 {
 		return false
 	}
 	if !ck.functionCatalogDrained() {
@@ -4540,7 +4547,7 @@ func (ck *CommandKernel) shutdownQuiescent() bool {
 		ck.compositeFenceRecheck ||
 		ck.tasks.Active() != 0 || ck.tasks.Pending() != 0 || len(ck.shutdownRequests) != 0 || len(ck.shutdownTasks) != 0 || len(ck.controls) != 0 || ck.deadlines.Len() != 0 ||
 		len(ck.submissions[0]) != 0 || len(ck.submissions[1]) != 0 || ck.blockedSubmission[0] || ck.blockedSubmission[1] ||
-		ck.ready[0].len != 0 || ck.ready[1].len != 0 || ck.claims.WaitingCount() != 0 || len(ck.claims.keys) != 0 {
+		ck.ready[0].len != 0 || ck.ready[1].len != 0 || ck.claims.waitingCount() != 0 || len(ck.claims.keys) != 0 {
 		return false
 	}
 	return ck.functionCatalogDrained() &&
@@ -4993,21 +5000,6 @@ func validPersistentAdmission(
 	default:
 		return false
 	}
-}
-
-func AdmissionFootprint(request Request, plan WorkPlan) (int64, error) {
-	if err := request.Validate(); err != nil {
-		return 0, err
-	}
-	if err := plan.validate(); err != nil {
-		return 0, err
-	}
-	if plan.Resource != nil && plan.Resource.ID != request.LaneKey ||
-		plan.Transaction != nil && plan.Transaction.ID != request.LaneKey ||
-		plan.Capability != nil && plan.Capability.ID != request.LaneKey {
-		return 0, errors.New("jobmgr kernel: admission footprint identity differs")
-	}
-	return operationAdmissionBytes(request, plan)
 }
 
 func (ck *CommandKernel) abortRequestInputBody(request Request) error {

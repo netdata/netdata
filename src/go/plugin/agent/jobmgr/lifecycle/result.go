@@ -92,7 +92,6 @@ const (
 	valueInvalid valueKind = iota
 	valueNull
 	valueBool
-	valueInt64
 	valueUint64
 	valueFloat64
 	valueString
@@ -101,18 +100,17 @@ const (
 )
 
 type Value struct {
-	kind         valueKind
-	bool         bool
-	int64        int64
-	uint64       uint64
-	float        float64
 	string       string
-	repeated     bool
-	repeatByte   byte
-	repeatLength int
 	array        []Value
 	object       []ObjectField
+	uint64       uint64
+	float        float64
+	repeatLength int
 	charge       int64
+	kind         valueKind
+	bool         bool
+	repeated     bool
+	repeatByte   byte
 }
 
 type ObjectField struct {
@@ -123,9 +121,6 @@ type ObjectField struct {
 func NullValue() Value { return Value{kind: valueNull, charge: functionValueNodeCharge} }
 func BoolValue(value bool) Value {
 	return Value{kind: valueBool, bool: value, charge: functionValueNodeCharge}
-}
-func Int64Value(value int64) Value {
-	return Value{kind: valueInt64, int64: value, charge: functionValueNodeCharge}
 }
 func Uint64Value(value uint64) Value {
 	return Value{kind: valueUint64, uint64: value, charge: functionValueNodeCharge}
@@ -248,8 +243,6 @@ func appendValueJSON(dst []byte, value Value, depth int) ([]byte, error) {
 		return append(dst, "null"...), nil
 	case valueBool:
 		return strconv.AppendBool(dst, value.bool), nil
-	case valueInt64:
-		return strconv.AppendInt(dst, value.int64, 10), nil
 	case valueUint64:
 		return strconv.AppendUint(dst, value.uint64, 10), nil
 	case valueFloat64:
@@ -311,8 +304,6 @@ func valueJSONSize(value Value, depth int) (int, error) {
 			return 4, nil
 		}
 		return 5, nil
-	case valueInt64:
-		return len(strconv.FormatInt(value.int64, 10)), nil
 	case valueUint64:
 		return len(strconv.FormatUint(value.uint64, 10)), nil
 	case valueFloat64:

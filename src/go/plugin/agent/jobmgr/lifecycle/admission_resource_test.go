@@ -42,7 +42,7 @@ func TestAdmissionResourceAlgebraBoundaries(t *testing.T) {
 				AdmissionLaneRef{Slot: 1, Generation: 1},
 				test.request,
 			)
-			require.EqualValues(t, test.wantAccepted, (result.Rejected == nil))
+			require.EqualValues(t, test.wantAccepted, result.Rejected == nil)
 		})
 	}
 
@@ -67,7 +67,7 @@ func TestAdmissionResourceAlgebraBoundaries(t *testing.T) {
 				AdmissionLaneRef{Slot: 1, Generation: 1},
 				test.bytes,
 			)
-			require.EqualValues(t, test.wantAccepted, (result.Rejected == nil))
+			require.EqualValues(t, test.wantAccepted, result.Rejected == nil)
 		})
 	}
 }

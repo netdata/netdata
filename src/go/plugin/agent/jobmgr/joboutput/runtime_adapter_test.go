@@ -51,7 +51,7 @@ func TestManagedJobV1V2JoinBeforeCleanup(t *testing.T) {
 			require.True(t, equalStrings(got, want))
 
 			census := tasks.InheritedCensus()
-			require.EqualValues(t, (lifecycle.InheritedTaskCensus{}), census)
+			require.EqualValues(t, lifecycle.InheritedTaskCensus{}, census)
 		})
 	}
 }

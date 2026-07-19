@@ -88,7 +88,7 @@ func TestRepeatedStringValuePreflightsExactDeferredBoundary(t *testing.T) {
 		require.NoError(t, err)
 		require.EqualValues(t, deferredBytes, size+1)
 		err = validateResultPlanSize(200, "application/json", size)
-		require.EqualValues(t, (deferredBytes <= FunctionPayloadBytes), (err == nil))
+		require.EqualValues(t, deferredBytes <= FunctionPayloadBytes, err == nil)
 	}
 }
 

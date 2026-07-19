@@ -312,7 +312,7 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 			}
 
 			census := supervisor.InheritedCensus()
-			require.EqualValues(t, (InheritedTaskCensus{}), census)
+			require.EqualValues(t, InheritedTaskCensus{}, census)
 		})
 	}
 }

@@ -192,6 +192,8 @@ func (prt *PreparedResourceTransaction) Apply(
 	}
 
 	switch spec.Disposition {
+	case lifecycle.ResourceTransactionUnchanged,
+		lifecycle.ResourceTransactionInstalled:
 	case lifecycle.ResourceTransactionRemoved,
 		lifecycle.ResourceTransactionReplaced:
 		if err := spec.Current.Stop(ctx); err != nil {
@@ -200,6 +202,9 @@ func (prt *PreparedResourceTransaction) Apply(
 		if err := spec.Current.Finalize(); err != nil {
 			return lifecycle.AppliedResourceTransaction{}, err
 		}
+	default:
+		return lifecycle.AppliedResourceTransaction{},
+			errors.New("job output: invalid transaction disposition")
 	}
 
 	var current lifecycle.ReadyResource
@@ -223,6 +228,10 @@ func (prt *PreparedResourceTransaction) Apply(
 		if err := current.Publish(); err != nil {
 			return lifecycle.AppliedResourceTransaction{}, err
 		}
+	case lifecycle.ResourceTransactionRemoved:
+	default:
+		return lifecycle.AppliedResourceTransaction{},
+			errors.New("job output: invalid transaction disposition")
 	}
 	if spec.Graph != nil {
 		if err := spec.Graph.Commit(spec.Mutation); err != nil {

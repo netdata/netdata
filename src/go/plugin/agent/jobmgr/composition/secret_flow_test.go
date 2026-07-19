@@ -96,7 +96,7 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 	}
 
 	reader, writer := io.Pipe()
-	defer writer.Close()
+	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	var graph *dyncfg.Graph
 	process, err := newProcessCore(processCoreConfig{
@@ -239,7 +239,7 @@ func TestProcessCoreCancelledSecretUpdateRestoresStoppedDependent(
 	}
 
 	reader, writer := io.Pipe()
-	defer writer.Close()
+	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	var storeScope func(
 		[]string,
@@ -345,7 +345,7 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 	)
 	require.NoError(t, err)
 	reader, writer := io.Pipe()
-	defer writer.Close()
+	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	process, err := newProcessCore(processCoreConfig{
 		Input: reader, Output: output, FirstGeneration: 1,
@@ -511,7 +511,7 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
 		"__source_type__": confgroup.TypeUser,
 	}
 	reader, writer := io.Pipe()
-	defer writer.Close()
+	defer func() { require.NoError(t, writer.Close()) }()
 	output := newProcessSynchronizedBuffer()
 	var graph *dyncfg.Graph
 	process, err := newProcessCore(processCoreConfig{

@@ -41,14 +41,14 @@ const (
 )
 
 type OperationGeneration struct {
-	ID         OperationID
 	UID        string
-	Source     Source
 	LaneKey    string
+	Task       TaskRef
+	ID         OperationID
+	Source     Source
 	State      OperationState
 	Response   ResponseState
 	Child      ChildState
-	Task       TaskRef
 	timedOut   bool
 	childPhase uint8
 }

@@ -140,7 +140,7 @@ func TestDiscoveryZeroChargePermitFailurePaths(t *testing.T) {
 			)
 			test.fail(t, prepared)
 
-			require.EqualValues(t, (lifecycle.LongLivedCensus{}), prepared.tasks.LongLivedCensus())
+			require.EqualValues(t, lifecycle.LongLivedCensus{}, prepared.tasks.LongLivedCensus())
 
 			census := admission.Census()
 			require.False(t, census.ActiveRecords != 1 ||
@@ -264,25 +264,25 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	require.NoError(t, generation.Start(context.Background()))
+	require.NoError(t, generation.start(context.Background()))
 
 	require.EqualValues(t, 2, generation.tasks.InheritedCensus().Active)
 
-	require.EqualValues(t, (lifecycle.LongLivedCensus{
+	require.EqualValues(t, lifecycle.LongLivedCensus{
 		Active:         1,
 		Pipelines:      1,
 		GActive:        2,
 		ExternalActive: 1,
-	}), generation.tasks.LongLivedCensus(),
+	}, generation.tasks.LongLivedCensus(),
 	)
 
 	generation.Stop()
 
 	require.NoError(t, generation.Wait(context.Background()))
 
-	require.EqualValues(t, (lifecycle.InheritedTaskCensus{}), generation.tasks.InheritedCensus())
+	require.EqualValues(t, lifecycle.InheritedTaskCensus{}, generation.tasks.InheritedCensus())
 
-	require.EqualValues(t, (lifecycle.LongLivedCensus{}), generation.tasks.LongLivedCensus())
+	require.EqualValues(t, lifecycle.LongLivedCensus{}, generation.tasks.LongLivedCensus())
 
 	require.NoError(t, admission.CloseDrained(1))
 

@@ -141,40 +141,33 @@ type admissionLaneUse struct {
 }
 
 type AdmissionLedger struct {
-	mu sync.Mutex
-
-	phase         admissionPhase
-	runGeneration uint64
-	nextTicket    uint64
-
-	records        []admissionRecord
-	freeRecordHead uint32
-	freeRecords    int
-	activeRecords  int
-
-	lanes map[uint32]admissionLaneUse
-
-	nodes        []admissionRadixNode
-	freeNodeHead uint32
-	freeNodes    int
-
-	ordinaryWaiting   int
-	ordinaryGranted   int
-	ordinarySuspended int
-	ordinaryBytes     int64
-	processBytes      int64
-	processReserved   bool
-	longLivedRecords  int
-	longLivedBytes    int64
-
-	cleanupHead     uint32
-	cleanupTail     uint32
-	cleanupWaiting  int
-	cleanupGrant    uint32
-	cleanupRetained bool
-
-	inputBodyCarried        bool
+	lanes                   map[uint32]admissionLaneUse
+	records                 []admissionRecord
+	nodes                   []admissionRadixNode
+	ordinaryWaiting         int
+	longLivedBytes          int64
 	inputBodyNextGeneration uint64
+	freeRecords             int
+	activeRecords           int
+	runGeneration           uint64
+	cleanupWaiting          int
+	nextTicket              uint64
+	freeNodes               int
+	longLivedRecords        int
+	ordinaryGranted         int
+	ordinarySuspended       int
+	ordinaryBytes           int64
+	processBytes            int64
+	mu                      sync.Mutex
+	freeNodeHead            uint32
+	cleanupHead             uint32
+	cleanupTail             uint32
+	cleanupGrant            uint32
+	freeRecordHead          uint32
+	processReserved         bool
+	phase                   admissionPhase
+	cleanupRetained         bool
+	inputBodyCarried        bool
 }
 
 func NewAdmissionLedger() *AdmissionLedger {
