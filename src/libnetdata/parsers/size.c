@@ -79,7 +79,10 @@ static inline double size_round_to_resolution_dbl2(uint64_t value, uint64_t reso
 }
 
 static inline uint64_t size_round_to_resolution_int(uint64_t value, uint64_t resolution) {
-    return (value + (resolution / 2)) / resolution;
+    uint64_t quotient = value / resolution;
+    uint64_t remainder = value % resolution;
+
+    return quotient + (remainder >= resolution - resolution / 2);
 }
 
 // -------------------------------------------------------------------------------------------------------------------
