@@ -112,6 +112,37 @@ set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
     /var/lib
     /var/log)
 
+# Scriptlets. openSUSE uses the %service_* macro family, everything else the
+# %systemd_* one; the choice happens at spec-generation time because the
+# macros expand when rpmbuild parses the generated spec. On distros where RPM
+# handles the shipped sysusers file natively (EL >= 10, Fedora >= 43) the
+# netdata-user %post only manages supplemental groups; elsewhere it also
+# creates the user and group, exactly like the spec.
+if(NETDATA_DISTRO_SUSE)
+  set(NETDATA_RPM_SCRIPTLET_FAMILY "suse")
+else()
+  set(NETDATA_RPM_SCRIPTLET_FAMILY "systemd")
+endif()
+
+if(NOT NETDATA_DISTRO_SUSE AND
+   ((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 10) OR
+    (NETDATA_DISTRO_FEDORA AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 43)))
+  set(NETDATA_RPM_USER_POST "post.groups-only")
+else()
+  set(NETDATA_RPM_USER_POST "post.create-user")
+endif()
+
+set(CPACK_RPM_NETDATA_PRE_INSTALL_SCRIPT_FILE
+    "${PKG_FILES_PATH}/rpm/netdata/pre")
+set(CPACK_RPM_NETDATA_POST_INSTALL_SCRIPT_FILE
+    "${PKG_FILES_PATH}/rpm/netdata/post.${NETDATA_RPM_SCRIPTLET_FAMILY}")
+set(CPACK_RPM_NETDATA_PRE_UNINSTALL_SCRIPT_FILE
+    "${PKG_FILES_PATH}/rpm/netdata/preun.${NETDATA_RPM_SCRIPTLET_FAMILY}")
+set(CPACK_RPM_NETDATA_POST_UNINSTALL_SCRIPT_FILE
+    "${PKG_FILES_PATH}/rpm/netdata/postun.${NETDATA_RPM_SCRIPTLET_FAMILY}")
+set(CPACK_RPM_USER_POST_INSTALL_SCRIPT_FILE
+    "${PKG_FILES_PATH}/rpm/user/${NETDATA_RPM_USER_POST}")
+
 #
 # netdata
 #
