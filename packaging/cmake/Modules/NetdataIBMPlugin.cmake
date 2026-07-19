@@ -146,6 +146,8 @@ function(install_ibm_runtime component)
       list(APPEND _rpm_excludes "/usr/lib/netdata/${IBM_MQ_DIR_NAME}/${_file}")
     elseif(_file MATCHES "(^|/)bin/" OR _file MATCHES "\\.so(\\.|$)"
            OR _file MATCHES "\\.(dll|a)$" OR _file MATCHES "(^|/)gskit8/private_"
+           # the spec's 0750 band lists the lib64 amqczsc tools; their lib/
+           # twins stay in the 0640 band
            OR _file MATCHES "(^|/)lib64/amqczscg?$")
       list(APPEND _rpm_filelist
            "%attr(0750,root,netdata) /usr/lib/netdata/${IBM_MQ_DIR_NAME}/${_file}")

@@ -28,7 +28,9 @@ packaging/tests/rpm-parity/compare-rpms.sh ref-rpms cpack-rpms \
     packaging/tests/rpm-parity/allowlist
 ```
 
-The comparison itself only needs the `rpm` binary on the host.
+The comparison itself only needs the `rpm` binary on the host. It must be
+rpm >= 4.12: older rpm silently returns nothing for `--recommends` and
+`--suggests`, which would make the weak-dependency comparison vacuous.
 
 ## Limitations
 

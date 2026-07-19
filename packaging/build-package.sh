@@ -217,10 +217,12 @@ case "${PKG_TYPE}" in
 
         # The spec builds through the distro %cmake macro. Reproduce its
         # build environment, or the binaries differ (missing hardening and
-        # fortified symbols, extra sonames without --as-needed):
-        # - distro compiler/linker flags from the rpm build macros;
-        # - an empty CMAKE_BUILD_TYPE on the redhat macro family (it sets
-        #   none), RelWithDebInfo on SUSE (its macro sets it).
+        # fortified symbols, extra sonames without --as-needed). The build
+        # type needs no per-distro handling: the redhat macro family sets
+        # none and SUSE's sets RelWithDebInfo, but the top-level
+        # CMakeLists.txt defaults an unset/empty CMAKE_BUILD_TYPE to
+        # RelWithDebInfo for every configure — the spec's included — so both
+        # paths build RelWithDebInfo either way.
         CFLAGS="${CFLAGS:-$(rpm -E '%{?build_cflags}')}"
         [ -n "${CFLAGS}" ] || CFLAGS="$(rpm -E '%{?optflags}')"
         CXXFLAGS="${CXXFLAGS:-$(rpm -E '%{?build_cxxflags}')}"
@@ -233,9 +235,7 @@ case "${PKG_TYPE}" in
         # from STATIC_BUILD, so passing it here would be inert (it is equally
         # inert for the spec path, so parity holds without it).
 
-        if [ "${is_suse}" = 0 ]; then
-            add_cmake_option CMAKE_BUILD_TYPE ""
-        else
+        if [ "${is_suse}" = 1 ]; then
             # SUSE's %cmake passes the linker flags as cmake arguments
             # rather than via LDFLAGS (its build_ldflags macro is empty).
             add_cmake_option CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed -Wl,-z,now"

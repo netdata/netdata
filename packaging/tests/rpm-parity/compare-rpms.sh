@@ -25,7 +25,8 @@ command -v rpm >/dev/null 2>&1 || {
 }
 
 WORK_DIR="$(mktemp -d)"
-trap 'rm -rf "${WORK_DIR}"' EXIT INT TERM
+trap 'rm -rf "${WORK_DIR}"' EXIT
+trap 'exit 130' INT TERM
 
 # Render one RPM into a normalized text report.
 report_rpm() {
