@@ -117,6 +117,8 @@ set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
     /usr/lib/sysusers.d
     /usr/lib/tmpfiles.d
     /usr/share/netdata
+    # openSUSE keeps package docs under /usr/share/doc/packages
+    /usr/share/doc/packages
     /var
     /var/cache
     /var/lib

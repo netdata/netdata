@@ -229,6 +229,12 @@ case "${PKG_TYPE}" in
 
         if [ "${is_suse}" = 0 ]; then
             add_cmake_option CMAKE_BUILD_TYPE ""
+        else
+            # SUSE's %cmake passes the linker flags as cmake arguments
+            # rather than via LDFLAGS (its build_ldflags macro is empty).
+            add_cmake_option CMAKE_EXE_LINKER_FLAGS " -Wl,--as-needed -Wl,-z,now"
+            add_cmake_option CMAKE_MODULE_LINKER_FLAGS " -Wl,--as-needed"
+            add_cmake_option CMAKE_SHARED_LINKER_FLAGS " -Wl,--as-needed -Wl,-z,now"
         fi
         ;;
     *) echo "Unrecognized package type ${PKG_TYPE}." ; exit 1 ;;
