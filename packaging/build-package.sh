@@ -210,6 +210,26 @@ case "${PKG_TYPE}" in
             add_cmake_option USE_CXX_11 On
             add_cmake_option FORCE_LEGACY_LIBBPF On
         fi
+
+        # The spec builds through the distro %cmake macro. Reproduce its
+        # build environment, or the binaries differ (missing hardening and
+        # fortified symbols, extra sonames without --as-needed):
+        # - distro compiler/linker flags from the rpm build macros;
+        # - BUILD_SHARED_LIBS=ON, which the redhat and suse macros both pass;
+        # - an empty CMAKE_BUILD_TYPE on the redhat macro family (it sets
+        #   none), RelWithDebInfo on SUSE (its macro sets it).
+        CFLAGS="${CFLAGS:-$(rpm -E '%{?build_cflags}')}"
+        [ -n "${CFLAGS}" ] || CFLAGS="$(rpm -E '%{?optflags}')"
+        CXXFLAGS="${CXXFLAGS:-$(rpm -E '%{?build_cxxflags}')}"
+        [ -n "${CXXFLAGS}" ] || CXXFLAGS="${CFLAGS}"
+        LDFLAGS="${LDFLAGS:-$(rpm -E '%{?build_ldflags}')}"
+        export CFLAGS CXXFLAGS LDFLAGS
+
+        add_cmake_option BUILD_SHARED_LIBS On
+
+        if [ "${is_suse}" = 0 ]; then
+            add_cmake_option CMAKE_BUILD_TYPE ""
+        fi
         ;;
     *) echo "Unrecognized package type ${PKG_TYPE}." ; exit 1 ;;
 esac
