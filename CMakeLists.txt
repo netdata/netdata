@@ -4268,9 +4268,20 @@ if(BUILD_FOR_PACKAGING AND NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
                 PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE)
 
         # %doc README.md equivalent; openSUSE keeps package docs under
-        # /usr/share/doc/packages.
+        # /usr/share/doc/packages, and the rpm 4.11 era (EL 7, Amazon
+        # Linux 2) defaults %_docdir_fmt to %{NAME}-%{VERSION} where newer
+        # rpm uses plain %{NAME}.
         if(NETDATA_DISTRO_SUSE)
                 set(NETDATA_RPM_DOC_DIR "usr/share/doc/packages/netdata")
+        elseif((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 7) OR
+               (NETDATA_DISTRO_AMZN AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 2))
+                if(NETDATA_VERSION_DESCR STREQUAL "N/A")
+                        set(_rpm_doc_version "${NETDATA_VERSION_MAJOR}.${NETDATA_VERSION_MINOR}.${NETDATA_VERSION_PATCH}")
+                else()
+                        set(_rpm_doc_version "${NETDATA_VERSION_MAJOR}.${NETDATA_VERSION_MINOR}.${NETDATA_VERSION_PATCH}-${NETDATA_VERSION_TWEAK}-${NETDATA_VERSION_DESCR}")
+                endif()
+                string(REPLACE "-" "." _rpm_doc_version "${_rpm_doc_version}")
+                set(NETDATA_RPM_DOC_DIR "usr/share/doc/netdata-${_rpm_doc_version}")
         else()
                 set(NETDATA_RPM_DOC_DIR "usr/share/doc/netdata")
         endif()
