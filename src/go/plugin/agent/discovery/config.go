@@ -39,18 +39,17 @@ type (
 	}
 )
 
-type Config struct {
-	Registry     confgroup.Registry
+type PipelineConfig struct {
 	BuildContext BuildContext
-	Providers    []ProviderFactory
+	Providers    *ProviderCatalog
 }
 
-func validateConfig(cfg Config) error {
-	if len(cfg.Registry) == 0 {
+func validatePipelineConfig(cfg PipelineConfig) error {
+	if len(cfg.BuildContext.Registry) == 0 {
 		return errors.New("empty config registry")
 	}
-	if len(cfg.Providers) == 0 {
-		return errors.New("discoverers not set")
+	if cfg.Providers == nil || cfg.Providers.Len() == 0 {
+		return errors.New("provider catalog not set")
 	}
 	return nil
 }

@@ -29,6 +29,26 @@ func TestDiscoveryProviderCatalog(t *testing.T) {
 	}
 }
 
+func TestDiscoveryProviderCatalogRetainsFrozenNames(t *testing.T) {
+	name := "file"
+	factory := mutableNameProviderFactory{name: &name}
+	catalog, err := NewProviderCatalog([]ProviderFactory{factory})
+	if err != nil {
+		t.Fatal(err)
+	}
+	name = "changed"
+	names := catalog.Names()
+	if len(names) != 1 || names[0] != "file" {
+		t.Fatalf("catalog names=%v", names)
+	}
+	if _, ok := catalog.Lookup("file"); !ok {
+		t.Fatal("frozen provider identity disappeared")
+	}
+	if _, ok := catalog.Lookup("changed"); ok {
+		t.Fatal("mutable factory identity replaced frozen catalog identity")
+	}
+}
+
 func TestDiscoveryProviderCatalogLookupAllocatesNothing(t *testing.T) {
 	catalog, err := NewProviderCatalog([]ProviderFactory{
 		NewProviderFactory(
@@ -69,3 +89,17 @@ func BenchmarkBDiscoveryFactoryLookup(b *testing.B) {
 type catalogTestDiscoverer struct{}
 
 func (catalogTestDiscoverer) Run(context.Context, chan<- []*confgroup.Group) {}
+
+type mutableNameProviderFactory struct {
+	name *string
+}
+
+func (factory mutableNameProviderFactory) Name() string {
+	return *factory.name
+}
+
+func (mutableNameProviderFactory) Build(
+	BuildContext,
+) (Discoverer, bool, error) {
+	return catalogTestDiscoverer{}, true, nil
+}

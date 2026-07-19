@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 )
 
@@ -51,6 +52,7 @@ type inheritedTaskSlot struct {
 	active         bool
 	owner          ResourceIdentity
 	role           InheritedTaskRole
+	key            string
 	cancel         context.CancelFunc
 	done           chan struct{}
 	cancelled      bool
@@ -58,7 +60,6 @@ type inheritedTaskSlot struct {
 	joined         bool
 	releasing      bool
 	permit         LongLivedPermitRef
-	permitG        LongLivedGFacet
 	err            error
 	activePrevious uint32
 	activeNext     uint32
@@ -67,6 +68,7 @@ type inheritedTaskSlot struct {
 type inheritedOwnerRole struct {
 	owner ResourceIdentity
 	role  InheritedTaskRole
+	key   string
 }
 
 type InheritedTaskCensus struct {
@@ -83,28 +85,81 @@ type ShutdownCancellationCensus struct {
 }
 
 func (supervisor *TaskSupervisor) StartInherited(parent context.Context, owner ResourceIdentity, role InheritedTaskRole, work InheritedTaskWork) (InheritedTaskRef, error) {
-	return supervisor.startInherited(parent, owner, role, work, LongLivedPermitRef{}, 0)
+	if role == InheritedPipelineSupervisor ||
+		role == InheritedPipelineProvider {
+		return InheritedTaskRef{},
+			errors.New("jobmgr task supervisor: pipeline task requires a permit")
+	}
+	return supervisor.startInherited(
+		parent, owner, role, "", work, LongLivedPermitRef{},
+	)
 }
 
 func (supervisor *TaskSupervisor) StartInheritedWithPermit(parent context.Context, owner ResourceIdentity, role InheritedTaskRole, permit LongLivedPermit, work InheritedTaskWork) (InheritedTaskRef, error) {
+	return supervisor.startInheritedWithPermit(
+		parent, owner, role, "", permit, work,
+	)
+}
+
+// StartInheritedWithPermitKey starts one independently owned child for a
+// stable key within a shared owner and role.
+func (supervisor *TaskSupervisor) StartInheritedWithPermitKey(
+	parent context.Context,
+	owner ResourceIdentity,
+	role InheritedTaskRole,
+	key string,
+	permit LongLivedPermit,
+	work InheritedTaskWork,
+) (InheritedTaskRef, error) {
+	if key == "" || key != strings.TrimSpace(key) {
+		return InheritedTaskRef{},
+			errors.New("jobmgr task supervisor: invalid inherited task key")
+	}
+	return supervisor.startInheritedWithPermit(
+		parent, owner, role, key, permit, work,
+	)
+}
+
+func (supervisor *TaskSupervisor) startInheritedWithPermit(
+	parent context.Context,
+	owner ResourceIdentity,
+	role InheritedTaskRole,
+	key string,
+	permit LongLivedPermit,
+	work InheritedTaskWork,
+) (InheritedTaskRef, error) {
 	if supervisor == nil || permit.supervisor != supervisor || permit.owner != owner {
 		return InheritedTaskRef{}, errors.New("jobmgr task supervisor: inherited permit differs")
 	}
-	facet, ok := gFacetForInheritedRole(role)
-	if !ok {
+	if _, ok := longLivedGKeyForInherited(role, key); !ok {
 		return InheritedTaskRef{}, errors.New("jobmgr task supervisor: inherited role has no long-lived facet")
 	}
-	if err := supervisor.activateLongLivedG(permit.ref, owner, facet); err != nil {
+	if err := supervisor.activateLongLivedG(
+		permit.ref,
+		owner,
+		role,
+		key,
+	); err != nil {
 		return InheritedTaskRef{}, err
 	}
-	ref, err := supervisor.startInherited(parent, owner, role, work, permit.ref, facet)
+	ref, err := supervisor.startInherited(
+		parent, owner, role, key, work, permit.ref,
+	)
 	if err != nil {
-		return InheritedTaskRef{}, errors.Join(err, supervisor.restoreLongLivedG(permit.ref, owner, facet))
+		return InheritedTaskRef{}, errors.Join(
+			err,
+			supervisor.restoreLongLivedG(
+				permit.ref,
+				owner,
+				role,
+				key,
+			),
+		)
 	}
 	return ref, nil
 }
 
-func (supervisor *TaskSupervisor) startInherited(parent context.Context, owner ResourceIdentity, role InheritedTaskRole, work InheritedTaskWork, permit LongLivedPermitRef, permitG LongLivedGFacet) (InheritedTaskRef, error) {
+func (supervisor *TaskSupervisor) startInherited(parent context.Context, owner ResourceIdentity, role InheritedTaskRole, key string, work InheritedTaskWork, permit LongLivedPermitRef) (InheritedTaskRef, error) {
 	if supervisor == nil || parent == nil || !owner.Valid() || !role.valid() || work == nil {
 		return InheritedTaskRef{}, errors.New("jobmgr task supervisor: invalid inherited task")
 	}
@@ -114,8 +169,8 @@ func (supervisor *TaskSupervisor) startInherited(parent context.Context, owner R
 		registry.mu.Unlock()
 		return InheritedTaskRef{}, errors.New("jobmgr task supervisor: inherited activation is sealed")
 	}
-	key := inheritedOwnerRole{owner: owner, role: role}
-	if _, ok := registry.owners[key]; ok {
+	ownerKey := inheritedOwnerRole{owner: owner, role: role, key: key}
+	if _, ok := registry.owners[ownerKey]; ok {
 		registry.mu.Unlock()
 		return InheritedTaskRef{}, errors.New("jobmgr task supervisor: duplicate inherited owner role")
 	}
@@ -147,11 +202,12 @@ func (supervisor *TaskSupervisor) startInherited(parent context.Context, owner R
 	started := make(chan struct{})
 	*slot = inheritedTaskSlot{
 		generation: generation, active: true, owner: owner, role: role,
-		cancel: cancel, done: done, permit: permit, permitG: permitG,
+		key:    key,
+		cancel: cancel, done: done, permit: permit,
 	}
 	registry.census.Active++
 	ref := InheritedTaskRef{Slot: index, Generation: generation}
-	registry.owners[key] = ref
+	registry.owners[ownerKey] = ref
 	handle := index + 1
 	slot.activePrevious = registry.activeTail
 	if registry.activeTail != 0 {
@@ -254,11 +310,17 @@ func (supervisor *TaskSupervisor) ReleaseInherited(ref InheritedTaskRef, owner R
 		registry.mu.Unlock()
 		return errors.New("jobmgr task supervisor: inherited release before cancel and join")
 	}
-	permit, permitG := slot.permit, slot.permitG
+	permit := slot.permit
 	if permit.valid() {
+		role, taskKey := slot.role, slot.key
 		slot.releasing = true
 		registry.mu.Unlock()
-		if err := supervisor.releaseLongLivedG(permit, owner, permitG); err != nil {
+		if err := supervisor.releaseLongLivedG(
+			permit,
+			owner,
+			role,
+			taskKey,
+		); err != nil {
 			registry.mu.Lock()
 			if current, lookupErr := registry.slot(ref, owner); lookupErr == nil {
 				current.releasing = false
@@ -273,7 +335,11 @@ func (supervisor *TaskSupervisor) ReleaseInherited(ref InheritedTaskRef, owner R
 			return errors.Join(err, errors.New("jobmgr task supervisor: inherited release changed"))
 		}
 	}
-	key := inheritedOwnerRole{owner: slot.owner, role: slot.role}
+	key := inheritedOwnerRole{
+		owner: slot.owner,
+		role:  slot.role,
+		key:   slot.key,
+	}
 	previous, next := slot.activePrevious, slot.activeNext
 	handle := ref.Slot + 1
 	if registry.shutdownCursor == handle {

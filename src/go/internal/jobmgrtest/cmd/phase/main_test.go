@@ -137,11 +137,11 @@ func TestPackageGateManifestCoversApprovedPhase(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := len(contract.BMM003HotpathGates()); got != 35 {
-		t.Fatalf("hotpath owners=%d, want 35", got)
+	if got := len(contract.BMM004HotpathGates()); got != 37 {
+		t.Fatalf("hotpath owners=%d, want 37", got)
 	}
-	if got := countBenchmarks(gates); got != 35 {
-		t.Fatalf("hotpath benchmarks=%d, want 35", got)
+	if got := countBenchmarks(gates); got != 37 {
+		t.Fatalf("hotpath benchmarks=%d, want 37", got)
 	}
 	jobmgr := gates["./plugin/agent/jobmgr"]
 	if jobmgr == nil {

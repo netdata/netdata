@@ -167,3 +167,38 @@ func TestBMM003HotpathContractAddsOnlySecretOwners(t *testing.T) {
 		t.Fatal("B-M-003 hot-path proofs did not grow cumulatively")
 	}
 }
+
+func TestBMM004HotpathContractAddsOnlyDiscoveryOwners(t *testing.T) {
+	gates := BMM004HotpathGates()
+	if len(gates) != 37 {
+		t.Fatalf("hot-path owners=%d, want 37", len(gates))
+	}
+	owners := make(map[string]HotpathGate, len(gates))
+	for _, gate := range gates {
+		if _, exists := owners[gate.OwnerID]; exists {
+			t.Fatalf("duplicate hot-path owner %s", gate.OwnerID)
+		}
+		owners[gate.OwnerID] = gate
+	}
+	expected := map[string]string{
+		"B-O-00032": "./plugin/agent/jobmgr/discovery",
+		"B-O-00033": "./plugin/agent/discovery",
+	}
+	for owner, pkg := range expected {
+		gate, ok := owners[owner]
+		if !ok {
+			t.Fatalf("B-M-004 owner %s is absent", owner)
+		}
+		if gate.Package != pkg {
+			t.Fatalf(
+				"B-M-004 owner %s package=%q want=%q",
+				owner,
+				gate.Package,
+				pkg,
+			)
+		}
+	}
+	if len(BMM004HotpathProofs()) <= len(BMM003HotpathProofs()) {
+		t.Fatal("B-M-004 hot-path proofs did not grow cumulatively")
+	}
+}

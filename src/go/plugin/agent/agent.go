@@ -165,7 +165,7 @@ func (a *Agent) run(ctx context.Context) error {
 	process, err := composition.NewProcess(composition.Config{
 		Input: a.In, Output: a.Out,
 		PluginName: a.Name, Modules: enabledModules,
-		Defaults:              discCfg.Registry,
+		Defaults:              discCfg.Defaults,
 		DiscoveryBuildContext: discCfg.BuildContext,
 		DiscoveryProviders:    discCfg.Providers,
 		RunJob:                runJob,

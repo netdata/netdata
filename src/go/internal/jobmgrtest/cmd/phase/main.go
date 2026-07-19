@@ -225,7 +225,7 @@ func run(arguments []string) error {
 	summary := phaseSummary{
 		Cases:                len(cases),
 		ComponentTests:       countTests(gates),
-		HotpathOwners:        len(contract.BMM003HotpathGates()),
+		HotpathOwners:        len(contract.BMM004HotpathGates()),
 		DiagnosticBenchmarks: countBenchmarks(gates),
 		RuntimeSuites:        len(productionSuiteTests()),
 		ComparisonGates:      len(replayed.Gates),
@@ -543,7 +543,7 @@ func collectPackageGates(
 			addTest(proof)
 		}
 	}
-	for _, hotpath := range contract.BMM003HotpathGates() {
+	for _, hotpath := range contract.BMM004HotpathGates() {
 		for _, test := range hotpath.Tests {
 			addTest(contract.ComponentProof{
 				Package: hotpath.Package,

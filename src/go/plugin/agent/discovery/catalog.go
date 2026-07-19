@@ -48,10 +48,8 @@ func (catalog *ProviderCatalog) Len() int {
 	return len(catalog.factories)
 }
 
-// Factories returns the frozen factories in stable name order. Consumers use
-// this snapshot to construct one run generation without creating a second
-// provider-factory authority.
-func (catalog *ProviderCatalog) Factories() []ProviderFactory {
+// Names returns the provider identities captured when the catalog was frozen.
+func (catalog *ProviderCatalog) Names() []string {
 	if catalog == nil {
 		return nil
 	}
@@ -60,9 +58,5 @@ func (catalog *ProviderCatalog) Factories() []ProviderFactory {
 		names = append(names, name)
 	}
 	sort.Strings(names)
-	factories := make([]ProviderFactory, 0, len(names))
-	for _, name := range names {
-		factories = append(factories, catalog.factories[name])
-	}
-	return factories
+	return names
 }

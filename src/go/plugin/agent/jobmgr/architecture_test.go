@@ -155,6 +155,12 @@ var checkpointOwnerDeclarations = map[string]ownerDeclaration{
 	"discovery provider catalog": {
 		packagePath: "plugin/agent/discovery", typeName: "ProviderCatalog",
 	},
+	"discovery pipeline generation": {
+		packagePath: "plugin/agent/discovery", typeName: "PipelineGeneration",
+	},
+	"discovery decision index": {
+		packagePath: "plugin/agent/jobmgr/discovery", typeName: "DecisionIndex",
+	},
 	"configured vnode authority": {
 		packagePath: "plugin/agent/jobmgr/discovery", typeName: "VNodeConfiguration",
 	},
@@ -206,7 +212,7 @@ func TestActiveArchitecturePackages(t *testing.T) {
 }
 
 func TestCheckpointOwnerManifestHasConcreteDeclarations(t *testing.T) {
-	const checkpointOwnerCount = 35
+	const checkpointOwnerCount = 37
 	if len(checkpointOwnerDeclarations) != checkpointOwnerCount {
 		t.Fatalf(
 			"checkpoint owner declarations=%d want=%d",

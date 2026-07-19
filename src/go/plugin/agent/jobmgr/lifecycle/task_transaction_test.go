@@ -218,7 +218,7 @@ func TestTaskSupervisorDisposesPreparedTransactionAndRestoresCurrent(t *testing.
 
 func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 	tests := map[string]struct {
-		permitPlan func(int64) (LongLivedPlan, error)
+		permitPlan func([]string) (LongLivedPlan, error)
 	}{
 		"pipeline": {permitPlan: NewPipelineLongLivedPlan},
 	}
@@ -228,7 +228,7 @@ func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 			admission := NewAdmissionLedger()
 			supervisor := newResourceTaskSupervisor(t)
 			var grants [4]AdmissionGrant
-			seedPlan, err := test.permitPlan(1)
+			seedPlan, err := test.permitPlan([]string{"provider"})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -257,7 +257,7 @@ func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			permitPlan, err := test.permitPlan(1)
+			permitPlan, err := test.permitPlan([]string{"provider"})
 			if err != nil {
 				t.Fatal(err)
 			}

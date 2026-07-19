@@ -11,25 +11,27 @@ import (
 
 func TestLongLivedPermitConservesAdmittedBGEFacets(t *testing.T) {
 	admission := NewAdmissionLedger()
-	ref := grantLongLivedTestAdmission(t, admission, 100)
 	supervisor := newLongLivedTestSupervisor(t)
-	plan, err := NewPipelineLongLivedPlan(40)
+	plan, err := NewPipelineLongLivedPlan(
+		[]string{"file", "service-discovery"},
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
+	ref := grantLongLivedTestAdmission(t, admission, plan.Bytes())
 	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
 	permit, err := supervisor.IssueLongLivedPermit(admission, ref, owner, plan)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if census := admission.Census(); census.OrdinaryBytes != 100+TaskChildExecutionBytes ||
+	if census := admission.Census(); census.OrdinaryBytes != plan.Bytes()+TaskChildExecutionBytes ||
 		census.LongLivedRecords != 1 ||
 		census.LongLivedBytes != plan.Bytes() {
 		t.Fatalf("admission after transfer=%+v", census)
 	}
 	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{
 		Active: 1, Pipelines: 1, Bytes: plan.Bytes(),
-		GReserved: 2, ExternalReserved: 1,
+		GReserved: 3, ExternalReserved: 1,
 	}) {
 		t.Fatalf("permit after transfer=%+v", census)
 	}
@@ -48,20 +50,64 @@ func TestLongLivedPermitConservesAdmittedBGEFacets(t *testing.T) {
 	if err := permit.ActivateExternal(LongLivedEProvider); err == nil {
 		t.Fatal("duplicate external activation succeeded")
 	}
+	if _, err := supervisor.StartInheritedWithPermitKey(
+		context.Background(),
+		owner,
+		InheritedPipelineProvider,
+		"unknown",
+		permit,
+		func(context.Context) error { return nil },
+	); err == nil {
+		t.Fatal("unknown provider key was accepted")
+	}
+	if census := supervisor.LongLivedCensus(); census.GReserved != 3 ||
+		census.GActive != 0 {
+		t.Fatalf("unknown key changed facets=%+v", census)
+	}
 
-	roles := []InheritedTaskRole{InheritedPipelineSupervisor, InheritedPipelineProvider}
-	refs := make([]InheritedTaskRef, 0, len(roles))
-	for _, role := range roles {
-		child, err := supervisor.StartInheritedWithPermit(context.Background(), owner, role, permit, func(ctx context.Context) error {
+	refs := make(map[string]InheritedTaskRef)
+	child, err := supervisor.StartInheritedWithPermit(
+		context.Background(),
+		owner,
+		InheritedPipelineSupervisor,
+		permit,
+		func(ctx context.Context) error {
 			<-ctx.Done()
 			return nil
-		})
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	refs["supervisor"] = child
+	for name := range map[string]struct{}{"file": {}, "service-discovery": {}} {
+		child, err := supervisor.StartInheritedWithPermitKey(
+			context.Background(),
+			owner,
+			InheritedPipelineProvider,
+			name,
+			permit,
+			func(ctx context.Context) error {
+				<-ctx.Done()
+				return nil
+			},
+		)
 		if err != nil {
 			t.Fatal(err)
 		}
-		refs = append(refs, child)
+		refs[name] = child
 	}
-	if census := supervisor.LongLivedCensus(); census.GReserved != 0 || census.GActive != 2 || census.ExternalReserved != 0 || census.ExternalActive != 1 {
+	if _, err := supervisor.StartInheritedWithPermitKey(
+		context.Background(),
+		owner,
+		InheritedPipelineProvider,
+		"file",
+		permit,
+		func(context.Context) error { return nil },
+	); err == nil {
+		t.Fatal("duplicate provider key was accepted")
+	}
+	if census := supervisor.LongLivedCensus(); census.GReserved != 0 || census.GActive != 3 || census.ExternalReserved != 0 || census.ExternalActive != 1 {
 		t.Fatalf("active facets=%+v", census)
 	}
 	if err := permit.ReleaseExternal(LongLivedEProvider); err != nil {
@@ -81,7 +127,7 @@ func TestLongLivedPermitConservesAdmittedBGEFacets(t *testing.T) {
 	if err := permit.ReleaseBytes(); err != nil {
 		t.Fatal(err)
 	}
-	if census := admission.Census(); census.OrdinaryBytes != 60 || census.LongLivedRecords != 0 || census.LongLivedBytes != 0 {
+	if census := admission.Census(); census.OrdinaryBytes != TaskChildExecutionBytes || census.LongLivedRecords != 0 || census.LongLivedBytes != 0 {
 		t.Fatalf("admission after persistent release=%+v", census)
 	}
 	if census := supervisor.LongLivedCensus(); census.Active != 1 || census.Bytes != 0 || census.GActive != 0 || census.ExternalActive != 0 {
@@ -100,6 +146,119 @@ func TestLongLivedPermitConservesAdmittedBGEFacets(t *testing.T) {
 		t.Fatal(err)
 	}
 	if census := admission.Census(); census.ActiveRecords != 0 || census.OrdinaryBytes != 0 {
+		t.Fatalf("final admission census=%+v", census)
+	}
+}
+
+func TestPipelineLongLivedPlanProviderKeys(t *testing.T) {
+	overflow := make(
+		[]string,
+		int(OrdinaryBudgetBytes/TaskChildExecutionBytes),
+	)
+	tests := map[string]struct {
+		keys      []string
+		wantBytes int64
+		wantErr   bool
+	}{
+		"one provider": {
+			keys:      []string{"file"},
+			wantBytes: 2 * TaskChildExecutionBytes,
+		},
+		"several providers": {
+			keys:      []string{"service-discovery", "file", "dummy"},
+			wantBytes: 4 * TaskChildExecutionBytes,
+		},
+		"empty": {
+			wantErr: true,
+		},
+		"blank": {
+			keys:    []string{""},
+			wantErr: true,
+		},
+		"whitespace": {
+			keys:    []string{" file"},
+			wantErr: true,
+		},
+		"duplicate": {
+			keys:    []string{"file", "file"},
+			wantErr: true,
+		},
+		"does not self fit": {
+			keys:    overflow,
+			wantErr: true,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			plan, err := NewPipelineLongLivedPlan(test.keys)
+			if test.wantErr {
+				if err == nil {
+					t.Fatalf("plan=%+v, want error", plan)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			if plan.Bytes() != test.wantBytes {
+				t.Fatalf(
+					"bytes=%d, want %d",
+					plan.Bytes(),
+					test.wantBytes,
+				)
+			}
+		})
+	}
+}
+
+func TestPipelinePermitReleasesDisabledProviderClaim(t *testing.T) {
+	admission := NewAdmissionLedger()
+	supervisor := newLongLivedTestSupervisor(t)
+	plan, err := NewPipelineLongLivedPlan([]string{"disabled", "enabled"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	admissionRef := grantLongLivedTestAdmission(
+		t,
+		admission,
+		plan.Bytes(),
+	)
+	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
+	permit, err := supervisor.IssueLongLivedPermit(
+		admission,
+		admissionRef,
+		owner,
+		plan,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := permit.ReleaseUnusedInherited(
+		InheritedPipelineProvider,
+		"disabled",
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := permit.ReleaseUnusedInherited(
+		InheritedPipelineProvider,
+		"disabled",
+	); err == nil {
+		t.Fatal("disabled provider claim released twice")
+	}
+	if census := supervisor.LongLivedCensus(); census.GReserved != 2 {
+		t.Fatalf("permit after disabled release=%+v", census)
+	}
+	if err := permit.AbortUnused(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admission.ReleaseOrdinary(admissionRef); err != nil {
+		t.Fatal(err)
+	}
+	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{}) {
+		t.Fatalf("final permit census=%+v", census)
+	}
+	if census := admission.Census(); census.ActiveRecords != 0 ||
+		census.OrdinaryBytes != 0 {
 		t.Fatalf("final admission census=%+v", census)
 	}
 }
@@ -143,7 +302,7 @@ func TestLongLivedPermitSurvivesOperationAdmissionRelease(t *testing.T) {
 func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 	admission := NewAdmissionLedger()
 	supervisor := newLongLivedTestSupervisor(t)
-	pipelinePlan, err := NewPipelineLongLivedPlan(1)
+	pipelinePlan, err := NewPipelineLongLivedPlan([]string{"provider"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +315,7 @@ func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 	permits := make([]LongLivedPermit, 0, jobs+1)
 	issue := func(owner ResourceIdentity, plan LongLivedPlan) {
 		t.Helper()
-		ref := grantLongLivedTestAdmission(t, admission, 2)
+		ref := grantLongLivedTestAdmission(t, admission, plan.Bytes())
 		permit, issueErr := supervisor.IssueLongLivedPermit(
 			admission,
 			ref,
@@ -195,7 +354,7 @@ func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 
 	if census := admission.Census(); census.ActiveRecords != 0 ||
 		census.LongLivedRecords != jobs+1 ||
-		census.OrdinaryBytes != int64(jobs+1)*jobPlan.Bytes() {
+		census.OrdinaryBytes != pipelinePlan.Bytes()+int64(jobs)*jobPlan.Bytes() {
 		t.Fatalf("separated admission census=%+v", census)
 	}
 	if census := supervisor.LongLivedCensus(); census.Active != jobs+1 {

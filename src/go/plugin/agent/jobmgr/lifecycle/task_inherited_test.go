@@ -13,7 +13,7 @@ func TestInheritedTaskRunCancelJoinRelease(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	owner := ResourceIdentity{ID: "pipeline", Generation: 7}
 	entered := make(chan struct{})
-	ref, err := supervisor.StartInherited(context.Background(), owner, InheritedPipelineProvider, func(ctx context.Context) error {
+	ref, err := supervisor.StartInherited(context.Background(), owner, InheritedV1Runtime, func(ctx context.Context) error {
 		close(entered)
 		<-ctx.Done()
 		return nil
@@ -45,7 +45,7 @@ func TestInheritedTaskRunCancelJoinRelease(t *testing.T) {
 func TestInheritedTaskOwnerRoleAndPanicAreContained(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
-	ref, err := supervisor.StartInherited(context.Background(), owner, InheritedPipelineSupervisor, func(context.Context) error {
+	ref, err := supervisor.StartInherited(context.Background(), owner, InheritedV2Runner, func(context.Context) error {
 		panic("boom")
 	})
 	if err != nil {
@@ -74,7 +74,7 @@ func TestInheritedTaskMissedJoinRetainsRecord(t *testing.T) {
 	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
 	releaseWork := make(chan struct{})
 	finished := make(chan struct{})
-	ref, err := supervisor.StartInherited(context.Background(), owner, InheritedPipelineProvider, func(context.Context) error {
+	ref, err := supervisor.StartInherited(context.Background(), owner, InheritedV1Runtime, func(context.Context) error {
 		defer close(finished)
 		<-releaseWork
 		return nil
@@ -106,7 +106,7 @@ func TestInheritedTasksGrowBeyondFormerDerivedLimit(t *testing.T) {
 	refs := make([]InheritedTaskRef, 0, population)
 	for index := 0; index < population; index++ {
 		owner := ResourceIdentity{ID: "pipeline", Generation: uint64(index + 1)}
-		ref, err := supervisor.StartInherited(context.Background(), owner, InheritedPipelineProvider, func(ctx context.Context) error {
+		ref, err := supervisor.StartInherited(context.Background(), owner, InheritedV1Runtime, func(ctx context.Context) error {
 			<-ctx.Done()
 			return nil
 		})
@@ -132,5 +132,26 @@ func TestInheritedTasksGrowBeyondFormerDerivedLimit(t *testing.T) {
 	}
 	if supervisor.InheritedActive() != 0 {
 		t.Fatalf("inherited=%d", supervisor.InheritedActive())
+	}
+}
+
+func TestInheritedPipelineTasksRequirePermit(t *testing.T) {
+	tests := map[string]InheritedTaskRole{
+		"provider":   InheritedPipelineProvider,
+		"supervisor": InheritedPipelineSupervisor,
+	}
+	supervisor := newResourceTaskSupervisor(t)
+	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
+	for name, role := range tests {
+		t.Run(name, func(t *testing.T) {
+			if _, err := supervisor.StartInherited(
+				context.Background(),
+				owner,
+				role,
+				func(context.Context) error { return nil },
+			); err == nil {
+				t.Fatal("pipeline task started without a permit")
+			}
+		})
 	}
 }

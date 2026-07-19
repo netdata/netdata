@@ -6,22 +6,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"slices"
-	"sort"
 	"sync"
 
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	jobmgrdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
-const (
-	discoveryResourceID    = "__jobmgr_discovery__"
-	discoveryRetainedBytes = int64(64 * 1024)
-)
+const discoveryResourceID = "__jobmgr_discovery__"
 
 type runDiscoveryServices struct {
 	BuildContext agentdiscovery.BuildContext
@@ -38,15 +32,40 @@ func (generation *runGeneration) startDiscovery(ctx context.Context) error {
 	if generation == nil || ctx == nil || !generation.discovery.valid() {
 		return errors.New("jobmgr composition: invalid discovery start")
 	}
-	manager, err := agentdiscovery.NewManager(agentdiscovery.Config{
-		Registry:     generation.discovery.BuildContext.Registry,
-		BuildContext: generation.discovery.BuildContext,
-		Providers:    generation.discovery.Providers.Factories(),
-	})
+	pipeline, err := agentdiscovery.NewPipelineGeneration(
+		agentdiscovery.PipelineConfig{
+			BuildContext: generation.discovery.BuildContext,
+			Providers:    generation.discovery.Providers,
+		},
+	)
 	if err != nil {
 		return err
 	}
-	permitPlan, err := lifecycle.NewPipelineLongLivedPlan(discoveryRetainedBytes)
+	decisions, err := jobmgrdiscovery.NewDecisionIndex(
+		jobmgrdiscovery.DecisionConfig{
+			Generation: generation.run.Generation(),
+			RunJob:     generation.discovery.RunJob,
+			AutoEnable: generation.discovery.AutoEnable,
+			Commands:   generation.kernel,
+			Plan: func(
+				change jobmgrdiscovery.DiscoveredChange,
+			) (jobmgr.WorkPlan, error) {
+				return generation.dyncfg.PlanDiscovered(
+					joboutput.DiscoveredJobChange{
+						Config: change.Config,
+						Status: change.Status,
+						Remove: change.Remove,
+					},
+				)
+			},
+		},
+	)
+	if err != nil {
+		return err
+	}
+	permitPlan, err := lifecycle.NewPipelineLongLivedPlan(
+		generation.discovery.Providers.Names(),
+	)
 	if err != nil {
 		return err
 	}
@@ -83,10 +102,8 @@ func (generation *runGeneration) startDiscovery(ctx context.Context) error {
 			return nil, errors.New("jobmgr composition: discovery resource already exists")
 		}
 		prepared, err := newPreparedDiscovery(
-			manager,
-			generation.discovery,
-			generation.dyncfg,
-			generation.kernel,
+			pipeline,
+			decisions,
 			generation.tasks,
 			scope.Successor,
 			permit,
@@ -127,36 +144,32 @@ func (generation *runGeneration) startDiscovery(ctx context.Context) error {
 }
 
 type preparedDiscovery struct {
-	manager    *agentdiscovery.Manager
-	services   runDiscoveryServices
-	controller *joboutput.DynCfgJobController
-	commands   jobmgr.PreparedCommandPort
-	tasks      *lifecycle.TaskSupervisor
-	identity   lifecycle.ResourceIdentity
-	permit     lifecycle.LongLivedPermit
-	fail       func(error)
+	pipeline  *agentdiscovery.PipelineGeneration
+	decisions *jobmgrdiscovery.DecisionIndex
+	tasks     *lifecycle.TaskSupervisor
+	identity  lifecycle.ResourceIdentity
+	permit    lifecycle.LongLivedPermit
+	fail      func(error)
 }
 
 func newPreparedDiscovery(
-	manager *agentdiscovery.Manager,
-	services runDiscoveryServices,
-	controller *joboutput.DynCfgJobController,
-	commands jobmgr.PreparedCommandPort,
+	pipeline *agentdiscovery.PipelineGeneration,
+	decisions *jobmgrdiscovery.DecisionIndex,
 	tasks *lifecycle.TaskSupervisor,
 	identity lifecycle.ResourceIdentity,
 	permit lifecycle.LongLivedPermit,
 	fail func(error),
 ) (*preparedDiscovery, error) {
-	if manager == nil || !services.valid() || controller == nil ||
-		commands == nil || tasks == nil || !identity.Valid() ||
+	if pipeline == nil || decisions == nil ||
+		len(pipeline.ProviderNames()) == 0 ||
+		tasks == nil || !identity.Valid() ||
 		!permit.Valid() || permit.Owner() != identity ||
 		permit.Class() != lifecycle.LongLivedPipeline || fail == nil {
 		return nil, errors.New("jobmgr composition: invalid prepared discovery")
 	}
 	return &preparedDiscovery{
-		manager: manager, services: services, controller: controller,
-		commands: commands, tasks: tasks, identity: identity, permit: permit,
-		fail: fail,
+		pipeline: pipeline, decisions: decisions, tasks: tasks,
+		identity: identity, permit: permit, fail: fail,
 	}, nil
 }
 
@@ -175,14 +188,20 @@ func (prepared *preparedDiscovery) AcceptStart(
 		return nil, errors.New("jobmgr composition: invalid discovery acceptance")
 	}
 	resource := &readyDiscovery{
-		manager: prepared.manager, services: prepared.services,
-		controller: prepared.controller, commands: prepared.commands,
-		tasks: prepared.tasks, identity: prepared.identity, permit: prepared.permit,
-		groups: make(chan []*confgroup.Group, 1),
-		fail:   prepared.fail,
+		pipeline: prepared.pipeline, decisions: prepared.decisions,
+		tasks: prepared.tasks, identity: prepared.identity,
+		permit: prepared.permit, fail: prepared.fail,
+		providerNames:    prepared.pipeline.ProviderNames(),
+		disabledNames:    prepared.pipeline.DisabledProviderNames(),
+		providerRefs:     make(map[string]lifecycle.InheritedTaskRef),
+		providerReleased: make(map[string]bool),
 	}
 	if err := resource.start(ctx); err != nil {
-		return resource, err
+		cleanupErr := resource.abortStart(ctx)
+		if cleanupErr == nil {
+			return nil, err
+		}
+		return resource, errors.Join(err, cleanupErr)
 	}
 	return resource, nil
 }
@@ -197,26 +216,26 @@ func (prepared *preparedDiscovery) Dispose(context.Context) error {
 type readyDiscovery struct {
 	mu sync.Mutex
 
-	manager    *agentdiscovery.Manager
-	services   runDiscoveryServices
-	controller *joboutput.DynCfgJobController
-	commands   jobmgr.PreparedCommandPort
-	tasks      *lifecycle.TaskSupervisor
-	identity   lifecycle.ResourceIdentity
-	permit     lifecycle.LongLivedPermit
-	groups     chan []*confgroup.Group
-	fail       func(error)
-	managerRef lifecycle.InheritedTaskRef
-	reconRef   lifecycle.InheritedTaskRef
-	started    bool
-	stopped    bool
-	finalized  bool
+	pipeline      *agentdiscovery.PipelineGeneration
+	decisions     *jobmgrdiscovery.DecisionIndex
+	tasks         *lifecycle.TaskSupervisor
+	identity      lifecycle.ResourceIdentity
+	permit        lifecycle.LongLivedPermit
+	fail          func(error)
+	providerNames []string
+	disabledNames []string
+	supervisorRef lifecycle.InheritedTaskRef
+	providerRefs  map[string]lifecycle.InheritedTaskRef
+	started       bool
+	stopped       bool
+	finalized     bool
 
-	managerReleased  bool
-	reconReleased    bool
-	externalReleased bool
-	bytesReleased    bool
-	permitReturned   bool
+	providerReleased   map[string]bool
+	supervisorReleased bool
+	externalActivated  bool
+	externalReleased   bool
+	bytesReleased      bool
+	permitReturned     bool
 }
 
 func (resource *readyDiscovery) Identity() lifecycle.ResourceIdentity {
@@ -235,70 +254,190 @@ func (resource *readyDiscovery) start(ctx context.Context) error {
 	if err := resource.permit.ActivateExternal(lifecycle.LongLivedEProvider); err != nil {
 		return err
 	}
-	managerRef, err := resource.tasks.StartInheritedWithPermit(
-		context.WithoutCancel(ctx),
-		resource.identity,
-		lifecycle.InheritedPipelineProvider,
-		resource.permit,
-		func(runCtx context.Context) error {
-			resource.manager.Run(runCtx, resource.groups)
-			close(resource.groups)
-			if runCtx.Err() == nil {
-				err := errors.New(
-					"jobmgr composition: discovery manager exited unexpectedly",
-				)
-				resource.fail(err)
-				return err
-			}
-			return nil
-		},
-	)
-	if err != nil {
-		return errors.Join(
-			err,
-			resource.permit.ReleaseExternal(lifecycle.LongLivedEProvider),
-			resource.permit.AbortUnused(),
-		)
+	resource.externalActivated = true
+	for _, name := range resource.disabledNames {
+		if err := resource.permit.ReleaseUnusedInherited(
+			lifecycle.InheritedPipelineProvider,
+			name,
+		); err != nil {
+			return err
+		}
 	}
-	resource.managerRef = managerRef
-	reconciler := newDiscoveryReconciler(
-		resource.identity.Generation,
-		resource.services,
-		resource.controller,
-		resource.commands,
-	)
-	reconRef, err := resource.tasks.StartInheritedWithPermit(
+	supervisorRef, err := resource.tasks.StartInheritedWithPermit(
 		context.WithoutCancel(ctx),
 		resource.identity,
 		lifecycle.InheritedPipelineSupervisor,
 		resource.permit,
 		func(runCtx context.Context) error {
-			return reconciler.run(runCtx, resource.groups)
+			return runDiscoverySupervisor(
+				runCtx,
+				resource.pipeline,
+				resource.decisions,
+				resource.fail,
+			)
 		},
 	)
 	if err != nil {
-		_ = resource.tasks.CancelInherited(managerRef, resource.identity)
-		joined, joinErr := resource.tasks.JoinInherited(
-			context.Background(),
-			managerRef,
-			resource.identity,
-		)
-		if joined {
-			joinErr = errors.Join(
-				joinErr,
-				resource.tasks.ReleaseInherited(managerRef, resource.identity),
-			)
-		}
-		return errors.Join(
-			err,
-			joinErr,
-			resource.permit.ReleaseExternal(lifecycle.LongLivedEProvider),
-			resource.permit.AbortUnused(),
-		)
+		return err
 	}
-	resource.reconRef = reconRef
+	resource.supervisorRef = supervisorRef
+	for _, name := range resource.providerNames {
+		name := name
+		ref, err := resource.tasks.StartInheritedWithPermitKey(
+			context.WithoutCancel(ctx),
+			resource.identity,
+			lifecycle.InheritedPipelineProvider,
+			name,
+			resource.permit,
+			func(runCtx context.Context) error {
+				return runDiscoveryProvider(
+					runCtx,
+					resource.pipeline,
+					name,
+					resource.fail,
+				)
+			},
+		)
+		if err != nil {
+			return err
+		}
+		resource.providerRefs[name] = ref
+	}
 	resource.started = true
 	return nil
+}
+
+func runDiscoverySupervisor(
+	ctx context.Context,
+	pipeline *agentdiscovery.PipelineGeneration,
+	decisions *jobmgrdiscovery.DecisionIndex,
+	fail func(error),
+) error {
+	err := pipeline.Run(ctx, decisions.Apply)
+	if err == nil && ctx.Err() == nil {
+		err = errors.New(
+			"jobmgr composition: discovery supervisor exited unexpectedly",
+		)
+	}
+	if err != nil && ctx.Err() == nil {
+		fail(err)
+	}
+	return err
+}
+
+func runDiscoveryProvider(
+	ctx context.Context,
+	pipeline *agentdiscovery.PipelineGeneration,
+	name string,
+	fail func(error),
+) (err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			err = fmt.Errorf(
+				"%w in discovery provider %q: %v",
+				lifecycle.ErrTaskPanic,
+				name,
+				recovered,
+			)
+		}
+		if err != nil && ctx.Err() == nil {
+			fail(err)
+		}
+	}()
+	return pipeline.RunProvider(ctx, name)
+}
+
+func (resource *readyDiscovery) abortStart(ctx context.Context) error {
+	if resource == nil || ctx == nil {
+		return errors.New("jobmgr composition: invalid discovery start abort")
+	}
+	resource.mu.Lock()
+	supervisorRef := resource.supervisorRef
+	providerNames := append([]string(nil), resource.providerNames...)
+	providerRefs := make(
+		map[string]lifecycle.InheritedTaskRef,
+		len(resource.providerRefs),
+	)
+	for name, ref := range resource.providerRefs {
+		providerRefs[name] = ref
+	}
+	externalActivated := resource.externalActivated
+	resource.mu.Unlock()
+
+	var cleanupErr error
+	if supervisorRef.Generation != 0 {
+		cleanupErr = errors.Join(
+			cleanupErr,
+			resource.tasks.CancelInherited(
+				supervisorRef,
+				resource.identity,
+			),
+		)
+	}
+	for _, name := range providerNames {
+		if ref := providerRefs[name]; ref.Generation != 0 {
+			cleanupErr = errors.Join(
+				cleanupErr,
+				resource.tasks.CancelInherited(
+					ref,
+					resource.identity,
+				),
+			)
+		}
+	}
+	for _, name := range providerNames {
+		ref := providerRefs[name]
+		if ref.Generation == 0 {
+			continue
+		}
+		joined, err := resource.tasks.JoinInherited(
+			ctx,
+			ref,
+			resource.identity,
+		)
+		if !joined {
+			cleanupErr = errors.Join(cleanupErr, err)
+			continue
+		}
+		cleanupErr = errors.Join(
+			cleanupErr,
+			resource.tasks.ReleaseInherited(
+				ref,
+				resource.identity,
+			),
+		)
+	}
+	if supervisorRef.Generation != 0 {
+		joined, err := resource.tasks.JoinInherited(
+			ctx,
+			supervisorRef,
+			resource.identity,
+		)
+		if !joined {
+			cleanupErr = errors.Join(cleanupErr, err)
+		} else {
+			cleanupErr = errors.Join(
+				cleanupErr,
+				resource.tasks.ReleaseInherited(
+					supervisorRef,
+					resource.identity,
+				),
+			)
+		}
+	}
+	if externalActivated {
+		cleanupErr = errors.Join(
+			cleanupErr,
+			resource.permit.ReleaseExternal(
+				lifecycle.LongLivedEProvider,
+			),
+		)
+	}
+	cleanupErr = errors.Join(
+		cleanupErr,
+		resource.permit.AbortUnused(),
+	)
+	return cleanupErr
 }
 
 func (resource *readyDiscovery) Publish() error {
@@ -325,38 +464,57 @@ func (resource *readyDiscovery) Stop(ctx context.Context) error {
 		resource.mu.Unlock()
 		return nil
 	}
-	managerRef, reconRef := resource.managerRef, resource.reconRef
+	supervisorRef := resource.supervisorRef
+	providerNames := append([]string(nil), resource.providerNames...)
+	providerRefs := make(
+		map[string]lifecycle.InheritedTaskRef,
+		len(resource.providerRefs),
+	)
+	for name, ref := range resource.providerRefs {
+		providerRefs[name] = ref
+	}
 	resource.mu.Unlock()
 
 	cancelErr := cancelDiscoveryTasks(
 		resource.tasks.CancelInherited,
 		resource.identity,
-		managerRef,
-		reconRef,
+		supervisorRef,
+		providerNames,
+		providerRefs,
 	)
-	managerJoined, managerErr := resource.tasks.JoinInherited(
+	var joinErr error
+	for _, name := range providerNames {
+		ref := providerRefs[name]
+		joined, err := resource.tasks.JoinInherited(
+			ctx,
+			ref,
+			resource.identity,
+		)
+		if !joined {
+			err = errors.Join(
+				err,
+				fmt.Errorf(
+					"jobmgr composition: discovery provider %q did not join",
+					name,
+				),
+			)
+		}
+		joinErr = errors.Join(joinErr, err)
+	}
+	supervisorJoined, supervisorErr := resource.tasks.JoinInherited(
 		ctx,
-		managerRef,
+		supervisorRef,
 		resource.identity,
 	)
-	reconJoined, reconErr := resource.tasks.JoinInherited(
-		ctx,
-		reconRef,
-		resource.identity,
-	)
-	if !managerJoined {
-		managerErr = errors.Join(
-			managerErr,
-			errors.New("jobmgr composition: discovery manager did not join"),
+	if !supervisorJoined {
+		supervisorErr = errors.Join(
+			supervisorErr,
+			errors.New(
+				"jobmgr composition: discovery supervisor did not join",
+			),
 		)
 	}
-	if !reconJoined {
-		reconErr = errors.Join(
-			reconErr,
-			errors.New("jobmgr composition: discovery reconciler did not join"),
-		)
-	}
-	if err := errors.Join(cancelErr, managerErr, reconErr); err != nil {
+	if err := errors.Join(cancelErr, joinErr, supervisorErr); err != nil {
 		return err
 	}
 	resource.mu.Lock()
@@ -371,15 +529,21 @@ func cancelDiscoveryTasks(
 		lifecycle.ResourceIdentity,
 	) error,
 	identity lifecycle.ResourceIdentity,
-	managerRef lifecycle.InheritedTaskRef,
-	reconRef lifecycle.InheritedTaskRef,
+	supervisorRef lifecycle.InheritedTaskRef,
+	providerNames []string,
+	providerRefs map[string]lifecycle.InheritedTaskRef,
 ) error {
 	if cancel == nil {
 		return errors.New("jobmgr composition: nil discovery cancellation")
 	}
-	reconErr := cancel(reconRef, identity)
-	managerErr := cancel(managerRef, identity)
-	return errors.Join(reconErr, managerErr)
+	err := cancel(supervisorRef, identity)
+	for _, name := range providerNames {
+		err = errors.Join(
+			err,
+			cancel(providerRefs[name], identity),
+		)
+	}
+	return err
 }
 
 func (resource *readyDiscovery) Finalize() error {
@@ -395,26 +559,28 @@ func (resource *readyDiscovery) Finalize() error {
 		resource.mu.Unlock()
 		return nil
 	}
-	managerRef, reconRef := resource.managerRef, resource.reconRef
-	if !resource.managerReleased {
+	for _, name := range resource.providerNames {
+		if resource.providerReleased[name] {
+			continue
+		}
 		if err := resource.tasks.ReleaseInherited(
-			managerRef,
+			resource.providerRefs[name],
 			resource.identity,
 		); err != nil {
 			resource.mu.Unlock()
 			return err
 		}
-		resource.managerReleased = true
+		resource.providerReleased[name] = true
 	}
-	if !resource.reconReleased {
+	if !resource.supervisorReleased {
 		if err := resource.tasks.ReleaseInherited(
-			reconRef,
+			resource.supervisorRef,
 			resource.identity,
 		); err != nil {
 			resource.mu.Unlock()
 			return err
 		}
-		resource.reconReleased = true
+		resource.supervisorReleased = true
 	}
 	if !resource.externalReleased {
 		if err := resource.permit.ReleaseExternal(
@@ -442,186 +608,4 @@ func (resource *readyDiscovery) Finalize() error {
 	resource.finalized = true
 	resource.mu.Unlock()
 	return nil
-}
-
-type discoveryReconciler struct {
-	generation uint64
-	services   runDiscoveryServices
-	controller *joboutput.DynCfgJobController
-	commands   jobmgr.PreparedCommandPort
-	sources    map[string]map[uint64]confgroup.Config
-	selected   map[string]confgroup.Config
-	nextUID    uint64
-}
-
-func newDiscoveryReconciler(
-	generation uint64,
-	services runDiscoveryServices,
-	controller *joboutput.DynCfgJobController,
-	commands jobmgr.PreparedCommandPort,
-) *discoveryReconciler {
-	return &discoveryReconciler{
-		generation: generation, services: services,
-		controller: controller, commands: commands,
-		sources:  make(map[string]map[uint64]confgroup.Config),
-		selected: make(map[string]confgroup.Config),
-	}
-}
-
-func (reconciler *discoveryReconciler) run(
-	ctx context.Context,
-	groups <-chan []*confgroup.Group,
-) error {
-	for {
-		select {
-		case <-ctx.Done():
-			return nil
-		case batch, ok := <-groups:
-			if !ok {
-				if ctx.Err() != nil {
-					return nil
-				}
-				return errors.New("jobmgr composition: discovery manager exited")
-			}
-			for _, group := range batch {
-				if err := reconciler.applyGroup(ctx, group); err != nil {
-					return err
-				}
-			}
-		}
-	}
-}
-
-func (reconciler *discoveryReconciler) applyGroup(
-	ctx context.Context,
-	group *confgroup.Group,
-) error {
-	if group == nil || group.Source == "" {
-		return errors.New("jobmgr composition: invalid discovery group")
-	}
-	affected := make(map[string]struct{})
-	for _, config := range reconciler.sources[group.Source] {
-		affected[config.FullName()] = struct{}{}
-	}
-	next := make(map[uint64]confgroup.Config, len(group.Configs))
-	for _, config := range group.Configs {
-		if config == nil || !reconciler.allowed(config) {
-			continue
-		}
-		cloned, err := config.Clone()
-		if err != nil {
-			return err
-		}
-		next[cloned.Hash()] = cloned
-		affected[cloned.FullName()] = struct{}{}
-	}
-	if len(next) == 0 {
-		delete(reconciler.sources, group.Source)
-	} else {
-		reconciler.sources[group.Source] = next
-	}
-	names := make([]string, 0, len(affected))
-	for name := range affected {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	for _, name := range names {
-		if err := reconciler.reconcile(ctx, name); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (reconciler *discoveryReconciler) allowed(config confgroup.Config) bool {
-	if len(reconciler.services.RunJob) == 0 {
-		return true
-	}
-	return slices.Contains(reconciler.services.RunJob, config.Name())
-}
-
-func (reconciler *discoveryReconciler) reconcile(
-	ctx context.Context,
-	fullName string,
-) error {
-	current, hasCurrent := reconciler.selected[fullName]
-	next, hasNext := reconciler.selectConfig(fullName, current, hasCurrent)
-	if hasCurrent && hasNext && current.UID() == next.UID() {
-		return nil
-	}
-	var change joboutput.DiscoveredJobChange
-	if hasNext {
-		change.Config = next
-		change.Status = dyncfg.StatusAccepted
-		if reconciler.services.AutoEnable {
-			change.Status = dyncfg.StatusRunning
-		}
-	} else {
-		change.Config = current
-		change.Remove = true
-	}
-	plan, err := reconciler.controller.PlanDiscovered(change)
-	if err != nil {
-		return err
-	}
-	reconciler.nextUID++
-	if reconciler.nextUID == 0 {
-		return errors.New("jobmgr composition: discovery command UID wrapped")
-	}
-	if err := reconciler.commands.SubmitPreparedAndWait(
-		ctx,
-		jobmgr.Request{
-			UID: fmt.Sprintf(
-				"jobmgr-discovery-%d-%d",
-				reconciler.generation,
-				reconciler.nextUID,
-			),
-			LaneKey: fullName,
-			Source:  lifecycle.SourceJobManager,
-			Route:   "internal/discovery/reconcile",
-		},
-		plan,
-	); err != nil {
-		return err
-	}
-	if hasNext {
-		reconciler.selected[fullName] = next
-	} else {
-		delete(reconciler.selected, fullName)
-	}
-	return nil
-}
-
-func (reconciler *discoveryReconciler) selectConfig(
-	fullName string,
-	current confgroup.Config,
-	hasCurrent bool,
-) (confgroup.Config, bool) {
-	var candidates []confgroup.Config
-	for _, configs := range reconciler.sources {
-		for _, config := range configs {
-			if config.FullName() == fullName {
-				candidates = append(candidates, config)
-			}
-		}
-	}
-	if len(candidates) == 0 {
-		return nil, false
-	}
-	sort.Slice(candidates, func(i, j int) bool {
-		left, right := candidates[i], candidates[j]
-		if left.SourceTypePriority() != right.SourceTypePriority() {
-			return left.SourceTypePriority() > right.SourceTypePriority()
-		}
-		return left.UID() < right.UID()
-	})
-	priority := candidates[0].SourceTypePriority()
-	if hasCurrent && current.SourceTypePriority() == priority {
-		for _, candidate := range candidates {
-			if candidate.UID() == current.UID() {
-				return candidate, true
-			}
-		}
-	}
-	return candidates[0], true
 }

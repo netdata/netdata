@@ -354,6 +354,30 @@ var bmM003HotpathRows = [...]HotpathGate{
 	},
 }
 
+var bmM004HotpathRows = [...]HotpathGate{
+	{
+		OwnerID: "B-O-00032",
+		Package: "./plugin/agent/jobmgr/discovery",
+		Tests: []string{
+			"TestDecisionIndexAcknowledgesSelectionAndFallback",
+			"TestDecisionIndexFailureKeepsLastAcknowledgedSelection",
+			"TestDecisionIndexHasNoFixedPopulationCeiling",
+		},
+		Benchmark: "BenchmarkBDecisionIndexApply",
+	},
+	{
+		OwnerID: "B-O-00033",
+		Package: "./plugin/agent/discovery",
+		Tests: []string{
+			"TestPipelineGenerationConstruction",
+			"TestPipelineGenerationRunsNamedProvidersAndAggregates",
+			"TestPipelineGenerationPropagatesApplyFailure",
+			"TestPipelineGenerationHasNoFixedProviderPopulationCeiling",
+		},
+		Benchmark: "BenchmarkBPipelineGenerationRun",
+	},
+}
+
 func BMM002HotpathGates() []HotpathGate {
 	return cloneHotpathGates(bmM002HotpathRows[:])
 }
@@ -384,6 +408,36 @@ func BMM002HotpathProofs() []ComponentProof {
 
 func BMM003HotpathProofs() []ComponentProof {
 	return hotpathProofs(BMM003HotpathGates())
+}
+
+func BMM004HotpathGates() []HotpathGate {
+	gates := BMM003HotpathGates()
+	for index := range gates {
+		switch gates[index].OwnerID {
+		case "B-O-00006":
+			gates[index].Tests = append(
+				gates[index].Tests,
+				"TestPipelineLongLivedPlanProviderKeys",
+				"TestPipelinePermitReleasesDisabledProviderClaim",
+			)
+		case "B-O-00007":
+			gates[index].Tests = append(
+				gates[index].Tests,
+				"TestInheritedPipelineTasksRequirePermit",
+			)
+		case "B-O-00036":
+			gates[index].Tests = append(
+				gates[index].Tests,
+				"TestRunGenerationOwnsFrozenDiscoveryChildren",
+				"TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin",
+			)
+		}
+	}
+	return append(gates, cloneHotpathGates(bmM004HotpathRows[:])...)
+}
+
+func BMM004HotpathProofs() []ComponentProof {
+	return hotpathProofs(BMM004HotpathGates())
 }
 
 func cloneHotpathGates(rows []HotpathGate) []HotpathGate {

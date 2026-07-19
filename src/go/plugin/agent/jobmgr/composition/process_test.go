@@ -448,6 +448,109 @@ func TestProcessCoreRejectsSuccessorAfterUnquiescedPredecessor(
 	}
 }
 
+func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(
+	t *testing.T,
+) {
+	reader, writer := io.Pipe()
+	defer writer.Close()
+	started := make(chan struct{})
+	release := make(chan struct{})
+	defer close(release)
+	factory := agentdiscovery.NewProviderFactory(
+		"noncooperative",
+		func(agentdiscovery.BuildContext) (
+			agentdiscovery.Discoverer,
+			bool,
+			error,
+		) {
+			return processNoncooperativeDiscovery{
+				started: started,
+				release: release,
+			}, true, nil
+		},
+	)
+	catalog, err := agentdiscovery.NewProviderCatalog(
+		[]agentdiscovery.ProviderFactory{factory},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plannerCalls := 0
+	process, err := newProcessCore(processCoreConfig{
+		Input: reader, Output: newProcessSynchronizedBuffer(),
+		FirstGeneration: 1, ShutdownTimeout: 100 * time.Millisecond,
+		Clock: lifecycle.RealClock{}, Modules: collectorapi.Registry{},
+		Jobs: testRunJobServices(t),
+		Discovery: runDiscoveryServices{
+			BuildContext: agentdiscovery.BuildContext{
+				Registry: confgroup.Registry{"test": {}},
+			},
+			Providers: catalog,
+		},
+		Planner: func(
+			runPlannerCapabilities,
+		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
+			plannerCalls++
+			return runRejectingPlanner{},
+				jobmgr.RunFinalizerFunc(
+					func(context.Context, uint64) error {
+						return nil
+					},
+				),
+				nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	commands := make(chan processControl, 1)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), commands)
+	}()
+	select {
+	case <-started:
+	case <-time.After(time.Second):
+		t.Fatal("discovery provider did not start")
+	}
+	control := testProcessControl(processRestart)
+	commands <- control
+	select {
+	case err := <-control.result:
+		if err == nil ||
+			!strings.Contains(
+				err.Error(),
+				"jobmgr composition: run did not quiesce",
+			) ||
+			!errors.Is(
+				err,
+				context.DeadlineExceeded,
+			) {
+			t.Fatalf("restart error=%v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("restart did not reject retained discovery provider")
+	}
+	select {
+	case err := <-done:
+		if err == nil ||
+			!strings.Contains(
+				err.Error(),
+				"jobmgr composition: run did not quiesce",
+			) {
+			t.Fatalf("process error=%v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("process did not exit after retained discovery provider")
+	}
+	if plannerCalls != 1 {
+		t.Fatalf(
+			"successor construction reached planner: calls=%d",
+			plannerCalls,
+		)
+	}
+}
+
 func TestProcessCoreContainsConstructionFailures(t *testing.T) {
 	cases := map[string]struct {
 		failAt          int
@@ -678,6 +781,19 @@ func testRunServiceDiscoveryServices(
 type processServiceDiscovery struct {
 	registry frameworkfunctions.Registry
 	output   io.Writer
+}
+
+type processNoncooperativeDiscovery struct {
+	started chan<- struct{}
+	release <-chan struct{}
+}
+
+func (discovery processNoncooperativeDiscovery) Run(
+	context.Context,
+	chan<- []*confgroup.Group,
+) {
+	close(discovery.started)
+	<-discovery.release
 }
 
 func (discovery processServiceDiscovery) Run(

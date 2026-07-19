@@ -70,7 +70,13 @@ func (a *Agent) loadEnabledModules(cfg config) collectorapi.Registry {
 	return enabled
 }
 
-func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry) discovery.Config {
+type discoverySetup struct {
+	Defaults     confgroup.Registry
+	BuildContext discovery.BuildContext
+	Providers    []discovery.ProviderFactory
+}
+
+func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry) discoverySetup {
 	a.Info("building discovery config")
 
 	reg := confgroup.Registry{}
@@ -91,8 +97,8 @@ func (a *Agent) buildDiscoveryConf(enabled collectorapi.Registry) discovery.Conf
 		sdConfDir = nil
 	}
 
-	cfg := discovery.Config{
-		Registry: reg,
+	cfg := discoverySetup{
+		Defaults: reg,
 		BuildContext: discovery.BuildContext{
 			Policy: discovery.PlatformPolicy{
 				IsInsideK8s: a.IsInsideK8s,
