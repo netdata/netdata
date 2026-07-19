@@ -59,7 +59,7 @@ pub(super) fn build_v9_restore_packet(
                             .iter()
                             .map(|field| NetflowV9OptionsTemplateScopeField {
                                 field_type_number: field.field_type,
-                                field_type: netflow_parser::variable_versions::v9_lookup::ScopeFieldType::from(field.field_type),
+                                field_type: netflow_parser::variable_versions::v9::lookup::ScopeFieldType::from(field.field_type),
                                 field_length: field.field_length,
                             })
                             .collect(),

@@ -1,7 +1,7 @@
 use super::tier_commit::TierCommitTelemetry;
 use super::*;
 
-pub(super) const INGEST_STATS_SNAPSHOT_KEY_COUNT: usize = 57;
+pub(super) const INGEST_STATS_SNAPSHOT_KEY_COUNT: usize = 58;
 
 #[derive(Default)]
 pub(crate) struct IngestMetrics {
@@ -11,6 +11,7 @@ pub(crate) struct IngestMetrics {
     pub(crate) parsed_packets: AtomicU64,
     pub(crate) parse_errors: AtomicU64,
     pub(crate) template_errors: AtomicU64,
+    pub(crate) partial_counter_records: AtomicU64,
     pub(crate) netflow_v5_packets: AtomicU64,
     pub(crate) netflow_v7_packets: AtomicU64,
     pub(crate) netflow_v9_packets: AtomicU64,
@@ -74,6 +75,8 @@ impl IngestMetrics {
             .fetch_add(stats.parse_errors, Ordering::Relaxed);
         self.template_errors
             .fetch_add(stats.template_errors, Ordering::Relaxed);
+        self.partial_counter_records
+            .fetch_add(stats.partial_counter_records, Ordering::Relaxed);
         self.netflow_v5_packets
             .fetch_add(stats.netflow_v5_packets, Ordering::Relaxed);
         self.netflow_v7_packets
@@ -121,6 +124,7 @@ impl IngestMetrics {
         insert!("decoded_parsed_packets", parsed_packets);
         insert!("decoded_parse_errors", parse_errors);
         insert!("decoded_template_errors", template_errors);
+        insert!("decoded_partial_counter_records", partial_counter_records);
         insert!("decoded_netflow_v5", netflow_v5_packets);
         insert!("decoded_netflow_v7", netflow_v7_packets);
         insert!("decoded_netflow_v9", netflow_v9_packets);

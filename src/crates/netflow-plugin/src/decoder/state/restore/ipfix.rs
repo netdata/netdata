@@ -125,14 +125,16 @@ pub(super) fn build_ipfix_restore_packet(
                     .values()
                     .map(|template| NetflowV9OptionsTemplate {
                         template_id: template.template_id,
-                        options_scope_length: sum_v9_field_lengths(&template.scope_fields),
-                        options_length: sum_v9_field_lengths(&template.option_fields),
+                        // RFC 3954 section 6.1 defines these as byte lengths
+                        // of the field-definition descriptors, not the data values.
+                        options_scope_length: (template.scope_fields.len() * 4) as u16,
+                        options_length: (template.option_fields.len() * 4) as u16,
                         scope_fields: template
                             .scope_fields
                             .iter()
                             .map(|field| NetflowV9OptionsTemplateScopeField {
                                 field_type_number: field.field_type,
-                                field_type: netflow_parser::variable_versions::v9_lookup::ScopeFieldType::from(field.field_type),
+                                field_type: netflow_parser::variable_versions::v9::lookup::ScopeFieldType::from(field.field_type),
                                 field_length: field.field_length,
                             })
                             .collect(),

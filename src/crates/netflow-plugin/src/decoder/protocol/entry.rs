@@ -42,11 +42,34 @@ pub(crate) fn decode_sflow(
     batch
 }
 
-pub(crate) fn decode_netflow(
-    parser: &mut AutoScopedParser,
+pub(crate) fn missing_template_ids(packets: &[NetflowPacket]) -> HashSet<u16> {
+    let mut ids = HashSet::new();
+    for packet in packets {
+        match packet {
+            NetflowPacket::V9(packet) => {
+                for flowset in &packet.flowsets {
+                    if let V9FlowSetBody::NoTemplate(info) = &flowset.body {
+                        ids.insert(info.template_id);
+                    }
+                }
+            }
+            NetflowPacket::IPFix(packet) => {
+                for flowset in &packet.flowsets {
+                    if let IPFixFlowSetBody::NoTemplate(info) = &flowset.body {
+                        ids.insert(info.template_id);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    ids
+}
+
+pub(crate) fn decode_netflow_result(
+    result: ParseResult,
     sampling: &mut SamplingState,
     source: SocketAddr,
-    payload: &[u8],
     decapsulation_mode: DecapsulationMode,
     timestamp_source: TimestampSource,
     input_realtime_usec: u64,
@@ -54,133 +77,85 @@ pub(crate) fn decode_netflow(
     enable_v7: bool,
     enable_v9: bool,
     enable_ipfix: bool,
-    packet_context: Option<&DecoderPacketContext>,
+    parse_attempts: u64,
 ) -> DecodedBatch {
     let mut batch = DecodedBatch {
         stats: DecodeStats {
-            parse_attempts: 1,
+            parse_attempts,
             ..Default::default()
         },
         ..Default::default()
     };
 
-    // Skip special datalink-frame decode paths when this packet has no scoped templates.
-    // These functions parse the raw payload looking for template-matched records — pointless
-    // when no templates exist, and they are a significant fraction of per-packet CPU cost.
-    let raw_v9_flows = if enable_v9
-        && packet_context.is_some_and(|context| {
-            context.version == 9
-                && sampling
-                    .has_v9_datalink_templates(context.exporter_ip, context.observation_domain_id)
-        }) {
-        decode_v9_special_from_raw_payload(
-            source,
-            payload,
-            sampling,
-            decapsulation_mode,
-            timestamp_source,
-            input_realtime_usec,
-        )
-    } else {
-        Vec::new()
-    };
-
-    let raw_ipfix_flows = if enable_ipfix
-        && packet_context.is_some_and(|context| {
-            context.version == 10
-                && sampling.has_ipfix_datalink_templates(
-                    context.exporter_ip,
-                    context.observation_domain_id,
-                )
-        }) {
-        decode_ipfix_special_from_raw_payload(
-            source,
-            payload,
-            sampling,
-            decapsulation_mode,
-            timestamp_source,
-            input_realtime_usec,
-        )
-    } else {
-        Vec::new()
-    };
-
-    let parser_source = packet_context
-        .map(|context| context.parser_source)
-        .unwrap_or_else(|| normalize_template_scope_source(source));
-
-    match parser.parse_from_source(parser_source, payload) {
-        Ok(packets) => {
-            batch.stats.parsed_packets = packets.len() as u64;
-            for packet in packets {
-                match packet {
-                    NetflowPacket::V5(v5) => {
-                        if enable_v5 {
-                            batch.stats.netflow_v5_packets += 1;
-                            append_v5_records(
-                                source,
-                                &mut batch.flows,
-                                v5,
-                                timestamp_source,
-                                input_realtime_usec,
-                            );
-                        }
-                    }
-                    NetflowPacket::V7(v7) => {
-                        if enable_v7 {
-                            batch.stats.netflow_v7_packets += 1;
-                            append_v7_records(
-                                source,
-                                &mut batch.flows,
-                                v7,
-                                timestamp_source,
-                                input_realtime_usec,
-                            );
-                        }
-                    }
-                    NetflowPacket::V9(v9) => {
-                        if enable_v9 {
-                            batch.stats.netflow_v9_packets += 1;
-                            append_v9_records(
-                                source,
-                                &mut batch.flows,
-                                v9,
-                                sampling,
-                                decapsulation_mode,
-                                timestamp_source,
-                                input_realtime_usec,
-                            );
-                        }
-                    }
-                    NetflowPacket::IPFix(ipfix) => {
-                        if enable_ipfix {
-                            batch.stats.ipfix_packets += 1;
-                            append_ipfix_records(
-                                source,
-                                &mut batch.flows,
-                                ipfix,
-                                sampling,
-                                decapsulation_mode,
-                                timestamp_source,
-                                input_realtime_usec,
-                            );
-                        }
-                    }
+    if !missing_template_ids(&result.packets).is_empty() {
+        batch.stats.template_errors = 1;
+    }
+    batch.stats.parsed_packets = result.packets.len() as u64;
+    for packet in result.packets {
+        match packet {
+            NetflowPacket::V5(v5) => {
+                if enable_v5 {
+                    batch.stats.netflow_v5_packets += 1;
+                    append_v5_records(
+                        source,
+                        &mut batch.flows,
+                        v5,
+                        timestamp_source,
+                        input_realtime_usec,
+                    );
                 }
             }
-        }
-        Err(err) => {
-            if is_template_error(&err.to_string()) {
-                batch.stats.template_errors = 1;
-            } else {
-                batch.stats.parse_errors = 1;
+            NetflowPacket::V7(v7) => {
+                if enable_v7 {
+                    batch.stats.netflow_v7_packets += 1;
+                    append_v7_records(
+                        source,
+                        &mut batch.flows,
+                        v7,
+                        timestamp_source,
+                        input_realtime_usec,
+                    );
+                }
             }
+            NetflowPacket::V9(v9) => {
+                if enable_v9 {
+                    batch.stats.netflow_v9_packets += 1;
+                    batch.stats.partial_counter_records += append_v9_records(
+                        source,
+                        &mut batch.flows,
+                        v9,
+                        sampling,
+                        decapsulation_mode,
+                        timestamp_source,
+                        input_realtime_usec,
+                    );
+                }
+            }
+            NetflowPacket::IPFix(ipfix) => {
+                if enable_ipfix {
+                    batch.stats.ipfix_packets += 1;
+                    batch.stats.partial_counter_records += append_ipfix_records(
+                        source,
+                        &mut batch.flows,
+                        ipfix,
+                        sampling,
+                        decapsulation_mode,
+                        timestamp_source,
+                        input_realtime_usec,
+                    );
+                }
+            }
+            _ => {}
         }
     }
 
-    let mut raw_flows = raw_v9_flows;
-    raw_flows.extend(raw_ipfix_flows);
-    append_unique_flows(&mut batch.flows, raw_flows);
+    if let Some(err) = result.error {
+        if is_template_error(&err.to_string()) {
+            batch.stats.template_errors = 1;
+        } else {
+            batch.stats.parse_errors = 1;
+        }
+    }
 
     batch
 }

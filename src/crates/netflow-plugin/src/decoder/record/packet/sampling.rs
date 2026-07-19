@@ -1,5 +1,6 @@
 use super::super::*;
 
+#[cfg(test)]
 fn has_positive_sampling_rate_field(fields: &FlowFields) -> bool {
     fields
         .get("SAMPLING_RATE")
@@ -35,6 +36,7 @@ pub(crate) fn apply_sampling_state_record(
     }
 }
 
+#[cfg(test)]
 pub(crate) fn apply_sampling_state_fields(
     fields: &mut FlowFields,
     exporter_ip: IpAddr,

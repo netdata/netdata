@@ -2,17 +2,16 @@ use super::{
     CANONICAL_FLOW_DEFAULTS, DECODER_STATE_HEADER_LEN, DECODER_STATE_MAGIC,
     DECODER_STATE_SCHEMA_VERSION, DIRECTION_EGRESS, DIRECTION_INGRESS, DecapsulationMode,
     DecodeStats, DecodedFlow, DecoderStateNamespace, ETYPE_IPV4, ETYPE_IPV6, FlowDecoders,
-    FlowFields, FlowRecord, IPFIX_FIELD_DATALINK_FRAME_SECTION, IPFIX_FIELD_DIRECTION,
-    IPFIX_FIELD_INPUT_SNMP, IPFIX_SET_ID_TEMPLATE, MAX_DECODER_STATE_PAYLOAD_LEN, SamplingState,
-    TimestampSource, append_mpls_label, append_unique_flows, apply_icmp_port_fallback,
-    apply_v9_special_mappings, decode_persisted_namespace_file, decode_v9_special_from_raw_payload,
-    default_exporter_name, field_tracks_presence, finalize_canonical_flow_fields,
-    normalize_direction_value, observe_v9_templates_from_raw_payload, to_field_token, xxhash64,
+    FlowFields, IPFIX_FIELD_DATALINK_FRAME_SECTION, IPFIX_FIELD_DIRECTION, IPFIX_FIELD_INPUT_SNMP,
+    IPFIX_SET_ID_TEMPLATE, MAX_DECODER_STATE_PAYLOAD_LEN, SamplingState, TimestampSource,
+    append_mpls_label, apply_icmp_port_fallback, apply_v9_special_mappings,
+    decode_persisted_namespace_file, default_exporter_name, field_tracks_presence,
+    finalize_canonical_flow_fields, normalize_direction_value, to_field_token, xxhash64,
 };
 use crate::enrichment::FlowEnricher;
 use crate::plugin_config::{EnrichmentConfig, NetworkAttributesConfig, NetworkAttributesValue};
 use etherparse::{NetSlice, SlicedPacket, TransportSlice};
-use netflow_parser::variable_versions::v9_lookup::V9Field;
+use netflow_parser::V9Field;
 use pcap_file::pcap::PcapReader;
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -381,7 +380,8 @@ fn akvorado_sflow_expanded_sample_fixture_matches_expected_projection() {
             ),
             ("SRC_MASK", "32"),
             ("DST_MASK", "22"),
-            ("SRC_VLAN", ""),
+            ("SRC_VLAN", "809"),
+            ("DST_VLAN", "809"),
             ("ETYPE", ETYPE_IPV4),
             ("PROTOCOL", "6"),
             ("SRC_PORT", "22"),
@@ -444,6 +444,38 @@ fn emits_flow_records_for_v5_fixture() {
 
     assert!(stats.netflow_v5_packets > 0);
     assert!(records > 0);
+}
+
+#[test]
+fn keeps_valid_flows_parsed_before_a_trailing_error() {
+    let path = fixture_dir().join("nfv5.pcap");
+    let file = File::open(&path).unwrap_or_else(|e| panic!("open {}: {e}", path.display()));
+    let mut reader =
+        PcapReader::new(file).unwrap_or_else(|e| panic!("pcap reader {}: {e}", path.display()));
+    let (source, payload) = loop {
+        let packet = reader
+            .next_packet()
+            .expect("v5 fixture must contain a packet")
+            .unwrap_or_else(|e| panic!("read packet {}: {e}", path.display()));
+        if let Some((source, payload)) = extract_udp_payload(packet.data.as_ref()) {
+            break (source, payload.to_vec());
+        }
+    };
+
+    let clean = FlowDecoders::new().decode_udp_payload(source, &payload);
+    assert!(!clean.flows.is_empty(), "v5 fixture must decode cleanly");
+
+    let mut malformed = payload;
+    malformed.push(0);
+    let decoded = FlowDecoders::new().decode_udp_payload(source, &malformed);
+
+    assert_eq!(decoded.flows.len(), clean.flows.len());
+    assert_eq!(decoded.stats.parsed_packets, clean.stats.parsed_packets);
+    assert_eq!(
+        decoded.stats.netflow_v5_packets,
+        clean.stats.netflow_v5_packets
+    );
+    assert_eq!(decoded.stats.parse_errors, 1);
 }
 
 #[test]
@@ -956,6 +988,7 @@ fn akvorado_ipfix_datalink_fixture_matches_expected_projection() {
             ("FLOW_VERSION", "ipfix"),
             ("EXPORTER_IP", "49.49.49.49"),
             ("SRC_VLAN", "231"),
+            ("DST_VLAN", "231"),
             ("IN_IF", "582"),
             ("OUT_IF", "0"),
             ("BYTES", "96"),
@@ -983,24 +1016,15 @@ fn akvorado_ipfix_datalink_fixture_vxlan_mode_drops_non_encapsulated_record() {
 }
 
 #[test]
-fn synthetic_v9_datalink_special_decoder_matches_expected_projection() {
+fn synthetic_v9_datalink_decoder_matches_expected_projection() {
     let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
     let frame = synthetic_vlan_ipv4_udp_frame();
     let template = synthetic_v9_datalink_template_packet(256, 42, frame.len() as u16);
     let data = synthetic_v9_datalink_data_packet(256, 42, 582, 0, &frame);
 
-    let mut sampling = SamplingState::default();
-    let mut namespace = DecoderStateNamespace::default();
-    observe_v9_templates_from_raw_payload(source, &template, &mut sampling, &mut namespace);
-
-    let flows = decode_v9_special_from_raw_payload(
-        source,
-        &data,
-        &sampling,
-        DecapsulationMode::None,
-        TimestampSource::Input,
-        1_700_000_000_000_000,
-    );
+    let mut decoders = FlowDecoders::new();
+    let _ = decoders.decode_udp_payload(source, &template);
+    let flows = decoders.decode_udp_payload(source, &data).flows;
     assert_eq!(
         flows.len(),
         1,
@@ -1024,6 +1048,7 @@ fn synthetic_v9_datalink_special_decoder_matches_expected_projection() {
             ("PACKETS", "1"),
             ("ETYPE", ETYPE_IPV4),
             ("SRC_VLAN", "231"),
+            ("DST_VLAN", "231"),
             ("IN_IF", "582"),
             ("DIRECTION", DIRECTION_INGRESS),
             ("SRC_MAC", "b4:02:16:55:92:f4"),
@@ -1150,24 +1175,22 @@ fn ipfix_datalink_decode_is_scoped_by_exporter_and_observation_domain() {
 }
 
 #[test]
-fn synthetic_v9_datalink_special_decoder_vxlan_mode_drops_non_encap_record() {
+fn synthetic_v9_datalink_decoder_vxlan_mode_drops_non_encap_record() {
     let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
     let frame = synthetic_vlan_ipv4_udp_frame();
     let template = synthetic_v9_datalink_template_packet(256, 42, frame.len() as u16);
     let data = synthetic_v9_datalink_data_packet(256, 42, 582, 0, &frame);
 
-    let mut sampling = SamplingState::default();
-    let mut namespace = DecoderStateNamespace::default();
-    observe_v9_templates_from_raw_payload(source, &template, &mut sampling, &mut namespace);
-
-    let flows = decode_v9_special_from_raw_payload(
-        source,
-        &data,
-        &sampling,
+    let mut decoders = FlowDecoders::with_protocols_and_decap(
+        true,
+        true,
+        true,
+        true,
+        true,
         DecapsulationMode::Vxlan,
-        TimestampSource::Input,
-        1_700_000_000_000_000,
     );
+    let _ = decoders.decode_udp_payload(source, &template);
+    let flows = decoders.decode_udp_payload(source, &data).flows;
     assert!(
         flows.is_empty(),
         "vxlan decap mode should drop synthetic v9 records without vxlan payload"
@@ -1228,6 +1251,298 @@ fn sampling_state_is_scoped_by_version_and_observation_domain() {
 }
 
 #[test]
+fn canonical_counters_v9_out_only_become_canonical() {
+    let (_stats, fields) =
+        decode_synthetic_counter_record(SyntheticCounterProtocol::V9, &[(23, 123), (24, 7)], None);
+
+    assert_counter_values(&fields, 123, 7, 123, 7);
+}
+
+#[test]
+fn canonical_counters_ipfix_post_only_become_canonical() {
+    let (_stats, fields) = decode_synthetic_counter_record(
+        SyntheticCounterProtocol::Ipfix,
+        &[(23, 456), (24, 8)],
+        None,
+    );
+
+    assert_counter_values(&fields, 456, 8, 456, 8);
+}
+
+#[test]
+fn canonical_counters_incoming_wins_in_both_template_orders() {
+    for protocol in SyntheticCounterProtocol::ALL {
+        for fields in [
+            [(1, 101), (2, 11), (23, 202), (24, 22)],
+            [(23, 202), (24, 22), (1, 101), (2, 11)],
+        ] {
+            let (stats, decoded) = decode_synthetic_counter_record(protocol, &fields, None);
+
+            assert_eq!(stats.partial_counter_records, 0, "{protocol:?}");
+            assert_counter_values(&decoded, 101, 11, 101, 11);
+        }
+    }
+}
+
+#[test]
+fn canonical_counters_complete_post_beats_partial_incoming() {
+    for protocol in SyntheticCounterProtocol::ALL {
+        for partial_incoming in [(1, 101), (2, 11)] {
+            let fields = [partial_incoming, (23, 202), (24, 22)];
+            let (stats, decoded) = decode_synthetic_counter_record(protocol, &fields, None);
+
+            assert_eq!(stats.partial_counter_records, 0, "{protocol:?}");
+            assert_counter_values(&decoded, 202, 22, 202, 22);
+        }
+    }
+}
+
+#[test]
+fn canonical_counters_selected_partial_preserves_only_available_member() {
+    for protocol in SyntheticCounterProtocol::ALL {
+        for (field, value, expected) in [
+            (1, 101, (101, 0, 101, 0)),
+            (2, 11, (0, 11, 0, 11)),
+            (23, 202, (202, 0, 202, 0)),
+            (24, 22, (0, 22, 0, 22)),
+        ] {
+            let (stats, decoded) =
+                decode_synthetic_counter_record(protocol, &[(field, value)], None);
+
+            assert_eq!(stats.partial_counter_records, 1, "{protocol:?}, IE {field}");
+            assert_counter_values(&decoded, expected.0, expected.1, expected.2, expected.3);
+        }
+    }
+}
+
+#[test]
+fn canonical_counters_exported_zero_follows_selection_rules() {
+    let cases = [
+        (
+            vec![(1, 0), (2, 0), (23, 202), (24, 22)],
+            (202, 22, 202, 22),
+            0,
+        ),
+        (vec![(1, 101), (2, 0)], (101, 0, 101, 0), 1),
+        (vec![(23, 0), (24, 22)], (0, 22, 0, 22), 1),
+        (vec![(1, 0), (2, 0), (23, 0), (24, 0)], (0, 0, 0, 0), 0),
+    ];
+
+    for protocol in SyntheticCounterProtocol::ALL {
+        for (fields, expected, partial_records) in &cases {
+            let (stats, decoded) = decode_synthetic_counter_record(protocol, fields, None);
+
+            assert_eq!(
+                stats.partial_counter_records, *partial_records,
+                "{protocol:?}, fields={fields:?}"
+            );
+            assert_counter_values(&decoded, expected.0, expected.1, expected.2, expected.3);
+        }
+    }
+}
+
+#[test]
+fn canonical_counters_sampling_scales_selected_but_keeps_raw() {
+    for protocol in SyntheticCounterProtocol::ALL {
+        let (stats, fields) = decode_synthetic_counter_record(
+            protocol,
+            &[(23, 202), (24, 22), (1, 101), (2, 11)],
+            Some(10),
+        );
+
+        assert_eq!(stats.partial_counter_records, 0, "{protocol:?}");
+        assert_counter_values(&fields, 1_010, 110, 101, 11);
+        assert_eq!(
+            fields.get("SAMPLING_RATE").map(String::as_str),
+            Some("10"),
+            "{protocol:?}"
+        );
+    }
+}
+
+#[test]
+fn canonical_counters_whole_flow_pair_beats_sampled_frame_in_both_orders() {
+    let frame = synthetic_vlan_ipv4_udp_frame();
+    for protocol in SyntheticCounterProtocol::ALL {
+        let frame_field = match protocol {
+            SyntheticCounterProtocol::V9 => 104,
+            SyntheticCounterProtocol::Ipfix => 315,
+        };
+        for (bytes_field, packets_field) in [(1, 2), (23, 24)] {
+            for fields in [
+                vec![
+                    (frame_field, frame.clone()),
+                    (bytes_field, 11_u64.to_be_bytes().to_vec()),
+                    (packets_field, 2_u64.to_be_bytes().to_vec()),
+                ],
+                vec![
+                    (bytes_field, 11_u64.to_be_bytes().to_vec()),
+                    (packets_field, 2_u64.to_be_bytes().to_vec()),
+                    (frame_field, frame.clone()),
+                ],
+            ] {
+                let (stats, decoded) = decode_synthetic_raw_record(protocol, &fields);
+
+                assert_eq!(stats.partial_counter_records, 0, "{protocol:?}");
+                assert_counter_values(&decoded, 11, 2, 11, 2);
+            }
+        }
+    }
+}
+
+#[test]
+fn canonical_counters_partial_whole_flow_is_not_filled_from_sampled_frame() {
+    let frame = synthetic_vlan_ipv4_udp_frame();
+    for protocol in SyntheticCounterProtocol::ALL {
+        let frame_field = match protocol {
+            SyntheticCounterProtocol::V9 => 104,
+            SyntheticCounterProtocol::Ipfix => 315,
+        };
+        for bytes_field in [1, 23] {
+            for fields in [
+                vec![
+                    (frame_field, frame.clone()),
+                    (bytes_field, 11_u64.to_be_bytes().to_vec()),
+                ],
+                vec![
+                    (bytes_field, 11_u64.to_be_bytes().to_vec()),
+                    (frame_field, frame.clone()),
+                ],
+            ] {
+                let (stats, decoded) = decode_synthetic_raw_record(protocol, &fields);
+
+                assert_eq!(stats.partial_counter_records, 1, "{protocol:?}");
+                assert_counter_values(&decoded, 11, 0, 11, 0);
+            }
+        }
+    }
+}
+
+#[test]
+fn canonical_counters_leave_v9_nsel_ids_for_the_nsel_stage() {
+    let (stats, fields) = decode_synthetic_counter_record(
+        SyntheticCounterProtocol::V9,
+        &[(231, 101), (232, 202), (298, 11), (299, 22)],
+        None,
+    );
+
+    assert_eq!(stats.partial_counter_records, 0);
+    assert_counter_values(&fields, 0, 0, 0, 0);
+}
+
+#[test]
+fn canonical_counters_leave_ipfix_initiator_responder_path_unchanged() {
+    let (stats, counters) =
+        decode_synthetic_ipfix_counter_flows(&[(231, 101), (298, 11), (232, 202), (299, 22)]);
+
+    assert_eq!(stats.partial_counter_records, 0);
+    assert_eq!(counters, vec![(101, 11, 101, 11), (202, 22, 202, 22)]);
+}
+
+#[test]
+fn canonical_counters_ipfix_session_model_wins_in_every_field_order() {
+    let session = [(231, 101), (298, 11), (232, 202), (299, 22)];
+
+    for ordinary in [vec![(1, 5)], vec![(1, 5), (2, 1), (23, 6), (24, 2)]] {
+        for fields in [
+            ordinary.iter().copied().chain(session).collect::<Vec<_>>(),
+            session
+                .into_iter()
+                .chain(ordinary.iter().copied())
+                .collect::<Vec<_>>(),
+        ] {
+            let (stats, counters) = decode_synthetic_ipfix_counter_flows(&fields);
+
+            assert_eq!(stats.partial_counter_records, 0, "fields={fields:?}");
+            assert_eq!(
+                counters,
+                vec![(101, 11, 101, 11), (202, 22, 202, 22)],
+                "fields={fields:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn canonical_counters_ipfix_zero_session_fields_still_select_session_model() {
+    let (stats, counters) = decode_synthetic_ipfix_counter_flows(&[
+        (1, 5),
+        (2, 1),
+        (231, 0),
+        (298, 0),
+        (232, 0),
+        (299, 0),
+    ]);
+
+    assert_eq!(stats.partial_counter_records, 0);
+    assert_eq!(counters, vec![(0, 0, 0, 0)]);
+}
+
+#[test]
+fn canonical_counters_ipfix_responder_only_still_selects_session_model() {
+    let (stats, counters) =
+        decode_synthetic_ipfix_counter_flows(&[(1, 5), (2, 1), (232, 202), (299, 22)]);
+
+    assert_eq!(stats.partial_counter_records, 0);
+    assert_eq!(counters, vec![(0, 0, 0, 0), (202, 22, 202, 22)]);
+}
+
+#[test]
+fn canonical_counters_ipfix_each_partial_session_pair_ignores_complete_ordinary() {
+    for (session_field, value, expected) in [
+        (231, 101, vec![(101, 0, 101, 0)]),
+        (298, 11, vec![(0, 11, 0, 11)]),
+        (232, 202, vec![(0, 0, 0, 0), (202, 0, 202, 0)]),
+        (299, 22, vec![(0, 0, 0, 0), (0, 22, 0, 22)]),
+    ] {
+        for fields in [
+            vec![(1, 5), (2, 1), (session_field, value)],
+            vec![(session_field, value), (1, 5), (2, 1)],
+        ] {
+            let (stats, counters) = decode_synthetic_ipfix_counter_flows(&fields);
+
+            assert_eq!(stats.partial_counter_records, 0, "fields={fields:?}");
+            assert_eq!(counters, expected, "fields={fields:?}");
+        }
+    }
+}
+
+#[test]
+fn canonical_counters_ipfix_session_model_keeps_raw_values_before_sampling() {
+    let (stats, counters) = decode_synthetic_ipfix_counter_flows_with_sampling(
+        &[(1, 5), (2, 1), (231, 101), (298, 11), (232, 202), (299, 22)],
+        Some(10),
+    );
+
+    assert_eq!(stats.partial_counter_records, 0);
+    assert_eq!(counters, vec![(1_010, 110, 101, 11), (2_020, 220, 202, 22)]);
+}
+
+#[test]
+fn canonical_counters_ipfix_session_model_beats_sampled_frame_in_both_orders() {
+    let frame = synthetic_vlan_ipv4_udp_frame();
+    let session = [
+        (231, 101_u64.to_be_bytes().to_vec()),
+        (298, 11_u64.to_be_bytes().to_vec()),
+    ];
+
+    for fields in [
+        std::iter::once((315, frame.clone()))
+            .chain(session.clone())
+            .collect::<Vec<_>>(),
+        session
+            .into_iter()
+            .chain(std::iter::once((315, frame.clone())))
+            .collect::<Vec<_>>(),
+    ] {
+        let (stats, counters) = decode_synthetic_ipfix_raw_counter_flows(&fields);
+
+        assert_eq!(stats.partial_counter_records, 0, "fields={fields:?}");
+        assert_eq!(counters, vec![(101, 11, 101, 11)], "fields={fields:?}");
+    }
+}
+
+#[test]
 fn finalize_sets_exporter_name_fallback_from_exporter_ip() {
     let mut fields: FlowFields = BTreeMap::from([
         ("FLOW_VERSION", "ipfix".to_string()),
@@ -1261,230 +1576,6 @@ fn finalize_preserves_explicit_exporter_name() {
     assert_eq!(
         fields.get("EXPORTER_NAME").map(String::as_str),
         Some("edge-router")
-    );
-}
-
-#[test]
-fn merge_enrichment_updates_default_fields_on_identity_match() {
-    let mut dst = vec![canonical_test_flow(&[])];
-    let incoming = canonical_test_flow(&[("IPTTL", "255"), ("MPLS_LABELS", "20005,524250")]);
-
-    append_unique_flows(&mut dst, vec![incoming]);
-
-    assert_eq!(dst.len(), 1);
-    let fields = dst[0].record.to_fields();
-    assert_eq!(fields.get("IPTTL").map(String::as_str), Some("255"));
-    assert_eq!(
-        fields.get("MPLS_LABELS").map(String::as_str),
-        Some("20005,524250")
-    );
-}
-
-#[test]
-fn merge_enrichment_does_not_merge_when_identity_keys_differ() {
-    let mut dst = vec![canonical_test_flow(&[])];
-    let incoming = canonical_test_flow(&[("BYTES", "63"), ("MPLS_LABELS", "20005,524250")]);
-
-    append_unique_flows(&mut dst, vec![incoming]);
-
-    assert_eq!(dst.len(), 2);
-}
-
-#[test]
-fn merge_enrichment_does_not_override_existing_non_default_fields() {
-    let mut dst = vec![canonical_test_flow(&[
-        ("IPTTL", "64"),
-        ("MPLS_LABELS", "20005"),
-    ])];
-    let incoming = canonical_test_flow(&[("IPTTL", "255"), ("MPLS_LABELS", "20006")]);
-
-    append_unique_flows(&mut dst, vec![incoming]);
-
-    assert_eq!(dst.len(), 2);
-    let f0 = dst[0].record.to_fields();
-    let f1 = dst[1].record.to_fields();
-    assert_eq!(f0.get("IPTTL").map(String::as_str), Some("64"));
-    assert_eq!(f0.get("MPLS_LABELS").map(String::as_str), Some("20005"));
-    assert_eq!(f1.get("IPTTL").map(String::as_str), Some("255"));
-    assert_eq!(f1.get("MPLS_LABELS").map(String::as_str), Some("20006"));
-}
-
-#[test]
-fn merge_enrichment_keeps_distinct_records_on_non_identity_conflict() {
-    let mut dst = vec![canonical_test_flow(&[
-        ("IPTTL", "64"),
-        ("MPLS_LABELS", "20005"),
-    ])];
-    let incoming = canonical_test_flow(&[("IPTTL", "63"), ("MPLS_LABELS", "20006")]);
-
-    append_unique_flows(&mut dst, vec![incoming]);
-
-    assert_eq!(dst.len(), 2);
-    let f0 = dst[0].record.to_fields();
-    let f1 = dst[1].record.to_fields();
-    assert_eq!(f0.get("MPLS_LABELS").map(String::as_str), Some("20005"));
-    assert_eq!(f1.get("MPLS_LABELS").map(String::as_str), Some("20006"));
-}
-
-#[test]
-fn merge_enrichment_matches_on_raw_counters_when_visible_counters_are_scaled() {
-    let mut dst = vec![canonical_test_flow(&[
-        ("SAMPLING_RATE", "10"),
-        ("BYTES", "890"),
-        ("PACKETS", "10"),
-        ("RAW_BYTES", "89"),
-        ("RAW_PACKETS", "1"),
-        ("IPTOS", "0"),
-        ("TCP_FLAGS", "0"),
-        ("ICMPV6_TYPE", "0"),
-        ("ICMPV6_CODE", "0"),
-        ("MPLS_LABELS", ""),
-    ])];
-    let incoming = canonical_test_flow(&[
-        ("BYTES", "89"),
-        ("PACKETS", "1"),
-        ("RAW_BYTES", "89"),
-        ("RAW_PACKETS", "1"),
-        ("IPTTL", "255"),
-        ("MPLS_LABELS", "20005,524250"),
-    ]);
-
-    append_unique_flows(&mut dst, vec![incoming]);
-
-    assert_eq!(dst.len(), 1);
-    let fields = dst[0].record.to_fields();
-    assert_eq!(fields.get("BYTES").map(String::as_str), Some("890"));
-    assert_eq!(fields.get("PACKETS").map(String::as_str), Some("10"));
-    assert_eq!(fields.get("RAW_BYTES").map(String::as_str), Some("89"));
-    assert_eq!(fields.get("RAW_PACKETS").map(String::as_str), Some("1"));
-    assert_eq!(
-        fields.get("MPLS_LABELS").map(String::as_str),
-        Some("20005,524250")
-    );
-}
-
-#[test]
-fn merge_enrichment_keeps_asn_names_and_geo_coordinates() {
-    let mut dst = vec![canonical_test_flow(&[])];
-    let incoming = canonical_test_flow(&[
-        ("SRC_AS_NAME", "AS15169 GOOGLE"),
-        ("DST_AS_NAME", "AS13335 CLOUDFLARE"),
-        ("SRC_GEO_LATITUDE", "40.712800"),
-        ("DST_GEO_LATITUDE", "50.110900"),
-        ("SRC_GEO_LONGITUDE", "-74.006000"),
-        ("DST_GEO_LONGITUDE", "8.682100"),
-    ]);
-
-    append_unique_flows(&mut dst, vec![incoming]);
-
-    assert_eq!(dst.len(), 1);
-    let fields = dst[0].record.to_fields();
-    assert_eq!(
-        fields.get("SRC_AS_NAME").map(String::as_str),
-        Some("AS15169 GOOGLE")
-    );
-    assert_eq!(
-        fields.get("DST_AS_NAME").map(String::as_str),
-        Some("AS13335 CLOUDFLARE")
-    );
-    assert_eq!(
-        fields.get("SRC_GEO_LATITUDE").map(String::as_str),
-        Some("40.712800")
-    );
-    assert_eq!(
-        fields.get("DST_GEO_LATITUDE").map(String::as_str),
-        Some("50.110900")
-    );
-    assert_eq!(
-        fields.get("SRC_GEO_LONGITUDE").map(String::as_str),
-        Some("-74.006000")
-    );
-    assert_eq!(
-        fields.get("DST_GEO_LONGITUDE").map(String::as_str),
-        Some("8.682100")
-    );
-}
-
-#[test]
-fn merge_enrichment_synchronizes_asn_name_when_asn_is_backfilled() {
-    let mut dst = vec![canonical_test_flow(&[
-        ("SRC_AS", "0"),
-        ("SRC_AS_NAME", "AS0 Unknown ASN"),
-    ])];
-    let incoming = canonical_test_flow(&[
-        ("SRC_AS", "64512"),
-        ("SRC_AS_NAME", "AS64512 EXAMPLE TRANSIT"),
-    ]);
-
-    append_unique_flows(&mut dst, vec![incoming]);
-
-    assert_eq!(dst.len(), 1);
-    let fields = dst[0].record.to_fields();
-    assert_eq!(fields.get("SRC_AS").map(String::as_str), Some("64512"));
-    assert_eq!(
-        fields.get("SRC_AS_NAME").map(String::as_str),
-        Some("AS64512 EXAMPLE TRANSIT")
-    );
-}
-
-#[test]
-fn merge_enrichment_does_not_attach_mismatched_asn_name() {
-    let mut dst = vec![canonical_test_flow(&[("DST_AS", "64500")])];
-    let incoming = canonical_test_flow(&[
-        ("DST_AS", "64501"),
-        ("DST_AS_NAME", "AS64501 OTHER TRANSIT"),
-    ]);
-
-    append_unique_flows(&mut dst, vec![incoming]);
-
-    assert_eq!(dst.len(), 2);
-    let fields = dst[0].record.to_fields();
-    assert_eq!(fields.get("DST_AS").map(String::as_str), Some("64500"));
-    assert_eq!(fields.get("DST_AS_NAME").map(String::as_str), Some(""));
-}
-
-#[test]
-fn merge_enrichment_keeps_same_batch_dedup_stable_after_raw_counter_backfill() {
-    let mut dst = vec![canonical_test_flow(&[
-        ("BYTES", "89"),
-        ("PACKETS", "1"),
-        ("RAW_BYTES", "0"),
-        ("RAW_PACKETS", "0"),
-        ("IPTTL", "0"),
-        ("MPLS_LABELS", ""),
-    ])];
-    let incoming = canonical_test_flow(&[
-        ("BYTES", "89"),
-        ("PACKETS", "1"),
-        ("RAW_BYTES", "89"),
-        ("RAW_PACKETS", "1"),
-        ("IPTTL", "255"),
-        ("MPLS_LABELS", "20005,524250"),
-    ]);
-
-    append_unique_flows(&mut dst, vec![incoming.clone(), incoming]);
-
-    assert_eq!(dst.len(), 1);
-    let fields = dst[0].record.to_fields();
-    assert_eq!(fields.get("RAW_BYTES").map(String::as_str), Some("89"));
-    assert_eq!(fields.get("RAW_PACKETS").map(String::as_str), Some("1"));
-    assert_eq!(fields.get("IPTTL").map(String::as_str), Some("255"));
-}
-
-#[test]
-fn merge_enrichment_deduplicates_within_first_incoming_batch() {
-    let mut dst = Vec::new();
-    let base = canonical_test_flow(&[]);
-    let incoming = canonical_test_flow(&[("IPTTL", "255"), ("MPLS_LABELS", "20005,524250")]);
-
-    append_unique_flows(&mut dst, vec![base, incoming]);
-
-    assert_eq!(dst.len(), 1);
-    let fields = dst[0].record.to_fields();
-    assert_eq!(fields.get("IPTTL").map(String::as_str), Some("255"));
-    assert_eq!(
-        fields.get("MPLS_LABELS").map(String::as_str),
-        Some("20005,524250")
     );
 }
 
@@ -2907,6 +2998,7 @@ fn persisted_decoder_state_restores_v9_datalink_templates_after_restart() {
     assert_eq!(flow.get("PACKETS").map(String::as_str), Some("1"));
     assert_eq!(flow.get("IN_IF").map(String::as_str), Some("582"));
     assert_eq!(flow.get("SRC_VLAN").map(String::as_str), Some("231"));
+    assert_eq!(flow.get("DST_VLAN").map(String::as_str), Some("231"));
 }
 
 #[test]
@@ -2952,6 +3044,39 @@ fn persisted_decoder_state_restores_ipfix_templates_after_restart() {
 }
 
 #[test]
+fn persisted_decoder_state_restores_ipfix_sampling_after_restart() {
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
+    let template = synthetic_ipfix_sampling_options_template_packet(256, 42);
+    let data = synthetic_ipfix_sampling_options_data_packet(256, 42, 1_000);
+
+    let mut warm = FlowDecoders::new();
+    let _ = warm.decode_udp_payload(source, &template);
+    let decoded = warm.decode_udp_payload(source, &data);
+    assert_eq!(decoded.stats.parse_errors, 0);
+
+    let key = FlowDecoders::decoder_state_namespace_key(source, &template).unwrap();
+    assert_eq!(
+        warm.decoder_state_namespaces[&key]
+            .sampling_rates
+            .get(&(10, 0))
+            .map(|row| row.sampling_rate),
+        Some(1_000)
+    );
+    let persisted = warm.export_decoder_state_namespace(&key).unwrap().unwrap();
+
+    let mut restored = FlowDecoders::new();
+    restored
+        .import_decoder_state_namespace(key, source, &persisted)
+        .unwrap();
+    assert_eq!(
+        restored
+            .sampling
+            .get(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 10, 42, 0),
+        Some(1_000)
+    );
+}
+
+#[test]
 fn persisted_decoder_state_keeps_latest_effective_template_only() {
     let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
     let mut decoders = FlowDecoders::new();
@@ -2987,6 +3112,58 @@ fn persisted_decoder_state_keeps_latest_effective_template_only() {
         template.fields[2].field_length, 128,
         "latest template definition should replace the earlier one"
     );
+}
+
+#[test]
+fn parsed_v9_template_persists_raw_iana_field_id() {
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
+    let mut packet = synthetic_v9_header(1_700_000_000, 42, 1);
+    packet.extend_from_slice(&0_u16.to_be_bytes());
+    packet.extend_from_slice(&12_u16.to_be_bytes());
+    packet.extend_from_slice(&256_u16.to_be_bytes());
+    packet.extend_from_slice(&1_u16.to_be_bytes());
+    packet.extend_from_slice(&231_u16.to_be_bytes());
+    packet.extend_from_slice(&8_u16.to_be_bytes());
+
+    let mut decoders = FlowDecoders::new();
+    let decoded = decoders.decode_udp_payload(source, &packet);
+    assert_eq!(decoded.stats.parse_errors, 0);
+
+    let key = FlowDecoders::decoder_state_namespace_key(source, &packet).unwrap();
+    let template = decoders.decoder_state_namespaces[&key]
+        .v9_templates
+        .get(&256)
+        .unwrap();
+    assert_eq!(template.fields[0].field_type, 231);
+    assert_eq!(template.fields[0].field_length, 8);
+}
+
+#[test]
+fn parsed_ipfix_template_persists_enterprise_identity() {
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
+    let mut set = Vec::new();
+    set.extend_from_slice(&2_u16.to_be_bytes());
+    set.extend_from_slice(&16_u16.to_be_bytes());
+    set.extend_from_slice(&256_u16.to_be_bytes());
+    set.extend_from_slice(&1_u16.to_be_bytes());
+    set.extend_from_slice(&(0x8000_u16 | 137).to_be_bytes());
+    set.extend_from_slice(&2_u16.to_be_bytes());
+    set.extend_from_slice(&2636_u32.to_be_bytes());
+    let mut packet = synthetic_ipfix_header(32, 1_700_000_000, 1, 42);
+    packet.extend_from_slice(&set);
+
+    let mut decoders = FlowDecoders::new();
+    let decoded = decoders.decode_udp_payload(source, &packet);
+    assert_eq!(decoded.stats.parse_errors, 0);
+
+    let key = FlowDecoders::decoder_state_namespace_key(source, &packet).unwrap();
+    let template = decoders.decoder_state_namespaces[&key]
+        .ipfix_templates
+        .get(&256)
+        .unwrap();
+    assert_eq!(template.fields[0].field_type, 137);
+    assert_eq!(template.fields[0].field_length, 2);
+    assert_eq!(template.fields[0].enterprise_number, Some(2636));
 }
 
 #[test]
@@ -3069,6 +3246,62 @@ fn v9_parser_scope_reuses_templates_across_source_port_churn() {
 }
 
 #[test]
+fn v9_parser_source_eviction_recovers_only_the_missing_template_once() {
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
+    let other_source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 2055);
+    let frame = synthetic_vlan_ipv4_udp_frame();
+    let template = synthetic_v9_datalink_template_packet(256, 42, frame.len() as u16);
+    let data = synthetic_v9_datalink_data_packet(256, 42, 582, 0, &frame);
+    let eviction_template = synthetic_v9_datalink_template_packet(256, 43, frame.len() as u16);
+
+    let mut decoders = FlowDecoders::new();
+    decoders.set_parser_source_limit_for_test(1);
+    let _ = decoders.decode_udp_payload(source, &template);
+    let _ = decoders.decode_udp_payload(other_source, &eviction_template);
+
+    let decoded = decoders.decode_udp_payload(source, &data);
+
+    assert_eq!(decoded.stats.parse_attempts, 2);
+    assert_eq!(decoded.stats.template_errors, 0);
+    assert_eq!(decoded.flows.len(), 1);
+    assert_eq!(decoded.flows[0].record.in_if, 582);
+}
+
+#[test]
+fn ipfix_parser_source_eviction_recovers_only_the_missing_template_once() {
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
+    let other_source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2)), 2055);
+    let frame = synthetic_vlan_ipv4_udp_frame();
+    let template = synthetic_ipfix_datalink_template_packet(256, 42, frame.len() as u16);
+    let data = synthetic_ipfix_datalink_data_packet(256, 42, 582, 0, &frame);
+    let eviction_template = synthetic_ipfix_datalink_template_packet(256, 43, frame.len() as u16);
+
+    let mut decoders = FlowDecoders::new();
+    decoders.set_parser_source_limit_for_test(1);
+    let _ = decoders.decode_udp_payload(source, &template);
+    let _ = decoders.decode_udp_payload(other_source, &eviction_template);
+
+    let decoded = decoders.decode_udp_payload(source, &data);
+
+    assert_eq!(decoded.stats.parse_attempts, 2);
+    assert_eq!(decoded.stats.template_errors, 0);
+    assert_eq!(decoded.flows.len(), 1);
+    assert_eq!(decoded.flows[0].record.in_if, 582);
+}
+
+#[test]
+fn genuinely_unknown_v9_template_is_not_retried() {
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
+    let data = synthetic_v9_datalink_data_packet(999, 42, 582, 0, &synthetic_vlan_ipv4_udp_frame());
+
+    let decoded = FlowDecoders::new().decode_udp_payload(source, &data);
+
+    assert_eq!(decoded.stats.parse_attempts, 1);
+    assert_eq!(decoded.stats.template_errors, 1);
+    assert!(decoded.flows.is_empty());
+}
+
+#[test]
 fn persisted_decoder_state_reuses_loaded_namespace_for_new_source_port() {
     let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
     let alternate_source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9999);
@@ -3102,6 +3335,7 @@ fn persisted_decoder_state_reuses_loaded_namespace_for_new_source_port() {
     let flow = decoded.flows[0].record.to_fields();
     assert_eq!(flow.get("IN_IF").map(String::as_str), Some("582"));
     assert_eq!(flow.get("SRC_VLAN").map(String::as_str), Some("231"));
+    assert_eq!(flow.get("DST_VLAN").map(String::as_str), Some("231"));
 }
 
 #[test]
@@ -3181,8 +3415,8 @@ fn ipfix_v9_restore_packet_keeps_options_template_descriptor_lengths() {
     assert_eq!(u16::from_be_bytes([packet[0], packet[1]]), 10);
     assert_eq!(u16::from_be_bytes([packet[16], packet[17]]), 1);
     assert_eq!(u16::from_be_bytes([packet[20], packet[21]]), 256);
-    assert_eq!(u16::from_be_bytes([packet[22], packet[23]]), 1);
-    assert_eq!(u16::from_be_bytes([packet[24], packet[25]]), 10);
+    assert_eq!(u16::from_be_bytes([packet[22], packet[23]]), 4);
+    assert_eq!(u16::from_be_bytes([packet[24], packet[25]]), 8);
     assert_eq!(u16::from_be_bytes([packet[28], packet[29]]), 1);
     assert_eq!(u16::from_be_bytes([packet[32], packet[33]]), 8);
     assert_eq!(u16::from_be_bytes([packet[36], packet[37]]), 2);
@@ -3538,35 +3772,285 @@ fn apply_expected_visible_counter_semantics(fields: &mut FlowFields) {
     }
 }
 
-fn canonical_test_flow(overrides: &[(&'static str, &str)]) -> DecodedFlow {
-    let mut fields: FlowFields = BTreeMap::from([
-        ("FLOW_VERSION", "ipfix".to_string()),
-        ("EXPORTER_IP", "10.127.100.7".to_string()),
-        ("EXPORTER_PORT", "50145".to_string()),
-        ("SRC_ADDR", "10.0.0.1".to_string()),
-        ("DST_ADDR", "10.0.0.2".to_string()),
-        ("PROTOCOL", "17".to_string()),
-        ("SRC_PORT", "49153".to_string()),
-        ("DST_PORT", "862".to_string()),
-        ("IN_IF", "0".to_string()),
-        ("OUT_IF", "16".to_string()),
-        ("BYTES", "62".to_string()),
-        ("PACKETS", "1".to_string()),
-        ("FLOW_START_USEC", "1699893330381000".to_string()),
-        ("FLOW_END_USEC", "1699893330381000".to_string()),
-        ("DIRECTION", DIRECTION_INGRESS.to_string()),
-        ("IPTTL", "0".to_string()),
-        ("MPLS_LABELS", "".to_string()),
-    ]);
+#[derive(Clone, Copy, Debug)]
+enum SyntheticCounterProtocol {
+    V9,
+    Ipfix,
+}
 
-    for (key, value) in overrides {
-        fields.insert(*key, (*value).to_string());
+impl SyntheticCounterProtocol {
+    const ALL: [Self; 2] = [Self::V9, Self::Ipfix];
+
+    fn version(self) -> u16 {
+        match self {
+            Self::V9 => 9,
+            Self::Ipfix => 10,
+        }
+    }
+}
+
+fn decode_synthetic_counter_record(
+    protocol: SyntheticCounterProtocol,
+    fields: &[(u16, u64)],
+    sampling_rate: Option<u64>,
+) -> (DecodeStats, FlowFields) {
+    const TEMPLATE_ID: u16 = 256;
+    const OBSERVATION_DOMAIN_ID: u32 = 42;
+
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
+    let (template, data) = match protocol {
+        SyntheticCounterProtocol::V9 => {
+            synthetic_v9_counter_packets(TEMPLATE_ID, OBSERVATION_DOMAIN_ID, fields)
+        }
+        SyntheticCounterProtocol::Ipfix => {
+            synthetic_ipfix_counter_packets(TEMPLATE_ID, OBSERVATION_DOMAIN_ID, fields)
+        }
+    };
+    let mut decoders = FlowDecoders::new();
+    if let Some(rate) = sampling_rate {
+        decoders.sampling.set(
+            source.ip(),
+            protocol.version(),
+            OBSERVATION_DOMAIN_ID,
+            0,
+            rate,
+        );
     }
 
-    DecodedFlow {
-        record: FlowRecord::from_fields(&fields),
-        source_realtime_usec: Some(1699893404000000),
+    let template_batch = decoders.decode_udp_payload(source, &template);
+    assert_eq!(template_batch.stats.parse_errors, 0, "{protocol:?}");
+    assert_eq!(template_batch.stats.template_errors, 0, "{protocol:?}");
+
+    let decoded = decoders.decode_udp_payload(source, &data);
+    assert_eq!(decoded.stats.parse_errors, 0, "{protocol:?}");
+    assert_eq!(decoded.stats.template_errors, 0, "{protocol:?}");
+    assert_eq!(decoded.flows.len(), 1, "{protocol:?}");
+
+    (decoded.stats, decoded.flows[0].record.to_fields())
+}
+
+fn decode_synthetic_ipfix_counter_flows(
+    fields: &[(u16, u64)],
+) -> (DecodeStats, Vec<(u64, u64, u64, u64)>) {
+    decode_synthetic_ipfix_counter_flows_with_sampling(fields, None)
+}
+
+fn decode_synthetic_ipfix_counter_flows_with_sampling(
+    fields: &[(u16, u64)],
+    sampling_rate: Option<u64>,
+) -> (DecodeStats, Vec<(u64, u64, u64, u64)>) {
+    let raw_fields = fields
+        .iter()
+        .map(|(field, value)| (*field, value.to_be_bytes().to_vec()))
+        .collect::<Vec<_>>();
+    decode_synthetic_ipfix_raw_counter_flows_with_sampling(&raw_fields, sampling_rate)
+}
+
+fn decode_synthetic_ipfix_raw_counter_flows(
+    fields: &[(u16, Vec<u8>)],
+) -> (DecodeStats, Vec<(u64, u64, u64, u64)>) {
+    decode_synthetic_ipfix_raw_counter_flows_with_sampling(fields, None)
+}
+
+fn decode_synthetic_ipfix_raw_counter_flows_with_sampling(
+    fields: &[(u16, Vec<u8>)],
+    sampling_rate: Option<u64>,
+) -> (DecodeStats, Vec<(u64, u64, u64, u64)>) {
+    const TEMPLATE_ID: u16 = 256;
+    const OBSERVATION_DOMAIN_ID: u32 = 42;
+
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 2055);
+    let (template, data) =
+        synthetic_ipfix_raw_field_packets(TEMPLATE_ID, OBSERVATION_DOMAIN_ID, fields);
+    let mut decoders = FlowDecoders::new();
+    if let Some(rate) = sampling_rate {
+        decoders.sampling.set(
+            source.ip(),
+            SyntheticCounterProtocol::Ipfix.version(),
+            OBSERVATION_DOMAIN_ID,
+            0,
+            rate,
+        );
     }
+
+    let template_batch = decoders.decode_udp_payload(source, &template);
+    assert_eq!(template_batch.stats.parse_errors, 0);
+    assert_eq!(template_batch.stats.template_errors, 0);
+
+    let decoded = decoders.decode_udp_payload(source, &data);
+    assert_eq!(decoded.stats.parse_errors, 0);
+    assert_eq!(decoded.stats.template_errors, 0);
+
+    let mut counters = decoded
+        .flows
+        .iter()
+        .map(|flow| {
+            (
+                flow.record.bytes,
+                flow.record.packets,
+                flow.record.raw_bytes,
+                flow.record.raw_packets,
+            )
+        })
+        .collect::<Vec<_>>();
+    counters.sort_unstable();
+
+    (decoded.stats, counters)
+}
+
+fn decode_synthetic_raw_record(
+    protocol: SyntheticCounterProtocol,
+    fields: &[(u16, Vec<u8>)],
+) -> (DecodeStats, FlowFields) {
+    const TEMPLATE_ID: u16 = 256;
+    const OBSERVATION_DOMAIN_ID: u32 = 42;
+
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 2055);
+    let (template, data) = match protocol {
+        SyntheticCounterProtocol::V9 => {
+            synthetic_v9_raw_field_packets(TEMPLATE_ID, OBSERVATION_DOMAIN_ID, fields)
+        }
+        SyntheticCounterProtocol::Ipfix => {
+            synthetic_ipfix_raw_field_packets(TEMPLATE_ID, OBSERVATION_DOMAIN_ID, fields)
+        }
+    };
+    let mut decoders = FlowDecoders::new();
+
+    let template_batch = decoders.decode_udp_payload(source, &template);
+    assert_eq!(template_batch.stats.parse_errors, 0, "{protocol:?}");
+    assert_eq!(template_batch.stats.template_errors, 0, "{protocol:?}");
+
+    let decoded = decoders.decode_udp_payload(source, &data);
+    assert_eq!(decoded.stats.parse_errors, 0, "{protocol:?}");
+    assert_eq!(decoded.stats.template_errors, 0, "{protocol:?}");
+    assert_eq!(decoded.flows.len(), 1, "{protocol:?}");
+
+    (decoded.stats, decoded.flows[0].record.to_fields())
+}
+
+fn assert_counter_values(
+    fields: &FlowFields,
+    bytes: u64,
+    packets: u64,
+    raw_bytes: u64,
+    raw_packets: u64,
+) {
+    for (field, expected) in [
+        ("BYTES", bytes),
+        ("PACKETS", packets),
+        ("RAW_BYTES", raw_bytes),
+        ("RAW_PACKETS", raw_packets),
+    ] {
+        assert_eq!(
+            fields
+                .get(field)
+                .and_then(|value| value.parse::<u64>().ok()),
+            Some(expected),
+            "field mismatch for {field}"
+        );
+    }
+}
+
+fn synthetic_v9_counter_packets(
+    template_id: u16,
+    source_id: u32,
+    fields: &[(u16, u64)],
+) -> (Vec<u8>, Vec<u8>) {
+    let raw_fields = fields
+        .iter()
+        .map(|(field, value)| (*field, value.to_be_bytes().to_vec()))
+        .collect::<Vec<_>>();
+    synthetic_v9_raw_field_packets(template_id, source_id, &raw_fields)
+}
+
+fn synthetic_v9_raw_field_packets(
+    template_id: u16,
+    source_id: u32,
+    fields: &[(u16, Vec<u8>)],
+) -> (Vec<u8>, Vec<u8>) {
+    let template_len = 8 + fields.len() * 4;
+    let mut template_set = Vec::with_capacity(template_len);
+    template_set.extend_from_slice(&0_u16.to_be_bytes());
+    template_set.extend_from_slice(&(template_len as u16).to_be_bytes());
+    template_set.extend_from_slice(&template_id.to_be_bytes());
+    template_set.extend_from_slice(&(fields.len() as u16).to_be_bytes());
+    for (field, value) in fields {
+        template_set.extend_from_slice(&field.to_be_bytes());
+        template_set.extend_from_slice(&(value.len() as u16).to_be_bytes());
+    }
+    let mut template = synthetic_v9_header(1_700_000_000, source_id, 1);
+    template.extend_from_slice(&template_set);
+
+    let record_len = fields.iter().map(|(_, value)| value.len()).sum::<usize>();
+    let padding = (4 - (record_len % 4)) % 4;
+    let data_len = 4 + record_len + padding;
+    let mut data_set = Vec::with_capacity(data_len);
+    data_set.extend_from_slice(&template_id.to_be_bytes());
+    data_set.extend_from_slice(&(data_len as u16).to_be_bytes());
+    for (_, value) in fields {
+        data_set.extend_from_slice(value);
+    }
+    data_set.resize(data_len, 0);
+    let mut data = synthetic_v9_header(1_700_000_001, source_id, 2);
+    data.extend_from_slice(&data_set);
+
+    (template, data)
+}
+
+fn synthetic_ipfix_counter_packets(
+    template_id: u16,
+    observation_domain_id: u32,
+    fields: &[(u16, u64)],
+) -> (Vec<u8>, Vec<u8>) {
+    let raw_fields = fields
+        .iter()
+        .map(|(field, value)| (*field, value.to_be_bytes().to_vec()))
+        .collect::<Vec<_>>();
+    synthetic_ipfix_raw_field_packets(template_id, observation_domain_id, &raw_fields)
+}
+
+fn synthetic_ipfix_raw_field_packets(
+    template_id: u16,
+    observation_domain_id: u32,
+    fields: &[(u16, Vec<u8>)],
+) -> (Vec<u8>, Vec<u8>) {
+    let template_len = 8 + fields.len() * 4;
+    let mut template_set = Vec::with_capacity(template_len);
+    template_set.extend_from_slice(&IPFIX_SET_ID_TEMPLATE.to_be_bytes());
+    template_set.extend_from_slice(&(template_len as u16).to_be_bytes());
+    template_set.extend_from_slice(&template_id.to_be_bytes());
+    template_set.extend_from_slice(&(fields.len() as u16).to_be_bytes());
+    for (field, value) in fields {
+        template_set.extend_from_slice(&field.to_be_bytes());
+        template_set.extend_from_slice(&(value.len() as u16).to_be_bytes());
+    }
+    let mut template = synthetic_ipfix_header(
+        (16 + template_set.len()) as u16,
+        1_700_000_000,
+        1,
+        observation_domain_id,
+    );
+    template.extend_from_slice(&template_set);
+
+    let record_len = fields.iter().map(|(_, value)| value.len()).sum::<usize>();
+    let padding = (4 - (record_len % 4)) % 4;
+    let data_len = 4 + record_len + padding;
+    let mut data_set = Vec::with_capacity(data_len);
+    data_set.extend_from_slice(&template_id.to_be_bytes());
+    data_set.extend_from_slice(&(data_len as u16).to_be_bytes());
+    for (_, value) in fields {
+        data_set.extend_from_slice(value);
+    }
+    data_set.resize(data_len, 0);
+    let mut data = synthetic_ipfix_header(
+        (16 + data_set.len()) as u16,
+        1_700_000_001,
+        2,
+        observation_domain_id,
+    );
+    data.extend_from_slice(&data_set);
+
+    (template, data)
 }
 
 fn synthetic_v9_header(unix_secs: u32, source_id: u32, sequence: u32) -> Vec<u8> {
@@ -3684,6 +4168,52 @@ fn synthetic_ipfix_datalink_data_packet(
     set.push(direction);
     set.extend_from_slice(frame);
     set.resize(set_len, 0);
+
+    let mut packet = synthetic_ipfix_header(
+        (16 + set.len()) as u16,
+        1_700_000_001,
+        2,
+        observation_domain_id,
+    );
+    packet.extend_from_slice(&set);
+    packet
+}
+
+fn synthetic_ipfix_sampling_options_template_packet(
+    template_id: u16,
+    observation_domain_id: u32,
+) -> Vec<u8> {
+    let mut set = Vec::new();
+    set.extend_from_slice(&3_u16.to_be_bytes());
+    set.extend_from_slice(&18_u16.to_be_bytes());
+    set.extend_from_slice(&template_id.to_be_bytes());
+    set.extend_from_slice(&2_u16.to_be_bytes());
+    set.extend_from_slice(&1_u16.to_be_bytes());
+    set.extend_from_slice(&149_u16.to_be_bytes());
+    set.extend_from_slice(&4_u16.to_be_bytes());
+    set.extend_from_slice(&34_u16.to_be_bytes());
+    set.extend_from_slice(&4_u16.to_be_bytes());
+
+    let mut packet = synthetic_ipfix_header(
+        (16 + set.len()) as u16,
+        1_700_000_000,
+        1,
+        observation_domain_id,
+    );
+    packet.extend_from_slice(&set);
+    packet
+}
+
+fn synthetic_ipfix_sampling_options_data_packet(
+    template_id: u16,
+    observation_domain_id: u32,
+    sampling_rate: u32,
+) -> Vec<u8> {
+    let mut set = Vec::new();
+    set.extend_from_slice(&template_id.to_be_bytes());
+    set.extend_from_slice(&12_u16.to_be_bytes());
+    set.extend_from_slice(&observation_domain_id.to_be_bytes());
+    set.extend_from_slice(&sampling_rate.to_be_bytes());
 
     let mut packet = synthetic_ipfix_header(
         (16 + set.len()) as u16,

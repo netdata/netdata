@@ -39,9 +39,7 @@ impl FlowDecoders {
             None
         };
         let packet_context = packet_context.or(computed_context.as_ref());
-        let template_state_changed = packet_context.is_some_and(|context| {
-            self.observe_decoder_state_from_context(source, payload, context)
-        });
+        let mut template_state_changed = false;
 
         let mut batch = if is_sflow_payload(payload) && self.enable_sflow {
             decode_sflow(
@@ -52,11 +50,46 @@ impl FlowDecoders {
                 input_realtime_usec,
             )
         } else {
-            decode_netflow(
-                &mut self.netflow,
+            let parser_source = packet_context
+                .map(|context| context.parser_source)
+                .unwrap_or_else(|| normalize_template_scope_source(source));
+            let mut parse_attempts = 1;
+            let mut result = self.netflow.parse_from_source(parser_source, payload);
+            let missing_ids = missing_template_ids(&result.packets);
+
+            if let Some(context) = packet_context
+                && !missing_ids.is_empty()
+                && let Some(namespace) = self.decoder_state_namespaces.get(&context.key)
+            {
+                let subset = namespace.template_subset(context.version, &missing_ids);
+                if !subset.is_empty() {
+                    match self.replay_namespace_packets(&context.key, &subset, parser_source) {
+                        Ok(()) => {
+                            result = self.netflow.parse_from_source(parser_source, payload);
+                            parse_attempts = 2;
+                        }
+                        Err(err) => {
+                            tracing::warn!(
+                                "failed to recover NetFlow templates for {} / {} from {}: {}",
+                                context.key.exporter_ip,
+                                context.key.observation_domain_id,
+                                parser_source,
+                                err
+                            );
+                        }
+                    }
+                }
+            }
+
+            if let Some(context) = packet_context {
+                template_state_changed =
+                    self.observe_decoder_state_from_packets(context, &result.packets);
+            }
+
+            decode_netflow_result(
+                result,
                 &mut self.sampling,
                 source,
-                payload,
                 self.decapsulation_mode,
                 self.timestamp_source,
                 input_realtime_usec,
@@ -64,7 +97,7 @@ impl FlowDecoders {
                 self.enable_v7,
                 self.enable_v9,
                 self.enable_ipfix,
-                packet_context,
+                parse_attempts,
             )
         };
 

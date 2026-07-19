@@ -8,7 +8,8 @@ pub(crate) fn append_ipfix_records(
     decapsulation_mode: DecapsulationMode,
     timestamp_source: TimestampSource,
     input_realtime_usec: u64,
-) {
+) -> u64 {
+    let mut partial_counter_records = 0_u64;
     let export_usec = unix_timestamp_to_usec(packet.header.export_time as u64, 0);
     let exporter_ip = canonicalize_ip_addr(source.ip());
     let observation_domain_id = packet.header.observation_domain_id;
@@ -32,7 +33,7 @@ pub(crate) fn append_ipfix_records(
                         );
                     }
 
-                    let Some((forward, reverse)) = finalize_ipfix_record(
+                    let Some((forward, reverse, partial_counter_record)) = finalize_ipfix_record(
                         rec,
                         state,
                         exporter_ip,
@@ -46,22 +47,19 @@ pub(crate) fn append_ipfix_records(
                         continue;
                     };
 
+                    if partial_counter_record {
+                        partial_counter_records += 1;
+                    }
+
                     out.push(forward);
                     if let Some(reverse) = reverse {
                         out.push(reverse);
                     }
                 }
             }
-            IPFixFlowSetBody::OptionsData(options_data) => {
-                observe_ipfix_sampling_options(
-                    exporter_ip,
-                    version,
-                    observation_domain_id,
-                    sampling,
-                    options_data,
-                );
-            }
             _ => continue,
         }
     }
+
+    partial_counter_records
 }

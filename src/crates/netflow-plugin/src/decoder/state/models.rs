@@ -96,6 +96,54 @@ impl DecoderStateNamespace {
             && self.ipfix_v9_options_templates.is_empty()
     }
 
+    pub(crate) fn template_subset(&self, version: u16, ids: &HashSet<u16>) -> Self {
+        let mut subset = Self::default();
+        match version {
+            9 => {
+                subset.v9_templates = self
+                    .v9_templates
+                    .iter()
+                    .filter(|(id, _)| ids.contains(id))
+                    .map(|(id, template)| (*id, template.clone()))
+                    .collect();
+                subset.v9_options_templates = self
+                    .v9_options_templates
+                    .iter()
+                    .filter(|(id, _)| ids.contains(id))
+                    .map(|(id, template)| (*id, template.clone()))
+                    .collect();
+            }
+            10 => {
+                subset.ipfix_templates = self
+                    .ipfix_templates
+                    .iter()
+                    .filter(|(id, _)| ids.contains(id))
+                    .map(|(id, template)| (*id, template.clone()))
+                    .collect();
+                subset.ipfix_options_templates = self
+                    .ipfix_options_templates
+                    .iter()
+                    .filter(|(id, _)| ids.contains(id))
+                    .map(|(id, template)| (*id, template.clone()))
+                    .collect();
+                subset.ipfix_v9_templates = self
+                    .ipfix_v9_templates
+                    .iter()
+                    .filter(|(id, _)| ids.contains(id))
+                    .map(|(id, template)| (*id, template.clone()))
+                    .collect();
+                subset.ipfix_v9_options_templates = self
+                    .ipfix_v9_options_templates
+                    .iter()
+                    .filter(|(id, _)| ids.contains(id))
+                    .map(|(id, template)| (*id, template.clone()))
+                    .collect();
+            }
+            _ => {}
+        }
+        subset
+    }
+
     pub(crate) fn set_sampling_rate(
         &mut self,
         version: u16,

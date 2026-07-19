@@ -5,10 +5,11 @@ pub(crate) fn append_v9_records(
     out: &mut Vec<DecodedFlow>,
     packet: V9,
     sampling: &mut SamplingState,
-    _decapsulation_mode: DecapsulationMode,
+    decapsulation_mode: DecapsulationMode,
     timestamp_source: TimestampSource,
     input_realtime_usec: u64,
-) {
+) -> u64 {
+    let mut partial_counter_records = 0_u64;
     let export_usec = unix_timestamp_to_usec(packet.header.unix_secs as u64, 0);
     let exporter_ip = canonicalize_ip_addr(source.ip());
     let observation_domain_id = packet.header.source_id;
@@ -27,8 +28,30 @@ pub(crate) fn append_v9_records(
                     let mut observed_sampling_rate: Option<u64> = None;
                     let mut first_switched_millis: Option<u64> = None;
                     let mut last_switched_millis: Option<u64> = None;
+                    let mut decap_required = false;
+                    let mut decap_ok = false;
+                    let mut counters = OrdinaryCounterSelector::default();
 
                     for (field, value) in record {
+                        if field == V9Field::Layer2packetSectionData {
+                            decap_required = true;
+                            if let FieldValue::Vec(raw_value) = &value
+                                && let Some(l3_len) = parse_datalink_frame_section_record(
+                                    raw_value,
+                                    &mut rec,
+                                    decapsulation_mode,
+                                )
+                            {
+                                counters.observe_sampled_frame(l3_len);
+                                decap_ok = true;
+                            }
+                            continue;
+                        }
+
+                        if counters.observe_v9(field, &value) {
+                            continue;
+                        }
+
                         let value_str = field_value_to_string(&value);
                         apply_v9_special_mappings_record(&mut rec, field, &value_str);
                         match field {
@@ -72,6 +95,13 @@ pub(crate) fn append_v9_records(
                     if looks_like_sampling_option_record_from_rec(&rec, observed_sampling_rate) {
                         continue;
                     }
+                    if decap_required && !decap_ok {
+                        continue;
+                    }
+
+                    if counters.apply_to_record(&mut rec) {
+                        partial_counter_records += 1;
+                    }
 
                     if rec.flows == 0 {
                         rec.flows = 1;
@@ -99,16 +129,9 @@ pub(crate) fn append_v9_records(
                     });
                 }
             }
-            V9FlowSetBody::OptionsData(options_data) => {
-                observe_v9_sampling_options(
-                    exporter_ip,
-                    version,
-                    observation_domain_id,
-                    sampling,
-                    options_data,
-                );
-            }
             _ => continue,
         }
     }
+
+    partial_counter_records
 }

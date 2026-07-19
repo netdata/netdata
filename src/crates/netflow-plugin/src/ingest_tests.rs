@@ -40,6 +40,50 @@ fn ingest_metrics_extend_snapshot_preserves_existing_query_stats_on_key_collisio
 }
 
 #[test]
+fn decode_stats_merge_accumulates_partial_counter_records() {
+    let mut stats = DecodeStats {
+        partial_counter_records: 2,
+        ..DecodeStats::default()
+    };
+
+    stats.merge(&DecodeStats {
+        partial_counter_records: 3,
+        ..DecodeStats::default()
+    });
+
+    assert_eq!(stats.partial_counter_records, 5);
+}
+
+#[test]
+fn ingest_metrics_apply_decode_stats_accumulates_partial_counter_records() {
+    let metrics = IngestMetrics::default();
+
+    metrics.apply_decode_stats(&DecodeStats {
+        partial_counter_records: 2,
+        ..DecodeStats::default()
+    });
+    metrics.apply_decode_stats(&DecodeStats {
+        partial_counter_records: 3,
+        ..DecodeStats::default()
+    });
+
+    assert_eq!(metrics.partial_counter_records.load(Ordering::Relaxed), 5);
+}
+
+#[test]
+fn ingest_metrics_snapshot_exposes_partial_counter_records() {
+    let metrics = IngestMetrics::default();
+    metrics.partial_counter_records.store(7, Ordering::Relaxed);
+
+    let stats = metrics.snapshot();
+
+    assert_eq!(
+        stats.get("decoded_partial_counter_records").copied(),
+        Some(7)
+    );
+}
+
+#[test]
 fn ingest_service_with_decap_none_keeps_outer_header_view() {
     let (_tmp, mut service) = new_test_ingest_service(ConfigDecapsulationMode::None);
     let flows = decode_fixture_sequence(

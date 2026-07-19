@@ -8,22 +8,6 @@ impl SamplingState {
                 self.by_exporter.remove(&exporter_ip);
             }
         }
-
-        clear_template_namespace(
-            &mut self.v9_sampling_templates,
-            exporter_ip,
-            observation_domain_id,
-        );
-        clear_template_namespace(
-            &mut self.v9_datalink_templates,
-            exporter_ip,
-            observation_domain_id,
-        );
-        clear_template_namespace(
-            &mut self.ipfix_datalink_templates,
-            exporter_ip,
-            observation_domain_id,
-        );
     }
 
     pub(crate) fn set(
@@ -83,72 +67,6 @@ impl SamplingState {
                 row.sampler_id,
                 row.sampling_rate,
             );
-        }
-
-        for row in namespace.v9_options_templates.values() {
-            self.set_v9_sampling_template(
-                exporter_ip,
-                key.observation_domain_id,
-                row.template_id,
-                row.scope_fields
-                    .iter()
-                    .map(|f| V9TemplateField {
-                        field_type: f.field_type,
-                        field_length: usize::from(f.field_length),
-                    })
-                    .collect(),
-                row.option_fields
-                    .iter()
-                    .map(|f| V9TemplateField {
-                        field_type: f.field_type,
-                        field_length: usize::from(f.field_length),
-                    })
-                    .collect(),
-            );
-        }
-
-        for row in namespace.v9_templates.values() {
-            self.set_v9_datalink_template(
-                exporter_ip,
-                key.observation_domain_id,
-                row.template_id,
-                row.fields
-                    .iter()
-                    .map(|f| V9TemplateField {
-                        field_type: f.field_type,
-                        field_length: usize::from(f.field_length),
-                    })
-                    .collect(),
-            );
-        }
-
-        for row in namespace.ipfix_templates.values() {
-            self.set_ipfix_datalink_template(
-                exporter_ip,
-                key.observation_domain_id,
-                row.template_id,
-                row.fields
-                    .iter()
-                    .map(|f| IPFixTemplateField {
-                        field_type: f.field_type,
-                        field_length: f.field_length,
-                        enterprise_number: f.enterprise_number,
-                    })
-                    .collect(),
-            );
-        }
-    }
-}
-
-fn clear_template_namespace<T>(
-    templates: &mut HashMap<IpAddr, HashMap<u32, HashMap<u16, T>>>,
-    exporter_ip: IpAddr,
-    observation_domain_id: u32,
-) {
-    if let Some(domains) = templates.get_mut(&exporter_ip) {
-        domains.remove(&observation_domain_id);
-        if domains.is_empty() {
-            templates.remove(&exporter_ip);
         }
     }
 }

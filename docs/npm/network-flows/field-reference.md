@@ -32,12 +32,34 @@ The four most-used fields. Read these first.
 |---|---|---|
 | `BYTES` | uint64 | Bytes in the flow, **already multiplied by `SAMPLING_RATE`** at ingest. The dashboard's volume numbers come from this. |
 | `PACKETS` | uint64 | Packets in the flow, already multiplied by `SAMPLING_RATE`. |
-| `RAW_BYTES` | uint64 | Bytes the exporter literally reported, before per-flow sampling multiplication. Use when you want the unscaled value the exporter sent. |
-| `RAW_PACKETS` | uint64 | Packets the exporter actually reported, before scaling. |
+| `RAW_BYTES` | uint64 | The selected byte counter before per-flow sampling multiplication. This is the unscaled value behind `BYTES`, not every byte counter the exporter included. |
+| `RAW_PACKETS` | uint64 | The selected packet counter before scaling. This is the unscaled value behind `PACKETS`. |
 | `FLOWS` | uint64 | Number of flows aggregated into this record. Always 1 for raw records. |
 | `SAMPLING_RATE` | uint64 | Packets-per-sample reported by the exporter. `1` means unsampled. Used as the multiplier for BYTES and PACKETS. |
 
 Every protocol populates these. sFlow always sends a sampling rate (per-sample). NetFlow v5 reads a header rate. NetFlow v7 has no rate field and is treated as unsampled. NetFlow v9 and IPFIX may include the rate per-record or via Sampling Options.
+
+### How Netdata chooses byte and packet counters
+
+A [NetFlow v9 flow is one-way](https://www.rfc-editor.org/rfc/rfc3954.html). The `IN` and `OUT` counter names do **not** mean the two directions of a connection:
+
+- IEs 1/2 (`IN_BYTES`/`IN_PKTS` in v9; `octetDeltaCount`/`packetDeltaCount` in IPFIX) count traffic arriving at the observation point.
+- IEs 23/24 (`OUT_BYTES`/`OUT_PKTS` in v9; `postOctetDeltaCount`/`postPacketDeltaCount` in IPFIX) count the potentially modified result after device processing. See the [IANA IPFIX definitions](https://www.iana.org/assignments/ipfix/ipfix.xhtml).
+
+Netdata selects one family before storing the flow:
+
+1. Prefer a complete incoming family, with both IEs 1/2.
+2. Otherwise, use a complete post-observation family, with both IEs 23/24.
+3. If neither family is complete, use the available incoming counter before an available post-observation counter.
+4. For a partial family, preserve the available counter and store zero for the missing counter. Never fill the missing value from another family. Netdata records this condition in its internal diagnostics.
+5. A family that reports no traffic does not beat a family that reports traffic.
+6. Never add the families; that can count the same one-way traffic twice.
+
+Only the selected family is retained. `RAW_BYTES` and `RAW_PACKETS` hold that selected pair before sampling multiplication; the other family is discarded. All normal dashboard views, totals, rankings, and alerts use the resulting canonical `BYTES` and `PACKETS`, so there is no IN/OUT choice in the UI.
+
+If a NetFlow v9 or IPFIX record contains both a sampled frame and whole-flow counters, the whole-flow family wins. The sampled frame's decoded length and single packet are used only when the record contains no whole-flow byte or packet counter; they never fill the missing half of a partial whole-flow family.
+
+IPFIX reverse Information Elements and initiator/responder counter pairs describe direction in other ways. Netdata handles them separately; they do not use this incoming/post-observation rule. If an IPFIX record contains any IANA initiator/responder counter field (IEs 231/232/298/299), that session-direction model is authoritative: initiator counters produce the forward flow, responder counters produce the reverse flow, and ordinary IEs 1/2/23/24 are ignored. If the same record also contains RFC 5103 reverse Information Elements, their byte and packet counters are ignored while their addresses, ports, timestamps, and other non-counter fields are retained. Records containing only RFC 5103 reverse Information Elements are unchanged.
 
 ## Identity — who and what
 
@@ -200,7 +222,7 @@ For exporter-derived fields (not enrichment), the protocols differ. The shortest
 
 For NetFlow v9 and IPFIX, only specific Information Elements end up in flow-record fields. The rest of the template is parsed (so the decoder can walk past them) but the values are dropped.
 
-The mapped IEs cover the standard set: identity (8/12/27/28, 7/11), counters (1/2/23/24/231/232/298/299), interfaces (10/14/252/253), protocol (4/5/6), ToS/DSCP (5/55), TTL (52/192), VLANs (58/59/243/254), MACs (56/80/57/81), NAT (225/226/281/282/227/228), AS (16/17), prefixes (44/45), masks (9/13/29/30), MPLS (70-79), ICMP (32/176-179, 139), fragmentation (54/88), IPv6 flow label (31), forwarding status (89), direction (61/239), sampling (34/50/305/306), timestamps (21/22/152/153/322 and the seconds/microseconds variants), and the data-link section for decapsulation (315).
+The mapped IEs cover the standard set: identity (8/12/27/28, 7/11), ordinary counters (1/2/23/24), IPFIX initiator/responder counters (231/232/298/299; not yet mapped for NetFlow v9 NSEL), interfaces (10/14/252/253), protocol (4/5/6), ToS/DSCP (5/55), TTL (52/192), VLANs (58/59/243/254), MACs (56/80/57/81), NAT (225/226/281/282/227/228), AS (16/17), prefixes (44/45), masks (9/13/29/30), MPLS (70-79), ICMP (32/176-179, 139), fragmentation (54/88), IPv6 flow label (31), forwarding status (89), direction (61/239), sampling (34/50/305/306), timestamps (21/22/152/153/322 and the seconds/microseconds variants), and the data-link section for decapsulation (315).
 
 Vendor enterprise IEs are recognised only for one Juniper case (PEN 2636 `commonPropertiesId`) used to surface forwarding status. Cisco AVC, Cisco NEL/NSEL NAT events, and similar vendor-private fields are parsed (so the decoder doesn't fail) but their values are not exposed in flow records.
 
@@ -239,7 +261,7 @@ Column legend:
 
 | Field | Type | v5 | v7 | v9 | IPFIX | sFlow | Source | Tiers | Selectivity | Notes |
 |---|---|---|---|---|---|---|---|---|---|---|
-| `BYTES` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | metric, filter | Counter; scaled by `SAMPLING_RATE` at ingest. sFlow derives from decoded L3 length |
+| `BYTES` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | metric, filter | Canonical byte counter, scaled by `SAMPLING_RATE` at ingest. v9/IPFIX prefer IEs 1/2 and fall back to IEs 23/24 as a matched family. sFlow derives it from decoded L3 length |
 | `DIRECTION` | string | — | — | ◐ | ◐ | — | decoder | all | facet, group-by, filter | v9 IE 61, IPFIX IE 61/239. sFlow has no native direction |
 | `DST_ADDR` | IP | ✓ | ✓ | ◐ | ◐ | ◐ | decoder | raw | facet, group-by, filter | v9/IPFIX IE 12/28; sFlow `SampledHeader`/`SampledIPv4`/`SampledIPv6`. Raw-only |
 | `DST_ADDR_NAT` | IP | — | — | ◐ | ◐ | — | decoder | raw | facet, group-by, filter | v9 IE 226/282; IPFIX `postNATdestinationIPv4/IPv6Address` |
@@ -304,10 +326,10 @@ Column legend:
 | `OUT_IF_NAME` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | `metadata_static.exporters.<ip>.if_indexes.<idx>.name` |
 | `OUT_IF_PROVIDER` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | Static metadata or interface classifier provider tag |
 | `OUT_IF_SPEED` | uint64 | — | — | — | — | — | enrichment | all | facet, group-by, filter | `metadata_static.exporters.<ip>.if_indexes.<idx>.speed` (bps) |
-| `PACKETS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | metric, filter | Counter; scaled by `SAMPLING_RATE` at ingest. sFlow always 1 per sample |
+| `PACKETS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | metric, filter | Canonical packet counter, selected with `BYTES` from the same family and scaled by `SAMPLING_RATE`. sFlow always 1 per sample |
 | `PROTOCOL` | uint8 | ✓ | ✓ | ✓ | ✓ | ◐ | decoder | all | facet, group-by, filter | IP protocol number: v5/v7 protocol_number; v9 IE 4; IPFIX IE 4 `ProtocolIdentifier`. sFlow from `SampledIPv4`/`SampledIPv6` or parsed L3. Zero (`HOPOPT`) is retained explicitly |
-| `RAW_BYTES` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | raw | metric | Pre-sampling byte count from the exporter |
-| `RAW_PACKETS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | raw | metric | Pre-sampling packet count from the exporter |
+| `RAW_BYTES` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | raw | metric | Unscaled byte value from the selected canonical counter family; the non-selected family is discarded |
+| `RAW_PACKETS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | raw | metric | Unscaled packet value from the selected canonical counter family; the non-selected family is discarded |
 | `SAMPLING_RATE` | uint64 | ✓ (header) | — | ◐ | ◐ | ✓ | decoder | raw | metric | v5 from header `sampling_interval`. v7 has no rate (treated as unsampled). v9/IPFIX from IE 34/305/306 or Sampling Options template. sFlow per-sample rate |
 | `SRC_ADDR` | IP | ✓ | ✓ | ◐ | ◐ | ◐ | decoder | raw | facet, group-by, filter | v9/IPFIX IE 8/27. sFlow `SampledHeader`/`SampledIPv4`/`SampledIPv6`. Raw-only |
 | `SRC_ADDR_NAT` | IP | — | — | ◐ | ◐ | — | decoder | raw | facet, group-by, filter | v9 IE 225/281; IPFIX `postNATsourceIPv4/IPv6Address` |

@@ -1,5 +1,9 @@
 use super::*;
 
+pub(super) fn new_netflow_parser() -> AutoScopedParser {
+    AutoScopedParser::new()
+}
+
 pub(crate) struct FlowDecoders {
     pub(crate) netflow: AutoScopedParser,
     pub(crate) sampling: SamplingState,
@@ -86,7 +90,7 @@ impl FlowDecoders {
         timestamp_source: TimestampSource,
     ) -> Self {
         Self {
-            netflow: AutoScopedParser::new(),
+            netflow: new_netflow_parser(),
             sampling: SamplingState::default(),
             decoder_state_namespaces: HashMap::new(),
             loaded_decoder_namespaces: HashSet::new(),
@@ -117,5 +121,12 @@ impl FlowDecoders {
         if let Some(enricher) = &mut self.enricher {
             enricher.refresh_runtime_state();
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_parser_source_limit_for_test(&mut self, max_sources: usize) {
+        self.netflow = new_netflow_parser()
+            .with_max_sources(max_sources)
+            .expect("test parser source limit must be nonzero");
     }
 }

@@ -8,6 +8,5 @@ pub(crate) use parse::{
     sflow_agent_ip_addr,
 };
 pub(crate) use sampling::{
-    apply_sampling_state_fields, apply_sampling_state_record,
-    looks_like_sampling_option_record_from_rec,
+    apply_sampling_state_record, looks_like_sampling_option_record_from_rec,
 };

@@ -1,77 +1,75 @@
 use super::*;
 
 impl FlowDecoders {
-    #[cfg_attr(not(test), allow(dead_code))]
-    pub(crate) fn observe_decoder_state_from_payload(
+    pub(crate) fn observe_decoder_state_from_packets(
         &mut self,
-        source: SocketAddr,
-        payload: &[u8],
-    ) -> Option<DecoderStateNamespaceKey> {
-        let context = Self::decoder_packet_context(source, payload)?;
-        self.observe_decoder_state_from_context(source, payload, &context)
-            .then_some(context.key)
-    }
-
-    pub(crate) fn observe_decoder_state_from_context(
-        &mut self,
-        source: SocketAddr,
-        payload: &[u8],
         context: &DecoderPacketContext,
+        packets: &[NetflowPacket],
     ) -> bool {
         self.loaded_decoder_namespaces.insert(context.key.clone());
         let namespace = self
             .decoder_state_namespaces
             .entry(context.key.clone())
             .or_default();
+        let mut namespace_state_changed = false;
+        let mut template_state_changed = false;
 
-        let observation = match context.version {
-            9 => observe_v9_decoder_state_from_raw_payload(
-                source,
-                payload,
-                &mut self.sampling,
-                namespace,
-            ),
-            10 => observe_ipfix_decoder_state_from_raw_payload(
-                source,
-                payload,
-                &mut self.sampling,
-                namespace,
-            ),
-            _ => DecoderStateObservation {
-                namespace_state_changed: false,
-                template_state_changed: false,
-            },
-        };
+        for packet in packets {
+            let observation = match packet {
+                NetflowPacket::V9(packet)
+                    if context.version == 9
+                        && packet.header.source_id == context.observation_domain_id =>
+                {
+                    observe_v9_decoder_state_from_packet(
+                        context.exporter_ip,
+                        packet,
+                        &mut self.sampling,
+                        namespace,
+                    )
+                }
+                NetflowPacket::IPFix(packet)
+                    if context.version == 10
+                        && packet.header.observation_domain_id == context.observation_domain_id =>
+                {
+                    observe_ipfix_decoder_state_from_packet(
+                        context.exporter_ip,
+                        packet,
+                        &mut self.sampling,
+                        namespace,
+                    )
+                }
+                _ => continue,
+            };
+            namespace_state_changed |= observation.namespace_state_changed;
+            template_state_changed |= observation.template_state_changed;
+        }
 
-        if observation.namespace_state_changed {
+        if namespace_state_changed {
             self.dirty_decoder_namespaces.insert(context.key.clone());
         }
 
-        observation.template_state_changed
+        template_state_changed
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::net::{IpAddr, Ipv4Addr};
-
     #[test]
-    fn observe_decoder_state_from_short_payload_returns_none() {
+    fn observing_no_packets_does_not_dirty_the_namespace() {
         let mut decoders = FlowDecoders::new();
-        let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 0, 2, 10)), 2055);
+        let context = DecoderPacketContext {
+            version: 9,
+            exporter_ip: "192.0.2.10".parse().unwrap(),
+            observation_domain_id: 7,
+            parser_source: "192.0.2.10:0".parse().unwrap(),
+            key: DecoderStateNamespaceKey {
+                exporter_ip: "192.0.2.10".to_string(),
+                observation_domain_id: 7,
+            },
+        };
 
-        assert_eq!(
-            decoders.observe_decoder_state_from_payload(source, &[]),
-            None
-        );
-        assert_eq!(
-            decoders.observe_decoder_state_from_payload(source, &[9]),
-            None
-        );
-        assert!(
-            decoders.decoder_state_namespace_keys().is_empty(),
-            "short payloads must not create decoder namespaces"
-        );
+        assert!(!decoders.observe_decoder_state_from_packets(&context, &[]));
+        assert!(decoders.dirty_decoder_state_namespaces().is_empty());
     }
 }

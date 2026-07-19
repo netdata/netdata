@@ -93,7 +93,7 @@ The multiplication is per-flow, so different exporters and different interfaces 
 
 Sampling has a real statistical limit, separate from the multiplication. At 1-in-1000, a single-packet flow has roughly a 99.9% chance of not being sampled at all. If you need to catch small, rare events (security beaconing, scanning), pick a lower sampling rate on the exporters that watch that traffic, or run unsampled there.
 
-For the exact pre-multiplication counts the exporter literally reported, see `RAW_BYTES` and `RAW_PACKETS` in the [field reference](/docs/npm/network-flows/field-reference.md).
+For the selected canonical counters before sampling multiplication, see `RAW_BYTES` and `RAW_PACKETS` in the [field reference](/docs/npm/network-flows/field-reference.md). The field reference also explains how Netdata selects between incoming and post-observation NetFlow/IPFIX counter families.
 
 ## What the dashboard looks like
 

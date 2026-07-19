@@ -26,7 +26,7 @@ impl FlowDecoders {
 
         // Validate replay into a fresh parser first so restore failures do not
         // partially mutate the live parser or sampling state.
-        let mut validation_parser = AutoScopedParser::new();
+        let mut validation_parser = super::init::new_netflow_parser();
         Self::replay_namespace_packets_into(&mut validation_parser, key, &namespace, source)?;
 
         self.replay_namespace_packets(key, &namespace, source)?;
@@ -111,17 +111,107 @@ impl FlowDecoders {
         namespace: &DecoderStateNamespace,
         source: SocketAddr,
     ) -> Result<(), String> {
+        let mut observed_namespace = DecoderStateNamespace::default();
+        let mut observed_sampling = SamplingState::default();
+
         for (packet_index, packet) in build_namespace_restore_packets(key, namespace)?
             .into_iter()
             .enumerate()
         {
-            parser.parse_from_source(source, &packet).map_err(|err| {
-                format!(
+            let result = parser.parse_from_source(source, &packet);
+            if let Some(err) = &result.error {
+                return Err(format!(
                     "failed to replay persisted namespace packet {} for {} / {} from {}: {}",
                     packet_index, key.exporter_ip, key.observation_domain_id, source, err
-                )
-            })?;
+                ));
+            }
+
+            for packet in &result.packets {
+                match packet {
+                    NetflowPacket::V9(packet) => {
+                        observe_v9_decoder_state_from_packet(
+                            source.ip(),
+                            packet,
+                            &mut observed_sampling,
+                            &mut observed_namespace,
+                        );
+                    }
+                    NetflowPacket::IPFix(packet) => {
+                        observe_ipfix_decoder_state_from_packet(
+                            source.ip(),
+                            packet,
+                            &mut observed_sampling,
+                            &mut observed_namespace,
+                        );
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        let mut mismatches = Vec::new();
+        record_template_mismatch(
+            &mut mismatches,
+            "v9 templates",
+            &namespace.v9_templates,
+            &observed_namespace.v9_templates,
+        );
+        record_template_mismatch(
+            &mut mismatches,
+            "v9 options templates",
+            &namespace.v9_options_templates,
+            &observed_namespace.v9_options_templates,
+        );
+        record_template_mismatch(
+            &mut mismatches,
+            "IPFIX templates",
+            &namespace.ipfix_templates,
+            &observed_namespace.ipfix_templates,
+        );
+        record_template_mismatch(
+            &mut mismatches,
+            "IPFIX options templates",
+            &namespace.ipfix_options_templates,
+            &observed_namespace.ipfix_options_templates,
+        );
+        record_template_mismatch(
+            &mut mismatches,
+            "IPFIX v9 templates",
+            &namespace.ipfix_v9_templates,
+            &observed_namespace.ipfix_v9_templates,
+        );
+        record_template_mismatch(
+            &mut mismatches,
+            "IPFIX v9 options templates",
+            &namespace.ipfix_v9_options_templates,
+            &observed_namespace.ipfix_v9_options_templates,
+        );
+
+        if !mismatches.is_empty() {
+            return Err(format!(
+                "persisted template replay was incomplete for {} / {} from {}: {}",
+                key.exporter_ip,
+                key.observation_domain_id,
+                source,
+                mismatches.join("; ")
+            ));
         }
         Ok(())
+    }
+}
+
+fn record_template_mismatch<T: PartialEq>(
+    mismatches: &mut Vec<String>,
+    label: &str,
+    expected: &BTreeMap<u16, T>,
+    observed: &BTreeMap<u16, T>,
+) {
+    if expected != observed {
+        mismatches.push(format!(
+            "{} expected IDs {:?}, observed IDs {:?}",
+            label,
+            expected.keys().copied().collect::<Vec<_>>(),
+            observed.keys().copied().collect::<Vec<_>>()
+        ));
     }
 }
