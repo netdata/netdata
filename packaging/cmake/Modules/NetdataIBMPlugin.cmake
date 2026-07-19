@@ -125,6 +125,31 @@ function(install_ibm_runtime component)
     endif()
   endforeach()
 
+  # RPM packaging metadata derived from the same manifest: the spec forces
+  # 0750 on executables/libraries and 0640 on data files (all root:netdata),
+  # and does not own the MQ directory tree. Exported for Packaging.cmake,
+  # which turns these into CPack RPM file-list entries and ownership
+  # exclusions; unused by other package formats.
+  set(_rpm_filelist "")
+  set(_rpm_dirs "/usr/lib/netdata/${IBM_MQ_DIR_NAME}")
+
+  foreach(_file IN LISTS _files)
+    if(_file MATCHES "(^|/)bin/" OR _file MATCHES "\\.so(\\.|$)")
+      list(APPEND _rpm_filelist
+           "%attr(0750,root,netdata) /usr/lib/netdata/${IBM_MQ_DIR_NAME}/${_file}")
+    endif()
+
+    get_filename_component(_dir "${_file}" DIRECTORY)
+    while(NOT _dir STREQUAL "")
+      list(APPEND _rpm_dirs "/usr/lib/netdata/${IBM_MQ_DIR_NAME}/${_dir}")
+      get_filename_component(_dir "${_dir}" DIRECTORY)
+    endwhile()
+  endforeach()
+
+  list(REMOVE_DUPLICATES _rpm_dirs)
+  set(NETDATA_IBM_MQ_RPM_FILELIST "${_rpm_filelist}" PARENT_SCOPE)
+  set(NETDATA_IBM_MQ_RPM_DIR_EXCLUDES "${_rpm_dirs}" PARENT_SCOPE)
+
   list(LENGTH _files _file_count)
   math(EXPR _max_idx "${_file_count} - 1")
 

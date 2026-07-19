@@ -110,7 +110,16 @@ set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
     /var
     /var/cache
     /var/lib
-    /var/log)
+    /var/log
+    # the spec leaves the legacy eBPF object directory unowned
+    /usr/libexec/netdata/plugins.d/ebpf.d)
+
+# The spec does not own the vendored IBM MQ directory tree either; the list
+# of its directories is derived from the MQ manifest by install_ibm_runtime.
+if(NETDATA_IBM_MQ_RPM_DIR_EXCLUDES)
+  list(APPEND CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
+       ${NETDATA_IBM_MQ_RPM_DIR_EXCLUDES})
+endif()
 
 # Scriptlets. openSUSE uses the %service_* macro family, everything else the
 # %systemd_* one; the choice happens at spec-generation time because the
@@ -331,6 +340,40 @@ if(_rpm_main_suggests)
   list(JOIN _rpm_main_suggests ", " CPACK_RPM_NETDATA_PACKAGE_SUGGESTS)
 endif()
 
+# File attributes that differ from the staged tree (which is root:root with
+# install-rule modes), matching the spec's %files for the main package.
+set(CPACK_RPM_NETDATA_USER_FILELIST
+    "%config(noreplace) /etc/netdata/netdata.conf"
+    "%config(noreplace) /etc/netdata/netdata-updater.conf"
+    "%config(noreplace) /etc/logrotate.d/netdata"
+    "%attr(0644,root,netdata) /etc/netdata/.install-type"
+    "%attr(0755,root,netdata) /etc/netdata/edit-config"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/install-service.sh"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/netdata-uninstaller.sh"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/netdata-updater.sh"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/alarm-notify.sh"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/anonymous-statistics.sh"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/cgroup-name"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/cgroup-network-helper.sh"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/get-kubernetes-labels.sh"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/ioping.plugin"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/loopsleepms.sh.inc"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/system-info.sh"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/tc-qos-helper.sh"
+    "%attr(4750,root,netdata) /usr/libexec/netdata/plugins.d/cgroup-network"
+    "%attr(4750,root,netdata) /usr/libexec/netdata/plugins.d/local-listeners"
+    "%attr(4750,root,netdata) /usr/libexec/netdata/plugins.d/ndsudo"
+    "%attr(0770,netdata,netdata) %dir /var/cache/netdata"
+    "%attr(0770,netdata,netdata) %dir /var/lib/netdata"
+    "%attr(0770,netdata,netdata) %dir /var/lib/netdata/cloud.d"
+    "%attr(0770,netdata,netdata) %dir /var/lib/netdata/registry"
+    "%attr(0755,netdata,root) %dir /var/log/netdata")
+
+if(NETDATA_RPM_DOC_DIR)
+  list(APPEND CPACK_RPM_NETDATA_USER_FILELIST
+       "%doc /${NETDATA_RPM_DOC_DIR}/README.md")
+endif()
+
 #
 # user
 #
@@ -410,6 +453,10 @@ set(CPACK_RPM_PLUGIN-APPS_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-APPS_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-APPS_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-APPS_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-APPS_USER_FILELIST
+    "%attr(0750,root,netdata) %caps(cap_dac_read_search,cap_sys_ptrace=ep) /usr/libexec/netdata/plugins.d/apps.plugin")
 
 #
 # charts.d.plugin
@@ -445,6 +492,15 @@ endif()
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-CHARTSD_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-CHARTSD_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-CHARTSD_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-CHARTSD_USER_FILELIST
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/charts.d.plugin"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/charts.d.dryrun-helper.sh"
+    "%attr(0750,root,netdata) %dir /usr/libexec/netdata/charts.d"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/charts.d/example.chart.sh"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/charts.d/libreswan.chart.sh"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/charts.d/opensips.chart.sh")
 
 #
 # cups.plugin
@@ -469,6 +525,10 @@ set(CPACK_RPM_PLUGIN-CUPS_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-CUPS_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-CUPS_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-CUPS_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-CUPS_USER_FILELIST
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/cups.plugin")
 
 #
 # debugfs.plugin
@@ -496,6 +556,10 @@ set(CPACK_RPM_PLUGIN-DEBUGFS_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-DEBUGFS_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-DEBUGFS_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-DEBUGFS_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-DEBUGFS_USER_FILELIST
+    "%attr(0750,root,netdata) %caps(cap_dac_read_search,cap_audit_control=ep) /usr/libexec/netdata/plugins.d/debugfs.plugin")
 
 #
 # ebpf.plugin
@@ -532,6 +596,14 @@ endif()
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-EBPF_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-EBPF_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-EBPF_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-EBPF_USER_FILELIST
+    "%attr(4750,root,netdata) /usr/libexec/netdata/plugins.d/ebpf.plugin")
+if(ENABLE_PLUGIN_EBPF_GO)
+  list(APPEND CPACK_RPM_PLUGIN-EBPF_USER_FILELIST
+       "%attr(4750,root,netdata) /usr/libexec/netdata/plugins.d/ebpf-go.plugin")
+endif()
 
 #
 # ebpf-code-legacy
@@ -565,6 +637,10 @@ set(CPACK_RPM_EBPF-CODE-LEGACY_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSIO
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_EBPF-CODE-LEGACY_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_EBPF-CODE-LEGACY_DEFAULT_USER "root")
+set(CPACK_RPM_EBPF-CODE-LEGACY_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_EBPF-CODE-LEGACY_DEFAULT_FILE_PERMISSIONS
+    OWNER_READ OWNER_WRITE GROUP_READ)
 
 #
 # freeipmi.plugin
@@ -591,6 +667,10 @@ set(CPACK_RPM_PLUGIN-FREEIPMI_PACKAGE_REQUIRES "freeipmi, netdata = ${NETDATA_RP
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-FREEIPMI_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-FREEIPMI_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-FREEIPMI_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-FREEIPMI_USER_FILELIST
+    "%attr(4750,root,netdata) /usr/libexec/netdata/plugins.d/freeipmi.plugin")
 
 #
 # go.plugin
@@ -625,6 +705,11 @@ endif()
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-GO_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-GO_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-GO_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-GO_USER_FILELIST
+    "%attr(0750,root,netdata) %caps(cap_dac_read_search,cap_net_admin,cap_net_raw,cap_net_bind_service=eip) /usr/libexec/netdata/plugins.d/go.d.plugin"
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/snmp-trap-profile-gen")
 
 #
 # scripts.d.plugin
@@ -655,6 +740,10 @@ set(CPACK_RPM_PLUGIN-SCRIPTS_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-SCRIPTS_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-SCRIPTS_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-SCRIPTS_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-SCRIPTS_USER_FILELIST
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/scripts.d.plugin")
 
 #
 # ibm.plugin
@@ -692,6 +781,10 @@ if(NETDATA_RPM_HAVE_SYSUSER)
 elseif(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-IBM_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-IBM_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-IBM_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-IBM_USER_FILELIST
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/ibm.d.plugin")
 
 set(CPACK_DEBIAN_PLUGIN-IBM-LIBS_DESCRIPTION
 		"IBM MQ client libraries for the Netdata IBM ecosystem metrics collection plugin.
@@ -715,6 +808,15 @@ if(NETDATA_RPM_HAVE_SYSUSER)
   set(CPACK_RPM_PLUGIN-IBM-LIBS_PACKAGE_REQUIRES_PRE "user(netdata), group(netdata)")
 elseif(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-IBM-LIBS_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
+set(CPACK_RPM_PLUGIN-IBM-LIBS_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-IBM-LIBS_DEFAULT_GROUP "netdata")
+# 0640 for the vendored MQ data files; the executable/library exceptions are
+# derived from the MQ manifest by install_ibm_runtime.
+set(CPACK_RPM_PLUGIN-IBM-LIBS_DEFAULT_FILE_PERMISSIONS
+    OWNER_READ OWNER_WRITE GROUP_READ)
+if(NETDATA_IBM_MQ_RPM_FILELIST)
+  set(CPACK_RPM_PLUGIN-IBM-LIBS_USER_FILELIST ${NETDATA_IBM_MQ_RPM_FILELIST})
 endif()
 
 #
@@ -752,6 +854,10 @@ endif()
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-NETWORK-VIEWER_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-NETWORK-VIEWER_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-NETWORK-VIEWER_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-NETWORK-VIEWER_USER_FILELIST
+    "%attr(0750,root,netdata) %caps(cap_sys_admin,cap_sys_ptrace,cap_dac_read_search=ep) /usr/libexec/netdata/plugins.d/network-viewer.plugin")
 
 #
 # otel.plugin
@@ -783,6 +889,10 @@ set(CPACK_RPM_PLUGIN-OTEL_PACKAGE_OBSOLETES "netdata-plugin-otel-signal-viewer")
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-OTEL_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-OTEL_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-OTEL_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-OTEL_USER_FILELIST
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/otel-plugin")
 
 #
 # netflow.plugin
@@ -810,6 +920,11 @@ set(CPACK_RPM_PLUGIN-NETFLOW_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-NETFLOW_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-NETFLOW_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-NETFLOW_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-NETFLOW_USER_FILELIST
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/netflow-plugin"
+    "%attr(0750,root,netdata) /usr/sbin/topology-ip-intel-downloader")
 
 #
 # nfacct.plugin
@@ -838,6 +953,10 @@ set(CPACK_RPM_PLUGIN-NFACCT_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}"
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-NFACCT_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-NFACCT_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-NFACCT_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-NFACCT_USER_FILELIST
+    "%attr(4750,root,netdata) /usr/libexec/netdata/plugins.d/nfacct.plugin")
 
 #
 # perf.plugin
@@ -865,6 +984,18 @@ set(CPACK_RPM_PLUGIN-PERF_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
 set(CPACK_RPM_PLUGIN-PERF_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-PERF_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
+endif()
+set(CPACK_RPM_PLUGIN-PERF_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-PERF_DEFAULT_GROUP "netdata")
+# cap_perfmon exists on EL >= 9 and Fedora >= 36 (kernel 5.8+); older
+# targets fall back to cap_sys_admin, as the spec does.
+if((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 9) OR
+   (NETDATA_DISTRO_FEDORA AND NETDATA_DISTRO_VERSION_MAJOR GREATER_EQUAL 36))
+  set(CPACK_RPM_PLUGIN-PERF_USER_FILELIST
+      "%attr(0750,root,netdata) %caps(cap_perfmon=ep) /usr/libexec/netdata/plugins.d/perf.plugin")
+else()
+  set(CPACK_RPM_PLUGIN-PERF_USER_FILELIST
+      "%attr(0750,root,netdata) %caps(cap_sys_admin=ep) /usr/libexec/netdata/plugins.d/perf.plugin")
 endif()
 
 #
@@ -905,6 +1036,22 @@ endif()
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-PYTHOND_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-PYTHOND_DEFAULT_GROUP "netdata")
+# The spec's %defattr makes the whole python.d tree 0750; the stock configs
+# keep 0644 with a world-readable directory.
+set(CPACK_RPM_PLUGIN-PYTHOND_DEFAULT_FILE_PERMISSIONS
+    OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE)
+set(CPACK_RPM_PLUGIN-PYTHOND_DEFAULT_DIR_PERMISSIONS
+    OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE)
+set(CPACK_RPM_PLUGIN-PYTHOND_USER_FILELIST
+    "%attr(0644,root,netdata) /usr/lib/netdata/conf.d/python.d.conf"
+    "%attr(0755,root,netdata) %dir /usr/lib/netdata/conf.d/python.d"
+    "%attr(0644,root,netdata) /usr/lib/netdata/conf.d/python.d/am2320.conf"
+    "%attr(0644,root,netdata) /usr/lib/netdata/conf.d/python.d/go_expvar.conf"
+    "%attr(0644,root,netdata) /usr/lib/netdata/conf.d/python.d/haproxy.conf"
+    "%attr(0644,root,netdata) /usr/lib/netdata/conf.d/python.d/pandas.conf"
+    "%attr(0644,root,netdata) /usr/lib/netdata/conf.d/python.d/traefik.conf")
 
 #
 # slabinfo.plugin
@@ -933,6 +1080,10 @@ set(CPACK_RPM_PLUGIN-SLABINFO_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-SLABINFO_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-SLABINFO_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-SLABINFO_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-SLABINFO_USER_FILELIST
+    "%attr(0750,root,netdata) %caps(cap_dac_read_search=ep) /usr/libexec/netdata/plugins.d/slabinfo.plugin")
 
 #
 # systemd-journal.plugin
@@ -960,6 +1111,10 @@ set(CPACK_RPM_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-SYSTEMD-JOURNAL_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-SYSTEMD-JOURNAL_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-SYSTEMD-JOURNAL_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-SYSTEMD-JOURNAL_USER_FILELIST
+    "%attr(0750,root,netdata) %caps(cap_dac_read_search=ep) /usr/libexec/netdata/plugins.d/systemd-journal.plugin")
 
 set(CPACK_COMPONENT_PLUGIN-JOURNAL-VIEWER_DESCRIPTION
 		"Transitional dummy package.
@@ -1000,6 +1155,10 @@ set(CPACK_RPM_PLUGIN-SYSTEMD-UNITS_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VE
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-SYSTEMD-UNITS_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-SYSTEMD-UNITS_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-SYSTEMD-UNITS_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-SYSTEMD-UNITS_USER_FILELIST
+    "%attr(0750,root,netdata) /usr/libexec/netdata/plugins.d/systemd-units.plugin")
 
 #
 # xenstat.plugin
@@ -1031,6 +1190,10 @@ set(CPACK_RPM_PLUGIN-XENSTAT_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_PLUGIN-XENSTAT_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_PLUGIN-XENSTAT_DEFAULT_USER "root")
+set(CPACK_RPM_PLUGIN-XENSTAT_DEFAULT_GROUP "netdata")
+set(CPACK_RPM_PLUGIN-XENSTAT_USER_FILELIST
+    "%attr(4750,root,netdata) /usr/libexec/netdata/plugins.d/xenstat.plugin")
 
 #
 # CPack components
