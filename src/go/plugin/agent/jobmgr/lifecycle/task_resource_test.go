@@ -6,9 +6,10 @@ import (
 	"context"
 	"errors"
 	"io"
-	"reflect"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestTaskSupervisorAcceptsStartsPublishesAndTransfersPreparedResource(t *testing.T) {
@@ -23,54 +24,43 @@ func TestTaskSupervisorAcceptsStartsPublishesAndTransfersPreparedResource(t *tes
 		}),
 	})
 	completion := <-supervisor.CompletionCh()
-	if completion.Kind != TaskOutcomePreparedResource || completion.Err != nil {
-		t.Fatalf("completion=%#v", completion)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionAcceptStart, ExpectedGeneration: 7}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil || ack.Kind != TaskActionAcceptStart {
-		t.Fatalf("accept/start acknowledgement=%#v", ack)
-	}
-	if err := supervisor.Release(ref); err == nil {
-		t.Fatal("slot released while ready resource was present")
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionPublishResource}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil || ack.Kind != TaskActionPublishResource {
-		t.Fatalf("publish acknowledgement=%#v", ack)
-	}
+	require.False(t, completion.Kind != TaskOutcomePreparedResource || completion.Err != nil)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionAcceptStart, ExpectedGeneration: 7}))
+
+	ack := <-supervisor.AcknowledgementCh()
+	require.False(t, ack.Err != nil || ack.Kind != TaskActionAcceptStart)
+
+	require.Error(t, supervisor.Release(ref))
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionPublishResource}))
+
+	acknowledgementCh := <-supervisor.AcknowledgementCh()
+	require.False(t, acknowledgementCh.Err != nil || acknowledgementCh.Kind != TaskActionPublishResource)
+
 	taken, err := supervisor.TakePublishedReadyResource(ref, 3, ready.identity)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if taken != ready {
-		t.Fatalf("transferred resource=%T %p, want %p", taken, taken, ready)
-	}
-	if _, err := supervisor.TakePublishedReadyResource(ref, 3, ready.identity); err == nil {
-		t.Fatal("duplicate ready-resource transfer succeeded")
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	if err := supervisor.Release(ref); err != nil {
-		t.Fatal(err)
-	}
-	if got, want := events, []string{"accept-start", "publish"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("events=%v want=%v", got, want)
-	}
+	require.NoError(t, err)
+	require.Same(t, ready, taken)
+
+	_, takePublishedReadyResourceErr := supervisor.TakePublishedReadyResource(ref, 3, ready.identity)
+	require.Error(t, takePublishedReadyResourceErr)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}))
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.NoError(t, supervisor.Release(ref))
+
+	got, want := events, []string{"accept-start", "publish"}
+	require.Equal(t, want, got)
 }
 
 func TestTaskSupervisorRetainsPreparedResourceReturnedWithPrepareError(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	observer := &recordingRuntimeObserver{}
-	if err := supervisor.BindRuntimeObserver(observer); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, supervisor.BindRuntimeObserver(observer))
+
 	events := []string{}
 	wantFailure := errors.New("construction cleanup failed")
 	prepared := &recordingPreparedResource{
@@ -83,30 +73,22 @@ func TestTaskSupervisorRetainsPreparedResourceReturnedWithPrepareError(t *testin
 		}),
 	})
 	completion := <-supervisor.CompletionCh()
-	if completion.Kind != TaskOutcomePreparedResource || !errors.Is(completion.Err, wantFailure) {
-		t.Fatalf("completion=%#v", completion)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	if got := observer.counter(RuntimeCounterResultsDisposed); got != 1 {
-		t.Fatalf("results disposed=%d want=1", got)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	if err := supervisor.Release(ref); err != nil {
-		t.Fatal(err)
-	}
-	if got, want := events, []string{"dispose"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("events=%v want=%v", got, want)
-	}
+	require.False(t, completion.Kind != TaskOutcomePreparedResource || !errors.Is(completion.Err, wantFailure))
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.EqualValues(t, 1, observer.counter(RuntimeCounterResultsDisposed))
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.NoError(t, supervisor.Release(ref))
+
+	got, want := events, []string{"dispose"}
+	require.Equal(t, want, got)
 }
 
 func TestTaskSupervisorRetainsReadyResourceAfterPublishFailureUntilAbort(t *testing.T) {
@@ -124,34 +106,27 @@ func TestTaskSupervisorRetainsReadyResourceAfterPublishFailureUntilAbort(t *test
 		}),
 	})
 	<-supervisor.CompletionCh()
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionAcceptStart, ExpectedGeneration: 1}); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionAcceptStart, ExpectedGeneration: 1}))
+
 	<-supervisor.AcknowledgementCh()
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionPublishResource}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); !errors.Is(ack.Err, wantFailure) {
-		t.Fatalf("publish acknowledgement=%#v want=%v", ack, wantFailure)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionDispose}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 5, Kind: TaskActionTerminate}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	if err := supervisor.Release(ref); err != nil {
-		t.Fatal(err)
-	}
-	if got, want := events, []string{"accept-start", "publish", "abort-ready"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("events=%v want=%v", got, want)
-	}
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionPublishResource}))
+
+	require.ErrorIs(t, (<-supervisor.AcknowledgementCh()).Err, wantFailure)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionDispose}))
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 5, Kind: TaskActionTerminate}))
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.NoError(t, supervisor.Release(ref))
+
+	got, want := events, []string{"accept-start", "publish", "abort-ready"}
+	require.Equal(t, want, got)
 }
 
 func TestTaskSupervisorStopsAndFinalizesInitialReadyResource(t *testing.T) {
@@ -160,33 +135,24 @@ func TestTaskSupervisorStopsAndFinalizesInitialReadyResource(t *testing.T) {
 	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 3}, events: &events, panicAfterIdentity: true}
 	_, ref := enqueueAndDispatchTask(t, supervisor, readyTaskPlan(t, SourceJobManager, time.Time{}, ready))
 	completion := <-supervisor.CompletionCh()
-	if completion.Kind != TaskOutcomeReadyResource || completion.Err != nil {
-		t.Fatalf("completion=%#v", completion)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionStopResource}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionFinalizeResource}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	if err := supervisor.Release(ref); err != nil {
-		t.Fatal(err)
-	}
-	if got, want := events, []string{"stop", "finalize"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("events=%v want=%v", got, want)
-	}
+	require.False(t, completion.Kind != TaskOutcomeReadyResource || completion.Err != nil)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionStopResource}))
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionFinalizeResource}))
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}))
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.NoError(t, supervisor.Release(ref))
+
+	got, want := events, []string{"stop", "finalize"}
+	require.Equal(t, want, got)
 }
 
 func TestTaskSupervisorFinalizesResourceOffLoop(t *testing.T) {
@@ -200,19 +166,17 @@ func TestTaskSupervisorFinalizesResourceOffLoop(t *testing.T) {
 	}
 	_, ref := enqueueAndDispatchTask(t, supervisor, readyTaskPlan(t, SourceJobManager, time.Time{}, ready))
 	<-supervisor.CompletionCh()
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionStopResource}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionFinalizeResource}); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionStopResource}))
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionFinalizeResource}))
+
 	select {
 	case <-finalizeEntered:
 	case <-time.After(time.Second):
-		t.Fatal("Finalize did not enter")
+		require.FailNow(t, "test failed", "Finalize did not enter")
 	}
 	_, other := enqueueAndDispatchTask(t, supervisor, TaskPlan{
 		Source: SourceFunction,
@@ -220,31 +184,27 @@ func TestTaskSupervisorFinalizesResourceOffLoop(t *testing.T) {
 			return NoValueOutcome(), nil
 		},
 	})
-	if completion := <-supervisor.CompletionCh(); completion.Ref != other || completion.Err != nil {
-		t.Fatalf("unrelated completion=%#v", completion)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: other, Sequence: 2, Kind: TaskActionTerminate}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Ref != other || ack.Err != nil {
-		t.Fatalf("unrelated acknowledgement=%#v", ack)
-	}
-	if err := supervisor.Release(other); err != nil {
-		t.Fatal(err)
-	}
+
+	completion := <-supervisor.CompletionCh()
+	require.False(t, completion.Ref != other || completion.Err != nil)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: other, Sequence: 2, Kind: TaskActionTerminate}))
+
+	ack := <-supervisor.AcknowledgementCh()
+	require.False(t, ack.Ref != other || ack.Err != nil)
+
+	require.NoError(t, supervisor.Release(other))
+
 	close(finalizeRelease)
-	if ack := <-supervisor.AcknowledgementCh(); ack.Ref != ref || ack.Err != nil {
-		t.Fatalf("finalize acknowledgement=%#v", ack)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	if err := supervisor.Release(ref); err != nil {
-		t.Fatal(err)
-	}
+
+	acknowledgementCh := <-supervisor.AcknowledgementCh()
+	require.False(t, acknowledgementCh.Ref != ref || acknowledgementCh.Err != nil)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}))
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.NoError(t, supervisor.Release(ref))
 }
 
 func TestTaskSupervisorDisposesResourcesWithoutExpiredWorkContext(t *testing.T) {
@@ -278,70 +238,52 @@ func TestTaskSupervisorDisposesResourcesWithoutExpiredWorkContext(t *testing.T) 
 			events := []string{}
 			plan, contextErr := test.plan(&events)
 			_, ref := enqueueAndDispatchTask(t, supervisor, plan)
-			if completion := <-supervisor.CompletionCh(); completion.Err != nil || completion.Kind != test.wantKind {
-				t.Fatalf("completion=%#v", completion)
-			}
-			if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
-				t.Fatal(err)
-			}
-			if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-				t.Fatal(ack.Err)
-			}
-			if err := contextErr(); err != nil {
-				t.Fatalf("resource disposal inherited expired work context: %v", err)
-			}
-			if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
-				t.Fatal(err)
-			}
-			if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-				t.Fatal(ack.Err)
-			}
-			if err := supervisor.Release(ref); err != nil {
-				t.Fatal(err)
-			}
+
+			completion := <-supervisor.CompletionCh()
+			require.False(t, completion.Err != nil || completion.Kind != test.wantKind)
+
+			require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+
+			require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+			require.NoError(t, contextErr())
+
+			require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+
+			require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+			require.NoError(t, supervisor.Release(ref))
 		})
 	}
 }
 
 func TestTaskSupervisorPreservesShutdownBudgetForResourceDisposal(t *testing.T) {
 	run, err := NewRunSupervisor(1, RealClock{}, time.Minute)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	budget, err := run.BeginShutdown()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() { _ = run.FinishShutdown() })
 	supervisor := newResourceTaskSupervisor(t)
 	events := []string{}
 	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: &events}
 	plan, err := NewShutdownReadyResourceTaskPlan(SourceJobManager, budget, TransactionTaskPhases, ready, ready.identity)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	_, ref := enqueueAndDispatchTask(t, supervisor, plan)
-	if completion := <-supervisor.CompletionCh(); completion.Err != nil || completion.Kind != TaskOutcomeReadyResource {
-		t.Fatalf("completion=%#v", completion)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	if ready.abortContextErr != nil || !ready.abortDeadline.Equal(budget.Deadline()) {
-		t.Fatalf("shutdown disposal context differs: err=%v deadline=%s want=%s", ready.abortContextErr, ready.abortDeadline, budget.Deadline())
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	if err := supervisor.Release(ref); err != nil {
-		t.Fatal(err)
-	}
+
+	completion := <-supervisor.CompletionCh()
+	require.False(t, completion.Err != nil || completion.Kind != TaskOutcomeReadyResource)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.False(t, ready.abortContextErr != nil || !ready.abortDeadline.Equal(budget.Deadline()))
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.NoError(t, supervisor.Release(ref))
 }
 
 func TestTaskSupervisorReturnsPendingInitialResourceOnTransferAwareCancellation(t *testing.T) {
@@ -352,26 +294,19 @@ func TestTaskSupervisorReturnsPendingInitialResourceOnTransferAwareCancellation(
 		TaskClassFrameworkControl,
 		readyTaskPlan(t, SourceJobManager, time.Time{}, ready),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := supervisor.CancelPending(request); err == nil {
-		t.Fatal("non-transfer-aware cancellation accepted a pending resource")
-	}
+	require.NoError(t, err)
+
+	require.Error(t, supervisor.CancelPending(request))
+
 	outcome, err := supervisor.CancelPendingOutcome(request)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	returned, ok := outcome.ReadyResource()
-	if !ok || returned != ready {
-		t.Fatalf("returned resource=%T %p ok=%v want=%p", returned, returned, ok, ready)
-	}
-	if supervisor.Pending() != 0 {
-		t.Fatalf("pending=%d, want zero", supervisor.Pending())
-	}
-	if _, err := supervisor.CancelPendingOutcome(request); err == nil {
-		t.Fatal("stale transfer-aware cancellation succeeded")
-	}
+	require.False(t, !ok || returned != ready)
+	require.EqualValues(t, 0, supervisor.Pending())
+
+	_, cancelPendingOutcomeErr := supervisor.CancelPendingOutcome(request)
+	require.Error(t, cancelPendingOutcomeErr)
+
 }
 
 func TestTaskSupervisorRetainsPreparedResourceWhenAcceptStartPanics(t *testing.T) {
@@ -384,21 +319,16 @@ func TestTaskSupervisorRetainsPreparedResourceWhenAcceptStartPanics(t *testing.T
 		Work:   PreparedResourceTaskWork(func(context.Context) (PreparedResource, error) { return prepared, nil }),
 	})
 	<-supervisor.CompletionCh()
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionAcceptStart, ExpectedGeneration: 1}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); !errors.Is(ack.Err, ErrTaskPanic) {
-		t.Fatalf("accept/start panic acknowledgement=%#v", ack)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err == nil {
-		t.Fatal("termination acknowledged despite retained prepared resource")
-	}
-	if err := supervisor.Release(ref); err == nil {
-		t.Fatal("slot released after prepared-resource panic")
-	}
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionAcceptStart, ExpectedGeneration: 1}))
+
+	require.ErrorIs(t, (<-supervisor.AcknowledgementCh()).Err, ErrTaskPanic)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+
+	require.NotNil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.Error(t, supervisor.Release(ref))
 }
 
 func TestTaskSupervisorRetainsReadyResourceReturnedWithAcceptError(t *testing.T) {
@@ -412,35 +342,27 @@ func TestTaskSupervisorRetainsReadyResourceReturnedWithAcceptError(t *testing.T)
 		Work:   PreparedResourceTaskWork(func(context.Context) (PreparedResource, error) { return prepared, nil }),
 	})
 	completion := <-supervisor.CompletionCh()
-	if completion.Ref != ref || completion.Kind != TaskOutcomePreparedResource || completion.Err != nil {
-		t.Fatalf("completion=%+v", completion)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionAcceptStart, ExpectedGeneration: 1}); err != nil {
-		t.Fatal(err)
-	}
+	require.False(t, completion.Ref != ref || completion.Kind != TaskOutcomePreparedResource || completion.Err != nil)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionAcceptStart, ExpectedGeneration: 1}))
+
 	ack := <-supervisor.AcknowledgementCh()
-	if !errors.Is(ack.Err, wantFailure) {
-		t.Fatalf("accept acknowledgement=%+v", ack)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionDispose}); err != nil {
-		t.Fatal(err)
-	}
+	require.ErrorIs(t, ack.Err, wantFailure)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionDispose}))
+
 	ack = <-supervisor.AcknowledgementCh()
-	if ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	if got, want := events, []string{"accept-start", "abort-ready"}; !reflect.DeepEqual(got, want) {
-		t.Fatalf("events=%v want=%v", got, want)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}); err != nil {
-		t.Fatal(err)
-	}
-	if ack = <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	if err := supervisor.Release(ref); err != nil {
-		t.Fatal(err)
-	}
+	require.Nil(t, ack.Err)
+
+	got, want := events, []string{"accept-start", "abort-ready"}
+	require.Equal(t, want, got)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}))
+
+	ack = <-supervisor.AcknowledgementCh()
+	require.Nil(t, ack.Err)
+
+	require.NoError(t, supervisor.Release(ref))
 }
 
 func TestTaskSupervisorRetainsReadyResourceWhenAbortFails(t *testing.T) {
@@ -450,46 +372,33 @@ func TestTaskSupervisorRetainsReadyResourceWhenAbortFails(t *testing.T) {
 	ready := &recordingReadyResource{identity: ResourceIdentity{ID: "job", Generation: 1}, events: &events, abortErr: wantFailure}
 	_, ref := enqueueAndDispatchTask(t, supervisor, readyTaskPlan(t, SourceJobManager, time.Time{}, ready))
 	<-supervisor.CompletionCh()
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); !errors.Is(ack.Err, wantFailure) {
-		t.Fatalf("abort acknowledgement=%#v", ack)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err == nil {
-		t.Fatal("termination acknowledged despite retained ready resource")
-	}
-	if err := supervisor.Release(ref); err == nil {
-		t.Fatal("slot released after ready-resource abort failure")
-	}
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+
+	require.ErrorIs(t, (<-supervisor.AcknowledgementCh()).Err, wantFailure)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+
+	require.NotNil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.Error(t, supervisor.Release(ref))
 }
 
 func newResourceTaskSupervisor(t *testing.T) *TaskSupervisor {
 	t.Helper()
 	frame, err := NewFrameOwner(io.Discard)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	supervisor, err := NewTaskSupervisor(frame)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return supervisor
 }
 
 func readyTaskPlan(t *testing.T, source Source, deadline time.Time, resource ReadyResource) TaskPlan {
 	t.Helper()
 	identity, err := readyResourceIdentity(resource)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	plan, err := NewReadyResourceTaskPlan(source, deadline, TransactionTaskPhases, resource, identity)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return plan
 }
 

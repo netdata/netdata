@@ -4,9 +4,10 @@ package lifecycle
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T) {
@@ -27,9 +28,7 @@ func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T)
 				admissionRef AdmissionRef,
 			) TaskPlan {
 				permit, err := NewJobLongLivedPlan(40)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				plan, err := NewPreparedResourcePermitTaskPlan(
 					SourceJobManager,
 					time.Time{},
@@ -45,9 +44,7 @@ func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T)
 						panic("prepare resource")
 					},
 				)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				return plan
 			},
 		},
@@ -59,9 +56,7 @@ func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T)
 				admissionRef AdmissionRef,
 			) TaskPlan {
 				permit, err := NewSecretStoreLongLivedPlan(40)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				plan, err := NewPreparedCapabilityPermitTaskPlan(
 					SourceJobManager,
 					time.Time{},
@@ -77,9 +72,7 @@ func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T)
 						panic("prepare capability")
 					},
 				)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				return plan
 			},
 		},
@@ -100,9 +93,7 @@ func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T)
 					Successor: ResourceIdentity{ID: "job", Generation: 2},
 				}
 				permit, err := NewJobLongLivedPlan(40)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				plan, err := NewResourceTransactionPermitTaskPlan(
 					SourceJobManager,
 					time.Time{},
@@ -121,9 +112,7 @@ func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T)
 						panic("prepare transaction")
 					},
 				)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				return plan
 			},
 			wantCurrent: true,
@@ -139,9 +128,7 @@ func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T)
 			_, ref := enqueueAndDispatchTask(t, supervisor, plan)
 
 			completion := <-supervisor.CompletionCh()
-			if !errors.Is(completion.Err, ErrTaskPanic) {
-				t.Fatalf("preparation panic completion=%+v", completion)
-			}
+			require.ErrorIs(t, completion.Err, ErrTaskPanic)
 			if test.wantCurrent {
 				current, err := supervisor.TakeDisposedResourceTransaction(
 					ref,
@@ -152,49 +139,41 @@ func TestTaskSupervisorPreparationPanicReturnsTransferredOwnership(t *testing.T)
 						Successor: ResourceIdentity{ID: "job", Generation: 2},
 					},
 				)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if current == nil ||
+				require.NoError(t, err)
+				require.False(t, current == nil ||
 					current.Identity() !=
-						(ResourceIdentity{ID: "job", Generation: 1}) {
-					t.Fatalf("restored current=%T %#v", current, current)
-				}
-				if err := supervisor.SendAction(TaskAction{
+						(ResourceIdentity{ID: "job", Generation: 1}))
+
+				require.NoError(t, supervisor.SendAction(TaskAction{
 					Ref: ref, Sequence: 2, Kind: TaskActionDispose,
-				}); err != nil {
-					t.Fatal(err)
-				}
-				if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-					t.Fatal(ack.Err)
-				}
+				}),
+				)
+
+				ack := <-supervisor.AcknowledgementCh()
+				require.Nil(t, ack.Err)
 			}
 			sequence := uint8(2)
 			if test.wantCurrent {
 				sequence = 3
 			}
-			if err := supervisor.SendAction(TaskAction{
+
+			require.NoError(t, supervisor.SendAction(TaskAction{
 				Ref: ref, Sequence: sequence, Kind: TaskActionTerminate,
-			}); err != nil {
-				t.Fatal(err)
-			}
-			if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-				t.Fatal(ack.Err)
-			}
-			if err := supervisor.Release(ref); err != nil {
-				t.Fatal(err)
-			}
-			if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{}) {
-				t.Fatalf("preparation panic retained permit: %+v", census)
-			}
-			if _, err := admission.ReleaseOrdinary(admissionRef); err != nil {
-				t.Fatal(err)
-			}
-			if census := admission.Census(); census.ActiveRecords != 0 ||
-				census.OrdinaryBytes != 0 ||
-				census.LongLivedBytes != 0 {
-				t.Fatalf("preparation panic retained admission: %+v", census)
-			}
+			}),
+			)
+
+			ack := <-supervisor.AcknowledgementCh()
+			require.Nil(t, ack.Err)
+
+			require.NoError(t, supervisor.Release(ref))
+
+			require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
+
+			_, err := admission.ReleaseOrdinary(admissionRef)
+			require.NoError(t, err)
+
+			census := admission.Census()
+			require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0 || census.LongLivedBytes != 0)
 		})
 	}
 }

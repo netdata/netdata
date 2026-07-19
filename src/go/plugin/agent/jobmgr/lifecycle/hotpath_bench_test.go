@@ -6,6 +6,8 @@ import (
 	"io"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func BenchmarkBAdmission(b *testing.B) {
@@ -16,14 +18,14 @@ func BenchmarkBAdmission(b *testing.B) {
 	for b.Loop() {
 		request := ledger.RequestOrdinary(1, lane, 1)
 		if request.Rejected != nil {
-			b.Fatal(request.Rejected)
+			require.FailNow(b, "benchmark failed", request.Rejected)
 		}
 		count, _, err := ledger.TakeGrants(1, &grants)
 		if err != nil || count != 1 {
-			b.Fatalf("grant count=%d err=%v", count, err)
+			require.FailNowf(b, "benchmark failed", "grant count=%d err=%v", count, err)
 		}
 		if _, err := ledger.ReleaseOrdinary(request.Ref); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 	}
 }
@@ -41,7 +43,7 @@ func BenchmarkBOperationTransition(b *testing.B) {
 			true,
 		)
 		if err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		for _, state := range []OperationState{
 			OperationQueued,
@@ -50,22 +52,20 @@ func BenchmarkBOperationTransition(b *testing.B) {
 			OperationDisposing,
 		} {
 			if err := operation.Advance(state); err != nil {
-				b.Fatal(err)
+				require.FailNow(b, "benchmark failed", err)
 			}
 		}
 		if err := operation.MarkResponsePending(); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		if err := operation.CommitResponse(); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		if !operation.CanDisposeTerminal() {
-			b.Fatal("terminal disposition was not ready")
+			require.FailNow(b, "benchmark failed", "terminal disposition was not ready")
 		}
-		if err := operation.Advance(
-			OperationDisposedTerminal,
-		); err != nil {
-			b.Fatal(err)
+		if err := operation.Advance(OperationDisposedTerminal); err != nil {
+			require.FailNow(b, "benchmark failed", err)
 		}
 	}
 }
@@ -73,21 +73,17 @@ func BenchmarkBOperationTransition(b *testing.B) {
 func BenchmarkBTaskSupervisorEnqueueCancel(b *testing.B) {
 	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	supervisor, err := NewTaskSupervisor(frame)
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	plan := TaskPlan{
 		Source: SourceFunction,
 		Work: FrameTaskWork(
 			func(context.Context) (SealedResult, error) {
-				return NewSealedResult(
-					200,
-					"application/json",
-					[]byte(`{}`),
-				)
+				return NewSealedResult(200, "application/json", []byte(`{}`))
 			},
 		),
 	}
@@ -95,10 +91,10 @@ func BenchmarkBTaskSupervisorEnqueueCancel(b *testing.B) {
 	for b.Loop() {
 		ref, err := supervisor.Enqueue(TaskClassGenericFunction, plan)
 		if err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		if err := supervisor.CancelPending(ref); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 	}
 }
@@ -106,11 +102,11 @@ func BenchmarkBTaskSupervisorEnqueueCancel(b *testing.B) {
 func BenchmarkBTaskSupervisorDispatch(b *testing.B) {
 	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	supervisor, err := NewTaskSupervisor(frame)
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	plan := TaskPlan{
 		Source: SourceFunction,
@@ -121,18 +117,14 @@ func BenchmarkBTaskSupervisorDispatch(b *testing.B) {
 	var started [TaskStartServiceQuantum]TaskStart
 	pending, err := supervisor.Enqueue(TaskClassGenericFunction, plan)
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	b.ReportAllocs()
 	for b.Loop() {
-		count, more, err := supervisor.Dispatch(
-			context.Background(),
-			1,
-			&started,
-		)
+		count, more, err := supervisor.Dispatch(context.Background(), 1, &started)
 		b.StopTimer()
 		if err != nil || count != 1 || more {
-			b.Fatalf(
+			require.FailNowf(b, "benchmark failed",
 				"dispatch count=%d more=%t err=%v",
 				count,
 				more,
@@ -140,7 +132,7 @@ func BenchmarkBTaskSupervisorDispatch(b *testing.B) {
 			)
 		}
 		if started[0].Request != pending {
-			b.Fatalf(
+			require.FailNowf(b, "benchmark failed",
 				"started request=%+v, want %+v",
 				started[0].Request,
 				pending,
@@ -151,90 +143,76 @@ func BenchmarkBTaskSupervisorDispatch(b *testing.B) {
 			Ref: completion.Ref, Sequence: 2,
 			Kind: TaskActionDispose,
 		}); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		ack := <-supervisor.AcknowledgementCh()
 		if err := supervisor.SendAction(TaskAction{
 			Ref: ack.Ref, Sequence: 3,
 			Kind: TaskActionTerminate,
 		}); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		ack = <-supervisor.AcknowledgementCh()
 		if err := supervisor.Release(ack.Ref); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		started[0] = TaskStart{}
-		pending, err = supervisor.Enqueue(
-			TaskClassGenericFunction,
-			plan,
-		)
+		pending, err = supervisor.Enqueue(TaskClassGenericFunction, plan)
 		if err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		b.StartTimer()
 	}
 	b.StopTimer()
 	if err := supervisor.CancelPending(pending); err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 }
 
 func BenchmarkBTaskChildLaunchCompletion(b *testing.B) {
 	frame, err := NewFrameOwner(io.Discard)
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	supervisor, err := NewTaskSupervisor(frame)
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	plan := TaskPlan{
 		Source: SourceFunction,
 		Work: FrameTaskWork(
 			func(context.Context) (SealedResult, error) {
-				return NewSealedResult(
-					200,
-					"application/json",
-					[]byte(`{}`),
-				)
+				return NewSealedResult(200, "application/json", []byte(`{}`))
 			},
 		),
 	}
 	var started [TaskStartServiceQuantum]TaskStart
 	b.ReportAllocs()
 	for b.Loop() {
-		if _, err := supervisor.Enqueue(
-			TaskClassGenericFunction,
-			plan,
-		); err != nil {
-			b.Fatal(err)
+		if _, err := supervisor.Enqueue(TaskClassGenericFunction, plan); err != nil {
+			require.FailNow(b, "benchmark failed", err)
 		}
-		count, _, err := supervisor.Dispatch(
-			context.Background(),
-			1,
-			&started,
-		)
+		count, _, err := supervisor.Dispatch(context.Background(), 1, &started)
 		if err != nil || count != 1 {
-			b.Fatalf("dispatch count=%d err=%v", count, err)
+			require.FailNowf(b, "benchmark failed", "dispatch count=%d err=%v", count, err)
 		}
 		completion := <-supervisor.CompletionCh()
 		if err := supervisor.SendAction(TaskAction{
 			Ref: completion.Ref, Sequence: 2,
 			Kind: TaskActionDispose,
 		}); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		ack := <-supervisor.AcknowledgementCh()
 		if err := supervisor.SendAction(TaskAction{
 			Ref: ack.Ref, Sequence: 3,
 			Kind: TaskActionTerminate,
 		}); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		ack = <-supervisor.AcknowledgementCh()
 		if err := supervisor.Release(ack.Ref); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 	}
 }
@@ -242,24 +220,20 @@ func BenchmarkBTaskChildLaunchCompletion(b *testing.B) {
 func BenchmarkBFrameCommit(b *testing.B) {
 	owner, err := NewFrameOwner(io.Discard)
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
-	result, err := NewSealedResult(
-		200,
-		"application/json",
-		[]byte(`{"status":"ok"}`),
-	)
+	result, err := NewSealedResult(200, "application/json", []byte(`{"status":"ok"}`))
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	b.ReportAllocs()
 	for b.Loop() {
 		frame, err := PrepareFrame("uid", result, 1)
 		if err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		if err := owner.Commit(frame); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 	}
 }
@@ -271,15 +245,15 @@ func BenchmarkBRunAck(b *testing.B) {
 		time.Second,
 	)
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	if err := supervisor.OpenAdmission(); err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	b.ReportAllocs()
 	for b.Loop() {
 		if !supervisor.Admitting() {
-			b.Fatal("run unexpectedly stopped admitting")
+			require.FailNow(b, "benchmark failed", "run unexpectedly stopped admitting")
 		}
 	}
 }
@@ -297,10 +271,10 @@ func BenchmarkBUIDAdmission(b *testing.B) {
 		sequence++
 		uid := uids[sequence%uint64(len(uids))]
 		if err := ledger.Admit(uid, now); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		if err := ledger.Complete(uid, false, now); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 	}
 }

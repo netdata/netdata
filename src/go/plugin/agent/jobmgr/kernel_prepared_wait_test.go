@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSubmitPreparedAndWaitJoinsAcceptedCancellation(t *testing.T) {
@@ -16,25 +17,16 @@ func TestSubmitPreparedAndWaitJoinsAcceptedCancellation(t *testing.T) {
 		stoppedKernelPlanner{},
 	)
 	loop, err := NewKernelLoop(kernel)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := loop.Start(t.Context()); err != nil {
-		t.Fatal(err)
-	}
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, loop.Start(t.Context()))
+
+	require.NoError(t, run.OpenAdmission())
+
 	started := make(chan struct{})
 	release := make(chan struct{})
-	result, err := lifecycle.NewSealedResult(
-		200,
-		"application/json",
-		[]byte(`{}`),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	result, err := lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
+	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(t.Context())
 	returned := make(chan error, 1)
 	go func() {
@@ -63,30 +55,23 @@ func TestSubmitPreparedAndWaitJoinsAcceptedCancellation(t *testing.T) {
 	select {
 	case <-started:
 	case <-time.After(time.Second):
-		t.Fatal("prepared command did not start")
+		require.FailNow(t, "test failed", "prepared command did not start")
 	}
 	cancel()
 	select {
 	case err := <-returned:
-		t.Fatalf(
-			"accepted prepared command returned before terminal disposal: %v",
-			err,
-		)
+		require.FailNowf(t, "test failed", "accepted prepared command returned before terminal disposal: %v", err)
 	case <-time.After(25 * time.Millisecond):
 	}
 	close(release)
 	select {
 	case <-returned:
 	case <-time.After(time.Second):
-		t.Fatal("prepared command was not joined after terminal disposal")
+		require.FailNow(t, "test failed", "prepared command was not joined after terminal disposal")
 	}
 	kernel.Stop()
-	waitCtx, waitCancel := context.WithTimeout(
-		context.Background(),
-		time.Second,
-	)
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
 	defer waitCancel()
-	if err := kernel.Wait(waitCtx); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(waitCtx))
 }

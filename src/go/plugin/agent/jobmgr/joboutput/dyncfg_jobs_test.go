@@ -9,13 +9,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
-
-	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDynCfgAddCommitsOrDisposesOneGraphTransaction(t *testing.T) {
@@ -60,58 +60,36 @@ func TestDynCfgAddCommitsOrDisposesOneGraphTransaction(t *testing.T) {
 					)
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			ref := startDynCfgJobTestTask(t, supervisor, plan)
 			first := <-supervisor.CompletionCh()
-			if first.Ref != ref ||
+			require.False(t, first.Ref != ref ||
 				first.Sequence != 1 ||
 				first.Kind != lifecycle.TaskOutcomePreparedResourceTransaction ||
-				first.Err != nil {
-				t.Fatalf("initial completion=%+v", first)
-			}
+				first.Err != nil)
 
 			if test.apply {
-				if err := supervisor.SendAction(
+				require.NoError(t, supervisor.SendAction(
 					lifecycle.TaskAction{
 						Ref: ref, Sequence: 2,
 						Kind: lifecycle.TaskActionApplyResourceTransaction,
 					},
-				); err != nil {
-					t.Fatal(err)
-				}
+				),
+				)
+
 				second := <-supervisor.CompletionCh()
-				if second.Ref != ref ||
+				require.False(t, second.Ref != ref ||
 					second.Sequence != 2 ||
 					second.Kind != lifecycle.TaskOutcomeAppliedResourceTransaction ||
-					second.Err != nil {
-					t.Fatalf("apply completion=%+v", second)
-				}
+					second.Err != nil)
 				disposition, current, err :=
-					supervisor.TakeAppliedResourceTransaction(
-						ref,
-						2,
-						scope,
-					)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if disposition != lifecycle.ResourceTransactionUnchanged ||
-					current != nil {
-					t.Fatalf(
-						"disposition=%v current=%T",
-						disposition,
-						current,
-					)
-				}
-				if _, err := supervisor.PreflightResult(
-					ref,
-					"add",
-					1,
-				); err != nil {
-					t.Fatal(err)
-				}
+					supervisor.TakeAppliedResourceTransaction(ref, 2, scope)
+				require.NoError(t, err)
+				require.False(t, disposition != lifecycle.ResourceTransactionUnchanged || current != nil)
+
+				_, preflightResultErr := supervisor.PreflightResult(ref, "add", 1)
+				require.NoError(t, preflightResultErr)
+
 				sendDynCfgJobTestAction(
 					t,
 					supervisor,
@@ -146,17 +124,9 @@ func TestDynCfgAddCommitsOrDisposesOneGraphTransaction(t *testing.T) {
 						Kind: lifecycle.TaskActionDispose,
 					},
 				)
-				current, err := supervisor.TakeDisposedResourceTransaction(
-					ref,
-					2,
-					scope,
-				)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if current != nil {
-					t.Fatalf("disposed graph-only transaction returned %T", current)
-				}
+				current, err := supervisor.TakeDisposedResourceTransaction(ref, 2, scope)
+				require.NoError(t, err)
+				require.Nil(t, current)
 				sendDynCfgJobTestAction(
 					t,
 					supervisor,
@@ -166,52 +136,21 @@ func TestDynCfgAddCommitsOrDisposesOneGraphTransaction(t *testing.T) {
 					},
 				)
 			}
-			if err := supervisor.Release(ref); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, supervisor.Release(ref))
 
 			record, exists := graph.Lookup("module_job")
-			if exists != test.wantGraph {
-				t.Fatalf(
-					"graph record exists=%v want=%v record=%+v",
-					exists,
-					test.wantGraph,
-					record,
-				)
-			}
-			if exists &&
-				record.Status != dyncfg.StatusAccepted.String() {
-				t.Fatalf("graph status=%q", record.Status)
-			}
-			if state.collectorCleanup != 1 {
-				t.Fatalf(
-					"validation cleanup calls=%d want=1",
-					state.collectorCleanup,
-				)
-			}
+			require.EqualValues(t, test.wantGraph, exists)
+			require.False(t, exists && record.Status != dyncfg.StatusAccepted.String())
+			require.EqualValues(t, 1, state.collectorCleanup)
 			wire := output.String()
 			if !test.apply {
-				if wire != "" {
-					t.Fatalf("disposed transaction emitted %q", wire)
-				}
+				require.EqualValues(t, "", wire)
 				return
 			}
-			resultAt := strings.Index(
-				wire,
-				"FUNCTION_RESULT_BEGIN add 202 application/json 1\n",
-			)
-			notificationAt := strings.Index(
-				wire,
-				"CONFIG go.d:collector:module:job create accepted job",
-			)
-			if resultAt < 0 ||
-				notificationAt < 0 ||
-				resultAt >= notificationAt {
-				t.Fatalf(
-					"response/notification order is wrong: %q",
-					wire,
-				)
-			}
+			resultAt := strings.Index(wire, "FUNCTION_RESULT_BEGIN add 202 application/json 1\n")
+			notificationAt := strings.Index(wire, "CONFIG go.d:collector:module:job create accepted job")
+			require.False(t, resultAt < 0 || notificationAt < 0 || resultAt >= notificationAt)
 		})
 	}
 }
@@ -233,14 +172,8 @@ func TestResourceOnlyTransactionReplacesWithoutGraphMutation(t *testing.T) {
 	successor := &transactionTestPreparedResource{
 		identity: successorIdentity, ready: successorReady, events: &events,
 	}
-	result, err := lifecycle.NewSealedResult(
-		200,
-		"application/json",
-		[]byte(`{"status":200,"message":""}`),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	result, err := lifecycle.NewSealedResult(200, "application/json", []byte(`{"status":200,"message":""}`))
+	require.NoError(t, err)
 	transaction, err := PrepareResourceTransaction(
 		ResourceTransactionSpec{
 			Scope: lifecycle.ResourceTransactionScope{
@@ -252,21 +185,18 @@ func TestResourceOnlyTransactionReplacesWithoutGraphMutation(t *testing.T) {
 			Result: result, Cleanup: func() error { return nil },
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := transaction.Apply(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	_, applyErr := transaction.Apply(context.Background())
+	require.NoError(t, applyErr)
+
 	want := []string{
 		"current-stop",
 		"current-finalize",
 		"successor-accept",
 		"successor-publish",
 	}
-	if strings.Join(events, ",") != strings.Join(want, ",") {
-		t.Fatalf("events=%v want=%v", events, want)
-	}
+	require.EqualValues(t, strings.Join(want, ","), strings.Join(events, ","))
 }
 
 func newDynCfgJobTestHarness(
@@ -281,13 +211,9 @@ func newDynCfgJobTestHarness(
 	t.Helper()
 	output := &bytes.Buffer{}
 	frames, err := lifecycle.NewFrameOwner(output)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	supervisor, err := lifecycle.NewTaskSupervisor(frames)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	state := &factoryTestState{}
 	modules := collectorapi.Registry{
 		"module": {
@@ -301,9 +227,7 @@ func newDynCfgJobTestHarness(
 		},
 	}
 	resolver, err := secretresolver.NewAtomicResolver(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	factory, err := NewFactory(
 		FactoryConfig{
 			PluginName: "go.d", Modules: modules,
@@ -313,22 +237,16 @@ func newDynCfgJobTestHarness(
 			Scheduler: newTestScheduler(t),
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	configModules, err := NewConfigModuleFactory(
 		ConfigModuleFactoryConfig{
 			Modules: modules, Resolver: resolver,
 			StoreScope: unavailableStoreScope,
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	graph, err := dyncfg.NewGraph(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	controller, err := NewDynCfgJobController(
 		DynCfgJobControllerConfig{
 			PluginName: "go.d", Modules: modules,
@@ -341,9 +259,7 @@ func newDynCfgJobTestHarness(
 			Graph: graph, Frames: frames,
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return controller, graph, supervisor, output, state
 }
 
@@ -353,31 +269,12 @@ func startDynCfgJobTestTask(
 	plan lifecycle.TaskPlan,
 ) lifecycle.TaskRef {
 	t.Helper()
-	request, err := supervisor.Enqueue(
-		lifecycle.TaskClassFrameworkControl,
-		plan,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	request, err := supervisor.Enqueue(lifecycle.TaskClassFrameworkControl, plan)
+	require.NoError(t, err)
 	var starts [lifecycle.TaskStartServiceQuantum]lifecycle.TaskStart
-	count, _, err := supervisor.Dispatch(
-		context.Background(),
-		1,
-		&starts,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if count != 1 ||
-		starts[0].Request != request ||
-		starts[0].Err != nil {
-		t.Fatalf(
-			"task start count=%d start=%+v",
-			count,
-			starts[0],
-		)
-	}
+	count, _, err := supervisor.Dispatch(context.Background(), 1, &starts)
+	require.NoError(t, err)
+	require.False(t, count != 1 || starts[0].Request != request || starts[0].Err != nil)
 	return starts[0].Task
 }
 
@@ -387,14 +284,9 @@ func sendDynCfgJobTestAction(
 	action lifecycle.TaskAction,
 ) {
 	t.Helper()
-	if err := supervisor.SendAction(action); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, supervisor.SendAction(action))
+
 	ack := <-supervisor.AcknowledgementCh()
-	if ack.Ref != action.Ref ||
-		ack.Sequence != action.Sequence ||
-		ack.Kind != action.Kind ||
-		ack.Err != nil {
-		t.Fatalf("action acknowledgement=%+v", ack)
-	}
+	require.False(t, ack.Ref != action.Ref || ack.Sequence != action.Sequence || ack.Kind != action.Kind || ack.Err != nil)
 }

@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"reflect"
 	"runtime"
 	"strings"
 	"sync"
@@ -20,6 +19,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/stretchr/testify/require"
 )
 
 func TestKernelCompletionBroadcastsToAllCallers(t *testing.T) {
@@ -27,9 +27,8 @@ func TestKernelCompletionBroadcastsToAllCallers(t *testing.T) {
 		kernel := newStoppedKernel(t)
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
-		if err := kernel.Wait(ctx); err != nil {
-			t.Fatalf("second wait differs: %v", err)
-		}
+
+		require.NoError(t, kernel.Wait(ctx))
 	})
 
 	t.Run("submit after stop", func(t *testing.T) {
@@ -38,13 +37,8 @@ func TestKernelCompletionBroadcastsToAllCallers(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 		err := kernel.Submit(ctx, Request{UID: "after-stop", Source: lifecycle.SourceFunction, Route: "route"})
-		if err == nil || errors.Is(err, context.DeadlineExceeded) || !strings.Contains(err.Error(), "stopped") {
-			t.Fatalf("post-stop submit differs: %v", err)
-		}
-		if catalog.next != 0 || catalog.release != 0 || len(catalog.leases) != 0 {
-			t.Fatalf("post-stop submit touched Function catalog: resolves=%d releases=%d active=%d",
-				catalog.next, catalog.release, len(catalog.leases))
-		}
+		require.False(t, err == nil || errors.Is(err, context.DeadlineExceeded) || !strings.Contains(err.Error(), "stopped"))
+		require.False(t, catalog.next != 0 || catalog.release != 0 || len(catalog.leases) != 0)
 	})
 
 	t.Run("cancel after stop", func(t *testing.T) {
@@ -52,9 +46,7 @@ func TestKernelCompletionBroadcastsToAllCallers(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 		defer cancel()
 		err := kernel.Cancel(ctx, "after-stop")
-		if err == nil || errors.Is(err, context.DeadlineExceeded) || !strings.Contains(err.Error(), "stopped") {
-			t.Fatalf("post-stop cancel differs: %v", err)
-		}
+		require.False(t, err == nil || errors.Is(err, context.DeadlineExceeded) || !strings.Contains(err.Error(), "stopped"))
 	})
 }
 
@@ -64,65 +56,52 @@ func TestKernelLoopStartsExactlyOnce(t *testing.T) {
 	}{
 		"nil command kernel": {
 			run: func(t *testing.T) {
-				if _, err := NewKernelLoop(nil); err == nil {
-					t.Fatal("nil command kernel was accepted")
-				}
+				_, err := NewKernelLoop(nil)
+				require.Error(t, err)
 			},
 		},
 		"nil context": {
 			run: func(t *testing.T) {
 				kernel, _ := newKernel(t)
 				loop, err := NewKernelLoop(kernel)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := loop.Start(nil); err == nil {
-					t.Fatal("nil loop context was accepted")
-				}
+				require.NoError(t, err)
+
+				require.Error(t, loop.Start(nil))
 			},
 		},
 		"duplicate start": {
 			run: func(t *testing.T) {
 				kernel, _ := newKernel(t)
 				loop, err := NewKernelLoop(kernel)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := loop.Start(context.Background()); err != nil {
-					t.Fatal(err)
-				}
-				if err := loop.Start(context.Background()); err == nil {
-					t.Fatal("second loop start was accepted")
-				}
+				require.NoError(t, err)
+
+				require.NoError(t, loop.Start(context.Background()))
+
+				require.Error(t, loop.Start(context.Background()))
+
 				kernel.Stop()
-				if err := kernel.Wait(context.Background()); err != nil {
-					t.Fatal(err)
-				}
+
+				require.NoError(t, kernel.Wait(context.Background()))
 			},
 		},
 		"duplicate wrappers": {
 			run: func(t *testing.T) {
 				kernel, _ := newKernel(t)
 				first, err := NewKernelLoop(kernel)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				second, err := NewKernelLoop(kernel)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := first.Start(context.Background()); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
+
+				require.NoError(t, first.Start(context.Background()))
+
 				if err := second.Start(context.Background()); err == nil {
 					kernel.Stop()
 					_ = kernel.Wait(context.Background())
-					t.Fatal("second wrapper start was accepted")
+					require.FailNow(t, "test failed", "second wrapper start was accepted")
 				}
 				kernel.Stop()
-				if err := kernel.Wait(context.Background()); err != nil {
-					t.Fatal(err)
-				}
+
+				require.NoError(t, kernel.Wait(context.Background()))
 			},
 		},
 	}
@@ -160,13 +139,12 @@ func TestKernelTerminalRejectsWithoutRetainingSubmissions(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			kernel := newStoppedKernel(t)
 			for index := 0; index < externalSourceQueueDepth*4; index++ {
-				if err := test.call(context.Background(), kernel, index); !errors.Is(err, ErrStopped) {
-					t.Fatalf("terminal submission %d differs: %v", index, err)
-				}
+				err := test.call(context.Background(), kernel, index)
+				require.ErrorIs(t, err, ErrStopped)
 			}
-			if retained := len(kernel.submissions[sourceIndex(test.source)]); retained != 0 {
-				t.Fatalf("terminal submissions retained=%d", retained)
-			}
+
+			retained := len(kernel.submissions[sourceIndex(test.source)])
+			require.EqualValues(t, 0, retained)
 		})
 	}
 }
@@ -179,31 +157,30 @@ func TestKernelDirtyStateTriggersFailStop(t *testing.T) {
 	kernel.NotifyControlReady()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := kernel.Wait(ctx); !errors.Is(err, want) {
-		t.Fatalf("dirty terminal cause differs: %v", err)
-	}
-	if err := kernel.Wait(ctx); !errors.Is(err, want) {
-		t.Fatalf("repeated dirty terminal cause differs: %v", err)
-	}
+
+	require.ErrorIs(t, kernel.Wait(ctx), want)
+
+	require.ErrorIs(t, kernel.Wait(ctx), want)
 }
 
 func TestKernelResourcePublicationRunsOffLoop(t *testing.T) {
 	publishRelease := make(chan struct{})
 	resource := newKernelTestReadyResource("resource", publishRelease, nil)
 	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, kernelResourcePlanner(t, resource, nil, nil))
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
-	if err := kernel.Submit(context.Background(), Request{
+
+	require.NoError(t, kernel.Submit(context.Background(), Request{
 		UID: "publish-off-loop", LaneKey: "resource", Source: lifecycle.SourceJobManager, Route: "install",
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}),
+	)
+
 	select {
 	case <-resource.publishEntered:
 	case <-time.After(time.Second):
-		t.Fatal("resource publication did not start")
+		require.FailNow(t, "test failed", "resource publication did not start")
 	}
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
@@ -212,18 +189,14 @@ func TestKernelResourcePublicationRunsOffLoop(t *testing.T) {
 	close(publishRelease)
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
 	defer waitCancel()
-	if err := kernel.Wait(waitCtx); err != nil {
-		t.Fatal(err)
-	}
-	if shutdownErr != nil {
-		t.Fatalf("resource publication blocked KernelLoop shutdown: %v", shutdownErr)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 {
-		t.Fatalf("resource publication retained tasks: active=%d pending=%d", tasks.Active(), tasks.Pending())
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(waitCtx))
+
+	require.NoError(t, shutdownErr)
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -238,9 +211,9 @@ func TestKernelPlanningRunsOutsideLoop(t *testing.T) {
 		})}, nil
 	})
 	kernel, run, admission, uids, _ := newKernelWithPlanner(t, planner)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	submitResult := make(chan error, 1)
 	go func() {
@@ -251,7 +224,7 @@ func TestKernelPlanningRunsOutsideLoop(t *testing.T) {
 	select {
 	case <-planEntered:
 	case <-time.After(time.Second):
-		t.Fatal("planning did not start")
+		require.FailNow(t, "test failed", "planning did not start")
 	}
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
@@ -261,19 +234,17 @@ func TestKernelPlanningRunsOutsideLoop(t *testing.T) {
 	select {
 	case <-submitResult:
 	case <-time.After(time.Second):
-		t.Fatal("blocked planning caller did not return")
+		require.FailNow(t, "test failed", "blocked planning caller did not return")
 	}
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
 	defer waitCancel()
-	if err := kernel.Wait(waitCtx); err != nil {
-		t.Fatal(err)
-	}
-	if shutdownErr != nil {
-		t.Fatalf("plan preparation blocked KernelLoop shutdown: %v", shutdownErr)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(waitCtx))
+
+	require.NoError(t, shutdownErr)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -287,9 +258,8 @@ func TestFunctionCatalogPlanningWaitsForKernelLoop(t *testing.T) {
 	})
 	kernel, run, admission, uids, _ := newKernelWithPlanner(t, planner)
 	catalog := testFunctionCatalogFor(t, kernel)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
 
 	submitted := make(chan error, 1)
 	go func() {
@@ -309,27 +279,19 @@ func TestFunctionCatalogPlanningWaitsForKernelLoop(t *testing.T) {
 	startKernelLoop(t, kernel)
 	select {
 	case err := <-submitted:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("Function submission did not complete")
+		require.FailNow(t, "test failed", "Function submission did not complete")
 	}
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
-	if calledBeforeStart {
-		t.Fatal("Function catalog planning ran before KernelLoop")
-	}
-	if catalog.next != 1 || catalog.release != 1 || len(catalog.leases) != 0 {
-		t.Fatalf("Function lease lifecycle differs: resolves=%d releases=%d active=%d",
-			catalog.next, catalog.release, len(catalog.leases))
-	}
+	require.False(t, calledBeforeStart)
+	require.False(t, catalog.next != 1 || catalog.release != 1 || len(catalog.leases) != 0)
 }
 
 func TestFunctionCatalogDecisionOwnsExactLease(t *testing.T) {
@@ -385,32 +347,28 @@ func TestFunctionCatalogDecisionOwnsExactLease(t *testing.T) {
 			kernel, run, admission, uids, _ := newKernelWithClockFinalizerCatalogAndTimeout(
 				t, planner, catalog, &output, lifecycle.RealClock{}, newNoopRunFinalizer(), time.Second,
 			)
-			if err := run.OpenAdmission(); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, run.OpenAdmission())
+
 			startKernelLoop(t, kernel)
 			ctx, cancel := context.WithTimeout(t.Context(), time.Second)
 			defer cancel()
 			err := kernel.SubmitAndWait(ctx, Request{
 				UID: "catalog-decision", Source: lifecycle.SourceFunction, Route: "route",
 			})
-			if gotErr := err != nil; gotErr != test.wantErr {
-				t.Fatalf("SubmitAndWait error=%v, want error=%v", err, test.wantErr)
-			}
+
+			gotErr := err != nil
+			require.EqualValues(t, test.wantErr, gotErr)
+
 			kernel.Stop()
-			if err := kernel.Wait(context.Background()); err != nil {
-				t.Fatal(err)
-			}
-			if resolves != 1 || releases != test.wantReleases {
-				t.Fatalf("catalog transitions: resolves=%d releases=%d, want 1/%d",
-					resolves, releases, test.wantReleases)
-			}
-			if test.wantStatus != "" && !bytes.Contains(output.Bytes(), []byte(test.wantStatus)) {
-				t.Fatalf("Function result status differs: %q", output.Bytes())
-			}
-			if err := admission.CloseDrained(run.Generation()); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, kernel.Wait(context.Background()))
+
+			require.False(t, resolves != 1 || releases != test.wantReleases)
+			require.False(t, test.wantStatus != "" && !bytes.Contains(output.Bytes(), []byte(test.wantStatus)))
+
+			require.NoError(t, admission.CloseDrained(run.Generation()))
+
 			closeUIDLedger(t, uids)
 		})
 	}
@@ -449,34 +407,30 @@ func TestFunctionHandlerCleanupRunsOffKernelLoop(t *testing.T) {
 	kernel, run, admission, uids, _ = newKernelWithClockFinalizerCatalogAndTimeout(
 		t, planner, catalog, io.Discard, lifecycle.RealClock{}, newNoopRunFinalizer(), time.Second,
 	)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
-	if err := kernel.SubmitAndWait(context.Background(), Request{
+
+	require.NoError(t, kernel.SubmitAndWait(context.Background(), Request{
 		UID: "cleanup-off-loop", Source: lifecycle.SourceFunction, Route: "route",
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}),
+	)
+
 	select {
 	case err := <-cleanupCompleted:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("Function cleanup did not complete through TaskSupervisor")
+		require.FailNow(t, "test failed", "Function cleanup did not complete through TaskSupervisor")
 	}
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if len(kernel.functionCleanupRequests) != 0 || len(kernel.functionCleanupTasks) != 0 {
-		t.Fatalf("Function cleanup retained kernel state: requests=%d tasks=%d",
-			len(kernel.functionCleanupRequests), len(kernel.functionCleanupTasks))
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	require.False(t, len(kernel.functionCleanupRequests) != 0 || len(kernel.functionCleanupTasks) != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -511,9 +465,8 @@ func TestWorkPlanRejectsUnboundedClaims(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			plan := valid
 			test.mutate(&plan)
-			if err := plan.validate(); err == nil {
-				t.Fatal("unbounded plan passed validation")
-			}
+
+			require.Error(t, plan.validate())
 		})
 	}
 }
@@ -522,16 +475,14 @@ func TestKernelSubmitWaitsForOrdinaryAdmissionGrant(t *testing.T) {
 	kernel, run, admission, _, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
 	gate := make(chan struct{})
 	kernel.admissionServiceGate = gate
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	request := Request{
 		UID: "grant-boundary", Source: lifecycle.SourceFunction, Route: "route",
 	}
 	plan, err := kernel.prepareSubmissionPlanForTest(request)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	submitted := make(chan error, 1)
 	kernel.submissions[sourceIndex(request.Source)] <- submission{
 		request: request,
@@ -539,12 +490,13 @@ func TestKernelSubmitWaitsForOrdinaryAdmissionGrant(t *testing.T) {
 		result:  submitted,
 	}
 	kernel.serviceSubmissions(1)
-	if census := admission.Census(); census.OrdinaryWaiting != 1 || census.OrdinaryGranted != 0 {
-		t.Fatalf("pre-grant admission differs: %#v", census)
-	}
+
+	census := admission.Census()
+	require.False(t, census.OrdinaryWaiting != 1 || census.OrdinaryGranted != 0)
+
 	select {
 	case err := <-submitted:
-		t.Fatalf("submission returned before ordinary grant: %v", err)
+		require.FailNowf(t, "test failed", "submission returned before ordinary grant: %v", err)
 	default:
 	}
 
@@ -552,11 +504,9 @@ func TestKernelSubmitWaitsForOrdinaryAdmissionGrant(t *testing.T) {
 	kernel.serviceAdmissions(1)
 	select {
 	case err := <-submitted:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	default:
-		t.Fatal("submission did not return after ordinary grant")
+		require.FailNow(t, "test failed", "submission did not return after ordinary grant")
 	}
 }
 
@@ -565,9 +515,9 @@ func TestKernelCancelledSubmitReleasesUngrantableAdmission(t *testing.T) {
 	catalog := testFunctionCatalogFor(t, kernel)
 	gate := make(chan struct{})
 	kernel.admissionServiceGate = gate
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -579,37 +529,30 @@ func TestKernelCancelledSubmitReleasesUngrantableAdmission(t *testing.T) {
 	}()
 	deadline := time.Now().Add(time.Second)
 	for admission.Census().OrdinaryWaiting != 1 {
-		if time.Now().After(deadline) {
-			t.Fatal("submission did not reach ordinary admission")
-		}
+		require.False(t, time.Now().After(deadline))
 		runtime.Gosched()
 	}
 	cancel()
 	select {
 	case err := <-submitted:
-		if !errors.Is(err, context.Canceled) {
-			t.Fatalf("cancelled submission result differs: %v", err)
-		}
+		require.ErrorIs(t, err, context.Canceled)
 	case <-time.After(time.Second):
-		t.Fatal("cancelled submission did not return")
+		require.FailNow(t, "test failed", "cancelled submission did not return")
 	}
-	if census := admission.Census(); census.ActiveRecords != 0 || census.OrdinaryWaiting != 0 {
-		t.Fatalf("cancelled submission retained admission: %#v", census)
-	}
+
+	census := admission.Census()
+	require.False(t, census.ActiveRecords != 0 || census.OrdinaryWaiting != 0)
 
 	kernel.Stop()
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
 	defer waitCancel()
-	if err := kernel.Wait(waitCtx); err != nil {
-		t.Fatal(err)
-	}
-	if catalog.next != 1 || catalog.release != 1 || len(catalog.leases) != 0 {
-		t.Fatalf("pre-start cancellation Function lease differs: resolves=%d releases=%d active=%d",
-			catalog.next, catalog.release, len(catalog.leases))
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(waitCtx))
+
+	require.False(t, catalog.next != 1 || catalog.release != 1 || len(catalog.leases) != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -621,9 +564,9 @@ func TestKernelAbsentResourceStopSettlesWithoutAdmission(t *testing.T) {
 		}, nil
 	})
 	kernel, run, admission, uids, _ := newKernelWithPlanner(t, planner)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 
 	result := make(chan error, 1)
@@ -634,25 +577,22 @@ func TestKernelAbsentResourceStopSettlesWithoutAdmission(t *testing.T) {
 	}()
 	select {
 	case err := <-result:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("absent resource stop did not settle")
+		require.FailNow(t, "test failed", "absent resource stop did not settle")
 	}
-	if census := admission.Census(); census.ActiveRecords != 0 || census.OrdinaryWaiting != 0 || census.OrdinaryGranted != 0 {
-		t.Fatalf("absent stop consumed admission: %#v", census)
-	}
+
+	census := admission.Census()
+	require.False(t, census.ActiveRecords != 0 || census.OrdinaryWaiting != 0 || census.OrdinaryGranted != 0)
 
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := kernel.Wait(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(ctx))
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -681,9 +621,7 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 			current := newKernelTestReadyResource("resource", nil, nil)
 			successor := newKernelTestReadyResource("resource", nil, nil)
 			permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			planner := kernelTestTransactionPlanner{
 				permitPlan: permitPlan,
 				current:    current,
@@ -694,12 +632,12 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 			var output bytes.Buffer
 			kernel, run, admission, uids, tasks :=
 				newKernelWithPlannerAndWriter(t, planner, &output)
-			if err := run.OpenAdmission(); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, run.OpenAdmission())
+
 			startKernelLoop(t, kernel)
 
-			if err := kernel.SubmitAndWait(
+			require.NoError(t, kernel.SubmitAndWait(
 				context.Background(),
 				Request{
 					UID:     "install-current",
@@ -707,15 +645,16 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 					Source:  lifecycle.SourceJobManager,
 					Route:   "install",
 				},
-			); err != nil {
-				t.Fatal(err)
-			}
+			),
+			)
+
 			originalIdentity := current.identity
 			uid := "replace-rejected"
 			if test.wantSuccessor {
 				uid = "replace-success"
 			}
-			if err := kernel.SubmitAndWait(
+
+			require.NoError(t, kernel.SubmitAndWait(
 				context.Background(),
 				Request{
 					UID:     uid,
@@ -723,70 +662,32 @@ func TestKernelRunsResourceTransactionInOriginalOperation(t *testing.T) {
 					Source:  lifecycle.SourceJobManager,
 					Route:   "replace",
 				},
-			); err != nil {
-				t.Fatal(err)
-			}
+			),
+			)
 
 			lane := kernel.lanes[resourceCommandLaneKey("resource")]
-			if lane == nil {
-				t.Fatal("transaction released the live resource lane")
-			}
+			require.NotNil(t, lane)
 			if test.wantSuccessor {
-				if lane.current != successor ||
+				require.False(t, lane.current != successor ||
 					lane.currentIdentity != successor.identity ||
-					lane.currentIdentity == originalIdentity {
-					t.Fatalf(
-						"replacement current=%T identity=%#v, successor=%T identity=%#v",
-						lane.current,
-						lane.currentIdentity,
-						successor,
-						successor.identity,
-					)
-				}
-			} else if lane.current != current ||
-				lane.currentIdentity != originalIdentity {
-				t.Fatalf(
-					"rejected replacement current=%T identity=%#v, want exact original %#v",
-					lane.current,
-					lane.currentIdentity,
-					originalIdentity,
-				)
+					lane.currentIdentity == originalIdentity)
+			} else {
+				require.False(t, lane.current != current || lane.currentIdentity != originalIdentity)
 			}
-			if lane.currentStopping ||
-				lane.retiringIdentity.Valid() ||
-				lane.transactionPlanned != 0 {
-				t.Fatalf("transaction retained lane state: %#v", lane)
-			}
-			if !reflect.DeepEqual(events, test.wantEvents) {
-				t.Fatalf("events=%v, want %v", events, test.wantEvents)
-			}
-			if !strings.Contains(output.String(), test.wantResponseText) {
-				t.Fatalf(
-					"response does not contain UID %q: %q",
-					test.wantResponseText,
-					output.String(),
-				)
-			}
+			require.False(t, lane.currentStopping || lane.retiringIdentity.Valid() || lane.transactionPlanned != 0)
+			require.Equal(t, test.wantEvents, events)
+			require.Contains(t, output.String(), test.wantResponseText)
 
 			kernel.Stop()
-			waitCtx, cancel := context.WithTimeout(
-				context.Background(),
-				time.Second,
-			)
+			waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			if err := kernel.Wait(waitCtx); err != nil {
-				t.Fatal(err)
-			}
-			if tasks.Active() != 0 || tasks.Pending() != 0 {
-				t.Fatalf(
-					"transaction retained tasks: active=%d pending=%d",
-					tasks.Active(),
-					tasks.Pending(),
-				)
-			}
-			if err := admission.CloseDrained(run.Generation()); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, kernel.Wait(waitCtx))
+
+			require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+
+			require.NoError(t, admission.CloseDrained(run.Generation()))
+
 			closeUIDLedger(t, uids)
 		})
 	}
@@ -797,9 +698,7 @@ func TestKernelSharesResourceAuthorityAcrossSchedulingSources(t *testing.T) {
 	current := newKernelTestReadyResource("resource", nil, nil)
 	successor := newKernelTestReadyResource("resource", nil, nil)
 	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	resourcePlanner := kernelTestTransactionPlanner{
 		permitPlan: permitPlan,
 		current:    current,
@@ -822,12 +721,12 @@ func TestKernelSharesResourceAuthorityAcrossSchedulingSources(t *testing.T) {
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string {
 		return "resource"
 	})
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 
-	if err := kernel.SubmitAndWait(
+	require.NoError(t, kernel.SubmitAndWait(
 		context.Background(),
 		Request{
 			UID:     "install-from-job-manager",
@@ -835,74 +734,47 @@ func TestKernelSharesResourceAuthorityAcrossSchedulingSources(t *testing.T) {
 			Source:  lifecycle.SourceJobManager,
 			Route:   "install",
 		},
-	); err != nil {
-		t.Fatal(err)
-	}
-	if err := kernel.SubmitAndWait(
+	),
+	)
+
+	require.NoError(t, kernel.SubmitAndWait(
 		context.Background(),
 		Request{
 			UID:    "replace-from-function",
 			Source: lifecycle.SourceFunction,
 			Route:  "replace",
 		},
-	); err != nil {
-		t.Fatal(err)
-	}
+	),
+	)
 
 	lane := kernel.lanes[resourceCommandLaneKey("resource")]
-	if lane == nil ||
+	require.False(t, lane == nil ||
 		lane.current != successor ||
 		lane.currentIdentity != successor.identity ||
-		lane.resourceSource != lifecycle.SourceFunction {
-		t.Fatalf(
-			"cross-source replacement did not retain one exact resource authority: %#v",
-			lane,
-		)
-	}
+		lane.resourceSource != lifecycle.SourceFunction)
 	resourceLanes := 0
 	for key := range kernel.lanes {
 		if key.resource && key.key == "resource" {
 			resourceLanes++
 		}
 	}
-	if resourceLanes != 1 {
-		t.Fatalf(
-			"cross-source replacement created %d resource authorities, want 1",
-			resourceLanes,
-		)
-	}
-	if want := []string{"prepare", "apply", "cleanup"}; !reflect.DeepEqual(events, want) {
-		t.Fatalf("events=%v, want %v", events, want)
-	}
-	if !strings.Contains(
-		output.String(),
-		"FUNCTION_RESULT_BEGIN replace-from-function 200 ",
-	) {
-		t.Fatalf(
-			"cross-source transaction response missing: %q",
-			output.String(),
-		)
-	}
+	require.EqualValues(t, 1, resourceLanes)
+
+	want := []string{"prepare", "apply", "cleanup"}
+	require.Equal(t, want, events)
+
+	require.Contains(t, output.String(), "FUNCTION_RESULT_BEGIN replace-from-function 200 ")
 
 	kernel.Stop()
-	waitCtx, cancel := context.WithTimeout(
-		context.Background(),
-		time.Second,
-	)
+	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := kernel.Wait(waitCtx); err != nil {
-		t.Fatal(err)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 {
-		t.Fatalf(
-			"cross-source transaction retained tasks: active=%d pending=%d",
-			tasks.Active(),
-			tasks.Pending(),
-		)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(waitCtx))
+
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -911,9 +783,7 @@ func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
 	current := newKernelTestReadyResource("resource", nil, nil)
 	successor := newKernelTestReadyResource("resource", nil, nil)
 	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	planner := kernelTestTransactionPlanner{
 		permitPlan:          permitPlan,
 		current:             current,
@@ -924,11 +794,12 @@ func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
 	var output bytes.Buffer
 	kernel, run, admission, uids, tasks :=
 		newKernelWithPlannerAndWriter(t, planner, &output)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
-	if err := kernel.SubmitAndWait(
+
+	require.NoError(t, kernel.SubmitAndWait(
 		context.Background(),
 		Request{
 			UID:     "install-before-cancel",
@@ -936,11 +807,12 @@ func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
 			Source:  lifecycle.SourceJobManager,
 			Route:   "install",
 		},
-	); err != nil {
-		t.Fatal(err)
-	}
+	),
+	)
+
 	originalIdentity := current.identity
-	if err := kernel.SubmitAndWait(
+
+	require.NoError(t, kernel.SubmitAndWait(
 		context.Background(),
 		Request{
 			UID:      "replace-deadline",
@@ -949,43 +821,31 @@ func TestKernelDisposesCancelledPreparedResourceTransaction(t *testing.T) {
 			Route:    "replace",
 			Deadline: time.Now().Add(10 * time.Millisecond),
 		},
-	); err != nil {
-		t.Fatal(err)
-	}
+	),
+	)
+
 	lane := kernel.lanes[resourceCommandLaneKey("resource")]
-	if lane == nil ||
+	require.False(t, lane == nil ||
 		lane.current != current ||
 		lane.currentIdentity != originalIdentity ||
 		lane.currentStopping ||
-		lane.transactionPlanned != 0 {
-		t.Fatalf("cancelled transaction did not restore exact current: %#v", lane)
-	}
-	if want := []string{"prepare", "dispose"}; !reflect.DeepEqual(
-		events,
-		want,
-	) {
-		t.Fatalf("events=%v, want %v", events, want)
-	}
-	if !strings.Contains(output.String(), "replace-deadline") {
-		t.Fatalf("deadline response missing: %q", output.String())
-	}
+		lane.transactionPlanned != 0)
+
+	want := []string{"prepare", "dispose"}
+	require.Equal(t, want, events)
+
+	require.Contains(t, output.String(), "replace-deadline")
 
 	kernel.Stop()
 	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := kernel.Wait(waitCtx); err != nil {
-		t.Fatal(err)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 {
-		t.Fatalf(
-			"cancelled transaction retained tasks: active=%d pending=%d",
-			tasks.Active(),
-			tasks.Pending(),
-		)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(waitCtx))
+
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -994,9 +854,7 @@ func TestKernelPreparedInternalTransactionAppliesWithoutResponse(t *testing.T) {
 	current := newKernelTestReadyResource("resource", nil, nil)
 	successor := newKernelTestReadyResource("resource", nil, nil)
 	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	planner := kernelTestTransactionPlanner{
 		permitPlan: permitPlan,
 		current:    current,
@@ -1006,11 +864,12 @@ func TestKernelPreparedInternalTransactionAppliesWithoutResponse(t *testing.T) {
 	var output bytes.Buffer
 	kernel, run, admission, uids, tasks :=
 		newKernelWithPlannerAndWriter(t, planner, &output)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
-	if err := kernel.SubmitAndWait(
+
+	require.NoError(t, kernel.SubmitAndWait(
 		context.Background(),
 		Request{
 			UID:     "prepared-install",
@@ -1018,9 +877,9 @@ func TestKernelPreparedInternalTransactionAppliesWithoutResponse(t *testing.T) {
 			Source:  lifecycle.SourceJobManager,
 			Route:   "install",
 		},
-	); err != nil {
-		t.Fatal(err)
-	}
+	),
+	)
+
 	request := Request{
 		UID:     "prepared-replace",
 		LaneKey: "resource",
@@ -1031,49 +890,31 @@ func TestKernelPreparedInternalTransactionAppliesWithoutResponse(t *testing.T) {
 		LaneKey: request.LaneKey,
 		Route:   "replace",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	plan.NoResponse = true
-	if err := kernel.SubmitPreparedAndWait(
-		context.Background(),
-		request,
-		plan,
-	); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.SubmitPreparedAndWait(context.Background(), request, plan))
+
 	lane := kernel.lanes[resourceCommandLaneKey("resource")]
-	if lane == nil ||
+	require.False(t, lane == nil ||
 		lane.current != successor ||
 		lane.currentIdentity != successor.identity ||
 		lane.currentStopping ||
-		lane.transactionPlanned != 0 {
-		t.Fatalf("prepared transaction lane=%#v", lane)
-	}
-	if want := []string{"prepare", "apply", "cleanup"}; !reflect.DeepEqual(
-		events,
-		want,
-	) {
-		t.Fatalf("events=%v want=%v", events, want)
-	}
-	if strings.Contains(output.String(), request.UID) {
-		t.Fatalf("internal transaction emitted a response: %q", output.String())
-	}
+		lane.transactionPlanned != 0)
+
+	want := []string{"prepare", "apply", "cleanup"}
+	require.Equal(t, want, events)
+
+	require.NotContains(t, output.String(), request.UID)
 
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 {
-		t.Fatalf(
-			"prepared transaction retained tasks: active=%d pending=%d",
-			tasks.Active(),
-			tasks.Pending(),
-		)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -1086,15 +927,16 @@ func TestKernelShutdownStopsResourceAfterActiveUserDrains(t *testing.T) {
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string {
 		return "resource"
 	})
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
-	if err := kernel.SubmitAndWait(context.Background(), Request{
+
+	require.NoError(t, kernel.SubmitAndWait(context.Background(), Request{
 		UID: "install-before-use", LaneKey: "resource", Source: lifecycle.SourceJobManager, Route: "install",
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}),
+	)
+
 	useResult := make(chan error, 1)
 	go func() {
 		useResult <- kernel.SubmitAndWait(context.Background(), Request{
@@ -1104,9 +946,9 @@ func TestKernelShutdownStopsResourceAfterActiveUserDrains(t *testing.T) {
 	select {
 	case <-workEntered:
 	case err := <-useResult:
-		t.Fatalf("resource user reached terminal before starting: %v", err)
+		require.FailNowf(t, "test failed", "resource user reached terminal before starting: %v", err)
 	case <-time.After(time.Second):
-		t.Fatal("resource user did not start")
+		require.FailNow(t, "test failed", "resource user did not start")
 	}
 	kernel.Stop()
 	var overlap bool
@@ -1119,28 +961,24 @@ func TestKernelShutdownStopsResourceAfterActiveUserDrains(t *testing.T) {
 	select {
 	case <-resource.stopEntered:
 	case <-time.After(time.Second):
-		t.Fatal("resource stop did not begin after its user drained")
+		require.FailNow(t, "test failed", "resource stop did not begin after its user drained")
 	}
 	close(stopRelease)
 	select {
 	case <-useResult:
 	case <-time.After(time.Second):
-		t.Fatal("resource user did not reach terminal disposal")
+		require.FailNow(t, "test failed", "resource user did not reach terminal disposal")
 	}
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
 	defer waitCancel()
-	if err := kernel.Wait(waitCtx); err != nil {
-		t.Fatal(err)
-	}
-	if overlap {
-		t.Fatal("resource stop overlapped an active same-lane user")
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 {
-		t.Fatalf("resource shutdown retained tasks: active=%d pending=%d", tasks.Active(), tasks.Pending())
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(waitCtx))
+
+	require.False(t, overlap)
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -1154,26 +992,23 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 		resources[id] = newKernelTestReadyResource(id, nil, stopRelease)
 	}
 	permitPlan, err := lifecycle.NewJobLongLivedPlan(512)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, kernelTestResourceSetPlanner{
 		permitPlan: permitPlan,
 		resources:  resources,
 	})
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	for id := range resources {
-		if err := kernel.SubmitAndWait(context.Background(), Request{
+		require.NoError(t, kernel.SubmitAndWait(context.Background(), Request{
 			UID:     "install-" + id,
 			LaneKey: id,
 			Source:  lifecycle.SourceJobManager,
 			Route:   "install",
-		}); err != nil {
-			t.Fatal(err)
-		}
+		}),
+		)
 	}
 
 	kernel.Stop()
@@ -1181,46 +1016,36 @@ func TestKernelShutdownTracksDynamicTaskPopulation(t *testing.T) {
 		select {
 		case <-resource.stopEntered:
 		case <-time.After(time.Second):
-			t.Fatalf("resource %q did not begin shutdown", id)
+			require.FailNowf(t, "test failed", "resource %q did not begin shutdown", id)
 		}
 	}
-	if active := tasks.Active(); active != population {
-		t.Fatalf("active shutdown tasks=%d, want %d", active, population)
-	}
+
+	active := tasks.Active()
+	require.EqualValues(t, population, active)
+
 	wantLongLivedBytes := int64(population) *
 		512
-	if census := tasks.LongLivedCensus(); census.Active != population ||
-		census.Bytes != wantLongLivedBytes {
-		t.Fatalf(
-			"active shutdown long-lived census=%+v, want bytes=%d",
-			census,
-			wantLongLivedBytes,
-		)
-	}
-	if census := admission.Census(); census.LongLivedRecords != population ||
-		census.LongLivedBytes != wantLongLivedBytes {
-		t.Fatalf(
-			"active shutdown admission census=%+v, want bytes=%d",
-			census,
-			wantLongLivedBytes,
-		)
-	}
+
+	census := tasks.LongLivedCensus()
+	require.False(t, census.Active != population || census.Bytes != wantLongLivedBytes)
+
+	admissionCensus := admission.Census()
+	require.False(t, admissionCensus.LongLivedRecords != population ||
+		admissionCensus.LongLivedBytes != wantLongLivedBytes)
+
 	close(stopRelease)
 
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer waitCancel()
-	if err := kernel.Wait(waitCtx); err != nil {
-		t.Fatal(err)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 {
-		t.Fatalf("resource shutdown retained tasks: active=%d pending=%d", tasks.Active(), tasks.Pending())
-	}
-	if census := tasks.LongLivedCensus(); census != (lifecycle.LongLivedCensus{}) {
-		t.Fatalf("resource shutdown retained long-lived ownership: %+v", census)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(waitCtx))
+
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+
+	require.EqualValues(t, (lifecycle.LongLivedCensus{}), tasks.LongLivedCensus())
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -1231,19 +1056,15 @@ func TestKernelLoopContinuesPendingTaskStartsAcrossServiceQuanta(t *testing.T) {
 		t,
 		stoppedKernelPlanner{},
 	)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
 
 	release := make(chan struct{})
 	var releaseOnce sync.Once
 	t.Cleanup(func() {
 		releaseOnce.Do(func() { close(release) })
 		kernel.Stop()
-		waitCtx, waitCancel := context.WithTimeout(
-			context.Background(),
-			time.Second,
-		)
+		waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
 		defer waitCancel()
 		_ = kernel.Wait(waitCtx)
 	})
@@ -1261,9 +1082,7 @@ func TestKernelLoopContinuesPendingTaskStartsAcrossServiceQuanta(t *testing.T) {
 				},
 			},
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		kernel.functionCleanupRequests[request] = FunctionCleanupRef{
 			Slot: slot, Generation: 1,
 		}
@@ -1277,15 +1096,13 @@ func TestKernelLoopContinuesPendingTaskStartsAcrossServiceQuanta(t *testing.T) {
 		select {
 		case <-genericEntered:
 		case <-time.After(time.Second):
-			t.Fatalf(
-				"generic task %d remained pending after a service quantum",
-				index+1,
-			)
+			require.FailNowf(t, "test failed", "generic task %d remained pending after a service quantum", index+1)
 		}
 	}
 
 	controlEntered := make(chan struct{}, 1)
-	if err := kernel.SubmitPrepared(
+
+	require.NoError(t, kernel.SubmitPrepared(
 		context.Background(),
 		Request{
 			UID:     "continued-framework-control",
@@ -1298,40 +1115,30 @@ func TestKernelLoopContinuesPendingTaskStartsAcrossServiceQuanta(t *testing.T) {
 				func(context.Context) (lifecycle.SealedResult, error) {
 					controlEntered <- struct{}{}
 					<-release
-					return lifecycle.NewSealedResult(
-						200,
-						"application/json",
-						[]byte(`{}`),
-					)
+					return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
 				},
 			),
 		},
-	); err != nil {
-		t.Fatal(err)
-	}
+	),
+	)
+
 	select {
 	case <-controlEntered:
 	case <-time.After(time.Second):
-		t.Fatal("newly runnable framework-control task did not start")
+		require.FailNow(t, "test failed", "newly runnable framework-control task did not start")
 	}
 
 	releaseOnce.Do(func() { close(release) })
 	kernel.Stop()
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer waitCancel()
-	if err := kernel.Wait(waitCtx); err != nil {
-		t.Fatal(err)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 {
-		t.Fatalf(
-			"continued task service retained work: active=%d pending=%d",
-			tasks.Active(),
-			tasks.Pending(),
-		)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(waitCtx))
+
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -1347,27 +1154,14 @@ func TestKernelAsyncEventServiceQuantumIsPhaseBalancedAndBounded(
 	}
 
 	count := kernel.serviceAsyncEvents(asyncEventServiceQuantum)
-	if count != asyncEventServiceQuantum {
-		t.Fatalf(
-			"first async service count=%d, want %d",
-			count,
-			asyncEventServiceQuantum,
-		)
-	}
-	if pending := len(kernel.cancel); pending != 1 {
-		t.Fatalf("first async service left %d events, want one", pending)
-	}
+	require.EqualValues(t, asyncEventServiceQuantum, count)
+
+	require.EqualValues(t, 1, len(kernel.cancel))
 
 	count = kernel.serviceAsyncEvents(asyncEventServiceQuantum)
-	if count != 1 {
-		t.Fatalf(
-			"second async service count=%d, want 1",
-			count,
-		)
-	}
-	if pending := len(kernel.cancel); pending != 0 {
-		t.Fatalf("second async service left %d events", pending)
-	}
+	require.EqualValues(t, 1, count)
+
+	require.EqualValues(t, 0, len(kernel.cancel))
 }
 
 func TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch(
@@ -1379,18 +1173,15 @@ func TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch(
 		t,
 		stoppedKernelPlanner{},
 	)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	release := make(chan struct{})
 	var releaseOnce sync.Once
 	t.Cleanup(func() {
 		releaseOnce.Do(func() { close(release) })
 		kernel.Stop()
-		waitCtx, waitCancel := context.WithTimeout(
-			context.Background(),
-			time.Second,
-		)
+		waitCtx, waitCancel := context.WithTimeout(context.Background(), time.Second)
 		defer waitCancel()
 		_ = kernel.Wait(waitCtx)
 	})
@@ -1403,15 +1194,12 @@ func TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch(
 				func(context.Context) (lifecycle.SealedResult, error) {
 					entered <- uid
 					<-release
-					return lifecycle.NewSealedResult(
-						200,
-						"application/json",
-						[]byte(`{}`),
-					)
+					return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
 				},
 			),
 		}
-		if err := kernel.admit(
+
+		require.NoError(t, kernel.admit(
 			Request{
 				UID: uid, LaneKey: uid,
 				Source: lifecycle.SourceJobManager,
@@ -1420,21 +1208,14 @@ func TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch(
 			context.Background(),
 			nil,
 			nil,
-		); err != nil {
-			t.Fatal(err)
-		}
+		),
+		)
 	}
 	for kernel.serviceAdmissions(lifecycle.TaskStartServiceQuantum) {
 	}
 	for kernel.scheduleTasks(lifecycle.TaskStartServiceQuantum) {
 	}
-	if tasks.Pending() != population {
-		t.Fatalf(
-			"shutdown-fence setup pending tasks=%d, want %d",
-			tasks.Pending(),
-			population,
-		)
-	}
+	require.EqualValues(t, population, tasks.Pending())
 
 	kernel.Stop()
 	startKernelLoop(t, kernel)
@@ -1442,31 +1223,25 @@ func TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch(
 		select {
 		case <-entered:
 		case <-time.After(time.Second):
-			t.Fatalf("initial task %d did not start", index+1)
+			require.FailNowf(t, "test failed", "initial task %d did not start", index+1)
 		}
 	}
 	select {
 	case uid := <-entered:
-		t.Fatalf("pending operation %q started after shutdown began", uid)
+		require.FailNowf(t, "test failed", "pending operation %q started after shutdown began", uid)
 	case <-time.After(100 * time.Millisecond):
 	}
 
 	releaseOnce.Do(func() { close(release) })
 	waitCtx, waitCancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer waitCancel()
-	if err := kernel.Wait(waitCtx); err != nil {
-		t.Fatal(err)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 {
-		t.Fatalf(
-			"shutdown fence retained tasks: active=%d pending=%d",
-			tasks.Active(),
-			tasks.Pending(),
-		)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(waitCtx))
+
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -1487,47 +1262,41 @@ func TestKernelRunFinalizerUsesSharedBudgetExactlyOnce(t *testing.T) {
 		return nil
 	})
 	kernel, run, admission, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	budget, err := run.BeginShutdown()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	startKernelLoop(t, kernel)
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
 	call := <-called
-	if call.generation != run.Generation() || !call.deadline.Equal(budget.Deadline()) {
-		t.Fatalf("finalizer budget differs: generation=%d deadline=%s want_generation=%d want_deadline=%s", call.generation, call.deadline, run.Generation(), budget.Deadline())
-	}
+	require.False(t, call.generation != run.Generation() || !call.deadline.Equal(budget.Deadline()))
 	select {
 	case duplicate := <-called:
-		t.Fatalf("finalizer ran more than once: %+v", duplicate)
+		require.FailNowf(t, "test failed", "finalizer ran more than once: %+v", duplicate)
 	default:
 	}
-	if terminal := run.TerminalState(); !terminal.Reached || !terminal.Quiescent || terminal.Dirty != nil {
-		t.Fatalf("finalizer terminal differs: %+v", terminal)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 || !admission.RunDrained(run.Generation()) {
-		t.Fatalf("finalizer left state: active=%d pending=%d admission=%+v", tasks.Active(), tasks.Pending(), admission.Census())
-	}
+
+	terminal := run.TerminalState()
+	require.False(t, !terminal.Reached || !terminal.Quiescent || terminal.Dirty != nil)
+
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || !admission.RunDrained(run.Generation()))
 }
 
 func TestKernelShutdownDeadlineWinsFinalizerCompletion(t *testing.T) {
 	const helperEnv = "NETDATA_JOBMGR_FINALIZER_DEADLINE_HELPER"
 	if os.Getenv(helperEnv) != "1" {
 		executable, err := os.Executable()
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		cmd := exec.Command(executable, "-test.run=^TestKernelShutdownDeadlineWinsFinalizerCompletion$")
 		cmd.Env = append(os.Environ(), helperEnv+"=1")
-		if output, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("finalizer-deadline helper failed: %v\n%s", err, output)
-		}
+
+		combinedOutput, combinedOutputErr := cmd.CombinedOutput()
+		require.NoError(t, combinedOutputErr, string(combinedOutput))
+
 		return
 	}
 	clock := newKernelFinalizerClock()
@@ -1538,38 +1307,36 @@ func TestKernelShutdownDeadlineWinsFinalizerCompletion(t *testing.T) {
 		return nil
 	})
 	kernel, run, _, _, _ := newKernelWithClockFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, clock, finalizer, time.Second)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	kernel.Stop()
 	select {
 	case <-started:
 	case <-time.After(time.Second):
-		t.Fatal("finalizer did not start before shutdown expiry")
+		require.FailNow(t, "test failed", "finalizer did not start before shutdown expiry")
 	}
 	clock.expireShutdown(t)
-	if err := kernel.Wait(context.Background()); err == nil || !strings.Contains(err.Error(), "shutdown deadline exceeded") {
-		t.Fatalf("shutdown expiry lost to finalizer completion: %v", err)
-	}
+
+	err := kernel.Wait(context.Background())
+	require.False(t, err == nil || !strings.Contains(err.Error(), "shutdown deadline exceeded"))
+
 	terminal := run.TerminalState()
-	if !terminal.Reached || terminal.Quiescent || terminal.Dirty == nil {
-		t.Fatalf("expired finalizer terminal differs: %+v", terminal)
-	}
+	require.False(t, !terminal.Reached || terminal.Quiescent || terminal.Dirty == nil)
 }
 
 func TestKernelDueClockWinsIndependentFinalizerCompletion(t *testing.T) {
 	const helperEnv = "NETDATA_JOBMGR_FINALIZER_DUE_CLOCK_HELPER"
 	if os.Getenv(helperEnv) != "1" {
 		executable, err := os.Executable()
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		cmd := exec.Command(executable, "-test.run=^TestKernelDueClockWinsIndependentFinalizerCompletion$")
 		cmd.Env = append(os.Environ(), helperEnv+"=1")
-		if output, err := cmd.CombinedOutput(); err != nil {
-			t.Fatalf("due-clock finalizer helper failed: %v\n%s", err, output)
-		}
+
+		combinedOutput, combinedOutputErr := cmd.CombinedOutput()
+		require.NoError(t, combinedOutputErr, string(combinedOutput))
+
 		return
 	}
 	clock := newKernelFinalizerClock()
@@ -1581,25 +1348,24 @@ func TestKernelDueClockWinsIndependentFinalizerCompletion(t *testing.T) {
 		return nil
 	})
 	kernel, run, _, _, _ := newKernelWithClockFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, clock, finalizer, time.Second)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	kernel.Stop()
 	select {
 	case <-started:
 	case <-time.After(time.Second):
-		t.Fatal("finalizer did not start before shutdown expiry")
+		require.FailNow(t, "test failed", "finalizer did not start before shutdown expiry")
 	}
 	clock.advanceShutdownWithoutSignal(t)
 	close(release)
-	if err := kernel.Wait(context.Background()); err == nil || !strings.Contains(err.Error(), "shutdown deadline exceeded") {
-		t.Fatalf("due Clock lost to independent finalizer completion: %v", err)
-	}
+
+	err := kernel.Wait(context.Background())
+	require.False(t, err == nil || !strings.Contains(err.Error(), "shutdown deadline exceeded"))
+
 	terminal := run.TerminalState()
-	if !terminal.Reached || terminal.Quiescent || terminal.Dirty == nil {
-		t.Fatalf("due-clock finalizer terminal differs: %+v", terminal)
-	}
+	require.False(t, !terminal.Reached || terminal.Quiescent || terminal.Dirty == nil)
 }
 
 func TestKernelDueClockDisposesLatePreparedCapabilityWithoutTimerDelivery(t *testing.T) {
@@ -1607,9 +1373,7 @@ func TestKernelDueClockDisposesLatePreparedCapabilityWithoutTimerDelivery(t *tes
 	prepared := make(chan context.Context, 1)
 	release := make(chan struct{})
 	permitPlan, err := lifecycle.NewSecretStoreLongLivedPlan(4096)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	var capability *latePreparedCapability
 	const capabilityID = "secret-store:late"
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
@@ -1632,9 +1396,9 @@ func TestKernelDueClockDisposesLatePreparedCapabilityWithoutTimerDelivery(t *tes
 		}, nil
 	})
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	request := Request{
 		UID: "late-capability", LaneKey: capabilityID, Source: lifecycle.SourceJobManager, Route: "late",
@@ -1646,11 +1410,11 @@ func TestKernelDueClockDisposesLatePreparedCapabilityWithoutTimerDelivery(t *tes
 	select {
 	case workCtx = <-prepared:
 	case <-time.After(time.Second):
-		t.Fatal("prepared capability did not enter")
+		require.FailNow(t, "test failed", "prepared capability did not enter")
 	}
 	select {
 	case <-workCtx.Done():
-		t.Fatalf("host clock canceled prepared capability before authoritative Clock advanced: %v", workCtx.Err())
+		require.FailNowf(t, "test failed", "host clock canceled prepared capability before authoritative Clock advanced: %v", workCtx.Err())
 	default:
 	}
 	clock.advance(time.Second + time.Nanosecond)
@@ -1658,30 +1422,26 @@ func TestKernelDueClockDisposesLatePreparedCapabilityWithoutTimerDelivery(t *tes
 	select {
 	case <-workCtx.Done():
 	case <-time.After(time.Second):
-		t.Fatal("authoritative Clock deadline did not cancel prepared capability")
+		require.FailNow(t, "test failed", "authoritative Clock deadline did not cancel prepared capability")
 	}
 	close(release)
 	select {
 	case err := <-done:
-		if err != nil {
-			t.Fatalf("late capability terminal result differs: %v", err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("late capability did not reach terminal ownership")
+		require.FailNow(t, "test failed", "late capability did not reach terminal ownership")
 	}
-	if capability.committed.Load() || !capability.disposed.Load() {
-		t.Fatalf("late capability action differs: committed=%v disposed=%v", capability.committed.Load(), capability.disposed.Load())
-	}
-	if census := tasks.LongLivedCensus(); census != (lifecycle.LongLivedCensus{}) {
-		t.Fatalf("late capability retained permit: %+v", census)
-	}
+	require.False(t, capability.committed.Load() || !capability.disposed.Load())
+
+	census := tasks.LongLivedCensus()
+	require.EqualValues(t, (lifecycle.LongLivedCensus{}), census)
+
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -1697,9 +1457,9 @@ func TestKernelKeepsUnchangedDeadlineTimerAcrossUnrelatedEvents(t *testing.T) {
 		})}, nil
 	})
 	kernel, run, admission, uids, _ := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	done := make(chan error, 1)
 	go func() {
@@ -1711,40 +1471,36 @@ func TestKernelKeepsUnchangedDeadlineTimerAcrossUnrelatedEvents(t *testing.T) {
 	select {
 	case <-workEntered:
 	case <-time.After(time.Second):
-		t.Fatal("deadline-timer work did not enter")
+		require.FailNow(t, "test failed", "deadline-timer work did not enter")
 	}
 	select {
 	case <-clock.deadlineArmed:
 	case <-time.After(time.Second):
-		t.Fatal("Kernel did not arm the deadline timer")
+		require.FailNow(t, "test failed", "Kernel did not arm the deadline timer")
 	}
 	for index := 0; index < 32; index++ {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		err := kernel.Cancel(ctx, fmt.Sprintf("absent-%d", index))
 		cancel()
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	}
-	if arms := clock.deadlineArmCount(); arms != 1 {
-		t.Fatalf("unchanged deadline timer arms=%d want=1", arms)
-	}
+
+	arms := clock.deadlineArmCount()
+	require.EqualValues(t, 1, arms)
+
 	close(releaseWork)
 	select {
 	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("deadline-timer operation did not finish")
+		require.FailNow(t, "test failed", "deadline-timer operation did not finish")
 	}
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -1752,9 +1508,7 @@ func TestKernelDeadlineCancelsPendingCapabilityCommit(t *testing.T) {
 	clock := newKernelFinalizerClock()
 	commitEntered := make(chan context.Context, 1)
 	permitPlan, err := lifecycle.NewSecretStoreLongLivedPlan(4096)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	const capabilityID = "secret-store:commit-deadline"
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
 		return WorkPlan{
@@ -1776,9 +1530,9 @@ func TestKernelDeadlineCancelsPendingCapabilityCommit(t *testing.T) {
 		}, nil
 	})
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	done := make(chan error, 1)
 	deadline := clock.Now().Add(time.Second)
@@ -1792,14 +1546,15 @@ func TestKernelDeadlineCancelsPendingCapabilityCommit(t *testing.T) {
 	select {
 	case commitCtx = <-commitEntered:
 	case <-time.After(time.Second):
-		t.Fatal("capability commit did not enter")
+		require.FailNow(t, "test failed", "capability commit did not enter")
 	}
-	if got, ok := commitCtx.Deadline(); !ok || !got.Equal(deadline) {
-		t.Fatalf("capability commit deadline=%s ok=%v, want %s", got, ok, deadline)
-	}
+
+	got, ok := commitCtx.Deadline()
+	require.False(t, !ok || !got.Equal(deadline))
+
 	select {
 	case <-commitCtx.Done():
-		t.Fatalf("capability commit context canceled before authoritative deadline: %v", commitCtx.Err())
+		require.FailNowf(t, "test failed", "capability commit context canceled before authoritative deadline: %v", commitCtx.Err())
 	default:
 	}
 	clock.advance(time.Second + time.Nanosecond)
@@ -1807,28 +1562,24 @@ func TestKernelDeadlineCancelsPendingCapabilityCommit(t *testing.T) {
 	select {
 	case <-commitCtx.Done():
 	case <-time.After(time.Second):
-		t.Fatal("pending capability commit did not observe authoritative deadline")
+		require.FailNow(t, "test failed", "pending capability commit did not observe authoritative deadline")
 	}
-	if !errors.Is(commitCtx.Err(), context.DeadlineExceeded) || !errors.Is(context.Cause(commitCtx), context.DeadlineExceeded) {
-		t.Fatalf("capability commit cancellation err=%v cause=%v", commitCtx.Err(), context.Cause(commitCtx))
-	}
+	require.False(t, !errors.Is(commitCtx.Err(), context.DeadlineExceeded) || !errors.Is(context.Cause(commitCtx), context.DeadlineExceeded))
 	select {
 	case terminalErr := <-done:
-		if terminalErr == nil || !errors.Is(terminalErr, context.DeadlineExceeded) {
-			t.Fatalf("capability commit terminal result differs: %v", terminalErr)
-		}
+		require.False(t, terminalErr == nil || !errors.Is(terminalErr, context.DeadlineExceeded))
 	case <-time.After(time.Second):
-		t.Fatal("deadline-canceled capability did not reach terminal ownership")
+		require.FailNow(t, "test failed", "deadline-canceled capability did not reach terminal ownership")
 	}
-	if err := kernel.Wait(context.Background()); err == nil || !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("deadline-canceled Kernel result differs: %v", err)
-	}
-	if census := tasks.LongLivedCensus(); census != (lifecycle.LongLivedCensus{}) {
-		t.Fatalf("deadline-canceled commit retained permit: %+v", census)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	waitErr := kernel.Wait(context.Background())
+	require.False(t, waitErr == nil || !errors.Is(waitErr, context.DeadlineExceeded))
+
+	census := tasks.LongLivedCensus()
+	require.EqualValues(t, (lifecycle.LongLivedCensus{}), census)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -1867,32 +1618,34 @@ func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string {
 		return "queued-deadline"
 	})
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	future := clock.Now().Add(time.Minute)
-	if err := kernel.Submit(context.Background(), Request{
+
+	require.NoError(t, kernel.Submit(context.Background(), Request{
 		UID: "blocker", Source: lifecycle.SourceFunction,
 		Route: "blocker", Deadline: future,
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}),
+	)
+
 	select {
 	case <-blockerEntered:
 	case <-time.After(time.Second):
-		t.Fatal("same-lane blocker did not start")
+		require.FailNow(t, "test failed", "same-lane blocker did not start")
 	}
 	due := clock.Now()
-	if err := kernel.Submit(context.Background(), Request{
+
+	require.NoError(t, kernel.Submit(context.Background(), Request{
 		UID: "queued-deadline", Source: lifecycle.SourceFunction,
 		Route: "deadline", Deadline: due,
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}),
+	)
+
 	select {
 	case observed := <-deadlineEntered:
-		t.Fatalf("queued deadline handler bypassed its active lane: %+v", observed)
+		require.FailNowf(t, "test failed", "queued deadline handler bypassed its active lane: %+v", observed)
 	case <-time.After(20 * time.Millisecond):
 	}
 	close(release)
@@ -1906,25 +1659,20 @@ func TestKernelStartsQueuedCooperativeFunctionAfterItsDeadline(t *testing.T) {
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if err := kernel.Wait(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if !seen {
-		t.Fatal("queued cooperative deadline handler was terminalized without execution")
-	}
-	if calls := deadlineCalls.Load(); calls != 1 || !observed.ok || !observed.deadline.Equal(due) ||
-		!errors.Is(observed.err, context.DeadlineExceeded) || !errors.Is(observed.cause, context.DeadlineExceeded) {
-		t.Fatalf("queued deadline observation calls=%d deadline=%s ok=%v err=%v cause=%v", calls, observed.deadline, observed.ok, observed.err, observed.cause)
-	}
-	if !bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN queued-deadline 504 application/json ")) {
-		t.Fatalf("queued deadline response differs: %q", output.Bytes())
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0 {
-		t.Fatalf("queued deadline retained state: active=%d pending=%d operations=%d lanes=%d", tasks.Active(), tasks.Pending(), len(kernel.operations), len(kernel.lanes))
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(ctx))
+
+	require.True(t, seen)
+
+	calls := deadlineCalls.Load()
+	require.False(t, calls != 1 || !observed.ok || !observed.deadline.Equal(due) ||
+		!errors.Is(observed.err, context.DeadlineExceeded) || !errors.Is(observed.cause, context.DeadlineExceeded))
+
+	require.True(t, bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN queued-deadline 504 application/json ")))
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -1951,11 +1699,7 @@ func TestKernelStartsDueCooperativeRunner(t *testing.T) {
 			) (lifecycle.SealedResult, error) {
 				blockerEntered <- struct{}{}
 				<-release
-				return lifecycle.NewSealedResult(
-					200,
-					"application/json",
-					[]byte(`{}`),
-				)
+				return lifecycle.NewSealedResult(200, "application/json", []byte(`{}`))
 			}),
 		}, nil
 	})
@@ -1969,14 +1713,15 @@ func TestKernelStartsDueCooperativeRunner(t *testing.T) {
 			newNoopRunFinalizer(),
 			time.Second,
 		)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	setTestFunctionResource(t, kernel, func(lookup FunctionLookup) string {
 		return "due-runner"
 	})
 	startKernelLoop(t, kernel)
-	if err := kernel.Submit(
+
+	require.NoError(t, kernel.Submit(
 		context.Background(),
 		Request{
 			UID:      "runner-blocker",
@@ -1984,13 +1729,13 @@ func TestKernelStartsDueCooperativeRunner(t *testing.T) {
 			Route:    "blocker",
 			Deadline: clock.Now().Add(time.Minute),
 		},
-	); err != nil {
-		t.Fatal(err)
-	}
+	),
+	)
+
 	select {
 	case <-blockerEntered:
 	case <-time.After(time.Second):
-		t.Fatal("same-lane runner blocker did not start")
+		require.FailNow(t, "test failed", "same-lane runner blocker did not start")
 	}
 	result := make(chan error, 1)
 	go func() {
@@ -2006,46 +1751,31 @@ func TestKernelStartsDueCooperativeRunner(t *testing.T) {
 	}()
 	select {
 	case cause := <-observed:
-		t.Fatalf("due cooperative runner bypassed its active lane: %v", cause)
+		require.FailNowf(t, "test failed", "due cooperative runner bypassed its active lane: %v", cause)
 	case <-time.After(20 * time.Millisecond):
 	}
 	close(release)
 	select {
 	case cause := <-observed:
-		if !errors.Is(cause, context.DeadlineExceeded) {
-			t.Fatalf("runner cancellation cause=%v", cause)
-		}
+		require.ErrorIs(t, cause, context.DeadlineExceeded)
 	case <-time.After(time.Second):
-		t.Fatal("due cooperative runner was terminalized without execution")
+		require.FailNow(t, "test failed", "due cooperative runner was terminalized without execution")
 	}
 	select {
 	case err := <-result:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("due cooperative runner did not reach terminal disposition")
+		require.FailNow(t, "test failed", "due cooperative runner did not reach terminal disposition")
 	}
-	if !bytes.Contains(
-		output.Bytes(),
-		[]byte("FUNCTION_RESULT_BEGIN due-runner 504 application/json "),
-	) {
-		t.Fatalf("due cooperative runner response differs: %q", output.Bytes())
-	}
+	require.True(t, bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN due-runner 504 application/json ")))
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 {
-		t.Fatalf(
-			"due cooperative runner retained tasks: active=%d pending=%d",
-			tasks.Active(),
-			tasks.Pending(),
-		)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -2097,9 +1827,9 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 	var output bytes.Buffer
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string { return "same-lane" })
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	predecessorResult := make(chan error, 1)
 	go func() {
@@ -2110,7 +1840,7 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 	select {
 	case <-predecessorEntered:
 	case <-time.After(time.Second):
-		t.Fatal("same-lane predecessor did not start")
+		require.FailNow(t, "test failed", "same-lane predecessor did not start")
 	}
 	due := clock.Now().Add(time.Second)
 	deadlineResult := make(chan error, 1)
@@ -2123,60 +1853,52 @@ func TestKernelSchedulesExpiredCooperativeFunctionAfterItsLanePredecessor(t *tes
 	select {
 	case <-clock.deadlineArmed:
 	case <-time.After(time.Second):
-		t.Fatal("same-lane successor deadline was not armed")
+		require.FailNow(t, "test failed", "same-lane successor deadline was not armed")
 	}
 	clock.advance(time.Second + time.Nanosecond)
 	kernel.NotifyControlReady()
 	barrierCtx, barrierCancel := context.WithTimeout(context.Background(), time.Second)
 	defer barrierCancel()
-	if err := kernel.Cancel(barrierCtx, "same-lane-deadline"); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Cancel(barrierCtx, "same-lane-deadline"))
+
 	select {
 	case observed := <-deadlineEntered:
-		t.Fatalf("same-lane deadline handler bypassed its predecessor: %+v", observed)
+		require.FailNowf(t, "test failed", "same-lane deadline handler bypassed its predecessor: %+v", observed)
 	default:
 	}
 	close(releasePredecessor)
 	select {
 	case err := <-predecessorResult:
-		if err != nil {
-			t.Fatalf("same-lane predecessor result: %v", err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("same-lane predecessor did not complete")
+		require.FailNow(t, "test failed", "same-lane predecessor did not complete")
 	}
 	var observed deadlineObservation
 	select {
 	case observed = <-deadlineEntered:
 	case <-time.After(time.Second):
-		t.Fatal("expired same-lane successor was not scheduled")
+		require.FailNow(t, "test failed", "expired same-lane successor was not scheduled")
 	}
 	select {
 	case err := <-deadlineResult:
-		if err != nil {
-			t.Fatalf("same-lane deadline result: %v", err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("same-lane deadline operation did not complete")
+		require.FailNow(t, "test failed", "same-lane deadline operation did not complete")
 	}
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if calls := deadlineCalls.Load(); calls != 1 || !observed.ok || !observed.deadline.Equal(due) ||
-		!errors.Is(observed.err, context.DeadlineExceeded) || !errors.Is(observed.cause, context.DeadlineExceeded) {
-		t.Fatalf("same-lane deadline observation calls=%d deadline=%s ok=%v err=%v cause=%v", calls, observed.deadline, observed.ok, observed.err, observed.cause)
-	}
-	if !bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN same-lane-deadline 504 application/json ")) {
-		t.Fatalf("same-lane deadline response differs: %q", output.Bytes())
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0 {
-		t.Fatalf("same-lane deadline retained state: active=%d pending=%d operations=%d lanes=%d", tasks.Active(), tasks.Pending(), len(kernel.operations), len(kernel.lanes))
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	calls := deadlineCalls.Load()
+	require.False(t, calls != 1 || !observed.ok || !observed.deadline.Equal(due) ||
+		!errors.Is(observed.err, context.DeadlineExceeded) || !errors.Is(observed.cause, context.DeadlineExceeded))
+
+	require.True(t, bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN same-lane-deadline 504 application/json ")))
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -2185,9 +1907,7 @@ func TestKernelDisposesQueuedNoResponseCapabilityAfterItsDeadline(t *testing.T) 
 	releaseBlockers := make(chan struct{})
 	blockerEntered := make(chan struct{}, 1)
 	permitPlan, err := lifecycle.NewSecretStoreLongLivedPlan(4096)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	var prepareCalls atomic.Int32
 	const capabilityID = "secret-store:queued-deadline"
 	planner := plannerFunc(func(_ context.Context, route string, _ []string) (WorkPlan, error) {
@@ -2210,20 +1930,21 @@ func TestKernelDisposesQueuedNoResponseCapabilityAfterItsDeadline(t *testing.T) 
 		})}, nil
 	})
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, io.Discard, clock, newNoopRunFinalizer(), time.Second)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
-	if err := kernel.Submit(context.Background(), Request{
+
+	require.NoError(t, kernel.Submit(context.Background(), Request{
 		UID: "queued-capability-blocker", LaneKey: capabilityID,
 		Source: lifecycle.SourceJobManager, Route: "blocker",
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}),
+	)
+
 	select {
 	case <-blockerEntered:
 	case <-time.After(time.Second):
-		t.Fatal("same-lane capability blocker did not start")
+		require.FailNow(t, "test failed", "same-lane capability blocker did not start")
 	}
 	terminal := make(chan error, 1)
 	go func() {
@@ -2240,36 +1961,30 @@ func TestKernelDisposesQueuedNoResponseCapabilityAfterItsDeadline(t *testing.T) 
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Second)
 		defer cleanupCancel()
 		_ = kernel.Wait(cleanupCtx)
-		t.Fatal("queued no-response capability deadline was not armed")
+		require.FailNow(t, "test failed", "queued no-response capability deadline was not armed")
 	}
 	kernel.NotifyControlReady()
 	select {
 	case err := <-terminal:
-		if err != nil {
-			t.Fatalf("queued no-response capability terminal result differs: %v", err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
 		close(releaseBlockers)
 		kernel.Stop()
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), time.Second)
 		defer cleanupCancel()
 		_ = kernel.Wait(cleanupCtx)
-		t.Fatal("queued no-response capability did not reach terminal disposal")
+		require.FailNow(t, "test failed", "queued no-response capability did not reach terminal disposal")
 	}
-	if prepareCalls.Load() != 0 {
-		t.Fatalf("queued no-response capability prepare=%d, want 0", prepareCalls.Load())
-	}
+	require.EqualValues(t, 0, prepareCalls.Load())
 	close(releaseBlockers)
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0 {
-		t.Fatalf("queued no-response capability retained state: active=%d pending=%d operations=%d lanes=%d", tasks.Active(), tasks.Pending(), len(kernel.operations), len(kernel.lanes))
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -2298,20 +2013,21 @@ func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string {
 		return "queued-noncooperative"
 	})
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
-	if err := kernel.Submit(context.Background(), Request{
+
+	require.NoError(t, kernel.Submit(context.Background(), Request{
 		UID:    "noncooperative-blocker",
 		Source: lifecycle.SourceFunction, Route: "blocker",
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}),
+	)
+
 	select {
 	case <-blockerEntered:
 	case <-time.After(time.Second):
-		t.Fatal("same-lane noncooperative blocker did not start")
+		require.FailNow(t, "test failed", "same-lane noncooperative blocker did not start")
 	}
 	terminal := make(chan error, 1)
 	go func() {
@@ -2323,34 +2039,26 @@ func TestKernelDisposesQueuedNonCooperativeWorkAfterItsDeadline(t *testing.T) {
 	select {
 	case <-clock.deadlineArmed:
 	case <-time.After(time.Second):
-		t.Fatal("queued noncooperative deadline was not armed")
+		require.FailNow(t, "test failed", "queued noncooperative deadline was not armed")
 	}
 	kernel.NotifyControlReady()
 	select {
 	case err := <-terminal:
-		if err != nil {
-			t.Fatalf("queued noncooperative deadline result differs: %v", err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("queued noncooperative deadline did not reach terminal disposal")
+		require.FailNow(t, "test failed", "queued noncooperative deadline did not reach terminal disposal")
 	}
-	if workCalls.Load() != 0 {
-		t.Fatalf("queued noncooperative work calls=%d, want 0", workCalls.Load())
-	}
-	if !bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN queued-noncooperative-deadline 504 application/json ")) {
-		t.Fatalf("queued noncooperative deadline response differs: %q", output.Bytes())
-	}
+	require.EqualValues(t, 0, workCalls.Load())
+	require.True(t, bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN queued-noncooperative-deadline 504 application/json ")))
 	close(releaseBlockers)
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0 {
-		t.Fatalf("queued noncooperative deadline retained state: active=%d pending=%d operations=%d lanes=%d", tasks.Active(), tasks.Pending(), len(kernel.operations), len(kernel.lanes))
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -2367,9 +2075,9 @@ func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) 
 	})
 	writer := &firstHoldingFrameWriter{offered: make(chan []byte, 1), release: make(chan struct{})}
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, writer, clock, newNoopRunFinalizer(), time.Second)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	deadline := clock.Now().Add(time.Second)
 	terminals := make([]chan error, lifecycle.RetainedTimeoutFailStopThreshold)
@@ -2382,63 +2090,55 @@ func TestKernelOneRetainedTimeoutPlusThreeActiveTasksDoesNotDirty(t *testing.T) 
 		if index == 0 {
 			request.Deadline = deadline
 		}
-		if err := kernel.submit(context.Background(), request, terminals[index]); err != nil {
-			t.Fatal(err)
-		}
+
+		require.NoError(t, kernel.submit(context.Background(), request, terminals[index]))
 	}
 	for index := 0; index < lifecycle.RetainedTimeoutFailStopThreshold; index++ {
 		select {
 		case <-entered:
 		case <-time.After(time.Second):
-			t.Fatal("mixed retained TaskChild did not start")
+			require.FailNow(t, "test failed", "mixed retained TaskChild did not start")
 		}
 	}
 	clock.advance(time.Second + time.Nanosecond)
 	kernel.NotifyControlReady()
 	select {
 	case frame := <-writer.offered:
-		if !bytes.Contains(frame, []byte("FUNCTION_RESULT_BEGIN mixed-retained-0 504 application/json ")) {
-			t.Fatalf("mixed retained timeout frame differs: %q", frame)
-		}
+		require.True(t, bytes.Contains(frame, []byte("FUNCTION_RESULT_BEGIN mixed-retained-0 504 application/json ")))
 	case <-time.After(time.Second):
-		t.Fatal("mixed retained timeout frame was not offered")
+		require.FailNow(t, "test failed", "mixed retained timeout frame was not offered")
 	}
 	close(writer.release)
 	barrierCtx, barrierCancel := context.WithTimeout(context.Background(), time.Second)
 	defer barrierCancel()
-	if err := kernel.Cancel(barrierCtx, "retained-count-barrier"); err != nil {
-		t.Fatal(err)
-	}
-	if count, saturated := tasks.RetainedTimeouts(); count != 1 || saturated {
-		t.Fatalf("mixed retained timeout census=(%d,%v), want (1,false)", count, saturated)
-	}
-	if err := run.DirtyCause(); err != nil {
-		t.Fatalf("one retained timeout plus three unrelated active tasks dirtied the run: %v", err)
-	}
+
+	require.NoError(t, kernel.Cancel(barrierCtx, "retained-count-barrier"))
+
+	count, saturated := tasks.RetainedTimeouts()
+	require.False(t, count != 1 || saturated)
+
+	require.NoError(t, run.DirtyCause())
+
 	close(releaseWork)
 	for index, terminal := range terminals {
 		select {
 		case err := <-terminal:
-			if err != nil {
-				t.Fatalf("mixed retained terminal %d: %v", index, err)
-			}
+			require.NoError(t, err)
 		case <-time.After(time.Second):
-			t.Fatalf("mixed retained terminal %d did not complete", index)
+			require.FailNowf(t, "test failed", "mixed retained terminal %d did not complete", index)
 		}
 	}
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if count, saturated := tasks.RetainedTimeouts(); count != 0 || saturated {
-		t.Fatalf("completed mixed retained census=(%d,%v), want (0,false)", count, saturated)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0 {
-		t.Fatalf("mixed retained test left state: active=%d pending=%d operations=%d lanes=%d", tasks.Active(), tasks.Pending(), len(kernel.operations), len(kernel.lanes))
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	retainedTimeoutsCount, retainedTimeoutsSaturated := tasks.RetainedTimeouts()
+	require.False(t, retainedTimeoutsCount != 0 || retainedTimeoutsSaturated)
+
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -2447,9 +2147,7 @@ func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T)
 	release := make(chan struct{})
 	entered := make(chan string, lifecycle.RetainedTimeoutFailStopThreshold)
 	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	planner := plannerFunc(func(_ context.Context, route string, args []string) (WorkPlan, error) {
 		if route != "background-capability" || len(args) != 1 {
 			return WorkPlan{}, errors.New("unexpected background capability request")
@@ -2469,69 +2167,62 @@ func TestKernelFourthBackgroundTimeoutDirtiesWithoutResponseCommit(t *testing.T)
 	})
 	var output bytes.Buffer
 	kernel, run, admission, uids, tasks := newKernelWithClockFinalizerAndTimeout(t, planner, &output, clock, newNoopRunFinalizer(), time.Second)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	deadline := clock.Now().Add(time.Second)
 	terminals := make([]chan error, lifecycle.RetainedTimeoutFailStopThreshold)
 	for index := 0; index < lifecycle.RetainedTimeoutFailStopThreshold; index++ {
 		id := fmt.Sprintf("job:background-%d", index)
 		terminals[index] = make(chan error, 1)
-		if err := kernel.submit(context.Background(), Request{
+
+		require.NoError(t, kernel.submit(context.Background(), Request{
 			UID: fmt.Sprintf("background-timeout-%d", index), LaneKey: id, Source: lifecycle.SourceJobManager,
 			Route: "background-capability", Args: []string{id}, Deadline: deadline,
-		}, terminals[index]); err != nil {
-			t.Fatal(err)
-		}
+		}, terminals[index]),
+		)
 	}
 	for index := 0; index < lifecycle.RetainedTimeoutFailStopThreshold; index++ {
 		select {
 		case <-entered:
 		case <-time.After(time.Second):
-			t.Fatal("background capability did not occupy its TaskChild slot")
+			require.FailNow(t, "test failed", "background capability did not occupy its TaskChild slot")
 		}
 	}
 	clock.advance(time.Second + time.Nanosecond)
 	kernel.NotifyControlReady()
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), time.Second)
 	defer shutdownCancel()
-	if err := kernel.WaitShutdownStarted(shutdownCtx); err != nil {
-		t.Fatalf("fourth background timeout did not start dirty shutdown: %v", err)
-	}
-	if cause := run.DirtyCause(); cause == nil || !strings.Contains(cause.Error(), "fourth background timeout reached the retained-timeout fail-stop threshold") {
-		t.Fatalf("fourth background timeout dirty cause differs: %v", cause)
-	}
-	if count, saturated := tasks.RetainedTimeouts(); count != lifecycle.RetainedTimeoutFailStopThreshold || !saturated {
-		t.Fatalf("background timeout census=(%d,%v), want (%d,true)", count, saturated, lifecycle.RetainedTimeoutFailStopThreshold)
-	}
+
+	require.NoError(t, kernel.WaitShutdownStarted(shutdownCtx))
+
+	cause := run.DirtyCause()
+	require.False(t, cause == nil || !strings.Contains(cause.Error(), "fourth background timeout reached the retained-timeout fail-stop threshold"))
+
+	count, saturated := tasks.RetainedTimeouts()
+	require.False(t, count != lifecycle.RetainedTimeoutFailStopThreshold || !saturated)
+
 	close(release)
 	for index, terminal := range terminals {
 		select {
 		case err := <-terminal:
-			if err != nil {
-				t.Fatalf("background terminal %d: %v", index, err)
-			}
+			require.NoError(t, err)
 		case <-time.After(time.Second):
-			t.Fatalf("background terminal %d did not complete", index)
+			require.FailNowf(t, "test failed", "background terminal %d did not complete", index)
 		}
 	}
 	terminalErr := kernel.Wait(context.Background())
-	if terminalErr == nil || !strings.Contains(terminalErr.Error(), "fourth background timeout reached the retained-timeout fail-stop threshold") {
-		t.Fatalf("background timeout terminal error differs: %v", terminalErr)
-	}
-	if output.Len() != 0 {
-		t.Fatalf("background timeout emitted a response: %q", output.Bytes())
-	}
-	if count, saturated := tasks.RetainedTimeouts(); count != 0 || !saturated {
-		t.Fatalf("completed background timeout census=(%d,%v), want (0,true)", count, saturated)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0 || tasks.LongLivedCensus() != (lifecycle.LongLivedCensus{}) {
-		t.Fatalf("background timeout retained state: active=%d pending=%d operations=%d lanes=%d long_lived=%+v", tasks.Active(), tasks.Pending(), len(kernel.operations), len(kernel.lanes), tasks.LongLivedCensus())
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+	require.False(t, terminalErr == nil || !strings.Contains(terminalErr.Error(), "fourth background timeout reached the retained-timeout fail-stop threshold"))
+	require.EqualValues(t, 0, output.Len())
+
+	retainedTimeoutsCount, retainedTimeoutsSaturated := tasks.RetainedTimeouts()
+	require.False(t, retainedTimeoutsCount != 0 || !retainedTimeoutsSaturated)
+
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0 || tasks.LongLivedCensus() != (lifecycle.LongLivedCensus{}))
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -2595,51 +2286,42 @@ func TestKernelRunFinalizerReleasesOnlyTypedFinalizerOwnedPermit(t *testing.T) {
 	})
 	kernel, run, admission, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
 	plan, err := lifecycle.NewSecretStoreLongLivedPlan(512)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	requested := admission.RequestOrdinary(
 		run.Generation(),
 		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
 		plan.Bytes()+512,
 	)
-	if requested.Rejected != nil {
-		t.Fatal(requested.Rejected)
-	}
+	require.Nil(t, requested.Rejected)
 	var grants [4]lifecycle.AdmissionGrant
 	count, _, err := admission.TakeGrants(1, &grants)
-	if err != nil || count != 1 || grants[0].Ref != requested.Ref {
-		t.Fatalf("grant differs: count=%d grant=%+v err=%v", count, grants[0], err)
-	}
+	require.False(t, err != nil || count != 1 || grants[0].Ref != requested.Ref)
 	permit, err = tasks.IssueLongLivedPermit(admission, requested.Ref, lifecycle.ResourceIdentity{ID: "secret-store", Generation: 1}, plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := permit.ActivateExternal(lifecycle.LongLivedESecretStore); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := admission.ReleaseOrdinary(requested.Ref); err != nil {
-		t.Fatal(err)
-	}
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, permit.ActivateExternal(lifecycle.LongLivedESecretStore))
+
+	_, releaseOrdinaryErr := admission.ReleaseOrdinary(requested.Ref)
+	require.NoError(t, releaseOrdinaryErr)
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
 	select {
 	case <-called:
 	default:
-		t.Fatal("typed finalizer-owned permit prevented finalizer dispatch")
+		require.FailNow(t, "test failed", "typed finalizer-owned permit prevented finalizer dispatch")
 	}
-	if census := tasks.LongLivedCensus(); census != (lifecycle.LongLivedCensus{}) {
-		t.Fatalf("finalizer-owned permit remained: %+v", census)
-	}
-	if terminal := run.TerminalState(); !terminal.Quiescent || terminal.Dirty != nil {
-		t.Fatalf("typed finalizer-owned terminal differs: %+v", terminal)
-	}
+
+	census := tasks.LongLivedCensus()
+	require.EqualValues(t, (lifecycle.LongLivedCensus{}), census)
+
+	terminal := run.TerminalState()
+	require.False(t, !terminal.Quiescent || terminal.Dirty != nil)
 }
 
 func TestKernelLongLivedBoundaryAllowsReplacementAndSteadyAddition(t *testing.T) {
@@ -2652,13 +2334,9 @@ func TestKernelLongLivedBoundaryAllowsReplacementAndSteadyAddition(t *testing.T)
 		return result
 	})
 	steadyPlan, err := lifecycle.NewSecretStoreLongLivedPlan(1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	replacementPlan, err := lifecycle.NewSecretStoreReplacementLongLivedPlan(1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	var replacementPrepared atomic.Int32
 	var additionPrepared atomic.Int32
 	planner := plannerFunc(func(_ context.Context, route string, _ []string) (WorkPlan, error) {
@@ -2693,78 +2371,58 @@ func TestKernelLongLivedBoundaryAllowsReplacementAndSteadyAddition(t *testing.T)
 		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
 		steadyPlan.Bytes()+1,
 	)
-	if requested.Rejected != nil {
-		t.Fatalf("seed admission: %v", requested.Rejected)
-	}
+	require.Nil(t, requested.Rejected)
 	var grants [4]lifecycle.AdmissionGrant
 	count, _, err := admission.TakeGrants(1, &grants)
-	if err != nil || count != 1 || grants[0].Ref != requested.Ref {
-		t.Fatalf(
-			"seed grant differs: count=%d grant=%+v err=%v",
-			count,
-			grants[0],
-			err,
-		)
-	}
+	require.False(t, err != nil || count != 1 || grants[0].Ref != requested.Ref)
 	permit, err := tasks.IssueLongLivedPermit(
 		admission,
 		requested.Ref,
 		lifecycle.ResourceIdentity{ID: "seed", Generation: 1},
 		steadyPlan,
 	)
-	if err != nil {
-		t.Fatalf("seed permit: %v", err)
-	}
-	if _, err := admission.ReleaseOrdinary(requested.Ref); err != nil {
-		t.Fatalf("seed ordinary release: %v", err)
-	}
+	require.NoError(t, err)
+
+	_, releaseOrdinaryErr := admission.ReleaseOrdinary(requested.Ref)
+	require.NoError(t, releaseOrdinaryErr)
+
 	seeded = append(seeded, permit)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if err := kernel.SubmitAndWait(ctx, Request{
+
+	require.NoError(t, kernel.SubmitAndWait(ctx, Request{
 		UID: "boundary-replacement", LaneKey: "secret-store:replacement", Source: lifecycle.SourceJobManager, Route: "replacement",
-	}); err != nil {
-		t.Fatalf("maximum-population replacement failed: %v", err)
-	}
-	if replacementPrepared.Load() != 1 {
-		t.Fatalf("replacement prepare calls=%d want=1", replacementPrepared.Load())
-	}
+	}),
+	)
+
+	require.EqualValues(t, 1, replacementPrepared.Load())
 	err = kernel.SubmitAndWait(ctx, Request{
 		UID: "boundary-addition", LaneKey: "secret-store:addition", Source: lifecycle.SourceJobManager, Route: "addition",
 	})
-	if err != nil {
-		t.Fatalf("steady addition failed: %v", err)
-	}
-	if additionPrepared.Load() != 1 {
-		t.Fatalf("steady addition prepare calls=%d want=1", additionPrepared.Load())
-	}
-	if !run.Admitting() || run.DirtyCause() != nil {
-		t.Fatalf("steady addition poisoned Kernel: admitting=%v dirty=%v", run.Admitting(), run.DirtyCause())
-	}
-	if census := admission.Census(); census.ActiveRecords != 0 ||
-		census.LongLivedRecords != 1 ||
-		census.OrdinaryGranted != 0 {
-		t.Fatalf("boundary operations left Admission ownership: %+v", census)
-	}
-	if census := tasks.LongLivedCensus(); census.Active != 1 ||
-		census.SecretStores != 1 ||
-		census.Bytes != steadyPlan.Bytes() {
-		t.Fatalf("boundary operations left long-lived ownership: %+v", census)
-	}
+	require.NoError(t, err)
+	require.EqualValues(t, 1, additionPrepared.Load())
+	require.False(t, !run.Admitting() || run.DirtyCause() != nil)
+
+	census := admission.Census()
+	require.False(t, census.ActiveRecords != 0 || census.LongLivedRecords != 1 || census.OrdinaryGranted != 0)
+
+	longLivedCensus := tasks.LongLivedCensus()
+	require.False(t, longLivedCensus.Active != 1 ||
+		longLivedCensus.SecretStores != 1 ||
+		longLivedCensus.Bytes != steadyPlan.Bytes())
+
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if census := tasks.LongLivedCensus(); census != (lifecycle.LongLivedCensus{}) {
-		t.Fatalf("boundary finalizer retained permits: %+v", census)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	require.EqualValues(t, (lifecycle.LongLivedCensus{}), tasks.LongLivedCensus())
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -2772,41 +2430,35 @@ func TestKernelRunFinalizerFailureReleasesTaskWithoutQuiescence(t *testing.T) {
 	want := errors.New("finalizer failed")
 	finalizer := RunFinalizerFunc(func(context.Context, uint64) error { return want })
 	kernel, run, _, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); !errors.Is(err, want) {
-		t.Fatalf("finalizer failure differs: %v", err)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 {
-		t.Fatalf("failed finalizer retained transient task: active=%d pending=%d", tasks.Active(), tasks.Pending())
-	}
+
+	err := kernel.Wait(context.Background())
+	require.ErrorIs(t, err, want)
+
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 	terminal := run.TerminalState()
-	if !terminal.Reached || terminal.Quiescent || !errors.Is(terminal.Dirty, want) {
-		t.Fatalf("failed finalizer terminal differs: %+v", terminal)
-	}
+	require.False(t, !terminal.Reached || terminal.Quiescent || !errors.Is(terminal.Dirty, want))
 }
 
 func TestKernelRunFinalizerPanicReleasesTaskWithoutQuiescence(t *testing.T) {
 	finalizer := RunFinalizerFunc(func(context.Context, uint64) error { panic("finalizer panic") })
 	kernel, run, _, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, time.Second)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); !errors.Is(err, lifecycle.ErrTaskPanic) {
-		t.Fatalf("finalizer panic differs: %v", err)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 {
-		t.Fatalf("panicked finalizer retained transient task: active=%d pending=%d", tasks.Active(), tasks.Pending())
-	}
+
+	err := kernel.Wait(context.Background())
+	require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
+
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
 	terminal := run.TerminalState()
-	if !terminal.Reached || terminal.Quiescent || !errors.Is(terminal.Dirty, lifecycle.ErrTaskPanic) {
-		t.Fatalf("panicked finalizer terminal differs: %+v", terminal)
-	}
+	require.False(t, !terminal.Reached || terminal.Quiescent || !errors.Is(terminal.Dirty, lifecycle.ErrTaskPanic))
 }
 
 func TestKernelRunFinalizerRejectsUnrelatedLongLivedPermit(t *testing.T) {
@@ -2817,117 +2469,92 @@ func TestKernelRunFinalizerRejectsUnrelatedLongLivedPermit(t *testing.T) {
 	})
 	kernel, run, admission, _, tasks := newKernelWithPlannerWriterFinalizerAndTimeout(t, stoppedKernelPlanner{}, io.Discard, finalizer, 10*time.Millisecond)
 	plan, err := lifecycle.NewJobLongLivedPlan(512)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	requested := admission.RequestOrdinary(
 		run.Generation(),
 		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
 		plan.Bytes()+512,
 	)
-	if requested.Rejected != nil {
-		t.Fatal(requested.Rejected)
-	}
+	require.Nil(t, requested.Rejected)
 	var grants [4]lifecycle.AdmissionGrant
 	count, _, err := admission.TakeGrants(1, &grants)
-	if err != nil || count != 1 || grants[0].Ref != requested.Ref {
-		t.Fatalf("grant differs: count=%d grant=%+v err=%v", count, grants[0], err)
-	}
+	require.False(t, err != nil || count != 1 || grants[0].Ref != requested.Ref)
 	permit, err := tasks.IssueLongLivedPermit(admission, requested.Ref, lifecycle.ResourceIdentity{ID: "job", Generation: 1}, plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := admission.ReleaseOrdinary(requested.Ref); err != nil {
-		t.Fatal(err)
-	}
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	_, releaseOrdinaryErr := admission.ReleaseOrdinary(requested.Ref)
+	require.NoError(t, releaseOrdinaryErr)
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err == nil || !strings.Contains(err.Error(), "shutdown deadline exceeded") {
-		t.Fatalf("unrelated long-lived terminal differs: %v", err)
-	}
-	if calls.Load() != 0 {
-		t.Fatalf("finalizer ran with an unrelated long-lived permit: calls=%d", calls.Load())
-	}
-	if err := permit.AbortUnused(); err != nil {
-		t.Fatal(err)
-	}
+
+	waitErr := kernel.Wait(context.Background())
+	require.False(t, waitErr == nil || !strings.Contains(waitErr.Error(), "shutdown deadline exceeded"))
+
+	require.EqualValues(t, 0, calls.Load())
+
+	require.NoError(t, permit.AbortUnused())
 }
 
 func TestKernelRejectsMissingRunFinalizer(t *testing.T) {
 	run, err := lifecycle.NewRunSupervisor(1, lifecycle.RealClock{}, time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	frames, err := lifecycle.NewFrameOwner(io.Discard)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	planner := stoppedKernelPlanner{}
-	if _, err := NewCommandKernel(
+
+	_, newCommandKernelErr := NewCommandKernel(
 		run, admission, uids, tasks, frames, lifecycle.RealClock{},
 		make(chan lifecycle.AdmissionGrant, 1), nil,
 		newNoopRunShutdownBarrier(), nil,
 		planner, newTestFunctionCatalog(planner),
-	); err == nil {
-		t.Fatal("Kernel accepted missing run finalizer")
-	}
+	)
+	require.Error(t, newCommandKernelErr)
+
 }
 
 func TestKernelCannotReportQuiescentWithRetainedLongLivedPermit(t *testing.T) {
 	kernel, run, admission, _, tasks := newKernelWithPlannerAndTimeout(t, stoppedKernelPlanner{}, time.Millisecond)
 	permitPlan, err := lifecycle.NewJobLongLivedPlan(512)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	requested := admission.RequestOrdinary(
 		run.Generation(),
 		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
 		permitPlan.Bytes()+512,
 	)
-	if requested.Rejected != nil {
-		t.Fatal(requested.Rejected)
-	}
+	require.Nil(t, requested.Rejected)
 	var grants [4]lifecycle.AdmissionGrant
 	count, _, err := admission.TakeGrants(1, &grants)
-	if err != nil || count != 1 || grants[0].Ref != requested.Ref {
-		t.Fatalf("grant count=%d grant=%+v err=%v", count, grants[0], err)
-	}
+	require.False(t, err != nil || count != 1 || grants[0].Ref != requested.Ref)
 	permit, err := tasks.IssueLongLivedPermit(
 		admission, requested.Ref, lifecycle.ResourceIdentity{ID: "retained", Generation: 1}, permitPlan,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := kernel.Wait(ctx); err == nil || !strings.Contains(err.Error(), "shutdown deadline exceeded") || !strings.Contains(err.Error(), "nonzero process census") {
-		t.Fatalf("retained permit terminal error=%v", err)
-	}
-	if census := tasks.LongLivedCensus(); census.Active != 1 ||
-		census.Bytes != permitPlan.Bytes() ||
-		census.ExternalReserved != 1 {
-		t.Fatalf("retained permit census=%+v", census)
-	}
-	if err := permit.AbortUnused(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := admission.ReleaseOrdinary(requested.Ref); err != nil {
-		t.Fatal(err)
-	}
+
+	waitErr := kernel.Wait(ctx)
+	require.False(t, waitErr == nil || !strings.Contains(waitErr.Error(), "shutdown deadline exceeded") || !strings.Contains(waitErr.Error(), "nonzero process census"))
+
+	census := tasks.LongLivedCensus()
+	require.False(t, census.Active != 1 || census.Bytes != permitPlan.Bytes() || census.ExternalReserved != 1)
+
+	require.NoError(t, permit.AbortUnused())
+
+	_, releaseOrdinaryErr := admission.ReleaseOrdinary(requested.Ref)
+	require.NoError(t, releaseOrdinaryErr)
+
 }
 
 func TestKernelStopDrainsCooperativeTask(t *testing.T) {
@@ -2944,55 +2571,48 @@ func TestKernelStopDrainsCooperativeTask(t *testing.T) {
 	})
 	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, planner)
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string { return "lane" })
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
-	if err := kernel.Submit(context.Background(), Request{
+
+	require.NoError(t, kernel.Submit(context.Background(), Request{
 		UID: "cooperative-stop", Source: lifecycle.SourceFunction,
 		Route: "route", Deadline: time.Now().Add(time.Minute),
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}),
+	)
+
 	select {
 	case <-started:
 	case <-time.After(time.Second):
-		t.Fatal("cooperative task did not start")
+		require.FailNow(t, "test failed", "cooperative task did not start")
 	}
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if err := kernel.Wait(ctx); err != nil {
-		t.Fatalf("cooperative shutdown did not drain: %v", err)
-	}
-	if tasks.Active() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0 {
-		t.Fatalf("cooperative shutdown retained task/kernel state: tasks=%d operations=%d lanes=%d", tasks.Active(), len(kernel.operations), len(kernel.lanes))
-	}
-	if census := admission.Census(); census.ActiveRecords != 0 || census.Phase != "cleanup-only" {
-		t.Fatalf("cooperative shutdown admission census differs: %#v", census)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(ctx))
+
+	require.False(t, tasks.Active() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
+
+	census := admission.Census()
+	require.False(t, census.ActiveRecords != 0 || census.Phase != "cleanup-only")
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
 func TestKernelShutdownSettlesPendingInputBodyGrowthBeforeCleanupOnly(t *testing.T) {
 	run, err := lifecycle.NewRunSupervisor(1, lifecycle.RealClock{}, lifecycle.DefaultShutdownTimeout)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() { _ = run.FinishShutdown() })
 	uids := lifecycle.NewUIDLedger()
 	admission := lifecycle.NewAdmissionLedger()
 	frames, err := lifecycle.NewFrameOwner(io.Discard)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	grants := make(chan lifecycle.AdmissionGrant, 1)
 	planner := stoppedKernelPlanner{}
 	kernel, err := NewCommandKernel(
@@ -3000,40 +2620,33 @@ func TestKernelShutdownSettlesPendingInputBodyGrowthBeforeCleanupOnly(t *testing
 		newNoopRunShutdownBarrier(), newNoopRunFinalizer(),
 		planner, newTestFunctionCatalog(planner),
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, run.OpenAdmission())
+
 	const capacity = int64(64 * 1024)
 	token, err := admission.RequestInputBodyGrowth(run.Generation(), 0, capacity)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := kernel.beginShutdown(time.Now().Add(time.Second)); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, kernel.beginShutdown(time.Now().Add(time.Second)))
+
 	select {
 	case grant := <-grants:
-		if grant.Kind != lifecycle.ReservationInputBodyGrowth || grant.InputBodyToken != token || grant.Bytes != capacity {
-			t.Fatalf("shutdown input grant differs: %+v", grant)
-		}
+		require.False(t, grant.Kind != lifecycle.ReservationInputBodyGrowth || grant.InputBodyToken != token || grant.Bytes != capacity)
 	default:
-		t.Fatal("shutdown did not settle the pending input body growth")
+		require.FailNow(t, "test failed", "shutdown did not settle the pending input body growth")
 	}
-	if census := admission.Census(); census.Phase != "cleanup-only" || census.InputBodyWaiting {
-		t.Fatalf("shutdown admission transition differs: %+v", census)
-	}
-	if _, err := admission.CommitInputBodyGrowth(token, capacity); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := admission.AbortInputBody(token); err != nil {
-		t.Fatal(err)
-	}
-	if !kernel.shutdownQuiescent() {
-		t.Fatal("shutdown did not become quiescent after parser released its body")
-	}
+
+	census := admission.Census()
+	require.False(t, census.Phase != "cleanup-only" || census.InputBodyWaiting)
+
+	_, commitInputBodyGrowthErr := admission.CommitInputBodyGrowth(token, capacity)
+	require.NoError(t, commitInputBodyGrowthErr)
+
+	_, abortInputBodyErr := admission.AbortInputBody(token)
+	require.NoError(t, abortInputBodyErr)
+
+	require.True(t, kernel.shutdownQuiescent())
 }
 
 func TestKernelShutdownCancelsOperationsInBoundedTurns(t *testing.T) {
@@ -3042,9 +2655,9 @@ func TestKernelShutdownCancelsOperationsInBoundedTurns(t *testing.T) {
 		quantum    = 4
 	)
 	kernel, run := newKernel(t)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	plan := WorkPlan{
 		Work:       lifecycle.FrameTaskWork(plannerPlanWork),
 		NoResponse: true,
@@ -3055,55 +2668,30 @@ func TestKernelShutdownCancelsOperationsInBoundedTurns(t *testing.T) {
 			Source:  lifecycle.SourceJobManager,
 			LaneKey: "shared",
 		}
-		if err := kernel.admit(request, plan, nil, nil, nil); err != nil {
-			t.Fatalf("admit operation %d: %v", index, err)
-		}
+
+		require.NoError(t, kernel.admit(request, plan, nil, nil, nil))
 	}
-	if err := kernel.beginShutdown(time.Now().Add(time.Second)); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.beginShutdown(time.Now().Add(time.Second)))
+
 	for {
 		before := len(kernel.operations)
 		more, err := kernel.serviceShutdownOperations(quantum)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		visited := before - len(kernel.operations)
-		if visited < 0 || visited > quantum {
-			t.Fatalf(
-				"one shutdown turn disposed %d operations, want 0..%d",
-				visited,
-				quantum,
-			)
-		}
+		require.False(t, visited < 0 || visited > quantum)
 		if !more {
 			break
 		}
 	}
-	if len(kernel.operations) != 0 || kernel.operationHead != nil ||
-		kernel.operationTail != nil {
-		t.Fatalf(
-			"shutdown retained operations=%d head=%p tail=%p",
-			len(kernel.operations),
-			kernel.operationHead,
-			kernel.operationTail,
-		)
-	}
-	if err := kernel.advanceShutdownAdmission(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := kernel.serviceShutdownStops(quantum); err != nil {
-		t.Fatal(err)
-	}
-	if len(kernel.lanes) != 0 || kernel.laneHead != nil ||
-		kernel.laneTail != nil {
-		t.Fatalf(
-			"shutdown retained lanes=%d head=%p tail=%p",
-			len(kernel.lanes),
-			kernel.laneHead,
-			kernel.laneTail,
-		)
-	}
+	require.False(t, len(kernel.operations) != 0 || kernel.operationHead != nil || kernel.operationTail != nil)
+
+	require.NoError(t, kernel.advanceShutdownAdmission())
+
+	_, err := kernel.serviceShutdownStops(quantum)
+	require.NoError(t, err)
+
+	require.False(t, len(kernel.lanes) != 0 || kernel.laneHead != nil || kernel.laneTail != nil)
 }
 
 func TestKernelShutdownVisitsLiveLanesOnceInBoundedTurns(t *testing.T) {
@@ -3116,12 +2704,13 @@ func TestKernelShutdownVisitsLiveLanesOnceInBoundedTurns(t *testing.T) {
 	for name, population := range populations {
 		t.Run(name, func(t *testing.T) {
 			kernel, run := newKernel(t)
-			if err := run.OpenAdmission(); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, run.OpenAdmission())
+
 			for index := range population {
 				key := fmt.Sprintf("shutdown-lane-%d", index)
-				if _, err := kernel.allocateLane(
+
+				_, err := kernel.allocateLane(
 					commandLaneKey{
 						source: lifecycle.SourceJobManager,
 						key:    key,
@@ -3130,42 +2719,23 @@ func TestKernelShutdownVisitsLiveLanesOnceInBoundedTurns(t *testing.T) {
 						Source:  lifecycle.SourceJobManager,
 						LaneKey: key,
 					},
-				); err != nil {
-					t.Fatal(err)
-				}
+				)
+				require.NoError(t, err)
 			}
-			if err := kernel.beginShutdown(
-				time.Now().Add(time.Second),
-			); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, kernel.beginShutdown(time.Now().Add(time.Second)))
+
 			for {
 				before := len(kernel.lanes)
 				more, err := kernel.serviceShutdownStops(quantum)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				visited := before - len(kernel.lanes)
-				if visited < 0 || visited > quantum {
-					t.Fatalf(
-						"one shutdown turn visited %d lanes, want 0..%d",
-						visited,
-						quantum,
-					)
-				}
+				require.False(t, visited < 0 || visited > quantum)
 				if !more {
 					break
 				}
 			}
-			if len(kernel.lanes) != 0 || kernel.laneHead != nil ||
-				kernel.laneTail != nil {
-				t.Fatalf(
-					"shutdown retained lanes=%d head=%p tail=%p",
-					len(kernel.lanes),
-					kernel.laneHead,
-					kernel.laneTail,
-				)
-			}
+			require.False(t, len(kernel.lanes) != 0 || kernel.laneHead != nil || kernel.laneTail != nil)
 		})
 	}
 }
@@ -3184,43 +2754,43 @@ func TestKernelRunsTaskCleanupBeforeSlotRelease(t *testing.T) {
 		}, nil
 	})
 	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, planner)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
-	if err := kernel.Submit(context.Background(), Request{
+
+	require.NoError(t, kernel.Submit(context.Background(), Request{
 		UID: "cleanup", LaneKey: "lane", Source: lifecycle.SourceJobManager,
 		Route: "route", Deadline: time.Now().Add(time.Minute),
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}),
+	)
+
 	select {
 	case <-cleaned:
 	case <-time.After(time.Second):
-		t.Fatal("task cleanup phase did not execute")
+		require.FailNow(t, "test failed", "task cleanup phase did not execute")
 	}
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if err := kernel.Wait(ctx); err != nil {
-		t.Fatalf("cleanup task did not drain: %v", err)
-	}
+
+	require.NoError(t, kernel.Wait(ctx))
+
 	select {
 	case <-cleaned:
-		t.Fatal("task cleanup phase executed more than once")
+		require.FailNow(t, "test failed", "task cleanup phase executed more than once")
 	default:
 	}
-	if tasks.Active() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0 {
-		t.Fatalf("cleanup task retained state: tasks=%d operations=%d lanes=%d", tasks.Active(), len(kernel.operations), len(kernel.lanes))
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+	require.False(t, tasks.Active() != 0 || len(kernel.operations) != 0 || len(kernel.lanes) != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
 func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 	started := make(chan struct{})
+	var queuedWorkStarted atomic.Bool
 	planner := plannerFunc(func(_ context.Context, route string, _ []string) (WorkPlan, error) {
 		switch route {
 		case "blocking":
@@ -3235,7 +2805,7 @@ func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 		case "queued":
 			return WorkPlan{
 				Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) {
-					t.Fatal("cancelled queued operation entered TaskChild")
+					queuedWorkStarted.Store(true)
 					return lifecycle.NewControlResult(lifecycle.ControlInternal)
 				}),
 			}, nil
@@ -3246,117 +2816,98 @@ func TestKernelCancelsQueuedOperationWithoutStartingWork(t *testing.T) {
 	kernel, run, admission, uids, tasks := newKernelWithPlanner(t, planner)
 	setTestFunctionResource(t, kernel, func(FunctionLookup) string { return "lane" })
 	catalog := testFunctionCatalogFor(t, kernel)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	deadline := time.Now().Add(time.Minute)
-	if err := kernel.Submit(context.Background(), Request{UID: "blocking", Source: lifecycle.SourceFunction, Route: "blocking", Deadline: deadline}); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Submit(context.Background(), Request{UID: "blocking", Source: lifecycle.SourceFunction, Route: "blocking", Deadline: deadline}))
+
 	select {
 	case <-started:
 	case <-time.After(time.Second):
-		t.Fatal("blocking operation did not start")
+		require.FailNow(t, "test failed", "blocking operation did not start")
 	}
 	queuedResult := make(chan error, 1)
-	if err := kernel.submit(context.Background(), Request{
+
+	require.NoError(t, kernel.submit(context.Background(), Request{
 		UID: "queued", Source: lifecycle.SourceFunction, Route: "queued", Deadline: deadline,
-	}, queuedResult); err != nil {
-		t.Fatal(err)
-	}
-	if err := kernel.Cancel(context.Background(), "queued"); err != nil {
-		t.Fatal(err)
-	}
+	}, queuedResult),
+	)
+
+	require.NoError(t, kernel.Cancel(context.Background(), "queued"))
+
 	select {
 	case err := <-queuedResult:
-		if err != nil {
-			t.Fatalf("queued cancellation result differs: %v", err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("queued cancellation did not reach terminal disposal")
+		require.FailNow(t, "test failed", "queued cancellation did not reach terminal disposal")
 	}
-	if catalog.next != 2 || catalog.release != 1 || len(catalog.leases) != 1 {
-		t.Fatalf("queued cancellation Function lease differs: resolves=%d releases=%d active=%d",
-			catalog.next, catalog.release, len(catalog.leases))
-	}
+	require.False(t, queuedWorkStarted.Load())
+	require.False(t, catalog.next != 2 || catalog.release != 1 || len(catalog.leases) != 1)
 
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if err := kernel.Wait(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 {
-		t.Fatalf("task census differs: active=%d pending=%d", tasks.Active(), tasks.Pending())
-	}
-	if catalog.next != 2 || catalog.release != 2 || len(catalog.leases) != 0 {
-		t.Fatalf("shutdown Function lease differs: resolves=%d releases=%d active=%d",
-			catalog.next, catalog.release, len(catalog.leases))
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(ctx))
+
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+	require.False(t, catalog.next != 2 || catalog.release != 2 || len(catalog.leases) != 0)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
 func TestKernelReservesExactPlanAndFrameBytesBeforeWrite(t *testing.T) {
 	pad, err := lifecycle.RepeatedStringValue(1024*1024, 'A')
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	body, err := lifecycle.ObjectValue(lifecycle.ObjectField{Key: "pad", Value: pad})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	result, err := lifecycle.NewCompleteRawValueEnvelope(200, lifecycle.ReviewedPerformanceJSON, body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	sealed, err := lifecycle.SealFunctionResult(result)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
 		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) { return sealed, nil })}, nil
 	})
 	writer := &holdingFrameWriter{offered: make(chan []byte, 1), release: make(chan struct{})}
 	kernel, run, admission, uids, _ := newKernelWithPlannerAndWriter(t, planner, writer)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
 	request := Request{UID: "self-fit", Source: lifecycle.SourceFunction, Route: "route"}
-	if err := kernel.Submit(context.Background(), request); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Submit(context.Background(), request))
+
 	var frame []byte
 	select {
 	case frame = <-writer.offered:
 	case <-time.After(time.Second):
-		t.Fatal("result did not reach held Write")
+		require.FailNow(t, "test failed", "result did not reach held Write")
 	}
 	chargedRequest := request
 	chargedRequest.LaneKey = request.Route
 	base, err := operationAdmissionBytes(chargedRequest, WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	const repeatedObjectPlanBytes = int64(64 + 16 + len("pad") + 64)
 	wantBytes := base + repeatedObjectPlanBytes + int64(len(frame))
-	if census := admission.Census(); census.OrdinaryBytes != wantBytes || census.OrdinaryGranted != 1 || census.OrdinaryWaiting != 0 {
-		t.Fatalf("held-write admission differs: got=%#v want-bytes=%d", census, wantBytes)
-	}
+
+	census := admission.Census()
+	require.False(t, census.OrdinaryBytes != wantBytes || census.OrdinaryGranted != 1 || census.OrdinaryWaiting != 0)
+
 	close(writer.release)
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if err := kernel.Wait(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(ctx))
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -3366,9 +2917,7 @@ func TestOperationAdmissionBytesIncludesSealedRequestMetadata(t *testing.T) {
 	}
 	plan := WorkPlan{Work: lifecycle.FrameTaskWork(plannerPlanWork)}
 	base, err := operationAdmissionBytes(baseRequest, plan)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tests := map[string]struct {
 		mutate func(*Request)
 		delta  int64
@@ -3387,42 +2936,28 @@ func TestOperationAdmissionBytesIncludesSealedRequestMetadata(t *testing.T) {
 			request := baseRequest
 			test.mutate(&request)
 			got, err := operationAdmissionBytes(request, plan)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got != base+test.delta {
-				t.Fatalf("admission metadata delta differs: got=%d want=%d", got-base, test.delta)
-			}
+			require.NoError(t, err)
+			require.EqualValues(t, base+test.delta, got)
 		})
 	}
 }
 
 func TestOperationAdmissionBytesUsesAggregateFrameworkOverhead(t *testing.T) {
 	got, err := operationAdmissionBytes(Request{}, WorkPlan{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	const want = int64(4_608)
-	if got != want {
-		t.Fatalf("empty operation admission=%d, want %d", got, want)
-	}
+	require.EqualValues(t, want, got)
 }
 
 func TestOperationAdmissionBytesChargesDeclaredLongLivedBytes(t *testing.T) {
 	pipeline, err := lifecycle.NewPipelineLongLivedPlan(
 		[]string{"provider"},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	job, err := lifecycle.NewJobLongLivedPlan(73)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	secretStore, err := lifecycle.NewSecretStoreLongLivedPlan(91)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tests := map[string]struct {
 		permit lifecycle.LongLivedPlan
 		want   int64
@@ -3451,12 +2986,8 @@ func TestOperationAdmissionBytesChargesDeclaredLongLivedBytes(t *testing.T) {
 					},
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got != test.want {
-				t.Fatalf("operation admission=%d, want %d", got, test.want)
-			}
+			require.NoError(t, err)
+			require.EqualValues(t, test.want, got)
 		})
 	}
 }
@@ -3474,49 +3005,37 @@ func TestOperationResultAdmissionBytesBoundaries(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			total, err := operationResultAdmissionBytes(base, lifecycle.ResultPreflight{PlanBytes: 1, FrameBytes: test.frame})
-			if (err == nil) != test.valid {
-				t.Fatalf("result self-fit differs: total=%d err=%v", total, err)
-			}
+			require.EqualValues(t, test.valid, err == nil, "total=%d", total)
 		})
 	}
 }
 
 func TestKernelCancelsResultWaitingForAdmissionGrowth(t *testing.T) {
 	pad, err := lifecycle.RepeatedStringValue(1024*1024, 'A')
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	body, err := lifecycle.ObjectValue(lifecycle.ObjectField{Key: "pad", Value: pad})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	result, err := lifecycle.NewCompleteRawValueEnvelope(200, lifecycle.ReviewedPerformanceJSON, body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	sealed, err := lifecycle.SealFunctionResult(result)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	planner := plannerFunc(func(context.Context, string, []string) (WorkPlan, error) {
 		return WorkPlan{Work: lifecycle.FrameTaskWork(func(context.Context) (lifecycle.SealedResult, error) { return sealed, nil })}, nil
 	})
 	kernel, run, admission, uids, _ := newKernelWithPlanner(t, planner)
 	blocker := admission.RequestOrdinary(run.Generation(), lifecycle.AdmissionLaneRef{Slot: ^uint32(0), Generation: 1}, lifecycle.OrdinaryBudgetBytes-1024*1024)
-	if blocker.Rejected != nil {
-		t.Fatal(blocker.Rejected)
-	}
+	require.Nil(t, blocker.Rejected)
 	var grants [4]lifecycle.AdmissionGrant
-	if count, _, err := admission.TakeGrants(1, &grants); err != nil || count != 1 || grants[0].Ref != blocker.Ref {
-		t.Fatalf("blocker grant differs: count=%d grant=%#v err=%v", count, grants[0], err)
-	}
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	takeGrantsCount, _, takeGrantsErr := admission.TakeGrants(1, &grants)
+	require.False(t, takeGrantsErr != nil || takeGrantsCount != 1 || grants[0].Ref != blocker.Ref)
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
-	if err := kernel.Submit(context.Background(), Request{UID: "growth-cancel", Source: lifecycle.SourceFunction, Route: "route"}); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Submit(context.Background(), Request{UID: "growth-cancel", Source: lifecycle.SourceFunction, Route: "route"}))
+
 	deadline := time.Now().Add(time.Second)
 	for time.Now().Before(deadline) {
 		census := admission.Census()
@@ -3525,31 +3044,31 @@ func TestKernelCancelsResultWaitingForAdmissionGrowth(t *testing.T) {
 		}
 		time.Sleep(time.Millisecond)
 	}
-	if census := admission.Census(); census.OrdinaryWaiting != 1 || census.OrdinaryGranted != 2 {
-		t.Fatalf("result growth did not wait: %#v", census)
-	}
-	if err := kernel.Cancel(context.Background(), "growth-cancel"); err != nil {
-		t.Fatal(err)
-	}
+
+	census := admission.Census()
+	require.False(t, census.OrdinaryWaiting != 1 || census.OrdinaryGranted != 2)
+
+	require.NoError(t, kernel.Cancel(context.Background(), "growth-cancel"))
+
 	deadline = time.Now().Add(time.Second)
 	for admission.Census().OrdinaryWaiting != 0 && time.Now().Before(deadline) {
 		time.Sleep(time.Millisecond)
 	}
-	if census := admission.Census(); census.OrdinaryWaiting != 0 || census.OrdinaryGranted < 1 || census.OrdinaryGranted > 2 {
-		t.Fatalf("cancelled growth retained waiter: %#v", census)
-	}
-	if _, err := admission.ReleaseOrdinary(blocker.Ref); err != nil {
-		t.Fatal(err)
-	}
+
+	admissionCensus := admission.Census()
+	require.False(t, admissionCensus.OrdinaryWaiting != 0 || admissionCensus.OrdinaryGranted < 1 || admissionCensus.OrdinaryGranted > 2)
+
+	_, releaseOrdinaryErr := admission.ReleaseOrdinary(blocker.Ref)
+	require.NoError(t, releaseOrdinaryErr)
+
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if err := kernel.Wait(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(ctx))
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -3584,9 +3103,9 @@ func (fhfw *firstHoldingFrameWriter) Write(payload []byte) (int, error) {
 
 func TestKernelExternalSubmissionServiceRotatesSources(t *testing.T) {
 	kernel, run := newKernel(t)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	requests := []Request{
 		{UID: "j1", LaneKey: "j1", Source: lifecycle.SourceJobManager, Route: "route"},
 		{UID: "j2", LaneKey: "j2", Source: lifecycle.SourceJobManager, Route: "route"},
@@ -3596,24 +3115,19 @@ func TestKernelExternalSubmissionServiceRotatesSources(t *testing.T) {
 	results := make([]chan error, len(requests))
 	for index, request := range requests {
 		plan, err := kernel.prepareSubmissionPlanForTest(request)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		results[index] = make(chan error, 1)
 		kernel.submissions[sourceIndex(request.Source)] <- submission{request: request, plan: plan, result: results[index]}
 	}
 	kernel.serviceSubmissions(4)
 	kernel.serviceAdmissions(4)
 	for _, result := range results {
-		if err := <-result; err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, <-result)
 	}
 	want := map[string]lifecycle.OperationID{"j1": 1, "f1": 2, "j2": 3, "f2": 4}
 	for uid, id := range want {
-		if operation := kernel.operations[uid]; operation == nil || operation.ID != id {
-			t.Fatalf("external source rotation differs for %s: %#v", uid, operation)
-		}
+		operation := kernel.operations[uid]
+		require.False(t, operation == nil || operation.ID != id)
 	}
 }
 
@@ -3629,9 +3143,7 @@ func TestKernelShutdownDrainsMoreThanTwoSubmissionQuantaWithoutAnotherWake(t *te
 			Route:  "route",
 		}
 		plan, err := kernel.prepareSubmissionPlanForTest(request)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		kernel.submissions[sourceIndex(lifecycle.SourceFunction)] <- submission{
 			request: request,
 			plan:    plan,
@@ -3643,17 +3155,15 @@ func TestKernelShutdownDrainsMoreThanTwoSubmissionQuantaWithoutAnotherWake(t *te
 	startKernelLoop(t, kernel)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := kernel.Wait(ctx); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(ctx))
+
 	for index, result := range results {
 		select {
 		case err := <-result:
-			if err == nil || !strings.Contains(err.Error(), "admission closed") {
-				t.Fatalf("submission %d result differs: %v", index, err)
-			}
+			require.False(t, err == nil || !strings.Contains(err.Error(), "admission closed"))
 		default:
-			t.Fatalf("submission %d was not drained", index)
+			require.FailNowf(t, "test failed", "submission %d was not drained", index)
 		}
 	}
 }
@@ -3663,9 +3173,7 @@ func TestKernelClosedAdmissionDoesNotRearmFrameBlockedControl(t *testing.T) {
 	source := sourceIndex(lifecycle.SourceFunction)
 	kernel.blockedSubmission[source] = true
 	kernel.blockedSubmissions[source] = submission{controlStatus: lifecycle.ControlBadRequest}
-	if kernel.hasRunnableSubmissions() {
-		t.Fatal("frame-blocked control was reported as immediately runnable")
-	}
+	require.False(t, kernel.hasRunnableSubmissions())
 }
 
 func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
@@ -3677,9 +3185,9 @@ func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
 	})
 	kernel, run, _, _, tasks := newKernelWithPlanner(t, planner)
 	setTestFunctionResource(t, kernel, func(lookup FunctionLookup) string { return lookup.UID })
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	for index := 0; index < 9; index++ {
 		request := Request{
 			UID:    fmt.Sprintf("claim-%d", index),
@@ -3687,28 +3195,25 @@ func TestKernelTaskSchedulingCountsClaimConflictsAgainstQuantum(t *testing.T) {
 			Route:  "route",
 		}
 		plan, err := kernel.prepareSubmissionPlanForTest(request)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := kernel.admit(request, plan, nil, nil, nil); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
+
+		require.NoError(t, kernel.admit(request, plan, nil, nil, nil))
 	}
 	for range 3 {
 		kernel.serviceAdmissions(4)
 	}
-	if got := kernel.ready[0].len + kernel.ready[1].len; got != 9 {
-		t.Fatalf("initial ready lanes differ: %d", got)
-	}
-	if more := kernel.scheduleTasks(4); !more || tasks.Pending() != 1 || kernel.claims.WaitingCount() != 3 || kernel.ready[0].len+kernel.ready[1].len != 5 {
-		t.Fatalf("first quantum differs: more=%v pending=%d waiters=%d ready=%d", more, tasks.Pending(), kernel.claims.WaitingCount(), kernel.ready[0].len+kernel.ready[1].len)
-	}
-	if more := kernel.scheduleTasks(4); !more || tasks.Pending() != 1 || kernel.claims.WaitingCount() != 7 || kernel.ready[0].len+kernel.ready[1].len != 1 {
-		t.Fatalf("second quantum differs: more=%v pending=%d waiters=%d ready=%d", more, tasks.Pending(), kernel.claims.WaitingCount(), kernel.ready[0].len+kernel.ready[1].len)
-	}
-	if more := kernel.scheduleTasks(4); more || tasks.Pending() != 1 || kernel.claims.WaitingCount() != 8 || kernel.ready[0].len+kernel.ready[1].len != 0 {
-		t.Fatalf("final quantum differs: more=%v pending=%d waiters=%d ready=%d", more, tasks.Pending(), kernel.claims.WaitingCount(), kernel.ready[0].len+kernel.ready[1].len)
-	}
+
+	got := kernel.ready[0].len + kernel.ready[1].len
+	require.EqualValues(t, 9, got)
+
+	require.False(t, !kernel.scheduleTasks(4) ||
+		tasks.Pending() != 1 || kernel.claims.WaitingCount() != 3 || kernel.ready[0].len+kernel.ready[1].len != 5)
+
+	require.False(t, !kernel.scheduleTasks(4) ||
+		tasks.Pending() != 1 || kernel.claims.WaitingCount() != 7 || kernel.ready[0].len+kernel.ready[1].len != 1)
+
+	require.False(t, kernel.scheduleTasks(4) ||
+		tasks.Pending() != 1 || kernel.claims.WaitingCount() != 8 || kernel.ready[0].len+kernel.ready[1].len != 0)
 }
 
 func TestKernelResourceScopedFunctionHasIndependentTaskSchedulingClass(t *testing.T) {
@@ -3722,63 +3227,44 @@ func TestKernelResourceScopedFunctionHasIndependentTaskSchedulingClass(t *testin
 		}
 		return ""
 	})
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	requests := []Request{
 		{UID: "generic-first", Source: lifecycle.SourceFunction, Route: "generic"},
 		{UID: "dyncfg-second", Source: lifecycle.SourceFunction, Route: "dyncfg"},
 	}
 	for _, request := range requests {
-		if err := kernel.admit(request, WorkPlan{}, nil, nil, nil); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, kernel.admit(request, WorkPlan{}, nil, nil, nil))
 	}
 	kernel.serviceAdmissions(len(requests))
-	if more := kernel.scheduleTasks(len(requests)); more {
-		t.Fatal("task scheduling retained an unexpected ready lane")
-	}
-	if tasks.Pending() != len(requests) {
-		t.Fatalf("pending tasks=%d, want %d", tasks.Pending(), len(requests))
-	}
+
+	more := kernel.scheduleTasks(len(requests))
+	require.False(t, more)
+
+	require.EqualValues(t, len(requests), tasks.Pending())
 	var started [lifecycle.TaskStartServiceQuantum]lifecycle.TaskStart
 	count, _, err := tasks.Dispatch(context.Background(), 1, &started)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if count != 1 {
-		t.Fatalf("started tasks=%d, want 1", count)
-	}
+	require.NoError(t, err)
+	require.EqualValues(t, 1, count)
 	operation := kernel.tasksByRequest[started[0].Request]
-	if operation == nil {
-		t.Fatal("started task has no kernel operation")
-	}
-	if operation.Source != lifecycle.SourceFunction {
-		t.Fatalf("resource-scoped Function source=%v, want Function", operation.Source)
-	}
-	if operation.request.UID != "dyncfg-second" {
-		t.Fatalf(
-			"first dispatched Function=%q, want resource-scoped %q",
-			operation.request.UID,
-			"dyncfg-second",
-		)
-	}
+	require.NotNil(t, operation)
+	require.EqualValues(t, lifecycle.SourceFunction, operation.Source)
+	require.EqualValues(t, "dyncfg-second", operation.request.UID)
 }
 
 func TestKernelSubmissionBacklogCannotStarveStop(t *testing.T) {
 	kernel, run, admission, uids, _ := newKernelWithPlanner(t, stoppedKernelPlanner{})
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	for index := 0; index < externalSourceQueueDepth; index++ {
 		request := Request{
 			UID:    fmt.Sprintf("backlog-%d", index),
 			Source: lifecycle.SourceFunction, Route: "route",
 		}
 		plan, err := kernel.prepareSubmissionPlanForTest(request)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		kernel.submissions[sourceIndex(request.Source)] <- submission{
 			request: request, plan: plan, result: make(chan error, 1),
 		}
@@ -3787,44 +3273,38 @@ func TestKernelSubmissionBacklogCannotStarveStop(t *testing.T) {
 	startKernelLoop(t, kernel)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := kernel.WaitShutdownStarted(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err := kernel.Wait(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.WaitShutdownStarted(ctx))
+
+	require.NoError(t, kernel.Wait(ctx))
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
 func TestKernelSubmissionBacklogCannotStarveDueDeadline(t *testing.T) {
 	var output bytes.Buffer
 	kernel, run, admission, uids, _ := newKernelWithPlannerAndWriter(t, stoppedKernelPlanner{}, &output)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	request := Request{
 		UID: "deadline-probe", Source: lifecycle.SourceFunction, Route: "route",
 		Deadline: time.Now().Add(-time.Second),
 	}
 	plan, err := kernel.prepareSubmissionPlanForTest(request)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := kernel.admit(request, plan, nil, nil, nil); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, kernel.admit(request, plan, nil, nil, nil))
+
 	for index := 0; index < externalSourceQueueDepth; index++ {
 		request := Request{
 			UID:    fmt.Sprintf("backlog-%d", index),
 			Source: lifecycle.SourceFunction, Route: "route",
 		}
 		plan, err := kernel.prepareSubmissionPlanForTest(request)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		kernel.submissions[sourceIndex(request.Source)] <- submission{
 			request: request, plan: plan, result: make(chan error, 1),
 		}
@@ -3833,43 +3313,38 @@ func TestKernelSubmissionBacklogCannotStarveDueDeadline(t *testing.T) {
 	startKernelLoop(t, kernel)
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := kernel.Wait(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN deadline-probe 504 application/json ")) {
-		t.Fatalf("due deadline was starved or overwritten by shutdown: %q", output.Bytes())
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(ctx))
+
+	require.True(t, bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN deadline-probe 504 application/json ")))
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
 func TestKernelPreAdmissionRejectionCommitsWithoutUIDOrAdmissionRecord(t *testing.T) {
 	var output bytes.Buffer
 	kernel, run, admission, uids, _ := newKernelWithPlannerAndWriter(t, stoppedKernelPlanner{}, &output)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	startKernelLoop(t, kernel)
-	if err := kernel.Reject(context.Background(), "malformed-safe-uid", lifecycle.ControlBadRequest); err != nil {
-		t.Fatal(err)
-	}
-	if census := admission.Census(); census.ActiveRecords != 0 || census.OrdinaryWaiting != 0 || census.OrdinaryGranted != 0 {
-		t.Fatalf("pre-admission rejection consumed admission state: %#v", census)
-	}
-	if !bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN malformed-safe-uid 400 application/json ")) {
-		t.Fatalf("pre-admission rejection frame differs: %q", output.Bytes())
-	}
+
+	require.NoError(t, kernel.Reject(context.Background(), "malformed-safe-uid", lifecycle.ControlBadRequest))
+
+	census := admission.Census()
+	require.False(t, census.ActiveRecords != 0 || census.OrdinaryWaiting != 0 || census.OrdinaryGranted != 0)
+
+	require.True(t, bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN malformed-safe-uid 400 application/json ")))
 	kernel.Stop()
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := kernel.Wait(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(ctx))
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeUIDLedger(t, uids)
 }
 
@@ -3879,32 +3354,25 @@ func TestKernelDeadlineServiceHasFixedQuantum(t *testing.T) {
 	for index := 0; index < 9; index++ {
 		id := lifecycle.OperationID(index + 1)
 		generation, err := lifecycle.NewOperation(id, fmt.Sprintf("u%d", index), lifecycle.SourceFunction, fmt.Sprintf("lane%d", index), true)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		for _, state := range []lifecycle.OperationState{
 			lifecycle.OperationQueued, lifecycle.OperationAcquiringClaims, lifecycle.OperationReady, lifecycle.OperationRunning,
 		} {
-			if err := generation.Advance(state); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, generation.Advance(state))
 		}
-		if err := generation.StartChild(lifecycle.TaskRef{Slot: uint32(index), Generation: uint64(index + 1)}); err != nil {
-			t.Fatal(err)
-		}
+
+		require.NoError(t, generation.StartChild(lifecycle.TaskRef{Slot: uint32(index), Generation: uint64(index + 1)}))
+
 		operation := &commandOperation{OperationGeneration: generation, deadline: deadlineEntry{when: now.Add(-time.Second), index: -1}}
 		operation.deadline.operation = operation
 		heap.Push(&kernel.deadlines, &operation.deadline)
 	}
-	if more := kernel.serviceDeadlines(now, 4); !more || len(kernel.controls) != 4 || kernel.deadlines.Len() != 5 {
-		t.Fatalf("first deadline quantum differs: more=%v controls=%d deadlines=%d", more, len(kernel.controls), kernel.deadlines.Len())
-	}
-	if more := kernel.serviceDeadlines(now, 4); !more || len(kernel.controls) != 8 || kernel.deadlines.Len() != 1 {
-		t.Fatalf("second deadline quantum differs: more=%v controls=%d deadlines=%d", more, len(kernel.controls), kernel.deadlines.Len())
-	}
-	if more := kernel.serviceDeadlines(now, 4); more || len(kernel.controls) != 9 || kernel.deadlines.Len() != 0 {
-		t.Fatalf("final deadline quantum differs: more=%v controls=%d deadlines=%d", more, len(kernel.controls), kernel.deadlines.Len())
-	}
+
+	require.False(t, !kernel.serviceDeadlines(now, 4) || len(kernel.controls) != 4 || kernel.deadlines.Len() != 5)
+
+	require.False(t, !kernel.serviceDeadlines(now, 4) || len(kernel.controls) != 8 || kernel.deadlines.Len() != 1)
+
+	require.False(t, kernel.serviceDeadlines(now, 4) || len(kernel.controls) != 9 || kernel.deadlines.Len() != 0)
 }
 
 func newStoppedKernel(t *testing.T) *CommandKernel {
@@ -3912,9 +3380,9 @@ func newStoppedKernel(t *testing.T) *CommandKernel {
 	kernel, _ := newKernel(t)
 	startKernelLoop(t, kernel)
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatalf("first wait differs: %v", err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
 	return kernel
 }
 
@@ -3953,29 +3421,21 @@ func newKernelWithClockFinalizerAndTimeout(t *testing.T, planner Planner, writer
 func newKernelWithClockFinalizerCatalogAndTimeout(t *testing.T, planner Planner, functionCatalog FunctionCatalogPort, writer io.Writer, clock lifecycle.Clock, finalizer RunFinalizer, timeout time.Duration) (*CommandKernel, *lifecycle.RunSupervisor, *lifecycle.AdmissionLedger, *lifecycle.UIDLedger, *lifecycle.TaskSupervisor) {
 	t.Helper()
 	run, err := lifecycle.NewRunSupervisor(1, clock, timeout)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() { _ = run.FinishShutdown() })
 	uids := lifecycle.NewUIDLedger()
 	admission := lifecycle.NewAdmissionLedger()
 	frames, err := lifecycle.NewFrameOwner(writer)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	kernel, err := NewCommandKernel(
 		run, admission, uids, tasks, frames, clock,
 		make(chan lifecycle.AdmissionGrant, 1), nil,
 		newNoopRunShutdownBarrier(), finalizer,
 		planner, functionCatalog,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return kernel, run, admission, uids, tasks
 }
 
@@ -4026,9 +3486,7 @@ func (kfc *kernelFinalizerClock) expireShutdown(t *testing.T) {
 	kfc.now = kfc.now.Add(time.Second)
 	now := kfc.now
 	kfc.mu.Unlock()
-	if ready == nil {
-		t.Fatal("shutdown timer was not armed")
-	}
+	require.NotNil(t, ready)
 	ready <- now
 }
 
@@ -4036,9 +3494,7 @@ func (kfc *kernelFinalizerClock) advanceShutdownWithoutSignal(t *testing.T) {
 	t.Helper()
 	kfc.mu.Lock()
 	defer kfc.mu.Unlock()
-	if kfc.shutdown == nil {
-		t.Fatal("shutdown timer was not armed")
-	}
+	require.NotNil(t, kfc.shutdown)
 	kfc.now = kfc.now.Add(time.Second)
 }
 
@@ -4052,9 +3508,7 @@ func closeUIDLedger(t *testing.T, ledger *lifecycle.UIDLedger) {
 	t.Helper()
 	for {
 		more, err := ledger.CloseBatch(lifecycle.UIDReturnBatch)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		if !more {
 			return
 		}
@@ -4109,9 +3563,7 @@ func (functionCatalogPortStub) BeginMutation(FunctionCatalogMutation) error {
 }
 
 func (functionCatalogPortStub) AdvanceMutationQuiesce(int) (FunctionCatalogMutationProgress, error) {
-	return FunctionCatalogMutationProgress{}, errors.New(
-		"test Function catalog: no active mutation",
-	)
+	return FunctionCatalogMutationProgress{}, errors.New("test Function catalog: no active mutation")
 }
 
 func (functionCatalogPortStub) ResumeMutation(FunctionCatalogMutation) error {
@@ -4186,9 +3638,7 @@ func (*testFunctionCatalog) BeginMutation(FunctionCatalogMutation) error {
 }
 
 func (*testFunctionCatalog) AdvanceMutationQuiesce(int) (FunctionCatalogMutationProgress, error) {
-	return FunctionCatalogMutationProgress{}, errors.New(
-		"test Function catalog: no active mutation",
-	)
+	return FunctionCatalogMutationProgress{}, errors.New("test Function catalog: no active mutation")
 }
 
 func (*testFunctionCatalog) ResumeMutation(FunctionCatalogMutation) error {
@@ -4221,18 +3671,14 @@ func setTestFunctionResource(t *testing.T, kernel *CommandKernel, resource func(
 func testFunctionCatalogFor(t *testing.T, kernel *CommandKernel) *testFunctionCatalog {
 	t.Helper()
 	catalog, ok := kernel.functionCatalog.(*testFunctionCatalog)
-	if !ok {
-		t.Fatal("kernel does not use the test Function catalog")
-	}
+	require.True(t, ok)
 	return catalog
 }
 
 func kernelResourcePlanner(t *testing.T, resource *kernelTestReadyResource, workEntered chan<- struct{}, workRelease <-chan struct{}) Planner {
 	t.Helper()
 	permitPlan, err := lifecycle.NewJobLongLivedPlan(4096)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return kernelTestResourcePlanner{
 		permitPlan:  permitPlan,
 		resource:    resource,
@@ -4341,9 +3787,7 @@ func (kttp kernelTestTransactionPlanner) Plan(
 					if current != kttp.current ||
 						scope.Current != kttp.current.identity ||
 						!scope.Successor.Valid() {
-						return nil, errors.New(
-							"kernel test transaction scope differs",
-						)
+						return nil, errors.New("kernel test transaction scope differs")
 					}
 					if kttp.waitForCancellation {
 						<-ctx.Done()
@@ -4362,9 +3806,7 @@ func (kttp kernelTestTransactionPlanner) Plan(
 			},
 		}, nil
 	default:
-		return WorkPlan{}, errors.New(
-			"unexpected kernel transaction route",
-		)
+		return WorkPlan{}, errors.New("unexpected kernel transaction route")
 	}
 }
 
@@ -4390,9 +3832,7 @@ func (ktprt *kernelTestPreparedResourceTransaction) Apply(
 	if err := ktprt.current.Finalize(); err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
-	if err := ktprt.permit.ActivateExternal(
-		lifecycle.LongLivedEJobResources,
-	); err != nil {
+	if err := ktprt.permit.ActivateExternal(lifecycle.LongLivedEJobResources); err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
 	ktprt.successor.identity = ktprt.scope.Successor
@@ -4400,11 +3840,7 @@ func (ktprt *kernelTestPreparedResourceTransaction) Apply(
 	if err := ktprt.successor.Publish(); err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
-	result, err := lifecycle.NewSealedResult(
-		200,
-		"application/json",
-		[]byte(`{"accepted":true}`),
-	)
+	result, err := lifecycle.NewSealedResult(200, "application/json", []byte(`{"accepted":true}`))
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
@@ -4553,10 +3989,7 @@ func (stoppedKernelPlanner) Plan(Request) (WorkPlan, error) {
 func startKernelLoop(t *testing.T, kernel *CommandKernel) {
 	t.Helper()
 	loop, err := NewKernelLoop(kernel)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := loop.Start(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, loop.Start(context.Background()))
 }

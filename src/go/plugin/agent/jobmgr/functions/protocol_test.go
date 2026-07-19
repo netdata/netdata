@@ -8,44 +8,34 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFunctionPublicationFrame(t *testing.T) {
 	var output bytes.Buffer
 	owner, err := lifecycle.NewFrameOwner(&output)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	port, err := NewFramePublicationPort(7, owner)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	record := PublicationRecord{
 		Name: "module:method", Generation: 3, Timeout: 60,
 		Help: "method help", Tags: "top", Access: "0x0013",
 		Priority: 100, Version: 3,
 	}
 	handle, err := port.Publish(record)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if handle != (PublicationHandle{
+	require.NoError(t, err)
+	require.EqualValues(t, (PublicationHandle{
 		ID: 1, Epoch: 7, Generation: 3, Name: "module:method",
-	}) {
-		t.Fatalf("handle=%+v", handle)
-	}
-	if err := port.Withdraw(handle); err != nil {
-		t.Fatal(err)
-	}
+	}), handle)
+
+	require.NoError(t, port.Withdraw(handle))
+
 	want := "" +
 		"FUNCTION GLOBAL \"module:method\" 60 \"method help\" \"top\" 0x0013 100 3\n\n" +
 		"FUNCTION_DEL GLOBAL \"module:method\"\n\n"
-	if output.String() != want {
-		t.Fatalf("output=%q want=%q", output.String(), want)
-	}
-	if err := port.Withdraw(handle); err == nil {
-		t.Fatal("duplicate withdrawal was accepted")
-	}
+	require.EqualValues(t, want, output.String())
+
+	require.Error(t, port.Withdraw(handle))
 }
 
 func TestFunctionPublicationFrameRejectsInjection(t *testing.T) {
@@ -78,24 +68,19 @@ func TestFunctionPublicationFrameRejectsInjection(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			var output bytes.Buffer
 			owner, err := lifecycle.NewFrameOwner(&output)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			port, err := NewFramePublicationPort(1, owner)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			record := PublicationRecord{
 				Name: "module:method", Generation: 1, Timeout: 1,
 				Help: "help", Tags: "top", Access: "0x0000",
 			}
 			test.mutate(&record)
-			if _, err := port.Publish(record); err == nil {
-				t.Fatal("invalid registration was accepted")
-			}
-			if output.Len() != 0 {
-				t.Fatalf("invalid registration wrote %q", output.String())
-			}
+
+			_, publishErr := port.Publish(record)
+			require.Error(t, publishErr)
+
+			require.EqualValues(t, 0, output.Len())
 		})
 	}
 }
@@ -103,24 +88,18 @@ func TestFunctionPublicationFrameRejectsInjection(t *testing.T) {
 func TestFunctionPublicationFrameNoHandleBeforeCommit(t *testing.T) {
 	writer := &failingFunctionFrameWriter{err: errors.New("write failed")}
 	owner, err := lifecycle.NewFrameOwner(writer)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	port, err := NewFramePublicationPort(1, owner)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	record := PublicationRecord{
 		Name: "module:method", Generation: 1, Timeout: 1,
 		Help: "help", Tags: "top", Access: "0x0000",
 	}
 	handle, err := port.Publish(record)
-	if err == nil || handle != (PublicationHandle{}) {
-		t.Fatalf("handle=%+v err=%v", handle, err)
-	}
-	if census := owner.Census(); !census.Poisoned || census.Commits != 0 {
-		t.Fatalf("frame census=%+v", census)
-	}
+	require.False(t, err == nil || handle != (PublicationHandle{}))
+
+	census := owner.Census()
+	require.False(t, !census.Poisoned || census.Commits != 0)
 }
 
 type failingFunctionFrameWriter struct {

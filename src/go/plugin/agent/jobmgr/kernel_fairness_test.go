@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/stretchr/testify/require"
 )
 
 func TestKernelFunctionResourceLanesGrowAndPreserveCrossLaneProgress(
@@ -16,9 +17,9 @@ func TestKernelFunctionResourceLanesGrowAndPreserveCrossLaneProgress(
 		t,
 		stoppedKernelPlanner{},
 	)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
+
 	setTestFunctionResource(
 		t,
 		kernel,
@@ -36,18 +37,9 @@ func TestKernelFunctionResourceLanesGrowAndPreserveCrossLaneProgress(
 			Route:  "route",
 		}
 		plan, err := kernel.prepareSubmissionPlanForTest(request)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := kernel.admit(
-			request,
-			plan,
-			nil,
-			nil,
-			nil,
-		); err != nil {
-			t.Fatalf("hot lane admission %d: %v", index, err)
-		}
+		require.NoError(t, err)
+
+		require.NoError(t, kernel.admit(request, plan, nil, nil, nil))
 	}
 	cold := Request{
 		UID:    "cold-progress",
@@ -55,21 +47,9 @@ func TestKernelFunctionResourceLanesGrowAndPreserveCrossLaneProgress(
 		Route:  "route",
 	}
 	plan, err := kernel.prepareSubmissionPlanForTest(cold)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := kernel.admit(
-		cold,
-		plan,
-		nil,
-		nil,
-		nil,
-	); err != nil {
-		t.Fatalf(
-			"cold lane was blocked by hot-lane depth: %v",
-			err,
-		)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, kernel.admit(cold, plan, nil, nil, nil))
 }
 
 func TestKernelReadyLaneFairnessAtBoundaries(t *testing.T) {
@@ -87,11 +67,7 @@ func TestKernelReadyLaneFairnessAtBoundaries(t *testing.T) {
 				lifecycle.SourceFunction,
 			} {
 				for index := 0; index < population; index++ {
-					uid := fmt.Sprintf(
-						"%d-%03d",
-						sourceIndex,
-						index,
-					)
+					uid := fmt.Sprintf("%d-%03d", sourceIndex, index)
 					generation, err := lifecycle.NewOperation(
 						lifecycle.OperationID(index+1),
 						uid,
@@ -99,9 +75,7 @@ func TestKernelReadyLaneFairnessAtBoundaries(t *testing.T) {
 						uid,
 						false,
 					)
-					if err != nil {
-						t.Fatal(err)
-					}
+					require.NoError(t, err)
 					operation := &commandOperation{
 						OperationGeneration: generation,
 						admitted:            true,
@@ -111,44 +85,21 @@ func TestKernelReadyLaneFairnessAtBoundaries(t *testing.T) {
 						source: source,
 						head:   operation,
 					}
-					expected[sourceIndex] = append(
-						expected[sourceIndex],
-						lane,
-					)
+					expected[sourceIndex] = append(expected[sourceIndex], lane)
 					kernel.markReady(lane)
 				}
 			}
 			positions := [2]int{}
 			for decision := 0; decision < 2*population; decision++ {
 				lane := kernel.nextReadyLane()
-				if lane == nil {
-					t.Fatalf(
-						"decision %d returned no lane",
-						decision,
-					)
-				}
+				require.NotNil(t, lane)
 				source := sourceIndex(lane.source)
 				want := expected[source][positions[source]]
-				if lane != want {
-					t.Fatalf(
-						"source %d decision %d lane=%s want=%s",
-						source,
-						positions[source],
-						lane.key,
-						want.key,
-					)
-				}
+				require.EqualValues(t, want, lane)
 				positions[source]++
 				kernel.markReady(lane)
 			}
-			if positions != [2]int{population, population} {
-				t.Fatalf(
-					"source decisions=%v want=%d/%d",
-					positions,
-					population,
-					population,
-				)
-			}
+			require.EqualValues(t, [2]int{population, population}, positions)
 		})
 	}
 }

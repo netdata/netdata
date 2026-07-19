@@ -9,6 +9,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/internal/jobmgrtest"
 	"github.com/netdata/netdata/go/plugins/internal/jobmgrtest/contract"
+	"github.com/stretchr/testify/require"
 )
 
 type productionRuntimeCase struct {
@@ -20,17 +21,10 @@ func TestProductionAgentCases(t *testing.T) {
 	driver := &jobmgrtest.AgentDriver{}
 	for caseID, test := range productionCases(t, contract.SuiteAgent) {
 		t.Run(caseID, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(
-				context.Background(),
-				15*time.Second,
-			)
+			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-			if err := driver.Run(
-				ctx,
-				test.evidence.RuntimePredicate,
-			); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, driver.Run(ctx, test.evidence.RuntimePredicate))
 		})
 	}
 }
@@ -39,17 +33,10 @@ func TestProductionProcessCases(t *testing.T) {
 	driver := &jobmgrtest.ProcessDriver{}
 	for caseID, test := range productionCases(t, contract.SuiteProcess) {
 		t.Run(caseID, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(
-				context.Background(),
-				10*time.Second,
-			)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			if err := driver.Run(
-				ctx,
-				test.evidence.RuntimePredicate,
-			); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, driver.Run(ctx, test.evidence.RuntimePredicate))
 		})
 	}
 }
@@ -57,65 +44,29 @@ func TestProductionProcessCases(t *testing.T) {
 func TestProductionShippedRootCases(t *testing.T) {
 	configDirectory := os.Getenv("JOBMGRTEST_ROOT_CONFIG_DIR")
 	driver := productionShippedRootDriver(configDirectory)
-	for caseID, test := range productionCases(
-		t,
-		contract.SuiteShippedRoot,
-	) {
+	for caseID, test := range productionCases(t, contract.SuiteShippedRoot) {
 		t.Run(caseID, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(
-				context.Background(),
-				10*time.Second,
-			)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			missing, err := driver.RunAvailable(
-				ctx,
-				test.evidence.RuntimePredicate,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			missing, err := driver.RunAvailable(ctx, test.evidence.RuntimePredicate)
+			require.NoError(t, err)
 			if len(missing) != 0 {
-				if os.Getenv(
-					"JOBMGRTEST_REQUIRE_ALL_ROOTS",
-				) == "1" {
-					t.Fatalf(
-						"required shipped-root binaries disappeared; missing=%v",
-						missing,
-					)
-				}
-				t.Skipf(
-					"prebuilt supported shipped-root binaries are required; missing=%v",
-					missing,
-				)
+				require.NotEqualValues(t, "1", os.Getenv("JOBMGRTEST_REQUIRE_ALL_ROOTS"))
+				t.Skipf("prebuilt supported shipped-root binaries are required; missing=%v", missing)
 			}
 		})
 	}
 }
 
 func TestProductionShippedRootScenarioMatrix(t *testing.T) {
-	driver := productionShippedRootDriver(
-		os.Getenv("JOBMGRTEST_ROOT_CONFIG_DIR"),
-	)
-	ctx, cancel := context.WithTimeout(
-		context.Background(),
-		30*time.Second,
-	)
+	driver := productionShippedRootDriver(os.Getenv("JOBMGRTEST_ROOT_CONFIG_DIR"))
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	missing, err := driver.RunMatrixAvailable(ctx)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	if len(missing) != 0 {
-		if os.Getenv("JOBMGRTEST_REQUIRE_ALL_ROOTS") == "1" {
-			t.Fatalf(
-				"required shipped-root binaries disappeared; missing=%v",
-				missing,
-			)
-		}
-		t.Skipf(
-			"prebuilt supported shipped-root binaries are required; missing=%v",
-			missing,
-		)
+		require.NotEqualValues(t, "1", os.Getenv("JOBMGRTEST_REQUIRE_ALL_ROOTS"))
+		t.Skipf("prebuilt supported shipped-root binaries are required; missing=%v", missing)
 	}
 }
 
@@ -145,22 +96,12 @@ func productionShippedRootDriver(
 
 func TestProductionCollectorBoundaryCases(t *testing.T) {
 	driver := &jobmgrtest.CollectorBoundaryDriver{}
-	for caseID, test := range productionCases(
-		t,
-		contract.SuiteCollectorBoundary,
-	) {
+	for caseID, test := range productionCases(t, contract.SuiteCollectorBoundary) {
 		t.Run(caseID, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(
-				context.Background(),
-				10*time.Second,
-			)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			if err := driver.Run(
-				ctx,
-				test.evidence.RuntimePredicate,
-			); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, driver.Run(ctx, test.evidence.RuntimePredicate))
 		})
 	}
 }
@@ -177,28 +118,18 @@ func TestProductionResolverCases(t *testing.T) {
 		"child=$!\n" +
 		"printf '%s %s\\n' \"$$\" \"$child\" > \"$1\"\n" +
 		"wait \"$child\"\n"
-	if err := os.WriteFile(helper, []byte(script), 0o700); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, os.WriteFile(helper, []byte(script), 0o700))
+
 	driver := jobmgrtest.ResolverDriver{
 		Helper: helper, PIDFile: pidFile,
 	}
-	for caseID, test := range productionCases(
-		t,
-		contract.SuiteResolver,
-	) {
+	for caseID, test := range productionCases(t, contract.SuiteResolver) {
 		t.Run(caseID, func(t *testing.T) {
-			ctx, cancel := context.WithTimeout(
-				context.Background(),
-				10*time.Second,
-			)
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			if err := driver.Run(
-				ctx,
-				test.evidence.RuntimePredicate,
-			); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, driver.Run(ctx, test.evidence.RuntimePredicate))
 		})
 	}
 }
@@ -209,21 +140,17 @@ func productionCases(
 ) map[string]productionRuntimeCase {
 	t.Helper()
 	cases, err := contract.BMM002Cases()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := contract.ValidateEvidenceContract(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, contract.ValidateEvidenceContract())
+
 	selected := make(map[string]productionRuntimeCase)
 	for _, productionCase := range cases {
 		if productionCase.Suite != suite {
 			continue
 		}
 		evidence, err := contract.EvidenceFor(productionCase)
-		if err != nil {
-			t.Fatalf("case %s: %v", productionCase.ID, err)
-		}
+		require.NoError(t, err)
 		if evidence.RuntimePredicate == "" {
 			continue
 		}
@@ -232,9 +159,7 @@ func productionCases(
 			evidence:       evidence,
 		}
 	}
-	if len(selected) == 0 {
-		t.Fatalf("B-M-002 suite %s has no cases", suite)
-	}
+	require.NotEqualValues(t, 0, len(selected))
 	return selected
 }
 
@@ -258,18 +183,13 @@ func TestProductionRuntimeCasesExcludeComponentOnlyEvidence(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			cases := productionCases(t, test.suite)
-			if _, ok := cases[test.excluded]; ok {
-				t.Fatalf(
-					"component-only case %s reached runtime driver",
-					test.excluded,
-				)
-			}
-			if _, ok := cases[test.included]; !ok {
-				t.Fatalf(
-					"runtime case %s did not reach runtime driver",
-					test.included,
-				)
-			}
+
+			_, ok := cases[test.excluded]
+			require.False(t, ok)
+
+			_, casesOk := cases[test.included]
+			require.True(t, casesOk)
+
 		})
 	}
 }

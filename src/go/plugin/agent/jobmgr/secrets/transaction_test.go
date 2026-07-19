@@ -11,19 +11,16 @@ import (
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(
 	t *testing.T,
 ) {
 	resolver, err := secretresolver.NewAtomicResolver(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	store, err := secretstore.NewSecretStore(resolver)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	catalog, err := secretstore.NewCreatorCatalog(
 		[]secretstore.Creator{{
 			Kind:        secretstore.KindVault,
@@ -34,9 +31,7 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(
 			},
 		}},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	carrier := &transactionTestCarrier{}
 	mutation, err := store.PrepareMutation(
 		t.Context(),
@@ -51,9 +46,7 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(
 		},
 		0,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	transaction, err := newPreparedSecretTransaction(
 		preparedSecretSpec{
 			scope: lifecycle.ResourceTransactionScope{
@@ -67,24 +60,19 @@ func TestCancelledStoreCommitWithoutDependentsIsSafeUnchanged(
 			controller: &Controller{},
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
-	if _, err := transaction.Apply(ctx); err != nil {
-		t.Fatalf("safe cancelled mutation dirtied transaction: %v", err)
-	}
-	if !carrier.released {
-		t.Fatal("safe cancelled mutation retained its carrier")
-	}
-	if census := store.Census(); census !=
-		(secretstore.SecretStoreCensus{}) {
-		t.Fatalf("safe cancelled mutation retained ownership: %+v", census)
-	}
-	if err := store.Close(t.Context()); err != nil {
-		t.Fatal(err)
-	}
+
+	_, applyErr := transaction.Apply(ctx)
+	require.NoError(t, applyErr)
+
+	require.True(t, carrier.released)
+
+	census := store.Census()
+	require.EqualValues(t, (secretstore.SecretStoreCensus{}), census)
+
+	require.NoError(t, store.Close(t.Context()))
 }
 
 type transactionTestCarrier struct {

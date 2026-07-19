@@ -1,6 +1,10 @@
 package lifecycle
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/require"
+)
 
 func TestAdmissionResourceAlgebraBoundaries(t *testing.T) {
 	tests := map[string]struct {
@@ -30,23 +34,15 @@ func TestAdmissionResourceAlgebraBoundaries(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			ledger := NewAdmissionLedger()
-			if err := ledger.ReserveProcessBytes(
-				test.reserveProcess,
-			); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, ledger.ReserveProcessBytes(test.reserveProcess))
+
 			result := ledger.RequestOrdinary(
 				1,
 				AdmissionLaneRef{Slot: 1, Generation: 1},
 				test.request,
 			)
-			if (result.Rejected == nil) != test.wantAccepted {
-				t.Fatalf(
-					"ordinary admission=%v wantAccepted=%v",
-					result.Rejected,
-					test.wantAccepted,
-				)
-			}
+			require.EqualValues(t, test.wantAccepted, (result.Rejected == nil))
 		})
 	}
 
@@ -71,13 +67,7 @@ func TestAdmissionResourceAlgebraBoundaries(t *testing.T) {
 				AdmissionLaneRef{Slot: 1, Generation: 1},
 				test.bytes,
 			)
-			if (result.Rejected == nil) != test.wantAccepted {
-				t.Fatalf(
-					"cleanup admission=%v wantAccepted=%v",
-					result.Rejected,
-					test.wantAccepted,
-				)
-			}
+			require.EqualValues(t, test.wantAccepted, (result.Rejected == nil))
 		})
 	}
 }
@@ -106,50 +96,29 @@ func TestAdmissionSuspensionPreservesRetainedBytes(t *testing.T) {
 				AdmissionLaneRef{Slot: 1, Generation: 1},
 				100,
 			)
-			if result.Rejected != nil {
-				t.Fatal(result.Rejected)
-			}
+			require.Nil(t, result.Rejected)
 			var grants [4]AdmissionGrant
 			count, _, err := ledger.TakeGrants(1, &grants)
-			if err != nil || count != 1 ||
-				grants[0].Ref != result.Ref {
-				t.Fatalf(
-					"initial grant count=%d grant=%+v error=%v",
-					count,
-					grants[0],
-					err,
-				)
-			}
-			if _, err := ledger.SuspendOrdinary(
-				result.Ref,
-				test.retained,
-			); err != nil {
-				t.Fatal(err)
-			}
-			if census := ledger.Census(); census.ActiveRecords != 1 ||
+			require.False(t, err != nil || count != 1 || grants[0].Ref != result.Ref)
+
+			_, suspendOrdinaryErr := ledger.SuspendOrdinary(result.Ref, test.retained)
+			require.NoError(t, suspendOrdinaryErr)
+
+			census := ledger.Census()
+			require.False(t, census.ActiveRecords != 1 ||
 				census.OrdinaryGranted != 0 ||
 				census.OrdinaryWaiting != 0 ||
 				census.OrdinarySuspended != 1 ||
-				census.OrdinaryBytes != test.retained {
-				t.Fatalf("suspended census=%+v", census)
-			}
+				census.OrdinaryBytes != test.retained)
+
 			count, _, err = ledger.TakeGrants(1, &grants)
-			if err != nil || count != 0 {
-				t.Fatalf(
-					"suspended grant count=%d error=%v",
-					count,
-					err,
-				)
-			}
+			require.False(t, err != nil || count != 0)
 			if !test.resume {
-				if err := ledger.CancelWaiting(result.Ref); err != nil {
-					t.Fatal(err)
-				}
-				if census := ledger.Census(); census.ActiveRecords != 0 ||
-					census.OrdinarySuspended != 0 ||
-					census.OrdinaryBytes != 0 {
-					t.Fatalf("cancelled census=%+v", census)
-				}
+				require.NoError(t, ledger.CancelWaiting(result.Ref))
+
+				census := ledger.Census()
+				require.False(t, census.ActiveRecords != 0 || census.OrdinarySuspended != 0 || census.OrdinaryBytes != 0)
+
 				return
 			}
 			later := ledger.RequestOrdinary(
@@ -157,42 +126,27 @@ func TestAdmissionSuspensionPreservesRetainedBytes(t *testing.T) {
 				AdmissionLaneRef{Slot: 2, Generation: 1},
 				100,
 			)
-			if later.Rejected != nil {
-				t.Fatal(later.Rejected)
-			}
-			if err := ledger.ResumeOrdinary(result.Ref); err != nil {
-				t.Fatal(err)
-			}
-			if census := ledger.Census(); census.OrdinaryWaiting != 2 ||
-				census.OrdinarySuspended != 0 ||
-				census.OrdinaryBytes != test.retained {
-				t.Fatalf("resumed census=%+v", census)
-			}
+			require.Nil(t, later.Rejected)
+
+			require.NoError(t, ledger.ResumeOrdinary(result.Ref))
+
+			ledgerCensus := ledger.Census()
+			require.False(t, ledgerCensus.OrdinaryWaiting != 2 ||
+				ledgerCensus.OrdinarySuspended != 0 ||
+				ledgerCensus.OrdinaryBytes != test.retained)
+
 			count, _, err = ledger.TakeGrants(2, &grants)
-			if err != nil || count != 2 ||
-				grants[0].Ref != later.Ref ||
-				grants[1].Ref != result.Ref {
-				t.Fatalf(
-					"resumed grants count=%d grants=%+v error=%v",
-					count,
-					grants[:count],
-					err,
-				)
-			}
-			if _, err := ledger.ReleaseOrdinary(
-				later.Ref,
-			); err != nil {
-				t.Fatal(err)
-			}
-			if _, err := ledger.ReleaseOrdinary(
-				result.Ref,
-			); err != nil {
-				t.Fatal(err)
-			}
-			if census := ledger.Census(); census.ActiveRecords != 0 ||
-				census.OrdinaryBytes != 0 {
-				t.Fatalf("released census=%+v", census)
-			}
+			require.False(t, err != nil || count != 2 || grants[0].Ref != later.Ref || grants[1].Ref != result.Ref)
+
+			_, releaseOrdinaryErr := ledger.ReleaseOrdinary(later.Ref)
+			require.NoError(t, releaseOrdinaryErr)
+
+			_, releaseOrdinaryErr2 := ledger.ReleaseOrdinary(result.Ref)
+			require.NoError(t, releaseOrdinaryErr2)
+
+			ledgerCensus2 := ledger.Census()
+			require.False(t, ledgerCensus2.ActiveRecords != 0 || ledgerCensus2.OrdinaryBytes != 0)
+
 		})
 	}
 }

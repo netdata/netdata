@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/stretchr/testify/require"
 )
 
 func TestManagedJobV1V2JoinBeforeCleanup(t *testing.T) {
@@ -23,13 +24,9 @@ func TestManagedJobV1V2JoinBeforeCleanup(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			frame, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			tasks, err := lifecycle.NewTaskSupervisor(frame)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			job := newRecordingManagedJob()
 			constructed, err := NewManagedJob(
 				test.variant,
@@ -38,28 +35,23 @@ func TestManagedJobV1V2JoinBeforeCleanup(t *testing.T) {
 				lifecycle.ResourceIdentity{ID: "job", Generation: 1},
 				newTestScheduler(t),
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := constructed.Runtime.Start(context.Background()); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
+
+			require.NoError(t, constructed.Runtime.Start(context.Background()))
+
 			job.waitStarted(t)
-			if err := constructed.Runtime.Stop(context.Background()); err != nil {
-				t.Fatal(err)
-			}
-			if err := constructed.Runtime.ReleaseAfterCleanup(context.Background()); err != nil {
-				t.Fatal(err)
-			}
-			if err := constructed.CollectorCleanup(context.Background()); err != nil {
-				t.Fatal(err)
-			}
-			if got, want := job.snapshot(), []string{"start", "stop", "joined", "cleanup"}; !equalStrings(got, want) {
-				t.Fatalf("events=%v want=%v", got, want)
-			}
-			if census := tasks.InheritedCensus(); census != (lifecycle.InheritedTaskCensus{}) {
-				t.Fatalf("inherited census=%+v", census)
-			}
+
+			require.NoError(t, constructed.Runtime.Stop(context.Background()))
+
+			require.NoError(t, constructed.Runtime.ReleaseAfterCleanup(context.Background()))
+
+			require.NoError(t, constructed.CollectorCleanup(context.Background()))
+
+			got, want := job.snapshot(), []string{"start", "stop", "joined", "cleanup"}
+			require.True(t, equalStrings(got, want))
+
+			census := tasks.InheritedCensus()
+			require.EqualValues(t, (lifecycle.InheritedTaskCensus{}), census)
 		})
 	}
 }
@@ -74,13 +66,9 @@ func TestManagedJobStartAcknowledgesLoopReadiness(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			frame, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			tasks, err := lifecycle.NewTaskSupervisor(frame)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			job := newRecordingManagedJob()
 			job.readyGate = make(chan struct{})
 			constructed, err := NewManagedJob(
@@ -90,9 +78,7 @@ func TestManagedJobStartAcknowledgesLoopReadiness(t *testing.T) {
 				lifecycle.ResourceIdentity{ID: "job", Generation: 1},
 				newTestScheduler(t),
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			started := make(chan error, 1)
 			go func() {
 				started <- constructed.Runtime.Start(context.Background())
@@ -100,27 +86,22 @@ func TestManagedJobStartAcknowledgesLoopReadiness(t *testing.T) {
 			job.waitStarted(t)
 			select {
 			case err := <-started:
-				t.Fatalf("runtime acknowledged start before loop readiness: %v", err)
+				require.FailNowf(t, "test failed", "runtime acknowledged start before loop readiness: %v", err)
 			default:
 			}
 			close(job.readyGate)
 			select {
 			case err := <-started:
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 			case <-time.After(time.Second):
-				t.Fatal("runtime did not acknowledge loop readiness")
+				require.FailNow(t, "test failed", "runtime did not acknowledge loop readiness")
 			}
-			if err := constructed.Runtime.Stop(context.Background()); err != nil {
-				t.Fatal(err)
-			}
-			if err := constructed.Runtime.ReleaseAfterCleanup(context.Background()); err != nil {
-				t.Fatal(err)
-			}
-			if err := constructed.CollectorCleanup(context.Background()); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, constructed.Runtime.Stop(context.Background()))
+
+			require.NoError(t, constructed.Runtime.ReleaseAfterCleanup(context.Background()))
+
+			require.NoError(t, constructed.CollectorCleanup(context.Background()))
 		})
 	}
 }
@@ -128,25 +109,17 @@ func TestManagedJobStartAcknowledgesLoopReadiness(t *testing.T) {
 func TestFrameWriterWholeCommit(t *testing.T) {
 	var output bytes.Buffer
 	owner, err := lifecycle.NewFrameOwner(&output)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	writer := FrameWriter{Owner: owner}
 	payload := []byte("BEGIN x\nEND\n\n")
 	n, err := writer.Write(payload)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if n != len(payload) || !bytes.Equal(output.Bytes(), payload) {
-		t.Fatalf("n=%d output=%q", n, output.Bytes())
-	}
+	require.NoError(t, err)
+	require.False(t, n != len(payload) || !bytes.Equal(output.Bytes(), payload))
 }
 
 func TestFrameWriterSuccessfulCommitDoesNotCopy(t *testing.T) {
 	owner, err := lifecycle.NewFrameOwner(io.Discard)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	writer := FrameWriter{Owner: owner}
 	payload := []byte("BEGIN x\nEND\n\n")
 	allocations := testing.AllocsPerRun(1_000, func() {
@@ -154,9 +127,7 @@ func TestFrameWriterSuccessfulCommitDoesNotCopy(t *testing.T) {
 			panic(err)
 		}
 	})
-	if allocations != 0 {
-		t.Fatalf("successful frame commits allocate %f times, want 0", allocations)
-	}
+	require.EqualValues(t, 0, allocations)
 }
 
 type recordingManagedJob struct {
@@ -227,7 +198,7 @@ func (job *recordingManagedJob) waitStarted(t *testing.T) {
 	select {
 	case <-job.started:
 	case <-time.After(time.Second):
-		t.Fatal("managed job did not start")
+		require.FailNow(t, "test failed", "managed job did not start")
 	}
 }
 
@@ -255,8 +226,6 @@ func (testModuleReconciler) ReconcileModule(
 func newTestScheduler(t testing.TB) *Scheduler {
 	t.Helper()
 	scheduler, err := NewScheduler(testModuleReconciler{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return scheduler
 }

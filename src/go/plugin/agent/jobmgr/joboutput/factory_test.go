@@ -16,6 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
@@ -85,33 +86,12 @@ func TestFactoryRejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 			creator := collectorapi.Creator{}
 			hooks := test.configure(state, &creator)
 			factory, output := newFactoryTestHarness(t, creator, hooks)
-			constructed, err := factory.Build(
-				context.Background(),
-				factoryTestConfig(creator.FunctionOnly),
-				1,
-			)
-			if err == nil {
-				t.Fatal("factory rejection unexpectedly succeeded")
-			}
-			if constructed.Runtime != nil {
-				t.Fatal("factory rejection returned constructed runtime ownership")
-			}
-			if state.collectorCleanup != 1 {
-				t.Fatalf("collector cleanup calls=%d want=1", state.collectorCleanup)
-			}
-			if state.handlerClose != test.wantClose ||
-				state.handlerCleanup != test.wantHandlerCleanup {
-				t.Fatalf(
-					"handler close=%d cleanup=%d want=%d/%d",
-					state.handlerClose,
-					state.handlerCleanup,
-					test.wantClose,
-					test.wantHandlerCleanup,
-				)
-			}
-			if output.Len() != 0 {
-				t.Fatalf("rejected construction emitted output: %q", output.String())
-			}
+			constructed, err := factory.Build(context.Background(), factoryTestConfig(creator.FunctionOnly), 1)
+			require.Error(t, err)
+			require.Nil(t, constructed.Runtime)
+			require.EqualValues(t, 1, state.collectorCleanup)
+			require.False(t, state.handlerClose != test.wantClose || state.handlerCleanup != test.wantHandlerCleanup)
+			require.EqualValues(t, 0, output.Len())
 		})
 	}
 }
@@ -144,19 +124,12 @@ func TestFactoryV2RejectsWithExactlyOneCollectorCleanup(t *testing.T) {
 				creator.SharedFunctions = func() []funcapi.FunctionConfig { return nil }
 			}
 			factory, output := newFactoryTestHarness(t, creator, test.hooks)
-			if _, err := factory.Build(
-				context.Background(),
-				factoryTestConfig(test.functionOnly),
-				1,
-			); err == nil {
-				t.Fatal("factory rejection unexpectedly succeeded")
-			}
-			if state.collectorCleanup != 1 {
-				t.Fatalf("collector cleanup calls=%d want=1", state.collectorCleanup)
-			}
-			if output.Len() != 0 {
-				t.Fatalf("rejected construction emitted output: %q", output.String())
-			}
+
+			_, err := factory.Build(context.Background(), factoryTestConfig(test.functionOnly), 1)
+			require.Error(t, err)
+
+			require.EqualValues(t, 1, state.collectorCleanup)
+			require.EqualValues(t, 0, output.Len())
 		})
 	}
 }
@@ -172,22 +145,12 @@ func TestFactorySuccessfulCollectorCleanupIsExactlyOnce(t *testing.T) {
 		},
 	}
 	factory, _ := newFactoryTestHarness(t, creator, nil)
-	constructed, err := factory.Build(
-		context.Background(),
-		factoryTestConfig(false),
-		1,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	constructed, err := factory.Build(context.Background(), factoryTestConfig(false), 1)
+	require.NoError(t, err)
 	for range 2 {
-		if err := constructed.CollectorCleanup(context.Background()); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, constructed.CollectorCleanup(context.Background()))
 	}
-	if state.collectorCleanup != 1 {
-		t.Fatalf("collector cleanup calls=%d want=1", state.collectorCleanup)
-	}
+	require.EqualValues(t, 1, state.collectorCleanup)
 }
 
 type factoryTestState struct {
@@ -267,17 +230,11 @@ func newFactoryTestHarness(
 	t.Helper()
 	output := &bytes.Buffer{}
 	frames, err := lifecycle.NewFrameOwner(output)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	resolver, err := secretresolver.NewAtomicResolver(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	factory, err := NewFactory(FactoryConfig{
 		PluginName: "test",
 		Modules:    collectorapi.Registry{"module": creator},
@@ -289,9 +246,7 @@ func newFactoryTestHarness(
 		Hooks:      hooks,
 		Scheduler:  newTestScheduler(t),
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return factory, output
 }
 

@@ -11,6 +11,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDecisionIndexAcknowledgesSelectionAndFallback(t *testing.T) {
@@ -22,16 +23,8 @@ func TestDecisionIndexAcknowledgesSelectionAndFallback(t *testing.T) {
 		changes = append(changes, change)
 		return jobmgr.WorkPlan{}, nil
 	})
-	stock := decisionTestConfig(
-		"job",
-		confgroup.TypeStock,
-		"stock",
-	)
-	user := decisionTestConfig(
-		"job",
-		confgroup.TypeUser,
-		"user",
-	)
+	stock := decisionTestConfig("job", confgroup.TypeStock, "stock")
+	user := decisionTestConfig("job", confgroup.TypeUser, "user")
 	groups := map[string]*confgroup.Group{
 		"stock": {
 			Source:  "stock",
@@ -54,27 +47,22 @@ func TestDecisionIndexAcknowledgesSelectionAndFallback(t *testing.T) {
 		"remove user",
 		"remove stock",
 	} {
-		if err := index.Apply(
+		require.NoError(t, index.Apply(
 			context.Background(),
 			[]*confgroup.Group{groups[name]},
-		); err != nil {
-			t.Fatalf("%s: %v", name, err)
-		}
+		),
+		)
 	}
-	if len(changes) != 4 {
-		t.Fatalf("changes=%d, want 4", len(changes))
-	}
-	if changes[0].Config.UID() != stock.UID() ||
+	require.EqualValues(t, 4, len(changes))
+	require.False(t, changes[0].Config.UID() != stock.UID() ||
 		changes[1].Config.UID() != user.UID() ||
 		changes[2].Config.UID() != stock.UID() ||
-		!changes[3].Remove {
-		t.Fatalf("changes=%+v", changes)
-	}
-	if census := index.Census(); census != (DecisionCensus{
+		!changes[3].Remove)
+
+	census := index.Census()
+	require.EqualValues(t, (DecisionCensus{
 		Revision: 4,
-	}) {
-		t.Fatalf("final census=%+v", census)
-	}
+	}), census)
 }
 
 func TestDecisionIndexFailureKeepsLastAcknowledgedSelection(t *testing.T) {
@@ -86,39 +74,30 @@ func TestDecisionIndexFailureKeepsLastAcknowledgedSelection(t *testing.T) {
 			return jobmgr.WorkPlan{}, nil
 		},
 	)
-	stock := decisionTestConfig(
-		"job",
-		confgroup.TypeStock,
-		"stock",
-	)
-	user := decisionTestConfig(
-		"job",
-		confgroup.TypeUser,
-		"user",
-	)
-	if err := index.Apply(context.Background(), []*confgroup.Group{{
+	stock := decisionTestConfig("job", confgroup.TypeStock, "stock")
+	user := decisionTestConfig("job", confgroup.TypeUser, "user")
+
+	require.NoError(t, index.Apply(context.Background(), []*confgroup.Group{{
 		Source:  "stock",
 		Configs: []confgroup.Config{stock},
-	}}); err != nil {
-		t.Fatal(err)
-	}
+	}}),
+	)
+
 	commands.err = errors.New("acknowledgement failed")
-	if err := index.Apply(context.Background(), []*confgroup.Group{{
+
+	err := index.Apply(context.Background(), []*confgroup.Group{{
 		Source:  "user",
 		Configs: []confgroup.Config{user},
-	}}); !errors.Is(err, commands.err) {
-		t.Fatalf("error=%v", err)
-	}
+	}})
+	require.ErrorIs(t, err, commands.err)
+
 	acknowledged := index.acknowledged[stock.FullName()]
-	if acknowledged.config.UID() != stock.UID() ||
-		acknowledged.revision != 1 {
-		t.Fatalf("acknowledged=%+v", acknowledged)
-	}
-	if census := index.Census(); census != (DecisionCensus{
+	require.False(t, acknowledged.config.UID() != stock.UID() || acknowledged.revision != 1)
+
+	census := index.Census()
+	require.EqualValues(t, (DecisionCensus{
 		Sources: 2, Candidates: 2, Acknowledged: 1, Revision: 1,
-	}) {
-		t.Fatalf("failure census=%+v", census)
-	}
+	}), census)
 }
 
 func TestDecisionIndexConfigurationPolicy(t *testing.T) {
@@ -166,33 +145,19 @@ func TestDecisionIndexConfigurationPolicy(t *testing.T) {
 					return jobmgr.WorkPlan{}, nil
 				},
 			})
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := index.Apply(
+			require.NoError(t, err)
+
+			require.NoError(t, index.Apply(
 				context.Background(),
 				[]*confgroup.Group{{
 					Source:  "source",
 					Configs: []confgroup.Config{test.config},
 				}},
-			); err != nil {
-				t.Fatal(err)
-			}
-			if len(changes) != test.wantCalls {
-				t.Fatalf(
-					"calls=%d, want %d",
-					len(changes),
-					test.wantCalls,
-				)
-			}
-			if len(changes) != 0 &&
-				changes[0].Status != test.want {
-				t.Fatalf(
-					"status=%s, want %s",
-					changes[0].Status,
-					test.want,
-				)
-			}
+			),
+			)
+
+			require.EqualValues(t, test.wantCalls, len(changes))
+			require.False(t, len(changes) != 0 && changes[0].Status != test.want)
 		})
 	}
 }
@@ -213,54 +178,35 @@ func TestDecisionIndexReconcilesOnlyChangedSourceRecords(t *testing.T) {
 		groups = append(groups, &confgroup.Group{
 			Source: source,
 			Configs: []confgroup.Config{
-				decisionTestConfig(
-					fmt.Sprintf("job-%03d", ordinal),
-					confgroup.TypeStock,
-					source,
-				),
+				decisionTestConfig(fmt.Sprintf("job-%03d", ordinal), confgroup.TypeStock, source),
 			},
 		})
 	}
-	if err := index.Apply(context.Background(), groups); err != nil {
-		t.Fatal(err)
-	}
-	if len(commands.requests) != population {
-		t.Fatalf(
-			"initial commands=%d, want %d",
-			len(commands.requests),
-			population,
-		)
-	}
-	if err := index.Apply(
+
+	require.NoError(t, index.Apply(context.Background(), groups))
+
+	require.EqualValues(t, population, len(commands.requests))
+
+	require.NoError(t, index.Apply(
 		context.Background(),
 		[]*confgroup.Group{{
 			Source: "source-000",
 			Configs: []confgroup.Config{
-				decisionTestConfig(
-					"job-000",
-					confgroup.TypeStock,
-					"source-000",
-				).Set("value", "changed"),
+				decisionTestConfig("job-000", confgroup.TypeStock, "source-000").Set("value", "changed"),
 			},
 		}},
-	); err != nil {
-		t.Fatal(err)
-	}
-	if len(commands.requests) != population+1 {
-		t.Fatalf(
-			"commands after one changed source=%d, want %d",
-			len(commands.requests),
-			population+1,
-		)
-	}
-	if census := index.Census(); census != (DecisionCensus{
+	),
+	)
+
+	require.EqualValues(t, population+1, len(commands.requests))
+
+	census := index.Census()
+	require.EqualValues(t, (DecisionCensus{
 		Sources:      population,
 		Candidates:   population,
 		Acknowledged: population,
 		Revision:     population + 1,
-	}) {
-		t.Fatalf("changed-source census=%+v", census)
-	}
+	}), census)
 }
 
 func TestDecisionIndexHasNoFixedPopulationCeiling(t *testing.T) {
@@ -275,11 +221,7 @@ func TestDecisionIndexHasNoFixedPopulationCeiling(t *testing.T) {
 				for ordinal := 0; ordinal < population; ordinal++ {
 					group.Configs = append(
 						group.Configs,
-						decisionTestConfig(
-							fmt.Sprintf("job-%d", ordinal),
-							confgroup.TypeStock,
-							"source",
-						),
+						decisionTestConfig(fmt.Sprintf("job-%d", ordinal), confgroup.TypeStock, "source"),
 					)
 				}
 				return []*confgroup.Group{group}
@@ -288,21 +230,13 @@ func TestDecisionIndexHasNoFixedPopulationCeiling(t *testing.T) {
 		},
 		"many independent sources": {
 			batch: func() []*confgroup.Group {
-				groups := make(
-					[]*confgroup.Group,
-					0,
-					population,
-				)
+				groups := make([]*confgroup.Group, 0, population)
 				for ordinal := 0; ordinal < population; ordinal++ {
 					source := fmt.Sprintf("source-%d", ordinal)
 					groups = append(groups, &confgroup.Group{
 						Source: source,
 						Configs: []confgroup.Config{
-							decisionTestConfig(
-								fmt.Sprintf("job-%d", ordinal),
-								confgroup.TypeStock,
-								source,
-							),
+							decisionTestConfig(fmt.Sprintf("job-%d", ordinal), confgroup.TypeStock, source),
 						},
 					})
 				}
@@ -321,27 +255,18 @@ func TestDecisionIndexHasNoFixedPopulationCeiling(t *testing.T) {
 					return jobmgr.WorkPlan{}, nil
 				},
 			)
-			if err := index.Apply(
-				context.Background(),
-				test.batch(),
-			); err != nil {
-				t.Fatal(err)
-			}
-			if census := index.Census(); census != (DecisionCensus{
+
+			require.NoError(t, index.Apply(context.Background(), test.batch()))
+
+			census := index.Census()
+			require.EqualValues(t, (DecisionCensus{
 				Sources:      test.wantSources,
 				Candidates:   population,
 				Acknowledged: population,
 				Revision:     population,
-			}) {
-				t.Fatalf("census=%+v", census)
-			}
-			if len(commands.requests) != population {
-				t.Fatalf(
-					"commands=%d, want %d",
-					len(commands.requests),
-					population,
-				)
-			}
+			}), census)
+
+			require.EqualValues(t, population, len(commands.requests))
 		})
 	}
 }
@@ -355,27 +280,19 @@ func BenchmarkBDecisionIndexApply(b *testing.B) {
 		},
 	})
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	groups := [2][]*confgroup.Group{
 		{{
 			Source: "source",
 			Configs: []confgroup.Config{
-				decisionTestConfig(
-					"job",
-					confgroup.TypeStock,
-					"source",
-				).Set("value", 1),
+				decisionTestConfig("job", confgroup.TypeStock, "source").Set("value", 1),
 			},
 		}},
 		{{
 			Source: "source",
 			Configs: []confgroup.Config{
-				decisionTestConfig(
-					"job",
-					confgroup.TypeStock,
-					"source",
-				).Set("value", 2),
+				decisionTestConfig("job", confgroup.TypeStock, "source").Set("value", 2),
 			},
 		}},
 	}
@@ -384,7 +301,7 @@ func BenchmarkBDecisionIndexApply(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		if err := index.Apply(ctx, groups[ordinal&1]); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		ordinal++
 	}
@@ -402,9 +319,7 @@ func newDecisionTestIndex(
 		Commands:   commands,
 		Plan:       plan,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return index
 }
 
@@ -413,11 +328,7 @@ func decisionTestConfig(
 	sourceType string,
 	source string,
 ) confgroup.Config {
-	return confgroup.Config{}.
-		SetName(name).
-		SetModule("module").
-		SetProvider("test").
-		SetSourceType(sourceType).
+	return confgroup.Config{}.SetName(name).SetModule("module").SetProvider("test").SetSourceType(sourceType).
 		SetSource(source)
 }
 

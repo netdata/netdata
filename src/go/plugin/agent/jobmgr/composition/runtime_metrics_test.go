@@ -15,6 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/runtimecomp"
+	"github.com/stretchr/testify/require"
 )
 
 type runMetricsService struct {
@@ -82,22 +83,13 @@ func (rms *runMetricsService) snapshot() (
 ) {
 	rms.mu.Lock()
 	defer rms.mu.Unlock()
-	components := append(
-		[]runtimecomp.ComponentConfig(nil),
-		rms.components...,
-	)
-	componentRemovals := append(
-		[]string(nil),
-		rms.componentRemovals...,
-	)
+	components := append([]runtimecomp.ComponentConfig(nil), rms.components...)
+	componentRemovals := append([]string(nil), rms.componentRemovals...)
 	producers := make(map[string]func() error, len(rms.producers))
 	for name, producer := range rms.producers {
 		producers[name] = producer
 	}
-	producerRemovals := append(
-		[]string(nil),
-		rms.producerRemovals...,
-	)
+	producerRemovals := append([]string(nil), rms.producerRemovals...)
 	return components, componentRemovals, producers, producerRemovals
 }
 
@@ -115,38 +107,23 @@ func TestRunMetricsProjection(t *testing.T) {
 	}{
 		"sets owner gauge": {
 			apply: func(metrics *runMetrics) {
-				metrics.SetRuntimeGauge(
-					lifecycle.RuntimeGaugeOperationsActive,
-					7,
-				)
+				metrics.SetRuntimeGauge(lifecycle.RuntimeGaugeOperationsActive, 7)
 			},
 			name: runtimeMetricPrefix + ".operations_active",
 			want: 7,
 		},
 		"adds shared owner gauge": {
 			apply: func(metrics *runMetrics) {
-				metrics.AddRuntimeGauge(
-					lifecycle.RuntimeGaugeJobsActive,
-					1,
-				)
-				metrics.AddRuntimeGauge(
-					lifecycle.RuntimeGaugeJobsActive,
-					1,
-				)
-				metrics.AddRuntimeGauge(
-					lifecycle.RuntimeGaugeJobsActive,
-					-1,
-				)
+				metrics.AddRuntimeGauge(lifecycle.RuntimeGaugeJobsActive, 1)
+				metrics.AddRuntimeGauge(lifecycle.RuntimeGaugeJobsActive, 1)
+				metrics.AddRuntimeGauge(lifecycle.RuntimeGaugeJobsActive, -1)
 			},
 			name: runtimeMetricPrefix + ".jobs_active",
 			want: 1,
 		},
 		"adds lifecycle counter": {
 			apply: func(metrics *runMetrics) {
-				metrics.AddRuntimeCounter(
-					lifecycle.RuntimeCounterTaskPanics,
-					2,
-				)
+				metrics.AddRuntimeCounter(lifecycle.RuntimeCounterTaskPanics, 2)
 			},
 			name: runtimeMetricPrefix + ".task_panics_total",
 			want: 2,
@@ -166,17 +143,13 @@ func TestRunMetricsProjection(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			metrics := newRunMetrics()
 			test.apply(metrics)
-			if err := metrics.refreshProjection(); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, metrics.refreshProjection())
+
 			reader := metrics.store.Read(metrix.ReadRaw())
 			got, ok := reader.Value(test.name, nil)
-			if !ok {
-				t.Fatalf("metric %q is absent", test.name)
-			}
-			if got != test.want {
-				t.Fatalf("metric %q=%v want=%v", test.name, got, test.want)
-			}
+			require.True(t, ok)
+			require.EqualValues(t, test.want, got)
 		})
 	}
 }
@@ -185,26 +158,12 @@ func TestRunMetricsOwnerUpdatesDoNotAllocate(t *testing.T) {
 	metrics := newRunMetrics()
 	now := time.Now()
 	allocations := testing.AllocsPerRun(100, func() {
-		metrics.SetRuntimeGauge(
-			lifecycle.RuntimeGaugeOperationsActive,
-			1,
-		)
-		metrics.AddRuntimeGauge(
-			lifecycle.RuntimeGaugeJobsActive,
-			1,
-		)
-		metrics.AddRuntimeCounter(
-			lifecycle.RuntimeCounterOperationsAdmitted,
-			1,
-		)
-		metrics.SetRuntimeTimestamp(
-			lifecycle.RuntimeTimestampOldestOperation,
-			now,
-		)
+		metrics.SetRuntimeGauge(lifecycle.RuntimeGaugeOperationsActive, 1)
+		metrics.AddRuntimeGauge(lifecycle.RuntimeGaugeJobsActive, 1)
+		metrics.AddRuntimeCounter(lifecycle.RuntimeCounterOperationsAdmitted, 1)
+		metrics.SetRuntimeTimestamp(lifecycle.RuntimeTimestampOldestOperation, now)
 	})
-	if allocations != 0 {
-		t.Fatalf("owner updates allocate %v objects per run", allocations)
-	}
+	require.EqualValues(t, 0, allocations)
 }
 
 func TestRunMetricsRegistration(t *testing.T) {
@@ -233,27 +192,14 @@ func TestRunMetricsRegistration(t *testing.T) {
 			}
 			metrics := newRunMetrics()
 			err := metrics.register(service)
-			if (err != nil) != test.wantErr {
-				t.Fatalf("register error=%v wantErr=%v", err, test.wantErr)
-			}
+			require.EqualValues(t, test.wantErr, (err != nil))
 			components, removals, producers, _ := service.snapshot()
-			if len(components) != test.wantComponents ||
+			require.False(t, len(components) != test.wantComponents ||
 				len(removals) != test.wantUnregistered ||
-				len(producers) != test.wantProducers {
-				t.Fatalf(
-					"components=%d removals=%d producers=%d",
-					len(components),
-					len(removals),
-					len(producers),
-				)
-			}
+				len(producers) != test.wantProducers)
 			if len(components) == 1 {
 				config := components[0]
-				if config.Name != runtimeComponentName ||
-					config.Store != metrics.store ||
-					!config.Autogen.Enabled {
-					t.Fatalf("component config=%+v", config)
-				}
+				require.False(t, config.Name != runtimeComponentName || config.Store != metrics.store || !config.Autogen.Enabled)
 			}
 		})
 	}
@@ -264,9 +210,7 @@ func TestRunGenerationRuntimeMetricsLifecycle(t *testing.T) {
 	jobs := testRunJobServices(t)
 	jobs.Runtime = service
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
@@ -284,56 +228,31 @@ func TestRunGenerationRuntimeMetricsLifecycle(t *testing.T) {
 				nil
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	components, removals, producers, producerRemovals :=
 		service.snapshot()
-	if len(components) != 1 || len(removals) != 0 ||
-		len(producers) != 1 || len(producerRemovals) != 0 {
-		t.Fatalf(
-			"before start components=%d removals=%d producers=%d producerRemovals=%d",
-			len(components),
-			len(removals),
-			len(producers),
-			len(producerRemovals),
-		)
-	}
-	if err := generation.Start(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	generation.metrics.AddRuntimeCounter(
-		lifecycle.RuntimeCounterDirtyRuns,
-		1,
-	)
+	require.False(t, len(components) != 1 || len(removals) != 0 || len(producers) != 1 || len(producerRemovals) != 0)
+
+	require.NoError(t, generation.Start(context.Background()))
+
+	generation.metrics.AddRuntimeCounter(lifecycle.RuntimeCounterDirtyRuns, 1)
 	generation.Stop()
-	if err := generation.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, generation.Wait(context.Background()))
+
 	_, removals, producers, producerRemovals = service.snapshot()
 	finalized := service.finalized()
-	if len(removals) != 0 ||
+	require.False(t, len(removals) != 0 ||
 		len(finalized) != 1 ||
 		finalized[0] != runtimeComponentName ||
 		len(producers) != 0 || len(producerRemovals) != 1 ||
-		producerRemovals[0] != runtimeProducerName {
-		t.Fatalf(
-			"after terminal removals=%v finalized=%v producers=%d producerRemovals=%v",
-			removals,
-			finalized,
-			len(producers),
-			producerRemovals,
-		)
-	}
+		producerRemovals[0] != runtimeProducerName)
 	reader := components[0].Store.Read(metrix.ReadRaw())
-	if got, ok := reader.Value(
-		runtimeMetricPrefix+".dirty_runs_total",
-		nil,
-	); !ok || got != 1 {
-		t.Fatalf("final dirty runs=%v present=%v want=1", got, ok)
-	}
-	if err := admission.CloseDrained(1); err != nil {
-		t.Fatal(err)
-	}
+
+	got, ok := reader.Value(runtimeMetricPrefix+".dirty_runs_total", nil)
+	require.False(t, !ok || got != 1)
+
+	require.NoError(t, admission.CloseDrained(1))
+
 	closeRunTestUIDs(t, uids)
 }

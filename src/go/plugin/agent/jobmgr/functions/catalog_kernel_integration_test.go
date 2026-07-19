@@ -11,6 +11,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
@@ -27,25 +28,17 @@ func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 		}
 	}
 	catalog, err := NewCatalog(declarations)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	clock := lifecycle.RealClock{}
 	run, err := lifecycle.NewRunSupervisor(1, clock, 5*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() { _ = run.FinishShutdown() })
 	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	kernel, err := jobmgr.NewCommandKernel(
 		run,
 		admission,
@@ -64,67 +57,44 @@ func TestFunctionCatalogCleanupBacklogDrainsThroughKernelLifecycle(
 		cleanupIntegrationPlanner{},
 		catalog,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	loop, err := jobmgr.NewKernelLoop(kernel)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
-	if err := loop.Start(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, run.OpenAdmission())
+
+	require.NoError(t, loop.Start(context.Background()))
+
 	kernel.Stop()
-	waitCtx, waitCancel := context.WithTimeout(
-		context.Background(),
-		5*time.Second,
-	)
+	waitCtx, waitCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer waitCancel()
-	if err := kernel.Wait(waitCtx); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(waitCtx))
 
 	census := catalog.Census()
-	if !census.Closed ||
+	require.False(t, !census.Closed ||
 		census.Routes != 0 ||
 		census.InvocationLeases != 0 ||
 		census.PendingCleanups != 0 ||
 		census.CompletedCleanups != population ||
-		cleanupCalls.Load() != population {
-		t.Fatalf(
-			"kernel cleanup lifecycle differs: census=%+v calls=%d",
-			census,
-			cleanupCalls.Load(),
-		)
-	}
-	if published := catalog.storage.published.Load(); published != 0 {
-		t.Fatalf("closed catalog retained %d published bytes", published)
-	}
-	if cleanup := catalog.storage.cleanup.Load(); cleanup != 0 {
-		t.Fatalf("closed catalog retained %d cleanup bytes", cleanup)
-	}
-	if total := catalog.storage.total.Load(); total != 0 {
-		t.Fatalf("closed catalog retained %d total bytes", total)
-	}
-	if catalog.storage.preparation.Load() {
-		t.Fatal("closed catalog retained mutation preparation")
-	}
-	if tasks.Active() != 0 || tasks.Pending() != 0 {
-		t.Fatalf(
-			"kernel cleanup retained Tasks: active=%d pending=%d",
-			tasks.Active(),
-			tasks.Pending(),
-		)
-	}
-	if census := tasks.LongLivedCensus(); census != (lifecycle.LongLivedCensus{}) {
-		t.Fatalf("kernel cleanup retained long-lived ownership: %+v", census)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+		cleanupCalls.Load() != population)
+
+	published := catalog.storage.published.Load()
+	require.EqualValues(t, 0, published)
+
+	cleanup := catalog.storage.cleanup.Load()
+	require.EqualValues(t, 0, cleanup)
+
+	total := catalog.storage.total.Load()
+	require.EqualValues(t, 0, total)
+
+	require.False(t, catalog.storage.preparation.Load())
+	require.False(t, tasks.Active() != 0 || tasks.Pending() != 0)
+
+	require.EqualValues(t, (lifecycle.LongLivedCensus{}), tasks.LongLivedCensus())
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeCleanupIntegrationUIDs(t, uids)
 }
 
@@ -136,9 +106,7 @@ func (cleanupIntegrationPlanner) Plan(
 	return jobmgr.WorkPlan{
 		Work: lifecycle.FrameTaskWork(
 			func(context.Context) (lifecycle.SealedResult, error) {
-				return lifecycle.NewControlResult(
-					lifecycle.ControlInternal,
-				)
+				return lifecycle.NewControlResult(lifecycle.ControlInternal)
 			},
 		),
 	}, nil
@@ -151,9 +119,7 @@ func closeCleanupIntegrationUIDs(
 	t.Helper()
 	for {
 		more, err := uids.CloseBatch(lifecycle.UIDReturnBatch)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		if !more {
 			return
 		}

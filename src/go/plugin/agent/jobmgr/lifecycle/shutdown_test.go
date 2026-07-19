@@ -11,6 +11,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 type shutdownTestClock struct {
@@ -68,88 +70,62 @@ func (stc *shutdownTestClock) advanceWithoutSignal() {
 func TestRunSupervisorOwnsOneBroadcastShutdownBudget(t *testing.T) {
 	clock := newShutdownTestClock()
 	run, err := NewRunSupervisor(7, clock, 10*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, run.OpenAdmission())
+
 	first, err := run.BeginShutdown()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	second, err := run.BeginShutdown()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if first != second || run.Admitting() {
-		t.Fatalf("shutdown budget identity/admission differs: first=%p second=%p admitting=%v", first, second, run.Admitting())
-	}
-	if deadline, ok := first.Context().Deadline(); !ok || !deadline.Equal(time.Unix(110, 0)) || first.Deadline() != deadline {
-		t.Fatalf("shutdown deadline differs: deadline=%s ok=%v budget=%s", deadline, ok, first.Deadline())
-	}
+	require.NoError(t, err)
+	require.False(t, first != second || run.Admitting())
+
+	deadline, ok := first.Context().Deadline()
+	require.False(t, !ok || !deadline.Equal(time.Unix(110, 0)) || first.Deadline() != deadline)
+
 	clock.mu.Lock()
 	arms, kind, delay := clock.arms, clock.kind, clock.delay
 	clock.mu.Unlock()
-	if arms != 1 || kind != TimerKindShutdown || delay != 10*time.Second {
-		t.Fatalf("shutdown timer differs: arms=%d kind=%q delay=%s", arms, kind, delay)
-	}
+	require.False(t, arms != 1 || kind != TimerKindShutdown || delay != 10*time.Second)
 	clock.expire()
 	select {
 	case <-first.Context().Done():
 	case <-time.After(time.Second):
-		t.Fatal("shutdown context did not broadcast expiry")
+		require.FailNow(t, "test failed", "shutdown context did not broadcast expiry")
 	}
-	if !errors.Is(first.Context().Err(), context.DeadlineExceeded) || !first.Expired() {
-		t.Fatalf("shutdown expiry differs: err=%v expired=%v", first.Context().Err(), first.Expired())
-	}
-	if err := run.FinishShutdown(); !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("timer-delivered shutdown expiry was lost: %v", err)
-	}
+	require.False(t, !errors.Is(first.Context().Err(), context.DeadlineExceeded) || !first.Expired())
+
+	require.ErrorIs(t, run.FinishShutdown(), context.DeadlineExceeded)
+
 	clock.mu.Lock()
 	cancels := clock.cancels
 	clock.mu.Unlock()
-	if cancels != 1 {
-		t.Fatalf("shutdown timer cancel count differs: %d", cancels)
-	}
+	require.EqualValues(t, 1, cancels)
 }
 
 func TestShutdownBudgetPublishesDueClockWithoutTimerBridge(t *testing.T) {
 	clock := newShutdownTestClock()
 	run, err := NewRunSupervisor(7, clock, 10*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	budget, err := run.BeginShutdown()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	clock.advanceWithoutSignal()
-	if !budget.ExpireIfDue() || !errors.Is(budget.Context().Err(), context.DeadlineExceeded) {
-		t.Fatalf("due Clock was not authoritative: expired=%v err=%v", budget.Expired(), budget.Context().Err())
-	}
-	if err := run.FinishShutdown(); !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("published shutdown expiry was lost: %v", err)
-	}
+	require.False(t, !budget.ExpireIfDue() || !errors.Is(budget.Context().Err(), context.DeadlineExceeded))
+
+	require.ErrorIs(t, run.FinishShutdown(), context.DeadlineExceeded)
 }
 
 func TestFinishShutdownPublishesDueClockWithoutTimerBridge(t *testing.T) {
 	clock := newShutdownTestClock()
 	run, err := NewRunSupervisor(7, clock, 10*time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	budget, err := run.BeginShutdown()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	clock.advanceWithoutSignal()
-	if err := run.FinishShutdown(); !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("FinishShutdown lost the due authoritative Clock: %v", err)
-	}
-	if !budget.Expired() || !errors.Is(budget.Context().Err(), context.DeadlineExceeded) {
-		t.Fatalf("FinishShutdown expiry differs: expired=%v err=%v", budget.Expired(), budget.Context().Err())
-	}
+
+	require.ErrorIs(t, run.FinishShutdown(), context.DeadlineExceeded)
+
+	require.False(t, !budget.Expired() || !errors.Is(budget.Context().Err(), context.DeadlineExceeded))
 }
 
 func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
@@ -162,66 +138,53 @@ func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
 	}{
 		"late dirty": {
 			run: func(t *testing.T, run *RunSupervisor) {
-				if err := run.Terminal(census); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, run.Terminal(census))
+
 				reporter, ok := any(run).(interface{ Dirty(error) error })
-				if !ok {
-					t.Fatal("Dirty does not report a rejected terminal mutation")
-				}
-				if err := reporter.Dirty(errors.New("late dirty")); !errors.Is(err, ErrRunTerminalReached) {
-					t.Fatalf("late dirty rejection differs: %v", err)
-				}
-				if state := run.TerminalState(); !state.Reached || !state.Quiescent || state.Dirty != nil {
-					t.Fatalf("late dirty rewrote terminal truth: %+v", state)
-				}
-				if cause := run.DirtyCause(); cause != nil {
-					t.Fatalf("late dirty rewrote dirty cause: %v", cause)
-				}
+				require.True(t, ok)
+
+				err := reporter.Dirty(errors.New("late dirty"))
+				require.ErrorIs(t, err, ErrRunTerminalReached)
+
+				state := run.TerminalState()
+				require.False(t, !state.Reached || !state.Quiescent || state.Dirty != nil)
+
+				cause := run.DirtyCause()
+				require.Nil(t, cause)
 			},
 		},
 		"duplicate terminal": {
 			run: func(t *testing.T, run *RunSupervisor) {
-				if err := run.Terminal(census); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, run.Terminal(census))
+
 				nonzero := census
 				nonzero.TransientActive = 1
-				if err := run.Terminal(nonzero); !errors.Is(err, ErrRunTerminalReached) {
-					t.Fatalf("duplicate terminal rejection differs: %v", err)
-				}
-				if state := run.TerminalState(); !state.Reached || !state.Quiescent || state.Dirty != nil {
-					t.Fatalf("duplicate terminal rewrote terminal truth: %+v", state)
-				}
-				if cause := run.DirtyCause(); cause != nil {
-					t.Fatalf("duplicate terminal rewrote dirty cause: %v", cause)
-				}
+
+				err := run.Terminal(nonzero)
+				require.ErrorIs(t, err, ErrRunTerminalReached)
+
+				state := run.TerminalState()
+				require.False(t, !state.Reached || !state.Quiescent || state.Dirty != nil)
+
+				cause := run.DirtyCause()
+				require.Nil(t, cause)
 			},
 		},
 		"nonquiescent terminal preserves cause and census": {
 			run: func(t *testing.T, run *RunSupervisor) {
 				cause := errors.New("discovery shutdown failed")
-				if err := run.Dirty(cause); err != nil {
-					t.Fatal(err)
-				}
+
+				require.NoError(t, run.Dirty(cause))
+
 				nonzero := census
 				nonzero.TransientActive = 1
 				err := run.Terminal(nonzero)
-				if !errors.Is(err, cause) {
-					t.Fatalf("terminal lost prior dirty cause: %v", err)
-				}
-				if !strings.Contains(err.Error(), "TransientActive:1") {
-					t.Fatalf("terminal lost nonzero census: %v", err)
-				}
+				require.ErrorIs(t, err, cause)
+				require.Contains(t, err.Error(), "TransientActive:1")
 				state := run.TerminalState()
-				if !state.Reached || state.Quiescent ||
+				require.False(t, !state.Reached || state.Quiescent ||
 					!errors.Is(state.Dirty, cause) ||
-					!strings.Contains(
-						state.Dirty.Error(),
-						"TransientActive:1",
-					) {
-					t.Fatalf("terminal state differs: %+v", state)
-				}
+					!strings.Contains(state.Dirty.Error(), "TransientActive:1"))
 			},
 		},
 	}
@@ -229,9 +192,7 @@ func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			run, err := NewRunSupervisor(1, RealClock{}, time.Second)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			test.run(t, run)
 		})
 	}
@@ -247,56 +208,45 @@ func TestRunSupervisorProjectsFirstDirtyTransitionExactlyOnce(t *testing.T) {
 	}{
 		"explicit dirty": {
 			run: func(t *testing.T, run *RunSupervisor) {
-				if err := run.Dirty(errors.New("failed")); err != nil {
-					t.Fatal(err)
-				}
-				if err := run.Dirty(errors.New("also failed")); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, run.Dirty(errors.New("failed")))
+
+				require.NoError(t, run.Dirty(errors.New("also failed")))
 			},
 		},
 		"terminal census creates dirty cause": {
 			run: func(t *testing.T, run *RunSupervisor) {
 				nonzero := census
 				nonzero.TransientActive = 1
-				if err := run.Terminal(nonzero); err == nil {
-					t.Fatal("nonquiescent terminal returned no dirty cause")
-				}
-				if err := run.Terminal(nonzero); !errors.Is(
-					err,
-					ErrRunTerminalReached,
-				) {
-					t.Fatalf("duplicate terminal error=%v", err)
-				}
+
+				require.Error(t, run.Terminal(nonzero))
+
+				err := run.Terminal(nonzero)
+				require.ErrorIs(t, err, ErrRunTerminalReached)
 			},
 		},
 		"explicit dirty precedes terminal census": {
 			run: func(t *testing.T, run *RunSupervisor) {
-				if err := run.Dirty(errors.New("failed")); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, run.Dirty(errors.New("failed")))
+
 				nonzero := census
 				nonzero.TransientActive = 1
-				if err := run.Terminal(nonzero); err == nil {
-					t.Fatal("nonquiescent terminal returned no dirty cause")
-				}
+
+				require.Error(t, run.Terminal(nonzero))
 			},
 		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			run, err := NewRunSupervisor(1, RealClock{}, time.Second)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			observer := &recordingRuntimeObserver{}
-			if err := run.BindRuntimeObserver(observer); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, run.BindRuntimeObserver(observer))
+
 			test.run(t, run)
-			if got := observer.counter(RuntimeCounterDirtyRuns); got != 1 {
-				t.Fatalf("dirty runs=%d want=1", got)
-			}
+
+			got := observer.counter(RuntimeCounterDirtyRuns)
+			require.EqualValues(t, 1, got)
 		})
 	}
 }
@@ -308,13 +258,9 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 	for name, population := range populations {
 		t.Run(name, func(t *testing.T) {
 			frame, err := NewFrameOwner(io.Discard)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			supervisor, err := NewTaskSupervisor(frame)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			observed := make(chan struct{}, population)
 			release := make(chan struct{})
 			refs := make([]InheritedTaskRef, population)
@@ -327,73 +273,50 @@ func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 					<-release
 					return nil
 				})
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 			}
-			if err := supervisor.SealInherited(); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, supervisor.SealInherited())
+
 			var total ShutdownCancellationCensus
 			for {
-				census, more, cancelErr := supervisor.CancelInheritedBatch(
-					InheritedCancellationServiceQuantum,
-				)
-				if cancelErr != nil {
-					t.Fatal(cancelErr)
-				}
-				if census.Visited > InheritedCancellationServiceQuantum {
-					t.Fatalf(
-						"one cancellation turn visited %d tasks, want at most %d",
-						census.Visited,
-						InheritedCancellationServiceQuantum,
-					)
-				}
+				census, more, cancelErr := supervisor.CancelInheritedBatch(InheritedCancellationServiceQuantum)
+				require.NoError(t, cancelErr)
+				require.False(t, census.Visited > InheritedCancellationServiceQuantum)
 				total.Visited += census.Visited
 				total.Signalled += census.Signalled
 				total.AlreadyCancelled += census.AlreadyCancelled
-				if more != supervisor.InheritedCancellationPending() {
-					t.Fatalf(
-						"cancellation continuation differs: returned=%v pending=%v",
-						more,
-						supervisor.InheritedCancellationPending(),
-					)
-				}
+				require.EqualValues(t, supervisor.InheritedCancellationPending(), more)
 				if !more {
 					break
 				}
 			}
-			if total.Visited != population || total.Signalled != population ||
-				total.AlreadyCancelled != 0 {
-				t.Fatalf("shutdown cancellation census differs: %+v", total)
-			}
+			require.False(t, total.Visited != population || total.Signalled != population || total.AlreadyCancelled != 0)
 			for range population {
 				select {
 				case <-observed:
 				case <-time.After(time.Second):
-					t.Fatal("not every inherited child observed cancellation")
+					require.FailNow(t, "test failed", "not every inherited child observed cancellation")
 				}
 			}
-			if _, err := supervisor.StartInherited(context.Background(), ResourceIdentity{ID: "late", Generation: 1}, InheritedV1Runtime, func(context.Context) error { return nil }); err == nil {
-				t.Fatal("inherited activation succeeded after shutdown seal")
-			}
+
+			_, startInheritedErr := supervisor.StartInherited(context.Background(), ResourceIdentity{ID: "late", Generation: 1}, InheritedV1Runtime, func(context.Context) error { return nil })
+			require.Error(t, startInheritedErr)
+
 			for index := range refs {
-				if err := supervisor.CancelInherited(refs[index], owners[index]); err != nil {
-					t.Fatalf("idempotent exact cancellation %d: %v", index, err)
-				}
+				require.NoError(t, supervisor.CancelInherited(refs[index], owners[index]))
 			}
 			close(release)
 			for index := range refs {
-				if joined, err := supervisor.JoinInherited(context.Background(), refs[index], owners[index]); err != nil || !joined {
-					t.Fatalf("join %d: joined=%v err=%v", index, joined, err)
-				}
-				if err := supervisor.ReleaseInherited(refs[index], owners[index]); err != nil {
-					t.Fatalf("release %d: %v", index, err)
-				}
+
+				joinInheritedJoined, joinInheritedErr := supervisor.JoinInherited(context.Background(), refs[index], owners[index])
+				require.False(t, joinInheritedErr != nil || !joinInheritedJoined)
+
+				require.NoError(t, supervisor.ReleaseInherited(refs[index], owners[index]))
 			}
-			if census := supervisor.InheritedCensus(); census != (InheritedTaskCensus{}) {
-				t.Fatalf("final inherited census differs: %+v", census)
-			}
+
+			census := supervisor.InheritedCensus()
+			require.EqualValues(t, (InheritedTaskCensus{}), census)
 		})
 	}
 }

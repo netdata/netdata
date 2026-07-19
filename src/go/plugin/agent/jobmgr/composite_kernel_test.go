@@ -5,13 +5,13 @@ package jobmgr
 import (
 	"context"
 	"errors"
-	"reflect"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/stretchr/testify/require"
 )
 
 type compositeTestTransaction struct {
@@ -78,15 +78,11 @@ func stopCompositeTestKernel(
 ) {
 	t.Helper()
 	kernel.Stop()
-	waitCtx, cancel := context.WithTimeout(
-		context.Background(),
-		time.Second,
-	)
+	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := kernel.Wait(waitCtx); err != nil &&
-		!errors.Is(err, ErrStopped) {
-		t.Fatal(err)
-	}
+
+	err := kernel.Wait(waitCtx)
+	require.False(t, err != nil && !errors.Is(err, ErrStopped))
 }
 
 func waitForCompositeRecords(
@@ -100,13 +96,7 @@ func waitForCompositeRecords(
 		if census := admission.Census(); census.ActiveRecords >= count {
 			return
 		}
-		if time.Now().After(deadline) {
-			t.Fatalf(
-				"active admission records did not reach %d: %+v",
-				count,
-				admission.Census(),
-			)
-		}
+		require.False(t, time.Now().After(deadline))
 		time.Sleep(time.Millisecond)
 	}
 }
@@ -160,11 +150,7 @@ func (scct *simpleCompositeChildTransaction) Dispose(
 func compositeTestApplied(
 	scope lifecycle.ResourceTransactionScope,
 ) (lifecycle.AppliedResourceTransaction, error) {
-	result, err := lifecycle.NewSealedResult(
-		204,
-		"text/plain",
-		nil,
-	)
+	result, err := lifecycle.NewSealedResult(204, "text/plain", nil)
 	if err != nil {
 		return lifecycle.AppliedResourceTransaction{}, err
 	}
@@ -185,9 +171,8 @@ func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(
 		stoppedKernelPlanner{},
 	)
 	startKernelLoop(t, kernel)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
 
 	var mu sync.Mutex
 	var applied []string
@@ -279,7 +264,7 @@ func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(
 	select {
 	case <-parentEntered:
 	case <-time.After(time.Second):
-		t.Fatal("composite parent did not enter apply")
+		require.FailNow(t, "test failed", "composite parent did not enter apply")
 	}
 
 	normalPlan := WorkPlan{
@@ -292,7 +277,8 @@ func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(
 			close(normalApplied)
 		}),
 	}
-	if err := kernel.SubmitPrepared(
+
+	require.NoError(t, kernel.SubmitPrepared(
 		t.Context(),
 		Request{
 			UID:     "normal-claim-waiter",
@@ -301,49 +287,35 @@ func TestCompositeChildBypassesParentClaimWaiterOnTargetLane(
 			Route:   "internal/test/normal",
 		},
 		normalPlan,
-	); err != nil {
-		t.Fatal(err)
-	}
+	),
+	)
+
 	close(submitChild)
 
 	select {
 	case err := <-parentDone:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal(
-			"composite child deadlocked behind the parent's claim waiter",
-		)
+		require.FailNow(t, "test failed", "composite child deadlocked behind the parent's claim waiter")
 	}
 	select {
 	case <-normalApplied:
 	case <-time.After(time.Second):
-		t.Fatalf(
-			"normal claim waiter did not run after parent release: dirty=%v",
-			run.DirtyCause(),
-		)
+		require.FailNowf(t, "test failed", "normal claim waiter did not run after parent release: dirty=%v", run.DirtyCause())
 	}
 	mu.Lock()
 	got := append([]string(nil), applied...)
 	mu.Unlock()
-	if want := []string{"child", "normal"}; !reflect.DeepEqual(
-		got,
-		want,
-	) {
-		t.Fatalf("apply order=%v want=%v", got, want)
-	}
+
+	want := []string{"child", "normal"}
+	require.Equal(t, want, got)
 
 	kernel.Stop()
-	waitCtx, cancel := context.WithTimeout(
-		context.Background(),
-		time.Second,
-	)
+	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := kernel.Wait(waitCtx); err != nil &&
-		!errors.Is(err, ErrStopped) {
-		t.Fatal(err)
-	}
+
+	err := kernel.Wait(waitCtx)
+	require.False(t, err != nil && !errors.Is(err, ErrStopped))
 }
 
 func TestCompositeChildRejectsActiveParentLane(t *testing.T) {
@@ -352,9 +324,8 @@ func TestCompositeChildRejectsActiveParentLane(t *testing.T) {
 		stoppedKernelPlanner{},
 	)
 	startKernelLoop(t, kernel)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
 
 	childErr := make(chan error, 1)
 	parentPlan := compositeParentTestPlan(
@@ -397,24 +368,19 @@ func TestCompositeChildRejectsActiveParentLane(t *testing.T) {
 
 	select {
 	case err := <-childErr:
-		if err == nil ||
-			!strings.Contains(err.Error(), "active parent lane") {
-			t.Fatalf("same-lane child error=%v", err)
-		}
+		require.False(t, err == nil || !strings.Contains(err.Error(), "active parent lane"))
 	case <-time.After(time.Second):
-		t.Fatal("same-lane child was not rejected promptly")
+		require.FailNow(t, "test failed", "same-lane child was not rejected promptly")
 	}
 	select {
 	case err := <-parentDone:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("parent did not complete after same-lane rejection")
+		require.FailNow(t, "test failed", "parent did not complete after same-lane rejection")
 	}
-	if err := run.DirtyCause(); err != nil {
-		t.Fatalf("same-lane rejection dirtied run: %v", err)
-	}
+
+	require.NoError(t, run.DirtyCause())
+
 	stopCompositeTestKernel(t, kernel)
 }
 
@@ -426,9 +392,8 @@ func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
 		stoppedKernelPlanner{},
 	)
 	startKernelLoop(t, kernel)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
 
 	var mu sync.Mutex
 	var applied []string
@@ -453,7 +418,7 @@ func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
 	select {
 	case <-blockerEntered:
 	case <-time.After(time.Second):
-		t.Fatal("target-lane blocker did not start")
+		require.FailNow(t, "test failed", "target-lane blocker did not start")
 	}
 
 	parentEntered := make(chan struct{})
@@ -490,10 +455,7 @@ func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
 							[]string{"graph"},
 							func() {
 								mu.Lock()
-								applied = append(
-									applied,
-									"child",
-								)
+								applied = append(applied, "child")
 								mu.Unlock()
 							},
 						),
@@ -505,7 +467,7 @@ func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
 	select {
 	case <-parentEntered:
 	case <-time.After(time.Second):
-		t.Fatal("FIFO parent did not enter apply")
+		require.FailNow(t, "test failed", "FIFO parent did not enter apply")
 	}
 
 	normalDone := make(chan error, 1)
@@ -531,40 +493,31 @@ func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
 
 	select {
 	case err := <-blockerDone:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("target-lane blocker did not finish")
+		require.FailNow(t, "test failed", "target-lane blocker did not finish")
 	}
 	select {
 	case err := <-parentDone:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("FIFO parent did not finish")
+		require.FailNow(t, "test failed", "FIFO parent did not finish")
 	}
 	select {
 	case err := <-normalDone:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("ordinary target-lane operation did not finish")
+		require.FailNow(t, "test failed", "ordinary target-lane operation did not finish")
 	}
 	mu.Lock()
 	got := append([]string(nil), applied...)
 	mu.Unlock()
-	if want := []string{"child", "normal"}; !reflect.DeepEqual(
-		got,
-		want,
-	) {
-		t.Fatalf("target-lane apply order=%v want=%v", got, want)
-	}
-	if err := run.DirtyCause(); err != nil {
-		t.Fatalf("FIFO run dirtied: %v", err)
-	}
+
+	want := []string{"child", "normal"}
+	require.Equal(t, want, got)
+
+	require.NoError(t, run.DirtyCause())
+
 	stopCompositeTestKernel(t, kernel)
 }
 
@@ -576,9 +529,8 @@ func TestCompositeFenceDefersConflictingAdmissionButNotUnrelatedWork(
 		stoppedKernelPlanner{},
 	)
 	startKernelLoop(t, kernel)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
 
 	childEntered := make(chan struct{})
 	childRelease := make(chan struct{})
@@ -623,7 +575,7 @@ func TestCompositeFenceDefersConflictingAdmissionButNotUnrelatedWork(
 	select {
 	case <-childEntered:
 	case <-time.After(time.Second):
-		t.Fatal("composite child did not start")
+		require.FailNow(t, "test failed", "composite child did not start")
 	}
 
 	beforeConflict := admission.Census()
@@ -642,32 +594,16 @@ func TestCompositeFenceDefersConflictingAdmissionButNotUnrelatedWork(
 		[]string{"graph"},
 		func() { close(conflictingApplied) },
 	)
-	base, err := operationAdmissionBytes(
-		conflictingRequest,
-		conflictingPlan,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	base, err := operationAdmissionBytes(conflictingRequest, conflictingPlan)
+	require.NoError(t, err)
 	conflictingPlan.OwnedBytes = available - base
-	if conflictingPlan.OwnedBytes <= 0 {
-		t.Fatalf(
-			"invalid conflicting byte calculation: capacity=%d census=%+v base=%d",
-			capacity,
-			beforeConflict,
-			base,
-		)
-	}
-	conflictingPlan, err = prepareOwnedJobPlan(
-		conflictingRequest,
-		conflictingPlan,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.False(t, conflictingPlan.OwnedBytes <= 0)
+	conflictingPlan, err = prepareOwnedJobPlan(conflictingRequest, conflictingPlan)
+	require.NoError(t, err)
 	conflictingAdmitted := make(chan error, 1)
 	conflictingDone := make(chan error, 1)
-	if err := kernel.enqueueSubmission(
+
+	require.NoError(t, kernel.enqueueSubmission(
 		t.Context(),
 		conflictingRequest.Source,
 		submission{
@@ -677,15 +613,13 @@ func TestCompositeFenceDefersConflictingAdmissionButNotUnrelatedWork(
 			result:   conflictingAdmitted,
 			terminal: conflictingDone,
 		},
-	); err != nil {
-		t.Fatal(err)
-	}
+	),
+	)
+
 	select {
-	case <-kernel.submissionSpace[sourceIndex(
-		conflictingRequest.Source,
-	)]:
+	case <-kernel.submissionSpace[sourceIndex(conflictingRequest.Source)]:
 	case <-time.After(time.Second):
-		t.Fatal("conflicting submission was not dequeued")
+		require.FailNow(t, "test failed", "conflicting submission was not dequeued")
 	}
 
 	unrelatedApplied := make(chan struct{})
@@ -709,65 +643,50 @@ func TestCompositeFenceDefersConflictingAdmissionButNotUnrelatedWork(
 	select {
 	case <-unrelatedApplied:
 	case <-time.After(time.Second):
-		t.Fatalf(
-			"unrelated work was starved by conflicting admission: %+v",
-			admission.Census(),
-		)
+		require.FailNowf(t, "test failed", "unrelated work was starved by conflicting admission: %+v", admission.Census())
 	}
 	select {
 	case err := <-conflictingAdmitted:
-		t.Fatalf(
-			"conflicting operation admitted before parent terminal: %v",
-			err,
-		)
+		require.FailNowf(t, "test failed", "conflicting operation admitted before parent terminal: %v", err)
 	default:
 	}
 	select {
 	case err := <-unrelatedDone:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("unrelated operation did not finish")
+		require.FailNow(t, "test failed", "unrelated operation did not finish")
 	}
 
 	close(childRelease)
 	select {
 	case err := <-parentDone:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("composite parent did not finish")
+		require.FailNow(t, "test failed", "composite parent did not finish")
 	}
 	select {
 	case err := <-conflictingAdmitted:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("conflicting operation was not admitted after parent terminal")
+		require.FailNow(t, "test failed", "conflicting operation was not admitted after parent terminal")
 	}
 	select {
 	case <-conflictingApplied:
 	case <-time.After(time.Second):
-		t.Fatal("conflicting operation did not run after parent terminal")
+		require.FailNow(t, "test failed", "conflicting operation did not run after parent terminal")
 	}
 	select {
 	case err := <-conflictingDone:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("conflicting operation did not reach terminal")
+		require.FailNow(t, "test failed", "conflicting operation did not reach terminal")
 	}
-	if census := admission.Census(); census.ActiveRecords != 0 ||
-		census.OrdinaryBytes != 0 {
-		t.Fatalf("composite fence admission did not converge: %+v", census)
-	}
-	if err := run.DirtyCause(); err != nil {
-		t.Fatalf("composite fence run dirtied: %v", err)
-	}
+
+	census := admission.Census()
+	require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
+
+	require.NoError(t, run.DirtyCause())
+
 	stopCompositeTestKernel(t, kernel)
 }
 
@@ -779,9 +698,8 @@ func TestCompositeChildGetsParentLinkedProgressAdmission(
 		stoppedKernelPlanner{},
 	)
 	startKernelLoop(t, kernel)
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.OpenAdmission())
 
 	parentEntered := make(chan struct{})
 	submitChild := make(chan struct{})
@@ -830,7 +748,7 @@ func TestCompositeChildGetsParentLinkedProgressAdmission(
 	select {
 	case <-parentEntered:
 	case <-time.After(time.Second):
-		t.Fatal("progress parent did not enter apply")
+		require.FailNow(t, "test failed", "progress parent did not enter apply")
 	}
 
 	beforeBlocker := admission.Census()
@@ -852,82 +770,51 @@ func TestCompositeChildGetsParentLinkedProgressAdmission(
 			<-blockerRelease
 		},
 	)
-	base, err := operationAdmissionBytes(
-		blockerRequest,
-		blockerPlan,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	base, err := operationAdmissionBytes(blockerRequest, blockerPlan)
+	require.NoError(t, err)
 	blockerPlan.OwnedBytes =
 		capacity - beforeBlocker.OrdinaryBytes - base
-	if blockerPlan.OwnedBytes <= 0 {
-		t.Fatalf(
-			"invalid blocker byte calculation: capacity=%d census=%+v base=%d",
-			capacity,
-			beforeBlocker,
-			base,
-		)
-	}
+	require.False(t, blockerPlan.OwnedBytes <= 0)
 	blockerDone := make(chan error, 1)
 	go func() {
-		blockerDone <- kernel.SubmitPreparedAndWait(
-			t.Context(),
-			blockerRequest,
-			blockerPlan,
-		)
+		blockerDone <- kernel.SubmitPreparedAndWait(t.Context(), blockerRequest, blockerPlan)
 	}()
 	select {
 	case <-blockerEntered:
 	case <-time.After(time.Second):
-		t.Fatal("ordinary-budget blocker did not start")
+		require.FailNow(t, "test failed", "ordinary-budget blocker did not start")
 	}
-	if census := admission.Census(); census.OrdinaryBytes != capacity {
-		t.Fatalf(
-			"ordinary budget not fully held: capacity=%d census=%+v",
-			capacity,
-			census,
-		)
-	}
+
+	require.EqualValues(t, capacity, admission.Census().OrdinaryBytes)
 
 	close(submitChild)
 	select {
 	case <-childEntered:
 	case <-time.After(time.Second):
-		t.Fatal(
-			"composite child did not receive parent-linked progress admission",
-		)
+		require.FailNow(t, "test failed", "composite child did not receive parent-linked progress admission")
 	}
-	if census := admission.Census(); census.OrdinaryBytes <= capacity {
-		t.Fatalf(
-			"composite progress was not represented as bounded overcommit: %+v",
-			census,
-		)
-	}
+
+	require.False(t, admission.Census().OrdinaryBytes <= capacity)
+
 	close(childRelease)
 	select {
 	case err := <-parentDone:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("progress parent did not finish")
+		require.FailNow(t, "test failed", "progress parent did not finish")
 	}
 	close(blockerRelease)
 	select {
 	case err := <-blockerDone:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("ordinary-budget blocker did not finish")
+		require.FailNow(t, "test failed", "ordinary-budget blocker did not finish")
 	}
-	if census := admission.Census(); census.ActiveRecords != 0 ||
-		census.OrdinaryBytes != 0 {
-		t.Fatalf("composite progress admission leaked: %+v", census)
-	}
-	if err := run.DirtyCause(); err != nil {
-		t.Fatalf("progress run dirtied: %v", err)
-	}
+
+	census := admission.Census()
+	require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
+
+	require.NoError(t, run.DirtyCause())
+
 	stopCompositeTestKernel(t, kernel)
 }

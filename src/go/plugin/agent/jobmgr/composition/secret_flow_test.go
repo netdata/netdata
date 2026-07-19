@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 	"strconv"
-	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -21,6 +20,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
@@ -67,9 +67,7 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobPayload, err := yaml.Marshal(jobConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	jobs := testRunJobServices(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
@@ -89,9 +87,7 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 			},
 		}},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	initialStore := secretstore.Config{
 		"name": "main", "kind": string(secretstore.KindVault),
 		"value":           "initial",
@@ -122,9 +118,7 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 				nil
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commands := make(chan processControl, 1)
 	done := make(chan error, 1)
 	go func() {
@@ -132,60 +126,35 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 	}()
 	select {
 	case got := <-starts:
-		if got != "initial" {
-			t.Fatalf("collector secret=%q want=%q", got, "initial")
-		}
+		require.EqualValues(t, "initial", got)
 	case err := <-done:
-		t.Fatalf(
-			"process stopped before initial collector start: %v; output=%q",
-			err,
-			output.String(),
-		)
+		require.FailNowf(t, "test failed", "process stopped before initial collector start: %v; output=%q", err, output.String())
 	case <-time.After(3 * time.Second):
-		t.Fatalf(
-			"collector did not start with initial secret; graph=%v output=%q",
-			graph.IDs(),
-			output.String(),
-		)
+		require.FailNowf(t, "test failed", "collector did not start with initial secret; graph=%v output=%q", graph.IDs(), output.String())
 	}
 
-	if _, err := io.WriteString(
+	_, writeStringErr := io.WriteString(
 		writer,
 		"FUNCTION_PAYLOAD secret-update 30 "+
 			"\"config go.d:secretstore:vault:main update\" "+
 			"0xFFFF \"user=test\" application/json\n"+
 			"{\"value\":\"replacement\"}\n"+
 			"FUNCTION_PAYLOAD_END\n",
-	); err != nil {
-		t.Fatal(err)
-	}
-	waitSecretStart(t, starts, "replacement")
-	if cleanups.Load() != 1 {
-		t.Fatalf(
-			"dependent cleanup count=%d before replacement start",
-			cleanups.Load(),
-		)
-	}
-	output.waitContains(
-		t,
-		"FUNCTION_RESULT_BEGIN secret-update 200 application/json",
 	)
+	require.NoError(t, writeStringErr)
+
+	waitSecretStart(t, starts, "replacement")
+	require.EqualValues(t, 1, cleanups.Load())
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-update 200 application/json")
 
 	commands <- testProcessControl(processTerminate)
 	select {
 	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(3 * time.Second):
-		t.Fatal("process did not terminate")
+		require.FailNow(t, "test failed", "process did not terminate")
 	}
-	if cleanups.Load() != 2 {
-		t.Fatalf(
-			"dependent cleanup count=%d after shutdown",
-			cleanups.Load(),
-		)
-	}
+	require.EqualValues(t, 2, cleanups.Load())
 }
 
 func TestProcessCoreCancelledSecretUpdateRestoresStoppedDependent(
@@ -241,9 +210,7 @@ func TestProcessCoreCancelledSecretUpdateRestoresStoppedDependent(
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobPayload, err := yaml.Marshal(jobConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	jobs := testRunJobServices(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
@@ -263,9 +230,7 @@ func TestProcessCoreCancelledSecretUpdateRestoresStoppedDependent(
 			},
 		}},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	initialStore := secretstore.Config{
 		"name": "main", "kind": string(secretstore.KindVault),
 		"value":           "initial",
@@ -300,9 +265,7 @@ func TestProcessCoreCancelledSecretUpdateRestoresStoppedDependent(
 				nil
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commands := make(chan processControl, 1)
 	done := make(chan error, 1)
 	go func() {
@@ -310,107 +273,61 @@ func TestProcessCoreCancelledSecretUpdateRestoresStoppedDependent(
 	}()
 	select {
 	case got := <-starts:
-		if got != "initial" {
-			t.Fatalf(
-				"collector secret=%q want=%q",
-				got,
-				"initial",
-			)
-		}
+		require.EqualValues(t, "initial", got)
 	case err := <-done:
-		t.Fatalf(
-			"process stopped before initial collector start: %v; output=%q",
-			err,
-			output.String(),
-		)
+		require.FailNowf(t, "test failed", "process stopped before initial collector start: %v; output=%q", err, output.String())
 	case <-time.After(3 * time.Second):
-		t.Fatalf(
-			"collector did not start with initial secret; output=%q",
-			output.String(),
-		)
+		require.FailNowf(t, "test failed", "collector did not start with initial secret; output=%q", output.String())
 	}
 	armStop.Store(true)
 
-	if _, err := io.WriteString(
+	_, writeStringErr := io.WriteString(
 		writer,
 		"FUNCTION_PAYLOAD secret-cancel 30 "+
 			"\"config go.d:secretstore:vault:main update\" "+
 			"0xFFFF \"user=test\" application/json\n"+
 			"{\"value\":\"replacement\"}\n"+
 			"FUNCTION_PAYLOAD_END\n",
-	); err != nil {
-		t.Fatal(err)
-	}
+	)
+	require.NoError(t, writeStringErr)
+
 	select {
 	case <-stopEntered:
 	case <-time.After(3 * time.Second):
-		t.Fatal("dependent stop did not reach collector cleanup")
+		require.FailNow(t, "test failed", "dependent stop did not reach collector cleanup")
 	}
-	if _, err := io.WriteString(
-		writer,
-		"FUNCTION_CANCEL secret-cancel\n",
-	); err != nil {
-		t.Fatal(err)
-	}
+
+	_, writeStringErr2 := io.WriteString(writer, "FUNCTION_CANCEL secret-cancel\n")
+	require.NoError(t, writeStringErr2)
+
 	releaseOnce.Do(func() { close(releaseStop) })
 	waitSecretStart(t, starts, "initial")
-	output.waitContains(
-		t,
-		"FUNCTION_RESULT_BEGIN secret-cancel 499 application/json",
-	)
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-cancel 499 application/json")
 
 	key := secretstore.StoreKey(secretstore.KindVault, "main")
 	scope, err := storeScope([]string{key})
-	if err != nil {
-		t.Fatal(err)
-	}
-	value, resolveErr := scope.Resolve(
-		t.Context(),
-		key,
-		"key",
-	)
+	require.NoError(t, err)
+	value, resolveErr := scope.Resolve(t.Context(), key, "key")
 	releaseErr := scope.Release(t.Context())
-	if resolveErr != nil || releaseErr != nil ||
-		string(value) != "initial" {
-		t.Fatalf(
-			"restored Store value=%q resolve=%v release=%v",
-			value,
-			resolveErr,
-			releaseErr,
-		)
-	}
-	if census := storeCensus(); census.Current != 1 ||
+	require.False(t, resolveErr != nil || releaseErr != nil || string(value) != "initial")
+
+	census := storeCensus()
+	require.False(t, census.Current != 1 ||
 		census.Generations != 1 ||
 		census.Preparations != 0 ||
 		census.Readers != 0 ||
-		census.Scopes != 0 {
-		t.Fatalf(
-			"cancelled Store update retained ownership: %+v",
-			census,
-		)
-	}
-	if cleanups.Load() != 1 {
-		t.Fatalf(
-			"dependent cleanups=%d want=1 before shutdown",
-			cleanups.Load(),
-		)
-	}
+		census.Scopes != 0)
+
+	require.EqualValues(t, 1, cleanups.Load())
 
 	commands <- testProcessControl(processTerminate)
 	select {
 	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(3 * time.Second):
-		t.Fatal("process did not terminate")
+		require.FailNow(t, "test failed", "process did not terminate")
 	}
-	if cleanups.Load() != 2 {
-		t.Fatalf(
-			"dependent cleanups=%d want=2 after shutdown",
-			cleanups.Load(),
-		)
-	}
+	require.EqualValues(t, 2, cleanups.Load())
 }
 
 func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
@@ -426,9 +343,7 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 			},
 		}},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	reader, writer := io.Pipe()
 	defer writer.Close()
 	output := newProcessSynchronizedBuffer()
@@ -447,18 +362,13 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 				nil
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commands := make(chan processControl, 1)
 	done := make(chan error, 1)
 	go func() {
 		done <- process.run(context.Background(), commands)
 	}()
-	output.waitContains(
-		t,
-		"CONFIG go.d:secretstore:vault create accepted template",
-	)
+	output.waitContains(t, "CONFIG go.d:secretstore:vault create accepted template")
 
 	steps := []struct {
 		uid     string
@@ -499,47 +409,30 @@ func TestProcessCoreSecretCRUDAndValidationRedaction(t *testing.T) {
 	}
 	for _, step := range steps {
 		if step.payload == "" {
-			if _, err := io.WriteString(
+
+			_, writeStringErr := io.WriteString(writer, "FUNCTION "+step.uid+" 30 \""+step.command+"\" 0xFFFF \"user=test\"\n")
+			require.NoError(t, writeStringErr)
+
+		} else {
+			_, err := io.WriteString(
 				writer,
-				"FUNCTION "+step.uid+" 30 \""+
+				"FUNCTION_PAYLOAD "+step.uid+" 30 \""+
 					step.command+
-					"\" 0xFFFF \"user=test\"\n",
-			); err != nil {
-				t.Fatal(err)
-			}
-		} else if _, err := io.WriteString(
-			writer,
-			"FUNCTION_PAYLOAD "+step.uid+" 30 \""+
-				step.command+
-				"\" 0xFFFF \"user=test\" application/json\n"+
-				step.payload+"\nFUNCTION_PAYLOAD_END\n",
-		); err != nil {
-			t.Fatal(err)
+					"\" 0xFFFF \"user=test\" application/json\n"+
+					step.payload+"\nFUNCTION_PAYLOAD_END\n",
+			)
+			require.NoError(t, err)
 		}
-		output.waitContains(
-			t,
-			"FUNCTION_RESULT_BEGIN "+step.uid+" "+
-				strconv.Itoa(step.status)+" application/json",
-		)
+		output.waitContains(t, "FUNCTION_RESULT_BEGIN "+step.uid+" "+strconv.Itoa(step.status)+" application/json")
 	}
-	if strings.Contains(
-		output.String(),
-		"backend-sensitive-detail",
-	) {
-		t.Fatalf(
-			"secret validation detail reached protocol output: %q",
-			output.String(),
-		)
-	}
+	require.NotContains(t, output.String(), "backend-sensitive-detail")
 
 	commands <- testProcessControl(processTerminate)
 	select {
 	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(3 * time.Second):
-		t.Fatal("process did not terminate")
+		require.FailNow(t, "test failed", "process did not terminate")
 	}
 }
 
@@ -590,9 +483,7 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
 	jobConfig.SetSourceType(confgroup.TypeDyncfg)
 	jobConfig.SetSource("test")
 	jobPayload, err := yaml.Marshal(jobConfig)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	jobs := testRunJobServices(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
@@ -612,9 +503,7 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
 			},
 		}},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	initialStore := secretstore.Config{
 		"name": "main", "kind": string(secretstore.KindVault),
 		"value":           "initial",
@@ -644,80 +533,60 @@ func TestProcessCoreSecretUpdateHoldsJobGraphThroughRestart(
 				nil
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commands := make(chan processControl, 1)
 	done := make(chan error, 1)
 	go func() {
 		done <- process.run(context.Background(), commands)
 	}()
-	output.waitContains(
-		t,
-		"CONFIG go.d:collector:module:job create running job",
-	)
-	if _, err := io.WriteString(
+	output.waitContains(t, "CONFIG go.d:collector:module:job create running job")
+
+	_, writeStringErr := io.WriteString(
 		writer,
 		"FUNCTION_PAYLOAD secret-rotation 30 "+
 			"\"config go.d:secretstore:vault:main update\" "+
 			"0xFFFF \"user=test\" application/json\n"+
 			"{\"value\":\"replacement\"}\n"+
 			"FUNCTION_PAYLOAD_END\n",
-	); err != nil {
-		t.Fatal(err)
-	}
+	)
+	require.NoError(t, writeStringErr)
+
 	select {
 	case <-restartEntered:
 	case <-time.After(3 * time.Second):
-		t.Fatal("dependent restart did not reach the blocking start")
+		require.FailNow(t, "test failed", "dependent restart did not reach the blocking start")
 	}
-	if _, err := io.WriteString(
+
+	_, writeStringErr2 := io.WriteString(
 		writer,
 		"FUNCTION_PAYLOAD job-add 30 "+
 			"\"config go.d:collector:module add other\" "+
 			"0xFFFF \"user=test\" application/json\n"+
 			"{\"option_str\":\"plain\",\"option_int\":1}\n"+
 			"FUNCTION_PAYLOAD_END\n",
-	); err != nil {
-		t.Fatal(err)
-	}
+	)
+	require.NoError(t, writeStringErr2)
+
 	waitActiveUIDs(t, process.uids, 2)
-	if _, exists := graph.Lookup("module_other"); exists {
-		t.Fatal("job graph changed while Store rotation held its claim")
-	}
-	if strings.Contains(
-		output.String(),
-		"FUNCTION_RESULT_BEGIN job-add",
-	) {
-		t.Fatal("job mutation completed before Store rotation released")
-	}
+
+	_, exists := graph.Lookup("module_other")
+	require.False(t, exists)
+
+	require.NotContains(t, output.String(), "FUNCTION_RESULT_BEGIN job-add")
 
 	releaseOnce.Do(func() { close(releaseRestart) })
-	output.waitContains(
-		t,
-		"FUNCTION_RESULT_BEGIN secret-rotation 200 application/json",
-	)
-	output.waitContains(
-		t,
-		"FUNCTION_RESULT_BEGIN job-add 202 application/json",
-	)
-	if record, exists := graph.Lookup("module_other"); !exists ||
-		record.Status != dyncfg.StatusAccepted.String() {
-		t.Fatalf(
-			"released job graph record=%+v exists=%v",
-			record,
-			exists,
-		)
-	}
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN secret-rotation 200 application/json")
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN job-add 202 application/json")
+
+	lookupRecord, lookupExists := graph.Lookup("module_other")
+	require.False(t, !lookupExists || lookupRecord.Status != dyncfg.StatusAccepted.String())
 
 	commands <- testProcessControl(processTerminate)
 	select {
 	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(3 * time.Second):
-		t.Fatal("process did not terminate")
+		require.FailNow(t, "test failed", "process did not terminate")
 	}
 }
 
@@ -739,7 +608,7 @@ func waitActiveUIDs(
 		select {
 		case <-tick.C:
 		case <-timeout.C:
-			t.Fatalf("active UIDs=%d want at least %d", active, want)
+			require.FailNowf(t, "test failed", "active UIDs=%d want at least %d", active, want)
 		}
 	}
 }
@@ -752,11 +621,9 @@ func waitSecretStart(
 	t.Helper()
 	select {
 	case got := <-starts:
-		if got != want {
-			t.Fatalf("collector secret=%q want=%q", got, want)
-		}
+		require.EqualValues(t, want, got)
 	case <-time.After(3 * time.Second):
-		t.Fatalf("collector did not start with secret %q", want)
+		require.FailNowf(t, "test failed", "collector did not start with secret %q", want)
 	}
 }
 
@@ -772,9 +639,7 @@ func (pss *processSecretStore) Configuration() any {
 
 func (pss *processSecretStore) Init(context.Context) error {
 	if pss.config.Value == "backend-sensitive-detail" {
-		return errors.New(
-			"backend rejected backend-sensitive-detail",
-		)
+		return errors.New("backend rejected backend-sensitive-detail")
 	}
 	return nil
 }

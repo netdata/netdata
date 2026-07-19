@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/stretchr/testify/require"
 )
 
 type releaseErrorAtomicScope struct {
@@ -38,26 +39,15 @@ func TestRunOwnedAtomicScopeDirtiesRunOnReleaseFailure(
 		lifecycle.RealClock{},
 		time.Second,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	scope := &runOwnedAtomicScope{
 		run: run,
 		scope: releaseErrorAtomicScope{
 			err: releaseErr,
 		},
 	}
-	if err := scope.Release(t.Context()); !errors.Is(
-		err,
-		releaseErr,
-	) {
-		t.Fatalf("release error=%v want=%v", err, releaseErr)
-	}
-	if !errors.Is(run.DirtyCause(), releaseErr) {
-		t.Fatalf(
-			"run dirty cause=%v want=%v",
-			run.DirtyCause(),
-			releaseErr,
-		)
-	}
+
+	require.ErrorIs(t, scope.Release(t.Context()), releaseErr)
+
+	require.ErrorIs(t, run.DirtyCause(), releaseErr)
 }

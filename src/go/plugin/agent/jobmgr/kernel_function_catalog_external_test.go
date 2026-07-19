@@ -13,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	functionadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFunctionCatalogKernelIntegration(t *testing.T) {
@@ -32,26 +33,18 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 			},
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	clock := lifecycle.RealClock{}
 	run, err := lifecycle.NewRunSupervisor(1, clock, time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() { _ = run.FinishShutdown() })
 	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	kernel, err := jobmgr.NewCommandKernel(
 		run, admission, uids, tasks, frames, clock,
 		make(chan lifecycle.AdmissionGrant, 1), nil,
@@ -59,40 +52,31 @@ func TestFunctionCatalogKernelIntegration(t *testing.T) {
 		jobmgr.RunFinalizerFunc(func(context.Context, uint64) error { return nil }),
 		externalPlanner{}, catalog,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	loop, err := jobmgr.NewKernelLoop(kernel)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
-	if err := loop.Start(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := kernel.SubmitAndWait(context.Background(), jobmgr.Request{
+	require.NoError(t, err)
+
+	require.NoError(t, run.OpenAdmission())
+
+	require.NoError(t, loop.Start(context.Background()))
+
+	require.NoError(t, kernel.SubmitAndWait(context.Background(), jobmgr.Request{
 		UID: "concrete-catalog", Source: lifecycle.SourceFunction, Route: "direct",
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if !bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN concrete-catalog 500 application/json ")) {
-		t.Fatalf("concrete Function result differs: %q", output.Bytes())
-	}
+	}),
+	)
+
+	require.True(t, bytes.Contains(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN concrete-catalog 500 application/json ")))
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if census := catalog.Census(); !census.Closed || census.Routes != 0 ||
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	census := catalog.Census()
+	require.False(t, !census.Closed || census.Routes != 0 ||
 		census.InvocationLeases != 0 || census.PendingCleanups != 0 ||
-		census.CompletedCleanups != 1 || cleanupCalls.Load() != 1 {
-		t.Fatalf("kernel did not close concrete Function catalog: census=%+v cleanup=%d",
-			census, cleanupCalls.Load())
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+		census.CompletedCleanups != 1 || cleanupCalls.Load() != 1)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeExternalUIDLedger(t, uids)
 }
 
@@ -114,9 +98,7 @@ func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T
 				) (lifecycle.SealedResult, error) {
 					entered <- input.UID
 					<-release
-					return lifecycle.NewControlResult(
-						lifecycle.ControlInternal,
-					)
+					return lifecycle.NewControlResult(lifecycle.ControlInternal)
 				},
 				Cleanup: func(context.Context) error {
 					cleanupCalls.Add(1)
@@ -125,9 +107,7 @@ func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T
 			},
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	kernel, run, admission, uids := newExternalKernel(t, catalog)
 	for index := 0; index < calls; index++ {
 		if err := kernel.Submit(context.Background(), jobmgr.Request{
@@ -135,7 +115,7 @@ func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T
 			Route: "direct",
 		}); err != nil {
 			close(release)
-			t.Fatal(err)
+			require.FailNow(t, "test failed", err)
 		}
 	}
 
@@ -149,11 +129,7 @@ func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T
 			close(release)
 			kernel.Stop()
 			_ = kernel.Wait(context.Background())
-			t.Fatalf(
-				"same-route handlers entered=%d, want %d concurrent entries",
-				len(seen),
-				calls,
-			)
+			require.FailNowf(t, "test failed", "same-route handlers entered=%d, want %d concurrent entries", len(seen), calls)
 		}
 	}
 	if !timer.Stop() {
@@ -163,28 +139,21 @@ func TestKernelGenericFunctionInvocationsOnSameRouteRunConcurrently(t *testing.T
 		close(release)
 		kernel.Stop()
 		_ = kernel.Wait(context.Background())
-		t.Fatal("handler generation cleaned while invocations were active")
+		require.FailNow(t, "test failed", "handler generation cleaned while invocations were active")
 	}
 
 	close(release)
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if census := catalog.Census(); census.InvocationLeases != 0 ||
-		census.CompletedCleanups != 1 || cleanupCalls.Load() != 1 {
-		t.Fatalf(
-			"same-route invocation cleanup differs: census=%+v calls=%d",
-			census,
-			cleanupCalls.Load(),
-		)
-	}
-	if len(seen) != calls {
-		t.Fatalf("same-route handlers entered=%d, want %d", len(seen), calls)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	census := catalog.Census()
+	require.False(t, census.InvocationLeases != 0 || census.CompletedCleanups != 1 || cleanupCalls.Load() != 1)
+
+	require.EqualValues(t, calls, len(seen))
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeExternalUIDLedger(t, uids)
 }
 
@@ -207,17 +176,13 @@ func TestKernelSameRouteFunctionCancellationIsInvocationLocal(t *testing.T) {
 					} else {
 						<-ctx.Done()
 					}
-					return lifecycle.NewControlResult(
-						lifecycle.ControlInternal,
-					)
+					return lifecycle.NewControlResult(lifecycle.ControlInternal)
 				},
 			},
 			CooperativeCancel: true,
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	kernel, run, admission, uids := newExternalKernel(t, catalog)
 	results := map[string]chan error{
 		"blocked":   make(chan error, 1),
@@ -243,49 +208,43 @@ func TestKernelSameRouteFunctionCancellationIsInvocationLocal(t *testing.T) {
 			close(releaseBlocked)
 			kernel.Stop()
 			_ = kernel.Wait(context.Background())
-			t.Fatalf("same-route handlers entered=%v, want both", seen)
+			require.FailNowf(t, "test failed", "same-route handlers entered=%v, want both", seen)
 		}
 	}
 	if err := kernel.Cancel(context.Background(), "cancelled"); err != nil {
 		close(releaseBlocked)
-		t.Fatal(err)
+		require.FailNow(t, "test failed", err)
 	}
 	select {
 	case err := <-results["cancelled"]:
 		if err != nil {
 			close(releaseBlocked)
-			t.Fatalf("cancelled invocation terminal error: %v", err)
+			require.FailNowf(t, "test failed", "cancelled invocation terminal error: %v", err)
 		}
 	case <-time.After(time.Second):
 		close(releaseBlocked)
-		t.Fatal("cancelled invocation did not reach terminal")
+		require.FailNow(t, "test failed", "cancelled invocation did not reach terminal")
 	}
 	select {
 	case err := <-results["blocked"]:
 		close(releaseBlocked)
-		t.Fatalf(
-			"cancelling one same-route invocation completed its peer: %v",
-			err,
-		)
+		require.FailNowf(t, "test failed", "cancelling one same-route invocation completed its peer: %v", err)
 	case <-time.After(25 * time.Millisecond):
 	}
 	close(releaseBlocked)
 	select {
 	case err := <-results["blocked"]:
-		if err != nil {
-			t.Fatalf("blocked invocation terminal error: %v", err)
-		}
+		require.NoError(t, err)
 	case <-time.After(time.Second):
-		t.Fatal("blocked invocation did not complete after release")
+		require.FailNow(t, "test failed", "blocked invocation did not complete after release")
 	}
 
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeExternalUIDLedger(t, uids)
 }
 
@@ -309,9 +268,7 @@ func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 		ID: "method", Generation: oldGeneration,
 		PublicName: "direct",
 	}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	kernel, run, admission, uids := newExternalKernel(t, catalog)
 
 	newGeneration := &functionadapter.HandlerGenerationDeclaration{
@@ -332,62 +289,43 @@ func TestFunctionCatalogMutationUsesKernelLoop(t *testing.T) {
 	mutation, err := catalog.NewMutation(catalog.Census().Version, []functionadapter.RouteChange{{
 		PublicName: "direct", Declaration: &replacement,
 	}})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := kernel.QuiesceFunctions(
-		context.Background(),
-		mutation,
-	); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, kernel.QuiesceFunctions(context.Background(), mutation))
+
 	rejected, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
 		UID: "during-mutation", Route: "direct",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if rejected.Rejected != lifecycle.ControlUnavailable ||
-		catalog.Census().Version != 1 {
-		t.Fatalf(
-			"quiesced catalog decision=%+v census=%+v",
-			rejected,
-			catalog.Census(),
-		)
-	}
+	require.NoError(t, err)
+	require.False(t, rejected.Rejected != lifecycle.ControlUnavailable || catalog.Census().Version != 1)
 	version, err := kernel.CommitFunctions(context.Background(), mutation)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if version != 2 {
-		t.Fatalf("mutation version=%d, want 2", version)
-	}
+	require.NoError(t, err)
+	require.EqualValues(t, 2, version)
 	select {
 	case <-oldCleaned:
 	case <-time.After(time.Second):
-		t.Fatal("retired handler cleanup did not run through TaskSupervisor")
-	}
-	if err := kernel.SubmitAndWait(context.Background(), jobmgr.Request{
-		UID: "after-mutation", Source: lifecycle.SourceFunction, Route: "direct",
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if oldCalls.Load() != 0 || newCalls.Load() != 1 {
-		t.Fatalf("post-mutation dispatch differs: old=%d new=%d", oldCalls.Load(), newCalls.Load())
+		require.FailNow(t, "test failed", "retired handler cleanup did not run through TaskSupervisor")
 	}
 
+	require.NoError(t, kernel.SubmitAndWait(context.Background(), jobmgr.Request{
+		UID: "after-mutation", Source: lifecycle.SourceFunction, Route: "direct",
+	}),
+	)
+
+	require.False(t, oldCalls.Load() != 0 || newCalls.Load() != 1)
+
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
 	select {
 	case <-newCleaned:
 	default:
-		t.Fatal("replacement handler was not cleaned during catalog close")
+		require.FailNow(t, "test failed", "replacement handler was not cleaned during catalog close")
 	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeExternalUIDLedger(t, uids)
 }
 
@@ -410,16 +348,13 @@ func TestFunctionCatalogMutationCancellationAfterHandoffWaitsForDisposition(t *t
 			done <- mutationResult{err: err}
 			return
 		}
-		version, err := kernel.CommitFunctions(
-			context.Background(),
-			mutation,
-		)
+		version, err := kernel.CommitFunctions(context.Background(), mutation)
 		done <- mutationResult{version: version, err: err}
 	}()
 	select {
 	case <-catalog.begun:
 	case <-time.After(time.Second):
-		t.Fatal("Function mutation did not reach catalog admission")
+		require.FailNow(t, "test failed", "Function mutation did not reach catalog admission")
 	}
 	cancel()
 
@@ -438,29 +373,20 @@ func TestFunctionCatalogMutationCancellationAfterHandoffWaitsForDisposition(t *t
 		select {
 		case result = <-done:
 		case <-time.After(time.Second):
-			t.Fatal("accepted Function mutation did not complete")
+			require.FailNow(t, "test failed", "accepted Function mutation did not complete")
 		}
 	}
 
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeExternalUIDLedger(t, uids)
 
-	if early != nil {
-		t.Fatalf(
-			"accepted Function mutation returned before disposition: version=%d err=%v",
-			result.version,
-			result.err,
-		)
-	}
-	if result.version != 2 || result.err != nil {
-		t.Fatalf("Function mutation disposition=%+v, want committed version 2", result)
-	}
+	require.Nil(t, early)
+	require.False(t, result.version != 2 || result.err != nil)
 }
 
 func TestFunctionCatalogPausedMutationAbortsDuringShutdown(t *testing.T) {
@@ -471,36 +397,22 @@ func TestFunctionCatalogPausedMutationAbortsDuringShutdown(t *testing.T) {
 	close(catalog.allow)
 	kernel, run, admission, uids := newExternalKernel(t, catalog)
 	mutation := handoffMutation{}
-	if err := kernel.QuiesceFunctions(
-		context.Background(),
-		mutation,
-	); err != nil {
-		t.Fatal(err)
-	}
-	if !catalog.active.Load() {
-		t.Fatal("quiesced mutation did not remain catalog-owned")
-	}
+
+	require.NoError(t, kernel.QuiesceFunctions(context.Background(), mutation))
+
+	require.True(t, catalog.active.Load())
 
 	kernel.Stop()
-	if err := kernel.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if catalog.active.Load() || !catalog.closed.Load() {
-		t.Fatalf(
-			"shutdown catalog state: active=%v closed=%v",
-			catalog.active.Load(),
-			catalog.closed.Load(),
-		)
-	}
-	if _, err := kernel.CommitFunctions(
-		context.Background(),
-		mutation,
-	); err == nil {
-		t.Fatal("shutdown accepted a paused mutation commit")
-	}
-	if err := admission.CloseDrained(run.Generation()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, kernel.Wait(context.Background()))
+
+	require.False(t, catalog.active.Load() || !catalog.closed.Load())
+
+	_, err := kernel.CommitFunctions(context.Background(), mutation)
+	require.Error(t, err)
+
+	require.NoError(t, admission.CloseDrained(run.Generation()))
+
 	closeExternalUIDLedger(t, uids)
 }
 
@@ -611,20 +523,14 @@ func newExternalKernel(t *testing.T, catalog jobmgr.FunctionCatalogPort) (*jobmg
 	t.Helper()
 	clock := lifecycle.RealClock{}
 	run, err := lifecycle.NewRunSupervisor(1, clock, time.Second)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	t.Cleanup(func() { _ = run.FinishShutdown() })
 	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	kernel, err := jobmgr.NewCommandKernel(
 		run, admission, uids, tasks, frames, clock,
 		make(chan lifecycle.AdmissionGrant, 1), nil,
@@ -632,19 +538,14 @@ func newExternalKernel(t *testing.T, catalog jobmgr.FunctionCatalogPort) (*jobmg
 		jobmgr.RunFinalizerFunc(func(context.Context, uint64) error { return nil }),
 		externalPlanner{}, catalog,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	loop, err := jobmgr.NewKernelLoop(kernel)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := run.OpenAdmission(); err != nil {
-		t.Fatal(err)
-	}
-	if err := loop.Start(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, run.OpenAdmission())
+
+	require.NoError(t, loop.Start(context.Background()))
+
 	return kernel, run, admission, uids
 }
 
@@ -662,9 +563,7 @@ func closeExternalUIDLedger(t *testing.T, ledger *lifecycle.UIDLedger) {
 	t.Helper()
 	for {
 		more, err := ledger.CloseBatch(lifecycle.UIDReturnBatch)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		if !more {
 			return
 		}

@@ -4,149 +4,129 @@ package functions
 
 import (
 	"context"
-	"errors"
 	"io"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	functionwire "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProcessIngressKeepsOneReaderAndLinearizesPauseAdoptFence(t *testing.T) {
 	reader, writer := io.Pipe()
 	ingress, err := NewProcessIngress(reader, lifecycle.NewAdmissionLedger())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	first := newTestProcessInput(1)
 	second := newTestProcessInput(2)
-	if err := ingress.Adopt(context.Background(), ProcessBinding{port: first, admission: ingress.admission}); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: first, admission: ingress.admission}))
+
 	done := make(chan error, 1)
 	go func() { done <- ingress.Run(context.Background()) }()
 
 	writeFunctionLine(t, writer, "first")
 	firstCall := <-first.calls
-	if firstCall.UID != "first" {
-		t.Fatalf("first call differs: %+v", firstCall)
-	}
-	if err := ingress.SealPause(); err != nil {
-		t.Fatal(err)
-	}
+	require.EqualValues(t, "first", firstCall.UID)
+
+	require.NoError(t, ingress.SealPause())
+
 	paused := make(chan error, 1)
 	go func() { paused <- ingress.DrainPause(context.Background(), 2) }()
 	select {
 	case err := <-paused:
-		t.Fatalf("pause bypassed an acquired delivery: %v", err)
+		require.FailNowf(t, "test failed", "pause bypassed an acquired delivery: %v", err)
 	default:
 	}
 	close(first.release)
-	if err := <-paused; err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, <-paused)
 
 	writeFunctionLine(t, writer, "carried")
 	select {
 	case call := <-first.calls:
-		t.Fatalf("paused call reached old run: %+v", call)
+		require.FailNowf(t, "test failed", "paused call reached old run: %+v", call)
 	case call := <-second.calls:
-		t.Fatalf("paused call reached successor before adopt: %+v", call)
+		require.FailNowf(t, "test failed", "paused call reached successor before adopt: %+v", call)
 	default:
 	}
-	if err := ingress.Adopt(context.Background(), ProcessBinding{port: second, admission: ingress.admission}); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: second, admission: ingress.admission}))
+
 	carriedCall := <-second.calls
-	if carriedCall.UID != "carried" {
-		t.Fatalf("carried call differs: %+v", carriedCall)
-	}
+	require.EqualValues(t, "carried", carriedCall.UID)
 	close(second.release)
 	writeFunctionLine(t, writer, "second")
 	secondCall := <-second.calls
-	if secondCall.UID != "second" {
-		t.Fatalf("second call differs: %+v", secondCall)
-	}
-	if err := ingress.Pause(context.Background(), 0); err != nil {
-		t.Fatal(err)
-	}
-	if err := ingress.Fence(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.EqualValues(t, "second", secondCall.UID)
+
+	require.NoError(t, ingress.Pause(context.Background(), 0))
+
+	require.NoError(t, ingress.Fence(context.Background()))
+
 	ingress.boundary.mu.Lock()
-	if ingress.boundary.target != nil ||
+	require.False(t, ingress.boundary.target != nil ||
 		!ingress.boundary.contained ||
-		ingress.boundary.state != ProcessIngressContained {
-		t.Fatalf("final capsule boundary retained a generation capability: %+v", ingress.boundary)
-	}
+		ingress.boundary.state != ProcessIngressContained)
 	ingress.boundary.mu.Unlock()
 	writeFunctionLine(t, writer, "contained")
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
-	if census := ingress.Census(); census.State != ProcessIngressContained ||
+
+	require.NoError(t, writer.Close())
+
+	require.NoError(t, <-done)
+
+	census := ingress.Census()
+	require.False(t, census.State != ProcessIngressContained ||
 		census.ReaderStarts != 1 ||
 		census.RunGeneration != 0 ||
 		census.ActiveDeliveries != 0 ||
-		census.PendingBody {
-		t.Fatalf("final process ingress census differs: %+v", census)
-	}
-	if err := ingress.Run(context.Background()); err == nil {
-		t.Fatal("process input reader started twice")
-	}
+		census.PendingBody)
+
+	require.Error(t, ingress.Run(context.Background()))
 }
 
 func TestProcessIngressTimedOutPauseCanBeRetriedWithoutSplitState(t *testing.T) {
 	reader, writer := io.Pipe()
 	defer writer.Close()
 	ingress, err := NewProcessIngress(reader, lifecycle.NewAdmissionLedger())
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	input := newTestProcessInput(1)
-	if err := ingress.Adopt(context.Background(), ProcessBinding{port: input, admission: ingress.admission}); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, ingress.Adopt(context.Background(), ProcessBinding{port: input, admission: ingress.admission}))
+
 	done := make(chan error, 1)
 	go func() { done <- ingress.Run(context.Background()) }()
 	writeFunctionLine(t, writer, "held")
 	<-input.calls
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 	defer cancel()
-	if err := ingress.Pause(ctx, 0); !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("timed pause result differs: %v", err)
-	}
+
+	require.ErrorIs(t, ingress.Pause(ctx, 0), context.DeadlineExceeded)
+
 	ingress.boundary.mu.Lock()
 	boundaryState := ingress.boundary.state
 	ingress.boundary.mu.Unlock()
-	if census := ingress.Census(); census.State != ProcessIngressLive || boundaryState != ProcessIngressLive {
-		t.Fatalf("timed pause left split state: ingress=%+v boundary=%s", census, boundaryState)
-	}
+
+	census := ingress.Census()
+	require.False(t, census.State != ProcessIngressLive || boundaryState != ProcessIngressLive)
+
 	close(input.release)
-	if err := ingress.Pause(context.Background(), 0); err != nil {
-		t.Fatal(err)
-	}
-	if err := ingress.Fence(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, ingress.Pause(context.Background(), 0))
+
+	require.NoError(t, ingress.Fence(context.Background()))
+
+	require.NoError(t, writer.Close())
+
+	require.NoError(t, <-done)
 }
 
 func writeFunctionLine(t *testing.T, writer io.Writer, uid string) {
 	t.Helper()
 	line := "FUNCTION " + uid + " 30 \"test:work\" 0xFFFF \"method=api,role=test\"\n"
-	if _, err := io.WriteString(writer, line); err != nil {
-		t.Fatal(err)
-	}
+
+	_, err := io.WriteString(writer, line)
+	require.NoError(t, err)
 }
 
 type testProcessInput struct {

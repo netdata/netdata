@@ -6,13 +6,14 @@ import (
 
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/stretchr/testify/require"
 )
 
 func BenchmarkBConfigFactoryCold(b *testing.B) {
 	state := &factoryTestState{}
 	resolver, err := secretresolver.NewAtomicResolver(nil)
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	factory, err := NewConfigModuleFactory(
 		ConfigModuleFactoryConfig{
@@ -28,16 +29,13 @@ func BenchmarkBConfigFactoryCold(b *testing.B) {
 		},
 	)
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	config := factoryTestConfig(false)
 	b.ReportAllocs()
 	for b.Loop() {
-		if err := factory.Validate(
-			context.Background(),
-			config,
-		); err != nil {
-			b.Fatal(err)
+		if err := factory.Validate(context.Background(), config); err != nil {
+			require.FailNow(b, "benchmark failed", err)
 		}
 	}
 }
@@ -47,7 +45,7 @@ func BenchmarkBJobGenerationLookup(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		if generation.State() != JobActive {
-			b.Fatal("job generation state changed")
+			require.FailNow(b, "benchmark failed", "job generation state changed")
 		}
 	}
 }

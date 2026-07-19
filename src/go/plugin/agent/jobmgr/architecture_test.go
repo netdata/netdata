@@ -17,6 +17,8 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -185,9 +187,7 @@ func TestActiveArchitecturePackages(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			dir := filepath.Join(root, name)
 			entries, err := os.ReadDir(dir)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
 			productionFiles := 0
 			for _, entry := range entries {
@@ -198,45 +198,24 @@ func TestActiveArchitecturePackages(t *testing.T) {
 				productionFiles++
 				checkActiveFile(t, name, rule, filepath.Join(dir, entry.Name()), foundOwners)
 			}
-			if productionFiles == 0 {
-				t.Fatal("active package must contain production source")
-			}
+			require.NotEqualValues(t, 0, productionFiles)
 		})
 	}
 
 	for owner := range requiredLifecycleOwners {
-		if foundOwners[owner] == "" {
-			t.Errorf("lifecycle owner %s is not declared", owner)
-		}
+		assert.NotEqualValues(t, "", foundOwners[owner])
 	}
 }
 
 func TestProductionOwnerManifestHasConcreteDeclarations(t *testing.T) {
 	const productionOwnerCount = 37
-	if len(productionOwnerDeclarations) != productionOwnerCount {
-		t.Fatalf(
-			"production owner declarations=%d want=%d",
-			len(productionOwnerDeclarations),
-			productionOwnerCount,
-		)
-	}
+	require.EqualValues(t, productionOwnerCount, len(productionOwnerDeclarations))
 	root := filepath.Clean(filepath.Join(jobmgrSourceRoot(t), "../../.."))
 	for role, owner := range productionOwnerDeclarations {
 		t.Run(role, func(t *testing.T) {
-			found, err := findOwnerDeclaration(
-				filepath.Join(root, owner.packagePath),
-				owner,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if !found {
-				t.Fatalf(
-					"%s has no matching declaration in %s",
-					role,
-					owner.packagePath,
-				)
-			}
+			found, err := findOwnerDeclaration(filepath.Join(root, owner.packagePath), owner)
+			require.NoError(t, err)
+			require.True(t, found)
 		})
 	}
 }
@@ -284,18 +263,16 @@ func assertExactJobManagerTree(t *testing.T) {
 		"secrets":                                  {},
 	}
 	entries, err := os.ReadDir(jobmgrSourceRoot(t))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, entry := range entries {
-		if _, ok := allowed[entry.Name()]; !ok {
-			t.Errorf("unexpected Job Manager root entry %q", entry.Name())
-		}
+		_, ok := allowed[entry.Name()]
+		assert.True(t, ok)
 	}
 	for name := range allowed {
-		if _, err := os.Stat(filepath.Join(jobmgrSourceRoot(t), name)); err != nil {
-			t.Errorf("required Job Manager root entry %q: %v", name, err)
-		}
+
+		_, statErr := os.Stat(filepath.Join(jobmgrSourceRoot(t), name))
+		assert.NoError(t, statErr)
+
 	}
 }
 
@@ -314,15 +291,11 @@ func assertNoIgnoredJobManagerSource(t *testing.T) {
 			if err != nil {
 				return err
 			}
-			if strings.Contains(string(data), "//go:build "+"ignore") {
-				t.Errorf("ignored Job Manager source remains: %s", path)
-			}
+			assert.NotContains(t, string(data), "//go:build "+"ignore")
 			return nil
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 }
 
 func assertRetiredOwnersAbsent(t *testing.T) {
@@ -382,21 +355,16 @@ func assertNoDeclarations(
 ) {
 	t.Helper()
 	files, err := productionGoFiles(dir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for _, path := range files {
 		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		for _, declaration := range file.Decls {
 			switch declaration := declaration.(type) {
 			case *ast.FuncDecl:
 				if declaration.Recv == nil {
-					if _, banned := functions[declaration.Name.Name]; banned {
-						t.Errorf("%s declares retired function %s", path, declaration.Name.Name)
-					}
+					_, banned := functions[declaration.Name.Name]
+					assert.False(t, banned)
 				}
 			case *ast.GenDecl:
 				for _, specification := range declaration.Specs {
@@ -404,9 +372,9 @@ func assertNoDeclarations(
 					if !ok {
 						continue
 					}
-					if _, banned := types[typeSpec.Name.Name]; banned {
-						t.Errorf("%s declares retired type %s", path, typeSpec.Name.Name)
-					}
+
+					_, banned := types[typeSpec.Name.Name]
+					assert.False(t, banned)
 				}
 			}
 		}
@@ -501,21 +469,15 @@ func checkActiveFile(
 	t.Helper()
 
 	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	fset := token.NewFileSet()
 	file, err := parser.ParseFile(fset, path, data, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	for _, decl := range file.Decls {
 		switch decl := decl.(type) {
 		case *ast.FuncDecl:
-			if decl.Recv == nil && decl.Name.Name == "init" {
-				t.Errorf("%s declares init", path)
-			}
+			assert.False(t, decl.Recv == nil && decl.Name.Name == "init")
 		case *ast.GenDecl:
 			for _, spec := range decl.Specs {
 				typeSpec, ok := spec.(*ast.TypeSpec)
@@ -528,10 +490,10 @@ func checkActiveFile(
 				if _, required := requiredLifecycleOwners[typeSpec.Name.Name]; !required {
 					continue
 				}
-				if previous := foundOwners[typeSpec.Name.Name]; previous != "" {
-					t.Errorf("lifecycle owner %s is declared in both %s and %s",
-						typeSpec.Name.Name, previous, path)
-				}
+
+				previous := foundOwners[typeSpec.Name.Name]
+				assert.EqualValues(t, "", previous)
+
 				foundOwners[typeSpec.Name.Name] = path
 			}
 		}
@@ -539,12 +501,8 @@ func checkActiveFile(
 
 	for _, imported := range file.Imports {
 		importPath, err := strconv.Unquote(imported.Path.Value)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if importPath == "C" {
-			t.Errorf("%s imports cgo", path)
-		}
+		require.NoError(t, err)
+		assert.NotEqualValues(t, "C", importPath)
 		checkActiveImport(t, packageName, rule, importPath, path)
 	}
 }
@@ -574,20 +532,12 @@ func TestNoExperimentalIdentity(t *testing.T) {
 				}
 				lower := strings.ToLower(string(data))
 				for _, token := range forbidden {
-					if strings.Contains(lower, token) {
-						t.Errorf(
-							"%s contains experimental identity %q",
-							path,
-							token,
-						)
-					}
+					assert.NotContains(t, lower, token)
 				}
 				return nil
 			},
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	}
 }
 
@@ -601,10 +551,7 @@ func checkActiveImport(
 	t.Helper()
 
 	if rule.neutral {
-		if strings.HasPrefix(importPath, "github.com/netdata/netdata/go/plugins/") {
-			t.Errorf("neutral lifecycle package imports Agent/domain package %q in %s",
-				importPath, path)
-		}
+		assert.False(t, strings.HasPrefix(importPath, "github.com/netdata/netdata/go/plugins/"))
 		return
 	}
 	if rule.mayImportSiblings {
@@ -613,10 +560,7 @@ func checkActiveImport(
 	if importPath == jobmgrImportPath || importPath == lifecycleImportPath {
 		return
 	}
-	if strings.HasPrefix(importPath, jobmgrImportPath+"/") {
-		t.Errorf("adapter package %s imports sibling adapter %q in %s",
-			packageName, importPath, path)
-	}
+	assert.False(t, strings.HasPrefix(importPath, jobmgrImportPath+"/"))
 }
 
 type constructionCounts struct {
@@ -664,15 +608,13 @@ func TestProductionConstructionChain(t *testing.T) {
 			counts, err := inspectConstructionFiles(
 				[]string{filepath.Join(root, path)},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := validateConstructionContract(
+			require.NoError(t, err)
+
+			require.NoError(t, validateConstructionContract(
 				counts,
 				constructionContract{agentNew: 1, hostRun: 1},
-			); err != nil {
-				t.Fatalf("%s: %v", path, err)
-			}
+			),
+			)
 		})
 	}
 
@@ -696,19 +638,11 @@ func TestProductionConstructionChain(t *testing.T) {
 	for name, test := range packages {
 		t.Run(name, func(t *testing.T) {
 			files, err := productionGoFiles(filepath.Join(root, test.path))
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			counts, err := inspectConstructionFiles(files)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := validateConstructionContract(
-				counts,
-				test.contract,
-			); err != nil {
-				t.Fatalf("%s: %v", test.path, err)
-			}
+			require.NoError(t, err)
+
+			require.NoError(t, validateConstructionContract(counts, test.contract))
 		})
 	}
 }
@@ -716,18 +650,9 @@ func TestProductionConstructionChain(t *testing.T) {
 func TestProductionCompositionConstructsOneSecretAuthoritySet(
 	t *testing.T,
 ) {
-	root := filepath.Clean(
-		filepath.Join(jobmgrSourceRoot(t), "../../.."),
-	)
-	files, err := productionGoFiles(
-		filepath.Join(
-			root,
-			"plugin/agent/jobmgr/composition",
-		),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	root := filepath.Clean(filepath.Join(jobmgrSourceRoot(t), "../../.."))
+	files, err := productionGoFiles(filepath.Join(root, "plugin/agent/jobmgr/composition"))
+	require.NoError(t, err)
 	calls := map[string]struct {
 		importPath string
 		function   string
@@ -749,42 +674,20 @@ func TestProductionCompositionConstructsOneSecretAuthoritySet(
 	}
 	for name, call := range calls {
 		t.Run(name, func(t *testing.T) {
-			got, err := countImportedCalls(
-				files,
-				call.importPath,
-				call.function,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got != call.want {
-				t.Fatalf(
-					"%s.%s calls=%d want=%d",
-					call.importPath,
-					call.function,
-					got,
-					call.want,
-				)
-			}
+			got, err := countImportedCalls(files, call.importPath, call.function)
+			require.NoError(t, err)
+			require.EqualValues(t, call.want, got)
 		})
 	}
 	for _, path := range files {
 		data, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		source := string(data)
 		for _, forbidden := range []string{
 			jobmgrImportPath + "/secretsctl",
 			"secretstore.NewService(",
 		} {
-			if strings.Contains(source, forbidden) {
-				t.Fatalf(
-					"active composition %s retains %q",
-					path,
-					forbidden,
-				)
-			}
+			require.NotContains(t, source, forbidden)
 		}
 	}
 }
@@ -792,18 +695,9 @@ func TestProductionCompositionConstructsOneSecretAuthoritySet(
 func TestProductionCompositionConstructsOneDiscoveryAuthoritySet(
 	t *testing.T,
 ) {
-	root := filepath.Clean(
-		filepath.Join(jobmgrSourceRoot(t), "../../.."),
-	)
-	files, err := productionGoFiles(
-		filepath.Join(
-			root,
-			"plugin/agent/jobmgr/composition",
-		),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	root := filepath.Clean(filepath.Join(jobmgrSourceRoot(t), "../../.."))
+	files, err := productionGoFiles(filepath.Join(root, "plugin/agent/jobmgr/composition"))
+	require.NoError(t, err)
 	calls := map[string]struct {
 		importPath string
 		function   string
@@ -821,23 +715,9 @@ func TestProductionCompositionConstructsOneDiscoveryAuthoritySet(
 	}
 	for name, call := range calls {
 		t.Run(name, func(t *testing.T) {
-			got, err := countImportedCalls(
-				files,
-				call.importPath,
-				call.function,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if got != call.want {
-				t.Fatalf(
-					"%s.%s calls=%d want=%d",
-					call.importPath,
-					call.function,
-					got,
-					call.want,
-				)
-			}
+			got, err := countImportedCalls(files, call.importPath, call.function)
+			require.NoError(t, err)
+			require.EqualValues(t, call.want, got)
 		})
 	}
 }
@@ -927,19 +807,10 @@ func TestProductionConstructionGuardRejectsAdversarialSources(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			counts, err := inspectConstructionSource(
-				name+".go",
-				test.source,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := validateConstructionContract(
-				counts,
-				test.contract,
-			); err == nil {
-				t.Fatal("adversarial construction source was accepted")
-			}
+			counts, err := inspectConstructionSource(name+".go", test.source)
+			require.NoError(t, err)
+
+			require.Error(t, validateConstructionContract(counts, test.contract))
 		})
 	}
 }
@@ -1001,10 +872,7 @@ func countImportedCalls(
 				name = imported.Name.Name
 			}
 			if name == "." {
-				return 0, fmt.Errorf(
-					"architecture guard: dot import %q",
-					importPath,
-				)
+				return 0, fmt.Errorf("architecture guard: dot import %q", importPath)
 			}
 			if name != "_" {
 				qualifiers[name] = struct{}{}
@@ -1080,10 +948,7 @@ func inspectConstructionSource(
 			continue
 		case ".":
 			if isConstructionImport(importPath) {
-				return constructionCounts{}, fmt.Errorf(
-					"architecture guard: dot import %q",
-					importPath,
-				)
+				return constructionCounts{}, fmt.Errorf("architecture guard: dot import %q", importPath)
 			}
 		default:
 			imports[name] = importPath
@@ -1128,10 +993,7 @@ func inspectConstructionSource(
 	})
 	counts.rootHandoff = constructionRootHandoff(file, imports)
 	counts.agentProcessRun = constructionAgentProcessRun(file, imports)
-	counts.compositionRunPath = constructionCompositionRunPath(
-		file,
-		imports,
-	)
+	counts.compositionRunPath = constructionCompositionRunPath(file, imports)
 	return counts, nil
 }
 
@@ -1366,10 +1228,7 @@ func bodyCallsIdentifier(body *ast.BlockStmt, name string) bool {
 func bodyCallsSelector(body *ast.BlockStmt, want []string) bool {
 	found := false
 	inspectConstructionBody(body, func(call *ast.CallExpr) {
-		found = found || reflect.DeepEqual(
-			selectorParts(call.Fun),
-			want,
-		)
+		found = found || reflect.DeepEqual(selectorParts(call.Fun), want)
 	})
 	return found
 }
@@ -1426,32 +1285,16 @@ func validateConstructionContract(
 ) error {
 	var result error
 	if counts.agentNew != want.agentNew {
-		result = errors.Join(result, fmt.Errorf(
-			"agent.New calls=%d want=%d",
-			counts.agentNew,
-			want.agentNew,
-		))
+		result = errors.Join(result, fmt.Errorf("agent.New calls=%d want=%d", counts.agentNew, want.agentNew))
 	}
 	if counts.hostRun != want.hostRun {
-		result = errors.Join(result, fmt.Errorf(
-			"agenthost.Run calls=%d want=%d",
-			counts.hostRun,
-			want.hostRun,
-		))
+		result = errors.Join(result, fmt.Errorf("agenthost.Run calls=%d want=%d", counts.hostRun, want.hostRun))
 	}
 	if counts.processNew != want.processNew {
-		result = errors.Join(result, fmt.Errorf(
-			"composition.NewProcess calls=%d want=%d",
-			counts.processNew,
-			want.processNew,
-		))
+		result = errors.Join(result, fmt.Errorf("composition.NewProcess calls=%d want=%d", counts.processNew, want.processNew))
 	}
 	if counts.retiredNew != want.retiredNew {
-		result = errors.Join(result, fmt.Errorf(
-			"retired jobmgr.New calls=%d want=%d",
-			counts.retiredNew,
-			want.retiredNew,
-		))
+		result = errors.Join(result, fmt.Errorf("retired jobmgr.New calls=%d want=%d", counts.retiredNew, want.retiredNew))
 	}
 	if counts.commandKernel != want.commandKernel {
 		result = errors.Join(result, fmt.Errorf(
@@ -1462,20 +1305,10 @@ func validateConstructionContract(
 	}
 	if want.agentNew != 0 && want.hostRun != 0 &&
 		!counts.rootHandoff {
-		result = errors.Join(
-			result,
-			errors.New(
-				"agent.New result does not reach agenthost.Run from main",
-			),
-		)
+		result = errors.Join(result, errors.New("agent.New result does not reach agenthost.Run from main"))
 	}
 	if want.processNew != 0 && !counts.agentProcessRun {
-		result = errors.Join(
-			result,
-			errors.New(
-				"Agent.run does not run its composition.NewProcess result",
-			),
-		)
+		result = errors.Join(result, errors.New("Agent.run does not run its composition.NewProcess result"))
 	}
 	if want.commandKernel != 0 &&
 		counts.compositionRunPath != completeCompositionRunPath {
@@ -1489,39 +1322,30 @@ func validateConstructionContract(
 }
 
 func TestWorkPlanCannotCarryKernelLoopAbandonCallback(t *testing.T) {
-	if _, found := reflect.TypeOf(jobmgr.WorkPlan{}).FieldByName("Abandon"); found {
-		t.Fatal("WorkPlan exposes an opaque abandonment callback to KernelLoop")
-	}
+	_, found := reflect.TypeOf(jobmgr.WorkPlan{}).FieldByName("Abandon")
+	require.False(t, found)
 }
 
 func TestCommandKernelUsesSourceSpecificPlanningPorts(t *testing.T) {
 	constructor := reflect.TypeOf(jobmgr.NewCommandKernel)
 	planner := reflect.TypeOf((*jobmgr.Planner)(nil)).Elem()
 	functionCatalog := reflect.TypeOf((*jobmgr.FunctionCatalogPort)(nil)).Elem()
-	if constructor.NumIn() < 2 ||
+	require.False(t, constructor.NumIn() < 2 ||
 		constructor.In(constructor.NumIn()-2) != planner ||
-		constructor.In(constructor.NumIn()-1) != functionCatalog {
-		t.Fatalf("CommandKernel constructor does not end in Planner, FunctionCatalogPort: %v", constructor)
-	}
+		constructor.In(constructor.NumIn()-1) != functionCatalog)
 	for index := 0; index < constructor.NumIn(); index++ {
-		if constructor.In(index).Kind() == reflect.Map {
-			t.Fatalf("CommandKernel constructor accepts generic source-indexed port map at argument %d", index)
-		}
+		require.NotEqualValues(t, reflect.Map, constructor.In(index).Kind())
 	}
 
 	data, err := os.ReadFile(filepath.Join(jobmgrSourceRoot(t), "kernel.go"))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	source := string(data)
 	for _, forbidden := range []string{
 		"map[lifecycle.Source]Planner",
 		"planners[request.Source]",
 		"preparePlan(request Request)",
 	} {
-		if strings.Contains(source, forbidden) {
-			t.Fatalf("CommandKernel retains generic Function planner carrier %q", forbidden)
-		}
+		require.NotContains(t, source, forbidden)
 	}
 }
 
@@ -1529,8 +1353,6 @@ func jobmgrSourceRoot(t *testing.T) string {
 	t.Helper()
 
 	root, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return root
 }

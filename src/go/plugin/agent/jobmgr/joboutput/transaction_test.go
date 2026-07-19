@@ -4,11 +4,11 @@ package joboutput
 
 import (
 	"context"
-	"reflect"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPreparedResourceTransactionCommitsOrRestoresWholePostimage(t *testing.T) {
@@ -56,9 +56,7 @@ func TestPreparedResourceTransactionCommitsOrRestoresWholePostimage(t *testing.T
 				ID: "job", Module: "module", Name: "job",
 				Payload: []byte(`{"version":1}`),
 			}})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			mutation, err := graph.PrepareMutation([]dyncfg.GraphChange{{
 				ID: "job",
 				Config: &dyncfg.GraphConfig{
@@ -66,17 +64,9 @@ func TestPreparedResourceTransactionCommitsOrRestoresWholePostimage(t *testing.T
 					Payload: []byte(`{"version":2}`),
 				},
 			}})
-			if err != nil {
-				t.Fatal(err)
-			}
-			result, err := lifecycle.NewSealedResult(
-				200,
-				"application/json",
-				[]byte(`{"accepted":true}`),
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
+			result, err := lifecycle.NewSealedResult(200, "application/json", []byte(`{"accepted":true}`))
+			require.NoError(t, err)
 			transaction, err := PrepareResourceTransaction(
 				ResourceTransactionSpec{
 					Scope: lifecycle.ResourceTransactionScope{
@@ -95,38 +85,25 @@ func TestPreparedResourceTransactionCommitsOrRestoresWholePostimage(t *testing.T
 					Cleanup: func() error { return nil },
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 
 			if test.apply {
-				if _, err := transaction.Apply(context.Background()); err != nil {
-					t.Fatal(err)
-				}
+
+				_, applyErr2 := transaction.Apply(context.Background())
+				require.NoError(t, applyErr2)
+
 			} else {
 				restored, err := transaction.Dispose(context.Background())
-				if err != nil {
-					t.Fatal(err)
-				}
-				if restored != current {
-					t.Fatal("disposal did not return the exact current resource")
-				}
+				require.NoError(t, err)
+				require.Same(t, current, restored)
 			}
 			record, ok := graph.Lookup("job")
-			if !ok || record.Payload() != test.wantPayload {
-				t.Fatalf(
-					"graph record=%#v ok=%v, want payload %s",
-					record,
-					ok,
-					test.wantPayload,
-				)
-			}
-			if !reflect.DeepEqual(events, test.wantEvents) {
-				t.Fatalf("events=%v, want %v", events, test.wantEvents)
-			}
-			if _, err := transaction.Apply(context.Background()); err == nil {
-				t.Fatal("consumed transaction applied twice")
-			}
+			require.False(t, !ok || record.Payload() != test.wantPayload)
+			require.Equal(t, test.wantEvents, events)
+
+			_, applyErr := transaction.Apply(context.Background())
+			require.Error(t, applyErr)
+
 		})
 	}
 }
@@ -170,37 +147,25 @@ func (ttrr *transactionTestReadyResource) Identity() lifecycle.ResourceIdentity 
 }
 
 func (ttrr *transactionTestReadyResource) Publish() error {
-	*ttrr.events = append(
-		*ttrr.events,
-		ttrr.prefix+"-publish",
-	)
+	*ttrr.events = append(*ttrr.events, ttrr.prefix+"-publish")
 	return nil
 }
 
 func (ttrr *transactionTestReadyResource) AbortReady(
 	context.Context,
 ) error {
-	*ttrr.events = append(
-		*ttrr.events,
-		ttrr.prefix+"-abort",
-	)
+	*ttrr.events = append(*ttrr.events, ttrr.prefix+"-abort")
 	return nil
 }
 
 func (ttrr *transactionTestReadyResource) Stop(
 	context.Context,
 ) error {
-	*ttrr.events = append(
-		*ttrr.events,
-		ttrr.prefix+"-stop",
-	)
+	*ttrr.events = append(*ttrr.events, ttrr.prefix+"-stop")
 	return nil
 }
 
 func (ttrr *transactionTestReadyResource) Finalize() error {
-	*ttrr.events = append(
-		*ttrr.events,
-		ttrr.prefix+"-finalize",
-	)
+	*ttrr.events = append(*ttrr.events, ttrr.prefix+"-finalize")
 	return nil
 }

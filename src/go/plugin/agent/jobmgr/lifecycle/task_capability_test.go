@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestTaskSupervisorCommitsPreparedCapabilityWithoutReadyResource(t *testing.T) {
@@ -15,9 +17,7 @@ func TestTaskSupervisorCommitsPreparedCapabilityWithoutReadyResource(t *testing.
 	admissionRef := grantLongLivedTestAdmission(t, admission, 100)
 	supervisor := newLongLivedTestSupervisor(t)
 	permitPlan, err := NewSecretStoreLongLivedPlan(40)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	identity := ResourceIdentity{ID: "secret", Generation: 1}
 	var capability *testPreparedCapability
 	plan, err := NewPreparedCapabilityPermitTaskPlan(SourceJobManager, time.Time{}, TransactionTaskPhases, admission, admissionRef, identity, permitPlan,
@@ -28,35 +28,29 @@ func TestTaskSupervisorCommitsPreparedCapabilityWithoutReadyResource(t *testing.
 			capability = &testPreparedCapability{identity: identity, permit: permit}
 			return capability, nil
 		})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ref := dispatchCapabilityTask(t, supervisor, plan)
-	if completion := <-supervisor.CompletionCh(); completion.Ref != ref || completion.Kind != TaskOutcomePreparedCapability || completion.Err != nil {
-		t.Fatalf("prepared capability completion differs: %+v", completion)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionCommitCapability, ExpectedGeneration: 1}); err != nil {
-		t.Fatal(err)
-	}
+
+	completion := <-supervisor.CompletionCh()
+	require.False(t, completion.Ref != ref || completion.Kind != TaskOutcomePreparedCapability || completion.Err != nil)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionCommitCapability, ExpectedGeneration: 1}))
+
 	ack := <-supervisor.AcknowledgementCh()
-	if ack.Err != nil || ack.CapabilityDisposition != CapabilityApplied {
-		t.Fatalf("capability commit acknowledgement differs: %+v", ack)
-	}
-	if err := capability.releaseCarrier(); err != nil {
-		t.Fatal(err)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil || ack.Kind != TaskActionTerminate {
-		t.Fatalf("capability termination differs: %+v", ack)
-	}
-	if err := supervisor.Release(ref); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := admission.ReleaseOrdinary(admissionRef); err != nil {
-		t.Fatal(err)
-	}
+	require.False(t, ack.Err != nil || ack.CapabilityDisposition != CapabilityApplied)
+
+	require.NoError(t, capability.releaseCarrier())
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+
+	acknowledgementCh := <-supervisor.AcknowledgementCh()
+	require.False(t, acknowledgementCh.Err != nil || acknowledgementCh.Kind != TaskActionTerminate)
+
+	require.NoError(t, supervisor.Release(ref))
+
+	_, releaseOrdinaryErr := admission.ReleaseOrdinary(admissionRef)
+	require.NoError(t, releaseOrdinaryErr)
+
 }
 
 func TestTaskSupervisorRetainsPreparedCapabilityAfterCommitPanic(t *testing.T) {
@@ -64,9 +58,7 @@ func TestTaskSupervisorRetainsPreparedCapabilityAfterCommitPanic(t *testing.T) {
 	admissionRef := grantLongLivedTestAdmission(t, admission, 100)
 	supervisor := newLongLivedTestSupervisor(t)
 	permitPlan, err := NewSecretStoreLongLivedPlan(40)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	identity := ResourceIdentity{ID: "secret", Generation: 1}
 	var capability *testPreparedCapability
 	plan, err := NewPreparedCapabilityPermitTaskPlan(SourceJobManager, time.Time{}, TransactionTaskPhases, admission, admissionRef, identity, permitPlan,
@@ -77,36 +69,29 @@ func TestTaskSupervisorRetainsPreparedCapabilityAfterCommitPanic(t *testing.T) {
 			capability = &testPreparedCapability{identity: identity, permit: permit, panicCommit: true}
 			return capability, nil
 		})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ref := dispatchCapabilityTask(t, supervisor, plan)
 	<-supervisor.CompletionCh()
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionCommitCapability, ExpectedGeneration: 1}); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionCommitCapability, ExpectedGeneration: 1}))
+
 	ack := <-supervisor.AcknowledgementCh()
-	if !errors.Is(ack.Err, ErrTaskPanic) || ack.CapabilityDisposition != CapabilityRetained {
-		t.Fatalf("capability panic acknowledgement differs: %+v", ack)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionDispose}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil || ack.Kind != TaskActionDispose {
-		t.Fatalf("capability disposal differs: %+v", ack)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatalf("capability termination differs: %+v", ack)
-	}
-	if err := supervisor.Release(ref); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := admission.ReleaseOrdinary(admissionRef); err != nil {
-		t.Fatal(err)
-	}
+	require.False(t, !errors.Is(ack.Err, ErrTaskPanic) || ack.CapabilityDisposition != CapabilityRetained)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionDispose}))
+
+	acknowledgementCh := <-supervisor.AcknowledgementCh()
+	require.False(t, acknowledgementCh.Err != nil || acknowledgementCh.Kind != TaskActionDispose)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 4, Kind: TaskActionTerminate}))
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.NoError(t, supervisor.Release(ref))
+
+	_, releaseOrdinaryErr := admission.ReleaseOrdinary(admissionRef)
+	require.NoError(t, releaseOrdinaryErr)
+
 }
 
 func TestTaskSupervisorDisposesPreparedCapabilityWithWrongPermitOwner(t *testing.T) {
@@ -114,9 +99,7 @@ func TestTaskSupervisorDisposesPreparedCapabilityWithWrongPermitOwner(t *testing
 	admissionRef := grantLongLivedTestAdmission(t, admission, 100)
 	supervisor := newLongLivedTestSupervisor(t)
 	permitPlan, err := NewSecretStoreLongLivedPlan(40)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	permitOwner := ResourceIdentity{ID: "secret", Generation: 1}
 	wrongOwner := ResourceIdentity{ID: "other-secret", Generation: 1}
 	plan, err := NewPreparedCapabilityPermitTaskPlan(SourceJobManager, time.Time{}, TransactionTaskPhases, admission, admissionRef, permitOwner, permitPlan,
@@ -126,35 +109,27 @@ func TestTaskSupervisorDisposesPreparedCapabilityWithWrongPermitOwner(t *testing
 			}
 			return &testPreparedCapability{identity: wrongOwner, permit: permit}, nil
 		})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ref := dispatchCapabilityTask(t, supervisor, plan)
 	completion := <-supervisor.CompletionCh()
-	if completion.Ref != ref || completion.Kind != TaskOutcomePreparedCapability || completion.Err == nil || !strings.Contains(completion.Err.Error(), "prepared capability identity differs from permit owner") {
-		t.Fatalf("wrong-owner completion differs: %+v", completion)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil || ack.Kind != TaskActionDispose {
-		t.Fatalf("wrong-owner disposal differs: %+v", ack)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatalf("wrong-owner termination differs: %+v", ack)
-	}
-	if err := supervisor.Release(ref); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := admission.ReleaseOrdinary(admissionRef); err != nil {
-		t.Fatal(err)
-	}
-	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{}) {
-		t.Fatalf("wrong-owner capability retained permit: %+v", census)
-	}
+	require.False(t, completion.Ref != ref || completion.Kind != TaskOutcomePreparedCapability || completion.Err == nil || !strings.Contains(completion.Err.Error(), "prepared capability identity differs from permit owner"))
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+
+	ack := <-supervisor.AcknowledgementCh()
+	require.False(t, ack.Err != nil || ack.Kind != TaskActionDispose)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.NoError(t, supervisor.Release(ref))
+
+	_, releaseOrdinaryErr := admission.ReleaseOrdinary(admissionRef)
+	require.NoError(t, releaseOrdinaryErr)
+
+	census := supervisor.LongLivedCensus()
+	require.EqualValues(t, (LongLivedCensus{}), census)
 }
 
 func TestTaskSupervisorDisposesPreparedCapabilityAfterIdentityPanic(t *testing.T) {
@@ -162,9 +137,7 @@ func TestTaskSupervisorDisposesPreparedCapabilityAfterIdentityPanic(t *testing.T
 	admissionRef := grantLongLivedTestAdmission(t, admission, 100)
 	supervisor := newLongLivedTestSupervisor(t)
 	permitPlan, err := NewSecretStoreLongLivedPlan(40)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	permitOwner := ResourceIdentity{ID: "secret", Generation: 1}
 	plan, err := NewPreparedCapabilityPermitTaskPlan(SourceJobManager, time.Time{}, TransactionTaskPhases, admission, admissionRef, permitOwner, permitPlan,
 		func(_ context.Context, permit LongLivedPermit) (PreparedCapability, error) {
@@ -173,48 +146,36 @@ func TestTaskSupervisorDisposesPreparedCapabilityAfterIdentityPanic(t *testing.T
 			}
 			return &testPreparedCapability{identity: permitOwner, permit: permit, panicIdentity: true}, nil
 		})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ref := dispatchCapabilityTask(t, supervisor, plan)
 	completion := <-supervisor.CompletionCh()
-	if completion.Ref != ref || completion.Kind != TaskOutcomePreparedCapability || completion.Err == nil || !strings.Contains(completion.Err.Error(), "prepared capability identity panic") {
-		t.Fatalf("identity-panic completion differs: %+v", completion)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil || ack.Kind != TaskActionDispose {
-		t.Fatalf("identity-panic disposal differs: %+v", ack)
-	}
-	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatalf("identity-panic termination differs: %+v", ack)
-	}
-	if err := supervisor.Release(ref); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := admission.ReleaseOrdinary(admissionRef); err != nil {
-		t.Fatal(err)
-	}
-	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{}) {
-		t.Fatalf("identity-panic capability retained permit: %+v", census)
-	}
+	require.False(t, completion.Ref != ref || completion.Kind != TaskOutcomePreparedCapability || completion.Err == nil || !strings.Contains(completion.Err.Error(), "prepared capability identity panic"))
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 2, Kind: TaskActionDispose}))
+
+	ack := <-supervisor.AcknowledgementCh()
+	require.False(t, ack.Err != nil || ack.Kind != TaskActionDispose)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}))
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.NoError(t, supervisor.Release(ref))
+
+	_, releaseOrdinaryErr := admission.ReleaseOrdinary(admissionRef)
+	require.NoError(t, releaseOrdinaryErr)
+
+	census := supervisor.LongLivedCensus()
+	require.EqualValues(t, (LongLivedCensus{}), census)
 }
 
 func dispatchCapabilityTask(t *testing.T, supervisor *TaskSupervisor, plan TaskPlan) TaskRef {
 	t.Helper()
 	request, err := supervisor.Enqueue(TaskClassFrameworkControl, plan)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	var starts [TaskStartServiceQuantum]TaskStart
 	count, _, err := supervisor.Dispatch(context.Background(), 1, &starts)
-	if err != nil || count != 1 || starts[0].Request != request {
-		t.Fatalf("capability dispatch differs: count=%d start=%+v err=%v", count, starts[0], err)
-	}
+	require.False(t, err != nil || count != 1 || starts[0].Request != request)
 	return starts[0].Task
 }
 

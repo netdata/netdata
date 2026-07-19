@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
@@ -19,40 +20,22 @@ func TestSecretJobSummariesAreBounded(t *testing.T) {
 			names: func() []string {
 				names := make([]string, 1_000)
 				for index := range names {
-					names[index] = fmt.Sprintf(
-						"module:job-%04d",
-						index,
-					)
+					names[index] = fmt.Sprintf("module:job-%04d", index)
 				}
 				return names
 			}(),
 		},
 		"one oversized job": {
 			names: []string{
-				strings.Repeat(
-					"x",
-					maximumSecretJobSummaryBytes*2,
-				),
+				strings.Repeat("x", maximumSecretJobSummaryBytes*2),
 			},
 		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			summary := formatSecretJobNames(test.names)
-			if len(summary) >
-				maximumSecretJobSummaryBytes {
-				t.Fatalf(
-					"summary bytes=%d exceed cap=%d",
-					len(summary),
-					maximumSecretJobSummaryBytes,
-				)
-			}
-			if !strings.Contains(summary, "more") {
-				t.Fatalf(
-					"bounded summary lacks omitted-count suffix: %q",
-					summary,
-				)
-			}
+			require.False(t, len(summary) > maximumSecretJobSummaryBytes)
+			require.Contains(t, summary, "more")
 		})
 	}
 }
@@ -71,18 +54,8 @@ func TestSecretImpactMessageHasOneCombinedBound(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			message := secretImpactMessage(
-				summary,
-				summary,
-				test.validationOnly,
-			)
-			if len(message) > maximumSecretJobSummaryBytes {
-				t.Fatalf(
-					"impact message bytes=%d exceed cap=%d",
-					len(message),
-					maximumSecretJobSummaryBytes,
-				)
-			}
+			message := secretImpactMessage(summary, summary, test.validationOnly)
+			require.False(t, len(message) > maximumSecretJobSummaryBytes)
 		})
 	}
 }
@@ -115,9 +88,7 @@ func TestSecretDependencyIndexTracksAcknowledgedPostimages(t *testing.T) {
 					"${store:" + key + ":value}"
 			}
 			payload, err := yaml.Marshal(config)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			commit, err := index.PrepareJobChange(
 				test.id,
 				&dyncfg.GraphConfig{
@@ -126,34 +97,24 @@ func TestSecretDependencyIndexTracksAcknowledgedPostimages(t *testing.T) {
 					Status: test.status.String(), Payload: payload,
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			commit()
 		})
 	}
 
-	if refs := index.Affected("vault:main", false); len(refs) != 2 {
-		t.Fatalf("all affected=%+v", refs)
-	}
-	if refs := index.Affected("vault:main", true); len(refs) != 1 ||
-		refs[0].ID != "module_one" {
-		t.Fatalf("running affected=%+v", refs)
-	}
+	require.EqualValues(t, 2, len(index.Affected("vault:main", false)))
+
+	refs := index.Affected("vault:main", true)
+	require.False(t, len(refs) != 1 || refs[0].ID != "module_one")
+
 	commit, err := index.PrepareJobChange("module_one", nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commit()
-	if refs := index.Affected("aws-sm:prod", false); len(refs) != 0 {
-		t.Fatalf("removed job retained dependencies=%+v", refs)
-	}
-	if census := index.Census(); census.Jobs != 1 ||
-		census.StoreKeys != 1 ||
-		census.References != 1 ||
-		census.Commits != 3 {
-		t.Fatalf("dependency census=%+v", census)
-	}
+
+	require.EqualValues(t, 0, len(index.Affected("aws-sm:prod", false)))
+
+	census := index.Census()
+	require.False(t, census.Jobs != 1 || census.StoreKeys != 1 || census.References != 1 || census.Commits != 3)
 }
 
 func BenchmarkBSecretDependencyLookup(b *testing.B) {
@@ -170,7 +131,7 @@ func BenchmarkBSecretDependencyLookup(b *testing.B) {
 			"secret": "${store:" + key + ":value}",
 		})
 		if err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		commit, err := index.PrepareJobChange(
 			id,
@@ -180,7 +141,7 @@ func BenchmarkBSecretDependencyLookup(b *testing.B) {
 			},
 		)
 		if err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		commit()
 	}
@@ -188,7 +149,7 @@ func BenchmarkBSecretDependencyLookup(b *testing.B) {
 	b.ResetTimer()
 	for b.Loop() {
 		if refs := index.Affected("vault:target", true); len(refs) != 3 {
-			b.Fatal(len(refs))
+			require.FailNow(b, "benchmark failed", len(refs))
 		}
 	}
 }

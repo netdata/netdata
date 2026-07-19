@@ -10,6 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	functionwire "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFunctionIngressLeavesResourceSelectionToCatalog(t *testing.T) {
@@ -38,35 +39,15 @@ func TestFunctionIngressLeavesResourceSelectionToCatalog(t *testing.T) {
 				lifecycle.RealClock{},
 				func() {},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := ingress.HandleCall(
-				context.Background(),
-				test.call,
-			); err != nil {
-				t.Fatal(err)
-			}
-			if len(port.requests) != 1 {
-				t.Fatalf("submissions=%d want=1", len(port.requests))
-			}
+			require.NoError(t, err)
+
+			require.NoError(t, ingress.HandleCall(context.Background(), test.call))
+
+			require.EqualValues(t, 1, len(port.requests))
 			request := port.requests[0]
-			if request.Source != lifecycle.SourceFunction {
-				t.Fatalf("source=%v want Function", request.Source)
-			}
-			if request.LaneKey != "" {
-				t.Fatalf(
-					"ingress preselected catalog resource %q",
-					request.LaneKey,
-				)
-			}
-			if request.Route != test.call.Method {
-				t.Fatalf(
-					"route=%q want=%q",
-					request.Route,
-					test.call.Method,
-				)
-			}
+			require.EqualValues(t, lifecycle.SourceFunction, request.Source)
+			require.EqualValues(t, "", request.LaneKey)
+			require.EqualValues(t, test.call.Method, request.Route)
 		})
 	}
 }

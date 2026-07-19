@@ -5,7 +5,6 @@ package composition
 import (
 	"bytes"
 	"context"
-	"errors"
 	"fmt"
 	"sync"
 	"sync/atomic"
@@ -22,6 +21,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
@@ -73,9 +73,7 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveryPipeline(
 			jobs.Graph = fullCapacityInitialJobs(t, test.jobs)
 
 			frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			admission := lifecycle.NewAdmissionLedger()
 			uids := lifecycle.NewUIDLedger()
 			generation, err := newRunGeneration(runGenerationConfig{
@@ -93,33 +91,26 @@ func TestRunGenerationGrowsBeyondFormerJobLimitWithDiscoveryPipeline(
 						nil
 				},
 			})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			if err := generation.Start(context.Background()); err != nil {
 				waitErr := generation.Wait(context.Background())
-				t.Fatalf("full-capacity generation start: %v; shutdown: %v", err, waitErr)
-			}
-			if got := generation.scheduler.Census(); got != test.jobs {
-				t.Fatalf("scheduler jobs=%d want=%d", got, test.jobs)
-			}
-			if got := len(generation.graph.IDs()); got != test.jobs {
-				t.Fatalf("graph jobs=%d want=%d", got, test.jobs)
-			}
-			if got := generation.tasks.LongLivedCensus().Active; got != test.jobs+1 {
-				t.Fatalf("long-lived resources=%d want=%d", got, test.jobs+1)
+				require.FailNowf(t, "test failed", "full-capacity generation start: %v; shutdown: %v", err, waitErr)
 			}
 
+			require.EqualValues(t, test.jobs, generation.scheduler.Census())
+
+			require.EqualValues(t, test.jobs, len(generation.graph.IDs()))
+
+			require.EqualValues(t, test.jobs+1, generation.tasks.LongLivedCensus().Active)
+
 			generation.Stop()
-			if err := generation.Wait(context.Background()); err != nil {
-				t.Fatal(err)
-			}
-			if got := cleanupCalls.Load(); got != int32(test.jobs) {
-				t.Fatalf("collector cleanups=%d want=%d", got, test.jobs)
-			}
-			if err := admission.CloseDrained(1); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, generation.Wait(context.Background()))
+
+			require.EqualValues(t, int32(test.jobs), cleanupCalls.Load())
+
+			require.NoError(t, admission.CloseDrained(1))
+
 			closeRunTestUIDs(t, uids)
 		})
 	}
@@ -149,9 +140,7 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 			}
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	modules := collectorapi.Registry{
 		"module": {
 			AgentFunctions: func() []funcapi.FunctionConfig {
@@ -179,36 +168,30 @@ func TestRunGenerationFunctionFlowAndShutdownOrder(t *testing.T) {
 				nil
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := generation.Start(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := generation.kernel.SubmitAndWait(context.Background(), jobmgr.Request{
+	require.NoError(t, err)
+
+	require.NoError(t, generation.Start(context.Background()))
+
+	require.NoError(t, generation.kernel.SubmitAndWait(context.Background(), jobmgr.Request{
 		UID: "function-flow", Source: lifecycle.SourceFunction, Route: "module:method",
-	}); err != nil {
-		t.Fatal(err)
-	}
+	}),
+	)
+
 	generation.Stop()
-	if err := generation.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, generation.Wait(context.Background()))
+
 	eventsMu.Lock()
 	got := append([]string(nil), events...)
 	eventsMu.Unlock()
 	want := []string{"publish", "result", "withdraw", "cleanup", "finalizer"}
-	if len(got) != len(want) {
-		t.Fatalf("events=%v want=%v", got, want)
-	}
+	require.EqualValues(t, len(want), len(got))
 	for index := range want {
-		if got[index] != want[index] {
-			t.Fatalf("events=%v want=%v", got, want)
-		}
+		require.EqualValues(t, want[index], got[index])
 	}
-	if err := admission.CloseDrained(1); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, admission.CloseDrained(1))
+
 	closeRunTestUIDs(t, uids)
 }
 
@@ -243,9 +226,7 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 	config.SetSourceType(confgroup.TypeDyncfg)
 	config.SetSource("test")
 	payload, err := yaml.Marshal(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	jobs := testRunJobServices(t)
 	jobs.Defaults = confgroup.Registry{
 		"module": {UpdateEvery: 1},
@@ -257,9 +238,7 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
@@ -270,11 +249,7 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 		Planner: func(
 			capabilities runPlannerCapabilities,
 		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
-			if capabilities.Jobs == nil ||
-				capabilities.DynCfg == nil ||
-				capabilities.Graph == nil {
-				t.Fatal("planner did not receive sealed job capabilities")
-			}
+			require.False(t, capabilities.Jobs == nil || capabilities.DynCfg == nil || capabilities.Graph == nil)
 			return runRejectingPlanner{},
 				jobmgr.RunFinalizerFunc(
 					func(context.Context, uint64) error { return nil },
@@ -282,13 +257,11 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 				nil
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := generation.Start(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := generation.kernel.SubmitAndWait(
+	require.NoError(t, err)
+
+	require.NoError(t, generation.Start(context.Background()))
+
+	require.NoError(t, generation.kernel.SubmitAndWait(
 		context.Background(),
 		jobmgr.Request{
 			UID:    "enable",
@@ -299,39 +272,24 @@ func TestRunGenerationDynCfgEnableUsesCatalogTransaction(t *testing.T) {
 				string(dyncfg.CommandEnable),
 			},
 		},
-	); err != nil {
-		t.Fatal(err)
-	}
+	),
+	)
+
 	record, ok := generation.graph.Lookup("module_job")
-	if !ok || record.Status != dyncfg.StatusRunning.String() {
-		t.Fatalf("DynCfg graph record=%+v exists=%v", record, ok)
-	}
+	require.False(t, !ok || record.Status != dyncfg.StatusRunning.String())
 	wire := output.String()
-	resultAt := bytes.Index(
-		output.Bytes(),
-		[]byte("FUNCTION_RESULT_BEGIN enable 200 application/json"),
-	)
-	statusAt := bytes.Index(
-		output.Bytes(),
-		[]byte("CONFIG go.d:collector:module:job status running"),
-	)
-	if !bytes.Contains(
-		output.Bytes(),
-		[]byte(`FUNCTION GLOBAL "config"`),
-	) || resultAt < 0 || statusAt < 0 || resultAt >= statusAt {
-		t.Fatalf("DynCfg wire ordering differs: %q", wire)
-	}
+	resultAt := bytes.Index(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN enable 200 application/json"))
+	statusAt := bytes.Index(output.Bytes(), []byte("CONFIG go.d:collector:module:job status running"))
+	require.False(t, !bytes.Contains(output.Bytes(), []byte(`FUNCTION GLOBAL "config"`)) || resultAt < 0 || statusAt < 0 || resultAt >= statusAt, "wire=%q", wire)
 
 	generation.Stop()
-	if err := generation.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if cleanupCalls.Load() != 1 {
-		t.Fatalf("collector cleanups=%d want=1", cleanupCalls.Load())
-	}
-	if err := admission.CloseDrained(1); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, generation.Wait(context.Background()))
+
+	require.EqualValues(t, 1, cleanupCalls.Load())
+
+	require.NoError(t, admission.CloseDrained(1))
+
 	closeRunTestUIDs(t, uids)
 }
 
@@ -354,9 +312,7 @@ func fullCapacityInitialJobs(
 		config.SetSourceType(confgroup.TypeDyncfg)
 		config.SetSource("test")
 		payload, err := yaml.Marshal(config)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		records[ordinal] = dyncfg.GraphConfig{
 			ID: config.FullName(), Module: config.Module(),
 			Name: config.Name(), Status: dyncfg.StatusRunning.String(),
@@ -369,13 +325,9 @@ func fullCapacityInitialJobs(
 func testRunJobServices(t testing.TB) runJobServices {
 	t.Helper()
 	resolver, err := secretresolver.NewAtomicResolver(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	creators, err := secretstore.NewCreatorCatalog(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return runJobServices{
 		PluginName:    "go.d",
 		Defaults:      confgroup.Registry{},
@@ -400,9 +352,7 @@ func testRunDiscoveryServices(t testing.TB) runDiscoveryServices {
 	catalog, err := agentdiscovery.NewProviderCatalog(
 		[]agentdiscovery.ProviderFactory{factory},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return runDiscoveryServices{
 		BuildContext: agentdiscovery.BuildContext{
 			Registry: confgroup.Registry{"test": {}},
@@ -480,12 +430,10 @@ func TestCloseProcessUIDsObservesShutdownContextBetweenBatches(t *testing.T) {
 			now := time.Now()
 			for index := range 257 {
 				uid := fmt.Sprintf("close-uid-%d", index)
-				if err := uids.Admit(uid, now); err != nil {
-					t.Fatal(err)
-				}
-				if err := uids.Complete(uid, true, now); err != nil {
-					t.Fatal(err)
-				}
+
+				require.NoError(t, uids.Admit(uid, now))
+
+				require.NoError(t, uids.Complete(uid, true, now))
 			}
 			ctx, cancel := context.WithCancel(context.Background())
 			if test.cancelled {
@@ -494,26 +442,15 @@ func TestCloseProcessUIDsObservesShutdownContextBetweenBatches(t *testing.T) {
 				defer cancel()
 			}
 			err := closeProcessUIDs(ctx, uids)
-			if !errors.Is(err, test.wantErr) {
-				t.Fatalf("UID close error=%v, want %v", err, test.wantErr)
-			}
+			require.ErrorIs(t, err, test.wantErr)
 			active, tombstones, closed := uids.Census()
-			if active != 0 || tombstones != test.wantTombstones ||
-				closed != test.wantClosed {
-				t.Fatalf(
-					"UID close census active=%d tombstones=%d closed=%v",
-					active,
-					tombstones,
-					closed,
-				)
-			}
+			require.False(t, active != 0 || tombstones != test.wantTombstones || closed != test.wantClosed)
 		})
 	}
 }
 
 func closeRunTestUIDs(t *testing.T, uids *lifecycle.UIDLedger) {
 	t.Helper()
-	if err := closeProcessUIDs(context.Background(), uids); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, closeProcessUIDs(context.Background(), uids))
 }

@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFunctionCatalogDecisionValidate(t *testing.T) {
@@ -87,9 +88,8 @@ func TestFunctionCatalogDecisionValidate(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if gotErr := test.decision.validate() != nil; gotErr != test.wantErr {
-				t.Fatalf("validation error=%v, want %v", gotErr, test.wantErr)
-			}
+			gotErr := test.decision.validate() != nil
+			require.EqualValues(t, test.wantErr, gotErr)
 		})
 	}
 }
@@ -105,9 +105,8 @@ func TestFunctionInvocationRefValid(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if got := test.ref.Valid(); got != test.want {
-				t.Fatalf("Valid()=%v, want %v", got, test.want)
-			}
+			got := test.ref.Valid()
+			require.EqualValues(t, test.want, got)
 		})
 	}
 }

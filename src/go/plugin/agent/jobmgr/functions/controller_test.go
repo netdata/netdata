@@ -13,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFunctionControllerJobLifecycle(t *testing.T) {
@@ -30,21 +31,16 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 		},
 	}
 	controller, catalog, err := NewController(1, modules)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	mutations := controllerTestMutationPort{catalog: catalog}
 	publicationPort := newRecordingPublicationPort()
 	publication, err := NewPublication(1, publicationPort)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := controller.Bind(&mutations, publication); err != nil {
-		t.Fatal(err)
-	}
-	if err := controller.Activate(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, controller.Bind(&mutations, publication))
+
+	require.NoError(t, controller.Activate())
+
 	job := &controllerTestJob{
 		fullName: "module_job", module: "module", name: "job", running: true,
 	}
@@ -52,67 +48,47 @@ func TestFunctionControllerJobLifecycle(t *testing.T) {
 		JobIdentity{ID: job.FullName(), Generation: 1},
 		job,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := handle.Publish(); err != nil {
-		t.Fatal(err)
-	}
-	if constructions != 1 {
-		t.Fatalf("handler constructions=%d want=1", constructions)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, handle.Publish())
+
+	require.EqualValues(t, 1, constructions)
 	ctx := context.Background()
 	allocations := testing.AllocsPerRun(1_000, func() {
 		if err := controller.ReconcileModule(ctx, "module"); err != nil {
 			panic(err)
 		}
 	})
-	if allocations != 0 {
-		t.Fatalf(
-			"unchanged module reconciliation allocations=%f want=0",
-			allocations,
-		)
-	}
+	require.EqualValues(t, 0, allocations)
 	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
 		UID: "request", Route: "module:method",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := decision.Plan.Runner.RunTask(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	_, runTaskErr := decision.Plan.Runner.RunTask(context.Background())
+	require.NoError(t, runTaskErr)
+
 	cleanup, err := catalog.ReleaseInvocation(decision.Lease)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if cleanup.Ref.Valid() {
-		t.Fatal("live generation produced cleanup")
-	}
-	if err := handle.CloseAndDrain(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := handle.Cleanup(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if handler.cleanupCount() != 1 {
-		t.Fatalf("handler cleanups=%d want=1", handler.cleanupCount())
-	}
-	if got := publicationPort.events; !equalPublicationEvents(
+	require.NoError(t, err)
+	require.False(t, cleanup.Ref.Valid())
+
+	require.NoError(t, handle.CloseAndDrain(context.Background()))
+
+	require.NoError(t, handle.Cleanup(context.Background()))
+
+	require.EqualValues(t, 1, handler.cleanupCount())
+
+	got := publicationPort.events
+	require.True(t, equalPublicationEvents(
 		got,
 		[]string{"publish:module:method", "withdraw:module:method"},
-	) {
-		t.Fatalf("publication events=%v", got)
-	}
+	))
+
 	decision, err = catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
 		UID: "after-close", Route: "module:method",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if decision.Rejected == 0 {
-		t.Fatal("closed job route still resolved")
-	}
+	require.NoError(t, err)
+	require.NotEqualValues(t, 0, decision.Rejected)
 }
 
 func TestFunctionControllerClosesAdmissionBeforeExternalWithdrawal(t *testing.T) {
@@ -127,9 +103,7 @@ func TestFunctionControllerClosesAdmissionBeforeExternalWithdrawal(t *testing.T)
 			},
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	mutations := controllerTestMutationPort{catalog: catalog}
 	publicationPort := &blockingWithdrawPublicationPort{
 		recordingPublicationPort: newRecordingPublicationPort(),
@@ -137,15 +111,12 @@ func TestFunctionControllerClosesAdmissionBeforeExternalWithdrawal(t *testing.T)
 		release:                  make(chan struct{}),
 	}
 	publication, err := NewPublication(1, publicationPort)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := controller.Bind(&mutations, publication); err != nil {
-		t.Fatal(err)
-	}
-	if err := controller.Activate(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, controller.Bind(&mutations, publication))
+
+	require.NoError(t, controller.Activate())
+
 	job := &controllerTestJob{
 		fullName: "module_job", module: "module", name: "job", running: true,
 	}
@@ -153,12 +124,9 @@ func TestFunctionControllerClosesAdmissionBeforeExternalWithdrawal(t *testing.T)
 		JobIdentity{ID: job.FullName(), Generation: 1},
 		job,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := handle.Publish(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, handle.Publish())
 
 	closed := make(chan error, 1)
 	go func() {
@@ -174,19 +142,9 @@ func TestFunctionControllerClosesAdmissionBeforeExternalWithdrawal(t *testing.T)
 	close(publicationPort.release)
 	closeErr := <-closed
 
-	if resolveErr != nil {
-		t.Fatal(resolveErr)
-	}
-	if decision.Rejected != lifecycle.ControlUnavailable {
-		t.Fatalf(
-			"route admission during withdrawal=%v want=%v",
-			decision.Rejected,
-			lifecycle.ControlUnavailable,
-		)
-	}
-	if closeErr != nil {
-		t.Fatal(closeErr)
-	}
+	require.NoError(t, resolveErr)
+	require.EqualValues(t, lifecycle.ControlUnavailable, decision.Rejected)
+	require.NoError(t, closeErr)
 }
 
 func TestFunctionControllerRawRequestFidelity(t *testing.T) {
@@ -202,21 +160,16 @@ func TestFunctionControllerRawRequestFidelity(t *testing.T) {
 		},
 	}
 	controller, catalog, err := NewController(1, modules)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	mutations := controllerTestMutationPort{catalog: catalog}
 	publicationPort := newRecordingPublicationPort()
 	publication, err := NewPublication(1, publicationPort)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := controller.Bind(&mutations, publication); err != nil {
-		t.Fatal(err)
-	}
-	if err := controller.Activate(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, controller.Bind(&mutations, publication))
+
+	require.NoError(t, controller.Activate())
+
 	lookup := jobmgr.FunctionLookup{
 		UID: "raw-request", Route: "module:raw", Args: []string{"info", "arg"},
 		Payload: []byte(`{"value":1}`), ContentType: "application/json",
@@ -224,31 +177,26 @@ func TestFunctionControllerRawRequestFidelity(t *testing.T) {
 		Timeout: 17 * time.Second, HasPayload: true,
 	}
 	decision, err := catalog.ResolveAndAcquire(lookup)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := decision.Plan.Runner.RunTask(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	_, runTaskErr := decision.Plan.Runner.RunTask(context.Background())
+	require.NoError(t, runTaskErr)
+
 	if cleanup, err := catalog.ReleaseInvocation(decision.Lease); err != nil {
-		t.Fatal(err)
-	} else if cleanup.Ref.Valid() {
-		t.Fatal("live agent generation produced cleanup")
+		require.FailNow(t, "test failed", err)
+	} else {
+		require.False(t, cleanup.Ref.Valid())
 	}
 	got := handler.rawRequest()
-	if got.Method != "raw" || !got.Info ||
+	require.False(t, got.Method != "raw" || !got.Info ||
 		got.ContentType != lookup.ContentType ||
 		got.Permissions != lookup.Permissions ||
 		got.Source != lookup.CallerSource ||
 		got.Timeout != lookup.Timeout ||
-		string(got.Payload) != string(lookup.Payload) {
-		t.Fatalf("raw request=%+v", got)
-	}
+		string(got.Payload) != string(lookup.Payload))
 	got.Args[0] = "changed"
 	got.Payload[0] = 'X'
-	if lookup.Args[0] != "info" || lookup.Payload[0] != '{' {
-		t.Fatal("handler request aliases lookup-owned slices")
-	}
+	require.False(t, lookup.Args[0] != "info" || lookup.Payload[0] != '{')
 }
 
 func TestFunctionControllerAgentAvailabilityIsMonotonic(t *testing.T) {
@@ -267,50 +215,40 @@ func TestFunctionControllerAgentAvailabilityIsMonotonic(t *testing.T) {
 		},
 	}
 	controller, catalog, err := NewController(1, modules)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	mutations := controllerTestMutationPort{catalog: catalog}
 	publicationPort := newRecordingPublicationPort()
 	publication, err := NewPublication(1, publicationPort)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := controller.Bind(&mutations, publication); err != nil {
-		t.Fatal(err)
-	}
-	if err := controller.Activate(); err != nil {
-		t.Fatal(err)
-	}
-	if len(publicationPort.events) != 0 {
-		t.Fatalf("unavailable function was published: %v", publicationPort.events)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, controller.Bind(&mutations, publication))
+
+	require.NoError(t, controller.Activate())
+
+	require.EqualValues(t, 0, len(publicationPort.events))
 	available = true
-	if err := controller.ReconcileModule(context.Background(), "module"); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, controller.ReconcileModule(context.Background(), "module"))
+
 	available = false
-	if err := controller.ReconcileModule(context.Background(), "module"); err != nil {
-		t.Fatal(err)
-	}
-	if got := publicationPort.events; !equalPublicationEvents(
+
+	require.NoError(t, controller.ReconcileModule(context.Background(), "module"))
+
+	got := publicationPort.events
+	require.True(t, equalPublicationEvents(
 		got,
 		[]string{"publish:module:delayed"},
-	) {
-		t.Fatalf("availability publication events=%v", got)
-	}
+	))
+
 	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
 		UID: "still-published", Route: "module:delayed",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if decision.Rejected != 0 {
-		t.Fatalf("published agent function was withdrawn: %v", decision.Rejected)
-	}
-	if _, err := catalog.ReleaseInvocation(decision.Lease); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	require.EqualValues(t, 0, decision.Rejected)
+
+	_, releaseInvocationErr := catalog.ReleaseInvocation(decision.Lease)
+	require.NoError(t, releaseInvocationErr)
+
 }
 
 func TestFunctionControllerRejectsInvalidDeclarations(t *testing.T) {
@@ -359,9 +297,7 @@ func TestFunctionControllerRejectsInvalidDeclarations(t *testing.T) {
 					},
 				},
 			})
-			if err == nil {
-				t.Fatal("invalid Function declaration was accepted")
-			}
+			require.Error(t, err)
 		})
 	}
 }
@@ -381,9 +317,7 @@ func (ctmp *controllerTestMutationPort) QuiesceFunctions(
 		return err
 	}
 	for {
-		progress, err := ctmp.catalog.AdvanceMutationQuiesce(
-			jobmgr.MaximumFunctionMutationQuantum,
-		)
+		progress, err := ctmp.catalog.AdvanceMutationQuiesce(jobmgr.MaximumFunctionMutationQuantum)
 		if err != nil {
 			return err
 		}
@@ -405,10 +339,7 @@ func (ctmp *controllerTestMutationPort) CommitFunctions(
 	}
 	for {
 		var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
-		progress, count, err := ctmp.catalog.AdvanceMutation(
-			jobmgr.MaximumFunctionMutationQuantum,
-			&cleanups,
-		)
+		progress, count, err := ctmp.catalog.AdvanceMutation(jobmgr.MaximumFunctionMutationQuantum, &cleanups)
 		if err != nil {
 			return 0, err
 		}
@@ -443,10 +374,7 @@ func (ctmp *controllerTestMutationPort) AbortFunctions(
 	for index := 0; index < count; index++ {
 		cleanup := cleanups[index]
 		_, cleanupErr := cleanup.Runner.RunTask(context.Background())
-		if err := ctmp.catalog.CompleteCleanup(
-			cleanup.Ref,
-			cleanupErr,
-		); err != nil {
+		if err := ctmp.catalog.CompleteCleanup(cleanup.Ref, cleanupErr); err != nil {
 			return errors.Join(cleanupErr, err)
 		}
 	}

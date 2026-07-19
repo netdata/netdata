@@ -8,6 +8,8 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestInheritedTaskRunCancelJoinRelease(t *testing.T) {
@@ -19,62 +21,50 @@ func TestInheritedTaskRunCancelJoinRelease(t *testing.T) {
 		<-ctx.Done()
 		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	<-entered
-	if supervisor.Active() != 0 || supervisor.InheritedActive() != 1 {
-		t.Fatalf("transient=%d inherited=%d", supervisor.Active(), supervisor.InheritedActive())
-	}
-	if err := supervisor.CancelInherited(ref, owner); err != nil {
-		t.Fatal(err)
-	}
-	if joined, err := supervisor.JoinInherited(context.Background(), ref, owner); err != nil || !joined {
-		t.Fatal(err)
-	}
-	if err := supervisor.ReleaseInherited(ref, owner); err != nil {
-		t.Fatal(err)
-	}
-	if supervisor.InheritedActive() != 0 {
-		t.Fatalf("inherited=%d", supervisor.InheritedActive())
-	}
-	if err := supervisor.ReleaseInherited(ref, owner); err == nil {
-		t.Fatal("stale inherited reference released twice")
-	}
+	require.False(t, supervisor.Active() != 0 || supervisor.InheritedActive() != 1)
+
+	require.NoError(t, supervisor.CancelInherited(ref, owner))
+
+	joinInheritedJoined, joinInheritedErr := supervisor.JoinInherited(context.Background(), ref, owner)
+	require.False(t, joinInheritedErr != nil || !joinInheritedJoined)
+
+	require.NoError(t, supervisor.ReleaseInherited(ref, owner))
+
+	require.EqualValues(t, 0, supervisor.InheritedActive())
+
+	require.Error(t, supervisor.ReleaseInherited(ref, owner))
 }
 
 func TestInheritedTaskOwnerRoleAndPanicAreContained(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
 	observer := &recordingRuntimeObserver{}
-	if err := supervisor.BindRuntimeObserver(observer); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, supervisor.BindRuntimeObserver(observer))
+
 	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
 	ref, err := supervisor.StartInherited(context.Background(), owner, InheritedV2Runner, func(context.Context) error {
 		panic("boom")
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	wrongOwner := ResourceIdentity{ID: owner.ID, Generation: owner.Generation + 1}
-	if err := supervisor.CancelInherited(ref, wrongOwner); err == nil {
-		t.Fatal("wrong owner canceled inherited child")
-	}
-	if err := supervisor.CancelInherited(ref, owner); err != nil {
-		t.Fatal(err)
-	}
-	if joined, err := supervisor.JoinInherited(context.Background(), ref, owner); !joined || !errors.Is(err, ErrTaskPanic) {
-		t.Fatalf("joined=%v join error=%v", joined, err)
-	}
-	if err := supervisor.ReleaseInherited(ref, owner); err != nil {
-		t.Fatal(err)
-	}
-	if got := observer.counter(RuntimeCounterTaskPanics); got != 1 {
-		t.Fatalf("task panics=%d want=1", got)
-	}
-	if _, err := supervisor.StartInherited(context.Background(), owner, 0, func(context.Context) error { return nil }); err == nil {
-		t.Fatal("invalid inherited role was accepted")
-	}
+
+	require.Error(t, supervisor.CancelInherited(ref, wrongOwner))
+
+	require.NoError(t, supervisor.CancelInherited(ref, owner))
+
+	joinInheritedJoined, joinInheritedErr := supervisor.JoinInherited(context.Background(), ref, owner)
+	require.False(t, !joinInheritedJoined || !errors.Is(joinInheritedErr, ErrTaskPanic))
+
+	require.NoError(t, supervisor.ReleaseInherited(ref, owner))
+
+	got := observer.counter(RuntimeCounterTaskPanics)
+	require.EqualValues(t, 1, got)
+
+	_, startInheritedErr := supervisor.StartInherited(context.Background(), owner, 0, func(context.Context) error { return nil })
+	require.Error(t, startInheritedErr)
+
 }
 
 type recordingRuntimeObserver struct {
@@ -117,23 +107,19 @@ func TestInheritedTaskMissedJoinRetainsRecord(t *testing.T) {
 		<-releaseWork
 		return nil
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := supervisor.CancelInherited(ref, owner); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, supervisor.CancelInherited(ref, owner))
+
 	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 	defer cancel()
-	if joined, err := supervisor.JoinInherited(ctx, ref, owner); joined || !errors.Is(err, context.DeadlineExceeded) {
-		t.Fatalf("joined=%v join error=%v", joined, err)
-	}
-	if err := supervisor.ReleaseInherited(ref, owner); err == nil {
-		t.Fatal("missed join released inherited record")
-	}
-	if supervisor.InheritedActive() != 1 {
-		t.Fatalf("inherited=%d", supervisor.InheritedActive())
-	}
+
+	joinInheritedJoined, joinInheritedErr := supervisor.JoinInherited(ctx, ref, owner)
+	require.False(t, joinInheritedJoined || !errors.Is(joinInheritedErr, context.DeadlineExceeded))
+
+	require.Error(t, supervisor.ReleaseInherited(ref, owner))
+
+	require.EqualValues(t, 1, supervisor.InheritedActive())
 	close(releaseWork)
 	<-finished
 }
@@ -148,29 +134,23 @@ func TestInheritedTasksGrowBeyondFormerDerivedLimit(t *testing.T) {
 			<-ctx.Done()
 			return nil
 		})
-		if err != nil {
-			t.Fatalf("start %d: %v", index, err)
-		}
+		require.NoError(t, err)
 		refs = append(refs, ref)
 	}
 	for index, ref := range refs {
 		owner := ResourceIdentity{ID: "pipeline", Generation: uint64(index + 1)}
-		if err := supervisor.CancelInherited(ref, owner); err != nil {
-			t.Fatal(err)
-		}
+
+		require.NoError(t, supervisor.CancelInherited(ref, owner))
 	}
 	for index, ref := range refs {
 		owner := ResourceIdentity{ID: "pipeline", Generation: uint64(index + 1)}
-		if joined, err := supervisor.JoinInherited(context.Background(), ref, owner); err != nil || !joined {
-			t.Fatal(err)
-		}
-		if err := supervisor.ReleaseInherited(ref, owner); err != nil {
-			t.Fatal(err)
-		}
+
+		joined, err := supervisor.JoinInherited(context.Background(), ref, owner)
+		require.False(t, err != nil || !joined)
+
+		require.NoError(t, supervisor.ReleaseInherited(ref, owner))
 	}
-	if supervisor.InheritedActive() != 0 {
-		t.Fatalf("inherited=%d", supervisor.InheritedActive())
-	}
+	require.EqualValues(t, 0, supervisor.InheritedActive())
 }
 
 func TestInheritedPipelineTasksRequirePermit(t *testing.T) {
@@ -182,14 +162,13 @@ func TestInheritedPipelineTasksRequirePermit(t *testing.T) {
 	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
 	for name, role := range tests {
 		t.Run(name, func(t *testing.T) {
-			if _, err := supervisor.StartInherited(
+			_, err := supervisor.StartInherited(
 				context.Background(),
 				owner,
 				role,
 				func(context.Context) error { return nil },
-			); err == nil {
-				t.Fatal("pipeline task started without a permit")
-			}
+			)
+			require.Error(t, err)
 		})
 	}
 }

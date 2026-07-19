@@ -16,6 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProductionProcessRejectsInvalidInitialVnodes(t *testing.T) {
@@ -30,9 +31,9 @@ func TestProductionProcessRejectsInvalidInitialVnodes(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			config := testProductionProcessConfig(strings.NewReader(""), io.Discard)
 			config.InitialVnodes = test.vnodes
-			if _, err := NewProcess(config); err == nil {
-				t.Fatal("invalid initial vnode was accepted")
-			}
+
+			_, err := NewProcess(config)
+			require.Error(t, err)
 		})
 	}
 }
@@ -41,9 +42,7 @@ func TestProductionProcessIsSingleUse(t *testing.T) {
 	reader, writer := io.Pipe()
 	var output bytes.Buffer
 	process, err := NewProcess(testProductionProcessConfig(reader, &output))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	runDone := make(chan error, 1)
 	go func() {
 		runDone <- process.Run(context.Background())
@@ -51,54 +50,37 @@ func TestProductionProcessIsSingleUse(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	if err := process.Terminate(ctx); err != nil {
 		cancel()
-		t.Fatal(err)
+		require.FailNow(t, "test failed", err)
 	}
 	cancel()
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
-	}
-	if err := <-runDone; err != nil {
-		t.Fatal(err)
-	}
-	if err := process.Run(context.Background()); err == nil {
-		t.Fatal("second production Run was accepted")
-	}
+
+	require.NoError(t, writer.Close())
+
+	require.NoError(t, <-runDone)
+
+	require.Error(t, process.Run(context.Background()))
 }
 
 func TestProductionProcessQuitHasOneCleanTerminalDisposition(t *testing.T) {
 	for iteration := 0; iteration < 32; iteration++ {
-		process, err := NewProcess(
-			testProductionProcessConfig(strings.NewReader("QUIT\n"), io.Discard),
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := process.Run(context.Background()); err != nil {
-			t.Fatalf("QUIT iteration %d returned %v", iteration, err)
-		}
+		process, err := NewProcess(testProductionProcessConfig(strings.NewReader("QUIT\n"), io.Discard))
+		require.NoError(t, err)
+
+		require.NoError(t, process.Run(context.Background()))
 	}
 }
 
 func TestProductionProcessChargesCatalogStorageUntilFinalClose(t *testing.T) {
-	process, err := NewProcess(
-		testProductionProcessConfig(
-			strings.NewReader("QUIT\n"),
-			io.Discard,
-		),
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	process, err := NewProcess(testProductionProcessConfig(strings.NewReader("QUIT\n"), io.Discard))
+	require.NoError(t, err)
 	wantProcessBytes := functionadapter.MaximumCatalogStorageBytes
-	if census := process.core.admission.Census(); census.ProcessBytes != wantProcessBytes {
-		t.Fatalf("construction admission census=%+v", census)
-	}
-	if err := process.Run(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if census := process.core.admission.Census(); census.ProcessBytes != 0 || census.Phase != "closed" {
-		t.Fatalf("final admission census=%+v", census)
-	}
+
+	require.EqualValues(t, wantProcessBytes, process.core.admission.Census().ProcessBytes)
+
+	require.NoError(t, process.Run(context.Background()))
+
+	census := process.core.admission.Census()
+	require.False(t, census.ProcessBytes != 0 || census.Phase != "closed")
 }
 
 func TestProcessControlCancellationAfterHandoffWaitsForDisposition(t *testing.T) {
@@ -144,7 +126,7 @@ func TestProcessControlCancellationAfterHandoffWaitsForDisposition(t *testing.T)
 			select {
 			case <-accepted:
 			case <-time.After(time.Second):
-				t.Fatal("process control was not accepted")
+				require.FailNow(t, "test failed", "process control was not accepted")
 			}
 			cancel()
 
@@ -160,18 +142,11 @@ func TestProcessControlCancellationAfterHandoffWaitsForDisposition(t *testing.T)
 				select {
 				case early = <-result:
 				case <-time.After(time.Second):
-					t.Fatal("accepted process control did not complete")
+					require.FailNow(t, "test failed", "accepted process control did not complete")
 				}
 			}
-			if returnedEarly {
-				t.Fatalf(
-					"accepted process control returned before disposition: %v",
-					early,
-				)
-			}
-			if early != nil {
-				t.Fatalf("process control disposition: %v", early)
-			}
+			require.False(t, returnedEarly)
+			require.Nil(t, early)
 		})
 	}
 }

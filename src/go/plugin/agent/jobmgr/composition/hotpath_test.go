@@ -8,13 +8,11 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/stretchr/testify/require"
 )
 
 func TestModuleCatalogPolicyIsFrozenAtProcessConstruction(t *testing.T) {
-	config := testProductionProcessConfig(
-		strings.NewReader(""),
-		io.Discard,
-	)
+	config := testProductionProcessConfig(strings.NewReader(""), io.Discard)
 	config.Modules = collectorapi.Registry{
 		"enabled": {
 			Defaults: collectorapi.Defaults{UpdateEvery: 1},
@@ -35,9 +33,7 @@ func TestModuleCatalogPolicyIsFrozenAtProcessConstruction(t *testing.T) {
 		},
 	}
 	process, err := NewProcess(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	delete(config.Modules, "enabled")
 	config.Modules["late"] = collectorapi.Creator{}
 
@@ -62,20 +58,8 @@ func TestModuleCatalogPolicyIsFrozenAtProcessConstruction(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			creator, found := process.core.config.Modules.Lookup(
-				test.module,
-			)
-			if found != test.wantFound ||
-				(found &&
-					creator.Disabled != test.wantDisabled) {
-				t.Fatalf(
-					"lookup found/disabled=%v/%v, want %v/%v",
-					found,
-					creator.Disabled,
-					test.wantFound,
-					test.wantDisabled,
-				)
-			}
+			creator, found := process.core.config.Modules.Lookup(test.module)
+			require.False(t, found != test.wantFound || (found && creator.Disabled != test.wantDisabled))
 		})
 	}
 }
@@ -93,9 +77,7 @@ func TestModuleCatalogLookupAllocatesNothing(t *testing.T) {
 			panic("module disappeared")
 		}
 	})
-	if allocations != 0 {
-		t.Fatalf("module lookup allocations=%f, want 0", allocations)
-	}
+	require.EqualValues(t, 0, allocations)
 }
 
 func BenchmarkBProcessRestart(b *testing.B) {
@@ -116,10 +98,8 @@ func BenchmarkBProcessRestart(b *testing.B) {
 	})
 	b.ReportAllocs()
 	for b.Loop() {
-		if err := process.Restart(
-			context.Background(),
-		); err != nil {
-			b.Fatal(err)
+		if err := process.Restart(context.Background()); err != nil {
+			require.FailNow(b, "benchmark failed", err)
 		}
 	}
 }
@@ -135,7 +115,7 @@ func BenchmarkBModuleLookup(b *testing.B) {
 	b.ReportAllocs()
 	for b.Loop() {
 		if _, ok := modules.Lookup("module"); !ok {
-			b.Fatal("module disappeared")
+			require.FailNow(b, "benchmark failed", "module disappeared")
 		}
 	}
 }

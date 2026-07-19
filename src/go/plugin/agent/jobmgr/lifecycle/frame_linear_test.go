@@ -4,34 +4,27 @@ package lifecycle
 
 import (
 	"bytes"
-	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestPreparedFunctionFrameTransfersExactlyOnce(t *testing.T) {
 	result, err := NewSealedResult(200, "application/json", []byte(`{"ok":true}`))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	frame, err := PrepareFrame("u-linear", result, 1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	alias := frame
 	var output bytes.Buffer
 	owner, err := NewFrameOwner(&output)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := owner.Commit(frame); err != nil {
-		t.Fatal(err)
-	}
-	if err := owner.Commit(alias); !errors.Is(err, ErrPreparedFrameConsumed) {
-		t.Fatalf("duplicate transfer error=%v, want ErrPreparedFrameConsumed", err)
-	}
-	if got := bytes.Count(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN")); got != 1 {
-		t.Fatalf("writes=%d, want 1", got)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, owner.Commit(frame))
+
+	require.ErrorIs(t, owner.Commit(alias), ErrPreparedFrameConsumed)
+
+	got := bytes.Count(output.Bytes(), []byte("FUNCTION_RESULT_BEGIN"))
+	require.EqualValues(t, 1, got)
 }
 
 func TestPreparedProtocolFrameCommitOrAbortIsLinear(t *testing.T) {
@@ -44,38 +37,29 @@ func TestPreparedProtocolFrameCommitOrAbortIsLinear(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			frame, err := PrepareProtocolFrame([]byte("HOST_DEFINE node\n\n"))
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			alias := frame
 			if !test.commit {
-				if err := frame.Abort(); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, frame.Abort())
+
 				owner, err := NewFrameOwner(&bytes.Buffer{})
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := owner.CommitPreparedProtocolFrame(alias); !errors.Is(err, ErrPreparedFrameConsumed) {
-					t.Fatalf("post-abort transfer error=%v, want ErrPreparedFrameConsumed", err)
-				}
+				require.NoError(t, err)
+
+				require.ErrorIs(t, owner.CommitPreparedProtocolFrame(alias), ErrPreparedFrameConsumed)
+
 				return
 			}
 
 			var output bytes.Buffer
 			owner, err := NewFrameOwner(&output)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := owner.CommitPreparedProtocolFrame(frame); err != nil {
-				t.Fatal(err)
-			}
-			if err := alias.Abort(); !errors.Is(err, ErrPreparedFrameConsumed) {
-				t.Fatalf("post-commit abort error=%v, want ErrPreparedFrameConsumed", err)
-			}
-			if got := output.String(); got != "HOST_DEFINE node\n\n" {
-				t.Fatalf("output=%q", got)
-			}
+			require.NoError(t, err)
+
+			require.NoError(t, owner.CommitPreparedProtocolFrame(frame))
+
+			require.ErrorIs(t, alias.Abort(), ErrPreparedFrameConsumed)
+
+			got := output.String()
+			require.EqualValues(t, "HOST_DEFINE node\n\n", got)
 		})
 	}
 }

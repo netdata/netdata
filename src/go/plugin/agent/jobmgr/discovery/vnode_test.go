@@ -3,13 +3,13 @@
 package discovery
 
 import (
-	"errors"
 	"strconv"
 	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
+	"github.com/stretchr/testify/require"
 )
 
 func TestVNodeConfigAtomicRevisions(t *testing.T) {
@@ -19,20 +19,13 @@ func TestVNodeConfigAtomicRevisions(t *testing.T) {
 		"abort preserves current": {
 			run: func(t *testing.T, configuration *VNodeConfiguration) {
 				first := commitVNode(t, configuration, "node", 0, testVNode("host", "source"))
-				aborted, err := configuration.PrepareUpsert(
-					"node", first.Revision, testVNode("changed", "source"),
-				)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := aborted.Abort(); err != nil {
-					t.Fatal(err)
-				}
+				aborted, err := configuration.PrepareUpsert("node", first.Revision, testVNode("changed", "source"))
+				require.NoError(t, err)
+
+				require.NoError(t, aborted.Abort())
+
 				current, ok := configuration.Lookup("node")
-				if !ok || current.Revision != first.Revision ||
-					current.Vnode.Hostname != "host" {
-					t.Fatalf("snapshot=%+v ok=%v", current, ok)
-				}
+				require.False(t, !ok || current.Revision != first.Revision || current.Vnode.Hostname != "host")
 			},
 		},
 		"metadata revision changes only with metadata": {
@@ -42,47 +35,35 @@ func TestVNodeConfigAtomicRevisions(t *testing.T) {
 				second := commitVNode(t, configuration, "node", first.Revision, sourceOnly)
 				metadata := testVNode("next-host", "source-b")
 				third := commitVNode(t, configuration, "node", second.Revision, metadata)
-				if first.MetadataRevision != 1 ||
+				require.False(t, first.MetadataRevision != 1 ||
 					second.MetadataRevision != first.MetadataRevision ||
-					third.MetadataRevision != second.MetadataRevision+1 {
-					t.Fatalf("metadata revisions=%d/%d/%d",
-						first.MetadataRevision,
-						second.MetadataRevision,
-						third.MetadataRevision,
-					)
-				}
+					third.MetadataRevision != second.MetadataRevision+1)
 			},
 		},
 		"remove is atomic": {
 			run: func(t *testing.T, configuration *VNodeConfiguration) {
 				first := commitVNode(t, configuration, "node", 0, testVNode("host", "source"))
 				prepared, err := configuration.PrepareRemove("node", first.Revision)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if _, ok := configuration.Lookup("node"); !ok {
-					t.Fatal("prepared removal became visible")
-				}
+				require.NoError(t, err)
+
+				_, ok := configuration.Lookup("node")
+				require.True(t, ok)
+
 				removed, err := prepared.Commit()
-				if err != nil {
-					t.Fatal(err)
-				}
-				if removed.Revision != first.Revision+1 || removed.Vnode != nil {
-					t.Fatalf("removed snapshot=%+v", removed)
-				}
-				if _, ok := configuration.Lookup("node"); ok {
-					t.Fatal("committed removal retained vnode")
-				}
+				require.NoError(t, err)
+				require.False(t, removed.Revision != first.Revision+1 || removed.Vnode != nil)
+
+				_, lookup := configuration.Lookup("node")
+				require.False(t, lookup)
+
 			},
 		},
 		"stale revision is rejected": {
 			run: func(t *testing.T, configuration *VNodeConfiguration) {
 				commitVNode(t, configuration, "node", 0, testVNode("host", "source"))
-				if _, err := configuration.PrepareUpsert(
-					"node", 0, testVNode("stale", "source"),
-				); !errors.Is(err, ErrVNodeRevision) {
-					t.Fatalf("stale revision error=%v", err)
-				}
+
+				_, err := configuration.PrepareUpsert("node", 0, testVNode("stale", "source"))
+				require.ErrorIs(t, err, ErrVNodeRevision)
 			},
 		},
 	}
@@ -100,14 +81,10 @@ func TestVNodeConfigCopiesMutableValues(t *testing.T) {
 	input.Labels["site"] = "mutated-input"
 	snapshot.Vnode.Labels["site"] = "mutated-output"
 	current, ok := configuration.Lookup("node")
-	if !ok || current.Vnode.Labels["site"] != "original" {
-		t.Fatalf("stored snapshot aliases caller memory: %+v", current)
-	}
+	require.False(t, !ok || current.Vnode.Labels["site"] != "original")
 	current.Vnode.Labels["site"] = "mutated-lookup"
 	again, _ := configuration.Lookup("node")
-	if again.Vnode.Labels["site"] != "original" {
-		t.Fatalf("lookup snapshot aliases stored memory: %+v", again)
-	}
+	require.EqualValues(t, "original", again.Vnode.Labels["site"])
 }
 
 func TestVNodeConfigInitialSnapshotIsDeterministicAndIndependent(t *testing.T) {
@@ -122,32 +99,25 @@ func TestVNodeConfigInitialSnapshotIsDeterministicAndIndependent(t *testing.T) {
 		},
 	}
 	configuration, err := NewVNodeConfigurationWithInitial(initial)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	initial["a"].Labels["site"] = "changed"
 	entries := configuration.Entries()
-	if len(entries) != 2 ||
+	require.False(t, len(entries) != 2 ||
 		entries[0].ID != "a" ||
 		entries[1].ID != "z" ||
-		entries[0].Snapshot.Vnode.Labels["site"] != "a" {
-		t.Fatalf("entries=%+v", entries)
-	}
+		entries[0].Snapshot.Vnode.Labels["site"] != "a")
 	entries[0].Snapshot.Vnode.Labels["site"] = "changed-again"
 	snapshot, ok := configuration.Lookup("a")
-	if !ok || snapshot.Vnode.Labels["site"] != "a" {
-		t.Fatalf("stored snapshot aliases entries: %+v", snapshot)
-	}
+	require.False(t, !ok || snapshot.Vnode.Labels["site"] != "a")
 }
 
 func TestVNodeConfigInitialIdentityMustMatchMapKey(t *testing.T) {
-	if _, err := NewVNodeConfigurationWithInitial(
+	_, err := NewVNodeConfigurationWithInitial(
 		map[string]*vnodes.VirtualNode{
 			"map-name": {Name: "vnode-name"},
 		},
-	); err == nil {
-		t.Fatal("mismatched initial vnode identity was accepted")
-	}
+	)
+	require.Error(t, err)
 }
 
 func TestVNodeConfigBounds(t *testing.T) {
@@ -160,9 +130,7 @@ func TestVNodeConfigBounds(t *testing.T) {
 					id := strconv.Itoa(index)
 					commitVNode(t, configuration, id, 0, testVNode(id, "source"))
 				}
-				_, err := configuration.PrepareUpsert(
-					"overflow", 0, testVNode("overflow", "source"),
-				)
+				_, err := configuration.PrepareUpsert("overflow", 0, testVNode("overflow", "source"))
 				return err
 			},
 		},
@@ -177,9 +145,8 @@ func TestVNodeConfigBounds(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := test.prepare(NewVNodeConfiguration()); !errors.Is(err, ErrVNodeCapacity) {
-				t.Fatalf("capacity error=%v", err)
-			}
+			err := test.prepare(NewVNodeConfiguration())
+			require.ErrorIs(t, err, ErrVNodeCapacity)
 		})
 	}
 }
@@ -194,8 +161,8 @@ func BenchmarkBVNodeConfigLookup(b *testing.B) {
 }
 
 type vnodeTesting interface {
+	require.TestingT
 	Helper()
-	Fatal(...any)
 }
 
 func commitVNode(
@@ -207,13 +174,9 @@ func commitVNode(
 ) jobruntime.VnodeSnapshot {
 	t.Helper()
 	prepared, err := configuration.PrepareUpsert(id, expected, vnode)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	snapshot, err := prepared.Commit()
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return snapshot
 }
 

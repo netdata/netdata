@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFunctionCleanupQueuePreservesFIFOAndReleasesChunks(t *testing.T) {
@@ -23,61 +24,33 @@ func TestFunctionCleanupQueuePreservesFIFOAndReleasesChunks(t *testing.T) {
 				return lifecycle.NoValueOutcome(), nil
 			},
 		}
-		if err := queue.push(plan); err != nil {
-			t.Fatal(err)
-		}
+
+		require.NoError(t, queue.push(plan))
 	}
-	if queue.count != population {
-		t.Fatalf("queued plans=%d, want %d", queue.count, population)
-	}
+	require.EqualValues(t, population, queue.count)
 	chunks := 0
 	for chunk := queue.head; chunk != nil; chunk = chunk.next {
 		chunks++
 	}
 	const wantChunks = 4
-	if chunks != wantChunks {
-		t.Fatalf("queue chunks=%d, want %d", chunks, wantChunks)
-	}
+	require.EqualValues(t, wantChunks, chunks)
 
 	firstChunk := queue.head
 	for index := range population {
 		plan := queue.front()
-		if plan.Ref.Slot != uint32(index+1) ||
-			plan.Ref.Generation != 1 {
-			t.Fatalf(
-				"front at %d=%+v",
-				index,
-				plan.Ref,
-			)
-		}
+		require.False(t, plan.Ref.Slot != uint32(index+1) || plan.Ref.Generation != 1)
 		queue.pop()
 		if index == functionCleanupChunkCapacity-1 {
-			if firstChunk.next != nil {
-				t.Fatal("exhausted queue chunk remained linked")
-			}
+			require.Nil(t, firstChunk.next)
 			for slot, plan := range firstChunk.plans {
-				if plan.Ref.Valid() || plan.Work != nil || plan.Runner != nil {
-					t.Fatalf(
-						"exhausted chunk retained plan %d: %+v",
-						slot,
-						plan.Ref,
-					)
-				}
+				require.False(t, plan.Ref.Valid() || plan.Work != nil || plan.Runner != nil, "slot=%d", slot)
 			}
 		}
 	}
-	if queue.count != 0 || queue.head != nil || queue.tail != nil {
-		t.Fatalf(
-			"drained queue retained state: count=%d head=%p tail=%p",
-			queue.count,
-			queue.head,
-			queue.tail,
-		)
-	}
-	if plan := queue.front(); plan.Ref.Valid() ||
-		plan.Work != nil || plan.Runner != nil {
-		t.Fatalf("empty queue returned plan %+v", plan.Ref)
-	}
+	require.False(t, queue.count != 0 || queue.head != nil || queue.tail != nil)
+
+	plan := queue.front()
+	require.False(t, plan.Ref.Valid() || plan.Work != nil || plan.Runner != nil)
 }
 
 func BenchmarkBFunctionCleanupQueuePushPop(b *testing.B) {
@@ -99,7 +72,7 @@ func BenchmarkBFunctionCleanupQueuePushPop(b *testing.B) {
 		var queue functionCleanupQueue
 		for _, plan := range plans {
 			if err := queue.push(plan); err != nil {
-				b.Fatal(err)
+				require.FailNow(b, "benchmark failed", err)
 			}
 		}
 		for queue.count != 0 {

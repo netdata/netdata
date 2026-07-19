@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestUIDLedgerTombstonePopulationGrowsBeyondFormerBoundary(t *testing.T) {
@@ -30,9 +32,8 @@ func TestUIDLedgerTombstonePopulationGrowsBeyondFormerBoundary(t *testing.T) {
 				test.population,
 				now,
 			)
-			if err := ledger.Admit("fresh", now); err != nil {
-				t.Fatalf("fresh admission: %v", err)
-			}
+
+			require.NoError(t, ledger.Admit("fresh", now))
 		})
 	}
 
@@ -56,20 +57,13 @@ func TestUIDLedgerTombstonePopulationGrowsBeyondFormerBoundary(t *testing.T) {
 	for name, test := range expiryTests {
 		t.Run(name, func(t *testing.T) {
 			ledger := NewUIDLedger()
-			if err := ledger.Admit("same", now); err != nil {
-				t.Fatal(err)
-			}
-			if err := ledger.Complete("same", true, now); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, ledger.Admit("same", now))
+
+			require.NoError(t, ledger.Complete("same", true, now))
+
 			err := ledger.Admit("same", now.Add(test.offset))
-			if (err == nil) != test.wantAdmit {
-				t.Fatalf(
-					"same-UID admission err=%v wantAdmit=%v",
-					err,
-					test.wantAdmit,
-				)
-			}
+			require.EqualValues(t, test.wantAdmit, (err == nil))
 		})
 	}
 }
@@ -95,23 +89,11 @@ func TestUIDLedgerAdmissionReapsOneBoundedExpiredPrefix(t *testing.T) {
 				UIDReturnBatch+1,
 				now,
 			)
-			if err := ledger.Admit(
-				test.incoming,
-				now.Add(UIDTombstoneLifetime),
-			); err != nil {
-				t.Fatal(err)
-			}
+
+			require.NoError(t, ledger.Admit(test.incoming, now.Add(UIDTombstoneLifetime)))
+
 			active, tombstones, closed := ledger.Census()
-			if active != 1 ||
-				tombstones != 1 ||
-				closed {
-				t.Fatalf(
-					"bounded reap census=%d/%d/%v, want 1/1/false",
-					active,
-					tombstones,
-					closed,
-				)
-			}
+			require.False(t, active != 1 || tombstones != 1 || closed)
 		})
 	}
 }
@@ -133,33 +115,15 @@ func TestUIDLedgerCloseUsesBoundedAcknowledgedBatches(t *testing.T) {
 			for {
 				turns++
 				more, err := ledger.CloseBatch(UIDReturnBatch)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				if !more {
 					break
 				}
 			}
-			wantTurns := max(
-				1,
-				(population+UIDReturnBatch-1)/UIDReturnBatch,
-			)
-			if turns != wantTurns {
-				t.Fatalf(
-					"close turns=%d, want %d within bound",
-					turns,
-					wantTurns,
-				)
-			}
+			wantTurns := max(1, (population+UIDReturnBatch-1)/UIDReturnBatch)
+			require.EqualValues(t, wantTurns, turns)
 			active, tombstones, closed := ledger.Census()
-			if active != 0 || tombstones != 0 || !closed {
-				t.Fatalf(
-					"closed census=%d/%d/%v",
-					active,
-					tombstones,
-					closed,
-				)
-			}
+			require.False(t, active != 0 || tombstones != 0 || !closed)
 		})
 	}
 }
@@ -173,11 +137,9 @@ func seedUIDTombstones(
 	t.Helper()
 	for index := 0; index < count; index++ {
 		uid := fmt.Sprintf("uid-%05d", index)
-		if err := ledger.Admit(uid, now); err != nil {
-			t.Fatalf("admit %d: %v", index, err)
-		}
-		if err := ledger.Complete(uid, true, now); err != nil {
-			t.Fatalf("complete %d: %v", index, err)
-		}
+
+		require.NoError(t, ledger.Admit(uid, now))
+
+		require.NoError(t, ledger.Complete(uid, true, now))
 	}
 }

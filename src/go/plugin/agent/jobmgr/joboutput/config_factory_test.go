@@ -10,6 +10,7 @@ import (
 
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/stretchr/testify/require"
 )
 
 func TestConfigModuleFactoryCleansEveryAttemptAndPrefersV2(t *testing.T) {
@@ -39,9 +40,7 @@ func TestConfigModuleFactoryCleansEveryAttemptAndPrefersV2(t *testing.T) {
 			v1Creates := 0
 			v2Creates := 0
 			resolver, err := secretresolver.NewAtomicResolver(nil)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			factory, err := NewConfigModuleFactory(
 				ConfigModuleFactoryConfig{
 					Modules: collectorapi.Registry{
@@ -62,42 +61,22 @@ func TestConfigModuleFactoryCleansEveryAttemptAndPrefersV2(t *testing.T) {
 					StoreScope: unavailableStoreScope,
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			config := factoryTestConfig(false)
 			switch test.operation {
 			case "configuration":
-				payload, runErr := factory.Configuration(
-					context.Background(),
-					config,
-				)
+				payload, runErr := factory.Configuration(context.Background(), config)
 				err = runErr
-				if runErr == nil && !json.Valid(payload) {
-					t.Fatalf("configuration payload is not JSON: %q", payload)
-				}
+				require.False(t, runErr == nil && !json.Valid(payload))
 			case "test":
 				err = factory.Test(context.Background(), config)
 			case "validate":
 				err = factory.Validate(context.Background(), config)
 			default:
-				t.Fatalf("unknown operation %q", test.operation)
+				require.FailNowf(t, "test failed", "unknown operation %q", test.operation)
 			}
-			if (err != nil) != test.wantErr {
-				t.Fatalf("error=%v, want error=%v", err, test.wantErr)
-			}
-			if v1Creates != 0 ||
-				v2Creates != test.wantCreates ||
-				state.collectorCleanup != test.wantCreates {
-				t.Fatalf(
-					"creates v1/v2=%d/%d cleanup=%d want=0/%d/%d",
-					v1Creates,
-					v2Creates,
-					state.collectorCleanup,
-					test.wantCreates,
-					test.wantCreates,
-				)
-			}
+			require.EqualValues(t, test.wantErr, (err != nil))
+			require.False(t, v1Creates != 0 || v2Creates != test.wantCreates || state.collectorCleanup != test.wantCreates)
 		})
 	}
 }

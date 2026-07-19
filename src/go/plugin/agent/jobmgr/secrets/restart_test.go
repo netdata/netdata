@@ -13,6 +13,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v2"
 )
 
@@ -93,9 +94,7 @@ func TestSecretRestartCommandCommitsWithoutDependentsOrCompositeScope(
 		NewSecretDependencyIndex(),
 		restartTestJobs{},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commits := 0
 	result, message, restored, err := command.Apply(
 		context.Background(),
@@ -112,20 +111,9 @@ func TestSecretRestartCommandCommitsWithoutDependentsOrCompositeScope(
 			}, nil
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if commits != 1 {
-		t.Fatalf("Store commits=%d want=1", commits)
-	}
-	if !result.Applied || message != "" || !restored {
-		t.Fatalf(
-			"no-dependent result=%+v message=%q restored=%v",
-			result,
-			message,
-			restored,
-		)
-	}
+	require.NoError(t, err)
+	require.EqualValues(t, 1, commits)
+	require.False(t, !result.Applied || message != "" || !restored)
 }
 
 func TestSecretRestartCommandReportsFailedPrecommitRestoration(
@@ -141,9 +129,7 @@ func TestSecretRestartCommandReportsFailedPrecommitRestoration(
 			"secret": "${store:vault:main:value}",
 		}
 		payload, err := yaml.Marshal(config)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		commit, err := index.PrepareJobChange(
 			config.FullName(),
 			&dyncfg.GraphConfig{
@@ -152,9 +138,7 @@ func TestSecretRestartCommandReportsFailedPrecommitRestoration(
 				Payload: payload,
 			},
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		commit()
 	}
 	command, err := NewSecretRestartCommand(
@@ -164,9 +148,7 @@ func TestSecretRestartCommandReportsFailedPrecommitRestoration(
 			stopError: stopError, restoreError: restoreError,
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commitCalled := false
 	_, _, restored, err := command.Apply(
 		context.Background(),
@@ -180,16 +162,9 @@ func TestSecretRestartCommandReportsFailedPrecommitRestoration(
 			return secretstore.SecretMutationResult{}, nil
 		},
 	)
-	if !errors.Is(err, stopError) ||
-		!errors.Is(err, restoreError) {
-		t.Fatalf("restart error=%v", err)
-	}
-	if restored {
-		t.Fatal("failed dependent restoration was reported as complete")
-	}
-	if commitCalled {
-		t.Fatal("Store commit ran after dependent stop failure")
-	}
+	require.False(t, !errors.Is(err, stopError) || !errors.Is(err, restoreError))
+	require.False(t, restored)
+	require.False(t, commitCalled)
 }
 
 func TestSecretRestartCommandRestoresStopAcknowledgedDuringCancellation(
@@ -202,9 +177,7 @@ func TestSecretRestartCommandRestoresStopAcknowledgedDuringCancellation(
 		"secret": "${store:vault:main:value}",
 	}
 	payload, err := yaml.Marshal(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commitDependency, err := index.PrepareJobChange(
 		config.FullName(),
 		&dyncfg.GraphConfig{
@@ -213,18 +186,14 @@ func TestSecretRestartCommandRestoresStopAcknowledgedDuringCancellation(
 			Payload: payload,
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commitDependency()
 	command, err := NewSecretRestartCommand(
 		1,
 		index,
 		restartTestJobs{},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	scope := &restartTestCommandScope{
 		normalErr: context.Canceled,
 	}
@@ -241,29 +210,16 @@ func TestSecretRestartCommandRestoresStopAcknowledgedDuringCancellation(
 			return secretstore.SecretMutationResult{}, nil
 		},
 	)
-	if !errors.Is(err, context.Canceled) {
-		t.Fatalf("restart error=%v", err)
-	}
-	if !restored {
-		t.Fatal("acknowledged stop was not restored")
-	}
-	if scope.rollbackCalls != 1 {
-		t.Fatalf(
-			"rollback starts=%d want=1",
-			scope.rollbackCalls,
-		)
-	}
-	if commitCalled {
-		t.Fatal("Store commit ran after cancelled dependent stop")
-	}
+	require.ErrorIs(t, err, context.Canceled)
+	require.True(t, restored)
+	require.EqualValues(t, 1, scope.rollbackCalls)
+	require.False(t, commitCalled)
 }
 
 func TestSecretRestartCommandRedactsAppliedRestartFailure(
 	t *testing.T,
 ) {
-	sensitive := errors.New(
-		"collector initialization exposed backend-sensitive-detail",
-	)
+	sensitive := errors.New("collector initialization exposed backend-sensitive-detail")
 	index := NewSecretDependencyIndex()
 	config := confgroup.Config{
 		"module": "module",
@@ -271,9 +227,7 @@ func TestSecretRestartCommandRedactsAppliedRestartFailure(
 		"secret": "${store:vault:main:value}",
 	}
 	payload, err := yaml.Marshal(config)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commitDependency, err := index.PrepareJobChange(
 		config.FullName(),
 		&dyncfg.GraphConfig{
@@ -282,18 +236,14 @@ func TestSecretRestartCommandRedactsAppliedRestartFailure(
 			Payload: payload,
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commitDependency()
 	command, err := NewSecretRestartCommand(
 		1,
 		index,
 		restartTestJobs{restoreError: sensitive},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	result, message, _, err := command.Apply(
 		context.Background(),
 		&restartTestCommandScope{},
@@ -308,17 +258,8 @@ func TestSecretRestartCommandRedactsAppliedRestartFailure(
 			}, nil
 		},
 	)
-	if !result.Applied || err != nil {
-		t.Fatalf(
-			"restart result=%+v error=%v",
-			result,
-			err,
-		)
-	}
-	if strings.Contains(message, "backend-sensitive-detail") ||
-		!strings.Contains(message, "module:one") {
-		t.Fatalf("public restart message=%q", message)
-	}
+	require.False(t, !result.Applied || err != nil)
+	require.False(t, strings.Contains(message, "backend-sensitive-detail") || !strings.Contains(message, "module:one"))
 }
 
 func BenchmarkBSecretRestart(b *testing.B) {
@@ -333,7 +274,7 @@ func BenchmarkBSecretRestart(b *testing.B) {
 		}
 		payload, err := yaml.Marshal(config)
 		if err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		commit, err := index.PrepareJobChange(
 			config.FullName(),
@@ -344,7 +285,7 @@ func BenchmarkBSecretRestart(b *testing.B) {
 			},
 		)
 		if err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		commit()
 	}
@@ -354,7 +295,7 @@ func BenchmarkBSecretRestart(b *testing.B) {
 		restartTestJobs{},
 	)
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	scope := &restartTestCommandScope{}
 	commit := func(context.Context) (
@@ -376,7 +317,7 @@ func BenchmarkBSecretRestart(b *testing.B) {
 			commit,
 		)
 		if err != nil || !result.Applied || message != "" {
-			b.Fatalf(
+			require.FailNowf(b, "benchmark failed",
 				"restart result=%+v message=%q error=%v",
 				result,
 				message,

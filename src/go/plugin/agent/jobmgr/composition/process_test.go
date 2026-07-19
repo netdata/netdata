@@ -24,6 +24,8 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	frameworkfunctions "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnodes"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProcessCoreServiceDiscoveryUsesCandidateFunctionTransaction(t *testing.T) {
@@ -46,55 +48,34 @@ func TestProcessCoreServiceDiscoveryUsesCandidateFunctionTransaction(t *testing.
 				nil
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commands := make(chan processControl, 1)
 	done := make(chan error, 1)
 	go func() {
 		done <- process.run(context.Background(), commands)
 	}()
-	output.waitContains(
-		t,
-		"CONFIG go.d:sd:test create accepted template",
-	)
-	if _, err := io.WriteString(
+	output.waitContains(t, "CONFIG go.d:sd:test create accepted template")
+
+	_, writeStringErr := io.WriteString(
 		writer,
 		"FUNCTION sd-get 30 \"config go.d:sd:test:job get\" 0xFFFF \"user=test\"\n",
-	); err != nil {
-		t.Fatal(err)
-	}
-	output.waitContains(
-		t,
-		"CONFIG go.d:sd:test:job status running",
 	)
+	require.NoError(t, writeStringErr)
+
+	output.waitContains(t, "CONFIG go.d:sd:test:job status running")
 	wire := output.String()
-	result := strings.Index(
-		wire,
-		"FUNCTION_RESULT_BEGIN sd-get 200 application/json",
-	)
-	notification := strings.Index(
-		wire,
-		"CONFIG go.d:sd:test:job status running",
-	)
-	if result < 0 || notification < 0 || result >= notification {
-		t.Fatalf(
-			"service discovery wire ordering differs: %q",
-			wire,
-		)
-	}
+	result := strings.Index(wire, "FUNCTION_RESULT_BEGIN sd-get 200 application/json")
+	notification := strings.Index(wire, "CONFIG go.d:sd:test:job status running")
+	require.False(t, result < 0 || notification < 0 || result >= notification)
 	commands <- testProcessControl(processTerminate)
 	select {
 	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(3 * time.Second):
-		t.Fatal("process did not terminate")
+		require.FailNow(t, "test failed", "process did not terminate")
 	}
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, writer.Close())
 }
 
 func TestProcessCoreVnodeDynCfgUsesCandidateTransaction(t *testing.T) {
@@ -125,66 +106,42 @@ func TestProcessCoreVnodeDynCfgUsesCandidateTransaction(t *testing.T) {
 				nil
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commands := make(chan processControl, 1)
 	done := make(chan error, 1)
 	go func() {
 		done <- process.run(context.Background(), commands)
 	}()
-	output.waitContains(
-		t,
-		"CONFIG go.d:vnode:initial create running job",
-	)
+	output.waitContains(t, "CONFIG go.d:vnode:initial create running job")
 	input := "" +
 		"FUNCTION_PAYLOAD vnode-add 30 \"config go.d:vnode add db\" 0xFFFF \"user=test\" application/json\n" +
 		"{\"guid\":\"22222222-2222-2222-2222-222222222222\"}\n" +
 		"FUNCTION_PAYLOAD_END\n" +
 		"FUNCTION vnode-get 30 \"config go.d:vnode:db get\" 0xFFFF \"user=test\"\n"
-	if _, err := io.WriteString(writer, input); err != nil {
-		t.Fatal(err)
-	}
-	output.waitContains(
-		t,
-		"FUNCTION_RESULT_BEGIN vnode-get 200 application/json",
-	)
+
+	_, writeStringErr := io.WriteString(writer, input)
+	require.NoError(t, writeStringErr)
+
+	output.waitContains(t, "FUNCTION_RESULT_BEGIN vnode-get 200 application/json")
 	wire := output.String()
-	addResult := strings.Index(
-		wire,
-		"FUNCTION_RESULT_BEGIN vnode-add 202 application/json",
-	)
-	configCreate := strings.Index(
-		wire,
-		"CONFIG go.d:vnode:db create running job",
-	)
-	getResult := strings.Index(
-		wire,
-		"FUNCTION_RESULT_BEGIN vnode-get 200 application/json",
-	)
-	if addResult < 0 ||
+	addResult := strings.Index(wire, "FUNCTION_RESULT_BEGIN vnode-add 202 application/json")
+	configCreate := strings.Index(wire, "CONFIG go.d:vnode:db create running job")
+	getResult := strings.Index(wire, "FUNCTION_RESULT_BEGIN vnode-get 200 application/json")
+	require.False(t, addResult < 0 ||
 		configCreate < 0 ||
 		getResult < 0 ||
 		addResult >= configCreate ||
 		configCreate >= getResult ||
-		!strings.Contains(
-			wire[getResult:],
-			`"name":"db","hostname":"db","guid":"22222222-2222-2222-2222-222222222222"`,
-		) {
-		t.Fatalf("vnode wire flow differs: %q", wire)
-	}
+		!strings.Contains(wire[getResult:], `"name":"db","hostname":"db","guid":"22222222-2222-2222-2222-222222222222"`))
 	commands <- testProcessControl(processTerminate)
 	select {
 	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(3 * time.Second):
-		t.Fatal("process did not terminate")
+		require.FailNow(t, "test failed", "process did not terminate")
 	}
-	if err := writer.Close(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, writer.Close())
 }
 
 func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
@@ -230,9 +187,7 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 				nil
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commands := make(chan processControl, 2)
 	done := make(chan error, 1)
 	go func() {
@@ -246,22 +201,17 @@ func TestProcessCoreRestartsOneInputAndMovesFrameAuthority(t *testing.T) {
 	waitProcessEvent(t, events, "withdraw")
 	select {
 	case err := <-done:
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	case <-time.After(3 * time.Second):
-		t.Fatal("process did not terminate")
+		require.FailNow(t, "test failed", "process did not terminate")
 	}
-	if census := process.ingress.Census(); census.ReaderStarts != 1 ||
-		census.State != "contained" ||
-		census.RunGeneration != 0 {
-		t.Fatalf("process ingress census=%+v", census)
-	}
+
+	census := process.ingress.Census()
+	require.False(t, census.ReaderStarts != 1 || census.State != "contained" || census.RunGeneration != 0)
+
 	cleanupsMu.Lock()
 	defer cleanupsMu.Unlock()
-	if cleanups != 2 {
-		t.Fatalf("handler cleanups=%d want=2", cleanups)
-	}
+	require.EqualValues(t, 2, cleanups)
 }
 
 func TestProcessCoreRejectsSuccessorAfterUnquiescedPredecessor(
@@ -294,9 +244,7 @@ func TestProcessCoreRejectsSuccessorAfterUnquiescedPredecessor(
 			},
 		}},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	initialStore := secretstore.Config{
 		"name": "main", "kind": string(secretstore.KindVault),
 		"value":           "initial",
@@ -345,18 +293,14 @@ func TestProcessCoreRejectsSuccessorAfterUnquiescedPredecessor(
 				nil
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commands := make(chan processControl, 1)
 	done := make(chan error, 1)
 	go func() {
 		done <- process.run(context.Background(), commands)
 	}()
 	waitProcessEvent(t, events, "publish")
-	if storeScope == nil || storeCensus == nil {
-		t.Fatal("planner did not receive Store observation capabilities")
-	}
+	require.False(t, storeScope == nil || storeCensus == nil)
 	key := secretstore.StoreKey(secretstore.KindVault, "main")
 	var retained secretresolver.AtomicScope
 	deadline := time.Now().Add(3 * time.Second)
@@ -365,87 +309,61 @@ func TestProcessCoreRejectsSuccessorAfterUnquiescedPredecessor(
 		if err == nil {
 			break
 		}
-		if time.Now().After(deadline) {
-			t.Fatalf("initial Store was not published: %v", err)
-		}
+		require.False(t, time.Now().After(deadline))
 		time.Sleep(time.Millisecond)
 	}
 	defer func() {
 		if retained != nil {
-			if err := retained.Release(context.Background()); err != nil {
-				t.Errorf("release retained Store scope: %v", err)
-			}
+			assert.NoError(t, retained.Release(context.Background()))
 		}
 	}()
-	if census := storeCensus(); census.Current != 1 ||
-		census.Generations != 1 ||
-		census.Readers != 1 ||
-		census.Scopes != 1 {
-		t.Fatalf("retained predecessor Store census=%+v", census)
-	}
+
+	census := storeCensus()
+	require.False(t, census.Current != 1 || census.Generations != 1 || census.Readers != 1 || census.Scopes != 1)
+
 	control := testProcessControl(processRestart)
 	commands <- control
 	waitProcessEvent(t, events, "withdraw")
 	select {
 	case err := <-control.result:
-		if err == nil ||
-			!strings.Contains(
-				err.Error(),
-				"secretstore: close with retained ownership",
-			) ||
-			!strings.Contains(
-				err.Error(),
-				"jobmgr composition: run did not quiesce",
-			) {
-			t.Fatalf("restart error=%v", err)
-		}
+		require.False(t, err == nil ||
+			!strings.Contains(err.Error(), "secretstore: close with retained ownership") ||
+			!strings.Contains(err.Error(), "jobmgr composition: run did not quiesce"))
 	case <-time.After(3 * time.Second):
-		t.Fatal("restart did not reject unquiesced predecessor")
+		require.FailNow(t, "test failed", "restart did not reject unquiesced predecessor")
 	}
 	select {
 	case err := <-done:
-		if err == nil ||
-			!strings.Contains(
-				err.Error(),
-				"secretstore: close with retained ownership",
-			) {
-			t.Fatalf("process error=%v", err)
-		}
+		require.False(t, err == nil || !strings.Contains(err.Error(), "secretstore: close with retained ownership"))
 	case <-time.After(3 * time.Second):
-		t.Fatal("process did not exit after rejected publication")
+		require.FailNow(t, "test failed", "process did not exit after rejected publication")
 	}
-	if plannerCalls != 1 {
-		t.Fatalf(
-			"successor construction reached planner: calls=%d",
-			plannerCalls,
-		)
-	}
+	require.EqualValues(t, 1, plannerCalls)
 	select {
 	case event := <-events:
-		t.Fatalf("successor produced event %q", event)
+		require.FailNowf(t, "test failed", "successor produced event %q", event)
 	default:
 	}
-	if census := process.ingress.Census(); census.State != "contained" ||
-		census.RunGeneration != 0 {
-		t.Fatalf("process ingress census=%+v", census)
-	}
-	if census := storeCensus(); census.Current != 0 ||
-		census.Retiring != 1 ||
-		census.Generations != 1 ||
-		census.Readers != 1 ||
-		census.Scopes != 1 ||
-		!census.Closing {
-		t.Fatalf("unquiesced predecessor Store census=%+v", census)
-	}
-	if err := retained.Release(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+
+	ingressCensus := process.ingress.Census()
+	require.False(t, ingressCensus.State != "contained" || ingressCensus.RunGeneration != 0)
+
+	storeCensus2 := storeCensus()
+	require.False(t, storeCensus2.Current != 0 ||
+		storeCensus2.Retiring != 1 ||
+		storeCensus2.Generations != 1 ||
+		storeCensus2.Readers != 1 ||
+		storeCensus2.Scopes != 1 ||
+		!storeCensus2.Closing)
+
+	require.NoError(t, retained.Release(context.Background()))
+
 	retained = nil
-	if census := storeCensus(); census != (secretstore.SecretStoreCensus{
+
+	require.EqualValues(t, (secretstore.SecretStoreCensus{
 		Closing: true,
-	}) {
-		t.Fatalf("released predecessor Store census=%+v", census)
-	}
+	}), storeCensus(),
+	)
 }
 
 func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(
@@ -472,9 +390,7 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(
 	catalog, err := agentdiscovery.NewProviderCatalog(
 		[]agentdiscovery.ProviderFactory{factory},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	plannerCalls := 0
 	process, err := newProcessCore(processCoreConfig{
 		Input: reader, Output: newProcessSynchronizedBuffer(),
@@ -500,9 +416,7 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(
 				nil
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commands := make(chan processControl, 1)
 	done := make(chan error, 1)
 	go func() {
@@ -511,44 +425,25 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(
 	select {
 	case <-started:
 	case <-time.After(time.Second):
-		t.Fatal("discovery provider did not start")
+		require.FailNow(t, "test failed", "discovery provider did not start")
 	}
 	control := testProcessControl(processRestart)
 	commands <- control
 	select {
 	case err := <-control.result:
-		if err == nil ||
-			!strings.Contains(
-				err.Error(),
-				"jobmgr composition: run did not quiesce",
-			) ||
-			!errors.Is(
-				err,
-				context.DeadlineExceeded,
-			) {
-			t.Fatalf("restart error=%v", err)
-		}
+		require.False(t, err == nil ||
+			!strings.Contains(err.Error(), "jobmgr composition: run did not quiesce") ||
+			!errors.Is(err, context.DeadlineExceeded))
 	case <-time.After(time.Second):
-		t.Fatal("restart did not reject retained discovery provider")
+		require.FailNow(t, "test failed", "restart did not reject retained discovery provider")
 	}
 	select {
 	case err := <-done:
-		if err == nil ||
-			!strings.Contains(
-				err.Error(),
-				"jobmgr composition: run did not quiesce",
-			) {
-			t.Fatalf("process error=%v", err)
-		}
+		require.False(t, err == nil || !strings.Contains(err.Error(), "jobmgr composition: run did not quiesce"))
 	case <-time.After(time.Second):
-		t.Fatal("process did not exit after retained discovery provider")
+		require.FailNow(t, "test failed", "process did not exit after retained discovery provider")
 	}
-	if plannerCalls != 1 {
-		t.Fatalf(
-			"successor construction reached planner: calls=%d",
-			plannerCalls,
-		)
-	}
+	require.EqualValues(t, 1, plannerCalls)
 }
 
 func TestProcessCoreContainsConstructionFailures(t *testing.T) {
@@ -598,9 +493,7 @@ func TestProcessCoreContainsConstructionFailures(t *testing.T) {
 				catalog, err := agentdiscovery.NewProviderCatalog(
 					[]agentdiscovery.ProviderFactory{factory},
 				)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				discovery = runDiscoveryServices{
 					BuildContext: agentdiscovery.BuildContext{
 						Registry: confgroup.Registry{"module": {}},
@@ -648,9 +541,7 @@ func TestProcessCoreContainsConstructionFailures(t *testing.T) {
 						nil
 				},
 			})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			commands := make(chan processControl, 1)
 			done := make(chan error, 1)
 			go func() {
@@ -666,37 +557,25 @@ func TestProcessCoreContainsConstructionFailures(t *testing.T) {
 			}
 			select {
 			case err := <-done:
-				if tc.wantErr != nil &&
-					!errors.Is(err, tc.wantErr) {
-					t.Fatalf("process error=%v", err)
-				}
-				if tc.wantErrorText != "" &&
-					!strings.Contains(err.Error(), tc.wantErrorText) {
-					t.Fatalf("process error=%v", err)
-				}
+				require.False(t, tc.wantErr != nil && !errors.Is(err, tc.wantErr))
+				require.False(t, tc.wantErrorText != "" && !strings.Contains(err.Error(), tc.wantErrorText))
 			case <-time.After(3 * time.Second):
-				t.Fatal("process did not contain construction failure")
+				require.FailNow(t, "test failed", "process did not contain construction failure")
 			}
-			if err := writer.Close(); err != nil {
-				t.Fatal(err)
-			}
-			if len(events) != 0 {
-				t.Fatalf("unexpected process events remain: %d", len(events))
-			}
+
+			require.NoError(t, writer.Close())
+
+			require.EqualValues(t, 0, len(events))
 			census := process.ingress.Census()
-			if census.State != "contained" ||
+			require.False(t, census.State != "contained" ||
 				census.RunGeneration != 0 ||
-				census.ReaderStarts != tc.wantReaderStart {
-				t.Fatalf("process ingress census=%+v", census)
-			}
-			if census := process.admission.Census(); census.Phase != "closed" {
-				t.Fatalf("admission census=%+v", census)
-			}
+				census.ReaderStarts != tc.wantReaderStart)
+
+			require.EqualValues(t, "closed", process.admission.Census().Phase)
+
 			cleanupsMu.Lock()
 			defer cleanupsMu.Unlock()
-			if cleanups != tc.wantCleanups {
-				t.Fatalf("handler cleanups=%d want=%d", cleanups, tc.wantCleanups)
-			}
+			require.EqualValues(t, tc.wantCleanups, cleanups)
 		})
 	}
 }
@@ -707,21 +586,16 @@ func TestProcessRetirementPreservesRunDirtyCause(t *testing.T) {
 		lifecycle.RealClock{},
 		time.Second,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	cause := errors.New("discovery shutdown failed")
-	if err := run.Dirty(cause); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, run.Dirty(cause))
+
 	err = (&processCore{}).retireRun(
 		context.Background(),
 		&runGeneration{run: run},
 	)
-	if !errors.Is(err, cause) ||
-		!strings.Contains(err.Error(), "run did not quiesce") {
-		t.Fatalf("retirement lost run failure: %v", err)
-	}
+	require.False(t, !errors.Is(err, cause) || !strings.Contains(err.Error(), "run did not quiesce"))
 }
 
 var errProcessPlannerConstruction = errors.New("process planner construction failed")
@@ -778,11 +652,7 @@ func (psb *processSynchronizedBuffer) waitContains(
 		select {
 		case <-psb.writes:
 		case <-timeout.C:
-			t.Fatalf(
-				"process output does not contain %q: %q",
-				want,
-				psb.String(),
-			)
+			require.FailNowf(t, "test failed", "process output does not contain %q: %q", want, psb.String())
 		}
 	}
 }
@@ -807,9 +677,7 @@ func testRunServiceDiscoveryServices(
 	catalog, err := agentdiscovery.NewProviderCatalog(
 		[]agentdiscovery.ProviderFactory{factory},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return runDiscoveryServices{
 		BuildContext: agentdiscovery.BuildContext{
 			Registry: confgroup.Registry{"test": {}},
@@ -854,10 +722,7 @@ func (psd processServiceDiscovery) Run(
 				ExpireTimestamp: "0",
 				Payload:         `{"status":200}`,
 			})
-			api.CONFIGSTATUS(
-				"go.d:sd:test:job",
-				"running",
-			)
+			api.CONFIGSTATUS("go.d:sd:test:job", "running")
 		},
 	)
 	api.CONFIGCREATE(netdataapi.ConfigOpts{
@@ -875,11 +740,9 @@ func waitProcessEvent(t *testing.T, events <-chan string, want string) {
 	t.Helper()
 	select {
 	case got := <-events:
-		if got != want {
-			t.Fatalf("process event=%q want=%q", got, want)
-		}
+		require.EqualValues(t, want, got)
 	case <-time.After(2 * time.Second):
-		t.Fatalf("timed out waiting for process event %q", want)
+		require.FailNowf(t, "test failed", "timed out waiting for process event %q", want)
 	}
 }
 

@@ -9,14 +9,13 @@ import (
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSchedulerTicksEachJobAndModuleOnce(t *testing.T) {
 	reconciler := &schedulerTestReconciler{}
 	scheduler, err := NewScheduler(reconciler)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	jobs := map[string]*schedulerTestJob{
 		"first": {
 			id: "first", module: "module-a",
@@ -31,79 +30,63 @@ func TestSchedulerTicksEachJobAndModuleOnce(t *testing.T) {
 	order := []string{"first", "second", "third"}
 	for _, name := range order {
 		job := jobs[name]
-		if err := scheduler.Register(
+
+		require.NoError(t, scheduler.Register(
 			lifecycle.ResourceIdentity{ID: name, Generation: 1},
 			job,
-		); err != nil {
-			t.Fatal(err)
-		}
+		),
+		)
 	}
-	if err := scheduler.Tick(context.Background(), 7); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, scheduler.Tick(context.Background(), 7))
+
 	for _, name := range order {
 		job := jobs[name]
-		if job.ticks != 1 || job.clock != 7 {
-			t.Fatalf(
-				"job %s ticks=%d clock=%d want=1/7",
-				name,
-				job.ticks,
-				job.clock,
-			)
-		}
+		require.False(t, job.ticks != 1 || job.clock != 7)
 	}
-	if got := reconciler.snapshot(); !equalStrings(
+
+	got := reconciler.snapshot()
+	require.True(t, equalStrings(
 		got,
 		[]string{"module-a", "module-b"},
-	) {
-		t.Fatalf("module reconciliations=%v", got)
-	}
+	))
+
 	for name, job := range jobs {
-		if err := scheduler.Unregister(
+		require.NoError(t, scheduler.Unregister(
 			lifecycle.ResourceIdentity{ID: name, Generation: 1},
 			job,
-		); err != nil {
-			t.Fatal(err)
-		}
+		),
+		)
 	}
-	if scheduler.Census() != 0 {
-		t.Fatalf("scheduler census=%d want=0", scheduler.Census())
-	}
-	if err := scheduler.Tick(context.Background(), 8); err != nil {
-		t.Fatal(err)
-	}
+	require.EqualValues(t, 0, scheduler.Census())
+
+	require.NoError(t, scheduler.Tick(context.Background(), 8))
+
 	for name, job := range jobs {
-		if job.ticks != 1 {
-			t.Fatalf("unregistered job %s ticked again", name)
-		}
+		require.EqualValues(t, 1, job.ticks, "job=%s", name)
 	}
 }
 
 func TestSchedulerWarmTickDoesNotAllocate(t *testing.T) {
 	scheduler, err := NewScheduler(testModuleReconciler{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	job := &schedulerTestJob{id: "job", module: "module"}
 	identity := lifecycle.ResourceIdentity{ID: "job", Generation: 1}
-	if err := scheduler.Register(identity, job); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, scheduler.Register(identity, job))
+
 	ctx := context.Background()
-	if err := scheduler.Tick(ctx, 1); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, scheduler.Tick(ctx, 1))
+
 	allocations := testing.AllocsPerRun(1_000, func() {
 		if err := scheduler.Tick(ctx, 1); err != nil {
 			panic(err)
 		}
 	})
-	if allocations != 0 {
-		t.Fatalf("warm scheduler tick allocations=%f want=0", allocations)
-	}
-	if err := scheduler.Unregister(identity, job); err != nil {
-		t.Fatal(err)
-	}
+	require.EqualValues(t, 0, allocations)
+
+	require.NoError(t, scheduler.Unregister(identity, job))
 }
 
 func TestSchedulerGrowsBeyondFormerActiveJobLimit(t *testing.T) {
@@ -120,41 +103,33 @@ func TestSchedulerGrowsBeyondFormerActiveJobLimit(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			scheduler, err := NewScheduler(testModuleReconciler{})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			jobs := make([]*schedulerTestJob, 0, test.population)
 			for index := 0; index < test.population; index++ {
 				id := fmt.Sprintf("dynamic-job-%03d", index)
 				job := &schedulerTestJob{id: id, module: "module"}
-				if err := scheduler.Register(
+
+				require.NoError(t, scheduler.Register(
 					lifecycle.ResourceIdentity{
 						ID:         id,
 						Generation: 1,
 					},
 					job,
-				); err != nil {
-					t.Fatalf("register job %d: %v", index, err)
-				}
+				),
+				)
+
 				jobs = append(jobs, job)
 			}
-			if scheduler.Census() != test.population {
-				t.Fatalf(
-					"scheduler census=%d want=%d",
-					scheduler.Census(),
-					test.population,
-				)
-			}
+			require.EqualValues(t, test.population, scheduler.Census())
 			for _, job := range jobs {
-				if err := scheduler.Unregister(
+				require.NoError(t, scheduler.Unregister(
 					lifecycle.ResourceIdentity{
 						ID:         job.id,
 						Generation: 1,
 					},
 					job,
-				); err != nil {
-					t.Fatal(err)
-				}
+				),
+				)
 			}
 		})
 	}

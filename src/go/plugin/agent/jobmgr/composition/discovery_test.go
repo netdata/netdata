@@ -15,6 +15,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDiscoveryShutdownCancelsSupervisorBeforeProviders(t *testing.T) {
@@ -51,16 +52,12 @@ func TestDiscoveryShutdownCancelsSupervisorBeforeProviders(t *testing.T) {
 				supervisorCancelled = true
 			case providerRefs["file"]:
 				if !supervisorCancelled {
-					return errors.New(
-						"provider canceled before supervisor",
-					)
+					return errors.New("provider canceled before supervisor")
 				}
 				providers = append(providers, "file")
 			case providerRefs["service-discovery"]:
 				if !supervisorCancelled {
-					return errors.New(
-						"provider canceled before supervisor",
-					)
+					return errors.New("provider canceled before supervisor")
 				}
 				providers = append(providers, "service-discovery")
 			default:
@@ -73,14 +70,8 @@ func TestDiscoveryShutdownCancelsSupervisorBeforeProviders(t *testing.T) {
 		[]string{"file", "service-discovery"},
 		providerRefs,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(providers) != 2 ||
-		providers[0] != "file" ||
-		providers[1] != "service-discovery" {
-		t.Fatalf("provider cancellation order=%v", providers)
-	}
+	require.NoError(t, err)
+	require.False(t, len(providers) != 2 || providers[0] != "file" || providers[1] != "service-discovery")
 }
 
 func TestDiscoveryChildrenWaitForPublication(t *testing.T) {
@@ -90,9 +81,7 @@ func TestDiscoveryChildrenWaitForPublication(t *testing.T) {
 		publicationTestDiscoverer{entered: entered},
 	)
 	ready, err := prepared.AcceptStart(context.Background(), 1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	enteredBeforePublish := false
 	select {
@@ -100,31 +89,25 @@ func TestDiscoveryChildrenWaitForPublication(t *testing.T) {
 		enteredBeforePublish = true
 	case <-time.After(50 * time.Millisecond):
 	}
-	if err := ready.Publish(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, ready.Publish())
+
 	select {
 	case <-entered:
 	case <-time.After(time.Second):
-		t.Fatal("provider did not enter after discovery publication")
+		require.FailNow(t, "test failed", "provider did not enter after discovery publication")
 	}
-	stopCtx, cancel := context.WithTimeout(
-		context.Background(),
-		time.Second,
-	)
+	stopCtx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	if err := ready.Stop(stopCtx); err != nil {
-		t.Fatal(err)
-	}
-	if err := ready.Finalize(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := admission.ReleaseOrdinary(admissionRef); err != nil {
-		t.Fatal(err)
-	}
-	if enteredBeforePublish {
-		t.Fatal("provider entered before discovery publication")
-	}
+
+	require.NoError(t, ready.Stop(stopCtx))
+
+	require.NoError(t, ready.Finalize())
+
+	_, releaseOrdinaryErr := admission.ReleaseOrdinary(admissionRef)
+	require.NoError(t, releaseOrdinaryErr)
+
+	require.False(t, enteredBeforePublish)
 }
 
 func TestDiscoveryZeroChargePermitFailurePaths(t *testing.T) {
@@ -134,25 +117,18 @@ func TestDiscoveryZeroChargePermitFailurePaths(t *testing.T) {
 		"prepared disposal": {
 			fail: func(t *testing.T, prepared *preparedDiscovery) {
 				t.Helper()
-				if err := prepared.Dispose(context.Background()); err != nil {
-					t.Fatal(err)
-				}
+
+				require.NoError(t, prepared.Dispose(context.Background()))
 			},
 		},
 		"partial start": {
 			fail: func(t *testing.T, prepared *preparedDiscovery) {
 				t.Helper()
-				if err := prepared.tasks.SealInherited(); err != nil {
-					t.Fatal(err)
-				}
+
+				require.NoError(t, prepared.tasks.SealInherited())
+
 				ready, err := prepared.AcceptStart(context.Background(), 1)
-				if err == nil || ready != nil {
-					t.Fatalf(
-						"sealed inherited registry accepted discovery start: ready=%T err=%v",
-						ready,
-						err,
-					)
-				}
+				require.False(t, err == nil || ready != nil)
 			},
 		},
 	}
@@ -163,39 +139,28 @@ func TestDiscoveryZeroChargePermitFailurePaths(t *testing.T) {
 				publicationTestDiscoverer{},
 			)
 			test.fail(t, prepared)
-			if census := prepared.tasks.LongLivedCensus(); census != (lifecycle.LongLivedCensus{}) {
-				t.Fatalf(
-					"failed discovery retained lifecycle ownership: %+v",
-					census,
-				)
-			}
-			if census := admission.Census(); census.ActiveRecords != 1 ||
+
+			require.EqualValues(t, (lifecycle.LongLivedCensus{}), prepared.tasks.LongLivedCensus())
+
+			census := admission.Census()
+			require.False(t, census.ActiveRecords != 1 ||
 				census.OrdinaryGranted != 1 ||
 				census.OrdinaryBytes != 1 ||
 				census.LongLivedRecords != 0 ||
-				census.LongLivedBytes != 0 {
-				t.Fatalf(
-					"failed discovery changed charge-free admission: %+v",
-					census,
-				)
-			}
-			if _, err := admission.ReleaseOrdinary(admissionRef); err != nil {
-				t.Fatal(err)
-			}
-			if census := admission.Census(); census.ActiveRecords != 0 ||
-				census.OrdinaryBytes != 0 {
-				t.Fatalf("failed discovery retained admission: %+v", census)
-			}
+				census.LongLivedBytes != 0)
+
+			_, err := admission.ReleaseOrdinary(admissionRef)
+			require.NoError(t, err)
+
+			admissionCensus := admission.Census()
+			require.False(t, admissionCensus.ActiveRecords != 0 || admissionCensus.OrdinaryBytes != 0)
+
 		})
 	}
 }
 
 func TestDiscoverySupervisorPanicFailsRun(t *testing.T) {
-	config := confgroup.Config{}.
-		SetName("job").
-		SetModule("module").
-		SetProvider("test").
-		SetSourceType(confgroup.TypeStock).
+	config := confgroup.Config{}.SetName("job").SetModule("module").SetProvider("test").SetSourceType(confgroup.TypeStock).
 		SetSource("source")
 	pipeline := newDiscoveryTestPipeline(
 		t,
@@ -217,9 +182,7 @@ func TestDiscoverySupervisorPanicFailsRun(t *testing.T) {
 			},
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	providerErr := make(chan error, 1)
@@ -233,21 +196,16 @@ func TestDiscoverySupervisorPanicFailsRun(t *testing.T) {
 		decisions,
 		func(err error) { failed <- err },
 	)
-	if !errors.Is(err, lifecycle.ErrTaskPanic) {
-		t.Fatalf("supervisor error=%v", err)
-	}
+	require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
 	select {
 	case failErr := <-failed:
-		if !errors.Is(failErr, lifecycle.ErrTaskPanic) {
-			t.Fatalf("fail-stop error=%v", failErr)
-		}
+		require.ErrorIs(t, failErr, lifecycle.ErrTaskPanic)
 	case <-time.After(time.Second):
-		t.Fatal("supervisor panic did not fail-stop the run")
+		require.FailNow(t, "test failed", "supervisor panic did not fail-stop the run")
 	}
 	cancel()
-	if err := <-providerErr; err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, <-providerErr)
 }
 
 func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
@@ -275,13 +233,9 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 			),
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	admission := lifecycle.NewAdmissionLedger()
 	uids := lifecycle.NewUIDLedger()
 	generation, err := newRunGeneration(runGenerationConfig{
@@ -308,37 +262,30 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 				nil
 		},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := generation.Start(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if census := generation.tasks.InheritedCensus(); census.Active != 2 {
-		t.Fatalf("inherited census=%+v, want two active records", census)
-	}
-	if census := generation.tasks.LongLivedCensus(); census != (lifecycle.LongLivedCensus{
+	require.NoError(t, err)
+
+	require.NoError(t, generation.Start(context.Background()))
+
+	require.EqualValues(t, 2, generation.tasks.InheritedCensus().Active)
+
+	require.EqualValues(t, (lifecycle.LongLivedCensus{
 		Active:         1,
 		Pipelines:      1,
 		GActive:        2,
 		ExternalActive: 1,
-	}) {
-		t.Fatalf("long-lived census=%+v", census)
-	}
+	}), generation.tasks.LongLivedCensus(),
+	)
 
 	generation.Stop()
-	if err := generation.Wait(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if census := generation.tasks.InheritedCensus(); census != (lifecycle.InheritedTaskCensus{}) {
-		t.Fatalf("final inherited census=%+v", census)
-	}
-	if census := generation.tasks.LongLivedCensus(); census != (lifecycle.LongLivedCensus{}) {
-		t.Fatalf("final long-lived census=%+v", census)
-	}
-	if err := admission.CloseDrained(1); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, generation.Wait(context.Background()))
+
+	require.EqualValues(t, (lifecycle.InheritedTaskCensus{}), generation.tasks.InheritedCensus())
+
+	require.EqualValues(t, (lifecycle.LongLivedCensus{}), generation.tasks.LongLivedCensus())
+
+	require.NoError(t, admission.CloseDrained(1))
+
 	closeRunTestUIDs(t, uids)
 }
 
@@ -363,42 +310,25 @@ func newPublicationTestDiscovery(
 			},
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tasks, err := lifecycle.NewTaskSupervisor(frames)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	plan, err := lifecycle.NewPipelineLongLivedPlan(
 		[]string{"provider"},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	admission := lifecycle.NewAdmissionLedger()
 	requested := admission.RequestOrdinary(
 		1,
 		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
 		plan.Bytes()+1,
 	)
-	if requested.Rejected != nil {
-		t.Fatal(requested.Rejected)
-	}
+	require.Nil(t, requested.Rejected)
 	var grants [4]lifecycle.AdmissionGrant
 	count, _, err := admission.TakeGrants(1, &grants)
-	if err != nil || count != 1 || grants[0].Ref != requested.Ref {
-		t.Fatalf(
-			"admission grant count=%d grant=%+v err=%v",
-			count,
-			grants[0],
-			err,
-		)
-	}
+	require.False(t, err != nil || count != 1 || grants[0].Ref != requested.Ref)
 	identity := lifecycle.ResourceIdentity{
 		ID: discoveryResourceID, Generation: 1,
 	}
@@ -408,9 +338,7 @@ func newPublicationTestDiscovery(
 		identity,
 		plan,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	prepared, err := newPreparedDiscovery(
 		pipeline,
 		decisions,
@@ -419,9 +347,7 @@ func newPublicationTestDiscovery(
 		permit,
 		func(error) {},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return prepared, admission, requested.Ref
 }
 
@@ -444,9 +370,7 @@ func newDiscoveryTestPipeline(
 			),
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	pipeline, err := agentdiscovery.NewPipelineGeneration(
 		agentdiscovery.PipelineConfig{
 			BuildContext: agentdiscovery.BuildContext{
@@ -455,9 +379,7 @@ func newDiscoveryTestPipeline(
 			Providers: catalog,
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return pipeline
 }
 

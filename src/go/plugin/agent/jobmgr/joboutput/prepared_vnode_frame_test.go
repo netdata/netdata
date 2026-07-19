@@ -10,6 +10,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/netdataapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/vnoderegistry"
+	"github.com/stretchr/testify/require"
 )
 
 func TestPreparedVNodeFrameLinearTransfer(t *testing.T) {
@@ -36,31 +37,20 @@ func TestPreparedVNodeFrameLinearTransfer(t *testing.T) {
 				func() error { commits++; return nil },
 				func() error { aborts++; return nil },
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			alias := prepared
 			owner, err := lifecycle.NewFrameOwner(test.writer)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			transferErr := prepared.Transfer(owner)
-			if test.wantCommit > 0 && transferErr != nil {
-				t.Fatal(transferErr)
-			}
-			if test.wantAbort > 0 && transferErr == nil {
-				t.Fatal("short write unexpectedly succeeded")
-			}
-			if commits != test.wantCommit || aborts != test.wantAbort {
-				t.Fatalf("commits=%d aborts=%d", commits, aborts)
-			}
-			if err := alias.Abort(); !errors.Is(err, ErrPreparedVNodeFrameConsumed) {
-				t.Fatalf("duplicate disposition error=%v", err)
-			}
+			require.False(t, test.wantCommit > 0 && transferErr != nil)
+			require.False(t, test.wantAbort > 0 && transferErr == nil)
+			require.False(t, commits != test.wantCommit || aborts != test.wantAbort)
+
+			require.ErrorIs(t, alias.Abort(), ErrPreparedVNodeFrameConsumed)
+
 			if test.wantAbort > 0 {
-				if census := owner.Census(); !census.Poisoned || census.RetainedBytes == 0 {
-					t.Fatalf("frame census=%#v", census)
-				}
+				census := owner.Census()
+				require.False(t, !census.Poisoned || census.RetainedBytes == 0)
 			}
 		})
 	}
@@ -69,9 +59,7 @@ func TestPreparedVNodeFrameLinearTransfer(t *testing.T) {
 func TestPreparedVNodeFrameHoldsFrameOwnershipThroughMetadataCommit(t *testing.T) {
 	writer := &countingProtocolWriter{}
 	owner, err := lifecycle.NewFrameOwner(writer)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	commitSawBusy := false
 	prepared, err := PrepareVNodeFrame(
 		1,
@@ -83,28 +71,21 @@ func TestPreparedVNodeFrameHoldsFrameOwnershipThroughMetadataCommit(t *testing.T
 		},
 		func() error { return nil },
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := prepared.Transfer(owner); err != nil {
-		t.Fatal(err)
-	}
-	if !commitSawBusy {
-		t.Fatal("FrameOwner released serialization before metadata commit")
-	}
-	if err := owner.CommitProtocolFrame([]byte("BEGIN chart\nEND\n\n")); err != nil {
-		t.Fatal(err)
-	}
-	if writes := writer.Writes(); writes != 2 {
-		t.Fatalf("writes=%d want=2", writes)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, prepared.Transfer(owner))
+
+	require.True(t, commitSawBusy)
+
+	require.NoError(t, owner.CommitProtocolFrame([]byte("BEGIN chart\nEND\n\n")))
+
+	writes := writer.Writes()
+	require.EqualValues(t, 2, writes)
 }
 
 func TestPreparedVNodeFrameCommitFailurePoisonsOwner(t *testing.T) {
 	owner, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	sentinel := errors.New("metadata commit failed")
 	prepared, err := PrepareVNodeFrame(
 		1,
@@ -113,15 +94,12 @@ func TestPreparedVNodeFrameCommitFailurePoisonsOwner(t *testing.T) {
 		func() error { return sentinel },
 		func() error { return nil },
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := prepared.Transfer(owner); !errors.Is(err, sentinel) {
-		t.Fatalf("transfer error=%v want=%v", err, sentinel)
-	}
-	if census := owner.Census(); !census.Poisoned || census.RetainedBytes == 0 {
-		t.Fatalf("frame census=%+v", census)
-	}
+	require.NoError(t, err)
+
+	require.ErrorIs(t, prepared.Transfer(owner), sentinel)
+
+	census := owner.Census()
+	require.False(t, !census.Poisoned || census.RetainedBytes == 0)
 }
 
 func TestPreparedVNodeFrameDrivesRegistryTransaction(t *testing.T) {
@@ -143,14 +121,10 @@ func TestPreparedVNodeFrameDrivesRegistryTransaction(t *testing.T) {
 				vnoderegistry.MetadataAuthority{ID: "job", Generation: 1},
 				netdataapi.HostInfo{GUID: "node", Hostname: "host"},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			revision := pending.Revision()
 			reservation, err := pending.Transfer()
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			var lease vnoderegistry.MetadataLease
 			prepared, err := PrepareVNodeFrame(
 				1,
@@ -163,45 +137,35 @@ func TestPreparedVNodeFrameDrivesRegistryTransaction(t *testing.T) {
 				},
 				reservation.Abort,
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, ok := registry.Lookup("node"); ok {
-				t.Fatal("reservation visible before frame commit")
-			}
+			require.NoError(t, err)
+
+			_, ok := registry.Lookup("node")
+			require.False(t, ok)
+
 			owner, err := lifecycle.NewFrameOwner(test.writer)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			transferErr := prepared.Transfer(owner)
-			if test.wantVisible && transferErr != nil {
-				t.Fatal(transferErr)
-			}
-			if !test.wantVisible && transferErr == nil {
-				t.Fatal("short write unexpectedly succeeded")
-			}
-			if info, ok := registry.Lookup("node"); ok != test.wantVisible {
-				t.Fatalf("metadata=%#v visible=%v want=%v", info, ok, test.wantVisible)
-			}
+			require.False(t, test.wantVisible && transferErr != nil)
+			require.False(t, !test.wantVisible && transferErr == nil)
+
+			lookupInfo, lookup := registry.Lookup("node")
+			require.EqualValues(t, test.wantVisible, lookup, "metadata=%+v", lookupInfo)
+
 			if test.wantVisible {
-				if removed, err := registry.ReleaseMetadata(lease); err != nil || !removed {
-					t.Fatalf("release removed=%v err=%v", removed, err)
-				}
+
+				releaseMetadataRemoved, releaseMetadataErr := registry.ReleaseMetadata(lease)
+				require.False(t, releaseMetadataErr != nil || !releaseMetadataRemoved)
+
 			} else {
 				next, err := registry.PrepareMetadata(
 					vnoderegistry.MetadataAuthority{ID: "job", Generation: 2},
 					netdataapi.HostInfo{GUID: "node", Hostname: "next"},
 				)
-				if err != nil {
-					t.Fatalf("failed frame retained reservation: %v", err)
-				}
+				require.NoError(t, err)
 				reservation, err := next.Transfer()
-				if err != nil {
-					t.Fatal(err)
-				}
-				if err := reservation.Abort(); err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
+
+				require.NoError(t, reservation.Abort())
 			}
 		})
 	}
@@ -223,7 +187,7 @@ func (cpw *countingProtocolWriter) Writes() int {
 func BenchmarkBVnodeFrame(b *testing.B) {
 	owner, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	b.ReportAllocs()
 	for b.Loop() {
@@ -235,10 +199,10 @@ func BenchmarkBVnodeFrame(b *testing.B) {
 			func() error { return nil },
 		)
 		if err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		if err := prepared.Transfer(owner); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 	}
 }

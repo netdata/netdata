@@ -5,9 +5,11 @@ package lifecycle
 import (
 	"context"
 	"errors"
-	"reflect"
+	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T) {
@@ -39,9 +41,7 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 			supervisor := newResourceTaskSupervisor(t)
 			events := []string{}
 			result, err := NewSealedResult(200, "application/json", []byte(`{"ok":true}`))
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			applied, err := NewAppliedResourceTransaction(
 				test.scope,
 				test.disposition,
@@ -52,9 +52,7 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 					return nil
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			prepared := &recordingPreparedResourceTransaction{
 				scope: test.scope, current: test.current, applied: applied, events: &events,
 			}
@@ -74,78 +72,55 @@ func TestTaskSupervisorRunsSealedResourceTransactionInOriginalSlot(t *testing.T)
 					return prepared, nil
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			_, ref := enqueueAndDispatchTask(t, supervisor, plan)
 
 			first := <-supervisor.CompletionCh()
-			if first.Ref != ref || first.Sequence != 1 ||
+			require.False(t, first.Ref != ref || first.Sequence != 1 ||
 				first.Kind != TaskOutcomePreparedResourceTransaction ||
-				first.Err != nil {
-				t.Fatalf("initial completion=%#v", first)
-			}
-			if err := supervisor.SendAction(TaskAction{
+				first.Err != nil)
+
+			require.NoError(t, supervisor.SendAction(TaskAction{
 				Ref: ref, Sequence: 2, Kind: TaskActionApplyResourceTransaction,
-			}); err != nil {
-				t.Fatal(err)
-			}
-			second := <-supervisor.CompletionCh()
-			if second.Ref != ref || second.Sequence != 2 ||
-				second.Kind != TaskOutcomeAppliedResourceTransaction ||
-				second.Err != nil {
-				t.Fatalf("apply completion=%#v", second)
-			}
-			disposition, current, err := supervisor.TakeAppliedResourceTransaction(
-				ref,
-				2,
-				test.scope,
+			}),
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if disposition != test.disposition || current != test.resulting {
-				t.Fatalf(
-					"applied transaction disposition=%v current=%T, want %v %T",
-					disposition,
-					current,
-					test.disposition,
-					test.resulting,
-				)
-			}
-			if _, err := supervisor.PreflightResult(ref, "tx", 1); err != nil {
-				t.Fatal(err)
-			}
-			if err := supervisor.SendAction(TaskAction{
+
+			second := <-supervisor.CompletionCh()
+			require.False(t, second.Ref != ref || second.Sequence != 2 ||
+				second.Kind != TaskOutcomeAppliedResourceTransaction ||
+				second.Err != nil)
+			disposition, current, err := supervisor.TakeAppliedResourceTransaction(ref, 2, test.scope)
+			require.NoError(t, err)
+			require.False(t, disposition != test.disposition || current != test.resulting)
+
+			_, preflightResultErr := supervisor.PreflightResult(ref, "tx", 1)
+			require.NoError(t, preflightResultErr)
+
+			require.NoError(t, supervisor.SendAction(TaskAction{
 				Ref: ref, Sequence: 3, Kind: TaskActionEncodeWrite, UID: "tx", Expiry: 1,
-			}); err != nil {
-				t.Fatal(err)
-			}
-			if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-				t.Fatalf("encode acknowledgement=%#v", ack)
-			}
-			if err := supervisor.SendAction(TaskAction{
+			}),
+			)
+
+			require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+			require.NoError(t, supervisor.SendAction(TaskAction{
 				Ref: ref, Sequence: 4, Kind: TaskActionCleanup,
-			}); err != nil {
-				t.Fatal(err)
-			}
-			if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-				t.Fatalf("cleanup acknowledgement=%#v", ack)
-			}
-			if err := supervisor.SendAction(TaskAction{
+			}),
+			)
+
+			require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+			require.NoError(t, supervisor.SendAction(TaskAction{
 				Ref: ref, Sequence: 5, Kind: TaskActionTerminate,
-			}); err != nil {
-				t.Fatal(err)
-			}
-			if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-				t.Fatalf("termination acknowledgement=%#v", ack)
-			}
-			if err := supervisor.Release(ref); err != nil {
-				t.Fatal(err)
-			}
-			if want := []string{"prepare", "apply", "cleanup"}; !reflect.DeepEqual(events, want) {
-				t.Fatalf("events=%v, want %v", events, want)
-			}
+			}),
+			)
+
+			require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+			require.NoError(t, supervisor.Release(ref))
+
+			want := []string{"prepare", "apply", "cleanup"}
+			require.Equal(t, want, events)
 		})
 	}
 }
@@ -179,41 +154,32 @@ func TestTaskSupervisorDisposesPreparedTransactionAndRestoresCurrent(t *testing.
 			return prepared, nil
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	_, ref := enqueueAndDispatchTask(t, supervisor, plan)
 	<-supervisor.CompletionCh()
 
-	if err := supervisor.SendAction(TaskAction{
+	require.NoError(t, supervisor.SendAction(TaskAction{
 		Ref: ref, Sequence: 2, Kind: TaskActionDispose,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatalf("dispose acknowledgement=%#v", ack)
-	}
+	}),
+	)
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
 	restored, err := supervisor.TakeDisposedResourceTransaction(ref, 2, scope)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if restored != current {
-		t.Fatalf("restored current=%T, want original resource", restored)
-	}
-	if err := supervisor.SendAction(TaskAction{
+	require.NoError(t, err)
+	require.Same(t, current, restored)
+
+	require.NoError(t, supervisor.SendAction(TaskAction{
 		Ref: ref, Sequence: 3, Kind: TaskActionTerminate,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatalf("termination acknowledgement=%#v", ack)
-	}
-	if err := supervisor.Release(ref); err != nil {
-		t.Fatal(err)
-	}
-	if want := []string{"prepare", "dispose"}; !reflect.DeepEqual(events, want) {
-		t.Fatalf("events=%v, want %v", events, want)
-	}
+	}),
+	)
+
+	require.Nil(t, (<-supervisor.AcknowledgementCh()).Err)
+
+	require.NoError(t, supervisor.Release(ref))
+
+	want := []string{"prepare", "dispose"}
+	require.Equal(t, want, events)
 }
 
 func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
@@ -229,58 +195,41 @@ func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 			supervisor := newResourceTaskSupervisor(t)
 			var grants [4]AdmissionGrant
 			seedPlan, err := test.permitPlan([]string{"provider"})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			seedAdmission := admission.RequestOrdinary(
 				1,
 				AdmissionLaneRef{Slot: 1, Generation: 1},
 				seedPlan.Bytes()+1,
 			)
-			if seedAdmission.Rejected != nil {
-				t.Fatal(seedAdmission.Rejected)
-			}
+			require.Nil(t, seedAdmission.Rejected)
 			count, _, err := admission.TakeGrants(1, &grants)
-			if err != nil || count != 1 {
-				t.Fatalf("long-lived grant count=%d err=%v", count, err)
-			}
+			require.False(t, err != nil || count != 1)
 			seed, err := supervisor.IssueLongLivedPermit(
 				admission,
 				seedAdmission.Ref,
 				ResourceIdentity{ID: "seed", Generation: 1},
 				seedPlan,
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if _, err := admission.ReleaseOrdinary(seedAdmission.Ref); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
+
+			_, releaseOrdinaryErr := admission.ReleaseOrdinary(seedAdmission.Ref)
+			require.NoError(t, releaseOrdinaryErr)
 
 			permitPlan, err := test.permitPlan([]string{"provider"})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			transactionAdmission := admission.RequestOrdinary(
 				1,
 				AdmissionLaneRef{Slot: 2, Generation: 1},
 				permitPlan.Bytes()+1,
 			)
-			if transactionAdmission.Rejected != nil {
-				t.Fatal(transactionAdmission.Rejected)
-			}
+			require.Nil(t, transactionAdmission.Rejected)
 			count, _, err = admission.TakeGrants(1, &grants)
-			if err != nil || count != 1 {
-				t.Fatalf(
-					"transaction grant count=%d err=%v",
-					count,
-					err,
-				)
-			}
+			require.False(t, err != nil || count != 1)
 			scope := ResourceTransactionScope{
 				ID:        "successor",
 				Successor: ResourceIdentity{ID: "successor", Generation: 1},
 			}
+			var transactionRan atomic.Bool
 			plan, err := NewResourceTransactionPermitTaskPlan(
 				SourceJobManager,
 				time.Time{},
@@ -296,66 +245,30 @@ func TestTaskSupervisorRejectsSecondSteadyPipelineTransaction(t *testing.T) {
 					ResourceTransactionScope,
 					LongLivedPermit,
 				) (PreparedResourceTransaction, error) {
-					t.Fatal("capacity-rejected transaction ran")
-					return nil, nil
+					transactionRan.Store(true)
+					return nil, errors.New("capacity-rejected transaction ran")
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			requestRef, err := supervisor.Enqueue(
-				TaskClassFrameworkControl,
-				plan,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
+			requestRef, err := supervisor.Enqueue(TaskClassFrameworkControl, plan)
+			require.NoError(t, err)
 			var started [TaskStartServiceQuantum]TaskStart
-			count, _, err = supervisor.Dispatch(
-				context.Background(),
-				1,
-				&started,
-			)
-			if err != nil ||
+			count, _, err = supervisor.Dispatch(context.Background(), 1, &started)
+			require.False(t, err != nil ||
 				count != 1 ||
 				started[0].Request != requestRef ||
-				!errors.Is(
-					started[0].Err,
-					ErrLongLivedRecordCapacity,
-				) {
-				t.Fatalf(
-					"rejected start count=%d start=%#v err=%v",
-					count,
-					started[0],
-					err,
-				)
-			}
-			if started[0].Outcome.Kind() != TaskOutcomeNone {
-				t.Fatalf(
-					"graph-only rejected outcome=%v",
-					started[0].Outcome.Kind(),
-				)
-			}
-			if supervisor.Active() != 0 || supervisor.Pending() != 0 {
-				t.Fatalf(
-					"rejected start retained tasks: active=%d pending=%d",
-					supervisor.Active(),
-					supervisor.Pending(),
-				)
-			}
-			if _, err := admission.ReleaseOrdinary(
-				transactionAdmission.Ref,
-			); err != nil {
-				t.Fatal(err)
-			}
-			if err := seed.AbortUnused(); err != nil {
-				t.Fatal(err)
-			}
-			if census := admission.Census(); census.ActiveRecords != 0 ||
-				census.OrdinaryBytes != 0 ||
-				census.LongLivedBytes != 0 {
-				t.Fatalf("released census=%+v", census)
-			}
+				!errors.Is(started[0].Err, ErrLongLivedRecordCapacity))
+			require.EqualValues(t, TaskOutcomeNone, started[0].Outcome.Kind())
+			require.False(t, transactionRan.Load())
+			require.False(t, supervisor.Active() != 0 || supervisor.Pending() != 0)
+
+			_, releaseOrdinaryErr2 := admission.ReleaseOrdinary(transactionAdmission.Ref)
+			require.NoError(t, releaseOrdinaryErr2)
+
+			require.NoError(t, seed.AbortUnused())
+
+			census := admission.Census()
+			require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0 || census.LongLivedBytes != 0)
 		})
 	}
 }

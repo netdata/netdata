@@ -12,6 +12,7 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
@@ -35,11 +36,7 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 			wantMethod: "method",
 		},
 		"DynCfg existing job resource": {
-			declaration: testDeclaration(
-				"config",
-				"go.d:collector:",
-				DynCfgJobResource(0, "go.d:collector:"),
-			),
+			declaration: testDeclaration("config", "go.d:collector:", DynCfgJobResource(0, "go.d:collector:")),
 			lookup: jobmgr.FunctionLookup{
 				UID: "dyncfg-update", Route: "config",
 				Args: []string{
@@ -51,11 +48,7 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 			wantMethod:   "method",
 		},
 		"DynCfg add job resource": {
-			declaration: testDeclaration(
-				"config",
-				"go.d:collector:",
-				DynCfgJobResource(0, "go.d:collector:"),
-			),
+			declaration: testDeclaration("config", "go.d:collector:", DynCfgJobResource(0, "go.d:collector:")),
 			lookup: jobmgr.FunctionLookup{
 				UID: "dyncfg-add", Route: "config",
 				Args: []string{
@@ -71,11 +64,7 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 			declaration: testDeclaration(
 				"config",
 				"go.d:secretstore:",
-				ScopedDynCfgJobResource(
-					0,
-					"go.d:secretstore:",
-					"secretstore:",
-				),
+				ScopedDynCfgJobResource(0, "go.d:secretstore:", "secretstore:"),
 			),
 			lookup: jobmgr.FunctionLookup{
 				UID: "dyncfg-secret-update", Route: "config",
@@ -88,11 +77,7 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 			wantMethod:   "method",
 		},
 		"scoped DynCfg add resource identity": {
-			declaration: testDeclaration(
-				"config",
-				"go.d:vnode",
-				ScopedDynCfgJobResource(0, "go.d:vnode", "vnode:"),
-			),
+			declaration: testDeclaration("config", "go.d:vnode", ScopedDynCfgJobResource(0, "go.d:vnode", "vnode:")),
 			lookup: jobmgr.FunctionLookup{
 				UID: "dyncfg-vnode-add", Route: "config",
 				Args: []string{"go.d:vnode", "add", "production"},
@@ -120,50 +105,31 @@ func TestFunctionCatalogLookupLeaseSameTurn(t *testing.T) {
 				return lifecycle.NewControlResult(lifecycle.ControlInternal)
 			}
 			catalog, err := NewCatalog([]Declaration{test.declaration})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			decision, err := catalog.ResolveAndAcquire(test.lookup)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if decision.Rejected != test.wantStatus {
-				t.Fatalf("status=%d, want %d", decision.Rejected, test.wantStatus)
-			}
+			require.NoError(t, err)
+			require.EqualValues(t, test.wantStatus, decision.Rejected)
 			if test.wantStatus != 0 {
-				if decision.Lease.Valid() || decision.Plan.Runner != nil {
-					t.Fatalf("rejection owns work or lease: %+v", decision)
-				}
+				require.False(t, decision.Lease.Valid() || decision.Plan.Runner != nil)
 				return
 			}
-			if !decision.Lease.Valid() || decision.Plan.Runner == nil ||
-				decision.ResourceID != test.wantResource {
-				t.Fatalf("resolved decision differs: %+v", decision)
-			}
-			if census := catalog.Census(); census.InvocationLeases != 1 {
-				t.Fatalf("lookup and lease did not linearize together: %+v", census)
-			}
+			require.False(t, !decision.Lease.Valid() || decision.Plan.Runner == nil || decision.ResourceID != test.wantResource)
+
+			require.EqualValues(t, 1, catalog.Census().InvocationLeases)
+
 			outcome, err := decision.Plan.Runner.RunTask(context.Background())
-			if err != nil {
-				t.Fatal(err)
-			}
-			if outcome.Kind() != lifecycle.TaskOutcomeFrame || handled.UID != test.lookup.UID ||
-				handled.Method != test.wantMethod {
-				t.Fatalf("handler input/outcome differs: input=%+v kind=%d", handled, outcome.Kind())
-			}
+			require.NoError(t, err)
+			require.False(t, outcome.Kind() != lifecycle.TaskOutcomeFrame || handled.UID != test.lookup.UID ||
+				handled.Method != test.wantMethod)
 			cleanup, err := catalog.ReleaseInvocation(decision.Lease)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if cleanup.Ref.Valid() {
-				t.Fatalf("live handler unexpectedly requested cleanup: %+v", cleanup)
-			}
-			if census := catalog.Census(); census.InvocationLeases != 0 {
-				t.Fatalf("release retained invocation: %+v", census)
-			}
-			if _, err := catalog.ReleaseInvocation(decision.Lease); err == nil {
-				t.Fatal("duplicate invocation release was accepted")
-			}
+			require.NoError(t, err)
+			require.False(t, cleanup.Ref.Valid())
+
+			require.EqualValues(t, 0, catalog.Census().InvocationLeases)
+
+			_, releaseInvocationErr := catalog.ReleaseInvocation(decision.Lease)
+			require.Error(t, releaseInvocationErr)
+
 		})
 	}
 }
@@ -196,32 +162,20 @@ func TestFunctionCatalogInvocationPopulationGrowsBeyondFormerLimit(t *testing.T)
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			catalog, err := NewCatalog([]Declaration{test.declaration})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			const population = 257
 			leases := make([]jobmgr.FunctionInvocationRef, 0, population)
 			for index := 0; index < population; index++ {
-				decision, resolveErr := catalog.ResolveAndAcquire(
-					test.lookup(index),
-				)
-				if resolveErr != nil {
-					t.Fatalf("resolve invocation %d: %v", index, resolveErr)
-				}
-				if decision.Rejected != 0 || !decision.Lease.Valid() {
-					t.Fatalf(
-						"invocation %d rejected=%d lease=%+v",
-						index,
-						decision.Rejected,
-						decision.Lease,
-					)
-				}
+				decision, resolveErr := catalog.ResolveAndAcquire(test.lookup(index))
+				require.NoError(t, resolveErr)
+				require.False(t, decision.Rejected != 0 || !decision.Lease.Valid())
 				leases = append(leases, decision.Lease)
 			}
 			for _, lease := range leases {
-				if _, err := catalog.ReleaseInvocation(lease); err != nil {
-					t.Fatal(err)
-				}
+
+				_, releaseInvocationErr := catalog.ReleaseInvocation(lease)
+				require.NoError(t, releaseInvocationErr)
+
 			}
 		})
 	}
@@ -235,36 +189,24 @@ func TestFunctionPayloadValidationRunsInTaskChild(t *testing.T) {
 		return lifecycle.NewControlResult(lifecycle.ControlInternal)
 	}
 	catalog, err := NewCatalog([]Declaration{declaration})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
 		UID: "invalid-json", Route: "direct", HasPayload: true, Payload: []byte("{"),
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if calls.Load() != 0 {
-		t.Fatal("lookup invoked the Function handler")
-	}
+	require.NoError(t, err)
+	require.EqualValues(t, 0, calls.Load())
 	outcome, err := decision.Plan.Runner.RunTask(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if outcome.Kind() != lifecycle.TaskOutcomeFrame || calls.Load() != 0 {
-		t.Fatalf("invalid JSON reached handler or returned wrong outcome: kind=%d calls=%d",
-			outcome.Kind(), calls.Load())
-	}
-	if _, err := catalog.ReleaseInvocation(decision.Lease); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	require.False(t, outcome.Kind() != lifecycle.TaskOutcomeFrame || calls.Load() != 0)
+
+	_, releaseInvocationErr := catalog.ReleaseInvocation(decision.Lease)
+	require.NoError(t, releaseInvocationErr)
+
 }
 
 func TestFunctionCatalogReturnsSealedResourceTransactionPlan(t *testing.T) {
 	permit, err := lifecycle.NewJobLongLivedPlan(4096)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tests := map[string]struct {
 		command           string
 		allocateSuccessor bool
@@ -287,11 +229,7 @@ func TestFunctionCatalogReturnsSealedResourceTransactionPlan(t *testing.T) {
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			declaration := testDeclaration(
-				"config",
-				"job:",
-				DynCfgJobResource(0, "job:"),
-			)
+			declaration := testDeclaration("config", "job:", DynCfgJobResource(0, "job:"))
 			var preparedInput HandlerInput
 			declaration.Transaction = &ResourceTransactionDeclaration{
 				Prepare: func(
@@ -316,9 +254,7 @@ func TestFunctionCatalogReturnsSealedResourceTransactionPlan(t *testing.T) {
 				},
 			}
 			catalog, err := NewCatalog([]Declaration{declaration})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			lookup := jobmgr.FunctionLookup{
 				UID:        "transaction",
 				Route:      "config",
@@ -327,44 +263,34 @@ func TestFunctionCatalogReturnsSealedResourceTransactionPlan(t *testing.T) {
 				HasPayload: true,
 			}
 			decision, err := catalog.ResolveAndAcquire(lookup)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			plan := decision.Plan.Transaction
-			if plan == nil ||
+			require.False(t, plan == nil ||
 				decision.Plan.Runner != nil ||
 				plan.ID != "mysql" ||
 				plan.AllocateSuccessor != test.allocateSuccessor ||
-				!reflect.DeepEqual(
-					decision.Plan.Claims,
-					test.wantClaims,
-				) {
-				t.Fatalf("transaction decision=%+v", decision)
-			}
+				!reflect.DeepEqual(decision.Plan.Claims, test.wantClaims))
 			if test.allocateSuccessor {
-				if err := plan.Permit.Validate(); err != nil {
-					t.Fatal(err)
-				}
-			} else if plan.Permit.Class() != 0 ||
-				plan.Permit.Bytes() != 0 {
-				t.Fatal("remove transaction retained a successor permit")
+				require.NoError(t, plan.Permit.Validate())
+			} else {
+				require.False(t, plan.Permit.Class() != 0 || plan.Permit.Bytes() != 0)
 			}
-			if _, err := plan.Prepare(
+
+			_, prepareErr := plan.Prepare(
 				context.Background(),
 				nil,
 				lifecycle.ResourceTransactionScope{},
 				lifecycle.LongLivedPermit{},
-			); err != nil {
-				t.Fatal(err)
-			}
-			if preparedInput.UID != lookup.UID ||
+			)
+			require.NoError(t, prepareErr)
+
+			require.False(t, preparedInput.UID != lookup.UID ||
 				!reflect.DeepEqual(preparedInput.Args, lookup.Args) ||
-				!reflect.DeepEqual(preparedInput.Payload, lookup.Payload) {
-				t.Fatalf("prepared input=%+v, lookup=%+v", preparedInput, lookup)
-			}
-			if _, err := catalog.ReleaseInvocation(decision.Lease); err != nil {
-				t.Fatal(err)
-			}
+				!reflect.DeepEqual(preparedInput.Payload, lookup.Payload))
+
+			_, releaseInvocationErr := catalog.ReleaseInvocation(decision.Lease)
+			require.NoError(t, releaseInvocationErr)
+
 		})
 	}
 }
@@ -384,11 +310,7 @@ func TestFunctionCatalogDerivesSuccessorPermitFromInvocation(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			declaration := testDeclaration(
-				"config",
-				"job:",
-				DynCfgJobResource(0, "job:"),
-			)
+			declaration := testDeclaration("config", "job:", DynCfgJobResource(0, "job:"))
 			declaration.Transaction = &ResourceTransactionDeclaration{
 				Prepare: func(
 					context.Context,
@@ -407,9 +329,7 @@ func TestFunctionCatalogDerivesSuccessorPermitFromInvocation(t *testing.T) {
 				},
 			}
 			catalog, err := NewCatalog([]Declaration{declaration})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			decision, err := catalog.ResolveAndAcquire(
 				jobmgr.FunctionLookup{
 					UID: "transaction", Route: "config",
@@ -417,17 +337,12 @@ func TestFunctionCatalogDerivesSuccessorPermitFromInvocation(t *testing.T) {
 					Payload: test.payload, HasPayload: true,
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if decision.Plan.Transaction == nil ||
-				decision.Plan.Transaction.Permit.Bytes() !=
-					test.wantBytes {
-				t.Fatalf("transaction decision=%+v", decision)
-			}
-			if _, err := catalog.ReleaseInvocation(decision.Lease); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
+			require.False(t, decision.Plan.Transaction == nil || decision.Plan.Transaction.Permit.Bytes() != test.wantBytes)
+
+			_, releaseInvocationErr := catalog.ReleaseInvocation(decision.Lease)
+			require.NoError(t, releaseInvocationErr)
+
 		})
 	}
 }
@@ -440,54 +355,32 @@ func TestHandlerLeaseLifecycle(t *testing.T) {
 		return nil
 	}
 	catalog, err := NewCatalog([]Declaration{declaration})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	decision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{
 		UID: "held", Route: "direct",
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := catalog.BeginClose(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, catalog.BeginClose())
+
 	var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
 	count, more, err := catalog.CloseStep(1, &cleanups)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if count != 0 || more || cleanupCalls.Load() != 0 {
-		t.Fatalf("close bypassed held invocation: count=%d more=%v calls=%d",
-			count, more, cleanupCalls.Load())
-	}
+	require.NoError(t, err)
+	require.False(t, count != 0 || more || cleanupCalls.Load() != 0)
 	cleanup, err := catalog.ReleaseInvocation(decision.Lease)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !cleanup.Ref.Valid() || cleanup.Runner == nil {
-		t.Fatalf("drained handler did not return cleanup work: %+v", cleanup)
-	}
-	if cleanupCalls.Load() != 0 {
-		t.Fatal("lease release invoked Cleanup on KernelLoop")
-	}
+	require.NoError(t, err)
+	require.False(t, !cleanup.Ref.Valid() || cleanup.Runner == nil)
+	require.EqualValues(t, 0, cleanupCalls.Load())
 	outcome, err := cleanup.Runner.RunTask(context.Background())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if outcome.Kind() != lifecycle.TaskOutcomeNone || cleanupCalls.Load() != 1 {
-		t.Fatalf("cleanup work differs: kind=%d calls=%d", outcome.Kind(), cleanupCalls.Load())
-	}
-	if err := catalog.CompleteCleanup(cleanup.Ref, nil); err != nil {
-		t.Fatal(err)
-	}
-	if err := catalog.CompleteCleanup(cleanup.Ref, nil); err == nil {
-		t.Fatal("duplicate cleanup completion was accepted")
-	}
-	if census := catalog.Census(); census.PendingCleanups != 0 ||
-		census.CompletedCleanups != 1 || census.FailedCleanups != 0 {
-		t.Fatalf("cleanup census differs: %+v", census)
-	}
+	require.NoError(t, err)
+	require.False(t, outcome.Kind() != lifecycle.TaskOutcomeNone || cleanupCalls.Load() != 1)
+
+	require.NoError(t, catalog.CompleteCleanup(cleanup.Ref, nil))
+
+	require.Error(t, catalog.CompleteCleanup(cleanup.Ref, nil))
+
+	census := catalog.Census()
+	require.False(t, census.PendingCleanups != 0 || census.CompletedCleanups != 1 || census.FailedCleanups != 0)
 }
 
 func TestRetiredRouteRejectsDuringLeaseDrainThenDisappears(t *testing.T) {
@@ -508,11 +401,7 @@ func TestRetiredRouteRejectsDuringLeaseDrainThenDisappears(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			var cleanupCalls atomic.Int32
-			declaration := testDeclaration(
-				"work",
-				test.prefix,
-				test.resource,
-			)
+			declaration := testDeclaration("work", test.prefix, test.resource)
 			declaration.Generation.Cleanup = func(
 				context.Context,
 			) error {
@@ -520,9 +409,7 @@ func TestRetiredRouteRejectsDuringLeaseDrainThenDisappears(t *testing.T) {
 				return nil
 			}
 			catalog, err := NewCatalog([]Declaration{declaration})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			held, err := catalog.ResolveAndAcquire(
 				jobmgr.FunctionLookup{
 					UID:   "held",
@@ -530,9 +417,7 @@ func TestRetiredRouteRejectsDuringLeaseDrainThenDisappears(t *testing.T) {
 					Args:  test.args,
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			mutation, err := catalog.NewMutation(
 				catalog.Census().Version,
 				[]RouteChange{{
@@ -540,39 +425,22 @@ func TestRetiredRouteRejectsDuringLeaseDrainThenDisappears(t *testing.T) {
 					Prefix:     test.prefix,
 				}},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			builder, err := catalog.startMutation(mutation)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			var postimage *MutationPostimage
 			for {
 				var done bool
-				postimage, done, err = builder.PrepareStep(
-					MaximumMutationQuantum,
-				)
-				if err != nil {
-					t.Fatal(err)
-				}
+				postimage, done, err = builder.PrepareStep(MaximumMutationQuantum)
+				require.NoError(t, err)
 				if done {
 					break
 				}
 			}
 			var cleanups [MaximumMutationChanges]jobmgr.FunctionCleanupPlan
-			count, err := catalog.commitMutation(
-				postimage,
-				&cleanups,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if count != 0 {
-				t.Fatal(
-					"retired generation cleaned before its lease drained",
-				)
-			}
+			count, err := catalog.commitMutation(postimage, &cleanups)
+			require.NoError(t, err)
+			require.EqualValues(t, 0, count)
 
 			rejected, err := catalog.ResolveAndAcquire(
 				jobmgr.FunctionLookup{
@@ -581,16 +449,8 @@ func TestRetiredRouteRejectsDuringLeaseDrainThenDisappears(t *testing.T) {
 					Args:  test.args,
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if rejected.Rejected != lifecycle.ControlUnavailable ||
-				rejected.Lease.Valid() {
-				t.Fatalf(
-					"retired route decision=%+v, want unavailable without lease",
-					rejected,
-				)
-			}
+			require.NoError(t, err)
+			require.False(t, rejected.Rejected != lifecycle.ControlUnavailable || rejected.Lease.Valid())
 			unknown, err := catalog.ResolveAndAcquire(
 				jobmgr.FunctionLookup{
 					UID:   "unknown",
@@ -598,20 +458,11 @@ func TestRetiredRouteRejectsDuringLeaseDrainThenDisappears(t *testing.T) {
 					Args:  test.args,
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if unknown.Rejected != lifecycle.ControlNotFound {
-				t.Fatalf(
-					"unrelated route decision=%+v, want not found",
-					unknown,
-				)
-			}
+			require.NoError(t, err)
+			require.EqualValues(t, lifecycle.ControlNotFound, unknown.Rejected)
 
 			cleanup, err := catalog.ReleaseInvocation(held.Lease)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			afterDrain, err := catalog.ResolveAndAcquire(
 				jobmgr.FunctionLookup{
 					UID:   "after-drain",
@@ -619,28 +470,14 @@ func TestRetiredRouteRejectsDuringLeaseDrainThenDisappears(t *testing.T) {
 					Args:  test.args,
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if afterDrain.Rejected != lifecycle.ControlNotFound {
-				t.Fatalf(
-					"drained route decision=%+v, want not found",
-					afterDrain,
-				)
-			}
-			if published := catalog.storage.published.Load(); published != 0 {
-				t.Fatalf(
-					"drained tombstone retained %d path bytes",
-					published,
-				)
-			}
+			require.NoError(t, err)
+			require.EqualValues(t, lifecycle.ControlNotFound, afterDrain.Rejected)
+
+			published := catalog.storage.published.Load()
+			require.EqualValues(t, 0, published)
+
 			runCleanupPlan(t, catalog, cleanup)
-			if cleanupCalls.Load() != 1 {
-				t.Fatalf(
-					"cleanup calls=%d, want 1",
-					cleanupCalls.Load(),
-				)
-			}
+			require.EqualValues(t, 1, cleanupCalls.Load())
 		})
 	}
 }
@@ -676,18 +513,14 @@ func TestFunctionCatalogSharedGenerationUsesRouteLocalLeaseDrain(t *testing.T) {
 				ResourcePolicy{},
 			)
 			catalog, err := NewCatalog([]Declaration{target, sibling})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			held, err := catalog.ResolveAndAcquire(
 				jobmgr.FunctionLookup{
 					UID:   "held-sibling",
 					Route: "sibling",
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			before := catalog.storage.published.Load()
 			mutation, err := catalog.NewMutation(
 				catalog.Census().Version,
@@ -696,37 +529,22 @@ func TestFunctionCatalogSharedGenerationUsesRouteLocalLeaseDrain(t *testing.T) {
 					Prefix:     test.prefix,
 				}},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			builder, err := catalog.startMutation(mutation)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			var postimage *MutationPostimage
 			for {
 				var done bool
-				postimage, done, err = builder.PrepareStep(
-					MaximumMutationQuantum,
-				)
-				if err != nil {
-					t.Fatal(err)
-				}
+				postimage, done, err = builder.PrepareStep(MaximumMutationQuantum)
+				require.NoError(t, err)
 				if done {
 					break
 				}
 			}
 			var cleanups [MaximumMutationChanges]jobmgr.FunctionCleanupPlan
-			count, err := catalog.commitMutation(
-				postimage,
-				&cleanups,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if count != 0 {
-				t.Fatal("shared generation cleaned with one live route")
-			}
+			count, err := catalog.commitMutation(postimage, &cleanups)
+			require.NoError(t, err)
+			require.EqualValues(t, 0, count)
 			removed, err := catalog.ResolveAndAcquire(
 				jobmgr.FunctionLookup{
 					UID:   "removed",
@@ -734,27 +552,16 @@ func TestFunctionCatalogSharedGenerationUsesRouteLocalLeaseDrain(t *testing.T) {
 					Args:  test.args,
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if removed.Rejected != lifecycle.ControlNotFound ||
-				removed.Lease.Valid() {
-				t.Fatalf(
-					"lease-free retired route decision=%+v, want not found",
-					removed,
-				)
-			}
-			if published := catalog.storage.published.Load(); published >= before {
-				t.Fatalf(
-					"lease-free retired route retained path storage: before=%d after=%d",
-					before,
-					published,
-				)
-			}
+			require.NoError(t, err)
+			require.False(t, removed.Rejected != lifecycle.ControlNotFound || removed.Lease.Valid())
+
+			published := catalog.storage.published.Load()
+			require.False(t, published >= before)
+
 			if cleanup, err := catalog.ReleaseInvocation(held.Lease); err != nil {
-				t.Fatal(err)
-			} else if cleanup.Ref.Valid() {
-				t.Fatal("shared generation cleaned before sibling route retired")
+				require.FailNow(t, "test failed", err)
+			} else {
+				require.False(t, cleanup.Ref.Valid())
 			}
 		})
 	}
@@ -791,9 +598,7 @@ func TestFunctionCatalogReaddsRouteBeforeRetiredLeaseDrains(t *testing.T) {
 				ResourcePolicy{},
 			)
 			catalog, err := NewCatalog([]Declaration{target, sibling})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			var oldRef jobmgr.FunctionCleanupRef
 			for ref, generation := range catalog.generations {
 				if generation.id == "old-shared" {
@@ -801,9 +606,7 @@ func TestFunctionCatalogReaddsRouteBeforeRetiredLeaseDrains(t *testing.T) {
 					break
 				}
 			}
-			if !oldRef.Valid() {
-				t.Fatal("old shared generation is absent")
-			}
+			require.True(t, oldRef.Valid())
 			held, err := catalog.ResolveAndAcquire(
 				jobmgr.FunctionLookup{
 					UID:   "held-old",
@@ -811,88 +614,50 @@ func TestFunctionCatalogReaddsRouteBeforeRetiredLeaseDrains(t *testing.T) {
 					Args:  test.args,
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			commit := func(change RouteChange) {
 				t.Helper()
 				mutation, mutationErr := catalog.NewMutation(
 					catalog.Census().Version,
 					[]RouteChange{change},
 				)
-				if mutationErr != nil {
-					t.Fatal(mutationErr)
-				}
+				require.NoError(t, mutationErr)
 				builder, mutationErr := catalog.startMutation(mutation)
-				if mutationErr != nil {
-					t.Fatal(mutationErr)
-				}
+				require.NoError(t, mutationErr)
 				var postimage *MutationPostimage
 				for {
 					var done bool
-					postimage, done, mutationErr = builder.PrepareStep(
-						MaximumMutationQuantum,
-					)
-					if mutationErr != nil {
-						t.Fatal(mutationErr)
-					}
+					postimage, done, mutationErr = builder.PrepareStep(MaximumMutationQuantum)
+					require.NoError(t, mutationErr)
 					if done {
 						break
 					}
 				}
 				var cleanups [MaximumMutationChanges]jobmgr.FunctionCleanupPlan
-				if count, commitErr := catalog.commitMutation(
-					postimage,
-					&cleanups,
-				); commitErr != nil || count != 0 {
-					t.Fatalf(
-						"mutation cleanup count=%d error=%v",
-						count,
-						commitErr,
-					)
-				}
+
+				count, commitErr := catalog.commitMutation(postimage, &cleanups)
+				require.False(t, commitErr != nil || count != 0)
 			}
 			commit(RouteChange{
 				PublicName: "work",
 				Prefix:     test.prefix,
 			})
-			replacement := testDeclaration(
-				"work",
-				test.prefix,
-				test.resource,
-			)
+			replacement := testDeclaration("work", test.prefix, test.resource)
 			commit(RouteChange{
 				PublicName:  "work",
 				Prefix:      test.prefix,
 				Declaration: &replacement,
 			})
-			if census := catalog.Census(); census.Routes != 2 {
-				t.Fatalf(
-					"re-add route census=%+v, want two published routes",
-					census,
-				)
-			}
-			if resolvedMethod(catalog, "sibling", nil) == "" ||
-				resolvedMethod(catalog, "work", test.args) == "" {
-				t.Fatal("re-add lost sibling or replacement route")
-			}
+
+			require.EqualValues(t, 2, catalog.Census().Routes)
+
+			require.False(t, resolvedMethod(catalog, "sibling", nil) == "" || resolvedMethod(catalog, "work", test.args) == "")
 			cleanup, err := catalog.ReleaseInvocation(held.Lease)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if cleanup.Ref.Valid() {
-				t.Fatal(
-					"shared generation cleaned while sibling route remained",
-				)
-			}
-			if census := catalog.HandlerCensus(oldRef); census.RouteReferences != 1 ||
-				census.InvocationLeases != 0 ||
-				census.AdmissionClosed {
-				t.Fatalf(
-					"old shared generation census=%+v",
-					census,
-				)
-			}
+			require.NoError(t, err)
+			require.False(t, cleanup.Ref.Valid())
+
+			census := catalog.HandlerCensus(oldRef)
+			require.False(t, census.RouteReferences != 1 || census.InvocationLeases != 0 || census.AdmissionClosed)
 		})
 	}
 }
@@ -917,9 +682,7 @@ func TestFunctionCatalogQuiesceAbortRestoresAdmission(t *testing.T) {
 			catalog, err := NewCatalog([]Declaration{
 				testDeclaration("work", test.prefix, test.resource),
 			})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			mutation, err := catalog.NewMutation(
 				catalog.Census().Version,
 				[]RouteChange{{
@@ -927,19 +690,13 @@ func TestFunctionCatalogQuiesceAbortRestoresAdmission(t *testing.T) {
 					Prefix:     test.prefix,
 				}},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := catalog.BeginMutation(mutation); err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
+
+			require.NoError(t, catalog.BeginMutation(mutation))
+
 			for {
-				progress, err := catalog.AdvanceMutationQuiesce(
-					MaximumMutationQuantum,
-				)
-				if err != nil {
-					t.Fatal(err)
-				}
+				progress, err := catalog.AdvanceMutationQuiesce(MaximumMutationQuantum)
+				require.NoError(t, err)
 				if progress.Quiesced {
 					break
 				}
@@ -949,49 +706,31 @@ func TestFunctionCatalogQuiesceAbortRestoresAdmission(t *testing.T) {
 					UID: "quiesced", Route: "work", Args: test.args,
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if rejected.Rejected != lifecycle.ControlUnavailable ||
+			require.NoError(t, err)
+			require.False(t, rejected.Rejected != lifecycle.ControlUnavailable ||
 				rejected.Lease.Valid() ||
-				catalog.Census().Version != 1 {
-				t.Fatalf(
-					"quiesced decision=%+v census=%+v",
-					rejected,
-					catalog.Census(),
-				)
-			}
-			if err := catalog.ResumeMutation(mutation); err != nil {
-				t.Fatal(err)
-			}
+				catalog.Census().Version != 1)
+
+			require.NoError(t, catalog.ResumeMutation(mutation))
+
 			var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
-			if count, err := catalog.AbortMutation(
-				&cleanups,
-			); err != nil || count != 0 {
-				t.Fatalf("abort count=%d err=%v", count, err)
-			}
+
+			abortMutationCount, abortMutationErr := catalog.AbortMutation(&cleanups)
+			require.False(t, abortMutationErr != nil || abortMutationCount != 0)
+
 			restored, err := catalog.ResolveAndAcquire(
 				jobmgr.FunctionLookup{
 					UID: "restored", Route: "work", Args: test.args,
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if restored.Rejected != 0 || !restored.Lease.Valid() ||
+			require.NoError(t, err)
+			require.False(t, restored.Rejected != 0 || !restored.Lease.Valid() ||
 				catalog.Census().Version != 1 ||
-				catalog.Census().MutationActive {
-				t.Fatalf(
-					"restored decision=%+v census=%+v",
-					restored,
-					catalog.Census(),
-				)
-			}
-			if _, err := catalog.ReleaseInvocation(
-				restored.Lease,
-			); err != nil {
-				t.Fatal(err)
-			}
+				catalog.Census().MutationActive)
+
+			_, releaseInvocationErr := catalog.ReleaseInvocation(restored.Lease)
+			require.NoError(t, releaseInvocationErr)
+
 		})
 	}
 }
@@ -1017,50 +756,31 @@ func TestRetiredRouteDrainDuringUnrelatedMutationDefersPhysicalPrune(t *testing.
 	catalog, err := NewCatalog(
 		[]Declaration{heldDeclaration, otherDeclaration},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	held, err := catalog.ResolveAndAcquire(
 		jobmgr.FunctionLookup{UID: "held", Route: "held"},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	remove, err := catalog.NewMutation(
 		catalog.Census().Version,
 		[]RouteChange{{PublicName: "held"}},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	removeBuilder, err := catalog.startMutation(remove)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	var removePostimage *MutationPostimage
 	for {
 		var done bool
-		removePostimage, done, err = removeBuilder.PrepareStep(
-			MaximumMutationQuantum,
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		removePostimage, done, err = removeBuilder.PrepareStep(MaximumMutationQuantum)
+		require.NoError(t, err)
 		if done {
 			break
 		}
 	}
 	var cleanups [MaximumMutationChanges]jobmgr.FunctionCleanupPlan
-	if count, err := catalog.commitMutation(
-		removePostimage,
-		&cleanups,
-	); err != nil || count != 0 {
-		t.Fatalf(
-			"held-route retirement count=%d err=%v",
-			count,
-			err,
-		)
-	}
+
+	commitMutationCount, commitMutationErr := catalog.commitMutation(removePostimage, &cleanups)
+	require.False(t, commitMutationErr != nil || commitMutationCount != 0)
 
 	replacement := testDeclaration(
 		"other",
@@ -1074,86 +794,51 @@ func TestRetiredRouteDrainDuringUnrelatedMutationDefersPhysicalPrune(t *testing.
 			Declaration: &replacement,
 		}},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	unrelatedBuilder, err := catalog.startMutation(unrelated)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for unrelatedBuilder.phase == mutationTopology {
-		if _, _, err := unrelatedBuilder.PrepareStep(1); err != nil {
-			t.Fatal(err)
-		}
+
+		_, _, prepareStepErr := unrelatedBuilder.PrepareStep(1)
+		require.NoError(t, prepareStepErr)
+
 	}
 
 	cleanup, err := catalog.ReleaseInvocation(held.Lease)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if catalog.deferredPrune == nil {
-		t.Fatal(
-			"lease drain physically pruned a route during another mutation",
-		)
-	}
+	require.NoError(t, err)
+	require.NotNil(t, catalog.deferredPrune)
 	afterDrain, err := catalog.ResolveAndAcquire(
 		jobmgr.FunctionLookup{
 			UID:   "after-drain",
 			Route: "held",
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if afterDrain.Rejected != lifecycle.ControlNotFound {
-		t.Fatalf(
-			"semantically drained route decision=%+v, want not found",
-			afterDrain,
-		)
-	}
+	require.NoError(t, err)
+	require.EqualValues(t, lifecycle.ControlNotFound, afterDrain.Rejected)
 
 	var unrelatedPostimage *MutationPostimage
 	for {
 		var done bool
 		unrelatedPostimage, done, err =
-			unrelatedBuilder.PrepareStep(
-				MaximumMutationQuantum,
-			)
-		if err != nil {
-			t.Fatal(err)
-		}
+			unrelatedBuilder.PrepareStep(MaximumMutationQuantum)
+		require.NoError(t, err)
 		if done {
 			break
 		}
 	}
-	count, err := catalog.commitMutation(
-		unrelatedPostimage,
-		&cleanups,
-	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	count, err := catalog.commitMutation(unrelatedPostimage, &cleanups)
+	require.NoError(t, err)
 	for index := 0; index < count; index++ {
 		runCleanupPlan(t, catalog, cleanups[index])
 	}
-	if catalog.deferredPrune != nil {
-		t.Fatal("unrelated mutation retained deferred route pruning")
-	}
+	require.Nil(t, catalog.deferredPrune)
 	published := catalog.storage.published.Load()
-	if want := catalogPathStorage(catalog.routes); published != want {
-		t.Fatalf(
-			"published storage=%d, live trie=%d",
-			published,
-			want,
-		)
-	}
+
+	want := catalogPathStorage(catalog.routes)
+	require.EqualValues(t, want, published)
+
 	runCleanupPlan(t, catalog, cleanup)
-	if cleanupCalls.Load() != 1 {
-		t.Fatalf(
-			"cleanup calls=%d, want 1",
-			cleanupCalls.Load(),
-		)
-	}
+	require.EqualValues(t, 1, cleanupCalls.Load())
 }
 
 func TestHandlerCleanupOnce(t *testing.T) {
@@ -1168,39 +853,32 @@ func TestHandlerCleanupOnce(t *testing.T) {
 		testDeclarationForGeneration(generation, "config", "store:", ResourcePolicy{}),
 	}
 	catalog, err := NewCatalog(declarations)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := catalog.BeginClose(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, catalog.BeginClose())
+
 	var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
 	total := 0
 	for {
 		count, more, err := catalog.CloseStep(1, &cleanups)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		for _, cleanup := range cleanups[:count] {
-			if _, err := cleanup.Runner.RunTask(context.Background()); err != nil {
-				t.Fatal(err)
-			}
-			if err := catalog.CompleteCleanup(cleanup.Ref, nil); err != nil {
-				t.Fatal(err)
-			}
+
+			_, runTaskErr := cleanup.Runner.RunTask(context.Background())
+			require.NoError(t, runTaskErr)
+
+			require.NoError(t, catalog.CompleteCleanup(cleanup.Ref, nil))
+
 			total++
 		}
 		if !more {
 			break
 		}
 	}
-	if total != 1 || cleanupCalls.Load() != 1 {
-		t.Fatalf("cleanup count=%d calls=%d, want one generation cleanup", total, cleanupCalls.Load())
-	}
-	if census := catalog.Census(); census.Routes != 0 || census.CloseRoutesPending != 0 ||
-		census.CompletedCleanups != 1 {
-		t.Fatalf("closed catalog census differs: %+v", census)
-	}
+	require.False(t, total != 1 || cleanupCalls.Load() != 1)
+
+	census := catalog.Census()
+	require.False(t, census.Routes != 0 || census.CloseRoutesPending != 0 || census.CompletedCleanups != 1)
 }
 
 func TestFunctionCatalogRetainsGenerationStorageUntilCleanupCompletion(
@@ -1215,9 +893,7 @@ func TestFunctionCatalogRetainsGenerationStorageUntilCleanupCompletion(
 			newCatalog: func(t *testing.T, declarations []Declaration) *Catalog {
 				t.Helper()
 				catalog, err := NewCatalog(declarations)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				return catalog
 			},
 		},
@@ -1225,9 +901,7 @@ func TestFunctionCatalogRetainsGenerationStorageUntilCleanupCompletion(
 			newCatalog: func(t *testing.T, declarations []Declaration) *Catalog {
 				t.Helper()
 				catalog, err := NewCatalog(nil)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				changes := make([]RouteChange, 0, len(declarations))
 				for index := range declarations {
 					declaration := &declarations[index]
@@ -1236,88 +910,51 @@ func TestFunctionCatalogRetainsGenerationStorageUntilCleanupCompletion(
 						Declaration: declaration,
 					})
 				}
-				mutation, err := catalog.NewMutation(
-					catalog.Census().Version,
-					changes,
-				)
-				if err != nil {
-					t.Fatal(err)
-				}
+				mutation, err := catalog.NewMutation(catalog.Census().Version, changes)
+				require.NoError(t, err)
 				builder, err := catalog.startMutation(mutation)
-				if err != nil {
-					t.Fatal(err)
-				}
+				require.NoError(t, err)
 				var postimage *MutationPostimage
 				for {
 					var done bool
-					postimage, done, err = builder.PrepareStep(
-						MaximumMutationQuantum,
-					)
-					if err != nil {
-						t.Fatal(err)
-					}
+					postimage, done, err = builder.PrepareStep(MaximumMutationQuantum)
+					require.NoError(t, err)
 					if done {
 						break
 					}
 				}
 				var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
-				if count, err := catalog.commitMutation(
-					postimage,
-					&cleanups,
-				); err != nil || count != 0 {
-					t.Fatalf(
-						"new-generation mutation cleanup count=%d err=%v",
-						count,
-						err,
-					)
-				}
+
+				commitMutationCount, commitMutationErr := catalog.commitMutation(postimage, &cleanups)
+				require.False(t, commitMutationErr != nil || commitMutationCount != 0)
+
 				return catalog
 			},
 		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			catalog := test.newCatalog(
-				t,
-				testCleanupDeclarations(population),
-			)
-			if err := catalog.BeginClose(); err != nil {
-				t.Fatal(err)
-			}
+			catalog := test.newCatalog(t, testCleanupDeclarations(population))
+
+			require.NoError(t, catalog.BeginClose())
+
 			var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
-			count, more, err := catalog.CloseStep(
-				MaximumCloseQuantum,
-				&cleanups,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if count != population || more {
-				t.Fatalf(
-					"catalog close cleanup count=%d more=%v, want %d,false",
-					count,
-					more,
-					population,
-				)
-			}
+			count, more, err := catalog.CloseStep(MaximumCloseQuantum, &cleanups)
+			require.NoError(t, err)
+			require.False(t, count != population || more)
 			wantRetentionBytes := int64(population) *
 				catalogGenerationRetentionBytes
-			if published := catalog.storage.published.Load(); published != 0 {
-				t.Fatalf("closed catalog retained %d published path bytes", published)
-			}
-			if total := catalog.storage.total.Load(); total != wantRetentionBytes {
-				t.Fatalf(
-					"pending cleanup storage=%d, want %d",
-					total,
-					wantRetentionBytes,
-				)
-			}
+
+			published := catalog.storage.published.Load()
+			require.EqualValues(t, 0, published)
+
+			require.EqualValues(t, wantRetentionBytes, catalog.storage.total.Load())
+
 			for _, cleanup := range cleanups[:count] {
 				runCleanupPlan(t, catalog, cleanup)
 			}
-			if total := catalog.storage.total.Load(); total != 0 {
-				t.Fatalf("completed cleanup retained %d storage bytes", total)
-			}
+
+			require.EqualValues(t, 0, catalog.storage.total.Load())
 		})
 	}
 }
@@ -1331,9 +968,7 @@ func TestFunctionCatalogAbortRetainsInitializedGenerationStorage(
 	)
 
 	catalog, err := NewCatalog(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	declarations := testCleanupDeclarations(population)
 	changes := make([]RouteChange, 0, population)
 	for index := range declarations {
@@ -1344,46 +979,33 @@ func TestFunctionCatalogAbortRetainsInitializedGenerationStorage(
 		})
 	}
 	mutation, err := catalog.NewMutation(catalog.Census().Version, changes)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	builder, err := catalog.startMutation(mutation)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for builder.phase == mutationTopology {
-		if _, err := builder.PrepareQuiesceStep(
-			MaximumMutationQuantum,
-		); err != nil {
-			t.Fatal(err)
-		}
+
+		_, prepareQuiesceStepErr := builder.PrepareQuiesceStep(MaximumMutationQuantum)
+		require.NoError(t, prepareQuiesceStepErr)
+
 	}
-	if _, _, err := builder.PrepareStep(initialized); err != nil {
-		t.Fatal(err)
-	}
+
+	_, _, prepareStepErr := builder.PrepareStep(initialized)
+	require.NoError(t, prepareStepErr)
+
 	var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
 	count, err := builder.Abort(&cleanups)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if count != initialized {
-		t.Fatalf("aborted initialized cleanup count=%d, want %d", count, initialized)
-	}
+	require.NoError(t, err)
+	require.EqualValues(t, initialized, count)
 	wantRetentionBytes := int64(initialized) *
 		catalogGenerationRetentionBytes
-	if total := catalog.storage.total.Load(); total != wantRetentionBytes {
-		t.Fatalf(
-			"aborted cleanup storage=%d, want %d",
-			total,
-			wantRetentionBytes,
-		)
-	}
+
+	require.EqualValues(t, wantRetentionBytes, catalog.storage.total.Load())
+
 	for _, cleanup := range cleanups[:count] {
 		runCleanupPlan(t, catalog, cleanup)
 	}
-	if total := catalog.storage.total.Load(); total != 0 {
-		t.Fatalf("completed aborted cleanup retained %d storage bytes", total)
-	}
+
+	require.EqualValues(t, 0, catalog.storage.total.Load())
 }
 
 func TestFunctionCatalogAtomicMutation(t *testing.T) {
@@ -1396,14 +1018,10 @@ func TestFunctionCatalogAtomicMutation(t *testing.T) {
 	catalog, err := NewCatalog([]Declaration{
 		testDeclarationForGeneration(old, "work", "", ResourcePolicy{}),
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	oldVersion := catalog.Census().Version
 	oldDecision, err := catalog.ResolveAndAcquire(jobmgr.FunctionLookup{UID: "old", Route: "work"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	short := testDeclarationForGeneration(testGeneration("short"), "config", "collector:", ResourcePolicy{})
 	long := testDeclarationForGeneration(testGeneration("long"), "config", "collector:job:", ResourcePolicy{})
@@ -1411,26 +1029,20 @@ func TestFunctionCatalogAtomicMutation(t *testing.T) {
 		{PublicName: short.PublicName, Prefix: short.Prefix, Declaration: &short},
 		{PublicName: long.PublicName, Prefix: long.Prefix, Declaration: &long},
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	invalidBuilder, err := catalog.startMutation(invalid)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	var mutationCleanups [MaximumMutationChanges]jobmgr.FunctionCleanupPlan
 	for {
 		_, _, prepareErr := invalidBuilder.PrepareStep(3)
-		if catalog.Census().Version != oldVersion || resolvedMethod(catalog, "work", nil) != "method" {
-			t.Fatal("private or failed mutation changed visible catalog state")
-		}
+		require.False(t, catalog.Census().Version != oldVersion || resolvedMethod(catalog, "work", nil) != "method")
 		if prepareErr != nil {
 			break
 		}
 	}
-	if count, err := invalidBuilder.Abort(&mutationCleanups); err != nil || count != 0 {
-		t.Fatalf("invalid topology constructed private handlers: count=%d err=%v", count, err)
-	}
+
+	abortCount, abortErr := invalidBuilder.Abort(&mutationCleanups)
+	require.False(t, abortErr != nil || abortCount != 0)
 
 	var newCleanups atomic.Int32
 	replacementGeneration := testGeneration("new-generation")
@@ -1442,46 +1054,28 @@ func TestFunctionCatalogAtomicMutation(t *testing.T) {
 	mutation, err := catalog.NewMutation(oldVersion, []RouteChange{{
 		PublicName: "work", Declaration: &replacement,
 	}})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	builder, err := catalog.startMutation(mutation)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	var postimage *MutationPostimage
 	for {
 		var done bool
 		postimage, done, err = builder.PrepareStep(3)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if catalog.Census().Version != oldVersion || resolvedMethod(catalog, "work", nil) != "method" {
-			t.Fatal("replacement became visible before commit")
-		}
+		require.NoError(t, err)
+		require.False(t, catalog.Census().Version != oldVersion || resolvedMethod(catalog, "work", nil) != "method")
 		if done {
 			break
 		}
 	}
 	count, err := catalog.commitMutation(postimage, &mutationCleanups)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if count != 0 || catalog.Census().Version != oldVersion+1 ||
-		resolvedMethod(catalog, "work", nil) != "method" {
-		t.Fatalf("atomic commit differs: cleanup=%d census=%+v", count, catalog.Census())
-	}
-	if oldCleanups.Load() != 0 {
-		t.Fatal("retired handler cleaned before its invocation lease drained")
-	}
+	require.NoError(t, err)
+	require.False(t, count != 0 || catalog.Census().Version != oldVersion+1 ||
+		resolvedMethod(catalog, "work", nil) != "method")
+	require.EqualValues(t, 0, oldCleanups.Load())
 	oldCleanup, err := catalog.ReleaseInvocation(oldDecision.Lease)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	runCleanupPlan(t, catalog, oldCleanup)
-	if oldCleanups.Load() != 1 || newCleanups.Load() != 0 {
-		t.Fatalf("generation cleanup differs: old=%d new=%d", oldCleanups.Load(), newCleanups.Load())
-	}
+	require.False(t, oldCleanups.Load() != 1 || newCleanups.Load() != 0)
 }
 
 func TestFunctionCatalogBoundedMutationTurns(t *testing.T) {
@@ -1499,64 +1093,50 @@ func TestFunctionCatalogBoundedMutationTurns(t *testing.T) {
 			declarations = append(declarations, testDeclaration(name, "", ResourcePolicy{}))
 		}
 		catalog, err := NewCatalog(declarations)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		prefix := strings.Repeat("p", 128)
 		declaration := testDeclaration("config", prefix, ResourcePolicy{})
 		mutation, err := catalog.NewMutation(catalog.Census().Version, []RouteChange{{
 			PublicName: declaration.PublicName, Prefix: declaration.Prefix, Declaration: &declaration,
 		}})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		builder, err := catalog.startMutation(mutation)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		previous := builder.Progress()
 		turns := 0
 		for {
 			_, done, err := builder.PrepareStep(quantum)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			progress := builder.Progress()
 			delta := progress.CompletedNodes - previous.CompletedNodes
-			if delta <= 0 || delta > quantum || progress.LastStepNodes != delta {
-				t.Fatalf("mutation turn work=%d last=%d, want 1..%d", delta, progress.LastStepNodes, quantum)
-			}
-			if _, ok := catalogRouteSet(catalog.routes, "config"); ok {
-				t.Fatal("private postimage became visible during bounded preparation")
-			}
+			require.False(t, delta <= 0 || delta > quantum || progress.LastStepNodes != delta)
+
+			_, ok := catalogRouteSet(catalog.routes, "config")
+			require.False(t, ok)
+
 			previous = progress
 			turns++
 			if done {
-				if progress.CompletedNodes != progress.TotalNodes {
-					t.Fatalf("completed work=%d total=%d", progress.CompletedNodes, progress.TotalNodes)
-				}
+				require.EqualValues(t, progress.TotalNodes, progress.CompletedNodes)
 				break
 			}
 		}
 		var cleanups [MaximumMutationChanges]jobmgr.FunctionCleanupPlan
-		if count, err := builder.Abort(&cleanups); err != nil || count != 0 {
-			t.Fatalf("mutation abort count=%d err=%v", count, err)
-		}
+
+		abortCount, abortErr := builder.Abort(&cleanups)
+		require.False(t, abortErr != nil || abortCount != 0)
+
 		return result{total: previous.TotalNodes, turns: turns}
 	}
 
 	small := run(t, 0)
 	large := run(t, unrelatedRoutes)
-	if small != large {
-		t.Fatalf("mutation work scaled with total catalog population: small=%+v large=%+v", small, large)
-	}
+	require.EqualValues(t, large, small)
 }
 
 func TestCatalogRejectsInvalidDeclarations(t *testing.T) {
 	permit, err := lifecycle.NewJobLongLivedPlan(1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tests := map[string]Declaration{
 		"missing handler": {
 			ID: "method", Generation: &HandlerGenerationDeclaration{ID: "generation"},
@@ -1666,9 +1246,9 @@ func TestCatalogRejectsInvalidDeclarations(t *testing.T) {
 			if name == "duplicate direct" {
 				declarations = append(declarations, declaration)
 			}
-			if _, err := NewCatalog(declarations); err == nil {
-				t.Fatal("invalid declaration was accepted")
-			}
+
+			_, err := NewCatalog(declarations)
+			require.Error(t, err)
 		})
 	}
 }
@@ -1679,14 +1259,7 @@ func TestCatalogRejectsPathStorageBeyondProcessBudgetBeforePublication(t *testin
 		"initial catalog": func() error {
 			var declarations []Declaration
 			for index := 0; index < 5; index++ {
-				name := fmt.Sprintf(
-					"%d%s",
-					index,
-					strings.Repeat(
-						"n",
-						maximumDeclarationMetadataBytes-1,
-					),
-				)
+				name := fmt.Sprintf("%d%s", index, strings.Repeat("n", maximumDeclarationMetadataBytes-1))
 				declarations = append(
 					declarations,
 					testDeclaration(name, prefix, ResourcePolicy{}),
@@ -1702,14 +1275,7 @@ func TestCatalogRejectsPathStorageBeyondProcessBudgetBeforePublication(t *testin
 			}
 			var changes []RouteChange
 			for index := 0; index < 3; index++ {
-				name := fmt.Sprintf(
-					"%d%s",
-					index,
-					strings.Repeat(
-						"n",
-						maximumDeclarationMetadataBytes-1,
-					),
-				)
+				name := fmt.Sprintf("%d%s", index, strings.Repeat("n", maximumDeclarationMetadataBytes-1))
 				declaration := testDeclaration(
 					name,
 					prefix,
@@ -1727,18 +1293,14 @@ func TestCatalogRejectsPathStorageBeyondProcessBudgetBeforePublication(t *testin
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := run(); err == nil {
-				t.Fatal("path storage beyond the process budget was accepted")
-			}
+			require.Error(t, run())
 		})
 	}
 }
 
 func TestCatalogPathStorageReturnsToPublishedPostimageAcrossChurn(t *testing.T) {
 	catalog, err := NewCatalog(nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	publicName := strings.Repeat("n", 1_024)
 	prefix := strings.Repeat("p", 1_024)
 	apply := func(change RouteChange) {
@@ -1747,31 +1309,21 @@ func TestCatalogPathStorageReturnsToPublishedPostimageAcrossChurn(t *testing.T) 
 			catalog.Census().Version,
 			[]RouteChange{change},
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		builder, err := catalog.startMutation(mutation)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		var postimage *MutationPostimage
 		for {
 			var done bool
-			postimage, done, err = builder.PrepareStep(
-				MaximumMutationQuantum,
-			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			postimage, done, err = builder.PrepareStep(MaximumMutationQuantum)
+			require.NoError(t, err)
 			if done {
 				break
 			}
 		}
 		var cleanups [MaximumMutationChanges]jobmgr.FunctionCleanupPlan
 		count, err := catalog.commitMutation(postimage, &cleanups)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		for index := 0; index < count; index++ {
 			runCleanupPlan(t, catalog, cleanups[index])
 		}
@@ -1792,43 +1344,31 @@ func TestCatalogPathStorageReturnsToPublishedPostimageAcrossChurn(t *testing.T) 
 			PublicName: publicName,
 			Prefix:     prefix,
 		})
-		if published := catalog.storage.published.Load(); published != 0 {
-			t.Fatalf(
-				"iteration %d retained published path bytes: %d",
-				iteration,
-				published,
-			)
-		}
-		if total := catalog.storage.total.Load(); total != 0 {
-			t.Fatalf(
-				"iteration %d retained total path bytes: %d",
-				iteration,
-				total,
-			)
-		}
-		if catalog.storage.preparation.Load() {
-			t.Fatalf(
-				"iteration %d retained a mutation reservation",
-				iteration,
-			)
-		}
+
+		published := catalog.storage.published.Load()
+		require.EqualValues(t, 0, published)
+
+		total := catalog.storage.total.Load()
+		require.EqualValues(t, 0, total)
+
+		require.False(t, catalog.storage.preparation.Load())
 	}
 }
 
 func BenchmarkBFunctionCatalogLookup(b *testing.B) {
 	catalog, err := NewCatalog([]Declaration{testDeclaration("direct", "", ResourcePolicy{})})
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	lookup := jobmgr.FunctionLookup{UID: "benchmark", Route: "direct"}
 	b.ReportAllocs()
 	for b.Loop() {
 		decision, err := catalog.ResolveAndAcquire(lookup)
 		if err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		if _, err := catalog.ReleaseInvocation(decision.Lease); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 	}
 }
@@ -1836,26 +1376,24 @@ func BenchmarkBFunctionCatalogLookup(b *testing.B) {
 func BenchmarkBHandlerLease(b *testing.B) {
 	catalog, err := NewCatalog([]Declaration{testDeclaration("direct", "", ResourcePolicy{})})
 	if err != nil {
-		b.Fatal(err)
+		require.FailNow(b, "benchmark failed", err)
 	}
 	lookup := jobmgr.FunctionLookup{UID: "handler-lease", Route: "direct"}
 	b.ReportAllocs()
 	for b.Loop() {
 		decision, err := catalog.ResolveAndAcquire(lookup)
 		if err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		if _, err := catalog.ReleaseInvocation(decision.Lease); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 	}
 }
 
 func TestFunctionCatalogLookupAndHandlerLeaseAllocateNothing(t *testing.T) {
 	catalog, err := NewCatalog([]Declaration{testDeclaration("direct", "", ResourcePolicy{})})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	lookup := jobmgr.FunctionLookup{UID: "allocations", Route: "direct"}
 	allocations := testing.AllocsPerRun(1_000, func() {
 		decision, resolveErr := catalog.ResolveAndAcquire(lookup)
@@ -1866,9 +1404,7 @@ func TestFunctionCatalogLookupAndHandlerLeaseAllocateNothing(t *testing.T) {
 			panic(releaseErr)
 		}
 	})
-	if allocations != 0 {
-		t.Fatalf("lookup+lease allocations=%f, want 0", allocations)
-	}
+	require.EqualValues(t, 0, allocations)
 }
 
 func testDeclaration(publicName, prefix string, resource ResourcePolicy) Declaration {
@@ -1922,13 +1458,10 @@ func resolvedMethod(catalog *Catalog, publicName string, args []string) string {
 
 func runCleanupPlan(t *testing.T, catalog *Catalog, cleanup jobmgr.FunctionCleanupPlan) {
 	t.Helper()
-	if !cleanup.Ref.Valid() || cleanup.Runner == nil {
-		t.Fatalf("invalid cleanup plan: %+v", cleanup)
-	}
-	if _, err := cleanup.Runner.RunTask(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := catalog.CompleteCleanup(cleanup.Ref, nil); err != nil {
-		t.Fatal(err)
-	}
+	require.False(t, !cleanup.Ref.Valid() || cleanup.Runner == nil)
+
+	_, err := cleanup.Runner.RunTask(context.Background())
+	require.NoError(t, err)
+
+	require.NoError(t, catalog.CompleteCleanup(cleanup.Ref, nil))
 }

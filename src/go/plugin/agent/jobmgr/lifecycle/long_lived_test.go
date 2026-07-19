@@ -7,6 +7,8 @@ import (
 	"context"
 	"fmt"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestPipelinePermitConservesLifecycleFacetsWithoutAdmissionCharge(t *testing.T) {
@@ -15,64 +17,47 @@ func TestPipelinePermitConservesLifecycleFacetsWithoutAdmissionCharge(t *testing
 	plan, err := NewPipelineLongLivedPlan(
 		[]string{"file", "service-discovery"},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	ref := grantLongLivedTestAdmission(t, admission, plan.Bytes())
 	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
 	permit, err := supervisor.IssueLongLivedPermit(admission, ref, owner, plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if census := admission.Census(); census.OrdinaryBytes != 1 ||
-		census.LongLivedRecords != 0 ||
-		census.LongLivedBytes != 0 {
-		t.Fatalf("admission after transfer=%+v", census)
-	}
-	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{
+	require.NoError(t, err)
+
+	census := admission.Census()
+	require.False(t, census.OrdinaryBytes != 1 || census.LongLivedRecords != 0 || census.LongLivedBytes != 0)
+
+	require.EqualValues(t, (LongLivedCensus{
 		Active: 1, Pipelines: 1,
 		GReserved: 3, ExternalReserved: 1,
-	}) {
-		t.Fatalf("permit after transfer=%+v", census)
-	}
+	}), supervisor.LongLivedCensus(),
+	)
+
 	slot := supervisor.longLived.slots[permit.ref.Slot]
-	if slot.admission != nil || slot.admissionRef.Valid() || slot.bytes != 0 {
-		t.Fatalf(
-			"charge-free Pipeline retained admission authority: admission=%p ref=%+v bytes=%d",
-			slot.admission,
-			slot.admissionRef,
-			slot.bytes,
-		)
-	}
-	if err := permit.Return(); err == nil {
-		t.Fatal("permit returned with retained facets")
-	}
+	require.False(t, slot.admission != nil || slot.admissionRef.Valid() || slot.bytes != 0)
+
+	require.Error(t, permit.Return())
 
 	wrongOwner := permit
 	wrongOwner.owner = ResourceIdentity{ID: "other", Generation: 1}
-	if err := wrongOwner.ActivateExternal(LongLivedEProvider); err == nil {
-		t.Fatal("cross-owner external activation succeeded")
-	}
-	if err := permit.ActivateExternal(LongLivedEProvider); err != nil {
-		t.Fatal(err)
-	}
-	if err := permit.ActivateExternal(LongLivedEProvider); err == nil {
-		t.Fatal("duplicate external activation succeeded")
-	}
-	if _, err := supervisor.StartInheritedWithPermitKey(
+
+	require.Error(t, wrongOwner.ActivateExternal(LongLivedEProvider))
+
+	require.NoError(t, permit.ActivateExternal(LongLivedEProvider))
+
+	require.Error(t, permit.ActivateExternal(LongLivedEProvider))
+
+	_, startInheritedWithPermitKeyErr := supervisor.StartInheritedWithPermitKey(
 		context.Background(),
 		owner,
 		InheritedPipelineProvider,
 		"unknown",
 		permit,
 		func(context.Context) error { return nil },
-	); err == nil {
-		t.Fatal("unknown provider key was accepted")
-	}
-	if census := supervisor.LongLivedCensus(); census.GReserved != 3 ||
-		census.GActive != 0 {
-		t.Fatalf("unknown key changed facets=%+v", census)
-	}
+	)
+	require.Error(t, startInheritedWithPermitKeyErr)
+
+	longLivedCensus := supervisor.LongLivedCensus()
+	require.False(t, longLivedCensus.GReserved != 3 || longLivedCensus.GActive != 0)
 
 	refs := make(map[string]InheritedTaskRef)
 	child, err := supervisor.StartInheritedWithPermit(
@@ -85,9 +70,7 @@ func TestPipelinePermitConservesLifecycleFacetsWithoutAdmissionCharge(t *testing
 			return nil
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	refs["supervisor"] = child
 	for name := range map[string]struct{}{"file": {}, "service-discovery": {}} {
 		child, err := supervisor.StartInheritedWithPermitKey(
@@ -101,63 +84,55 @@ func TestPipelinePermitConservesLifecycleFacetsWithoutAdmissionCharge(t *testing
 				return nil
 			},
 		)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		refs[name] = child
 	}
-	if _, err := supervisor.StartInheritedWithPermitKey(
+
+	_, startInheritedWithPermitKeyErr2 := supervisor.StartInheritedWithPermitKey(
 		context.Background(),
 		owner,
 		InheritedPipelineProvider,
 		"file",
 		permit,
 		func(context.Context) error { return nil },
-	); err == nil {
-		t.Fatal("duplicate provider key was accepted")
-	}
-	if census := supervisor.LongLivedCensus(); census.GReserved != 0 || census.GActive != 3 || census.ExternalReserved != 0 || census.ExternalActive != 1 {
-		t.Fatalf("active facets=%+v", census)
-	}
-	if err := permit.ReleaseExternal(LongLivedEProvider); err != nil {
-		t.Fatal(err)
-	}
+	)
+	require.Error(t, startInheritedWithPermitKeyErr2)
+
+	longLivedCensus2 := supervisor.LongLivedCensus()
+	require.False(t, longLivedCensus2.GReserved != 0 || longLivedCensus2.GActive != 3 || longLivedCensus2.ExternalReserved != 0 || longLivedCensus2.ExternalActive != 1)
+
+	require.NoError(t, permit.ReleaseExternal(LongLivedEProvider))
+
 	for _, child := range refs {
-		if err := supervisor.CancelInherited(child, owner); err != nil {
-			t.Fatal(err)
-		}
-		if joined, err := supervisor.JoinInherited(context.Background(), child, owner); err != nil || !joined {
-			t.Fatalf("joined=%v err=%v", joined, err)
-		}
-		if err := supervisor.ReleaseInherited(child, owner); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, supervisor.CancelInherited(child, owner))
+
+		joinInheritedJoined, joinInheritedErr := supervisor.JoinInherited(context.Background(), child, owner)
+		require.False(t, joinInheritedErr != nil || !joinInheritedJoined)
+
+		require.NoError(t, supervisor.ReleaseInherited(child, owner))
 	}
-	if err := permit.ReleaseBytes(); err != nil {
-		t.Fatal(err)
-	}
-	if census := admission.Census(); census.OrdinaryBytes != 1 ||
-		census.LongLivedRecords != 0 || census.LongLivedBytes != 0 {
-		t.Fatalf("admission after persistent release=%+v", census)
-	}
-	if census := supervisor.LongLivedCensus(); census.Active != 1 || census.Bytes != 0 || census.GActive != 0 || census.ExternalActive != 0 {
-		t.Fatalf("permit before return=%+v", census)
-	}
-	if err := permit.Return(); err != nil {
-		t.Fatal(err)
-	}
-	if err := permit.Return(); err == nil {
-		t.Fatal("stale permit returned twice")
-	}
-	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{}) {
-		t.Fatalf("final permit census=%+v", census)
-	}
-	if _, err := admission.ReleaseOrdinary(ref); err != nil {
-		t.Fatal(err)
-	}
-	if census := admission.Census(); census.ActiveRecords != 0 || census.OrdinaryBytes != 0 {
-		t.Fatalf("final admission census=%+v", census)
-	}
+
+	require.NoError(t, permit.ReleaseBytes())
+
+	admissionCensus := admission.Census()
+	require.False(t, admissionCensus.OrdinaryBytes != 1 ||
+		admissionCensus.LongLivedRecords != 0 || admissionCensus.LongLivedBytes != 0)
+
+	longLivedCensus3 := supervisor.LongLivedCensus()
+	require.False(t, longLivedCensus3.Active != 1 || longLivedCensus3.Bytes != 0 || longLivedCensus3.GActive != 0 || longLivedCensus3.ExternalActive != 0)
+
+	require.NoError(t, permit.Return())
+
+	require.Error(t, permit.Return())
+
+	require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
+
+	_, releaseOrdinaryErr := admission.ReleaseOrdinary(ref)
+	require.NoError(t, releaseOrdinaryErr)
+
+	admissionCensus2 := admission.Census()
+	require.False(t, admissionCensus2.ActiveRecords != 0 || admissionCensus2.OrdinaryBytes != 0)
+
 }
 
 func TestPipelineLongLivedPlanProviderKeys(t *testing.T) {
@@ -194,21 +169,11 @@ func TestPipelineLongLivedPlanProviderKeys(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			plan, err := NewPipelineLongLivedPlan(test.keys)
 			if test.wantErr {
-				if err == nil {
-					t.Fatalf("plan=%+v, want error", plan)
-				}
+				require.Error(t, err)
 				return
 			}
-			if err != nil {
-				t.Fatal(err)
-			}
-			if plan.Bytes() != test.wantBytes {
-				t.Fatalf(
-					"bytes=%d, want %d",
-					plan.Bytes(),
-					test.wantBytes,
-				)
-			}
+			require.NoError(t, err)
+			require.EqualValues(t, test.wantBytes, plan.Bytes())
 		})
 	}
 }
@@ -231,19 +196,12 @@ func TestLongLivedResourcePlansChargeDeclaredBytes(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			const retainedBytes = int64(73)
 			plan, err := test.newPlan(retainedBytes)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if plan.Bytes() != retainedBytes {
-				t.Fatalf(
-					"retained bytes=%d, want %d",
-					plan.Bytes(),
-					retainedBytes,
-				)
-			}
-			if plan, err := test.newPlan(0); err == nil {
-				t.Fatalf("zero-byte resource plan was accepted: %+v", plan)
-			}
+			require.NoError(t, err)
+			require.EqualValues(t, retainedBytes, plan.Bytes())
+
+			newPlan2, newPlanErr := test.newPlan(0)
+			require.Error(t, newPlanErr, "plan=%+v", newPlan2)
+
 		})
 	}
 }
@@ -266,9 +224,7 @@ func TestZeroChargePipelinePermitRequiresLiveAdmissionAuthority(t *testing.T) {
 					AdmissionLaneRef{Slot: 1, Generation: 1},
 					1,
 				)
-				if requested.Rejected != nil {
-					t.Fatal(requested.Rejected)
-				}
+				require.Nil(t, requested.Rejected)
 				return requested.Ref
 			},
 			cleanup: func(
@@ -277,18 +233,18 @@ func TestZeroChargePipelinePermitRequiresLiveAdmissionAuthority(t *testing.T) {
 				ref AdmissionRef,
 			) {
 				t.Helper()
-				if err := admission.CancelWaiting(ref); err != nil {
-					t.Fatal(err)
-				}
+
+				require.NoError(t, admission.CancelWaiting(ref))
 			},
 		},
 		"stale reference": {
 			ref: func(t *testing.T, admission *AdmissionLedger) AdmissionRef {
 				t.Helper()
 				ref := grantLongLivedTestAdmission(t, admission, 0)
-				if _, err := admission.ReleaseOrdinary(ref); err != nil {
-					t.Fatal(err)
-				}
+
+				_, err := admission.ReleaseOrdinary(ref)
+				require.NoError(t, err)
+
 				return ref
 			},
 		},
@@ -296,9 +252,9 @@ func TestZeroChargePipelinePermitRequiresLiveAdmissionAuthority(t *testing.T) {
 			ref: func(t *testing.T, admission *AdmissionLedger) AdmissionRef {
 				t.Helper()
 				ref := grantLongLivedTestAdmission(t, admission, 1)
-				if err := admission.transferLongLived(ref, 1); err != nil {
-					t.Fatal(err)
-				}
+
+				require.NoError(t, admission.transferLongLived(ref, 1))
+
 				return ref
 			},
 			cleanup: func(
@@ -307,12 +263,13 @@ func TestZeroChargePipelinePermitRequiresLiveAdmissionAuthority(t *testing.T) {
 				ref AdmissionRef,
 			) {
 				t.Helper()
-				if _, err := admission.releaseLongLived(ref, 1); err != nil {
-					t.Fatal(err)
-				}
-				if _, err := admission.ReleaseOrdinary(ref); err != nil {
-					t.Fatal(err)
-				}
+
+				_, err := admission.releaseLongLived(ref, 1)
+				require.NoError(t, err)
+
+				_, releaseOrdinaryErr := admission.ReleaseOrdinary(ref)
+				require.NoError(t, releaseOrdinaryErr)
+
 			},
 		},
 	}
@@ -321,28 +278,25 @@ func TestZeroChargePipelinePermitRequiresLiveAdmissionAuthority(t *testing.T) {
 			admission := NewAdmissionLedger()
 			supervisor := newLongLivedTestSupervisor(t)
 			plan, err := NewPipelineLongLivedPlan([]string{"provider"})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			ref := test.ref(t, admission)
-			if _, err := supervisor.IssueLongLivedPermit(
+
+			_, issueLongLivedPermitErr := supervisor.IssueLongLivedPermit(
 				admission,
 				ref,
 				ResourceIdentity{ID: "pipeline", Generation: 1},
 				plan,
-			); err == nil {
-				t.Fatal("zero-charge Pipeline accepted invalid admission authority")
-			}
+			)
+			require.Error(t, issueLongLivedPermitErr)
+
 			if test.cleanup != nil {
 				test.cleanup(t, admission, ref)
 			}
-			if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{}) {
-				t.Fatalf("failed issue retained lifecycle ownership: %+v", census)
-			}
-			if census := admission.Census(); census.ActiveRecords != 0 ||
-				census.OrdinaryBytes != 0 {
-				t.Fatalf("failed issue retained admission: %+v", census)
-			}
+
+			require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
+
+			census := admission.Census()
+			require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
 		})
 	}
 }
@@ -351,14 +305,8 @@ func TestPipelinePermitReleasesDisabledProviderClaim(t *testing.T) {
 	admission := NewAdmissionLedger()
 	supervisor := newLongLivedTestSupervisor(t)
 	plan, err := NewPipelineLongLivedPlan([]string{"disabled", "enabled"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	admissionRef := grantLongLivedTestAdmission(
-		t,
-		admission,
-		plan.Bytes(),
-	)
+	require.NoError(t, err)
+	admissionRef := grantLongLivedTestAdmission(t, admission, plan.Bytes())
 	owner := ResourceIdentity{ID: "pipeline", Generation: 1}
 	permit, err := supervisor.IssueLongLivedPermit(
 		admission,
@@ -366,37 +314,23 @@ func TestPipelinePermitReleasesDisabledProviderClaim(t *testing.T) {
 		owner,
 		plan,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := permit.ReleaseUnusedInherited(
-		InheritedPipelineProvider,
-		"disabled",
-	); err != nil {
-		t.Fatal(err)
-	}
-	if err := permit.ReleaseUnusedInherited(
-		InheritedPipelineProvider,
-		"disabled",
-	); err == nil {
-		t.Fatal("disabled provider claim released twice")
-	}
-	if census := supervisor.LongLivedCensus(); census.GReserved != 2 {
-		t.Fatalf("permit after disabled release=%+v", census)
-	}
-	if err := permit.AbortUnused(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := admission.ReleaseOrdinary(admissionRef); err != nil {
-		t.Fatal(err)
-	}
-	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{}) {
-		t.Fatalf("final permit census=%+v", census)
-	}
-	if census := admission.Census(); census.ActiveRecords != 0 ||
-		census.OrdinaryBytes != 0 {
-		t.Fatalf("final admission census=%+v", census)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, permit.ReleaseUnusedInherited(InheritedPipelineProvider, "disabled"))
+
+	require.Error(t, permit.ReleaseUnusedInherited(InheritedPipelineProvider, "disabled"))
+
+	require.EqualValues(t, 2, supervisor.LongLivedCensus().GReserved)
+
+	require.NoError(t, permit.AbortUnused())
+
+	_, releaseOrdinaryErr := admission.ReleaseOrdinary(admissionRef)
+	require.NoError(t, releaseOrdinaryErr)
+
+	require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
+
+	census := admission.Census()
+	require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
 }
 
 func TestLongLivedPermitSurvivesOperationAdmissionRelease(t *testing.T) {
@@ -404,48 +338,38 @@ func TestLongLivedPermitSurvivesOperationAdmissionRelease(t *testing.T) {
 	ref := grantLongLivedTestAdmission(t, admission, 100)
 	supervisor := newLongLivedTestSupervisor(t)
 	plan, err := NewJobLongLivedPlan(40)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	permit, err := supervisor.IssueLongLivedPermit(admission, ref, ResourceIdentity{ID: "job", Generation: 1}, plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := admission.ReleaseOrdinary(ref); err != nil {
-		t.Fatal(err)
-	}
-	if census := admission.Census(); census.ActiveRecords != 0 ||
+	require.NoError(t, err)
+
+	_, releaseOrdinaryErr := admission.ReleaseOrdinary(ref)
+	require.NoError(t, releaseOrdinaryErr)
+
+	census := admission.Census()
+	require.False(t, census.ActiveRecords != 0 ||
 		census.FreeRecords == 0 ||
 		census.OrdinaryGranted != 0 ||
 		census.OrdinaryBytes != plan.Bytes() ||
-		census.LongLivedBytes != plan.Bytes() {
-		t.Fatalf("persistent-only admission=%+v", census)
-	}
-	if err := permit.ReleaseExternal(LongLivedEJobResources); err != nil {
-		t.Fatal(err)
-	}
-	if err := permit.ReleaseBytes(); err != nil {
-		t.Fatal(err)
-	}
-	if err := permit.Return(); err != nil {
-		t.Fatal(err)
-	}
-	if census := admission.Census(); census.ActiveRecords != 0 || census.OrdinaryBytes != 0 || census.LongLivedRecords != 0 {
-		t.Fatalf("final admission=%+v", census)
-	}
+		census.LongLivedBytes != plan.Bytes())
+
+	require.NoError(t, permit.ReleaseExternal(LongLivedEJobResources))
+
+	require.NoError(t, permit.ReleaseBytes())
+
+	require.NoError(t, permit.Return())
+
+	admissionCensus := admission.Census()
+	require.False(t, admissionCensus.ActiveRecords != 0 || admissionCensus.OrdinaryBytes != 0 || admissionCensus.LongLivedRecords != 0)
+
 }
 
 func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 	admission := NewAdmissionLedger()
 	supervisor := newLongLivedTestSupervisor(t)
 	pipelinePlan, err := NewPipelineLongLivedPlan([]string{"provider"})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	jobPlan, err := NewJobLongLivedPlan(1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	const jobs = formerFixedPopulation + 1
 	permits := make([]LongLivedPermit, 0, jobs+1)
@@ -458,19 +382,14 @@ func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 			owner,
 			plan,
 		)
-		if issueErr != nil {
-			t.Fatal(issueErr)
-		}
-		if _, releaseErr := admission.ReleaseOrdinary(ref); releaseErr != nil {
-			t.Fatal(releaseErr)
-		}
-		if census := admission.Census(); census.ActiveRecords != 0 ||
-			census.FreeRecords == 0 {
-			t.Fatalf(
-				"persistent resource retained operation admission: %+v",
-				census,
-			)
-		}
+		require.NoError(t, issueErr)
+
+		_, releaseErr := admission.ReleaseOrdinary(ref)
+		require.NoError(t, releaseErr)
+
+		census := admission.Census()
+		require.False(t, census.ActiveRecords != 0 || census.FreeRecords == 0)
+
 		permits = append(permits, permit)
 	}
 
@@ -488,28 +407,23 @@ func TestLongLivedPermitDomainsGrowBeyondFormerJobLimit(t *testing.T) {
 		)
 	}
 
-	if census := admission.Census(); census.ActiveRecords != 0 ||
+	census := admission.Census()
+	require.False(t, census.ActiveRecords != 0 ||
 		census.LongLivedRecords != jobs ||
-		census.OrdinaryBytes != int64(jobs)*jobPlan.Bytes() {
-		t.Fatalf("separated admission census=%+v", census)
-	}
-	if census := supervisor.LongLivedCensus(); census.Active != jobs+1 {
-		t.Fatalf("separated permit census=%+v", census)
-	}
+		census.OrdinaryBytes != int64(jobs)*jobPlan.Bytes())
+
+	require.EqualValues(t, jobs+1, supervisor.LongLivedCensus().Active)
 
 	for _, permit := range permits {
-		if err := permit.AbortUnused(); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, permit.AbortUnused())
 	}
-	if census := admission.Census(); census.ActiveRecords != 0 ||
-		census.LongLivedRecords != 0 ||
-		census.OrdinaryBytes != 0 {
-		t.Fatalf("final separated admission census=%+v", census)
-	}
-	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{}) {
-		t.Fatalf("final separated permit census=%+v", census)
-	}
+
+	admissionCensus := admission.Census()
+	require.False(t, admissionCensus.ActiveRecords != 0 ||
+		admissionCensus.LongLivedRecords != 0 ||
+		admissionCensus.OrdinaryBytes != 0)
+
+	require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
 }
 
 func TestSecretStoreReplacementPermitsGrowBeyondFormerOverlapLimit(t *testing.T) {
@@ -518,13 +432,9 @@ func TestSecretStoreReplacementPermitsGrowBeyondFormerOverlapLimit(t *testing.T)
 	admission := NewAdmissionLedger()
 	supervisor := newLongLivedTestSupervisor(t)
 	steadyPlan, err := NewSecretStoreLongLivedPlan(1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	replacementPlan, err := NewSecretStoreReplacementLongLivedPlan(1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	permits := make([]LongLivedPermit, 0, replacements+1)
 	issue := func(owner ResourceIdentity, plan LongLivedPlan) {
@@ -536,12 +446,11 @@ func TestSecretStoreReplacementPermitsGrowBeyondFormerOverlapLimit(t *testing.T)
 			owner,
 			plan,
 		)
-		if issueErr != nil {
-			t.Fatal(issueErr)
-		}
-		if _, releaseErr := admission.ReleaseOrdinary(ref); releaseErr != nil {
-			t.Fatal(releaseErr)
-		}
+		require.NoError(t, issueErr)
+
+		_, releaseErr := admission.ReleaseOrdinary(ref)
+		require.NoError(t, releaseErr)
+
 		permits = append(permits, permit)
 	}
 
@@ -559,29 +468,26 @@ func TestSecretStoreReplacementPermitsGrowBeyondFormerOverlapLimit(t *testing.T)
 		)
 	}
 
-	if census := supervisor.LongLivedCensus(); census.Active != replacements+1 ||
+	census := supervisor.LongLivedCensus()
+	require.False(t, census.Active != replacements+1 ||
 		census.SecretStores != replacements+1 ||
-		census.Bytes != int64(replacements+1)*steadyPlan.Bytes() {
-		t.Fatalf("replacement overlap census=%+v", census)
-	}
-	if census := admission.Census(); census.ActiveRecords != 0 ||
-		census.LongLivedRecords != replacements+1 ||
-		census.OrdinaryBytes != int64(replacements+1)*steadyPlan.Bytes() {
-		t.Fatalf("replacement overlap admission=%+v", census)
-	}
+		census.Bytes != int64(replacements+1)*steadyPlan.Bytes())
+
+	admissionCensus := admission.Census()
+	require.False(t, admissionCensus.ActiveRecords != 0 ||
+		admissionCensus.LongLivedRecords != replacements+1 ||
+		admissionCensus.OrdinaryBytes != int64(replacements+1)*steadyPlan.Bytes())
+
 	for _, permit := range permits {
-		if err := permit.AbortUnused(); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, permit.AbortUnused())
 	}
-	if census := admission.Census(); census.ActiveRecords != 0 ||
-		census.LongLivedRecords != 0 ||
-		census.OrdinaryBytes != 0 {
-		t.Fatalf("final replacement admission=%+v", census)
-	}
-	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{}) {
-		t.Fatalf("final replacement census=%+v", census)
-	}
+
+	admissionCensus2 := admission.Census()
+	require.False(t, admissionCensus2.ActiveRecords != 0 ||
+		admissionCensus2.LongLivedRecords != 0 ||
+		admissionCensus2.OrdinaryBytes != 0)
+
+	require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
 }
 
 func TestSecretStoreSteadyPermitsHaveNoConfiguredStoreCountLimit(t *testing.T) {
@@ -590,9 +496,7 @@ func TestSecretStoreSteadyPermitsHaveNoConfiguredStoreCountLimit(t *testing.T) {
 	admission := NewAdmissionLedger()
 	supervisor := newLongLivedTestSupervisor(t)
 	plan, err := NewSecretStoreLongLivedPlan(1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	permits := make([]LongLivedPermit, 0, stores)
 	for index := range stores {
 		ref := grantLongLivedTestAdmission(t, admission, 2)
@@ -605,27 +509,22 @@ func TestSecretStoreSteadyPermitsHaveNoConfiguredStoreCountLimit(t *testing.T) {
 			},
 			plan,
 		)
-		if issueErr != nil {
-			t.Fatal(issueErr)
-		}
-		if _, releaseErr := admission.ReleaseOrdinary(ref); releaseErr != nil {
-			t.Fatal(releaseErr)
-		}
+		require.NoError(t, issueErr)
+
+		_, releaseErr := admission.ReleaseOrdinary(ref)
+		require.NoError(t, releaseErr)
+
 		permits = append(permits, permit)
 	}
-	if census := supervisor.LongLivedCensus(); census.Active != stores ||
-		census.SecretStores != stores ||
-		census.Bytes != stores*plan.Bytes() {
-		t.Fatalf("steady Store permit census=%+v", census)
-	}
+
+	census := supervisor.LongLivedCensus()
+	require.False(t, census.Active != stores || census.SecretStores != stores || census.Bytes != stores*plan.Bytes())
+
 	for _, permit := range permits {
-		if err := permit.AbortUnused(); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, permit.AbortUnused())
 	}
-	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{}) {
-		t.Fatalf("final Store permit census=%+v", census)
-	}
+
+	require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
 }
 
 func TestLongLivedSecretStorePermitRejectsByteReleaseBeforeExternalRelease(t *testing.T) {
@@ -633,55 +532,45 @@ func TestLongLivedSecretStorePermitRejectsByteReleaseBeforeExternalRelease(t *te
 	ref := grantLongLivedTestAdmission(t, admission, 100)
 	supervisor := newLongLivedTestSupervisor(t)
 	plan, err := NewSecretStoreLongLivedPlan(40)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	permit, err := supervisor.IssueLongLivedPermit(admission, ref, ResourceIdentity{ID: "secret-store", Generation: 1}, plan)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	assertUnchanged := func(wantAdmission AdmissionCensus, wantLongLived LongLivedCensus) {
 		t.Helper()
-		if got := admission.Census(); got != wantAdmission {
-			t.Fatalf("premature byte release changed Admission: got=%+v want=%+v", got, wantAdmission)
-		}
-		if got := supervisor.LongLivedCensus(); got != wantLongLived {
-			t.Fatalf("premature byte release changed long-lived census: got=%+v want=%+v", got, wantLongLived)
-		}
+
+		require.EqualValues(t, wantAdmission, admission.Census())
+
+		require.EqualValues(t, wantLongLived, supervisor.LongLivedCensus())
 	}
 	wantAdmission := admission.Census()
 	wantLongLived := supervisor.LongLivedCensus()
-	if err := permit.ReleaseBytes(); err == nil {
-		t.Fatal("released SecretStore bytes while the external facet was reserved")
-	}
+
+	require.Error(t, permit.ReleaseBytes())
+
 	assertUnchanged(wantAdmission, wantLongLived)
-	if err := permit.ActivateExternal(LongLivedESecretStore); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, permit.ActivateExternal(LongLivedESecretStore))
+
 	wantAdmission = admission.Census()
 	wantLongLived = supervisor.LongLivedCensus()
-	if err := permit.ReleaseBytes(); err == nil {
-		t.Fatal("released SecretStore bytes while the external facet was active")
-	}
+
+	require.Error(t, permit.ReleaseBytes())
+
 	assertUnchanged(wantAdmission, wantLongLived)
-	if err := permit.ReleaseExternal(LongLivedESecretStore); err != nil {
-		t.Fatal(err)
-	}
-	if err := permit.ReleaseBytes(); err != nil {
-		t.Fatal(err)
-	}
-	if err := permit.Return(); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := admission.ReleaseOrdinary(ref); err != nil {
-		t.Fatal(err)
-	}
-	if census := admission.Census(); census.ActiveRecords != 0 || census.OrdinaryBytes != 0 {
-		t.Fatalf("final Admission census=%+v", census)
-	}
-	if census := supervisor.LongLivedCensus(); census != (LongLivedCensus{}) {
-		t.Fatalf("final long-lived census=%+v", census)
-	}
+
+	require.NoError(t, permit.ReleaseExternal(LongLivedESecretStore))
+
+	require.NoError(t, permit.ReleaseBytes())
+
+	require.NoError(t, permit.Return())
+
+	_, releaseOrdinaryErr := admission.ReleaseOrdinary(ref)
+	require.NoError(t, releaseOrdinaryErr)
+
+	census := admission.Census()
+	require.False(t, census.ActiveRecords != 0 || census.OrdinaryBytes != 0)
+
+	require.EqualValues(t, (LongLivedCensus{}), supervisor.LongLivedCensus())
 }
 
 func grantLongLivedTestAdmission(t *testing.T, ledger *AdmissionLedger, byteCount int64) AdmissionRef {
@@ -691,90 +580,72 @@ func grantLongLivedTestAdmission(t *testing.T, ledger *AdmissionLedger, byteCoun
 		AdmissionLaneRef{Slot: 1, Generation: 1},
 		byteCount+1,
 	)
-	if requested.Rejected != nil {
-		t.Fatal(requested.Rejected)
-	}
+	require.Nil(t, requested.Rejected)
 	var grants [4]AdmissionGrant
 	count, _, err := ledger.TakeGrants(1, &grants)
-	if err != nil || count != 1 || grants[0].Ref != requested.Ref {
-		t.Fatalf("grant count=%d grant=%+v err=%v", count, grants[0], err)
-	}
+	require.False(t, err != nil || count != 1 || grants[0].Ref != requested.Ref)
 	return requested.Ref
 }
 
 func TestLongLivedByteReleaseSignalsNewAdmissionCapacity(t *testing.T) {
 	supervisor := newLongLivedTestSupervisor(t)
 	ready := make(chan struct{}, 1)
-	if err := supervisor.BindAdmissionReady(func() { ready <- struct{}{} }); err != nil {
-		t.Fatal(err)
-	}
-	if err := supervisor.BindAdmissionReady(func() {}); err == nil {
-		t.Fatal("duplicate admission-ready binding succeeded")
-	}
+
+	require.NoError(t, supervisor.BindAdmissionReady(func() { ready <- struct{}{} }))
+
+	require.Error(t, supervisor.BindAdmissionReady(func() {}))
+
 	admission := NewAdmissionLedger()
 	ownerRef := grantLongLivedTestAdmission(t, admission, 100)
 	plan, err := NewJobLongLivedPlan(40)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	permit, err := supervisor.IssueLongLivedPermit(
 		admission, ownerRef, ResourceIdentity{ID: "owner", Generation: 1}, plan,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := admission.ReleaseOrdinary(ownerRef); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	_, releaseOrdinaryErr := admission.ReleaseOrdinary(ownerRef)
+	require.NoError(t, releaseOrdinaryErr)
+
 	blocker := admission.RequestOrdinary(
 		1,
 		AdmissionLaneRef{Slot: 2, Generation: 1},
 		OrdinaryBudgetBytes-plan.Bytes(),
 	)
 	waiter := admission.RequestOrdinary(1, AdmissionLaneRef{Slot: 3, Generation: 1}, 1)
-	if blocker.Rejected != nil || waiter.Rejected != nil {
-		t.Fatalf("saturation setup differs: blocker=%v waiter=%v", blocker.Rejected, waiter.Rejected)
-	}
+	require.False(t, blocker.Rejected != nil || waiter.Rejected != nil)
 	var grants [4]AdmissionGrant
 	count, _, err := admission.TakeGrants(2, &grants)
-	if err != nil || count != 1 || grants[0].Ref != blocker.Ref {
-		t.Fatalf("saturation grant differs: count=%d grant=%#v err=%v", count, grants[0], err)
-	}
-	if err := permit.ReleaseExternal(LongLivedEJobResources); err != nil {
-		t.Fatal(err)
-	}
-	if err := permit.ReleaseBytes(); err != nil {
-		t.Fatal(err)
-	}
+	require.False(t, err != nil || count != 1 || grants[0].Ref != blocker.Ref)
+
+	require.NoError(t, permit.ReleaseExternal(LongLivedEJobResources))
+
+	require.NoError(t, permit.ReleaseBytes())
+
 	select {
 	case <-ready:
 	default:
-		t.Fatal("long-lived byte release lost admission wake")
+		require.FailNow(t, "test failed", "long-lived byte release lost admission wake")
 	}
-	if err := permit.Return(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, permit.Return())
+
 	count, _, err = admission.TakeGrants(1, &grants)
-	if err != nil || count != 1 || grants[0].Ref != waiter.Ref {
-		t.Fatalf("released-capacity grant differs: count=%d grant=%#v err=%v", count, grants[0], err)
-	}
-	if _, err := admission.ReleaseOrdinary(waiter.Ref); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := admission.ReleaseOrdinary(blocker.Ref); err != nil {
-		t.Fatal(err)
-	}
+	require.False(t, err != nil || count != 1 || grants[0].Ref != waiter.Ref)
+
+	_, releaseOrdinaryErr2 := admission.ReleaseOrdinary(waiter.Ref)
+	require.NoError(t, releaseOrdinaryErr2)
+
+	_, releaseOrdinaryErr3 := admission.ReleaseOrdinary(blocker.Ref)
+	require.NoError(t, releaseOrdinaryErr3)
+
 }
 
 func newLongLivedTestSupervisor(t *testing.T) *TaskSupervisor {
 	t.Helper()
 	frame, err := NewFrameOwner(&bytes.Buffer{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	supervisor, err := NewTaskSupervisor(frame)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return supervisor
 }

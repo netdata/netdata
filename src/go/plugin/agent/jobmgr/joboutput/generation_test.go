@@ -6,13 +6,13 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"reflect"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/jobruntime"
+	"github.com/stretchr/testify/require"
 )
 
 var _ lifecycle.PreparedResource = PreparedJob{}
@@ -55,15 +55,11 @@ func TestJobFactoryRejectCleanup(t *testing.T) {
 					return test.build(t, events)
 				},
 			)
-			if err == nil {
-				t.Fatal("construction unexpectedly succeeded")
-			}
-			if prepared.Valid() {
-				t.Fatal("failed construction returned a capability")
-			}
-			if got := events.snapshot(); !reflect.DeepEqual(got, test.want) {
-				t.Fatalf("events=%v want=%v", got, test.want)
-			}
+			require.Error(t, err)
+			require.False(t, prepared.Valid())
+
+			got := events.snapshot()
+			require.Equal(t, test.want, got)
 		})
 	}
 }
@@ -87,45 +83,34 @@ func TestJobGenerationV1V2(t *testing.T) {
 					return testConstructedJob(t, test.variant, events, jobEventWriter{events: events}), nil
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			generation, err := prepared.Accept(context.Background(), 7)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := generation.Start(context.Background()); err != nil {
-				t.Fatal(err)
-			}
-			if err := generation.Publish(); err != nil {
-				t.Fatal(err)
-			}
-			if err := generation.Stop(context.Background()); err != nil {
-				t.Fatal(err)
-			}
-			if generation.State() != JobStopped {
-				t.Fatalf("state before finalization=%v", generation.State())
-			}
-			if err := generation.Finalize(); err != nil {
-				t.Fatal(err)
-			}
-			if err := generation.Stop(context.Background()); err != nil {
-				t.Fatalf("idempotent stop: %v", err)
-			}
-			if err := generation.Finalize(); err != nil {
-				t.Fatalf("idempotent finalize: %v", err)
-			}
+			require.NoError(t, err)
+
+			require.NoError(t, generation.Start(context.Background()))
+
+			require.NoError(t, generation.Publish())
+
+			require.NoError(t, generation.Stop(context.Background()))
+
+			require.EqualValues(t, JobStopped, generation.State())
+
+			require.NoError(t, generation.Finalize())
+
+			require.NoError(t, generation.Stop(context.Background()))
+
+			require.NoError(t, generation.Finalize())
+
 			want := []string{
 				"runtime-start", "handler-publish", "handler-close", "runtime-stop", "prepare-cleanup",
 				"write", "metadata-commit", "runtime-release", "vnode", "handler",
 				"collector", "external", "bytes", "permit",
 			}
-			if got := events.snapshot(); !reflect.DeepEqual(got, want) {
-				t.Fatalf("events=%v want=%v", got, want)
-			}
-			if generation.State() != JobTerminal {
-				t.Fatalf("state=%v", generation.State())
-			}
+
+			got := events.snapshot()
+			require.Equal(t, want, got)
+
+			require.EqualValues(t, JobTerminal, generation.State())
 		})
 	}
 }
@@ -144,44 +129,30 @@ func TestJobGenerationPermitReturnLast(t *testing.T) {
 			return constructed, nil
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	generation, err := prepared.Accept(context.Background(), 1)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := generation.Start(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := generation.Publish(); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+
+	require.NoError(t, generation.Start(context.Background()))
+
+	require.NoError(t, generation.Publish())
+
 	done := make(chan error, 1)
 	go func() { done <- generation.Stop(context.Background()) }()
 	events.waitFor(t, "runtime-stop-enter")
-	if generation.State() != JobStopping {
-		t.Fatalf("state while Stop blocked=%v", generation.State())
-	}
-	if events.contains("permit") {
-		t.Fatal("permit returned while runtime Stop was blocked")
-	}
+	require.EqualValues(t, JobStopping, generation.State())
+	require.False(t, events.contains("permit"))
 	close(release)
-	if err := <-done; err != nil {
-		t.Fatal(err)
-	}
-	if generation.State() != JobStopped {
-		t.Fatalf("state after joined Stop=%v", generation.State())
-	}
-	if events.contains("permit") {
-		t.Fatal("permit returned before kernel finalization")
-	}
-	if err := generation.Finalize(); err != nil {
-		t.Fatal(err)
-	}
-	if got := events.snapshot(); got[len(got)-1] != "permit" {
-		t.Fatalf("last event=%q want permit: %v", got[len(got)-1], got)
-	}
+
+	require.NoError(t, <-done)
+
+	require.EqualValues(t, JobStopped, generation.State())
+	require.False(t, events.contains("permit"))
+
+	require.NoError(t, generation.Finalize())
+
+	got := events.snapshot()
+	require.EqualValues(t, "permit", got[len(got)-1])
 }
 
 func TestJobGenerationRetainsAfterIrrecoverableFailure(t *testing.T) {
@@ -232,40 +203,25 @@ func TestJobGenerationRetainsAfterIrrecoverableFailure(t *testing.T) {
 					return constructed, nil
 				},
 			)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			generation, err := prepared.Accept(context.Background(), 1)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			startErr := generation.Start(context.Background())
 			if !test.start {
-				if startErr == nil {
-					t.Fatal("start unexpectedly succeeded")
-				}
+				require.Error(t, startErr)
 			} else {
-				if startErr != nil {
-					t.Fatal(startErr)
-				}
-				if err := generation.Publish(); err != nil {
-					t.Fatal(err)
-				}
-				if err := generation.Stop(context.Background()); err == nil {
-					t.Fatal("stop unexpectedly succeeded")
-				}
+				require.NoError(t, startErr)
+
+				require.NoError(t, generation.Publish())
+
+				require.Error(t, generation.Stop(context.Background()))
 			}
-			if generation.State() != JobRetained {
-				t.Fatalf("state=%v want retained", generation.State())
-			}
-			if events.contains("permit") {
-				t.Fatalf("permit returned from retained generation: %v", events.snapshot())
-			}
+			require.EqualValues(t, JobRetained, generation.State())
+			require.False(t, events.contains("permit"))
 			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 			defer cancel()
-			if err := generation.Stop(ctx); err == nil {
-				t.Fatal("repeated stop unexpectedly succeeded")
-			}
+
+			require.Error(t, generation.Stop(ctx))
 		})
 	}
 }
@@ -289,9 +245,8 @@ func TestJobLifecyclePanicsPreserveTaskClassification(t *testing.T) {
 	}
 	for name, run := range tests {
 		t.Run(name, func(t *testing.T) {
-			if err := run(); !errors.Is(err, lifecycle.ErrTaskPanic) {
-				t.Fatalf("panic error=%v want ErrTaskPanic", err)
-			}
+			err := run()
+			require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
 		})
 	}
 }
@@ -309,17 +264,17 @@ func BenchmarkBJobFactoryCold(b *testing.B) {
 			},
 		)
 		if err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 		if err := prepared.Dispose(context.Background()); err != nil {
-			b.Fatal(err)
+			require.FailNow(b, "benchmark failed", err)
 		}
 	}
 }
 
 type testingHelper interface {
+	require.TestingT
 	Helper()
-	Fatal(...any)
 }
 
 func testConstructedJob(
@@ -330,9 +285,7 @@ func testConstructedJob(
 ) ConstructedJob {
 	t.Helper()
 	owner, err := lifecycle.NewFrameOwner(writer)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	return ConstructedJob{
 		Variant:    variant,
 		Runtime:    &recordingJobRuntime{events: events},
@@ -547,5 +500,5 @@ func (log *jobEventLog) waitFor(t *testing.T, want string) {
 		}
 		time.Sleep(time.Millisecond)
 	}
-	t.Fatalf("event %q not observed: %v", want, log.snapshot())
+	require.FailNowf(t, "test failed", "event %q not observed: %v", want, log.snapshot())
 }

@@ -14,14 +14,13 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFunctionAssemblyLifecycle(t *testing.T) {
 	var output bytes.Buffer
 	frames, err := lifecycle.NewFrameOwner(&output)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	modules := collectorapi.Registry{
 		"module": {
 			AgentFunctions: func() []funcapi.FunctionConfig {
@@ -33,31 +32,22 @@ func TestFunctionAssemblyLifecycle(t *testing.T) {
 		},
 	}
 	assembly, err := NewFunctionAssembly(7, modules, frames)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	catalog, ok := assembly.Catalog().(*functionadapter.Catalog)
-	if !ok {
-		t.Fatal("assembly did not expose its exact Function catalog")
-	}
+	require.True(t, ok)
 	mutations := &assemblyMutationPort{catalog: catalog}
-	if err := assembly.Bind(mutations); err != nil {
-		t.Fatal(err)
-	}
-	if err := assembly.Activate(); err != nil {
-		t.Fatal(err)
-	}
+
+	require.NoError(t, assembly.Bind(mutations))
+
+	require.NoError(t, assembly.Activate())
+
 	const registration = "FUNCTION GLOBAL \"module:method\" 60 \"module method data function\" \"top\" 0x0000 100 3\n\n"
-	if got := output.String(); got != registration {
-		t.Fatalf("activation frame=%q", got)
-	}
-	if err := assembly.Stop(); err != nil {
-		t.Fatal(err)
-	}
-	if got := output.String(); got != registration+
-		"FUNCTION_DEL GLOBAL \"module:method\"\n\n" {
-		t.Fatalf("lifecycle frames=%q", got)
-	}
+
+	require.EqualValues(t, registration, output.String())
+
+	require.NoError(t, assembly.Stop())
+
+	require.EqualValues(t, registration+"FUNCTION_DEL GLOBAL \"module:method\"\n\n", output.String())
 }
 
 func TestFunctionAssemblyStateGuards(t *testing.T) {
@@ -106,17 +96,12 @@ func TestFunctionAssemblyStateGuards(t *testing.T) {
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			assembly, err := NewFunctionAssembly(1, collectorapi.Registry{}, frames)
-			if err != nil {
-				t.Fatal(err)
-			}
+			require.NoError(t, err)
 			catalog := assembly.Catalog().(*functionadapter.Catalog)
-			if err := test.run(assembly, &assemblyMutationPort{catalog: catalog}); err == nil {
-				t.Fatal("invalid assembly transition was accepted")
-			}
+
+			require.Error(t, test.run(assembly, &assemblyMutationPort{catalog: catalog}))
 		})
 	}
 }
@@ -125,42 +110,30 @@ func TestFunctionProtocolPanicPreservesTaskClassification(t *testing.T) {
 	err := callFunctionProtocol(func() {
 		panic("handler failed")
 	})
-	if !errors.Is(err, lifecycle.ErrTaskPanic) {
-		t.Fatalf("panic error=%v want ErrTaskPanic", err)
-	}
+	require.ErrorIs(t, err, lifecycle.ErrTaskPanic)
 }
 
 func TestFunctionAssemblyJobHookCapturesExactHandle(t *testing.T) {
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	assembly, err := NewFunctionAssembly(
 		1,
 		collectorapi.Registry{"module": {}},
 		frames,
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	job := &assemblyTestJob{}
 	handle, err := assembly.JobHooks().Prepare(joboutput.PublishedJob{
 		Identity: lifecycle.ResourceIdentity{ID: job.FullName(), Generation: 3},
 		Variant:  joboutput.JobVariantV1,
 		Job:      job,
 	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if handle == nil {
-		t.Fatal("job hook returned no lifecycle handle")
-	}
-	if err := handle.CloseAndDrain(context.Background()); err != nil {
-		t.Fatal(err)
-	}
-	if err := handle.Cleanup(context.Background()); err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
+	require.NotNil(t, handle)
+
+	require.NoError(t, handle.CloseAndDrain(context.Background()))
+
+	require.NoError(t, handle.Cleanup(context.Background()))
 }
 
 type assemblyMutationPort struct {
@@ -178,9 +151,7 @@ func (amp *assemblyMutationPort) QuiesceFunctions(
 		return err
 	}
 	for {
-		progress, err := amp.catalog.AdvanceMutationQuiesce(
-			jobmgr.MaximumFunctionMutationQuantum,
-		)
+		progress, err := amp.catalog.AdvanceMutationQuiesce(jobmgr.MaximumFunctionMutationQuantum)
 		if err != nil {
 			return err
 		}
@@ -202,10 +173,7 @@ func (amp *assemblyMutationPort) CommitFunctions(
 	}
 	for {
 		var cleanups [jobmgr.MaximumFunctionCleanupBatch]jobmgr.FunctionCleanupPlan
-		progress, count, err := amp.catalog.AdvanceMutation(
-			jobmgr.MaximumFunctionMutationQuantum,
-			&cleanups,
-		)
+		progress, count, err := amp.catalog.AdvanceMutation(jobmgr.MaximumFunctionMutationQuantum, &cleanups)
 		if err != nil {
 			return 0, err
 		}
@@ -240,10 +208,7 @@ func (amp *assemblyMutationPort) AbortFunctions(
 	for index := 0; index < count; index++ {
 		cleanup := cleanups[index]
 		_, cleanupErr := cleanup.Runner.RunTask(context.Background())
-		if err := amp.catalog.CompleteCleanup(
-			cleanup.Ref,
-			cleanupErr,
-		); err != nil {
+		if err := amp.catalog.CompleteCleanup(cleanup.Ref, cleanupErr); err != nil {
 			return errors.Join(cleanupErr, err)
 		}
 	}

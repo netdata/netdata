@@ -6,88 +6,72 @@ import (
 	"bytes"
 	"math"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestClosedFunctionResultVariantsHaveExactSizeAppend(t *testing.T) {
 	message, err := StringValue("ok")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	body, err := ObjectValue(
 		ObjectField{Key: "z", Value: Uint64Value(2)},
 		ObjectField{Key: "a", Value: message},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	errorResult, err := NewErrorResult(503, "Service unavailable.")
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tableResult, err := NewTableResult(200, body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	topologyResult, err := NewTopologyResult(200, body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	rawResult, err := NewCompleteRawEnvelope(200, ReviewedPerformanceJSON, []byte(`{"status":200}`))
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	for name, result := range map[string]FunctionResult{
 		"error": errorResult, "table": tableResult, "topology": topologyResult, "raw": rawResult,
 	} {
 		seed := []byte("seed:")
 		appended := result.Append(bytes.Clone(seed))
-		if len(appended)-len(seed) != result.Size() {
-			t.Fatalf("%s Size/Append differs: size=%d appended=%d", name, result.Size(), len(appended)-len(seed))
-		}
+		require.EqualValues(t, result.Size(), len(appended)-len(seed), "result=%s", name)
 	}
-	if got := string(tableResult.Append(nil)); got != `{"a":"ok","z":2}` {
-		t.Fatalf("deterministic object order differs: %s", got)
-	}
-	if got := string(errorResult.Append(nil)); got != `{"errorMessage":"Service unavailable.","status":503}` {
-		t.Fatalf("typed error bytes differ: %s", got)
-	}
+
+	require.EqualValues(t, `{"a":"ok","z":2}`, string(tableResult.Append(nil)))
+
+	require.EqualValues(t, `{"errorMessage":"Service unavailable.","status":503}`, string(errorResult.Append(nil)))
 }
 
 func TestClosedFunctionValuesRejectInvalidGraphs(t *testing.T) {
-	if _, err := FiniteFloat64Value(math.NaN()); err == nil {
-		t.Fatal("NaN Function value was accepted")
-	}
-	if _, err := FiniteFloat64Value(math.Inf(1)); err == nil {
-		t.Fatal("infinite Function value was accepted")
-	}
-	if _, err := StringValue(string([]byte{0xff})); err == nil {
-		t.Fatal("invalid UTF-8 Function value was accepted")
-	}
-	if _, err := ObjectValue(
+
+	_, finiteFloat64ValueErr := FiniteFloat64Value(math.NaN())
+	require.Error(t, finiteFloat64ValueErr)
+
+	_, finiteFloat64ValueErr2 := FiniteFloat64Value(math.Inf(1))
+	require.Error(t, finiteFloat64ValueErr2)
+
+	_, stringValueErr := StringValue(string([]byte{0xff}))
+	require.Error(t, stringValueErr)
+
+	_, objectValueErr := ObjectValue(
 		ObjectField{Key: "same", Value: NullValue()},
 		ObjectField{Key: "same", Value: BoolValue(true)},
-	); err == nil {
-		t.Fatal("duplicate Function object key was accepted")
-	}
+	)
+	require.Error(t, objectValueErr)
 
 	value := NullValue()
 	for depth := 1; depth <= MaximumFunctionValueDepth; depth++ {
 		var err error
 		value, err = ArrayValue(value)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 	}
-	if _, err := NewTableResult(200, value); err != nil {
-		t.Fatalf("depth %d was rejected: %v", MaximumFunctionValueDepth, err)
-	}
+
+	_, newTableResultErr := NewTableResult(200, value)
+	require.NoError(t, newTableResultErr)
+
 	value, err := ArrayValue(value)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := NewTableResult(200, value); err == nil {
-		t.Fatalf("depth %d was accepted", MaximumFunctionValueDepth+1)
-	}
+	require.NoError(t, err)
+
+	_, newTableResultErr2 := NewTableResult(200, value)
+	require.Error(t, newTableResultErr2)
+
 }
 
 func TestRepeatedStringValuePreflightsExactDeferredBoundary(t *testing.T) {
@@ -97,40 +81,24 @@ func TestRepeatedStringValuePreflightsExactDeferredBoundary(t *testing.T) {
 		FunctionPayloadBytes + 1,
 	} {
 		pad, err := RepeatedStringValue(deferredBytes-1-len(`{"pad":""}`), 'A')
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		body, err := ObjectValue(ObjectField{Key: "pad", Value: pad})
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		size, err := valueJSONSize(body, 0)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if size+1 != deferredBytes {
-			t.Fatalf("deferred size %d computed as %d", deferredBytes, size+1)
-		}
+		require.NoError(t, err)
+		require.EqualValues(t, deferredBytes, size+1)
 		err = validateResultPlanSize(200, "application/json", size)
-		if (err == nil) != (deferredBytes <= FunctionPayloadBytes) {
-			t.Fatalf("deferred boundary %d validation differs: %v", deferredBytes, err)
-		}
+		require.EqualValues(t, (deferredBytes <= FunctionPayloadBytes), (err == nil))
 	}
 }
 
 func TestRepeatedStringValueAppendGrowsDestination(t *testing.T) {
 	pad, err := RepeatedStringValue(4*1024, 'A')
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	body, err := ObjectValue(ObjectField{Key: "pad", Value: pad})
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	result, err := NewTableResult(200, body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	tests := map[string][]byte{
 		"nil destination": nil,
 		"small capacity":  make([]byte, 0, 8),
@@ -138,10 +106,8 @@ func TestRepeatedStringValueAppendGrowsDestination(t *testing.T) {
 	for name, seed := range tests {
 		t.Run(name, func(t *testing.T) {
 			appended := result.Append(seed)
-			if len(appended) != result.Size() || !bytes.HasPrefix(appended, []byte(`{"pad":"`)) ||
-				!bytes.HasSuffix(appended, []byte(`"}`)) {
-				t.Fatalf("grown repeated value differs: size=%d want=%d", len(appended), result.Size())
-			}
+			require.False(t, len(appended) != result.Size() || !bytes.HasPrefix(appended, []byte(`{"pad":"`)) ||
+				!bytes.HasSuffix(appended, []byte(`"}`)))
 		})
 	}
 }
@@ -149,24 +115,25 @@ func TestRepeatedStringValueAppendGrowsDestination(t *testing.T) {
 func TestReviewedRawEnvelopeCopiesAndValidatesBody(t *testing.T) {
 	body := []byte(`{"status":200}`)
 	result, err := NewCompleteRawEnvelope(200, ReviewedPerformanceJSON, body)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	body[2] = 'X'
-	if got := string(result.Append(nil)); got != `{"status":200}` {
-		t.Fatalf("accepted raw body retained caller alias: %s", got)
-	}
+
+	got := string(result.Append(nil))
+	require.EqualValues(t, `{"status":200}`, got)
+
 	for _, invalid := range [][]byte{
 		[]byte(`{"status": 200}`),
 		[]byte(`{"status":`),
 	} {
-		if _, err := NewCompleteRawEnvelope(200, ReviewedPerformanceJSON, invalid); err == nil {
-			t.Fatalf("invalid reviewed JSON was accepted: %q", invalid)
-		}
+
+		_, newCompleteRawEnvelopeErr3 := NewCompleteRawEnvelope(200, ReviewedPerformanceJSON, invalid)
+		require.Error(t, newCompleteRawEnvelopeErr3)
+
 	}
-	if _, err := NewCompleteRawEnvelope(200, ReviewedDynCfgYAML, []byte("key: value\n")); err != nil {
-		t.Fatal(err)
-	}
+
+	_, newCompleteRawEnvelopeErr := NewCompleteRawEnvelope(200, ReviewedDynCfgYAML, []byte("key: value\n"))
+	require.NoError(t, newCompleteRawEnvelopeErr)
+
 	for _, invalid := range [][]byte{
 		[]byte("key: value\nFUNCTION_RESULT_END\n"),
 		[]byte("key: &anchor value\nother: *anchor\n"),
@@ -174,11 +141,13 @@ func TestReviewedRawEnvelopeCopiesAndValidatesBody(t *testing.T) {
 		[]byte("key: first\nkey: second\n"),
 		[]byte("---\nkey: value\n---\nother: value\n"),
 	} {
-		if _, err := NewCompleteRawEnvelope(200, ReviewedDynCfgYAML, invalid); err == nil {
-			t.Fatalf("unsafe reviewed YAML was accepted: %q", invalid)
-		}
+
+		_, newCompleteRawEnvelopeErr4 := NewCompleteRawEnvelope(200, ReviewedDynCfgYAML, invalid)
+		require.Error(t, newCompleteRawEnvelopeErr4)
+
 	}
-	if _, err := NewCompleteRawEnvelope(200, 0, []byte(`{}`)); err == nil {
-		t.Fatal("unknown raw body schema was accepted")
-	}
+
+	_, newCompleteRawEnvelopeErr2 := NewCompleteRawEnvelope(200, 0, []byte(`{}`))
+	require.Error(t, newCompleteRawEnvelopeErr2)
+
 }

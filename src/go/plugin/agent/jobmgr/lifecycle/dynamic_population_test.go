@@ -8,6 +8,8 @@ import (
 	"io"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 const formerFixedPopulation = 256
@@ -53,15 +55,11 @@ func testAdmissionRecordGrowth(t *testing.T) {
 			},
 			1,
 		)
-		if result.Rejected != nil {
-			t.Fatalf("admit record %d: %v", index, result.Rejected)
-		}
+		require.Nil(t, result.Rejected)
 		refs = append(refs, result.Ref)
 	}
 	for _, ref := range refs {
-		if err := ledger.CancelWaiting(ref); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, ledger.CancelWaiting(ref))
 	}
 }
 
@@ -71,27 +69,19 @@ func testAdmissionLaneGrowth(t *testing.T) {
 	refs := make([]AdmissionRef, 0, formerFixedPopulation+1)
 	for index := 0; index <= formerFixedPopulation; index++ {
 		result := ledger.RequestOrdinary(1, lane, 1)
-		if result.Rejected != nil {
-			t.Fatalf("admit lane record %d: %v", index, result.Rejected)
-		}
+		require.Nil(t, result.Rejected)
 		refs = append(refs, result.Ref)
 	}
 	for _, ref := range refs {
-		if err := ledger.CancelWaiting(ref); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, ledger.CancelWaiting(ref))
 	}
 }
 
 func testTaskRequestGrowth(t *testing.T) {
 	frame, err := NewFrameOwner(io.Discard)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	supervisor, err := NewTaskSupervisor(frame)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	plan := TaskPlan{
 		Source: SourceJobManager,
 		Work: FrameTaskWork(func(context.Context) (SealedResult, error) {
@@ -100,19 +90,12 @@ func testTaskRequestGrowth(t *testing.T) {
 	}
 	refs := make([]TaskRequestRef, 0, formerFixedPopulation+1)
 	for index := 0; index <= formerFixedPopulation; index++ {
-		ref, enqueueErr := supervisor.Enqueue(
-			TaskClassFrameworkControl,
-			plan,
-		)
-		if enqueueErr != nil {
-			t.Fatalf("enqueue request %d: %v", index, enqueueErr)
-		}
+		ref, enqueueErr := supervisor.Enqueue(TaskClassFrameworkControl, plan)
+		require.NoError(t, enqueueErr)
 		refs = append(refs, ref)
 	}
 	for _, ref := range refs {
-		if err := supervisor.CancelPending(ref); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, supervisor.CancelPending(ref))
 	}
 }
 
@@ -120,9 +103,7 @@ func testLongLivedJobGrowth(t *testing.T) {
 	admission := NewAdmissionLedger()
 	supervisor := newLongLivedTestSupervisor(t)
 	plan, err := NewJobLongLivedPlan(1)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 	permits := make([]LongLivedPermit, 0, formerFixedPopulation+1)
 	for index := 0; index <= formerFixedPopulation; index++ {
 		ref := grantLongLivedTestAdmission(t, admission, 2)
@@ -135,18 +116,15 @@ func testLongLivedJobGrowth(t *testing.T) {
 			},
 			plan,
 		)
-		if issueErr != nil {
-			t.Fatalf("issue job permit %d: %v", index, issueErr)
-		}
-		if _, releaseErr := admission.ReleaseOrdinary(ref); releaseErr != nil {
-			t.Fatal(releaseErr)
-		}
+		require.NoError(t, issueErr)
+
+		_, releaseErr := admission.ReleaseOrdinary(ref)
+		require.NoError(t, releaseErr)
+
 		permits = append(permits, permit)
 	}
 	for _, permit := range permits {
-		if err := permit.AbortUnused(); err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, permit.AbortUnused())
 	}
 }
 
@@ -155,20 +133,9 @@ func testUIDGrowth(t *testing.T) {
 	const population = formerFixedUIDPopulation + 1
 	now := time.Unix(1, 0)
 	for index := 0; index < population; index++ {
-		if err := ledger.Admit(
-			fmt.Sprintf("uid-%05d", index),
-			now,
-		); err != nil {
-			t.Fatalf("admit UID %d: %v", index, err)
-		}
+		require.NoError(t, ledger.Admit(fmt.Sprintf("uid-%05d", index), now))
 	}
 	for index := 0; index < population; index++ {
-		if err := ledger.Complete(
-			fmt.Sprintf("uid-%05d", index),
-			false,
-			now,
-		); err != nil {
-			t.Fatalf("complete UID %d: %v", index, err)
-		}
+		require.NoError(t, ledger.Complete(fmt.Sprintf("uid-%05d", index), false, now))
 	}
 }

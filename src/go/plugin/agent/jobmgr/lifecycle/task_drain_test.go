@@ -6,6 +6,8 @@ import (
 	"context"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestDrainDependentTasksDoNotConsumeGlobalExecutionCapacity(t *testing.T) {
@@ -21,9 +23,7 @@ func TestDrainDependentTasksDoNotConsumeGlobalExecutionCapacity(t *testing.T) {
 		}
 		plan := readyTaskPlan(t, SourceJobManager, time.Time{}, resource)
 		request, err := supervisor.Enqueue(TaskClassFrameworkControl, plan)
-		if err != nil {
-			t.Fatal(err)
-		}
+		require.NoError(t, err)
 		drainRequests[request] = struct{}{}
 	}
 	progressRequest, err := supervisor.Enqueue(
@@ -35,35 +35,21 @@ func TestDrainDependentTasksDoNotConsumeGlobalExecutionCapacity(t *testing.T) {
 			},
 		},
 	)
-	if err != nil {
-		t.Fatal(err)
-	}
+	require.NoError(t, err)
 
 	started := make([]TaskStart, 0, len(drainRequests)+1)
 	for {
 		var starts [TaskStartServiceQuantum]TaskStart
-		count, more, err := supervisor.Dispatch(
-			context.Background(),
-			TaskStartServiceQuantum,
-			&starts,
-		)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if count > TaskStartServiceQuantum {
-			t.Fatalf("one dispatch started %d tasks", count)
-		}
+		count, more, err := supervisor.Dispatch(context.Background(), TaskStartServiceQuantum, &starts)
+		require.NoError(t, err)
+		require.False(t, count > TaskStartServiceQuantum)
 		started = append(started, starts[:count]...)
 		if !more {
 			break
 		}
 	}
-	if len(started) != len(drainRequests)+1 {
-		t.Fatalf("started=%d want=%d", len(started), len(drainRequests)+1)
-	}
-	if supervisor.Active() != len(started) {
-		t.Fatalf("active=%d want=%d", supervisor.Active(), len(started))
-	}
+	require.EqualValues(t, len(drainRequests)+1, len(started))
+	require.EqualValues(t, len(started), supervisor.Active())
 
 	byTask := make(map[TaskRef]TaskRequestRef, len(started))
 	for _, start := range started {
@@ -76,26 +62,21 @@ func TestDrainDependentTasksDoNotConsumeGlobalExecutionCapacity(t *testing.T) {
 			terminateAndReleaseTask(t, supervisor, completion.Ref, 2)
 			continue
 		}
-		if _, ok := drainRequests[request]; !ok {
-			t.Fatalf("completion for unknown request=%+v", request)
-		}
-		if err := supervisor.SendAction(TaskAction{
+
+		_, ok := drainRequests[request]
+		require.True(t, ok)
+
+		require.NoError(t, supervisor.SendAction(TaskAction{
 			Ref: completion.Ref, Sequence: 2, Kind: TaskActionDispose,
-		}); err != nil {
-			t.Fatal(err)
-		}
-		if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-			t.Fatal(ack.Err)
-		}
+		}),
+		)
+
+		ack := <-supervisor.AcknowledgementCh()
+		require.Nil(t, ack.Err)
+
 		terminateAndReleaseTask(t, supervisor, completion.Ref, 3)
 	}
-	if supervisor.Active() != 0 || supervisor.Pending() != 0 {
-		t.Fatalf(
-			"terminal task census active=%d pending=%d",
-			supervisor.Active(),
-			supervisor.Pending(),
-		)
-	}
+	require.False(t, supervisor.Active() != 0 || supervisor.Pending() != 0)
 }
 
 func terminateAndReleaseTask(
@@ -105,15 +86,14 @@ func terminateAndReleaseTask(
 	sequence uint8,
 ) {
 	t.Helper()
-	if err := supervisor.SendAction(TaskAction{
+
+	require.NoError(t, supervisor.SendAction(TaskAction{
 		Ref: ref, Sequence: sequence, Kind: TaskActionTerminate,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
-		t.Fatal(ack.Err)
-	}
-	if err := supervisor.Release(ref); err != nil {
-		t.Fatal(err)
-	}
+	}),
+	)
+
+	ack := <-supervisor.AcknowledgementCh()
+	require.Nil(t, ack.Err)
+
+	require.NoError(t, supervisor.Release(ref))
 }
