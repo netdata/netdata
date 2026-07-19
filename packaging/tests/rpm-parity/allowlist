@@ -10,3 +10,9 @@
 # ownership and the artifact flag; everything about them except the hash is
 # invariant, which is what this pattern pins down.
 ^[+-](40755|120777)\|root:root\|a\|[^|]*\|/usr/lib/\.build-id(/.*)?$
+
+# CPack emits one empty line between a scriptlet section tag and the
+# embedded scriptlet file's content; rpmbuild's spec path does not. Blank
+# lines are semantically inert in shell scriptlets. The pattern matches only
+# entirely-empty added lines.
+^\+$
