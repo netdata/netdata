@@ -27,11 +27,15 @@ import (
 type runPlannerFactory func(runPlannerCapabilities) (jobmgr.Planner, jobmgr.RunFinalizer, error)
 
 type runPlannerCapabilities struct {
-	Tasks     *lifecycle.TaskSupervisor
-	Functions *FunctionAssembly
-	Jobs      *joboutput.Factory
-	DynCfg    *joboutput.DynCfgJobController
-	Graph     *dyncfg.Graph
+	Tasks      *lifecycle.TaskSupervisor
+	Functions  *FunctionAssembly
+	Jobs       *joboutput.Factory
+	DynCfg     *joboutput.DynCfgJobController
+	Graph      *dyncfg.Graph
+	StoreScope func(
+		[]string,
+	) (secretresolver.AtomicScope, error)
+	StoreCensus func() secretstore.SecretStoreCensus
 }
 
 type runJobServices struct {
@@ -135,7 +139,12 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	if err != nil {
 		return nil, err
 	}
-	stores := secretstore.NewSecretStore()
+	stores, err := secretstore.NewSecretStore(
+		config.Jobs.Resolver,
+	)
+	if err != nil {
+		return nil, err
+	}
 	dependencies := secretadapter.NewSecretDependencyIndex()
 	vnodeConfig, err := agentdiscovery.NewVNodeConfigurationWithInitial(
 		config.Jobs.InitialVnodes,
@@ -244,7 +253,11 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 		StoreScope: func(
 			keys []string,
 		) (secretresolver.AtomicScope, error) {
-			return stores.AcquireScope(keys)
+			return acquireRunOwnedStoreScope(
+				run,
+				stores,
+				keys,
+			)
 		},
 		Runtime:   config.Jobs.Runtime,
 		Vnodes:    config.Jobs.Vnodes,
@@ -262,7 +275,11 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 			StoreScope: func(
 				keys []string,
 			) (secretresolver.AtomicScope, error) {
-				return stores.AcquireScope(keys)
+				return acquireRunOwnedStoreScope(
+					run,
+					stores,
+					keys,
+				)
 			},
 		},
 	)
@@ -290,6 +307,16 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	planner, finalizer, err := config.Planner(runPlannerCapabilities{
 		Tasks: tasks, Functions: functions,
 		Jobs: jobs, DynCfg: dynCfgJobs, Graph: graph,
+		StoreScope: func(
+			keys []string,
+		) (secretresolver.AtomicScope, error) {
+			return acquireRunOwnedStoreScope(
+				run,
+				stores,
+				keys,
+			)
+		},
+		StoreCensus: stores.Census,
 	})
 	if err != nil {
 		return nil, errors.Join(err, functions.abortConstruction())
@@ -331,7 +358,6 @@ func newRunGeneration(config runGenerationConfig) (*runGeneration, error) {
 	}
 	if err := secretController.Bind(
 		secretDependentJobBinding{controller: dynCfgJobs},
-		kernel,
 	); err != nil {
 		return nil, errors.Join(err, functions.abortConstruction())
 	}

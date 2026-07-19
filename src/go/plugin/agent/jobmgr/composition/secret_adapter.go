@@ -12,7 +12,6 @@ import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/joboutput"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretadapter "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/secrets"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
@@ -32,14 +31,14 @@ func (binding secretDependentJobBinding) PlanDependentStop(
 }
 
 func (binding secretDependentJobBinding) PlanDependentStart(
-	config confgroup.Config,
+	id string,
 ) (
 	plan jobmgr.WorkPlan,
 	result secretadapter.DependentStartResult,
 	err error,
 ) {
 	plan, result, err =
-		binding.controller.PlanSecretDependentStart(config)
+		binding.controller.PlanSecretDependentStart(id)
 	return plan, result, err
 }
 
@@ -88,29 +87,39 @@ func newSecretInitialRoute(
 				},
 			},
 			Transaction: &functionadapter.ResourceTransactionDeclaration{
-				Prepare: func(
+				PrepareComposite: func(
 					ctx context.Context,
 					input functionadapter.HandlerInput,
 					current lifecycle.ReadyResource,
 					scope lifecycle.ResourceTransactionScope,
 					permit lifecycle.LongLivedPermit,
 				) (
-					lifecycle.PreparedResourceTransaction,
+					jobmgr.PreparedCompositeResourceTransaction,
 					error,
 				) {
-					return controller.Prepare(
+					prepared, err := controller.Prepare(
 						ctx,
 						secretCommandInput(input),
 						current,
 						scope,
 						permit,
 					)
+					if prepared == nil {
+						return nil, err
+					}
+					composite, ok :=
+						prepared.(jobmgr.PreparedCompositeResourceTransaction)
+					if !ok {
+						return nil, errors.Join(
+							err,
+							errors.New(
+								"jobmgr composition: secret transaction is not composite",
+							),
+						)
+					}
+					return composite, err
 				},
-				PermitFor: func(
-					input functionadapter.HandlerInput,
-				) (lifecycle.LongLivedPlan, error) {
-					return secretadapter.MutationPermit(input.Payload)
-				},
+				PermitPolicy:    functionadapter.SuccessorPermitSecretStorePayload,
 				CommandArgument: 1,
 				GlobalClaim:     secretadapter.SecretGraphClaim,
 				Commands:        commands,

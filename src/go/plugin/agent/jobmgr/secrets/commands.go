@@ -16,6 +16,11 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
+const (
+	maximumSecretJobSummaryBytes = 4 * 1024
+	secretJobSummaryContentBytes = 7 * 512
+)
+
 func (controller *Controller) prepareSchema(
 	scope lifecycle.ResourceTransactionScope,
 	current lifecycle.ReadyResource,
@@ -593,6 +598,7 @@ func (controller *Controller) prepareStoreMutation(
 	return newPreparedSecretTransaction(
 		preparedSecretSpec{
 			scope: scope, current: current,
+			permit:     permit,
 			store:      controller.store,
 			storeKey:   config.ExposedKey(),
 			mutation:   &mutation,
@@ -631,16 +637,60 @@ func (controller *Controller) noop(
 }
 
 func formatSecretJobs(refs []secretstore.JobRef) string {
+	return formatBoundedSecretNames(
+		len(refs),
+		func(index int) string {
+			ref := refs[index]
+			if ref.Display != "" {
+				return ref.Display
+			}
+			return ref.ID
+		},
+	)
+}
+
+func formatSecretJobNames(names []string) string {
+	return formatBoundedSecretNames(
+		len(names),
+		func(index int) string {
+			return names[index]
+		},
+	)
+}
+
+func formatBoundedSecretNames(
+	count int,
+	name func(int) string,
+) string {
+	if count <= 0 || name == nil {
+		return ""
+	}
 	var builder strings.Builder
-	for index, ref := range refs {
-		if index != 0 {
+	builder.Grow(maximumSecretJobSummaryBytes)
+	for index := 0; index < count; index++ {
+		value := name(index)
+		separatorBytes := 0
+		if builder.Len() != 0 {
+			separatorBytes = 2
+		}
+		if len(value) >
+			secretJobSummaryContentBytes-
+				builder.Len()-
+				separatorBytes {
+			if builder.Len() != 0 {
+				builder.WriteString(", ")
+			}
+			fmt.Fprintf(
+				&builder,
+				"... and %d more",
+				count-index,
+			)
+			break
+		}
+		if separatorBytes != 0 {
 			builder.WriteString(", ")
 		}
-		if ref.Display != "" {
-			builder.WriteString(ref.Display)
-		} else {
-			builder.WriteString(ref.ID)
-		}
+		builder.WriteString(value)
 	}
 	return builder.String()
 }

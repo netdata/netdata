@@ -48,6 +48,8 @@ type testPublishedStore struct {
 	value string
 }
 
+func (*testPublishedStore) RetainedBytes() int64 { return 512 }
+
 func (s *testPublishedStore) Resolve(_ context.Context, req secretstore.ResolveRequest) (string, error) {
 	if req.Operand != "value" {
 		return "", fmt.Errorf("unexpected operand %q", req.Operand)

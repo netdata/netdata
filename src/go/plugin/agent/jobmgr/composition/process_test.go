@@ -18,6 +18,8 @@ import (
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	frameworkfunctions "github.com/netdata/netdata/go/plugins/plugin/framework/functions"
@@ -280,8 +282,32 @@ func TestProcessCoreRejectsSuccessorAfterUnquiescedPredecessor(
 			}
 		},
 	}
-	unquiesced := errors.New("predecessor finalizer did not quiesce")
+	jobs := testRunJobServices(t)
+	var err error
+	jobs.StoreCreators, err = secretstore.NewCreatorCatalog(
+		[]secretstore.Creator{{
+			Kind:        secretstore.KindVault,
+			DisplayName: "Vault",
+			Schema:      `{}`,
+			Create: func() secretstore.Store {
+				return &processSecretStore{}
+			},
+		}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialStore := secretstore.Config{
+		"name": "main", "kind": string(secretstore.KindVault),
+		"value":           "initial",
+		"__source__":      confgroup.TypeUser,
+		"__source_type__": confgroup.TypeUser,
+	}
 	plannerCalls := 0
+	var storeScope func(
+		[]string,
+	) (secretresolver.AtomicScope, error)
+	var storeCensus func() secretstore.SecretStoreCensus
 	process, err := newProcessCore(processCoreConfig{
 		Input: reader, Output: output, FirstGeneration: 1,
 		ShutdownTimeout: time.Second, Clock: lifecycle.RealClock{},
@@ -299,16 +325,21 @@ func TestProcessCoreRejectsSuccessorAfterUnquiescedPredecessor(
 				},
 			},
 		},
-		Jobs:      testRunJobServices(t),
+		Jobs: jobs,
+		Secrets: runSecretServices{
+			Initial: []secretstore.Config{initialStore},
+		},
 		Discovery: testRunDiscoveryServices(t),
 		Planner: func(
-			runPlannerCapabilities,
+			capabilities runPlannerCapabilities,
 		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
 			plannerCalls++
+			storeScope = capabilities.StoreScope
+			storeCensus = capabilities.StoreCensus
 			return runRejectingPlanner{},
 				jobmgr.RunFinalizerFunc(
 					func(context.Context, uint64) error {
-						return unquiesced
+						return nil
 					},
 				),
 				nil
@@ -323,12 +354,49 @@ func TestProcessCoreRejectsSuccessorAfterUnquiescedPredecessor(
 		done <- process.run(context.Background(), commands)
 	}()
 	waitProcessEvent(t, events, "publish")
+	if storeScope == nil || storeCensus == nil {
+		t.Fatal("planner did not receive Store observation capabilities")
+	}
+	key := secretstore.StoreKey(secretstore.KindVault, "main")
+	var retained secretresolver.AtomicScope
+	deadline := time.Now().Add(3 * time.Second)
+	for retained == nil {
+		retained, err = storeScope([]string{key})
+		if err == nil {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("initial Store was not published: %v", err)
+		}
+		time.Sleep(time.Millisecond)
+	}
+	defer func() {
+		if retained != nil {
+			if err := retained.Release(context.Background()); err != nil {
+				t.Errorf("release retained Store scope: %v", err)
+			}
+		}
+	}()
+	if census := storeCensus(); census.Current != 1 ||
+		census.Generations != 1 ||
+		census.Readers != 1 ||
+		census.Scopes != 1 {
+		t.Fatalf("retained predecessor Store census=%+v", census)
+	}
 	control := testProcessControl(processRestart)
 	commands <- control
 	waitProcessEvent(t, events, "withdraw")
 	select {
 	case err := <-control.result:
-		if !errors.Is(err, unquiesced) {
+		if err == nil ||
+			!strings.Contains(
+				err.Error(),
+				"secretstore: close with retained ownership",
+			) ||
+			!strings.Contains(
+				err.Error(),
+				"jobmgr composition: run did not quiesce",
+			) {
 			t.Fatalf("restart error=%v", err)
 		}
 	case <-time.After(3 * time.Second):
@@ -336,7 +404,11 @@ func TestProcessCoreRejectsSuccessorAfterUnquiescedPredecessor(
 	}
 	select {
 	case err := <-done:
-		if !errors.Is(err, unquiesced) {
+		if err == nil ||
+			!strings.Contains(
+				err.Error(),
+				"secretstore: close with retained ownership",
+			) {
 			t.Fatalf("process error=%v", err)
 		}
 	case <-time.After(3 * time.Second):
@@ -356,6 +428,23 @@ func TestProcessCoreRejectsSuccessorAfterUnquiescedPredecessor(
 	if census := process.ingress.Census(); census.State != "contained" ||
 		census.RunGeneration != 0 {
 		t.Fatalf("process ingress census=%+v", census)
+	}
+	if census := storeCensus(); census.Current != 0 ||
+		census.Retiring != 1 ||
+		census.Generations != 1 ||
+		census.Readers != 1 ||
+		census.Scopes != 1 ||
+		!census.Closing {
+		t.Fatalf("unquiesced predecessor Store census=%+v", census)
+	}
+	if err := retained.Release(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	retained = nil
+	if census := storeCensus(); census != (secretstore.SecretStoreCensus{
+		Closing: true,
+	}) {
+		t.Fatalf("released predecessor Store census=%+v", census)
 	}
 }
 

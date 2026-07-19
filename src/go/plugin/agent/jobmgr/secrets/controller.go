@@ -83,9 +83,8 @@ func NewController(config ControllerConfig) (*Controller, error) {
 
 func (controller *Controller) Bind(
 	jobs DependentJobPort,
-	commands CommandPort,
 ) error {
-	if controller == nil || jobs == nil || commands == nil {
+	if controller == nil || jobs == nil {
 		return errors.New("jobmgr secrets: invalid controller binding")
 	}
 	controller.mu.Lock()
@@ -99,7 +98,6 @@ func (controller *Controller) Bind(
 		controller.epoch,
 		controller.dependencies,
 		jobs,
-		commands,
 	)
 	if err != nil {
 		return err

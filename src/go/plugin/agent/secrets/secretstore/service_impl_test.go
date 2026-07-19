@@ -275,7 +275,7 @@ func TestServiceValidate_RejectsStoreRefsInProviderPayload(t *testing.T) {
 
 	err := svc.Validate(context.Background(), newStoreFromConfig(t, svc, secretstore.KindVault, cfg))
 	require.Error(t, err)
-	assert.ErrorContains(t, err, "secretstore resolver is not configured")
+	assert.ErrorContains(t, err, "Store scope failure")
 }
 
 func TestServiceValidate_KeepsMetadataStatic(t *testing.T) {

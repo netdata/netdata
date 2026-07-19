@@ -7,6 +7,7 @@ import (
 	"errors"
 	"sync"
 
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 )
@@ -72,8 +73,51 @@ func (transaction *preparedSecretTransaction) Scope() lifecycle.ResourceTransact
 	return transaction.spec.scope
 }
 
+func (transaction *preparedSecretTransaction) LongLivedResourceBytes() (
+	int64,
+	error,
+) {
+	if transaction == nil {
+		return 0, errors.New(
+			"jobmgr secrets: nil prepared transaction",
+		)
+	}
+	transaction.mu.Lock()
+	defer transaction.mu.Unlock()
+	if transaction.consumed {
+		return 0, errors.New(
+			"jobmgr secrets: prepared transaction consumed",
+		)
+	}
+	spec := transaction.spec
+	if spec.mutation == nil ||
+		spec.remove ||
+		!spec.permit.Valid() {
+		return 0, nil
+	}
+	return spec.mutation.RetainedResourceBytes()
+}
+
 func (transaction *preparedSecretTransaction) Apply(
 	ctx context.Context,
+) (lifecycle.AppliedResourceTransaction, error) {
+	return transaction.apply(ctx, nil)
+}
+
+func (transaction *preparedSecretTransaction) ApplyComposite(
+	ctx context.Context,
+	commands jobmgr.CompositeCommandScope,
+) (lifecycle.AppliedResourceTransaction, error) {
+	if commands == nil {
+		return lifecycle.AppliedResourceTransaction{},
+			errors.New("jobmgr secrets: nil composite command scope")
+	}
+	return transaction.apply(ctx, commands)
+}
+
+func (transaction *preparedSecretTransaction) apply(
+	ctx context.Context,
+	commands jobmgr.CompositeCommandScope,
 ) (lifecycle.AppliedResourceTransaction, error) {
 	spec, err := transaction.take()
 	if err != nil {
@@ -106,27 +150,73 @@ func (transaction *preparedSecretTransaction) Apply(
 		)
 	}
 
+	commitCalled := false
 	commit := func(
 		commitCtx context.Context,
 	) (secretstore.SecretMutationResult, error) {
+		commitCalled = true
 		return spec.mutation.Commit(commitCtx)
 	}
 	var result secretstore.SecretMutationResult
 	var message string
 	var postCommitErr error
-	if spec.restarts != nil && !spec.remove {
-		result, message, postCommitErr = spec.restarts.Apply(
-			ctx,
-			spec.storeKey,
-			commit,
-		)
+	var predecessorRestored bool
+	if spec.restarts != nil &&
+		!spec.remove &&
+		spec.restarts.HasAffectedJobs(spec.storeKey) {
+		if commands == nil {
+			rollbackErr := spec.mutation.Abort(ctx)
+			return lifecycle.AppliedResourceTransaction{},
+				errors.Join(
+					errors.New(
+						"jobmgr secrets: restart transaction lacks composite scope",
+					),
+					rollbackErr,
+				)
+		}
+		result, message, predecessorRestored, postCommitErr =
+			spec.restarts.Apply(
+				ctx,
+				commands,
+				spec.storeKey,
+				commit,
+			)
 	} else {
 		result, postCommitErr = commit(ctx)
 	}
 	if !result.Applied {
+		var abortErr error
+		if !commitCalled {
+			rollbackCtx := ctx
+			if commands != nil {
+				var rollbackErr error
+				rollbackCtx, rollbackErr =
+					commands.RollbackContext()
+				postCommitErr = errors.Join(
+					postCommitErr,
+					rollbackErr,
+				)
+			}
+			if rollbackCtx != nil {
+				abortErr = spec.mutation.Abort(rollbackCtx)
+			}
+		}
+		if predecessorRestored && abortErr == nil {
+			return lifecycle.NewAppliedResourceTransaction(
+				spec.scope,
+				lifecycle.ResourceTransactionUnchanged,
+				spec.current,
+				mustSecretMessage(
+					500,
+					"Secretstore change was not applied; dependent collectors were restored.",
+				),
+				func() error { return nil },
+			)
+		}
 		return lifecycle.AppliedResourceTransaction{},
 			errors.Join(
 				postCommitErr,
+				abortErr,
 				errors.New(
 					"jobmgr secrets: Store mutation was not applied",
 				),

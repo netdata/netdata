@@ -43,9 +43,19 @@ type ResourceTransactionHandler func(
 	lifecycle.LongLivedPermit,
 ) (lifecycle.PreparedResourceTransaction, error)
 
-type ResourcePermitFactory func(
+type CompositeResourceTransactionHandler func(
+	context.Context,
 	HandlerInput,
-) (lifecycle.LongLivedPlan, error)
+	lifecycle.ReadyResource,
+	lifecycle.ResourceTransactionScope,
+	lifecycle.LongLivedPermit,
+) (jobmgr.PreparedCompositeResourceTransaction, error)
+
+type SuccessorPermitPolicy uint8
+
+const (
+	SuccessorPermitSecretStorePayload SuccessorPermitPolicy = iota + 1
+)
 
 type ResourceTransactionCommand struct {
 	Name              string
@@ -54,12 +64,13 @@ type ResourceTransactionCommand struct {
 }
 
 type ResourceTransactionDeclaration struct {
-	Prepare         ResourceTransactionHandler
-	Permit          lifecycle.LongLivedPlan
-	PermitFor       ResourcePermitFactory
-	CommandArgument uint16
-	GlobalClaim     string
-	Commands        []ResourceTransactionCommand
+	Prepare          ResourceTransactionHandler
+	PrepareComposite CompositeResourceTransactionHandler
+	Permit           lifecycle.LongLivedPlan
+	PermitPolicy     SuccessorPermitPolicy
+	CommandArgument  uint16
+	GlobalClaim      string
+	Commands         []ResourceTransactionCommand
 }
 
 // HandlerGenerationDeclaration describes one job- or module-owned handler
@@ -396,6 +407,29 @@ func (slot *invocationSlot) prepareResourceTransaction(
 	)
 }
 
+func (slot *invocationSlot) prepareCompositeResourceTransaction(
+	ctx context.Context,
+	current lifecycle.ReadyResource,
+	scope lifecycle.ResourceTransactionScope,
+	permit lifecycle.LongLivedPermit,
+) (jobmgr.PreparedCompositeResourceTransaction, error) {
+	if slot == nil ||
+		slot.resolved == nil ||
+		slot.resolved.transaction == nil ||
+		slot.resolved.transaction.PrepareComposite == nil {
+		return nil, errors.New(
+			"jobmgr Function catalog: invalid composite transaction invocation",
+		)
+	}
+	return slot.resolved.transaction.PrepareComposite(
+		ctx,
+		slot.input,
+		current,
+		scope,
+		permit,
+	)
+}
+
 type Catalog struct {
 	routes      *catalogNode
 	generations map[jobmgr.FunctionCleanupRef]*handlerGeneration
@@ -573,7 +607,8 @@ func validateResourceTransactionDeclaration(
 	if declaration == nil {
 		return nil
 	}
-	if declaration.Prepare == nil ||
+	if (declaration.Prepare == nil) ==
+		(declaration.PrepareComposite == nil) ||
 		declaration.GlobalClaim == "" ||
 		len(declaration.GlobalClaim) > maximumDeclarationMetadataBytes ||
 		declaration.CommandArgument >= 1_024 ||
@@ -625,7 +660,8 @@ func validateResourceTransactionDeclaration(
 	if hasSuccessor {
 		hasStaticPermit := declaration.Permit.Class() != 0 ||
 			declaration.Permit.Bytes() != 0
-		if hasStaticPermit == (declaration.PermitFor != nil) {
+		hasPermitPolicy := declaration.PermitPolicy != 0
+		if hasStaticPermit == hasPermitPolicy {
 			return errors.New(
 				"jobmgr Function catalog: successor transaction must declare exactly one permit source",
 			)
@@ -634,10 +670,15 @@ func validateResourceTransactionDeclaration(
 			if err := declaration.Permit.Validate(); err != nil {
 				return err
 			}
+		} else if declaration.PermitPolicy !=
+			SuccessorPermitSecretStorePayload {
+			return errors.New(
+				"jobmgr Function catalog: invalid successor permit policy",
+			)
 		}
 	} else if declaration.Permit.Class() != 0 ||
 		declaration.Permit.Bytes() != 0 ||
-		declaration.PermitFor != nil {
+		declaration.PermitPolicy != 0 {
 		return errors.New(
 			"jobmgr Function catalog: transaction without successor has a permit",
 		)
@@ -719,17 +760,24 @@ func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.
 	var transactionPermit lifecycle.LongLivedPlan
 	if transactionCommand && command.AllocateSuccessor {
 		transactionPermit = resolved.transaction.Permit
-		if resolved.transaction.PermitFor != nil {
+		switch resolved.transaction.PermitPolicy {
+		case 0:
+		case SuccessorPermitSecretStorePayload:
+			retained := int64(len(lookup.Payload))
+			if retained == 0 {
+				retained = 1
+			}
 			var err error
-			transactionPermit, err = resolved.transaction.PermitFor(
-				handlerInput(lookup, resolved.method),
-			)
+			transactionPermit, err =
+				lifecycle.NewSecretStoreLongLivedPlan(retained)
 			if err != nil {
 				return jobmgr.FunctionCatalogDecision{}, err
 			}
-			if err := transactionPermit.Validate(); err != nil {
-				return jobmgr.FunctionCatalogDecision{}, err
-			}
+		default:
+			return jobmgr.FunctionCatalogDecision{},
+				errors.New(
+					"jobmgr Function catalog: unknown successor permit policy",
+				)
 		}
 	}
 
@@ -778,7 +826,13 @@ func (catalog *Catalog) ResolveAndAcquire(lookup jobmgr.FunctionLookup) (jobmgr.
 		slot.transactionPlan = jobmgr.ResourceTransactionPlan{
 			ID:                resourceID,
 			AllocateSuccessor: command.AllocateSuccessor,
-			Prepare:           slot.prepareResourceTransaction,
+		}
+		if resolved.transaction.PrepareComposite != nil {
+			slot.transactionPlan.PrepareComposite =
+				slot.prepareCompositeResourceTransaction
+		} else {
+			slot.transactionPlan.Prepare =
+				slot.prepareResourceTransaction
 		}
 		if command.AllocateSuccessor {
 			slot.transactionPlan.Permit = transactionPermit

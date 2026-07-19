@@ -142,6 +142,21 @@ func StoreReferences(input any) ([]string, error) {
 	return keys, nil
 }
 
+// EstimateRetainedBytes validates and conservatively estimates one cloned
+// value without resolving references.
+func EstimateRetainedBytes(input any) (int64, error) {
+	compiler := atomicCompiler{
+		active: make(map[atomicContainerIdentity]struct{}),
+	}
+	if _, err := compiler.clone(input, 0, false); err != nil {
+		return 0, err
+	}
+	if compiler.resultBytes <= 0 {
+		return 1, nil
+	}
+	return int64(compiler.resultBytes), nil
+}
+
 func (resolver *AtomicResolver) Resolve(
 	ctx context.Context,
 	input any,

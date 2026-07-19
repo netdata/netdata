@@ -4,7 +4,6 @@ package secrets
 
 import (
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 )
 
 // CommandInput is the wire-neutral input consumed by the secret command
@@ -23,7 +22,7 @@ type CommandPort interface {
 }
 
 type DependentStopResult interface {
-	Config() (confgroup.Config, bool, error)
+	Stopped() (bool, error)
 }
 
 type DependentStartResult interface {
@@ -37,6 +36,6 @@ type DependentJobPort interface {
 		string,
 	) (jobmgr.WorkPlan, DependentStopResult, error)
 	PlanDependentStart(
-		confgroup.Config,
+		string,
 	) (jobmgr.WorkPlan, DependentStartResult, error)
 }

@@ -5,13 +5,17 @@ package secretstore
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
+
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 )
 
 // GenerationCarrier owns the admitted memory and external-resource facets of
 // one configured Store generation.
 type GenerationCarrier interface {
 	Valid() bool
+	ResourceCapacityBytes() int64
 	Activate() error
 	Release() error
 }
@@ -37,6 +41,8 @@ type SecretStore struct {
 	readers            int
 	activeScopes       int
 	activePreparations int
+	nextGeneration     uint64
+	resolver           *secretresolver.AtomicResolver
 }
 
 type storeAuthorityState uint8
@@ -81,11 +87,17 @@ type SecretStoreCensus struct {
 	Dirty        bool
 }
 
-func NewSecretStore() *SecretStore {
-	return &SecretStore{
-		state:   storeAuthorityOpen,
-		records: make(map[string]*generationRecord),
+func NewSecretStore(
+	resolver *secretresolver.AtomicResolver,
+) (*SecretStore, error) {
+	if resolver == nil {
+		return nil, errors.New("secretstore: nil process resolver")
 	}
+	return &SecretStore{
+		state:    storeAuthorityOpen,
+		records:  make(map[string]*generationRecord),
+		resolver: resolver,
+	}, nil
 }
 
 func (store *SecretStore) Census() SecretStoreCensus {
@@ -132,13 +144,16 @@ func (store *SecretStore) Config(key string) (Config, StoreStatus, bool) {
 		return nil, StoreStatus{}, false
 	}
 	store.mu.Lock()
-	defer store.mu.Unlock()
 	record := store.records[key]
 	if record == nil || record.current == nil {
+		store.mu.Unlock()
 		return nil, StoreStatus{}, false
 	}
-	return cloneConfig(record.current.config),
-		cloneStoreStatus(record.current.status),
+	config := record.current.config
+	status := record.current.status
+	store.mu.Unlock()
+	return cloneConfig(config),
+		cloneStoreStatus(status),
 		true
 }
 
@@ -263,6 +278,21 @@ func callGenerationCarrierActivate(carrier GenerationCarrier) (err error) {
 		}
 	}()
 	return carrier.Activate()
+}
+
+func callGenerationCarrierCapacity(
+	carrier GenerationCarrier,
+) (capacity int64, err error) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			capacity = 0
+			err = fmt.Errorf(
+				"secretstore: generation carrier capacity panic: %v",
+				recovered,
+			)
+		}
+	}()
+	return carrier.ResourceCapacityBytes(), nil
 }
 
 func callGenerationCarrierRelease(carrier GenerationCarrier) (err error) {

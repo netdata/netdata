@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"testing"
-	"time"
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
@@ -186,16 +185,11 @@ func TestStoreCommandRun_CommandCodeByPhase(t *testing.T) {
 
 // The race-independent classification is a TOTAL post-condition at the
 // restart seam, not only a per-checkpoint duty inside the plan: a restart
-// sequence reporting NO error while the command's window has expired (the
-// deadline fired DURING a restart, or right after the last one - shapes the
-// plan's own cut checkpoints cannot see) must still fail the mutating
-// callbacks, or the closure-wins arm of the completion race would classify
-// the same physical timeout as success.
-func TestSecretStoreCallbacks_ExpiredWindowFailsMutationsWithoutRunError(t *testing.T) {
+// sequence reporting NO error after cancellation fired during its last step
+// must still fail the mutating callbacks, or the closure-wins arm of the
+// completion race would classify the same physical timeout as success.
+func TestSecretStoreCallbacks_CancellationDuringRestartFailsMutationsWithoutRunError(t *testing.T) {
 	cb, _, restart := newSecretStoreCallbacksTestSubject()
-
-	expired, cancel := context.WithDeadline(context.Background(), time.Now().Add(-time.Second))
-	defer cancel()
 
 	addFn := newSecretStoreCallbackFunction(t, "ss-add", testSecretStoreTemplateID(secretstore.KindVault), dyncfg.CommandAdd, "vault_prod", map[string]any{"value": "one"})
 	key, name, ok := cb.ExtractKey(addFn)
@@ -203,16 +197,16 @@ func TestSecretStoreCallbacks_ExpiredWindowFailsMutationsWithoutRunError(t *test
 	cfg, err := cb.ParseAndValidate(restart.ctx(key), addFn, name)
 	require.NoError(t, err)
 
-	err = cb.Start(restart.ctxOn(expired, key), cfg)
-	require.Error(t, err, "an expired command window must fail the mutation even when the restart run reports no error")
+	err = cb.Start(restart.ctxCancelledDuringRun(key), cfg)
+	require.Error(t, err, "cancellation during the final restart must fail the mutation even when the restart run reports no error")
 	assert.Contains(t, err.Error(), "timed out")
 	assert.Equal(t, "restart:"+key, restart.takeMessage(), "the per-dependent report still reaches the terminal message")
 
 	updateFn := newSecretStoreCallbackFunction(t, "ss-update", testSecretStoreConfigID(key), dyncfg.CommandUpdate, "", map[string]any{"value": "two"})
 	updatedCfg, err := cb.ParseAndValidate(restart.ctx(key), updateFn, "")
 	require.NoError(t, err)
-	err = cb.Update(restart.ctxOn(expired, key), cfg, updatedCfg)
-	require.Error(t, err, "Update must reclassify an expired-window success the same way")
+	err = cb.Update(restart.ctxCancelledDuringRun(key), cfg, updatedCfg)
+	require.Error(t, err, "Update must reclassify cancellation during the final restart the same way")
 	assert.Contains(t, err.Error(), "timed out")
 }
 
@@ -220,9 +214,10 @@ func TestSecretStoreCallbacks_ExpiredWindowFailsMutationsWithoutRunError(t *test
 // restart-seam invocations and captures the message the callbacks store for
 // the terminal. runErr, when set, plays a deadline-cut restart sequence.
 type secretStoreCallbackRestartRecorder struct {
-	calls  []string
-	box    *storeCommandRun
-	runErr error
+	calls       []string
+	box         *storeCommandRun
+	runErr      error
+	cancelOnRun context.CancelFunc
 }
 
 // ctx returns an effect context carrying a command run whose staged restart
@@ -231,13 +226,24 @@ func (r *secretStoreCallbackRestartRecorder) ctx(storeKey string) context.Contex
 	return r.ctxOn(context.Background(), storeKey)
 }
 
-// ctxOn is ctx on an arbitrary parent (an expired one plays a command whose
-// deadline fired during the restart sequence).
+func (r *secretStoreCallbackRestartRecorder) ctxCancelledDuringRun(
+	storeKey string,
+) context.Context {
+	ctx, cancel := context.WithCancel(context.Background())
+	r.cancelOnRun = cancel
+	return r.ctxOn(ctx, storeKey)
+}
+
+// ctxOn is ctx on an arbitrary parent.
 func (r *secretStoreCallbackRestartRecorder) ctxOn(parent context.Context, storeKey string) context.Context {
 	r.box = &storeCommandRun{
 		staged: &StagedRestarts{
 			Run: func(context.Context) (string, error) {
 				r.calls = append(r.calls, storeKey)
+				if r.cancelOnRun != nil {
+					r.cancelOnRun()
+					r.cancelOnRun = nil
+				}
 				return "restart:" + storeKey, r.runErr
 			},
 			Flush: func() {},
@@ -327,6 +333,8 @@ func (s *testStore) Publish() secretstore.PublishedStore {
 type testPublishedStore struct {
 	value string
 }
+
+func (*testPublishedStore) RetainedBytes() int64 { return 512 }
 
 func (s *testPublishedStore) Resolve(_ context.Context, req secretstore.ResolveRequest) (string, error) {
 	if req.Operand != "value" {

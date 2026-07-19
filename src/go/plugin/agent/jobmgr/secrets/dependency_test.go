@@ -4,11 +4,58 @@ package secrets
 
 import (
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 	"gopkg.in/yaml.v2"
 )
+
+func TestSecretJobSummariesAreBounded(t *testing.T) {
+	tests := map[string]struct {
+		names []string
+	}{
+		"many jobs": {
+			names: func() []string {
+				names := make([]string, 1_000)
+				for index := range names {
+					names[index] = fmt.Sprintf(
+						"module:job-%04d",
+						index,
+					)
+				}
+				return names
+			}(),
+		},
+		"one oversized job": {
+			names: []string{
+				strings.Repeat(
+					"x",
+					maximumSecretJobSummaryBytes*2,
+				),
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			summary := formatSecretJobNames(test.names)
+			if len(summary) >
+				maximumSecretJobSummaryBytes {
+				t.Fatalf(
+					"summary bytes=%d exceed cap=%d",
+					len(summary),
+					maximumSecretJobSummaryBytes,
+				)
+			}
+			if !strings.Contains(summary, "more") {
+				t.Fatalf(
+					"bounded summary lacks omitted-count suffix: %q",
+					summary,
+				)
+			}
+		})
+	}
+}
 
 func TestSecretDependencyIndexTracksAcknowledgedPostimages(t *testing.T) {
 	index := NewSecretDependencyIndex()

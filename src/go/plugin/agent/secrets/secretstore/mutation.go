@@ -5,6 +5,7 @@ package secretstore
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 )
 
@@ -19,6 +20,7 @@ type preparationSlot struct {
 	freeNext   uint32
 	key        string
 	expected   uint64
+	removal    bool
 	prepared   preparedStore
 	carrier    GenerationCarrier
 }
@@ -60,10 +62,12 @@ func (store *SecretStore) PrepareMutation(
 	}
 	ref, err := store.reservePreparation(key, expected, carrier)
 	if err != nil {
-		return PreparedSecretMutation{}, err
+		return PreparedSecretMutation{},
+			errors.Join(err, callGenerationCarrierRelease(carrier))
 	}
 	prepared, prepareErr := preparePublishedConfig(
 		ctx,
+		store.resolver,
 		cfg,
 		func(kind StoreKind) (Store, bool) {
 			creator, ok := catalog.Lookup(kind)
@@ -76,10 +80,6 @@ func (store *SecretStore) PrepareMutation(
 	if prepareErr != nil {
 		return PreparedSecretMutation{},
 			errors.Join(prepareErr, store.abortPreparation(ref))
-	}
-	if err := callGenerationCarrierActivate(carrier); err != nil {
-		return PreparedSecretMutation{},
-			errors.Join(err, store.abortPreparation(ref))
 	}
 	store.mu.Lock()
 	slot, err := store.preparation(ref)
@@ -118,6 +118,7 @@ func (store *SecretStore) Validate(
 	}
 	_, err := preparePublishedConfig(
 		ctx,
+		store.resolver,
 		cfg,
 		func(kind StoreKind) (Store, bool) {
 			creator, ok := catalog.Lookup(kind)
@@ -150,8 +151,31 @@ func (store *SecretStore) PrepareRemoval(
 		return PreparedSecretMutation{},
 			errors.New("secretstore: removal generation differs")
 	}
+	index, slot, err := store.allocatePreparation()
+	if err != nil {
+		return PreparedSecretMutation{}, err
+	}
+	next := slot.generation + 1
+	if next == 0 {
+		store.releaseUnusedPreparationSlot(index, slot)
+		return PreparedSecretMutation{},
+			errors.New("secretstore: preparation generation wrapped")
+	}
+	*slot = preparationSlot{
+		generation: next,
+		active:     true,
+		key:        key,
+		expected:   expected,
+		removal:    true,
+	}
+	store.activePreparations++
 	return PreparedSecretMutation{
-		owner: store, key: key, expected: expected, removal: true,
+		owner: store,
+		ref: preparationRef{
+			slot:       index,
+			generation: next,
+		},
+		key: key, expected: expected, removal: true,
 	}, nil
 }
 
@@ -185,6 +209,7 @@ func (store *SecretStore) reservePreparation(
 	}
 	next := slot.generation + 1
 	if next == 0 {
+		store.releaseUnusedPreparationSlot(index, slot)
 		return preparationRef{},
 			errors.New("secretstore: preparation generation wrapped")
 	}
@@ -226,6 +251,18 @@ func (store *SecretStore) allocatePreparation() (
 	return index, slot, nil
 }
 
+func (store *SecretStore) releaseUnusedPreparationSlot(
+	index uint32,
+	slot *preparationSlot,
+) {
+	generation := slot.generation
+	*slot = preparationSlot{
+		generation: generation,
+		freeNext:   store.freePreparation,
+	}
+	store.freePreparation = index + 1
+}
+
 func (mutation *PreparedSecretMutation) Commit(
 	ctx context.Context,
 ) (SecretMutationResult, error) {
@@ -234,7 +271,7 @@ func (mutation *PreparedSecretMutation) Commit(
 		return SecretMutationResult{Retained: true}, err
 	}
 	if removal {
-		return owner.commitRemoval(ctx, key, expected)
+		return owner.commitRemoval(ctx, ref, key, expected)
 	}
 	return owner.commitPreparation(ctx, ref, key, expected)
 }
@@ -245,9 +282,40 @@ func (mutation *PreparedSecretMutation) Abort(context.Context) error {
 		return err
 	}
 	if removal {
-		return nil
+		return owner.abortRemoval(ref)
 	}
 	return owner.abortPreparation(ref)
+}
+
+func (mutation *PreparedSecretMutation) RetainedResourceBytes() (
+	int64,
+	error,
+) {
+	if mutation == nil || mutation.owner == nil {
+		return 0, errors.New("secretstore: empty prepared mutation")
+	}
+	mutation.mu.Lock()
+	defer mutation.mu.Unlock()
+	if mutation.consumed {
+		return 0, errors.New(
+			"secretstore: prepared mutation consumed",
+		)
+	}
+	if mutation.removal {
+		return 0, nil
+	}
+	mutation.owner.mu.Lock()
+	defer mutation.owner.mu.Unlock()
+	slot, err := mutation.owner.preparation(mutation.ref)
+	if err != nil {
+		return 0, err
+	}
+	if slot.prepared.retainedBytes <= 0 {
+		return 0, errors.New(
+			"secretstore: prepared mutation has invalid retained bytes",
+		)
+	}
+	return slot.prepared.retainedBytes, nil
 }
 
 func (mutation *PreparedSecretMutation) take() (
@@ -275,31 +343,48 @@ func (mutation *PreparedSecretMutation) take() (
 
 func (store *SecretStore) commitRemoval(
 	ctx context.Context,
+	ref preparationRef,
 	key string,
 	expected uint64,
 ) (SecretMutationResult, error) {
 	if ctx == nil || ctx.Err() != nil {
+		abortErr := store.abortRemoval(ref)
 		if ctx == nil {
-			return SecretMutationResult{},
-				errors.New("secretstore: nil removal context")
+			return SecretMutationResult{Retained: abortErr != nil},
+				errors.Join(
+					errors.New("secretstore: nil removal context"),
+					abortErr,
+				)
 		}
-		return SecretMutationResult{}, ctx.Err()
+		return SecretMutationResult{Retained: abortErr != nil},
+			errors.Join(ctx.Err(), abortErr)
 	}
 	store.mu.Lock()
+	slot, preparationErr := store.preparation(ref)
 	record := store.records[key]
-	if store.state != storeAuthorityOpen ||
+	if preparationErr != nil ||
+		!slot.removal ||
+		slot.key != key ||
+		slot.expected != expected ||
+		store.state != storeAuthorityOpen ||
 		store.dirty != nil ||
 		record == nil ||
 		record.current == nil ||
 		record.current.generation != expected ||
 		record.retiring != nil {
 		store.mu.Unlock()
-		return SecretMutationResult{},
-			errors.New("secretstore: removal CAS rejected")
+		abortErr := store.abortRemoval(ref)
+		return SecretMutationResult{Retained: abortErr != nil},
+			errors.Join(
+				errors.New("secretstore: removal CAS rejected"),
+				preparationErr,
+				abortErr,
+			)
 	}
 	old := record.current
 	record.current = nil
 	record.retiring = old
+	store.clearPreparation(ref.slot, slot)
 	releaseOld := old.readers == 0
 	store.mu.Unlock()
 	result := SecretMutationResult{Generation: expected, Applied: true}
@@ -331,6 +416,46 @@ func (store *SecretStore) commitPreparation(
 	}
 	store.mu.Lock()
 	slot, err := store.preparation(ref)
+	if err != nil ||
+		slot.key != key ||
+		slot.expected != expected ||
+		slot.removal ||
+		store.state != storeAuthorityOpen ||
+		store.dirty != nil {
+		store.mu.Unlock()
+		abortErr := store.abortPreparation(ref)
+		return SecretMutationResult{Retained: abortErr != nil},
+			errors.Join(
+				errors.New("secretstore: mutation CAS rejected"),
+				err,
+				abortErr,
+			)
+	}
+	carrier := slot.carrier
+	requiredBytes := slot.prepared.retainedBytes
+	store.mu.Unlock()
+	capacityBytes, capacityErr :=
+		callGenerationCarrierCapacity(carrier)
+	if capacityErr != nil ||
+		requiredBytes <= 0 ||
+		capacityBytes < requiredBytes {
+		return SecretMutationResult{},
+			errors.Join(
+				fmt.Errorf(
+					"secretstore: generation carrier capacity %d is below retained state %d",
+					capacityBytes,
+					requiredBytes,
+				),
+				capacityErr,
+				store.abortPreparation(ref),
+			)
+	}
+	if err := callGenerationCarrierActivate(carrier); err != nil {
+		return SecretMutationResult{},
+			errors.Join(err, store.abortPreparation(ref))
+	}
+	store.mu.Lock()
+	slot, err = store.preparation(ref)
 	if err != nil {
 		store.mu.Unlock()
 		return SecretMutationResult{}, err
@@ -356,9 +481,20 @@ func (store *SecretStore) commitPreparation(
 		record = &generationRecord{key: key}
 		store.records[key] = record
 	}
+	nextGeneration := store.nextGeneration + 1
+	if nextGeneration == 0 {
+		store.mu.Unlock()
+		abortErr := store.abortPreparation(ref)
+		return SecretMutationResult{Retained: abortErr != nil},
+			errors.Join(
+				errors.New("secretstore: Store generation wrapped"),
+				abortErr,
+			)
+	}
+	store.nextGeneration = nextGeneration
 	generation := &StoreGeneration{
 		record:     record,
-		generation: expected + 1,
+		generation: nextGeneration,
 		config:     cloneConfig(slot.prepared.rawConfig),
 		hash:       slot.prepared.configHash,
 		status:     cloneStoreStatus(slot.prepared.status),
@@ -394,6 +530,12 @@ func (store *SecretStore) abortPreparation(ref preparationRef) error {
 		store.mu.Unlock()
 		return err
 	}
+	if slot.removal {
+		store.mu.Unlock()
+		return errors.New(
+			"secretstore: removal used mutation abort path",
+		)
+	}
 	carrier := slot.carrier
 	store.mu.Unlock()
 	releaseErr := callGenerationCarrierRelease(carrier)
@@ -406,6 +548,22 @@ func (store *SecretStore) abortPreparation(ref preparationRef) error {
 	if releaseErr != nil {
 		store.dirty = errors.Join(store.dirty, releaseErr)
 		return releaseErr
+	}
+	store.clearPreparation(ref.slot, slot)
+	return nil
+}
+
+func (store *SecretStore) abortRemoval(ref preparationRef) error {
+	store.mu.Lock()
+	defer store.mu.Unlock()
+	slot, err := store.preparation(ref)
+	if err != nil {
+		return err
+	}
+	if !slot.removal || slot.carrier != nil {
+		return errors.New(
+			"secretstore: mutation used removal abort path",
+		)
 	}
 	store.clearPreparation(ref.slot, slot)
 	return nil

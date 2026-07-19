@@ -681,6 +681,48 @@ func (ledger *AdmissionLedger) transferLongLived(ref AdmissionRef, bytes int64) 
 	return nil
 }
 
+func (ledger *AdmissionLedger) resizeLongLived(
+	ref AdmissionRef,
+	currentBytes,
+	nextBytes int64,
+) (bool, error) {
+	if ledger == nil || !ref.Valid() ||
+		currentBytes <= 0 ||
+		nextBytes <= 0 ||
+		nextBytes == currentBytes ||
+		nextBytes >= OrdinaryBudgetBytes {
+		return false, errors.New(
+			"jobmgr admission: invalid long-lived growth",
+		)
+	}
+	ledger.mu.Lock()
+	defer ledger.mu.Unlock()
+	record, err := ledger.record(ref)
+	if err != nil {
+		return false, err
+	}
+	if record.state != admissionOrdinaryGranted ||
+		!record.ordinaryHeld ||
+		record.longLivedBytes != currentBytes {
+		return false, errors.New(
+			"jobmgr admission: long-lived growth lacks granted bytes",
+		)
+	}
+	delta := nextBytes - currentBytes
+	if delta > 0 && record.heldBytes < nextBytes {
+		return false, errors.New(
+			"jobmgr admission: long-lived growth lacks granted bytes",
+		)
+	}
+	if delta < 0 {
+		record.heldBytes += delta
+		ledger.ordinaryBytes += delta
+	}
+	record.longLivedBytes = nextBytes
+	ledger.longLivedBytes += delta
+	return delta < 0 && ledger.hasGrantableWork(), nil
+}
+
 func (ledger *AdmissionLedger) releaseLongLived(ref AdmissionRef, bytes int64) (bool, error) {
 	if ledger == nil || !ref.Valid() || bytes <= 0 {
 		return false, errors.New("jobmgr admission: invalid long-lived release")

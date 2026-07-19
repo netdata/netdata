@@ -4,7 +4,6 @@ package functions
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"reflect"
 	"strings"
@@ -372,19 +371,16 @@ func TestFunctionCatalogReturnsSealedResourceTransactionPlan(t *testing.T) {
 
 func TestFunctionCatalogDerivesSuccessorPermitFromInvocation(t *testing.T) {
 	tests := map[string]struct {
-		payload      []byte
-		factoryError error
-		wantBytes    int64
-		wantError    bool
+		payload   []byte
+		wantBytes int64
 	}{
 		"payload sizes the permit": {
-			payload:   []byte(`{"option":"value"}`),
-			wantBytes: 4_096 + lifecycle.TaskChildExecutionBytes,
+			payload: []byte(`{"option":"value"}`),
+			wantBytes: int64(len(`{"option":"value"}`)) +
+				lifecycle.TaskChildExecutionBytes,
 		},
-		"factory rejection owns no invocation": {
-			payload:      []byte(`{"option":"value"}`),
-			factoryError: errors.New("rejected permit"),
-			wantError:    true,
+		"empty payload retains minimum byte": {
+			wantBytes: 1 + lifecycle.TaskChildExecutionBytes,
 		},
 	}
 	for name, test := range tests {
@@ -404,22 +400,7 @@ func TestFunctionCatalogDerivesSuccessorPermitFromInvocation(t *testing.T) {
 				) (lifecycle.PreparedResourceTransaction, error) {
 					return nil, nil
 				},
-				PermitFor: func(input HandlerInput) (
-					lifecycle.LongLivedPlan,
-					error,
-				) {
-					if !reflect.DeepEqual(input.Payload, test.payload) {
-						t.Fatalf("permit input=%q want=%q", input.Payload, test.payload)
-					}
-					if test.factoryError != nil {
-						return lifecycle.LongLivedPlan{},
-							test.factoryError
-					}
-					return lifecycle.NewJobLongLivedPlan(
-						test.wantBytes -
-							lifecycle.TaskChildExecutionBytes,
-					)
-				},
+				PermitPolicy:    SuccessorPermitSecretStorePayload,
 				CommandArgument: 1,
 				GlobalClaim:     "dyncfg:graph",
 				Commands: []ResourceTransactionCommand{
@@ -437,15 +418,6 @@ func TestFunctionCatalogDerivesSuccessorPermitFromInvocation(t *testing.T) {
 					Payload: test.payload, HasPayload: true,
 				},
 			)
-			if test.wantError {
-				if !errors.Is(err, test.factoryError) {
-					t.Fatalf("resolve error=%v want=%v", err, test.factoryError)
-				}
-				if census := catalog.LifecycleCensus(); census.InvocationLeases != 0 {
-					t.Fatalf("failed permit factory retained lease: %+v", census)
-				}
-				return
-			}
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -1635,14 +1607,9 @@ func TestCatalogRejectsInvalidDeclarations(t *testing.T) {
 				) (lifecycle.PreparedResourceTransaction, error) {
 					return nil, nil
 				},
-				Permit: permit,
-				PermitFor: func(HandlerInput) (
-					lifecycle.LongLivedPlan,
-					error,
-				) {
-					return permit, nil
-				},
-				GlobalClaim: "claim",
+				Permit:       permit,
+				PermitPolicy: SuccessorPermitSecretStorePayload,
+				GlobalClaim:  "claim",
 				Commands: []ResourceTransactionCommand{
 					{Name: "update", AllocateSuccessor: true},
 				},

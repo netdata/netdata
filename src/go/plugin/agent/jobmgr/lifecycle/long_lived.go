@@ -127,6 +127,22 @@ func (plan LongLivedPlan) forReplacement() (LongLivedPlan, error) {
 func (plan LongLivedPlan) Class() LongLivedClass { return plan.class }
 func (plan LongLivedPlan) Bytes() int64          { return plan.bytes }
 
+func (plan LongLivedPlan) ResourceBytes() int64 {
+	if plan.bytes <= TaskChildExecutionBytes {
+		return 0
+	}
+	return plan.bytes - TaskChildExecutionBytes
+}
+
+func (plan LongLivedPlan) WithResourceBytes(
+	bytes int64,
+) (LongLivedPlan, error) {
+	if err := plan.setResourceBytes(bytes); err != nil {
+		return LongLivedPlan{}, err
+	}
+	return plan, plan.Validate()
+}
+
 type LongLivedCarrier interface {
 	Valid() bool
 	Owner() ResourceIdentity
@@ -161,7 +177,15 @@ func (permit LongLivedPermit) Valid() bool {
 
 func (permit LongLivedPermit) Owner() ResourceIdentity { return permit.owner }
 func (permit LongLivedPermit) Class() LongLivedClass   { return permit.class }
-func (permit LongLivedPermit) CapacityBytes() int64    { return permit.bytes }
+func (permit LongLivedPermit) CapacityBytes() int64 {
+	if !permit.Valid() {
+		return 0
+	}
+	return permit.supervisor.longLivedCapacity(
+		permit.ref,
+		permit.owner,
+	)
+}
 
 func (permit LongLivedPermit) ActivateExternal(facet LongLivedExternalFacet) error {
 	if !permit.Valid() {
@@ -224,6 +248,7 @@ type longLivedSlot struct {
 	admissionRef   AdmissionRef
 	bytes          int64
 	bytesReleasing bool
+	bytesResizing  bool
 	gReserved      LongLivedGFacet
 	gActive        LongLivedGFacet
 	eReserved      LongLivedExternalFacet
@@ -362,6 +387,82 @@ func (supervisor *TaskSupervisor) LongLivedCensus() LongLivedCensus {
 	return registry.census
 }
 
+func (supervisor *TaskSupervisor) longLivedCapacity(
+	ref LongLivedPermitRef,
+	owner ResourceIdentity,
+) int64 {
+	registry := &supervisor.longLived
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	slot, err := registry.slot(ref, owner)
+	if err != nil {
+		return 0
+	}
+	return slot.bytes
+}
+
+func (supervisor *TaskSupervisor) resizeLongLivedPermit(
+	ref LongLivedPermitRef,
+	owner ResourceIdentity,
+	nextBytes int64,
+) error {
+	if nextBytes <= TaskChildExecutionBytes ||
+		nextBytes >= OrdinaryBudgetBytes {
+		return errors.New(
+			"jobmgr long-lived permit: invalid resized capacity",
+		)
+	}
+	registry := &supervisor.longLived
+	registry.mu.Lock()
+	slot, err := registry.slot(ref, owner)
+	if err != nil {
+		registry.mu.Unlock()
+		return err
+	}
+	if slot.bytesReleasing || slot.bytesResizing ||
+		nextBytes == slot.bytes {
+		registry.mu.Unlock()
+		return errors.New(
+			"jobmgr long-lived permit: invalid capacity growth",
+		)
+	}
+	slot.bytesResizing = true
+	admission := slot.admission
+	admissionRef := slot.admissionRef
+	currentBytes := slot.bytes
+	registry.mu.Unlock()
+
+	wake, resizeErr := admission.resizeLongLived(
+		admissionRef,
+		currentBytes,
+		nextBytes,
+	)
+	if wake {
+		supervisor.notifyAdmissionReady()
+	}
+
+	registry.mu.Lock()
+	slot, lookupErr := registry.slot(ref, owner)
+	if lookupErr != nil {
+		registry.mu.Unlock()
+		return errors.Join(resizeErr, lookupErr)
+	}
+	if resizeErr != nil {
+		slot.bytesResizing = false
+		registry.mu.Unlock()
+		return resizeErr
+	}
+	growth := nextBytes - currentBytes
+	slot.bytes = nextBytes
+	slot.bytesResizing = false
+	registry.census.Bytes += growth
+	if slot.class == LongLivedSecretStore {
+		registry.census.FinalizerOwnedBytes += growth
+	}
+	registry.mu.Unlock()
+	return nil
+}
+
 func (supervisor *TaskSupervisor) activateLongLivedExternal(ref LongLivedPermitRef, owner ResourceIdentity, facet LongLivedExternalFacet) error {
 	if !singleExternalFacet(facet) {
 		return errors.New("jobmgr long-lived permit: invalid external facet")
@@ -415,7 +516,8 @@ func (supervisor *TaskSupervisor) releaseLongLivedBytes(ref LongLivedPermitRef, 
 		registry.mu.Unlock()
 		return err
 	}
-	if slot.bytes <= 0 || slot.bytesReleasing {
+	if slot.bytes <= 0 || slot.bytesReleasing ||
+		slot.bytesResizing {
 		registry.mu.Unlock()
 		return errors.New("jobmgr long-lived permit: bytes already released")
 	}
@@ -467,7 +569,10 @@ func (supervisor *TaskSupervisor) returnLongLivedPermit(ref LongLivedPermitRef, 
 	if err != nil {
 		return err
 	}
-	if slot.bytes != 0 || slot.bytesReleasing || slot.gReserved != 0 || slot.gActive != 0 || slot.eReserved != 0 || slot.eActive != 0 {
+	if slot.bytes != 0 || slot.bytesReleasing ||
+		slot.bytesResizing ||
+		slot.gReserved != 0 || slot.gActive != 0 ||
+		slot.eReserved != 0 || slot.eActive != 0 {
 		return errors.New("jobmgr long-lived permit: return with retained B/G/E facets")
 	}
 	delete(registry.owners, slot.owner)

@@ -9,7 +9,6 @@ import (
 
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
-	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/dyncfg"
 )
 
@@ -18,26 +17,17 @@ import (
 type SecretDependentStop struct {
 	mu sync.Mutex
 
-	config  confgroup.Config
 	stopped bool
 }
 
-func (stop *SecretDependentStop) Config() (
-	confgroup.Config,
-	bool,
-	error,
-) {
+func (stop *SecretDependentStop) Stopped() (bool, error) {
 	if stop == nil {
-		return nil, false,
+		return false,
 			errors.New("job output: nil dependent stop")
 	}
 	stop.mu.Lock()
 	defer stop.mu.Unlock()
-	if !stop.stopped {
-		return nil, false, nil
-	}
-	config, err := stop.config.Clone()
-	return config, true, err
+	return stop.stopped, nil
 }
 
 // SecretDependentStart records a collector-construction failure that was
@@ -102,12 +92,7 @@ func (controller *DynCfgJobController) PlanSecretDependentStop(
 						"job output: running dependent has no current resource",
 					)
 				}
-				config, err := graphRecordConfig(record)
-				if err != nil {
-					return nil, err
-				}
 				state.mu.Lock()
-				state.config = config
 				state.stopped = true
 				state.mu.Unlock()
 				return PrepareResourceTransaction(
@@ -125,15 +110,11 @@ func (controller *DynCfgJobController) PlanSecretDependentStop(
 }
 
 func (controller *DynCfgJobController) PlanSecretDependentStart(
-	config confgroup.Config,
+	id string,
 ) (jobmgr.WorkPlan, *SecretDependentStart, error) {
-	if controller == nil || config == nil || config.FullName() == "" {
+	if controller == nil || id == "" {
 		return jobmgr.WorkPlan{}, nil,
 			errors.New("job output: invalid dependent start")
-	}
-	cloned, err := config.Clone()
-	if err != nil {
-		return jobmgr.WorkPlan{}, nil, err
 	}
 	permit, err := lifecycle.NewJobLongLivedPlan(
 		DefaultJobRetainedBytes,
@@ -141,7 +122,6 @@ func (controller *DynCfgJobController) PlanSecretDependentStart(
 	if err != nil {
 		return jobmgr.WorkPlan{}, nil, err
 	}
-	id := cloned.FullName()
 	state := &SecretDependentStart{}
 	// The enclosing secret mutation keeps the dependency graph stable through
 	// this acknowledged restart.
@@ -169,6 +149,15 @@ func (controller *DynCfgJobController) PlanSecretDependentStart(
 						nil,
 						permit,
 						mustDynCfgMessage(204, ""),
+					)
+				}
+				cloned, cloneErr := graphRecordConfig(record)
+				if cloneErr != nil {
+					return nil, cloneErr
+				}
+				if cloned.FullName() != id {
+					return nil, errors.New(
+						"job output: dependent start identity differs",
 					)
 				}
 				successor, prepareErr := controller.factory.Prepare(

@@ -16,6 +16,7 @@ import (
 	"github.com/netdata/netdata/go/plugins/pkg/funcapi"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/secrets/secretstore"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -182,6 +183,231 @@ func TestProcessCoreSecretUpdateRestartsDependentAgainstNewGeneration(
 	if cleanups.Load() != 2 {
 		t.Fatalf(
 			"dependent cleanup count=%d after shutdown",
+			cleanups.Load(),
+		)
+	}
+}
+
+func TestProcessCoreCancelledSecretUpdateRestoresStoppedDependent(
+	t *testing.T,
+) {
+	starts := make(chan string, 4)
+	stopEntered := make(chan struct{})
+	releaseStop := make(chan struct{})
+	var releaseOnce sync.Once
+	t.Cleanup(func() {
+		releaseOnce.Do(func() { close(releaseStop) })
+	})
+	var cleanups atomic.Int32
+	var armStop atomic.Bool
+	modules := collectorapi.Registry{
+		"module": {
+			Create: func() collectorapi.CollectorV1 {
+				collector := &collectorapi.MockCollectorV1{}
+				collector.InitFunc = func(context.Context) error {
+					starts <- collector.Config.OptionStr
+					return nil
+				}
+				collector.CleanupFunc = func(context.Context) {
+					if armStop.Load() &&
+						cleanups.Add(1) == 1 {
+						close(stopEntered)
+						<-releaseStop
+					}
+				}
+				return collector
+			},
+			Config: func() any {
+				return &collectorapi.MockConfiguration{}
+			},
+			AgentFunctions: func() []funcapi.FunctionConfig {
+				return []funcapi.FunctionConfig{{ID: "method"}}
+			},
+			MethodHandler: func(
+				collectorapi.RuntimeJob,
+			) funcapi.MethodHandler {
+				return &runTestHandler{cleanup: func() {}}
+			},
+			JobConfigSchema: collectorapi.MockConfigSchema,
+		},
+	}
+	jobConfig := confgroup.Config{
+		"module": "module", "name": "job",
+		"update_every": 1, "function_only": true,
+		"option_str": "${store:vault:main:key}",
+		"option_int": 1,
+	}
+	jobConfig.SetProvider(confgroup.TypeDyncfg)
+	jobConfig.SetSourceType(confgroup.TypeDyncfg)
+	jobConfig.SetSource("test")
+	jobPayload, err := yaml.Marshal(jobConfig)
+	if err != nil {
+		t.Fatal(err)
+	}
+	jobs := testRunJobServices(t)
+	jobs.Defaults = confgroup.Registry{
+		"module": {UpdateEvery: 1},
+	}
+	jobs.Graph = []dyncfg.GraphConfig{{
+		ID: jobConfig.FullName(), Module: jobConfig.Module(),
+		Name: jobConfig.Name(), Status: dyncfg.StatusRunning.String(),
+		Payload: jobPayload,
+	}}
+	jobs.StoreCreators, err = secretstore.NewCreatorCatalog(
+		[]secretstore.Creator{{
+			Kind:        secretstore.KindVault,
+			DisplayName: "Vault",
+			Schema:      `{}`,
+			Create: func() secretstore.Store {
+				return &processSecretStore{}
+			},
+		}},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	initialStore := secretstore.Config{
+		"name": "main", "kind": string(secretstore.KindVault),
+		"value":           "initial",
+		"__source__":      confgroup.TypeUser,
+		"__source_type__": confgroup.TypeUser,
+	}
+
+	reader, writer := io.Pipe()
+	defer writer.Close()
+	output := newProcessSynchronizedBuffer()
+	var storeScope func(
+		[]string,
+	) (secretresolver.AtomicScope, error)
+	var storeCensus func() secretstore.SecretStoreCensus
+	process, err := newProcessCore(processCoreConfig{
+		Input: reader, Output: output, FirstGeneration: 1,
+		ShutdownTimeout: time.Second, Clock: lifecycle.RealClock{},
+		Modules: modules, Jobs: jobs,
+		Secrets: runSecretServices{
+			Initial: []secretstore.Config{initialStore},
+		},
+		Discovery: testRunDiscoveryServices(t),
+		Planner: func(
+			capabilities runPlannerCapabilities,
+		) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
+			storeScope = capabilities.StoreScope
+			storeCensus = capabilities.StoreCensus
+			return runRejectingPlanner{},
+				jobmgr.RunFinalizerFunc(
+					func(context.Context, uint64) error { return nil },
+				),
+				nil
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	commands := make(chan processControl, 1)
+	done := make(chan error, 1)
+	go func() {
+		done <- process.run(context.Background(), commands)
+	}()
+	select {
+	case got := <-starts:
+		if got != "initial" {
+			t.Fatalf(
+				"collector secret=%q want=%q",
+				got,
+				"initial",
+			)
+		}
+	case err := <-done:
+		t.Fatalf(
+			"process stopped before initial collector start: %v; output=%q",
+			err,
+			output.String(),
+		)
+	case <-time.After(3 * time.Second):
+		t.Fatalf(
+			"collector did not start with initial secret; output=%q",
+			output.String(),
+		)
+	}
+	armStop.Store(true)
+
+	if _, err := io.WriteString(
+		writer,
+		"FUNCTION_PAYLOAD secret-cancel 30 "+
+			"\"config go.d:secretstore:vault:main update\" "+
+			"0xFFFF \"user=test\" application/json\n"+
+			"{\"value\":\"replacement\"}\n"+
+			"FUNCTION_PAYLOAD_END\n",
+	); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-stopEntered:
+	case <-time.After(3 * time.Second):
+		t.Fatal("dependent stop did not reach collector cleanup")
+	}
+	if _, err := io.WriteString(
+		writer,
+		"FUNCTION_CANCEL secret-cancel\n",
+	); err != nil {
+		t.Fatal(err)
+	}
+	releaseOnce.Do(func() { close(releaseStop) })
+	waitSecretStart(t, starts, "initial")
+	output.waitContains(
+		t,
+		"FUNCTION_RESULT_BEGIN secret-cancel 499 application/json",
+	)
+
+	key := secretstore.StoreKey(secretstore.KindVault, "main")
+	scope, err := storeScope([]string{key})
+	if err != nil {
+		t.Fatal(err)
+	}
+	value, resolveErr := scope.Resolve(
+		t.Context(),
+		key,
+		"key",
+	)
+	releaseErr := scope.Release(t.Context())
+	if resolveErr != nil || releaseErr != nil ||
+		string(value) != "initial" {
+		t.Fatalf(
+			"restored Store value=%q resolve=%v release=%v",
+			value,
+			resolveErr,
+			releaseErr,
+		)
+	}
+	if census := storeCensus(); census.Current != 1 ||
+		census.Generations != 1 ||
+		census.Preparations != 0 ||
+		census.Readers != 0 ||
+		census.Scopes != 0 {
+		t.Fatalf(
+			"cancelled Store update retained ownership: %+v",
+			census,
+		)
+	}
+	if cleanups.Load() != 1 {
+		t.Fatalf(
+			"dependent cleanups=%d want=1 before shutdown",
+			cleanups.Load(),
+		)
+	}
+
+	commands <- testProcessControl(processTerminate)
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("process did not terminate")
+	}
+	if cleanups.Load() != 2 {
+		t.Fatalf(
+			"dependent cleanups=%d want=2 after shutdown",
 			cleanups.Load(),
 		)
 	}
@@ -558,6 +784,8 @@ func (store *processSecretStore) Publish() secretstore.PublishedStore {
 }
 
 type processPublishedSecret string
+
+func (processPublishedSecret) RetainedBytes() int64 { return 512 }
 
 func (secret processPublishedSecret) Resolve(
 	context.Context,

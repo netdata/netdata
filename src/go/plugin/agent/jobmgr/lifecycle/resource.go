@@ -20,16 +20,21 @@ const (
 )
 
 type TaskOutcome struct {
-	kind        TaskOutcomeKind
-	frame       SealedResult
-	prepared    PreparedResource
-	ready       ReadyResource
-	capability  PreparedCapability
-	transaction PreparedResourceTransaction
-	scope       ResourceTransactionScope
-	scopeSet    bool
-	disposition ResourceTransactionDisposition
-	identity    ResourceIdentity
+	kind                   TaskOutcomeKind
+	frame                  SealedResult
+	prepared               PreparedResource
+	ready                  ReadyResource
+	capability             PreparedCapability
+	transaction            PreparedResourceTransaction
+	scope                  ResourceTransactionScope
+	scopeSet               bool
+	disposition            ResourceTransactionDisposition
+	identity               ResourceIdentity
+	longLivedResourceBytes int64
+}
+
+type PreparedLongLivedResourceSizer interface {
+	LongLivedResourceBytes() (int64, error)
 }
 
 func PreparedCapabilityOutcome(capability PreparedCapability) (TaskOutcome, error) {
@@ -81,11 +86,29 @@ func preparedResourceTransactionOutcome(
 	transaction PreparedResourceTransaction,
 	scope ResourceTransactionScope,
 ) (TaskOutcome, error) {
+	var longLivedResourceBytes int64
+	if sizer, ok := transaction.(PreparedLongLivedResourceSizer); ok {
+		var err error
+		longLivedResourceBytes, err =
+			sizer.LongLivedResourceBytes()
+		if err != nil {
+			return TaskOutcome{}, err
+		}
+		if longLivedResourceBytes < 0 ||
+			longLivedResourceBytes >=
+				OrdinaryBudgetBytes-
+					TaskChildExecutionBytes {
+			return TaskOutcome{}, errors.New(
+				"jobmgr lifecycle: invalid transaction retained bytes",
+			)
+		}
+	}
 	outcome := TaskOutcome{
-		kind:        TaskOutcomePreparedResourceTransaction,
-		transaction: transaction,
-		scope:       scope,
-		scopeSet:    true,
+		kind:                   TaskOutcomePreparedResourceTransaction,
+		transaction:            transaction,
+		scope:                  scope,
+		scopeSet:               true,
+		longLivedResourceBytes: longLivedResourceBytes,
 	}
 	return outcome, outcome.validate()
 }
@@ -144,7 +167,8 @@ func (outcome TaskOutcome) validate() error {
 			outcome.transaction != nil ||
 			outcome.scopeSet ||
 			outcome.disposition != 0 ||
-			outcome.identity.Valid() {
+			outcome.identity.Valid() ||
+			outcome.longLivedResourceBytes != 0 {
 			return errors.New("jobmgr lifecycle: nonempty no-value outcome")
 		}
 	case TaskOutcomeFrame:
@@ -154,7 +178,8 @@ func (outcome TaskOutcome) validate() error {
 			outcome.transaction != nil ||
 			outcome.scopeSet ||
 			outcome.disposition != 0 ||
-			outcome.identity.Valid() {
+			outcome.identity.Valid() ||
+			outcome.longLivedResourceBytes != 0 {
 			return errors.New("jobmgr lifecycle: mixed frame outcome")
 		}
 		return outcome.frame.validate()
@@ -166,7 +191,8 @@ func (outcome TaskOutcome) validate() error {
 			outcome.transaction != nil ||
 			outcome.scopeSet ||
 			outcome.disposition != 0 ||
-			!outcome.identity.Valid() {
+			!outcome.identity.Valid() ||
+			outcome.longLivedResourceBytes != 0 {
 			return errors.New("jobmgr lifecycle: invalid prepared resource outcome")
 		}
 	case TaskOutcomeReadyResource:
@@ -177,7 +203,8 @@ func (outcome TaskOutcome) validate() error {
 			outcome.transaction != nil ||
 			outcome.scopeSet ||
 			outcome.disposition != 0 ||
-			!outcome.identity.Valid() {
+			!outcome.identity.Valid() ||
+			outcome.longLivedResourceBytes != 0 {
 			return errors.New("jobmgr lifecycle: invalid ready resource outcome")
 		}
 	case TaskOutcomePreparedCapability:
@@ -188,7 +215,8 @@ func (outcome TaskOutcome) validate() error {
 			outcome.transaction != nil ||
 			outcome.scopeSet ||
 			outcome.disposition != 0 ||
-			!outcome.identity.Valid() {
+			!outcome.identity.Valid() ||
+			outcome.longLivedResourceBytes != 0 {
 			return errors.New("jobmgr lifecycle: invalid prepared capability outcome")
 		}
 	case TaskOutcomePreparedResourceTransaction:
@@ -209,7 +237,8 @@ func (outcome TaskOutcome) validate() error {
 			outcome.transaction != nil ||
 			!outcome.scopeSet ||
 			!outcome.scope.Valid() ||
-			!outcome.disposition.Valid() {
+			!outcome.disposition.Valid() ||
+			outcome.longLivedResourceBytes != 0 {
 			return errors.New("jobmgr lifecycle: invalid applied resource transaction outcome")
 		}
 		if err := outcome.frame.validate(); err != nil {
@@ -261,7 +290,8 @@ func (outcome TaskOutcome) empty() bool {
 		outcome.transaction == nil &&
 		!outcome.scopeSet &&
 		outcome.disposition == 0 &&
-		!outcome.identity.Valid()
+		!outcome.identity.Valid() &&
+		outcome.longLivedResourceBytes == 0
 }
 
 func preparedCapabilityIdentity(capability PreparedCapability) (identity ResourceIdentity, err error) {

@@ -3,6 +3,7 @@
 package lifecycle
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"sync"
@@ -156,4 +157,36 @@ func (supervisor *RunSupervisor) TerminalState() RunTerminalState {
 
 func (supervisor *RunSupervisor) Generation() uint64 {
 	return supervisor.generation
+}
+
+// NewRollbackContext returns one run-owned context bounded by the configured
+// shutdown budget. It deliberately does not inherit a cancelled command
+// context.
+func (supervisor *RunSupervisor) NewRollbackContext() (
+	context.Context,
+	context.CancelFunc,
+	error,
+) {
+	if supervisor == nil {
+		return nil, nil,
+			errors.New("jobmgr run supervisor: nil rollback owner")
+	}
+	supervisor.mu.Lock()
+	if supervisor.terminal {
+		supervisor.mu.Unlock()
+		return nil, nil,
+			errors.New("jobmgr run supervisor: rollback after terminal")
+	}
+	timeout := supervisor.timeout
+	shutdown := supervisor.shutdown
+	supervisor.mu.Unlock()
+	if shutdown != nil {
+		ctx, cancel := context.WithDeadline(
+			context.Background(),
+			shutdown.Deadline(),
+		)
+		return ctx, cancel, nil
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	return ctx, cancel, nil
 }

@@ -15,34 +15,41 @@ import (
 	"gopkg.in/yaml.v2"
 )
 
-type restartTestCommandPort struct{}
-
-func (restartTestCommandPort) SubmitPrepared(
-	context.Context,
-	jobmgr.Request,
-	jobmgr.WorkPlan,
-) error {
-	return nil
+type restartTestCommandScope struct {
+	normalErr     error
+	rollbackErr   error
+	rollbackCalls int
 }
 
-func (restartTestCommandPort) SubmitPreparedAndWait(
+func (scope *restartTestCommandScope) SubmitPreparedAndWait(
 	context.Context,
 	jobmgr.Request,
 	jobmgr.WorkPlan,
 ) error {
-	return nil
+	return scope.normalErr
+}
+
+func (scope *restartTestCommandScope) SubmitRollbackAndWait(
+	jobmgr.Request,
+	jobmgr.WorkPlan,
+) error {
+	scope.rollbackCalls++
+	return scope.rollbackErr
+}
+
+func (*restartTestCommandScope) RollbackContext() (
+	context.Context,
+	error,
+) {
+	return context.Background(), nil
 }
 
 type restartTestStop struct {
-	config confgroup.Config
+	stopped bool
 }
 
-func (stop restartTestStop) Config() (
-	confgroup.Config,
-	bool,
-	error,
-) {
-	return stop.config, true, nil
+func (stop restartTestStop) Stopped() (bool, error) {
+	return stop.stopped, nil
 }
 
 type restartTestStart struct {
@@ -64,16 +71,13 @@ func (jobs restartTestJobs) PlanDependentStop(
 	if id == "module_two" {
 		return jobmgr.WorkPlan{}, nil, jobs.stopError
 	}
-	return jobmgr.WorkPlan{}, restartTestStop{
-		config: confgroup.Config{
-			"module": "module",
-			"name":   "one",
-		},
-	}, nil
+	return jobmgr.WorkPlan{},
+		restartTestStop{stopped: true},
+		nil
 }
 
 func (jobs restartTestJobs) PlanDependentStart(
-	confgroup.Config,
+	string,
 ) (jobmgr.WorkPlan, DependentStartResult, error) {
 	return jobmgr.WorkPlan{},
 		restartTestStart{err: jobs.restoreError},
@@ -115,14 +119,14 @@ func TestSecretRestartCommandReportsFailedPrecommitRestoration(
 		restartTestJobs{
 			stopError: stopError, restoreError: restoreError,
 		},
-		restartTestCommandPort{},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	commitCalled := false
-	_, _, err = command.Apply(
+	_, _, restored, err := command.Apply(
 		context.Background(),
+		&restartTestCommandScope{},
 		"vault:main",
 		func(context.Context) (
 			secretstore.SecretMutationResult,
@@ -136,8 +140,77 @@ func TestSecretRestartCommandReportsFailedPrecommitRestoration(
 		!errors.Is(err, restoreError) {
 		t.Fatalf("restart error=%v", err)
 	}
+	if restored {
+		t.Fatal("failed dependent restoration was reported as complete")
+	}
 	if commitCalled {
 		t.Fatal("Store commit ran after dependent stop failure")
+	}
+}
+
+func TestSecretRestartCommandRestoresStopAcknowledgedDuringCancellation(
+	t *testing.T,
+) {
+	index := NewSecretDependencyIndex()
+	config := confgroup.Config{
+		"module": "module",
+		"name":   "one",
+		"secret": "${store:vault:main:value}",
+	}
+	payload, err := yaml.Marshal(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitDependency, err := index.PrepareJobChange(
+		config.FullName(),
+		&dyncfg.GraphConfig{
+			ID: config.FullName(), Module: config.Module(),
+			Name: config.Name(), Status: dyncfg.StatusRunning.String(),
+			Payload: payload,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitDependency()
+	command, err := NewSecretRestartCommand(
+		1,
+		index,
+		restartTestJobs{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scope := &restartTestCommandScope{
+		normalErr: context.Canceled,
+	}
+	commitCalled := false
+	_, _, restored, err := command.Apply(
+		context.Background(),
+		scope,
+		"vault:main",
+		func(context.Context) (
+			secretstore.SecretMutationResult,
+			error,
+		) {
+			commitCalled = true
+			return secretstore.SecretMutationResult{}, nil
+		},
+	)
+	if !errors.Is(err, context.Canceled) {
+		t.Fatalf("restart error=%v", err)
+	}
+	if !restored {
+		t.Fatal("acknowledged stop was not restored")
+	}
+	if scope.rollbackCalls != 1 {
+		t.Fatalf(
+			"rollback starts=%d want=1",
+			scope.rollbackCalls,
+		)
+	}
+	if commitCalled {
+		t.Fatal("Store commit ran after cancelled dependent stop")
 	}
 }
 
@@ -173,13 +246,13 @@ func TestSecretRestartCommandRedactsAppliedRestartFailure(
 		1,
 		index,
 		restartTestJobs{restoreError: sensitive},
-		restartTestCommandPort{},
 	)
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, message, err := command.Apply(
+	result, message, _, err := command.Apply(
 		context.Background(),
+		&restartTestCommandScope{},
 		"vault:main",
 		func(context.Context) (
 			secretstore.SecretMutationResult,

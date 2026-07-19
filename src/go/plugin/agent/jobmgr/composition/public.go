@@ -345,7 +345,9 @@ func productionPlanner(
 		capabilities.Functions == nil ||
 		capabilities.Jobs == nil ||
 		capabilities.DynCfg == nil ||
-		capabilities.Graph == nil {
+		capabilities.Graph == nil ||
+		capabilities.StoreScope == nil ||
+		capabilities.StoreCensus == nil {
 		return nil, nil, errors.New(
 			"jobmgr composition: incomplete production capabilities",
 		)

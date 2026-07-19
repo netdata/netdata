@@ -6,11 +6,13 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"math"
 	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
 
+	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"gopkg.in/yaml.v2"
 )
 
@@ -22,11 +24,12 @@ type storeRecord struct {
 }
 
 type preparedStore struct {
-	key        string
-	rawConfig  Config
-	configHash uint64
-	status     StoreStatus
-	published  PublishedStore
+	key           string
+	rawConfig     Config
+	configHash    uint64
+	status        StoreStatus
+	published     PublishedStore
+	retainedBytes int64
 }
 
 type serviceState struct {
@@ -40,11 +43,12 @@ type creatorRegistry struct {
 }
 
 type inMemoryService struct {
-	mu       sync.Mutex
-	state    atomic.Pointer[serviceState]
-	now      func() time.Time
-	resolver *runtimeResolver
-	registry creatorRegistry
+	mu              sync.Mutex
+	state           atomic.Pointer[serviceState]
+	now             func() time.Time
+	resolver        *runtimeResolver
+	processResolver *secretresolver.AtomicResolver
+	registry        creatorRegistry
 }
 
 func NewService(creators ...Creator) Service {
@@ -52,10 +56,15 @@ func NewService(creators ...Creator) Service {
 }
 
 func newInMemoryService(creators ...Creator) Service {
+	processResolver, err := secretresolver.NewDefaultAtomicResolver()
+	if err != nil {
+		panic(err)
+	}
 	s := &inMemoryService{
-		now:      time.Now,
-		resolver: newRuntimeResolver(),
-		registry: newCreatorRegistry(creators...),
+		now:             time.Now,
+		resolver:        newRuntimeResolver(),
+		processResolver: processResolver,
+		registry:        newCreatorRegistry(creators...),
 	}
 	s.state.Store(&serviceState{
 		snapshot: &Snapshot{
@@ -311,11 +320,17 @@ func newCreatorRegistry(creators ...Creator) creatorRegistry {
 }
 
 func (s *inMemoryService) prepareConfig(ctx context.Context, cfg Config) (preparedStore, error) {
-	return preparePublishedConfig(ctx, cfg, s.New)
+	return preparePublishedConfig(
+		ctx,
+		s.processResolver,
+		cfg,
+		s.New,
+	)
 }
 
 func preparePublishedConfig(
 	ctx context.Context,
+	resolver *secretresolver.AtomicResolver,
 	cfg Config,
 	newStore func(StoreKind) (Store, bool),
 ) (preparedStore, error) {
@@ -338,7 +353,19 @@ func preparePublishedConfig(
 	}
 	rawConfig := cloneConfig(raw)
 	rawHash := raw.Hash()
-	resolvedPayload, err := resolveProviderPayload(ctx, raw)
+	rawBytes, err := secretresolver.EstimateRetainedBytes(
+		map[string]any(raw),
+	)
+	if err != nil {
+		return preparedStore{}, err
+	}
+	resolvedPayload, err := resolveProviderPayload(ctx, resolver, raw)
+	if err != nil {
+		return preparedStore{}, err
+	}
+	resolvedBytes, err := secretresolver.EstimateRetainedBytes(
+		map[string]any(resolvedPayload),
+	)
 	if err != nil {
 		return preparedStore{}, err
 	}
@@ -378,6 +405,23 @@ func preparePublishedConfig(
 	if published == nil {
 		return preparedStore{}, fmt.Errorf("store '%s': published resolver state is nil", key)
 	}
+	backendBytes := published.RetainedBytes()
+	if backendBytes <= 0 {
+		return preparedStore{}, fmt.Errorf(
+			"store '%s': invalid published retained-byte estimate",
+			key,
+		)
+	}
+	const generationRetainedBytes = int64(512)
+	if backendBytes >
+		math.MaxInt64-rawBytes-resolvedBytes-generationRetainedBytes {
+		return preparedStore{}, fmt.Errorf(
+			"store '%s': published retained-byte estimate overflows",
+			key,
+		)
+	}
+	retainedBytes := rawBytes + resolvedBytes +
+		backendBytes + generationRetainedBytes
 
 	return preparedStore{
 		key:        key,
@@ -387,7 +431,8 @@ func preparePublishedConfig(
 			Name: name,
 			Kind: kind,
 		},
-		published: published,
+		published:     published,
+		retainedBytes: retainedBytes,
 	}, nil
 }
 
