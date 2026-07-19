@@ -553,17 +553,27 @@ func TestProcessCoreRejectsSuccessorAfterDiscoveryProviderMissesJoin(
 
 func TestProcessCoreContainsConstructionFailures(t *testing.T) {
 	cases := map[string]struct {
-		failAt          int
-		restart         bool
-		wantCleanups    int
-		wantReaderStart int
+		failAt             int
+		restart            bool
+		providerBuildPanic bool
+		wantErr            error
+		wantErrorText      string
+		wantCleanups       int
+		wantReaderStart    int
 	}{
 		"first generation": {
-			failAt: 1, wantCleanups: 1,
+			failAt: 1, wantErr: errProcessPlannerConstruction,
+			wantCleanups: 1,
 		},
 		"restart successor": {
 			failAt: 2, restart: true,
+			wantErr:      errProcessPlannerConstruction,
 			wantCleanups: 2, wantReaderStart: 1,
+		},
+		"provider build panic": {
+			providerBuildPanic: true,
+			wantErrorText:      "provider factory panic",
+			wantCleanups:       1,
 		},
 	}
 	for name, tc := range cases {
@@ -573,6 +583,31 @@ func TestProcessCoreContainsConstructionFailures(t *testing.T) {
 			var cleanupsMu sync.Mutex
 			cleanups := 0
 			plannerCalls := 0
+			discovery := testRunDiscoveryServices(t)
+			if tc.providerBuildPanic {
+				factory := agentdiscovery.NewProviderFactory(
+					"panicked",
+					func(agentdiscovery.BuildContext) (
+						agentdiscovery.Discoverer,
+						bool,
+						error,
+					) {
+						panic("provider construction")
+					},
+				)
+				catalog, err := agentdiscovery.NewProviderCatalog(
+					[]agentdiscovery.ProviderFactory{factory},
+				)
+				if err != nil {
+					t.Fatal(err)
+				}
+				discovery = runDiscoveryServices{
+					BuildContext: agentdiscovery.BuildContext{
+						Registry: confgroup.Registry{"module": {}},
+					},
+					Providers: catalog,
+				}
+			}
 			process, err := newProcessCore(processCoreConfig{
 				Input: reader,
 				Output: processRecordingWriter{record: func(payload []byte) {
@@ -602,7 +637,7 @@ func TestProcessCoreContainsConstructionFailures(t *testing.T) {
 					},
 				},
 				Jobs:      testRunJobServices(t),
-				Discovery: testRunDiscoveryServices(t),
+				Discovery: discovery,
 				Planner: func(runPlannerCapabilities) (jobmgr.Planner, jobmgr.RunFinalizer, error) {
 					plannerCalls++
 					if plannerCalls == tc.failAt {
@@ -621,14 +656,22 @@ func TestProcessCoreContainsConstructionFailures(t *testing.T) {
 			go func() {
 				done <- process.run(context.Background(), commands)
 			}()
-			if tc.restart {
+			if tc.providerBuildPanic {
+				waitProcessEvent(t, events, "publish")
+				waitProcessEvent(t, events, "withdraw")
+			} else if tc.restart {
 				waitProcessEvent(t, events, "publish")
 				commands <- testProcessControl(processRestart)
 				waitProcessEvent(t, events, "withdraw")
 			}
 			select {
 			case err := <-done:
-				if !errors.Is(err, errProcessPlannerConstruction) {
+				if tc.wantErr != nil &&
+					!errors.Is(err, tc.wantErr) {
+					t.Fatalf("process error=%v", err)
+				}
+				if tc.wantErrorText != "" &&
+					!strings.Contains(err.Error(), tc.wantErrorText) {
 					t.Fatalf("process error=%v", err)
 				}
 			case <-time.After(3 * time.Second):

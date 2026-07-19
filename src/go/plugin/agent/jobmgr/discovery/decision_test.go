@@ -197,6 +197,72 @@ func TestDecisionIndexConfigurationPolicy(t *testing.T) {
 	}
 }
 
+func TestDecisionIndexReconcilesOnlyChangedSourceRecords(t *testing.T) {
+	const population = 300
+	commands := &decisionTestCommands{}
+	index := newDecisionTestIndex(
+		t,
+		commands,
+		func(DiscoveredChange) (jobmgr.WorkPlan, error) {
+			return jobmgr.WorkPlan{}, nil
+		},
+	)
+	groups := make([]*confgroup.Group, 0, population)
+	for ordinal := 0; ordinal < population; ordinal++ {
+		source := fmt.Sprintf("source-%03d", ordinal)
+		groups = append(groups, &confgroup.Group{
+			Source: source,
+			Configs: []confgroup.Config{
+				decisionTestConfig(
+					fmt.Sprintf("job-%03d", ordinal),
+					confgroup.TypeStock,
+					source,
+				),
+			},
+		})
+	}
+	if err := index.Apply(context.Background(), groups); err != nil {
+		t.Fatal(err)
+	}
+	if len(commands.requests) != population {
+		t.Fatalf(
+			"initial commands=%d, want %d",
+			len(commands.requests),
+			population,
+		)
+	}
+	if err := index.Apply(
+		context.Background(),
+		[]*confgroup.Group{{
+			Source: "source-000",
+			Configs: []confgroup.Config{
+				decisionTestConfig(
+					"job-000",
+					confgroup.TypeStock,
+					"source-000",
+				).Set("value", "changed"),
+			},
+		}},
+	); err != nil {
+		t.Fatal(err)
+	}
+	if len(commands.requests) != population+1 {
+		t.Fatalf(
+			"commands after one changed source=%d, want %d",
+			len(commands.requests),
+			population+1,
+		)
+	}
+	if census := index.Census(); census != (DecisionCensus{
+		Sources:      population,
+		Candidates:   population,
+		Acknowledged: population,
+		Revision:     population + 1,
+	}) {
+		t.Fatalf("changed-source census=%+v", census)
+	}
+}
+
 func TestDecisionIndexHasNoFixedPopulationCeiling(t *testing.T) {
 	const population = 300
 	tests := map[string]struct {

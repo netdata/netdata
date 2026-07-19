@@ -11,6 +11,7 @@ import (
 
 	agentdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+	jobmgrdiscovery "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/discovery"
 	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -79,6 +80,110 @@ func TestDiscoveryShutdownCancelsSupervisorBeforeProviders(t *testing.T) {
 		providers[0] != "file" ||
 		providers[1] != "service-discovery" {
 		t.Fatalf("provider cancellation order=%v", providers)
+	}
+}
+
+func TestDiscoveryChildrenWaitForPublication(t *testing.T) {
+	entered := make(chan struct{})
+	prepared, admission, admissionRef := newPublicationTestDiscovery(
+		t,
+		publicationTestDiscoverer{entered: entered},
+	)
+	ready, err := prepared.AcceptStart(context.Background(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	enteredBeforePublish := false
+	select {
+	case <-entered:
+		enteredBeforePublish = true
+	case <-time.After(50 * time.Millisecond):
+	}
+	if err := ready.Publish(); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-entered:
+	case <-time.After(time.Second):
+		t.Fatal("provider did not enter after discovery publication")
+	}
+	stopCtx, cancel := context.WithTimeout(
+		context.Background(),
+		time.Second,
+	)
+	defer cancel()
+	if err := ready.Stop(stopCtx); err != nil {
+		t.Fatal(err)
+	}
+	if err := ready.Finalize(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := admission.ReleaseOrdinary(admissionRef); err != nil {
+		t.Fatal(err)
+	}
+	if enteredBeforePublish {
+		t.Fatal("provider entered before discovery publication")
+	}
+}
+
+func TestDiscoverySupervisorPanicFailsRun(t *testing.T) {
+	config := confgroup.Config{}.
+		SetName("job").
+		SetModule("module").
+		SetProvider("test").
+		SetSourceType(confgroup.TypeStock).
+		SetSource("source")
+	pipeline := newDiscoveryTestPipeline(
+		t,
+		publicationTestDiscoverer{
+			groups: []*confgroup.Group{{
+				Source:  "source",
+				Configs: []confgroup.Config{config},
+			}},
+		},
+	)
+	decisions, err := jobmgrdiscovery.NewDecisionIndex(
+		jobmgrdiscovery.DecisionConfig{
+			Generation: 1,
+			Commands:   discoveryTestCommands{},
+			Plan: func(
+				jobmgrdiscovery.DiscoveredChange,
+			) (jobmgr.WorkPlan, error) {
+				panic("decision panic")
+			},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	providerErr := make(chan error, 1)
+	go func() {
+		providerErr <- pipeline.RunProvider(ctx, "provider")
+	}()
+	failed := make(chan error, 1)
+	err = runDiscoverySupervisor(
+		ctx,
+		pipeline,
+		decisions,
+		func(err error) { failed <- err },
+	)
+	if !errors.Is(err, lifecycle.ErrTaskPanic) {
+		t.Fatalf("supervisor error=%v", err)
+	}
+	select {
+	case failErr := <-failed:
+		if !errors.Is(failErr, lifecycle.ErrTaskPanic) {
+			t.Fatalf("fail-stop error=%v", failErr)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("supervisor panic did not fail-stop the run")
+	}
+	cancel()
+	if err := <-providerErr; err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -173,4 +278,155 @@ func TestRunGenerationOwnsFrozenDiscoveryChildren(t *testing.T) {
 		t.Fatal(err)
 	}
 	closeRunTestUIDs(t, uids)
+}
+
+func newPublicationTestDiscovery(
+	t *testing.T,
+	discoverer agentdiscovery.Discoverer,
+) (
+	*preparedDiscovery,
+	*lifecycle.AdmissionLedger,
+	lifecycle.AdmissionRef,
+) {
+	t.Helper()
+	pipeline := newDiscoveryTestPipeline(t, discoverer)
+	decisions, err := jobmgrdiscovery.NewDecisionIndex(
+		jobmgrdiscovery.DecisionConfig{
+			Generation: 1,
+			Commands:   discoveryTestCommands{},
+			Plan: func(
+				jobmgrdiscovery.DiscoveredChange,
+			) (jobmgr.WorkPlan, error) {
+				return jobmgr.WorkPlan{}, nil
+			},
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tasks, err := lifecycle.NewTaskSupervisor(frames)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := lifecycle.NewPipelineLongLivedPlan(
+		[]string{"provider"},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	admission := lifecycle.NewAdmissionLedger()
+	requested := admission.RequestOrdinary(
+		1,
+		lifecycle.AdmissionLaneRef{Slot: 1, Generation: 1},
+		plan.Bytes()+lifecycle.TaskChildExecutionBytes,
+	)
+	if requested.Rejected != nil {
+		t.Fatal(requested.Rejected)
+	}
+	var grants [4]lifecycle.AdmissionGrant
+	count, _, err := admission.TakeGrants(1, &grants)
+	if err != nil || count != 1 || grants[0].Ref != requested.Ref {
+		t.Fatalf(
+			"admission grant count=%d grant=%+v err=%v",
+			count,
+			grants[0],
+			err,
+		)
+	}
+	identity := lifecycle.ResourceIdentity{
+		ID: discoveryResourceID, Generation: 1,
+	}
+	permit, err := tasks.IssueLongLivedPermit(
+		admission,
+		requested.Ref,
+		identity,
+		plan,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	prepared, err := newPreparedDiscovery(
+		pipeline,
+		decisions,
+		tasks,
+		identity,
+		permit,
+		func(error) {},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return prepared, admission, requested.Ref
+}
+
+func newDiscoveryTestPipeline(
+	t *testing.T,
+	discoverer agentdiscovery.Discoverer,
+) *agentdiscovery.PipelineGeneration {
+	t.Helper()
+	catalog, err := agentdiscovery.NewProviderCatalog(
+		[]agentdiscovery.ProviderFactory{
+			agentdiscovery.NewProviderFactory(
+				"provider",
+				func(agentdiscovery.BuildContext) (
+					agentdiscovery.Discoverer,
+					bool,
+					error,
+				) {
+					return discoverer, true, nil
+				},
+			),
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pipeline, err := agentdiscovery.NewPipelineGeneration(
+		agentdiscovery.PipelineConfig{
+			BuildContext: agentdiscovery.BuildContext{
+				Registry: confgroup.Registry{"module": {}},
+			},
+			Providers: catalog,
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return pipeline
+}
+
+type publicationTestDiscoverer struct {
+	entered chan<- struct{}
+	groups  []*confgroup.Group
+}
+
+func (discoverer publicationTestDiscoverer) Run(
+	ctx context.Context,
+	out chan<- []*confgroup.Group,
+) {
+	if discoverer.entered != nil {
+		close(discoverer.entered)
+	}
+	if discoverer.groups != nil {
+		select {
+		case <-ctx.Done():
+			return
+		case out <- discoverer.groups:
+		}
+	}
+	<-ctx.Done()
+}
+
+type discoveryTestCommands struct{}
+
+func (discoveryTestCommands) SubmitPreparedAndWait(
+	context.Context,
+	jobmgr.Request,
+	jobmgr.WorkPlan,
+) error {
+	return nil
 }

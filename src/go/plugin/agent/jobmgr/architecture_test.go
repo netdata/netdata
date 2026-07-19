@@ -600,6 +600,59 @@ func TestProductionCompositionConstructsOneSecretAuthoritySet(
 	}
 }
 
+func TestProductionCompositionConstructsOneDiscoveryAuthoritySet(
+	t *testing.T,
+) {
+	root := filepath.Clean(
+		filepath.Join(jobmgrSourceRoot(t), "../../.."),
+	)
+	files, err := productionGoFiles(
+		filepath.Join(
+			root,
+			"plugin/agent/jobmgr/composition",
+		),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	calls := map[string]struct {
+		importPath string
+		function   string
+		want       int
+	}{
+		"pipeline generation": {
+			importPath: pluginsImportRoot +
+				"plugin/agent/discovery",
+			function: "NewPipelineGeneration", want: 1,
+		},
+		"decision index": {
+			importPath: jobmgrImportPath + "/discovery",
+			function:   "NewDecisionIndex", want: 1,
+		},
+	}
+	for name, call := range calls {
+		t.Run(name, func(t *testing.T) {
+			got, err := countImportedCalls(
+				files,
+				call.importPath,
+				call.function,
+			)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got != call.want {
+				t.Fatalf(
+					"%s.%s calls=%d want=%d",
+					call.importPath,
+					call.function,
+					got,
+					call.want,
+				)
+			}
+		})
+	}
+}
+
 func TestProductionConstructionGuardRejectsAdversarialSources(t *testing.T) {
 	tests := map[string]struct {
 		source   string

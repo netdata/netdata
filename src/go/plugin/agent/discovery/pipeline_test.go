@@ -80,6 +80,17 @@ func TestPipelineGenerationConstruction(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		"provider build panic": {
+			catalog: []ProviderFactory{
+				NewProviderFactory(
+					"panicked",
+					func(BuildContext) (Discoverer, bool, error) {
+						panic("build panic")
+					},
+				),
+			},
+			wantErr: true,
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {

@@ -60,7 +60,10 @@ func NewPipelineGeneration(
 				"discovery pipeline: frozen provider disappeared",
 			)
 		}
-		discoverer, enabled, err := factory.Build(config.BuildContext)
+		discoverer, enabled, err := buildPipelineProvider(
+			factory,
+			config.BuildContext,
+		)
 		if err != nil {
 			return nil, fmt.Errorf(
 				"discovery pipeline provider %q: %w",
@@ -90,6 +93,27 @@ func NewPipelineGeneration(
 		)
 	}
 	return generation, nil
+}
+
+func buildPipelineProvider(
+	factory ProviderFactory,
+	ctx BuildContext,
+) (
+	discoverer Discoverer,
+	enabled bool,
+	err error,
+) {
+	defer func() {
+		if recovered := recover(); recovered != nil {
+			discoverer = nil
+			enabled = false
+			err = fmt.Errorf(
+				"provider factory panic: %v",
+				recovered,
+			)
+		}
+	}()
+	return factory.Build(ctx)
 }
 
 func (generation *PipelineGeneration) ProviderNames() []string {

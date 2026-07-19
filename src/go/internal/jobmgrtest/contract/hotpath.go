@@ -361,6 +361,7 @@ var bmM004HotpathRows = [...]HotpathGate{
 		Tests: []string{
 			"TestDecisionIndexAcknowledgesSelectionAndFallback",
 			"TestDecisionIndexFailureKeepsLastAcknowledgedSelection",
+			"TestDecisionIndexReconcilesOnlyChangedSourceRecords",
 			"TestDecisionIndexHasNoFixedPopulationCeiling",
 		},
 		Benchmark: "BenchmarkBDecisionIndexApply",
