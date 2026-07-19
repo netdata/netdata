@@ -496,6 +496,8 @@ endif()
 
 set(PKG_FILES_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")
 
+include(NetdataOSRelease)
+
 if(ENABLE_PLUGIN_EBPF)
         include(NetdataLibBPF)
         include(NetdataEBPFCORE)
@@ -4192,11 +4194,19 @@ install(FILES
         COMPONENT netdata
         DESTINATION usr/lib/netdata/system/systemd/tmpfiles)
 
+# RPM distros ship systemd units in %{_unitdir} (/usr/lib/systemd/system);
+# the DEB layout (and the historical default) uses /lib/systemd/system.
+if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+        set(NETDATA_SYSTEMD_UNIT_DEST "usr/lib/systemd/system")
+else()
+        set(NETDATA_SYSTEMD_UNIT_DEST "lib/systemd/system")
+endif()
+
 if(BUILD_FOR_PACKAGING)
         install(FILES
                 ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
                 COMPONENT netdata
-                DESTINATION lib/systemd/system)
+                DESTINATION ${NETDATA_SYSTEMD_UNIT_DEST})
         install(FILES
                 ${CMAKE_BINARY_DIR}/system/systemd/sysusers/netdata.conf
                 COMPONENT user
@@ -4213,6 +4223,13 @@ if(BUILD_FOR_PACKAGING)
                 COMPONENT netdata
                 DESTINATION usr/lib/systemd/journald@netdata.conf.d
                 RENAME netdata.conf)
+
+        if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+                install(FILES
+                        system/systemd/50-netdata.preset
+                        COMPONENT netdata
+                        DESTINATION usr/lib/systemd/system-preset)
+        endif()
 endif()
 
 install(FILES
@@ -4244,7 +4261,7 @@ endif()
 #
 # misc files
 #
-if(BUILD_FOR_PACKAGING)
+if(BUILD_FOR_PACKAGING AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
         install(FILES
                 ${PKG_FILES_PATH}/deb/netdata/etc/default/netdata
                 COMPONENT netdata
@@ -4254,6 +4271,28 @@ if(BUILD_FOR_PACKAGING)
                 ${PKG_FILES_PATH}/deb/netdata/etc/init.d/netdata
                 COMPONENT netdata
                 DESTINATION etc/init.d)
+endif()
+
+if(BUILD_FOR_PACKAGING AND NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+        # The spec's %install stages these RPM-only files; no other install
+        # rule covers them.
+        install(PROGRAMS
+                packaging/installer/netdata-uninstaller.sh
+                COMPONENT netdata
+                DESTINATION usr/libexec/netdata
+                PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ GROUP_EXECUTE)
+
+        # %doc README.md equivalent; openSUSE keeps package docs under
+        # /usr/share/doc/packages.
+        if(NETDATA_DISTRO_SUSE)
+                set(NETDATA_RPM_DOC_DIR "usr/share/doc/packages/netdata")
+        else()
+                set(NETDATA_RPM_DOC_DIR "usr/share/doc/netdata")
+        endif()
+        install(FILES
+                README.md
+                COMPONENT netdata
+                DESTINATION ${NETDATA_RPM_DOC_DIR})
 endif()
 
 if(NOT OS_WINDOWS)
@@ -4293,11 +4332,11 @@ if(NOT OS_WINDOWS)
     install(FILES
             ${CMAKE_BINARY_DIR}/system/systemd/netdata-updater.service
             COMPONENT netdata
-            DESTINATION lib/systemd/system)
+            DESTINATION ${NETDATA_SYSTEMD_UNIT_DEST})
     install(FILES
             system/systemd/netdata-updater.timer
             COMPONENT netdata
-            DESTINATION lib/systemd/system)
+            DESTINATION ${NETDATA_SYSTEMD_UNIT_DEST})
   endif()
 endif()
 
