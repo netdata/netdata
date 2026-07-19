@@ -26,8 +26,8 @@ pub(crate) fn append_v9_records(
                     let mut rec = base_record("v9", source);
                     let mut sampler_id: Option<u64> = None;
                     let mut observed_sampling_rate: Option<u64> = None;
-                    let mut first_switched_millis: Option<u64> = None;
-                    let mut last_switched_millis: Option<u64> = None;
+                    let mut flow_start_usec: Option<u64> = None;
+                    let mut flow_end_usec: Option<u64> = None;
                     let mut decap_required = false;
                     let mut decap_ok = false;
                     let mut counters = OrdinaryCounterSelector::default();
@@ -61,11 +61,33 @@ pub(crate) fn append_v9_records(
                             V9Field::SamplingInterval | V9Field::FlowSamplerRandomInterval => {
                                 observed_sampling_rate = value_str.parse::<u64>().ok();
                             }
-                            V9Field::FirstSwitched | V9Field::FlowStartMilliseconds => {
-                                first_switched_millis = value_str.parse::<u64>().ok();
+                            V9Field::FirstSwitched => {
+                                flow_start_usec = value_str.parse::<u64>().ok().map(|value| {
+                                    netflow_v9_uptime_millis_to_absolute_usec(
+                                        system_init_usec,
+                                        value,
+                                    )
+                                });
                             }
-                            V9Field::LastSwitched | V9Field::FlowEndMilliseconds => {
-                                last_switched_millis = value_str.parse::<u64>().ok();
+                            V9Field::LastSwitched => {
+                                flow_end_usec = value_str.parse::<u64>().ok().map(|value| {
+                                    netflow_v9_uptime_millis_to_absolute_usec(
+                                        system_init_usec,
+                                        value,
+                                    )
+                                });
+                            }
+                            V9Field::FlowStartMilliseconds => {
+                                flow_start_usec = value_str
+                                    .parse::<u64>()
+                                    .ok()
+                                    .map(|value| value.saturating_mul(USEC_PER_MILLISECOND));
+                            }
+                            V9Field::FlowEndMilliseconds => {
+                                flow_end_usec = value_str
+                                    .parse::<u64>()
+                                    .ok()
+                                    .map(|value| value.saturating_mul(USEC_PER_MILLISECOND));
                             }
                             _ => {}
                         }
@@ -106,16 +128,8 @@ pub(crate) fn append_v9_records(
                     if rec.flows == 0 {
                         rec.flows = 1;
                     }
-                    rec.flow_start_usec = first_switched_millis
-                        .map(|value| {
-                            netflow_v9_uptime_millis_to_absolute_usec(system_init_usec, value)
-                        })
-                        .unwrap_or(0);
-                    rec.flow_end_usec = last_switched_millis
-                        .map(|value| {
-                            netflow_v9_uptime_millis_to_absolute_usec(system_init_usec, value)
-                        })
-                        .unwrap_or(0);
+                    rec.flow_start_usec = flow_start_usec.unwrap_or(0);
+                    rec.flow_end_usec = flow_end_usec.unwrap_or(0);
                     finalize_record(&mut rec);
                     let first_switched_usec =
                         (rec.flow_start_usec != 0).then_some(rec.flow_start_usec);

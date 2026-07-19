@@ -157,8 +157,8 @@ Static-network configuration can override `SRC_MASK` / `DST_MASK` and `SRC_AS` /
 
 | Field | Type | Description |
 |---|---|---|
-| `FLOW_START_USEC` | uint64 | Microseconds since epoch. From v5/v7 first-switched + sysUptime; from v9 first-switched normalised against system init time; from IPFIX `flowStartMicroseconds` family. Not populated for sFlow. |
-| `FLOW_END_USEC` | uint64 | Microseconds since epoch. Same sources. Not populated for sFlow. |
+| `FLOW_START_USEC` | uint64 | Microseconds since epoch. From v5/v7 first-switched + sysUptime; from v9 `FIRST_SWITCHED` + sysUptime or absolute `flowStartMilliseconds`; from the IPFIX flow-start time family. Not populated for sFlow. |
+| `FLOW_END_USEC` | uint64 | Microseconds since epoch. From v5/v7 last-switched + sysUptime; from v9 `LAST_SWITCHED` + sysUptime or absolute `flowEndMilliseconds`; from the IPFIX flow-end time family. Not populated for sFlow. |
 | `OBSERVATION_TIME_MILLIS` | uint64 | NetFlow v9 observation time (`ObservationTimeMilliseconds`, IE 323). IPFIX observation-time fields are not exposed. |
 
 ## Geolocation (enrichment-only)
@@ -296,8 +296,8 @@ Column legend:
 | `EXPORTER_SITE` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | `metadata_static.exporters.<ip>.site`. Classifiers may fill |
 | `EXPORTER_TENANT` | string | — | — | — | — | — | enrichment | all | facet, group-by, filter | `metadata_static.exporters.<ip>.tenant`. Classifiers may fill |
 | `FLOWS` | uint64 | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | metric, filter | Always 1 for raw records; sums during rollup aggregation |
-| `FLOW_END_USEC` | uint64 | ✓ | ✓ | ◐ | ◐ | — | decoder | raw | hidden | v5/v7 from header `sysUpTime` + `LastSwitched`. v9 from `LastSwitched`/`flowEndMilliseconds` normalised against `system_init`. IPFIX from `flowEndMilliseconds` family. Not populated for sFlow |
-| `FLOW_START_USEC` | uint64 | ✓ | ✓ | ◐ | ◐ | — | decoder | raw | hidden | Same sources as `FLOW_END_USEC`. Not populated for sFlow |
+| `FLOW_END_USEC` | uint64 | ✓ | ✓ | ◐ | ◐ | — | decoder | raw | hidden | v5/v7 from header `sysUpTime` + `LastSwitched`. v9 `LastSwitched` is relative to system init; `flowEndMilliseconds` is an absolute Unix timestamp. IPFIX uses the flow-end time family. Not populated for sFlow |
+| `FLOW_START_USEC` | uint64 | ✓ | ✓ | ◐ | ◐ | — | decoder | raw | hidden | v5/v7 from header `sysUpTime` + `FirstSwitched`. v9 `FirstSwitched` is relative to system init; `flowStartMilliseconds` is an absolute Unix timestamp. IPFIX uses the flow-start time family. Not populated for sFlow |
 | `FLOW_VERSION` | string | ✓ | ✓ | ✓ | ✓ | ✓ | decoder | all | facet, group-by, filter | One of `v5`, `v7`, `v9`, `ipfix`, `sflow` |
 | `FORWARDING_STATUS` | uint8 | — | — | ◐ | ◐ | ◐ | decoder | all | facet, group-by, filter | v9/IPFIX IE 89; IPFIX also from Juniper PEN 2636 `commonPropertiesId`. sFlow synthesises `128` (dropped) when `output_format` is `discarded` |
 | `ICMPV4_CODE` | uint8 | — | — | ◐ | ◐ | ◐ | decoder | all | facet, group-by, filter | IPFIX IE 177 `IcmpCodeIpv4` + IE 32 low byte. v9 IE 178 `IcmpCodeValue` + IE 32. sFlow from decoded ICMP header |

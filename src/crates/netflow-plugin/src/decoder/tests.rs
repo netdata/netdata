@@ -4,7 +4,7 @@ use super::{
     DecodeStats, DecodedFlow, DecoderStateNamespace, ETYPE_IPV4, ETYPE_IPV6, FlowDecoders,
     FlowFields, IPFIX_FIELD_DATALINK_FRAME_SECTION, IPFIX_FIELD_DIRECTION, IPFIX_FIELD_INPUT_SNMP,
     IPFIX_SET_ID_TEMPLATE, MAX_DECODER_STATE_PAYLOAD_LEN, SamplingState, TimestampSource,
-    append_mpls_label, apply_icmp_port_fallback, apply_v9_special_mappings,
+    USEC_PER_MILLISECOND, append_mpls_label, apply_icmp_port_fallback, apply_v9_special_mappings,
     decode_persisted_namespace_file, default_exporter_name, field_tracks_presence,
     finalize_canonical_flow_fields, normalize_direction_value, to_field_token, xxhash64,
 };
@@ -2002,8 +2002,8 @@ fn akvorado_icmp_fixture_full_rows_match_expected() {
                 ("DST_PORT", "32768"),
                 ("ICMPV6_TYPE", "128"),
                 ("ICMPV6_CODE", "0"),
-                ("FLOW_START_USEC", "3371735984147000"),
-                ("FLOW_END_USEC", "3371735984147000"),
+                ("FLOW_START_USEC", "1685867993216000"),
+                ("FLOW_END_USEC", "1685867993216000"),
                 ("IPTOS", "0"),
                 ("TCP_FLAGS", "0"),
                 ("DIRECTION", DIRECTION_INGRESS),
@@ -2023,8 +2023,8 @@ fn akvorado_icmp_fixture_full_rows_match_expected() {
                 ("DST_PORT", "33024"),
                 ("ICMPV6_TYPE", "129"),
                 ("ICMPV6_CODE", "0"),
-                ("FLOW_START_USEC", "3371735984147000"),
-                ("FLOW_END_USEC", "3371735984147000"),
+                ("FLOW_START_USEC", "1685867993216000"),
+                ("FLOW_END_USEC", "1685867993216000"),
                 ("IPTOS", "0"),
                 ("TCP_FLAGS", "0"),
                 ("DIRECTION", DIRECTION_INGRESS),
@@ -2044,8 +2044,8 @@ fn akvorado_icmp_fixture_full_rows_match_expected() {
                 ("DST_PORT", "2048"),
                 ("ICMPV4_TYPE", "8"),
                 ("ICMPV4_CODE", "0"),
-                ("FLOW_START_USEC", "3371735985965000"),
-                ("FLOW_END_USEC", "3371735985965000"),
+                ("FLOW_START_USEC", "1685867995034000"),
+                ("FLOW_END_USEC", "1685867995034000"),
                 ("IPTOS", "0"),
                 ("TCP_FLAGS", "0"),
                 ("DIRECTION", DIRECTION_INGRESS),
@@ -2065,8 +2065,8 @@ fn akvorado_icmp_fixture_full_rows_match_expected() {
                 ("DST_PORT", "0"),
                 ("ICMPV4_TYPE", "0"),
                 ("ICMPV4_CODE", "0"),
-                ("FLOW_START_USEC", "3371735985965000"),
-                ("FLOW_END_USEC", "3371735985965000"),
+                ("FLOW_START_USEC", "1685867995034000"),
+                ("FLOW_END_USEC", "1685867995034000"),
                 ("IPTOS", "0"),
                 ("TCP_FLAGS", "0"),
                 ("DIRECTION", DIRECTION_INGRESS),
@@ -2804,6 +2804,59 @@ fn akvorado_timestamp_source_first_switched_uses_ipfix_flow_start_usec() {
         Some(1_699_893_330_381_000),
         "ipfix first_switched mode must use flowStartMilliseconds when available"
     );
+}
+
+#[test]
+fn v9_epoch_millisecond_fields_are_absolute_in_both_template_orders() {
+    const TEMPLATE_ID: u16 = 256;
+    const OBSERVATION_DOMAIN_ID: u32 = 42;
+    const FLOW_START_MILLIS: u64 = 1_699_893_330_381;
+    const FLOW_END_MILLIS: u64 = 1_699_893_331_729;
+
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 2055);
+    for fields in [
+        vec![
+            (152, FLOW_START_MILLIS.to_be_bytes().to_vec()),
+            (153, FLOW_END_MILLIS.to_be_bytes().to_vec()),
+        ],
+        vec![
+            (153, FLOW_END_MILLIS.to_be_bytes().to_vec()),
+            (152, FLOW_START_MILLIS.to_be_bytes().to_vec()),
+        ],
+    ] {
+        let (template, data) =
+            synthetic_v9_raw_field_packets(TEMPLATE_ID, OBSERVATION_DOMAIN_ID, &fields);
+        let mut decoders = FlowDecoders::with_protocols_decap_and_timestamp(
+            true,
+            true,
+            true,
+            true,
+            true,
+            DecapsulationMode::None,
+            TimestampSource::NetflowFirstSwitched,
+        );
+
+        let template_batch = decoders.decode_udp_payload(source, &template);
+        assert_eq!(template_batch.stats.parse_errors, 0);
+        assert_eq!(template_batch.stats.template_errors, 0);
+
+        let decoded = decoders.decode_udp_payload_at(source, &data, 1);
+        assert_eq!(decoded.stats.parse_errors, 0);
+        assert_eq!(decoded.stats.template_errors, 0);
+        assert_eq!(decoded.flows.len(), 1);
+        assert_eq!(
+            decoded.flows[0].record.flow_start_usec,
+            FLOW_START_MILLIS * USEC_PER_MILLISECOND
+        );
+        assert_eq!(
+            decoded.flows[0].record.flow_end_usec,
+            FLOW_END_MILLIS * USEC_PER_MILLISECOND
+        );
+        assert_eq!(
+            decoded.flows[0].source_realtime_usec,
+            Some(FLOW_START_MILLIS * USEC_PER_MILLISECOND)
+        );
+    }
 }
 
 #[test]
