@@ -194,7 +194,7 @@ impl IngestService {
             }
         };
 
-        let mut decoders = FlowDecoders::with_protocols_decap_and_timestamp(
+        let mut decoders = FlowDecoders::with_protocols_decap_timestamp_and_packet_limit(
             cfg.protocols.v5,
             cfg.protocols.v7,
             cfg.protocols.v9,
@@ -202,6 +202,7 @@ impl IngestService {
             cfg.protocols.sflow,
             decapsulation_mode,
             timestamp_source,
+            cfg.listener.max_packet_size,
         );
         let enricher = FlowEnricher::from_config(&cfg.enrichment)
             .context("failed to initialize netflow enrichment pipeline")?;

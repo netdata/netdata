@@ -26,7 +26,7 @@ impl FlowDecoders {
 
         // Validate replay into a fresh parser first so restore failures do not
         // partially mutate the live parser or sampling state.
-        let mut validation_parser = super::init::new_netflow_parser();
+        let mut validation_parser = super::init::new_netflow_parser(self.max_records_per_flowset);
         Self::replay_namespace_packets_into(&mut validation_parser, key, &namespace, source)?;
 
         self.replay_namespace_packets(key, &namespace, source)?;

@@ -18,7 +18,7 @@ use netflow_parser::variable_versions::v9::{
     OptionsTemplates as NetflowV9OptionsTemplates, Template as NetflowV9Template,
     TemplateField as NetflowV9TemplateField, Templates as NetflowV9Templates, V9,
 };
-use netflow_parser::{DataNumber, FieldValue, NetflowPacket, ParseResult, V9Field};
+use netflow_parser::{DataNumber, FieldValue, NetflowPacket, NetflowParser, ParseResult, V9Field};
 use serde::{Deserialize, Serialize};
 use sflow_parser::models::{
     Address, FlowData, FlowRecord as SFlowRecord, HeaderProtocol, SFlowDatagram, SampleData,

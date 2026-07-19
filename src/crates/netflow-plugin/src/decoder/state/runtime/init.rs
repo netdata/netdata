@@ -1,7 +1,14 @@
 use super::*;
 
-pub(super) fn new_netflow_parser() -> AutoScopedParser {
-    AutoScopedParser::new()
+pub(super) fn new_netflow_parser(max_records_per_flowset: usize) -> AutoScopedParser {
+    assert!(
+        max_records_per_flowset > 0,
+        "maximum records per flowset must be positive"
+    );
+    AutoScopedParser::try_with_builder(
+        NetflowParser::builder().with_max_records_per_flowset(max_records_per_flowset),
+    )
+    .expect("positive flowset record limit must be a valid parser configuration")
 }
 
 pub(crate) struct FlowDecoders {
@@ -20,6 +27,7 @@ pub(crate) struct FlowDecoders {
     pub(crate) enable_v9: bool,
     pub(crate) enable_ipfix: bool,
     pub(crate) enable_sflow: bool,
+    pub(crate) max_records_per_flowset: usize,
 }
 
 impl Default for FlowDecoders {
@@ -89,8 +97,30 @@ impl FlowDecoders {
         decapsulation_mode: DecapsulationMode,
         timestamp_source: TimestampSource,
     ) -> Self {
+        Self::with_protocols_decap_timestamp_and_packet_limit(
+            enable_v5,
+            enable_v7,
+            enable_v9,
+            enable_ipfix,
+            enable_sflow,
+            decapsulation_mode,
+            timestamp_source,
+            u16::MAX as usize,
+        )
+    }
+
+    pub(crate) fn with_protocols_decap_timestamp_and_packet_limit(
+        enable_v5: bool,
+        enable_v7: bool,
+        enable_v9: bool,
+        enable_ipfix: bool,
+        enable_sflow: bool,
+        decapsulation_mode: DecapsulationMode,
+        timestamp_source: TimestampSource,
+        max_packet_size: usize,
+    ) -> Self {
         Self {
-            netflow: new_netflow_parser(),
+            netflow: new_netflow_parser(max_packet_size),
             sampling: SamplingState::default(),
             decoder_state_namespaces: HashMap::new(),
             loaded_decoder_namespaces: HashSet::new(),
@@ -105,6 +135,10 @@ impl FlowDecoders {
             enable_v9,
             enable_ipfix,
             enable_sflow,
+            // Every data record consumes at least one byte. The listener's
+            // bounded datagram size is therefore also a safe upper bound on
+            // records in one flowset.
+            max_records_per_flowset: max_packet_size,
         }
     }
 
@@ -125,7 +159,7 @@ impl FlowDecoders {
 
     #[cfg(test)]
     pub(crate) fn set_parser_source_limit_for_test(&mut self, max_sources: usize) {
-        self.netflow = new_netflow_parser()
+        self.netflow = new_netflow_parser(self.max_records_per_flowset)
             .with_max_sources(max_sources)
             .expect("test parser source limit must be nonzero");
     }

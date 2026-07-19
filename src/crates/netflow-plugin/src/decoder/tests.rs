@@ -3566,6 +3566,78 @@ fn persisted_decoder_state_rejects_corrupt_payload_with_valid_hash() {
     );
 }
 
+#[test]
+fn v9_flowset_parses_more_than_parser_default_when_datagram_allows_it() {
+    const RECORD_COUNT: usize = 1_100;
+    const TEMPLATE_ID: u16 = 256;
+    const SOURCE_ID: u32 = 42;
+
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 2055);
+    let (template, data) =
+        synthetic_v9_one_byte_record_packets(TEMPLATE_ID, SOURCE_ID, RECORD_COUNT);
+    let mut decoders = FlowDecoders::with_protocols_decap_timestamp_and_packet_limit(
+        true,
+        true,
+        true,
+        true,
+        true,
+        DecapsulationMode::None,
+        TimestampSource::Input,
+        data.len(),
+    );
+
+    let template_batch = decoders.decode_udp_payload(source, &template);
+    assert_eq!(template_batch.stats.parse_errors, 0);
+    assert_eq!(template_batch.stats.template_errors, 0);
+
+    let data_batch = decoders.decode_udp_payload(source, &data);
+    assert_eq!(data_batch.stats.parse_errors, 0);
+    assert_eq!(data_batch.stats.template_errors, 0);
+    assert_eq!(data_batch.flows.len(), RECORD_COUNT);
+    assert!(
+        data_batch
+            .flows
+            .iter()
+            .all(|flow| flow.record.protocol == 6)
+    );
+}
+
+#[test]
+fn ipfix_flowset_parses_more_than_parser_default_when_datagram_allows_it() {
+    const RECORD_COUNT: usize = 1_100;
+    const TEMPLATE_ID: u16 = 256;
+    const OBSERVATION_DOMAIN_ID: u32 = 42;
+
+    let source = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 2055);
+    let (template, data) =
+        synthetic_ipfix_one_byte_record_packets(TEMPLATE_ID, OBSERVATION_DOMAIN_ID, RECORD_COUNT);
+    let mut decoders = FlowDecoders::with_protocols_decap_timestamp_and_packet_limit(
+        true,
+        true,
+        true,
+        true,
+        true,
+        DecapsulationMode::None,
+        TimestampSource::Input,
+        data.len(),
+    );
+
+    let template_batch = decoders.decode_udp_payload(source, &template);
+    assert_eq!(template_batch.stats.parse_errors, 0);
+    assert_eq!(template_batch.stats.template_errors, 0);
+
+    let data_batch = decoders.decode_udp_payload(source, &data);
+    assert_eq!(data_batch.stats.parse_errors, 0);
+    assert_eq!(data_batch.stats.template_errors, 0);
+    assert_eq!(data_batch.flows.len(), RECORD_COUNT);
+    assert!(
+        data_batch
+            .flows
+            .iter()
+            .all(|flow| flow.record.protocol == 6)
+    );
+}
+
 const TEST_INPUT_REALTIME_USEC: u64 = 1_700_000_000_000_000;
 
 fn decode_fixture_sequence(fixtures: &[&str]) -> Vec<DecodedFlow> {
@@ -4050,6 +4122,35 @@ fn synthetic_v9_raw_field_packets(
     (template, data)
 }
 
+fn synthetic_v9_one_byte_record_packets(
+    template_id: u16,
+    source_id: u32,
+    record_count: usize,
+) -> (Vec<u8>, Vec<u8>) {
+    let mut template_set = Vec::with_capacity(12);
+    template_set.extend_from_slice(&0_u16.to_be_bytes());
+    template_set.extend_from_slice(&12_u16.to_be_bytes());
+    template_set.extend_from_slice(&template_id.to_be_bytes());
+    template_set.extend_from_slice(&1_u16.to_be_bytes());
+    template_set.extend_from_slice(&4_u16.to_be_bytes());
+    template_set.extend_from_slice(&1_u16.to_be_bytes());
+    let mut template = synthetic_v9_header(1_700_000_000, source_id, 1);
+    template.extend_from_slice(&template_set);
+
+    let padding = (4 - (record_count % 4)) % 4;
+    let data_len = 4 + record_count + padding;
+    assert!(data_len <= u16::MAX as usize);
+    let mut data_set = Vec::with_capacity(data_len);
+    data_set.extend_from_slice(&template_id.to_be_bytes());
+    data_set.extend_from_slice(&(data_len as u16).to_be_bytes());
+    data_set.resize(4 + record_count, 6);
+    data_set.resize(data_len, 0);
+    let mut data = synthetic_v9_header(1_700_000_001, source_id, 2);
+    data.extend_from_slice(&data_set);
+
+    (template, data)
+}
+
 fn synthetic_ipfix_counter_packets(
     template_id: u16,
     observation_domain_id: u32,
@@ -4060,6 +4161,45 @@ fn synthetic_ipfix_counter_packets(
         .map(|(field, value)| (*field, value.to_be_bytes().to_vec()))
         .collect::<Vec<_>>();
     synthetic_ipfix_raw_field_packets(template_id, observation_domain_id, &raw_fields)
+}
+
+fn synthetic_ipfix_one_byte_record_packets(
+    template_id: u16,
+    observation_domain_id: u32,
+    record_count: usize,
+) -> (Vec<u8>, Vec<u8>) {
+    let mut template_set = Vec::with_capacity(12);
+    template_set.extend_from_slice(&IPFIX_SET_ID_TEMPLATE.to_be_bytes());
+    template_set.extend_from_slice(&12_u16.to_be_bytes());
+    template_set.extend_from_slice(&template_id.to_be_bytes());
+    template_set.extend_from_slice(&1_u16.to_be_bytes());
+    template_set.extend_from_slice(&4_u16.to_be_bytes());
+    template_set.extend_from_slice(&1_u16.to_be_bytes());
+    let mut template = synthetic_ipfix_header(
+        (16 + template_set.len()) as u16,
+        1_700_000_000,
+        1,
+        observation_domain_id,
+    );
+    template.extend_from_slice(&template_set);
+
+    let padding = (4 - (record_count % 4)) % 4;
+    let data_len = 4 + record_count + padding;
+    assert!(data_len <= u16::MAX as usize);
+    let mut data_set = Vec::with_capacity(data_len);
+    data_set.extend_from_slice(&template_id.to_be_bytes());
+    data_set.extend_from_slice(&(data_len as u16).to_be_bytes());
+    data_set.resize(4 + record_count, 6);
+    data_set.resize(data_len, 0);
+    let mut data = synthetic_ipfix_header(
+        (16 + data_set.len()) as u16,
+        1_700_000_001,
+        2,
+        observation_domain_id,
+    );
+    data.extend_from_slice(&data_set);
+
+    (template, data)
 }
 
 fn synthetic_ipfix_raw_field_packets(
