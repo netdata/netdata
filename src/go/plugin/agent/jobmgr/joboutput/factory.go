@@ -284,7 +284,11 @@ func callPrepareHandlers(
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			handlers = nil
-			err = fmt.Errorf("job output: handler preparation panic: %v", recovered)
+			err = fmt.Errorf(
+				"%w in handler preparation: %v",
+				lifecycle.ErrTaskPanic,
+				recovered,
+			)
 		}
 	}()
 	return hooks.Prepare(published)
@@ -318,7 +322,11 @@ func (factory *Factory) buildV1(
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			job = nil
-			err = fmt.Errorf("job output: V1 construction panic: %v", recovered)
+			err = fmt.Errorf(
+				"%w in V1 construction: %v",
+				lifecycle.ErrTaskPanic,
+				recovered,
+			)
 		}
 		if err != nil && module != nil {
 			err = errors.Join(
@@ -367,7 +375,11 @@ func (factory *Factory) buildV2(
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			job = nil
-			err = fmt.Errorf("job output: V2 construction panic: %v", recovered)
+			err = fmt.Errorf(
+				"%w in V2 construction: %v",
+				lifecycle.ErrTaskPanic,
+				recovered,
+			)
 		}
 		if err != nil && module != nil {
 			err = errors.Join(

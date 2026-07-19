@@ -69,6 +69,7 @@ func (m *mockRuntimeComponentService) UnregisterComponent(name string) {
 }
 
 func (m *mockRuntimeComponentService) QuarantineComponent(_ string) {}
+func (m *mockRuntimeComponentService) FinalizeComponent(_ string)   {}
 
 func (m *mockRuntimeComponentService) RegisterProducer(_ string, _ func() error) error {
 	return nil

@@ -123,6 +123,28 @@ func (s *Service) QuarantineComponent(name string) {
 	s.registry.remove(name)
 }
 
+// FinalizeComponent emits one final sample and establishes the same output
+// barrier as QuarantineComponent.
+func (s *Service) FinalizeComponent(name string) {
+	if s == nil {
+		return
+	}
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return
+	}
+
+	s.mu.Lock()
+	job := s.job
+	s.mu.Unlock()
+
+	if job != nil {
+		job.finalizeComponent(name)
+		return
+	}
+	s.registry.remove(name)
+}
+
 // Stop terminates the runtime emitter job. Calling Stop multiple times is safe.
 func (s *Service) Stop() {
 	if s == nil {

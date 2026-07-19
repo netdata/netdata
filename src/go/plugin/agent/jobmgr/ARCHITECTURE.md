@@ -249,7 +249,10 @@ One component, `jobmgr.runtime`, projects current production concepts:
 Mutation owners write metrics-owned atomics. The runtime producer snapshots
 those projections into the metrics store; it never reads or mutates
 KernelLoop-private state. Registration occurs before external admission;
-unregistration occurs only after terminal run acknowledgement.
+terminal run acknowledgement unregisters the cadence producer, refreshes and
+synchronously emits the final projection, then removes the component behind
+an output barrier. No predecessor-generation sample can cross a successful
+HUP handoff.
 
 ## Static and behavioral proof
 

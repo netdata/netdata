@@ -508,22 +508,23 @@ func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
 		t.Fatal("FIFO parent did not enter apply")
 	}
 
-	if err := kernel.SubmitPrepared(
-		t.Context(),
-		Request{
-			UID:     "fifo-normal",
-			LaneKey: "job",
-			Source:  lifecycle.SourceJobManager,
-			Route:   "internal/test/fifo-normal",
-		},
-		compositeTestPlan("job", nil, func() {
-			mu.Lock()
-			applied = append(applied, "normal")
-			mu.Unlock()
-		}),
-	); err != nil {
-		t.Fatal(err)
-	}
+	normalDone := make(chan error, 1)
+	go func() {
+		normalDone <- kernel.SubmitPreparedAndWait(
+			t.Context(),
+			Request{
+				UID:     "fifo-normal",
+				LaneKey: "job",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "internal/test/fifo-normal",
+			},
+			compositeTestPlan("job", nil, func() {
+				mu.Lock()
+				applied = append(applied, "normal")
+				mu.Unlock()
+			}),
+		)
+	}()
 	close(submitChild)
 	waitForCompositeRecords(t, admission, 4)
 	close(blockerRelease)
@@ -543,6 +544,14 @@ func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
 		}
 	case <-time.After(time.Second):
 		t.Fatal("FIFO parent did not finish")
+	}
+	select {
+	case err := <-normalDone:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("ordinary target-lane operation did not finish")
 	}
 	mu.Lock()
 	got := append([]string(nil), applied...)

@@ -3398,12 +3398,6 @@ func (kernel *CommandKernel) sendDisposeAction(operation *commandOperation) {
 		kernel.run.Dirty(err)
 		return
 	}
-	if kernel.runtimeObserver != nil {
-		kernel.runtimeObserver.AddRuntimeCounter(
-			lifecycle.RuntimeCounterResultsDisposed,
-			1,
-		)
-	}
 	if err := kernel.tasks.SendAction(action); err != nil {
 		kernel.run.Dirty(err)
 	}

@@ -46,6 +46,10 @@ type Service interface {
 	// UnregisterComponent, which stops future snapshots but lets an
 	// in-progress tick finish and later emits removal-obsolete output.
 	QuarantineComponent(name string)
+	// FinalizeComponent synchronously emits the component's current Store
+	// state, then removes its registration and emission state. It returns only
+	// after no output from that component can reach the wire.
+	FinalizeComponent(name string)
 	RegisterProducer(name string, tickFn func() error) error
 	UnregisterProducer(name string)
 }

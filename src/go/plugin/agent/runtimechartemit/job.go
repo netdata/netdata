@@ -234,6 +234,55 @@ func (j *runtimeMetricsJob) quarantineComponent(name string) {
 	delete(j.components, name)
 }
 
+// finalizeComponent emits the current registration exactly once under the
+// tick barrier, then removes both registration and emitter state.
+func (j *runtimeMetricsJob) finalizeComponent(name string) {
+	j.tickMu.Lock()
+	defer j.tickMu.Unlock()
+	defer func() {
+		j.registry.remove(name)
+		delete(j.components, name)
+	}()
+
+	var spec *componentSpec
+	for _, candidate := range j.registry.snapshot() {
+		if candidate.Name == name {
+			current := candidate
+			spec = &current
+			break
+		}
+	}
+	if spec == nil {
+		return
+	}
+	step, buf, ok := j.prepareComponentStep(*spec, time.Now())
+	if !ok {
+		return
+	}
+	if buf != nil && buf.Len() > 0 {
+		if _, err := io.Copy(j.out, buf); err != nil {
+			step.attempt.Abort()
+			j.Warningf(
+				"runtime metrics component %q final output failed: %v",
+				name,
+				err,
+			)
+			return
+		}
+	}
+	if err := step.attempt.Commit(); err != nil {
+		j.Warningf(
+			"runtime metrics component %q final commit failed: %v",
+			name,
+			err,
+		)
+		return
+	}
+	if step.finalize != nil {
+		step.finalize()
+	}
+}
+
 func (j *runtimeMetricsJob) newComponentState(spec componentSpec) (*runtimeComponentState, error) {
 	engineLog := j.Logger.With(slog.String("runtime_component", spec.Name))
 	engine, err := chartengine.New(

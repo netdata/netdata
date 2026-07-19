@@ -233,17 +233,22 @@ func (metrics *runMetrics) register(service runtimecomp.Service) error {
 	); err != nil {
 		service.UnregisterComponent(runtimeComponentName)
 		return errors.Join(
-			errors.New("jobmgr runtime metrics: register age producer"),
+			errors.New("jobmgr runtime metrics: register projection producer"),
 			err,
 		)
 	}
 	return nil
 }
 
-func (metrics *runMetrics) unregister(service runtimecomp.Service) {
+func (metrics *runMetrics) unregister(service runtimecomp.Service) error {
 	if metrics == nil || service == nil {
-		return
+		return nil
 	}
 	service.UnregisterProducer(runtimeProducerName)
-	service.UnregisterComponent(runtimeComponentName)
+	if err := metrics.refreshProjection(); err != nil {
+		service.QuarantineComponent(runtimeComponentName)
+		return err
+	}
+	service.FinalizeComponent(runtimeComponentName)
+	return nil
 }

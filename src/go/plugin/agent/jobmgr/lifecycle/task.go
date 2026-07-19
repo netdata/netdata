@@ -1083,6 +1083,14 @@ func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slo
 			supervisor.acks <- ack
 			return
 		}
+		if action.Kind == TaskActionDispose &&
+			ack.Err == nil &&
+			supervisor.observer != nil {
+			supervisor.observer.AddRuntimeCounter(
+				RuntimeCounterResultsDisposed,
+				1,
+			)
+		}
 		supervisor.observeTaskPanic(ack.Err)
 		supervisor.acks <- ack
 	}

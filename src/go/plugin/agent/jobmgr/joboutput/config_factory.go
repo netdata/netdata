@@ -11,6 +11,7 @@ import (
 	"sync"
 
 	"github.com/netdata/netdata/go/plugins/logger"
+	"github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/lifecycle"
 	secretresolver "github.com/netdata/netdata/go/plugins/plugin/agent/secrets/resolver"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/collectorapi"
 	"github.com/netdata/netdata/go/plugins/plugin/framework/confgroup"
@@ -171,7 +172,8 @@ func (factory *ConfigModuleFactory) construct(
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf(
-				"job output: config-module construction panic: %v",
+				"%w in config-module construction: %v",
+				lifecycle.ErrTaskPanic,
 				recovered,
 			)
 		}

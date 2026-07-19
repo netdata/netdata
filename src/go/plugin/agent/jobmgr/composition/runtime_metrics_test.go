@@ -20,11 +20,12 @@ import (
 type runMetricsService struct {
 	mu sync.Mutex
 
-	components        []runtimecomp.ComponentConfig
-	componentRemovals []string
-	producers         map[string]func() error
-	producerRemovals  []string
-	producerErr       error
+	components         []runtimecomp.ComponentConfig
+	componentRemovals  []string
+	componentFinalized []string
+	producers          map[string]func() error
+	producerRemovals   []string
+	producerErr        error
 }
 
 func (service *runMetricsService) RegisterComponent(
@@ -43,6 +44,12 @@ func (service *runMetricsService) UnregisterComponent(name string) {
 }
 
 func (*runMetricsService) QuarantineComponent(string) {}
+
+func (service *runMetricsService) FinalizeComponent(name string) {
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	service.componentFinalized = append(service.componentFinalized, name)
+}
 
 func (service *runMetricsService) RegisterProducer(
 	name string,
@@ -92,6 +99,12 @@ func (service *runMetricsService) snapshot() (
 		service.producerRemovals...,
 	)
 	return components, componentRemovals, producers, producerRemovals
+}
+
+func (service *runMetricsService) finalized() []string {
+	service.mu.Lock()
+	defer service.mu.Unlock()
+	return append([]string(nil), service.componentFinalized...)
 }
 
 func TestRunMetricsProjection(t *testing.T) {
@@ -289,20 +302,35 @@ func TestRunGenerationRuntimeMetricsLifecycle(t *testing.T) {
 	if err := generation.Start(context.Background()); err != nil {
 		t.Fatal(err)
 	}
+	generation.metrics.AddRuntimeCounter(
+		lifecycle.RuntimeCounterDirtyRuns,
+		1,
+	)
 	generation.Stop()
 	if err := generation.Wait(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	_, removals, producers, producerRemovals = service.snapshot()
-	if len(removals) != 1 || removals[0] != runtimeComponentName ||
+	finalized := service.finalized()
+	if len(removals) != 0 ||
+		len(finalized) != 1 ||
+		finalized[0] != runtimeComponentName ||
 		len(producers) != 0 || len(producerRemovals) != 1 ||
 		producerRemovals[0] != runtimeProducerName {
 		t.Fatalf(
-			"after terminal removals=%v producers=%d producerRemovals=%v",
+			"after terminal removals=%v finalized=%v producers=%d producerRemovals=%v",
 			removals,
+			finalized,
 			len(producers),
 			producerRemovals,
 		)
+	}
+	reader := components[0].Store.Read(metrix.ReadRaw())
+	if got, ok := reader.Value(
+		runtimeMetricPrefix+".dirty_runs_total",
+		nil,
+	); !ok || got != 1 {
+		t.Fatalf("final dirty runs=%v present=%v want=1", got, ok)
 	}
 	if err := admission.CloseDrained(1); err != nil {
 		t.Fatal(err)

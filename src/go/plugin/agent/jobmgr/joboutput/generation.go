@@ -580,7 +580,11 @@ func callPreparedCleanup(
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			prepared = PreparedVNodeFrame{}
-			err = fmt.Errorf("job output: cleanup preparation panic: %v", recovered)
+			err = fmt.Errorf(
+				"%w in cleanup preparation: %v",
+				lifecycle.ErrTaskPanic,
+				recovered,
+			)
 		}
 	}()
 	return prepare(generation)
@@ -589,7 +593,12 @@ func callPreparedCleanup(
 func callJobLifecycle(name string, call func() error) (err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf("job output: %s panic: %v", name, recovered)
+			err = fmt.Errorf(
+				"%w in job %s: %v",
+				lifecycle.ErrTaskPanic,
+				name,
+				recovered,
+			)
 		}
 	}()
 	return call()

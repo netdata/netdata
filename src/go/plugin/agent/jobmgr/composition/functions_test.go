@@ -121,6 +121,15 @@ func TestFunctionAssemblyStateGuards(t *testing.T) {
 	}
 }
 
+func TestFunctionProtocolPanicPreservesTaskClassification(t *testing.T) {
+	err := callFunctionProtocol(func() {
+		panic("handler failed")
+	})
+	if !errors.Is(err, lifecycle.ErrTaskPanic) {
+		t.Fatalf("panic error=%v want ErrTaskPanic", err)
+	}
+}
+
 func TestFunctionAssemblyJobHookCapturesExactHandle(t *testing.T) {
 	frames, err := lifecycle.NewFrameOwner(&bytes.Buffer{})
 	if err != nil {

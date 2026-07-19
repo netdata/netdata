@@ -67,6 +67,10 @@ func TestTaskSupervisorAcceptsStartsPublishesAndTransfersPreparedResource(t *tes
 
 func TestTaskSupervisorRetainsPreparedResourceReturnedWithPrepareError(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
+	observer := &recordingRuntimeObserver{}
+	if err := supervisor.BindRuntimeObserver(observer); err != nil {
+		t.Fatal(err)
+	}
 	events := []string{}
 	wantFailure := errors.New("construction cleanup failed")
 	prepared := &recordingPreparedResource{
@@ -87,6 +91,9 @@ func TestTaskSupervisorRetainsPreparedResourceReturnedWithPrepareError(t *testin
 	}
 	if ack := <-supervisor.AcknowledgementCh(); ack.Err != nil {
 		t.Fatal(ack.Err)
+	}
+	if got := observer.counter(RuntimeCounterResultsDisposed); got != 1 {
+		t.Fatalf("results disposed=%d want=1", got)
 	}
 	if err := supervisor.SendAction(TaskAction{Ref: ref, Sequence: 3, Kind: TaskActionTerminate}); err != nil {
 		t.Fatal(err)

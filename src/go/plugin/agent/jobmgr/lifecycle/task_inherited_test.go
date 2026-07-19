@@ -45,7 +45,7 @@ func TestInheritedTaskRunCancelJoinRelease(t *testing.T) {
 
 func TestInheritedTaskOwnerRoleAndPanicAreContained(t *testing.T) {
 	supervisor := newResourceTaskSupervisor(t)
-	observer := &inheritedTaskRuntimeObserver{}
+	observer := &recordingRuntimeObserver{}
 	if err := supervisor.BindRuntimeObserver(observer); err != nil {
 		t.Fatal(err)
 	}
@@ -77,17 +77,17 @@ func TestInheritedTaskOwnerRoleAndPanicAreContained(t *testing.T) {
 	}
 }
 
-type inheritedTaskRuntimeObserver struct {
+type recordingRuntimeObserver struct {
 	mu       sync.Mutex
 	counters map[RuntimeCounter]uint64
 }
 
-func (*inheritedTaskRuntimeObserver) SetRuntimeGauge(RuntimeGauge, int) {}
-func (*inheritedTaskRuntimeObserver) AddRuntimeGauge(RuntimeGauge, int) {}
-func (*inheritedTaskRuntimeObserver) SetRuntimeTimestamp(RuntimeTimestamp, time.Time) {
+func (*recordingRuntimeObserver) SetRuntimeGauge(RuntimeGauge, int) {}
+func (*recordingRuntimeObserver) AddRuntimeGauge(RuntimeGauge, int) {}
+func (*recordingRuntimeObserver) SetRuntimeTimestamp(RuntimeTimestamp, time.Time) {
 }
 
-func (observer *inheritedTaskRuntimeObserver) AddRuntimeCounter(
+func (observer *recordingRuntimeObserver) AddRuntimeCounter(
 	kind RuntimeCounter,
 	delta uint64,
 ) {
@@ -99,7 +99,7 @@ func (observer *inheritedTaskRuntimeObserver) AddRuntimeCounter(
 	observer.counters[kind] += delta
 }
 
-func (observer *inheritedTaskRuntimeObserver) counter(
+func (observer *recordingRuntimeObserver) counter(
 	kind RuntimeCounter,
 ) uint64 {
 	observer.mu.Lock()

@@ -619,11 +619,14 @@ func checkActiveImport(
 }
 
 type constructionCounts struct {
-	agentNew      int
-	hostRun       int
-	processNew    int
-	retiredNew    int
-	commandKernel int
+	agentNew           int
+	hostRun            int
+	processNew         int
+	retiredNew         int
+	commandKernel      int
+	rootHandoff        bool
+	agentProcessRun    bool
+	compositionRunPath uint8
 }
 
 type constructionContract struct {
@@ -633,6 +636,20 @@ type constructionContract struct {
 	retiredNew    int
 	commandKernel int
 }
+
+const (
+	compositionPathNewProcessCore uint8 = 1 << iota
+	compositionPathPublicRun
+	compositionPathCoreNewRun
+	compositionPathGeneration
+	compositionPathKernel
+
+	completeCompositionRunPath = compositionPathNewProcessCore |
+		compositionPathPublicRun |
+		compositionPathCoreNewRun |
+		compositionPathGeneration |
+		compositionPathKernel
+)
 
 func TestProductionConstructionChain(t *testing.T) {
 	root := filepath.Clean(filepath.Join(jobmgrSourceRoot(t), "../../.."))
@@ -874,6 +891,38 @@ func TestProductionConstructionGuardRejectsAdversarialSources(t *testing.T) {
 				}`,
 			contract: constructionContract{agentNew: 1, hostRun: 1},
 		},
+		"disconnected root calls": {
+			source: `package main
+				import (
+					"github.com/netdata/netdata/go/plugins/cmd/internal/agenthost"
+					"github.com/netdata/netdata/go/plugins/plugin/agent"
+				)
+				func construct() *agent.Agent {
+					return agent.New(agent.Config{})
+				}
+				func run(a *agent.Agent) {
+					agenthost.Run(a)
+				}
+				func main() {}`,
+			contract: constructionContract{agentNew: 1, hostRun: 1},
+		},
+		"disconnected Agent process construction": {
+			source: `package agent
+				import "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr/composition"
+				func construct() {
+					_, _ = composition.NewProcess(composition.Config{})
+				}
+				func (a *Agent) run() error { return nil }`,
+			contract: constructionContract{processNew: 1},
+		},
+		"disconnected composition Kernel construction": {
+			source: `package composition
+				import "github.com/netdata/netdata/go/plugins/plugin/agent/jobmgr"
+				func construct() {
+					_, _ = jobmgr.NewCommandKernel(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+				}`,
+			contract: constructionContract{commandKernel: 1},
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
@@ -994,6 +1043,10 @@ func inspectConstructionFiles(paths []string) (constructionCounts, error) {
 		total.processNew += counts.processNew
 		total.retiredNew += counts.retiredNew
 		total.commandKernel += counts.commandKernel
+		total.rootHandoff = total.rootHandoff || counts.rootHandoff
+		total.agentProcessRun =
+			total.agentProcessRun || counts.agentProcessRun
+		total.compositionRunPath |= counts.compositionRunPath
 	}
 	return total, nil
 }
@@ -1072,7 +1125,286 @@ func inspectConstructionSource(
 		}
 		return true
 	})
+	counts.rootHandoff = constructionRootHandoff(file, imports)
+	counts.agentProcessRun = constructionAgentProcessRun(file, imports)
+	counts.compositionRunPath = constructionCompositionRunPath(
+		file,
+		imports,
+	)
 	return counts, nil
+}
+
+func constructionRootHandoff(
+	file *ast.File,
+	imports map[string]string,
+) bool {
+	for _, declaration := range file.Decls {
+		function, ok := declaration.(*ast.FuncDecl)
+		if !ok || function.Recv != nil || function.Name.Name != "main" ||
+			function.Body == nil {
+			continue
+		}
+		constructed := make(map[string]struct{})
+		inspectConstructionBody(function.Body, func(call *ast.CallExpr) {
+			if !isImportedConstructionCall(
+				call,
+				imports,
+				agentImportPath,
+				"New",
+			) {
+				return
+			}
+			assignment, ok := parentAssignment(function.Body, call)
+			if !ok {
+				return
+			}
+			constructed[assignment] = struct{}{}
+		})
+		connected := false
+		inspectConstructionBody(function.Body, func(call *ast.CallExpr) {
+			if connected ||
+				!isImportedConstructionCall(
+					call,
+					imports,
+					agentHostImportPath,
+					"Run",
+				) ||
+				len(call.Args) != 1 {
+				return
+			}
+			argument, ok := call.Args[0].(*ast.Ident)
+			if !ok {
+				return
+			}
+			_, connected = constructed[argument.Name]
+		})
+		return connected
+	}
+	return false
+}
+
+func constructionAgentProcessRun(
+	file *ast.File,
+	imports map[string]string,
+) bool {
+	for _, declaration := range file.Decls {
+		function, ok := declaration.(*ast.FuncDecl)
+		if !ok || function.Name.Name != "run" ||
+			receiverType(function) != "Agent" ||
+			function.Body == nil {
+			continue
+		}
+		constructed := make(map[string]struct{})
+		inspectConstructionBody(function.Body, func(call *ast.CallExpr) {
+			if !isImportedConstructionCall(
+				call,
+				imports,
+				compositionImportPath,
+				"NewProcess",
+			) {
+				return
+			}
+			assignment, ok := parentAssignment(function.Body, call)
+			if ok {
+				constructed[assignment] = struct{}{}
+			}
+		})
+		connected := false
+		inspectConstructionBody(function.Body, func(call *ast.CallExpr) {
+			if connected {
+				return
+			}
+			parts := selectorParts(call.Fun)
+			if len(parts) != 2 || parts[1] != "Run" {
+				return
+			}
+			_, connected = constructed[parts[0]]
+		})
+		return connected
+	}
+	return false
+}
+
+func constructionCompositionRunPath(
+	file *ast.File,
+	imports map[string]string,
+) uint8 {
+	var path uint8
+	for _, declaration := range file.Decls {
+		function, ok := declaration.(*ast.FuncDecl)
+		if !ok || function.Body == nil {
+			continue
+		}
+		receiver := receiverType(function)
+		receiverName := receiverName(function)
+		switch {
+		case function.Recv == nil && function.Name.Name == "NewProcess":
+			if bodyCallsIdentifier(function.Body, "newProcessCore") {
+				path |= compositionPathNewProcessCore
+			}
+		case receiver == "Process" && function.Name.Name == "Run":
+			if bodyCallsSelector(
+				function.Body,
+				[]string{receiverName, "core", "run"},
+			) {
+				path |= compositionPathPublicRun
+			}
+		case receiver == "processCore" && function.Name.Name == "run":
+			if bodyCallsSelector(
+				function.Body,
+				[]string{receiverName, "newRun"},
+			) {
+				path |= compositionPathCoreNewRun
+			}
+		case receiver == "processCore" && function.Name.Name == "newRun":
+			if bodyCallsIdentifier(function.Body, "newRunGeneration") {
+				path |= compositionPathGeneration
+			}
+		case function.Recv == nil &&
+			function.Name.Name == "newRunGeneration":
+			if bodyCallsImported(
+				function.Body,
+				imports,
+				jobmgrImportPath,
+				"NewCommandKernel",
+			) {
+				path |= compositionPathKernel
+			}
+		}
+	}
+	return path
+}
+
+func inspectConstructionBody(
+	body *ast.BlockStmt,
+	visit func(*ast.CallExpr),
+) {
+	ast.Inspect(body, func(node ast.Node) bool {
+		if _, nested := node.(*ast.FuncLit); nested {
+			return false
+		}
+		if call, ok := node.(*ast.CallExpr); ok {
+			visit(call)
+		}
+		return true
+	})
+}
+
+func parentAssignment(
+	body *ast.BlockStmt,
+	target *ast.CallExpr,
+) (string, bool) {
+	var name string
+	ast.Inspect(body, func(node ast.Node) bool {
+		if name != "" {
+			return false
+		}
+		if _, nested := node.(*ast.FuncLit); nested {
+			return false
+		}
+		assignment, ok := node.(*ast.AssignStmt)
+		if !ok {
+			return true
+		}
+		for index, expression := range assignment.Rhs {
+			if expression != target || index >= len(assignment.Lhs) {
+				continue
+			}
+			identifier, ok := assignment.Lhs[index].(*ast.Ident)
+			if ok && identifier.Name != "_" {
+				name = identifier.Name
+			}
+			return false
+		}
+		return true
+	})
+	return name, name != ""
+}
+
+func isImportedConstructionCall(
+	call *ast.CallExpr,
+	imports map[string]string,
+	importPath string,
+	function string,
+) bool {
+	selector, ok := call.Fun.(*ast.SelectorExpr)
+	if !ok || selector.Sel.Name != function {
+		return false
+	}
+	qualifier, ok := selector.X.(*ast.Ident)
+	return ok && imports[qualifier.Name] == importPath
+}
+
+func bodyCallsImported(
+	body *ast.BlockStmt,
+	imports map[string]string,
+	importPath string,
+	function string,
+) bool {
+	found := false
+	inspectConstructionBody(body, func(call *ast.CallExpr) {
+		found = found || isImportedConstructionCall(
+			call,
+			imports,
+			importPath,
+			function,
+		)
+	})
+	return found
+}
+
+func bodyCallsIdentifier(body *ast.BlockStmt, name string) bool {
+	found := false
+	inspectConstructionBody(body, func(call *ast.CallExpr) {
+		identifier, ok := call.Fun.(*ast.Ident)
+		found = found || ok && identifier.Name == name
+	})
+	return found
+}
+
+func bodyCallsSelector(body *ast.BlockStmt, want []string) bool {
+	found := false
+	inspectConstructionBody(body, func(call *ast.CallExpr) {
+		found = found || reflect.DeepEqual(
+			selectorParts(call.Fun),
+			want,
+		)
+	})
+	return found
+}
+
+func selectorParts(expression ast.Expr) []string {
+	switch value := expression.(type) {
+	case *ast.Ident:
+		return []string{value.Name}
+	case *ast.SelectorExpr:
+		return append(selectorParts(value.X), value.Sel.Name)
+	default:
+		return nil
+	}
+}
+
+func receiverType(function *ast.FuncDecl) string {
+	if function.Recv == nil || len(function.Recv.List) != 1 {
+		return ""
+	}
+	expression := function.Recv.List[0].Type
+	if pointer, ok := expression.(*ast.StarExpr); ok {
+		expression = pointer.X
+	}
+	identifier, _ := expression.(*ast.Ident)
+	if identifier == nil {
+		return ""
+	}
+	return identifier.Name
+}
+
+func receiverName(function *ast.FuncDecl) string {
+	if function.Recv == nil || len(function.Recv.List) != 1 ||
+		len(function.Recv.List[0].Names) != 1 {
+		return ""
+	}
+	return function.Recv.List[0].Names[0].Name
 }
 
 func isConstructionImport(importPath string) bool {
@@ -1125,6 +1457,31 @@ func validateConstructionContract(
 			"jobmgr.NewCommandKernel calls=%d want=%d",
 			counts.commandKernel,
 			want.commandKernel,
+		))
+	}
+	if want.agentNew != 0 && want.hostRun != 0 &&
+		!counts.rootHandoff {
+		result = errors.Join(
+			result,
+			errors.New(
+				"agent.New result does not reach agenthost.Run from main",
+			),
+		)
+	}
+	if want.processNew != 0 && !counts.agentProcessRun {
+		result = errors.Join(
+			result,
+			errors.New(
+				"Agent.run does not run its composition.NewProcess result",
+			),
+		)
+	}
+	if want.commandKernel != 0 &&
+		counts.compositionRunPath != completeCompositionRunPath {
+		result = errors.Join(result, fmt.Errorf(
+			"production composition path=0x%x want=0x%x",
+			counts.compositionRunPath,
+			completeCompositionRunPath,
 		))
 	}
 	return result

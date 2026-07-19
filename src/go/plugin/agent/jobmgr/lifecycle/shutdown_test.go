@@ -237,6 +237,70 @@ func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
 	}
 }
 
+func TestRunSupervisorProjectsFirstDirtyTransitionExactlyOnce(t *testing.T) {
+	census := RunCensus{
+		AdmissionRunDrained:  true,
+		RunFinalizerComplete: true,
+	}
+	tests := map[string]struct {
+		run func(*testing.T, *RunSupervisor)
+	}{
+		"explicit dirty": {
+			run: func(t *testing.T, run *RunSupervisor) {
+				if err := run.Dirty(errors.New("failed")); err != nil {
+					t.Fatal(err)
+				}
+				if err := run.Dirty(errors.New("also failed")); err != nil {
+					t.Fatal(err)
+				}
+			},
+		},
+		"terminal census creates dirty cause": {
+			run: func(t *testing.T, run *RunSupervisor) {
+				nonzero := census
+				nonzero.TransientActive = 1
+				if err := run.Terminal(nonzero); err == nil {
+					t.Fatal("nonquiescent terminal returned no dirty cause")
+				}
+				if err := run.Terminal(nonzero); !errors.Is(
+					err,
+					ErrRunTerminalReached,
+				) {
+					t.Fatalf("duplicate terminal error=%v", err)
+				}
+			},
+		},
+		"explicit dirty precedes terminal census": {
+			run: func(t *testing.T, run *RunSupervisor) {
+				if err := run.Dirty(errors.New("failed")); err != nil {
+					t.Fatal(err)
+				}
+				nonzero := census
+				nonzero.TransientActive = 1
+				if err := run.Terminal(nonzero); err == nil {
+					t.Fatal("nonquiescent terminal returned no dirty cause")
+				}
+			},
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			run, err := NewRunSupervisor(1, RealClock{}, time.Second)
+			if err != nil {
+				t.Fatal(err)
+			}
+			observer := &recordingRuntimeObserver{}
+			if err := run.BindRuntimeObserver(observer); err != nil {
+				t.Fatal(err)
+			}
+			test.run(t, run)
+			if got := observer.counter(RuntimeCounterDirtyRuns); got != 1 {
+				t.Fatalf("dirty runs=%d want=1", got)
+			}
+		})
+	}
+}
+
 func TestTaskSupervisorSealsAndCancelsEveryInheritedContext(t *testing.T) {
 	populations := map[string]int{
 		"one": 1, "thirty-two": 32, "two-hundred-fifty-seven": 257,

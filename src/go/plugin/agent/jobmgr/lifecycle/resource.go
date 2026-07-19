@@ -271,7 +271,11 @@ func preparedCapabilityIdentity(capability PreparedCapability) (identity Resourc
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			identity = ResourceIdentity{}
-			err = fmt.Errorf("jobmgr lifecycle: prepared capability identity panic: %v", recovered)
+			err = fmt.Errorf(
+				"%w: prepared capability identity panic: %v",
+				ErrTaskPanic,
+				recovered,
+			)
 		}
 	}()
 	identity = capability.Identity()
@@ -288,7 +292,11 @@ func preparedResourceIdentity(resource PreparedResource) (identity ResourceIdent
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			identity = ResourceIdentity{}
-			err = fmt.Errorf("jobmgr lifecycle: prepared resource identity panic: %v", recovered)
+			err = fmt.Errorf(
+				"%w in prepared resource identity: %v",
+				ErrTaskPanic,
+				recovered,
+			)
 		}
 	}()
 	identity = resource.Identity()
@@ -305,7 +313,11 @@ func readyResourceIdentity(resource ReadyResource) (identity ResourceIdentity, e
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			identity = ResourceIdentity{}
-			err = fmt.Errorf("jobmgr lifecycle: ready resource identity panic: %v", recovered)
+			err = fmt.Errorf(
+				"%w in ready resource identity: %v",
+				ErrTaskPanic,
+				recovered,
+			)
 		}
 	}()
 	identity = resource.Identity()

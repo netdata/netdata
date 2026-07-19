@@ -132,7 +132,11 @@ func (generation *methodGeneration) cleanup(ctx context.Context) error {
 func callMethodCleanup(ctx context.Context, handler funcapi.MethodHandler) (err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf("jobmgr Function handler Cleanup panic: %v", recovered)
+			err = fmt.Errorf(
+				"%w in Function handler Cleanup: %v",
+				lifecycle.ErrTaskPanic,
+				recovered,
+			)
 		}
 	}()
 	handler.Cleanup(ctx)

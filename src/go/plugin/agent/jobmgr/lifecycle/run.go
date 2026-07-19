@@ -159,6 +159,7 @@ func (supervisor *RunSupervisor) Terminal(census RunCensus) error {
 		census.LongLived == (LongLivedCensus{}) && frameDrained &&
 		census.RunFinalizerComplete
 	if !quiescent {
+		first := supervisor.dirty == nil
 		supervisor.dirty = errors.Join(
 			supervisor.dirty,
 			fmt.Errorf(
@@ -166,6 +167,12 @@ func (supervisor *RunSupervisor) Terminal(census RunCensus) error {
 				census,
 			),
 		)
+		if first && supervisor.observer != nil {
+			supervisor.observer.AddRuntimeCounter(
+				RuntimeCounterDirtyRuns,
+				1,
+			)
+		}
 	}
 	supervisor.terminal = true
 	supervisor.state = RunTerminalState{Reached: true, Quiescent: quiescent, Dirty: supervisor.dirty}

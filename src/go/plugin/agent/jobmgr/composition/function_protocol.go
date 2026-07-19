@@ -105,7 +105,8 @@ func callFunctionProtocol(call func()) (err error) {
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			err = fmt.Errorf(
-				"jobmgr composition: Function protocol handler panic: %v",
+				"%w in Function protocol handler: %v",
+				lifecycle.ErrTaskPanic,
 				recovered,
 			)
 		}

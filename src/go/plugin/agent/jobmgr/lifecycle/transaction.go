@@ -5,6 +5,7 @@ package lifecycle
 import (
 	"context"
 	"errors"
+	"fmt"
 )
 
 // ResourceTransactionScope seals the exact current and optional successor
@@ -111,7 +112,11 @@ func preparedResourceTransactionScope(
 	defer func() {
 		if recovered := recover(); recovered != nil {
 			scope = ResourceTransactionScope{}
-			err = errors.New("jobmgr lifecycle: prepared resource transaction scope panic")
+			err = fmt.Errorf(
+				"%w in prepared resource transaction scope: %v",
+				ErrTaskPanic,
+				recovered,
+			)
 		}
 	}()
 	scope = transaction.Scope()

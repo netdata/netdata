@@ -270,6 +270,32 @@ func TestJobGenerationRetainsAfterIrrecoverableFailure(t *testing.T) {
 	}
 }
 
+func TestJobLifecyclePanicsPreserveTaskClassification(t *testing.T) {
+	tests := map[string]func() error{
+		"cleanup preparation": func() error {
+			_, err := callPreparedCleanup(
+				func(uint64) (PreparedVNodeFrame, error) {
+					panic("prepare cleanup")
+				},
+				1,
+			)
+			return err
+		},
+		"job lifecycle": func() error {
+			return callJobLifecycle("test", func() error {
+				panic("lifecycle")
+			})
+		},
+	}
+	for name, run := range tests {
+		t.Run(name, func(t *testing.T) {
+			if err := run(); !errors.Is(err, lifecycle.ErrTaskPanic) {
+				t.Fatalf("panic error=%v want ErrTaskPanic", err)
+			}
+		})
+	}
+}
+
 func BenchmarkBJobFactoryCold(b *testing.B) {
 	for b.Loop() {
 		events := &jobEventLog{}

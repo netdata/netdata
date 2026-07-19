@@ -507,8 +507,7 @@ func (generation *runGeneration) releaseRuntimeMetrics() error {
 	metrics := generation.metrics
 	service := generation.runtime
 	generation.mu.Unlock()
-	metrics.unregister(service)
-	return nil
+	return metrics.unregister(service)
 }
 
 type joinedRunFinalizer struct {

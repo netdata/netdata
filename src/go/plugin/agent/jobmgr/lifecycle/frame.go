@@ -433,7 +433,12 @@ func callFrameTransition(name string, transition func() error) (err error) {
 	}
 	defer func() {
 		if recovered := recover(); recovered != nil {
-			err = fmt.Errorf("jobmgr frame owner: protocol %s panic: %v", name, recovered)
+			err = fmt.Errorf(
+				"%w in frame protocol %s: %v",
+				ErrTaskPanic,
+				name,
+				recovered,
+			)
 		}
 	}()
 	return transition()
