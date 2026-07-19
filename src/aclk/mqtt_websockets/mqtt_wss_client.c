@@ -560,13 +560,13 @@ static const char *mqtt_wss_error_tos(int ec)
 
 static int mqtt_wss_service_all(mqtt_wss_client client, int timeout_ms)
 {
-    uint64_t exit_by_us = now_boottime_usec() + (timeout_ms * NSEC_PER_MSEC);
+    uint64_t exit_by_us = now_boottime_usec() + ((uint64_t)timeout_ms * USEC_PER_MS);
     client->poll_fds[POLLFD_SOCKET].events |= POLLOUT; // TODO when entering mwtt_wss_service use out buffer size to arm POLLOUT
     while (rbuf_bytes_available(client->ws_client->buf_write)) {
         const uint64_t now_us = now_boottime_usec();
         if (now_us >= exit_by_us)
             return MWS_TIMED_OUT;
-        if (mqtt_wss_service(client, (exit_by_us - now_us) / USEC_PER_SEC))
+        if (mqtt_wss_service(client, (int)((exit_by_us - now_us) / USEC_PER_MS)))
             return MWS_ERROR;
     }
     return MWS_OK;
