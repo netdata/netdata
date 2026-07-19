@@ -126,7 +126,80 @@ case "${PKG_TYPE}" in
         fi
         ;;
     RPM)
+        # Mirrors the per-distro conditionals of netdata.spec.in's %build.
         add_cmake_option NETDATA_PACKAGING_FORMAT rpm
+
+        arch="$(uname -m)"
+        distro_major="${VERSION_ID%%.*}"
+        [ -n "${distro_major}" ] || distro_major=0
+
+        is_el=0
+        is_suse=0
+        case "${ID}" in
+            rhel|centos|almalinux|rocky|ol) is_el=1 ;;
+            *suse*|sles) is_suse=1 ;;
+        esac
+
+        is_el7=0
+        if { [ "${is_el}" = 1 ] && [ "${distro_major}" -le 7 ]; } || \
+           { [ "${ID}" = "amzn" ] && [ "${distro_major}" -le 2 ]; }; then
+            is_el7=1
+        fi
+
+        if [ "${arch}" = "x86_64" ]; then
+            add_cmake_option ENABLE_PLUGIN_EBPF On
+        else
+            add_cmake_option ENABLE_PLUGIN_EBPF Off
+        fi
+
+        if [ "${arch}" = "x86_64" ] && [ "${is_el7}" = 0 ]; then
+            add_cmake_option ENABLE_PLUGIN_IBM On
+        else
+            add_cmake_option ENABLE_PLUGIN_IBM Off
+        fi
+
+        add_cmake_option ENABLE_PLUGIN_XENSTAT Off
+
+        if [ "${is_el7}" = 1 ]; then
+            add_cmake_option ENABLE_PLUGIN_CUPS Off
+            add_cmake_option ENABLE_PLUGIN_SYSTEMD_UNITS Off
+        else
+            add_cmake_option ENABLE_PLUGIN_CUPS On
+            add_cmake_option ENABLE_PLUGIN_SYSTEMD_UNITS On
+        fi
+
+        if [ "${ID}" = "amzn" ] && [ "${distro_major}" -ge 2023 ]; then
+            add_cmake_option ENABLE_PLUGIN_FREEIPMI Off
+        else
+            add_cmake_option ENABLE_PLUGIN_FREEIPMI On
+        fi
+
+        # nfacct ships only on Fedora and openSUSE Leap 15.x.
+        if [ "${ID}" = "fedora" ] || { [ "${is_suse}" = 1 ] && [ "${distro_major}" -eq 15 ]; }; then
+            add_cmake_option ENABLE_PLUGIN_NFACCT On
+        else
+            add_cmake_option ENABLE_PLUGIN_NFACCT Off
+        fi
+
+        if [ "${ID}" = "ol" ] || [ "${is_suse}" = 1 ] || [ "${ID}" = "amzn" ] || \
+           { [ "${is_el}" = 1 ] && [ "${distro_major}" -ge 10 ]; }; then
+            add_cmake_option ENABLE_EXPORTER_MONGODB Off
+        else
+            add_cmake_option ENABLE_EXPORTER_MONGODB On
+        fi
+
+        if [ "${is_suse}" = 1 ] || { [ "${is_el}" = 1 ] && [ "${distro_major}" -le 7 ]; }; then
+            add_cmake_option ENABLE_BUNDLED_PROTOBUF On
+        fi
+
+        if [ "${is_suse}" = 1 ]; then
+            add_cmake_option USE_LTO Off
+        fi
+
+        if [ "${is_el}" = 1 ] && [ "${distro_major}" -le 7 ]; then
+            add_cmake_option USE_CXX_11 On
+            add_cmake_option FORCE_LEGACY_LIBBPF On
+        fi
         ;;
     *) echo "Unrecognized package type ${PKG_TYPE}." ; exit 1 ;;
 esac
