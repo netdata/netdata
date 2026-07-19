@@ -1335,6 +1335,41 @@ func TestKernelLoopContinuesPendingTaskStartsAcrossServiceQuanta(t *testing.T) {
 	closeUIDLedger(t, uids)
 }
 
+func TestKernelAsyncEventServiceQuantumIsPhaseBalancedAndBounded(
+	t *testing.T,
+) {
+	const population = asyncEventServiceQuantum + 1
+
+	kernel := newStoppedKernel(t)
+	kernel.cancel = make(chan string, population)
+	for index := 0; index < population; index++ {
+		kernel.cancel <- fmt.Sprintf("unknown-cancel-%02d", index)
+	}
+
+	count := kernel.serviceAsyncEvents(asyncEventServiceQuantum)
+	if count != asyncEventServiceQuantum {
+		t.Fatalf(
+			"first async service count=%d, want %d",
+			count,
+			asyncEventServiceQuantum,
+		)
+	}
+	if pending := len(kernel.cancel); pending != 1 {
+		t.Fatalf("first async service left %d events, want one", pending)
+	}
+
+	count = kernel.serviceAsyncEvents(asyncEventServiceQuantum)
+	if count != 1 {
+		t.Fatalf(
+			"second async service count=%d, want 1",
+			count,
+		)
+	}
+	if pending := len(kernel.cancel); pending != 0 {
+		t.Fatalf("second async service left %d events", pending)
+	}
+}
+
 func TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch(
 	t *testing.T,
 ) {

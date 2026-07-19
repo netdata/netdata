@@ -60,6 +60,7 @@ var bmM002HotpathRows = [...]HotpathGate{
 			"TestKernelExternalSubmissionServiceRotatesSources",
 			"TestKernelStartsDueCooperativeRunner",
 			"TestKernelLoopContinuesPendingTaskStartsAcrossServiceQuanta",
+			"TestKernelAsyncEventServiceQuantumIsPhaseBalancedAndBounded",
 			"TestKernelShutdownCancelsInitialOperationSweepBeforePendingTaskDispatch",
 		},
 		Benchmark: "BenchmarkBKernelMixedTurn",

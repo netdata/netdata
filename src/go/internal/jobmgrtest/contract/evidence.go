@@ -355,6 +355,7 @@ var componentProofByCase = map[string][]ComponentProof{
 	},
 	"F24.9-b-kernel-priority": {
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelSubmissionBacklogCannotStarveDueDeadline"},
+		{Package: "./plugin/agent/jobmgr", Test: "TestKernelAsyncEventServiceQuantumIsPhaseBalancedAndBounded"},
 	},
 	"F24.10-b-kernel-source-rotation": {
 		{Package: "./plugin/agent/jobmgr", Test: "TestKernelExternalSubmissionServiceRotatesSources"},

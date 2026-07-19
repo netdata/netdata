@@ -19,6 +19,10 @@ const (
 	maximumPlanClaims     = 1_024
 	maximumClaimKeyBytes  = maximumRequestArgumentBytes
 	maximumPlanClaimBytes = lifecycle.ControlFrameBytes
+	// Keep lifecycle-event service capacity at least equal to the maximum
+	// phase work introduced by one task-start quantum.
+	asyncEventServiceQuantum = lifecycle.TaskStartServiceQuantum *
+		lifecycle.TransactionTaskPhases
 )
 
 var ErrStopped = errors.New("jobmgr kernel: stopped")
@@ -1081,6 +1085,11 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 		if !shuttingDown {
 			moreAdmissions = kernel.serviceAdmissions(4)
 			moreTasks = kernel.scheduleTasks(4)
+		}
+		servicedAsyncEvents := kernel.serviceAsyncEvents(
+			asyncEventServiceQuantum,
+		)
+		if !shuttingDown {
 			moreTaskStarts = kernel.serviceTaskStarts(
 				lifecycle.TaskStartServiceQuantum,
 			)
@@ -1138,7 +1147,7 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 		if moreDeadlines || moreControls || moreSubmissions || moreFunctionCleanups ||
 			moreFunctionMutation || moreFunctionClose || moreClaimSettlements ||
 			moreAdmissions || moreTasks || moreTaskStarts ||
-			moreShutdownOperations ||
+			servicedAsyncEvents > 0 || moreShutdownOperations ||
 			moreInheritedCancellations || moreShutdownLanes ||
 			kernel.claims.PendingSettlements() ||
 			kernel.hasRunnableSubmissions() {
@@ -1161,7 +1170,6 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 					return
 				}
 			}
-			kernel.serviceOneAsyncEvent()
 			continue
 		}
 		if !shuttingDown {
@@ -1252,6 +1260,16 @@ func (kernel *CommandKernel) serviceOneAsyncEvent() bool {
 		}
 	}
 	return false
+}
+
+func (kernel *CommandKernel) serviceAsyncEvents(
+	quantum int,
+) int {
+	count := 0
+	for count < quantum && kernel.serviceOneAsyncEvent() {
+		count++
+	}
+	return count
 }
 
 func (kernel *CommandKernel) serviceSubmissions(quantum int) bool {
