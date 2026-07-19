@@ -259,7 +259,7 @@ inline char *prometheus_units_copy(char *d, const char *s, size_t usable, int sh
     for (n = 1; *s && n < usable; d++, s++, n++) {
         register char c = *s;
 
-        if (!isalnum(c))
+        if (!isalnum((uint8_t)c))
             *d = '_';
         else
             *d = c;

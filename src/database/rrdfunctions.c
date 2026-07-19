@@ -201,7 +201,7 @@ static inline bool is_function_dyncfg(const char *name) {
         return false;
 
     char c = name[sizeof(PLUGINSD_FUNCTION_CONFIG) - 1];
-    if(c == 0 || isspace(c))
+    if(c == 0 || isspace((uint8_t)c))
         return true;
 
     return false;

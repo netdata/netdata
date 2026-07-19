@@ -2,9 +2,15 @@
 
 #include "query-internal.h"
 
+typedef struct {
+    size_t dim_idx;
+    NETDATA_DOUBLE contribution;
+    const char *id;
+} CARDINALITY_DIMENSION;
+
 static int compare_contributions(const void *a, const void *b) {
-    const struct { size_t dim_idx; NETDATA_DOUBLE contribution; const char *id; } *da = a;
-    const struct { size_t dim_idx; NETDATA_DOUBLE contribution; const char *id; } *db = b;
+    const CARDINALITY_DIMENSION *da = a;
+    const CARDINALITY_DIMENSION *db = b;
 
     if (da->contribution > db->contribution) return -1;
     if (da->contribution < db->contribution) return 1;
@@ -79,11 +85,7 @@ RRDR *rrd2rrdr_cardinality_limit(RRDR *r) {
     }
 
     // Create array of dimension indices sorted by contribution (descending)
-    struct {
-        size_t dim_idx;
-        NETDATA_DOUBLE contribution;
-        const char *id;
-    } *sorted_dims = onewayalloc_mallocz(
+    CARDINALITY_DIMENSION *sorted_dims = onewayalloc_mallocz(
         owa, onewayalloc_mul_or_fatal(queried_count, sizeof(*sorted_dims), "RRDR cardinality dimensions"));
 
     size_t sorted_idx = 0;

@@ -152,7 +152,7 @@ static bool parse_rename(LOG_JOB *jb, const char *param) {
 }
 
 static bool is_symbol(char c) {
-    return !isalpha(c) && !isdigit(c) && !iscntrl(c);
+    return !isalpha((uint8_t)c) && !isdigit((uint8_t)c) && !iscntrl((uint8_t)c);
 }
 
 struct {

@@ -90,6 +90,16 @@ void aclk_query_free(aclk_query_t *query)
             freez(query->data.node_id);
             freez(query->machine_guid);
             break;
+        case ALARM_PROVIDE_CFG:
+        case ALARM_SNAPSHOT:
+        case REGISTER_NODE:
+        case NODE_STATE_UPDATE:
+        case UPDATE_NODE_INFO:
+        case UPDATE_NODE_COLLECTORS:
+        case CTX_SEND_SNAPSHOT:
+        case CTX_SEND_SNAPSHOT_UPD:
+            freez(query->data.bin_payload.payload);
+            break;
         // keep following cases together
         case CTX_STOP_STREAMING:
         case CTX_CHECKPOINT:

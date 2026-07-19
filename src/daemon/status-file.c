@@ -1160,7 +1160,10 @@ static void post_status_file(struct post_status_file_thread_data *d) {
     buffer_json_member_add_uint64(wb, "agent_pid_now", getpid());
     buffer_json_member_add_boolean(wb, "host_memory_critical",
                                    OS_SYSTEM_MEMORY_OK(d->status->memory) && d->status->memory.ram_available_bytes <= d->status->oom_protection);
-    buffer_json_member_add_uint64(wb, "host_memory_free_percent", (uint64_t)round(os_system_memory_available_percent(d->status->memory)));
+    uint64_t host_memory_free_percent;
+    if(!parser_round_number_to_uint64(os_system_memory_available_percent(d->status->memory), &host_memory_free_percent))
+        host_memory_free_percent = UINT64_MAX;
+    buffer_json_member_add_uint64(wb, "host_memory_free_percent", host_memory_free_percent);
     buffer_json_member_add_string(wb, "agent_health", agent_health(d->status));
     daemon_status_file_to_json(wb, d->status);
     buffer_json_finalize(wb);

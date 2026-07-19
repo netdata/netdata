@@ -1123,6 +1123,9 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
         if (cnt == ALARM_EVENTS_PER_CHUNK) {
             if (aclk_online_for_alerts())
                 aclk_send_alarm_snapshot(snapshot_proto);
+            else
+                destroy_alarm_snapshot_proto(snapshot_proto);
+            snapshot_proto = NULL;
             cnt = 0;
             if (alarm_snap.chunk < chunks) {
                 alarm_snap.chunk++;
@@ -1133,6 +1136,8 @@ void send_alert_snapshot_to_cloud(RRDHOST *host __maybe_unused)
     }
     if (cnt)
         aclk_send_alarm_snapshot(snapshot_proto);
+    else
+        destroy_alarm_snapshot_proto(snapshot_proto);
 
     nd_log(
         NDLS_ACCESS,

@@ -52,7 +52,7 @@ static void find_all_mc() {
 
     struct dirent *de = NULL;
     while((de = readdir(dir))) {
-        if(de->d_type == DT_DIR && de->d_name[0] == 'm' && de->d_name[1] == 'c' && isdigit(de->d_name[2])) {
+        if(de->d_type == DT_DIR && de->d_name[0] == 'm' && de->d_name[1] == 'c' && isdigit((uint8_t)de->d_name[2])) {
             struct mc *m = callocz(1, sizeof(struct mc));
             m->name = strdupz(de->d_name);
 
@@ -98,7 +98,7 @@ static void find_all_mc() {
 
             if (de->d_type == DT_DIR &&
                 ((strncmp(de->d_name, "rank", 4) == 0 || strncmp(de->d_name, "dimm", 4) == 0)) &&
-                isdigit(de->d_name[4])) {
+                isdigit((uint8_t)de->d_name[4])) {
 
                 struct edac_dimm *d = callocz(1, sizeof(struct edac_dimm));
                 d->name = strdupz(de->d_name);
