@@ -94,6 +94,9 @@ set(CPACK_RPM_REQUIRES_EXCLUDE_FROM "^/usr/lib/netdata/system/.*$")
 # custom-plugins.d and ssl dirs are unpackaged in the spec build and are
 # excluded for parity with it.
 set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
+    # an install-rule-less component (plugin-journal-viewer) degenerates to a
+    # lone "/" entry
+    /
     /etc/netdata
     /etc/netdata/custom-plugins.d
     /etc/netdata/ssl
@@ -111,8 +114,21 @@ set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
     /var/cache
     /var/lib
     /var/log
+    # staged but unpackaged in the spec build
+    /var/run
+    /var/run/netdata
+    /etc/netdata/charts.d
+    /etc/netdata/go.d
+    /etc/netdata/python.d
+    /etc/netdata/otel.d
+    /etc/netdata/otel.d/v1
+    /etc/netdata/otel.d/v1/metrics
     # the spec leaves the legacy eBPF object directory unowned
-    /usr/libexec/netdata/plugins.d/ebpf.d)
+    /usr/libexec/netdata/plugins.d/ebpf.d
+    # owned by the main package alone (per-plugin components stage them too);
+    # the netdata USER_FILELIST re-adds them as %dir entries
+    /usr/libexec/netdata
+    /usr/libexec/netdata/plugins.d)
 
 # The spec does not own the vendored IBM MQ directory tree either; the list
 # of its directories is derived from the MQ manifest by install_ibm_runtime.
@@ -343,6 +359,8 @@ endif()
 # File attributes that differ from the staged tree (which is root:root with
 # install-rule modes), matching the spec's %files for the main package.
 set(CPACK_RPM_NETDATA_USER_FILELIST
+    "%dir /usr/libexec/netdata"
+    "%dir /usr/libexec/netdata/plugins.d"
     "%config(noreplace) /etc/netdata/netdata.conf"
     "%config(noreplace) /etc/netdata/netdata-updater.conf"
     "%config(noreplace) /etc/logrotate.d/netdata"
