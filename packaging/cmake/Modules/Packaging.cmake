@@ -125,10 +125,13 @@ set(CPACK_RPM_EXCLUDE_FROM_AUTO_FILELIST_ADDITION
     /etc/netdata/otel.d/v1/metrics
     # the spec leaves the legacy eBPF object directory unowned
     /usr/libexec/netdata/plugins.d/ebpf.d
-    # owned by the main package alone (per-plugin components stage them too);
-    # the netdata USER_FILELIST re-adds them as %dir entries
+    # owned by exactly one package (other components stage them too); the
+    # owning package's USER_FILELIST re-adds them as %dir entries
     /usr/libexec/netdata
-    /usr/libexec/netdata/plugins.d)
+    /usr/libexec/netdata/plugins.d
+    /usr/lib/netdata
+    /usr/lib/netdata/conf.d
+    /usr/share/netdata/web)
 
 # The spec does not own the vendored IBM MQ directory tree either; the list
 # of its directories is derived from the MQ manifest by install_ibm_runtime.
@@ -361,6 +364,8 @@ endif()
 set(CPACK_RPM_NETDATA_USER_FILELIST
     "%dir /usr/libexec/netdata"
     "%dir /usr/libexec/netdata/plugins.d"
+    "%dir /usr/lib/netdata"
+    "%dir /usr/lib/netdata/conf.d"
     "%config(noreplace) /etc/netdata/netdata.conf"
     "%config(noreplace) /etc/netdata/netdata-updater.conf"
     "%config(noreplace) /etc/logrotate.d/netdata"
@@ -443,6 +448,8 @@ set(CPACK_RPM_DASHBOARD_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
 if(NETDATA_RPM_USER_PREDEP)
   set(CPACK_RPM_DASHBOARD_PACKAGE_REQUIRES_PRE "${NETDATA_RPM_USER_PREDEP}")
 endif()
+set(CPACK_RPM_DASHBOARD_USER_FILELIST
+    "%dir /usr/share/netdata/web")
 
 #
 # apps.plugin

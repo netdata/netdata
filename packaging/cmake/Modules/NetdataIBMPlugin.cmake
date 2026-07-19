@@ -125,30 +125,53 @@ function(install_ibm_runtime component)
     endif()
   endforeach()
 
-  # RPM packaging metadata derived from the same manifest: the spec forces
-  # 0750 on executables/libraries and 0640 on data files (all root:netdata),
-  # and does not own the MQ directory tree. Exported for Packaging.cmake,
-  # which turns these into CPack RPM file-list entries and ownership
-  # exclusions; unused by other package formats.
+  # RPM packaging metadata derived from the same manifest, mirroring the
+  # spec's enumerated %files bands: 0750 on executables and libraries, 0640
+  # on data files (all root:netdata), no ownership of any MQ directory, and
+  # no packaging of the versionless library symlinks. Exported for
+  # Packaging.cmake, which turns these into CPack RPM file-list entries and
+  # ownership/packaging exclusions; unused by other package formats.
   set(_rpm_filelist "")
-  set(_rpm_dirs "/usr/lib/netdata/${IBM_MQ_DIR_NAME}")
+  set(_rpm_excludes
+      "/usr/lib/netdata/${IBM_MQ_DIR_NAME}"
+      "/usr/lib/netdata/${IBM_MQ_DIR_NAME}/MANIFEST")
 
   foreach(_file IN LISTS _files)
-    if(_file MATCHES "(^|/)bin/" OR _file MATCHES "\\.so(\\.|$)")
+    if(_file MATCHES "(^|/)lib(64)?/libimq[^/]*\\.so$")
+      # versionless C++ compat-library symlinks; staged but never packaged
+      # by the spec
+      list(APPEND _rpm_excludes "/usr/lib/netdata/${IBM_MQ_DIR_NAME}/${_file}")
+    elseif(_file MATCHES "(^|/)bin/" OR _file MATCHES "\\.so(\\.|$)"
+           OR _file MATCHES "\\.(dll|a)$" OR _file MATCHES "(^|/)gskit8/private_"
+           OR _file MATCHES "(^|/)lib64/amqczscg?$")
       list(APPEND _rpm_filelist
            "%attr(0750,root,netdata) /usr/lib/netdata/${IBM_MQ_DIR_NAME}/${_file}")
     endif()
+  endforeach()
+
+  # Directory entries are derived from the FULL manifest (every type,
+  # including the samp/ tree that is filtered out of the install): CMake's
+  # install(DIRECTORY ... FILES_MATCHING) creates every directory of the
+  # source tree regardless of the file filters, and the spec owns none of
+  # them.
+  foreach(line IN LISTS _ibm_manifest_lines)
+    if("${line}" STREQUAL "" OR "${line}" MATCHES "^#")
+      continue()
+    endif()
+
+    string(REPLACE "," ";" _fields "${line}")
+    list(GET _fields 0 _file)
 
     get_filename_component(_dir "${_file}" DIRECTORY)
     while(NOT _dir STREQUAL "")
-      list(APPEND _rpm_dirs "/usr/lib/netdata/${IBM_MQ_DIR_NAME}/${_dir}")
+      list(APPEND _rpm_excludes "/usr/lib/netdata/${IBM_MQ_DIR_NAME}/${_dir}")
       get_filename_component(_dir "${_dir}" DIRECTORY)
     endwhile()
   endforeach()
 
-  list(REMOVE_DUPLICATES _rpm_dirs)
+  list(REMOVE_DUPLICATES _rpm_excludes)
   set(NETDATA_IBM_MQ_RPM_FILELIST "${_rpm_filelist}" PARENT_SCOPE)
-  set(NETDATA_IBM_MQ_RPM_DIR_EXCLUDES "${_rpm_dirs}" PARENT_SCOPE)
+  set(NETDATA_IBM_MQ_RPM_DIR_EXCLUDES "${_rpm_excludes}" PARENT_SCOPE)
 
   list(LENGTH _files _file_count)
   math(EXPR _max_idx "${_file_count} - 1")
