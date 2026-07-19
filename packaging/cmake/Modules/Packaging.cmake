@@ -68,6 +68,13 @@ set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Netdata Builder <bot@netdata.cloud>")
 set(CPACK_RPM_COMPONENT_INSTALL YES)
 set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
 
+# CPack only emits Recommends: from CMake 4.1 on; older versions ignore the
+# variables silently, which would strip the weak dependencies from the
+# packages without any build failure.
+if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm" AND CMAKE_VERSION VERSION_LESS 4.1)
+  message(FATAL_ERROR "RPM packaging requires CMake >= 4.1 (CPack weak-dependency support); this is ${CMAKE_VERSION}")
+endif()
+
 # RPM forbids dashes in Version; the spec receives a pre-sanitized version
 # (nightly 2.10.0-809-nightly becomes 2.10.0.809.nightly).
 string(REPLACE "-" "." CPACK_RPM_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION}")
@@ -196,6 +203,15 @@ if(NOT NETDATA_RPM_HAVE_SYSUSER)
   set(NETDATA_RPM_USER_PREDEP "netdata-user >= ${NETDATA_RPM_VERSION}")
 else()
   set(NETDATA_RPM_USER_PREDEP "")
+endif()
+
+# The spec gates the per-plugin Suggests on EL 7 only (Amazon Linux 2 keeps
+# them even though its main-package weak deps are downgraded), so this is
+# deliberately narrower than NOT NETDATA_RPM_HAVE_WEAK_DEPS.
+if(NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 7)
+  set(NETDATA_RPM_PLUGIN_SUGGESTS FALSE)
+else()
+  set(NETDATA_RPM_PLUGIN_SUGGESTS TRUE)
 endif()
 
 #
@@ -511,7 +527,7 @@ set(CPACK_RPM_PLUGIN-CHARTSD_PACKAGE_NAME "netdata-plugin-chartsd")
 set(CPACK_RPM_PLUGIN-CHARTSD_PACKAGE_SUMMARY "The charts.d metrics collection plugin for the Netdata Agent")
 set(CPACK_RPM_PLUGIN-CHARTSD_PACKAGE_REQUIRES "bash, netdata = ${NETDATA_RPM_VERSION}")
 set(CPACK_RPM_PLUGIN-CHARTSD_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
-if(NETDATA_RPM_HAVE_WEAK_DEPS)
+if(NETDATA_RPM_PLUGIN_SUGGESTS)
   set(CPACK_RPM_PLUGIN-CHARTSD_PACKAGE_SUGGESTS "apcupsd, iw, sudo")
 endif()
 if(NETDATA_RPM_USER_PREDEP)
@@ -724,7 +740,7 @@ set(CPACK_RPM_PLUGIN-GO_PACKAGE_NAME "netdata-plugin-go")
 set(CPACK_RPM_PLUGIN-GO_PACKAGE_SUMMARY "The go.d metrics collection plugin for the Netdata Agent")
 set(CPACK_RPM_PLUGIN-GO_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}")
 set(CPACK_RPM_PLUGIN-GO_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
-if(NETDATA_RPM_HAVE_WEAK_DEPS)
+if(NETDATA_RPM_PLUGIN_SUGGESTS)
   set(CPACK_RPM_PLUGIN-GO_PACKAGE_SUGGESTS "nvme-cli, sudo")
 endif()
 if(NETDATA_RPM_USER_PREDEP)
@@ -1055,7 +1071,7 @@ else()
   set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_REQUIRES "netdata = ${NETDATA_RPM_VERSION}, python3")
 endif()
 set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_CONFLICTS "netdata < ${NETDATA_RPM_VERSION}")
-if(NETDATA_RPM_HAVE_WEAK_DEPS)
+if(NETDATA_RPM_PLUGIN_SUGGESTS)
   set(CPACK_RPM_PLUGIN-PYTHOND_PACKAGE_SUGGESTS "sudo")
 endif()
 if(NETDATA_RPM_USER_PREDEP)

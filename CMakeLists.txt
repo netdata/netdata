@@ -3811,7 +3811,7 @@ if(ENABLE_PLUGIN_IBM)
             DESTINATION usr/lib/netdata/conf.d/ibm.d
     )
 
-    install_ibm_runtime(plugin-ibm)
+    install_ibm_runtime(plugin-ibm-libs)
 endif()
 
 #

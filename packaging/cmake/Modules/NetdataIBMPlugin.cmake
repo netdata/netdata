@@ -187,7 +187,7 @@ function(install_ibm_runtime component)
 
   install(DIRECTORY ${IBM_MQ_BUILD_DIR}
           DESTINATION usr/lib/netdata
-          COMPONENT plugin-ibm-libs
+          COMPONENT ${component}
           USE_SOURCE_PERMISSIONS
           FILES_MATCHING REGEX "(${_file_group_0})"
                          REGEX "(${_file_group_1})"
