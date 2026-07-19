@@ -4169,11 +4169,21 @@ else()
         set(NETDATA_SYSTEMD_UNIT_DEST "lib/systemd/system")
 endif()
 
+# The spec packages the systemd-235-compatible unit variant on EL 7 and
+# Amazon Linux 2.
+set(NETDATA_PACKAGED_SYSTEMD_UNIT "${CMAKE_BINARY_DIR}/system/systemd/netdata.service")
+if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm" AND
+   ((NETDATA_DISTRO_EL AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 7) OR
+    (NETDATA_DISTRO_AMZN AND NETDATA_DISTRO_VERSION_MAJOR LESS_EQUAL 2)))
+        set(NETDATA_PACKAGED_SYSTEMD_UNIT "${CMAKE_BINARY_DIR}/system/systemd/netdata.service.v235")
+endif()
+
 if(BUILD_FOR_PACKAGING)
         install(FILES
-                ${CMAKE_BINARY_DIR}/system/systemd/netdata.service
+                ${NETDATA_PACKAGED_SYSTEMD_UNIT}
                 COMPONENT netdata
-                DESTINATION ${NETDATA_SYSTEMD_UNIT_DEST})
+                DESTINATION ${NETDATA_SYSTEMD_UNIT_DEST}
+                RENAME netdata.service)
         install(FILES
                 ${CMAKE_BINARY_DIR}/system/systemd/sysusers/netdata.conf
                 COMPONENT user

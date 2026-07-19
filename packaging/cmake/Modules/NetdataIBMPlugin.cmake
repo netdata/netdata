@@ -132,6 +132,9 @@ function(install_ibm_runtime component)
   # Packaging.cmake, which turns these into CPack RPM file-list entries and
   # ownership/packaging exclusions; unused by other package formats.
   set(_rpm_filelist "")
+  # The bare MANIFEST entry is real: the staged tree contains it (distinct
+  # from the MANIFEST.Redist file this function parses) and the spec does not
+  # package it.
   set(_rpm_excludes
       "/usr/lib/netdata/${IBM_MQ_DIR_NAME}"
       "/usr/lib/netdata/${IBM_MQ_DIR_NAME}/MANIFEST")

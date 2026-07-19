@@ -19,6 +19,11 @@ REF_DIR="${1:?usage: compare-rpms.sh <reference-dir> <candidate-dir> [allowlist]
 NEW_DIR="${2:?usage: compare-rpms.sh <reference-dir> <candidate-dir> [allowlist]}"
 ALLOWLIST="${3:-}"
 
+command -v rpm >/dev/null 2>&1 || {
+    echo "ERROR: the rpm binary is required for the comparison" >&2
+    exit 2
+}
+
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "${WORK_DIR}"' EXIT INT TERM
 
@@ -51,9 +56,20 @@ render_dir() {
     for _pkg in "${_dir}"/*.rpm; do
         [ -e "${_pkg}" ] || continue
         _name="$(rpm -qp --qf '%{NAME}' "${_pkg}" 2>/dev/null)"
+        if [ -z "${_name}" ]; then
+            echo "ERROR: cannot read package name from ${_pkg}" >&2
+            exit 2
+        fi
         report_rpm "${_pkg}" > "${_out}/${_name}.report"
         echo "${_name}"
     done | sort > "${_out}/.package-set"
+
+    # An empty set means the input directory has no readable RPMs; comparing
+    # two empty sets must not pass as parity.
+    if [ ! -s "${_out}/.package-set" ]; then
+        echo "ERROR: no RPM packages found in ${_dir}" >&2
+        exit 2
+    fi
 }
 
 render_dir "${REF_DIR}" "${WORK_DIR}/ref"
@@ -79,9 +95,9 @@ filter_allowed() {
     # real +/- body line, including ones whose content itself starts with +
     # or -; a hunk whose every +/- line is allowlisted counts as clean.
     if [ -s "${ALLOW_PATTERNS}" ]; then
-        grep -vE '^(\+\+\+ |--- )' | { grep -E '^[+-]' || true; } | { grep -vEf "${ALLOW_PATTERNS}" || true; }
+        grep -vE '^(\+\+\+ |--- )/' | { grep -E '^[+-]' || true; } | { grep -vEf "${ALLOW_PATTERNS}" || true; }
     else
-        grep -vE '^(\+\+\+ |--- )' | { grep -E '^[+-]' || true; }
+        grep -vE '^(\+\+\+ |--- )/' | { grep -E '^[+-]' || true; }
     fi
 }
 

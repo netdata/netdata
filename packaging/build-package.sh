@@ -140,10 +140,14 @@ case "${PKG_TYPE}" in
             *suse*|sles) is_suse=1 ;;
         esac
 
-        is_el7=0
+        # "Legacy" here means EL <= 7 or Amazon Linux 2, the targets the
+        # spec treats as the pre-weak-deps generation. Deliberate deviations
+        # from the spec: EL 6 and i386 are not distinguished (both are dead
+        # targets the v2 builder matrix does not contain).
+        is_legacy_rpm=0
         if { [ "${is_el}" = 1 ] && [ "${distro_major}" -le 7 ]; } || \
            { [ "${ID}" = "amzn" ] && [ "${distro_major}" -le 2 ]; }; then
-            is_el7=1
+            is_legacy_rpm=1
         fi
 
         if [ "${arch}" = "x86_64" ]; then
@@ -152,7 +156,7 @@ case "${PKG_TYPE}" in
             add_cmake_option ENABLE_PLUGIN_EBPF Off
         fi
 
-        if [ "${arch}" = "x86_64" ] && [ "${is_el7}" = 0 ]; then
+        if [ "${arch}" = "x86_64" ] && [ "${is_legacy_rpm}" = 0 ]; then
             add_cmake_option ENABLE_PLUGIN_IBM On
         else
             add_cmake_option ENABLE_PLUGIN_IBM Off
@@ -160,7 +164,7 @@ case "${PKG_TYPE}" in
 
         add_cmake_option ENABLE_PLUGIN_XENSTAT Off
 
-        if [ "${is_el7}" = 1 ]; then
+        if [ "${is_legacy_rpm}" = 1 ]; then
             add_cmake_option ENABLE_PLUGIN_CUPS Off
             add_cmake_option ENABLE_PLUGIN_SYSTEMD_UNITS Off
         else
@@ -215,7 +219,6 @@ case "${PKG_TYPE}" in
         # build environment, or the binaries differ (missing hardening and
         # fortified symbols, extra sonames without --as-needed):
         # - distro compiler/linker flags from the rpm build macros;
-        # - BUILD_SHARED_LIBS=ON, which the redhat and suse macros both pass;
         # - an empty CMAKE_BUILD_TYPE on the redhat macro family (it sets
         #   none), RelWithDebInfo on SUSE (its macro sets it).
         CFLAGS="${CFLAGS:-$(rpm -E '%{?build_cflags}')}"
@@ -225,7 +228,10 @@ case "${PKG_TYPE}" in
         LDFLAGS="${LDFLAGS:-$(rpm -E '%{?build_ldflags}')}"
         export CFLAGS CXXFLAGS LDFLAGS
 
-        add_cmake_option BUILD_SHARED_LIBS On
+        # The distro %cmake macros also pass BUILD_SHARED_LIBS=ON, but the
+        # top-level CMakeLists.txt unconditionally overwrites that variable
+        # from STATIC_BUILD, so passing it here would be inert (it is equally
+        # inert for the spec path, so parity holds without it).
 
         if [ "${is_suse}" = 0 ]; then
             add_cmake_option CMAKE_BUILD_TYPE ""
