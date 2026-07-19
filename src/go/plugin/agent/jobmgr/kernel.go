@@ -425,63 +425,63 @@ type commandLane struct {
 	shutdownAction     lifecycle.TaskActionKind
 }
 
-type readyRing struct {
+type readyQueue struct {
 	head *commandLane
 	tail *commandLane
 	len  int
 }
 
-func (rr *readyRing) push(lane *commandLane) {
+func (rq *readyQueue) push(lane *commandLane) {
 	if lane.ready {
 		return
 	}
 	lane.ready = true
-	lane.readyPrev = rr.tail
-	if rr.tail != nil {
-		rr.tail.readyNext = lane
+	lane.readyPrev = rq.tail
+	if rq.tail != nil {
+		rq.tail.readyNext = lane
 	} else {
-		rr.head = lane
+		rq.head = lane
 	}
-	rr.tail = lane
-	rr.len++
+	rq.tail = lane
+	rq.len++
 }
 
-func (rr *readyRing) pop() *commandLane {
-	lane := rr.head
+func (rq *readyQueue) pop() *commandLane {
+	lane := rq.head
 	if lane == nil {
 		return nil
 	}
-	rr.head = lane.readyNext
-	if rr.head != nil {
-		rr.head.readyPrev = nil
+	rq.head = lane.readyNext
+	if rq.head != nil {
+		rq.head.readyPrev = nil
 	} else {
-		rr.tail = nil
+		rq.tail = nil
 	}
 	lane.ready = false
 	lane.readyPrev = nil
 	lane.readyNext = nil
-	rr.len--
+	rq.len--
 	return lane
 }
 
-func (rr *readyRing) remove(lane *commandLane) {
+func (rq *readyQueue) remove(lane *commandLane) {
 	if !lane.ready {
 		return
 	}
 	if lane.readyPrev != nil {
 		lane.readyPrev.readyNext = lane.readyNext
 	} else {
-		rr.head = lane.readyNext
+		rq.head = lane.readyNext
 	}
 	if lane.readyNext != nil {
 		lane.readyNext.readyPrev = lane.readyPrev
 	} else {
-		rr.tail = lane.readyPrev
+		rq.tail = lane.readyPrev
 	}
 	lane.ready = false
 	lane.readyPrev = nil
 	lane.readyNext = nil
-	rr.len--
+	rq.len--
 }
 
 type deadlineEntry struct {
@@ -568,7 +568,7 @@ type CommandKernel struct {
 	lanes                    map[commandLaneKey]*commandLane
 	laneSlots                []*commandLane
 	freeLane                 uint32
-	ready                    [2]readyRing
+	ready                    [2]readyQueue
 	nextID                   lifecycle.OperationID
 	nextResourceGeneration   uint64
 	nextSource               lifecycle.Source

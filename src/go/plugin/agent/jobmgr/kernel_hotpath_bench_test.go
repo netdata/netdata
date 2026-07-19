@@ -8,7 +8,7 @@ import (
 )
 
 func BenchmarkBCommandKernelLaneOps(b *testing.B) {
-	var ring readyRing
+	var ring readyQueue
 	lane := &commandLane{source: lifecycle.SourceJobManager}
 	b.ReportAllocs()
 	for b.Loop() {
