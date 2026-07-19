@@ -111,21 +111,20 @@ type taskRequestQueue struct {
 }
 
 type TaskSupervisor struct {
-	frame         *FrameOwner
-	inherited     inheritedTaskRegistry
-	longLived     longLivedRegistry
-	slots         []*taskSlot
-	freeSlot      uint32
-	requests      []*taskRequest
-	pending       [2]taskRequestQueue
-	freeRequest   uint32
-	nextClass     TaskClass
-	completions   chan TaskCompletion
-	acks          chan TaskAcknowledgement
-	launchHandoff chan struct{}
-	active        int
-	retained      int
-	saturated     bool
+	frame       *FrameOwner
+	inherited   inheritedTaskRegistry
+	longLived   longLivedRegistry
+	slots       []*taskSlot
+	freeSlot    uint32
+	requests    []*taskRequest
+	pending     [2]taskRequestQueue
+	freeRequest uint32
+	nextClass   TaskClass
+	completions chan TaskCompletion
+	acks        chan TaskAcknowledgement
+	active      int
+	retained    int
+	saturated   bool
 
 	admissionReadyMu      sync.Mutex
 	onAdmissionReady      func()
@@ -137,11 +136,10 @@ func NewTaskSupervisor(frame *FrameOwner) (*TaskSupervisor, error) {
 		return nil, errors.New("jobmgr task supervisor: nil FrameOwner")
 	}
 	supervisor := &TaskSupervisor{
-		frame:         frame,
-		requests:      []*taskRequest{nil},
-		completions:   make(chan TaskCompletion, TaskStartServiceQuantum),
-		acks:          make(chan TaskAcknowledgement, TaskStartServiceQuantum),
-		launchHandoff: make(chan struct{}, 1),
+		frame:       frame,
+		requests:    []*taskRequest{nil},
+		completions: make(chan TaskCompletion, TaskStartServiceQuantum),
+		acks:        make(chan TaskAcknowledgement, TaskStartServiceQuantum),
 	}
 	supervisor.inherited.initialize()
 	supervisor.longLived.initialize()
@@ -559,7 +557,6 @@ func (supervisor *TaskSupervisor) start(parent context.Context, plan TaskPlan, i
 	supervisor.active++
 	launched = true
 	go supervisor.runChild(ctx, ref, slot, plan, initial)
-	<-supervisor.launchHandoff
 	return ref, nil
 }
 
@@ -856,7 +853,6 @@ func (supervisor *TaskSupervisor) TakeDisposedResourceTransaction(
 }
 
 func (supervisor *TaskSupervisor) runChild(ctx context.Context, ref TaskRef, slot *taskSlot, plan TaskPlan, outcome TaskOutcome) {
-	supervisor.launchHandoff <- struct{}{}
 	var err error
 	if outcome.empty() {
 		if plan.Runner != nil {

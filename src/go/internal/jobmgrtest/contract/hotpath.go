@@ -71,7 +71,6 @@ var bmM002HotpathRows = [...]HotpathGate{
 		Tests: []string{
 			"TestTaskSupervisorDynamicPopulationAndGenerationCheckedReuse",
 			"TestTaskSupervisorDispatchRotatesPendingClasses",
-			"TestTaskSupervisorDispatchHandsOffEachLaunchBeforeReturning",
 			"TestTaskSupervisorFrameworkControlStartsWithManyActiveGenericTasks",
 			"TestTaskSupervisorRetainedTimeoutCountAndSaturationLatch",
 			"TestPendingTaskRequestPopulationGrowsBeyondFormerLimit",
