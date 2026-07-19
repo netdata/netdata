@@ -251,6 +251,22 @@ if(NOT NETDATA_PACKAGING_FORMAT STREQUAL "" AND
         message(FATAL_ERROR "Invalid NETDATA_PACKAGING_FORMAT '${NETDATA_PACKAGING_FORMAT}' (expected deb, rpm, or empty)")
 endif()
 
+# A few payloads live in different packages per format: the spec keeps the
+# sensors3/otel stock configs and nd-mcp in the main RPM and the swagger
+# files in the dashboard RPM, while the DEB layout groups them with their
+# plugins (and swagger with the main package).
+if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+        set(NETDATA_SENSORS3_COMPONENT netdata)
+        set(NETDATA_ND_MCP_COMPONENT netdata)
+        set(NETDATA_OTEL_CONF_COMPONENT netdata)
+        set(NETDATA_SWAGGER_COMPONENT dashboard)
+else()
+        set(NETDATA_SENSORS3_COMPONENT plugin-debugfs)
+        set(NETDATA_ND_MCP_COMPONENT plugin-go)
+        set(NETDATA_OTEL_CONF_COMPONENT plugin-otel)
+        set(NETDATA_SWAGGER_COMPONENT netdata)
+endif()
+
 cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS" False)
 mark_as_advanced(ENABLE_LIBBACKTRACE)
 cmake_dependent_option(ENABLE_LIBUNWIND "Use libunwind for stack traces in log output" False "NOT ENABLE_LIBBACKTRACE" False)
@@ -497,6 +513,17 @@ endif()
 set(PKG_FILES_PATH "${CMAKE_SOURCE_DIR}/packaging/cmake/pkg-files")
 
 include(NetdataOSRelease)
+
+# DEB policy requires a copyright file in every binary package; RPMs do not
+# ship one (netdata.spec.in never packaged it).
+function(netdata_add_deb_copyright component package_name)
+        if(BUILD_FOR_PACKAGING AND NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+                install(FILES
+                        "${PKG_FILES_PATH}/copyright"
+                        COMPONENT "${component}"
+                        DESTINATION "usr/share/doc/${package_name}")
+        endif()
+endfunction()
 
 if(ENABLE_PLUGIN_EBPF)
         include(NetdataLibBPF)
@@ -2844,17 +2871,12 @@ if(ENABLE_PLUGIN_DEBUGFS)
 
     install(FILES
             src/collectors/debugfs.plugin/libsensors/vendored/etc/sensors.conf.default
-            COMPONENT plugin-debugfs
+            COMPONENT ${NETDATA_SENSORS3_COMPONENT}
             DESTINATION usr/lib/netdata/conf.d
             RENAME sensors3.conf)
 
     # Install additional packaging files if building for packaging
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-debugfs
-                DESTINATION usr/share/doc/netdata-plugin-debugfs)
-    endif()
+    netdata_add_deb_copyright(plugin-debugfs netdata-plugin-debugfs)
 endif()
 
 add_executable(spawn-tester src/libnetdata/spawn_server/spawn-tester.c)
@@ -2915,12 +2937,7 @@ if(ENABLE_PLUGIN_APPS)
             COMPONENT plugin-apps
             DESTINATION usr/lib/netdata/conf.d)
 
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-apps
-                DESTINATION usr/share/doc/netdata-plugin-apps)
-    endif()
+    netdata_add_deb_copyright(plugin-apps netdata-plugin-apps)
 endif()
 
 if(ENABLE_PLUGIN_FREEIPMI)
@@ -2937,12 +2954,7 @@ if(ENABLE_PLUGIN_FREEIPMI)
             COMPONENT plugin-freeipmi
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-freeipmi
-                DESTINATION usr/share/doc/netdata-plugin-freeipmi)
-    endif()
+    netdata_add_deb_copyright(plugin-freeipmi netdata-plugin-freeipmi)
 endif()
 
 if(ENABLE_PLUGIN_NFACCT)
@@ -2963,12 +2975,7 @@ if(ENABLE_PLUGIN_NFACCT)
             COMPONENT plugin-nfacct
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-nfacct
-                DESTINATION usr/share/doc/netdata-plugin-nfacct)
-    endif()
+    netdata_add_deb_copyright(plugin-nfacct netdata-plugin-nfacct)
 endif()
 
 if(ENABLE_PLUGIN_XENSTAT)
@@ -2986,12 +2993,7 @@ if(ENABLE_PLUGIN_XENSTAT)
             COMPONENT plugin-xenstat
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-xenstat
-                DESTINATION usr/share/doc/netdata-plugin-xenstat)
-    endif()
+    netdata_add_deb_copyright(plugin-xenstat netdata-plugin-xenstat)
 endif()
 
 if(ENABLE_PLUGIN_PERF)
@@ -3004,12 +3006,7 @@ if(ENABLE_PLUGIN_PERF)
             COMPONENT plugin-perf
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    if(BUILD_FOR_PACKAGING)
-         install(FILES
-                 ${PKG_FILES_PATH}/copyright
-                 COMPONENT plugin-perf
-                 DESTINATION usr/share/doc/netdata-plugin-perf)
-    endif()
+    netdata_add_deb_copyright(plugin-perf netdata-plugin-perf)
 endif()
 
 if(ENABLE_PLUGIN_SLABINFO)
@@ -3022,12 +3019,7 @@ if(ENABLE_PLUGIN_SLABINFO)
             COMPONENT plugin-slabinfo
             DESTINATION usr/libexec/netdata/plugins.d)
 
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-slabinfo
-                DESTINATION usr/share/doc/netdata-plugin-slabinfo)
-    endif()
+    netdata_add_deb_copyright(plugin-slabinfo netdata-plugin-slabinfo)
 endif()
 
 
@@ -3062,12 +3054,7 @@ if(ENABLE_PLUGIN_CUPS)
                 COMPONENT plugin-cups
                 DESTINATION usr/libexec/netdata/plugins.d)
 
-        if(BUILD_FOR_PACKAGING)
-                install(FILES
-                        ${PKG_FILES_PATH}/copyright
-                        COMPONENT plugin-cups
-                        DESTINATION usr/share/doc/netdata-plugin-cups)
-        endif()
+        netdata_add_deb_copyright(plugin-cups netdata-plugin-cups)
     endif()
 endif()
 
@@ -3191,12 +3178,7 @@ if(ENABLE_PLUGIN_SYSTEMD_JOURNAL)
                 COMPONENT plugin-systemd-journal
                 DESTINATION usr/libexec/netdata/plugins.d)
 
-        if(BUILD_FOR_PACKAGING)
-                install(FILES
-                        ${PKG_FILES_PATH}/copyright
-                        COMPONENT plugin-systemd-journal
-                        DESTINATION usr/share/doc/netdata-plugin-systemd-journal)
-        endif()
+        netdata_add_deb_copyright(plugin-systemd-journal netdata-plugin-systemd-journal)
 endif()
 
 if(ENABLE_PLUGIN_SYSTEMD_UNITS)
@@ -3217,12 +3199,7 @@ if(ENABLE_PLUGIN_SYSTEMD_UNITS)
                 COMPONENT plugin-systemd-units
                 DESTINATION usr/libexec/netdata/plugins.d)
 
-        if(BUILD_FOR_PACKAGING)
-                install(FILES
-                        ${PKG_FILES_PATH}/copyright
-                        COMPONENT plugin-systemd-units
-                        DESTINATION usr/share/doc/netdata-plugin-systemd-units)
-        endif()
+        netdata_add_deb_copyright(plugin-systemd-units netdata-plugin-systemd-units)
 endif()
 
 if(OS_WINDOWS)
@@ -3397,12 +3374,7 @@ if(ENABLE_PLUGIN_EBPF)
             COMPONENT plugin-ebpf
             DESTINATION usr/lib/netdata/conf.d/ebpf.d)
 
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-ebpf
-                DESTINATION usr/share/doc/netdata-plugin-ebpf)
-    endif()
+    netdata_add_deb_copyright(plugin-ebpf netdata-plugin-ebpf)
 
     if(ENABLE_LEGACY_EBPF_PROGRAMS)
         netdata_install_legacy_ebpf_code()
@@ -3516,12 +3488,7 @@ if(ENABLE_PLUGIN_NETWORK_VIEWER)
                 target_link_libraries(network-viewer-topology-containers-test libnetdata)
         endif()
 
-        if(BUILD_FOR_PACKAGING)
-                install(FILES
-                        ${PKG_FILES_PATH}/copyright
-                        COMPONENT plugin-network-viewer
-                        DESTINATION usr/share/doc/netdata-plugin-network-viewer)
-        endif()
+        netdata_add_deb_copyright(plugin-network-viewer netdata-plugin-network-viewer)
 endif()
 
 #
@@ -3784,7 +3751,7 @@ if(ENABLE_PLUGIN_GO)
         add_go_target(nd-mcp-target ${ND_MCP_NAME} src/web/mcp/bridges/stdio-golang .)
         install(PROGRAMS
                 ${CMAKE_BINARY_DIR}/${ND_MCP_NAME}
-                COMPONENT plugin-go
+                COMPONENT ${NETDATA_ND_MCP_COMPONENT}
                 DESTINATION "${BINDIR}")
     endif()
 endif()
@@ -3859,7 +3826,7 @@ if(ENABLE_PLUGIN_OTEL)
                       COMPONENT plugin-otel)
 
     install(FILES src/crates/otel-ingestor/configs/otel.d/v1/metrics/hostmetrics-receiver.yaml
-            COMPONENT plugin-otel
+            COMPONENT ${NETDATA_OTEL_CONF_COMPONENT}
             DESTINATION usr/lib/netdata/conf.d/otel.d/v1/metrics)
 
     install(DIRECTORY COMPONENT plugin-otel DESTINATION etc/netdata/otel.d/v1/metrics)
@@ -4049,7 +4016,7 @@ if(ENABLE_PLUGIN_OTEL)
                    @ONLY)
 
     install(FILES ${CMAKE_BINARY_DIR}/src/crates/otel-plugin/configs/otel.yaml
-            COMPONENT plugin-otel
+            COMPONENT ${NETDATA_OTEL_CONF_COMPONENT}
             DESTINATION usr/lib/netdata/conf.d)
 endif()
 
@@ -4094,7 +4061,7 @@ install(FILES
 install(FILES
         src/web/api/netdata-swagger.json
         src/web/api/netdata-swagger.yaml
-        COMPONENT netdata
+        COMPONENT ${NETDATA_SWAGGER_COMPONENT}
         DESTINATION ${WEB_DEST})
 
 #
@@ -4307,6 +4274,16 @@ if(NOT OS_WINDOWS)
           COMPONENT netdata
           DESTINATION ${NETDATA_CONF_DEST})
 
+  if(BUILD_FOR_PACKAGING AND NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+    # The spec ships the stock copies under /usr/lib/netdata/conf.d in
+    # addition to the %config(noreplace) ones in /etc/netdata.
+    install(FILES
+            system/netdata.conf
+            system/netdata-updater.conf
+            COMPONENT netdata
+            DESTINATION usr/lib/netdata/conf.d)
+  endif()
+
   configure_file(system/cron/netdata-updater-daily.in
                  system/cron/netdata-updater-daily
                  @ONLY)
@@ -4448,12 +4425,7 @@ if(ENABLE_PLUGIN_CHARTS)
           COMPONENT plugin-chartsd
           DESTINATION usr/lib/netdata/conf.d/charts.d)
 
-  if(BUILD_FOR_PACKAGING)
-    install(FILES
-            ${PKG_FILES_PATH}/copyright
-            COMPONENT plugin-chartsd
-            DESTINATION usr/share/doc/netdata-plugin-chartsd)
-  endif()
+  netdata_add_deb_copyright(plugin-chartsd netdata-plugin-chartsd)
 endif()
 
 # This is needed both by the TC plugin (which only gets built on Linux) and the charts plugin.
@@ -4526,12 +4498,7 @@ if(ENABLE_PLUGIN_PYTHON)
           COMPONENT plugin-pythond
           DESTINATION usr/libexec/netdata/python.d)
 
-  if(BUILD_FOR_PACKAGING)
-    install(FILES
-            ${PKG_FILES_PATH}/copyright
-            COMPONENT plugin-pythond
-            DESTINATION usr/share/doc/netdata-plugin-pythond)
-  endif()
+  netdata_add_deb_copyright(plugin-pythond netdata-plugin-pythond)
 endif()
 
 #
@@ -4697,12 +4664,7 @@ if(ENABLE_PLUGIN_GO)
             COMPONENT plugin-go
             DESTINATION usr/lib/netdata/conf.d/go.d/cloudwatch.profiles/default)
 
-    if(BUILD_FOR_PACKAGING)
-        install(FILES
-                ${PKG_FILES_PATH}/copyright
-                COMPONENT plugin-go
-                DESTINATION usr/share/doc/netdata-plugin-go)
-    endif()
+    netdata_add_deb_copyright(plugin-go netdata-plugin-go)
 endif()
 
 #
