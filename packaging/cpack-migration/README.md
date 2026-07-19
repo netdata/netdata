@@ -131,14 +131,29 @@ two reviewed deviations, each documented in place: the `.build-id` artifact
 paths, which are content hashes and cannot match across two separate builds,
 and a single blank line CPack inserts ahead of embedded scriptlet bodies.
 
-Against that harness the branch reaches full parity on a four-distro sample
+Against that harness the branch reaches full parity on a five-distro sample
 covering each RPM family we ship: CentOS Stream 9 with twenty-three
 packages, Fedora 42 and openSUSE 15.6 with twenty-four each (nfacct exists
-on those two), and Amazon Linux 2023 with twenty-two. Getting there took
-three iterations on CentOS Stream 9 — which flushed out the build-flag and
-directory-ownership classes — after which Fedora and Amazon passed on their
-first attempt and openSUSE needed only its linker-flag and doc-path
-specifics.
+on those two), Amazon Linux 2023 with twenty-two, and CentOS 7 with
+nineteen. Getting there took three iterations on CentOS Stream 9 — which
+flushed out the build-flag and directory-ownership classes — after which
+Fedora and Amazon passed on their first attempt and openSUSE needed only
+its linker-flag and doc-path specifics. The CentOS 7 run, done later,
+caught three legacy-only classes of its own: the spec bypasses the distro
+`%cmake` macro entirely on EL 7 and Amazon Linux 2 (it redefines `%cmake`
+to a bare `/cmake/bin/cmake`), so exporting the distro hardening flags
+there over-hardened every binary; rpm 4.11 defaults its documentation
+directory to the versioned `%{NAME}-%{VERSION}` form; and the v2 builder
+image carried an EPEL macros package whose sysusers generator invented
+`user()`/`group()` provides the spec-built packages lack.
+
+CentOS Stream 10 has no spec reference to compare against — its v1 image
+cannot build at all — so it was validated by building the packages and
+inspecting the result directly: the twenty-three-package set, the SUID and
+capability sets (including the `cap_perfmon` variant), the weak
+dependencies, the sysusers-based user package with rpm's generated account
+provides, the config-file flags, the state-directory ownership and the
+embedded changelog all match the spec's contract for EL 10.
 
 Because two of the shared fixes touch the DEB path, we also rebuilt the DEBs
 on debian12 from the branch base and from the branch head and compared them.
@@ -163,10 +178,11 @@ The CI flip — pointing `distros.yml` at the `v2` builders, wiring the
 parity harness into a workflow, and upgrade-path testing from spec-built to
 CPack-built RPMs on a live system — is the follow-up this branch was scoped
 to stop short of, so that the switch is a reviewable decision of its own.
-EL 7 and Amazon Linux 2 are implemented (weak-dep downgrades, python2, the
-v235 unit) and their images now carry CMake 4.1.6, but no parity run has
-been done on them, so the claims there should still be established
-empirically, including how their rpm macro sets actually behave. Two
+CentOS 7 has since been parity-proven, which leaves Amazon Linux 2 as the
+one implemented-but-unvalidated platform (weak-dep downgrades, python2,
+the v235 unit): it shares every legacy fix the CentOS 7 run produced, but
+its own parity run and the behavior of its rpm macro set should still be
+established empirically. Two
 smaller observations from the image work also await a decision: the
 fedora41 Dockerfiles (both revisions) were rotated out of the image build
 matrix when Fedora 44 was added but were not deleted, contrary to the
