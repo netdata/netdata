@@ -57,8 +57,13 @@ var (
 	keyPaths       dedupPaths
 	dedupSeparator string
 	startTime      time.Time
-	dedupLogger    *os.File
-	dedupLogFile   string // Store the deduplication log file path
+	// dedupLogger is written by concurrent HTTP handlers and closed by main()
+	// on shutdown. dedupLoggerMu serializes those accesses to avoid a data race
+	// where a handler writes to (or dereferences) an *os.File that main() is
+	// concurrently closing.
+	dedupLogger   *os.File
+	dedupLoggerMu sync.RWMutex
+	dedupLogFile  string // Store the deduplication log file path
 
 	// Track active connections for graceful shutdown
 	activeConnections int32
@@ -382,11 +387,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 		// Write to stdout for normal processing
 		fmt.Println(string(outputBytes))
 		requestsCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("status", "success")))
-	} else if dedupLogger != nil {
-		// Write to dedup log file if it's a duplicate and logging is enabled
-		if _, err := fmt.Fprintln(dedupLogger, string(outputBytes)); err != nil {
-			slog.Error("failed to write to deduplication log file", "error", err)
-		}
+	} else {
+		// Write to dedup log file if it's a duplicate and logging is enabled.
+		// The read of dedupLogger and the write to it must happen under the
+		// same RLock to prevent main() from closing the file in between.
+		writeDedupLog(outputBytes)
 	}
 
 	// Send response
@@ -420,11 +425,13 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 	mapMutex.Lock()
 	mapSize := len(seenIDs)
 	mapMutex.Unlock()
+	dedupLoggerMu.RLock()
 	dedupLogEnabled := dedupLogger != nil
 	dedupLogPath := ""
 	if dedupLogEnabled {
 		dedupLogPath = dedupLogFile
 	}
+	dedupLoggerMu.RUnlock()
 	status["deduplication"] = map[string]interface{}{
 		"enabled":     len(keyPaths) > 0,
 		"keys":        keyPaths,
@@ -490,14 +497,16 @@ func main() {
 	seenIDs = make(map[[32]byte]seenEntry)
 	dedupWindow = time.Duration(*dedupSeconds) * time.Second
 
-	// Open deduplication log file if specified
+	// Open deduplication log file if specified. The initial assignment happens
+	// before any HTTP handler goroutine is started, so it does not need a lock;
+	// concurrent access starts only once ListenAndServe is running below.
 	if dedupLogFile != "" {
-		var err error
-		dedupLogger, err = os.OpenFile(dedupLogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+		f, err := os.OpenFile(dedupLogFile, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 		if err != nil {
 			slog.Error("failed to open deduplication log file", "file", dedupLogFile, "error", err)
 			os.Exit(1)
 		}
+		dedupLogger = f
 		slog.Info("deduplication log file opened", "path", dedupLogFile)
 	}
 
@@ -580,16 +589,43 @@ func main() {
 			slog.Info("server shutdown completed gracefully")
 		}
 
-		// Close deduplication log file if open
-		if dedupLogger != nil {
-			slog.Info("closing deduplication log file")
-			if err := dedupLogger.Close(); err != nil {
-				slog.Error("failed to close deduplication log file", "error", err)
-			}
-		}
+		// Close deduplication log file if open. Acquiring the write lock here
+		// guarantees no handler is mid-write; setting the pointer to nil makes
+		// any late handler skip the write branch cleanly.
+		closeDedupLogger()
 	}
 
 	slog.Info("server exiting")
+}
+
+// writeDedupLog appends one line to the deduplication log file if it is open.
+// It holds dedupLoggerMu for read to keep the nil-check, the *os.File deref
+// and the underlying Write() call inside the same critical section.
+func writeDedupLog(line []byte) {
+	dedupLoggerMu.RLock()
+	defer dedupLoggerMu.RUnlock()
+	if dedupLogger == nil {
+		return
+	}
+	if _, err := fmt.Fprintln(dedupLogger, string(line)); err != nil {
+		slog.Error("failed to write to deduplication log file", "error", err)
+	}
+}
+
+// closeDedupLogger closes the deduplication log file and clears the pointer
+// under the write lock so that any handler waking up afterwards observes
+// dedupLogger == nil rather than an already-closed *os.File.
+func closeDedupLogger() {
+	dedupLoggerMu.Lock()
+	defer dedupLoggerMu.Unlock()
+	if dedupLogger == nil {
+		return
+	}
+	slog.Info("closing deduplication log file")
+	if err := dedupLogger.Close(); err != nil {
+		slog.Error("failed to close deduplication log file", "error", err)
+	}
+	dedupLogger = nil
 }
 
 // --- Helper Functions ---
