@@ -99,13 +99,24 @@ to RelWithDebInfo for every configure — the spec's rpmbuild run included.
 One hard dependency came out of CPack itself: it only emits `Recommends:`
 from CMake 4.1 on, and silently ignores the variables on anything older.
 Since dnf installs recommends by default, silently losing them would be a
-real behavioral regression, so the RPM `v2` images now carry CMake 4.1.6
-under `/cmake` (the entrypoint already preferred that path — the mechanism
-the spec builds use for EL 7), and the configure fails fast if the RPM
-format is requested on an older CMake. The image changes live on the
+real behavioral regression, so all eighteen RPM `v2` images now carry CMake
+4.1.6 under `/cmake` (the entrypoint already preferred that path — the
+mechanism the spec builds use for EL 7), and the configure fails fast if
+the RPM format is requested on an older CMake. The install goes through a
+single shared `scripts/install-cmake.sh` in the image repository, which
+pins the upstream SHA-256 per architecture and fails the image build on any
+mismatch, stalled download, or unexpected tarball layout; the centos7 and
+amazonlinux2 images, which had been carrying their own pinned CMake 3.27.6
+installer, moved onto the same script. The image changes live on the
 `cpack-rpm-cmake` branch of helper-images, together with an `rpm-build`
-addition for the openSUSE and Amazon images, which listed only `rpmdevtools`
-and could never have run `cpack -G RPM`.
+addition for the openSUSE and Amazon images (which listed only
+`rpmdevtools` and could never have run `cpack -G RPM`) and the removal of
+libmongoc from the three EL10 images, where the package does not exist in
+EPEL 10 and had been making those images unbuildable — netdata disables
+the MongoDB exporter on EL 10 for the same reason. Every edited image was
+rebuilt locally and checked to report CMake 4.1.6 with rpmbuild present,
+and the branch went through three multi-model review rounds of its own
+before settling.
 
 ## How we tested it
 
@@ -148,15 +159,20 @@ The last three rounds returned unanimous approvals with no blocking issues.
 
 ## What is deliberately not here
 
-The CI flip — pointing `distros.yml` at the `v2` builders, extending the
-CMake install to the remaining RPM images, wiring the parity harness into a
-workflow, and upgrade-path testing from spec-built to CPack-built RPMs on a
-live system — is the follow-up this branch was scoped to stop short of, so
-that the switch is a reviewable decision of its own. EL 7 and Amazon Linux 2
-are implemented (weak-dep downgrades, python2, the v235 unit) but
-unvalidated, since their images lack CMake 4.1 and the parity claims there
-should be established empirically, including how their rpm macro sets
-actually behave. Three latent DEB-side typos found during review were left
+The CI flip — pointing `distros.yml` at the `v2` builders, wiring the
+parity harness into a workflow, and upgrade-path testing from spec-built to
+CPack-built RPMs on a live system — is the follow-up this branch was scoped
+to stop short of, so that the switch is a reviewable decision of its own.
+EL 7 and Amazon Linux 2 are implemented (weak-dep downgrades, python2, the
+v235 unit) and their images now carry CMake 4.1.6, but no parity run has
+been done on them, so the claims there should still be established
+empirically, including how their rpm macro sets actually behave. Two
+smaller observations from the image work also await a decision: the
+fedora41 Dockerfiles (both revisions) were rotated out of the image build
+matrix when Fedora 44 was added but were not deleted, contrary to the
+repository's usual cleanup of rotated-out images, and the `v1` EL10
+Dockerfiles share the libmongoc defect fixed on the `v2` side and cannot
+build today. Three latent DEB-side typos found during review were left
 alone on purpose because fixing them changes DEB output — two dead
 per-component debuginfo variables and a misspelled `PACHAGE_DEPENDS` that
 leaves the pythond DEB without its declared python3 dependency — and they
