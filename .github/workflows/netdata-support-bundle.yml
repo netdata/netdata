@@ -74,7 +74,7 @@ jobs:
           sh packaging/installer/netdata-support-bundle.sh --timeout 3 --since 1 -o "$output"
           bundle=$(find "$output" -maxdepth 1 \( -name '*.tar.gz' -o -name '*.tar.zst' \) -print -quit)
           test -n "$bundle"
-          tar -xf "$bundle" -C "$extract"
+          tar -xaf "$bundle" -C "$extract"
           root=$(find "$extract" -mindepth 1 -maxdepth 1 -type d -print -quit)
           if ! test -s "$root/01-system/os-release.txt"; then
             echo 'OS release fixture is missing or empty' >&2
