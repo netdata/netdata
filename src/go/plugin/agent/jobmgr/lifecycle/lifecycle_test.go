@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"runtime"
 	"strings"
 	"sync"
 	"testing"
@@ -1286,6 +1287,68 @@ func TestTaskSupervisorDispatchRotatesPendingClasses(t *testing.T) {
 		if err := supervisor.Release(ack.Ref); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestTaskSupervisorDispatchHandsOffEachLaunchBeforeReturning(t *testing.T) {
+	previousProcs := runtime.GOMAXPROCS(1)
+	defer runtime.GOMAXPROCS(previousProcs)
+
+	frame, err := NewFrameOwner(io.Discard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	supervisor, err := NewTaskSupervisor(frame)
+	if err != nil {
+		t.Fatal(err)
+	}
+	entered := make(chan struct{}, TaskStartServiceQuantum)
+	release := make(chan struct{})
+	for range TaskStartServiceQuantum {
+		_, err := supervisor.Enqueue(
+			TaskClassGenericFunction,
+			TaskPlan{
+				Source: SourceFunction,
+				Work: func(context.Context) (TaskOutcome, error) {
+					entered <- struct{}{}
+					<-release
+					return NoValueOutcome(), nil
+				},
+			},
+		)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var started [TaskStartServiceQuantum]TaskStart
+	count, more, err := supervisor.Dispatch(
+		context.Background(),
+		TaskStartServiceQuantum,
+		&started,
+	)
+	if err != nil || count != TaskStartServiceQuantum || more {
+		close(release)
+		t.Fatalf(
+			"dispatch count=%d more=%t err=%v",
+			count,
+			more,
+			err,
+		)
+	}
+	if got := len(entered); got != TaskStartServiceQuantum {
+		close(release)
+		t.Fatalf(
+			"dispatch returned after handing execution to %d/%d children",
+			got,
+			TaskStartServiceQuantum,
+		)
+	}
+
+	close(release)
+	for range TaskStartServiceQuantum {
+		completion := <-supervisor.CompletionCh()
+		terminateAndReleaseTask(t, supervisor, completion.Ref, 2)
 	}
 }
 
