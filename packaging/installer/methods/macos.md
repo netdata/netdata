@@ -134,13 +134,7 @@ We don't recommend installing Netdata from source on macOS, as it can be difficu
    brew install ossp-uuid autoconf automake pkg-config libuv lz4 json-c openssl libtool cmake
    ```
 
-   To include the OpenTelemetry plugin (`otel-plugin`), also install a Rust toolchain. It is built automatically when a toolchain covering the minimum version (`rust-version` in `src/crates/Cargo.toml`) is available:
-
-   ```bash
-   brew install rust
-   ```
-
-   If you use [rustup](https://rustup.rs/), a stable toolchain works as well; Homebrew Rust is only the fallback when neither `cargo` nor `rustup` is present.
+   To include the OpenTelemetry plugin (`otel-plugin`), also install a Rust toolchain — either `brew install rust` or a stable toolchain via [rustup](https://rustup.rs/). The plugin is built automatically when a toolchain covering the minimum version (`rust-version` in `src/crates/Cargo.toml`) is available; without one, the installer prints a warning and builds the agent without the plugin.
 
 4. Download Netdata from our GitHub repository:
 
