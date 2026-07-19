@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# shellcheck disable=SC2034
-# We use lots of computed variable names in here, so we need to disable shellcheck 2034
-# shellcheck disable=SC2329
-# The install_*/validate_* functions are invoked indirectly through the
-# ${package_installer} variable, which shellcheck cannot see
+# shellcheck disable=SC2034,SC2329
+# SC2034: we use lots of computed variable names in here.
+# SC2329: the install_*/validate_* functions are invoked indirectly through
+#         the ${package_installer} variable, which shellcheck cannot see.
 
 export PATH="${PATH}:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 export LC_ALL=C
