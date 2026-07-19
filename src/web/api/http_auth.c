@@ -118,14 +118,19 @@ static bool bearer_token_save_to_file(nd_uuid_t token, struct bearer_token *bt) 
         return false;
     }
 
-    if(fwrite(buffer_tostring(wb), 1, buffer_strlen(wb), fp) != buffer_strlen(wb)) {
-        fclose(fp);
+    size_t len = buffer_strlen(wb);
+    size_t written = fwrite(buffer_tostring(wb), 1, len, fp);
+    int saved_errno = errno;
+    if(fclose(fp) != 0 || written != len) {
+        if(written == len)
+            saved_errno = errno;
+
         unlink(filename);
+        errno = saved_errno;
         nd_log(NDLS_DAEMON, NDLP_ERR, "Cannot save file '%s'", filename);
         return false;
     }
 
-    fclose(fp);
     return true;
 }
 

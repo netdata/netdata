@@ -478,6 +478,17 @@ static int buffer_int64_roundtrip(BUFFER *wb, NUMBER_ENCODING encoding, int64_t 
     return errors;
 }
 
+static int buffer_int64_parse(const char *encoded, int64_t expected) {
+    int64_t value = str2ll_encoded(encoded);
+
+    if(value == expected)
+        return 0;
+
+    netdata_log_error("BUFFER: string '%s' resolves to %lld, expected %lld",
+                      encoded, (long long)value, (long long)expected);
+    return 1;
+}
+
 static int buffer_double_roundtrip(BUFFER *wb, NUMBER_ENCODING encoding, NETDATA_DOUBLE value, const char *expected) {
     int errors = 0;
     buffer_flush(wb);
@@ -523,6 +534,54 @@ int buffer_unittest(void) {
     buffer_int64_roundtrip(wb, NUMBER_ENCODING_DECIMAL, (int64_t)-9223372036854775807ULL, "-9223372036854775807");
     buffer_int64_roundtrip(wb, NUMBER_ENCODING_HEX, (int64_t)-9223372036854775807ULL, "-0x7FFFFFFFFFFFFFFF");
     buffer_int64_roundtrip(wb, NUMBER_ENCODING_BASE64, (int64_t)-9223372036854775807ULL, "-#H//////////");
+
+    errors += buffer_int64_roundtrip(wb, NUMBER_ENCODING_DECIMAL, INT64_MIN, "-9223372036854775808");
+    errors += buffer_int64_roundtrip(wb, NUMBER_ENCODING_HEX, INT64_MIN, "-0x8000000000000000");
+    errors += buffer_int64_roundtrip(wb, NUMBER_ENCODING_BASE64, INT64_MIN, "-#IAAAAAAAAAA");
+
+    static const struct {
+        const char *encoded;
+        int64_t expected;
+    } int64_parse_tests[] = {
+        { "0", 0 },
+        { "-0", 0 },
+        { "9223372036854775807", LLONG_MAX },
+        { "0x7FFFFFFFFFFFFFFF", LLONG_MAX },
+        { "#H//////////", LLONG_MAX },
+        { "-9223372036854775808", LLONG_MIN },
+        { "-0x8000000000000000", LLONG_MIN },
+        { "-#IAAAAAAAAAA", LLONG_MIN },
+        { "9223372036854775808", LLONG_MIN },
+        { "0x8000000000000000", LLONG_MIN },
+        { "#IAAAAAAAAAA", LLONG_MIN },
+        { "-9223372036854775809", LLONG_MAX },
+        { "-0x8000000000000001", LLONG_MAX },
+        { "-#IAAAAAAAAAB", LLONG_MAX },
+        { "18446744073709551615", -1 },
+        { "-18446744073709551615", 1 },
+        { "18446744073709551616", 0 },
+        { "0x10000000000000000", 0 },
+        { "#QAAAAAAAAAA", 0 },
+        { " 9223372036854775808", LLONG_MIN },
+        { " -9223372036854775808", 0 },
+        { "- 9223372036854775808", LLONG_MIN },
+        { " 0x8000000000000000", 0 },
+        { "- 0x8000000000000000", 0 },
+        { "-9223372036854775808suffix", LLONG_MIN },
+        { "-0x8000000000000000!suffix", LLONG_MIN },
+        { "-#IAAAAAAAAAA!suffix", LLONG_MIN },
+        { "", 0 },
+        { "-", 0 },
+        { "+1", 0 },
+        { "--1", 0 },
+        { "#", 0 },
+        { "0x", 0 },
+        { "-#", 0 },
+        { "-0x", 0 },
+    };
+
+    for(size_t i = 0; i < _countof(int64_parse_tests); i++)
+        errors += buffer_int64_parse(int64_parse_tests[i].encoded, int64_parse_tests[i].expected);
 
     buffer_double_roundtrip(wb, NUMBER_ENCODING_DECIMAL, 0, "0");
     buffer_double_roundtrip(wb, NUMBER_ENCODING_HEX, 0, "%0");
