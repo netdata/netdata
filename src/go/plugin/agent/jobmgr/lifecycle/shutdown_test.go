@@ -140,11 +140,7 @@ func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
 			run: func(t *testing.T, run *RunSupervisor) {
 				require.NoError(t, run.Terminal(census))
 
-				reporter, ok := any(run).(interface{ Dirty(error) error })
-				require.True(t, ok)
-
-				err := reporter.Dirty(errors.New("late dirty"))
-				require.ErrorIs(t, err, ErrRunTerminalReached)
+				run.Dirty(errors.New("late dirty"))
 
 				state := run.TerminalState()
 				require.False(t, !state.Reached || !state.Quiescent || state.Dirty != nil)
@@ -174,7 +170,7 @@ func TestRunSupervisorTerminalTruthIsImmutable(t *testing.T) {
 			run: func(t *testing.T, run *RunSupervisor) {
 				cause := errors.New("discovery shutdown failed")
 
-				require.NoError(t, run.Dirty(cause))
+				run.Dirty(cause)
 
 				nonzero := census
 				nonzero.TransientActive = 1
@@ -208,9 +204,9 @@ func TestRunSupervisorProjectsFirstDirtyTransitionExactlyOnce(t *testing.T) {
 	}{
 		"explicit dirty": {
 			run: func(t *testing.T, run *RunSupervisor) {
-				require.NoError(t, run.Dirty(errors.New("failed")))
+				run.Dirty(errors.New("failed"))
 
-				require.NoError(t, run.Dirty(errors.New("also failed")))
+				run.Dirty(errors.New("also failed"))
 			},
 		},
 		"terminal census creates dirty cause": {
@@ -226,7 +222,7 @@ func TestRunSupervisorProjectsFirstDirtyTransitionExactlyOnce(t *testing.T) {
 		},
 		"explicit dirty precedes terminal census": {
 			run: func(t *testing.T, run *RunSupervisor) {
-				require.NoError(t, run.Dirty(errors.New("failed")))
+				run.Dirty(errors.New("failed"))
 
 				nonzero := census
 				nonzero.TransientActive = 1

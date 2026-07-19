@@ -706,7 +706,7 @@ func (ck *CommandKernel) bindRunNotifications() error {
 		ck.run.Generation(),
 		ck.NotifyControlReady,
 		func(err error) {
-			_ = ck.run.Dirty(err)
+			ck.run.Dirty(err)
 			ck.NotifyControlReady()
 		},
 		ck.runtimeObserver,

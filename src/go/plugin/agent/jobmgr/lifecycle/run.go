@@ -116,14 +116,14 @@ func (rs *RunSupervisor) Admitting() bool {
 	return rs.admission && rs.dirty == nil && !rs.terminal
 }
 
-func (rs *RunSupervisor) Dirty(cause error) error {
+func (rs *RunSupervisor) Dirty(cause error) {
 	if cause == nil {
 		cause = errors.New("jobmgr run supervisor: unspecified dirty cause")
 	}
 	rs.mu.Lock()
 	defer rs.mu.Unlock()
 	if rs.terminal {
-		return errors.Join(ErrRunTerminalReached, cause)
+		return
 	}
 	first := rs.dirty == nil
 	if first {
@@ -134,7 +134,6 @@ func (rs *RunSupervisor) Dirty(cause error) error {
 	if first && observer != nil {
 		observer.AddRuntimeCounter(RuntimeCounterDirtyRuns, 1)
 	}
-	return nil
 }
 
 func (rs *RunSupervisor) DirtyCause() error {

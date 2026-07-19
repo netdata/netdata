@@ -223,7 +223,7 @@ func (kcs *kernelCompositeScope) waitChildTerminal(
 			cancellation = context.Cause(ctx)
 			done = nil
 			if rollback {
-				_ = kcs.kernel.run.Dirty(
+				kcs.kernel.run.Dirty(
 					errors.Join(
 						errors.New(
 							"jobmgr composite: rollback deadline exceeded",

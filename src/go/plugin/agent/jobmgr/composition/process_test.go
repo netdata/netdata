@@ -589,7 +589,7 @@ func TestProcessRetirementPreservesRunDirtyCause(t *testing.T) {
 	require.NoError(t, err)
 	cause := errors.New("discovery shutdown failed")
 
-	require.NoError(t, run.Dirty(cause))
+	run.Dirty(cause)
 
 	err = (&processCore{}).retireRun(
 		context.Background(),

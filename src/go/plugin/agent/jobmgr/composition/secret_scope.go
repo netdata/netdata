@@ -58,7 +58,7 @@ func (roas *runOwnedAtomicScope) Release(
 	}
 	err := roas.scope.Release(ctx)
 	if err != nil {
-		_ = roas.run.Dirty(err)
+		roas.run.Dirty(err)
 	}
 	return err
 }

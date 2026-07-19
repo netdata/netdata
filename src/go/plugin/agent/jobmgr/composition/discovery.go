@@ -112,7 +112,7 @@ func (rg *runGeneration) startDiscovery(ctx context.Context) error {
 				if cause == nil {
 					return
 				}
-				_ = rg.run.Dirty(cause)
+				rg.run.Dirty(cause)
 				rg.kernel.Stop()
 			},
 		)

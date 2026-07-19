@@ -178,7 +178,7 @@ func (pc *processCore) run(
 			return pc.finalize(generation, generationID, ctx.Err())
 		case clock := <-ticks.C:
 			if err := generation.scheduler.Tick(ctx, clock); err != nil {
-				_ = generation.run.Dirty(err)
+				generation.run.Dirty(err)
 				generation.Stop()
 				continue
 			}
