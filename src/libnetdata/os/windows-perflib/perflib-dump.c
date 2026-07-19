@@ -526,7 +526,25 @@ int windows_perflib_dump(const char *key) {
     perflibQueryAndTraverse(id, dumpDataCb, dumpObjectCb, dumpInstanceCb, dumpInstanceCounterCb, dumpCounterCb, wb);
 
     buffer_json_finalize(wb);
-    printf("\n%s\n", buffer_tostring(wb));
+
+    const char *filename = "C:\\Windows\\Temp\\NetdataDump.json";
+    FILE *fp = fopen(filename, "wb");
+    if(!fp) {
+        fprintf(stderr, "Cannot open '%s' for writing: %s\n", filename, strerror(errno));
+        perflibFreePerformanceData();
+        return 1;
+    }
+
+    size_t len = buffer_strlen(wb);
+    if(fwrite(buffer_tostring(wb), 1, len, fp) != len) {
+        fprintf(stderr, "Failed to write the perflib dump to '%s': %s\n", filename, strerror(errno));
+        fclose(fp);
+        perflibFreePerformanceData();
+        return 1;
+    }
+
+    fclose(fp);
+    fprintf(stderr, "Perflib dump written to '%s'\n", filename);
 
     perflibFreePerformanceData();
 

@@ -169,7 +169,8 @@ int help(int exitcode) {
             "                           Check if string matches pattern and exit.\n\n"
 #ifdef OS_WINDOWS
             "  -W perflibdump [key]\n"
-            "                           Dump the Windows Performance Counters Registry in JSON.\n\n"
+            "                           Dump the Windows Performance Counters Registry in JSON\n"
+            "                           to C:\\Windows\\Temp\\NetdataDump.json.\n\n"
 #endif
     );
 
