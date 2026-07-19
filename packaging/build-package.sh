@@ -130,7 +130,7 @@ case "${PKG_TYPE}" in
         add_cmake_option NETDATA_PACKAGING_FORMAT rpm
 
         arch="$(uname -m)"
-        distro_major="${VERSION_ID%%.*}"
+        distro_major="$(printf '%s' "${VERSION_ID%%.*}" | tr -cd '0-9')"
         [ -n "${distro_major}" ] || distro_major=0
 
         is_el=0
@@ -238,9 +238,17 @@ case "${PKG_TYPE}" in
         else
             # SUSE's %cmake passes the linker flags as cmake arguments
             # rather than via LDFLAGS (its build_ldflags macro is empty).
-            add_cmake_option CMAKE_EXE_LINKER_FLAGS " -Wl,--as-needed -Wl,-z,now"
-            add_cmake_option CMAKE_MODULE_LINKER_FLAGS " -Wl,--as-needed"
-            add_cmake_option CMAKE_SHARED_LINKER_FLAGS " -Wl,--as-needed -Wl,-z,now"
+            add_cmake_option CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed -Wl,-z,now"
+            add_cmake_option CMAKE_MODULE_LINKER_FLAGS "-Wl,--as-needed"
+            add_cmake_option CMAKE_SHARED_LINKER_FLAGS "-Wl,--as-needed -Wl,-z,now"
+        fi
+
+        # The spec builds the Rust plugins only when a Rust toolchain is
+        # present; the v2 builder images always ship one, so this matters
+        # only if the script runs outside them.
+        if ! command -v rustc >/dev/null 2>&1; then
+            add_cmake_option ENABLE_PLUGIN_NETFLOW Off
+            add_cmake_option ENABLE_PLUGIN_OTEL Off
         fi
         ;;
     *) echo "Unrecognized package type ${PKG_TYPE}." ; exit 1 ;;

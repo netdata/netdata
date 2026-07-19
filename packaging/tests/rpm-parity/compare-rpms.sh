@@ -53,16 +53,21 @@ render_dir() {
     _out="$2"
     mkdir -p "${_out}"
 
+    # No pipeline here: an exit inside a pipeline stage only leaves its
+    # subshell, so the error guards below would not abort the script.
+    : > "${_out}/.package-set.unsorted"
     for _pkg in "${_dir}"/*.rpm; do
         [ -e "${_pkg}" ] || continue
-        _name="$(rpm -qp --qf '%{NAME}' "${_pkg}" 2>/dev/null)"
+        _name="$(rpm -qp --qf '%{NAME}' "${_pkg}" 2>/dev/null)" || _name=""
         if [ -z "${_name}" ]; then
             echo "ERROR: cannot read package name from ${_pkg}" >&2
             exit 2
         fi
         report_rpm "${_pkg}" > "${_out}/${_name}.report"
-        echo "${_name}"
-    done | sort > "${_out}/.package-set"
+        echo "${_name}" >> "${_out}/.package-set.unsorted"
+    done
+    sort "${_out}/.package-set.unsorted" > "${_out}/.package-set"
+    rm -f "${_out}/.package-set.unsorted"
 
     # An empty set means the input directory has no readable RPMs; comparing
     # two empty sets must not pass as parity.

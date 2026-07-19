@@ -68,13 +68,6 @@ set(CPACK_DEBIAN_PACKAGE_MAINTAINER "Netdata Builder <bot@netdata.cloud>")
 set(CPACK_RPM_COMPONENT_INSTALL YES)
 set(CPACK_RPM_FILE_NAME RPM-DEFAULT)
 
-# CPack only emits Recommends: from CMake 4.1 on; older versions ignore the
-# variables silently, which would strip the weak dependencies from the
-# packages without any build failure.
-if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm" AND CMAKE_VERSION VERSION_LESS 4.1)
-  message(FATAL_ERROR "RPM packaging requires CMake >= 4.1 (CPack weak-dependency support); this is ${CMAKE_VERSION}")
-endif()
-
 # RPM forbids dashes in Version; the spec receives a pre-sanitized version
 # (nightly 2.10.0-809-nightly becomes 2.10.0.809.nightly).
 string(REPLACE "-" "." CPACK_RPM_PACKAGE_VERSION "${CPACK_PACKAGE_VERSION}")

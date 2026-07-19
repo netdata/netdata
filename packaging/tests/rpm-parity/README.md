@@ -30,6 +30,15 @@ packaging/tests/rpm-parity/compare-rpms.sh ref-rpms cpack-rpms \
 
 The comparison itself only needs the `rpm` binary on the host.
 
+## Limitations
+
+The comparison covers RPM metadata and file attributes, not payload bytes:
+two builds that package the same paths with the same modes but differently
+compiled binaries (for example after a compiler-flag drift that changes
+optimization but not the linked sonames) compare equal. Dependency
+generation catches the common cases because soname and versioned-symbol
+requirements are part of the compared metadata.
+
 ## Allowlist
 
 `allowlist` holds extended regexes for reviewed, intentionally accepted

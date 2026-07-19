@@ -251,6 +251,14 @@ if(NOT NETDATA_PACKAGING_FORMAT STREQUAL "" AND
         message(FATAL_ERROR "Invalid NETDATA_PACKAGING_FORMAT '${NETDATA_PACKAGING_FORMAT}' (expected deb, rpm, or empty)")
 endif()
 
+# CPack only emits Recommends: from CMake 4.1 on; older versions ignore the
+# variables silently, which would strip the weak dependencies from the RPMs
+# without any build failure. Checked here rather than in Packaging.cmake so
+# the configure fails fast.
+if(NETDATA_PACKAGING_FORMAT STREQUAL "rpm" AND CMAKE_VERSION VERSION_LESS 4.1)
+        message(FATAL_ERROR "RPM packaging requires CMake >= 4.1 (CPack weak-dependency support); this is ${CMAKE_VERSION}")
+endif()
+
 # A few payloads live in different packages per format: the spec keeps the
 # sensors3/otel stock configs and nd-mcp in the main RPM and the swagger
 # files in the dashboard RPM, while the DEB layout groups them with their
