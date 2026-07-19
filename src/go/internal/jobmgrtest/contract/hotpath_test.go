@@ -119,3 +119,51 @@ func TestBMM002HotpathEnvelopeIsClosedByEveryOwnerTest(t *testing.T) {
 		}
 	}
 }
+
+func TestBMM003HotpathContractAddsOnlySecretOwners(t *testing.T) {
+	gates := BMM003HotpathGates()
+	if len(gates) != 35 {
+		t.Fatalf("hot-path owners=%d, want 35", len(gates))
+	}
+	owners := make(map[string]HotpathGate, len(gates))
+	for _, gate := range gates {
+		if _, exists := owners[gate.OwnerID]; exists {
+			t.Fatalf("duplicate hot-path owner %s", gate.OwnerID)
+		}
+		owners[gate.OwnerID] = gate
+	}
+	expected := map[string]string{
+		"B-O-00027": "./plugin/agent/secrets/secretstore",
+		"B-O-00028": "./plugin/agent/secrets/secretstore",
+		"B-O-00029": "./plugin/agent/jobmgr/secrets",
+		"B-O-00030": "./plugin/agent/jobmgr/secrets",
+	}
+	for owner, pkg := range expected {
+		gate, ok := owners[owner]
+		if !ok {
+			t.Fatalf("B-M-003 owner %s is absent", owner)
+		}
+		if gate.Package != pkg {
+			t.Fatalf(
+				"B-M-003 owner %s package=%q want=%q",
+				owner,
+				gate.Package,
+				pkg,
+			)
+		}
+	}
+	for _, futureOwner := range []string{
+		"B-O-00032",
+		"B-O-00033",
+	} {
+		if _, exists := owners[futureOwner]; exists {
+			t.Fatalf(
+				"future checkpoint owner %s entered B-M-003",
+				futureOwner,
+			)
+		}
+	}
+	if len(BMM003HotpathProofs()) <= len(BMM002HotpathProofs()) {
+		t.Fatal("B-M-003 hot-path proofs did not grow cumulatively")
+	}
+}

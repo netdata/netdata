@@ -5,6 +5,7 @@ package secrets
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -82,6 +83,49 @@ func (jobs restartTestJobs) PlanDependentStart(
 	return jobmgr.WorkPlan{},
 		restartTestStart{err: jobs.restoreError},
 		nil
+}
+
+func TestSecretRestartCommandCommitsWithoutDependentsOrCompositeScope(
+	t *testing.T,
+) {
+	command, err := NewSecretRestartCommand(
+		1,
+		NewSecretDependencyIndex(),
+		restartTestJobs{},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	commits := 0
+	result, message, restored, err := command.Apply(
+		context.Background(),
+		nil,
+		"vault:main",
+		func(context.Context) (
+			secretstore.SecretMutationResult,
+			error,
+		) {
+			commits++
+			return secretstore.SecretMutationResult{
+				Generation: 1,
+				Applied:    true,
+			}, nil
+		},
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if commits != 1 {
+		t.Fatalf("Store commits=%d want=1", commits)
+	}
+	if !result.Applied || message != "" || !restored {
+		t.Fatalf(
+			"no-dependent result=%+v message=%q restored=%v",
+			result,
+			message,
+			restored,
+		)
+	}
 }
 
 func TestSecretRestartCommandReportsFailedPrecommitRestoration(
@@ -274,5 +318,70 @@ func TestSecretRestartCommandRedactsAppliedRestartFailure(
 	if strings.Contains(message, "backend-sensitive-detail") ||
 		!strings.Contains(message, "module:one") {
 		t.Fatalf("public restart message=%q", message)
+	}
+}
+
+func BenchmarkBSecretRestart(b *testing.B) {
+	index := NewSecretDependencyIndex()
+	const dependents = 16
+	for job := range dependents {
+		name := fmt.Sprintf("job-%d", job)
+		config := confgroup.Config{
+			"module": "module",
+			"name":   name,
+			"secret": "${store:vault:main:value}",
+		}
+		payload, err := yaml.Marshal(config)
+		if err != nil {
+			b.Fatal(err)
+		}
+		commit, err := index.PrepareJobChange(
+			config.FullName(),
+			&dyncfg.GraphConfig{
+				ID: config.FullName(), Module: config.Module(),
+				Name: name, Status: dyncfg.StatusRunning.String(),
+				Payload: payload,
+			},
+		)
+		if err != nil {
+			b.Fatal(err)
+		}
+		commit()
+	}
+	command, err := NewSecretRestartCommand(
+		1,
+		index,
+		restartTestJobs{},
+	)
+	if err != nil {
+		b.Fatal(err)
+	}
+	scope := &restartTestCommandScope{}
+	commit := func(context.Context) (
+		secretstore.SecretMutationResult,
+		error,
+	) {
+		return secretstore.SecretMutationResult{
+			Generation: 1,
+			Applied:    true,
+		}, nil
+	}
+	b.ReportAllocs()
+	b.ResetTimer()
+	for b.Loop() {
+		result, message, _, err := command.Apply(
+			context.Background(),
+			scope,
+			"vault:main",
+			commit,
+		)
+		if err != nil || !result.Applied || message != "" {
+			b.Fatalf(
+				"restart result=%+v message=%q error=%v",
+				result,
+				message,
+				err,
+			)
+		}
 	}
 }

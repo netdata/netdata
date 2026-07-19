@@ -149,19 +149,7 @@ func (transaction *preparedSecretTransaction) apply(
 	var message string
 	var postCommitErr error
 	var predecessorRestored bool
-	if spec.restarts != nil &&
-		!spec.remove &&
-		spec.restarts.HasAffectedJobs(spec.storeKey) {
-		if commands == nil {
-			rollbackErr := spec.mutation.Abort(ctx)
-			return lifecycle.AppliedResourceTransaction{},
-				errors.Join(
-					errors.New(
-						"jobmgr secrets: restart transaction lacks composite scope",
-					),
-					rollbackErr,
-				)
-		}
+	if spec.restarts != nil && !spec.remove {
 		result, message, predecessorRestored, postCommitErr =
 			spec.restarts.Apply(
 				ctx,

@@ -62,25 +62,26 @@ type AdmissionGrant struct {
 }
 
 type AdmissionCensus struct {
-	Phase            string
-	ProcessBytes     int64
-	ActiveRecords    int
-	OrdinaryWaiting  int
-	OrdinaryGranted  int
-	OrdinaryBytes    int64
-	LongLivedRecords int
-	LongLivedBytes   int64
-	CleanupWaiting   int
-	CleanupGranted   bool
-	CleanupRetained  bool
-	InputBodyActive  bool
-	InputBodyWaiting bool
-	InputBodyCarried bool
-	InputBodyBytes   int64
-	AllocatedRadix   int
-	FreeRecords      int
-	FreeRadixNodes   int
-	RunGeneration    uint64
+	Phase             string
+	ProcessBytes      int64
+	ActiveRecords     int
+	OrdinaryWaiting   int
+	OrdinaryGranted   int
+	OrdinarySuspended int
+	OrdinaryBytes     int64
+	LongLivedRecords  int
+	LongLivedBytes    int64
+	CleanupWaiting    int
+	CleanupGranted    bool
+	CleanupRetained   bool
+	InputBodyActive   bool
+	InputBodyWaiting  bool
+	InputBodyCarried  bool
+	InputBodyBytes    int64
+	AllocatedRadix    int
+	FreeRecords       int
+	FreeRadixNodes    int
+	RunGeneration     uint64
 }
 
 type admissionPhase uint8
@@ -98,6 +99,7 @@ const (
 	admissionOrdinaryWaiting
 	admissionOrdinaryGranted
 	admissionOrdinaryGrowing
+	admissionOrdinarySuspended
 	admissionCleanupWaiting
 	admissionCleanupGranted
 	admissionCleanupRetained
@@ -156,13 +158,14 @@ type AdmissionLedger struct {
 	freeNodeHead uint32
 	freeNodes    int
 
-	ordinaryWaiting  int
-	ordinaryGranted  int
-	ordinaryBytes    int64
-	processBytes     int64
-	processReserved  bool
-	longLivedRecords int
-	longLivedBytes   int64
+	ordinaryWaiting   int
+	ordinaryGranted   int
+	ordinarySuspended int
+	ordinaryBytes     int64
+	processBytes      int64
+	processReserved   bool
+	longLivedRecords  int
+	longLivedBytes    int64
 
 	cleanupHead     uint32
 	cleanupTail     uint32
@@ -191,7 +194,7 @@ func (ledger *AdmissionLedger) ReserveProcessBytes(bytes int64) error {
 	}
 	ledger.mu.Lock()
 	defer ledger.mu.Unlock()
-	if ledger.processReserved || ledger.phase != admissionOrdinaryOpen || ledger.runGeneration != 0 || ledger.activeRecords != 0 || ledger.ordinaryWaiting != 0 || ledger.ordinaryGranted != 0 || ledger.ordinaryBytes != 0 {
+	if ledger.processReserved || ledger.phase != admissionOrdinaryOpen || ledger.runGeneration != 0 || ledger.activeRecords != 0 || ledger.ordinaryWaiting != 0 || ledger.ordinaryGranted != 0 || ledger.ordinarySuspended != 0 || ledger.ordinaryBytes != 0 {
 		return errors.New("jobmgr admission: process bytes must be reserved before run admission")
 	}
 	ledger.processBytes = bytes
@@ -206,7 +209,8 @@ func (ledger *AdmissionLedger) ReleaseProcessBytes(bytes int64) error {
 	ledger.mu.Lock()
 	defer ledger.mu.Unlock()
 	pristineConstruction := ledger.phase == admissionOrdinaryOpen && ledger.runGeneration == 0 && ledger.activeRecords == 0 &&
-		ledger.ordinaryWaiting == 0 && ledger.ordinaryGranted == 0 && ledger.ordinaryBytes == 0
+		ledger.ordinaryWaiting == 0 && ledger.ordinaryGranted == 0 &&
+		ledger.ordinarySuspended == 0 && ledger.ordinaryBytes == 0
 	closedProcess := ledger.phase == admissionClosed && ledger.activeRecords == 0 && ledger.ordinaryBytes == 0
 	if !ledger.processReserved || (!pristineConstruction && !closedProcess) || ledger.processBytes != bytes {
 		return errors.New("jobmgr admission: stale or premature process byte release")
@@ -466,7 +470,7 @@ func (ledger *AdmissionLedger) RunFinalizerReady(runGeneration uint64, allowedLo
 	ledger.mu.Lock()
 	defer ledger.mu.Unlock()
 	if ledger.phase != admissionCleanupOnly || runGeneration == 0 || ledger.runGeneration != runGeneration || allowedLongLivedRecords < 0 || allowedLongLivedBytes < 0 ||
-		ledger.activeRecords != 0 || ledger.ordinaryWaiting != 0 || ledger.ordinaryGranted != 0 ||
+		ledger.activeRecords != 0 || ledger.ordinaryWaiting != 0 || ledger.ordinaryGranted != 0 || ledger.ordinarySuspended != 0 ||
 		ledger.longLivedRecords != allowedLongLivedRecords || ledger.longLivedBytes != allowedLongLivedBytes ||
 		ledger.cleanupWaiting != 0 || ledger.cleanupGrant != 0 || ledger.cleanupRetained || ledger.cleanupHead != 0 || ledger.cleanupTail != 0 ||
 		ledger.oldestInNode(1) != 0 || !ledger.allOperationRecordsFree() ||
@@ -541,6 +545,17 @@ func (ledger *AdmissionLedger) CancelWaiting(ref AdmissionRef) error {
 		record.state = admissionOrdinaryGranted
 		record.bytes = 0
 		return nil
+	case admissionOrdinarySuspended:
+		if record.heldBytes < 0 ||
+			record.heldBytes > ledger.ordinaryBytes {
+			return errors.New(
+				"jobmgr admission: invalid held bytes on suspended request",
+			)
+		}
+		ledger.ordinarySuspended--
+		ledger.ordinaryBytes -= record.heldBytes
+		ledger.freeRecord(ref.Slot)
+		return nil
 	case admissionCleanupWaiting:
 		ledger.removeCleanup(ref.Slot)
 		ledger.cleanupWaiting--
@@ -549,6 +564,76 @@ func (ledger *AdmissionLedger) CancelWaiting(ref AdmissionRef) error {
 	default:
 		return errors.New("jobmgr admission: request is not waiting")
 	}
+}
+
+// SuspendOrdinary makes a granted operation admission-ineligible while
+// retaining bytes that already exist independently of its execution grant.
+func (ledger *AdmissionLedger) SuspendOrdinary(
+	ref AdmissionRef,
+	retainedBytes int64,
+) (bool, error) {
+	ledger.mu.Lock()
+	defer ledger.mu.Unlock()
+	record, err := ledger.record(ref)
+	if err != nil {
+		return false, err
+	}
+	if record.state != admissionOrdinaryGranted ||
+		!record.ordinaryHeld ||
+		record.longLivedBytes != 0 ||
+		retainedBytes < 0 ||
+		retainedBytes >= record.heldBytes {
+		return false, errors.New(
+			"jobmgr admission: ordinary request is not suspendable",
+		)
+	}
+	released := record.heldBytes - retainedBytes
+	record.state = admissionOrdinarySuspended
+	record.bytes = released
+	record.heldBytes = retainedBytes
+	record.ordinaryHeld = false
+	ledger.ordinaryGranted--
+	ledger.ordinarySuspended++
+	ledger.ordinaryBytes -= released
+	return ledger.hasGrantableWork(), nil
+}
+
+// ResumeOrdinary returns a suspended operation to its original ordered
+// admission domain without allocating a replacement ownership record.
+func (ledger *AdmissionLedger) ResumeOrdinary(
+	ref AdmissionRef,
+) error {
+	ledger.mu.Lock()
+	defer ledger.mu.Unlock()
+	record, err := ledger.record(ref)
+	if err != nil {
+		return err
+	}
+	if ledger.phase != admissionOrdinaryOpen ||
+		record.state != admissionOrdinarySuspended ||
+		record.ordinaryHeld ||
+		record.longLivedBytes != 0 ||
+		record.bytes <= 0 ||
+		record.heldBytes < 0 {
+		return errors.New(
+			"jobmgr admission: ordinary request is not resumable",
+		)
+	}
+	ledger.nextTicket++
+	if ledger.nextTicket == 0 {
+		return errors.New(
+			"jobmgr admission: ticket sequence wrapped",
+		)
+	}
+	record.ticket = ledger.nextTicket
+	record.state = admissionOrdinaryWaiting
+	if err := ledger.insertOrdinary(ref.Slot); err != nil {
+		record.state = admissionOrdinarySuspended
+		return err
+	}
+	ledger.ordinarySuspended--
+	ledger.ordinaryWaiting++
+	return nil
 }
 
 func (ledger *AdmissionLedger) TakeGrants(quantum int, output *[4]AdmissionGrant) (count int, more bool, err error) {
@@ -844,7 +929,7 @@ func (ledger *AdmissionLedger) ReopenDrained(completedGeneration, nextGeneration
 }
 
 func (ledger *AdmissionLedger) drained() bool {
-	return ledger.activeRecords == 0 && ledger.ordinaryWaiting == 0 && ledger.ordinaryGranted == 0 && ledger.ordinaryBytes == 0 &&
+	return ledger.activeRecords == 0 && ledger.ordinaryWaiting == 0 && ledger.ordinaryGranted == 0 && ledger.ordinarySuspended == 0 && ledger.ordinaryBytes == 0 &&
 		ledger.longLivedRecords == 0 && ledger.longLivedBytes == 0 &&
 		ledger.cleanupWaiting == 0 && ledger.cleanupGrant == 0 && !ledger.cleanupRetained && ledger.cleanupHead == 0 && ledger.cleanupTail == 0 &&
 		ledger.oldestInNode(1) == 0 && ledger.allOperationRecordsFree() &&
@@ -853,7 +938,7 @@ func (ledger *AdmissionLedger) drained() bool {
 }
 
 func (ledger *AdmissionLedger) runDrained(runGeneration uint64) bool {
-	if ledger.phase != admissionCleanupOnly || runGeneration == 0 || ledger.runGeneration != runGeneration || ledger.activeRecords != 0 || ledger.ordinaryWaiting != 0 || ledger.ordinaryGranted != 0 ||
+	if ledger.phase != admissionCleanupOnly || runGeneration == 0 || ledger.runGeneration != runGeneration || ledger.activeRecords != 0 || ledger.ordinaryWaiting != 0 || ledger.ordinaryGranted != 0 || ledger.ordinarySuspended != 0 ||
 		ledger.longLivedRecords != 0 || ledger.longLivedBytes != 0 || ledger.cleanupWaiting != 0 || ledger.cleanupGrant != 0 || ledger.cleanupRetained ||
 		ledger.cleanupHead != 0 || ledger.cleanupTail != 0 || ledger.oldestInNode(1) != 0 ||
 		!ledger.allOperationRecordsFree() || !ledger.allRadixNodesFree() {
@@ -872,7 +957,7 @@ func (ledger *AdmissionLedger) Census() AdmissionCensus {
 	defer ledger.mu.Unlock()
 	return AdmissionCensus{
 		Phase: ledger.phase.String(), ProcessBytes: ledger.processBytes, ActiveRecords: ledger.activeRecords,
-		OrdinaryWaiting: ledger.ordinaryWaiting, OrdinaryGranted: ledger.ordinaryGranted, OrdinaryBytes: ledger.ordinaryBytes,
+		OrdinaryWaiting: ledger.ordinaryWaiting, OrdinaryGranted: ledger.ordinaryGranted, OrdinarySuspended: ledger.ordinarySuspended, OrdinaryBytes: ledger.ordinaryBytes,
 		LongLivedRecords: ledger.longLivedRecords, LongLivedBytes: ledger.longLivedBytes,
 		CleanupWaiting: ledger.cleanupWaiting, CleanupGranted: ledger.cleanupGrant != 0, CleanupRetained: ledger.cleanupRetained,
 		InputBodyActive:  ledger.records[inputBodyRecordSlot].state != admissionRecordFree,

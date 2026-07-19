@@ -418,7 +418,7 @@ func TestCompositeChildRejectsActiveParentLane(t *testing.T) {
 	stopCompositeTestKernel(t, kernel)
 }
 
-func TestCompositeChildPreservesRunnableTargetLaneFIFO(
+func TestCompositeChildContinuationPrecedesRunnableTargetLaneWork(
 	t *testing.T,
 ) {
 	kernel, run, admission, _, _ := newKernelWithPlanner(
@@ -547,7 +547,7 @@ func TestCompositeChildPreservesRunnableTargetLaneFIFO(
 	mu.Lock()
 	got := append([]string(nil), applied...)
 	mu.Unlock()
-	if want := []string{"normal", "child"}; !reflect.DeepEqual(
+	if want := []string{"child", "normal"}; !reflect.DeepEqual(
 		got,
 		want,
 	) {
@@ -555,6 +555,209 @@ func TestCompositeChildPreservesRunnableTargetLaneFIFO(
 	}
 	if err := run.DirtyCause(); err != nil {
 		t.Fatalf("FIFO run dirtied: %v", err)
+	}
+	stopCompositeTestKernel(t, kernel)
+}
+
+func TestCompositeFenceDefersConflictingAdmissionButNotUnrelatedWork(
+	t *testing.T,
+) {
+	kernel, run, admission, _, _ := newKernelWithPlanner(
+		t,
+		stoppedKernelPlanner{},
+	)
+	startKernelLoop(t, kernel)
+	if err := run.OpenAdmission(); err != nil {
+		t.Fatal(err)
+	}
+
+	childEntered := make(chan struct{})
+	childRelease := make(chan struct{})
+	parentDone := make(chan error, 1)
+	go func() {
+		parentDone <- kernel.SubmitPreparedAndWait(
+			t.Context(),
+			Request{
+				UID:     "fence-parent",
+				LaneKey: "fence-parent",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "internal/test/fence-parent",
+			},
+			compositeParentTestPlan(
+				"fence-parent",
+				[]string{"graph"},
+				func(
+					ctx context.Context,
+					commands CompositeCommandScope,
+				) error {
+					return commands.SubmitPreparedAndWait(
+						ctx,
+						Request{
+							UID:     "fence-child",
+							LaneKey: "fence-child",
+							Source:  lifecycle.SourceJobManager,
+							Route:   "internal/test/fence-child",
+						},
+						compositeTestPlan(
+							"fence-child",
+							[]string{"graph"},
+							func() {
+								close(childEntered)
+								<-childRelease
+							},
+						),
+					)
+				},
+			),
+		)
+	}()
+	select {
+	case <-childEntered:
+	case <-time.After(time.Second):
+		t.Fatal("composite child did not start")
+	}
+
+	beforeConflict := admission.Census()
+	capacity := lifecycle.OrdinaryBudgetBytes -
+		beforeConflict.ProcessBytes
+	available := capacity - beforeConflict.OrdinaryBytes
+	conflictingRequest := Request{
+		UID:     "fence-conflicting",
+		LaneKey: "fence-conflicting",
+		Source:  lifecycle.SourceJobManager,
+		Route:   "internal/test/fence-conflicting",
+	}
+	conflictingApplied := make(chan struct{})
+	conflictingPlan := compositeTestPlan(
+		"fence-conflicting",
+		[]string{"graph"},
+		func() { close(conflictingApplied) },
+	)
+	base, err := operationAdmissionBytes(
+		conflictingRequest,
+		conflictingPlan,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conflictingPlan.OwnedBytes = available - base
+	if conflictingPlan.OwnedBytes <= 0 {
+		t.Fatalf(
+			"invalid conflicting byte calculation: capacity=%d census=%+v base=%d",
+			capacity,
+			beforeConflict,
+			base,
+		)
+	}
+	conflictingPlan, err = prepareOwnedJobPlan(
+		conflictingRequest,
+		conflictingPlan,
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conflictingAdmitted := make(chan error, 1)
+	conflictingDone := make(chan error, 1)
+	if err := kernel.enqueueSubmission(
+		t.Context(),
+		conflictingRequest.Source,
+		submission{
+			request:  conflictingRequest,
+			plan:     conflictingPlan,
+			context:  t.Context(),
+			result:   conflictingAdmitted,
+			terminal: conflictingDone,
+		},
+	); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-kernel.submissionSpace[sourceIndex(
+		conflictingRequest.Source,
+	)]:
+	case <-time.After(time.Second):
+		t.Fatal("conflicting submission was not dequeued")
+	}
+
+	unrelatedApplied := make(chan struct{})
+	unrelatedDone := make(chan error, 1)
+	go func() {
+		unrelatedDone <- kernel.SubmitPreparedAndWait(
+			t.Context(),
+			Request{
+				UID:     "fence-unrelated",
+				LaneKey: "fence-unrelated",
+				Source:  lifecycle.SourceJobManager,
+				Route:   "internal/test/fence-unrelated",
+			},
+			compositeTestPlan(
+				"fence-unrelated",
+				nil,
+				func() { close(unrelatedApplied) },
+			),
+		)
+	}()
+	select {
+	case <-unrelatedApplied:
+	case <-time.After(time.Second):
+		t.Fatalf(
+			"unrelated work was starved by conflicting admission: %+v",
+			admission.Census(),
+		)
+	}
+	select {
+	case err := <-conflictingAdmitted:
+		t.Fatalf(
+			"conflicting operation admitted before parent terminal: %v",
+			err,
+		)
+	default:
+	}
+	select {
+	case err := <-unrelatedDone:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("unrelated operation did not finish")
+	}
+
+	close(childRelease)
+	select {
+	case err := <-parentDone:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("composite parent did not finish")
+	}
+	select {
+	case err := <-conflictingAdmitted:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("conflicting operation was not admitted after parent terminal")
+	}
+	select {
+	case <-conflictingApplied:
+	case <-time.After(time.Second):
+		t.Fatal("conflicting operation did not run after parent terminal")
+	}
+	select {
+	case err := <-conflictingDone:
+		if err != nil {
+			t.Fatal(err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("conflicting operation did not reach terminal")
+	}
+	if census := admission.Census(); census.ActiveRecords != 0 ||
+		census.OrdinaryBytes != 0 {
+		t.Fatalf("composite fence admission did not converge: %+v", census)
+	}
+	if err := run.DirtyCause(); err != nil {
+		t.Fatalf("composite fence run dirtied: %v", err)
 	}
 	stopCompositeTestKernel(t, kernel)
 }

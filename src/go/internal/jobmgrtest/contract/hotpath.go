@@ -1,6 +1,6 @@
 package contract
 
-// HotpathGate binds one B-M-002 owner to enforceable deterministic production
+// HotpathGate binds one published owner to enforceable deterministic production
 // gates and one supplementary diagnostic benchmark. Only Tests close the
 // owner-specific operation, allocation, fairness, and resource envelope.
 type HotpathGate struct {
@@ -315,19 +315,90 @@ var bmM002HotpathRows = [...]HotpathGate{
 	},
 }
 
+var bmM003HotpathRows = [...]HotpathGate{
+	{
+		OwnerID: "B-O-00027",
+		Package: "./plugin/agent/secrets/secretstore",
+		Tests: []string{
+			"TestSecretStoreLeaseRetirementAndDynamicPopulation",
+			"TestSecretStoreCloseRejectsRetainedScope",
+		},
+		Benchmark: "BenchmarkBSecretStoreLease",
+	},
+	{
+		OwnerID: "B-O-00028",
+		Package: "./plugin/agent/secrets/secretstore",
+		Tests: []string{
+			"TestSecretStorePreparationOwnershipRegressions",
+		},
+		Benchmark: "BenchmarkBSecretMutationControl",
+	},
+	{
+		OwnerID: "B-O-00029",
+		Package: "./plugin/agent/jobmgr/secrets",
+		Tests: []string{
+			"TestSecretDependencyIndexTracksAcknowledgedPostimages",
+		},
+		Benchmark: "BenchmarkBSecretDependencyLookup",
+	},
+	{
+		OwnerID: "B-O-00030",
+		Package: "./plugin/agent/jobmgr/secrets",
+		Tests: []string{
+			"TestSecretRestartCommandCommitsWithoutDependentsOrCompositeScope",
+			"TestSecretRestartCommandReportsFailedPrecommitRestoration",
+			"TestSecretRestartCommandRestoresStopAcknowledgedDuringCancellation",
+			"TestSecretRestartCommandRedactsAppliedRestartFailure",
+		},
+		Benchmark: "BenchmarkBSecretRestart",
+	},
+}
+
 func BMM002HotpathGates() []HotpathGate {
-	gates := make([]HotpathGate, len(bmM002HotpathRows))
-	for index, row := range bmM002HotpathRows {
+	return cloneHotpathGates(bmM002HotpathRows[:])
+}
+
+func BMM003HotpathGates() []HotpathGate {
+	gates := cloneHotpathGates(bmM002HotpathRows[:])
+	for index := range gates {
+		switch gates[index].OwnerID {
+		case "B-O-00001":
+			gates[index].Tests = append(
+				gates[index].Tests,
+				"TestAdmissionSuspensionPreservesRetainedBytes",
+			)
+		case "B-O-00003":
+			gates[index].Tests = append(
+				gates[index].Tests,
+				"TestCompositeChildContinuationPrecedesRunnableTargetLaneWork",
+				"TestCompositeFenceDefersConflictingAdmissionButNotUnrelatedWork",
+			)
+		}
+	}
+	return append(gates, cloneHotpathGates(bmM003HotpathRows[:])...)
+}
+
+func BMM002HotpathProofs() []ComponentProof {
+	return hotpathProofs(bmM002HotpathRows[:])
+}
+
+func BMM003HotpathProofs() []ComponentProof {
+	return hotpathProofs(BMM003HotpathGates())
+}
+
+func cloneHotpathGates(rows []HotpathGate) []HotpathGate {
+	gates := make([]HotpathGate, len(rows))
+	for index, row := range rows {
 		row.Tests = append([]string(nil), row.Tests...)
 		gates[index] = row
 	}
 	return gates
 }
 
-func BMM002HotpathProofs() []ComponentProof {
+func hotpathProofs(rows []HotpathGate) []ComponentProof {
 	seen := make(map[ComponentProof]struct{})
 	var proofs []ComponentProof
-	for _, gate := range bmM002HotpathRows {
+	for _, gate := range rows {
 		for _, test := range gate.Tests {
 			proof := ComponentProof{
 				Package: gate.Package,

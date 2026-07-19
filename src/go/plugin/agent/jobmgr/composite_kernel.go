@@ -16,6 +16,7 @@ type kernelCompositeScope struct {
 	kernel *CommandKernel
 	parent *commandOperation
 	closed atomic.Bool
+	fenced bool
 
 	rollbackMu     sync.Mutex
 	rollbackCtx    context.Context
@@ -269,6 +270,11 @@ type preparedCompositeBridge struct {
 	scope       *kernelCompositeScope
 }
 
+type compositeFenceClaimUse struct {
+	readers int
+	writers int
+}
+
 func (bridge *preparedCompositeBridge) Scope() (
 	scope lifecycle.ResourceTransactionScope,
 ) {
@@ -382,21 +388,9 @@ func (kernel *CommandKernel) insertCompositeOperation(
 		)
 		return
 	}
-	anchor := lane.active
-	cursor := lane.head
-	if anchor != nil {
-		cursor = anchor.next
-	}
-	for ; cursor != nil; cursor = cursor.next {
-		if cursor.parent != nil ||
-			!authorityClaimsConflict(
-				operation.parent.claims,
-				cursor.claims,
-			) {
-			anchor = cursor
-			continue
-		}
-		break
+	anchor := lane.continuationTail
+	if anchor == nil {
+		anchor = lane.active
 	}
 	if anchor == nil {
 		operation.next = lane.head
@@ -406,6 +400,7 @@ func (kernel *CommandKernel) insertCompositeOperation(
 			lane.tail = operation
 		}
 		lane.head = operation
+		lane.continuationTail = operation
 		return
 	}
 	operation.previous = anchor
@@ -416,29 +411,181 @@ func (kernel *CommandKernel) insertCompositeOperation(
 		lane.tail = operation
 	}
 	anchor.next = operation
+	lane.continuationTail = operation
 }
 
-func authorityClaimsConflict(left, right []authorityClaim) bool {
-	leftIndex := 0
-	rightIndex := 0
-	for leftIndex < len(left) && rightIndex < len(right) {
-		leftClaim := left[leftIndex]
-		rightClaim := right[rightIndex]
-		switch {
-		case leftClaim.key < rightClaim.key:
-			leftIndex++
-		case rightClaim.key < leftClaim.key:
-			rightIndex++
-		default:
-			if leftClaim.mode != authorityClaimRead ||
-				rightClaim.mode != authorityClaimRead {
+func (kernel *CommandKernel) beginCompositeFence(
+	parent *commandOperation,
+) error {
+	if kernel == nil || parent == nil || parent.composite == nil ||
+		parent.composite.parent != parent {
+		return errors.New("jobmgr composite: invalid admission fence parent")
+	}
+	if parent.composite.fenced {
+		return nil
+	}
+	for _, claim := range parent.claims {
+		use := kernel.compositeFenceClaims[claim.key]
+		if claim.mode == authorityClaimRead {
+			use.readers++
+		} else {
+			use.writers++
+		}
+		kernel.compositeFenceClaims[claim.key] = use
+	}
+	parent.composite.fenced = true
+	return nil
+}
+
+func (kernel *CommandKernel) endCompositeFence(
+	parent *commandOperation,
+) error {
+	if kernel == nil || parent == nil || parent.composite == nil ||
+		!parent.composite.fenced {
+		return nil
+	}
+	for _, claim := range parent.claims {
+		use := kernel.compositeFenceClaims[claim.key]
+		if claim.mode == authorityClaimRead {
+			use.readers--
+		} else {
+			use.writers--
+		}
+		if use.readers < 0 || use.writers < 0 {
+			return errors.New(
+				"jobmgr composite: negative admission fence ownership",
+			)
+		}
+		if use.readers == 0 && use.writers == 0 {
+			delete(kernel.compositeFenceClaims, claim.key)
+		} else {
+			kernel.compositeFenceClaims[claim.key] = use
+		}
+	}
+	parent.composite.fenced = false
+	kernel.compositeFenceGeneration++
+	if kernel.compositeFenceGeneration == 0 {
+		return errors.New(
+			"jobmgr composite: admission fence generation wrapped",
+		)
+	}
+	kernel.compositeFenceRecheck = kernel.compositeFenceHead != nil
+	return nil
+}
+
+func (kernel *CommandKernel) compositeFenceConflicts(
+	claims []authorityClaim,
+) bool {
+	for _, claim := range claims {
+		use := kernel.compositeFenceClaims[claim.key]
+		if claim.mode == authorityClaimRead {
+			if use.writers != 0 {
 				return true
 			}
-			leftIndex++
-			rightIndex++
+		} else if use.readers != 0 || use.writers != 0 {
+			return true
 		}
 	}
 	return false
+}
+
+func (kernel *CommandKernel) blockOnCompositeFence(
+	operation *commandOperation,
+) error {
+	if operation == nil || operation.parent != nil ||
+		operation.admitted || !operation.admission.Valid() ||
+		operation.fenceBlocked ||
+		!kernel.compositeFenceConflicts(operation.claims) {
+		return errors.New(
+			"jobmgr composite: invalid admission fence block",
+		)
+	}
+	operation.fencePrevious = kernel.compositeFenceTail
+	operation.fenceNext = nil
+	operation.fenceBlocked = true
+	operation.fenceChecked = kernel.compositeFenceGeneration
+	if kernel.compositeFenceTail != nil {
+		kernel.compositeFenceTail.fenceNext = operation
+	} else {
+		kernel.compositeFenceHead = operation
+	}
+	kernel.compositeFenceTail = operation
+	kernel.compositeFenceCount++
+	return nil
+}
+
+func (kernel *CommandKernel) removeCompositeFenceBlocked(
+	operation *commandOperation,
+) error {
+	if operation == nil || !operation.fenceBlocked ||
+		kernel.compositeFenceCount <= 0 {
+		return errors.New(
+			"jobmgr composite: invalid admission fence removal",
+		)
+	}
+	if operation.fencePrevious != nil {
+		operation.fencePrevious.fenceNext = operation.fenceNext
+	} else {
+		kernel.compositeFenceHead = operation.fenceNext
+	}
+	if operation.fenceNext != nil {
+		operation.fenceNext.fencePrevious = operation.fencePrevious
+	} else {
+		kernel.compositeFenceTail = operation.fencePrevious
+	}
+	operation.fencePrevious = nil
+	operation.fenceNext = nil
+	operation.fenceBlocked = false
+	kernel.compositeFenceCount--
+	if kernel.compositeFenceCount == 0 {
+		kernel.compositeFenceHead = nil
+		kernel.compositeFenceTail = nil
+		kernel.compositeFenceRecheck = false
+	}
+	return nil
+}
+
+func (kernel *CommandKernel) serviceCompositeFenceBlocked(
+	quantum int,
+) bool {
+	if !kernel.compositeFenceRecheck || quantum <= 0 {
+		return false
+	}
+	for serviced := 0; serviced < quantum; serviced++ {
+		operation := kernel.compositeFenceHead
+		if operation == nil {
+			kernel.compositeFenceRecheck = false
+			return false
+		}
+		if operation.fenceChecked ==
+			kernel.compositeFenceGeneration {
+			kernel.compositeFenceRecheck = false
+			return false
+		}
+		if err := kernel.removeCompositeFenceBlocked(
+			operation,
+		); err != nil {
+			kernel.run.Dirty(err)
+			return false
+		}
+		operation.fenceChecked = kernel.compositeFenceGeneration
+		if kernel.compositeFenceConflicts(operation.claims) {
+			if err := kernel.blockOnCompositeFence(
+				operation,
+			); err != nil {
+				kernel.run.Dirty(err)
+				return false
+			}
+			continue
+		}
+		if err := kernel.admission.ResumeOrdinary(
+			operation.admission,
+		); err != nil {
+			kernel.run.Dirty(err)
+			return false
+		}
+	}
+	return kernel.compositeFenceRecheck
 }
 
 func (kernel *CommandKernel) completeCompositeChild(

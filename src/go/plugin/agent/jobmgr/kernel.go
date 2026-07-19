@@ -358,6 +358,10 @@ type commandOperation struct {
 	parent              *commandOperation
 	composite           *kernelCompositeScope
 	activeChild         *commandOperation
+	fencePrevious       *commandOperation
+	fenceNext           *commandOperation
+	fenceBlocked        bool
+	fenceChecked        uint64
 	deferredCompletion  *lifecycle.TaskCompletion
 	claimsInherited     bool
 	compositeRollback   bool
@@ -374,6 +378,7 @@ type commandLane struct {
 	head               *commandOperation
 	tail               *commandOperation
 	active             *commandOperation
+	continuationTail   *commandOperation
 	ready              bool
 	readyPrev          *commandLane
 	readyNext          *commandLane
@@ -548,6 +553,12 @@ type CommandKernel struct {
 	controls                 []*commandOperation
 	operationHead            *commandOperation
 	operationTail            *commandOperation
+	compositeFenceClaims     map[string]compositeFenceClaimUse
+	compositeFenceHead       *commandOperation
+	compositeFenceTail       *commandOperation
+	compositeFenceCount      int
+	compositeFenceGeneration uint64
+	compositeFenceRecheck    bool
 	laneHead                 *commandLane
 	laneTail                 *commandLane
 	shutdownActive           bool
@@ -580,7 +591,8 @@ func NewCommandKernel(run *lifecycle.RunSupervisor, admission *lifecycle.Admissi
 		shutdownTasks:           make(map[lifecycle.TaskRef]*commandLane),
 		functionMutations:       make(chan functionMutationSubmission),
 		byAdmission:             make(map[lifecycle.AdmissionRef]*commandOperation), lanes: make(map[commandLaneKey]*commandLane),
-		nextSource: lifecycle.SourceJobManager, nextExternalSource: lifecycle.SourceJobManager,
+		compositeFenceClaims: make(map[string]compositeFenceClaimUse),
+		nextSource:           lifecycle.SourceJobManager, nextExternalSource: lifecycle.SourceJobManager,
 		inputBodyGrants:      inputBodyGrants,
 		admissionServiceGate: admissionServiceGate,
 		shutdownBarrier:      shutdownBarrier,
@@ -1106,12 +1118,15 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 			maximumClaimSettlementQuantum,
 		)
 		moreAdmissions := false
+		moreCompositeFenceRechecks := false
 		moreTasks := false
 		moreTaskStarts := false
 		moreShutdownOperations := false
 		moreInheritedCancellations := false
 		moreShutdownLanes := false
 		if !shuttingDown {
+			moreCompositeFenceRechecks =
+				kernel.serviceCompositeFenceBlocked(4)
 			moreAdmissions = kernel.serviceAdmissions(4)
 			moreTasks = kernel.scheduleTasks(4)
 		}
@@ -1175,7 +1190,8 @@ func (kernel *CommandKernel) runLoop(ctx context.Context) {
 		}
 		if moreDeadlines || moreControls || moreSubmissions || moreFunctionCleanups ||
 			moreFunctionMutation || moreFunctionClose || moreClaimSettlements ||
-			moreAdmissions || moreTasks || moreTaskStarts ||
+			moreCompositeFenceRechecks || moreAdmissions ||
+			moreTasks || moreTaskStarts ||
 			servicedAsyncEvents > 0 || moreShutdownOperations ||
 			moreInheritedCancellations || moreShutdownLanes ||
 			kernel.claims.PendingSettlements() ||
@@ -1664,6 +1680,14 @@ func (kernel *CommandKernel) admitSubmission(
 	if request.InputBodyToken != 0 {
 		requested = kernel.admission.TransferInputBody(kernel.run.Generation(), request.InputBodyToken, admissionLane, charge, request.PayloadCapacity)
 	} else if parent != nil {
+		if err := kernel.beginCompositeFence(parent); err != nil {
+			kernel.releaseUnusedLane(lane)
+			return errors.Join(
+				err,
+				kernel.uids.Complete(request.UID, false, now),
+				kernel.abortRequestInputBody(request),
+			)
+		}
 		requested = kernel.admission.GrantCompositeProgress(
 			kernel.run.Generation(),
 			parent.admission,
@@ -1794,6 +1818,25 @@ func (kernel *CommandKernel) serviceAdmissions(quantum int) bool {
 			if operation.admitted {
 				kernel.run.Dirty(errors.New("jobmgr kernel: duplicate initial admission grant"))
 				return false
+			}
+			if kernel.compositeFenceConflicts(operation.claims) {
+				wake, suspendErr :=
+					kernel.admission.SuspendOrdinary(
+						grant.Ref,
+						operation.request.PayloadCapacity,
+					)
+				if suspendErr != nil {
+					kernel.run.Dirty(suspendErr)
+					return false
+				}
+				if err := kernel.blockOnCompositeFence(
+					operation,
+				); err != nil {
+					kernel.run.Dirty(err)
+					return false
+				}
+				more = more || wake
+				continue
 			}
 			operation.admitted = true
 			kernel.settleSubmission(operation, nil)
@@ -3462,6 +3505,10 @@ func (kernel *CommandKernel) tryDispose(operation *commandOperation) {
 	if operation.State < lifecycle.OperationDisposing {
 		_ = operation.Advance(lifecycle.OperationDisposing)
 	}
+	if err := kernel.endCompositeFence(operation); err != nil {
+		kernel.run.Dirty(err)
+		return
+	}
 	if operation.Response == lifecycle.ResponseNotRequired {
 		if err := kernel.completeOperationUID(operation, false); err != nil {
 			kernel.run.Dirty(err)
@@ -3612,6 +3659,11 @@ func (kernel *CommandKernel) unlinkQueued(operation *commandOperation, submissio
 	if lane.ready {
 		kernel.ready[sourceIndex(lane.source)].remove(lane)
 	}
+	if operation.fenceBlocked {
+		if err := kernel.removeCompositeFenceBlocked(operation); err != nil {
+			kernel.run.Dirty(err)
+		}
+	}
 	if operation.admission.Valid() && !operation.admitted {
 		if err := kernel.admission.CancelWaiting(operation.admission); err != nil {
 			kernel.run.Dirty(err)
@@ -3719,6 +3771,7 @@ func (kernel *CommandKernel) removeHead(lane *commandLane) {
 	if operation == nil {
 		return
 	}
+	kernel.removingLaneOperation(lane, operation)
 	lane.head = operation.next
 	if lane.head != nil {
 		lane.head.previous = nil
@@ -3730,6 +3783,7 @@ func (kernel *CommandKernel) removeHead(lane *commandLane) {
 }
 
 func (kernel *CommandKernel) unlink(operation *commandOperation) {
+	kernel.removingLaneOperation(operation.lane, operation)
 	if operation.previous != nil {
 		operation.previous.next = operation.next
 	}
@@ -3741,6 +3795,22 @@ func (kernel *CommandKernel) unlink(operation *commandOperation) {
 	}
 	operation.previous = nil
 	operation.next = nil
+}
+
+func (kernel *CommandKernel) removingLaneOperation(
+	lane *commandLane,
+	operation *commandOperation,
+) {
+	if lane == nil || operation == nil ||
+		lane.continuationTail != operation {
+		return
+	}
+	previous := operation.previous
+	if previous != nil && previous.parent != nil {
+		lane.continuationTail = previous
+	} else {
+		lane.continuationTail = nil
+	}
 }
 
 func (kernel *CommandKernel) markReady(lane *commandLane) {
@@ -4194,6 +4264,11 @@ func (kernel *CommandKernel) shutdownReadyForFinalizer() bool {
 		kernel.functionCleanupBacklog.count != 0 ||
 		kernel.functionMutationActive || kernel.functionMutationPaused ||
 		len(kernel.byAdmission) != 0 || len(kernel.lanes) != 0 ||
+		len(kernel.compositeFenceClaims) != 0 ||
+		kernel.compositeFenceHead != nil ||
+		kernel.compositeFenceTail != nil ||
+		kernel.compositeFenceCount != 0 ||
+		kernel.compositeFenceRecheck ||
 		kernel.tasks.Active() != 0 || kernel.tasks.Pending() != 0 || inherited.Active != 0 ||
 		len(kernel.shutdownRequests) != 0 || len(kernel.shutdownTasks) != 0 || len(kernel.controls) != 0 || kernel.deadlines.Len() != 0 ||
 		len(kernel.submissions[0]) != 0 || len(kernel.submissions[1]) != 0 || kernel.blockedSubmission[0] || kernel.blockedSubmission[1] ||
@@ -4274,6 +4349,11 @@ func (kernel *CommandKernel) shutdownQuiescent() bool {
 		kernel.functionCleanupBacklog.count != 0 ||
 		kernel.functionMutationActive || kernel.functionMutationPaused ||
 		len(kernel.byAdmission) != 0 || len(kernel.lanes) != 0 ||
+		len(kernel.compositeFenceClaims) != 0 ||
+		kernel.compositeFenceHead != nil ||
+		kernel.compositeFenceTail != nil ||
+		kernel.compositeFenceCount != 0 ||
+		kernel.compositeFenceRecheck ||
 		kernel.tasks.Active() != 0 || kernel.tasks.Pending() != 0 || len(kernel.shutdownRequests) != 0 || len(kernel.shutdownTasks) != 0 || len(kernel.controls) != 0 || kernel.deadlines.Len() != 0 ||
 		len(kernel.submissions[0]) != 0 || len(kernel.submissions[1]) != 0 || kernel.blockedSubmission[0] || kernel.blockedSubmission[1] ||
 		kernel.ready[0].len != 0 || kernel.ready[1].len != 0 || kernel.claims.WaitingCount() != 0 || len(kernel.claims.keys) != 0 {
@@ -4581,7 +4661,9 @@ func resourceCommandLaneKey(id string) commandLaneKey {
 }
 
 func (kernel *CommandKernel) releaseUnusedLane(lane *commandLane) {
-	if lane == nil || lane.owners != 0 || lane.head != nil || lane.tail != nil || lane.active != nil || lane.ready ||
+	if lane == nil || lane.owners != 0 || lane.head != nil ||
+		lane.tail != nil || lane.active != nil ||
+		lane.continuationTail != nil || lane.ready ||
 		lane.current != nil || lane.currentIdentity.Valid() || lane.currentStopping || lane.retiringIdentity.Valid() ||
 		lane.installPlanned || lane.stopPlanned ||
 		lane.shutdownRequest.Valid() || lane.shutdownTask.Valid() || lane.shutdownAction != 0 {

@@ -42,13 +42,6 @@ func NewSecretRestartCommand(
 	}, nil
 }
 
-func (command *SecretRestartCommand) HasAffectedJobs(
-	storeKey string,
-) bool {
-	return command != nil &&
-		len(command.dependencies.Affected(storeKey, true)) != 0
-}
-
 func (command *SecretRestartCommand) Apply(
 	ctx context.Context,
 	commands jobmgr.CompositeCommandScope,
@@ -60,13 +53,22 @@ func (command *SecretRestartCommand) Apply(
 ) (secretstore.SecretMutationResult, string, bool, error) {
 	if command == nil ||
 		ctx == nil ||
-		commands == nil ||
 		storeKey == "" ||
 		commit == nil {
 		return secretstore.SecretMutationResult{}, "", false,
 			errors.New("jobmgr secrets: invalid restart command")
 	}
 	refs := command.dependencies.Affected(storeKey, true)
+	if len(refs) == 0 {
+		result, err := commit(ctx)
+		return result, "", !result.Retained, err
+	}
+	if commands == nil {
+		return secretstore.SecretMutationResult{}, "", false,
+			errors.New(
+				"jobmgr secrets: affected restart lacks composite scope",
+			)
+	}
 	displayByID := make(map[string]string, len(refs))
 	stopped := make([]string, 0, len(refs))
 	for _, ref := range refs {
