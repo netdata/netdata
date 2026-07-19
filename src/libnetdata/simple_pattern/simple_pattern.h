@@ -21,6 +21,9 @@ typedef enum __attribute__ ((__packed__)) {
 struct simple_pattern;
 typedef struct simple_pattern SIMPLE_PATTERN;
 
+typedef struct simple_pattern_index SIMPLE_PATTERN_INDEX;
+typedef struct simple_pattern_index_matches SIMPLE_PATTERN_INDEX_MATCHES;
+
 #define SIMPLE_PATTERN_NO_SEPARATORS (const char *)(0xFFFFFFFF)
 
 // create a simple_pattern from the string given
@@ -51,6 +54,28 @@ char *simple_pattern_iterate(SIMPLE_PATTERN **p);
 
 // check if string contains pattern wildcards (*, ! prefix, or separators)
 bool simple_pattern_contains_wildcards(const char *str, const char *separators);
+
+// A thread-safe many-to-many index from interned strings to non-NULL user pointers.
+// The index owns one STRING reference per distinct key. Match results contain
+// borrowed user pointers and preserve the caller's existing lifetime contract.
+SIMPLE_PATTERN_INDEX *simple_pattern_index_create(void);
+void simple_pattern_index_destroy(SIMPLE_PATTERN_INDEX *index);
+bool simple_pattern_index_add(SIMPLE_PATTERN_INDEX *index, struct netdata_string *key, void *user);
+bool simple_pattern_index_del(SIMPLE_PATTERN_INDEX *index, struct netdata_string *key, void *user);
+size_t simple_pattern_index_del_user(SIMPLE_PATTERN_INDEX *index, void *user);
+bool simple_pattern_index_replace_user(
+    SIMPLE_PATTERN_INDEX *index, struct netdata_string *const *keys, size_t keys_count, void *user);
+
+// A NULL pattern selects every indexed user. Positive rules select users and a
+// negative match on any key is a permanent veto. Duplicate users are returned once.
+SIMPLE_PATTERN_INDEX_MATCHES *simple_pattern_index_search(SIMPLE_PATTERN_INDEX *index, SIMPLE_PATTERN *pattern);
+bool simple_pattern_index_matches_contains(SIMPLE_PATTERN_INDEX_MATCHES *matches, const void *user);
+void *simple_pattern_index_matches_first(SIMPLE_PATTERN_INDEX_MATCHES *matches, Word_t *cursor);
+void *simple_pattern_index_matches_next(SIMPLE_PATTERN_INDEX_MATCHES *matches, Word_t *cursor);
+size_t simple_pattern_index_matches_count(SIMPLE_PATTERN_INDEX_MATCHES *matches);
+void simple_pattern_index_matches_free(SIMPLE_PATTERN_INDEX_MATCHES *matches);
+
+int simple_pattern_index_unittest(void);
 
 #define SIMPLE_PATTERN_DEFAULT_WEB_SEPARATORS ",|\t\r\n\f\v"
 

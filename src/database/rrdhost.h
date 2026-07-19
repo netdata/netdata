@@ -490,6 +490,10 @@ RRDHOST *rrdhost_find_by_node_id(const char *node_id);
 // the lifetime argument, that constraint, and why this is not keyed on node_id
 bool rrdhost_apply_by_machine_guid(const char *machine_guid, void (*cb)(RRDHOST *host, void *data), void *data, bool may_block);
 
+SIMPLE_PATTERN_INDEX_MATCHES *rrdhost_identity_index_search(SIMPLE_PATTERN *pattern);
+bool rrdhost_node_id_set(RRDHOST *host, const ND_UUID *node_id);
+int rrdhost_identity_index_unittest(void);
+
 #ifdef RRDHOST_INTERNALS
 RRDHOST *rrdhost_create(
     const char *hostname,

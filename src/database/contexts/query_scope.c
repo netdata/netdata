@@ -10,56 +10,30 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
     if(!host_node_id_str) host_node_id_str = uuid;
     host_node_id_str[0] = '\0';
 
-    RRDHOST *host;
     ssize_t added = 0;
     uint64_t v_hash = 0;
     uint64_t h_hash = 0;
     uint64_t a_hash = 0;
     uint64_t t_hash = 0;
 
-    dfe_start_read(rrdhost_root_index, host) {
-        RRDHOST_IDENTITY identity = { 0 };
-        char host_machine_guid[GUID_LEN + 1] = "";
+    SIMPLE_PATTERN_INDEX_MATCHES *scope_matches = rrdhost_identity_index_search(scope_hosts_sp);
+    SIMPLE_PATTERN_INDEX_MATCHES *host_matches = rrdhost_identity_index_search(hosts_sp);
+    if(unlikely(!scope_matches || !host_matches)) {
+        simple_pattern_index_matches_free(host_matches);
+        simple_pattern_index_matches_free(scope_matches);
+        return -1;
+    }
 
-        if(scope_hosts_sp || hosts_sp)
-            identity = rrdhost_identity_acquire(host);
-
-        if(hosts_sp)
-            strncpyz(host_machine_guid, host->machine_guid, GUID_LEN);
-
+    Word_t cursor = 0;
+    for(RRDHOST *host = simple_pattern_index_matches_first(scope_matches, &cursor);
+        host;
+        host = simple_pattern_index_matches_next(scope_matches, &cursor)) {
         if(!UUIDiszero(host->node_id))
             uuid_unparse_lower(host->node_id.uuid, host_node_id_str);
         else
             host_node_id_str[0] = '\0';
 
-        SIMPLE_PATTERN_RESULT match = SP_MATCHED_POSITIVE;
-        if(scope_hosts_sp) {
-            match = simple_pattern_matches_string_extract(scope_hosts_sp, identity.hostname, NULL, 0);
-            if(match == SP_NOT_MATCHED) {
-                match = simple_pattern_matches_extract(scope_hosts_sp, host->machine_guid, NULL, 0);
-                if(match == SP_NOT_MATCHED && *host_node_id_str)
-                    match = simple_pattern_matches_extract(scope_hosts_sp, host_node_id_str, NULL, 0);
-            }
-        }
-
-        if(match != SP_MATCHED_POSITIVE) {
-            rrdhost_identity_release(&identity);
-            continue;
-        }
-
-        dfe_unlock(host);
-
-        if(hosts_sp) {
-            match = simple_pattern_matches_string_extract(hosts_sp, identity.hostname, NULL, 0);
-            if(match == SP_NOT_MATCHED) {
-                match = simple_pattern_matches_extract(hosts_sp, host_machine_guid, NULL, 0);
-                if(match == SP_NOT_MATCHED && *host_node_id_str)
-                    match = simple_pattern_matches_extract(hosts_sp, host_node_id_str, NULL, 0);
-            }
-        }
-
-        bool queryable_host = (match == SP_MATCHED_POSITIVE);
-        rrdhost_identity_release(&identity);
+        bool queryable_host = simple_pattern_index_matches_contains(host_matches, host);
 
         v_hash += dictionary_version(host->rrdctx.contexts);
         h_hash += rrdcontext_queue_version(&host->rrdctx.hub_queue);
@@ -72,7 +46,9 @@ ssize_t query_scope_foreach_host(SIMPLE_PATTERN *scope_hosts_sp, SIMPLE_PATTERN 
         }
         added += ret;
     }
-    dfe_done(host);
+
+    simple_pattern_index_matches_free(host_matches);
+    simple_pattern_index_matches_free(scope_matches);
 
     if(versions) {
         versions->contexts_hard_hash = v_hash;
@@ -135,4 +111,3 @@ ssize_t query_scope_foreach_context(RRDHOST *host, const char *scope_contexts, S
 
     return added;
 }
-

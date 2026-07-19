@@ -541,40 +541,6 @@ void query_weights_worker_thread(void *arg)
             break;
         }
 
-        char uuid[UUID_STR_LEN];
-        if(!UUIDiszero(host->node_id))
-            uuid_unparse_lower(host->node_id.uuid, uuid);
-        else
-            uuid[0] = '\0';
-
-        local_qwd.host_snapshot = weights_host_snapshot_get(local_qwd.host_snapshots, host);
-
-        SIMPLE_PATTERN_RESULT match = SP_MATCHED_POSITIVE;
-        if(main_qwd->scope_nodes_sp) {
-            match = simple_pattern_matches_string_extract(
-                main_qwd->scope_nodes_sp, local_qwd.host_snapshot->hostname, NULL, 0);
-            if(match == SP_NOT_MATCHED) {
-                match = simple_pattern_matches_extract(main_qwd->scope_nodes_sp, host->machine_guid, NULL, 0);
-                if(match == SP_NOT_MATCHED && *uuid)
-                    match = simple_pattern_matches_extract(main_qwd->scope_nodes_sp, uuid, NULL, 0);
-            }
-        }
-
-        if(match != SP_MATCHED_POSITIVE)
-            continue;
-
-        if(main_qwd->nodes_sp) {
-            match = simple_pattern_matches_string_extract(
-                main_qwd->nodes_sp, local_qwd.host_snapshot->hostname, NULL, 0);
-            if(match == SP_NOT_MATCHED) {
-                match = simple_pattern_matches_extract(main_qwd->nodes_sp, host->machine_guid, NULL, 0);
-                if(match == SP_NOT_MATCHED && *uuid)
-                    match = simple_pattern_matches_extract(main_qwd->nodes_sp, uuid, NULL, 0);
-            }
-        }
-
-        bool queryable_host = (match == SP_MATCHED_POSITIVE);
-
         // Update local version hashes
         thread_data->local_versions.contexts_hard_hash += dictionary_version(host->rrdctx.contexts);
         thread_data->local_versions.contexts_soft_hash += rrdcontext_queue_version(&host->rrdctx.hub_queue);
@@ -582,7 +548,7 @@ void query_weights_worker_thread(void *arg)
         thread_data->local_versions.alerts_soft_hash += __atomic_load_n(&host->health_transitions, __ATOMIC_RELAXED);
 
         // Process the host using the callback
-        ssize_t ret = weights_do_node_callback(&local_qwd, host, queryable_host);
+        ssize_t ret = weights_do_node_callback(&local_qwd, host, true);
         if (ret < 0)
             break;
 

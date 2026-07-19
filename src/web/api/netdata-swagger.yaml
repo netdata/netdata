@@ -39,6 +39,10 @@ info:
     - `/api/v3/claim` - Agent claiming
     - Additional management and streaming endpoints
 
+    ### Agent Request-target Limit
+
+    The Agent accepts an encoded HTTP request target of up to 1,048,576 bytes and returns HTTP `414 URI Too Long` for a larger target. Intermediaries may enforce lower limits before the request reaches the Agent.
+
     **Note:** V1 and V2 APIs are deprecated and maintained for backwards compatibility only. New integrations should use V3 exclusively.
   version: "v1-rolling"
   contact:
@@ -1802,7 +1806,7 @@ paths:
             **Examples:**
             - `system.*` - Export only system charts
             - `disk.* net.*` - Export disk and network charts
-            - `* !*.mdstat` - Export all except mdstat charts
+            - `!*.mdstat|*` - Export all except mdstat charts
           required: false
           schema:
             type: string
@@ -2081,7 +2085,7 @@ paths:
             **Examples:**
             - `alert=ram_in_use` - Only RAM usage alert
             - `alert=*cpu*` - All CPU-related alerts
-            - `alert=* !*_critical` - All alerts except those ending with _critical
+            - `alert=!*_critical|*` - All alerts except those ending with _critical
           required: false
           schema:
             type: string
@@ -2320,14 +2324,14 @@ paths:
 
             **Pattern Syntax:**
             - `*` matches any number of characters (including none)
-            - `node1 node2` space-separated list matches any of the nodes
+            - `node1|node2` pipe-separated list matches any of the nodes
             - `!node3` exclude specific nodes (prefix with !)
-            - Can combine inclusion and exclusion: `web* !web-test*`
+            - Put exclusions first when combining rules: `!web-test*|web*`
 
             **Examples:**
             - `scope_nodes=web*` - All nodes starting with "web"
-            - `scope_nodes=web* db*` - All web and database nodes
-            - `scope_nodes=* !test*` - All nodes except test nodes
+            - `scope_nodes=web*|db*` - All web and database nodes
+            - `scope_nodes=!test*|*` - All nodes except test nodes
             - `scope_nodes=prod-web-01` - Specific node only
 
             **Use Cases:**
@@ -2344,27 +2348,19 @@ paths:
               value: "web*"
               summary: All web servers
             prod_only:
-              value: "* !test* !dev*"
+              value: "!test*|!dev*|*"
               summary: Production nodes only
         - name: nodes
           in: query
           description: |
-            Filter transitions to specific nodes by their exact names.
-
-            Unlike `scope_nodes` which supports patterns, this parameter requires exact node names. Multiple nodes are separated by comma or pipe.
-
-            **Format:** Comma or pipe-separated list of exact node names
+            Filter transitions to specific nodes using the same simple-pattern syntax as `scope_nodes`. Literal lists use fast exact lookup; wildcard rules are also supported. Multiple rules are separated by comma or pipe.
 
             **Examples:**
             - `nodes=web-server-01` - Single specific node
             - `nodes=web-server-01,web-server-02,db-server-01` - Multiple specific nodes
             - `nodes=web-server-01|web-server-02` - Pipe separator also works
 
-            **Difference from scope_nodes:**
-            - `scope_nodes`: Pattern matching, filters at query time
-            - `nodes`: Exact names, more efficient for known node names
-
-            **Best Practice:** Use `nodes` when you know exact node names, use `scope_nodes` for pattern-based filtering.
+            `scope_nodes` defines the nodes in scope. `nodes` then selects the queryable subset from that scope.
 
             When not specified, transitions from all nodes matching scope_nodes (or all nodes if scope_nodes is also not specified) are included.
           required: false
@@ -2382,7 +2378,7 @@ paths:
             - `*` matches any number of characters
             - `context1 context2` space-separated list matches any of the contexts
             - `!context3` exclude specific contexts
-            - Can combine: `system.* !system.io*`
+            - Put exclusions first when combining rules: `!system.io*|system.*`
 
             **Common Context Patterns:**
             - `system.*` - All system-level metrics
@@ -2393,8 +2389,8 @@ paths:
 
             **Examples:**
             - `scope_contexts=system.cpu` - Only CPU alerts
-            - `scope_contexts=disk.* net.*` - All disk and network alerts
-            - `scope_contexts=* !system.ip*` - All contexts except IP-related
+            - `scope_contexts=disk.*|net.*` - All disk and network alerts
+            - `scope_contexts=!system.ip*|*` - All contexts except IP-related
 
             **Use Cases:**
             - Focus on specific subsystem (e.g., storage, network)
@@ -3592,14 +3588,14 @@ paths:
 
             **Pattern Syntax:**
             - `*` matches any characters
-            - Space-separated list for multiple patterns
+            - Comma or pipe-separated list for multiple patterns
             - `!` prefix to exclude
-            - Combine with: `web* !web-test*`
+            - Put exclusions first: `!web-test*|web*`
 
             **Examples:**
             - `scope_nodes=web*` - All web servers
             - `scope_nodes=prod-*` - All production nodes
-            - `scope_nodes=* !test*` - All except test nodes
+            - `scope_nodes=!test*|*` - All except test nodes
 
             **Use Cases:**
             - Focus on specific infrastructure tiers
@@ -3614,20 +3610,16 @@ paths:
         - name: nodes
           in: query
           description: |
-            Filter to specific nodes by exact names.
+            Filter to specific nodes using the same simple-pattern syntax as `scope_nodes`.
 
-            Unlike `scope_nodes`, this requires exact node names (no patterns).
-
-            **Format:** Comma or pipe-separated list
+            **Format:** Comma or pipe-separated rules
 
             **Examples:**
             - `nodes=web-server-01` - Single node
             - `nodes=web-server-01,db-server-01` - Multiple nodes
             - `nodes=web-01|web-02` - Pipe separator
 
-            **Best Practice:**
-            - Use `nodes` when you know exact names
-            - Use `scope_nodes` for pattern-based filtering
+            `scope_nodes` defines the scope; `nodes` selects the queryable subset.
 
             When not specified, returns info for all nodes matching scope_nodes.
           required: false
@@ -3910,14 +3902,14 @@ paths:
 
             **Pattern Syntax:**
             - `*` matches any characters
-            - Space-separated for multiple patterns
+            - Comma or pipe-separated for multiple patterns
             - `!` prefix excludes
-            - Example: `prod-* !prod-test*`
+            - Example: `!prod-test*|prod-*`
 
             **Examples:**
             - `scope_nodes=web*` - All web servers
-            - `scope_nodes=db-* cache-*` - Database and cache nodes
-            - `scope_nodes=* !test*` - All except test nodes
+            - `scope_nodes=db-*|cache-*` - Database and cache nodes
+            - `scope_nodes=!test*|*` - All except test nodes
 
             When not specified, returns instances from all nodes.
           required: false
@@ -3927,15 +3919,15 @@ paths:
         - name: nodes
           in: query
           description: |
-            Filter to specific nodes by exact names.
+            Filter to specific nodes using simple-pattern rules.
 
-            **Format:** Comma or pipe-separated exact names
+            **Format:** Comma or pipe-separated rules
 
             **Examples:**
             - `nodes=web-server-01` - Single node
             - `nodes=web-01,db-01` - Multiple nodes
 
-            **Best Practice:** Use `nodes` for exact names, `scope_nodes` for patterns.
+            `scope_nodes` defines the scope; `nodes` selects the queryable subset.
 
             When not specified, returns instances from all nodes.
           required: false
@@ -8952,7 +8944,7 @@ components:
       name: scope_nodes
       in: query
       description: |
-        A simple pattern limiting the nodes scope of the query. The scope controls both data and metadata response. The simple pattern is checked against the nodes' machine guid, node id and hostname. The default nodes scope is all nodes for which this Agent has data for. Usually the nodes scope is used to slice the entire dashboard (e.g. the Global Nodes Selector at the Netdata Cloud overview dashboard). Both positive and negative simple pattern expressions are supported.
+        A simple pattern limiting the nodes scope of the query. The scope controls both data and metadata response. The simple pattern is checked independently against each node's machine GUID, node ID, and hostname. A node requires a positive match, and a negative match on any of its identities vetoes it even if another identity matches positively. The default nodes scope is all nodes for which this Agent has data. Put exclusions before a broad positive fallback because simple-pattern rules use first-match order for each identity, for example `!test*|*`. Both positive and negative expressions are supported.
       required: false
       schema:
         type: string
@@ -9002,7 +8994,7 @@ components:
       name: nodes
       in: query
       description: |
-        A simple pattern matching the nodes to be queried. This only controls the data response, not the metadata. The simple pattern is checked against the nodes' machine guid, node id, hostname. The default nodes selector is all the nodes matched by the nodes scope. Both positive and negative simple pattern expressions are supported.
+        A simple pattern matching the nodes to be queried. This only controls the data response, not the metadata. The pattern is checked independently against each node's machine GUID, node ID, and hostname. A node requires a positive match, and a negative match on any identity vetoes it even if another identity matches positively. The default selector is all nodes matched by the nodes scope. Both positive and negative expressions are supported.
       required: false
       schema:
         type: string

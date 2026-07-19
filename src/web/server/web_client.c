@@ -113,6 +113,17 @@ static inline char *strip_control_characters(char *url) {
     return url;
 }
 
+static inline void web_client_reset_or_recreate_buffer(
+    BUFFER **wb, size_t initial_size, size_t cache_max_size, size_t *statistics)
+{
+    if((*wb)->size > cache_max_size) {
+        buffer_free(*wb);
+        *wb = buffer_create(initial_size, statistics);
+    }
+    else
+        buffer_reset(*wb);
+}
+
 static void web_client_reset_allocations(struct web_client *w, bool free_all) {
 
     if(free_all) {
@@ -120,6 +131,9 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
 
         buffer_free(w->url_as_received);
         w->url_as_received = NULL;
+
+        buffer_free(w->url_for_logging);
+        w->url_for_logging = NULL;
 
         buffer_free(w->url_path_decoded);
         w->url_path_decoded = NULL;
@@ -142,16 +156,44 @@ static void web_client_reset_allocations(struct web_client *w, bool free_all) {
     else {
         // the web client is to be re-used
 
-        buffer_reset(w->url_as_received);
-        buffer_reset(w->url_path_decoded);
-        buffer_reset(w->url_query_string_decoded);
+        web_client_reset_or_recreate_buffer(&w->url_as_received,
+                                            NETDATA_WEB_DECODED_URL_INITIAL_SIZE,
+                                            NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
+                                            w->statistics.memory_accounting);
+        web_client_reset_or_recreate_buffer(&w->url_for_logging,
+                                            NETDATA_WEB_DECODED_URL_INITIAL_SIZE,
+                                            NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
+                                            w->statistics.memory_accounting);
+        web_client_reset_or_recreate_buffer(&w->url_path_decoded,
+                                            NETDATA_WEB_DECODED_URL_INITIAL_SIZE,
+                                            NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
+                                            w->statistics.memory_accounting);
+        web_client_reset_or_recreate_buffer(&w->url_query_string_decoded,
+                                            NETDATA_WEB_DECODED_URL_INITIAL_SIZE,
+                                            NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
+                                            w->statistics.memory_accounting);
 
-        buffer_reset(w->response.header_output);
-        buffer_reset(w->response.header);
-        buffer_reset(w->response.data);
+        web_client_reset_or_recreate_buffer(&w->response.header_output,
+                                            NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE,
+                                            NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
+                                            w->statistics.memory_accounting);
+        web_client_reset_or_recreate_buffer(&w->response.header,
+                                            NETDATA_WEB_RESPONSE_HEADER_INITIAL_SIZE,
+                                            NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
+                                            w->statistics.memory_accounting);
+        web_client_reset_or_recreate_buffer(&w->response.data,
+                                            NETDATA_WEB_RESPONSE_INITIAL_SIZE,
+                                            NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE,
+                                            w->statistics.memory_accounting);
 
-        if(w->payload)
-            buffer_reset(w->payload);
+        if(w->payload) {
+            if(w->payload->size > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE) {
+                buffer_free(w->payload);
+                w->payload = NULL;
+            }
+            else
+                buffer_reset(w->payload);
+        }
 
         // to add more items here,
         // web_client_reuse_from_cache() needs to be adjusted to maintain them
@@ -220,14 +262,14 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
     usec_t prep_ut = w->timings.tv_ready.tv_sec ? dt_usec(&w->timings.tv_ready, &w->timings.tv_in) : 0;
     usec_t sent_ut = w->timings.tv_ready.tv_sec ? dt_usec(&tv, &w->timings.tv_ready) : 0;
     usec_t total_ut = dt_usec(&tv, &w->timings.tv_in);
-    strip_control_characters((char *)buffer_tostring(w->url_as_received));
+    strip_control_characters((char *)buffer_tostring(w->url_for_logging));
 
     ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
             ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, HTTP_REQUEST_MODE_2str(w->mode)),
-            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
+            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_for_logging),
             ND_LOG_FIELD_U64(NDF_RESPONSE_CODE, w->response.code),
             ND_LOG_FIELD_U64(NDF_RESPONSE_SENT_BYTES, sent),
             ND_LOG_FIELD_U64(NDF_RESPONSE_SIZE_BYTES, size),
@@ -260,7 +302,7 @@ void web_client_log_completed_request(struct web_client *w, bool update_web_stat
     }
 
     // access log
-    if(likely(buffer_strlen(w->url_as_received))) {
+    if(likely(buffer_strlen(w->url_for_logging))) {
         nd_log(NDLS_ACCESS, prio, NULL);
 
         if(update_web_stats)
@@ -626,7 +668,7 @@ int web_client_api_request(RRDHOST *host, struct web_client *w, char *url_path_f
             ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->user_auth.forwarded_for),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
             ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, HTTP_REQUEST_MODE_2str(w->mode)),
-            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
+            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_for_logging),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->user_auth.cloud_account_id.uuid),
@@ -742,6 +784,66 @@ static inline char *web_client_valid_method(struct web_client *w, char *s) {
     return s;
 }
 
+static const char *web_client_request_target_start(const char *request, size_t length) {
+    static const struct {
+        const char *method;
+        size_t length;
+    } methods[] = {
+        { "GET ", 4 },
+        { "OPTIONS ", 8 },
+        { "POST ", 5 },
+        { "PUT ", 4 },
+        { "DELETE ", 7 },
+        { "STREAM ", 7 },
+    };
+
+    for(size_t i = 0; i < _countof(methods); i++)
+        if(length >= methods[i].length && !memcmp(request, methods[i].method, methods[i].length))
+            return request + methods[i].length;
+
+    return NULL;
+}
+
+static size_t web_client_request_target_received(const char *request, size_t length, bool *complete) {
+    if(complete)
+        *complete = false;
+
+    const char *target = web_client_request_target_start(request, length);
+    if(!target)
+        return 0;
+
+    const char *request_end = request + length;
+    const char *request_line_end = memchr(target, '\r', (size_t)(request_end - target));
+    if(!request_line_end)
+        request_line_end = request_end;
+
+    const char *protocol = url_find_protocol((char *)target, request_line_end);
+    if(protocol < request_line_end && *protocol) {
+        if(complete)
+            *complete = true;
+        return (size_t)(protocol - target);
+    }
+
+    static const char protocol_marker[] = " HTTP/";
+    size_t available = (size_t)(request_line_end - target);
+    size_t possible_prefix = MIN(available, sizeof(protocol_marker) - 2);
+    while(possible_prefix &&
+          memcmp(request_line_end - possible_prefix, protocol_marker, possible_prefix) != 0)
+        possible_prefix--;
+
+    return available - possible_prefix;
+}
+
+static size_t web_client_request_size_without_target(const char *request, size_t length) {
+    size_t target_length = web_client_request_target_received(request, length, NULL);
+    return length - MIN(length, target_length);
+}
+
+static size_t web_client_request_max_parse_tries(size_t received_target_length) {
+    return HTTP_REQ_MAX_HEADER_FETCH_TRIES +
+           (received_target_length + NETDATA_WEB_REQUEST_INITIAL_SIZE - 1) / NETDATA_WEB_REQUEST_INITIAL_SIZE;
+}
+
 /**
  * Request validate
  *
@@ -759,6 +861,15 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
     w->header_parse_last_size = buffer_strlen(w->response.data);
     char *request_end = request + w->header_parse_last_size;
 
+    size_t received_target_length =
+        web_client_request_target_received(request, w->header_parse_last_size, NULL);
+    if(unlikely(received_target_length > NETDATA_WEB_REQUEST_TARGET_MAX_SIZE)) {
+        const char *target = web_client_request_target_start(request, w->header_parse_last_size);
+        if(target)
+            buffer_content_summary(w->url_for_logging, target, received_target_length);
+        return HTTP_VALIDATION_URL_TOO_LONG;
+    }
+
     int is_it_valid;
     if(w->header_parse_tries > 1) {
         if(last_pos > 4) last_pos -= 4; // allow searching for \r\n\r\n
@@ -771,7 +882,7 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
                                                                   w->header_parse_last_size, &w->payload);
 
         if(!is_it_valid) {
-            if(w->header_parse_tries > HTTP_REQ_MAX_HEADER_FETCH_TRIES) {
+            if(w->header_parse_tries > web_client_request_max_parse_tries(received_target_length)) {
                 netdata_log_info("Disabling slow client after %zu attempts to read the request (%zu bytes received)", w->header_parse_tries, buffer_strlen(w->response.data));
                 w->header_parse_tries = 0;
                 w->header_parse_last_size = 0;
@@ -819,6 +930,10 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
 
     // we have the end of encoded_url - remember it
     char *ue = s;
+    size_t encoded_url_length = (size_t)(ue - encoded_url);
+
+    if(unlikely(encoded_url_length > NETDATA_WEB_REQUEST_TARGET_MAX_SIZE))
+        return HTTP_VALIDATION_URL_TOO_LONG;
 
     // make sure we have complete request
     // complete requests contain: \r\n\r\n
@@ -836,10 +951,10 @@ HTTP_VALIDATION http_request_validate(struct web_client *w) {
             if(unlikely(*s == '\r' && s[1] == '\n')) {
                 // a valid complete HTTP request found
 
-                char c = *ue;
-                *ue = '\0';
-                web_client_decode_path_and_query_string(w, encoded_url);
-                *ue = c;
+                HTTP_VALIDATION decode_status =
+                    web_client_decode_path_and_query_string(w, encoded_url, encoded_url_length);
+                if(unlikely(decode_status != HTTP_VALIDATION_OK))
+                    return decode_status;
 
                 if ( (web_client_check_conn_tcp(w)) && (netdata_ssl_web_server_ctx) ) {
                     if (!w->ssl.conn && (http_is_using_ssl_force(w) || http_is_using_ssl_default(w)) && (w->mode != HTTP_REQUEST_MODE_STREAM)) {
@@ -1210,7 +1325,7 @@ int web_client_api_request_with_node_selection(RRDHOST *host, struct web_client 
 
     ND_LOG_STACK lgs[] = {
             ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, HTTP_REQUEST_MODE_2str(w->mode)),
-            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
+            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_for_logging),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->user_auth.cloud_account_id.uuid),
@@ -1413,7 +1528,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             ND_LOG_FIELD_TXT(NDF_SRC_FORWARDED_FOR, w->user_auth.forwarded_for),
             ND_LOG_FIELD_TXT(NDF_NIDL_NODE, w->client_host),
             ND_LOG_FIELD_TXT(NDF_REQUEST_METHOD, HTTP_REQUEST_MODE_2str(w->mode)),
-            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_as_received),
+            ND_LOG_FIELD_BFR(NDF_REQUEST, w->url_for_logging),
             ND_LOG_FIELD_U64(NDF_CONNECTION_ID, w->id),
             ND_LOG_FIELD_UUID(NDF_TRANSACTION_ID, &w->transaction),
             ND_LOG_FIELD_UUID(NDF_ACCOUNT_ID, &w->user_auth.cloud_account_id.uuid),
@@ -1561,9 +1676,14 @@ void web_client_process_request_from_web_server(struct web_client *w) {
             break;
 
         case HTTP_VALIDATION_INCOMPLETE:
-            if(w->response.data->len > NETDATA_WEB_REQUEST_MAX_SIZE) {
+            if(web_client_request_size_without_target(
+                    buffer_tostring(w->response.data), buffer_strlen(w->response.data)) >
+               NETDATA_WEB_REQUEST_MAX_SIZE) {
                 buffer_flush(w->url_as_received);
                 buffer_strcat(w->url_as_received, "too big request");
+                buffer_content_summary(w->url_for_logging,
+                                       buffer_tostring(w->url_as_received),
+                                       buffer_strlen(w->url_as_received));
 
                 netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Received request is too big (%zu bytes).", w->id, (size_t)w->response.data->len);
 
@@ -1580,6 +1700,20 @@ void web_client_process_request_from_web_server(struct web_client *w) {
                     w->mode = HTTP_REQUEST_MODE_GET;
                 return;
             }
+            break;
+
+        case HTTP_VALIDATION_URL_TOO_LONG:
+            buffer_flush(w->url_as_received);
+            buffer_strcat(w->url_as_received, "request target too long");
+            if(!buffer_strlen(w->url_for_logging))
+                buffer_content_summary(w->url_for_logging,
+                                       buffer_tostring(w->url_as_received),
+                                       buffer_strlen(w->url_as_received));
+            buffer_flush(w->response.data);
+            buffer_sprintf(w->response.data,
+                           "Request target is too long (maximum is %zu bytes).\r\n",
+                           (size_t)NETDATA_WEB_REQUEST_TARGET_MAX_SIZE);
+            w->response.code = http_validation_error_to_response_code(HTTP_VALIDATION_URL_TOO_LONG);
             break;
 
         case HTTP_VALIDATION_REDIRECT:
@@ -1603,7 +1737,7 @@ void web_client_process_request_from_web_server(struct web_client *w) {
 
             buffer_flush(w->response.data);
             buffer_strcat(w->response.data, "Malformed URL...\r\n");
-            w->response.code = HTTP_RESP_BAD_REQUEST;
+            w->response.code = http_validation_error_to_response_code(HTTP_VALIDATION_MALFORMED_URL);
             break;
         case HTTP_VALIDATION_TOO_MANY_READ_RETRIES:
             netdata_log_debug(D_WEB_CLIENT_ACCESS, "%llu: Too many retries to read request '%s'.", w->id, w->response.data->buffer);
@@ -2006,16 +2140,28 @@ ssize_t web_client_receive(struct web_client *w) {
     return(bytes);
 }
 
-void web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string) {
-    char buffer[NETDATA_WEB_REQUEST_URL_SIZE + 2];
-    buffer[0] = '\0';
-
+HTTP_VALIDATION web_client_decode_path_and_query_string(struct web_client *w, const char *path_and_query_string, size_t length) {
     buffer_flush(w->url_path_decoded);
     buffer_flush(w->url_query_string_decoded);
 
-    if(buffer_strlen(w->url_as_received) == 0)
-        // do not overwrite this if it is already filled
-        buffer_strcat(w->url_as_received, path_and_query_string);
+    if(unlikely(length > NETDATA_WEB_REQUEST_TARGET_MAX_SIZE)) {
+        buffer_content_summary(w->url_for_logging, path_and_query_string, length);
+        return HTTP_VALIDATION_URL_TOO_LONG;
+    }
+
+    if(buffer_strlen(w->url_as_received) == 0) {
+        // Do not overwrite these if they are already filled.
+        buffer_contents_replace(w->url_as_received, path_and_query_string, length);
+        buffer_content_summary(w->url_for_logging, path_and_query_string, length);
+    }
+
+    CLEAN_CHAR_P *decoded = mallocz(length + 1);
+    size_t decoded_length = 0;
+    URL_DECODE_STATUS decode_status =
+        url_decode_r_len(decoded, length + 1, path_and_query_string, length, &decoded_length);
+
+    if(unlikely(decode_status != URL_DECODE_OK))
+        return HTTP_VALIDATION_MALFORMED_URL;
 
     // PATH_IS_MCP is a function of the URL alone; clear and re-derive on
     // every decode so keepalived connections reusing the same web_client
@@ -2024,11 +2170,7 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
 
     if(w->mode == HTTP_REQUEST_MODE_STREAM) {
         // in stream mode, there is no path
-
-        url_decode_r(buffer, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-
-        buffer[NETDATA_WEB_REQUEST_URL_SIZE + 1] = '\0';
-        buffer_strcat(w->url_query_string_decoded, buffer);
+        buffer_contents_replace(w->url_query_string_decoded, decoded, decoded_length);
     }
     else {
         // in non-stream mode, there is a path
@@ -2037,18 +2179,13 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
         // dictionary and decode each of the parameters individually.
         // OR: in url_query_string_decoded use as separator a control character that cannot appear in the URL.
 
-        url_decode_r(buffer, path_and_query_string, NETDATA_WEB_REQUEST_URL_SIZE + 1);
-
-        char *question_mark_start = strchr(buffer, '?');
+        char *question_mark_start = memchr(decoded, '?', decoded_length);
         if (question_mark_start) {
-            buffer_strcat(w->url_query_string_decoded, question_mark_start);
-            char c = *question_mark_start;
-            *question_mark_start = '\0';
-            buffer_strcat(w->url_path_decoded, buffer);
-            *question_mark_start = c;
+            size_t path_length = (size_t)(question_mark_start - decoded);
+            buffer_contents_replace(w->url_query_string_decoded, question_mark_start, decoded_length - path_length);
+            buffer_contents_replace(w->url_path_decoded, decoded, path_length);
         } else {
-            buffer_strcat(w->url_query_string_decoded, "");
-            buffer_strcat(w->url_path_decoded, buffer);
+            buffer_contents_replace(w->url_path_decoded, decoded, decoded_length);
         }
 
         // Classify path: set PATH_IS_MCP when the URL addresses one of
@@ -2065,6 +2202,8 @@ void web_client_decode_path_and_query_string(struct web_client *w, const char *p
            && (decoded_path_len == 4 || decoded_path[4] == '/'))
             web_client_flag_set(w, WEB_CLIENT_FLAG_PATH_IS_MCP);
     }
+
+    return HTTP_VALIDATION_OK;
 }
 
 void web_client_reuse_from_cache(struct web_client *w) {
@@ -2080,6 +2219,7 @@ void web_client_reuse_from_cache(struct web_client *w) {
     BUFFER *b5 = w->url_as_received;
     BUFFER *b6 = w->url_query_string_decoded;
     BUFFER *b7 = w->payload;
+    BUFFER *b8 = w->url_for_logging;
 
     NETDATA_SSL ssl = w->ssl;
 
@@ -2103,6 +2243,7 @@ void web_client_reuse_from_cache(struct web_client *w) {
     w->url_as_received = b5;
     w->url_query_string_decoded = b6;
     w->payload = b7;
+    w->url_for_logging = b8;
 }
 
 struct web_client *web_client_create(size_t *statistics_memory_accounting) {
@@ -2114,6 +2255,7 @@ struct web_client *web_client_create(size_t *statistics_memory_accounting) {
     w->statistics.memory_accounting = statistics_memory_accounting;
 
     w->url_as_received = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics.memory_accounting);
+    w->url_for_logging = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics.memory_accounting);
     w->url_path_decoded = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics.memory_accounting);
     w->url_query_string_decoded = buffer_create(NETDATA_WEB_DECODED_URL_INITIAL_SIZE, w->statistics.memory_accounting);
     w->response.data = buffer_create(NETDATA_WEB_RESPONSE_INITIAL_SIZE, w->statistics.memory_accounting);
@@ -2132,6 +2274,104 @@ void web_client_free(struct web_client *w) {
 
     __atomic_sub_fetch(w->statistics.memory_accounting, sizeof(struct web_client), __ATOMIC_RELAXED);
     freez(w);
+}
+
+static void web_client_unittest_prepare_request(struct web_client *w, size_t target_length) {
+    buffer_flush(w->response.data);
+    buffer_strcat(w->response.data, "GET ");
+
+    CLEAN_CHAR_P *target = mallocz(target_length + 1);
+    memset(target, 'a', target_length);
+    if(target_length)
+        target[0] = '/';
+    buffer_strncat(w->response.data, target, target_length);
+}
+
+int web_client_request_target_unittest(void) {
+    int errors = 0;
+    size_t memory_accounting = 0;
+    struct web_client *w = web_client_create(&memory_accounting);
+
+    web_client_unittest_prepare_request(w, NETDATA_WEB_REQUEST_TARGET_MAX_SIZE - 1);
+    buffer_strcat(w->response.data, " HTTP/1.1\r\n\r\n");
+    if(http_request_validate(w) != HTTP_VALIDATION_OK ||
+       buffer_strlen(w->url_as_received) != NETDATA_WEB_REQUEST_TARGET_MAX_SIZE - 1 ||
+       buffer_strlen(w->url_path_decoded) != NETDATA_WEB_REQUEST_TARGET_MAX_SIZE - 1)
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    web_client_unittest_prepare_request(w, NETDATA_WEB_REQUEST_TARGET_MAX_SIZE);
+    if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE)
+        errors++;
+    buffer_strcat(w->response.data, " HT");
+    if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE)
+        errors++;
+    buffer_strcat(w->response.data, "TP/1.1\r\n");
+    if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE)
+        errors++;
+    buffer_strcat(w->response.data, "\r\n");
+    if(http_request_validate(w) != HTTP_VALIDATION_OK ||
+       buffer_strlen(w->url_as_received) != NETDATA_WEB_REQUEST_TARGET_MAX_SIZE ||
+       buffer_strlen(w->url_path_decoded) != NETDATA_WEB_REQUEST_TARGET_MAX_SIZE ||
+       buffer_strlen(w->url_for_logging) <= BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH ||
+       buffer_strlen(w->url_for_logging) >= NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE)
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    if(w->response.data->size > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE ||
+       w->url_as_received->size > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE ||
+       w->url_path_decoded->size > NETDATA_WEB_CLIENT_CACHE_MAX_BUFFER_SIZE)
+        errors++;
+
+    web_client_unittest_prepare_request(w, NETDATA_WEB_REQUEST_TARGET_MAX_SIZE + 1);
+    if(http_request_validate(w) != HTTP_VALIDATION_URL_TOO_LONG ||
+       buffer_strlen(w->url_for_logging) <= BUFFER_CONTENT_SUMMARY_MAX_PREFIX_LENGTH ||
+       !strstr(buffer_tostring(w->url_for_logging), "original_length=1048577"))
+        errors++;
+
+    if(http_validation_error_to_response_code(HTTP_VALIDATION_URL_TOO_LONG) != HTTP_RESP_URI_TOO_LONG ||
+       http_validation_error_to_response_code(HTTP_VALIDATION_MALFORMED_URL) != HTTP_RESP_BAD_REQUEST)
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    buffer_strcat(w->response.data, "GET ");
+    size_t remaining = NETDATA_WEB_REQUEST_TARGET_MAX_SIZE;
+    while(remaining) {
+        size_t chunk = MIN(remaining, (size_t)NETDATA_WEB_REQUEST_INITIAL_SIZE - 1);
+        buffer_need_bytes(w->response.data, chunk);
+        memset(&w->response.data->buffer[w->response.data->len], 'a', chunk);
+        w->response.data->len += chunk;
+        w->response.data->buffer[w->response.data->len] = '\0';
+        remaining -= chunk;
+
+        if(http_request_validate(w) != HTTP_VALIDATION_INCOMPLETE) {
+            errors++;
+            break;
+        }
+    }
+    buffer_strcat(w->response.data, " HTTP/1.1\r\n\r\n");
+    if(http_request_validate(w) != HTTP_VALIDATION_OK ||
+       buffer_strlen(w->url_as_received) != NETDATA_WEB_REQUEST_TARGET_MAX_SIZE)
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    if(web_client_decode_path_and_query_string(w, "/api?x=1", 8) != HTTP_VALIDATION_OK ||
+       strcmp(buffer_tostring(w->url_path_decoded), "/api") != 0 ||
+       strcmp(buffer_tostring(w->url_query_string_decoded), "?x=1") != 0)
+        errors++;
+
+    web_client_reuse_from_cache(w);
+    if(web_client_decode_path_and_query_string(w, "/api?x=%GG", 10) != HTTP_VALIDATION_MALFORMED_URL)
+        errors++;
+
+    web_client_free(w);
+    if(memory_accounting)
+        errors++;
+
+    if(errors)
+        fprintf(stderr, "WEB REQUEST TARGET: %d test(s) failed\n", errors);
+
+    return errors;
 }
 
 inline void web_client_timeout_checkpoint_init(struct web_client *w) {
