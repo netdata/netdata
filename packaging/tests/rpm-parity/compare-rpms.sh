@@ -24,6 +24,13 @@ command -v rpm >/dev/null 2>&1 || {
     exit 2
 }
 
+# Older rpm silently returns nothing for --recommends/--suggests, which would
+# make the weak-dependency comparison vacuous.
+rpm --recommends --version >/dev/null 2>&1 || {
+    echo "ERROR: the host rpm does not support --recommends (rpm >= 4.12 required)" >&2
+    exit 2
+}
+
 WORK_DIR="$(mktemp -d)"
 trap 'rm -rf "${WORK_DIR}"' EXIT
 trap 'exit 130' INT TERM
