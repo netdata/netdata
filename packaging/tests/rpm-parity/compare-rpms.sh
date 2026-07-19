@@ -75,19 +75,25 @@ if [ -n "${ALLOWLIST}" ]; then
 fi
 
 filter_allowed() {
+    # Keep the +++/--- file headers out of allowlist matching, but keep every
+    # real +/- body line, including ones whose content itself starts with +
+    # or -; a hunk whose every +/- line is allowlisted counts as clean.
     if [ -s "${ALLOW_PATTERNS}" ]; then
-        # Keep diff headers and hunk markers out of allowlist matching; a
-        # hunk whose every +/- line is allowlisted counts as clean.
-        grep -E '^[+-][^+-]' | grep -vEf "${ALLOW_PATTERNS}" || true
+        grep -vE '^(\+\+\+ |--- )' | { grep -E '^[+-]' || true; } | { grep -vEf "${ALLOW_PATTERNS}" || true; }
     else
-        grep -E '^[+-][^+-]' || true
+        grep -vE '^(\+\+\+ |--- )' | { grep -E '^[+-]' || true; }
     fi
 }
+
+# Compare the union of both package sets so a candidate-only package still
+# gets its report shown (the package-set diff above already fails the run).
+sort -u "${WORK_DIR}/ref/.package-set" "${WORK_DIR}/new/.package-set" > "${WORK_DIR}/.package-union"
 
 while IFS= read -r _name; do
     _ref="${WORK_DIR}/ref/${_name}.report"
     _new="${WORK_DIR}/new/${_name}.report"
-    [ -e "${_ref}" ] && [ -e "${_new}" ] || continue
+    [ -e "${_ref}" ] || _ref=/dev/null
+    [ -e "${_new}" ] || _new=/dev/null
 
     if ! diff -u "${_ref}" "${_new}" > "${WORK_DIR}/${_name}.diff"; then
         _residual="$(filter_allowed < "${WORK_DIR}/${_name}.diff")"
@@ -98,7 +104,7 @@ while IFS= read -r _name; do
             failed=1
         fi
     fi
-done < "${WORK_DIR}/ref/.package-set"
+done < "${WORK_DIR}/.package-union"
 
 if [ "${failed}" -eq 0 ]; then
     echo "PARITY OK: $(wc -l < "${WORK_DIR}/ref/.package-set") packages match."
