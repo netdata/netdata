@@ -240,6 +240,17 @@ mark_as_advanced(ENABLE_SENTRY)
 option(BUILD_FOR_PACKAGING "Include component files for native packages" False)
 mark_as_advanced(BUILD_FOR_PACKAGING)
 
+# Selects which native package format the staged tree is shaped for. The empty
+# default preserves the historical (DEB-shaped) layout so existing builds are
+# unaffected; packaging/build-package.sh passes it explicitly.
+set(NETDATA_PACKAGING_FORMAT "" CACHE STRING "Native package format being built (deb, rpm, or empty)")
+mark_as_advanced(NETDATA_PACKAGING_FORMAT)
+if(NOT NETDATA_PACKAGING_FORMAT STREQUAL "" AND
+   NOT NETDATA_PACKAGING_FORMAT STREQUAL "deb" AND
+   NOT NETDATA_PACKAGING_FORMAT STREQUAL "rpm")
+        message(FATAL_ERROR "Invalid NETDATA_PACKAGING_FORMAT '${NETDATA_PACKAGING_FORMAT}' (expected deb, rpm, or empty)")
+endif()
+
 cmake_dependent_option(ENABLE_LIBBACKTRACE "Use libbacktrace for stack traces in log output" True "OS_LINUX OR OS_WINDOWS" False)
 mark_as_advanced(ENABLE_LIBBACKTRACE)
 cmake_dependent_option(ENABLE_LIBUNWIND "Use libunwind for stack traces in log output" False "NOT ENABLE_LIBBACKTRACE" False)

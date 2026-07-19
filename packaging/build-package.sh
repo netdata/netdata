@@ -91,6 +91,8 @@ fi
 
 case "${PKG_TYPE}" in
     DEB)
+        add_cmake_option NETDATA_PACKAGING_FORMAT deb
+
         case "$(dpkg-architecture -q DEB_TARGET_ARCH)" in
             amd64)
                 add_cmake_option ENABLE_PLUGIN_XENSTAT On
@@ -123,7 +125,9 @@ case "${PKG_TYPE}" in
             add_cmake_option ENABLE_EXPORTER_MONGODB On
         fi
         ;;
-    RPM) ;;
+    RPM)
+        add_cmake_option NETDATA_PACKAGING_FORMAT rpm
+        ;;
     *) echo "Unrecognized package type ${PKG_TYPE}." ; exit 1 ;;
 esac
 
