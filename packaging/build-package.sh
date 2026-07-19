@@ -192,6 +192,16 @@ case "${PKG_TYPE}" in
             add_cmake_option ENABLE_BUNDLED_PROTOBUF On
         fi
 
+        # RPM distros ship no static libprotobuf, and netdata's protobuf
+        # detection prefers static libs; point it at the shared library
+        # explicitly, exactly like the spec's %build does.
+        for _pb in /usr/lib64/libprotobuf.so /usr/lib/libprotobuf.so; do
+            if [ -e "${_pb}" ]; then
+                add_cmake_option Protobuf_LIBRARY "${_pb}"
+                break
+            fi
+        done
+
         if [ "${is_suse}" = 1 ]; then
             add_cmake_option USE_LTO Off
         fi
